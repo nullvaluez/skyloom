@@ -1,1413 +1,1121 @@
-# Flight Tracker Application - Final Requirements Specification
+# SkyTracker ADSB Application - Comprehensive Analysis & Action Plan
 
 ## Executive Summary
 
-A real-time aircraft tracking web application with a sleek dark theme, interactive map visualization, comprehensive filtering, aircraft clustering for performance, flight trails, and detailed aircraft information including photos.
+After thorough analysis of the SkyTracker codebase, I've identified several issues, performance bottlenecks, and opportunities for enhancement. This document provides a detailed breakdown and a prioritized action plan to transform the application into a modern, high-performance flight tracker.
 
 ---
 
-## 1. Technology Stack
+## Part 1: Current Issues Identified
 
-```yaml
-# Core Framework
-framework: Next.js 16.2+
-language: TypeScript 5.x
-runtime: Node.js 20+
+### 🔴 Critical Issues
 
-# Styling & UI
-css: Tailwind CSS 3.4+
-components: shadcn/ui
-icons: Lucide React
-animations: Framer Motion
-
-# Map & Visualization
-map: react-leaflet 4.x + Leaflet 1.9.x
-clustering: react-leaflet-cluster
-tiles: CartoDB Dark Matter (free)
-trails: Leaflet Polyline
-
-# State Management
-global_state: Zustand
-server_state: TanStack Query (React Query) v5
-url_state: nuqs (for shareable filter URLs)
-
-# Data Fetching
-http_client: Native fetch + Next.js caching
-polling: TanStack Query refetchInterval
-
-# External APIs
-aircraft_data: adsb.lol API v2
-aircraft_images: Planespotters.net API
-aircraft_database: OpenSky Network (fallback metadata)
-
-# Development
-linting: ESLint + Prettier
-testing: Vitest + Playwright
-bundler: Turbopack (Next.js built-in)
-
-# Deployment
-platform: Vercel
-edge_functions: Vercel Edge Runtime (optional)
-analytics: Vercel Analytics
-monitoring: Vercel Speed Insights
+#### 1. **Memory Leaks in Aircraft Store**
+```javascript
+// Problem: Map references in trails never get cleaned up for stale aircraft
+trails: new Map(), // Grows unbounded over time
 ```
+- Trail data persists even after aircraft leave the viewport
+- No garbage collection for aircraft that haven't been seen in 30+ seconds
+
+#### 2. **renderToString Performance Bottleneck**
+```javascript
+// In AircraftMarker.jsx - Line 3877
+const iconHtml = renderToString(
+  <AircraftIcon type={iconType} color={color} size={size} rotation={rotation} />
+);
+```
+- `renderToString` is called on every render for every marker
+- Synchronous, blocking operation that doesn't scale with 5,000+ aircraft
+
+#### 3. **Icon Re-creation on Every Update**
+- The `useMemo` dependency array includes `rotation`, causing icon re-creation on every position update
+- CSS transforms should handle rotation instead of re-rendering the entire icon
+
+#### 4. **No Virtual Rendering for Aircraft List**
+- All filtered aircraft are rendered to the DOM even when not visible
+- At 10,000+ aircraft, this causes significant memory pressure
+
+### 🟠 Moderate Issues
+
+#### 5. **Inefficient Filter Processing**
+```javascript
+// In use-filters.js - runs O(n) filters sequentially
+filteredAircraft.forEach((ac) => {
+  const type = classifyAircraft(ac); // Called multiple times per aircraft
+});
+```
+- `classifyAircraft()` is called multiple times per aircraft (in filtering + stats)
+- Should memoize classification results per aircraft
+
+#### 6. **Missing Error Boundaries**
+- No error boundaries around map components
+- A single bad aircraft data point could crash the entire application
+
+#### 7. **Polling Inefficiency**
+- Uses fixed 5-second interval regardless of viewport size
+- Small viewport = wasted API calls; large viewport = stale data
+
+#### 8. **Trail Position Diffing**
+```javascript
+if (!lastPos || lastPos.lat !== ac.lat || lastPos.lon !== ac.lon)
+```
+- Floating-point comparison is unreliable
+- Aircraft hovering may create duplicate points
+
+### 🟡 Minor Issues
+
+#### 9. **Missing Leaflet Static Assets**
+- References `/leaflet/marker-icon.png` but files may not exist in public folder
+
+#### 10. **Tooltip Performance**
+- Tooltips create additional DOM nodes for every aircraft
+- Should use a single shared tooltip that repositions
+
+#### 11. **No Request Deduplication**
+- Rapid panning can trigger multiple overlapping API requests
 
 ---
 
-## 2. Data Sources & API Integration
+## Part 2: Performance Improvement Plan
 
-### 2.1 Primary API: adsb.lol
+### Tier 1: Critical Performance Fixes (Immediate Impact)
 
-```javascript
-// Base URL
-const ADSB_BASE_URL = "https://api.adsb.lol/v2";
-
-// Endpoints to implement
-interface AdsbEndpoints {
-  // Get aircraft within radius of point
-  byLocation: "/lat/{lat}/lon/{lon}/dist/{nauticalMiles}";
-  
-  // Get specific aircraft by ICAO hex
-  byHex: "/hex/{icao24}";
-  
-  // Get all military aircraft globally
-  military: "/mil";
-  
-  // Get by squawk code
-  bySquawk: "/sqk/{squawk}";
-  
-  // Get by callsign
-  byCallsign: "/callsign/{callsign}";
-  
-  // Get by registration
-  byRegistration: "/reg/{registration}";
-  
-  // Get by aircraft type
-  byType: "/type/{icaoType}";
-  
-  // PIA (Privacy ICAO Address) aircraft
-  pia: "/pia";
-  
-  // LADD (Limiting Aircraft Data Displayed)
-  ladd: "/ladd";
-}
-
-// Response structure
-interface AdsbAircraft {
-  hex: string;              // ICAO 24-bit address
-  type: string;             // Message type
-  flight?: string;          // Callsign
-  r?: string;               // Registration
-  t?: string;               // Aircraft type
-  alt_baro?: number;        // Barometric altitude (ft)
-  alt_geom?: number;        // Geometric altitude (ft)
-  gs?: number;              // Ground speed (knots)
-  track?: number;           // Track/heading (degrees)
-  baro_rate?: number;       // Vertical rate (ft/min)
-  squawk?: string;          // Squawk code
-  emergency?: string;       // Emergency status
-  category?: string;        // Aircraft category
-  lat?: number;             // Latitude
-  lon?: number;             // Longitude
-  seen?: number;            // Seconds since last message
-  seen_pos?: number;        // Seconds since last position
-  messages?: number;        // Message count
-  mlat?: string[];          // MLAT data sources
-  tisb?: string[];          // TIS-B data sources
-  dbFlags?: number;         // Database flags (military, etc.)
-  nav_qnh?: number;         // Altimeter setting
-  nav_altitude_mcp?: number; // Selected altitude
-  nav_heading?: number;     // Selected heading
-  nic?: number;             // Navigation Integrity Category
-  rc?: number;              // Radius of containment
-  version?: number;         // ADS-B version
-}
-```
-
-### 2.2 Aircraft Images: Planespotters.net
+#### A. Canvas-Based Rendering for Markers
+Replace DOM-based Leaflet markers with Canvas rendering for massive performance gains.
 
 ```javascript
-// API endpoint
-const PLANESPOTTERS_URL = "https://api.planespotters.net/pub/photos/hex/{icao24}";
+// New: CanvasIconLayer.jsx
+import L from 'leaflet';
 
-// Response structure
-interface PlanespottersResponse {
-  photos: Array<{
-    id: string;
-    thumbnail: {
-      src: string;
-      size: { width: number; height: number };
-    };
-    thumbnail_large: {
-      src: string;
-      size: { width: number; height: number };
-    };
-    link: string;
-    photographer: string;
-  }>;
-}
-
-// Usage notes:
-// - Free API with reasonable rate limits
-// - Returns empty array if no photos found
-// - Use thumbnail_large for detail panel
-// - Credit photographer when displaying
-```
-
-### 2.3 Aircraft Type Classification
-
-```javascript
-// Category codes from ADS-B data
-const AIRCRAFT_CATEGORIES = {
-  // Category Set A
-  A0: "No info",
-  A1: "Light (<15,500 lbs)",
-  A2: "Small (15,500-75,000 lbs)",
-  A3: "Large (75,000-300,000 lbs)",
-  A4: "High vortex large",
-  A5: "Heavy (>300,000 lbs)",
-  A6: "High performance",
-  A7: "Rotorcraft",
-  
-  // Category Set B
-  B0: "No info",
-  B1: "Glider/sailplane",
-  B2: "Lighter than air",
-  B3: "Parachutist",
-  B4: "Ultralight",
-  B5: "Reserved",
-  B6: "UAV",
-  B7: "Space vehicle",
-  
-  // Category Set C
-  C0: "No info",
-  C1: "Emergency vehicle",
-  C2: "Service vehicle",
-  C3: "Fixed obstruction",
-  C4: "Cluster obstruction",
-  C5: "Line obstruction",
-  C6: "Reserved",
-  C7: "Reserved",
-};
-
-// Military detection via dbFlags
-const DB_FLAGS = {
-  MILITARY: 1,
-  INTERESTING: 2,
-  PIA: 4,
-  LADD: 8,
-};
-```
-
----
-
-## 3. Feature Specifications
-
-### 3.1 Interactive Map
-
-| Feature | Specification |
-|---------|---------------|
-| **Map Provider** | CartoDB Dark Matter (no API key required) |
-| **Tile URL** | `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png` |
-| **Initial View** | Center on user's geolocation or US center (39.8, -98.5) |
-| **Zoom Range** | Min: 2, Max: 18, Default: 5 |
-| **Interactions** | Scroll zoom, drag pan, double-click zoom, touch gestures |
-| **Attribution** | CartoDB + OpenStreetMap (required) |
-
-### 3.2 Aircraft Clustering
-
-```javascript
-// Clustering configuration
-const CLUSTER_CONFIG = {
-  // Disable clustering above this zoom level
-  disableClusteringAtZoom: 10,
-  
-  // Cluster radius in pixels
-  maxClusterRadius: 80,
-  
-  // Animate cluster splits
-  animate: true,
-  
-  // Show coverage bounds on hover
-  showCoverageOnHover: false,
-  
-  // Spiderfy clusters on click
-  spiderfyOnMaxZoom: true,
-  
-  // Remove outside markers from DOM
-  removeOutsideVisibleBounds: true,
-  
-  // Chunked loading for performance
-  chunkedLoading: true,
-  
-  // Custom icon function
-  iconCreateFunction: (cluster) => {
-    const count = cluster.getChildCount();
-    const size = count < 10 ? 'small' : count < 100 ? 'medium' : 'large';
-    return createClusterIcon(count, size);
+// Use Leaflet.Canvas-Markers plugin or custom canvas layer
+const CanvasIconLayer = L.Layer.extend({
+  initialize: function(options) {
+    this._icons = [];
+    L.setOptions(this, options);
   },
+  
+  onAdd: function(map) {
+    this._canvas = L.DomUtil.create('canvas', 'aircraft-canvas');
+    this._ctx = this._canvas.getContext('2d');
+    map.getPanes().overlayPane.appendChild(this._canvas);
+    
+    map.on('moveend zoomend', this._redraw, this);
+    this._redraw();
+  },
+  
+  setAircraft: function(aircraft) {
+    this._icons = aircraft;
+    this._redraw();
+  },
+  
+  _redraw: function() {
+    // Batch render all aircraft to canvas
+    requestAnimationFrame(() => this._draw());
+  },
+  
+  _draw: function() {
+    const ctx = this._ctx;
+    ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
+    
+    this._icons.forEach(ac => {
+      if (ac.lat && ac.lon) {
+        const point = this._map.latLngToContainerPoint([ac.lat, ac.lon]);
+        this._drawAircraft(ctx, point, ac);
+      }
+    });
+  }
+});
+```
+
+**Expected Impact:** 10x-50x rendering performance improvement for 5,000+ aircraft
+
+#### B. Pre-compiled SVG Icon Sprites
+Create a single sprite sheet with all aircraft types and rotations pre-rendered.
+
+```javascript
+// Icon sprite configuration
+const ROTATION_STEPS = 36; // 10-degree increments (vs continuous)
+const ICON_TYPES = ['airliner', 'helicopter', 'military', 'cargo', 'prop', 'jet', 'glider', 'drone', 'unknown'];
+
+// Pre-generate at build time
+function generateIconSprite() {
+  const canvas = document.createElement('canvas');
+  const iconSize = 40;
+  const cols = ROTATION_STEPS;
+  const rows = ICON_TYPES.length;
+  
+  canvas.width = iconSize * cols;
+  canvas.height = iconSize * rows;
+  // ... pre-render all icons
+}
+```
+
+**Expected Impact:** Eliminate runtime SVG rendering overhead
+
+#### C. Web Worker for Data Processing
+Move filtering and classification to a Web Worker.
+
+```javascript
+// workers/aircraft-processor.worker.js
+self.onmessage = function(e) {
+  const { aircraft, filters } = e.data;
+  
+  // Heavy processing off main thread
+  const processed = aircraft.map(ac => ({
+    ...ac,
+    classification: classifyAircraft(ac),
+    iconType: getAircraftIconType(ac),
+    color: getAircraftColor(ac),
+  }));
+  
+  const filtered = applyFilters(processed, filters);
+  
+  self.postMessage({ processed, filtered });
 };
 ```
 
-### 3.3 Aircraft Markers
+**Expected Impact:** Unblock main thread, maintain 60fps during data updates
 
+### Tier 2: Optimization Improvements (High Value)
+
+#### D. Spatial Indexing with R-Tree
 ```javascript
-// Aircraft icon specifications
-interface AircraftMarkerConfig {
-  // Icon sizes (pixels)
-  sizes: {
-    small: 24,    // Zoom < 7
-    medium: 32,   // Zoom 7-10
-    large: 40,    // Zoom > 10
-  };
-  
-  // Colors by aircraft classification
-  colors: {
-    commercial: "#22c55e",   // Green
-    cargo: "#f59e0b",        // Amber
-    military: "#ef4444",     // Red
-    private: "#8b5cf6",      // Purple
-    helicopter: "#06b6d4",   // Cyan
-    government: "#ec4899",   // Pink
-    special: "#f97316",      // Orange
-    unknown: "#6b7280",      // Gray
-    selected: "#3b82f6",     // Blue (override)
-  };
-  
-  // Emergency state (pulsing)
-  emergency: {
-    color: "#ff0000",
-    pulse: true,
-    pulseInterval: 500, // ms
-  };
-}
+import RBush from 'rbush';
 
-// Icon rotation
-// Rotate icon SVG to match aircraft track/heading
-// Use CSS transform: rotate({track}deg)
+class AircraftSpatialIndex {
+  constructor() {
+    this.tree = new RBush();
+  }
+  
+  update(aircraft) {
+    this.tree.clear();
+    this.tree.load(aircraft.map(ac => ({
+      minX: ac.lon, minY: ac.lat,
+      maxX: ac.lon, maxY: ac.lat,
+      aircraft: ac
+    })));
+  }
+  
+  queryBounds(bounds) {
+    return this.tree.search({
+      minX: bounds.getWest(),
+      minY: bounds.getSouth(),
+      maxX: bounds.getEast(),
+      maxY: bounds.getNorth()
+    }).map(item => item.aircraft);
+  }
+}
 ```
 
-### 3.4 Flight Trails
+#### E. Adaptive Polling Rate
+```javascript
+function getPollingInterval(zoom, aircraftCount) {
+  if (zoom > 12 && aircraftCount < 100) return 2000;  // Focused view
+  if (zoom < 6) return 10000;  // Wide view, less urgent
+  if (aircraftCount > 3000) return 8000;  // Heavy load
+  return 5000;  // Default
+}
+```
+
+#### F. Request Coalescing
+```javascript
+class RequestCoalescer {
+  constructor(fetchFn, delay = 300) {
+    this.pending = null;
+    this.fetchFn = fetchFn;
+    this.delay = delay;
+  }
+  
+  request(params) {
+    if (this.pending) {
+      clearTimeout(this.pending.timeout);
+    }
+    
+    return new Promise((resolve, reject) => {
+      this.pending = {
+        params,
+        resolve,
+        reject,
+        timeout: setTimeout(() => this._execute(), this.delay)
+      };
+    });
+  }
+  
+  _execute() {
+    const { params, resolve, reject } = this.pending;
+    this.pending = null;
+    this.fetchFn(params).then(resolve).catch(reject);
+  }
+}
+```
+
+---
+
+## Part 3: Unique Aircraft Icons Implementation
+
+### Current State
+You have 9 different icon shapes defined in `AircraftIcon.jsx`:
+- AirlinerIcon, HelicopterIcon, MilitaryIcon, CargoIcon, PropIcon, JetIcon, GliderIcon, DroneIcon, UnknownIcon
+
+**Problem:** Same icon shape is used with different colors, making aircraft types visually similar.
+
+### Solution: Distinctive Icon Design System
+
+#### Phase 1: Enhanced Icon Differentiation
 
 ```javascript
-interface FlightTrailConfig {
-  // Store last N positions
-  maxPositions: 100;
+// New: lib/aircraft-icons.js
+export const AIRCRAFT_ICON_DEFINITIONS = {
+  // Commercial Airliners - Wide body silhouette
+  airliner: {
+    viewBox: '0 0 32 32',
+    path: 'M28 18v-2l-10-6V4c0-1.1-.9-2-2-2s-2 .9-2 2v6L4 16v2l10-3v7l-3 2v2l5-1.5 5 1.5v-2l-3-2v-7l10 3z',
+    style: 'filled',
+    showTrail: true,
+  },
   
-  // Polyline style
-  style: {
-    color: "#3b82f6",     // Blue to match selection
-    weight: 2,
+  // Regional Jets - Smaller, sleeker
+  jet: {
+    viewBox: '0 0 32 32',
+    path: 'M26 17v-2l-9-5V4.5c0-.83-.67-1.5-1.5-1.5S14 3.67 14 4.5V10l-9 5v2l9-2.5v6l-3 2v2l4.5-1 4.5 1v-2l-3-2v-6l9 2.5z',
+    style: 'filled',
+    showTrail: true,
+  },
+  
+  // Military - Swept wings, aggressive shape
+  military: {
+    viewBox: '0 0 32 32',
+    path: 'M27 16l-9-5.5V4a2 2 0 10-4 0v6.5L5 16v2l9-2v5l-3 2v2l5-1 5 1v-2l-3-2v-5l9 2v-2zM16 6l2-2h-4l2 2z',
+    style: 'outlined',
+    strokeWidth: 1.5,
+    marker: 'star', // Adds small star indicator
+  },
+  
+  // Cargo Freighter - Bulky body
+  cargo: {
+    viewBox: '0 0 32 32',
+    path: 'M28 18v-2l-10-6V4c0-1.1-.9-2-2-2s-2 .9-2 2v6L4 16v2l10-3v7l-3 2v2l5-1.5 5 1.5v-2l-3-2v-7l10 3z',
+    bodyPath: 'M11 11h10v6H11z', // Additional cargo bay
+    style: 'filled',
+    showTrail: true,
+  },
+  
+  // Helicopter - Distinct rotor blade
+  helicopter: {
+    viewBox: '0 0 32 32',
+    path: 'M6 8h20v2H6z M16 10v6m-6 0h12a3 3 0 010 6H10a3 3 0 010-6z M13 22l-2 4h10l-2-4',
+    rotorPath: 'M6 8h20', // Animated rotor
+    style: 'filled',
+    animate: 'rotor',
+  },
+  
+  // Prop/Turboprop - High wing design
+  prop: {
+    viewBox: '0 0 32 32',
+    path: 'M16 3a1 1 0 00-1 1v7L6 15v2l9-2v6l-3 2v2l4-1.5 4 1.5v-2l-3-2v-6l9 2v-2l-9-4V4a1 1 0 00-1-1z',
+    propPath: 'M16 3l2-2-4 0 2 2', // Propeller detail
+    style: 'filled',
+  },
+  
+  // Glider - Long slender wings
+  glider: {
+    viewBox: '0 0 32 32',
+    path: 'M16 5c-.3 0-.5.2-.5.5v6L2 14v1.5L15.5 13v6l-2.5 1.5v1.5l3-.75 3 .75V20l-2.5-1.5v-6L30 15.5V14l-13.5-2.5V5.5c0-.3-.2-.5-.5-.5z',
+    style: 'thin',
+    strokeWidth: 1,
+  },
+  
+  // Drone/UAV - Quad configuration
+  drone: {
+    viewBox: '0 0 32 32',
+    path: 'M8 8a4 4 0 100-1 M24 8a4 4 0 100-1 M8 24a4 4 0 100-1 M24 24a4 4 0 100-1',
+    bodyPath: 'M13 13h6v6h-6z',
+    armPaths: ['M8 8L13 13', 'M24 8L19 13', 'M8 24L13 19', 'M24 24L19 19'],
+    style: 'outlined',
+    animate: 'props',
+  },
+  
+  // Unknown - Distinctive question mark/radar blip
+  unknown: {
+    viewBox: '0 0 32 32',
+    path: 'M16 4a12 12 0 100 24 12 12 0 000-24z',
+    innerPath: 'M16 8l6 12H10l6-12z',
+    style: 'pulsing',
     opacity: 0.7,
-    dashArray: "5, 10",   // Dashed line
-  };
-  
-  // Gradient opacity (newer = more opaque)
-  fadeTrail: true;
-  fadeSteps: 5;
-  
-  // Update frequency
-  positionInterval: 5000; // 5 seconds
-  
-  // Only show for selected aircraft (performance)
-  showOnlySelected: true;
-}
-```
-
-### 3.5 Filter System
-
-```javascript
-interface FilterState {
-  // Aircraft type filters (multi-select)
-  types: {
-    commercial: boolean;
-    cargo: boolean;
-    military: boolean;
-    private: boolean;
-    helicopter: boolean;
-    government: boolean;
-    special: boolean;
-    unknown: boolean;
-  };
-  
-  // Altitude range filter
-  altitude: {
-    min: number;      // feet
-    max: number;      // feet
-    enabled: boolean;
-  };
-  
-  // Speed filter
-  speed: {
-    min: number;      // knots
-    max: number;      // knots
-    enabled: boolean;
-  };
-  
-  // Status filters
-  status: {
-    airborne: boolean;
-    onGround: boolean;
-  };
-  
-  // Data source filters
-  dataSource: {
-    adsb: boolean;
-    mlat: boolean;
-    tisb: boolean;
-  };
-  
-  // Special filters
-  special: {
-    emergency: boolean;      // Squawk 7500/7600/7700
-    military: boolean;       // Military aircraft only
-    interesting: boolean;    // Flagged as interesting
-  };
-  
-  // Search/text filter
-  search: {
-    query: string;
-    field: "callsign" | "registration" | "type" | "all";
-  };
-}
-
-// Default filter state
-const DEFAULT_FILTERS: FilterState = {
-  types: {
-    commercial: true,
-    cargo: true,
-    military: true,
-    private: true,
-    helicopter: true,
-    government: true,
-    special: true,
-    unknown: true,
   },
-  altitude: { min: 0, max: 60000, enabled: false },
-  speed: { min: 0, max: 700, enabled: false },
-  status: { airborne: true, onGround: true },
-  dataSource: { adsb: true, mlat: true, tisb: true },
-  special: { emergency: true, military: false, interesting: false },
-  search: { query: "", field: "all" },
+  
+  // NEW: Government/VIP - Distinct executive shape
+  government: {
+    viewBox: '0 0 32 32',
+    path: 'M28 17v-2l-10-6V4c0-1.1-.9-2-2-2s-2 .9-2 2v5L4 15v2l10-2.5v7l-3 2v2l5-1.5 5 1.5v-2l-3-2v-7l10 2.5z',
+    crownPath: 'M10 4l2-2h8l2 2', // Crown/official marker
+    style: 'filled',
+    marker: 'shield',
+  },
+  
+  // NEW: Emergency - Pulsing with alert styling
+  emergency: {
+    viewBox: '0 0 32 32',
+    path: 'M28 18v-2l-10-6V4c0-1.1-.9-2-2-2s-2 .9-2 2v6L4 16v2l10-3v7l-3 2v2l5-1.5 5 1.5v-2l-3-2v-7l10 3z',
+    style: 'emergency',
+    animate: 'pulse',
+    glowColor: '#ff0000',
+  }
 };
 ```
 
-### 3.6 Detail Panel
+#### Phase 2: New AircraftIcon Component
 
-```
-┌─────────────────────────────────────────────────┐
-│ ╳ Close                                         │
-├─────────────────────────────────────────────────┤
-│                                                 │
-│  ┌─────────────────────────────────────────┐   │
-│  │                                         │   │
-│  │          [Aircraft Photo]               │   │
-│  │          from Planespotters             │   │
-│  │                                         │   │
-│  │  📷 Photo by: John Doe                  │   │
-│  └─────────────────────────────────────────┘   │
-│                                                 │
-│  ✈ UAL1234                    🔴 MILITARY      │
-│  United Airlines Flight 1234                    │
-│                                                 │
-├─────────────────────────────────────────────────┤
-│  AIRCRAFT                                       │
-│  ───────────────────────────────────────────── │
-│  Type:          Boeing 737-900ER (B739)        │
-│  Registration:  N12345                          │
-│  ICAO:          A1B2C3                          │
-│  Country:       🇺🇸 United States              │
-│                                                 │
-├─────────────────────────────────────────────────┤
-│  FLIGHT DATA                                    │
-│  ───────────────────────────────────────────── │
-│                                                 │
-│  Altitude     ████████████░░░  35,025 ft       │
-│  Speed        ██████████░░░░░  462 kts         │
-│  Heading      087° →                            │
-│  Vert Rate    ↗ +1,250 ft/min                  │
-│  Squawk       1234                              │
-│                                                 │
-├─────────────────────────────────────────────────┤
-│  POSITION                                       │
-│  ───────────────────────────────────────────── │
-│  Latitude:    40.7128° N                        │
-│  Longitude:   -74.0060° W                       │
-│  Track:       087°                              │
-│                                                 │
-├─────────────────────────────────────────────────┤
-│  DATA SOURCE                                    │
-│  ───────────────────────────────────────────── │
-│  Source:      ADS-B                             │
-│  Messages:    1,234                             │
-│  Last Seen:   2s ago                            │
-│                                                 │
-├─────────────────────────────────────────────────┤
-│                                                 │
-│  [🎯 Follow Aircraft]  [📋 Copy Info]  [↗ Share]│
-│                                                 │
-└─────────────────────────────────────────────────┘
-```
+```jsx
+// components/aircraft/AircraftIcon.jsx - Complete Rewrite
+'use client';
 
-### 3.7 Statistics Bar
+import { memo, useMemo } from 'react';
+import { cn } from '@/lib/utils';
+import { AIRCRAFT_ICON_DEFINITIONS } from '@/lib/aircraft-icons';
 
-```javascript
-interface StatsBarData {
-  totalAircraft: number;
-  byType: {
-    commercial: number;
-    cargo: number;
-    military: number;
-    private: number;
-    helicopter: number;
-    other: number;
-  };
-  inEmergency: number;
-  dataSource: {
-    adsb: number;
-    mlat: number;
-  };
-  lastUpdate: Date;
-}
-
-// Display format (bottom of screen)
-// ✈ 12,456 aircraft | 🛫 Commercial: 8,234 | 📦 Cargo: 1,456 | 🎖 Military: 234 | 🚁 Heli: 567 | ⚠️ Emergency: 2 | Updated: 2s ago
-```
-
----
-
-## 4. UI/UX Specifications
-
-### 4.1 Design Tokens
-
-```css
-:root {
-  /* Background colors */
-  --bg-primary: #09090b;      /* Main background */
-  --bg-secondary: #0f0f13;    /* Cards, panels */
-  --bg-tertiary: #18181b;     /* Elevated surfaces */
-  --bg-hover: #27272a;        /* Hover states */
+export const AircraftIcon = memo(function AircraftIcon({
+  type = 'unknown',
+  color = '#6b7280',
+  size = 32,
+  rotation = 0,
+  isEmergency = false,
+  isSelected = false,
+  className,
+}) {
+  const iconDef = AIRCRAFT_ICON_DEFINITIONS[isEmergency ? 'emergency' : type] 
+    || AIRCRAFT_ICON_DEFINITIONS.unknown;
   
-  /* Border colors */
-  --border-primary: #27272a;
-  --border-secondary: #3f3f46;
-  --border-focus: #3b82f6;
-  
-  /* Text colors */
-  --text-primary: #fafafa;
-  --text-secondary: #a1a1aa;
-  --text-muted: #71717a;
-  --text-inverse: #09090b;
-  
-  /* Accent colors */
-  --accent-blue: #3b82f6;
-  --accent-blue-hover: #2563eb;
-  --accent-green: #22c55e;
-  --accent-amber: #f59e0b;
-  --accent-red: #ef4444;
-  --accent-purple: #8b5cf6;
-  --accent-cyan: #06b6d4;
-  --accent-pink: #ec4899;
-  
-  /* Aircraft type colors */
-  --aircraft-commercial: #22c55e;
-  --aircraft-cargo: #f59e0b;
-  --aircraft-military: #ef4444;
-  --aircraft-private: #8b5cf6;
-  --aircraft-helicopter: #06b6d4;
-  --aircraft-government: #ec4899;
-  --aircraft-special: #f97316;
-  --aircraft-unknown: #6b7280;
-  --aircraft-emergency: #ff0000;
-  
-  /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.3);
-  
-  /* Spacing */
-  --spacing-xs: 0.25rem;
-  --spacing-sm: 0.5rem;
-  --spacing-md: 1rem;
-  --spacing-lg: 1.5rem;
-  --spacing-xl: 2rem;
-  
-  /* Border radius */
-  --radius-sm: 0.25rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-  
-  /* Transitions */
-  --transition-fast: 150ms ease;
-  --transition-normal: 250ms ease;
-  --transition-slow: 350ms ease;
-  
-  /* Z-index layers */
-  --z-map: 1;
-  --z-controls: 100;
-  --z-panel: 200;
-  --z-modal: 300;
-  --z-toast: 400;
-}
-```
+  const styles = useMemo(() => ({
+    width: size,
+    height: size,
+    // Use CSS transform for rotation - no re-render needed
+    '--rotation': `${rotation}deg`,
+    '--icon-color': isSelected ? '#3b82f6' : color,
+    '--glow-color': isEmergency ? '#ff0000' : 'transparent',
+  }), [size, rotation, color, isSelected, isEmergency]);
 
-### 4.2 Layout Structure
-
-```
-┌────────────────────────────────────────────────────────────────────────────┐
-│                               HEADER (h-14)                                │
-│  [Logo] SkyTracker         [🔍 Search...]        [Filters ▾]    [⚙]       │
-├────────────────┬───────────────────────────────────────────────────────────┤
-│                │                                                           │
-│   FILTER       │                                                           │
-│   SIDEBAR      │                                                           │
-│   (w-72)       │                        MAP AREA                           │
-│                │                      (flex-1)                             │
-│   - Types      │                                                           │
-│   - Altitude   │                                                           │
-│   - Speed      │                                                           │
-│   - Status     │                                                           │
-│   - Data Src   │                                                           │
-│   - Special    │                                                           │
-│                │                                                           │
-│                │                                                           │
-│                │                                                           │
-│                ├───────────────────────────────────────────────────────────┤
-│                │                    STATS BAR (h-10)                       │
-│                │  ✈ 12,456 | Commercial: 8,234 | Military: 234 | ...      │
-└────────────────┴───────────────────────────────────────────────────────────┘
-
-                 ┌───────────────────────────────────────────────────────────┐
-                 │                                                           │
-                 │                   DETAIL PANEL                            │
-                 │                   (Slide-in from right)                   │
-                 │                   (w-96)                                  │
-                 │                                                           │
-                 │                   - Aircraft photo                        │
-                 │                   - Flight info                           │
-                 │                   - Position data                         │
-                 │                   - Actions                               │
-                 │                                                           │
-                 └───────────────────────────────────────────────────────────┘
-```
-
-### 4.3 Responsive Breakpoints
-
-```javascript
-const breakpoints = {
-  sm: "640px",   // Mobile landscape
-  md: "768px",   // Tablet
-  lg: "1024px",  // Laptop
-  xl: "1280px",  // Desktop
-  "2xl": "1536px", // Large desktop
-};
-
-// Layout behavior per breakpoint
-const layoutBehavior = {
-  mobile: {
-    // < 768px
-    sidebar: "hidden", // Bottom sheet instead
-    detailPanel: "full-screen overlay",
-    statsBar: "simplified",
-    headerSearch: "icon only, expands on click",
-  },
-  tablet: {
-    // 768px - 1024px
-    sidebar: "collapsible drawer",
-    detailPanel: "slide-in, 50% width",
-    statsBar: "full",
-    headerSearch: "visible",
-  },
-  desktop: {
-    // > 1024px
-    sidebar: "always visible",
-    detailPanel: "slide-in, fixed width",
-    statsBar: "full",
-    headerSearch: "expanded",
-  },
-};
-```
-
-### 4.4 Component Specifications
-
-#### Header
-
-```javascript
-interface HeaderProps {
-  logo: ReactNode;
-  search: {
-    placeholder: "Search callsign, registration, type...";
-    debounceMs: 300;
-    showRecent: true;
-    maxRecent: 5;
-  };
-  filterToggle: {
-    showCount: true; // Number of active filters
-    mobileOnly: true;
-  };
-  settingsMenu: {
-    items: [
-      "Map style",
-      "Units (metric/imperial)",
-      "Update interval",
-      "About",
-    ];
-  };
-}
-```
-
-#### Filter Panel
-
-```javascript
-interface FilterPanelProps {
-  sections: [
-    {
-      title: "Aircraft Type";
-      type: "checkbox-group";
-      options: AircraftType[];
-      showCounts: true; // Number of each type visible
-    },
-    {
-      title: "Altitude";
-      type: "range-slider";
-      min: 0;
-      max: 60000;
-      step: 1000;
-      unit: "ft";
-    },
-    {
-      title: "Speed";
-      type: "range-slider";
-      min: 0;
-      max: 700;
-      step: 50;
-      unit: "kts";
-    },
-    {
-      title: "Status";
-      type: "checkbox-group";
-      options: ["Airborne", "On Ground"];
-    },
-    {
-      title: "Data Source";
-      type: "checkbox-group";
-      options: ["ADS-B", "MLAT", "TIS-B"];
-    },
-    {
-      title: "Special";
-      type: "checkbox-group";
-      options: ["Emergency", "Military Only", "Interesting"];
-    },
-  ];
-  footer: {
-    resetButton: true;
-    activeCount: true;
-  };
-}
-```
-
-#### Map Controls
-
-```javascript
-// Overlay controls on map
-interface MapControls {
-  position: "top-right" | "bottom-right";
-  controls: [
-    {
-      type: "zoom";
-      buttons: ["+", "-"];
-    },
-    {
-      type: "geolocate";
-      icon: "crosshairs";
-      tooltip: "Center on my location";
-    },
-    {
-      type: "fullscreen";
-      icon: "expand";
-    },
-    {
-      type: "recenter";
-      icon: "home";
-      tooltip: "Reset view";
-    },
-  ];
-}
-```
-
----
-
-## 5. State Management
-
-### 5.1 Global State (Zustand)
-
-```javascript
-// stores/aircraft-store.js
-interface AircraftStore {
-  // Aircraft data
-  aircraft: Map<string, Aircraft>;
-  selectedAircraftId: string | null;
-  followedAircraftId: string | null;
-  
-  // Trail data
-  trails: Map<string, Position[]>;
-  
-  // Actions
-  setAircraft: (aircraft: Aircraft[]) => void;
-  selectAircraft: (id: string | null) => void;
-  followAircraft: (id: string | null) => void;
-  updateTrail: (id: string, position: Position) => void;
-  clearTrails: () => void;
-}
-
-// stores/filter-store.js
-interface FilterStore {
-  filters: FilterState;
-  
-  // Actions
-  setFilter: <K extends keyof FilterState>(
-    key: K,
-    value: FilterState[K]
-  ) => void;
-  resetFilters: () => void;
-  loadPreset: (preset: FilterPreset) => void;
-}
-
-// stores/map-store.js
-interface MapStore {
-  center: [number, number];
-  zoom: number;
-  bounds: LatLngBounds | null;
-  
-  // Actions
-  setView: (center: [number, number], zoom: number) => void;
-  setBounds: (bounds: LatLngBounds) => void;
-  flyTo: (center: [number, number], zoom?: number) => void;
-}
-
-// stores/ui-store.js
-interface UIStore {
-  sidebarOpen: boolean;
-  detailPanelOpen: boolean;
-  settingsOpen: boolean;
-  
-  // Actions
-  toggleSidebar: () => void;
-  toggleDetailPanel: () => void;
-  toggleSettings: () => void;
-}
-```
-
-### 5.2 Server State (TanStack Query)
-
-```javascript
-// hooks/use-aircraft.js
-function useAircraft(bounds: LatLngBounds) {
-  return useQuery({
-    queryKey: ["aircraft", bounds.toBBoxString()],
-    queryFn: () => fetchAircraftInBounds(bounds),
-    refetchInterval: 5000, // 5 second updates
-    staleTime: 2000,
-    gcTime: 30000,
-  });
-}
-
-// hooks/use-military.js
-function useMilitaryAircraft() {
-  return useQuery({
-    queryKey: ["military"],
-    queryFn: fetchMilitaryAircraft,
-    refetchInterval: 5000,
-    staleTime: 2000,
-  });
-}
-
-// hooks/use-aircraft-photo.js
-function useAircraftPhoto(icao: string) {
-  return useQuery({
-    queryKey: ["photo", icao],
-    queryFn: () => fetchAircraftPhoto(icao),
-    staleTime: Infinity, // Photos don't change
-    gcTime: 1000 * 60 * 60, // Cache for 1 hour
-    enabled: !!icao,
-  });
-}
-
-// hooks/use-aircraft-details.js
-function useAircraftDetails(icao: string) {
-  return useQuery({
-    queryKey: ["aircraft", icao],
-    queryFn: () => fetchAircraftByHex(icao),
-    refetchInterval: 2000, // Faster updates for selected aircraft
-    enabled: !!icao,
-  });
-}
-```
-
----
-
-## 6. API Routes
-
-### 6.1 Route Definitions
-
-```javascript
-// app/api/aircraft/route.js
-// GET /api/aircraft?lat={lat}&lon={lon}&dist={nm}
-// Returns aircraft within distance of point
-
-// app/api/aircraft/[hex]/route.js
-// GET /api/aircraft/{hex}
-// Returns specific aircraft details
-
-// app/api/aircraft/military/route.js
-// GET /api/aircraft/military
-// Returns all military aircraft
-
-// app/api/aircraft/search/route.js
-// GET /api/aircraft/search?q={query}&field={field}
-// Search aircraft by various fields
-
-// app/api/aircraft/[hex]/photo/route.js
-// GET /api/aircraft/{hex}/photo
-// Proxies Planespotters API to avoid CORS
-```
-
-### 6.2 Caching Strategy
-
-```javascript
-// app/api/aircraft/route.js
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const lat = searchParams.get("lat");
-  const lon = searchParams.get("lon");
-  const dist = searchParams.get("dist") || "250";
-  
-  const response = await fetch(
-    `https://api.adsb.lol/v2/lat/${lat}/lon/${lon}/dist/${dist}`,
-    {
-      next: {
-        revalidate: 3, // Cache for 3 seconds
-      },
-    }
+  return (
+    <svg
+      viewBox={iconDef.viewBox}
+      style={styles}
+      className={cn(
+        'aircraft-icon',
+        `aircraft-icon--${iconDef.style}`,
+        iconDef.animate && `aircraft-icon--${iconDef.animate}`,
+        isSelected && 'aircraft-icon--selected',
+        className
+      )}
+    >
+      {/* Drop shadow filter */}
+      <defs>
+        <filter id={`shadow-${type}`} x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="1" stdDeviation="1" floodOpacity="0.5"/>
+        </filter>
+        {isEmergency && (
+          <filter id="emergency-glow">
+            <feGaussianBlur stdDeviation="2" result="blur"/>
+            <feFlood floodColor="#ff0000" floodOpacity="0.6"/>
+            <feComposite in2="blur" operator="in"/>
+            <feMerge>
+              <feMergeNode/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        )}
+      </defs>
+      
+      {/* Main aircraft path */}
+      <g 
+        style={{ transform: 'rotate(var(--rotation))', transformOrigin: 'center' }}
+        filter={isEmergency ? 'url(#emergency-glow)' : `url(#shadow-${type})`}
+      >
+        <path 
+          d={iconDef.path} 
+          fill={iconDef.style === 'outlined' ? 'none' : 'var(--icon-color)'} 
+          stroke={iconDef.style === 'outlined' ? 'var(--icon-color)' : 'none'}
+          strokeWidth={iconDef.strokeWidth || 0}
+        />
+        
+        {/* Additional paths for complex icons */}
+        {iconDef.bodyPath && (
+          <path d={iconDef.bodyPath} fill="var(--icon-color)" opacity="0.8"/>
+        )}
+        
+        {iconDef.propPath && (
+          <path d={iconDef.propPath} fill="var(--icon-color)" opacity="0.9"/>
+        )}
+        
+        {/* Markers */}
+        {iconDef.marker === 'star' && (
+          <polygon points="16,2 17,5 20,5 18,7 19,10 16,8 13,10 14,7 12,5 15,5" 
+            fill="var(--icon-color)" opacity="0.7" transform="scale(0.4) translate(24,0)"/>
+        )}
+        
+        {iconDef.marker === 'shield' && (
+          <path d="M16 1l4 2v4c0 3-4 5-4 5s-4-2-4-5V3l4-2z" 
+            fill="var(--icon-color)" opacity="0.6" transform="scale(0.35) translate(30,0)"/>
+        )}
+      </g>
+    </svg>
   );
-  
-  const data = await response.json();
-  
-  return Response.json(data, {
-    headers: {
-      "Cache-Control": "public, s-maxage=3, stale-while-revalidate=10",
-    },
-  });
+});
+
+// CSS to add in globals.css
+/*
+.aircraft-icon {
+  transform-origin: center;
+  will-change: transform;
+}
+
+.aircraft-icon--pulse {
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.aircraft-icon--rotor g:first-of-type::after {
+  animation: spin 0.1s linear infinite;
+}
+
+.aircraft-icon--selected {
+  filter: drop-shadow(0 0 6px var(--icon-color));
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.1); }
+}
+*/
+```
+
+#### Phase 3: Icon Preview Component for Testing
+
+```jsx
+// components/aircraft/IconGallery.jsx - Development tool
+'use client';
+
+import { AircraftIcon } from './AircraftIcon';
+import { AIRCRAFT_COLORS } from '@/lib/constants';
+
+const ICON_TYPES = [
+  'airliner', 'jet', 'military', 'cargo', 'helicopter', 
+  'prop', 'glider', 'drone', 'government', 'unknown'
+];
+
+export function IconGallery() {
+  return (
+    <div className="grid grid-cols-5 gap-4 p-4 bg-gray-900">
+      {ICON_TYPES.map(type => (
+        <div key={type} className="flex flex-col items-center gap-2">
+          <div className="text-xs text-gray-400">{type}</div>
+          <div className="flex gap-2">
+            {[0, 45, 90, 180, 270].map(rotation => (
+              <AircraftIcon
+                key={rotation}
+                type={type}
+                color={AIRCRAFT_COLORS[type] || AIRCRAFT_COLORS.unknown}
+                size={32}
+                rotation={rotation}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+      
+      {/* Emergency states */}
+      <div className="col-span-5 border-t border-gray-700 pt-4 mt-4">
+        <div className="text-sm text-gray-400 mb-2">Emergency States</div>
+        <div className="flex gap-4">
+          {['airliner', 'helicopter', 'military'].map(type => (
+            <AircraftIcon
+              key={type}
+              type={type}
+              color="#ff0000"
+              size={40}
+              rotation={45}
+              isEmergency={true}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 ```
 
 ---
 
-## 7. File Structure
+## Part 4: New Features for Modern Sleek Tracker
 
-```
-flight-tracker/
-├── app/
-│   ├── layout.jsx              # Root layout with providers
-│   ├── page.jsx                # Main map page
-│   ├── loading.jsx             # Loading skeleton
-│   ├── error.jsx               # Error boundary
-│   ├── globals.css             # Global styles + Tailwind
-│   └── api/
-│       └── aircraft/
-│           ├── route.js        # GET aircraft by location
-│           ├── military/
-│           │   └── route.js    # GET military aircraft
-│           ├── search/
-│           │   └── route.js    # GET search results
-│           └── [hex]/
-│               ├── route.js    # GET aircraft by hex
-│               └── photo/
-│                   └── route.js # GET aircraft photo
-│
-├── components/
-│   ├── layout/
-│   │   ├── Header.jsx
-│   │   ├── Sidebar.jsx
-│   │   ├── StatsBar.jsx
-│   │   └── MobileNav.jsx
-│   │
-│   ├── map/
-│   │   ├── FlightMap.jsx       # Main map container
-│   │   ├── MapProvider.jsx     # Map context provider
-│   │   ├── AircraftLayer.jsx   # Aircraft markers layer
-│   │   ├── AircraftMarker.jsx  # Individual aircraft marker
-│   │   ├── AircraftCluster.jsx # Cluster icon component
-│   │   ├── FlightTrail.jsx     # Trail polyline
-│   │   ├── MapControls.jsx     # Zoom, geolocate, etc.
-│   │   └── MapAttribution.jsx  # Attribution overlay
-│   │
-│   ├── panels/
-│   │   ├── FilterPanel.jsx     # Main filter sidebar
-│   │   ├── FilterSection.jsx   # Individual filter group
-│   │   ├── DetailPanel.jsx     # Aircraft detail slide-out
-│   │   ├── AircraftPhoto.jsx   # Photo with loading state
-│   │   └── FlightInfo.jsx      # Flight data display
-│   │
-│   ├── search/
-│   │   ├── SearchBar.jsx
-│   │   ├── SearchResults.jsx
-│   │   └── RecentSearches.jsx
-│   │
-│   ├── aircraft/
-│   │   ├── AircraftIcon.jsx    # SVG icon component
-│   │   ├── AircraftCard.jsx    # Compact aircraft info
-│   │   ├── AircraftBadge.jsx   # Type badge (military, etc.)
-│   │   └── EmergencyIndicator.jsx
-│   │
-│   └── ui/                     # shadcn/ui components
-│       ├── button.jsx
-│       ├── checkbox.jsx
-│       ├── slider.jsx
-│       ├── sheet.jsx
-│       ├── tooltip.jsx
-│       ├── skeleton.jsx
-│       ├── badge.jsx
-│       ├── input.jsx
-│       ├── command.jsx         # For search
-│       ├── scroll-area.jsx
-│       └── separator.jsx
-│
-├── hooks/
-│   ├── use-aircraft.js         # Aircraft data fetching
-│   ├── use-aircraft-photo.js   # Photo fetching
-│   ├── use-map-bounds.js       # Track visible bounds
-│   ├── use-geolocation.js      # User location
-│   ├── use-filters.js          # Filter state helpers
-│   ├── use-debounce.js         # Debounce utility
-│   ├── use-local-storage.js    # Persist preferences
-│   └── use-media-query.js      # Responsive helpers
-│
-├── stores/
-│   ├── aircraft-store.js       # Aircraft state
-│   ├── filter-store.js         # Filter state
-│   ├── map-store.js            # Map view state
-│   └── ui-store.js             # UI state
-│
-├── lib/
-│   ├── api.js                  # API client functions
-│   ├── utils.js                # General utilities
-│   ├── aircraft-utils.js       # Aircraft-specific helpers
-│   ├── format.js               # Number/date formatting
-│   ├── classify.js             # Aircraft classification
-│   ├── constants.js            # App constants
-│   └── cn.js                   # Class name utility
-│
-├── types/
-│   ├── aircraft.js             # Aircraft types
-│   ├── api.js                  # API response types
-│   ├── filters.js              # Filter types
-│   └── map.js                  # Map-related types
-│
-├── config/
-│   ├── map.js                  # Map configuration
-│   ├── filters.js              # Default filters
-│   └── site.js                 # Site metadata
-│
-├── public/
-│   ├── icons/
-│   │   ├── aircraft/           # Aircraft type SVGs
-│   │   │   ├── airliner.svg
-│   │   │   ├── cargo.svg
-│   │   │   ├── helicopter.svg
-│   │   │   ├── jet.svg
-│   │   │   ├── military.svg
-│   │   │   ├── prop.svg
-│   │   │   └── unknown.svg
-│   │   └── app/
-│   │       ├── favicon.ico
-│   │       ├── apple-touch-icon.png
-│   │       └── og-image.png
-│   └── placeholder-aircraft.jpg
-│
-├── .env.local                  # Environment variables
-├── .env.example                # Example env file
-├── next.config.js              # Next.js configuration
-├── tailwind.config.js          # Tailwind configuration
-├── tsconfig.json               # TypeScript configuration
-├── package.json
-└── README.md
-```
-
----
-
-## 8. Performance Requirements
-
-### 8.1 Metrics Targets
-
-| Metric | Target | Tool |
-|--------|--------|------|
-| First Contentful Paint (FCP) | < 1.2s | Lighthouse |
-| Largest Contentful Paint (LCP) | < 2.0s | Lighthouse |
-| Time to Interactive (TTI) | < 3.0s | Lighthouse |
-| Cumulative Layout Shift (CLS) | < 0.1 | Lighthouse |
-| First Input Delay (FID) | < 100ms | Web Vitals |
-| Map Frame Rate | 60 FPS | Chrome DevTools |
-| Aircraft Render Time | < 50ms for 5,000 aircraft | Performance API |
-| Memory Usage | < 200MB | Chrome DevTools |
-| Bundle Size (gzip) | < 400KB initial | Bundle analyzer |
-
-### 8.2 Optimization Strategies
+### Feature 1: Real-time Flight Path Prediction
 
 ```javascript
-// 1. Aircraft data optimization
-const optimizations = {
-  // Only fetch aircraft in viewport
-  viewportFetching: true,
+// lib/prediction.js
+export function predictFlightPath(aircraft, minutes = 5) {
+  if (!aircraft.lat || !aircraft.lon || !aircraft.track || !aircraft.gs) {
+    return null;
+  }
   
-  // Cluster at low zoom levels
-  clustering: {
-    enabled: true,
-    disableAtZoom: 10,
-  },
+  const speedKnots = aircraft.gs;
+  const headingRad = (aircraft.track * Math.PI) / 180;
+  const distanceNm = (speedKnots / 60) * minutes;
   
-  // Debounce map movement before fetching
-  fetchDebounce: 300, // ms
+  // Convert nautical miles to degrees (approximate)
+  const distanceDeg = distanceNm / 60;
   
-  // Limit concurrent API requests
-  maxConcurrent: 3,
+  const predictedLat = aircraft.lat + distanceDeg * Math.cos(headingRad);
+  const predictedLon = aircraft.lon + distanceDeg * Math.sin(headingRad) / Math.cos(aircraft.lat * Math.PI / 180);
   
-  // Use Web Workers for data processing
-  webWorkers: {
-    enabled: true,
-    tasks: ["filterAircraft", "calculateTrails", "classifyAircraft"],
-  },
-  
-  // Canvas rendering for markers (instead of DOM)
-  canvasMarkers: {
-    enabled: true,
-    threshold: 500, // Use canvas above this count
-  },
-};
-
-// 2. React optimizations
-const reactOptimizations = {
-  // Virtualize aircraft list
-  virtualList: true,
-  
-  // Memoize expensive components
-  memoization: ["AircraftMarker", "FilterPanel", "StatsBar"],
-  
-  // Use transitions for non-urgent updates
-  useTransition: ["filterChange", "searchResults"],
-  
-  // Lazy load panels
-  lazyLoad: ["DetailPanel", "SettingsModal"],
-};
-
-// 3. Map optimizations
-const mapOptimizations = {
-  // Prefer canvas over SVG
-  preferCanvas: true,
-  
-  // Remove markers outside viewport
-  removeOutsideViewport: true,
-  
-  // Throttle position updates
-  updateThrottle: 100, // ms
-  
-  // Use requestAnimationFrame for animations
-  useRAF: true,
-};
-```
-
----
-
-## 9. Deployment Configuration
-
-### 9.1 Vercel Configuration
-
-```json
-// vercel.json
-{
-  "framework": "nextjs",
-  "regions": ["iad1"],  // US East for proximity to adsb.lol
-  "functions": {
-    "app/api/**/*": {
-      "maxDuration": 10
-    }
-  },
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, s-maxage=3, stale-while-revalidate=10"
-        }
-      ]
-    },
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        },
-        {
-          "key": "X-XSS-Protection",
-          "value": "1; mode=block"
-        }
-      ]
-    }
-  ]
+  return {
+    lat: predictedLat,
+    lon: predictedLon,
+    eta: new Date(Date.now() + minutes * 60000),
+  };
 }
 ```
 
-### 9.2 Environment Variables
+### Feature 2: 3D Altitude Visualization
 
-```bash
-# .env.example
+```jsx
+// components/map/AltitudeLayer.jsx
+'use client';
 
-# API Configuration (optional, for rate limiting bypass)
-ADSB_API_KEY=
+import { useMemo } from 'react';
+import { Polyline } from 'react-leaflet';
 
-# Planespotters API (if required)
-PLANESPOTTERS_API_KEY=
-
-# Map Configuration
-NEXT_PUBLIC_MAP_CENTER_LAT=39.8
-NEXT_PUBLIC_MAP_CENTER_LON=-98.5
-NEXT_PUBLIC_MAP_DEFAULT_ZOOM=5
-
-# Feature Flags
-NEXT_PUBLIC_ENABLE_TRAILS=true
-NEXT_PUBLIC_ENABLE_CLUSTERING=true
-NEXT_PUBLIC_UPDATE_INTERVAL=5000
-
-# Analytics (optional)
-NEXT_PUBLIC_VERCEL_ANALYTICS=true
-
-# Development
-NEXT_PUBLIC_DEBUG_MODE=false
+export function AltitudeLayer({ aircraft }) {
+  const altitudeLines = useMemo(() => {
+    return aircraft
+      .filter(ac => ac.lat && ac.lon && ac.alt_baro > 1000)
+      .map(ac => {
+        const height = Math.min(ac.alt_baro / 1000, 50); // Normalize
+        const opacity = 0.3 + (height / 50) * 0.4;
+        
+        return {
+          positions: [
+            [ac.lat, ac.lon],
+            [ac.lat + 0.01, ac.lon + 0.01], // Offset for shadow effect
+          ],
+          color: `hsl(${200 + height * 2}, 70%, 50%)`,
+          weight: 1,
+          opacity,
+          key: ac.hex,
+        };
+      });
+  }, [aircraft]);
+  
+  return altitudeLines.map(line => (
+    <Polyline key={line.key} {...line} />
+  ));
+}
 ```
 
-### 9.3 Next.js Configuration
+### Feature 3: Aircraft Proximity Alerts
 
 ```javascript
-// next.config.js
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  reactStrictMode: true,
+// hooks/use-proximity-alerts.js
+'use client';
+
+import { useMemo } from 'react';
+
+export function useProximityAlerts(aircraft, thresholdNm = 5) {
+  const alerts = useMemo(() => {
+    const proximityAlerts = [];
+    const checked = new Set();
+    
+    aircraft.forEach((ac1, i) => {
+      if (!ac1.lat || !ac1.lon) return;
+      
+      aircraft.slice(i + 1).forEach(ac2 => {
+        if (!ac2.lat || !ac2.lon) return;
+        
+        const key = [ac1.hex, ac2.hex].sort().join('-');
+        if (checked.has(key)) return;
+        checked.add(key);
+        
+        const distance = calculateDistanceNm(
+          ac1.lat, ac1.lon, ac2.lat, ac2.lon
+        );
+        
+        // Check altitude separation
+        const altSeparation = Math.abs(
+          (ac1.alt_baro || 0) - (ac2.alt_baro || 0)
+        );
+        
+        if (distance < thresholdNm && altSeparation < 1000) {
+          proximityAlerts.push({
+            aircraft1: ac1,
+            aircraft2: ac2,
+            distance,
+            altitudeSeparation: altSeparation,
+            severity: distance < 2 ? 'critical' : 'warning',
+          });
+        }
+      });
+    });
+    
+    return proximityAlerts.sort((a, b) => a.distance - b.distance);
+  }, [aircraft, thresholdNm]);
   
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'cdn.planespotters.net',
-        pathname: '/photos/**',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.planespotters.net',
-        pathname: '/**',
-      },
-    ],
-    formats: ['image/avif', 'image/webp'],
+  return alerts;
+}
+
+function calculateDistanceNm(lat1, lon1, lat2, lon2) {
+  const R = 3440.065; // Earth radius in nautical miles
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) ** 2 + 
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+```
+
+### Feature 4: Weather Layer Integration
+
+```jsx
+// components/map/WeatherLayer.jsx
+'use client';
+
+import { TileLayer } from 'react-leaflet';
+import { useUIStore } from '@/stores/ui-store';
+
+const WEATHER_LAYERS = {
+  radar: 'https://tilecache.rainviewer.com/v2/radar/{ts}/256/{z}/{x}/{y}/2/1_1.png',
+  clouds: 'https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid={apiKey}',
+  wind: 'https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid={apiKey}',
+};
+
+export function WeatherLayer({ type = 'radar', apiKey }) {
+  const { weatherLayerEnabled } = useUIStore();
+  
+  if (!weatherLayerEnabled) return null;
+  
+  const url = WEATHER_LAYERS[type]
+    .replace('{apiKey}', apiKey)
+    .replace('{ts}', Math.floor(Date.now() / 600000) * 600); // 10-min cache
+  
+  return (
+    <TileLayer
+      url={url}
+      opacity={0.5}
+      zIndex={100}
+    />
+  );
+}
+```
+
+### Feature 5: Flight History Playback
+
+```javascript
+// stores/playback-store.js
+import { create } from 'zustand';
+
+export const usePlaybackStore = create((set, get) => ({
+  isPlaying: false,
+  playbackSpeed: 1,
+  currentTime: null,
+  history: [], // [{timestamp, aircraft: []}]
+  
+  recordFrame: (aircraft) => {
+    set(state => ({
+      history: [
+        ...state.history.slice(-360), // Keep 30 min at 5s intervals
+        { timestamp: Date.now(), aircraft: [...aircraft] }
+      ]
+    }));
   },
   
-  experimental: {
-    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
+  startPlayback: (fromTime) => {
+    set({ isPlaying: true, currentTime: fromTime || get().history[0]?.timestamp });
   },
   
-  async headers() {
-    return [
-      {
-        source: '/:path*',
-        headers: [
-          {
-            key: 'Permissions-Policy',
-            value: 'geolocation=(self)',
-          },
-        ],
-      },
+  stopPlayback: () => {
+    set({ isPlaying: false, currentTime: null });
+  },
+  
+  getFrameAtTime: (time) => {
+    const history = get().history;
+    return history.find(h => h.timestamp >= time)?.aircraft || [];
+  },
+  
+  setPlaybackSpeed: (speed) => {
+    set({ playbackSpeed: speed });
+  },
+}));
+```
+
+### Feature 6: Airport/Runway Overlay
+
+```javascript
+// lib/airports.js
+export const MAJOR_AIRPORTS = {
+  KJFK: { lat: 40.6413, lon: -73.7781, name: 'JFK International', runways: ['04L/22R', '04R/22L', '13L/31R', '13R/31L'] },
+  KLAX: { lat: 33.9425, lon: -118.4081, name: 'Los Angeles International', runways: ['06L/24R', '06R/24L', '07L/25R', '07R/25L'] },
+  KORD: { lat: 41.9742, lon: -87.9073, name: 'O\'Hare International', runways: ['04L/22R', '09C/27C', '10L/28R', '10C/28C', '10R/28L', '09L/27R', '09R/27L', '04R/22L', '14R/32L', '15/33'] },
+  // ... add more
+};
+```
+
+### Feature 7: Keyboard Shortcuts
+
+```javascript
+// hooks/use-keyboard-shortcuts.js
+'use client';
+
+import { useEffect } from 'react';
+import { useUIStore } from '@/stores/ui-store';
+import { useMapStore } from '@/stores/map-store';
+import { useAircraftStore } from '@/stores/aircraft-store';
+
+export function useKeyboardShortcuts() {
+  const { toggleSidebar, toggleDetailPanel } = useUIStore();
+  const { resetView, geolocate } = useMapStore();
+  const { selectAircraft, unfollowAircraft } = useAircraftStore();
+  
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Ignore if typing in input
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      
+      switch (e.key) {
+        case 'f':
+          e.preventDefault();
+          toggleSidebar(); // Toggle filters
+          break;
+        case 'd':
+          e.preventDefault();
+          toggleDetailPanel(); // Toggle detail panel
+          break;
+        case 'Escape':
+          selectAircraft(null);
+          unfollowAircraft();
+          break;
+        case 'h':
+          e.preventDefault();
+          resetView(); // Home view
+          break;
+        case 'l':
+          e.preventDefault();
+          geolocate(); // My location
+          break;
+        case '+':
+        case '=':
+          // Zoom in handled by Leaflet
+          break;
+        case '-':
+          // Zoom out handled by Leaflet
+          break;
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [toggleSidebar, toggleDetailPanel, selectAircraft, unfollowAircraft, resetView, geolocate]);
+}
+```
+
+### Feature 8: Night Mode Map Variant
+
+```javascript
+// lib/constants.js - Add map themes
+export const MAP_THEMES = {
+  dark: {
+    name: 'Dark Matter',
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; CARTO',
+  },
+  satellite: {
+    name: 'Satellite',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: '&copy; Esri',
+  },
+  terrain: {
+    name: 'Terrain',
+    url: 'https://stamen-tiles.a.ssl.fastly.net/terrain/{z}/{x}/{y}.jpg',
+    attribution: '&copy; Stamen',
+  },
+  light: {
+    name: 'Light',
+    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; CARTO',
+  },
+};
+```
+
+### Feature 9: Live Stats Dashboard
+
+```jsx
+// components/panels/StatsDashboard.jsx
+'use client';
+
+import { memo, useMemo } from 'react';
+import { useAircraftStore } from '@/stores/aircraft-store';
+import { useFilterStats } from '@/hooks/use-filters';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+
+export const StatsDashboard = memo(function StatsDashboard() {
+  const aircraft = useAircraftStore(s => s.getAircraftArray());
+  const stats = useFilterStats(aircraft);
+  
+  const altitudeDistribution = useMemo(() => {
+    const ranges = [
+      { range: '0-10k', min: 0, max: 10000, count: 0 },
+      { range: '10-20k', min: 10000, max: 20000, count: 0 },
+      { range: '20-30k', min: 20000, max: 30000, count: 0 },
+      { range: '30-40k', min: 30000, max: 40000, count: 0 },
+      { range: '40k+', min: 40000, max: Infinity, count: 0 },
     ];
-  },
-};
-
-module.exports = nextConfig;
+    
+    aircraft.forEach(ac => {
+      const alt = ac.alt_baro || 0;
+      const range = ranges.find(r => alt >= r.min && alt < r.max);
+      if (range) range.count++;
+    });
+    
+    return ranges;
+  }, [aircraft]);
+  
+  return (
+    <div className="p-4 bg-card rounded-lg space-y-4">
+      <h3 className="text-sm font-semibold">Live Statistics</h3>
+      
+      <div className="grid grid-cols-3 gap-4 text-center">
+        <div>
+          <div className="text-2xl font-bold text-primary">{stats.total}</div>
+          <div className="text-xs text-muted-foreground">Total Aircraft</div>
+        </div>
+        <div>
+          <div className="text-2xl font-bold text-green-500">{stats.byType.commercial}</div>
+          <div className="text-xs text-muted-foreground">Commercial</div>
+        </div>
+        <div>
+          <div className="text-2xl font-bold text-red-500">{stats.byType.military}</div>
+          <div className="text-xs text-muted-foreground">Military</div>
+        </div>
+      </div>
+      
+      <div className="h-32">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={altitudeDistribution}>
+            <XAxis dataKey="range" tick={{ fontSize: 10 }} />
+            <YAxis tick={{ fontSize: 10 }} />
+            <Tooltip />
+            <Bar dataKey="count" fill="#3b82f6" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+});
 ```
 
----
-
-## 10. Testing Requirements
-
-### 10.1 Test Coverage
+### Feature 10: Shareable Flight Links
 
 ```javascript
-// Unit Tests (Vitest)
-const unitTests = {
-  coverage: {
-    target: "80%",
-    include: ["lib/**", "hooks/**", "stores/**"],
-  },
-  tests: [
-    "Aircraft classification logic",
-    "Filter application",
-    "Data transformation",
-    "Utility functions",
-    "Custom hooks",
-    "Store actions",
-  ],
-};
+// hooks/use-share.js
+'use client';
 
-// Integration Tests (Vitest + React Testing Library)
-const integrationTests = {
-  tests: [
-    "Filter panel updates map display",
-    "Search returns correct results",
-    "Detail panel displays correct data",
-    "Clustering works at different zoom levels",
-  ],
-};
+import { useCallback } from 'react';
+import { useAircraftStore } from '@/stores/aircraft-store';
+import { useMapStore } from '@/stores/map-store';
 
-// E2E Tests (Playwright)
-const e2eTests = {
-  tests: [
-    "Full user flow: Load → Filter → Select → View Details",
-    "Mobile responsive behavior",
-    "Map interaction (zoom, pan, click)",
-    "Real-time updates work correctly",
-  ],
-};
+export function useShare() {
+  const selectedAircraft = useAircraftStore(s => s.getSelectedAircraft());
+  const { center, zoom } = useMapStore();
+  
+  const generateShareUrl = useCallback(() => {
+    const params = new URLSearchParams();
+    
+    if (selectedAircraft) {
+      params.set('hex', selectedAircraft.hex);
+    }
+    
+    params.set('lat', center[0].toFixed(4));
+    params.set('lon', center[1].toFixed(4));
+    params.set('zoom', zoom.toString());
+    
+    return `${window.location.origin}?${params.toString()}`;
+  }, [selectedAircraft, center, zoom]);
+  
+  const share = useCallback(async () => {
+    const url = generateShareUrl();
+    
+    if (navigator.share) {
+      await navigator.share({
+        title: selectedAircraft 
+          ? `Tracking ${selectedAircraft.flight || selectedAircraft.hex}`
+          : 'SkyTracker - Live Flight Tracker',
+        url,
+      });
+    } else {
+      await navigator.clipboard.writeText(url);
+      // Show toast notification
+    }
+  }, [generateShareUrl, selectedAircraft]);
+  
+  return { generateShareUrl, share };
+}
 ```
 
 ---
 
-## 11. Accessibility Requirements
+## Part 5: Prioritized Implementation Roadmap
 
+### Phase 1: Critical Fixes (Week 1)
+| Priority | Task | Impact | Effort |
+|----------|------|--------|--------|
+| P0 | Fix memory leaks in trail storage | High | Low |
+| P0 | Remove renderToString, use CSS rotation | High | Medium |
+| P0 | Add error boundaries | High | Low |
+| P1 | Memoize classification results | Medium | Low |
+| P1 | Implement request coalescing | Medium | Medium |
+
+### Phase 2: Performance Optimization (Week 2)
+| Priority | Task | Impact | Effort |
+|----------|------|--------|--------|
+| P0 | Implement Canvas-based marker rendering | Very High | High |
+| P1 | Add Web Worker for data processing | High | Medium |
+| P1 | Pre-generate icon sprites | Medium | Medium |
+| P2 | Implement spatial indexing | Medium | Medium |
+| P2 | Add adaptive polling | Low | Low |
+
+### Phase 3: Icon System (Week 3)
+| Priority | Task | Impact | Effort |
+|----------|------|--------|--------|
+| P0 | Design 10 unique aircraft icons | High | Medium |
+| P0 | Implement new AircraftIcon component | High | Medium |
+| P1 | Add emergency/selected states | Medium | Low |
+| P1 | Create icon gallery for testing | Low | Low |
+| P2 | Add icon animations (helicopter rotor) | Low | Medium |
+
+### Phase 4: New Features (Week 4+)
+| Priority | Task | Impact | Effort |
+|----------|------|--------|--------|
+| P1 | Keyboard shortcuts | Medium | Low |
+| P1 | Shareable flight links | Medium | Low |
+| P2 | Weather layer integration | Medium | Medium |
+| P2 | Airport overlay | Medium | Medium |
+| P2 | Statistics dashboard | Medium | Medium |
+| P3 | Flight path prediction | Low | Medium |
+| P3 | Altitude visualization | Low | Medium |
+| P3 | History playback | Low | High |
+
+---
+
+## Part 6: Quick Wins (Can Implement Today)
+
+### 1. CSS-Only Rotation Fix (5 minutes)
+```css
+/* globals.css */
+.aircraft-marker svg {
+  transform: rotate(var(--rotation, 0deg));
+  transition: transform 0.3s ease-out;
+}
+```
+
+```jsx
+// AircraftMarker.jsx - Remove rotation from dependency array
+const icon = useMemo(() => {
+  // Don't include rotation here
+}, [iconType, color, size, emergency]);
+
+// Apply rotation via CSS variable
+return (
+  <Marker
+    style={{ '--rotation': `${rotation}deg` }}
+    // ...
+  />
+);
+```
+
+### 2. Classification Memoization (10 minutes)
 ```javascript
-const a11yRequirements = {
-  // WCAG 2.1 AA compliance
-  wcag: "2.1 AA",
+// In aircraft-store.js
+setAircraft: (aircraftList) => {
+  const newMap = new Map();
   
-  requirements: [
-    // Keyboard navigation
-    "Full keyboard navigation for all interactive elements",
-    "Focus indicators visible on all focusable elements",
-    "Skip link to main content",
-    "Escape key closes modals/panels",
-    
-    // Screen readers
-    "All images have alt text",
-    "ARIA labels on icon-only buttons",
-    "Live regions for real-time updates",
-    "Semantic HTML structure",
-    
-    // Visual
-    "Minimum 4.5:1 contrast ratio for text",
-    "Minimum 3:1 contrast ratio for UI elements",
-    "No information conveyed by color alone",
-    "Text remains readable at 200% zoom",
-    
-    // Motion
-    "Respect prefers-reduced-motion",
-    "No flashing content",
-    
-    // Forms
-    "Labels associated with form controls",
-    "Error messages linked to inputs",
-    "Clear focus states",
-  ],
-};
+  aircraftList.forEach((ac) => {
+    if (ac.hex) {
+      // Pre-calculate and cache classification
+      ac._classification = classifyAircraft(ac);
+      ac._iconType = getAircraftIconType(ac);
+      ac._color = getAircraftColor(ac);
+      newMap.set(ac.hex, ac);
+    }
+  });
+  // ...
+}
 ```
 
----
-
-## 12. Security Requirements
-
+### 3. Trail Cleanup (5 minutes)
 ```javascript
-const securityRequirements = {
-  // API Security
-  api: [
-    "Rate limiting on all API routes",
-    "Input validation and sanitization",
-    "No sensitive data in client-side code",
-    "Proxy external APIs to prevent CORS issues",
-  ],
+// In aircraft-store.js
+setAircraft: (aircraftList) => {
+  const { trails } = get();
+  const activeHexes = new Set(aircraftList.map(ac => ac.hex));
   
-  // Headers
-  headers: [
-    "Content-Security-Policy",
-    "X-Content-Type-Options: nosniff",
-    "X-Frame-Options: DENY",
-    "X-XSS-Protection: 1; mode=block",
-    "Referrer-Policy: strict-origin-when-cross-origin",
-  ],
+  // Clean up trails for aircraft no longer in view
+  const cleanedTrails = new Map();
+  trails.forEach((trail, hex) => {
+    if (activeHexes.has(hex)) {
+      cleanedTrails.set(hex, trail);
+    }
+  });
   
-  // Data
-  data: [
-    "No PII collection without user accounts",
-    "No tracking beyond anonymous analytics",
-    "Local storage for preferences only",
-  ],
-};
+  set({ trails: cleanedTrails });
+  // ...
+}
+```
+
+### 4. Error Boundary (10 minutes)
+```jsx
+// components/ErrorBoundary.jsx
+'use client';
+
+import { Component } from 'react';
+
+export class MapErrorBoundary extends Component {
+  state = { hasError: false };
+  
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+  
+  componentDidCatch(error, errorInfo) {
+    console.error('Map error:', error, errorInfo);
+  }
+  
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex h-full items-center justify-center bg-background">
+          <div className="text-center">
+            <p className="text-lg font-medium">Map failed to load</p>
+            <button 
+              onClick={() => this.setState({ hasError: false })}
+              className="mt-2 text-primary hover:underline"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      );
+    }
+    
+    return this.props.children;
+  }
+}
 ```
 
 ---
 
-## 13. Development Phases
+## Summary
 
-### Phase 1: Foundation (Week 1)
-- [ ] Project setup with Next.js, TypeScript, Tailwind
-- [ ] Basic layout components (Header, Sidebar, StatsBar)
-- [ ] Map integration with CartoDB tiles
-- [ ] Basic API route for aircraft data
-- [ ] Aircraft markers on map (no clustering yet)
+Your SkyTracker application has a solid foundation but requires optimization for handling 5,000+ aircraft smoothly. The key improvements are:
 
-### Phase 2: Core Features (Week 2)
-- [ ] Aircraft clustering implementation
-- [ ] Filter panel with all filter types
-- [ ] Detail panel with aircraft info
-- [ ] Planespotters photo integration
-- [ ] Real-time updates with polling
+1. **Performance**: Switch to Canvas rendering, use Web Workers, and optimize icon creation
+2. **Icons**: Implement 10 unique, distinctive aircraft silhouettes instead of color-only differentiation
+3. **Features**: Add modern features like keyboard shortcuts, sharing, weather layers, and statistics
 
-### Phase 3: Enhancement (Week 3)
-- [ ] Flight trails implementation
-- [ ] Search functionality
-- [ ] Follow aircraft feature
-- [ ] Mobile responsive design
-- [ ] Performance optimizations
-
-### Phase 4: Polish (Week 4)
-- [ ] Animations and transitions
-- [ ] Error handling and loading states
-- [ ] Accessibility audit and fixes
-- [ ] Testing (unit, integration, e2e)
-- [ ] Documentation
-
-### Phase 5: Launch
-- [ ] Final performance audit
-- [ ] Security review
-- [ ] Vercel deployment
-- [ ] Monitoring setup
-- [ ] Launch! 🚀
-
----
-
-## 14. Success Criteria
-
-| Criteria | Metric |
-|----------|--------|
-| Performance | Lighthouse score > 90 |
-| Reliability | 99.9% uptime |
-| Data Freshness | < 10 second delay from source |
-| User Experience | < 3 clicks to any feature |
-| Mobile Usability | Full functionality on mobile |
-| Accessibility | WCAG 2.1 AA compliant |
-| Load Time | < 3s on 3G connection |
-| Aircraft Capacity | Handle 10,000+ aircraft smoothly |
-
----
-
+The phased approach allows for incremental improvements while maintaining a working application throughout the process.

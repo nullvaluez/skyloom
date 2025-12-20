@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SkyTracker - Aircraft Icon Gallery</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #09090b;
+      color: #fafafa;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+    
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    
+    .subtitle {
+      color: #71717a;
+      margin-bottom: 2rem;
+    }
+    
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 3rem;
+    }
+    
+    .icon-card {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 12px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+    
+    .icon-card:hover {
+      border-color: #3f3f46;
+      background: #1f1f23;
+    }
+    
+    .icon-name {
+      font-size: 0.875rem;
+      font-weight: 500;
+      text-transform: capitalize;
+    }
+    
+    .icon-color {
+      font-size: 0.75rem;
+      color: #71717a;
+      font-family: monospace;
+    }
+    
+    .icon-row {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+    }
+    
+    .icon-container {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .section-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #a1a1aa;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #27272a;
+    }
+    
+    .special-states {
+      margin-top: 2rem;
+    }
+    
+    .state-row {
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+    
+    .state-card {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 12px;
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    
+    .state-card.emergency {
+      border-color: #7f1d1d;
+      background: linear-gradient(135deg, #18181b 0%, #1a0a0a 100%);
+    }
+    
+    .state-card.selected {
+      border-color: #1d4ed8;
+      background: linear-gradient(135deg, #18181b 0%, #0a1a2e 100%);
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; filter: drop-shadow(0 0 4px currentColor); }
+      50% { opacity: 0.7; filter: drop-shadow(0 0 12px currentColor); }
+    }
+    
+    @keyframes rotor {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    
+    .emergency-icon {
+      animation: pulse 0.5s ease-in-out infinite;
+      color: #ff0000;
+    }
+    
+    .heli-rotor {
+      animation: rotor 0.1s linear infinite;
+      transform-origin: center;
+    }
+    
+    .legend {
+      margin-top: 3rem;
+      padding: 1.5rem;
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 12px;
+    }
+    
+    .legend h3 {
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+    
+    .legend-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 0.75rem;
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+    }
+    
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+  <h1>✈️ SkyTracker Aircraft Icon Gallery</h1>
+  <p class="subtitle">Unique, distinctive icons for each aircraft type</p>
+  
+  <div class="section-title">Aircraft Types (with rotation examples)</div>
+  <div class="grid">
+    
+    <!-- Commercial Airliner -->
+    <div class="icon-card">
+      <div class="icon-name">Commercial Airliner</div>
+      <div class="icon-color">#22c55e</div>
+      <div class="icon-row">
+        <div class="icon-container">
+          <svg viewBox="0 0 32 32" width="36" height="36" fill="#22c55e">
+            <path d="M16 2c-1.1 0-2 .9-2 2v7L3 16v3l11-3v8l-4 2.5v2.5l6-2 6 2v-2.5L18 24v-8l11 3v-3L18 11V4c0-1.1-.9-2-2-2z"/>
+          </svg>
+        </div>
+        <div class="icon-container" style="transform: rotate(45deg);">
+          <svg viewBox="0 0 32 32" width="36" height="36" fill="#22c55e">
+            <path d="M16 2c-1.1 0-2 .9-2 2v7L3 16v3l11-3v8l-4 2.5v2.5l6-2 6 2v-2.5L18 24v-8l11 3v-3L18 11V4c0-1.1-.9-2-2-2z"/>
+          </svg>
+        </div>
+        <div class="icon-container" style="transform: rotate(90deg);">
+          <svg viewBox="0 0 32 32" width="36" height="36" fill="#22c55e">
+            <path d="M16 2c-1.1 0-2 .9-2 2v7L3 16v3l11-3v8l-4 2.5v2.5l6-2 6 2v-2.5L18 24v-8l11 3v-3L18 11V4c0-1.1-.9-2-2-2z"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Business Jet -->
+    <div class="icon-card">
+      <div class="icon-name">Business Jet</div>
+      <div class="icon-color">#8b5cf6</div>
+      <div class="icon-row">
+        <div class="icon-container">
+          <svg viewBox="0 0 32 32" width="36" height="36" fill="#8b5cf6">
+            <path d="M16 3c-.8 0-1.5.7-1.5 1.5V10L4 14.5v2l10.5-2V21l-3.5 2v2l5-1.5 5 1.5v-2l-3.5-2v-6.5l10.5 2v-2L17.5 10V4.5c0-.8-.7-1.5-1.5-1.5z"/>
+          </svg>
+        </div>
+        <div class="icon-container" style="transform: rotate(45deg);">
+          <svg viewBox="0 0 32 32" width="36" height="36" fill="#8b5cf6">
+            <path d="M16 3c-.8 0-1.5.7-1.5 1.5V10L4 14.5v2l10.5-2V21l-3.5 2v2l5-1.5 5 1.5v-2l-3.5-2v-6.5l10.5 2v-2L17.5 10V4.5c0-.8-.7-1.5-1.5-1.5z"/>
+          </svg>
+        </div>
+        <div class="icon-container" style="transform: rotate(180deg);">
+          <svg viewBox="0 0 32 32" width="36" height="36" fill="#8b5cf6">
+            <path d="M16 3c-.8 0-1.5.7-1.5 1.5V10L4 14.5v2l10.5-2V21l-3.5 2v2l5-1.5 5 1.5v-2l-3.5-2v-6.5l10.5 2v-2L17.5 10V4.5c0-.8-.7-1.5-1.5-1.5z"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Military Fighter -->
+    <div class="icon-card">
+      <div class="icon-name">Military</div>
+      <div class="icon-color">#ef4444</div>
+      <div class="icon-row">
+        <div class="icon-container">
+          <svg viewBox="0 0 32 32" width="36" height="36" fill="#ef4444">
+            <path d="M16 1l-2 3v6L3 15v2l11-2v7l-4 3v2l6-2 6 2v-2l-4-3v-7l11 2v-2L18 10V4l-2-3z"/>
+            <path d="M14 22l-2 1v1l2-.5v-1.5zM18 22l2 1v1l-2-.5v-1.5z" opacity="0.7"/>
+          </svg>
+        </div>
+        <div class="icon-container" style="transform: rotate(45deg);">
+          <svg viewBox="0 0 32 32" width="36" height="36" fill="#ef4444">
+            <path d="M16 1l-2 3v6L3 15v2l11-2v7l-4 3v2l6-2 6 2v-2l-4-3v-7l11 2v-2L18 10V4l-2-3z"/>
+          </svg>
+        </div>
+        <div class="icon-container" style="transform: rotate(270deg);">
+          <svg viewBox="0 0 32 32" width="36" height="36" fill="#ef4444">
+            <path d="M16 1l-2 3v6L3 15v2l11-2v7l-4 3v2l6-2 6 2v-2l-4-3v-7l11 2v-2L18 10V4l-2-3z"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Cargo Freighter -->
+    <div class="icon-card">
+      <div class="icon-name">Cargo Freighter</div>
+      <div class="icon-color">#f59e0b</div>
+      <div class="icon-row">
+        <div class="icon-container">
+          <svg viewBox="0 0 32 32" width="36" height="36" fill="#f59e0b">
+            <path d="M16 2c-1.1 0-2 .9-2 2v7L3 16v3l11-3v8l-4 2.5v2.5l6-2 6 2v-2.5L18 24v-8l11 3v-3L18 11V4c0-1.1-.9-2-2-2z"/>
+            <rect x="11" y="12" width="10" height="5" opacity="0.6"/>
+            <rect x="13" y="13" width="2" height="2" fill="none" stroke="#f59e0b" stroke-width="0.5" opacity="0.4"/>
+            <rect x="17" y="13" width="2" height="2" fill="none" stroke="#f59e0b" stroke-width="0.5" opacity="0.4"/>
+          </svg>
+        </div>
+        <div class="icon-container" style="transform: rotate(45deg);">
+          <svg viewBox="0 0 32 32" width="36" height="36" fill="#f59e0b">
+            <path d="M16 2c-1.1 0-2 .9-2 2v7L3 16v3l11-3v8l-4 2.5v2.5l6-2 6 2v-2.5L18 24v-8l11 3v-3L18 11V4c0-1.1-.9-2-2-2z"/>
+            <rect x="11" y="12" width="10" height="5" opacity="0.6"/>
+          </svg>
+        </div>
+        <div class="icon-container" style="transform: rotate(180deg);">
+          <svg viewBox="0 0 32 32" width="36" height="36" fill="#f59e0b">
+            <path d="M16 2c-1.1 0-2 .9-2 2v7L3 16v3l11-3v8l-4 2.5v2.5l6-2 6 2v-2.5L18 24v-8l11 3v-3L18 11V4c0-1.1-.9-2-2-2z"/>
+            <rect x="11" y="12" width="10" height="5" opacity="0.6"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Helicopter -->
+    <div class="icon-card">
+      <div class="icon-name">Helicopter</div>
+      <div class="icon-color">#06b6d4</div>
+      <div class="icon-row">
+        <div class="icon-container">
+          <svg viewBox="0 0 32 32" width="36" height="36">
+            <rect class="heli-rotor" x="4" y="7" width="24" height="2" fill="#06b6d4"/>
+            <rect x="15" y="9" width="2" height="4" fill="#06b6d4"/>
+            <path d="M10 13h12c2 0 3 1.5 3 3v4c0 1.5-1 3-3 3H10c-2 0-3-1.5-3-3v-4c0-1.5 1-3 3-3z" fill="#06b6d4"/>
+            <rect x="22" y="17" width="6" height="2" fill="#06b6d4"/>
+            <line x1="27" y1="14" x2="27" y2="22" stroke="#06b6d4" stroke-width="2"/>
+            <path d="M8 23v3M24 23v3M6 26h8M18 26h8" stroke="#06b6d4" stroke-width="1.5" fill="none"/>
+          </svg>
+        </div>
+        <div class="icon-container" style="transform: rotate(45deg);">
+          <svg viewBox="0 0 32 32" width="36" height="36">
+            <rect x="4" y="7" width="24" height="2" fill="#06b6d4"/>
+            <rect x="15" y="9" width="2" height="4" fill="#06b6d4"/>
+            <path d="M10 13h12c2 0 3 1.5 3 3v4c0 1.5-1 3-3 3H10c-2 0-3-1.5-3-3v-4c0-1.5 1-3 3-3z" fill="#06b6d4"/>
+            <rect x="22" y="17" width="6" height="2" fill="#06b6d4"/>
+          </svg>
+        </div>
+        <div class="icon-container" style="transform: rotate(90deg);">
+          <svg viewBox="0 0 32 32" width="36" height="36">
+            <rect x="4" y="7" width="24" height="2" fill="#06b6d4"/>
+            <rect x="15" y="9" width="2" height="4" fill="#06b6d4"/>
+            <path d="M10 13h12c2 0 3 1.5 3 3v4c0 1.5-1 3-3 3H10c-2 0-3-1.5-3-3v-4c0-1.5 1-3 3-3z" fill="#06b6d4"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Prop/Turboprop -->
+    <div class="icon-card">
+      <div class="icon-name">Prop / Turboprop</div>
+      <div class="icon-color">#8b5cf6</div>
+      <div class="icon-row">
+        <div class="icon-container">
+          <svg viewBox="0 0 32 32" width="36" height="36" fill="#8b5cf6">
+            <path d="M16 2l2-1h-4l2 1z"/>
+            <path d="M14 3l-1-2v4l1-2zM18 3l1-2v4l-1-2z"/>
+            <path d="M16 4c-.6 0-1 .4-1 1v6L5 14v2l10-2v7l-3 2v2l4-1 4 1v-2l-3-2v-7l10 2v-2L17 11V5c0-.6-.4-1-1-1z"/>
+          </svg>
+        </div>
+        <div class="icon-container" style="transform: rotate(45deg);">
+          <svg viewBox="0 0 32 32" width="36" height="36" fill="#8b5cf6">
+            <path d="M16 4c-.6 0-1 .4-1 1v6L5 14v2l10-2v7l-3 2v2l4-1 4 1v-2l-3-2v-7l10 2v-2L17 11V5c0-.6-.4-1-1-1z"/>
+          </svg>
+        </div>
+        <div class="icon-container" style="transform: rotate(180deg);">
+          <svg viewBox="0 0 32 32" width="36" height="36" fill="#8b5cf6">
+            <path d="M16 4c-.6 0-1 .4-1 1v6L5 14v2l10-2v7l-3 2v2l4-1 4 1v-2l-3-2v-7l10 2v-2L17 11V5c0-.6-.4-1-1-1z"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Glider -->
+    <div class="icon-card">
+      <div class="icon-name">Glider</div>
+      <div class="icon-color">#a1a1aa</div>
+      <div class="icon-row">
+        <div class="icon-container">
+          <svg viewBox="0 0 32 32" width="36" height="36" fill="none" stroke="#a1a1aa" stroke-width="1.5">
+            <path d="M16 5c-.3 0-.5.2-.5.5v6L2 14v1.5l13.5-2v6l-3 2v1.5l3.5-1 3.5 1V20.5l-3-2v-6L30 15.5V14L16.5 11.5V5.5c0-.3-.2-.5-.5-.5z" fill="#a1a1aa"/>
+          </svg>
+        </div>
+        <div class="icon-container" style="transform: rotate(45deg);">
+          <svg viewBox="0 0 32 32" width="36" height="36" fill="#a1a1aa">
+            <path d="M16 5c-.3 0-.5.2-.5.5v6L2 14v1.5l13.5-2v6l-3 2v1.5l3.5-1 3.5 1V20.5l-3-2v-6L30 15.5V14L16.5 11.5V5.5c0-.3-.2-.5-.5-.5z"/>
+          </svg>
+        </div>
+        <div class="icon-container" style="transform: rotate(90deg);">
+          <svg viewBox="0 0 32 32" width="36" height="36" fill="#a1a1aa">
+            <path d="M16 5c-.3 0-.5.2-.5.5v6L2 14v1.5l13.5-2v6l-3 2v1.5l3.5-1 3.5 1V20.5l-3-2v-6L30 15.5V14L16.5 11.5V5.5c0-.3-.2-.5-.5-.5z"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Drone/UAV -->
+    <div class="icon-card">
+      <div class="icon-name">Drone / UAV</div>
+      <div class="icon-color">#f97316</div>
+      <div class="icon-row">
+        <div class="icon-container">
+          <svg viewBox="0 0 32 32" width="36" height="36">
+            <circle cx="8" cy="8" r="3" fill="#f97316" opacity="0.5"/>
+            <circle cx="24" cy="8" r="3" fill="#f97316" opacity="0.5"/>
+            <circle cx="8" cy="24" r="3" fill="#f97316" opacity="0.5"/>
+            <circle cx="24" cy="24" r="3" fill="#f97316" opacity="0.5"/>
+            <rect x="13" y="13" width="6" height="6" fill="#f97316"/>
+            <line x1="8" y1="8" x2="13" y2="13" stroke="#f97316" stroke-width="2"/>
+            <line x1="24" y1="8" x2="19" y2="13" stroke="#f97316" stroke-width="2"/>
+            <line x1="8" y1="24" x2="13" y2="19" stroke="#f97316" stroke-width="2"/>
+            <line x1="24" y1="24" x2="19" y2="19" stroke="#f97316" stroke-width="2"/>
+          </svg>
+        </div>
+        <div class="icon-container" style="transform: rotate(45deg);">
+          <svg viewBox="0 0 32 32" width="36" height="36">
+            <circle cx="8" cy="8" r="3" fill="#f97316" opacity="0.5"/>
+            <circle cx="24" cy="8" r="3" fill="#f97316" opacity="0.5"/>
+            <circle cx="8" cy="24" r="3" fill="#f97316" opacity="0.5"/>
+            <circle cx="24" cy="24" r="3" fill="#f97316" opacity="0.5"/>
+            <rect x="13" y="13" width="6" height="6" fill="#f97316"/>
+            <line x1="8" y1="8" x2="13" y2="13" stroke="#f97316" stroke-width="2"/>
+            <line x1="24" y1="8" x2="19" y2="13" stroke="#f97316" stroke-width="2"/>
+            <line x1="8" y1="24" x2="13" y2="19" stroke="#f97316" stroke-width="2"/>
+            <line x1="24" y1="24" x2="19" y2="19" stroke="#f97316" stroke-width="2"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Government/VIP -->
+    <div class="icon-card">
+      <div class="icon-name">Government / VIP</div>
+      <div class="icon-color">#ec4899</div>
+      <div class="icon-row">
+        <div class="icon-container">
+          <svg viewBox="0 0 32 32" width="36" height="36" fill="#ec4899">
+            <path d="M16 3c-.8 0-1.5.7-1.5 1.5V10L4 14.5v2l10.5-2V21l-3.5 2v2l5-1.5 5 1.5v-2l-3.5-2v-6.5l10.5 2v-2L17.5 10V4.5c0-.8-.7-1.5-1.5-1.5z"/>
+            <path d="M16 0l3 1.5v2.5c0 2-3 3.5-3 3.5s-3-1.5-3-3.5V1.5L16 0z" opacity="0.6"/>
+          </svg>
+        </div>
+        <div class="icon-container" style="transform: rotate(45deg);">
+          <svg viewBox="0 0 32 32" width="36" height="36" fill="#ec4899">
+            <path d="M16 3c-.8 0-1.5.7-1.5 1.5V10L4 14.5v2l10.5-2V21l-3.5 2v2l5-1.5 5 1.5v-2l-3.5-2v-6.5l10.5 2v-2L17.5 10V4.5c0-.8-.7-1.5-1.5-1.5z"/>
+          </svg>
+        </div>
+        <div class="icon-container" style="transform: rotate(270deg);">
+          <svg viewBox="0 0 32 32" width="36" height="36" fill="#ec4899">
+            <path d="M16 3c-.8 0-1.5.7-1.5 1.5V10L4 14.5v2l10.5-2V21l-3.5 2v2l5-1.5 5 1.5v-2l-3.5-2v-6.5l10.5 2v-2L17.5 10V4.5c0-.8-.7-1.5-1.5-1.5z"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Unknown -->
+    <div class="icon-card">
+      <div class="icon-name">Unknown</div>
+      <div class="icon-color">#6b7280</div>
+      <div class="icon-row">
+        <div class="icon-container">
+          <svg viewBox="0 0 32 32" width="36" height="36">
+            <circle cx="16" cy="16" r="12" fill="none" stroke="#6b7280" stroke-width="2" opacity="0.5"/>
+            <path d="M16 8l5 10H11l5-10z" fill="#6b7280" opacity="0.8"/>
+          </svg>
+        </div>
+        <div class="icon-container" style="transform: rotate(45deg);">
+          <svg viewBox="0 0 32 32" width="36" height="36">
+            <circle cx="16" cy="16" r="12" fill="none" stroke="#6b7280" stroke-width="2" opacity="0.5"/>
+            <path d="M16 8l5 10H11l5-10z" fill="#6b7280" opacity="0.8"/>
+          </svg>
+        </div>
+        <div class="icon-container" style="transform: rotate(180deg);">
+          <svg viewBox="0 0 32 32" width="36" height="36">
+            <circle cx="16" cy="16" r="12" fill="none" stroke="#6b7280" stroke-width="2" opacity="0.5"/>
+            <path d="M16 8l5 10H11l5-10z" fill="#6b7280" opacity="0.8"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+    
+  </div>
+  
+  <div class="special-states">
+    <div class="section-title">Special States</div>
+    <div class="state-row">
+      
+      <div class="state-card emergency">
+        <div class="icon-container emergency-icon">
+          <svg viewBox="0 0 32 32" width="40" height="40" fill="currentColor">
+            <path d="M16 2c-1.1 0-2 .9-2 2v7L3 16v3l11-3v8l-4 2.5v2.5l6-2 6 2v-2.5L18 24v-8l11 3v-3L18 11V4c0-1.1-.9-2-2-2z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="icon-name">Emergency State</div>
+          <div class="icon-color">Pulsing animation with glow</div>
+        </div>
+      </div>
+      
+      <div class="state-card selected">
+        <div class="icon-container" style="filter: drop-shadow(0 0 6px #3b82f6);">
+          <svg viewBox="0 0 32 32" width="40" height="40" fill="#3b82f6">
+            <path d="M16 2c-1.1 0-2 .9-2 2v7L3 16v3l11-3v8l-4 2.5v2.5l6-2 6 2v-2.5L18 24v-8l11 3v-3L18 11V4c0-1.1-.9-2-2-2z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="icon-name">Selected State</div>
+          <div class="icon-color">Blue glow highlight</div>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+  
+  <div class="legend">
+    <h3>Color Legend</h3>
+    <div class="legend-grid">
+      <div class="legend-item">
+        <div class="legend-color" style="background: #22c55e;"></div>
+        <span>Commercial - Green</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #f59e0b;"></div>
+        <span>Cargo - Amber</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #ef4444;"></div>
+        <span>Military - Red</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #8b5cf6;"></div>
+        <span>Private - Purple</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #06b6d4;"></div>
+        <span>Helicopter - Cyan</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #ec4899;"></div>
+        <span>Government - Pink</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #f97316;"></div>
+        <span>Special/UAV - Orange</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #6b7280;"></div>
+        <span>Unknown - Gray</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #3b82f6;"></div>
+        <span>Selected - Blue</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #ff0000;"></div>
+        <span>Emergency - Bright Red</span>
+      </div>
+    </div>
+  </div>
+  
+</body>
+</html>

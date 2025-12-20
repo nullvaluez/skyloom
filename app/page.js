@@ -6,6 +6,8 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { StatsBar } from '@/components/layout/StatsBar';
 import { DetailPanel } from '@/components/panels/DetailPanel';
 import { MobileNav } from '@/components/layout/MobileNav';
+import { MapErrorBoundary } from '@/components/ErrorBoundary';
+import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 
 // Dynamically import the map to avoid SSR issues with Leaflet
 const FlightMap = dynamic(
@@ -24,6 +26,9 @@ const FlightMap = dynamic(
 );
 
 export default function Home() {
+  // Initialize keyboard shortcuts
+  useKeyboardShortcuts();
+
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       {/* Header */}
@@ -36,7 +41,9 @@ export default function Home() {
 
         {/* Map Area */}
         <main className="relative flex-1 overflow-hidden">
-          <FlightMap />
+          <MapErrorBoundary>
+            <FlightMap />
+          </MapErrorBoundary>
 
           {/* Detail Panel */}
           <DetailPanel />

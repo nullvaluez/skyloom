@@ -1,18 +1,96 @@
 'use client';
 
-import { useMemo, memo } from 'react';
+import { useMemo, memo, useRef, useEffect } from 'react';
 import { Marker, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
-import { renderToString } from 'react-dom/server';
 import { useAircraftStore } from '@/stores/aircraft-store';
 import { useMapStore } from '@/stores/map-store';
 import { useUIStore } from '@/stores/ui-store';
-import { AircraftIcon } from '@/components/aircraft/AircraftIcon';
-import { classifyAircraft, getAircraftColor, getAircraftIconType, isEmergency } from '@/lib/classify';
+import { isEmergency } from '@/lib/classify';
 import { formatAltitude, formatSpeed, formatCallsign } from '@/lib/format';
+import { AIRCRAFT_ICON_DEFINITIONS, ICON_COLORS } from '@/lib/aircraft-icons';
+
+/**
+ * Generate SVG HTML string for aircraft icon
+ * This is a pure function that doesn't require React rendering
+ * @param {Object} params - Icon parameters
+ * @returns {string} SVG HTML string
+ */
+function generateIconSvg({ iconType, color, size, rotation, emergency, selected }) {
+  const iconDef = AIRCRAFT_ICON_DEFINITIONS[iconType] || AIRCRAFT_ICON_DEFINITIONS.unknown;
+  const iconColor = selected ? ICON_COLORS.selected : (emergency ? ICON_COLORS.emergency : color);
+
+  const paths = iconDef.paths.map((path, index) => {
+    if (path.stroke && !path.fill) {
+      return `<path
+        d="${path.d}"
+        fill="none"
+        stroke="${iconColor}"
+        stroke-width="${path.strokeWidth || 1.5}"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        opacity="${path.opacity || 1}"
+      />`;
+    }
+    return `<path
+      d="${path.d}"
+      fill="${path.fill ? iconColor : 'none'}"
+      stroke="${path.stroke ? iconColor : 'none'}"
+      stroke-width="${path.strokeWidth || 0}"
+      opacity="${path.opacity || 1}"
+    />`;
+  }).join('');
+
+  const emergencyClass = emergency ? 'aircraft-icon-v2--emergency' : '';
+  const selectedClass = selected ? 'aircraft-icon-v2--selected' : '';
+  const animateClass = iconDef.animate ? `aircraft-icon-v2--${iconDef.animate}` : '';
+
+  // Apply rotation directly to the group transform (CSS variables don't work reliably in HTML strings)
+  // Get viewBox center for transform-origin
+  const [, , vbWidth, vbHeight] = iconDef.viewBox.split(' ').map(Number);
+  const centerX = vbWidth / 2;
+  const centerY = vbHeight / 2;
+
+  return `
+    <svg
+      viewBox="${iconDef.viewBox}"
+      width="${size}"
+      height="${size}"
+      class="aircraft-icon-v2 ${emergencyClass} ${selectedClass} ${animateClass}"
+      style="--aircraft-color: ${iconColor};"
+    >
+      <g transform="rotate(${rotation} ${centerX} ${centerY})">
+        ${paths}
+      </g>
+    </svg>
+  `;
+}
+
+/**
+ * Generate the full marker HTML with icon and callsign label
+ */
+function generateMarkerHtml({ iconType, color, size, rotation, emergency, selected, callsign }) {
+  const iconSvg = generateIconSvg({ iconType, color, size, rotation, emergency, selected });
+  const iconColor = selected ? ICON_COLORS.selected : (emergency ? ICON_COLORS.emergency : color);
+
+  // Only show label if there's a callsign
+  const labelHtml = callsign ? `
+    <div class="aircraft-label" style="color: ${iconColor};">
+      ${callsign}
+    </div>
+  ` : '';
+
+  return `
+    <div class="aircraft-marker-container">
+      ${iconSvg}
+      ${labelHtml}
+    </div>
+  `;
+}
 
 /**
  * Individual aircraft marker component
+ * Optimized to avoid renderToString by using pure SVG string generation
  */
 export const AircraftMarker = memo(function AircraftMarker({ aircraft }) {
   const { selectedAircraftId, selectAircraft } = useAircraftStore();
@@ -20,12 +98,17 @@ export const AircraftMarker = memo(function AircraftMarker({ aircraft }) {
   const { openDetailPanel } = useUIStore();
 
   const isSelected = selectedAircraftId === aircraft.hex;
-  const classification = classifyAircraft(aircraft);
-  const physicalType = getAircraftIconType(aircraft);
-  
-  // Determine the best icon shape, prioritizing classification over physical type for better variety
+  const emergency = isEmergency(aircraft);
+  const size = getIconSize();
+  const rotation = aircraft.track || 0;
+
+  // Use pre-computed classification from store (memoized during setAircraft)
+  const classification = aircraft._classification || 'unknown';
+  const physicalType = aircraft._iconType || 'unknown';
+  const color = aircraft._color || ICON_COLORS.unknown;
+
+  // Determine the best icon shape
   const iconType = useMemo(() => {
-    // Always prioritize special classifications that should have unique icons
     switch (classification) {
       case 'military':
         return 'military';
@@ -34,51 +117,49 @@ export const AircraftMarker = memo(function AircraftMarker({ aircraft }) {
       case 'helicopter':
         return 'helicopter';
       case 'private':
-        // Use physical type if it's prop/jet, otherwise default to prop
         return (physicalType === 'prop' || physicalType === 'jet') ? physicalType : 'prop';
       case 'government':
-        return 'jet';
+        return 'government';
       case 'special':
         return 'jet';
       case 'commercial':
-        // For commercial, use the physical type to get airliner/jet distinction
         if (physicalType === 'airliner' || physicalType === 'jet' || physicalType === 'prop') {
           return physicalType;
         }
         return 'airliner';
       default:
-        // For unknown classification, use physical type
         return physicalType;
     }
   }, [physicalType, classification]);
 
-  const color = getAircraftColor(aircraft, isSelected); // Color based on classification
-  const size = getIconSize();
-  const rotation = aircraft.track || 0;
-  const emergency = isEmergency(aircraft);
+  // Get callsign for label display
+  const callsign = aircraft.flight?.trim() || '';
 
-  // Create custom icon
+  // Create custom icon using pure HTML string (no renderToString)
   const icon = useMemo(() => {
-    const iconHtml = renderToString(
-      <div className={emergency ? 'aircraft-emergency' : ''}>
-        <AircraftIcon
-          type={iconType}
-          color={color}
-          size={size}
-          rotation={rotation}
-        />
-      </div>
-    );
+    const iconHtml = generateMarkerHtml({
+      iconType,
+      color,
+      size,
+      rotation,
+      emergency,
+      selected: isSelected,
+      callsign,
+    });
+
+    // Increase icon container size to accommodate label
+    const containerWidth = callsign ? Math.max(size, 60) : size;
+    const containerHeight = callsign ? size + 16 : size;
 
     return L.divIcon({
       html: iconHtml,
       className: 'aircraft-marker',
-      iconSize: [size, size],
-      iconAnchor: [size / 2, size / 2],
+      iconSize: [containerWidth, containerHeight],
+      iconAnchor: [containerWidth / 2, size / 2],
     });
-  }, [iconType, color, size, rotation, emergency]);
+  }, [iconType, color, size, rotation, emergency, isSelected, callsign]);
 
-  // Handle marker click - stop propagation so map click doesn't also fire
+  // Handle marker click
   const handleClick = (e) => {
     L.DomEvent.stopPropagation(e);
     selectAircraft(aircraft.hex);
@@ -119,3 +200,5 @@ export const AircraftMarker = memo(function AircraftMarker({ aircraft }) {
     </Marker>
   );
 });
+
+export default AircraftMarker;

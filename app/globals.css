@@ -266,3 +266,102 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #52525b;
 }
+
+/* Aircraft Icon V2 Styles */
+.aircraft-icon-v2 {
+  will-change: transform;
+  pointer-events: none;
+}
+
+.aircraft-icon-v2__body {
+  transform: rotate(var(--aircraft-rotation, 0deg));
+  transform-origin: center;
+  transition: transform 0.3s ease-out;
+}
+
+/* Emergency pulsing animation */
+.aircraft-icon-v2--emergency {
+  animation: emergency-pulse-v2 0.5s ease-in-out infinite;
+}
+
+@keyframes emergency-pulse-v2 {
+  0%, 100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 4px #ff0000);
+  }
+  50% {
+    opacity: 0.7;
+    filter: drop-shadow(0 0 8px #ff0000);
+  }
+}
+
+/* Selected state glow */
+.aircraft-icon-v2--selected {
+  filter: drop-shadow(0 0 6px var(--aircraft-color));
+}
+
+/* Helicopter rotor animation */
+.aircraft-icon-v2--rotor .heli-rotor {
+  animation: rotor-spin 0.1s linear infinite;
+  transform-origin: center;
+}
+
+@keyframes rotor-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Unknown aircraft pulsing style */
+.aircraft-icon-v2--pulsing {
+  animation: unknown-pulse 2s ease-in-out infinite;
+}
+
+@keyframes unknown-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+/* Tooltip styles */
+.aircraft-tooltip {
+  background: rgba(15, 15, 19, 0.95) !important;
+  border: 1px solid rgba(63, 63, 70, 0.8) !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+.aircraft-tooltip::before {
+  border-top-color: rgba(15, 15, 19, 0.95) !important;
+}
+
+.leaflet-tooltip.aircraft-tooltip {
+  background: rgba(15, 15, 19, 0.95);
+  border: 1px solid rgba(63, 63, 70, 0.8);
+  border-radius: 8px;
+  color: #fafafa;
+}
+
+/* Aircraft marker container with label */
+.aircraft-marker-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Aircraft callsign label */
+.aircraft-label {
+  font-size: 10px;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  white-space: nowrap;
+  text-shadow:
+    -1px -1px 0 rgba(0, 0, 0, 0.8),
+    1px -1px 0 rgba(0, 0, 0, 0.8),
+    -1px 1px 0 rgba(0, 0, 0, 0.8),
+    1px 1px 0 rgba(0, 0, 0, 0.8),
+    0 0 4px rgba(0, 0, 0, 0.9);
+  letter-spacing: 0.5px;
+  pointer-events: none;
+  line-height: 1;
+}

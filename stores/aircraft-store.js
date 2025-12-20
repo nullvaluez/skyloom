@@ -1,5 +1,12 @@
 import { create } from 'zustand';
 import { TRAIL_CONFIG } from '@/lib/constants';
+import { classifyAircraft, getAircraftIconType, getAircraftColor } from '@/lib/classify';
+
+// Maximum age for trail points (5 minutes)
+const TRAIL_MAX_AGE_MS = 300000;
+
+// Epsilon for floating-point comparison
+const POSITION_EPSILON = 0.00001;
 
 export const useAircraftStore = create((set, get) => ({
   // Aircraft data as a Map for O(1) lookups
@@ -20,10 +27,25 @@ export const useAircraftStore = create((set, get) => ({
   // Actions
   setAircraft: (aircraftList) => {
     const { selectedAircraftId, trails } = get();
+    const now = Date.now();
     const newMap = new Map();
+    const activeHexes = new Set();
+
+    // Start with cleaned trails (only keep trails for selected aircraft)
+    const newTrails = new Map();
 
     aircraftList.forEach((ac) => {
       if (ac.hex) {
+        activeHexes.add(ac.hex);
+
+        // Pre-calculate and cache classification data to avoid repeated calculations
+        // This memoization prevents calling classifyAircraft multiple times per aircraft
+        if (!ac._classification) {
+          ac._classification = classifyAircraft(ac);
+          ac._iconType = getAircraftIconType(ac);
+          ac._color = getAircraftColor(ac);
+        }
+
         newMap.set(ac.hex, ac);
 
         // Update trail for selected aircraft
@@ -31,29 +53,59 @@ export const useAircraftStore = create((set, get) => ({
           const currentTrail = trails.get(ac.hex) || [];
           const lastPos = currentTrail[currentTrail.length - 1];
 
-          // Only add if position has changed
-          if (!lastPos || lastPos.lat !== ac.lat || lastPos.lon !== ac.lon) {
-            const newTrail = [
+          // Use epsilon comparison for floating point (more reliable than direct comparison)
+          const hasChanged = !lastPos ||
+            Math.abs(lastPos.lat - ac.lat) > POSITION_EPSILON ||
+            Math.abs(lastPos.lon - ac.lon) > POSITION_EPSILON;
+
+          if (hasChanged) {
+            // Add new position and limit trail length
+            const updatedTrail = [
               ...currentTrail,
-              { lat: ac.lat, lon: ac.lon, timestamp: Date.now() },
+              { lat: ac.lat, lon: ac.lon, timestamp: now },
             ].slice(-TRAIL_CONFIG.maxPositions);
 
-            set((state) => ({
-              trails: new Map(state.trails).set(ac.hex, newTrail),
-            }));
+            // Filter out old trail points (older than 5 minutes)
+            const recentTrail = updatedTrail.filter(p => now - p.timestamp < TRAIL_MAX_AGE_MS);
+
+            if (recentTrail.length > 0) {
+              newTrails.set(ac.hex, recentTrail);
+            }
+          } else {
+            // Position hasn't changed, keep existing trail
+            const existingTrail = trails.get(ac.hex);
+            if (existingTrail && existingTrail.length > 0) {
+              // Filter out old trail points
+              const recentTrail = existingTrail.filter(p => now - p.timestamp < TRAIL_MAX_AGE_MS);
+              if (recentTrail.length > 0) {
+                newTrails.set(ac.hex, recentTrail);
+              }
+            }
           }
         }
       }
     });
 
+    // If there's a selected aircraft but it wasn't in this batch, keep its trail
+    if (selectedAircraftId && !newTrails.has(selectedAircraftId)) {
+      const existingTrail = trails.get(selectedAircraftId);
+      if (existingTrail && existingTrail.length > 0) {
+        const recentTrail = existingTrail.filter(p => now - p.timestamp < TRAIL_MAX_AGE_MS);
+        if (recentTrail.length > 0) {
+          newTrails.set(selectedAircraftId, recentTrail);
+        }
+      }
+    }
+
     set({
       aircraft: newMap,
+      trails: newTrails,
       lastUpdate: new Date(),
     });
   },
 
   selectAircraft: (id) => {
-    const { trails, selectedAircraftId: previousId, followedAircraftId } = get();
+    const { trails, selectedAircraftId: previousId, followedAircraftId, aircraft } = get();
 
     // If deselecting (id is null), clear the trail and unfollow if following
     if (id === null) {
@@ -61,7 +113,7 @@ export const useAircraftStore = create((set, get) => ({
       if (previousId) {
         newTrails.delete(previousId);
       }
-      
+
       set({
         selectedAircraftId: null,
         trails: newTrails,
@@ -73,21 +125,16 @@ export const useAircraftStore = create((set, get) => ({
 
     // If selecting a new aircraft, clear old trail and initialize new one
     if (id !== previousId) {
-      const aircraft = get().aircraft.get(id);
-      const newTrails = new Map(trails);
-      
-      // Clear previous aircraft's trail
-      if (previousId) {
-        newTrails.delete(previousId);
-      }
-      
-      // Initialize new aircraft's trail
-      if (aircraft && aircraft.lat && aircraft.lon) {
+      const selectedAircraft = aircraft.get(id);
+      const newTrails = new Map();
+
+      // Initialize new aircraft's trail with current position
+      if (selectedAircraft && selectedAircraft.lat && selectedAircraft.lon) {
         newTrails.set(id, [
-          { lat: aircraft.lat, lon: aircraft.lon, timestamp: Date.now() },
+          { lat: selectedAircraft.lat, lon: selectedAircraft.lon, timestamp: Date.now() },
         ]);
       }
-      
+
       set({
         selectedAircraftId: id,
         trails: newTrails,
@@ -161,5 +208,16 @@ export const useAircraftStore = create((set, get) => ({
   // Get aircraft count
   getAircraftCount: () => {
     return get().aircraft.size;
+  },
+
+  // Get cached classification for an aircraft (uses pre-computed values)
+  getAircraftClassification: (hex) => {
+    const aircraft = get().aircraft.get(hex);
+    if (!aircraft) return null;
+    return {
+      classification: aircraft._classification,
+      iconType: aircraft._iconType,
+      color: aircraft._color,
+    };
   },
 }));
