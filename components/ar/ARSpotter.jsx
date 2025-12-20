@@ -10,6 +10,9 @@ import { usePassportStore } from '@/stores/passport-store';
 import { formatAltitude, formatCallsign } from '@/lib/format';
 import { getRarityColor } from '@/lib/rarity';
 
+// Track already-logged aircraft hex codes to prevent infinite loops
+const loggedAircraftSet = new Set();
+
 /**
  * Calculate bearing between two points
  */
@@ -257,12 +260,22 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
     }).slice(0, 10); // Limit to 10 aircraft for performance
   }, [aircraft, userLocation, orientation, isCalibrating]);
   
-  // Auto-log spotted aircraft
+  // Auto-log spotted aircraft (only once per session)
   useEffect(() => {
     visibleAircraft.forEach(ac => {
-      logSpot(ac);
+      if (!loggedAircraftSet.has(ac.hex)) {
+        loggedAircraftSet.add(ac.hex);
+        logSpot(ac);
+      }
     });
   }, [visibleAircraft, logSpot]);
+  
+  // Clear logged set when component unmounts
+  useEffect(() => {
+    return () => {
+      loggedAircraftSet.clear();
+    };
+  }, []);
   
   if (error) {
     return (

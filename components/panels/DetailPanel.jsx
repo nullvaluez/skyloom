@@ -56,10 +56,11 @@ const DetailPanelContent = memo(function DetailPanelContent({
   onFollow,
   onCopy,
   onShare,
+  showActions = true,
 }) {
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-4 space-y-6 flex-1">
+    <div className="flex flex-col">
+      <div className="p-4 space-y-6">
         <AircraftPhoto 
           aircraft={aircraft} 
           photo={photo} 
@@ -97,14 +98,16 @@ const DetailPanelContent = memo(function DetailPanelContent({
         />
       </div>
 
-      <div className="border-t border-zinc-800 p-4 sticky bottom-0 bg-zinc-950">
-        <ActionButtons
-          isFollowing={isFollowing}
-          onFollow={onFollow}
-          onCopy={onCopy}
-          onShare={onShare}
-        />
-      </div>
+      {showActions && (
+        <div className="border-t border-zinc-800 p-4 mt-auto bg-zinc-950">
+          <ActionButtons
+            isFollowing={isFollowing}
+            onFollow={onFollow}
+            onCopy={onCopy}
+            onShare={onShare}
+          />
+        </div>
+      )}
     </div>
   );
 });
@@ -211,7 +214,7 @@ export const DetailPanel = memo(function DetailPanel() {
             <SheetTitle className="text-left text-zinc-100">{headerTitle}</SheetTitle>
           </SheetHeader>
 
-          <ScrollArea className="flex-1 bg-zinc-950">
+          <ScrollArea className="flex-1 min-h-0 bg-zinc-950">
             <DetailPanelContent
               aircraft={aircraft}
               photo={photo}
@@ -223,8 +226,19 @@ export const DetailPanel = memo(function DetailPanel() {
               onFollow={handleFollow}
               onCopy={handleCopy}
               onShare={shareNative}
+              showActions={false}
             />
           </ScrollArea>
+          
+          {/* Fixed action buttons at bottom for mobile */}
+          <div className="border-t border-zinc-800 p-4 shrink-0 bg-zinc-950">
+            <ActionButtons
+              isFollowing={isFollowing}
+              onFollow={handleFollow}
+              onCopy={handleCopy}
+              onShare={shareNative}
+            />
+          </div>
         </SheetContent>
       </Sheet>
     );
