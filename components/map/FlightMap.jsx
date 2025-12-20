@@ -142,6 +142,41 @@ function getDepthDarkenFactor(pitch) {
 }
 
 /**
+ * Calculate viewport bounds from map view state
+ * Uses approximate degrees per pixel based on zoom level
+ * @param {object} viewState - Map view state { latitude, longitude, zoom }
+ * @param {number} width - Viewport width in pixels (default 1920)
+ * @param {number} height - Viewport height in pixels (default 1080)
+ * @returns {object|null} Bounds { north, south, east, west } or null
+ */
+function computeViewportBounds(viewState, width = 1920, height = 1080) {
+  if (!viewState || viewState.latitude == null || viewState.longitude == null) {
+    return null;
+  }
+
+  const { latitude, longitude, zoom } = viewState;
+  
+  // Approximate degrees per pixel at current zoom (at equator)
+  // zoom 0 = 360 degrees / 256 pixels, zoom increases halve the degrees
+  const degreesPerPixel = 360 / (256 * Math.pow(2, zoom));
+  
+  // Adjust for latitude (longitude degrees shrink toward poles)
+  const latRadians = (latitude * Math.PI) / 180;
+  const lonDegreesPerPixel = degreesPerPixel / Math.cos(latRadians);
+  
+  // Calculate bounds with some extra padding
+  const latSpan = (degreesPerPixel * height) / 2;
+  const lonSpan = (lonDegreesPerPixel * width) / 2;
+  
+  return {
+    north: latitude + latSpan,
+    south: latitude - latSpan,
+    east: longitude + lonSpan,
+    west: longitude - lonSpan,
+  };
+}
+
+/**
  * Main FlightMap component
  * - 2-layer extrusion in 3D: depth layer (offset + darker + slightly larger) + top layer (pickable)
  * - 1 layer in 2D
@@ -192,8 +227,9 @@ export const FlightMap = memo(function FlightMap() {
   const selectedAircraftId = useAircraftStore((s) => s.selectedAircraftId);
   const selectAircraft = useAircraftStore((s) => s.selectAircraft);
   const followedAircraftId = useAircraftStore((s) => s.followedAircraftId);
-  const getAllTrails = useAircraftStore((s) => s.getAllTrails);
+  const getTrailsInBounds = useAircraftStore((s) => s.getTrailsInBounds);
   const setCurrentZoom = useAircraftStore((s) => s.setCurrentZoom);
+  const setViewportBounds = useAircraftStore((s) => s.setViewportBounds);
 
   const openDetailPanel = useUIStore((s) => s.openDetailPanel);
   const closeDetailPanel = useUIStore((s) => s.closeDetailPanel);
@@ -276,10 +312,16 @@ export const FlightMap = memo(function FlightMap() {
     };
   }, []);
 
-  // Sync zoom level to aircraft store for trail tracking decisions
+  // Sync zoom level and viewport bounds to aircraft store for trail tracking decisions
   useEffect(() => {
     setCurrentZoom(viewState.zoom);
-  }, [viewState.zoom, setCurrentZoom]);
+    
+    // Compute and set viewport bounds for trail culling
+    const bounds = computeViewportBounds(viewState);
+    if (bounds) {
+      setViewportBounds(bounds);
+    }
+  }, [viewState.zoom, viewState.latitude, viewState.longitude, setCurrentZoom, setViewportBounds]);
 
   useEffect(() => {
     const lat = searchParams.get('lat');
@@ -347,8 +389,17 @@ export const FlightMap = memo(function FlightMap() {
     [selectedAircraftId, selectAircraft, closeDetailPanel]
   );
 
-  // Get all trails for rendering (includes selected and nearby aircraft when zoomed in)
-  const allTrailsData = getAllTrails();
+  // Compute viewport bounds for trail filtering
+  const viewportBounds = useMemo(
+    () => computeViewportBounds(viewState),
+    [viewState.latitude, viewState.longitude, viewState.zoom]
+  );
+
+  // Get only visible trails for rendering (performance optimization)
+  const allTrailsData = useMemo(
+    () => getTrailsInBounds(viewportBounds),
+    [getTrailsInBounds, viewportBounds]
+  );
 
   const baseSize = viewState.zoom < 7 ? 24 : viewState.zoom <= 10 ? 32 : 40;
   const is3DMode = viewState.pitch > 0;
@@ -377,8 +428,13 @@ export const FlightMap = memo(function FlightMap() {
 
     // Render trails for all tracked aircraft (when zoomed in)
     const use3DTrail = is3DMode && viewState.zoom >= 10;
-    const now = Date.now();
     const maxAge = 300000; // 5 minutes
+
+    // Batch all trail segments for a single PathLayer (performance optimization)
+    // Previously: N PathLayers per trail for gradient effect
+    // Now: 1 PathLayer for all 3D segments, 1 PathLayer for all 2D trails
+    const trail3DSegments = [];
+    const trail2DData = [];
 
     allTrailsData.forEach(({ hex, trail, color, isSelected }) => {
       if (trail.length < 2) return;
@@ -387,68 +443,79 @@ export const FlightMap = memo(function FlightMap() {
       const trailColor = getCachedColor(color);
 
       if (use3DTrail) {
-        // 3D trail with altitude
+        // 3D trail with altitude - create segments for gradient effect
         const path3D = trail.map((p) => [
           p.lon,
           p.lat,
           altitudeToMeters(p.alt || 0, viewState.pitch),
         ]);
 
-        // Create segments for gradient effect (newer = brighter)
-        const segments = [];
+        // Add segments with metadata for gradient rendering
         for (let i = 0; i < path3D.length - 1; i++) {
-          const age = now - (trail[i].timestamp || now);
           const progress = i / Math.max(1, path3D.length - 1);
           const avgAlt = ((trail[i].alt || 0) + (trail[i + 1].alt || 0)) / 2;
 
-          segments.push({
+          trail3DSegments.push({
             path: [path3D[i], path3D[i + 1]],
             progress,
             avgAlt,
-            normalizedAge: Math.min(age / maxAge, 1),
+            isSelected,
+            trailColor,
           });
         }
-
-        result.push(
-          new PathLayer({
-            id: `trail-3d-${hex}`,
-            data: segments,
-            getPath: (d) => d.path,
-            // Width varies with altitude; selected trails are slightly thicker
-            getWidth: (d) => (isSelected ? 2.5 : 1.5) + (d.avgAlt / 40000) * 1.5,
-            // Color gradient using aircraft's color
-            getColor: (d) => {
-              const baseOpacity = isSelected ? 180 : 120; // Selected trails are more visible
-              const opacity = (0.3 + d.progress * 0.7) * baseOpacity / 180 * 255;
-              return [...trailColor.slice(0, 3), Math.round(opacity)];
-            },
-            widthUnits: 'pixels',
-            widthMinPixels: 1,
-            widthMaxPixels: isSelected ? 6 : 4,
-            jointRounded: true,
-            capRounded: true,
-            billboard: false,
-            pickable: false,
-          })
-        );
       } else {
-        // 2D trail fallback
+        // 2D trail - batch all trails together
         const path2D = trail.map((p) => [p.lon, p.lat]);
-        result.push(
-          new PathLayer({
-            id: `trail-2d-${hex}`,
-            data: [{ path: path2D }],
-            getPath: (d) => d.path,
-            getWidth: isSelected ? 3 : 2,
-            getColor: [...trailColor.slice(0, 3), isSelected ? 180 : 120],
-            widthUnits: 'pixels',
-            jointRounded: true,
-            capRounded: true,
-            pickable: false,
-          })
-        );
+        trail2DData.push({
+          path: path2D,
+          isSelected,
+          trailColor,
+        });
       }
     });
+
+    // Create single PathLayer for all 3D trail segments
+    if (trail3DSegments.length > 0) {
+      result.push(
+        new PathLayer({
+          id: 'trails-3d-batched',
+          data: trail3DSegments,
+          getPath: (d) => d.path,
+          // Width varies with altitude; selected trails are slightly thicker
+          getWidth: (d) => (d.isSelected ? 2.5 : 1.5) + (d.avgAlt / 40000) * 1.5,
+          // Color gradient using aircraft's color
+          getColor: (d) => {
+            const baseOpacity = d.isSelected ? 180 : 120;
+            const opacity = (0.3 + d.progress * 0.7) * baseOpacity / 180 * 255;
+            return [...d.trailColor.slice(0, 3), Math.round(opacity)];
+          },
+          widthUnits: 'pixels',
+          widthMinPixels: 1,
+          widthMaxPixels: 6,
+          jointRounded: true,
+          capRounded: true,
+          billboard: false,
+          pickable: false,
+        })
+      );
+    }
+
+    // Create single PathLayer for all 2D trails
+    if (trail2DData.length > 0) {
+      result.push(
+        new PathLayer({
+          id: 'trails-2d-batched',
+          data: trail2DData,
+          getPath: (d) => d.path,
+          getWidth: (d) => (d.isSelected ? 3 : 2),
+          getColor: (d) => [...d.trailColor.slice(0, 3), d.isSelected ? 180 : 120],
+          widthUnits: 'pixels',
+          jointRounded: true,
+          capRounded: true,
+          pickable: false,
+        })
+      );
+    }
 
     if (is3DMode && ScatterplotLayer && airborneAircraft.length > 0) {
       result.push(

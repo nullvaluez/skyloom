@@ -72,7 +72,7 @@ export const SettingsPanel = memo(function SettingsPanel() {
           </div>
 
           <div className="pt-10 text-center">
-            <p className="text-[10px] text-zinc-500 uppercase tracking-widest">SkyTracker 2026 v0.1.0</p>
+            <p className="text-[10px] text-zinc-500 uppercase tracking-widest">ShadowADSB 2026 v0.1.0</p>
           </div>
         </div>
       </SheetContent>

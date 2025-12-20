@@ -17,7 +17,7 @@ export async function GET(request, { params }) {
         revalidate: 3600, // Cache photos for 1 hour
       },
       headers: {
-        'User-Agent': 'SkyTracker/1.0',
+        'User-Agent': 'ShadowADSB/1.0',
       },
     });
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { memo, useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -98,10 +99,17 @@ export const Header = memo(function Header() {
     <header className="flex h-14 items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4">
       {/* Logo */}
       <div className="flex items-center gap-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-          <Plane className="h-5 w-5 text-primary-foreground" />
+        <div className="relative flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden">
+          <Image 
+            src="/logo.webp" 
+            alt="ShadowADSB Logo" 
+            width={32}
+            height={32}
+            className="object-contain"
+            priority
+          />
         </div>
-        <span className="text-lg font-semibold tracking-tight">SkyTracker</span>
+        <span className="text-lg font-semibold tracking-tight">ShadowADSB</span>
       </div>
 
       {/* Search Bar - Desktop */}

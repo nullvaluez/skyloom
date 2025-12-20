@@ -209,7 +209,7 @@ export const useFilterStore = create(
       },
     }),
     {
-      name: 'skytracker-filters',
+      name: 'shadowadsb-filters',
       partialize: (state) => ({ filters: state.filters }),
     }
   )

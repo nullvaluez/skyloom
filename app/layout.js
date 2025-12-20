@@ -13,14 +13,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "SkyTracker - Real-time Aircraft Tracking",
+  title: "ShadowADSB - Real-time Aircraft Tracking",
   description: "Track aircraft in real-time with 3D visualization, AR spotting mode, and gamification. The ultimate flight tracking experience.",
   keywords: ["aircraft tracking", "flight tracker", "ADS-B", "aviation", "real-time", "flights", "AR", "3D map"],
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "SkyTracker",
+    title: "ShadowADSB",
   },
   formatDetection: {
     telephone: false,
@@ -28,24 +28,24 @@ export const metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://skytracker.app",
-    title: "SkyTracker - Real-time Aircraft Tracking",
+    url: "https://shadowadsb.app",
+    title: "ShadowADSB - Real-time Aircraft Tracking",
     description: "Track aircraft in real-time with 3D visualization, AR spotting mode, and gamification.",
-    siteName: "SkyTracker",
+    siteName: "ShadowADSB",
   },
   twitter: {
     card: "summary_large_image",
-    title: "SkyTracker - Real-time Aircraft Tracking",
+    title: "ShadowADSB - Real-time Aircraft Tracking",
     description: "Track aircraft in real-time with 3D visualization, AR spotting mode, and gamification.",
   },
   icons: {
     icon: [
-      { url: "/favicon.ico" },
+      { url: "/logo.webp" },
       { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
       { url: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" },
     ],
     apple: [
-      { url: "/icons/icon-152x152.png", sizes: "152x152", type: "image/png" },
+      { url: "/logo.webp" },
       { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
     ],
   },
@@ -65,12 +65,12 @@ export default function RootLayout({ children }) {
     <html lang="en" className="dark">
       <head>
         {/* PWA meta tags */}
-        <meta name="application-name" content="SkyTracker" />
+        <meta name="application-name" content="ShadowADSB" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="SkyTracker" />
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+        <meta name="apple-mobile-web-app-title" content="ShadowADSB" />
+        <link rel="apple-touch-icon" href="/logo.webp" />
         
         {/* Splash screens for iOS */}
         <link

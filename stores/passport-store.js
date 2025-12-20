@@ -227,7 +227,7 @@ export const usePassportStore = create(
       },
     }),
     {
-      name: 'skytracker-passport',
+      name: 'shadowadsb-passport',
       partialize: (state) => ({
         spottedAircraft: state.spottedAircraft,
         badges: state.badges,

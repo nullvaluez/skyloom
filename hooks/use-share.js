@@ -57,7 +57,7 @@ export function useShare() {
         await navigator.share({
           title: selectedAircraft
             ? `Tracking ${selectedAircraft.flight?.trim() || selectedAircraft.hex}`
-            : 'SkyTracker - Live Flight Tracking',
+            : 'ShadowADSB - Live Flight Tracking',
           text: selectedAircraft
             ? `Check out this flight: ${selectedAircraft.flight?.trim() || selectedAircraft.hex}`
             : 'Real-time aircraft tracking',

@@ -247,7 +247,7 @@ export const useMapStore = create(
       },
     }),
     {
-      name: 'skytracker-map',
+      name: 'shadowadsb-map',
       partialize: (state) => ({
         center: state.center,
         zoom: state.zoom,

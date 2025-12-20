@@ -1,6 +1,24 @@
 import { NextResponse } from 'next/server';
 import { ADSB_BASE_URL } from '@/lib/constants';
 
+// Timeout for external API calls (8 seconds for single aircraft)
+const API_TIMEOUT_MS = 8000;
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = API_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export async function GET(request, { params }) {
   const { hex } = await params;
 
@@ -12,11 +30,15 @@ export async function GET(request, { params }) {
   }
 
   try {
-    const response = await fetch(`${ADSB_BASE_URL}/hex/${hex.toUpperCase()}`, {
-      next: {
-        revalidate: 2, // Faster updates for single aircraft
+    const response = await fetchWithTimeout(
+      `${ADSB_BASE_URL}/hex/${hex.toUpperCase()}`,
+      {
+        next: {
+          revalidate: 2, // Faster updates for single aircraft
+        },
       },
-    });
+      API_TIMEOUT_MS
+    );
 
     if (!response.ok) {
       if (response.status === 404) {
@@ -36,6 +58,13 @@ export async function GET(request, { params }) {
       },
     });
   } catch (error) {
+    if (error.name === 'AbortError') {
+      return NextResponse.json(
+        { error: 'External API timeout' },
+        { status: 504 }
+      );
+    }
+
     console.error('Error fetching aircraft:', error);
     return NextResponse.json(
       { error: 'Failed to fetch aircraft', details: error.message },

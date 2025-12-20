@@ -1,10 +1,10 @@
 export const siteConfig = {
-  name: "SkyTracker",
+  name: "ShadowADSB",
   description: "Real-time aircraft tracking with interactive maps",
-  url: "https://skytracker.app",
-  author: "SkyTracker",
+  url: "https://shadowadsb.app",
+  author: "ShadowADSB",
   links: {
-    github: "https://github.com/skytracker",
+    github: "https://github.com/shadowadsb",
   },
 };
 

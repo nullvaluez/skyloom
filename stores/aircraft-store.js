@@ -20,6 +20,72 @@ const TRAILS_MIN_ZOOM = 9;
 // Cleanup interval timer reference
 let cleanupIntervalId = null;
 
+// Padding in degrees for viewport bounds check (approx 11km at equator)
+const VIEWPORT_PADDING = 0.1;
+
+/**
+ * Check if aircraft data has meaningfully changed (position, altitude, speed)
+ * Used for differential updates to avoid reprocessing unchanged aircraft
+ * @param {object} oldAc - Previous aircraft data
+ * @param {object} newAc - New aircraft data
+ * @returns {boolean} True if aircraft has changed enough to warrant update
+ */
+function hasAircraftChanged(oldAc, newAc) {
+  if (!oldAc) return true;
+  
+  // Position change
+  if (Math.abs((oldAc.lat || 0) - (newAc.lat || 0)) > POSITION_EPSILON) return true;
+  if (Math.abs((oldAc.lon || 0) - (newAc.lon || 0)) > POSITION_EPSILON) return true;
+  
+  // Altitude change (>50ft is meaningful)
+  const oldAlt = typeof oldAc.alt_baro === 'number' ? oldAc.alt_baro : 0;
+  const newAlt = typeof newAc.alt_baro === 'number' ? newAc.alt_baro : 0;
+  if (Math.abs(oldAlt - newAlt) > 50) return true;
+  
+  // Speed change (>5 knots is meaningful)
+  if (Math.abs((oldAc.gs || 0) - (newAc.gs || 0)) > 5) return true;
+  
+  // Track/heading change (>2 degrees is meaningful)
+  if (Math.abs((oldAc.track || 0) - (newAc.track || 0)) > 2) return true;
+  
+  // Squawk change (emergency detection)
+  if (oldAc.squawk !== newAc.squawk) return true;
+  
+  return false;
+}
+
+/**
+ * Check if a position is within viewport bounds (with optional padding)
+ * @param {number} lat - Latitude
+ * @param {number} lon - Longitude
+ * @param {object} bounds - Viewport bounds { north, south, east, west }
+ * @param {number} padding - Padding in degrees (default 0.1)
+ * @returns {boolean} True if position is within padded bounds
+ */
+function isInViewport(lat, lon, bounds, padding = VIEWPORT_PADDING) {
+  if (!bounds || lat == null || lon == null) return false;
+  
+  const { north, south, east, west } = bounds;
+  
+  // Add padding to bounds
+  const paddedNorth = north + padding;
+  const paddedSouth = south - padding;
+  const paddedEast = east + padding;
+  const paddedWest = west - padding;
+  
+  // Check latitude (simple comparison)
+  if (lat < paddedSouth || lat > paddedNorth) return false;
+  
+  // Check longitude (handle wraparound at +/-180)
+  if (paddedWest <= paddedEast) {
+    // Normal case: bounds don't cross antimeridian
+    return lon >= paddedWest && lon <= paddedEast;
+  } else {
+    // Bounds cross antimeridian
+    return lon >= paddedWest || lon <= paddedEast;
+  }
+}
+
 export const useAircraftStore = create((set, get) => ({
   // Aircraft data as a Map for O(1) lookups
   aircraft: new Map(),
@@ -45,9 +111,12 @@ export const useAircraftStore = create((set, get) => ({
   // Whether to track trails for all aircraft (based on zoom)
   trailsForAll: true,
 
+  // Viewport bounds for trail culling { north, south, east, west }
+  viewportBounds: null,
+
   // Actions
   setAircraft: (aircraftList) => {
-    const { selectedAircraftId, trails, lastSeen, aircraft: existingAircraft, currentZoom, trailsForAll } = get();
+    const { selectedAircraftId, trails, lastSeen, aircraft: existingAircraft, currentZoom, trailsForAll, viewportBounds } = get();
     const now = Date.now();
     const newMap = new Map();
     const newLastSeen = new Map(lastSeen);
@@ -61,6 +130,11 @@ export const useAircraftStore = create((set, get) => ({
 
     // Keep track of how many trails we're tracking for performance
     let trailCount = 0;
+    
+    // Differential processing stats (for debugging)
+    let unchanged = 0;
+    let updated = 0;
+    let newAircraft = 0;
 
     aircraftList.forEach((ac) => {
       if (ac.hex) {
@@ -72,10 +146,23 @@ export const useAircraftStore = create((set, get) => ({
         // Get existing aircraft data to preserve classification
         const existing = existingAircraft.get(ac.hex);
         
-        // Merge with existing data, keeping position updates
-        const mergedAc = existing 
-          ? { ...existing, ...ac }
-          : ac;
+        // Check if aircraft has meaningfully changed (differential processing)
+        const changed = hasAircraftChanged(existing, ac);
+        
+        let mergedAc;
+        if (existing && !changed) {
+          // Aircraft unchanged - reuse existing object entirely (best performance)
+          mergedAc = existing;
+          unchanged++;
+        } else if (existing) {
+          // Aircraft changed - merge new data but preserve classification
+          mergedAc = { ...existing, ...ac };
+          updated++;
+        } else {
+          // New aircraft - calculate classification
+          mergedAc = ac;
+          newAircraft++;
+        }
 
         // Calculate classification data if not already cached
         if (!mergedAc._classification) {
@@ -87,10 +174,11 @@ export const useAircraftStore = create((set, get) => ({
         newMap.set(ac.hex, mergedAc);
 
         // Determine if we should track trail for this aircraft
-        // Always track selected, or track all when zoomed in (up to performance limit)
+        // Always track selected, or track visible aircraft when zoomed in (up to performance limit)
         const isSelected = ac.hex === selectedAircraftId;
+        const isInView = ac.lat && ac.lon && isInViewport(ac.lat, ac.lon, viewportBounds);
         const shouldTrackTrail = isSelected || 
-          (shouldTrackAll && trailCount < MAX_TRAIL_AIRCRAFT && ac.lat && ac.lon);
+          (shouldTrackAll && isInView && trailCount < MAX_TRAIL_AIRCRAFT);
 
         if (shouldTrackTrail && ac.lat && ac.lon) {
           const currentTrail = trails.get(ac.hex) || [];
@@ -294,9 +382,62 @@ export const useAircraftStore = create((set, get) => ({
     return result.sort((a, b) => (a.isSelected ? 1 : 0) - (b.isSelected ? 1 : 0));
   },
 
+  // Get trails that intersect with the given viewport bounds
+  // Returns array of { hex, trail, color, isSelected } for visible trails only
+  getTrailsInBounds: (bounds) => {
+    const { trails, aircraft, selectedAircraftId } = get();
+    const result = [];
+    
+    if (!bounds) {
+      // If no bounds provided, return all trails (fallback behavior)
+      return get().getAllTrails();
+    }
+    
+    for (const [hex, trail] of trails.entries()) {
+      if (trail.length < 2) continue;
+      
+      const ac = aircraft.get(hex);
+      const isSelected = hex === selectedAircraftId;
+      
+      // Always include selected aircraft trail
+      if (isSelected) {
+        result.push({
+          hex,
+          trail,
+          color: ac?._color || '#9ca3af',
+          isSelected: true,
+        });
+        continue;
+      }
+      
+      // Check if any trail point is within the viewport bounds
+      // Use a slightly larger padding for trail visibility
+      const trailInView = trail.some(point => 
+        isInViewport(point.lat, point.lon, bounds, VIEWPORT_PADDING * 2)
+      );
+      
+      if (trailInView) {
+        result.push({
+          hex,
+          trail,
+          color: ac?._color || '#9ca3af',
+          isSelected: false,
+        });
+      }
+    }
+    
+    // Sort so selected trail renders on top
+    return result.sort((a, b) => (a.isSelected ? 1 : 0) - (b.isSelected ? 1 : 0));
+  },
+
   // Update current zoom level (called by map component)
   setCurrentZoom: (zoom) => {
     set({ currentZoom: zoom });
+  },
+
+  // Update viewport bounds for trail culling (called by map component)
+  setViewportBounds: (bounds) => {
+    set({ viewportBounds: bounds });
   },
 
   // Toggle trails for all aircraft
