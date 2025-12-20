@@ -12,6 +12,7 @@ import { useAircraftWorker } from '@/hooks/use-aircraft-worker';
 import { MapControls } from './MapControls';
 import { isEmergency } from '@/lib/classify';
 import { altitudeToMeters, getShadowRadius } from '@/lib/altitude';
+import { getPitchBracket } from '@/lib/icon-bitmap-cache';
 
 // Dark map style
 const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
@@ -111,6 +112,33 @@ COMMON_COLORS.forEach(getCachedColor);
 function darkenRgba([r, g, b, a], factor = 0.55, alphaOverride = null) {
   const na = alphaOverride == null ? a : alphaOverride;
   return [r * factor, g * factor, b * factor, na];
+}
+
+/**
+ * Calculate pitch-responsive depth offset for 3D icon layer
+ * Offset scales with camera pitch angle to create more convincing depth
+ * @param {number} pitch - Camera pitch in degrees (0-85)
+ * @param {number} zoom - Current zoom level
+ * @returns {[number, number]} Pixel offset [x, y]
+ */
+function getPitchResponsiveOffset(pitch, zoom) {
+  const pitchFactor = Math.sin((pitch * Math.PI) / 180);
+  const zoomScale = Math.max(0.5, zoom / 12);
+  return [
+    2 + pitchFactor * 3 * zoomScale,  // X offset
+    2 + pitchFactor * 4 * zoomScale   // Y offset (more pronounced)
+  ];
+}
+
+/**
+ * Calculate depth layer darkening factor based on pitch
+ * Steeper angles = darker depth layer for more contrast
+ * @param {number} pitch - Camera pitch in degrees
+ * @returns {number} Darkening factor (0.4 to 0.55)
+ */
+function getDepthDarkenFactor(pitch) {
+  const pitchFactor = Math.min(pitch / 85, 1);
+  return 0.55 - pitchFactor * 0.15; // Range: 0.55 (flat) to 0.40 (steep)
 }
 
 /**
@@ -314,7 +342,6 @@ export const FlightMap = memo(function FlightMap() {
   );
 
   const trailData = getSelectedTrail();
-  const trailPath = useMemo(() => trailData?.map((p) => [p.lon, p.lat]) || [], [trailData]);
 
   const baseSize = viewState.zoom < 7 ? 24 : viewState.zoom <= 10 ? 32 : 40;
   const is3DMode = viewState.pitch > 0;
@@ -324,29 +351,93 @@ export const FlightMap = memo(function FlightMap() {
     [filteredAircraft]
   );
 
-  // 3D depth tuning (pixels): kept small so it looks like thickness, not a drop shadow.
-  // You can scale slightly with zoom if desired; this is stable and cheap.
-  const depthPixelOffset = useMemo(() => (is3DMode ? [3, 3] : [0, 0]), [is3DMode]);
-  const depthScale = 1.08; // “thickness” size bump
+  // 3D depth tuning: pitch-responsive offset creates more convincing depth at steep angles
+  const depthPixelOffset = useMemo(
+    () => (is3DMode ? getPitchResponsiveOffset(viewState.pitch, viewState.zoom) : [0, 0]),
+    [is3DMode, viewState.pitch, viewState.zoom]
+  );
+
+  // Depth layer scale and darkening respond to pitch for enhanced 3D effect
+  const depthScale = 1.08; // "thickness" size bump
+  const depthDarkenFactor = useMemo(() => getDepthDarkenFactor(viewState.pitch), [viewState.pitch]);
+
+  // Get current pitch bracket for icon foreshortening (memoized to avoid recalc)
+  const pitchBracket = useMemo(() => getPitchBracket(viewState.pitch), [viewState.pitch]);
 
   const layers = useMemo(() => {
     if (!IconLayer || !PathLayer) return [];
     const result = [];
 
-    if (trailPath.length >= 2 && selectedAircraftId) {
-      result.push(
-        new PathLayer({
-          id: 'trail-layer',
-          data: [{ path: trailPath }],
-          getPath: (d) => d.path,
-          getWidth: 3,
-          getColor: [59, 130, 246, 180],
-          widthUnits: 'pixels',
-          jointRounded: true,
-          capRounded: true,
-          pickable: false,
-        })
-      );
+    // Trail layer - 3D with altitude when zoomed in (zoom >= 10) and in 3D mode
+    if (trailData.length >= 2 && selectedAircraftId) {
+      const use3DTrail = is3DMode && viewState.zoom >= 10;
+
+      if (use3DTrail) {
+        // 3D trail with altitude - creates immersive flight path visualization
+        const path3D = trailData.map((p) => [
+          p.lon,
+          p.lat,
+          altitudeToMeters(p.alt || 0, viewState.pitch),
+        ]);
+
+        // Create segments for gradient effect (newer = brighter)
+        const segments = [];
+        const now = Date.now();
+        const maxAge = 300000; // 5 minutes
+
+        for (let i = 0; i < path3D.length - 1; i++) {
+          const age = now - (trailData[i].timestamp || now);
+          const progress = i / Math.max(1, path3D.length - 1);
+          const avgAlt = ((trailData[i].alt || 0) + (trailData[i + 1].alt || 0)) / 2;
+
+          segments.push({
+            path: [path3D[i], path3D[i + 1]],
+            progress,
+            avgAlt,
+            normalizedAge: Math.min(age / maxAge, 1),
+          });
+        }
+
+        result.push(
+          new PathLayer({
+            id: 'trail-3d-layer',
+            data: segments,
+            getPath: (d) => d.path,
+            // Width varies slightly with altitude (higher = slightly thicker)
+            getWidth: (d) => 2 + (d.avgAlt / 40000) * 2,
+            // Color gradient: older = dimmer, newer = brighter
+            getColor: (d) => {
+              const opacity = 50 + d.progress * 130;
+              // Slight blue shift for higher altitudes
+              const altFactor = Math.min(d.avgAlt / 40000, 1);
+              return [59 - altFactor * 20, 130 + altFactor * 20, 246, opacity];
+            },
+            widthUnits: 'pixels',
+            widthMinPixels: 1,
+            widthMaxPixels: 6,
+            jointRounded: true,
+            capRounded: true,
+            billboard: false,
+            pickable: false,
+          })
+        );
+      } else {
+        // 2D trail fallback
+        const path2D = trailData.map((p) => [p.lon, p.lat]);
+        result.push(
+          new PathLayer({
+            id: 'trail-layer',
+            data: [{ path: path2D }],
+            getPath: (d) => d.path,
+            getWidth: 3,
+            getColor: [59, 130, 246, 180],
+            widthUnits: 'pixels',
+            jointRounded: true,
+            capRounded: true,
+            pickable: false,
+          })
+        );
+      }
     }
 
     if (is3DMode && ScatterplotLayer && airborneAircraft.length > 0) {
@@ -380,6 +471,7 @@ export const FlightMap = memo(function FlightMap() {
             getAngle: (d) => -(d.track || 0),
 
             // Darkened tint reads as the side wall/rim
+            // Darkening intensifies with pitch for better depth perception
             getColor: (d) => {
               const base =
                 d.hex === selectedAircraftId
@@ -388,8 +480,8 @@ export const FlightMap = memo(function FlightMap() {
                     ? getCachedColor('#ef4444')
                     : getCachedColor(d._color || '#9ca3af');
 
-              // Slightly more opaque than top layer so the rim is visible
-              return darkenRgba(base, 0.55, 200);
+              // Use pitch-responsive darkening for enhanced 3D effect
+              return darkenRgba(base, depthDarkenFactor, 200);
             },
 
             getPixelOffset: () => depthPixelOffset,
@@ -401,9 +493,10 @@ export const FlightMap = memo(function FlightMap() {
 
             updateTriggers: {
               getSize: [selectedAircraftId, baseSize, is3DMode],
-              getColor: [selectedAircraftId],
-              getPixelOffset: [is3DMode],
+              getColor: [selectedAircraftId, depthDarkenFactor],
+              getPixelOffset: [is3DMode, viewState.pitch, viewState.zoom],
               getPosition: [is3DMode, viewState.pitch],
+              getIcon: [pitchBracket.name], // Update icons when pitch bracket changes
             },
           })
         );
@@ -442,6 +535,7 @@ export const FlightMap = memo(function FlightMap() {
             getSize: [selectedAircraftId, baseSize],
             getColor: [selectedAircraftId],
             getPosition: [is3DMode, viewState.pitch],
+            getIcon: [pitchBracket.name], // Update icons when pitch bracket changes for foreshortening
           },
         })
       );
@@ -453,10 +547,13 @@ export const FlightMap = memo(function FlightMap() {
     airborneAircraft,
     selectedAircraftId,
     baseSize,
-    trailPath,
+    trailData,
     is3DMode,
     viewState.pitch,
+    viewState.zoom,
     depthPixelOffset,
+    depthDarkenFactor,
+    pitchBracket,
   ]);
 
   if (!isReady || !DeckGL || !MapGL) {

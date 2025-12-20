@@ -74,15 +74,24 @@ export const useAircraftStore = create((set, get) => ({
           const lastPos = currentTrail[currentTrail.length - 1];
 
           // Use epsilon comparison for floating point (more reliable than direct comparison)
+          // Also detect significant altitude changes (>100ft) for 3D trail accuracy
+          const altChanged = !lastPos ||
+            Math.abs((lastPos.alt || 0) - (ac.alt_baro || 0)) > 100;
           const hasChanged = !lastPos ||
             Math.abs(lastPos.lat - ac.lat) > POSITION_EPSILON ||
-            Math.abs(lastPos.lon - ac.lon) > POSITION_EPSILON;
+            Math.abs(lastPos.lon - ac.lon) > POSITION_EPSILON ||
+            altChanged;
 
           if (hasChanged) {
-            // Add new position and limit trail length
+            // Add new position with altitude for 3D trail rendering
             const updatedTrail = [
               ...currentTrail,
-              { lat: ac.lat, lon: ac.lon, timestamp: now },
+              {
+                lat: ac.lat,
+                lon: ac.lon,
+                alt: ac.alt_baro || 0,  // Store altitude for 3D trails
+                timestamp: now
+              },
             ].slice(-TRAIL_CONFIG.maxPositions);
 
             // Filter out old trail points (older than 5 minutes)
@@ -156,10 +165,15 @@ export const useAircraftStore = create((set, get) => ({
       const selectedAircraft = aircraft.get(id);
       const newTrails = new Map();
 
-      // Initialize new aircraft's trail with current position
+      // Initialize new aircraft's trail with current position and altitude
       if (selectedAircraft && selectedAircraft.lat && selectedAircraft.lon) {
         newTrails.set(id, [
-          { lat: selectedAircraft.lat, lon: selectedAircraft.lon, timestamp: Date.now() },
+          {
+            lat: selectedAircraft.lat,
+            lon: selectedAircraft.lon,
+            alt: selectedAircraft.alt_baro || 0,  // Include altitude for 3D trails
+            timestamp: Date.now()
+          },
         ]);
       }
 
@@ -185,9 +199,15 @@ export const useAircraftStore = create((set, get) => ({
     const { trails } = get();
     const currentTrail = trails.get(id) || [];
 
+    // Ensure altitude is included in trail points for 3D rendering
     const newTrail = [
       ...currentTrail,
-      { ...position, timestamp: Date.now() },
+      {
+        lat: position.lat,
+        lon: position.lon,
+        alt: position.alt || 0,  // Include altitude for 3D trails
+        timestamp: Date.now()
+      },
     ].slice(-TRAIL_CONFIG.maxPositions);
 
     set((state) => ({

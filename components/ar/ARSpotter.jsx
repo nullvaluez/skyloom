@@ -160,6 +160,8 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
   const [orientation, setOrientation] = useState({ alpha: 0, beta: 0, gamma: 0 });
   const [isCalibrating, setIsCalibrating] = useState(true);
   const [hasOrientation, setHasOrientation] = useState(false);
+  const [needsOrientationPermission, setNeedsOrientationPermission] = useState(false);
+  const orientationHandlerRef = useRef(null);
   
   // Select primitive/stable values from stores to avoid infinite loops
   const userLocation = useMapStore((s) => s.userLocation);
@@ -203,66 +205,93 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
     };
   }, []);
   
-  // Request device orientation
+  // Setup orientation handler function (shared between auto-init and manual request)
+  const setupOrientationListener = useCallback(() => {
+    // Remove any existing handler first
+    if (orientationHandlerRef.current) {
+      window.removeEventListener('deviceorientation', orientationHandlerRef.current, true);
+    }
+
+    orientationHandlerRef.current = (event) => {
+      // Check if we have actual orientation data (not all nulls)
+      if (event.alpha !== null || event.beta !== null) {
+        setOrientation({
+          alpha: event.alpha || 0, // Compass heading
+          beta: event.beta || 0,   // Front-to-back tilt
+          gamma: event.gamma || 0, // Left-to-right tilt
+        });
+        setHasOrientation(true);
+        setIsCalibrating(false);
+        setNeedsOrientationPermission(false);
+      }
+    };
+
+    window.addEventListener('deviceorientation', orientationHandlerRef.current, true);
+
+    // Fallback: end calibration after 3 seconds even if no orientation events
+    setTimeout(() => {
+      setIsCalibrating(false);
+    }, 3000);
+  }, []);
+
+  // Handle iOS permission request - MUST be called from user gesture (button tap)
+  const requestOrientationPermission = useCallback(async () => {
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+      try {
+        const permission = await DeviceOrientationEvent.requestPermission();
+        if (permission === 'granted') {
+          setupOrientationListener();
+        } else {
+          console.log('Orientation permission denied');
+          setIsCalibrating(false);
+          setNeedsOrientationPermission(false);
+        }
+      } catch (err) {
+        console.error('Orientation permission error:', err);
+        setIsCalibrating(false);
+        setNeedsOrientationPermission(false);
+      }
+    }
+  }, [setupOrientationListener]);
+
+  // Check if we need permission and auto-setup for non-iOS devices
   useEffect(() => {
     let mounted = true;
-    let orientationHandler = null;
-    let calibrationTimeout = null;
-    
-    async function initOrientation() {
-      // iOS requires permission request
-      if (typeof DeviceOrientationEvent !== 'undefined' && 
+
+    const checkOrientationSupport = () => {
+      // Check if iOS requires permission (iOS 13+)
+      if (typeof DeviceOrientationEvent !== 'undefined' &&
           typeof DeviceOrientationEvent.requestPermission === 'function') {
-        try {
-          const permission = await DeviceOrientationEvent.requestPermission();
-          if (permission !== 'granted') {
-            // Don't show error, just proceed without orientation
-            if (mounted) setIsCalibrating(false);
-            return;
-          }
-        } catch (err) {
-          console.error('Orientation permission error:', err);
-          if (mounted) setIsCalibrating(false);
-          return;
+        // iOS - need user gesture to request permission
+        if (mounted) {
+          setNeedsOrientationPermission(true);
+          setIsCalibrating(false); // Stop calibration spinner, show button instead
         }
+        return;
       }
-      
-      orientationHandler = (event) => {
-        if (!mounted) return;
-        // Check if we have actual orientation data (not all nulls)
-        if (event.alpha !== null || event.beta !== null) {
-          setOrientation({
-            alpha: event.alpha || 0, // Compass heading
-            beta: event.beta || 0,   // Front-to-back tilt
-            gamma: event.gamma || 0, // Left-to-right tilt
-          });
-          setHasOrientation(true);
-          setIsCalibrating(false);
-        }
-      };
-      
-      window.addEventListener('deviceorientation', orientationHandler, true);
-      
-      // Fallback: end calibration after 3 seconds even if no orientation events
-      calibrationTimeout = setTimeout(() => {
+
+      // Non-iOS: try to listen directly
+      // First check if deviceorientation events are even available
+      if (typeof window !== 'undefined' && 'DeviceOrientationEvent' in window) {
+        setupOrientationListener();
+      } else {
+        // No orientation support at all
         if (mounted) {
           setIsCalibrating(false);
         }
-      }, 3000);
-    }
-    
-    initOrientation();
-    
-    return () => {
-      mounted = false;
-      if (orientationHandler) {
-        window.removeEventListener('deviceorientation', orientationHandler, true);
-      }
-      if (calibrationTimeout) {
-        clearTimeout(calibrationTimeout);
       }
     };
-  }, []);
+
+    checkOrientationSupport();
+
+    return () => {
+      mounted = false;
+      if (orientationHandlerRef.current) {
+        window.removeEventListener('deviceorientation', orientationHandlerRef.current, true);
+      }
+    };
+  }, [setupOrientationListener]);
   
   // Get user location if not available (run once on mount)
   useEffect(() => {
@@ -363,6 +392,39 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
                 <p className="text-sm text-muted-foreground">
                   Move your device in a figure-8 pattern
                 </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* iOS Gyroscope Permission Request - must be triggered by user tap */}
+        <AnimatePresence>
+          {needsOrientationPermission && !hasOrientation && !isCalibrating && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 flex items-center justify-center bg-black/70"
+            >
+              <div className="glass-panel p-6 text-center max-w-xs">
+                <Navigation className="h-12 w-12 mx-auto mb-4 text-blue-400" />
+                <p className="text-lg font-semibold mb-2">Enable Gyroscope</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Tap the button below to enable motion tracking for AR mode. This allows us to track where you're pointing your device.
+                </p>
+                <Button
+                  onClick={requestOrientationPermission}
+                  className="w-full"
+                  size="lg"
+                >
+                  Enable Motion Tracking
+                </Button>
+                <button
+                  onClick={() => setNeedsOrientationPermission(false)}
+                  className="mt-3 text-sm text-muted-foreground hover:text-white transition-colors"
+                >
+                  Skip (show all nearby aircraft)
+                </button>
               </div>
             </motion.div>
           )}
