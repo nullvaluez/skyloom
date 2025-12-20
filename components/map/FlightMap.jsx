@@ -11,7 +11,14 @@ import { useAircraftByLocation } from '@/hooks/use-aircraft';
 import { useAircraftWorker } from '@/hooks/use-aircraft-worker';
 import { MapControls } from './MapControls';
 import { isEmergency } from '@/lib/classify';
-import { altitudeToMeters, getShadowRadius } from '@/lib/altitude';
+import { 
+  altitudeToMeters, 
+  getShadowRadius, 
+  getShadowOpacity,
+  getAltitudeStemData,
+  getAltitudeStemWidth,
+  getAltitudeIntensity,
+} from '@/lib/altitude';
 import { getPitchBracket } from '@/lib/icon-bitmap-cache';
 
 // Dark map style
@@ -22,6 +29,7 @@ let MapGL = null;
 let DeckGL = null;
 let IconLayer = null;
 let PathLayer = null;
+let LineLayer = null;
 let ScatterplotLayer = null;
 let maplibreLoaded = false;
 
@@ -200,6 +208,7 @@ export const FlightMap = memo(function FlightMap() {
         DeckGL = deckModule.DeckGL;
         IconLayer = layersModule.IconLayer;
         PathLayer = layersModule.PathLayer;
+        LineLayer = layersModule.LineLayer;
         ScatterplotLayer = layersModule.ScatterplotLayer;
 
         await import('maplibre-gl/dist/maplibre-gl.css');
@@ -447,7 +456,7 @@ export const FlightMap = memo(function FlightMap() {
         const path3D = trail.map((p) => [
           p.lon,
           p.lat,
-          altitudeToMeters(p.alt || 0, viewState.pitch),
+          altitudeToMeters(p.alt || 0, viewState.pitch, viewState.zoom),
         ]);
 
         // Add segments with metadata for gradient rendering
@@ -517,18 +526,53 @@ export const FlightMap = memo(function FlightMap() {
       );
     }
 
+    // Enhanced 3D shadow layer with altitude-responsive sizing and opacity
     if (is3DMode && ScatterplotLayer && airborneAircraft.length > 0) {
       result.push(
         new ScatterplotLayer({
           id: 'shadow-layer',
           data: airborneAircraft,
           getPosition: (d) => [d.lon, d.lat, 0],
-          getRadius: (d) => getShadowRadius(d.alt_baro),
-          getFillColor: [0, 0, 0, 60],
+          getRadius: (d) => getShadowRadius(d.alt_baro, viewState.zoom),
+          // Dynamic opacity - higher aircraft have fainter shadows
+          getFillColor: (d) => [0, 0, 0, getShadowOpacity(d.alt_baro)],
           radiusUnits: 'meters',
           pickable: false,
+          updateTriggers: {
+            getRadius: [viewState.zoom],
+          },
         })
       );
+    }
+
+    // Altitude stems - vertical lines connecting aircraft to ground shadows
+    // Creates strong visual connection showing height above ground
+    if (is3DMode && LineLayer && airborneAircraft.length > 0 && viewState.zoom >= 8) {
+      const stemData = airborneAircraft
+        .map((ac) => getAltitudeStemData(ac, viewState.pitch, viewState.zoom))
+        .filter(Boolean);
+
+      if (stemData.length > 0) {
+        result.push(
+          new LineLayer({
+            id: 'altitude-stems-layer',
+            data: stemData,
+            getSourcePosition: (d) => d.path[0],
+            getTargetPosition: (d) => d.path[1],
+            // Thinner stems for higher aircraft (perspective)
+            getWidth: (d) => getAltitudeStemWidth(d.altitude),
+            // Subtle color with altitude-based opacity
+            getColor: (d) => {
+              const opacity = Math.max(40, 100 - d.altitude / 600);
+              return [100, 160, 220, opacity];
+            },
+            widthUnits: 'pixels',
+            widthMinPixels: 0.5,
+            widthMaxPixels: 2,
+            pickable: false,
+          })
+        );
+      }
     }
 
     if (filteredAircraft.length > 0) {
@@ -540,10 +584,10 @@ export const FlightMap = memo(function FlightMap() {
             data: filteredAircraft,
             pickable: false,
 
-            getPosition: (d) => [d.lon, d.lat, altitudeToMeters(d.alt_baro, viewState.pitch)],
+            getPosition: (d) => [d.lon, d.lat, altitudeToMeters(d.alt_baro, viewState.pitch, viewState.zoom)],
             getIcon: (d) => getIconConfig(d._iconType || 'unknown'),
 
-            // Slightly bigger + offset in screen space creates a consistent “thickness”
+            // Slightly bigger + offset in screen space creates a consistent "thickness"
             getSize: (d) => (d.hex === selectedAircraftId ? baseSize * 1.4 * depthScale : baseSize * depthScale),
             getAngle: (d) => -(d.track || 0),
 
@@ -572,14 +616,14 @@ export const FlightMap = memo(function FlightMap() {
               getSize: [selectedAircraftId, baseSize, is3DMode],
               getColor: [selectedAircraftId, depthDarkenFactor],
               getPixelOffset: [is3DMode, viewState.pitch, viewState.zoom],
-              getPosition: [is3DMode, viewState.pitch],
+              getPosition: [is3DMode, viewState.pitch, viewState.zoom],
               getIcon: [pitchBracket.name], // Update icons when pitch bracket changes
             },
           })
         );
       }
 
-      // Top face layer (pickable)
+      // Top face layer (pickable) with altitude-responsive brightness
       result.push(
         new IconLayer({
           id: 'aircraft-layer',
@@ -587,16 +631,34 @@ export const FlightMap = memo(function FlightMap() {
           pickable: true,
 
           getPosition: (d) =>
-            is3DMode ? [d.lon, d.lat, altitudeToMeters(d.alt_baro, viewState.pitch)] : [d.lon, d.lat, 0],
+            is3DMode ? [d.lon, d.lat, altitudeToMeters(d.alt_baro, viewState.pitch, viewState.zoom)] : [d.lon, d.lat, 0],
 
           getIcon: (d) => getIconConfig(d._iconType || 'unknown'),
           getSize: (d) => (d.hex === selectedAircraftId ? baseSize * 1.4 : baseSize),
           getAngle: (d) => -(d.track || 0),
 
+          // Altitude-responsive color intensity - higher aircraft appear brighter
           getColor: (d) => {
-            if (d.hex === selectedAircraftId) return getCachedColor('#60a5fa');
-            if (isEmergency(d)) return getCachedColor('#ef4444');
-            return getCachedColor(d._color || '#9ca3af');
+            let baseColor;
+            if (d.hex === selectedAircraftId) {
+              baseColor = getCachedColor('#60a5fa');
+            } else if (isEmergency(d)) {
+              baseColor = getCachedColor('#ef4444');
+            } else {
+              baseColor = getCachedColor(d._color || '#9ca3af');
+            }
+            
+            // Apply altitude intensity in 3D mode for depth perception
+            if (is3DMode) {
+              const intensity = getAltitudeIntensity(d.alt_baro);
+              return [
+                Math.min(255, baseColor[0] * intensity),
+                Math.min(255, baseColor[1] * intensity),
+                Math.min(255, baseColor[2] * intensity),
+                baseColor[3],
+              ];
+            }
+            return baseColor;
           },
 
           getPixelOffset: () => [0, 0],
@@ -610,8 +672,8 @@ export const FlightMap = memo(function FlightMap() {
 
           updateTriggers: {
             getSize: [selectedAircraftId, baseSize],
-            getColor: [selectedAircraftId],
-            getPosition: [is3DMode, viewState.pitch],
+            getColor: [selectedAircraftId, is3DMode],
+            getPosition: [is3DMode, viewState.pitch, viewState.zoom],
             getIcon: [pitchBracket.name], // Update icons when pitch bracket changes for foreshortening
           },
         })
@@ -633,55 +695,6 @@ export const FlightMap = memo(function FlightMap() {
     pitchBracket,
   ]);
 
-  // Enhanced controller configuration for better 3D rotation control
-  // Must be before conditional return to maintain hooks order
-  const controllerConfig = useMemo(
-    () => ({
-      // Basic controls
-      keyboard: true,
-      doubleClickZoom: true,
-      
-      // Pan controls
-      dragPan: true, // Left-click + drag to pan
-      
-      // Rotation controls (right-click drag for bearing + pitch)
-      // deck.gl MapController: right-click drag = bearing, Ctrl+drag = pitch
-      dragRotate: true,
-      
-      // Smooth motion with inertia
-      inertia: 300,
-      
-      // Touch controls
-      touchZoom: true,
-      touchRotate: true, // Two-finger rotate
-      
-      // Scroll zoom (disable if handling wheel ourselves)
-      scrollZoom: true,
-      
-      // Pitch constraints
-      minPitch: 0,
-      maxPitch: 85,
-    }),
-    []
-  );
-
-  // Intercept wheel events for Shift+scroll pitch control
-  // Must be before conditional return to maintain hooks order
-  const handleContainerWheel = useCallback(
-    (event) => {
-      if (event.shiftKey) {
-        event.preventDefault();
-        event.stopPropagation();
-        const delta = event.deltaY > 0 ? -5 : 5;
-        setViewState((prev) => {
-          const newPitch = Math.max(0, Math.min(85, prev.pitch + delta));
-          return { ...prev, pitch: newPitch };
-        });
-      }
-    },
-    []
-  );
-
   if (!isReady || !DeckGL || !MapGL) {
     return (
       <div className="h-full w-full relative flex items-center justify-center bg-zinc-950">
@@ -694,14 +707,11 @@ export const FlightMap = memo(function FlightMap() {
   }
 
   return (
-    <div 
-      className="h-full w-full relative"
-      onWheel={handleContainerWheel}
-    >
+    <div className="h-full w-full relative">
       <DeckGL
         viewState={viewState}
         onViewStateChange={handleViewStateChange}
-        controller={controllerConfig}
+        controller={{ touchRotate: true, keyboard: true, doubleClickZoom: true }}
         layers={layers}
         onClick={handleMapClick}
         getCursor={({ isDragging, isHovering }) =>

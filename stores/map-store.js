@@ -238,50 +238,6 @@ export const useMapStore = create(
         set((state) => ({ terrain: !state.terrain }));
       },
 
-      // Adjust pitch incrementally
-      adjustPitch: (delta) => {
-        const { pitch } = get();
-        const newPitch = Math.max(0, Math.min(85, pitch + delta));
-        set({ pitch: newPitch });
-      },
-
-      // Adjust bearing incrementally
-      adjustBearing: (delta) => {
-        const { bearing } = get();
-        const newBearing = ((bearing + delta) % 360 + 360) % 360;
-        set({ bearing: newBearing });
-      },
-
-      // Reset bearing to North (0°)
-      resetBearing: () => {
-        set({ bearing: 0 });
-      },
-
-      // Set preset view
-      setPresetView: (preset) => {
-        const { center, zoom } = get();
-        const presets = {
-          topDown: { pitch: 0, bearing: 0 },
-          northEast: { pitch: 70, bearing: 45 },   // Higher pitch for dramatic 3D
-          southEast: { pitch: 70, bearing: 135 },
-          southWest: { pitch: 70, bearing: 225 },
-          northWest: { pitch: 70, bearing: 315 },
-          isometric: { pitch: 75, bearing: 45 },   // Almost horizontal view
-        };
-        
-        const presetConfig = presets[preset] || presets.topDown;
-        set({ pitch: presetConfig.pitch, bearing: presetConfig.bearing });
-        
-        return {
-          longitude: center[1],
-          latitude: center[0],
-          zoom,
-          pitch: presetConfig.pitch,
-          bearing: presetConfig.bearing,
-          transitionDuration: 800,
-        };
-      },
-
       // Get icon size based on zoom level
       getIconSize: () => {
         const { zoom } = get();
