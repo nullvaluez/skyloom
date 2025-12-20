@@ -17,6 +17,7 @@ import { getPollingInterval } from '@/lib/utils';
 
 /**
  * Hook to fetch aircraft by location
+ * Coordinates are rounded to reduce query key changes during panning
  */
 export function useAircraftByLocation(lat, lon, dist = 250, options = {}) {
   const setMetric = useDevStore(s => s.setMetric);
@@ -28,10 +29,18 @@ export function useAircraftByLocation(lat, lon, dist = 250, options = {}) {
     return getPollingInterval(zoom, aircraftCount, !!followedAircraftId);
   }, [zoom, aircraftCount, followedAircraftId]);
 
+  // Round coordinates to 2 decimal places (~1km precision at equator)
+  // This prevents excessive API calls during smooth panning
+  // Query will reuse cached data until user moves > ~1km
+  const roundedLat = useMemo(() => Math.round(lat * 100) / 100, [lat]);
+  const roundedLon = useMemo(() => Math.round(lon * 100) / 100, [lon]);
+
   const query = useQuery({
-    queryKey: ['aircraft', 'location', lat, lon, dist],
+    // Use rounded coordinates in query key to reduce refetches
+    queryKey: ['aircraft', 'location', roundedLat, roundedLon, dist],
     queryFn: async () => {
       const start = performance.now();
+      // Fetch using actual coordinates for accuracy
       const result = await fetchAircraftByLocation(lat, lon, dist);
       const end = performance.now();
       setMetric('pollLatencyMs', end - start);

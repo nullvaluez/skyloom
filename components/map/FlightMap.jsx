@@ -6,8 +6,9 @@ import { useSearchParams } from 'next/navigation';
 import { useAircraftStore } from '@/stores/aircraft-store';
 import { useMapStore } from '@/stores/map-store';
 import { useUIStore } from '@/stores/ui-store';
-import { useFilteredAircraft } from '@/hooks/use-filters';
+import { useFilteredAircraftAsync } from '@/hooks/use-filters';
 import { useAircraftByLocation } from '@/hooks/use-aircraft';
+import { useAircraftWorker } from '@/hooks/use-aircraft-worker';
 import { MapControls } from './MapControls';
 import { isEmergency } from '@/lib/classify';
 import { altitudeToMeters, getShadowRadius } from '@/lib/altitude';
@@ -48,12 +49,25 @@ function getIconUrl(type) {
   return url;
 }
 
-// Color converter
+// Color converter with caching for performance
 function hexToRgba(hex, alpha = 255) {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   if (!result) return [128, 128, 128, alpha];
   return [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16), alpha];
 }
+
+// Pre-cached colors for common aircraft types (avoids repeated hexToRgba calls)
+const COLOR_CACHE = new Map();
+function getCachedColor(hex) {
+  if (!COLOR_CACHE.has(hex)) {
+    COLOR_CACHE.set(hex, hexToRgba(hex));
+  }
+  return COLOR_CACHE.get(hex);
+}
+
+// Pre-cache common colors at module load
+const COMMON_COLORS = ['#60a5fa', '#ef4444', '#9ca3af', '#4ade80', '#fbbf24', '#f87171', '#a78bfa', '#22d3ee', '#f472b6', '#fb923c'];
+COMMON_COLORS.forEach(getCachedColor);
 
 /**
  * Main FlightMap component - simplified for performance
@@ -114,6 +128,9 @@ export const FlightMap = memo(function FlightMap() {
   const openDetailPanel = useUIStore((s) => s.openDetailPanel);
   const closeDetailPanel = useUIStore((s) => s.closeDetailPanel);
 
+  // Web Worker for off-main-thread processing
+  const { processAircraft, isReady: workerReady } = useAircraftWorker();
+
   // View state - single source of truth
   const [viewState, setViewState] = useState({
     longitude: center[1],
@@ -131,9 +148,9 @@ export const FlightMap = memo(function FlightMap() {
   const lastStoreZoom = useRef(storeZoom);
   const lastStoreCenter = useRef(center);
 
-  // Aircraft array from map
+  // Aircraft array from map - use async filtering via web worker
   const allAircraft = useMemo(() => Array.from(aircraftMap.values()), [aircraftMap]);
-  const filteredAircraft = useFilteredAircraft(allAircraft);
+  const filteredAircraft = useFilteredAircraftAsync(allAircraft);
 
   // Calculate fetch distance based on zoom
   const fetchDist = viewState.zoom <= 5 ? 500 : viewState.zoom <= 7 ? 300 : viewState.zoom <= 9 ? 150 : 100;
@@ -141,12 +158,20 @@ export const FlightMap = memo(function FlightMap() {
   // Fetch aircraft data
   const { data } = useAircraftByLocation(viewState.latitude, viewState.longitude, fetchDist);
 
-  // Update aircraft store when data arrives
+  // Update aircraft store when data arrives - use worker for processing if available
   useEffect(() => {
-    if (data?.ac) {
+    if (!data?.ac) return;
+    
+    if (workerReady) {
+      // Process in web worker (off main thread)
+      processAircraft(data.ac).then(processed => {
+        setAircraft(processed);
+      });
+    } else {
+      // Fallback to main thread processing
       setAircraft(data.ac);
     }
-  }, [data, setAircraft]);
+  }, [data, setAircraft, workerReady, processAircraft]);
 
   // Sync pitch/bearing/zoom from store (for controls like 3D toggle)
   // Don't sync center when following - the follow effect handles that
@@ -246,13 +271,17 @@ export const FlightMap = memo(function FlightMap() {
     }, 200);
   }, [setMapViewState]);
 
-  // Handle aircraft click
+  // Handle aircraft click - use ref for stable callback in layers
   const handleAircraftClick = useCallback((info) => {
     if (info.object) {
       selectAircraft(info.object.hex);
       openDetailPanel();
     }
   }, [selectAircraft, openDetailPanel]);
+
+  // Stable ref for click handler (prevents layer recreation)
+  const handleAircraftClickRef = useRef(handleAircraftClick);
+  handleAircraftClickRef.current = handleAircraftClick;
 
   // Handle map click (deselect)
   const handleMapClick = useCallback((info) => {
@@ -262,8 +291,12 @@ export const FlightMap = memo(function FlightMap() {
     }
   }, [selectedAircraftId, selectAircraft, closeDetailPanel]);
 
-  // Trail data
+  // Trail data - memoized path conversion
   const trailData = getSelectedTrail();
+  const trailPath = useMemo(() => 
+    trailData?.map(p => [p.lon, p.lat]) || [],
+    [trailData]
+  );
 
   // Base size for icons
   const baseSize = viewState.zoom < 7 ? 24 : viewState.zoom <= 10 ? 32 : 40;
@@ -271,18 +304,39 @@ export const FlightMap = memo(function FlightMap() {
   // Check if we're in 3D mode (pitch > 0)
   const is3DMode = viewState.pitch > 0;
 
-  // Create layers
+  // Memoize airborne aircraft for shadow layer (avoid filtering on every pitch change)
+  const airborneAircraft = useMemo(() => 
+    filteredAircraft.filter(ac => typeof ac.alt_baro === 'number' && ac.alt_baro > 500),
+    [filteredAircraft]
+  );
+
+  // Pre-compute icon configurations and colors for each aircraft (Phase 3 optimization)
+  const aircraftWithPrecomputed = useMemo(() => 
+    filteredAircraft.map(ac => ({
+      ...ac,
+      _iconConfig: {
+        url: getIconUrl(ac._iconType || 'unknown'),
+        width: 64,
+        height: 64,
+        anchorY: 32,
+        mask: true,
+      },
+      _rgba: getCachedColor(ac._color || '#9ca3af'),
+    })),
+    [filteredAircraft]
+  );
+
+  // Create layers - uses pre-computed data for maximum performance
   const layers = useMemo(() => {
     if (!IconLayer || !PathLayer) return [];
     
     const result = [];
 
-    // Trail layer
-    if (trailData && trailData.length >= 2 && selectedAircraftId) {
-      const path = trailData.map(p => [p.lon, p.lat]);
+    // Trail layer - uses pre-computed trailPath
+    if (trailPath.length >= 2 && selectedAircraftId) {
       result.push(new PathLayer({
         id: 'trail-layer',
-        data: [{ path }],
+        data: [{ path: trailPath }],
         getPath: d => d.path,
         getWidth: 3,
         getColor: [59, 130, 246, 180],
@@ -292,68 +346,56 @@ export const FlightMap = memo(function FlightMap() {
       }));
     }
 
-    // Shadow layer - only visible in 3D mode
-    // Renders dark circles on the ground beneath aircraft for depth perception
-    if (is3DMode && ScatterplotLayer && filteredAircraft.length > 0) {
-      const airborneAircraft = filteredAircraft.filter(ac => {
-        const alt = ac.alt_baro;
-        return typeof alt === 'number' && alt > 500;
-      });
-      if (airborneAircraft.length > 0) {
-        result.push(new ScatterplotLayer({
-          id: 'shadow-layer',
-          data: airborneAircraft,
-          getPosition: d => [d.lon, d.lat, 0], // Always on ground
-          getRadius: d => getShadowRadius(d.alt_baro),
-          getFillColor: [0, 0, 0, 60], // Semi-transparent black
-          radiusUnits: 'meters',
-          pickable: false, // Don't intercept clicks
-        }));
-      }
+    // Shadow layer - uses pre-filtered airborneAircraft
+    if (is3DMode && ScatterplotLayer && airborneAircraft.length > 0) {
+      result.push(new ScatterplotLayer({
+        id: 'shadow-layer',
+        data: airborneAircraft,
+        getPosition: d => [d.lon, d.lat, 0],
+        getRadius: d => getShadowRadius(d.alt_baro),
+        getFillColor: [0, 0, 0, 60],
+        radiusUnits: 'meters',
+        pickable: false,
+      }));
     }
 
-    // Aircraft layer
-    if (filteredAircraft.length > 0) {
+    // Aircraft layer - uses pre-computed icons and colors
+    if (aircraftWithPrecomputed.length > 0) {
       result.push(new IconLayer({
         id: 'aircraft-layer',
-        data: filteredAircraft,
+        data: aircraftWithPrecomputed,
         pickable: true,
-        // 3D positioning: use altitude when in 3D mode
         getPosition: d => {
           if (!is3DMode) return [d.lon, d.lat, 0];
-          // Use altitudeToMeters for consistent scaling (20x exaggeration)
           const z = altitudeToMeters(d.alt_baro, viewState.pitch);
           return [d.lon, d.lat, z];
         },
-        getIcon: d => ({
-          url: getIconUrl(d._iconType || 'unknown'),
-          width: 64,
-          height: 64,
-          anchorY: 32,
-          mask: true,
-        }),
+        // Use pre-computed icon config
+        getIcon: d => d._iconConfig,
         getSize: d => d.hex === selectedAircraftId ? baseSize * 1.4 : baseSize,
         getAngle: d => -(d.track || 0),
+        // Use pre-computed colors with selection/emergency overrides
         getColor: d => {
-          if (d.hex === selectedAircraftId) return hexToRgba('#60a5fa');
-          if (isEmergency(d)) return hexToRgba('#ef4444');
-          return hexToRgba(d._color || '#9ca3af');
+          if (d.hex === selectedAircraftId) return getCachedColor('#60a5fa');
+          if (isEmergency(d)) return getCachedColor('#ef4444');
+          return d._rgba;
         },
         sizeUnits: 'pixels',
         sizeMinPixels: 16,
         sizeMaxPixels: 56,
         billboard: false,
-        onClick: handleAircraftClick,
+        // Use stable ref callback to prevent layer recreation
+        onClick: info => handleAircraftClickRef.current(info),
         updateTriggers: {
           getSize: [selectedAircraftId, baseSize],
           getColor: [selectedAircraftId],
-          getPosition: [is3DMode, viewState.pitch], // Re-compute positions when 3D mode changes
+          getPosition: [is3DMode, viewState.pitch],
         },
       }));
     }
 
     return result;
-  }, [filteredAircraft, selectedAircraftId, baseSize, trailData, handleAircraftClick, isReady, is3DMode, viewState.pitch]);
+  }, [aircraftWithPrecomputed, airborneAircraft, selectedAircraftId, baseSize, trailPath, isReady, is3DMode, viewState.pitch]);
 
   // Show loading while libraries load
   if (!isReady || !DeckGL || !MapGL) {
