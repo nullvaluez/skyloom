@@ -1,379 +1,312 @@
-'use client';
+import { create } from 'zustand';
+import { TRAIL_CONFIG } from '@/lib/constants';
+import { classifyAircraft, getAircraftIconType, getAircraftColor } from '@/lib/classify';
 
-import { memo, useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Camera, AlertTriangle, Plane, Navigation } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useAircraftStore } from '@/stores/aircraft-store';
-import { useMapStore } from '@/stores/map-store';
-import { usePassportStore } from '@/stores/passport-store';
-import { formatAltitude, formatCallsign } from '@/lib/format';
-import { getRarityColor } from '@/lib/rarity';
+// Maximum age for trail points (5 minutes)
+const TRAIL_MAX_AGE_MS = 300000;
 
-// Track already-logged aircraft hex codes to prevent infinite loops
-const loggedAircraftSet = new Set();
+// Maximum age for stale aircraft data (2 minutes)
+const STALE_AIRCRAFT_AGE_MS = 120000;
 
-/**
- * Calculate bearing between two points
- */
-function calculateBearing(lat1, lon1, lat2, lon2) {
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const lat1Rad = lat1 * Math.PI / 180;
-  const lat2Rad = lat2 * Math.PI / 180;
-  
-  const y = Math.sin(dLon) * Math.cos(lat2Rad);
-  const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - 
-            Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
-  
-  let bearing = Math.atan2(y, x) * 180 / Math.PI;
-  return (bearing + 360) % 360;
-}
+// Epsilon for floating-point comparison
+const POSITION_EPSILON = 0.00001;
 
-/**
- * Calculate elevation angle to aircraft
- */
-function calculateElevation(userLat, userLon, acLat, acLon, acAlt) {
-  // Approximate distance in meters
-  const R = 6371000; // Earth radius in meters
-  const dLat = (acLat - userLat) * Math.PI / 180;
-  const dLon = (acLon - userLon) * Math.PI / 180;
-  const a = Math.sin(dLat/2) ** 2 + 
-            Math.cos(userLat * Math.PI / 180) * Math.cos(acLat * Math.PI / 180) * 
-            Math.sin(dLon/2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  const distance = R * c;
-  
-  // Convert altitude from feet to meters
-  const altMeters = (acAlt || 0) * 0.3048;
-  
-  // Calculate elevation angle
-  return Math.atan2(altMeters, distance) * 180 / Math.PI;
-}
+// Cleanup interval timer reference
+let cleanupIntervalId = null;
 
-/**
- * Check if aircraft is within camera's field of view
- */
-function isInFOV(bearing, elevation, orientation, fovH = 70, fovV = 50) {
-  const { alpha, beta, gamma } = orientation;
-  
-  // Convert device orientation to compass heading
-  // alpha: rotation around z-axis (0-360)
-  // beta: front-to-back tilt (-180 to 180)
-  // gamma: left-to-right tilt (-90 to 90)
-  
-  // Device heading (where camera is pointing)
-  const deviceHeading = (360 - alpha) % 360;
-  
-  // Calculate bearing difference
-  let bearingDiff = bearing - deviceHeading;
-  if (bearingDiff > 180) bearingDiff -= 360;
-  if (bearingDiff < -180) bearingDiff += 360;
-  
-  // Device pitch (elevation)
-  const devicePitch = beta - 90; // 0 = horizontal, positive = looking up
-  const elevationDiff = elevation - devicePitch;
-  
-  // Check if within FOV
-  return Math.abs(bearingDiff) < fovH / 2 && Math.abs(elevationDiff) < fovV / 2;
-}
+export const useAircraftStore = create((set, get) => ({
+  // Aircraft data as a Map for O(1) lookups
+  aircraft: new Map(),
 
-/**
- * AR Label for an aircraft
- */
-const ARLabel = memo(function ARLabel({ aircraft, orientation, userLocation }) {
-  const bearing = calculateBearing(
-    userLocation[0], userLocation[1],
-    aircraft.lat, aircraft.lon
-  );
-  const elevation = calculateElevation(
-    userLocation[0], userLocation[1],
-    aircraft.lat, aircraft.lon,
-    aircraft.alt_baro
-  );
-  
-  // Calculate screen position based on bearing/elevation difference from device orientation
-  const { alpha, beta } = orientation;
-  const deviceHeading = (360 - alpha) % 360;
-  const devicePitch = beta - 90;
-  
-  let bearingDiff = bearing - deviceHeading;
-  if (bearingDiff > 180) bearingDiff -= 360;
-  if (bearingDiff < -180) bearingDiff += 360;
-  
-  const elevationDiff = elevation - devicePitch;
-  
-  // Convert to screen coordinates (center = 50%)
-  const x = 50 + (bearingDiff / 70) * 100; // Assuming 70° horizontal FOV
-  const y = 50 - (elevationDiff / 50) * 100; // Assuming 50° vertical FOV
-  
-  // Clamp to screen
-  const clampedX = Math.max(5, Math.min(95, x));
-  const clampedY = Math.max(5, Math.min(95, y));
-  
-  const rarityColor = getRarityColor(aircraft._rarity || 0);
-  
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.5 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.5 }}
-      className="absolute pointer-events-none"
-      style={{
-        left: `${clampedX}%`,
-        top: `${clampedY}%`,
-        transform: 'translate(-50%, -50%)',
-      }}
-    >
-      <div className="glass-panel p-2 flex flex-col items-center gap-1 min-w-[80px]">
-        <Plane 
-          className="h-6 w-6" 
-          style={{ 
-            color: rarityColor,
-            transform: `rotate(${aircraft.track || 0}deg)`,
-          }} 
-        />
-        <div className="text-xs font-bold text-white">
-          {formatCallsign(aircraft.flight) || aircraft.hex}
-        </div>
-        <div className="text-[10px] text-muted-foreground">
-          {formatAltitude(aircraft.alt_baro)}
-        </div>
-        <div className="h-1 w-full rounded bg-background/50 overflow-hidden">
-          <div 
-            className="h-full rounded"
-            style={{ 
-              width: `${Math.min(100, (aircraft._rarity || 0))}%`,
-              backgroundColor: rarityColor,
-            }}
-          />
-        </div>
-      </div>
-    </motion.div>
-  );
-});
+  // Selected aircraft hex
+  selectedAircraftId: null,
 
-/**
- * AR Spotter Mode - Point your phone at the sky
- */
-export const ARSpotter = memo(function ARSpotter({ onClose }) {
-  const videoRef = useRef(null);
-  const [hasPermissions, setHasPermissions] = useState(false);
-  const [error, setError] = useState(null);
-  const [orientation, setOrientation] = useState({ alpha: 0, beta: 0, gamma: 0 });
-  const [isCalibrating, setIsCalibrating] = useState(true);
-  
-  const userLocation = useMapStore((s) => s.userLocation);
-  const geolocate = useMapStore((s) => s.geolocate);
-  const aircraft = useAircraftStore((s) => s.getAircraftArray());
-  const logSpot = usePassportStore((s) => s.logSpot);
-  
-  // Request camera permission
-  useEffect(() => {
-    async function initCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' },
-          audio: false,
-        });
+  // Followed aircraft hex (map centers on this aircraft)
+  followedAircraftId: null,
+
+  // Flight trails as a Map of hex -> position array
+  trails: new Map(),
+
+  // Track when each aircraft was last seen (hex -> timestamp)
+  lastSeen: new Map(),
+
+  // Last update timestamp
+  lastUpdate: null,
+
+  // Actions
+  setAircraft: (aircraftList) => {
+    const { selectedAircraftId, trails, lastSeen, aircraft: existingAircraft } = get();
+    const now = Date.now();
+    const newMap = new Map();
+    const newLastSeen = new Map(lastSeen);
+    const activeHexes = new Set();
+
+    // Start with cleaned trails (only keep trails for selected aircraft)
+    const newTrails = new Map();
+
+    aircraftList.forEach((ac) => {
+      if (ac.hex) {
+        activeHexes.add(ac.hex);
         
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+        // Track when this aircraft was last seen
+        newLastSeen.set(ac.hex, now);
+
+        // Get existing aircraft data to preserve classification
+        const existing = existingAircraft.get(ac.hex);
+        
+        // Merge with existing data, keeping position updates
+        const mergedAc = existing 
+          ? { ...existing, ...ac }
+          : ac;
+
+        // Calculate classification data if not already cached
+        if (!mergedAc._classification) {
+          mergedAc._classification = classifyAircraft(mergedAc);
+          mergedAc._iconType = getAircraftIconType(mergedAc);
+          mergedAc._color = getAircraftColor(mergedAc);
         }
-        setHasPermissions(true);
-      } catch (err) {
-        console.error('Camera error:', err);
-        setError('Camera access denied. Please enable camera permissions.');
-      }
-    }
-    
-    initCamera();
-    
-    return () => {
-      // Stop camera on unmount
-      if (videoRef.current?.srcObject) {
-        videoRef.current.srcObject.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, []);
-  
-  // Request device orientation
-  useEffect(() => {
-    async function initOrientation() {
-      // iOS requires permission request
-      if (typeof DeviceOrientationEvent !== 'undefined' && 
-          typeof DeviceOrientationEvent.requestPermission === 'function') {
-        try {
-          const permission = await DeviceOrientationEvent.requestPermission();
-          if (permission !== 'granted') {
-            setError('Orientation permission denied');
-            return;
+
+        newMap.set(ac.hex, mergedAc);
+
+        // Update trail for selected aircraft
+        if (ac.hex === selectedAircraftId && ac.lat && ac.lon) {
+          const currentTrail = trails.get(ac.hex) || [];
+          const lastPos = currentTrail[currentTrail.length - 1];
+
+          // Use epsilon comparison for floating point (more reliable than direct comparison)
+          const hasChanged = !lastPos ||
+            Math.abs(lastPos.lat - ac.lat) > POSITION_EPSILON ||
+            Math.abs(lastPos.lon - ac.lon) > POSITION_EPSILON;
+
+          if (hasChanged) {
+            // Add new position and limit trail length
+            const updatedTrail = [
+              ...currentTrail,
+              { lat: ac.lat, lon: ac.lon, timestamp: now },
+            ].slice(-TRAIL_CONFIG.maxPositions);
+
+            // Filter out old trail points (older than 5 minutes)
+            const recentTrail = updatedTrail.filter(p => now - p.timestamp < TRAIL_MAX_AGE_MS);
+
+            if (recentTrail.length > 0) {
+              newTrails.set(ac.hex, recentTrail);
+            }
+          } else {
+            // Position hasn't changed, keep existing trail
+            const existingTrail = trails.get(ac.hex);
+            if (existingTrail && existingTrail.length > 0) {
+              // Filter out old trail points
+              const recentTrail = existingTrail.filter(p => now - p.timestamp < TRAIL_MAX_AGE_MS);
+              if (recentTrail.length > 0) {
+                newTrails.set(ac.hex, recentTrail);
+              }
+            }
           }
-        } catch (err) {
-          console.error('Orientation permission error:', err);
         }
-      }
-      
-      const handleOrientation = (event) => {
-        setOrientation({
-          alpha: event.alpha || 0, // Compass heading
-          beta: event.beta || 0,   // Front-to-back tilt
-          gamma: event.gamma || 0, // Left-to-right tilt
-        });
-        setIsCalibrating(false);
-      };
-      
-      window.addEventListener('deviceorientation', handleOrientation, true);
-      
-      return () => {
-        window.removeEventListener('deviceorientation', handleOrientation, true);
-      };
-    }
-    
-    initOrientation();
-  }, []);
-  
-  // Get user location if not available
-  useEffect(() => {
-    if (!userLocation) {
-      geolocate();
-    }
-  }, [userLocation, geolocate]);
-  
-  // Filter aircraft that are in field of view
-  const visibleAircraft = useMemo(() => {
-    if (!userLocation || isCalibrating) return [];
-    
-    return aircraft.filter(ac => {
-      if (!ac.lat || !ac.lon) return false;
-      
-      const bearing = calculateBearing(
-        userLocation[0], userLocation[1],
-        ac.lat, ac.lon
-      );
-      const elevation = calculateElevation(
-        userLocation[0], userLocation[1],
-        ac.lat, ac.lon,
-        ac.alt_baro
-      );
-      
-      return isInFOV(bearing, elevation, orientation);
-    }).slice(0, 10); // Limit to 10 aircraft for performance
-  }, [aircraft, userLocation, orientation, isCalibrating]);
-  
-  // Auto-log spotted aircraft (only once per session)
-  useEffect(() => {
-    visibleAircraft.forEach(ac => {
-      if (!loggedAircraftSet.has(ac.hex)) {
-        loggedAircraftSet.add(ac.hex);
-        logSpot(ac);
       }
     });
-  }, [visibleAircraft, logSpot]);
-  
-  // Clear logged set when component unmounts
-  useEffect(() => {
-    return () => {
-      loggedAircraftSet.clear();
-    };
-  }, []);
-  
-  if (error) {
-    return (
-      <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center p-4">
-        <AlertTriangle className="h-12 w-12 text-amber-500 mb-4" />
-        <p className="text-center text-lg mb-4">{error}</p>
-        <Button onClick={onClose}>Close</Button>
-      </div>
-    );
-  }
-  
-  return (
-    <div className="fixed inset-0 z-50 bg-black">
-      {/* Camera feed */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className="absolute inset-0 w-full h-full object-cover"
-      />
-      
-      {/* AR Overlay */}
-      <div className="absolute inset-0">
-        {/* Calibration overlay */}
-        <AnimatePresence>
-          {isCalibrating && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 flex items-center justify-center bg-black/50"
-            >
-              <div className="glass-panel p-6 text-center">
-                <Navigation className="h-12 w-12 mx-auto mb-4 animate-spin" />
-                <p className="text-lg font-semibold">Calibrating...</p>
-                <p className="text-sm text-muted-foreground">
-                  Move your device in a figure-8 pattern
-                </p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        
-        {/* Aircraft labels */}
-        <AnimatePresence>
-          {userLocation && visibleAircraft.map(ac => (
-            <ARLabel
-              key={ac.hex}
-              aircraft={ac}
-              orientation={orientation}
-              userLocation={userLocation}
-            />
-          ))}
-        </AnimatePresence>
-        
-        {/* HUD overlay */}
-        <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start">
-          <div className="glass-panel-light p-2">
-            <div className="text-xs text-muted-foreground">Heading</div>
-            <div className="text-lg font-bold">
-              {Math.round((360 - orientation.alpha) % 360)}°
-            </div>
-          </div>
-          
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="glass-panel"
-          >
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
-        
-        {/* Bottom info */}
-        <div className="absolute bottom-0 left-0 right-0 p-4">
-          <div className="glass-panel p-3 flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <Camera className="h-4 w-4 text-green-400" />
-              <span className="text-sm">AR Mode Active</span>
-            </div>
-            <div className="text-sm">
-              <span className="font-bold">{visibleAircraft.length}</span>
-              <span className="text-muted-foreground"> aircraft in view</span>
-            </div>
-          </div>
-        </div>
-        
-        {/* Crosshair */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-8 h-8 border-2 border-white/30 rounded-full" />
-          <div className="absolute w-12 h-0.5 bg-white/20" />
-          <div className="absolute w-0.5 h-12 bg-white/20" />
-        </div>
-      </div>
-    </div>
-  );
-});
 
-export default ARSpotter;
+    // If there's a selected aircraft but it wasn't in this batch, keep its trail
+    if (selectedAircraftId && !newTrails.has(selectedAircraftId)) {
+      const existingTrail = trails.get(selectedAircraftId);
+      if (existingTrail && existingTrail.length > 0) {
+        const recentTrail = existingTrail.filter(p => now - p.timestamp < TRAIL_MAX_AGE_MS);
+        if (recentTrail.length > 0) {
+          newTrails.set(selectedAircraftId, recentTrail);
+        }
+      }
+    }
+
+    // Clean up stale lastSeen entries for aircraft no longer in view
+    for (const [hex, timestamp] of newLastSeen.entries()) {
+      if (now - timestamp > STALE_AIRCRAFT_AGE_MS && !activeHexes.has(hex)) {
+        newLastSeen.delete(hex);
+      }
+    }
+
+    set({
+      aircraft: newMap,
+      trails: newTrails,
+      lastSeen: newLastSeen,
+      lastUpdate: new Date(),
+    });
+  },
+
+  selectAircraft: (id) => {
+    const { trails, selectedAircraftId: previousId, followedAircraftId, aircraft } = get();
+
+    // If deselecting (id is null), clear the trail and unfollow if following
+    if (id === null) {
+      const newTrails = new Map(trails);
+      if (previousId) {
+        newTrails.delete(previousId);
+      }
+
+      set({
+        selectedAircraftId: null,
+        trails: newTrails,
+        // Also unfollow if we were following this aircraft
+        followedAircraftId: followedAircraftId === previousId ? null : followedAircraftId,
+      });
+      return;
+    }
+
+    // If selecting a new aircraft, clear old trail and initialize new one
+    if (id !== previousId) {
+      const selectedAircraft = aircraft.get(id);
+      const newTrails = new Map();
+
+      // Initialize new aircraft's trail with current position
+      if (selectedAircraft && selectedAircraft.lat && selectedAircraft.lon) {
+        newTrails.set(id, [
+          { lat: selectedAircraft.lat, lon: selectedAircraft.lon, timestamp: Date.now() },
+        ]);
+      }
+
+      set({
+        selectedAircraftId: id,
+        trails: newTrails,
+      });
+      return;
+    }
+
+    set({ selectedAircraftId: id });
+  },
+
+  followAircraft: (id) => {
+    set({ followedAircraftId: id });
+  },
+
+  unfollowAircraft: () => {
+    set({ followedAircraftId: null });
+  },
+
+  updateTrail: (id, position) => {
+    const { trails } = get();
+    const currentTrail = trails.get(id) || [];
+
+    const newTrail = [
+      ...currentTrail,
+      { ...position, timestamp: Date.now() },
+    ].slice(-TRAIL_CONFIG.maxPositions);
+
+    set((state) => ({
+      trails: new Map(state.trails).set(id, newTrail),
+    }));
+  },
+
+  clearTrail: (id) => {
+    set((state) => {
+      const newTrails = new Map(state.trails);
+      newTrails.delete(id);
+      return { trails: newTrails };
+    });
+  },
+
+  clearAllTrails: () => {
+    set({ trails: new Map() });
+  },
+
+  // Get selected aircraft object
+  getSelectedAircraft: () => {
+    const { aircraft, selectedAircraftId } = get();
+    if (!selectedAircraftId) return null;
+    return aircraft.get(selectedAircraftId) || null;
+  },
+
+  // Get followed aircraft object
+  getFollowedAircraft: () => {
+    const { aircraft, followedAircraftId } = get();
+    if (!followedAircraftId) return null;
+    return aircraft.get(followedAircraftId) || null;
+  },
+
+  // Get trail for selected aircraft
+  getSelectedTrail: () => {
+    const { trails, selectedAircraftId } = get();
+    if (!selectedAircraftId) return [];
+    return trails.get(selectedAircraftId) || [];
+  },
+
+  // Get aircraft array for rendering
+  getAircraftArray: () => {
+    return Array.from(get().aircraft.values());
+  },
+
+  // Get aircraft count
+  getAircraftCount: () => {
+    return get().aircraft.size;
+  },
+
+  // Get cached classification for an aircraft (uses pre-computed values)
+  getAircraftClassification: (hex) => {
+    const aircraft = get().aircraft.get(hex);
+    if (!aircraft) return null;
+    return {
+      classification: aircraft._classification,
+      iconType: aircraft._iconType,
+      color: aircraft._color,
+    };
+  },
+
+  // Clean up stale trails and data for aircraft not seen recently
+  cleanupStaleData: () => {
+    const { trails, lastSeen, selectedAircraftId, followedAircraftId } = get();
+    const now = Date.now();
+    const newTrails = new Map();
+    const newLastSeen = new Map();
+    let unfollowNeeded = false;
+
+    // Keep only recent lastSeen entries and their associated trails
+    for (const [hex, timestamp] of lastSeen.entries()) {
+      if (now - timestamp < STALE_AIRCRAFT_AGE_MS) {
+        newLastSeen.set(hex, timestamp);
+        
+        // Keep trail if it exists and aircraft is selected
+        if (hex === selectedAircraftId && trails.has(hex)) {
+          const trail = trails.get(hex);
+          const recentTrail = trail.filter(p => now - p.timestamp < TRAIL_MAX_AGE_MS);
+          if (recentTrail.length > 0) {
+            newTrails.set(hex, recentTrail);
+          }
+        }
+      } else {
+        // Aircraft is stale - if we were following it, we need to unfollow
+        if (hex === followedAircraftId) {
+          unfollowNeeded = true;
+        }
+      }
+    }
+
+    set({
+      trails: newTrails,
+      lastSeen: newLastSeen,
+      followedAircraftId: unfollowNeeded ? null : followedAircraftId,
+    });
+  },
+
+  // Start periodic cleanup timer (call once on app mount)
+  startCleanupTimer: () => {
+    if (cleanupIntervalId) return; // Already running
+    
+    cleanupIntervalId = setInterval(() => {
+      get().cleanupStaleData();
+    }, 30000); // Run cleanup every 30 seconds
+  },
+
+  // Stop cleanup timer (call on app unmount)
+  stopCleanupTimer: () => {
+    if (cleanupIntervalId) {
+      clearInterval(cleanupIntervalId);
+      cleanupIntervalId = null;
+    }
+  },
+
+  // Check if an aircraft is stale (not seen recently)
+  isAircraftStale: (hex) => {
+    const { lastSeen } = get();
+    const timestamp = lastSeen.get(hex);
+    if (!timestamp) return true;
+    return Date.now() - timestamp > STALE_AIRCRAFT_AGE_MS;
+  },
+}));
