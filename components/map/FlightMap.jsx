@@ -10,6 +10,7 @@ import { useFilteredAircraft } from '@/hooks/use-filters';
 import { useAircraftByLocation } from '@/hooks/use-aircraft';
 import { MapControls } from './MapControls';
 import { isEmergency } from '@/lib/classify';
+import { altitudeToMeters, getShadowRadius } from '@/lib/altitude';
 
 // Dark map style
 const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
@@ -19,6 +20,7 @@ let MapGL = null;
 let DeckGL = null;
 let IconLayer = null;
 let PathLayer = null;
+let ScatterplotLayer = null;
 let maplibreLoaded = false;
 
 // SVG paths for aircraft icons
@@ -76,6 +78,7 @@ export const FlightMap = memo(function FlightMap() {
         DeckGL = deckModule.DeckGL;
         IconLayer = layersModule.IconLayer;
         PathLayer = layersModule.PathLayer;
+        ScatterplotLayer = layersModule.ScatterplotLayer;
         
         // Import CSS
         await import('maplibre-gl/dist/maplibre-gl.css');
@@ -265,6 +268,9 @@ export const FlightMap = memo(function FlightMap() {
   // Base size for icons
   const baseSize = viewState.zoom < 7 ? 24 : viewState.zoom <= 10 ? 32 : 40;
 
+  // Check if we're in 3D mode (pitch > 0)
+  const is3DMode = viewState.pitch > 0;
+
   // Create layers
   const layers = useMemo(() => {
     if (!IconLayer || !PathLayer) return [];
@@ -286,13 +292,39 @@ export const FlightMap = memo(function FlightMap() {
       }));
     }
 
+    // Shadow layer - only visible in 3D mode
+    // Renders dark circles on the ground beneath aircraft for depth perception
+    if (is3DMode && ScatterplotLayer && filteredAircraft.length > 0) {
+      const airborneAircraft = filteredAircraft.filter(ac => {
+        const alt = ac.alt_baro;
+        return typeof alt === 'number' && alt > 500;
+      });
+      if (airborneAircraft.length > 0) {
+        result.push(new ScatterplotLayer({
+          id: 'shadow-layer',
+          data: airborneAircraft,
+          getPosition: d => [d.lon, d.lat, 0], // Always on ground
+          getRadius: d => getShadowRadius(d.alt_baro),
+          getFillColor: [0, 0, 0, 60], // Semi-transparent black
+          radiusUnits: 'meters',
+          pickable: false, // Don't intercept clicks
+        }));
+      }
+    }
+
     // Aircraft layer
     if (filteredAircraft.length > 0) {
       result.push(new IconLayer({
         id: 'aircraft-layer',
         data: filteredAircraft,
         pickable: true,
-        getPosition: d => [d.lon, d.lat],
+        // 3D positioning: use altitude when in 3D mode
+        getPosition: d => {
+          if (!is3DMode) return [d.lon, d.lat, 0];
+          // Use altitudeToMeters for consistent scaling (20x exaggeration)
+          const z = altitudeToMeters(d.alt_baro, viewState.pitch);
+          return [d.lon, d.lat, z];
+        },
         getIcon: d => ({
           url: getIconUrl(d._iconType || 'unknown'),
           width: 64,
@@ -315,12 +347,13 @@ export const FlightMap = memo(function FlightMap() {
         updateTriggers: {
           getSize: [selectedAircraftId, baseSize],
           getColor: [selectedAircraftId],
+          getPosition: [is3DMode, viewState.pitch], // Re-compute positions when 3D mode changes
         },
       }));
     }
 
     return result;
-  }, [filteredAircraft, selectedAircraftId, baseSize, trailData, handleAircraftClick, isReady]);
+  }, [filteredAircraft, selectedAircraftId, baseSize, trailData, handleAircraftClick, isReady, is3DMode, viewState.pitch]);
 
   // Show loading while libraries load
   if (!isReady || !DeckGL || !MapGL) {
