@@ -53,11 +53,11 @@ export const Sidebar = memo(function Sidebar() {
           animate={{ width: 288, opacity: 1 }}
           exit={{ width: 0, opacity: 0 }}
           transition={{ duration: 0.2, ease: 'easeInOut' }}
-          className="h-full border-r border-border bg-card overflow-hidden shrink-0"
+          className="h-full border-r border-zinc-800 bg-zinc-950 overflow-hidden shrink-0"
         >
           <div className="flex h-full w-72 flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
               <h2 className="text-sm font-semibold">Filters</h2>
               <Button
                 variant="ghost"

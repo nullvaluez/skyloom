@@ -23,6 +23,9 @@ export const useUIStore = create((set, get) => ({
   // Error state
   error: null,
 
+  // AR mode
+  arModeOpen: false,
+
   // Actions
   toggleSidebar: () => {
     set((state) => ({ sidebarOpen: !state.sidebarOpen }));
@@ -86,5 +89,17 @@ export const useUIStore = create((set, get) => ({
 
   clearError: () => {
     set({ error: null });
+  },
+
+  toggleARMode: () => {
+    set((state) => ({ arModeOpen: !state.arModeOpen }));
+  },
+
+  openARMode: () => {
+    set({ arModeOpen: true });
+  },
+
+  closeARMode: () => {
+    set({ arModeOpen: false });
   },
 }));

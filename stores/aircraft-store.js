@@ -5,8 +5,14 @@ import { classifyAircraft, getAircraftIconType, getAircraftColor } from '@/lib/c
 // Maximum age for trail points (5 minutes)
 const TRAIL_MAX_AGE_MS = 300000;
 
+// Maximum age for stale aircraft data (2 minutes)
+const STALE_AIRCRAFT_AGE_MS = 120000;
+
 // Epsilon for floating-point comparison
 const POSITION_EPSILON = 0.00001;
+
+// Cleanup interval timer reference
+let cleanupIntervalId = null;
 
 export const useAircraftStore = create((set, get) => ({
   // Aircraft data as a Map for O(1) lookups
@@ -21,14 +27,18 @@ export const useAircraftStore = create((set, get) => ({
   // Flight trails as a Map of hex -> position array
   trails: new Map(),
 
+  // Track when each aircraft was last seen (hex -> timestamp)
+  lastSeen: new Map(),
+
   // Last update timestamp
   lastUpdate: null,
 
   // Actions
   setAircraft: (aircraftList) => {
-    const { selectedAircraftId, trails } = get();
+    const { selectedAircraftId, trails, lastSeen, aircraft: existingAircraft } = get();
     const now = Date.now();
     const newMap = new Map();
+    const newLastSeen = new Map(lastSeen);
     const activeHexes = new Set();
 
     // Start with cleaned trails (only keep trails for selected aircraft)
@@ -37,16 +47,26 @@ export const useAircraftStore = create((set, get) => ({
     aircraftList.forEach((ac) => {
       if (ac.hex) {
         activeHexes.add(ac.hex);
+        
+        // Track when this aircraft was last seen
+        newLastSeen.set(ac.hex, now);
 
-        // Pre-calculate and cache classification data to avoid repeated calculations
-        // This memoization prevents calling classifyAircraft multiple times per aircraft
-        if (!ac._classification) {
-          ac._classification = classifyAircraft(ac);
-          ac._iconType = getAircraftIconType(ac);
-          ac._color = getAircraftColor(ac);
+        // Get existing aircraft data to preserve classification
+        const existing = existingAircraft.get(ac.hex);
+        
+        // Merge with existing data, keeping position updates
+        const mergedAc = existing 
+          ? { ...existing, ...ac }
+          : ac;
+
+        // Calculate classification data if not already cached
+        if (!mergedAc._classification) {
+          mergedAc._classification = classifyAircraft(mergedAc);
+          mergedAc._iconType = getAircraftIconType(mergedAc);
+          mergedAc._color = getAircraftColor(mergedAc);
         }
 
-        newMap.set(ac.hex, ac);
+        newMap.set(ac.hex, mergedAc);
 
         // Update trail for selected aircraft
         if (ac.hex === selectedAircraftId && ac.lat && ac.lon) {
@@ -97,9 +117,17 @@ export const useAircraftStore = create((set, get) => ({
       }
     }
 
+    // Clean up stale lastSeen entries for aircraft no longer in view
+    for (const [hex, timestamp] of newLastSeen.entries()) {
+      if (now - timestamp > STALE_AIRCRAFT_AGE_MS && !activeHexes.has(hex)) {
+        newLastSeen.delete(hex);
+      }
+    }
+
     set({
       aircraft: newMap,
       trails: newTrails,
+      lastSeen: newLastSeen,
       lastUpdate: new Date(),
     });
   },
@@ -219,5 +247,66 @@ export const useAircraftStore = create((set, get) => ({
       iconType: aircraft._iconType,
       color: aircraft._color,
     };
+  },
+
+  // Clean up stale trails and data for aircraft not seen recently
+  cleanupStaleData: () => {
+    const { trails, lastSeen, selectedAircraftId, followedAircraftId } = get();
+    const now = Date.now();
+    const newTrails = new Map();
+    const newLastSeen = new Map();
+    let unfollowNeeded = false;
+
+    // Keep only recent lastSeen entries and their associated trails
+    for (const [hex, timestamp] of lastSeen.entries()) {
+      if (now - timestamp < STALE_AIRCRAFT_AGE_MS) {
+        newLastSeen.set(hex, timestamp);
+        
+        // Keep trail if it exists and aircraft is selected
+        if (hex === selectedAircraftId && trails.has(hex)) {
+          const trail = trails.get(hex);
+          const recentTrail = trail.filter(p => now - p.timestamp < TRAIL_MAX_AGE_MS);
+          if (recentTrail.length > 0) {
+            newTrails.set(hex, recentTrail);
+          }
+        }
+      } else {
+        // Aircraft is stale - if we were following it, we need to unfollow
+        if (hex === followedAircraftId) {
+          unfollowNeeded = true;
+        }
+      }
+    }
+
+    set({
+      trails: newTrails,
+      lastSeen: newLastSeen,
+      followedAircraftId: unfollowNeeded ? null : followedAircraftId,
+    });
+  },
+
+  // Start periodic cleanup timer (call once on app mount)
+  startCleanupTimer: () => {
+    if (cleanupIntervalId) return; // Already running
+    
+    cleanupIntervalId = setInterval(() => {
+      get().cleanupStaleData();
+    }, 30000); // Run cleanup every 30 seconds
+  },
+
+  // Stop cleanup timer (call on app unmount)
+  stopCleanupTimer: () => {
+    if (cleanupIntervalId) {
+      clearInterval(cleanupIntervalId);
+      cleanupIntervalId = null;
+    }
+  },
+
+  // Check if an aircraft is stale (not seen recently)
+  isAircraftStale: (hex) => {
+    const { lastSeen } = get();
+    const timestamp = lastSeen.get(hex);
+    if (!timestamp) return true;
+    return Date.now() - timestamp > STALE_AIRCRAFT_AGE_MS;
   },
 }));

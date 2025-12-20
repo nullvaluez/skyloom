@@ -25,60 +25,60 @@ export const StatsBar = memo(function StatsBar() {
     : null;
 
   return (
-    <footer className="flex h-10 items-center justify-between border-t border-border bg-card px-4 text-sm">
+    <footer className="flex h-10 items-center justify-between border-t border-zinc-800 bg-zinc-950 px-4 text-sm">
       <div className="flex items-center gap-4 overflow-x-auto">
         {/* Total Aircraft */}
-        <div className="flex items-center gap-1.5 text-foreground">
+        <div className="flex items-center gap-1.5 text-zinc-100">
           <Plane className="h-4 w-4" />
           <span className="font-medium">{stats.total.toLocaleString()}</span>
-          <span className="hidden text-muted-foreground sm:inline">aircraft</span>
+          <span className="hidden text-zinc-500 sm:inline">aircraft</span>
         </div>
 
-        <div className="h-4 w-px bg-border" />
+        <div className="h-4 w-px bg-zinc-700" />
 
         {/* Commercial */}
-        <div className="flex items-center gap-1.5 text-green-500">
+        <div className="flex items-center gap-1.5 text-green-400">
           <Plane className="h-3.5 w-3.5" />
           <span className="font-medium">{stats.byType.commercial.toLocaleString()}</span>
-          <span className="hidden text-muted-foreground lg:inline">commercial</span>
+          <span className="hidden text-zinc-500 lg:inline">commercial</span>
         </div>
 
         {/* Cargo */}
-        <div className="flex items-center gap-1.5 text-amber-500">
+        <div className="flex items-center gap-1.5 text-amber-400">
           <Package className="h-3.5 w-3.5" />
           <span className="font-medium">{stats.byType.cargo.toLocaleString()}</span>
-          <span className="hidden text-muted-foreground lg:inline">cargo</span>
+          <span className="hidden text-zinc-500 lg:inline">cargo</span>
         </div>
 
         {/* Military */}
-        <div className="flex items-center gap-1.5 text-red-500">
+        <div className="flex items-center gap-1.5 text-red-400">
           <Shield className="h-3.5 w-3.5" />
           <span className="font-medium">{stats.byType.military.toLocaleString()}</span>
-          <span className="hidden text-muted-foreground lg:inline">military</span>
+          <span className="hidden text-zinc-500 lg:inline">military</span>
         </div>
 
         {/* Helicopter */}
-        <div className="hidden items-center gap-1.5 text-cyan-500 md:flex">
+        <div className="hidden items-center gap-1.5 text-cyan-400 md:flex">
           <Helicopter className="h-3.5 w-3.5" />
           <span className="font-medium">{stats.byType.helicopter.toLocaleString()}</span>
-          <span className="hidden text-muted-foreground xl:inline">heli</span>
+          <span className="hidden text-zinc-500 xl:inline">heli</span>
         </div>
 
         {/* Emergency */}
         {stats.inEmergency > 0 && (
           <>
-            <div className="h-4 w-px bg-border" />
+            <div className="h-4 w-px bg-zinc-700" />
             <div className="flex items-center gap-1.5 text-red-500 animate-pulse">
               <AlertTriangle className="h-3.5 w-3.5" />
               <span className="font-medium">{stats.inEmergency}</span>
-              <span className="hidden text-muted-foreground sm:inline">emergency</span>
+              <span className="hidden text-zinc-500 sm:inline">emergency</span>
             </div>
           </>
         )}
       </div>
 
       {/* Last Update */}
-      <div className="text-muted-foreground">
+      <div className="text-zinc-500">
         {timeSinceUpdate !== null ? (
           <span>Updated: {formatTimeSince(timeSinceUpdate)}</span>
         ) : (

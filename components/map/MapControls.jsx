@@ -1,50 +1,63 @@
 'use client';
 
-import { memo } from 'react';
-import { useMap } from 'react-leaflet';
+import { memo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Plus, Minus, Crosshair, Maximize2, Home } from 'lucide-react';
+import { Plus, Minus, Crosshair, Maximize2, Home, Box, RotateCcw } from 'lucide-react';
 import { useMapStore } from '@/stores/map-store';
-import { MAP_CONFIG } from '@/lib/constants';
 
 /**
- * Custom map controls component
+ * Custom map controls component for MapLibre/Deck.gl
  */
 export const MapControls = memo(function MapControls() {
-  const map = useMap();
-  const { geolocate, geolocating, resetView } = useMapStore();
+  const zoom = useMapStore((s) => s.zoom);
+  const pitch = useMapStore((s) => s.pitch);
+  const geolocating = useMapStore((s) => s.geolocating);
+  const geolocate = useMapStore((s) => s.geolocate);
+  const resetView = useMapStore((s) => s.resetView);
+  const setZoom = useMapStore((s) => s.setZoom);
+  const setPitch = useMapStore((s) => s.setPitch);
+  const disable3D = useMapStore((s) => s.disable3D);
 
-  const handleZoomIn = () => {
-    map.zoomIn();
-  };
+  const handleZoomIn = useCallback(() => {
+    setZoom(Math.min(zoom + 1, 18));
+  }, [zoom, setZoom]);
 
-  const handleZoomOut = () => {
-    map.zoomOut();
-  };
+  const handleZoomOut = useCallback(() => {
+    setZoom(Math.max(zoom - 1, 2));
+  }, [zoom, setZoom]);
 
-  const handleGeolocate = () => {
+  const handleGeolocate = useCallback(() => {
     geolocate();
-  };
+  }, [geolocate]);
 
-  const handleFullscreen = () => {
-    const container = map.getContainer();
+  const handleFullscreen = useCallback(() => {
+    const container = document.querySelector('.maplibregl-map')?.parentElement;
+    if (!container) return;
+    
     if (document.fullscreenElement) {
       document.exitFullscreen();
     } else {
       container.requestFullscreen();
     }
-  };
+  }, []);
 
-  const handleReset = () => {
-    map.flyTo(MAP_CONFIG.defaultCenter, MAP_CONFIG.defaultZoom, {
-      duration: 1.5,
-    });
-  };
+  const handleReset = useCallback(() => {
+    resetView();
+  }, [resetView]);
+
+  const handleToggle3D = useCallback(() => {
+    if (pitch > 0) {
+      disable3D();
+    } else {
+      setPitch(60);
+    }
+  }, [pitch, setPitch, disable3D]);
 
   return (
-    <div className="absolute right-4 top-4 z-[1000] flex flex-col gap-2">
-      <div className="flex flex-col overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+    <div className="absolute left-4 bottom-24 z-[1000] flex flex-col gap-2 md:left-auto md:right-4 md:top-20 md:bottom-auto">
+      {/* Zoom controls */}
+      <div className="flex flex-col overflow-hidden rounded-lg border border-border bg-card/90 backdrop-blur-sm shadow-lg">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -76,7 +89,8 @@ export const MapControls = memo(function MapControls() {
         </Tooltip>
       </div>
 
-      <div className="flex flex-col overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+      {/* Navigation controls */}
+      <div className="flex flex-col overflow-hidden rounded-lg border border-border bg-card/90 backdrop-blur-sm shadow-lg">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -91,6 +105,21 @@ export const MapControls = memo(function MapControls() {
             </Button>
           </TooltipTrigger>
           <TooltipContent side="left">My location</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`h-9 w-9 rounded-none border-b border-border hover:bg-accent ${pitch > 0 ? 'bg-accent' : ''}`}
+              onClick={handleToggle3D}
+              aria-label="Toggle 3D view"
+            >
+              <Box className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="left">{pitch > 0 ? 'Disable 3D' : 'Enable 3D view'}</TooltipContent>
         </Tooltip>
 
         <Tooltip>

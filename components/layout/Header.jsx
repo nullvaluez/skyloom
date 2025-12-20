@@ -62,7 +62,7 @@ export const Header = memo(function Header() {
   // Mobile search expanded view
   if (mobileSearchOpen && mounted) {
     return (
-      <header className="flex h-14 items-center gap-2 border-b border-border bg-card px-4 md:hidden">
+      <header className="flex h-14 items-center gap-2 border-b border-zinc-800 bg-zinc-950 px-4 md:hidden">
         <Button
           variant="ghost"
           size="icon"
@@ -95,7 +95,7 @@ export const Header = memo(function Header() {
   }
 
   return (
-    <header className="flex h-14 items-center justify-between border-b border-border bg-card px-4">
+    <header className="flex h-14 items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4">
       {/* Logo */}
       <div className="flex items-center gap-2">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">

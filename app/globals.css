@@ -139,41 +139,212 @@
   }
 }
 
-/* Leaflet overrides for dark theme */
-.leaflet-container {
-  background: #09090b !important; /* Ensure dark background to prevent white flash on zoom */
+/* ===========================================
+   GLASSMORPHISM DESIGN SYSTEM
+   =========================================== */
+
+:root {
+  /* Glass effect variables - dark theme */
+  --glass-bg: rgba(9, 9, 11, 0.85);
+  --glass-bg-light: rgba(9, 9, 11, 0.7);
+  --glass-bg-heavy: rgba(9, 9, 11, 0.95);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-light: rgba(255, 255, 255, 0.04);
+  --glass-blur: 16px;
+  --glass-blur-light: 10px;
+  --glass-blur-heavy: 24px;
+  
+  /* HUD accent colors */
+  --hud-primary: #3b82f6;
+  --hud-success: #22c55e;
+  --hud-warning: #f59e0b;
+  --hud-danger: #ef4444;
+  --hud-info: #06b6d4;
+  
+  /* Scan-line effect */
+  --scanline-color: rgba(255, 255, 255, 0.03);
+}
+
+/* Glass panel - main floating UI elements */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+}
+
+.glass-panel-light {
+  background: var(--glass-bg-light);
+  backdrop-filter: blur(var(--glass-blur-light));
+  -webkit-backdrop-filter: blur(var(--glass-blur-light));
+  border: 1px solid var(--glass-border-light);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+}
+
+.glass-panel-heavy {
+  background: var(--glass-bg-heavy);
+  backdrop-filter: blur(var(--glass-blur-heavy));
+  -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
+  border: 1px solid var(--glass-border);
+  box-shadow: 
+    0 12px 48px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+}
+
+/* HUD-style borders */
+.hud-border {
+  border: 1px solid var(--hud-primary);
+  box-shadow: 
+    0 0 10px rgba(59, 130, 246, 0.3),
+    inset 0 0 10px rgba(59, 130, 246, 0.1);
+}
+
+.hud-border-danger {
+  border: 1px solid var(--hud-danger);
+  box-shadow: 
+    0 0 10px rgba(239, 68, 68, 0.3),
+    inset 0 0 10px rgba(239, 68, 68, 0.1);
+  animation: hud-pulse-danger 1s ease-in-out infinite;
+}
+
+@keyframes hud-pulse-danger {
+  0%, 100% {
+    box-shadow: 
+      0 0 10px rgba(239, 68, 68, 0.3),
+      inset 0 0 10px rgba(239, 68, 68, 0.1);
+  }
+  50% {
+    box-shadow: 
+      0 0 20px rgba(239, 68, 68, 0.5),
+      inset 0 0 15px rgba(239, 68, 68, 0.2);
+  }
+}
+
+/* Scan-line animation for HUD effect */
+.scanlines {
+  position: relative;
+  overflow: hidden;
+}
+
+.scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    var(--scanline-color) 2px,
+    var(--scanline-color) 4px
+  );
+  pointer-events: none;
+  animation: scanline-move 8s linear infinite;
+}
+
+@keyframes scanline-move {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(100px); }
+}
+
+/* HUD text styles */
+.hud-text {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.hud-value {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Glow effects */
+.glow-primary {
+  text-shadow: 0 0 10px var(--hud-primary), 0 0 20px var(--hud-primary);
+}
+
+.glow-success {
+  text-shadow: 0 0 10px var(--hud-success), 0 0 20px var(--hud-success);
+}
+
+.glow-warning {
+  text-shadow: 0 0 10px var(--hud-warning), 0 0 20px var(--hud-warning);
+}
+
+.glow-danger {
+  text-shadow: 0 0 10px var(--hud-danger), 0 0 20px var(--hud-danger);
+}
+
+/* ===========================================
+   MAPLIBRE GL OVERRIDES FOR DARK THEME
+   =========================================== */
+
+.maplibregl-map {
   font-family: inherit;
 }
 
-.leaflet-control-zoom a,
-.leaflet-control-layers-toggle {
-  background-color: #18181b !important;
+.maplibregl-ctrl-group {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(var(--glass-blur-light));
+  -webkit-backdrop-filter: blur(var(--glass-blur-light));
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+}
+
+.maplibregl-ctrl-group button {
+  background-color: transparent !important;
   color: #fafafa !important;
-  border-color: #27272a !important;
+  border: none !important;
 }
 
-.leaflet-control-zoom a:hover,
-.leaflet-control-layers-toggle:hover {
-  background-color: #27272a !important;
+.maplibregl-ctrl-group button:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
-.leaflet-control-attribution {
-  background: rgba(9, 9, 11, 0.8) !important;
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid var(--glass-border) !important;
+}
+
+.maplibregl-ctrl-attrib {
+  background: var(--glass-bg-light) !important;
+  backdrop-filter: blur(var(--glass-blur-light));
+  -webkit-backdrop-filter: blur(var(--glass-blur-light));
   color: #71717a !important;
+  border-radius: 4px;
+  padding: 2px 6px;
 }
 
-.leaflet-control-attribution a {
+.maplibregl-ctrl-attrib a {
   color: #a1a1aa !important;
 }
 
-.leaflet-popup-content-wrapper {
-  background: #0f0f13;
-  color: #fafafa;
-  border-radius: 0.5rem;
+.maplibregl-ctrl-logo {
+  opacity: 0.5;
 }
 
-.leaflet-popup-tip {
-  background: #0f0f13;
+.maplibregl-popup-content {
+  background: var(--glass-bg-heavy);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  color: #fafafa;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.maplibregl-popup-tip {
+  border-top-color: var(--glass-bg-heavy);
+}
+
+.maplibregl-ctrl-geolocate {
+  background: var(--glass-bg) !important;
 }
 
 /* Aircraft marker animations */
@@ -192,60 +363,29 @@
   animation: pulse-emergency 1s ease-in-out infinite;
 }
 
-/* Aircraft marker styling */
-.aircraft-marker {
-  background: transparent !important;
-  border: none !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
+/* ===========================================
+   DECK.GL CANVAS STYLING
+   =========================================== */
+
+/* Ensure Deck.gl canvas is properly positioned */
+.deck-canvas {
+  position: absolute !important;
+  top: 0;
+  left: 0;
 }
 
-/* Cluster styling */
-.marker-cluster {
-  background-clip: padding-box;
-  border-radius: 50%;
-}
-
-.marker-cluster div {
-  width: 30px;
-  height: 30px;
-  margin-left: 5px;
-  margin-top: 5px;
-  text-align: center;
-  border-radius: 50%;
+/* Deck.gl tooltip styling */
+.deck-tooltip {
+  background: var(--glass-bg-heavy) !important;
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+  color: #fafafa !important;
+  font-family: ui-monospace, monospace;
   font-size: 12px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.marker-cluster-small {
-  background-color: rgba(59, 130, 246, 0.4);
-}
-
-.marker-cluster-small div {
-  background-color: rgba(59, 130, 246, 0.8);
-  color: white;
-}
-
-.marker-cluster-medium {
-  background-color: rgba(245, 158, 11, 0.4);
-}
-
-.marker-cluster-medium div {
-  background-color: rgba(245, 158, 11, 0.8);
-  color: white;
-}
-
-.marker-cluster-large {
-  background-color: rgba(239, 68, 68, 0.4);
-}
-
-.marker-cluster-large div {
-  background-color: rgba(239, 68, 68, 0.8);
-  color: white;
 }
 
 /* Custom scrollbar for dark theme */
@@ -336,23 +476,18 @@
   50% { opacity: 1; }
 }
 
-/* Tooltip styles */
+/* ===========================================
+   AIRCRAFT TOOLTIP STYLES
+   =========================================== */
+
 .aircraft-tooltip {
-  background: rgba(15, 15, 19, 0.95) !important;
-  border: 1px solid rgba(63, 63, 70, 0.8) !important;
+  background: var(--glass-bg-heavy) !important;
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border) !important;
   border-radius: 8px !important;
   padding: 8px 12px !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
-}
-
-.aircraft-tooltip::before {
-  border-top-color: rgba(15, 15, 19, 0.95) !important;
-}
-
-.leaflet-tooltip.aircraft-tooltip {
-  background: rgba(15, 15, 19, 0.95);
-  border: 1px solid rgba(63, 63, 70, 0.8);
-  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
   color: #fafafa;
 }
 

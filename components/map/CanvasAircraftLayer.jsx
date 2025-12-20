@@ -54,117 +54,121 @@ export function CanvasAircraftLayer({ aircraft }) {
     };
   }, [map]);
 
-  // Redraw function
+  // Redraw function - optimized with parallel bitmap fetching
   const redraw = useCallback(async () => {
     if (!canvasRef.current || !aircraft || aircraft.length === 0) return;
 
     const start = performance.now();
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    const size = map.getSize();
     const bounds = map.getBounds();
     const iconSize = getIconSize();
+    const zoom = map.getZoom();
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Filter aircraft that are in bounds
-    const visibleAircraft = aircraft.filter(ac => 
-      ac.lat && ac.lon && bounds.contains([ac.lat, ac.lon])
-    );
+    // Filter aircraft that are in bounds and pre-compute render data
+    const visibleAircraft = aircraft
+      .filter(ac => ac.lat && ac.lon && bounds.contains([ac.lat, ac.lon]))
+      .map(ac => ({
+        ac,
+        point: map.latLngToContainerPoint([ac.lat, ac.lon]),
+        isSelected: selectedAircraftId === ac.hex,
+        emergency: isEmergency(ac),
+        callsign: ac.flight?.trim() || ac.hex,
+      }));
 
-    // Draw aircraft with enhanced visual effects
-    for (const ac of visibleAircraft) {
-      if (!ac || !ac.lat || !ac.lon) continue; // Skip invalid aircraft
-      
-      const point = map.latLngToContainerPoint([ac.lat, ac.lon]);
-      const isSelected = selectedAircraftId === ac.hex;
-      const emergency = isEmergency(ac);
-      
-      const bitmap = await getIconBitmap({
+    // Pre-fetch all bitmaps in parallel for better performance
+    const bitmapPromises = visibleAircraft.map(({ ac, isSelected, emergency }) =>
+      getIconBitmap({
         type: ac._iconType || 'airliner',
         color: ac._color || ICON_COLORS.unknown,
         size: iconSize,
         rotation: ac.track || 0,
         emergency,
         selected: isSelected,
-        aircraft: ac, // Pass aircraft object for type-specific silhouettes
-      });
+        aircraft: ac,
+      })
+    );
 
-      if (bitmap) {
-        const drawX = point.x - iconSize / 2;
-        const drawY = point.y - iconSize / 2;
-        
-        // Selection glow effect
-        if (isSelected) {
-          ctx.shadowColor = ICON_COLORS.selected;
-          ctx.shadowBlur = 12;
-          ctx.shadowOffsetX = 0;
-          ctx.shadowOffsetY = 0;
-          
-          // Draw selection ring
-          ctx.strokeStyle = ICON_COLORS.selected;
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.arc(point.x, point.y, iconSize * 0.7, 0, Math.PI * 2);
-          ctx.stroke();
-        } 
-        // Emergency pulsing glow
-        else if (emergency) {
-          const pulseIntensity = Math.abs(Math.sin(Date.now() / 250)) * 8 + 4;
-          ctx.shadowColor = ICON_COLORS.emergency;
-          ctx.shadowBlur = pulseIntensity;
-          ctx.shadowOffsetX = 0;
-          ctx.shadowOffsetY = 0;
-        }
-        // Subtle shadow for all aircraft
-        else {
-          ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-          ctx.shadowBlur = 3;
-          ctx.shadowOffsetX = 0;
-          ctx.shadowOffsetY = 2;
-        }
+    const bitmaps = await Promise.all(bitmapPromises);
 
-        // Draw the aircraft icon
-        ctx.drawImage(bitmap, drawX, drawY, iconSize, iconSize);
-        
-        // Reset shadow for text rendering
-        ctx.shadowBlur = 0;
+    // Now draw all aircraft synchronously for consistent frame timing
+    visibleAircraft.forEach(({ ac, point, isSelected, emergency, callsign }, index) => {
+      const bitmap = bitmaps[index];
+      if (!bitmap) return;
+
+      const drawX = point.x - iconSize / 2;
+      const drawY = point.y - iconSize / 2;
+
+      // Selection glow effect
+      if (isSelected) {
+        ctx.shadowColor = ICON_COLORS.selected;
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 0;
 
-        // Draw callsign with background pill if zoomed in or selected
-        const zoom = map.getZoom();
-        if (isSelected || zoom > 11) {
-          const callsign = ac.flight?.trim() || ac.hex;
-          const textColor = isSelected ? ICON_COLORS.selected : (emergency ? ICON_COLORS.emergency : ac._color);
-          
-          // Measure text for background pill
-          ctx.font = 'bold 10px ui-monospace, monospace';
-          const textMetrics = ctx.measureText(callsign);
-          const textWidth = textMetrics.width;
-          const paddingX = 4;
-          const paddingY = 2;
-          const pillY = point.y + iconSize / 2 + 6;
-          
-          // Draw background pill
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-          ctx.beginPath();
-          ctx.roundRect(
-            point.x - textWidth / 2 - paddingX, 
-            pillY - paddingY, 
-            textWidth + paddingX * 2, 
-            12 + paddingY * 2, 
-            3
-          );
-          ctx.fill();
-          
-          // Draw text
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'top';
-          ctx.fillStyle = textColor;
-          ctx.fillText(callsign, point.x, pillY);
-        }
+        // Draw selection ring
+        ctx.strokeStyle = ICON_COLORS.selected;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, iconSize * 0.7, 0, Math.PI * 2);
+        ctx.stroke();
       }
-    }
+      // Emergency pulsing glow
+      else if (emergency) {
+        const pulseIntensity = Math.abs(Math.sin(Date.now() / 250)) * 8 + 4;
+        ctx.shadowColor = ICON_COLORS.emergency;
+        ctx.shadowBlur = pulseIntensity;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+      }
+      // Subtle shadow for all aircraft
+      else {
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        ctx.shadowBlur = 3;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 2;
+      }
+
+      // Draw the aircraft icon
+      ctx.drawImage(bitmap, drawX, drawY, iconSize, iconSize);
+
+      // Reset shadow for text rendering
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
+
+      // Draw callsign with background pill if zoomed in or selected
+      if (isSelected || zoom > 11) {
+        const textColor = isSelected ? ICON_COLORS.selected : (emergency ? ICON_COLORS.emergency : ac._color);
+
+        // Measure text for background pill
+        ctx.font = 'bold 10px ui-monospace, monospace';
+        const textMetrics = ctx.measureText(callsign);
+        const textWidth = textMetrics.width;
+        const paddingX = 4;
+        const paddingY = 2;
+        const pillY = point.y + iconSize / 2 + 6;
+
+        // Draw background pill
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+        ctx.beginPath();
+        ctx.roundRect(
+          point.x - textWidth / 2 - paddingX,
+          pillY - paddingY,
+          textWidth + paddingX * 2,
+          12 + paddingY * 2,
+          3
+        );
+        ctx.fill();
+
+        // Draw text
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = textColor;
+        ctx.fillText(callsign, point.x, pillY);
+      }
+    });
 
     const end = performance.now();
     setMetric('renderTimeMs', end - start);

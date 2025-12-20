@@ -20,6 +20,7 @@ import { useUIStore } from '@/stores/ui-store';
 import { useAircraftPhoto } from '@/hooks/use-aircraft';
 import { useIsMobile } from '@/hooks/use-media-query';
 import { useShare } from '@/hooks/use-share';
+import { useHaptics } from '@/hooks/use-haptics';
 import { classifyAircraft, isEmergency, getDataSource } from '@/lib/classify';
 import {
   formatAltitude,
@@ -96,7 +97,7 @@ const DetailPanelContent = memo(function DetailPanelContent({
         />
       </div>
 
-      <div className="border-t border-border p-4 sticky bottom-0 bg-card">
+      <div className="border-t border-zinc-800 p-4 sticky bottom-0 bg-zinc-950">
         <ActionButtons
           isFollowing={isFollowing}
           onFollow={onFollow}
@@ -116,9 +117,11 @@ export const DetailPanel = memo(function DetailPanel() {
   const followedAircraftId = useAircraftStore((s) => s.followedAircraftId);
   const unfollowAircraft = useAircraftStore((s) => s.unfollowAircraft);
   const selectAircraft = useAircraftStore((s) => s.selectAircraft);
-  const centerOnAircraft = useMapStore((s) => s.centerOnAircraft);
+  const enable3DFollow = useMapStore((s) => s.enable3DFollow);
+  const disable3D = useMapStore((s) => s.disable3D);
   const isMobile = useIsMobile();
   const { shareNative } = useShare();
+  const { onSelect, onFollow: hapticFollow } = useHaptics();
 
   const aircraft = getSelectedAircraft();
   const { data: photo, isLoading: photoLoading } = useAircraftPhoto(aircraft?.hex);
@@ -134,9 +137,17 @@ export const DetailPanel = memo(function DetailPanel() {
     if (aircraft) {
       if (isFollowing) {
         unfollowAircraft();
+        disable3D(); // Return to flat view when unfollowing
+        onSelect(); // Light haptic for unfollow
       } else {
         followAircraft(aircraft.hex);
-        centerOnAircraft(aircraft);
+        // Enable 3D follow mode with tilted camera
+        enable3DFollow(aircraft);
+        hapticFollow(); // Distinctive haptic pattern for follow
+        // Close sheet on mobile so user can see the map while following
+        if (isMobile) {
+          closeDetailPanel();
+        }
       }
     }
   };
@@ -187,16 +198,20 @@ export const DetailPanel = memo(function DetailPanel() {
   if (isMobile) {
     return (
       <Sheet open={detailPanelOpen} onOpenChange={(open) => !open && handleClose()}>
-        <SheetContent side="bottom" className="h-[80dvh] max-h-[80dvh] p-0 rounded-t-xl flex flex-col overflow-hidden">
+        <SheetContent 
+          side="bottom" 
+          showClose={false}
+          className="h-[80dvh] max-h-[80dvh] p-0 rounded-t-xl flex flex-col overflow-hidden bg-zinc-950 border-t border-zinc-800"
+        >
           <div className="flex justify-center py-2 shrink-0">
-            <div className="h-1 w-12 rounded-full bg-muted-foreground/30" />
+            <div className="h-1 w-12 rounded-full bg-zinc-700" />
           </div>
           
-          <SheetHeader className="border-b border-border px-4 pb-3 shrink-0">
-            <SheetTitle className="text-left">{headerTitle}</SheetTitle>
+          <SheetHeader className="border-b border-zinc-800 px-4 pb-3 shrink-0 bg-zinc-950">
+            <SheetTitle className="text-left text-zinc-100">{headerTitle}</SheetTitle>
           </SheetHeader>
 
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 bg-zinc-950">
             <DetailPanelContent
               aircraft={aircraft}
               photo={photo}
@@ -223,10 +238,10 @@ export const DetailPanel = memo(function DetailPanel() {
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: '100%', opacity: 0 }}
           transition={{ duration: 0.2, ease: 'easeInOut' }}
-          className="absolute right-0 top-0 z-1001 h-full w-96 border-l border-border bg-card shadow-xl"
+          className="absolute right-0 top-0 z-[1001] h-full w-96 bg-zinc-950 border-l border-zinc-800 shadow-2xl"
         >
           <div className="flex h-full flex-col overflow-hidden">
-            <div className="flex items-center justify-between border-b border-border p-4 shrink-0">
+            <div className="flex items-center justify-between border-b border-zinc-800 p-4 shrink-0 bg-zinc-950">
               {headerTitle}
               <Button
                 variant="ghost"
@@ -239,7 +254,7 @@ export const DetailPanel = memo(function DetailPanel() {
               </Button>
             </div>
 
-            <ScrollArea className="flex-1">
+            <ScrollArea className="flex-1 bg-zinc-950">
               <DetailPanelContent
                 aircraft={aircraft}
                 photo={photo}
