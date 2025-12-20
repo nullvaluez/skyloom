@@ -9,20 +9,43 @@ import {
   fetchAircraftInBounds,
 } from '@/lib/api';
 import { UPDATE_INTERVALS } from '@/lib/constants';
+import { useDevStore } from '@/stores/dev-store';
+import { useEffect, useMemo } from 'react';
+import { useMapStore } from '@/stores/map-store';
+import { useAircraftStore } from '@/stores/aircraft-store';
+import { getPollingInterval } from '@/lib/utils';
 
 /**
  * Hook to fetch aircraft by location
  */
 export function useAircraftByLocation(lat, lon, dist = 250, options = {}) {
-  return useQuery({
+  const setMetric = useDevStore(s => s.setMetric);
+  const zoom = useMapStore(s => s.zoom);
+  const aircraftCount = useAircraftStore(s => s.getAircraftCount());
+  const followedAircraftId = useAircraftStore(s => s.followedAircraftId);
+
+  const refetchInterval = useMemo(() => {
+    return getPollingInterval(zoom, aircraftCount, !!followedAircraftId);
+  }, [zoom, aircraftCount, followedAircraftId]);
+
+  const query = useQuery({
     queryKey: ['aircraft', 'location', lat, lon, dist],
-    queryFn: () => fetchAircraftByLocation(lat, lon, dist),
-    refetchInterval: UPDATE_INTERVALS.aircraft,
+    queryFn: async () => {
+      const start = performance.now();
+      const result = await fetchAircraftByLocation(lat, lon, dist);
+      const end = performance.now();
+      setMetric('pollLatencyMs', end - start);
+      setMetric('lastPollMs', Date.now());
+      return result;
+    },
+    refetchInterval,
     staleTime: 2000,
     gcTime: 30000,
     enabled: lat !== undefined && lon !== undefined,
     ...options,
   });
+
+  return query;
 }
 
 /**

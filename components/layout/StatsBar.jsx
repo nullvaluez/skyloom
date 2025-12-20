@@ -1,6 +1,6 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { Plane, Package, Shield, Helicopter, AlertTriangle } from 'lucide-react';
 import { useAircraftStore } from '@/stores/aircraft-store';
 import { useFilterStats } from '@/hooks/use-filters';
@@ -10,9 +10,15 @@ import { formatTimeSince } from '@/lib/format';
  * Statistics bar component showing aircraft counts
  */
 export const StatsBar = memo(function StatsBar() {
-  const { getAircraftArray, lastUpdate } = useAircraftStore();
-  const aircraft = getAircraftArray();
-  const stats = useFilterStats(aircraft);
+  // Select the Map directly (stable reference) and convert to array in useMemo
+  const aircraftMap = useAircraftStore((s) => s.aircraft);
+  const lastUpdate = useAircraftStore((s) => s.lastUpdate);
+  
+  const allAircraft = useMemo(() => {
+    return Array.from(aircraftMap.values());
+  }, [aircraftMap]);
+  
+  const stats = useFilterStats(allAircraft);
 
   const timeSinceUpdate = lastUpdate
     ? Math.floor((Date.now() - lastUpdate.getTime()) / 1000)

@@ -5,7 +5,7 @@ import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-
+import { useSearchParams } from 'next/navigation';
 import { useAircraftStore } from '@/stores/aircraft-store';
 import { useMapStore } from '@/stores/map-store';
 import { useUIStore } from '@/stores/ui-store';
@@ -15,7 +15,9 @@ import { useDebouncedCallback } from '@/hooks/use-debounce';
 import { AircraftMarker } from './AircraftMarker';
 import { FlightTrail } from './FlightTrail';
 import { MapControls } from './MapControls';
+import { CanvasAircraftLayer } from './CanvasAircraftLayer';
 import { MAP_CONFIG, CLUSTER_CONFIG } from '@/lib/constants';
+import { preWarmCache } from '@/lib/icon-bitmap-cache';
 
 
 // Fix Leaflet default marker icons
@@ -30,10 +32,35 @@ L.Icon.Default.mergeOptions({
  * Map event handler component
  */
 function MapEventHandler() {
-  const { setView, setBounds, setMapRef } = useMapStore();
-  const { selectAircraft, selectedAircraftId } = useAircraftStore();
-  const { closeDetailPanel } = useUIStore();
+  const setView = useMapStore((s) => s.setView);
+  const setBounds = useMapStore((s) => s.setBounds);
+  const setMapRef = useMapStore((s) => s.setMapRef);
+  const selectAircraft = useAircraftStore((s) => s.selectAircraft);
+  const selectedAircraftId = useAircraftStore((s) => s.selectedAircraftId);
+  const closeDetailPanel = useUIStore((s) => s.closeDetailPanel);
+  const openDetailPanel = useUIStore((s) => s.openDetailPanel);
   const map = useMap();
+  const searchParams = useSearchParams();
+
+  // Restore state from URL on mount
+  useEffect(() => {
+    const lat = searchParams.get('lat');
+    const lon = searchParams.get('lon');
+    const zoom = searchParams.get('z');
+    const hex = searchParams.get('hex');
+
+    if (lat && lon) {
+      map.setView([parseFloat(lat), parseFloat(lon)], zoom ? parseInt(zoom) : map.getZoom());
+    }
+
+    if (hex) {
+      // Small delay to let data load or just set selected ID
+      setTimeout(() => {
+        selectAircraft(hex);
+        openDetailPanel();
+      }, 500);
+    }
+  }, []); // Run once on mount
 
   // Set map ref on mount
   useEffect(() => {
@@ -81,8 +108,13 @@ function MapEventHandler() {
  */
 function FollowHandler() {
   const map = useMap();
-  const { getFollowedAircraft } = useAircraftStore();
-  const followedAircraft = getFollowedAircraft();
+  const followedAircraftId = useAircraftStore((s) => s.followedAircraftId);
+  const aircraftMap = useAircraftStore((s) => s.aircraft);
+  
+  const followedAircraft = useMemo(() => {
+    if (!followedAircraftId) return null;
+    return aircraftMap.get(followedAircraftId) || null;
+  }, [followedAircraftId, aircraftMap]);
 
   useEffect(() => {
     if (followedAircraft && followedAircraft.lat && followedAircraft.lon) {
@@ -100,8 +132,15 @@ function FollowHandler() {
  * Aircraft layer with data fetching
  */
 function AircraftLayer() {
-  const { center, zoom } = useMapStore();
-  const { setAircraft, getAircraftArray } = useAircraftStore();
+  const center = useMapStore((s) => s.center);
+  const zoom = useMapStore((s) => s.zoom);
+  const setAircraft = useAircraftStore((s) => s.setAircraft);
+  // Select the Map directly (stable reference) and convert to array in useMemo
+  const aircraftMap = useAircraftStore((s) => s.aircraft);
+
+  const allAircraft = useMemo(() => {
+    return Array.from(aircraftMap.values());
+  }, [aircraftMap]);
 
   // Calculate distance based on zoom level
   const dist = useMemo(() => {
@@ -121,8 +160,6 @@ function AircraftLayer() {
     }
   }, [data, setAircraft]);
 
-  // Get filtered aircraft
-  const allAircraft = getAircraftArray();
   const filteredAircraft = useFilteredAircraft(allAircraft);
 
   // Create custom cluster icon
@@ -146,6 +183,12 @@ function AircraftLayer() {
     });
   }, []);
 
+  const showClusters = zoom < CLUSTER_CONFIG.disableClusteringAtZoom;
+
+  if (!showClusters) {
+    return <CanvasAircraftLayer aircraft={filteredAircraft} />;
+  }
+
   return (
     <MarkerClusterGroup
       chunkedLoading={CLUSTER_CONFIG.chunkedLoading}
@@ -162,6 +205,22 @@ function AircraftLayer() {
       ))}
     </MarkerClusterGroup>
   );
+}
+
+/**
+ * Cache pre-warming component
+ */
+function CachePreWarmer() {
+  useEffect(() => {
+    // Pre-warm icon cache on mount using idle time
+    const timer = setTimeout(() => {
+      preWarmCache();
+    }, 2000); // Wait 2 seconds after initial load
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
+  return null;
 }
 
 /**
@@ -192,6 +251,7 @@ export const FlightMap = memo(function FlightMap() {
       <AircraftLayer />
       <FlightTrail />
       <MapControls />
+      <CachePreWarmer />
     </MapContainer>
   );
 });

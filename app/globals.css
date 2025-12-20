@@ -45,16 +45,16 @@
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
 
-  /* Aircraft type colors */
-  --color-aircraft-commercial: #22c55e;
-  --color-aircraft-cargo: #f59e0b;
-  --color-aircraft-military: #ef4444;
-  --color-aircraft-private: #8b5cf6;
-  --color-aircraft-helicopter: #06b6d4;
-  --color-aircraft-government: #ec4899;
-  --color-aircraft-special: #f97316;
-  --color-aircraft-unknown: #6b7280;
-  --color-aircraft-selected: #3b82f6;
+  /* Aircraft type colors - optimized for dark map visibility */
+  --color-aircraft-commercial: #4ade80;
+  --color-aircraft-cargo: #fbbf24;
+  --color-aircraft-military: #f87171;
+  --color-aircraft-private: #a78bfa;
+  --color-aircraft-helicopter: #22d3ee;
+  --color-aircraft-government: #f472b6;
+  --color-aircraft-special: #fb923c;
+  --color-aircraft-unknown: #9ca3af;
+  --color-aircraft-selected: #60a5fa;
   --color-aircraft-emergency: #ff0000;
 }
 
@@ -141,7 +141,7 @@
 
 /* Leaflet overrides for dark theme */
 .leaflet-container {
-  background: #09090b;
+  background: #09090b !important; /* Ensure dark background to prevent white flash on zoom */
   font-family: inherit;
 }
 
@@ -279,7 +279,7 @@
   transition: transform 0.3s ease-out;
 }
 
-/* Emergency pulsing animation */
+/* Emergency pulsing animation - Enhanced for better visibility */
 .aircraft-icon-v2--emergency {
   animation: emergency-pulse-v2 0.5s ease-in-out infinite;
 }
@@ -287,11 +287,11 @@
 @keyframes emergency-pulse-v2 {
   0%, 100% {
     opacity: 1;
-    filter: drop-shadow(0 0 4px #ff0000);
+    filter: drop-shadow(0 0 6px #ff0000) brightness(1);
   }
   50% {
-    opacity: 0.7;
-    filter: drop-shadow(0 0 8px #ff0000);
+    opacity: 0.85;
+    filter: drop-shadow(0 0 12px #ff0000) brightness(1.2);
   }
 }
 
@@ -300,13 +300,28 @@
   filter: drop-shadow(0 0 6px var(--aircraft-color));
 }
 
-/* Helicopter rotor animation */
-.aircraft-icon-v2--rotor .heli-rotor {
-  animation: rotor-spin 0.1s linear infinite;
+/* Helicopter rotor animation - Smooth and realistic */
+.aircraft-icon-v2--rotor .heli-body {
+  animation: none;
+}
+
+.heli-rotor {
+  animation: rotor-spin 0.08s linear infinite;
   transform-origin: center;
 }
 
 @keyframes rotor-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Prop blade animation for propeller aircraft */
+.prop-blade {
+  animation: prop-spin 0.1s linear infinite;
+  transform-origin: center;
+}
+
+@keyframes prop-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }

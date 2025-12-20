@@ -94,7 +94,7 @@ function generateMarkerHtml({ aircraft, iconType, color, size, rotation, emergen
  */
 export const AircraftMarker = memo(function AircraftMarker({ aircraft }) {
   const { selectedAircraftId, selectAircraft } = useAircraftStore();
-  const { getIconSize } = useMapStore();
+  const { getIconSize, zoom } = useMapStore();
   const { openDetailPanel } = useUIStore();
 
   const isSelected = selectedAircraftId === aircraft.hex;
@@ -107,7 +107,9 @@ export const AircraftMarker = memo(function AircraftMarker({ aircraft }) {
   const physicalType = aircraft._iconType || 'unknown';
   const color = aircraft._color || ICON_COLORS.unknown;
 
-  // Determine the best icon shape
+  // Only show callsign labels at high zoom or when selected
+  const showLabel = isSelected || zoom > 11;
+  const callsign = showLabel ? (aircraft.flight?.trim() || '') : '';
   const iconType = useMemo(() => {
     switch (classification) {
       case 'military':
@@ -131,9 +133,6 @@ export const AircraftMarker = memo(function AircraftMarker({ aircraft }) {
         return physicalType;
     }
   }, [physicalType, classification]);
-
-  // Get callsign for label display
-  const callsign = aircraft.flight?.trim() || '';
 
   // Create custom icon using pure HTML string (no renderToString)
   const icon = useMemo(() => {
@@ -180,24 +179,27 @@ export const AircraftMarker = memo(function AircraftMarker({ aircraft }) {
       }}
       bubblingMouseEvents={false}
     >
-      <Tooltip
-        direction="top"
-        offset={[0, -size / 2]}
-        opacity={0.95}
-        className="aircraft-tooltip"
-      >
-        <div className="text-sm font-medium">
-          {formatCallsign(aircraft.flight) || aircraft.hex}
-        </div>
-        <div className="text-xs text-muted-foreground">
-          {formatAltitude(aircraft.alt_baro)} • {formatSpeed(aircraft.gs)}
-        </div>
-        {aircraft.t && (
-          <div className="text-xs text-muted-foreground">
-            {aircraft.t}
+      {isSelected && (
+        <Tooltip
+          direction="top"
+          offset={[0, -size / 2]}
+          opacity={0.95}
+          className="aircraft-tooltip"
+          permanent
+        >
+          <div className="text-sm font-medium">
+            {formatCallsign(aircraft.flight) || aircraft.hex}
           </div>
-        )}
-      </Tooltip>
+          <div className="text-xs text-muted-foreground">
+            {formatAltitude(aircraft.alt_baro)} • {formatSpeed(aircraft.gs)}
+          </div>
+          {aircraft.t && (
+            <div className="text-xs text-muted-foreground">
+              {aircraft.t}
+            </div>
+          )}
+        </Tooltip>
+      )}
     </Marker>
   );
 });

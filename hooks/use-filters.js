@@ -1,21 +1,25 @@
 'use client';
 
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useEffect } from 'react';
 import { useFilterStore } from '@/stores/filter-store';
 import { classifyAircraft, isEmergency, isOnGround, getDataSource, isMilitary, isSpecial } from '@/lib/classify';
+import { useDevStore } from '@/stores/dev-store';
 
 /**
  * Hook to filter aircraft based on current filter state
  */
 export function useFilteredAircraft(aircraft) {
   const { filters } = useFilterStore();
+  const setMetric = useDevStore(s => s.setMetric);
 
   const filteredAircraft = useMemo(() => {
+    const start = performance.now();
     if (!aircraft || !Array.isArray(aircraft)) {
       return [];
     }
 
-    return aircraft.filter((ac) => {
+    const filtered = aircraft.filter((ac) => {
+      // ... same logic ...
       // Check if any special filter is active
       const militaryFilterActive = filters.special.military;
       const interestingFilterActive = filters.special.interesting;
@@ -33,7 +37,7 @@ export function useFilteredAircraft(aircraft) {
         // If it matches a special filter, skip the type filter (show all matching aircraft)
       } else {
         // No special filter active - apply normal type filter
-        const type = classifyAircraft(ac);
+        const type = ac._classification || classifyAircraft(ac);
         if (!filters.types[type] && type !== 'emergency') {
           return false;
         }
@@ -104,7 +108,17 @@ export function useFilteredAircraft(aircraft) {
 
       return true;
     });
-  }, [aircraft, filters]);
+
+    const end = performance.now();
+    // Use setTimeout to avoid state updates during render
+    setTimeout(() => {
+      setMetric('filterTimeMs', end - start);
+      setMetric('aircraftCount', aircraft.length);
+      setMetric('filteredCount', filtered.length);
+    }, 0);
+
+    return filtered;
+  }, [aircraft, filters, setMetric]);
 
   return filteredAircraft;
 }
@@ -132,7 +146,7 @@ export function useFilterStats(aircraft) {
     let mlat = 0;
 
     filteredAircraft.forEach((ac) => {
-      const type = classifyAircraft(ac);
+      const type = ac._classification || classifyAircraft(ac);
       if (byType[type] !== undefined) {
         byType[type]++;
       }

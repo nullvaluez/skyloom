@@ -6,8 +6,10 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { StatsBar } from '@/components/layout/StatsBar';
 import { DetailPanel } from '@/components/panels/DetailPanel';
 import { MobileNav } from '@/components/layout/MobileNav';
+import { SettingsPanel } from '@/components/panels/SettingsPanel';
 import { MapErrorBoundary } from '@/components/ErrorBoundary';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
+import { PerformanceHUD } from '@/components/dev/PerformanceHUD';
 
 // Dynamically import the map to avoid SSR issues with Leaflet
 const FlightMap = dynamic(
@@ -55,6 +57,12 @@ export default function Home() {
 
       {/* Mobile Navigation */}
       <MobileNav />
+
+      {/* Settings Panel */}
+      <SettingsPanel />
+
+      {/* Performance HUD */}
+      <PerformanceHUD />
     </div>
   );
 }
