@@ -2,7 +2,7 @@
 
 import { memo, useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import { AIRCRAFT_ICON_DEFINITIONS, ICON_COLORS } from '@/lib/aircraft-icons';
+import { getAircraftIconDefinition, ICON_COLORS } from '@/lib/aircraft-icons';
 
 /**
  * Optimized SVG Aircraft Icon component
@@ -10,6 +10,7 @@ import { AIRCRAFT_ICON_DEFINITIONS, ICON_COLORS } from '@/lib/aircraft-icons';
  * Renders different distinctive aircraft shapes based on type
  */
 export const AircraftIcon = memo(function AircraftIcon({
+  aircraft,
   type = 'unknown',
   classification = 'unknown',
   color,
@@ -19,7 +20,7 @@ export const AircraftIcon = memo(function AircraftIcon({
   isSelected = false,
   className,
 }) {
-  const iconDef = AIRCRAFT_ICON_DEFINITIONS[type] || AIRCRAFT_ICON_DEFINITIONS.unknown;
+  const iconDef = getAircraftIconDefinition(aircraft, type);
 
   // Determine color - props override classification
   const iconColor = useMemo(() => {

@@ -8,7 +8,7 @@ import { useMapStore } from '@/stores/map-store';
 import { useUIStore } from '@/stores/ui-store';
 import { isEmergency } from '@/lib/classify';
 import { formatAltitude, formatSpeed, formatCallsign } from '@/lib/format';
-import { AIRCRAFT_ICON_DEFINITIONS, ICON_COLORS } from '@/lib/aircraft-icons';
+import { getAircraftIconDefinition, ICON_COLORS } from '@/lib/aircraft-icons';
 
 /**
  * Generate SVG HTML string for aircraft icon
@@ -16,8 +16,8 @@ import { AIRCRAFT_ICON_DEFINITIONS, ICON_COLORS } from '@/lib/aircraft-icons';
  * @param {Object} params - Icon parameters
  * @returns {string} SVG HTML string
  */
-function generateIconSvg({ iconType, color, size, rotation, emergency, selected }) {
-  const iconDef = AIRCRAFT_ICON_DEFINITIONS[iconType] || AIRCRAFT_ICON_DEFINITIONS.unknown;
+function generateIconSvg({ aircraft, iconType, color, size, rotation, emergency, selected }) {
+  const iconDef = getAircraftIconDefinition(aircraft, iconType);
   const iconColor = selected ? ICON_COLORS.selected : (emergency ? ICON_COLORS.emergency : color);
 
   const paths = iconDef.paths.map((path, index) => {
@@ -69,8 +69,8 @@ function generateIconSvg({ iconType, color, size, rotation, emergency, selected 
 /**
  * Generate the full marker HTML with icon and callsign label
  */
-function generateMarkerHtml({ iconType, color, size, rotation, emergency, selected, callsign }) {
-  const iconSvg = generateIconSvg({ iconType, color, size, rotation, emergency, selected });
+function generateMarkerHtml({ aircraft, iconType, color, size, rotation, emergency, selected, callsign }) {
+  const iconSvg = generateIconSvg({ aircraft, iconType, color, size, rotation, emergency, selected });
   const iconColor = selected ? ICON_COLORS.selected : (emergency ? ICON_COLORS.emergency : color);
 
   // Only show label if there's a callsign
@@ -138,6 +138,7 @@ export const AircraftMarker = memo(function AircraftMarker({ aircraft }) {
   // Create custom icon using pure HTML string (no renderToString)
   const icon = useMemo(() => {
     const iconHtml = generateMarkerHtml({
+      aircraft,
       iconType,
       color,
       size,
@@ -157,7 +158,7 @@ export const AircraftMarker = memo(function AircraftMarker({ aircraft }) {
       iconSize: [containerWidth, containerHeight],
       iconAnchor: [containerWidth / 2, size / 2],
     });
-  }, [iconType, color, size, rotation, emergency, isSelected, callsign]);
+  }, [aircraft, iconType, color, size, rotation, emergency, isSelected, callsign]);
 
   // Handle marker click
   const handleClick = (e) => {
