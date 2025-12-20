@@ -2,7 +2,7 @@
 
 import { memo, useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Camera, AlertTriangle, Plane, Navigation } from 'lucide-react';
+import { X, Camera, AlertTriangle, Plane, Navigation, Compass } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAircraftStore } from '@/stores/aircraft-store';
 import { useMapStore } from '@/stores/map-store';
@@ -30,8 +30,7 @@ function calculateBearing(lat1, lon1, lat2, lon2) {
  * Calculate elevation angle to aircraft
  */
 function calculateElevation(userLat, userLon, acLat, acLon, acAlt) {
-  // Approximate distance in meters
-  const R = 6371000; // Earth radius in meters
+  const R = 6371000;
   const dLat = (acLat - userLat) * Math.PI / 180;
   const dLon = (acLon - userLon) * Math.PI / 180;
   const a = Math.sin(dLat/2) ** 2 + 
@@ -40,10 +39,8 @@ function calculateElevation(userLat, userLon, acLat, acLon, acAlt) {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   const distance = R * c;
   
-  // Convert altitude from feet to meters
   const altMeters = (acAlt || 0) * 0.3048;
   
-  // Calculate elevation angle
   return Math.atan2(altMeters, distance) * 180 / Math.PI;
 }
 
@@ -51,26 +48,17 @@ function calculateElevation(userLat, userLon, acLat, acLon, acAlt) {
  * Check if aircraft is within camera's field of view
  */
 function isInFOV(bearing, elevation, orientation, fovH = 70, fovV = 50) {
-  const { alpha, beta, gamma } = orientation;
+  const { alpha, beta } = orientation;
   
-  // Convert device orientation to compass heading
-  // alpha: rotation around z-axis (0-360)
-  // beta: front-to-back tilt (-180 to 180)
-  // gamma: left-to-right tilt (-90 to 90)
-  
-  // Device heading (where camera is pointing)
   const deviceHeading = (360 - alpha) % 360;
   
-  // Calculate bearing difference
   let bearingDiff = bearing - deviceHeading;
   if (bearingDiff > 180) bearingDiff -= 360;
   if (bearingDiff < -180) bearingDiff += 360;
   
-  // Device pitch (elevation)
-  const devicePitch = beta - 90; // 0 = horizontal, positive = looking up
+  const devicePitch = beta - 90;
   const elevationDiff = elevation - devicePitch;
   
-  // Check if within FOV
   return Math.abs(bearingDiff) < fovH / 2 && Math.abs(elevationDiff) < fovV / 2;
 }
 
@@ -88,7 +76,6 @@ const ARLabel = memo(function ARLabel({ aircraft, orientation, userLocation }) {
     aircraft.alt_baro
   );
   
-  // Calculate screen position based on bearing/elevation difference from device orientation
   const { alpha, beta } = orientation;
   const deviceHeading = (360 - alpha) % 360;
   const devicePitch = beta - 90;
@@ -99,11 +86,9 @@ const ARLabel = memo(function ARLabel({ aircraft, orientation, userLocation }) {
   
   const elevationDiff = elevation - devicePitch;
   
-  // Convert to screen coordinates (center = 50%)
-  const x = 50 + (bearingDiff / 70) * 100; // Assuming 70° horizontal FOV
-  const y = 50 - (elevationDiff / 50) * 100; // Assuming 50° vertical FOV
+  const x = 50 + (bearingDiff / 70) * 100;
+  const y = 50 - (elevationDiff / 50) * 100;
   
-  // Clamp to screen
   const clampedX = Math.max(5, Math.min(95, x));
   const clampedY = Math.max(5, Math.min(95, y));
   
@@ -154,21 +139,77 @@ const ARLabel = memo(function ARLabel({ aircraft, orientation, userLocation }) {
  */
 export const ARSpotter = memo(function ARSpotter({ onClose }) {
   const videoRef = useRef(null);
-  const loggedRef = useRef(new Set()); // Track logged aircraft per session
+  const loggedRef = useRef(new Set());
+  const orientationHandlerRef = useRef(null);
   const [hasPermissions, setHasPermissions] = useState(false);
   const [error, setError] = useState(null);
   const [orientation, setOrientation] = useState({ alpha: 0, beta: 0, gamma: 0 });
   const [isCalibrating, setIsCalibrating] = useState(true);
   const [hasOrientation, setHasOrientation] = useState(false);
+  const [needsIOSPermission, setNeedsIOSPermission] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   
-  // Select primitive/stable values from stores to avoid infinite loops
   const userLocation = useMapStore((s) => s.userLocation);
   const aircraftMap = useAircraftStore((s) => s.aircraft);
   
-  // Convert Map to array only when the Map reference changes
   const aircraftArray = useMemo(() => {
     return Array.from(aircraftMap.values());
   }, [aircraftMap]);
+  
+  // Setup the orientation event listener
+  const setupOrientationListener = useCallback(() => {
+    // Remove any existing listener
+    if (orientationHandlerRef.current) {
+      window.removeEventListener('deviceorientation', orientationHandlerRef.current, true);
+    }
+    
+    const handler = (event) => {
+      // Check if we have actual orientation data
+      if (event.alpha !== null && event.beta !== null && event.gamma !== null) {
+        setOrientation({
+          alpha: event.alpha,
+          beta: event.beta,
+          gamma: event.gamma,
+        });
+        setHasOrientation(true);
+        setIsCalibrating(false);
+      }
+    };
+    
+    orientationHandlerRef.current = handler;
+    window.addEventListener('deviceorientation', handler, true);
+    
+    // Also try the absolute version for better compass accuracy
+    window.addEventListener('deviceorientationabsolute', handler, true);
+    
+    // Fallback timeout
+    setTimeout(() => {
+      setIsCalibrating(false);
+    }, 3000);
+  }, []);
+  
+  // iOS permission request - MUST be called from a user gesture (button click)
+  const requestIOSPermission = useCallback(async () => {
+    try {
+      // This MUST be triggered by user gesture on iOS
+      const permission = await DeviceOrientationEvent.requestPermission();
+      
+      if (permission === 'granted') {
+        setNeedsIOSPermission(false);
+        setIsCalibrating(true);
+        setupOrientationListener();
+      } else {
+        setNeedsIOSPermission(false);
+        setPermissionDenied(true);
+        setIsCalibrating(false);
+      }
+    } catch (err) {
+      console.error('iOS orientation permission error:', err);
+      setNeedsIOSPermission(false);
+      setPermissionDenied(true);
+      setIsCalibrating(false);
+    }
+  }, [setupOrientationListener]);
   
   // Request camera permission
   useEffect(() => {
@@ -196,75 +237,46 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
     
     return () => {
       mounted = false;
-      // Stop camera on unmount using captured reference
       if (videoElement?.srcObject) {
         videoElement.srcObject.getTracks().forEach(track => track.stop());
       }
     };
   }, []);
   
-  // Request device orientation
+  // Initialize device orientation
   useEffect(() => {
     let mounted = true;
-    let orientationHandler = null;
-    let calibrationTimeout = null;
     
-    async function initOrientation() {
-      // iOS requires permission request
-      if (typeof DeviceOrientationEvent !== 'undefined' && 
-          typeof DeviceOrientationEvent.requestPermission === 'function') {
-        try {
-          const permission = await DeviceOrientationEvent.requestPermission();
-          if (permission !== 'granted') {
-            // Don't show error, just proceed without orientation
-            if (mounted) setIsCalibrating(false);
-            return;
-          }
-        } catch (err) {
-          console.error('Orientation permission error:', err);
-          if (mounted) setIsCalibrating(false);
-          return;
-        }
-      }
-      
-      orientationHandler = (event) => {
-        if (!mounted) return;
-        // Check if we have actual orientation data (not all nulls)
-        if (event.alpha !== null || event.beta !== null) {
-          setOrientation({
-            alpha: event.alpha || 0, // Compass heading
-            beta: event.beta || 0,   // Front-to-back tilt
-            gamma: event.gamma || 0, // Left-to-right tilt
-          });
-          setHasOrientation(true);
-          setIsCalibrating(false);
-        }
-      };
-      
-      window.addEventListener('deviceorientation', orientationHandler, true);
-      
-      // Fallback: end calibration after 3 seconds even if no orientation events
-      calibrationTimeout = setTimeout(() => {
-        if (mounted) {
-          setIsCalibrating(false);
-        }
-      }, 3000);
+    // Check if DeviceOrientationEvent exists
+    if (typeof window === 'undefined' || typeof DeviceOrientationEvent === 'undefined') {
+      // No device orientation support at all
+      setIsCalibrating(false);
+      return;
     }
     
-    initOrientation();
+    // Check if this is iOS 13+ which requires permission
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      // iOS 13+ - we need user gesture to request permission
+      // Show the permission button instead of auto-requesting
+      if (mounted) {
+        setNeedsIOSPermission(true);
+        setIsCalibrating(false);
+      }
+    } else {
+      // Non-iOS or older iOS - just add listener directly
+      setupOrientationListener();
+    }
     
     return () => {
       mounted = false;
-      if (orientationHandler) {
-        window.removeEventListener('deviceorientation', orientationHandler, true);
-      }
-      if (calibrationTimeout) {
-        clearTimeout(calibrationTimeout);
+      if (orientationHandlerRef.current) {
+        window.removeEventListener('deviceorientation', orientationHandlerRef.current, true);
+        window.removeEventListener('deviceorientationabsolute', orientationHandlerRef.current, true);
       }
     };
-  }, []);
+  }, [setupOrientationListener]);
   
-  // Get user location if not available (run once on mount)
+  // Get user location if not available
   useEffect(() => {
     const currentUserLocation = useMapStore.getState().userLocation;
     if (!currentUserLocation) {
@@ -272,17 +284,15 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
     }
   }, []);
   
-  // Filter aircraft that are in field of view (or show all nearby if no orientation)
+  // Filter aircraft that are in field of view
   const visibleAircraft = useMemo(() => {
     if (!userLocation) return [];
     if (isCalibrating) return [];
     
-    // If we don't have orientation data, show all nearby aircraft sorted by distance
     if (!hasOrientation) {
       return aircraftArray
         .filter(ac => ac.lat && ac.lon)
         .map(ac => {
-          // Calculate distance for sorting
           const dLat = ac.lat - userLocation[0];
           const dLon = ac.lon - userLocation[1];
           const dist = Math.sqrt(dLat * dLat + dLon * dLon);
@@ -292,7 +302,6 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
         .slice(0, 10);
     }
     
-    // With orientation, filter to aircraft in field of view (use wider FOV)
     return aircraftArray.filter(ac => {
       if (!ac.lat || !ac.lon) return false;
       
@@ -306,12 +315,11 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
         ac.alt_baro
       );
       
-      // Use wider FOV for better detection (120° horizontal, 90° vertical)
       return isInFOV(bearing, elevation, orientation, 120, 90);
-    }).slice(0, 10); // Limit to 10 aircraft for performance
+    }).slice(0, 10);
   }, [aircraftArray, userLocation, orientation, isCalibrating, hasOrientation]);
   
-  // Auto-log spotted aircraft (only once per session, don't cause re-renders)
+  // Auto-log spotted aircraft
   useEffect(() => {
     const logged = loggedRef.current;
     const logSpotFn = usePassportStore.getState().logSpot;
@@ -319,7 +327,6 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
     visibleAircraft.forEach(ac => {
       if (!logged.has(ac.hex)) {
         logged.add(ac.hex);
-        // Use setTimeout to break the synchronous update chain
         setTimeout(() => logSpotFn(ac), 0);
       }
     });
@@ -348,9 +355,45 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
       
       {/* AR Overlay */}
       <div className="absolute inset-0">
+        {/* iOS Permission Request Overlay - requires user gesture */}
+        <AnimatePresence>
+          {needsIOSPermission && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 flex items-center justify-center bg-black/70 z-20"
+            >
+              <div className="glass-panel p-6 text-center max-w-xs mx-4">
+                <Compass className="h-16 w-16 mx-auto mb-4 text-primary" />
+                <p className="text-xl font-semibold mb-2">Enable Motion Sensors</p>
+                <p className="text-sm text-muted-foreground mb-6">
+                  iOS requires permission to access motion sensors for AR tracking. Tap the button below to enable.
+                </p>
+                <Button 
+                  onClick={requestIOSPermission} 
+                  className="w-full text-lg py-6"
+                  size="lg"
+                >
+                  Enable AR Tracking
+                </Button>
+                <button 
+                  onClick={() => {
+                    setNeedsIOSPermission(false);
+                    setIsCalibrating(false);
+                  }}
+                  className="mt-4 text-sm text-muted-foreground underline"
+                >
+                  Skip (limited functionality)
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        
         {/* Calibration overlay */}
         <AnimatePresence>
-          {isCalibrating && (
+          {isCalibrating && !needsIOSPermission && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -370,7 +413,7 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
         
         {/* Aircraft labels */}
         <AnimatePresence>
-          {userLocation && visibleAircraft.map(ac => (
+          {userLocation && !needsIOSPermission && visibleAircraft.map(ac => (
             <ARLabel
               key={ac.hex}
               aircraft={ac}
@@ -385,7 +428,7 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
           <div className="glass-panel-light p-2">
             <div className="text-xs text-muted-foreground">Heading</div>
             <div className="text-lg font-bold">
-              {Math.round((360 - orientation.alpha) % 360)}°
+              {hasOrientation ? `${Math.round((360 - orientation.alpha) % 360)}°` : '--'}
             </div>
           </div>
           
@@ -412,9 +455,12 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
                 <span className="text-muted-foreground"> aircraft nearby</span>
               </div>
             </div>
-            {!hasOrientation && !isCalibrating && (
+            {!hasOrientation && !isCalibrating && !needsIOSPermission && (
               <div className="text-xs text-amber-400 text-center">
-                No gyroscope detected - showing all nearby aircraft
+                {permissionDenied 
+                  ? 'Motion permission denied - showing all nearby aircraft'
+                  : 'No gyroscope detected - showing all nearby aircraft'
+                }
               </div>
             )}
             {!userLocation && !isCalibrating && (
@@ -426,11 +472,13 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
         </div>
         
         {/* Crosshair */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-8 h-8 border-2 border-white/30 rounded-full" />
-          <div className="absolute w-12 h-0.5 bg-white/20" />
-          <div className="absolute w-0.5 h-12 bg-white/20" />
-        </div>
+        {!needsIOSPermission && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-8 h-8 border-2 border-white/30 rounded-full" />
+            <div className="absolute w-12 h-0.5 bg-white/20" />
+            <div className="absolute w-0.5 h-12 bg-white/20" />
+          </div>
+        )}
       </div>
     </div>
   );
