@@ -159,6 +159,7 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
   const [error, setError] = useState(null);
   const [orientation, setOrientation] = useState({ alpha: 0, beta: 0, gamma: 0 });
   const [isCalibrating, setIsCalibrating] = useState(true);
+  const [hasOrientation, setHasOrientation] = useState(false);
   
   // Select primitive/stable values from stores to avoid infinite loops
   const userLocation = useMapStore((s) => s.userLocation);
@@ -206,6 +207,7 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
   useEffect(() => {
     let mounted = true;
     let orientationHandler = null;
+    let calibrationTimeout = null;
     
     async function initOrientation() {
       // iOS requires permission request
@@ -214,25 +216,39 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
         try {
           const permission = await DeviceOrientationEvent.requestPermission();
           if (permission !== 'granted') {
-            if (mounted) setError('Orientation permission denied');
+            // Don't show error, just proceed without orientation
+            if (mounted) setIsCalibrating(false);
             return;
           }
         } catch (err) {
           console.error('Orientation permission error:', err);
+          if (mounted) setIsCalibrating(false);
+          return;
         }
       }
       
       orientationHandler = (event) => {
         if (!mounted) return;
-        setOrientation({
-          alpha: event.alpha || 0, // Compass heading
-          beta: event.beta || 0,   // Front-to-back tilt
-          gamma: event.gamma || 0, // Left-to-right tilt
-        });
-        setIsCalibrating(false);
+        // Check if we have actual orientation data (not all nulls)
+        if (event.alpha !== null || event.beta !== null) {
+          setOrientation({
+            alpha: event.alpha || 0, // Compass heading
+            beta: event.beta || 0,   // Front-to-back tilt
+            gamma: event.gamma || 0, // Left-to-right tilt
+          });
+          setHasOrientation(true);
+          setIsCalibrating(false);
+        }
       };
       
       window.addEventListener('deviceorientation', orientationHandler, true);
+      
+      // Fallback: end calibration after 3 seconds even if no orientation events
+      calibrationTimeout = setTimeout(() => {
+        if (mounted) {
+          setIsCalibrating(false);
+        }
+      }, 3000);
     }
     
     initOrientation();
@@ -241,6 +257,9 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
       mounted = false;
       if (orientationHandler) {
         window.removeEventListener('deviceorientation', orientationHandler, true);
+      }
+      if (calibrationTimeout) {
+        clearTimeout(calibrationTimeout);
       }
     };
   }, []);
@@ -253,10 +272,27 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
     }
   }, []);
   
-  // Filter aircraft that are in field of view
+  // Filter aircraft that are in field of view (or show all nearby if no orientation)
   const visibleAircraft = useMemo(() => {
-    if (!userLocation || isCalibrating) return [];
+    if (!userLocation) return [];
+    if (isCalibrating) return [];
     
+    // If we don't have orientation data, show all nearby aircraft sorted by distance
+    if (!hasOrientation) {
+      return aircraftArray
+        .filter(ac => ac.lat && ac.lon)
+        .map(ac => {
+          // Calculate distance for sorting
+          const dLat = ac.lat - userLocation[0];
+          const dLon = ac.lon - userLocation[1];
+          const dist = Math.sqrt(dLat * dLat + dLon * dLon);
+          return { ...ac, _dist: dist };
+        })
+        .sort((a, b) => a._dist - b._dist)
+        .slice(0, 10);
+    }
+    
+    // With orientation, filter to aircraft in field of view (use wider FOV)
     return aircraftArray.filter(ac => {
       if (!ac.lat || !ac.lon) return false;
       
@@ -270,9 +306,10 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
         ac.alt_baro
       );
       
-      return isInFOV(bearing, elevation, orientation);
+      // Use wider FOV for better detection (120° horizontal, 90° vertical)
+      return isInFOV(bearing, elevation, orientation, 120, 90);
     }).slice(0, 10); // Limit to 10 aircraft for performance
-  }, [aircraftArray, userLocation, orientation, isCalibrating]);
+  }, [aircraftArray, userLocation, orientation, isCalibrating, hasOrientation]);
   
   // Auto-log spotted aircraft (only once per session, don't cause re-renders)
   useEffect(() => {
@@ -364,15 +401,27 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
         
         {/* Bottom info */}
         <div className="absolute bottom-0 left-0 right-0 p-4">
-          <div className="glass-panel p-3 flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <Camera className="h-4 w-4 text-green-400" />
-              <span className="text-sm">AR Mode Active</span>
+          <div className="glass-panel p-3 flex flex-col gap-2">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Camera className="h-4 w-4 text-green-400" />
+                <span className="text-sm">AR Mode Active</span>
+              </div>
+              <div className="text-sm">
+                <span className="font-bold">{visibleAircraft.length}</span>
+                <span className="text-muted-foreground"> aircraft nearby</span>
+              </div>
             </div>
-            <div className="text-sm">
-              <span className="font-bold">{visibleAircraft.length}</span>
-              <span className="text-muted-foreground"> aircraft in view</span>
-            </div>
+            {!hasOrientation && !isCalibrating && (
+              <div className="text-xs text-amber-400 text-center">
+                No gyroscope detected - showing all nearby aircraft
+              </div>
+            )}
+            {!userLocation && !isCalibrating && (
+              <div className="text-xs text-amber-400 text-center">
+                Waiting for location...
+              </div>
+            )}
           </div>
         </div>
         
