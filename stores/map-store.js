@@ -195,9 +195,9 @@ export const useMapStore = create(
       centerOnAircraft: (aircraft, enable3D = false) => {
         if (aircraft && aircraft.lat && aircraft.lon) {
           const options = enable3D 
-            ? { pitch: 60, bearing: aircraft.track || 0, duration: 1000 }
+            ? { pitch: 45, bearing: aircraft.track || 0, duration: 1000 }
             : {};
-          return get().flyTo([aircraft.lat, aircraft.lon], 12, options);
+          return get().flyTo([aircraft.lat, aircraft.lon], 11, options);
         }
         return null;
       },
@@ -207,9 +207,9 @@ export const useMapStore = create(
         if (aircraft && aircraft.lat && aircraft.lon) {
           return get().flyTo(
             [aircraft.lat, aircraft.lon], 
-            14, 
+            11, // Wider view to see aircraft in flight context
             { 
-              pitch: 60, 
+              pitch: 45, // Lower pitch for better visibility
               bearing: aircraft.track || 0,
               duration: 1000,
             }
