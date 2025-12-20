@@ -633,6 +633,55 @@ export const FlightMap = memo(function FlightMap() {
     pitchBracket,
   ]);
 
+  // Enhanced controller configuration for better 3D rotation control
+  // Must be before conditional return to maintain hooks order
+  const controllerConfig = useMemo(
+    () => ({
+      // Basic controls
+      keyboard: true,
+      doubleClickZoom: true,
+      
+      // Pan controls
+      dragPan: true, // Left-click + drag to pan
+      
+      // Rotation controls (right-click drag for bearing + pitch)
+      // deck.gl MapController: right-click drag = bearing, Ctrl+drag = pitch
+      dragRotate: true,
+      
+      // Smooth motion with inertia
+      inertia: 300,
+      
+      // Touch controls
+      touchZoom: true,
+      touchRotate: true, // Two-finger rotate
+      
+      // Scroll zoom (disable if handling wheel ourselves)
+      scrollZoom: true,
+      
+      // Pitch constraints
+      minPitch: 0,
+      maxPitch: 85,
+    }),
+    []
+  );
+
+  // Intercept wheel events for Shift+scroll pitch control
+  // Must be before conditional return to maintain hooks order
+  const handleContainerWheel = useCallback(
+    (event) => {
+      if (event.shiftKey) {
+        event.preventDefault();
+        event.stopPropagation();
+        const delta = event.deltaY > 0 ? -5 : 5;
+        setViewState((prev) => {
+          const newPitch = Math.max(0, Math.min(85, prev.pitch + delta));
+          return { ...prev, pitch: newPitch };
+        });
+      }
+    },
+    []
+  );
+
   if (!isReady || !DeckGL || !MapGL) {
     return (
       <div className="h-full w-full relative flex items-center justify-center bg-zinc-950">
@@ -645,11 +694,14 @@ export const FlightMap = memo(function FlightMap() {
   }
 
   return (
-    <div className="h-full w-full relative">
+    <div 
+      className="h-full w-full relative"
+      onWheel={handleContainerWheel}
+    >
       <DeckGL
         viewState={viewState}
         onViewStateChange={handleViewStateChange}
-        controller={{ touchRotate: true, keyboard: true, doubleClickZoom: true }}
+        controller={controllerConfig}
         layers={layers}
         onClick={handleMapClick}
         getCursor={({ isDragging, isHovering }) =>

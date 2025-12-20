@@ -17,6 +17,12 @@ export const SHORTCUTS = {
   '+': 'Zoom in',
   '-': 'Zoom out',
   '?': 'Show keyboard shortcuts',
+  'q': 'Rotate bearing left (15°)',
+  'e': 'Rotate bearing right (15°)',
+  'w': 'Increase pitch (5°)',
+  's': 'Decrease pitch (5°)',
+  'r': 'Reset bearing to North',
+  't': 'Toggle 3D view',
 };
 
 /**
@@ -25,7 +31,17 @@ export const SHORTCUTS = {
  */
 export function useKeyboardShortcuts() {
   const { toggleSidebar, closeDetailPanel } = useUIStore();
-  const { resetView, geolocate, mapRef } = useMapStore();
+  const { 
+    resetView, 
+    geolocate, 
+    mapRef, 
+    adjustPitch, 
+    adjustBearing, 
+    resetBearing,
+    pitch,
+    setPitch,
+    disable3D,
+  } = useMapStore();
   const { selectAircraft, unfollowAircraft } = useAircraftStore();
 
   const handleKeyDown = useCallback((e) => {
@@ -86,10 +102,58 @@ export function useKeyboardShortcuts() {
         // Could open a modal here in the future
         break;
 
+      case 'q':
+        e.preventDefault();
+        adjustBearing(-15);
+        break;
+
+      case 'e':
+        e.preventDefault();
+        adjustBearing(15);
+        break;
+
+      case 'w':
+        e.preventDefault();
+        adjustPitch(5);
+        break;
+
+      case 's':
+        e.preventDefault();
+        adjustPitch(-5);
+        break;
+
+      case 'r':
+        e.preventDefault();
+        resetBearing();
+        break;
+
+      case 't':
+        e.preventDefault();
+        if (pitch > 0) {
+          disable3D();
+        } else {
+          setPitch(60);
+        }
+        break;
+
       default:
         break;
     }
-  }, [toggleSidebar, closeDetailPanel, selectAircraft, unfollowAircraft, resetView, geolocate, mapRef]);
+  }, [
+    toggleSidebar, 
+    closeDetailPanel, 
+    selectAircraft, 
+    unfollowAircraft, 
+    resetView, 
+    geolocate, 
+    mapRef,
+    adjustPitch,
+    adjustBearing,
+    resetBearing,
+    pitch,
+    setPitch,
+    disable3D,
+  ]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
