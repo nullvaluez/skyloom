@@ -45,16 +45,87 @@ function SheetOverlay({
   );
 }
 
+/**
+ * Hook to handle swipe-to-close gesture for bottom sheets
+ */
+function useSwipeToClose(onClose, { enabled = true, threshold = 100 } = {}) {
+  const [dragState, setDragState] = React.useState({
+    isDragging: false,
+    startY: 0,
+    currentY: 0,
+  });
+  
+  const dragOffset = dragState.isDragging 
+    ? Math.max(0, dragState.currentY - dragState.startY) 
+    : 0;
+
+  const handleTouchStart = React.useCallback((e) => {
+    if (!enabled) return;
+    const touch = e.touches[0];
+    setDragState({
+      isDragging: true,
+      startY: touch.clientY,
+      currentY: touch.clientY,
+    });
+  }, [enabled]);
+
+  const handleTouchMove = React.useCallback((e) => {
+    if (!dragState.isDragging) return;
+    const touch = e.touches[0];
+    setDragState((prev) => ({
+      ...prev,
+      currentY: touch.clientY,
+    }));
+  }, [dragState.isDragging]);
+
+  const handleTouchEnd = React.useCallback(() => {
+    if (!dragState.isDragging) return;
+    
+    const dragDistance = dragState.currentY - dragState.startY;
+    
+    if (dragDistance > threshold) {
+      onClose?.();
+    }
+    
+    setDragState({
+      isDragging: false,
+      startY: 0,
+      currentY: 0,
+    });
+  }, [dragState, threshold, onClose]);
+
+  return {
+    dragOffset,
+    isDragging: dragState.isDragging,
+    handlers: {
+      onTouchStart: handleTouchStart,
+      onTouchMove: handleTouchMove,
+      onTouchEnd: handleTouchEnd,
+    },
+  };
+}
+
 function SheetContent({
   className,
   children,
   side = "right",
   showClose = true,
+  onSwipeClose,
   ...props
 }) {
+  const isBottomSheet = side === "bottom";
+  const { dragOffset, isDragging, handlers } = useSwipeToClose(onSwipeClose, {
+    enabled: isBottomSheet && !!onSwipeClose,
+    threshold: 100,
+  });
+
   return (
     <SheetPortal>
-      <SheetOverlay />
+      <SheetOverlay 
+        style={isBottomSheet && isDragging ? { 
+          opacity: Math.max(0, 1 - dragOffset / 300) 
+        } : undefined}
+      />
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
@@ -67,9 +138,23 @@ function SheetContent({
             "data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top inset-x-0 top-0 h-auto border-b border-zinc-800",
           side === "bottom" &&
             "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-0 bottom-0 h-auto border-t border-zinc-800",
+          // Disable transition during drag for responsive feel
+          isDragging && "transition-none",
           className
         )}
+        style={isBottomSheet && dragOffset > 0 ? {
+          transform: `translateY(${dragOffset}px)`,
+        } : undefined}
         {...props}>
+        {/* Swipe handle for bottom sheets */}
+        {isBottomSheet && onSwipeClose && (
+          <div
+            className="flex justify-center py-3 cursor-grab active:cursor-grabbing touch-none"
+            {...handlers}
+          >
+            <div className="h-1.5 w-12 rounded-full bg-zinc-600 transition-colors hover:bg-zinc-500" />
+          </div>
+        )}
         {children}
         {showClose && (
           <SheetPrimitive.Close

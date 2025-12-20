@@ -11,6 +11,12 @@ const STALE_AIRCRAFT_AGE_MS = 120000;
 // Epsilon for floating-point comparison
 const POSITION_EPSILON = 0.00001;
 
+// Maximum number of aircraft to track trails for (performance limit)
+const MAX_TRAIL_AIRCRAFT = 50;
+
+// Minimum zoom level to enable trails for all aircraft (performance optimization)
+const TRAILS_MIN_ZOOM = 9;
+
 // Cleanup interval timer reference
 let cleanupIntervalId = null;
 
@@ -33,16 +39,28 @@ export const useAircraftStore = create((set, get) => ({
   // Last update timestamp
   lastUpdate: null,
 
+  // Current zoom level (updated by map component)
+  currentZoom: 10,
+
+  // Whether to track trails for all aircraft (based on zoom)
+  trailsForAll: true,
+
   // Actions
   setAircraft: (aircraftList) => {
-    const { selectedAircraftId, trails, lastSeen, aircraft: existingAircraft } = get();
+    const { selectedAircraftId, trails, lastSeen, aircraft: existingAircraft, currentZoom, trailsForAll } = get();
     const now = Date.now();
     const newMap = new Map();
     const newLastSeen = new Map(lastSeen);
     const activeHexes = new Set();
 
-    // Start with cleaned trails (only keep trails for selected aircraft)
+    // Determine if we should track trails for all aircraft (when zoomed in)
+    const shouldTrackAll = trailsForAll && currentZoom >= TRAILS_MIN_ZOOM;
+
+    // Start with cleaned trails
     const newTrails = new Map();
+
+    // Keep track of how many trails we're tracking for performance
+    let trailCount = 0;
 
     aircraftList.forEach((ac) => {
       if (ac.hex) {
@@ -68,8 +86,13 @@ export const useAircraftStore = create((set, get) => ({
 
         newMap.set(ac.hex, mergedAc);
 
-        // Update trail for selected aircraft
-        if (ac.hex === selectedAircraftId && ac.lat && ac.lon) {
+        // Determine if we should track trail for this aircraft
+        // Always track selected, or track all when zoomed in (up to performance limit)
+        const isSelected = ac.hex === selectedAircraftId;
+        const shouldTrackTrail = isSelected || 
+          (shouldTrackAll && trailCount < MAX_TRAIL_AIRCRAFT && ac.lat && ac.lon);
+
+        if (shouldTrackTrail && ac.lat && ac.lon) {
           const currentTrail = trails.get(ac.hex) || [];
           const lastPos = currentTrail[currentTrail.length - 1];
 
@@ -99,6 +122,7 @@ export const useAircraftStore = create((set, get) => ({
 
             if (recentTrail.length > 0) {
               newTrails.set(ac.hex, recentTrail);
+              trailCount++;
             }
           } else {
             // Position hasn't changed, keep existing trail
@@ -108,6 +132,7 @@ export const useAircraftStore = create((set, get) => ({
               const recentTrail = existingTrail.filter(p => now - p.timestamp < TRAIL_MAX_AGE_MS);
               if (recentTrail.length > 0) {
                 newTrails.set(ac.hex, recentTrail);
+                trailCount++;
               }
             }
           }
@@ -248,6 +273,37 @@ export const useAircraftStore = create((set, get) => ({
     return trails.get(selectedAircraftId) || [];
   },
 
+  // Get all trails as an array of { hex, trail, color } for rendering
+  getAllTrails: () => {
+    const { trails, aircraft, selectedAircraftId } = get();
+    const result = [];
+    
+    for (const [hex, trail] of trails.entries()) {
+      if (trail.length >= 2) {
+        const ac = aircraft.get(hex);
+        result.push({
+          hex,
+          trail,
+          color: ac?._color || '#9ca3af',
+          isSelected: hex === selectedAircraftId,
+        });
+      }
+    }
+    
+    // Sort so selected trail renders on top
+    return result.sort((a, b) => (a.isSelected ? 1 : 0) - (b.isSelected ? 1 : 0));
+  },
+
+  // Update current zoom level (called by map component)
+  setCurrentZoom: (zoom) => {
+    set({ currentZoom: zoom });
+  },
+
+  // Toggle trails for all aircraft
+  setTrailsForAll: (enabled) => {
+    set({ trailsForAll: enabled });
+  },
+
   // Get aircraft array for rendering
   getAircraftArray: () => {
     return Array.from(get().aircraft.values());
@@ -282,8 +338,8 @@ export const useAircraftStore = create((set, get) => ({
       if (now - timestamp < STALE_AIRCRAFT_AGE_MS) {
         newLastSeen.set(hex, timestamp);
         
-        // Keep trail if it exists and aircraft is selected
-        if (hex === selectedAircraftId && trails.has(hex)) {
+        // Keep trail if it exists and has recent points
+        if (trails.has(hex)) {
           const trail = trails.get(hex);
           const recentTrail = trail.filter(p => now - p.timestamp < TRAIL_MAX_AGE_MS);
           if (recentTrail.length > 0) {

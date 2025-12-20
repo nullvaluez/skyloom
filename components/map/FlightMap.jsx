@@ -192,7 +192,8 @@ export const FlightMap = memo(function FlightMap() {
   const selectedAircraftId = useAircraftStore((s) => s.selectedAircraftId);
   const selectAircraft = useAircraftStore((s) => s.selectAircraft);
   const followedAircraftId = useAircraftStore((s) => s.followedAircraftId);
-  const getSelectedTrail = useAircraftStore((s) => s.getSelectedTrail);
+  const getAllTrails = useAircraftStore((s) => s.getAllTrails);
+  const setCurrentZoom = useAircraftStore((s) => s.setCurrentZoom);
 
   const openDetailPanel = useUIStore((s) => s.openDetailPanel);
   const closeDetailPanel = useUIStore((s) => s.closeDetailPanel);
@@ -275,6 +276,11 @@ export const FlightMap = memo(function FlightMap() {
     };
   }, []);
 
+  // Sync zoom level to aircraft store for trail tracking decisions
+  useEffect(() => {
+    setCurrentZoom(viewState.zoom);
+  }, [viewState.zoom, setCurrentZoom]);
+
   useEffect(() => {
     const lat = searchParams.get('lat');
     const lon = searchParams.get('lon');
@@ -341,7 +347,8 @@ export const FlightMap = memo(function FlightMap() {
     [selectedAircraftId, selectAircraft, closeDetailPanel]
   );
 
-  const trailData = getSelectedTrail();
+  // Get all trails for rendering (includes selected and nearby aircraft when zoomed in)
+  const allTrailsData = getAllTrails();
 
   const baseSize = viewState.zoom < 7 ? 24 : viewState.zoom <= 10 ? 32 : 40;
   const is3DMode = viewState.pitch > 0;
@@ -368,13 +375,20 @@ export const FlightMap = memo(function FlightMap() {
     if (!IconLayer || !PathLayer) return [];
     const result = [];
 
-    // Trail layer - 3D with altitude when zoomed in (zoom >= 10) and in 3D mode
-    if (trailData.length >= 2 && selectedAircraftId) {
-      const use3DTrail = is3DMode && viewState.zoom >= 10;
+    // Render trails for all tracked aircraft (when zoomed in)
+    const use3DTrail = is3DMode && viewState.zoom >= 10;
+    const now = Date.now();
+    const maxAge = 300000; // 5 minutes
+
+    allTrailsData.forEach(({ hex, trail, color, isSelected }) => {
+      if (trail.length < 2) return;
+
+      // Parse color for this trail
+      const trailColor = getCachedColor(color);
 
       if (use3DTrail) {
-        // 3D trail with altitude - creates immersive flight path visualization
-        const path3D = trailData.map((p) => [
+        // 3D trail with altitude
+        const path3D = trail.map((p) => [
           p.lon,
           p.lat,
           altitudeToMeters(p.alt || 0, viewState.pitch),
@@ -382,13 +396,10 @@ export const FlightMap = memo(function FlightMap() {
 
         // Create segments for gradient effect (newer = brighter)
         const segments = [];
-        const now = Date.now();
-        const maxAge = 300000; // 5 minutes
-
         for (let i = 0; i < path3D.length - 1; i++) {
-          const age = now - (trailData[i].timestamp || now);
+          const age = now - (trail[i].timestamp || now);
           const progress = i / Math.max(1, path3D.length - 1);
-          const avgAlt = ((trailData[i].alt || 0) + (trailData[i + 1].alt || 0)) / 2;
+          const avgAlt = ((trail[i].alt || 0) + (trail[i + 1].alt || 0)) / 2;
 
           segments.push({
             path: [path3D[i], path3D[i + 1]],
@@ -400,21 +411,20 @@ export const FlightMap = memo(function FlightMap() {
 
         result.push(
           new PathLayer({
-            id: 'trail-3d-layer',
+            id: `trail-3d-${hex}`,
             data: segments,
             getPath: (d) => d.path,
-            // Width varies slightly with altitude (higher = slightly thicker)
-            getWidth: (d) => 2 + (d.avgAlt / 40000) * 2,
-            // Color gradient: older = dimmer, newer = brighter
+            // Width varies with altitude; selected trails are slightly thicker
+            getWidth: (d) => (isSelected ? 2.5 : 1.5) + (d.avgAlt / 40000) * 1.5,
+            // Color gradient using aircraft's color
             getColor: (d) => {
-              const opacity = 50 + d.progress * 130;
-              // Slight blue shift for higher altitudes
-              const altFactor = Math.min(d.avgAlt / 40000, 1);
-              return [59 - altFactor * 20, 130 + altFactor * 20, 246, opacity];
+              const baseOpacity = isSelected ? 180 : 120; // Selected trails are more visible
+              const opacity = (0.3 + d.progress * 0.7) * baseOpacity / 180 * 255;
+              return [...trailColor.slice(0, 3), Math.round(opacity)];
             },
             widthUnits: 'pixels',
             widthMinPixels: 1,
-            widthMaxPixels: 6,
+            widthMaxPixels: isSelected ? 6 : 4,
             jointRounded: true,
             capRounded: true,
             billboard: false,
@@ -423,14 +433,14 @@ export const FlightMap = memo(function FlightMap() {
         );
       } else {
         // 2D trail fallback
-        const path2D = trailData.map((p) => [p.lon, p.lat]);
+        const path2D = trail.map((p) => [p.lon, p.lat]);
         result.push(
           new PathLayer({
-            id: 'trail-layer',
+            id: `trail-2d-${hex}`,
             data: [{ path: path2D }],
             getPath: (d) => d.path,
-            getWidth: 3,
-            getColor: [59, 130, 246, 180],
+            getWidth: isSelected ? 3 : 2,
+            getColor: [...trailColor.slice(0, 3), isSelected ? 180 : 120],
             widthUnits: 'pixels',
             jointRounded: true,
             capRounded: true,
@@ -438,7 +448,7 @@ export const FlightMap = memo(function FlightMap() {
           })
         );
       }
-    }
+    });
 
     if (is3DMode && ScatterplotLayer && airborneAircraft.length > 0) {
       result.push(
@@ -547,7 +557,7 @@ export const FlightMap = memo(function FlightMap() {
     airborneAircraft,
     selectedAircraftId,
     baseSize,
-    trailData,
+    allTrailsData,
     is3DMode,
     viewState.pitch,
     viewState.zoom,

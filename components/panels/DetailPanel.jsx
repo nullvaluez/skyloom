@@ -121,7 +121,6 @@ export const DetailPanel = memo(function DetailPanel() {
   const unfollowAircraft = useAircraftStore((s) => s.unfollowAircraft);
   const selectAircraft = useAircraftStore((s) => s.selectAircraft);
   const enable3DFollow = useMapStore((s) => s.enable3DFollow);
-  const disable3D = useMapStore((s) => s.disable3D);
   const isMobile = useIsMobile();
   const { shareNative } = useShare();
   const { onSelect, onFollow: hapticFollow } = useHaptics();
@@ -140,7 +139,8 @@ export const DetailPanel = memo(function DetailPanel() {
     if (aircraft) {
       if (isFollowing) {
         unfollowAircraft();
-        disable3D(); // Return to flat view when unfollowing
+        // Stay in current 3D mode - just stop tracking the aircraft
+        // User can still see 3D trails and manually control the view
         onSelect(); // Light haptic for unfollow
       } else {
         followAircraft(aircraft.hex);
@@ -204,13 +204,10 @@ export const DetailPanel = memo(function DetailPanel() {
         <SheetContent 
           side="bottom" 
           showClose={false}
-          className="h-[80dvh] max-h-[80dvh] p-0 rounded-t-xl flex flex-col overflow-hidden bg-zinc-950 border-t border-zinc-800"
+          onSwipeClose={handleClose}
+          className="h-[80dvh] max-h-[80dvh] p-0 pt-0 rounded-t-xl flex flex-col overflow-hidden bg-zinc-950 border-t border-zinc-800"
         >
-          <div className="flex justify-center py-2 shrink-0">
-            <div className="h-1 w-12 rounded-full bg-zinc-700" />
-          </div>
-          
-          <SheetHeader className="border-b border-zinc-800 px-4 pb-3 shrink-0 bg-zinc-950">
+          <SheetHeader className="border-b border-zinc-800 px-4 pb-3 pt-0 shrink-0 bg-zinc-950">
             <SheetTitle className="text-left text-zinc-100">{headerTitle}</SheetTitle>
           </SheetHeader>
 
