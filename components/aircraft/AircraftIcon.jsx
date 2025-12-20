@@ -161,6 +161,6 @@ export const AircraftIcon = memo(function AircraftIcon({
     case 'unknown':
       return <UnknownIcon />;
     default:
-      return <AirlinerIcon />;
+      return <UnknownIcon />;
   }
 });

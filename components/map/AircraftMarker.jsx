@@ -20,7 +20,38 @@ export const AircraftMarker = memo(function AircraftMarker({ aircraft }) {
   const { openDetailPanel } = useUIStore();
 
   const isSelected = selectedAircraftId === aircraft.hex;
-  const iconType = getAircraftIconType(aircraft); // Physical shape for icon
+  const classification = classifyAircraft(aircraft);
+  const physicalType = getAircraftIconType(aircraft);
+  
+  // Determine the best icon shape, prioritizing classification over physical type for better variety
+  const iconType = useMemo(() => {
+    // Always prioritize special classifications that should have unique icons
+    switch (classification) {
+      case 'military':
+        return 'military';
+      case 'cargo':
+        return 'cargo';
+      case 'helicopter':
+        return 'helicopter';
+      case 'private':
+        // Use physical type if it's prop/jet, otherwise default to prop
+        return (physicalType === 'prop' || physicalType === 'jet') ? physicalType : 'prop';
+      case 'government':
+        return 'jet';
+      case 'special':
+        return 'jet';
+      case 'commercial':
+        // For commercial, use the physical type to get airliner/jet distinction
+        if (physicalType === 'airliner' || physicalType === 'jet' || physicalType === 'prop') {
+          return physicalType;
+        }
+        return 'airliner';
+      default:
+        // For unknown classification, use physical type
+        return physicalType;
+    }
+  }, [physicalType, classification]);
+
   const color = getAircraftColor(aircraft, isSelected); // Color based on classification
   const size = getIconSize();
   const rotation = aircraft.track || 0;
@@ -47,8 +78,9 @@ export const AircraftMarker = memo(function AircraftMarker({ aircraft }) {
     });
   }, [iconType, color, size, rotation, emergency]);
 
-  // Handle marker click
-  const handleClick = () => {
+  // Handle marker click - stop propagation so map click doesn't also fire
+  const handleClick = (e) => {
+    L.DomEvent.stopPropagation(e);
     selectAircraft(aircraft.hex);
     openDetailPanel();
   };
@@ -64,6 +96,7 @@ export const AircraftMarker = memo(function AircraftMarker({ aircraft }) {
       eventHandlers={{
         click: handleClick,
       }}
+      bubblingMouseEvents={false}
     >
       <Tooltip
         direction="top"

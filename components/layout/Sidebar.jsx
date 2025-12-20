@@ -1,6 +1,6 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,9 +10,40 @@ import { FilterPanel } from '@/components/panels/FilterPanel';
 
 /**
  * Sidebar component for desktop filter panel
+ * Hidden on mobile - uses MobileNav sheet instead
  */
 export const Sidebar = memo(function Sidebar() {
   const { sidebarOpen, closeSidebar } = useUIStore();
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  // Check viewport on mount and close sidebar if mobile
+  useEffect(() => {
+    const checkDesktop = () => {
+      const desktop = window.matchMedia('(min-width: 768px)').matches;
+      setIsDesktop(desktop);
+      
+      // Close sidebar on mobile to prevent it from showing
+      if (!desktop) {
+        closeSidebar();
+      }
+    };
+
+    // Check on mount
+    checkDesktop();
+
+    // Listen for resize
+    const mediaQuery = window.matchMedia('(min-width: 768px)');
+    mediaQuery.addEventListener('change', checkDesktop);
+
+    return () => {
+      mediaQuery.removeEventListener('change', checkDesktop);
+    };
+  }, [closeSidebar]);
+
+  // Don't render on mobile - use MobileNav instead
+  if (!isDesktop) {
+    return null;
+  }
 
   return (
     <AnimatePresence mode="wait">
@@ -22,7 +53,7 @@ export const Sidebar = memo(function Sidebar() {
           animate={{ width: 288, opacity: 1 }}
           exit={{ width: 0, opacity: 0 }}
           transition={{ duration: 0.2, ease: 'easeInOut' }}
-          className="h-full border-r border-border bg-card overflow-hidden flex-shrink-0"
+          className="h-full border-r border-border bg-card overflow-hidden shrink-0"
         >
           <div className="flex h-full w-72 flex-col">
             {/* Header */}

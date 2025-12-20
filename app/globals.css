@@ -192,6 +192,15 @@
   animation: pulse-emergency 1s ease-in-out infinite;
 }
 
+/* Aircraft marker styling */
+.aircraft-marker {
+  background: transparent !important;
+  border: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
 /* Cluster styling */
 .marker-cluster {
   background-clip: padding-box;

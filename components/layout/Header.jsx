@@ -1,10 +1,10 @@
 'use client';
 
-import { memo, useState, useEffect } from 'react';
+import { memo, useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Plane, Search, SlidersHorizontal, Settings, X } from 'lucide-react';
+import { Plane, Search, SlidersHorizontal, Settings, X, ArrowLeft } from 'lucide-react';
 import { useUIStore } from '@/stores/ui-store';
 import { useFilterStore } from '@/stores/filter-store';
 import { useIsMobile } from '@/hooks/use-media-query';
@@ -15,6 +15,8 @@ import { Badge } from '@/components/ui/badge';
  */
 export const Header = memo(function Header() {
   const [mounted, setMounted] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const mobileSearchRef = useRef(null);
   const { toggleSidebar, toggleMobileFilters, toggleSettings, sidebarOpen } = useUIStore();
   const { filters, setSearch, clearSearch, getActiveFilterCount } = useFilterStore();
   const isMobile = useIsMobile();
@@ -23,6 +25,13 @@ export const Header = memo(function Header() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Focus mobile search input when opened
+  useEffect(() => {
+    if (mobileSearchOpen && mobileSearchRef.current) {
+      mobileSearchRef.current.focus();
+    }
+  }, [mobileSearchOpen]);
 
   const activeFilterCount = mounted ? getActiveFilterCount() : 0;
 
@@ -42,6 +51,49 @@ export const Header = memo(function Header() {
     }
   };
 
+  const handleMobileSearchToggle = () => {
+    setMobileSearchOpen(!mobileSearchOpen);
+  };
+
+  const handleMobileSearchClose = () => {
+    setMobileSearchOpen(false);
+  };
+
+  // Mobile search expanded view
+  if (mobileSearchOpen && mounted) {
+    return (
+      <header className="flex h-14 items-center gap-2 border-b border-border bg-card px-4 md:hidden">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleMobileSearchClose}
+          aria-label="Close search"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            ref={mobileSearchRef}
+            type="text"
+            placeholder="Search callsign, registration, type..."
+            value={filters.search.query}
+            onChange={handleSearchChange}
+            className="h-9 w-full pl-9 pr-9 bg-secondary border-border"
+          />
+          {filters.search.query && (
+            <button
+              onClick={handleClearSearch}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </header>
+    );
+  }
+
   return (
     <header className="flex h-14 items-center justify-between border-b border-border bg-card px-4">
       {/* Logo */}
@@ -52,7 +104,7 @@ export const Header = memo(function Header() {
         <span className="text-lg font-semibold tracking-tight">SkyTracker</span>
       </div>
 
-      {/* Search Bar */}
+      {/* Search Bar - Desktop */}
       <div className="mx-4 hidden flex-1 max-w-md md:flex">
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -76,16 +128,20 @@ export const Header = memo(function Header() {
 
       {/* Actions */}
       <div className="flex items-center gap-2">
-        {/* Mobile Search */}
+        {/* Mobile Search Button */}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
-              variant="ghost"
+              variant={filters.search.query ? 'secondary' : 'ghost'}
               size="icon"
-              className="md:hidden"
+              className="md:hidden relative"
+              onClick={handleMobileSearchToggle}
               aria-label="Search"
             >
               <Search className="h-5 w-5" />
+              {filters.search.query && (
+                <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-primary" />
+              )}
             </Button>
           </TooltipTrigger>
           <TooltipContent>Search</TooltipContent>

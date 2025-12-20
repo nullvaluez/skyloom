@@ -53,20 +53,46 @@ export const useAircraftStore = create((set, get) => ({
   },
 
   selectAircraft: (id) => {
-    const { trails } = get();
+    const { trails, selectedAircraftId: previousId, followedAircraftId } = get();
 
-    // If selecting a new aircraft, initialize its trail
-    if (id && !trails.has(id)) {
-      const aircraft = get().aircraft.get(id);
-      if (aircraft && aircraft.lat && aircraft.lon) {
-        set((state) => ({
-          selectedAircraftId: id,
-          trails: new Map(state.trails).set(id, [
-            { lat: aircraft.lat, lon: aircraft.lon, timestamp: Date.now() },
-          ]),
-        }));
-        return;
+    // If deselecting (id is null), clear the trail and unfollow if following
+    if (id === null) {
+      const newTrails = new Map(trails);
+      if (previousId) {
+        newTrails.delete(previousId);
       }
+      
+      set({
+        selectedAircraftId: null,
+        trails: newTrails,
+        // Also unfollow if we were following this aircraft
+        followedAircraftId: followedAircraftId === previousId ? null : followedAircraftId,
+      });
+      return;
+    }
+
+    // If selecting a new aircraft, clear old trail and initialize new one
+    if (id !== previousId) {
+      const aircraft = get().aircraft.get(id);
+      const newTrails = new Map(trails);
+      
+      // Clear previous aircraft's trail
+      if (previousId) {
+        newTrails.delete(previousId);
+      }
+      
+      // Initialize new aircraft's trail
+      if (aircraft && aircraft.lat && aircraft.lon) {
+        newTrails.set(id, [
+          { lat: aircraft.lat, lon: aircraft.lon, timestamp: Date.now() },
+        ]);
+      }
+      
+      set({
+        selectedAircraftId: id,
+        trails: newTrails,
+      });
+      return;
     }
 
     set({ selectedAircraftId: id });

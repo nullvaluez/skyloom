@@ -8,6 +8,7 @@ import 'leaflet/dist/leaflet.css';
 
 import { useAircraftStore } from '@/stores/aircraft-store';
 import { useMapStore } from '@/stores/map-store';
+import { useUIStore } from '@/stores/ui-store';
 import { useFilteredAircraft } from '@/hooks/use-filters';
 import { useAircraftByLocation } from '@/hooks/use-aircraft';
 import { useDebouncedCallback } from '@/hooks/use-debounce';
@@ -15,6 +16,7 @@ import { AircraftMarker } from './AircraftMarker';
 import { FlightTrail } from './FlightTrail';
 import { MapControls } from './MapControls';
 import { MAP_CONFIG, CLUSTER_CONFIG } from '@/lib/constants';
+
 
 // Fix Leaflet default marker icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -29,6 +31,8 @@ L.Icon.Default.mergeOptions({
  */
 function MapEventHandler() {
   const { setView, setBounds, setMapRef } = useMapStore();
+  const { selectAircraft, selectedAircraftId } = useAircraftStore();
+  const { closeDetailPanel } = useUIStore();
   const map = useMap();
 
   // Set map ref on mount
@@ -57,6 +61,15 @@ function MapEventHandler() {
     },
     load: () => {
       setBounds(map.getBounds());
+    },
+    // Deselect aircraft when clicking on empty map space
+    click: (e) => {
+      // Only deselect if we're not clicking on an aircraft marker
+      // The marker click handler will stop propagation
+      if (selectedAircraftId) {
+        selectAircraft(null);
+        closeDetailPanel();
+      }
     },
   });
 
