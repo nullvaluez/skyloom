@@ -2,7 +2,7 @@
 
 import { memo, useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Camera, AlertTriangle, Plane, Navigation, MapPin, Clock, ArrowUp, Volume2, VolumeX, Download } from 'lucide-react';
+import { X, Camera, AlertTriangle, Plane, Navigation, ArrowUp, Volume2, VolumeX, Radar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAircraftStore } from '@/stores/aircraft-store';
 import { useMapStore } from '@/stores/map-store';
@@ -155,13 +155,11 @@ const ARLabel = memo(function ARLabel({ aircraft, orientation, userLocation, onT
   
   const rarityColor = getRarityColor(aircraft._rarity || 0);
   
-  // Calculate distance to aircraft
-  const distanceNm = useMemo(() => {
-    return calculateDistanceToAircraft(
-      userLocation[0], userLocation[1],
-      aircraft.lat, aircraft.lon
-    );
-  }, [userLocation, aircraft.lat, aircraft.lon]);
+  // Use pre-calculated distance from geofence filter (already in miles)
+  const distanceMi = aircraft._distanceMi || calculateDistanceToAircraft(
+    userLocation[0], userLocation[1],
+    aircraft.lat, aircraft.lon
+  );
   
   // Get airline info from callsign
   const airline = useMemo(() => {
@@ -233,7 +231,7 @@ const ARLabel = memo(function ARLabel({ aircraft, orientation, userLocation, onT
             {formatAltitude(aircraft.alt_baro)}
           </span>
           <span className="text-cyan-400 font-mono">
-            {formatDistanceDisplay(distanceNm)}
+            {formatDistanceDisplay(distanceMi)}
           </span>
         </div>
         
@@ -422,31 +420,33 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
     }
   }, []);
   
-  // Filter aircraft that are in field of view (or show all nearby if no orientation)
+  // Filter aircraft that are in field of view AND within geofence radius
   const visibleAircraft = useMemo(() => {
     if (!userLocation) return [];
     if (isCalibrating) return [];
     
+    // First, filter by geofence radius (only show aircraft within X miles)
+    const nearbyAircraft = aircraftArray
+      .filter(ac => ac.lat && ac.lon)
+      .map(ac => {
+        const distanceMi = calculateDistanceToAircraft(
+          userLocation[0], userLocation[1],
+          ac.lat, ac.lon
+        );
+        return { ...ac, _distanceMi: distanceMi };
+      })
+      .filter(ac => ac._distanceMi <= geofenceRadius);
+    
     // If we don't have orientation data, show all nearby aircraft sorted by distance
     if (!hasOrientation) {
-      return aircraftArray
-        .filter(ac => ac.lat && ac.lon)
-        .map(ac => {
-          // Calculate distance for sorting
-          const dLat = ac.lat - userLocation[0];
-          const dLon = ac.lon - userLocation[1];
-          const dist = Math.sqrt(dLat * dLat + dLon * dLon);
-          return { ...ac, _dist: dist };
-        })
-        .sort((a, b) => a._dist - b._dist)
+      return nearbyAircraft
+        .sort((a, b) => a._distanceMi - b._distanceMi)
         .slice(0, 10);
     }
     
     // With orientation, filter to aircraft in field of view
     // Use FOV that matches our screen mapping (90° H, 90° V)
-    return aircraftArray.filter(ac => {
-      if (!ac.lat || !ac.lon) return false;
-      
+    return nearbyAircraft.filter(ac => {
       const bearing = calculateBearing(
         userLocation[0], userLocation[1],
         ac.lat, ac.lon
@@ -460,7 +460,7 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
       // Use FOV consistent with our screen mapping (90° each direction)
       return isInFOV(bearing, elevation, orientation, 90, 90);
     }).slice(0, 8); // Limit to 8 aircraft to reduce visual clutter
-  }, [aircraftArray, userLocation, orientation, isCalibrating, hasOrientation]);
+  }, [aircraftArray, userLocation, orientation, isCalibrating, hasOrientation, geofenceRadius]);
   
   // Auto-log spotted aircraft (only once per session, don't cause re-renders)
   useEffect(() => {
@@ -845,9 +845,33 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
               </div>
               <div className="text-sm">
                 <span className="font-bold">{visibleAircraft.length}</span>
-                <span className="text-muted-foreground"> aircraft nearby</span>
+                <span className="text-muted-foreground"> aircraft visible</span>
               </div>
             </div>
+            
+            {/* Geofence radius selector */}
+            <div className="flex items-center justify-between gap-2 py-1 border-t border-white/10">
+              <div className="flex items-center gap-1.5">
+                <Radar className="h-4 w-4 text-cyan-400" />
+                <span className="text-xs text-muted-foreground">Range:</span>
+              </div>
+              <div className="flex items-center gap-1">
+                {GEOFENCE_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setGeofenceRadius(option.value)}
+                    className={`px-2 py-0.5 text-xs rounded transition-all ${
+                      geofenceRadius === option.value
+                        ? 'bg-cyan-500/30 text-cyan-300 font-medium'
+                        : 'text-muted-foreground hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
             {!hasOrientation && !isCalibrating && (
               <div className="text-xs text-amber-400 text-center">
                 No gyroscope detected - showing all nearby aircraft
@@ -881,7 +905,7 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
               transition={{ type: 'spring', stiffness: 100, damping: 15 }}
               className="flex flex-col items-center"
             >
-              <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[12px] border-b-red-500 drop-shadow-lg" />
+              <div className="w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-b-12 border-b-red-500 drop-shadow-lg" />
               <span className="text-[10px] font-bold text-red-500 mt-0.5">N</span>
             </motion.div>
           </div>
