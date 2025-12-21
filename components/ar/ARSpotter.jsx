@@ -78,10 +78,10 @@ function isInFOV(bearing, elevation, orientation, fovH = 70, fovV = 50) {
 }
 
 /**
- * Calculate distance from user to aircraft in nautical miles
+ * Calculate distance from user to aircraft in statute miles
  */
 function calculateDistanceToAircraft(userLat, userLon, acLat, acLon) {
-  const R = 3440.065; // Earth radius in nautical miles
+  const R = 3958.8; // Earth radius in statute miles
   const dLat = (acLat - userLat) * Math.PI / 180;
   const dLon = (acLon - userLon) * Math.PI / 180;
   const a = 
@@ -92,14 +92,23 @@ function calculateDistanceToAircraft(userLat, userLon, acLat, acLon) {
   return R * c;
 }
 
+// Geofence radius options in miles
+const GEOFENCE_OPTIONS = [
+  { value: 15, label: '15 mi' },
+  { value: 25, label: '25 mi' },
+  { value: 50, label: '50 mi' },
+  { value: 75, label: '75 mi' },
+  { value: 100, label: '100 mi' },
+];
+
 /**
- * Format distance for display
+ * Format distance for display (in miles)
  */
-function formatDistanceDisplay(distanceNm) {
-  if (distanceNm < 1) {
-    return `${Math.round(distanceNm * 10) / 10} nm`;
+function formatDistanceDisplay(distanceMi) {
+  if (distanceMi < 1) {
+    return `${Math.round(distanceMi * 10) / 10} mi`;
   }
-  return `${Math.round(distanceNm)} nm`;
+  return `${Math.round(distanceMi)} mi`;
 }
 
 /**
@@ -119,6 +128,9 @@ const ARLabel = memo(function ARLabel({ aircraft, orientation, userLocation, onT
   // Calculate screen position based on bearing/elevation difference from device orientation
   const { alpha, beta } = orientation;
   const deviceHeading = (360 - alpha) % 360;
+  
+  // When phone is tilted back to look at sky, beta > 90
+  // beta = 90 is horizontal, beta = 180 is straight up
   const devicePitch = beta - 90;
   
   let bearingDiff = bearing - deviceHeading;
@@ -128,12 +140,18 @@ const ARLabel = memo(function ARLabel({ aircraft, orientation, userLocation, onT
   const elevationDiff = elevation - devicePitch;
   
   // Convert to screen coordinates (center = 50%)
-  const x = 50 + (bearingDiff / 70) * 100; // Assuming 70° horizontal FOV
-  const y = 50 - (elevationDiff / 50) * 100; // Assuming 50° vertical FOV
+  // Use wider FOV mapping to keep labels more centered and readable
+  // Horizontal: ~90° FOV mapped to screen width
+  const x = 50 + (bearingDiff / 45) * 40; // ±45° maps to ±40% from center
   
-  // Clamp to screen
-  const clampedX = Math.max(5, Math.min(95, x));
-  const clampedY = Math.max(5, Math.min(95, y));
+  // Vertical: When looking at sky, we want labels to stay in viewable area
+  // Use gentler mapping that keeps labels more centered
+  // ±45° elevation difference maps to ±35% from center
+  const y = 50 - (elevationDiff / 45) * 35;
+  
+  // Clamp to screen with better margins (10-90%) to ensure readability
+  const clampedX = Math.max(10, Math.min(90, x));
+  const clampedY = Math.max(12, Math.min(88, y));
   
   const rarityColor = getRarityColor(aircraft._rarity || 0);
   
@@ -170,7 +188,7 @@ const ARLabel = memo(function ARLabel({ aircraft, orientation, userLocation, onT
       initial={{ opacity: 0, scale: 0.5 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.5 }}
-      className="absolute"
+      className="absolute z-10"
       style={{
         left: `${clampedX}%`,
         top: `${clampedY}%`,
@@ -178,68 +196,61 @@ const ARLabel = memo(function ARLabel({ aircraft, orientation, userLocation, onT
       }}
     >
       <div 
-        className="glass-panel p-2.5 flex flex-col items-center gap-1.5 min-w-[100px] cursor-pointer active:scale-95 transition-transform"
+        className="glass-panel px-2 py-1.5 flex flex-col items-center gap-0.5 min-w-[85px] cursor-pointer active:scale-95 transition-transform"
         onClick={handleTap}
       >
-        {/* Aircraft icon with heading indicator */}
-        <div className="relative">
-          <Plane 
-            className="h-7 w-7" 
-            style={{ 
-              color: rarityColor,
-              transform: `rotate(${aircraft.track || 0}deg)`,
-            }} 
-          />
-          {/* Vertical trend indicator */}
-          {verticalTrend !== 'level' && (
-            <ArrowUp 
-              className={`absolute -right-1 -top-1 h-3 w-3 ${
-                verticalTrend === 'climbing' ? 'text-green-400' : 'text-red-400 rotate-180'
-              }`}
+        {/* Top row: Icon + Callsign */}
+        <div className="flex items-center gap-1.5">
+          <div className="relative">
+            <Plane 
+              className="h-5 w-5" 
+              style={{ 
+                color: rarityColor,
+                transform: `rotate(${aircraft.track || 0}deg)`,
+              }} 
             />
-          )}
-        </div>
-        
-        {/* Flight callsign / airline */}
-        <div className="text-xs font-bold text-white text-center">
-          {formatCallsign(aircraft.flight) || aircraft.hex}
-        </div>
-        
-        {/* Airline name if available */}
-        {airline && (
-          <div className="text-[9px] text-muted-foreground truncate max-w-[90px]">
-            {airline.name}
+            {/* Vertical trend indicator */}
+            {verticalTrend !== 'level' && (
+              <ArrowUp 
+                className={`absolute -right-0.5 -top-0.5 h-2.5 w-2.5 ${
+                  verticalTrend === 'climbing' ? 'text-green-400' : 'text-red-400 rotate-180'
+                }`}
+              />
+            )}
           </div>
-        )}
+          <div className="text-xs font-bold text-white">
+            {formatCallsign(aircraft.flight) || aircraft.hex.slice(-6)}
+          </div>
+        </div>
         
-        {/* Altitude with trend indicator */}
-        <div className="flex items-center gap-1 text-[10px]">
+        {/* Middle row: Altitude + Distance */}
+        <div className="flex items-center gap-2 text-[10px]">
           <span className={`font-mono ${
             verticalTrend === 'climbing' ? 'text-green-400' : 
             verticalTrend === 'descending' ? 'text-amber-400' : 
-            'text-muted-foreground'
+            'text-white'
           }`}>
             {formatAltitude(aircraft.alt_baro)}
           </span>
+          <span className="text-cyan-400 font-mono">
+            {formatDistanceDisplay(distanceNm)}
+          </span>
         </div>
         
-        {/* Distance from user */}
-        <div className="flex items-center gap-1 text-[10px] text-cyan-400">
-          <MapPin className="h-3 w-3" />
-          <span className="font-mono">{formatDistanceDisplay(distanceNm)}</span>
+        {/* Bottom: Compact info row */}
+        <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
+          {airline && (
+            <span className="truncate max-w-[60px]">{airline.name}</span>
+          )}
+          {aircraft.gs && !airline && (
+            <span className="font-mono">{Math.round(aircraft.gs)} kts</span>
+          )}
         </div>
         
-        {/* Ground speed */}
-        {aircraft.gs && (
-          <div className="text-[9px] text-muted-foreground font-mono">
-            {Math.round(aircraft.gs)} kts
-          </div>
-        )}
-        
-        {/* Rarity bar */}
-        <div className="h-1 w-full rounded bg-background/50 overflow-hidden mt-1">
+        {/* Thin rarity indicator bar */}
+        <div className="h-0.5 w-full rounded-full bg-background/50 overflow-hidden">
           <div 
-            className="h-full rounded transition-all duration-300"
+            className="h-full rounded-full transition-all duration-300"
             style={{ 
               width: `${Math.min(100, (aircraft._rarity || 0))}%`,
               backgroundColor: rarityColor,
@@ -268,6 +279,7 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
   const [selectedAircraft, setSelectedAircraft] = useState(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [captureMessage, setCaptureMessage] = useState(null);
+  const [geofenceRadius, setGeofenceRadius] = useState(50); // Default 50 miles
   const orientationHandlerRef = useRef(null);
   
   // Select primitive/stable values from stores to avoid infinite loops
@@ -430,7 +442,8 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
         .slice(0, 10);
     }
     
-    // With orientation, filter to aircraft in field of view (use wider FOV)
+    // With orientation, filter to aircraft in field of view
+    // Use FOV that matches our screen mapping (90° H, 90° V)
     return aircraftArray.filter(ac => {
       if (!ac.lat || !ac.lon) return false;
       
@@ -444,9 +457,9 @@ export const ARSpotter = memo(function ARSpotter({ onClose }) {
         ac.alt_baro
       );
       
-      // Use wider FOV for better detection (120° horizontal, 90° vertical)
-      return isInFOV(bearing, elevation, orientation, 120, 90);
-    }).slice(0, 10); // Limit to 10 aircraft for performance
+      // Use FOV consistent with our screen mapping (90° each direction)
+      return isInFOV(bearing, elevation, orientation, 90, 90);
+    }).slice(0, 8); // Limit to 8 aircraft to reduce visual clutter
   }, [aircraftArray, userLocation, orientation, isCalibrating, hasOrientation]);
   
   // Auto-log spotted aircraft (only once per session, don't cause re-renders)
