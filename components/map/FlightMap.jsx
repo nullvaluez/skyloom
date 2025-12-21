@@ -6,11 +6,24 @@ import { useSearchParams } from 'next/navigation';
 import { useAircraftStore } from '@/stores/aircraft-store';
 import { useMapStore } from '@/stores/map-store';
 import { useUIStore } from '@/stores/ui-store';
+import { usePassportStore } from '@/stores/passport-store';
 import { useFilteredAircraftAsync } from '@/hooks/use-filters';
 import { useAircraftByLocation } from '@/hooks/use-aircraft';
 import { useAircraftWorker } from '@/hooks/use-aircraft-worker';
+import { useRoute } from '@/hooks/use-route';
+import { useShare } from '@/hooks/use-share';
 import { MapControls } from './MapControls';
+import { QuickActionsMenu } from './QuickActionsMenu';
 import { isEmergency } from '@/lib/classify';
+import { 
+  formatCallsign, 
+  formatAltitude, 
+  formatSpeed, 
+  formatHeading,
+  formatRegistration,
+  formatAircraftType,
+  formatHex,
+} from '@/lib/format';
 import { 
   altitudeToMeters, 
   getShadowRadius, 
@@ -245,6 +258,23 @@ export const FlightMap = memo(function FlightMap() {
 
   const { processAircraft, isReady: workerReady } = useAircraftWorker();
 
+  // Get selected aircraft for route visualization
+  const selectedAircraft = useMemo(() => {
+    if (!selectedAircraftId) return null;
+    return aircraftMap.get(selectedAircraftId) || null;
+  }, [selectedAircraftId, aircraftMap]);
+
+  // Fetch route data for selected aircraft
+  const { route: selectedRoute } = useRoute(selectedAircraft);
+
+  // Quick actions menu state
+  const [quickActionsAircraft, setQuickActionsAircraft] = useState(null);
+  const [quickActionsPosition, setQuickActionsPosition] = useState(null);
+  const { shareNative } = useShare();
+  const logSpot = usePassportStore((s) => s.logSpot);
+  const followAircraft = useAircraftStore((s) => s.followAircraft);
+  const enable3DFollow = useMapStore((s) => s.enable3DFollow);
+
   const [viewState, setViewState] = useState({
     longitude: center[1],
     latitude: center[0],
@@ -375,14 +405,60 @@ export const FlightMap = memo(function FlightMap() {
     [setMapViewState]
   );
 
-  const handleAircraftClick = useCallback(
-    (info) => {
-      if (info.object) {
-        selectAircraft(info.object.hex);
-        openDetailPanel();
+  // Handle double-tap/click to follow aircraft
+  const handleDoubleTapAircraftInternal = useCallback(
+    (aircraft) => {
+      if (aircraft) {
+        followAircraft(aircraft.hex);
+        enable3DFollow(aircraft);
+        // Haptic feedback
+        if (navigator.vibrate) {
+          navigator.vibrate([10, 50, 10]);
+        }
       }
     },
-    [selectAircraft, openDetailPanel]
+    [followAircraft, enable3DFollow]
+  );
+
+  // Track double-click timing for aircraft
+  const lastClickTimeRef = useRef(0);
+  const lastClickedAircraftRef = useRef(null);
+  const clickTimerRef = useRef(null);
+  const DOUBLE_CLICK_DELAY = 300;
+
+  const handleAircraftClick = useCallback(
+    (info) => {
+      if (!info.object) return;
+      
+      const now = Date.now();
+      const aircraft = info.object;
+      const timeSinceLastClick = now - lastClickTimeRef.current;
+      const isSameAircraft = lastClickedAircraftRef.current === aircraft.hex;
+      
+      // Check for double-click on same aircraft
+      if (isSameAircraft && timeSinceLastClick < DOUBLE_CLICK_DELAY) {
+        // Double-click detected - follow the aircraft
+        if (clickTimerRef.current) {
+          clearTimeout(clickTimerRef.current);
+          clickTimerRef.current = null;
+        }
+        handleDoubleTapAircraftInternal(aircraft);
+        lastClickTimeRef.current = 0;
+        lastClickedAircraftRef.current = null;
+      } else {
+        // Single click - wait to see if double-click follows
+        lastClickTimeRef.current = now;
+        lastClickedAircraftRef.current = aircraft.hex;
+        
+        // Select and open panel after short delay (to allow for double-click)
+        clickTimerRef.current = setTimeout(() => {
+          selectAircraft(aircraft.hex);
+          openDetailPanel();
+          clickTimerRef.current = null;
+        }, DOUBLE_CLICK_DELAY);
+      }
+    },
+    [selectAircraft, openDetailPanel, handleDoubleTapAircraftInternal]
   );
 
   const handleAircraftClickRef = useRef(handleAircraftClick);
@@ -394,9 +470,81 @@ export const FlightMap = memo(function FlightMap() {
         selectAircraft(null);
         closeDetailPanel();
       }
+      // Close quick actions if open
+      if (quickActionsAircraft) {
+        setQuickActionsAircraft(null);
+        setQuickActionsPosition(null);
+      }
     },
-    [selectedAircraftId, selectAircraft, closeDetailPanel]
+    [selectedAircraftId, selectAircraft, closeDetailPanel, quickActionsAircraft]
   );
+
+  // Handle long-press to show quick actions
+  const handleLongPressAircraft = useCallback(
+    (info) => {
+      if (info.object) {
+        setQuickActionsAircraft(info.object);
+        setQuickActionsPosition({ x: info.x, y: info.y });
+        // Haptic feedback
+        if (navigator.vibrate) {
+          navigator.vibrate(15);
+        }
+      }
+    },
+    []
+  );
+
+  // Quick action handlers
+  const handleQuickFollow = useCallback(() => {
+    if (quickActionsAircraft) {
+      followAircraft(quickActionsAircraft.hex);
+      enable3DFollow(quickActionsAircraft);
+    }
+  }, [quickActionsAircraft, followAircraft, enable3DFollow]);
+
+  const handleQuickCenterMap = useCallback(() => {
+    if (quickActionsAircraft?.lat && quickActionsAircraft?.lon) {
+      setViewState((prev) => ({
+        ...prev,
+        latitude: quickActionsAircraft.lat,
+        longitude: quickActionsAircraft.lon,
+        zoom: Math.max(prev.zoom, 10),
+        transitionDuration: 500,
+      }));
+    }
+  }, [quickActionsAircraft]);
+
+  const handleQuickShare = useCallback(() => {
+    if (quickActionsAircraft) {
+      shareNative();
+    }
+  }, [quickActionsAircraft, shareNative]);
+
+  const handleQuickCopy = useCallback(() => {
+    if (quickActionsAircraft) {
+      const info = [
+        `Callsign: ${formatCallsign(quickActionsAircraft.flight)}`,
+        `Registration: ${formatRegistration(quickActionsAircraft.r)}`,
+        `Type: ${formatAircraftType(quickActionsAircraft.t)}`,
+        `ICAO: ${formatHex(quickActionsAircraft.hex)}`,
+        `Altitude: ${formatAltitude(quickActionsAircraft.alt_baro)}`,
+        `Speed: ${formatSpeed(quickActionsAircraft.gs)}`,
+        `Heading: ${formatHeading(quickActionsAircraft.track)}`,
+      ].join('\n');
+      navigator.clipboard.writeText(info);
+    }
+  }, [quickActionsAircraft]);
+
+  const handleQuickSpot = useCallback(() => {
+    if (quickActionsAircraft) {
+      logSpot(quickActionsAircraft);
+    }
+  }, [quickActionsAircraft, logSpot]);
+
+  const closeQuickActions = useCallback(() => {
+    setQuickActionsAircraft(null);
+    setQuickActionsPosition(null);
+  }, []);
 
   // Compute viewport bounds for trail filtering
   const viewportBounds = useMemo(
@@ -524,6 +672,102 @@ export const FlightMap = memo(function FlightMap() {
           pickable: false,
         })
       );
+    }
+
+    // Flight route path layer (origin → destination great circle)
+    // Shows planned route for selected aircraft
+    if (selectedRoute?.flightPath && selectedRoute.flightPath.length >= 2) {
+      const routePath = selectedRoute.flightPath;
+      
+      // Calculate how far along the route the aircraft is for split coloring
+      const progress = selectedRoute.progressPercent || 0;
+      const splitIndex = Math.floor((progress / 100) * routePath.length);
+      
+      // Completed portion of route (solid, brighter)
+      if (splitIndex > 0) {
+        const completedPath = routePath.slice(0, splitIndex + 1);
+        result.push(
+          new PathLayer({
+            id: 'route-completed',
+            data: [{ path: completedPath }],
+            getPath: (d) => d.path,
+            getWidth: 3,
+            getColor: [59, 130, 246, 180], // Blue, fairly opaque
+            widthUnits: 'pixels',
+            widthMinPixels: 2,
+            widthMaxPixels: 4,
+            jointRounded: true,
+            capRounded: true,
+            pickable: false,
+          })
+        );
+      }
+      
+      // Remaining portion of route (dashed, muted)
+      if (splitIndex < routePath.length - 1) {
+        const remainingPath = routePath.slice(Math.max(0, splitIndex));
+        result.push(
+          new PathLayer({
+            id: 'route-remaining',
+            data: [{ path: remainingPath }],
+            getPath: (d) => d.path,
+            getWidth: 2,
+            getColor: [156, 163, 175, 100], // Gray, semi-transparent
+            widthUnits: 'pixels',
+            widthMinPixels: 1,
+            widthMaxPixels: 3,
+            jointRounded: true,
+            capRounded: true,
+            getDashArray: [8, 4],
+            dashJustified: true,
+            pickable: false,
+          })
+        );
+      }
+      
+      // Origin airport marker (if we have coordinates)
+      if (selectedRoute.origin?.lat && selectedRoute.origin?.lon && ScatterplotLayer) {
+        result.push(
+          new ScatterplotLayer({
+            id: 'route-origin-marker',
+            data: [{
+              position: [selectedRoute.origin.lon, selectedRoute.origin.lat],
+              name: selectedRoute.origin.iata || selectedRoute.origin.icao,
+            }],
+            getPosition: (d) => d.position,
+            getRadius: 8,
+            getFillColor: [34, 197, 94, 200], // Green
+            getLineColor: [255, 255, 255, 255],
+            lineWidthMinPixels: 2,
+            stroked: true,
+            filled: true,
+            radiusUnits: 'pixels',
+            pickable: false,
+          })
+        );
+      }
+      
+      // Destination airport marker (if we have coordinates)
+      if (selectedRoute.destination?.lat && selectedRoute.destination?.lon && ScatterplotLayer) {
+        result.push(
+          new ScatterplotLayer({
+            id: 'route-destination-marker',
+            data: [{
+              position: [selectedRoute.destination.lon, selectedRoute.destination.lat],
+              name: selectedRoute.destination.iata || selectedRoute.destination.icao,
+            }],
+            getPosition: (d) => d.position,
+            getRadius: 8,
+            getFillColor: [239, 68, 68, 200], // Red
+            getLineColor: [255, 255, 255, 255],
+            lineWidthMinPixels: 2,
+            stroked: true,
+            filled: true,
+            radiusUnits: 'pixels',
+            pickable: false,
+          })
+        );
+      }
     }
 
     // Enhanced 3D shadow layer with altitude-responsive sizing and opacity
@@ -693,6 +937,7 @@ export const FlightMap = memo(function FlightMap() {
     depthPixelOffset,
     depthDarkenFactor,
     pitchBracket,
+    selectedRoute,
   ]);
 
   if (!isReady || !DeckGL || !MapGL) {
@@ -722,6 +967,20 @@ export const FlightMap = memo(function FlightMap() {
         <MapGL mapStyle={MAP_STYLE} attributionControl={false} reuseMaps />
       </DeckGL>
       <MapControls />
+      
+      {/* Quick Actions Menu - shown on long-press */}
+      {quickActionsAircraft && quickActionsPosition && (
+        <QuickActionsMenu
+          aircraft={quickActionsAircraft}
+          position={quickActionsPosition}
+          onClose={closeQuickActions}
+          onFollow={handleQuickFollow}
+          onCenterMap={handleQuickCenterMap}
+          onShare={handleQuickShare}
+          onCopy={handleQuickCopy}
+          onSpot={handleQuickSpot}
+        />
+      )}
     </div>
   );
 });

@@ -18,6 +18,7 @@ import { useAircraftStore } from '@/stores/aircraft-store';
 import { useMapStore } from '@/stores/map-store';
 import { useUIStore } from '@/stores/ui-store';
 import { useAircraftPhoto } from '@/hooks/use-aircraft';
+import { useRoute } from '@/hooks/use-route';
 import { useIsMobile } from '@/hooks/use-media-query';
 import { useShare } from '@/hooks/use-share';
 import { useHaptics } from '@/hooks/use-haptics';
@@ -41,6 +42,8 @@ import { AircraftInfo } from './detail/AircraftInfo';
 import { FlightData } from './detail/FlightData';
 import { DataSourceInfo } from './detail/DataSourceInfo';
 import { ActionButtons } from './detail/ActionButtons';
+import { RouteInfo } from './detail/RouteInfo';
+import { AirlineInfo } from './detail/AirlineInfo';
 
 /**
  * Detail panel content - shared between mobile and desktop views
@@ -52,6 +55,8 @@ const DetailPanelContent = memo(function DetailPanelContent({
   country,
   coords,
   dataSource,
+  route,
+  routeLoading,
   isFollowing,
   onFollow,
   onCopy,
@@ -70,6 +75,25 @@ const DetailPanelContent = memo(function DetailPanelContent({
         <AircraftInfo 
           aircraft={aircraft} 
           country={country} 
+        />
+
+        <Separator />
+
+        {/* Airline Information - only show if we have airline data */}
+        {route?.airline && (
+          <>
+            <AirlineInfo 
+              airline={route.airline}
+              flightNumber={route.flightNumber}
+            />
+            <Separator />
+          </>
+        )}
+
+        {/* Route Information */}
+        <RouteInfo 
+          route={route}
+          isLoading={routeLoading}
         />
 
         <Separator />
@@ -127,6 +151,7 @@ export const DetailPanel = memo(function DetailPanel() {
 
   const aircraft = getSelectedAircraft();
   const { data: photo, isLoading: photoLoading } = useAircraftPhoto(aircraft?.hex);
+  const { route, isLoading: routeLoading } = useRoute(aircraft);
 
   const type = aircraft ? classifyAircraft(aircraft) : null;
   const emergency = aircraft ? isEmergency(aircraft) : false;
@@ -219,6 +244,8 @@ export const DetailPanel = memo(function DetailPanel() {
               country={country}
               coords={coords}
               dataSource={dataSource}
+              route={route}
+              routeLoading={routeLoading}
               isFollowing={isFollowing}
               onFollow={handleFollow}
               onCopy={handleCopy}
@@ -273,6 +300,8 @@ export const DetailPanel = memo(function DetailPanel() {
                 country={country}
                 coords={coords}
                 dataSource={dataSource}
+                route={route}
+                routeLoading={routeLoading}
                 isFollowing={isFollowing}
                 onFollow={handleFollow}
                 onCopy={handleCopy}
