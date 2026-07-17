@@ -12,11 +12,17 @@ import { useAircraftStore } from '@/stores/aircraft-store';
  * @returns {boolean} Whether to retry the query
  */
 function shouldRetry(failureCount, error) {
-  // Don't retry on 4xx errors (client errors)
-  if (error?.response?.status >= 400 && error?.response?.status < 500) {
+  const status = error?.status ?? error?.response?.status;
+  // Never hammer a rate-limited or client-error upstream
+  if (status === 429 || (status >= 400 && status < 500)) {
     return false;
   }
-  // Retry up to 3 times for server/network errors
+  // Proxy outages / cooldown windows — soft-fail path usually avoids this,
+  // but if a throw slips through, don't multiply load with retries.
+  if (status === 502 || status === 503 || status === 504) {
+    return false;
+  }
+  // Retry up to 3 times for other server/network errors
   return failureCount < 3;
 }
 
@@ -25,7 +31,9 @@ function shouldRetry(failureCount, error) {
  * @param {number} attemptIndex - The current retry attempt (0-indexed)
  * @returns {number} Delay in milliseconds
  */
-function getRetryDelay(attemptIndex) {
+function getRetryDelay(attemptIndex, error) {
+  // Respect Retry-After-style long pause when rate limited (if we ever retry)
+  if (error?.status === 429) return 30_000;
   // Exponential backoff: 1s, 2s, 4s (with jitter)
   const baseDelay = 1000;
   const maxDelay = 10000;

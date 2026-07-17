@@ -1,0 +1,108 @@
+{
+  "before": 112,
+  "after": 59,
+  "windowSec": 60,
+  "top": [
+    [
+      "cloneUniforms @ /_next/static/chunks/node_modules_three_build_three_core_996ef05a.js:27297",
+      1578300
+    ],
+    [
+      "Object3D @ /_next/static/chunks/node_modules_three_build_three_core_996ef05a.js:9554",
+      624476
+    ],
+    [
+      "exports.jsxDEV @ /_next/static/chunks/node_modules_89fc5e2c._.js:206",
+      552984
+    ],
+    [
+      "WaypointCanvas.useEffect.draw @ /_next/static/chunks/_3bef0861._.js:5955",
+      371244
+    ],
+    [
+      "exports.jsx @ /_next/static/chunks/node_modules_next_dist_compiled_a0e4c7b4._.js:1981",
+      99432
+    ],
+    [
+      "ReactElement @ /_next/static/chunks/node_modules_89fc5e2c._.js:117",
+      98544
+    ],
+    [
+      "BufferAttribute @ /_next/static/chunks/node_modules_three_build_three_core_996ef05a.js:13088",
+      98440
+    ],
+    [
+      "Material @ /_next/static/chunks/node_modules_three_build_three_core_996ef05a.js:15502",
+      82560
+    ],
+    [
+      "toLowerCase @ ?:0",
+      82080
+    ],
+    [
+      "Float32Array @ ?:0",
+      82072
+    ],
+    [
+      "(anon) @ /_next/static/chunks/node_modules_next_dist_compiled_next-devtools_index_1dd7fb59.js:1644",
+      69824
+    ],
+    [
+      "exports.createElement @ /_next/static/chunks/node_modules_next_dist_compiled_a0e4c7b4._.js:1599",
+      66976
+    ],
+    [
+      "update @ /_next/static/chunks/node_modules_three_build_three_module_0c59ee63.js:160",
+      65888
+    ],
+    [
+      "T @ /_next/static/chunks/node_modules_three-tile_dist_e723572d._.js:171",
+      65592
+    ],
+    [
+      "intersectsSphere @ /_next/static/chunks/node_modules_three_build_three_core_996ef05a.js:19016",
+      57644
+    ],
+    [
+      "set @ ?:0",
+      53388
+    ],
+    [
+      "Texture @ /_next/static/chunks/node_modules_three_build_three_core_996ef05a.js:6298",
+      49332
+    ],
+    [
+      "WebGLLights @ /_next/static/chunks/node_modules_three_build_three_module_0c59ee63.js:5833",
+      49248
+    ],
+    [
+      "createBindingState @ /_next/static/chunks/node_modules_three_build_three_module_0c59ee63.js:1469",
+      49248
+    ],
+    [
+      "push @ ?:0",
+      49248
+    ],
+    [
+      "handleMessage @ /_next/static/chunks/node_modules_next_dist_client_17643121._.js:10884",
+      41576
+    ],
+    [
+      "exec @ ?:0",
+      39324
+    ],
+    [
+      "replace @ ?:0",
+      34688
+    ],
+    [
+      "getComponentNameFromType @ /_next/static/chunks/node_modules_89fc5e2c._.js:16",
+      33856
+    ],
+    [
+      "getDFGLUT @ /_next/static/chunks/node_modules_three_build_three_module_0c59ee63.js:10779",
+      33824
+    ]
+  ],
+  "errs": []
+}

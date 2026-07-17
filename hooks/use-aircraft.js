@@ -29,25 +29,33 @@ export function useAircraftByLocation(lat, lon, dist = 250, options = {}) {
     return getPollingInterval(zoom, aircraftCount, !!followedAircraftId);
   }, [zoom, aircraftCount, followedAircraftId]);
 
-  // Round coordinates to 2 decimal places (~1km precision at equator)
-  // This prevents excessive API calls during smooth panning
-  // Query will reuse cached data until user moves > ~1km
-  const roundedLat = useMemo(() => Math.round(lat * 100) / 100, [lat]);
-  const roundedLon = useMemo(() => Math.round(lon * 100) / 100, [lon]);
+  // Round to 0.05° (~5km) — matches proxy/client cache grid
+  const roundedLat = useMemo(() => Math.round(lat * 20) / 20, [lat]);
+  const roundedLon = useMemo(() => Math.round(lon * 20) / 20, [lon]);
 
   const query = useQuery({
     // Use rounded coordinates in query key to reduce refetches
     queryKey: ['aircraft', 'location', roundedLat, roundedLon, dist],
     queryFn: async () => {
       const start = performance.now();
-      // Fetch using actual coordinates for accuracy
-      const result = await fetchAircraftByLocation(lat, lon, dist);
+      // Same rounding as the query key — avoids unique URLs on every pan tick
+      const result = await fetchAircraftByLocation(roundedLat, roundedLon, dist);
       const end = performance.now();
       setMetric('pollLatencyMs', end - start);
       setMetric('lastPollMs', Date.now());
       return result;
     },
-    refetchInterval,
+    refetchInterval: (q) => {
+      // Back off when rate-limited or proxy reports soft upstream failure
+      if (q.state.error?.status === 429) return Math.max(refetchInterval, 30_000);
+      if (q.state.data?.error === 'rate_limited') return Math.max(refetchInterval, 15_000);
+      if (q.state.data?.error === 'unavailable' || q.state.data?.error === 'all upstream sources unavailable') {
+        return Math.max(refetchInterval, 8_000);
+      }
+      return refetchInterval;
+    },
+    // Keep last successful aircraft on screen when a poll fails (429/5xx)
+    placeholderData: (previousData) => previousData,
     staleTime: 2000,
     gcTime: 30000,
     enabled: lat !== undefined && lon !== undefined,

@@ -297,7 +297,7 @@ export const FlightMap = memo(function FlightMap() {
   const { data } = useAircraftByLocation(viewState.latitude, viewState.longitude, fetchDist);
 
   useEffect(() => {
-    if (!data?.ac) return;
+    if (!data?.ac || data.error) return;
 
     if (workerReady) {
       processAircraft(data.ac).then((processed) => setAircraft(processed));

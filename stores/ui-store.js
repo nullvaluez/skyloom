@@ -26,6 +26,9 @@ export const useUIStore = create((set, get) => ({
   // AR mode
   arModeOpen: false,
 
+  // Fly mode (immersive 3D flight)
+  flyModeOpen: false,
+
   // Actions
   toggleSidebar: () => {
     set((state) => ({ sidebarOpen: !state.sidebarOpen }));
@@ -101,5 +104,17 @@ export const useUIStore = create((set, get) => ({
 
   closeARMode: () => {
     set({ arModeOpen: false });
+  },
+
+  toggleFlyMode: () => {
+    set((state) => ({ flyModeOpen: !state.flyModeOpen }));
+  },
+
+  openFlyMode: () => {
+    set({ flyModeOpen: true });
+  },
+
+  closeFlyMode: () => {
+    set({ flyModeOpen: false });
   },
 }));

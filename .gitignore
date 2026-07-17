@@ -3,3 +3,7 @@
 
 # next.js
 .next
+
+# env files (Mapbox token etc.) — never commit secrets
+.env*.local
+.env

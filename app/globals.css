@@ -754,3 +754,21 @@
   pointer-events: none;
   line-height: 1;
 }
+
+/* Toy World game-UI faces (OFL, self-hosted — see CREDITS.md) */
+@font-face {
+  font-family: 'Chango';
+  src: url('/fonts/Chango-Regular.ttf') format('truetype');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Patrick Hand';
+  src: url('/fonts/PatrickHand-Regular.ttf') format('truetype');
+  font-display: swap;
+}
+/* INK CODEX inspect card display face (also the 3D POI letters' file) */
+@font-face {
+  font-family: 'Archivo Black';
+  src: url('/fonts/ArchivoBlack-Regular.ttf') format('truetype');
+  font-display: swap;
+}

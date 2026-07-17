@@ -18,7 +18,7 @@ export const Header = memo(function Header() {
   const [mounted, setMounted] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const mobileSearchRef = useRef(null);
-  const { toggleSidebar, toggleMobileFilters, toggleSettings, sidebarOpen } = useUIStore();
+  const { toggleSidebar, toggleMobileFilters, toggleSettings, sidebarOpen, openFlyMode } = useUIStore();
   const { filters, setSearch, clearSearch, getActiveFilterCount } = useFilterStore();
   const isMobile = useIsMobile();
 
@@ -177,6 +177,22 @@ export const Header = memo(function Header() {
             </Button>
           </TooltipTrigger>
           <TooltipContent>Filters</TooltipContent>
+        </Tooltip>
+
+        {/* Fly Mode (desktop-first) */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={openFlyMode}
+              className="hidden md:inline-flex"
+              aria-label="Fly Mode"
+            >
+              <Plane className="h-5 w-5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Fly Mode</TooltipContent>
         </Tooltip>
 
         {/* Settings */}

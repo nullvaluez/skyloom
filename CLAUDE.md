@@ -1,5 +1,38 @@
 # SkyTracker ADSB Application - Comprehensive Analysis & Action Plan
 
+> **⚠️ ACTIVE WORK — READ FIRST:** **Round 5 "Atlas" is EXECUTED
+> (2026-07-17): [FLY_ATLAS_REWORK.md](FLY_ATLAS_REWORK.md) §8 is the
+> record.** The Atlas fast-travel screen (M / minimap click / pause menu:
+> canvas world map with Natural Earth coastlines, search-to-warp,
+> destination cards, recents/favorites/visits in the persisted
+> `fly-atlas-store`), `runtime.warpToGeo` (military/hotspot warps spawn
+> 4km out, nose on the field), a much bigger offline POI DB
+> (`lib/fly/poi/` — ~300 cities +tz, ~120 landmarks, 63 military bases,
+> 30 spotting hotspots; military/hotspot letters + tooltip badges +
+> minimap triangles), the world-alive pass (worker-baked road-traffic
+> pulses on `aArc` + rooftop beacon blink on `aBeacon` — both ZERO extra
+> draws, cache keys `world-bend-fade-pulse`/`-beacon`; Day-only instanced
+> cloud shadows +1 draw), and SPICY traffic pings (military/epic+ first
+> sightings → toast + minimap ring). The §4.4c scout is UNBUILT
+> (flag-off; needs explicit user opt-in). Open: live-tuning review of the
+> new defaults (ROAD_PULSE/BEACONS/CLOUDS.shadow/SPICY + atlas colors).
+> Earlier rounds: the **"Globe" rework (2026-07-16)** made every style a
+> curved mini-globe with neon tracers + clean 3D Archivo-Black letters,
+> and round 4 added the void-grid floor, terrain-clearing clouds, ribbon
+> contrails (clock-skew mass-delete fixed in traffic-engine ingest), the
+> INK CODEX inspect card, spot toasts and shoreline foam — see
+> **[FLY_GLOBE_REWORK.md](FLY_GLOBE_REWORK.md) §6 + §6.3**.
+> [FLY_TOYWORLD_REWORK.md](FLY_TOYWORLD_REWORK.md) §6.5's gotchas still
+> apply (vector pipeline/curvature/tracers carry forward). The base Fly
+> Mode is COMPLETE (all phases 0–6 + GLB fleet + game-feel pass,
+> browser-verified — see
+> **[FLY_MODE_HANDOFF.md](FLY_MODE_HANDOFF.md)** §8/§8.5.1 for the record,
+> hard constraints (NO API keys; no r3f-perf; asset licensing), and the
+> verification harnesses). Before touching anything under `components/fly/`,
+> `lib/fly/`, or `stores/fly-store.js`, read those docs. The analysis below
+> this notice predates Fly Mode and parts of it are stale (e.g. it
+> references Leaflet, which was already replaced by deck.gl/MapLibre).
+
 ## Executive Summary
 
 After thorough analysis of the SkyTracker codebase, I've identified several issues, performance bottlenecks, and opportunities for enhancement. This document provides a detailed breakdown and a prioritized action plan to transform the application into a modern, high-performance flight tracker.

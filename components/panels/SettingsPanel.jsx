@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Camera, Smartphone } from 'lucide-react';
+import { Camera, Smartphone, Plane, Monitor } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -16,12 +16,17 @@ import {
 } from '@/components/ui/sheet';
 
 export const SettingsPanel = memo(function SettingsPanel() {
-  const { settingsOpen, closeSettings, openARMode } = useUIStore();
+  const { settingsOpen, closeSettings, openARMode, openFlyMode } = useUIStore();
   const { showHUD, toggleHUD } = useDevStore();
 
   const handleARMode = () => {
     closeSettings();
     openARMode();
+  };
+
+  const handleFlyMode = () => {
+    closeSettings();
+    openFlyMode();
   };
 
   return (
@@ -45,6 +50,17 @@ export const SettingsPanel = memo(function SettingsPanel() {
               <Smartphone className="h-3 w-3 ml-auto text-zinc-500" />
             </Button>
             <p className="text-xs text-zinc-500">Point your phone at the sky to see aircraft labels overlaid on camera</p>
+
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-2 bg-zinc-900 border-zinc-700 text-zinc-100 hover:bg-zinc-800"
+              onClick={handleFlyMode}
+            >
+              <Plane className="h-4 w-4" />
+              <span>Fly Mode</span>
+              <Monitor className="h-3 w-3 ml-auto text-zinc-500" />
+            </Button>
+            <p className="text-xs text-zinc-500">Pilot your own aircraft over live 3D traffic (desktop recommended)</p>
           </div>
 
           <Separator className="bg-zinc-800" />

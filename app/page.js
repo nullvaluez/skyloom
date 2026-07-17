@@ -34,11 +34,27 @@ const ARSpotter = dynamic(
   { ssr: false }
 );
 
+// Dynamically import Fly Mode (three.js bundle loads only when entered)
+const FlyMode = dynamic(
+  () => import('@/components/fly/FlyMode').then((mod) => mod.FlyMode),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+          <p className="text-sm text-zinc-500">Preparing flight...</p>
+        </div>
+      </div>
+    ),
+  }
+);
+
 export default function Home() {
   // Initialize keyboard shortcuts
   useKeyboardShortcuts();
   
-  const { arModeOpen, closeARMode } = useUIStore();
+  const { arModeOpen, closeARMode, flyModeOpen, closeFlyMode } = useUIStore();
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-zinc-950">
@@ -52,9 +68,13 @@ export default function Home() {
 
         {/* Map Area */}
         <main className="relative flex-1 overflow-hidden">
-          <MapErrorBoundary>
-            <FlightMap />
-          </MapErrorBoundary>
+          {/* Unmounted while flying: frees the MapLibre GL context, its tile
+              cache, and the 2D polling loop for the Fly-mode canvas. */}
+          {!flyModeOpen && (
+            <MapErrorBoundary>
+              <FlightMap />
+            </MapErrorBoundary>
+          )}
 
           {/* Detail Panel */}
           <DetailPanel />
@@ -70,11 +90,14 @@ export default function Home() {
       {/* Settings Panel */}
       <SettingsPanel />
 
-      {/* Performance HUD */}
-      <PerformanceHUD />
+      {/* Performance HUD (hidden while flying — it z-stacks above the overlay) */}
+      {!flyModeOpen && <PerformanceHUD />}
 
       {/* AR Spotter Mode */}
       {arModeOpen && <ARSpotter onClose={closeARMode} />}
+
+      {/* Fly Mode (immersive 3D flight) */}
+      {flyModeOpen && <FlyMode onClose={closeFlyMode} />}
     </div>
   );
 }

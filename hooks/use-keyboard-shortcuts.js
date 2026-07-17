@@ -29,6 +29,13 @@ export function useKeyboardShortcuts() {
   const { selectAircraft, unfollowAircraft } = useAircraftStore();
 
   const handleKeyDown = useCallback((e) => {
+    // Fly mode owns the keyboard (WASD, F, Escape, 1/2/3) — these global
+    // shortcuts would hijack flight controls. (arModeOpen would benefit from
+    // the same guard; left unchanged to avoid altering AR behavior here.)
+    if (useUIStore.getState().flyModeOpen) {
+      return;
+    }
+
     // Ignore if user is typing in an input field
     if (
       e.target.tagName === 'INPUT' ||
