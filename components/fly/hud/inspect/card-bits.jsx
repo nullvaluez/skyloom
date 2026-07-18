@@ -114,20 +114,85 @@ export function StatBar({ label, pct, delay = 0, children }) {
 }
 
 /**
+ * Round 7: bearing + relative-altitude chip — where the target sits
+ * relative to the player (the card floats over the live world now, so
+ * spatial context is the point).
+ */
+const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+export function BearingChip({ bearingDeg, relAltFt }) {
+  if (bearingDeg == null) return null;
+  const dir = COMPASS[Math.round(((bearingDeg % 360) + 360) % 360 / 45) % 8];
+  const rel =
+    relAltFt == null
+      ? ''
+      : Math.abs(relAltFt) < 300
+        ? ' · co-alt'
+        : relAltFt > 0
+          ? ` · ▲ ${Math.round(Math.abs(relAltFt) / 100) / 10}k ft above`
+          : ` · ▼ ${Math.round(Math.abs(relAltFt) / 100) / 10}k ft below`;
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider"
+      style={{ background: CARD_THEME.panel, color: CARD_THEME.iceDim }}
+      data-testid="inspect-bearing"
+    >
+      <span
+        className="inline-block leading-none"
+        style={{ color: 'var(--hero)', transform: `rotate(${Math.round(bearingDeg)}deg)` }}
+      >
+        ➤
+      </span>
+      {dir} {Math.round(bearingDeg)}°{rel}
+    </span>
+  );
+}
+
+/**
+ * Round 7: tiny V/S trend sparkline — the last ~10 samples of the 500ms
+ * telemetry interval, plain SVG polyline (no deps, no extra state churn:
+ * the samples ride the existing live-state updates).
+ */
+export function Sparkline({ samples, width = 72, height = 20 }) {
+  if (!samples || samples.length < 2) return null;
+  const max = Math.max(500, ...samples.map((v) => Math.abs(v)));
+  const pts = samples
+    .map((v, i) => {
+      const x = (i / (samples.length - 1)) * (width - 2) + 1;
+      const y = height / 2 - (v / max) * (height / 2 - 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(' ');
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      data-testid="inspect-sparkline"
+      aria-hidden="true"
+    >
+      <line x1="0" y1={height / 2} x2={width} y2={height / 2} stroke={CARD_THEME.edgeSoft} strokeWidth="1" />
+      <polyline points={pts} fill="none" stroke="var(--hero)" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/**
  * Route progress row: origin ──✈── destination with a hero-colored fill at
  * route.progressPercent, distance/ETA line under. Ghosts when unknown.
  */
-export function RouteProgress({ route }) {
+export function RouteProgress({ route, loading = false }) {
   const o = route?.origin;
   const d = route?.destination;
   if (!o && !d) {
+    // Honest empty states: a lookup in flight is not the same as "this
+    // flight filed no route" (GA/military tails legitimately 404 upstream).
     return (
       <div
-        className="flex items-center justify-center rounded-xl px-3 py-2 text-[10px] uppercase tracking-[0.3em]"
+        className={`flex items-center justify-center rounded-xl px-3 py-2 text-[10px] uppercase tracking-[0.3em] ${loading ? 'animate-pulse' : ''}`}
         style={{ background: CARD_THEME.panel, color: CARD_THEME.iceFaint }}
         data-testid="inspect-route-unknown"
       >
-        route unknown
+        {loading ? 'route lookup…' : 'no filed route'}
       </div>
     );
   }

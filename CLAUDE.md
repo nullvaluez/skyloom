@@ -1,8 +1,52 @@
 # SkyTracker ADSB Application - Comprehensive Analysis & Action Plan
 
-> **⚠️ ACTIVE WORK — READ FIRST:** **Round 5 "Atlas" is EXECUTED
-> (2026-07-17): [FLY_ATLAS_REWORK.md](FLY_ATLAS_REWORK.md) §8 is the
-> record.** The Atlas fast-travel screen (M / minimap click / pause menu:
+> **⚠️ THE APP IS NOW FLY-ONLY (Round 9, 2026-07-17):** the flat 2D tracker,
+> AR spotter, and their components/hooks/stores are DELETED —
+> [FLY_ROUND9.md](FLY_ROUND9.md) is the record (tag `round9-pre-delete` =
+> full pre-deletion tree). `app/page.js` boots straight into FlyMode behind
+> a BootScreen overlay (`window.__flyBoot` progress contract). What remains:
+> `components/fly/**`, `lib/fly/**`, the fly/atlas/contracts/passport
+> stores, use-fly-traffic/use-fly-audio/use-route/use-aircraft-photo, all
+> `app/api/aircraft/*` routes, and the aircraft-processor worker. The
+> flat-tracker analysis in the body of this file is HISTORICAL — it
+> describes deleted code (markers, panels, Leaflet-era plans); do not act
+> on it.
+
+> **⚠️ ACTIVE WORK — READ FIRST:** **Round 7 "Electric Night City" is BUILT
+> (2026-07-17): [FLY_ROUND7.md](FLY_ROUND7.md) is the record.** The Neon
+> (toy) world now EMITS light (facade windows on `aFacade`, runway edge
+> lights on `aGlow`, town glow-domes via `world-bend-anchor` — cache-key
+> registry in world-bend.js grew 4 variants), RMB is a full 360° orbit
+> (offset-space damping; coalesced pointer events), satellite gained a
+> DEM hillshade + anisotropy + z17, the inspect card is a transparent
+> isometric holo-panel (wiring/testids unchanged), airports are gameplay
+> (lib/fly/airport-buzz.js → contracts + toasts), and the **Night style is
+> RETIRED** ('night'→'toy' migration; NIGHT constants kept as documented
+> dead values). Mid-round live fixes: traffic altitude LIFT
+> (`GLOBE.trafficBend.farLiftBoost` — high traffic reads UP, not
+> horizon-pinned; GPU + CPU `airDrop` mirror change together) and rooftop
+> brightness (near-black since round 4, exposed by the new camera).
+> FLY_ROUND7.md §4 = user sign-offs pending; §5 = which harnesses are
+> green vs the paused full sweep + soak; §6 = new lessons (don't run
+> harnesses while the user live-tests; stale tabs across dev-server
+> restarts). Earlier: **Round 6 "Connected Sky" EXECUTED
+> (2026-07-17): [FLY_ROUND6.md](FLY_ROUND6.md) is the record.** It fixed
+> the round-5 live-review bugs (silent warp/chase failures → loud;
+> contrails now backfill instantly, never render vertical/slab/spear —
+> new `world-bend-air-anchor` shader variant + behind-camera cull; sky/
+> ground rim unified via `GLOBE.rim` + a bend-following SkyDome dip; far
+> warps stream ~3× faster behind a held streak→hold→reveal cinematic;
+> POI letters are slot-stable with hysteresis; SPICY no longer pings CAP
+> Cessnas and picks the nearest contact) and added the arcade layer the
+> user asked for (C cinema wing-cam during chases, Contracts v1 scoring
+> panel + persisted `fly-contracts` store, Day-style local-time sun).
+> FLY_ROUND6.md §4 lists the user sign-off checkpoints (all defaults
+> live-tunable in `fly-constants.js`); §5 has new hard-won lessons
+> (ribbon width factors must cover camera geometry; per-vertex bend
+> shears rigid objects; no store writes inside React state updaters).
+> Harnesses: verify-inspect-actions/tracers/poi/rim/warp-arrival/
+> chase-cam/contracts/sun all new and green, plus full round-5 sweep.
+> Earlier: **Round 5 "Atlas" (2026-07-17): [FLY_ATLAS_REWORK.md](FLY_ATLAS_REWORK.md) §8.** The Atlas fast-travel screen (M / minimap click / pause menu:
 > canvas world map with Natural Earth coastlines, search-to-warp,
 > destination cards, recents/favorites/visits in the persisted
 > `fly-atlas-store`), `runtime.warpToGeo` (military/hotspot warps spawn

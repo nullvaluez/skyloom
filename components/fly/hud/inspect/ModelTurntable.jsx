@@ -29,7 +29,7 @@ import { CARD_THEME } from './inspect-tokens';
  * boundary), context failure.
  */
 
-const TARGET_LEN = 2.2; // card units — fills the fov-28 viewport at dist 4.6
+const TARGET_LEN = 2.4; // card units — fills the iso fov-24 viewport (round 7)
 const BASE_SPIN = 0.35; // rad/s auto-rotate
 
 /** Call on hover/lock so the card opens with the model already parsed. */
@@ -179,7 +179,8 @@ export function ModelTurntable({ archetype, meta, heroColor, onDraggingChange })
             dpr={[1, 1.5]}
             gl={{ antialias: true, alpha: true, powerPreference: 'low-power' }}
             frameloop="always"
-            camera={{ fov: 28, position: [2.5, 2.16, 3.2], near: 0.1, far: 50 }}
+            // Round 7: truer isometric angle for the big holo viewport
+            camera={{ fov: 24, position: [3.2, 2.6, 3.2], near: 0.1, far: 50 }}
             style={{ background: 'transparent' }}
           >
             <CameraRig />

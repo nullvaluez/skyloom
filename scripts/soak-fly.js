@@ -7,6 +7,7 @@
 const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
+const { bootFly } = require('./_boot');
 
 const MINUTES = parseFloat(process.argv[2] || '15');
 const IDLE = process.argv.includes('--idle'); // no inputs/warps: isolates tile churn
@@ -22,12 +23,7 @@ const NO_AUDIO = process.argv.includes('--no-audio'); // dispose FlyAudio: leak 
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
 
-  await page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded', timeout: 90000 });
-  await page.waitForSelector('header', { timeout: 90000 });
-  await page.evaluate(() => localStorage.setItem('fly-controls-seen', '1'));
-  await page.locator('button[aria-label="Fly Mode"]').click();
-  await page.waitForSelector('.fixed.inset-0 canvas', { timeout: 90000 });
-  await page.waitForTimeout(10000);
+  await bootFly(page); // R9-3: fly-only boot — waits on the real __flyBoot contract
   await page.mouse.move(800, 450);
 
   if (NO_AUDIO) {

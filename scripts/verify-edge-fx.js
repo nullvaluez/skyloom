@@ -12,9 +12,16 @@
  *     + a crude two-frame pixel diff (screen must be animating),
  *     (7) FL300 + spawn screenshots per style (round-4 lesson 11).
  * ALWAYS look at the screenshots — a blank canvas passes numeric gates.
+ * Round 8 note: the P4 depth haze (toy, 4–13km) ends BEFORE the 14km fade
+ * band starts, and every rim/floor gate here is a STATS probe (mount flags,
+ * cloudMinAgl, tracer counts, an animation diff) — none read distant-ground
+ * luminance, so no haze retune is needed; only the shader cache keys (fade
+ * family bumped '-r8', land/building re-keyed by their final layers) and
+ * the toy draw budget (470 + slack, shadows/monuments/fleet lights) moved.
  */
 const { chromium } = require('playwright');
 const path = require('path');
+const { bootFly } = require('./_boot');
 
 (async () => {
   const browser = await chromium.launch({
@@ -32,13 +39,8 @@ const path = require('path');
     if (!ok) fails.push(name);
   };
 
-  await page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded', timeout: 120000 });
-  await page.waitForSelector('header', { timeout: 120000 });
-  await page.evaluate(() => localStorage.setItem('fly-controls-seen', '1'));
-  await page.locator('button[aria-label="Fly Mode"]').click();
-  await page.waitForSelector('.fixed.inset-0 canvas', { timeout: 120000 });
-  console.log('fly up (neon); stream-in…');
-  await page.waitForTimeout(25000);
+  await bootFly(page); // R9-3: fly-only boot — waits on the real __flyBoot contract
+  await page.waitForTimeout(5000); // live traffic/tracers accumulate (not a boot wait)
   await page.mouse.move(800, 450);
 
   // --- 1. Toy: floor + clouds -----------------------------------------------
@@ -96,10 +98,17 @@ const path = require('path');
     }
     return out;
   });
+  // Round 8: the pulse/beacon layers are INTERMEDIATE wraps — the shared
+  // materials are re-keyed by the FINAL layers (runway glow on land, facade
+  // grid on building), and the P4 depth-haze change bumped the whole fade
+  // family to '-r8' (fix round: building '-r8b', crown emissive floor). The
+  // userData markers still prove the pulse/beacon programs are in the
+  // chain; the keys assert the final compiled variants.
   check(
     'pulse/beacon programs patched',
     pulse.landPatched && pulse.buildingPatched &&
-      pulse.landKey === 'world-bend-fade-pulse' && pulse.buildingKey === 'world-bend-fade-beacon',
+      pulse.landKey === 'world-bend-fade-pulse-rwy-r8' &&
+      pulse.buildingKey === 'world-bend-fade-beacon-grid-r8b',
     `${pulse.landKey} / ${pulse.buildingKey}`
   );
   check(
@@ -147,7 +156,10 @@ const path = require('path');
     `${((diff.hot / diff.total) * 100).toFixed(2)}% pixels changed`
   );
   const toyDraws = await page.evaluate(() => window.__flyStats?.drawCalls ?? 0);
-  check('toy draw budget', toyDraws <= 350, `draws=${toyDraws}`);
+  // Round 8: toy budget 470 (+10 composer slack; fix-round raise — measured
+  // 461 in verify-roofs) — shadow pass + monuments + fleet lights;
+  // satellite gates below stay at 350 (none of those mount).
+  check('toy draw budget', toyDraws <= 480, `draws=${toyDraws}`);
   // Constraint 11: the same world from cruise
   await page.evaluate(() => {
     window.__fly.flight.pos.y = 9100;
@@ -160,6 +172,22 @@ const path = require('path');
   await page.waitForTimeout(2000);
 
   // --- 2. Tracer stability: 45s of 500ms samples ----------------------------
+  // R9 boot lands here ~14s earlier than the old fixed-wait flow, INSIDE the
+  // per-aircraft trail-backfill ramp (measured 2026-07-18: tracers 25→385
+  // across the 45s window, slope +4/sample — an S-curve the linear detrend
+  // can't absorb). Warm up until the count is steady (<5% growth per 10s,
+  // cap 120s) so the gate measures wink-outs, not spawn-in.
+  {
+    const t0 = Date.now();
+    let prev = await page.evaluate(() => window.__flyStats?.tracers ?? 0);
+    while (Date.now() - t0 < 120000) {
+      await page.waitForTimeout(10000);
+      const cur = await page.evaluate(() => window.__flyStats?.tracers ?? 0);
+      if (prev > 20 && cur < prev * 1.05) break;
+      prev = cur;
+    }
+    console.log(`tracer warm-up done after ${((Date.now() - t0) / 1000).toFixed(0)}s (count ${prev}→)`);
+  }
   console.log('sampling tracer stability for 45s…');
   const samples = [];
   for (let i = 0; i < 90; i++) {
@@ -209,24 +237,22 @@ const path = require('path');
     `maxDrop=${(maxDropPct * 100).toFixed(1)}%`
   );
 
-  // --- 3. Night: floor + tracers --------------------------------------------
-  await page.evaluate(() => window.__flyStore.getState().setMapStyle('night'));
-  console.log('switched to night; settling…');
-  await page.waitForTimeout(15000);
+  // --- 3. Toy floor/tracer assertions (round 7: Night retired — toy is the
+  // remaining dark style and carries the void-floor gates) ------------------
   const night = await page.evaluate(() => ({
     voidFloor: window.__flyStats?.voidFloor ?? 0,
     tracers: window.__flyStats?.tracers ?? 0,
     draws: window.__flyStats?.drawCalls ?? 0,
   }));
-  check('night void floor mounted', night.voidFloor === 1, `voidFloor=${night.voidFloor}`);
-  check('night tracers alive', night.tracers > 0, `tracers=${night.tracers}`);
-  check('night draw budget', night.draws <= 350, `draws=${night.draws}`);
-  await shot('03-night-rim');
+  check('toy void floor mounted', night.voidFloor === 1, `voidFloor=${night.voidFloor}`);
+  check('toy tracers alive', night.tracers > 0, `tracers=${night.tracers}`);
+  check('toy draw budget', night.draws <= 480, `draws=${night.draws}`); // round-8 budget 470 + slack
+  await shot('03-toy-rim');
   await page.evaluate(() => {
     window.__fly.flight.pos.y = 9100;
   });
   await page.waitForTimeout(2500);
-  await shot('07-night-fl300');
+  await shot('07-toy-fl300');
   await page.evaluate(() => {
     window.__fly.flight.pos.y = 1600;
   });
@@ -291,7 +317,7 @@ const path = require('path');
     boostMinTracers > 0,
     `minTracers=${boostMinTracers} resets=${boost.resets}`
   );
-  check('toy draw budget (post-boost)', boost.draws <= 350, `draws=${boost.draws}`);
+  check('toy draw budget (post-boost)', boost.draws <= 480, `draws=${boost.draws}`); // round-8 budget 470 + slack
   await shot('05-boost-ribbons');
 
   console.log(

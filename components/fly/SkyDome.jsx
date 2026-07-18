@@ -4,6 +4,16 @@ import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { BackSide, Color, ShaderMaterial, SphereGeometry, Mesh } from 'three';
 
+// Live horizon dip (round 6): the ground curves away d²k but the dome's
+// horizon used to sit at flat eye level — at altitude a black band opened
+// between the terrain rim and the sky. FlyScene feeds the dip each frame
+// (same pattern as world-bend's setBend); the dome shifts its horizon line
+// down to meet the bent rim. Module scope: one dome per scene.
+const dipUniform = { value: 0 };
+export function setSkyDip(dipY) {
+  dipUniform.value = dipY;
+}
+
 /**
  * Per-style globe sky (FLY_GLOBE_REWORK): a camera-following gradient dome —
  * horizon glow at the rim, zenith above, and a dark VOID below the horizon
@@ -11,9 +21,23 @@ import { BackSide, Color, ShaderMaterial, SphereGeometry, Mesh } from 'three';
  * reference). rimOnly (satellite) renders transparent above the horizon so
  * the HDRI day sky shows through — the dome only supplies the atmosphere
  * band + void under the globe's rim.
+ *
+ * Round 6 "connected rim": below the (dipped) horizon the dome blends
+ * horizon → uRim (the SHARED per-style rim color that scene fog and the
+ * ground edge-fade also use) before falling to the deep void — so the
+ * terrain melts into exactly the color the sky presents where they meet.
  * Fog is disabled on it (it IS the backdrop); drawn first, no depth write.
  */
-export function SkyDome({ horizon, zenith, voidColor, rimOnly = false, stars = false }) {
+export function SkyDome({
+  horizon,
+  zenith,
+  voidColor,
+  rim,
+  rimOnly = false,
+  stars = false,
+  midColor = null,
+  midFrac = 0.3,
+}) {
   const mesh = useMemo(() => {
     const mat = new ShaderMaterial({
       side: BackSide,
@@ -24,8 +48,15 @@ export function SkyDome({ horizon, zenith, voidColor, rimOnly = false, stars = f
         uHorizon: { value: new Color(horizon) },
         uZenith: { value: new Color(zenith) },
         uVoid: { value: new Color(voidColor) },
+        uRim: { value: new Color(rim ?? voidColor) },
         uRimOnly: { value: rimOnly ? 1 : 0 },
         uStars: { value: stars ? 1 : 0 },
+        uDipY: dipUniform,
+        // Round 8 (P4): optional three-stop upper gradient (toy passes
+        // PALETTE.skyMid). Absent → uHasMid 0 → the original two-stop blend.
+        uMid: { value: new Color(midColor ?? horizon) },
+        uMidFrac: { value: midFrac },
+        uHasMid: { value: midColor ? 1 : 0 },
       },
       vertexShader: /* glsl */ `
         varying vec3 vDir;
@@ -39,14 +70,31 @@ export function SkyDome({ horizon, zenith, voidColor, rimOnly = false, stars = f
         uniform vec3 uHorizon;
         uniform vec3 uZenith;
         uniform vec3 uVoid;
+        uniform vec3 uRim;
         uniform float uRimOnly;
         uniform float uStars;
+        uniform float uDipY;
+        uniform vec3 uMid;
+        uniform float uMidFrac;
+        uniform float uHasMid;
         varying vec3 vDir;
         void main() {
-          float y = vDir.y;
-          vec3 up = mix(uHorizon, uZenith, pow(clamp(y, 0.0, 1.0), 0.55));
-          // below the horizon: quick falloff into the void
-          vec3 down = mix(uHorizon, uVoid, clamp(-y * 5.0, 0.0, 1.0));
+          // Dipped horizon: y = 0 where the bent terrain rim sits, not at
+          // flat eye level — the gradient hugs the world's actual edge.
+          float y = vDir.y + uDipY;
+          // Upper hemisphere: the original two-stop horizon→zenith, or (toy)
+          // a three-stop horizon→mid→zenith with the knee at uMidFrac for a
+          // richer night band.
+          float yy = pow(clamp(y, 0.0, 1.0), 0.55);
+          vec3 up = uHasMid > 0.5
+            ? ( yy < uMidFrac
+                  ? mix(uHorizon, uMid, yy / max(1e-4, uMidFrac))
+                  : mix(uMid, uZenith, (yy - uMidFrac) / max(1e-4, 1.0 - uMidFrac)) )
+            : mix(uHorizon, uZenith, yy);
+          // below the horizon: settle on the shared rim tone first (where
+          // terrain fades out), then fall into the deep void underneath
+          vec3 down = mix(uHorizon, uRim, clamp(-y * 2.5, 0.0, 1.0));
+          down = mix(down, uVoid, smoothstep(0.22, 0.65, -y));
           vec3 col = y >= 0.0 ? up : down;
           // Restrained star field (dark styles): a few hundred pinprick
           // stars, dim enough to stay under the bloom threshold — presence
@@ -66,8 +114,8 @@ export function SkyDome({ horizon, zenith, voidColor, rimOnly = false, stars = f
             star *= step(0.96, h.x); // ~4% of cells hold a star
             col += star * (0.15 + 0.28 * h.y) * smoothstep(0.04, 0.25, y) * uStars;
           }
-          // rimOnly: fade out just above the horizon so the HDRI sky owns
-          // the upper hemisphere while the void still swallows the rim
+          // rimOnly: fade out just above the (dipped) horizon so the HDRI
+          // sky owns the upper hemisphere while the void swallows the rim
           float alpha = uRimOnly > 0.5 ? smoothstep(0.015, -0.005, y) : 1.0;
           gl_FragColor = vec4(col, alpha);
           #include <colorspace_fragment>
@@ -87,9 +135,13 @@ export function SkyDome({ horizon, zenith, voidColor, rimOnly = false, stars = f
     u.uHorizon.value.set(horizon);
     u.uZenith.value.set(zenith);
     u.uVoid.value.set(voidColor);
+    u.uRim.value.set(rim ?? voidColor);
     u.uRimOnly.value = rimOnly ? 1 : 0;
     u.uStars.value = stars ? 1 : 0;
-  }, [mesh, horizon, zenith, voidColor, rimOnly, stars]);
+    u.uMid.value.set(midColor ?? horizon);
+    u.uMidFrac.value = midFrac;
+    u.uHasMid.value = midColor ? 1 : 0;
+  }, [mesh, horizon, zenith, voidColor, rim, rimOnly, stars, midColor, midFrac]);
 
   useEffect(() => {
     return () => {

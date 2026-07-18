@@ -25,6 +25,7 @@ const FADE_BAND_M = 800; // opacity ramps in across this band above minAltM
 const _tan = new Vector3();
 const _view = new Vector3();
 const _side = new Vector3();
+const _camFwd = new Vector3();
 
 /**
  * High-altitude contrail: a camera-facing ribbon rebuilt each frame from a
@@ -55,6 +56,9 @@ export function Contrail({ flight, origin }) {
         opacity: 0,
         depthWrite: false,
         side: DoubleSide,
+        // Round 8.5 (H3): the trail owns its alpha ladder — toy's ~2.7×
+        // denser fog was washing it toward the haze tone at distance.
+        fog: false,
       })
     );
     mesh.frustumCulled = false;
@@ -120,6 +124,7 @@ export function Contrail({ flight, origin }) {
     const ax = origin.anchor.x;
     const az = origin.anchor.z;
     const halfW = (CONTRAIL.width * 0.1) / 2; // matches the old meshline scale
+    camera.getWorldDirection(_camFwd);
     for (let i = 0; i < n; i++) {
       const p = pts[i];
       const prev = pts[Math.max(0, i - 1)];
@@ -136,8 +141,22 @@ export function Contrail({ flight, origin }) {
       );
       _side.crossVectors(_view, _tan);
       const len = _side.length() || 1;
+      // Edge-on collapse (round 6): viewed straight down its own axis
+      // (chase cam dead astern) the stacked camera-facing quads read as a
+      // solid white spear — |view × tan| / (|view||tan|) is the sine of
+      // the view↔trail angle; fade the width out below ~15°.
+      // Dead-astern the trail sits only ~8m under the 100m-back chase cam
+      // (sinT ≈ 0.24) — the window starts above that so the end-on sliver
+      // fully collapses instead of surviving at partial width.
+      const sinT = len / ((vlen * _tan.length()) || 1);
+      const edgeK = Math.min(1, Math.max(0, (sinT - 0.15) / 0.3));
+      // Behind-camera cull (round 6 — the FL300 "white spear"): the chase
+      // cam sits INSIDE this trail, so ~3km of points project with
+      // negative w — mirrored across the screen as a vertical smear.
+      // Zero-width them; the straddling segment pinches closed cleanly.
+      const behindK = _view.dot(_camFwd) < 0 ? 0 : 1;
       const t = i / (n - 1); // 0 tail → 1 head
-      const w = (halfW * t * t * nearK) / len;
+      const w = (halfW * t * t * nearK * edgeK * behindK) / len;
       const o = i * 6;
       pos.array[o] = p.x - ax + _side.x * w;
       pos.array[o + 1] = p.y + _side.y * w;

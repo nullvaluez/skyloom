@@ -28,8 +28,8 @@ const rowLabel = { color: CARD_THEME.iceDim, letterSpacing: '0.14em' };
 
 /**
  * The Atlas destination panel: kind badge, curated blurb, tags, distance,
- * coarse local time (+ "try Night style" nudge), visit count, and the WARP
- * button. Pure DOM — INK CODEX tokens throughout.
+ * coarse local time (with an "it's night there" hint), visit count, and the
+ * WARP button. Pure DOM — INK CODEX tokens throughout.
  */
 export function DestinationCard({ entry, runtime, onWarp }) {
   const visits = useFlyAtlasStore((s) => (entry ? (s.visits[entry.key] ?? 0) : 0));
@@ -134,7 +134,7 @@ export function DestinationCard({ entry, runtime, onWarp }) {
           <span style={rowLabel}>LOCAL TIME</span>
           <span style={{ color: night ? '#a5b4fc' : CARD_THEME.ice }}>
             {t.text}
-            {night ? ' · dark — try Night style' : ''}
+            {night ? ' · after dark there' : ''}
           </span>
         </div>
         {visits > 0 && (

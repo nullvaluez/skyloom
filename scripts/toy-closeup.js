@@ -1,6 +1,7 @@
 /** Dev probe: teleport low over a lon/lat in toy mode and screenshot down. */
 const { chromium } = require('playwright');
 const path = require('path');
+const { bootFly } = require('./_boot');
 
 const lon = parseFloat(process.argv[2] ?? '-73.945');
 const lat = parseFloat(process.argv[3] ?? '40.735');
@@ -15,12 +16,7 @@ const name = process.argv[5] ?? 'closeup';
   });
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
   page.on('pageerror', (e) => console.log('pageerror:', e.message.slice(0, 200)));
-  await page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded', timeout: 120000 });
-  await page.waitForSelector('header', { timeout: 120000 });
-  await page.evaluate(() => localStorage.setItem('fly-controls-seen', '1'));
-  await page.locator('button[aria-label="Fly Mode"]').click();
-  await page.waitForSelector('.fixed.inset-0 canvas', { timeout: 120000 });
-  await page.waitForTimeout(8000);
+  await bootFly(page); // R9-3: fly-only boot
   await page.mouse.move(800, 450);
   await page.evaluate(
     ({ lon, lat, altM }) => {

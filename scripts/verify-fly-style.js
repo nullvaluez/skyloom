@@ -1,6 +1,12 @@
-/** Verify: waypoint chips, player orientation, night map style, hover UX. */
+/**
+ * Verify: waypoint chips, player orientation, map-style toggle via the
+ * pause menu (persistence path), hover UX.
+ * Round 7: the Night style is retired — the toggle test now flips to Day
+ * (satellite) and gates on Esri imagery + attribution.
+ */
 const { chromium } = require('playwright');
 const path = require('path');
+const { bootFly } = require('./_boot');
 
 (async () => {
   const browser = await chromium.launch({
@@ -11,30 +17,25 @@ const path = require('path');
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
-  let cartoTiles = 0;
+  let esriTiles = 0;
   page.on('response', (r) => {
-    if (r.url().includes('basemaps.cartocdn.com')) cartoTiles++;
+    if (r.url().includes('World_Imagery/MapServer/tile')) esriTiles++;
   });
 
-  await page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded', timeout: 90000 });
-  await page.waitForSelector('header', { timeout: 90000 });
-  await page.evaluate(() => {
-    localStorage.setItem('fly-controls-seen', '1');
-    localStorage.removeItem('fly-map-style');
-  });
-  await page.locator('button[aria-label="Fly Mode"]').click();
-  await page.waitForSelector('.fixed.inset-0 canvas', { timeout: 90000 });
-  await page.waitForTimeout(12000);
+  // R9-3: the app boots straight into fly mode — bootFly waits on the real
+  // __flyBoot readiness contract (style switching lives ONLY in the pause
+  // menu now, which is exactly the path step 2 exercises).
+  await bootFly(page); // Neon (toy) default
   await page.mouse.move(800, 450);
   await page.waitForTimeout(1500);
 
-  // 1. New waypoint chips + player orientation (satellite)
-  await page.screenshot({ path: path.join(__dirname, 'style-01-chips-day.png') });
+  // 1. Chips + player orientation at spawn (toy default)
+  await page.screenshot({ path: path.join(__dirname, 'style-01-chips-neon.png') });
 
-  // 2. Night Ops toggle via pause menu (also exercises persistence path)
+  // 2. Day toggle via pause menu (exercises the persistence path)
   await page.keyboard.press('Escape');
   await page.waitForTimeout(400);
-  await page.getByRole('button', { name: 'Night', exact: true }).click();
+  await page.getByRole('button', { name: 'Day', exact: true }).click();
   await page.waitForTimeout(300);
   await page.screenshot({ path: path.join(__dirname, 'style-02-pause-menu.png') });
   await page.keyboard.press('Escape');
@@ -44,9 +45,10 @@ const path = require('path');
   const attribution = await page.evaluate(
     () => document.querySelector('.bottom-2.left-2')?.textContent ?? ''
   );
-  await page.screenshot({ path: path.join(__dirname, 'style-03-night.png') });
-  console.log('carto tiles fetched:', cartoTiles);
-  console.log('attribution now:', attribution);
+  const saved = await page.evaluate(() => localStorage.getItem('fly-map-style-2'));
+  await page.screenshot({ path: path.join(__dirname, 'style-03-day.png') });
+  console.log('esri tiles fetched:', esriTiles);
+  console.log('attribution now:', attribution, '· saved style:', saved);
 
   // 3. Hover + T-inspect (works regardless of pointer precision)
   const locked = await page.evaluate(() => window.__fly.targeting.lockedHex);
@@ -60,12 +62,13 @@ const path = require('path');
     .catch(() => false);
   console.log('locked:', locked, '→ T-inspect modal:', modalVisible);
   if (modalVisible) {
-    await page.screenshot({ path: path.join(__dirname, 'style-04-night-modal.png') });
+    await page.screenshot({ path: path.join(__dirname, 'style-04-day-modal.png') });
     await page.keyboard.press('Escape');
   }
 
   console.log('pageerrors:', errs.slice(0, 6).join(' | ') || 'none');
-  const pass = cartoTiles > 20 && attribution.includes('CARTO') && errs.length === 0;
+  const pass =
+    esriTiles > 20 && attribution.includes('Esri') && saved === 'satellite' && errs.length === 0;
   console.log(pass ? 'VERIFY: PASS' : 'VERIFY: FAIL');
   await browser.close();
   process.exit(pass ? 0 : 1);

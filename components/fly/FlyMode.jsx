@@ -12,22 +12,67 @@ import { Minimap } from './hud/Minimap';
 import { InfoCard } from './hud/InfoCard';
 import { InspectModal } from './hud/InspectModal';
 import { SpotToast } from './hud/SpotToast';
+import { Contracts } from './hud/Contracts';
 import { WarpFlash } from './hud/WarpFlash';
 import { Atlas } from './hud/Atlas';
 import { ArrivalBanner } from './hud/ArrivalBanner';
 import { PauseMenu } from './PauseMenu';
+import { BootScreen } from './hud/BootScreen';
 import { useFlyTraffic } from '@/hooks/use-fly-traffic';
 import { useFlyAudio } from '@/hooks/use-fly-audio';
+import { BOOT } from '@/lib/fly/fly-constants';
 import { useFlyStore } from '@/stores/fly-store';
-import { useMapStore } from '@/stores/map-store';
 
 // Fallback spawn: NYC harbor — dense airspace, good demo
 const DEFAULT_SPAWN = [40.6892, -74.0445];
+// Last in-flight position, persisted ~10s + pagehide → next boot spawns here
+const LAST_POS_KEY = 'fly-last-pos';
+
+function readLastPos() {
+  try {
+    const raw = window.localStorage.getItem(LAST_POS_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (Number.isFinite(p?.lat) && Number.isFinite(p?.lon)) return [p.lat, p.lon];
+  } catch {
+    // corrupt entry — fall through to the default
+  }
+  return null;
+}
 
 /**
- * Fullscreen Fly-mode container (same overlay pattern as ARSpotter).
- * Mounted by app/page.js when ui-store.flyModeOpen is true; the 2D map is
- * unmounted while this is up, so all GPU budget belongs to the flight.
+ * R9-1 spawn resolution: geolocation with a quick timeout (the boot screen
+ * covers the wait) → last session's persisted position → NYC. Resolves
+ * [lat, lon]; never rejects. A late/denied permission prompt can't stall
+ * the boot past BOOT.geoTimeoutMs.
+ */
+function getSpawnLatLon() {
+  return new Promise((resolve) => {
+    const fallback = () => resolve(readLastPos() ?? DEFAULT_SPAWN);
+    if (!navigator.geolocation) {
+      fallback();
+      return;
+    }
+    const timer = setTimeout(fallback, BOOT.geoTimeoutMs);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        clearTimeout(timer);
+        resolve([pos.coords.latitude, pos.coords.longitude]);
+      },
+      () => {
+        clearTimeout(timer);
+        fallback();
+      },
+      { timeout: BOOT.geoTimeoutMs, maximumAge: 10 * 60 * 1000 }
+    );
+  });
+}
+
+/**
+ * Fullscreen Fly-mode container. Round 9 (fly-only pivot): mounted directly
+ * by app/page.js — the game IS the app. The FlyCanvas mounts as soon as the
+ * spawn resolves, under the BootScreen overlay, which reveals once the
+ * world/fleet/shaders are actually ready (window.__flyBoot contract).
  */
 export function FlyMode({ onClose }) {
   const spawn = useFlyStore((s) => s.spawn);
@@ -43,14 +88,44 @@ export function FlyMode({ onClose }) {
   // Procedural audio bed + one-shots (lock blip, warp sweep, UI clicks)
   useFlyAudio(runtimeRef.current);
 
-  // Spawn where the user is: geolocation if granted, else where the 2D map
-  // was last looking (persisted center), else NYC.
+  // Spawn where the user is: geolocation (quick timeout — the boot screen
+  // covers the wait), else last session's persisted position, else NYC.
   useEffect(() => {
-    const { userLocation, center } = useMapStore.getState();
-    const [lat, lon] = userLocation || center || DEFAULT_SPAWN;
-    const fly = useFlyStore.getState();
-    fly.setSpawn({ lat, lon });
-    fly.setPhase('flying');
+    let cancelled = false;
+    getSpawnLatLon().then(([lat, lon]) => {
+      if (cancelled) return;
+      const fly = useFlyStore.getState();
+      fly.setSpawn({ lat, lon });
+      fly.setPhase('flying');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Persist the live position (runtime.geo, written by the frame loop) so
+  // the NEXT boot spawns where this flight left off — cadence save plus
+  // pagehide (the reliable tab-close/refresh signal) plus unmount.
+  useEffect(() => {
+    const save = () => {
+      const g = runtimeRef.current.geo; // Vector3(lon, lat, altM)
+      if (!g || !Number.isFinite(g.x) || !Number.isFinite(g.y)) return;
+      try {
+        window.localStorage.setItem(
+          LAST_POS_KEY,
+          JSON.stringify({ lat: g.y, lon: g.x, at: Date.now() })
+        );
+      } catch {
+        // storage full/blocked — spawn memory is a nicety, not a requirement
+      }
+    };
+    const id = setInterval(save, BOOT.lastPosSaveMs);
+    window.addEventListener('pagehide', save);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener('pagehide', save);
+      save();
+    };
   }, []);
 
   // Escape priority: inspect → atlas → credits → pause/resume.
@@ -96,11 +171,17 @@ export function FlyMode({ onClose }) {
       <InfoCard runtime={runtimeRef.current} />
       <InspectModal runtime={runtimeRef.current} />
       <SpotToast runtime={runtimeRef.current} />
+      <Contracts runtime={runtimeRef.current} />
       <Atlas runtime={runtimeRef.current} />
       <ArrivalBanner />
-      <WarpFlash />
+      <WarpFlash runtime={runtimeRef.current} />
       <PauseMenu onExit={onClose} />
       <AttributionBar />
+
+      {/* Boot overlay (z-40) covers everything — including the first-entry
+          controls card — until the world reveals, so the fly-controls-seen
+          flow effectively starts AFTER the reveal. */}
+      <BootScreen runtime={runtimeRef.current} />
 
       {mobileNote && (
         <div className="pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-md bg-zinc-900/85 px-3 py-2 text-xs text-zinc-200 shadow-lg">

@@ -1,6 +1,7 @@
 /** Visual check of the GLB asset pass: player plane + close-up traffic. */
 const { chromium } = require('playwright');
 const path = require('path');
+const { bootFly } = require('./_boot');
 
 (async () => {
   const browser = await chromium.launch({
@@ -16,12 +17,7 @@ const path = require('path');
     if (m.text().includes('fly-models')) warns.push(m.text());
   });
 
-  await page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded', timeout: 90000 });
-  await page.waitForSelector('header', { timeout: 90000 });
-  await page.evaluate(() => localStorage.setItem('fly-controls-seen', '1'));
-  await page.locator('button[aria-label="Fly Mode"]').click();
-  await page.waitForSelector('.fixed.inset-0 canvas', { timeout: 90000 });
-  await page.waitForTimeout(12000);
+  await bootFly(page); // R9-3: GLB loads are boot gate (b) — no fixed swap sleep
   await page.mouse.move(800, 450);
   await page.waitForTimeout(1000);
 

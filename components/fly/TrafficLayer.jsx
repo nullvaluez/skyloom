@@ -11,17 +11,17 @@ import {
   Object3D,
   PlaneGeometry,
 } from 'three';
-import { GLOBE, NIGHT, SKY, TOY, TRAFFIC, WORLD } from '@/lib/fly/fly-constants';
+import { GLOBE, NAV_LIGHTS, SKY, TOY, TRAFFIC, WORLD } from '@/lib/fly/fly-constants';
 import { buildArchetypeGeometries } from '@/lib/fly/traffic-geometries';
 import { loadTrafficGeometries } from '@/lib/fly/model-loader';
-import { applyBendAir } from '@/lib/fly/toy-world/world-bend';
+import { applyBendAirAnchor, applyNavLights, setNavTime } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
 
 const _dummy = new Object3D();
 const _color = new Color();
 const _fog = new Color(SKY.fogColor);
 // Stale traffic fades toward the style's haze, not always daylight blue
-const FOG_BY_STYLE = { satellite: SKY.fogColor, night: NIGHT.fogColor, toy: TOY.fogColor };
+const FOG_BY_STYLE = { satellite: SKY.fogColor, toy: TOY.fogColor };
 
 /**
  * Live traffic rendering: one raw InstancedMesh per archetype (NOT drei
@@ -38,15 +38,21 @@ export function TrafficLayer({ runtime, flight, origin }) {
   const meshes = useMemo(
     () =>
       buildArchetypeGeometries().map((geometry) => {
+        // Round 8: glossier hull (0.35/0.5) — the moonlit night reads specular
         const material = new MeshStandardMaterial({
           color: 0xffffff,
-          roughness: 0.55,
-          metalness: 0.15,
+          roughness: 0.35,
+          metalness: 0.5,
           flatShading: true,
         });
-        // Altitude-aware bend: grounded traffic hugs the drawn terrain,
-        // airborne traffic caps its drop so it never sinks below eye level
-        applyBendAir(material, GLOBE.trafficBend);
+        // Altitude-aware bend, evaluated at the INSTANCE anchor: grounded
+        // traffic hugs the drawn terrain, airborne traffic caps its drop so
+        // it never sinks below eye level — and the whole model translates
+        // rigidly (per-vertex air-drop sheared rim objects vertically).
+        applyBendAirAnchor(material, GLOBE.trafficBend);
+        // Round 8: baked nav-light emissive (aEmissive from the GLB bake;
+        // primitive boot geometries lack it → reads 0 → dark, safe)
+        applyNavLights(material, NAV_LIGHTS);
         const mesh = new InstancedMesh(geometry, material, TRAFFIC.maxPerArchetype);
         mesh.instanceMatrix.setUsage(DynamicDrawUsage);
         mesh.count = 0;
@@ -63,7 +69,10 @@ export function TrafficLayer({ runtime, flight, origin }) {
       opacity: 0.85,
       depthWrite: false,
     });
-    applyBendAir(material, GLOBE.trafficBend); // far-LOD dots: same aircraft bend
+    // Far-LOD dots: anchor-evaluated air bend. These quads GROW with
+    // distance — per-vertex drop stretched ones straddling the AGL blend
+    // band into giant vertical bars at the rim ("vertical contrails").
+    applyBendAirAnchor(material, GLOBE.trafficBend);
     const mesh = new InstancedMesh(new PlaneGeometry(1, 1), material, TRAFFIC.maxBillboards);
     mesh.instanceMatrix.setUsage(DynamicDrawUsage);
     mesh.count = 0;
@@ -88,11 +97,14 @@ export function TrafficLayer({ runtime, flight, origin }) {
         mesh.material.needsUpdate = true;
         mesh._isModel = true;
       });
+      // R9-1 boot gate (b): the fleet pass settled (per-model failures
+      // degrade to primitives inside the loader — this still counts done).
+      runtime.modelsReady = true;
     });
     return () => {
       cancelled = true;
     };
-  }, [meshes]);
+  }, [meshes, runtime]);
 
   useEffect(() => {
     return () => {
@@ -111,6 +123,9 @@ export function TrafficLayer({ runtime, flight, origin }) {
     const traffic = runtime.traffic;
     if (!traffic) return;
 
+    // Nav-light strobe/beacon clock — ONE uniform write for the whole fleet
+    setNavTime(performance.now() / 1000);
+
     const items = traffic.update(performance.now() / 1000, flight.pos);
     const ax = origin.anchor.x;
     const az = origin.anchor.z;
@@ -121,7 +136,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
 
     for (const it of items) {
       const x = it.rx - ax;
-      const y = it.ry;
+      const y = it.ryd; // drawn-frame render Y (round 8.5 H1; = ry in satellite)
       const z = it.rz - az;
 
       if (it.distM < TRAFFIC.modelLodDistanceM) {
@@ -176,7 +191,6 @@ export function TrafficLayer({ runtime, flight, origin }) {
   return (
     <group>
       {meshes.map((mesh, i) => (
-        // eslint-disable-next-line react/no-array-index-key
         <primitive key={i} object={mesh} />
       ))}
       <primitive object={billboards} />

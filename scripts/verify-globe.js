@@ -1,12 +1,17 @@
 /**
- * Globe rework harness (FLY_GLOBE_REWORK): all three map styles are curved
- * mini-globes with neon tracers + clean 3D letters. Enter Fly mode (toy/neon
- * default) at NYC → stream-in → screenshots; hot-swap night and satellite
- * via the dev store handle; programmatic warp exercises the confetti burst.
- * Budgets: draws ≤350 per style, zero page errors. ALWAYS view screenshots.
+ * Globe rework harness (FLY_GLOBE_REWORK): every map style is a curved
+ * mini-globe with neon tracers + clean 3D letters. Enter Fly mode (toy/neon
+ * default) at NYC → stream-in → screenshots; hot-swap satellite via the dev
+ * store handle; programmatic warp exercises the confetti burst.
+ * Round 7: the Night style is retired — two styles remain.
+ * Budgets (round 8): toy ≤480 (PERF_BUDGET 470 — shadows/monuments/fleet
+ * lights — plus the usual +10 composer slack); satellite keeps ≤350 (no
+ * shadow pass or monuments outside toy). Zero page errors. ALWAYS view
+ * screenshots.
  */
 const { chromium } = require('playwright');
 const path = require('path');
+const { bootFly } = require('./_boot');
 
 (async () => {
   const browser = await chromium.launch({
@@ -37,13 +42,8 @@ const path = require('path');
       heapMB: Math.round(performance.memory.usedJSHeapSize / 1048576),
     }));
 
-  await page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded', timeout: 120000 });
-  await page.waitForSelector('header', { timeout: 120000 });
-  await page.evaluate(() => localStorage.setItem('fly-controls-seen', '1'));
-  await page.locator('button[aria-label="Fly Mode"]').click();
-  await page.waitForSelector('.fixed.inset-0 canvas', { timeout: 120000 });
-  console.log('fly mode up (neon default); waiting for chunk stream-in…');
-  await page.waitForTimeout(25000);
+  await bootFly(page); // R9-3: ring-0 stream-in is boot gate (a) — no fixed sleep
+  await page.waitForTimeout(4000); // traffic/labels settle beyond ring-0 (not a boot wait)
   await page.mouse.move(800, 450);
 
   const results = {};
@@ -57,21 +57,6 @@ const path = require('path');
   await page.mouse.move(800, 240, { steps: 10 });
   await page.waitForTimeout(700);
   await shot('02-neon-down');
-  await page.mouse.move(800, 450, { steps: 10 });
-  await page.mouse.up({ button: 'right' });
-
-  // --- NIGHT: airloom-exact dark globe --------------------------------------
-  await page.evaluate(() => window.__flyStore.getState().setMapStyle('night'));
-  console.log('switched to night; tiles refetching…');
-  await page.waitForTimeout(15000);
-  s = await stats();
-  results.night = s;
-  console.log('NIGHT:', JSON.stringify(s));
-  await shot('03-night');
-  await page.mouse.down({ button: 'right' });
-  await page.mouse.move(800, 240, { steps: 10 });
-  await page.waitForTimeout(700);
-  await shot('04-night-down');
   await page.mouse.move(800, 450, { steps: 10 });
   await page.mouse.up({ button: 'right' });
 
@@ -106,7 +91,14 @@ const path = require('path');
     await shot('08-after-warp');
   }
 
-  const overBudget = Object.entries(results).filter(([, r]) => r.draws !== null && r.draws > 350);
+  // Round 8: per-style budgets — the toy leg carries the shadow pass +
+  // monuments + fleet lights (470 budget after the fix-round raise —
+  // measured 461 in verify-roofs — 480 with slack); satellite has none of
+  // those and holds the round-7 gate.
+  const budgetFor = (style) => (style === 'neon' ? 480 : 350);
+  const overBudget = Object.entries(results).filter(
+    ([style, r]) => r.draws !== null && r.draws > budgetFor(style)
+  );
   const pass = {
     drawBudget: overBudget.length === 0,
     tracersSeen: Object.values(results).some((r) => (r.tracers ?? 0) > 0),

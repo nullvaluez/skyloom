@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "ShadowADSB - Real-time Aircraft Tracking",
-  description: "Track aircraft in real-time with 3D visualization, AR spotting mode, and gamification. The ultimate flight tracking experience.",
-  keywords: ["aircraft tracking", "flight tracker", "ADS-B", "aviation", "real-time", "flights", "AR", "3D map"],
+  title: "ShadowADSB - Fly the Living Night Sky",
+  description: "A night-flying game over a glowing toy Earth. Soar through neon cities built from real map data, chase real air traffic live from ADS-B, warp between world landmarks, and log every plane you spot.",
+  keywords: ["flying game", "flight game", "night flight", "ADS-B", "aviation", "toy world", "3D", "exploration"],
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -29,14 +29,14 @@ export const metadata = {
     type: "website",
     locale: "en_US",
     url: "https://shadowadsb.app",
-    title: "ShadowADSB - Real-time Aircraft Tracking",
-    description: "Track aircraft in real-time with 3D visualization, AR spotting mode, and gamification.",
+    title: "ShadowADSB - Fly the Living Night Sky",
+    description: "A night-flying game over a glowing toy Earth. Neon cities from real map data, live ADS-B air traffic, warps to world landmarks.",
     siteName: "ShadowADSB",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ShadowADSB - Real-time Aircraft Tracking",
-    description: "Track aircraft in real-time with 3D visualization, AR spotting mode, and gamification.",
+    title: "ShadowADSB - Fly the Living Night Sky",
+    description: "A night-flying game over a glowing toy Earth. Neon cities from real map data, live ADS-B air traffic, warps to world landmarks.",
   },
   icons: {
     icon: [

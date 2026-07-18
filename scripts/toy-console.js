@@ -1,6 +1,7 @@
 /** Dev probe: enter fly mode and dump EVERY console message + a screenshot. */
 const { chromium } = require('playwright');
 const path = require('path');
+const { bootFly } = require('./_boot');
 
 (async () => {
   const browser = await chromium.launch({
@@ -15,12 +16,8 @@ const path = require('path');
     seen.set(key, (seen.get(key) ?? 0) + 1);
   });
   page.on('pageerror', (e) => console.log('PAGEERROR:', e.message.slice(0, 300)));
-  await page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded', timeout: 120000 });
-  await page.waitForSelector('header', { timeout: 120000 });
-  await page.evaluate(() => localStorage.setItem('fly-controls-seen', '1'));
-  await page.locator('button[aria-label="Fly Mode"]').click();
-  await page.waitForSelector('.fixed.inset-0 canvas', { timeout: 120000 });
-  await page.waitForTimeout(20000);
+  await bootFly(page); // R9-3: fly-only boot
+  await page.waitForTimeout(10000); // let post-boot console traffic accumulate
   await page.screenshot({ path: path.join(__dirname, 'toy-console.png') });
   console.log('--- console messages (deduped) ---');
   for (const [text, count] of seen) console.log(`[×${count}]`, text);

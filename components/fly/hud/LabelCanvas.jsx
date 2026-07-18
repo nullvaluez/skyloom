@@ -52,15 +52,17 @@ function drawReticle(ctx, w, h, runtime, prev) {
   if (!track || !track.fix1 || !camera || !origin || !flight) return null;
 
   // Project where the GPU actually draws it: minus the AIRCRAFT bend drop
-  // (full near the ground, capped at eye level for high targets)
+  // (full near the ground, capped at eye level for high targets). ryd =
+  // drawn-frame render Y (round 8.5 H1) — the same Y TrafficLayer places
+  // the instance at, so the bracket stays glued to the model.
   const drop = airDrop(
     Math.hypot(track.rx - flight.pos.x, track.rz - flight.pos.z),
-    track.ry
+    track.ryd
   );
   camera.getWorldDirection(_camFwd);
-  if (!inFront(track.rx - origin.anchor.x, track.ry - drop, track.rz - origin.anchor.z, camera))
+  if (!inFront(track.rx - origin.anchor.x, track.ryd - drop, track.rz - origin.anchor.z, camera))
     return null;
-  _v.set(track.rx - origin.anchor.x, track.ry - drop, track.rz - origin.anchor.z).project(camera);
+  _v.set(track.rx - origin.anchor.x, track.ryd - drop, track.rz - origin.anchor.z).project(camera);
   if (_v.z > 1) return null;
   const sx = (_v.x * 0.5 + 0.5) * w;
   const sy = (-_v.y * 0.5 + 0.5) * h;
@@ -85,7 +87,7 @@ function drawReticle(ctx, w, h, runtime, prev) {
   const k = 1; // pip is cosmetic; mercator refinement invisible at this scale
   _v.set(
     track.rx - origin.anchor.x + fix.vE * leadT * k,
-    track.ry + fix.vUp * leadT - drop,
+    track.ryd + fix.vUp * leadT - drop,
     track.rz - origin.anchor.z - fix.vN * leadT * k
   );
   if (inFront(_v.x, _v.y, _v.z, camera) && (_v.project(camera), _v.z <= 1)) {
@@ -208,9 +210,11 @@ export function LabelCanvas({ runtime }) {
 
       for (const it of items) {
         if (it.distM < LABELS.minDistM) continue;
-        const drop = airDrop(Math.hypot(it.rx - flight.pos.x, it.rz - flight.pos.z), it.ry);
+        // ryd: labels/carets anchor to the drawn-frame Y the GPU renders at
+        // (round 8.5 H1); the altFt TEXT below stays the true it.ry.
+        const drop = airDrop(Math.hypot(it.rx - flight.pos.x, it.rz - flight.pos.z), it.ryd);
         const wx = it.rx - origin.anchor.x;
-        const wy = it.ry - drop;
+        const wy = it.ryd - drop;
         const wz = it.rz - origin.anchor.z;
         if (!inFront(wx, wy, wz, camera)) continue; // TRUE behind-camera cull
         _v.set(wx, wy, wz).project(camera);

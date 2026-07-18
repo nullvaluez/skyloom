@@ -1,7 +1,7 @@
 {
-  "name": "ShadowADSB - Live Flight Tracker",
+  "name": "ShadowADSB - Fly the Living Night Sky",
   "short_name": "ShadowADSB",
-  "description": "Real-time aircraft tracking with 3D visualization, AR spotting mode, and gamification",
+  "description": "A night-flying game over a glowing toy Earth: neon cities built from real map data, live ADS-B air traffic, warps to world landmarks, and a passport of every plane you spot",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#09090b",
@@ -57,48 +57,7 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["travel", "navigation", "utilities"],
-  "screenshots": [
-    {
-      "src": "/screenshots/desktop-map.png",
-      "sizes": "1920x1080",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "ShadowADSB Map View"
-    },
-    {
-      "src": "/screenshots/mobile-map.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "ShadowADSB Mobile View"
-    }
-  ],
-  "share_target": {
-    "action": "/",
-    "method": "GET",
-    "params": {
-      "title": "title",
-      "text": "text",
-      "url": "url"
-    }
-  },
-  "shortcuts": [
-    {
-      "name": "My Location",
-      "short_name": "Location",
-      "description": "Center map on your location",
-      "url": "/?action=geolocate",
-      "icons": [{ "src": "/icons/location.png", "sizes": "96x96" }]
-    },
-    {
-      "name": "AR Spotter",
-      "short_name": "AR",
-      "description": "Open AR spotting mode",
-      "url": "/?action=ar",
-      "icons": [{ "src": "/icons/ar.png", "sizes": "96x96" }]
-    }
-  ],
+  "categories": ["games", "entertainment"],
   "related_applications": [],
   "prefer_related_applications": false
 }

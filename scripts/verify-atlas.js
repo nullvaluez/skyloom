@@ -8,6 +8,7 @@
  */
 const { chromium } = require('playwright');
 const path = require('path');
+const { bootFly } = require('./_boot');
 
 const TOKYO = { lat: 35.6762, lon: 139.6503 };
 const NELLIS = { lat: 36.2362, lon: -115.0343 };
@@ -47,12 +48,7 @@ const distM = (lat1, lon1, lat2, lon2) => {
     }
   };
 
-  await page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded', timeout: 120000 });
-  await page.waitForSelector('header', { timeout: 120000 });
-  await page.evaluate(() => localStorage.setItem('fly-controls-seen', '1'));
-  await page.locator('button[aria-label="Fly Mode"]').click();
-  await page.waitForSelector('.fixed.inset-0 canvas', { timeout: 120000 });
-  await page.waitForTimeout(10000);
+  await bootFly(page); // R9-3: fly-only boot — waits on the real __flyBoot contract
   await page.mouse.move(800, 450);
 
   // --- 1. M opens the atlas ------------------------------------------------

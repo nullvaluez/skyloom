@@ -3,12 +3,17 @@
 import { useEffect, useRef } from 'react';
 import { MPS_TO_KT, M_TO_FT, RAD2DEG } from '@/lib/fly/coords';
 import { usePassportStore } from '@/stores/passport-store';
+import { useFlyStore } from '@/stores/fly-store';
 
 /**
  * Flight readouts. DOM text updated at 10Hz from the shared runtime via
  * refs — no React state per tick, no work inside the frame loop.
  */
 export function FlyHUD({ runtime }) {
+  // Round 8 fix (F5): live tier readout — PerformanceMonitor degrades were
+  // invisible outside the pause menu, making "why does it look flat?"
+  // undiagnosable mid-flight. Store-subscribed, so it is always current.
+  const qualityTier = useFlyStore((s) => s.qualityTier);
   const spdRef = useRef(null);
   const altRef = useRef(null);
   const aglRef = useRef(null);
@@ -16,6 +21,7 @@ export function FlyHUD({ runtime }) {
   const presetRef = useRef(null);
   const poiRef = useRef(null);
   const spotsRef = useRef(null);
+  const chaseRef = useRef(null);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -47,6 +53,23 @@ export function FlyHUD({ runtime }) {
         // persisted Spotter's Passport — read per tick, never reactive
         spotsRef.current.textContent = usePassportStore.getState().stats.totalSpotted;
       }
+      if (chaseRef.current) {
+        // CHASE feedback: the intercept/formation autopilot was previously
+        // invisible — ordering a chase looked like a dead button.
+        const mode = runtime.autopilot?.mode;
+        const t = runtime.targeting?.target;
+        if (mode && mode !== 'off' && t) {
+          const name = t.meta?.flight || t.meta?.r || t.hex?.toUpperCase() || '';
+          const nm = (t.distM / 1852).toFixed(1);
+          const cinema = useFlyStore.getState().cameraMode === 'cinema';
+          chaseRef.current.textContent = cinema
+            ? `◉ CINEMA · ${name} · C to exit`
+            : `${mode === 'formation' ? '◎ FORMATION' : '◎ INTERCEPT'} · ${name} · ${nm}nm · C cinema`;
+          chaseRef.current.style.opacity = '1';
+        } else {
+          chaseRef.current.style.opacity = '0';
+        }
+      }
     }, 100);
     return () => clearInterval(id);
   }, [runtime]);
@@ -64,6 +87,13 @@ export function FlyHUD({ runtime }) {
       <div
         ref={poiRef}
         className="pointer-events-none absolute left-1/2 top-20 z-10 -translate-x-1/2 font-mono text-xs font-semibold uppercase tracking-[0.2em] text-amber-200/90 transition-opacity duration-500 [text-shadow:0_1px_4px_rgba(0,0,0,0.9)]"
+      />
+
+      {/* Active chase/intercept chip — visible payoff for the CHASE button */}
+      <div
+        ref={chaseRef}
+        data-testid="hud-chase-chip"
+        className="pointer-events-none absolute left-1/2 top-27 z-10 -translate-x-1/2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200/90 opacity-0 transition-opacity duration-300 [text-shadow:0_1px_4px_rgba(0,0,0,0.9)]"
       />
 
       <div className="pointer-events-none absolute left-1/2 top-4 z-10 flex -translate-x-1/2 divide-x divide-zinc-700 rounded-lg bg-zinc-950/60 py-1.5 backdrop-blur-sm">
@@ -96,6 +126,12 @@ export function FlyHUD({ runtime }) {
 
       <div className="pointer-events-none absolute bottom-8 left-1/2 z-10 -translate-x-1/2 rounded bg-zinc-950/50 px-3 py-1 text-[11px] text-zinc-400">
         Steer with the mouse · WASD/arrows · 1/2/3 speed · Shift boost · RMB look · click a plane (or T on a lock) to inspect &amp; warp · F intercept · Esc menu
+        <span
+          data-testid="hud-quality-tier"
+          className="ml-2 font-mono text-[10px] uppercase tracking-widest text-zinc-500"
+        >
+          Q {qualityTier}
+        </span>
       </div>
     </>
   );

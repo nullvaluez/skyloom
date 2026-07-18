@@ -8,6 +8,7 @@
  */
 const { chromium } = require('playwright');
 const path = require('path');
+const { bootFly } = require('./_boot');
 
 (async () => {
   const browser = await chromium.launch({
@@ -19,12 +20,8 @@ const path = require('path');
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
 
-  await page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded', timeout: 120000 });
-  await page.waitForSelector('header', { timeout: 120000 });
-  await page.evaluate(() => localStorage.setItem('fly-controls-seen', '1'));
-  await page.locator('button[aria-label="Fly Mode"]').click();
-  await page.waitForSelector('.fixed.inset-0 canvas', { timeout: 120000 });
-  await page.waitForTimeout(15000);
+  await bootFly(page); // R9-3: fly-only boot — waits on the real __flyBoot contract
+  await page.waitForTimeout(6000); // live traffic polls accumulate (not a boot wait)
   await page.mouse.move(800, 450);
 
   // The reported scenario: 3,000 ft

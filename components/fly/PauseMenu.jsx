@@ -12,10 +12,11 @@ const HELP_SEEN_KEY = 'fly-controls-seen';
 const MAP_STYLE_KEY = 'fly-map-style-2';
 // Every style is a curved mini-globe now (FLY_GLOBE_REWORK) — the names
 // describe the mood, not the tile provider. Keys stay stable for persistence.
+// Round 7: 'night' retired — it was a flat dark raster with none of Neon's
+// vector world; the Electric Night City pass made Neon THE night look.
 const MAP_STYLES = [
   ['toy', 'Neon'],
   ['satellite', 'Day'],
-  ['night', 'Night'],
 ];
 
 const CONTROL_ROWS = [
@@ -23,8 +24,9 @@ const CONTROL_ROWS = [
   ['WASD / arrows', 'steer (adds to mouse)'],
   ['1 / 2 / 3', 'speed preset: slow / cruise / boost'],
   ['Shift (hold)', 'boost'],
-  ['RMB (hold)', 'free-look, snaps back on release'],
+  ['RMB (hold)', 'free-look — full 360° orbit, snaps back on release'],
   ['F', 'intercept the locked aircraft · F again to release'],
+  ['C', 'cinema wing-cam while chasing · C again to exit'],
   ['Click a plane', 'inspect it — warp to it or order an intercept'],
   ['T', 'inspect whatever is soft-locked (no aiming needed)'],
   ['M', 'open the Atlas — warp anywhere on Earth'],
@@ -55,11 +57,32 @@ export function PauseMenu({ onExit }) {
     if (window.localStorage.getItem(HELP_SEEN_KEY)) {
       useFlyStore.getState().markControlsHelpSeen();
     }
-    const savedStyle = window.localStorage.getItem(MAP_STYLE_KEY);
+    let savedStyle = window.localStorage.getItem(MAP_STYLE_KEY);
+    // Round 7 migration: saved 'night' lands on Neon (the migration must run
+    // BEFORE the validity check — 'night' is no longer a valid style).
+    if (savedStyle === 'night') {
+      savedStyle = 'toy';
+      window.localStorage.setItem(MAP_STYLE_KEY, savedStyle);
+    }
     if (savedStyle && MAP_STYLES.some(([k]) => k === savedStyle)) {
       useFlyStore.getState().setMapStyle(savedStyle);
     }
   }, []);
+
+  // M from the pause menu goes straight to the Atlas — same key as in
+  // flight, so muscle memory doesn't dead-end on the paused screen.
+  useEffect(() => {
+    if (phase !== 'paused') return;
+    const onKey = (e) => {
+      if (e.key !== 'm' && e.key !== 'M') return;
+      const store = useFlyStore.getState();
+      store.closeCredits();
+      store.setPhase('flying');
+      store.setAtlasOpen(true);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [phase]);
 
   const pickMapStyle = (style) => {
     window.localStorage.setItem(MAP_STYLE_KEY, style);

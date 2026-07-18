@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { useAircraftStore } from '@/stores/aircraft-store';
 
 /**
  * Custom retry function with exponential backoff
@@ -63,15 +62,6 @@ export function Providers({ children }) {
         },
       })
   );
-
-  const startCleanupTimer = useAircraftStore((s) => s.startCleanupTimer);
-  const stopCleanupTimer = useAircraftStore((s) => s.stopCleanupTimer);
-
-  // Initialize stale data cleanup timer on mount
-  useEffect(() => {
-    startCleanupTimer();
-    return () => stopCleanupTimer();
-  }, [startCleanupTimer, stopCleanupTimer]);
 
   return (
     <QueryClientProvider client={queryClient}>

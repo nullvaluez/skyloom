@@ -4,9 +4,20 @@ import { Suspense, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Object3D, Vector3 } from 'three';
 import { Environment } from '@react-three/drei';
-import { airDrop, applyBendFade, setBend, setBendEye, setEdgeFade } from '@/lib/fly/toy-world/world-bend';
+import {
+  airDrop,
+  applyBendFade,
+  applyHillshade,
+  getHillshade,
+  setBend,
+  setBendEye,
+  setDepthHaze,
+  setEdgeFade,
+  setHillDir,
+  setHillshade,
+} from '@/lib/fly/toy-world/world-bend';
 import { PALETTE } from '@/lib/fly/toy-world/toy-palette';
-import { SkyDome } from './SkyDome';
+import { SkyDome, setSkyDip } from './SkyDome';
 import { PoiLetters } from './PoiLetters';
 import { TrafficTracers } from './TrafficTracers';
 import { WarpBurst } from './WarpBurst';
@@ -15,7 +26,9 @@ import { createImagerySource, createTerrainSources } from '@/lib/fly/tile-source
 import { FlightModel } from '@/lib/fly/flight-model';
 import { InputController } from '@/lib/fly/input-controller';
 import { ChaseCamera } from '@/lib/fly/chase-camera';
+import { CinemaCamera } from '@/lib/fly/cinema-camera';
 import { TrafficEngine, mercatorWorldXZ } from '@/lib/fly/traffic-engine';
+import { registerRuntimeActions, clearRuntimeActions } from '@/lib/fly/runtime-bus';
 import { Targeting } from '@/lib/fly/targeting';
 import { Autopilot } from '@/lib/fly/autopilot';
 import { mercatorScale } from '@/lib/fly/coords';
@@ -23,7 +36,7 @@ import {
   CLOUDS,
   FLIGHT,
   GLOBE,
-  NIGHT,
+  HILLSHADE,
   SKY,
   TOY,
   TOY_WORLD,
@@ -36,6 +49,8 @@ import { usePassportStore } from '@/stores/passport-store';
 import { PlayerPlane } from './PlayerPlane';
 import { CloudField } from './CloudField';
 import { VoidFloor } from './VoidFloor';
+import { TownGlow } from './TownGlow';
+import { LandmarkMonuments } from './LandmarkMonuments';
 import { Contrail } from './Contrail';
 import { TrafficLayer } from './TrafficLayer';
 import { ToyWorldLayer } from './ToyWorldLayer';
@@ -45,7 +60,10 @@ const _spotPos = new Vector3();
 const _warpPos = new Vector3();
 
 // Per-map-style scene mood (bg/fog/lights). hdriBg: use the HDRI as the
-// visible sky; otherwise the flat background color IS the sky.
+// visible sky; otherwise the flat background color IS the sky. Round 8
+// (P4): lightDir is the per-style KEY-light direction — the directional
+// light AND the shadow-follow rig read it, so toy gets its high-NW moon
+// (long NE shadows) while satellite keeps the day sun.
 const MOODS = {
   satellite: {
     bg: SKY.fogColor,
@@ -54,17 +72,12 @@ const MOODS = {
     hemi: ['#cfe5ff', '#5a6b53', SKY.hemiIntensity],
     sunColor: '#ffffff',
     sunIntensity: SKY.sunIntensity,
+    lightDir: SKY.sunDirection,
     env: SKY.envIntensity,
   },
-  night: {
-    bg: NIGHT.background,
-    fog: [NIGHT.fogColor, NIGHT.fogDensity],
-    hdriBg: false,
-    hemi: [NIGHT.hemiSky, NIGHT.hemiGround, NIGHT.hemiIntensity],
-    sunColor: NIGHT.sunColor,
-    sunIntensity: NIGHT.sunIntensity,
-    env: NIGHT.envIntensity,
-  },
+  // (round 7: the 'night' mood was retired with the style — Neon is the
+  // night look; NIGHT constants remain in fly-constants as documented dead
+  // values in case a dark-raster style ever returns)
   toy: {
     bg: TOY.background,
     fog: [TOY.fogColor, TOY.fogDensity],
@@ -72,6 +85,7 @@ const MOODS = {
     hemi: [TOY.hemiSky, TOY.hemiGround, TOY.hemiIntensity],
     sunColor: TOY.sunColor,
     sunIntensity: TOY.sunIntensity,
+    lightDir: TOY.moonDirection, // round 8: cool moonlight key
     env: TOY.envIntensity,
   },
 };
@@ -100,7 +114,9 @@ export function FlyScene({ runtime }) {
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
   const sunRef = useRef();
+  const hemiRef = useRef();
   const sunTarget = useMemo(() => new Object3D(), []);
+  const warpEpochForSun = useFlyStore((s) => s.warpEpoch); // re-aim the day-cycle on warps
 
   // Built once with the style active at mount; later changes hot-swap via
   // engine.setImagery below (styleRef starts in sync with this).
@@ -111,6 +127,7 @@ export function FlyScene({ runtime }) {
   const flight = useMemo(() => new FlightModel(), []);
   const input = useMemo(() => new InputController(), []);
   const chase = useMemo(() => new ChaseCamera(), []);
+  const cinema = useMemo(() => new CinemaCamera(), []);
   const traffic = useMemo(() => new TrafficEngine(), []);
   const targeting = useMemo(() => new Targeting(), []);
   const autopilot = useMemo(() => new Autopilot(), []);
@@ -146,6 +163,7 @@ export function FlyScene({ runtime }) {
     runtime.targeting = targeting;
     runtime.autopilot = autopilot;
     runtime.camera = camera;
+    runtime.chaseRig = chase; // round 7: harnesses read _look/_freeAmt
     // Grounded-aircraft pin: quality-gated (a coarse fallback DEM tile
     // "answers" with plateau garbage — planes got pinned mid-air forever),
     // and in toy style pinned to the DRAWN ground (exaggerated + lifted),
@@ -158,27 +176,56 @@ export function FlyScene({ runtime }) {
         ? s.elev * TOY_WORLD.terrainExaggeration + TOY_WORLD.groundLift
         : s.elev;
     });
+    // Round 8.5 (H1): AIRBORNE traffic renders in the DRAWN frame too. Toy
+    // draws terrain at elev×exaggeration+groundLift while planes fly TRUE
+    // altitude — over relief they read up to 0.7×elev too low against the
+    // drawn ground. This sampler returns the lift (drawnGround − trueGround)
+    // under a track; the engine adds it (smoothed) to track.ryd, the render
+    // Y all visual consumers read. Satellite returns 0 → byte-identical
+    // path. Same tileZ quality gate as the pin sampler above (a coarse
+    // fallback DEM tile answers with plateau garbage); null = retry later,
+    // the track keeps its last lift meanwhile.
+    traffic.setRenderLiftSampler((lon, lat) => {
+      if (
+        !TOY_WORLD.airFrameFollowsDrawnGround ||
+        useFlyStore.getState().mapStyle !== 'toy'
+      ) {
+        return 0;
+      }
+      const s = engine.getGroundAt(lon, lat);
+      if (!s || s.tileZ < 11) return null;
+      return s.elev * (TOY_WORLD.terrainExaggeration - 1) + TOY_WORLD.groundLift;
+    });
 
     // Warp: hard-teleport the player behind a live track, matching its
     // heading and roughly its speed. Rebase + camera snap land the cut
     // clean; the WarpFlash overlay masks the tile stream-in beat.
     runtime.warpTo = (hex) => {
       const track = traffic.tracks.get(hex);
-      if (!track || !track.fix1) return false;
+      // Round 8.5 (§B): no hard fix1 gate — the position warp only needs
+      // rx/ry/rz; fix1 merely fed the arrival speed (cruise fallback below).
+      // A fixless track hasn't run the engine update, so yaw/ryd may be
+      // unset — default to north / true altitude.
+      if (!track) return false;
+      const yaw = Number.isFinite(track.yaw) ? track.yaw : 0;
       const geoT = engine.worldToGeo(_warpPos.set(track.rx, track.ry, track.rz));
       const k = mercatorScale(geoT.y);
       autopilot.disengage();
       flight.pos.set(
-        track.rx - Math.sin(track.yaw) * WARP.behindM * k,
-        track.ry + WARP.aboveM,
-        track.rz + Math.cos(track.yaw) * WARP.behindM * k
+        track.rx - Math.sin(yaw) * WARP.behindM * k,
+        // ryd: spawn above where the target is DRAWN (round 8.5 H1) — the
+        // player then physically flies at that (true-frame) altitude.
+        (track.ryd ?? track.ry) + WARP.aboveM,
+        track.rz + Math.cos(yaw) * WARP.behindM * k
       );
-      flight.heading = track.yaw;
+      flight.heading = yaw;
       flight.pitch = 0;
       flight.bank = 0;
       flight.turnRate = 0;
       flight.pitchRate = 0;
-      const tSpeed = Math.hypot(track.fix1.vE, track.fix1.vN);
+      const tSpeed = track.fix1
+        ? Math.hypot(track.fix1.vE, track.fix1.vN)
+        : FLIGHT.speeds.cruise;
       flight.speed = Math.max(FLIGHT.speeds.slow, tSpeed + WARP.speedPadMps);
       const geo = engine.worldToGeo(flight.pos);
       flight.latDeg = geo.y;
@@ -206,6 +253,12 @@ export function FlyScene({ runtime }) {
         name = null,
         kind = null,
       } = opts;
+      // Classify the hop BEFORE moving: cross-region warps (> farKmThreshold)
+      // get the held streak→hold→reveal arrival instead of the bare flash.
+      const g0 = engine.worldToGeo(flight.pos);
+      const dKmLat = (lat - g0.y) * 111.32;
+      const dKmLon = (lon - g0.x) * 111.32 * Math.cos((lat * Math.PI) / 180);
+      const farWarp = Math.hypot(dKmLat, dKmLon) > WARP.farKmThreshold;
       autopilot.disengage();
       let lat2 = lat;
       let lon2 = lon;
@@ -237,7 +290,9 @@ export function FlyScene({ runtime }) {
       const store = useFlyStore.getState();
       store.setInspectHex(null);
       store.setAtlasOpen(false);
-      store.bumpWarpEpoch();
+      // Far warps (cross-region) get the held arrival treatment — the
+      // distance is measured on the PRE-warp position captured above.
+      store.bumpWarpEpoch(farWarp ? 'far' : 'local');
       if (name) store.setArrival({ name, kind, at: Date.now() });
       return true;
     };
@@ -254,14 +309,35 @@ export function FlyScene({ runtime }) {
       return true;
     };
 
+    // Round 8.5 (§B): mirror the action handles onto the module-scope bus
+    // and flip runtimeReady — overlays resolve these AT CALL TIME, so a
+    // FlyScene remount re-registers here and heals any captured nulls.
+    registerRuntimeActions({
+      warpTo: runtime.warpTo,
+      warpToGeo: runtime.warpToGeo,
+      interceptHex: runtime.interceptHex,
+    });
+    useFlyStore.getState().setRuntimeReady(true);
+
     if (process.env.NODE_ENV === 'development') {
       window.__fly = runtime;
       window.__flyStore = useFlyStore; // harnesses drive style/tier switches
+      // Remount tripwire: the runtime handles are nulled on cleanup, so a
+      // FlyScene remount (Suspense/error-boundary trip) briefly dead-arms
+      // every overlay button. 0 on first mount; anything higher during a
+      // session means the scene subtree bounced — chase THAT, not the UI.
+      const stats = (window.__flyStats ??= {});
+      stats.sceneRemounts = (stats.sceneRemounts ?? -1) + 1;
       // Harness aim helper: the EXACT aircraft drop the GPU applies (reads
       // the live uniforms) — headless scripts project targets through this
       window.__flyAirDrop = (d, y) => airDrop(d, y);
     }
     return () => {
+      // Dead window opens here (until the next mount re-registers): the bus
+      // goes null-safe and runtimeReady disarms the overlay buttons loudly
+      // instead of leaving them clickable-but-dead.
+      useFlyStore.getState().setRuntimeReady(false);
+      clearRuntimeActions();
       runtime.engine = null;
       runtime.flight = null;
       runtime.input = null;
@@ -270,6 +346,7 @@ export function FlyScene({ runtime }) {
       runtime.targeting = null;
       runtime.autopilot = null;
       runtime.camera = null;
+      runtime.chaseRig = null;
       runtime.warpTo = null;
       runtime.warpToGeo = null;
       runtime.interceptHex = null;
@@ -287,20 +364,78 @@ export function FlyScene({ runtime }) {
   // stream); strength rides a live uniform (0 in flat styles) so the patch
   // is style-agnostic and survives imagery hot-swaps. Tiles are GROUND —
   // they get the fade variant so the rim melts into the void (no facets).
-  useEffect(() => engine.onTileMaterial(applyBendFade), [engine]);
+  // Round 7: + DEM-normal hillshade (strength-gated to satellite via a live
+  // uniform — the SAME hook patches toy's solid-tan tiles) and anisotropic
+  // imagery sampling (low-pass smearing fix; bandwidth only, zero draws).
+  useEffect(
+    () =>
+      engine.onTileMaterial((m) => {
+        applyBendFade(m);
+        applyHillshade(m, HILLSHADE);
+        if (m.map && m.map.anisotropy !== HILLSHADE.anisotropy) {
+          m.map.anisotropy = HILLSHADE.anisotropy;
+          m.map.needsUpdate = true;
+        }
+      }),
+    [engine]
+  );
 
-  // World-edge fade band + target color per style (style-change-time only;
-  // the color matches the style's fog/void family so the melt is seamless).
+  // Hillshade style gate (live uniform — no re-patch, survives hot-swaps)
+  useEffect(() => {
+    setHillshade(mapStyle === 'satellite' ? HILLSHADE.strength : 0);
+  }, [mapStyle]);
+
+  // World-edge fade band + target color per style (style-change-time only).
+  // Round 6: the fade target is the SHARED GLOBE.rim color — the same tone
+  // the fog carries and the SkyDome presents below its horizon — so the
+  // terrain, haze and sky agree at the rim (the old void/fog/dome-band
+  // three-way mismatch was the "ground and sky feel disconnected" band).
   useEffect(() => {
     const fade = WORLD_EDGE.fade[mapStyle] ?? WORLD_EDGE.fade.satellite;
-    const color =
-      mapStyle === 'toy'
-        ? PALETTE.voidFloor
-        : mapStyle === 'night'
-          ? GLOBE.sky.night.void
-          : SKY.fogColor;
-    setEdgeFade(fade.startM, fade.endM, color);
+    setEdgeFade(fade.startM, fade.endM, GLOBE.rim[mapStyle] ?? GLOBE.rim.satellite);
+    // Round 8 (P4): depth haze — toy's distant ground recedes toward a cool
+    // haze tone BEFORE the rim fade (its 13km end sits under the 14km fade
+    // start so the round-6 rim gates hold). max 0 = off in every other style.
+    const haze = TOY.haze;
+    setDepthHaze(haze.startM, haze.endM, haze.color, mapStyle === 'toy' ? haze.max : 0);
   }, [mapStyle]);
+
+  // Day-style local-time light (round 6, Phase G): the sun/hemi intensity
+  // lerps with the destination's coarse solar elevation (UTC + lon/15 —
+  // the atlas's "exactness doesn't matter" stance). Satellite only; the
+  // authored night/toy moods and all colors stay untouched. Recomputes on
+  // style change, warps, and a slow interval — never per frame.
+  useEffect(() => {
+    const apply = () => {
+      if (useFlyStore.getState().mapStyle !== 'satellite') return;
+      const lon = runtime.geo?.x ?? spawn?.lon ?? 0;
+      const t =
+        (typeof window !== 'undefined' && window.__flySunOverride) || Date.now();
+      const d = new Date(t);
+      const localH = (d.getUTCHours() + d.getUTCMinutes() / 60 + lon / 15 + 24) % 24;
+      const sunFactor = Math.max(0, Math.cos(((localH - 12) / 12) * Math.PI));
+      const frac =
+        SKY.dayCycle.minSunFrac + (1 - SKY.dayCycle.minSunFrac) * sunFactor;
+      if (sunRef.current) sunRef.current.intensity = SKY.sunIntensity * frac;
+      if (hemiRef.current) hemiRef.current.intensity = SKY.hemiIntensity * frac;
+      // Round 7: hillshade sun direction from the same coarse local time —
+      // east in the morning, west in the evening, elevation clamped so
+      // relief never flattens (noon) nor drops below the graze floor (night).
+      const az = ((localH - 12) / 12) * Math.PI;
+      const el = Math.min(
+        HILLSHADE.maxElRad,
+        Math.max(HILLSHADE.minElRad, Math.asin(Math.max(0, sunFactor)))
+      );
+      setHillDir(-Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el));
+      if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+        (window.__flyStats ??= {}).sunFactor = sunFactor;
+        window.__flyHill = { get: getHillshade, set: setHillshade };
+      }
+    };
+    apply();
+    const id = setInterval(apply, SKY.dayCycle.refreshSec * 1000);
+    return () => clearInterval(id);
+  }, [mapStyle, warpEpochForSun, runtime, spawn]);
 
   // Map style hot-swap: replace the imagery provider in place — the DEM,
   // quadtree and every coordinate stay untouched; tiles refetch lazily.
@@ -401,6 +536,18 @@ export function FlyScene({ runtime }) {
     if (!paused && !flyState.inspectHex && input.consumePress('m')) {
       store.setAtlasOpen(true);
     }
+    // C toggles the cinema (wing) camera while the autopilot is flying an
+    // intercept/formation — the visible payoff of a CHASE order.
+    if (!paused && input.consumePress('c') && autopilot.mode !== 'off') {
+      const mode = store.cameraMode === 'cinema' ? 'chase' : 'cinema';
+      store.setCameraMode(mode);
+      (mode === 'cinema' ? cinema : chase).snap();
+    }
+    // Auto-revert when the chase ends (lock lost / disengaged / hard stick)
+    if (flyState.cameraMode === 'cinema' && (autopilot.mode === 'off' || !targeting.target)) {
+      store.setCameraMode('chase');
+      chase.snap();
+    }
     const apCmd = autopilot.update(dt, flight, targeting.target, cmd);
 
     // Sync lock state to the store only when it actually changes
@@ -434,10 +581,21 @@ export function FlyScene({ runtime }) {
       }
     }
 
-    // ChaseCamera thinks in absolute coordinates; the camera renders rebased.
+    // Camera rigs think in absolute coordinates; the camera renders rebased.
     camera.position.x += origin.anchor.x;
     camera.position.z += origin.anchor.z;
-    chase.update(dt, flight, camera, cmd.freeLook, mercatorScale(flight.latDeg));
+    if (flyState.cameraMode === 'cinema' && targeting.target) {
+      cinema.update(
+        dt,
+        flight,
+        targeting.target,
+        camera,
+        mercatorScale(flight.latDeg),
+        flight.groundElev
+      );
+    } else {
+      chase.update(dt, flight, camera, cmd.freeLook, mercatorScale(flight.latDeg));
+    }
     camera.position.x -= origin.anchor.x;
     camera.position.z -= origin.anchor.z;
 
@@ -458,16 +616,37 @@ export function FlyScene({ runtime }) {
     }
     setBend(rpx, rpz, bendK);
     // The aircraft bend variant caps drops against the player's eye level —
-    // grounded targets keep the full drop, high targets never sink below us
+    // grounded targets keep the full drop, high targets never sink below us.
+    // Round 8.5 (H1) decision: groundElev stays TRUE-frame here even in toy
+    // (the alternative was passing the drawn ground so the shader's AGL cap
+    // blend matches the render frame — we picked the track-Y transform
+    // instead, ONE approach only). Both args must stay in the PLAYER's true
+    // frame: uEyeY caps drops against the player's actual eye, and the CPU
+    // mirror (airDrop) reads the SAME uniforms, so stems/labels stay glued
+    // to the GPU either way. Residual: lifted traffic near the drawn ground
+    // reads as "more airborne" by the local lift (≤ 0.7×elev) inside the
+    // 150–900m blend band — second-order next to the 420m-at-600m-elev bug
+    // the ryd transform fixes.
     setBendEye(flight.pos.y, flight.groundElev);
+    // Sky horizon follows the bent rim: dip = depression angle (as vDir.y)
+    // of the point where the ground starts melting into the rim color —
+    // eye height + bend drop at the fade start, over that distance. The
+    // dome's gradient lands exactly where the terrain visually ends.
+    const skyFade = WORLD_EDGE.fade[flyState.mapStyle] ?? WORLD_EDGE.fade.satellite;
+    const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
+    const rimDrop = skyFade.startM * skyFade.startM * bendK + eyeAgl;
+    setSkyDip(rimDrop / Math.hypot(rimDrop, skyFade.startM));
 
-    // Toon shadow sun rides with the player (small ortho frustum)
+    // Toon shadow sun rides with the player (small ortho frustum). Round 8:
+    // it follows the style's KEY light (MOODS lightDir) — toy's moon, not
+    // the day sun — so shadows agree with the moonlit shading.
     const sun = sunRef.current;
     if (sun && TOY.shadows && flyState.mapStyle === 'toy') {
+      const dir = (MOODS[flyState.mapStyle] ?? MOODS.satellite).lightDir;
       sun.position.set(
-        rpx + SKY.sunDirection[0] * 2500,
-        flight.pos.y + SKY.sunDirection[1] * 2500,
-        rpz + SKY.sunDirection[2] * 2500
+        rpx + dir[0] * 2500,
+        flight.pos.y + dir[1] * 2500,
+        rpz + dir[2] * 2500
       );
       sunTarget.position.set(rpx, flight.pos.y, rpz);
       sunTarget.updateMatrixWorld();
@@ -497,6 +676,7 @@ export function FlyScene({ runtime }) {
     mapStyle === 'toy'
       ? {
           horizon: PALETTE.skyHorizon,
+          mid: PALETTE.skyMid, // round 8: three-stop night band (toy only)
           zenith: PALETTE.skyZenith,
           void: PALETTE.voidFloor,
           rimOnly: false,
@@ -523,20 +703,24 @@ export function FlyScene({ runtime }) {
         horizon={dome.horizon}
         zenith={dome.zenith}
         voidColor={dome.void}
+        rim={GLOBE.rim[mapStyle] ?? GLOBE.rim.satellite}
         rimOnly={dome.rimOnly}
         stars={mapStyle !== 'satellite'}
+        midColor={dome.mid ?? null}
       />
 
-      <hemisphereLight args={mood.hemi} />
+      <hemisphereLight ref={hemiRef} args={mood.hemi} />
+      {/* Round 8: position follows the style's key light (toy = moon) and
+          the shadow map is tier-gated — 2048 is a HIGH-only luxury (P7). */}
       <directionalLight
         ref={sunRef}
-        position={SKY.sunDirection}
+        position={mood.lightDir}
         intensity={mood.sunIntensity}
         color={mood.sunColor}
         castShadow={mapStyle === 'toy' && TOY.shadows && qualityTier !== 'low'}
         target={sunTarget}
-        shadow-mapSize-width={TOY.shadowMapSize}
-        shadow-mapSize-height={TOY.shadowMapSize}
+        shadow-mapSize-width={TOY.shadowMapSize[qualityTier] ?? TOY.shadowMapSize.medium}
+        shadow-mapSize-height={TOY.shadowMapSize[qualityTier] ?? TOY.shadowMapSize.medium}
         shadow-camera-left={-TOY.shadowRadiusM}
         shadow-camera-right={TOY.shadowRadiusM}
         shadow-camera-top={TOY.shadowRadiusM}
@@ -573,6 +757,19 @@ export function FlyScene({ runtime }) {
       {/* Void-grid floor past the rim (dark styles) — the confined-world seller */}
       {WORLD_EDGE.floor.byStyle[mapStyle] && (
         <VoidFloor flight={flight} origin={origin} mapStyle={mapStyle} />
+      )}
+
+      {/* Round 7: distant town glow-domes on the horizon (toy only, +1 draw) */}
+      {mapStyle === 'toy' && <TownGlow flight={flight} origin={origin} engine={engine} />}
+
+      {/* Round 8 (P5): procedural landmark monuments (toy only, +10 draws) */}
+      {mapStyle === 'toy' && (
+        <LandmarkMonuments
+          flight={flight}
+          origin={origin}
+          engine={engine}
+          qualityTier={qualityTier}
+        />
       )}
 
       {(CLOUDS.byStyle[mapStyle]?.enabled ?? true) && (

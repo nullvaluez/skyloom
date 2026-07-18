@@ -11,12 +11,22 @@
  */
 
 export const CARD_THEME = {
-  // Glass body (PALETTE.groundBase → skyZenith gradient, near-opaque)
-  bgTop: 'rgba(16, 19, 34, 0.94)',
-  bgBottom: 'rgba(7, 10, 20, 0.97)',
-  scrim: 'rgba(4, 6, 13, 0.55)', // full-screen backdrop (PALETTE.voidFloor)
+  // Round 7 "holo codex": the card went TRANSPARENT — the live world stays
+  // visible behind it (the sky IS the backdrop). Text sits on gradient-
+  // local panels, not an opaque body. Pre-round-7 values: bgTop .94,
+  // bgBottom .97, scrim .55.
+  bgTop: 'rgba(16, 19, 34, 0.30)',
+  bgBottom: 'rgba(7, 10, 20, 0.38)',
+  scrim: 'rgba(4, 6, 13, 0.12)', // whisper of a backdrop (PALETTE.voidFloor)
   edge: 'rgba(207, 238, 248, 0.30)', // card border (PALETTE.waterFoam @30%)
   edgeSoft: 'rgba(207, 238, 248, 0.14)', // inner hairlines / dividers
+  textPanel: 'rgba(4, 6, 13, 0.42)', // gradient-local scrim behind data rows
+
+  // Round 8.5 (§B): action-failure voice (card-level flash + notice) and
+  // the hero-photo legibility scrim (docked panel, photo leads the card)
+  danger: '#f87171',
+  dangerFlash: 'rgba(248, 113, 113, 0.20)',
+  heroScrim: 'linear-gradient(180deg, rgba(4, 6, 13, 0.35), transparent 30%, transparent 60%, rgba(4, 6, 13, 0.72))',
 
   // Ink+Ice text ramp
   ice: '#eef5ff', // primary text (PALETTE.roadMotorway)

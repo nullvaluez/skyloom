@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { useFlyStore } from '@/stores/fly-store';
 import { useRoute } from '@/hooks/use-route';
-import { useAircraftPhoto } from '@/hooks/use-aircraft';
+import { useAircraftPhoto } from '@/hooks/use-aircraft-photo';
 import { TARGETING } from '@/lib/fly/fly-constants';
 import { M_TO_FT, MPS_TO_KT, RAD2DEG } from '@/lib/fly/coords';
 import { formatSquawk } from '@/lib/format';

@@ -1,6 +1,7 @@
 /** Quick visual check: spawn view after cloud-material fix. */
 const { chromium } = require('playwright');
 const path = require('path');
+const { bootFly } = require('./_boot');
 
 (async () => {
   const browser = await chromium.launch({
@@ -11,11 +12,8 @@ const path = require('path');
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
-  await page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded', timeout: 90000 });
-  await page.waitForSelector('header', { timeout: 90000 });
-  await page.locator('button[aria-label="Fly Mode"]').click();
-  await page.waitForSelector('.fixed.inset-0 canvas', { timeout: 90000 });
-  await page.waitForTimeout(14000);
+  await bootFly(page); // R9-3: fly-only boot
+  await page.waitForTimeout(3000); // clouds drift into frame
   await page.mouse.move(800, 450);
   await page.waitForTimeout(1000);
   await page.screenshot({ path: path.join(__dirname, 'p3-06-clouds-fixed.png') });

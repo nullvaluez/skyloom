@@ -1,6 +1,7 @@
 /** Close-up traffic model check: warp + intercept → formation screenshots. */
 const { chromium } = require('playwright');
 const path = require('path');
+const { bootFly } = require('./_boot');
 
 (async () => {
   const browser = await chromium.launch({
@@ -12,12 +13,7 @@ const path = require('path');
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
 
-  await page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded', timeout: 90000 });
-  await page.waitForSelector('header', { timeout: 90000 });
-  await page.evaluate(() => localStorage.setItem('fly-controls-seen', '1'));
-  await page.locator('button[aria-label="Fly Mode"]').click();
-  await page.waitForSelector('.fixed.inset-0 canvas', { timeout: 90000 });
-  await page.waitForTimeout(12000);
+  await bootFly(page); // R9-3: fly-only boot — the archetype loop below retries for live candidates
   await page.mouse.move(800, 450);
 
   for (const arch of [0, 5, 4, 3]) {

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { CircleGeometry, Color, Mesh, ShaderMaterial } from 'three';
-import { GLOBE, WORLD_EDGE } from '@/lib/fly/fly-constants';
+import { GLOBE, NIGHT, TOY, WORLD_EDGE } from '@/lib/fly/fly-constants';
 import { PALETTE } from '@/lib/fly/toy-world/toy-palette';
 
 /**
@@ -29,11 +29,18 @@ export function VoidFloor({ flight, origin, mapStyle }) {
   const mesh = useMemo(() => {
     const f = WORLD_EDGE.floor;
     const mat = new ShaderMaterial({
-      fog: false, // fogExp2 would flatten the whole disc to fog color
+      fog: false, // three's fogExp2 uses VIEW depth; we fog radially (below)
       uniforms: {
         uBase: { value: new Color('#04060d') },
         uGrid: { value: new Color('#3d4a75') },
         uVoid: { value: new Color('#04060d') },
+        // Round 8 fix round (dark horizon band): far floor converges toward
+        // the style's RIM color with the scene-fog exp2 law — at flying
+        // altitudes the floor IS what fills the band between the terrain
+        // silhouette and the sky, and fog-free black there buried the rim
+        // glow behind a hard dead band.
+        uRim: { value: new Color('#1a2246') },
+        uRimFogD: { value: 0 },
         uGridOffset: { value: { x: 0, y: 0, isVector2: true } },
         uCell: { value: f.cellM },
         uLinePx: { value: f.lineWidthPx },
@@ -59,6 +66,8 @@ export function VoidFloor({ flight, origin, mapStyle }) {
         uniform vec3 uBase;
         uniform vec3 uGrid;
         uniform vec3 uVoid;
+        uniform vec3 uRim;
+        uniform float uRimFogD;
         uniform vec2 uGridOffset;
         uniform float uCell;
         uniform float uLinePx;
@@ -75,6 +84,12 @@ export function VoidFloor({ flight, origin, mapStyle }) {
           float gridVis = uGridAlpha * (1.0 - smoothstep(uFades.x, uFades.y, r));
           vec3 col = mix(uBase, uGrid, line * gridVis);
           col = mix(col, uVoid, smoothstep(uFades.z, uFades.w, r));
+          // Rim haze last (round-8 fix): same exp2 law as scene fog, radial
+          // distance from the player — the far floor melts into the SHARED
+          // rim tone the terrain fade and sky dome already present, so the
+          // horizon band glows instead of hard-cutting to black.
+          float rimF = 1.0 - exp(-uRimFogD * uRimFogD * r * r);
+          col = mix(col, uRim, rimF);
           gl_FragColor = vec4(col, 1.0);
           #include <colorspace_fragment>
         }
@@ -97,6 +112,10 @@ export function VoidFloor({ flight, origin, mapStyle }) {
     u.uGrid.value.set(grid);
     u.uVoid.value.set(base);
     u.uGridAlpha.value = WORLD_EDGE.floor.gridAlpha[mapStyle] ?? 0.3;
+    // Rim haze: the style's shared rim color + fog density (× rimFogScale)
+    u.uRim.value.set(GLOBE.rim[mapStyle] ?? GLOBE.rim.toy);
+    u.uRimFogD.value =
+      (isToy ? TOY.fogDensity : NIGHT.fogDensity) * WORLD_EDGE.floor.rimFogScale;
     const fade = WORLD_EDGE.fade[mapStyle] ?? WORLD_EDGE.fade.toy;
     const bendR = GLOBE.bendRadiusM[mapStyle] ?? GLOBE.bendRadiusM.toy;
     floorY.current = -((fade.endM * fade.endM) / (2 * bendR)) - WORLD_EDGE.floor.marginM;

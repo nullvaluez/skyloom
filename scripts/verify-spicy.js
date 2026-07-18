@@ -7,6 +7,7 @@
  */
 const { chromium } = require('playwright');
 const path = require('path');
+const { bootFly } = require('./_boot');
 
 (async () => {
   const browser = await chromium.launch({
@@ -19,12 +20,7 @@ const path = require('path');
   page.on('pageerror', (e) => errs.push(e.message));
   const shot = (n) => page.screenshot({ path: path.join(__dirname, `spicy-${n}.png`) });
 
-  await page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded', timeout: 120000 });
-  await page.waitForSelector('header', { timeout: 120000 });
-  await page.evaluate(() => localStorage.setItem('fly-controls-seen', '1'));
-  await page.locator('button[aria-label="Fly Mode"]').click();
-  await page.waitForSelector('.fixed.inset-0 canvas', { timeout: 120000 });
-  await page.waitForTimeout(10000);
+  await bootFly(page); // R9-3: fly-only boot — waits on the real __flyBoot contract
   await page.mouse.move(800, 450);
 
   // Synthetic military contact 12km NE, military archetype (4) + iconType.

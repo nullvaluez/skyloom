@@ -22,15 +22,27 @@ const initialState = {
   // Aircraft being inspected in the click-modal (input is neutralized while set)
   inspectHex: null,
 
+  // Round 8.5 (§B): true while FlyScene's action handles (warpTo/warpToGeo/
+  // interceptHex) are registered on the runtime bus — overlays gate their
+  // buttons on this instead of probing possibly-orphaned runtime captures.
+  runtimeReady: false,
+
   // Procedural audio on/off (WebAudio, no assets)
   soundOn: true,
 
-  // Terrain imagery style: 'toy' (CARTO Voyager arcade diorama, default) |
-  // 'satellite' (Esri) | 'night' (CARTO dark)
+  // Terrain imagery style: 'toy' ("Neon" — OpenFreeMap vector world over a
+  // solid ink tile, default) | 'satellite' ("Day", Esri). Round 7 retired
+  // 'night' (flat CARTO raster) — setMapStyle migrates stale callers.
   mapStyle: 'toy',
 
   // Bumped on every warp — drives the DOM flash + lets overlays reset
   warpEpoch: 0,
+  // 'local' (target warp / short hop) or 'far' (cross-region atlas warp) —
+  // far warps get the held streak→hold→reveal arrival treatment (round 6)
+  warpKind: 'local',
+  // 'chase' | 'cinema' — cinema is the wing view while intercept/formation
+  // is flying (C toggles; FlyScene auto-reverts on lock loss)
+  cameraMode: 'chase',
 
   // Overlays
   creditsOpen: false,
@@ -39,6 +51,10 @@ const initialState = {
   atlasOpen: false,
   // Last atlas-warp arrival { name, kind, at } — drives the arrival banner
   arrival: null,
+
+  // Round 7: last airport-buzz event { airport, kind: 'buzz'|'touch-go',
+  // pts, at } — drives the SpotToast arcade flavor (discrete, 1Hz source)
+  buzz: null,
 
   // Telemetry (discrete, low-frequency — never per-frame)
   trafficCount: 0,
@@ -78,11 +94,16 @@ export const useFlyStore = create(
 
     setInspectHex: (inspectHex) => set({ inspectHex }),
 
+    setRuntimeReady: (runtimeReady) => set({ runtimeReady }),
+
     toggleSound: () => set((state) => ({ soundOn: !state.soundOn })),
 
-    setMapStyle: (mapStyle) => set({ mapStyle }),
+    // Round 7: 'night' retired — stale callers (old harnesses, saved links)
+    // deterministically land on Neon instead of exercising ?? fallbacks.
+    setMapStyle: (mapStyle) => set({ mapStyle: mapStyle === 'night' ? 'toy' : mapStyle }),
 
-    bumpWarpEpoch: () => set((state) => ({ warpEpoch: state.warpEpoch + 1 })),
+    bumpWarpEpoch: (warpKind = 'local') =>
+      set((state) => ({ warpEpoch: state.warpEpoch + 1, warpKind })),
 
     openCredits: () => set({ creditsOpen: true }),
 
@@ -91,6 +112,10 @@ export const useFlyStore = create(
     setAtlasOpen: (atlasOpen) => set({ atlasOpen }),
 
     setArrival: (arrival) => set({ arrival }),
+
+    setBuzz: (buzz) => set({ buzz }),
+
+    setCameraMode: (cameraMode) => set({ cameraMode }),
 
     markControlsHelpSeen: () => set({ controlsHelpSeen: true }),
 

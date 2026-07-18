@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useState } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { PerformanceMonitor } from '@react-three/drei';
 import { FlyScene } from './FlyScene';
 import { Effects } from './Effects';
@@ -14,6 +14,19 @@ function initialDpr() {
 }
 
 const TIERS = ['low', 'medium', 'high'];
+
+/**
+ * R9-1 boot gate (c): counts rendered frames AFTER Suspense resolved (it
+ * mounts beside FlyScene, so its useFrame only runs once the scene — and
+ * its compiled shaders — actually draw). The BootScreen overlay polls
+ * runtime.framesRendered from the DOM.
+ */
+function BootFramePulse({ runtime }) {
+  useFrame(() => {
+    runtime.framesRendered = (runtime.framesRendered ?? 0) + 1;
+  });
+  return null;
+}
 
 /** Second rung of the quality ladder after DPR: bloom + cloud density. */
 function stepQualityTier(dir) {
@@ -72,6 +85,7 @@ export function FlyCanvas({ runtime }) {
         <Suspense fallback={null}>
           <FlyScene runtime={runtime} />
           <Effects />
+          <BootFramePulse runtime={runtime} />
         </Suspense>
       </PerformanceMonitor>
     </Canvas>

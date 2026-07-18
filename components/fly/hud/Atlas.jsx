@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildAtlasList } from '@/lib/fly/poi-data';
+import { getRuntimeAction } from '@/lib/fly/runtime-bus';
 import { useFlyStore } from '@/stores/fly-store';
 import { useFlyAtlasStore } from '@/stores/fly-atlas-store';
 import { AtlasMap } from './atlas/AtlasMap';
@@ -40,6 +41,7 @@ function AtlasBody({ runtime }) {
   const [selectedKey, setSelectedKey] = useState(null);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [focus, setFocus] = useState(null); // {lat, lon, seq} → AtlasMap centers
+  const [warpNotice, setWarpNotice] = useState(null); // { key, msg } | null
   const inputRef = useRef(null);
   const focusSeq = useRef(0);
 
@@ -81,13 +83,30 @@ function AtlasBody({ runtime }) {
   };
 
   const warp = (entry) => {
-    if (!runtime.warpToGeo) return;
-    const ok = runtime.warpToGeo(entry.lat, entry.lon, {
-      ...warpOptsFor(entry),
-      name: entry.name,
-      kind: entry.kind,
-    });
-    if (ok) useFlyAtlasStore.getState().logVisit(entry.key, entry.name, entry.kind);
+    // Round 8 fix (F5): resolve through the runtime bus AT CALL TIME (the
+    // InspectModal pattern) — the old `if (!runtime.warpToGeo) return` was
+    // a silent dead button across the scene unmount→remount window.
+    const fn =
+      getRuntimeAction('warpToGeo') ??
+      (typeof runtime.warpToGeo === 'function' ? runtime.warpToGeo : null);
+    const ok =
+      !!fn &&
+      fn(entry.lat, entry.lon, {
+        ...warpOptsFor(entry),
+        name: entry.name,
+        kind: entry.kind,
+      });
+    if (ok) {
+      setWarpNotice(null);
+      useFlyAtlasStore.getState().logVisit(entry.key, entry.name, entry.kind);
+    } else {
+      setWarpNotice({
+        key: Date.now(),
+        msg: useFlyStore.getState().runtimeReady
+          ? 'warp failed — try again'
+          : 'scene rebuilding — try again',
+      });
+    }
   };
 
   const randomCity = () => {
@@ -207,6 +226,16 @@ function AtlasBody({ runtime }) {
               </div>
             )}
           </div>
+          {warpNotice && (
+            <span
+              key={warpNotice.key}
+              className="font-mono text-[10px] uppercase tracking-[0.2em]"
+              style={{ color: '#ff6b6b' }}
+              data-testid="atlas-warp-notice"
+            >
+              {warpNotice.msg}
+            </span>
+          )}
           <span className="font-mono text-[10px]" style={{ color: CARD_THEME.iceFaint }}>
             esc / M close
           </span>

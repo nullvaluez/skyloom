@@ -17,6 +17,7 @@ import {
 import { mercatorScale } from '@/lib/fly/coords';
 import { GLOBE, TRACERS } from '@/lib/fly/fly-constants';
 import { applyBendAir } from '@/lib/fly/toy-world/world-bend';
+import { useFlyStore } from '@/stores/fly-store';
 
 // Altitude → neon (airloom reference): green on the deck, yellow low,
 // orange mid, cyan cruise. Tail fades to black (additive = transparent).
@@ -79,9 +80,48 @@ const PTS = P + 1; // + the live dead-reckoned head appended at draw time
 
 // Scratch: current track's points (absolute float64), oldest → head
 const _pts = new Float64Array(PTS * 3);
+const _vlen = new Float64Array(PTS); // per-point camera distance (near-fade)
 const _tan = new Vector3();
 const _view = new Vector3();
 const _side = new Vector3();
+const _camFwd = new Vector3();
+
+/**
+ * Instant trail (Round 6, user-approved fake): fill the whole ring
+ * backwards along the track's current velocity so a freshly-seen plane
+ * carries a full-length contrail immediately instead of growing a stub
+ * for 15-20s. Horizontal step is mercator-stretched to match the world;
+ * vUp gives climbing/descending traffic a plausible slope. Real
+ * dead-reckoned recording takes over from the next append on.
+ */
+function backfillRec(rec, t) {
+  const fix = t.fix1;
+  const h = Math.hypot(fix.vE, fix.vN);
+  if (h < 1) return;
+  // mercatorScale at the track (synthetic harness fixes may lack latRad)
+  const k = Number.isFinite(fix.latRad) ? 1 / Math.cos(fix.latRad) : 1;
+  const sx = (-fix.vE / h) * TRACERS.ribbon.minSpacingM * k;
+  // Clamp the synthetic climb slope: a hard climber's extrapolated trail
+  // (25%+ grade over 3.8km) foreshortens into a vertical streak when seen
+  // end-on. Real recorded points are unclamped — physics wins once live.
+  const slope = Math.max(-0.12, Math.min(0.12, fix.vUp / h));
+  const sy = -slope * TRACERS.ribbon.minSpacingM;
+  const sz = (fix.vN / h) * TRACERS.ribbon.minSpacingM * k; // world +z = south
+  const buf = rec.buf;
+  for (let j = 0; j < P; j++) {
+    const back = P - j; // oldest (j=0) is farthest behind the head
+    buf[j * 3] = t.rx + sx * back;
+    // ryd: trails record in the drawn frame with the head (round 8.5 H1)
+    buf[j * 3 + 1] = Math.max(0, t.ryd + sy * back);
+    buf[j * 3 + 2] = t.rz + sz * back;
+  }
+  rec.head = 0; // gather reads ((0 - P + j + P) % P) = j → oldest-first
+  rec.cnt = P;
+  if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+    const stats = (window.__flyStats ??= {});
+    stats.tracerBackfills = (stats.tracerBackfills ?? 0) + 1;
+  }
+}
 
 /**
  * Per-track state lives HERE (render-only) — traffic-engine stays a pure
@@ -92,6 +132,7 @@ const _side = new Vector3();
  * (correction snap after a long gap) > warpResetM hard-cuts its buffer.
  */
 function RibbonTracers({ runtime, origin }) {
+  const mapStyle = useFlyStore((s) => s.mapStyle);
   const { mesh, pos, col } = useMemo(() => {
     const geo = new BufferGeometry();
     const vertCount = TRACERS.max * PTS * 2;
@@ -125,6 +166,10 @@ function RibbonTracers({ runtime, origin }) {
       blending: AdditiveBlending,
       depthWrite: false,
       side: DoubleSide,
+      // Round 8.5 (H3): tracers own their alpha ladder (displayAlpha /
+      // tail pow / rim dissolve) — scene fog (toy: 2.7× satellite's
+      // density) was double-dimming the additive trails at distance.
+      fog: false,
     });
     applyBendAir(mat, GLOBE.trafficBend); // rebased coords; aircraft (capped) bend
     const mesh = new Mesh(geo, mat);
@@ -147,6 +192,12 @@ function RibbonTracers({ runtime, origin }) {
     const items = runtime.traffic?.items ?? [];
     const ax = origin.anchor.x;
     const az = origin.anchor.z;
+    camera.getWorldDirection(_camFwd);
+    // Round 8 fix (F5): per-style write-time brightness — additive ribbons
+    // over the toy world's near-black backdrop need a gain (and a longer
+    // bright head section) that satellite's bright imagery never did.
+    const gain = TRACERS.styleGain[mapStyle] ?? 1;
+    const headFrac = TRACERS.headSectionFrac[mapStyle] ?? 0;
     let n = 0;
     let resets = 0;
 
@@ -164,30 +215,38 @@ function RibbonTracers({ runtime, origin }) {
         if (!gateOn) continue; // nothing recorded, nothing to draw
         rec = { buf: state.pool.pop() ?? new Float64Array(P * 3), head: 0, cnt: 0 };
         state.recs.set(t.hex, rec);
+        if (TRACERS.ribbon.backfill) backfillRec(rec, t); // instant full trail
       }
       const buf = rec.buf;
 
       // --- Record (absolute float64 head from the dead-reckoned track) ---
       const hx = t.rx;
-      const hy = t.ry;
+      const hy = t.ryd; // drawn-frame render Y (round 8.5 H1) — matches TrafficLayer
       const hz = t.rz;
       if (rec.cnt > 0) {
         const li = ((rec.head - 1 + P) % P) * 3;
         const step = Math.hypot(hx - buf[li], hy - buf[li + 1], hz - buf[li + 2]);
-        if (step > TRACERS.ribbon.warpResetM) {
-          // Correction snap after a long data gap — hard cut, no smear
+        const vStep = Math.abs(hy - buf[li + 1]);
+        // Big 3D jump = data-gap correction; big VERTICAL step = altitude
+        // correction/blend (drawing it produced the "vertical contrail"
+        // columns). Either way: hard cut, then re-backfill along the new
+        // velocity so the trail comes back whole, not as a stub.
+        if (step > TRACERS.ribbon.warpResetM || vStep > TRACERS.ribbon.vertCutM) {
           rec.cnt = 0;
           rec.head = 0;
           resets += 1;
+          if (TRACERS.ribbon.backfill && gateOn && t.stale !== 2) backfillRec(rec, t);
         }
       }
       if (gateOn && t.stale !== 2) {
         // frozen tracks stop appending; the ribbon holds at the alpha floor
         const li = ((rec.head - 1 + P) % P) * 3;
+        // HORIZONTAL spacing only: a pure altitude sweep (altBlend lerping
+        // ry with no ground motion) must never mint ribbon points — that
+        // was the vertical-column artifact.
         if (
           rec.cnt === 0 ||
-          Math.hypot(hx - buf[li], hy - buf[li + 1], hz - buf[li + 2]) >=
-            TRACERS.ribbon.minSpacingM
+          Math.hypot(hx - buf[li], hz - buf[li + 2]) >= TRACERS.ribbon.minSpacingM
         ) {
           const o = rec.head * 3;
           buf[o] = hx;
@@ -217,6 +276,19 @@ function RibbonTracers({ runtime, origin }) {
       // --- Write the slot: camera-facing tapered quads ---
       const c = BANDS.find(([alt]) => t.ry < alt)[1];
       const headBright = headBrightFor(displayAlpha);
+      // Pre-pass: camera distance per point. The near-fade takes the MIN
+      // over a point's neighbors so a segment STRADDLING the camera (both
+      // endpoints outside the window, midpoint at your face — the
+      // formation "slab") still collapses.
+      for (let j = 0; j < m; j++) {
+        const j3 = j * 3;
+        _view.set(
+          _pts[j3] - ax - camera.position.x,
+          _pts[j3 + 1] - camera.position.y,
+          _pts[j3 + 2] - az - camera.position.z
+        );
+        _vlen[j] = _view.length();
+      }
       let vo = n * PTS * 2 * 3; // float offset of this slot's verts
       for (let j = 0; j < m; j++) {
         const j3 = j * 3;
@@ -231,7 +303,11 @@ function RibbonTracers({ runtime, origin }) {
         // Collapse width near the camera: CHASE parks the camera inside
         // the target's own ribbon — full-width camera-facing quads at
         // ~20m would smear across the whole screen.
-        const vlen = _view.length();
+        const vlen = Math.min(
+          _vlen[j],
+          j > 0 ? _vlen[j - 1] : Infinity,
+          j < m - 1 ? _vlen[j + 1] : Infinity
+        );
         const nearK = Math.min(
           1,
           Math.max(
@@ -242,14 +318,37 @@ function RibbonTracers({ runtime, origin }) {
         );
         _side.crossVectors(_view, _tan);
         const len = _side.length() || 1;
+        // Edge-on collapse: a trail pointing radially at the camera
+        // foreshortens its bend-drop gradient into a floating vertical
+        // bar (round-6 user report). sin(view↔tangent) fades it out.
+        const sinT = len / ((_vlen[j] * _tan.length()) || 1);
+        const edgeK = Math.min(1, Math.max(0, (sinT - 0.06) / 0.2));
+        // Behind-camera cull: chase mode parks the camera inside the
+        // target's own trail — behind-camera points project mirrored
+        // (negative w) and smeared. Zero width pinches them closed.
+        const behindK = _view.dot(_camFwd) < 0 ? 0 : 1;
         const tt = j / (m - 1); // 0 tail → 1 head
         const halfW =
           ((TRACERS.ribbon.widthTailM +
             (TRACERS.ribbon.widthHeadM - TRACERS.ribbon.widthTailM) * tt) *
-            nearK) /
+            nearK *
+            edgeK *
+            behindK) /
           2 /
           len;
-        const bright = j === m - 1 ? headBright : displayAlpha * Math.pow(tt, 1.4);
+        let bright;
+        if (j === m - 1) {
+          bright = headBright;
+        } else {
+          bright = displayAlpha * Math.pow(tt, 1.4);
+          if (headFrac > 0 && tt > 1 - headFrac) {
+            // longer bright head section (toy): floor the run-in to the head
+            // at half→full head brightness instead of the raw pow taper
+            const hk = (tt - (1 - headFrac)) / headFrac;
+            bright = Math.max(bright, headBright * (0.5 + 0.5 * hk));
+          }
+        }
+        bright *= gain;
         const rx = _pts[j3] - ax;
         const ry = _pts[j3 + 1];
         const rz = _pts[j3 + 2] - az;
@@ -335,6 +434,7 @@ function RibbonTracers({ runtime, origin }) {
 // ---------------------------------------------------------------------------
 
 function StreakTracers({ runtime, flight, origin }) {
+  const mapStyle = useFlyStore((s) => s.mapStyle);
   const { mesh, pos, col } = useMemo(() => {
     const geo = new BufferGeometry();
     const pos = new BufferAttribute(new Float32Array(TRACERS.max * 6), 3);
@@ -348,6 +448,7 @@ function StreakTracers({ runtime, flight, origin }) {
       transparent: true,
       blending: AdditiveBlending,
       depthWrite: false,
+      fog: false, // round 8.5 (H3) — same reason as the ribbon material
     });
     applyBendAir(mat, GLOBE.trafficBend);
     const mesh = new LineSegments(geo, mat);
@@ -367,6 +468,7 @@ function StreakTracers({ runtime, flight, origin }) {
   useFrame(() => {
     const items = runtime.traffic?.items ?? [];
     const k = mercatorScale(flight.latDeg);
+    const gain = TRACERS.styleGain[mapStyle] ?? 1; // round 8 fix (F5)
     let n = 0;
     for (let i = 0; i < items.length && n < TRACERS.max; i++) {
       const t = items[i];
@@ -378,7 +480,7 @@ function StreakTracers({ runtime, flight, origin }) {
       if (!speedGate(state.gates, t.hex, speed)) continue;
       const lenSec = Math.min(TRACERS.streakLenSecMax, 4000 / speed + 20); // ~5–12km
       const hx = t.rx - origin.anchor.x;
-      const hy = t.ry;
+      const hy = t.ryd; // drawn-frame render Y (round 8.5 H1)
       const hz = t.rz - origin.anchor.z;
       const c = BANDS.find(([alt]) => t.ry < alt)[1];
       const o = n * 6;
@@ -388,13 +490,13 @@ function StreakTracers({ runtime, flight, origin }) {
       pos.array[o + 3] = hx - fix.vE * lenSec * k;
       pos.array[o + 4] = hy - fix.vUp * lenSec;
       pos.array[o + 5] = hz + fix.vN * lenSec * k;
-      const head = headBrightFor(displayAlpha);
+      const head = headBrightFor(displayAlpha) * gain;
       col.array[o] = c.r * head;
       col.array[o + 1] = c.g * head;
       col.array[o + 2] = c.b * head;
-      col.array[o + 3] = c.r * 0.02;
-      col.array[o + 4] = c.g * 0.02;
-      col.array[o + 5] = c.b * 0.02;
+      col.array[o + 3] = c.r * 0.02 * gain;
+      col.array[o + 4] = c.g * 0.02 * gain;
+      col.array[o + 5] = c.b * 0.02 * gain;
       n += 1;
     }
     mesh.geometry.setDrawRange(0, n * 2);

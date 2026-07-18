@@ -1,6 +1,7 @@
 /** Side-profile screenshot of the player plane via RMB free-look. */
 const { chromium } = require('playwright');
 const path = require('path');
+const { bootFly } = require('./_boot');
 
 (async () => {
   const browser = await chromium.launch({
@@ -9,12 +10,7 @@ const path = require('path');
     args: ['--enable-gpu', '--ignore-gpu-blocklist'],
   });
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
-  await page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded', timeout: 90000 });
-  await page.waitForSelector('header', { timeout: 90000 });
-  await page.evaluate(() => localStorage.setItem('fly-controls-seen', '1'));
-  await page.locator('button[aria-label="Fly Mode"]').click();
-  await page.waitForSelector('.fixed.inset-0 canvas', { timeout: 90000 });
-  await page.waitForTimeout(10000);
+  await bootFly(page); // R9-3: fly-only boot
   await page.mouse.move(800, 450);
   await page.waitForTimeout(500);
 

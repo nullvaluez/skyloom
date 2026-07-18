@@ -10,7 +10,7 @@ import {
   Vignette,
   SMAA,
 } from '@react-three/postprocessing';
-import { NIGHT, SKY, TOY } from '@/lib/fly/fly-constants';
+import { SKY, TOY } from '@/lib/fly/fly-constants';
 import { useFlyStore } from '@/stores/fly-store';
 
 // Bloom buffer scale per quality tier; at 'low' bloom is dropped entirely
@@ -22,7 +22,6 @@ const BLOOM_SCALE = { high: 0.5, medium: 0.3, low: 0 };
 // the neon palette values in the dark styles).
 const BLOOM_BY_STYLE = {
   satellite: { intensity: SKY.bloomIntensity, threshold: SKY.bloomThreshold },
-  night: { intensity: NIGHT.bloomIntensity, threshold: NIGHT.bloomThreshold },
   toy: { intensity: TOY.bloomIntensity, threshold: TOY.bloomThreshold },
 };
 

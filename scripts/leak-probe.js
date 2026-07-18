@@ -10,6 +10,7 @@
 const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
+const { bootFly } = require('./_boot');
 
 const WINDOW_SEC = parseFloat(process.argv[2] || '90');
 
@@ -35,13 +36,9 @@ const WINDOW_SEC = parseFloat(process.argv[2] || '90');
     console.log('console.assert guard installed');
   }
 
-  await page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded', timeout: 90000 });
-  await page.waitForSelector('header', { timeout: 90000 });
-  await page.evaluate(() => localStorage.setItem('fly-controls-seen', '1'));
-  await page.locator('button[aria-label="Fly Mode"]').click();
-  await page.waitForSelector('.fixed.inset-0 canvas', { timeout: 90000 });
-  console.log('fly mode up; warming 20s (tile stream-in settles)...');
-  await page.waitForTimeout(20000);
+  await bootFly(page); // R9-3: fly-only boot — waits on the real __flyBoot contract
+  console.log('fly mode up; warming 10s (post-boot allocations settle)...');
+  await page.waitForTimeout(10000);
 
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('HeapProfiler.enable');

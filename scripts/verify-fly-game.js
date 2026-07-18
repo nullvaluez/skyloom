@@ -5,6 +5,7 @@
  */
 const { chromium } = require('playwright');
 const path = require('path');
+const { bootFly } = require('./_boot');
 
 const shot = (page, name) =>
   page.screenshot({ path: path.join(__dirname, `game-${name}.png`) });
@@ -60,14 +61,10 @@ async function pickTarget(page) {
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
 
-  await page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded', timeout: 90000 });
-  await page.waitForSelector('header', { timeout: 90000 });
-  await page.evaluate(() => localStorage.setItem('fly-controls-seen', '1'));
-  await page.locator('button[aria-label="Fly Mode"]').click();
-  await page.waitForSelector('.fixed.inset-0 canvas', { timeout: 90000 });
+  await bootFly(page); // R9-3: fly-only boot — waits on the real __flyBoot contract
 
-  // Let terrain + first traffic polls land
-  await page.waitForTimeout(12000);
+  // Let the first traffic polls land (not a boot wait)
+  await page.waitForTimeout(5000);
   await page.mouse.move(800, 450); // center = neutral stick
   await page.waitForTimeout(1500);
 
