@@ -164,7 +164,7 @@ function AtlasBody({ runtime }) {
         }}
       >
         {/* header: title · search · close */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 max-sm:flex-wrap max-sm:gap-x-2 max-sm:gap-y-2">
           <h2
             className="text-lg uppercase tracking-[0.3em]"
             style={{ fontFamily: CARD_THEME.fontDisplay, color: CARD_THEME.ice }}
@@ -236,7 +236,7 @@ function AtlasBody({ runtime }) {
               {warpNotice.msg}
             </span>
           )}
-          <span className="font-mono text-[10px]" style={{ color: CARD_THEME.iceFaint }}>
+          <span className="font-mono text-[10px] max-sm:hidden" style={{ color: CARD_THEME.iceFaint }}>
             esc / M close
           </span>
           <button
@@ -249,10 +249,11 @@ function AtlasBody({ runtime }) {
           </button>
         </div>
 
-        {/* map + destination card */}
-        <div className="mt-3 flex min-h-0 flex-1 gap-3">
+        {/* map + destination card — side by side on desktop, stacked on phone
+            (map a fixed band on top, card scrolls below) */}
+        <div className="mt-3 flex min-h-0 flex-1 gap-3 max-sm:flex-col max-sm:gap-2 max-sm:overflow-y-auto">
           <div
-            className="min-w-0 flex-1 overflow-hidden rounded-lg border"
+            className="min-w-0 flex-1 overflow-hidden rounded-lg border max-sm:h-[32svh] max-sm:flex-none"
             style={{ borderColor: CARD_THEME.edgeSoft }}
           >
             <AtlasMap
@@ -263,13 +264,13 @@ function AtlasBody({ runtime }) {
               focus={focus}
             />
           </div>
-          <div className="w-72 shrink-0">
+          <div className="w-72 shrink-0 max-sm:w-full max-sm:shrink">
             <DestinationCard entry={selected} runtime={runtime} onWarp={warp} />
           </div>
         </div>
 
         {/* footer: random · recents · filters */}
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-3 flex items-center gap-2 max-sm:flex-wrap max-sm:gap-y-2">
           <button
             onClick={randomCity}
             className="rounded-md border px-2.5 py-1 font-mono text-[11px] transition-colors hover:bg-white/10"

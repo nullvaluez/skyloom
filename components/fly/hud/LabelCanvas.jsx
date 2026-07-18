@@ -147,10 +147,41 @@ export function LabelCanvas({ runtime }) {
       cursor.x = e.clientX;
       cursor.y = e.clientY;
     };
+    // Nearest projected aircraft to a screen point, within the pick radius.
+    // Mirrors the hover pick below; used for the direct touch-tap path.
+    const pickAt = (x, y, radius) => {
+      let best = null;
+      let bestD = radius;
+      for (const hit of hits) {
+        let d = Math.hypot(hit.sx - x, hit.sy - y);
+        const r = hit.rect;
+        if (r && x >= r[0] - 6 && x <= r[0] + r[2] + 6 && y >= r[1] - 6 && y <= r[1] + r[3] + 6) {
+          d = 0; // tap landed on the label itself
+        }
+        if (d < bestD) {
+          bestD = d;
+          best = hit.hex;
+        }
+      }
+      return best;
+    };
     const onDown = (e) => {
-      if (e.button !== 0 || !runtime.hoverHex) return;
       const store = useFlyStore.getState();
       if (store.phase !== 'flying' || store.inspectHex || store.atlasOpen) return;
+      // Touch has no persistent hover — hit-test the tap point directly against
+      // this frame's projected planes (a fat-finger radius, since there's no
+      // aim), and never let the steering stick eat the tap (input ignores
+      // touch pointers on the canvas).
+      if (e.pointerType === 'touch') {
+        const hex = pickAt(e.clientX, e.clientY, Math.max(WARP.hoverRadiusPx, 64));
+        if (hex) {
+          runtime.hoverHex = hex; // brief hover ring on the next frame
+          store.setInspectHex(hex);
+        }
+        return;
+      }
+      // Mouse/pen: the desktop hover ring already resolved the target.
+      if (e.button !== 0 || !runtime.hoverHex) return;
       store.setInspectHex(runtime.hoverHex);
     };
     window.addEventListener('pointermove', onMove);

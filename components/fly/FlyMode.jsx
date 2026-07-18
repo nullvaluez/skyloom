@@ -16,10 +16,12 @@ import { Contracts } from './hud/Contracts';
 import { WarpFlash } from './hud/WarpFlash';
 import { Atlas } from './hud/Atlas';
 import { ArrivalBanner } from './hud/ArrivalBanner';
+import { TouchControls } from './hud/TouchControls';
 import { PauseMenu } from './PauseMenu';
 import { BootScreen } from './hud/BootScreen';
 import { useFlyTraffic } from '@/hooks/use-fly-traffic';
 import { useFlyAudio } from '@/hooks/use-fly-audio';
+import { useIsTouch } from '@/hooks/use-is-touch';
 import { BOOT } from '@/lib/fly/fly-constants';
 import { useFlyStore } from '@/stores/fly-store';
 
@@ -76,6 +78,7 @@ function getSpawnLatLon() {
  */
 export function FlyMode({ onClose }) {
   const spawn = useFlyStore((s) => s.spawn);
+  const isTouch = useIsTouch();
 
   // Shared per-frame runtime: engine/flight/input handles written by the
   // scene, read by DOM overlays at low frequency. Never React state.
@@ -143,10 +146,13 @@ export function FlyMode({ onClose }) {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // Mobile heads-up (non-blocking): flying wants a mouse and a big screen
+  // Small non-touch window heads-up: flying wants room. Touch devices get the
+  // on-screen controls instead of a "use a desktop" nudge, so skip it there.
   const [mobileNote, setMobileNote] = useState(false);
   useEffect(() => {
-    if (window.matchMedia?.('(pointer: coarse)').matches || window.innerWidth < 900) {
+    const coarse = window.matchMedia?.('(pointer: coarse)').matches;
+    const hasTouch = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
+    if (!(coarse && hasTouch) && window.innerWidth < 900) {
       setMobileNote(true);
       const id = setTimeout(() => setMobileNote(false), 8000);
       return () => clearTimeout(id);
@@ -175,6 +181,7 @@ export function FlyMode({ onClose }) {
       <Atlas runtime={runtimeRef.current} />
       <ArrivalBanner />
       <WarpFlash runtime={runtimeRef.current} />
+      {isTouch && <TouchControls runtime={runtimeRef.current} />}
       <PauseMenu onExit={onClose} />
       <AttributionBar />
 
@@ -189,15 +196,19 @@ export function FlyMode({ onClose }) {
         </div>
       )}
 
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={onClose}
-        aria-label="Exit Fly Mode"
-        className="absolute right-4 top-4 z-10 bg-zinc-900/60 text-zinc-100 hover:bg-zinc-800"
-      >
-        <X className="h-5 w-5" />
-      </Button>
+      {/* Desktop keeps the quick-exit X (top-right); touch replaces it with the
+          Pause button in TouchControls, whose menu carries Exit. */}
+      {!isTouch && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
+          aria-label="Exit Fly Mode"
+          className="absolute right-4 top-4 z-10 bg-zinc-900/60 text-zinc-100 hover:bg-zinc-800"
+        >
+          <X className="h-5 w-5" />
+        </Button>
+      )}
     </div>
   );
 }

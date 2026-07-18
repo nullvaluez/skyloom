@@ -179,11 +179,11 @@ export function Contracts({ runtime }) {
 
   return (
     <div
-      className="pointer-events-none absolute left-4 top-24 z-10 w-60 select-none"
+      className="pointer-events-none absolute left-4 top-24 z-10 w-60 select-none max-sm:left-2 max-sm:top-[calc(env(safe-area-inset-top)+8.25rem)] max-sm:w-[10.5rem]"
       data-testid="contracts-panel"
     >
       <div
-        className="rounded-xl border px-3 py-2.5 backdrop-blur-sm"
+        className="rounded-xl border px-3 py-2.5 backdrop-blur-sm max-sm:px-2 max-sm:py-2"
         style={{
           background: 'rgba(6, 9, 18, 0.62)',
           borderColor: 'rgba(148, 163, 184, 0.16)',

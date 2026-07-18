@@ -255,13 +255,17 @@ function ModalBody({ hex, runtime }) {
       animate={{ x: 0, opacity: 1 }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
       style={{
-        width: INSPECT.panelW,
+        // Desktop: fixed 420px right-docked column. Phone: clamp to the
+        // viewport (never overflow the left edge).
+        width: `min(${INSPECT.panelW}px, calc(100vw - 1rem))`,
         '--hero': heroColor,
         backgroundImage: `linear-gradient(180deg, ${CARD_THEME.bgTop}, ${CARD_THEME.bgBottom})`,
         borderColor: CARD_THEME.edge,
         boxShadow: `0 24px 80px rgba(2, 4, 10, 0.45), 0 0 44px color-mix(in srgb, var(--hero) 14%, transparent)`,
       }}
-      className="pointer-events-auto absolute inset-y-16 right-4 z-20 flex flex-col overflow-hidden rounded-3xl border backdrop-blur-sm"
+      // Phone (max-sm): drop the top pin and dock as a bottom sheet, capped in
+      // height — the inner column scrolls, the WARP/CHASE footer stays pinned.
+      className="pointer-events-auto absolute inset-y-16 right-4 z-20 flex flex-col overflow-hidden rounded-3xl border backdrop-blur-sm max-sm:inset-x-2 max-sm:right-2 max-sm:top-auto max-sm:bottom-2 max-sm:max-h-[82svh]"
       data-testid="inspect-card"
     >
       {/* One-shot holo sweep */}
@@ -328,7 +332,7 @@ function ModalBody({ hex, runtime }) {
 
       {/* ---- HERO: real photo when planespotters has one, else turntable ---- */}
       <div
-        className="relative shrink-0 overflow-hidden"
+        className="relative shrink-0 overflow-hidden max-sm:!h-40"
         style={{ height: INSPECT.heroH }}
       >
         {photoLeads ? (

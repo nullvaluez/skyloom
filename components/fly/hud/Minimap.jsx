@@ -142,15 +142,23 @@ export function Minimap({ runtime }) {
     return () => clearInterval(id);
   }, [runtime]);
 
+  // Desktop: bottom-right dial. Touch/phone (max-sm): the bottom corners
+  // belong to the joystick + throttle, so the dial moves to the top-right
+  // (below the compact stats strip) and shrinks — the fixed-resolution canvas
+  // just scales, staying crisp.
   return (
-    <canvas
-      ref={canvasRef}
-      style={{ width: MINIMAP.sizePx, height: MINIMAP.sizePx }}
-      className="pointer-events-auto absolute bottom-10 right-4 z-10 cursor-pointer rounded-full"
-      onClick={() => useFlyStore.getState().setAtlasOpen(true)}
-      title="Open the Atlas (M)"
-      role="button"
-      aria-label="Open the Atlas"
-    />
+    <div
+      className="pointer-events-none absolute bottom-10 right-4 z-10 origin-bottom-right max-sm:bottom-auto max-sm:right-2 max-sm:top-[calc(env(safe-area-inset-top)+3.25rem)] max-sm:origin-top-right max-sm:scale-[0.62]"
+    >
+      <canvas
+        ref={canvasRef}
+        style={{ width: MINIMAP.sizePx, height: MINIMAP.sizePx }}
+        className="pointer-events-auto cursor-pointer rounded-full"
+        onClick={() => useFlyStore.getState().setAtlasOpen(true)}
+        title="Open the Atlas (M)"
+        role="button"
+        aria-label="Open the Atlas"
+      />
+    </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useFlyStore } from '@/stores/fly-store';
+import { useIsTouch } from '@/hooks/use-is-touch';
 import { FLY_ASSETS } from '@/lib/fly/assets';
 import { TERRAIN_ATTRIBUTIONS } from '@/lib/fly/tile-sources';
 
@@ -34,6 +35,16 @@ const CONTROL_ROWS = [
   ['Esc', 'close modal / pause menu'],
 ];
 
+// Touch scheme — mirrors CONTROL_ROWS for the on-screen controls.
+const TOUCH_CONTROL_ROWS = [
+  ['Left stick', 'steer — push where you want to fly (up = climb)'],
+  ['Throttle', 'tap SLOW / CRUISE / BOOST on the right rail'],
+  ['👁 Look', 'toggle free-look, then drag the stick to orbit'],
+  ['Tap a plane', 'inspect it — then WARP to it or order a CHASE'],
+  ['🗺 Atlas', 'warp anywhere on Earth'],
+  ['⏸ Pause', 'this menu — quality, map style, sound, exit'],
+];
+
 /**
  * Pause layer (Phase 6): Esc pauses instead of exiting; exit lives in the
  * menu. Includes the quality-tier setting, the controls reference, and the
@@ -50,6 +61,7 @@ export function PauseMenu({ onExit }) {
   const controlsHelpSeen = useFlyStore((s) => s.controlsHelpSeen);
   const soundOn = useFlyStore((s) => s.soundOn);
   const mapStyle = useFlyStore((s) => s.mapStyle);
+  const isTouch = useIsTouch();
 
   // First-entry controls help + persisted map style
   useEffect(() => {
@@ -99,9 +111,9 @@ export function PauseMenu({ onExit }) {
   // --- First-entry help card (shown while flying, before any pause) ------
   if (phase !== 'paused') {
     return (
-      <div className="pointer-events-auto absolute left-1/2 top-1/2 z-20 w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-zinc-700/60 bg-zinc-900/85 p-5 text-zinc-100 shadow-2xl backdrop-blur">
+      <div className="pointer-events-auto absolute left-1/2 top-1/2 z-20 w-[420px] max-w-[calc(100vw-1.5rem)] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-zinc-700/60 bg-zinc-900/85 p-5 text-zinc-100 shadow-2xl backdrop-blur">
         <h2 className="text-base font-semibold">Welcome to Fly Mode</h2>
-        <ControlsTable />
+        <ControlsTable touch={isTouch} />
         <button
           onClick={markHelpSeen}
           className="mt-4 w-full rounded-md bg-zinc-100 py-1.5 text-sm font-medium text-zinc-900 hover:bg-white"
@@ -182,7 +194,7 @@ export function PauseMenu({ onExit }) {
             <MenuButton onClick={onExit}>Exit Fly Mode</MenuButton>
           </div>
           <div className="mt-3 border-t border-zinc-800 pt-3">
-            <ControlsTable compact />
+            <ControlsTable compact touch={isTouch} />
           </div>
         </div>
       )}
@@ -205,10 +217,11 @@ function MenuButton({ children, onClick, primary = false }) {
   );
 }
 
-function ControlsTable({ compact = false }) {
+function ControlsTable({ compact = false, touch = false }) {
+  const rows = touch ? TOUCH_CONTROL_ROWS : CONTROL_ROWS;
   return (
     <div className={`mt-2 space-y-1 ${compact ? 'text-[10px]' : 'text-xs'}`}>
-      {CONTROL_ROWS.map(([key, what]) => (
+      {rows.map(([key, what]) => (
         <div key={key} className="flex gap-2">
           <span className="w-28 shrink-0 font-mono text-zinc-300">{key}</span>
           <span className="text-zinc-400">{what}</span>
