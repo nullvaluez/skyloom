@@ -24,11 +24,21 @@ export function FlyHUD({ runtime }) {
   const poiRef = useRef(null);
   const spotsRef = useRef(null);
   const chaseRef = useRef(null);
+  const latRef = useRef(null);
+  const lonRef = useRef(null);
 
   useEffect(() => {
     const id = setInterval(() => {
       const f = runtime.flight;
       if (!f) return;
+      // Live geographic position ("where are we"). runtime.geo is a
+      // Vector3(lon, lat, altM) written every 3rd frame by FlyScene; hemisphere
+      // letters avoid a stray minus sign reading as "no fix".
+      const g = runtime.geo;
+      if (g && latRef.current && lonRef.current) {
+        latRef.current.textContent = `${Math.abs(g.y).toFixed(4)}°${g.y >= 0 ? 'N' : 'S'}`;
+        lonRef.current.textContent = `${Math.abs(g.x).toFixed(4)}°${g.x >= 0 ? 'E' : 'W'}`;
+      }
       if (spdRef.current)
         spdRef.current.textContent = Math.round(f.speed * MPS_TO_KT);
       if (altRef.current)
@@ -128,6 +138,16 @@ export function FlyHUD({ runtime }) {
         <div className={`${cell} max-sm:hidden`}>
           <span className={label}>Spots</span>
           <span className={value} ref={spotsRef}>—</span>
+        </div>
+        {/* Live position — "where are we" (per user). Folds away on the compact
+            phone strip; desktop shows lat/lon with N/S · E/W hemispheres. */}
+        <div className={`${cell} max-sm:hidden`}>
+          <span className={label}>Lat</span>
+          <span className={value} ref={latRef}>—</span>
+        </div>
+        <div className={`${cell} max-sm:hidden`}>
+          <span className={label}>Lon</span>
+          <span className={value} ref={lonRef}>—</span>
         </div>
       </div>
 
