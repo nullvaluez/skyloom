@@ -16,7 +16,7 @@
 > Draw budget: measured 461 (Levittown, high tier) vs 450 budget — the +50
 > shadow estimate was low. FIX ROUND + Round 8.5 running; post-build tree
 > tagged `round8-swept` (bef0560). Detailed design doc (full GLSL, tables):
-> `C:/Users/bfecho/.claude/plans/look-over-fly-round7-md-to-unified-moonbeam-agent-ab5cb3cb2ded39983.md`.
+> a machine-local `.claude/plans/` design doc (full GLSL, tables).
 > Pre-round-8 tree snapshot: git tag `round8-baseline`.
 
 ## Context

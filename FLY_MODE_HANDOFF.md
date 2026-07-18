@@ -2,8 +2,8 @@
 
 > **Audience:** a fresh Claude session with no prior context. This document is
 > self-contained: read it top to bottom before writing code. The supplementary
-> approved plan lives at `C:\Users\bfecho\.claude\plans\we-have-created-a-sharded-reef.md`
-> (machine-local), but everything needed is here.
+> approved plan lives at a machine-local `.claude/plans/` path, but everything
+> needed is here.
 >
 > **State as of 2026-07-15 (END OF DAY): ALL PHASES 0–6 IMPLEMENTED AND
 > BROWSER-VERIFIED.** See §8 (added at the bottom) for what was built in
@@ -702,7 +702,7 @@ asset pass, all browser-verified (`scripts/verify-fly-game.js`,
   includes per-step age histograms + poll-status forensics),
   `verify-fly5.js` (synthetic-target gameplay chain incl. pause/credits),
   `p3-quick.js` (fast visual spot-check). Playwright lives OUTSIDE the
-  repo at `C:\Users\bfecho\node_modules` (drives installed Chrome).
+  repo in a machine-local `node_modules` (drives installed Chrome).
 - The dev-only globals: `window.__fly` (runtime: engine/flight/traffic/
   targeting/autopilot/origin/camera/geo) and `window.__flyStats`
   (rebases, maxRebaseMs, drawCalls, triangles, traffic).

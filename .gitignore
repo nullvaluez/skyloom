@@ -3,7 +3,20 @@
 
 # next.js
 .next
+/out
+/build
 
-# env files (Mapbox token etc.) — never commit secrets
+# env files — never commit secrets
 .env*.local
 .env
+
+# local Claude Code / editor settings
+.claude/settings.local.json
+
+# tooling artifacts / dumps
+repomix-output.xml
+
+# logs & OS cruft
+*.log
+.DS_Store
+Thumbs.db

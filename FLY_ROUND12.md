@@ -1,7 +1,7 @@
 # Fly Round 12 — "Neon Planet" (2026-07-18)
 
 Round 11 certified satellite at altitude; the user then flew Neon at cruise
-(~26,000 ft over Delaware County) and it "looked like absolute shit": the toy
+(~26,000 ft over a US metro area) and it "looked like absolute shit": the toy
 ground dissolved at a **static 14–26km band** while everything else — the
 curvature (`GLOBE.altFlatten`), the POI letters (round 10's `sqrt(alt/k)`
 cull), the traffic (`horizonFade`) — already scaled with altitude. Past a

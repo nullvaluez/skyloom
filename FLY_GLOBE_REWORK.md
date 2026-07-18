@@ -133,7 +133,7 @@ this session (details in FLY_TOYWORLD_REWORK §6.5):
 7. The repo's eslint react-hooks compiler rules conflict with the
    runtime pattern (pre-existing errors in FlyMode etc.) — the baseline
    is not lint-clean; don't chase it, don't make it worse.
-8. Playwright drives installed Chrome from `C:\Users\bfecho\node_modules`;
+8. Playwright drives installed Chrome from a machine-local `node_modules`;
    headless rAF ≈ 240fps (frame-count gates, not wall-clock); background
    Bash tasks cap at 10 min — size soaks accordingly.
 

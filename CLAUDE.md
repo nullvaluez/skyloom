@@ -59,7 +59,7 @@
 >
 > Earlier: **Round 10 "In That Area" is BUILT + verified
 > (2026-07-18): [FLY_ROUND10.md](FLY_ROUND10.md) is the record.** Two paired
-> user asks (the user lives near Delaware County, Ohio): (1) WAY more world
+> user asks (the user wanted their local area well-covered): (1) WAY more world
 > markers — the offline `CITIES` POI DB grew **303 → 1719** (+1416,
 > 5-Opus-agent generate→verify workflow; merged with accent/case dedupe +
 > bounds validation; every ambiguous US name state-suffixed — `Dublin` was

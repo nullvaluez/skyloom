@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# SkyTracker — Fly Mode
 
-## Getting Started
+A keyless, real-time 3D flight tracker. Boot straight into **Fly Mode** and pilot
+through a stylized mini-globe of live [ADS-B](https://en.wikipedia.org/wiki/Automatic_Dependent_Surveillance%E2%80%93Broadcast)
+air traffic — real aircraft, real positions, rendered as a warped toy planet or a
+satellite world you can fly across.
 
-First, run the development server:
+> **No API keys, no tokens, no `.env` required.** Every data source is a public,
+> community-run endpoint. Clone, install, run.
+
+## Features
+
+- **Live traffic** — real aircraft streamed from community ADS-B networks
+  (adsb.lol → adsb.fi → airplanes.live failover), rendered as a 3D fleet with
+  contrails, nav lights, and altitude-aware behavior.
+- **Two worlds** — a neon "Toy World" mini-planet and a satellite-imagery globe,
+  both with real terrain elevation, curvature that scales with your altitude, and
+  a streaming tile pipeline.
+- **Fly it like a game** — free-flight controls, chase/cinema cameras, an Atlas
+  fast-travel map, POI markers for ~1,700 world cities plus landmarks, military
+  bases and spotting hotspots, contracts/scoring, and aircraft inspection cards.
+- **Rich aircraft data** — photos (planespotters), route lookups, and type
+  classification, all fetched on demand.
+
+## Tech stack
+
+Next.js 16 · React 19 · Three.js / React Three Fiber · Zustand · Web Workers ·
+vector + raster map tiles. Rendering runs entirely client-side; the Next API
+routes are thin, cache-friendly proxies to the public data sources.
+
+## Getting started
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). The app boots directly into
+Fly Mode behind a loading screen.
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+```bash
+npm run build   # production build
+npm run start   # serve the production build
+npm run lint    # eslint
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Data sources & attribution
 
-## Learn More
+This project uses only tokenless, community/public data and openly-licensed
+assets. Flight data is provided by [adsb.lol](https://adsb.lol) (ODbL) and peers;
+map imagery © Esri/Maxar/Earthstar; 3D models, fonts, HDRIs and textures are
+CC-BY / CC0 / OFL / public domain. **Full attribution is in
+[CREDITS.md](CREDITS.md)** — please preserve it in any redistribution.
 
-To learn more about Next.js, take a look at the following resources:
+## Project notes
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The `CLAUDE.md` and `FLY_*.md` files are the internal design/build record for the
+Fly Mode reworks — kept as documentation of how the renderer evolved. They are
+notes, not user docs.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## License
 
-## Deploy on Vercel
+[MIT](LICENSE) © nullvaluez
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Third-party assets bundled or fetched by this project retain their own licenses;
+see [CREDITS.md](CREDITS.md).

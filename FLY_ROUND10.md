@@ -1,7 +1,7 @@
 # Fly Round 10 — "In That Area" (world-marker expansion + altitude-aware POI letters)
 
 > STATUS: BUILT + verified (2026-07-18). Two paired asks from the user
-> (who lives near Delaware County, Ohio): (1) **WAY more world markers** —
+> (who wanted their local area well-covered): (1) **WAY more world markers** —
 > "I want to see Powell, Dublin, and so forth… this to all major cities";
 > (2) at cruise altitude, **see the ground markers near AND far so it feels
 > like you're *inside* that little area** the mini-planet warp carves out
@@ -17,8 +17,8 @@
 ## 1. What shipped
 
 **Part A — data.** `lib/fly/poi/cities.js` went from ~300 hand-curated world
-cities to **1719**: every US metro's suburbs + satellite towns (Columbus OH /
-Delaware County exhaustive per the user's home turf), plus dense fill across
+cities to **1719**: every US metro's suburbs + satellite towns (Columbus OH
+metro area covered in depth per the user's request), plus dense fill across
 Europe, Canada, Latin America, Asia, the Middle East, Africa and Oceania. Format
 unchanged — `[name, lat, lon, tzOffsetH]` — so every consumer (PoiLetters,
 buildPoiList, buildAtlasList, minimap) is unmoved. Cities are distance-culled at
