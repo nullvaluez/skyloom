@@ -102,12 +102,12 @@ export function PoiLetters({ runtime, flight, origin }) {
         const heldVisible = isShown && d <= cullD; // shown AND still on-screen
         const maxD = isShown ? style.rangeM * 1.25 : style.rangeM;
         // Round 8 fix round: a monument-bearing landmark's letter rides high
-        // above its monument in toy — let it survive a much closer approach
-        // (the flat floor suppressed STATUE OF LIBERTY at the 1.7km framing).
+        // above its monument — let it survive a much closer approach (the
+        // flat floor suppressed STATUE OF LIBERTY at the 1.7km framing).
+        // Round 11: monuments mount in BOTH styles now, so the gate is
+        // simply "has a monument", no style check.
         const nearK =
-          styleRef.current === 'toy' && poi.kind === 'landmark' && poi.lm
-            ? LETTERS.monumentMinDistK
-            : 1;
+          poi.kind === 'landmark' && poi.lm ? LETTERS.monumentMinDistK : 1;
         const minD = (isShown ? LETTERS.minDistM * 0.55 : LETTERS.minDistM) * nearK;
         if (d > maxD || d < minD) continue;
         poi._dist = d;
@@ -140,8 +140,8 @@ export function PoiLetters({ runtime, flight, origin }) {
           // landmarks now only declutter against OTHER landmarks; every
           // grounded letter keeps the round-6 rule (and slot stability /
           // hysteresis are untouched — this only widens candidacy).
-          const sepExempt =
-            styleRef.current === 'toy' && poi.kind === 'landmark' && !!poi.lm;
+          // (round 11: monuments exist in both styles — no style check)
+          const sepExempt = poi.kind === 'landmark' && !!poi.lm;
           if (
             ideal.some(
               (p) =>
@@ -151,7 +151,14 @@ export function PoiLetters({ runtime, flight, origin }) {
             )
           )
             continue;
-          if (poi.elev == null && runtime.engine) {
+          // Round 11: re-sample on EVERY selection tick (≤ ~17 lookups / 2s
+          // — trivial), keeping the last known value on a null. The old
+          // resolve-once cache froze whatever the DEM answered first: a
+          // mountain letter selected before its DEM streamed in stood at
+          // ~0m forever while its monument (which re-samples, same cadence)
+          // healed to the summit — caught by verify-monuments-sat at
+          // Corcovado (letter 64m vs monument top 741m).
+          if (runtime.engine) {
             const e = runtime.engine.getElevationAt(poi.lon, poi.lat);
             if (e != null) poi.elev = e;
           }
@@ -259,9 +266,10 @@ export function PoiLetters({ runtime, flight, origin }) {
       const groundY = toy
         ? (poi.elev ?? 0) * TOY_WORLD.terrainExaggeration + TOY_WORLD.groundLift
         : (poi.elev ?? 0);
-      // Round 8 (P5): landmark letters float ABOVE their monument (toy only —
-      // monuments mount toy-only); naturals return 0 and stay grounded.
-      const lift = toy ? letterLiftM(poi) : 0;
+      // Round 8 (P5): landmark letters float ABOVE their monument; naturals
+      // return 0 and stay grounded. Round 11: monuments mount in satellite
+      // too (standing on raw DEM), so the lift applies in every style.
+      const lift = letterLiftM(poi);
       g.position.set(rx, groundY + lift - bendDrop(d, k), rz);
       g.rotation.y = Math.atan2(camera.position.x - rx, camera.position.z - rz);
     }

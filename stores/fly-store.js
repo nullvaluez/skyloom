@@ -34,8 +34,9 @@ const initialState = {
   // solid ink tile) | 'satellite' ("Day", Esri). Round 7 retired 'night' (flat
   // CARTO raster) — setMapStyle migrates stale callers. This LITERAL is the
   // pre-hydration mount value only; the effective DEFAULT for a player with no
-  // saved choice is 'satellite' (round 10 — PauseMenu resolves it on mount).
-  // Kept 'toy' so harnesses (which seed 'toy') mount without a style hot-swap.
+  // saved choice is 'satellite', resolved by lib/fly/map-style.js in FlyMode
+  // BEFORE the canvas mounts (round 11 — no boot hot-swap). Kept 'toy' so
+  // harnesses (which seed 'toy') mount without a style hot-swap.
   mapStyle: 'toy',
 
   // Bumped on every warp — drives the DOM flash + lets overlays reset

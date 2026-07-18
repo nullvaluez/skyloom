@@ -241,6 +241,12 @@ export function LabelCanvas({ runtime }) {
 
       for (const it of items) {
         if (it.distM < LABELS.minDistM) continue;
+        // Round 11: a plane faded past the horizon (TrafficLayer stamps the
+        // shared per-frame value) gets NO label and NO hit — you can't hover
+        // or click a ghost the renderer skipped. Checked before the hits
+        // push, not just the draw.
+        const hFade = it.horizonFade ?? 1;
+        if (hFade <= 0.05) continue;
         // ryd: labels/carets anchor to the drawn-frame Y the GPU renders at
         // (round 8.5 H1); the altFt TEXT below stays the true it.ry.
         const drop = airDrop(Math.hypot(it.rx - flight.pos.x, it.rz - flight.pos.z), it.ryd);
@@ -264,7 +270,9 @@ export function LabelCanvas({ runtime }) {
         grid.add(cell);
         labeled += 1;
 
-        const alpha = (it._losDim ? 0.32 : 0.88) * Math.max(0.25, it.opacity);
+        // horizon fade multiplies OUTSIDE the 0.25 stale-floor: the floor
+        // defeats poll starvation, not the horizon (round 11)
+        const alpha = (it._losDim ? 0.32 : 0.88) * Math.max(0.25, it.opacity) * hFade;
         const name = it.meta?.flight || it.meta?.r || it.hex.toUpperCase();
         const altFt = Math.round((it.ry * M_TO_FT) / 100) * 100;
         const distNm = it.distM / 1852;

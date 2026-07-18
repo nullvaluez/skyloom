@@ -12,7 +12,30 @@
 > describes deleted code (markers, panels, Leaflet-era plans); do not act
 > on it.
 
-> **⚠️ NEWEST — READ FIRST:** **Round 10 "In That Area" is BUILT + verified
+> **⚠️ NEWEST — READ FIRST:** **Round 11 "Satellite, For Real" is BUILT
+> (2026-07-18): [FLY_ROUND11.md](FLY_ROUND11.md) is the record.** The round-10
+> satellite default was never perf-certified (harnesses seed 'toy') and the
+> user's first real session on it lagged badly + showed the old
+> "buried planes" class of bug. Root cause: the flip itself, not the round-10
+> code. Round 11: (1) boot resolves the style PRE-mount via new
+> `lib/fly/map-style.js` (no more toy-build→satellite hot-swap; store literal
+> stays 'toy' for harnesses); (2) perf floor — aniso 8→4 + per-tier, satMaxZoom
+> 17→16, tier-aware hillshade strength, cloud shadows high-tier-only; (3) NEW
+> `TRAFFIC_HORIZON` + `horizonFade()` in world-bend.js — per-aircraft two-body
+> horizon (`sqrt(eye/k)·1 + sqrt(alt/k)·2.5`), stamped once per frame in
+> TrafficLayer, folded into the EXISTING fade channels of sprites/tracers/
+> labels (no new GPU uniform; multiply OUTSIDE the anti-starvation floors);
+> (4) satellite clouds: band 1500–4200, deterministic 6-cluster layout,
+> sun-tinted via `runtime.sun` (unlit material, tinted not lit); (5) monuments
+> mount in satellite (raw DEM ground, Lambert daylight satStyle, letters lift
+> in both styles now); player Contrail finally rides applyBendAir.
+> Harnesses: verify-round11 + verify-monuments-sat NEW, verify-sat-depth
+> updated (aniso ≥4, z16, draws ≤375, tier pinned). FLY_ROUND11.md §4 =
+> live-tune sign-offs pending; §6 lessons (a default flip is a certification
+> event; the horizon is a two-body problem; style-conditional costs hide in
+> configs).
+>
+> Earlier: **Round 10 "In That Area" is BUILT + verified
 > (2026-07-18): [FLY_ROUND10.md](FLY_ROUND10.md) is the record.** Two paired
 > user asks (the user lives near Delaware County, Ohio): (1) WAY more world
 > markers — the offline `CITIES` POI DB grew **303 → 1719** (+1416,

@@ -59,7 +59,10 @@ async function bootFly(
   }
 
   // The harness contract: pct hits 100 exactly at reveal and stays there.
-  await page.waitForFunction(() => window.__flyBoot?.pct === 100, {
+  // Round 11 fix: options are waitForFunction's THIRD parameter (second is
+  // `arg`) — the old two-arg call silently fell back to the 30s default,
+  // which every toy harness tripped the first time a boot ran >30s.
+  await page.waitForFunction(() => window.__flyBoot?.pct === 100, undefined, {
     timeout: timeoutMs,
     polling: 250,
   });

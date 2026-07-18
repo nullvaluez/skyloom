@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Clouds, Cloud } from '@react-three/drei';
 import {
   CanvasTexture,
   CircleGeometry,
+  Color,
   InstancedMesh,
   MeshBasicMaterial,
   Object3D,
@@ -67,17 +68,74 @@ export function CloudField({ runtime, flight, origin }) {
     (CLOUDS.puffsByTier[qualityTier] ?? CLOUDS.puffsByTier.high) * (style.countScale ?? 1)
   );
 
-  const puffs = useMemo(
-    () =>
-      Array.from({ length: CLOUDS.puffsByTier.high }, (_, i) => ({
-        x: (hash(i * 3 + 1) - 0.5) * CLOUDS.cellSize,
-        z: (hash(i * 3 + 2) - 0.5) * CLOUDS.cellSize,
+  // Round 11: clustered placement — N hashed cluster centers in the cell,
+  // puffs on discs around them round-robin (i % count), so the tier count
+  // cut thins every cluster instead of deleting whole ones. Uniform scatter
+  // read as a fog of specks on bright satellite imagery; grouped puffs read
+  // as weather. Same deterministic hash() — layouts stay harness-stable.
+  const puffs = useMemo(() => {
+    const cl = CLOUDS.clusters;
+    const centers = cl.enabled
+      ? Array.from({ length: cl.count }, (_, c) => ({
+          x: (hash(c * 7 + 101) - 0.5) * CLOUDS.cellSize,
+          z: (hash(c * 7 + 202) - 0.5) * CLOUDS.cellSize,
+        }))
+      : null;
+    return Array.from({ length: CLOUDS.puffsByTier.high }, (_, i) => {
+      let x = (hash(i * 3 + 1) - 0.5) * CLOUDS.cellSize;
+      let z = (hash(i * 3 + 2) - 0.5) * CLOUDS.cellSize;
+      if (centers) {
+        const c = centers[i % cl.count];
+        const r = cl.radiusM * Math.sqrt(hash(i * 3 + 1)); // sqrt = even disc
+        const a = hash(i * 3 + 2) * Math.PI * 2;
+        x = c.x + Math.cos(a) * r;
+        z = c.z + Math.sin(a) * r;
+      }
+      return {
+        x,
+        z,
         u: hash(i * 3 + 3), // altitude fraction within the style band
         size: 900 + hash(i * 5 + 4) * 1900,
         seed: i,
-      })),
-    []
-  );
+      };
+    });
+  }, []);
+
+  // Round 11: sun-driven tint for the unlit puffs (satellite only). The
+  // clouds are MeshBasicMaterial — the day-cycle sun never lit them, so
+  // dawn/dusk left flat white cotton on a golden world. FlyScene publishes
+  // runtime.sun on its 60s day-cycle cadence; we sample it every ~10s and
+  // lerp dim → warm → bright (CLOUDS.dayTint). React state at 0.1Hz — drei
+  // Cloud color/opacity props are reactive, cost is negligible.
+  const [sunTint, setSunTint] = useState(null);
+  useEffect(() => {
+    if (mapStyle !== 'satellite') {
+      setSunTint(null);
+      return;
+    }
+    const cfg = CLOUDS.dayTint;
+    const bright = new Color(cfg.bright);
+    const warm = new Color(cfg.warm);
+    const dim = new Color(cfg.dim);
+    const c = new Color();
+    const apply = () => {
+      const frac = runtime.sun?.frac ?? 1;
+      if (frac >= cfg.warmBand) {
+        c.lerpColors(warm, bright, (frac - cfg.warmBand) / (1 - cfg.warmBand));
+      } else {
+        c.lerpColors(dim, warm, frac / cfg.warmBand);
+      }
+      const next = '#' + c.getHexString();
+      if (process.env.NODE_ENV === 'development' && window.__flyStats) {
+        window.__flyStats.cloudTint = next; // harness probe (verify-round11)
+      }
+      // functional set + bail: identical tint (steady noon) re-renders nothing
+      setSunTint((prev) => (prev?.color === next ? prev : { color: next, frac }));
+    };
+    apply();
+    const id = setInterval(apply, 10000);
+    return () => clearInterval(id);
+  }, [mapStyle, runtime]);
 
   // Per-puff ground state (parallel to puffs): last sampled drawn-ground Y,
   // smoothed so a DEM tile streaming in can't pop a puff upward.
@@ -130,7 +188,10 @@ export function CloudField({ runtime, flight, origin }) {
     const { k } = getBend(); // clouds ride the mini-planet like the terrain
     const engine = runtime.engine;
     const isToy = mapStyle === 'toy';
-    const wantShadows = style.shadows === true;
+    // Round 11: shadows are a high-tier luxury — the discs are cheap but the
+    // pool + transparent overdraw is exactly what a degraded tier is shedding.
+    const wantShadows =
+      style.shadows === true && qualityTier === CLOUDS.shadow.minTier;
     let minAgl = Infinity;
     const hideShadow = (i) => {
       if (!wantShadows) return;
@@ -255,10 +316,12 @@ export function CloudField({ runtime, flight, origin }) {
             segments={CLOUDS.segments}
             bounds={[p.size, p.size * 0.28, p.size]}
             volume={p.size * 1.15}
-            opacity={style.opacity}
+            opacity={
+              sunTint ? style.opacity * (0.7 + 0.3 * sunTint.frac) : style.opacity
+            }
             fade={CLOUDS.fade}
             speed={0.06}
-            color={style.color}
+            color={sunTint?.color ?? style.color}
           />
         </group>
       ))}

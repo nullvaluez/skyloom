@@ -7,6 +7,7 @@ import {
   DataTexture,
   DynamicDrawUsage,
   MeshBasicMaterial,
+  MeshLambertMaterial,
   MeshToonMaterial,
   NearestFilter,
   Object3D,
@@ -29,18 +30,32 @@ const ARCH_COUNT = LANDMARK_ARCHETYPES.length;
 const HALO_POOL = ARCH_COUNT * LANDMARKS_3D.poolPerArchetype;
 
 /**
- * Round 8 (P5): procedural landmark monuments (toy only) — the TownGlow
- * recipe applied to the landmark POI DB: one InstancedMesh per archetype
- * (9 pools since the round-8.5 'church') of vertex-colored toon geometry,
- * plus ONE shared additive hero-halo dome under each placed monument
- * (medium/high tiers). Materials ride 'world-bend-anchor-r8' via
- * applyBendAnchor — rigid instanced ground objects must never ride the
+ * Round 8 (P5): procedural landmark monuments — the TownGlow recipe applied
+ * to the landmark POI DB: one InstancedMesh per archetype (9 pools since the
+ * round-8.5 'church'), plus ONE shared additive hero-halo dome under each
+ * placed monument (medium/high tiers). Materials ride 'world-bend-anchor-r8'
+ * via applyBendAnchor — rigid instanced ground objects must never ride the
  * per-vertex bend (round-6 lesson 2). Placement runs on a 2s cadence (never
  * per frame); a floating-origin rebase forces an immediate re-place.
  * +10 draws total (9 archetypes + halo).
+ *
+ * Round 11: mounts in SATELLITE too (was toy-only — the Day default had zero
+ * landmarks). Style split, mirroring CloudField's isToy pattern:
+ * - ground: toy stands on drawn ground (elev × exaggeration + lift);
+ *   satellite stands on RAW DEM elevation
+ * - material: toy keeps the neon vertex-colored toon ramp; satellite gets a
+ *   sun-lit Lambert daylight tint (LANDMARKS_3D.satStyle) — the day sun/hemi
+ *   light it, so monuments read as stone, not glow
+ * - halo: satellite drops to satStyle.haloOpacity (0 skips the draw)
+ * FlyScene keys this component by mapStyle, so a style switch is a clean
+ * remount — materials never hot-swap mid-life.
  */
-export function LandmarkMonuments({ flight, origin, engine, qualityTier }) {
-  const halosOn = qualityTier !== 'low';
+export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyle }) {
+  const isToy = mapStyle !== 'satellite';
+  const haloOpacity = isToy
+    ? LANDMARKS_3D.haloOpacity
+    : LANDMARKS_3D.satStyle.haloOpacity;
+  const halosOn = qualityTier !== 'low' && haloOpacity > 0;
   const sites = useMemo(() => {
     const byArch = new Map(LANDMARK_ARCHETYPES.map((a) => [a, []]));
     for (const p of buildPoiList()) {
@@ -59,6 +74,14 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier }) {
     []
   );
   const material = useMemo(() => {
+    if (!isToy) {
+      // Satellite daylight: one flat Lambert tint lit by the day sun/hemi.
+      // The neon palette vertex colors are ignored (vertexColors off) — a
+      // magenta-glow statue on real Esri imagery read as a bug, not a look.
+      const m = new MeshLambertMaterial({ color: LANDMARKS_3D.satStyle.color });
+      applyBendAnchor(m); // rigid ground objects anchor-bend in EVERY style
+      return m;
+    }
     // Same 3-step toon ramp as toy-world-engine — the monuments must shade
     // like the city they stand in (the stepped bands ARE the toy look).
     const ramp = new DataTexture(new Uint8Array([110, 190, 255]), 3, 1, RedFormat);
@@ -69,23 +92,25 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier }) {
     m.userData.__ramp = ramp; // disposed with the material below
     applyBendAnchor(m);
     return m;
-  }, []);
+  }, [isToy]);
   const haloMaterial = useMemo(() => {
     const m = new MeshBasicMaterial({
       color: PALETTE.monumentHalo,
       transparent: true,
-      opacity: LANDMARKS_3D.haloOpacity,
+      opacity: haloOpacity,
       blending: AdditiveBlending,
       depthWrite: false,
     });
     applyBendAnchor(m);
     return m;
-  }, []);
+    // haloOpacity is style-derived and the component is keyed by mapStyle —
+    // this memo never sees it change mid-life.
+  }, [haloOpacity]);
   useEffect(
     () => () => {
       for (const g of Object.values(geometries)) g.dispose();
       haloGeometry.dispose();
-      material.userData.__ramp.dispose();
+      material.userData.__ramp?.dispose();
       material.dispose();
       haloMaterial.dispose();
     },
@@ -115,8 +140,12 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier }) {
         const d = Math.hypot(poi.wx - px, poi.wz - pz);
         if (d > LANDMARKS_3D.maxRangeM) continue;
         const s = engine?.getGroundAt?.(poi.lon, poi.lat);
+        // Toy stands on the DRAWN ground (exaggeration + lift); satellite
+        // stands on raw DEM — the same isToy split CloudField uses.
         const groundY = s
-          ? s.elev * TOY_WORLD.terrainExaggeration + TOY_WORLD.groundLift
+          ? isToy
+            ? s.elev * TOY_WORLD.terrainExaggeration + TOY_WORLD.groundLift
+            : s.elev
           : 0;
         const { sx, sy, sz, yaw } = monumentScale(poi);
         _dummy.position.set(poi.wx - origin.anchor.x, groundY, poi.wz - origin.anchor.z);

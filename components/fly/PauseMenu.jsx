@@ -5,20 +5,13 @@ import { useFlyStore } from '@/stores/fly-store';
 import { useIsTouch } from '@/hooks/use-is-touch';
 import { FLY_ASSETS } from '@/lib/fly/assets';
 import { TERRAIN_ATTRIBUTIONS } from '@/lib/fly/tile-sources';
+// Round 11: style key/list + boot-time resolution moved to lib/fly/map-style
+// (FlyMode resolves the style BEFORE the canvas mounts — no more toy→sat
+// hot-swap on a fresh boot). This menu only reads/writes the picked style.
+import { MAP_STYLE_KEY, MAP_STYLES } from '@/lib/fly/map-style';
 
 const TIERS = ['low', 'medium', 'high'];
 const HELP_SEEN_KEY = 'fly-controls-seen';
-// v2: key bumped when Toy World became the default so styles saved before
-// it existed don't pin users to the old look
-const MAP_STYLE_KEY = 'fly-map-style-2';
-// Every style is a curved mini-globe now (FLY_GLOBE_REWORK) — the names
-// describe the mood, not the tile provider. Keys stay stable for persistence.
-// Round 7: 'night' retired — it was a flat dark raster with none of Neon's
-// vector world; the Electric Night City pass made Neon THE night look.
-const MAP_STYLES = [
-  ['toy', 'Neon'],
-  ['satellite', 'Day'],
-];
 
 const CONTROL_ROWS = [
   ['Mouse', 'steer — cursor offset from center commands the turn/pitch'],
@@ -63,29 +56,11 @@ export function PauseMenu({ onExit }) {
   const mapStyle = useFlyStore((s) => s.mapStyle);
   const isTouch = useIsTouch();
 
-  // First-entry controls help + persisted map style
+  // First-entry controls help (map style now resolves in FlyMode, pre-mount)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (window.localStorage.getItem(HELP_SEEN_KEY)) {
       useFlyStore.getState().markControlsHelpSeen();
-    }
-    let savedStyle = window.localStorage.getItem(MAP_STYLE_KEY);
-    // Round 7 migration: saved 'night' lands on Neon (the migration must run
-    // BEFORE the validity check — 'night' is no longer a valid style).
-    if (savedStyle === 'night') {
-      savedStyle = 'toy';
-      window.localStorage.setItem(MAP_STYLE_KEY, savedStyle);
-    }
-    if (savedStyle && MAP_STYLES.some(([k]) => k === savedStyle)) {
-      useFlyStore.getState().setMapStyle(savedStyle);
-    } else {
-      // Round 10 (user): satellite ("Day") is the default view for now — a
-      // player with no saved choice lands on Esri imagery, not Neon. Persist it
-      // so the choice sticks (and later boots skip the store-default toy→sat
-      // hot-swap). Explicit toy-choosers keep toy; harnesses seed 'toy' via
-      // scripts/_boot.js, so they never take this branch (neon tests unmoved).
-      window.localStorage.setItem(MAP_STYLE_KEY, 'satellite');
-      useFlyStore.getState().setMapStyle('satellite');
     }
   }, []);
 

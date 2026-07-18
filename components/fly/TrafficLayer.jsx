@@ -11,10 +11,10 @@ import {
   Object3D,
   PlaneGeometry,
 } from 'three';
-import { GLOBE, NAV_LIGHTS, SKY, TOY, TRAFFIC, WORLD } from '@/lib/fly/fly-constants';
+import { GLOBE, NAV_LIGHTS, SKY, TOY, TRAFFIC, TRAFFIC_HORIZON, WORLD } from '@/lib/fly/fly-constants';
 import { buildArchetypeGeometries } from '@/lib/fly/traffic-geometries';
 import { loadTrafficGeometries } from '@/lib/fly/model-loader';
-import { applyBendAirAnchor, applyNavLights, setNavTime } from '@/lib/fly/toy-world/world-bend';
+import { applyBendAirAnchor, applyNavLights, horizonFade, setNavTime } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
 
 const _dummy = new Object3D();
@@ -133,11 +133,27 @@ export function TrafficLayer({ runtime, flight, origin }) {
 
     for (const mesh of meshes) mesh._used = 0;
     let billboardsUsed = 0;
+    let horizonFaded = 0;
 
     for (const it of items) {
       const x = it.rx - ax;
       const y = it.ryd; // drawn-frame render Y (round 8.5 H1; = ry in satellite)
       const z = it.rz - az;
+
+      // Round 11 horizon fade: computed ONCE here (priority -45, after
+      // setBendEye at -50 wrote this frame's uEyeY/uBendK), stashed on the
+      // shared track item so tracers (-44) and the LabelCanvas RAF read the
+      // same value. Distance MUST be world-XZ hypot to match the GPU's bendD
+      // and the sqrt(alt/k) horizon — it.distM is mercator-corrected true
+      // meters (~35% off at NYC latitudes) and would shift the fade radius.
+      const dW = Math.hypot(it.rx - flight.pos.x, it.rz - flight.pos.z);
+      it.horizonFade = horizonFade(dW, y, TRAFFIC_HORIZON);
+      if (it.horizonFade <= 0.02) {
+        // Fully past the horizon: no instance at all (overdraw win). The
+        // minimap intentionally still shows it — it's radar, not eyes.
+        horizonFaded += 1;
+        continue;
+      }
 
       if (it.distM < TRAFFIC.modelLodDistanceM) {
         const mesh = meshes[it.archetype] ?? meshes[meshes.length - 1];
@@ -145,7 +161,8 @@ export function TrafficLayer({ runtime, flight, origin }) {
         // GLB archetypes carry their own vertex colors (tint white);
         // primitives stay classification-colored
         _color.set(mesh._isModel ? '#ffffff' : it.meta?.color || '#9ca3af');
-        if (it.opacity < 1) _color.lerp(_fog, 1 - it.opacity);
+        const eff = it.opacity * it.horizonFade;
+        if (eff < 1) _color.lerp(_fog, 1 - eff);
         const fix = it.fix1;
         const speed = Math.hypot(fix.vE, fix.vN);
         const pitch = speed > 20 ? Math.atan2(fix.vUp, speed) : 0;
@@ -161,7 +178,8 @@ export function TrafficLayer({ runtime, flight, origin }) {
       } else {
         if (billboardsUsed >= TRAFFIC.maxBillboards) continue;
         _color.set(it.meta?.color || '#9ca3af'); // far dots stay class-colored
-        if (it.opacity < 1) _color.lerp(_fog, 1 - it.opacity);
+        const eff = it.opacity * it.horizonFade;
+        if (eff < 1) _color.lerp(_fog, 1 - eff);
         _dummy.position.set(x, y, z);
         _dummy.quaternion.copy(camera.quaternion); // camera-facing
         // Grow with distance so far traffic stays a visible speck
@@ -186,6 +204,10 @@ export function TrafficLayer({ runtime, flight, origin }) {
     billboards.count = billboardsUsed;
     billboards.instanceMatrix.needsUpdate = true;
     if (billboards.instanceColor) billboards.instanceColor.needsUpdate = true;
+
+    if (process.env.NODE_ENV === 'development' && window.__flyStats) {
+      window.__flyStats.horizonFaded = horizonFaded;
+    }
   }, -45);
 
   return (

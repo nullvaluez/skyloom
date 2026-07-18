@@ -9,6 +9,7 @@ import {
   applyBendFade,
   applyHillshade,
   getHillshade,
+  horizonFade,
   setBend,
   setBendEye,
   setDepthHaze,
@@ -40,6 +41,7 @@ import {
   SKY,
   TOY,
   TOY_WORLD,
+  TRAFFIC_HORIZON,
   WARP,
   WORLD,
   WORLD_EDGE,
@@ -331,6 +333,9 @@ export function FlyScene({ runtime }) {
       // Harness aim helper: the EXACT aircraft drop the GPU applies (reads
       // the live uniforms) — headless scripts project targets through this
       window.__flyAirDrop = (d, y) => airDrop(d, y);
+      // Round 11: the same live-uniform horizon fade TrafficLayer stamps on
+      // every track — harnesses probe controlled (d, alt) pairs through it.
+      window.__flyHorizonFade = (d, y) => horizonFade(d, y, TRAFFIC_HORIZON);
     }
     return () => {
       // Dead window opens here (until the next mount re-registers): the bus
@@ -372,18 +377,29 @@ export function FlyScene({ runtime }) {
       engine.onTileMaterial((m) => {
         applyBendFade(m);
         applyHillshade(m, HILLSHADE);
-        if (m.map && m.map.anisotropy !== HILLSHADE.anisotropy) {
-          m.map.anisotropy = HILLSHADE.anisotropy;
+        // Round 11: tier-aware aniso, read imperatively so NEW tiles pick up
+        // a live tier change without re-uploading the streamed field (no
+        // degrade hitch; the field converges as tiles stream).
+        const aniso =
+          HILLSHADE.anisotropyByTier[useFlyStore.getState().qualityTier] ??
+          HILLSHADE.anisotropy;
+        if (m.map && m.map.anisotropy !== aniso) {
+          m.map.anisotropy = aniso;
           m.map.needsUpdate = true;
         }
       }),
     [engine]
   );
 
-  // Hillshade style gate (live uniform — no re-patch, survives hot-swaps)
+  // Hillshade style gate (live uniform — no re-patch, survives hot-swaps).
+  // Round 11: tier-aware strength (uniform flip, free on degrade).
   useEffect(() => {
-    setHillshade(mapStyle === 'satellite' ? HILLSHADE.strength : 0);
-  }, [mapStyle]);
+    setHillshade(
+      mapStyle === 'satellite'
+        ? (HILLSHADE.strengthByTier[qualityTier] ?? HILLSHADE.strength)
+        : 0
+    );
+  }, [mapStyle, qualityTier]);
 
   // World-edge fade band + target color per style (style-change-time only).
   // Round 6: the fade target is the SHARED GLOBE.rim color — the same tone
@@ -427,6 +443,10 @@ export function FlyScene({ runtime }) {
         Math.max(HILLSHADE.minElRad, Math.asin(Math.max(0, sunFactor)))
       );
       setHillDir(-Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el));
+      // Round 11: publish the sun state for discrete low-frequency consumers
+      // (CloudField tints its unlit puffs from this on a ~10s cadence).
+      // Same 60s recompute cadence — zero per-frame cost.
+      runtime.sun = { frac: sunFactor, az, el };
       if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
         (window.__flyStats ??= {}).sunFactor = sunFactor;
         window.__flyHill = { get: getHillshade, set: setHillshade };
@@ -762,15 +782,17 @@ export function FlyScene({ runtime }) {
       {/* Round 7: distant town glow-domes on the horizon (toy only, +1 draw) */}
       {mapStyle === 'toy' && <TownGlow flight={flight} origin={origin} engine={engine} />}
 
-      {/* Round 8 (P5): procedural landmark monuments (toy only, +10 draws) */}
-      {mapStyle === 'toy' && (
-        <LandmarkMonuments
-          flight={flight}
-          origin={origin}
-          engine={engine}
-          qualityTier={qualityTier}
-        />
-      )}
+      {/* Round 8 (P5): procedural landmark monuments, +10 draws. Round 11:
+          satellite mounts them too (daylight restyle, raw-DEM ground) — the
+          key remounts cleanly on a style switch so materials never hot-swap */}
+      <LandmarkMonuments
+        key={mapStyle}
+        flight={flight}
+        origin={origin}
+        engine={engine}
+        qualityTier={qualityTier}
+        mapStyle={mapStyle}
+      />
 
       {(CLOUDS.byStyle[mapStyle]?.enabled ?? true) && (
         <Suspense fallback={null}>

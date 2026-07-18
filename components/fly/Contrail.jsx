@@ -11,7 +11,8 @@ import {
   MeshBasicMaterial,
   Vector3,
 } from 'three';
-import { CONTRAIL } from '@/lib/fly/fly-constants';
+import { CONTRAIL, GLOBE } from '@/lib/fly/fly-constants';
+import { applyBendAir } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
 
 const MAX_POINTS = 160;
@@ -48,19 +49,25 @@ export function Contrail({ flight, origin }) {
       idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
     }
     geo.setIndex(idx);
-    const mesh = new Mesh(
-      geo,
-      new MeshBasicMaterial({
-        color: new Color(CONTRAIL.color),
-        transparent: true,
-        opacity: 0,
-        depthWrite: false,
-        side: DoubleSide,
-        // Round 8.5 (H3): the trail owns its alpha ladder — toy's ~2.7×
-        // denser fog was washing it toward the haze tone at distance.
-        fog: false,
-      })
-    );
+    const mat = new MeshBasicMaterial({
+      color: new Color(CONTRAIL.color),
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: DoubleSide,
+      // Round 8.5 (H3): the trail owns its alpha ladder — toy's ~2.7×
+      // denser fog was washing it toward the haze tone at distance.
+      fog: false,
+    });
+    // Round 11: the player's trail was the ONLY unbent trail in the sky —
+    // every traffic tracer rides the air bend. Shares the compiled
+    // 'world-bend-air' program (zero new variants). The effect is subtle by
+    // design: points sit at the player's own eye altitude so the capped drop
+    // ≈ 0 near the head; only the far tail (~3.2km) dips with the globe. The
+    // variant's rim dissolve is a no-op at this length (satellite fade
+    // starts at 60km) — it's here for consistency, not for the rim.
+    applyBendAir(mat, GLOBE.trafficBend);
+    const mesh = new Mesh(geo, mat);
     mesh.frustumCulled = false;
     mesh.visible = false;
     return { mesh, geo, pos };

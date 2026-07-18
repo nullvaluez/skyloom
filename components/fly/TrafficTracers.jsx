@@ -206,7 +206,11 @@ function RibbonTracers({ runtime, origin }) {
       const fix = t.fix1;
       if (!fix) continue;
       const displayAlpha = displayAlphaFor(t);
-      if (displayAlpha <= 0.02) continue;
+      // Round 11: the whole trail fades with its aircraft past the horizon.
+      // Multiplied OUTSIDE displayAlphaFor's alphaFloor — that floor defeats
+      // poll starvation, and must not keep a beyond-horizon ghost alive.
+      const hFade = t.horizonFade ?? 1;
+      if (displayAlpha * hFade <= 0.02) continue;
       const speed = Math.hypot(fix.vE, fix.vN);
       const gateOn = speedGate(state.gates, t.hex, speed);
 
@@ -348,7 +352,7 @@ function RibbonTracers({ runtime, origin }) {
             bright = Math.max(bright, headBright * (0.5 + 0.5 * hk));
           }
         }
-        bright *= gain;
+        bright *= gain * hFade; // round 11: horizon fade rides the same channel
         const rx = _pts[j3] - ax;
         const ry = _pts[j3 + 1];
         const rz = _pts[j3 + 2] - az;
@@ -475,7 +479,9 @@ function StreakTracers({ runtime, flight, origin }) {
       const fix = t.fix1;
       if (!fix) continue;
       const displayAlpha = displayAlphaFor(t);
-      if (displayAlpha <= 0.02) continue;
+      // Round 11 horizon fade — outside the alphaFloor (see ribbon renderer)
+      const hFade = t.horizonFade ?? 1;
+      if (displayAlpha * hFade <= 0.02) continue;
       const speed = Math.hypot(fix.vE, fix.vN);
       if (!speedGate(state.gates, t.hex, speed)) continue;
       const lenSec = Math.min(TRACERS.streakLenSecMax, 4000 / speed + 20); // ~5–12km
@@ -490,13 +496,14 @@ function StreakTracers({ runtime, flight, origin }) {
       pos.array[o + 3] = hx - fix.vE * lenSec * k;
       pos.array[o + 4] = hy - fix.vUp * lenSec;
       pos.array[o + 5] = hz + fix.vN * lenSec * k;
-      const head = headBrightFor(displayAlpha) * gain;
+      const head = headBrightFor(displayAlpha) * gain * hFade;
+      const tailG = 0.02 * gain * hFade;
       col.array[o] = c.r * head;
       col.array[o + 1] = c.g * head;
       col.array[o + 2] = c.b * head;
-      col.array[o + 3] = c.r * 0.02 * gain;
-      col.array[o + 4] = c.g * 0.02 * gain;
-      col.array[o + 5] = c.b * 0.02 * gain;
+      col.array[o + 3] = c.r * tailG;
+      col.array[o + 4] = c.g * tailG;
+      col.array[o + 5] = c.b * tailG;
       n += 1;
     }
     mesh.geometry.setDrawRange(0, n * 2);

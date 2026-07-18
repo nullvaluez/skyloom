@@ -4,11 +4,14 @@
  * luminance std-dev of a mountain-terrain crop must rise ≥ 12% (relief
  * contrast exists and is attributable to the layer); (2) the sun-direction
  * uniform flips east↔west between a morning and evening __flySunOverride;
- * (3) some streamed tile texture carries anisotropy = HILLSHADE.anisotropy;
- * (4) a z17 Esri imagery request is observed at low altitude (satMaxZoom
- * 16→17); (5) draws ≤ 360 at low AGL in satellite (deeper LOD = more tiles
- * — the phase's real budget risk, reported loudly); (6) zero pageerrors.
- * Screenshots: Sierra Nevada morning/evening — eyeball the relief.
+ * (3) some streamed tile texture carries anisotropy = HILLSHADE.anisotropy
+ * (round 11: 8→4 perf floor — the gate follows); (4) a satMaxZoom Esri
+ * imagery request is observed at low altitude (round 11: 17→16 perf floor);
+ * (5) draws ≤ 375 at low AGL in satellite (round 11: was 360; monuments now
+ * mount in satellite = +10 structural draws — 9 archetype pools + halo);
+ * (6) zero pageerrors. Screenshots: Sierra Nevada morning/evening.
+ * Round 11: qualityTier pinned 'high' — hillshade strength is tier-aware
+ * now, and a mid-run PerformanceMonitor degrade would flake the 0.55 gate.
  */
 const { chromium } = require('playwright');
 const path = require('path');
@@ -51,9 +54,9 @@ async function lumaStd(file, region) {
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
-  let z17Seen = false;
+  let deepZoomSeen = false; // round 11: satMaxZoom 16 (was a z17 check)
   page.on('response', (r) => {
-    if (/World_Imagery\/MapServer\/tile\/17\//.test(r.url())) z17Seen = true;
+    if (/World_Imagery\/MapServer\/tile\/16\//.test(r.url())) deepZoomSeen = true;
   });
   const fails = [];
   const gate = (name, ok, detail = '') => {
@@ -66,6 +69,9 @@ async function lumaStd(file, region) {
   // R9-3: boot straight into satellite (persisted-style path) — the boot
   // contract already waits for the tile download queue to drain.
   await bootFly(page, { style: 'satellite' });
+  // Round 11: hillshade strength + aniso are quality-tier-aware — pin high
+  // so a headless-GPU FPS dip can't degrade the tier under the gates.
+  await page.evaluate(() => window.__flyStore.getState().setQualityTier('high'));
   await page.mouse.move(800, 450);
 
   // Sierra Nevada, morning light
@@ -125,7 +131,7 @@ async function lumaStd(file, region) {
     });
     return found;
   });
-  gate('anisotropic imagery sampling', aniso >= 8, `max anisotropy ${aniso}`);
+  gate('anisotropic imagery sampling', aniso >= 4, `max anisotropy ${aniso}`);
 
   // z17 descent at low altitude over the valley
   await page.evaluate(() => {
@@ -137,9 +143,12 @@ async function lumaStd(file, region) {
     draws: window.__flyStats?.drawCalls,
     heapMB: Math.round(performance.memory.usedJSHeapSize / 1048576),
   }));
-  console.log(`z17 request seen: ${z17Seen} · SAT DRAWS low-AGL: ${s.draws} · heap ${s.heapMB}MB`);
-  gate('z17 imagery streams at low level', z17Seen);
-  if (s.draws > 360) fails.push(`draws ${s.draws} > 360`);
+  console.log(`z16 request seen: ${deepZoomSeen} · SAT DRAWS low-AGL: ${s.draws} · heap ${s.heapMB}MB`);
+  gate('satMaxZoom imagery streams at low level', deepZoomSeen);
+  // Round 11: 360 → 375 — monuments mount in satellite now (+10 structural
+  // draws: 9 zero-scale-parked archetype pools + halo), mirroring the R8
+  // "measured 461 → gate 470" precedent.
+  if (s.draws > 375) fails.push(`draws ${s.draws} > 375`);
   await glShot('04-valley-low');
 
   gate('zero pageerrors', errs.length === 0, errs.slice(0, 3).join(' | '));

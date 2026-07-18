@@ -23,6 +23,7 @@ import { useFlyTraffic } from '@/hooks/use-fly-traffic';
 import { useFlyAudio } from '@/hooks/use-fly-audio';
 import { useIsTouch } from '@/hooks/use-is-touch';
 import { BOOT } from '@/lib/fly/fly-constants';
+import { resolveInitialMapStyle } from '@/lib/fly/map-style';
 import { useFlyStore } from '@/stores/fly-store';
 
 // Fallback spawn: NYC harbor — dense airspace, good demo
@@ -95,6 +96,11 @@ export function FlyMode({ onClose }) {
   // covers the wait), else last session's persisted position, else NYC.
   useEffect(() => {
     let cancelled = false;
+    // Round 11: resolve the map style BEFORE spawn resolves — FlyCanvas only
+    // mounts once spawn is set, so the once-built TerrainEngine sees the
+    // final style. Kills the round-10 boot hot-swap where an unsaved player
+    // built the toy vector world and then swapped to satellite post-mount.
+    resolveInitialMapStyle();
     getSpawnLatLon().then(([lat, lon]) => {
       if (cancelled) return;
       const fly = useFlyStore.getState();
