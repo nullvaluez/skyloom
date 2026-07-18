@@ -11,9 +11,9 @@ import {
   MeshBasicMaterial,
   Object3D,
 } from 'three';
-import { CLOUDS, TOY_WORLD } from '@/lib/fly/fly-constants';
+import { CLOUDS, TOY_WORLD, WORLD_EDGE } from '@/lib/fly/fly-constants';
 import { expApproach } from '@/lib/fly/coords';
-import { applyBend, bendDrop, getBend } from '@/lib/fly/toy-world/world-bend';
+import { applyBend, bendDrop, getBend, getEdgeFade } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
 
 /** Soft radial falloff for the shadow discs — procedural, no asset. */
@@ -81,19 +81,29 @@ export function CloudField({ runtime, flight, origin }) {
           z: (hash(c * 7 + 202) - 0.5) * CLOUDS.cellSize,
         }))
       : null;
+    // Round 12: stored as CENTER + intra-cluster OFFSET so the altitude
+    // spread factor can scale cluster centers (and the wrap cell) without
+    // breaking clusters apart: x(f) = cx·f + dx. Same hash inputs as round
+    // 11 (hash is pure) — at f = 1 the positions are numerically identical.
     return Array.from({ length: CLOUDS.puffsByTier.high }, (_, i) => {
-      let x = (hash(i * 3 + 1) - 0.5) * CLOUDS.cellSize;
-      let z = (hash(i * 3 + 2) - 0.5) * CLOUDS.cellSize;
+      let cx = (hash(i * 3 + 1) - 0.5) * CLOUDS.cellSize;
+      let cz = (hash(i * 3 + 2) - 0.5) * CLOUDS.cellSize;
+      let dx = 0;
+      let dz = 0;
       if (centers) {
         const c = centers[i % cl.count];
         const r = cl.radiusM * Math.sqrt(hash(i * 3 + 1)); // sqrt = even disc
         const a = hash(i * 3 + 2) * Math.PI * 2;
-        x = c.x + Math.cos(a) * r;
-        z = c.z + Math.sin(a) * r;
+        cx = c.x;
+        cz = c.z;
+        dx = Math.cos(a) * r;
+        dz = Math.sin(a) * r;
       }
       return {
-        x,
-        z,
+        cx,
+        cz,
+        dx,
+        dz,
         u: hash(i * 3 + 3), // altitude fraction within the style band
         size: 900 + hash(i * 5 + 4) * 1900,
         seed: i,
@@ -179,8 +189,6 @@ export function CloudField({ runtime, flight, origin }) {
   useFrame((state, delta) => {
     const t = state.clock.elapsedTime;
     const dt = Math.min(delta, 0.05);
-    const cell = CLOUDS.cellSize;
-    const half = cell / 2;
     const px = flight.pos.x; // absolute frame
     const pz = flight.pos.z;
     const ax = origin.anchor.x;
@@ -188,11 +196,32 @@ export function CloudField({ runtime, flight, origin }) {
     const { k } = getBend(); // clouds ride the mini-planet like the terrain
     const engine = runtime.engine;
     const isToy = mapStyle === 'toy';
+    // Round 12 (toy): spread the deck with the altitude-extended fade band —
+    // f scales the CLUSTER CENTERS, the wrap cell AND the distance dissolve
+    // together (same puff count; fading farther without scaling the cell is
+    // meaningless — wrap keeps every puff within ±cell/2). At cruise the
+    // deck below stays visible instead of dissolving inside a 13.5km bubble
+    // the extended terrain has long outgrown. f = 1 at low altitude and in
+    // every other style; >1e8 = the uniform's pre-boot "disabled" default.
+    const asp = CLOUDS.altSpread;
+    let f = 1;
+    if (isToy && asp?.enabled) {
+      const feEnd = getEdgeFade().endM;
+      if (feEnd < 1e8) {
+        f = Math.min(asp.maxF, Math.max(1, feEnd / WORLD_EDGE.fade.toy.endM));
+      }
+    }
+    const fScale = f === 1 ? 1 : Math.pow(f, asp.sizeExp);
+    const cell = CLOUDS.cellSize * f;
+    const half = cell / 2;
+    const fadeStartM = CLOUDS.fadeStartM * f;
+    const fadeEndM = CLOUDS.fadeEndM * f;
     // Round 11: shadows are a high-tier luxury — the discs are cheap but the
     // pool + transparent overdraw is exactly what a degraded tier is shedding.
     const wantShadows =
       style.shadows === true && qualityTier === CLOUDS.shadow.minTier;
     let minAgl = Infinity;
+    let belowEye = 0; // round 12: visible puffs under the player's eye
     const hideShadow = (i) => {
       if (!wantShadows) return;
       shadows.dummy.position.set(0, -1e6, 0);
@@ -220,14 +249,16 @@ export function CloudField({ runtime, flight, origin }) {
       const p = puffs[i];
       const gs = ground[i];
       // Nearest toroidal copy of the puff relative to the player (absolute),
-      // then rebased for rendering. Drift is a slow wind along +X.
-      const ox = wrap(p.x + CLOUDS.driftMps * t - px, half, cell);
-      const oz = wrap(p.z - pz, half, cell);
+      // then rebased for rendering. Drift is a slow wind along +X. Cluster
+      // centers ride the spread factor; intra-cluster offsets don't (the
+      // clusters spread apart but stay internally tight).
+      const ox = wrap(p.cx * f + p.dx + CLOUDS.driftMps * t - px, half, cell);
+      const oz = wrap(p.cz * f + p.dz - pz, half, cell);
       const dist = Math.hypot(ox, oz);
       // Distance dissolve: shrink puffs away BEFORE the bent terrain rim
       // can depth-slice them (drei re-reads our matrixWorld scale per frame)
       const s =
-        1 - Math.min(1, Math.max(0, (dist - CLOUDS.fadeStartM) / (CLOUDS.fadeEndM - CLOUDS.fadeStartM)));
+        1 - Math.min(1, Math.max(0, (dist - fadeStartM) / (fadeEndM - fadeStartM)));
       if (s <= 0.02) {
         g.visible = false;
         hideShadow(i);
@@ -261,9 +292,12 @@ export function CloudField({ runtime, flight, origin }) {
         gs.y + CLOUDS.clearanceM + p.u * CLOUDS.clearanceJitterM
       );
       if (y - gs.y < minAgl) minAgl = y - gs.y;
+      if (y < flight.pos.y) belowEye += 1;
 
       g.visible = true;
-      g.scale.setScalar(s);
+      // fScale: spread puffs grow with f^sizeExp so the deck reads from
+      // altitude instead of shrinking to specks over the wider cell.
+      g.scale.setScalar(s * fScale);
       // Cloud billboards can't ride the vertex bend patch — drop them
       // CPU-side so nearby puffs still track the mini-planet curvature.
       const drop = bendDrop(dist, k);
@@ -286,6 +320,8 @@ export function CloudField({ runtime, flight, origin }) {
 
     if (process.env.NODE_ENV === 'development' && window.__flyStats) {
       window.__flyStats.cloudMinAgl = minAgl === Infinity ? null : Math.round(minAgl);
+      window.__flyStats.cloudSpreadF = f; // round 12 (verify-neon-alt)
+      window.__flyStats.cloudsBelowEye = belowEye;
     }
   });
 

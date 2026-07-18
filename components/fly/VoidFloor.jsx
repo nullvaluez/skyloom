@@ -5,6 +5,7 @@ import { useFrame } from '@react-three/fiber';
 import { CircleGeometry, Color, Mesh, ShaderMaterial } from 'three';
 import { GLOBE, NIGHT, TOY, WORLD_EDGE } from '@/lib/fly/fly-constants';
 import { PALETTE } from '@/lib/fly/toy-world/toy-palette';
+import { getBend, getEdgeFade } from '@/lib/fly/toy-world/world-bend';
 
 /**
  * The void-grid floor (FLY_GLOBE_REWORK §4.3, finally built): a huge dark
@@ -45,6 +46,11 @@ export function VoidFloor({ flight, origin, mapStyle }) {
         uCell: { value: f.cellM },
         uLinePx: { value: f.lineWidthPx },
         uGridAlpha: { value: 0.4 },
+        // Round 12: × the grid's visibility as the toy fade band extends
+        // with altitude — the grid is the LOW-altitude void signature and
+        // must not read through the real far ground at cruise. Plain
+        // visibility term (no anti-starvation floor to respect here).
+        uGridAltFade: { value: 1 },
         uFades: {
           value: {
             x: f.gridFadeStartM,
@@ -72,6 +78,7 @@ export function VoidFloor({ flight, origin, mapStyle }) {
         uniform float uCell;
         uniform float uLinePx;
         uniform float uGridAlpha;
+        uniform float uGridAltFade;
         uniform vec4 uFades; // gridFadeStart, gridFadeEnd, edgeFadeStart, edgeFadeEnd
         varying vec2 vLocalXZ;
         void main() {
@@ -81,7 +88,7 @@ export function VoidFloor({ flight, origin, mapStyle }) {
           vec2 d = abs(fract(g - 0.5) - 0.5) / fwidth(g); // px to nearest line
           float line = 1.0 - min(min(d.x, d.y) / uLinePx, 1.0);
           float r = length(vLocalXZ);
-          float gridVis = uGridAlpha * (1.0 - smoothstep(uFades.x, uFades.y, r));
+          float gridVis = uGridAlpha * uGridAltFade * (1.0 - smoothstep(uFades.x, uFades.y, r));
           vec3 col = mix(uBase, uGrid, line * gridVis);
           col = mix(col, uVoid, smoothstep(uFades.z, uFades.w, r));
           // Rim haze last (round-8 fix): same exp2 law as scene fog, radial
@@ -116,6 +123,11 @@ export function VoidFloor({ flight, origin, mapStyle }) {
     u.uRim.value.set(GLOBE.rim[mapStyle] ?? GLOBE.rim.toy);
     u.uRimFogD.value =
       (isToy ? TOY.fogDensity : NIGHT.fogDensity) * WORLD_EDGE.floor.rimFogScale;
+    // Static seed only (pre-first-frame). Round 12: the useFrame below
+    // re-derives floorY every frame from the LIVE band × the LIVE k — the
+    // static value here is wrong at cruise on BOTH axes (band 26→82km,
+    // k flattened ~3×) and an opaque floor at the static depth would
+    // depth-occlude the entire extended far field.
     const fade = WORLD_EDGE.fade[mapStyle] ?? WORLD_EDGE.fade.toy;
     const bendR = GLOBE.bendRadiusM[mapStyle] ?? GLOBE.bendRadiusM.toy;
     floorY.current = -((fade.endM * fade.endM) / (2 * bendR)) - WORLD_EDGE.floor.marginM;
@@ -139,10 +151,36 @@ export function VoidFloor({ flight, origin, mapStyle }) {
     };
   }, [mesh]);
 
-  // Default priority (after FlyScene's -50 writes flight.pos): follow the
-  // player in the rebased frame, keep the grid glued to absolute world XZ.
+  // Default priority (after FlyScene's -50 writes flight.pos + the live
+  // fade band): follow the player in the rebased frame, keep the grid glued
+  // to absolute world XZ. Round 12: floorY and the grid's altitude fade
+  // track the LIVE band (getEdgeFade — smoothed by FlyScene in toy, the
+  // static constants elsewhere), so the floor always sits just below the
+  // bend drop at the CURRENT fully-faded distance (the round-4 no-seam
+  // invariant, now dynamic) and the grid melts away as real far ground
+  // covers it. Both inputs are smoothed/continuous — no pops. The >1e8
+  // guard covers the pre-style-effect boot frames (uniform boots
+  // "disabled"); the static useEffect seed holds until then.
   useFrame(() => {
     const cell = WORLD_EDGE.floor.cellM;
+    const fe = getEdgeFade();
+    const k = getBend().k;
+    if (fe.endM < 1e8 && k > 1e-9) {
+      floorY.current = -(fe.endM * fe.endM * k) - WORLD_EDGE.floor.marginM;
+      const staticEnd = (WORLD_EDGE.fade[mapStyle] ?? WORLD_EDGE.fade.toy).endM;
+      const gaf = WORLD_EDGE.floor.gridAltFade;
+      const ext = fe.endM - staticEnd; // 0 in every static style
+      const t = Math.min(
+        1,
+        Math.max(0, (ext - gaf.extStartM) / (gaf.extEndM - gaf.extStartM))
+      );
+      const altFade = 1 - t * t * (3 - 2 * t); // smoothstep
+      mesh.material.uniforms.uGridAltFade.value = altFade;
+      if (process.env.NODE_ENV === 'development') {
+        (window.__flyStats ??= {}).voidGridAlpha =
+          mesh.material.uniforms.uGridAlpha.value * altFade;
+      }
+    }
     mesh.position.set(
       flight.pos.x - origin.anchor.x,
       floorY.current,

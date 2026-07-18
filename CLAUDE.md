@@ -12,7 +12,29 @@
 > describes deleted code (markers, panels, Leaflet-era plans); do not act
 > on it.
 
-> **⚠️ NEWEST — READ FIRST:** **Round 11 "Satellite, For Real" is BUILT
+> **⚠️ NEWEST — READ FIRST:** **Round 12 "Neon Planet" is BUILT + verified
+> (2026-07-18): [FLY_ROUND12.md](FLY_ROUND12.md) is the record.** Neon at
+> cruise was "toy plane over graph paper": the toy ground fade band
+> (`WORLD_EDGE.fade.toy` 14–26km) was STATIC while curvature/letters/traffic
+> all already scaled with altitude. Now the band BREATHES
+> (`WORLD_EDGE.altHorizon`, sqrt(AGL/k)·frac, floor = the static band so
+> low-altitude Neon is byte-identical): FlyScene's −50 block damps it into
+> the live `uEdgeFade` uniform and **`getEdgeFade()` (world-bend.js) is the
+> single source of truth** for every consumer — sky dip, the NEW z10 'ultra'
+> streaming ring (`TOY_WORLD.ultraRing`, hysteresis-armed, full-ring shrink
+> pays for it, worker 'ultra'→'far' alias, WORKER_PROTOCOL 9, quadtree
+> descent generalized for zoom-gapped rings), VoidFloor (LIVE floorY — the
+> static depth would occlude the far field at cruise — + delta-based grid
+> fade), TownGlow (nearest-N sort fix, range = band end, farScale, pool 96),
+> and the toy cloud deck (altSpread: centers/cell/dissolve scale together).
+> verify-neon-alt NEW (spawn invariants EXACT → FL260 band 81.5km, 30 ultra
+> chunks, grid 0, draws 278, void-pixel 0.1% → descend re-clamps);
+> verify-neon-city/rim pass unchanged. FLY_ROUND12.md §7 = live-tune
+> sign-offs PENDING USER; §9 lessons (certify the altitudes users fly; check
+> what the fade hides before building; store derived values where the GPU
+> reads them; descent encodes zoom-adjacency silently).
+>
+> Earlier: **Round 11 "Satellite, For Real" is BUILT
 > (2026-07-18): [FLY_ROUND11.md](FLY_ROUND11.md) is the record.** The round-10
 > satellite default was never perf-certified (harnesses seed 'toy') and the
 > user's first real session on it lagged badly + showed the old

@@ -8,7 +8,9 @@ import {
   airDrop,
   applyBendFade,
   applyHillshade,
+  getEdgeFade,
   getHillshade,
+  groundHorizonTargetM,
   horizonFade,
   setBend,
   setBendEye,
@@ -32,7 +34,7 @@ import { TrafficEngine, mercatorWorldXZ } from '@/lib/fly/traffic-engine';
 import { registerRuntimeActions, clearRuntimeActions } from '@/lib/fly/runtime-bus';
 import { Targeting } from '@/lib/fly/targeting';
 import { Autopilot } from '@/lib/fly/autopilot';
-import { mercatorScale } from '@/lib/fly/coords';
+import { expApproach, mercatorScale } from '@/lib/fly/coords';
 import {
   CLOUDS,
   FLIGHT,
@@ -401,13 +403,19 @@ export function FlyScene({ runtime }) {
     );
   }, [mapStyle, qualityTier]);
 
-  // World-edge fade band + target color per style (style-change-time only).
-  // Round 6: the fade target is the SHARED GLOBE.rim color — the same tone
-  // the fog carries and the SkyDome presents below its horizon — so the
-  // terrain, haze and sky agree at the rim (the old void/fog/dome-band
-  // three-way mismatch was the "ground and sky feel disconnected" band).
+  // World-edge fade band + target color per style. Round 6: the fade target
+  // is the SHARED GLOBE.rim color — the same tone the fog carries and the
+  // SkyDome presents below its horizon — so the terrain, haze and sky agree
+  // at the rim (the old void/fog/dome-band three-way mismatch was the
+  // "ground and sky feel disconnected" band). Round 12: for static styles
+  // this effect is still the ONLY writer; in toy it seeds the band and the
+  // per-frame altitude-horizon writer (the -50 block) takes over from the
+  // same values — edgeFadeEndRef restarts the smoothing at the static end
+  // on every style switch so a toy re-entry never inherits a stale band.
+  const edgeFadeEndRef = useRef(null);
   useEffect(() => {
     const fade = WORLD_EDGE.fade[mapStyle] ?? WORLD_EDGE.fade.satellite;
+    edgeFadeEndRef.current = fade.endM;
     setEdgeFade(fade.startM, fade.endM, GLOBE.rim[mapStyle] ?? GLOBE.rim.satellite);
     // Round 8 (P4): depth haze — toy's distant ground recedes toward a cool
     // haze tone BEFORE the rim fade (its 13km end sits under the 14km fade
@@ -648,14 +656,47 @@ export function FlyScene({ runtime }) {
     // 150–900m blend band — second-order next to the 420m-at-600m-elev bug
     // the ryd transform fixes.
     setBendEye(flight.pos.y, flight.groundElev);
+
+    // Round 12 "Neon Planet": in toy the ground fade band BREATHES with
+    // altitude — END chases sqrt(eyeAGL/k)·frac (floored at the static band
+    // so the certified low-altitude look is byte-identical), START trails at
+    // startGrow of the extension, and the round-8 haze end rides START at
+    // its 13/14 ratio so the rim gates hold at every altitude. One damped
+    // write into the LIVE uEdgeFade uniform — every consumer (sky dip below,
+    // ultra ring, VoidFloor, TownGlow, clouds) reads it via getEdgeFade().
+    // Static styles never enter here; their style effect stays the writer.
+    const skyFade = WORLD_EDGE.fade[flyState.mapStyle] ?? WORLD_EDGE.fade.satellite;
+    const ah = WORLD_EDGE.altHorizon;
+    if (ah?.enabled && ah.byStyle[flyState.mapStyle]) {
+      const target = groundHorizonTargetM(ah, skyFade.endM, ah.maxM);
+      const endM = (edgeFadeEndRef.current = expApproach(
+        edgeFadeEndRef.current ?? skyFade.endM,
+        target,
+        1 / ah.smoothSec,
+        dt
+      ));
+      const startM = skyFade.startM + (endM - skyFade.endM) * ah.startGrow;
+      setEdgeFade(startM, endM, GLOBE.rim[flyState.mapStyle] ?? GLOBE.rim.toy);
+      setDepthHaze(
+        TOY.haze.startM,
+        (startM * TOY.haze.endM) / skyFade.startM,
+        TOY.haze.color,
+        TOY.haze.max
+      );
+    }
+
     // Sky horizon follows the bent rim: dip = depression angle (as vDir.y)
     // of the point where the ground starts melting into the rim color —
     // eye height + bend drop at the fade start, over that distance. The
     // dome's gradient lands exactly where the terrain visually ends.
-    const skyFade = WORLD_EDGE.fade[flyState.mapStyle] ?? WORLD_EDGE.fade.satellite;
+    // Round 12: reads the LIVE band (altitude-extended in toy; the static
+    // style constants elsewhere — identical output there). The >1e8 guard
+    // covers the pre-style-effect boot frame (uniform boots "disabled").
+    const liveFadeStart = getEdgeFade().startM;
+    const dipStartM = liveFadeStart > 1e8 ? skyFade.startM : liveFadeStart;
     const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
-    const rimDrop = skyFade.startM * skyFade.startM * bendK + eyeAgl;
-    setSkyDip(rimDrop / Math.hypot(rimDrop, skyFade.startM));
+    const rimDrop = dipStartM * dipStartM * bendK + eyeAgl;
+    setSkyDip(rimDrop / Math.hypot(rimDrop, dipStartM));
 
     // Toon shadow sun rides with the player (small ortho frustum). Round 8:
     // it follows the style's KEY light (MOODS lightDir) — toy's moon, not
@@ -685,6 +726,11 @@ export function FlyScene({ runtime }) {
         stats.triangles = gl.info.render.triangles;
         stats.traffic = traffic.size;
         stats.bendK = bendK; // EFFECTIVE k — harnesses project like LabelCanvas
+        // Round 12: the LIVE (smoothed) ground fade band — verify-neon-alt
+        // gates on these (static 14000/26000 at spawn; ~47k/82k at cruise).
+        const ef = getEdgeFade();
+        stats.edgeFadeStartM = ef.startM;
+        stats.groundHorizonM = ef.endM;
       }
       gl.info.reset();
     }
