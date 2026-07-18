@@ -111,7 +111,12 @@ export function PoiLetters({ runtime, flight, origin }) {
         const minD = (isShown ? LETTERS.minDistM * 0.55 : LETTERS.minDistM) * nearK;
         if (d > maxD || d < minD) continue;
         poi._dist = d;
-        poi._sortD = heldVisible ? d * 0.8 : d;
+        // Sticky sort: a shown letter competes at a fraction of its true
+        // distance so it keeps its slot against a marginally-nearer challenger.
+        // Round 10 strengthened 0.8→stickyK: the denser letter field crosses
+        // 3-way distance boundaries (e.g. the STATUE/VERRAZZANO/CONEY reshuffle
+        // south of Manhattan) that a 0.8 damp let jitter into a gone-and-back.
+        poi._sortD = heldVisible ? d * LETTERS.stickyK : d;
         // Minimum hold: a letter shown < 20s ago outranks any newcomer for
         // its kind's quota — a name must never pop in and vanish seconds
         // later just because a slightly closer candidate crossed the ring.

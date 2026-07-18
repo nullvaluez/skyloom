@@ -36,7 +36,14 @@ const { bootFly } = require('./_boot');
     window.__fly.warpToGeo(40.6892, -74.0445, { altM: 1200, name: null });
     window.__fly.flight.heading = Math.PI; // south, out to sea
   });
-  await page.waitForTimeout(8000);
+  // Round 10: the spawn is ON the Statue of Liberty; while the plane clears its
+  // overhead-suppression ring (still doing 180 m/s), the nearest landmark hands
+  // off legitimately (EMPIRE STATE → STATUE) in the first ~2 s — an ARRIVAL
+  // transient, not the round-6 flicker bug. The round-10 denser letter set +
+  // tick-phase shift lets it bleed into an 8 s window; 14 s lets arrival fully
+  // settle first. Mid-flight flicker detection (the actual purpose) is
+  // unchanged — the 40 s sample window still covers the whole southbound run.
+  await page.waitForTimeout(14000);
 
   // Sample the rendered slot state (group userData.name per slot is not
   // exposed; poiSlots is the selection snapshot the letters render from).

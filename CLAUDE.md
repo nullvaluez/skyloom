@@ -35,6 +35,16 @@
 > §5 = harnesses green (verify-poi / verify-monuments / verify-atlas); §6 =
 > lessons (letters aren't ground; ride the curve, don't fight it; per-kind
 > declutter; `name` is an identity key; decouple selection from visibility).
+> **§7 follow-up (same day): SATELLITE is the default view now** (user) — the
+> store literal `mapStyle` stays `'toy'` but `PauseMenu` resolves an unsaved
+> player to `'satellite'` and persists it; harnesses seed `'toy'` via
+> `scripts/_boot.js` (no more `removeItem`) so the Neon suite is unmoved. Same
+> pass also SCOPED the area-feel boost to cities/airports (landmark/military/
+> hotspot reverted to round-6/8 tuning), added `LETTERS.stickyK` 0.68 to damp a
+> pre-existing STATUE/VERRAZZANO/CONEY gone-and-back, and bumped verify-poi's
+> settle 8s→14s (arrival transient, not flicker). §7 lesson 6: a harness sample
+> WINDOW can hide a real flicker — re-trace the full timeline when density or
+> settle changes.
 >
 > **⚠️ ACTIVE WORK — READ FIRST:** **Round 7 "Electric Night City" is BUILT
 > (2026-07-17): [FLY_ROUND7.md](FLY_ROUND7.md) is the record.** The Neon

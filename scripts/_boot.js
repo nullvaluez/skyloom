@@ -16,7 +16,7 @@
  *
  * Usage:
  *   const { bootFly } = require('./_boot');
- *   await bootFly(page);                        // Neon (toy) default — clears saved style
+ *   await bootFly(page);                        // Neon (toy) — SEEDS 'toy' (app default is now satellite, round 10)
  *   await bootFly(page, { style: 'satellite' }); // Day
  *   await bootFly(page, { style: 'night' });     // raw seed (legacy-migration tests)
  *
@@ -32,8 +32,12 @@ async function bootFly(
   await page.addInitScript((s) => {
     try {
       localStorage.setItem('fly-controls-seen', '1');
-      if (s) localStorage.setItem('fly-map-style-2', s);
-      else localStorage.removeItem('fly-map-style-2');
+      // Round 10: the APP default is now satellite (PauseMenu defaults an
+      // unsaved player to 'satellite'). Harnesses want the Neon world unless
+      // they ask otherwise, so a no-style boot SEEDS 'toy' explicitly — this
+      // also matches the store literal default, so the scene mounts toy with
+      // no mid-boot hot-swap (which would let the boot gate reveal early).
+      localStorage.setItem('fly-map-style-2', s || 'toy');
       window.__flyBootSeeded = true;
     } catch {
       /* storage blocked — the app boots on defaults */
@@ -49,8 +53,7 @@ async function bootFly(
   if (!seeded) {
     await page.evaluate((s) => {
       localStorage.setItem('fly-controls-seen', '1');
-      if (s) localStorage.setItem('fly-map-style-2', s);
-      else localStorage.removeItem('fly-map-style-2');
+      localStorage.setItem('fly-map-style-2', s || 'toy'); // round 10: default toy for harnesses
     }, style);
     await page.reload({ waitUntil: 'domcontentloaded', timeout: timeoutMs });
   }

@@ -128,3 +128,38 @@ All knobs are in `LETTERS`. Fly up over your home area and eyeball; nudge freely
    guarantees (verify-poi reads `poiSlots`, the selection snapshot) AND fixed
    the void-floater problem — two goals that a selection-time cap would have
    traded off against each other (and would have narrowed the harness's route).
+
+## 7. Follow-up (2026-07-18, same day): satellite default + POI stability
+
+**Satellite is the default view now** (user). A player with no saved style lands
+on Esri "Day", not Neon. The store literal `mapStyle` STAYS `'toy'` (so harnesses,
+which seed `'toy'` via `scripts/_boot.js`, mount with no style hot-swap that would
+let the boot gate reveal early); `PauseMenu`'s hydration effect resolves an unsaved
+player to `'satellite'` and persists it. Explicit toy-choosers keep toy. `_boot.js`
+no longer `removeItem`s the style key on a no-arg boot — it seeds `'toy'` — so the
+Neon-world harness suite is unmoved. Verified: a fresh boot (no saved key) →
+`mapStyle==='satellite'`, and verify-neon-city stays green (toy path intact).
+
+**POI stability pass (found while verifying the above).** Scoping the round-10
+area-feel boost to CITIES + airport reach exposed that the earlier all-kinds bump
+had destabilized the dense NYC landmark field. Two real fixes:
+- **Non-city kinds reverted to round-6/8 tuning** — landmark/military/hotspot
+  `rangeM`/`sizeM`/`max` and `minDistM` (2200→2600) fed the round-6 stability
+  contract; only cities pack tight (`separationM.city` 3000, every other kind
+  back to 4500). Cities/airports keep the area-feel boost; the global horizon
+  cull + `farScale` still apply to every kind (visual, not selection).
+- **`stickyK` 0.8→0.68** — a *pre-existing* gone-and-back at the STATUE /
+  VERRAZZANO / CONEY 3-way distance crossing south of Manhattan (round-9's 8 s
+  window ended right before the come-back at t≈50, so it was never sampled). The
+  denser round-10 field + the settle bump surfaced it; a stronger shown-letter
+  sticky factor turns the 3-way boundary jitter into clean one-way handoffs.
+- **verify-poi settle 8 s → 14 s** — the harness spawns ON the Statue; EMPIRE
+  STATE's real 10 s arrival lifetime was being sampled mid-life (looked like a
+  2 s blink). Letting arrival settle before sampling fixes the artifact without
+  weakening mid-flight flicker detection.
+
+Verified green ×4: verify-poi (clean, no gone-and-back). verify-monuments /
+verify-atlas / verify-neon-city all PASS. **Lesson 6:** a harness sample WINDOW
+can hide a real flicker — the Statue gone-and-back lived just past round-9's
+window edge for a year. When you change letter density OR the settle, re-trace
+the FULL timeline, don't just trust the pass/fail.

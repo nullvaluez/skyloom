@@ -78,6 +78,14 @@ export function PauseMenu({ onExit }) {
     }
     if (savedStyle && MAP_STYLES.some(([k]) => k === savedStyle)) {
       useFlyStore.getState().setMapStyle(savedStyle);
+    } else {
+      // Round 10 (user): satellite ("Day") is the default view for now — a
+      // player with no saved choice lands on Esri imagery, not Neon. Persist it
+      // so the choice sticks (and later boots skip the store-default toy→sat
+      // hot-swap). Explicit toy-choosers keep toy; harnesses seed 'toy' via
+      // scripts/_boot.js, so they never take this branch (neon tests unmoved).
+      window.localStorage.setItem(MAP_STYLE_KEY, 'satellite');
+      useFlyStore.getState().setMapStyle('satellite');
     }
   }, []);
 
