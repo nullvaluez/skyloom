@@ -12,9 +12,25 @@ import { useFlyStore } from '@/stores/fly-store';
 const FONT = '/fonts/ArchivoBlack-Regular.ttf'; // OFL, self-hosted
 
 const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-// 10 slots since the Atlas round added military/hotspot kinds (2 max each);
-// the separation declutter keeps the skyline from actually filling all 10.
-const SLOTS = 10;
+// Round 10 "area feel": the per-kind quotas grew (city 6, airport 4, military 3,
+// landmark/hotspot 2 = 17), so a metro can populate around you. Slots are the
+// capacity ceiling; the separation declutter + horizon cull keep the skyline
+// from actually filling all of them at once.
+const SLOTS = 20;
+
+// smoothstep(a,b,x) → 0..1 with eased ends (distance-scale ramp).
+function smoothstep(a, b, x) {
+  if (b <= a) return x >= b ? 1 : 0;
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+}
+
+// Per-kind declutter radius (LETTERS.separationM may be a number or a per-kind
+// map — tolerate both so a future single-value tune still works).
+function sepFor(kind) {
+  const s = LETTERS.separationM;
+  return typeof s === 'number' ? s : (s[kind] ?? 4000);
+}
 // Bigger kinds pick first; a smaller name that would stand inside a bigger
 // one's footprint is dropped (MANHATTAN over TIMES SQUARE).
 const KIND_ORDER = ['city', 'airport', 'military', 'landmark', 'hotspot'];
@@ -68,11 +84,22 @@ export function PoiLetters({ runtime, flight, origin }) {
       for (const p of current) if (p) shown.add(p.name);
       const byKind = { airport: [], city: [], landmark: [], military: [], hotspot: [] };
       let nearest = null;
+      // Round 10: the same visible-rim distance the render loop culls at. A
+      // letter that has sunk past it is HIDDEN, so its slot-holding bonuses
+      // (sticky sort + 20s minimum hold) must NOT apply — otherwise a big
+      // Atlas warp leaves the previous area's now-off-screen names squatting
+      // the quota for 20s while the new area's towns wait, unseen. Held
+      // in-view letters behave exactly as before (stability preserved).
+      const { k } = getBend();
+      const altM = Math.max(0, flight.pos.y);
+      const horizonD = k > 1e-9 ? Math.sqrt(altM / k) : Infinity;
+      const cullD = Math.max(LETTERS.minVisM, horizonD * LETTERS.horizonFrac);
       for (const poi of pois) {
         const style = LETTERS[poi.kind];
         if (!style) continue;
         const d = Math.hypot(poi.wx - px, poi.wz - pz);
         const isShown = shown.has(poi.name);
+        const heldVisible = isShown && d <= cullD; // shown AND still on-screen
         const maxD = isShown ? style.rangeM * 1.25 : style.rangeM;
         // Round 8 fix round: a monument-bearing landmark's letter rides high
         // above its monument in toy — let it survive a much closer approach
@@ -84,11 +111,13 @@ export function PoiLetters({ runtime, flight, origin }) {
         const minD = (isShown ? LETTERS.minDistM * 0.55 : LETTERS.minDistM) * nearK;
         if (d > maxD || d < minD) continue;
         poi._dist = d;
-        poi._sortD = isShown ? d * 0.8 : d;
+        poi._sortD = heldVisible ? d * 0.8 : d;
         // Minimum hold: a letter shown < 20s ago outranks any newcomer for
         // its kind's quota — a name must never pop in and vanish seconds
         // later just because a slightly closer candidate crossed the ring.
-        poi._prio = isShown && Date.now() - (poi._shownAt ?? 0) < 20000 ? 0 : 1;
+        // Only while it is actually on-screen (heldVisible), else it releases
+        // its slot to a nearer, visible town.
+        poi._prio = heldVisible && Date.now() - (poi._shownAt ?? 0) < 20000 ? 0 : 1;
         byKind[poi.kind].push(poi);
         if (poi.kind !== 'landmark' && (!nearest || d < nearest._dist)) nearest = poi;
       }
@@ -112,7 +141,8 @@ export function PoiLetters({ runtime, flight, origin }) {
             ideal.some(
               (p) =>
                 (!sepExempt || p.kind === 'landmark') &&
-                Math.hypot(p.wx - poi.wx, p.wz - poi.wz) < LETTERS.separationM
+                Math.hypot(p.wx - poi.wx, p.wz - poi.wz) <
+                  Math.max(sepFor(poi.kind), sepFor(p.kind))
             )
           )
             continue;
@@ -179,6 +209,15 @@ export function PoiLetters({ runtime, flight, origin }) {
     const toy = styleRef.current === 'toy';
     const now = performance.now() / 1000;
     const list = pickedRef.current;
+    // Round 10 horizon cull: only draw letters out to the visible rim. horizonD
+    // = sqrt(altM / k) is where the (altitude-flattened) bent ground drops to
+    // eye level; past it a grounded letter floats in the void. The world
+    // flattens as you climb, so this distance GROWS with altitude — the area's
+    // town set widens the higher you fly, with no per-altitude tuning.
+    const altM = Math.max(0, flight.pos.y);
+    const horizonD = k > 1e-9 ? Math.sqrt(altM / k) : Infinity;
+    const cullD = Math.max(LETTERS.minVisM, horizonD * LETTERS.horizonFrac);
+    const FSc = LETTERS.farScale;
     for (let i = 0; i < SLOTS; i++) {
       const g = groupRefs.current[i];
       if (!g) continue;
@@ -188,6 +227,17 @@ export function PoiLetters({ runtime, flight, origin }) {
         g.userData.name = null;
         continue;
       }
+      const rx = poi.wx - origin.anchor.x;
+      const rz = poi.wz - origin.anchor.z;
+      const d = Math.hypot(poi.wx - flight.pos.x, poi.wz - flight.pos.z);
+      // Sunk past the rim → hide (keep the name so re-showing doesn't re-pop).
+      // Selection / runtime.poiSlots are untouched: this is purely visual, so
+      // letter stability (verify-poi) is preserved.
+      if (d > cullD) {
+        g.visible = false;
+        g.userData.name = poi.name;
+        continue;
+      }
       g.visible = true;
       // Pop-in spring whenever the slot's name changes
       if (g.userData.name !== poi.name) {
@@ -195,12 +245,11 @@ export function PoiLetters({ runtime, flight, origin }) {
         g.userData.popT = now;
       }
       const u = Math.min(1, (now - (g.userData.popT ?? 0)) / LETTERS.popInSec);
-      const s = popScale(u);
+      // Distance up-scale keeps far letters legible (near-constant screen size)
+      const fm = FSc ? 1 + (FSc.mul - 1) * smoothstep(FSc.startM, FSc.endM, d) : 1;
+      const s = popScale(u) * fm;
       g.scale.set(s, s, s);
 
-      const rx = poi.wx - origin.anchor.x;
-      const rz = poi.wz - origin.anchor.z;
-      const d = Math.hypot(poi.wx - flight.pos.x, poi.wz - flight.pos.z);
       // Toy terrain is exaggerated + lifted; satellite/night stand on true DEM
       const groundY = toy
         ? (poi.elev ?? 0) * TOY_WORLD.terrainExaggeration + TOY_WORLD.groundLift

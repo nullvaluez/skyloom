@@ -12,6 +12,30 @@
 > describes deleted code (markers, panels, Leaflet-era plans); do not act
 > on it.
 
+> **⚠️ NEWEST — READ FIRST:** **Round 10 "In That Area" is BUILT + verified
+> (2026-07-18): [FLY_ROUND10.md](FLY_ROUND10.md) is the record.** Two paired
+> user asks (the user lives near Delaware County, Ohio): (1) WAY more world
+> markers — the offline `CITIES` POI DB grew **303 → 1719** (+1416,
+> 5-Opus-agent generate→verify workflow; merged with accent/case dedupe +
+> bounds validation; every ambiguous US name state-suffixed — `Dublin` was
+> already Dublin IRELAND, so Ohio's is `Dublin OH`); (2) at cruise altitude,
+> see the ground town markers near AND far so a warped mini-planet reads as
+> "its own little area you're inside of". The POI **letter** system
+> ([PoiLetters.jsx](components/fly/PoiLetters.jsx) + `LETTERS` in
+> fly-constants.js) is now altitude/horizon-aware: city `max` 2→6, SLOTS
+> 10→20, **per-kind `separationM`** (cities pack tight at 3000, landmarks keep
+> the stable 4500 — a flat 3000 blinked EMPIRE STATE, caught by verify-poi), a
+> **horizon cull** (`horizonD = sqrt(altM/k)` reading the live bend uniform —
+> letters are troika Text, NOT the rim-fade shader, so far ones would float in
+> the void), distance up-scale (`farScale`) for legibility, and a `heldVisible`
+> gate so a big Atlas warp doesn't leave the previous area's off-screen names
+> squatting the quota for 20s. Because `GLOBE.altFlatten` flattens `k` with
+> altitude, MORE of the area's towns appear the higher you fly — for free.
+> FLY_ROUND10.md §4 = live-tuning sign-offs pending (all knobs in `LETTERS`);
+> §5 = harnesses green (verify-poi / verify-monuments / verify-atlas); §6 =
+> lessons (letters aren't ground; ride the curve, don't fight it; per-kind
+> declutter; `name` is an identity key; decouple selection from visibility).
+>
 > **⚠️ ACTIVE WORK — READ FIRST:** **Round 7 "Electric Night City" is BUILT
 > (2026-07-17): [FLY_ROUND7.md](FLY_ROUND7.md) is the record.** The Neon
 > (toy) world now EMITS light (facade windows on `aFacade`, runway edge
