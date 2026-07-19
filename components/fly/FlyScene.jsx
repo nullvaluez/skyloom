@@ -42,6 +42,7 @@ import {
   FLIGHT,
   GLOBE,
   HILLSHADE,
+  SAT_BUILDINGS,
   SKY,
   TOY,
   TOY_WORLD,
@@ -61,6 +62,7 @@ import { Contrail } from './Contrail';
 import { PlayerGroundShadow } from './PlayerGroundShadow';
 import { TrafficLayer } from './TrafficLayer';
 import { ToyWorldLayer } from './ToyWorldLayer';
+import { SatBuildingLayer } from './SatBuildingLayer';
 
 const SPAWN_ALT_M = 800;
 const _spotPos = new Vector3();
@@ -569,11 +571,16 @@ export function FlyScene({ runtime }) {
     traffic.clearGroundCache();
   }, [mapStyle, engine, traffic]);
 
+  // Round 13 fix: set true by the spawn effect; gates the frame loop's
+  // runtime.geo publisher (see the comment at the sample block below).
+  const spawnPlacedRef = useRef(false);
+
   // Spawn: place the aircraft above the spawn point, pointing north, and
   // drop the floating-origin anchor there.
   useEffect(() => {
     if (!spawn) return;
     flight.pos.copy(engine.geoToWorld(spawn.lon, spawn.lat, SPAWN_ALT_M));
+    spawnPlacedRef.current = true; // runtime.geo may publish from here on
     flight.latDeg = spawn.lat;
     flight.heading = 0;
     flight.pitch = 0;
@@ -594,6 +601,19 @@ export function FlyScene({ runtime }) {
   }, [spawn, engine, flight, rebase]);
 
   const frameCount = useRef(0);
+  // Round 13 fix (live-caught "night at noon" boot): the frame loop can tick
+  // BEFORE React flushes the spawn-placement effect below, so the first geo
+  // samples came from the UNPLACED flight.pos at the world origin — publishing
+  // runtime.geo = (0, 0) ("null island"). The day cycle's first run then read
+  // lon 0 and, at the wrong UTC hour, stamped runtime.sun.frac ≈ 0 — and every
+  // R13 night consumer (HDRI bucket, moonlit key, altAtmo rim, white balance)
+  // faithfully rendered NIGHT at a daytime spawn for up to a 60s cadence tick
+  // (a style toggle/warp also healed it, which is how it was reported). Gate
+  // the sample block until the spawn effect has actually placed the aircraft —
+  // the day cycle's `runtime.geo?.x ?? spawn?.lon` fallback then reads the real
+  // spawn longitude on its first run. (Pre-R13 the same latch existed but only
+  // dimmed intensity through the 0.35 floor — satellite's new real night made
+  // it visible.)
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
     const flyState = useFlyStore.getState();
@@ -605,7 +625,7 @@ export function FlyScene({ runtime }) {
 
     // Terrain raycasts are ~fractions of a ms but not free — sample the
     // ground under the aircraft every 3rd frame.
-    if (frameCount.current++ % 3 === 0) {
+    if (spawnPlacedRef.current && frameCount.current++ % 3 === 0) {
       const geo = engine.worldToGeo(flight.pos);
       flight.latDeg = geo.y;
       const elev = engine.getElevationAt(geo.x, geo.y);
@@ -959,6 +979,14 @@ export function FlyScene({ runtime }) {
         <primitive object={engine.object} />
         {/* Toy World vector chunks drape over the (flat-tan) tile ground */}
         {mapStyle === 'toy' && <ToyWorldLayer runtime={runtime} flight={flight} />}
+        {/* Round 13 Phase 3 CENTERPIECE: 3D extruded buildings in satellite,
+            fed by the same vector worker (lean 'sat-buildings' mode). Inside
+            worldRoot so chunk meshes ride the -anchor rebase like the toy chunks
+            (anchor-bend uBendCenter frame stays in sync). Gated satellite +
+            enabled + tier≥medium → byte-noop (no worker/engine/draws) elsewhere. */}
+        {mapStyle === 'satellite' && SAT_BUILDINGS.enabled && qualityTier !== 'low' && (
+          <SatBuildingLayer runtime={runtime} flight={flight} />
+        )}
         <PlayerPlane flight={flight} />
       </group>
 

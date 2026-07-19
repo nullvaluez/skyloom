@@ -94,6 +94,34 @@ const path = require('path');
     });
     await page.screenshot({ path: path.join(__dirname, `boot-${style}-revealed.png`) });
 
+    // Round 13 regression gate ("night at noon" boot): the day cycle's FIRST
+    // run must compute the sun from the SPAWN longitude, never from the
+    // unplaced flight at null island (a pre-spawn frame tick used to publish
+    // runtime.geo = (0,0), and the first sun latch lived a full 60s cadence —
+    // invisible pre-R13, a full night boot after satellite got a real night).
+    // Recompute the expected sunFactor from the persisted position with the
+    // day cycle's own formula and require agreement. Satellite only (the day
+    // cycle is satellite-scoped) and dev-only stats.
+    let sunGate = { ok: true, note: 'n/a (toy)' };
+    if (style === 'satellite') {
+      const got = await page.evaluate(() => window.__flyStats?.sunFactor ?? null);
+      const lon = persisted.lastPos?.lon;
+      if (got == null || !Number.isFinite(lon)) {
+        sunGate = { ok: false, note: `missing sunFactor (${got}) or lon (${lon})` };
+      } else {
+        const d = new Date();
+        const localH = (d.getUTCHours() + d.getUTCMinutes() / 60 + lon / 15 + 24) % 24;
+        const expected = Math.max(0, Math.cos(((localH - 12) / 12) * Math.PI));
+        // 0.2 tolerance: covers the 60s cadence drift; the null-island latch
+        // failure mode is a gross mismatch (e.g. 0 vs ~1), not a drift.
+        sunGate = {
+          ok: Math.abs(got - expected) < 0.2,
+          note: `sunFactor ${got.toFixed(3)} vs expected ${expected.toFixed(3)} @lon ${lon.toFixed(2)}`,
+        };
+      }
+      console.log(`sun-at-spawn gate: ${sunGate.ok ? 'PASS' : 'FAIL'} — ${sunGate.note}`);
+    }
+
     console.log(`\n=== ${style} ===`);
     console.log('trace:', JSON.stringify(trace));
     console.log('goto→pct100:', done, 'ms; monotonic:', monotonic);
@@ -108,6 +136,7 @@ const path = require('path');
       !post.overlay &&
       persisted.still?.pct === 100 &&
       Number.isFinite(persisted.lastPos?.lat) &&
+      sunGate.ok && // Round 13: sun must match the spawn longitude at boot
       errs.length === 0;
     console.log(pass ? `PASS ${style}` : `FAIL ${style}`);
     await page.close();
