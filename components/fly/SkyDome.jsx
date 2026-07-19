@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { BackSide, Color, ShaderMaterial, SphereGeometry, Mesh } from 'three';
+import { BackSide, Color, ShaderMaterial, SphereGeometry, Mesh, SRGBColorSpace } from 'three';
 
 // Live horizon dip (round 6): the ground curves away d²k but the dome's
 // horizon used to sit at flat eye level — at altitude a black band opened
@@ -12,6 +12,24 @@ import { BackSide, Color, ShaderMaterial, SphereGeometry, Mesh } from 'three';
 const dipUniform = { value: 0 };
 export function setSkyDip(dipY) {
   dipUniform.value = dipY;
+}
+
+// Round 13 Phase 1: live per-frame dome atmosphere (satellite time-of-day +
+// altitude tint). FlyScene's -50 block writes the interpolated rim/void colors
+// here every frame in satellite — the THIRD leg of the rim triple (scene fog +
+// tile edge-fade being the other two, all from SKY.altAtmo). Components are
+// OUTPUT-space sRGB (0..1); setRGB(...,SRGBColorSpace) converts to the dome's
+// linear working space (matching the Color(hex) prop path). horizon = rim so
+// the below-horizon band starts on the same tone the sky presents. clearSkyAtmo
+// hands the dome back to its declarative props (toy/night keep the prop path).
+const atmo = { active: false, rim: new Color(), void: new Color() };
+export function setSkyAtmo(rr, rg, rb, vr, vg, vb) {
+  atmo.active = true;
+  atmo.rim.setRGB(rr, rg, rb, SRGBColorSpace);
+  atmo.void.setRGB(vr, vg, vb, SRGBColorSpace);
+}
+export function clearSkyAtmo() {
+  atmo.active = false;
 }
 
 /**
@@ -150,9 +168,16 @@ export function SkyDome({
     };
   }, [mesh]);
 
-  // Follow the camera (rebased frame) so the dome never parallaxes
+  // Follow the camera (rebased frame) so the dome never parallaxes; in
+  // satellite the -50 block feeds live time-of-day/altitude atmosphere colors.
   useFrame(({ camera }) => {
     mesh.position.copy(camera.position);
+    if (atmo.active) {
+      const u = mesh.material.uniforms;
+      u.uHorizon.value.copy(atmo.rim);
+      u.uRim.value.copy(atmo.rim);
+      u.uVoid.value.copy(atmo.void);
+    }
   });
 
   return <primitive object={mesh} dispose={null} />;

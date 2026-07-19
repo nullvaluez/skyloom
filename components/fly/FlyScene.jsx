@@ -1,8 +1,8 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useRef } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Object3D, Vector3 } from 'three';
+import { Object3D, Vector3, SRGBColorSpace } from 'three';
 import { Environment } from '@react-three/drei';
 import {
   airDrop,
@@ -15,12 +15,14 @@ import {
   setBend,
   setBendEye,
   setDepthHaze,
+  setDepthHazeRGB,
   setEdgeFade,
+  setEdgeFadeRGB,
   setHillDir,
   setHillshade,
 } from '@/lib/fly/toy-world/world-bend';
 import { PALETTE } from '@/lib/fly/toy-world/toy-palette';
-import { SkyDome, setSkyDip } from './SkyDome';
+import { SkyDome, setSkyDip, setSkyAtmo, clearSkyAtmo } from './SkyDome';
 import { PoiLetters } from './PoiLetters';
 import { TrafficTracers } from './TrafficTracers';
 import { WarpBurst } from './WarpBurst';
@@ -62,6 +64,45 @@ import { ToyWorldLayer } from './ToyWorldLayer';
 const SPAWN_ALT_M = 800;
 const _spotPos = new Vector3();
 const _warpPos = new Vector3();
+
+// Round 13 Phase 1: satellite atmosphere (the rim triple). Precompute the
+// SKY.altAtmo time-of-day keyframes as sRGB 0..1 triples once (SKY is a
+// constant import); the -50 block interpolates them by runtime.sun.frac and
+// cool-shifts toward the high-altitude blue by the smoothed eye-AGL term.
+const _hex2rgb = (hex) => {
+  const n = parseInt(hex.slice(1), 16);
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+};
+const _ATMO_TOD = SKY.altAtmo.tod.map((k) => ({
+  frac: k.frac,
+  rim: _hex2rgb(k.rim),
+  void: _hex2rgb(k.void),
+}));
+const _ATMO_HI_RIM = _hex2rgb(SKY.altAtmo.highAltRim);
+const _ATMO_HI_VOID = _hex2rgb(SKY.altAtmo.highAltVoid);
+const _atmoRim = [0, 0, 0];
+const _atmoVoid = [0, 0, 0];
+
+// Fill _atmoRim/_atmoVoid (sRGB 0..1) for the current sun fraction + smoothed
+// altitude term. No allocation (writes the module scratch triples). dayness
+// gates the cool-shift so night stays dark at altitude, not lifted to blue.
+function computeSatAtmo(frac, altT) {
+  const kf = _ATMO_TOD;
+  let i = 0;
+  while (i < kf.length - 1 && frac > kf[i + 1].frac) i++;
+  const a = kf[i];
+  const b = kf[Math.min(i + 1, kf.length - 1)];
+  const span = b.frac - a.frac;
+  const t = span > 1e-6 ? Math.min(1, Math.max(0, (frac - a.frac) / span)) : 0;
+  const dayness = Math.min(1, Math.max(0, frac / SKY.altAtmo.daynessFrac));
+  const shift = altT * dayness;
+  for (let c = 0; c < 3; c++) {
+    const rim = a.rim[c] + (b.rim[c] - a.rim[c]) * t;
+    const vd = a.void[c] + (b.void[c] - a.void[c]) * t;
+    _atmoRim[c] = rim + (_ATMO_HI_RIM[c] - rim) * shift;
+    _atmoVoid[c] = vd + (_ATMO_HI_VOID[c] - vd) * shift;
+  }
+}
 
 // Per-map-style scene mood (bg/fog/lights). hdriBg: use the HDRI as the
 // visible sky; otherwise the flat background color IS the sky. Round 8
@@ -117,10 +158,16 @@ export function FlyScene({ runtime }) {
   const mood = MOODS[mapStyle] ?? MOODS.satellite;
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene); // round 13: live satellite fog color/density
   const sunRef = useRef();
   const hemiRef = useRef();
+  const satAltTRef = useRef(null); // round 13: smoothed satellite altitude term
   const sunTarget = useMemo(() => new Object3D(), []);
   const warpEpochForSun = useFlyStore((s) => s.warpEpoch); // re-aim the day-cycle on warps
+  // Round 13 Phase 1: satellite time-of-day HDRI bucket. Discrete React state
+  // that changes only on a sun-frac bucket crossing (a PMREM re-bake); toy
+  // ignores it and stays on the certified noon HDRI.
+  const [hdriBucket, setHdriBucket] = useState('day');
 
   // Built once with the style active at mount; later changes hot-swap via
   // engine.setImagery below (styleRef starts in sync with this).
@@ -465,6 +512,36 @@ export function FlyScene({ runtime }) {
     return () => clearInterval(id);
   }, [mapStyle, warpEpochForSun, runtime, spawn]);
 
+  // Round 13 Phase 1: satellite time-of-day HDRI sky. Reads the SAME runtime.sun
+  // the day cycle publishes and buckets it into day / dawn / dusk / night (dawn
+  // vs dusk splits on az sign). setState only on a bucket CHANGE, so the drei
+  // <Environment> (keyed by the bucket) remounts + re-bakes PMREM at most once
+  // per crossing — never per frame. Toy never enters here (its noon HDRI is
+  // certified). Re-picks on warp (warpEpochForSun) so a fast-travel to another
+  // timezone swaps the sky on arrival, matching the day-cycle light.
+  useEffect(() => {
+    if (mapStyle !== 'satellite') {
+      setHdriBucket('day');
+      return;
+    }
+    const hc = SKY.hdriCycle;
+    const pick = () => {
+      const frac = runtime.sun?.frac ?? 1;
+      const az = runtime.sun?.az ?? 0;
+      let b;
+      if (frac >= hc.dayFrac) b = 'day';
+      else if (frac < hc.nightFrac) b = 'night';
+      else b = az < 0 ? 'dawn' : 'dusk';
+      setHdriBucket((prev) => (prev === b ? prev : b));
+      if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+        (window.__flyStats ??= {}).hdriBucket = b;
+      }
+    };
+    pick();
+    const id = setInterval(pick, 5000);
+    return () => clearInterval(id);
+  }, [mapStyle, warpEpochForSun, runtime]);
+
   // Map style hot-swap: replace the imagery provider in place — the DEM,
   // quadtree and every coordinate stay untouched; tiles refetch lazily.
   // Grounded pins are style-dependent (toy exaggeration) — resample them.
@@ -667,7 +744,56 @@ export function FlyScene({ runtime }) {
     // Static styles never enter here; their style effect stays the writer.
     const skyFade = WORLD_EDGE.fade[flyState.mapStyle] ?? WORLD_EDGE.fade.satellite;
     const ah = WORLD_EDGE.altHorizon;
-    if (ah?.enabled && ah.byStyle[flyState.mapStyle]) {
+    const ahOn = ah?.enabled && ah.byStyle[flyState.mapStyle];
+    if (ahOn && flyState.mapStyle === 'satellite') {
+      // Round 13 Phase 1: satellite time-of-day + altitude ATMOSPHERE — the
+      // rim triple from ONE source (SKY.altAtmo). The edge-fade band stays the
+      // static round-11 60/120km (the sky dip below reads its start); only the
+      // COLOR, the aerial haze and the fog density move with time-of-day/alt.
+      // The altitude term is expApproach-smoothed so a dive can't pop the band;
+      // tod tracks slowly (runtime.sun updates on the 60s cadence + on warp).
+      const aa = SKY.altAtmo;
+      const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
+      const targetAltT = Math.min(
+        1,
+        Math.max(0, (eyeAgl - aa.aglStartM) / (aa.aglFullM - aa.aglStartM))
+      );
+      const altT = (satAltTRef.current = expApproach(
+        satAltTRef.current ?? targetAltT,
+        targetAltT,
+        1 / aa.smoothSec,
+        dt
+      ));
+      computeSatAtmo(runtime.sun?.frac ?? 1, altT);
+      // (1) scene fog, (2) tile edge-fade + aerial haze target, (3) SkyDome
+      // band — all the same rim color; fog density FALLS with altitude to kill
+      // the FL300 "wet mirror" murk band.
+      scene.fog?.color.setRGB(_atmoRim[0], _atmoRim[1], _atmoRim[2], SRGBColorSpace);
+      if (scene.fog) {
+        scene.fog.density =
+          aa.fogDensityBase + (aa.fogDensityHigh - aa.fogDensityBase) * altT;
+      }
+      setEdgeFadeRGB(skyFade.startM, skyFade.endM, _atmoRim[0], _atmoRim[1], _atmoRim[2]);
+      setDepthHazeRGB(
+        SKY.haze.startM,
+        SKY.haze.endM,
+        _atmoRim[0],
+        _atmoRim[1],
+        _atmoRim[2],
+        SKY.haze.max
+      );
+      setSkyAtmo(_atmoRim[0], _atmoRim[1], _atmoRim[2], _atmoVoid[0], _atmoVoid[1], _atmoVoid[2]);
+    } else if (ahOn) {
+      // Round 12 "Neon Planet" (TOY): the ground fade band BREATHES with
+      // altitude — END chases sqrt(eyeAGL/k)·frac (floored at the static band
+      // so the certified low-altitude look is byte-identical), START trails at
+      // startGrow of the extension, and the round-8 haze end rides START at its
+      // 13/14 ratio so the rim gates hold at every altitude. One damped write
+      // into the LIVE uEdgeFade uniform — every consumer (sky dip below, ultra
+      // ring, VoidFloor, TownGlow, clouds) reads it via getEdgeFade(). UNCHANGED
+      // from R12 (satellite takes its own branch above); clearSkyAtmo hands the
+      // dome back to its PALETTE props.
+      clearSkyAtmo();
       const target = groundHorizonTargetM(ah, skyFade.endM, ah.maxM);
       const endM = (edgeFadeEndRef.current = expApproach(
         edgeFadeEndRef.current ?? skyFade.endM,
@@ -683,6 +809,8 @@ export function FlyScene({ runtime }) {
         TOY.haze.color,
         TOY.haze.max
       );
+    } else {
+      clearSkyAtmo();
     }
 
     // Sky horizon follows the bent rim: dip = depression angle (as vDir.y)
@@ -756,12 +884,25 @@ export function FlyScene({ runtime }) {
       {/* Aerial haze doubles as the horizon cap that bounds tile loads */}
       <fogExp2 attach="fog" args={mood.fog} />
       <Suspense fallback={null}>
-        {/* keyed: drei restores the previous scene.background on unmount */}
+        {/* keyed: drei restores the previous scene.background on unmount.
+            Round 13 Phase 1: satellite swaps the visible sky HDRI on discrete
+            sun-frac buckets (dawn/dusk/night purskies) — the key carries the
+            bucket so each crossing remounts + re-bakes PMREM once. Toy keeps
+            the certified noon HDRI unconditionally (key 'toy', never rebakes). */}
         <Environment
-          key={mapStyle}
-          files={SKY.hdri}
+          key={mapStyle === 'satellite' ? `sat:${hdriBucket}` : mapStyle}
+          files={mapStyle === 'satellite' ? SKY.hdriCycle[hdriBucket] ?? SKY.hdri : SKY.hdri}
           background={mood.hdriBg}
-          environmentIntensity={mood.env}
+          environmentIntensity={
+            mapStyle === 'satellite'
+              ? SKY.hdriCycle.intensity[hdriBucket]?.env ?? mood.env
+              : mood.env
+          }
+          backgroundIntensity={
+            mapStyle === 'satellite'
+              ? SKY.hdriCycle.intensity[hdriBucket]?.bg ?? 1
+              : 1
+          }
         />
       </Suspense>
 

@@ -9,6 +9,7 @@ import {
   Color,
   InstancedMesh,
   MeshBasicMaterial,
+  MeshLambertMaterial,
   Object3D,
 } from 'three';
 import { CLOUDS, TOY_WORLD, WORLD_EDGE } from '@/lib/fly/fly-constants';
@@ -111,12 +112,13 @@ export function CloudField({ runtime, flight, origin }) {
     });
   }, []);
 
-  // Round 11: sun-driven tint for the unlit puffs (satellite only). The
-  // clouds are MeshBasicMaterial — the day-cycle sun never lit them, so
-  // dawn/dusk left flat white cotton on a golden world. FlyScene publishes
-  // runtime.sun on its 60s day-cycle cadence; we sample it every ~10s and
-  // lerp dim → warm → bright (CLOUDS.dayTint). React state at 0.1Hz — drei
-  // Cloud color/opacity props are reactive, cost is negligible.
+  // Round 11 / Round 13: sun-driven tint (satellite only). Round 13 made the
+  // satellite deck LIT (MeshLambertMaterial below), so sun/hemi/env now carry
+  // day/night LUMINANCE — this tint is only a SUBTLE chromatic bias (cool at
+  // night → warm at golden hour → neutral by day) multiplied onto the lit
+  // result (CLOUDS.dayTint reworked subtler, warmBand 0.25). FlyScene publishes
+  // runtime.sun on its 60s cadence; sampled every ~10s. React state at 0.1Hz —
+  // drei Cloud color prop is reactive, cost negligible.
   const [sunTint, setSunTint] = useState(null);
   useEffect(() => {
     if (mapStyle !== 'satellite') {
@@ -210,6 +212,15 @@ export function CloudField({ runtime, flight, origin }) {
       if (feEnd < 1e8) {
         f = Math.min(asp.maxF, Math.max(1, feEnd / WORLD_EDGE.fade.toy.endM));
       }
+    } else if (!isToy && mapStyle === 'satellite' && asp?.satEnabled) {
+      // Round 13 Phase 1: satellite band is static, so key the spread to eye
+      // altitude directly — at cruise the deck spreads and reads as weather
+      // below you (belowEye rises for free). f = 1 at/below satStartAglM keeps
+      // the round-11 low-AGL deck byte-identical (verify-round11 clouds @1800m).
+      f = Math.min(
+        asp.maxF,
+        Math.max(1, 1 + (flight.pos.y - asp.satStartAglM) / asp.satPerAglM)
+      );
     }
     const fScale = f === 1 ? 1 : Math.pow(f, asp.sizeExp);
     const cell = CLOUDS.cellSize * f;
@@ -325,18 +336,23 @@ export function CloudField({ runtime, flight, origin }) {
     }
   });
 
-  // MeshBasicMaterial: unlit — zero lighting cost, color is fully authored
-  // per style (bright white in Day; ink wisps in the dark styles that stay
-  // far under the bloom threshold so they never compete with the tracers).
-  // key={mapStyle}: drei Cloud config is prop-reactive, but a clean remount
-  // on the (discrete) style switch removes any doubt about stale segments.
+  // Round 13 Phase 1: satellite uses MeshLambertMaterial (sun/hemi/env shape
+  // the deck for real) + the softer cumulus sprite (CLOUDS.textureSat) + a
+  // flatter base (style.boundsYFrac). Toy/night stay unlit MeshBasicMaterial on
+  // cloud.png — zero lighting cost, colors authored under the bloom threshold
+  // so they never compete with the tracers (pixel-stable). key={mapStyle}: drei
+  // Cloud config is prop-reactive, but a clean remount on the (discrete) style
+  // switch removes any doubt about stale segments — and the material CLASS.
+  const cloudTexture = mapStyle === 'satellite' ? CLOUDS.textureSat : CLOUDS.texture;
+  const CloudMat = style.lit ? MeshLambertMaterial : MeshBasicMaterial;
+  const boundsYFrac = style.boundsYFrac ?? 0.28;
   return (
     <>
       <primitive object={shadows.mesh} />
       <Clouds
       key={mapStyle}
-      texture={CLOUDS.texture}
-      material={MeshBasicMaterial}
+      texture={cloudTexture}
+      material={CloudMat}
       limit={CLOUDS.limit}
       frustumCulled={false}
     >
@@ -350,11 +366,9 @@ export function CloudField({ runtime, flight, origin }) {
           <Cloud
             seed={p.seed}
             segments={CLOUDS.segments}
-            bounds={[p.size, p.size * 0.28, p.size]}
+            bounds={[p.size, p.size * boundsYFrac, p.size]}
             volume={p.size * 1.15}
-            opacity={
-              sunTint ? style.opacity * (0.7 + 0.3 * sunTint.frac) : style.opacity
-            }
+            opacity={style.opacity}
             fade={CLOUDS.fade}
             speed={0.06}
             color={sunTint?.color ?? style.color}

@@ -15,7 +15,11 @@
  * (C) SUNLIT CLOUDS — __flySunOverride dusk vs noon moves __flyStats.cloudTint
  *     off/back to white (the tint interval is 10s — dwell covers it), and
  *     cloudMinAgl ≥ CLOUDS.clearanceM still holds with the raised band +
- *     clustered layout.
+ *     clustered layout. Round 13: the satellite deck is now MeshLambert (lit),
+ *     so cloudTint is a SUBTLE chromatic BIAS on the lit result, not the whole
+ *     visible color (the reworked CLOUDS.dayTint keeps noon = #ffffff / dusk =
+ *     cool off-white, so the numeric gates below hold unchanged — they now
+ *     assert the tint BIAS still tracks the sun, which is what matters).
  * (D) draws ≤ 480, zero page/console errors. Screenshots for the eyeball:
  *     clustered clouds noon + dusk tint.
  * Run against the dev server on :3000 (dev-only globals).
@@ -147,8 +151,10 @@ const { BOOT_URL } = require('./_boot');
   const dusk = await page.evaluate(() => window.__flyStats?.cloudTint ?? null);
   await glShot('02-clouds-dusk');
   console.log(`cloud tint noon=${noon.tint} dusk=${dusk} · minAgl=${noon.minAgl}`);
+  // Round 13: same thresholds (dayTint reworked but noon still #ffffff, dusk
+  // still a cool off-white) — asserts the sun-driven tint bias is live.
   gate(
-    'noon clouds ~white',
+    'noon clouds ~white (tint bias neutral)',
     noon.tint !== null && parseInt(noon.tint.slice(1, 3), 16) > 230,
     String(noon.tint)
   );
