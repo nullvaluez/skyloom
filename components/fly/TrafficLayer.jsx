@@ -3,6 +3,7 @@
 import { useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import {
+  CanvasTexture,
   Color,
   DynamicDrawUsage,
   InstancedMesh,
@@ -22,6 +23,33 @@ const _color = new Color();
 const _fog = new Color(SKY.fogColor);
 // Stale traffic fades toward the style's haze, not always daylight blue
 const FOG_BY_STYLE = { satellite: SKY.fogColor, toy: TOY.fogColor };
+
+/**
+ * Round 13 Phase 2: procedural far-LOD billboard sprite — a soft radial glow
+ * with a faint wing/fuselage cross, generated to a CanvasTexture at startup (no
+ * asset, no network). Set as the billboard material MAP so far traffic reads as
+ * a distant aircraft glint on the SAME instanced draw, not a colored square.
+ */
+function makeBillboardSprite() {
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 64;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(32, 32, 1, 32, 32, 30);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.4, 'rgba(255,255,255,0.55)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 64);
+  // Faint silhouette hint: wings + fuselage cross (additive over the glow)
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.fillRect(8, 30, 48, 4); // wings
+  ctx.fillRect(30, 12, 4, 40); // fuselage
+  const tex = new CanvasTexture(c);
+  tex.anisotropy = 2;
+  return tex;
+}
 
 /**
  * Live traffic rendering: one raw InstancedMesh per archetype (NOT drei
@@ -68,6 +96,10 @@ export function TrafficLayer({ runtime, flight, origin }) {
       transparent: true,
       opacity: 0.85,
       depthWrite: false,
+      // Round 13 Phase 2: soft-glow sprite (white rgb / shaped alpha) — the
+      // per-instance tint still colors it, the same instanced draw now reads
+      // as a distant glint. map is disposed with the mesh below.
+      map: TRAFFIC.billboardSprite ? makeBillboardSprite() : null,
     });
     // Far-LOD dots: anchor-evaluated air bend. These quads GROW with
     // distance — per-vertex drop stretched ones straddling the AGL blend
@@ -114,6 +146,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
         mesh.dispose();
       }
       billboards.geometry.dispose();
+      billboards.material.map?.dispose();
       billboards.material.dispose();
       billboards.dispose();
     };
@@ -129,7 +162,20 @@ export function TrafficLayer({ runtime, flight, origin }) {
     const items = traffic.update(performance.now() / 1000, flight.pos);
     const ax = origin.anchor.x;
     const az = origin.anchor.z;
-    _fog.set(FOG_BY_STYLE[useFlyStore.getState().mapStyle] ?? SKY.fogColor);
+    const mapStyleNow = useFlyStore.getState().mapStyle;
+    _fog.set(FOG_BY_STYLE[mapStyleNow] ?? SKY.fogColor);
+    // Round 13 Phase 2: hull PRESENCE floor over dark ground — over-drive the
+    // per-instance tint so lit hulls × dim moonlight never read as black cutouts.
+    // Toy is always dark; satellite ramps the lift in only as the sun sets, so
+    // bright daylight imagery keeps gain 1 (byte-identical certified day look).
+    const hp = TRAFFIC.hullPresence;
+    let hullGain = 1;
+    if (mapStyleNow === 'toy') {
+      hullGain = hp.toy;
+    } else if (mapStyleNow === 'satellite') {
+      const nightT = Math.min(1, Math.max(0, 1 - (runtime.sun?.frac ?? 1) / hp.satDayFrac));
+      hullGain = 1 + (hp.satelliteNight - 1) * nightT;
+    }
 
     for (const mesh of meshes) mesh._used = 0;
     let billboardsUsed = 0;
@@ -161,6 +207,9 @@ export function TrafficLayer({ runtime, flight, origin }) {
         // GLB archetypes carry their own vertex colors (tint white);
         // primitives stay classification-colored
         _color.set(mesh._isModel ? '#ffffff' : it.meta?.color || '#9ca3af');
+        // Round 13 Phase 2: lift the hull out of black over dark ground, BEFORE
+        // the stale fog-lerp (so ghosting still dims relative to the lifted base)
+        if (hullGain !== 1) _color.multiplyScalar(hullGain);
         const eff = it.opacity * it.horizonFade;
         if (eff < 1) _color.lerp(_fog, 1 - eff);
         const fix = it.fix1;

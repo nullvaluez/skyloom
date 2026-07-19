@@ -58,6 +58,7 @@ import { VoidFloor } from './VoidFloor';
 import { TownGlow } from './TownGlow';
 import { LandmarkMonuments } from './LandmarkMonuments';
 import { Contrail } from './Contrail';
+import { PlayerGroundShadow } from './PlayerGroundShadow';
 import { TrafficLayer } from './TrafficLayer';
 import { ToyWorldLayer } from './ToyWorldLayer';
 
@@ -542,6 +543,21 @@ export function FlyScene({ runtime }) {
     return () => clearInterval(id);
   }, [mapStyle, warpEpochForSun, runtime]);
 
+  // Round 13 Phase 2 (P1 handoff): cool the directional KEY + hemi-sky COLOR per
+  // HDRI bucket in satellite (moonlit blue at night, warm at dawn/dusk). Discrete
+  // — same cadence as the bucket swap. COLOR only; INTENSITY stays on the day
+  // cycle (verify-sun's noon/midnight intensity gates are untouched). Fixes the
+  // "night ground reads as dimmed daylight" gap: the night HDRI dimmed env/bg but
+  // the key stayed white. Non-satellite styles keep their JSX mood colors (the
+  // directional/hemi color props reset on the style swap).
+  useEffect(() => {
+    if (mapStyle !== 'satellite') return;
+    const kc = SKY.hdriCycle.keyColor[hdriBucket] ?? SKY.hdriCycle.keyColor.day;
+    const hc = SKY.hdriCycle.hemiSky[hdriBucket] ?? SKY.hdriCycle.hemiSky.day;
+    if (sunRef.current) sunRef.current.color.set(kc);
+    if (hemiRef.current) hemiRef.current.color.set(hc);
+  }, [mapStyle, hdriBucket]);
+
   // Map style hot-swap: replace the imagery provider in place — the DEM,
   // quadtree and every coordinate stay untouched; tiles refetch lazily.
   // Grounded pins are style-dependent (toy exaggeration) — resample them.
@@ -987,6 +1003,9 @@ export function FlyScene({ runtime }) {
         </Suspense>
       )}
       <Contrail flight={flight} origin={origin} />
+      {/* Round 13 Phase 2: satellite player ground-contact disc (1 draw, low
+          AGL only). Toy keeps its real cast shadow via the player's castShadow. */}
+      {mapStyle === 'satellite' && <PlayerGroundShadow flight={flight} origin={origin} />}
     </>
   );
 }
