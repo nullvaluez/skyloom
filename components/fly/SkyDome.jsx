@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { BackSide, Color, ShaderMaterial, SphereGeometry, Mesh, SRGBColorSpace } from 'three';
+import { BackSide, Color, ShaderMaterial, SphereGeometry, Mesh, SRGBColorSpace, Vector3 } from 'three';
 
 // Live horizon dip (round 6): the ground curves away d²k but the dome's
 // horizon used to sit at flat eye level — at altitude a black band opened
@@ -55,6 +55,7 @@ export function SkyDome({
   stars = false,
   midColor = null,
   midFrac = 0.3,
+  moon = null,
 }) {
   const mesh = useMemo(() => {
     const mat = new ShaderMaterial({
@@ -75,6 +76,14 @@ export function SkyDome({
         uMid: { value: new Color(midColor ?? horizon) },
         uMidFrac: { value: midFrac },
         uHasMid: { value: midColor ? 1 : 0 },
+        // Round 13 P5 (toy): moon disc on TOY.moonDirection. uMoon 0 → no disc.
+        uMoon: { value: moon ? 1 : 0 },
+        uMoonDir: { value: new Vector3(...(moon?.dir ?? [0, 1, 0])).normalize() },
+        uMoonColor: { value: new Color(moon?.color ?? '#ffffff') },
+        // (angularR, glowR, brightness, glowStrength)
+        uMoonParams: {
+          value: [moon?.angularR ?? 0.05, moon?.glowR ?? 0.16, moon?.brightness ?? 0.6, moon?.glowStrength ?? 0.18],
+        },
       },
       vertexShader: /* glsl */ `
         varying vec3 vDir;
@@ -95,6 +104,10 @@ export function SkyDome({
         uniform vec3 uMid;
         uniform float uMidFrac;
         uniform float uHasMid;
+        uniform float uMoon;
+        uniform vec3 uMoonDir;
+        uniform vec3 uMoonColor;
+        uniform vec4 uMoonParams;
         varying vec3 vDir;
         void main() {
           // Dipped horizon: y = 0 where the bent terrain rim sits, not at
@@ -128,9 +141,20 @@ export function SkyDome({
               )) * 43758.5453
             );
             vec3 sdir = normalize((cell + 0.2 + 0.6 * h) / 110.0);
-            float star = smoothstep(0.0022, 0.0006, distance(dir, sdir));
-            star *= step(0.96, h.x); // ~4% of cells hold a star
-            col += star * (0.15 + 0.28 * h.y) * smoothstep(0.04, 0.25, y) * uStars;
+            // Round 13 P5: per-star SIZE (h.z) + brightness (h.y) variation — a
+            // few brighter/bigger stars among the pinpricks (still under bloom).
+            float sz = 0.0009 + 0.0016 * h.z;
+            float star = smoothstep(sz, sz * 0.3, distance(dir, sdir));
+            star *= step(0.955, h.x); // ~4.5% of cells hold a star
+            col += star * (0.13 + 0.30 * h.y) * smoothstep(0.04, 0.25, y) * uStars;
+          }
+          // Round 13 P5: toy moon disc on TOY.moonDirection — a soft-edged disc
+          // + a gentle halo. Value-only (cool ICE white). Upper hemisphere only.
+          if (uMoon > 0.5) {
+            float ad = distance(normalize(vDir), normalize(uMoonDir));
+            float disc = smoothstep(uMoonParams.x, uMoonParams.x * 0.6, ad);
+            float glow = smoothstep(uMoonParams.y, 0.0, ad);
+            col += uMoonColor * (disc * uMoonParams.z + glow * glow * uMoonParams.w);
           }
           // rimOnly: fade out just above the (dipped) horizon so the HDRI
           // sky owns the upper hemisphere while the void swallows the rim
@@ -159,7 +183,13 @@ export function SkyDome({
     u.uMid.value.set(midColor ?? horizon);
     u.uMidFrac.value = midFrac;
     u.uHasMid.value = midColor ? 1 : 0;
-  }, [mesh, horizon, zenith, voidColor, rim, rimOnly, stars, midColor, midFrac]);
+    u.uMoon.value = moon ? 1 : 0;
+    if (moon) {
+      u.uMoonDir.value.set(moon.dir[0], moon.dir[1], moon.dir[2]).normalize();
+      u.uMoonColor.value.set(moon.color);
+      u.uMoonParams.value = [moon.angularR, moon.glowR, moon.brightness, moon.glowStrength];
+    }
+  }, [mesh, horizon, zenith, voidColor, rim, rimOnly, stars, midColor, midFrac, moon]);
 
   useEffect(() => {
     return () => {

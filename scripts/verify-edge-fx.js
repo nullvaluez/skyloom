@@ -108,7 +108,10 @@ const { bootFly } = require('./_boot');
     'pulse/beacon programs patched',
     pulse.landPatched && pulse.buildingPatched &&
       pulse.landKey === 'world-bend-fade-pulse-rwy-r8' &&
-      pulse.buildingKey === 'world-bend-fade-beacon-grid-r8b',
+      // Round 13 P5: the building chain's FINAL key moved -r8b → -r13 (roof
+      // skylight content added to the beacon-grid layer — sanctioned rename,
+      // not a gate re-baseline; the registry in world-bend.js documents it).
+      pulse.buildingKey === 'world-bend-fade-beacon-grid-r13',
     `${pulse.landKey} / ${pulse.buildingKey}`
   );
   check(

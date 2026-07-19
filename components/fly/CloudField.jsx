@@ -361,7 +361,14 @@ export function CloudField({ runtime, flight, origin }) {
   // so they never compete with the tracers (pixel-stable). key={mapStyle}: drei
   // Cloud config is prop-reactive, but a clean remount on the (discrete) style
   // switch removes any doubt about stale segments — and the material CLASS.
-  const cloudTexture = mapStyle === 'satellite' ? CLOUDS.textureSat : CLOUDS.texture;
+  // Round 13 P5: toy gets its own 2–3-step toon puff (matches the ramp look);
+  // satellite = the soft cumulus (P1); night keeps cloud.png (pixel-stable).
+  const cloudTexture =
+    mapStyle === 'satellite'
+      ? CLOUDS.textureSat
+      : mapStyle === 'toy'
+        ? CLOUDS.textureToy
+        : CLOUDS.texture;
   const CloudMat = style.lit ? MeshLambertMaterial : MeshBasicMaterial;
   const boundsYFrac = style.boundsYFrac ?? 0.28;
   return (

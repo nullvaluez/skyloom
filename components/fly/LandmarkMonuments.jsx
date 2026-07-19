@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import {
   AdditiveBlending,
+  CanvasTexture,
+  CircleGeometry,
   DataTexture,
   DynamicDrawUsage,
   MeshBasicMaterial,
@@ -24,6 +26,22 @@ import {
 } from '@/lib/fly/landmarks-3d';
 
 const _dummy = new Object3D();
+
+/** Round 13 P5: soft radial-gradient alpha for the toy hero-halo ground pool
+ *  (replaces the crude flat hemisphere "puddle" — a soft glow that tapers out). */
+function makeHaloTexture() {
+  const c = document.createElement('canvas');
+  c.width = 128;
+  c.height = 128;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(64, 64, 2, 64, 64, 64);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.45, 'rgba(255,255,255,0.5)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 128, 128);
+  return new CanvasTexture(c);
+}
 
 const ARCH_COUNT = LANDMARK_ARCHETYPES.length;
 const HALO_POOL = ARCH_COUNT * LANDMARKS_3D.poolPerArchetype;
@@ -67,11 +85,17 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
   const lastRef = useRef({ t: -Infinity, ax: NaN, az: NaN });
 
   const geometries = useMemo(() => buildLandmarkGeometries(), []);
-  const haloGeometry = useMemo(
-    // top hemisphere, squashed via instance scale (TownGlow's dome)
-    () => new SphereGeometry(1, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2),
-    []
-  );
+  const haloGeometry = useMemo(() => {
+    // Round 13 P5: toy hero-halo is a flat radial-gradient ground POOL (a disc
+    // in the XZ plane, softened by the alphaMap) — replaces the crude flat
+    // hemisphere "puddle". Satellite keeps the squashed hemisphere (P4).
+    if (isToy) {
+      const g = new CircleGeometry(1, 40);
+      g.rotateX(-Math.PI / 2); // XZ plane, facing up
+      return g;
+    }
+    return new SphereGeometry(1, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2);
+  }, [isToy]);
   const material = useMemo(() => {
     if (!isToy) {
       // Round 13 (P4) satStyle v2: a two-tone STONE toon ramp (was a flat
@@ -113,7 +137,9 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
       // neon. isToy is stable per-mount (the component is keyed by mapStyle).
       color: isToy ? PALETTE.monumentHalo : LANDMARKS_3D.satStyle.haloColor,
       transparent: true,
-      opacity: haloOpacity,
+      // Round 13 P5: toy disc uses its own opacity + a soft radial alpha pool.
+      opacity: isToy ? LANDMARKS_3D.toyHalo.opacity : haloOpacity,
+      alphaMap: isToy ? makeHaloTexture() : null,
       blending: AdditiveBlending,
       depthWrite: false,
     });
@@ -128,6 +154,7 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
       haloGeometry.dispose();
       material.userData.__ramp?.dispose();
       material.dispose();
+      haloMaterial.alphaMap?.dispose();
       haloMaterial.dispose();
     },
     [geometries, haloGeometry, material, haloMaterial]
@@ -173,7 +200,15 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
         // hero halo under the monument (shared pool, medium/high only)
         if (halo && halosOn && h < HALO_POOL) {
           const r = sy * 0.55;
-          _dummy.scale.set(r, r * 0.22, r);
+          if (isToy) {
+            // Round 13 P5: flat radial ground pool (lifted a hair off the plane
+            // so the additive disc doesn't z-fight the terrain — depthWrite off).
+            const R = r * LANDMARKS_3D.toyHalo.radiusFrac;
+            _dummy.position.y = groundY + 3;
+            _dummy.scale.set(R, 1, R);
+          } else {
+            _dummy.scale.set(r, r * 0.22, r);
+          }
           _dummy.rotation.set(0, 0, 0);
           _dummy.updateMatrix();
           halo.setMatrixAt(h, _dummy.matrix);

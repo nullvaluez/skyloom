@@ -2,7 +2,11 @@
  * §8.5.2 soak: 15-minute Fly-mode session on real hardware (GPU-enabled
  * Chrome), sampling frame times, draw calls, triangles, traffic and JS heap
  * every 10s while autonomously flying (turns + periodic boost + a warp).
- * Targets: p5 fps ≥55, draw calls <300, tris <1.5M, heap stable.
+ * Targets (renegotiated Round 13 — the original <300/<1.5M numbers predate
+ * R7 and every round since; judge against the CURRENT harness-enforced
+ * budgets): p5 fps ≥55 (gpuFrameMs 12 headroom), draw calls within
+ * PERF_BUDGET + composer slack (toy ≤480, satellite ≤350/375 low-AGL),
+ * tris < 2.2M (PERF_BUDGET.maxTriangles), heap stable (no monotonic climb).
  */
 const { chromium } = require('playwright');
 const path = require('path');

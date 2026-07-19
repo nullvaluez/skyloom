@@ -20,6 +20,7 @@
 - **Qwantani Night (Pure Sky)** (hdri) — Jarod Guest, Sergej Majboroda, Poly Haven · [CC0](https://polyhaven.com/a/qwantani_night_puresky) · modifications: none (1K .hdr as published) — round 13: satellite night sky (first real night since R7)
 - **Clouds with Transparency** (texture) — WickedInsignia, OpenGameArt · [CC0](https://opengameart.org/content/clouds-with-transparency) · modifications: downscaled to 512px; RGB flattened to white (alpha carries the shape) — toy/night cloud puff
 - **Particle Pack — soft cumulus puff (smoke_08)** (texture) — Kenney Vleugels (Kenney.nl), Kenney · [CC0](https://kenney.nl/assets/particle-pack) · modifications: round 13: smoke_08 resized to 512px; RGB flattened to white (alpha carries the shape) — satellite cumulus deck
+- **Toon cumulus puff** (texture) — SkyTracker (self-made), first-party (scripts/gen-toon-cloud.mjs) · [CC0](null) · modifications: round 13 P5: procedurally generated 512px 2–3-step toon cumulus silhouette (white RGB, alpha shape) — toy cloud deck
 - **Water normals** (texture) — three.js authors (mrdoob et al.), three.js (examples/textures) · [MIT](https://github.com/mrdoob/three.js/blob/dev/examples/textures/waternormals.jpg) · modifications: round 13: downscaled to 512px — satellite water-glint normal map (specular sparkle)
 - **World coastlines (1:110m)** (data) — Natural Earth, naturalearthdata.com · [Public Domain](https://www.naturalearthdata.com/downloads/110m-physical-vectors/) · modifications: simplified + packed to a binary polyline blob (scripts/gen-atlas-map.mjs) for the Atlas map
 

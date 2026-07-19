@@ -10,6 +10,7 @@
  */
 const { chromium } = require('playwright');
 const path = require('path');
+const { bootFly } = require('./_boot');
 
 (async () => {
   const browser = await chromium.launch({
@@ -25,15 +26,18 @@ const path = require('path');
     console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ' — ' + detail : ''}`);
     if (!ok) fails.push(name);
   };
-  await page.addInitScript(() => localStorage.setItem('fly-controls-seen', '1'));
-
   // --- 1. boot to reveal --------------------------------------------------
+  // Round 13: migrated to the R9-3 shared boot contract (_boot.js). This
+  // smoke predated it and hand-seeded only fly-controls-seen — after the
+  // round-10 default flip a fresh context therefore booted SATELLITE, where
+  // __toyWorld is REQUIRED to be absent (R11 gate A), so the toy-globals
+  // gate below could never pass again. bootFly seeds 'toy' like every other
+  // harness (and waits pct 100 with the correct 3rd-arg options — the same
+  // waitForFunction 2-arg/30s-default trap R11 fixed in _boot).
   const t0 = Date.now();
-  await page.goto('http://localhost:3000', { waitUntil: 'domcontentloaded', timeout: 90000 });
+  await bootFly(page);
   const noHeader = await page.evaluate(() => !document.querySelector('header'));
   gate('flat-tracker header GONE', noHeader);
-  await page.waitForFunction(() => window.__flyBoot?.pct === 100, { timeout: 90000 });
-  await page.waitForTimeout(2500); // reveal fade settles
   const booted = await page.evaluate(() => ({
     boot: window.__flyBoot,
     overlay: !!document.querySelector('[data-testid="boot-screen"]'),

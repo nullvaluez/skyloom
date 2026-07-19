@@ -11,13 +11,15 @@ import {
   SphereGeometry,
 } from 'three';
 import { buildPoiList } from '@/lib/fly/poi-data';
-import { TOWN_GLOW, TOY_WORLD } from '@/lib/fly/fly-constants';
+import { TOWN_CORES, TOWN_GLOW, TOY_WORLD } from '@/lib/fly/fly-constants';
 import { PALETTE } from '@/lib/fly/toy-world/toy-palette';
 import { applyBendAnchor, getEdgeFade } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
 
 const _dummy = new Object3D();
 const _col = new Color();
+const _coreCol = new Color();
+const _TIER_RANK = { low: 0, medium: 1, high: 2 };
 
 /**
  * Round 7 "Electric Night City": distant town glow-domes (toy only) — ONE
@@ -34,6 +36,7 @@ export function TownGlow({ flight, origin, engine }) {
     []
   );
   const meshRef = useRef();
+  const coreRef = useRef();
   const lastRef = useRef({ t: -Infinity, ax: NaN, az: NaN });
 
   const geometry = useMemo(
@@ -52,12 +55,27 @@ export function TownGlow({ flight, origin, engine }) {
     applyBendAnchor(m);
     return m;
   }, []);
+  // Round 13 P5: a WARM CORE material — a second, brighter additive instance at
+  // each town center that clears the bloom threshold (metro warmth). Its own
+  // instanced draw (+1 total); per-instance color carries TOWN_CORES.color × fade.
+  const coreMaterial = useMemo(() => {
+    const m = new MeshBasicMaterial({
+      color: '#ffffff',
+      transparent: true,
+      opacity: TOWN_CORES.opacity,
+      blending: AdditiveBlending,
+      depthWrite: false,
+    });
+    applyBendAnchor(m);
+    return m;
+  }, []);
   useEffect(
     () => () => {
       geometry.dispose();
       material.dispose();
+      coreMaterial.dispose();
     },
-    [geometry, material]
+    [geometry, material, coreMaterial]
   );
 
   useFrame(({ clock }) => {
@@ -72,6 +90,12 @@ export function TownGlow({ flight, origin, engine }) {
     last.az = origin.anchor.z;
 
     const base = _col.set(PALETTE.townGlow);
+    const core = coreRef.current;
+    const coreBase = _coreCol.set(TOWN_CORES.color);
+    const coresOn =
+      core &&
+      TOWN_CORES.enabled &&
+      (_TIER_RANK[useFlyStore.getState().qualityTier] ?? 2) >= (_TIER_RANK[TOWN_CORES.minTier] ?? 1);
     const px = flight.pos.x;
     const pz = flight.pos.z;
     // Round 12: placement range follows the LIVE fade band (the domes'
@@ -121,6 +145,14 @@ export function TownGlow({ flight, origin, engine }) {
       _dummy.updateMatrix();
       mesh.setMatrixAt(n, _dummy.matrix);
       mesh.setColorAt(n, _col.copy(base).multiplyScalar(fade));
+      // Round 13 P5: a small warm bloom-clearing CORE at the same center.
+      if (coresOn) {
+        const cr = r * TOWN_CORES.radiusFrac;
+        _dummy.scale.set(cr, cr * TOWN_CORES.heightFrac, cr);
+        _dummy.updateMatrix();
+        core.setMatrixAt(n, _dummy.matrix);
+        core.setColorAt(n, _coreCol.copy(coreBase).multiplyScalar(fade));
+      }
       if (d > maxPlacedD) maxPlacedD = d;
       n += 1;
     }
@@ -130,6 +162,12 @@ export function TownGlow({ flight, origin, engine }) {
     for (let i = n; i < TOWN_GLOW.max; i++) mesh.setMatrixAt(i, _dummy.matrix);
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    // Round 13 P5: park cores from n (or all, when cores are tier-disabled).
+    if (core) {
+      for (let i = coresOn ? n : 0; i < TOWN_GLOW.max; i++) core.setMatrixAt(i, _dummy.matrix);
+      core.instanceMatrix.needsUpdate = true;
+      if (core.instanceColor) core.instanceColor.needsUpdate = true;
+    }
     if (process.env.NODE_ENV === 'development') {
       const stats = (window.__flyStats ??= {});
       stats.townGlowPlaced = n;
@@ -138,15 +176,28 @@ export function TownGlow({ flight, origin, engine }) {
   });
 
   return (
-    <instancedMesh
-      ref={(m) => {
-        meshRef.current = m;
-        if (m) {
-          m.instanceMatrix.setUsage(DynamicDrawUsage);
-          m.frustumCulled = false;
-        }
-      }}
-      args={[geometry, material, TOWN_GLOW.max]}
-    />
+    <>
+      <instancedMesh
+        ref={(m) => {
+          meshRef.current = m;
+          if (m) {
+            m.instanceMatrix.setUsage(DynamicDrawUsage);
+            m.frustumCulled = false;
+          }
+        }}
+        args={[geometry, material, TOWN_GLOW.max]}
+      />
+      {/* Round 13 P5: warm cores (one extra instanced draw; parked when off) */}
+      <instancedMesh
+        ref={(m) => {
+          coreRef.current = m;
+          if (m) {
+            m.instanceMatrix.setUsage(DynamicDrawUsage);
+            m.frustumCulled = false;
+          }
+        }}
+        args={[geometry, coreMaterial, TOWN_GLOW.max]}
+      />
+    </>
   );
 }

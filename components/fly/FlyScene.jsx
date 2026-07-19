@@ -44,6 +44,7 @@ import {
   FLIGHT,
   GLOBE,
   HILLSHADE,
+  MOON,
   SAT_BUILDINGS,
   SKY,
   TOY,
@@ -67,6 +68,9 @@ import { ToyWorldLayer } from './ToyWorldLayer';
 import { SatBuildingLayer } from './SatBuildingLayer';
 
 const SPAWN_ALT_M = 800;
+// Round 13 P5: stable toy moon-prop (moon disc on TOY.moonDirection) — a module
+// const so SkyDome's update effect never re-runs on a new object identity.
+const _MOON_PROP = { dir: TOY.moonDirection, ...MOON };
 const _spotPos = new Vector3();
 const _warpPos = new Vector3();
 
@@ -981,6 +985,7 @@ export function FlyScene({ runtime }) {
         rimOnly={dome.rimOnly}
         stars={mapStyle !== 'satellite'}
         midColor={dome.mid ?? null}
+        moon={mapStyle === 'toy' ? _MOON_PROP : null}
       />
 
       <hemisphereLight ref={hemiRef} args={mood.hemi} />
