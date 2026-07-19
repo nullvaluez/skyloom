@@ -84,7 +84,7 @@ export function FlyCanvas({ runtime }) {
       >
         <Suspense fallback={null}>
           <FlyScene runtime={runtime} />
-          <Effects />
+          <Effects runtime={runtime} />
           <BootFramePulse runtime={runtime} />
         </Suspense>
       </PerformanceMonitor>
