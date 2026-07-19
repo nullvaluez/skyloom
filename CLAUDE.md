@@ -12,7 +12,41 @@
 > describes deleted code (markers, panels, Leaflet-era plans); do not act
 > on it.
 
-> **⚠️ NEWEST — READ FIRST:** **Round 12 "Neon Planet" is BUILT + verified
+> **⚠️ NEWEST — READ FIRST:** **Round 13 "Solid Ground" is BUILT (2026-07-19):
+> [FLY_ROUND13.md](FLY_ROUND13.md) is the record** (the plan is
+> [FLY_ROUND13_PLAN.md](FLY_ROUND13_PLAN.md) — executed same-day, satellite-first).
+> What changed: **ACES filmic tone mapping in BOTH styles** + satellite's first
+> color grade (sun-frac WhiteBalance effect, merges into the EffectPass);
+> satellite ATMOSPHERE — aerial haze ON, `SKY.altAtmo` drives the rim triple
+> per frame (time-of-day keyframes × altitude cool-shift — the FL300 "wet
+> mirror" is dead), and a discrete-bucket HDRI cycle gives satellite its
+> **first real night since R7** (toy keeps the certified noon HDRI); AIRCRAFT
+> presence (clearcoat+fresnel hull grade, double-flash strobes, throttle
+> afterburner, 1-draw contact-blob shadow — the ortho rig was REJECTED on
+> fill-rate grounds, twin altitude-scaled contrails, moonlit night key);
+> **CENTERPIECE: 3D extruded buildings in SATELLITE** (worker detail
+> 'sat-buildings', WORKER_PROTOCOL 10, lean SatBuildingEngine z14 ring —
+> `__toyWorld` still never defined in satellite — per-vertex footprint-centroid
+> anchor bend `world-bend-anchor-satbldg`, raw-DEM drape;
+> **`SAT_BUILDINGS.enabled:false` = one-line byte-noop revert**); low-AGL
+> micro-detail noise + hillshade v2 (the ONE existing key move:
+> `world-bend-fade-hill-r8`→`-r13`) + satWater glint (PROTOCOL 11) + monuments
+> satStyle v2 + POI letter haze-fade; and the Neon §8 bundle (roof skylight
+> content `beacon-grid-r8b`→`-r13`, water moonglade `foam-r8`→`-r13`, toon
+> cloud puff, monument floodlights + gradient halo, moon disc + star
+> variation, TOWN_CORES) with **ZERO R12 §7 / R10 §4 knob-value moves**. Two
+> live-caught fixes: the null-island boot sun (frame loop published
+> runtime.geo before spawn placement — `spawnPlacedRef` gates it now; verify-
+> boot gained a sun-at-spawn gate) and damped satellite cloud altSpread
+> (`satSmoothSec` — post-warp transients whipped the deck). **Zero harness
+> gate re-baselines the entire round.** FLY_ROUND13.md §8 = THREE user
+> checkpoint tables PENDING (they also close the R11 §4 dayTint/satStyle rows
+> and the R12 §7 + R10 §4 tables); §10 = lessons (fallbacks turn visible when
+> visual range widens; gate frame-loop publishers on placement; damp any
+> input a position-multiplier reads; never let agents edit while the user
+> flies HMR; draw gates can't see fill-rate).
+>
+> Earlier: **Round 12 "Neon Planet" is BUILT + verified
 > (2026-07-18): [FLY_ROUND12.md](FLY_ROUND12.md) is the record.** Neon at
 > cruise was "toy plane over graph paper": the toy ground fade band
 > (`WORLD_EDGE.fade.toy` 14–26km) was STATIC while curvature/letters/traffic
