@@ -7,7 +7,6 @@ import {
   DataTexture,
   DynamicDrawUsage,
   MeshBasicMaterial,
-  MeshLambertMaterial,
   MeshToonMaterial,
   NearestFilter,
   Object3D,
@@ -75,10 +74,24 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
   );
   const material = useMemo(() => {
     if (!isToy) {
-      // Satellite daylight: one flat Lambert tint lit by the day sun/hemi.
-      // The neon palette vertex colors are ignored (vertexColors off) — a
-      // magenta-glow statue on real Esri imagery read as a bug, not a look.
-      const m = new MeshLambertMaterial({ color: LANDMARKS_3D.satStyle.color });
+      // Round 13 (P4) satStyle v2: a two-tone STONE toon ramp (was a flat
+      // Lambert tint that read as near-invisible clay). The day sun/hemi shade
+      // it; the 3-step grey gradient bands sunlit vs shaded faces so the
+      // monument's form reads as daylight stone — no neon (vertexColors off).
+      const ramp = new DataTexture(
+        new Uint8Array(LANDMARKS_3D.satStyle.ramp),
+        LANDMARKS_3D.satStyle.ramp.length,
+        1,
+        RedFormat
+      );
+      ramp.minFilter = NearestFilter;
+      ramp.magFilter = NearestFilter;
+      ramp.needsUpdate = true;
+      const m = new MeshToonMaterial({
+        color: LANDMARKS_3D.satStyle.color,
+        gradientMap: ramp,
+      });
+      m.userData.__ramp = ramp; // disposed with the material below
       applyBendAnchor(m); // rigid ground objects anchor-bend in EVERY style
       return m;
     }
@@ -95,7 +108,10 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
   }, [isToy]);
   const haloMaterial = useMemo(() => {
     const m = new MeshBasicMaterial({
-      color: PALETTE.monumentHalo,
+      // Round 13 (P4): satellite gets a warm daylight rim-glow (soft white/gold)
+      // instead of the toy's blue monumentHalo — reads as sunlit presence, not
+      // neon. isToy is stable per-mount (the component is keyed by mapStyle).
+      color: isToy ? PALETTE.monumentHalo : LANDMARKS_3D.satStyle.haloColor,
       transparent: true,
       opacity: haloOpacity,
       blending: AdditiveBlending,
@@ -105,7 +121,7 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
     return m;
     // haloOpacity is style-derived and the component is keyed by mapStyle —
     // this memo never sees it change mid-life.
-  }, [haloOpacity]);
+  }, [haloOpacity, isToy]);
   useEffect(
     () => () => {
       for (const g of Object.values(geometries)) g.dispose();

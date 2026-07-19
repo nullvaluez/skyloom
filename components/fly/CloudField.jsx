@@ -156,6 +156,9 @@ export function CloudField({ runtime, flight, origin }) {
     [puffs]
   );
   const rr = useRef(0);
+  // Round 13 live fix: damped satellite spread factor (see the satEnabled
+  // branch below). null = seed at the first frame's target (no boot animation).
+  const satFRef = useRef(null);
 
   const groupRefs = useRef([]);
 
@@ -217,9 +220,24 @@ export function CloudField({ runtime, flight, origin }) {
       // altitude directly — at cruise the deck spreads and reads as weather
       // below you (belowEye rises for free). f = 1 at/below satStartAglM keeps
       // the round-11 low-AGL deck byte-identical (verify-round11 clouds @1800m).
-      f = Math.min(
+      // Round 13 live fix (user-caught: "clouds whip back and forth for ~20s
+      // after a warp at ~14.5k ft"): cluster centers MULTIPLY by f, so a RAW
+      // per-frame altitude input turns any altitude transient into km-scale
+      // horizontal cloud motion (the post-warp flight-model settle oscillates
+      // pos.y; every swing is amplified by cx, up to ±cell/2 ≈ 12km). Damp the
+      // target through expApproach — the exact reason the toy branch above
+      // never glitched: its input (the band end) is already damped in FlyScene
+      // (WORLD_EDGE.altHorizon.smoothSec). At an equal target expApproach is
+      // exact, so steady flight keeps the certified values bit-for-bit.
+      const target = Math.min(
         asp.maxF,
         Math.max(1, 1 + (flight.pos.y - asp.satStartAglM) / asp.satPerAglM)
+      );
+      f = satFRef.current = expApproach(
+        satFRef.current ?? target,
+        target,
+        1 / asp.satSmoothSec,
+        dt
       );
     }
     const fScale = f === 1 ? 1 : Math.pow(f, asp.sizeExp);

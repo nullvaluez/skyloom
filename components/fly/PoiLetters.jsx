@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import { buildPoiList } from '@/lib/fly/poi-data';
-import { LETTERS, TOY_WORLD } from '@/lib/fly/fly-constants';
+import { LETTERS, SKY, TOY_WORLD } from '@/lib/fly/fly-constants';
 import { letterLiftM } from '@/lib/fly/landmarks-3d';
 import { bendDrop, getBend } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
@@ -261,6 +261,21 @@ export function PoiLetters({ runtime, flight, origin }) {
       const fm = FSc ? 1 + (FSc.mul - 1) * smoothstep(FSc.startM, FSc.endM, d) : 1;
       const s = popScale(u) * fm;
       g.scale.set(s, s, s);
+
+      // Round 13 (P4): satellite atmosphere fade — recede far letters into the
+      // aerial haze (SKY.haze veil) and dissolve them softly toward the horizon
+      // cull, so they stop punching through the atmosphere like UI stickers.
+      // Toy keeps op = 1 (certified full-contrast letters; verify-poi untouched).
+      let op = 1;
+      if (!toy) {
+        const hz = SKY.haze;
+        const hazeCover = hz.max * smoothstep(hz.startM, hz.endM, d);
+        const horizonRamp =
+          1 - smoothstep(cullD * LETTERS.satAtmoFade.horizonFadeFrac, cullD, d);
+        op = Math.max(0, (1 - hazeCover) * horizonRamp);
+      }
+      const tm = g.children[0];
+      if (tm) tm.fillOpacity = op; // troika syncs fillOpacity → uniform on render
 
       // Toy terrain is exaggerated + lifted; satellite/night stand on true DEM
       const groundY = toy

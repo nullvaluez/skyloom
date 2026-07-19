@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
 import { SatBuildingEngine } from '@/lib/fly/toy-world/sat-building-engine';
+import { SAT_WATER } from '@/lib/fly/fly-constants';
 import { useFlyStore } from '@/stores/fly-store';
 
 /**
@@ -21,10 +22,17 @@ import { useFlyStore } from '@/stores/fly-store';
  * gate A asserts the toy pipeline is never built in satellite).
  */
 export function SatBuildingLayer({ runtime, flight }) {
+  const qualityTier = useFlyStore((s) => s.qualityTier);
   const engine = useMemo(
     () => new SatBuildingEngine({ groundAt: (lon, lat) => runtime.engine?.getGroundAt(lon, lat) }),
     [runtime]
   );
+  // Round 13 (P4): water glint is a STRICT high-tier flourish. The layer itself
+  // mounts at medium+ (FlyScene gate); this flips water on only at high, and off
+  // (evicting the water meshes) on a high→medium degrade — no per-frame cost.
+  useEffect(() => {
+    engine.setWaterEnabled(SAT_WATER.enabled && qualityTier === SAT_WATER.minTier);
+  }, [engine, qualityTier]);
   // Frame-loop timing lives in refs (never mutate the memoized engine in render —
   // react-hooks/purity); the warp subscription reads the current clock from here.
   const nowRef = useRef(0);

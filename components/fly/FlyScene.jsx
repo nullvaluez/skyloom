@@ -20,6 +20,8 @@ import {
   setEdgeFadeRGB,
   setHillDir,
   setHillshade,
+  setHillV2,
+  setMicroDetail,
 } from '@/lib/fly/toy-world/world-bend';
 import { PALETTE } from '@/lib/fly/toy-world/toy-palette';
 import { SkyDome, setSkyDip, setSkyAtmo, clearSkyAtmo } from './SkyDome';
@@ -446,10 +448,16 @@ export function FlyScene({ runtime }) {
   // Hillshade style gate (live uniform — no re-patch, survives hot-swaps).
   // Round 11: tier-aware strength (uniform flip, free on degrade).
   useEffect(() => {
+    const sat = mapStyle === 'satellite';
     setHillshade(
-      mapStyle === 'satellite'
-        ? (HILLSHADE.strengthByTier[qualityTier] ?? HILLSHADE.strength)
-        : 0
+      sat ? (HILLSHADE.strengthByTier[qualityTier] ?? HILLSHADE.strength) : 0
+    );
+    // Round 13 (P4): hillshade v2 (slope AO + slope saturation) rides the same
+    // tier/style gate; both live INSIDE the uHillStrength envelope so the
+    // verify-sat-depth strength-0 A/B toggle captures them and toy stays 0.
+    setHillV2(
+      sat ? (HILLSHADE.aoByTier[qualityTier] ?? 0) : 0,
+      sat ? (HILLSHADE.satByTier[qualityTier] ?? 0) : 0
     );
   }, [mapStyle, qualityTier]);
 
@@ -861,6 +869,29 @@ export function FlyScene({ runtime }) {
     const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
     const rimDrop = dipStartM * dipStartM * bendK + eyeAgl;
     setSkyDip(rimDrop / Math.hypot(rimDrop, dipStartM));
+
+    // Round 13 (P4): low-AGL ground micro-detail. The noise-grain uniform fades
+    // IN below HILLSHADE.micro.inAglM and OUT by outAglM (satellite only; the
+    // SKY.altAtmo eyeAgl pattern), tier-gated (low → 0). Pure uniform write —
+    // 0 above the band / off-satellite compiles the term to a ×1.0 no-op.
+    const mc = HILLSHADE.micro;
+    const microMax =
+      flyState.mapStyle === 'satellite'
+        ? (mc.strengthByTier[flyState.qualityTier] ?? 0)
+        : 0;
+    let mt = Math.min(1, Math.max(0, (eyeAgl - mc.inAglM) / (mc.outAglM - mc.inAglM)));
+    mt = mt * mt * (3 - 2 * mt);
+    let microStrength = microMax * (1 - mt);
+    // Dev A/B handle (like __flySunOverride): pin micro-detail strength for the
+    // off/on evidence pair. Ignored in production.
+    if (
+      process.env.NODE_ENV === 'development' &&
+      typeof window !== 'undefined' &&
+      window.__flyMicroOverride != null
+    ) {
+      microStrength = window.__flyMicroOverride;
+    }
+    setMicroDetail(microStrength);
 
     // Toon shadow sun rides with the player (small ortho frustum). Round 8:
     // it follows the style's KEY light (MOODS lightDir) — toy's moon, not
