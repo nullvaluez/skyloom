@@ -202,7 +202,10 @@ export function TrafficLayer({ runtime, flight, origin }) {
       }
 
       if (it.distM < TRAFFIC.modelLodDistanceM) {
-        const mesh = meshes[it.archetype] ?? meshes[meshes.length - 1];
+        // R14: out-of-range archetype falls back to the UNKNOWN blob (index 8).
+        // It is no longer the last mesh — warbird-prop/jet/heavy/classic-transport
+        // occupy 9–12, so meshes.length-1 would wrongly resolve to classic-transport.
+        const mesh = meshes[it.archetype] ?? meshes[8];
         if (mesh._used >= TRAFFIC.maxPerArchetype) continue;
         // GLB archetypes carry their own vertex colors (tint white);
         // primitives stay classification-colored
