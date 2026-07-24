@@ -12,7 +12,45 @@
 > describes deleted code (markers, panels, Leaflet-era plans); do not act
 > on it.
 
-> **⚠️ NEWEST — READ FIRST:** **Round 14 "AirVenture" is BUILT (2026-07-24):
+> **⚠️ NEWEST — READ FIRST:** **Round 15 "Ground Truth" is BUILT (2026-07-24):
+> [FLY_ROUND15.md](FLY_ROUND15.md) is the record** (plan
+> [FLY_ROUND15_PLAN.md](FLY_ROUND15_PLAN.md); four Opus 5 agents in parallel
+> under Fable orchestration). The R14 live complaints are FIXED at the root:
+> **(1) classification is exact-first everywhere** — NEW `lib/aircraft-type-tables.js`
+> (269 audited codes, worker keeps a gate-synced inline copy) consulted before
+> any substring list; the trap lists are DELETED (SR22 was a helicopter via
+> `R22`, **C172 was MILITARY via `C17`**); airliner families are now explicit
+> `startsWith` prefixes (81 variant codes rescued from `unknown`); rarity got
+> the same escape hatch (`EXACT_TYPE_BONUS` + known-code +0 short-circuit — 20
+> substring payouts killed incl. index-1 matches like `'E3'` in `BE33`; the
+> legendary EMS **B212 SPICY ping is dead**). NEW gate `scripts/verify-classify.mjs`
+> (38 gates incl. a full-universe pattern×code sweep). **(2) The purple planes
+> are fixed** — primitives carry baked vertex-color liveries and anything
+> painted tints WHITE (`mesh._painted`); new CC-BY GLBs for warbird-prop +
+> glider; `traffic-military.glb` had rendered FLAT WHITE since R8 (texture
+> never baked) and the cargo 747 flew with a baked 26° nose-up attitude —
+> both fixed offline, documented in FLY_ASSETS `modifications`. warbird-heavy
+> + classic-transport remain honest premium primitives (no era-correct
+> license-clean GLB exists — re-verified across 4 sources). **(3) The inspect
+> panel shows the actual real plane** — the planespotters photo pipeline was
+> 100% DEAD (they now 403 UAs without a contact URL; the old catch swallowed
+> it) — fixed with a compliant UA + hardened proxy; NEW keyless registry route
+> `/api/aircraft/[hex]/info` (adsbdb → hexdb, fixed-order failover, never
+> throws) feeds manufacturer/real model/OWNER-vs-operator/country; real phone
+> bottom sheet (matchMedia, 88svh, safe-area); harness testids preserved;
+> +68 names, +219 silhouette mappings. **(4) Satellite buildings got roofs
+> that read + night windows** — height-banded roof palette decoupled from
+> walls, baked wall AO, facade window atlas via worker-emitted FACADE-METER
+> UVs (WORKER_PROTOCOL 11→12, stale bundles DROP), night `emissiveMap` driven
+> by `runtime.sun.frac` (tier high, zero extra draws — sat-depth measured 246
+> ≤ 261). The constant-neutralUV/mip-0 trick keeps roofs textureless with NO
+> shader injection. Full 14-harness sweep GREEN. FLY_ROUND15.md §6 = user
+> checkpoints PENDING (liveries, roof palette, night intensity, panel
+> defaults, mythic B-2); §8 = follow-ups (classify.js is importer-less dead
+> code — delete decision pending; ATN→"Royal Air Maroc" airline-prefix
+> collision in the route path).
+>
+> Earlier: **Round 14 "AirVenture" is BUILT (2026-07-24):
 > [FLY_ROUND14.md](FLY_ROUND14.md) is the record** (plan
 > [FLY_ROUND14_PLAN.md](FLY_ROUND14_PLAN.md), executed same-day by 10 Opus 4.8
 > subagents in six waves). The spotting game now knows the EAA Oshkosh fleet.
