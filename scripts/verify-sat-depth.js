@@ -145,10 +145,12 @@ async function lumaStd(file, region) {
   }));
   console.log(`z16 request seen: ${deepZoomSeen} · SAT DRAWS low-AGL: ${s.draws} · heap ${s.heapMB}MB`);
   gate('satMaxZoom imagery streams at low level', deepZoomSeen);
-  // Round 11: 360 → 375 — monuments mount in satellite now (+10 structural
-  // draws: 9 zero-scale-parked archetype pools + halo), mirroring the R8
-  // "measured 461 → gate 470" precedent.
-  if (s.draws > 375) fails.push(`draws ${s.draws} > 375`);
+  // Round 14: 375 → 261 — re-measured with the 13-pool AirVenture fleet (the 4
+  // new warbird/classic archetype pools appended, indices 9–12). Measured 246
+  // (deterministic across runs; R12/R13 ring-shrink dropped the baseline well
+  // below the R11-era ~360), + ~15 headroom = 261. Mirrors the R11 "measured →
+  // gate" precedent; a loose 375 would have masked a +100-draw regression.
+  if (s.draws > 261) fails.push(`draws ${s.draws} > 261`);
   await glShot('04-valley-low');
 
   gate('zero pageerrors', errs.length === 0, errs.slice(0, 3).join(' | '));
