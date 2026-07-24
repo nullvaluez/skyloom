@@ -177,8 +177,70 @@ export function Sparkline({ samples, width = 72, height = 20 }) {
 }
 
 /**
- * Route progress row: origin ──✈── destination with a hero-colored fill at
- * route.progressPercent, distance/ETA line under. Ghosts when unknown.
+ * ISO-3166 alpha-2 → flag emoji, via regional indicator symbols. Zero deps
+ * and works for any valid pair, so a registry country we have never seen
+ * still gets its flag (lib/airports' getCountryFlag is table-driven).
+ */
+export function countryFlag(iso) {
+  if (!iso || typeof iso !== 'string' || !/^[A-Za-z]{2}$/.test(iso)) return '';
+  return String.fromCodePoint(
+    ...[...iso.toUpperCase()].map((c) => 127397 + c.charCodeAt(0))
+  );
+}
+
+/** Muted label + value line — the registry/identity workhorse row. */
+export function FactRow({ label, value, mono = false, title, testid }) {
+  if (!value) return null;
+  return (
+    <div className="flex items-baseline gap-2" data-testid={testid}>
+      <span
+        className="shrink-0 font-mono text-[9px] uppercase tracking-[0.22em]"
+        style={{ color: CARD_THEME.iceFaint }}
+      >
+        {label}
+      </span>
+      <span
+        className={`min-w-0 flex-1 truncate text-[12px] ${mono ? 'font-mono' : ''}`}
+        style={{ color: CARD_THEME.ice }}
+        title={title || (typeof value === 'string' ? value : undefined)}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+/** One cell of the mono data grid (label + value, ghosted when absent). */
+export function DataCell({ label, value, align = 'left', title }) {
+  return (
+    <span
+      className={`min-w-0 truncate ${align === 'right' ? 'text-right' : ''}`}
+      style={{ color: CARD_THEME.iceDim }}
+      title={title || undefined}
+    >
+      {label}{' '}
+      <span style={{ color: value ? CARD_THEME.ice : CARD_THEME.iceFaint }}>
+        {value || '—'}
+      </span>
+    </span>
+  );
+}
+
+/** Local clock for an ETA Date — "14:23". Null-safe. */
+function clockOf(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
+  try {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Route block (round 15): origin ──✈── destination with the airport NAMES
+ * and country flags under the codes, a hero-colored fill at
+ * route.progressPercent, and a distance / ETA-clock / time-remaining line.
+ * Ghosts honestly when the lookup is in flight vs when nothing was filed.
  */
 export function RouteProgress({ route, loading = false }) {
   const o = route?.origin;
@@ -188,7 +250,7 @@ export function RouteProgress({ route, loading = false }) {
     // flight filed no route" (GA/military tails legitimately 404 upstream).
     return (
       <div
-        className={`flex items-center justify-center rounded-xl px-3 py-2 text-[10px] uppercase tracking-[0.3em] ${loading ? 'animate-pulse' : ''}`}
+        className={`flex items-center justify-center rounded-xl px-3 py-2.5 text-[10px] uppercase tracking-[0.3em] ${loading ? 'animate-pulse' : ''}`}
         style={{ background: CARD_THEME.panel, color: CARD_THEME.iceFaint }}
         data-testid="inspect-route-unknown"
       >
@@ -197,24 +259,61 @@ export function RouteProgress({ route, loading = false }) {
     );
   }
   const pct = route.progressPercent;
+  const eta = clockOf(route.eta);
   const sub = [
     route.totalDistanceNm ? `${route.totalDistanceNm.toLocaleString()} nm` : null,
-    pct != null ? `${pct}%` : null,
-    route.timeRemaining ? `ETA ${route.timeRemaining}` : null,
+    route.distanceRemainingNm != null
+      ? `${route.distanceRemainingNm.toLocaleString()} nm to run`
+      : null,
+    eta ? `ETA ${eta}` : null,
+    route.timeRemaining ? `${route.timeRemaining} out` : null,
   ]
     .filter(Boolean)
     .join(' · ');
 
-  return (
-    <div className="rounded-xl px-3 py-2" style={{ background: CARD_THEME.panel }}>
-      <div className="flex items-center gap-2.5">
+  const end = (ap, side) => (
+    <div className={`flex min-w-0 flex-col ${side === 'right' ? 'items-end' : 'items-start'}`}>
+      <span
+        className="font-mono text-[17px] font-bold leading-none"
+        style={{ color: ap ? CARD_THEME.ice : CARD_THEME.iceFaint }}
+      >
+        {ap?.iata || ap?.icao || '···'}
+      </span>
+      {ap?.iata && ap?.icao && ap.iata !== ap.icao && (
         <span
-          className="font-mono text-[15px] font-bold leading-none"
-          style={{ color: CARD_THEME.ice }}
-          title={o?.name}
+          className="mt-0.5 font-mono text-[8px] tracking-widest"
+          style={{ color: CARD_THEME.iceFaint }}
         >
-          {o?.iata || o?.icao || '···'}
+          {ap.icao}
         </span>
+      )}
+    </div>
+  );
+
+  const place = (ap, side) => {
+    if (!ap) return <span />;
+    const label = ap.city || ap.name;
+    const flag = countryFlag(ap.country);
+    return (
+      <span
+        className={`min-w-0 truncate text-[10px] ${side === 'right' ? 'text-right' : ''}`}
+        style={{ color: CARD_THEME.iceDim }}
+        title={ap.name || undefined}
+      >
+        {flag ? `${flag} ` : ''}
+        {label || ''}
+      </span>
+    );
+  };
+
+  return (
+    <div
+      className="rounded-xl px-3 py-2.5"
+      style={{ background: CARD_THEME.panel }}
+      data-testid="inspect-route"
+    >
+      <div className="flex items-center gap-2.5">
+        {end(o, 'left')}
         <div
           className="relative h-[4px] flex-1 rounded-full"
           style={{ background: 'rgba(207, 238, 248, 0.12)' }}
@@ -240,16 +339,17 @@ export function RouteProgress({ route, loading = false }) {
             </>
           ) : null}
         </div>
-        <span
-          className="font-mono text-[15px] font-bold leading-none"
-          style={{ color: CARD_THEME.ice }}
-          title={d?.name}
-        >
-          {d?.iata || d?.icao || '···'}
-        </span>
+        {end(d, 'right')}
+      </div>
+      <div className="mt-1 flex items-baseline justify-between gap-3">
+        {place(o, 'left')}
+        {place(d, 'right')}
       </div>
       {sub && (
-        <div className="mt-1.5 text-center text-[10px]" style={{ color: CARD_THEME.iceDim }}>
+        <div
+          className="mt-1.5 border-t pt-1.5 text-center font-mono text-[9.5px] tracking-wide"
+          style={{ borderColor: CARD_THEME.edgeSoft, color: CARD_THEME.iceDim }}
+        >
           {sub}
         </div>
       )}
