@@ -114,8 +114,27 @@ function InfoCardBody({ hex, runtime, onDismiss }) {
   return (
     <div className="pointer-events-auto absolute bottom-10 left-4 z-10 w-72 overflow-hidden rounded-lg border border-zinc-700/60 bg-zinc-900/80 text-zinc-100 shadow-xl backdrop-blur">
       {photoSrc && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={photoSrc} alt={title} className="h-28 w-full object-cover" />
+        // Round 15: the photographer credit + link back is a planespotters
+        // REQUIREMENT wherever the photo is shown. This card was rendering a
+        // bare <img> — harmless only because the proxy's User-Agent was being
+        // 403'd, so photoSrc was permanently null. It isn't any more.
+        // (`bottom-1 left-1`, never `bottom-2 left-2` — verify-fly-style finds
+        // the Esri AttributionBar by that class pair.)
+        <div className="relative">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={photoSrc} alt={title} className="h-28 w-full object-cover" />
+          {photo?.photographer && (
+            <a
+              href={photo.link || 'https://www.planespotters.net'}
+              target="_blank"
+              rel="noreferrer"
+              className="absolute bottom-1 left-1 max-w-[92%] truncate rounded bg-zinc-950/75 px-1.5 py-0.5 font-mono text-[9px] text-zinc-300 hover:underline"
+              data-testid="infocard-photo-credit"
+            >
+              📷 {photo.photographer} · planespotters.net
+            </a>
+          )}
+        </div>
       )}
       <div className="space-y-1.5 p-3">
         <div className="flex items-start justify-between">

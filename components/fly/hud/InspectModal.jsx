@@ -7,6 +7,7 @@ import { useFlyStore } from '@/stores/fly-store';
 import { usePassportStore } from '@/stores/passport-store';
 import { useRoute } from '@/hooks/use-route';
 import { useAircraftPhoto } from '@/hooks/use-aircraft-photo';
+import { useAircraftInfo } from '@/hooks/use-aircraft-info';
 import { getRuntimeAction } from '@/lib/fly/runtime-bus';
 import { INSPECT } from '@/lib/fly/fly-constants';
 import { M_TO_FT, MPS_TO_KT, RAD2DEG } from '@/lib/fly/coords';
@@ -16,38 +17,54 @@ import { getAircraftTypeName } from '@/lib/aircraft-type-names';
 import { CARD_THEME } from './inspect/inspect-tokens';
 import {
   BearingChip,
+  DataCell,
+  FactRow,
   MonogramChip,
   Odometer,
   RarityChip,
   RouteProgress,
   Sparkline,
   StatBar,
+  countryFlag,
 } from './inspect/card-bits';
 import { ModelTurntable, preloadTurntable } from './inspect/ModelTurntable';
 
 /**
- * INK CODEX — the click-to-inspect target panel. Round 8.5 (§B) re-layout:
- * a right-DOCKED column (~420px, springs in from the right edge) instead of
- * the centered card — NO full-screen scrim, so clicks outside the panel
- * keep flying (the stick is still neutralized while open via
- * store.inspectHex). The planespotters photo is the HERO when one exists
- * (photographer credit + link kept — planespotters requirement); the 3D
- * turntable demotes to a secondary section, and takes the hero slot when
- * no photo comes back. Same INK+ICE holo identity: hero color (--hero from
- * track.meta.color) + rarity are the only saturated voices, chunky beveled
- * buttons, one-shot holo sweep.
+ * INK CODEX — the click-to-inspect target panel.
  *
- * Reliability (the round-8 complaint): WARP/CHASE resolve their actions AT
- * CALL TIME through the runtime bus (scene remounts heal, captured nulls
- * don't orphan), WARP arms on runtimeReady && track (no more eternal
- * "ACQUIRING…" while a fix is missing — warpTo dead-reckons), CHASE
- * disables with a reason on frozen (stale === 2) tracks, and a failed
- * action flashes the WHOLE panel + auto-retries once ~400ms later.
+ * Round 8.5 (§B) gave it a right-DOCKED column (no full-screen scrim, so
+ * clicks outside the panel keep flying) with the planespotters photo as the
+ * HERO and the 3D turntable demoted to a secondary section (the turntable
+ * still takes the hero when no photo exists).
+ *
+ * Round 15 "Ground Truth" EVOLVES that identity — same INK+ICE holo voice
+ * (hero color from track.meta.color + rarity are still the only saturated
+ * voices, chunky beveled buttons, one-shot holo sweep) with a reworked
+ * hierarchy around real data:
+ *   · REGISTRY identity (hooks/use-aircraft-info → keyless adsbdb → hexdb):
+ *     manufacturer + the real model name, the registered owner, the registry
+ *     country. ADS-B alone only ever knew an ICAO type code.
+ *   · Richer route: airport names/cities + flags under the codes, ETA clock
+ *     and distance-to-run under the progress bar.
+ *   · The photo hero actually WORKS again (planespotters started 403ing our
+ *     old User-Agent — see app/api/aircraft/[hex]/photo/route.js) and states
+ *     its state honestly: looking up… / no photo on file.
+ *   · A real phone bottom sheet: full-bleed, drag-handle affordance,
+ *     safe-area padding, 50px WARP/CHASE targets, svh-capped height. Short
+ *     landscape viewports shrink the desktop dock's vertical inset instead of
+ *     clipping (top/bottom use min(4rem, 8svh)).
+ *
+ * Reliability (the round-8 complaint) is UNCHANGED: WARP/CHASE resolve their
+ * actions AT CALL TIME through the runtime bus (scene remounts heal, captured
+ * nulls don't orphan), WARP arms on runtimeReady && track (warpTo
+ * dead-reckons), CHASE disables with a reason on frozen (stale === 2) tracks,
+ * and a failed action flashes the WHOLE panel + auto-retries once ~400ms later.
  *
  * Wiring preserved exactly: opens via store.inspectHex (click a hovered
  * plane, or T on a lock), Esc closes (FlyMode), 1s stale auto-close, 500ms
  * live telemetry (per-frame data never touches React). Testids kept:
- * inspect-card/-warp/-chase/-hex/-action-notice.
+ * inspect-card/-warp/-chase/-hex/-action-notice/-photo-credit/-spot-log
+ * (plus -turntable/-bearing/-sparkline from the child atoms).
  */
 export function InspectModal({ runtime }) {
   const inspectHex = useFlyStore((s) => s.inspectHex);
@@ -70,8 +87,29 @@ export function InspectModal({ runtime }) {
   return <ModalBody key={inspectHex} hex={inspectHex} runtime={runtime} />;
 }
 
+/**
+ * Phone-sheet breakpoint (Tailwind `sm`). matchMedia, not a resize listener:
+ * one state update when the breakpoint is actually crossed (rotation), never
+ * per pixel. Drives layout + entrance direction + touch-target sizing, so the
+ * geometry can live in INSPECT constants instead of hard-coded utilities.
+ */
+function useSheetLayout() {
+  const [isSheet, setIsSheet] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)');
+    const onChange = () => setIsSheet(mq.matches);
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return isSheet;
+}
+
 function ModalBody({ hex, runtime }) {
   const runtimeReady = useFlyStore((s) => s.runtimeReady);
+  const isSheet = useSheetLayout();
   const track = runtime.traffic?.tracks.get(hex);
   const meta = track?.meta;
   const close = () => useFlyStore.getState().setInspectHex(null);
@@ -195,7 +233,8 @@ function ModalBody({ hex, runtime }) {
   }, [hex, meta, live?.gsKt == null]);
 
   const { route, isLoading: routeLoading } = useRoute(aircraftShim);
-  const { data: photo } = useAircraftPhoto(hex);
+  const { data: photo, isPending: photoPending } = useAircraftPhoto(hex);
+  const { data: info, isPending: infoPending } = useAircraftInfo(hex);
   const photoSrc = photo?.thumbnail_large?.src || photo?.thumbnail?.src || null;
 
   // ---- Actions: resolve AT CALL TIME (bus first, legacy runtime prop as
@@ -245,27 +284,74 @@ function ModalBody({ hex, runtime }) {
   if (!meta || !track) return null;
   const title = meta.flight || meta.r || hex.toUpperCase();
   const heroColor = meta.color || '#22d3ee';
-  const typeName = getAircraftTypeName(meta.t, meta.category);
   const warpReady = runtimeReady; // track is non-null here by the guard above
   const photoLeads = !!photoSrc;
 
+  // ---- Identity: registry FIRST, local tables as the honest fallback ------
+  // meta.t is the ADS-B type designator (may be absent); the registry knows
+  // the real model ("R172K", "UH-72A Lakota"), the manufacturer and who owns
+  // the tail. Registration prefers the LIVE ADS-B value — adsbdb mangles some
+  // non-US tails (C-GNWK comes back as "CA-GNWK").
+  const reg = meta.r || info?.registration || null;
+  const typeCode = meta.t || info?.typeCode || null;
+  const typeName = getAircraftTypeName(typeCode, meta.category);
+  const registryModel = [info?.manufacturer, info?.model].filter(Boolean).join(' ') || null;
+  // Some registry models are bare series numbers ("Beech 36") — the friendly
+  // table reads better there ("Beechcraft Bonanza 36"). Anything with real
+  // model detail ("R172K", "UH-72A Lakota") beats the generic ICAO name.
+  const thinModel = !info?.model || /^[0-9]{1,4}$/.test(info.model);
+  const headlineIsRegistry = !!registryModel && !(thinModel && typeName);
+  const modelPrimary = (headlineIsRegistry ? registryModel : typeName) || registryModel || 'UNKNOWN TYPE';
+  const modelSub = [
+    headlineIsRegistry ? typeName : registryModel,
+    typeCode,
+  ]
+    .filter((v) => v && v !== modelPrimary)
+    .join(' · ');
+
+  const airlineName = route?.airline?.name || null;
+  const owner = info?.owner || null;
+  const operatorLine =
+    airlineName || owner || (reg ? `Registered ${reg}` : 'Unknown operator');
+  // Only surface OWNER separately when it says something the operator line
+  // didn't (leased airline fleets: operator ≠ registered owner).
+  const ownerFact = owner && owner !== operatorLine ? owner : null;
+  const flag = countryFlag(info?.countryIso);
+  const monogram =
+    route?.airline?.iata || route?.airline?.icao || info?.operatorFlagCode || null;
+
+  // ---- Geometry: desktop right dock vs phone bottom sheet -----------------
+  const dockStyle = isSheet
+    ? {
+        left: 0,
+        right: 0,
+        top: 'auto',
+        bottom: 0,
+        maxHeight: `${INSPECT.sheetMaxSvh}svh`,
+        borderRadius: '1.5rem 1.5rem 0 0',
+      }
+    : {
+        right: '1rem',
+        // Short landscape phones: shrink the inset instead of clipping.
+        top: 'min(4rem, 8svh)',
+        bottom: 'min(4rem, 8svh)',
+        width: `min(${INSPECT.panelW}px, calc(100vw - 1rem))`,
+        borderRadius: '1.5rem',
+      };
+
   return (
     <motion.div
-      initial={{ x: INSPECT.panelW + 60, opacity: 0.4 }}
-      animate={{ x: 0, opacity: 1 }}
+      initial={isSheet ? { y: 80, opacity: 0.4 } : { x: INSPECT.panelW + 60, opacity: 0.4 }}
+      animate={isSheet ? { y: 0, opacity: 1 } : { x: 0, opacity: 1 }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
       style={{
-        // Desktop: fixed 420px right-docked column. Phone: clamp to the
-        // viewport (never overflow the left edge).
-        width: `min(${INSPECT.panelW}px, calc(100vw - 1rem))`,
+        ...dockStyle,
         '--hero': heroColor,
         backgroundImage: `linear-gradient(180deg, ${CARD_THEME.bgTop}, ${CARD_THEME.bgBottom})`,
         borderColor: CARD_THEME.edge,
         boxShadow: `0 24px 80px rgba(2, 4, 10, 0.45), 0 0 44px color-mix(in srgb, var(--hero) 14%, transparent)`,
       }}
-      // Phone (max-sm): drop the top pin and dock as a bottom sheet, capped in
-      // height — the inner column scrolls, the WARP/CHASE footer stays pinned.
-      className="pointer-events-auto absolute inset-y-16 right-4 z-20 flex flex-col overflow-hidden rounded-3xl border backdrop-blur-sm max-sm:inset-x-2 max-sm:right-2 max-sm:top-auto max-sm:bottom-2 max-sm:max-h-[82svh]"
+      className="pointer-events-auto absolute z-20 flex flex-col overflow-hidden border backdrop-blur-sm"
       data-testid="inspect-card"
     >
       {/* One-shot holo sweep */}
@@ -287,33 +373,50 @@ function ModalBody({ hex, runtime }) {
           initial={{ opacity: 1 }}
           animate={{ opacity: 0 }}
           transition={{ duration: 0.7, ease: 'easeOut' }}
-          className="pointer-events-none absolute inset-0 z-20 rounded-3xl"
+          className="pointer-events-none absolute inset-0 z-20"
           style={{
             background: CARD_THEME.dangerFlash,
             boxShadow: `inset 0 0 0 2px ${CARD_THEME.danger}`,
+            borderRadius: dockStyle.borderRadius,
           }}
         />
       )}
 
+      {/* ---- Sheet grab handle (phone only): the affordance AND a fat,
+           thumb-reachable close target at the top of the sheet ---- */}
+      {isSheet && (
+        <button
+          onClick={close}
+          aria-label="Close inspect panel"
+          className="flex w-full shrink-0 items-center justify-center pb-1 pt-2.5"
+          data-testid="inspect-sheet-handle"
+        >
+          <span
+            className="block h-1 w-11 rounded-full"
+            style={{ background: CARD_THEME.edge }}
+          />
+        </button>
+      )}
+
       {/* ---- Header band ---- */}
       <div
-        className="flex shrink-0 items-center justify-between px-4 py-2.5"
+        className="flex shrink-0 items-center justify-between gap-2 px-4 py-2.5"
         style={{ borderBottom: `1px solid color-mix(in srgb, var(--hero) 30%, transparent)` }}
       >
-        <div className="flex items-center gap-2.5">
+        <div className="flex min-w-0 items-center gap-2.5">
           {spot.isNew ? (
             <motion.span
               initial={{ scale: 1.6, rotate: -14, opacity: 0 }}
               animate={{ scale: 1, rotate: -3, opacity: 1 }}
               transition={{ type: 'spring', stiffness: 320, damping: 14, delay: 0.18 }}
-              className="text-[11px] uppercase tracking-[0.2em]"
+              className="whitespace-nowrap text-[11px] uppercase tracking-[0.2em]"
               style={{ fontFamily: CARD_THEME.fontDisplay, color: 'var(--hero)' }}
             >
               ⟬ new spot! ⟭
             </motion.span>
           ) : (
             <span
-              className="text-[11px] uppercase tracking-[0.2em]"
+              className="whitespace-nowrap text-[11px] uppercase tracking-[0.2em]"
               style={{ fontFamily: CARD_THEME.fontDisplay, color: CARD_THEME.iceDim }}
             >
               spotted ×{spot.count}
@@ -322,7 +425,7 @@ function ModalBody({ hex, runtime }) {
           <RarityChip tier={rarity} />
         </div>
         <div
-          className="font-mono text-[10px] uppercase tracking-widest"
+          className="shrink-0 font-mono text-[10px] uppercase tracking-widest"
           style={{ color: CARD_THEME.iceDim }}
           data-testid="inspect-hex"
         >
@@ -332,8 +435,8 @@ function ModalBody({ hex, runtime }) {
 
       {/* ---- HERO: real photo when planespotters has one, else turntable ---- */}
       <div
-        className="relative shrink-0 overflow-hidden max-sm:!h-40"
-        style={{ height: INSPECT.heroH }}
+        className="relative shrink-0 overflow-hidden"
+        style={{ height: isSheet ? INSPECT.heroHMobile : INSPECT.heroH }}
       >
         {photoLeads ? (
           <>
@@ -345,8 +448,19 @@ function ModalBody({ hex, runtime }) {
                 href={photo.link || 'https://www.planespotters.net'}
                 target="_blank"
                 rel="noreferrer"
-                className="absolute bottom-2 left-2 rounded-md px-2 py-0.5 font-mono text-[9px] hover:underline"
-                style={{ background: 'rgba(4, 6, 13, 0.72)', color: CARD_THEME.iceDim }}
+                className="absolute truncate rounded-md px-2 py-1 font-mono text-[9px] hover:underline"
+                // Positioned inline, NOT with `bottom-2 left-2`: verify-fly-style
+                // finds the Esri AttributionBar with the class selector
+                // `.bottom-2.left-2`, and the credit pill would shadow it now
+                // that photos actually come back (they never did while the
+                // planespotters UA was being 403'd).
+                style={{
+                  bottom: '0.5rem',
+                  left: '0.5rem',
+                  background: 'rgba(4, 6, 13, 0.72)',
+                  color: CARD_THEME.iceDim,
+                  maxWidth: 'calc(100% - 1rem)',
+                }}
                 data-testid="inspect-photo-credit"
               >
                 📷 {photo.photographer} · planespotters.net
@@ -354,39 +468,88 @@ function ModalBody({ hex, runtime }) {
             )}
           </>
         ) : (
-          <ModelTurntable archetype={track.archetype} meta={meta} heroColor={heroColor} />
+          <>
+            <ModelTurntable archetype={track.archetype} meta={meta} heroColor={heroColor} />
+            {/* Honest photo state: a lookup in flight is not "no photo". */}
+            <span
+              className={`pointer-events-none absolute right-2 top-2 rounded-md px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-[0.18em] ${photoPending ? 'animate-pulse' : ''}`}
+              style={{ background: 'rgba(4, 6, 13, 0.55)', color: CARD_THEME.iceFaint }}
+              data-testid="inspect-photo-state"
+            >
+              {photoPending ? 'photo lookup…' : 'no photo on file'}
+            </span>
+          </>
         )}
       </div>
 
       {/* ---- Scroll column: the data stack (uncramped — vertical room) ---- */}
       <div
-        className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-3 pt-3"
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden px-4 pb-3 pt-3"
         style={{ background: CARD_THEME.textPanel }}
       >
-        {/* Identity */}
+        {/* Identity — the round-15 headline: what this actually IS */}
         <div>
-          <div className="flex items-baseline justify-between">
+          <div className="flex items-baseline justify-between gap-2">
             <div
-              className="truncate text-[26px] leading-tight"
+              className="min-w-0 truncate text-[26px] leading-tight"
               style={{ fontFamily: CARD_THEME.fontDisplay, color: CARD_THEME.ice }}
+              title={title}
             >
               {title}
             </div>
-            {meta.r && meta.r !== title && (
-              <div className="font-mono text-[11px]" style={{ color: CARD_THEME.iceDim }}>
-                {meta.r}
+            {reg && reg !== title && (
+              <div
+                className="shrink-0 font-mono text-[11px]"
+                style={{ color: CARD_THEME.iceDim }}
+                data-testid="inspect-reg"
+              >
+                {reg}
               </div>
             )}
           </div>
+
           <div className="mt-1.5 flex items-center gap-2">
-            <MonogramChip code={route?.airline?.iata || route?.airline?.icao} />
-            <span className="truncate text-[13px]" style={{ color: CARD_THEME.iceDim }}>
-              {route?.airline?.name || (meta.r ? `Registered ${meta.r}` : 'Unknown operator')}
+            <MonogramChip code={monogram} />
+            <span
+              className="min-w-0 flex-1 truncate text-[13px]"
+              style={{ color: CARD_THEME.iceDim }}
+              title={operatorLine}
+            >
+              {operatorLine}
             </span>
+            {flag && (
+              <span
+                className="shrink-0 text-[13px] leading-none"
+                title={info?.country || undefined}
+              >
+                {flag}
+              </span>
+            )}
           </div>
-          <div className="mt-1 font-mono text-[11px]" style={{ color: CARD_THEME.iceDim }}>
-            {typeName || 'UNKNOWN TYPE'}
+
+          <div
+            className="mt-1.5 truncate text-[14px] leading-snug"
+            style={{ color: CARD_THEME.ice }}
+            title={modelPrimary}
+            data-testid="inspect-model"
+          >
+            {modelPrimary}
           </div>
+          {modelSub && (
+            <div
+              className="truncate font-mono text-[10px] uppercase tracking-wider"
+              style={{ color: CARD_THEME.iceDim }}
+              title={modelSub}
+            >
+              {modelSub}
+            </div>
+          )}
+          {ownerFact && (
+            <div className="mt-1.5">
+              <FactRow label="owner" value={ownerFact} testid="inspect-owner" />
+            </div>
+          )}
+
           {live && (
             <div className="mt-2">
               <BearingChip bearingDeg={live.bearingDeg} relAltFt={live.relAltFt} />
@@ -411,12 +574,12 @@ function ModalBody({ hex, runtime }) {
                 <span style={{ color: 'var(--hero)' }}>{live.vsFpm > 50 ? '▲ ' : live.vsFpm < -50 ? '▼ ' : ''}</span>
                 <Odometer value={Math.abs(live.vsFpm)} format={(v) => `${Math.round(v)} fpm`} />
               </StatBar>
-              <div className="flex items-center justify-between pt-0.5 font-mono text-[11px]" style={{ color: CARD_THEME.iceDim }}>
-                <span>
+              <div className="flex items-center justify-between gap-2 pt-0.5 font-mono text-[11px]" style={{ color: CARD_THEME.iceDim }}>
+                <span className="whitespace-nowrap">
                   HDG <span style={{ color: CARD_THEME.ice }}>{live.hdg}°</span>
                 </span>
                 <Sparkline samples={vsSamplesRef.current} />
-                <span>
+                <span className="whitespace-nowrap">
                   DIST{' '}
                   <span style={{ color: CARD_THEME.ice }}>
                     <Odometer value={live.distNm} format={(v) => `${v.toFixed(1)} nm`} />
@@ -434,45 +597,47 @@ function ModalBody({ hex, runtime }) {
           )}
         </div>
 
-        {/* Data grid: squawk / type code / category / wake class */}
+        {/* Data grid: squawk / type code / category / class / reg / country,
+            with the registry provenance line underneath (honest about where
+            the identity above came from, or that nothing was on file). */}
         <div
-          className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-xl px-3 py-2 font-mono text-[11px]"
+          className="rounded-xl px-3 py-2 font-mono text-[11px]"
           style={{ background: CARD_THEME.panel }}
         >
-          <span style={{ color: CARD_THEME.iceDim }}>
-            SQUAWK{' '}
-            <span style={{ color: meta.squawk ? CARD_THEME.ice : CARD_THEME.iceFaint }}>
-              {meta.squawk ? formatSquawk(meta.squawk) : '····'}
-            </span>
-          </span>
-          <span className="text-right" style={{ color: CARD_THEME.iceDim }}>
-            TYPE{' '}
-            <span style={{ color: meta.t ? CARD_THEME.ice : CARD_THEME.iceFaint }}>
-              {meta.t || '—'}
-            </span>
-          </span>
-          <span style={{ color: CARD_THEME.iceDim }}>
-            CAT{' '}
-            <span style={{ color: meta.category ? CARD_THEME.ice : CARD_THEME.iceFaint }}>
-              {meta.category || '—'}
-            </span>
-          </span>
-          <span className="text-right" style={{ color: CARD_THEME.iceDim }}>
-            CLASS{' '}
-            <span style={{ color: CARD_THEME.ice }}>
-              {(meta.iconType || 'unknown').toUpperCase()}
-            </span>
-          </span>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            <DataCell label="SQUAWK" value={meta.squawk ? formatSquawk(meta.squawk) : null} />
+            <DataCell label="TYPE" value={typeCode} align="right" />
+            <DataCell label="CAT" value={meta.category} />
+            <DataCell label="CLASS" value={(meta.iconType || 'unknown').toUpperCase()} align="right" />
+            <DataCell label="REG" value={reg} />
+            <DataCell
+              label="CTRY"
+              value={info?.countryIso ? `${flag} ${info.countryIso}` : null}
+              title={info?.country || undefined}
+              align="right"
+            />
+          </div>
+          <div
+            className={`mt-1.5 border-t pt-1.5 text-[9px] uppercase tracking-[0.2em] ${infoPending ? 'animate-pulse' : ''}`}
+            style={{ borderColor: CARD_THEME.edgeSoft, color: CARD_THEME.iceFaint }}
+            data-testid="inspect-registry-source"
+          >
+            {infoPending
+              ? 'registry lookup…'
+              : info?.found
+                ? `registry · ${info.source}`
+                : 'registry · no public record'}
+          </div>
         </div>
 
         {/* Spot log */}
         <div
-          className="flex items-center justify-between rounded-xl px-3 py-2 font-mono text-[10px] uppercase tracking-wider"
+          className="flex items-center justify-between gap-2 rounded-xl px-3 py-2 font-mono text-[10px] uppercase tracking-wider"
           style={{ background: CARD_THEME.panel, color: CARD_THEME.iceDim }}
           data-testid="inspect-spot-log"
         >
-          <span>spot log</span>
-          <span style={{ color: CARD_THEME.ice }}>
+          <span className="shrink-0">spot log</span>
+          <span className="min-w-0 truncate text-right" style={{ color: CARD_THEME.ice }}>
             {spot.isNew
               ? 'first sighting'
               : `×${spot.count}${
@@ -517,6 +682,7 @@ function ModalBody({ hex, runtime }) {
               borderColor: CARD_THEME.warpEdge,
               color: CARD_THEME.warpText,
               opacity: warpReady ? 1 : 0.45,
+              minHeight: isSheet ? INSPECT.sheetActionH : undefined,
             }}
             data-testid="inspect-warp"
           >
@@ -534,6 +700,7 @@ function ModalBody({ hex, runtime }) {
               borderColor: 'color-mix(in srgb, var(--hero) 55%, black)',
               color: '#0b0e1a',
               opacity: frozen ? 0.45 : 1,
+              minHeight: isSheet ? INSPECT.sheetActionH : undefined,
             }}
             data-testid="inspect-chase"
           >
@@ -566,7 +733,14 @@ function ModalBody({ hex, runtime }) {
       <button
         onClick={close}
         className="w-full shrink-0 py-2 text-center font-mono text-[11px] tracking-widest transition-colors"
-        style={{ color: CARD_THEME.iceDim, background: CARD_THEME.textPanel }}
+        style={{
+          color: CARD_THEME.iceDim,
+          background: CARD_THEME.textPanel,
+          // Phone: clear the home indicator / gesture bar.
+          paddingBottom: isSheet
+            ? 'max(0.5rem, env(safe-area-inset-bottom, 0px))'
+            : undefined,
+        }}
         onMouseEnter={(e) => (e.currentTarget.style.color = CARD_THEME.ice)}
         onMouseLeave={(e) => (e.currentTarget.style.color = CARD_THEME.iceDim)}
       >
