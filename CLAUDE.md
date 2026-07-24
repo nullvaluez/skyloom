@@ -12,7 +12,41 @@
 > describes deleted code (markers, panels, Leaflet-era plans); do not act
 > on it.
 
-> **⚠️ NEWEST — READ FIRST:** **Round 13 "Solid Ground" is BUILT (2026-07-19):
+> **⚠️ NEWEST — READ FIRST:** **Round 14 "AirVenture" is BUILT (2026-07-24):
+> [FLY_ROUND14.md](FLY_ROUND14.md) is the record** (plan
+> [FLY_ROUND14_PLAN.md](FLY_ROUND14_PLAN.md), executed same-day by 10 Opus 4.8
+> subagents in six waves). The spotting game now knows the EAA Oshkosh fleet.
+> **`lib/warbirds.js` = 170 audited warbird/classic ICAO codes** (three lock-step
+> exports: `WARBIRD_TYPE_RARITY` / `WARBIRD_ARCHETYPE` / `WARBIRD_TYPES`), driving
+> **exact-first rarity** in `lib/rarity.js` — the exact code is checked BEFORE the
+> legacy substring loop and, on a hit, adds the audited bonus and
+> SHORT-CIRCUITS (so `B29` can't stack `B2`'s +60; non-warbird scoring incl.
+> empty typeCode is byte-unchanged, gate-proven). Marquee list lands Legendary+
+> (≥85) so it SPICY-pings via the tier gate (NOT the military accent —
+> `militaryTypes` untouched, no spot-military miscount). **Four APPENDED traffic
+> archetypes (indices 9–12): warbird-prop / warbird-jet / warbird-heavy /
+> classic-transport** — append-only lock-step across worker `FLY_ARCHETYPES` /
+> `TRAFFIC_MODELS` / `buildArchetypeGeometries()` / TrafficLayer (wire row slot 7
+> packs the index; out-of-range now falls back to `meshes[8]` unknown, NOT
+> `.length-1`). Only **warbird-jet gets a real GLB** (Stephen Graybill "Low poly
+> Fighter", CC-BY 3.0, `traffic-warbird-jet.glb` 10KB uncompressed — the model
+> scout found poly.pizza has NO era-correct warbirds, so the other three ship
+> purpose-built flat-shaded primitives). Plus 170 display names, a `spot-warbird`
+> contract (kind `spot-type`, `WARBIRD_TYPES`, 300 pts, completable off-airshow),
+> three new silhouettes + fallbacks, and **NEW gate `scripts/verify-warbirds.mjs`**
+> (deterministic: source-parses all four files to prove the worker inline map ≡
+> canonical + append-only order + disjoint from every modern-code set + tier
+> bands). **ZERO gate re-baselines except one sanctioned measured move: sat-depth
+> 375 → 261** (measured 245; R12/R13 ring-shrink already dropped structural
+> draws). Red-team (A10): NO product-code defects; licensing re-verified live;
+> 10/10 designators confirmed real; per-archetype visual evidence captured.
+> FLY_ROUND14.md §9 = user checkpoints PENDING (marquee tier feel during
+> AirVenture week, SPICY frequency near airshows, silhouette reads, spot-warbird
+> pacing); §7 = lessons (substring tables need exact-first escape hatches; paired
+> verifiers can double-reject the same row for opposite ownership reasons — the
+> merge must arbitrate; scouts report honest fallbacks, not forced picks).
+>
+> Earlier: **Round 13 "Solid Ground" is BUILT (2026-07-19):
 > [FLY_ROUND13.md](FLY_ROUND13.md) is the record** (the plan is
 > [FLY_ROUND13_PLAN.md](FLY_ROUND13_PLAN.md) — executed same-day, satellite-first).
 > What changed: **ACES filmic tone mapping in BOTH styles** + satellite's first
