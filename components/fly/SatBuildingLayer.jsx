@@ -4,8 +4,11 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
 import { SatBuildingEngine } from '@/lib/fly/toy-world/sat-building-engine';
-import { SAT_WATER } from '@/lib/fly/fly-constants';
+import { SAT_BUILDINGS, SAT_WATER } from '@/lib/fly/fly-constants';
 import { useFlyStore } from '@/stores/fly-store';
+
+const TIERS = ['low', 'medium', 'high']; // mirrors FlyCanvas's quality ladder
+const atLeastTier = (tier, min) => TIERS.indexOf(tier) >= TIERS.indexOf(min);
 
 /**
  * Round 13 Phase 3 — mounts the SATELLITE 3D-building streamer inside worldRoot
@@ -32,6 +35,18 @@ export function SatBuildingLayer({ runtime, flight }) {
   // (evicting the water meshes) on a high→medium degrade — no per-frame cost.
   useEffect(() => {
     engine.setWaterEnabled(SAT_WATER.enabled && qualityTier === SAT_WATER.minTier);
+  }, [engine, qualityTier]);
+  // Round 15: facade windows (daylight `map`, medium+) and NIGHT windows
+  // (`emissiveMap`, high only) are material swaps on the SAME shared material —
+  // zero extra draws, no re-stream. Each flip costs one shader compile, so they
+  // ride tier changes (rare), never the frame loop.
+  useEffect(() => {
+    engine.setFacadeEnabled(
+      SAT_BUILDINGS.facade.enabled && atLeastTier(qualityTier, SAT_BUILDINGS.facade.minTier)
+    );
+    engine.setNightWindowsEnabled(
+      SAT_BUILDINGS.night.enabled && atLeastTier(qualityTier, SAT_BUILDINGS.night.minTier)
+    );
   }, [engine, qualityTier]);
   // Frame-loop timing lives in refs (never mutate the memoized engine in render —
   // react-hooks/purity); the warp subscription reads the current clock from here.
@@ -71,6 +86,9 @@ export function SatBuildingLayer({ runtime, flight }) {
   useFrame(({ clock }) => {
     nowRef.current = clock.elapsedTime;
     const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
+    // Windows light up as the sun goes down (runtime.sun is the R13 day cycle,
+    // republished on a 60s cadence — this just reads it; one uniform write).
+    engine.setNightMix(runtime.sun?.frac);
     engine.update(clock.elapsedTime, flight.pos.x, flight.pos.z, eyeAgl);
     if (
       process.env.NODE_ENV === 'development' &&
