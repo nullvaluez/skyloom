@@ -66,12 +66,21 @@ export function TrafficLayer({ runtime, flight, origin }) {
   const meshes = useMemo(
     () =>
       buildArchetypeGeometries().map((geometry) => {
+        // Round 15: primitives ship BAKED LIVERIES (a per-part vertex `color`
+        // attribute + userData.bakedColors). Those hulls are tinted white by
+        // the frame loop exactly like a GLB — otherwise the per-instance
+        // CLASSIFICATION color paints them (warbirds fly private N-numbers →
+        // `private` → #a78bfa, the round-14 "purple warbird" bug). The
+        // `unknown` blob deliberately carries no baked color and stays
+        // classification-tinted.
+        const painted = geometry.userData?.bakedColors === true;
         // Round 8: glossier hull (0.35/0.5) — the moonlit night reads specular
         const material = new MeshStandardMaterial({
           color: 0xffffff,
           roughness: 0.35,
           metalness: 0.5,
           flatShading: true,
+          vertexColors: painted,
         });
         // Altitude-aware bend, evaluated at the INSTANCE anchor: grounded
         // traffic hugs the drawn terrain, airborne traffic caps its drop so
@@ -85,6 +94,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
         mesh.instanceMatrix.setUsage(DynamicDrawUsage);
         mesh.count = 0;
         mesh.frustumCulled = false;
+        mesh._painted = painted; // white instance tint — see the frame loop
         return mesh;
       }),
     []
@@ -114,8 +124,9 @@ export function TrafficLayer({ runtime, flight, origin }) {
 
   // GLB asset pass: primitives render instantly; each archetype's merged
   // vertex-colored geometry swaps in when its model resolves (per-model
-  // failure keeps the primitive). Vertex colors need a white instance tint
-  // as the base — the frame loop checks mesh._isModel.
+  // failure keeps the primitive — which now has its own baked livery). Vertex
+  // colors need a white instance tint as the base — the frame loop checks
+  // mesh._painted, which a swap sets alongside _isModel.
   useEffect(() => {
     let cancelled = false;
     loadTrafficGeometries().then((geos) => {
@@ -128,6 +139,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
         mesh.material.vertexColors = true;
         mesh.material.needsUpdate = true;
         mesh._isModel = true;
+        mesh._painted = true;
       });
       // R9-1 boot gate (b): the fleet pass settled (per-model failures
       // degrade to primitives inside the loader — this still counts done).
@@ -207,9 +219,10 @@ export function TrafficLayer({ runtime, flight, origin }) {
         // occupy 9–12, so meshes.length-1 would wrongly resolve to classic-transport.
         const mesh = meshes[it.archetype] ?? meshes[8];
         if (mesh._used >= TRAFFIC.maxPerArchetype) continue;
-        // GLB archetypes carry their own vertex colors (tint white);
-        // primitives stay classification-colored
-        _color.set(mesh._isModel ? '#ffffff' : it.meta?.color || '#9ca3af');
+        // Anything carrying its own vertex colors — a swapped-in GLB or a
+        // round-15 baked-livery primitive — tints WHITE so classification can
+        // never repaint a hull. Only the `unknown` blob stays class-colored.
+        _color.set(mesh._painted ? '#ffffff' : it.meta?.color || '#9ca3af');
         // Round 13 Phase 2: lift the hull out of black over dark ground, BEFORE
         // the stale fog-lerp (so ghosting still dims relative to the lifted base)
         if (hullGain !== 1) _color.multiplyScalar(hullGain);
