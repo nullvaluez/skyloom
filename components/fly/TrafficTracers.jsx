@@ -14,7 +14,7 @@ import {
   MeshBasicMaterial,
   Vector3,
 } from 'three';
-import { mercatorScale } from '@/lib/fly/coords';
+import { expApproach, mercatorScale } from '@/lib/fly/coords';
 import { GLOBE, TRACERS } from '@/lib/fly/fly-constants';
 import { applyBendAir } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
@@ -51,6 +51,45 @@ function headBrightFor(displayAlpha) {
   return (
     Math.max(TRACERS.headMinBrightness, Math.min(1, displayAlpha + 0.15)) * TRACERS.headBoost
   );
+}
+
+/**
+ * Round 16 "Living World": time-of-day tracer gain — SATELLITE ONLY.
+ *
+ * Full-strength neon ribbons over daylight photography read as a toy overlay
+ * on a photoreal world; the same ribbons at night ARE the traffic. nightT is
+ * the ramp TrafficLayer's hull presence and the sat-building night mix already
+ * use (clamp01(1 − sun.frac / dayFrac)), the gain lerps dayGain → nightGain,
+ * and the ribbon half-width narrows in daylight so a dimmed trail also gets
+ * thinner instead of turning into a wide grey smear. Exp-damped so crossing
+ * the terminator (or warping across it) eases instead of stepping.
+ *
+ * TOY takes the early return: gain and widthK are the literal 1 (×1.0 is
+ * bit-identical in IEEE-754, so every Neon vertex color and width is
+ * byte-unchanged), and the damped scalar is DROPPED so returning to satellite
+ * re-initializes at the correct value rather than ramping down from 1.
+ *
+ * HARD RULE (plan §5 risk 10): this is a brightness/width multiplier and
+ * nothing else. It must NEVER be folded into the `displayAlpha * hFade <= 0.02`
+ * skip predicates below — the tracer harness gates are COUNTS
+ * (__flyStats.tracers / tracerBackfills), so dimming is free but culling would
+ * fail them silently. Dim, never cull.
+ */
+function stepSunGain(state, mapStyle, runtime, dt) {
+  if (mapStyle !== 'satellite') {
+    state.sunGain = null;
+    return { gain: 1, widthK: 1 };
+  }
+  const S = TRACERS.sun;
+  const span = S.nightGain - S.dayGain || 1;
+  const nightT = Math.min(1, Math.max(0, 1 - (runtime.sun?.frac ?? 1) / S.dayFrac));
+  const target = S.dayGain + span * nightT;
+  state.sunGain =
+    state.sunGain == null ? target : expApproach(state.sunGain, target, S.lerpPerSec, dt);
+  // Width rides the SAME damped scalar (inverse-lerped back to 0..1) so
+  // brightness and thickness can never disagree mid-transition.
+  const dampedT = Math.min(1, Math.max(0, (state.sunGain - S.dayGain) / span));
+  return { gain: state.sunGain, widthK: S.dayWidthK + (1 - S.dayWidthK) * dampedT };
 }
 
 /**
@@ -188,7 +227,7 @@ function RibbonTracers({ runtime, origin }) {
     };
   }, [mesh]);
 
-  useFrame(({ camera }) => {
+  useFrame(({ camera }, delta) => {
     const items = runtime.traffic?.items ?? [];
     const ax = origin.anchor.x;
     const az = origin.anchor.z;
@@ -198,6 +237,13 @@ function RibbonTracers({ runtime, origin }) {
     // bright head section) that satellite's bright imagery never did.
     const gain = TRACERS.styleGain[mapStyle] ?? 1;
     const headFrac = TRACERS.headSectionFrac[mapStyle] ?? 0;
+    // Round 16: …and satellite's gain now also rides the sun (toy = ×1 exactly)
+    const { gain: sunGain, widthK } = stepSunGain(
+      state,
+      mapStyle,
+      runtime,
+      Math.min(delta, 0.05)
+    );
     let n = 0;
     let resets = 0;
 
@@ -337,7 +383,8 @@ function RibbonTracers({ runtime, origin }) {
             (TRACERS.ribbon.widthHeadM - TRACERS.ribbon.widthTailM) * tt) *
             nearK *
             edgeK *
-            behindK) /
+            behindK *
+            widthK) / // round 16: satellite daylight thins the ribbon (toy ×1)
           2 /
           len;
         let bright;
@@ -352,7 +399,9 @@ function RibbonTracers({ runtime, origin }) {
             bright = Math.max(bright, headBright * (0.5 + 0.5 * hk));
           }
         }
-        bright *= gain * hFade; // round 11: horizon fade rides the same channel
+        // round 11: horizon fade rides the same channel; round 16: so does the
+        // satellite time-of-day gain (toy sunGain is exactly 1 → unchanged)
+        bright *= gain * hFade * sunGain;
         const rx = _pts[j3] - ax;
         const ry = _pts[j3 + 1];
         const rz = _pts[j3 + 2] - az;
@@ -426,6 +475,7 @@ function RibbonTracers({ runtime, origin }) {
     if (process.env.NODE_ENV === 'development' && window.__flyStats) {
       window.__flyStats.tracers = n;
       window.__flyStats.tracerResets = (window.__flyStats.tracerResets ?? 0) + resets;
+      window.__flyStats.tracerSunGain = sunGain; // round 16 (toy: exactly 1)
     }
   }, -44); // right after TrafficLayer writes render state at -45
 
@@ -469,10 +519,13 @@ function StreakTracers({ runtime, flight, origin }) {
     };
   }, [mesh]);
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const items = runtime.traffic?.items ?? [];
     const k = mercatorScale(flight.latDeg);
     const gain = TRACERS.styleGain[mapStyle] ?? 1; // round 8 fix (F5)
+    // Round 16: satellite time-of-day gain (toy = ×1 exactly). Streaks are
+    // lines — no width channel to ride, so widthK is unused here.
+    const { gain: sunGain } = stepSunGain(state, mapStyle, runtime, Math.min(delta, 0.05));
     let n = 0;
     for (let i = 0; i < items.length && n < TRACERS.max; i++) {
       const t = items[i];
@@ -496,8 +549,8 @@ function StreakTracers({ runtime, flight, origin }) {
       pos.array[o + 3] = hx - fix.vE * lenSec * k;
       pos.array[o + 4] = hy - fix.vUp * lenSec;
       pos.array[o + 5] = hz + fix.vN * lenSec * k;
-      const head = headBrightFor(displayAlpha) * gain * hFade;
-      const tailG = 0.02 * gain * hFade;
+      const head = headBrightFor(displayAlpha) * gain * hFade * sunGain;
+      const tailG = 0.02 * gain * hFade * sunGain;
       col.array[o] = c.r * head;
       col.array[o + 1] = c.g * head;
       col.array[o + 2] = c.b * head;
@@ -525,6 +578,7 @@ function StreakTracers({ runtime, flight, origin }) {
 
     if (process.env.NODE_ENV === 'development' && window.__flyStats) {
       window.__flyStats.tracers = n;
+      window.__flyStats.tracerSunGain = sunGain; // round 16 (toy: exactly 1)
     }
   }, -44);
 

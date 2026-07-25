@@ -57,6 +57,12 @@ const { BOOT_URL } = require('./_boot');
       localStorage.setItem('fly-controls-seen', '1'); // skip the help card only
       localStorage.removeItem('fly-map-style-2'); // the unsaved-player path
     } catch {}
+    // R16: the fleet-wide weather determinism pin from _boot.js, applied here
+    // by hand BECAUSE this harness deliberately bypasses bootFly. Without it,
+    // LIVE weather reaches the deck — a real 97%-overcast NYC evening greyed
+    // the noon cloud tint to #c9ced8 (the R16 overcast grey working exactly as
+    // designed) and flaked the tint gate. Style seeding stays untouched.
+    window.__flyWeatherOverride = 'baseline';
   });
   const t0 = Date.now();
   await page.goto(BOOT_URL, { waitUntil: 'domcontentloaded', timeout: 180000 });

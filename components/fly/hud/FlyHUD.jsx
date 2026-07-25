@@ -134,11 +134,22 @@ export function FlyHUD({ runtime }) {
           <span className={value} ref={presetRef}>—</span>
         </div>
         {/* LAST cell on purpose: verify-fly.js indexes .font-mono [0..4].
-            Hidden on phones (Spots also lives on the inspect card). */}
-        <div className={`${cell} max-sm:hidden`}>
+            Hidden on phones (Spots also lives on the inspect card).
+            Round 16: the cell is now the logbook's front door — a <button>
+            wrapper only; the inner spans (and therefore that .font-mono
+            indexing) are untouched. The HUD strip is pointer-events-none, so
+            the button re-enables pointers on itself alone. */}
+        <button
+          type="button"
+          onClick={() => useFlyStore.getState().setLogbookOpen(true)}
+          title="Open the pilot logbook (L)"
+          aria-label="Open the pilot logbook"
+          data-testid="hud-spots-cell"
+          className={`${cell} pointer-events-auto transition-colors hover:bg-white/5 max-sm:hidden`}
+        >
           <span className={label}>Spots</span>
           <span className={value} ref={spotsRef}>—</span>
-        </div>
+        </button>
         {/* Live position — "where are we" (per user). Folds away on the compact
             phone strip; desktop shows lat/lon with N/S · E/W hemispheres. */}
         <div className={`${cell} max-sm:hidden`}>

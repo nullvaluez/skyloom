@@ -6,11 +6,15 @@ import { usePassportStore } from '@/stores/passport-store';
 import { useFlyStore } from '@/stores/fly-store';
 import { calculateRarity, getRarityTier, RARITY_TIERS } from '@/lib/rarity';
 import { getAircraftTypeName } from '@/lib/aircraft-type-names';
+import { BADGES, BADGE_TIERS } from '@/lib/badges';
 import { SPICY } from '@/lib/fly/fly-constants';
 import { CARD_THEME } from './inspect/inspect-tokens';
 
 const TOAST_MS = 3500;
 const SPICY_TOAST_MS = 4800;
+// Badges are rarer and carry more text (name + description) — they need a
+// beat longer on screen than a spot stamp.
+const BADGE_TOAST_MS = 5200;
 const MAX_STACK = 2;
 const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 const MILITARY_ACCENT = '#f87171';
@@ -27,11 +31,22 @@ const MILITARY_ACCENT = '#f87171';
  *   qualifying hex → "◆ SPICY" toast with type + bearing, a minimap
  *   attention ring (runtime.spicyPulse) and the tiered blip. Rarity is
  *   computed once per hex and cached; a hex never re-pings this session.
+ * - Badge unlocks (round 16): the passport's 24 achievements have unlocked in
+ *   TOTAL SILENCE since they shipped. A new badge now stamps in with its icon,
+ *   name, description and tier chip.
+ *
+ * Round-16 queueing note: badges — and ONLY badges — defer instead of
+ * evicting. The three existing push paths are byte-preserved (verify-spicy and
+ * verify-airport-buzz gate their behavior), so a badge that arrives while two
+ * toasts are up waits in pendingRef and is drained by the effect below when a
+ * slot frees, rather than shoving a live SPICY ping off the stack.
  */
 export function SpotToast({ runtime }) {
   const [toasts, setToasts] = useState([]);
   const seenHead = useRef(usePassportStore.getState().spottedAircraft[0]?.timestamp ?? 0);
   const idRef = useRef(0);
+  const pendingRef = useRef([]); // badge toasts waiting for a free slot
+  const [pendingTick, setPendingTick] = useState(0); // nudges the drain effect
 
   useEffect(() => {
     const unsub = usePassportStore.subscribe((state) => {
@@ -159,6 +174,66 @@ export function SpotToast({ runtime }) {
     };
   }, [runtime]);
 
+  // --- Round 16: badge unlocks (queued, never evicting) -------------------
+  useEffect(() => {
+    // Closure cursor read from getState() AT SUBSCRIBE TIME: StrictMode's
+    // subscribe → unsubscribe → subscribe re-reads the live count, so a dev
+    // remount can never replay badges that already toasted. (A ref would
+    // survive the remount too, but this also self-heals if the store is
+    // rehydrated or cleared underneath us.)
+    let seenCount = usePassportStore.getState().badges.length;
+    return usePassportStore.subscribe((state) => {
+      const n = state.badges.length;
+      if (n <= seenCount) {
+        seenCount = n; // clearAll() shrinks the list — re-arm, never replay
+        return;
+      }
+      const fresh = state.badges.slice(seenCount);
+      seenCount = n;
+      for (const b of fresh) {
+        const def = BADGES[b.id];
+        const tier = BADGE_TIERS[def?.tier] ?? BADGE_TIERS.bronze;
+        pendingRef.current.push({
+          id: idRef.current++,
+          badge: true,
+          accent: tier.color,
+          icon: b.icon || def?.icon || '⬢',
+          title: b.name || b.id,
+          type: b.description || def?.description || '',
+          // Shaped like a rarity tier so the EXISTING chip markup renders it
+          // with no extra branch in the JSX.
+          tier: { color: tier.color, name: def?.tier ?? 'bronze' },
+        });
+      }
+      setPendingTick((t) => t + 1);
+    });
+  }, []);
+
+  // Dev telemetry: the LIVE stack length. The DOM can transiently hold more
+  // badge-toast nodes than MAX_STACK while AnimatePresence plays exit springs
+  // (an expiring card + its admitted replacement coexist for ~400ms) — the
+  // stack DISCIPLINE lives in this state, and verify-logbook gates on it.
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+      (window.__flyStats ??= {}).toastCount = toasts.length;
+    }
+  }, [toasts]);
+
+  // Drain the badge queue whenever there is room. The toast stack IS the
+  // clock: every existing path ends in a setToasts (push or expiry), so this
+  // effect re-runs on its own — no interval, no polling, and crucially no edit
+  // to the spot/spicy/buzz push paths.
+  useEffect(() => {
+    if (toasts.length >= MAX_STACK) return;
+    const next = pendingRef.current.shift();
+    if (!next) return;
+    runtime.audio?.spotBlip?.(3); // blip when it APPEARS, not when it queued
+    setToasts((prev) => [next, ...prev].slice(0, MAX_STACK));
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== next.id));
+    }, BADGE_TOAST_MS);
+  }, [toasts, pendingTick, runtime]);
+
   return (
     <div className="pointer-events-none absolute right-4 top-16 z-10 flex flex-col items-end gap-2">
       <AnimatePresence>
@@ -177,14 +252,30 @@ export function SpotToast({ runtime }) {
               borderColor: `${t.accent}66`,
               boxShadow: `0 8px 28px rgba(2, 4, 10, 0.6), 0 0 18px ${t.accent}22`,
             }}
-            data-testid={t.buzz ? 'buzz-toast' : t.spicy ? 'spicy-toast' : 'spot-toast'}
+            data-testid={
+              t.badge
+                ? 'badge-toast'
+                : t.buzz
+                  ? 'buzz-toast'
+                  : t.spicy
+                    ? 'spicy-toast'
+                    : 'spot-toast'
+            }
           >
             <div className="flex items-center gap-2.5 px-3.5 py-2">
               <span
                 className="text-[10px] uppercase tracking-[0.18em]"
                 style={{ fontFamily: CARD_THEME.fontDisplay, color: t.accent }}
               >
-                {t.buzz ? t.label : t.spicy ? '◆ spicy' : t.isNew ? '⟬ new spot! ⟭' : 'spotted'}
+                {t.badge
+                  ? `⬢ ${t.icon} badge earned`
+                  : t.buzz
+                    ? t.label
+                    : t.spicy
+                      ? '◆ spicy'
+                      : t.isNew
+                        ? '⟬ new spot! ⟭'
+                        : 'spotted'}
               </span>
               <span
                 className="font-mono text-[12px] font-bold"
@@ -193,7 +284,12 @@ export function SpotToast({ runtime }) {
                 {t.title}
               </span>
               {t.type && (
-                <span className="font-mono text-[10px]" style={{ color: CARD_THEME.iceDim }}>
+                <span
+                  // Badge descriptions are full sentences — cap them so a
+                  // toast can never run off the right edge of the screen.
+                  className={`font-mono text-[10px] ${t.badge ? 'max-w-[240px] truncate' : ''}`}
+                  style={{ color: CARD_THEME.iceDim }}
+                >
                   {t.type}
                 </span>
               )}

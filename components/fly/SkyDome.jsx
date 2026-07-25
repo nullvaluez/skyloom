@@ -32,6 +32,43 @@ export function clearSkyAtmo() {
   atmo.active = false;
 }
 
+// Round 16 "Living World" — the two live NIGHT/WEATHER channels, same
+// module-setter pattern as setSkyAtmo above (one dome per scene; the frame
+// loop owns the uniforms and always wins over the declarative props).
+//
+// BYTE IDENTITY, precisely: the star and moon terms are multiplied by
+// `uNight × (1 − uOvercast)` and the upper gradient is `mix(up, lid,
+// uOvercast)`. When NOTHING drives these channels the frame loop pins
+// uNight = 1 and uOvercast = 0, so those become `× 1.0 × (1.0 − 0.0)` and
+// `mix(up, lid, 0.0)` — IEEE-exact identities in any evaluation order. Toy
+// (which never calls these setters, and whose -50 branch clears them) is
+// therefore bit-for-bit the R15 dome, and so is a satellite DAYLIGHT frame
+// (nightT resolves to exactly 0 above SKY_LIVE.nightSky.starZeroFrac, and
+// baseline weather holds overcastT at exactly 0).
+//
+// The rimOnly alpha additions are inside `if (uRimOnly > 0.5)` — a branch toy
+// never takes at all — and each is a `max(existing, 0.0)` at rest.
+const night = { active: false, t: 0, dir: new Vector3(0, 1, 0) };
+export function setSkyNight(nightT, mx, my, mz) {
+  night.active = true;
+  night.t = nightT;
+  night.dir.set(mx, my, mz);
+}
+export function clearSkyNight() {
+  night.active = false;
+}
+
+const weather = { active: false, t: 0, horizon: new Color(), zenith: new Color() };
+export function setSkyWeather(overcastT, hr, hg, hb, zr, zg, zb) {
+  weather.active = true;
+  weather.t = overcastT;
+  weather.horizon.setRGB(hr, hg, hb, SRGBColorSpace);
+  weather.zenith.setRGB(zr, zg, zb, SRGBColorSpace);
+}
+export function clearSkyWeather() {
+  weather.active = false;
+}
+
 /**
  * Per-style globe sky (FLY_GLOBE_REWORK): a camera-following gradient dome —
  * horizon glow at the rim, zenith above, and a dark VOID below the horizon
@@ -84,6 +121,13 @@ export function SkyDome({
         uMoonParams: {
           value: [moon?.angularR ?? 0.05, moon?.glowR ?? 0.16, moon?.brightness ?? 0.6, moon?.glowStrength ?? 0.18],
         },
+        // Round 16: live night weight (1 = "the stars/moon are at the strength
+        // the props asked for" — the R15 behaviour, hence the default) and the
+        // overcast lid (0 = no lid at all). See the setter comments above.
+        uNight: { value: 1 },
+        uOvercast: { value: 0 },
+        uOverH: { value: new Color(0, 0, 0) },
+        uOverZ: { value: new Color(0, 0, 0) },
       },
       vertexShader: /* glsl */ `
         varying vec3 vDir;
@@ -108,6 +152,10 @@ export function SkyDome({
         uniform vec3 uMoonDir;
         uniform vec3 uMoonColor;
         uniform vec4 uMoonParams;
+        uniform float uNight;
+        uniform float uOvercast;
+        uniform vec3 uOverH;
+        uniform vec3 uOverZ;
         varying vec3 vDir;
         void main() {
           // Dipped horizon: y = 0 where the bent terrain rim sits, not at
@@ -122,11 +170,21 @@ export function SkyDome({
                   ? mix(uHorizon, uMid, yy / max(1e-4, uMidFrac))
                   : mix(uMid, uZenith, (yy - uMidFrac) / max(1e-4, 1.0 - uMidFrac)) )
             : mix(uHorizon, uZenith, yy);
+          // Round 16: the OVERCAST LID. A real overcast sky is a dim grey
+          // ceiling, not a blue sky seen through cloud — so the upper
+          // hemisphere is replaced (not tinted) by a horizon→zenith grey ramp
+          // that FlyScene feeds from the already grey-mixed rim triple. At
+          // uOvercast 0 this is mix(up, lid, 0.0) = up, exactly.
+          up = mix(up, mix(uOverH, uOverZ, yy), uOvercast);
           // below the horizon: settle on the shared rim tone first (where
           // terrain fades out), then fall into the deep void underneath
           vec3 down = mix(uHorizon, uRim, clamp(-y * 2.5, 0.0, 1.0));
           down = mix(down, uVoid, smoothstep(0.22, 0.65, -y));
           vec3 col = y >= 0.0 ? up : down;
+          // How much light the dome ADDS above the horizon (stars + moon).
+          // In rimOnly (satellite) the dome is transparent up there, so this
+          // is also what its alpha has to carry or the night sky is invisible.
+          float nightLuma = 0.0;
           // Restrained star field (dark styles): a few hundred pinprick
           // stars, dim enough to stay under the bloom threshold — presence
           // for the ink sky without turning it into a blizzard.
@@ -146,7 +204,13 @@ export function SkyDome({
             float sz = 0.0009 + 0.0016 * h.z;
             float star = smoothstep(sz, sz * 0.3, distance(dir, sdir));
             star *= step(0.955, h.x); // ~4.5% of cells hold a star
-            col += star * (0.13 + 0.30 * h.y) * smoothstep(0.04, 0.25, y) * uStars;
+            // Round 16: × uNight (they come out as the sun goes down) and
+            // × (1 − uOvercast) (a lid hides them). Both are exactly 1.0 at
+            // rest, so the toy star field is unchanged to the bit.
+            float sAdd = star * (0.13 + 0.30 * h.y) * smoothstep(0.04, 0.25, y) * uStars
+              * uNight * (1.0 - uOvercast);
+            col += sAdd;
+            nightLuma += sAdd;
           }
           // Round 13 P5: toy moon disc on TOY.moonDirection — a soft-edged disc
           // + a gentle halo. Value-only (cool ICE white). Upper hemisphere only.
@@ -154,11 +218,23 @@ export function SkyDome({
             float ad = distance(normalize(vDir), normalize(uMoonDir));
             float disc = smoothstep(uMoonParams.x, uMoonParams.x * 0.6, ad);
             float glow = smoothstep(uMoonParams.y, 0.0, ad);
-            col += uMoonColor * (disc * uMoonParams.z + glow * glow * uMoonParams.w);
+            vec3 mAdd = uMoonColor * (disc * uMoonParams.z + glow * glow * uMoonParams.w)
+              * uNight * (1.0 - uOvercast);
+            col += mAdd;
+            nightLuma += max(mAdd.r, max(mAdd.g, mAdd.b));
           }
           // rimOnly: fade out just above the (dipped) horizon so the HDRI
           // sky owns the upper hemisphere while the void swallows the rim
           float alpha = uRimOnly > 0.5 ? smoothstep(0.015, -0.005, y) : 1.0;
+          if (uRimOnly > 0.5) {
+            // Round 16 (satellite): the dome has to become VISIBLE up there
+            // for the two things it now draws — the night sky it just added,
+            // and the overcast lid that has to cover the HDRI to read as a
+            // ceiling. Both are max(existing, 0.0) at rest, so a satellite
+            // DAYLIGHT frame keeps exactly the R15 rim-only alpha.
+            alpha = max(alpha, min(1.0, nightLuma));
+            alpha = max(alpha, uOvercast * smoothstep(0.0, 0.06, y));
+          }
           gl_FragColor = vec4(col, alpha);
           #include <colorspace_fragment>
         }
@@ -202,11 +278,28 @@ export function SkyDome({
   // satellite the -50 block feeds live time-of-day/altitude atmosphere colors.
   useFrame(({ camera }) => {
     mesh.position.copy(camera.position);
+    const u = mesh.material.uniforms;
     if (atmo.active) {
-      const u = mesh.material.uniforms;
       u.uHorizon.value.copy(atmo.rim);
       u.uRim.value.copy(atmo.rim);
       u.uVoid.value.copy(atmo.void);
+    }
+    // Round 16: the live night + overcast channels. When a channel is not
+    // being driven (toy, or before satellite's first day-cycle tick) it is
+    // pinned to its identity value — so a style switch out of satellite can
+    // never strand the dome at someone else's night weight.
+    if (night.active) {
+      u.uNight.value = night.t;
+      u.uMoonDir.value.copy(night.dir);
+    } else if (u.uNight.value !== 1) {
+      u.uNight.value = 1;
+    }
+    if (weather.active) {
+      u.uOvercast.value = weather.t;
+      u.uOverH.value.copy(weather.horizon);
+      u.uOverZ.value.copy(weather.zenith);
+    } else if (u.uOvercast.value !== 0) {
+      u.uOvercast.value = 0;
     }
   });
 

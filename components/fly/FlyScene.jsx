@@ -24,7 +24,16 @@ import {
   setMicroDetail,
 } from '@/lib/fly/toy-world/world-bend';
 import { PALETTE } from '@/lib/fly/toy-world/toy-palette';
-import { SkyDome, setSkyDip, setSkyAtmo, clearSkyAtmo } from './SkyDome';
+import {
+  SkyDome,
+  setSkyDip,
+  setSkyAtmo,
+  clearSkyAtmo,
+  setSkyNight,
+  clearSkyNight,
+  setSkyWeather,
+  clearSkyWeather,
+} from './SkyDome';
 import { PoiLetters } from './PoiLetters';
 import { TrafficTracers } from './TrafficTracers';
 import { WarpBurst } from './WarpBurst';
@@ -39,6 +48,14 @@ import { registerRuntimeActions, clearRuntimeActions } from '@/lib/fly/runtime-b
 import { Targeting } from '@/lib/fly/targeting';
 import { Autopilot } from '@/lib/fly/autopilot';
 import { expApproach, mercatorScale } from '@/lib/fly/coords';
+import { computeSun, moonDirFromSun, nightWeight } from '@/lib/fly/sun-model';
+import {
+  applyWeatherAtmo,
+  snapWeather,
+  stepWeather,
+  weatherFogDensity,
+  weatherHazeMax,
+} from '@/lib/fly/weather-model';
 import {
   CLOUDS,
   FLIGHT,
@@ -46,11 +63,15 @@ import {
   HILLSHADE,
   MOON,
   SAT_BUILDINGS,
+  SAT_CITY_GLOW,
+  SAT_ROADS,
   SKY,
+  SKY_LIVE,
   TOY,
   TOY_WORLD,
   TRAFFIC_HORIZON,
   WARP,
+  WEATHER,
   WORLD,
   WORLD_EDGE,
 } from '@/lib/fly/fly-constants';
@@ -66,11 +87,31 @@ import { PlayerGroundShadow } from './PlayerGroundShadow';
 import { TrafficLayer } from './TrafficLayer';
 import { ToyWorldLayer } from './ToyWorldLayer';
 import { SatBuildingLayer } from './SatBuildingLayer';
+import { SatRoadLayer } from './SatRoadLayer';
+import { SatCityGlow } from './SatCityGlow';
+import { SatEnvironment } from './SatEnvironment';
+import { PrecipLayer } from './PrecipLayer';
 
 const SPAWN_ALT_M = 800;
 // Round 13 P5: stable toy moon-prop (moon disc on TOY.moonDirection) — a module
 // const so SkyDome's update effect never re-runs on a new object identity.
 const _MOON_PROP = { dir: TOY.moonDirection, ...MOON };
+// Round 16: satellite's own moon prop — dimmer and smaller than toy's (there is
+// a real HDRI sky behind it). The DIRECTION here is only the boot placeholder;
+// the day cycle drives the live anti-solar direction through setSkyNight, which
+// wins every frame. Module const so SkyDome's prop effect keeps one identity.
+const _SAT_MOON_PROP = {
+  dir: [0, 1, 0],
+  color: SKY_LIVE.nightSky.moonColor,
+  angularR: SKY_LIVE.nightSky.moonAngularR,
+  glowR: SKY_LIVE.nightSky.moonGlowR,
+  brightness: SKY_LIVE.nightSky.moonBrightness,
+  glowStrength: SKY_LIVE.nightSky.moonGlowStrength,
+};
+const _moonDir = [0, 1, 0]; // scratch (no per-cadence allocation)
+// Round 16: the overcast lid colours, derived from the (already grey-mixed)
+// rim triple each frame — scratch, no allocation.
+const _lidZenith = [0, 0, 0];
 const _spotPos = new Vector3();
 const _warpPos = new Vector3();
 
@@ -382,6 +423,7 @@ export function FlyScene({ runtime }) {
     if (process.env.NODE_ENV === 'development') {
       window.__fly = runtime;
       window.__flyStore = useFlyStore; // harnesses drive style/tier switches
+      window.__passportStore = usePassportStore; // round 16: logbook/badge gates
       // Remount tripwire: the runtime handles are nulled on cleanup, so a
       // FlyScene remount (Suspense/error-boundary trip) briefly dead-arms
       // every overlay button. 0 on first mount; anything higher during a
@@ -394,6 +436,12 @@ export function FlyScene({ runtime }) {
       // Round 11: the same live-uniform horizon fade TrafficLayer stamps on
       // every track — harnesses probe controlled (d, alt) pairs through it.
       window.__flyHorizonFade = (d, y) => horizonFade(d, y, TRAFFIC_HORIZON);
+      // Round 16: the sun MODEL itself, so a harness can predict what the day
+      // cycle should have computed instead of keeping a second copy of the
+      // solar math that silently drifts (verify-boot's sun-at-spawn gate).
+      // Defaults to the SAME clock the day cycle uses, override included.
+      window.__flySunModel = (lon, lat, tMs) =>
+        computeSun(lon, lat, tMs ?? window.__flySunOverride ?? Date.now()).frac;
     }
     return () => {
       // Dead window opens here (until the next mount re-registers): the bus
@@ -486,39 +534,59 @@ export function FlyScene({ runtime }) {
     setDepthHaze(haze.startM, haze.endM, haze.color, mapStyle === 'toy' ? haze.max : 0);
   }, [mapStyle]);
 
-  // Day-style local-time light (round 6, Phase G): the sun/hemi intensity
-  // lerps with the destination's coarse solar elevation (UTC + lon/15 —
-  // the atlas's "exactness doesn't matter" stance). Satellite only; the
-  // authored night/toy moods and all colors stay untouched. Recomputes on
-  // style change, warps, and a slow interval — never per frame.
+  // Day-style local-time light (round 6, Phase G; round 16 rebuilt on a REAL
+  // sun). Satellite only; the authored toy mood and all colors stay untouched.
+  // Recomputes on style change, warps, and a slow interval — never per frame.
+  //
+  // Round 16: the position now feeds lib/fly/sun-model.js — latitude,
+  // declination and date instead of longitude alone. `az` is still the hour
+  // angle (the hillshade E/W flip and the dawn/dusk HDRI split key on its
+  // sign, and the model reproduces the old value exactly); `frac` is the new,
+  // honest "how much day is it". LATITUDE comes from the same
+  // `runtime.geo ?? spawn` pair the longitude always has, behind the SAME
+  // spawnPlacedRef discipline (the R13 null-island lesson: runtime.geo is only
+  // published once the aircraft is actually placed).
+  //
+  // Also the origin of the two LIVE sky channels: the base light intensities
+  // the -50 block dims for weather, and the SkyDome night weight + anti-solar
+  // moon direction. Both are clock-driven, so they belong on this cadence.
+  const sunBaseRef = useRef(null);
+  const hemiBaseRef = useRef(null);
   useEffect(() => {
     const apply = () => {
-      if (useFlyStore.getState().mapStyle !== 'satellite') return;
+      if (useFlyStore.getState().mapStyle !== 'satellite') {
+        clearSkyNight(); // toy: hand the dome back to its certified props
+        return;
+      }
       const lon = runtime.geo?.x ?? spawn?.lon ?? 0;
+      const lat = runtime.geo?.y ?? spawn?.lat ?? 0;
       const t =
         (typeof window !== 'undefined' && window.__flySunOverride) || Date.now();
-      const d = new Date(t);
-      const localH = (d.getUTCHours() + d.getUTCMinutes() / 60 + lon / 15 + 24) % 24;
-      const sunFactor = Math.max(0, Math.cos(((localH - 12) / 12) * Math.PI));
+      const sun = computeSun(lon, lat, t);
       const frac =
-        SKY.dayCycle.minSunFrac + (1 - SKY.dayCycle.minSunFrac) * sunFactor;
-      if (sunRef.current) sunRef.current.intensity = SKY.sunIntensity * frac;
-      if (hemiRef.current) hemiRef.current.intensity = SKY.hemiIntensity * frac;
-      // Round 7: hillshade sun direction from the same coarse local time —
-      // east in the morning, west in the evening, elevation clamped so
-      // relief never flattens (noon) nor drops below the graze floor (night).
-      const az = ((localH - 12) / 12) * Math.PI;
-      const el = Math.min(
-        HILLSHADE.maxElRad,
-        Math.max(HILLSHADE.minElRad, Math.asin(Math.max(0, sunFactor)))
-      );
-      setHillDir(-Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el));
+        SKY.dayCycle.minSunFrac + (1 - SKY.dayCycle.minSunFrac) * sun.frac;
+      // Stash the BASE intensities: the -50 block multiplies weather dimming
+      // onto these every frame, so the two writers can never compound.
+      sunBaseRef.current = SKY.sunIntensity * frac;
+      hemiBaseRef.current = SKY.hemiIntensity * frac;
+      if (sunRef.current) sunRef.current.intensity = sunBaseRef.current;
+      if (hemiRef.current) hemiRef.current.intensity = hemiBaseRef.current;
+      // Round 7: hillshade sun direction — east in the morning, west in the
+      // evening, elevation clamped so relief never flattens (noon) nor drops
+      // below the graze floor (night). Round 16: same convention, real sun.
+      const cosEl = Math.cos(sun.el);
+      setHillDir(-Math.sin(sun.az) * cosEl, Math.sin(sun.el), Math.cos(sun.az) * cosEl);
+      // Round 16: satellite's night sky. nightT is an inverse smoothstep of
+      // frac (exactly 0 in daylight → the dome's new terms vanish), and the
+      // moon rides the ANTI-solar hour angle so it rises as the sun sets.
+      moonDirFromSun(sun.az, _moonDir);
+      setSkyNight(nightWeight(sun.frac), _moonDir[0], _moonDir[1], _moonDir[2]);
       // Round 11: publish the sun state for discrete low-frequency consumers
-      // (CloudField tints its unlit puffs from this on a ~10s cadence).
-      // Same 60s recompute cadence — zero per-frame cost.
-      runtime.sun = { frac: sunFactor, az, el };
+      // (CloudField tint, HDRI bucket, night windows/roads/city glow, tracer
+      // gain). Same 60s recompute cadence — zero per-frame cost.
+      runtime.sun = { frac: sun.frac, az: sun.az, el: sun.el, decl: sun.decl, sinEl: sun.sinEl };
       if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
-        (window.__flyStats ??= {}).sunFactor = sunFactor;
+        (window.__flyStats ??= {}).sunFactor = sun.frac;
         window.__flyHill = { get: getHillshade, set: setHillshade };
       }
     };
@@ -526,6 +594,15 @@ export function FlyScene({ runtime }) {
     const id = setInterval(apply, SKY.dayCycle.refreshSec * 1000);
     return () => clearInterval(id);
   }, [mapStyle, warpEpochForSun, runtime, spawn]);
+
+  // Round 16: a warp is a CUT, not a journey — damping the weather across it
+  // would smear the departure sky over the arrival for ~10s. Snap under the
+  // WarpFlash instead (the same beat that masks the tile stream-in). Fires
+  // once at mount too, where targets are baseline and the snap is a no-op.
+  useEffect(() => {
+    const w = runtime.weather;
+    if (w) snapWeather(w.wx, w.targets);
+  }, [warpEpochForSun, runtime]);
 
   // Round 13 Phase 1: satellite time-of-day HDRI sky. Reads the SAME runtime.sun
   // the day cycle publishes and buckets it into day / dawn / dusk / night (dawn
@@ -632,7 +709,7 @@ export function FlyScene({ runtime }) {
     const paused = flyState.phase === 'paused';
     // Inspect modal / Atlas count as a soft pause for the stick: the world
     // (and your plane) keep flying, but the cursor belongs to the overlay.
-    if (paused || flyState.inspectHex || flyState.atlasOpen) input.neutralize();
+    if (paused || flyState.inspectHex || flyState.atlasOpen || flyState.logbookOpen) input.neutralize();
     const cmd = input.read();
 
     // Terrain raycasts are ~fractions of a ms but not free — sample the
@@ -813,13 +890,37 @@ export function FlyScene({ runtime }) {
         dt
       ));
       computeSatAtmo(runtime.sun?.frac ?? 1, altT);
+      // --- Round 16: the WEATHER post-pass ---------------------------------
+      // Order is the whole contract. computeSatAtmo has just written the
+      // clean time-of-day/altitude rim triple; stepWeather advances the
+      // damped state ONE step (this is the app's only stepper — nothing else
+      // may call it); applyWeatherAtmo then grey-mixes the SAME scratch
+      // triples IN PLACE, before the four writes below consume them. The rim
+      // therefore still has exactly one source, which is the round-6 rule.
+      // At baseline every one of these is an IEEE identity, so a no-weather
+      // satellite frame is bit-for-bit R15.
+      const wx = runtime.weather?.wx;
+      if (wx) {
+        stepWeather(wx, runtime.weather.targets, dt);
+        applyWeatherAtmo(_atmoRim, _atmoVoid, wx);
+      }
       // (1) scene fog, (2) tile edge-fade + aerial haze target, (3) SkyDome
       // band — all the same rim color; fog density FALLS with altitude to kill
       // the FL300 "wet mirror" murk band.
       scene.fog?.color.setRGB(_atmoRim[0], _atmoRim[1], _atmoRim[2], SRGBColorSpace);
       if (scene.fog) {
-        scene.fog.density =
+        const baseDensity =
           aa.fogDensityBase + (aa.fogDensityHigh - aa.fogDensityBase) * altT;
+        // Low visibility thickens the fog (capped in weather-model so a 200m
+        // report can never white the world out); fogMul is exactly 1 at
+        // baseline, and the base sits far below the cap, so this returns the
+        // R15 density unchanged.
+        scene.fog.density = wx ? weatherFogDensity(baseDensity, wx) : baseDensity;
+        if (process.env.NODE_ENV === 'development' && window.__flyStats?.weather) {
+          // The hook owns this object and mutates it in place at 1Hz; patch
+          // the one per-frame field onto it rather than replacing it.
+          window.__flyStats.weather.fogDensity = scene.fog.density;
+        }
       }
       setEdgeFadeRGB(skyFade.startM, skyFade.endM, _atmoRim[0], _atmoRim[1], _atmoRim[2]);
       setDepthHazeRGB(
@@ -828,9 +929,42 @@ export function FlyScene({ runtime }) {
         _atmoRim[0],
         _atmoRim[1],
         _atmoRim[2],
-        SKY.haze.max
+        // Murk widens the aerial haze as well as the fog (hazeAdd is 0 at
+        // baseline → the certified SKY.haze.max).
+        wx ? weatherHazeMax(SKY.haze.max, wx) : SKY.haze.max
       );
       setSkyAtmo(_atmoRim[0], _atmoRim[1], _atmoRim[2], _atmoVoid[0], _atmoVoid[1], _atmoVoid[2]);
+      // The overcast LID: the rim triple (already grey-mixed above) at the
+      // horizon, darkened toward the zenith — a real ceiling is dimmest
+      // overhead. overcastT 0 → the dome's mix() is an exact no-op.
+      if (wx) {
+        const zk = SKY_LIVE.overcastLid.zenithK;
+        _lidZenith[0] = _atmoRim[0] * zk;
+        _lidZenith[1] = _atmoRim[1] * zk;
+        _lidZenith[2] = _atmoRim[2] * zk;
+        setSkyWeather(
+          wx.overcastT,
+          _atmoRim[0],
+          _atmoRim[1],
+          _atmoRim[2],
+          _lidZenith[0],
+          _lidZenith[1],
+          _lidZenith[2]
+        );
+      } else {
+        clearSkyWeather();
+      }
+      // Weather dims the LIGHT too — an overcast day is flat, not just grey.
+      // Both multiply the STASHED day-cycle base (never each other), so the
+      // 60s cadence and this per-frame write can't compound. At overcastT 0
+      // the multiplier is exactly 1 and the intensity is the day cycle's.
+      const ocDim = wx ? 1 - SKY_LIVE.weatherDim.sun * wx.overcastT : 1;
+      if (sunRef.current && sunBaseRef.current != null) {
+        sunRef.current.intensity = sunBaseRef.current * ocDim;
+      }
+      if (hemiRef.current && hemiBaseRef.current != null) {
+        hemiRef.current.intensity = hemiBaseRef.current * ocDim;
+      }
     } else if (ahOn) {
       // Round 12 "Neon Planet" (TOY): the ground fade band BREATHES with
       // altitude — END chases sqrt(eyeAGL/k)·frac (floored at the static band
@@ -840,8 +974,11 @@ export function FlyScene({ runtime }) {
       // into the LIVE uEdgeFade uniform — every consumer (sky dip below, ultra
       // ring, VoidFloor, TownGlow, clouds) reads it via getEdgeFade(). UNCHANGED
       // from R12 (satellite takes its own branch above); clearSkyAtmo hands the
-      // dome back to its PALETTE props.
+      // dome back to its PALETTE props. Round 16: clearSkyWeather goes with it
+      // — the overcast lid is a satellite-only channel, and leaving a stale
+      // value behind would put someone else's ceiling over the Neon world.
       clearSkyAtmo();
+      clearSkyWeather();
       const target = groundHorizonTargetM(ah, skyFade.endM, ah.maxM);
       const endM = (edgeFadeEndRef.current = expApproach(
         edgeFadeEndRef.current ?? skyFade.endM,
@@ -859,6 +996,7 @@ export function FlyScene({ runtime }) {
       );
     } else {
       clearSkyAtmo();
+      clearSkyWeather();
     }
 
     // Sky horizon follows the bent rim: dip = depression angle (as vDir.y)
@@ -955,37 +1093,36 @@ export function FlyScene({ runtime }) {
       {/* Aerial haze doubles as the horizon cap that bounds tile loads */}
       <fogExp2 attach="fog" args={mood.fog} />
       <Suspense fallback={null}>
-        {/* keyed: drei restores the previous scene.background on unmount.
-            Round 13 Phase 1: satellite swaps the visible sky HDRI on discrete
-            sun-frac buckets (dawn/dusk/night purskies) — the key carries the
-            bucket so each crossing remounts + re-bakes PMREM once. Toy keeps
-            the certified noon HDRI unconditionally (key 'toy', never rebakes). */}
-        <Environment
-          key={mapStyle === 'satellite' ? `sat:${hdriBucket}` : mapStyle}
-          files={mapStyle === 'satellite' ? SKY.hdriCycle[hdriBucket] ?? SKY.hdri : SKY.hdri}
-          background={mood.hdriBg}
-          environmentIntensity={
-            mapStyle === 'satellite'
-              ? SKY.hdriCycle.intensity[hdriBucket]?.env ?? mood.env
-              : mood.env
-          }
-          backgroundIntensity={
-            mapStyle === 'satellite'
-              ? SKY.hdriCycle.intensity[hdriBucket]?.bg ?? 1
-              : 1
-          }
-        />
+        {/* Round 16: satellite's sky is imperative now (SatEnvironment) — one
+            PMREM generator, one live cubemap, prefetch + same-frame swap +
+            continuous intensity, instead of R13's key-remount hard cut. TOY is
+            untouched: the same keyed drei element on the certified noon HDRI
+            (key 'toy', background false, TOY.envIntensity) it has always had. */}
+        {mapStyle === 'satellite' ? (
+          <SatEnvironment runtime={runtime} bucket={hdriBucket} />
+        ) : (
+          <Environment
+            key={mapStyle}
+            files={SKY.hdri}
+            background={mood.hdriBg}
+            environmentIntensity={mood.env}
+            backgroundIntensity={1}
+          />
+        )}
       </Suspense>
 
+      {/* Round 16: satellite gets the star field + a moon at last (R13 built
+          the shader terms then forced them to 0 here). They ride the live
+          uNight weight — exactly 0 in daylight — so a day frame is unchanged. */}
       <SkyDome
         horizon={dome.horizon}
         zenith={dome.zenith}
         voidColor={dome.void}
         rim={GLOBE.rim[mapStyle] ?? GLOBE.rim.satellite}
         rimOnly={dome.rimOnly}
-        stars={mapStyle !== 'satellite'}
+        stars
         midColor={dome.mid ?? null}
-        moon={mapStyle === 'toy' ? _MOON_PROP : null}
+        moon={mapStyle === 'toy' ? _MOON_PROP : _SAT_MOON_PROP}
       />
 
       <hemisphereLight ref={hemiRef} args={mood.hemi} />
@@ -1023,6 +1160,15 @@ export function FlyScene({ runtime }) {
         {mapStyle === 'satellite' && SAT_BUILDINGS.enabled && qualityTier !== 'low' && (
           <SatBuildingLayer runtime={runtime} flight={flight} />
         )}
+        {/* Round 16 (A4): the satellite GROUND-LIGHT NETWORK (roads + runway
+            lights + airport beacons). Inside worldRoot for the same reason the
+            buildings are: its chunk meshes sit at ABSOLUTE tile centers and ride
+            the -anchor rebase, keeping the anchor-bend uBendCenter frame in sync.
+            Same &&-chain shape as the buildings → off = no mount, no worker, no
+            draws, no globals. */}
+        {mapStyle === 'satellite' && SAT_ROADS.enabled && qualityTier !== 'low' && (
+          <SatRoadLayer runtime={runtime} flight={flight} />
+        )}
         <PlayerPlane flight={flight} />
       </group>
 
@@ -1049,6 +1195,14 @@ export function FlyScene({ runtime }) {
       {/* Round 7: distant town glow-domes on the horizon (toy only, +1 draw) */}
       {mapStyle === 'toy' && <TownGlow flight={flight} origin={origin} engine={engine} />}
 
+      {/* Round 16 (A4): the SATELLITE night-city counterpart — distant sodium
+          glow domes + warm cores at POI cities (2 instanced draws, always
+          issued; the sun drives per-instance COLOR only). OUTSIDE worldRoot
+          like TownGlow: it writes anchor-RELATIVE instance matrices itself. */}
+      {mapStyle === 'satellite' && SAT_CITY_GLOW.enabled && (
+        <SatCityGlow runtime={runtime} flight={flight} origin={origin} engine={engine} />
+      )}
+
       {/* Round 8 (P5): procedural landmark monuments, +10 draws. Round 11:
           satellite mounts them too (daylight restyle, raw-DEM ground) — the
           key remounts cleanly on a style switch so materials never hot-swap */}
@@ -1065,6 +1219,15 @@ export function FlyScene({ runtime }) {
         <Suspense fallback={null}>
           <CloudField runtime={runtime} flight={flight} origin={origin} />
         </Suspense>
+      )}
+      {/* Round 16: rain and snow (one instanced quad; +1 draw while falling,
+          0 when it is not). SCENE ROOT deliberately — the mesh pins itself to
+          camera.position each frame, so a parent transform would slide the
+          whole cylinder off the aircraft. Satellite only (toy has no weather
+          at all) and never on the low tier, where its cost is fill rate a
+          draw gate cannot see. */}
+      {mapStyle === 'satellite' && WEATHER.enabled && qualityTier !== 'low' && (
+        <PrecipLayer runtime={runtime} flight={flight} />
       )}
       <Contrail flight={flight} origin={origin} />
       {/* Round 13 Phase 2: satellite player ground-contact disc (1 draw, low

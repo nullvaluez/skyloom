@@ -8,6 +8,7 @@ import { usePassportStore } from '@/stores/passport-store';
 import { useRoute } from '@/hooks/use-route';
 import { useAircraftPhoto } from '@/hooks/use-aircraft-photo';
 import { useAircraftInfo } from '@/hooks/use-aircraft-info';
+import { useSheetLayout } from '@/hooks/use-sheet-layout';
 import { getRuntimeAction } from '@/lib/fly/runtime-bus';
 import { INSPECT } from '@/lib/fly/fly-constants';
 import { M_TO_FT, MPS_TO_KT, RAD2DEG } from '@/lib/fly/coords';
@@ -87,25 +88,9 @@ export function InspectModal({ runtime }) {
   return <ModalBody key={inspectHex} hex={inspectHex} runtime={runtime} />;
 }
 
-/**
- * Phone-sheet breakpoint (Tailwind `sm`). matchMedia, not a resize listener:
- * one state update when the breakpoint is actually crossed (rotation), never
- * per pixel. Drives layout + entrance direction + touch-target sizing, so the
- * geometry can live in INSPECT constants instead of hard-coded utilities.
- */
-function useSheetLayout() {
-  const [isSheet, setIsSheet] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches
-  );
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 639px)');
-    const onChange = () => setIsSheet(mq.matches);
-    onChange();
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
-  return isSheet;
-}
+// R16: the phone-sheet breakpoint hook moved VERBATIM to
+// hooks/use-sheet-layout.js — the Logbook overlay needs the same one source
+// of truth for "this is a phone". Import swap only; behavior identical.
 
 function ModalBody({ hex, runtime }) {
   const runtimeReady = useFlyStore((s) => s.runtimeReady);
