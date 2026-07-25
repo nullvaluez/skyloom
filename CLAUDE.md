@@ -12,7 +12,56 @@
 > describes deleted code (markers, panels, Leaflet-era plans); do not act
 > on it.
 
-> **⚠️ NEWEST — READ FIRST:** **Round 15 "Ground Truth" is BUILT (2026-07-24):
+> **⚠️ NEWEST — READ FIRST:** **Round 16 "Living World" is BUILT (2026-07-24):
+> [FLY_ROUND16.md](FLY_ROUND16.md) is the record** (plan
+> [FLY_ROUND16_PLAN.md](FLY_ROUND16_PLAN.md); five Opus 5 agents in two waves
+> under Fable orchestration). Satellite-first: **(1) REAL WEATHER** — NEW
+> keyless `/api/weather` (open-meteo → aviationweather METAR failover, 0.25°
+> cells, never fabricates) drives cloud coverage / visibility-fog / wind /
+> rain-snow through NEW `lib/fly/weather-model.js` damped `runtime.weather.wx`
+> scalars; **baseline (no data / `__flyWeatherOverride='baseline'`) is
+> bit-identical to R15** — that pin is in `scripts/_boot.js` fleet-wide AND
+> hand-added to raw-boot verify-round11 (live 97%-overcast NYC greyed its
+> noon tint through the new overcast path working as designed). PrecipLayer =
+> +1 draw active / 0 clear / never mounts low. **(2) LIVING SKY** — NEW
+> `lib/fly/sun-model.js` (latitude+declination: polar night & midnight sun
+> real; `az`=hour angle BIT-IDENTICAL so hillshade flip/dawn-dusk split
+> unmoved; verify-boot now mirrors via `window.__flySunModel` — sanctioned),
+> NEW SatEnvironment (continuous env/bg intensity, prefetch + same-frame HDRI
+> swap — **background must be the RAW equirect; a PMREM CubeUV background
+> IGNORES backgroundIntensity**, measured), satellite stars+moon+overcast lid
+> (uNight multiply-to-identity at rest), night bloom breathing, and
+> `SKY_LIVE.hdriFade.nightTexelCap 0.35` — the qwantani "night" HDRI is
+> really TWILIGHT with a bright band on one azimuth (faced it = luma 225;
+> R13 never eyeballed that heading); do NOT cap the day files (their sun is
+> the IBL key light — tried, measured cool-shift, reverted). **(3) NIGHT
+> GROUND** — worker detail `'sat-roads'` (**WORKER_PROTOCOL 12→13**, 3 pins),
+> NEW sat-road-engine (z13 ring r12000, ≤16 draws, cache key
+> `world-bend-road-satnight-r16`, sun drives UNIFORMS only — draw counts
+> identical day/night), real runway edge lights from `aeroway` (cls 7, 0 extra
+> draws), SatRoadLayer + white/green airport beacons (+1), SatCityGlow sodium
+> domes to 90 km (+2 always-issued), and `SAT_BLDG_FADE` Bayer screen-door
+> dissolve (2400→3000 m, evict at 3200 only when invisible — key
+> `world-bend-anchor-satbldg-r16`). Owens Valley draw gate: **254 ≤ 261, NO
+> re-baseline** (roads exist in that scene — planned for). **(4) PILOT
+> LOGBOOK** — the passport's first UI (L key / PauseMenu / Spots cell; LOG /
+> BADGES / STATS; phone 100svh sheet via extracted `hooks/use-sheet-layout`),
+> badge unlock toasts (queued, spot/spicy/buzz push paths byte-preserved),
+> `daily_streak_7` fixed, quality+sound persist (`lib/fly/fly-settings.js` —
+> explicit picks only; **PerformanceMonitor onIncline reverts any downward
+> tier pin in seconds — low-tier contracts must be STATIC source gates**),
+> TOD tracers (vapor day / glow night, never culled), rarity dual-table adds
+> (K35R/C30J/GLF6/A124/A225 — zero classify-gate edits). NEW harnesses
+> verify-weather (28) / verify-sat-night (33) / verify-logbook (13); full
+> 37-run sweep GREEN, zero re-baselines. FLY_ROUND16.md **§6 = the COMBINED
+> R15+R16 user checkpoint table PENDING** (weather feel + procedural flip,
+> road-night look, glow/beacons/fade, TOD tracers, night sky + moon, bloom,
+> latitude sun, logbook — plus everything R15 §6 carried); §7 = lessons
+> (animated layers pollute their own A/B noise — gate net sparks; scene-total
+> draws are not a signal in live flight; addInitScript re-runs on EVERY
+> navigation; gate toast stacks on state, not exit-animating DOM).
+>
+> Earlier: **Round 15 "Ground Truth" is BUILT (2026-07-24):
 > [FLY_ROUND15.md](FLY_ROUND15.md) is the record** (plan
 > [FLY_ROUND15_PLAN.md](FLY_ROUND15_PLAN.md); four Opus 5 agents in parallel
 > under Fable orchestration). The R14 live complaints are FIXED at the root:
