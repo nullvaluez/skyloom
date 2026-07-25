@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildAtlasList } from '@/lib/fly/poi-data';
 import { getRuntimeAction } from '@/lib/fly/runtime-bus';
+import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { useFlyStore } from '@/stores/fly-store';
 import { useFlyAtlasStore } from '@/stores/fly-atlas-store';
 import { AtlasMap } from './atlas/AtlasMap';
@@ -35,6 +36,9 @@ export function Atlas({ runtime }) {
 }
 
 function AtlasBody({ runtime }) {
+  // Round 17. `isTouch` gates the two things that make the Atlas unusable on a
+  // phone: the search AUTOFOCUS (below) and the desktop-sized tap targets.
+  const { isTouch } = useDeviceLayout();
   const entries = useMemo(() => buildAtlasList(), []);
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState(0);
@@ -74,7 +78,15 @@ function AtlasBody({ runtime }) {
     return hits.slice(0, MAX_RESULTS).map((h) => h.e);
   }, [entries, query]);
 
-  useEffect(() => inputRef.current?.focus(), []);
+  // Autofocus is a DESKTOP affordance: the Atlas opens, you type, Enter warps.
+  // On a phone the same line summons the software keyboard the instant the
+  // screen opens, which eats roughly half the viewport — the map you came here
+  // to look at — before you have touched anything. Touch users tap the field
+  // when they actually want to search.
+  useEffect(() => {
+    if (isTouch) return;
+    inputRef.current?.focus();
+  }, [isTouch]);
 
   const select = (entry) => {
     setSelectedKey(entry.key);
@@ -181,10 +193,18 @@ function AtlasBody({ runtime }) {
               }}
               onKeyDown={onSearchKey}
               placeholder="Search cities, bases, spots… (enter warps)"
-              className="w-full rounded-md border bg-transparent px-3 py-1.5 font-mono text-sm outline-none"
+              className={`w-full rounded-md border bg-transparent px-3 font-mono text-sm outline-none ${
+                isTouch ? 'h-11 py-0' : 'py-1.5'
+              }`}
               style={{ borderColor: CARD_THEME.edgeSoft, color: CARD_THEME.ice }}
               data-testid="atlas-search"
               spellCheck={false}
+              // The software keyboard's action key should say GO, because Enter
+              // here WARPS. `inputMode` is deliberately left at its default:
+              // 'search' swaps the key for a magnifier on several Android
+              // keyboards, which is the wrong promise for a control that flies
+              // you across the planet.
+              enterKeyHint="go"
             />
             {results.length > 0 && (
               <div
@@ -201,7 +221,9 @@ function AtlasBody({ runtime }) {
                       key={e.key}
                       onClick={() => select(e)}
                       onMouseEnter={() => setCursor(i)}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left font-mono text-xs"
+                      className={`flex w-full items-center gap-2 px-3 text-left font-mono text-xs ${
+                        isTouch ? 'min-h-11 py-2' : 'py-1.5'
+                      }`}
                       style={{
                         background: i === cursor ? CARD_THEME.panelHover : 'transparent',
                         color: CARD_THEME.ice,
@@ -241,9 +263,12 @@ function AtlasBody({ runtime }) {
           </span>
           <button
             onClick={() => useFlyStore.getState().setAtlasOpen(false)}
-            className="rounded-md border px-2 py-1 font-mono text-xs transition-colors hover:bg-white/10"
+            className={`shrink-0 rounded-md border font-mono transition-colors hover:bg-white/10 ${
+              isTouch ? 'grid h-11 w-11 place-items-center text-base' : 'px-2 py-1 text-xs'
+            }`}
             style={{ borderColor: CARD_THEME.edgeSoft, color: CARD_THEME.iceDim }}
             aria-label="Close Atlas"
+            data-testid="atlas-close"
           >
             ✕
           </button>
@@ -269,18 +294,33 @@ function AtlasBody({ runtime }) {
           </div>
         </div>
 
-        {/* footer: random · recents · filters */}
-        <div className="mt-3 flex items-center gap-2 max-sm:flex-wrap max-sm:gap-y-2">
+        {/* footer: random · recents · filters.
+            CHIP SIZING (round 17): the chips are held at 36 px on touch, NOT
+            the 44 px `MOBILE_UI.minTargetPx` floor the buttons use. Five
+            filter chips at 44 px plus their gaps is 260 px of a 390 px screen
+            for a row that also has to carry the random-city button and up to
+            seven recents — the row would wrap three deep and push the map off
+            the sheet. 36 px is the documented, deliberate exception: they are
+            a dense filter STRIP, they are spaced further apart on touch so the
+            gap does the disambiguating, and every one of them is a toggle
+            whose state is visible, i.e. a mis-tap is instantly seen and
+            instantly undone. (verify-mobile-layout's ≥44 px sweep is A4's;
+            these chips are the reason this comment exists.) */}
+        <div className={`mt-3 flex items-center max-sm:flex-wrap max-sm:gap-y-2 ${isTouch ? 'gap-3' : 'gap-2'}`}>
           <button
             onClick={randomCity}
-            className="rounded-md border px-2.5 py-1 font-mono text-[11px] transition-colors hover:bg-white/10"
+            className={`shrink-0 rounded-md border font-mono text-[11px] transition-colors hover:bg-white/10 ${
+              isTouch ? 'h-11 px-3' : 'px-2.5 py-1'
+            }`}
             style={{ borderColor: CARD_THEME.edgeSoft, color: CARD_THEME.ice }}
             title="Warp to a random city"
             data-testid="atlas-random"
           >
             ⚄ random city
           </button>
-          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+          <div
+            className={`flex min-w-0 flex-1 items-center overflow-hidden ${isTouch ? 'gap-2' : 'gap-1.5'}`}
+          >
             {quickChips.map((c) => {
               const kind = ATLAS_KIND[c.kind] ?? ATLAS_KIND.city;
               return (
@@ -290,7 +330,9 @@ function AtlasBody({ runtime }) {
                     const e = entries.find((x) => x.key === c.key);
                     if (e) select(e);
                   }}
-                  className="truncate rounded px-2 py-1 font-mono text-[10px] transition-colors hover:bg-white/10"
+                  className={`truncate rounded font-mono text-[10px] transition-colors hover:bg-white/10 ${
+                    isTouch ? 'h-9 px-3' : 'px-2 py-1'
+                  }`}
                   style={{ background: CARD_THEME.panel, color: CARD_THEME.iceDim }}
                   title={c.name}
                 >
@@ -300,7 +342,7 @@ function AtlasBody({ runtime }) {
               );
             })}
           </div>
-          <div className="flex items-center gap-1">
+          <div className={`flex items-center ${isTouch ? 'gap-2' : 'gap-1'}`}>
             {FILTER_KINDS.map((k) => {
               const kind = ATLAS_KIND[k];
               const on = filters[k];
@@ -308,13 +350,16 @@ function AtlasBody({ runtime }) {
                 <button
                   key={k}
                   onClick={() => setFilters((f) => ({ ...f, [k]: !f[k] }))}
-                  className="rounded px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-[0.12em] transition-opacity"
+                  className={`shrink-0 rounded font-mono text-[9px] font-bold tracking-[0.12em] transition-opacity ${
+                    isTouch ? 'h-9 px-2.5' : 'px-1.5 py-0.5'
+                  }`}
                   style={{
                     color: kind.color,
                     background: `${kind.color}${on ? '26' : '0d'}`,
                     opacity: on ? 1 : 0.4,
                   }}
                   title={`Toggle ${kind.label.toLowerCase()} dots`}
+                  aria-pressed={on}
                 >
                   ● {kind.label}
                 </button>

@@ -1,26 +1,75 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Eye, Map as MapIcon, Pause } from 'lucide-react';
+import {
+  BookOpen,
+  Camera,
+  Crosshair,
+  Eye,
+  Info,
+  Map as MapIcon,
+  Pause,
+  Video,
+  Zap,
+} from 'lucide-react';
+import { Zone } from '@/components/fly/LayoutRoot';
+import { MOBILE_UI } from '@/lib/fly/fly-constants';
+import { useDeviceLayout } from '@/hooks/use-device-layout';
+import { useOverlayBack } from '@/hooks/use-overlay-back';
 import { useFlyStore } from '@/stores/fly-store';
 
 /**
  * On-screen flight controls for touch devices (mobile / tablet). Desktop
- * never mounts this — FlyMode gates it behind useIsTouch. Everything drives
- * the shared InputController imperatively (runtime.input), the same struct
- * the mouse/keyboard produce, so the flight model is untouched:
+ * never mounts this — FlyMode gates it behind `useDeviceLayout().isTouch`.
+ * Everything drives the shared InputController imperatively (runtime.input),
+ * the same struct the mouse/keyboard produce, so the flight model is
+ * untouched:
  *
  *   • left thumbstick  → setTouchSteer(x, y)   (turn + pitch, expo-shaped)
  *   • throttle rail     → setSpeedPreset(...)   (mirrors the 1/2/3 keys)
+ *   • BOOST pad         → setBoost(true/false)  (mirrors HOLDING Shift)
  *   • LOOK toggle       → setLookActive()/addLook()  (RMB-orbit equivalent)
- *   • ATLAS / PAUSE     → store transitions      (M / Esc equivalent)
+ *   • ATLAS / LOGBOOK / PAUSE → store transitions    (M / L / Esc equivalent)
+ *   • INSPECT / INTERCEPT / CINEMA / PHOTO → input.press('t'|'f'|'c'|'p')
  *
- * The controls hide themselves whenever a full overlay owns the screen
- * (pause menu, Atlas, inspect card) — the stick is neutralized there anyway.
- * Look mode auto-exits on any such overlay so it can never desync.
+ * ROUND 17 — three things changed here, and the first is a BUG FIX.
+ *
+ * 1. THE TAP LEAK. LabelCanvas listens for pointerdown on WINDOW (its canvas
+ *    is pointer-events-none, so that is the only way it can pick a plane).
+ *    Nothing here stopped propagation, so every thumb on the joystick, every
+ *    throttle detent and every button ALSO reached that listener, and a touch
+ *    landing within the fat-finger radius of any projected aircraft opened the
+ *    inspect card mid-turn. Every pointer handler below now calls
+ *    `stopPropagation()`. React attaches its listeners at the root container
+ *    and forwards the call to the NATIVE event, so a window-level listener
+ *    genuinely never fires — this is not a React-tree-only stop.
+ *    (LabelCanvas also carries a `[data-zone]` exclusion guard, so the fix
+ *    holds even for a listener that bypassed React entirely.)
+ *
+ * 2. ZONES. The two anchors are now `<Zone>` containers (components/fly/
+ *    LayoutRoot.jsx) reading `MOBILE_UI.zones['controls-left'|'controls-right']`,
+ *    whose `style` values were transcribed verbatim off the hard-coded ones
+ *    that used to live here — portrait geometry is unchanged to the pixel.
+ *    LayoutRoot lists both names in its OWNED set precisely so this component
+ *    can mount them; that is also what registers them in `window.__flyZones`
+ *    for the layout harness's disjointness proof.
+ *
+ * 3. THE ACTION CLUSTER. Before this round a phone could not press F, C, T,
+ *    L or P at all, while the HUD cheerfully printed "C to exit" at it. The
+ *    cluster is driven by `MOBILE_UI.cluster` (the ORDER contract shared with
+ *    the layout half of the round) and the one-shot actions ride
+ *    `InputController.press()` into FlyScene's EXISTING consumePress state
+ *    machines — so a touch intercept and a keyboard intercept are the same
+ *    code path, guards and all, and cannot drift apart.
+ *
+ * The controls hide themselves whenever a full overlay owns the screen (pause
+ * menu, Atlas, inspect card, logbook, hangar, photo mode) — the stick is
+ * neutralized there anyway. Look mode auto-exits on any such overlay so it can
+ * never desync.
  */
 
 const KNOB_TRAVEL = 52; // px — max thumbstick deflection from center
+const { buttonPx, contextualPx, boostPx } = MOBILE_UI.clusterSize;
 
 // Throttle detents, top (fast) → bottom (slow); mirrors keys 3 / 2 / 1.
 const THROTTLE = [
@@ -28,6 +77,27 @@ const THROTTLE = [
   { key: 'cruise', label: 'CRUISE', tint: '#7dd3fc' },
   { key: 'slow', label: 'SLOW', tint: '#bef264' },
 ];
+
+/** Cluster metadata by id — labels/testids stay in MOBILE_UI.cluster. */
+const CLUSTER_ICON = {
+  look: Eye,
+  atlas: MapIcon,
+  logbook: BookOpen,
+  photo: Camera,
+  pause: Pause,
+  inspect: Info,
+  intercept: Crosshair,
+  cinema: Video,
+};
+
+const PERSISTENT = MOBILE_UI.cluster.filter((c) => !c.contextual);
+const CONTEXTUAL = MOBILE_UI.cluster.filter((c) => c.contextual);
+
+/** Dev-only telemetry so the harness can prove WHICH action a tap fired. */
+function stampPress(key) {
+  if (process.env.NODE_ENV !== 'development' || typeof window === 'undefined') return;
+  (window.__flyStats ??= {}).touchPress = { key, at: Date.now() };
+}
 
 function Thumbstick({ runtime, lookMode }) {
   const baseRef = useRef(null);
@@ -65,19 +135,31 @@ function Thumbstick({ runtime, lookMode }) {
 
   const onDown = (e) => {
     e.preventDefault();
+    e.stopPropagation(); // THE TAP LEAK (see header) — never reach LabelCanvas
     dragging.current = true;
     setDragActive(true);
     last.current = { x: e.clientX, y: e.clientY };
-    baseRef.current?.setPointerCapture?.(e.pointerId);
+    try {
+      baseRef.current?.setPointerCapture?.(e.pointerId);
+    } catch {
+      /* synthetic/never-active pointer id — the drag still tracks on-element */
+    }
     apply(e);
   };
   const onMove = (e) => {
-    if (dragging.current) apply(e);
+    if (!dragging.current) return;
+    e.stopPropagation();
+    apply(e);
   };
   const onUp = (e) => {
+    e.stopPropagation();
     dragging.current = false;
     setDragActive(false);
-    baseRef.current?.releasePointerCapture?.(e.pointerId);
+    try {
+      baseRef.current?.releasePointerCapture?.(e.pointerId);
+    } catch {
+      /* see onDown */
+    }
     setKnob({ x: 0, y: 0 });
     if (!lookMode) runtime.input?.clearTouchSteer();
   };
@@ -91,14 +173,11 @@ function Thumbstick({ runtime, lookMode }) {
       onPointerUp={onUp}
       onPointerCancel={onUp}
       onContextMenu={(e) => e.preventDefault()}
-      className="pointer-events-auto relative grid h-32 w-32 place-items-center rounded-full"
+      className="hud-glass pointer-events-auto relative grid h-32 w-32 place-items-center rounded-full"
       style={{
         touchAction: 'none',
-        background: 'radial-gradient(circle at 50% 50%, rgba(14,20,34,0.5), rgba(6,9,16,0.62))',
         border: `1px solid ${lookMode ? 'rgba(249,168,212,0.5)' : 'rgba(125,211,252,0.35)'}`,
         boxShadow: '0 8px 30px rgba(2,4,10,0.5)',
-        backdropFilter: 'blur(6px)',
-        WebkitBackdropFilter: 'blur(6px)',
       }}
     >
       {/* cardinal ticks */}
@@ -133,13 +212,11 @@ function Throttle({ runtime, preset, boost }) {
   return (
     <div
       data-testid="touch-throttle"
-      className="pointer-events-auto flex w-[68px] flex-col overflow-hidden rounded-2xl"
+      className="hud-glass pointer-events-auto flex flex-col overflow-hidden rounded-2xl"
       style={{
+        width: boostPx,
         border: '1px solid rgba(125,211,252,0.28)',
-        background: 'rgba(6,9,16,0.55)',
         boxShadow: '0 8px 30px rgba(2,4,10,0.5)',
-        backdropFilter: 'blur(6px)',
-        WebkitBackdropFilter: 'blur(6px)',
         touchAction: 'none',
       }}
     >
@@ -148,9 +225,11 @@ function Throttle({ runtime, preset, boost }) {
         return (
           <button
             key={t.key}
+            type="button"
             data-testid={`touch-throttle-${t.key}`}
             onPointerDown={(e) => {
               e.preventDefault();
+              e.stopPropagation();
               runtime.input?.setSpeedPreset(t.key);
             }}
             className="flex items-center justify-center py-3 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors"
@@ -169,24 +248,87 @@ function Throttle({ runtime, preset, boost }) {
   );
 }
 
-function ActionButton({ testid, label, active, onTap, children }) {
+/**
+ * Momentary BOOST — the touch spelling of HOLDING Shift.
+ *
+ * `InputController.setBoost()` has existed (and been read by `read()`) since
+ * round 9 with ZERO callers; this is its caller. Momentary means the release
+ * MUST be unconditional, so pointerup / pointercancel / pointerleave all clear
+ * it: a finger that slides off the pad, or a gesture the browser steals for a
+ * system swipe, cannot leave the throttle jammed open.
+ */
+function BoostPad({ runtime, held, setHeld }) {
+  const release = (e) => {
+    e?.stopPropagation?.();
+    if (!held) return;
+    setHeld(false);
+    runtime.input?.setBoost(false);
+  };
   return (
     <button
+      type="button"
+      data-testid="touch-boost"
+      aria-label="Boost"
+      aria-pressed={held}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setHeld(true);
+        runtime.input?.setBoost(true);
+      }}
+      onPointerUp={release}
+      onPointerCancel={release}
+      onPointerLeave={release}
+      className="hud-glass pointer-events-auto flex items-center justify-center gap-1 rounded-2xl font-mono text-[10px] font-bold uppercase tracking-[0.14em] transition-colors"
+      style={{
+        width: boostPx,
+        height: MOBILE_UI.minTargetPx,
+        touchAction: 'none',
+        border: `1px solid ${held ? 'rgba(249,168,212,0.65)' : 'rgba(125,211,252,0.28)'}`,
+        color: held ? '#fbcfe8' : '#dbeafe',
+        boxShadow: held
+          ? '0 6px 20px rgba(2,4,10,0.5), inset 0 0 0 999px rgba(244,114,182,0.28)'
+          : '0 6px 20px rgba(2,4,10,0.5)',
+      }}
+    >
+      <Zap className="h-3.5 w-3.5" aria-hidden="true" />
+      BST
+    </button>
+  );
+}
+
+/**
+ * One round cluster button. `size` is the tap target in px — never below
+ * `MOBILE_UI.minTargetPx`.
+ *
+ * The active tint is an INSET box-shadow rather than a `background`, so it
+ * composites OVER whatever `.hud-glass` resolved to (translucent + blurred on
+ * desktop/tablet, near-solid and blur-free on a phone). Overriding `background`
+ * inline would have won against the class and handed phones a 22%-alpha button
+ * with no backdrop blur behind it — i.e. an unreadable one.
+ */
+function ActionButton({ testid, label, active, size = buttonPx, onTap, children }) {
+  return (
+    <button
+      type="button"
       data-testid={testid}
       aria-label={label}
       aria-pressed={active}
+      title={label}
       onPointerDown={(e) => {
         e.preventDefault();
+        e.stopPropagation();
         onTap();
       }}
-      className="pointer-events-auto grid h-12 w-12 place-items-center rounded-full transition-colors"
+      className="hud-glass pointer-events-auto grid shrink-0 place-items-center rounded-full transition-colors"
       style={{
+        width: size,
+        height: size,
         border: `1px solid ${active ? 'rgba(249,168,212,0.6)' : 'rgba(125,211,252,0.3)'}`,
-        background: active ? 'rgba(244,114,182,0.22)' : 'rgba(6,9,16,0.55)',
         color: active ? '#fbcfe8' : '#dbeafe',
-        boxShadow: '0 6px 20px rgba(2,4,10,0.5)',
-        backdropFilter: 'blur(6px)',
-        WebkitBackdropFilter: 'blur(6px)',
+        boxShadow: active
+          ? '0 6px 20px rgba(2,4,10,0.5), inset 0 0 0 999px rgba(244,114,182,0.22)'
+          : '0 6px 20px rgba(2,4,10,0.5)',
         touchAction: 'none',
       }}
     >
@@ -195,24 +337,50 @@ function ActionButton({ testid, label, active, onTap, children }) {
   );
 }
 
+function Glyph({ id, size }) {
+  const Icon = CLUSTER_ICON[id];
+  return Icon ? <Icon style={{ width: size, height: size }} aria-hidden="true" /> : null;
+}
+
 export function TouchControls({ runtime }) {
   const phase = useFlyStore((s) => s.phase);
   const atlasOpen = useFlyStore((s) => s.atlasOpen);
   const inspectHex = useFlyStore((s) => s.inspectHex);
   const logbookOpen = useFlyStore((s) => s.logbookOpen);
   const hangarOpen = useFlyStore((s) => s.hangarOpen); // round 17
+  const cameraMode = useFlyStore((s) => s.cameraMode); // round 17 (photo/cinema)
   const speedPreset = useFlyStore((s) => s.speedPreset);
+  // Targeting state is DISCRETE (it changes on lock transitions, never per
+  // frame — FlyScene writes it only when it differs), so subscribing is not a
+  // per-frame-through-React violation.
+  const lockedHex = useFlyStore((s) => s.lockedHex);
+  const lockState = useFlyStore((s) => s.lockState);
+  const { orientation } = useDeviceLayout();
   const [lookMode, setLookMode] = useState(false);
 
-  // A full overlay owns the screen (pause / Atlas / inspect / logbook / hangar)
-  // and neutralizes the stick, so free-look must read as OFF while covered.
-  // Derive it — never a second state that could desync — and let ONE effect
-  // mirror the effective value onto the InputController (updating an external
-  // system is exactly what an effect is for). Round 17: the hangar is a
-  // full-bleed phone sheet, so it belongs in this list exactly like the logbook
-  // (measured: without it, the joystick and throttle rail float over the cards).
+  // Android / in-browser BACK replays the Escape chain. Mounted HERE rather
+  // than in FlyMode because it only matters on touch, and this component is
+  // already the exact "we are on a touch device" boundary. It is called
+  // before any early return, so it keeps running while an overlay covers us —
+  // which is precisely when it has work to do.
+  useOverlayBack(true);
+
+  // A full overlay owns the screen (pause / Atlas / inspect / logbook / hangar
+  // / photo) and neutralizes the stick, so free-look must read as OFF while
+  // covered. Derive it — never a second state that could desync — and let ONE
+  // effect mirror the effective value onto the InputController (updating an
+  // external system is exactly what an effect is for). Round 17: the hangar is
+  // a full-bleed phone sheet, so it belongs in this list exactly like the
+  // logbook (measured: without it, the joystick and throttle rail float over
+  // the cards); photo mode joins it because the shot must be clean and
+  // PhotoModeBar carries its own controls.
   const covered =
-    phase === 'paused' || atlasOpen || !!inspectHex || logbookOpen || hangarOpen;
+    phase === 'paused' ||
+    atlasOpen ||
+    !!inspectHex ||
+    logbookOpen ||
+    hangarOpen ||
+    cameraMode === 'photo';
   const lookActive = lookMode && !covered;
   useEffect(() => {
     runtime.input?.setLookActive(lookActive);
@@ -220,7 +388,10 @@ export function TouchControls({ runtime }) {
 
   // Boost is momentary state on the controller, not the store — reflect it in
   // the throttle highlight by polling at a lazy cadence (never per frame).
+  // `boostHeld` is this component's own pad; the poll also catches a physical
+  // Shift on a keyboard-equipped tablet.
   const [boost, setBoost] = useState(false);
+  const [boostHeld, setBoostHeld] = useState(false);
   useEffect(() => {
     const id = setInterval(() => {
       const cmd = runtime.input?.read?.();
@@ -228,6 +399,16 @@ export function TouchControls({ runtime }) {
     }, 200);
     return () => clearInterval(id);
   }, [runtime]);
+
+  // A held BOOST must not survive an overlay opening (neutralize() clears the
+  // controller's flag, so the pad's local state would be the only thing left
+  // saying "held") or an unmount.
+  useEffect(() => {
+    if (!covered) return;
+    setBoostHeld(false);
+    runtime?.input?.setBoost(false);
+  }, [covered, runtime]);
+  useEffect(() => () => runtime?.input?.setBoost(false), [runtime]);
 
   if (covered) return null;
 
@@ -238,53 +419,105 @@ export function TouchControls({ runtime }) {
     });
   };
 
-  return (
-    <div className="pointer-events-none absolute inset-0 z-20">
-      {/* Left thumbstick — lifted above the required attribution strip */}
-      <div
-        className="absolute"
-        style={{
-          left: 'max(env(safe-area-inset-left), 18px)',
-          bottom: 'calc(env(safe-area-inset-bottom) + 3.25rem)',
-        }}
-      >
-        <Thumbstick runtime={runtime} lookMode={lookActive} />
-      </div>
+  // One-shot actions ride the SAME edge-press channel the keyboard writes, so
+  // FlyScene's consumePress() machines (and their guards) are the only
+  // implementation of "what F/C/P do".
+  const press = (key) => {
+    runtime.input?.press(key);
+    stampPress(key);
+  };
 
-      {/* Right cluster: action buttons above the throttle rail */}
-      <div
-        className="absolute flex flex-col items-end gap-3"
-        style={{
-          right: 'max(env(safe-area-inset-right), 16px)',
-          bottom: 'calc(env(safe-area-inset-bottom) + 3.25rem)',
-        }}
-      >
-        <div className="flex gap-2">
-          <ActionButton
-            testid="touch-look"
-            label="Free look"
-            active={lookActive}
-            onTap={toggleLook}
-          >
-            <Eye className="h-5 w-5" />
-          </ActionButton>
-          <ActionButton
-            testid="touch-atlas"
-            label="Open Atlas"
-            onTap={() => useFlyStore.getState().setAtlasOpen(true)}
-          >
-            <MapIcon className="h-5 w-5" />
-          </ActionButton>
-          <ActionButton
-            testid="touch-pause"
-            label="Pause"
-            onTap={() => useFlyStore.getState().setPhase('paused')}
-          >
-            <Pause className="h-5 w-5" />
-          </ActionButton>
+  const TAP = {
+    look: toggleLook,
+    atlas: () => useFlyStore.getState().setAtlasOpen(true),
+    logbook: () => useFlyStore.getState().setLogbookOpen(true),
+    photo: () => press('p'),
+    pause: () => useFlyStore.getState().setPhase('paused'),
+    // The T-key path, minus the key: FlyScene's `consumePress('t')` needs a
+    // lock it can read off the targeting engine, and we already have the hex
+    // the store mirrors — so open the card directly and stamp the same
+    // telemetry, which keeps the harness reading ONE channel for every tap.
+    inspect: () => {
+      if (!lockedHex) return;
+      useFlyStore.getState().setInspectHex(lockedHex);
+      stampPress('t');
+    },
+    intercept: () => press('f'),
+    cinema: () => press('c'),
+  };
+
+  const locked = !!lockedHex && lockState !== 'none';
+  const chasing = lockState === 'intercepting' || lockState === 'formation';
+  // Which contextual buttons are RELEVANT right now. INSPECT and INTERCEPT
+  // mirror the F/T keys (any lock); CINEMA mirrors C, which FlyScene gates on
+  // `autopilot.mode !== 'off'` — the store spelling of that is a chase-grade
+  // lock state, so an inert button can never appear.
+  const shows = { inspect: locked, intercept: locked, cinema: chasing };
+  const actives = { inspect: false, intercept: chasing, cinema: cameraMode === 'cinema' };
+  const contextual = CONTEXTUAL.filter((c) => shows[c.id]);
+
+  // Landscape is 390 px TALL — the right column (contextual row + cluster row +
+  // throttle rail + boost pad) is the tallest thing on the screen, so it gives
+  // back both its gaps AND its stacking: the BOOST pad moves BESIDE the
+  // throttle rail instead of under it, which is 52 px of a 390 px screen. The
+  // two stay adjacent either way, because they are one functional group.
+  // The zone ANCHORS are identical in both orientations on purpose — the
+  // bottom offset exists to clear the mandatory attribution credit, and that
+  // credit does not move when you turn the phone.
+  const land = orientation === 'landscape';
+  const stackGap = land ? 'gap-2' : 'gap-3';
+  const rowGap = land ? 'gap-1.5' : 'gap-2';
+  const throttleGroup = (
+    <>
+      <Throttle runtime={runtime} preset={speedPreset} boost={boost} />
+      <BoostPad runtime={runtime} held={boostHeld} setHeld={setBoostHeld} />
+    </>
+  );
+
+  return (
+    <>
+      <Zone name="controls-left">
+        <Thumbstick runtime={runtime} lookMode={lookActive} />
+      </Zone>
+
+      <Zone name="controls-right" className={`flex flex-col items-end ${stackGap}`}>
+        {contextual.length > 0 && (
+          <div className={`flex ${rowGap}`} data-testid="touch-contextual">
+            {contextual.map((c) => (
+              <ActionButton
+                key={c.id}
+                testid={c.testid}
+                label={c.label}
+                active={actives[c.id]}
+                size={contextualPx}
+                onTap={TAP[c.id]}
+              >
+                <Glyph id={c.id} size={18} />
+              </ActionButton>
+            ))}
+          </div>
+        )}
+
+        <div className={`flex ${rowGap}`}>
+          {PERSISTENT.map((c) => (
+            <ActionButton
+              key={c.id}
+              testid={c.testid}
+              label={c.label}
+              active={c.id === 'look' ? lookActive : false}
+              onTap={TAP[c.id]}
+            >
+              <Glyph id={c.id} size={20} />
+            </ActionButton>
+          ))}
         </div>
-        <Throttle runtime={runtime} preset={speedPreset} boost={boost} />
-      </div>
-    </div>
+
+        {land ? (
+          <div className={`flex flex-row-reverse items-end ${rowGap}`}>{throttleGroup}</div>
+        ) : (
+          throttleGroup
+        )}
+      </Zone>
+    </>
   );
 }

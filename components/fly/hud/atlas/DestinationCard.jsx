@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useFlyAtlasStore } from '@/stores/fly-atlas-store';
+import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { ATLAS_KIND, CARD_THEME } from './atlas-tokens';
 
 const NM_PER_DEG = 60;
@@ -32,6 +33,7 @@ const rowLabel = { color: CARD_THEME.iceDim, letterSpacing: '0.14em' };
  * WARP button. Pure DOM — INK CODEX tokens throughout.
  */
 export function DestinationCard({ entry, runtime, onWarp }) {
+  const { isTouch } = useDeviceLayout();
   const visits = useFlyAtlasStore((s) => (entry ? (s.visits[entry.key] ?? 0) : 0));
   const isFav = useFlyAtlasStore((s) => (entry ? s.favorites.includes(entry.key) : false));
   const toggleFavorite = useFlyAtlasStore((s) => s.toggleFavorite);
@@ -79,12 +81,21 @@ export function DestinationCard({ entry, runtime, onWarp }) {
         >
           {kind.label}
         </span>
+        {/* Round 17: on touch the star grows its TARGET, not its glyph — a
+            44 px box with the same 16 px star inside. Scaling the character
+            would have made a decorative mark shout; scaling the padding just
+            makes it hittable. `-m-*` pulls the extra box back out of the flow
+            so the header row's height is unchanged. */}
         <button
           onClick={() => toggleFavorite(entry.key)}
-          className="px-1 text-base leading-none transition-transform hover:scale-125"
+          className={`text-base leading-none transition-transform hover:scale-125 ${
+            isTouch ? '-my-3 -mr-2 grid h-11 w-11 place-items-center' : 'px-1'
+          }`}
           style={{ color: isFav ? '#fbbf24' : CARD_THEME.iceFaint }}
           title={isFav ? 'Unfavorite' : 'Favorite'}
           aria-label="Toggle favorite"
+          aria-pressed={isFav}
+          data-testid="atlas-card-fav"
         >
           {isFav ? '★' : '☆'}
         </button>

@@ -2,8 +2,9 @@
 
 import { useEffect, useRef } from 'react';
 import { Vector3 } from 'three';
-import { LABELS, LETTERS, TOY_WORLD, TRAFFIC, WARP } from '@/lib/fly/fly-constants';
+import { LABELS, LETTERS, MOBILE_UI, TOY_WORLD, TRAFFIC, WARP } from '@/lib/fly/fly-constants';
 import { M_TO_FT } from '@/lib/fly/coords';
+import { isPhoneClass } from '@/lib/fly/device-class';
 import { airDrop, bendDrop, getBend } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
 
@@ -40,11 +41,30 @@ const POI_BADGES = {
 };
 
 /**
+ * Coarse-pointer + touch-hardware reading, resolved ONCE per mount. Same pair
+ * of tests `useDeviceLayout()` / `isPhoneClass()` use, deliberately: a
+ * touchscreen laptop keeps the desktop reticle text, a small mouse-driven
+ * window does too.
+ */
+function readTouch() {
+  if (typeof window === 'undefined') return false;
+  const coarse = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+  const hasTouch =
+    (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0) ||
+    'ontouchstart' in window;
+  return coarse && hasTouch;
+}
+
+/**
  * Bracket + leading pip + range/closure for the locked target.
  * @param prev {hex, dist, t} from the previous frame (for closure rate)
+ * @param touch true on a coarse-pointer device — the reticle then advertises
+ *   the TAP, because F and T do not exist there (round 17: the phone HUD used
+ *   to print key hints for keys the device has no way to press; the touch
+ *   cluster's INSPECT / INTERCEPT buttons carry those actions now)
  * @returns updated prev sample, or null when nothing is locked
  */
-function drawReticle(ctx, w, h, runtime, prev) {
+function drawReticle(ctx, w, h, runtime, prev, touch) {
   const { lockedHex, lockState } = useFlyStore.getState();
   if (!lockedHex || lockState === 'none') return null;
   const track = runtime.traffic?.tracks.get(lockedHex);
@@ -105,8 +125,9 @@ function drawReticle(ctx, w, h, runtime, prev) {
   if (prev && prev.hex === lockedHex && now > prev.t) {
     closureMps = (prev.dist - track.distM) / (now - prev.t);
   }
+  const softLabel = touch ? 'LOCK · tap to inspect' : 'LOCK · F intercept · T inspect';
   const mode =
-    lockState === 'soft' ? 'LOCK · F intercept · T inspect' : lockState === 'intercepting' ? 'INTERCEPT' : 'FORMATION';
+    lockState === 'soft' ? softLabel : lockState === 'intercepting' ? 'INTERCEPT' : 'FORMATION';
   ctx.font = '600 11px ui-monospace, monospace';
   ctx.textAlign = 'left';
   ctx.fillStyle = color;
@@ -137,12 +158,31 @@ export function LabelCanvas({ runtime }) {
     let raf = 0;
     let losCursor = 0;
     let reticlePrev = null;
+    // Round 17 — resolved ONCE per mount, never in the draw loop. `isTouch`
+    // only changes the two touch-gated behaviours below; `isPhone` halves the
+    // 2D compositing cost on the device that needs the GL frame back.
+    const isTouch = readTouch();
+    const isPhone = isPhoneClass();
+    // 60 / phoneHz → draw every Nth rAF. Desktop resolves to 1 (every frame),
+    // i.e. byte-identical scheduling to before this round.
+    const frameStep = isPhone
+      ? Math.max(1, Math.round(60 / (MOBILE_UI.label.phoneHz || 60)))
+      : 1;
+    let frameTick = 0;
 
     // Pointer picking: this canvas is pointer-events-none (events land on
     // the GL canvas below), so track the cursor on window and hit-test it
     // against this frame's projected aircraft. Click opens the inspect modal.
     const cursor = { x: -1, y: -1 };
     const hits = []; // {hex, sx, sy} rebuilt per frame
+    // Round 17: the projected POI letters of THIS frame, rebuilt alongside
+    // `hits`. It is the pick source for BOTH the desktop cursor tooltip and
+    // the touch tap tooltip, so the two can never disagree about where a
+    // letter is on screen.
+    const poiHits = []; // {poi, sx, sy, distM}
+    // The touch tap tooltip: a sticky selection that outlives the finger.
+    // NOT React state — this is drawn on a canvas, in a rAF loop.
+    let poiTap = null; // {name, until} | null
     const onMove = (e) => {
       cursor.x = e.clientX;
       cursor.y = e.clientY;
@@ -165,12 +205,36 @@ export function LabelCanvas({ runtime }) {
       }
       return best;
     };
+    // Nearest projected POI letter to a screen point, within a radius.
+    const pickPoiAt = (x, y, radius) => {
+      let best = null;
+      let bestD = radius;
+      for (const p of poiHits) {
+        const d = Math.hypot(p.sx - x, p.sy - y);
+        if (d < bestD) {
+          bestD = d;
+          best = p;
+        }
+      }
+      return best;
+    };
+
     const onDown = (e) => {
       const store = useFlyStore.getState();
       if (store.phase !== 'flying' || store.inspectHex || store.atlasOpen) return;
       // Round 17: photo mode hides this canvas (display:none) but the window
       // listener lives on — a compose drag must never open the inspect card.
       if (store.cameraMode === 'photo') return;
+      // ROUND 17 — HIT EXCLUSION. This listener is on WINDOW because the
+      // canvas is pointer-events-none, which means it also hears every touch
+      // that landed on a HUD control: a thumb on the joystick, a throttle
+      // detent, a button in a modal. That is how "steering opened the inspect
+      // card" happened. TouchControls now stops propagation at the source;
+      // this is the second, independent line of defence, and it covers
+      // surfaces that are not TouchControls at all (`[data-overlay]` modals,
+      // any zone's content, and the photo-hidden HUD wrapper whose children
+      // are display:none but still legal event targets in some engines).
+      if (e.target?.closest?.('[data-zone],[data-overlay],[data-photo-hidden="1"]')) return;
       // Touch has no persistent hover — hit-test the tap point directly against
       // this frame's projected planes (a fat-finger radius, since there's no
       // aim), and never let the steering stick eat the tap (input ignores
@@ -179,8 +243,19 @@ export function LabelCanvas({ runtime }) {
         const hex = pickAt(e.clientX, e.clientY, Math.max(WARP.hoverRadiusPx, 64));
         if (hex) {
           runtime.hoverHex = hex; // brief hover ring on the next frame
+          poiTap = null; // a plane wins over a place
           store.setInspectHex(hex);
+          return;
         }
+        // Missed every plane → try the POI letters. Desktop reveals a place's
+        // name by hovering near it; a finger cannot hover, so a tap raises the
+        // SAME tooltip and it dwells on its own. Tapping the same letter again
+        // (or letting it time out) puts it away.
+        const p = pickPoiAt(e.clientX, e.clientY, MOBILE_UI.poiTap.radiusPx);
+        poiTap =
+          p && poiTap?.name !== p.poi.name
+            ? { name: p.poi.name, until: performance.now() + MOBILE_UI.poiTap.dwellMs }
+            : null;
         return;
       }
       // Mouse/pen: the desktop hover ring already resolved the target.
@@ -192,6 +267,12 @@ export function LabelCanvas({ runtime }) {
 
     const draw = () => {
       raf = requestAnimationFrame(draw);
+      // Round 17 — phone cadence. The overlay redraws at 30 Hz on a phone
+      // (MOBILE_UI.label.phoneHz): labels still track smoothly at that rate,
+      // and the GL frame gets back half of the 2D compositing cost on the one
+      // device that has none to spare. `frameStep` is 1 everywhere else, so
+      // this branch is a no-op on desktop and tablets.
+      if (frameStep > 1 && frameTick++ % frameStep !== 0) return;
       const { traffic, camera, flight, origin, engine } = runtime;
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
@@ -204,7 +285,7 @@ export function LabelCanvas({ runtime }) {
       ctx.clearRect(0, 0, w, h);
       if (!traffic || !camera || !flight || !origin) return;
 
-      reticlePrev = drawReticle(ctx, w, h, runtime, reticlePrev);
+      reticlePrev = drawReticle(ctx, w, h, runtime, reticlePrev, isTouch);
 
       // Wider pool than the labels: every on-screen plane in it is hoverable
       // and clickable even when it doesn't earn one of the 15 labels —
@@ -354,11 +435,16 @@ export function LabelCanvas({ runtime }) {
         ctx.globalAlpha = 1;
       }
 
-      // --- POI hover tooltip: aim near a 3D letter (aircraft hover wins) ---
-      if (!hover && store.phase === 'flying' && !store.inspectHex && !store.atlasOpen && runtime.poiSlots?.length) {
+      // --- POI tooltip: aim near a 3D letter (aircraft hover wins) ---------
+      // ROUND 17: the PROJECTION now runs unconditionally into `poiHits`,
+      // because a TAP has to be able to pick a letter at pointerdown time —
+      // outside the draw loop, on a frame that already happened. The SELECTION
+      // rules below are the pre-round ones, verbatim and in the same order, so
+      // the desktop result for a given cursor position is unchanged; only the
+      // (cheap, ~20-slot) projection moved out of the `!hover` branch.
+      poiHits.length = 0;
+      if (store.phase === 'flying' && !store.inspectHex && !store.atlasOpen && runtime.poiSlots?.length) {
         const isToy = store.mapStyle === 'toy';
-        let best = null;
-        let bestD = LABELS.poiHoverRadiusPx;
         for (const poi of runtime.poiSlots) {
           const distM = Math.hypot(poi.wx - flight.pos.x, poi.wz - flight.pos.z);
           if (distM < LABELS.minDistM) continue;
@@ -375,11 +461,29 @@ export function LabelCanvas({ runtime }) {
           if (_v.z > 1 || _v.z < -1) continue;
           const sx = (_v.x * 0.5 + 0.5) * w;
           const sy = (-_v.y * 0.5 + 0.5) * h;
-          const d = Math.hypot(sx - cursor.x, sy - cursor.y);
-          if (d < bestD) {
-            bestD = d;
-            best = { poi, sx, sy, distM };
+          poiHits.push({ poi, sx, sy, distM });
+        }
+      }
+      {
+        let best = null;
+        if (!hover) {
+          let bestD = LABELS.poiHoverRadiusPx;
+          for (const p of poiHits) {
+            const d = Math.hypot(p.sx - cursor.x, p.sy - cursor.y);
+            if (d < bestD) {
+              bestD = d;
+              best = p;
+            }
           }
+        }
+        // Touch: the tapped letter holds the tooltip for its dwell, and is
+        // re-resolved from THIS frame's projection every frame — so it tracks
+        // the letter as you fly past instead of freezing at the tap point.
+        // Expiry is checked here (one place), never on a timer.
+        if (poiTap && performance.now() >= poiTap.until) poiTap = null;
+        if (!best && poiTap) {
+          best = poiHits.find((p) => p.poi.name === poiTap.name) ?? null;
+          if (!best) poiTap = null; // letter left the view — drop the tooltip
         }
         if (best) {
           const nm = best.distM / 1852;
