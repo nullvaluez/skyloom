@@ -55,6 +55,19 @@ export function PlayerPlane({ flight, aircraft }) {
   const ac = aircraft ?? resolveAircraft(DEFAULT_AIRCRAFT_ID);
   const group = useRef();
 
+  // Dev-only rig handle (the __satRoads pattern): verify-sat-night hides the
+  // hero during its ground-layer A/B probes — the idle bob straddles the probe
+  // crop's top edge and its phase luck dominated the "corrected" pixel signal
+  // (R17 control experiment: the PRE-R17 build measured 1.79–1.95 corrected
+  // against the 1.2 gate — the plane, not the round, was the signal).
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') return undefined;
+    window.__flyPlayer = group.current;
+    return () => {
+      if (window.__flyPlayer === group.current) delete window.__flyPlayer;
+    };
+  }, []);
+
   useFrame(() => {
     const g = group.current;
     if (!g) return;
