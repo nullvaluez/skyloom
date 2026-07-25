@@ -18,6 +18,7 @@ import { Atlas } from './hud/Atlas';
 import { Logbook } from './hud/Logbook';
 import { ArrivalBanner } from './hud/ArrivalBanner';
 import { TouchControls } from './hud/TouchControls';
+import { PhotoModeBar } from './hud/PhotoModeBar';
 import { PauseMenu } from './PauseMenu';
 import { BootScreen } from './hud/BootScreen';
 import { useFlyTraffic } from '@/hooks/use-fly-traffic';
@@ -75,6 +76,19 @@ function getSpawnLatLon() {
 }
 
 /**
+ * Round 17: a layout- and stacking-transparent wrapper (display:contents)
+ * that flips to display:none in photo mode. Children stay MOUNTED — their
+ * refs, queues and intervals survive the trip.
+ */
+function HudGroup({ hidden, children }) {
+  return (
+    <div className={hidden ? 'hidden' : 'contents'} data-photo-hidden={hidden ? '1' : '0'}>
+      {children}
+    </div>
+  );
+}
+
+/**
  * Fullscreen Fly-mode container. Round 9 (fly-only pivot): mounted directly
  * by app/page.js — the game IS the app. The FlyCanvas mounts as soon as the
  * spawn resolves, under the BootScreen overlay, which reveals once the
@@ -83,6 +97,8 @@ function getSpawnLatLon() {
 export function FlyMode({ onClose }) {
   const spawn = useFlyStore((s) => s.spawn);
   const isTouch = useIsTouch();
+  // Round 17: photo mode hides the HUD (see the wrapper in the tree below).
+  const photoActive = useFlyStore((s) => s.cameraMode === 'photo');
 
   // Shared per-frame runtime: engine/flight/input handles written by the
   // scene, read by DOM overlays at low frequency. Never React state.
@@ -148,7 +164,9 @@ export function FlyMode({ onClose }) {
     };
   }, []);
 
-  // Escape priority: inspect → atlas → logbook → credits → pause/resume.
+  // Escape priority: inspect → photo → atlas → logbook → credits →
+  // pause/resume. (Round 17: photo sits directly under inspect — the inspect
+  // card can be opened from inside photo mode, so it must unwind first.)
   //
   // Round 16: the L (Logbook) toggle lives in THIS listener, deliberately —
   // the Atlas's private 'm' handler is a standing lesson that a second window
@@ -160,8 +178,11 @@ export function FlyMode({ onClose }) {
       const store = useFlyStore.getState();
       if (e.key === 'Escape') {
         if (store.inspectHex) store.setInspectHex(null);
+        else if (store.cameraMode === 'photo') store.setCameraMode('chase');
         else if (store.atlasOpen) store.setAtlasOpen(false);
         else if (store.logbookOpen) store.setLogbookOpen(false);
+        // [round 17 merge slot] hangar (agent A1) goes HERE — between logbook
+        // and credits — per FLY_ROUND17_PLAN §6.
         else if (store.creditsOpen) store.closeCredits();
         else if (store.phase === 'paused') store.setPhase('flying');
         else store.setPhase('paused');
@@ -216,19 +237,44 @@ export function FlyMode({ onClose }) {
         {spawn && <FlyCanvas runtime={runtimeRef.current} />}
       </FlyErrorBoundary>
 
-      {/* POI names are in-world 3D letters (PoiLetters) in every style */}
-      <LabelCanvas runtime={runtimeRef.current} />
-      <FlyHUD runtime={runtimeRef.current} />
-      <Minimap runtime={runtimeRef.current} />
-      <InfoCard runtime={runtimeRef.current} />
+      {/* Round 17 photo mode: the flying HUD is HIDDEN, never unmounted.
+          `contents` makes the wrapper invisible to layout AND to stacking, so
+          every child keeps positioning/painting against the fixed root exactly
+          as before; `hidden` is display:none, which keeps Contracts' progress
+          refs, the SpotToast queue and their intervals alive — an unmount
+          would silently reset a session's contract progress every time someone
+          framed a shot.
+          FOUR wrappers, not one, and NOTHING is re-ordered: half of these
+          overlays share a z-index (six sit at z-20, six at z-10), so among
+          equals DOM order IS paint order. One wrapper would have meant moving
+          InspectModal/Atlas/ArrivalBanner past each other and quietly
+          re-stacking the non-photo HUD — the round's "default is
+          bit-identical" rule covers pixels, not just numbers.
+          AttributionBar, PauseMenu, WarpFlash, BootScreen and PhotoModeBar
+          stay OUTSIDE: the Esri credit is required in EVERY UI state, and the
+          shutter/exit must survive the state that hides everything else. */}
+      <HudGroup hidden={photoActive}>
+        {/* POI names are in-world 3D letters (PoiLetters) in every style */}
+        <LabelCanvas runtime={runtimeRef.current} />
+        <FlyHUD runtime={runtimeRef.current} />
+        <Minimap runtime={runtimeRef.current} />
+        <InfoCard runtime={runtimeRef.current} />
+      </HudGroup>
       <InspectModal runtime={runtimeRef.current} />
-      <SpotToast runtime={runtimeRef.current} />
-      <Contracts runtime={runtimeRef.current} />
+      <HudGroup hidden={photoActive}>
+        <SpotToast runtime={runtimeRef.current} />
+        <Contracts runtime={runtimeRef.current} />
+      </HudGroup>
       <Atlas runtime={runtimeRef.current} />
       <Logbook />
-      <ArrivalBanner />
+      <HudGroup hidden={photoActive}>
+        <ArrivalBanner />
+      </HudGroup>
       <WarpFlash runtime={runtimeRef.current} />
-      {isTouch && <TouchControls runtime={runtimeRef.current} />}
+      <HudGroup hidden={photoActive}>
+        {isTouch && <TouchControls runtime={runtimeRef.current} />}
+      </HudGroup>
+      <PhotoModeBar />
       <PauseMenu onExit={onClose} />
       <AttributionBar />
 
