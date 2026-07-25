@@ -6,7 +6,7 @@
  *   2. pause-menu entry (Escape → pause-logbook → open, resumed)
  *   3. 200-spot fixture windows at LOGBOOK.pageSize, grows on scroll
  *   4. RAREST sort + MIL filter are actually correct
- *   5. 24 badge cards, each with data-earned + a progress element
+ *   5. 26 badge cards, each with data-earned + a progress element (R17: +2)
  *   6. STATS "/269" (the audited type universe) + a 28-cell activity strip
  *   7. badge toasts QUEUE — never more than the 2-toast stack, and it drains
  *   8. streak: 6 seeded days + one spot today → daily_streak_7 unlocks
@@ -284,11 +284,15 @@ function seedPassport({ key, count }) {
       ).length,
     };
   });
+  // R17 SANCTIONED RE-BASELINE: 24 → 26. daily_streak_30 (gold) and
+  // daily_streak_100 (platinum) join the ladder; the seeded 6-day fixture in
+  // gate 8 leaves both locked with real partial progress, so the `earned` and
+  // `partial` floors below are unaffected.
   gate(
-    '24 badge cards, all flagged, with progress fills',
-    badgeInfo.n === 24 &&
-      badgeInfo.withEarned === 24 &&
-      badgeInfo.progress === 24 &&
+    '26 badge cards, all flagged, with progress fills',
+    badgeInfo.n === 26 &&
+      badgeInfo.withEarned === 26 &&
+      badgeInfo.progress === 26 &&
       badgeInfo.earned >= 7 &&
       badgeInfo.partial >= 1,
     `${badgeInfo.n} cards · ${badgeInfo.earned} earned · ${badgeInfo.partial} partial bars`

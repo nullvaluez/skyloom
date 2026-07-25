@@ -11,6 +11,7 @@ import { useAircraftInfo } from '@/hooks/use-aircraft-info';
 import { useSheetLayout } from '@/hooks/use-sheet-layout';
 import { getRuntimeAction } from '@/lib/fly/runtime-bus';
 import { INSPECT } from '@/lib/fly/fly-constants';
+import { trackSpotAttrs } from '@/lib/fly/spot-attrs';
 import { M_TO_FT, MPS_TO_KT, RAD2DEG } from '@/lib/fly/coords';
 import { formatSquawk } from '@/lib/format';
 import { calculateRarity, getRarityTier } from '@/lib/rarity';
@@ -165,31 +166,19 @@ function ModalBody({ hex, runtime }) {
     const t = runtime.traffic?.tracks.get(hex);
     if (!t?.meta) return;
     const geo = runtime.engine?.worldToGeo({ x: t.rx, y: t.ry, z: t.rz });
-    usePassportStore.getState().logSpot({
-      hex,
-      flight: t.meta.flight,
-      r: t.meta.r,
-      t: t.meta.t,
-      category: t.meta.category,
-      lat: geo?.y,
-      lon: geo?.x,
-      _classification: t.meta.iconType,
-    });
+    usePassportStore.getState().logSpot(trackSpotAttrs(t, geo));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hex]);
 
+  // R17: the SAME builder the logSpot above uses, so the tier printed on this
+  // card and the rarity written into the passport can no longer disagree
+  // (before, this memo saw `squawk` and the log did not, and neither saw
+  // gs/alt). `track` is this render's live track — the effect logs off the
+  // same object microseconds apart.
   const rarity = useMemo(() => {
     if (!meta) return null;
-    return getRarityTier(
-      calculateRarity({
-        hex,
-        flight: meta.flight,
-        t: meta.t,
-        squawk: meta.squawk,
-        category: meta.category,
-        _classification: meta.iconType,
-      })
-    );
+    return getRarityTier(calculateRarity(trackSpotAttrs(track)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hex, meta]);
 
   // Geo shim for the shared 2D-map data hooks (gs/track feed ETA/progress)

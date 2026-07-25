@@ -3,6 +3,9 @@ import { persist } from 'zustand/middleware';
 import { BADGES, checkBadgeUnlock, getStreakDays } from '@/lib/badges';
 import { calculateRarity } from '@/lib/rarity';
 
+/** Squawks that make a contact an emergency (hijack / radio-fail / mayday). */
+const EMERGENCY_SQUAWKS = ['7500', '7600', '7700'];
+
 /**
  * Spotter's Passport Store
  * Gamification system for tracking spotted aircraft
@@ -77,7 +80,15 @@ export const usePassportStore = create(
         // Track by classification
         if (aircraft._classification === 'military') newStats.militaryCount++;
         if (aircraft._classification === 'helicopter') newStats.helicopterCount++;
-        if (aircraft._emergency) newStats.emergencyCount++;
+        // R17: `_emergency` is a 2D-map field that NOTHING in the fly path
+        // ever set (the traffic engine carries emergency as a bit on
+        // `track.flags`, not on meta), so this counter — and with it the
+        // `emergency_witness` badge PROGRESS bar — was permanently 0. The
+        // squawk is the same fact stated in the units the feed sends, and it
+        // now actually arrives here (lib/fly/spot-attrs.js). The `_emergency`
+        // term stays first so any caller that does set it keeps working.
+        if (aircraft._emergency || EMERGENCY_SQUAWKS.includes(aircraft.squawk))
+          newStats.emergencyCount++;
         
         // Track by type
         const typeKey = aircraft._classification || 'unknown';
@@ -215,6 +226,13 @@ export const usePassportStore = create(
             return { progress: Math.min(stats.uniqueTypes?.size || 0, 100), target: 100 };
           case 'daily_streak_7':
             return { progress: Math.min(getStreakDays(stats.spotsByDay), 7), target: 7 };
+          // R17: the streak ladder continues past a week. Same single
+          // getStreakDays read (it walks back only until the first gap, so a
+          // 100-day target costs nothing extra on a 3-day run).
+          case 'daily_streak_30':
+            return { progress: Math.min(getStreakDays(stats.spotsByDay), 30), target: 30 };
+          case 'daily_streak_100':
+            return { progress: Math.min(getStreakDays(stats.spotsByDay), 100), target: 100 };
           default:
             return { progress: 0, target: 1 };
         }

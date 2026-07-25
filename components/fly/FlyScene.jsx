@@ -49,6 +49,7 @@ import { Targeting } from '@/lib/fly/targeting';
 import { Autopilot } from '@/lib/fly/autopilot';
 import { expApproach, mercatorScale } from '@/lib/fly/coords';
 import { computeSun, moonDirFromSun, nightWeight } from '@/lib/fly/sun-model';
+import { trackSpotAttrs } from '@/lib/fly/spot-attrs';
 import {
   applyWeatherAtmo,
   snapWeather,
@@ -736,16 +737,10 @@ export function FlyScene({ runtime }) {
       const t = targeting.target;
       if (t?.meta) {
         const geo = engine.worldToGeo(_spotPos.set(t.rx, t.ry, t.rz));
-        usePassportStore.getState().logSpot({
-          hex: t.hex,
-          flight: t.meta.flight,
-          r: t.meta.r,
-          t: t.meta.t,
-          category: t.meta.category,
-          lat: geo.y,
-          lon: geo.x,
-          _classification: t.meta.iconType,
-        });
+        // R17: one shared attribute builder (lib/fly/spot-attrs.js) — it is
+        // what finally carries `squawk` (and gs/alt) into the passport, so the
+        // emergency badges and the squawk rarity bonuses are reachable here.
+        usePassportStore.getState().logSpot(trackSpotAttrs(t, geo));
       }
     } else if (transition === 'released' && autopilot.mode !== 'off') {
       autopilot.disengage();
