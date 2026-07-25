@@ -14,6 +14,9 @@ import { MAP_STYLE_KEY, MAP_STYLES } from '@/lib/fly/map-style';
 // sites below. PerformanceMonitor's automatic degrade is a live response to
 // this session's frame times and must never be written to storage.
 import { saveQualityTier, saveSoundOn } from '@/lib/fly/fly-settings';
+// Round 17: the hangar's ONLY entry point (no keyboard shortcut this round).
+import { HANGAR } from '@/lib/fly/fly-constants';
+import { aircraftName } from '@/lib/fly/player-aircraft';
 
 const TIERS = ['low', 'medium', 'high'];
 const HELP_SEEN_KEY = 'fly-controls-seen';
@@ -61,6 +64,7 @@ export function PauseMenu({ onExit }) {
   const controlsHelpSeen = useFlyStore((s) => s.controlsHelpSeen);
   const soundOn = useFlyStore((s) => s.soundOn);
   const mapStyle = useFlyStore((s) => s.mapStyle);
+  const aircraftId = useFlyStore((s) => s.aircraftId);
   const isTouch = useIsTouch();
 
   // First-entry controls help (map style now resolves in FlyMode, pre-mount)
@@ -157,6 +161,17 @@ export function PauseMenu({ onExit }) {
             >
               Pilot Logbook — {totalSpots.toLocaleString()} spots
             </MenuButton>
+            {HANGAR.enabled && (
+              <MenuButton
+                testid="pause-hangar"
+                onClick={() => {
+                  store.setPhase('flying');
+                  store.setHangarOpen(true);
+                }}
+              >
+                Hangar — {aircraftName(aircraftId)}
+              </MenuButton>
+            )}
             <div className="rounded-md border border-zinc-700/60 p-2">
               <div className="mb-1.5 text-center text-[10px] uppercase tracking-widest text-zinc-500">
                 Quality

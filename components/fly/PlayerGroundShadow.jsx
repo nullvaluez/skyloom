@@ -33,13 +33,22 @@ function makeShadowTexture() {
  * read at 1 draw with zero tile-pipeline risk. Bend-anchored (drop ≈ 0 at the
  * player's own XZ); tier-gated exactly like the toy rig (low tier sheds it).
  * Mounted satellite-only; toy keeps its real cast shadow (player castShadow).
+ *
+ * Round 17 ("Your Wings"): the disc RADIUS is per-aircraft (`radiusM`) — a 70 m
+ * cargo 747 casting the fighter's 26 m blob reads as a shadow of some other,
+ * smaller plane. The default is the round-16 constant, so the fighter (and any
+ * un-propped mount) is unchanged.
  */
-export function PlayerGroundShadow({ flight, origin }) {
+export function PlayerGroundShadow({
+  flight,
+  origin,
+  radiusM = PLAYER.groundShadow.blobRadiusM,
+}) {
   const qualityTier = useFlyStore((s) => s.qualityTier);
   const ref = useRef();
   const mesh = useMemo(() => {
     const gs = PLAYER.groundShadow;
-    const geo = new CircleGeometry(gs.blobRadiusM, 40);
+    const geo = new CircleGeometry(radiusM, 40);
     geo.rotateX(-Math.PI / 2);
     const mat = new MeshBasicMaterial({
       color: new Color(gs.blobColor),
@@ -54,7 +63,7 @@ export function PlayerGroundShadow({ flight, origin }) {
     m.renderOrder = -1; // under the puffs/tracers in the transparent pass
     m.visible = false;
     return m;
-  }, []);
+  }, [radiusM]);
   useEffect(
     () => () => {
       mesh.geometry.dispose();

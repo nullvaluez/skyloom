@@ -128,8 +128,20 @@ function SilhouetteBadge({ meta, heroColor, visible }) {
   );
 }
 
-export function ModelTurntable({ archetype, meta, heroColor, onDraggingChange }) {
-  const entry = TRAFFIC_MODELS[archetype] ?? null;
+/**
+ * Round 17: `entry` is an OPTIONAL explicit model descriptor ({url, yawFixRad})
+ * so the hangar can preview an aircraft that has no traffic archetype index.
+ * Omitted, the component resolves TRAFFIC_MODELS[archetype] exactly as before —
+ * the inspect card passes no `entry` and is untouched, testids included.
+ */
+export function ModelTurntable({
+  archetype,
+  entry: entryProp,
+  meta,
+  heroColor,
+  onDraggingChange,
+}) {
+  const entry = entryProp ?? TRAFFIC_MODELS[archetype] ?? null;
   const [modelReady, setModelReady] = useState(false);
   const spin = useRef({ vel: BASE_SPIN, dragging: false, pendingYaw: 0, lastX: 0, lastT: 0 });
 

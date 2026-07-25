@@ -41,9 +41,22 @@ const _camFwd = new Vector3();
  * opacity scale with altitude (thin/faint just above minAltM, wide/sharp at
  * cruise — the user's stated satellite joy). Each ribbon rides applyBendAir
  * (shared 'world-bend-air' program) exactly as the round-11 single ribbon did.
+ *
+ * Round 17 ("Your Wings"): the emitter GEOMETRY is per-aircraft — the `contrail`
+ * prop carries {twin, engineSpanM, backM} from the hangar config. The default
+ * below is the fighter's, read straight out of the CONTRAIL block, so an
+ * un-propped mount is byte-identical to round 16. Everything else (altitude
+ * ramps, near/edge/behind collapse, the air bend) is fleet-wide.
  */
-export function Contrail({ flight, origin }) {
-  const nEmitters = CONTRAIL.twin ? 2 : 1;
+const DEFAULT_CONTRAIL = {
+  enabled: true,
+  twin: CONTRAIL.twin,
+  engineSpanM: CONTRAIL.engineSpanM,
+  backM: CONTRAIL.backM,
+};
+
+export function Contrail({ flight, origin, contrail = DEFAULT_CONTRAIL }) {
+  const nEmitters = contrail.twin ? 2 : 1;
 
   const { material, ribbons } = useMemo(() => {
     const mat = new MeshBasicMaterial({
@@ -120,8 +133,8 @@ export function Contrail({ flight, origin }) {
     // Perpendicular (right) unit vector in world XZ for the twin lateral offset.
     const rightX = Math.cos(flight.heading);
     const rightZ = Math.sin(flight.heading);
-    const half = CONTRAIL.engineSpanM / 2;
-    const back = 12; // ~12m behind the tail, absolute frame
+    const half = (contrail.engineSpanM ?? CONTRAIL.engineSpanM) / 2;
+    const back = contrail.backM ?? CONTRAIL.backM; // behind the tail, absolute frame
     const halfWBase = (CONTRAIL.width * 0.1 * widthScale) / 2;
     camera.getWorldDirection(_camFwd);
 
