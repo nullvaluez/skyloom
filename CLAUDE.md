@@ -60,6 +60,15 @@
 > (animated layers pollute their own A/B noise — gate net sparks; scene-total
 > draws are not a signal in live flight; addInitScript re-runs on EVERY
 > navigation; gate toast stacks on state, not exit-animating DOM).
+> **Post-round live fix (2026-07-25, FLY_ROUND16.md §9):** satellite on
+> iPhone washed the whole frame to one pale field (Neon fine) —
+> SatEnvironment's `FloatType` HDRIs aren't linear-filterable on Apple GPUs
+> (no `OES_texture_float_linear`; three r185 warns instead of falling back,
+> so the sky sampled undefined garbage) → decode is now `HalfFloatType`
+> (toy/drei's certified path; texelCap clamps raw half bits). NEW gate
+> `scripts/verify-sat-mobile.js` (7) boots the iPhone viewport with the
+> extension hidden — pre-fix code fails it, current code + verify-mobile
+> are green. A texture TYPE is a device contract, not a quality knob.
 >
 > Earlier: **Round 15 "Ground Truth" is BUILT (2026-07-24):
 > [FLY_ROUND15.md](FLY_ROUND15.md) is the record** (plan

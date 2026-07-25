@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { EquirectangularReflectionMapping, FloatType, PMREMGenerator } from 'three';
+import { DataUtils, EquirectangularReflectionMapping, HalfFloatType, PMREMGenerator } from 'three';
 import { RGBELoader } from 'three-stdlib';
 import { SKY, SKY_LIVE } from '@/lib/fly/fly-constants';
 
@@ -82,7 +82,18 @@ function loadHdr(url) {
   if (hit?.texture) return Promise.resolve(hit.texture);
   if (hit?.promise) return hit.promise;
   const promise = new Promise((resolve, reject) => {
-    new RGBELoader().setDataType(FloatType).load(
+    // HALF float, not full float — this is a HARD mobile constraint, found
+    // live (satellite washed out to a single pale field on iPhone while Neon
+    // was fine). RGBA32F is not linear-filterable on Apple GPUs before A17
+    // Pro, so iOS WebKit never exposes OES_texture_float_linear there, and
+    // three r185 no longer downgrades the filters — it warns and samples an
+    // INCOMPLETE texture: undefined on Metal (reads blown-white garbage that
+    // ACES+bloom smear over the whole frame; strict GLES drivers read black).
+    // RGBA16F is core-filterable in every WebGL2 — and it is what toy's drei
+    // <Environment> has always decoded to, which is exactly why Neon worked
+    // on the same phone. Half precision is a superset of the 8-bit RGBE
+    // mantissas being decoded, so the sky itself is visually unchanged.
+    new RGBELoader().setDataType(HalfFloatType).load(
       url,
       (tex) => {
         tex.mapping = EquirectangularReflectionMapping;
@@ -105,7 +116,13 @@ function loadHdr(url) {
         if (cap > 0) {
           const d = tex.image?.data;
           if (d) {
-            for (let i = 0; i < d.length; i += 1) if (d[i] > cap) d[i] = cap;
+            // The data is raw half-float BITS (Uint16). RGBE decodes are
+            // never negative, and non-negative halves order the same as
+            // their values bit-wise, so one uint16 compare both finds and
+            // clamps over-cap texels (NaN/Inf bit patterns land above every
+            // finite cap and get clamped with them, which is what we want).
+            const capBits = DataUtils.toHalfFloat(cap);
+            for (let i = 0; i < d.length; i += 1) if (d[i] > capBits) d[i] = capBits;
             tex.needsUpdate = true;
           }
         }
@@ -258,6 +275,9 @@ export function SatEnvironment({ runtime, bucket }) {
           stats.envSwapMs = +(performance.now() - t0).toFixed(2);
           stats.envSwaps = swapsRef.current;
           stats.envUrl = url;
+          // verify-sat-mobile gates on this: HalfFloatType (1016) or the
+          // whole sky is undefined-sampling territory on iOS (see loadHdr).
+          stats.envTexType = tex.type;
         }
       })
       .catch((err) => {

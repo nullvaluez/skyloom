@@ -270,3 +270,46 @@ R16 new:
   natural next satellite draw-budget spend.
 - Weather → gameplay hooks (IFR contracts, storm-chaser spots) — deliberately
   out of this visuals round.
+
+## 9. Post-round live fix (2026-07-25) — satellite white-out on iPhone
+
+**Symptom (user screenshot, live):** on iPhone, satellite rendered the entire
+3D frame as one pale `#c6d7e8` wash — no sky, no terrain, no aircraft — while
+the DOM HUD stayed alive and **Neon on the same phone was fine**.
+
+**Root cause:** `SatEnvironment.loadHdr` decoded the R16 HDRIs with
+`RGBELoader.setDataType(FloatType)`. RGBA32F is **not linear-filterable on
+Apple GPUs before A17 Pro**, so iOS WebKit does not expose
+`OES_texture_float_linear` there — and three r185 no longer downgrades the
+filters the way older threes did (it warns and leaves LINEAR on an INCOMPLETE
+texture). Sampling one is undefined on Metal: the background equirect and the
+PMREM bake both read blown garbage, and ACES + mipmap bloom smear it over the
+whole frame (strict GLES drivers read black instead — same bug, other color).
+Toy never hit it because drei's `<Environment>` decodes to `HalfFloatType`,
+and RGBA16F is core-filterable in every WebGL2 — which is exactly why the
+same phone flew Neon happily.
+
+**Fix (one file):** decode to `HalfFloatType`. Half precision is a superset
+of the 8-bit RGBE mantissas being decoded, so the sky is visually unchanged
+on desktop; the texelCap clamp now compares/writes raw half-float bits via
+`DataUtils.toHalfFloat` (non-negative halves order bit-wise like their
+values, and RGBE never decodes negative; NaN/Inf bit patterns land above any
+finite cap and get clamped with it — free hardening). Dev stat `envTexType`
+published for the gate.
+
+**NEW gate `scripts/verify-sat-mobile.js` (7):** boots the iPhone-class
+viewport with `OES_texture_float_linear` HIDDEN from the context (emulating
+the device class, not the vendor garbage color) + the sun pinned to noon —
+asserts the decoded type is HalfFloat, three's float-linear warning never
+fires, and the sky band of the GL canvas is a real image (mean luma in
+[15, 245], std ≥ 1.5 — the failure modes are uniform ~0 or ~250). Runs
+egress-blocked (the HDRI is same-origin). Negative control measured: pre-fix
+code on the hidden-extension device fails exactly `hdri-half-float`,
+`no-float-linear-warning` (2 warns) and `sky-band-renders` (mean 6.5);
+post-fix all 7 PASS (mean 111.9, std 47) and verify-mobile stays green.
+
+**Lesson:** a texture TYPE is a device contract, not a quality knob. The R16
+"raw equirect as background" decision quietly widened where that float
+texture got sampled, and no harness ran satellite on a phone-class GPU until
+a user's phone did. Capability-gate emulation (hide the extension, assert the
+frame) is cheap and now standing.
