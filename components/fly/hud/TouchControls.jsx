@@ -200,15 +200,19 @@ export function TouchControls({ runtime }) {
   const atlasOpen = useFlyStore((s) => s.atlasOpen);
   const inspectHex = useFlyStore((s) => s.inspectHex);
   const logbookOpen = useFlyStore((s) => s.logbookOpen);
+  const hangarOpen = useFlyStore((s) => s.hangarOpen); // round 17
   const speedPreset = useFlyStore((s) => s.speedPreset);
   const [lookMode, setLookMode] = useState(false);
 
-  // A full overlay owns the screen (pause / Atlas / inspect / logbook) and
-  // neutralizes the stick, so free-look must read as OFF while covered. Derive
-  // it — never a second state that could desync — and let ONE effect mirror
-  // the effective value onto the InputController (updating an external system
-  // is exactly what an effect is for).
-  const covered = phase === 'paused' || atlasOpen || !!inspectHex || logbookOpen;
+  // A full overlay owns the screen (pause / Atlas / inspect / logbook / hangar)
+  // and neutralizes the stick, so free-look must read as OFF while covered.
+  // Derive it — never a second state that could desync — and let ONE effect
+  // mirror the effective value onto the InputController (updating an external
+  // system is exactly what an effect is for). Round 17: the hangar is a
+  // full-bleed phone sheet, so it belongs in this list exactly like the logbook
+  // (measured: without it, the joystick and throttle rail float over the cards).
+  const covered =
+    phase === 'paused' || atlasOpen || !!inspectHex || logbookOpen || hangarOpen;
   const lookActive = lookMode && !covered;
   useEffect(() => {
     runtime.input?.setLookActive(lookActive);

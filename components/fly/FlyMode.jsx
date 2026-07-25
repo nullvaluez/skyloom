@@ -16,6 +16,7 @@ import { Contracts } from './hud/Contracts';
 import { WarpFlash } from './hud/WarpFlash';
 import { Atlas } from './hud/Atlas';
 import { Logbook } from './hud/Logbook';
+import { HangarPanel } from './hud/HangarPanel';
 import { ArrivalBanner } from './hud/ArrivalBanner';
 import { TouchControls } from './hud/TouchControls';
 import { PauseMenu } from './PauseMenu';
@@ -24,9 +25,11 @@ import { useFlyTraffic } from '@/hooks/use-fly-traffic';
 import { useFlyWeather } from '@/hooks/use-fly-weather';
 import { useFlyAudio } from '@/hooks/use-fly-audio';
 import { useIsTouch } from '@/hooks/use-is-touch';
+import { useGLTF } from '@react-three/drei';
 import { BOOT } from '@/lib/fly/fly-constants';
 import { resolveInitialMapStyle } from '@/lib/fly/map-style';
 import { resolveInitialSettings } from '@/lib/fly/fly-settings';
+import { resolveAircraft, resolveInitialAircraft } from '@/lib/fly/player-aircraft';
 import { useFlyStore } from '@/stores/fly-store';
 
 // Fallback spawn: NYC harbor — dense airspace, good demo
@@ -112,6 +115,16 @@ export function FlyMode({ onClose }) {
     // for the same reason — the scene should be built at the tier the player
     // chose rather than built at 'high' and degraded afterwards.
     resolveInitialSettings();
+    // Round 17: the saved AIRCRAFT resolves on that same pre-mount beat and for
+    // the same round-11 reason — FlyScene builds its FlightModel from
+    // aircraftId once, so the pick must be in the store before the canvas
+    // exists. Then get the chosen GLB in flight immediately: without this, a
+    // saved Leviathan would mount, Suspense-fall back to the primitive plane,
+    // and pop in a second later (the fighter is preloaded at import time by
+    // PlayerPlane, so only NON-default picks need this).
+    resolveInitialAircraft();
+    const picked = resolveAircraft(useFlyStore.getState().aircraftId);
+    useGLTF.preload(picked.entry.url);
     getSpawnLatLon().then(([lat, lon]) => {
       if (cancelled) return;
       const fly = useFlyStore.getState();
@@ -148,7 +161,7 @@ export function FlyMode({ onClose }) {
     };
   }, []);
 
-  // Escape priority: inspect → atlas → logbook → credits → pause/resume.
+  // Escape priority: inspect → atlas → logbook → hangar → credits → pause/resume.
   //
   // Round 16: the L (Logbook) toggle lives in THIS listener, deliberately —
   // the Atlas's private 'm' handler is a standing lesson that a second window
@@ -162,6 +175,7 @@ export function FlyMode({ onClose }) {
         if (store.inspectHex) store.setInspectHex(null);
         else if (store.atlasOpen) store.setAtlasOpen(false);
         else if (store.logbookOpen) store.setLogbookOpen(false);
+        else if (store.hangarOpen) store.setHangarOpen(false); // round 17
         else if (store.creditsOpen) store.closeCredits();
         else if (store.phase === 'paused') store.setPhase('flying');
         else store.setPhase('paused');
@@ -226,6 +240,7 @@ export function FlyMode({ onClose }) {
       <Contracts runtime={runtimeRef.current} />
       <Atlas runtime={runtimeRef.current} />
       <Logbook />
+      <HangarPanel />
       <ArrivalBanner />
       <WarpFlash runtime={runtimeRef.current} />
       {isTouch && <TouchControls runtime={runtimeRef.current} />}
