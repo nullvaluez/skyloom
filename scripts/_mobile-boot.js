@@ -36,6 +36,22 @@ const MOBILE_CTX = {
     'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
 };
 
+/**
+ * The SAME phone, turned sideways (round 17). Identical UA, DPR, isMobile and
+ * hasTouch — only the viewport is transposed, which is exactly the state the
+ * old layout handled worst: 844 px wide clears every `max-sm:` rule, so a
+ * landscape phone used to get on-screen touch controls stacked on top of the
+ * full desktop HUD, in 390 px of height. `useDeviceLayout().isPhone` reads
+ * `screen`, not the viewport, so it stays true through the rotation.
+ */
+const LANDSCAPE_CTX = {
+  viewport: { width: 844, height: 390 },
+  deviceScaleFactor: 3,
+  isMobile: true,
+  hasTouch: true,
+  userAgent: MOBILE_CTX.userAgent,
+};
+
 const LAUNCH_ARGS = [
   '--enable-gpu',
   '--ignore-gpu-blocklist',
@@ -45,4 +61,4 @@ const LAUNCH_ARGS = [
   '--autoplay-policy=no-user-gesture-required',
 ];
 
-module.exports = { bootMobile, MOBILE_CTX, LAUNCH_ARGS };
+module.exports = { bootMobile, MOBILE_CTX, LANDSCAPE_CTX, LAUNCH_ARGS };

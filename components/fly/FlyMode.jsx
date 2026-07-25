@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FlyErrorBoundary } from './FlyErrorBoundary';
 import { FlyCanvas } from './FlyCanvas';
+import { LayoutRoot } from './LayoutRoot';
 import { AttributionBar } from './hud/AttributionBar';
 import { FlyHUD } from './hud/FlyHUD';
 import { LabelCanvas } from './hud/LabelCanvas';
@@ -25,7 +26,7 @@ import { BootScreen } from './hud/BootScreen';
 import { useFlyTraffic } from '@/hooks/use-fly-traffic';
 import { useFlyWeather } from '@/hooks/use-fly-weather';
 import { useFlyAudio } from '@/hooks/use-fly-audio';
-import { useIsTouch } from '@/hooks/use-is-touch';
+import { deviceAttr, useDeviceLayout } from '@/hooks/use-device-layout';
 import { useGLTF } from '@react-three/drei';
 import { BOOT } from '@/lib/fly/fly-constants';
 import { resolveInitialMapStyle } from '@/lib/fly/map-style';
@@ -99,7 +100,13 @@ function HudGroup({ hidden, children }) {
  */
 export function FlyMode({ onClose }) {
   const spawn = useFlyStore((s) => s.spawn);
-  const isTouch = useIsTouch();
+  // Round 17: ONE device description for the whole HUD. `isTouch` is the same
+  // boolean useIsTouch() always returned (that hook is now a wrapper over this
+  // one); the extra fields are what let the overlays stop disagreeing about
+  // what a phone is. Stamped onto the root below as data-device/data-orient,
+  // which is what the phone:/phone-land:/phone-port: CSS variants key off.
+  const device = useDeviceLayout();
+  const isTouch = device.isTouch;
   // Round 17: photo mode hides the HUD (see the wrapper in the tree below).
   const photoActive = useFlyStore((s) => s.cameraMode === 'photo');
 
@@ -244,10 +251,29 @@ export function FlyMode({ onClose }) {
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black">
+    <div
+      className="fixed inset-0 z-50 bg-black"
+      // Round 17 mobile overhaul. These three attributes are the whole device
+      // contract: `data-fly-root` scopes the globals.css game-surface rules
+      // (no rubber-band scroll, no double-tap zoom, no grey tap flash) to this
+      // subtree, and data-device/data-orient drive the phone:/phone-land:/
+      // phone-port: custom variants. On desktop they resolve to
+      // device="desktop" / orient="portrait|landscape" and NO variant matches,
+      // so every desktop pixel is unchanged.
+      data-fly-root=""
+      data-device={deviceAttr(device)}
+      data-orient={device.orientation}
+    >
       <FlyErrorBoundary onExit={onClose}>
         {spawn && <FlyCanvas runtime={runtimeRef.current} />}
       </FlyErrorBoundary>
+
+      {/* Named layout zones (MOBILE_UI.zones). Empty scaffolding until the
+          overlays migrate in — an empty pointer-events-none absolute div has
+          zero size and paints nothing, so this mount is inert on every
+          device. Mounted here, early, because every zone member is z-10 and
+          every overlay that must cover them is z-20+. */}
+      <LayoutRoot />
 
       {/* Round 17 photo mode: the flying HUD is HIDDEN, never unmounted.
           `contents` makes the wrapper invisible to layout AND to stacking, so
