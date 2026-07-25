@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { BADGES, checkBadgeUnlock } from '@/lib/badges';
+import { BADGES, checkBadgeUnlock, getStreakDays } from '@/lib/badges';
 import { calculateRarity } from '@/lib/rarity';
 
 /**
@@ -198,6 +198,23 @@ export const usePassportStore = create(
             return { progress: Math.min(stats.helicopterCount, 5), target: 5 };
           case 'emergency_witness':
             return { progress: Math.min(stats.emergencyCount, 1), target: 1 };
+          // R16: every countable badge now reports real progress — the Logbook
+          // renders these as fill bars, and a locked card with a hard-coded
+          // 0/1 reads as "impossible" rather than "40% of the way there".
+          // Badges gated on a one-off event (squawks, a specific type, time of
+          // day) legitimately keep the 0/1 default: there is no partial credit.
+          case 'military_ace':
+            return { progress: Math.min(stats.militaryCount, 50), target: 50 };
+          case 'cargo_king':
+            return { progress: Math.min(stats.spotsByType?.cargo || 0, 20), target: 20 };
+          case 'type_collector_10':
+            return { progress: Math.min(stats.uniqueTypes?.size || 0, 10), target: 10 };
+          case 'type_collector_50':
+            return { progress: Math.min(stats.uniqueTypes?.size || 0, 50), target: 50 };
+          case 'type_collector_100':
+            return { progress: Math.min(stats.uniqueTypes?.size || 0, 100), target: 100 };
+          case 'daily_streak_7':
+            return { progress: Math.min(getStreakDays(stats.spotsByDay), 7), target: 7 };
           default:
             return { progress: 0, target: 1 };
         }

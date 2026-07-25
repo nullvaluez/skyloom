@@ -30,6 +30,16 @@ async function bootFly(
   { style = null, url = BOOT_URL, timeoutMs = 180000, settleMs = 2500 } = {}
 ) {
   await page.addInitScript((s) => {
+    // Round 16 (SANCTIONED harness edit): pin the LIVE WEATHER off for the
+    // whole browser fleet. Every satellite harness now flies under a real sky
+    // fetched from open-meteo/METAR — an overcast Tuesday would grey the rim,
+    // thicken the fog and add a precipitation draw under gates calibrated on a
+    // clear one. 'baseline' is weather-model's exactly-neutral state (every
+    // multiplier the IEEE identity), so a pinned harness sees precisely the
+    // R15 sky. Set OUTSIDE the try below: localStorage can throw, and this
+    // determinism pin must land even then. verify-weather is the ONE harness
+    // that overrides it (per-state, deliberately).
+    window.__flyWeatherOverride = 'baseline';
     try {
       localStorage.setItem('fly-controls-seen', '1');
       // Round 10: the APP default is now satellite (PauseMenu defaults an
@@ -52,6 +62,7 @@ async function bootFly(
   const seeded = await page.evaluate(() => window.__flyBootSeeded === true);
   if (!seeded) {
     await page.evaluate((s) => {
+      window.__flyWeatherOverride = 'baseline'; // round 16: same determinism pin
       localStorage.setItem('fly-controls-seen', '1');
       localStorage.setItem('fly-map-style-2', s || 'toy'); // round 10: default toy for harnesses
     }, style);

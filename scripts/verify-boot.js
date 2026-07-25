@@ -31,6 +31,14 @@ const path = require('path');
           console.log(`[${style}] console:`, t.slice(0, 200));
       }
     });
+    // Round 16 (SANCTIONED harness edit): the same fleet-wide weather pin
+    // scripts/_boot.js installs. verify-boot does its OWN goto (it has to
+    // trace __flyBoot from the first byte, so it cannot use bootFly), which
+    // means it needs its own copy — without it the satellite run boots under
+    // whatever the real sky is doing over the spawn.
+    await page.addInitScript(() => {
+      window.__flyWeatherOverride = 'baseline';
+    });
     // Persisted style must exist BEFORE the app boots (PauseMenu reads it on
     // mount). Toy is the default — only satellite needs the key.
     if (style === 'satellite') {
@@ -99,25 +107,41 @@ const path = require('path');
     // unplaced flight at null island (a pre-spawn frame tick used to publish
     // runtime.geo = (0,0), and the first sun latch lived a full 60s cadence —
     // invisible pre-R13, a full night boot after satellite got a real night).
-    // Recompute the expected sunFactor from the persisted position with the
-    // day cycle's own formula and require agreement. Satellite only (the day
-    // cycle is satellite-scoped) and dev-only stats.
+    // Recompute the expected sunFactor from the persisted position and require
+    // agreement. Satellite only (the day cycle is satellite-scoped) and
+    // dev-only stats.
+    //
+    // Round 16 (SANCTIONED harness edit): this used to REPLICATE the day
+    // cycle's longitude-only formula inline. The sun is latitude- and
+    // date-aware now (lib/fly/sun-model.js), and the old formula disagrees by
+    // far more than the 0.2 tolerance outside midsummer (NYC in December:
+    // Δ0.43) — the gate would have failed for a correct app. Mirror the MODEL
+    // instead, through the dev handle the app publishes, so this stays a
+    // "did the sun read the SPAWN position" gate and never becomes a second,
+    // silently-drifting copy of the solar math. Semantics are unchanged: same
+    // persisted lastPos source, same |Δ| < 0.2, same null-island failure mode
+    // (which is a gross mismatch, e.g. 0 vs ~1, not a drift).
     let sunGate = { ok: true, note: 'n/a (toy)' };
     if (style === 'satellite') {
       const got = await page.evaluate(() => window.__flyStats?.sunFactor ?? null);
       const lon = persisted.lastPos?.lon;
-      if (got == null || !Number.isFinite(lon)) {
-        sunGate = { ok: false, note: `missing sunFactor (${got}) or lon (${lon})` };
+      const lat = persisted.lastPos?.lat;
+      if (got == null || !Number.isFinite(lon) || !Number.isFinite(lat)) {
+        sunGate = { ok: false, note: `missing sunFactor (${got}) or lastPos (${lon}, ${lat})` };
       } else {
-        const d = new Date();
-        const localH = (d.getUTCHours() + d.getUTCMinutes() / 60 + lon / 15 + 24) % 24;
-        const expected = Math.max(0, Math.cos(((localH - 12) / 12) * Math.PI));
-        // 0.2 tolerance: covers the 60s cadence drift; the null-island latch
-        // failure mode is a gross mismatch (e.g. 0 vs ~1), not a drift.
-        sunGate = {
-          ok: Math.abs(got - expected) < 0.2,
-          note: `sunFactor ${got.toFixed(3)} vs expected ${expected.toFixed(3)} @lon ${lon.toFixed(2)}`,
-        };
+        const expected = await page.evaluate(
+          ([lo, la]) =>
+            typeof window.__flySunModel === 'function' ? window.__flySunModel(lo, la) : null,
+          [lon, lat]
+        );
+        if (expected == null || !Number.isFinite(expected)) {
+          sunGate = { ok: false, note: '__flySunModel dev handle missing (dev build required)' };
+        } else {
+          sunGate = {
+            ok: Math.abs(got - expected) < 0.2,
+            note: `sunFactor ${got.toFixed(3)} vs model ${expected.toFixed(3)} @ ${lat.toFixed(2)}, ${lon.toFixed(2)}`,
+          };
+        }
       }
       console.log(`sun-at-spawn gate: ${sunGate.ok ? 'PASS' : 'FAIL'} — ${sunGate.note}`);
     }

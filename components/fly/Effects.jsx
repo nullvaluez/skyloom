@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   EffectComposer,
   Bloom,
@@ -13,7 +13,7 @@ import {
   SMAA,
 } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
-import { SKY, TOY } from '@/lib/fly/fly-constants';
+import { SKY, SKY_LIVE, TOY } from '@/lib/fly/fly-constants';
 import { useFlyStore } from '@/stores/fly-store';
 import { WhiteBalanceEffect } from './WhiteBalance';
 
@@ -40,6 +40,35 @@ const TONE_MODES = {
 };
 
 const lerp = (a, b, t) => a + (b - a) * t;
+
+/**
+ * Round 16: satellite bloom BREATHES with the clock. The daylight grade
+ * (SKY.bloomIntensity 0.7 / threshold 0.85) exists so that nothing but the
+ * tracers glows in sunlight — which is right at noon and wrong at midnight,
+ * where the whole point of the new night ground (city lights, runway lights,
+ * lit windows) is that it glows. `nightT` is 0 at/above SKY_LIVE.bloomNight
+ * .dayFrac, so every sun-pinned DAYLIGHT gate sees exactly the JSX constants
+ * and toy (which never calls this) is untouched.
+ *
+ * Written as direct property mutation on the live effect: changing the JSX
+ * props would reconstruct the BloomEffect and force an EffectPass recompile
+ * on every tick.
+ */
+function applyBloom(effect, frac) {
+  const bn = SKY_LIVE.bloomNight;
+  const nightT = Math.min(1, Math.max(0, 1 - frac / bn.dayFrac));
+  const intensity = lerp(SKY.bloomIntensity, bn.intensity, nightT);
+  const threshold = lerp(SKY.bloomThreshold, bn.threshold, nightT);
+  effect.intensity = intensity;
+  if (effect.luminanceMaterial) effect.luminanceMaterial.threshold = threshold;
+  if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+    (window.__flyStats ??= {}).bloom = {
+      intensity: +intensity.toFixed(3),
+      threshold: +threshold.toFixed(3),
+      nightT: +nightT.toFixed(3),
+    };
+  }
+}
 
 /**
  * The single post chain: Bloom + Vignette + SMAA + a FINAL filmic tone map
@@ -74,6 +103,20 @@ export function Effects({ runtime }) {
     (window.__flyStats ??= {}).toneMode = toneName;
   }
 
+  // Live handle on the BloomEffect. A CALLBACK ref on purpose: @react-three/
+  // postprocessing's wrapper memoises its constructor args on
+  // `JSON.stringify(restProps)`, and an object ref would put the effect
+  // instance (circular) into that stringify the moment it populated. Functions
+  // are dropped by JSON.stringify, so a callback ref is invisible to it.
+  // If the handle never arrives the bloom simply stays on its JSX day grade —
+  // a missing flourish, never a broken frame.
+  const bloomRef = useRef(null);
+  const bloomFracRef = useRef(null); // last sun frac, so a rebuilt effect catches up
+  const setBloom = useCallback((o) => {
+    bloomRef.current = o ?? null;
+    if (o && bloomFracRef.current != null) applyBloom(o, bloomFracRef.current);
+  }, []);
+
   // Satellite white-balance effect (one persistent instance — the balance
   // uniform is mutated in place; no reconstruction/recompile per sun step).
   const whiteBalance = useMemo(
@@ -104,6 +147,10 @@ export function Effects({ runtime }) {
         ];
       }
       whiteBalance.setBalance(bal[0], bal[1], bal[2]);
+      // Round 16: the night bloom rides this SAME 5s cadence — no new timer,
+      // no new state, and it reads the frac that was just resolved.
+      bloomFracRef.current = frac;
+      if (bloomRef.current) applyBloom(bloomRef.current, frac);
       if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
         (window.__flyStats ??= {}).gradeBalance = bal.map((v) => +v.toFixed(3));
         window.__flyStats.gradeFrac = +frac.toFixed(3);
@@ -118,6 +165,7 @@ export function Effects({ runtime }) {
     <EffectComposer multisampling={0}>
       {bloomScale > 0 && (
         <Bloom
+          ref={setBloom}
           mipmapBlur
           intensity={bloom.intensity}
           luminanceThreshold={bloom.threshold}

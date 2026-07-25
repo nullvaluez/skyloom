@@ -15,15 +15,18 @@ import { SpotToast } from './hud/SpotToast';
 import { Contracts } from './hud/Contracts';
 import { WarpFlash } from './hud/WarpFlash';
 import { Atlas } from './hud/Atlas';
+import { Logbook } from './hud/Logbook';
 import { ArrivalBanner } from './hud/ArrivalBanner';
 import { TouchControls } from './hud/TouchControls';
 import { PauseMenu } from './PauseMenu';
 import { BootScreen } from './hud/BootScreen';
 import { useFlyTraffic } from '@/hooks/use-fly-traffic';
+import { useFlyWeather } from '@/hooks/use-fly-weather';
 import { useFlyAudio } from '@/hooks/use-fly-audio';
 import { useIsTouch } from '@/hooks/use-is-touch';
 import { BOOT } from '@/lib/fly/fly-constants';
 import { resolveInitialMapStyle } from '@/lib/fly/map-style';
+import { resolveInitialSettings } from '@/lib/fly/fly-settings';
 import { useFlyStore } from '@/stores/fly-store';
 
 // Fallback spawn: NYC harbor — dense airspace, good demo
@@ -89,6 +92,10 @@ export function FlyMode({ onClose }) {
   // worker, dead-reckon in runtime.traffic (rendered by TrafficLayer).
   useFlyTraffic(runtimeRef.current, true);
 
+  // Real weather at the player's cell (satellite only; toy never fetches).
+  // Owns runtime.weather; no data / override 'baseline' = today's exact look.
+  useFlyWeather(runtimeRef.current, true);
+
   // Procedural audio bed + one-shots (lock blip, warp sweep, UI clicks)
   useFlyAudio(runtimeRef.current);
 
@@ -101,6 +108,10 @@ export function FlyMode({ onClose }) {
     // final style. Kills the round-10 boot hot-swap where an unsaved player
     // built the toy vector world and then swapped to satellite post-mount.
     resolveInitialMapStyle();
+    // Round 16: quality tier + sound resolve on the SAME pre-mount beat and
+    // for the same reason — the scene should be built at the tier the player
+    // chose rather than built at 'high' and degraded afterwards.
+    resolveInitialSettings();
     getSpawnLatLon().then(([lat, lon]) => {
       if (cancelled) return;
       const fly = useFlyStore.getState();
@@ -137,16 +148,45 @@ export function FlyMode({ onClose }) {
     };
   }, []);
 
-  // Escape priority: inspect → atlas → credits → pause/resume.
+  // Escape priority: inspect → atlas → logbook → credits → pause/resume.
+  //
+  // Round 16: the L (Logbook) toggle lives in THIS listener, deliberately —
+  // the Atlas's private 'm' handler is a standing lesson that a second window
+  // keydown listener races the first on mount order (and has to re-derive the
+  // same "am I typing / is something else open" guards). One listener, one
+  // priority chain.
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key !== 'Escape') return;
       const store = useFlyStore.getState();
-      if (store.inspectHex) store.setInspectHex(null);
-      else if (store.atlasOpen) store.setAtlasOpen(false);
-      else if (store.creditsOpen) store.closeCredits();
-      else if (store.phase === 'paused') store.setPhase('flying');
-      else store.setPhase('paused');
+      if (e.key === 'Escape') {
+        if (store.inspectHex) store.setInspectHex(null);
+        else if (store.atlasOpen) store.setAtlasOpen(false);
+        else if (store.logbookOpen) store.setLogbookOpen(false);
+        else if (store.creditsOpen) store.closeCredits();
+        else if (store.phase === 'paused') store.setPhase('flying');
+        else store.setPhase('paused');
+        return;
+      }
+      if (e.key !== 'l' && e.key !== 'L') return;
+      // Held keys must not strobe the overlay, and the Atlas search field is a
+      // real text input — L belongs to whoever is typing.
+      if (e.repeat) return;
+      const tag = e.target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (store.logbookOpen) {
+        store.setLogbookOpen(false);
+      } else if (!store.inspectHex && !store.atlasOpen) {
+        // From the pause menu L resumes first — the same shape as PauseMenu's
+        // M-to-Atlas, but kept in THIS listener on purpose: PauseMenu's
+        // keydown effect is a CHILD effect and therefore registers on window
+        // BEFORE this one, so a duplicate handler there would open the logbook
+        // and then have this toggle close it on the very same keypress.
+        if (store.phase === 'paused') {
+          store.closeCredits();
+          store.setPhase('flying');
+        }
+        store.setLogbookOpen(true);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -185,6 +225,7 @@ export function FlyMode({ onClose }) {
       <SpotToast runtime={runtimeRef.current} />
       <Contracts runtime={runtimeRef.current} />
       <Atlas runtime={runtimeRef.current} />
+      <Logbook />
       <ArrivalBanner />
       <WarpFlash runtime={runtimeRef.current} />
       {isTouch && <TouchControls runtime={runtimeRef.current} />}

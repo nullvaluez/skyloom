@@ -199,15 +199,16 @@ export function TouchControls({ runtime }) {
   const phase = useFlyStore((s) => s.phase);
   const atlasOpen = useFlyStore((s) => s.atlasOpen);
   const inspectHex = useFlyStore((s) => s.inspectHex);
+  const logbookOpen = useFlyStore((s) => s.logbookOpen);
   const speedPreset = useFlyStore((s) => s.speedPreset);
   const [lookMode, setLookMode] = useState(false);
 
-  // A full overlay owns the screen (pause / Atlas / inspect) and neutralizes
-  // the stick, so free-look must read as OFF while covered. Derive it — never
-  // a second state that could desync — and let ONE effect mirror the effective
-  // value onto the InputController (updating an external system is exactly
-  // what an effect is for).
-  const covered = phase === 'paused' || atlasOpen || !!inspectHex;
+  // A full overlay owns the screen (pause / Atlas / inspect / logbook) and
+  // neutralizes the stick, so free-look must read as OFF while covered. Derive
+  // it — never a second state that could desync — and let ONE effect mirror
+  // the effective value onto the InputController (updating an external system
+  // is exactly what an effect is for).
+  const covered = phase === 'paused' || atlasOpen || !!inspectHex || logbookOpen;
   const lookActive = lookMode && !covered;
   useEffect(() => {
     runtime.input?.setLookActive(lookActive);

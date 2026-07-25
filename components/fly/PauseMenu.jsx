@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useFlyStore } from '@/stores/fly-store';
+import { usePassportStore } from '@/stores/passport-store';
 import { useIsTouch } from '@/hooks/use-is-touch';
 import { FLY_ASSETS } from '@/lib/fly/assets';
 import { TERRAIN_ATTRIBUTIONS } from '@/lib/fly/tile-sources';
@@ -9,6 +10,10 @@ import { TERRAIN_ATTRIBUTIONS } from '@/lib/fly/tile-sources';
 // (FlyMode resolves the style BEFORE the canvas mounts — no more toy→sat
 // hot-swap on a fresh boot). This menu only reads/writes the picked style.
 import { MAP_STYLE_KEY, MAP_STYLES } from '@/lib/fly/map-style';
+// Round 16: quality + sound persist the same way — but ONLY from the click
+// sites below. PerformanceMonitor's automatic degrade is a live response to
+// this session's frame times and must never be written to storage.
+import { saveQualityTier, saveSoundOn } from '@/lib/fly/fly-settings';
 
 const TIERS = ['low', 'medium', 'high'];
 const HELP_SEEN_KEY = 'fly-controls-seen';
@@ -24,6 +29,7 @@ const CONTROL_ROWS = [
   ['Click a plane', 'inspect it — warp to it or order an intercept'],
   ['T', 'inspect whatever is soft-locked (no aiming needed)'],
   ['M', 'open the Atlas — warp anywhere on Earth'],
+  ['L', 'pilot logbook — every spot, badge and stat you have earned'],
   ['Hard stick input', 'breaks intercept/formation'],
   ['Esc', 'close modal / pause menu'],
 ];
@@ -35,6 +41,7 @@ const TOUCH_CONTROL_ROWS = [
   ['👁 Look', 'toggle free-look, then drag the stick to orbit'],
   ['Tap a plane', 'inspect it — then WARP to it or order a CHASE'],
   ['🗺 Atlas', 'warp anywhere on Earth'],
+  ['📓 Logbook', 'your spots, badges and stats — open it from this menu'],
   ['⏸ Pause', 'this menu — quality, map style, sound, exit'],
 ];
 
@@ -66,6 +73,13 @@ export function PauseMenu({ onExit }) {
 
   // M from the pause menu goes straight to the Atlas — same key as in
   // flight, so muscle memory doesn't dead-end on the paused screen.
+  //
+  // Round 16 note: L-from-pause behaves the same way but is handled in
+  // FlyMode's single listener, NOT here. This effect is a CHILD effect, so it
+  // registers on window BEFORE FlyMode's parent effect does — a duplicate L
+  // handler here would open the logbook and then FlyMode's toggle, seeing it
+  // open, would immediately close it again on the very same keypress. (M is
+  // safe: the Atlas's own 'm' listener only mounts on the NEXT render.)
   useEffect(() => {
     if (phase !== 'paused') return;
     const onKey = (e) => {
@@ -108,6 +122,10 @@ export function PauseMenu({ onExit }) {
   }
 
   const store = useFlyStore.getState();
+  // Read (never subscribe): this branch only renders while paused, so a
+  // snapshot is current by construction and the passport can't re-render the
+  // menu on every spot logged behind it.
+  const totalSpots = usePassportStore.getState().stats.totalSpotted ?? 0;
 
   return (
     <div className="absolute inset-x-0 top-0 bottom-8 z-20 flex items-center justify-center bg-zinc-950/55">
@@ -130,6 +148,15 @@ export function PauseMenu({ onExit }) {
             >
               Atlas — warp the world
             </MenuButton>
+            <MenuButton
+              testid="pause-logbook"
+              onClick={() => {
+                store.setPhase('flying');
+                store.setLogbookOpen(true);
+              }}
+            >
+              Pilot Logbook — {totalSpots.toLocaleString()} spots
+            </MenuButton>
             <div className="rounded-md border border-zinc-700/60 p-2">
               <div className="mb-1.5 text-center text-[10px] uppercase tracking-widest text-zinc-500">
                 Quality
@@ -138,7 +165,10 @@ export function PauseMenu({ onExit }) {
                 {TIERS.map((tier) => (
                   <button
                     key={tier}
-                    onClick={() => store.setQualityTier(tier)}
+                    onClick={() => {
+                      store.setQualityTier(tier);
+                      saveQualityTier(tier); // a CLICKED tier is a choice — persist it
+                    }}
                     className={`rounded py-1 text-xs capitalize ${
                       qualityTier === tier
                         ? 'bg-zinc-100 font-medium text-zinc-900'
@@ -170,7 +200,14 @@ export function PauseMenu({ onExit }) {
                 ))}
               </div>
             </div>
-            <MenuButton onClick={() => store.toggleSound()}>
+            <MenuButton
+              onClick={() => {
+                // Keep the existing toggle as the single source of truth for
+                // the flip, then persist whatever it landed on.
+                store.toggleSound();
+                saveSoundOn(useFlyStore.getState().soundOn);
+              }}
+            >
               Sound: {soundOn ? 'On' : 'Off'}
             </MenuButton>
             <MenuButton onClick={() => store.openCredits()}>Credits &amp; licenses</MenuButton>
@@ -185,10 +222,11 @@ export function PauseMenu({ onExit }) {
   );
 }
 
-function MenuButton({ children, onClick, primary = false }) {
+function MenuButton({ children, onClick, primary = false, testid }) {
   return (
     <button
       onClick={onClick}
+      data-testid={testid}
       className={`w-full rounded-md py-1.5 text-sm ${
         primary
           ? 'bg-zinc-100 font-medium text-zinc-900 hover:bg-white'

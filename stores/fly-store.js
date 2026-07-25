@@ -53,6 +53,11 @@ const initialState = {
   controlsHelpSeen: false,
   // The Atlas fast-travel screen (input is neutralized while open)
   atlasOpen: false,
+  // Round 16: the pilot Logbook — the passport's spots/badges/stats finally
+  // have a surface. Full-screen overlay, same neutralize/hide treatment as the
+  // Atlas. NOT persisted: which screen is open is session state, and reset()
+  // must close it when Fly Mode unmounts.
+  logbookOpen: false,
   // Last atlas-warp arrival { name, kind, at } — drives the arrival banner
   arrival: null,
 
@@ -102,6 +107,10 @@ export const useFlyStore = create(
 
     toggleSound: () => set((state) => ({ soundOn: !state.soundOn })),
 
+    // Round 16: explicit setter so lib/fly/fly-settings.js can restore the
+    // persisted value at boot without having to guess a toggle parity.
+    setSoundOn: (soundOn) => set({ soundOn }),
+
     // Round 7: 'night' retired — stale callers (old harnesses, saved links)
     // deterministically land on Neon instead of exercising ?? fallbacks.
     setMapStyle: (mapStyle) => set({ mapStyle: mapStyle === 'night' ? 'toy' : mapStyle }),
@@ -114,6 +123,8 @@ export const useFlyStore = create(
     closeCredits: () => set({ creditsOpen: false }),
 
     setAtlasOpen: (atlasOpen) => set({ atlasOpen }),
+
+    setLogbookOpen: (logbookOpen) => set({ logbookOpen }),
 
     setArrival: (arrival) => set({ arrival }),
 

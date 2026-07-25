@@ -12,8 +12,9 @@ import {
   MeshLambertMaterial,
   Object3D,
 } from 'three';
-import { CLOUDS, TOY_WORLD, WORLD_EDGE } from '@/lib/fly/fly-constants';
+import { CLOUDS, TOY_WORLD, WEATHER, WORLD_EDGE } from '@/lib/fly/fly-constants';
 import { expApproach } from '@/lib/fly/coords';
+import { puffPresence } from '@/lib/fly/weather-model';
 import { applyBend, bendDrop, getBend, getEdgeFade } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
 
@@ -44,6 +45,7 @@ function wrap(v, half, cell) {
 }
 
 const _geo = { x: 0, y: 0, z: 0 };
+const _cloudDrift = [0, 0]; // dev stat scratch (no per-frame allocation)
 
 /**
  * An endless cumulus field: puffs live at fixed ABSOLUTE positions inside a
@@ -60,6 +62,14 @@ const _geo = { x: 0, y: 0, z: 0 };
  * and clamps its base CLOUDS.clearanceM above it — hills can't punch
  * through cloud bases anymore (the toy ground is drawn at elev × 1.7 +
  * lift, which used to clear the old fixed 900m band easily).
+ *
+ * Round 16 — WEATHER-AWARE (satellite only, `runtime.weather` from
+ * use-fly-weather). Real cloud cover thins the deck per puff by a stable
+ * hashed rank, overcast greys and thickens it on the existing ~10s tint
+ * cadence, and the drift is now an integrated WIND vector instead of a
+ * constant rate × elapsed product. Every one of those paths is the exact
+ * identity with no weather — same puff positions, same scales, same opacity,
+ * same draw count as R15 — which is what keeps the whole harness fleet green.
  */
 export function CloudField({ runtime, flight, origin }) {
   const qualityTier = useFlyStore((s) => s.qualityTier);
@@ -108,6 +118,11 @@ export function CloudField({ runtime, flight, origin }) {
         u: hash(i * 3 + 3), // altitude fraction within the style band
         size: 900 + hash(i * 5 + 4) * 1900,
         seed: i,
+        // Round 16: a STABLE coverage rank in [0,1). Real cover thins the
+        // deck by keeping the puffs whose rank falls under the coverage
+        // fraction — deterministic (same hash family), so a 5% "clear" sky
+        // always keeps the SAME three puffs and harness layouts stay stable.
+        rank: hash(i * 11 + 707),
       };
     });
   }, []);
@@ -129,6 +144,7 @@ export function CloudField({ runtime, flight, origin }) {
     const bright = new Color(cfg.bright);
     const warm = new Color(cfg.warm);
     const dim = new Color(cfg.dim);
+    const grey = new Color(WEATHER.overcast.cloudGrey);
     const c = new Color();
     const apply = () => {
       const frac = runtime.sun?.frac ?? 1;
@@ -137,17 +153,30 @@ export function CloudField({ runtime, flight, origin }) {
       } else {
         c.lerpColors(dim, warm, frac / cfg.warmBand);
       }
+      // Round 16: real weather rides this SAME cadence (no new timer, no new
+      // React state) — an overcast sky greys the deck and thickens it. Both
+      // terms are EXACT no-ops at baseline: overcastT 0 → lerp(…, 0) leaves
+      // every channel untouched, opacityMul 1 → style.opacity unchanged, so a
+      // no-weather session renders the certified R15 deck bit-for-bit.
+      const wx = runtime.weather?.wx;
+      const greyT = wx ? wx.overcastT * WEATHER.overcast.tintK : 0;
+      if (greyT > 0) c.lerp(grey, greyT);
       const next = '#' + c.getHexString();
+      const opacity = wx ? style.opacity * wx.opacityMul : style.opacity;
       if (process.env.NODE_ENV === 'development' && window.__flyStats) {
         window.__flyStats.cloudTint = next; // harness probe (verify-round11)
+        window.__flyStats.cloudOpacity = opacity;
       }
-      // functional set + bail: identical tint (steady noon) re-renders nothing
-      setSunTint((prev) => (prev?.color === next ? prev : { color: next, frac }));
+      // functional set + bail: an unchanged deck (steady noon, steady weather —
+      // i.e. an unchanged runtime.weather epoch) re-renders nothing.
+      setSunTint((prev) =>
+        prev?.color === next && prev?.opacity === opacity ? prev : { color: next, frac, opacity }
+      );
     };
     apply();
-    const id = setInterval(apply, 10000);
+    const id = setInterval(apply, WEATHER.smooth.tintMs);
     return () => clearInterval(id);
-  }, [mapStyle, runtime]);
+  }, [mapStyle, runtime, style]);
 
   // Per-puff ground state (parallel to puffs): last sampled drawn-ground Y,
   // smoothed so a DEM tile streaming in can't pop a puff upward.
@@ -159,6 +188,16 @@ export function CloudField({ runtime, flight, origin }) {
   // Round 13 live fix: damped satellite spread factor (see the satEnabled
   // branch below). null = seed at the first frame's target (no boot animation).
   const satFRef = useRef(null);
+  // Round 16 wind INTEGRATOR. The deck used to drift by `driftMps * t` — a
+  // rate × total-elapsed PRODUCT, which teleports the whole field the instant
+  // the rate changes (10 minutes in, a 5 → 8 m/s veer jumps every puff by
+  // 1.8 km). Live wind must be integrated. What is accumulated here is the
+  // DEVIATION from the constant baseline drift, so with no weather the term
+  // stays exactly 0 and the position expression reduces to the certified
+  // `CLOUDS.driftMps * t` bit-for-bit — no drift-history divergence, no
+  // harness exposure. No wrapping: float64 carries a 22 m/s deviation for
+  // centuries, and the toroidal wrap() below already folds it into the cell.
+  const driftRef = useRef({ x: 0, z: 0 });
 
   const groupRefs = useRef([]);
 
@@ -259,6 +298,25 @@ export function CloudField({ runtime, flight, origin }) {
       shadows.mesh.setMatrixAt(i, shadows.dummy.matrix);
     };
 
+    // --- Round 16: live weather (satellite only; `wx` is null everywhere
+    // else, and every derived value below is then the exact identity) -------
+    const wx = runtime.weather?.wx ?? null;
+    const windX = wx ? wx.windX : CLOUDS.driftMps;
+    const windZ = wx ? wx.windZ : 0;
+    const dev = driftRef.current;
+    // WEATHER.wind.baseMps === CLOUDS.driftMps, so a baseline/no-weather
+    // session adds exactly 0.0 per frame and dev stays exactly 0.
+    dev.x += (windX - CLOUDS.driftMps) * dt;
+    dev.z += windZ * dt;
+    const driftX = CLOUDS.driftMps * t + dev.x;
+    const driftZ = dev.z;
+    // Coverage: puffs whose stable rank falls under presenceFrac survive; the
+    // rest scale out through the feather band. presence 1 ⇒ pi is literally 1.
+    const presence = wx ? wx.presenceFrac : 1;
+    const sizeMul = wx ? wx.sizeMul : 1;
+    const thinning = presence < 1 - 1e-3;
+    const feather = WEATHER.coverage.feather;
+
     // Round-robin healing budget: a couple of sub-ms DEM raycasts per frame
     // cycle the whole field in ~half a second.
     const healFrom = rr.current;
@@ -278,16 +336,22 @@ export function CloudField({ runtime, flight, origin }) {
       const p = puffs[i];
       const gs = ground[i];
       // Nearest toroidal copy of the puff relative to the player (absolute),
-      // then rebased for rendering. Drift is a slow wind along +X. Cluster
-      // centers ride the spread factor; intra-cluster offsets don't (the
-      // clusters spread apart but stay internally tight).
-      const ox = wrap(p.cx * f + p.dx + CLOUDS.driftMps * t - px, half, cell);
-      const oz = wrap(p.cz * f + p.dz - pz, half, cell);
+      // then rebased for rendering. Drift is the integrated wind (baseline =
+      // the constant +X breeze this deck has always had). Cluster centers ride
+      // the spread factor; intra-cluster offsets don't (the clusters spread
+      // apart but stay internally tight).
+      const ox = wrap(p.cx * f + p.dx + driftX - px, half, cell);
+      const oz = wrap(p.cz * f + p.dz + driftZ - pz, half, cell);
       const dist = Math.hypot(ox, oz);
       // Distance dissolve: shrink puffs away BEFORE the bent terrain rim
       // can depth-slice them (drei re-reads our matrixWorld scale per frame)
-      const s =
+      const s0 =
         1 - Math.min(1, Math.max(0, (dist - fadeStartM) / (fadeEndM - fadeStartM)));
+      // Coverage folds into the SAME dissolve scale (and therefore the same
+      // early-out and the same shadow), so a thinned deck costs no extra work
+      // and drops its shadow in lockstep. pi === 1 with no weather ⇒ s === s0.
+      const pi = thinning ? puffPresence(p.rank, presence, feather) : 1;
+      const s = s0 * pi;
       if (s <= 0.02) {
         g.visible = false;
         hideShadow(i);
@@ -326,7 +390,7 @@ export function CloudField({ runtime, flight, origin }) {
       g.visible = true;
       // fScale: spread puffs grow with f^sizeExp so the deck reads from
       // altitude instead of shrinking to specks over the wider cell.
-      g.scale.setScalar(s * fScale);
+      g.scale.setScalar(s * fScale * sizeMul);
       // Cloud billboards can't ride the vertex bend patch — drop them
       // CPU-side so nearby puffs still track the mini-planet curvature.
       const drop = bendDrop(dist, k);
@@ -339,7 +403,7 @@ export function CloudField({ runtime, flight, origin }) {
       // material rides the bend vertex patch — no CPU drop here)
       if (wantShadows) {
         shadows.dummy.position.set(ox + px - ax, gs.y + CLOUDS.shadow.liftM, oz + pz - az);
-        shadows.dummy.scale.setScalar(p.size * CLOUDS.shadow.scale * s);
+        shadows.dummy.scale.setScalar(p.size * CLOUDS.shadow.scale * s * sizeMul);
         shadows.dummy.updateMatrix();
         shadows.mesh.setMatrixAt(i, shadows.dummy.matrix);
       }
@@ -351,6 +415,10 @@ export function CloudField({ runtime, flight, origin }) {
       window.__flyStats.cloudMinAgl = minAgl === Infinity ? null : Math.round(minAgl);
       window.__flyStats.cloudSpreadF = f; // round 12 (verify-neon-alt)
       window.__flyStats.cloudsBelowEye = belowEye;
+      // Round 16: the wind integrator's absolute drift (baseline = [5t, 0]).
+      _cloudDrift[0] = driftX;
+      _cloudDrift[1] = driftZ;
+      window.__flyStats.cloudDrift = _cloudDrift;
     }
   });
 
@@ -393,7 +461,7 @@ export function CloudField({ runtime, flight, origin }) {
             segments={CLOUDS.segments}
             bounds={[p.size, p.size * boundsYFrac, p.size]}
             volume={p.size * 1.15}
-            opacity={style.opacity}
+            opacity={sunTint?.opacity ?? style.opacity}
             fade={CLOUDS.fade}
             speed={0.06}
             color={sunTint?.color ?? style.color}
