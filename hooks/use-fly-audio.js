@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { FlyAudio } from '@/lib/fly/audio-engine';
 import { AUDIO } from '@/lib/fly/fly-constants';
+import { resolveAircraft } from '@/lib/fly/player-aircraft';
 import { useFlyStore } from '@/stores/fly-store';
 
 /**
@@ -10,6 +11,11 @@ import { useFlyStore } from '@/stores/fly-store';
  * user gesture, chases the continuous wind/engine bed from runtime.flight,
  * and fires one-shots on store transitions (lock acquired, warp). The
  * instance is also published on runtime.audio for ad-hoc UI clicks.
+ *
+ * Round 17: the aircraft's voice is installed on mount and on every hangar
+ * pick — a DISCRETE store subscription, exactly like the sound toggle beside
+ * it. The fighter's profile is the identity profile, so the default session
+ * runs the round-16 DSP graph unchanged.
  */
 export function useFlyAudio(runtime) {
   const audioRef = useRef(null);
@@ -19,6 +25,11 @@ export function useFlyAudio(runtime) {
     audioRef.current = audio;
     runtime.audio = audio;
     audio.setMuted(!useFlyStore.getState().soundOn);
+    const applyAircraft = (id) => {
+      const ac = resolveAircraft(id);
+      audio.setProfile(ac.audio, ac.cfg.speeds);
+    };
+    applyAircraft(useFlyStore.getState().aircraftId);
 
     const gesture = () => audio.resume();
     window.addEventListener('pointerdown', gesture);
@@ -36,6 +47,7 @@ export function useFlyAudio(runtime) {
         (s) => s.soundOn,
         (soundOn) => audio.setMuted(!soundOn)
       ),
+      useFlyStore.subscribe((s) => s.aircraftId, applyAircraft),
       useFlyStore.subscribe(
         (s) => s.lockedHex,
         (hex, prev) => {
