@@ -232,7 +232,7 @@ function Throttle({ runtime, preset, boost }) {
               e.stopPropagation();
               runtime.input?.setSpeedPreset(t.key);
             }}
-            className="flex items-center justify-center py-3 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors"
+            className="flex min-h-11 items-center justify-center py-3 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors"
             style={{
               color: on ? '#04060f' : 'rgba(203,213,225,0.75)',
               background: on ? t.tint : 'transparent',
@@ -481,7 +481,13 @@ export function TouchControls({ runtime }) {
       </Zone>
 
       <Zone name="controls-right" className={`flex flex-col items-end ${stackGap}`}>
-        {contextual.length > 0 && (
+        {/* Integration (Fable): in LANDSCAPE the contextual row rides IN the
+            persistent row instead of stacking above it — a stacked row pushed
+            the column top to ~y42 on a 390px-tall screen, straight into the
+            minimap's band (caught by verify-mobile-layout's zone-overlap
+            gate). Inline, the column top stays ~150px and the minimap ends
+            ~146px. Portrait keeps the stacked row. */}
+        {!land && contextual.length > 0 && (
           <div className={`flex ${rowGap}`} data-testid="touch-contextual">
             {contextual.map((c) => (
               <ActionButton
@@ -499,6 +505,22 @@ export function TouchControls({ runtime }) {
         )}
 
         <div className={`flex ${rowGap}`}>
+          {land && contextual.length > 0 && (
+            <div className={`flex ${rowGap}`} data-testid="touch-contextual">
+              {contextual.map((c) => (
+                <ActionButton
+                  key={c.id}
+                  testid={c.testid}
+                  label={c.label}
+                  active={actives[c.id]}
+                  size={contextualPx}
+                  onTap={TAP[c.id]}
+                >
+                  <Glyph id={c.id} size={18} />
+                </ActionButton>
+              ))}
+            </div>
+          )}
           {PERSISTENT.map((c) => (
             <ActionButton
               key={c.id}

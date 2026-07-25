@@ -457,12 +457,15 @@ export function Contracts({ runtime }) {
     };
   }, [runtime]);
 
-  // Landscape phone: 390px of HEIGHT, and the objective list is the tallest
-  // thing on the left edge. It collapses to a tap-to-expand chip so the strip,
-  // the stick and the world are all still visible; portrait and desktop are
-  // untouched. `expanded` lives here (not the store) because it is pure view
-  // state that should reset when the panel unmounts.
-  const collapsed = landscapePhone && !expanded;
+  // Phone (both orientations, integration recompute — Fable): the objective
+  // list is the tallest persistent thing on the left edge. Landscape got the
+  // tap-to-expand chip first (390px of HEIGHT); portrait joined it when the
+  // daily rows + wrapped labels pushed the full panel's bottom (measured 478px
+  // on 390x844) through the info chip's dock band — and a collapsed chip is
+  // also simply the right answer to "crammed" on a 390px-wide screen. Desktop
+  // is untouched. `expanded` lives here (not the store) because it is pure
+  // view state that should reset when the panel unmounts.
+  const collapsed = isPhone && !expanded;
 
   return (
     <Zone
@@ -493,17 +496,27 @@ export function Contracts({ runtime }) {
           className={`hud-flat-phone rounded-xl border px-3 py-2.5 backdrop-blur-sm max-sm:px-2 max-sm:py-2 ${
             landscapePhone
               ? 'pointer-events-auto relative w-[13.5rem] overflow-y-auto pr-9'
-              : ''
+              : isPhone
+                ? 'pointer-events-auto relative overflow-y-auto pr-9'
+                : ''
           }`}
           style={{
             background: 'rgba(6, 9, 18, 0.62)',
             borderColor: 'rgba(148, 163, 184, 0.16)',
             // The expanded panel must not out-grow a 390px-tall viewport: it
             // opens under the strip and stops short of the throttle rail.
-            maxHeight: landscapePhone ? 'calc(100svh - 7rem)' : undefined,
+            // Portrait phone (integration, Fable): the daily rows + wrapped
+            // labels push the panel bottom past the info chip's dock band
+            // (~404px on 390x844) — cap and scroll; verify-mobile-layout's
+            // zone-overlap gate measured the collision.
+            maxHeight: landscapePhone
+              ? 'calc(100svh - 7rem)'
+              : isPhone
+                ? '16rem'
+                : undefined,
           }}
         >
-        {landscapePhone && (
+        {isPhone && (
           <button
             type="button"
             onClick={() => setExpanded(false)}
