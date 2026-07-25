@@ -43,6 +43,7 @@ import { FlightModel } from '@/lib/fly/flight-model';
 import { InputController } from '@/lib/fly/input-controller';
 import { ChaseCamera } from '@/lib/fly/chase-camera';
 import { CinemaCamera } from '@/lib/fly/cinema-camera';
+import { PhotoCamera } from '@/lib/fly/photo-camera';
 import { TrafficEngine, mercatorWorldXZ } from '@/lib/fly/traffic-engine';
 import { registerRuntimeActions, clearRuntimeActions } from '@/lib/fly/runtime-bus';
 import { Targeting } from '@/lib/fly/targeting';
@@ -229,6 +230,7 @@ export function FlyScene({ runtime }) {
   const input = useMemo(() => new InputController(), []);
   const chase = useMemo(() => new ChaseCamera(), []);
   const cinema = useMemo(() => new CinemaCamera(), []);
+  const photo = useMemo(() => new PhotoCamera(), []); // round 17: photo mode
   const traffic = useMemo(() => new TrafficEngine(), []);
   const targeting = useMemo(() => new Targeting(), []);
   const autopilot = useMemo(() => new Autopilot(), []);
@@ -265,6 +267,7 @@ export function FlyScene({ runtime }) {
     runtime.autopilot = autopilot;
     runtime.camera = camera;
     runtime.chaseRig = chase; // round 7: harnesses read _look/_freeAmt
+    runtime.photoRig = photo; // round 17: verify-photo reads _look/_dist
     // Grounded-aircraft pin: quality-gated (a coarse fallback DEM tile
     // "answers" with plateau garbage — planes got pinned mid-air forever),
     // and in toy style pinned to the DRAWN ground (exaggerated + lifted),
@@ -458,13 +461,14 @@ export function FlyScene({ runtime }) {
       runtime.autopilot = null;
       runtime.camera = null;
       runtime.chaseRig = null;
+      runtime.photoRig = null;
       runtime.warpTo = null;
       runtime.warpToGeo = null;
       runtime.interceptHex = null;
       traffic.dispose();
       engine.dispose();
     };
-  }, [runtime, engine, flight, input, origin, traffic, targeting, autopilot, camera, chase, rebase]);
+  }, [runtime, engine, flight, input, origin, traffic, targeting, autopilot, camera, chase, photo, rebase]);
 
   useEffect(() => {
     input.attach(gl.domElement);
@@ -709,7 +713,13 @@ export function FlyScene({ runtime }) {
     const paused = flyState.phase === 'paused';
     // Inspect modal / Atlas count as a soft pause for the stick: the world
     // (and your plane) keep flying, but the cursor belongs to the overlay.
-    if (paused || flyState.inspectHex || flyState.atlasOpen || flyState.logbookOpen) input.neutralize();
+    // Round 17: photo mode joins them — the plane keeps flying (the instructor
+    // auto-levels the neutralized stick) while the mouse composes a shot.
+    // setPhotoLook also tells neutralize() to spare the orbit drag + P key.
+    const photoMode = flyState.cameraMode === 'photo';
+    input.setPhotoLook(photoMode);
+    if (paused || photoMode || flyState.inspectHex || flyState.atlasOpen || flyState.logbookOpen)
+      input.neutralize();
     const cmd = input.read();
 
     // Terrain raycasts are ~fractions of a ms but not free — sample the
@@ -773,6 +783,15 @@ export function FlyScene({ runtime }) {
       store.setCameraMode(mode);
       (mode === 'cinema' ? cinema : chase).snap();
     }
+    // P toggles PHOTO mode (round 17). No `!paused` guard is needed — while
+    // paused, neutralize() above has already eaten the press (exactly like
+    // F/T/M/C); while photo mode is ON, setPhotoLook spares the press so P is
+    // always the way back out.
+    if (input.consumePress('p')) {
+      const mode = store.cameraMode === 'photo' ? 'chase' : 'photo';
+      store.setCameraMode(mode);
+      (mode === 'photo' ? photo : chase).snap();
+    }
     // Auto-revert when the chase ends (lock lost / disengaged / hard stick)
     if (flyState.cameraMode === 'cinema' && (autopilot.mode === 'off' || !targeting.target)) {
       store.setCameraMode('chase');
@@ -814,7 +833,16 @@ export function FlyScene({ runtime }) {
     // Camera rigs think in absolute coordinates; the camera renders rebased.
     camera.position.x += origin.anchor.x;
     camera.position.z += origin.anchor.z;
-    if (flyState.cameraMode === 'cinema' && targeting.target) {
+    if (photoMode) {
+      // Round 17: free orbit around the plane, persistent pose, wheel zoom.
+      photo.update(dt, flight, camera, input, mercatorScale(flight.latDeg));
+    } else if (photo.handoff()) {
+      // Left photo mode by ANY path (P / Esc / the pill / a warp) — hard-cut
+      // the chase rig, whose damped world position is stale by exactly the
+      // distance flown while composing.
+      chase.snap();
+      chase.update(dt, flight, camera, cmd.freeLook, mercatorScale(flight.latDeg));
+    } else if (flyState.cameraMode === 'cinema' && targeting.target) {
       cinema.update(
         dt,
         flight,

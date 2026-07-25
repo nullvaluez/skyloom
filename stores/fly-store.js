@@ -44,8 +44,11 @@ const initialState = {
   // 'local' (target warp / short hop) or 'far' (cross-region atlas warp) —
   // far warps get the held streak→hold→reveal arrival treatment (round 6)
   warpKind: 'local',
-  // 'chase' | 'cinema' — cinema is the wing view while intercept/formation
-  // is flying (C toggles; FlyScene auto-reverts on lock loss)
+  // 'chase' | 'cinema' | 'photo' — cinema is the wing view while intercept/
+  // formation is flying (C toggles; FlyScene auto-reverts on lock loss).
+  // Round 17: 'photo' is the free compose orbit (P toggles; the plane keeps
+  // flying with a neutralized stick — it is NOT phase:'paused'). The cinema
+  // auto-revert is scoped to 'cinema' on purpose and cannot eat 'photo'.
   cameraMode: 'chase',
 
   // Overlays

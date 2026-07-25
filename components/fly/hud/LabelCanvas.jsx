@@ -168,6 +168,9 @@ export function LabelCanvas({ runtime }) {
     const onDown = (e) => {
       const store = useFlyStore.getState();
       if (store.phase !== 'flying' || store.inspectHex || store.atlasOpen) return;
+      // Round 17: photo mode hides this canvas (display:none) but the window
+      // listener lives on — a compose drag must never open the inspect card.
+      if (store.cameraMode === 'photo') return;
       // Touch has no persistent hover — hit-test the tap point directly against
       // this frame's projected planes (a fat-finger radius, since there's no
       // aim), and never let the steering stick eat the tap (input ignores
