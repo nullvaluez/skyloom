@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { WARP } from '@/lib/fly/fly-constants';
+import { MOBILE_UI, WARP } from '@/lib/fly/fly-constants';
+import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { useFlyStore } from '@/stores/fly-store';
 
 /**
@@ -19,6 +20,8 @@ import { useFlyStore } from '@/stores/fly-store';
  */
 export function WarpFlash({ runtime }) {
   const warpEpoch = useFlyStore((s) => s.warpEpoch);
+  // Round 17: layout/particle budget only — no stage or timing logic reads it.
+  const { isPhone: phone } = useDeviceLayout();
   const [stage, setStage] = useState(null); // 'flash' | 'streak' | 'hold' | 'reveal'
   const runtimeRef = useRef(runtime);
   runtimeRef.current = runtime;
@@ -88,11 +91,11 @@ export function WarpFlash({ runtime }) {
           }}
         />
         <div
-          className="absolute left-1/2 top-1/2 h-64 w-64 rounded-full border-2 border-white/80"
+          className="absolute left-1/2 top-1/2 h-64 w-64 rounded-full border-2 border-white/80 phone:h-[min(16rem,60vw)] phone:w-[min(16rem,60vw)]"
           style={{ animation: `fly-warp-ring ${WARP.flashMs}ms cubic-bezier(0.16, 1, 0.3, 1) forwards` }}
         />
         <div
-          className="absolute left-1/2 top-1/2 font-mono text-3xl font-bold uppercase text-white"
+          className="fly-display-lg absolute left-1/2 top-1/2 max-w-[92vw] font-mono font-bold uppercase text-white"
           style={{ animation: `fly-warp-text ${WARP.flashMs}ms ease-out forwards` }}
         >
           Warp
@@ -128,7 +131,7 @@ export function WarpFlash({ runtime }) {
         }
       `}</style>
       {/* streak tunnel: a handful of radial lines racing outward */}
-      {[...Array(9)].map((_, i) => (
+      {[...Array(phone ? MOBILE_UI.boot.phoneStreaks : 9)].map((_, i) => (
         <div
           // eslint-disable-next-line react/no-array-index-key
           key={i}
@@ -141,10 +144,10 @@ export function WarpFlash({ runtime }) {
         />
       ))}
       <div
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center"
+        className="absolute left-1/2 top-1/2 w-[92vw] -translate-x-1/2 -translate-y-1/2 text-center"
         style={{ fontFamily: "'Archivo Black', ui-sans-serif" }}
       >
-        <div className="text-4xl uppercase tracking-[0.3em] text-white">
+        <div className="fly-display-xl max-w-[92vw] break-words uppercase text-white" style={{ letterSpacing: phone ? '0.08em' : '0.3em' }}>
           {arrival?.name ?? 'warping'}
         </div>
         <div

@@ -5,6 +5,7 @@ import { MINIMAP } from '@/lib/fly/fly-constants';
 import { mercatorScale } from '@/lib/fly/coords';
 import { buildPoiList } from '@/lib/fly/poi-data';
 import { useFlyStore } from '@/stores/fly-store';
+import { Zone } from '../LayoutRoot';
 
 // Military bases as small hollow triangles on the dial (Atlas round §4.2):
 // the in-world letters stay clean white, so the minimap carries the kind.
@@ -146,9 +147,14 @@ export function Minimap({ runtime }) {
   // belong to the joystick + throttle, so the dial moves to the top-right
   // (below the compact stats strip) and shrinks — the fixed-resolution canvas
   // just scales, staying crisp.
+  // Round 17: the offsets moved to MOBILE_UI.zones.minimap (identical values);
+  // what stays here is the TRANSFORM, which belongs to the dial itself.
+  // Landscape phone: 390px of height, so the dial shrinks further and tucks
+  // under the compressed strip on the right, opposite the contracts chip.
   return (
-    <div
-      className="pointer-events-none absolute bottom-10 right-4 z-10 origin-bottom-right max-sm:bottom-auto max-sm:right-2 max-sm:top-[calc(env(safe-area-inset-top)+3.25rem)] max-sm:origin-top-right max-sm:scale-[0.62]"
+    <Zone
+      name="minimap"
+      className="origin-bottom-right max-sm:origin-top-right max-sm:scale-[0.62] phone-land:origin-top-right phone-land:scale-50"
     >
       <canvas
         ref={canvasRef}
@@ -159,6 +165,6 @@ export function Minimap({ runtime }) {
         role="button"
         aria-label="Open the Atlas"
       />
-    </div>
+    </Zone>
   );
 }

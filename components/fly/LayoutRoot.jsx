@@ -54,7 +54,16 @@ export const ZONE_NAMES = Object.keys(MOBILE_UI.zones);
  * components/fly/hud/TouchControls.jsx (round 17 agent A5). LayoutRoot must
  * not shadow them.
  */
-const OWNED = new Set(['controls-left', 'controls-right']);
+const OWNED = new Set([
+  'toasts', //          components/fly/hud/SpotToast.jsx
+  'contracts', //       components/fly/hud/Contracts.jsx
+  'minimap', //         components/fly/hud/Minimap.jsx
+  'info-dock', //       components/fly/hud/InfoCard.jsx
+  'attribution', //     components/fly/hud/AttributionBar.jsx
+  'exit', //            components/fly/FlyMode.jsx (desktop quick-exit X)
+  'controls-left', //   components/fly/hud/TouchControls.jsx (round 17 agent A5)
+  'controls-right', //  components/fly/hud/TouchControls.jsx (round 17 agent A5)
+]);
 
 /**
  * Compose a zone's class list: desktop offsets first, then the additive phone
@@ -108,15 +117,33 @@ export function Zone({ name, className = '', style, children, ...rest }) {
 }
 
 /**
- * The scaffold. Mounts every zone that no component has claimed yet.
+ * The scaffold. Mounts every zone that no component has claimed yet (as of
+ * the round-17 migration: none — every zone has an owner) and publishes the
+ * zone vocabulary for the layout harness.
+ *
+ * WHY IT STILL MOUNTS WITH NOTHING TO RENDER. Most zone owners are
+ * CONDITIONAL — the InfoCard exists only while a contact is locked, the
+ * toasts zone only while a toast is up, the exit zone only off touch. So
+ * `window.__flyZones` is legitimately sparse at rest, and a harness reading it
+ * cannot tell "this zone is missing because nothing is in it" from "this zone
+ * is missing because I typo'd its name". `__flyZoneNames` is the full
+ * vocabulary, always present, so the harness can enumerate first and then
+ * measure whatever is live.
  *
  * Placed EARLY in FlyMode's tree, directly after the canvas: every zone member
  * is z-10, every full-screen overlay that must cover them is z-20 or higher,
- * so the z-index decides and the DOM position only has to be somewhere the
- * z-10 group agrees on. (It is also where the zones' content will end up, so
- * the tree reads in paint order.)
+ * so the z-index decides and DOM position only has to be somewhere the z-10
+ * group agrees on.
  */
 export function LayoutRoot() {
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development' || typeof window === 'undefined') return;
+    window.__flyZoneNames = ZONE_NAMES;
+    return () => {
+      delete window.__flyZoneNames;
+    };
+  }, []);
+
   return (
     <>
       {ZONE_NAMES.filter((n) => !OWNED.has(n)).map((n) => (

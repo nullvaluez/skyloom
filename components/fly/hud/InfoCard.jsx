@@ -5,9 +5,11 @@ import { X } from 'lucide-react';
 import { useFlyStore } from '@/stores/fly-store';
 import { useRoute } from '@/hooks/use-route';
 import { useAircraftPhoto } from '@/hooks/use-aircraft-photo';
-import { TARGETING } from '@/lib/fly/fly-constants';
+import { MOBILE_UI, TARGETING } from '@/lib/fly/fly-constants';
 import { M_TO_FT, MPS_TO_KT, RAD2DEG } from '@/lib/fly/coords';
 import { formatSquawk } from '@/lib/format';
+import { Zone } from '../LayoutRoot';
+import { useDeviceLayout } from '@/hooks/use-device-layout';
 
 /**
  * Soft-lock info card: auto-shows when the locked target is inside
@@ -60,6 +62,7 @@ export function InfoCard({ runtime }) {
 function InfoCardBody({ hex, runtime, onDismiss }) {
   const track = runtime.traffic?.tracks.get(hex);
   const meta = track?.meta;
+  const { isPhone } = useDeviceLayout();
 
   // Live-ish numbers at 2Hz without re-rendering per frame
   const [live, setLive] = useState(null);
@@ -111,8 +114,61 @@ function InfoCardBody({ hex, runtime, onDismiss }) {
   if (!meta) return null;
   const title = meta.flight || meta.r || hex.toUpperCase();
 
+  // ---- PHONE: a chip, not a card -----------------------------------------
+  // The desktop card is 288px wide and ~200px tall with a photo. On a 390px
+  // phone that is most of the screen, and its `bottom-10 left-4` corner is
+  // exactly where the thumbstick lives — it covered the stick and swallowed
+  // the steering touch (the round-17 complaint, verbatim). The chip carries
+  // the same identity at 48px tall, docks ABOVE the stick by construction
+  // (MOBILE_UI.infoChip.dockBottomRem is derived from the stick anchor), and
+  // opens the full inspect sheet on tap, which is where all this detail
+  // already lives on a phone.
+  if (isPhone) {
+    return (
+      <Zone name="info-dock">
+        <div
+          className="hud-glass pointer-events-auto flex items-center gap-2 overflow-hidden rounded-xl border border-zinc-700/60 text-zinc-100 shadow-xl"
+          style={{ height: `${MOBILE_UI.infoChip.heightRem}rem` }}
+          data-testid="infocard-chip"
+        >
+          <button
+            type="button"
+            onClick={() => useFlyStore.getState().setInspectHex(hex)}
+            className="flex h-full min-w-0 flex-1 items-center gap-2 px-3 text-left"
+            aria-label={`Inspect ${title}`}
+            data-testid="infocard-chip-open"
+          >
+            <span className="shrink-0 text-[13px] leading-none text-cyan-200/90">✈</span>
+            <span className="shrink-0 font-mono text-[13px] font-semibold tracking-wide">
+              {title}
+            </span>
+            {live && (
+              <span className="shrink-0 font-mono text-[11px] text-zinc-400">
+                {live.distNm}nm
+              </span>
+            )}
+            {meta.t && (
+              <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-zinc-500">
+                {meta.t}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={onDismiss}
+            aria-label="Dismiss info card"
+            className="grid h-full shrink-0 place-items-center text-zinc-400"
+            style={{ width: MOBILE_UI.minTargetPx }}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </Zone>
+    );
+  }
+
   return (
-    <div className="pointer-events-auto absolute bottom-10 left-4 z-10 w-72 overflow-hidden rounded-lg border border-zinc-700/60 bg-zinc-900/80 text-zinc-100 shadow-xl backdrop-blur">
+    <Zone name="info-dock" className="w-72">
+      <div className="pointer-events-auto overflow-hidden rounded-lg border border-zinc-700/60 bg-zinc-900/80 text-zinc-100 shadow-xl backdrop-blur">
       {photoSrc && (
         // Round 15: the photographer credit + link back is a planespotters
         // REQUIREMENT wherever the photo is shown. This card was rendering a
@@ -188,6 +244,7 @@ function InfoCardBody({ hex, runtime, onDismiss }) {
           <div className="text-[10px] text-zinc-500">Squawk {formatSquawk(meta.squawk)}</div>
         )}
       </div>
-    </div>
+      </div>
+    </Zone>
   );
 }

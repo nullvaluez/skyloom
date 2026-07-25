@@ -97,7 +97,7 @@ function HangarBody() {
         initial={isSheet ? { y: 40, opacity: 0.5 } : { scale: 0.985, opacity: 0.4 }}
         animate={isSheet ? { y: 0, opacity: 1 } : { scale: 1, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 320, damping: 30 }}
-        className={`pointer-events-auto flex flex-col border shadow-2xl backdrop-blur-md ${
+        className={`hud-flat-phone pointer-events-auto flex flex-col border shadow-2xl backdrop-blur-md ${
           isSheet ? 'px-3 pb-2 pt-2' : 'rounded-xl p-4'
         }`}
         style={{
