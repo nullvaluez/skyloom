@@ -176,7 +176,7 @@ export function FlyHUD({ runtime }) {
         </div>
       ) : (
         <div className="pointer-events-none absolute bottom-8 left-1/2 z-10 -translate-x-1/2 rounded bg-zinc-950/50 px-3 py-1 text-[11px] text-zinc-400">
-          Steer with the mouse · WASD/arrows · 1/2/3 speed · Shift boost · RMB look · click a plane (or T on a lock) to inspect &amp; warp · F intercept · Esc menu
+          Steer with the mouse · WASD/arrows · 1/2/3 speed · Shift boost · RMB look · click a plane (or T on a lock) to inspect &amp; warp · F intercept · P photo · Esc menu
           <span
             data-testid="hud-quality-tier"
             className="ml-2 font-mono text-[10px] uppercase tracking-widest text-zinc-500"
