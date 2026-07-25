@@ -85,10 +85,10 @@ export function PhotoModeBar() {
   return (
     <div
       data-testid="photo-bar"
-      className="pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2 select-none max-sm:bottom-[calc(env(safe-area-inset-bottom)+1rem)]"
+      className="pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2 select-none max-sm:bottom-[calc(env(safe-area-inset-bottom)+1rem)] phone:bottom-[calc(env(safe-area-inset-bottom)+1rem)]"
     >
       <div
-        className="pointer-events-auto flex items-center gap-2 rounded-2xl border px-2 py-2 backdrop-blur-sm"
+        className="hud-flat-phone pointer-events-auto flex items-center gap-2 rounded-2xl border px-2 py-2 backdrop-blur-sm"
         style={{
           background: `linear-gradient(180deg, ${CARD_THEME.bgTop}, ${CARD_THEME.bgBottom})`,
           borderColor: CARD_THEME.edge,

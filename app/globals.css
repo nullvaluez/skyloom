@@ -746,13 +746,22 @@
    the slope is chosen so the clamp is already saturated well below any
    desktop viewport - at >= 920px these resolve to exactly text-4xl (2.25rem)
    and text-3xl (1.875rem), so the desktop harness screenshots are unmoved.
-   Below that they shrink instead of overflowing a 375px screen. */
+   Below that they shrink instead of overflowing a 375px screen.
+
+   The line-heights are RATIOS, not the obvious `1.05`, and the ratio is the
+   one the Tailwind class they replace bakes in: text-4xl is 36px/40px = 1.111
+   and text-3xl is 30px/36px = 1.2. A round 1.05 would have been 2px shorter
+   at desktop size, which sounds like nothing until you remember these blocks
+   are centred by `-translate-y-1/2` (the warp stamp) or stack a caption under
+   themselves (the arrival banner and the boot wordmark) - a 2px box change
+   moves the whole composition. Ratios keep desktop exact AND keep the leading
+   proportional once the clamp starts shrinking. */
 .fly-display-xl {
   font-size: clamp(1.5rem, 1.05rem + 2.2vw, 2.25rem); /* -> 2.25rem @ >=873px */
-  line-height: 1.05;
+  line-height: 1.1111111; /* = 40/36, i.e. text-4xl's 2.5rem at full size */
 }
 .fly-display-lg {
   font-size: clamp(1.25rem, 0.9rem + 1.7vw, 1.875rem); /* -> 1.875rem @ >=918px */
-  line-height: 1.05;
+  line-height: 1.2; /* = 36/30, i.e. text-3xl's 2.25rem at full size */
 }
 

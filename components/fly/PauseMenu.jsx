@@ -110,14 +110,17 @@ export function PauseMenu({ onExit }) {
   if (phase !== 'paused' && controlsHelpSeen) return null;
 
   // --- First-entry help card (shown while flying, before any pause) ------
+  // Thirteen control rows do not fit in 390px of landscape-phone height, and
+  // this card is the first thing a new player ever sees. Cap it and let it
+  // scroll rather than running "Got it" off the bottom of the screen.
   if (phase !== 'paused') {
     return (
-      <div className="pointer-events-auto absolute left-1/2 top-1/2 z-20 w-[420px] max-w-[calc(100vw-1.5rem)] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-zinc-700/60 bg-zinc-900/85 p-5 text-zinc-100 shadow-2xl backdrop-blur">
-        <h2 className="text-base font-semibold">Welcome to Fly Mode</h2>
+      <div className="pointer-events-auto absolute left-1/2 top-1/2 z-20 flex max-h-[calc(100svh-2rem)] w-[420px] max-w-[calc(100vw-1.5rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-y-auto overscroll-contain rounded-xl border border-zinc-700/60 bg-zinc-900/85 p-5 text-zinc-100 shadow-2xl backdrop-blur">
+        <h2 className="shrink-0 text-base font-semibold">Welcome to Fly Mode</h2>
         <ControlsTable touch={isTouch} />
         <button
           onClick={markHelpSeen}
-          className="mt-4 w-full rounded-md bg-zinc-100 py-1.5 text-sm font-medium text-zinc-900 hover:bg-white"
+          className="mt-4 w-full shrink-0 rounded-md bg-zinc-100 py-1.5 text-sm font-medium text-zinc-900 hover:bg-white phone:min-h-11"
         >
           Got it — let&apos;s fly
         </button>
@@ -132,11 +135,20 @@ export function PauseMenu({ onExit }) {
   const totalSpots = usePassportStore.getState().stats.totalSpotted ?? 0;
 
   return (
-    <div className="absolute inset-x-0 top-0 bottom-8 z-20 flex items-center justify-center bg-zinc-950/55">
+    // Round 17: the backdrop SCROLLS. The pause card is ~640px tall with the
+    // controls table; a phone in landscape has 390px of viewport, so
+    // `items-center` centred it and clipped both ends — "Exit Fly Mode" was
+    // literally unreachable, with no way to scroll to it. `overflow-y-auto`
+    // plus `my-auto` on the card keeps the desktop centring (a card shorter
+    // than the box still centres) and turns the overflow case into a scroll
+    // instead of a crop. Safe-area padding keeps it clear of the notch and
+    // the gesture bar; `bottom-8` is unchanged so the Esri credit stays
+    // visible underneath, exactly as before.
+    <div className="absolute inset-x-0 top-0 bottom-8 z-20 flex items-start justify-center overflow-y-auto overscroll-contain bg-zinc-950/55 py-[max(env(safe-area-inset-top),0.5rem)] px-[max(env(safe-area-inset-left),0px)]">
       {creditsOpen ? (
         <CreditsPanel onClose={() => store.closeCredits()} />
       ) : (
-        <div className="pointer-events-auto w-72 rounded-xl border border-zinc-700/60 bg-zinc-900/90 p-4 text-zinc-100 shadow-2xl backdrop-blur">
+        <div className="pointer-events-auto my-auto w-72 rounded-xl border border-zinc-700/60 bg-zinc-900/90 p-4 text-zinc-100 shadow-2xl backdrop-blur">
           <h2 className="mb-3 text-center text-sm font-semibold uppercase tracking-widest text-zinc-400">
             Paused
           </h2>
@@ -184,7 +196,7 @@ export function PauseMenu({ onExit }) {
                       store.setQualityTier(tier);
                       saveQualityTier(tier); // a CLICKED tier is a choice — persist it
                     }}
-                    className={`rounded py-1 text-xs capitalize ${
+                    className={`rounded py-1 text-xs capitalize phone:min-h-11 ${
                       qualityTier === tier
                         ? 'bg-zinc-100 font-medium text-zinc-900'
                         : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
@@ -204,7 +216,7 @@ export function PauseMenu({ onExit }) {
                   <button
                     key={key}
                     onClick={() => pickMapStyle(key)}
-                    className={`rounded py-1 text-xs ${
+                    className={`rounded py-1 text-xs phone:min-h-11 ${
                       mapStyle === key
                         ? 'bg-zinc-100 font-medium text-zinc-900'
                         : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
@@ -242,7 +254,11 @@ function MenuButton({ children, onClick, primary = false, testid }) {
     <button
       onClick={onClick}
       data-testid={testid}
-      className={`w-full rounded-md py-1.5 text-sm ${
+      // `phone:min-h-11` is 44px — MOBILE_UI.minTargetPx, the size
+      // verify-mobile-layout gates every visible control against. The desktop
+      // `py-1.5 text-sm` row (30px) is unchanged: a mouse does not need 44px
+      // and the menu would grow 40% taller for nothing.
+      className={`w-full rounded-md py-1.5 text-sm phone:min-h-11 phone:py-2.5 ${
         primary
           ? 'bg-zinc-100 font-medium text-zinc-900 hover:bg-white'
           : 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700'
@@ -269,7 +285,12 @@ function ControlsTable({ compact = false, touch = false }) {
 
 function CreditsPanel({ onClose }) {
   return (
-    <div className="pointer-events-auto max-h-[70vh] w-[440px] overflow-y-auto rounded-xl border border-zinc-700/60 bg-zinc-900/90 p-5 text-zinc-100 shadow-2xl backdrop-blur">
+    // `w-[440px]` was a hard 440 with no cap: on a 390px phone the credits
+    // panel overflowed the viewport by 50px and took the horizontal scrollbar
+    // with it. The clamp resolves to exactly 440 at any width >= 472px, so
+    // desktop is unchanged. `my-auto` matches the pause card so the scrolling
+    // backdrop centres it when it fits.
+    <div className="pointer-events-auto my-auto max-h-[70vh] w-[min(440px,calc(100vw-2rem))] overflow-y-auto overscroll-contain rounded-xl border border-zinc-700/60 bg-zinc-900/90 p-5 text-zinc-100 shadow-2xl backdrop-blur">
       <h2 className="text-base font-semibold">Credits &amp; licenses</h2>
 
       <h3 className="mt-3 text-xs font-semibold uppercase tracking-widest text-zinc-500">
@@ -325,7 +346,7 @@ function CreditsPanel({ onClose }) {
 
       <button
         onClick={onClose}
-        className="mt-4 w-full rounded-md bg-zinc-800 py-1.5 text-sm text-zinc-200 hover:bg-zinc-700"
+        className="mt-4 w-full rounded-md bg-zinc-800 py-1.5 text-sm text-zinc-200 hover:bg-zinc-700 phone:min-h-11"
       >
         Back
       </button>

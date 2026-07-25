@@ -9,6 +9,7 @@ import { useRoute } from '@/hooks/use-route';
 import { useAircraftPhoto } from '@/hooks/use-aircraft-photo';
 import { useAircraftInfo } from '@/hooks/use-aircraft-info';
 import { useSheetLayout } from '@/hooks/use-sheet-layout';
+import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { getRuntimeAction } from '@/lib/fly/runtime-bus';
 import { INSPECT } from '@/lib/fly/fly-constants';
 import { trackSpotAttrs } from '@/lib/fly/spot-attrs';
@@ -96,6 +97,10 @@ export function InspectModal({ runtime }) {
 function ModalBody({ hex, runtime }) {
   const runtimeReady = useFlyStore((s) => s.runtimeReady);
   const isSheet = useSheetLayout();
+  // Round 17: the sheet/dock split needs the orientation too (see the
+  // three-case geometry below). useSheetLayout() is itself a wrapper over
+  // this hook, so both reads come from ONE measurement.
+  const { isPhone, orientation } = useDeviceLayout();
   const track = runtime.traffic?.tracks.get(hex);
   const meta = track?.meta;
   const close = () => useFlyStore.getState().setInspectHex(null);
@@ -294,29 +299,52 @@ function ModalBody({ hex, runtime }) {
   const monogram =
     route?.airline?.iata || route?.airline?.icao || info?.operatorFlagCode || null;
 
-  // ---- Geometry: desktop right dock vs phone bottom sheet -----------------
-  const dockStyle = isSheet
+  // ---- Geometry: desktop dock · phone sheet · landscape-phone dock --------
+  //
+  // Round 17 added the third case. `isSheet` is now `isPhone || width <= 639`,
+  // so a phone in LANDSCAPE finally counts as a phone — but the bottom sheet
+  // is the wrong answer there: 88svh of a 390px-tall viewport is a 343px slab
+  // covering the whole screen, and the card's content is a tall column that
+  // would have ~40px of scroll height. Sideways, a phone has width to spare
+  // and no height, so it gets a DOCK, sized off vw and inset in svh.
+  // A narrow DESKTOP window keeps the bottom sheet exactly as before: this
+  // branch requires isPhone, not just isSheet.
+  const landDock = isPhone && orientation === 'landscape';
+  // The grab handle and the rise-from-below entrance belong to the SHEET
+  // only — a docked panel that sprouts a drag handle reads as broken.
+  const sheetMotion = isSheet && !landDock;
+  const dockStyle = landDock
     ? {
-        left: 0,
-        right: 0,
-        top: 'auto',
-        bottom: 0,
-        maxHeight: `${INSPECT.sheetMaxSvh}svh`,
-        borderRadius: '1.5rem 1.5rem 0 0',
+        right: 'max(env(safe-area-inset-right), 0.5rem)',
+        top: '0.5svh',
+        bottom: '0.5svh',
+        width: 'min(56vw, 420px)',
+        borderRadius: '1.25rem',
       }
-    : {
-        right: '1rem',
-        // Short landscape phones: shrink the inset instead of clipping.
-        top: 'min(4rem, 8svh)',
-        bottom: 'min(4rem, 8svh)',
-        width: `min(${INSPECT.panelW}px, calc(100vw - 1rem))`,
-        borderRadius: '1.5rem',
-      };
+    : isSheet
+      ? {
+          left: 0,
+          right: 0,
+          top: 'auto',
+          bottom: 0,
+          maxHeight: `${INSPECT.sheetMaxSvh}svh`,
+          borderRadius: '1.5rem 1.5rem 0 0',
+        }
+      : {
+          right: '1rem',
+          // Short landscape phones: shrink the inset instead of clipping.
+          top: 'min(4rem, 8svh)',
+          bottom: 'min(4rem, 8svh)',
+          width: `min(${INSPECT.panelW}px, calc(100vw - 1rem))`,
+          borderRadius: '1.5rem',
+        };
 
   return (
     <motion.div
-      initial={isSheet ? { y: 80, opacity: 0.4 } : { x: INSPECT.panelW + 60, opacity: 0.4 }}
-      animate={isSheet ? { y: 0, opacity: 1 } : { x: 0, opacity: 1 }}
+      // A sheet rises; a dock slides in from the edge it docks to. The
+      // landscape-phone panel is a dock, so it takes the desktop entrance.
+      initial={sheetMotion ? { y: 80, opacity: 0.4 } : { x: INSPECT.panelW + 60, opacity: 0.4 }}
+      animate={sheetMotion ? { y: 0, opacity: 1 } : { x: 0, opacity: 1 }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
       style={{
         ...dockStyle,
@@ -325,7 +353,7 @@ function ModalBody({ hex, runtime }) {
         borderColor: CARD_THEME.edge,
         boxShadow: `0 24px 80px rgba(2, 4, 10, 0.45), 0 0 44px color-mix(in srgb, var(--hero) 14%, transparent)`,
       }}
-      className="pointer-events-auto absolute z-20 flex flex-col overflow-hidden border backdrop-blur-sm"
+      className="hud-flat-phone pointer-events-auto absolute z-20 flex flex-col overflow-hidden border backdrop-blur-sm"
       data-testid="inspect-card"
     >
       {/* One-shot holo sweep */}
@@ -358,7 +386,7 @@ function ModalBody({ hex, runtime }) {
 
       {/* ---- Sheet grab handle (phone only): the affordance AND a fat,
            thumb-reachable close target at the top of the sheet ---- */}
-      {isSheet && (
+      {sheetMotion && (
         <button
           onClick={close}
           aria-label="Close inspect panel"
