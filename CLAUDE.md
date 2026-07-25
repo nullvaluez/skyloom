@@ -69,6 +69,16 @@
 > `scripts/verify-sat-mobile.js` (7) boots the iPhone viewport with the
 > extension hidden — pre-fix code fails it, current code + verify-mobile
 > are green. A texture TYPE is a device contract, not a quality knob.
+> **Same-day mobile perf floor (FLY_ROUND16.md §10):** the first phone that
+> RENDERED satellite ran it at tier high ("Q High" — the §7 incline lesson
+> live) and flapped high↔medium, rebuilding bloom/building materials each
+> crossing. NEW `lib/fly/device-class.js` `isPhoneClass()` static gate:
+> unpicked phones resolve tier 'medium' pre-mount and `autoTierCeiling()`
+> (fly-settings) caps stepQualityTier UP-steps at the player's saved pick
+> or 'medium' — explicit picks win both ways, declines never capped,
+> desktop byte-identical (probe: phone:false/high/high). verify-sat-mobile
+> grew 7 → 10 gates (tierPolicy resolve, live never-high, seeded explicit
+> pick honored).
 >
 > Earlier: **Round 15 "Ground Truth" is BUILT (2026-07-24):
 > [FLY_ROUND15.md](FLY_ROUND15.md) is the record** (plan

@@ -6,6 +6,7 @@ import { PerformanceMonitor } from '@react-three/drei';
 import { FlyScene } from './FlyScene';
 import { Effects } from './Effects';
 import { CANVAS } from '@/lib/fly/fly-constants';
+import { autoTierCeiling } from '@/lib/fly/fly-settings';
 import { useFlyStore } from '@/stores/fly-store';
 
 function initialDpr() {
@@ -28,11 +29,20 @@ function BootFramePulse({ runtime }) {
   return null;
 }
 
-/** Second rung of the quality ladder after DPR: bloom + cloud density. */
+/** Second rung of the quality ladder after DPR: bloom + cloud density.
+ *  Up-steps are capped at autoTierCeiling() — 'high' on desktop (unchanged),
+ *  and on phone-class devices the player's saved pick or 'medium', so the
+ *  incline can never flap a phone back into the high-tier scene it just
+ *  declined out of (each high↔medium crossing rebuilds bloom + building
+ *  materials — the hitch IS the flap). Declines are never capped. */
 function stepQualityTier(dir) {
   const store = useFlyStore.getState();
   const i = TIERS.indexOf(store.qualityTier);
-  const next = TIERS[Math.min(TIERS.length - 1, Math.max(0, i + dir))];
+  let next = TIERS[Math.min(TIERS.length - 1, Math.max(0, i + dir))];
+  if (dir > 0) {
+    const ceil = TIERS.indexOf(autoTierCeiling());
+    if (ceil >= 0 && TIERS.indexOf(next) > ceil) next = TIERS[ceil];
+  }
   if (next !== store.qualityTier) store.setQualityTier(next);
 }
 

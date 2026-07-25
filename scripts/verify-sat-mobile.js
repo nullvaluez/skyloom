@@ -30,6 +30,18 @@
  *      the HDRI itself is same-origin, which is exactly why this harness can
  *      run egress-blocked).
  *
+ * Post-R16 mobile perf floor (same live session as the FloatType fix — the
+ * first phone that RENDERED satellite then ran it at tier 'high', because
+ * the monitor's incline walks phones to the top and flaps): three more gates.
+ *  (F) with no explicit pick, a phone-class boot RESOLVES tier 'medium'
+ *      (fly-settings publishes the race-free resolution as
+ *      __flyStats.tierPolicy) with auto ceiling 'medium'.
+ *  (G) the LIVE tier never reads 'high' after the settle — the incline
+ *      ceiling holds behaviorally, not just in the resolver.
+ *  (H) second boot, fresh context, localStorage fly-quality-tier='high'
+ *      seeded: the explicit pick wins (resolved high, ceiling high) — the
+ *      floor is a default, never an override of the player.
+ *
  * Run: npm run dev (on :3000) first, then
  *   NODE_PATH=$(npm root -g) node scripts/verify-sat-mobile.js
  * Do NOT run while the user is live-testing (round-7 lesson).
@@ -154,8 +166,40 @@ const SUN_PIN_MS = Date.UTC(2026, 6, 25, 16, 0, 0);
     `mean=${band.mean.toFixed(1)} std=${band.std.toFixed(2)}`
   );
 
+  // (F) phone-class default: unpicked tier resolves 'medium', ceiling 'medium'
+  const pol = await page.evaluate(() => window.__flyStats?.tierPolicy ?? null);
+  gate(
+    'tier-resolves-medium-on-phone',
+    !!pol && pol.phone === true && pol.saved === null && pol.resolved === 'medium' &&
+      pol.ceiling === 'medium',
+    JSON.stringify(pol)
+  );
+
+  // (G) the incline ceiling holds live: 'high' is unreachable without a pick
+  const liveTier = await page.evaluate(() => window.__flyStore?.getState?.().qualityTier);
+  gate('tier-never-high', liveTier !== 'high', `tier=${liveTier}`);
+
   // (E) page errors
   gate('zero-page-errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+  await context.close();
+
+  // (H) explicit pick wins: fresh context, saved 'high', phone-class boot
+  const ctx2 = await browser.newContext(MOBILE_CTX);
+  await ctx2.addInitScript(() => {
+    try {
+      localStorage.setItem('fly-quality-tier', 'high');
+    } catch {}
+  });
+  const page2 = await ctx2.newPage();
+  const boot2 = await bootMobile(page2, { style: 'satellite' });
+  console.log('explicit-pick boot in', boot2, 's');
+  const pol2 = await page2.evaluate(() => window.__flyStats?.tierPolicy ?? null);
+  gate(
+    'explicit-pick-honored',
+    !!pol2 && pol2.saved === 'high' && pol2.resolved === 'high' && pol2.ceiling === 'high',
+    JSON.stringify(pol2)
+  );
+  await ctx2.close();
 
   console.log(fails.length ? `VERIFY: FAIL (${fails.join(', ')})` : 'VERIFY: PASS');
   await browser.close();

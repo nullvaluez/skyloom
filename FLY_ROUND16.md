@@ -313,3 +313,49 @@ post-fix all 7 PASS (mean 111.9, std 47) and verify-mobile stays green.
 texture got sampled, and no harness ran satellite on a phone-class GPU until
 a user's phone did. Capability-gate emulation (hide the extension, assert the
 frame) is cheap and now standing.
+
+## 10. Post-round mobile perf floor (2026-07-25) — same live session
+
+**Symptom:** with satellite actually rendering (§9), the phone "feels heavy
+and a bit lagged". The user's screenshot read **Q High**: the §7-lesson
+mechanism in the wild — PerformanceMonitor's onIncline walks every smooth
+stretch back UP, so a phone lands in the FULL high-tier satellite scene
+(night-window building materials, cloud shadows, 0.5-scale bloom), declines,
+re-inclines, forever. Each high↔medium crossing rebuilds the bloom pass and
+recompiles the building materials — **the hitch IS the flap**. (DPR was
+never the issue: `CANVAS.dprMax` has been 1.5 since R8.)
+
+**Fix — a STATIC source gate (the §7 lesson's prescribed shape), phone-only:**
+
+- NEW `lib/fly/device-class.js` → `isPhoneClass()`: coarse-pointer AND touch
+  (the use-is-touch pair, so touchscreen laptops stay desktop) AND smallest
+  screen dimension < 768 CSS px (iPads and desktops excluded). Decided once
+  from what the device IS — never from how a frame ran.
+- `resolveInitialSettings` (pre-mount, the R11 no-hot-swap beat): with NO
+  explicit pick, phone-class resolves tier **'medium'** instead of 'high' —
+  every tier-keyed R11–R16 reduction (aniso, hillshade strength, bloom
+  scale, micro-detail, emissive windows, cloud shadows) engages from frame
+  one. NOT persisted: a default is not a choice. Dev-publishes
+  `__flyStats.tierPolicy {saved, phone, resolved, ceiling}` for the gate.
+- NEW `autoTierCeiling()` (fly-settings) + a clamp in FlyCanvas's
+  `stepQualityTier`, **up-steps only**: desktop 'high' (byte-identical,
+  verify-logbook gate 9's documented walk-back-up untouched); phone-class =
+  the player's explicitly saved tier if any, else 'medium'. A phone can
+  never be inclined into a tier the player didn't choose; an explicit
+  'high' pick is both reachable and restorable, and an explicit 'low' pick
+  finally HOLDS on phones (the §7 lesson, fixed at the source for the
+  device class that hurts). Declines are never capped.
+
+**verify-sat-mobile grew 7 → 10 gates:** (F) unpicked phone boot resolves
+medium/medium (race-free via tierPolicy, not tier-polling), (G) the live
+tier never reads 'high' after settle, (H) a fresh context seeded with an
+explicit 'high' pick resolves high/high. Full run green (sky gates
+unmoved, boot 29s → 19s at medium — the floor pays for itself); verify-
+mobile green; a desktop probe confirms `{phone:false, resolved:'high',
+ceiling:'high'}` — the certified desktop suite never sees this pass.
+
+**Recorded follow-up:** the ceiling honors explicit picks on phones only.
+Desktop keeps R16 behavior (incline may exceed an explicit pick — gate 9
+calls that "its job"); if a desktop user ever files the §7 annoyance,
+extending `autoTierCeiling()` to respect saved picks everywhere is a
+two-line, gate-9-comment-touching decision.
