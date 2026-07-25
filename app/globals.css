@@ -724,6 +724,23 @@
   -webkit-backdrop-filter: none;
 }
 
+/* PHONE-ONLY blur kill, for surfaces that already own their look. Most of the
+   HUD does: the toast cards, the contracts panel, the inspect card and the
+   logbook each paint a specific INK CODEX gradient at a specific
+   `backdrop-blur-sm`/`-md` radius. .hud-glass would overwrite both with one
+   flat fill - a DESKTOP pixel change, which is not allowed. Those panels keep
+   every class they have today and just ADD this one, which contributes
+   NOTHING on desktop (no declaration at all) and drops the compositor's
+   framebuffer re-read on phones. Specificity 0,1,1 beats the 0,1,0 Tailwind
+   backdrop-blur utility, so no !important is needed.
+   Pair it with a `phone:bg-*` bump wherever the panel leaned on the blur for
+   legibility rather than only for depth. */
+[data-device='phone'] .hud-flat-phone,
+[data-device='phone'].hud-flat-phone {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 /* Fluid display type for the full-bleed banners (boot wordmark, arrival
    banner, warp label). Each clamp's UPPER bound is today's desktop size and
    the slope is chosen so the clamp is already saturated well below any

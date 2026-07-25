@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FlyErrorBoundary } from './FlyErrorBoundary';
 import { FlyCanvas } from './FlyCanvas';
-import { LayoutRoot } from './LayoutRoot';
+import { LayoutRoot, Zone } from './LayoutRoot';
 import { AttributionBar } from './hud/AttributionBar';
 import { FlyHUD } from './hud/FlyHUD';
 import { LabelCanvas } from './hud/LabelCanvas';
@@ -331,15 +331,17 @@ export function FlyMode({ onClose }) {
       {/* Desktop keeps the quick-exit X (top-right); touch replaces it with the
           Pause button in TouchControls, whose menu carries Exit. */}
       {!isTouch && (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onClose}
-          aria-label="Exit Fly Mode"
-          className="absolute right-4 top-4 z-10 bg-zinc-900/60 text-zinc-100 hover:bg-zinc-800"
-        >
-          <X className="h-5 w-5" />
-        </Button>
+        <Zone name="exit">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            aria-label="Exit Fly Mode"
+            className="pointer-events-auto bg-zinc-900/60 text-zinc-100 hover:bg-zinc-800"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        </Zone>
       )}
     </div>
   );

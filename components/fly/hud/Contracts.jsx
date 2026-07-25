@@ -15,7 +15,9 @@ import {
 } from '@/lib/fly/contracts';
 import { AirportBuzzDetector } from '@/lib/fly/airport-buzz';
 import { mercatorScale } from '@/lib/fly/coords';
-import { CONTRACTS_LIVING } from '@/lib/fly/fly-constants';
+import { CONTRACTS_LIVING, MOBILE_UI } from '@/lib/fly/fly-constants';
+import { Zone } from '../LayoutRoot';
+import { useDeviceLayout } from '@/hooks/use-device-layout';
 import {
   loadSnapshot,
   reviveEntry,
@@ -156,6 +158,10 @@ export function Contracts({ runtime }) {
   const [, setTick] = useState(0);
   const rerender = () => setTick((t) => t + 1);
   const [streakDays, setStreakDays] = useState(0);
+  // Round 17 (layout only — no scoring path reads either of these).
+  const { isPhone, orientation } = useDeviceLayout();
+  const landscapePhone = isPhone && orientation === 'landscape';
+  const [expanded, setExpanded] = useState(false);
 
   // --- snapshot persistence (debounced, event-context only) ----------------
   const saveTimer = useRef(null);
@@ -451,18 +457,68 @@ export function Contracts({ runtime }) {
     };
   }, [runtime]);
 
+  // Landscape phone: 390px of HEIGHT, and the objective list is the tallest
+  // thing on the left edge. It collapses to a tap-to-expand chip so the strip,
+  // the stick and the world are all still visible; portrait and desktop are
+  // untouched. `expanded` lives here (not the store) because it is pure view
+  // state that should reset when the panel unmounts.
+  const collapsed = landscapePhone && !expanded;
+
   return (
-    <div
-      className="pointer-events-none absolute left-4 top-24 z-10 w-60 select-none max-sm:left-2 max-sm:top-[calc(env(safe-area-inset-top)+8.25rem)] max-sm:w-[10.5rem]"
+    <Zone
+      name="contracts"
+      className="w-60 select-none max-sm:w-[10.5rem] phone-land:w-auto"
       data-testid="contracts-panel"
     >
-      <div
-        className="rounded-xl border px-3 py-2.5 backdrop-blur-sm max-sm:px-2 max-sm:py-2"
-        style={{
-          background: 'rgba(6, 9, 18, 0.62)',
-          borderColor: 'rgba(148, 163, 184, 0.16)',
-        }}
-      >
+      {collapsed ? (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          data-testid="contracts-chip"
+          aria-label="Show contracts"
+          className="hud-glass pointer-events-auto flex items-center gap-2 rounded-xl border px-3 font-mono text-[11px]"
+          style={{
+            borderColor: 'rgba(148, 163, 184, 0.16)',
+            color: CARD_THEME.ice,
+            minHeight: MOBILE_UI.minTargetPx,
+          }}
+        >
+          <span className="text-[9px] uppercase tracking-[0.3em]" style={{ color: CARD_THEME.iceDim }}>
+            ◈ {active.length + daily.length}
+          </span>
+          <span>{totalScore.toLocaleString()} pts</span>
+        </button>
+      ) : (
+        <div
+          className={`hud-flat-phone rounded-xl border px-3 py-2.5 backdrop-blur-sm max-sm:px-2 max-sm:py-2 ${
+            landscapePhone
+              ? 'pointer-events-auto relative w-[13.5rem] overflow-y-auto pr-9'
+              : ''
+          }`}
+          style={{
+            background: 'rgba(6, 9, 18, 0.62)',
+            borderColor: 'rgba(148, 163, 184, 0.16)',
+            // The expanded panel must not out-grow a 390px-tall viewport: it
+            // opens under the strip and stops short of the throttle rail.
+            maxHeight: landscapePhone ? 'calc(100svh - 7rem)' : undefined,
+          }}
+        >
+        {landscapePhone && (
+          <button
+            type="button"
+            onClick={() => setExpanded(false)}
+            aria-label="Collapse contracts"
+            data-testid="contracts-collapse"
+            className="pointer-events-auto absolute right-1 top-1 grid place-items-center rounded-md text-[12px]"
+            style={{
+              width: MOBILE_UI.minTargetPx,
+              height: MOBILE_UI.minTargetPx,
+              color: CARD_THEME.iceDim,
+            }}
+          >
+            ✕
+          </button>
+        )}
         <div className="mb-1.5 flex items-baseline justify-between">
           <span
             className="text-[9px] uppercase tracking-[0.3em]"
@@ -557,8 +613,9 @@ export function Contracts({ runtime }) {
             ))}
           </div>
         )}
-      </div>
-    </div>
+        </div>
+      )}
+    </Zone>
   );
 }
 
