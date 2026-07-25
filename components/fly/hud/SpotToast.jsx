@@ -290,7 +290,14 @@ export function SpotToast({ runtime }) {
         {toasts.map((t) => {
           const labelEl = (
             <span
-              className="text-[10px] uppercase tracking-[0.18em]"
+              // `truncate` (with min-w-0, which it needs to bite) ONLY on the
+              // phone: "⬢ 🐋 badge earned" at 0.18em tracking is ~130px and
+              // WRAPPED inside a 262px card, turning the two-line design into
+              // three lines and pushing the stack down into the contracts
+              // panel. Clipping a label is fine; growing the card is not.
+              className={`text-[10px] uppercase tracking-[0.18em] ${
+                phone ? 'min-w-0 truncate' : ''
+              }`}
               style={{ fontFamily: CARD_THEME.fontDisplay, color: t.accent }}
             >
               {t.contract
@@ -307,7 +314,12 @@ export function SpotToast({ runtime }) {
             </span>
           );
           const titleEl = (
-            <span className="font-mono text-[12px] font-bold" style={{ color: CARD_THEME.ice }}>
+            <span
+              className={`font-mono text-[12px] font-bold ${
+                phone ? 'shrink-0 whitespace-nowrap' : ''
+              }`}
+              style={{ color: CARD_THEME.ice }}
+            >
               {t.title}
             </span>
           );
@@ -318,7 +330,11 @@ export function SpotToast({ runtime }) {
               // On a phone the card is full-width, so the cap becomes
               // "whatever is left on this line" instead of a magic 240px.
               className={`font-mono text-[10px] ${
-                phone ? 'min-w-0 flex-1 truncate' : t.badge ? 'max-w-[240px] truncate' : ''
+                phone
+                  ? 'min-w-0 flex-1 truncate whitespace-nowrap'
+                  : t.badge
+                    ? 'max-w-[240px] truncate'
+                    : ''
               }`}
               style={{ color: CARD_THEME.iceDim }}
             >

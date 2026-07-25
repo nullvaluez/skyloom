@@ -115,14 +115,18 @@ export function FlyHUD({ runtime }) {
           On phones it sits below the notch-safe stats strip. */}
       <div
         ref={poiRef}
-        className="pointer-events-none absolute left-1/2 top-20 z-10 -translate-x-1/2 font-mono text-xs font-semibold uppercase tracking-[0.2em] text-amber-200/90 transition-opacity duration-500 [text-shadow:0_1px_4px_rgba(0,0,0,0.9)] max-sm:top-[calc(env(safe-area-inset-top)+4.75rem)] phone:top-[calc(env(safe-area-inset-top)+4.75rem)] phone-land:top-[calc(env(safe-area-inset-top)+3.1rem)]"
+        // Round 17: a testid so verify-mobile-layout can prove the toast band
+        // does not land on it (it did — caught in a landscape screenshot, not
+        // by a gate, which is why the gate now knows about this element).
+        data-testid="hud-poi"
+        className="pointer-events-none absolute left-1/2 top-20 z-10 -translate-x-1/2 font-mono text-xs font-semibold uppercase tracking-[0.2em] text-amber-200/90 transition-opacity duration-500 [text-shadow:0_1px_4px_rgba(0,0,0,0.9)] max-sm:top-[calc(env(safe-area-inset-top)+4.75rem)] phone:top-[calc(env(safe-area-inset-top)+4.75rem)] phone-land:top-[calc(env(safe-area-inset-top)+3.1rem)] phone:w-[92vw] phone:truncate phone:text-center"
       />
 
       {/* Active chase/intercept chip — visible payoff for the CHASE button */}
       <div
         ref={chaseRef}
         data-testid="hud-chase-chip"
-        className="pointer-events-none absolute left-1/2 top-27 z-10 -translate-x-1/2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200/90 opacity-0 transition-opacity duration-300 [text-shadow:0_1px_4px_rgba(0,0,0,0.9)] max-sm:top-[calc(env(safe-area-inset-top)+6.5rem)] phone:top-[calc(env(safe-area-inset-top)+6.5rem)] phone-land:top-[calc(env(safe-area-inset-top)+4.4rem)] phone:max-w-[92vw] phone:truncate"
+        className="pointer-events-none absolute left-1/2 top-27 z-10 -translate-x-1/2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200/90 opacity-0 transition-opacity duration-300 [text-shadow:0_1px_4px_rgba(0,0,0,0.9)] max-sm:top-[calc(env(safe-area-inset-top)+6.5rem)] phone:top-[calc(env(safe-area-inset-top)+6.5rem)] phone-land:top-[calc(env(safe-area-inset-top)+4.4rem)] phone:w-[92vw] phone:truncate phone:text-center"
       />
 
       {/* `hud-flat-phone` + a phone opacity bump replace the blur on phones:

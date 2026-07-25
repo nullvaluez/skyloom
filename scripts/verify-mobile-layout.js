@@ -160,15 +160,19 @@ function collectBoxes() {
     }
   }
 
-  // Controls fallback (see header): the frozen touch testids stand in until
-  // TouchControls adopts controls-left / controls-right.
-  for (const [zone, sel] of [
-    ['controls-left', '[data-testid="touch-joystick"]'],
-    ['controls-right', '[data-testid="touch-throttle"]'],
-  ]) {
-    if (zones[zone]) continue;
-    const el = document.querySelector(sel);
-    if (el && visible(el)) out.push(box(el, zone, zone));
+  // Controls fallback (see header): until TouchControls adopts controls-left /
+  // controls-right, stand in with EVERY `touch-*` testid rather than a
+  // hand-picked pair. The first version listed only touch-joystick and
+  // touch-throttle and therefore never saw the ACTION BUTTON ROW between
+  // them — which is exactly what the phone InfoCard chip was landing on. A
+  // prefix sweep also survives A5 adding logbook/photo/contextual buttons.
+  if (!zones['controls-left'] && !zones['controls-right']) {
+    const touch = [...document.querySelectorAll('[data-testid^="touch-"]')].filter(visible);
+    for (const e of touch) {
+      // Outermost only: touch-throttle-slow lives inside touch-throttle.
+      if (touch.some((o) => o !== e && o.contains(e))) continue;
+      out.push(box(e, e.dataset.testid, 'controls'));
+    }
   }
   return out;
 }
@@ -221,33 +225,13 @@ async function runOrientation(browser, label, ctxOpts) {
     `scrollWidth ${overflow.scrollW} <= innerWidth ${overflow.innerW}`
   );
 
-  let boxes = await page.evaluate(collectBoxes);
-  const outside = boxes.filter(
-    (b) => b.x < -1 || b.y < -1 || b.right > overflow.innerW + 1 || b.bottom > overflow.innerH + 1
-  );
-  gate(
-    `${label} every zone member is inside the viewport`,
-    outside.length === 0,
-    outside.length
-      ? outside.map((b) => `${b.name} [${b.x},${b.y} ${b.w}x${b.h}]`).join(' | ')
-      : `${boxes.length} members measured`
-  );
-
-  // --- 2. zone-pair disjointness -----------------------------------------
-  let clashes = [];
-  for (let i = 0; i < boxes.length; i++) {
-    for (let j = i + 1; j < boxes.length; j++) {
-      if (boxes[i].zone === boxes[j].zone) continue;
-      if (overlaps(boxes[i], boxes[j])) clashes.push(`${boxes[i].name} x ${boxes[j].name}`);
-    }
-  }
-  gate(
-    `${label} no two zones overlap`,
-    clashes.length === 0,
-    clashes.length ? clashes.join(' | ') : `${boxes.length} members pairwise-checked`
-  );
-
-  // --- 2b. THE headline pair: the chip must clear the stick ---------------
+  // --- 2. the busiest state, then measure everything at once --------------
+  // Gates 1b and 2 run with the InfoCard chip UP, not on the idle HUD. The
+  // first version measured the resting screen, and the resting screen has no
+  // info-dock in it at all — so the single collision the round exists to kill
+  // was structurally invisible to its own harness.
+  //
+  // --- THE headline pair: the chip must clear the touch controls ----------
   // Forced, not waited for: the harness hosts are egress-blocked in CI, so
   // there is no live traffic to lock onto. A minimal synthetic track plus a
   // matching lock is the only way to put a real InfoCard on screen.
@@ -263,42 +247,50 @@ async function runOrientation(browser, label, ctxOpts) {
     const hex = 'a0beef';
     const rt = window.__fly;
     const f = rt.flight;
-    // A synthetic contact, RE-STAMPED on an interval. Three layers each
-    // undo a one-shot injection, and it took all three to learn why:
-    //   · FlyScene's frame loop syncs the store FROM runtime.targeting every
-    //     frame, so store.setLock() alone is erased within ~16 ms;
-    //   · Targeting.update() releases any lock whose hex is not in
-    //     `traffic.items` ("if (!current) release = true"), so the contact
-    //     has to live in the ITEMS array, not just the tracks map;
-    //   · the traffic engine rebuilds items on its own cadence.
-    // NO `fix1`: TrafficTracers skips items without one, and a track that HAS
-    // one gets dead-reckoned with fields this fixture lacks, producing NaN
-    // altitude and a per-frame throw in the tracer's altitude-band lookup.
-    // The InfoCard only needs `meta`, so the chip renders either way.
-    const mk = () => ({
+    // NO `fix1` on the fixture: TrafficTracers skips items without one, and a
+    // track that HAS one gets dead-reckoned with fields this fixture lacks,
+    // producing a NaN altitude and a per-frame throw in the tracer's
+    // altitude-band lookup. The InfoCard only needs `meta`.
+    const track = {
       hex,
       meta: { flight: 'TEST123', r: 'N123TS', t: 'B738', color: '#4ade80' },
       rx: f.pos.x, ry: f.pos.y, ryd: f.pos.y, rz: f.pos.z - 100,
       yaw: 0,
-      // Inside TARGETING.infoCardRangeM (2000), so the card's own 5Hz
+      // Inside TARGETING.infoCardRangeM (2000), so the card's own 5 Hz
       // controller OPENS it — infoCardHex is never forced.
       distM: 1200,
       stale: 0,
       horizonFade: 1,
-    });
+    };
+    // FREEZE the targeting scanner for the duration of this gate. An earlier
+    // version re-stamped the contact on a 60 ms interval instead, and the chip
+    // FLICKERED at roughly 5 Hz: Targeting.update() releases any lock whose
+    // hex is missing from `traffic.items`, the traffic engine rebuilds that
+    // array on its own cadence, FlyScene then mirrors the release into the
+    // store, and the InfoCard's controller closes the card — all before the
+    // next re-stamp. The measurement caught the card up and the SCREENSHOT
+    // caught it down, which is the worst possible failure mode for a gate
+    // whose evidence is a screenshot. Freezing the scanner removes the race
+    // instead of narrowing it. Restored in the teardown below.
+    rt.targeting.update = () => null;
+    rt.targeting.lockedHex = hex;
+    rt.targeting.target = track;
+    rt.traffic.tracks.set(hex, track);
+    const items = rt.traffic.items;
+    if (!items.some((x) => x.hex === hex)) items.push(track);
+    // The tracks map is what the InfoCard reads; keep the entry alive against
+    // the engine's own pruning.
     window.__mlFixture = setInterval(() => {
-      const t = mk();
-      const items = rt.traffic.items;
-      const i = items.findIndex((x) => x.hex === hex);
-      if (i >= 0) items[i] = t;
-      else items.push(t);
-      rt.traffic.tracks.set(hex, t);
-      rt.targeting.lockedHex = hex;
-      rt.targeting.target = t;
-      rt.targeting._lockT = performance.now() / 1000;
-    }, 60);
+      rt.traffic.tracks.set(hex, track);
+    }, 100);
   });
-  await page.waitForTimeout(1600);
+  // POLL, do not sleep: the chip only appears once the fixture has survived a
+  // frame of Targeting.update AND the InfoCard's own 5 Hz controller has
+  // ticked. A fixed wait raced both and made this gate flaky.
+  await page
+    .waitForSelector('[data-testid="infocard-chip"]', { timeout: 8000 })
+    .catch(() => {});
+  await page.waitForTimeout(300);
   const chipVsStick = await page.evaluate(() => {
     const q = (s) => document.querySelector(s)?.getBoundingClientRect();
     const chip = q('[data-testid="infocard-chip"]');
@@ -329,9 +321,41 @@ async function runOrientation(browser, label, ctxOpts) {
       : `chip=${chipVsStick.chip} stick=${chipVsStick.stick}`
   );
   await shot('01-chip');
+
+  // --- 1b + 2, measured WITH the chip on screen ---------------------------
+  const boxes = await page.evaluate(collectBoxes);
+  const outside = boxes.filter(
+    (b) => b.x < -1 || b.y < -1 || b.right > overflow.innerW + 1 || b.bottom > overflow.innerH + 1
+  );
+  gate(
+    `${label} every zone member is inside the viewport`,
+    outside.length === 0,
+    outside.length
+      ? outside.map((b) => `${b.name} [${b.x},${b.y} ${b.w}x${b.h}]`).join(' | ')
+      : `${boxes.length} members measured`
+  );
+
+  const clashes = [];
+  for (let i = 0; i < boxes.length; i++) {
+    for (let j = i + 1; j < boxes.length; j++) {
+      if (boxes[i].zone === boxes[j].zone) continue;
+      if (overlaps(boxes[i], boxes[j])) clashes.push(`${boxes[i].name} x ${boxes[j].name}`);
+    }
+  }
+  gate(
+    `${label} no two zones overlap`,
+    clashes.length === 0,
+    clashes.length
+      ? clashes.join(' | ')
+      : `${boxes.length} members pairwise-checked (${[...new Set(boxes.map((b) => b.zone))].join(', ')})`
+  );
+
   await page.evaluate(() => {
     clearInterval(window.__mlFixture);
     const rt = window.__fly;
+    // `update` was shadowed with an own property; deleting it restores the
+    // prototype method rather than leaving a copy of it behind.
+    delete rt.targeting.update;
     rt.targeting.lockedHex = null;
     rt.targeting.target = null;
     const i = rt.traffic.items.findIndex((x) => x.hex === 'a0beef');
@@ -378,11 +402,25 @@ async function runOrientation(browser, label, ctxOpts) {
         x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom,
       };
     });
+    // The three permanent surfaces a transient card must never land on. The
+    // contracts panel is on this list because the first screenshot showed the
+    // toast stack UNDERNEATH it: both sit at z-10 and Contracts renders later
+    // in FlyMode's tree, so among equals DOM order won and the alert lost.
+    // Making them geometrically disjoint fixes it at the source; this gate
+    // keeps it fixed.
     const others = [
       ['hud-strip', document.querySelector('.divide-x.divide-zinc-700')],
       ['minimap', document.querySelector('canvas.rounded-full')],
+      ['contracts', document.querySelector('[data-testid="contracts-panel"]')],
+      // Both of these live in the same centre column as the landscape toast
+      // stack. The POI line is here because a screenshot caught the toast
+      // sitting on top of "HOBOKEN · 1.4NM NE" — no gate was watching.
+      ['hud-poi', document.querySelector('[data-testid="hud-poi"]')],
+      ['chase-chip', document.querySelector('[data-testid="hud-chase-chip"]')],
     ]
-      .filter(([, e]) => e)
+      // Opacity-0 elements are present but not on screen (the POI line and the
+      // chase chip both idle at 0) — they cannot be "covered".
+      .filter(([, e]) => e && Number(getComputedStyle(e).opacity) > 0.01)
       .map(([id, e]) => {
         const r = e.getBoundingClientRect();
         return { id, x: r.x, y: r.y, right: r.right, bottom: r.bottom };
