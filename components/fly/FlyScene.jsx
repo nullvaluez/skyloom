@@ -40,15 +40,18 @@ import { WarpBurst } from './WarpBurst';
 import { TerrainEngine } from '@/lib/fly/terrain-engine';
 import { createImagerySource, createTerrainSources } from '@/lib/fly/tile-sources';
 import { FlightModel } from '@/lib/fly/flight-model';
+import { resolveAircraft } from '@/lib/fly/player-aircraft';
 import { InputController } from '@/lib/fly/input-controller';
 import { ChaseCamera } from '@/lib/fly/chase-camera';
 import { CinemaCamera } from '@/lib/fly/cinema-camera';
+import { PhotoCamera } from '@/lib/fly/photo-camera';
 import { TrafficEngine, mercatorWorldXZ } from '@/lib/fly/traffic-engine';
 import { registerRuntimeActions, clearRuntimeActions } from '@/lib/fly/runtime-bus';
 import { Targeting } from '@/lib/fly/targeting';
 import { Autopilot } from '@/lib/fly/autopilot';
 import { expApproach, mercatorScale } from '@/lib/fly/coords';
 import { computeSun, moonDirFromSun, nightWeight } from '@/lib/fly/sun-model';
+import { trackSpotAttrs } from '@/lib/fly/spot-attrs';
 import {
   applyWeatherAtmo,
   snapWeather,
@@ -58,7 +61,6 @@ import {
 } from '@/lib/fly/weather-model';
 import {
   CLOUDS,
-  FLIGHT,
   GLOBE,
   HILLSHADE,
   MOON,
@@ -225,14 +227,49 @@ export function FlyScene({ runtime }) {
     () => new TerrainEngine(createTerrainSources(useFlyStore.getState().mapStyle)),
     []
   );
-  const flight = useMemo(() => new FlightModel(), []);
+  // Round 17 hangar: which airframe the player flies. `aircraft` is the frozen
+  // resolveAircraft() config (flight envelope + fx + the GLB entry); the store
+  // value is discrete, so this memo changes only on a hangar pick.
+  const aircraftId = useFlyStore((s) => s.aircraftId);
+  const aircraft = useMemo(() => resolveAircraft(aircraftId), [aircraftId]);
+  // Built ONCE with the pick that was resolved pre-mount (FlyMode resolves the
+  // saved aircraft before the canvas exists, exactly like the map style/tier).
+  const flight = useMemo(
+    () => new FlightModel(resolveAircraft(useFlyStore.getState().aircraftId).cfg),
+    []
+  );
   const input = useMemo(() => new InputController(), []);
   const chase = useMemo(() => new ChaseCamera(), []);
   const cinema = useMemo(() => new CinemaCamera(), []);
+  const photo = useMemo(() => new PhotoCamera(), []); // round 17: photo mode
   const traffic = useMemo(() => new TrafficEngine(), []);
   const targeting = useMemo(() => new Targeting(), []);
   const autopilot = useMemo(() => new Autopilot(), []);
   const origin = useMemo(() => ({ anchor: new Vector3(), epoch: 0 }), []);
+
+  // Round 17: a mid-session hangar pick swaps the flight ENVELOPE in place —
+  // position/heading/pitch/bank are kept (you change aircraft, you do not
+  // respawn) and the speed eases to the new preset through the normal accel
+  // path. On first mount this re-applies the cfg the model was built with, so
+  // the no-pick default stays value-identical.
+  useEffect(() => {
+    flight.setConfig(aircraft.cfg);
+  }, [flight, aircraft]);
+  // Stable dev-stats payload for scripts/verify-hangar.js (built per pick, not
+  // per frame — the stats block below only assigns the reference).
+  const aircraftStat = useMemo(
+    () => ({
+      id: aircraft.id,
+      url: aircraft.entry.url,
+      boost: aircraft.cfg.speeds.boost,
+      // What is actually MOUNTED below — these two flags ARE the mount
+      // conditions for <Afterburner> and <Contrail>, so the harness can gate
+      // "the glider has no burner and no trail" without a scene walk.
+      afterburner: !!aircraft.afterburner?.enabled,
+      contrailEmitters: aircraft.contrail.enabled ? (aircraft.contrail.twin ? 2 : 1) : 0,
+    }),
+    [aircraft]
+  );
 
   const worldRoot = useRef();
 
@@ -265,6 +302,7 @@ export function FlyScene({ runtime }) {
     runtime.autopilot = autopilot;
     runtime.camera = camera;
     runtime.chaseRig = chase; // round 7: harnesses read _look/_freeAmt
+    runtime.photoRig = photo; // round 17: verify-photo reads _look/_dist
     // Grounded-aircraft pin: quality-gated (a coarse fallback DEM tile
     // "answers" with plateau garbage — planes got pinned mid-air forever),
     // and in toy style pinned to the DRAWN ground (exaggerated + lifted),
@@ -324,10 +362,12 @@ export function FlyScene({ runtime }) {
       flight.bank = 0;
       flight.turnRate = 0;
       flight.pitchRate = 0;
+      // Round 17: seed from the AIRCRAFT's envelope (flight.cfg) — a warp must
+      // not hand a Skylark a 240 m/s arrival speed it can never sustain.
       const tSpeed = track.fix1
         ? Math.hypot(track.fix1.vE, track.fix1.vN)
-        : FLIGHT.speeds.cruise;
-      flight.speed = Math.max(FLIGHT.speeds.slow, tSpeed + WARP.speedPadMps);
+        : flight.cfg.speeds.cruise;
+      flight.speed = Math.max(flight.cfg.speeds.slow, tSpeed + WARP.speedPadMps);
       const geo = engine.worldToGeo(flight.pos);
       flight.latDeg = geo.y;
       runtime.geo = geo; // the 1Hz poll key picks the new area up next tick
@@ -378,7 +418,7 @@ export function FlyScene({ runtime }) {
       flight.bank = 0;
       flight.turnRate = 0;
       flight.pitchRate = 0;
-      flight.speed = FLIGHT.speeds.cruise;
+      flight.speed = flight.cfg.speeds.cruise; // round 17: per-aircraft envelope
       const geo = engine.worldToGeo(flight.pos);
       flight.latDeg = geo.y;
       runtime.geo = geo; // the 1Hz poll key picks the new area up next tick
@@ -458,13 +498,14 @@ export function FlyScene({ runtime }) {
       runtime.autopilot = null;
       runtime.camera = null;
       runtime.chaseRig = null;
+      runtime.photoRig = null;
       runtime.warpTo = null;
       runtime.warpToGeo = null;
       runtime.interceptHex = null;
       traffic.dispose();
       engine.dispose();
     };
-  }, [runtime, engine, flight, input, origin, traffic, targeting, autopilot, camera, chase, rebase]);
+  }, [runtime, engine, flight, input, origin, traffic, targeting, autopilot, camera, chase, photo, rebase]);
 
   useEffect(() => {
     input.attach(gl.domElement);
@@ -709,7 +750,20 @@ export function FlyScene({ runtime }) {
     const paused = flyState.phase === 'paused';
     // Inspect modal / Atlas count as a soft pause for the stick: the world
     // (and your plane) keep flying, but the cursor belongs to the overlay.
-    if (paused || flyState.inspectHex || flyState.atlasOpen || flyState.logbookOpen) input.neutralize();
+    // Round 17: photo mode joins them — the plane keeps flying (the instructor
+    // auto-levels the neutralized stick) while the mouse composes a shot.
+    // setPhotoLook also tells neutralize() to spare the orbit drag + P key.
+    const photoMode = flyState.cameraMode === 'photo';
+    input.setPhotoLook(photoMode);
+    if (
+      paused ||
+      photoMode ||
+      flyState.inspectHex ||
+      flyState.atlasOpen ||
+      flyState.logbookOpen ||
+      flyState.hangarOpen // round 17: the hangar is a soft pause like the atlas
+    )
+      input.neutralize();
     const cmd = input.read();
 
     // Terrain raycasts are ~fractions of a ms but not free — sample the
@@ -736,16 +790,10 @@ export function FlyScene({ runtime }) {
       const t = targeting.target;
       if (t?.meta) {
         const geo = engine.worldToGeo(_spotPos.set(t.rx, t.ry, t.rz));
-        usePassportStore.getState().logSpot({
-          hex: t.hex,
-          flight: t.meta.flight,
-          r: t.meta.r,
-          t: t.meta.t,
-          category: t.meta.category,
-          lat: geo.y,
-          lon: geo.x,
-          _classification: t.meta.iconType,
-        });
+        // R17: one shared attribute builder (lib/fly/spot-attrs.js) — it is
+        // what finally carries `squawk` (and gs/alt) into the passport, so the
+        // emergency badges and the squawk rarity bonuses are reachable here.
+        usePassportStore.getState().logSpot(trackSpotAttrs(t, geo));
       }
     } else if (transition === 'released' && autopilot.mode !== 'off') {
       autopilot.disengage();
@@ -772,6 +820,15 @@ export function FlyScene({ runtime }) {
       const mode = store.cameraMode === 'cinema' ? 'chase' : 'cinema';
       store.setCameraMode(mode);
       (mode === 'cinema' ? cinema : chase).snap();
+    }
+    // P toggles PHOTO mode (round 17). No `!paused` guard is needed — while
+    // paused, neutralize() above has already eaten the press (exactly like
+    // F/T/M/C); while photo mode is ON, setPhotoLook spares the press so P is
+    // always the way back out.
+    if (input.consumePress('p')) {
+      const mode = store.cameraMode === 'photo' ? 'chase' : 'photo';
+      store.setCameraMode(mode);
+      (mode === 'photo' ? photo : chase).snap();
     }
     // Auto-revert when the chase ends (lock lost / disengaged / hard stick)
     if (flyState.cameraMode === 'cinema' && (autopilot.mode === 'off' || !targeting.target)) {
@@ -814,7 +871,16 @@ export function FlyScene({ runtime }) {
     // Camera rigs think in absolute coordinates; the camera renders rebased.
     camera.position.x += origin.anchor.x;
     camera.position.z += origin.anchor.z;
-    if (flyState.cameraMode === 'cinema' && targeting.target) {
+    if (photoMode) {
+      // Round 17: free orbit around the plane, persistent pose, wheel zoom.
+      photo.update(dt, flight, camera, input, mercatorScale(flight.latDeg));
+    } else if (photo.handoff()) {
+      // Left photo mode by ANY path (P / Esc / the pill / a warp) — hard-cut
+      // the chase rig, whose damped world position is stale by exactly the
+      // distance flown while composing.
+      chase.snap();
+      chase.update(dt, flight, camera, cmd.freeLook, mercatorScale(flight.latDeg));
+    } else if (flyState.cameraMode === 'cinema' && targeting.target) {
       cinema.update(
         dt,
         flight,
@@ -1068,6 +1134,7 @@ export function FlyScene({ runtime }) {
         const ef = getEdgeFade();
         stats.edgeFadeStartM = ef.startM;
         stats.groundHorizonM = ef.endM;
+        stats.aircraft = aircraftStat; // round 17: verify-hangar reads this
       }
       gl.info.reset();
     }
@@ -1169,7 +1236,9 @@ export function FlyScene({ runtime }) {
         {mapStyle === 'satellite' && SAT_ROADS.enabled && qualityTier !== 'low' && (
           <SatRoadLayer runtime={runtime} flight={flight} />
         )}
-        <PlayerPlane flight={flight} />
+        {/* Round 17: keyed on the pick so a hangar swap is a clean remount —
+            the old clone's graded materials dispose, the new GLB mounts. */}
+        <PlayerPlane key={aircraftId} flight={flight} aircraft={aircraft} />
       </group>
 
       {/* Traffic writes rebased instance matrices — must stay OUTSIDE worldRoot */}
@@ -1229,10 +1298,20 @@ export function FlyScene({ runtime }) {
       {mapStyle === 'satellite' && WEATHER.enabled && qualityTier !== 'low' && (
         <PrecipLayer runtime={runtime} flight={flight} />
       )}
-      <Contrail flight={flight} origin={origin} />
+      {/* Round 17: props and gliders leave no contrail at all — the component
+          is not mounted for them, so they cost zero ribbon draws. */}
+      {aircraft.contrail.enabled && (
+        <Contrail flight={flight} origin={origin} contrail={aircraft.contrail} />
+      )}
       {/* Round 13 Phase 2: satellite player ground-contact disc (1 draw, low
           AGL only). Toy keeps its real cast shadow via the player's castShadow. */}
-      {mapStyle === 'satellite' && <PlayerGroundShadow flight={flight} origin={origin} />}
+      {mapStyle === 'satellite' && (
+        <PlayerGroundShadow
+          flight={flight}
+          origin={origin}
+          radiusM={aircraft.shadowRadiusM}
+        />
+      )}
     </>
   );
 }

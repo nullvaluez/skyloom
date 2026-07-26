@@ -6,7 +6,9 @@ import { ContactShadows, useGLTF } from '@react-three/drei';
 import { AdditiveBlending, DoubleSide } from 'three';
 import { TRAFFIC_MODELS } from '@/lib/fly/assets';
 import { computeModelCorrection } from '@/lib/fly/model-loader';
+import { isPhoneClass } from '@/lib/fly/device-class';
 import { AIRCRAFT_SILHOUETTES, getBestSilhouette } from '@/lib/aircraft-silhouettes';
+import { useFlyStore } from '@/stores/fly-store';
 import { CARD_THEME } from './inspect-tokens';
 
 /**
@@ -128,10 +130,45 @@ function SilhouetteBadge({ meta, heroColor, visible }) {
   );
 }
 
-export function ModelTurntable({ archetype, meta, heroColor, onDraggingChange }) {
-  const entry = TRAFFIC_MODELS[archetype] ?? null;
+/**
+ * Round 17: `entry` is an OPTIONAL explicit model descriptor ({url, yawFixRad})
+ * so the hangar can preview an aircraft that has no traffic archetype index.
+ * Omitted, the component resolves TRAFFIC_MODELS[archetype] exactly as before —
+ * the inspect card passes no `entry` and is untouched, testids included.
+ */
+export function ModelTurntable({
+  archetype,
+  entry: entryProp,
+  meta,
+  heroColor,
+  onDraggingChange,
+}) {
   const [modelReady, setModelReady] = useState(false);
   const spin = useRef({ vel: BASE_SPIN, dragging: false, pendingYaw: 0, lastX: 0, lastT: 0 });
+
+  /**
+   * ROUND 17 — the low-tier phone gate.
+   *
+   * This card mounts a SECOND WebGL context on top of the main scene's. On a
+   * desktop or a mid/high-tier phone that is the "transient ~360x210 context"
+   * the header describes and it is genuinely cheap. On a phone that has
+   * already been judged LOW tier, it is not: a second context there costs a
+   * context switch per frame and its own render target, on the exact device
+   * whose frame budget is the reason it is low tier in the first place. The
+   * silhouette below is not a degraded fallback — it is the permanent view for
+   * drone/unknown archetypes and it reads perfectly well.
+   *
+   * Read ONCE at mount, from a lazy initializer, and deliberately NOT
+   * subscribed: `qualityTier` can be stepped by PerformanceMonitor mid-flight,
+   * and tearing a live GL context down (or standing one up) because the frame
+   * time wobbled while you are reading a card is a worse experience than
+   * whichever answer the card opened with. The card is short-lived; the next
+   * one gets the fresh reading.
+   */
+  const [heavyOk] = useState(
+    () => !(isPhoneClass() && useFlyStore.getState().qualityTier === 'low')
+  );
+  const entry = heavyOk ? (entryProp ?? TRAFFIC_MODELS[archetype] ?? null) : null;
 
   // Manual drag-to-spin (no OrbitControls — it would fight the card tilt).
   const onPointerDown = (e) => {

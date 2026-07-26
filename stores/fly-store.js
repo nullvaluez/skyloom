@@ -44,8 +44,11 @@ const initialState = {
   // 'local' (target warp / short hop) or 'far' (cross-region atlas warp) —
   // far warps get the held streak→hold→reveal arrival treatment (round 6)
   warpKind: 'local',
-  // 'chase' | 'cinema' — cinema is the wing view while intercept/formation
-  // is flying (C toggles; FlyScene auto-reverts on lock loss)
+  // 'chase' | 'cinema' | 'photo' — cinema is the wing view while intercept/
+  // formation is flying (C toggles; FlyScene auto-reverts on lock loss).
+  // Round 17: 'photo' is the free compose orbit (P toggles; the plane keeps
+  // flying with a neutralized stick — it is NOT phase:'paused'). The cinema
+  // auto-revert is scoped to 'cinema' on purpose and cannot eat 'photo'.
   cameraMode: 'chase',
 
   // Overlays
@@ -58,6 +61,15 @@ const initialState = {
   // Atlas. NOT persisted: which screen is open is session state, and reset()
   // must close it when Fly Mode unmounts.
   logbookOpen: false,
+  // Round 17: the player's aircraft (lib/fly/player-aircraft.js id). This
+  // LITERAL is the no-pick default and must stay 'fighter' — bootFly never
+  // seeds `fly-aircraft`, so every pre-R17 harness flies the round-16 plane
+  // with round-16 numbers. A saved pick is resolved into here by
+  // resolveInitialAircraft() in FlyMode, BEFORE the canvas mounts.
+  aircraftId: 'fighter',
+  // The hangar overlay (input is neutralized while open, same as atlas/logbook).
+  // Session state, never persisted — reset() must close it on unmount.
+  hangarOpen: false,
   // Last atlas-warp arrival { name, kind, at } — drives the arrival banner
   arrival: null,
 
@@ -125,6 +137,13 @@ export const useFlyStore = create(
     setAtlasOpen: (atlasOpen) => set({ atlasOpen }),
 
     setLogbookOpen: (logbookOpen) => set({ logbookOpen }),
+
+    // Round 17 hangar. setAircraftId does NOT persist — lib/fly/player-aircraft
+    // saveAircraft() is the only writer, called from the "Fly this" click site
+    // (same split as quality/sound: a choice is persisted, a state change is not).
+    setAircraftId: (aircraftId) => set({ aircraftId }),
+
+    setHangarOpen: (hangarOpen) => set({ hangarOpen }),
 
     setArrival: (arrival) => set({ arrival }),
 

@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BOOT } from '@/lib/fly/fly-constants';
+import { BOOT, MOBILE_UI } from '@/lib/fly/fly-constants';
+import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { useFlyStore } from '@/stores/fly-store';
 
 /**
@@ -48,11 +49,24 @@ export function BootScreen({ runtime }) {
   const runtimeRef = useRef(runtime);
   runtimeRef.current = runtime;
 
+  // Round 17: this screen mounts BEFORE the canvas, on the exact frame a
+  // phone is also compiling shaders and streaming its first tiles — 70
+  // independently-animated star divs plus 9 streaks is a measurable
+  // compositor cost precisely when there is none to spare. Phones take
+  // MOBILE_UI.boot's smaller budget; desktop keeps 70/9 to the pixel.
+  // Read through useDeviceLayout (not a media query) so it agrees with the
+  // rest of the HUD about what a phone is, including in landscape.
+  const { isPhone } = useDeviceLayout();
+  const starCount = isPhone ? MOBILE_UI.boot.phoneStars : 70;
+  const streakCount = isPhone ? MOBILE_UI.boot.phoneStreaks : 9;
+
   // Deterministic star field — same sky every boot, zero hydration risk.
+  // The PRNG is seeded and consumed in the same order, so the phone field is
+  // a prefix of the desktop one rather than a different sky.
   const stars = useMemo(() => {
     let s = 0x5eed;
     const rnd = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32);
-    return Array.from({ length: 70 }, (_, i) => ({
+    return Array.from({ length: starCount }, (_, i) => ({
       id: i,
       left: rnd() * 100,
       top: rnd() * 100,
@@ -61,7 +75,7 @@ export function BootScreen({ runtime }) {
       dur: 2.4 + rnd() * 3,
       dim: rnd() < 0.5,
     }));
-  }, []);
+  }, [starCount]);
 
   useEffect(() => {
     publish('spawn', 0);
@@ -218,7 +232,7 @@ export function BootScreen({ runtime }) {
       ))}
 
       {/* streak tunnel — idle drift while loading, hyper on reveal */}
-      {[...Array(9)].map((_, i) => (
+      {[...Array(streakCount)].map((_, i) => (
         <div
           key={i}
           className="absolute left-1/2 top-1/2 h-2 w-px"
@@ -235,9 +249,9 @@ export function BootScreen({ runtime }) {
       ))}
 
       {/* wordmark + progress */}
-      <div className="absolute left-1/2 top-1/2 w-[340px] -translate-x-1/2 -translate-y-1/2 text-center">
+      <div className="absolute left-1/2 top-1/2 w-[min(340px,90vw)] -translate-x-1/2 -translate-y-1/2 text-center">
         <div
-          className="select-none text-4xl uppercase text-[#eef5ff]"
+          className="fly-display-xl select-none uppercase text-[#eef5ff]"
           style={{
             fontFamily: "'Archivo Black', ui-sans-serif",
             letterSpacing: '0.28em',
@@ -251,7 +265,7 @@ export function BootScreen({ runtime }) {
           fly mode
         </div>
 
-        <div className="mx-auto mt-8 h-0.5 w-64 overflow-hidden rounded-full bg-[#3d4a75]/40">
+        <div className="mx-auto mt-8 h-0.5 w-[min(16rem,80vw)] overflow-hidden rounded-full bg-[#3d4a75]/40">
           <div
             className="relative h-full rounded-full"
             style={{

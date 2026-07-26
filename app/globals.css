@@ -665,3 +665,103 @@
   src: url('/fonts/ArchivoBlack-Regular.ttf') format('truetype');
   font-display: swap;
 }
+
+/* ===========================================
+   ROUND 17 - MOBILE UI FOUNDATION (ADDITIVE)
+   Nothing above this line is modified. Every rule below is scoped to the Fly
+   root ([data-fly-root]) or to elements that only exist inside it, so desktop
+   and every non-Fly surface are untouched.
+   =========================================== */
+
+/* Device variants. Keyed off the attributes FlyMode stamps on its root from
+   useDeviceLayout(), NOT off a width media query - a phone in landscape is
+   844px wide, which is precisely why `max-sm:` alone produced the broken
+   layout (touch controls plus a full desktop HUD). `max-sm:` still exists and
+   still means "narrow window"; these mean "phone". Compose, never replace. */
+/* prettier-ignore */
+@custom-variant phone (&:is([data-device='phone'], [data-device='phone'] *));
+/* prettier-ignore */
+@custom-variant phone-land (&:is([data-device='phone'][data-orient='landscape'], [data-device='phone'][data-orient='landscape'] *));
+/* prettier-ignore */
+@custom-variant phone-port (&:is([data-device='phone'][data-orient='portrait'], [data-device='phone'][data-orient='portrait'] *));
+
+/* The Fly root is a fullscreen game surface, not a document. Rubber-band
+   scroll, double-tap zoom and the grey tap flash are all browser affordances
+   for reading pages; here they read as bugs (the world lurches under a
+   thumbstick drag). Scoped to the root so the rest of the app keeps them. */
+[data-fly-root] {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Text selection off on the HUD chrome ONLY. A drag across the joystick must
+   not select the throttle labels. Zones are chrome by definition; overlays
+   with real prose - the inspect card, the logbook, the credits - are NOT
+   zones, so their text stays selectable and copyable.
+   The attribution zone is exempt: it is a required data CREDIT, and a credit
+   you cannot select is a credit you cannot quote. */
+[data-fly-root] [data-zone]:not([data-zone='attribution']) {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Shared HUD surface. Desktop keeps the translucent blurred glass the round-7
+   look is built on. PHONES GET SOLID: a backdrop-filter over a live WebGL
+   canvas forces the compositor to re-read the framebuffer for every blurred
+   panel, every frame - measured as the single most expensive piece of phone
+   HUD chrome. The solid fill is the same hue at the blur's effective density,
+   so the look survives the substitution. */
+.hud-glass {
+  background: rgba(6, 9, 16, 0.62);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+[data-device='phone'] .hud-glass,
+[data-device='phone'].hud-glass {
+  background: rgba(6, 9, 16, 0.82);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* PHONE-ONLY blur kill, for surfaces that already own their look. Most of the
+   HUD does: the toast cards, the contracts panel, the inspect card and the
+   logbook each paint a specific INK CODEX gradient at a specific
+   `backdrop-blur-sm`/`-md` radius. .hud-glass would overwrite both with one
+   flat fill - a DESKTOP pixel change, which is not allowed. Those panels keep
+   every class they have today and just ADD this one, which contributes
+   NOTHING on desktop (no declaration at all) and drops the compositor's
+   framebuffer re-read on phones. Specificity 0,1,1 beats the 0,1,0 Tailwind
+   backdrop-blur utility, so no !important is needed.
+   Pair it with a `phone:bg-*` bump wherever the panel leaned on the blur for
+   legibility rather than only for depth. */
+[data-device='phone'] .hud-flat-phone,
+[data-device='phone'].hud-flat-phone {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Fluid display type for the full-bleed banners (boot wordmark, arrival
+   banner, warp label). Each clamp's UPPER bound is today's desktop size and
+   the slope is chosen so the clamp is already saturated well below any
+   desktop viewport - at >= 920px these resolve to exactly text-4xl (2.25rem)
+   and text-3xl (1.875rem), so the desktop harness screenshots are unmoved.
+   Below that they shrink instead of overflowing a 375px screen.
+
+   The line-heights are RATIOS, not the obvious `1.05`, and the ratio is the
+   one the Tailwind class they replace bakes in: text-4xl is 36px/40px = 1.111
+   and text-3xl is 30px/36px = 1.2. A round 1.05 would have been 2px shorter
+   at desktop size, which sounds like nothing until you remember these blocks
+   are centred by `-translate-y-1/2` (the warp stamp) or stack a caption under
+   themselves (the arrival banner and the boot wordmark) - a 2px box change
+   moves the whole composition. Ratios keep desktop exact AND keep the leading
+   proportional once the clamp starts shrinking. */
+.fly-display-xl {
+  font-size: clamp(1.5rem, 1.05rem + 2.2vw, 2.25rem); /* -> 2.25rem @ >=873px */
+  line-height: 1.1111111; /* = 40/36, i.e. text-4xl's 2.5rem at full size */
+}
+.fly-display-lg {
+  font-size: clamp(1.25rem, 0.9rem + 1.7vw, 1.875rem); /* -> 1.875rem @ >=918px */
+  line-height: 1.2; /* = 36/30, i.e. text-3xl's 2.25rem at full size */
+}
+

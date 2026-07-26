@@ -1,29 +1,23 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useDeviceLayout } from './use-device-layout';
 
 /**
- * Phone-sheet breakpoint (Tailwind `sm`). matchMedia, not a resize listener:
- * one state update when the breakpoint is actually crossed (rotation), never
- * per pixel. Drives layout + entrance direction + touch-target sizing, so the
- * geometry can live in constants instead of hard-coded utilities.
+ * "Render as a full-bleed sheet rather than a floating dialog." Drives layout,
+ * entrance direction and touch-target sizing for InspectModal / Logbook /
+ * HangarPanel, so the geometry can live in constants instead of hard-coded
+ * utilities.
  *
- * R16 "Living World": EXTRACTED VERBATIM from InspectModal.jsx (round 15 §A3,
- * where it was a private function) so the Logbook overlay and the inspect
- * sheet share ONE breakpoint definition — the same media string, the same
- * single state update. Mechanical move: InspectModal only swapped its local
- * function for this import; zero behavior change, zero testid change.
+ * R16 "Living World": extracted verbatim from InspectModal.jsx (round 15 §A3,
+ * where it was a private function) so the overlays share ONE breakpoint.
+ *
+ * ROUND 17: now a thin wrapper over `useDeviceLayout().isSheet`, which is the
+ * UNION `isPhone || width ≤ 639`. The width term is the old rule byte-for-byte
+ * (narrow desktop windows behave exactly as before); the `isPhone` term is the
+ * fix — a phone held in LANDSCAPE is 844 px wide, so it used to fail the width
+ * test and got a desktop-sized dialog on a 390 px-tall screen. Public API and
+ * return type are unchanged (a boolean), so existing call sites are untouched.
  */
 export function useSheetLayout() {
-  const [isSheet, setIsSheet] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches
-  );
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 639px)');
-    const onChange = () => setIsSheet(mq.matches);
-    onChange();
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
-  return isSheet;
+  return useDeviceLayout().isSheet;
 }

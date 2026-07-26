@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { MPS_TO_KT, M_TO_FT, RAD2DEG } from '@/lib/fly/coords';
 import { usePassportStore } from '@/stores/passport-store';
 import { useFlyStore } from '@/stores/fly-store';
-import { useIsTouch } from '@/hooks/use-is-touch';
+import { useDeviceLayout } from '@/hooks/use-device-layout';
 
 /**
  * Flight readouts. DOM text updated at 10Hz from the shared runtime via
@@ -15,7 +15,7 @@ export function FlyHUD({ runtime }) {
   // invisible outside the pause menu, making "why does it look flat?"
   // undiagnosable mid-flight. Store-subscribed, so it is always current.
   const qualityTier = useFlyStore((s) => s.qualityTier);
-  const isTouch = useIsTouch();
+  const { isTouch } = useDeviceLayout();
   const spdRef = useRef(null);
   const altRef = useRef(null);
   const aglRef = useRef(null);
@@ -74,9 +74,14 @@ export function FlyHUD({ runtime }) {
           const name = t.meta?.flight || t.meta?.r || t.hex?.toUpperCase() || '';
           const nm = (t.distM / 1852).toFixed(1);
           const cinema = useFlyStore.getState().cameraMode === 'cinema';
+          // Round 17: a phone has no C key. The chip used to tell touch
+          // players to "press C" for a camera they had no way to reach — it
+          // now names the cluster button that actually does it. Desktop text
+          // is byte-identical.
+          const cine = isTouch ? 'tap ◉' : 'C';
           chaseRef.current.textContent = cinema
-            ? `◉ CINEMA · ${name} · C to exit`
-            : `${mode === 'formation' ? '◎ FORMATION' : '◎ INTERCEPT'} · ${name} · ${nm}nm · C cinema`;
+            ? `◉ CINEMA · ${name} · ${cine} to exit`
+            : `${mode === 'formation' ? '◎ FORMATION' : '◎ INTERCEPT'} · ${name} · ${nm}nm · ${cine} cinema`;
           chaseRef.current.style.opacity = '1';
         } else {
           chaseRef.current.style.opacity = '0';
@@ -84,13 +89,22 @@ export function FlyHUD({ runtime }) {
       }
     }, 100);
     return () => clearInterval(id);
-  }, [runtime]);
+  }, [runtime, isTouch]);
 
   // max-sm: overrides keep desktop pixel-identical while the phone gets a
   // tighter, notch-safe strip (AGL + Spots fold away below 640px).
-  const cell = 'flex flex-col items-center px-3 max-sm:px-2';
-  const label = 'text-[9px] uppercase tracking-widest text-zinc-400 max-sm:text-[8px]';
-  const value = 'font-mono text-lg leading-6 text-zinc-50 max-sm:text-sm max-sm:leading-5';
+  //
+  // Round 17: every `max-sm:` rule is now MIRRORED by a `phone:` rule rather
+  // than replaced. `max-sm:` means "narrow window" and still fires for a
+  // narrow desktop; `phone:` means "this is a phone" and is the one that
+  // catches LANDSCAPE, where 844px of width sails past the sm breakpoint and
+  // the full eight-cell desktop strip used to land on a 390px-tall screen.
+  // Landscape squeezes a little further still — height is the scarce axis.
+  const cell = 'flex flex-col items-center px-3 max-sm:px-2 phone:px-2 phone-land:px-1.5';
+  const label =
+    'text-[9px] uppercase tracking-widest text-zinc-400 max-sm:text-[8px] phone:text-[8px]';
+  const value =
+    'font-mono text-lg leading-6 text-zinc-50 max-sm:text-sm max-sm:leading-5 phone:text-sm phone:leading-5 phone-land:text-[13px]';
 
   return (
     <>
@@ -101,17 +115,25 @@ export function FlyHUD({ runtime }) {
           On phones it sits below the notch-safe stats strip. */}
       <div
         ref={poiRef}
-        className="pointer-events-none absolute left-1/2 top-20 z-10 -translate-x-1/2 font-mono text-xs font-semibold uppercase tracking-[0.2em] text-amber-200/90 transition-opacity duration-500 [text-shadow:0_1px_4px_rgba(0,0,0,0.9)] max-sm:top-[calc(env(safe-area-inset-top)+4.75rem)]"
+        // Round 17: a testid so verify-mobile-layout can prove the toast band
+        // does not land on it (it did — caught in a landscape screenshot, not
+        // by a gate, which is why the gate now knows about this element).
+        data-testid="hud-poi"
+        className="pointer-events-none absolute left-1/2 top-20 z-10 -translate-x-1/2 font-mono text-xs font-semibold uppercase tracking-[0.2em] text-amber-200/90 transition-opacity duration-500 [text-shadow:0_1px_4px_rgba(0,0,0,0.9)] max-sm:top-[calc(env(safe-area-inset-top)+4.75rem)] phone:top-[calc(env(safe-area-inset-top)+4.75rem)] phone-land:top-[calc(env(safe-area-inset-top)+3.1rem)] phone:w-[92vw] phone:truncate phone:text-center"
       />
 
       {/* Active chase/intercept chip — visible payoff for the CHASE button */}
       <div
         ref={chaseRef}
         data-testid="hud-chase-chip"
-        className="pointer-events-none absolute left-1/2 top-27 z-10 -translate-x-1/2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200/90 opacity-0 transition-opacity duration-300 [text-shadow:0_1px_4px_rgba(0,0,0,0.9)] max-sm:top-[calc(env(safe-area-inset-top)+6.5rem)]"
+        className="pointer-events-none absolute left-1/2 top-27 z-10 -translate-x-1/2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200/90 opacity-0 transition-opacity duration-300 [text-shadow:0_1px_4px_rgba(0,0,0,0.9)] max-sm:top-[calc(env(safe-area-inset-top)+6.5rem)] phone:top-[calc(env(safe-area-inset-top)+6.5rem)] phone-land:top-[calc(env(safe-area-inset-top)+4.4rem)] phone:w-[92vw] phone:truncate phone:text-center"
       />
 
-      <div className="pointer-events-none absolute left-1/2 top-4 z-10 flex -translate-x-1/2 divide-x divide-zinc-700 rounded-lg bg-zinc-950/60 py-1.5 backdrop-blur-sm max-sm:top-[calc(env(safe-area-inset-top)+0.375rem)]">
+      {/* `hud-flat-phone` + a phone opacity bump replace the blur on phones:
+          a backdrop-filter over the live GL canvas makes the compositor
+          re-read the framebuffer every frame. Desktop keeps blur-sm and
+          bg-zinc-950/60 exactly. */}
+      <div className="hud-flat-phone pointer-events-none absolute left-1/2 top-4 z-10 flex -translate-x-1/2 divide-x divide-zinc-700 rounded-lg bg-zinc-950/60 py-1.5 backdrop-blur-sm max-sm:top-[calc(env(safe-area-inset-top)+0.375rem)] phone:top-[calc(env(safe-area-inset-top)+0.375rem)] phone-land:top-[calc(env(safe-area-inset-top)+0.25rem)] phone:bg-zinc-950/85 phone:py-1">
         <div className={cell}>
           <span className={label}>SPD KT</span>
           <span className={value} ref={spdRef}>—</span>
@@ -121,7 +143,7 @@ export function FlyHUD({ runtime }) {
           <span className={value} ref={altRef}>—</span>
         </div>
         {/* AGL folds away on phones — the compact strip keeps SPD/ALT/HDG/THR */}
-        <div className={`${cell} max-sm:hidden`}>
+        <div className={`${cell} max-sm:hidden phone:hidden`}>
           <span className={label}>AGL FT</span>
           <span className={value} ref={aglRef}>—</span>
         </div>
@@ -145,18 +167,18 @@ export function FlyHUD({ runtime }) {
           title="Open the pilot logbook (L)"
           aria-label="Open the pilot logbook"
           data-testid="hud-spots-cell"
-          className={`${cell} pointer-events-auto transition-colors hover:bg-white/5 max-sm:hidden`}
+          className={`${cell} pointer-events-auto transition-colors hover:bg-white/5 max-sm:hidden phone:hidden`}
         >
           <span className={label}>Spots</span>
           <span className={value} ref={spotsRef}>—</span>
         </button>
         {/* Live position — "where are we" (per user). Folds away on the compact
             phone strip; desktop shows lat/lon with N/S · E/W hemispheres. */}
-        <div className={`${cell} max-sm:hidden`}>
+        <div className={`${cell} max-sm:hidden phone:hidden`}>
           <span className={label}>Lat</span>
           <span className={value} ref={latRef}>—</span>
         </div>
-        <div className={`${cell} max-sm:hidden`}>
+        <div className={`${cell} max-sm:hidden phone:hidden`}>
           <span className={label}>Lon</span>
           <span className={value} ref={lonRef}>—</span>
         </div>
@@ -166,7 +188,7 @@ export function FlyHUD({ runtime }) {
           self-explanatory, so drop the mouse/keyboard sentence and keep only
           the tiny live quality-tier chip (out of the way, above attribution). */}
       {isTouch ? (
-        <div className="pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2">
+        <div className="pointer-events-none absolute bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] left-1/2 z-10 -translate-x-1/2">
           <span
             data-testid="hud-quality-tier"
             className="font-mono text-[10px] uppercase tracking-widest text-zinc-500/80"
@@ -176,7 +198,7 @@ export function FlyHUD({ runtime }) {
         </div>
       ) : (
         <div className="pointer-events-none absolute bottom-8 left-1/2 z-10 -translate-x-1/2 rounded bg-zinc-950/50 px-3 py-1 text-[11px] text-zinc-400">
-          Steer with the mouse · WASD/arrows · 1/2/3 speed · Shift boost · RMB look · click a plane (or T on a lock) to inspect &amp; warp · F intercept · Esc menu
+          Steer with the mouse · WASD/arrows · 1/2/3 speed · Shift boost · RMB look · click a plane (or T on a lock) to inspect &amp; warp · F intercept · P photo · Esc menu
           <span
             data-testid="hud-quality-tier"
             className="ml-2 font-mono text-[10px] uppercase tracking-widest text-zinc-500"

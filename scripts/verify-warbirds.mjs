@@ -39,9 +39,18 @@ const ALLOWED_ARCH = new Set([
   'warbird-prop', 'warbird-jet', 'warbird-heavy', 'classic-transport',
   'prop', 'jet', 'helicopter',
 ]);
+// R17 SANCTIONED RE-BASELINE: `prop` 0 → 10 and `jet` 0 → 15.
+// CLASSIFICATION_RARITY only ever held the deleted 2D vocabulary, so the FLY
+// archetypes airliner/jet/prop/glider/drone scored base 0. R17 gives them real
+// bases; the warbird table is untouched, but 72 of its 170 codes carry the
+// plain 'prop' archetype (Cubs, RVs, Champs — honest light aircraft that are
+// not warbirds) and so move +10. Measured effect on the histogram below:
+// common 12 → 0, uncommon 50 → 39, rare 26 → 49; epic/legendary/mythic
+// unmoved, max still 97. No warbird carries the 'jet' archetype, so the jet
+// base moves nothing here.
 const BASE_MAP = {
   'warbird-prop': 45, 'warbird-jet': 45, 'warbird-heavy': 50,
-  'classic-transport': 40, prop: 0, jet: 0, helicopter: 30,
+  'classic-transport': 40, prop: 10, jet: 15, helicopter: 30,
 };
 
 // --- source-parse helpers ---------------------------------------------------
@@ -243,10 +252,13 @@ const setsEqual = (a, b) => a.size === b.size && [...a].every((k) => b.has(k));
     // cross-check the hard-coded base map against source CLASSIFICATION_RARITY
     const raritySrc = read('lib/rarity.js');
     const classBase = parseNumberMap(objectBody(raritySrc, 'CLASSIFICATION_RARITY'));
-    const baseOk = ['warbird-prop', 'warbird-jet', 'warbird-heavy', 'classic-transport', 'helicopter']
-      .every((a) => classBase[a] === BASE_MAP[a]) &&
-      classBase.prop === undefined && classBase.jet === undefined; // prop/jet fall to || 0
-    gate('e0 base map matches CLASSIFICATION_RARITY (prop/jet → 0)', baseOk,
+    // R17: prop/jet are now REAL keys (see the BASE_MAP note above), so the
+    // assertion flips from "absent" to "equal" — the model and the source must
+    // agree on the value, which is the stronger statement anyway.
+    const baseOk = ['warbird-prop', 'warbird-jet', 'warbird-heavy', 'classic-transport',
+      'helicopter', 'prop', 'jet']
+      .every((a) => classBase[a] === BASE_MAP[a]);
+    gate('e0 base map matches CLASSIFICATION_RARITY (incl. R17 prop 10 / jet 15)', baseOk,
       `wp=${classBase['warbird-prop']} wj=${classBase['warbird-jet']} wh=${classBase['warbird-heavy']} ct=${classBase['classic-transport']} heli=${classBase.helicopter} prop=${classBase.prop} jet=${classBase.jet}`);
 
     const TIERS = [

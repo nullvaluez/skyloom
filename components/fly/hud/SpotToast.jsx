@@ -4,10 +4,14 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { usePassportStore } from '@/stores/passport-store';
 import { useFlyStore } from '@/stores/fly-store';
+import { useFlyContractsStore } from '@/stores/fly-contracts-store';
 import { calculateRarity, getRarityTier, RARITY_TIERS } from '@/lib/rarity';
 import { getAircraftTypeName } from '@/lib/aircraft-type-names';
 import { BADGES, BADGE_TIERS } from '@/lib/badges';
-import { SPICY } from '@/lib/fly/fly-constants';
+import { MOBILE_UI, SPICY } from '@/lib/fly/fly-constants';
+import { trackSpotAttrs } from '@/lib/fly/spot-attrs';
+import { Zone } from '../LayoutRoot';
+import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { CARD_THEME } from './inspect/inspect-tokens';
 
 const TOAST_MS = 3500;
@@ -15,9 +19,14 @@ const SPICY_TOAST_MS = 4800;
 // Badges are rarer and carry more text (name + description) — they need a
 // beat longer on screen than a spot stamp.
 const BADGE_TOAST_MS = 5200;
+// A contract stamp is short (label + points) — it does not need the badge dwell.
+const CONTRACT_TOAST_MS = 4200;
 const MAX_STACK = 2;
 const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 const MILITARY_ACCENT = '#f87171';
+// PALETTE.accentGreen — the same "objective cleared" green the Contracts panel
+// stamps a completed row with (var(--contract-done)).
+const CONTRACT_ACCENT = '#4ade80';
 
 /**
  * ONE toast stack for both spotting reward flavors:
@@ -31,9 +40,11 @@ const MILITARY_ACCENT = '#f87171';
  *   qualifying hex → "◆ SPICY" toast with type + bearing, a minimap
  *   attention ring (runtime.spicyPulse) and the tiered blip. Rarity is
  *   computed once per hex and cached; a hex never re-pings this session.
- * - Badge unlocks (round 16): the passport's 24 achievements have unlocked in
+ * - Badge unlocks (round 16): the passport's achievements have unlocked in
  *   TOTAL SILENCE since they shipped. A new badge now stamps in with its icon,
  *   name, description and tier chip.
+ * - Contract completions (round 17): a cleared objective + its payout, riding
+ *   the same deferred queue as badges.
  *
  * Round-16 queueing note: badges — and ONLY badges — defer instead of
  * evicting. The three existing push paths are byte-preserved (verify-spicy and
@@ -43,6 +54,11 @@ const MILITARY_ACCENT = '#f87171';
  */
 export function SpotToast({ runtime }) {
   const [toasts, setToasts] = useState([]);
+  // Round 17: layout ONLY. Not one line of the queueing/eviction machinery
+  // below reads this — the push paths, MAX_STACK, pendingRef and the drain
+  // effect are byte-identical to R16, because verify-spicy and
+  // verify-airport-buzz gate their exact behavior.
+  const { isPhone, orientation } = useDeviceLayout();
   const seenHead = useRef(usePassportStore.getState().spottedAircraft[0]?.timestamp ?? 0);
   const idRef = useRef(0);
   const pendingRef = useRef([]); // badge toasts waiting for a free slot
@@ -121,12 +137,10 @@ export function SpotToast({ runtime }) {
         if (distNm > SPICY.maxRangeNm) continue;
         let score = rarityByHex.get(it.hex);
         if (score == null) {
-          score = calculateRarity({
-            _classification: it.meta.iconType,
-            t: it.meta.t,
-            flight: it.meta.flight,
-            squawk: it.meta.squawk,
-          });
+          // R17: the shared builder (lib/fly/spot-attrs.js) — the ping now
+          // scores the SAME attribute set the card shows and the passport
+          // stores, so a contact can't ping at one tier and log at another.
+          score = calculateRarity(trackSpotAttrs(it));
           rarityByHex.set(it.hex, score);
         }
         const tier = getRarityTier(score);
@@ -209,6 +223,32 @@ export function SpotToast({ runtime }) {
     });
   }, []);
 
+  // --- Round 17: contract completions (SAME deferred queue as badges) ------
+  // Completing a contract used to be announced by nothing but a 2.6s
+  // strikethrough in a 10rem panel in the corner. It rides the R16 pendingRef
+  // path for exactly the R16 reason: the spot / SPICY / buzz push paths are
+  // gated by verify-spicy and verify-airport-buzz and stay byte-identical, so
+  // a completion waits for a slot instead of evicting a live ping.
+  useEffect(() => {
+    let prevAt = useFlyContractsStore.getState().lastCompleted?.at ?? 0;
+    return useFlyContractsStore.subscribe((state) => {
+      const c = state.lastCompleted;
+      if (!c || !(c.at > prevAt)) return;
+      prevAt = c.at;
+      pendingRef.current.push({
+        id: idRef.current++,
+        contract: true,
+        ms: CONTRACT_TOAST_MS,
+        accent: CONTRACT_ACCENT,
+        label: c.daily ? '◈ daily complete' : '◈ contract complete',
+        title: c.label || 'contract',
+        type: '',
+        pts: c.pts,
+      });
+      setPendingTick((t) => t + 1);
+    });
+  }, []);
+
   // Dev telemetry: the LIVE stack length. The DOM can transiently hold more
   // badge-toast nodes than MAX_STACK while AnimatePresence plays exit springs
   // (an expiring card + its admitted replacement coexist for ~400ms) — the
@@ -231,43 +271,38 @@ export function SpotToast({ runtime }) {
     setToasts((prev) => [next, ...prev].slice(0, MAX_STACK));
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== next.id));
-    }, BADGE_TOAST_MS);
+    }, next.ms ?? BADGE_TOAST_MS); // badges push no `ms` → unchanged dwell
   }, [toasts, pendingTick, runtime]);
 
+  // A phone card is TWO lines. One line of "label · CALLSIGN · type · tier"
+  // measures ~430px; a 375px iPhone SE clipped the tier chip clean off and a
+  // badge description ran ~180px past the right edge. Splitting it is a
+  // MARKUP change only — same spans, same styles, same testids, regrouped.
+  const phone = isPhone;
+  const land = phone && orientation === 'landscape';
+
   return (
-    <div className="pointer-events-none absolute right-4 top-16 z-10 flex flex-col items-end gap-2">
+    <Zone
+      name="toasts"
+      className={`flex flex-col items-end gap-2 phone-port:items-stretch phone-land:items-center`}
+    >
       <AnimatePresence>
-        {toasts.map((t) => (
-          <motion.div
-            key={t.id}
-            initial={{ opacity: 0, x: 60, scale: 0.85, rotate: 3 }}
-            animate={{ opacity: 1, x: 0, scale: 1, rotate: 0 }}
-            exit={{ opacity: 0, x: 40, scale: 0.9 }}
-            transition={{ type: 'spring', stiffness: 380, damping: 24 }}
-            className="overflow-hidden rounded-xl border backdrop-blur-md"
-            style={{
-              // Fixed dark glass — CARD_THEME.bg* went transparent for the
-              // round-7 inspect redesign; toasts must stay readable.
-              background: 'linear-gradient(180deg, rgba(16, 19, 34, 0.9), rgba(7, 10, 20, 0.94))',
-              borderColor: `${t.accent}66`,
-              boxShadow: `0 8px 28px rgba(2, 4, 10, 0.6), 0 0 18px ${t.accent}22`,
-            }}
-            data-testid={
-              t.badge
-                ? 'badge-toast'
-                : t.buzz
-                  ? 'buzz-toast'
-                  : t.spicy
-                    ? 'spicy-toast'
-                    : 'spot-toast'
-            }
-          >
-            <div className="flex items-center gap-2.5 px-3.5 py-2">
-              <span
-                className="text-[10px] uppercase tracking-[0.18em]"
-                style={{ fontFamily: CARD_THEME.fontDisplay, color: t.accent }}
-              >
-                {t.badge
+        {toasts.map((t) => {
+          const labelEl = (
+            <span
+              // `truncate` (with min-w-0, which it needs to bite) ONLY on the
+              // phone: "⬢ 🐋 badge earned" at 0.18em tracking is ~130px and
+              // WRAPPED inside a 262px card, turning the two-line design into
+              // three lines and pushing the stack down into the contracts
+              // panel. Clipping a label is fine; growing the card is not.
+              className={`text-[10px] uppercase tracking-[0.18em] ${
+                phone ? 'min-w-0 truncate' : ''
+              }`}
+              style={{ fontFamily: CARD_THEME.fontDisplay, color: t.accent }}
+            >
+              {t.contract
+                ? t.label
+                : t.badge
                   ? `⬢ ${t.icon} badge earned`
                   : t.buzz
                     ? t.label
@@ -276,39 +311,117 @@ export function SpotToast({ runtime }) {
                       : t.isNew
                         ? '⟬ new spot! ⟭'
                         : 'spotted'}
-              </span>
-              <span
-                className="font-mono text-[12px] font-bold"
-                style={{ color: CARD_THEME.ice }}
-              >
-                {t.title}
-              </span>
-              {t.type && (
-                <span
-                  // Badge descriptions are full sentences — cap them so a
-                  // toast can never run off the right edge of the screen.
-                  className={`font-mono text-[10px] ${t.badge ? 'max-w-[240px] truncate' : ''}`}
-                  style={{ color: CARD_THEME.iceDim }}
-                >
-                  {t.type}
-                </span>
+            </span>
+          );
+          const titleEl = (
+            <span
+              className={`font-mono text-[12px] font-bold ${
+                phone ? 'shrink-0 whitespace-nowrap' : ''
+              }`}
+              style={{ color: CARD_THEME.ice }}
+            >
+              {t.title}
+            </span>
+          );
+          const typeEl = t.type ? (
+            <span
+              // Badge descriptions are full sentences — cap them so a
+              // toast can never run off the right edge of the screen.
+              // On a phone the card is full-width, so the cap becomes
+              // "whatever is left on this line" instead of a magic 240px.
+              className={`font-mono text-[10px] ${
+                phone
+                  ? 'min-w-0 flex-1 truncate whitespace-nowrap'
+                  : t.badge
+                    ? 'max-w-[240px] truncate'
+                    : ''
+              }`}
+              style={{ color: CARD_THEME.iceDim }}
+            >
+              {t.type}
+            </span>
+          ) : null;
+          const trailEl = t.contract ? (
+            <span className="font-mono text-[11px] font-bold" style={{ color: t.accent }}>
+              +{t.pts}
+            </span>
+          ) : t.spicy ? (
+            <span className="font-mono text-[10px] font-bold" style={{ color: CARD_THEME.ice }}>
+              {t.where}
+            </span>
+          ) : t.tier ? (
+            <span
+              className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider"
+              style={{ color: t.tier.color, background: `${t.tier.color}1a` }}
+            >
+              {t.tier.name}
+            </span>
+          ) : null;
+
+          return (
+            <motion.div
+              key={t.id}
+              // Desktop keeps the exact round-16 spring and offsets. A
+              // full-width phone card cannot slide in from "off the right
+              // edge" — there is no right edge left — so it drops in.
+              initial={
+                phone
+                  ? { opacity: 0, y: -14, scale: 0.96 }
+                  : { opacity: 0, x: 60, scale: 0.85, rotate: 3 }
+              }
+              animate={
+                phone
+                  ? { opacity: 1, y: 0, scale: 1 }
+                  : { opacity: 1, x: 0, scale: 1, rotate: 0 }
+              }
+              exit={phone ? { opacity: 0, y: -10, scale: 0.97 } : { opacity: 0, x: 40, scale: 0.9 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 24 }}
+              className="hud-flat-phone overflow-hidden rounded-xl border backdrop-blur-md"
+              style={{
+                // Fixed dark glass — CARD_THEME.bg* went transparent for the
+                // round-7 inspect redesign; toasts must stay readable.
+                background: 'linear-gradient(180deg, rgba(16, 19, 34, 0.9), rgba(7, 10, 20, 0.94))',
+                borderColor: `${t.accent}66`,
+                boxShadow: `0 8px 28px rgba(2, 4, 10, 0.6), 0 0 18px ${t.accent}22`,
+                // Landscape: bounded and centred under the strip, so an 844px
+                // phone does not get a 6cm-wide banner.
+                width: land ? MOBILE_UI.toast.landWidth : undefined,
+              }}
+              data-testid={
+                t.contract
+                  ? 'contract-toast'
+                  : t.badge
+                    ? 'badge-toast'
+                    : t.buzz
+                      ? 'buzz-toast'
+                      : t.spicy
+                        ? 'spicy-toast'
+                        : 'spot-toast'
+              }
+            >
+              {phone ? (
+                <div className="px-3 py-1.5">
+                  <div className="flex items-baseline justify-between gap-2">
+                    {labelEl}
+                    {titleEl}
+                  </div>
+                  <div className="mt-0.5 flex items-baseline justify-between gap-2">
+                    {typeEl ?? <span />}
+                    {trailEl}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2.5 px-3.5 py-2">
+                  {labelEl}
+                  {titleEl}
+                  {typeEl}
+                  {trailEl}
+                </div>
               )}
-              {t.spicy ? (
-                <span className="font-mono text-[10px] font-bold" style={{ color: CARD_THEME.ice }}>
-                  {t.where}
-                </span>
-              ) : t.tier ? (
-                <span
-                  className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider"
-                  style={{ color: t.tier.color, background: `${t.tier.color}1a` }}
-                >
-                  {t.tier.name}
-                </span>
-              ) : null}
-            </div>
-          </motion.div>
-        ))}
+            </motion.div>
+          );
+        })}
       </AnimatePresence>
-    </div>
+    </Zone>
   );
 }

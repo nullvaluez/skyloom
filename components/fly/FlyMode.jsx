@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FlyErrorBoundary } from './FlyErrorBoundary';
 import { FlyCanvas } from './FlyCanvas';
+import { LayoutRoot, Zone } from './LayoutRoot';
 import { AttributionBar } from './hud/AttributionBar';
 import { FlyHUD } from './hud/FlyHUD';
 import { LabelCanvas } from './hud/LabelCanvas';
@@ -16,17 +17,21 @@ import { Contracts } from './hud/Contracts';
 import { WarpFlash } from './hud/WarpFlash';
 import { Atlas } from './hud/Atlas';
 import { Logbook } from './hud/Logbook';
+import { HangarPanel } from './hud/HangarPanel';
 import { ArrivalBanner } from './hud/ArrivalBanner';
 import { TouchControls } from './hud/TouchControls';
+import { PhotoModeBar } from './hud/PhotoModeBar';
 import { PauseMenu } from './PauseMenu';
 import { BootScreen } from './hud/BootScreen';
 import { useFlyTraffic } from '@/hooks/use-fly-traffic';
 import { useFlyWeather } from '@/hooks/use-fly-weather';
 import { useFlyAudio } from '@/hooks/use-fly-audio';
-import { useIsTouch } from '@/hooks/use-is-touch';
+import { deviceAttr, useDeviceLayout } from '@/hooks/use-device-layout';
+import { useGLTF } from '@react-three/drei';
 import { BOOT } from '@/lib/fly/fly-constants';
 import { resolveInitialMapStyle } from '@/lib/fly/map-style';
 import { resolveInitialSettings } from '@/lib/fly/fly-settings';
+import { resolveAircraft, resolveInitialAircraft } from '@/lib/fly/player-aircraft';
 import { useFlyStore } from '@/stores/fly-store';
 
 // Fallback spawn: NYC harbor — dense airspace, good demo
@@ -75,6 +80,19 @@ function getSpawnLatLon() {
 }
 
 /**
+ * Round 17: a layout- and stacking-transparent wrapper (display:contents)
+ * that flips to display:none in photo mode. Children stay MOUNTED — their
+ * refs, queues and intervals survive the trip.
+ */
+function HudGroup({ hidden, children }) {
+  return (
+    <div className={hidden ? 'hidden' : 'contents'} data-photo-hidden={hidden ? '1' : '0'}>
+      {children}
+    </div>
+  );
+}
+
+/**
  * Fullscreen Fly-mode container. Round 9 (fly-only pivot): mounted directly
  * by app/page.js — the game IS the app. The FlyCanvas mounts as soon as the
  * spawn resolves, under the BootScreen overlay, which reveals once the
@@ -82,7 +100,15 @@ function getSpawnLatLon() {
  */
 export function FlyMode({ onClose }) {
   const spawn = useFlyStore((s) => s.spawn);
-  const isTouch = useIsTouch();
+  // Round 17: ONE device description for the whole HUD. `isTouch` is the same
+  // boolean useIsTouch() always returned (that hook is now a wrapper over this
+  // one); the extra fields are what let the overlays stop disagreeing about
+  // what a phone is. Stamped onto the root below as data-device/data-orient,
+  // which is what the phone:/phone-land:/phone-port: CSS variants key off.
+  const device = useDeviceLayout();
+  const isTouch = device.isTouch;
+  // Round 17: photo mode hides the HUD (see the wrapper in the tree below).
+  const photoActive = useFlyStore((s) => s.cameraMode === 'photo');
 
   // Shared per-frame runtime: engine/flight/input handles written by the
   // scene, read by DOM overlays at low frequency. Never React state.
@@ -112,6 +138,16 @@ export function FlyMode({ onClose }) {
     // for the same reason — the scene should be built at the tier the player
     // chose rather than built at 'high' and degraded afterwards.
     resolveInitialSettings();
+    // Round 17: the saved AIRCRAFT resolves on that same pre-mount beat and for
+    // the same round-11 reason — FlyScene builds its FlightModel from
+    // aircraftId once, so the pick must be in the store before the canvas
+    // exists. Then get the chosen GLB in flight immediately: without this, a
+    // saved Leviathan would mount, Suspense-fall back to the primitive plane,
+    // and pop in a second later (the fighter is preloaded at import time by
+    // PlayerPlane, so only NON-default picks need this).
+    resolveInitialAircraft();
+    const picked = resolveAircraft(useFlyStore.getState().aircraftId);
+    useGLTF.preload(picked.entry.url);
     getSpawnLatLon().then(([lat, lon]) => {
       if (cancelled) return;
       const fly = useFlyStore.getState();
@@ -148,7 +184,9 @@ export function FlyMode({ onClose }) {
     };
   }, []);
 
-  // Escape priority: inspect → atlas → logbook → credits → pause/resume.
+  // Escape priority: inspect → photo → atlas → logbook → hangar → credits →
+  // pause/resume. (Round 17: photo sits directly under inspect — the inspect
+  // card can be opened from inside photo mode, so it must unwind first.)
   //
   // Round 16: the L (Logbook) toggle lives in THIS listener, deliberately —
   // the Atlas's private 'm' handler is a standing lesson that a second window
@@ -160,8 +198,10 @@ export function FlyMode({ onClose }) {
       const store = useFlyStore.getState();
       if (e.key === 'Escape') {
         if (store.inspectHex) store.setInspectHex(null);
+        else if (store.cameraMode === 'photo') store.setCameraMode('chase');
         else if (store.atlasOpen) store.setAtlasOpen(false);
         else if (store.logbookOpen) store.setLogbookOpen(false);
+        else if (store.hangarOpen) store.setHangarOpen(false); // round 17
         else if (store.creditsOpen) store.closeCredits();
         else if (store.phase === 'paused') store.setPhase('flying');
         else store.setPhase('paused');
@@ -211,24 +251,69 @@ export function FlyMode({ onClose }) {
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black">
+    <div
+      className="fixed inset-0 z-50 bg-black"
+      // Round 17 mobile overhaul. These three attributes are the whole device
+      // contract: `data-fly-root` scopes the globals.css game-surface rules
+      // (no rubber-band scroll, no double-tap zoom, no grey tap flash) to this
+      // subtree, and data-device/data-orient drive the phone:/phone-land:/
+      // phone-port: custom variants. On desktop they resolve to
+      // device="desktop" / orient="portrait|landscape" and NO variant matches,
+      // so every desktop pixel is unchanged.
+      data-fly-root=""
+      data-device={deviceAttr(device)}
+      data-orient={device.orientation}
+    >
       <FlyErrorBoundary onExit={onClose}>
         {spawn && <FlyCanvas runtime={runtimeRef.current} />}
       </FlyErrorBoundary>
 
-      {/* POI names are in-world 3D letters (PoiLetters) in every style */}
-      <LabelCanvas runtime={runtimeRef.current} />
-      <FlyHUD runtime={runtimeRef.current} />
-      <Minimap runtime={runtimeRef.current} />
-      <InfoCard runtime={runtimeRef.current} />
+      {/* Named layout zones (MOBILE_UI.zones). Empty scaffolding until the
+          overlays migrate in — an empty pointer-events-none absolute div has
+          zero size and paints nothing, so this mount is inert on every
+          device. Mounted here, early, because every zone member is z-10 and
+          every overlay that must cover them is z-20+. */}
+      <LayoutRoot />
+
+      {/* Round 17 photo mode: the flying HUD is HIDDEN, never unmounted.
+          `contents` makes the wrapper invisible to layout AND to stacking, so
+          every child keeps positioning/painting against the fixed root exactly
+          as before; `hidden` is display:none, which keeps Contracts' progress
+          refs, the SpotToast queue and their intervals alive — an unmount
+          would silently reset a session's contract progress every time someone
+          framed a shot.
+          FOUR wrappers, not one, and NOTHING is re-ordered: half of these
+          overlays share a z-index (six sit at z-20, six at z-10), so among
+          equals DOM order IS paint order. One wrapper would have meant moving
+          InspectModal/Atlas/ArrivalBanner past each other and quietly
+          re-stacking the non-photo HUD — the round's "default is
+          bit-identical" rule covers pixels, not just numbers.
+          AttributionBar, PauseMenu, WarpFlash, BootScreen and PhotoModeBar
+          stay OUTSIDE: the Esri credit is required in EVERY UI state, and the
+          shutter/exit must survive the state that hides everything else. */}
+      <HudGroup hidden={photoActive}>
+        {/* POI names are in-world 3D letters (PoiLetters) in every style */}
+        <LabelCanvas runtime={runtimeRef.current} />
+        <FlyHUD runtime={runtimeRef.current} />
+        <Minimap runtime={runtimeRef.current} />
+        <InfoCard runtime={runtimeRef.current} />
+      </HudGroup>
       <InspectModal runtime={runtimeRef.current} />
-      <SpotToast runtime={runtimeRef.current} />
-      <Contracts runtime={runtimeRef.current} />
+      <HudGroup hidden={photoActive}>
+        <SpotToast runtime={runtimeRef.current} />
+        <Contracts runtime={runtimeRef.current} />
+      </HudGroup>
       <Atlas runtime={runtimeRef.current} />
       <Logbook />
-      <ArrivalBanner />
+      <HangarPanel />
+      <HudGroup hidden={photoActive}>
+        <ArrivalBanner />
+      </HudGroup>
       <WarpFlash runtime={runtimeRef.current} />
-      {isTouch && <TouchControls runtime={runtimeRef.current} />}
+      <HudGroup hidden={photoActive}>
+        {isTouch && <TouchControls runtime={runtimeRef.current} />}
+      </HudGroup>
+      <PhotoModeBar />
       <PauseMenu onExit={onClose} />
       <AttributionBar />
 
@@ -246,15 +331,17 @@ export function FlyMode({ onClose }) {
       {/* Desktop keeps the quick-exit X (top-right); touch replaces it with the
           Pause button in TouchControls, whose menu carries Exit. */}
       {!isTouch && (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onClose}
-          aria-label="Exit Fly Mode"
-          className="absolute right-4 top-4 z-10 bg-zinc-900/60 text-zinc-100 hover:bg-zinc-800"
-        >
-          <X className="h-5 w-5" />
-        </Button>
+        <Zone name="exit">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            aria-label="Exit Fly Mode"
+            className="pointer-events-auto bg-zinc-900/60 text-zinc-100 hover:bg-zinc-800"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        </Zone>
       )}
     </div>
   );

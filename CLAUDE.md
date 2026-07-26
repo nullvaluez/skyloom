@@ -12,7 +12,54 @@
 > describes deleted code (markers, panels, Leaflet-era plans); do not act
 > on it.
 
-> **⚠️ NEWEST — READ FIRST:** **Round 16 "Living World" is BUILT (2026-07-24):
+> **⚠️ NEWEST — READ FIRST:** **Round 17 "Your Wings" is BUILT (2026-07-25):
+> [FLY_ROUND17.md](FLY_ROUND17.md) is the record** (plan
+> [FLY_ROUND17_PLAN.md](FLY_ROUND17_PLAN.md); five Opus 5 agents in two waves
+> under Fable orchestration). **(1) PLAYER HANGAR** — 9 selectable aircraft
+> (NEW `lib/fly/player-aircraft.js` manifest, NOT assets.js — verify-fleet's
+> count arithmetic never moved; helicopter excluded, no hover model) with
+> DISTINCT flight feel via the new `flight.cfg` seam (`FlightModel(cfg)`;
+> chase-cam/autopilot/audio read the aircraft's own envelope); persistence =
+> the fly-settings pre-mount pattern (`fly-aircraft`); **default = the
+> fighter, value-identical** (bootFly never seeds the key — zero harness
+> moves); rollback `HANGAR.enabled:false`; gate verify-hangar (16).
+> **(2) PROGRESSION REPAIR + LIVING CONTRACTS** — ONE `lib/fly/spot-attrs.js`
+> helper at all three spot sites (persisted ≡ displayed rarity; squawk
+> badges + emergencyCount finally reachable); `concorde_heir` got a real
+> case; CLASSIFICATION_RARITY speaks Fly vocabulary (airliner 10/jet 15/
+> prop 10/glider 45/drone 50 — A320 no longer rarity 0; NEW intended ping:
+> 7700 airliner = 90 legendary); contract progress PERSISTS
+> (`fly-contracts-active-v1` sibling key — the `fly-contracts` envelope is a
+> harness contract); 9 weather/night/POI-tag templates appended after
+> touch-go (toy NEVER deals weather/night — toy has no live `runtime.sun`);
+> deterministic DAILY set ×2 pay (`lib/fly/daily.js`, `__flyDayOverride`);
+> gates verify-daily (28) + verify-living-contracts (16); SANCTIONED
+> re-baselines: verify-warbirds e0/BASE_MAP, verify-logbook badges 24→26.
+> **(3) PHOTO MODE** — P/touch button, orbit+zoom, flight keeps flying,
+> HUD hidden-not-unmounted (AttributionBar ALWAYS visible), capture reads
+> the canvas same-rAF POST-EffectComposer (preserveDrawingBuffer stays
+> false) and bakes the style's attribution; gate verify-photo (10).
+> **(4) MOBILE OVERHAUL** — `hooks/use-device-layout.js` is the ONE device
+> truth (`isSheet = isPhone || ≤639` union: landscape phones get sheets);
+> named zones in `LayoutRoot.jsx` carry desktop offsets VERBATIM (desktop
+> byte-identity MEASURED); overflows dead (two-line toasts, InfoCard→chip,
+> clamp() banners); complete touch scheme (LOGBOOK/PHOTO/BOOST + contextual
+> INSPECT/INTERCEPT/CINEMA ride `input.press()` into the EXISTING key
+> machines); tap-leak fixed (stopPropagation + `[data-zone]` exclusion);
+> Atlas pinch; Android back; **phone contracts panel collapses to a chip in
+> BOTH orientations**; `.hud-glass`/`.hud-flat-phone` kill phone
+> backdrop-filter; gate **verify-mobile-layout (390×844 AND 844×390,
+> measures overlap/overflow/44px)** + verify-mobile now 28.
+> **Post-round harness archaeology (FLY_ROUND17.md §7.1):** verify-sat-night's
+> noon pixel gates had passed R16 on the HERO'S IDLE BOB, not road glow —
+> control-experimented against the pre-R17 build; probes now hide
+> `window.__flyPlayer` + traffic, residual road-pixel gates demoted to
+> informational. A pixel-probe gate must not contain an actor it doesn't
+> control. **§6 = the R17 user checkpoint table PENDING** (aircraft feel,
+> rarity re-base, daily set, photo output, phone portrait/landscape — plus
+> carried R15 §6 + R16 §6).
+>
+> Earlier: **Round 16 "Living World" is BUILT (2026-07-24):
 > [FLY_ROUND16.md](FLY_ROUND16.md) is the record** (plan
 > [FLY_ROUND16_PLAN.md](FLY_ROUND16_PLAN.md); five Opus 5 agents in two waves
 > under Fable orchestration). Satellite-first: **(1) REAL WEATHER** — NEW
