@@ -474,13 +474,21 @@ let CRASH_MIN_SPEED = 0;
     );
     // Sample hard through the whole arm window — the DEM streams in during it
     // and shoves the floor up past the aircraft.
+    //
+    // W2 sweep fix (Fable): judge "inside the window" by the APP's own armT,
+    // not this loop's wall clock — t0 predates the warp round-trip, so under
+    // a heavy streaming tree the loop's last samples can legitimately land
+    // after the app's 5.0 s arm crossing and read armed=true (one sweep run
+    // did exactly that: epoch 0, invariant intact, auxiliary check raced).
+    // The crash-immunity half (epoch === 0) deliberately KEEPS the full
+    // wall-clock span — armed-and-still-no-crash is a stronger claim.
     let worstAgl = Infinity;
     let epoch = 0;
     let armedDuring = false;
     while (Date.now() - t0 < 5200) {
       const s = await snap(page);
       epoch = Math.max(epoch, s.epoch);
-      armedDuring = armedDuring || s.armed;
+      if (s.armT != null && s.armT < 5.0) armedDuring = armedDuring || s.armed;
       worstAgl = Math.min(worstAgl, s.agl);
       await page.waitForTimeout(150);
     }
