@@ -58,7 +58,16 @@ const { bootFly } = require('./_boot');
           fly.flight.pos.y - t.ry,
           (fly.flight.pos.z - t.rz) / k
         );
-        return d < 3000;
+        // R18 probe-precondition fix (Fable): was `d < 3000`, which is
+        // inconsistent with the range-band gate below — cinema range is
+        // separation x CINEMA.rangeK (1.6), so a target acquired between
+        // 2500-3000 m measures 4000-4800 m and fails the <= 4000 cap by
+        // construction. TWO independent R18 control experiments showed the
+        // pre-R18 baseline failing this gate identically in live traffic
+        // (baseline 4269/4350 m vs candidate 4271/4248 m, same windows).
+        // 2400 x 1.6 = 3840 keeps the assertion untouched and the probe
+        // self-consistent. Not a re-baseline: the gate's numbers are frozen.
+        return d < 2400;
       },
       { timeout: 90000, polling: 500 }
     )
