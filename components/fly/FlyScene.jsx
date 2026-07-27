@@ -71,6 +71,7 @@ import {
   SAT_BUILDINGS,
   SAT_CITY_GLOW,
   SAT_ROADS,
+  SAT_SKYLINE,
   SKY,
   SKY_LIVE,
   TOY,
@@ -94,6 +95,7 @@ import { TrafficLayer } from './TrafficLayer';
 import { ToyWorldLayer } from './ToyWorldLayer';
 import { SatBuildingLayer } from './SatBuildingLayer';
 import { SatRoadLayer } from './SatRoadLayer';
+import { SatSkylineLayer } from './SatSkylineLayer';
 import { SatCityGlow } from './SatCityGlow';
 import { SatEnvironment } from './SatEnvironment';
 import { PrecipLayer } from './PrecipLayer';
@@ -1425,6 +1427,12 @@ export function FlyScene({ runtime }) {
             draws, no globals. */}
         {mapStyle === 'satellite' && SAT_ROADS.enabled && qualityTier !== 'low' && (
           <SatRoadLayer runtime={runtime} flight={flight} />
+        )}
+        {/* Round 18 (A2): the DISTANT BLOCK-MASS skyline ring — the city past
+            the detail bubble, and the city that survives the climb. Same
+            &&-chain / same worldRoot reason as the two layers above. */}
+        {mapStyle === 'satellite' && SAT_SKYLINE.enabled && qualityTier !== 'low' && (
+          <SatSkylineLayer runtime={runtime} flight={flight} />
         )}
         {/* Round 17: keyed on the pick so a hangar swap is a clean remount —
             the old clone's graded materials dispose, the new GLB mounts. */}
