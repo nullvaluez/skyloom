@@ -353,9 +353,33 @@ let CRASH_MIN_SPEED = 0;
     const real = await page.evaluate(
       () => typeof window.__fly.satBuildings?.queryColumns === 'function'
     );
-    // Slow first: below minSpeedMps, threading the towers is the playground.
-    // The speed drops SYNCHRONOUSLY in the same task that plants the column —
-    // an interval alone loses the race, because a frame can land in the 8 ms
+    // W1 merge fix (Fable): the original fast run flew at 900 m — above every
+    // real column top (heights knee out ~330 m), so the y-test correctly
+    // skipped the whole city and the gate only ever passed against the
+    // injected topY:1e6 stub. With the REAL engine the probe now removes all
+    // flight-path luck: wait for columns to stream, TELEPORT INSIDE the
+    // tallest one 30 m below its top, and pin position+speed there for the
+    // slow phase. The fast phase releases the pin at 200 m/s from inside the
+    // column — the very next armed frame satisfies inside && >= minSpeed.
+    if (real) {
+      const col = await page.evaluate(async () => {
+        const f = window.__fly;
+        for (let i = 0; i < 100; i++) {
+          const cols = f.satBuildings.queryColumns(f.flight.pos.x, f.flight.pos.z, 6000);
+          const tall = cols.filter((c) => c.r >= 8).sort((a, b) => b.topY - a.topY)[0];
+          if (tall) return tall;
+          await new Promise((r) => setTimeout(r, 200));
+        }
+        return null;
+      });
+      if (!col) throw new Error('5a: no real columns streamed within 20s');
+      await page.evaluate((c) => {
+        window.__col = c;
+      }, col);
+    }
+    // Slow: below minSpeedMps, threading the towers is the playground. The
+    // pins drop SYNCHRONOUSLY in the same task that plants the column — an
+    // interval alone loses the race, because a frame can land in the 8 ms
     // before its first tick and that frame still sees cruise. (It cost a run
     // to find out: the "slow" phase crashed at 180 m/s and read as a rule
     // failure rather than a harness one.)
@@ -367,11 +391,23 @@ let CRASH_MIN_SPEED = 0;
         f.satBuildings = {
           queryColumns: (px, pz) => [{ x: px, z: pz, topY: 1e6, r: 200 }],
         };
+      } else if (window.__col) {
+        f.flight.pos.x = window.__col.x;
+        f.flight.pos.z = window.__col.z;
+        f.flight.pos.y = window.__col.topY - 30;
+        f.flight.pitch = 0;
       }
       window.__slowMax = 0;
       window.__slow = setInterval(() => {
         window.__slowMax = Math.max(window.__slowMax, f.flight.speed);
         f.flight.speed = 30;
+        if (window.__col) {
+          // hold the aircraft INSIDE the column — 30 m/s of drift would exit
+          // a 30 m radius long before the 6 s slow window closes
+          f.flight.pos.x = window.__col.x;
+          f.flight.pos.z = window.__col.z;
+          f.flight.pos.y = window.__col.topY - 30;
+        }
       }, 8);
     });
     await page.waitForTimeout(6000);
@@ -379,6 +415,19 @@ let CRASH_MIN_SPEED = 0;
     const slowMax = await page.evaluate(() => {
       clearInterval(window.__slow);
       return window.__slowMax;
+    });
+    // Fast: from INSIDE the column, jump the speed past minSpeedMps in the
+    // same task as the final position re-pin — accelerating naturally from 30
+    // would drift a slim column's radius before crossing 45 m/s.
+    await page.evaluate(() => {
+      const f = window.__fly;
+      if (window.__col) {
+        f.flight.pos.x = window.__col.x;
+        f.flight.pos.z = window.__col.z;
+        f.flight.pos.y = window.__col.topY - 30;
+        f.flight.pitch = 0;
+      }
+      f.flight.speed = 200;
     });
     await page.waitForTimeout(6000);
     const fast = await snap(page);
