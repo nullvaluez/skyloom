@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { getBoostMirror } from '@/lib/fly/juice';
 import { useFlyStore } from '@/stores/fly-store';
 import { BoostBar } from './BoostBar';
 import { ComboChip } from './ComboChip';
@@ -33,10 +35,27 @@ import { RunSummary } from './RunSummary';
  */
 export function JuiceHud() {
   const photoActive = useFlyStore((s) => s.cameraMode === 'photo');
+  const combo = useFlyStore((s) => s.combo);
+  const [hasBoost, setHasBoost] = useState(false);
+
+  // The column is a positioning shell with no look of its own, so it must not
+  // exist when both of its children are absent — that is what makes the
+  // "flags false ⇒ ZERO HUD elements" revert contract literally true rather
+  // than merely invisible. 2 Hz is plenty: `present` flips at most twice a
+  // session (when A5's meter appears).
+  useEffect(() => {
+    const id = setInterval(() => {
+      const v = getBoostMirror().present;
+      setHasBoost((p) => (p === v ? p : v));
+    }, 500);
+    return () => clearInterval(id);
+  }, []);
+
+  const showColumn = combo >= 2 || hasBoost;
 
   return (
     <>
-      {!photoActive && (
+      {!photoActive && showColumn && (
         <div
           data-testid="juice-hud"
           className="pointer-events-none absolute bottom-56 right-4 z-10 flex flex-col items-end gap-2 phone:bottom-auto phone:right-auto phone:left-2 phone:top-[calc(env(safe-area-inset-top)+12.4rem)] phone:items-start phone-land:left-[max(env(safe-area-inset-left),0.5rem)] phone-land:top-[0.55rem]"

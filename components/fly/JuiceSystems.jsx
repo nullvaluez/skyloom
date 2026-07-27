@@ -42,6 +42,21 @@ import { usePassportStore } from '@/stores/passport-store';
  * `runtime.juice = { addTrauma, onCrash, onEvent }`. A5 GRAVITY calls
  * `juice?.onCrash()` optional-chained, so either merge order builds.
  */
+/**
+ * Dev-only A/B lever for verify-juice, in the sanctioned `__flyWeatherOverride`
+ * / `__flyMicroOverride` idiom: it lets a harness measure the MUSIC.enabled
+ * FALSE branch (zero nodes) against the true branch in one run, without
+ * hot-patching a constant mid-session. Production is untouched — the whole
+ * expression short-circuits on NODE_ENV.
+ */
+function musicOff() {
+  return (
+    process.env.NODE_ENV === 'development' &&
+    typeof window !== 'undefined' &&
+    window.__flyMusicOverride === 'off'
+  );
+}
+
 export function JuiceSystems({ runtime }) {
   const detectorRef = useRef(null);
   const musicRef = useRef(null);
@@ -264,7 +279,7 @@ export function JuiceSystems({ runtime }) {
     // --- Music: MUSIC.updateHz, never per frame --------------------------
     if (MUSIC.enabled && nowSec - S.musicAt >= 1 / MUSIC.updateHz) {
       S.musicAt = nowSec;
-      if (!musicRef.current) {
+      if (!musicRef.current && !musicOff()) {
         const bus = runtime.audio?.bus?.();
         if (bus) musicRef.current = new MusicDirector(bus);
       }
@@ -293,6 +308,7 @@ export function JuiceSystems({ runtime }) {
         nearMisses: js.nearMisses,
         musicLayers: musicRef.current?.activeLayers ?? 0,
         musicNodes: musicRef.current?.nodeCount ?? 0,
+        musicPulseRate: musicRef.current?.pulseRate ?? 0,
         tracked: detectorRef.current?.tracked ?? 0,
       };
     }
