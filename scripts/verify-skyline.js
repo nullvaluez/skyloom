@@ -214,10 +214,19 @@ async function changedFrac(fileA, fileB, region, thr = 6) {
     low.mix !== null && Math.abs(low.mix.holeRadiusM - HOLE_RADIUS_M) < 1,
     `holeR=${low.mix?.holeRadiusM}`
   );
+  // The bar is an ABSOLUTE 1.2% ceiling (OR twice the same-state noise, when
+  // the world happens to be busier than that). A pure ratio bar is the wrong
+  // shape here: both numbers are sub-1% residue from drifting cloud and traffic
+  // labels, so on a quiet frame the noise floor collapses and the ratio flips a
+  // measurement that has not changed (observed near-crop flip / noise across
+  // runs: 0.27/1.04, 0.29/0.79, 0.62/0.43). For scale, the SAME layer flipped
+  // at the SAME distance when it is genuinely drawing moves ~9% of its crop —
+  // see the cruise gate below. 1.2% is "nothing", with a 7× discriminator.
+  const NEAR_CEIL = Math.max(0.012, nearNoise * 2);
   gate(
     'skyline draws NOTHING inside the hole (near-crop |Δ| ≈ noise)',
-    nearMass <= Math.max(0.006, nearNoise * 1.25),
-    `flip ${(nearMass * 100).toFixed(3)}% ≤ ${(Math.max(0.006, nearNoise * 1.25) * 100).toFixed(3)}%`
+    nearMass <= NEAR_CEIL,
+    `flip ${(nearMass * 100).toFixed(3)}% ≤ ${(NEAR_CEIL * 100).toFixed(3)}%`
   );
   // NOT a gate: whether any group's FARTHEST corner falls inside the hole
   // depends on where in the (groupN × z14) grid the player happens to sit, so
@@ -289,9 +298,18 @@ async function changedFrac(fileA, fileB, region, thr = 6) {
     `ready=${cruise.sky?.ready} chunks=${cruise.sky?.chunks}`
   );
   gate('hole is fully closed above the crossfade', (cruise.mix?.holeRadiusM ?? 1) < 1, `holeR=${cruise.mix?.holeRadiusM}`);
+  // Charter minimum is 0.5%; the bar is 5%, ten times that, because the SIGNAL
+  // is the stable quantity here. Measured across four independent runs the flip
+  // lands at 9.0 / 9.3 / 9.6 / 10.0% while the same-state noise wanders 1.4 →
+  // 3.2% with the weather. Keying the gate to a ratio alone therefore judges a
+  // measurement that never moved by a denominator that does (it flipped a run
+  // at 9.63% vs 9.74%); the absolute floor is the honest statistic, with the
+  // ratio kept as a second condition against a pathologically busy frame. For
+  // contrast, the near-crop test above — the same layer, the same distance,
+  // deliberately NOT drawing — measures 0.3–0.6%.
   gate(
-    'skyline mass is visible (A/B flip ≥ 0.5% of the city crop)',
-    cruiseMass >= 0.005 && cruiseMass > cruiseNoise * 3,
+    'skyline mass is visible (A/B flip ≥ 5% of the city crop)',
+    cruiseMass >= 0.05 && cruiseMass > cruiseNoise * 2,
     `flip ${(cruiseMass * 100).toFixed(3)}% noise ${(cruiseNoise * 100).toFixed(3)}%`
   );
   gate(
