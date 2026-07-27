@@ -988,6 +988,13 @@ export function FlyScene({ runtime }) {
         const geoR = engine.worldToGeo(_warpPos.set(pose.x, pose.y, pose.z));
         const elev = engine.getElevationAt(geoR.x, geoR.y) ?? flight.groundElev;
         flight.pos.set(pose.x, elev + CRASH.respawn.aglM, pose.z);
+        // The pose AS PLACED. verify-crash gates the exact aglM off this
+        // rather than off the live AGL a moment later: 2 km back along the
+        // track the terrain is simply somewhere else, and over Owens Valley
+        // that is worth ~100 m of honest relief the constant is not
+        // responsible for. Also the first thing to read when a live respawn
+        // ever lands somewhere strange.
+        crash.respawn = { y: flight.pos.y, elev };
         flight.heading = crash.track.heading;
         flight.pitch = 0;
         flight.bank = 0;
