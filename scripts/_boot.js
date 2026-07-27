@@ -40,6 +40,14 @@ async function bootFly(
     // determinism pin must land even then. verify-weather is the ONE harness
     // that overrides it (per-state, deliberately).
     window.__flyWeatherOverride = 'baseline';
+    // Round 18 (SANCTIONED harness edit, the round-16 weather-pin idiom):
+    // unlimited boost for the whole browser fleet. R18's BOOST_METER empties
+    // after 6 s of boost and coerces the plane back to cruise — under gates
+    // calibrated on unlimited 750 m/s runs (verify-edge-fx holds boost for
+    // 40 s across 3 rebases). With the pin the meter never drains — the
+    // pre-R18 speed envelope exactly. verify-crash is the ONE harness that
+    // clears it (per-state, deliberately) to certify the meter itself.
+    window.__flyBoostInfinite = true;
     try {
       localStorage.setItem('fly-controls-seen', '1');
       // Round 10: the APP default is now satellite (PauseMenu defaults an

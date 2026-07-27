@@ -99,10 +99,16 @@ let CRASH_MIN_SPEED = 0;
   const modelSrc = read('lib/fly/flight-model.js');
   const sysSrc = read('lib/fly/crash-system.js');
   gate(
-    '1c flight-model: boostBlocked defaults false and only gates cmd.boost',
+    // W1 integration (Fable): the meter now governs the '3' preset too — the
+    // coercion swaps an effective preset in, and stays an identity while
+    // boostBlocked is false (the default). Assert the NEW shape.
+    '1c flight-model: boostBlocked defaults false and coerces held boost AND the preset',
     /this\.boostBlocked\s*=\s*false/.test(modelSrc) &&
       /const boosting = this\.boostBlocked \? false : cmd\.boost/.test(modelSrc) &&
-      /F\.speeds\[boosting \? 'boost' : cmd\.speedPreset\]/.test(modelSrc),
+      /this\.boostBlocked && cmd\.speedPreset === 'boost' \? 'cruise' : cmd\.speedPreset/.test(
+        modelSrc
+      ) &&
+      /F\.speeds\[boosting \? 'boost' : effPreset\]/.test(modelSrc),
     'coercion is an identity at the default'
   );
   gate(
@@ -195,8 +201,10 @@ let CRASH_MIN_SPEED = 0;
   };
 
   // A full-stick dive. 'w' is nose-DOWN (this model is stick-forward: 's'
-  // pulls up), and '3' selects the boost preset, which the meter does not
-  // govern — so the dive is fast and stays fast.
+  // pulls up), and '3' selects the boost preset. The meter DOES govern the
+  // preset since the W1 integration, but every bootFly session carries the
+  // fleet-wide __flyBoostInfinite pin (scripts/_boot.js) — so the dive is
+  // fast and stays fast, exactly like the pre-R18 envelope.
   //
   // Everything here is measured against the epoch the phase STARTED on, never
   // against 0: crashEpoch is cumulative for the whole session and this file
@@ -436,6 +444,12 @@ let CRASH_MIN_SPEED = 0;
 
   // -- 7/8: the boost meter -------------------------------------------------
   await session('meter', null, async (page) => {
+    // THE one deliberate un-pin in the fleet (the verify-weather idiom): this
+    // session certifies the meter itself, so the _boot.js unlimited-boost pin
+    // is cleared before any boost is held.
+    await page.evaluate(() => {
+      window.__flyBoostInfinite = false;
+    });
     await warpAndArm(page, [40.6892, -74.0445, 4000]);
     const legend = () =>
       page.evaluate(() => {

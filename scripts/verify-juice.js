@@ -18,7 +18,10 @@
  *   C. MUSIC — node-count A/B (__flyMusicOverride='off' ⇒ zero nodes) plus a
  *      source assertion that construction is behind `MUSIC.enabled`, and a
  *      layer response to a speed-preset flip.
- *   D. BOOST BAR — absent while A5's runtime.boost does not exist.
+ *   D. BOOST BAR — present and full now that A5's meter publishes
+ *      runtime.boost (W1 merge). Under the fleet __flyBoostInfinite pin the
+ *      meter never drains, so frac stays 1 — drain/block behavior is
+ *      verify-crash's job (the one script that clears the pin).
  *   E. TOASTS — the five pre-R18 testids still exist in source, and the new
  *      flavor renders as `nearmiss-toast`.
  *
@@ -348,13 +351,18 @@ async function quatSpread(page, samples, everyMs) {
   );
 
   // ============================================================ D. BOOST BAR
+  // W1 merge (Fable): A5's meter is live, so the pre-merge "absent" gate
+  // flipped to its designed post-merge form — bar mounted, runtime.boost a
+  // real {frac, armed}, and frac pinned FULL by the _boot.js infinite pin
+  // (drain/block certification lives in verify-crash, which un-pins).
   const boostBar = await page.evaluate(() => ({
     el: !!document.querySelector('[data-testid="boost-bar"]'),
-    runtimeBoost: window.__fly.boost === undefined ? 'undefined' : typeof window.__fly.boost,
+    frac: window.__fly.boost?.frac,
+    armed: window.__fly.boost?.armed,
   }));
   gate(
-    'boost bar absent while runtime.boost is undefined',
-    !boostBar.el && boostBar.runtimeBoost === 'undefined',
+    'boost bar present, runtime.boost full and armed under the fleet pin',
+    boostBar.el && boostBar.frac >= 0.99 && boostBar.armed === true,
     JSON.stringify(boostBar)
   );
 

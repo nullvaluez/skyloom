@@ -915,7 +915,19 @@ export function FlyScene({ runtime }) {
     if (BOOST_METER.enabled) {
       const apOn = autopilot.mode !== 'off';
       const m = boostRef.current;
-      if (cmd.boost && !apOn && m.armed) {
+      // W1 integration (Fable): the meter meters EFFECTIVE boost — held Shift
+      // OR the '3' preset (metering only the hold left the preset as an
+      // unlimited loophole). The harness fleet opts out wholesale via the
+      // sanctioned _boot.js pin (__flyWeatherOverride idiom): with the pin the
+      // meter simply never drains, so every frozen gate that cruises at
+      // 750 m/s (verify-edge-fx's 40 s ribbon run) is untouched. verify-crash
+      // clears the pin deliberately for its meter states.
+      const boostInfinite =
+        process.env.NODE_ENV === 'development' &&
+        typeof window !== 'undefined' &&
+        window.__flyBoostInfinite === true;
+      const wantsBoost = cmd.boost || cmd.speedPreset === 'boost';
+      if (wantsBoost && !apOn && m.armed && !boostInfinite) {
         m.frac = Math.max(0, m.frac - dt / BOOST_METER.capacitySec);
         if (m.frac <= 0) m.armed = false;
       } else {
