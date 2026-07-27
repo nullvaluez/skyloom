@@ -84,7 +84,14 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
   const haloRef = useRef();
   const lastRef = useRef({ t: -Infinity, ax: NaN, az: NaN });
 
-  const geometries = useMemo(() => buildLandmarkGeometries(), []);
+  // Round 18 (A2): satellite builds the 'sat' VARIANT geometry — the same
+  // archetypes plus setback ledges / cornice steps / a chamfered tower shaft /
+  // buttress hints / a drum step, painted with value-only grey vertex colours.
+  // The toy variant is the pre-R18 buffer byte-for-byte (its part list and
+  // painter are literally unchanged), which is what keeps verify-monuments'
+  // pixel gate honest. isToy is stable per-mount (keyed by mapStyle in
+  // FlyScene), so this memo never rebuilds mid-life.
+  const geometries = useMemo(() => buildLandmarkGeometries(isToy ? 'toy' : 'sat'), [isToy]);
   const haloGeometry = useMemo(() => {
     // Round 13 P5: toy hero-halo is a flat radial-gradient ground POOL (a disc
     // in the XZ plane, softened by the alphaMap) — replaces the crude flat
@@ -111,9 +118,15 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
       ramp.minFilter = NearestFilter;
       ramp.magFilter = NearestFilter;
       ramp.needsUpdate = true;
+      // Round 18 (A2): vertexColors ON. The 'sat' geometry variant carries
+      // VALUE-ONLY greys (r == g == b), so this multiplies the one stone tint
+      // by a role/height modulation — base grime, sky bounce, light-catching
+      // cornices — without introducing a single hue. The toy material below
+      // keeps its own neon vertex palette, untouched.
       const m = new MeshToonMaterial({
         color: LANDMARKS_3D.satStyle.color,
         gradientMap: ramp,
+        vertexColors: true,
       });
       m.userData.__ramp = ramp; // disposed with the material below
       applyBendAnchor(m); // rigid ground objects anchor-bend in EVERY style
