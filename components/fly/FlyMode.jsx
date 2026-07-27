@@ -21,6 +21,7 @@ import { HangarPanel } from './hud/HangarPanel';
 import { ArrivalBanner } from './hud/ArrivalBanner';
 import { TouchControls } from './hud/TouchControls';
 import { PhotoModeBar } from './hud/PhotoModeBar';
+import { CrashFlash } from './CrashFlash';
 import { PauseMenu } from './PauseMenu';
 import { BootScreen } from './hud/BootScreen';
 import { useFlyTraffic } from '@/hooks/use-fly-traffic';
@@ -310,6 +311,7 @@ export function FlyMode({ onClose }) {
         <ArrivalBanner />
       </HudGroup>
       <WarpFlash runtime={runtimeRef.current} />
+      <CrashFlash />
       <HudGroup hidden={photoActive}>
         {isTouch && <TouchControls runtime={runtimeRef.current} />}
       </HudGroup>
