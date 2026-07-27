@@ -238,6 +238,17 @@ async function toneStats(onFile, offFile, region) {
   });
   await bootFly(page, { style: 'satellite', ...BOOT_OPTS });
   await page.evaluate(() => window.__flyStore.getState().setQualityTier('high'));
+  // W2 integration (Fable): PIN THE SUN. bootFly pins weather but the day
+  // cycle follows the wall clock, and gate (C)'s luminance numbers were
+  // measured + pinned at midday — at dusk the buildings-vs-imagery delta
+  // flips SIGN (A1 midday: buildings 87 vs imagery 119; W2 evening runs:
+  // ~104 vs ~81) and lumaStd read 28 vs the 34 floor on the UNMODIFIED
+  // base (two independent W2 control experiments). Same determinism class
+  // as the fleet weather pin. 17:00 UTC = 13:00 EDT — the A1 measurement
+  // hour. Re-applied by the warps below (sun re-reads on warpEpoch).
+  await page.evaluate(() => {
+    window.__flySunOverride = Date.UTC(2026, 6, 27, 17, 0, 0);
+  });
   await page.mouse.move(800, 450);
 
   const readMeta = () => ({
