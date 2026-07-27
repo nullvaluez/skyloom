@@ -112,6 +112,16 @@ let CRASH_MIN_SPEED = 0;
     'building crashes evaporate without A1s engine'
   );
   gate(
+    '1d2 crash-system: the autopilot is exempt, and BEFORE any rule runs',
+    // ...and BEFORE the rules, not woven into one of them. (Compared against
+    // the terrain rule's actual statement — `floorContact` appears in this
+    // module's doc block long before any code does.)
+    /if \(ctx\.autopilot\) return null;/.test(sysSrc) &&
+      sysSrc.indexOf('if (ctx.autopilot) return null;') <
+        sysSrc.indexOf('const hit = flight.floorContact;'),
+    'an assist you asked for cannot kill you'
+  );
+  gate(
     '1e the two new testids exist in source (crash-flash / pause-stakes)',
     /data-testid="crash-flash"/.test(read('components/fly/CrashFlash.jsx')) &&
       /testid="pause-stakes"/.test(read('components/fly/PauseMenu.jsx')),
@@ -474,10 +484,20 @@ let CRASH_MIN_SPEED = 0;
     // mode cannot disengage itself on a missing target; the real closing
     // speeds it produces stay gated by verify-fly-formation and
     // verify-inspect-actions, which run against this same build.
+    // The stub is TWO methods, not one. `update` returning null keeps the mode
+    // from disengaging itself on a missing target; `disengage` has to go too,
+    // because FlyScene disengages on any targeting release (and a soft lock on
+    // passing traffic releases whenever the traffic passes) — without it the
+    // exemption gates below would flip to "off" mid-measurement and read as a
+    // rule failure. What is under test is the PREDICATE; the autopilot's real
+    // flying stays gated by verify-fly-formation and verify-inspect-actions,
+    // which run against this same build.
     await page.evaluate(() => {
       const ap = window.__fly.autopilot;
       window.__apReal = ap.update;
+      window.__apRealOff = ap.disengage;
       ap.update = () => null;
+      ap.disengage = () => {};
       ap.mode = 'formation';
     });
     const apStart = (await snap(page)).boost.frac;
@@ -485,15 +505,31 @@ let CRASH_MIN_SPEED = 0;
     await page.waitForTimeout(8000);
     const apEnd = await snap(page);
     await page.keyboard.up('Shift');
-    await page.evaluate(() => {
-      const ap = window.__fly.autopilot;
-      ap.update = window.__apReal;
-      ap.mode = 'off';
-    });
     gate(
       '8 autopilot engaged: 8s of held boost neither drains nor blocks the meter',
       apEnd.boost.frac >= Math.min(1, apStart) - 0.001 && !apEnd.blocked && apEnd.boost.armed,
       `frac ${apStart.toFixed(2)} -> ${apEnd.boost.frac.toFixed(2)}, blocked ${apEnd.blocked}`
+    );
+
+    // 8b — the SAME exemption on the crash side. The assist is still stubbed
+    // on, so this is a full-stick dive straight into the ground with the
+    // autopilot nominally flying: it must not crash. Then hand control back
+    // and fly the identical dive: it must.
+    await warpAndArm(page, DIVE_AT);
+    const apDive = await dive(page, 15, 0);
+    const apAfter = await snap(page);
+    await page.evaluate(() => {
+      const ap = window.__fly.autopilot;
+      ap.update = window.__apReal;
+      ap.disengage = window.__apRealOff;
+      ap.mode = 'off';
+    });
+    await warpAndArm(page, DIVE_AT);
+    const ownDive = await dive(page, 15, 0);
+    gate(
+      '8b autopilot engaged: the same dive that crashes on the stick does NOT crash',
+      !apDive && apAfter.epoch === 0 && apAfter.armed && !!ownDive && ownDive.epoch === 1,
+      `assist: epoch ${apAfter.epoch} (armed ${apAfter.armed}, ${apAfter.agl.toFixed(0)}m AGL); stick: ${ownDive ? `crashed at ${ownDive.tSec.toFixed(1)}s` : 'NO CRASH'}`
     );
 
     // The pause-menu row, and the evidence shot of it.

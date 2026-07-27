@@ -941,6 +941,7 @@ export function FlyScene({ runtime }) {
     if (crash.state === 'idle') {
       const hit = crashSys.update(dt, {
         enabled: CRASH.enabled && crashStakesOn(),
+        autopilot: autopilot.mode !== 'off', // an assist must not kill you
         flight,
         satellite: flyState.mapStyle === 'satellite',
         satBuildings: runtime.satBuildings,
