@@ -358,6 +358,18 @@ function compare(a, b) {
     `draws=${ow.draws} (verify-sat-depth measured 254 pre-veg)`
   );
   await glShot('r18a3-owens-rural-trees.png');
+  // …and again from the altitude the look actually reads at. The gated pose
+  // above is 1,278 m AGL (altM 2600 over a 1,320 m valley floor), where a 6 m
+  // canopy is a few pixels; this second, ungated pass is the evidence for what
+  // rural vegetation looks like on a hillside you are flying along.
+  const owLow = await fly([36.6, -118.1, 1720, 1.5, -0.28], 22000);
+  console.log(`OWENS low pass (evidence, not gated): ${JSON.stringify(owLow)}`);
+  gate(
+    `Owens low pass still <= ${OWENS_DRAW_MAX}`,
+    owLow.draws > 0 && owLow.draws <= OWENS_DRAW_MAX,
+    `draws=${owLow.draws} at ${owLow.agl} m AGL, ${owLow.placed} canopies`
+  );
+  await glShot('r18a3-owens-rural-trees-low.png');
 
   // === (E) BOATS — NY Upper Bay =============================================
   const bay = await fly([40.66, -74.05, 500, 1.15, -0.3]);
