@@ -87,6 +87,18 @@ const initialState = {
   // (the contrail keeps absolute-frame points now) but kept: it's the
   // designed hook for any future world-frame-history component.
   rebaseEpoch: 0,
+
+  // --- ROUND 18 (Fable scaffolding — fields pre-seeded so W1 agents merge
+  // cleanly; A4 SHOWTIME owns the session/combo group, A5 GRAVITY owns the
+  // crash group). Discrete TRANSITIONS only — per-frame combo timing and
+  // trauma live in lib/fly/juice.js, never here.
+  sessionScore: 0, // mount-to-unmount total (reset() wipes it — by design)
+  runScore: 0, // since last crash; crash banks it into runStats
+  combo: 0, // current chain count (transition writes only)
+  runStats: null, // { nearMisses, buzzes, bestCombo, contracts, durationSec } at run end
+  runSummaryOpen: false, // post-crash summary overlay
+  crashEpoch: 0, // bumped once per crash — drives CrashFlash + RunSummary
+  lastCrash: null, // { at, kind: 'terrain'|'building' }
 };
 
 /**
@@ -158,6 +170,16 @@ export const useFlyStore = create(
 
     bumpRebaseEpoch: () =>
       set((state) => ({ rebaseEpoch: state.rebaseEpoch + 1 })),
+
+    // --- ROUND 18 action stubs (Fable scaffolding). A4 SHOWTIME fills the
+    // session group's call sites; A5 GRAVITY fills the crash sites.
+    setSessionScore: (sessionScore) => set({ sessionScore }),
+    setRunScore: (runScore) => set({ runScore }),
+    setCombo: (combo) => set({ combo }),
+    setRunStats: (runStats) => set({ runStats }),
+    setRunSummaryOpen: (runSummaryOpen) => set({ runSummaryOpen }),
+    bumpCrashEpoch: (lastCrash = null) =>
+      set((state) => ({ crashEpoch: state.crashEpoch + 1, lastCrash })),
 
     addTileStats: (requested = 0, evicted = 0) =>
       set((state) => ({

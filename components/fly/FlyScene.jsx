@@ -450,6 +450,21 @@ export function FlyScene({ runtime }) {
       return true;
     };
 
+    // ------------------------------------------------------------------
+    // RUNTIME CONTRACTS (R18) — Fable scaffolding. New runtime fields the
+    // R18 agents publish/consume; cross-agent data flows ONLY through
+    // these (optional-chained at every read — merge order never breaks a
+    // worktree build):
+    //   runtime.boost        {frac, armed}  — A5 GRAVITY publishes from the
+    //                        cmd-assembly meter; A4's BoostBar reads it.
+    //   runtime.satBuildings SatBuildingEngine — A1 BLOCKSMITH publishes
+    //                        from SatBuildingLayer; A5's crash-system calls
+    //                        engine.queryColumns(px, pz, r) for building
+    //                        collision columns (satellite only).
+    //   runtime.juice        {addTrauma, onCrash, onEvent} — A4 SHOWTIME
+    //                        publishes from JuiceSystems; A5 calls
+    //                        juice?.onCrash() in the crash sequence.
+    // ------------------------------------------------------------------
     // Round 8.5 (§B): mirror the action handles onto the module-scope bus
     // and flip runtimeReady — overlays resolve these AT CALL TIME, so a
     // FlyScene remount re-registers here and heals any captured nulls.
