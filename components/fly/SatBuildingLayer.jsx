@@ -4,8 +4,9 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
 import { SatBuildingEngine } from '@/lib/fly/toy-world/sat-building-engine';
-import { SAT_BUILDINGS, SAT_WATER } from '@/lib/fly/fly-constants';
+import { SAT_AMBIENT, SAT_BUILDINGS, SAT_VEG, SAT_WATER } from '@/lib/fly/fly-constants';
 import { useFlyStore } from '@/stores/fly-store';
+import { SatVegLayer } from './SatVegLayer';
 
 const TIERS = ['low', 'medium', 'high']; // mirrors FlyCanvas's quality ladder
 const atLeastTier = (tier, min) => TIERS.indexOf(tier) >= TIERS.indexOf(min);
@@ -125,5 +126,21 @@ export function SatBuildingLayer({ runtime, flight }) {
     }
   }, -47);
 
-  return <primitive object={engine.object} />;
+  return (
+    <>
+      <primitive object={engine.object} />
+      {/* Round 18 (A3 "GROUNDSKEEPER"): the living ground — pooled canopies plus
+          the two data-anchored ambient movers. Mounted HERE rather than from
+          FlyScene because it wants exactly this gate (satellite, tier >= medium,
+          inside worldRoot so its meshes ride the -anchor rebase into the
+          uBendCenter frame) and A3 owns only these mount lines this wave.
+          EITHER flag alone keeps the shared 'sat-veg' streamer alive: the worker
+          emits the canopies and the mover anchor points in ONE bundle, so
+          SatVegLayer owns the streamer and SatAmbientLife reads its chunks.
+          Both flags false = no mount, no worker, no draws, no globals. */}
+      {(SAT_VEG.enabled || SAT_AMBIENT.enabled) && (
+        <SatVegLayer runtime={runtime} flight={flight} />
+      )}
+    </>
+  );
 }
