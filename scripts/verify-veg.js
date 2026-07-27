@@ -74,8 +74,16 @@ const CANOPY_SAT_BAND = [0.12, 0.62];
 // Ground-only crop at the pinned poses: below the horizon, clear of the HUD.
 const CROP = { left: 260, top: 430, width: 1080, height: 400 };
 
-/** Warp + pin a fixed pose, then dwell for the imagery/DEM/vector stream-in. */
-const pinScene = ([lat, lon, altM, heading, pitch]) => {
+/** Warp + pin a fixed pose, then dwell for the imagery/DEM/vector stream-in.
+ * W2 sweep fix (Fable): async + guarded — a FlyScene remount (the R17
+ * sceneRemounts tripwire) nulls window.__fly.flight for a beat, and one
+ * sweep run entered here inside that dead window ("reading 'pos' of null").
+ * Poll the handle back instead of dereferencing it cold. */
+const pinScene = async ([lat, lon, altM, heading, pitch]) => {
+  for (let i = 0; i < 100 && !window.__fly?.flight?.pos; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  if (!window.__fly?.flight?.pos) throw new Error('flight handle never returned (scene remount?)');
   window.__fly.warpToGeo(lat, lon, { altM, name: null });
   const f = window.__fly.flight;
   f.heading = heading;
@@ -425,8 +433,10 @@ function compare(a, b) {
   // north being -Z in mercator world space.)
   const aimed = await page.evaluate(() => {
     const a = window.__satVeg?.ambient;
-    const f = window.__fly.flight;
-    if (!a?.indAnchors?.length) return null;
+    const f = window.__fly?.flight;
+    // Same remount guard as pinScene: no flight handle -> skip the aim (the
+    // plume gates above already passed on counts; the shot is evidence only).
+    if (!a?.indAnchors?.length || !f?.pos) return null;
     let best = null;
     for (const p of a.indAnchors) {
       const d = Math.hypot(p[0] - f.pos.x, p[1] - f.pos.z);
