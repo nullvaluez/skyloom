@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useFlyStore } from '@/stores/fly-store';
 import { usePassportStore } from '@/stores/passport-store';
 import { useIsTouch } from '@/hooks/use-is-touch';
@@ -13,9 +13,10 @@ import { MAP_STYLE_KEY, MAP_STYLES } from '@/lib/fly/map-style';
 // Round 16: quality + sound persist the same way — but ONLY from the click
 // sites below. PerformanceMonitor's automatic degrade is a live response to
 // this session's frame times and must never be written to storage.
-import { saveQualityTier, saveSoundOn } from '@/lib/fly/fly-settings';
+import { crashStakesOn, saveCrashMode, saveQualityTier, saveSoundOn } from '@/lib/fly/fly-settings';
 // Round 17: the hangar's ONLY entry point (no keyboard shortcut this round).
-import { HANGAR } from '@/lib/fly/fly-constants';
+// Round 18: CRASH gates whether the stakes row exists at all.
+import { CRASH, HANGAR } from '@/lib/fly/fly-constants';
 import { aircraftName } from '@/lib/fly/player-aircraft';
 
 const TIERS = ['low', 'medium', 'high'];
@@ -66,6 +67,11 @@ export function PauseMenu({ onExit }) {
   const mapStyle = useFlyStore((s) => s.mapStyle);
   const aircraftId = useFlyStore((s) => s.aircraftId);
   const isTouch = useIsTouch();
+  // Round 18: the stakes pick lives in a fly-settings module cache, not the
+  // store (see that file for why). This menu is the only surface that shows
+  // it, so mirroring it into local state is all the re-render wiring it needs.
+  const [stakes, setStakes] = useState(true);
+  useEffect(() => setStakes(crashStakesOn()), [phase]);
 
   // First-entry controls help (map style now resolves in FlyMode, pre-mount)
   useEffect(() => {
@@ -237,6 +243,22 @@ export function PauseMenu({ onExit }) {
             >
               Sound: {soundOn ? 'On' : 'Off'}
             </MenuButton>
+            {/* Round 18: the stakes switch. Crashes are ON by default (the
+                user's call); "Forgiving" restores the round-17 flight model
+                exactly — the same read gate as CRASH.enabled, so nothing about
+                a forgiving session differs from R17 by a single frame. */}
+            {CRASH.enabled && (
+              <MenuButton
+                testid="pause-stakes"
+                onClick={() => {
+                  const next = !stakes;
+                  saveCrashMode(next); // a CLICKED mode is a choice — persist it
+                  setStakes(next);
+                }}
+              >
+                Flight stakes: {stakes ? 'Crashes ON' : 'Forgiving'}
+              </MenuButton>
+            )}
             <MenuButton onClick={() => store.openCredits()}>Credits &amp; licenses</MenuButton>
             <MenuButton onClick={onExit}>Exit Fly Mode</MenuButton>
           </div>
