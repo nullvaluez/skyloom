@@ -6,6 +6,7 @@ import { PerformanceMonitor } from '@react-three/drei';
 import { FlyScene } from './FlyScene';
 import { Effects } from './Effects';
 import { PhotoCapture } from './PhotoCapture';
+import { JuiceSystems } from './JuiceSystems';
 import { CANVAS } from '@/lib/fly/fly-constants';
 import { autoTierCeiling } from '@/lib/fly/fly-settings';
 import { useFlyStore } from '@/stores/fly-store';
@@ -99,6 +100,11 @@ export function FlyCanvas({ runtime }) {
           {/* Round 17: reads the GRADED frame off this canvas at useFrame
               priority 100 — i.e. after the composer above, same task. */}
           <PhotoCapture />
+          {/* Round 18 (A4): the arcade layer's frame driver. Mounted AFTER
+              FlyScene so its default-priority useFrame runs behind the -50
+              flight step and the -45 traffic update — i.e. every item's
+              .distM is this frame's value when the near-miss scan reads it. */}
+          <JuiceSystems runtime={runtime} />
           <BootFramePulse runtime={runtime} />
         </Suspense>
       </PerformanceMonitor>

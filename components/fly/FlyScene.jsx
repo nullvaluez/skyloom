@@ -49,7 +49,9 @@ import { TrafficEngine, mercatorWorldXZ } from '@/lib/fly/traffic-engine';
 import { registerRuntimeActions, clearRuntimeActions } from '@/lib/fly/runtime-bus';
 import { Targeting } from '@/lib/fly/targeting';
 import { Autopilot } from '@/lib/fly/autopilot';
-import { expApproach, mercatorScale } from '@/lib/fly/coords';
+import { DEG2RAD, expApproach, expApproachAngle, mercatorScale, wrapAngle } from '@/lib/fly/coords';
+import { CrashSystem, respawnPose } from '@/lib/fly/crash-system';
+import { crashStakesOn } from '@/lib/fly/fly-settings';
 import { computeSun, moonDirFromSun, nightWeight } from '@/lib/fly/sun-model';
 import { trackSpotAttrs } from '@/lib/fly/spot-attrs';
 import {
@@ -60,13 +62,16 @@ import {
   weatherHazeMax,
 } from '@/lib/fly/weather-model';
 import {
+  BOOST_METER,
   CLOUDS,
+  CRASH,
   GLOBE,
   HILLSHADE,
   MOON,
   SAT_BUILDINGS,
   SAT_CITY_GLOW,
   SAT_ROADS,
+  SAT_SKYLINE,
   SKY,
   SKY_LIVE,
   TOY,
@@ -90,6 +95,7 @@ import { TrafficLayer } from './TrafficLayer';
 import { ToyWorldLayer } from './ToyWorldLayer';
 import { SatBuildingLayer } from './SatBuildingLayer';
 import { SatRoadLayer } from './SatRoadLayer';
+import { SatSkylineLayer } from './SatSkylineLayer';
 import { SatCityGlow } from './SatCityGlow';
 import { SatEnvironment } from './SatEnvironment';
 import { PrecipLayer } from './PrecipLayer';
@@ -246,6 +252,15 @@ export function FlyScene({ runtime }) {
   const targeting = useMemo(() => new Targeting(), []);
   const autopilot = useMemo(() => new Autopilot(), []);
   const origin = useMemo(() => ({ anchor: new Vector3(), epoch: 0 }), []);
+  // Round 18 (A5 GRAVITY). The detector is a plain object built once; the
+  // sequence is a REF, deliberately not a store phase — a crash must not make
+  // pause/photo/atlas reachable, and it must not survive into the next frame's
+  // React work. `state` is 'idle' | 'tumbling' | 'recovering'.
+  const crashSys = useMemo(() => new CrashSystem(), []);
+  const crashRef = useRef({ state: 'idle', t: 0, kind: null, track: null });
+  // The boost METER. Plain object, published straight onto runtime.boost —
+  // A4's BoostBar reads {frac, armed} at HUD cadence. Never store, never state.
+  const boostRef = useRef({ frac: 1, armed: true });
 
   // Round 17: a mid-session hangar pick swaps the flight ENVELOPE in place —
   // position/heading/pitch/bank are kept (you change aircraft, you do not
@@ -303,6 +318,8 @@ export function FlyScene({ runtime }) {
     runtime.camera = camera;
     runtime.chaseRig = chase; // round 7: harnesses read _look/_freeAmt
     runtime.photoRig = photo; // round 17: verify-photo reads _look/_dist
+    runtime.crashSys = crashSys; // round 18: verify-crash reads .armed/.armT
+    runtime.crash = crashRef.current; // ...and the live sequence state
     // Grounded-aircraft pin: quality-gated (a coarse fallback DEM tile
     // "answers" with plateau garbage — planes got pinned mid-air forever),
     // and in toy style pinned to the DRAWN ground (exaggerated + lifted),
@@ -450,6 +467,21 @@ export function FlyScene({ runtime }) {
       return true;
     };
 
+    // ------------------------------------------------------------------
+    // RUNTIME CONTRACTS (R18) — Fable scaffolding. New runtime fields the
+    // R18 agents publish/consume; cross-agent data flows ONLY through
+    // these (optional-chained at every read — merge order never breaks a
+    // worktree build):
+    //   runtime.boost        {frac, armed}  — A5 GRAVITY publishes from the
+    //                        cmd-assembly meter; A4's BoostBar reads it.
+    //   runtime.satBuildings SatBuildingEngine — A1 BLOCKSMITH publishes
+    //                        from SatBuildingLayer; A5's crash-system calls
+    //                        engine.queryColumns(px, pz, r) for building
+    //                        collision columns (satellite only).
+    //   runtime.juice        {addTrauma, onCrash, onEvent} — A4 SHOWTIME
+    //                        publishes from JuiceSystems; A5 calls
+    //                        juice?.onCrash() in the crash sequence.
+    // ------------------------------------------------------------------
     // Round 8.5 (§B): mirror the action handles onto the module-scope bus
     // and flip runtimeReady — overlays resolve these AT CALL TIME, so a
     // FlyScene remount re-registers here and heals any captured nulls.
@@ -499,18 +531,34 @@ export function FlyScene({ runtime }) {
       runtime.camera = null;
       runtime.chaseRig = null;
       runtime.photoRig = null;
+      runtime.crashSys = null;
+      runtime.crash = null;
+      runtime.boost = null; // round 18: A4's bar must not read a dead meter
       runtime.warpTo = null;
       runtime.warpToGeo = null;
       runtime.interceptHex = null;
       traffic.dispose();
       engine.dispose();
     };
-  }, [runtime, engine, flight, input, origin, traffic, targeting, autopilot, camera, chase, photo, rebase]);
+  }, [runtime, engine, flight, input, origin, traffic, targeting, autopilot, camera, chase, photo, crashSys, rebase]);
 
   useEffect(() => {
     input.attach(gl.domElement);
     return () => input.detach();
   }, [input, gl]);
+
+  // Round 18 (A5 GRAVITY) — THE ARM GATE's warp half. A TRANSIENT
+  // subscription, not the `warpEpochForSun` render subscription two effects
+  // down, and the difference matters: this fires SYNCHRONOUSLY inside the
+  // store set, so the disarm has landed before the very next frame. A React
+  // effect would run a commit later — a window in which a warp into an Alpine
+  // wall is already inside the terrain. (Every harness pose in scripts/ is
+  // placed by warpTo/warpToGeo or a pinScene built on one, so this single
+  // subscription is what makes the whole fleet crash-immune by construction.)
+  useEffect(
+    () => useFlyStore.subscribe((s) => s.warpEpoch, () => crashSys.disarm()),
+    [crashSys]
+  );
 
   // Mini-planet curvature: patch every tile material (now + as tiles
   // stream); strength rides a live uniform (0 in flat styles) so the patch
@@ -755,9 +803,14 @@ export function FlyScene({ runtime }) {
     // setPhotoLook also tells neutralize() to spare the orbit drag + P key.
     const photoMode = flyState.cameraMode === 'photo';
     input.setPhotoLook(photoMode);
+    // Round 18: a crash owns the stick for its whole ~1.8s. Neutralizing here
+    // (rather than gating each consumer) also eats every consumePress below,
+    // so photo/atlas/cinema/inspect stay unreachable until you are flying again.
+    const crashing = crashRef.current.state !== 'idle';
     if (
       paused ||
       photoMode ||
+      crashing ||
       flyState.inspectHex ||
       flyState.atlasOpen ||
       flyState.logbookOpen ||
@@ -851,7 +904,146 @@ export function FlyScene({ runtime }) {
       else store.clearLock();
     }
 
+    // --- Round 18 (A5 GRAVITY): the BOOST METER ---------------------------
+    // Runs HERE, between the autopilot and the model, because it needs both:
+    // the autopilot's live mode (which exempts it) and the raw stick (which it
+    // meters). Refs + a plain object only — nothing per-frame reaches React.
+    //
+    // AUTOPILOT IS EXEMPT, wholly: an intercept flies on `speedOverride`,
+    // which short-circuits the model's preset expression anyway, and
+    // verify-fly-formation / verify-inspect-actions gate the closing speeds it
+    // produces. So while the autopilot is engaged the meter neither drains nor
+    // blocks — it quietly refills.
+    if (BOOST_METER.enabled) {
+      const apOn = autopilot.mode !== 'off';
+      const m = boostRef.current;
+      // W1 integration (Fable): the meter meters EFFECTIVE boost — held Shift
+      // OR the '3' preset (metering only the hold left the preset as an
+      // unlimited loophole). The harness fleet opts out wholesale via the
+      // sanctioned _boot.js pin (__flyWeatherOverride idiom): with the pin the
+      // meter simply never drains, so every frozen gate that cruises at
+      // 750 m/s (verify-edge-fx's 40 s ribbon run) is untouched. verify-crash
+      // clears the pin deliberately for its meter states.
+      const boostInfinite =
+        process.env.NODE_ENV === 'development' &&
+        typeof window !== 'undefined' &&
+        window.__flyBoostInfinite === true;
+      const wantsBoost = cmd.boost || cmd.speedPreset === 'boost';
+      if (wantsBoost && !apOn && m.armed && !boostInfinite) {
+        m.frac = Math.max(0, m.frac - dt / BOOST_METER.capacitySec);
+        if (m.frac <= 0) m.armed = false;
+      } else {
+        m.frac = Math.min(1, m.frac + dt / BOOST_METER.regenSec);
+        // Hysteresis: without the rearm fraction an empty meter would flicker
+        // back on for a single frame, every frame.
+        if (!m.armed && m.frac >= BOOST_METER.rearmFrac) m.armed = true;
+      }
+      flight.boostBlocked = !m.armed && !apOn;
+      runtime.boost = m; // {frac, armed} — A4's BoostBar reads this
+    }
+
     flight.step(dt, apCmd ?? cmd);
+
+    // --- Round 18 (A5 GRAVITY): CRASH -------------------------------------
+    // Detection reads flight.floorContact, which the model wrote microseconds
+    // ago in the step above and clears every frame — so this call site is the
+    // only place it is ever valid. The sequence then drives the model
+    // DIRECTLY (the step has already displaced this frame; the tumble is a
+    // cinematic laid over the top of it), which is why it lives here and not
+    // in a separate priority.
+    const crash = crashRef.current;
+    if (crash.state === 'idle') {
+      const hit = crashSys.update(dt, {
+        enabled: CRASH.enabled && crashStakesOn(),
+        autopilot: autopilot.mode !== 'off', // an assist must not kill you
+        flight,
+        satellite: flyState.mapStyle === 'satellite',
+        satBuildings: runtime.satBuildings,
+        mercK: mercatorScale(flight.latDeg),
+      });
+      if (hit) {
+        crash.state = 'tumbling';
+        crash.t = 0;
+        crash.kind = hit.kind;
+        // Capture the track AT IMPACT — the tumble is about to scramble both,
+        // and the respawn is measured back along the line you were flying.
+        crash.track = { x: flight.pos.x, z: flight.pos.z, heading: flight.heading };
+        crash.spinSign = Math.sign(flight.bank) || 1;
+        autopilot.disengage(); // nothing flies a wreck
+        // Both optional-chained twice: A4 lands juice + the thud in parallel,
+        // and this file has to build and behave without either.
+        runtime.juice?.onCrash?.(hit.kind);
+        runtime.audio?.crashThud?.();
+      }
+    } else if (crash.state === 'tumbling') {
+      crash.t += dt;
+      const S = CRASH.sequence;
+      // Ballistic: the spin decays linearly to nothing, the nose falls toward
+      // pitchDeg, and speedBleedFrac of the speed goes with it.
+      const decay = Math.max(0, 1 - crash.t / S.tumbleSec);
+      flight.heading = wrapAngle(
+        flight.heading + crash.spinSign * S.spinDegPerSec * DEG2RAD * decay * dt
+      );
+      flight.pitch = expApproach(flight.pitch, S.pitchDeg * DEG2RAD, 2.2, dt);
+      flight.bank = expApproachAngle(flight.bank, crash.spinSign * 1.2, 2.2, dt);
+      flight.speed = Math.max(
+        0,
+        flight.speed - (flight.cfg.speeds.cruise * S.speedBleedFrac * dt) / S.tumbleSec
+      );
+      flight.turnRate = 0;
+      flight.pitchRate = 0;
+      if (crash.t >= S.tumbleSec) {
+        // --- the cut: flash, respawn, re-arm --------------------------------
+        // Ground under the RESPAWN point, not under the wreck. `?? groundElev`
+        // rather than warpToGeo's `?? 0`: 2 km away the current elevation is a
+        // far better guess than sea level, and it keeps an Alpine respawn out
+        // of the rock while the DEM catches up.
+        const k = mercatorScale(flight.latDeg);
+        const pose = respawnPose(crash.track, flight.groundElev, k);
+        const geoR = engine.worldToGeo(_warpPos.set(pose.x, pose.y, pose.z));
+        const elev = engine.getElevationAt(geoR.x, geoR.y) ?? flight.groundElev;
+        flight.pos.set(pose.x, elev + CRASH.respawn.aglM, pose.z);
+        // The pose AS PLACED. verify-crash gates the exact aglM off this
+        // rather than off the live AGL a moment later: 2 km back along the
+        // track the terrain is simply somewhere else, and over Owens Valley
+        // that is worth ~100 m of honest relief the constant is not
+        // responsible for. Also the first thing to read when a live respawn
+        // ever lands somewhere strange.
+        crash.respawn = { y: flight.pos.y, elev };
+        flight.heading = crash.track.heading;
+        flight.pitch = 0;
+        flight.bank = 0;
+        flight.turnRate = 0;
+        flight.pitchRate = 0;
+        flight.speed = flight.cfg.speeds.cruise;
+        flight.groundElev = elev;
+        const geo = engine.worldToGeo(flight.pos);
+        flight.latDeg = geo.y;
+        runtime.geo = geo;
+        chase.snap();
+        crashSys.disarm(); // you get the full arm delay back, every time
+        boostRef.current.frac = 1; // a fresh run starts with a full tank
+        boostRef.current.armed = true;
+        // The ONLY store write in the whole sequence, and it is what drives
+        // CrashFlash (and, once A4 lands, the run summary). Deliberately NOT
+        // bumpWarpEpoch: that would fire WarpFlash, snap the weather and reset
+        // the far-warp machinery for a 2 km hop. (It also means the airport
+        // buzz detector — owned by Contracts.jsx, which resets it on
+        // warpEpoch — is NOT reset here. It cannot mint a false pass anyway:
+        // a buzz needs two 1 Hz ticks under 140 m AGL and the respawn is at
+        // ground + 400 m.)
+        useFlyStore.getState().bumpCrashEpoch({ at: Date.now(), kind: crash.kind });
+        crash.state = 'recovering';
+      }
+    } else {
+      // 'recovering': the flash is up and the stick stays neutralized while
+      // the instructor flies it straight and level out of the cut.
+      crash.t += dt;
+      if (crash.t >= CRASH.sequence.totalSec) {
+        crash.state = 'idle';
+        crash.track = null;
+      }
+    }
 
     // Floating origin: rebase when the plane strays far from the anchor.
     const dx = flight.pos.x - origin.anchor.x;
@@ -1235,6 +1427,12 @@ export function FlyScene({ runtime }) {
             draws, no globals. */}
         {mapStyle === 'satellite' && SAT_ROADS.enabled && qualityTier !== 'low' && (
           <SatRoadLayer runtime={runtime} flight={flight} />
+        )}
+        {/* Round 18 (A2): the DISTANT BLOCK-MASS skyline ring — the city past
+            the detail bubble, and the city that survives the climb. Same
+            &&-chain / same worldRoot reason as the two layers above. */}
+        {mapStyle === 'satellite' && SAT_SKYLINE.enabled && qualityTier !== 'low' && (
+          <SatSkylineLayer runtime={runtime} flight={flight} />
         )}
         {/* Round 17: keyed on the pick so a hangar swap is a clean remount —
             the old clone's graded materials dispose, the new GLB mounts. */}

@@ -82,7 +82,12 @@ function stepSunGain(state, mapStyle, runtime, dt) {
   }
   const S = TRACERS.sun;
   const span = S.nightGain - S.dayGain || 1;
-  const nightT = Math.min(1, Math.max(0, 1 - (runtime.sun?.frac ?? 1) / S.dayFrac));
+  // Round 18 live fix: effective light = sun x (1 - overcastNightK*overcast).
+  // Baseline weather (overcastT 0) is the exact R16 expression — see the
+  // TRACERS.sun.overcastNightK comment for the CMH dusk report this fixes.
+  const oc = runtime.weather?.wx?.overcastT ?? 0;
+  const effFrac = (runtime.sun?.frac ?? 1) * (1 - (S.overcastNightK ?? 0) * oc);
+  const nightT = Math.min(1, Math.max(0, 1 - effFrac / S.dayFrac));
   const target = S.dayGain + span * nightT;
   state.sunGain =
     state.sunGain == null ? target : expApproach(state.sunGain, target, S.lerpPerSec, dt);

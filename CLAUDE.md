@@ -12,7 +12,72 @@
 > describes deleted code (markers, panels, Leaflet-era plans); do not act
 > on it.
 
-> **⚠️ NEWEST — READ FIRST:** **Round 17 "Your Wings" is BUILT (2026-07-25):
+> **⚠️ NEWEST — READ FIRST:** **Round 18 "Alive & Dangerous" is BUILT
+> (2026-07-27): [FLY_ROUND18.md](FLY_ROUND18.md) is the record** (plan
+> [FLY_ROUND18_PLAN.md](FLY_ROUND18_PLAN.md); five Opus 5 agents in two waves
+> under Fable orchestration; a scaffolding commit pre-seeded all 11 R18
+> constants blocks so five agents produced ONE trivial merge conflict).
+> **THE finding: `classifyRings` hard-codes the wrong winding sign for every
+> OpenFreeMap polygon layer — satellite Manhattan rendered 114 buildings
+> instead of 3,860.** Fixed satellite-side (`classifyRingsSat`, winding-
+> agnostic, gated behind `ROOFS_SAT.enabled`); **toy/Neon carries the SAME
+> defect at three frozen call sites (~99% of toy polygons dropped) — R19's
+> headline candidate, needs its own certification round.** What shipped:
+> **(1) ROOFS + VARIETY** — new 4-arg-pushV worker helpers (hip/shed/mansard/
+> pyramid via `pushInsetPeak`, penthouse/water-tank/chimney/antenna,
+> photo-plausible satellite crowns+spires), height-banded dispatch with an
+> always-something guarantee (`ROOFS_SAT`), volume-stratified suburb selection
+> over a HASH-SHUFFLED order (MVT feature order is spatially clustered),
+> house-height inference band, measured wall-tone re-tune (buildings-vs-
+> imagery delta −50→−32, band pinned in NEW verify-roof-variety), satWater
+> neighbor-gated ocean fill. WORKER_PROTOCOL 13→14 (all four pins lockstep).
+> **(2) CITY SCALE** — NEW sat-skyline-engine: z14 block-mass ring in
+> `groupN`-grouped chunks (8.7 km reach, ≤10 draws), Bayer near-field hole
+> crossfading with SAT_BLDG_FADE (the city BECOMES mass at altitude), empty
+> chunks issue NO mesh (**Owens 254–258 ≤ 261 all round, zero re-baselines**);
+> monuments got sat-only silhouette variants + value shading (toy geometry
+> proven 9/9 byte-identical). A2 killed the plan's area-fallback (its 18–60 m
+> invented-height clamp SATURATES — fake 60 m downtowns over every big-box
+> strip). **(3) LIVING GROUND** — NEW sat-veg-engine + ONE pooled canopy
+> InstancedMesh of tree STANDS (Central Park 999, rural Owens 952 — valley
+> trees are CORRECT; the invariant is +1 draw, not count 0), harbor boats
+> (leash-arithmetic proves on-water) + industrial steam plumes (normal-blend —
+> additive steam is invisible over white roofs); movers high-tier-only.
+> **(4) ARCADE JUICE** — near-miss off real ADS-B traffic (closest-approach
+> inflection gated on PEAK closing rate — range rate at CPA is ~0 by
+> definition), combo ×(1+0.25·(n−1)) cap ×3, session score + RunSummary,
+> screen shake wired INSIDE chase-camera post-slerp (zero-amplitude leaves
+> the quaternion untouched — probe-safe by construction), 4-layer procedural
+> music director on `audio.bus()` (enabled:false ⇒ zero nodes), BoostBar/
+> ComboChip self-anchored pointer-events:none (NO LayoutRoot zone changes).
+> **(5) STAKES** — crashes ON by default, reckless-only (commanded sink
+> >30 m/s at contact, or >200 m/s dive >18°, or buildings ≥45 m/s via REAL
+> collision columns built in the sat-building drape pass — `queryColumns`,
+> world units throughout, topY post-drape absolute); **arm gate 5 s after
+> mount AND every warpEpoch bump = the fleet immunity invariant**; ~1.8 s
+> tumble → respawn 2 km back at ground+400 m; "Flight stakes: Forgiving"
+> restores R17 byte-for-byte; boost is a real meter (6 s / 12 s / 0.25
+> re-arm, autopilot exempt, **the '3' preset is metered too** — the harness
+> fleet keeps unlimited boost via the sanctioned `__flyBoostInfinite` pin in
+> scripts/_boot.js, the R16 weather-pin idiom; verify-crash alone un-pins).
+> **Live fix during the round:** overcast-dusk tracer visibility
+> (`TRACERS.sun.overcastNightK` — the night ramp keys off EFFECTIVE light,
+> gain 0.38→1.1 at overcast dusk, identity at baseline weather) after a user
+> report was control-experimented to pre-existing R16 behavior. SIX
+> probe-determinism fixes, zero assertion-number changes. NEW gates:
+> verify-roof-variety (18) / verify-crash (23) / verify-juice (25) /
+> verify-skyline (17) / verify-veg (23). Full 22-harness sweep + 15-min soak
+> GREEN (p95 8.4–12.6 ms through a 525-aircraft surge), **zero gate
+> re-baselines**. Fable-authored Neon value/warmth nudge (3 values, isolated
+> commit `7865ba4`, A/B PNGs) awaits sign-off. FLY_ROUND18.md **§6 = 17
+> checkpoints PENDING USER** (+ carried R15/R16/R17 tables); §5b = follow-ups
+> (Neon winding round, satellite water material, overcast-dusk sky); §7 =
+> lessons (a coverage defect masquerades as a variety complaint; winding
+> conventions are data contracts; an integration seam both sides tested is
+> still untested; the fleet-pin idiom generalizes; probe preconditions must
+> imply their assertions; pre-seeded disjoint config blocks kill merge hell).
+>
+> Earlier: **Round 17 "Your Wings" is BUILT (2026-07-25):
 > [FLY_ROUND17.md](FLY_ROUND17.md) is the record** (plan
 > [FLY_ROUND17_PLAN.md](FLY_ROUND17_PLAN.md); five Opus 5 agents in two waves
 > under Fable orchestration). **(1) PLAYER HANGAR** — 9 selectable aircraft

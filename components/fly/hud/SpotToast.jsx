@@ -8,7 +8,7 @@ import { useFlyContractsStore } from '@/stores/fly-contracts-store';
 import { calculateRarity, getRarityTier, RARITY_TIERS } from '@/lib/rarity';
 import { getAircraftTypeName } from '@/lib/aircraft-type-names';
 import { BADGES, BADGE_TIERS } from '@/lib/badges';
-import { MOBILE_UI, SPICY } from '@/lib/fly/fly-constants';
+import { MOBILE_UI, NEARMISS, SPICY } from '@/lib/fly/fly-constants';
 import { trackSpotAttrs } from '@/lib/fly/spot-attrs';
 import { Zone } from '../LayoutRoot';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
@@ -249,6 +249,33 @@ export function SpotToast({ runtime }) {
     });
   }, []);
 
+  // --- Round 18 (A4 SHOWTIME): near-miss bonus ---------------------------
+  // JuiceSystems detects the closest-approach inflection inside the canvas
+  // frame loop and dispatches a window CustomEvent. A DOM event rather than a
+  // store field on purpose: a near miss is a fire-and-forget PING with no
+  // state to hold, and routing it through zustand would make a per-frame
+  // detector a per-frame store writer. Same deferred queue as badges and
+  // contracts, so the spot / SPICY / buzz push paths stay byte-identical.
+  useEffect(() => {
+    const onNearMiss = (e) => {
+      const d = e.detail || {};
+      pendingRef.current.push({
+        id: idRef.current++,
+        nearmiss: true,
+        ms: NEARMISS.toastMs,
+        accent: NEARMISS.accent,
+        label: '⌁ near miss',
+        title: d.callsign || '—',
+        type: `${d.distM ?? '?'} m`,
+        pts: d.pts,
+        mult: d.mult,
+      });
+      setPendingTick((t) => t + 1);
+    };
+    window.addEventListener('fly-nearmiss', onNearMiss);
+    return () => window.removeEventListener('fly-nearmiss', onNearMiss);
+  }, []);
+
   // Dev telemetry: the LIVE stack length. The DOM can transiently hold more
   // badge-toast nodes than MAX_STACK while AnimatePresence plays exit springs
   // (an expiring card + its admitted replacement coexist for ~400ms) — the
@@ -267,7 +294,10 @@ export function SpotToast({ runtime }) {
     if (toasts.length >= MAX_STACK) return;
     const next = pendingRef.current.shift();
     if (!next) return;
-    runtime.audio?.spotBlip?.(3); // blip when it APPEARS, not when it queued
+    // Round 18: the near-miss flavor brings its own sting (audio.whooshSting,
+    // fired at DETECTION so the sound lands with the fly-by, not with the
+    // card). Every other flavor keeps the round-16 blip byte-for-byte.
+    if (!next.nearmiss) runtime.audio?.spotBlip?.(3); // blip when it APPEARS, not when it queued
     setToasts((prev) => [next, ...prev].slice(0, MAX_STACK));
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== next.id));
@@ -300,17 +330,19 @@ export function SpotToast({ runtime }) {
               }`}
               style={{ fontFamily: CARD_THEME.fontDisplay, color: t.accent }}
             >
-              {t.contract
+              {t.nearmiss
                 ? t.label
-                : t.badge
-                  ? `⬢ ${t.icon} badge earned`
-                  : t.buzz
-                    ? t.label
-                    : t.spicy
-                      ? '◆ spicy'
-                      : t.isNew
-                        ? '⟬ new spot! ⟭'
-                        : 'spotted'}
+                : t.contract
+                  ? t.label
+                  : t.badge
+                    ? `⬢ ${t.icon} badge earned`
+                    : t.buzz
+                      ? t.label
+                      : t.spicy
+                        ? '◆ spicy'
+                        : t.isNew
+                          ? '⟬ new spot! ⟭'
+                          : 'spotted'}
             </span>
           );
           const titleEl = (
@@ -341,7 +373,12 @@ export function SpotToast({ runtime }) {
               {t.type}
             </span>
           ) : null;
-          const trailEl = t.contract ? (
+          const trailEl = t.nearmiss ? (
+            <span className="font-mono text-[11px] font-bold" style={{ color: t.accent }}>
+              +{t.pts}
+              {t.mult > 1 ? ` ×${t.mult}` : ''}
+            </span>
+          ) : t.contract ? (
             <span className="font-mono text-[11px] font-bold" style={{ color: t.accent }}>
               +{t.pts}
             </span>
@@ -388,15 +425,17 @@ export function SpotToast({ runtime }) {
                 width: land ? MOBILE_UI.toast.landWidth : undefined,
               }}
               data-testid={
-                t.contract
-                  ? 'contract-toast'
-                  : t.badge
-                    ? 'badge-toast'
-                    : t.buzz
-                      ? 'buzz-toast'
-                      : t.spicy
-                        ? 'spicy-toast'
-                        : 'spot-toast'
+                t.nearmiss
+                  ? 'nearmiss-toast'
+                  : t.contract
+                    ? 'contract-toast'
+                    : t.badge
+                      ? 'badge-toast'
+                      : t.buzz
+                        ? 'buzz-toast'
+                        : t.spicy
+                          ? 'spicy-toast'
+                          : 'spot-toast'
               }
             >
               {phone ? (

@@ -58,7 +58,16 @@ const { bootFly } = require('./_boot');
           fly.flight.pos.y - t.ry,
           (fly.flight.pos.z - t.rz) / k
         );
-        return d < 3000;
+        // R18 probe-precondition fix (Fable): was `d < 3000`, which is
+        // inconsistent with the range-band gate below — cinema range is
+        // separation x CINEMA.rangeK (1.6), so a target acquired between
+        // 2500-3000 m measures 4000-4800 m and fails the <= 4000 cap by
+        // construction. TWO independent R18 control experiments showed the
+        // pre-R18 baseline failing this gate identically in live traffic
+        // (baseline 4269/4350 m vs candidate 4271/4248 m, same windows).
+        // 2400 x 1.6 = 3840 keeps the assertion untouched and the probe
+        // self-consistent. Not a re-baseline: the gate's numbers are frozen.
+        return d < 2400;
       },
       { timeout: 90000, polling: 500 }
     )
@@ -66,6 +75,30 @@ const { bootFly } = require('./_boot');
 
   await page.keyboard.press('c');
   await page.waitForTimeout(1200);
+  // Second half of the precondition (R18 sweep fix): the wait above proves the
+  // pair was close ONCE, but live targets keep flying — one run measured
+  // 6,880 m because the contact diverged in the seconds between the wait, the
+  // C press and this read. The intercept autopilot is actively closing at
+  // boost, so hold the READ until separation is back inside the same 2,400 m
+  // the wait used — the precondition now holds AT the assertion. Gate numbers
+  // are untouched; a pair that never re-closes still fails loudly below.
+  await page
+    .waitForFunction(
+      () => {
+        const fly = window.__fly;
+        const t = fly.targeting.target;
+        if (!t) return false;
+        const k = 1 / Math.cos((fly.flight.latDeg * Math.PI) / 180);
+        const d = Math.hypot(
+          (fly.flight.pos.x - t.rx) / k,
+          fly.flight.pos.y - t.ry,
+          (fly.flight.pos.z - t.rz) / k
+        );
+        return d < 2400;
+      },
+      { timeout: 90000, polling: 500 }
+    )
+    .catch(() => {});
   const cin = await page.evaluate(() => {
     const s = window.__flyStore.getState();
     const fly = window.__fly;

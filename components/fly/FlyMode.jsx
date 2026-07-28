@@ -21,6 +21,8 @@ import { HangarPanel } from './hud/HangarPanel';
 import { ArrivalBanner } from './hud/ArrivalBanner';
 import { TouchControls } from './hud/TouchControls';
 import { PhotoModeBar } from './hud/PhotoModeBar';
+import { CrashFlash } from './CrashFlash';
+import { JuiceHud } from './hud/JuiceHud';
 import { PauseMenu } from './PauseMenu';
 import { BootScreen } from './hud/BootScreen';
 import { useFlyTraffic } from '@/hooks/use-fly-traffic';
@@ -310,10 +312,14 @@ export function FlyMode({ onClose }) {
         <ArrivalBanner />
       </HudGroup>
       <WarpFlash runtime={runtimeRef.current} />
+      <CrashFlash />
       <HudGroup hidden={photoActive}>
         {isTouch && <TouchControls runtime={runtimeRef.current} />}
       </HudGroup>
       <PhotoModeBar />
+      {/* Round 18 (A4): combo chip + boost meter + end-of-run summary, all in
+          one component so the round costs FlyMode a single line. */}
+      <JuiceHud />
       <PauseMenu onExit={onClose} />
       <AttributionBar />
 

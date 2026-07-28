@@ -4,8 +4,9 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
 import { SatBuildingEngine } from '@/lib/fly/toy-world/sat-building-engine';
-import { SAT_BUILDINGS, SAT_WATER } from '@/lib/fly/fly-constants';
+import { SAT_AMBIENT, SAT_BUILDINGS, SAT_VEG, SAT_WATER } from '@/lib/fly/fly-constants';
 import { useFlyStore } from '@/stores/fly-store';
+import { SatVegLayer } from './SatVegLayer';
 
 const TIERS = ['low', 'medium', 'high']; // mirrors FlyCanvas's quality ladder
 const atLeastTier = (tier, min) => TIERS.indexOf(tier) >= TIERS.indexOf(min);
@@ -52,6 +53,31 @@ export function SatBuildingLayer({ runtime, flight }) {
   // react-hooks/purity); the warp subscription reads the current clock from here.
   const nowRef = useRef(0);
   const statsAtRef = useRef(0);
+
+  // Round 18 (A1) — publish the engine on the runtime bus (the RUNTIME
+  // CONTRACTS (R18) block in FlyScene). A5 GRAVITY's crash system calls
+  // runtime.satBuildings?.queryColumns(px, pz, r) for building collision, and
+  // it does so on PRODUCTION paths — which is why this is NOT the dev-only
+  // window.__satBuildings global below. Off-satellite, at low tier, or with
+  // SAT_BUILDINGS.enabled false this layer never mounts and the field stays
+  // null, so the caller needs no style test. Mount-time is enough: the engine
+  // is memoized ON `runtime`, so a new runtime always brings a new engine and
+  // re-runs this. Cleared on unmount, guarded on identity so a StrictMode
+  // double-mount can't null out the live engine.
+  //
+  // `runtime` IS a prop, so react-hooks/immutability objects — but the whole
+  // point of the object is that it is the scene's mutable cross-component bus
+  // (ToyWorldLayer's runtime.toyStats, TrafficLayer's runtime.modelsReady,
+  // FlyCanvas's runtime.framesRendered all write it the same way). Disabled
+  // narrowly, on the one synchronous line, rather than silently. (The rule
+  // only analyses the effect body — the deferred cleanup below needs none.)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability -- runtime is the scene's mutable bus (FlyScene RUNTIME CONTRACTS (R18))
+    runtime.satBuildings = engine;
+    return () => {
+      if (runtime.satBuildings === engine) runtime.satBuildings = null;
+    };
+  }, [engine, runtime]);
 
   useEffect(() => {
     const worker = new Worker(
@@ -100,5 +126,21 @@ export function SatBuildingLayer({ runtime, flight }) {
     }
   }, -47);
 
-  return <primitive object={engine.object} />;
+  return (
+    <>
+      <primitive object={engine.object} />
+      {/* Round 18 (A3 "GROUNDSKEEPER"): the living ground — pooled canopies plus
+          the two data-anchored ambient movers. Mounted HERE rather than from
+          FlyScene because it wants exactly this gate (satellite, tier >= medium,
+          inside worldRoot so its meshes ride the -anchor rebase into the
+          uBendCenter frame) and A3 owns only these mount lines this wave.
+          EITHER flag alone keeps the shared 'sat-veg' streamer alive: the worker
+          emits the canopies and the mover anchor points in ONE bundle, so
+          SatVegLayer owns the streamer and SatAmbientLife reads its chunks.
+          Both flags false = no mount, no worker, no draws, no globals. */}
+      {(SAT_VEG.enabled || SAT_AMBIENT.enabled) && (
+        <SatVegLayer runtime={runtime} flight={flight} />
+      )}
+    </>
+  );
 }
