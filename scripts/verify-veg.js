@@ -213,6 +213,14 @@ function compare(a, b) {
   });
   await bootFly(page, { style: 'satellite', ...BOOT_OPTS });
   await page.evaluate(() => window.__flyStore.getState().setQualityTier('high'));
+  // R18 close fix (Fable): PIN THE SUN — the same wall-clock defect fixed in
+  // verify-roof-variety the same day. The canopy A/B green-mass and HSV
+  // saturation gates were authored and measured in daylight; the first
+  // after-dark run collapsed both (dark trees on dark ground). Same midday
+  // pin as roof-variety; re-applied by every warp below.
+  await page.evaluate(() => {
+    window.__flySunOverride = Date.UTC(2026, 6, 27, 17, 0, 0);
+  });
   await page.mouse.move(800, 450);
 
   const readVeg = () => {
