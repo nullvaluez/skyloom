@@ -4,7 +4,14 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
 import { SatBuildingEngine } from '@/lib/fly/toy-world/sat-building-engine';
-import { SAT_AMBIENT, SAT_BUILDINGS, SAT_VEG, SAT_WATER } from '@/lib/fly/fly-constants';
+import {
+  SAT_AMBIENT,
+  SAT_BUILDINGS,
+  SAT_COVERAGE,
+  SAT_SHADOWS,
+  SAT_VEG,
+  SAT_WATER,
+} from '@/lib/fly/fly-constants';
 import { useFlyStore } from '@/stores/fly-store';
 import { SatVegLayer } from './SatVegLayer';
 
@@ -47,6 +54,31 @@ export function SatBuildingLayer({ runtime, flight }) {
     );
     engine.setNightWindowsEnabled(
       SAT_BUILDINGS.night.enabled && atLeastTier(qualityTier, SAT_BUILDINGS.night.minTier)
+    );
+  }, [engine, qualityTier]);
+  // Round 19 (A HOMESTEAD, P2) — HIGH-TIER-ONLY coverage widen. The field
+  // study found building coverage effectively zero outside downtown cores:
+  // ring r 3600 / 12 chunks reaches ~4.8 km of tiles, and a suburb needs the
+  // reach more than a downtown does. Medium/low resolve to null ⇒ the engine
+  // falls back to the R18 SAT_BUILDINGS values and phones are byte-identical
+  // (user decision 2). SAT_COVERAGE.enabled false does the same at high.
+  useEffect(() => {
+    engine.setCoverage(
+      SAT_COVERAGE.enabled && qualityTier === 'high' ? SAT_COVERAGE.high : null
+    );
+  }, [engine, qualityTier]);
+  // Round 19 — the two SAT_SHADOWS mesh flags for THIS layer's meshes (the
+  // plan's per-layer rule; B DEEPFIELD owns the light rig and FlyScene's
+  // castShadow gate, C does the same for SatVegLayer in W2). The runtime
+  // override is the fleet pin from scripts/_boot.js: harnesses set it to 0 so
+  // every frozen satellite pixel gate keeps seeing the pre-R19 frame, and
+  // verify-aerial is the one harness that un-pins it. Optional-chained through
+  // `window` so this never assumes B's work has landed.
+  useEffect(() => {
+    const pinnedOff =
+      typeof window !== 'undefined' && window.__flySatShadowOverride === 0;
+    engine.setShadows(
+      SAT_SHADOWS.enabled && qualityTier === SAT_SHADOWS.minTier && !pinnedOff
     );
   }, [engine, qualityTier]);
   // Frame-loop timing lives in refs (never mutate the memoized engine in render —
