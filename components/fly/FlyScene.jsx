@@ -2,10 +2,11 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Object3D, Vector3, SRGBColorSpace } from 'three';
+import { Object3D, ShadowMaterial, Vector3, SRGBColorSpace } from 'three';
 import { Environment } from '@react-three/drei';
 import {
   airDrop,
+  applyBend,
   applyBendFade,
   applyHillshade,
   getEdgeFade,
@@ -22,7 +23,13 @@ import {
   setHillshade,
   setHillV2,
   setMicroDetail,
+  setQuiltGrade,
+  getQuiltGrade,
+  setSatContentHaze,
+  getSatContentHaze,
+  getBend,
 } from '@/lib/fly/toy-world/world-bend';
+import { setAerial, clearAerial, getAerialState } from './AerialPerspective';
 import { PALETTE } from '@/lib/fly/toy-world/toy-palette';
 import {
   SkyDome,
@@ -39,7 +46,11 @@ import { PoiLetters } from './PoiLetters';
 import { TrafficTracers } from './TrafficTracers';
 import { WarpBurst } from './WarpBurst';
 import { TerrainEngine } from '@/lib/fly/terrain-engine';
-import { createImagerySource, createTerrainSources } from '@/lib/fly/tile-sources';
+import {
+  createImagerySource,
+  createTerrainSources,
+  lodThresholdFor,
+} from '@/lib/fly/tile-sources';
 import { FlightModel } from '@/lib/fly/flight-model';
 import { resolveAircraft } from '@/lib/fly/player-aircraft';
 import { InputController } from '@/lib/fly/input-controller';
@@ -63,6 +74,7 @@ import {
   weatherHazeMax,
 } from '@/lib/fly/weather-model';
 import {
+  AERIAL_PERSPECTIVE,
   BOOST_METER,
   CLOUDS,
   CRASH,
@@ -71,7 +83,9 @@ import {
   MOON,
   SAT_BUILDINGS,
   SAT_CITY_GLOW,
+  SAT_QUILT,
   SAT_ROADS,
+  SAT_SHADOWS,
   SAT_SKYLINE,
   SKY,
   SKY_DUSK,
@@ -142,6 +156,25 @@ const _ATMO_HI_RIM = _hex2rgb(SKY.altAtmo.highAltRim);
 const _ATMO_HI_VOID = _hex2rgb(SKY.altAtmo.highAltVoid);
 const _atmoRim = [0, 0, 0];
 const _atmoVoid = [0, 0, 0];
+// Round 19 (B): the aerial-perspective feed, a module scratch object reused
+// every frame (the _atmoRim discipline) — setAerial() copies out of it, so
+// nothing here allocates in the frame loop.
+const _aerialFeed = {
+  strength: 0,
+  startM: 0,
+  endM: 0,
+  heightFalloffM: 1,
+  rim: [0, 0, 0],
+  camPos: [0, 0, 0],
+  camRight: [1, 0, 0],
+  camUp: [0, 1, 0],
+  camZ: [0, 0, 1],
+  tanHalfFov: 0.5,
+  bendCx: 0,
+  bendCz: 0,
+  bendK: 0,
+  groundY: 0,
+};
 
 // Fill _atmoRim/_atmoVoid (sRGB 0..1) for the current sun fraction + smoothed
 // altitude term. No allocation (writes the module scratch triples). dayness
@@ -196,6 +229,61 @@ const MOODS = {
 };
 
 /**
+ * Round 19 (B) SAT_SHADOWS ground catcher — BUILT, SHIPS OFF.
+ *
+ * Satellite shadows land on content that RECEIVES them (building chunk meshes,
+ * the veg instancer). The tiles deliberately never receive: they are a
+ * gigantic, constantly-restreaming, DEM-displaced quadtree, and putting them in
+ * the receive set is the classic route to shadow acne across the whole world.
+ * The consequence is that a shadow cast onto open GROUND has nothing to land
+ * on. This disc is the standard fix — a ShadowMaterial catcher that renders
+ * ONLY where it is shadowed, polygon-offset under the terrain to stay out of
+ * the z-fight.
+ *
+ * It ships `catcher.enabled:false` by Fable ruling on the plan §5 arithmetic:
+ * Owens Valley's worst case is 261 draws against a gate of exactly 261, with no
+ * headroom — and Owens is empty rural terrain with no casters at all, so the
+ * disc would cost the round's tightest draw for a shadow that cannot exist
+ * there. The user checkpoint row decides whether to opt in (at which point it
+ * wants its own AGL/te-caster gate, not an unconditional mount).
+ *
+ * Uses applyBend (bend-only), the variant the cloud shadows use — the same
+ * problem, a flat ground-anchored disc that must follow the mini-planet
+ * curvature. Without it the 900 m rim floats ~4 m over the bent terrain.
+ */
+function SatShadowCatcher({ flight, origin }) {
+  const ref = useRef();
+  const material = useMemo(() => {
+    const m = new ShadowMaterial({
+      opacity: SAT_SHADOWS.catcher.opacity,
+      transparent: true,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
+    });
+    applyBend(m);
+    return m;
+  }, []);
+  useEffect(() => () => material.dispose(), [material]);
+  useFrame(() => {
+    const m = ref.current;
+    if (!m) return;
+    // Rebased, like every other object mounted outside worldRoot.
+    m.position.set(
+      flight.pos.x - origin.anchor.x,
+      flight.groundElev,
+      flight.pos.z - origin.anchor.z
+    );
+  }, -49);
+  return (
+    <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} receiveShadow material={material}>
+      <circleGeometry args={[SAT_SHADOWS.catcher.radiusM, 48]} />
+    </mesh>
+  );
+}
+
+/**
  * The Fly-mode scene graph + frame loop. Order per frame (useFrame
  * priorities): input/flight/ground/rebase (-50) → chase camera (-50, same
  * pass) → player-plane pose (-30) → contrail emitter (-20) → three-tile LOD
@@ -229,12 +317,69 @@ export function FlyScene({ runtime }) {
   // ignores it and stays on the certified noon HDRI.
   const [hdriBucket, setHdriBucket] = useState('day');
 
+  // Round 19 (B) SAT_SHADOWS: the fleet pin, resolved ONCE pre-mount from
+  // window (scripts/_boot.js writes it in an addInitScript) and thereafter
+  // flippable only through the dev handle below. It has to be React state and
+  // not a live per-frame read because `castShadow` is a JSX prop: turning the
+  // shadow map on and off allocates/frees a 2048² depth target and changes the
+  // draw count, so it must be a discrete transition, never a per-frame decision
+  // (the __flySetTone precedent).
+  const [satShadowPin, setSatShadowPin] = useState(
+    () => typeof window === 'undefined' || window.__flySatShadowOverride !== 0
+  );
+  const satShadowsOn =
+    mapStyle === 'satellite' &&
+    SAT_SHADOWS.enabled &&
+    qualityTier === 'high' &&
+    satShadowPin;
+  // Render-time mirror so the frame loop reads this frame's value with no
+  // stale-closure window (the pattern styleRef uses).
+  const satShadowRef = useRef(false);
+  satShadowRef.current = satShadowsOn;
+  // The directional light is SHARED by both styles, so its shadow-camera props
+  // switch with the rig that owns it. Every value in the false branch is the
+  // pre-R19 literal verbatim: with SAT_SHADOWS.enabled false, or on toy, or on
+  // any tier but high, this object is byte-for-byte the R18 rig.
+  const shadowRig = satShadowsOn
+    ? {
+        mapSize: SAT_SHADOWS.mapSize,
+        radiusM: SAT_SHADOWS.orthoRadiusM,
+        farM: SAT_SHADOWS.farM,
+        bias: SAT_SHADOWS.bias,
+        normalBias: SAT_SHADOWS.normalBias,
+      }
+    : {
+        mapSize: TOY.shadowMapSize[qualityTier] ?? TOY.shadowMapSize.medium,
+        radiusM: TOY.shadowRadiusM,
+        farM: 8000,
+        bias: -0.0002,
+        normalBias: 4,
+      };
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development' || typeof window === 'undefined') return;
+    // verify-aerial's A/B leg: the ONE harness that un-pins the shadows.
+    window.__flySatShadow = {
+      set: (v) => setSatShadowPin(!!v),
+      get: () => satShadowRef.current,
+    };
+    return () => {
+      if (window.__flySatShadow) delete window.__flySatShadow;
+    };
+  }, []);
+
   // Built once with the style active at mount; later changes hot-swap via
   // engine.setImagery below (styleRef starts in sync with this).
-  const engine = useMemo(
-    () => new TerrainEngine(createTerrainSources(useFlyStore.getState().mapStyle)),
-    []
-  );
+  // Round 19 (B): the tier is read imperatively at the same beat as the style.
+  // resolveInitialSettings() has already run pre-mount, so this is the player's
+  // FINAL tier — which is what decides the imagery zoom ceiling (z17 high) and
+  // the anisotropy default (8 high). Both are deliberately fixed for the life
+  // of the engine: a mid-flight PerformanceMonitor step must not re-create the
+  // imagery source and re-stream the whole field (the R11 "new textures only"
+  // precedent — the field converges as tiles stream, with no degrade hitch).
+  const engine = useMemo(() => {
+    const s = useFlyStore.getState();
+    return new TerrainEngine(createTerrainSources(s.mapStyle, s.qualityTier));
+  }, []);
   // Round 17 hangar: which airframe the player flies. `aircraft` is the frozen
   // resolveAircraft() config (flight envelope + fx + the GLB entry); the store
   // value is discrete, so this memo changes only on a hangar pick.
@@ -621,6 +766,18 @@ export function FlyScene({ runtime }) {
       sat ? (HILLSHADE.aoByTier[qualityTier] ?? 0) : 0,
       sat ? (HILLSHADE.satByTier[qualityTier] ?? 0) : 0
     );
+    // Round 19 (B): the introspection handle lives HERE, not in the day-cycle
+    // effect, because that one early-returns for non-satellite — and the single
+    // most important thing to be able to assert is that the new tile-fragment
+    // terms read ZERO in TOY. A handle that only exists in the style it is
+    // meant to exonerate proves nothing.
+    if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+      window.__flyAerial = {
+        get: getAerialState,
+        quilt: getQuiltGrade,
+        haze: getSatContentHaze,
+      };
+    }
   }, [mapStyle, qualityTier]);
 
   // World-edge fade band + target color per style. Round 6: the fade target
@@ -766,7 +923,14 @@ export function FlyScene({ runtime }) {
   useEffect(() => {
     if (styleRef.current === mapStyle) return;
     styleRef.current = mapStyle;
-    engine.setImagery(createImagerySource(mapStyle));
+    // Round 19 (B): the swap keeps the ENGINE's tier (read live here — the
+    // same tier the aniso default was installed from at construction), so a
+    // style toggle can never silently change the imagery zoom ceiling.
+    const tier19 = useFlyStore.getState().qualityTier;
+    engine.setImagery(createImagerySource(mapStyle, tier19));
+    // Round 19 (B): the z17 draw clamp is satellite-only, so it moves with the
+    // style — see lodThresholdFor. Toy always gets three-tile's default 1.
+    engine.setLodThreshold(lodThresholdFor(mapStyle, tier19));
     traffic.clearGroundCache();
   }, [mapStyle, engine, traffic]);
 
@@ -1212,6 +1376,107 @@ export function FlyScene({ runtime }) {
         // baseline → the certified SKY.haze.max).
         wx ? weatherHazeMax(SKY.haze.max, wx) : SKY.haze.max
       );
+      // --- Round 19 (B "DEEPFIELD"): the atmosphere + depth feed ------------
+      // Placed HERE on purpose: _atmoRim is final (computeSatAtmo wrote it,
+      // applyWeatherAtmo grey-mixed it in place) and the tile band above has
+      // just consumed it, so the post pass, the tile haze and the content haze
+      // are provably mixing toward ONE colour — the round-6 single-source rule
+      // extended to the new channels.
+      //
+      // ONE master multiplier drives all three of B's visuals: the high-tier
+      // requirement (decision 2 — medium/low stay byte-identical to R18) and
+      // the fleet pin `__flyAerialOverride` (0 in scripts/_boot.js, the R16
+      // weather-pin idiom). At 0 each visual takes its OWN identity path
+      // (shader early-out / skipped branch / untouched uniform), so a pinned
+      // frame is bit-identical to R18 rather than merely close — which is what
+      // lets every frozen satellite pixel gate keep its numbers.
+      const highTier = flyState.qualityTier === 'high';
+      let aerialGate = highTier ? 1 : 0;
+      if (
+        process.env.NODE_ENV === 'development' &&
+        typeof window !== 'undefined' &&
+        window.__flyAerialOverride != null
+      ) {
+        aerialGate *= window.__flyAerialOverride;
+      }
+
+      // (a) the depth post pass. Feeds the camera basis from matrixWorld — the
+      // chase/cinema/photo rigs updated it ~40 lines above and the composer
+      // renders at priority 1, so these values are this frame's, not last's.
+      if (AERIAL_PERSPECTIVE.enabled && aerialGate > 0) {
+        camera.updateMatrixWorld();
+        const me = camera.matrixWorld.elements;
+        _aerialFeed.strength = AERIAL_PERSPECTIVE.maxMix * aerialGate;
+        _aerialFeed.startM = AERIAL_PERSPECTIVE.startM;
+        _aerialFeed.endM = AERIAL_PERSPECTIVE.endM;
+        _aerialFeed.heightFalloffM = AERIAL_PERSPECTIVE.heightFalloffM;
+        _aerialFeed.rim[0] = _atmoRim[0];
+        _aerialFeed.rim[1] = _atmoRim[1];
+        _aerialFeed.rim[2] = _atmoRim[2];
+        _aerialFeed.camRight[0] = me[0];
+        _aerialFeed.camRight[1] = me[1];
+        _aerialFeed.camRight[2] = me[2];
+        _aerialFeed.camUp[0] = me[4];
+        _aerialFeed.camUp[1] = me[5];
+        _aerialFeed.camUp[2] = me[6];
+        _aerialFeed.camZ[0] = me[8];
+        _aerialFeed.camZ[1] = me[9];
+        _aerialFeed.camZ[2] = me[10];
+        _aerialFeed.camPos[0] = me[12];
+        _aerialFeed.camPos[1] = me[13];
+        _aerialFeed.camPos[2] = me[14];
+        // Live FOV: the speed/boost kick animates it, and a stale tangent
+        // would skew the reconstructed distance exactly when the world is
+        // moving fastest.
+        _aerialFeed.tanHalfFov = Math.tan(camera.fov * 0.5 * DEG2RAD);
+        // The EFFECTIVE bend (altFlatten already applied) straight from the
+        // uniforms the GPU is about to use — the airDrop/horizonFade idiom, so
+        // the un-bend in the shader can never drift from the bend in the scene.
+        const bnd = getBend();
+        _aerialFeed.bendCx = bnd.cx;
+        _aerialFeed.bendCz = bnd.cz;
+        _aerialFeed.bendK = bnd.k;
+        _aerialFeed.groundY = flight.groundElev;
+        setAerial(_aerialFeed);
+      } else {
+        clearAerial();
+      }
+
+      // (b) the in-shader CONTENT haze (sat buildings + skyline). Ships OFF —
+      // at high tier the post pass above already hazes these exact pixels from
+      // the same depth buffer, and running both double-hazes the mid band. The
+      // term exists for medium/low, where no post pass runs; see the
+      // AERIAL_PERSPECTIVE.content header.
+      const ch = AERIAL_PERSPECTIVE.content;
+      if (ch.enabled && aerialGate > 0) {
+        setSatContentHaze(
+          ch.startM,
+          ch.endM,
+          _atmoRim[0],
+          _atmoRim[1],
+          _atmoRim[2],
+          ch.max * aerialGate
+        );
+      } else {
+        setSatContentHaze(ch.startM, ch.endM, 0, 0, 0, 0);
+      }
+
+      // (c) the SAT_QUILT tile grade. Esri's mosaic seams are a CRUISE
+      // artifact — at 300 m you are inside one capture and the seams are off
+      // screen, while the hillshade/micro-detail contracts own that band. So
+      // the grade fades IN with eye AGL and is exactly 0 below inAglM, which is
+      // also what keeps verify-sat-depth's low-altitude crops untouched.
+      if (SAT_QUILT.enabled && aerialGate > 0) {
+        let qt = Math.min(
+          1,
+          Math.max(0, (eyeAgl - SAT_QUILT.inAglM) / (SAT_QUILT.outAglM - SAT_QUILT.inAglM))
+        );
+        qt = qt * qt * (3 - 2 * qt);
+        const q = qt * aerialGate;
+        setQuiltGrade(SAT_QUILT.desatMax * q, SAT_QUILT.lumaFlatten * q);
+      } else {
+        setQuiltGrade(0, 0);
+      }
       setSkyAtmo(_atmoRim[0], _atmoRim[1], _atmoRim[2], _atmoVoid[0], _atmoVoid[1], _atmoVoid[2]);
       // R19 scaffolding (Fable): the SkyDome sun feed for D GOLDENHOUR's
       // golden-hour lobe. The stub is a no-op until D implements; the gate
@@ -1265,6 +1530,14 @@ export function FlyScene({ runtime }) {
       // value behind would put someone else's ceiling over the Neon world.
       clearSkyAtmo();
       clearSkyWeather();
+      // Round 19 (B): the three satellite-only atmosphere channels are LIVE
+      // uniforms shared with the toy programs (the tile material compiles the
+      // same hillshade patch in both styles), so leaving a stale satellite
+      // value behind would put a satellite grade on the Neon world — the exact
+      // class of bug clearSkyWeather was added for in R16.
+      clearAerial();
+      setQuiltGrade(0, 0);
+      setSatContentHaze(AERIAL_PERSPECTIVE.content.startM, AERIAL_PERSPECTIVE.content.endM, 0, 0, 0, 0);
       const target = groundHorizonTargetM(ah, skyFade.endM, ah.maxM);
       const endM = (edgeFadeEndRef.current = expApproach(
         edgeFadeEndRef.current ?? skyFade.endM,
@@ -1283,6 +1556,9 @@ export function FlyScene({ runtime }) {
     } else {
       clearSkyAtmo();
       clearSkyWeather();
+      clearAerial(); // round 19 (B): same reason as the toy branch above
+      setQuiltGrade(0, 0);
+      setSatContentHaze(AERIAL_PERSPECTIVE.content.startM, AERIAL_PERSPECTIVE.content.endM, 0, 0, 0, 0);
     }
 
     // Sky horizon follows the bent rim: dip = depression angle (as vDir.y)
@@ -1334,6 +1610,35 @@ export function FlyScene({ runtime }) {
       );
       sunTarget.position.set(rpx, flight.pos.y, rpz);
       sunTarget.updateMatrixWorld();
+    } else if (sun && satShadowRef.current && flyState.mapStyle === 'satellite') {
+      // Round 19 (B): the SATELLITE shadow rig — the same small-ortho follow,
+      // with two deliberate differences from the toy moon.
+      // (1) It centres on the GROUND under the player, not on the player.
+      //     Satellite casters are ground-bound content; a player-centred
+      //     frustum at FL300 would float 9 km above every building and shadow
+      //     precisely nothing (the toy rig gets away with it because the toy
+      //     world is a low-altitude experience).
+      // (2) The sun elevation is FLOORED at SAT_SHADOWS.minElRad. As el → 0 the
+      //     light lies down parallel to the ground: shadow length runs away to
+      //     infinity, the 1500 m frustum stops containing anything useful, and
+      //     a grazing frustum is exactly where depth precision fails and acne
+      //     appears. The hillshade applies the same floor for the same reason.
+      const ss = runtime.sun;
+      if (ss) {
+        const el = Math.max(SAT_SHADOWS.minElRad, ss.el);
+        const cosEl = Math.cos(el);
+        // The SAME basis setHillDir is fed, so a cast shadow and the hillshade
+        // it falls across can never disagree about where the sun is.
+        const gy = flight.groundElev;
+        const d = SAT_SHADOWS.distM;
+        sun.position.set(
+          rpx + -Math.sin(ss.az) * cosEl * d,
+          gy + Math.sin(el) * d,
+          rpz + Math.cos(ss.az) * cosEl * d
+        );
+        sunTarget.position.set(rpx, gy, rpz);
+        sunTarget.updateMatrixWorld();
+      }
     }
 
     // Discrete store sync only when the preset actually changes.
@@ -1420,18 +1725,20 @@ export function FlyScene({ runtime }) {
         position={mood.lightDir}
         intensity={mood.sunIntensity}
         color={mood.sunColor}
-        castShadow={mapStyle === 'toy' && TOY.shadows && qualityTier !== 'low'}
+        castShadow={
+          (mapStyle === 'toy' && TOY.shadows && qualityTier !== 'low') || satShadowsOn
+        }
         target={sunTarget}
-        shadow-mapSize-width={TOY.shadowMapSize[qualityTier] ?? TOY.shadowMapSize.medium}
-        shadow-mapSize-height={TOY.shadowMapSize[qualityTier] ?? TOY.shadowMapSize.medium}
-        shadow-camera-left={-TOY.shadowRadiusM}
-        shadow-camera-right={TOY.shadowRadiusM}
-        shadow-camera-top={TOY.shadowRadiusM}
-        shadow-camera-bottom={-TOY.shadowRadiusM}
+        shadow-mapSize-width={shadowRig.mapSize}
+        shadow-mapSize-height={shadowRig.mapSize}
+        shadow-camera-left={-shadowRig.radiusM}
+        shadow-camera-right={shadowRig.radiusM}
+        shadow-camera-top={shadowRig.radiusM}
+        shadow-camera-bottom={-shadowRig.radiusM}
         shadow-camera-near={1}
-        shadow-camera-far={8000}
-        shadow-bias={-0.0002}
-        shadow-normalBias={4}
+        shadow-camera-far={shadowRig.farM}
+        shadow-bias={shadowRig.bias}
+        shadow-normalBias={shadowRig.normalBias}
       />
       <primitive object={sunTarget} />
 
@@ -1537,6 +1844,11 @@ export function FlyScene({ runtime }) {
           origin={origin}
           radiusM={aircraft.shadowRadiusM}
         />
+      )}
+      {/* Round 19 (B): the satellite shadow catcher — built, ships OFF (see
+          the component header + plan §5's Owens arithmetic). */}
+      {satShadowsOn && SAT_SHADOWS.catcher.enabled && (
+        <SatShadowCatcher flight={flight} origin={origin} />
       )}
     </>
   );

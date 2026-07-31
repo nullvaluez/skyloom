@@ -13,9 +13,10 @@ import {
   SMAA,
 } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
-import { SKY, SKY_LIVE, TOY } from '@/lib/fly/fly-constants';
+import { AERIAL_PERSPECTIVE, SKY, SKY_LIVE, TOY } from '@/lib/fly/fly-constants';
 import { useFlyStore } from '@/stores/fly-store';
 import { WhiteBalanceEffect } from './WhiteBalance';
+import { AerialPerspectiveEffect } from './AerialPerspective';
 
 // Bloom buffer scale per quality tier; at 'low' bloom is dropped entirely
 // (the composer stays for SMAA — cheaper than MSAA on integrated GPUs).
@@ -123,6 +124,14 @@ export function Effects({ runtime }) {
     () => new WhiteBalanceEffect({ balance: SKY.grade.neutral }),
     []
   );
+
+  // Round 19 (B): depth-based aerial perspective. Mounted ONLY on satellite +
+  // high tier — declaring EffectAttribute.DEPTH makes the composer allocate a
+  // depth texture, which is a real (if small) cost, so medium/low must not pay
+  // it. Its uniforms are fed by FlyScene's -50 block through module setters, so
+  // the instance itself is constructed once and never reconfigured.
+  const aerialOn = sat && AERIAL_PERSPECTIVE.enabled && qualityTier === 'high';
+  const aerial = useMemo(() => new AerialPerspectiveEffect(), []);
   // Drive the balance from runtime.sun.frac on a discrete cadence (never per
   // frame; runtime.sun is only published in satellite by FlyScene's day cycle).
   useEffect(() => {
@@ -173,6 +182,13 @@ export function Effects({ runtime }) {
           resolutionScale={bloomScale}
         />
       )}
+      {/* Round 19 (B): aerial perspective goes FIRST, ahead of the grade. The
+          tile haze band and the SkyDome rim are baked in the SCENE render and
+          therefore pass through the whole grade; a post haze applied AFTER the
+          grade would land fully-hazed pixels on the raw rim colour while the
+          sky they melt into carries the graded one — a step at exactly the
+          horizon. Merges into the same EffectPass as the three below = 0 draws. */}
+      {aerialOn && <primitive object={aerial} dispose={null} />}
       {/* Satellite grade (round 13 P0): saturation + contrast + a sun-driven
           warm/cool white balance. All three merge into one EffectPass. */}
       {sat && <HueSaturation saturation={SKY.grade.saturation} />}
