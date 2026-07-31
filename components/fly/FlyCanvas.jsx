@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { PerformanceMonitor } from '@react-three/drei';
 import { FlyScene } from './FlyScene';
@@ -38,6 +38,21 @@ function BootFramePulse({ runtime }) {
  *  declined out of (each high↔medium crossing rebuilds bloom + building
  *  materials — the hitch IS the flap). Declines are never capped. */
 function stepQualityTier(dir) {
+  // R19 (Fable scaffolding): sanctioned DEV-ONLY tier hold for
+  // software-GL harness environments (SwiftShader always inclines to LOW,
+  // which disables every satellite layer a gate wants to measure). A harness
+  // sets window.__flyTierPin = 'high' pre-mount and the ladder never steps
+  // in either direction. The R16 fleet-pin idiom INVERTED: nothing in
+  // scripts/_boot.js sets it, so the production fleet and every existing
+  // harness are byte-untouched; the NODE_ENV guard makes it dead code in
+  // prod builds. The one-shot apply lives in FlyCanvas's mount effect.
+  if (
+    process.env.NODE_ENV === 'development' &&
+    typeof window !== 'undefined' &&
+    window.__flyTierPin
+  ) {
+    return;
+  }
   const store = useFlyStore.getState();
   const i = TIERS.indexOf(store.qualityTier);
   let next = TIERS[Math.min(TIERS.length - 1, Math.max(0, i + dir))];
@@ -56,6 +71,16 @@ function stepQualityTier(dir) {
  */
 export function FlyCanvas({ runtime }) {
   const [dpr, setDpr] = useState(initialDpr);
+
+  // R19 dev tier hold, one-shot apply: a pin set before mount lands as the
+  // live tier once, then stepQualityTier's early return keeps it there.
+  // See the comment on stepQualityTier — dev-only, harness-set, never in
+  // _boot.js, dead code in prod builds.
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') return;
+    const pin = typeof window !== 'undefined' ? window.__flyTierPin : null;
+    if (pin && TIERS.includes(pin)) useFlyStore.getState().setQualityTier(pin);
+  }, []);
 
   return (
     <Canvas

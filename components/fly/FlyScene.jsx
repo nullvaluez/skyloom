@@ -481,6 +481,17 @@ export function FlyScene({ runtime }) {
     //   runtime.juice        {addTrauma, onCrash, onEvent} — A4 SHOWTIME
     //                        publishes from JuiceSystems; A5 calls
     //                        juice?.onCrash() in the crash sequence.
+    //
+    // RUNTIME CONTRACTS (R19) — same rules (optional-chained reads only):
+    //   runtime.shadowAnchors  engine accessor — A1 HOMESTEAD publishes
+    //                        from SatBuildingLayer: per-chunk
+    //                        [x, z, footprintR, h] rows (real + synthesized
+    //                        infill); A2 SUNCAST's SatShadowLayer reads it
+    //                        on its placement cadence.
+    //   runtime.satVeg       live veg instance list [{x, z, r, kind}] — A1
+    //                        HOMESTEAD publishes from SatVegLayer; A2 reads
+    //                        it for canopy shadows, A6 AIRSENSE reads
+    //                        park/water anchors for bird-flock orbits.
     // ------------------------------------------------------------------
     // Round 8.5 (§B): mirror the action handles onto the module-scope bus
     // and flip runtimeReady — overlays resolve these AT CALL TIME, so a
@@ -1327,6 +1338,10 @@ export function FlyScene({ runtime }) {
         stats.edgeFadeStartM = ef.startM;
         stats.groundHorizonM = ef.endM;
         stats.aircraft = aircraftStat; // round 17: verify-hangar reads this
+        // Round 19 (A6 AIRSENSE fills): stats.fps + stats.frameMs
+        // {p50, p95} land here from A6's OWN default-priority useFrame
+        // (60-frame window) — NOT from this -50 block; nothing else in
+        // this file changes for it.
       }
       gl.info.reset();
     }
