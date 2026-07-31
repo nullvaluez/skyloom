@@ -73,6 +73,7 @@ import {
   weatherFogDensity,
   weatherHazeMax,
 } from '@/lib/fly/weather-model';
+import { resolveSky, skyDuskOn, trueElevationDeg } from '@/lib/fly/sky-dusk';
 import {
   AERIAL_PERSPECTIVE,
   BOOST_METER,
@@ -316,6 +317,15 @@ export function FlyScene({ runtime }) {
   // that changes only on a sun-frac bucket crossing (a PMREM re-bake); toy
   // ignores it and stays on the certified noon HDRI.
   const [hdriBucket, setHdriBucket] = useState('day');
+  // Round 19 (Fable W1 integration, D GOLDENHOUR handoff): the key/hemi COLOR
+  // bucket, dusk-aware. The legacy hdriBucket above stays byte-untouched (it
+  // still feeds SatEnvironment's flag-off path and __flyStats.hdriBucket) —
+  // but between el −8° and the legacy nightFrac the legacy rule says 'night'
+  // while the R19 sky is dusk, so the ground read moonlit-blue under a warm
+  // horizon. keyBucket follows the resolved dusk phase (dominant endpoint of
+  // a mid-blend); with SKY_DUSK off, skyDuskOn() is false and keyBucket ===
+  // hdriBucket every pick ⇒ R18 behavior exactly.
+  const [keyBucket, setKeyBucket] = useState('day');
 
   // Round 19 (B) SAT_SHADOWS: the fleet pin, resolved ONCE pre-mount from
   // window (scripts/_boot.js writes it in an addInitScript) and thereafter
@@ -892,6 +902,18 @@ export function FlyScene({ runtime }) {
       else if (frac < hc.nightFrac) b = 'night';
       else b = az < 0 ? 'dawn' : 'dusk';
       setHdriBucket((prev) => (prev === b ? prev : b));
+      // Round 19 (Fable): dusk-aware key-color bucket — same discrete 5 s
+      // cadence, dominant endpoint of the resolved phase. Falls back to the
+      // legacy bucket pre-spawn (no sinEl yet) and whenever the ladder is off.
+      let kb = b;
+      if (skyDuskOn()) {
+        const sinEl = runtime.sun?.sinEl;
+        if (Number.isFinite(sinEl)) {
+          const r = resolveSky(az, trueElevationDeg(sinEl));
+          kb = r.s >= 0.5 ? r.b : r.a;
+        }
+      }
+      setKeyBucket((prev) => (prev === kb ? prev : kb));
       if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
         (window.__flyStats ??= {}).hdriBucket = b;
       }
@@ -910,11 +932,13 @@ export function FlyScene({ runtime }) {
   // directional/hemi color props reset on the style swap).
   useEffect(() => {
     if (mapStyle !== 'satellite') return;
-    const kc = SKY.hdriCycle.keyColor[hdriBucket] ?? SKY.hdriCycle.keyColor.day;
-    const hc = SKY.hdriCycle.hemiSky[hdriBucket] ?? SKY.hdriCycle.hemiSky.day;
+    // Round 19 (Fable): reads keyBucket (dusk-aware) instead of hdriBucket —
+    // identical values whenever SKY_DUSK is off (see the keyBucket comment).
+    const kc = SKY.hdriCycle.keyColor[keyBucket] ?? SKY.hdriCycle.keyColor.day;
+    const hc = SKY.hdriCycle.hemiSky[keyBucket] ?? SKY.hdriCycle.hemiSky.day;
     if (sunRef.current) sunRef.current.color.set(kc);
     if (hemiRef.current) hemiRef.current.color.set(hc);
-  }, [mapStyle, hdriBucket]);
+  }, [mapStyle, keyBucket]);
 
   // Map style hot-swap: replace the imagery provider in place — the DEM,
   // quadtree and every coordinate stay untouched; tiles refetch lazily.

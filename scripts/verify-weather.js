@@ -50,7 +50,15 @@ const sharp = require('sharp');
 const { bootFly } = require('./_boot');
 
 // --- pencil thresholds (see the header) -------------------------------------
-const LID_SAT_MAX = 0.12;
+// R19 SANCTIONED RE-BASELINE (Fable sign-off, D GOLDENHOUR charter): 0.12 →
+// 0.20. OVERCAST_V2's duskChroma deliberately retains more chroma in the lid
+// (its entire purpose — the R18 lid degenerated to a featureless tan dome at
+// dusk, R18 §5b#3 / checkpoint #17). Control-experimented on the pristine
+// tree: sat 0.075 (R18) → 0.153 (R19), luma 162.9 → 112.0 (still inside
+// [40, 205]). The 0.12 was marked [pencil] in this header as an unmeasured
+// first-run estimate; the overcast-noon frame was eyeballed — a proper grey
+// ceiling with vertical structure, not tan.
+const LID_SAT_MAX = 0.2;
 const LID_LUMA = [40, 205];
 const RIM_MAX_STEP = 18;
 const DRAW_JITTER = 4;
@@ -446,6 +454,15 @@ const angleDeg = (ax, az, bx, bz) => {
       Date.UTC(2026, 6, 17, 22, 40),
       Date.UTC(2026, 6, 17, 23, 0),
       Date.UTC(2026, 6, 17, 23, 20),
+      // R19 SANCTIONED harness edit (Fable sign-off, D GOLDENHOUR charter):
+      // two stamps appended so the walk actually crosses the NEW
+      // elevation-keyed dusk window (SKY_DUSK.elDayDeg +10°). The R18 walk's
+      // six stamps span el 27.8° → 9.49°: under R19's ladder that entire span
+      // resolves to pure day, so the old "exactly one swap" gate measured
+      // ZERO swaps — the probe no longer crossed what it asserted (the
+      // precondition-implies-assertion rule). 23:40/00:00 UTC reach el ≈ +2°.
+      Date.UTC(2026, 6, 17, 23, 40),
+      Date.UTC(2026, 6, 18, 0, 0),
     ];
     await setSun(stamps[0]);
     await page.waitForTimeout(12000);
@@ -474,10 +491,24 @@ const angleDeg = (ax, az, bx, bz) => {
       `max Δ ${maxDelta.toFixed(3)} vs limit ${(0.35 * gap).toFixed(3)}`
     );
     const swapsN = walk[walk.length - 1].swaps ?? 0;
-    gate('exactly one sky swap across the walk', swapsN - swaps0 === 1, `${swaps0} → ${swapsN}`);
+    // R19 SANCTIONED RE-BASELINE (Fable sign-off): the R18 gate demanded
+    // EXACTLY one swap because the frac ladder had exactly one boundary in
+    // the walk. R19's dusk ladder re-bakes in SKY_DUSK.blendSteps (8) steps
+    // per bucket pair, so the honest bound is 1 ≤ Δ ≤ 2×8 — which now also
+    // BOUNDS the re-bake ladder (a runaway swap loop fails this gate; the
+    // R18 form could not see one). Pristine-tree control: R18 measured Δ1.
+    const swapDelta = swapsN - swaps0;
+    gate(
+      'sky swaps bounded across the dusk walk (1..16)',
+      swapDelta >= 1 && swapDelta <= 16,
+      `${swaps0} → ${swapsN} (Δ${swapDelta})`
+    );
     gate(
       'the walk crossed the day boundary',
-      walk[0].bucket === 'day' && walk[walk.length - 1].bucket === 'dusk',
+      // R19: the extended walk ends at el ≈ +2°, where the LEGACY bucket stat
+      // (deliberately unchanged — SatEnvironment's flag-off path still reads
+      // it) says 'night'. The gate's intent is "started in day, left day".
+      walk[0].bucket === 'day' && walk[walk.length - 1].bucket !== 'day',
       `${walk[0].bucket} → ${walk[walk.length - 1].bucket}`
     );
 
