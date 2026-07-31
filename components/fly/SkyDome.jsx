@@ -3,6 +3,8 @@
 import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { BackSide, Color, ShaderMaterial, SphereGeometry, Mesh, SRGBColorSpace, Vector3 } from 'three';
+import { OVERCAST_V2, SKY_DUSK } from '@/lib/fly/fly-constants';
+import { glowEnvelope, nightWeightEl, skyDuskOn } from '@/lib/fly/sky-dusk';
 
 // Live horizon dip (round 6): the ground curves away d²k but the dome's
 // horizon used to sit at flat eye level — at altitude a black band opened
@@ -69,12 +71,53 @@ export function clearSkyWeather() {
   weather.active = false;
 }
 
-// Round 19 scaffolding (Fable): the golden-hour sun feed for D GOLDENHOUR.
-// FlyScene's -50 satellite branch calls this (gated SKY_DUSK.enabled) with
-// runtime.sun's az (HOUR ANGLE — negative before local noon, the R16
-// convention), el (deg) and frac. No-op stub until D implements the lobe;
-// D adds the parameters with the implementation.
-export function setSkySun() {}
+// Round 19 "Honest World" — D GOLDENHOUR: the golden-hour sun feed.
+//
+// TWO CHANNELS, ONE FIELD EACH — never two writers on one value:
+//
+//  • setSkySun(az, el, frac) is FlyScene's -50 satellite branch (gated
+//    SKY_DUSK.enabled). It carries the HOUR ANGLE `az` (negative before local
+//    noon — the R16 convention the hillshade flip and the dawn/dusk split
+//    also key on) and `frac`. Because the call sits inside the SATELLITE
+//    branch and behind the flag, toy never reaches it at all.
+//
+//  • setSkySunElevation(elDeg) is SatEnvironment's, and it exists because
+//    FlyScene's `el` CANNOT express this round's thresholds: computeSun
+//    clamps el into the hillshade band [8.6°, 51.6°] over asin(max(0, sinEl)),
+//    so it is never low and never negative. SatEnvironment already derives the
+//    unclamped truth from runtime.sun.sinEl for the bucket re-key, so it
+//    publishes it here too. Until it does, the clamped value is the fallback
+//    (correct-by-construction for a high sun, which is the only state that
+//    can exist before the first satellite frame).
+//
+//  • clearSkySun() is called from SatEnvironment's unmount — which IS the
+//    satellite→toy transition, since that component mounts iff satellite.
+//    That hands the dome back to its certified toy props, exactly as
+//    clearSkyNight/clearSkyWeather do.
+const RAD2DEG = 180 / Math.PI;
+const DEG2RAD = Math.PI / 180;
+const sun = {
+  active: false,
+  az: 0,
+  frac: 1,
+  elDeg: 90, // authoritative TRUE elevation (SatEnvironment)
+  elValid: false,
+  elFallbackDeg: 90, // FlyScene's hillshade-clamped el, degrees
+};
+export function setSkySun(az, el, frac) {
+  sun.active = true;
+  sun.az = az;
+  sun.frac = frac;
+  sun.elFallbackDeg = el * RAD2DEG;
+}
+export function setSkySunElevation(elDeg) {
+  sun.elDeg = elDeg;
+  sun.elValid = true;
+}
+export function clearSkySun() {
+  sun.active = false;
+  sun.elValid = false;
+}
 
 /**
  * Per-style globe sky (FLY_GLOBE_REWORK): a camera-following gradient dome —
@@ -135,6 +178,23 @@ export function SkyDome({
         uOvercast: { value: 0 },
         uOverH: { value: new Color(0, 0, 0) },
         uOverZ: { value: new Color(0, 0, 0) },
+        // Round 19 (D): the golden-hour lobe. uSunGlow = (strength, radius,
+        // bandK, alphaK). strength is EXACTLY 0 outside the elevation band —
+        // that is the whole byte-identity contract (see the frame loop).
+        uSunDir: { value: new Vector3(0, 1, 0) },
+        uSunGlow: { value: [0, SKY_DUSK.glow.radius, SKY_DUSK.glow.bandK, 0] },
+        uSunGlowColor: { value: new Color(SKY_DUSK.glow.color) },
+        // Round 19 (D): overcast lid v2 = (enabled, horizonKeep, zenithRamp,
+        // duskChroma). Static — read once at build. x = 0 restores the R18 lid
+        // arithmetic exactly (every term below degenerates to ×1.0 / mix(…,0)).
+        uOverV2: {
+          value: [
+            OVERCAST_V2.enabled ? 1 : 0,
+            OVERCAST_V2.horizonKeep,
+            OVERCAST_V2.zenithRamp,
+            OVERCAST_V2.duskChroma,
+          ],
+        },
       },
       vertexShader: /* glsl */ `
         varying vec3 vDir;
@@ -163,6 +223,10 @@ export function SkyDome({
         uniform float uOvercast;
         uniform vec3 uOverH;
         uniform vec3 uOverZ;
+        uniform vec3 uSunDir;
+        uniform vec4 uSunGlow;
+        uniform vec3 uSunGlowColor;
+        uniform vec4 uOverV2;
         varying vec3 vDir;
         void main() {
           // Dipped horizon: y = 0 where the bent terrain rim sits, not at
@@ -182,7 +246,22 @@ export function SkyDome({
           // hemisphere is replaced (not tinted) by a horizon→zenith grey ramp
           // that FlyScene feeds from the already grey-mixed rim triple. At
           // uOvercast 0 this is mix(up, lid, 0.0) = up, exactly.
-          up = mix(up, mix(uOverH, uOverZ, yy), uOvercast);
+          //
+          // Round 19 (D) — LID v2 (R18 §5b#3): the R18 lid was a flat,
+          // fully-opaque field. uOverH is the grey-mixed rim and uOverZ was
+          // that same tone × 0.82, so an overcast dusk collapsed to ONE
+          // featureless tan dome. Two terms shape it, both gated on uOverV2.x
+          // and both still inside the uOvercast mix — so overcastT 0 is an
+          // exact no-op whatever they hold, and uOverV2.x = 0 reproduces the
+          // R18 arithmetic bit-for-bit (x*1.0 and mix(a,b,uOvercast)).
+          vec3 lid = mix(uOverH, uOverZ, yy);
+          // (a) a REAL vertical ramp — a ceiling is dimmest overhead.
+          lid *= 1.0 - uOverV2.x * uOverV2.z * yy;
+          // (b) the lid thins toward the rim, so the dome's own horizon→zenith
+          //     gradient (uZenith is the AUTHORED style color, never
+          //     grey-mixed) still reads underneath it low in the sky.
+          float lidT = uOvercast * (1.0 - uOverV2.x * uOverV2.y * (1.0 - yy));
+          up = mix(up, lid, lidT);
           // below the horizon: settle on the shared rim tone first (where
           // terrain fades out), then fall into the deep void underneath
           vec3 down = mix(uHorizon, uRim, clamp(-y * 2.5, 0.0, 1.0));
@@ -230,6 +309,41 @@ export function SkyDome({
             col += mAdd;
             nightLuma += max(mAdd.r, max(mAdd.g, mAdd.b));
           }
+          // Round 19 (D) — THE GOLDEN HOUR. A warm lobe hugging the horizon on
+          // the sun's own azimuth, which is the one thing a swapped HDRI can
+          // never give us: the baked sun in qwantani_dusk sits at whatever
+          // heading the photographer stood at, not at ours (the same class of
+          // defect as the R16 night-HDRI bright band).
+          //
+          // uSunGlow.x is computed in JS as strength × a smooth hat over
+          // [glow.elMinDeg, glow.elMaxDeg] that is EXACTLY 0 at and outside
+          // both ends, so at noon, in deep night, in toy, and whenever the
+          // round is flagged off this branch is not entered at all and the
+          // dome is bit-for-bit R18. Same discipline as the star/moon blocks.
+          if (uSunGlow.x > 0.0) {
+            vec3 d = normalize(vDir);
+            // Azimuth alignment only — the lobe wraps the horizon ring, so the
+            // vertical shape is the band term, not this dot.
+            vec2 dh = vec2(d.x, d.z);
+            vec2 sh = vec2(uSunDir.x, uSunDir.z);
+            float cosAz = dot(dh / max(length(dh), 1e-5), sh / max(length(sh), 1e-5));
+            float lobe = smoothstep(1.0 - 2.0 * uSunGlow.y, 1.0, cosAz);
+            // Tight to the (dipped) horizon, and faded out just below it so
+            // the glow never leaks into the void under the mini-planet.
+            float band = exp(-abs(y) * uSunGlow.z) * smoothstep(-0.10, 0.02, y);
+            // A lid DIMS a sunset but does not hide it — unlike the stars and
+            // the moon above, which a ceiling really does occlude. The
+            // admitted fraction is OVERCAST_V2.duskChroma; the whole factor is
+            // exactly 1.0 whenever there is no overcast.
+            float occ = 1.0 - uOvercast * (1.0 - uOverV2.w);
+            vec3 gAdd = uSunGlowColor * (uSunGlow.x * lobe * band * occ);
+            col += gAdd;
+            // In rimOnly (satellite) the dome is transparent above the horizon,
+            // so the glow has to carry its own alpha or it is invisible.
+            // alphaK (uSunGlow.w = 1 − frac) recedes the dome as the sun climbs
+            // and the HDRI legitimately takes the sky back.
+            nightLuma += max(gAdd.r, max(gAdd.g, gAdd.b)) * uSunGlow.w;
+          }
           // rimOnly: fade out just above the (dipped) horizon so the HDRI
           // sky owns the upper hemisphere while the void swallows the rim
           float alpha = uRimOnly > 0.5 ? smoothstep(0.015, -0.005, y) : 1.0;
@@ -240,7 +354,10 @@ export function SkyDome({
             // ceiling. Both are max(existing, 0.0) at rest, so a satellite
             // DAYLIGHT frame keeps exactly the R15 rim-only alpha.
             alpha = max(alpha, min(1.0, nightLuma));
-            alpha = max(alpha, uOvercast * smoothstep(0.0, 0.06, y));
+            // Round 19: the lid's own opacity, so a v2 lid that thins toward
+            // the rim actually LETS the HDRI through there. lidT === uOvercast
+            // exactly when uOverV2.x is 0, so this line is unchanged at R18.
+            alpha = max(alpha, lidT * smoothstep(0.0, 0.06, y));
           }
           gl_FragColor = vec4(col, alpha);
           #include <colorspace_fragment>
@@ -296,7 +413,14 @@ export function SkyDome({
     // pinned to its identity value — so a style switch out of satellite can
     // never strand the dome at someone else's night weight.
     if (night.active) {
-      u.uNight.value = night.t;
+      // Round 19 (D): FlyScene feeds nightWeight(frac), and frac cannot see
+      // below the horizon — it pins at 0, so the star field came up FULL the
+      // moment the sun set, over a still-bright twilight sky (the other half
+      // of P9). When the true elevation is available, re-key the same curve on
+      // it. Deep night still resolves to exactly 1 and daylight to exactly 0,
+      // so both ends of the R16 contract are untouched.
+      u.uNight.value =
+        sun.active && sun.elValid && skyDuskOn() ? nightWeightEl(sun.elDeg) : night.t;
       u.uMoonDir.value.copy(night.dir);
     } else if (u.uNight.value !== 1) {
       u.uNight.value = 1;
@@ -307,6 +431,39 @@ export function SkyDome({
       u.uOverZ.value.copy(weather.zenith);
     } else if (u.uOvercast.value !== 0) {
       u.uOvercast.value = 0;
+    }
+    // Round 19 (D): the golden-hour lobe. The band envelope is computed here,
+    // on the CPU, precisely so the shader's strength can be a hard 0 — the
+    // whole glow block is then skipped and every other style/time is
+    // untouched. `active` is false in toy (SatEnvironment's unmount clears it)
+    // and whenever the round is flagged off (FlyScene never calls the setter),
+    // so the reset arm below is what guarantees a style switch can't strand a
+    // satellite sunset over the Neon world.
+    const g = u.uSunGlow.value;
+    if (sun.active && skyDuskOn()) {
+      const elDeg = sun.elValid ? sun.elDeg : sun.elFallbackDeg;
+      const w = glowEnvelope(elDeg);
+      // Dev/harness strength multiplier, the __flyAerialOverride idiom: 0
+      // removes the lobe and NOTHING else, which is the only way to A/B it
+      // in isolation (flipping the whole round also changes the HDRI bucket,
+      // so a flag-level A/B measures two things at once). Also a live knob.
+      const k =
+        typeof window !== 'undefined' && typeof window.__flyGlowOverride === 'number'
+          ? window.__flyGlowOverride
+          : 1;
+      g[0] = SKY_DUSK.glow.strength * w * k;
+      if (g[0] > 0) {
+        g[1] = SKY_DUSK.glow.radius;
+        g[2] = SKY_DUSK.glow.bandK;
+        g[3] = 1 - (sun.frac > 1 ? 1 : sun.frac < 0 ? 0 : sun.frac);
+        // Same convention as the hillshade key and the moon: the hour angle
+        // becomes a world direction through (−sin az·cos el, sin el, cos az·cos el).
+        const er = elDeg * DEG2RAD;
+        const ce = Math.cos(er);
+        u.uSunDir.value.set(-Math.sin(sun.az) * ce, Math.sin(er), Math.cos(sun.az) * ce);
+      }
+    } else if (g[0] !== 0) {
+      g[0] = 0;
     }
   });
 

@@ -12,7 +12,7 @@ import {
   MeshLambertMaterial,
   Object3D,
 } from 'three';
-import { CLOUDS, TOY_WORLD, WEATHER, WORLD_EDGE } from '@/lib/fly/fly-constants';
+import { CLOUDS, SKY_CIRRUS, TOY_WORLD, WEATHER, WORLD_EDGE } from '@/lib/fly/fly-constants';
 import { expApproach } from '@/lib/fly/coords';
 import { puffPresence } from '@/lib/fly/weather-model';
 import { applyBend, bendDrop, getBend, getEdgeFade } from '@/lib/fly/toy-world/world-bend';
@@ -200,6 +200,32 @@ export function CloudField({ runtime, flight, origin }) {
   const driftRef = useRef({ x: 0, z: 0 });
 
   const groupRefs = useRef([]);
+
+  // Round 19 (D) — THE HIGH DECK. Everything above the cumulus band was empty
+  // sky: at cruise you flew under a bare HDRI with a cumulus carpet 8 km below
+  // and nothing in between, which is a large part of why altitude read flat.
+  // A SECOND drei <Clouds> = ONE more InstancedMesh = EXACTLY +1 draw, and it
+  // is only mounted when armed (satellite + high tier + flag), so a disabled
+  // deck, the medium tier and every toy frame cost precisely zero.
+  const cirrusArmed =
+    SKY_CIRRUS.enabled && mapStyle === 'satellite' && qualityTier === SKY_CIRRUS.minTier;
+  const cirrusRefs = useRef([]);
+  const cirrus = useMemo(
+    () =>
+      Array.from({ length: SKY_CIRRUS.count }, (_, i) => ({
+        // Same deterministic hash family as the cumulus layout (pure — the
+        // deck is identical across renders, tiers and harness runs), on a
+        // disjoint seed range so the two decks never correlate.
+        cx: (hash(i * 13 + 901) - 0.5) * SKY_CIRRUS.cellSizeM,
+        cz: (hash(i * 13 + 902) - 0.5) * SKY_CIRRUS.cellSizeM,
+        u: hash(i * 13 + 903),
+        size:
+          SKY_CIRRUS.sizeM[0] +
+          hash(i * 13 + 904) * (SKY_CIRRUS.sizeM[1] - SKY_CIRRUS.sizeM[0]),
+        seed: 900 + i,
+      })),
+    []
+  );
 
   // Day-only cloud shadows (§4.3c): ONE instanced pool of soft dark discs
   // on the ground under the puffs — +1 draw. The disc material rides the
@@ -411,6 +437,40 @@ export function CloudField({ runtime, flight, origin }) {
     shadows.mesh.visible = wantShadows;
     if (wantShadows) shadows.mesh.instanceMatrix.needsUpdate = true;
 
+    // --- Round 19 (D): the cirrus deck ------------------------------------
+    // Much simpler than the cumulus loop: at 7–11 km there is no terrain to
+    // sample (nothing on Earth reaches the band), no clearance to hold and no
+    // shadow to place — just a toroidal wrap, a distance dissolve and the
+    // mini-planet drop. It rides the SAME integrated wind deviation as the
+    // cumulus deck (so a wind change never teleports it) on top of its own
+    // faster jet-stream base drift.
+    if (cirrusArmed) {
+      const ccell = SKY_CIRRUS.cellSizeM;
+      const chalf = ccell / 2;
+      const cdriftX = SKY_CIRRUS.driftMps * t + dev.x;
+      const cdriftZ = dev.z;
+      const [cf0, cf1] = SKY_CIRRUS.fadeM;
+      const [ca0, ca1] = SKY_CIRRUS.altM;
+      for (let i = 0; i < cirrus.length; i++) {
+        const g = cirrusRefs.current[i];
+        if (!g) continue;
+        const p = cirrus[i];
+        const ox = wrap(p.cx + cdriftX - px, chalf, ccell);
+        const oz = wrap(p.cz + cdriftZ - pz, chalf, ccell);
+        const dist = Math.hypot(ox, oz);
+        const s = 1 - Math.min(1, Math.max(0, (dist - cf0) / (cf1 - cf0)));
+        if (s <= 0.02) {
+          g.visible = false;
+          continue;
+        }
+        g.visible = true;
+        g.scale.setScalar(s);
+        g.position.set(ox + px - ax, ca0 + p.u * (ca1 - ca0) - bendDrop(dist, k), oz + pz - az);
+        // drei decomposes each puff's matrixWorld this same frame (see above).
+        g.updateMatrixWorld(true);
+      }
+    }
+
     if (process.env.NODE_ENV === 'development' && window.__flyStats) {
       window.__flyStats.cloudMinAgl = minAgl === Infinity ? null : Math.round(minAgl);
       window.__flyStats.cloudSpreadF = f; // round 12 (verify-neon-alt)
@@ -444,6 +504,13 @@ export function CloudField({ runtime, flight, origin }) {
       <primitive object={shadows.mesh} />
       <Clouds
       key={mapStyle}
+      /* Round 19: a handle on the cumulus deck, the __satVeg idiom. drei's
+         <Cloud> animates continuously (speed prop), so an animated deck makes
+         every pixel A/B in this scene noisy by construction — a harness that
+         wants a STATIC frame has to be able to park it. */
+      ref={(el) => {
+        if (typeof window !== 'undefined') window.__flyClouds = el ?? null;
+      }}
       texture={cloudTexture}
       material={CloudMat}
       limit={CLOUDS.limit}
@@ -469,6 +536,42 @@ export function CloudField({ runtime, flight, origin }) {
         </group>
       ))}
       </Clouds>
+      {/* Round 19 (D): the high cirrus veil — ONE extra InstancedMesh. Same
+          lit material class as the satellite cumulus deck, so it darkens at
+          night and catches the warm key at golden hour for free, and the same
+          sun tint (cirrus is the cloud that goes orange first). */}
+      {cirrusArmed && (
+        <Clouds
+          key={`cirrus-${mapStyle}`}
+          ref={(el) => {
+            if (typeof window !== 'undefined') window.__flyCirrus = el ?? null;
+          }}
+          texture={SKY_CIRRUS.texture}
+          material={CloudMat}
+          limit={SKY_CIRRUS.count * SKY_CIRRUS.segments}
+          frustumCulled={false}
+        >
+          {cirrus.map((p, i) => (
+            <group
+              key={p.seed}
+              ref={(el) => {
+                cirrusRefs.current[i] = el;
+              }}
+            >
+              <Cloud
+                seed={p.seed}
+                segments={SKY_CIRRUS.segments}
+                bounds={[p.size, p.size * SKY_CIRRUS.boundsYFrac, p.size * 0.45]}
+                volume={p.size * 0.7}
+                opacity={SKY_CIRRUS.opacity}
+                fade={CLOUDS.fade}
+                speed={0.02}
+                color={sunTint?.color ?? SKY_CIRRUS.color}
+              />
+            </group>
+          ))}
+        </Clouds>
+      )}
     </>
   );
 }

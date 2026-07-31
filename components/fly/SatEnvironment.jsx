@@ -1,10 +1,26 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { DataUtils, EquirectangularReflectionMapping, HalfFloatType, PMREMGenerator } from 'three';
+import {
+  DataUtils,
+  EquirectangularReflectionMapping,
+  HalfFloatType,
+  LinearFilter,
+  Mesh,
+  NoColorSpace,
+  OrthographicCamera,
+  PMREMGenerator,
+  PlaneGeometry,
+  RGBAFormat,
+  Scene,
+  ShaderMaterial,
+  WebGLRenderTarget,
+} from 'three';
 import { RGBELoader } from 'three-stdlib';
-import { SKY, SKY_LIVE } from '@/lib/fly/fly-constants';
+import { SKY, SKY_DUSK, SKY_LIVE } from '@/lib/fly/fly-constants';
+import { legacyBucket, resolveSky, skyDuskOn, skyKey, trueElevationDeg } from '@/lib/fly/sky-dusk';
+import { clearSkySun, setSkySunElevation } from './SkyDome';
 
 /**
  * Round 16 "Living World" — satellite's sky, unhitched from React.
@@ -146,13 +162,86 @@ function loadHdr(url) {
 
 // --- pure helpers -----------------------------------------------------------
 
-/** The R13 bucket rule, unchanged (FlyScene owns the live one; this mirrors
- *  it only to name the NEIGHBOUR across a boundary for the prefetch). */
-function bucketFor(frac, az) {
-  const hc = SKY.hdriCycle;
-  if (frac >= hc.dayFrac) return 'day';
-  if (frac < hc.nightFrac) return 'night';
-  return az < 0 ? 'dawn' : 'dusk';
+/**
+ * Round 19 (D) — the EQUIRECT BLENDER.
+ *
+ * A PMREM bake takes ONE equirect, so a true cross-fade between two HDRIs has
+ * to composite them first. This is a 1024×512 half-float scratch target and a
+ * two-sampler fullscreen quad: mix in linear space, then PMREM the result and
+ * hand the SAME target's texture to `scene.background` (which stays a RAW
+ * equirect — the R16 finding that a CubeUV background ignores
+ * backgroundIntensity entirely still binds).
+ *
+ * HalfFloatType is not a quality choice here either — it is the same device
+ * contract as the source decode (R16 §9): RGBA16F is core-filterable in every
+ * WebGL2, RGBA32F is not on Apple GPUs.
+ *
+ * The material is a raw ShaderMaterial, so three appends NO tonemapping and NO
+ * colorspace chunk: what is sampled is what is written, linear in and linear
+ * out. UV orientation round-trips exactly (source uv.y=0 → quad bottom →
+ * target row 0 → target uv.y=0), so no flip correction is needed.
+ */
+function makeBlender(size) {
+  const rt = new WebGLRenderTarget(size, size / 2, {
+    type: HalfFloatType,
+    format: RGBAFormat,
+    colorSpace: NoColorSpace,
+    depthBuffer: false,
+    stencilBuffer: false,
+    generateMipmaps: false,
+    minFilter: LinearFilter,
+    magFilter: LinearFilter,
+  });
+  rt.texture.mapping = EquirectangularReflectionMapping;
+  const material = new ShaderMaterial({
+    uniforms: { tA: { value: null }, tB: { value: null }, uMix: { value: 0 } },
+    depthTest: false,
+    depthWrite: false,
+    vertexShader: /* glsl */ `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = vec4(position.xy, 0.0, 1.0);
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform sampler2D tA;
+      uniform sampler2D tB;
+      uniform float uMix;
+      varying vec2 vUv;
+      void main() {
+        gl_FragColor = vec4(
+          mix(texture2D(tA, vUv).rgb, texture2D(tB, vUv).rgb, uMix),
+          1.0
+        );
+      }
+    `,
+  });
+  const quad = new Mesh(new PlaneGeometry(2, 2), material);
+  quad.frustumCulled = false;
+  const scene = new Scene();
+  scene.add(quad);
+  return { rt, material, quad, scene, camera: new OrthographicCamera(-1, 1, 1, -1, 0, 1) };
+}
+
+function disposeBlender(b) {
+  if (!b) return;
+  b.rt.dispose();
+  b.quad.geometry.dispose();
+  b.material.dispose();
+  b.scene.clear();
+}
+
+/** Composite A→B at `s` into the scratch equirect and return its texture. */
+function renderBlend(gl, b, texA, texB, s) {
+  b.material.uniforms.tA.value = texA;
+  b.material.uniforms.tB.value = texB;
+  b.material.uniforms.uMix.value = s;
+  const prev = gl.getRenderTarget();
+  gl.setRenderTarget(b.rt);
+  gl.render(b.scene, b.camera);
+  gl.setRenderTarget(prev);
+  return b.rt.texture;
 }
 
 const _base = { env: 0, bg: 0 };
@@ -207,6 +296,20 @@ export function SatEnvironment({ runtime, bucket }) {
   const swapsRef = useRef(0);
   const envRef = useRef(null); // damped intensities (null = snap on first frame)
   const bgRef = useRef(null);
+  // Round 19 (D): the elevation-keyed sky state. `desiredRef` holds the live
+  // descriptor {a, b, s}; `skyState` is only its KEY, so React re-runs the
+  // swap effect exactly once per step and never per frame. With the round
+  // flagged off the descriptor is {a: bucket, b: bucket, s: 0} — the key IS
+  // the prop, so the effect's dependency and behaviour are the R18 ones.
+  const desiredRef = useRef(null);
+  const skyKeyRef = useRef(null); // last key HANDED to React (no per-frame setState)
+  const [skyState, setSkyState] = useState(null);
+  const blenderRef = useRef(null);
+  // Scales hdriFade.dipDepth for the NEXT swap: 1 for a bucket/pair change (a
+  // real chroma cut), SKY_DUSK.blendDipK for an intra-pair blend step (a
+  // 1/8 nudge — a full dip would be more visible than the step it masks).
+  const dipScaleRef = useRef(1);
+  const pairRef = useRef(null);
 
   // --- lifetime: PMREM + a symmetric restore of everything we touch ---------
   // Declared FIRST so React creates it before the bucket effect below (which
@@ -234,24 +337,54 @@ export function SatEnvironment({ runtime, bucket }) {
       retired.length = 0;
       if (rtRef.current) rtRef.current.dispose();
       rtRef.current = null;
+      // Round 19: the blend scratch target is ours alone and dies with us —
+      // symmetric with acquire, so StrictMode's create→destroy→create leaves
+      // exactly one alive (the same discipline as the PMREM refcount).
+      disposeBlender(blenderRef.current);
+      blenderRef.current = null;
       bucketRef.current = null;
+      pairRef.current = null;
       envRef.current = null;
       bgRef.current = null;
       pmremRef.current = null;
+      // This component mounts iff satellite, so our unmount IS the
+      // satellite→toy transition: hand the dome's sun channel back.
+      clearSkySun();
       releasePmrem();
     };
   }, [scene, gl]);
 
   // --- the swap: load → bake → assign (same frame) → retire the old ---------
+  // Round 19 (D): `skyState` replaces the raw bucket prop. When the round is
+  // flagged off it IS the bucket prop (the frame loop mirrors it verbatim), so
+  // this is the R18 effect with the R18 dependency. When it is on, a key can
+  // also name a PAIR at a blend step, which takes the composite path below.
   useEffect(() => {
     let cancelled = false;
-    const url = SKY.hdriCycle[bucket] ?? SKY.hdri;
-    if (bucketRef.current === bucket) return undefined;
-    loadHdr(url)
-      .then((tex) => {
+    const key = skyState;
+    if (key == null || bucketRef.current === key) return undefined;
+    const d = desiredRef.current;
+    const blending = !!d && d.s > 0 && d.s < 1 && d.a !== d.b;
+    const urlA = SKY.hdriCycle[blending ? d.a : key] ?? SKY.hdri;
+    const urlB = blending ? (SKY.hdriCycle[d.b] ?? SKY.hdri) : null;
+    Promise.all(blending ? [loadHdr(urlA), loadHdr(urlB)] : [loadHdr(urlA)])
+      .then(([texA, texB]) => {
         const pm = pmremRef.current;
         if (cancelled || !aliveRef.current || !pm) return;
         const t0 = performance.now();
+        // A pure endpoint (s === 0 or 1) bakes the RAW source texture — the
+        // exact R18 path, which is what keeps a settled day/night sky
+        // bit-identical. Only a genuine intermediate step pays for the
+        // composite, and only while a crossing is in progress.
+        const tex = blending
+          ? renderBlend(
+              gl,
+              (blenderRef.current ??= makeBlender(SKY_DUSK.blendSize)),
+              texA,
+              texB,
+              d.s
+            )
+          : texA;
         const rt = pm.fromEquirectangular(tex);
         // ATOMIC: the new cubemap becomes both the IBL and the visible sky in
         // one go. The old target only dies a frame later (below), so the
@@ -267,27 +400,36 @@ export function SatEnvironment({ runtime, bucket }) {
         // pixels) — the night sky washed white. The equirect lives in the
         // module cache forever, so it must never be disposed here.
         scene.background = tex;
-        bucketRef.current = bucket;
+        bucketRef.current = key;
+        // A step WITHIN one pair gets a shallow dip; a new pair (a real
+        // chroma cut) keeps the full certified dipDepth.
+        const pair = blending || d ? `${d?.a}|${d?.b}` : key;
+        dipScaleRef.current = pairRef.current === pair ? SKY_DUSK.blendDipK : 1;
+        pairRef.current = pair;
         swapsRef.current += 1;
         swapAtRef.current = performance.now();
         if (dev && typeof window !== 'undefined') {
           const stats = (window.__flyStats ??= {});
           stats.envSwapMs = +(performance.now() - t0).toFixed(2);
           stats.envSwaps = swapsRef.current;
-          stats.envUrl = url;
+          stats.envUrl = blending ? `${urlA}~${urlB}@${d.s}` : urlA;
+          stats.envBlend = blending ? d.s : 0;
+          stats.skyBucket = key;
           // verify-sat-mobile gates on this: HalfFloatType (1016) or the
           // whole sky is undefined-sampling territory on iOS (see loadHdr).
+          // A blended sky is the SAME type by construction (the scratch
+          // target is HalfFloatType too — that is a device contract, R16 §9).
           stats.envTexType = tex.type;
         }
       })
       .catch((err) => {
         // A dead CDN must not take the scene with it: keep the previous sky.
-        if (dev) console.warn('[fly] HDRI load failed', url, err?.message ?? err);
+        if (dev) console.warn('[fly] HDRI load failed', urlA, err?.message ?? err);
       });
     return () => {
       cancelled = true;
     };
-  }, [bucket, scene]);
+  }, [skyState, scene, gl]);
 
   // --- per-frame: retire, prefetch, intensity -------------------------------
   useFrame((_, delta) => {
@@ -299,18 +441,51 @@ export function SatEnvironment({ runtime, bucket }) {
 
     const frac = runtime?.sun?.frac ?? 1;
     const az = runtime?.sun?.az ?? 0;
+    const duskOn = skyDuskOn();
+
+    // (1b) Round 19 (D) — resolve the sky state and publish the TRUE solar
+    //      elevation. runtime.sun.el is the hillshade-CLAMPED value ([8.6°,
+    //      51.6°], asin(max(0, sinEl))) and cannot represent a setting sun at
+    //      all; sinEl is the documented unclamped truth. This is also the only
+    //      writer of the SkyDome's sub-horizon elevation channel.
+    const elDeg = trueElevationDeg(runtime?.sun?.sinEl);
+    if (duskOn) setSkySunElevation(elDeg);
+    const desired = duskOn
+      ? resolveSky(az, elDeg)
+      : { a: bucket, b: bucket, s: 0, label: bucket };
+    desiredRef.current = desired;
+    const key = duskOn ? skyKey(desired) : bucket;
+    if (key !== skyKeyRef.current) {
+      skyKeyRef.current = key;
+      setSkyState(key);
+    }
 
     // (2) Prefetch the neighbour across any boundary we are approaching, so a
     //     crossing costs a bake and not a download.
     const hc = SKY.hdriCycle;
-    const margin = SKY_LIVE.hdriFade.preloadFracMargin;
-    for (const b of [hc.dayFrac, hc.nightFrac]) {
-      if (Math.abs(frac - b) >= margin) continue;
-      // the bucket on the OTHER side of this boundary
-      const other = bucketFor(frac >= b ? b - 1e-4 : b + 1e-4, az);
-      if (other !== bucketRef.current) {
-        const u = hc[other];
-        if (u && !_hdrCache.has(u)) loadHdr(u).catch(() => {});
+    if (duskOn) {
+      // Elevation-keyed: warm the twilight file (and the far edge) one blend
+      // step before the window opens, so entering dusk is a bake, not a fetch.
+      const stepDeg =
+        (SKY_DUSK.elDayDeg - SKY_DUSK.elNightDeg) / Math.max(1, SKY_DUSK.blendSteps);
+      const nearNight = Math.abs(elDeg - SKY_DUSK.elNightDeg) <= stepDeg;
+      const nearDay = Math.abs(elDeg - SKY_DUSK.elDayDeg) <= stepDeg;
+      if (nearNight || nearDay) {
+        for (const b of [az < 0 ? 'dawn' : 'dusk', nearNight ? 'night' : 'day']) {
+          const u = hc[b];
+          if (u && !_hdrCache.has(u)) loadHdr(u).catch(() => {});
+        }
+      }
+    } else {
+      const margin = SKY_LIVE.hdriFade.preloadFracMargin;
+      for (const b of [hc.dayFrac, hc.nightFrac]) {
+        if (Math.abs(frac - b) >= margin) continue;
+        // the bucket on the OTHER side of this boundary
+        const other = legacyBucket(frac >= b ? b - 1e-4 : b + 1e-4, az);
+        if (other !== bucketRef.current) {
+          const u = hc[other];
+          if (u && !_hdrCache.has(u)) loadHdr(u).catch(() => {});
+        }
       }
     }
 
@@ -340,7 +515,12 @@ export function SatEnvironment({ runtime, bucket }) {
     const dipSec = SKY_LIVE.hdriFade.dipSec;
     let bgOut = bg;
     if (since >= 0 && since < dipSec) {
-      bgOut = bg * (1 - SKY_LIVE.hdriFade.dipDepth * (1 - since / dipSec));
+      // Round 19: dipScale is 1 for every R18 swap (and for every pair change),
+      // so the certified dip is unchanged; only an intra-pair blend step
+      // shallows it — masking a 1/8 nudge with a 45% dim would be louder than
+      // the nudge.
+      bgOut =
+        bg * (1 - SKY_LIVE.hdriFade.dipDepth * dipScaleRef.current * (1 - since / dipSec));
     }
 
     scene.environmentIntensity = env;
@@ -349,6 +529,12 @@ export function SatEnvironment({ runtime, bucket }) {
     if (dev && typeof window !== 'undefined' && window.__flyStats) {
       window.__flyStats.envIntensity = +env.toFixed(4);
       window.__flyStats.bgIntensity = +bgOut.toFixed(4);
+      // Round 19 (D) — verify-dusk's probe surface. skyElDeg is the TRUE
+      // elevation (never runtime.sun.el, which is clamped at 8.6°).
+      window.__flyStats.skyElDeg = +elDeg.toFixed(3);
+      window.__flyStats.skyState = desired.label;
+      window.__flyStats.skyBlendS = desired.s;
+      window.__flyStats.skyDuskOn = duskOn;
     }
   });
 
