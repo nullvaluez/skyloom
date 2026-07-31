@@ -33,6 +33,7 @@ import {
   clearSkyNight,
   setSkyWeather,
   clearSkyWeather,
+  setSkySun,
 } from './SkyDome';
 import { PoiLetters } from './PoiLetters';
 import { TrafficTracers } from './TrafficTracers';
@@ -73,6 +74,7 @@ import {
   SAT_ROADS,
   SAT_SKYLINE,
   SKY,
+  SKY_DUSK,
   SKY_LIVE,
   TOY,
   TOY_WORLD,
@@ -481,6 +483,25 @@ export function FlyScene({ runtime }) {
     //   runtime.juice        {addTrauma, onCrash, onEvent} — A4 SHOWTIME
     //                        publishes from JuiceSystems; A5 calls
     //                        juice?.onCrash() in the crash sequence.
+    // ------------------------------------------------------------------
+    // RUNTIME CONTRACTS (R19) — Fable scaffolding. Cross-agent data flows
+    // ONLY through these; every read optional-chained so merge order never
+    // breaks a worktree build:
+    //   worker sat bundle v15 — producer A HOMESTEAD (W1, FROZEN at A's
+    //     merge), consumer C GROUNDTRUTH (W2):
+    //     .satBuilding.housePts  Float32Array [x,z]* — anchors of inferred
+    //                            small-band houses → C's house lights.
+    //     .satTint               {pos, col, idx} merged landcover polys →
+    //                            C's SatTintLayer.
+    //     .satVeg rows           gain per-class ids (residential/farmland/
+    //                            orchard) + worker-side houseAvoid → C.
+    //   setSkySun(az, el, frac) — FlyScene's -50 satellite branch feeds the
+    //     SkyDome golden-hour lobe (gated SKY_DUSK.enabled; stub until D
+    //     GOLDENHOUR implements, W1).
+    //   SAT_SHADOWS mesh flags — each content layer sets castShadow/
+    //     receiveShadow on its OWN meshes (two lines), added by that layer's
+    //     owner-of-the-wave: A (SatBuildingLayer, W1) · C (SatVegLayer, W2).
+    //     B DEEPFIELD (W1) owns the light rig + FlyScene's castShadow gate.
     // ------------------------------------------------------------------
     // Round 8.5 (§B): mirror the action handles onto the module-scope bus
     // and flip runtimeReady — overlays resolve these AT CALL TIME, so a
@@ -1192,6 +1213,13 @@ export function FlyScene({ runtime }) {
         wx ? weatherHazeMax(SKY.haze.max, wx) : SKY.haze.max
       );
       setSkyAtmo(_atmoRim[0], _atmoRim[1], _atmoRim[2], _atmoVoid[0], _atmoVoid[1], _atmoVoid[2]);
+      // R19 scaffolding (Fable): the SkyDome sun feed for D GOLDENHOUR's
+      // golden-hour lobe. The stub is a no-op until D implements; the gate
+      // keeps this line a byte-noop while SKY_DUSK ships disabled.
+      if (SKY_DUSK.enabled) {
+        const s19 = runtime.sun;
+        if (s19) setSkySun(s19.az, s19.el, s19.frac);
+      }
       // The overcast LID: the rim triple (already grey-mixed above) at the
       // horizon, darkened toward the zenith — a real ceiling is dimmest
       // overhead. overcastT 0 → the dome's mix() is an exact no-op.

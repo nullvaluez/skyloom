@@ -23,7 +23,13 @@
  * Returns { ms } — goto → pct 100 wall time.
  */
 
-const BOOT_URL = 'http://localhost:3000';
+// Round 19 (SANCTIONED harness edit): the target defaults to :3000 exactly as
+// before, but FLY_URL overrides it fleet-wide — the R19 field study found
+// :3000/3001 occupied by an UNRELATED app on this machine and the user's live
+// dev server on :3002. Harness runs must never assume :3000 and must NEVER
+// point at the user's live server: run your own dev server from your own
+// worktree (its own .next) on a free port and pass FLY_URL.
+const BOOT_URL = process.env.FLY_URL || 'http://localhost:3000';
 
 async function bootFly(
   page,
@@ -48,6 +54,15 @@ async function bootFly(
     // pre-R18 speed envelope exactly. verify-crash is the ONE harness that
     // clears it (per-state, deliberately) to certify the meter itself.
     window.__flyBoostInfinite = true;
+    // Round 19 (SANCTIONED harness edit, the same idiom): pin the two new
+    // ship-state satellite visuals NEUTRAL for the whole browser fleet —
+    // depth-based aerial perspective and satellite content shadows would
+    // otherwise shift every frozen satellite pixel gate (sat-depth's
+    // hillshade crops, roof-variety's luminance band, sat-night). 0 is the
+    // exact pre-R19 frame. verify-aerial is the ONE harness that un-pins
+    // them (per-gate, deliberately).
+    window.__flyAerialOverride = 0;
+    window.__flySatShadowOverride = 0;
     try {
       localStorage.setItem('fly-controls-seen', '1');
       // Round 10: the APP default is now satellite (PauseMenu defaults an
@@ -71,6 +86,8 @@ async function bootFly(
   if (!seeded) {
     await page.evaluate((s) => {
       window.__flyWeatherOverride = 'baseline'; // round 16: same determinism pin
+      window.__flyAerialOverride = 0; // round 19: same idiom, reload leg
+      window.__flySatShadowOverride = 0;
       localStorage.setItem('fly-controls-seen', '1');
       localStorage.setItem('fly-map-style-2', s || 'toy'); // round 10: default toy for harnesses
     }, style);

@@ -69,6 +69,13 @@ export function clearSkyWeather() {
   weather.active = false;
 }
 
+// Round 19 scaffolding (Fable): the golden-hour sun feed for D GOLDENHOUR.
+// FlyScene's -50 satellite branch calls this (gated SKY_DUSK.enabled) with
+// runtime.sun's az (HOUR ANGLE — negative before local noon, the R16
+// convention), el (deg) and frac. No-op stub until D implements the lobe;
+// D adds the parameters with the implementation.
+export function setSkySun() {}
+
 /**
  * Per-style globe sky (FLY_GLOBE_REWORK): a camera-following gradient dome —
  * horizon glow at the rim, zenith above, and a dark VOID below the horizon
