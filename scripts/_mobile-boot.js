@@ -5,7 +5,7 @@
  * blocked, so the world boots via the maxBootMs ceiling with an empty sky,
  * which is fine for exercising the UI + controls.
  */
-async function bootMobile(page, { url = 'http://localhost:3000', style = null, waitS = 90 } = {}) {
+async function bootMobile(page, { url = process.env.FLY_URL || 'http://localhost:3000', style = null, waitS = 90 } = {}) {
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.evaluate((s) => {
     try {

@@ -159,7 +159,10 @@ const roadProbe = () => {
     // fatal. (R16 sweep: one anonymous 404 flaked an otherwise-green run.)
     const url = m.location()?.url ?? '';
     const is404 = /the server responded with a status of 404/.test(m.text());
-    if (is404 && url && !url.startsWith('http://localhost:3000')) {
+    // R19: compare against the ACTUAL app origin (FLY_URL) — pinned to :3000
+    // this filter would swallow app-origin 404s as "external" on any other
+    // port, silently weakening the gate.
+    if (is404 && url && !url.startsWith(process.env.FLY_URL || 'http://localhost:3000')) {
       externalBlips.push(url);
       console.log(`WARN external resource 404 (environmental): ${url.slice(0, 140)}`);
       return;

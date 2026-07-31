@@ -48,7 +48,10 @@ const path = require('path');
     }
 
     const t0 = Date.now();
-    await page.goto('http://localhost:3000', {
+    // R19: raw-boot harnesses take FLY_URL too (same default) — :3000 hosts
+    // an UNRELATED app on this machine; hitting it here made the sun-at-spawn
+    // gate report missing sunFactor/lastPos against a page that isn't SkyLoom.
+    await page.goto(process.env.FLY_URL || 'http://localhost:3000', {
       waitUntil: 'domcontentloaded',
       timeout: 120000,
     });
