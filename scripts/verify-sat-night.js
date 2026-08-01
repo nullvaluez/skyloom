@@ -16,7 +16,8 @@
  *      draws ≤ 375 (the satellite low-AGL budget, Appendix B).
  *  (B) MANHATTAN NOON (same pose): the same A/B moves almost nothing, the NIGHT
  *      signal is > 4× the day signal AND > 4× the measured shot noise, and the
- *      ROAD LAYER'S OWN draw cost is identical day vs night.
+ *      ROAD LAYER'S MESH CENSUS is identical day vs night — same meshes, same
+ *      material instance, with only the sun uniform moved (R19, ruling 1).
  *  (C) JFK NIGHT (~700 m): the roads A/B moves the runway-area crop, a streamed
  *      chunk carries cls-7 (runway-light) verts, and the airport beacon pool has
  *      placed ≥ 1 instance.
@@ -70,11 +71,17 @@
  *     foreground actors are not part of that claim. The night draw-ceiling
  *     gate now reads the PRE-probe scene sample (foreground included) so the
  *     budget still covers the real scene.
- *   • Gate B's "identical draw count" is measured as the ROAD LAYER'S OWN cost
- *     (the visibility-toggle Δ), not the scene total: the scene total legitimately
- *     breathes with live ADS-B traffic between two probes minutes apart, which
- *     would make a total-equality gate flaky while proving nothing about roads.
- *     The layer Δ at a pinned pose IS the claim ("the sun changes no draws").
+ *   • Gate B's "identical draw count" was measured R16–R18 as the ROAD LAYER'S
+ *     OWN cost (the visibility-toggle Δ), because the scene total legitimately
+ *     breathes with live ADS-B traffic between two probes minutes apart. R19
+ *     (Fable ruling 1) found that Δ is itself a difference of four breathing
+ *     scene totals sampled 2.5 s apart and tested for EXACT equality: it
+ *     returned negative "layer draws" and its sign flipped run to run, while
+ *     the layer's own census read 16/16 at both lighting states. The gate is
+ *     RE-BASED onto that census (see `roadCensus`), which measures the same
+ *     invariant deterministically and strictly more strongly. The old
+ *     arithmetic is kept as informational output. Not a re-baseline: no
+ *     assertion NUMBER in this harness moved, and the gate count is still 33.
  *   • Gate E's "pixel-silent" is a RATIO too: the fully-dithered A/B must move
  *     less than 15% of what the solid A/B moved at 2000 m (plus an absolute
  *     1.0/255 sanity cap) — self-calibrating against however bright the city
@@ -227,6 +234,62 @@ const roadProbe = () => {
       [a, b, y0f, y1f]
     );
 
+  // R19 FABLE-RULED INSTRUMENT REPLACEMENT (ruling 1) — the ROAD-LAYER MESH
+  // CENSUS. The invariant certified here has not moved: "the sun drives
+  // UNIFORMS ONLY, the same geometry is submitted at noon and at midnight."
+  // What moved is the instrument. The R16 original computed
+  //   layerDraws = onDraws − offDraws
+  // per leg from FOUR scene totals sampled 2.5 s apart in a live-ADS-B scene,
+  // then demanded EXACT equality of the two differences. Measured (R19,
+  // scripts/r19-satnight-roaddraws.js, 4 rounds per lighting state at a
+  // streaming pose): NIGHT [15, 11, 14, 18] · NOON [-3, 5, -16, 15] — a
+  // "layer draw count" that comes out NEGATIVE is the instrument confessing.
+  // Three consecutive harness runs on the settled pose gave night/day 6/5
+  // (FAIL), 5/6 (FAIL), 5/5 (PASS): the SIGN FLIPS, so it is noise, not a
+  // directional regression. The layer's own census over the same runs read
+  // 16 meshes / 16 visible at BOTH lighting states — the invariant holds.
+  //
+  // The replacement measures the SAME claim directly and deterministically,
+  // and is strictly STRONGER than the arithmetic it replaces:
+  //   (i)  per leg, every ready chunk is exactly one drawable mesh and every
+  //        mesh is drawn (meshes === ready === visible) — the layer's draw
+  //        cost per chunk, which is what "draw cost" ever meant here;
+  //   (ii) ONE material instance carries every road mesh, and it is the SAME
+  //        instance (uuid) at night and at noon — the sun cannot have swapped
+  //        a material, recompiled a program, or forked a variant;
+  //   (iii) and the sun-driven uniform DID change across the two legs
+  //        (uRoadNight ≈ 1 at 23:00 → ≈ 0 at noon, read from the live
+  //        getSatRoadMix() publication) — so (i)+(ii) are being asserted
+  //        across a REAL lighting change, not across two identical frames.
+  // The scene TOTAL is deliberately NOT part of the assertion: the chunk
+  // population between two legs minutes apart is a STREAMING property, not a
+  // sun property, and folding it in is precisely the defect being fixed. It
+  // is printed as informational output below, together with the old
+  // layerDraws arithmetic, so a real regression still leaves a trail.
+  // This is a Fable-ruled instrument replacement measuring the same
+  // invariant — NOT a product re-baseline. Gate count unchanged (33).
+  const roadCensus = () =>
+    page.evaluate(() => {
+      const eng = window.__satRoads;
+      if (!eng) return { meshes: -1, visible: -1, ready: -1, mats: [], mix: null };
+      let meshes = 0;
+      let visible = 0;
+      const mats = new Set();
+      eng.object.traverse((o) => {
+        if (!o.isMesh) return;
+        meshes += 1;
+        if (o.visible && (o.material?.visible ?? true)) visible += 1;
+        if (o.material) mats.add(o.material.uuid);
+      });
+      return {
+        meshes,
+        visible,
+        ready: window.__flyStats?.satRoads?.ready ?? -1,
+        mats: [...mats],
+        mix: window.__flyStats?.satRoadMix ?? null,
+      };
+    });
+
   const setRoadsVisible = (v) =>
     page.evaluate((vis) => {
       window.__satRoads?.object.traverse((o) => {
@@ -331,6 +394,8 @@ const roadProbe = () => {
     night.eyeAgl > 600 && night.eyeAgl < 1000, `agl=${night.eyeAgl}`);
 
   const abNight = await abProbe(setRoadsVisible, 'roads@night');
+  const censusNight = await roadCensus(); // R19 ruling 1 — see roadCensus above
+  console.log('ROAD CENSUS @night:', JSON.stringify(censusNight));
   await glShot('r16-satnight-02-manhattan-night-after-ab.png');
   // NOISE-CORRECTED (R16 first-run calibration, Fable): the raw-mean pencil 3
   // assumed the network covers the crop; from a shallow angle over canyon
@@ -408,11 +473,29 @@ const roadProbe = () => {
   console.log(
     `${abNight.sparks - abNight.noiseSparks > 250 ? 'PASS' : 'WARN'} night network net sparks (informational) — sparks=${abNight.sparks} noiseSparks=${abNight.noiseSparks}`
   );
-  gate('SUN DRIVES UNIFORMS ONLY — road layer draw cost identical day/night',
-    abDay.layerDraws === abNight.layerDraws,
-    `night=${abNight.layerDraws} day=${abDay.layerDraws} (ready ${night.roads?.ready}/${day.roads?.ready})`);
+  const censusDay = await roadCensus();
+  console.log('ROAD CENSUS @noon:', JSON.stringify(censusDay));
+  const oneMat = (c) => c.mats.length === 1;
+  const perChunk = (c) => c.meshes > 0 && c.meshes === c.ready && c.visible === c.meshes;
+  const sunMoved =
+    (censusNight.mix?.night ?? 0) > 0.9 && (censusDay.mix?.night ?? 1) < 0.1;
+  gate('SUN DRIVES UNIFORMS ONLY — same meshes, same material, only the uniform moved',
+    perChunk(censusNight) &&
+      perChunk(censusDay) &&
+      oneMat(censusNight) &&
+      oneMat(censusDay) &&
+      censusNight.mats[0] === censusDay.mats[0] &&
+      sunMoved,
+    `night ${censusNight.visible}/${censusNight.meshes} meshes ready=${censusNight.ready} · ` +
+      `noon ${censusDay.visible}/${censusDay.meshes} meshes ready=${censusDay.ready} · ` +
+      `materials ${censusNight.mats.length}/${censusDay.mats.length} same=${censusNight.mats[0] === censusDay.mats[0]} · ` +
+      `uRoadNight ${censusNight.mix?.night}→${censusDay.mix?.night}`);
+  // Informational only (R19 ruling 1): the retired arithmetic and the scene
+  // totals it was built from. Live traffic breathes every one of these.
   console.log(
-    `scene totals (live traffic breathes these — reported, not gated): night=${abNight.onDraws} day=${abDay.onDraws}`
+    `retired instrument (informational): layerDraws night=${abNight.layerDraws} day=${abDay.layerDraws} · ` +
+      `scene totals night ${abNight.onDraws}/${abNight.offDraws} day ${abDay.onDraws}/${abDay.offDraws} · ` +
+      `road chunk totals night=${censusNight.meshes} noon=${censusDay.meshes}`
   );
 
   // ==========================================================================
@@ -445,22 +528,126 @@ const roadProbe = () => {
   // The cirrus deck (D) needs its own handle: it is a sibling GROUP, not an
   // InstancedMesh, so the sweep below cannot see it — and it animates on the
   // same drei `speed` prop plus the jet-stream drift.
-  const parkClouds = (park) =>
+  // R19 (E) PARK v3 (Fable ruling 2) — park every actor this block does not
+  // control, at each SYSTEM'S ROOT, and restore each one's PREVIOUS flags.
+  //
+  // v2 parked the deck, its 14 scene-root InstancedMesh siblings and the
+  // cirrus, and that was still not a static frame. The v2 census
+  // (scripts/r19-satnight-movers.js) said the residue was "a live traffic GLB
+  // + three nested instanced pools + a moving Points". TWO of those three
+  // claims were an artifact of the census itself: Object3D.traverse does not
+  // stop at an invisible parent, so v1 reported objects UNDER an already-
+  // parked group as live movers. Corrected (effective-visibility) census on
+  // this tree:
+  //   • "the live traffic GLB Group#Jet_Cube024 + 4 meshes" is the node name
+  //     inside public/models/player-jet.glb — the PLAYER's own model, under
+  //     window.__flyPlayer, already hidden by setForegroundVisible. Likewise
+  //     the moving Points (PlayerLights' nav-light cloud). Neither reaches a
+  //     pixel.
+  //   • the "nested pools counted 93/432/30" are __flyClouds (432) and
+  //     __flyCirrus (30) themselves — already parked — plus TrafficLayer's
+  //     BILLBOARD pool, whose live count IS the ~79-136 that drifted run to
+  //     run. SatVegLayer's canopy, boats, plumes and house lights all read
+  //     count=0 / self-parked at this pose.
+  // What actually still moved in the ground crop, all of it live traffic:
+  //   1. TrafficLayer's far-LOD billboard pool — it carries NEITHER _isModel
+  //      NOR _painted, so setForegroundVisible walks straight past it.
+  //   2. TrafficTracers' ribbon — ONE scene-root Mesh that rewrites its whole
+  //      position attribute every frame and never moves its matrixWorld, so
+  //      no visibility sweep and no matrix census could see it at all. It was
+  //      found by an attribute-version pass.
+  //   3. the airport beacon pool (2 instances, instanceMatrix bumping).
+  //   4. and — measured by the cumulative park experiment
+  //      scripts/r19-satnight-e3100.js, which is the only reason it was found —
+  //      the SAT_SKYLINE block mass and the POI letters. Neither MOVES; both
+  //      are keyed to the very altitude this block climbs through (the skyline
+  //      crossfades in as SAT_BLDG_FADE dithers the near ring out, and R19 E's
+  //      label budget re-picks the letter set by altitude every 2 s), so both
+  //      repaint parts of the crop DURING the climb. Parking them took the
+  //      no-toggle crop delta from mean 0.11-0.65 / 238-2040 sparks to
+  //      0.03-0.28 / 12-74 sparks at the same pose.
+  // 1 and 2 are parked at their layer ROOT through two NEW dev-only handles
+  // added in the __flyClouds idiom (window.__flyTraffic on TrafficLayer's
+  // root group, window.__flyTracers on the tracer mesh) — parking a root is
+  // what keeps this fix from rotting the next time either layer grows a mesh.
+  // setForegroundVisible is deliberately NOT widened: gates (A)/(B)/(C)/(D)
+  // are calibrated against exactly what it hides today.
+  // Every target's PREVIOUS visible/material.visible is saved and restored, so
+  // the park is symmetric across abSolid/abGone and cannot leave a layer lit
+  // that the app had parked itself. Assertion numbers FROZEN.
+  // IDEMPOTENT by construction: the pick set of POI letters is re-evaluated
+  // every 2 s AND is altitude-keyed (R19 E's label budget), so the climb this
+  // block performs is itself a letter-churn generator. parkE(true) is
+  // therefore re-applied before each A/B — it re-asserts the flags it owns and
+  // adopts anything that appeared since, saving each newcomer's own previous
+  // flags exactly once.
+  const parkE = (park) =>
     page.evaluate((hide) => {
+      const st = (window.__r19ParkE ??= { seen: new Set(), saved: [] });
+      if (!hide) {
+        for (const [o, v, mv] of st.saved) {
+          o.visible = v;
+          if (o.material && mv !== null) o.material.visible = mv;
+        }
+        const n = st.saved.length;
+        window.__r19ParkE = null;
+        return { restored: n };
+      }
+      let added = 0;
+      const park1 = (o) => {
+        if (!o) return false;
+        if (!st.seen.has(o)) {
+          st.seen.add(o);
+          st.saved.push([o, o.visible, o.material ? o.material.visible : null]);
+          added += 1;
+        }
+        o.visible = false;
+        if (o.material) o.material.visible = false;
+        return true;
+      };
       const c = window.__flyClouds;
-      if (!c) return 0;
-      c.visible = !hide;
-      if (window.__flyCirrus) window.__flyCirrus.visible = !hide;
-      let n = 0;
-      c.parent?.children?.forEach((o) => {
+      park1(c);
+      park1(window.__flyCirrus);
+      let siblings = 0;
+      c?.parent?.children?.forEach((o) => {
         if (o === c || !o.isInstancedMesh) return;
-        o.visible = !hide;
-        if (o.material) o.material.visible = !hide;
-        n += 1;
+        park1(o);
+        siblings += 1;
       });
-      return n;
+      const traffic = park1(window.__flyTraffic);
+      const tracers = park1(window.__flyTracers);
+      const beacons = park1(window.__satBeacons);
+      const skyline = park1(window.__satSkyline?.object);
+      const glow = park1(window.__satCityGlow?.dome) && park1(window.__satCityGlow?.core);
+      // POI letters: their frame loop writes group.visible EVERY FRAME (the
+      // CloudField lesson), and the groups are scene-root siblings with no
+      // wrapper to park — so the park goes on the troika Text CHILD, which
+      // nothing rewrites. They are found by the userData key the loop itself
+      // stamps (`popT`).
+      let scene = window.__satRoads?.object ?? window.__flyClouds ?? null;
+      while (scene && scene.parent) scene = scene.parent;
+      let letters = 0;
+      scene?.children?.forEach((g) => {
+        if (!g.isGroup || !('popT' in (g.userData ?? {}))) return;
+        g.children.forEach((ch) => {
+          if (park1(ch)) letters += 1;
+        });
+      });
+      return {
+        tracked: st.saved.length,
+        added,
+        siblings,
+        clouds: !!c,
+        cirrus: !!window.__flyCirrus,
+        traffic,
+        tracers,
+        beacons,
+        skyline,
+        glow,
+        letters,
+      };
     }, park);
-  console.log(`(E) cloud deck PARKED — ${await parkClouds(true)} instanced siblings stilled`);
+  console.log(`(E) PARKED — ${JSON.stringify(await parkE(true))}`);
   await page.evaluate(pinScene, [40.7075, -74.0113, 2000, 2.6, -0.30]);
   await page.waitForTimeout(24000);
   const e2000 = await page.evaluate(() => ({
@@ -473,6 +660,7 @@ const roadProbe = () => {
   console.log('FADE @2000:', JSON.stringify(e2000));
   gate('buildings solid below the fade band (ready ≥ 3, fade == 1)',
     e2000.ready >= 3 && e2000.fade > 0.999, JSON.stringify(e2000));
+  console.log(`(E) re-park before abSolid — ${JSON.stringify(await parkE(true))}`);
   const abSolid = await abProbe(setBuildingsVisible, 'buildings@2000');
 
   await page.evaluate(pinScene, [40.7075, -74.0113, 2700, 2.6, -0.30]);
@@ -518,13 +706,53 @@ const roadProbe = () => {
       { timeout: 30000, polling: 500 }
     )
     .catch(() => {}); // stats field absent ⇒ fall through to the settle pair
-  for (let i = 0; i < 3; i++) {
+  // R19 (Fable ruling 2, same precondition class): the settle loop now demands
+  // TWO CONSECUTIVE quiet no-toggle pairs under 0.35/255, up to 10 attempts.
+  // One pair under 1.0 was not a quiescence proof — with the (E) park applied
+  // the settled floor at this pose measures 0.03-0.28/255, and the climb's own
+  // tile/DEM refinement is INTERMITTENT, so a single quiet sample can be the
+  // gap between two repaints: a run that exited on one quiet pair went on to
+  // read A/A noise 1.63 inside the probe itself. Assertion numbers untouched —
+  // this makes the gate's precondition imply its assertion (R18 lesson).
+  // …and the pairs are taken BACK-TO-BACK once quiet, deliberately: bandDelta
+  // decodes two 1600×900 PNGs and walks 619 200 pixels on the page's own main
+  // thread, which stalls the render loop long enough that queued stream work
+  // lands in one burst right afterwards. The probe's own no-toggle pair sits
+  // in exactly that phase (~0.3 s after a bandDelta), so a settle loop that
+  // only ever samples 3 s after a stall proves nothing about it — measured:
+  // settle pair 0.038 → the probe's own A/A noise 1.43 in the same run. Only
+  // the retry path waits.
+  // The loop ALSO hides the foreground first, because abProbe does — a
+  // precondition should be sampled in the state its assertion runs in.
+  // HONEST NOTE: that did NOT reconcile the two. The loop's back-to-back pairs
+  // still read 0.4-8.1/255 in runs whose probe A/A came out at 0.09-0.20, so
+  // the residue it sees is the SHOT CADENCE (two screenshots taken as fast as
+  // the CDP round-trip allows, with no settle between), not scene churn — the
+  // probe's own pair is preceded by a 250 ms settle and does not see it. The
+  // loop is therefore honest dwell (up to 12 pairs ≈ 25 s at the pose) plus a
+  // report, and the number that carries the gate is the probe's printed A/A
+  // noise. What actually moved the (E) result was the PARK below: A/B 3.41 →
+  // 0.36/0.60 against the unchanged ceiling, A/A 3.19 → 0.20/0.19.
+  await setForegroundVisible(false);
+  let quiet = 0;
+  let qLast = -1;
+  for (let i = 0; i < 12 && quiet < 3; i++) {
     const q1 = await shot64();
     const q2 = await shot64();
     const qd = await bandDelta(q1, q2, 0.55, 0.98);
-    if (qd.mean < 1.0) break;
+    qLast = qd.mean;
+    if (qd.mean < 0.35) {
+      quiet += 1;
+      continue;
+    }
+    quiet = 0;
     await page.waitForTimeout(3000);
   }
+  console.log(
+    `(E) quiescence @3100: ${quiet}/3 consecutive quiet pairs, last ${qLast.toFixed(3)}/255 ` +
+      `(bar 0.35 — the loop is bounded at 12 pairs and proceeds either way; the probe's own A/A noise is the number that matters and is printed below)`
+  );
+  console.log(`(E) re-park before abGone — ${JSON.stringify(await parkE(true))}`);
   const abGone = await abProbe(setBuildingsVisible, 'buildings@3100');
   await glShot('r16-satnight-06-fade-3100.png');
   gate('eviction happens on INVISIBLE geometry (A/B < 15% of the solid Δ)',
@@ -541,9 +769,9 @@ const roadProbe = () => {
   gate('…and THEN the ring evicts (ready 0, ring off by 3400 m)',
     e3400.ready === 0 && e3400.ringOn === false, JSON.stringify(e3400));
 
-  // R19: un-park the cloud deck (see the (E) header) — the JFK/cruise legs
-  // keep their calibrated context. Restores BOTH flags the park set.
-  console.log(`(E) cloud deck RESTORED — ${await parkClouds(false)} instanced siblings released`);
+  // R19: un-park everything (see the (E) header) — the JFK/cruise legs keep
+  // their calibrated context. Restores each target's SAVED flags, not `true`.
+  console.log(`(E) RESTORED — ${JSON.stringify(await parkE(false))}`);
 
   // ==========================================================================
   // (C) JFK NIGHT — runway edge lights (cls 7) + the airport beacon pool

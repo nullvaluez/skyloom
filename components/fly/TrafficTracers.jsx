@@ -226,7 +226,15 @@ function RibbonTracers({ runtime, origin }) {
   const state = useMemo(() => ({ recs: new Map(), pool: [], gates: new Map(), frame: 0 }), []);
 
   useEffect(() => {
+    // Round 19 (probe determinism, Fable ruling 2): dev-only park handle, the
+    // __flyClouds idiom. This ONE mesh rewrites its whole position attribute
+    // every frame and never moves its matrixWorld, so no visibility sweep and
+    // no matrix-diff census can see it — it was the last live-traffic actor
+    // inside verify-sat-night's (E) ground crop. Dev-only, product no-op.
+    if (process.env.NODE_ENV === 'development') window.__flyTracers = mesh;
     return () => {
+      if (process.env.NODE_ENV === 'development' && window.__flyTracers === mesh)
+        delete window.__flyTracers;
       mesh.geometry.dispose();
       mesh.material.dispose();
     };
@@ -518,7 +526,12 @@ function StreakTracers({ runtime, flight, origin }) {
   const state = useMemo(() => ({ gates: new Map(), frame: 0 }), []);
 
   useEffect(() => {
+    // Round 19: same dev-only park handle as RibbonTracers (TRACERS.mode picks
+    // exactly one of the two, so the handle names whichever is mounted).
+    if (process.env.NODE_ENV === 'development') window.__flyTracers = mesh;
     return () => {
+      if (process.env.NODE_ENV === 'development' && window.__flyTracers === mesh)
+        delete window.__flyTracers;
       mesh.geometry.dispose();
       mesh.material.dispose();
     };
