@@ -276,7 +276,21 @@ export function TrafficLayer({ runtime, flight, origin }) {
   }, -45);
 
   return (
-    <group>
+    // Round 19 (probe determinism, Fable ruling 2): a dev-only handle on the
+    // layer ROOT, in the established __flyClouds/__flyCirrus idiom. A pixel
+    // probe that must still the live sky needs ONE object it can park —
+    // verify-sat-night's foreground hide walks InstancedMeshes carrying
+    // _isModel/_painted, which the BILLBOARD pool below carries neither of, so
+    // ~80-140 far-LOD traffic sprites drifted through every "hidden traffic"
+    // A/B in the (E) block. Parking the root is also future-proof: anything
+    // this layer grows later is inside it by construction. Dev-only assignment,
+    // zero product behaviour.
+    <group
+      ref={(el) => {
+        if (process.env.NODE_ENV === 'development')
+          window.__flyTraffic = el ?? null; // harness A/B park (root)
+      }}
+    >
       {meshes.map((mesh, i) => (
         <primitive key={i} object={mesh} />
       ))}
