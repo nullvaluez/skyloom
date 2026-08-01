@@ -421,6 +421,46 @@ const roadProbe = () => {
   //     NOTE the order: the building ring only ARMS below SAT_BUILDINGS
   //     .cullAglOnM (2200 m), so the climb MUST start under it.
   // ==========================================================================
+  // R19 probe-determinism fix v2 (Fable; the R17 law — a pixel-probe gate
+  // must not contain an actor it doesn't control): at 3100 m the camera sits
+  // INSIDE the cloud band and the deck's shadows sweep the ground crop with
+  // the wind — and R19 raised shadow opacity 0.12 → 0.28 (sanctioned, D), so
+  // the drift now intermittently breaches the gate (A/A noise 2.00 vs the
+  // settled 0.18; gone=21.75 measured the SKY's motion, not the toggle; the
+  // quiescence guard above proved drape settling was NOT the cause). Drift
+  // never settles, so the deck is PARKED for the whole (E) block through
+  // window.__flyClouds — the handle D added for exactly this — plus its
+  // shadow-mesh sibling. Restored before (C). Assertion numbers FROZEN.
+  //
+  // WHY material.visible AND NOT object.visible: the disc pool is a scene-root
+  // sibling of the deck (CloudField returns `<primitive object={shadows.mesh}/>`
+  // beside `<Clouds>`), and CloudField's useFrame ends with the unconditional
+  // `shadows.mesh.visible = wantShadows` — so an object-visibility park is
+  // overwritten on the NEXT FRAME and is a no-op on exactly the actor this
+  // block is trying to still (measured: of the 14 scene-root InstancedMeshes,
+  // the opacity-0.28 disc pool was the ONE that came back true after 2.5 s of
+  // frames). Nothing rewrites material.visible, and three gates the
+  // render-list push on it (projectObject), so that flag holds. Both are set,
+  // and both are restored, so the park is symmetric across abSolid/abGone.
+  // The cirrus deck (D) needs its own handle: it is a sibling GROUP, not an
+  // InstancedMesh, so the sweep below cannot see it — and it animates on the
+  // same drei `speed` prop plus the jet-stream drift.
+  const parkClouds = (park) =>
+    page.evaluate((hide) => {
+      const c = window.__flyClouds;
+      if (!c) return 0;
+      c.visible = !hide;
+      if (window.__flyCirrus) window.__flyCirrus.visible = !hide;
+      let n = 0;
+      c.parent?.children?.forEach((o) => {
+        if (o === c || !o.isInstancedMesh) return;
+        o.visible = !hide;
+        if (o.material) o.material.visible = !hide;
+        n += 1;
+      });
+      return n;
+    }, park);
+  console.log(`(E) cloud deck PARKED — ${await parkClouds(true)} instanced siblings stilled`);
   await page.evaluate(pinScene, [40.7075, -74.0113, 2000, 2.6, -0.30]);
   await page.waitForTimeout(24000);
   const e2000 = await page.evaluate(() => ({
@@ -460,6 +500,31 @@ const roadProbe = () => {
   console.log('FADE @3100:', JSON.stringify(e3100));
   gate('fully dithered away by 3100 m (fade ≈ 0, chunks still resident)',
     e3100.fade < 0.02 && e3100.ready >= 1, JSON.stringify(e3100));
+  // R19 probe-determinism fix (Fable): the 2700 → 3100 climb crosses tile-LOD
+  // thresholds (B's z17 low-AGL descent) which can fire DEM-refinement
+  // re-drapes (A's stale-drape heal) — sampled mid-settle, the A/A noise
+  // measured 2.00 (10× the settled 0.18) and the A/B read the SCENE'S own
+  // motion, not the toggle (gone=21.75 > solid=17.70; settled control run:
+  // gone=0.81). Wait for streamer quiescence + a stable no-toggle pair before
+  // the A/B. Assertion numbers FROZEN — a precondition fix, not a re-baseline
+  // (the R18 chase-cam idiom: preconditions must imply their assertions).
+  await page
+    .waitForFunction(
+      () => {
+        const s = window.__flyStats?.satBuildings;
+        return s && s.building === 0 && s.draping === 0 && s.queued === 0;
+      },
+      undefined,
+      { timeout: 30000, polling: 500 }
+    )
+    .catch(() => {}); // stats field absent ⇒ fall through to the settle pair
+  for (let i = 0; i < 3; i++) {
+    const q1 = await shot64();
+    const q2 = await shot64();
+    const qd = await bandDelta(q1, q2, 0.55, 0.98);
+    if (qd.mean < 1.0) break;
+    await page.waitForTimeout(3000);
+  }
   const abGone = await abProbe(setBuildingsVisible, 'buildings@3100');
   await glShot('r16-satnight-06-fade-3100.png');
   gate('eviction happens on INVISIBLE geometry (A/B < 15% of the solid Δ)',
@@ -475,6 +540,10 @@ const roadProbe = () => {
   console.log('FADE @3400:', JSON.stringify(e3400));
   gate('…and THEN the ring evicts (ready 0, ring off by 3400 m)',
     e3400.ready === 0 && e3400.ringOn === false, JSON.stringify(e3400));
+
+  // R19: un-park the cloud deck (see the (E) header) — the JFK/cruise legs
+  // keep their calibrated context. Restores BOTH flags the park set.
+  console.log(`(E) cloud deck RESTORED — ${await parkClouds(false)} instanced siblings released`);
 
   // ==========================================================================
   // (C) JFK NIGHT — runway edge lights (cls 7) + the airport beacon pool
