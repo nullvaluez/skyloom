@@ -416,6 +416,24 @@ async function syntheticSpot(page, hex, reg, type, iconType) {
         (k) => JSON.parse(localStorage.getItem(k) || 'null'),
         PROGRESS_KEY
       );
+      // R19 probe-determinism fix (Fable; mechanism deterministically
+      // reproduced by D GOLDENHOUR): between this snapshot read and the
+      // reload's pagehide flush, LIVE traffic can COMPLETE a row (a second
+      // helicopter finishes spot-heli; a third spot finishes spot-3). A
+      // completed row is deliberately never persisted (R17: it paid out and
+      // rotates away), so the flushed snapshot legitimately lacks it and the
+      // mount refill legitimately advances poolIdx. The completedCount in the
+      // fly-contracts envelope is the deterministic witness: every vanished
+      // row must be covered by a completion. A wipe still fails BOTH gates
+      // (rows gone, completedCount unmoved). Gate semantics preserved; no
+      // number weakened.
+      const completedBefore = await page.evaluate(() => {
+        try {
+          return JSON.parse(localStorage.getItem('fly-contracts') || '{}').state?.completedCount ?? 0;
+        } catch {
+          return 0;
+        }
+      });
       await page.reload({ waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => window.__flyBoot?.pct === 100, undefined, {
         timeout: 180000,
@@ -438,17 +456,36 @@ async function syntheticSpot(page, hex, reg, type, iconType) {
         (snap?.active ?? []).find((r) => r.id === id)?.progress ?? null;
       const savedHeli = savedOf(snapBefore, 'spot-heli');
       const savedAny = savedOf(snapBefore, 'spot-3');
+      // R19 (see the completedBefore comment): a row may legitimately vanish
+      // across the reload ONLY by completing — witnessed by completedCount.
+      const completedAfter = await page.evaluate(() => {
+        try {
+          return JSON.parse(localStorage.getItem('fly-contracts') || '{}').state?.completedCount ?? 0;
+        } catch {
+          return 0;
+        }
+      });
+      const completedDelta = Math.max(0, completedAfter - completedBefore);
+      const rowOk = (row, saved) =>
+        row ? row.done || row.progress >= saved : completedDelta > 0;
+      const vanished = ['spot-heli', 'spot-3'].filter(
+        (id) => !post.active.find((r) => r.id === id)
+      ).length;
       gate(
         'progress restores across a reload',
         savedHeli === 1 && savedAny >= 1 &&
-          !!postHeli && (postHeli.done || postHeli.progress >= savedHeli) &&
-          !!postAny && (postAny.done || postAny.progress >= savedAny),
-        `saved heli ${savedHeli} / any ${savedAny} → restored heli ${postHeli?.progress}/${postHeli?.target}, any ${postAny?.progress}/${postAny?.target}`
+          rowOk(postHeli, savedHeli) && rowOk(postAny, savedAny) &&
+          vanished <= completedDelta,
+        `saved heli ${savedHeli} / any ${savedAny} → restored heli ${postHeli?.progress}/${postHeli?.target}, any ${postAny?.progress}/${postAny?.target} · vanished ${vanished} ≤ completedΔ ${completedDelta}`
       );
+      // R19: the cursor may advance ONLY to refill completion-vacated slots —
+      // Δ is bounded by the completion witness. A wipe (poolIdx reset or a
+      // 3-slot refill with no completions) still fails.
+      const poolDelta = (snapAfter?.poolIdx ?? -99) - (snapBefore?.poolIdx ?? 0);
       gate(
         'the rotation cursor survives the reload',
-        snapBefore?.poolIdx === 9 && snapAfter?.poolIdx === 9,
-        `poolIdx ${snapBefore?.poolIdx} → ${snapAfter?.poolIdx}`
+        snapBefore?.poolIdx === 9 && poolDelta >= 0 && poolDelta <= completedDelta,
+        `poolIdx ${snapBefore?.poolIdx} → ${snapAfter?.poolIdx} (Δ${poolDelta} ≤ completedΔ ${completedDelta})`
       );
       gate(
         'the fly-contracts envelope is untouched by the new key',

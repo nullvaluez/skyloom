@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Object3D, ShadowMaterial, Vector3, SRGBColorSpace } from 'three';
+import { Color, Object3D, ShadowMaterial, Vector3, SRGBColorSpace } from 'three';
 import { Environment } from '@react-three/drei';
 import {
   airDrop,
@@ -118,6 +118,10 @@ import { SatEnvironment } from './SatEnvironment';
 import { PrecipLayer } from './PrecipLayer';
 
 const SPAWN_ALT_M = 800;
+
+// Round 19 (Fable): scratch for the dusk key-color lerp — one module-scope
+// Color, written and consumed inside a single effect pass, never retained.
+const _keyLerp = new Color();
 // Round 13 P5: stable toy moon-prop (moon disc on TOY.moonDirection) — a module
 // const so SkyDome's update effect never re-runs on a new object identity.
 const _MOON_PROP = { dir: TOY.moonDirection, ...MOON };
@@ -317,15 +321,21 @@ export function FlyScene({ runtime }) {
   // that changes only on a sun-frac bucket crossing (a PMREM re-bake); toy
   // ignores it and stays on the certified noon HDRI.
   const [hdriBucket, setHdriBucket] = useState('day');
-  // Round 19 (Fable W1 integration, D GOLDENHOUR handoff): the key/hemi COLOR
-  // bucket, dusk-aware. The legacy hdriBucket above stays byte-untouched (it
-  // still feeds SatEnvironment's flag-off path and __flyStats.hdriBucket) —
-  // but between el −8° and the legacy nightFrac the legacy rule says 'night'
-  // while the R19 sky is dusk, so the ground read moonlit-blue under a warm
-  // horizon. keyBucket follows the resolved dusk phase (dominant endpoint of
-  // a mid-blend); with SKY_DUSK off, skyDuskOn() is false and keyBucket ===
-  // hdriBucket every pick ⇒ R18 behavior exactly.
-  const [keyBucket, setKeyBucket] = useState('day');
+  // Round 19 (Fable W1 integration, D GOLDENHOUR handoff — v2 after D's
+  // collateral catch): the key/hemi COLOR mix, dusk-aware. The legacy
+  // hdriBucket above stays byte-untouched (it still feeds SatEnvironment's
+  // flag-off path and __flyStats.hdriBucket) — but between el −8° and the
+  // legacy nightFrac the legacy rule says 'night' while the R19 sky is dusk,
+  // so the ground read moonlit-blue under a warm horizon. v1 snapped to the
+  // DOMINANT endpoint of the resolved phase, which stepped the key to full
+  // white at s > 0.5 — noon lighting an hour before a July sunset, the exact
+  // discontinuity the HDRI cross-blend exists to remove (caught by
+  // verify-dusk's golden-band gate). v2 carries the whole {a, b, s} mix and
+  // the color effect LERPS between the endpoint bucket colors by s,
+  // mirroring the HDRI blend. With SKY_DUSK off, skyDuskOn() is false and
+  // the mix is {legacy, legacy, 0} every pick ⇒ set(keyColor[legacy])
+  // exactly ⇒ R18 behavior byte-for-byte.
+  const [keyMix, setKeyMix] = useState({ a: 'day', b: 'day', s: 0 });
 
   // Round 19 (B) SAT_SHADOWS: the fleet pin, resolved ONCE pre-mount from
   // window (scripts/_boot.js writes it in an addInitScript) and thereafter
@@ -902,18 +912,25 @@ export function FlyScene({ runtime }) {
       else if (frac < hc.nightFrac) b = 'night';
       else b = az < 0 ? 'dawn' : 'dusk';
       setHdriBucket((prev) => (prev === b ? prev : b));
-      // Round 19 (Fable): dusk-aware key-color bucket — same discrete 5 s
-      // cadence, dominant endpoint of the resolved phase. Falls back to the
-      // legacy bucket pre-spawn (no sinEl yet) and whenever the ladder is off.
-      let kb = b;
+      // Round 19 (Fable, v2): dusk-aware key-color MIX — same discrete 5 s
+      // cadence, full {a, b, s} so the color effect can lerp instead of
+      // snapping (D's collateral catch). Falls back to the legacy bucket
+      // pre-spawn (no sinEl yet) and whenever the ladder is off.
+      let ka = b;
+      let kbb = b;
+      let ks = 0;
       if (skyDuskOn()) {
         const sinEl = runtime.sun?.sinEl;
         if (Number.isFinite(sinEl)) {
           const r = resolveSky(az, trueElevationDeg(sinEl));
-          kb = r.s >= 0.5 ? r.b : r.a;
+          ka = r.a;
+          kbb = r.b;
+          ks = r.s;
         }
       }
-      setKeyBucket((prev) => (prev === kb ? prev : kb));
+      setKeyMix((prev) =>
+        prev.a === ka && prev.b === kbb && prev.s === ks ? prev : { a: ka, b: kbb, s: ks }
+      );
       if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
         (window.__flyStats ??= {}).hdriBucket = b;
       }
@@ -932,13 +949,22 @@ export function FlyScene({ runtime }) {
   // directional/hemi color props reset on the style swap).
   useEffect(() => {
     if (mapStyle !== 'satellite') return;
-    // Round 19 (Fable): reads keyBucket (dusk-aware) instead of hdriBucket —
-    // identical values whenever SKY_DUSK is off (see the keyBucket comment).
-    const kc = SKY.hdriCycle.keyColor[keyBucket] ?? SKY.hdriCycle.keyColor.day;
-    const hc = SKY.hdriCycle.hemiSky[keyBucket] ?? SKY.hdriCycle.hemiSky.day;
-    if (sunRef.current) sunRef.current.color.set(kc);
-    if (hemiRef.current) hemiRef.current.color.set(hc);
-  }, [mapStyle, keyBucket]);
+    // Round 19 (Fable, v2): lerp key/hemi color between the mix's endpoint
+    // buckets by s — continuous through the dusk window, mirroring the HDRI
+    // cross-blend. At s === 0 this is set(keyColor[a]) exactly, so the
+    // SKY_DUSK-off path (mix always {legacy, legacy, 0}) is R18
+    // byte-identical (see the keyMix comment).
+    const KC = SKY.hdriCycle.keyColor;
+    const HC = SKY.hdriCycle.hemiSky;
+    if (sunRef.current) {
+      sunRef.current.color.set(KC[keyMix.a] ?? KC.day);
+      if (keyMix.s > 0) sunRef.current.color.lerp(_keyLerp.set(KC[keyMix.b] ?? KC.day), keyMix.s);
+    }
+    if (hemiRef.current) {
+      hemiRef.current.color.set(HC[keyMix.a] ?? HC.day);
+      if (keyMix.s > 0) hemiRef.current.color.lerp(_keyLerp.set(HC[keyMix.b] ?? HC.day), keyMix.s);
+    }
+  }, [mapStyle, keyMix]);
 
   // Map style hot-swap: replace the imagery provider in place — the DEM,
   // quadtree and every coordinate stay untouched; tiles refetch lazily.
