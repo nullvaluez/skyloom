@@ -360,25 +360,83 @@ onto B's W1 versions).
 ## 4. Certification
 
 Per-harness detail — every gate, every number, every re-run and its
-classification — lives in **`scripts/r19-close-sweep.md`** on the close
-branch. This section records only the round-level results and the ledger.
+classification, plus the skipped-on-byte-identity table with each row's citing
+commit — lives in **`scripts/r19-close-sweep.md`** on the close branch. This
+section records only the round-level results and the ledger.
+
+**Server deviation, recorded not hidden:** every certification run used the
+dev server already serving the close worktree on `:3019`, driven through
+`FLY_URL=http://localhost:3019`. The fleet convention is one's own server on a
+free port, but a second `next dev` would have had to share this worktree's
+single `.next` — which plan §2 forbids — and Next 16 has no `distDir` CLI
+flag. One tree, one server, one `.next`.
 
 ### 4.1 Final sweep
 
-<<PENDING: final sweep tally — harness count green / total, plus the live-flake
-re-run list and their classifications, from scripts/r19-close-sweep.md>>
+**All green. One retry all round** — verify-sat-night, during phase-1
+iteration, where the pre-fix tree failed gate (E) and the road gate was
+sign-flipping; both closed under the two Fable rulings in §4.3.
 
-Per-wave sweeps were green on each merged tree with the numbers recorded in
-§2/§3: W1 closed with sat-depth 212, Owens 239–240 armed, toy 363; W2 closed
-with Owens 178 noon / 179 night and the toy suite re-certified at its
-unchanged assertions.
+Re-executed today on the integrated tree: **verify-sat-night 33/33 ×2
+consecutive** · **verify-neon-cover 9/9** (toy worst 1.448 M ≤ 2 M, flag ON) ·
+**verify-tracers 6/6** (90 live tracers still drawing after style flips) ·
+**verify-fly-game PASS** — its pixel-hover leg self-WARNed not-engaged, the
+documented headless-aim flake; the card itself asserted (warp jump 2219
+world-u, arrival 653 m, lock held across warp) · **verify-spicy PASS** (VIPER11
++ WARBRD1 ping, retire, **0 re-fires over 12 s**; 3-min zero-error soak) ·
+**verify-feel 13/13** (cruise strength EXACTLY 0 at speedFrac 0.240; boost FOV
+**+3.02°** against a flag-off control of +0.79°; post-warp Δ **0.0 m**
+hands-off AND 2300 → 2300 m with the cursor parked at `cmd.pitch` −0.471;
+cinema refuses 21 nm, close pair 1060 m both framed; FL180 = 6 letters) ·
+**verify-aerial 16/16** (satellite boot **7.6 s** against the 28.8 s cap;
+mid-band Δ 7.28/255 against noise 0.19; **near field Δ exactly 0.000** — the
+sat-depth contract; aniso 8, tile textures ≈66 MB across 197 of a 300 MB cap;
+**Owens 194 ≤ 261 with everything armed**) · **verify-dusk 15/15** (golden band
+Δwarm 1.84 / Δluma 7.47; pinned-noon frame 0.0531 against a round-off control
+of 0.0559 — indistinguishable; P9: el +2.064° reads dusk with stars EXACTLY 0;
+**cirrus costs exactly +1 draw, 214 vs 213**) · **verify-fleet 28/28** ·
+**verify-classify / verify-warbirds / verify-daily** (node) PASS.
+
+verify-aerial was recorded 14/14 at B's merge (§2); the harness has since grown
+to 16 gates.
+
+**Scope, and an honest amendment.** The sweep was TARGETED by a Fable ruling:
+product code on the close tree differs from already-certified main `414a392`
+by a small named set, everything else being harness scripts and evidence. The
+ruling was issued on the premise that the delta was **exactly one file**
+(`app/api/aircraft/route.js`). **It became THREE during phase 1** — the
+sat-night park needed two dev-only handles, `window.__flyTraffic`
+(TrafficLayer's root group) and `window.__flyTracers` (the tracer mesh), both
+`process.env.NODE_ENV === 'development'` assignments that touch no geometry,
+material, draw or uniform in any build. They are nevertheless PRODUCT files and
+the harnesses run the dev bundle, so the traffic-rendering gates that cover
+them (verify-tracers / verify-fly-game / verify-spicy / verify-feel) were
+already in the must-run set, and **verify-fleet was ADDED to the run set** to
+cover exactly that — it is the gate that audits TrafficLayer's archetype meshes
+directly.
+
+Every other harness rests on **byte identity plus its cited wave-merge green**,
+row by row, in the ledger. Those greens are the ones recorded in §2/§3: W1
+closed with sat-depth 212, Owens 239–240 armed, toy 363; W2 closed with Owens
+178 noon / 179 night, verify-groundlife 18/18, and the toy suite re-certified
+at its unchanged assertions (neon-city 379, neon-alt 325, roofs 394,
+window-grids 403, edge-fx 400/372/322). **The ledger does not claim the full
+22-harness R18 sweep was re-run today** — it claims the only product code that
+moved since the last full green sweep is the three files above, and that every
+gate covering them was re-executed on the integrated tree.
 
 ### 4.2 Soak
 
-15 minutes, `node scripts/soak-fly.js 15`, live traffic, merged tree.
+15 minutes, `node scripts/soak-fly.js 15`, live traffic, merged tree. **GREEN.**
 
-<<PENDING: soak p50 / p95 frame time, draws max, tris peak, heap peak, peak
-live-aircraft count, pageerror count>>
+Worst **p95 8.4 ms**, p50 **4.2 ms** throughout, fps floor ≈119. Max draws
+**445 ≤ 480**; max tris **1.931 M ≤ 2.2 M**; heap 322 → 356 MB with **no
+monotonic climb**; max rebase 0.40 ms; **zero pageerrors**.
+
+**Live traffic peaked at 1,145 aircraft — R18's soak peaked at 525.** That peak
+IS `d5076d0` working: adsb.lol is still serving 200-OK-EMPTY on its geographic
+endpoint, and the proxy now rotates past it to adsb.fi (§5.2). The scene held
+every budget at more than double R18's load.
 
 ### 4.3 verify-sat-night determinism
 
@@ -390,19 +448,44 @@ Two Fable-ruled changes closed the two gates left open by `5baeb63` (§5.1):
    while live traffic breathes them. The sign FLIPPED across three
    consecutive runs (6/5, 5/6, 5/5) while the road layer's own mesh census
    read 16 visible at BOTH night and noon: the invariant holds, the instrument
-   does not. The gate now asserts the census. **Instrument replacement, same
-   invariant** — no assertion about the product moved.
-2. **The (E) block park extended to the remaining movers.** After the cloud
-   deck + 14 InstancedMesh siblings + the cirrus group were parked, the A/A
-   pair was still not a static frame: a live traffic GLB remained visible and
-   moving (`setForegroundVisible` hides only InstancedMeshes carrying
-   `_isModel`/`_painted`, and GLB traffic is Groups/Meshes), three animated
-   instanced pools nested under groups kept bumping `instanceMatrix` (counts
-   93 / 432 / 30), and one Points object moved.
+   does not. The gate now asserts the census directly — per leg **meshes ===
+   ready === visible (14/14 night, 14/14 noon)**, ONE material instance with
+   the same uuid across both legs, and the sun uniform must MOVE (`uRoadNight`
+   1 → 0). The old draw arithmetic is retained as informational output only.
+   **Instrument replacement, same invariant: gate count still 33, not one
+   assertion number moved.**
+2. **The (E) block park extended to the remaining movers — and `5baeb63`'s own
+   diagnosis of WHO those movers were was partly an instrument artifact.**
+   `Object3D.traverse` does not stop at an invisible parent, and that census
+   tested `o.visible` on the object itself, so it indicted actors it had
+   merely failed to EXCLUDE: the "Jet_Cube.024 + 4 meshes" was the PLAYER'S
+   OWN already-hidden GLB (`public/models/player-jet.glb` under
+   `window.__flyPlayer`); the moving Points object was PlayerLights' nav-light
+   cloud in that same hidden group; and the "93 / 432 / 30 pools" were
+   `__flyClouds` (432) and `__flyCirrus` (30) THEMSELVES — already parked —
+   plus the traffic billboard pool. A corrected EFFECTIVE-visibility census
+   found the two real movers: the **traffic billboard pool**, which carries
+   neither `_isModel` nor `_painted` and therefore walks straight through
+   `setForegroundVisible`; and the **tracers mesh**, which rewrites its
+   position ATTRIBUTE every frame and never moves its `matrixWorld` —
+   invisible to every visibility and every matrix census, and found only with
+   an attribute-version pass. The park now covers traffic, tracers, beacons,
+   the SAT_SKYLINE mass and POI letters (the last two altitude-keyed, so the
+   climb itself churns them), saves and restores each target's own prior
+   flags, is idempotent, and is re-applied before BOTH abSolid and abGone.
+   `setForegroundVisible` is untouched.
 
-<<PENDING: verify-sat-night final result — gate tally, and per-run margins over
-N consecutive runs: (E) @2000 A/A noise, @3100 gone vs the 2.82 ceiling, and
-the road-layer census equality>>
+**Result: the final revision runs 33/33 ×2 consecutive.** (E) A/A noise 0.204 /
+0.190; A/B gone 0.360 / 0.602 against ceilings 3.00 / 3.03 — **8.3× and 5.0×
+clear of noise**, meeting the amended two-run bar. Two further greens on the
+immediately preceding revision (noise 0.096 / 0.094, gone 0.913 / 0.525) make
+**four consecutive in total**. The pre-fix control read gone **3.41 against
+noise 3.19** and FAILED, which is the margin that mattered: the same gate had
+"passed" at 2.70 vs 2.82 a session earlier on nothing but the coin.
+
+Not certified, documented inline in the harness: the (E) quiescence loop's own
+back-to-back pairs still read 0.4–8.1/255 in runs whose probe A/A came out at
+0.09–0.20. That residue is the screenshot cadence, not scene churn.
 
 ### 4.4 Re-baseline ledger
 
@@ -447,7 +530,17 @@ verify-aerial's four A/A control pairs (`r19-b-aerial-*-ctrlA/B.png` — its
 `ctrlDrift` floor is quoted inside its own gate detail, so the frames belong
 with `r19-b-aerial-01..09`) and `formation-arch4.png`, the first live
 archetype-4 formation verify-fly-formation has ever caught. `r16-satnight-*`
-was deliberately NOT refreshed mid-session.
+was deliberately NOT refreshed mid-session — it was refreshed at close, by the
+run that certified it.
+
+The close pass regenerated, from the §4.1 runs on the integrated tree:
+`r16-satnight-01..08`, `r19-b-aerial-01..09` plus the four `*-ctrlA/ctrlB`
+control pairs, `r19d-01..07`, `r19-e-01..06`, `tracer-01..04`,
+`spicy-01/02b`, `game-01..05`, `fleet-01/02/03`, and `soak-results.json`.
+**Deliberately skipped:** the plan §7 cross-agent showcase captures (the
+four-agent frame; C+D night Powell) — removed from scope by the same Fable
+trim that targeted the sweep. They remain a nice-to-have for the checkpoint
+session, not certification evidence.
 
 Per-agent evidence on the branch: `r19-a-*` (Powell typology, Columbus
 coverage, Dublin far-mass, Owens empty), `r19-b-*` (aerial off/on, near,
@@ -521,6 +614,15 @@ gone 1.15 / 3.41 / 2.70 against the 2.82 ceiling. Run 3 reached 33/33 — **on
 a 4% margin with noise == signal, i.e. it passed on the coin, not on the
 physics**, which is why §4.3's two rulings exist and why run 3 was explicitly
 not reported as green.
+
+**One caveat on that commit's own text: its residual-mover list did NOT
+survive the corrected census** (§4.3, ruling 2). `Object3D.traverse` does not
+stop at an invisible parent, so the "Jet_Cube.024", the moving Points object
+and the "93 / 432 / 30 pools" it named were the already-hidden player GLB, its
+own nav lights, and the cloud and cirrus decks the park had ALREADY caught.
+The two movers that actually mattered were the traffic billboard pool and the
+tracers mesh. Read `5baeb63` for the visibility-park mechanism, not for the
+cast list.
 
 ### 5.2 The live-crafts outage — R19 exonerated, then fixed anyway
 
@@ -625,13 +727,19 @@ images the user shares. Attribution should follow the live `x-adsb-source`.
 9. **`SAT_SHADOWS.catcher` ships built-but-off** (Fable ruling on Owens
    headroom). Opt-in is checkpoint row 5.
 10. **Live-data flakes**: edge-fx tracer-cv and fly-game hover-aim persist
-    from R16/R18, and verify-feel's streak gate joins them as a marginal
-    pixel-noise assertion (armed A/A jitter 0.554 → 1.380 on a loaded
-    machine). Same synthetic-feed prescription as #2.
-11. **verify-sat-night's `layerDraws` instrument** was unchanged since R16
+    from R16/R18 — verify-fly-game's pixel-hover leg self-WARNed not-engaged
+    again at close — and **verify-feel's streak gates join them as marginal
+    BY CONSTRUCTION**: they compare a pixel signal against a same-frame noise
+    floor that is ~90% of it. Certified numbers, green both at close and at
+    `414a392`: gate 2 A/B **1.4074** vs A/A noise **1.3028** (luma step 0.0145
+    against world drift 0.0027), gate 7 frame A/B **4.85** vs floor **4.39**.
+    **A future red there must be control-experimented before it is believed.**
+    Same synthetic-feed prescription as #2.
+11. **Sibling gates that difference live scene totals for exact equality.**
+    verify-sat-night's `layerDraws` instrument was unchanged since R16
     (`4a1fe1f`) and was structurally a coin for three rounds before anyone
-    differenced it enough times to notice. Worth a sweep for sibling gates
-    that difference live scene totals for exact equality.
+    differenced it enough times to notice. That one gate is FIXED (§4.3
+    ruling 1); what remains open is the sweep for its siblings.
 
 ## 6. User checkpoints (PENDING USER — the next live session's agenda)
 
@@ -682,57 +790,70 @@ images the user shares. Attribution should follow the live `x-adsb-source`.
    all three. It had been that way since R16. If a gate's inputs are live
    scene totals sampled seconds apart, measure the thing itself — the road
    layer's mesh census read 16 at both night and noon, every time.
-4. **An aggregator can fail INSIDE a 200. Empty-but-well-formed is not
+4. **An instrument can indict actors it merely failed to EXCLUDE.** The census
+   that named verify-sat-night's residual movers walked `Object3D.traverse`,
+   which does not stop at an invisible parent, and tested `o.visible` on each
+   object rather than its effective visibility — so it reported the player's
+   own hidden GLB, that GLB's nav lights, and the two cloud decks the park had
+   already caught. Every name on the list was wrong and the conclusion ("the
+   frame is not static") was right, which is the dangerous shape: a fix aimed
+   at that list would have parked things that were already parked and left the
+   real movers — a billboard pool that carries neither marker
+   `setForegroundVisible` looks for, and a tracers mesh that rewrites its
+   position ATTRIBUTE while never moving its `matrixWorld`, invisible to any
+   visibility or matrix sweep. Before believing a census, prove it can exclude
+   something you already know is excluded.
+5. **An aggregator can fail INSIDE a 200. Empty-but-well-formed is not
    healthy.** adsb.lol answered every geographic query with a syntactically
    perfect zero-row payload while its own non-geographic endpoints stayed up.
    Every failover predicate in the proxy — `!response.ok`, missing array —
    said "success". Treat an empty result as a candidate, not an answer, and
    never let it pin preference or poison a last-good cache.
-5. **The harness fleet's own pins can hide an entire defect class from every
+6. **The harness fleet's own pins can hide an entire defect class from every
    gate.** `_boot.js` pins toy style, baseline weather and neutral overrides,
    and the pixel probes hide live traffic — so a total live-traffic kill was
    invisible to 20+ harnesses, and the two gates that DID depend on traffic
    crashed instead of failing meaningfully. Pins buy determinism by removing
    a variable; something must still test with the variable in.
-6. **The plan's mechanism is a hypothesis; measure the trigger before you
+7. **The plan's mechanism is a hypothesis; measure the trigger before you
    build the fix.** P12 was specified as altitude drift with a vy servo as
    the remedy. Hands-off, the flight model holds 0.0 m over 31 s — the servo
    would have shipped as a no-op against a defect that reproduces perfectly.
    The real trigger was a parked mouse cursor re-arming an absolute pitch
    command (−0.471, sustained), and the fix that works is a pitch trim with a
    cancel threshold set ABOVE the measured value.
-7. **A clamp that fights a frozen gate must be reconciled by geometry, not by
+8. **A clamp that fights a frozen gate must be reconciled by geometry, not by
    picking a smaller number.** A flat 900 m cinema standoff would have put
    both aircraft outside the half-FOV at the separation verify-chase-cam's
    frozen precondition allows. Computing the framing-safe range from the LIVE
    fov/aspect made the shot tighter AND kept the gate — 1083 m vs 2765 m.
-8. **Density, not size, separates a suburb from a desert.** A height cap
+9. **Density, not size, separates a suburb from a desert.** A height cap
    stopped the far-suburb hatch inventing downtowns but not inventing three
    blocks over Owens Valley. Arming on candidate COUNT per tile did — the
    measured gap between Owens (max 1) and a real suburb (Dublin max 12) is
    wide and clean, and it makes "an empty scene stays empty" true by
    construction instead of by winning a draw-count race.
-9. **An administrative layer is not a landcover layer.** OMT `park` covers
-   29.87 km² of Mojave desert at Owens and encloses parking lots in Ohio.
-   Tinting it green is a rendering bug wearing a feature's clothes. Check
-   what a vector layer MEANS before you paint it.
-10. **When one term double-duties as brightness and as size, tuning it dims
+10. **An administrative layer is not a landcover layer.** OMT `park` covers
+    29.87 km² of Mojave desert at Owens and encloses parking lots in Ohio.
+    Tinting it green is a rendering bug wearing a feature's clothes. Check
+    what a vector layer MEANS before you paint it.
+11. **When one term double-duties as brightness and as size, tuning it dims
     twice.** The road shader's class weight is both per-pixel gain and a
     proxy for lit pixel COUNT, so a 9 m suburban street was dimmed twice for
     being narrow — which read as "the streetlights are missing". The fix
     lifts per-pixel to parity and lets width do the differentiating; the
     R16-swept intensity knob was never touched.
-11. **Two systems that haze the same pixels double-haze them.** B's in-shader
+12. **Two systems that haze the same pixels double-haze them.** B's in-shader
     content haze is correct, key-bumped and free — and REDUNDANT at the only
     tier R19 lets it run, because the depth post pass already hazes those
     fragments by the same law. Ship it off, document why, and leave the flag
     for the tier that needs it.
-12. **A library define you never set is still a contract.** `postprocessing`
+13. **A library define you never set is still a contract.** `postprocessing`
     expects `USE_REVERSED_DEPTH_BUFFER`; unset, raw depth arrives reversed at
     every effect that samples it. Detect the convention at runtime
     (`getReversed()`) rather than assuming either sign — the same class of
     defect as R18's winding sign, one layer up the stack.
-13. **Zero product re-baselines is achievable on the round that multiplies
+14. **Zero product re-baselines is achievable on the round that multiplies
     the world by ~100×** — if the caps are sized from day-1 measurement
     rather than from taste. All six of F's pre-sanctioned re-baselines went
     unconsumed.

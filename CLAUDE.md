@@ -91,11 +91,33 @@
 > W2 close — exactly the plan §5 ledger). Sanctioned assertion moves: TWO,
 > both verify-weather, both charter-caused and escalated (`LID_SAT_MAX`
 > 0.12→0.20 against a measured control; the dusk walk rebuilt as a 1..16
-> band). **POSTMORTEM (§5):** a session limit interrupted the close, leaving
+> band). **CERTIFICATION (§4, per-harness ledger at
+> `scripts/r19-close-sweep.md`): ALL GREEN, one retry all round** (sat-night
+> during iteration) — sat-night 33/33 ×2 consecutive, neon-cover 9/9, tracers
+> 6/6, fly-game/spicy PASS, feel 13/13, aerial 16/16 (**Owens 194 ≤ 261 fully
+> armed**, sat boot 7.6 s vs a 28.8 s cap, near-field Δ exactly 0.000), dusk
+> 15/15 (**cirrus exactly +1 draw, 214 vs 213**), fleet 28/28, node gates PASS;
+> everything else rests on byte identity + its cited wave green. **15-min soak
+> GREEN: worst p95 8.4 ms / p50 4.2 ms, fps floor ≈119, draws max 445 ≤ 480,
+> tris 1.931 M ≤ 2.2 M, heap 322→356 MB with no climb, ZERO pageerrors —
+> through a live-traffic peak of 1,145 aircraft (R18's soak peaked at 525;
+> the peak IS the proxy fix working).** The sweep was Fable-TRIMMED on a
+> one-file-delta premise that became THREE files during the close (two
+> `NODE_ENV`-guarded dev-only park handles in TrafficLayer/TrafficTracers) —
+> recorded in §4.1, and verify-fleet was ADDED to the run set to cover it.
+> All runs used the worktree's existing `:3019` dev server (a second `next dev`
+> would share the single `.next`; Next 16 has no `distDir` flag) — a documented
+> deviation, not a hidden one. **POSTMORTEM (§5):** a session limit interrupted the close, leaving
 > work in two worktrees — both salvaged (`dfb6443` a frozen cross-owner bundle
 > hash that went red when C legitimately added keys, rewritten as 4a SOURCE +
 > 4b RUNTIME; `5baeb63` an `o.visible=false` cloud park that CloudField's own
-> `useFrame` overwrote every frame — a no-op on precisely the actor it named).
+> `useFrame` overwrote every frame — a no-op on precisely the actor it named,
+> and its residual-mover LIST was itself an instrument artifact:
+> `Object3D.traverse` does not stop at an invisible parent, so it indicted the
+> already-hidden player GLB and the decks it had already parked, while the two
+> real movers were the traffic billboard pool and the tracers mesh — which
+> rewrites its position ATTRIBUTE every frame and never moves its
+> `matrixWorld`, invisible to any visibility or matrix census).
 > **The user-visible "live crafts missing" event was NOT R19** — the round's
 > source diff contains ZERO lines matching `/traffic/i` — it was adsb.lol's
 > geographic endpoint degrading to **200-OK-EMPTY** meeting a pre-existing
@@ -118,9 +140,10 @@
 > §7 = lessons (a frozen cross-owner hash is a coupling gate not a leak gate;
 > object visibility cannot park an actor whose owner rewrites it every frame;
 > a gate that differences four breathing scene totals for exact equality is a
-> coin; an aggregator can fail INSIDE a 200; the harness fleet's own pins can
-> hide an entire defect class from every gate; measure the trigger before you
-> build the plan's fix).
+> coin; an instrument can indict actors it merely failed to EXCLUDE; an
+> aggregator can fail INSIDE a 200; the harness fleet's own pins can hide an
+> entire defect class from every gate; measure the trigger before you build
+> the plan's fix).
 >
 > Earlier: **Round 18 "Alive & Dangerous" is BUILT
 > (2026-07-27): [FLY_ROUND18.md](FLY_ROUND18.md) is the record** (plan
