@@ -54,17 +54,35 @@ const R18_ROLL = {
   'manhattan-mid': 'a6805b95',
   'manhattan-far': '473596c0',
 };
-// Satellite bundles must be byte-identical REGARDLESS of the flag — this is the
-// proof that classifyRingsSat's satellite path never reads NEON_COVER, i.e.
-// that F cannot have disturbed A's W1 work.
-const SAT_ROLL = {
-  'sat-buildings-manhattan': 'e6b44c38',
-  'sat-buildings-powell': '8a8a67f5',
-  'sat-veg-manhattan': 'd4589b10',
-  'sat-veg-powell': '032da74e',
-  'sat-roads-powell': '0d8b4300',
-  'sat-skyline-manhattan': 'af892789',
-};
+// The satellite builders whose output must be independent of NEON_COVER.
+//
+// R19 W2 POST-MERGE CORRECTION — this gate used to compare satellite bundles
+// against hashes frozen on F's own tree. That was WRONG, and it fired a false
+// positive the moment C GROUNDTRUTH merged: C flipped SAT_GROUND_LIFE and
+// SAT_TINT to true, so buildSatVeg legitimately began emitting `out.satVegCls`
+// and `out.satTint.{pos,col,idx,cls}` — arrays that simply did not exist when
+// the baseline was captured. A hash over "every array in the bundle" therefore
+// HAD to change, and only the two sat-veg scenes drifted (satVegCls/satTint are
+// emitted nowhere else) — exactly the observed signature.
+//
+// A frozen hash cannot express "F did not affect this", because it also fails
+// whenever the bundle's rightful owner changes it. The invariant F actually
+// owns is narrower and is now tested directly:
+//   (4a) SOURCE — no satellite builder may reference NEON_COVER at all.
+//   (4b) RUNTIME — a satellite bundle is byte-identical when rebuilt, and
+//        byte-identical whether or not the SAME worker built a toy tile first.
+//        That second half is the only runtime channel through which the toy
+//        path could reach satellite output (the worker holds no module-scope
+//        mutable state but `tileTemplate`), so it is the leak test with teeth.
+const SAT_BUILDERS = ['buildSatBuildings', 'buildSatRoads', 'buildSatSkyline', 'buildSatVeg'];
+const SAT_SCENES = [
+  'sat-buildings-manhattan',
+  'sat-buildings-powell',
+  'sat-veg-manhattan',
+  'sat-veg-powell',
+  'sat-roads-powell',
+  'sat-skyline-manhattan',
+];
 
 const SCENES = [
   ['powell-full', 14, 4411, 6193, 'full'],
@@ -204,12 +222,82 @@ const TRI_MAX = 2.0e6; // 0.2 M headroom under the 2.2 M gate
     );
   }
 
-  // --- (4) satellite is untouched by the flag, either way ------------------
-  const satBad = Object.keys(SAT_ROLL).filter((n) => fp[n].roll !== SAT_ROLL[n]);
+  // --- (4a) SOURCE: no satellite builder may reference NEON_COVER ----------
+  // Slice the file into top-level function bodies and check the satellite ones.
+  const bounds = [];
+  const fnRe = /^(?:function (\w+)|const (api) = )/gm;
+  let m;
+  while ((m = fnRe.exec(workerSrc))) bounds.push({ name: m[1] || m[2], start: m.index });
+  bounds.push({ name: '<eof>', start: workerSrc.length });
+  const bodyOf = (name) => {
+    const i = bounds.findIndex((b) => b.name === name);
+    return i < 0 ? null : workerSrc.slice(bounds[i].start, bounds[i + 1].start);
+  };
+  const leaky = SAT_BUILDERS.filter((n) => {
+    const body = bodyOf(n);
+    return body === null || /NEON_COVER/.test(body);
+  });
+  // Guard against a vacuous pass: the toy path MUST reference NEON_COVER.
+  const toyRefs = (bodyOf('api') || '').match(/NEON_COVER/g)?.length ?? 0;
   gate(
-    '4 satellite bundles byte-identical across the flag',
-    satBad.length === 0,
-    satBad.length ? `drifted: ${satBad.join(', ')}` : `${Object.keys(SAT_ROLL).length} scenes`
+    '4a no satellite builder references NEON_COVER (source)',
+    leaky.length === 0 && toyRefs > 0,
+    leaky.length
+      ? `leaked into: ${leaky.join(', ')}`
+      : `${SAT_BUILDERS.length} builders clean · toy path refs ${toyRefs}`
+  );
+
+  // --- (4b) RUNTIME: satellite output cannot depend on a prior toy build ---
+  const leak = await page.evaluate(async (scenes) => {
+    const fnv = (bytes) => {
+      let h = 0x811c9dc5;
+      for (let i = 0; i < bytes.length; i++) {
+        h ^= bytes[i];
+        h = Math.imul(h, 0x01000193) >>> 0;
+      }
+      return h.toString(16).padStart(8, '0');
+    };
+    const roll = async (z, x, y, detail) => {
+      const b = await window.__toyWorld.worker.buildTile(z, x, y, detail);
+      const parts = {};
+      const walk = (obj, pre) => {
+        for (const k of Object.keys(obj).sort()) {
+          if (k === 'tessMs' || k === 'v') continue;
+          const val = obj[k];
+          if (val == null) continue;
+          if (ArrayBuffer.isView(val))
+            parts[pre + k] = `${val.length}:${fnv(
+              new Uint8Array(val.buffer, val.byteOffset, val.byteLength)
+            )}`;
+          else if (typeof val === 'object') walk(val, pre + k + '.');
+          else parts[pre + k] = String(val);
+        }
+      };
+      walk(b, '');
+      return fnv(
+        new TextEncoder().encode(
+          Object.keys(parts)
+            .sort()
+            .map((k) => `${k}=${parts[k]}`)
+            .join('|')
+        )
+      );
+    };
+    const bad = [];
+    for (const [name, z, x, y, detail] of scenes) {
+      const before = await roll(z, x, y, detail);
+      // Drive the FLAGGED toy path hard on the same worker, same tile coords.
+      await roll(z, x, y, 'full');
+      await roll(z, x, y, 'mid');
+      const after = await roll(z, x, y, detail);
+      if (before !== after) bad.push(`${name} ${before}→${after}`);
+    }
+    return bad;
+  }, SCENES.filter((s) => SAT_SCENES.includes(s[0])));
+  gate(
+    '4b satellite bundles unaffected by toy builds on the same worker',
+    leak.length === 0,
+    leak.length ? leak.join(' | ') : `${SAT_SCENES.length} scenes rebuilt identically`
   );
 
   // --- (5) Powell is no longer a void --------------------------------------
