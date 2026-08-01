@@ -17,6 +17,34 @@
  *     ground) — mirrors verify-monuments-sat's raw-DEM discriminator.
  * (E) zero page/console errors. Screenshots: Manhattan 2.6k ft + Tokyo warp.
  * Run against the dev server on :3000 (dev-only globals).
+ *
+ * ---------------------------------------------------------------------------
+ * ROUND 20 (A "SPRAWL") — APPENDED GATE (F): THE PER-POLYGON BUNDLE CONTRACT
+ * ---------------------------------------------------------------------------
+ * SAT_POLY_COVER explodes a multipolygon `building` feature into one item per
+ * polygon. Two things downstream depend on that being TRUE and not merely
+ * intended, and neither had a gate:
+ *
+ *  (F1) THE CAP IS A POLYGON CAP. Before the flag a kept ITEM emitted every
+ *       polygon of its feature, so SAT_BUILDINGS.maxPerChunk (500) bounded
+ *       FEATURES and the geometry was unbounded — Manhattan's 9-tile block
+ *       measured 510,984 worker triangles against 400,551 after. The gate:
+ *       no chunk's meta.kept may exceed the cap, and the ring total must be
+ *       large enough that the cap is actually binding somewhere.
+ *
+ *  (F2) ONE DRAPE ANCHOR PER BUILDING — the half of the defect with no visible
+ *       symptom until you look for it. sat-building-engine samples the DEM
+ *       once per ANCHOR RUN and derives the R18 collision cylinder from the
+ *       same run, so a feature carrying a subdivision produced ONE cylinder
+ *       whose radius spanned the whole subdivision (hundreds of metres) and
+ *       one ground height for every house in it. Per polygon, the cylinder is
+ *       a building again. The gate reads the widest collision radius the ring
+ *       holds. MEASURED on the Manhattan pose, same 16 chunks: flag ON 306
+ *       world units, flag OFF 3391 — the control's widest "building" cylinder
+ *       is wider than a city block, which is the latent R18 collision defect
+ *       this fix retires as a side effect.
+ *
+ *  (F3) COVERAGE — the ring's total kept footprints at Manhattan: 3483 -> 6990.
  */
 const { chromium } = require('playwright');
 const path = require('path');
@@ -26,6 +54,21 @@ const { bootFly } = require('./_boot');
 // slope/hill gaps hide). Hardcoded because fly-constants.js is ESM (the harness
 // is CommonJS) — keep in sync if the constant moves.
 const BASE_SINK_M = 6;
+// Round 20 (A). = SAT_POLY_COVER.maxPerChunk — the POLYGON cap that replaces
+// SAT_BUILDINGS.maxPerChunk's feature cap under the flag.
+const POLY_CAP = 500;
+// Widest collision cylinder the ring may hold (gate F2), in WORLD (mercator)
+// units — the frame the engine stores columns in. A single long building can
+// legitimately reach a few hundred (a 600x100 plate at the 60,000 m² footprint
+// ceiling has a 304 half-diagonal), so this is not an analytic bound; it is a
+// MEASURED gap. On the Manhattan pose below: flag ON 306, flag OFF 3391 — an
+// 11x separation, because a feature-wide cylinder spans a whole city block.
+// 800 sits 2.6x above the armed reading and 4.2x under the control.
+const COLUMN_R_MAX_M = 800;
+// Ring-total footprints at Manhattan (gate F3). Measured: flag ON 6990, flag
+// OFF 3483 — the same 16 chunks, twice the buildings, because a kept item is
+// now a building instead of a whole merged feature.
+const MANHATTAN_KEPT_MIN = 5000;
 
 // Warp + pin a fixed pose, then dwell for the imagery/DEM/OFM stream-in.
 // (single array arg — page.evaluate passes exactly one argument)
@@ -119,20 +162,79 @@ const groundProbe = () => {
   await page.evaluate(pinScene, [40.7075, -74.0113, 792, 2.6, -0.12]);
   await page.waitForTimeout(22000);
   await page.mouse.move(800, 450);
-  const man = await page.evaluate(() => ({
-    sb: window.__flyStats?.satBuildings ?? null,
-    engReady: window.__satBuildings ? window.__satBuildings.stats.ready : -1,
-    draws: window.__flyStats?.drawCalls,
-    toyBuilt: typeof window.__toyWorld !== 'undefined',
-    heapMB: Math.round(performance.memory.usedJSHeapSize / 1048576),
-    eyeAgl: Math.round(window.__fly.flight.pos.y - window.__fly.flight.groundElev),
-  }));
+  const man = await page.evaluate(() => {
+    // Round 20 (A): per-chunk kept + the widest collision cylinder. Both come
+    // off the ENGINE's own records (chunk.meta is the worker's per-tile
+    // telemetry; chunk.columns.data is [x, z, topY, r] per anchor run), so
+    // this measures what actually shipped, not what the worker intended.
+    let maxKept = 0;
+    let totKept = 0;
+    let metaChunks = 0;
+    let maxR = 0;
+    let nCol = 0;
+    const eng = window.__satBuildings;
+    if (eng) {
+      for (const c of eng.chunks.values()) {
+        if (c.meta) {
+          metaChunks += 1;
+          totKept += c.meta.kept ?? 0;
+          if ((c.meta.kept ?? 0) > maxKept) maxKept = c.meta.kept;
+        }
+        const col = c.columns;
+        if (col) {
+          nCol += col.count;
+          for (let i = 0; i < col.count; i++) {
+            const r = col.data[i * 4 + 3];
+            if (r > maxR) maxR = r;
+          }
+        }
+      }
+    }
+    return {
+      sb: window.__flyStats?.satBuildings ?? null,
+      engReady: window.__satBuildings ? window.__satBuildings.stats.ready : -1,
+      draws: window.__flyStats?.drawCalls,
+      toyBuilt: typeof window.__toyWorld !== 'undefined',
+      heapMB: Math.round(performance.memory.usedJSHeapSize / 1048576),
+      eyeAgl: Math.round(window.__fly.flight.pos.y - window.__fly.flight.groundElev),
+      maxKept,
+      totKept,
+      metaChunks,
+      maxR,
+      nCol,
+    };
+  });
   await glShot('r13-bldg-manhattan.png');
   console.log('MANHATTAN:', JSON.stringify(man));
   gate('buildings stream in satellite (ready ≥ 3)', (man.sb?.ready ?? 0) >= 3, `ready=${man.sb?.ready}`);
   gate('stats reported (__flyStats.satBuildings)', man.sb !== null && typeof man.sb.chunks === 'number');
   gate('toy pipeline NEVER built in satellite (gate A)', man.toyBuilt === false);
   gate('eye AGL is the low-AGL worst case (~2.6k ft)', man.eyeAgl > 600 && man.eyeAgl < 1000, `agl=${man.eyeAgl}`);
+  // --- Round 20 (A SPRAWL): the per-polygon bundle contract ----------------
+  console.log(
+    `PER-POLY: chunks=${man.metaChunks} keptTotal=${man.totKept} keptMax/chunk=${man.maxKept} ` +
+      `columns=${man.nCol} maxColumnR=${man.maxR.toFixed(1)} m`
+  );
+  gate(
+    `(F1) per-chunk kept never exceeds the POLYGON cap (${POLY_CAP})`,
+    man.metaChunks > 0 && man.maxKept > 0 && man.maxKept <= POLY_CAP,
+    `max kept/chunk=${man.maxKept} over ${man.metaChunks} chunks (total ${man.totKept})`
+  );
+  gate(
+    '(F1) the cap is actually binding over Manhattan (precondition)',
+    man.maxKept === POLY_CAP,
+    `max kept/chunk=${man.maxKept}`
+  );
+  gate(
+    `(F2) one collision cylinder per BUILDING — widest radius <= ${COLUMN_R_MAX_M} (control: 3391)`,
+    man.nCol > 0 && man.maxR > 0 && man.maxR <= COLUMN_R_MAX_M,
+    `maxR=${man.maxR.toFixed(1)} across ${man.nCol} columns`
+  );
+  gate(
+    `(F3) per-polygon coverage over Manhattan (kept >= ${MANHATTAN_KEPT_MIN}; control 3483)`,
+    man.totKept >= MANHATTAN_KEPT_MIN,
+    `kept=${man.totKept} across ${man.metaChunks} chunks`
+  );
 
   // Building draw cost via the visibility toggle (verify-monuments-sat recipe)
   const before = man.draws;

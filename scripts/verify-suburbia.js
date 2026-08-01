@@ -79,6 +79,39 @@
  *     round moved.
  * (I) zero page/console errors.
  *
+ * ---------------------------------------------------------------------------
+ * ROUND 20 (A "SPRAWL") — APPENDED GATES (J)-(L)
+ * ---------------------------------------------------------------------------
+ * R19's finding 2 above ("American suburbs are empty in the `building` layer")
+ * was HALF TRUE, and this round found the other half. The satellite path still
+ * tested `maxFootprintM2` against the SUM of a feature's polygons and gave
+ * every polygon of a feature ONE drape anchor — the defect R19 (F) fixed for
+ * toy only. OpenFreeMap does not generalise the houses away; it MERGES them:
+ * Powell's centre tile ships one feature carrying 171 house polygons whose
+ * areas sum past 60 000 m², so the whole subdivision was discarded as a
+ * "district". Measured on the live tileset over this harness' own poses:
+ *
+ *     scene        streamed footprints      small-band houses
+ *     Powell OH      15  ->  1863                0  ->  1233
+ *     Columbus OH   ~250 ->  7971               17  ->  4558
+ *     Owens Valley   ~10 ->   769 columns         (desert town: Lone Pine)
+ *
+ * (J) POWELL IS A TOWN — >= 400 footprints extruded across the ring and >= 200
+ *     of them in the small (house) band. Pre-R20 this scene measured 15 and 0,
+ *     so both are real guards; the (B) ceiling above still holds over the
+ *     100x larger population, which is the point.
+ * (K) THE KEPT POPULATION IS MOSTLY HOUSES — small-band share of kept >= 0.4
+ *     over Powell. A suburb whose kept set is dominated by big footprints is
+ *     the R18 selection bug wearing new coverage.
+ * (L) (E) IS NOT A VACUOUS PASS — Owens' DETAIL ring must ITSELF have gained
+ *     per-polygon coverage (>= 200 collision columns; pre-R20 ~10). Owens is
+ *     not an empty desert in the building layer — Lone Pine is a real town,
+ *     and once winding-correct per-polygon reading lands, its ranch and
+ *     industrial footprints clear R19's per-FEATURE hatch threshold of 5. The
+ *     lock therefore reads SAT_POLY_COVER.skyline.minCountPerTile (40,
+ *     measured: Owens' busiest tile 15, Powell's 113) under the flag. Without
+ *     (L), (E) could pass simply because nothing reached Owens at all.
+ *
  * Screenshots: r19-a-*.png. Run against a dev server (dev-only globals):
  *   FLY_URL=http://localhost:3021 node scripts/verify-suburbia.js
  */
@@ -97,6 +130,14 @@ const R18_MAX_CHUNKS = 12; // = SAT_BUILDINGS.maxChunks (the pre-widen cap)
 const OWENS_DRAW_MAX = 261; // = verify-sat-depth's frozen Owens bound
 const SAT_DRAW_MAX = 375; // = the satellite ceiling
 const FAR_MASS_MIN = 10; // gate (F)
+// Round 20 (A). Measured on this harness' own Powell pose with the flag armed:
+// kept 1863 / houses 1233 / small share 0.66. The gates sit well under those
+// so a tileset revision cannot flip them, and well over the pre-R20 readings
+// (15 / 0 / 0.00) so they cannot pass on the old pipeline.
+const POWELL_KEPT_MIN = 400; // gate (J)
+const POWELL_HOUSE_MIN = 200; // gate (J)
+const POWELL_SMALL_SHARE_MIN = 0.4; // gate (K)
+const OWENS_COLUMN_MIN = 200; // gate (L) precondition — measured 769
 // Slack on the geometry-derived block height: the drape adds one ground value
 // per anchor run, so the span is exact to float precision — 1 m absorbs that
 // and any future sub-metre parapet without loosening the (25,35) gap.
@@ -252,6 +293,25 @@ const pinScene = ([lat, lon, altM, heading, pitch]) => {
     `suburbanInferMaxH=${(powell.meta?.suburbanInferMaxH ?? -1).toFixed(1)} m`
   );
   gate('Powell draws <= 375', powell.draws > 0 && powell.draws <= SAT_DRAW_MAX, `draws=${powell.draws}`);
+  // --- Round 20 (A SPRAWL): per-polygon coverage, on the same read ---------
+  const pKept = powell.meta?.kept ?? 0;
+  const pHouses = powell.meta?.houses ?? 0;
+  const pSmall = powell.meta?.smallKept ?? 0;
+  gate(
+    `(J) Powell extrudes >= ${POWELL_KEPT_MIN} footprints (pre-R20: 15)`,
+    pKept >= POWELL_KEPT_MIN,
+    `kept=${pKept} of ${powell.meta?.total} parsed across ${powell.meta?.chunks} chunks`
+  );
+  gate(
+    `(J) Powell finds >= ${POWELL_HOUSE_MIN} small-band houses (pre-R20: 0)`,
+    pHouses >= POWELL_HOUSE_MIN,
+    `houses=${pHouses} smallKept=${pSmall}`
+  );
+  gate(
+    `(K) Powell's kept set is mostly houses (small share >= ${POWELL_SMALL_SHARE_MIN})`,
+    pKept > 0 && pSmall / pKept >= POWELL_SMALL_SHARE_MIN,
+    `${((pSmall / Math.max(1, pKept)) * 100).toFixed(1)}% (${pSmall}/${pKept})`
+  );
 
   // === (C) + (D) + (H) COLUMBUS OH ==========================================
   // Straight down at 600 m — the plan's residential-coverage pose.
@@ -336,6 +396,14 @@ const pinScene = ([lat, lon, altM, heading, pitch]) => {
     `(E) Owens total draws <= ${OWENS_DRAW_MAX} with typology + far-mass + widen armed`,
     owens.draws >= 0 && owens.draws <= OWENS_DRAW_MAX,
     `draws=${owens.draws}`
+  );
+  // Round 20 (A): (E)'s precondition. Collision columns are built one per
+  // ANCHOR RUN, i.e. one per extruded building, so this counts the detail
+  // ring's real population without another probe.
+  gate(
+    `(L) (E) is not vacuous — Owens' detail ring gained coverage (>= ${OWENS_COLUMN_MIN} columns; pre-R20 ~10)`,
+    (owens.sb?.columns ?? 0) >= OWENS_COLUMN_MIN,
+    `columns=${owens.sb?.columns} across ready=${owens.sb?.ready} chunks`
   );
 
   gate('(I) zero page/console errors', errs.length === 0, errs.slice(0, 3).join(' | '));
