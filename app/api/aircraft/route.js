@@ -143,6 +143,11 @@ export async function GET(request) {
   const now = Date.now();
   let lastStatus = 0;
   let attempted = 0;
+  // First source that answered 200 with a valid but EMPTY aircraft list. Held
+  // rather than returned so the rest of the rotation gets a chance to disagree
+  // — see the ac.length === 0 branch below.
+  /** @type {{ payload: object, source: string } | null} */
+  let emptyCandidate = null;
 
   for (const source of orderedSources()) {
     if ((cooldownUntil.get(source.name) ?? 0) > now) continue;
@@ -178,7 +183,38 @@ export async function GET(request) {
       }
 
       const payload = { ...data, ac, aircraft: undefined };
+
+      // A WELL-FORMED EMPTY ANSWER IS NOT A HEALTHY ANSWER. A degraded
+      // aggregator whose spatial index has fallen over still answers 200 with
+      // `{"ac":[],"msg":"No error","total":0}` — syntactically perfect, and
+      // indistinguishable from real airspace by every check above. Observed
+      // live: adsb.lol served 0 rows for Manhattan/LAX/Tokyo/Sydney at dist
+      // 250 while adsb.fi and airplanes.live served ~1050 for the same point
+      // (its non-geographic /v2/mil was still fine — the index, not the host).
+      //
+      // Accepting that as success is a TOTAL live-traffic kill, not a
+      // degradation: the client engine's stale ladder only ever ages tracks
+      // out, so a run of empty batches deletes every aircraft in the sky
+      // (measured 281 -> 253 -> 0). And because `preferredSource` is sticky,
+      // one empty answer pinned the broken source to the FRONT of the
+      // rotation, so the two healthy aggregators were never even asked.
+      //
+      // So an empty result is held as a CANDIDATE and the rotation continues.
+      // Only if every source agrees the cell is empty do we return it — over
+      // genuinely quiet airspace (mid-ocean, small hours) that is the honest
+      // answer, and it costs one extra upstream call per poll cell there.
+      // Deliberately NOT a cooldown: an empty cell is not misbehaviour, and
+      // cooling every source over quiet airspace would strand the rotation.
+      if (ac.length === 0) {
+        if (!emptyCandidate) emptyCandidate = { payload, source: source.name };
+        console.warn(`ADS-B source ${source.name} returned 0 aircraft — trying next source`);
+        continue;
+      }
+
       preferredSource = source.name;
+      // Only NON-EMPTY payloads become last-good. Caching an empty one would
+      // poison the stale path, which exists to hold the last real frame
+      // through an outage.
       lastGood.set(key, { payload, ts: Date.now(), source: source.name });
 
       // Bound the stale map (fly crosses many cells).
@@ -198,6 +234,22 @@ export async function GET(request) {
       cooldownUntil.set(source.name, Date.now() + COOLDOWN_FAIL_MS);
       console.warn(`ADS-B source ${source.name} ${error.name ?? 'error'} — failing over`);
     }
+  }
+
+  // Every reachable source agreed the cell is empty. That is a real answer —
+  // return it, but do NOT pin `preferredSource` to whoever said it first: if
+  // one aggregator is empty because it is broken rather than because the sky
+  // is, pinning it would put it back at the head of the rotation and make the
+  // outage self-sustaining. Leaving the preference alone lets the last
+  // genuinely healthy source keep the lead.
+  if (emptyCandidate) {
+    return NextResponse.json(emptyCandidate.payload, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=3, stale-while-revalidate=10',
+        'x-adsb-source': emptyCandidate.source,
+        'x-adsb-empty': 'all-sources',
+      },
+    });
   }
 
   // Nothing attempted ⇒ every source still cooling. Prefer stale over 503.
