@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFrame } from '@react-three/fiber';
 import {
   EffectComposer,
   Bloom,
@@ -13,10 +14,18 @@ import {
   SMAA,
 } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
-import { AERIAL_PERSPECTIVE, SKY, SKY_LIVE, TOY } from '@/lib/fly/fly-constants';
+import {
+  AERIAL_PERSPECTIVE,
+  FLIGHT,
+  SKY,
+  SKY_LIVE,
+  SPEED_FEEL,
+  TOY,
+} from '@/lib/fly/fly-constants';
 import { useFlyStore } from '@/stores/fly-store';
 import { WhiteBalanceEffect } from './WhiteBalance';
 import { AerialPerspectiveEffect } from './AerialPerspective';
+import { SpeedLinesEffect, speedFeelStrength } from './SpeedLines';
 
 // Bloom buffer scale per quality tier; at 'low' bloom is dropped entirely
 // (the composer stays for SMAA — cheaper than MSAA on integrated GPUs).
@@ -132,6 +141,70 @@ export function Effects({ runtime }) {
   // the instance itself is constructed once and never reconfigured.
   const aerialOn = sat && AERIAL_PERSPECTIVE.enabled && qualityTier === 'high';
   const aerial = useMemo(() => new AerialPerspectiveEffect(), []);
+
+  // ---- Round 19 (E SLIPSTREAM): speed lines -----------------------------
+  // HIGH TIER ONLY, and that is a §1 decision-2 constraint rather than taste:
+  // every R19 visual spend is high-tier-gated and medium/low must stay
+  // byte-identical to R18 (phones are capped at medium). Style-agnostic —
+  // Neon flies at the same 750 m/s and needs the same cue — because the effect
+  // adds no draw either way. `__flySpeedLines.setMount(false)` is verify-feel's
+  // A/B leg: it UNMOUNTS the primitive, so the composer rebuilds the merged
+  // program without it and the cruise comparison is against a genuinely
+  // absent effect, not merely a zeroed one.
+  const [speedMountPin, setSpeedMountPin] = useState(true);
+  const speedLines = useMemo(() => new SpeedLinesEffect(), []);
+  const speedOn = SPEED_FEEL.enabled && qualityTier === 'high' && speedMountPin;
+  const speedTimeRef = useRef(0);
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development' || typeof window === 'undefined') return;
+    window.__flySpeedLines = {
+      setMount: (v) => setSpeedMountPin(!!v),
+      get: () => speedLines.getFeel(),
+    };
+    return () => {
+      if (window.__flySpeedLines) delete window.__flySpeedLines;
+    };
+  }, [speedLines]);
+  // The feed. Priority 0: after FlyScene's -50 publish (so flight state is
+  // this frame's), before the composer's priority-1 render. Pure arithmetic +
+  // uniform writes — nothing here reaches React or the store.
+  useFrame((_, delta) => {
+    if (!speedOn) return;
+    const flight = runtime?.flight;
+    if (!flight) return;
+    const dt = Math.min(delta, 0.05);
+    speedTimeRef.current += dt;
+    const F = flight.cfg ?? FLIGHT;
+    const speedFrac = Math.min(1, flight.speed / F.speeds.boost);
+    // EXACTLY 0 at and below onFrac — cruise is 0.24 against a 0.55 gate, so
+    // this is a literal zero and the shader's early-out fires.
+    const strength = speedFeelStrength(speedFrac, SPEED_FEEL);
+    const agl = Number.isFinite(flight.agl) ? Math.max(0, flight.agl) : Infinity;
+    const band = SPEED_FEEL.groundRush.aglBandM;
+    // Ground rush: the low band multiplies the smear, because near the deck the
+    // same airspeed sweeps far more angular content past the eye.
+    const rush =
+      agl < band ? SPEED_FEEL.groundRush.boost * (1 - agl / band) * (strength > 0 ? 1 : 0) : 0;
+    speedLines.setFeel({
+      strength,
+      time: speedTimeRef.current,
+      rush,
+      haze: strength > 0 && flight.boosting ? SPEED_FEEL.heatHaze.strength : 0,
+      smearUv: SPEED_FEEL.smear.maxUv,
+      lines: SPEED_FEEL.streaks.lines,
+      streakGain: SPEED_FEEL.streaks.gain,
+      scroll: SPEED_FEEL.streaks.scrollHz,
+      r0: SPEED_FEEL.radius.r0,
+      r1: SPEED_FEEL.radius.r1,
+      speedFrac,
+      aglM: agl,
+    });
+  });
+  // A tier drop or a flag flip must not leave the last armed frame's strength
+  // sitting in the uniform.
+  useEffect(() => {
+    if (!speedOn) speedLines.clearFeel();
+  }, [speedOn, speedLines]);
   // Drive the balance from runtime.sun.frac on a discrete cadence (never per
   // frame; runtime.sun is only published in satellite by FlyScene's day cycle).
   useEffect(() => {
@@ -182,6 +255,13 @@ export function Effects({ runtime }) {
           resolutionScale={bloomScale}
         />
       )}
+      {/* Round 19 (E): speed lines lead the chain. The smear SAMPLES
+          inputBuffer, which in a merged pass is the scene buffer — the same
+          texels `inputColor` was read from only while nothing upstream has
+          modified the colour yet. First position is therefore what keeps the
+          smeared taps and the pixel they land on in the same grade. (At cruise
+          the whole thing early-outs, so ordering is a boost-only concern.) */}
+      {speedOn && <primitive object={speedLines} dispose={null} />}
       {/* Round 19 (B): aerial perspective goes FIRST, ahead of the grade. The
           tile haze band and the SkyDome rim are baked in the SCENE render and
           therefore pass through the whole grade; a post haze applied AFTER the

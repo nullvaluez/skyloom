@@ -55,7 +55,7 @@ import { FlightModel } from '@/lib/fly/flight-model';
 import { resolveAircraft } from '@/lib/fly/player-aircraft';
 import { InputController } from '@/lib/fly/input-controller';
 import { ChaseCamera } from '@/lib/fly/chase-camera';
-import { CinemaCamera } from '@/lib/fly/cinema-camera';
+import { CinemaCamera, canEngageCinema } from '@/lib/fly/cinema-camera';
 import { PhotoCamera } from '@/lib/fly/photo-camera';
 import { TrafficEngine, mercatorWorldXZ } from '@/lib/fly/traffic-engine';
 import { registerRuntimeActions, clearRuntimeActions } from '@/lib/fly/runtime-bus';
@@ -603,6 +603,12 @@ export function FlyScene({ runtime }) {
       flight.turnRate = 0;
       flight.pitchRate = 0;
       flight.speed = flight.cfg.speeds.cruise; // round 17: per-aircraft envelope
+      // Round 19 (E SLIPSTREAM, P12): arm the arrival trim on the altitude the
+      // warp just placed us at. `flight.pos.y` (not the `altM` argument) is
+      // deliberately the target: it is the same number in MSL and it is what
+      // geoToWorld actually produced, so the servo can never disagree with the
+      // placement by a rounding step. WARP_TRIM.enabled false ⇒ no-op.
+      flight.armWarpTrim(flight.pos.y);
       const geo = engine.worldToGeo(flight.pos);
       flight.latDeg = geo.y;
       runtime.geo = geo; // the 1Hz poll key picks the new area up next tick
@@ -1106,8 +1112,23 @@ export function FlyScene({ runtime }) {
     // intercept/formation — the visible payoff of a CHASE order.
     if (!paused && input.consumePress('c') && autopilot.mode !== 'off') {
       const mode = store.cameraMode === 'cinema' ? 'chase' : 'cinema';
-      store.setCameraMode(mode);
-      (mode === 'cinema' ? cinema : chase).snap();
+      // Round 19 (E SLIPSTREAM, P11): refuse the engage on an absurd pair. A
+      // 21 nm intercept target framed empty sky — the rig stood 62 km off a
+      // midpoint the player was not even near — and C read as broken. The
+      // decision is the camera module's (canEngageCinema, CINEMA_FIX); this is
+      // the only seam in the app where "engage" happens, so the guard has to
+      // sit here. It says so out loud through the EXISTING arrival banner
+      // rather than inventing a channel: no new component, no new testid.
+      // CINEMA_FIX.enabled false ⇒ canEngageCinema is always true = pre-R19.
+      const farPair =
+        mode === 'cinema' &&
+        !canEngageCinema(flight, targeting.target, mercatorScale(flight.latDeg));
+      if (farPair) {
+        store.setArrival({ name: 'Target too far for cinema', kind: null, at: Date.now() });
+      } else {
+        store.setCameraMode(mode);
+        (mode === 'cinema' ? cinema : chase).snap();
+      }
     }
     // P toggles PHOTO mode (round 17). No `!paused` guard is needed — while
     // paused, neutralize() above has already eaten the press (exactly like

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import { buildPoiList } from '@/lib/fly/poi-data';
-import { LETTERS, SKY, TOY_WORLD } from '@/lib/fly/fly-constants';
+import { LABEL_DECLUTTER, LETTERS, SKY, TOY_WORLD } from '@/lib/fly/fly-constants';
 import { letterLiftM } from '@/lib/fly/landmarks-3d';
 import { bendDrop, getBend } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
@@ -166,6 +166,58 @@ export function PoiLetters({ runtime, flight, origin }) {
           taken += 1;
         }
       }
+      // --- Round 19 (E SLIPSTREAM, P11): altitude-keyed label budget --------
+      // The quotas (city 6 / airport 4 / military 3 / landmark 2 / hotspot 2 =
+      // 17) were tuned for a low pass over a metro, where the horizon cull and
+      // the separation radii thin them out for free. At altitude neither does:
+      // GLOBE.altFlatten widens the visible rim faster than the separation
+      // radii grow on screen, so the whole 17 land at once and cruise reads as
+      // a wall of names. Above aglOnM the field is trimmed to topN.
+      //
+      // Trimmed AFTER selection, deliberately: the per-kind quota, the
+      // separation declutter, the sticky sort and the 20 s minimum hold all
+      // still run exactly as before and pick the same `ideal` list — this only
+      // takes its head. So a kept letter is a letter that was already stable,
+      // and the ORDER is the existing KIND_ORDER precedence (cities first,
+      // hotspots last) with distance breaking ties inside a kind, which is the
+      // same priority the quotas encode. Below aglOnM the branch never runs
+      // and behaviour is byte-identical (verify-poi's continuity contract).
+      let selected = ideal;
+      if (LABEL_DECLUTTER.enabled && ideal.length > LABEL_DECLUTTER.topN) {
+        const eyeAgl = Math.max(0, flight.pos.y - (flight.groundElev ?? 0));
+        if (eyeAgl >= LABEL_DECLUTTER.aglOnM) {
+          // ROUND-ROBIN across kinds, not a straight rank sort: cities alone
+          // can fill the whole budget (quota 6 = topN 6), and an altitude pass
+          // that shows six town names and no JFK, no Statue of Liberty, is a
+          // worse map than the clutter it replaced. One of each kind first, in
+          // KIND_ORDER precedence, then seconds.
+          // Inside a kind, letters the render loop can actually DRAW sort
+          // first — `cullD` is that loop's own horizon rim, and spending a
+          // scarce slot on a name that is about to be hidden past it is how a
+          // budget turns into blank sky.
+          const bySel = KIND_ORDER.map((kind) =>
+            ideal
+              .filter((p) => p.kind === kind)
+              .sort(
+                (a, b) =>
+                  (a._dist <= cullD ? 0 : 1) - (b._dist <= cullD ? 0 : 1) ||
+                  a._dist - b._dist
+              )
+          );
+          const out = [];
+          for (let pass = 0; out.length < LABEL_DECLUTTER.topN; pass++) {
+            let added = 0;
+            for (const bucket of bySel) {
+              if (bucket.length <= pass) continue;
+              out.push(bucket[pass]);
+              added += 1;
+              if (out.length >= LABEL_DECLUTTER.topN) break;
+            }
+            if (added === 0) break;
+          }
+          selected = out;
+        }
+      }
       if (nearest) {
         const brg = Math.atan2(nearest.wx - px, -(nearest.wz - pz));
         const dir = COMPASS[Math.round((((brg * 180) / Math.PI + 360) % 360) / 45) % 8];
@@ -177,7 +229,7 @@ export function PoiLetters({ runtime, flight, origin }) {
       // Reconcile into stable slots: keep survivors where they are, then
       // fill empty slots with the newcomers in selection order.
       const nextSlots = new Array(SLOTS).fill(null);
-      const pending = [...ideal];
+      const pending = [...selected];
       for (let i = 0; i < SLOTS; i++) {
         const p = current[i];
         if (!p) continue;
