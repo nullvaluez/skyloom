@@ -12,7 +12,140 @@
 > describes deleted code (markers, panels, Leaflet-era plans); do not act
 > on it.
 
-> **⚠️ NEWEST — READ FIRST:** **Round 18 "Alive & Dangerous" is BUILT
+> **⚠️ NEWEST — READ FIRST:** **Round 19 "Honest World" is BUILT
+> (2026-08-01): [FLY_ROUND19.md](FLY_ROUND19.md) is the record** (plan
+> [FLY_ROUND19_PLAN.md](FLY_ROUND19_PLAN.md); SIX Opus 5 agents in two waves
+> of three under Fable orchestration; scaffolding commit `faf5e28` pre-seeded
+> all 17 R19 constants blocks `enabled:false`, moved WORKER_PROTOCOL 14→15 at
+> all six pin sites lockstep, and landed the `_boot.js` fleet pins
+> `__flyAerialOverride`/`__flySatShadowOverride` = 0 — zero constants
+> conflicts across six agents, the R18 idiom holding a second round). Planned
+> off a 15-minute live GPU field study (28 screenshots, both styles, Powell OH
+> / rural Union County / Columbus OH, 150 m–FL280, noon/dusk/night) that named
+> twelve pains P1–P12; every one has a merge commit against it.
+> **THE headline: the toy/Neon winding fix landed** — `classifyToy` dispatch
+> behind `NEON_COVER` at the three frozen call sites (`polygonPass`
+> land/water, toy buildings, toy scatter), and **Powell OH went from EVERY
+> polygon layer classifying to zero to a real town**. Two latent defects fell
+> out behind it: `maxFootprintM2` tested the SUM of a feature's polygons (one
+> OpenFreeMap feature carries a whole 171-house subdivision — multipolygons
+> now explode per-polygon behind the flag), and the scatter was
+> winding-starved too (restored stands with `frustumCulled=false` needed the
+> one charter-permitted engine-side distance gate; **NYC low 577→408 draws**).
+> **ZERO re-baselines: all six pre-sanctioned re-cert gates passed their
+> UNCHANGED assertions** (neon-city 379, neon-alt 325/void 0.19%, roofs
+> 394/2985 bldgs, window-grids 403, edge-fx 400/372/322, poi no shift;
+> ceilings 480 untouched). What else shipped: **(1) HONEST SUBURBIA** —
+> `ROOF_TYPOLOGY` bands untagged footprints by area+aspect inside a
+> suburban-context guard (**Powell invented heights 42.0→12.0 m**, walls emit
+> NEUTRAL_UV so a school goes dark instead of blazing with the office atlas;
+> downtown chunks keep the legacy curve VERBATIM), high-tier coverage widen
+> 3600→4400 m / 12→16 chunks, and a hard-capped far-suburb hatch where
+> **nothing can land in the (25, 35) m band by construction** — armed on
+> DENSITY (`minCountPerTile 5`; measured z14 candidates Owens max 1 / Powell 2
+> / Dublin 12 / Chicago 46 = THE OWENS LOCK). **(2) DEPTH + ATMOSPHERE** —
+> `postprocessing`'s `USE_REVERSED_DEPTH_BUFFER` define is never set so raw
+> depth arrives REVERSED (detected via `getReversed()`); AerialPerspective
+> merges into the existing EffectPass = **0 extra draws**; SAT_QUILT cruise
+> grade; satellite shadow rig (ground-catcher disc built-but-OFF); **z17 +
+> aniso 8 high tier with style-gated `LODThreshold 0.86` — naive z16 measured
+> 270 which BREAKS 261; shipped 209 and sharper than R18**. Exactly the FOUR
+> budgeted key moves: `fade-hill-r19`, `anchor-satbldg-r19`,
+> `anchor-satskyline-r19` (B) + `road-satnight-r19` (C). Content haze
+> built-but-off — redundant with the depth pass at high tier, and it is the
+> RIGHT fix for medium/low which decision 2 freezes. **(3) DUSK EXISTS** —
+> `runtime.sun.el` is CLAMPED [8.6°, 51.6°] so everything keys off
+> `trueElevationDeg(sinEl)`; buckets re-keyed on ELEVATION (night below −8°)
+> so **el +2 = dusk with ZERO stars** (was night + starfield: `nightFrac 0.06`
+> = el 2.6°, i.e. R18 called 8:40 pm July Ohio NIGHT), `nightWeight` star-snap
+> re-keyed (0 at −4°, full at −12° — verify-sat-night's deep-night contract
+> intact), SkyDome golden lobe (CPU strength + hard shader skip), 8-step HDRI
+> cross-blend on a HalfFloat scratch RT with **endpoint bypass = settled skies
+> bit-identical**, `WEATHER.fallback` → `'procedural'` (+ a cell-quantised
+> `tempC` bug that flapped precip kind at the freezing line), overcast lid v2
+> (closes R18 #17), cirrus +1 draw (procedural CC0). NEW `lib/fly/sky-dusk.js`.
+> **(4) LIVING GROUND** — residential canopy off A's frozen per-class scatter
+> (**Powell 227 placed, was 0**), landcover tint +1 draw with **`park` DROPPED
+> from the palette** (administrative, NOT landcover — Owens ships 29.87 km² of
+> `park:national_scenic_area` over Mojave desert; the desert stays pale),
+> suburban night (**2,128 lights at Powell** as hash-stable parcel clusters —
+> `housePts` is literally 0 there, OFM generalises houses away outside dense
+> cores) and the streetlight double-dimming diagnosed (**road width
+> double-duties as brightness** — fixed with an additive cls 5/6 envelope at
+> parity with primaries; the R16-swept `night.intensity` untouched), daylight
+> road seam (+121 luma peak on road pixels). **(5) SPEED + FEEL** — SpeedLines
+> (radial smear + 44 wedge streaks + boost heat-haze, 0 draws, **NO depth read
+> by design — immune to the reversed-depth trap**, exactly 0 at probe cruise
+> 0.24 = the SHAKE construction), boost FOV punch +3.06° measured outside the
+> damped state, framing-aware cinema clamp (**a flat 900 m would BREAK
+> verify-chase-cam's frozen framing gate**; 1083 m standoff both-framed vs
+> 2765 pre-R19) + far-target refusal at 8 km, altitude-keyed label budget
+> (FL180 6 letters vs 11), and **P12 with the plan's mechanism CORRECTED:
+> hands-off the model holds 0.0 m over 31 s** — the trigger is the parked
+> Atlas cursor re-arming an absolute sustained pitch (measured −0.471; the
+> field-study curve 2300→443 m in 16 s reproduced), so the trim servos PITCH
+> with `cancelPitch 0.55` + 1.5 s fade-back. **NEW gates: verify-suburbia (16)
+> / verify-aerial (14, the ONE un-pinner of both new fleet pins) / verify-dusk
+> (15) / verify-groundlife (18) / verify-feel (13) / verify-neon-cover (9).**
+> **Owens ≤261 never moved** (239–240 at W1 armed, **178 noon / 179 night** at
+> W2 close — exactly the plan §5 ledger). Sanctioned assertion moves: TWO,
+> both verify-weather, both charter-caused and escalated (`LID_SAT_MAX`
+> 0.12→0.20 against a measured control; the dusk walk rebuilt as a 1..16
+> band). **CERTIFICATION (§4, per-harness ledger at
+> `scripts/r19-close-sweep.md`): ALL GREEN, one retry all round** (sat-night
+> during iteration) — sat-night 33/33 ×2 consecutive, neon-cover 9/9, tracers
+> 6/6, fly-game/spicy PASS, feel 13/13, aerial 16/16 (**Owens 194 ≤ 261 fully
+> armed**, sat boot 7.6 s vs a 28.8 s cap, near-field Δ exactly 0.000), dusk
+> 15/15 (**cirrus exactly +1 draw, 214 vs 213**), fleet 28/28, node gates PASS;
+> everything else rests on byte identity + its cited wave green. **15-min soak
+> GREEN: worst p95 8.4 ms / p50 4.2 ms, fps floor ≈119, draws max 445 ≤ 480,
+> tris 1.931 M ≤ 2.2 M, heap 322→356 MB with no climb, ZERO pageerrors —
+> through a live-traffic peak of 1,145 aircraft (R18's soak peaked at 525;
+> the peak IS the proxy fix working).** The sweep was Fable-TRIMMED on a
+> one-file-delta premise that became THREE files during the close (two
+> `NODE_ENV`-guarded dev-only park handles in TrafficLayer/TrafficTracers) —
+> recorded in §4.1, and verify-fleet was ADDED to the run set to cover it.
+> All runs used the worktree's existing `:3019` dev server (a second `next dev`
+> would share the single `.next`; Next 16 has no `distDir` flag) — a documented
+> deviation, not a hidden one. **POSTMORTEM (§5):** a session limit interrupted the close, leaving
+> work in two worktrees — both salvaged (`dfb6443` a frozen cross-owner bundle
+> hash that went red when C legitimately added keys, rewritten as 4a SOURCE +
+> 4b RUNTIME; `5baeb63` an `o.visible=false` cloud park that CloudField's own
+> `useFrame` overwrote every frame — a no-op on precisely the actor it named,
+> and its residual-mover LIST was itself an instrument artifact:
+> `Object3D.traverse` does not stop at an invisible parent, so it indicted the
+> already-hidden player GLB and the decks it had already parked, while the two
+> real movers were the traffic billboard pool and the tracers mesh — which
+> rewrites its position ATTRIBUTE every frame and never moves its
+> `matrixWorld`, invisible to any visibility or matrix census).
+> **The user-visible "live crafts missing" event was NOT R19** — the round's
+> source diff contains ZERO lines matching `/traffic/i` — it was adsb.lol's
+> geographic endpoint degrading to **200-OK-EMPTY** meeting a pre-existing
+> proxy failover blind spot: an empty-but-present array walked the success
+> path, pinned `preferredSource`, poisoned `lastGood`, and the client stale
+> ladder deleted the whole sky (**281→253→0 tracks**). Fixed in `d5076d0`
+> (`app/api/aircraft/route.js`, 52 lines, no knob moves): empty = CANDIDATE,
+> rotation continues, first non-empty wins, unanimous-empty returned honestly
+> as `x-adsb-empty: all-sources` (before 0 tracks / after 782). **Follow-up
+> NOT fixed: attribution hardcodes "Flight data © adsb.lol" while the proxy
+> now serves adsb.fi — and R17 photo mode BAKES that string into exported
+> captures.** FLY_ROUND19.md **§4 = certification (per-harness detail in
+> `scripts/r19-close-sweep.md`)**; **§6 = 21 checkpoints PENDING USER** (incl.
+> the Neon before/after money shot `scripts/r19-f-powell-*`, the live-crafts
+> confirmation on the user's own machine, the carried R18 Neon nudge `7865ba4`
+> sign-off, and the still-open R15/R16/R17/R18 §6 tables); §5b = follow-ups
+> (attribution follows `x-adsb-source`; the fleet is structurally blind to
+> live-traffic outages; verify-neon-cover's hard-coded builder list; carried
+> satellite water / plumes / phone-satellite cert; two built-but-off features);
+> §7 = lessons (a frozen cross-owner hash is a coupling gate not a leak gate;
+> object visibility cannot park an actor whose owner rewrites it every frame;
+> a gate that differences four breathing scene totals for exact equality is a
+> coin; an instrument can indict actors it merely failed to EXCLUDE; an
+> aggregator can fail INSIDE a 200; the harness fleet's own pins can hide an
+> entire defect class from every gate; measure the trigger before you build
+> the plan's fix).
+>
+> Earlier: **Round 18 "Alive & Dangerous" is BUILT
 > (2026-07-27): [FLY_ROUND18.md](FLY_ROUND18.md) is the record** (plan
 > [FLY_ROUND18_PLAN.md](FLY_ROUND18_PLAN.md); five Opus 5 agents in two waves
 > under Fable orchestration; a scaffolding commit pre-seeded all 11 R18
