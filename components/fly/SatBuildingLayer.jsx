@@ -9,8 +9,10 @@ import {
   SAT_BUILDINGS,
   SAT_COVERAGE,
   SAT_SHADOWS,
+  SAT_TINT,
   SAT_VEG,
   SAT_WATER,
+  SUBURB_NIGHT,
 } from '@/lib/fly/fly-constants';
 import { useFlyStore } from '@/stores/fly-store';
 import { SatVegLayer } from './SatVegLayer';
@@ -169,8 +171,14 @@ export function SatBuildingLayer({ runtime, flight }) {
           EITHER flag alone keeps the shared 'sat-veg' streamer alive: the worker
           emits the canopies and the mover anchor points in ONE bundle, so
           SatVegLayer owns the streamer and SatAmbientLife reads its chunks.
-          Both flags false = no mount, no worker, no draws, no globals. */}
-      {(SAT_VEG.enabled || SAT_AMBIENT.enabled) && (
+          Both flags false = no mount, no worker, no draws, no globals.
+          Round 19 (C "GROUNDTRUTH") extended the SAME rule to two more
+          consumers of that one bundle — the landcover tint (satTint polys) and
+          the suburban house lights (residential scatter points). They are
+          mounted inside SatVegLayer, so their flags belong in this gate too:
+          any ONE of the four keeps the streamer alive, all four false is still
+          no mount, no worker, no draws, no globals. */}
+      {(SAT_VEG.enabled || SAT_AMBIENT.enabled || SAT_TINT.enabled || SUBURB_NIGHT.enabled) && (
         <SatVegLayer runtime={runtime} flight={flight} />
       )}
     </>

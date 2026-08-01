@@ -10,16 +10,32 @@ import {
   Object3D,
   Sphere,
   SphereGeometry,
+  SRGBColorSpace,
   Vector3,
 } from 'three';
 import { SatVegEngine } from '@/lib/fly/toy-world/sat-veg-engine';
-import { GLOBE, SAT_AMBIENT, SAT_VEG } from '@/lib/fly/fly-constants';
-import { applyBendAnchor } from '@/lib/fly/toy-world/world-bend';
+import {
+  GLOBE,
+  SAT_AMBIENT,
+  SAT_GROUND_LIFE,
+  SAT_SHADOWS,
+  SAT_TINT,
+  SAT_VEG,
+  SUBURB_NIGHT,
+} from '@/lib/fly/fly-constants';
+import { applyBendAnchor, getRimColor } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
 import { SatAmbientLife } from './SatAmbientLife';
+import { SatHouseLights } from './SatHouseLights';
+import { SatTintLayer } from './SatTintLayer';
 
 const _dummy = new Object3D();
 const _col = new Color();
+// Round 19 (C): the live rim tone the canopy hazes toward, read back from the
+// SAME uniform the tiles fade with (world-bend getRimColor). Reused across the
+// cadence pass — a placement pass should not allocate a Color per tree.
+const _rim = new Color();
+const _rimRGB = { r: 0, g: 0, b: 0 };
 // Palette resolved once at module load — SAT_VEG.palette is a constant, and a
 // cadence pass should not be allocating four Colors every two seconds.
 const PALETTE = SAT_VEG.palette.map((c) => new Color(c));
@@ -79,7 +95,17 @@ export function SatVegLayer({ runtime, flight }) {
   // downward tier pins within seconds (the R16 §7/§10 lesson), so a live tier
   // read would flap the pool and rebuild the mesh mid-flight.
   const tier = useMemo(() => useFlyStore.getState().qualityTier ?? 'medium', []);
-  const pool = SAT_VEG.enabled ? (SAT_VEG.poolByTier[tier] ?? 0) : 0;
+  // Round 19 (C): the HIGH-TIER pool raise. A tile's residential/farmland
+  // scatter is new content in the same buffer, so the R18 pool would have
+  // decimated the park trees to make room for the suburb. Medium and low
+  // resolve to the R18 value byte-identically (user decision 2 — phones get
+  // the honesty, none of the spend), and SAT_GROUND_LIFE.enabled false
+  // restores high too.
+  const basePool = SAT_VEG.enabled ? (SAT_VEG.poolByTier[tier] ?? 0) : 0;
+  const pool =
+    SAT_GROUND_LIFE.enabled && tier === 'high' && basePool > 0
+      ? SAT_GROUND_LIFE.poolHigh
+      : basePool;
   const maxChunks = SAT_VEG.maxChunksByTier[tier] ?? 0;
   // maxChunks × perChunkCap ≤ pool BY CONSTRUCTION: the pool can therefore
   // never bind, which makes a pool cut (a hard radius that pops as the player
@@ -97,7 +123,23 @@ export function SatVegLayer({ runtime, flight }) {
 
   const meshRef = useRef(null);
   const statsAtRef = useRef(0);
-  const placeRef = useRef({ t: -Infinity, placed: 0, altK: 0 });
+  // byClass: round 19 — placed canopies per worker class id (index 0..6), the
+  // value verify-groundlife's "Powell residential canopy" gate reads. It is
+  // counted from the LIVE placement pass, not from the streamed rows, so it
+  // proves what is on screen rather than what arrived.
+  // classAt: DEV ONLY — the class of instance i, so verify-groundlife can ask
+  // "is every RESIDENTIAL canopy clear of a building footprint?" against the
+  // instance matrices it can already read. Never allocated in production.
+  const placeRef = useRef({
+    t: -Infinity,
+    placed: 0,
+    altK: 0,
+    byClass: new Uint32Array(8),
+    classAt:
+      process.env.NODE_ENV === 'development'
+        ? new Uint8Array(Math.max(SAT_GROUND_LIFE.poolHigh, ...Object.values(SAT_VEG.poolByTier)))
+        : null,
+  });
   // Shared dev surface: this layer publishes window.__satVeg and SatAmbientLife
   // writes its mover telemetry into `.ambient` — one global, one contract.
   const dev = useMemo(() => ({}), []);
@@ -158,7 +200,16 @@ export function SatVegLayer({ runtime, flight }) {
     if (mesh && t - st.t >= SAT_VEG.placeCadenceSec) {
       st.t = t;
       st.altK = 1 - smoothstep(SAT_VEG.altFade.onM, SAT_VEG.altFade.offM, eyeAgl);
-      st.placed = placeCanopy(mesh, engine, flight, st.altK, pool, perChunkCap);
+      st.placed = placeCanopy(
+        mesh,
+        engine,
+        flight,
+        st.altK,
+        pool,
+        perChunkCap,
+        st.byClass,
+        st.classAt
+      );
     }
 
     if (
@@ -173,6 +224,8 @@ export function SatVegLayer({ runtime, flight }) {
       dev.pool = pool;
       dev.perChunkCap = perChunkCap;
       dev.tier = tier;
+      dev.byClass = Array.from(st.byClass); // round 19: placed canopies per class
+      dev.classAt = st.classAt; // round 19: per-instance class (dev only)
       if (mesh) dev.mesh = mesh; // harness A/B flip — never cleared by a transient
       window.__flyStats.satVeg = {
         placed: st.placed,
@@ -180,6 +233,7 @@ export function SatVegLayer({ runtime, flight }) {
         altK: st.altK,
         ready: dev.stats.ready,
         vegPts: dev.stats.vegPts,
+        byClass: dev.byClass,
       };
     }
   }, -45);
@@ -212,6 +266,21 @@ export function SatVegLayer({ runtime, flight }) {
             // origin for one cadence. Start parked; placeCanopy owns it after.
             m.count = 0;
             m.visible = false;
+            // Round 19 — the two SAT_SHADOWS mesh flags for THIS layer's mesh
+            // (the plan's per-layer rule; A HOMESTEAD did SatBuildingLayer in
+            // W1, C does the canopy here in W2, and B DEEPFIELD owns the light
+            // rig + FlyScene's castShadow gate). Copied from A's pattern: the
+            // flag, the tier, and the fleet pin from scripts/_boot.js — every
+            // frozen satellite pixel gate keeps seeing the pre-R19 frame, and
+            // verify-aerial is the one harness that un-pins it. Read at mount
+            // like the tier gate above: a shadow flag flip re-compiles, so it
+            // must not ride the frame loop.
+            const shadowPin =
+              typeof window !== 'undefined' && window.__flySatShadowOverride === 0;
+            const shadowOn =
+              SAT_SHADOWS.enabled && tier === SAT_SHADOWS.minTier && !shadowPin;
+            m.castShadow = shadowOn;
+            m.receiveShadow = shadowOn;
             placeRef.current.t = -Infinity; // place on the very next frame
           }}
           args={[geometry, material, pool]}
@@ -219,6 +288,19 @@ export function SatVegLayer({ runtime, flight }) {
       )}
       {SAT_AMBIENT.enabled && (
         <SatAmbientLife engine={engine} flight={flight} tier={tier} />
+      )}
+      {/* Round 19 (C "GROUNDTRUTH") — the other two consumers of THIS engine's
+          chunks. Mounted here rather than from SatBuildingLayer because both
+          need the veg engine itself: the tint drapes on its bilinear ground
+          grids, and the house lights fall back to its residential scatter
+          points (A HOMESTEAD's measured finding — see SatHouseLights' header).
+          Doing it through a second runtime-bus field would have added a
+          cross-component contract for data that is already right here. Each is
+          its own +1 draw, each parks itself (visible=false / count=0) when its
+          scene has nothing to show, and each is one flag from gone. */}
+      {SAT_TINT.enabled && <SatTintLayer engine={engine} flight={flight} />}
+      {SUBURB_NIGHT.enabled && (
+        <SatHouseLights engine={engine} runtime={runtime} flight={flight} />
       )}
     </>
   );
@@ -230,10 +312,29 @@ export function SatVegLayer({ runtime, flight }) {
  * Returns the placed count. Everything the look depends on — palette, jitter,
  * conifer shape, both fades — resolves HERE, so nothing runs per frame.
  */
-function placeCanopy(mesh, engine, flight, altK, pool, perChunkCap) {
+function placeCanopy(mesh, engine, flight, altK, pool, perChunkCap, byClass, classAt) {
   const S = SAT_VEG;
   const px = flight.pos.x;
   const pz = flight.pos.z;
+  // Round 19 (C) — VEG HAZE, and the reason it lives here rather than in a
+  // shader: the canopy material is the SHARED anchor-bend variant
+  // ('world-bend-anchor-r8'), which also reaches toy TownGlow and the
+  // monuments and is UNTOUCHABLE this round (§2). But this pass already writes
+  // an instance COLOUR every 2 s, so distance haze costs one lerp per tree and
+  // moves no cache key at all. It mixes toward the LIVE rim — the exact triple
+  // world-bend is fading the tiles toward this frame — so a tree and the
+  // ground under it recede on one law instead of the tree reading as a
+  // cut-out. max 0 ⇒ the lerp is skipped and the R18 colours are exact.
+  const HZ = SAT_GROUND_LIFE.enabled ? SAT_GROUND_LIFE.haze : null;
+  const hazeMax = HZ ? HZ.max : 0;
+  if (hazeMax > 0) {
+    getRimColor(_rimRGB);
+    // The rim components are raw sRGB (the output-space convention every
+    // world-bend colour setter uses); the instance colour is a Lambert diffuse
+    // in WORKING space, so convert rather than lerping across two spaces.
+    _rim.setRGB(_rimRGB.r, _rimRGB.g, _rimRGB.b, SRGBColorSpace);
+  }
+  byClass.fill(0);
   let n = 0;
   let maxR2 = 0; // furthest placed instance from the pool origin (local frame)
   let maxScale = 1;
@@ -279,6 +380,12 @@ function placeCanopy(mesh, engine, flight, altK, pool, perChunkCap) {
         // reads as a decal. Conifers additionally sit darker.
         const jit = 1 + (hash(lx * 11.31 - lz * 5.17) - 0.5) * 2 * S.lumaJitter;
         _col.copy(PALETTE[(h * PALETTE.length) | 0]).multiplyScalar(jit * (conifer ? cf.tint : 1));
+        // …then recede it toward the horizon tone by distance (see the header
+        // note). Applied AFTER the jitter/conifer tint so the haze is the last
+        // word, exactly like the fragment mixes it is standing in for.
+        if (hazeMax > 0) {
+          _col.lerp(_rim, hazeMax * smoothstep(HZ.startM, HZ.endM, d));
+        }
         const sy = conifer ? r * cf.heightFrac : r * S.crownFrac;
         const sxz = conifer ? r * cf.widthFrac : r;
         const y = gy + (conifer ? r * cf.liftFrac : r * S.crownLiftFrac);
@@ -295,6 +402,12 @@ function placeCanopy(mesh, engine, flight, altK, pool, perChunkCap) {
         if (r2 > maxR2) maxR2 = r2;
         if (sy > maxScale) maxScale = sy;
         if (d > maxD) maxD = d;
+        // Round 19: which landcover this canopy came from. `cls` is absent on a
+        // pre-R19 bundle (and when SAT_GROUND_LIFE is off), in which case every
+        // tree counts as class 0 = unknown — the sat-roads sentinel idiom.
+        const c = chunk.cls ? chunk.cls[i] : 0;
+        byClass[c] += 1;
+        if (classAt) classAt[n] = c;
         n += 1;
       }
     }
