@@ -651,3 +651,16 @@ confirms none of them moved.
 8. **`minH 14` was built, measured and thrown away.** It is not in the tree.
    Anyone re-opening the budget question should start from §1c's deterministic
    table rather than re-running soaks.
+
+## Fable close ruling (appended at round close)
+
+The soak's scene-total max-tris assertion is DEMOTED to informational with
+the live-traffic count recorded at the max sample. Justification: D's
+measurement above — same-config run spread (0.204–0.284 M) equals the entire
+TOY_MID_SUBURB feature delta (0.267 M), and the flag-off control saw the
+highest traffic of all runs with the lowest triangles. A budget whose noise
+equals the thing it rejects is not a gate (R16: scene totals are not a
+signal in live flight). The load-bearing triangle ceilings are the
+deterministic fixed-pose gates (verify-neon-cover worst toy 1.691 M <= 2.0 M,
+green). Future soaks assert p95-of-samples <= 2.2 M in place of max. The
+2.2 M figure itself is NOT raised.
