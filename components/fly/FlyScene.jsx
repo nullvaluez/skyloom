@@ -81,6 +81,7 @@ import {
   CRASH,
   GLOBE,
   HILLSHADE,
+  MONUMENT_MODELS,
   MOON,
   SAT_BUILDINGS,
   SAT_CITY_GLOW,
@@ -106,6 +107,7 @@ import { CloudField } from './CloudField';
 import { VoidFloor } from './VoidFloor';
 import { TownGlow } from './TownGlow';
 import { LandmarkMonuments } from './LandmarkMonuments';
+import { MonumentModels } from './MonumentModels';
 import { Contrail } from './Contrail';
 import { PlayerGroundShadow } from './PlayerGroundShadow';
 import { TrafficLayer } from './TrafficLayer';
@@ -1887,6 +1889,21 @@ export function FlyScene({ runtime }) {
         qualityTier={qualityTier}
         mapStyle={mapStyle}
       />
+
+      {/* Round 20 (C): REAL models for the marquee monuments — ONE merged mesh
+          (+1 draw) over the procedural archetypes above, which stay byte-
+          identical and keep rendering instantly as the fallback. Keyed by
+          mapStyle for the same reason LandmarkMonuments is: the two style
+          grades are baked into the geometry, so a flip is a clean rebuild. */}
+      {MONUMENT_MODELS.enabled && (
+        <MonumentModels
+          key={`marquee-${mapStyle}`}
+          flight={flight}
+          origin={origin}
+          engine={engine}
+          mapStyle={mapStyle}
+        />
+      )}
 
       {(CLOUDS.byStyle[mapStyle]?.enabled ?? true) && (
         <Suspense fallback={null}>

@@ -1,9 +1,21 @@
 /**
  * Round 8 (P8): procedural landmark monuments (P5).
+ *
+ * R20 SANCTIONED RE-BASELINE (FLY_ROUND20_PLAN §5.1): gates 3–7 were written
+ * when `landmark-statue` was the ONLY thing that could be standing at Liberty
+ * Island. Round 20 ships a real Statue of Liberty model and parks the
+ * archetype instance when it places, so those gates now read the UNION of
+ * procedural + marquee placements (see monumentProbe). Every assertion VALUE is
+ * unchanged — ≥ 1 placed, ≤ 300 m from the POI, 60–400 m tall, letter above the
+ * top; only the source of "what is standing there" widened. Gate 8
+ * (`/^landmark-/` ≤ 10) and gate 9 (Δ-draw window) did NOT move: the marquee
+ * layer is one mesh named `monument-marquee`, outside that namespace and
+ * outside that toggle.
+ *
  * Gates: (1) the landmark-* InstancedMesh pools are mounted in toy (9
  * archetypes since the round-8.5 'church' + halo on medium/high); (2)
- * warping to the Statue of Liberty places a `landmark-statue` instance AT
- * the landmark's world position (placed = non-zero instance scale); (3) the
+ * warping to the Statue of Liberty puts a monument AT the landmark's world
+ * position (procedural instance at non-zero scale, or a marquee model); (3) the
  * POI letter floats ABOVE the monument top (letters bake the CPU bendDrop,
  * monuments drop in-shader at the same anchor — compare after adding
  * d²·bendK back); (4) a center-crop bright gate (lit monument + additive
@@ -32,6 +44,15 @@ async function brightFrac(file, region, lumaMin) {
 }
 
 // Scene probe: landmark meshes + the statue's placed instances + its letter.
+//
+// R20 SANCTIONED RE-BASELINE (FLY_ROUND20_PLAN §5.1): PROCEDURAL-ONLY →
+// UNION of procedural + marquee. Round 20 ships a real Statue of Liberty GLB
+// (lib/fly/monument-models.js), and when a marquee model places, its procedural
+// archetype instance is deliberately parked at scale 0 — so `landmark-statue`
+// alone is no longer where the statue lives. Gates 3–7 below now read whichever
+// of the two is standing. NOTE what did NOT move: the `/^landmark-/` mesh count
+// (gate 8) is untouched, because the marquee layer is ONE mesh named
+// `monument-marquee` and never enters that namespace.
 const monumentProbe = () => {
   const f = window.__fly;
   let root = f.engine.object;
@@ -64,6 +85,15 @@ const monumentProbe = () => {
         sy: a[i * 16 + 5], // m22 — world height of the unit-height archetype
       });
     }
+  }
+  // R20 SANCTIONED RE-BASELINE: the marquee half of the union. __flyMonuments
+  // is the dev diagnostics handle MonumentModels publishes (NODE_ENV-guarded,
+  // the R19 park-handle idiom). Its x/z are ALREADY ABSOLUTE mercator — no
+  // anchor add — and `topY - groundY` is the same quantity `sy` measures for an
+  // archetype: the world height of the monument.
+  for (const m of window.__flyMonuments?.placed ?? []) {
+    if (m.name !== 'Statue of Liberty') continue;
+    placed.push({ x: m.x, y: m.groundY, z: m.z, sy: m.topY - m.groundY });
   }
   let best = null;
   for (const p of placed) {
@@ -176,7 +206,9 @@ async function waitToyStream(page, capMs = 90000) {
   console.log('probe:', JSON.stringify({ ...p1, slots: p1.slots.slice(0, 8) }));
   gate('landmark archetype pools mounted (9 + halo)', p1.meshes.length >= 9, p1.meshes.join(','));
   gate('halo mounted at high tier', p1.meshes.includes('landmark-halo'), p1.meshes.join(','));
-  gate('statue instance placed', p1.placedCount >= 1, `placed=${p1.placedCount}`);
+  // R20 SANCTIONED RE-BASELINE: 'statue instance placed' → 'the statue is
+  // standing (procedural OR marquee)'. Same assertion (≥ 1), wider source.
+  gate('the statue is standing (procedural or marquee)', p1.placedCount >= 1, `placed=${p1.placedCount}`);
   gate(
     'placed at the landmark coords (≤ 300m)',
     p1.best !== null && p1.best.d <= 300,
