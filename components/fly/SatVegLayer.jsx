@@ -16,6 +16,7 @@ import {
 import { SatVegEngine } from '@/lib/fly/toy-world/sat-veg-engine';
 import {
   GLOBE,
+  PARCEL_HOMES,
   SAT_AMBIENT,
   SAT_GROUND_LIFE,
   SAT_SHADOWS,
@@ -27,6 +28,7 @@ import { applyBendAnchor, getRimColor } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
 import { SatAmbientLife } from './SatAmbientLife';
 import { SatHouseLights } from './SatHouseLights';
+import { SatParcelHomes } from './SatParcelHomes';
 import { SatTintLayer } from './SatTintLayer';
 
 const _dummy = new Object3D();
@@ -301,6 +303,19 @@ export function SatVegLayer({ runtime, flight }) {
       {SAT_TINT.enabled && <SatTintLayer engine={engine} flight={flight} />}
       {SUBURB_NIGHT.enabled && (
         <SatHouseLights engine={engine} runtime={runtime} flight={flight} />
+      )}
+      {/* Round 20 (B "HOMES") — procedural suburbia off the worker's dedicated
+          residential parcel anchors, which ride THIS engine's chunks for the
+          same reason the porch lights and the tint do: it is the only streamer
+          that has the residential sample AND a per-chunk bilinear DEM grid, so
+          a house, the trees around it and the ground under it are drawn from
+          one source and cannot disagree. Same contract as its three siblings —
+          its own +1 draw, count = 0 when its scene has nothing to show, one
+          flag from gone. Mounted here rather than in FlyScene deliberately:
+          FlyScene gets a mount line from C ICONS this round and this one would
+          collide with it for no benefit. */}
+      {PARCEL_HOMES.enabled && (
+        <SatParcelHomes engine={engine} runtime={runtime} flight={flight} tier={tier} />
       )}
     </>
   );

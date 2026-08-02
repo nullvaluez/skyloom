@@ -19,6 +19,7 @@ import { buildPoiList } from '@/lib/fly/poi-data';
 import { LANDMARKS_3D, TOY_WORLD } from '@/lib/fly/fly-constants';
 import { PALETTE } from '@/lib/fly/toy-world/toy-palette';
 import { applyBendAnchor } from '@/lib/fly/toy-world/world-bend';
+import { isMonumentSuppressed, monumentSuppressionEpoch } from '@/lib/fly/monument-models';
 import {
   LANDMARK_ARCHETYPES,
   buildLandmarkGeometries,
@@ -82,7 +83,7 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
   }, []);
   const meshRefs = useRef({});
   const haloRef = useRef();
-  const lastRef = useRef({ t: -Infinity, ax: NaN, az: NaN });
+  const lastRef = useRef({ t: -Infinity, ax: NaN, az: NaN, sup: 0 });
 
   // Round 18 (A2): satellite builds the 'sat' VARIANT geometry — the same
   // archetypes plus setback ledges / cornice steps / a chamfered tower shaft /
@@ -178,10 +179,17 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
     const t = clock.elapsedTime;
     const last = lastRef.current;
     const rebased = origin.anchor.x !== last.ax || origin.anchor.z !== last.az;
-    if (!rebased && t - last.t < LANDMARKS_3D.refreshSec) return;
+    // Round 20 (C): the ONE marquee hook. A change in the suppression set is
+    // treated exactly like a rebase — re-place NOW rather than at the next 2s
+    // tick, so a monument whose real model just placed is never drawn twice.
+    // With MONUMENT_MODELS.enabled false the epoch is frozen at 0 forever and
+    // this whole path is the pre-R20 code.
+    const supEpoch = monumentSuppressionEpoch();
+    if (!rebased && supEpoch === last.sup && t - last.t < LANDMARKS_3D.refreshSec) return;
     last.t = t;
     last.ax = origin.anchor.x;
     last.az = origin.anchor.z;
+    last.sup = supEpoch;
 
     const px = flight.pos.x;
     const pz = flight.pos.z;
@@ -205,11 +213,20 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
           : 0;
         const { sx, sy, sz, yaw } = monumentScale(poi);
         _dummy.position.set(poi.wx - origin.anchor.x, groundY, poi.wz - origin.anchor.z);
-        _dummy.scale.set(sx, sy, sz);
-        _dummy.rotation.set(0, yaw, 0);
-        _dummy.updateMatrix();
-        mesh.setMatrixAt(n, _dummy.matrix);
-        n += 1;
+        // Round 20 (C): THE marquee hook, and the whole of it in this file. A
+        // POI whose REAL model is currently placed skips its ARCHETYPE instance
+        // — the tail loop below then parks that slot at scale 0 — but KEEPS its
+        // hero halo: the halo is the monument's ground presence, not part of the
+        // archetype, and a monument must not lose it at the moment it gets
+        // better. With MONUMENT_MODELS.enabled false nothing is ever suppressed,
+        // so this branch is the pre-R20 code path unconditionally.
+        if (!isMonumentSuppressed(poi.name)) {
+          _dummy.scale.set(sx, sy, sz);
+          _dummy.rotation.set(0, yaw, 0);
+          _dummy.updateMatrix();
+          mesh.setMatrixAt(n, _dummy.matrix);
+          n += 1;
+        }
         // hero halo under the monument (shared pool, medium/high only)
         if (halo && halosOn && h < HALO_POOL) {
           const r = sy * 0.55;

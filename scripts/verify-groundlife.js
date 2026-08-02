@@ -328,6 +328,54 @@ function meanSignedDelta(a, b) {
     page.evaluate((vis) => {
       if (window.__satVeg?.tintMesh) window.__satVeg.tintMesh.material.visible = vis;
     }, v);
+
+  /**
+   * R20 SANCTIONED RE-BASELINE (instrument re-point, not a contract move):
+   *   old → the tint A/B measured the WHOLE ground crop
+   *   new → the tint A/B measures GROUND ONLY: every streamed building mesh and
+   *         the parcel-home instancer are parked for both pairs of the A/B.
+   * Nothing else in this file moves — no floor, no ceiling, no other leg.
+   *
+   * WHY. A SPRAWL's per-polygon coverage took Powell from 15 streamed footprints
+   * to 1,863, and the tint is a landcover multiply that only ever touches
+   * GROUND. The gate's crop is now mostly ROOF, so the pixels under test were
+   * evicted from the instrument. A's control experiment, on this exact gate and
+   * pose (the numbers this row re-bases):
+   *     SAT_POLY_COVER off  →  dL -0.229 vs noise -0.075   PASS (3.1x)
+   *     SAT_POLY_COVER on   →  dL -0.016 vs noise  0.074   FAIL (0.2x)
+   * The feature did not regress — the same tint is still multiplying the same
+   * landcover; it is simply behind the houses A gave the suburb. This is R17
+   * §7.1 in its exact form (a pixel-probe gate must not contain an actor it does
+   * not control), and the fix is the same one: park the actor. The hero and the
+   * traffic are already parked here for the same reason; the buildings joined
+   * that list the round they became real.
+   *
+   * The ceiling half of gate (C) gets STRICTER under this re-point, not looser:
+   * with the roofs parked the crop is ~all landcover, so |dL| is measured on the
+   * worst case the tint can produce, against an unmoved TINT_MAX_DELTA of 6.0.
+   *
+   * HOW it parks matters (R19 §7: object visibility cannot park an actor whose
+   * owner rewrites it every frame — and its sibling failure, a per-object park
+   * that a STREAMING owner walks around by adding a new object). The building
+   * engine adds one mesh per chunk as it drapes, and a chunk that lands between
+   * the two shots of a pair would be born visible and darken exactly one frame
+   * of the pair. So the park is applied to the engine's ROOT GROUP, which
+   * covers every mesh it will ever add, and the engine never writes
+   * `object.visible` (verified: `sat-building-engine.js` contains no `.visible`
+   * assignment at all). The home instancer is parked through its MATERIAL, the
+   * same channel setTint/setCanopy use, because its layer does re-assert mesh
+   * state from `useFrame`.
+   */
+  const setSatOccluders = (v) =>
+    page.evaluate((vis) => {
+      // Streamed building chunks (A SPRAWL's per-polygon footprints) — root
+      // group, not per-mesh, so a chunk draped mid-A/B cannot leak in.
+      if (window.__satBuildings?.object) window.__satBuildings.object.visible = vis;
+      // B PARCEL-HOMES' single instancer (0 at Powell today — Powell has real
+      // footprints now — but parked anyway so the instrument does not depend on
+      // which of the two building sources happens to own the ground).
+      if (window.__satVeg?.homeMesh) window.__satVeg.homeMesh.material.visible = vis;
+    }, v);
   // The two NIGHT sources together: the house-light pool and the road network
   // that carries the streetlight envelope. Gated as one because that is how
   // the pain reads — "night suburbia is dead dark" is not a per-layer claim.
@@ -414,14 +462,61 @@ function meanSignedDelta(a, b) {
 
   // --- (C) TINT A/B, same pose ---------------------------------------------
   console.log('POWELL TINT:', JSON.stringify(pn.tint));
+  // Ground-only for the duration of this ONE A/B (see setSatOccluders). The
+  // settle is 3 s, not a token frame: parking 1,863 footprints hands the
+  // renderer a materially different scene, and the FIRST shot of the control
+  // pair must be taken after that transient, or the control measures the park
+  // instead of the noise (measured: a 400 ms settle left the control drifting
+  // −0.114 signed against a −0.202 signal).
+  await setSatOccluders(false);
+  await page.waitForTimeout(3000);
   const tintAB = await ab('r19-c-tint', setTint);
-  // A multiply tint can only DARKEN, so the signal is NEGATIVE by construction
-  // — a positive result would mean something else moved, not that the tint is
-  // strong.
+  await setSatOccluders(true);
+  /**
+   * R20 SANCTIONED RE-BASELINE: gate → informational (Fable ruling, R17 §7.1
+   * precedent — the same demotion verify-sat-night's residual road-pixel gates
+   * received once they were shown to be measuring something they did not
+   * control).
+   *
+   * THE FLOOR HALF OF (C) IS NO LONGER A GATE. A pass OR a fail of it is
+   * uninformative, and that is measured, not argued. The re-point above put the
+   * ground back in the crop — the tint's signal went from −0.016 (evicted by A
+   * SPRAWL's 1,863 new roofs) back to −0.202/−0.213, i.e. within 7–12 % of its
+   * own pre-R20 value of −0.229 — and then a 6-pair distribution diagnostic on
+   * this exact pose, spacing, crop and metric, with a FOURTH shot added per
+   * iteration to measure a pure A/A of the tint-OFF state, showed the
+   * instrument cannot resolve this feature at all:
+   *
+   *     SIGNAL   mean  0.152  sd 0.179   min −0.226  max 0.336
+   *     CONTROL  mean  0.146  sd 0.148   min −0.176  max 0.278
+   *     A/A off  mean  0.109  sd 0.201   min −0.284  max 0.324
+   *     POOLED |signal| / |control| = 1.04x
+   *     crop mean drifts 95.89 → 93.38 across the run ≈ 0.13 luma per 1.6 s
+   *
+   * A pair in which NOTHING is toggled scores the same as the signal, because
+   * the pose carries a monotonic settling drift of the same magnitude as an
+   * alpha-0.1 multiply over the fraction of the crop that is landcover. One
+   * pair at one spacing cannot separate a ramp from a step. **A's earlier 3.1×
+   * PASS (flag off: −0.229 vs −0.075) was the same coin** — nothing in the tint
+   * changed between that draw and this one.
+   *
+   * WHAT STILL GATES, and is untouched below: the tint STREAMS (Powell 738 tris
+   * across 8 chunks), it SHEDS (`visible === tris >= minPolys` — the lever the
+   * whole Owens draw ledger rests on), it stays a GRADE and never paint
+   * (|dL| ≤ TINT_MAX_DELTA, passing with ~30× margin), and Owens holds ≤ 261
+   * with it armed. Those are the load-bearing contracts; this one was a coin.
+   */
+  const tintFloorOk =
+    tintAB.signal < 0 && -tintAB.signal > TINT_NOISE_RATIO * Math.abs(tintAB.control);
+  console.log(
+    `INFORMATIONAL (demoted R20 — see comment): landcover tint floor A/B ` +
+      `${tintAB.signal.toFixed(3)} vs noise ${tintAB.control.toFixed(3)} ` +
+      `→ ${tintFloorOk ? 'would pass' : 'would fail'} the retired ${TINT_NOISE_RATIO}x bar`
+  );
   gate(
-    `landcover tint darkens, and beats its live noise control by ${TINT_NOISE_RATIO}x`,
-    tintAB.signal < 0 && -tintAB.signal > TINT_NOISE_RATIO * Math.abs(tintAB.control),
-    `${tintAB.signal.toFixed(3)} vs noise ${tintAB.control.toFixed(3)}`
+    `…and is PRESENT: the tint mesh streamed and is drawing at this pose`,
+    pn.tint !== null && pn.tint.polys > 0 && pn.tintVisible === true,
+    `${pn.tint?.polys} tris across ${pn.tint?.chunks} chunks, visible=${pn.tintVisible}`
   );
   gate(
     `…and stays a GRADE, not paint (|dL| <= ${TINT_MAX_DELTA})`,

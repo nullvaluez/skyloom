@@ -12,7 +12,73 @@
 > describes deleted code (markers, panels, Leaflet-era plans); do not act
 > on it.
 
-> **⚠️ NEWEST — READ FIRST:** **Round 19 "Honest World" is BUILT
+> **⚠️ NEWEST — READ FIRST:** **Round 20 "Icons & Sprawl" is BUILT +
+> CERTIFIED (2026-08-02): [FLY_ROUND20.md](FLY_ROUND20.md) is the record**
+> (plan [FLY_ROUND20_PLAN.md](FLY_ROUND20_PLAN.md); FOUR Opus 5 agents —
+> A SPRAWL / B HOMES / C ICONS / D CERT — plus salvage instances B2/C2 after
+> a session-limit interruption, under Fable orchestration; scaffolding
+> `f20f96f` moved WORKER_PROTOCOL 15→16 at all six pin sites lockstep and
+> pre-seeded four `enabled:false` constants blocks — zero constants conflicts
+> for a third straight round). **The two user asks are closed at the root:**
+> **(1) BUILDINGS IN ALL AREAS** — the satellite builders carried BOTH halves
+> of the R19 multipolygon defect (feature-SUM footprint test + one shared
+> drape anchor); per-polygon behind `SAT_POLY_COVER`, **Powell OH 15→1,863
+> streamed footprints / 1,233 houses**, Manhattan worker tris DOWN
+> (511k→401k, the cap finally binds), the toy z13 mid ring stops culling
+> <30 m (`TOY_MID_SUBURB`, floor 12 m, cap tuned back to the R19 180 under a
+> close ruling), and where OFM ships NOTHING, `SatParcelHomes`
+> (`PARCEL_HOMES`, +1 draw, satellite-only) builds hash-stable homes on
+> `landuse=residential` parcels — **Melton AU 2,068 homes from zero
+> footprints, while Powell/Blagnac/Lone Pine place ZERO with bit-identical
+> triangle totals across the flip** (two-term anti-duplication off the R18
+> collision-column index; the cls-4 canopy scatter was PROVEN unusable as an
+> anchor source — it is SAT_VEG cap leftovers, 22.72 km² of Craigieburn = 0
+> anchors). **The Owens lock held by measurement**: Lone Pine HAS 2.23 km²
+> residential landuse; all 69 in-range anchors suppress on regK=0; the
+> far-mass lock reads a per-POLYGON threshold (40) under A's flag only.
+> **(2) REAL MONUMENTS** — ten marquee landmarks are real models in ONE
+> `monument-marquee` mesh (+1 draw both styles, per-vertex `aAnchor` bend,
+> NEW key `world-bend-anchor-monument-r20`): ESB, Liberty, Big Ben, Taj,
+> Opera House, Colosseum, Willis, Space Needle, Gateway Arch downloaded
+> (licenses VERIFIED per-source; **four Meta-samples models were WITHDRAWN
+> when review caught the repo's README carve-out — its 3D assets are MPT-
+> licensed, NOT MIT**; verify-icons enforces a license allowlist + named
+> authors; Opera House credited to the author named in the GLB's own
+> asset.extras) + a BESPOKE first-party Eiffel (three candidates failed
+> honestly — disjoint lattice defeats decimation). Procedural archetypes stay
+> byte-identical as instant fallback; **C2's exclusion discs (25–190 m,
+> per-poly centroid, import-static = cache-safe) retire the second-actor
+> defect** (the Taj wore its OFM extrusion's night window atlas; the Eiffel
+> had a base cluster). Registration is `file:`-only + a separate runtime
+> manifest (`lib/fly/monument-models.js`) so verify-fleet/hangar count
+> arithmetic never moved. **CERTIFICATION (§4, ledger
+> `scripts/r20-close-sweep.md`): 32 browser harnesses + 3 node gates ALL
+> GREEN on the integrated tree; Owens 179–195 ≤ 261 everywhere; all five R18
+> hashes byte-exact; with all four R20 flags off the worker is BYTE-IDENTICAL
+> to main across 11 fingerprint scenes (+489 lines compose to a no-op); soak
+> fps floor 80.0 / heap no-climb / zero pageerrors through 1,616 live
+> aircraft (41% above R19's record)** — and the soak's scene-total max-tris
+> was proven unable to judge the mid-ring feature (same-config spread =
+> feature delta) and demoted to informational; fixed-pose gates
+> (1.691 M ≤ 2.0 M) are the load-bearing tris ceilings; future soaks assert
+> p95 ≤ 2.2 M. NEW gates: verify-icons (45) / verify-parcel-homes (18);
+> suburbia 21 / sat-buildings 17 (per-building collision columns — widest
+> 3,391→306, a latent R18 defect retired). Five sanctioned moves consumed,
+> all inline-commented; zero frozen assertion numbers moved. **§5 =
+> the session-limit postmortem (B's code was sound, B's brand-new HARNESS was
+> the red — it matched prose as code); §5b = nine follow-ups (latitude
+> coupling in parcel density, deep-rural US has no landuse to build on, Taj
+> night residual = the certified sat night key, Opera House trademark note);
+> §6 = 15 user checkpoints PENDING (ESB/Liberty/Eiffel/Taj reads, exclusion
+> radii, suburb night blend, per-model yaw facings); §7 = ten lessons (a
+> repo's LICENSE does not license its assets; the asset out-testifies the
+> aggregator; parking the archetype isn't enough when a second actor stands
+> at the same address; a scatter spending a shared cap is not an anchor
+> source; bit-identical triangle totals are the suppression instrument;
+> grep-gates read comments too; one-flag revert contracts rot as flags
+> accumulate).**
+>
+> Earlier: **Round 19 "Honest World" is BUILT
 > (2026-08-01): [FLY_ROUND19.md](FLY_ROUND19.md) is the record** (plan
 > [FLY_ROUND19_PLAN.md](FLY_ROUND19_PLAN.md); SIX Opus 5 agents in two waves
 > of three under Fable orchestration; scaffolding commit `faf5e28` pre-seeded
