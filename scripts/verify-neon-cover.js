@@ -123,7 +123,90 @@ const TRI_MAX = 2.0e6; // 0.2 M headroom under the 2.2 M gate
     'utf8'
   );
   const constSrc = fs.readFileSync(path.join(__dirname, '../lib/fly/fly-constants.js'), 'utf8');
-  const flagOn = /export const NEON_COVER = \{\s*[\r\n]+\s*enabled:\s*true/.test(constSrc);
+  const enabledOf = (name) => {
+    const m = new RegExp(`export const ${name} = \\{\\s*[\\r\\n]+\\s*enabled:\\s*(true|false)`).exec(
+      constSrc
+    );
+    return m ? m[1] === 'true' : null;
+  };
+  const flagOn = enabledOf('NEON_COVER') === true;
+
+  // Slice the worker into top-level function bodies. (Hoisted above gate 3 in
+  // R20 — gate 3's OFF branch now needs the same inventory that gate 4a uses.)
+  const bounds = [];
+  const fnRe = /^(?:function (\w+)|const (api) = )/gm;
+  let m;
+  while ((m = fnRe.exec(workerSrc))) bounds.push({ name: m[1] || m[2], start: m.index });
+  bounds.push({ name: '<eof>', start: workerSrc.length });
+  const bodyOf = (name) => {
+    const i = bounds.findIndex((b) => b.name === name);
+    return i < 0 ? null : workerSrc.slice(bounds[i].start, bounds[i + 1].start);
+  };
+
+  // --- R20: which flags can move a TOY bundle? -----------------------------
+  //
+  // R20 SANCTIONED RE-BASELINE (control state, not truth):
+  //   old → gate 3's OFF branch reproduced the five frozen R18 hashes with
+  //         NEON_COVER.enabled:false alone.
+  //   new → it reproduces them with every R20 TOY-PATH flag off:
+  //         NEON_COVER + TOY_MID_SUBURB + MONUMENT_MODELS.
+  //
+  // THE FIVE HASHES BELOW DO NOT MOVE. They are R18 byte truth and they stay
+  // R18 byte truth; what widened is the state a tree must be put in to
+  // reproduce them, because R20 landed two MORE toy-path coverage levers on
+  // top of F's:
+  //   * TOY_MID_SUBURB (A SPRAWL) drops the z13 mid-ring height floor 30→12 m
+  //     and lifts maxPerChunkMid 180→240 ⇒ powell-mid / manhattan-mid move.
+  //   * MONUMENT_MODELS (C ICONS) punches marquee footprint-exclusion discs in
+  //     `api`'s toy building pass via marqueeExclusionTile ⇒ manhattan-full
+  //     moves (the ESB/Willis extrusions the marble replaces).
+  // Measured by C2 during W1: NEON_COVER-off ALONE left powell-mid and
+  // manhattan-full still differing from the frozen bundle — a red that meant
+  // "two other features are also on", not "the revert path is broken".
+  //
+  // PARCEL_HOMES and SAT_POLY_COVER are NOT in the set, and that is asserted
+  // rather than asserted-by-comment: both are referenced only from satellite
+  // builder bodies that the toy pass never calls. Gate 3a recomputes this set
+  // from the worker source every run, so the day a future round reaches one of
+  // them from the toy path, the gate says so instead of the hashes silently
+  // going red.
+  const R20_FLAGS = ['NEON_COVER', 'TOY_MID_SUBURB', 'MONUMENT_MODELS', 'PARCEL_HOMES', 'SAT_POLY_COVER'];
+  const EXPECTED_TOY_FLAGS = ['NEON_COVER', 'TOY_MID_SUBURB', 'MONUMENT_MODELS'];
+  const apiStart = bounds.find((b) => b.name === 'api')?.start ?? 0;
+  const apiBody = bodyOf('api') || '';
+  // The toy pass is everything in `api` AFTER the satellite early-returns —
+  // buildTile dispatches `return buildSat*(...)` first and only then falls
+  // through to the toy tessellation, so a helper called by a satellite builder
+  // is not on the toy path even though `api` is its caller.
+  let lastSatReturn = 0;
+  for (const mm of apiBody.matchAll(/return build(?:SatBuildings|SatRoads|SatSkyline|SatVeg)\(/g))
+    lastSatReturn = Math.max(lastSatReturn, mm.index + mm[0].length);
+  const toyBodyStart = apiStart + lastSatReturn;
+  const toyBody = apiBody.slice(lastSatReturn);
+  const topLevelFns = new Set(bounds.map((b) => b.name));
+  const toyHelpers = new Set(
+    [...toyBody.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)]
+      .map((mm) => mm[1])
+      .filter((n) => topLevelFns.has(n))
+  );
+  const enclosingFn = (idx) => {
+    let name = '<module>';
+    for (const b of bounds) {
+      if (b.start <= idx) name = b.name;
+      else break;
+    }
+    return name;
+  };
+  const toyReachable = R20_FLAGS.filter((f) => {
+    const re = new RegExp(`\\b${f}\\b`, 'g');
+    let mm;
+    while ((mm = re.exec(workerSrc))) {
+      if (mm.index >= toyBodyStart && mm.index < apiStart + apiBody.length) return true;
+      if (toyHelpers.has(enclosingFn(mm.index))) return true;
+    }
+    return false;
+  });
+  const flagState = Object.fromEntries(R20_FLAGS.map((f) => [f, enabledOf(f)]));
 
   const dispatchOk =
     /const classifyToy\s*=\s*NEON_COVER\.enabled\s*\?\s*classifyRingsSat\s*:\s*classifyRings;/.test(
@@ -204,7 +287,17 @@ const TRI_MAX = 2.0e6; // 0.2 M headroom under the 2.2 M gate
     return out;
   }, SCENES);
 
-  // --- (3) the one-flag revert, tested on bytes ----------------------------
+  // --- (3a) the R20 control-state inventory, recomputed from source --------
+  gate(
+    `3a R20 toy-path flag inventory is exactly {${EXPECTED_TOY_FLAGS.join(', ')}}`,
+    toyReachable.length === EXPECTED_TOY_FLAGS.length &&
+      EXPECTED_TOY_FLAGS.every((f) => toyReachable.includes(f)),
+    `toy-reachable: {${toyReachable.join(', ')}} · satellite-only: {${R20_FLAGS.filter(
+      (f) => !toyReachable.includes(f)
+    ).join(', ')}} · state ${R20_FLAGS.map((f) => `${f}=${flagState[f]}`).join(' ')}`
+  );
+
+  // --- (3) the revert path, tested on bytes --------------------------------
   const toyNames = Object.keys(R18_ROLL);
   if (flagOn) {
     const changed = toyNames.filter((n) => fp[n].roll !== R18_ROLL[n]);
@@ -214,6 +307,18 @@ const TRI_MAX = 2.0e6; // 0.2 M headroom under the 2.2 M gate
       `${changed.length}/${toyNames.length} changed`
     );
   } else {
+    // The OFF branch is only MEANINGFUL under the full R20 toy-path-off state
+    // (see the re-baseline note above). A mixed state is reported as a control
+    // failure rather than as five broken hashes — that distinction is the whole
+    // point of this row.
+    const stillOn = toyReachable.filter((f) => flagState[f] !== false);
+    gate(
+      '3 OFF-branch control state: every R20 toy-path flag is off',
+      stillOn.length === 0,
+      stillOn.length
+        ? `still on: ${stillOn.join(', ')} — the frozen R18 hashes cannot reproduce until they are off`
+        : `${toyReachable.join(' + ')} all false`
+    );
     const same = toyNames.filter((n) => fp[n].roll === R18_ROLL[n]);
     gate(
       '3 flag OFF: every toy ring reproduces the frozen R18 bundle byte-exactly',
@@ -223,16 +328,7 @@ const TRI_MAX = 2.0e6; // 0.2 M headroom under the 2.2 M gate
   }
 
   // --- (4a) SOURCE: no satellite builder may reference NEON_COVER ----------
-  // Slice the file into top-level function bodies and check the satellite ones.
-  const bounds = [];
-  const fnRe = /^(?:function (\w+)|const (api) = )/gm;
-  let m;
-  while ((m = fnRe.exec(workerSrc))) bounds.push({ name: m[1] || m[2], start: m.index });
-  bounds.push({ name: '<eof>', start: workerSrc.length });
-  const bodyOf = (name) => {
-    const i = bounds.findIndex((b) => b.name === name);
-    return i < 0 ? null : workerSrc.slice(bounds[i].start, bounds[i + 1].start);
-  };
+  // (bounds / bodyOf are computed once, above gate 3.)
   const leaky = SAT_BUILDERS.filter((n) => {
     const body = bodyOf(n);
     return body === null || /NEON_COVER/.test(body);
