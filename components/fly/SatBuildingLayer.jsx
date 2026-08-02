@@ -5,6 +5,7 @@ import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
 import { SatBuildingEngine } from '@/lib/fly/toy-world/sat-building-engine';
 import {
+  PARCEL_HOMES,
   SAT_AMBIENT,
   SAT_BUILDINGS,
   SAT_COVERAGE,
@@ -178,9 +179,15 @@ export function SatBuildingLayer({ runtime, flight }) {
           mounted inside SatVegLayer, so their flags belong in this gate too:
           any ONE of the four keeps the streamer alive, all four false is still
           no mount, no worker, no draws, no globals. */}
-      {(SAT_VEG.enabled || SAT_AMBIENT.enabled || SAT_TINT.enabled || SUBURB_NIGHT.enabled) && (
-        <SatVegLayer runtime={runtime} flight={flight} />
-      )}
+      {/* Round 20 (B): PARCEL_HOMES joins the same any-one-of gate — its
+          anchors ride the same 'sat-veg' bundle, so it is a fifth consumer of
+          this one streamer, and with all five off it is still no mount, no
+          worker, no draws, no globals. */}
+      {(SAT_VEG.enabled ||
+        SAT_AMBIENT.enabled ||
+        SAT_TINT.enabled ||
+        SUBURB_NIGHT.enabled ||
+        PARCEL_HOMES.enabled) && <SatVegLayer runtime={runtime} flight={flight} />}
     </>
   );
 }
