@@ -63,6 +63,17 @@ async function bootFly(
     // them (per-gate, deliberately).
     window.__flyAerialOverride = 0;
     window.__flySatShadowOverride = 0;
+    // Round 21 (SANCTIONED harness edit, the same idiom): pin the perf
+    // governor to 'hold' for the whole browser fleet. R21's governor steps
+    // DPR/quality-tier from LIVE frame timing — on a busy CI GPU that would
+    // make every frozen pixel/draw gate nondeterministic (a mid-run tier step
+    // rebuilds the composer and re-streams satellite water). 'hold' freezes
+    // the boot DPR + tier exactly as the R20 fleet saw them. Inert while
+    // PERF_GOVERNOR.enabled is false (the legacy PerformanceMonitor ignores
+    // it — status quo). The R21 stability gates (verify-stability /
+    // verify-tier-step / both soaks) are the ONLY harnesses that un-pin it
+    // (per-gate, deliberately).
+    window.__flyGovPin = 'hold';
     try {
       localStorage.setItem('fly-controls-seen', '1');
       // Round 10: the APP default is now satellite (PauseMenu defaults an
@@ -88,6 +99,7 @@ async function bootFly(
       window.__flyWeatherOverride = 'baseline'; // round 16: same determinism pin
       window.__flyAerialOverride = 0; // round 19: same idiom, reload leg
       window.__flySatShadowOverride = 0;
+      window.__flyGovPin = 'hold'; // round 21: same idiom, reload leg
       localStorage.setItem('fly-controls-seen', '1');
       localStorage.setItem('fly-map-style-2', s || 'toy'); // round 10: default toy for harnesses
     }, style);
