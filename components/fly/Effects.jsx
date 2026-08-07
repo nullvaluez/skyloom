@@ -1,7 +1,8 @@
 'use client';
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { Vector2 } from 'three';
+import { useFrame, useThree } from '@react-three/fiber';
 import {
   Bloom,
   BrightnessContrast,
@@ -27,17 +28,26 @@ import {
 } from 'postprocessing';
 import {
   AERIAL_PERSPECTIVE,
+  DEPTH_PASS,
   FLIGHT,
   SKY,
   SKY_LIVE,
   SPEED_FEEL,
   TOY,
 } from '@/lib/fly/fly-constants';
+import { depthSubOn } from '@/lib/fly/depth-pass';
 import { useFlyStore } from '@/stores/fly-store';
 import { WhiteBalanceEffect } from './WhiteBalance';
 import { AerialPerspectiveEffect } from './AerialPerspective';
 import { SpeedLinesEffect, speedFeelStrength } from './SpeedLines';
 import { FlyEffectComposer } from './FlyEffectComposer';
+import {
+  createN8AOPass,
+  disposeN8AOPass,
+  getN8AOState,
+  setN8AOProbes,
+  warmN8AOPass,
+} from './N8AO';
 
 // Bloom buffer scale per quality tier; at 'low' bloom is dropped entirely
 // (the composer stays for SMAA — cheaper than MSAA on integrated GPUs).
@@ -101,6 +111,41 @@ export function buildPassList(style, tier, ctx = {}) {
   const aerialOn = sat && AERIAL_PERSPECTIVE.enabled && tier === 'high';
   const speedOn = SPEED_FEEL.enabled && tier === 'high' && ctx.speedMount !== false;
   const list = [];
+
+  // ROUND 22 (D "DEPTH") — N8AO, FIRST in the chain.
+  //
+  // Position is a correctness argument, not taste: ambient occlusion darkens
+  // the scene colour, and bloom's luminance pass reads that colour to decide
+  // what glows. Running AO after bloom would let a crevice that AO is about to
+  // blacken still bloom on its pre-AO luminance.
+  //
+  // It is a `Pass`, not an `Effect` — n8ao ping-pongs six of its own fullscreen
+  // targets, so it can neither merge into the existing EffectPass nor even be
+  // grouped like a convolution EFFECT. FlyEffectComposer's assembly loop
+  // already handles that case (`else if (child instanceof Pass)`: added
+  // straight through, and NOT entered into `owned`, so the React-owned instance
+  // is never disposed by a pass-list rebuild).
+  //
+  // `raw: () => null` is deliberate and load-bearing. prewarm.js builds its
+  // warm chain from THIS list and calls `effect.getAttributes()` on every
+  // non-null `raw()` result; a Pass has no such method, and the TypeError would
+  // be swallowed by runPrewarm's outer try — aborting B's ENTIRE warm, not just
+  // this one entry. Returning null drops the descriptor at prewarm's own
+  // `if (e) push` guard, and N8AO.jsx self-warms its four materials at
+  // construction instead. (Reported to Fable: buildPassList is the single
+  // source for EFFECTS; it cannot carry a Pass into the warm set as written.)
+  // Mounted in the CHAIN only at satellite-high, but the instance itself is
+  // kept alive across tier steps (see the Effects component) — a retained pass
+  // is what keeps its four programs refcounted, which is what makes a
+  // high->medium->low->high ladder cycle program-flat. Disposing it on every
+  // tier step measured +10 programs across one cycle.
+  if (ctx.n8ao && sat && tier === 'high') {
+    list.push({
+      id: 'n8ao',
+      el: () => <primitive key="n8ao" object={ctx.n8ao} dispose={null} />,
+      raw: () => null,
+    });
+  }
 
   if (bloomScale > 0) {
     list.push({
@@ -437,6 +482,83 @@ export const Effects = memo(function Effects({ runtime }) {
     return () => clearInterval(id);
   }, [sat, runtime, whiteBalance]);
 
+  // ---- ROUND 22 (D "DEPTH"): N8AO ---------------------------------------
+  // Satellite + HIGH tier only. Construction allocates six render targets and
+  // compiles four fullscreen programs, so it is a DISCRETE transition behind
+  // React state — never a per-frame decision (the __flySatShadow precedent).
+  // `depthSubOn` folds the constant, the `__flyDepthPin` fleet pin and the
+  // `__flyDepthArm` un-pinner; `aoPinNonce` exists so the dev handle can force
+  // a re-evaluation the moment a harness writes the arm global.
+  const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
+  const camera = useThree((s) => s.camera);
+  const [aoNonce, setAoNonce] = useState(0);
+  const [aoPass, setAoPass] = useState(null);
+  const aoRef = useRef(null);
+  // NOTE the absent tier term: creation is gated on style + flag only. The
+  // CHAIN membership is tier-gated inside buildPassList, so at medium/low the
+  // pass costs nothing but its materials stay alive and its programs stay
+  // refcounted — the prewarm.js "a retained warm pass is what keeps a program
+  // refcounted" finding, applied to a pass the warm cannot reach.
+  const aoWanted = sat && depthSubOn('n8ao') && aoNonce >= 0;
+  useEffect(() => {
+    if (!aoWanted) {
+      if (aoRef.current) {
+        disposeN8AOPass(aoRef.current);
+        aoRef.current = null;
+        setAoPass(null);
+      }
+      return;
+    }
+    if (aoRef.current) return;
+    let live = true;
+    const size = gl.getDrawingBufferSize(new Vector2());
+    const p = createN8AOPass({ gl, scene, camera, cfg: DEPTH_PASS.n8ao, size });
+    aoRef.current = p;
+    setAoPass(p);
+    if (DEPTH_PASS.n8ao.selfWarm) {
+      warmN8AOPass(gl, p).catch(() => {
+        // a missed warm is a stutter, never a broken frame
+      });
+    }
+    return () => {
+      live = false;
+      void live;
+    };
+  }, [aoWanted, gl, scene, camera, aoNonce]);
+  // Unmount teardown — the effect above only disposes on a WANT transition.
+  useEffect(
+    () => () => {
+      if (aoRef.current) {
+        disposeN8AOPass(aoRef.current);
+        aoRef.current = null;
+      }
+    },
+    []
+  );
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development' || typeof window === 'undefined') return;
+    window.__flyN8AO = {
+      // The A/B legs. `arm` writes the global depth-pass override and bumps the
+      // nonce so this component re-resolves on the very next commit.
+      set: (v) => {
+        if (v == null) delete window.__flyDepthArm;
+        else window.__flyDepthArm = v ? 1 : 0;
+        setAoNonce((n) => n + 1);
+      },
+      // Re-resolve without touching the master arm — E's per-feature legs and
+      // scripts/r22-d-capture.js write __flyDepthSub directly and then ask this
+      // component to re-read it.
+      refresh: () => setAoNonce((n) => n + 1),
+      get: () => ({ ...getN8AOState(), wanted: !!aoRef.current }),
+      probes: (o) => setN8AOProbes(aoRef.current, o),
+      pass: () => aoRef.current,
+    };
+    return () => {
+      if (window.__flyN8AO) delete window.__flyN8AO;
+    };
+  }, []);
+
   // ROUND 21 (S2): the child list, keyed on the DISCRETE inputs only. Every
   // value the chain reads is either one of these five or a module constant, so
   // a re-render that changes none of them (a DPR state step, a store selector
@@ -452,8 +574,19 @@ export const Effects = memo(function Effects({ runtime }) {
         speedLines,
         aerial,
         whiteBalance,
+        n8ao: aoPass,
       }).map((p) => p.el()),
-    [mapStyle, qualityTier, toneName, speedMountPin, setBloom, speedLines, aerial, whiteBalance]
+    [
+      mapStyle,
+      qualityTier,
+      toneName,
+      speedMountPin,
+      setBloom,
+      speedLines,
+      aerial,
+      whiteBalance,
+      aoPass,
+    ]
   );
 
   return (

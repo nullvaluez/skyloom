@@ -30,6 +30,9 @@ import {
   getBend,
 } from '@/lib/fly/toy-world/world-bend';
 import { setAerial, clearAerial, getAerialState } from './AerialPerspective';
+// Round 22 (D DEPTH): the single arm for the catcher / near receive set /
+// caster flips (lib/fly/depth-pass.js header explains the three inputs).
+import { depthPassOn, depthSubOn, depthCasterOn } from '@/lib/fly/depth-pass';
 import { PALETTE } from '@/lib/fly/toy-world/toy-palette';
 import {
   SkyDome,
@@ -83,6 +86,7 @@ import {
   CLOUDS,
   CLUTTER,
   CRASH,
+  DEPTH_PASS,
   GLOBE,
   HILLSHADE,
   MONUMENT_MODELS,
@@ -265,7 +269,7 @@ const MOODS = {
  * problem, a flat ground-anchored disc that must follow the mini-planet
  * curvature. Without it the 900 m rim floats ~4 m over the bent terrain.
  */
-function SatShadowCatcher({ flight, origin }) {
+function SatShadowCatcher({ flight, origin, radiusM }) {
   const ref = useRef();
   const gl = useThree((s) => s.gl);
   const material = useMemo(() => {
@@ -304,10 +308,339 @@ function SatShadowCatcher({ flight, origin }) {
   }, -49);
   return (
     <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} receiveShadow material={material}>
-      <circleGeometry args={[SAT_SHADOWS.catcher.radiusM, 48]} />
+      <circleGeometry args={[radiusM ?? SAT_SHADOWS.catcher.radiusM, 48]} />
     </mesh>
   );
 }
+
+/**
+ * ROUND 22 (D "DEPTH") — the satellite depth rig: everything that decides
+ * WHERE light lands, in one place, behind one flag.
+ *
+ * Mounted only inside `satShadowsOn` (satellite + high tier + SAT_SHADOWS on +
+ * the R19 fleet pin un-set), so with the depth flags off this component is a
+ * census that runs at 2 Hz and returns null — and with the R19 rig itself
+ * pinned off fleet-wide it never mounts at all. Three jobs:
+ *
+ * (1) THE CATCHER GATE. The R19 header says the disc "wants its own AGL/caster
+ *     gate, not an unconditional mount", and this is it. `maxAglM` because at
+ *     cruise a 900 m disc subtends nothing and every shadow that would land on
+ *     it is sub-pixel; `minCasters` because a catcher with nothing to catch is
+ *     a pure draw. The census is deliberately made of the two EXACT sources
+ *     rather than a scene-graph guess: the R18 building collision-column index
+ *     (`runtime.satBuildings.queryColumns` — the same instrument PARCEL_HOMES
+ *     anti-duplication uses) and a visibility-correct walk for instanced
+ *     content. Both counts are published so the Owens arithmetic is a MEASURED
+ *     number rather than an assumption.
+ *
+ * (2) THE NEAR RECEIVE SET. R13 refused terrain receivers on two grounds and
+ *     only one is still true. "A recompile on the hot tile path" is DEAD:
+ *     three r185 carries `receiveShadow` as a uniform (lights_pars_begin
+ *     `uniform bool receiveShadow`; WebGLRenderer sets it per object at :2687),
+ *     so a flip costs one uniform write and no program. Fill rate is the real
+ *     cost and the only judge — hence LEAF tiles only (a subdivided parent
+ *     draws nothing), inside the 1500 m ortho radius only (outside it the
+ *     shadow map has no data to sample anyway), hard-capped at `maxTiles`, and
+ *     graded by gpuFrameMs A/B rather than by any draw gate, which cannot see
+ *     fill rate at all. Roads stay OUT on purpose: additive, depthWrite:false
+ *     material cannot meaningfully receive.
+ *
+ * (3) THE CASTER FLIPS. C CLUTTER ships every car/pole/tree `castShadow:false`
+ *     and D owns the flip with per-kind gpuFrameMs. The seam is a MARKER, not
+ *     an import — any Object3D with `userData.r22Caster = 'trees' | 'carsParked'
+ *     | 'carsMoving' | 'poles'` is enlisted when that kind's flag is on — so
+ *     this works against C's merged meshes at W2 and against the stand-in
+ *     casters (`__flyCasterStandIn`) that produced the W1 numbers, with no
+ *     edit to either side.
+ *
+ * Everything it touches is restored on unmount: a receive flag left behind on a
+ * tile that outlives the rig would be an invisible, permanent fill-rate tax.
+ */
+const _rigV = /* @__PURE__ */ new Vector3();
+
+function countCastersNear(root, px, pz, radiusM) {
+  // Manual recursion, NOT Object3D.traverse: traverse does not stop at an
+  // invisible parent (the R19 §5 postmortem lesson — it indicted actors that
+  // had already been parked), and a census that counts hidden casters would
+  // mount the disc over an empty world.
+  let instanced = 0;
+  let meshes = 0;
+  const r2 = radiusM * radiusM;
+  const walk = (o) => {
+    if (!o.visible) return;
+    if (o.castShadow && (o.isMesh || o.isInstancedMesh)) {
+      if (o.isInstancedMesh) {
+        // A pooled instancer's own transform sits at the pool origin and its
+        // bounding sphere is a hand-set unit sphere (SatVegLayer), so a
+        // distance test on it is meaningless. `count > 0` is the honest signal:
+        // these pools are placed around the player by construction.
+        if (o.count > 0) instanced++;
+      } else {
+        _rigV.setFromMatrixPosition(o.matrixWorld);
+        const dx = _rigV.x - px;
+        const dz = _rigV.z - pz;
+        // Chunk meshes are ~1 km across and anchored at a corner, so the
+        // geometry's own bounding sphere is added when it exists.
+        const br = o.geometry?.boundingSphere?.radius ?? 0;
+        const reach = radiusM + br;
+        if (dx * dx + dz * dz <= (br > 0 ? reach * reach : r2)) meshes++;
+      }
+    }
+    const kids = o.children;
+    for (let i = 0; i < kids.length; i++) walk(kids[i]);
+  };
+  walk(root);
+  return { instanced, meshes };
+}
+
+function SatDepthRig({ runtime, flight, origin, engine, scene }) {
+  const [armed, setArmed] = useState(false);
+  const stateRef = useRef({
+    // Seeded LARGE-but-finite, deliberately: `-Infinity + delta` is still
+    // -Infinity, so the accumulator would never reach the poll interval and
+    // both sweeps would be dead for the life of the session. A big finite
+    // number fires both on the very first frame instead.
+    t: 1e6,
+    sweepT: 1e6,
+    receivers: new Set(),
+    casters: new Set(),
+    buildings: 0,
+    instanced: 0,
+    meshes: 0,
+  });
+
+  // Restore every flag this rig set, on unmount. A leaked receiveShadow=true on
+  // a tile that survives into a non-shadow frame is an invisible fill cost with
+  // no owner.
+  useEffect(() => {
+    const st = stateRef.current;
+    return () => {
+      for (const o of st.receivers) o.receiveShadow = false;
+      st.receivers.clear();
+      for (const o of st.casters) o.castShadow = false;
+      st.casters.clear();
+    };
+  }, []);
+
+  useFrame((_, delta) => {
+    const st = stateRef.current;
+    st.t += delta;
+    st.sweepT += delta;
+    const on = depthPassOn();
+    const px = flight.pos.x - origin.anchor.x;
+    const pz = flight.pos.z - origin.anchor.z;
+
+    // ---- (1) catcher census, at pollHz -----------------------------------
+    const C = DEPTH_PASS.catcher;
+    const pollDt = 1 / Math.max(0.5, C.pollHz ?? 2);
+    if (st.t >= pollDt) {
+      st.t = 0;
+      let want = false;
+      if (depthSubOn('catcher')) {
+        const agl = Number.isFinite(flight.agl) ? flight.agl : Infinity;
+        if (agl <= C.maxAglM) {
+          // EXACT for buildings: the R18 per-building collision column index,
+          // queried at the ortho frustum radius. Absent (no building layer, or
+          // a scene with none) it returns undefined and contributes 0.
+          const cols =
+            runtime.satBuildings?.queryColumns?.(
+              flight.pos.x,
+              flight.pos.z,
+              SAT_SHADOWS.orthoRadiusM
+            ) ?? null;
+          st.buildings = cols?.length ?? 0;
+          const walked = countCastersNear(scene, px, pz, SAT_SHADOWS.orthoRadiusM);
+          st.instanced = walked.instanced;
+          st.meshes = walked.meshes;
+          want =
+            st.buildings + st.instanced + st.meshes >= (C.minCasters ?? 1);
+        } else {
+          st.buildings = st.instanced = st.meshes = 0;
+        }
+      } else {
+        st.buildings = st.instanced = st.meshes = 0;
+      }
+      if (want !== armed) setArmed(want);
+      if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+        (window.__flyStats ??= {}).depthRig = {
+          catcher: want,
+          agl: Math.round(flight.agl ?? -1),
+          casters: {
+            buildings: st.buildings,
+            instanced: st.instanced,
+            meshes: st.meshes,
+          },
+          receivers: st.receivers.size,
+          casterFlips: st.casters.size,
+        };
+      }
+    }
+
+    // ---- (2) near receive set + (3) caster flips, at nearReceive.pollHz ---
+    const NR = DEPTH_PASS.nearReceive;
+    const sweepDt = 1 / Math.max(0.5, NR.pollHz ?? 6);
+    if (st.sweepT < sweepDt) return;
+    st.sweepT = 0;
+
+    const receiveOn = depthSubOn('nearReceive');
+    const next = receiveOn ? new Set() : null;
+    if (receiveOn) {
+      const reach = SAT_SHADOWS.orthoRadiusM + (NR.padM ?? 0);
+      const cap = NR.maxTiles ?? 48;
+      const root = engine?.object;
+      const walkTiles = (t) => {
+        if (!t || !t.visible || next.size >= cap) return;
+        if (t.isTile) {
+          if (t.isLeaf) {
+            const m = t.model;
+            if (m) {
+              const e = t.matrixWorld.elements;
+              _rigV.setFromMatrixPosition(t.matrixWorld);
+              // World half-extent from the matrix' own column lengths — the map
+              // is rotated -90 deg about X, so the ground plane's extents come
+              // out of columns 0 and 1. No decompose, no allocation.
+              const sx = Math.hypot(e[0], e[1], e[2]);
+              const sy = Math.hypot(e[4], e[5], e[6]);
+              const half = Math.max(sx, sy);
+              const dx = _rigV.x - px;
+              const dz = _rigV.z - pz;
+              const lim = reach + half;
+              if (dx * dx + dz * dz <= lim * lim) next.add(m);
+            }
+            return;
+          }
+        }
+        const kids = t.children;
+        for (let i = 0; i < kids.length; i++) walkTiles(kids[i]);
+      };
+      if (root) walkTiles(root);
+
+      // Parcel homes join as RECEIVERS only (never casters — the R20 rig is
+      // hash-stable placement and a 2,000-instance caster set is a different
+      // measurement). Identified by the userData latch SatParcelHomes already
+      // sets on its own mesh, so no edit to B's file.
+      if (NR.parcelHomes) {
+        const walkParcel = (o) => {
+          if (!o.visible) return;
+          if (o.isInstancedMesh && o.userData.__parcelInit === true && o.count > 0) {
+            next.add(o);
+          }
+          const kids = o.children;
+          for (let i = 0; i < kids.length; i++) walkParcel(kids[i]);
+        };
+        walkParcel(scene);
+      }
+    }
+
+    // Diff, so a steady pose costs zero writes.
+    const prev = st.receivers;
+    if (next) {
+      for (const o of prev) if (!next.has(o)) o.receiveShadow = false;
+      for (const o of next) if (!prev.has(o)) o.receiveShadow = true;
+      st.receivers = next;
+    } else if (prev.size) {
+      for (const o of prev) o.receiveShadow = false;
+      prev.clear();
+    }
+
+    // ---- (3) caster flips ------------------------------------------------
+    const nextC = new Set();
+    if (on) {
+      const walkCast = (o) => {
+        if (!o.visible) return;
+        const kind = o.userData?.r22Caster;
+        if (kind && depthCasterOn(kind)) nextC.add(o);
+        const kids = o.children;
+        for (let i = 0; i < kids.length; i++) walkCast(kids[i]);
+      };
+      walkCast(scene);
+    }
+    const prevC = st.casters;
+    for (const o of prevC) if (!nextC.has(o)) o.castShadow = false;
+    for (const o of nextC) if (!prevC.has(o)) o.castShadow = true;
+    st.casters = nextC;
+  }, -48); // after the catcher's own -49 pose write, before the composer
+
+  // The legacy path stays reachable: with DEPTH_PASS off, the disc mounts iff
+  // SAT_SHADOWS.catcher.enabled — exactly the R19 contract, byte-for-byte.
+  const legacy = !depthPassOn() && SAT_SHADOWS.catcher.enabled;
+  return (
+    <>
+      {(armed || legacy) && <SatShadowCatcher flight={flight} origin={origin} />}
+      {process.env.NODE_ENV === 'development' && (
+        <StandInCasters flight={flight} origin={origin} />
+      )}
+    </>
+  );
+}
+
+/**
+ * ROUND 22 (D "DEPTH") — dev-only stand-in casters for the W1 caster-flip
+ * measurement.
+ *
+ * C CLUTTER's cars/poles/trees do not exist in this worktree yet (plan §3
+ * merges D LAST, after C, precisely so the shadow arithmetic is measured
+ * against the real world). But the flip's COST is a property of the shadow map
+ * — N extra small casters re-rendered into a 2048² depth target — not of what
+ * the casters look like, so a pool of unit boxes carrying the same
+ * `userData.r22Caster` marker C's meshes will carry produces a W1 gpuFrameMs
+ * number that W2 only has to re-confirm against real geometry.
+ *
+ * Renders NOTHING until `window.__flyCasterStandIn(kind, n)` is called, costs
+ * one draw when it does, and never exists in a production build.
+ */
+function StandInCasters({ flight, origin }) {
+  const ref = useRef();
+  const cfgRef = useRef({ kind: null, n: 0, epoch: 0 });
+  const [epoch, setEpoch] = useState(0);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.__flyCasterStandIn = (kind, n = 0) => {
+      cfgRef.current = { kind, n: Math.max(0, Math.min(2000, n | 0)), epoch: epoch + 1 };
+      setEpoch((e) => e + 1);
+      return cfgRef.current;
+    };
+    return () => {
+      if (window.__flyCasterStandIn) delete window.__flyCasterStandIn;
+    };
+  }, [epoch]);
+  useFrame(() => {
+    const m = ref.current;
+    const cfg = cfgRef.current;
+    if (!m) return;
+    if (!cfg.kind || cfg.n <= 0) {
+      m.count = 0;
+      m.visible = false;
+      return;
+    }
+    m.userData.r22Caster = cfg.kind; // the same marker contract C's meshes use
+    m.visible = true;
+    m.count = cfg.n;
+    // Deterministic ring inside the ortho frustum: a fixed lattice keyed off the
+    // instance index, re-anchored to the player each frame. Frozen under a
+    // pinned clock by construction (no time term at all).
+    const px = flight.pos.x - origin.anchor.x;
+    const pz = flight.pos.z - origin.anchor.z;
+    const gy = flight.groundElev;
+    for (let i = 0; i < cfg.n; i++) {
+      const a = i * 2.399963;
+      const r = SAT_SHADOWS.orthoRadiusM * 0.9 * Math.sqrt((i + 0.5) / cfg.n);
+      _standIn.position.set(px + Math.cos(a) * r, gy + 1.5, pz + Math.sin(a) * r);
+      _standIn.updateMatrix();
+      m.setMatrixAt(i, _standIn.matrix);
+    }
+    m.instanceMatrix.needsUpdate = true;
+    m.computeBoundingSphere();
+  }, -48);
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, 2000]} frustumCulled={false}>
+      <boxGeometry args={[4, 3, 2]} />
+      <meshLambertMaterial color="#8a8f98" />
+    </instancedMesh>
+  );
+}
+
+const _standIn = /* @__PURE__ */ new Object3D();
 
 /**
  * The Fly-mode scene graph + frame loop. Order per frame (useFrame
@@ -2005,9 +2338,21 @@ export function FlyScene({ runtime }) {
         />
       )}
       {/* Round 19 (B): the satellite shadow catcher — built, ships OFF (see
-          the component header + plan §5's Owens arithmetic). */}
-      {satShadowsOn && SAT_SHADOWS.catcher.enabled && (
-        <SatShadowCatcher flight={flight} origin={origin} />
+          the component header + plan §5's Owens arithmetic).
+          Round 22 (D DEPTH): the mount now goes through SatDepthRig, which
+          carries the AGL + caster-presence gate the R19 header demanded plus
+          the near receive set and the C-clutter caster flips. With DEPTH_PASS
+          off (the shipped default AND every fleet-pinned harness) the rig's
+          only effect is that the disc mounts iff SAT_SHADOWS.catcher.enabled —
+          the R19 condition, unchanged. */}
+      {satShadowsOn && (
+        <SatDepthRig
+          runtime={runtime}
+          flight={flight}
+          origin={origin}
+          engine={engine}
+          scene={scene}
+        />
       )}
     </>
   );
