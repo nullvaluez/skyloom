@@ -1,0 +1,2604 @@
+{
+ "when": "2026-08-07T00:30:11.571Z",
+ "lock": 40,
+ "ramp": {
+  "lockLo": 24,
+  "rampHi": 64
+ },
+ "tiles": [
+  {
+   "scene": "owens",
+   "x": 2818,
+   "y": 6398,
+   "dx": 1,
+   "dy": -1,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens",
+   "x": 2819,
+   "y": 6398,
+   "dx": 2,
+   "dy": -1,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens",
+   "x": 2817,
+   "y": 6399,
+   "dx": 0,
+   "dy": 0,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens",
+   "x": 2818,
+   "y": 6399,
+   "dx": 1,
+   "dy": 0,
+   "parsed": 15,
+   "kept": 0,
+   "cand": 15,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens",
+   "x": 2819,
+   "y": 6399,
+   "dx": 2,
+   "dy": 0,
+   "parsed": 3,
+   "kept": 0,
+   "cand": 3,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens",
+   "x": 2815,
+   "y": 6400,
+   "dx": -2,
+   "dy": 1,
+   "parsed": 1,
+   "kept": 0,
+   "cand": 1,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens",
+   "x": 2816,
+   "y": 6400,
+   "dx": -1,
+   "dy": 1,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens",
+   "x": 2817,
+   "y": 6400,
+   "dx": 0,
+   "dy": 1,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens",
+   "x": 2818,
+   "y": 6400,
+   "dx": 1,
+   "dy": 1,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens",
+   "x": 2819,
+   "y": 6400,
+   "dx": 2,
+   "dy": 1,
+   "parsed": 8,
+   "kept": 0,
+   "cand": 8,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens",
+   "x": 2815,
+   "y": 6401,
+   "dx": -2,
+   "dy": 2,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens",
+   "x": 2816,
+   "y": 6401,
+   "dx": -1,
+   "dy": 2,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens",
+   "x": 2817,
+   "y": 6401,
+   "dx": 0,
+   "dy": 2,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens",
+   "x": 2818,
+   "y": 6401,
+   "dx": 1,
+   "dy": 2,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens",
+   "x": 2819,
+   "y": 6401,
+   "dx": 2,
+   "dy": 2,
+   "parsed": 1,
+   "kept": 0,
+   "cand": 1,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens-town",
+   "x": 2818,
+   "y": 6398,
+   "dx": 0,
+   "dy": -1,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens-town",
+   "x": 2819,
+   "y": 6398,
+   "dx": 1,
+   "dy": -1,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens-town",
+   "x": 2820,
+   "y": 6398,
+   "dx": 2,
+   "dy": -1,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens-town",
+   "x": 2817,
+   "y": 6399,
+   "dx": -1,
+   "dy": 0,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens-town",
+   "x": 2818,
+   "y": 6399,
+   "dx": 0,
+   "dy": 0,
+   "parsed": 15,
+   "kept": 0,
+   "cand": 15,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens-town",
+   "x": 2819,
+   "y": 6399,
+   "dx": 1,
+   "dy": 0,
+   "parsed": 3,
+   "kept": 0,
+   "cand": 3,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens-town",
+   "x": 2816,
+   "y": 6400,
+   "dx": -2,
+   "dy": 1,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens-town",
+   "x": 2817,
+   "y": 6400,
+   "dx": -1,
+   "dy": 1,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens-town",
+   "x": 2818,
+   "y": 6400,
+   "dx": 0,
+   "dy": 1,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens-town",
+   "x": 2819,
+   "y": 6400,
+   "dx": 1,
+   "dy": 1,
+   "parsed": 8,
+   "kept": 0,
+   "cand": 8,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens-town",
+   "x": 2820,
+   "y": 6400,
+   "dx": 2,
+   "dy": 1,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens-town",
+   "x": 2816,
+   "y": 6401,
+   "dx": -2,
+   "dy": 2,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens-town",
+   "x": 2817,
+   "y": 6401,
+   "dx": -1,
+   "dy": 2,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens-town",
+   "x": 2818,
+   "y": 6401,
+   "dx": 0,
+   "dy": 2,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "owens-town",
+   "x": 2819,
+   "y": 6401,
+   "dx": 1,
+   "dy": 2,
+   "parsed": 1,
+   "kept": 0,
+   "cand": 1,
+   "hk": 0,
+   "owens": true
+  },
+  {
+   "scene": "powell",
+   "x": 4409,
+   "y": 6191,
+   "dx": -2,
+   "dy": -2,
+   "parsed": 5,
+   "kept": 0,
+   "cand": 5,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4410,
+   "y": 6191,
+   "dx": -1,
+   "dy": -2,
+   "parsed": 15,
+   "kept": 0,
+   "cand": 15,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4411,
+   "y": 6191,
+   "dx": 0,
+   "dy": -2,
+   "parsed": 7,
+   "kept": 0,
+   "cand": 7,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4412,
+   "y": 6191,
+   "dx": 1,
+   "dy": -2,
+   "parsed": 6,
+   "kept": 0,
+   "cand": 6,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4413,
+   "y": 6191,
+   "dx": 2,
+   "dy": -2,
+   "parsed": 78,
+   "kept": 78,
+   "cand": 78,
+   "hk": 78,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4409,
+   "y": 6192,
+   "dx": -2,
+   "dy": -1,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4410,
+   "y": 6192,
+   "dx": -1,
+   "dy": -1,
+   "parsed": 54,
+   "kept": 54,
+   "cand": 54,
+   "hk": 54,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4411,
+   "y": 6192,
+   "dx": 0,
+   "dy": -1,
+   "parsed": 18,
+   "kept": 0,
+   "cand": 18,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4412,
+   "y": 6192,
+   "dx": 1,
+   "dy": -1,
+   "parsed": 1,
+   "kept": 0,
+   "cand": 1,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4413,
+   "y": 6192,
+   "dx": 2,
+   "dy": -1,
+   "parsed": 116,
+   "kept": 116,
+   "cand": 116,
+   "hk": 116,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4409,
+   "y": 6193,
+   "dx": -2,
+   "dy": 0,
+   "parsed": 34,
+   "kept": 0,
+   "cand": 34,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4410,
+   "y": 6193,
+   "dx": -1,
+   "dy": 0,
+   "parsed": 128,
+   "kept": 128,
+   "cand": 128,
+   "hk": 128,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4411,
+   "y": 6193,
+   "dx": 0,
+   "dy": 0,
+   "parsed": 21,
+   "kept": 0,
+   "cand": 21,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4412,
+   "y": 6193,
+   "dx": 1,
+   "dy": 0,
+   "parsed": 1,
+   "kept": 0,
+   "cand": 1,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4413,
+   "y": 6193,
+   "dx": 2,
+   "dy": 0,
+   "parsed": 29,
+   "kept": 0,
+   "cand": 29,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4409,
+   "y": 6194,
+   "dx": -2,
+   "dy": 1,
+   "parsed": 1,
+   "kept": 0,
+   "cand": 1,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4410,
+   "y": 6194,
+   "dx": -1,
+   "dy": 1,
+   "parsed": 32,
+   "kept": 0,
+   "cand": 32,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4411,
+   "y": 6194,
+   "dx": 0,
+   "dy": 1,
+   "parsed": 6,
+   "kept": 0,
+   "cand": 6,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4412,
+   "y": 6194,
+   "dx": 1,
+   "dy": 1,
+   "parsed": 5,
+   "kept": 0,
+   "cand": 5,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4413,
+   "y": 6194,
+   "dx": 2,
+   "dy": 1,
+   "parsed": 48,
+   "kept": 48,
+   "cand": 48,
+   "hk": 48,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4409,
+   "y": 6195,
+   "dx": -2,
+   "dy": 2,
+   "parsed": 12,
+   "kept": 0,
+   "cand": 12,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4410,
+   "y": 6195,
+   "dx": -1,
+   "dy": 2,
+   "parsed": 98,
+   "kept": 98,
+   "cand": 98,
+   "hk": 98,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4411,
+   "y": 6195,
+   "dx": 0,
+   "dy": 2,
+   "parsed": 20,
+   "kept": 0,
+   "cand": 20,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4412,
+   "y": 6195,
+   "dx": 1,
+   "dy": 2,
+   "parsed": 39,
+   "kept": 0,
+   "cand": 39,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "powell",
+   "x": 4413,
+   "y": 6195,
+   "dx": 2,
+   "dy": 2,
+   "parsed": 54,
+   "kept": 54,
+   "cand": 54,
+   "hk": 54,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4407,
+   "y": 6194,
+   "dx": -2,
+   "dy": -2,
+   "parsed": 6,
+   "kept": 0,
+   "cand": 6,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4408,
+   "y": 6194,
+   "dx": -1,
+   "dy": -2,
+   "parsed": 16,
+   "kept": 0,
+   "cand": 16,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4409,
+   "y": 6194,
+   "dx": 0,
+   "dy": -2,
+   "parsed": 1,
+   "kept": 0,
+   "cand": 1,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4410,
+   "y": 6194,
+   "dx": 1,
+   "dy": -2,
+   "parsed": 32,
+   "kept": 0,
+   "cand": 32,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4411,
+   "y": 6194,
+   "dx": 2,
+   "dy": -2,
+   "parsed": 6,
+   "kept": 0,
+   "cand": 6,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4407,
+   "y": 6195,
+   "dx": -2,
+   "dy": -1,
+   "parsed": 9,
+   "kept": 0,
+   "cand": 9,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4408,
+   "y": 6195,
+   "dx": -1,
+   "dy": -1,
+   "parsed": 51,
+   "kept": 51,
+   "cand": 51,
+   "hk": 51,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4409,
+   "y": 6195,
+   "dx": 0,
+   "dy": -1,
+   "parsed": 12,
+   "kept": 0,
+   "cand": 12,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4410,
+   "y": 6195,
+   "dx": 1,
+   "dy": -1,
+   "parsed": 98,
+   "kept": 98,
+   "cand": 98,
+   "hk": 98,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4411,
+   "y": 6195,
+   "dx": 2,
+   "dy": -1,
+   "parsed": 20,
+   "kept": 0,
+   "cand": 20,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4407,
+   "y": 6196,
+   "dx": -2,
+   "dy": 0,
+   "parsed": 76,
+   "kept": 76,
+   "cand": 76,
+   "hk": 76,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4408,
+   "y": 6196,
+   "dx": -1,
+   "dy": 0,
+   "parsed": 59,
+   "kept": 59,
+   "cand": 59,
+   "hk": 59,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4409,
+   "y": 6196,
+   "dx": 0,
+   "dy": 0,
+   "parsed": 130,
+   "kept": 130,
+   "cand": 130,
+   "hk": 130,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4410,
+   "y": 6196,
+   "dx": 1,
+   "dy": 0,
+   "parsed": 178,
+   "kept": 178,
+   "cand": 178,
+   "hk": 178,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4411,
+   "y": 6196,
+   "dx": 2,
+   "dy": 0,
+   "parsed": 69,
+   "kept": 69,
+   "cand": 69,
+   "hk": 69,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4407,
+   "y": 6197,
+   "dx": -2,
+   "dy": 1,
+   "parsed": 34,
+   "kept": 0,
+   "cand": 34,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4408,
+   "y": 6197,
+   "dx": -1,
+   "dy": 1,
+   "parsed": 102,
+   "kept": 102,
+   "cand": 102,
+   "hk": 102,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4409,
+   "y": 6197,
+   "dx": 0,
+   "dy": 1,
+   "parsed": 12,
+   "kept": 0,
+   "cand": 12,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4410,
+   "y": 6197,
+   "dx": 1,
+   "dy": 1,
+   "parsed": 137,
+   "kept": 137,
+   "cand": 137,
+   "hk": 137,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4411,
+   "y": 6197,
+   "dx": 2,
+   "dy": 1,
+   "parsed": 44,
+   "kept": 44,
+   "cand": 44,
+   "hk": 44,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4407,
+   "y": 6198,
+   "dx": -2,
+   "dy": 2,
+   "parsed": 33,
+   "kept": 0,
+   "cand": 33,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4408,
+   "y": 6198,
+   "dx": -1,
+   "dy": 2,
+   "parsed": 91,
+   "kept": 91,
+   "cand": 91,
+   "hk": 91,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4409,
+   "y": 6198,
+   "dx": 0,
+   "dy": 2,
+   "parsed": 49,
+   "kept": 49,
+   "cand": 49,
+   "hk": 49,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4410,
+   "y": 6198,
+   "dx": 1,
+   "dy": 2,
+   "parsed": 132,
+   "kept": 132,
+   "cand": 132,
+   "hk": 132,
+   "owens": false
+  },
+  {
+   "scene": "dublin",
+   "x": 4411,
+   "y": 6198,
+   "dx": 2,
+   "dy": 2,
+   "parsed": 150,
+   "kept": 150,
+   "cand": 150,
+   "hk": 150,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4412,
+   "y": 6202,
+   "dx": -2,
+   "dy": -2,
+   "parsed": 102,
+   "kept": 102,
+   "cand": 102,
+   "hk": 102,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4413,
+   "y": 6202,
+   "dx": -1,
+   "dy": -2,
+   "parsed": 189,
+   "kept": 189,
+   "cand": 180,
+   "hk": 180,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4414,
+   "y": 6202,
+   "dx": 0,
+   "dy": -2,
+   "parsed": 178,
+   "kept": 178,
+   "cand": 172,
+   "hk": 172,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4415,
+   "y": 6202,
+   "dx": 1,
+   "dy": -2,
+   "parsed": 52,
+   "kept": 52,
+   "cand": 52,
+   "hk": 52,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4416,
+   "y": 6202,
+   "dx": 2,
+   "dy": -2,
+   "parsed": 36,
+   "kept": 0,
+   "cand": 36,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4412,
+   "y": 6203,
+   "dx": -2,
+   "dy": -1,
+   "parsed": 106,
+   "kept": 106,
+   "cand": 105,
+   "hk": 105,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4413,
+   "y": 6203,
+   "dx": -1,
+   "dy": -1,
+   "parsed": 212,
+   "kept": 212,
+   "cand": 212,
+   "hk": 212,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4414,
+   "y": 6203,
+   "dx": 0,
+   "dy": -1,
+   "parsed": 266,
+   "kept": 266,
+   "cand": 263,
+   "hk": 263,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4415,
+   "y": 6203,
+   "dx": 1,
+   "dy": -1,
+   "parsed": 131,
+   "kept": 131,
+   "cand": 131,
+   "hk": 131,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4416,
+   "y": 6203,
+   "dx": 2,
+   "dy": -1,
+   "parsed": 47,
+   "kept": 47,
+   "cand": 47,
+   "hk": 47,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4412,
+   "y": 6204,
+   "dx": -2,
+   "dy": 0,
+   "parsed": 167,
+   "kept": 167,
+   "cand": 167,
+   "hk": 167,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4413,
+   "y": 6204,
+   "dx": -1,
+   "dy": 0,
+   "parsed": 129,
+   "kept": 129,
+   "cand": 129,
+   "hk": 129,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4414,
+   "y": 6204,
+   "dx": 0,
+   "dy": 0,
+   "parsed": 408,
+   "kept": 408,
+   "cand": 320,
+   "hk": 320,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4415,
+   "y": 6204,
+   "dx": 1,
+   "dy": 0,
+   "parsed": 180,
+   "kept": 180,
+   "cand": 177,
+   "hk": 177,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4416,
+   "y": 6204,
+   "dx": 2,
+   "dy": 0,
+   "parsed": 75,
+   "kept": 75,
+   "cand": 74,
+   "hk": 74,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4412,
+   "y": 6205,
+   "dx": -2,
+   "dy": 1,
+   "parsed": 60,
+   "kept": 60,
+   "cand": 60,
+   "hk": 60,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4413,
+   "y": 6205,
+   "dx": -1,
+   "dy": 1,
+   "parsed": 131,
+   "kept": 131,
+   "cand": 131,
+   "hk": 131,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4414,
+   "y": 6205,
+   "dx": 0,
+   "dy": 1,
+   "parsed": 282,
+   "kept": 282,
+   "cand": 211,
+   "hk": 211,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4415,
+   "y": 6205,
+   "dx": 1,
+   "dy": 1,
+   "parsed": 124,
+   "kept": 124,
+   "cand": 123,
+   "hk": 123,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4416,
+   "y": 6205,
+   "dx": 2,
+   "dy": 1,
+   "parsed": 52,
+   "kept": 52,
+   "cand": 52,
+   "hk": 52,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4412,
+   "y": 6206,
+   "dx": -2,
+   "dy": 2,
+   "parsed": 47,
+   "kept": 47,
+   "cand": 47,
+   "hk": 47,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4413,
+   "y": 6206,
+   "dx": -1,
+   "dy": 2,
+   "parsed": 68,
+   "kept": 68,
+   "cand": 68,
+   "hk": 68,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4414,
+   "y": 6206,
+   "dx": 0,
+   "dy": 2,
+   "parsed": 57,
+   "kept": 57,
+   "cand": 57,
+   "hk": 57,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4415,
+   "y": 6206,
+   "dx": 1,
+   "dy": 2,
+   "parsed": 65,
+   "kept": 65,
+   "cand": 65,
+   "hk": 65,
+   "owens": false
+  },
+  {
+   "scene": "columbus",
+   "x": 4416,
+   "y": 6206,
+   "dx": 2,
+   "dy": 2,
+   "parsed": 28,
+   "kept": 0,
+   "cand": 28,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "plaincity",
+   "x": 4403,
+   "y": 6194,
+   "dx": 1,
+   "dy": -2,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "plaincity",
+   "x": 4404,
+   "y": 6194,
+   "dx": 2,
+   "dy": -2,
+   "parsed": 3,
+   "kept": 0,
+   "cand": 3,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "plaincity",
+   "x": 4401,
+   "y": 6195,
+   "dx": -1,
+   "dy": -1,
+   "parsed": 2,
+   "kept": 0,
+   "cand": 2,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "plaincity",
+   "x": 4402,
+   "y": 6195,
+   "dx": 0,
+   "dy": -1,
+   "parsed": 2,
+   "kept": 0,
+   "cand": 2,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "plaincity",
+   "x": 4404,
+   "y": 6195,
+   "dx": 2,
+   "dy": -1,
+   "parsed": 19,
+   "kept": 0,
+   "cand": 19,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "plaincity",
+   "x": 4400,
+   "y": 6196,
+   "dx": -2,
+   "dy": 0,
+   "parsed": 3,
+   "kept": 0,
+   "cand": 3,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "plaincity",
+   "x": 4401,
+   "y": 6196,
+   "dx": -1,
+   "dy": 0,
+   "parsed": 24,
+   "kept": 0,
+   "cand": 24,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "plaincity",
+   "x": 4402,
+   "y": 6196,
+   "dx": 0,
+   "dy": 0,
+   "parsed": 20,
+   "kept": 0,
+   "cand": 20,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "plaincity",
+   "x": 4403,
+   "y": 6196,
+   "dx": 1,
+   "dy": 0,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "plaincity",
+   "x": 4400,
+   "y": 6197,
+   "dx": -2,
+   "dy": 1,
+   "parsed": 8,
+   "kept": 0,
+   "cand": 8,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "plaincity",
+   "x": 4401,
+   "y": 6197,
+   "dx": -1,
+   "dy": 1,
+   "parsed": 4,
+   "kept": 0,
+   "cand": 4,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "plaincity",
+   "x": 4402,
+   "y": 6197,
+   "dx": 0,
+   "dy": 1,
+   "parsed": 10,
+   "kept": 0,
+   "cand": 10,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "plaincity",
+   "x": 4403,
+   "y": 6197,
+   "dx": 1,
+   "dy": 1,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "plaincity",
+   "x": 4400,
+   "y": 6198,
+   "dx": -2,
+   "dy": 2,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "plaincity",
+   "x": 4401,
+   "y": 6198,
+   "dx": -1,
+   "dy": 2,
+   "parsed": 2,
+   "kept": 0,
+   "cand": 2,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "plaincity",
+   "x": 4402,
+   "y": 6198,
+   "dx": 0,
+   "dy": 2,
+   "parsed": 2,
+   "kept": 0,
+   "cand": 2,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "plaincity",
+   "x": 4403,
+   "y": 6198,
+   "dx": 1,
+   "dy": 2,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "ashley",
+   "x": 4416,
+   "y": 6176,
+   "dx": 0,
+   "dy": -2,
+   "parsed": 2,
+   "kept": 0,
+   "cand": 2,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "ashley",
+   "x": 4417,
+   "y": 6176,
+   "dx": 1,
+   "dy": -2,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "ashley",
+   "x": 4415,
+   "y": 6177,
+   "dx": -1,
+   "dy": -1,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "ashley",
+   "x": 4416,
+   "y": 6177,
+   "dx": 0,
+   "dy": -1,
+   "parsed": 0,
+   "kept": 0,
+   "cand": 0,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "ashley",
+   "x": 4416,
+   "y": 6178,
+   "dx": 0,
+   "dy": 0,
+   "parsed": 8,
+   "kept": 0,
+   "cand": 8,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "ashley",
+   "x": 4417,
+   "y": 6178,
+   "dx": 1,
+   "dy": 0,
+   "parsed": 1,
+   "kept": 0,
+   "cand": 1,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "ashley",
+   "x": 4418,
+   "y": 6178,
+   "dx": 2,
+   "dy": 0,
+   "parsed": 6,
+   "kept": 0,
+   "cand": 6,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "ashley",
+   "x": 4417,
+   "y": 6179,
+   "dx": 1,
+   "dy": 1,
+   "parsed": 2,
+   "kept": 0,
+   "cand": 2,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "ashley",
+   "x": 4417,
+   "y": 6180,
+   "dx": 1,
+   "dy": 2,
+   "parsed": 5,
+   "kept": 0,
+   "cand": 5,
+   "hk": 0,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4822,
+   "y": 6155,
+   "dx": -2,
+   "dy": -2,
+   "parsed": 106,
+   "kept": 106,
+   "cand": 106,
+   "hk": 106,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4823,
+   "y": 6155,
+   "dx": -1,
+   "dy": -2,
+   "parsed": 247,
+   "kept": 247,
+   "cand": 234,
+   "hk": 234,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4824,
+   "y": 6155,
+   "dx": 0,
+   "dy": -2,
+   "parsed": 127,
+   "kept": 127,
+   "cand": 81,
+   "hk": 81,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4825,
+   "y": 6155,
+   "dx": 1,
+   "dy": -2,
+   "parsed": 493,
+   "kept": 493,
+   "cand": 117,
+   "hk": 117,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4826,
+   "y": 6155,
+   "dx": 2,
+   "dy": -2,
+   "parsed": 541,
+   "kept": 541,
+   "cand": 168,
+   "hk": 168,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4822,
+   "y": 6156,
+   "dx": -2,
+   "dy": -1,
+   "parsed": 190,
+   "kept": 190,
+   "cand": 188,
+   "hk": 188,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4823,
+   "y": 6156,
+   "dx": -1,
+   "dy": -1,
+   "parsed": 127,
+   "kept": 127,
+   "cand": 119,
+   "hk": 119,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4824,
+   "y": 6156,
+   "dx": 0,
+   "dy": -1,
+   "parsed": 815,
+   "kept": 815,
+   "cand": 198,
+   "hk": 198,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4825,
+   "y": 6156,
+   "dx": 1,
+   "dy": -1,
+   "parsed": 1203,
+   "kept": 1203,
+   "cand": 98,
+   "hk": 98,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4826,
+   "y": 6156,
+   "dx": 2,
+   "dy": -1,
+   "parsed": 597,
+   "kept": 597,
+   "cand": 173,
+   "hk": 173,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4822,
+   "y": 6157,
+   "dx": -2,
+   "dy": 0,
+   "parsed": 219,
+   "kept": 219,
+   "cand": 205,
+   "hk": 205,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4823,
+   "y": 6157,
+   "dx": -1,
+   "dy": 0,
+   "parsed": 232,
+   "kept": 232,
+   "cand": 77,
+   "hk": 77,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4824,
+   "y": 6157,
+   "dx": 0,
+   "dy": 0,
+   "parsed": 2215,
+   "kept": 2215,
+   "cand": 336,
+   "hk": 336,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4825,
+   "y": 6157,
+   "dx": 1,
+   "dy": 0,
+   "parsed": 3835,
+   "kept": 3835,
+   "cand": 310,
+   "hk": 310,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4826,
+   "y": 6157,
+   "dx": 2,
+   "dy": 0,
+   "parsed": 457,
+   "kept": 457,
+   "cand": 332,
+   "hk": 332,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4822,
+   "y": 6158,
+   "dx": -2,
+   "dy": 1,
+   "parsed": 295,
+   "kept": 295,
+   "cand": 252,
+   "hk": 252,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4823,
+   "y": 6158,
+   "dx": -1,
+   "dy": 1,
+   "parsed": 318,
+   "kept": 318,
+   "cand": 156,
+   "hk": 156,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4824,
+   "y": 6158,
+   "dx": 0,
+   "dy": 1,
+   "parsed": 1986,
+   "kept": 1986,
+   "cand": 285,
+   "hk": 285,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4825,
+   "y": 6158,
+   "dx": 1,
+   "dy": 1,
+   "parsed": 680,
+   "kept": 680,
+   "cand": 85,
+   "hk": 85,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4826,
+   "y": 6158,
+   "dx": 2,
+   "dy": 1,
+   "parsed": 423,
+   "kept": 423,
+   "cand": 313,
+   "hk": 313,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4822,
+   "y": 6159,
+   "dx": -2,
+   "dy": 2,
+   "parsed": 240,
+   "kept": 240,
+   "cand": 154,
+   "hk": 154,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4823,
+   "y": 6159,
+   "dx": -1,
+   "dy": 2,
+   "parsed": 601,
+   "kept": 601,
+   "cand": 96,
+   "hk": 96,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4824,
+   "y": 6159,
+   "dx": 0,
+   "dy": 2,
+   "parsed": 831,
+   "kept": 831,
+   "cand": 250,
+   "hk": 250,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4825,
+   "y": 6159,
+   "dx": 1,
+   "dy": 2,
+   "parsed": 391,
+   "kept": 391,
+   "cand": 164,
+   "hk": 164,
+   "owens": false
+  },
+  {
+   "scene": "manhattan",
+   "x": 4826,
+   "y": 6159,
+   "dx": 2,
+   "dy": 2,
+   "parsed": 418,
+   "kept": 418,
+   "cand": 394,
+   "hk": 394,
+   "owens": false
+  }
+ ],
+ "map": [
+  [
+   0,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   1,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   2,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   3,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   4,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   5,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   6,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   7,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   8,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   9,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   10,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   12,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   15,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   16,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   18,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   19,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   20,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   21,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   24,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   28,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   29,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   32,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   33,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   34,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   36,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   39,
+   [
+    0,
+    0
+   ]
+  ],
+  [
+   44,
+   [
+    44,
+    44
+   ]
+  ],
+  [
+   47,
+   [
+    47,
+    47
+   ]
+  ],
+  [
+   48,
+   [
+    48,
+    48
+   ]
+  ],
+  [
+   49,
+   [
+    49,
+    49
+   ]
+  ],
+  [
+   51,
+   [
+    51,
+    51
+   ]
+  ],
+  [
+   52,
+   [
+    52,
+    52
+   ]
+  ],
+  [
+   54,
+   [
+    54,
+    54
+   ]
+  ],
+  [
+   57,
+   [
+    57,
+    57
+   ]
+  ],
+  [
+   59,
+   [
+    59,
+    59
+   ]
+  ],
+  [
+   60,
+   [
+    60,
+    60
+   ]
+  ],
+  [
+   65,
+   [
+    65,
+    65
+   ]
+  ],
+  [
+   68,
+   [
+    68,
+    68
+   ]
+  ],
+  [
+   69,
+   [
+    69,
+    69
+   ]
+  ],
+  [
+   74,
+   [
+    74,
+    74
+   ]
+  ],
+  [
+   76,
+   [
+    76,
+    76
+   ]
+  ],
+  [
+   77,
+   [
+    77,
+    77
+   ]
+  ],
+  [
+   78,
+   [
+    78,
+    78
+   ]
+  ],
+  [
+   81,
+   [
+    81,
+    81
+   ]
+  ],
+  [
+   85,
+   [
+    85,
+    85
+   ]
+  ],
+  [
+   91,
+   [
+    91,
+    91
+   ]
+  ],
+  [
+   96,
+   [
+    96,
+    96
+   ]
+  ],
+  [
+   98,
+   [
+    98,
+    98
+   ]
+  ],
+  [
+   102,
+   [
+    102,
+    102
+   ]
+  ],
+  [
+   105,
+   [
+    105,
+    105
+   ]
+  ],
+  [
+   106,
+   [
+    106,
+    106
+   ]
+  ],
+  [
+   116,
+   [
+    116,
+    116
+   ]
+  ],
+  [
+   117,
+   [
+    117,
+    117
+   ]
+  ],
+  [
+   119,
+   [
+    119,
+    119
+   ]
+  ],
+  [
+   123,
+   [
+    123,
+    123
+   ]
+  ],
+  [
+   128,
+   [
+    128,
+    128
+   ]
+  ],
+  [
+   129,
+   [
+    129,
+    129
+   ]
+  ],
+  [
+   130,
+   [
+    130,
+    130
+   ]
+  ],
+  [
+   131,
+   [
+    131,
+    131
+   ]
+  ],
+  [
+   132,
+   [
+    132,
+    132
+   ]
+  ],
+  [
+   137,
+   [
+    137,
+    137
+   ]
+  ],
+  [
+   150,
+   [
+    150,
+    150
+   ]
+  ],
+  [
+   154,
+   [
+    154,
+    154
+   ]
+  ],
+  [
+   156,
+   [
+    156,
+    156
+   ]
+  ],
+  [
+   164,
+   [
+    164,
+    164
+   ]
+  ],
+  [
+   167,
+   [
+    167,
+    167
+   ]
+  ],
+  [
+   168,
+   [
+    168,
+    168
+   ]
+  ],
+  [
+   172,
+   [
+    172,
+    172
+   ]
+  ],
+  [
+   173,
+   [
+    173,
+    173
+   ]
+  ],
+  [
+   177,
+   [
+    177,
+    177
+   ]
+  ],
+  [
+   178,
+   [
+    178,
+    178
+   ]
+  ],
+  [
+   180,
+   [
+    180,
+    180
+   ]
+  ],
+  [
+   188,
+   [
+    188,
+    188
+   ]
+  ],
+  [
+   198,
+   [
+    198,
+    198
+   ]
+  ],
+  [
+   205,
+   [
+    205,
+    205
+   ]
+  ],
+  [
+   211,
+   [
+    211,
+    211
+   ]
+  ],
+  [
+   212,
+   [
+    212,
+    212
+   ]
+  ],
+  [
+   234,
+   [
+    234,
+    234
+   ]
+  ],
+  [
+   250,
+   [
+    250,
+    250
+   ]
+  ],
+  [
+   252,
+   [
+    252,
+    252
+   ]
+  ],
+  [
+   263,
+   [
+    263,
+    263
+   ]
+  ],
+  [
+   285,
+   [
+    285,
+    285
+   ]
+  ],
+  [
+   310,
+   [
+    310,
+    310
+   ]
+  ],
+  [
+   313,
+   [
+    313,
+    313
+   ]
+  ],
+  [
+   320,
+   [
+    320,
+    320
+   ]
+  ],
+  [
+   332,
+   [
+    332,
+    332
+   ]
+  ],
+  [
+   336,
+   [
+    336,
+    336
+   ]
+  ],
+  [
+   394,
+   [
+    394,
+    394
+   ]
+  ]
+ ],
+ "pairs": [
+  "powell[4413,6192] 29->0 beside 116->116",
+  "powell[4409,6193] 34->0 beside 128->128",
+  "powell[4410,6193] 32->0 beside 128->128",
+  "powell[4413,6193] 29->0 beside 48->48",
+  "powell[4410,6194] 32->0 beside 98->98",
+  "powell[4412,6195] 39->0 beside 54->54",
+  "dublin[4410,6194] 32->0 beside 98->98",
+  "dublin[4407,6196] 34->0 beside 76->76",
+  "dublin[4407,6197] 34->0 beside 102->102",
+  "dublin[4407,6198] 33->0 beside 91->91",
+  "columbus[4415,6202] 36->0 beside 52->52",
+  "columbus[4416,6202] 36->0 beside 47->47",
+  "columbus[4416,6205] 28->0 beside 52->52",
+  "columbus[4415,6206] 28->0 beside 65->65"
+ ],
+ "browserOut": {
+  "distinct": 4,
+  "repeats": [
+   [
+    "https://tiles.openfreemap.org/planet/20260802_080001_pt/13/2204/3095.pbf",
+    2
+   ],
+   [
+    "https://tiles.openfreemap.org/planet/20260802_080001_pt/13/2204/3098.pbf",
+    2
+   ],
+   [
+    "https://tiles.openfreemap.org/planet/20260802_080001_pt/13/2204/3096.pbf",
+    2
+   ],
+   [
+    "https://tiles.openfreemap.org/planet/20260802_080001_pt/13/2204/3097.pbf",
+    2
+   ]
+  ],
+  "stats": {
+   "sb": {
+    "chunks": 16,
+    "ready": 16,
+    "waterReady": 12,
+    "waterSynth": 0,
+    "columns": 1863,
+    "empty": 0,
+    "queued": 0,
+    "building": 0,
+    "draping": 0,
+    "ringOn": true
+   },
+   "sky": {
+    "chunks": 10,
+    "ready": 8,
+    "drawn": 8,
+    "empty": 2,
+    "tris": 17379,
+    "verts": 32410,
+    "queued": 0,
+    "building": 0,
+    "draping": 0,
+    "ringOn": true,
+    "maxChunks": 10
+   },
+   "sbReason": null,
+   "skyReason": null,
+   "evictions": null,
+   "heals": null
+  }
+ },
+ "red": [
+  [
+   "P4 all-or-nothing lock",
+   "verify-seam (2)",
+   "8.8",
+   "<= 4"
+  ],
+  [
+   "P4 ramp not implemented",
+   "verify-seam (4)",
+   "22/156",
+   "0"
+  ],
+  [
+   "P4 visible tile seam",
+   "verify-seam (5)",
+   14,
+   "0"
+  ],
+  [
+   "P2/P6 heal + retry loops",
+   "verify-seam (7)",
+   "2x",
+   "<= 4x"
+  ]
+ ],
+ "fails": [
+  "(2) NO CLIFF — |delta hatchKept| <= 4 per candidate between adjacent measurements",
+  "(4) RAMP SPEC — hatchKept === keepN(candidates) (lockLo 24 / rampHi 64)",
+  "(5) NO ALL-OR-NOTHING NEIGHBOURS — no adjacent pair renders nothing beside everything"
+ ],
+ "softs": [
+  "(6b) api.setDiag",
+  "(6c) empty results carry a reason code",
+  "(8) emptyByReason telemetry"
+ ]
+}

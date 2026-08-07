@@ -1,0 +1,148 @@
+{
+ "when": "2026-08-07T00:27:08.307Z",
+ "frames": 12,
+ "frameMs": 250,
+ "urban": {
+  "stats": {
+   "px": 619200,
+   "w": 1600,
+   "h": 387,
+   "frames": 12,
+   "mean": 0.649,
+   "p50": 0.144,
+   "p95": 2.211,
+   "p99": 13.601,
+   "p999": 34.255,
+   "max": 82.561,
+   "maxSwing": 190.7,
+   "swingPixels": 380,
+   "movingFrac": 0.0538
+  },
+  "statsA": {
+   "px": 619200,
+   "w": 1600,
+   "h": 387,
+   "frames": 12,
+   "mean": 0.773,
+   "p50": 0.164,
+   "p95": 3.001,
+   "p99": 14.231,
+   "p999": 34.417,
+   "max": 82.561,
+   "maxSwing": 190.7,
+   "swingPixels": 289,
+   "movingFrac": 0.0689
+  },
+  "scene": {
+   "sb": 16,
+   "chunks": 16,
+   "sky": 10,
+   "veg": 609,
+   "parcel": 0,
+   "lights": 0,
+   "tint": {
+    "polys": 216,
+    "verts": 278,
+    "chunks": 9,
+    "visible": true
+   },
+   "draws": 202,
+   "remerges": null
+  }
+ },
+ "suburb": {
+  "stats": {
+   "px": 619200,
+   "w": 1600,
+   "h": 387,
+   "frames": 12,
+   "mean": 0.181,
+   "p50": 0.136,
+   "p95": 0.461,
+   "p99": 0.807,
+   "p999": 5.362,
+   "max": 44.428,
+   "maxSwing": 85.3,
+   "swingPixels": 0,
+   "movingFrac": 0.0033
+  },
+  "statsA": {
+   "px": 619200,
+   "w": 1600,
+   "h": 387,
+   "frames": 12,
+   "mean": 0.354,
+   "p50": 0.253,
+   "p95": 0.947,
+   "p99": 1.756,
+   "p999": 8.107,
+   "max": 50.947,
+   "maxSwing": 93.3,
+   "swingPixels": 0,
+   "movingFrac": 0.0078
+  },
+  "scene": {
+   "sb": 16,
+   "chunks": 16,
+   "sky": 8,
+   "veg": 799,
+   "parcel": 0,
+   "lights": 0,
+   "tint": {
+    "polys": 738,
+    "verts": 836,
+    "chunks": 8,
+    "visible": true
+   },
+   "draws": 218,
+   "remerges": null
+  }
+ },
+ "depth": {
+  "reversed": true,
+  "mats": [
+   {
+    "name": "sat-tint",
+    "factor": -2,
+    "units": -2
+   }
+  ],
+  "tint": {
+   "polys": 296,
+   "verts": 327,
+   "chunks": 7,
+   "visible": true
+  }
+ },
+ "red": [
+  [
+   "S5/S7/S8 flicker (urban)",
+   "verify-flicker (2)",
+   "14.231 → 13.601",
+   "<= 12"
+  ],
+  [
+   "S5/S7 flicker (suburb)",
+   "verify-flicker (3)",
+   "1.756 → 0.807",
+   "<= 12"
+  ],
+  [
+   "S5 disappear/reappear",
+   "verify-flicker (4)",
+   190.7,
+   "<= 120"
+  ],
+  [
+   "P8 polygonOffset sign under reversed depth",
+   "verify-flicker (5)",
+   "-2/-2",
+   "units > 0"
+  ]
+ ],
+ "fails": [
+  "(2) URBAN FLICKER — p99 per-pixel temporal stddev <= 12 over 12 settled frames",
+  "(4) NO PIXEL DISAPPEARS AND RETURNS — no consecutive-frame swing > 120",
+  "(5) SLOPE / P8 — under reversedDepthBuffer the tint offset is authored for it (units > 0)"
+ ]
+}
