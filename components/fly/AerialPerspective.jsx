@@ -41,6 +41,8 @@
  */
 import { Effect, EffectAttribute } from 'postprocessing';
 import { Uniform, Vector2, Vector3, Color } from 'three';
+import { AERIAL_PERSPECTIVE, DEPTH_PASS } from '@/lib/fly/fly-constants';
+import { depthSubOn } from '@/lib/fly/depth-pass';
 
 /**
  * Module-scope frame state. One satellite scene exists at a time, so a plain
@@ -63,6 +65,9 @@ const _state = {
   bendCz: 0,
   bendK: 0,
   groundY: 0,
+  // R22 (D DEPTH) — the near band. 0 until DEPTH_PASS.aerialNear is armed.
+  nearStartM: 0,
+  nearMaxMix: 0,
 };
 
 /**
@@ -95,11 +100,37 @@ export function setAerial(s) {
   _state.bendCz = s.bendCz;
   _state.bendK = s.bendK;
   _state.groundY = s.groundY;
+  // R22 (D DEPTH) — the near band, resolved HERE rather than in FlyScene's -50
+  // block. That block is not D's region and does not need to know about this:
+  // the near band uses the same rim colour, the same height falloff and the
+  // same bend correction the main band already computed, so the only new
+  // information is two scalars, and they are a pure function of the flag.
+  //
+  // WHY IT EXISTS: `AERIAL_PERSPECTIVE.startM` is 800, and smoothstep(800, ...)
+  // is exactly 0 below 800 m. Every fragment inside 800 m — the entire world at
+  // the user's 120 m AGL screenshot — is mathematically unattenuated. This adds
+  // a second, much weaker smoothstep UNDER the first, and multiplies it by
+  // (1 - t) so the two never sum past the main band's own maximum at the seam.
+  if (s.strength > 0 && depthSubOn('aerialNear')) {
+    const an = DEPTH_PASS.aerialNear;
+    _state.nearStartM = an.nearStartM;
+    // Scaled by the SAME gate the main band already carries: FlyScene feeds
+    // `strength = AERIAL_PERSPECTIVE.maxMix * gate`, where `gate` folds the
+    // tier, the style and the `__flyAerialOverride` fleet pin. Recovering the
+    // gate and re-applying it means a pinned frame zeroes the near band too and
+    // stays bit-identical, without this file needing to know what the gate was.
+    const gate = AERIAL_PERSPECTIVE.maxMix > 0 ? s.strength / AERIAL_PERSPECTIVE.maxMix : 0;
+    _state.nearMaxMix = an.nearMaxMix * gate;
+  } else {
+    _state.nearStartM = 0;
+    _state.nearMaxMix = 0;
+  }
 }
 
 /** Hand the pass back to identity (style switch / unmount / non-satellite). */
 export function clearAerial() {
   _state.strength = 0;
+  _state.nearMaxMix = 0; // R22 D: the near band is gated on strength too
 }
 
 /** Dev/harness introspection — verify-aerial reads the live strength. */
@@ -110,6 +141,10 @@ export function getAerialState() {
     endM: _state.endM,
     heightFalloffM: _state.heightFalloffM,
     rim: [..._state.rim],
+    // R22 (D DEPTH) — verify-depth2's near-band legs read these; both are 0 on
+    // every legacy/pinned frame, which is the flag-off assertion.
+    nearStartM: _state.nearStartM,
+    nearMaxMix: _state.nearMaxMix,
   };
 }
 
@@ -127,6 +162,7 @@ uniform vec2 uBendCenter;
 uniform float uBendK;
 uniform float uGroundY;
 uniform float uReverseDepth;
+uniform vec2 uNear; // R22 D: (nearStartM, nearMaxMix) — both 0 when un-armed
 
 void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth, out vec4 outputColor) {
   // REVERSED DEPTH. FlyCanvas runs the renderer with reversedDepthBuffer true
@@ -196,7 +232,22 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth,
 
   float t = smoothstep( uBand.x, uBand.y, dist );
   float hFall = exp( -h / uHeightFalloff );
-  outputColor = vec4( mix( inputColor.rgb, uHazeColor, uMaxMix * t * hFall ), inputColor.a );
+
+  // R22 (D DEPTH) — THE NEAR BAND. smoothstep(uBand.x = 800, ...) is exactly
+  // zero below 800 m, so today the whole near field has no distance cue at all;
+  // this is a second, weaker ramp from uNear.x (~420 m) up to where the main
+  // band takes over, multiplied by (1 - t) so the two never stack past the main
+  // band's own ceiling at the seam.
+  //
+  // FLAG-OFF IS BIT-IDENTICAL, not merely close: uNear.y is a literal 0 when
+  // DEPTH_PASS.aerialNear is un-armed (and whenever the __flyAerialOverride
+  // fleet pin zeroes the strength), and x + 0.0 * f is exactly x in IEEE-754
+  // for every finite f — nearT is a smoothstep, so it is finite and
+  // non-negative by construction and the product cannot even be -0.0.
+  float nearT = smoothstep( uNear.x, uBand.x, dist ) * ( 1.0 - t );
+  float mixAmt = ( uMaxMix * t + uNear.y * nearT ) * hFall;
+
+  outputColor = vec4( mix( inputColor.rgb, uHazeColor, mixAmt ), inputColor.a );
 }
 `;
 
@@ -219,6 +270,7 @@ export class AerialPerspectiveEffect extends Effect {
         ['uBendK', new Uniform(0)],
         ['uGroundY', new Uniform(0)],
         ['uReverseDepth', new Uniform(0)],
+        ['uNear', new Uniform(new Vector2(0, 0))],
       ]),
     });
     // Resolved from the live renderer on the first update() — see the shader.
@@ -254,5 +306,6 @@ export class AerialPerspectiveEffect extends Effect {
     u.get('uBendCenter').value.set(s.bendCx, s.bendCz);
     u.get('uBendK').value = s.bendK;
     u.get('uGroundY').value = s.groundY;
+    u.get('uNear').value.set(s.nearStartM, s.nearMaxMix);
   }
 }

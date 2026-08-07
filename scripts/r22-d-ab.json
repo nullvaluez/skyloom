@@ -1,0 +1,695 @@
+{
+  "poses": {
+    "P-LEWIS": {
+      "agl": 160,
+      "drawsOff": {
+        "draws": 218,
+        "tris": 236577,
+        "rig": {
+          "catcher": false,
+          "agl": 160,
+          "casters": {
+            "buildings": 0,
+            "instanced": 0,
+            "meshes": 0
+          },
+          "receivers": 0,
+          "casterFlips": 0
+        }
+      },
+      "features": {
+        "AA": {
+          "off": [
+            3.167,
+            3.158,
+            3.028
+          ],
+          "on": [
+            3.181,
+            2.985,
+            2.543
+          ],
+          "deltas": [
+            0.014,
+            -0.173,
+            -0.485
+          ],
+          "medianDelta": -0.173,
+          "p95Off": null,
+          "p95On": null
+        },
+        "catcher": {
+          "off": [
+            2.946,
+            3.324,
+            3.095,
+            2.937
+          ],
+          "on": [
+            3.129,
+            3.265,
+            2.894,
+            3.429
+          ],
+          "deltas": [
+            0.183,
+            -0.059,
+            -0.201,
+            0.492
+          ],
+          "medianDelta": 0.183,
+          "p95Off": null,
+          "p95On": null,
+          "draws": {
+            "draws": 219,
+            "tris": 236627,
+            "rig": {
+              "catcher": true,
+              "agl": 160,
+              "casters": {
+                "buildings": 49,
+                "instanced": 0,
+                "meshes": 0
+              },
+              "receivers": 0,
+              "casterFlips": 0
+            }
+          }
+        },
+        "nearReceive": {
+          "off": [
+            3.174,
+            3.023,
+            3.046,
+            3.074
+          ],
+          "on": [
+            3.066,
+            2.974,
+            3.13,
+            3.038
+          ],
+          "deltas": [
+            -0.108,
+            -0.049,
+            0.084,
+            -0.036
+          ],
+          "medianDelta": -0.036,
+          "p95Off": null,
+          "p95On": null,
+          "draws": {
+            "draws": 218,
+            "tris": 236675,
+            "rig": {
+              "catcher": false,
+              "agl": 160,
+              "casters": {
+                "buildings": 0,
+                "instanced": 0,
+                "meshes": 0
+              },
+              "receivers": 39,
+              "casterFlips": 0
+            }
+          }
+        },
+        "n8ao": {
+          "off": [
+            3.147,
+            2.972,
+            2.965,
+            3.18
+          ],
+          "on": [
+            3.328,
+            3.052,
+            3.194,
+            3.39
+          ],
+          "deltas": [
+            0.181,
+            0.08,
+            0.229,
+            0.21
+          ],
+          "medianDelta": 0.21,
+          "p95Off": null,
+          "p95On": null,
+          "draws": {
+            "draws": 224,
+            "tris": 236681,
+            "rig": {
+              "catcher": false,
+              "agl": 160,
+              "casters": {
+                "buildings": 0,
+                "instanced": 0,
+                "meshes": 0
+              },
+              "receivers": 0,
+              "casterFlips": 0
+            }
+          }
+        },
+        "aerialNear": {
+          "off": [
+            2.835,
+            2.918,
+            2.777,
+            3.077
+          ],
+          "on": [
+            3.132,
+            2.988,
+            3.151,
+            2.867
+          ],
+          "deltas": [
+            0.297,
+            0.07,
+            0.374,
+            -0.21
+          ],
+          "medianDelta": 0.297,
+          "p95Off": null,
+          "p95On": null,
+          "draws": {
+            "draws": 218,
+            "tris": 236675,
+            "rig": {
+              "catcher": false,
+              "agl": 160,
+              "casters": {
+                "buildings": 0,
+                "instanced": 0,
+                "meshes": 0
+              },
+              "receivers": 0,
+              "casterFlips": 0
+            }
+          }
+        },
+        "all": {
+          "off": [
+            2.905,
+            3.221,
+            3.337,
+            3.042
+          ],
+          "on": [
+            2.963,
+            3.626,
+            3.256,
+            3.293
+          ],
+          "deltas": [
+            0.058,
+            0.405,
+            -0.081,
+            0.251
+          ],
+          "medianDelta": 0.251,
+          "p95Off": null,
+          "p95On": null,
+          "draws": {
+            "draws": 225,
+            "tris": 236729,
+            "rig": {
+              "catcher": true,
+              "agl": 160,
+              "casters": {
+                "buildings": 49,
+                "instanced": 0,
+                "meshes": 0
+              },
+              "receivers": 39,
+              "casterFlips": 0
+            }
+          }
+        }
+      }
+    },
+    "OWENS": {
+      "agl": 420,
+      "drawsOff": {
+        "draws": 195,
+        "tris": 186734,
+        "rig": {
+          "catcher": false,
+          "agl": 420,
+          "casters": {
+            "buildings": 0,
+            "instanced": 0,
+            "meshes": 0
+          },
+          "receivers": 0,
+          "casterFlips": 0
+        }
+      },
+      "features": {
+        "AA": {
+          "off": [
+            2.68,
+            3.055,
+            2.442
+          ],
+          "on": [
+            2.78,
+            2.55,
+            2.591
+          ],
+          "deltas": [
+            0.1,
+            -0.505,
+            0.149
+          ],
+          "medianDelta": 0.1,
+          "p95Off": null,
+          "p95On": null
+        },
+        "catcher": {
+          "off": [
+            2.853,
+            2.779,
+            2.751,
+            2.683
+          ],
+          "on": [
+            2.697,
+            2.607,
+            2.893,
+            2.718
+          ],
+          "deltas": [
+            -0.156,
+            -0.172,
+            0.142,
+            0.035
+          ],
+          "medianDelta": 0.035,
+          "p95Off": null,
+          "p95On": null,
+          "draws": {
+            "draws": 196,
+            "tris": 186880,
+            "rig": {
+              "catcher": true,
+              "agl": 420,
+              "casters": {
+                "buildings": 949,
+                "instanced": 0,
+                "meshes": 0
+              },
+              "receivers": 0,
+              "casterFlips": 0
+            }
+          }
+        },
+        "n8ao": {
+          "off": [
+            2.678,
+            3.188,
+            3.316,
+            3.503
+          ],
+          "on": [
+            2.906,
+            4.04,
+            3.873,
+            3.498
+          ],
+          "deltas": [
+            0.228,
+            0.852,
+            0.557,
+            -0.005
+          ],
+          "medianDelta": 0.557,
+          "p95Off": null,
+          "p95On": null,
+          "draws": {
+            "draws": 201,
+            "tris": 186838,
+            "rig": {
+              "catcher": false,
+              "agl": 420,
+              "casters": {
+                "buildings": 0,
+                "instanced": 0,
+                "meshes": 0
+              },
+              "receivers": 0,
+              "casterFlips": 0
+            }
+          }
+        },
+        "all": {
+          "off": [
+            2.619,
+            2.776,
+            2.7,
+            2.864
+          ],
+          "on": [
+            2.94,
+            2.911,
+            2.923,
+            3.016
+          ],
+          "deltas": [
+            0.321,
+            0.135,
+            0.223,
+            0.152
+          ],
+          "medianDelta": 0.223,
+          "p95Off": null,
+          "p95On": null,
+          "draws": {
+            "draws": 202,
+            "tris": 186886,
+            "rig": {
+              "catcher": true,
+              "agl": 420,
+              "casters": {
+                "buildings": 949,
+                "instanced": 0,
+                "meshes": 0
+              },
+              "receivers": 30,
+              "casterFlips": 0
+            }
+          }
+        }
+      }
+    },
+    "RIDGE-SIERRA": {
+      "agl": 2548,
+      "drawsOff": {
+        "draws": 226,
+        "tris": 461577,
+        "rig": {
+          "catcher": false,
+          "agl": 2548,
+          "casters": {
+            "buildings": 0,
+            "instanced": 0,
+            "meshes": 0
+          },
+          "receivers": 0,
+          "casterFlips": 0
+        }
+      },
+      "features": {
+        "AA": {
+          "off": [
+            3.178,
+            3.076,
+            3.226
+          ],
+          "on": [
+            3.266,
+            3.253,
+            3.438
+          ],
+          "deltas": [
+            0.088,
+            0.177,
+            0.212
+          ],
+          "medianDelta": 0.177,
+          "p95Off": null,
+          "p95On": null
+        },
+        "nearReceive": {
+          "off": [
+            3.315,
+            3.134,
+            3.159,
+            3.403
+          ],
+          "on": [
+            3.102,
+            3.193,
+            3.046,
+            3.143
+          ],
+          "deltas": [
+            -0.213,
+            0.059,
+            -0.113,
+            -0.26
+          ],
+          "medianDelta": -0.113,
+          "p95Off": null,
+          "p95On": null,
+          "draws": {
+            "draws": 226,
+            "tris": 461383,
+            "rig": {
+              "catcher": false,
+              "agl": 2548,
+              "casters": {
+                "buildings": 0,
+                "instanced": 0,
+                "meshes": 0
+              },
+              "receivers": 48,
+              "casterFlips": 0
+            }
+          }
+        }
+      }
+    },
+    "MANHATTAN-DPR1.5": {
+      "agl": 485,
+      "drawsOff": {
+        "draws": 241,
+        "tris": 718962,
+        "rig": {
+          "catcher": false,
+          "agl": 485,
+          "casters": {
+            "buildings": 0,
+            "instanced": 0,
+            "meshes": 0
+          },
+          "receivers": 0,
+          "casterFlips": 0
+        }
+      },
+      "features": {
+        "AA": {
+          "off": [
+            3.68,
+            3.642,
+            3.151
+          ],
+          "on": [
+            3.635,
+            3.752,
+            3.268
+          ],
+          "deltas": [
+            -0.045,
+            0.11,
+            0.117
+          ],
+          "medianDelta": 0.11,
+          "p95Off": null,
+          "p95On": null
+        },
+        "n8ao": {
+          "off": [
+            3.596,
+            3.628,
+            3.176,
+            3.212
+          ],
+          "on": [
+            3.764,
+            3.2,
+            3.538,
+            4.356
+          ],
+          "deltas": [
+            0.168,
+            -0.428,
+            0.362,
+            1.144
+          ],
+          "medianDelta": 0.362,
+          "p95Off": null,
+          "p95On": null,
+          "draws": {
+            "draws": 247,
+            "tris": 718968,
+            "rig": {
+              "catcher": false,
+              "agl": 485,
+              "casters": {
+                "buildings": 0,
+                "instanced": 0,
+                "meshes": 0
+              },
+              "receivers": 0,
+              "casterFlips": 0
+            }
+          }
+        },
+        "nearReceive": {
+          "off": [
+            4.528,
+            4.458,
+            3.185,
+            3.237
+          ],
+          "on": [
+            4.44,
+            3.444,
+            3.094,
+            3.7
+          ],
+          "deltas": [
+            -0.088,
+            -1.014,
+            -0.091,
+            0.463
+          ],
+          "medianDelta": -0.088,
+          "p95Off": null,
+          "p95On": null,
+          "draws": {
+            "draws": 241,
+            "tris": 718962,
+            "rig": {
+              "catcher": false,
+              "agl": 485,
+              "casters": {
+                "buildings": 0,
+                "instanced": 0,
+                "meshes": 0
+              },
+              "receivers": 42,
+              "casterFlips": 0
+            }
+          }
+        },
+        "all": {
+          "off": [
+            3.66,
+            3.468,
+            3.615,
+            3.304
+          ],
+          "on": [
+            3.706,
+            3.664,
+            3.747,
+            3.999
+          ],
+          "deltas": [
+            0.046,
+            0.196,
+            0.132,
+            0.695
+          ],
+          "medianDelta": 0.196,
+          "p95Off": null,
+          "p95On": null,
+          "draws": {
+            "draws": 248,
+            "tris": 718816,
+            "rig": {
+              "catcher": true,
+              "agl": 485,
+              "casters": {
+                "buildings": 1861,
+                "instanced": 0,
+                "meshes": 0
+              },
+              "receivers": 42,
+              "casterFlips": 0
+            }
+          }
+        }
+      }
+    }
+  },
+  "bootMs": 6706,
+  "gpuTimer": "ok",
+  "casterStandIn": {
+    "off": [
+      3.512,
+      3.454,
+      3.189,
+      3.811
+    ],
+    "on": [
+      3.582,
+      3.288,
+      3.641,
+      3.545
+    ],
+    "deltas": [
+      0.07,
+      -0.166,
+      0.452,
+      -0.266
+    ],
+    "medianDelta": 0.07,
+    "draws": {
+      "draws": 243,
+      "tris": 733064,
+      "rig": {
+        "catcher": false,
+        "agl": 485,
+        "casters": {
+          "buildings": 0,
+          "instanced": 0,
+          "meshes": 0
+        },
+        "receivers": 0,
+        "casterFlips": 1
+      }
+    }
+  },
+  "tierCycleOff": [
+    [
+      "high(start)",
+      97
+    ],
+    [
+      "medium",
+      108
+    ],
+    [
+      "low",
+      94
+    ],
+    [
+      "high",
+      107
+    ]
+  ],
+  "tierCycleOn": [
+    [
+      "high(start)",
+      107
+    ],
+    [
+      "medium",
+      110
+    ],
+    [
+      "low",
+      97
+    ],
+    [
+      "high",
+      107
+    ]
+  ],
+  "pageerrors": []
+}
