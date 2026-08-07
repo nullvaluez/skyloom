@@ -50,19 +50,25 @@ REDESIGNED IN W1 where a better instrument existed.
 | **T2** LODThreshold is altitude-blind | verify-terra (4) | flat **0.86** at every AGL band (132 m → 8879 m) | altitude-keyed curve | binary |
 | **T3** imagery capped at z17 | verify-terra (5) | max imagery zoom requested = **17** | ≥ 18 | binary |
 | **T4** DEM stops at z15 while imagery reaches z17 | verify-terra (11) | DEM **15** / imagery **17** | DEM ≥ 16 | binary |
-| **T5** cold warp descent is serial | verify-terra (7) | **NEVER reached z13 in 40 s** (stuck at z10, `downloading` 0 the whole time) | ≤ 12 000 ms | total |
-| **T5b** far-warp descent STALLS at FL300 | verify-arrival (4b) | settled **z10** vs departure **z12**, 23 s | settled ≥ departure | 2 levels |
+| ~~**T5** cold warp descent is serial~~ | ~~verify-terra (7)~~ | ~~NEVER reached z13 in 40 s (stuck at z10, `downloading` 0)~~ | ~~≤ 12 000 ms~~ | **RETIRED W2 — §1g** |
+| ~~**T5b** far-warp descent STALLS at FL300~~ | ~~verify-arrival (4b)~~ | ~~settled z10 vs departure z12, 23 s~~ | ~~settled ≥ departure~~ | **RETIRED W2 — §1g** |
+| ~~**T8b** FL300 reveal coarse absolutely~~ | ~~verify-arrival (5)~~ | ~~camTileZ 10 at 8867 m AGL~~ | ~~≥ 12~~ | **RETIRED W2 — §1g** |
+| ~~**T1b** the low-AGL descent never reaches z17~~ | ~~verify-terra (2b)~~ | ~~maxLeafZ z17 at 0 ms~~ | ~~≤ 10 000 ms~~ | **RETIRED SAME-WAVE — §1g: `maxLeafZ` is vacuous at low AGL (it counts residue from earlier poses); gate (2) carries the claim** |
+| **T5** the cold cruise arrival re-fetches the whole pyramid | verify-terra (7) | **266** imagery+DEM requests for ONE cold FL300 arrival | ≤ 220 | A: 306 control → **182 armed** → **0** second visit |
+| **T9** a local warp reveals a 7-level deficit with no readiness poll | verify-arrival (9b) | camTileZ **10 → 17** (deficit **7**, reproduced twice) with a **0 ms** hold | ≤ 2 levels, or a hold ≤ 1500 ms | 3.5× |
 | **T6** no persistent raster cache | verify-terra (8) | `fly-raster-v1` **absent** (only R21's `fly-tiles-v1`, 221 vector entries) | > 0 entries | binary |
-| **T7** every warp is a cold descent | verify-terra (9) | second-session raster requests **0.56×** the cold session (945 vs 1698) | ≤ 0.40 | 1.4× |
-| **T8** the reveal fires on `downloading<3`, not on content | verify-arrival (4) | reveal **z10** vs departure **z12** at the same FL300 altitude | deficit ≤ 1 | 2 levels |
+| **T7** every warp is a cold descent | verify-terra (9) | second-session raster requests **0.49×** the cold session (837 vs 1709; W1 read 0.56×) | ≤ 0.40 | 1.2× · A armed: **0.026× low-AGL / 0.00× FL300** |
+| ~~**T8** the reveal fires on `downloading<3`, not on content~~ | ~~verify-arrival (4)~~ | ~~reveal z10 vs departure z12 at FL300~~ | ~~deficit ≤ 1~~ | **RETIRED W2 — §1g; re-based on `maxLeafZ` it reads 12 vs 13 = deficit 1, INSIDE the bound** |
 | **T8b** the FL300 reveal is coarse in absolute terms | verify-arrival (5) | camTileZ **10** at 8867 m AGL | ≥ 12 | 2 levels |
 | **B1** boot reveals over an undescended pyramid | verify-arrival (11) | boot reveal **z12** → settles **z15** | ≥ 12 (settles-1) | see §1b |
 | **S-POP** the city assembles after the WARP reveal | verify-settle (2b) | reveal at **2 300 ms**; `satRoads` reaches 90% of its settled 16 chunks at **+12 900 ms** | 0 late layers | 5.2× the grace |
 | **S-POP** (boot path — NOT red) | verify-settle (2a) | every layer assembled BEFORE the 7.7–10.0 s boot reveal (worst `traffic` +1 300 ms, inside grace) | 0 late layers | see §1b |
-| **S-STUT** the compile train lands after reveal | verify-settle (6), HDRI +9 s | **13 programs** compiled after reveal + one **179.2 ms** frame at reveal+9.9 s | 0 programs, ≤ 2 long frames | binary on programs |
+| ~~**S-STUT** compile train after reveal (COUNT)~~ | ~~verify-settle (4)/(6)~~ | ~~13 programs~~ | ~~0 programs~~ | **RE-BASED W2 — §1h: B's fix RAISES the count 13→19 by design** |
+| **S-STUT** the post-reveal compile train stalls the frame | verify-settle (4)/(6), HDRI +9 s | **179.2 ms** worst frame at reveal+9.9 s (W1) — B's arms: OFF **576–714 ms** → ON **132–165 ms** | ≤ 200 ms worst frame | 3–4× |
 | **S-STUT** (clean boot — NOT red) | verify-settle (4)/(5) | 0 programs, 0 long frames (median 4.2 ms, worst 20.9 ms over 2 365 frames) | 0 / ≤ 2 | see §1b |
 | **S-RAMP** the whole parcel pool appears in one frame at full size | verify-settle (8) | **100% of 1874 homes in one 100 ms sample at 100% of settled scale** (Melton AU) | ≤ 25% per sample, or born ≤ 60% scale | total |
-| **S-ELEV** raw `groundElev` sweeps every AGL fade band | verify-settle (10) | **22 697 m/s** (3813.76 → 1544 m across one 100 ms sample, Sierra warp) | ≤ 80 m/s | 284× |
+| ~~**S-ELEV** raw `groundElev` sweeps every fade band~~ | ~~verify-settle (10)~~ | ~~22 697–24 023 m/s~~ | ~~≤ 80 m/s~~ | **RE-EXPRESSED W2 — §1h** |
+| **S-ELEV** raw `groundElev` sweeps every AGL fade band | verify-settle (10) | — (W2 re-run) — B measured raw **~384 m per FRAME** | ≤ 8 m/frame (B: damped ≤ 4.0 by construction) | ~48× |
 | **S-LADDER** zero DPR rungs at devicePixelRatio 1 | verify-settle (11) | **0** render-scale steps before the first tier step; ladder is `[1/high, 1/medium, 1/low]` | ≥ 2 | total · control at dpr0 1.5 = **2** |
 | **C1** trees are 42-tri spheres with no trunk | verify-clutter (2) | **42 tris/instance**, bbox Y [-1, 1] (`SphereGeometry(1, 7, 4)` — no trunk) | 43..96 tris/instance | binary |
 | **D1** shadows land on nothing | verify-depth2 (3) | **0 of 4** near leaf tiles receive, with **5 casters inside the same 1 500 m radius** (20 casters in scene) | > 0 | binary |
@@ -71,6 +77,63 @@ REDESIGNED IN W1 where a better instrument existed.
 | **D4** nothing atmospheric touches the first 800 m | verify-depth2 (12) | live `startM` **800** at P-LEWIS | < 800 | binary |
 | — | verify-depth2 final W1 run | fails on **exactly (3)(4)(7)(12)(13)** — the five D-defects — and nothing else; (5)(6)(15)(16) green, three SOFT | | |
 | **D5** medium/low content is an un-atmosphered cut-out | verify-depth2 (13) | source: `AERIAL_PERSPECTIVE.content.enabled=false`, `minTier='high'`; at medium the composer runs **no aerial pass at all** | enabled + minTier medium | binary |
+
+### §1g W2 RE-BASE — four reds RETIRED because the instrument was wrong, not the world
+
+A TERRA's W1 measurements (`scripts/r22-a-dublin-*.json`, VENDOR.md "upstream
+behavior worth knowing") invalidated four of my frozen reds, and Fable ordered
+the re-base. The rows above are struck through rather than deleted — the R21
+idiom: **never erase a red, annotate it.**
+
+**THE FINDING.** three-tile skips `LOD()` for an out-of-frustum leaf and
+multiplies the distance ratio by 5 (rather than 0.8) when a tile is not
+visible. At FL300 with a near-level chase camera the ground DIRECTLY BELOW the
+aircraft is off screen — so `camTileZ`, the leaf under the aeroplane, **can
+never refine at cruise, by design**. My W1 P-DUBLIN reds ("stuck at z10 for
+40 s with `downloading` 0", "reveal z10 vs departure z12") were measuring that
+rule working correctly. A's armed runs still read z10 there, and no pipeline
+patch, LOD curve or cache can move it.
+
+| W1 red (retired) | What it was really measuring | Re-based on |
+|---|---|---|
+| terra (7) "never reached z13 in 40 s" | the frustum cap | **request count** for one cold FL300 arrival |
+| terra (6) "usable zoom at cruise" | the frustum cap | a `maxLeafZ` **regression floor**, not a target |
+| arrival (4)/(4b)/(5) reveal/settled zoom | the frustum cap at BOTH ends | `maxLeafZ` — and see below |
+| arrival (11) boot reveal | valid, but out of scope by B's decision | recorded, not closed |
+
+**AND THE RE-BASE RETIRED THE ARRIVAL RED ITSELF.** On `maxLeafZ` the FL300
+reveal measures **z12 against a departure of z13 — a deficit of ONE, inside the
+bound** — and the destination settles to 13. So there is no FL300
+content-at-reveal defect to close; the deficit was the instrument. The gates
+stay (they are the right invariant, and they would catch a future reveal firing
+two levels early), but **the round record must not claim R22 closed a defect
+there.**
+
+**A SECOND RE-SPEC, FROM A'S OWN ARMED EVIDENCE.** The first re-base put the
+FL300 descent clock on `maxLeafZ >= 13`. A's armed-vs-control files then showed
+that would be a gate *nobody can green*:
+
+| run | maxLeafZ | settled ahead-profile (km → leafZ) |
+|---|---|---|
+| `r22-a-dublin-prof-control.json` | 13 | {2:10, 5:10, 10:12, 20:12, 50:10} |
+| `r22-a-dublin-prof-armed.json` | **12** | **{2:10, 5:10, 10:12, 20:12, 50:10}** |
+| my control, merged tree | 12 | {2:10, 5:10, 10:12, 20:12, 50:10} |
+
+Identical profile armed and control, from two agents independently. **R22 does
+not make the FL300 view sharper** — at cruise the settled zoom is what
+three-tile gives you. What DOES move is the cost of getting there (306 → 182
+requests cold, → 0 on a second visit through the cache), so that is what the
+FL300 gate asserts, and the cruise profile is recorded as an ANCHOR every run
+so a regression is still visible. **Checkpoint #2 must be framed accordingly:
+what the user will see change at FL300 is the wait and the second visit, not
+the texel density.**
+
+**WHERE THE CONTENT DEFECT IS REAL.** The local-warp leg, at low AGL, where
+`camTileZ` is a valid statistic: **camTileZ 10 → 17, a seven-level deficit,
+with a 900 ms flash and no readiness poll of any kind** (WarpFlash keys its
+poll on `kind === 'far'`). That is red today and greenable by
+`ARRIVAL_GATE.localHold` — which is exactly what the FL300 gates are not. It is
+the new row **T9** above.
 
 ### §1a Anchors — not reds, but the controls the W2/W3 claims are measured against
 
@@ -88,12 +151,46 @@ triangle totals across a flag flip) only works if the "before" was recorded.
 | Boot at P-DUBLIN | **9.3 s** to `pct 100` | plan §4 (boot timing may not lengthen) |
 | Powell boot reveal | **10.0 s**; layers first populate 2.5–4.1 s (all BEFORE reveal) | verify-settle (2a) |
 | Prewarm | published at **2.11 s**, 29 variants + 9 passes in **183 ms** | verify-settle (7) |
+| P-DUBLIN cruise sharpness (**anchor, not a gate**) | settled ahead-profile **{2:10, 5:10, 10:12, 20:12, 50:10}**, maxLeafZ **12**, camTileZ **10** — identical armed and control (A), reproduced independently by E | the honest framing of checkpoint #2: R22 moves the WAIT at FL300, not the texel density |
 | P-LEWIS flicker floor (no movers) | **p99 9.00 / 9.25** across two runs, 408 000 ground pixels | verify-clutter (17) five-control — headroom to the 12 bound is only **1.33×** |
 | Manhattan frame-time baseline | **gpuP95 4.376 ms** / gpuP50 3.305 ms (`EXT_disjoint_timer_query_webgl2` IS available on this machine), rAF p95 8.4 ms | verify-depth2 (10) N8AO budget |
 | Receive-set experiment cost | **−0.18 ms** for 4 near leaf tiles at Manhattan 700 m (i.e. inside the noise) — the R13 fill-rate objection, measured | verify-depth2 (11) |
 | P-LEWIS collision index | 1 844 columns in the ring, **49 within 1 500 m**, entry shape `{x, z, topY, r}` | verify-clutter (5)/(14) anti-dup |
 | Manhattan (verify-depth2 pose) | 244 draws / 1 301 445 tris at 682 m AGL, 20 caster meshes | verify-depth2 budgets |
 | Owens (verify-clutter pose+settle) | **195 draws** / 187 224 tris, camTileZ 15 | verify-clutter (6)/(7)/(8) |
+
+### §1h W2 RE-EXPRESSIONS from B SETTLE's and C CLUTTER's own measurements
+
+Three more instruments were corrected by their owners' evidence, before W3
+rather than at it:
+
+1. **The slew gate was reporting an instrument artifact.** A m/s figure
+   computed with a dt that is not the damper's own dt is not the damper's rate:
+   B's per-rAF rates read 350–540 m/s on a damper that is correct by
+   construction, because a 100 ms sampler dividing by 0.1 s reports the rate of
+   a step the damper never took in one step. Re-expressed as the **per-frame
+   step in metres** (B: raw ~384 m/frame, damped ≤ 4.0 m/frame by
+   construction), sampled per-rAF rather than per-100 ms.
+
+2. **The stutter gate would have failed B's fix for working.** With the prewarm
+   fix ON the post-reveal program count RISES 13 → 19, because the env re-key
+   deliberately warms the full set — more programs, calmer frame. The long-frame
+   COUNT did not separate B's arms either (2 vs 2). The scalar that did is the
+   **worst frame** in the window: OFF 576–714 ms → ON 132–165 ms. Gates (4) and
+   (6) now assert that; programs and long-frame count are printed as evidence.
+
+3. **The clutter determinism gate needed C's three-valued pin and a
+   commutative set hash.** `__flyClutterPin` is `1` legacy / `0` live /
+   `'freeze'` armed-with-clock-0; the Owens-zero legs run LIVE (empty while
+   frozen would prove less), the determinism and flicker legs run `'freeze'`.
+   The hash is a **commutative sum over per-instance hashes excluding matrix
+   element 13** — pool order is an allocation detail, and element 13 is the
+   draped DEM height, which A legitimately moves with `demMaxZoom`. Mover COUNT
+   is never frozen (C measured 138–142 breathing at ring edges). Cross-boot,
+   the gate asserts poles bit-identical + counts stable and REPORTS the
+   parked/mover set-hash residual, which C attributes to the collision index
+   still filling as z14 streams. Sampling waits on a settle PREDICATE
+   (`clutter.ready === chunks` and the building ring resolved), not a timer.
 
 ### §1b Gates that did NOT go red on this hardware, and what was done about them
 
@@ -222,9 +319,11 @@ list, not a wish list.
 
 | Instrument | Owner | Gate that is blind without it |
 |---|---|---|
-| `runtime.terraStats = {camTileZ, targetZ, downloading, sharp}` | **A** | verify-terra (16); verify-arrival's hold-cap selection |
-| `runtime.arrivalStats` (is `ARRIVAL_GATE` armed, and which terms resolved) | **B** | verify-arrival (3) — without it the gate assumes the LEGACY 3500 ms cap and would call a correctly-armed 6500 ms hold a failure |
-| `runtime.popin` (per-layer first appearance + `fading` flag) | **B** | verify-settle (3) |
+| ~~`runtime.terraStats`~~ | A | **DELIVERED (r22/a)**. Canonical read: `runtime.terraStats ?? runtime.engine?.terraStats` (Fable's arbitration commit `6095e9c`). `sharp = settled && (atTarget || stalled)` with `sharpReason` is RATIFIED — verify-arrival (6) treats `sharpReason:'stalled'` as a legitimate CRUISE reveal reason, because `atTarget` is false forever at FL300 (targetZ is a pure function of AGL and does not know about the frustum rule) |
+| ~~`runtime.arrivalStats`~~ | B | **DELIVERED (r22/b)** — `{gateArmed, kind, epoch, holdStartAt, revealAt, holdCapMs, holdMs, reason, terms}` + `legacy:true`. verify-arrival now READS `holdCapMs` instead of inferring it |
+| ~~`runtime.popin`~~ | B | **DELIVERED (r22/b)** — `{revealKind, layers:{atMs, sinceRevealMs, birthed}, longFrames, worstMs, frames}`. Note the flag is `birthed`, not `fading`; verify-settle (3) re-pointed |
+| ~~`__flyStats.clutter` + the mesh handles~~ | C | **DELIVERED (r22/c)** — plus `baseDraws`. Caveat folded into the gate: `baseDraws` derives from `__flyStats.drawCalls`, which republishes every 60 frames (~1 s stale), so both arms of the Owens flip are sampled 5 s after the flip |
+| ~~`window.__flyTerraForce`~~ | A | **DELIVERED (r22/a)** — `{sharp,pipe,cache,demMaxZoom,maxZoomHigh,errTable,errTableValues}`. verify-terra and verify-arrival now arm TERRA through it and never touch `__flyTerraPin` |
 | `__flyStats.clutter = {parked, moving, poles: {count, tris, anchors}, baseDraws}` | **C** | verify-clutter (7)(8)(10)(11)(12)(13)(14) — seven gates |
 | `window.__flyClutterParked` / `__flyClutterMoving` / `__flyClutterPoles` (or `window.__flyClutter`) | **C** | verify-clutter (15)(16) determinism + pin freeze |
 | `window.__flyN8AO.set(bool)` | **D** | verify-depth2 (9)(10) — the AO A/B needs a live toggle, not a rebuild |
@@ -241,10 +340,10 @@ fully pinned (**proven: `verify-boot` ALL PASS on this tree after the edit**).
 
 | Gate | Un-pins | Deliberately does NOT un-pin |
 |---|---|---|
-| verify-terra | `__flyTerraPin` | — |
-| verify-arrival | `__flySettlePin` + `__flyTerraPin` (the content gate reads A's terraStats; certifying B's reveal over A's pinned legacy terrain would certify a combination that never ships) | `__flyAerialOverride` — verify-aerial owns that un-pin and the ruling is not reopened; the SAT_QUILT evidence here is a uniform read plus a screenshot |
+| verify-terra | **W2: none.** TERRA is armed through A's own `window.__flyTerraForce = {sharp,pipe,cache}` (the `__flyAerialOverride` idiom), so the fleet pin every other harness depends on is never touched — and the gate's result does not change when Fable later flips `TERRA_*.enabled`. `R22_TERRA=on` arms; the default forces all three OFF, which is the RED state | `__flyTerraPin` |
+| verify-arrival | `__flySettlePin` (B's family has no per-family override) + TERRA via `__flyTerraForce` as above | `__flyTerraPin`; `__flyAerialOverride` — verify-aerial owns that un-pin and the ruling is not reopened; the SAT_QUILT evidence here is a uniform read plus a screenshot |
 | verify-settle | `__flySettlePin` | `__flyTerraPin` — pop-in and stutter are B-owned, and letting A's pipeline change the stream-in ordering underneath them makes every number a two-variable experiment |
-| verify-clutter | `__flyClutterPin` | — |
+| verify-clutter | `__flyClutterPin`, and C shipped it THREE-VALUED: `1` legacy / `0` live / `'freeze'` armed-with-clock-0. The Owens-zero and +N-draw legs run LIVE (empty while frozen would prove less); the determinism and five-control flicker legs run `'freeze'` | — |
 | verify-depth2 | `__flyDepthPin` | `__flySatShadowOverride` — the shadow A/B drives `window.__flySatShadow.set()`, the imperative handle verify-aerial itself uses, so no other gate's frozen pixels can move |
 
 A gate proves it un-pinned rather than assuming it: the swallowed fleet write is

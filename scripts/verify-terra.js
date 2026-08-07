@@ -19,13 +19,22 @@
  * below is built on it.
  *
  * ---------------------------------------------------------------------------
- * WHAT THIS GATE UN-PINS
+ * HOW THIS GATE ARMS TERRA (W2: `__flyTerraForce`, not the fleet pin)
  * ---------------------------------------------------------------------------
- * `scripts/_boot.js` pins `__flyTerraPin = 1` fleet-wide (legacy = the R21
- * terrain pipeline) so every frozen gate keeps measuring the R21 world. This
- * is ONE of the five R22 gates that un-pin, per-gate and deliberately, via the
- * shared `unpinPins` accessor (the R21 `__flyGovPin` idiom: an accessor
- * defined before the app mounts swallows the fleet write).
+ * A TERRA shipped `window.__flyTerraForce = {sharp, pipe, cache, demMaxZoom,
+ * maxZoomHigh, errTable, errTableValues}` — a per-FAMILY dev override on the
+ * `__flyAerialOverride` idiom, read before the constants and before the fleet
+ * pin. That is the lever this gate uses, so it never touches
+ * `__flyTerraPin` (which every other harness in the fleet depends on) and its
+ * result does not change when Fable later flips `TERRA_*.enabled` in the
+ * constants — the harness states its own condition instead of inheriting one.
+ *
+ *   node scripts/verify-terra.js              -> CONTROL (all three forced OFF)
+ *   R22_TERRA=on node scripts/verify-terra.js -> ARMED   (all three forced ON)
+ *
+ * The control is the RED state and the default, so a bare run always
+ * re-measures the red rather than silently certifying whatever the tree
+ * happens to ship.
  *
  * ---------------------------------------------------------------------------
  * RED CALIBRATION (r22/e @ ee39397 — all seven R22 blocks enabled:false, i.e.
@@ -33,7 +42,7 @@
  * scripts/r22-close-sweep.md §1. The reds this gate exists to produce:
  *   (2)  P-LEWIS camTileZ at ~120 m AGL after a 10 s settle — target >= 17
  *   (5)  z18 imagery never requested (satMaxZoomByTier.high = 17)
- *   (7)  P-DUBLIN post-warp descent time to a usable tileZ
+ *   (7)  P-DUBLIN post-warp descent time (RE-BASED on maxLeafZ at W2)
  *   (8)  Cache API 'fly-raster-v1' does not exist (imagery/DEM are cold on
  *        every warp — the R21 tile cache covers vector pbf ONLY)
  *   (9)  second-visit request count vs cold (no persistent raster cache ⇒ ~1.0)
@@ -43,12 +52,19 @@
  * GATES
  *   (1)  precondition — satellite settled at P-LEWIS, tier high, engine live
  *   (2)  P-LEWIS SHARPNESS — camTileZ >= 17 within 10 s of settle
+ *   (2b) RETIRED IN W2 — see the anchor: `maxLeafZ` counts leaves ANYWHERE in
+ *        the tree, so at low AGL it reads 17 off residue from earlier poses
+ *        while the ground under the camera is z13. It is the right instrument
+ *        at CRUISE and the wrong one here; gate (2) carries the low-AGL claim.
  *   (3)  the LOD curve is MONOTONE — tileZ never rises as the camera climbs
  *   (4)  live LODThreshold matches the style/tier contract (and the TERRA_SHARP
  *        curve endpoints when the flag is on)
  *   (5)  z18 imagery is requested at P-LEWIS on the high tier
- *   (6)  P-DUBLIN settles to a usable tileZ within the settle window
- *   (7)  P-DUBLIN warp descent time to camTileZ >= DESCENT_Z
+ *   (6)  P-DUBLIN does not REGRESS at cruise (maxLeafZ floor, not a target)
+ *   (7)  P-DUBLIN COLD WARP COST — raster requests for one cold FL300 arrival.
+ *        (W2 RE-BASE, twice: camTileZ is frustum-capped at cruise BY DESIGN,
+ *        and A's armed-vs-control evidence shows the settled cruise ZOOM does
+ *        not move either — so the gate is the cost, and the zoom is an anchor.)
  *   (8)  the persistent raster cache exists after a satellite session
  *   (9)  SECOND VISIT IS CHEAP — raster requests <= 40% of the cold visit
  *   (10) Esri Terrain3D z16 LERC probe (informational — the §5.5 gate for
@@ -77,6 +93,11 @@ const { bootFly, unpinPins } = require('./_boot');
 const BOOT_OPTS = process.env.FLY_URL ? { url: process.env.FLY_URL } : {};
 const DEV_ORIGIN = (process.env.FLY_URL || 'http://localhost:3000').replace(/\/$/, '');
 const SETTLE_MS = +(process.env.TERRA_SETTLE_MS ?? 10000);
+const TERRA_ARMED = process.env.R22_TERRA === 'on';
+/** A's per-family override, installed before mount. See the header. */
+const FORCE_TERRA = (on) => {
+  window.__flyTerraForce = { sharp: on, pipe: on, cache: on };
+};
 
 /* ---------------------------------------------------------------- poses ---
  * P-LEWIS  — the user's low-AGL screenshot. Lewis Center OH, ground ~280 m
@@ -93,11 +114,37 @@ const P_LEWIS = [40.2083, -83.0701, 400];
 const P_DUBLIN = [40.0992, -83.1141, 9144];
 const OWENS = [36.601, -118.06, 500];
 const FAR_START = [36.75, -118.05, 9144];
-/* The zoom the descent clock stops at. Not "the target zoom" — a floor that
- * means "the ground under the camera is no longer a smeared parent tile". At
- * FL300 the LOD math wants ~z12-13; 13 is one level below that, so a descent
- * that reaches it has genuinely arrived. */
-const DESCENT_Z = 13;
+/* THE DESCENT CLOCK STOPS ON `maxLeafZ`, NOT ON `camTileZ` (W2 re-base).
+ * The W1 form asked for camTileZ >= 13 at FL300 and measured "NEVER in 40 s,
+ * stuck at z10 with downloading 0" — which A TERRA then proved is the three-
+ * tile frustum rule working correctly, not a pipeline defect (see PROBE). The
+ * clock now stops when the deepest resident leaf ANYWHERE reaches z13, which
+ * is real descent progress and is what A's own armed/control comparison
+ * measures (cold z14 reach 1541 ms armed vs 2053 ms control at low AGL). */
+const DESCENT_LEAF_Z = 13;
+/* ── WHAT IS ACTUALLY MOVABLE AT FL300, AND WHAT IS NOT (W2, second pass) ──
+ * The first re-base put the FL300 descent clock on `maxLeafZ >= 13`. A's own
+ * armed-vs-control evidence then showed that would be a gate NOBODY CAN GREEN:
+ *
+ *   scripts/r22-a-dublin-prof-control.json  maxLeafZ 13, profile {2:10 5:10 10:12 20:12 50:10}
+ *   scripts/r22-a-dublin-prof-armed.json    maxLeafZ 12, profile {2:10 5:10 10:12 20:12 50:10}
+ *
+ * IDENTICAL ahead-profile, armed and control, and the armed maxLeafZ is if
+ * anything one lower. My own control run reproduces the profile to the digit.
+ * At cruise the settled zoom is what three-tile gives you: the deep tiles are
+ * out of frustum and will not subdivide, and no LOD curve, vendored patch or
+ * cache changes that. **R22 does not make the FL300 view sharper, and a gate
+ * that claimed otherwise would be a red nobody could ever close.**
+ *
+ * What DOES move at FL300, measured by A on the same poses, is the COST of
+ * getting there: cold raster requests 306 (control) -> 182 (armed) -> 0 on a
+ * second visit through the cache. So the FL300 legs gate the REQUEST COUNT,
+ * the settled zoom is RECORDED as an anchor, and the sharpness gate moves to
+ * the altitude where sharpness is real — P-LEWIS, where the ground under the
+ * camera IS in frustum and A measured leaf 17 -> 18 at 4 s against my red 13. */
+const DUBLIN_REQ_MAX = +(process.env.TERRA_DUBLIN_REQ ?? 220); // control ~306, A armed 182
+const DUBLIN_LEAF_FLOOR = +(process.env.TERRA_DUBLIN_LEAF ?? 12); // regression floor, not a target
+const LEWIS_DESCENT_MS = +(process.env.TERRA_LEWIS_DESCENT_MS ?? 10000);
 const LEWIS_TARGET_Z = 17;
 const MAX_TRIS_LEWIS = 2000000; // plan §5.11
 const OWENS_DRAW_CEILING = 261; // plan §4, frozen
@@ -139,6 +186,51 @@ const PROBE = () => {
   const lon = +g.x;
   const lat = +g.y;
   const ga = eng.getGroundAt(lon, lat);
+  /* ── THE FRUSTUM-IMMUNE SIGNALS (W2 RE-BASE, A TERRA's instruments) ──────
+   * `camTileZ` — the leaf under the AIRCRAFT — is a valid sharpness statistic
+   * at low AGL and an INVALID one at cruise, and A measured exactly why: at
+   * 9 km with a near-level chase camera the ground directly below is outside
+   * the view frustum, and three-tile refuses to subdivide an out-of-frustum
+   * tile (`Tile._update` skips LOD for a non-visible leaf; `_getDistRatio`
+   * multiplies the ratio by 5 rather than 0.8 when not visible). So at FL300
+   * camTileZ saturates near z10 with the loader completely idle — which is the
+   * library working correctly, not a defect, and no pipeline or LOD-curve fix
+   * can move it. My W1 P-DUBLIN reds measured that saturation and have been
+   * RETIRED (see scripts/r22-close-sweep.md §1, struck through, and §1g).
+   *
+   * These three replace it, and none of them can be capped by the frustum in
+   * the same way:
+   *   maxLeafZ — the deepest resident leaf ANYWHERE in the tree. Real descent
+   *              progress; A measured 13 at P-DUBLIN while camTileZ sat at 10.
+   *   profile  — the leaf zoom on the ground at fixed distances AHEAD along
+   *              the heading. This is what the eye actually judges at cruise.
+   *   viewZ    — the leaf where the camera's forward ray meets the ground.
+   * Definitions are A's (scripts/r22-a-measure.js), reproduced verbatim so the
+   * two agents' numbers are comparable rather than merely similar. */
+  let maxLeafZ = 0;
+  try {
+    eng.object.traverse((o) => {
+      if (o.isTile && o.children.length <= 1 && o.z > maxLeafZ) maxLeafZ = o.z;
+    });
+  } catch {
+    maxLeafZ = null;
+  }
+  const profile = (() => {
+    try {
+      const hdg = f.heading;
+      const out = {};
+      for (const km of [2, 5, 10, 20, 50]) {
+        const dLat = (km * 1000 * Math.cos(hdg)) / 111320;
+        const dLon =
+          (km * 1000 * Math.sin(hdg)) / (111320 * Math.max(0.2, Math.cos((lat * Math.PI) / 180)));
+        const s = eng.getGroundAt(lon + dLon, lat + dLat);
+        out[km] = s ? s.tileZ : null;
+      }
+      return out;
+    } catch {
+      return null;
+    }
+  })();
   return {
     lon: +lon.toFixed(5),
     lat: +lat.toFixed(5),
@@ -146,6 +238,8 @@ const PROBE = () => {
     groundElev: Math.round(f.groundElev),
     aglM: Math.round(f.pos.y - f.groundElev),
     camTileZ: ga ? ga.tileZ : null,
+    maxLeafZ,
+    profile,
     camElev: ga ? Math.round(ga.elev) : null,
     downloading: eng.downloading ?? null,
     lodThreshold: eng.map?.LODThreshold ?? null,
@@ -153,8 +247,10 @@ const PROBE = () => {
     tier: window.__flyStore?.getState?.().qualityTier ?? null,
     draws: window.__flyStats?.drawCalls ?? null,
     tris: window.__flyStats?.triangles ?? null,
-    // A's contract (TERRA_SHARP header). undefined = legacy, by design.
-    terraStats: rt.terraStats ?? null,
+    // A's contract. FlyScene calls engine.attachRuntime, so the canonical read
+    // is `runtime.terraStats ?? runtime.engine?.terraStats` (Fable's
+    // arbitration commit 6095e9c). undefined = legacy, by design.
+    terraStats: rt.terraStats ?? rt.engine?.terraStats ?? null,
   };
 };
 
@@ -198,6 +294,7 @@ const UNFREEZE = () => {
     softs.push(name);
   };
   const info = (s) => console.log(`INFO ${s}`);
+  const anchorLog = (name, detail) => console.log(`ANCHOR ${name} — ${detail}`);
 
   /** Per-page request tally, by class and by zoom. */
   const tally = () => ({ img: 0, dem: 0, maxImgZ: 0, maxDemZ: 0, byZ: {} });
@@ -233,7 +330,7 @@ const UNFREEZE = () => {
 
   const newFlyPage = async () => {
     const p = await context.newPage();
-    await p.addInitScript(unpinPins, ['__flyTerraPin']);
+    await p.addInitScript(FORCE_TERRA, TERRA_ARMED);
     return p;
   };
 
@@ -250,10 +347,14 @@ const UNFREEZE = () => {
   });
 
   const pinState = await page.evaluate(() => ({
-    terraPin: window.__flyTerraPin ?? null,
-    attempted: window.__r22PinAttempt?.__flyTerraPin ?? null,
+    force: window.__flyTerraForce ?? null,
+    fleetPin: window.__flyTerraPin ?? null,
+    terraStats: window.__fly?.terraStats ?? window.__fly?.engine?.terraStats ?? null,
   }));
-  console.log(`TERRA pin un-pinned: value=${pinState.terraPin} (fleet attempted ${pinState.attempted})`);
+  console.log(
+    `TERRA ${TERRA_ARMED ? 'ARMED' : 'CONTROL (forced OFF)'} via __flyTerraForce=${JSON.stringify(pinState.force)} ` +
+      `· fleet pin left untouched at ${pinState.fleetPin} · terraStats ${pinState.terraStats ? 'published' : 'absent (legacy, as expected in control)'}`
+  );
 
   /* ============================ P-LEWIS ================================== */
   const warpTo = async (p, [lat, lon, altM]) => {
@@ -280,8 +381,9 @@ const UNFREEZE = () => {
   const lewisMaxZ = Math.max(...lewisTrace.map((r) => r.camTileZ ?? 0));
   const lewisFinalZ = lewis.camTileZ ?? 0;
   console.log(
-    `P-LEWIS trace (${lewisTrace.length} @500ms): camTileZ ${lewisTrace.map((r) => r.camTileZ).join(',')} ` +
-      `· AGL ${lewis.aglM} m · downloading ${lewisTrace.map((r) => r.downloading).join(',')}`
+    `P-LEWIS trace (${lewisTrace.length} @500ms): camTileZ ${lewisTrace.map((r) => r.camTileZ).join(',')} · ` +
+      `maxLeafZ ${lewisTrace.map((r) => r.maxLeafZ).join(',')} · AGL ${lewis.aglM} m · ` +
+      `downloading ${lewisTrace.map((r) => r.downloading).join(',')}`
   );
   await page
     .locator('.fixed.inset-0 canvas')
@@ -304,6 +406,31 @@ const UNFREEZE = () => {
     `camTileZ ${lewisFinalZ} @ ${lewis.aglM} m AGL`,
     `>= ${LEWIS_TARGET_Z}`,
   ]);
+  /* THE DESCENT GATE LIVES AT LOW AGL, where sharpness is real (see the
+   * DUBLIN_REQ_MAX comment). A measured maxLeafZ 17 -> 18 at 4 s here with
+   * TERRA armed; the control never gets there at all. */
+  /* maxLeafZ IS THE WRONG INSTRUMENT AT LOW AGL — measured, and recorded as an
+   * anchor rather than a gate.
+   *
+   * At cruise `maxLeafZ` is the honest signal precisely because it looks
+   * ANYWHERE in the tree, past the frustum cap on the tile under the aircraft.
+   * At low AGL that same property makes it vacuous: the tree still holds deep
+   * leaves from wherever the session has already been, so this run read
+   * maxLeafZ 17 in the FIRST sample (`0 ms`) on a control tree whose ground
+   * under the camera is z13. A gate that green on the defective tree is a
+   * coin, so this is an ANCHOR. The low-AGL sharpness claim belongs to gate
+   * (2), which reads camTileZ — valid here, because at 160 m AGL the ground
+   * under the camera IS in frustum. Each instrument is used exactly where it
+   * measures something. */
+  const lewisLeafHit = lewisTrace.find((r) => (r.maxLeafZ ?? 0) >= LEWIS_TARGET_Z);
+  const lewisDescentMs = lewisLeafHit ? Math.round(lewisLeafHit.t * 1000) : null;
+  anchorLog(
+    'P-LEWIS descent',
+    `maxLeafZ reached z${LEWIS_TARGET_Z} at ${lewisDescentMs ?? 'NEVER'} ms, best in window ` +
+      `${Math.max(...lewisTrace.map((r) => r.maxLeafZ ?? 0))} (A measured 17 -> 18 at 4 s armed). ` +
+      `NOT a gate: maxLeafZ counts leaves anywhere in the tree, including residue from earlier poses — ` +
+      `it reads 17 here while the ground under the camera is z${lewisFinalZ}. Gate (2) carries the low-AGL claim.`
+  );
 
   /* ------------------------- the AGL/tileZ curve ------------------------- */
   // Four altitude bands over the SAME ground. This is the "live LOD-curve
@@ -413,6 +540,7 @@ const UNFREEZE = () => {
   // reveal — verify-arrival owns the reveal moment; this gate owns the descent.
   await warpTo(page, FAR_START);
   await page.waitForTimeout(6000);
+  const reqAtWarp = { img: cold.img, dem: cold.dem };
   const tWarp = Date.now();
   await warpTo(page, P_DUBLIN);
   await page.waitForTimeout(1200);
@@ -421,36 +549,74 @@ const UNFREEZE = () => {
   let descentMs = null;
   while (Date.now() - tWarp < 40000) {
     const s = await page.evaluate(PROBE);
-    dublinTrace.push({ t: +((Date.now() - tWarp) / 1000).toFixed(1), z: s.camTileZ, dl: s.downloading });
-    if (descentMs == null && (s.camTileZ ?? 0) >= DESCENT_Z) descentMs = Date.now() - tWarp;
-    if (descentMs != null && Date.now() - tWarp > (descentMs + 4000)) break;
+    dublinTrace.push({
+      t: +((Date.now() - tWarp) / 1000).toFixed(1),
+      z: s.camTileZ,
+      leaf: s.maxLeafZ,
+      prof: s.profile,
+      dl: s.downloading,
+    });
+    if (descentMs == null && (s.maxLeafZ ?? 0) >= DESCENT_LEAF_Z) descentMs = Date.now() - tWarp;
+    if (descentMs != null && Date.now() - tWarp > descentMs + 4000) break;
     await page.waitForTimeout(400);
   }
-  const dublinZ = Math.max(...dublinTrace.map((r) => r.z ?? 0));
+  const dublinReqs = cold.img + cold.dem - reqAtWarp.img - reqAtWarp.dem;
+  const dublinLeaf = Math.max(...dublinTrace.map((r) => r.leaf ?? 0));
+  const dublinCam = Math.max(...dublinTrace.map((r) => r.z ?? 0));
+  // The AHEAD PROFILE, settled: the median leaf zoom per distance over the
+  // second half of the trace (the first half is still descending). This is
+  // the ground the player is looking at, and it is the honest answer to "is
+  // the arrival blurry" now that camTileZ has been retired at cruise.
+  const half = dublinTrace.slice(Math.floor(dublinTrace.length / 2));
+  const settledProfile = {};
+  for (const km of [2, 5, 10, 20, 50]) {
+    const vals = half
+      .map((r) => r.prof?.[km])
+      .filter((v) => v != null)
+      .sort((a, b) => a - b);
+    settledProfile[km] = vals.length ? vals[Math.floor(vals.length / 2)] : null;
+  }
+  const viewProfileZ = Math.max(settledProfile[10] ?? 0, settledProfile[20] ?? 0);
   console.log(
-    `P-DUBLIN descent: ${dublinTrace.map((r) => `${r.t}s:z${r.z}/dl${r.dl}`).join(' ')} · ` +
-      `reached z${DESCENT_Z} at ${descentMs ?? 'NEVER'} ms`
+    `P-DUBLIN descent: ${dublinTrace.map((r) => `${r.t}s:leaf${r.leaf}/cam${r.z}/dl${r.dl}`).join(' ')}`
+  );
+  console.log(
+    `  settled ahead-profile (km→leafZ): ${JSON.stringify(settledProfile)} · maxLeafZ ${dublinLeaf} · ` +
+      `camTileZ ${dublinCam} (FRUSTUM-CAPPED at cruise BY DESIGN — see PROBE) · reached leaf z${DESCENT_LEAF_Z} at ${descentMs ?? 'NEVER'} ms`
   );
   await page
     .locator('.fixed.inset-0 canvas')
     .first()
     .screenshot({ path: path.join(__dirname, 'r22-e-terra-02-dublin.png') });
   gate(
-    `(6) P-DUBLIN reaches a usable zoom (camTileZ >= ${DESCENT_Z}) inside the 40 s window`,
-    dublinZ >= DESCENT_Z,
-    `best camTileZ ${dublinZ} in 40 s`
+    `(6) P-DUBLIN does not REGRESS at cruise (maxLeafZ >= ${DUBLIN_LEAF_FLOOR})`,
+    dublinLeaf >= DUBLIN_LEAF_FLOOR,
+    `best maxLeafZ ${dublinLeaf} in 40 s (camTileZ ${dublinCam}, frustum-capped). This is a FLOOR, not a target: ` +
+      `A measured the same 12-13 armed AND control, so the cruise zoom is not something this round moves.`
   );
   gate(
-    `(7) P-DUBLIN cold warp descent to z${DESCENT_Z} <= 12000 ms`,
-    descentMs != null && descentMs <= 12000,
-    `${descentMs ?? '>40000'} ms (cold, no persistent raster cache)`
+    `(7) P-DUBLIN COLD WARP COST — raster requests for the arrival <= ${DUBLIN_REQ_MAX}`,
+    dublinReqs <= DUBLIN_REQ_MAX,
+    `${dublinReqs} imagery+DEM requests for one cold FL300 arrival ` +
+      `(A measured 306 control -> 182 armed -> 0 on a second visit through the cache). ` +
+      `This is the FL300 statistic that MOVES; the settled zoom is not.`
   );
   red.push([
-    'T5 cold warp descent is serial',
+    'T5 the cold cruise arrival re-fetches the whole pyramid (RE-BASED W2: request count)',
     'verify-terra (7)',
-    `${descentMs ?? '>40000'} ms to z${DESCENT_Z}`,
-    '<= 12000 ms',
+    `${dublinReqs} requests`,
+    `<= ${DUBLIN_REQ_MAX}`,
   ]);
+  // ANCHOR, not a gate. Recorded every run so a REGRESSION is visible, and
+  // recorded in the round record so checkpoint #2 is framed honestly: what the
+  // user will see change at FL300 is the wait and the second visit, not the
+  // texel density.
+  anchorLog(
+    'P-DUBLIN cruise sharpness',
+    `settled ahead-profile ${JSON.stringify(settledProfile)} (best 10/20 km = z${viewProfileZ}), maxLeafZ ${dublinLeaf}, ` +
+      `camTileZ ${dublinCam}, first leaf z${DESCENT_LEAF_Z} at ${descentMs ?? 'never'} ms — ` +
+      `A measured this profile IDENTICAL armed and control, so it is an anchor, not a gate`
+  );
 
   /* ------------------- Esri Terrain3D z16 LERC probe (§5.5) -------------- */
   // A's demMaxZoom 15 -> 16 sanction is CONDITIONAL on real z16 LERC existing
@@ -543,7 +709,10 @@ const UNFREEZE = () => {
   let warmDescentMs = null;
   while (Date.now() - tWarm < 25000) {
     const s = await page2.evaluate(PROBE);
-    if (warmDescentMs == null && (s.camTileZ ?? 0) >= DESCENT_Z) warmDescentMs = Date.now() - tWarm;
+    // P-LEWIS is LOW AGL, where camTileZ is a valid statistic (the tile under
+    // the aircraft is in frustum) — but the cold clock above stops on
+    // maxLeafZ, so this one does too or the two are not comparable.
+    if (warmDescentMs == null && (s.maxLeafZ ?? 0) >= DESCENT_LEAF_Z) warmDescentMs = Date.now() - tWarm;
     if (warmDescentMs != null) break;
     await page2.waitForTimeout(400);
   }
@@ -559,7 +728,7 @@ const UNFREEZE = () => {
   console.log(
     `SECOND VISIT: session requests ${warm.img}img/${warm.dem}dem vs cold ${cold.img}img/${cold.dem}dem ` +
       `(ratio ${ratio.toFixed(2)}) · P-LEWIS leg alone ${warmVisit.img}img/${warmVisit.dem}dem · ` +
-      `descent to z${DESCENT_Z} ${warmDescentMs ?? '>25000'} ms (cold was ${descentMs ?? '>40000'} ms) · ` +
+      `descent to leaf z${DESCENT_LEAF_Z} ${warmDescentMs ?? '>25000'} ms (cold P-DUBLIN was ${descentMs ?? '>40000'} ms) · ` +
       `settled camTileZ ${warmLewis.camTileZ}`
   );
   gate(
