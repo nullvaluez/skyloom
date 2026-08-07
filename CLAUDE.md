@@ -12,7 +12,49 @@
 > describes deleted code (markers, panels, Leaflet-era plans); do not act
 > on it.
 
-> **⚠️ NEWEST — READ FIRST:** **Round 20 "Icons & Sprawl" is BUILT +
+> **⚠️ NEWEST — READ FIRST:** **Round 21 "Steady State" is BUILT and pushed
+> (2026-08-07): [FLY_ROUND21.md](FLY_ROUND21.md) is the record** (plan
+> [FLY_ROUND21_PLAN.md](FLY_ROUND21_PLAN.md); FIVE Opus 5 agents — A GOVERNOR
+> / B STREAMKEEPER / C SURFACE / D PIPELINE / E CERT — under Fable
+> orchestration; scaffolding `e1077f8` moved WORKER_PROTOCOL 16→17 at all six
+> pin sites lockstep + four pre-seeded `enabled:false` blocks, zero constants
+> conflicts a fourth straight round). **It fixes the two R20 live regressions
+> at the root — 18 confirmed defects (S1–S8 flashing, P1–P10 patchy world),
+> each closed by measurement**: the un-latched PerformanceMonitor flap is
+> replaced by a session-latching governor (`PERF_GOVERNOR`, 0 steps at the
+> exact R20 flap condition); the EffectComposer leak/DPR-resize/rebuild churn
+> by a vendored composer (`FX_STABILITY`, programs flat across ladder
+> cycles); bend-blind frustum culling by computed sphere margins
+> (`STREAM_KEEPER`, orbit-proven +15/+45% submissions — the Neon
+> disappearing-chunks bug); sticky-empty tiles by reason-coded TTL/backoff;
+> the 39-vs-41 Owens-lock checkerboard by a monotone hatch ramp
+> (`TILE_PIPELINE`, Owens 0 BY CONSTRUCTION); the skyline one-corner-per-tile
+> cap by a hash shuffle; the parcel-homes boot carpet by a two-ring settle +
+> collision-index trust gate + rolling-MIN regK (`SURFACE_CALM` — NOT an EMA,
+> the flap converges an EMA to phantom homes, documented inline); the
+> monument 1-frame double-draw by same-frame suppression (epoch lag 0.000s);
+> the reversed-depth polygonOffset units sign; plus a PREWARM system
+> (compileAsync over 29 world-bend variants + all three Effects tier chains,
+> boot FASTER flag-on) and a persistent cross-worker Cache API tile cache
+> (3× traffic cut). NEW gates: verify-stability (17) / verify-flicker (7) /
+> verify-tier-step (10) / verify-seam (13) — each RED-calibrated on the
+> defective tree first — + the first SATELLITE soak (p95 tris ≤2.2M
+> BLOCKING). Flicker attribution series 380→146(A)→73(D)→49(B) swinging px;
+> Owens 179–195 ≤ 261 held everywhere; zero frozen numbers moved except two
+> Manhattan R18 hashes re-baselined under a 3-way-controlled UPSTREAM planet
+> drift ruling (OFM build 20260802 — frozen hashes over live tilesets have a
+> shelf life). **⚠️ W3 fleet + both 15-min soaks were IN FLIGHT at push
+> time** — smoke 17/17 + first fleet rows green; the final §4 run table and
+> soak percentiles land in a follow-up close commit. §5 = the session-limit
+> postmortem (both killed agents salvaged from transcripts; the carpet
+> reproduced only UNDER LOAD after a quiet-boot-green probe — "a probe green
+> on a quiet boot is not a probe green under load"). §6 = user checkpoints
+> (the two reported symptoms re-checked on the user's machine FIRST).
+> **[FLY_ROUND22_HANDOFF.md](FLY_ROUND22_HANDOFF.md) = the next round's
+> seed: the "Cinematic Night" graphics pass toward the user's reference
+> image (8 ranked deltas, ownership split, measurement protocol).**
+>
+> Earlier: **Round 20 "Icons & Sprawl" is BUILT +
 > CERTIFIED (2026-08-02): [FLY_ROUND20.md](FLY_ROUND20.md) is the record**
 > (plan [FLY_ROUND20_PLAN.md](FLY_ROUND20_PLAN.md); FOUR Opus 5 agents —
 > A SPRAWL / B HOMES / C ICONS / D CERT — plus salvage instances B2/C2 after
