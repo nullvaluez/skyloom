@@ -1,5 +1,5 @@
 {
- "when": "2026-08-07T18:28:55.805Z",
+ "when": "2026-08-07T22:57:51.199Z",
  "manh": {
   "tilesTotal": 170,
   "tilesNear": 4,
@@ -9,8 +9,8 @@
   "receivers": 0,
   "catcherMeshes": 0,
   "aglM": 682,
-  "draws": 245,
-  "tris": 1368850,
+  "draws": 242,
+  "tris": 1262115,
   "tier": "high"
  },
  "armed": {
@@ -66,40 +66,42 @@
     0,
     0,
     0
-   ]
+   ],
+   "nearStartM": 0,
+   "nearMaxMix": 0
   }
  },
  "manhBase": {
-  "frames": 943,
-  "p50": 8.2,
-  "p95": 8.4,
-  "gpuSamples": 471,
-  "gpuP50": 3.683,
-  "gpuP95": 4.224,
+  "frames": 1439,
+  "p50": 4.2,
+  "p95": 4.3,
+  "gpuSamples": 718,
+  "gpuP50": 3.321,
+  "gpuP95": 3.669,
   "instrument": "EXT_disjoint_timer_query_webgl2"
  },
  "recv": {
   "touched": 4
  },
  "recvOn": {
-  "frames": 956,
-  "p50": 4.3,
-  "p95": 8.4,
-  "gpuSamples": 477,
-  "gpuP50": 3.585,
-  "gpuP95": 4.345,
+  "frames": 1438,
+  "p50": 4.2,
+  "p95": 4.3,
+  "gpuSamples": 717,
+  "gpuP50": 3.427,
+  "gpuP95": 3.766,
   "instrument": "EXT_disjoint_timer_query_webgl2"
  },
  "recvOff": {
-  "frames": 981,
-  "p50": 4.3,
-  "p95": 8.4,
-  "gpuSamples": 490,
-  "gpuP50": 3.575,
-  "gpuP95": 4.241,
+  "frames": 1439,
+  "p50": 4.2,
+  "p95": 4.3,
+  "gpuSamples": 718,
+  "gpuP50": 3.411,
+  "gpuP95": 3.78,
   "instrument": "EXT_disjoint_timer_query_webgl2"
  },
- "recvDelta": 0.10400000000000009,
+ "recvDelta": -0.01399999999999979,
  "near": {
   "strength": 0,
   "startM": 800,
@@ -110,6 +112,8 @@
    0,
    0
   ],
+  "nearStartM": 0,
+  "nearMaxMix": 0,
   "quilt": {
    "desat": 0,
    "flatten": 0
@@ -137,18 +141,18 @@
   "castersNear": 4,
   "receivers": 0,
   "catcherMeshes": 0,
-  "aglM": 423,
+  "aglM": 417,
   "draws": 204,
-  "tris": 188860,
+  "tris": 189156,
   "tier": "high"
  },
  "owensFrame": {
-  "frames": 1160,
+  "frames": 1439,
   "p50": 4.2,
-  "p95": 8.4,
-  "gpuSamples": 579,
-  "gpuP50": 2.978,
-  "gpuP95": 3.888,
+  "p95": 4.3,
+  "gpuSamples": 717,
+  "gpuP50": 3.278,
+  "gpuP95": 3.593,
   "instrument": "EXT_disjoint_timer_query_webgl2"
  },
  "aboveBand": {
@@ -161,7 +165,7 @@
   "catcherMeshes": 0,
   "aglM": 2868,
   "draws": 168,
-  "tris": 65877,
+  "tris": 66367,
   "tier": "high"
  },
  "red": [
