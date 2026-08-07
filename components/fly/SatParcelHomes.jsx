@@ -17,8 +17,9 @@ import {
   Vector3,
 } from 'three';
 import { mercatorScale } from '@/lib/fly/coords';
-import { GLOBE, PARCEL_HOMES, SUBURB_NIGHT } from '@/lib/fly/fly-constants';
+import { GLOBE, PARCEL_HOMES, SUBURB_NIGHT, SURFACE_CALM } from '@/lib/fly/fly-constants';
 import { applyBendAnchor } from '@/lib/fly/toy-world/world-bend';
+import { useFlyStore } from '@/stores/fly-store';
 
 const _dummy = new Object3D();
 const _col = new Color();
@@ -38,6 +39,42 @@ const smoothstep = (a, b, v) => {
   const t = Math.min(1, Math.max(0, (v - a) / Math.max(1e-6, b - a)));
   return t * t * (3 - 2 * t);
 };
+
+/** Round 21 (C, S6) — ranged upload; see SatVegLayer's rangeUpload docstring. */
+function rangeUpload(attr, elements) {
+  if (!attr) return;
+  if (SURFACE_CALM.enabled && SURFACE_CALM.uploads.ranges) {
+    attr.clearUpdateRanges();
+    attr.addUpdateRange(0, Math.min(elements, attr.array.length));
+  }
+  attr.needsUpdate = true;
+}
+
+/**
+ * Round 21 (C "SURFACE", P5) — HAS A STREAMING RING RESOLVED?
+ *
+ * Both rings publish `ready`/`empty` counts, but neither is a complete
+ * partition of `chunks`: a sat-building chunk that carries WATER and no
+ * buildings reaches state 'ready' with `mesh === null`, and the stats getter
+ * counts `ready` off the MESH — so over a harbour `ready + empty` plateaus
+ * below `chunks` forever, and a settle test written only that way would hold
+ * this layer off Sydney for the whole session. The in-flight counters are the
+ * other side of the same question and they ARE complete, so the resolved count
+ * is the better of the two readings.
+ */
+function resolvedFrac(s, inFlight) {
+  if (!s || !(s.chunks > 0)) return 0;
+  // R21 B STREAMKEEPER keeps a failed chunk RESIDENT as an error record with a
+  // backoff instead of deleting it, so `chunks` can carry rows that will never
+  // become ready or empty until a retry lands. Those are not evidence in
+  // flight, so they leave the denominator if the engine names them. The
+  // load-bearing bound is NOT this subtraction — it is the maxHoldSec timeout
+  // below, which is why this can afford to be optional about a field name it
+  // has not seen.
+  const errored = s.errorChunks ?? s.errors ?? s.error ?? 0;
+  const denom = Math.max(1, s.chunks - errored);
+  return Math.max(s.ready + s.empty, s.chunks - inFlight - errored) / denom;
+}
 
 /**
  * Round 20 (B "HOMES") — SATELLITE procedural suburbia: houses where
@@ -98,8 +135,26 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
     maxDens: 0,
     regionalDens: 0,
     regK: 0,
-    atX: Infinity, // where the last placement happened (the hold's move escape)
+    atX: Infinity, // player position at the LAST PASS (warp + static-skip test)
     atZ: Infinity,
+    // --- round 21 (C) — the two-ring settle machine ---------------------------
+    first: true, // the one-time cadence phase nudge (S6)
+    sig: '', // static-skip signature
+    prevN: 0, // instances uploaded last pass (the ranged-upload tail)
+    floorA: null, // rolling-min buckets: the current relocateM of travel…
+    floorB: null, // …and the previous one (so evidence expires by DISTANCE)
+    bucketX: Infinity, // where the current bucket started
+    bucketZ: Infinity,
+    regKUsed: null, // the DEADBANDED value the placement actually ran on
+    regKRaw: 0, // this pass's raw measurement (telemetry only)
+    confirmed: false, // a SETTLED pass has placed here since the last warp
+    zeroPasses: 0, // consecutive settled passes voting to delete the field
+    warped: false, // a warp epoch bump is pending (dropped by the next pass)
+    holdSince: -1, // when the current unsettled hold started (-1 = not holding)
+    held: false, // …and whether this pass held (telemetry)
+    stale: false, // the ring timed out unresolved: treat it as resolved as it gets
+    provisional: false, // placed past maxHoldSec on an unresolved ring
+    settled: false,
   });
 
   const geometry = useMemo(() => buildHouseGeometry(), []);
@@ -126,6 +181,25 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
     [geometry, material]
   );
 
+  // Round 21 (C, P5) — a WARP is a discontinuity, and the warp epoch says so
+  // exactly (the SatBuildingLayer/SatRoadLayer idiom, same store, same shape).
+  // A distance threshold cannot: a boost run covers ~1.9 km between passes and
+  // the Owens→Lone Pine hop covers 4.2 km, so no single number separates
+  // "flying fast" from "somewhere else entirely". Everything the machine knows
+  // about the place it was over — the accumulated anti-duplication evidence,
+  // the standing field, the confirmed flag — belongs to that place and is
+  // dropped here, which is what makes the destination start from the hold
+  // instead of from the origin's suburb.
+  useEffect(() => {
+    if (!SURFACE_CALM.enabled) return undefined;
+    let prev = useFlyStore.getState().warpEpoch;
+    return useFlyStore.subscribe((s) => {
+      if (s.warpEpoch === prev) return;
+      prev = s.warpEpoch;
+      stateRef.current.warped = true; // consumed by the next placement pass
+    });
+  }, []);
+
   // Priority -42: after the canopy (-45), the tint (-44) and the porch lights
   // (-43) — the whole ground stack settles in streaming order on one cadence.
   useFrame(({ clock }) => {
@@ -134,13 +208,16 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
     const t = clock.elapsedTime;
     const st = stateRef.current;
     if (t - st.t >= 2) {
-      st.t = t;
+      // Round 21 (C, S6): one-time phase nudge; the first pass stays immediate.
+      const U = SURFACE_CALM.enabled ? SURFACE_CALM.uploads : null;
+      st.t = st.first && U ? t + U.stagger[3] * 2 : t;
+      st.first = false;
       const H = SUBURB_NIGHT.houseLights;
       // The EXACT SatHouseLights γ ramp — the windows and the porch lights are
       // the same dusk, so they must be the same curve.
       const nt = Math.min(1, Math.max(0, 1 - (runtime.sun?.frac ?? 1) / H.dayFrac));
       st.nightK = nt ** H.gamma;
-      placeHomes(mesh, engine, runtime, flight, st, pool);
+      placeHomes(mesh, engine, runtime, flight, st, pool, t);
     }
     // ONE material write per frame.
     mesh.material.emissiveIntensity = st.nightK * PARCEL_HOMES.night.intensity;
@@ -159,6 +236,12 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
         maxDens: st.maxDens,
         regionalDens: st.regionalDens,
         regK: st.regK,
+        // Round 21 (C, P5) — the settle machine, for the probe and E's gates.
+        regKRaw: st.regKRaw,
+        settled: st.settled,
+        held: st.held,
+        provisional: st.provisional,
+        zeroPasses: st.zeroPasses,
         tris: st.placed * (geometry.index.count / 3),
       };
       if (window.__satVeg) window.__satVeg.homeMesh = mesh; // harness A/B flip
@@ -465,17 +548,8 @@ function occupiedAt(wx, wz) {
   return _occ[z * OCC_N + x] === 1;
 }
 
-/**
- * ONE cadence pass: the streamed parcel anchors nearest-first, each thinned by
- * the local REAL footprint density, each laid out as a hash-rotated block of
- * houses on the chunk's own DEM grid. Returns nothing; writes stats into `st`.
- */
-function placeHomes(mesh, engine, runtime, flight, st, pool) {
-  const P = PARCEL_HOMES;
-  const px = flight.pos.x;
-  const pz = flight.pos.z;
-  const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
-  st.altK = 1 - smoothstep(P.altFade.onM, P.altFade.offM, eyeAgl);
+/** Everything this pass MEASURES (as opposed to remembers), zeroed. */
+function clearMeasurements(st) {
   st.anchors = 0;
   st.suppressed = 0;
   st.realCols = 0;
@@ -484,6 +558,27 @@ function placeHomes(mesh, engine, runtime, flight, st, pool) {
   st.maxDens = 0;
   st.regionalDens = 0;
   st.regK = 0;
+}
+
+/**
+ * ONE cadence pass: the streamed parcel anchors nearest-first, each thinned by
+ * the local REAL footprint density, each laid out as a hash-rotated block of
+ * houses on the chunk's own DEM grid. Returns nothing; writes stats into `st`.
+ */
+function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
+  const P = PARCEL_HOMES;
+  const C = SURFACE_CALM.enabled ? SURFACE_CALM.parcel : null;
+  const px = flight.pos.x;
+  const pz = flight.pos.z;
+  const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
+  st.altK = 1 - smoothstep(P.altFade.onM, P.altFade.offM, eyeAgl);
+  // Round 21 (C): the measurement fields are cleared where the measurement
+  // STARTS, not at the top. A pass that holds or is statically skipped made no
+  // measurement, and zeroing its predecessor's would report "no anchors here"
+  // for a field that is standing on screen — an instrument reporting the
+  // instrument's own state instead of the world's (the R19 §7 lesson). With
+  // the flag off this is the R20 line-for-line.
+  if (!C) clearMeasurements(st);
 
   let n = 0;
   let maxR2 = 0;
@@ -518,26 +613,110 @@ function placeHomes(mesh, engine, runtime, flight, st, pool) {
   // alone. So the pass HOLDS (returns without touching a matrix; the previous
   // placement, which is count = 0 on a fresh arrival, simply stays).
   //
-  // "Settled" is deliberately NOT "zero work in flight". At cruise the ring
-  // always has a tile in flight, and a strict test would hold forever — the
-  // houses would be left behind at the last origin while the ground under the
-  // player went bare. Three-quarters of the ring RESOLVED (ready or empty) is
-  // the honest threshold: it is false for the first seconds after a warp and
-  // true in ordinary flight. The move escape is the backstop for the case
-  // neither covers — if the player has left the last placement behind, stale
-  // is worse than provisional, so place anyway and let the next pass correct.
+  // ROUND 21 (C, P5) — THE R20 HOLD HAD THREE HOLES, and the user saw all
+  // three at once as a carpet of houses over a fully-mapped town that vanished
+  // two seconds after boot (measured at Powell OH: 0 → 633 → 0, and Melton
+  // over-placed 3,356 before settling to its true 2,068):
+  //   1. `bs.chunks === 0` COUNTED AS SETTLED. At boot and on the first frame
+  //      after a warp the building map is literally empty, which is the one
+  //      moment the ratio is guaranteed to be wrong — and it was the moment
+  //      the hold waved through. `chunks > 0` is now REQUIRED.
+  //   2. `movedSq >= 900²` bypassed the hold unconditionally. 900 m is four
+  //      seconds of cruise, so for the whole of any real flight the hold did
+  //      not exist. The bypass is gone; a bounded TIME hold (maxHoldSec) with
+  //      a PROVISIONAL, grown-in placement replaces it, so a long flight can
+  //      still never freeze the layer.
+  //   3. THE DENOMINATOR HAD NO TEST AT ALL. regK is building-ring columns
+  //      over veg-ring residential area, and only the numerator's ring was
+  //      ever asked whether it had arrived. A settled building ring over a
+  //      half-streamed veg ring reads as "lots of buildings, little
+  //      residential land" — a mapped town — and suppresses a real suburb.
+  // `!bs` (no building engine at all: this layer only exists inside
+  // SatBuildingLayer, so it is unreachable in practice) keeps the R20 escape.
   const bs = runtime.satBuildings?.stats;
-  const settled =
-    !bs ||
-    bs.chunks === 0 ||
-    bs.queued + bs.building + bs.draping === 0 ||
-    bs.ready + bs.empty >= bs.chunks * 0.75;
+  const vs = runtime.satVeg?.stats;
+  let settled;
+  if (C) {
+    settled =
+      !bs ||
+      (bs.chunks > 0 &&
+        resolvedFrac(bs, bs.queued + bs.building + bs.draping) >= C.minSettledFrac &&
+        !!vs &&
+        vs.chunks > 0 &&
+        resolvedFrac(vs, vs.queued + vs.building + vs.sampling) >= C.vegSettledFrac);
+  } else {
+    settled =
+      !bs ||
+      bs.chunks === 0 ||
+      bs.queued + bs.building + bs.draping === 0 ||
+      bs.ready + bs.empty >= bs.chunks * 0.75;
+  }
+  st.settled = settled;
   const movedSq = (px - st.atX) ** 2 + (pz - st.atZ) ** 2;
-  if (st.altK > 0.001 && !settled && movedSq < 900 * 900) return;
-
-  if (st.altK > 0.001 && pool > 0) {
+  if (!C) {
+    if (st.altK > 0.001 && !settled && movedSq < 900 * 900) return;
+  } else {
+    if (st.warped) {
+      st.warped = false;
+      st.floorA = null;
+      st.floorB = null;
+      st.bucketX = px;
+      st.bucketZ = pz;
+      st.regKUsed = null;
+      st.confirmed = false;
+      st.zeroPasses = 0;
+      st.holdSince = -1;
+      st.placed = 0;
+      st.prevN = 0;
+      mesh.count = 0;
+      mesh.visible = false;
+    }
     st.atX = px;
     st.atZ = pz;
+    st.held = false;
+    st.provisional = false;
+    st.stale = false;
+    if (st.altK > 0.001 && !settled) {
+      if (st.holdSince < 0) st.holdSince = now;
+      // Held while the evidence is still arriving — but only until maxHoldSec,
+      // and only until a settled pass has once placed HERE. After a confirmed
+      // placement the ring being partly in flight is ordinary cruise, not
+      // ignorance, and the filtered regK below is grounded in settled readings.
+      if (!st.confirmed && now - st.holdSince < C.maxHoldSec) {
+        st.held = true;
+        return;
+      }
+      // PAST THE TIMEOUT the ring is declared as resolved as it is going to
+      // get, and this pass counts as evidence (below) — otherwise a ring that
+      // can never settle (B's resident error records under a sustained
+      // upstream outage inflate the denominator without ever resolving) would
+      // leave the layer grown-in at growScale forever, waiting for a settled
+      // pass that is not coming. So the grow-in lasts exactly one pass: this
+      // one places small, sets `confirmed`, and the next places at full size.
+      st.stale = !st.confirmed;
+      st.provisional = st.stale;
+    } else {
+      st.holdSince = -1;
+    }
+    // The static skip. A parked aircraft over a settled ring re-derives an
+    // IDENTICAL field and re-uploads it every 2 s; the signature is everything
+    // this pass reads. Gated on `settled` so a stalled hold still times out.
+    const U = SURFACE_CALM.uploads;
+    const sig =
+      `${bs?.chunks ?? -1}|${bs?.ready ?? -1}|${bs?.empty ?? -1}|${bs?.columns ?? -1}|` +
+      `${vs?.chunks ?? -1}|${vs?.ready ?? -1}|${vs?.parcelPts ?? -1}|${st.altK.toFixed(3)}`;
+    if (settled && sig === st.sig && movedSq < U.staticSkipM ** 2) return;
+    st.sig = sig;
+    // Past every early return: this pass really does measure, so its
+    // predecessor's numbers go now.
+    clearMeasurements(st);
+  }
+
+  if (st.altK > 0.001 && pool > 0) {
+    if (!C) {
+      st.atX = px;
+      st.atZ = pz;
+    }
     buildRealGrids(runtime, px, pz);
     st.realCols = _grid.cols;
     // Pool origin rounded to 1 km (the canopy recipe): instanceMatrix is
@@ -545,6 +724,12 @@ function placeHomes(mesh, engine, runtime, flight, st, pool) {
     // 1.0 m — every house would snap to a metre lattice.
     const ox = Math.round(px / 1000) * 1000;
     const oz = Math.round(pz / 1000) * 1000;
+    // Remembered so a delete that is not yet confirmed can put the previous
+    // field back exactly where it was standing: the matrices are RELATIVE to
+    // this origin, so leaving a moved origin behind would slide the whole
+    // suburb sideways for a pass.
+    const keepOx = mesh.position.x;
+    const keepOz = mesh.position.z;
     mesh.position.set(ox, 0, oz);
 
     const rangeSq = P.rangeM ** 2;
@@ -571,10 +756,71 @@ function placeHomes(mesh, engine, runtime, flight, st, pool) {
     }
     const resKm2 = (inRange * P.anchors.areaPerM2) / (mercK * mercK * 1e6);
     st.regionalDens = resKm2 > 0 ? _grid.cols / resKm2 : 0;
-    const regK = Math.min(
+    const regKRaw = Math.min(
       1,
       Math.max(0, 1 - st.regionalDens / P.antiDup.regionalPerKm2Res)
     );
+    st.regKRaw = regKRaw;
+    let regK = regKRaw;
+    if (C) {
+      // THE ROLLING MINIMUM, then a DEADBAND — two different jobs.
+      //
+      // Only SETTLED measurements are evidence: an unsettled ring reads biased
+      // high by construction (buildings only ever arrive), so an unsettled
+      // pass contributes nothing and simply re-uses what is already known.
+      // The only pass that ever runs on a raw reading is the provisional first
+      // placement of an unconfirmed arrival — which is exactly why that one is
+      // grown in at growScale instead of shown at full size.
+      //
+      // THIS IS A MINIMUM, NOT AN AVERAGE, AND IT MUST NOT BE "SIMPLIFIED"
+      // BACK. Measured at Lone Pine, pinned, 15 s: the building ring
+      // heal-evicts and `queryColumns` cycles 987 → 693 → 357 → 696 → 987
+      // columns, so the RAW regK flaps 0 ↔ 0.482 indefinitely. An EMA of that
+      // converges to its mean (0.20) and places 55 procedural homes over a
+      // town that is already fully mapped — verify-parcel-homes gate (F) red,
+      // reproduced. The minimum is the honest estimator because the underlying
+      // quantity is monotone: real buildings only ever ARRIVE, so a lower regK
+      // is always the better-informed reading and a higher one is only ever
+      // lost evidence. (R21 B's heal cap reduces the flapping at its source;
+      // this filter deliberately does not depend on that — defence in depth,
+      // not coupling.)
+      //
+      // Evidence is kept in two buckets that roll over every relocateM of
+      // TRAVEL, so what a place taught us expires by distance rather than by
+      // time: parked over one town it never expires at all (which is what
+      // makes a suppressed town STAY suppressed through that cycling), and
+      // flying into unmapped land it clears within one to two buckets.
+      const travelSq = (px - st.bucketX) ** 2 + (pz - st.bucketZ) ** 2;
+      if (travelSq > C.relocateM ** 2) {
+        st.floorB = st.floorA;
+        st.floorA = null;
+        st.bucketX = px;
+        st.bucketZ = pz;
+      }
+      if (settled || st.stale) {
+        st.floorA = st.floorA == null ? regKRaw : Math.min(st.floorA, regKRaw);
+      }
+      const a = st.floorA;
+      const b = st.floorB;
+      const filtered = a == null ? (b == null ? regKRaw : b) : b == null ? a : Math.min(a, b);
+      // The deadband is what stops the FLICKER. `want` is a rounded count of
+      // houses per anchor, so an 0.01 wobble in regK flips a scatter of
+      // anchors by ±1 house every 2 s — a field that shimmers at the edges
+      // forever. Density therefore moves in steps of at least regKDeadband,
+      // while POSITION keeps updating every pass (the aircraft is moving even
+      // when the density answer has not changed).
+      if (st.regKUsed == null || Math.abs(filtered - st.regKUsed) >= C.regKDeadband) {
+        st.regKUsed = filtered;
+      }
+      // …with one exception: the SUPPRESSION verdict (a town that is already
+      // fully mapped) has to be reachable EXACTLY, and a deadband alone would
+      // park it a fraction above zero — a residual 0.07 is still one
+      // procedural house per anchor standing over a town A SPRAWL already
+      // finished, which is precisely what the regional term exists to
+      // prevent. At or below the pass's own suppression epsilon it snaps.
+      if (st.regKUsed > 0 && filtered <= 0.02) st.regKUsed = 0;
+      regK = st.regKUsed;
+    }
     st.regK = regK;
 
     for (const chunk of engine.nearest(px, pz)) {
@@ -618,7 +864,15 @@ function placeHomes(mesh, engine, runtime, flight, st, pool) {
         // material is opaque (darkening an instance paints a black house
         // instead of removing one — the SatVegLayer rule).
         const ft = smoothstep(P.farScale.startM, P.farScale.endM, d);
-        const fscale = (1 + (P.farScale.mul - 1) * ft) * st.altK;
+        // Round 21 (C, P5): a PROVISIONAL field — one placed past maxHoldSec
+        // on a ring that has not resolved — is grown in at growScale and
+        // confirmed to full size by the next settled pass. It is a hedge on
+        // evidence that is still arriving, so it should not arrive at full
+        // size and then be deleted; a small field growing is a world loading,
+        // a full field vanishing is a bug. (Scale is uniform, so the height
+        // band verify-suburbia (G) freezes only ever gets SMALLER.)
+        const growK = C && st.provisional ? C.growScale : 1;
+        const fscale = (1 + (P.farScale.mul - 1) * ft) * st.altK * growK;
         // One yaw for the whole cluster: every house on a street shares it.
         const yaw = hash(lx * 0.731 - lz * 1.117) * Math.PI * 2;
         const cs = Math.cos(yaw);
@@ -666,6 +920,24 @@ function placeHomes(mesh, engine, runtime, flight, st, pool) {
     }
     st.meanScalar = st.anchors > 0 ? scalarSum / st.anchors : 0;
     st.meanDens = st.anchors > 0 ? densSum / st.anchors : 0;
+
+    // THE DELETE CONFIRM. Deleting a placed field is the loud direction of
+    // this layer's error — a suburb that is there and then is not is the
+    // symptom the user reported — so a zero verdict has to be voted for twice
+    // by SETTLED passes before it lands. An unsettled pass never gets a vote
+    // at all. Nothing was written to the buffer this pass (n === 0 means the
+    // placement loop wrote no matrix), so keeping the previous field is
+    // literally leaving it alone; only the pool ORIGIN has to be put back.
+    if (C && n === 0 && st.placed > 0) {
+      st.zeroPasses = settled || st.stale ? st.zeroPasses + 1 : st.zeroPasses;
+      if (st.zeroPasses < C.confirmPasses) {
+        mesh.position.set(keepOx, 0, keepOz);
+        return;
+      }
+    } else if (C) {
+      st.zeroPasses = 0;
+    }
+    if (C && (settled || st.stale)) st.confirmed = true;
   }
 
   // Park the tail at zero scale AND clamp count (the SatVegLayer belt+braces).
@@ -677,8 +949,11 @@ function placeHomes(mesh, engine, runtime, flight, st, pool) {
   mesh.count = n;
   // THE OWENS INVARIANT: nothing placed = no draw.
   mesh.visible = n > 0;
-  mesh.instanceMatrix.needsUpdate = true;
-  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  // Round 21 (C, S6): upload only what can have changed (see rangeUpload).
+  const touched = Math.max(n, st.prevN | 0);
+  rangeUpload(mesh.instanceMatrix, touched * 16);
+  if (mesh.instanceColor) rangeUpload(mesh.instanceColor, touched * 3);
+  st.prevN = n;
   mesh.boundingSphere.center.set(0, 0, 0);
   mesh.boundingSphere.radius = Math.sqrt(maxR2) + maxScale + maxD * maxD * MAX_BEND_K + 50;
   st.placed = n;

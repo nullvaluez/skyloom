@@ -92,6 +92,7 @@ import {
   SKY,
   SKY_DUSK,
   SKY_LIVE,
+  SURFACE_CALM,
   TOY,
   TOY_WORLD,
   TRAFFIC_HORIZON,
@@ -260,6 +261,7 @@ const MOODS = {
  */
 function SatShadowCatcher({ flight, origin }) {
   const ref = useRef();
+  const gl = useThree((s) => s.gl);
   const material = useMemo(() => {
     const m = new ShadowMaterial({
       opacity: SAT_SHADOWS.catcher.opacity,
@@ -267,11 +269,22 @@ function SatShadowCatcher({ flight, origin }) {
       depthWrite: false,
       polygonOffset: true,
       polygonOffsetFactor: -1,
-      polygonOffsetUnits: -1,
+      // Round 21 (C, P8): this canvas runs `reversedDepthBuffer: true` and
+      // three r185 negates only the FACTOR when it is active, so the authored
+      // (-1, -1) reached GL as (+1, -1) — the two terms pushing opposite ways.
+      // Authoring the units with the opposite sign lands both positive, i.e.
+      // both "toward the eye", which is what a catcher under terrain wants.
+      // Same one-line fix as SatTintLayer's tint drape (see its offsetUnits).
+      polygonOffsetUnits:
+        SURFACE_CALM.enabled &&
+        SURFACE_CALM.depthOffsetFix &&
+        gl?.capabilities?.reversedDepthBuffer === true
+          ? 1
+          : -1,
     });
     applyBend(m);
     return m;
-  }, []);
+  }, [gl]);
   useEffect(() => () => material.dispose(), [material]);
   useFrame(() => {
     const m = ref.current;

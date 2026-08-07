@@ -16,7 +16,7 @@ import {
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { buildPoiList } from '@/lib/fly/poi-data';
-import { LANDMARKS_3D, MONUMENT_MODELS, TOY_WORLD } from '@/lib/fly/fly-constants';
+import { LANDMARKS_3D, MONUMENT_MODELS, SURFACE_CALM, TOY_WORLD } from '@/lib/fly/fly-constants';
 import { applyBendAnchorMonument } from '@/lib/fly/toy-world/world-bend';
 import { loadMonumentGeometries } from '@/lib/fly/monument-loader';
 import { setSuppressedMonuments } from '@/lib/fly/monument-models';
@@ -25,6 +25,22 @@ const _m = new Matrix4();
 const _q = new Quaternion();
 const _pos = new Vector3();
 const _scl = new Vector3();
+
+/**
+ * Round 21 (C "SURFACE", S7) — the marquee layer's frame-loop PRIORITY.
+ *
+ * LandmarkMonuments (the 9 procedural archetype pools) reads the suppression
+ * epoch imperatively inside its own useFrame, and both layers subscribed at
+ * the default priority 0 — where r3f keeps subscribers in MOUNT order, and
+ * LandmarkMonuments is mounted first in FlyScene. So the epoch bumped HERE was
+ * consumed by the archetypes on the FOLLOWING frame, and every placement-set
+ * change rendered the real model and its procedural twin co-located for one
+ * frame: a z-fighting pop at exactly the moment a monument is supposed to get
+ * better. Negative priorities are pure ordering in r3f (only priority > 0
+ * takes over rendering — see the subscribe() accounting), so -1 puts this
+ * layer's bump ahead of every priority-0 reader in the SAME frame.
+ */
+const MARQUEE_PRIORITY = SURFACE_CALM.enabled && SURFACE_CALM.monument ? -1 : 0;
 
 /** Empty stand-in so the mesh always exists (and its material always compiles)
  *  even before the first placement pass — three draws nothing for a 0-index
@@ -135,7 +151,20 @@ export function MonumentModels({ flight, origin, engine, mapStyle }) {
   }, [isToy]);
 
   const meshRef = useRef();
-  const stateRef = useRef({ t: -Infinity, sig: '', geo: null, anchor: { x: 0, z: 0 }, placed: [] });
+  const stateRef = useRef({
+    t: -Infinity,
+    sig: '',
+    geo: null,
+    anchor: { x: 0, z: 0 },
+    placed: [],
+    // Round 21 (C, S7): per-name baked placement state — what each standing
+    // monument was actually built with, so a rebuild can be decided against
+    // ITS OWN ground rather than against a shared quantisation edge.
+    baked: new Map(),
+    lastMergeAt: -1,
+    remerges: 0,
+    deferred: 0,
+  });
   const emptyGeometry = useMemo(() => makeEmptyGeometry(), []);
 
   useEffect(
@@ -174,12 +203,17 @@ export function MonumentModels({ flight, origin, engine, mapStyle }) {
     if (t - st.t < MONUMENT_MODELS.refreshSec) return;
     st.t = t;
 
+    const M = SURFACE_CALM.enabled ? SURFACE_CALM.monument : null;
     const px = flight.pos.x;
     const pz = flight.pos.z;
     const cand = [];
+    // With hysteresis the candidate window has to reach PAST the entry range,
+    // or an incumbent that has drifted just outside it could never be seen to
+    // still qualify (and would be re-merged out on every wobble across the cut).
+    const candRangeM = MONUMENT_MODELS.rangeM * (M ? M.exitRangeMul : 1);
     for (const s of sites) {
       const d = Math.hypot(s.poi.wx - px, s.poi.wz - pz);
-      if (d > MONUMENT_MODELS.rangeM) continue;
+      if (d > candRangeM) continue;
       const g = engine?.getGroundAt?.(s.poi.lon, s.poi.lat);
       const groundY = g
         ? isToy
@@ -189,18 +223,74 @@ export function MonumentModels({ flight, origin, engine, mapStyle }) {
       cand.push({ s, d, groundY });
     }
     cand.sort((a, b) => a.d - b.d);
-    const keep = cand.slice(0, MONUMENT_MODELS.maxPlaced);
 
-    // Signature: WHICH monuments, at WHAT ground. Quantising groundY by
-    // groundReplaceM means a DEM stream-in that actually moves a monument
-    // triggers one rebuild, while sub-metre re-drapes never do.
-    const q = MONUMENT_MODELS.groundReplaceM;
-    const sig = keep
-      .map((k) => `${k.s.poi.name}@${Math.round(k.groundY / q)}`)
-      .sort()
-      .join('|');
-    if (sig === st.sig) return;
-    st.sig = sig;
+    let keep;
+    if (!M) {
+      keep = cand.slice(0, MONUMENT_MODELS.maxPlaced);
+      // Signature: WHICH monuments, at WHAT ground. Quantising groundY by
+      // groundReplaceM means a DEM stream-in that actually moves a monument
+      // triggers one rebuild, while sub-metre re-drapes never do.
+      const q = MONUMENT_MODELS.groundReplaceM;
+      const sig = keep
+        .map((k) => `${k.s.poi.name}@${Math.round(k.groundY / q)}`)
+        .sort()
+        .join('|');
+      if (sig === st.sig) return;
+      st.sig = sig;
+    } else {
+      // ROUND 21 (C, S7) — WHY THE SIGNATURE HAD TO GO.
+      //
+      // `name@round(groundY / 1.5)` is a shared quantisation LATTICE, and
+      // groundY comes from the live streamed DEM. A monument whose ground is
+      // refining near an edge of that lattice crosses it on a few centimetres
+      // of change — and every crossing re-merged ALL twelve geometries
+      // (mergeGeometries + dispose + a full re-upload) and bumped the
+      // suppression epoch, which made LandmarkMonuments re-place all nine
+      // archetype pools. Measured at NYC: 3 full rebuilds in 60 s of ordinary
+      // flight, for ground that moved a total of 6 m.
+      //
+      // The replacement asks the only question that matters, per monument,
+      // against ITS OWN baked value: "is what is standing there still right?"
+      //   (a) the SET changed — with hysteresis, so a monument hovering on the
+      //       range cut does not enter and leave every two seconds;
+      //   (b) a placed monument's live ground has moved more than
+      //       groundDeltaM from the ground IT WAS BUILT ON (an absolute delta
+      //       against its own value can never be tripped by an edge);
+      //   (c) a style flip or remount, which arrives here as an empty bake.
+      // Plus a minimum gap between merges, so even a pathological DEM cannot
+      // make this layer rebuild faster than minRebuildSec.
+      const sel = [];
+      for (let i = 0; i < cand.length; i++) {
+        const c = cand[i];
+        const incumbent = st.baked.has(c.s.poi.name);
+        const rangeOk = c.d <= (incumbent ? candRangeM : MONUMENT_MODELS.rangeM);
+        const rankOk =
+          i < MONUMENT_MODELS.maxPlaced + (incumbent ? M.rankHysteresis : 0);
+        if (rangeOk && rankOk) sel.push(c);
+        if (sel.length >= MONUMENT_MODELS.maxPlaced) break;
+      }
+      keep = sel;
+      let changed = keep.length !== st.baked.size;
+      if (!changed) {
+        for (const k of keep) {
+          const b = st.baked.get(k.s.poi.name);
+          if (!b || Math.abs(k.groundY - b.groundY) > M.groundDeltaM) {
+            changed = true;
+            break;
+          }
+        }
+      }
+      if (!changed) return;
+      if (st.lastMergeAt >= 0 && t - st.lastMergeAt < M.minRebuildSec) {
+        st.deferred += 1;
+        // Not merged, so `st.t` has already been advanced: the decision is
+        // simply re-taken on the next cadence tick. The procedural archetype
+        // is standing in the meantime — that is the whole point of the
+        // fallback never being suppressed until its model is actually placed.
+        return;
+      }
+      st.lastMergeAt = t;
+    }
 
     const ax = origin.anchor.x;
     const az = origin.anchor.z;
@@ -250,6 +340,14 @@ export function MonumentModels({ flight, origin, engine, mapStyle }) {
     mesh.geometry = merged;
     mesh.position.set(0, 0, 0);
 
+    // Round 21 (C, S7): remember what each monument was actually built with.
+    // This is the state (b) above is tested against — per name, absolute.
+    st.baked.clear();
+    for (let i = 0; i < keep.length; i++) {
+      st.baked.set(keep[i].s.poi.name, { groundY: keep[i].groundY, rank: i });
+    }
+    st.remerges += 1;
+
     // Park each placed POI's procedural instance (LandmarkMonuments reads this
     // set and skips those names; the epoch forces it to re-place next frame
     // instead of waiting out its own 2s cadence, so the two never double-draw).
@@ -261,8 +359,19 @@ export function MonumentModels({ flight, origin, engine, mapStyle }) {
         loaded: sites.map((s) => s.poi.name),
         style: isToy ? 'toy' : 'satellite',
       };
+      // Round 21 (C): the churn counter, and the timestamp of the epoch bump
+      // this frame. LandmarkMonuments stamps the frame it CONSUMES the bump on
+      // the same object, so the double-draw window is a measurable number
+      // rather than a claim (equal times = same frame = no double draw).
+      const stats = (window.__flyStats ??= {});
+      const mon = (stats.monuments ??= {});
+      mon.remerges = st.remerges;
+      mon.deferred = st.deferred;
+      mon.placed = placed.length;
+      mon.priority = MARQUEE_PRIORITY;
+      mon.bumpT = +t.toFixed(4);
     }
-  });
+  }, MARQUEE_PRIORITY);
 
   return (
     <mesh
