@@ -9,8 +9,17 @@ import {
   Object3D,
   SphereGeometry,
 } from 'three';
-import { SAT_VEG, SUBURB_NIGHT, SURFACE_CALM } from '@/lib/fly/fly-constants';
+import { SAT_VEG, SETTLE_CALM, SUBURB_NIGHT, SURFACE_CALM } from '@/lib/fly/fly-constants';
 import { applyBendAnchor } from '@/lib/fly/toy-world/world-bend';
+import {
+  applyInstanceEnv,
+  arrivalEpoch,
+  birthK,
+  makeBirth,
+  makeEnv,
+  notePopin,
+  resetEnv,
+} from '@/lib/fly/settle';
 
 const _dummy = new Object3D();
 const POOL = SUBURB_NIGHT.houseLights.pool;
@@ -84,6 +93,13 @@ export function SatHouseLights({ engine, runtime, flight }) {
     fromHouse: 0,
     fromVeg: 0,
   });
+  // R22 (B SETTLE) — instanced layers birth as SCALE ramps: zero shader change,
+  // zero cache keys, and the ramp is applied to the matrices already in the
+  // buffer (see applyInstanceEnv — a uniform scale composes, so a birth is one
+  // ratio multiply of the 3×3 basis of each instance and never re-derives a
+  // single light).
+  const birthRef = useRef(makeBirth());
+  const envRef = useRef(makeEnv());
 
   const geometry = useMemo(() => new SphereGeometry(1, 6, 4), []);
   const material = useMemo(() => {
@@ -156,9 +172,27 @@ export function SatHouseLights({ engine, runtime, flight }) {
           st.atX = flight.pos.x;
           st.atZ = flight.pos.z;
           placeLights(mesh, engine, runtime, flight, st);
+          // A placement pass wrote every matrix at FULL scale, so whatever the
+          // birth had baked into the buffer is gone: the envelope restarts from
+          // 1 and the next frame re-applies the ramp.
+          resetEnv(envRef.current);
         }
       }
     }
+    // R22 (B): the birth envelope. Re-armed on every arrival epoch, and driven
+    // per frame (not per cadence) so a field placed between two cadence ticks
+    // still grows in instead of appearing whole.
+    const bk = birthK(
+      birthRef.current,
+      t,
+      st.placed > 0,
+      arrivalEpoch(),
+      SETTLE_CALM.births.rampSec
+    );
+    if (applyInstanceEnv(mesh, envRef.current, bk, st.placed)) {
+      rangeUpload(mesh.instanceMatrix, st.placed * 16); // only the live set
+    }
+    notePopin('satHouseLights', st.placed > 0 && mesh.visible, birthRef.current.running);
     // ONE material write per frame.
     mesh.material.opacity = st.nightK * H.opacity;
 

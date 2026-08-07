@@ -12,8 +12,9 @@ import {
   Sphere,
   Vector3,
 } from 'three';
-import { GLOBE, SAT_TINT, SAT_VEG, SURFACE_CALM } from '@/lib/fly/fly-constants';
+import { GLOBE, SAT_TINT, SAT_VEG, SETTLE_CALM, SURFACE_CALM } from '@/lib/fly/fly-constants';
 import { applyBendFade } from '@/lib/fly/toy-world/world-bend';
+import { arrivalEpoch, birthK, makeBirth, notePopin } from '@/lib/fly/settle';
 
 // Worst-case bend drop pad for the CPU bounding sphere (the SatVegLayer
 // recipe): the GPU pushes far geometry DOWN by d²k and the CPU bound cannot
@@ -109,7 +110,19 @@ export function SatTintLayer({ engine, flight }) {
     verts: 0,
     indices: 0,
     chunks: 0,
+    birthK: 1, // R22 (B): the α multiplier the current fill was written with
   });
+  // R22 (B SETTLE) — THE ONE LAYER THAT CANNOT FADE ON THE GPU. Multiply
+  // blending has no alpha channel of its own (`result = src × dst`), so the
+  // α-lerp is baked into the vertex COLOUR on the CPU (mult = 1 + α(c − 1)) —
+  // and dropping material.opacity would fade this drape to BLACK, not to
+  // nothing, because three's premultiplied path multiplies rgb by alpha and a
+  // multiply of 0 is a hole. The honest fade is therefore α itself, re-derived
+  // by the existing fill; the birth just runs that fill on a short step for
+  // 600 ms. Measured worst case is ~4.5 k verts, so four extra fills cost less
+  // than one ordinary cadence pass of the canopy next door — and a 10 % wash
+  // stepped in four increments is indistinguishable from a continuous ramp.
+  const birthRef = useRef(makeBirth());
 
   const geometry = useMemo(() => {
     const g = new BufferGeometry();
@@ -177,7 +190,19 @@ export function SatTintLayer({ engine, flight }) {
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
     const st = stateRef.current;
-    if (t - st.t < SAT_VEG.placeCadenceSec) return;
+    // R22 (B): while the birth is running the fill cadence shortens to
+    // births.tintStepSec; settled, it is the R21 veg cadence exactly.
+    const k = birthK(
+      birthRef.current,
+      t,
+      engine.stats.tintVerts > 0,
+      arrivalEpoch(),
+      SETTLE_CALM.births.rampSec
+    );
+    const cadence = birthRef.current.running
+      ? SETTLE_CALM.births.tintStepSec
+      : SAT_VEG.placeCadenceSec;
+    if (t - st.t < cadence) return;
     // Round 21 (C, S6): one-time phase nudge (first pass stays immediate) +
     // the static skip. See SatVegLayer for the reasoning on both.
     const U = SURFACE_CALM.enabled ? SURFACE_CALM.uploads : null;
@@ -186,12 +211,17 @@ export function SatTintLayer({ engine, flight }) {
     const sg = engine.stats;
     const sig = U ? `${sg.chunks}|${sg.ready}|${sg.empty}|${sg.tintChunks}|${sg.tintVerts}` : '';
     const moved2 = (flight.pos.x - st.atX) ** 2 + (flight.pos.z - st.atZ) ** 2;
-    if (!U || sig !== st.sig || moved2 >= U.staticSkipM ** 2) {
+    // …and the static skip must not swallow a birth step: the signature is
+    // unchanged by construction while a settled ring fades in.
+    const birthMoved = Math.abs(k - st.birthK) > 0.01;
+    if (!U || sig !== st.sig || moved2 >= U.staticSkipM ** 2 || birthMoved) {
       st.sig = sig;
       st.atX = flight.pos.x;
       st.atZ = flight.pos.z;
+      st.birthK = k;
       fillTint(mesh, engine, flight, st);
     }
+    notePopin('satTint', mesh.visible, birthRef.current.running);
     if (process.env.NODE_ENV === 'development' && window.__flyStats) {
       window.__flyStats.satTint = {
         polys: st.polys,
@@ -233,7 +263,10 @@ function fillTint(mesh, engine, flight, st) {
   const oz = Math.round(pz / 1000) * 1000;
   mesh.position.set(ox, 0, oz);
 
-  const a = S.alpha;
+  // R22 (B): the birth envelope IS the α. At k 0 every multiplier is exactly
+  // 1.0 — the identity of a multiply blend — so a newborn tint is not a faint
+  // tint, it is no tint at all. `st.birthK` is 1 whenever the flag is off.
+  const a = S.alpha * (st.birthK ?? 1);
   for (const chunk of engine.nearest(px, pz)) {
     const tint = chunk.tint;
     if (!tint) continue;

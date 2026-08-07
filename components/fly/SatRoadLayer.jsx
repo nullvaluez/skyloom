@@ -12,8 +12,9 @@ import {
 } from 'three';
 import { SatRoadEngine } from '@/lib/fly/toy-world/sat-road-engine';
 import { buildPoiList } from '@/lib/fly/poi-data';
-import { SAT_AIRPORT_BEACONS, SAT_ROADS } from '@/lib/fly/fly-constants';
+import { SAT_AIRPORT_BEACONS, SAT_ROADS, SETTLE_CALM } from '@/lib/fly/fly-constants';
 import { applyBendAnchor, getSatBldgFade, getSatRoadMix } from '@/lib/fly/toy-world/world-bend';
+import { arrivalEpoch, birthK, groundElevVis, makeBirth, notePopin } from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
 
 const TIERS = ['low', 'medium', 'high']; // mirrors FlyCanvas's quality ladder
@@ -57,6 +58,25 @@ export function SatRoadLayer({ runtime, flight }) {
   // — react-hooks/purity); the warp subscription reads the current clock here.
   const nowRef = useRef(0);
   const statsAtRef = useRef(0);
+  // R22 (B SETTLE) — the road network births on the shared material's OWN
+  // opacity. The network is ADDITIVE (blending: AdditiveBlending, src·srcAlpha
+  // added), so opacity is an exact 0 → identity dissolve with no shader change
+  // and no cache key; nothing in the engine or the layer ever wrote it before,
+  // so the settled value is 1 and flag-off is byte-identical.
+  const birthRef = useRef(makeBirth());
+
+  // R22 (B): the road engine joins the runtime bus (the R18 `satBuildings`
+  // contract) so ARRIVAL_GATE can read the ring's resolved fraction without a
+  // dev-only global. Off-satellite / low tier this layer never mounts and the
+  // field stays null, so the consumer needs no style test.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability -- runtime is the scene's mutable bus (FlyScene RUNTIME CONTRACTS (R18))
+    runtime.satRoads = engine;
+    runtime.satRoadsBandM = SAT_ROADS.cullAglOffM ?? Infinity;
+    return () => {
+      if (runtime.satRoads === engine) runtime.satRoads = null;
+    };
+  }, [engine, runtime]);
 
   // --- airport beacons -------------------------------------------------------
   // A STRICT high-tier flourish (mirrors how SatBuildingLayer gates the facade
@@ -125,10 +145,25 @@ export function SatRoadLayer({ runtime, flight }) {
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
     nowRef.current = t;
-    const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
+    // R22 (B): the VISUAL ground elevation — the ring's AGL arm/evict
+    // hysteresis is a fade band like any other and must not ride a refining
+    // DEM sample.
+    const eyeAgl = Math.max(0, flight.pos.y - groundElevVis(runtime, flight));
     // sunFrac is REQUIRED by the engine contract: omitting it falls back to noon
     // (1) and the whole network stays dark forever.
     engine.update(t, flight.pos.x, flight.pos.z, eyeAgl, runtime.sun?.frac);
+    // …and the birth: one material property write, only while it is running.
+    const roadsReady = engine.stats.ready;
+    const bk = birthK(
+      birthRef.current,
+      t,
+      roadsReady > 0,
+      arrivalEpoch(),
+      SETTLE_CALM.births.bayerSec
+    );
+    // eslint-disable-next-line react-hooks/immutability -- the engine's shared material is the scene's, not React state (the beacon envelope below writes its own the same way)
+    if (engine.material.opacity !== bk) engine.material.opacity = bk;
+    notePopin('satRoads', roadsReady > 0, birthRef.current.running);
 
     // --- beacons: 2s placement + night ramp, per-frame flash envelope --------
     const mesh = beaconRef.current;
