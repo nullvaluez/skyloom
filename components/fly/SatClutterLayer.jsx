@@ -405,6 +405,15 @@ function initPool(m, ref, flag, stRef) {
   // DEPTH_PASS with measured gpuFrameMs — stated, not merely defaulted.
   m.castShadow = false;
   m.receiveShadow = false;
+  // R22 W2 (Fable arbitration): D's caster-flip contract — any Object3D
+  // stamped `userData.r22Caster` is flippable by DEPTH_PASS.casters without
+  // an import coupling. Kind is derived from the pool's init flag.
+  m.userData.r22Caster =
+    flag === '__clutterParkedInit'
+      ? 'carsParked'
+      : flag === '__clutterMoverInit'
+        ? 'carsMoving'
+        : 'poles';
   stRef.current.t = -Infinity; // place on the very next frame
 }
 

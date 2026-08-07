@@ -398,6 +398,10 @@ export function SatVegLayer({ runtime, flight }) {
               SAT_SHADOWS.enabled && tier === SAT_SHADOWS.minTier && !shadowPin;
             m.castShadow = shadowOn;
             m.receiveShadow = shadowOn;
+            // R22 W2 (Fable arbitration): D's caster-flip marker — DEPTH_PASS
+            // .casters can arm the canopy as a caster via this stamp without
+            // touching the R19 logic above (which stays the default).
+            m.userData.r22Caster = 'trees';
             placeRef.current.t = -Infinity; // place on the very next frame
           }}
           args={[geometry, material, pool]}

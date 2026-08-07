@@ -1917,15 +1917,40 @@ export function FlyScene({ runtime }) {
       // the same depth buffer, and running both double-hazes the mid band. The
       // term exists for medium/low, where no post pass runs; see the
       // AERIAL_PERSPECTIVE.content header.
+      //
+      // R22 W2 (Fable arbitration, the plan §5.4 mechanism): D DEPTH measured
+      // the §5.4 flip as-written to be a NO-OP — this branch was gated on
+      // `aerialGate`, which is highTier-only, so the content term could never
+      // arm at the tiers it exists FOR, and `content.minTier` was read
+      // nowhere in the tree. The content haze now carries its OWN gate: armed
+      // at tiers >= content.minTier where the post pass is NOT running
+      // (highTier stays excluded — R19's double-haze finding), still zeroed
+      // by the `__flyAerialOverride` fleet pin exactly like the post pass.
+      // Defaults unchanged here (enabled:false) — the §5.4 flip is consumed
+      // at W3 with its medium-tier A/B.
       const ch = AERIAL_PERSPECTIVE.content;
-      if (ch.enabled && aerialGate > 0) {
+      const _tierRank = { low: 0, medium: 1, high: 2 };
+      let contentGate =
+        ch.enabled &&
+        !highTier &&
+        (_tierRank[flyState.qualityTier] ?? 0) >= (_tierRank[ch.minTier] ?? 2)
+          ? 1
+          : 0;
+      if (
+        process.env.NODE_ENV === 'development' &&
+        typeof window !== 'undefined' &&
+        window.__flyAerialOverride != null
+      ) {
+        contentGate *= window.__flyAerialOverride;
+      }
+      if (contentGate > 0) {
         setSatContentHaze(
           ch.startM,
           ch.endM,
           _atmoRim[0],
           _atmoRim[1],
           _atmoRim[2],
-          ch.max * aerialGate
+          ch.max * contentGate
         );
       } else {
         setSatContentHaze(ch.startM, ch.endM, 0, 0, 0, 0);
