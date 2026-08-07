@@ -4,8 +4,17 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
 import { SatSkylineEngine } from '@/lib/fly/toy-world/sat-skyline-engine';
-import { SAT_SKYLINE } from '@/lib/fly/fly-constants';
-import { getSatSkyline } from '@/lib/fly/toy-world/world-bend';
+import { SAT_SKYLINE, SETTLE_CALM } from '@/lib/fly/fly-constants';
+import { getSatSkyline, setSatSkyline } from '@/lib/fly/toy-world/world-bend';
+import {
+  applyUniformBirth,
+  arrivalEpoch,
+  birthK,
+  groundElevVis,
+  makeBirth,
+  makeUniformBirth,
+  notePopin,
+} from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
 
 /**
@@ -45,6 +54,11 @@ export function SatSkylineLayer({ runtime, flight }) {
   // — react-hooks/purity); the warp subscription reads the current clock here.
   const nowRef = useRef(0);
   const statsAtRef = useRef(0);
+  // R22 (B SETTLE) — the distant mass births on its OWN Bayer term (uSkyFade),
+  // the same mechanism and the same 0-gated identity as the near ring. No new
+  // shader, no new cache key.
+  const birthRef = useRef(makeBirth());
+  const fadeRef = useRef(makeUniformBirth());
 
   // Tier → group cap. Dropping to a smaller cap evicts the surplus on the next
   // refresh; 0 (low) evicts everything immediately. No re-stream on a raise —
@@ -88,10 +102,35 @@ export function SatSkylineLayer({ runtime, flight }) {
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
     nowRef.current = t;
-    const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
+    // R22 (B): the VISUAL ground elevation drives the skyline's own AGL fade
+    // and the hole choreography, so a DEM refining under the aircraft no longer
+    // sweeps the crossfade between the detail city and the distant mass.
+    const gVis = groundElevVis(runtime, flight);
+    const eyeAgl = Math.max(0, flight.pos.y - gVis);
     // groundElev rides along as the fallback for far DEM samples that have not
     // streamed yet — sea level would sink a mountain city's skyline.
-    engine.update(t, flight.pos.x, flight.pos.z, eyeAgl, flight.groundElev);
+    engine.update(t, flight.pos.x, flight.pos.z, eyeAgl, gVis);
+    const ready = engine.stats.ready;
+    const k = birthK(
+      birthRef.current,
+      t,
+      ready > 0,
+      arrivalEpoch(),
+      SETTLE_CALM.births.bayerSec
+    );
+    if (k < 1) {
+      const s = getSatSkyline();
+      applyUniformBirth(fadeRef.current, s.fade, k, (v) =>
+        setSatSkyline(s.holeRadiusM, s.holeFeatherM, v)
+      );
+    } else if (!Number.isNaN(fadeRef.current.lastWritten)) {
+      const s = getSatSkyline();
+      applyUniformBirth(fadeRef.current, s.fade, 1, (v) =>
+        setSatSkyline(s.holeRadiusM, s.holeFeatherM, v)
+      );
+      fadeRef.current.lastWritten = Number.NaN;
+    }
+    notePopin('satSkyline', ready > 0, birthRef.current.running);
     if (
       process.env.NODE_ENV === 'development' &&
       window.__flyStats &&

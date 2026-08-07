@@ -74,6 +74,9 @@ import {
   weatherHazeMax,
 } from '@/lib/fly/weather-model';
 import { resolveSky, skyDuskOn, trueElevationDeg } from '@/lib/fly/sky-dusk';
+// R22 (B SETTLE) — the two FlyScene regions this round's B agent owns: the
+// groundElev damper (the -50 block) and the HDRI bucket re-pick interval.
+import { groundElevVisStep, settleOn, sinceRevealMs } from '@/lib/fly/settle';
 import {
   AERIAL_PERSPECTIVE,
   BOOST_METER,
@@ -90,6 +93,7 @@ import {
   SAT_ROADS,
   SAT_SHADOWS,
   SAT_SKYLINE,
+  SETTLE_CALM,
   SKY,
   SKY_DUSK,
   SKY_LIVE,
@@ -936,6 +940,20 @@ export function FlyScene({ runtime }) {
       return;
     }
     const hc = SKY.hdriCycle;
+    // R22 (B SETTLE, arrivalCalm) — a bucket CROSSING remounts drei's
+    // <Environment> and re-bakes a PMREM, which is the single most expensive
+    // discrete event in a satellite session. Two guards, both bounded:
+    //  (a) POST-REVEAL GRACE. For arrivalCalm.graceSec after the world becomes
+    //      visible the bucket is held at whatever it arrived with. The sky the
+    //      player lands under is the sky they keep for the first seconds; a
+    //      warp already snaps the bucket on its own epoch (this effect's dep),
+    //      so the grace only ever suppresses a re-pick that would have moved
+    //      the sky UNDER a player who just arrived.
+    //  (b) HYSTERESIS. `frac` crawls, so a bucket edge sat on at 0.001/s
+    //      re-picks every 5 s forever. A new bucket must clear the boundary by
+    //      arrivalCalm.hdriHysteresis of the day/night span before it lands.
+    const H = SETTLE_CALM.arrivalCalm;
+    let held = null; // the bucket currently displayed, for the hysteresis test
     const pick = () => {
       const frac = runtime.sun?.frac ?? 1;
       const az = runtime.sun?.az ?? 0;
@@ -943,6 +961,16 @@ export function FlyScene({ runtime }) {
       if (frac >= hc.dayFrac) b = 'day';
       else if (frac < hc.nightFrac) b = 'night';
       else b = az < 0 ? 'dawn' : 'dusk';
+      if (settleOn() && held !== null && b !== held) {
+        const since = sinceRevealMs();
+        const inGrace = since >= 0 && since < H.graceSec * 1000;
+        // The margin the crossing has actually cleared, in `frac` units.
+        const edge = b === 'day' || held === 'day' ? hc.dayFrac : hc.nightFrac;
+        const span = Math.max(1e-3, hc.dayFrac - hc.nightFrac);
+        const cleared = Math.abs(frac - edge) / span;
+        if (inGrace || cleared < H.hdriHysteresis) b = held;
+      }
+      held = b;
       setHdriBucket((prev) => (prev === b ? prev : b));
       // Round 19 (Fable, v2): dusk-aware key-color MIX — same discrete 5 s
       // cadence, full {a, b, s} so the color effect can lerp instead of
@@ -1095,13 +1123,18 @@ export function FlyScene({ runtime }) {
       if (elev != null) flight.groundElev = elev;
       runtime.geo = geo; // Vector3(lon, lat, altM) — HUD/polling read this
     }
-    // R22 W0 pre-seed: the VISUAL ground-elevation channel. Today a raw
-    // alias (behavior-identical); B SETTLE slew-limits it behind
-    // SETTLE_CALM.groundElevVis and re-points visual consumers (fade bands,
-    // skyline hole, parcel altK, veg cull) to it. The flight model and the
-    // crash floor keep reading flight.groundElev RAW — safety never reads a
-    // damped signal.
-    runtime.groundElevVis = flight.groundElev;
+    // R22 (B SETTLE): the VISUAL ground-elevation channel, slew-limited.
+    // `flight.groundElev` is a DEM sample seeded 0 at spawn and at every warp
+    // and refined as tiles sharpen, so every AGL-keyed fade band downstream
+    // (the building dissolve, the skyline hole+cull, the road ring's arm
+    // hysteresis, the parcel altitude fade) was swept through its whole range
+    // in the first seconds of an arrival — a step of hundreds of metres
+    // between two frames. groundElevVisStep glides it at SETTLE_CALM
+    // .groundElevVis.slewMps and SNAPS on a warp (a new place is a new truth).
+    // Flag off / fleet-pinned it returns the raw value, so this line is the
+    // W0 alias exactly. The flight model and the crash floor keep reading
+    // flight.groundElev RAW — safety never reads a damped signal.
+    runtime.groundElevVis = groundElevVisStep(flight.groundElev, dt, flyState.warpEpoch);
 
     // --- Phase 5: targeting + autopilot (uses traffic items from the
     // previous frame's update at -45 — 16ms of staleness is immaterial) ---

@@ -1,0 +1,2768 @@
+[
+  {
+    "on": true,
+    "name": "Melton AU",
+    "samples": 3000,
+    "last": {
+      "t": 32863,
+      "placed": 2002,
+      "scale0": 18.05989824003788,
+      "anchors": 319,
+      "held": false,
+      "settled": true,
+      "provisional": false,
+      "regK": 0.826960171662471
+    },
+    "finalPlaced": 2002,
+    "maxPlaced": 3003,
+    "maxSingleFrameJump": 2805,
+    "scaleAtJump": 0.001413792895327839,
+    "scaleAfter250ms": 1.613279145306505,
+    "series": [
+      {
+        "t": 13537,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 14675,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 14941,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 15010,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 15079,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 15149,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 15211,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 15272,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 15342,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 15413,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 15493,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 15552,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 15613,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 15671,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 15730,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 15794,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 15850,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 15905,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 15961,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 16019,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 16077,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 16127,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 16191,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 16317,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 16388,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 16522,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 16608,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 16699,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 16845,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 16937,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 17035,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 17177,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 17254,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 17332,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 17423,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 17509,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 17604,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 17700,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 17779,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 17858,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 17937,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 18014,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 18097,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 18184,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 18278,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 18356,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 18434,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 18508,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 18577,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 18644,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 18712,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 18780,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 18843,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 18905,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 18968,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 19031,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 19097,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 19163,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 19230,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 19306,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 19374,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 19438,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 19508,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 19584,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 19672,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 19751,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 19825,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 19891,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 19957,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 20017,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 20086,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 20149,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 20219,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 468,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 20287,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 468,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 20354,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 468,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 20419,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 468,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 20483,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 468,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 20577,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 468,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 20644,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 468,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 20743,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 468,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 20815,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 468,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 20871,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 468,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 20929,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 468,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 20988,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 468,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 21048,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 468,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 21103,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 468,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 21155,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 468,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 21209,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 468,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 21268,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 468,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 21335,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 468,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      }
+    ]
+  },
+  {
+    "on": false,
+    "name": "Melton AU",
+    "samples": 3000,
+    "last": {
+      "t": 24669,
+      "placed": 2438,
+      "scale0": 18.061116742591167,
+      "anchors": 394,
+      "held": false,
+      "settled": true,
+      "provisional": false,
+      "regK": 0.7748410228047315
+    },
+    "finalPlaced": 2438,
+    "maxPlaced": 2772,
+    "maxSingleFrameJump": 2249,
+    "scaleAtJump": 14.295391747391127,
+    "scaleAfter250ms": 14.295391747391127,
+    "series": [
+      {
+        "t": 9582,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 9804,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 9884,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 9944,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 10006,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 10057,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 10107,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 10160,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 10209,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 10274,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 10312,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 10355,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 10398,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 10448,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 10515,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 10555,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 10596,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 10643,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 10716,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 10763,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 10808,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 10856,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 10902,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 10954,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11004,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11068,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11116,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11173,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11259,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11326,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11413,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11486,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11564,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11651,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11737,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11822,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11907,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11984,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 12059,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 12135,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 12194,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 12248,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 12294,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 12345,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 12395,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 12437,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 12485,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 12526,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 12569,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 12621,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 12671,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 12737,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 12798,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 12854,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 12911,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 12981,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 13050,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 13117,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 13173,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 13241,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 13285,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 13326,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 13367,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 13414,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 13459,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 13502,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 13545,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 13587,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 13658,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 13726,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 13794,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 13852,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 13896,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 13938,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 13978,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 14027,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 14073,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 392,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 14133,
+        "placed": 2249,
+        "scale0": 14.295391747391127,
+        "anchors": 451,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0.7748410228047315
+      },
+      {
+        "t": 14176,
+        "placed": 2249,
+        "scale0": 14.295391747391127,
+        "anchors": 451,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0.7748410228047315
+      },
+      {
+        "t": 14218,
+        "placed": 2249,
+        "scale0": 14.295391747391127,
+        "anchors": 451,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0.7748410228047315
+      },
+      {
+        "t": 14259,
+        "placed": 2249,
+        "scale0": 14.295391747391127,
+        "anchors": 451,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0.7748410228047315
+      },
+      {
+        "t": 14302,
+        "placed": 2249,
+        "scale0": 14.295391747391127,
+        "anchors": 451,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0.7748410228047315
+      },
+      {
+        "t": 14353,
+        "placed": 2249,
+        "scale0": 14.295391747391127,
+        "anchors": 451,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0.7748410228047315
+      },
+      {
+        "t": 14401,
+        "placed": 2249,
+        "scale0": 14.295391747391127,
+        "anchors": 451,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0.7748410228047315
+      },
+      {
+        "t": 14448,
+        "placed": 2249,
+        "scale0": 14.295391747391127,
+        "anchors": 451,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0.7748410228047315
+      },
+      {
+        "t": 14491,
+        "placed": 2249,
+        "scale0": 14.295391747391127,
+        "anchors": 451,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0.7748410228047315
+      },
+      {
+        "t": 14538,
+        "placed": 2249,
+        "scale0": 14.295391747391127,
+        "anchors": 451,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0.7748410228047315
+      },
+      {
+        "t": 14583,
+        "placed": 2249,
+        "scale0": 14.295391747391127,
+        "anchors": 451,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0.7748410228047315
+      },
+      {
+        "t": 14631,
+        "placed": 2249,
+        "scale0": 14.295391747391127,
+        "anchors": 451,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0.7748410228047315
+      },
+      {
+        "t": 14674,
+        "placed": 2249,
+        "scale0": 14.295391747391127,
+        "anchors": 451,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0.7748410228047315
+      }
+    ]
+  },
+  {
+    "on": true,
+    "name": "Powell OH",
+    "samples": 3000,
+    "last": {
+      "t": 31070,
+      "placed": 0,
+      "scale0": null,
+      "anchors": 53,
+      "held": false,
+      "settled": true,
+      "provisional": false,
+      "regK": 0
+    },
+    "finalPlaced": 0,
+    "maxPlaced": 0,
+    "maxSingleFrameJump": 0,
+    "scaleAtJump": null,
+    "scaleAfter250ms": null,
+    "series": [
+      {
+        "t": 10661,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 10807,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 10910,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11015,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11132,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11238,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11317,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11415,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11553,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11652,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11780,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11878,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 11976,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 12070,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 12171,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 12260,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 12359,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 12459,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 12568,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 12677,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 12798,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 12913,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 13022,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 13138,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 13235,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 13332,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 13431,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 13532,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 13619,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 13709,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 13794,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 13887,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 13983,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 14069,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 0,
+        "held": true,
+        "settled": false,
+        "provisional": false,
+        "regK": 1
+      },
+      {
+        "t": 14168,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 14263,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 14352,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 14433,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 14504,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 14570,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 14638,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 14737,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 14901,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 14994,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 15086,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 15195,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 15283,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 15377,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 15466,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 15536,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 15605,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 15671,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 15735,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 15796,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 15858,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 15918,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 15980,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 16050,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 16114,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 44,
+        "held": true,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 16174,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 16238,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 16306,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 16372,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 16451,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 16514,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 16606,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 16725,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 16810,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 16887,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 16960,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 17026,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 17087,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 17149,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 17215,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 17276,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 17341,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 17424,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 17492,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 17550,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 17606,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 17665,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 17728,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 17792,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 17852,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 17915,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 17978,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 18035,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 18091,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 18145,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 35,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      },
+      {
+        "t": 18203,
+        "placed": 0,
+        "scale0": null,
+        "anchors": 20,
+        "held": false,
+        "settled": true,
+        "provisional": false,
+        "regK": 0
+      }
+    ]
+  }
+]

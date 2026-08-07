@@ -129,8 +129,24 @@ export function TrafficLayer({ runtime, flight, origin }) {
   // mesh._painted, which a swap sets alongside _isModel.
   useEffect(() => {
     let cancelled = false;
+    // R22 SANCTIONED BUGFIX (B SETTLE, determinism — unflagged, the R21
+    // beacon-latch precedent). This effect depends on [meshes, runtime], and
+    // `runtime` is re-created for ordinary reasons — so on a re-run it
+    // re-entered a fleet that had ALREADY swapped: every archetype's GLB was
+    // re-fetched, re-merged and re-oriented (a multi-model CPU burst that
+    // lands wherever the remount lands), the live geometry was disposed and
+    // replaced with an identical copy, and `runtime.modelsReady` was driven
+    // false→true a second time — which is a BOOT GATE input. The latch is the
+    // mesh array's own (`meshes` is memoized per component instance, so a
+    // genuinely new fleet gets a fresh one and still loads).
+    if (meshes.__glbSwapped) {
+      // eslint-disable-next-line react-hooks/immutability -- runtime is the scene's mutable bus (FlyScene RUNTIME CONTRACTS (R18)); the deferred write below needs none
+      runtime.modelsReady = true;
+      return undefined;
+    }
     loadTrafficGeometries().then((geos) => {
       if (cancelled) return;
+      meshes.__glbSwapped = true;
       geos.forEach((geo, i) => {
         const mesh = meshes[i];
         if (!geo || !mesh) return;

@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { WEATHER } from '@/lib/fly/fly-constants';
+import { SETTLE_CALM, WEATHER } from '@/lib/fly/fly-constants';
 import {
   computeTargets,
   createWeatherState,
   proceduralWeather,
 } from '@/lib/fly/weather-model';
+import { settleOn, sinceRevealMs } from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
 
 // Round 16 "Living World" — real weather at the player's position.
@@ -43,10 +44,33 @@ function detachWeather(runtime) {
   if (runtime?.weather) runtime.weather = null;
 }
 
+/**
+ * R22 (B SETTLE, arrivalCalm) — THE POST-REVEAL GRACE.
+ *
+ * The weather targets are recomputed on a ~1 Hz cadence and FlyScene's -50
+ * block damps `wx` toward them every frame, so a payload that lands in the
+ * first seconds after a reveal re-grades the sky, the fog and the cloud deck
+ * while the player is still taking in where they are. That is not a wrong
+ * sky — it is the right sky arriving at the wrong moment, which is exactly
+ * the class of thing this charter is about.
+ *
+ * The grace HOLDS THE RECOMPUTE, not the payload: `w.data` keeps updating, so
+ * nothing is lost and the first tick past the grace applies everything at
+ * once through the existing damper. A WARP is exempt by construction —
+ * FlyScene SNAPS the weather on the warp epoch, so the destination's sky is
+ * already correct before this grace window even opens.
+ */
+function inArrivalGrace() {
+  if (!settleOn()) return false;
+  const since = sinceRevealMs();
+  return since >= 0 && since < SETTLE_CALM.arrivalCalm.graceSec * 1000;
+}
+
 /** Recompute the targets in place from the last payload + the override. */
 function refreshWeatherTargets(runtime) {
   const w = runtime?.weather;
   if (!w) return;
+  if (inArrivalGrace()) return;
   let payload = w.data && w.data.found ? w.data : null;
   // Designed-but-OFF fallback (WEATHER.fallback ships 'baseline'): invent
   // plausible weather when both upstreams miss. An explicit override still

@@ -17,8 +17,25 @@ import {
   Vector3,
 } from 'three';
 import { mercatorScale } from '@/lib/fly/coords';
-import { GLOBE, PARCEL_HOMES, SUBURB_NIGHT, SURFACE_CALM } from '@/lib/fly/fly-constants';
+import {
+  GLOBE,
+  PARCEL_HOMES,
+  SETTLE_CALM,
+  SUBURB_NIGHT,
+  SURFACE_CALM,
+} from '@/lib/fly/fly-constants';
 import { applyBendAnchor } from '@/lib/fly/toy-world/world-bend';
+import {
+  applyInstanceEnv,
+  arrivalEpoch,
+  birthK,
+  groundElevVis,
+  makeBirth,
+  makeEnv,
+  notePopin,
+  resetEnv,
+  settleOn,
+} from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
 
 const _dummy = new Object3D();
@@ -158,7 +175,19 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
     stale: false, // the ring timed out unresolved: treat it as resolved as it gets
     provisional: false, // placed past maxHoldSec on an unresolved ring
     settled: false,
+    // --- round 22 (B SETTLE) — TRANSITIONS ONLY. The R21 placement machine
+    // above (two-ring settle + collision-index trust gate + rolling-MIN regK)
+    // is FROZEN; every field here decides how a decision it already made is
+    // ANIMATED, never what the decision is.
+    growEaseFrom: -1, // clock at which the provisional→confirmed ease started
+    growWas: 1, // …and the grow factor it started from
+    deleteFrom: -1, // clock at which a CONFIRMED delete began fading out
+    pendingDelete: false,
   });
+  // The instanced birth (see SatHouseLights for the mechanism) plus the two
+  // parcel-specific envelopes it composes with.
+  const birthRef = useRef(makeBirth());
+  const envRef = useRef(makeEnv());
 
   const geometry = useMemo(() => buildHouseGeometry(), []);
   const material = useMemo(() => {
@@ -232,8 +261,67 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
       // the same dusk, so they must be the same curve.
       const nt = Math.min(1, Math.max(0, 1 - (runtime.sun?.frac ?? 1) / H.dayFrac));
       st.nightK = nt ** H.gamma;
-      placeHomes(mesh, engine, runtime, flight, st, pool, t);
+      // R22 (B): a pass that reached the tail rewrote every live matrix at FULL
+      // scale, so whatever the envelope had baked into the buffer is gone and
+      // it restarts from 1. A pass that held or was skipped left the buffer
+      // alone, and so must the envelope.
+      if (placeHomes(mesh, engine, runtime, flight, st, pool, t)) resetEnv(envRef.current);
+      // eslint-disable-next-line react-hooks/immutability -- runtime is the scene's mutable bus (FlyScene RUNTIME CONTRACTS (R18))
+      runtime.parcelSettle = { mounted: true, resolved: !st.held, placed: st.placed };
     }
+    // --- R22 (B SETTLE): the three composed scale envelopes -----------------
+    // Every one of them is a TRANSITION. The R21 placement machine decided
+    // what stands where and whether it stands at all; these decide only how a
+    // decision that has already been taken reaches the screen.
+    const C = SURFACE_CALM.enabled ? SURFACE_CALM.parcel : null;
+    const S = SETTLE_CALM.parcel;
+    let envK = birthK(birthRef.current, t, st.placed > 0, arrivalEpoch(), SETTLE_CALM.births.rampSec);
+    if (settleOn() && C) {
+      // (a) THE GROW EASE. R21 placed a provisional field at growScale 0.55 and
+      // jumped it to 1.0 on the next settled pass — a discrete 45% step on up
+      // to 2,000 houses, between two frames, two seconds apart. Same two
+      // endpoints, same trigger, continuous in between.
+      if (st.provisional) {
+        st.growWas = C.growScale;
+        st.growEaseFrom = -1;
+        envK *= C.growScale;
+      } else if (st.growWas < 1) {
+        if (st.growEaseFrom < 0) st.growEaseFrom = t;
+        const u = Math.min(1, (t - st.growEaseFrom) / Math.max(0.05, S.growEaseSec));
+        const e = u * u * (3 - 2 * u);
+        envK *= st.growWas + (1 - st.growWas) * e;
+        if (u >= 1) {
+          st.growWas = 1;
+          st.growEaseFrom = -1;
+        }
+      }
+      // (b) THE DELETE FADE. A confirmed zero verdict is the LOUD direction of
+      // this layer's error (the R21 header), so when it does land it should
+      // land as a field shrinking away, not as one that was there and is not.
+      // The verdict itself — two consecutive SETTLED zero passes — is
+      // untouched; this only spends deleteFadeSec spending it.
+      if (st.pendingDelete) {
+        const u = Math.min(1, (t - st.deleteFrom) / Math.max(0.05, S.deleteFadeSec));
+        envK *= 1 - u * u * (3 - 2 * u);
+        if (u >= 1) {
+          st.pendingDelete = false;
+          st.deleteFrom = -1;
+          st.placed = 0;
+          st.prevN = 0;
+          mesh.count = 0;
+          mesh.visible = false;
+          resetEnv(envRef.current);
+        }
+      }
+    }
+    if (applyInstanceEnv(mesh, envRef.current, envK, st.placed)) {
+      rangeUpload(mesh.instanceMatrix, st.placed * 16);
+    }
+    notePopin(
+      'parcelHomes',
+      st.placed > 0 && mesh.visible,
+      birthRef.current.running || st.growWas < 1
+    );
     // ONE material write per frame.
     mesh.material.emissiveIntensity = st.nightK * PARCEL_HOMES.night.intensity;
 
@@ -585,7 +673,11 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
   const C = SURFACE_CALM.enabled ? SURFACE_CALM.parcel : null;
   const px = flight.pos.x;
   const pz = flight.pos.z;
-  const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
+  // R22 (B): altK is a VISUAL fade band, so it reads the slew-limited ground
+  // elevation. At boot and after a warp the raw sample is seeded 0 and then
+  // refines, which swept this band (and every other) through its whole range
+  // in the first seconds of an arrival.
+  const eyeAgl = Math.max(0, flight.pos.y - groundElevVis(runtime, flight));
   st.altK = 1 - smoothstep(P.altFade.onM, P.altFade.offM, eyeAgl);
   // Round 21 (C): the measurement fields are cleared where the measurement
   // STARTS, not at the top. A pass that holds or is statically skipped made no
@@ -965,7 +1057,12 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
         // size and then be deleted; a small field growing is a world loading,
         // a full field vanishing is a bug. (Scale is uniform, so the height
         // band verify-suburbia (G) freezes only ever gets SMALLER.)
-        const growK = C && st.provisional ? C.growScale : 1;
+        // R22 (B): with the settle flag on, the grow factor moves OUT of the
+        // baked matrix and into the per-frame envelope, which is the only way
+        // a 0.55 → 1.0 step can become a continuous ease without re-deriving
+        // 2,000 houses every frame. Same two endpoints, same trigger; flag off
+        // this is the R21 expression character for character.
+        const growK = C && st.provisional && !settleOn() ? C.growScale : 1;
         const fscale = (1 + (P.farScale.mul - 1) * ft) * st.altK * growK;
         // One yaw for the whole cluster: every house on a street shares it.
         const yaw = hash(lx * 0.731 - lz * 1.117) * Math.PI * 2;
@@ -1026,10 +1123,26 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
       st.zeroPasses = settled || st.stale ? st.zeroPasses + 1 : st.zeroPasses;
       if (st.zeroPasses < C.confirmPasses) {
         mesh.position.set(keepOx, 0, keepOz);
-        return;
+        return false;
+      }
+      // R22 (B): the verdict has landed. Spend deleteFadeSec on it instead of
+      // one frame — the field stays exactly as it is, the frame loop's
+      // envelope shrinks it, and the pass that finds the envelope at 0 parks
+      // the draw. The DECISION above is untouched.
+      if (settleOn() && !st.pendingDelete) {
+        st.pendingDelete = true;
+        st.deleteFrom = now;
+        mesh.position.set(keepOx, 0, keepOz);
+        return false;
       }
     } else if (C) {
       st.zeroPasses = 0;
+      // A field that came back cancels a fade in progress (the envelope's next
+      // step finds pendingDelete false and the buffer freshly written).
+      if (st.pendingDelete && n > 0) {
+        st.pendingDelete = false;
+        st.deleteFrom = -1;
+      }
     }
     if (C && (settled || st.stale)) st.confirmed = true;
   }
@@ -1051,4 +1164,8 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
   mesh.boundingSphere.center.set(0, 0, 0);
   mesh.boundingSphere.radius = Math.sqrt(maxR2) + maxScale + maxD * maxD * MAX_BEND_K + 50;
   st.placed = n;
+  // R22 (B): TRUE ⇒ this pass rewrote the live matrices at full scale, so the
+  // caller's scale envelope must restart from 1. Every early return above is
+  // falsy, which is exactly the "the buffer was left alone" case.
+  return true;
 }

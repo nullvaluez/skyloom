@@ -7,14 +7,26 @@ import { SatBuildingEngine } from '@/lib/fly/toy-world/sat-building-engine';
 import {
   PARCEL_HOMES,
   SAT_AMBIENT,
+  SAT_BLDG_FADE,
   SAT_BUILDINGS,
   SAT_COVERAGE,
   SAT_SHADOWS,
   SAT_TINT,
   SAT_VEG,
   SAT_WATER,
+  SETTLE_CALM,
   SUBURB_NIGHT,
 } from '@/lib/fly/fly-constants';
+import {
+  applyUniformBirth,
+  arrivalEpoch,
+  birthK,
+  groundElevVis,
+  makeBirth,
+  makeUniformBirth,
+  notePopin,
+} from '@/lib/fly/settle';
+import { getSatBldgFade, setSatBldgFade } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
 import { SatVegLayer } from './SatVegLayer';
 
@@ -88,6 +100,14 @@ export function SatBuildingLayer({ runtime, flight }) {
   // react-hooks/purity); the warp subscription reads the current clock from here.
   const nowRef = useRef(0);
   const statsAtRef = useRef(0);
+  // R22 (B SETTLE) — the chunked-mesh BIRTH. No new shader, no new cache key:
+  // the ring already compiles an ordered Bayer-4 screen-door `discard` driven
+  // by the single `uSatBldgFade` uniform (R16's cull dissolve), so a birth is
+  // that same dither run in the other direction. The layer post-multiplies the
+  // engine's own per-frame write (see applyUniformBirth for why the read-back
+  // cannot simply be multiplied).
+  const birthRef = useRef(makeBirth());
+  const fadeRef = useRef(makeUniformBirth());
 
   // Round 18 (A1) — publish the engine on the runtime bus (the RUNTIME
   // CONTRACTS (R18) block in FlyScene). A5 GRAVITY's crash system calls
@@ -109,6 +129,13 @@ export function SatBuildingLayer({ runtime, flight }) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/immutability -- runtime is the scene's mutable bus (FlyScene RUNTIME CONTRACTS (R18))
     runtime.satBuildings = engine;
+    // R22 (B): the AGL band inside which this ring exists at all. ARRIVAL_GATE
+    // consults the building ready-fraction ONLY below it — above the band the
+    // ring is deliberately empty and holding a reveal for it would be holding
+    // for something that is never coming.
+    runtime.satBuildingsBandM = SAT_BLDG_FADE.enabled
+      ? SAT_BLDG_FADE.evictAglM
+      : SAT_BUILDINGS.cullAglOffM;
     return () => {
       if (runtime.satBuildings === engine) runtime.satBuildings = null;
     };
@@ -146,11 +173,35 @@ export function SatBuildingLayer({ runtime, flight }) {
 
   useFrame(({ clock }) => {
     nowRef.current = clock.elapsedTime;
-    const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
+    // R22 (B): the VISUAL ground elevation — slew-limited by FlyScene, so the
+    // SAT_BLDG_FADE dissolve band is no longer swept through by a raw DEM
+    // sample refining under the aircraft (seeded 0 at every spawn and warp).
+    // The flight model and the crash floor still read flight.groundElev RAW.
+    const eyeAgl = Math.max(0, flight.pos.y - groundElevVis(runtime, flight));
     // Windows light up as the sun goes down (runtime.sun is the R13 day cycle,
     // republished on a 60s cadence — this just reads it; one uniform write).
     engine.setNightMix(runtime.sun?.frac);
     engine.update(clock.elapsedTime, flight.pos.x, flight.pos.z, eyeAgl);
+    // …and the birth, AFTER the engine's own uniform write.
+    const ready = engine.stats.ready;
+    const k = birthK(
+      birthRef.current,
+      clock.elapsedTime,
+      ready > 0,
+      arrivalEpoch(),
+      SETTLE_CALM.births.bayerSec
+    );
+    if (k < 1) {
+      applyUniformBirth(fadeRef.current, getSatBldgFade(), k, setSatBldgFade);
+    } else if (!Number.isNaN(fadeRef.current.lastWritten)) {
+      // The completion frame: restore the engine's own base exactly once, then
+      // hand the uniform back (lastWritten NaN ⇒ this branch never runs again
+      // until the next arrival re-arms the birth). With the flag off `k` is 1
+      // from the first frame and NOTHING here ever writes.
+      applyUniformBirth(fadeRef.current, getSatBldgFade(), 1, setSatBldgFade);
+      fadeRef.current.lastWritten = Number.NaN;
+    }
+    notePopin('satBuildings', ready > 0, birthRef.current.running);
     if (
       process.env.NODE_ENV === 'development' &&
       window.__flyStats &&
