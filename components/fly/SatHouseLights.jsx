@@ -9,7 +9,7 @@ import {
   Object3D,
   SphereGeometry,
 } from 'three';
-import { SAT_VEG, SUBURB_NIGHT } from '@/lib/fly/fly-constants';
+import { SAT_VEG, SUBURB_NIGHT, SURFACE_CALM } from '@/lib/fly/fly-constants';
 import { applyBendAnchor } from '@/lib/fly/toy-world/world-bend';
 
 const _dummy = new Object3D();
@@ -19,6 +19,16 @@ const POOL = SUBURB_NIGHT.houseLights.pool;
 function hash(n) {
   const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
   return x - Math.floor(x);
+}
+
+/** Round 21 (C, S6) — ranged upload; see SatVegLayer's rangeUpload docstring. */
+function rangeUpload(attr, elements) {
+  if (!attr) return;
+  if (SURFACE_CALM.enabled && SURFACE_CALM.uploads.ranges) {
+    attr.clearUpdateRanges();
+    attr.addUpdateRange(0, Math.min(elements, attr.array.length));
+  }
+  attr.needsUpdate = true;
 }
 
 /**
@@ -62,7 +72,18 @@ function hash(n) {
  */
 export function SatHouseLights({ engine, runtime, flight }) {
   const meshRef = useRef(null);
-  const stateRef = useRef({ t: -Infinity, placed: 0, nightK: 0, fromHouse: 0, fromVeg: 0 });
+  const stateRef = useRef({
+    t: -Infinity,
+    first: true, // round 21: one-time cadence phase nudge (S6)
+    sig: '',
+    atX: Infinity,
+    atZ: Infinity,
+    prevN: 0,
+    placed: 0,
+    nightK: 0,
+    fromHouse: 0,
+    fromVeg: 0,
+  });
 
   const geometry = useMemo(() => new SphereGeometry(1, 6, 4), []);
   const material = useMemo(() => {
@@ -96,7 +117,10 @@ export function SatHouseLights({ engine, runtime, flight }) {
     const t = clock.elapsedTime;
     const st = stateRef.current;
     if (t - st.t >= SAT_VEG.placeCadenceSec) {
-      st.t = t;
+      // Round 21 (C, S6): one-time phase nudge; the first pass stays immediate.
+      const U = SURFACE_CALM.enabled ? SURFACE_CALM.uploads : null;
+      st.t = st.first && U ? t + U.stagger[2] * SAT_VEG.placeCadenceSec : t;
+      st.first = false;
       // γ night ramp — the EXACT SAT_ROADS.night / SAT_CITY_GLOW shape, so the
       // porch lights, the streetlights and the window emissive all arrive
       // together at dusk instead of in three separate waves.
@@ -111,10 +135,28 @@ export function SatHouseLights({ engine, runtime, flight }) {
         st.placed = 0;
         st.fromHouse = 0;
         st.fromVeg = 0;
+        st.prevN = 0;
+        st.sig = 'day';
         mesh.count = 0;
         mesh.visible = false;
       } else {
-        placeLights(mesh, engine, runtime, flight, st);
+        // …and the static skip: a settled ring under a parked aircraft
+        // re-derives an identical pool and re-uploads it every 2 s. Both
+        // anchor sources are in the signature (the building ring's houseAnchors
+        // and the veg ring's residential scatter), plus the night ramp itself.
+        const vg = engine.stats;
+        const bs = runtime.satBuildings?.stats;
+        const sig = U
+          ? `${vg.chunks}|${vg.ready}|${vg.clsChunks}|${vg.vegPts}|` +
+            `${bs?.chunks ?? -1}|${bs?.ready ?? -1}|${bs?.columns ?? -1}|${st.nightK.toFixed(3)}`
+          : '';
+        const moved2 = (flight.pos.x - st.atX) ** 2 + (flight.pos.z - st.atZ) ** 2;
+        if (!U || sig !== st.sig || moved2 >= U.staticSkipM ** 2) {
+          st.sig = sig;
+          st.atX = flight.pos.x;
+          st.atZ = flight.pos.z;
+          placeLights(mesh, engine, runtime, flight, st);
+        }
       }
     }
     // ONE material write per frame.
@@ -243,7 +285,9 @@ function placeLights(mesh, engine, runtime, flight, st) {
 
   mesh.count = n; // 0 = the draw is parked entirely (three skips primcount 0)
   mesh.visible = n > 0;
-  mesh.instanceMatrix.needsUpdate = true;
+  // Round 21 (C, S6): upload only what can have changed (see rangeUpload).
+  rangeUpload(mesh.instanceMatrix, Math.max(n, st.prevN | 0) * 16);
+  st.prevN = n;
   st.placed = n;
   st.fromHouse = fromHouse;
   st.fromVeg = n - fromHouse;
