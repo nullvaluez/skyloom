@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import {
   BufferAttribute,
   BufferGeometry,
@@ -12,7 +12,7 @@ import {
   Sphere,
   Vector3,
 } from 'three';
-import { GLOBE, SAT_TINT, SAT_VEG } from '@/lib/fly/fly-constants';
+import { GLOBE, SAT_TINT, SAT_VEG, SURFACE_CALM } from '@/lib/fly/fly-constants';
 import { applyBendFade } from '@/lib/fly/toy-world/world-bend';
 
 // Worst-case bend drop pad for the CPU bounding sphere (the SatVegLayer
@@ -20,6 +20,38 @@ import { applyBendFade } from '@/lib/fly/toy-world/world-bend';
 // see it. k is LARGEST at low altitude, which is the only altitude tint exists
 // at.
 const MAX_BEND_K = 1 / (2 * GLOBE.bendRadiusM.satellite);
+
+/**
+ * Round 21 (C "SURFACE", P8) — THE POLYGON OFFSET SIGN UNDER REVERSED DEPTH.
+ *
+ * FlyCanvas runs the renderer with `reversedDepthBuffer: true` (near = 1, far
+ * = 0), and three r185's WebGLState.setPolygonOffset negates ONLY THE FACTOR
+ * when the reversed buffer is active — the units term is passed through
+ * verbatim. So this material's authored (-2, -2) reaches GL as (+2, -2): the
+ * slope-scaled term pulls the drape toward the eye while the constant term
+ * pushes it away. The two disagree by a slope-dependent amount, which is
+ * exactly the shape of the defect — the landcover tint drops out on ground
+ * that is tilted away from the camera and holds on flat ground.
+ *
+ * The fix authors the units with the opposite sign when the reversed buffer is
+ * really active, so BOTH terms reach GL positive and both mean "toward the
+ * eye". Detected off the live renderer (the extension can be missing, in which
+ * case three silently runs a normal depth buffer and the R20 signs are right).
+ */
+function offsetUnits(gl, units) {
+  const reversed = gl?.capabilities?.reversedDepthBuffer === true;
+  return SURFACE_CALM.enabled && SURFACE_CALM.depthOffsetFix && reversed ? -units : units;
+}
+
+/** Round 21 (C, S6) — ranged upload; see SatVegLayer's rangeUpload docstring. */
+function rangeUpload(attr, elements) {
+  if (!attr) return;
+  if (SURFACE_CALM.enabled && SURFACE_CALM.uploads.ranges) {
+    attr.clearUpdateRanges();
+    attr.addUpdateRange(0, Math.min(elements, attr.array.length));
+  }
+  attr.needsUpdate = true;
+}
 
 /**
  * Round 19 (C "GROUNDTRUTH") — SATELLITE landcover albedo tint.
@@ -63,8 +95,21 @@ const MAX_BEND_K = 1 / (2 * GLOBE.bendRadiusM.satellite);
  * road ribbons (3) and beacons (4) still add on top of tinted ground.
  */
 export function SatTintLayer({ engine, flight }) {
+  const gl = useThree((s) => s.gl);
   const meshRef = useRef(null);
-  const stateRef = useRef({ t: -Infinity, polys: 0, verts: 0, indices: 0, chunks: 0 });
+  const stateRef = useRef({
+    t: -Infinity,
+    first: true, // round 21: one-time cadence phase nudge (S6)
+    sig: '',
+    atX: Infinity,
+    atZ: Infinity,
+    prevV: 0,
+    prevI: 0,
+    polys: 0,
+    verts: 0,
+    indices: 0,
+    chunks: 0,
+  });
 
   const geometry = useMemo(() => {
     const g = new BufferGeometry();
@@ -102,11 +147,13 @@ export function SatTintLayer({ engine, flight }) {
       depthTest: true,
       polygonOffset: true,
       polygonOffsetFactor: -2,
-      polygonOffsetUnits: -2,
+      // Round 21 (C, P8): authored -2, sign-flipped to +2 when the renderer is
+      // really running a reversed depth buffer (three flips only the factor).
+      polygonOffsetUnits: offsetUnits(gl, -2),
     });
     applyBendFade(m); // EXISTING variant, unmodified — no new cache key
     return m;
-  }, []);
+  }, [gl]);
 
   const mesh = useMemo(() => {
     const m = new Mesh(geometry, material);
@@ -131,8 +178,20 @@ export function SatTintLayer({ engine, flight }) {
     const t = clock.elapsedTime;
     const st = stateRef.current;
     if (t - st.t < SAT_VEG.placeCadenceSec) return;
-    st.t = t;
-    fillTint(mesh, engine, flight, st);
+    // Round 21 (C, S6): one-time phase nudge (first pass stays immediate) +
+    // the static skip. See SatVegLayer for the reasoning on both.
+    const U = SURFACE_CALM.enabled ? SURFACE_CALM.uploads : null;
+    st.t = st.first && U ? t + U.stagger[1] * SAT_VEG.placeCadenceSec : t;
+    st.first = false;
+    const sg = engine.stats;
+    const sig = U ? `${sg.chunks}|${sg.ready}|${sg.empty}|${sg.tintChunks}|${sg.tintVerts}` : '';
+    const moved2 = (flight.pos.x - st.atX) ** 2 + (flight.pos.z - st.atZ) ** 2;
+    if (!U || sig !== st.sig || moved2 >= U.staticSkipM ** 2) {
+      st.sig = sig;
+      st.atX = flight.pos.x;
+      st.atZ = flight.pos.z;
+      fillTint(mesh, engine, flight, st);
+    }
     if (process.env.NODE_ENV === 'development' && window.__flyStats) {
       window.__flyStats.satTint = {
         polys: st.polys,
@@ -212,9 +271,16 @@ function fillTint(mesh, engine, flight, st) {
   }
 
   geo.setDrawRange(0, nI);
-  geo.attributes.position.needsUpdate = true;
-  geo.attributes.color.needsUpdate = true;
-  geo.index.needsUpdate = true;
+  // Round 21 (C, S6): upload only what can have changed — this pass's fill
+  // plus the tail the previous one left behind (which the draw range already
+  // excludes, but which a later longer fill would otherwise read stale).
+  const tV = Math.max(nV, st.prevV | 0);
+  const tI = Math.max(nI, st.prevI | 0);
+  rangeUpload(geo.attributes.position, tV * 3);
+  rangeUpload(geo.attributes.color, tV * 3);
+  rangeUpload(geo.index, tI);
+  st.prevV = nV;
+  st.prevI = nI;
   geo.boundingSphere.center.set(0, 0, 0);
   geo.boundingSphere.radius = Math.sqrt(maxR2) + maxD * maxD * MAX_BEND_K + 50;
   // THE OWENS LEVER: below minPolys the pooled mesh is invisible, so a sparse
