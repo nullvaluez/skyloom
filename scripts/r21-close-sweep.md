@@ -49,7 +49,7 @@ coin (R20 lesson); these are the measured reds.
 | **P1** false frustum cull, toy z10 | verify-stability (9) | **5** chunk meshes of 417 (worst drop **10 191 m**) | 0 | binary |
 | **S3** tier step re-streams the ring | verify-tier-step (3) | ready/chunks floor **0.00** (16 ready → **0**) | ≥ 0.70 | total |
 | **S3** skyline ring re-streams | verify-tier-step (3a) | ready/chunks floor **0.60** | ≥ 0.70 | 1.2× |
-| **S4** leak across tier steps | verify-tier-step (6) | per-cycle geometry/texture floors, spread **16/16** across cycles (pre-floor metric) | floor rise ≤ 6 | — |
+| **S4** leak across tier steps | verify-tier-step (6) | ~~spread 16/16~~ → **NOT RED-CALIBRATED**, see §2.2: the shipped floor metric reads rise 0/0 on the pre-fix tree too | floor rise ≤ 6 | none |
 | **S5/S7/S8** flicker, urban | verify-flicker (2) | **p99 14.23 → 13.60** (does NOT decay) | ≤ 12 | 1.13× |
 | **S5** disappear/reappear | verify-flicker (4) | **380 pixels** swinging >120 luma at Manhattan · **0** at Powell | ≤ 32/leg | 12× / control 0 |
 | **S5/S7** flicker, suburb | verify-flicker (3) | **p99 1.76 → 0.81** — this is the CONTROL, and it is green | ≤ 12 | 15× headroom |
@@ -146,10 +146,10 @@ delivery list, not a wish list.
 
 | Instrument | Owner | Gate that is blind without it |
 |---|---|---|
-| `window.__flyGov.force(dir)` / `.state()` | A | verify-tier-step drives the ladder through `setQualityTier` instead — which measures the REAL R20 cost, but cannot exercise A's own latch |
-| `window.__flyStats.fx.rebuilds` | A | verify-stability (4) |
-| **`window.__flyComposer`** (the vendored composer, dev-only) | A | verify-tier-step (4) — the composer-buffer-vs-drawing-buffer assertion, i.e. the stretched-frame defect, has NO instrument at all today. **Please publish it.** |
-| `window.__flyStats.governor` | A | the satellite soak's governor block (falls back to counting store/DPR transitions) |
+| ~~`window.__flyGov.force(dir)` / `.state()`~~ | A | **DELIVERED (W2)** |
+| ~~`window.__flyStats.fx.rebuilds`~~ | A | **DELIVERED (W2)** — stability (4) is a live assertion now |
+| ~~**`window.__flyComposer`**~~ | A | **DELIVERED (W2)** — tier-step (4) is a live assertion now and passes at every sample |
+| ~~`window.__flyStats.governor`~~ | A | **DELIVERED (W2)** |
 | per-engine `stats.emptyByReason` | B | verify-seam (8) |
 | per-engine `stats.evictions` / `stats.heals` | B | verify-tier-step (3b) |
 | `window.__flyStats.monuments.remerges` | C | verify-stability (5) |
@@ -162,10 +162,83 @@ delivery list, not a wish list.
 
 | After merge | verify-stability | verify-tier-step | verify-flicker | verify-seam (node) | Notes |
 |---|---|---|---|---|---|
-| A GOVERNOR | — | — | — | — | expect `__flyGov` + `fx.rebuilds` to stop SOFT-failing |
+| **A GOVERNOR** (`7f55d12`) | **14/16**, only (7)+(9) red | **8/10**, only (3)+(3a) red | **4/6**, only (4)+(5) red | not re-run (worker untouched by A) | see §2.1 — every A-owned class flipped green, every B/C/D-owned class stayed red |
 | D PIPELINE | — | — | — | — | expect seam (4)/(5) to flip green; Owens (1) must stay 0 |
-| B STREAMKEEPER | — | — | — | — | expect stability (7)/(9) → 0 and seam (7) bounded |
-| C SURFACE | — | — | — | — | expect flicker (2)/(3)/(5) green and `monuments.remerges` present |
+| B STREAMKEEPER | — | — | — | — | expect stability (7)/(9) → 0, tier-step (3)/(3a) → green, seam (7) bounded |
+| C SURFACE | — | — | — | — | expect flicker (4)/(5) green and `monuments.remerges` present |
+
+### §2.1 Post-A smoke — full per-gate result (dev server restarted on :3124 from the merged tree)
+
+**Every instrument A owed arrived and every gate that was SOFT is now a real
+assertion**: `__flyGov`, `__flyStats.fx`, `__flyComposer`, `__flyGl`,
+`__flyStats.governor`, `__flyStats.prewarm`.
+
+| Gate | W1 pre-fix | W2 post-A | Owner | Verdict |
+|---|---|---|---|---|
+| stability (1) tier steps at a steady pose | 0 | **0** | A | green (was never red here — headless cannot sit on the vsync bound) |
+| stability (1b) ladder settles under 6× throttle | 2 steps, no re-entry | **2 steps, no re-entry** (high→medium@2 s→low@24 s) | A | green |
+| stability (3) sceneRemounts | 0 | **0** | — | green |
+| stability (4) composer rebuilds | **SOFT** (no instrument) | **PASS — `fx.rebuilds` 1→1** over a 45 s dwell | A | **instrument landed + green** |
+| stability (6) heap GC floor | +2.74 MB/min | **−10.39 MB/min** (floors 166→160→161) | A | green |
+| stability (7) satellite false culls | 1 / 54 | **1 / 54** (satRoads, drop 511 m) | **B** | **still RED — expected** |
+| stability (9) toy z10 false culls | 5 / 417, worst drop 10 191 m | **5 / 417, worst drop 10 191 m** | **B** | **still RED — expected, identical numbers** |
+| stability (12)/(13) boot window | 0 placed / 3.8 max step | **0 placed / 3.2 max step** | C | green (not red-calibrated) |
+| tier-step (3) ready/chunks floor | 0.00 | **0.00** (49.7 % of samples < 0.7, longest run 3.0 s) | **B** | **still RED — expected** |
+| tier-step (3a) skyline ready/chunks | 0.60 | **0.60** | **B** | **still RED — expected** |
+| tier-step (4) composer buffer === drawing buffer | **SOFT** (no instrument) | **PASS — agreed at every sample of 3 forced cycles** | A | **instrument landed + green** |
+| tier-step (5) programs flat after cycle 1 | flat (55→57) | **flat (73→73)**, prewarm baseline 72 | A | green |
+| tier-step (6) memory floors do not rise | floors [231,231,231] / [190,190,190] | **[231,231,231] / [190,190,190]**, rise 0/0 | A | green — **but see §2.2** |
+| tier-step (7) world never vanishes | min 214/221 | **min 216/219** | — | green |
+| flicker (2) urban p99 (settled window) | 13.60 | **8.71** (window A 14.41 → B 8.71) | A+B+C | **flipped GREEN on A alone** |
+| flicker (3) suburb p99 — the control | 0.81 | **0.49**, 0 swinging pixels | — | green, quieter still |
+| flicker (4) pixels swinging >120 | urban **380** | urban **146**, suburb 0 | B+C | **still RED — 62 % of the flicker was A's, the rest is not** |
+| flicker (5) P8 authored units | (−2, −2) | **(−2, −2)** | **C** | **still RED — expected** |
+
+The partial-red pattern is the point: **every defect class A owns went green and
+no defect class A does not own moved**, with the false-cull census returning
+byte-identical numbers (5 / 417, 10 191 m) across the merge.
+
+Two things worth flagging to the round record:
+
+- **A's fix removed 62 % of the settled urban flicker on its own** (swinging
+  pixels 380 → 146; p99 13.60 → 8.71; movingFrac 0.054 → 0.032). The composer
+  was rebuilding often enough to be a visible part of symptom 1. Window A (at
+  the settle) is unchanged at 14.41, so what A fixed is the STEADY-state half.
+- **flicker (2) is no longer near its threshold**: 8.71 against a bound of 12,
+  i.e. 3.3 of headroom before the ruling's demote-if-within-1.5 line. No
+  demotion is needed unless B or C moves it back up.
+
+### §2.2 HONEST CORRECTION to the W1 red table — tier-step (6)
+
+W1 recorded gate (6) as red at "geometry/texture spread 16/16". That number was
+measured with an EARLIER version of the gate that used the SPREAD across the
+cycles; the shipped gate uses the per-cycle FLOOR, because a spread indicts the
+tier-gated facade atlases and water meshes legitimately appearing and
+disappearing with the tier. Recomputing the FLOOR metric from the preserved W1
+trace (`scripts/r21-e-red-w1-tierstep.json`) gives **[231, 231, 231] and
+[190, 190, 190] — rise 0, i.e. green on the pre-fix tree too**.
+
+So **gate (6) as shipped is NOT red-calibrated**, and it joins the §1b list.
+It is still worth keeping (a floor that rises is the only unambiguous leak
+signature available without heap-snapshot tooling), but it must not be cited as
+evidence that A's dispose-on-remove fix works — A's own measurements are that
+evidence. This correction is recorded rather than quietly dropped because the
+W1 report claimed a red it cannot support.
+
+### §2.3 One harness defect found and fixed by the A merge
+
+The first post-A run failed stability (7) with `samples=0 tested=-1`: an
+INSTRUMENT failure, not a defect. Phase 1b (the 6× CPU throttle) ran BEFORE the
+satellite orbit and drove the ladder to tier `low`, where
+SatBuildingLayer / SatSkylineLayer / SatRoadLayer never mount — so the
+false-cull census found no engine roots at all. Under R20's `PerformanceMonitor`
+this was invisible because `onIncline` bounced the tier straight back up (the
+flap itself); under A's governor the descent LATCHES and stays, exactly as
+designed. **A's fix working correctly is what exposed the ordering assumption.**
+Fixed in-harness: phase 1b now runs LAST on the satellite page, the orbit leg
+prints the census error text when every sample fails, and a new precondition
+gate (6b) asserts the census had meshes to test so this can never again read as
+a product regression.
 
 ---
 

@@ -614,6 +614,71 @@ const lsq = (xs, ys) => {
       .join('->')}MB (${w.heap.length} samples)`
   );
 
+  /* ================= PHASE 2 — slow 360 orbit, satellite ================== */
+  const orbitLeg = async (pg, tag, secs, pitch, shotName) => {
+    const i0 = await drawWindow(pg);
+    await pg.evaluate(START_ORBIT, [secs, pitch]);
+    const samples = [];
+    const t0 = Date.now();
+    while (Date.now() - t0 < secs * 1000 + 1500) {
+      samples.push(await pg.evaluate(FALSE_CULL_CENSUS));
+      await pg.waitForTimeout(250);
+    }
+    const series = await drawSlice(pg, i0);
+    await glShot(pg, shotName);
+    const ok = samples.filter((s) => !s.err);
+    if (!ok.length)
+      console.log(
+        `ORBIT[${tag}] INSTRUMENT ERROR — every census sample failed: ` +
+          `${JSON.stringify([...new Set(samples.map((s) => s.err))])}. ` +
+          `The commonest cause is a tier below 'medium', where the satellite ` +
+          `engines never mount and there are no chunk meshes to test.`
+      );
+    const maxFalse = ok.length ? Math.max(...ok.map((s) => s.falseCulls)) : -1;
+    const sumTested = ok.length ? Math.max(...ok.map((s) => s.tested)) : -1;
+    const worstSample = ok.find((s) => s.falseCulls === maxFalse) ?? {};
+    // Draw-collapse evidence: biggest single-frame drop and the deepest dip
+    // below the orbit median, both as fractions of the median.
+    const med = series.length
+      ? [...series].sort((a, b) => a - b)[Math.floor(series.length / 2)]
+      : 0;
+    let maxStepDrop = 0;
+    for (let i = 1; i < series.length; i++)
+      maxStepDrop = Math.max(maxStepDrop, series[i - 1] - series[i]);
+    const dipFrac = med > 0 ? 1 - Math.min(...series) / med : 0;
+    console.log(
+      `ORBIT[${tag}]: samples=${ok.length} tested(max)=${sumTested} maxFalseCulls=${maxFalse} ` +
+        `byRoot=${JSON.stringify(worstSample.byRoot ?? {})} maxDrop=${worstSample.maxDropM}m ` +
+        `bendK=${worstSample.bendK} · draws med=${med} min=${Math.min(...series)} ` +
+        `max=${Math.max(...series)} dip=${(dipFrac * 100).toFixed(1)}% worstStepDrop=${maxStepDrop}` +
+        (worstSample.worst?.length ? ` · worst=${JSON.stringify(worstSample.worst)}` : '')
+    );
+    return { maxFalse, sumTested, worstSample, med, dipFrac, maxStepDrop, series };
+  };
+
+  const satOrbit = await orbitLeg(page, 'satellite NYC 900m', ORBIT_SEC, -0.28, 'r21-e-stability-02-sat-orbit.png');
+  gate(
+    '(6b) satellite orbit precondition: the census had chunk meshes to test',
+    satOrbit.sumTested > 0,
+    `tested=${satOrbit.sumTested} (a tier below medium mounts no satellite engines)`
+  );
+  gate(
+    `(7) satellite orbit: no chunk culled while the bend has it on screen (=== ${MAX_FALSE_CULLS})`,
+    satOrbit.maxFalse === MAX_FALSE_CULLS,
+    `maxFalseCulls=${satOrbit.maxFalse} of ${satOrbit.sumTested} chunk meshes · ` +
+      `worst drop ${satOrbit.worstSample.maxDropM}m`
+  );
+  red.push([
+    'P1 false frustum cull (satellite)',
+    'verify-stability (7)',
+    satOrbit.maxFalse,
+    `=== ${MAX_FALSE_CULLS}`,
+  ]);
+  console.log(
+    `INFO satellite orbit draw dip ${(satOrbit.dipFrac * 100).toFixed(1)}% ` +
+      `(informational — a turning camera legitimately changes what is in view)`
+  );
+
   /* ============ PHASE 1b — THE SLOW-MACHINE LEG (S1, the flap) ============ */
   // The flap the user reports is a SLOW-MACHINE behaviour: on the calibration
   // GPU the busy pose holds ~230 fps and drei's PerformanceMonitor never
@@ -623,6 +688,16 @@ const lsq = (xs, ys) => {
   // load — it is "step, then SETTLE": bounded steps and no oscillation. R20's
   // ladder has flipflops=Infinity and no latch, and FlyCanvas' own comment says
   // "the hitch IS the flap".
+  //
+  // ORDERING (W2, post-A): this leg runs LAST on the satellite page, after the
+  // orbit, and that is load-bearing. Throttling drives the ladder down to
+  // tier 'low', where SatBuildingLayer / SatSkylineLayer / SatRoadLayer do not
+  // mount at all — so a census taken afterwards finds NO engine roots. Under
+  // R20's PerformanceMonitor that was invisible because onIncline bounced the
+  // tier straight back up (the flap itself); under A's governor the descent
+  // LATCHES and stays, exactly as designed. The first post-A run of this
+  // harness failed gate (7) with `samples=0 tested=-1` for precisely that
+  // reason — a harness ordering assumption, not a regression.
   let throttleOut = { skipped: true };
   if (!process.env.STAB_NO_THROTTLE) {
     const rate = +(process.env.STAB_THROTTLE ?? 6);
@@ -673,58 +748,6 @@ const lsq = (xs, ys) => {
     red.push(['S1 tier flap under load', 'verify-stability (1b)', `${throttleOut.steps} steps`, '<= 3, no re-entry']);
   }
 
-  /* ================= PHASE 2 — slow 360 orbit, satellite ================== */
-  const orbitLeg = async (pg, tag, secs, pitch, shotName) => {
-    const i0 = await drawWindow(pg);
-    await pg.evaluate(START_ORBIT, [secs, pitch]);
-    const samples = [];
-    const t0 = Date.now();
-    while (Date.now() - t0 < secs * 1000 + 1500) {
-      samples.push(await pg.evaluate(FALSE_CULL_CENSUS));
-      await pg.waitForTimeout(250);
-    }
-    const series = await drawSlice(pg, i0);
-    await glShot(pg, shotName);
-    const ok = samples.filter((s) => !s.err);
-    const maxFalse = ok.length ? Math.max(...ok.map((s) => s.falseCulls)) : -1;
-    const sumTested = ok.length ? Math.max(...ok.map((s) => s.tested)) : -1;
-    const worstSample = ok.find((s) => s.falseCulls === maxFalse) ?? {};
-    // Draw-collapse evidence: biggest single-frame drop and the deepest dip
-    // below the orbit median, both as fractions of the median.
-    const med = series.length
-      ? [...series].sort((a, b) => a - b)[Math.floor(series.length / 2)]
-      : 0;
-    let maxStepDrop = 0;
-    for (let i = 1; i < series.length; i++)
-      maxStepDrop = Math.max(maxStepDrop, series[i - 1] - series[i]);
-    const dipFrac = med > 0 ? 1 - Math.min(...series) / med : 0;
-    console.log(
-      `ORBIT[${tag}]: samples=${ok.length} tested(max)=${sumTested} maxFalseCulls=${maxFalse} ` +
-        `byRoot=${JSON.stringify(worstSample.byRoot ?? {})} maxDrop=${worstSample.maxDropM}m ` +
-        `bendK=${worstSample.bendK} · draws med=${med} min=${Math.min(...series)} ` +
-        `max=${Math.max(...series)} dip=${(dipFrac * 100).toFixed(1)}% worstStepDrop=${maxStepDrop}` +
-        (worstSample.worst?.length ? ` · worst=${JSON.stringify(worstSample.worst)}` : '')
-    );
-    return { maxFalse, sumTested, worstSample, med, dipFrac, maxStepDrop, series };
-  };
-
-  const satOrbit = await orbitLeg(page, 'satellite NYC 900m', ORBIT_SEC, -0.28, 'r21-e-stability-02-sat-orbit.png');
-  gate(
-    `(7) satellite orbit: no chunk culled while the bend has it on screen (=== ${MAX_FALSE_CULLS})`,
-    satOrbit.maxFalse === MAX_FALSE_CULLS,
-    `maxFalseCulls=${satOrbit.maxFalse} of ${satOrbit.sumTested} chunk meshes · ` +
-      `worst drop ${satOrbit.worstSample.maxDropM}m`
-  );
-  red.push([
-    'P1 false frustum cull (satellite)',
-    'verify-stability (7)',
-    satOrbit.maxFalse,
-    `=== ${MAX_FALSE_CULLS}`,
-  ]);
-  console.log(
-    `INFO satellite orbit draw dip ${(satOrbit.dipFrac * 100).toFixed(1)}% ` +
-      `(informational — a turning camera legitimately changes what is in view)`
-  );
 
   /* ==================== PHASE 3 — the TOY cruise orbit ==================== */
   const toy = await newFlyPage();
