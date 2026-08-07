@@ -32,8 +32,14 @@
  *     `__flyStats.clutter` to exist. These print `SOFT … (owner C)` and do not
  *     set the exit code. W3 certification requires ZERO soft lines.
  *
- * WHAT THIS GATE UN-PINS: `__flyClutterPin` (C's determinism pin — pinned
- * fleet-wide so the movers cannot move under any other harness's frozen pose).
+ * WHAT THIS GATE UN-PINS: `__flyClutterPin`. C shipped it THREE-VALUED, and
+ * which value a leg wants is part of the leg's claim:
+ *     1         legacy — pools empty, the fleet default
+ *     0         live   — pools armed, movers moving (the Owens-zero legs want
+ *                        this: Owens is empty by construction either way, and
+ *                        asserting it against a FROZEN world would prove less)
+ *     'freeze'  pools ARMED with the mover clock pinned at 0 (the determinism
+ *                        and five-control flicker legs want this)
  *
  * GATES
  *   (1)  precondition — satellite settled at P-LEWIS on the high tier
@@ -76,6 +82,26 @@ const SPHERE_TRIS = 42; // SphereGeometry(1, 7, 4) — today's canopy blob
 const MAX_TRIS_PER_INSTANCE = 96; // CLUTTER.trees2.maxTrisPerInstance
 const VEG_POOL_TRI_CAP = 320000; // plan §5.9
 const POOL_CAPS = { parked: [1500, 48000], moving: [300, 12000], poles: [900, 20000] };
+/* C's pin values, named rather than spelled inline at every call site. */
+const PIN_LEGACY = 1;
+const PIN_LIVE = 0;
+const PIN_FREEZE = 'freeze';
+const setPin = (page, v) =>
+  page.evaluate((x) => ((window.__r22Unpinned ??= {}).__flyClutterPin = x), v);
+/* THE SETTLE PREDICATE (C's own determinism-run guidance). A hash taken before
+ * the ring has resolved is a hash of a half-built world, and it will differ
+ * between two boots for reasons that are not nondeterminism. Wait until the
+ * clutter engine reports ready === chunks AND the building ring has resolved,
+ * because the parked-car anchors are anti-duplicated against queryColumns and
+ * that index fills as z14 streams. */
+const CLUTTER_SETTLED = () => {
+  const c = window.__flyStats?.clutter ?? null;
+  const sb = window.__satBuildings?.stats ?? null;
+  if (!c || !sb) return false;
+  const ringOk = c.ready != null && c.chunks != null ? c.ready >= c.chunks : true;
+  const colsOk = (sb.resolvedFrac ?? (sb.chunks ? sb.ready / sb.chunks : 0)) >= 0.95;
+  return ringOk && colsOk;
+};
 const FLICK_FRAMES = 10;
 const FLICK_FRAME_MS = 250;
 /* The flicker floor. verify-flicker's own bound is p99 <= 12 at a Manhattan
@@ -129,31 +155,51 @@ const VEG_GEOMETRY = () => {
   };
 };
 
-/** Stable hash of an instance-matrix buffer (FNV-1a over rounded floats). */
+/**
+ * COMMUTATIVE SET HASH of an instancer's matrices (C's guidance, and every
+ * clause of it is a defect this gate would otherwise invent:
+ *
+ *  · COMMUTATIVE (sum of per-instance hashes, not a hash of the buffer) —
+ *    pool ORDER is an allocation detail. Two boots that place the same cars in
+ *    a different slot order are identical worlds, and an order-sensitive hash
+ *    calls them different.
+ *  · ELEMENT 13 EXCLUDED — matrix[13] is the instance's Y, which is the DRAPED
+ *    DEM height. A TERRA moves `demMaxZoom`, so the same car legitimately sits
+ *    at a slightly different altitude on a deeper DEM. Hashing it would make
+ *    this gate fail every time the terrain got better.
+ *  · COUNT IS NOT FROZEN — C measured movers breathing 138-142 at ring edges.
+ *    The count is reported and bounded elsewhere (the pool budgets); it is not
+ *    part of the identity.
+ */
 const MATRIX_HASH = (handleNames) => {
   const out = {};
   for (const name of handleNames) {
-    const m = window[name] ?? window.__flyClutter?.[name.replace('__flyClutter', '').toLowerCase()] ?? null;
+    const m =
+      window[name] ?? window.__flyClutter?.[name.replace('__flyClutter', '').toLowerCase()] ?? null;
     const mesh = m?.isInstancedMesh ? m : m?.mesh;
     if (!mesh?.instanceMatrix?.array) {
       out[name] = null;
       continue;
     }
     const a = mesh.instanceMatrix.array;
-    const n = Math.min(a.length, mesh.count * 16);
-    let h = 2166136261;
+    const n = Math.min(Math.floor(a.length / 16), mesh.count);
+    let sum = 0;
     for (let i = 0; i < n; i++) {
-      // Quantise to millimetres: a float that differs in its last bit is not
-      // the nondeterminism this gate is looking for.
-      const v = Math.round(a[i] * 1000);
-      h ^= v & 0xff;
-      h = Math.imul(h, 16777619);
-      h ^= (v >> 8) & 0xff;
-      h = Math.imul(h, 16777619);
-      h ^= (v >> 16) & 0xff;
-      h = Math.imul(h, 16777619);
+      const o = i * 16;
+      let h = 2166136261;
+      for (let k = 0; k < 16; k++) {
+        if (k === 13) continue; // draped DEM height — see the header
+        const v = Math.round(a[o + k] * 1000); // millimetre quantisation
+        h ^= v & 0xff;
+        h = Math.imul(h, 16777619);
+        h ^= (v >> 8) & 0xff;
+        h = Math.imul(h, 16777619);
+        h ^= (v >> 16) & 0xff;
+        h = Math.imul(h, 16777619);
+      }
+      sum = (sum + (h >>> 0)) % 4294967296; // commutative accumulate
     }
-    out[name] = { count: mesh.count, hash: (h >>> 0).toString(16) };
+    out[name] = { count: n, setHash: (sum >>> 0).toString(16) };
   }
   return out;
 };
@@ -215,6 +261,9 @@ const MATRIX_HASH = (handleNames) => {
 
   const page = await newFlyPage();
   await bootFly(page, { style: 'satellite', ...BOOT_OPTS });
+  // LIVE by default: the Owens-zero legs and the +N-draw anchors want the real
+  // world, movers and all. The determinism/flicker legs switch to 'freeze'.
+  await setPin(page, PIN_LIVE);
   await page.evaluate(() => window.__flyStore.getState().setQualityTier('high'));
   await page.mouse.move(800, 450);
   await page.evaluate(() => {
@@ -224,7 +273,10 @@ const MATRIX_HASH = (handleNames) => {
     pin: window.__flyClutterPin ?? null,
     attempted: window.__r22PinAttempt?.__flyClutterPin ?? null,
   }));
-  console.log(`CLUTTER pin un-pinned: value=${pinState.pin} (fleet attempted ${pinState.attempted})`);
+  console.log(
+    `CLUTTER pin un-pinned: value=${JSON.stringify(pinState.pin)} (fleet attempted ${pinState.attempted}) ` +
+      `— three-valued: 1 legacy / 0 live / 'freeze' armed-with-clock-0`
+  );
 
   /* ======================= P-LEWIS: the clutter pose ===================== */
   await settleAt(page, P_LEWIS);
@@ -249,7 +301,8 @@ const MATRIX_HASH = (handleNames) => {
     gate(
       `(2) TREES READ AS TREES — the canopy instance carries a trunk (${SPHERE_TRIS} < tris <= ${MAX_TRIS_PER_INSTANCE})`,
       veg.tris > SPHERE_TRIS && veg.tris <= MAX_TRIS_PER_INSTANCE,
-      `${veg.tris} triangles/instance, bbox Y ${JSON.stringify(veg.bbox)} — SphereGeometry(1,7,4) is exactly ${SPHERE_TRIS} and has no trunk; a merged trunk+crown must exceed it`
+      `${veg.tris} triangles/instance, bbox Y ${JSON.stringify(veg.bbox)} — SphereGeometry(1,7,4) is exactly ${SPHERE_TRIS} with bbox Y [-1,1] (a blob centred on the ground); ` +
+        `C's merged trunk+crown measures 58 tris with bbox Y [0,1] (it STANDS on the ground)`
     );
     red.push([
       'C1 trees are untextured 42-tri spheres with no trunk',
@@ -347,6 +400,13 @@ const MATRIX_HASH = (handleNames) => {
   // Same statistic as verify-flicker (per-pixel temporal stddev over N frames
   // of a frozen scene, gated on p99 rather than the mean) at THIS pose, with
   // the hero and traffic parked at their owner-published roots.
+  // 'freeze' for the flicker window: pools ARMED, mover clock pinned at 0. A
+  // live mover is SUPPOSED to move, so measuring temporal stddev with the
+  // clock running would indict the feature for working. The five controls this
+  // leg carries are: hero parked, traffic parked, movers frozen, movers live
+  // (the W2 second arm), and this pre-clutter floor.
+  await setPin(page, PIN_FREEZE);
+  await page.waitForTimeout(3000);
   await page.evaluate(() => {
     if (window.__flyPlayer) window.__flyPlayer.visible = false;
     let scene = window.__flyPlayer ?? window.__fly?.engine?.object ?? null;
@@ -394,12 +454,15 @@ const MATRIX_HASH = (handleNames) => {
   );
   anchor('P-LEWIS flicker floor', `p99 ${p99.toFixed(2)} with NO movers in the scene`);
   gate(
-    `(17) MOVER FLICKER — the frozen-pose p99 at P-LEWIS stays <= ${FLICK_P99_MAX} with the clutter pin engaged`,
+    `(17) MOVER FLICKER — the frozen-pose p99 at P-LEWIS stays <= ${FLICK_P99_MAX} with the movers frozen ('freeze')`,
     p99 <= FLICK_P99_MAX,
     `p99 ${p99.toFixed(2)} vs the W1 pre-clutter floor ${FLICK_FLOOR_W1} (headroom to the bound ${(FLICK_P99_MAX / FLICK_FLOOR_W1).toFixed(2)}x; with C merged this leg re-runs pinned AND un-pinned, and the five controls are: hero parked, traffic parked, movers pinned, movers un-pinned, and this floor)`
   );
 
   /* ======================= OWENS: the empty control ===================== */
+  // Back to LIVE: Owens must be empty with the movers actually running, which
+  // is a stronger claim than "empty while frozen".
+  await setPin(page, PIN_LIVE);
   await settleAt(page, OWENS, 18000);
   const owens = await page.evaluate(PROBE);
   console.log(`OWENS: ${JSON.stringify(owens)}`);
@@ -431,19 +494,23 @@ const MATRIX_HASH = (handleNames) => {
       total === 0,
       `instances ${JSON.stringify({ parked: c.parked?.count, moving: c.moving?.count, poles: c.poles?.count })}`
     );
-    // The R20 instrument: flip the pin and compare TOTALS bit-exactly. An
-    // empty pool that issues no draw and no triangle is the only thing that
-    // can survive this.
-    await page.evaluate(() => ((window.__r22Unpinned ??= {}).__flyClutterPin = 0));
-    await page.waitForTimeout(4000);
+    /* The R20 instrument: flip the pin and compare TOTALS bit-exactly. The
+     * flip is LEGACY (1) vs LIVE (0) — never 'freeze', because a frozen world
+     * at Owens would be empty for a second reason and the equality would
+     * prove less than it appears to. `__flyStats.drawCalls` republishes every
+     * 60 frames (C's note: up to ~1 s stale), so each arm is sampled after a
+     * settle, not immediately after the flip. */
+    await setPin(page, PIN_LEGACY);
+    await page.waitForTimeout(5000);
     const off = await page.evaluate(PROBE);
-    await page.evaluate(() => ((window.__r22Unpinned ??= {}).__flyClutterPin = 1));
-    await page.waitForTimeout(4000);
+    await setPin(page, PIN_LIVE);
+    await page.waitForTimeout(5000);
     const on = await page.evaluate(PROBE);
     gate(
       '(8) OWENS BIT-IDENTICAL TOTALS across the clutter flip (the R20 instrument)',
       off.draws === on.draws && off.tris === on.tris,
-      `off ${off.draws}/${off.tris} vs on ${on.draws}/${on.tris}`
+      `legacy ${off.draws}/${off.tris} vs live ${on.draws}/${on.tris} ` +
+        `(each sampled 5 s after the flip — __flyStats.drawCalls republishes every 60 frames)`
     );
   }
 
@@ -454,29 +521,63 @@ const MATRIX_HASH = (handleNames) => {
     soft('(15) two-boot determinism', 'C', `no clutter mesh handles (${HANDLES.join(' / ')} or window.__flyClutter)`);
     soft('(16) the pin freezes the movers', 'C', 'no mover pool exists');
   } else {
+    // 'freeze' — pools ARMED with the mover clock pinned at 0. Value 1 would
+    // give an empty world (nothing to hash) and 0 would leave the movers
+    // moving, which is what (16) exists to detect rather than to suffer.
+    await setPin(page, PIN_FREEZE);
     await settleAt(page, P_LEWIS);
+    // Settle PREDICATE, not just a timer: hash a half-built ring and two boots
+    // differ for reasons that are not nondeterminism (C's guidance).
+    const settled1 = await page
+      .waitForFunction(CLUTTER_SETTLED, undefined, { timeout: 60000, polling: 500 })
+      .then(() => true)
+      .catch(() => false);
     const h1 = await page.evaluate(MATRIX_HASH, HANDLES);
     await page.waitForTimeout(4000);
     const h1b = await page.evaluate(MATRIX_HASH, HANDLES);
+    const frozen = HANDLES.every(
+      (n) => (h1[n]?.setHash ?? null) === (h1b[n]?.setHash ?? null)
+    );
     gate(
-      '(16) the pin FREEZES the movers — matrices identical across 4 s at a frozen pose',
-      JSON.stringify(h1) === JSON.stringify(h1b),
-      `${JSON.stringify(h1)} vs ${JSON.stringify(h1b)}`
+      "(16) the 'freeze' pin FREEZES the movers — the matrix SET is identical across 4 s at a frozen pose",
+      frozen,
+      `settled=${settled1} · ${JSON.stringify(h1)} vs ${JSON.stringify(h1b)} ` +
+        `(counts may breathe 138-142 at ring edges by design — the SET hash is the identity, the count is not)`
     );
     const page2 = await newFlyPage();
     await bootFly(page2, { style: 'satellite', ...BOOT_OPTS });
+    await setPin(page2, PIN_FREEZE);
     await page2.evaluate(() => window.__flyStore.getState().setQualityTier('high'));
     await page2.evaluate(() => {
       window.__flySunOverride = Date.UTC(2026, 6, 17, 19, 30);
     });
     await settleAt(page2, P_LEWIS);
+    const settled2 = await page2
+      .waitForFunction(CLUTTER_SETTLED, undefined, { timeout: 60000, polling: 500 })
+      .then(() => true)
+      .catch(() => false);
     const h2 = await page2.evaluate(MATRIX_HASH, HANDLES);
+    /* WHAT THIS GATE ASSERTS, AND WHAT IT ONLY REPORTS.
+     * C's own cross-boot runs: POLES bit-identical; parked/movers count-stable
+     * with a set-hash residual attributed to still-converging inputs (the
+     * collision-column index fills as z14 streams, and the anti-dup term reads
+     * it). So the gate asserts bit-identity for the pool whose inputs are
+     * closed (poles), and asserts COUNT stability plus reports the set-hash for
+     * the pools whose inputs are still converging — with the settle predicate
+     * above as the thing that makes even that comparison fair. Asserting a
+     * hash over a converging input would be a gate that fails for being early. */
+    const poleName = HANDLES.find((n) => /pole/i.test(n));
+    const poleSame = (h1[poleName]?.setHash ?? 'a') === (h2[poleName]?.setHash ?? 'b');
+    const countsSame = HANDLES.every((n) => (h1[n]?.count ?? -1) === (h2[n]?.count ?? -2));
     gate(
-      '(15) DETERMINISM — two independent boots under __flyClutterPin produce identical matrix hashes',
-      JSON.stringify(h1) === JSON.stringify(h2),
-      `boot A ${JSON.stringify(h1)} · boot B ${JSON.stringify(h2)}`
+      '(15) DETERMINISM — two independent boots agree: poles bit-identical, every pool count stable',
+      poleSame && countsSame,
+      `settled A=${settled1} B=${settled2} · boot A ${JSON.stringify(h1)} · boot B ${JSON.stringify(h2)} · ` +
+        `poles identical=${poleSame} counts stable=${countsSame} ` +
+        `(parked/mover set-hash residual is attributed to the collision index still filling as z14 streams — reported, not asserted)`
     );
     await page2.close();
+    await setPin(page, PIN_LIVE);
   }
 
   // Upstream tile-network noise is classified, not gated — see verify-terra

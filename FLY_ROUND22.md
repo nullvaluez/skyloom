@@ -84,15 +84,16 @@ gate that now holds it. RED numbers are frozen in close-sweep §1.
 | T2 | LODThreshold is altitude-blind | flat 0.86 at every band | — (W2) | verify-terra (4) |
 | T3 | imagery capped at z17 | max img z 17 | — (W2) | verify-terra (5) |
 | T4 | DEM stops at z15 | DEM 15 / img 17 | — (W2) | verify-terra (11) |
-| T5 | cold warp descent is serial | never reached z13 in 40 s | — (W2) | verify-terra (7) |
-| T5b | far-warp descent STALLS at FL300 | settled z10 vs departure z12, `downloading` flat at 0 for 23 s | — (W2) | verify-arrival (4b) |
+| T5 | ~~cold warp descent is serial~~ → **the cold cruise arrival re-fetches the whole pyramid** | ~~never reached z13 in 40 s~~ **RETIRED (the frustum rule)** → **266 raster requests** for one cold FL300 arrival | — (W2) | verify-terra (7) |
+| T5b | ~~far-warp descent STALLS at FL300~~ | ~~settled z10 vs departure z12~~ — **RETIRED: on `maxLeafZ` it reads 13 vs 13** | n/a | verify-arrival (4b) |
+| T9 | a LOCAL warp reveals a 7-level deficit with no readiness poll | camTileZ 10 → 17 with a **0 ms** hold (reproduced twice) | — (W2) | verify-arrival (9b) |
 | T6 | no persistent raster cache | `fly-raster-v1` absent | — (W2) | verify-terra (8) |
 | T7 | every warp is a cold descent | second visit 0.56× cold | — (W2) | verify-terra (9) |
-| T8 | the reveal fires on `downloading<3` | reveal z10 vs departure z12 | — (W2) | verify-arrival (4) |
+| T8 | ~~the reveal fires on `downloading<3`~~ | ~~reveal z10 vs departure z12~~ — **RETIRED: on `maxLeafZ` the deficit is 1, inside the bound** | n/a | verify-arrival (4) |
 | S-POP | the city assembles after the warp reveal | satRoads t90 **+12.9 s** after reveal | — (W2) | verify-settle (2b) |
-| S-STUT | the compile train lands after reveal | 13 programs + a 179 ms frame at reveal+9.9 s | — (W2) | verify-settle (6) |
+| S-STUT | the post-reveal compile train stalls the frame | **179 ms worst frame** at reveal+9.9 s (B's arms: OFF 576–714 → ON 132–165 ms). The COUNT was retired — B's fix raises it 13→19 by design | — (W2) | verify-settle (4)/(6) |
 | S-RAMP | the parcel pool appears in one frame | 100% of 1 868 homes in one 100 ms sample at full scale | — (W2) | verify-settle (8) |
-| S-ELEV | raw `groundElev` sweeps the fade bands | 24 023 m/s | — (W2) | verify-settle (10) |
+| S-ELEV | raw `groundElev` sweeps the fade bands | **~384 m per FRAME** (re-expressed from the retired 24 023 m/s — a rate computed with a dt that is not the damper's own) | — (W2) | verify-settle (10) |
 | S-LADDER | zero DPR rungs at devicePixelRatio 1 | 0 rungs (control at dpr 1.5: 2) | — (W2) | verify-settle (11) |
 | C1 | trees are 42-tri spheres with no trunk | 42 tris/instance, bbox Y [-1,1] | — (W2) | verify-clutter (2) |
 | D1 | shadows land on nothing | 0 of 4 near leaf tiles receive, 5 casters in the same 1 500 m radius | — (W2) | verify-depth2 (3) |
@@ -171,7 +172,25 @@ Carried and still open: the R21 §6 table (7 checkpoints), R20 §6 (15), R19 §6
    the destination never sharpens either. The reference has to come from
    somewhere the defect does not reach; here, the departure pose at the same
    altitude.
-2. **"The layer exists" is not "the layer arrived."** Gating pop-in on first
+2. **An instrument can measure a library working correctly and call it a bug.**
+   Four W1 reds were the three-tile out-of-frustum LOD rule: at FL300 the tile
+   under the aircraft is off screen and never subdivides, so `camTileZ`
+   saturates near z10 with the loader idle. "Stuck at z10 for 40 s with
+   downloading 0" reads like a stalled pipeline and is a correct quadtree. The
+   tell was in the measurement all along — the loader was IDLE — and an idle
+   loader that has finished looks exactly like an idle loader that gave up, to
+   a gate watching only the number it expected to move.
+3. **The same instrument can be right at one altitude and vacuous at another.**
+   `maxLeafZ` replaced `camTileZ` at cruise because it sees past the frustum;
+   at low AGL that same property made it read z17 off residue from earlier
+   poses while the ground under the camera was z13. Neither is the better
+   instrument — each is used where it measures something, and the gate says so.
+4. **A gate must be greenable, not just red-able.** The first re-base put the
+   FL300 descent on `maxLeafZ >= 13` — until A's own armed-vs-control files
+   showed the cruise profile is IDENTICAL armed and control. A red nobody can
+   close is as useless as a green nobody can fail, and it would have shipped a
+   permanent failure into the round record.
+5. **"The layer exists" is not "the layer arrived."** Gating pop-in on first
    appearance passed on the defective tree by six seconds, because BootScreen
    already drains the tiles before it reveals. The pop a player sees is the
    ring FILLING — t90, not t>0 — and the path where it happens is the WARP

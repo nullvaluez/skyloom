@@ -71,6 +71,8 @@ const DEV_ORIGIN = (process.env.FLY_URL || 'http://localhost:3000').replace(/\/$
 
 const P_DUBLIN = [40.0992, -83.1141, 9144]; // FL300 over Dublin OH
 const FAR_START = [36.75, -118.05, 9144]; // Owens Valley — >3000 km away
+const TERRA_ARMED = process.env.R22_TERRA === 'on';
+const LOCAL_DEFICIT = 2; // ARRIVAL_GATE.localHold.localHoldDeficit
 const HOLD_MIN_MS = 2200; // WARP.far.holdMinMs (frozen)
 const HOLD_MAX_LEGACY = 3500; // WARP.far.holdMaxMs today
 const HOLD_MAX_GATED = 6500; // ARRIVAL_GATE.holdMaxMs (sanction §5.1)
@@ -93,8 +95,10 @@ const INSTALL_TRACE = (tag) => {
     const f = rt?.flight;
     const eng = rt?.engine;
     let z = null;
+    let leaf = null;
     let agl = null;
     let dl = null;
+    let sharpReason = null;
     if (f && eng) {
       try {
         const g = eng.worldToGeo(f.pos);
@@ -104,6 +108,16 @@ const INSTALL_TRACE = (tag) => {
         z = ga ? ga.tileZ : null;
         agl = Math.round(f.pos.y - f.groundElev);
         dl = eng.downloading ?? null;
+        // W2 RE-BASE: the deepest resident leaf ANYWHERE (A TERRA's
+        // instrument, scripts/r22-a-measure.js). `z` above is the leaf under
+        // the AIRCRAFT and is frustum-capped at cruise BY DESIGN — see the
+        // header. `leaf` is the reference every FL300 assertion now uses.
+        leaf = 0;
+        eng.object.traverse((o) => {
+          if (o.isTile && o.children.length <= 1 && o.z > leaf) leaf = o.z;
+        });
+        const ts = rt.terraStats ?? rt.engine?.terraStats ?? null;
+        sharpReason = ts ? (ts.sharp ? ts.sharpReason ?? 'true' : null) : undefined;
       } catch {
         /* mid-warp the quadtree can be between roots — recorded as null */
       }
@@ -114,6 +128,8 @@ const INSTALL_TRACE = (tag) => {
       stage: el ? el.getAttribute('data-stage') : null,
       boot: window.__flyBoot?.pct ?? null,
       z,
+      leaf,
+      sharpReason,
       dl,
       agl,
       draws: window.__flyStats?.drawCalls ?? null,
@@ -138,13 +154,24 @@ const PROBE = () => {
   const lon = +g.x;
   const lat = +g.y;
   const ga = eng.getGroundAt(lon, lat);
+  let maxLeafZ = 0;
+  try {
+    eng.object.traverse((o) => {
+      if (o.isTile && o.children.length <= 1 && o.z > maxLeafZ) maxLeafZ = o.z;
+    });
+  } catch {
+    maxLeafZ = null;
+  }
   return {
     camTileZ: ga ? ga.tileZ : null,
+    maxLeafZ,
     aglM: Math.round(f.pos.y - f.groundElev),
     downloading: eng.downloading ?? null,
     tier: window.__flyStore?.getState?.().qualityTier ?? null,
     arrivalStats: rt.arrivalStats ?? null, // B's instrument (optional)
-    terraStats: rt.terraStats ?? null, // A's instrument (optional)
+    // Fable's arbitration commit 6095e9c: FlyScene calls engine.attachRuntime,
+    // so this is the canonical read for A's contract.
+    terraStats: rt.terraStats ?? rt.engine?.terraStats ?? null,
   };
 };
 
@@ -169,7 +196,13 @@ const PROBE = () => {
   };
   const newFlyPage = async (extra) => {
     const p = await context.newPage();
-    await p.addInitScript(unpinPins, ['__flySettlePin', '__flyTerraPin']);
+    // SETTLE stays on the shared fleet-pin accessor (B's family has no
+    // per-family override). TERRA is armed through A's own
+    // `__flyTerraForce` — the fleet pin is never touched here (W2).
+    await p.addInitScript(unpinPins, ['__flySettlePin']);
+    await p.addInitScript((on) => {
+      window.__flyTerraForce = { sharp: on, pipe: on, cache: on };
+    }, TERRA_ARMED);
     if (extra) await p.addInitScript(extra);
     p.on('pageerror', (e) => errs.push(e.message));
     p.on('console', (m) => {
@@ -216,9 +249,19 @@ const PROBE = () => {
   red.push([
     'B1 boot reveals over an undescended pyramid',
     'verify-arrival (11)',
-    `boot reveal camTileZ ${bootReveal?.z} → settles ${bootSettled?.z}`,
+    `boot reveal cam ${bootReveal?.z} / leaf ${bootReveal?.leaf} -> settles cam ${bootSettled?.z} / leaf ${bootSettled?.leaf}`,
     `>= ${REVEAL_Z_FLOOR}`,
   ]);
+  // B SETTLE ships ARRIVAL_GATE.bootTerms:false — the boot content terms cost
+  // +2.6 s against a boot envelope plan section 4 FREEZES, so B deliberately
+  // did NOT consume a boot hold. This leg therefore expects the boot reveal to
+  // be UNCHANGED in both arms, and its number is a RECORD for R23 rather than
+  // a defect R22 closes. Stated here so a later reader does not mistake a
+  // deliberate non-fix for a missed one.
+  console.log(
+    'INFO (11)/(12): the BOOT reveal is out of scope BY DECISION — ARRIVAL_GATE.bootTerms ships false ' +
+      '(B measured +2.6 s against the frozen boot envelope). These numbers should be identical armed and unarmed.'
+  );
   gate(
     '(12) boot time did not lengthen (<= 28.8 s, verify-aerial\'s satellite cap)',
     bootMs <= 28800,
@@ -239,7 +282,10 @@ const PROBE = () => {
     terra: window.__flyTerraPin ?? null,
     attempted: window.__r22PinAttempt ?? null,
   }));
-  console.log(`pins un-pinned: settle=${pinState.settle} terra=${pinState.terra} (fleet attempted ${JSON.stringify(pinState.attempted)})`);
+  console.log(
+    `SETTLE un-pinned: ${pinState.settle} (fleet attempted ${JSON.stringify(pinState.attempted)}) · ` +
+      `TERRA ${TERRA_ARMED ? 'ARMED' : 'CONTROL (forced OFF)'} via __flyTerraForce, fleet pin untouched at ${pinState.terra}`
+  );
 
   // Park at Owens first so the destination pyramid is genuinely cold.
   await page.evaluate(
@@ -282,22 +328,46 @@ const PROBE = () => {
   const revealRow = revealIdx >= 0 ? farRows[revealIdx] : null;
   const revealMs = revealRow ? Math.round(revealRow.t * 1000) : null;
   const afterReveal = revealIdx >= 0 ? farRows.slice(revealIdx) : [];
-  const settledZ = Math.max(...afterReveal.map((r) => r.z ?? 0), 0);
-  const revealZ = revealRow?.z ?? 0;
-  const minAfter = afterReveal.length ? Math.min(...afterReveal.map((r) => r.z ?? 0)) : 0;
+  /* W2 RE-BASE — every FL300 zoom assertion below reads `leaf` (maxLeafZ), not
+   * `z` (camTileZ). A TERRA measured, and Fable ratified, that the tile under
+   * the aircraft at cruise is outside the view frustum and three-tile refuses
+   * to subdivide it: camTileZ saturates near z10 with the loader idle, BY
+   * DESIGN, and nothing in this round can move it. My W1 reds ("reveal z10 vs
+   * departure z12", "settled z10") measured that saturation at BOTH ends —
+   * they are retired in close-sweep 1 (struck through, never erased) and
+   * replaced by the numbers this run prints. camTileZ is still recorded, and
+   * still gated at LOW AGL where it is a valid statistic. */
+  const settledZ = Math.max(...afterReveal.map((r) => r.leaf ?? 0), 0);
+  const revealZ = revealRow?.leaf ?? 0;
+  const revealCamZ = revealRow?.z ?? 0;
+  const minAfter = afterReveal.length ? Math.min(...afterReveal.map((r) => r.leaf ?? 0)) : 0;
+  const departZ = before.maxLeafZ ?? 0;
+  /* B SETTLE's real contract (r22/b): runtime.arrivalStats = {gateArmed, kind,
+   * epoch, holdStartAt, revealAt, holdCapMs, holdMs, reason, terms}, published
+   * armed in-flight AND again at reveal, with legacy:true when terraStats is
+   * absent. The cap is READ from it rather than inferred — an inferred cap
+   * would call a correctly-armed 6500 ms hold a failure. */
   const armed = await page.evaluate(() => window.__fly?.arrivalStats ?? null);
-  const holdCap = armed ? HOLD_MAX_GATED : HOLD_MAX_LEGACY;
-  if (!armed) soft('ARRIVAL_GATE state (runtime.arrivalStats)', 'B', `assuming the legacy ${HOLD_MAX_LEGACY} ms cap`);
+  const gateArmed = armed?.gateArmed === true;
+  const holdCap = armed?.holdCapMs ?? (gateArmed ? HOLD_MAX_GATED : HOLD_MAX_LEGACY);
+  if (!armed)
+    soft('ARRIVAL_GATE state (runtime.arrivalStats)', 'B', `assuming the legacy ${HOLD_MAX_LEGACY} ms cap`);
+  else
+    console.log(
+      `ARRIVAL_GATE: armed=${gateArmed} kind=${armed.kind} cap=${armed.holdCapMs} hold=${armed.holdMs} ` +
+        `reason=${armed.reason} legacy=${armed.legacy ?? false} terms=${JSON.stringify(armed.terms)}`
+    );
 
   console.log(
     `FAR WARP trace (${farRows.length} @100ms): stages ${JSON.stringify([...new Set(farRows.map((r) => r.stage))])} · ` +
-      `reveal @${revealMs} ms · camTileZ before ${before.camTileZ} → AT REVEAL ${revealZ} → settled ${settledZ} · ` +
-      `downloading at reveal ${revealRow?.dl}`
+      `reveal @${revealMs} ms · maxLeafZ departure ${departZ} → AT REVEAL ${revealZ} → settled ${settledZ} · ` +
+      `camTileZ at reveal ${revealCamZ} (frustum-capped at cruise, informational) · downloading ${revealRow?.dl} · ` +
+      `sharpReason ${revealRow?.sharpReason ?? 'n/a'}`
   );
   console.log(
-    `  z timeline: ${farRows
+    `  leaf/cam timeline: ${farRows
       .filter((_, i) => i % 3 === 0)
-      .map((r) => `${r.t}:${r.stage ?? '-'}/z${r.z}`)
+      .map((r) => `${r.t}:${r.stage ?? '-'}/L${r.leaf}c${r.z}`)
       .join(' ')}`
   );
 
@@ -332,42 +402,64 @@ const PROBE = () => {
    * being trivially satisfiable by any working descent. `settledZ` rides along
    * as evidence, and (4b) states the stall directly. */
   gate(
-    '(4) CONTENT AT REVEAL — camTileZ at reveal >= the departure pose\'s settled camTileZ - 1',
-    revealZ >= (before.camTileZ ?? 0) - 1,
-    `reveal z${revealZ} vs departure z${before.camTileZ} at the same FL300 altitude (deficit ${(before.camTileZ ?? 0) - revealZ} levels) · destination settled to z${settledZ}`
+    '(4) CONTENT AT REVEAL — maxLeafZ at reveal >= the departure pose settled maxLeafZ - 1',
+    revealZ >= departZ - 1,
+    `reveal leaf z${revealZ} vs departure leaf z${departZ} at the same FL300 altitude (deficit ${departZ - revealZ} levels) · destination settles to leaf z${settledZ}`
   );
+  /* NOT RED-CALIBRATED AFTER THE RE-BASE, and that is the finding.
+   * On `maxLeafZ` the FL300 reveal measures z12 against a departure of z13 —
+   * a deficit of ONE, inside the bound — and the destination settles to 13.
+   * So the "blurry arrival" deficit my W1 run reported (reveal z10 vs
+   * departure z12) was ENTIRELY the camTileZ frustum cap at both ends, and on
+   * the honest instrument there is no FL300 content-at-reveal defect to close.
+   * The gate STAYS — it is the right invariant and it is cheap, and it is what
+   * would catch a future reveal that fires two levels early — but the round
+   * record must not claim R22 closed a defect here. Where the content-at-
+   * reveal defect IS real is LOW AGL, where camTileZ is a valid statistic and
+   * the local-warp path has no hold at all: see gate (9b). */
   red.push([
-    'T8 reveal fires on downloading<3, not on content',
+    'T8 reveal fires on downloading<3, not on content (RE-BASED W2 -> NOT RED, see the gate)',
     'verify-arrival (4)',
-    `reveal z${revealZ} vs departure z${before.camTileZ} (deficit ${(before.camTileZ ?? 0) - revealZ})`,
+    `reveal leaf z${revealZ} vs departure leaf z${departZ} (deficit ${departZ - revealZ}) — INSIDE the bound`,
     'deficit <= 1',
   ]);
   gate(
     '(4b) the destination eventually reaches the departure\'s zoom (the descent is not stalled)',
-    settledZ >= (before.camTileZ ?? 0),
-    `settled z${settledZ} vs departure z${before.camTileZ} after ${((SETTLE_MS + 6000) / 1000).toFixed(0)} s · ` +
-      `downloading stayed at ${revealRow?.dl} — a quadtree that is not downloading and not descending is STALLED, not slow`
+    settledZ >= departZ,
+    `settled leaf z${settledZ} vs departure leaf z${departZ} after ${((SETTLE_MS + 6000) / 1000).toFixed(0)} s · ` +
+      `downloading at reveal ${revealRow?.dl}. NOTE camTileZ is NOT the statistic here: at FL300 it is capped by ` +
+      `three-tile own out-of-frustum LOD rule, so "camTileZ stalled" is the library being correct, not the pipeline being slow.`
   );
   red.push([
-    'T5b far-warp descent stalls at FL300',
+    'T5b far-warp descent stalls at FL300 (RE-BASED W2 -> NOT RED: the stall was the frustum rule)',
     'verify-arrival (4b)',
-    `settled z${settledZ} vs departure z${before.camTileZ}`,
+    `settled leaf z${settledZ} vs departure leaf z${departZ}`,
     'settled >= departure',
   ]);
   gate(
-    `(5) camTileZ at reveal clears the FL300 floor (>= ${REVEAL_Z_FLOOR})`,
+    `(5) maxLeafZ at reveal clears the FL300 floor (>= ${REVEAL_Z_FLOOR})`,
     revealZ >= REVEAL_Z_FLOOR,
-    `z${revealZ} at ${revealRow?.agl} m AGL`
+    `leaf z${revealZ} (camTileZ ${revealCamZ}, frustum-capped) at ${revealRow?.agl} m AGL`
   );
   // "Content-driven" means the reveal did NOT land on the time cap. A reveal
   // that fires at holdMax every single time is a timer wearing a gate's name.
   const timeCapped = revealMs != null && revealMs >= holdCap - 400;
+  /* sharpReason 'stalled' IS A LEGITIMATE REVEAL REASON AT CRUISE (Fable's
+   * ratification of A's sharp = settled && (atTarget || stalled)). At FL300
+   * the atTarget term is false forever — targetZ is a pure function of AGL and
+   * does not know about the frustum rule — so a gate demanding 'target' would
+   * force every cruise arrival onto the time cap and then report the time cap
+   * as the defect. 'stalled' asserts the honest thing: the resident zoom
+   * stopped improving AND the loader went quiet. */
+  const revealReason = revealRow?.sharpReason ?? null;
+  const stalledOk = revealReason === 'stalled' || revealReason === 'target';
   gate(
     '(6) the reveal was CONTENT-driven, not time-capped',
-    !timeCapped || revealZ >= settledZ - 1,
+    !timeCapped || revealZ >= settledZ - 1 || stalledOk,
     timeCapped
-      ? `reveal landed on the ${holdCap} ms cap with z${revealZ}/${settledZ} — the content gate did not resolve`
-      : `reveal at ${revealMs} ms, ${holdCap - revealMs} ms before the cap`
+      ? `reveal landed on the ${holdCap} ms cap with leaf z${revealZ}/${settledZ} and sharpReason=${revealReason ?? 'n/a'} ` +
+        `(a 'stalled' or 'target' reason would make this a content reveal)`
+      : `reveal at ${revealMs} ms, ${holdCap - revealMs} ms before the cap · sharpReason=${revealReason ?? 'n/a'}`
   );
   gate(
     '(7) no reveal-then-blur — camTileZ never drops below its reveal value afterwards',
@@ -434,8 +526,36 @@ const PROBE = () => {
     gate(
       '(10) local warp tileZ deficit recorded (the localHoldDeficit input)',
       true,
-      `camTileZ ${local.zBefore} → ${local.zAfter} (deficit ${(local.zAfter ?? 0) - (local.zBefore ?? 0)} levels; ARRIVAL_GATE holds only when the deficit exceeds 2)`
+      `camTileZ ${local.zBefore} → ${local.zAfter} (deficit ${(local.zAfter ?? 0) - (local.zBefore ?? 0)} levels; ARRIVAL_GATE holds only when the deficit exceeds ${LOCAL_DEFICIT})`
     );
+    /* ── WHERE THE CONTENT-AT-REVEAL DEFECT ACTUALLY LIVES (W2) ────────────
+     * The FL300 legs above stopped being red once camTileZ was replaced by
+     * maxLeafZ: at cruise the reveal really does show content within one level
+     * of the settled state. The LOCAL warp is a different story, and here
+     * camTileZ is a VALID statistic because the destination is low and the
+     * ground under the camera is in frustum:
+     *
+     *   measured, control tree: camTileZ 10 -> 17, a SEVEN-level deficit,
+     *   with a 900 ms flash and NO readiness poll of any kind.
+     *
+     * That is the user's "post-warp terrain stays blurry" at the altitude
+     * where it is visible, and `ARRIVAL_GATE.localHold` exists precisely for
+     * it (a bounded hold, <= 1500 ms, only when the deficit exceeds
+     * localHoldDeficit). This gate is red today and greenable by that feature,
+     * which is what the FL300 gates are not. */
+    const deficit = (local.zAfter ?? 0) - (local.zBefore ?? 0);
+    gate(
+      `(9b) LOCAL WARP CONTENT — a deficit over ${LOCAL_DEFICIT} levels earns a bounded hold`,
+      deficit <= LOCAL_DEFICIT || (local.holdMs > 0 && local.holdMs <= 1500),
+      `deficit ${deficit} levels (camTileZ ${local.zBefore} → ${local.zAfter}) with a ${local.holdMs} ms hold — ` +
+        `a local warp today is a 900 ms flash with NO readiness poll at all (WarpFlash keys the poll on kind === 'far')`
+    );
+    red.push([
+      'T9 a local warp reveals a 7-level deficit with no readiness poll',
+      'verify-arrival (9b)',
+      `deficit ${deficit} levels, hold ${local.holdMs} ms`,
+      `<= ${LOCAL_DEFICIT} levels, or a hold <= 1500 ms`,
+    ]);
   }
 
   gate(
@@ -445,9 +565,17 @@ const PROBE = () => {
   );
   // Upstream tile-network noise is classified, not gated — see verify-terra
   // gate (17) for the full reasoning and the W1 evidence.
+  /* Two classes of noise, both upstream, neither an app defect:
+   *  · off-origin (Esri tiles) — see verify-terra gate (17).
+   *  · SAME-ORIGIN /api/aircraft/... 404s. Those are the app's own proxy
+   *    answering honestly that adsb.lol/adsbdb has no route or registry row
+   *    for a live aircraft this run happened to pick. The W2 run failed on
+   *    exactly one of these (`/api/aircraft/a804a7/route`) — a gate red caused
+   *    by which aeroplane was overhead, which is a coin, not a regression. */
   const netErrs = errs.filter(
     (e) =>
       /arcgisonline|arcgis\.com|ERR_FAILED|Access to fetch/i.test(e) ||
+      /\/api\/aircraft\/[^ ]*(route|info|photo)/i.test(e) ||
       (/@https?:\/\//.test(e) && !e.includes(DEV_ORIGIN))
   );
   const appErrs = errs.filter((e) => !netErrs.includes(e));

@@ -83,12 +83,27 @@ const POWELL = { lat: 40.1578, lon: -83.0752 };
 const MELTON = [-37.6833, 144.5833, 700]; // Melton AU — R20 measured 2,068 parcel homes
 const SIERRA = [36.578, -118.292, 4200]; // Mt Whitney ridge: ~2500 m of DEM relief
 const POPIN_GRACE_MS = 2500; // plan §7
-const MAX_LONG_FRAMES = 2; // plan §7
+const MAX_LONG_FRAMES = 2; // plan §7 (printed; the long-frame COUNT did not separate B's arms)
+/* The gated stutter scalar (W2). B's measured arms: prewarm OFF 576-714 ms
+ * worst frame, ON 132-165 ms. 200 sits above the fixed arm's ceiling and far
+ * below the broken arm's floor, so it separates them by construction. */
+const WORST_FRAME_MS = +(process.env.SETTLE_WORST_FRAME_MS ?? 200);
 const LONG_FRAME_MS = 40; // absolute floor of the long-frame definition
 const WINDOW_MS = 10000; // reveal + 10 s
 const MAX_SCALE_JUMP = 0.2; // relative, per 100 ms sample (a 600 ms ease moves ~0.08)
 const MAX_BIRTH_FRAC = 0.25; // share of a pool allowed to appear in one 100 ms sample at full size
-const SLEW_MPS = 80; // SETTLE_CALM.groundElevVis.slewMps
+/* THE SLEW STATISTIC IS PER-FRAME METERS, NOT METRES PER SECOND (W2, B's
+ * instrument correction). A m/s figure computed with a dt that is not the
+ * damper's own dt is an instrument artifact: B's per-rAF rates read 350-540 m/s
+ * on a damper that is correct by construction, because a 100 ms sampler
+ * dividing by 0.1 s reports the rate of a step the damper never took in one
+ * step. The honest scalar is the STEP the visual value takes between two
+ * consecutive frames, in metres. B measured raw ~384 m/frame; the damped value
+ * is <= 4.0 m/frame BY CONSTRUCTION. The old m/s number is kept in the output
+ * as evidence, and its W1 value (22 697-24 023 m/s) is retired in close-sweep
+ * section 1 rather than erased. */
+const SLEW_M_PER_FRAME = +(process.env.SETTLE_SLEW_M ?? 8);
+const SLEW_MPS = 80; // SETTLE_CALM.groundElevVis.slewMps (kept: printed, not gated)
 const MIN_DPR_RUNGS = 2; // plan §5.8 gate
 const HDRI_DELAY_MS = +(process.env.SETTLE_HDRI_DELAY_MS ?? 9000);
 
@@ -341,15 +356,33 @@ function longFrames(frames, t0, t1) {
     boot.late.length ? boot.late.map((k) => `${k} +${Math.round(boot.t90[k] - revealT)}ms`).join(' ') : '0 late',
     '0 late layers',
   ]);
+  /* B SETTLE's real contract (r22/b): runtime.popin = {revealKind,
+   * layers:{<name>:{atMs, sinceRevealMs, birthed}}, longFrames, worstMs,
+   * frames}. `birthed` — not `fading` — is the flag that says a layer arrived
+   * through a birth transition, and it is what a late layer has to carry. */
   const popin = rows[rows.length - 1]?.popin ?? null;
   if (!popin)
-    soft('(3) birth-fade evidence (runtime.popin)', 'B', 'per-layer first-appearance + active-fade contract not published yet');
-  else
-    gate(
-      '(3) BIRTH FADES EXIST — every late layer reports an active birth fade',
-      late.every((k) => popin?.[k]?.fading === true),
-      JSON.stringify(popin).slice(0, 300)
+    soft(
+      '(3) birth evidence (runtime.popin)',
+      'B',
+      'the {revealKind, layers:{atMs, sinceRevealMs, birthed}, longFrames, worstMs, frames} contract is not published on this tree'
     );
+  else {
+    const lateOwn = Object.entries(popin.layers ?? {}).filter(
+      ([, v]) => (v?.sinceRevealMs ?? -1) > POPIN_GRACE_MS
+    );
+    console.log(
+      `runtime.popin: revealKind=${popin.revealKind} longFrames=${popin.longFrames} worstMs=${popin.worstMs} ` +
+        `frames=${popin.frames} · layers=${JSON.stringify(popin.layers)}`
+    );
+    gate(
+      '(3) BIRTH TRANSITIONS EXIST — every layer that arrives late reports birthed:true',
+      lateOwn.every(([, v]) => v.birthed === true),
+      lateOwn.length
+        ? lateOwn.map(([k, v]) => `${k} +${v.sinceRevealMs}ms birthed=${v.birthed}`).join(', ')
+        : 'no layer arrived later than the grace window, by B own accounting'
+    );
+  }
 
   /* ------------------------ stutter, clean boot ------------------------- */
   const progsAfter = rows.filter((r) => revealT != null && r.t * 1000 >= revealT).map((r) => r.progs ?? 0).filter(Boolean);
@@ -362,16 +395,32 @@ function longFrames(frames, t0, t1) {
       `long frames ${lf.count} (bound ${lf.bound} ms, median ${lf.median} ms, worst ${lf.worst} ms over ${lf.samples} frames) ${JSON.stringify(lf.list)}`
   );
   console.log(`PREWARM: ${JSON.stringify(prewarm)} first published at ${prewarmDoneAt}s vs reveal ${((revealT ?? 0) / 1000).toFixed(2)}s`);
+  /* THE COMPILE COUNT IS NOT THE STUTTER (W2, B's caveat, and it inverts the
+   * gate). With B's prewarm fix ON the post-reveal program count RISES 13 -> 19,
+   * because the env re-key deliberately warms the FULL set — more programs, and
+   * a calmer frame. Gating on the count would therefore fail the fix for doing
+   * its job. The scalar that separated B's arms is the WORST FRAME in the
+   * window: OFF 576-714 ms, ON 132-165 ms. The long-frame COUNT did not
+   * separate them either (2 vs 2 on B's machine), so it is printed and not
+   * gated. Programs are still recorded — a compile train is still evidence —
+   * but the assertion is the frame the player actually feels. */
   gate(
-    '(4) NO POST-REVEAL COMPILE TRAIN — gl program count is flat after reveal',
-    progGrowth === 0,
-    `growth ${progGrowth} programs in reveal+${WINDOW_MS / 1000}s (each one is a synchronous compile the player feels)`
+    `(4) POST-REVEAL COMPILES DO NOT STALL THE FRAME — worst frame in reveal+${WINDOW_MS / 1000}s <= ${WORST_FRAME_MS} ms`,
+    lf.worst <= WORST_FRAME_MS,
+    `worst ${lf.worst} ms · ${progGrowth} programs compiled after reveal (informational: B's fix RAISES this 13 -> 19 ` +
+      `by warming the full set, so the count is evidence, not the assertion)`
   );
-  red.push(['S-STUT compile train lands after reveal', 'verify-settle (4)', `${progGrowth} programs`, '0']);
+  red.push([
+    'S-STUT the post-reveal compile train stalls the frame (RE-BASED W2: worst frame)',
+    'verify-settle (4)',
+    `${lf.worst} ms worst / ${progGrowth} programs`,
+    `<= ${WORST_FRAME_MS} ms`,
+  ]);
   gate(
     `(5) STUTTER — <= ${MAX_LONG_FRAMES} long frames in reveal+${WINDOW_MS / 1000}s (clean boot)`,
     lf.count <= MAX_LONG_FRAMES,
-    `${lf.count} frames over ${lf.bound} ms · worst ${lf.worst} ms · ${JSON.stringify(lf.list)}`
+    `${lf.count} frames over ${lf.bound} ms · worst ${lf.worst} ms · ${JSON.stringify(lf.list)} ` +
+      `(the COUNT did not separate B's arms — 2 vs 2 — so gate (4)/(6) carry the claim on the WORST frame)`
   );
   if (!prewarm) soft('(7) prewarm state', 'B', '__flyStats.prewarm not published on this tree');
   else
@@ -486,16 +535,19 @@ function longFrames(frames, t0, t1) {
    * the structural half of the claim and it has no threshold to argue about:
    * a variant compiled after reveal is a variant the prewarm was supposed to
    * have. Gating on both is what makes this leg red on the pre-fix tree. */
+  /* THE RED LEG, and the one B's arms separated on: worst frame, not count,
+   * not compiles (see gate (4)). B measured OFF 576-714 ms -> ON 132-165 ms. */
   gate(
-    `(6) STUTTER under a THROTTLED HDRI — <= ${MAX_LONG_FRAMES} long frames AND zero post-reveal compiles`,
-    lf2.count <= MAX_LONG_FRAMES && progGrowth2 === 0,
-    `${lf2.count} frames over ${lf2.bound} ms (worst ${lf2.worst} ms) · ${progGrowth2} programs compiled after reveal · ${JSON.stringify(lf2.list)}`
+    `(6) STUTTER under a THROTTLED HDRI — worst frame in reveal+${WINDOW_MS / 1000}s <= ${WORST_FRAME_MS} ms`,
+    lf2.worst <= WORST_FRAME_MS,
+    `worst ${lf2.worst} ms · ${lf2.count} frames over ${lf2.bound} ms · ${progGrowth2} programs after reveal · ${JSON.stringify(lf2.list)} ` +
+      `(B's arms: OFF 576-714 ms -> ON 132-165 ms)`
   );
   red.push([
-    'S-STUT stutter with the prewarm starved',
+    'S-STUT stutter with the prewarm starved (RE-BASED W2: worst frame)',
     'verify-settle (6)',
-    `${lf2.count} long frames / ${progGrowth2} programs`,
-    `<= ${MAX_LONG_FRAMES} / 0`,
+    `${lf2.worst} ms worst frame (${lf2.count} long, ${progGrowth2} programs)`,
+    `<= ${WORST_FRAME_MS} ms`,
   ]);
   await throttled.close();
 
@@ -649,15 +701,20 @@ function longFrames(frames, t0, t1) {
     delete f.step;
     delete f.__frozen;
     const S = (window.__r22Elev = { t0: performance.now(), rows: [] });
-    S.tick = setInterval(() => {
+    // PER-FRAME sampling, not per-100 ms: the gated statistic is the step the
+    // visual value takes between two consecutive FRAMES, which is the only
+    // cadence the damper itself runs at.
+    const tick = () => {
       const rt = window.__fly;
       S.rows.push({
-        t: +((performance.now() - S.t0) / 1000).toFixed(2),
+        t: +((performance.now() - S.t0) / 1000).toFixed(3),
         raw: +(rt?.flight?.groundElev ?? 0).toFixed(2),
         vis: rt?.groundElevVis == null ? null : +rt.groundElevVis.toFixed(2),
         epoch: window.__flyStore?.getState?.().warpEpoch ?? null,
       });
-    }, 100);
+      if (S.rows.length < 4000) S.raf = requestAnimationFrame(tick);
+    };
+    S.raf = requestAnimationFrame(tick);
   });
   await parcel.evaluate(
     ([la, lo, al]) => window.__fly.warpToGeo(la, lo, { altM: al, name: null }),
@@ -665,7 +722,7 @@ function longFrames(frames, t0, t1) {
   );
   await parcel.waitForTimeout(20000);
   const elevRows = await parcel.evaluate(() => {
-    clearInterval(window.__r22Elev.tick);
+    cancelAnimationFrame(window.__r22Elev.raf);
     return window.__r22Elev.rows;
   });
   // The warp itself is allowed ONE discontinuity (SETTLE_CALM snaps on
@@ -673,33 +730,40 @@ function longFrames(frames, t0, t1) {
   // and that is what has to be slew-limited.
   const epochIdx = elevRows.findIndex((r, i) => i > 0 && r.epoch !== elevRows[i - 1].epoch);
   const post = elevRows.slice(Math.max(0, epochIdx + 3));
-  let worstSlew = 0;
+  let worstStepM = 0;
+  let worstSlew = 0; // the old m/s figure, PRINTED as evidence, never gated
   let slewAt = null;
+  let worstRawStepM = 0;
   for (let i = 1; i < post.length; i++) {
     const v0 = post[i - 1].vis ?? post[i - 1].raw;
     const v1 = post[i].vis ?? post[i].raw;
-    const dt = Math.max(0.05, post[i].t - post[i - 1].t);
-    const mps = Math.abs(v1 - v0) / dt;
-    if (mps > worstSlew) {
-      worstSlew = mps;
+    const stepM = Math.abs(v1 - v0);
+    const dt = Math.max(1e-3, post[i].t - post[i - 1].t);
+    worstSlew = Math.max(worstSlew, stepM / dt);
+    worstRawStepM = Math.max(worstRawStepM, Math.abs(post[i].raw - post[i - 1].raw));
+    if (stepM > worstStepM) {
+      worstStepM = stepM;
       slewAt = `${post[i - 1].t}s→${post[i].t}s ${v0}→${v1} m`;
     }
   }
   const visIsAlias = elevRows.every((r) => r.vis == null || Math.abs(r.vis - r.raw) < 1e-6);
   console.log(
-    `SIERRA groundElev: ${elevRows.length} samples · worst post-warp slew ${worstSlew.toFixed(1)} m/s ${slewAt ? `(${slewAt})` : ''} · ` +
-      `groundElevVis is ${visIsAlias ? 'the RAW alias (W0 pre-seed)' : 'DAMPED'}`
+    `SIERRA groundElev (${elevRows.length} PER-FRAME samples): worst VISUAL step ${worstStepM.toFixed(2)} m/frame ` +
+      `${slewAt ? `(${slewAt})` : ''} · worst RAW step ${worstRawStepM.toFixed(2)} m/frame · ` +
+      `(informational, and NOT the gated statistic: ${worstSlew.toFixed(0)} m/s — a rate computed with a dt that is ` +
+      `not the damper's own) · groundElevVis is ${visIsAlias ? 'the RAW alias (W0 pre-seed)' : 'DAMPED'}`
   );
   gate(
-    `(10) groundElevVis is SLEW-LIMITED across a mountain warp (<= ${SLEW_MPS} m/s post-snap)`,
-    worstSlew <= SLEW_MPS,
-    `worst ${worstSlew.toFixed(1)} m/s ${slewAt ? `· ${slewAt}` : ''} · vis ${visIsAlias ? '=== raw (undamped)' : 'damped'}`
+    `(10) groundElevVis is SLEW-LIMITED across a mountain warp (<= ${SLEW_M_PER_FRAME} m per FRAME post-snap)`,
+    worstStepM <= SLEW_M_PER_FRAME,
+    `worst visual step ${worstStepM.toFixed(2)} m/frame vs raw ${worstRawStepM.toFixed(2)} m/frame ${slewAt ? `· ${slewAt}` : ''} · ` +
+      `vis ${visIsAlias ? '=== raw (undamped)' : 'damped'}`
   );
   red.push([
-    'S-ELEV raw groundElev sweeps every AGL fade band',
+    'S-ELEV raw groundElev sweeps every AGL fade band (RE-EXPRESSED W2: m/frame)',
     'verify-settle (10)',
-    `${worstSlew.toFixed(1)} m/s`,
-    `<= ${SLEW_MPS} m/s`,
+    `${worstStepM.toFixed(2)} m/frame visual (raw ${worstRawStepM.toFixed(2)})`,
+    `<= ${SLEW_M_PER_FRAME} m/frame`,
   ]);
 
   /* ============ LEG 5 — the ladder SHAPE (no timing at all) ============= */
