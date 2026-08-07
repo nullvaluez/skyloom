@@ -1,0 +1,19 @@
+{
+  "heal": {
+    "t0": {
+      "heals": 0,
+      "evictions": 28,
+      "ready": 16,
+      "chunks": 16
+    },
+    "t1": {
+      "heals": 0,
+      "evictions": 28,
+      "ready": 16,
+      "chunks": 16
+    },
+    "healsIn90s": 0,
+    "evictionsIn90s": 0
+  },
+  "pageErrors": []
+}

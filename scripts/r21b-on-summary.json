@@ -1,0 +1,19 @@
+{
+  "skyline": {
+    "abortedRequests": 0,
+    "holed": {
+      "ready": 9,
+      "tris": 89655,
+      "empty": 1,
+      "errorRetries": 0
+    },
+    "after": {
+      "ready": 9,
+      "tris": 89655,
+      "empty": 1,
+      "errorRetries": 0
+    },
+    "trisRecovered": 0
+  },
+  "pageErrors": []
+}

@@ -1,0 +1,499 @@
+{
+  "orbit": {
+    "far": {
+      "altM": 4200,
+      "tapped": 429,
+      "heldMax": 429,
+      "perHeading": [
+        {
+          "deg": 0,
+          "drawn": 148,
+          "min": 148,
+          "max": 148,
+          "held": 429,
+          "newlyTapped": 0,
+          "draws": 381
+        },
+        {
+          "deg": 15,
+          "drawn": 155,
+          "min": 155,
+          "max": 155,
+          "held": 429,
+          "newlyTapped": 0,
+          "draws": 404
+        },
+        {
+          "deg": 30,
+          "drawn": 156.1,
+          "min": 155,
+          "max": 157,
+          "held": 429,
+          "newlyTapped": 0,
+          "draws": 402
+        },
+        {
+          "deg": 45,
+          "drawn": 151,
+          "min": 151,
+          "max": 151,
+          "held": 429,
+          "newlyTapped": 0,
+          "draws": 393
+        },
+        {
+          "deg": 60,
+          "drawn": 156.57,
+          "min": 155,
+          "max": 158,
+          "held": 429,
+          "newlyTapped": 9,
+          "draws": 403
+        },
+        {
+          "deg": 75,
+          "drawn": 154.2,
+          "min": 152,
+          "max": 157,
+          "held": 429,
+          "newlyTapped": 0,
+          "draws": 403
+        },
+        {
+          "deg": 90,
+          "drawn": 157.3,
+          "min": 156,
+          "max": 158,
+          "held": 429,
+          "newlyTapped": 9,
+          "draws": 397
+        },
+        {
+          "deg": 105,
+          "drawn": 165.77,
+          "min": 165,
+          "max": 167,
+          "held": 429,
+          "newlyTapped": 0,
+          "draws": 413
+        },
+        {
+          "deg": 120,
+          "drawn": 159.67,
+          "min": 159,
+          "max": 160,
+          "held": 429,
+          "newlyTapped": 0,
+          "draws": 422
+        },
+        {
+          "deg": 135,
+          "drawn": 169.4,
+          "min": 169,
+          "max": 170,
+          "held": 429,
+          "newlyTapped": 9,
+          "draws": 399
+        },
+        {
+          "deg": 150,
+          "drawn": 166.43,
+          "min": 166,
+          "max": 167,
+          "held": 429,
+          "newlyTapped": 0,
+          "draws": 407
+        },
+        {
+          "deg": 165,
+          "drawn": 164.5,
+          "min": 164,
+          "max": 166,
+          "held": 426,
+          "newlyTapped": 0,
+          "draws": 419
+        },
+        {
+          "deg": 180,
+          "drawn": 162.1,
+          "min": 162,
+          "max": 163,
+          "held": 426,
+          "newlyTapped": 6,
+          "draws": 417
+        },
+        {
+          "deg": 195,
+          "drawn": 157.37,
+          "min": 157,
+          "max": 158,
+          "held": 426,
+          "newlyTapped": 0,
+          "draws": 414
+        },
+        {
+          "deg": 210,
+          "drawn": 168,
+          "min": 168,
+          "max": 168,
+          "held": 429,
+          "newlyTapped": 9,
+          "draws": 422
+        },
+        {
+          "deg": 225,
+          "drawn": 165.07,
+          "min": 165,
+          "max": 166,
+          "held": 429,
+          "newlyTapped": 3,
+          "draws": 382
+        },
+        {
+          "deg": 240,
+          "drawn": 163.1,
+          "min": 163,
+          "max": 164,
+          "held": 429,
+          "newlyTapped": 0,
+          "draws": 409
+        },
+        {
+          "deg": 255,
+          "drawn": 161,
+          "min": 161,
+          "max": 161,
+          "held": 429,
+          "newlyTapped": 9,
+          "draws": 408
+        },
+        {
+          "deg": 270,
+          "drawn": 159,
+          "min": 153,
+          "max": 162,
+          "held": 423,
+          "newlyTapped": 0,
+          "draws": 405
+        },
+        {
+          "deg": 285,
+          "drawn": 150,
+          "min": 150,
+          "max": 150,
+          "held": 429,
+          "newlyTapped": 9,
+          "draws": 399
+        },
+        {
+          "deg": 300,
+          "drawn": 157,
+          "min": 157,
+          "max": 157,
+          "held": 429,
+          "newlyTapped": 0,
+          "draws": 405
+        },
+        {
+          "deg": 315,
+          "drawn": 149.03,
+          "min": 149,
+          "max": 150,
+          "held": 429,
+          "newlyTapped": 0,
+          "draws": 390
+        },
+        {
+          "deg": 330,
+          "drawn": 146.3,
+          "min": 146,
+          "max": 147,
+          "held": 429,
+          "newlyTapped": 9,
+          "draws": 393
+        },
+        {
+          "deg": 345,
+          "drawn": 135.83,
+          "min": 135,
+          "max": 137,
+          "held": 429,
+          "newlyTapped": 0,
+          "draws": 386
+        }
+      ],
+      "drawnAvgOverSweep": 157.41,
+      "culledAvgOverSweep": 270.97,
+      "sceneDrawsMax": 422,
+      "toyStatsLast": {
+        "chunks": 156,
+        "ready": 156,
+        "queued": 0,
+        "building": 0,
+        "draping": 0,
+        "fullDone": 72,
+        "fullTotal": 72,
+        "ultra": 0,
+        "ultraReady": 0,
+        "ultraArmed": false,
+        "emptyByReason": {
+          "noData": 0,
+          "zero": 0,
+          "legacy": 0
+        },
+        "errorRetries": 0,
+        "evictions": 196,
+        "heals": 24,
+        "fullRingR": 8000
+      }
+    },
+    "ultra": {
+      "altM": 7925,
+      "tapped": 97,
+      "heldMax": 407,
+      "perHeading": [
+        {
+          "deg": 0,
+          "drawn": 163,
+          "min": 163,
+          "max": 163,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 380
+        },
+        {
+          "deg": 15,
+          "drawn": 166.73,
+          "min": 166,
+          "max": 168,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 390
+        },
+        {
+          "deg": 30,
+          "drawn": 161,
+          "min": 161,
+          "max": 161,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 379
+        },
+        {
+          "deg": 45,
+          "drawn": 161,
+          "min": 161,
+          "max": 161,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 385
+        },
+        {
+          "deg": 60,
+          "drawn": 155,
+          "min": 155,
+          "max": 155,
+          "held": 407,
+          "newlyTapped": 3,
+          "draws": 379
+        },
+        {
+          "deg": 75,
+          "drawn": 156,
+          "min": 156,
+          "max": 156,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 381
+        },
+        {
+          "deg": 90,
+          "drawn": 163.97,
+          "min": 162,
+          "max": 165,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 381
+        },
+        {
+          "deg": 105,
+          "drawn": 152,
+          "min": 152,
+          "max": 152,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 381
+        },
+        {
+          "deg": 120,
+          "drawn": 152.2,
+          "min": 151,
+          "max": 153,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 383
+        },
+        {
+          "deg": 135,
+          "drawn": 158,
+          "min": 158,
+          "max": 158,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 381
+        },
+        {
+          "deg": 150,
+          "drawn": 155,
+          "min": 155,
+          "max": 155,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 375
+        },
+        {
+          "deg": 165,
+          "drawn": 158.17,
+          "min": 158,
+          "max": 159,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 388
+        },
+        {
+          "deg": 180,
+          "drawn": 160.37,
+          "min": 160,
+          "max": 161,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 393
+        },
+        {
+          "deg": 195,
+          "drawn": 150,
+          "min": 150,
+          "max": 150,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 386
+        },
+        {
+          "deg": 210,
+          "drawn": 154.87,
+          "min": 154,
+          "max": 155,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 388
+        },
+        {
+          "deg": 225,
+          "drawn": 153.37,
+          "min": 153,
+          "max": 154,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 358
+        },
+        {
+          "deg": 240,
+          "drawn": 160,
+          "min": 160,
+          "max": 160,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 391
+        },
+        {
+          "deg": 255,
+          "drawn": 158,
+          "min": 158,
+          "max": 158,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 383
+        },
+        {
+          "deg": 270,
+          "drawn": 161,
+          "min": 161,
+          "max": 161,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 381
+        },
+        {
+          "deg": 285,
+          "drawn": 159.1,
+          "min": 158,
+          "max": 160,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 387
+        },
+        {
+          "deg": 300,
+          "drawn": 155.23,
+          "min": 155,
+          "max": 156,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 381
+        },
+        {
+          "deg": 315,
+          "drawn": 158,
+          "min": 158,
+          "max": 158,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 375
+        },
+        {
+          "deg": 330,
+          "drawn": 158,
+          "min": 158,
+          "max": 158,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 375
+        },
+        {
+          "deg": 345,
+          "drawn": 157.8,
+          "min": 156,
+          "max": 158,
+          "held": 407,
+          "newlyTapped": 0,
+          "draws": 382
+        }
+      ],
+      "drawnAvgOverSweep": 157.83,
+      "culledAvgOverSweep": 249.17,
+      "sceneDrawsMax": 393,
+      "toyStatsLast": {
+        "chunks": 160,
+        "ready": 160,
+        "queued": 0,
+        "building": 0,
+        "draping": 0,
+        "fullDone": 32,
+        "fullTotal": 32,
+        "ultra": 20,
+        "ultraReady": 20,
+        "ultraArmed": true,
+        "emptyByReason": {
+          "noData": 0,
+          "zero": 0,
+          "legacy": 0
+        },
+        "errorRetries": 0,
+        "evictions": 240,
+        "heals": 28,
+        "fullRingR": 4000
+      }
+    }
+  },
+  "pageErrors": []
+}
