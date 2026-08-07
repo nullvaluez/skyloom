@@ -7,8 +7,10 @@ import { FlyScene } from './FlyScene';
 import { Effects } from './Effects';
 import { PhotoCapture } from './PhotoCapture';
 import { JuiceSystems } from './JuiceSystems';
-import { CANVAS } from '@/lib/fly/fly-constants';
+import { PrewarmRig } from './PrewarmRig';
+import { CANVAS, PERF_GOVERNOR, PREWARM } from '@/lib/fly/fly-constants';
 import { autoTierCeiling } from '@/lib/fly/fly-settings';
+import { PerfGovernor } from '@/lib/fly/perf-governor';
 import { useFlyStore } from '@/stores/fly-store';
 
 function initialDpr() {
@@ -57,6 +59,28 @@ function stepQualityTier(dir) {
 export function FlyCanvas({ runtime }) {
   const [dpr, setDpr] = useState(initialDpr);
 
+  // ROUND 21 (A GOVERNOR, S1): the scene subtree, shared by both quality
+  // controllers so the two paths differ ONLY in what wraps it. With
+  // PERF_GOVERNOR.enabled false the JSX below is byte-for-byte the R20 tree.
+  const sceneTree = (
+    <Suspense fallback={null}>
+      <FlyScene runtime={runtime} />
+      <Effects runtime={runtime} />
+      {/* Round 17: reads the GRADED frame off this canvas at useFrame
+          priority 100 — i.e. after the composer above, same task. */}
+      <PhotoCapture />
+      {/* Round 18 (A4): the arcade layer's frame driver. Mounted AFTER
+          FlyScene so its default-priority useFrame runs behind the -50
+          flight step and the -45 traffic update — i.e. every item's
+          .distM is this frame's value when the near-miss scan reads it. */}
+      <JuiceSystems runtime={runtime} />
+      <BootFramePulse runtime={runtime} />
+      {/* Round 21 (A): boot shader pre-warm. Adds no object to the scene and
+          issues no draw — see components/fly/PrewarmRig.jsx. */}
+      {PREWARM.enabled && <PrewarmRig runtime={runtime} />}
+    </Suspense>
+  );
+
   return (
     <Canvas
       dpr={dpr}
@@ -81,33 +105,40 @@ export function FlyCanvas({ runtime }) {
             '[fly] reversedDepthBuffer active:',
             gl.capabilities?.reversedDepthBuffer === true
           );
+          // Round 21 (A): the renderer handle the stability gates need.
+          // `gl.info.programs.length` is the ONLY honest instrument for the
+          // S2 leak (a composer rebuild that abandons its EffectPass shows up
+          // there and nowhere else) and for proving the pre-warm actually
+          // seeded three's program cache. Dev-only, read-only, no frame cost.
+          window.__flyGl = gl;
         }
       }}
     >
-      <PerformanceMonitor
-        onDecline={() => {
-          setDpr((d) => Math.max(CANVAS.dprMin, d - CANVAS.dprStep));
-          stepQualityTier(-1);
-        }}
-        onIncline={() => {
-          setDpr((d) => Math.min(initialDpr(), d + CANVAS.dprStep));
-          stepQualityTier(1);
-        }}
-      >
-        <Suspense fallback={null}>
-          <FlyScene runtime={runtime} />
-          <Effects runtime={runtime} />
-          {/* Round 17: reads the GRADED frame off this canvas at useFrame
-              priority 100 — i.e. after the composer above, same task. */}
-          <PhotoCapture />
-          {/* Round 18 (A4): the arcade layer's frame driver. Mounted AFTER
-              FlyScene so its default-priority useFrame runs behind the -50
-              flight step and the -45 traffic update — i.e. every item's
-              .distM is this frame's value when the near-miss scan reads it. */}
-          <JuiceSystems runtime={runtime} />
-          <BootFramePulse runtime={runtime} />
-        </Suspense>
-      </PerformanceMonitor>
+      {PERF_GOVERNOR.enabled ? (
+        <>
+          {/* Round 21 (A GOVERNOR): the EMA + dwell + cooldown + session-latch
+              controller that replaces the drei monitor. One ladder, DPR rungs
+              above tier rungs, one rung per step — see lib/fly/perf-governor.js
+              for why the drei defaults could not stay (fps 60 sits ON the
+              default incline bound at vsync-locked steady state, and
+              flipflops=Infinity means it never latches). */}
+          <PerfGovernor setDpr={setDpr} />
+          {sceneTree}
+        </>
+      ) : (
+        <PerformanceMonitor
+          onDecline={() => {
+            setDpr((d) => Math.max(CANVAS.dprMin, d - CANVAS.dprStep));
+            stepQualityTier(-1);
+          }}
+          onIncline={() => {
+            setDpr((d) => Math.min(initialDpr(), d + CANVAS.dprStep));
+            stepQualityTier(1);
+          }}
+        >
+          {sceneTree}
+        </PerformanceMonitor>
+      )}
     </Canvas>
   );
 }
