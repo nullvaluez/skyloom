@@ -1,5 +1,5 @@
 {
- "when": "2026-08-07T02:10:24.822Z",
+ "when": "2026-08-07T05:21:24.399Z",
  "lock": 40,
  "ramp": {
   "lockLo": 24,
@@ -2542,7 +2542,7 @@
      "legacy": 0
     },
     "errorRetries": 0,
-    "evictions": 12,
+    "evictions": 11,
     "heals": 0
    },
    "sbReason": {
