@@ -13,6 +13,45 @@ const { chromium } = require('playwright');
 const path = require('path');
 const { bootFly } = require('./_boot');
 
+/* ===========================================================================
+ * R22 SANCTIONED - PENDING FABLE SIGN-OFF  (plan §5.1)
+ * ===========================================================================
+ * The sanction: `WARP.far.holdMaxMs` 3500 -> 6500 for satellite far warps when
+ * `ARRIVAL_GATE.enabled`, and THIS harness's satellite bound 5600 -> 7400 to
+ * match. The sanction's own condition is that the bound moves "WITH the new
+ * content assertion", never alone — a longer hold that still reveals over an
+ * undescended pyramid is a worse product, not a better one, and a bound raised
+ * without the content term would certify exactly that.
+ *
+ * PREPARED, NOT CONSUMED. Everything below is inert until
+ * `R22_ARRIVAL_SANCTION=1` is set, so an unflagged run of this file is
+ * byte-identical in behaviour to the R6 original: same 5600 ms bound, same
+ * assertions, same exit code. Fable arms it at the W2 merge of B SETTLE, at
+ * which point the two legs marked `R22` below become live and the 5600 bound
+ * is replaced by 7400 + the content assertion, together.
+ *
+ * The content instrument is the same one verify-arrival uses:
+ * `engine.getGroundAt(camera lon/lat).tileZ` at the reveal moment, compared
+ * against the DEPARTURE pose's settled zoom at the same altitude (verify-
+ * arrival's §1 note explains why the destination's own later self is not a
+ * valid reference — on the pre-R22 tree it shares the defect).
+ * ======================================================================== */
+const R22_SANCTION = process.env.R22_ARRIVAL_SANCTION === '1';
+const SAT_HOLD_BOUND_MS = R22_SANCTION ? 7400 : 5600; // §5.1: 5600 -> 7400 WITH the content term
+const R22_CAM_TILE_Z = () => {
+  const rt = window.__fly;
+  const f = rt?.flight;
+  const eng = rt?.engine;
+  if (!f || !eng) return null;
+  try {
+    const g = eng.worldToGeo(f.pos);
+    const ga = eng.getGroundAt(+g.x, +g.y);
+    return ga ? ga.tileZ : null;
+  } catch {
+    return null;
+  }
+};
+
 (async () => {
   const browser = await chromium.launch({
     channel: 'chrome',
@@ -90,6 +129,9 @@ const { bootFly } = require('./_boot');
   // --- satellite far warp (raster readiness path) -------------------------
   await page.evaluate(() => window.__flyStore.getState().setMapStyle('satellite'));
   await page.waitForTimeout(4000);
+  // R22 SANCTIONED - PENDING FABLE SIGN-OFF: the DEPARTURE reference for the
+  // content assertion below. Inert (a plain read) unless the sanction is armed.
+  const departZ = R22_SANCTION ? await page.evaluate(R22_CAM_TILE_Z) : null;
   await page.keyboard.press('m');
   await page.waitForTimeout(800);
   await page.keyboard.type('Tokyo', { delay: 40 });
@@ -103,15 +145,29 @@ const { bootFly } = require('./_boot');
     .catch(() => false);
   gate('satellite far warp → hold overlay', holdNight);
   let nightReveal = null;
+  let revealZ = null;
   for (let i = 0; i < 30; i++) {
     const hold = await page.evaluate(() => !!document.querySelector('[data-testid="warp-hold"]'));
     if (!hold) {
       nightReveal = Date.now() - t1;
+      if (R22_SANCTION) revealZ = await page.evaluate(R22_CAM_TILE_Z);
       break;
     }
     await page.waitForTimeout(400);
   }
-  gate('satellite hold resolves within bounds', nightReveal != null && nightReveal <= 5600, `${nightReveal}ms`);
+  gate(
+    `satellite hold resolves within bounds${R22_SANCTION ? ' (R22 §5.1 CONSUMED: 5600 → 7400)' : ''}`,
+    nightReveal != null && nightReveal <= SAT_HOLD_BOUND_MS,
+    `${nightReveal}ms vs ${SAT_HOLD_BOUND_MS}`
+  );
+  // R22 SANCTIONED - PENDING FABLE SIGN-OFF: the assertion the bound move is
+  // conditional on. Skipped entirely when the sanction is not armed.
+  if (R22_SANCTION)
+    gate(
+      'R22 §5.1 — the satellite reveal shows CONTENT, not just elapsed time',
+      revealZ != null && departZ != null && revealZ >= departZ - 1,
+      `camTileZ at reveal ${revealZ} vs departure ${departZ} (deficit ${(departZ ?? 0) - (revealZ ?? 0)})`
+    );
   await page.waitForTimeout(2500);
   await shot('03-sat-tokyo');
 

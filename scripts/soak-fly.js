@@ -128,17 +128,73 @@ const UNPIN_GOVERNOR = () => {
     console.log('audio disposed for differential');
   }
 
-  // Frame-time collector
-  await page.evaluate(() => {
-    const s = (window.__soak = { frames: [], last: performance.now() });
+  // Frame-time collector.
+  // ---------------------------------------------------------------------
+  // R22 SANCTIONED - PENDING FABLE SIGN-OFF (plan §5.10): an INFORMATIONAL
+  // gpuFrameMs p95 series, target <= 12 ms, blocking-candidate for R23. The
+  // R22 D DEPTH budgets (N8AO <= +1.5 ms Owens / +2.5 ms Manhattan;
+  // near-ring receiveShadow <= +1.0 ms) are written in GPU milliseconds
+  // because the R13 rejection of near-ring receiveShadow was a FILL-RATE
+  // objection — invisible to every draw-count gate in the fleet and only
+  // partly visible in a rAF interval that a fast CPU can hide. This adds the
+  // real number where the driver exposes it.
+  //
+  // SCOPE: satellite mode only (`SAT`), collected alongside the existing rAF
+  // series, never replacing it; reported in the summary and printed with the
+  // gate block, but NOT gated — the five BLOCKING gates are unchanged, and
+  // the TOY path does not execute one line of this. `gpuP95` is simply
+  // absent from the summary when the extension is unavailable, rather than
+  // silently falling back to a CPU number wearing a GPU name.
+  // ---------------------------------------------------------------------
+  await page.evaluate((sat) => {
+    const s = (window.__soak = { frames: [], last: performance.now(), gpu: [] });
+    let ext = null;
+    let ctx = null;
+    let q = null;
+    if (sat) {
+      try {
+        ctx = window.__flyGl?.getContext?.() ?? null;
+        ext = ctx?.getExtension?.('EXT_disjoint_timer_query_webgl2') ?? null;
+      } catch {
+        ext = null;
+      }
+      window.__soakGpuInstrument = ext ? 'EXT_disjoint_timer_query_webgl2' : 'unavailable';
+    }
     const tick = (t) => {
       s.frames.push(t - s.last);
       s.last = t;
       if (s.frames.length > 200000) s.frames.shift();
+      if (ext && ctx) {
+        try {
+          if (q) {
+            const avail = ctx.getQueryParameter(q, ctx.QUERY_RESULT_AVAILABLE);
+            const disjoint = ctx.getParameter(ext.GPU_DISJOINT_EXT);
+            if (avail && !disjoint) s.gpu.push(ctx.getQueryParameter(q, ctx.QUERY_RESULT) / 1e6);
+            if (avail || disjoint) {
+              ctx.deleteQuery(q);
+              q = null;
+            }
+          }
+          if (!q) {
+            q = ctx.createQuery();
+            ctx.beginQuery(ext.TIME_ELAPSED_EXT, q);
+            requestAnimationFrame(() => {
+              try {
+                ctx.endQuery(ext.TIME_ELAPSED_EXT);
+              } catch {
+                /* the query was cancelled by a context event */
+              }
+            });
+          }
+          if (s.gpu.length > 200000) s.gpu.shift();
+        } catch {
+          ext = null; // a driver that throws mid-run stops contributing, silently
+        }
+      }
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
-  });
+  }, SAT);
 
   const samples = [];
   const t0 = Date.now();
@@ -230,6 +286,17 @@ const UNPIN_GOVERNOR = () => {
         // exactly the R20 key set.
         ...(sat
           ? {
+              // R22 §5.10 (informational): per-sample GPU frame time.
+              gpuFrameMs: (() => {
+                const g = window.__soak.gpu.splice(0);
+                if (!g.length) return null;
+                g.sort((a, b) => a - b);
+                return {
+                  n: g.length,
+                  p50: +g[Math.floor(0.5 * g.length)].toFixed(2),
+                  p95: +g[Math.min(g.length - 1, Math.floor(0.95 * g.length))].toFixed(2),
+                };
+              })(),
               tier: window.__flyStore?.getState?.().qualityTier ?? null,
               govSteps: window.__soakGov?.steps ?? null,
               govFromStats: window.__flyStats?.governor
@@ -341,6 +408,31 @@ const UNPIN_GOVERNOR = () => {
       `${gov.steps} · ${JSON.stringify(gov.log.slice(0, 8))}`
     );
     g('zero pageerrors', errs.length === 0, `${errs.length}${errs[0] ? ` · ${errs[0].slice(0, 120)}` : ''}`);
+
+    // R22 SANCTIONED - PENDING FABLE SIGN-OFF (§5.10): INFORMATIONAL ONLY.
+    // Printed and stored, never gated, and it cannot change the exit code —
+    // the blocking set above is exactly R21's five.
+    const gpuP95s = samples.map((s) => s.gpuFrameMs?.p95).filter((v) => v != null);
+    const gpuInstrument = await page.evaluate(() => window.__soakGpuInstrument ?? 'unavailable');
+    if (gpuP95s.length) {
+      const worst = Math.max(...gpuP95s);
+      Object.assign(summary, {
+        gpuInstrument,
+        gpuP95Worst: worst,
+        gpuP95Median: pct(gpuP95s, 0.5),
+        gpuP95Series: gpuP95s,
+      });
+      console.log(
+        `INFO (R22 §5.10, NOT GATED) gpuFrameMs p95: worst ${worst.toFixed(2)} ms · median ${pct(gpuP95s, 0.5)} ms ` +
+          `over ${gpuP95s.length} samples · target <= 12 ms (blocking candidate for R23) · instrument ${gpuInstrument}`
+      );
+    } else {
+      Object.assign(summary, { gpuInstrument });
+      console.log(
+        `INFO (R22 §5.10) gpuFrameMs unavailable on this driver (${gpuInstrument}) — recorded as absent rather than ` +
+          `substituted with the rAF interval, which is a CPU-side number and would understate D DEPTH's fill-rate costs.`
+      );
+    }
   }
 
   console.log('SOAK SUMMARY:', JSON.stringify(summary, null, 2));

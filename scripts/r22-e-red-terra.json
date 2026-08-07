@@ -1,0 +1,1072 @@
+{
+ "when": "2026-08-07T18:00:17.370Z",
+ "lewisTrace": [
+  {
+   "t": 0,
+   "lon": -83.0701,
+   "lat": 40.21236,
+   "altM": 428,
+   "groundElev": 244,
+   "aglM": 184,
+   "camTileZ": 8,
+   "camElev": 244,
+   "downloading": 4,
+   "lodThreshold": 0.86,
+   "maxThreads": 10,
+   "tier": "high",
+   "draws": 113,
+   "tris": 81312,
+   "terraStats": null
+  },
+  {
+   "t": 0.5,
+   "lon": -83.0701,
+   "lat": 40.21236,
+   "altM": 428,
+   "groundElev": 276,
+   "aglM": 151,
+   "camTileZ": 9,
+   "camElev": 276,
+   "downloading": 8,
+   "lodThreshold": 0.86,
+   "maxThreads": 10,
+   "tier": "high",
+   "draws": 120,
+   "tris": 103566,
+   "terraStats": null
+  },
+  {
+   "t": 1,
+   "lon": -83.0701,
+   "lat": 40.21236,
+   "altM": 428,
+   "groundElev": 278,
+   "aglM": 150,
+   "camTileZ": 10,
+   "camElev": 278,
+   "downloading": 8,
+   "lodThreshold": 0.86,
+   "maxThreads": 10,
+   "tier": "high",
+   "draws": 126,
+   "tris": 103660,
+   "terraStats": null
+  },
+  {
+   "t": 1.5,
+   "lon": -83.0701,
+   "lat": 40.21236,
+   "altM": 428,
+   "groundElev": 278,
+   "aglM": 150,
+   "camTileZ": 10,
+   "camElev": 278,
+   "downloading": 7,
+   "lodThreshold": 0.86,
+   "maxThreads": 10,
+   "tier": "high",
+   "draws": 148,
+   "tris": 120092,
+   "terraStats": null
+  },
+  {
+   "t": 2,
+   "lon": -83.0701,
+   "lat": 40.21236,
+   "altM": 428,
+   "groundElev": 277,
+   "aglM": 151,
+   "camTileZ": 11,
+   "camElev": 277,
+   "downloading": 8,
+   "lodThreshold": 0.86,
+   "maxThreads": 10,
+   "tier": "high",
+   "draws": 165,
+   "tris": 139315,
+   "terraStats": null
+  },
+  {
+   "t": 2.5,
+   "lon": -83.0701,
+   "lat": 40.21236,
+   "altM": 428,
+   "groundElev": 277,
+   "aglM": 151,
+   "camTileZ": 11,
+   "camElev": 277,
+   "downloading": 1,
+   "lodThreshold": 0.86,
+   "maxThreads": 10,
+   "tier": "high",
+   "draws": 173,
+   "tris": 141965,
+   "terraStats": null
+  },
+  {
+   "t": 3,
+   "lon": -83.0701,
+   "lat": 40.21236,
+   "altM": 428,
+   "groundElev": 265,
+   "aglM": 163,
+   "camTileZ": 12,
+   "camElev": 265,
+   "downloading": 6,
+   "lodThreshold": 0.86,
+   "maxThreads": 10,
+   "tier": "high",
+   "draws": 177,
+   "tris": 142913,
+   "terraStats": null
+  },
+  {
+   "t": 3.5,
+   "lon": -83.0701,
+   "lat": 40.21236,
+   "altM": 428,
+   "groundElev": 263,
+   "aglM": 164,
+   "camTileZ": 13,
+   "camElev": 263,
+   "downloading": 9,
+   "lodThreshold": 0.86,
+   "maxThreads": 10,
+   "tier": "high",
+   "draws": 189,
+   "tris": 142499,
+   "terraStats": null
+  },
+  {
+   "t": 4.1,
+   "lon": -83.0701,
+   "lat": 40.21236,
+   "altM": 428,
+   "groundElev": 263,
+   "aglM": 164,
+   "camTileZ": 13,
+   "camElev": 263,
+   "downloading": 6,
+   "lodThreshold": 0.86,
+   "maxThreads": 10,
+   "tier": "high",
+   "draws": 199,
+   "tris": 143569,
+   "terraStats": null
+  },
+  {
+   "t": 4.6,
+   "lon": -83.0701,
+   "lat": 40.21236,
+   "altM": 428,
+   "groundElev": 263,
+   "aglM": 164,
+   "camTileZ": 13,
+   "camElev": 263,
+   "downloading": 7,
+   "lodThreshold": 0.86,
+   "maxThreads": 10,
+   "tier": "high",
+   "draws": 208,
+   "tris": 146284,
+   "terraStats": null
+  },
+  {
+   "t": 5.1,
+   "lon": -83.0701,
+   "lat": 40.21236,
+   "altM": 428,
+   "groundElev": 263,
+   "aglM": 164,
+   "camTileZ": 13,
+   "camElev": 263,
+   "downloading": 0,
+   "lodThreshold": 0.86,
+   "maxThreads": 10,
+   "tier": "high",
+   "draws": 217,
+   "tris": 152515,
+   "terraStats": null
+  },
+  {
+   "t": 5.6,
+   "lon": -83.0701,
+   "lat": 40.21236,
+   "altM": 428,
+   "groundElev": 263,
+   "aglM": 164,
+   "camTileZ": 13,
+   "camElev": 263,
+   "downloading": 0,
+   "lodThreshold": 0.86,
+   "maxThreads": 10,
+   "tier": "high",
+   "draws": 226,
+   "tris": 240079,
+   "terraStats": null
+  },
+  {
+   "t": 6.1,
+   "lon": -83.0701,
+   "lat": 40.21236,
+   "altM": 428,
+   "groundElev": 263,
+   "aglM": 164,
+   "camTileZ": 13,
+   "camElev": 263,
+   "downloading": 0,
+   "lodThreshold": 0.86,
+   "maxThreads": 10,
+   "tier": "high",
+   "draws": 227,
+   "tris": 248847,
+   "terraStats": null
+  },
+  {
+   "t": 6.6,
+   "lon": -83.0701,
+   "lat": 40.21236,
+   "altM": 428,
+   "groundElev": 263,
+   "aglM": 164,
+   "camTileZ": 13,
+   "camElev": 263,
+   "downloading": 0,
+   "lodThreshold": 0.86,
+   "maxThreads": 10,
+   "tier": "high",
+   "draws": 227,
+   "tris": 248847,
+   "terraStats": null
+  },
+  {
+   "t": 7.1,
+   "lon": -83.0701,
+   "lat": 40.21236,
+   "altM": 428,
+   "groundElev": 263,
+   "aglM": 164,
+   "camTileZ": 13,
+   "camElev": 263,
+   "downloading": 0,
+   "lodThreshold": 0.86,
+   "maxThreads": 10,
+   "tier": "high",
+   "draws": 227,
+   "tris": 248847,
+   "terraStats": null
+  },
+  {
+   "t": 7.6,
+   "lon": -83.0701,
+   "lat": 40.21236,
+   "altM": 428,
+   "groundElev": 263,
+   "aglM": 164,
+   "camTileZ": 13,
+   "camElev": 263,
+   "downloading": 0,
+   "lodThreshold": 0.86,
+   "maxThreads": 10,
+   "tier": "high",
+   "draws": 227,
+   "tris": 248847,
+   "terraStats": null
+  },
+  {
+   "t": 8.1,
+   "lon": -83.0701,
+   "lat": 40.21236,
+   "altM": 428,
+   "groundElev": 263,
+   "aglM": 164,
+   "camTileZ": 13,
+   "camElev": 263,
+   "downloading": 0,
+   "lodThreshold": 0.86,
+   "maxThreads": 10,
+   "tier": "high",
+   "draws": 227,
+   "tris": 248847,
+   "terraStats": null
+  },
+  {
+   "t": 8.6,
+   "lon": -83.0701,
+   "lat": 40.21236,
+   "altM": 428,
+   "groundElev": 263,
+   "aglM": 164,
+   "camTileZ": 13,
+   "camElev": 263,
+   "downloading": 0,
+   "lodThreshold": 0.86,
+   "maxThreads": 10,
+   "tier": "high",
+   "draws": 227,
+   "tris": 248847,
+   "terraStats": null
+  },
+  {
+   "t": 9.1,
+   "lon": -83.0701,
+   "lat": 40.21236,
+   "altM": 428,
+   "groundElev": 263,
+   "aglM": 164,
+   "camTileZ": 13,
+   "camElev": 263,
+   "downloading": 0,
+   "lodThreshold": 0.86,
+   "maxThreads": 10,
+   "tier": "high",
+   "draws": 227,
+   "tris": 248847,
+   "terraStats": null
+  },
+  {
+   "t": 9.6,
+   "lon": -83.0701,
+   "lat": 40.21236,
+   "altM": 428,
+   "groundElev": 263,
+   "aglM": 164,
+   "camTileZ": 13,
+   "camElev": 263,
+   "downloading": 0,
+   "lodThreshold": 0.86,
+   "maxThreads": 10,
+   "tier": "high",
+   "draws": 227,
+   "tris": 248847,
+   "terraStats": null
+  }
+ ],
+ "lewis": {
+  "t": 9.6,
+  "lon": -83.0701,
+  "lat": 40.21236,
+  "altM": 428,
+  "groundElev": 263,
+  "aglM": 164,
+  "camTileZ": 13,
+  "camElev": 263,
+  "downloading": 0,
+  "lodThreshold": 0.86,
+  "maxThreads": 10,
+  "tier": "high",
+  "draws": 227,
+  "tris": 248847,
+  "terraStats": null
+ },
+ "bands": [
+  {
+   "altM": 400,
+   "aglM": 132,
+   "camTileZ": 14,
+   "lod": 0.86,
+   "draws": 230,
+   "tris": 249631
+  },
+  {
+   "altM": 900,
+   "aglM": 636,
+   "camTileZ": 13,
+   "lod": 0.86,
+   "draws": 218,
+   "tris": 162135
+  },
+  {
+   "altM": 3000,
+   "aglM": 2736,
+   "camTileZ": 13,
+   "lod": 0.86,
+   "draws": 191,
+   "tris": 102862
+  },
+  {
+   "altM": 9144,
+   "aglM": 8879,
+   "camTileZ": 12,
+   "lod": 0.86,
+   "draws": 162,
+   "tris": 73574
+  }
+ ],
+ "dublinTrace": [
+  {
+   "t": 1.2,
+   "z": 10,
+   "dl": 4
+  },
+  {
+   "t": 1.6,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 2,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 2.4,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 2.8,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 3.2,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 3.6,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 4,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 4.5,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 4.9,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 5.3,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 5.7,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 6.1,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 6.5,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 6.9,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 7.3,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 7.7,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 8.1,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 8.5,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 8.9,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 9.3,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 9.7,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 10.1,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 10.5,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 10.9,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 11.3,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 11.8,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 12.2,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 12.6,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 13,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 13.4,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 13.8,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 14.2,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 14.6,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 15,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 15.4,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 15.8,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 16.2,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 16.6,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 17,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 17.5,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 17.9,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 18.3,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 18.7,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 19.1,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 19.5,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 19.9,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 20.3,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 20.7,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 21.1,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 21.5,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 21.9,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 22.3,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 22.7,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 23.1,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 23.5,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 23.9,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 24.4,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 24.8,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 25.2,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 25.6,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 26,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 26.4,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 26.8,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 27.2,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 27.6,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 28,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 28.4,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 28.8,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 29.2,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 29.6,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 30,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 30.4,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 30.9,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 31.3,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 31.7,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 32.1,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 32.5,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 32.9,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 33.3,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 33.7,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 34.1,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 34.5,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 34.9,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 35.3,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 35.7,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 36.1,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 36.5,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 36.9,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 37.3,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 37.7,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 38.1,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 38.6,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 39,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 39.4,
+   "z": 10,
+   "dl": 0
+  },
+  {
+   "t": 39.8,
+   "z": 10,
+   "dl": 0
+  }
+ ],
+ "descentMs": null,
+ "warmDescentMs": 2514,
+ "cold": {
+  "img": 911,
+  "dem": 787,
+  "maxImgZ": 17,
+  "maxDemZ": 16,
+  "byZ": {
+   "img2": 8,
+   "img3": 21,
+   "img4": 44,
+   "img5": 53,
+   "dem5": 53,
+   "img6": 70,
+   "dem6": 70,
+   "img7": 55,
+   "dem7": 55,
+   "img8": 64,
+   "dem8": 64,
+   "img9": 68,
+   "dem9": 68,
+   "img10": 65,
+   "dem10": 65,
+   "img11": 65,
+   "dem11": 65,
+   "img12": 59,
+   "dem12": 59,
+   "img13": 55,
+   "dem13": 55,
+   "img14": 68,
+   "dem14": 68,
+   "img15": 70,
+   "dem15": 162,
+   "img16": 90,
+   "img17": 56,
+   "dem16": 3
+  }
+ },
+ "warm": {
+  "img": 725,
+  "dem": 626,
+  "maxImgZ": 17,
+  "maxDemZ": 15,
+  "byZ": {
+   "img2": 11,
+   "img3": 29,
+   "img4": 33,
+   "img5": 45,
+   "dem5": 56,
+   "img6": 62,
+   "dem6": 71,
+   "img7": 38,
+   "dem7": 38,
+   "img8": 37,
+   "dem8": 38,
+   "img9": 32,
+   "dem9": 37,
+   "img10": 33,
+   "dem10": 34,
+   "img11": 41,
+   "dem11": 41,
+   "img12": 40,
+   "dem12": 41,
+   "img13": 50,
+   "dem13": 50,
+   "img14": 60,
+   "dem14": 60,
+   "img15": 67,
+   "dem15": 160,
+   "img16": 75,
+   "img17": 72
+  }
+ },
+ "ratio": 0.5565371024734982,
+ "demProbe": [
+  {
+   "name": "P-LEWIS",
+   "z": 15,
+   "status": 200,
+   "bytes": 35003
+  },
+  {
+   "name": "P-LEWIS",
+   "z": 16,
+   "status": 200,
+   "bytes": 32051
+  },
+  {
+   "name": "P-DUBLIN",
+   "z": 15,
+   "status": 200,
+   "bytes": 36100
+  },
+  {
+   "name": "P-DUBLIN",
+   "z": 16,
+   "status": 200,
+   "bytes": 32131
+  },
+  {
+   "name": "OWENS",
+   "z": 15,
+   "status": 200,
+   "bytes": 28259
+  },
+  {
+   "name": "OWENS",
+   "z": 16,
+   "status": 200,
+   "bytes": 20246
+  }
+ ],
+ "caches1": {
+  "fly-tiles-v1": 221
+ },
+ "tex": {
+  "mb": 59,
+  "count": 176,
+  "maxAniso": 8
+ },
+ "owens": {
+  "lon": -118.06,
+  "lat": 36.60582,
+  "altM": 1530,
+  "groundElev": 1133,
+  "aglM": 397,
+  "camTileZ": 15,
+  "camElev": 1133,
+  "downloading": 0,
+  "lodThreshold": 0.86,
+  "maxThreads": 10,
+  "tier": "high",
+  "draws": 200,
+  "tris": 186180,
+  "terraStats": null
+ },
+ "red": [
+  [
+   "T1 low-AGL ground is a magnified parent tile",
+   "verify-terra (2)",
+   "camTileZ 13 @ 164 m AGL",
+   ">= 17"
+  ],
+  [
+   "T2 LODThreshold is altitude-blind",
+   "verify-terra (4)",
+   "flat 0.86",
+   "altitude-keyed curve"
+  ],
+  [
+   "T3 imagery capped at z17",
+   "verify-terra (5)",
+   "max img z 17",
+   ">= 18"
+  ],
+  [
+   "T4 DEM stops at z15 while imagery reaches z17",
+   "verify-terra (11)",
+   "dem 15 / img 17",
+   "dem >= 16"
+  ],
+  [
+   "T5 cold warp descent is serial",
+   "verify-terra (7)",
+   ">40000 ms to z13",
+   "<= 12000 ms"
+  ],
+  [
+   "T6 no persistent raster cache",
+   "verify-terra (8)",
+   "fly-raster-v1 entries 0",
+   "> 0"
+  ],
+  [
+   "T7 every warp is a cold descent",
+   "verify-terra (9)",
+   "second/first request ratio 0.56",
+   "<= 0.4"
+  ]
+ ],
+ "fails": [
+  "(2) P-LEWIS SHARPNESS — camTileZ >= 17 within 10s of settle",
+  "(5) z18 imagery is requested at P-LEWIS on the high tier",
+  "(11) DEM refines as deep as imagery does",
+  "(6) P-DUBLIN reaches a usable zoom (camTileZ >= 13) inside the 40 s window",
+  "(7) P-DUBLIN cold warp descent to z13 <= 12000 ms",
+  "(8) the persistent raster cache 'fly-raster-v1' exists after a satellite session",
+  "(9) SECOND VISIT IS CHEAP — raster requests <= 40% of the cold session",
+  "(14) OWENS draws inside the R21 band 179..195 — vendor flag-off identity",
+  "(17) zero page/console errors"
+ ],
+ "softs": [
+  "(16) runtime.terraStats"
+ ]
+}

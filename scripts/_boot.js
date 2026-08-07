@@ -144,4 +144,46 @@ async function bootFly(
   return { ms };
 }
 
-module.exports = { bootFly, BOOT_URL };
+/**
+ * Round 22 (SANCTIONED harness edit — E CERT, plan §2): the shared PER-GATE
+ * UN-PIN accessor. R21 had ONE fleet pin (`__flyGovPin`) and three gates that
+ * un-pinned it, so each gate carried its own copy of the accessor. R22 adds
+ * FOUR pins (`__flyTerraPin` / `__flySettlePin` / `__flyClutterPin` /
+ * `__flyDepthPin`) and FIVE gates that un-pin them in different combinations —
+ * twenty copies of the same eight lines, each free to drift. This is that
+ * accessor, once.
+ *
+ * MECHANISM (the verify-tier-step / soak-fly idiom, verbatim): an accessor
+ * installed BEFORE the app mounts swallows the fleet write bootFly performs.
+ * The pin's getter then reads `window.__r22Unpinned[name]`, which is
+ * `undefined` until the gate sets it — and `undefined` is precisely what "not
+ * pinned" means to every R22 consumer (the TERRA_SHARP contract's own
+ * "consumers treat undefined as legacy" rule, applied to the pins). The
+ * swallowed write is preserved on `window.__r22PinAttempt[name]` so a gate can
+ * PROVE it un-pinned rather than assume it.
+ *
+ * ADDITIVE ONLY: nothing above this line changed, so every existing harness
+ * still boots fully pinned. A gate opts in with
+ *   await page.addInitScript(unpinPins, ['__flyTerraPin', '__flySettlePin']);
+ * and can later drive the flag from the page with
+ *   (window.__r22Unpinned ??= {}).__flyClutterPin = 0;
+ *
+ * @param {string[]} names — pin globals to un-pin for this page.
+ */
+function unpinPins(names) {
+  for (const n of names || []) {
+    try {
+      Object.defineProperty(window, n, {
+        configurable: true,
+        get: () => window.__r22Unpinned?.[n],
+        set: (v) => {
+          (window.__r22PinAttempt ??= {})[n] = v;
+        },
+      });
+    } catch {
+      /* reported by the gate that installed it, never silently assumed */
+    }
+  }
+}
+
+module.exports = { bootFly, BOOT_URL, unpinPins };

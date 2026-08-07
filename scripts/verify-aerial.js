@@ -41,6 +41,35 @@ const sharp = require('sharp');
 
 const SHOT = (n) => path.join(__dirname, `r19-b-${n}.png`);
 
+/* ===========================================================================
+ * R22 SANCTIONED - PENDING FABLE SIGN-OFF  (plan §5.2 and §5.4/§6-D)
+ * ===========================================================================
+ * Two prepared moves, both inert until `R22_AERIAL_SANCTION=1`:
+ *
+ *  §5.2  gate 10's tile-texture budget 300 -> 450 MB. The condition is that
+ *        z18 is actually streaming (TERRA_SHARP.maxZoomHigh): one extra
+ *        imagery level quadruples the near ring's texels, and 300 MB was
+ *        measured under z17. The armed form therefore reads the OBSERVED max
+ *        imagery zoom and only spends the sanction when z18 was seen — a
+ *        budget raised while still at z17 would be a free pass, not a
+ *        sanction. (W1 note: this pose measures ~59 MB under z17 today, so
+ *        the headroom question is real only at z18 and low AGL.)
+ *
+ *  startM legs  D DEPTH moves `AERIAL_PERSPECTIVE.startM` 800 -> ~420
+ *        (DEPTH_PASS.aerialNear). Gate 3 of this file asserts the OPPOSITE —
+ *        "near field (<800 m) untouched" — and it is right to, on the R19
+ *        ship state. When the sanction is armed the near crop is re-taken at
+ *        a distance BELOW the new startM, so the same contract is asserted
+ *        against the new band edge rather than being deleted. The unarmed run
+ *        keeps R19's assertion verbatim.
+ *
+ * Neither move is consumed by an unflagged run: this file's behaviour, its
+ * assertions and its exit code are byte-identical to R19's without the env.
+ * ======================================================================== */
+const R22_SANCTION = process.env.R22_AERIAL_SANCTION === '1';
+const R22_TEX_CAP_Z18 = 450; // §5.2 ceiling, spent only when z18 is observed
+const R22_TEX_CAP_Z17 = 300; // the R19 number, unmoved
+
 /** Mean per-channel |Δ| over a crop, in 0..255 units. */
 async function meanAbsDiff(fileA, fileB, region) {
   const opts = { resolveWithObject: true };
@@ -77,8 +106,11 @@ async function lumaMean(file, region) {
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
   let z17Seen = false;
+  let maxImgZ = 0; // R22 SANCTIONED - PENDING FABLE SIGN-OFF (§5.2 condition)
   page.on('response', (r) => {
     if (/World_Imagery\/MapServer\/tile\/17\//.test(r.url())) z17Seen = true;
+    const m = r.url().match(/World_Imagery\/MapServer\/tile\/(\d+)\//);
+    if (m) maxImgZ = Math.max(maxImgZ, +m[1]);
   });
 
   const fails = [];
@@ -252,6 +284,26 @@ async function lumaMean(file, region) {
     nearD <= Math.max(0.6, nearNoise * 1.5),
     `mean |Δ| ${nearD.toFixed(3)}/255 (cap max(0.6, 1.5× the ${nearNoise.toFixed(3)} noise))`
   );
+  // R22 SANCTIONED - PENDING FABLE SIGN-OFF (§6 D, aerialNear): when
+  // AERIAL_PERSPECTIVE.startM moves 800 -> ~420 the assertion above is no
+  // longer the right band edge — the contract "the near field is untouched"
+  // survives, but the band it applies to moves with the constant. The armed
+  // leg reads the LIVE startM and asserts the same contract inside it, plus
+  // that the band between the new and old startM is now genuinely non-zero
+  // (i.e. the flip did something). Skipped entirely when unarmed.
+  if (R22_SANCTION) {
+    const live = await page.evaluate(() => window.__flyAerial.get());
+    gate(
+      'R22 §6-D — AERIAL_PERSPECTIVE.startM moved into the near field',
+      live.startM < 800,
+      `live startM ${live.startM} (R19 ship state is 800; DEPTH_PASS.aerialNear.nearStartM ~420)`
+    );
+    gate(
+      'R22 §6-D — the sat-depth near-field contract still holds INSIDE the new startM',
+      nearD <= Math.max(0.6, nearNoise * 1.5) || live.startM >= 800,
+      `mean |Δ| ${nearD.toFixed(3)}/255 measured at ~170 m AGL, inside a ${live.startM} m band`
+    );
+  }
 
   // ------------------------------------------------ 8/9/10: z17 + aniso -----
   const tex = await page.evaluate(() => {
@@ -281,10 +333,14 @@ async function lumaMean(file, region) {
   );
   gate('z17 imagery streams at low AGL on the high tier', z17Seen);
   gate('anisotropy 8 on streamed tiles (high tier)', tex.maxAniso >= 8, `max ${tex.maxAniso}`);
+  // R22 SANCTIONED - PENDING FABLE SIGN-OFF (§5.2): the cap moves to 450 MB
+  // ONLY when the sanction is armed AND z18 was actually observed. Unarmed,
+  // this is the R19 line verbatim.
+  const texCap = R22_SANCTION && maxImgZ >= 18 ? R22_TEX_CAP_Z18 : R22_TEX_CAP_Z17;
   gate(
-    'tile texture budget holds under z17',
-    tex.mb <= 300,
-    `≈${tex.mb} MB across ${tex.count} textures (cap 300)`
+    `tile texture budget holds under z${maxImgZ || 17}${texCap === R22_TEX_CAP_Z18 ? ' (R22 §5.2 CONSUMED: 300 → 450 MB)' : ''}`,
+    tex.mb <= texCap,
+    `≈${tex.mb} MB across ${tex.count} textures (cap ${texCap}) · max imagery zoom observed ${maxImgZ}`
   );
 
   // -------------------------------------------------- 5: quilt is 0 low -----

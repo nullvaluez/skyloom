@@ -960,6 +960,79 @@ const lsq = (xs, ys) => {
   const bootRemounts = await boot.evaluate(() => window.__flyStats?.sceneRemounts ?? -1);
   gate('(14) boot window: scene subtree never bounced', bootRemounts === 0, `sceneRemounts=${bootRemounts}`);
   await boot.close();
+
+  /* =================================================================== R22 ==
+   * R22 SANCTIONED - PENDING FABLE SIGN-OFF (plan §6 E: "verify-stability
+   * gains a mountainous boot leg (Owens ridge) keeping original assertions").
+   *
+   * WHY: phase 4 boots at Powell, where the DEM is nearly flat, so the raw
+   * `groundElev` the whole app rides barely moves during the boot window. On a
+   * RIDGE it sweeps by kilometres as the DEM refines under a stationary
+   * aeroplane — and every AGL-keyed fade band in the app reads that raw value
+   * (R22 S-ELEV: verify-settle measured 24 023 m/s across a Sierra warp). This
+   * leg re-runs the EXACT phase-4 assertions, unchanged, over terrain that can
+   * express the defect.
+   *
+   * INERT BY DEFAULT. Nothing below executes without `STAB_MOUNTAIN=1`, so an
+   * unflagged run of this file is byte-identical in behaviour to R21's: same
+   * gates, same numbers, same exit code. This file is the round's most
+   * defended inherited gate and it must stay green through every W2 merge; a
+   * new leg that runs by default would put that at risk for a question that is
+   * B SETTLE's to answer. Fable arms it at W3.
+   * ======================================================================== */
+  if (process.env.STAB_MOUNTAIN === '1') {
+    const ridge = await newFlyPage(() => {
+      try {
+        // Owens Valley's western wall: ~2 500 m of DEM relief inside one tile.
+        localStorage.setItem('fly-last-pos', JSON.stringify({ lat: 36.578, lon: -118.292 }));
+      } catch {
+        /* storage blocked — the leg reports the spawn it actually got */
+      }
+    });
+    await bootFly(ridge, { style: 'satellite', settleMs: 0, ...BOOT_OPTS });
+    await ridge.evaluate(() => {
+      const f = window.__fly?.flight;
+      if (!f) return;
+      const p = { x: f.pos.x, y: f.pos.y, z: f.pos.z };
+      const h = f.heading;
+      window.__r21Pin = setInterval(() => {
+        f.pos.x = p.x;
+        f.pos.y = p.y;
+        f.pos.z = p.z;
+        f.heading = h;
+        f.bank = 0;
+        f.speed = 0;
+      }, 8);
+    });
+    const ridgeShots = [];
+    for (let i = 0; i < BOOTWIN_SHOTS; i++) {
+      ridgeShots.push(await shot64(ridge));
+      await ridge.waitForTimeout(stepMs);
+    }
+    const ridgeSteps = [];
+    for (let i = 1; i < ridgeShots.length; i++)
+      ridgeSteps.push(await ridge.evaluate(BAND_DELTA, [ridgeShots[i - 1], ridgeShots[i], 0.55, 0.98]));
+    await fs.promises.writeFile(
+      path.join(__dirname, 'r22-e-stability-05-ridge-bootwin.png'),
+      Buffer.from(ridgeShots[ridgeShots.length - 1], 'base64')
+    );
+    const ridgeSettled = ridgeSteps.slice(1);
+    const ridgeWorst = Math.max(...ridgeSettled);
+    const ridgeElev = await ridge.evaluate(() => ({
+      groundElev: Math.round(window.__fly?.flight?.groundElev ?? 0),
+      aglM: Math.round((window.__fly?.flight?.pos?.y ?? 0) - (window.__fly?.flight?.groundElev ?? 0)),
+      remounts: window.__flyStats?.sceneRemounts ?? -1,
+    }));
+    console.log(`RIDGE BOOTWIN (R22 leg): steps ${JSON.stringify(ridgeSteps)} · ${JSON.stringify(ridgeElev)}`);
+    gate(
+      `(13m) R22 — mountainous boot window settles: consecutive ground-crop step <= ${MAX_BOOTWIN_STEP} after the reveal`,
+      ridgeWorst <= MAX_BOOTWIN_STEP,
+      `worst=${ridgeWorst} · reveal step (informational) = ${ridgeSteps[0]} · series=${JSON.stringify(ridgeSteps)} · ground ${ridgeElev.groundElev} m, AGL ${ridgeElev.aglM} m`
+    );
+    gate('(14m) R22 — mountainous boot: scene subtree never bounced', ridgeElev.remounts === 0, `sceneRemounts=${ridgeElev.remounts}`);
+    await ridge.close();
+  }
+
   await page.close();
 
   gate('(15) zero page/console errors across all four phases', errs.length === 0, errs.slice(0, 3).join(' | '));
