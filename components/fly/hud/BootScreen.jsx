@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BOOT, MOBILE_UI } from '@/lib/fly/fly-constants';
+import { BOOT, MOBILE_UI, PREWARM } from '@/lib/fly/fly-constants';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { useFlyStore } from '@/stores/fly-store';
 
@@ -134,24 +134,35 @@ export function BootScreen({ runtime }) {
       // --- gates (b) + (c) --------------------------------------------
       const modelsP = rt.modelsReady ? 1 : 0;
       const framesP = clamp01(frames / BOOT.minFrames);
+      // Round 21 (A): gate (c) is no longer "2 frames drew, the shaders must
+      // be fine" — it now really waits for the pre-warm (lib/fly/prewarm.js),
+      // which is what makes the caption honest. HARD-CAPPED at PREWARM.maxMs
+      // from boot start: past that the reveal proceeds and the warm finishes
+      // in the background, so the boot envelope cannot grow by more than the
+      // cap and usually grows by nothing at all (the warm overlaps the tile
+      // stream, which is network-bound). Flag off ⇒ warmDone is constant true
+      // and this line is a no-op.
+      const warmDone =
+        !PREWARM.enabled || rt.prewarm?.done === true || now - t0 >= PREWARM.maxMs;
+      const shadersP = framesP === 1 && warmDone ? 1 : Math.min(framesP, 0.99);
 
       const timedOut = now - t0 >= BOOT.maxBootMs;
       const allDone =
-        timedOut || (worldDone && modelsP === 1 && framesP === 1 && !!store.spawn);
+        timedOut || (worldDone && modelsP === 1 && shadersP === 1 && !!store.spawn);
 
       // Weighted, monotonic, and pinned ≤99 until the reveal moment so the
       // harness can rely on pct === 100 ⇔ world revealed.
       const raw =
         BOOT.weights.world * (worldDone ? 1 : Math.min(worldP, 0.98)) +
         BOOT.weights.models * modelsP +
-        BOOT.weights.frames * framesP;
+        BOOT.weights.frames * shadersP;
       gate.pct = Math.max(gate.pct, Math.min(99, Math.round(raw * 100)));
 
       let phase;
       if (!store.spawn) phase = 'spawn';
       else if (!worldDone) phase = 'world';
       else if (!modelsP) phase = 'fleet';
-      else if (framesP < 1) phase = 'shaders';
+      else if (shadersP < 1) phase = 'shaders';
       else phase = 'ready';
 
       if (allDone) {
