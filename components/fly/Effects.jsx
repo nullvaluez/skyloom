@@ -1,9 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import {
-  EffectComposer,
   Bloom,
   BrightnessContrast,
   DepthOfField,
@@ -13,7 +12,19 @@ import {
   Vignette,
   SMAA,
 } from '@react-three/postprocessing';
-import { ToneMappingMode } from 'postprocessing';
+import {
+  BlendFunction,
+  BloomEffect,
+  BrightnessContrastEffect,
+  DepthOfFieldEffect,
+  HueSaturationEffect,
+  MaskFunction,
+  NoiseEffect,
+  SMAAEffect,
+  ToneMappingEffect,
+  ToneMappingMode,
+  VignetteEffect,
+} from 'postprocessing';
 import {
   AERIAL_PERSPECTIVE,
   FLIGHT,
@@ -26,6 +37,7 @@ import { useFlyStore } from '@/stores/fly-store';
 import { WhiteBalanceEffect } from './WhiteBalance';
 import { AerialPerspectiveEffect } from './AerialPerspective';
 import { SpeedLinesEffect, speedFeelStrength } from './SpeedLines';
+import { FlyEffectComposer } from './FlyEffectComposer';
 
 // Bloom buffer scale per quality tier; at 'low' bloom is dropped entirely
 // (the composer stays for SMAA — cheaper than MSAA on integrated GPUs).
@@ -50,6 +62,193 @@ const TONE_MODES = {
 };
 
 const lerp = (a, b, t) => a + (b - a) * t;
+
+/**
+ * ROUND 21 (A GOVERNOR, S2/S4) — the post chain as DATA.
+ *
+ * The R20 composer rebuilt every pass on every re-render of this component
+ * (@react-three/postprocessing lists `children` — a fresh array each render —
+ * in its pass-assembly effect's dependency array), and postprocessing's
+ * removePass never disposes, so each rebuild leaked an EffectPass, its
+ * EffectMaterial and the compiled program; with AerialPerspectiveEffect
+ * declaring EffectAttribute.DEPTH it also churned the composer's depth target.
+ * The React half of the fix is here: the child list is derived ONLY from the
+ * discrete inputs below and useMemo'd, so a DPR state change or an unrelated
+ * store tick leaves element identity untouched.
+ *
+ * It is also the SINGLE SOURCE OF TRUTH for the pre-warm. Each descriptor
+ * carries both an `el()` (the production React element, using the caller's
+ * long-lived effect singletons) and a `raw()` (a fresh postprocessing effect
+ * built from the SAME option values). @react-three/postprocessing's wrappers
+ * are thin — wrapEffect does `new Ctor({...defaults, ...props})` — so the two
+ * paths generate the same merged fragment shader, which is what lets
+ * lib/fly/prewarm.js compile the ALTERNATE tier's chain at boot and have the
+ * real tier flip find that program already in three's cache.
+ *
+ * Ordering is load-bearing and unchanged from R19/R20: speed lines first (they
+ * sample the un-graded scene buffer), aerial perspective next (the tile haze
+ * band and the SkyDome rim are baked in the scene render, so a post haze must
+ * precede the grade or it steps at the horizon), then the per-style grade,
+ * then vignette + SMAA, then the filmic tone map LAST.
+ */
+export function buildPassList(style, tier, ctx = {}) {
+  const toy = style === 'toy';
+  const sat = style === 'satellite';
+  const bloomScale = BLOOM_SCALE[tier] ?? 0.5;
+  const bloom = BLOOM_BY_STYLE[style] ?? BLOOM_BY_STYLE.satellite;
+  const toneName = ctx.toneName ?? SKY.toneMapping.byStyle[style] ?? 'ACES';
+  const toneMode = TONE_MODES[toneName];
+  const aerialOn = sat && AERIAL_PERSPECTIVE.enabled && tier === 'high';
+  const speedOn = SPEED_FEEL.enabled && tier === 'high' && ctx.speedMount !== false;
+  const list = [];
+
+  if (bloomScale > 0) {
+    list.push({
+      id: 'bloom',
+      el: () => (
+        <Bloom
+          key="bloom"
+          ref={ctx.setBloom}
+          mipmapBlur
+          intensity={bloom.intensity}
+          luminanceThreshold={bloom.threshold}
+          luminanceSmoothing={0.2}
+          resolutionScale={bloomScale}
+        />
+      ),
+      // wrapEffect(BloomEffect, { blendFunction: BlendFunction.ADD })
+      raw: () =>
+        new BloomEffect({
+          blendFunction: BlendFunction.ADD,
+          mipmapBlur: true,
+          intensity: bloom.intensity,
+          luminanceThreshold: bloom.threshold,
+          luminanceSmoothing: 0.2,
+          resolutionScale: bloomScale,
+        }),
+    });
+  }
+  if (speedOn) {
+    list.push({
+      id: 'speed',
+      el: () => <primitive key="speed" object={ctx.speedLines} dispose={null} />,
+      raw: () => new SpeedLinesEffect(),
+    });
+  }
+  if (aerialOn) {
+    list.push({
+      id: 'aerial',
+      el: () => <primitive key="aerial" object={ctx.aerial} dispose={null} />,
+      raw: () => new AerialPerspectiveEffect(),
+    });
+  }
+  if (sat) {
+    list.push({
+      id: 'sat-hue',
+      el: () => <HueSaturation key="sat-hue" saturation={SKY.grade.saturation} />,
+      raw: () => new HueSaturationEffect({ saturation: SKY.grade.saturation }),
+    });
+    list.push({
+      id: 'sat-bc',
+      el: () => (
+        <BrightnessContrast
+          key="sat-bc"
+          brightness={SKY.grade.brightness}
+          contrast={SKY.grade.contrast}
+        />
+      ),
+      raw: () =>
+        new BrightnessContrastEffect({
+          brightness: SKY.grade.brightness,
+          contrast: SKY.grade.contrast,
+        }),
+    });
+    list.push({
+      id: 'sat-wb',
+      el: () => <primitive key="sat-wb" object={ctx.whiteBalance} dispose={null} />,
+      raw: () => new WhiteBalanceEffect({ balance: SKY.grade.neutral }),
+    });
+  }
+  if (toy) {
+    list.push({
+      id: 'toy-hue',
+      el: () => <HueSaturation key="toy-hue" saturation={TOY.saturation} />,
+      raw: () => new HueSaturationEffect({ saturation: TOY.saturation }),
+    });
+    list.push({
+      id: 'toy-bc',
+      el: () => <BrightnessContrast key="toy-bc" contrast={TOY.contrast} />,
+      raw: () => new BrightnessContrastEffect({ contrast: TOY.contrast }),
+    });
+    if (tier === 'high') {
+      list.push({
+        id: 'toy-dof',
+        el: () => (
+          <DepthOfField
+            key="toy-dof"
+            worldFocusDistance={TOY.dofFocusM}
+            worldFocusRange={TOY.dofRangeM}
+            bokehScale={TOY.dofBokeh}
+          />
+        ),
+        // drei's DepthOfField is NOT wrapEffect: it reads the composer camera
+        // from context and restores the 6.21.3 mask behavior. Both are
+        // replicated here so the warmed program matches.
+        raw: (warmCtx) => {
+          const e = new DepthOfFieldEffect(warmCtx?.camera, {
+            blendFunction: undefined,
+            worldFocusDistance: TOY.dofFocusM,
+            worldFocusRange: TOY.dofRangeM,
+            focusDistance: undefined,
+            focusRange: undefined,
+            focalLength: undefined,
+            bokehScale: TOY.dofBokeh,
+            resolutionScale: undefined,
+            resolutionX: undefined,
+            resolutionY: undefined,
+            width: undefined,
+            height: undefined,
+          });
+          if (e.maskPass) e.maskPass.maskFunction = MaskFunction.MULTIPLY_RGB_SET_ALPHA;
+          return e;
+        },
+      });
+    }
+    list.push({
+      id: 'toy-noise',
+      el: () => <Noise key="toy-noise" premultiply opacity={TOY.grainOpacity} />,
+      // wrapEffect(NoiseEffect, { blendFunction: BlendFunction.COLOR_DODGE });
+      // `opacity` is consumed by the wrapper as blendMode-opacity-value, not a
+      // constructor arg — a uniform, so it never touches the shader text.
+      raw: () => {
+        const e = new NoiseEffect({
+          blendFunction: BlendFunction.COLOR_DODGE,
+          premultiply: true,
+        });
+        e.blendMode.opacity.value = TOY.grainOpacity;
+        return e;
+      },
+    });
+  }
+  list.push({
+    id: 'vignette',
+    el: () => <Vignette key="vignette" eskil={false} offset={0.25} darkness={0.55} />,
+    raw: () => new VignetteEffect({ eskil: false, offset: 0.25, darkness: 0.55 }),
+  });
+  list.push({
+    id: 'smaa',
+    el: () => <SMAA key="smaa" />,
+    raw: () => new SMAAEffect({}),
+  });
+  if (toneMode != null) {
+    list.push({
+      id: 'tone',
+      el: () => <ToneMapping key="tone" mode={toneMode} />,
+      raw: () => new ToneMappingEffect({ mode: toneMode }),
+    });
+  }
+  return list;
+}
 
 /**
  * Round 16: satellite bloom BREATHES with the clock. The daylight grade
@@ -88,13 +287,10 @@ function applyBloom(effect, frac) {
  * buffers; SMAA covers AA far cheaper on integrated GPUs. Reconfigures only
  * on discrete store transitions.
  */
-export function Effects({ runtime }) {
+export const Effects = memo(function Effects({ runtime }) {
   const qualityTier = useFlyStore((s) => s.qualityTier);
   const mapStyle = useFlyStore((s) => s.mapStyle);
-  const bloomScale = BLOOM_SCALE[qualityTier] ?? 0.5;
-  const toy = mapStyle === 'toy';
   const sat = mapStyle === 'satellite';
-  const bloom = BLOOM_BY_STYLE[mapStyle] ?? BLOOM_BY_STYLE.satellite;
 
   // Tone-map mode: constant per style, with a dev-only live override so the
   // A/B capture (scripts/r13-tonemap-capture.js) can flip AgX/ACES/None
@@ -108,7 +304,6 @@ export function Effects({ runtime }) {
     };
   }, []);
   const toneName = toneOverride ?? SKY.toneMapping.byStyle[mapStyle] ?? 'ACES';
-  const toneMode = TONE_MODES[toneName];
   if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
     (window.__flyStats ??= {}).toneMode = toneName;
   }
@@ -139,7 +334,6 @@ export function Effects({ runtime }) {
   // depth texture, which is a real (if small) cost, so medium/low must not pay
   // it. Its uniforms are fed by FlyScene's -50 block through module setters, so
   // the instance itself is constructed once and never reconfigured.
-  const aerialOn = sat && AERIAL_PERSPECTIVE.enabled && qualityTier === 'high';
   const aerial = useMemo(() => new AerialPerspectiveEffect(), []);
 
   // ---- Round 19 (E SLIPSTREAM): speed lines -----------------------------
@@ -243,58 +437,26 @@ export function Effects({ runtime }) {
     return () => clearInterval(id);
   }, [sat, runtime, whiteBalance]);
 
-  return (
-    <EffectComposer multisampling={0}>
-      {bloomScale > 0 && (
-        <Bloom
-          ref={setBloom}
-          mipmapBlur
-          intensity={bloom.intensity}
-          luminanceThreshold={bloom.threshold}
-          luminanceSmoothing={0.2}
-          resolutionScale={bloomScale}
-        />
-      )}
-      {/* Round 19 (E): speed lines lead the chain. The smear SAMPLES
-          inputBuffer, which in a merged pass is the scene buffer — the same
-          texels `inputColor` was read from only while nothing upstream has
-          modified the colour yet. First position is therefore what keeps the
-          smeared taps and the pixel they land on in the same grade. (At cruise
-          the whole thing early-outs, so ordering is a boost-only concern.) */}
-      {speedOn && <primitive object={speedLines} dispose={null} />}
-      {/* Round 19 (B): aerial perspective goes FIRST, ahead of the grade. The
-          tile haze band and the SkyDome rim are baked in the SCENE render and
-          therefore pass through the whole grade; a post haze applied AFTER the
-          grade would land fully-hazed pixels on the raw rim colour while the
-          sky they melt into carries the graded one — a step at exactly the
-          horizon. Merges into the same EffectPass as the three below = 0 draws. */}
-      {aerialOn && <primitive object={aerial} dispose={null} />}
-      {/* Satellite grade (round 13 P0): saturation + contrast + a sun-driven
-          warm/cool white balance. All three merge into one EffectPass. */}
-      {sat && <HueSaturation saturation={SKY.grade.saturation} />}
-      {sat && (
-        <BrightnessContrast
-          brightness={SKY.grade.brightness}
-          contrast={SKY.grade.contrast}
-        />
-      )}
-      {sat && <primitive object={whiteBalance} dispose={null} />}
-      {/* Diorama camera (toy): saturation/contrast + tilt-shift DOF + grain */}
-      {toy && <HueSaturation saturation={TOY.saturation} />}
-      {toy && <BrightnessContrast contrast={TOY.contrast} />}
-      {toy && qualityTier === 'high' && (
-        <DepthOfField
-          worldFocusDistance={TOY.dofFocusM}
-          worldFocusRange={TOY.dofRangeM}
-          bokehScale={TOY.dofBokeh}
-        />
-      )}
-      {toy && <Noise premultiply opacity={TOY.grainOpacity} />}
-      <Vignette eskil={false} offset={0.25} darkness={0.55} />
-      <SMAA />
-      {/* Round 13 P0: filmic tone map — the FINAL child, so it compresses the
-          fully-graded HDR image (bloom happens upstream in linear light). */}
-      {toneMode != null && <ToneMapping mode={toneMode} />}
-    </EffectComposer>
+  // ROUND 21 (S2): the child list, keyed on the DISCRETE inputs only. Every
+  // value the chain reads is either one of these five or a module constant, so
+  // a re-render that changes none of them (a DPR state step, a store selector
+  // tick, a parent re-render) reuses this exact array — and FlyEffectComposer's
+  // pass-list diff then does nothing at all. `runtime` is deliberately NOT a
+  // dependency: it is a stable mutable handle, never a render input.
+  const children = useMemo(
+    () =>
+      buildPassList(mapStyle, qualityTier, {
+        toneName,
+        speedMount: speedMountPin,
+        setBloom,
+        speedLines,
+        aerial,
+        whiteBalance,
+      }).map((p) => p.el()),
+    [mapStyle, qualityTier, toneName, speedMountPin, setBloom, speedLines, aerial, whiteBalance]
   );
-}
+
+  return (
+    <FlyEffectComposer multisampling={0}>{children}</FlyEffectComposer>
+  );
+})
