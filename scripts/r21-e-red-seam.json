@@ -1,5 +1,5 @@
 {
- "when": "2026-08-07T00:39:20.800Z",
+ "when": "2026-08-07T01:04:47.126Z",
  "lock": 40,
  "ramp": {
   "lockLo": 24,
@@ -445,9 +445,9 @@
    "dx": -1,
    "dy": -1,
    "parsed": 54,
-   "kept": 54,
+   "kept": 41,
    "cand": 54,
-   "hk": 54,
+   "hk": 41,
    "owens": false
   },
   {
@@ -493,9 +493,9 @@
    "dx": -2,
    "dy": 0,
    "parsed": 34,
-   "kept": 0,
+   "kept": 9,
    "cand": 34,
-   "hk": 0,
+   "hk": 9,
    "owens": false
   },
   {
@@ -541,9 +541,9 @@
    "dx": 2,
    "dy": 0,
    "parsed": 29,
-   "kept": 0,
+   "kept": 4,
    "cand": 29,
-   "hk": 0,
+   "hk": 4,
    "owens": false
   },
   {
@@ -565,9 +565,9 @@
    "dx": -1,
    "dy": 1,
    "parsed": 32,
-   "kept": 0,
+   "kept": 6,
    "cand": 32,
-   "hk": 0,
+   "hk": 6,
    "owens": false
   },
   {
@@ -601,9 +601,9 @@
    "dx": 2,
    "dy": 1,
    "parsed": 48,
-   "kept": 48,
+   "kept": 29,
    "cand": 48,
-   "hk": 48,
+   "hk": 29,
    "owens": false
   },
   {
@@ -649,9 +649,9 @@
    "dx": 1,
    "dy": 2,
    "parsed": 39,
-   "kept": 0,
+   "kept": 15,
    "cand": 39,
-   "hk": 0,
+   "hk": 15,
    "owens": false
   },
   {
@@ -661,9 +661,9 @@
    "dx": 2,
    "dy": 2,
    "parsed": 54,
-   "kept": 54,
+   "kept": 41,
    "cand": 54,
-   "hk": 54,
+   "hk": 41,
    "owens": false
   },
   {
@@ -709,9 +709,9 @@
    "dx": 1,
    "dy": -2,
    "parsed": 32,
-   "kept": 0,
+   "kept": 6,
    "cand": 32,
-   "hk": 0,
+   "hk": 6,
    "owens": false
   },
   {
@@ -745,9 +745,9 @@
    "dx": -1,
    "dy": -1,
    "parsed": 51,
-   "kept": 51,
+   "kept": 34,
    "cand": 51,
-   "hk": 51,
+   "hk": 34,
    "owens": false
   },
   {
@@ -805,9 +805,9 @@
    "dx": -1,
    "dy": 0,
    "parsed": 59,
-   "kept": 59,
+   "kept": 52,
    "cand": 59,
-   "hk": 59,
+   "hk": 52,
    "owens": false
   },
   {
@@ -853,9 +853,9 @@
    "dx": -2,
    "dy": 1,
    "parsed": 34,
-   "kept": 0,
+   "kept": 9,
    "cand": 34,
-   "hk": 0,
+   "hk": 9,
    "owens": false
   },
   {
@@ -901,9 +901,9 @@
    "dx": 2,
    "dy": 1,
    "parsed": 44,
-   "kept": 44,
+   "kept": 22,
    "cand": 44,
-   "hk": 44,
+   "hk": 22,
    "owens": false
   },
   {
@@ -913,9 +913,9 @@
    "dx": -2,
    "dy": 2,
    "parsed": 33,
-   "kept": 0,
+   "kept": 7,
    "cand": 33,
-   "hk": 0,
+   "hk": 7,
    "owens": false
   },
   {
@@ -937,9 +937,9 @@
    "dx": 0,
    "dy": 2,
    "parsed": 49,
-   "kept": 49,
+   "kept": 31,
    "cand": 49,
-   "hk": 49,
+   "hk": 31,
    "owens": false
   },
   {
@@ -1009,9 +1009,9 @@
    "dx": 1,
    "dy": -2,
    "parsed": 52,
-   "kept": 52,
+   "kept": 36,
    "cand": 52,
-   "hk": 52,
+   "hk": 36,
    "owens": false
   },
   {
@@ -1021,9 +1021,9 @@
    "dx": 2,
    "dy": -2,
    "parsed": 36,
-   "kept": 0,
+   "kept": 11,
    "cand": 36,
-   "hk": 0,
+   "hk": 11,
    "owens": false
   },
   {
@@ -1081,9 +1081,9 @@
    "dx": 2,
    "dy": -1,
    "parsed": 47,
-   "kept": 47,
+   "kept": 27,
    "cand": 47,
-   "hk": 47,
+   "hk": 27,
    "owens": false
   },
   {
@@ -1153,9 +1153,9 @@
    "dx": -2,
    "dy": 1,
    "parsed": 60,
-   "kept": 60,
+   "kept": 54,
    "cand": 60,
-   "hk": 60,
+   "hk": 54,
    "owens": false
   },
   {
@@ -1201,9 +1201,9 @@
    "dx": 2,
    "dy": 1,
    "parsed": 52,
-   "kept": 52,
+   "kept": 36,
    "cand": 52,
-   "hk": 52,
+   "hk": 36,
    "owens": false
   },
   {
@@ -1213,9 +1213,9 @@
    "dx": -2,
    "dy": 2,
    "parsed": 47,
-   "kept": 47,
+   "kept": 27,
    "cand": 47,
-   "hk": 47,
+   "hk": 27,
    "owens": false
   },
   {
@@ -1237,9 +1237,9 @@
    "dx": 0,
    "dy": 2,
    "parsed": 57,
-   "kept": 57,
+   "kept": 47,
    "cand": 57,
-   "hk": 57,
+   "hk": 47,
    "owens": false
   },
   {
@@ -1261,9 +1261,9 @@
    "dx": 2,
    "dy": 2,
    "parsed": 28,
-   "kept": 0,
+   "kept": 3,
    "cand": 28,
-   "hk": 0,
+   "hk": 3,
    "owens": false
   },
   {
@@ -2016,120 +2016,120 @@
   [
    28,
    [
-    0,
-    0
+    3,
+    3
    ]
   ],
   [
    29,
    [
-    0,
-    0
+    4,
+    4
    ]
   ],
   [
    32,
    [
-    0,
-    0
+    6,
+    6
    ]
   ],
   [
    33,
    [
-    0,
-    0
+    7,
+    7
    ]
   ],
   [
    34,
    [
-    0,
-    0
+    9,
+    9
    ]
   ],
   [
    36,
    [
-    0,
-    0
+    11,
+    11
    ]
   ],
   [
    39,
    [
-    0,
-    0
+    15,
+    15
    ]
   ],
   [
    44,
    [
-    44,
-    44
+    22,
+    22
    ]
   ],
   [
    47,
+   [
+    27,
+    27
+   ]
+  ],
+  [
+   48,
+   [
+    29,
+    29
+   ]
+  ],
+  [
+   49,
+   [
+    31,
+    31
+   ]
+  ],
+  [
+   51,
+   [
+    34,
+    34
+   ]
+  ],
+  [
+   52,
+   [
+    36,
+    36
+   ]
+  ],
+  [
+   54,
+   [
+    41,
+    41
+   ]
+  ],
+  [
+   57,
    [
     47,
     47
    ]
   ],
   [
-   48,
-   [
-    48,
-    48
-   ]
-  ],
-  [
-   49,
-   [
-    49,
-    49
-   ]
-  ],
-  [
-   51,
-   [
-    51,
-    51
-   ]
-  ],
-  [
-   52,
+   59,
    [
     52,
     52
    ]
   ],
   [
-   54,
+   60,
    [
     54,
     54
-   ]
-  ],
-  [
-   57,
-   [
-    57,
-    57
-   ]
-  ],
-  [
-   59,
-   [
-    59,
-    59
-   ]
-  ],
-  [
-   60,
-   [
-    60,
-    60
    ]
   ],
   [
@@ -2497,50 +2497,70 @@
    ]
   ]
  ],
- "pairs": [
-  "powell[4413,6192] 29->0 beside 116->116",
-  "powell[4409,6193] 34->0 beside 128->128",
-  "powell[4410,6193] 32->0 beside 128->128",
-  "powell[4413,6193] 29->0 beside 48->48",
-  "powell[4410,6194] 32->0 beside 98->98",
-  "powell[4412,6195] 39->0 beside 54->54",
-  "dublin[4410,6194] 32->0 beside 98->98",
-  "dublin[4407,6196] 34->0 beside 76->76",
-  "dublin[4407,6197] 34->0 beside 102->102",
-  "dublin[4407,6198] 33->0 beside 91->91",
-  "columbus[4415,6202] 36->0 beside 52->52",
-  "columbus[4416,6202] 36->0 beside 47->47",
-  "columbus[4416,6205] 28->0 beside 52->52",
-  "columbus[4415,6206] 28->0 beside 65->65"
- ],
- "browserOut": null,
+ "pairs": [],
+ "browserOut": {
+  "distinct": 0,
+  "repeats": [],
+  "stats": {
+   "sb": {
+    "chunks": 16,
+    "ready": 16,
+    "waterReady": 12,
+    "waterSynth": 0,
+    "columns": 1863,
+    "empty": 0,
+    "queued": 0,
+    "building": 0,
+    "draping": 0,
+    "ringOn": true
+   },
+   "sky": {
+    "chunks": 10,
+    "ready": 9,
+    "drawn": 9,
+    "empty": 1,
+    "tris": 16774,
+    "verts": 31260,
+    "queued": 0,
+    "building": 0,
+    "draping": 0,
+    "ringOn": true,
+    "maxChunks": 10
+   },
+   "sbReason": null,
+   "skyReason": null,
+   "evictions": null,
+   "heals": null
+  }
+ },
  "red": [
   [
    "P4 all-or-nothing lock",
    "verify-seam (2)",
-   "8.8",
+   "2.5",
    "<= 4"
   ],
   [
    "P4 ramp not implemented",
    "verify-seam (4)",
-   "22/156",
+   "0/156",
    "0"
   ],
   [
    "P4 visible tile seam",
    "verify-seam (5)",
-   14,
+   0,
    "0"
+  ],
+  [
+   "P2/P6 heal + retry loops",
+   "verify-seam (7)",
+   "1x",
+   "<= 4x"
   ]
  ],
- "fails": [
-  "(2) NO CLIFF — |delta hatchKept| <= 4 per candidate between adjacent measurements",
-  "(4) RAMP SPEC — hatchKept === keepN(candidates) (lockLo 24 / rampHi 64)",
-  "(5) NO ALL-OR-NOTHING NEIGHBOURS — no adjacent pair renders nothing beside everything"
- ],
+ "fails": [],
  "softs": [
-  "(6b) api.setDiag",
-  "(6c) empty results carry a reason code"
+  "(8) emptyByReason telemetry"
  ]
 }

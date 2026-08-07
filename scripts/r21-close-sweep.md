@@ -42,9 +42,9 @@ coin (R20 lesson); these are the measured reds.
 
 | Defect | Gate | Measured RED | Green target | Separation |
 |---|---|---|---|---|
-| **P4** all-or-nothing skyline lock | verify-seam (2) NO CLIFF | slope **8.8 / candidate** (39 cand → 0 kept, 44 → 44) | ≤ 4 | 2.2× |
-| **P4** ramp absent | verify-seam (4) RAMP SPEC | **22 / 156 tiles** disagree | 0 | binary |
-| **P4** visible tile seam | verify-seam (5) ALL-OR-NOTHING NEIGHBOURS | **14 seam pairs** (Powell: 34→0 beside 128→128) | 0 | binary |
+| **P4** all-or-nothing skyline lock | verify-seam (2) NO CLIFF | slope **8.8 / candidate** (39 cand → 0 kept, 44 → 44) | ≤ 4 | 2.2× · **CLOSED post-D: 2.5** |
+| **P4** ramp absent | verify-seam (4) RAMP SPEC | **22 / 156 tiles** disagree | 0 | binary · **CLOSED post-D: 0/156** |
+| **P4** visible tile seam | verify-seam (5) ALL-OR-NOTHING NEIGHBOURS | **14 seam pairs** (Powell: 34→0 beside 128→128) | 0 | binary · **CLOSED post-D: 0** |
 | **P1** false frustum cull, satellite | verify-stability (7) | **1** chunk mesh of 54 | 0 | binary |
 | **P1** false frustum cull, toy z10 | verify-stability (9) | **5** chunk meshes of 417 (worst drop **10 191 m**) | 0 | binary |
 | **S3** tier step re-streams the ring | verify-tier-step (3) | ready/chunks floor **0.00** (16 ready → **0**) | ≥ 0.70 | total |
@@ -163,7 +163,7 @@ delivery list, not a wish list.
 | After merge | verify-stability | verify-tier-step | verify-flicker | verify-seam (node) | Notes |
 |---|---|---|---|---|---|
 | **A GOVERNOR** (`7f55d12`) | **14/16**, only (7)+(9) red | **8/10**, only (3)+(3a) red | **4/6**, only (4)+(5) red | not re-run (worker untouched by A) | see §2.1 — every A-owned class flipped green, every B/C/D-owned class stayed red |
-| D PIPELINE | — | — | — | — | expect seam (4)/(5) to flip green; Owens (1) must stay 0 |
+| **D PIPELINE** (`6f10795`) | **15/17**, only (7)+(9) red — identical numbers | **8/10**, only (3)+(3a) red — identical | **4/6**, only (4)+(5) red; swing count halved again | **10/10 — VERIFY: PASS** | see §2.4 — D's own gate went fully green, Owens lock held at 0, nothing D does not own moved |
 | B STREAMKEEPER | — | — | — | — | expect stability (7)/(9) → 0, tier-step (3)/(3a) → green, seam (7) bounded |
 | C SURFACE | — | — | — | — | expect flicker (4)/(5) green and `monuments.remerges` present |
 
@@ -242,6 +242,71 @@ a product regression.
 
 ---
 
+### §2.4 Post-D smoke — full per-gate result (dev server restarted on :3124 from `6f10795`)
+
+**verify-seam is D's own gate and it went from three reds to `VERIFY: PASS`,
+10/10.** Every P4 assertion flipped, and the frozen Owens lock did not move.
+
+| verify-seam gate | W1 pre-fix | post-D | Verdict |
+|---|---|---|---|
+| (1) THE OWENS LOCK — every Owens z14 tile keeps ZERO | 0 over 30 tiles | **0 over 30 tiles** | frozen invariant HELD |
+| (2) NO CLIFF (slope per candidate) | **8.8** (39→0 beside 44→44) | **2.5** (52→36 .. 54→41) | **GREEN** — and 2.5 is the ramp's own steepest true slope (2.6 at `rampHi`), so the shipped curve *is* the specified curve |
+| (3) MONOTONE | ok | ok | green |
+| (4) RAMP SPEC — `hatchKept === keepN(cand)` | **22/156** disagree | **0/156** disagree | **GREEN, exact** |
+| (5) NO ALL-OR-NOTHING NEIGHBOURS | **14** seam pairs | **0** seam pairs | **GREEN** |
+| (6) DETERMINISM | byte-identical | byte-identical (**hashes changed** — see below) | green |
+| (6b) `api.setDiag` | SOFT | **PASS** | instrument landed |
+| (6c) empty results carry a reason | SOFT (bare `{empty:true}`) | **PASS** — ocean `zero`, Owens-outer `zero` | instrument landed |
+| (7) no unbounded re-request | 4 URLs × 2 | **0 network requests in the settled 60 s** | green — but see §2.5 |
+| (8) `emptyByReason` on engine stats | SOFT | SOFT | **B**, expected |
+
+The measured ramp reads exactly as specified across the whole observed domain:
+`24→0  28→3  29→4  32→6  34→9  36→11  39→15  44→22  48→29  52→36  54→41
+57→47  60→54  65→65 …` — the 39/44 cliff is gone and the curve is continuous
+into the identity region at `rampHi`.
+
+**D's shuffle changed WHICH members render, not HOW MANY.** The determinism
+hashes moved (`62282ae7…` → `a4baf11f…` at Manhattan, `ffd505ae…` → `967a5925…`
+at Columbus, `c24065b2…` → `5c869dd7…` at Dublin) while the kept counts at those
+same tiles are **unchanged** (2215 / 408 / 130). That is precisely the §5.2
+pre-sanctioned move behaving as described, and it is why the P3 capped-tile
+spread probe moved a little too (span 2385×2365 m → 2423×2428 m, still 16/16
+quarter cells). **Not a regression.**
+
+Everything D does not own is byte-stable: the false-cull census returned
+`1 / 54` satellite and `5 / 417` toy with the identical worst drop of
+**10 191 m** for the third run in a row; tier-step still floors at
+`ready/chunks 0.00` and skyline `0.60`; flicker (5) still reads authored
+`(−2, −2)`.
+
+**Flicker kept improving, and this time in the SETTLE window.** Manhattan
+window A p99 **14.41 → 9.41** and swinging pixels **345 → 125** (post-A those
+were unchanged at 14.41 / 345); window B 8.71 → 9.02 with swinging pixels
+**146 → 73**. The settle-window half is exactly what a tile cache plus a fetch
+semaphore should fix. Running total on the load-bearing swing metric:
+
+| | pre-fix | post-A | post-D | bound |
+|---|---|---|---|---|
+| Manhattan pixels swinging >120 (window B) | **380** | 146 | **73** | ≤ 32 |
+| Powell control | 0 | 0 | **0** | ≤ 32 |
+
+C's `SURFACE_CALM` owns the remaining 73.
+
+### §2.5 INSTRUMENT NOTE — D's tile cache made verify-seam (7) partially blind
+
+The browser leg now counts **zero** network tile requests in the settled 60 s
+window (pre-D: 4 URLs at 2× each). That is D's persistent Cache API working —
+but `caches.match()` is not a fetch, so **a heal/evict loop that re-reads a
+cached tile fires no Playwright request event at all.** Gate (7) therefore now
+asserts only "no unbounded NETWORK hammer", which is a weaker claim than the
+one it was written for.
+
+Consequence: **B's `stats.heals` / `stats.evictions` counters (still SOFT) are
+now the load-bearing instrument for P2/P6**, not gate (7). This is recorded so
+W3 does not read gate (7)'s pass as proof the heal loop is fixed.
+
+---
+
 ## §3 W3 RUN MATRIX
 
 Legend — **UNPIN**: the harness un-pins `__flyGovPin` (only the R21 stability
@@ -284,7 +349,7 @@ gate's numbers; each consumed move needs an inline
 
 | # | Harness | Result | MOVE | Why |
 |---|---|---|---|---|
-| 16 | verify-neon-cover (11) | — (W3) | gate 3a mechanics | the five frozen R18 hashes. **Gate 3a recomputes the toy-path flag inventory from worker SOURCE and asserts it is exactly `{NEON_COVER, TOY_MID_SUBURB, MONUMENT_MODELS}` (verify-neon-cover.js:174).** D's `TILE_PIPELINE` references land in that same source, so 3a goes red the moment D merges and its `EXPECTED_TOY_FLAGS` + the gate-3 OFF control state must both gain `TILE_PIPELINE` (and any other R21 flag the toy path reads). That is **gate mechanics, not a hash move** — the five FNV hashes do not change. **Needs Fable sign-off (the file is outside E's W1 list).** |
+| 16 | verify-neon-cover (11) | — (W3) | gate 3/3a mechanics **+ two hash re-baselines (RULED)** | see §3.1a below — **APPROVED by Fable in W2**, to be executed in E's W3 pass |
 | 17 | verify-neon-city (10) | — (W3) | — | toy facades/runways/beacons |
 | 18 | verify-neon-alt (19) | — (W3) | §5.1 | the z10 ultra ring is where the bend margin is largest; toy ≤ 480 |
 | 19 | verify-roofs (10) | — (W3) | §5.1 | toy building admission |
@@ -293,6 +358,38 @@ gate's numbers; each consumed move needs an inline
 | 22 | verify-rim (5) | — (W3) | — | world-bend consumer |
 | 23 | verify-airbend | — (W3) | — | world-bend consumer |
 | 24 | verify-globe / verify-globe2 | — (W3) | — | curvature + tracer baseline |
+
+#### §3.1a verify-neon-cover — the W3 edit, pre-approved (Fable ruling, W2)
+
+Three separate things must happen in this file in E's W3 pass. They are
+distinct and the ledger keeps them distinct.
+
+1. **GATE MECHANICS (not a re-baseline).** Gate 3a recomputes the toy-path flag
+   inventory from worker SOURCE and asserts it equals `EXPECTED_TOY_FLAGS`
+   (`verify-neon-cover.js:174`). D deliberately spelled out every
+   `TILE_PIPELINE` reference so 3a's attribution can see it, and it **is**
+   toy-reachable (the toy tail's `'zero'` reason tag). So `TILE_PIPELINE` joins
+   both `R20_FLAGS` and `EXPECTED_TOY_FLAGS`, and the gate-3 OFF control state
+   must clear it along with the rest of the R21 set. Inline comment to carry:
+   `R21 SANCTIONED GATE-MECHANICS`. **No hash value changes for this item.**
+2. **TWO HASH RE-BASELINES (RULED).** `manhattan-full` and `manhattan-mid` were
+   proven by D — with a three-way control including a pristine `e1077f8` stash —
+   to be **already red on the untouched scaffolding tree**. OpenFreeMap
+   published planet build `20260802_080001_pt` on the day R20 closed; the
+   building layer at `14/4824/6157` still reports exactly **1481** features, so
+   the drift is in another layer. Fable ruling: re-baseline both under an inline
+   `R21 SANCTIONED RE-BASELINE (upstream planet drift, controlled 3-way)`.
+   **The code invariant is untouched and independently proven**: flag-off
+   byte-identity for identical input stands on D's fixture determinism
+   (`verify-seam` (6), byte-identical across two builds of the same tile).
+3. **The other three R18 hashes do NOT move** and stay frozen in §5.
+
+**Follow-up seeded for FLY_ROUND21.md §5b (R22 candidate):** a hash gate whose
+input is a LIVE tileset is a gate against someone else's release schedule. The
+five R18 hashes need **pinned fixture tiles** (bytes committed to the repo, or a
+pinned planet build in the URL) so an upstream publish can never present as a
+code regression again. The in-process worker fixture E built this round
+(`verify-seam`'s node leg) is the natural place to host them.
 
 ### 3.4 Boot, canvas, effects — MUST RUN (A rewrites the canvas + composer)
 
@@ -354,6 +451,9 @@ gate's numbers; each consumed move needs an inline
 | 4 | soak-fly satellite mode + p95 assertions | **CONSUMED (W1, E)** | additive; toy path byte-unchanged — verified by running it: same console format, same summary KEY SET, same `soak-results.json` target, exit 0, no gate block (satellite writes `soak-results-satellite.json` instead). W1 smoke, 3 min NYC leg: p50/p95 tris 761 k / 863 k, draws 223 / 242, governor steps 0, heap floor +15 MB, 0 pageerrors — **SOAK: PASS** | header block in `scripts/soak-fly.js` | Fable — pending |
 | 5 | density fallback levers | — (W3, only if p95 breaches) | | | |
 | 6 | `_boot.js` `__flyGovPin` + per-gate un-pins | **CONSUMED (W0 + W1, E)** | the un-pin is an accessor that swallows the fleet write; each gate reports `pin=null attempted=hold` | headers of verify-stability / verify-tier-step / soak-fly | Fable — pending |
+| 2b | **P3/P4 skyline member re-baseline — OBSERVED CONSUMED (W2, D)** | **CONSUMED** | D's shuffle moved the verify-seam determinism hashes at Manhattan / Columbus / Dublin (`62282ae7→a4baf11f`, `ffd505ae→967a5925`, `c24065b2→5c869dd7`) while the kept COUNTS at those tiles are unchanged (2215 / 408 / 130) — "which members", not "how many", exactly as §5.2 describes | verify-seam prints both halves every run | Fable — W2 |
+| **7 (NEW, W2 ruling)** | **two R18 neon-cover hash re-baselines**: `manhattan-full` + `manhattan-mid` | **RULED — execute in W3** | D's three-way control incl. a pristine `e1077f8` stash proved both hashes already red on the UNTOUCHED scaffolding tree. Upstream OpenFreeMap planet build `20260802_080001_pt`; the building layer at `14/4824/6157` still reports exactly 1481 features, so the drift is in another layer. The CODE invariant (flag-off byte-identity for identical input) stands proven independently by verify-seam (6) fixture determinism | `R21 SANCTIONED RE-BASELINE (upstream planet drift, controlled 3-way)` in `verify-neon-cover.js` | **Fable, W2 — APPROVED** |
+| **8 (NEW, W2 ruling)** | **`TILE_PIPELINE` into verify-neon-cover `R20_FLAGS` + `EXPECTED_TOY_FLAGS` + the gate-3 OFF control state** | **RULED — execute in W3** | gate mechanics only, **no hash value moves**; `TILE_PIPELINE` is toy-reachable via the toy tail's `'zero'` reason tag and D spelled every reference out so gate 3a's source attribution sees it | `R21 SANCTIONED GATE-MECHANICS` | **Fable, W2 — APPROVED** |
 
 ---
 

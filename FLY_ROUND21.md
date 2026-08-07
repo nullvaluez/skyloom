@@ -141,10 +141,28 @@ answered first on every run here).
 
 ## §5b Follow-ups — (W3, seeded in W1)
 
-- **`window.__flyComposer` is not published.** verify-tier-step's
-  composer-buffer gate (4) SOFT-fails without it. A should publish the
-  vendored composer on `window` in development, or the gate stays soft forever
-  and the stretched-frame defect keeps its hiding place.
+- **A hash gate over LIVE tiles is a gate against someone else's release
+  schedule (R22 candidate).** In W2, D proved with a three-way control —
+  including a pristine `e1077f8` stash — that two of the five frozen R18
+  neon-cover hashes (`manhattan-full`, `manhattan-mid`) were **already red on
+  the untouched scaffolding tree**: OpenFreeMap published planet build
+  `20260802_080001_pt` on the day R20 closed. The building layer at
+  `14/4824/6157` still reports exactly 1481 features, so the drift is in
+  another layer entirely. Both were re-baselined under a Fable ruling
+  (`R21 SANCTIONED RE-BASELINE (upstream planet drift, controlled 3-way)`) and
+  the code invariant stands independently on fixture determinism. The fix is
+  **pinned fixture tiles** — commit the bytes, or pin the planet build in the
+  URL — so an upstream publish can never again present as a code regression.
+  The in-process worker fixture this round introduced (`verify-seam`'s node
+  leg) is the natural host.
+- **Instrument regression to watch: D's persistent tile cache made
+  verify-seam (7) partially blind.** `caches.match()` is not a fetch, so a
+  heal/evict loop that re-reads a cached tile fires no request event. Gate (7)
+  now asserts only "no unbounded NETWORK hammer"; B's `stats.heals` /
+  `stats.evictions` are the load-bearing instrument for P2/P6.
+- ~~`window.__flyComposer` is not published.~~ **DELIVERED by A in W2** —
+  verify-tier-step (4) is a live assertion now and passes at every sample of
+  three forced tier cycles.
 - **The R19 attribution follow-up is still open** (attribution hardcodes
   "Flight data © adsb.lol" while the proxy may serve adsb.fi; R17 photo mode
   bakes the string into exports).

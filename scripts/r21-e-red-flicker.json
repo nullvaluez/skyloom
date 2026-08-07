@@ -1,5 +1,5 @@
 {
- "when": "2026-08-07T00:59:39.441Z",
+ "when": "2026-08-07T01:13:09.399Z",
  "frames": 12,
  "frameMs": 250,
  "urban": {
@@ -8,30 +8,30 @@
    "w": 1600,
    "h": 387,
    "frames": 12,
-   "mean": 0.379,
-   "p50": 0,
-   "p95": 0.822,
-   "p99": 8.71,
-   "p999": 26.321,
-   "max": 73.294,
-   "maxSwing": 154.7,
-   "swingPixels": 146,
-   "movingFrac": 0.0324
+   "mean": 0.413,
+   "p50": 0.092,
+   "p95": 1.155,
+   "p99": 9.015,
+   "p999": 22.738,
+   "max": 66.625,
+   "maxSwing": 154.3,
+   "swingPixels": 73,
+   "movingFrac": 0.0349
   },
   "statsA": {
    "px": 619200,
    "w": 1600,
    "h": 387,
    "frames": 12,
-   "mean": 0.849,
-   "p50": 0.184,
-   "p95": 3.349,
-   "p99": 14.41,
-   "p999": 36.154,
-   "max": 83.975,
-   "maxSwing": 190.7,
-   "swingPixels": 345,
-   "movingFrac": 0.0775
+   "mean": 0.401,
+   "p50": 0.092,
+   "p95": 1.044,
+   "p99": 9.406,
+   "p999": 23.861,
+   "max": 69.945,
+   "maxSwing": 154.3,
+   "swingPixels": 125,
+   "movingFrac": 0.0335
   },
   "scene": {
    "sb": 16,
@@ -56,13 +56,13 @@
    "w": 1600,
    "h": 387,
    "frames": 12,
-   "mean": 0.115,
-   "p50": 0.092,
-   "p95": 0.314,
-   "p99": 0.493,
-   "p999": 3.831,
-   "max": 56.743,
-   "maxSwing": 68.7,
+   "mean": 0.099,
+   "p50": 0,
+   "p95": 0.289,
+   "p99": 0.419,
+   "p999": 4.422,
+   "max": 62.597,
+   "maxSwing": 61,
    "swingPixels": 0,
    "movingFrac": 0.002
   },
@@ -71,20 +71,20 @@
    "w": 1600,
    "h": 387,
    "frames": 12,
-   "mean": 0.101,
-   "p50": 0.092,
-   "p95": 0.287,
-   "p99": 0.416,
-   "p999": 3.585,
-   "max": 50.563,
-   "maxSwing": 68.7,
+   "mean": 0.104,
+   "p50": 0,
+   "p95": 0.289,
+   "p99": 0.408,
+   "p999": 4.423,
+   "max": 51.61,
+   "maxSwing": 60.7,
    "swingPixels": 0,
-   "movingFrac": 0.0018
+   "movingFrac": 0.0022
   },
   "scene": {
    "sb": 16,
    "chunks": 16,
-   "sky": 8,
+   "sky": 9,
    "veg": 799,
    "parcel": 0,
    "lights": 0,
@@ -94,7 +94,7 @@
     "chunks": 8,
     "visible": true
    },
-   "draws": 218,
+   "draws": 219,
    "remerges": null
   }
  },
@@ -118,19 +118,19 @@
   [
    "S5/S7/S8 flicker (urban)",
    "verify-flicker (2)",
-   "14.41 → 8.71",
+   "9.406 → 9.015",
    "<= 12"
   ],
   [
    "S5/S7 flicker (suburb)",
    "verify-flicker (3)",
-   "0.416 → 0.493",
+   "0.408 → 0.419",
    "<= 12"
   ],
   [
    "S5 disappear/reappear",
    "verify-flicker (4)",
-   "urban 146 px / suburb 0 px",
+   "urban 73 px / suburb 0 px",
    "<= 32 each"
   ],
   [
