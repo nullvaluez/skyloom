@@ -150,6 +150,9 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
     confirmed: false, // a SETTLED pass has placed here since the last warp
     zeroPasses: 0, // consecutive settled passes voting to delete the field
     warped: false, // a warp epoch bump is pending (dropped by the next pass)
+    probeRegK: null, // previous pass's raw regK, for the first-placement agreement
+    trustSince: -1, // when the collision-index trust hold started (its OWN timer)
+    indexStale: false, // the collision index is not yet built over this disc
     holdSince: -1, // when the current unsettled hold started (-1 = not holding)
     held: false, // …and whether this pass held (telemetry)
     stale: false, // the ring timed out unresolved: treat it as resolved as it gets
@@ -197,6 +200,18 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
       if (s.warpEpoch === prev) return;
       prev = s.warpEpoch;
       stateRef.current.warped = true; // consumed by the next placement pass
+      // …and park the field NOW rather than up to one cadence later. The
+      // standing instances are relative to the ORIGIN town's pool origin, so
+      // they are off-screen either way, but "the destination inherits the
+      // origin's house count for two seconds" is a lie in the telemetry every
+      // stability probe reads, and parking is this component's own business.
+      const m = meshRef.current;
+      if (m) {
+        m.count = 0;
+        m.visible = false;
+      }
+      stateRef.current.placed = 0;
+      stateRef.current.prevN = 0;
     });
   }, []);
 
@@ -663,6 +678,8 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
       st.bucketX = px;
       st.bucketZ = pz;
       st.regKUsed = null;
+      st.probeRegK = null; // the agreement test restarts at the destination
+      st.trustSince = -1;
       st.confirmed = false;
       st.zeroPasses = 0;
       st.holdSince = -1;
@@ -705,7 +722,13 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
     const sig =
       `${bs?.chunks ?? -1}|${bs?.ready ?? -1}|${bs?.empty ?? -1}|${bs?.columns ?? -1}|` +
       `${vs?.chunks ?? -1}|${vs?.ready ?? -1}|${vs?.parcelPts ?? -1}|${st.altK.toFixed(3)}`;
-    if (settled && sig === st.sig && movedSq < U.staticSkipM ** 2) return;
+    // …but NEVER while the first measurement at this locality is still
+    // pending. The skip's premise is "nothing changed, so there is nothing to
+    // do"; a pending trust hold is work that is owed regardless, and at a
+    // pinned pose the signature stabilises immediately — which deadlocked the
+    // hold into a permanent one the first time this was written.
+    const undecided = st.floorA == null && st.floorB == null;
+    if (!undecided && settled && sig === st.sig && movedSq < U.staticSkipM ** 2) return;
     st.sig = sig;
     // Past every early return: this pass really does measure, so its
     // predecessor's numbers go now.
@@ -762,6 +785,77 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
     );
     st.regKRaw = regKRaw;
     let regK = regKRaw;
+
+    // === THE COLLISION-INDEX TRUST GATE (R21 C, P5 second cut) ================
+    //
+    // WHAT THE FIRST CUT MISSED, and how it was caught: E CERT's
+    // verify-stability boots satellite AT Powell as the fourth page of a loaded
+    // run and samples this layer at 100 ms from reveal. It measured 290 homes
+    // over a town R20 froze at exactly zero — reproduced here on this branch,
+    // three times. The settle gate above was asking the BUILDING RING whether
+    // it had resolved; but regK does not divide by the ring's state, it divides
+    // by `queryColumns`, and at boot the ring passes "resolved" while it is
+    // still SMALL — a handful of chunks, all of them legitimately done, is
+    // (ready + empty) / chunks === 1. An index holding ~0 columns over a mapped
+    // town is indistinguishable from an unmapped one, so regK computes as if
+    // this were Melton and the town gets carpeted.
+    //
+    // THE ASYMMETRY THAT MAKES THIS FIXABLE: regK ≈ 1 ("nothing is built here")
+    // is the verdict that places thousands of houses, and regK ≈ 0 is the safe
+    // one. A dangerous verdict must be CORROBORATED; a safe one needs nothing.
+    // Two corroborations, both applied ONLY to the first measurement at a
+    // locality (`floorA`/`floorB` both empty) — in steady state this whole
+    // block is skipped, because the rolling minimum already ignores a stale
+    // index: a stale index reads HIGH, and a high reading is never taken.
+    //
+    //   (1) INDEX vs LANDUSE. The veg ring says how much residential land is
+    //       under us (one anchor per anchors.areaPerM2). Measured across every
+    //       scene this layer is certified on, real columns per anchor are:
+    //         Powell 14.8 · Lone Pine 14.3 · Blagnac 14.2 · Plain City 5.1 ·
+    //         MELTON 2.6  ← the least-mapped suburb on earth, and still 1,170
+    //       columns inside the disc. `cols ≈ 0` while anchors > 0 is therefore
+    //       not a place, it is an unbuilt index. minColsPerAnchor sits 5x below
+    //       the worst real scene, so Melton can never trip it.
+    //   (2) AGREEMENT. A HALF-built index is not caught by (1), so the first
+    //       measurement must also be repeated: two consecutive trustworthy
+    //       passes agreeing within regKDeadband. A partial index reads high
+    //       then lower, which disagrees, and the pass waits one more cadence.
+    //
+    // Both are HOLDS, not suppressions, and both are bounded by the same
+    // maxHoldSec as every other hold: in a hypothetical genuinely-zero-column
+    // suburb the layer places 8 s late instead of never. The R21 §7 lesson is
+    // in one line: a settle gate must test the quantity the arithmetic
+    // actually divides by, not a ring-state proxy for it.
+    if (C && !st.stale && st.floorA == null && st.floorB == null) {
+      const indexFresh = inRange === 0 || _grid.cols >= inRange * C.minColsPerAnchor;
+      const agrees =
+        st.probeRegK != null && Math.abs(regKRaw - st.probeRegK) < C.regKDeadband;
+      st.probeRegK = regKRaw;
+      if (!indexFresh || !agrees) {
+        // Its OWN timer: `holdSince` belongs to the ring-readiness hold and is
+        // cleared by the preamble on every pass where the ring is settled —
+        // which is every pass here, so sharing it meant this timeout could
+        // never accumulate and the hold was unbounded (caught in the first
+        // run of this cut: Melton held forever at placed 0).
+        if (st.trustSince < 0) st.trustSince = now;
+        if (now - st.trustSince < C.maxHoldSec) {
+          st.held = true;
+          st.indexStale = !indexFresh;
+          // A held pass reports the world rather than its own idleness (R19
+          // §7). Set HERE, on the return path only: the placement loop below
+          // accumulates st.anchors itself, and doing both double-counted every
+          // anchor — which reads as a harness failure ("suppressed 75 / 150")
+          // in a pass that was actually correct.
+          st.anchors = inRange;
+          mesh.position.set(keepOx, 0, keepOz);
+          return;
+        }
+        st.stale = true; // the 8 s bound is absolute; place on what we have
+      }
+      st.trustSince = -1;
+      st.indexStale = false;
+    }
+
     if (C) {
       // THE ROLLING MINIMUM, then a DEADBAND — two different jobs.
       //
