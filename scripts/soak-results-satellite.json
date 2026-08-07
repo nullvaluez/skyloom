@@ -1,14 +1,14 @@
 {
   "summary": {
-    "minutes": 3,
-    "samples": 16,
-    "worstP95ms": 8.3,
-    "fpsFloorApprox": 120.5,
-    "maxDrawCalls": 242,
-    "maxTriangles": 863235,
-    "heapStartMB": 193,
-    "heapEndMB": 216,
-    "maxRebaseMs": 0.5,
+    "minutes": 15,
+    "samples": 76,
+    "worstP95ms": 6.6,
+    "fpsFloorApprox": 151.5,
+    "maxDrawCalls": 257,
+    "maxTriangles": 942039,
+    "heapStartMB": 162,
+    "heapEndMB": 94,
+    "maxRebaseMs": 0.30000000074505806,
     "pageErrors": 0,
     "style": "satellite",
     "route": [
@@ -16,39 +16,55 @@
       "powell-suburb",
       "union-rural"
     ],
-    "p50Triangles": 760763,
-    "p95Triangles": 863235,
-    "p50DrawCalls": 223,
-    "p95DrawCalls": 242,
-    "p50FrameMs": 4.3,
-    "p95FrameMs": 8.3,
+    "p50Triangles": 391590,
+    "p95Triangles": 845301,
+    "p50DrawCalls": 230,
+    "p95DrawCalls": 249,
+    "p50FrameMs": 6.5,
+    "p95FrameMs": 6.6,
     "governorSteps": 0,
     "governorLog": [],
-    "governorStats": null,
-    "heapFloorStartMB": 179,
-    "heapFloorEndMB": 194,
-    "heapFloorClimbMB": 15,
+    "governorStats": {
+      "dprSteps": 0,
+      "tierSteps": 0,
+      "latched": false,
+      "emaFps": 172.38,
+      "refresh": 144,
+      "rung": 0,
+      "rungs": 3,
+      "dpr": 1,
+      "tier": "high",
+      "pinned": false
+    },
+    "heapFloorStartMB": 143,
+    "heapFloorEndMB": 65,
+    "heapFloorClimbMB": -78,
     "tiersSeen": [
       "high"
     ]
   },
   "samples": [
     {
-      "t": 24,
-      "frames": 3162,
+      "t": 23,
+      "frames": 3208,
       "p50": 4.2,
       "p95": 4.3,
       "p99": 12.5,
-      "drawCalls": 212,
-      "triangles": 760763,
-      "traffic": 326,
-      "heapMB": 193,
+      "drawCalls": 223,
+      "triangles": 770002,
+      "traffic": 95,
+      "heapMB": 162,
       "rebases": 0,
       "maxRebaseMs": 0,
       "tier": "high",
       "govSteps": 0,
-      "govFromStats": null,
-      "fxRebuilds": null,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 229.41
+      },
+      "fxRebuilds": 1,
       "sb": {
         "chunks": 16,
         "ready": 16
@@ -56,21 +72,26 @@
       "parcel": 0
     },
     {
-      "t": 38,
-      "frames": 3323,
+      "t": 37,
+      "frames": 3342,
       "p50": 4.2,
       "p95": 4.3,
       "p99": 4.3,
-      "drawCalls": 224,
-      "triangles": 653046,
-      "traffic": 319,
-      "heapMB": 179,
+      "drawCalls": 230,
+      "triangles": 619295,
+      "traffic": 93,
+      "heapMB": 185,
       "rebases": 0,
       "maxRebaseMs": 0,
       "tier": "high",
       "govSteps": 0,
-      "govFromStats": null,
-      "fxRebuilds": null,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 237.78
+      },
+      "fxRebuilds": 1,
       "sb": {
         "chunks": 16,
         "ready": 16
@@ -78,21 +99,26 @@
       "parcel": 0
     },
     {
-      "t": 48,
-      "frames": 2363,
+      "t": 47,
+      "frames": 2388,
       "p50": 4.2,
       "p95": 4.3,
-      "p99": 8.3,
-      "drawCalls": 229,
-      "triangles": 683445,
-      "traffic": 317,
-      "heapMB": 202,
+      "p99": 4.3,
+      "drawCalls": 234,
+      "triangles": 635382,
+      "traffic": 93,
+      "heapMB": 184,
       "rebases": 0,
       "maxRebaseMs": 0,
       "tier": "high",
       "govSteps": 0,
-      "govFromStats": null,
-      "fxRebuilds": null,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 236.97
+      },
+      "fxRebuilds": 1,
       "sb": {
         "chunks": 16,
         "ready": 16
@@ -100,21 +126,26 @@
       "parcel": 0
     },
     {
-      "t": 61,
-      "frames": 2837,
+      "t": 60,
+      "frames": 3100,
       "p50": 4.2,
-      "p95": 8.3,
-      "p99": 8.4,
-      "drawCalls": 228,
-      "triangles": 799006,
-      "traffic": 313,
-      "heapMB": 195,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 236,
+      "triangles": 835219,
+      "traffic": 343,
+      "heapMB": 187,
       "rebases": 1,
-      "maxRebaseMs": 0.39999999990686774,
+      "maxRebaseMs": 0.30000000074505806,
       "tier": "high",
       "govSteps": 0,
-      "govFromStats": null,
-      "fxRebuilds": null,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 232.7
+      },
+      "fxRebuilds": 1,
       "sb": {
         "chunks": 16,
         "ready": 16
@@ -122,21 +153,26 @@
       "parcel": 0
     },
     {
-      "t": 71,
-      "frames": 2223,
+      "t": 70,
+      "frames": 2383,
       "p50": 4.2,
-      "p95": 8.3,
-      "p99": 8.4,
-      "drawCalls": 222,
-      "triangles": 762247,
-      "traffic": 287,
-      "heapMB": 209,
+      "p95": 4.3,
+      "p99": 4.4,
+      "drawCalls": 236,
+      "triangles": 796721,
+      "traffic": 338,
+      "heapMB": 193,
       "rebases": 1,
-      "maxRebaseMs": 0.39999999990686774,
+      "maxRebaseMs": 0.30000000074505806,
       "tier": "high",
       "govSteps": 0,
-      "govFromStats": null,
-      "fxRebuilds": null,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 231.84
+      },
+      "fxRebuilds": 1,
       "sb": {
         "chunks": 16,
         "ready": 16
@@ -144,21 +180,26 @@
       "parcel": 0
     },
     {
-      "t": 85,
-      "frames": 3183,
+      "t": 84,
+      "frames": 3343,
       "p50": 4.2,
       "p95": 4.3,
-      "p99": 8.4,
-      "drawCalls": 223,
-      "triangles": 650156,
-      "traffic": 291,
-      "heapMB": 186,
+      "p99": 4.3,
+      "drawCalls": 232,
+      "triangles": 715336,
+      "traffic": 338,
+      "heapMB": 158,
       "rebases": 1,
-      "maxRebaseMs": 0.39999999990686774,
+      "maxRebaseMs": 0.30000000074505806,
       "tier": "high",
       "govSteps": 0,
-      "govFromStats": null,
-      "fxRebuilds": null,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 236.57
+      },
+      "fxRebuilds": 1,
       "sb": {
         "chunks": 16,
         "ready": 16
@@ -166,21 +207,26 @@
       "parcel": 0
     },
     {
-      "t": 95,
-      "frames": 2366,
+      "t": 94,
+      "frames": 2385,
       "p50": 4.2,
       "p95": 4.3,
-      "p99": 8.3,
-      "drawCalls": 218,
-      "triangles": 541663,
-      "traffic": 288,
-      "heapMB": 180,
+      "p99": 4.3,
+      "drawCalls": 227,
+      "triangles": 635841,
+      "traffic": 325,
+      "heapMB": 146,
       "rebases": 2,
-      "maxRebaseMs": 0.5,
+      "maxRebaseMs": 0.30000000074505806,
       "tier": "high",
       "govSteps": 0,
-      "govFromStats": null,
-      "fxRebuilds": null,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 233.27
+      },
+      "fxRebuilds": 1,
       "sb": {
         "chunks": 16,
         "ready": 16
@@ -188,21 +234,26 @@
       "parcel": 0
     },
     {
-      "t": 108,
-      "frames": 2898,
+      "t": 107,
+      "frames": 3089,
       "p50": 4.2,
-      "p95": 8.3,
-      "p99": 8.4,
-      "drawCalls": 241,
-      "triangles": 863235,
-      "traffic": 295,
-      "heapMB": 190,
+      "p95": 4.3,
+      "p99": 4.4,
+      "drawCalls": 247,
+      "triangles": 811363,
+      "traffic": 279,
+      "heapMB": 158,
       "rebases": 2,
-      "maxRebaseMs": 0.5,
+      "maxRebaseMs": 0.30000000074505806,
       "tier": "high",
       "govSteps": 0,
-      "govFromStats": null,
-      "fxRebuilds": null,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 233.03
+      },
+      "fxRebuilds": 1,
       "sb": {
         "chunks": 16,
         "ready": 16
@@ -210,21 +261,26 @@
       "parcel": 0
     },
     {
-      "t": 118,
-      "frames": 2269,
+      "t": 117,
+      "frames": 2377,
       "p50": 4.2,
       "p95": 4.3,
-      "p99": 8.4,
-      "drawCalls": 242,
-      "triangles": 859625,
-      "traffic": 290,
-      "heapMB": 196,
+      "p99": 4.3,
+      "drawCalls": 253,
+      "triangles": 942039,
+      "traffic": 347,
+      "heapMB": 191,
       "rebases": 2,
-      "maxRebaseMs": 0.5,
+      "maxRebaseMs": 0.30000000074505806,
       "tier": "high",
       "govSteps": 0,
-      "govFromStats": null,
-      "fxRebuilds": null,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 230.82
+      },
+      "fxRebuilds": 1,
       "sb": {
         "chunks": 16,
         "ready": 16
@@ -232,156 +288,1811 @@
       "parcel": 0
     },
     {
-      "t": 132,
-      "frames": 3117,
-      "p50": 4.2,
-      "p95": 8.3,
-      "p99": 8.4,
-      "drawCalls": 220,
-      "triangles": 627269,
-      "traffic": 288,
-      "heapMB": 186,
-      "rebases": 2,
-      "maxRebaseMs": 0.5,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": null,
-      "fxRebuilds": null,
-      "sb": {
-        "chunks": 16,
-        "ready": 16
-      },
-      "parcel": 0
-    },
-    {
-      "t": 142,
-      "frames": 2265,
-      "p50": 4.2,
-      "p95": 8.3,
-      "p99": 8.4,
-      "drawCalls": 223,
-      "triangles": 633424,
-      "traffic": 270,
-      "heapMB": 206,
-      "rebases": 3,
-      "maxRebaseMs": 0.5,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": null,
-      "fxRebuilds": null,
-      "sb": {
-        "chunks": 16,
-        "ready": 16
-      },
-      "parcel": 0
-    },
-    {
-      "t": 155,
-      "frames": 2868,
-      "p50": 4.2,
-      "p95": 8.3,
-      "p99": 8.4,
-      "drawCalls": 221,
-      "triangles": 760790,
-      "traffic": 267,
-      "heapMB": 194,
-      "rebases": 3,
-      "maxRebaseMs": 0.5,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": null,
-      "fxRebuilds": null,
-      "sb": {
-        "chunks": 16,
-        "ready": 16
-      },
-      "parcel": 0
-    },
-    {
-      "t": 165,
-      "frames": 2271,
+      "t": 131,
+      "frames": 3341,
       "p50": 4.2,
       "p95": 4.3,
-      "p99": 8.4,
-      "drawCalls": 206,
-      "triangles": 708215,
-      "traffic": 266,
-      "heapMB": 212,
-      "rebases": 3,
-      "maxRebaseMs": 0.5,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": null,
-      "fxRebuilds": null,
-      "sb": {
-        "chunks": 16,
-        "ready": 16
-      },
-      "parcel": 0
-    },
-    {
-      "t": 179,
-      "frames": 3194,
-      "p50": 4.2,
-      "p95": 4.3,
-      "p99": 8.4,
-      "drawCalls": 219,
-      "triangles": 787009,
-      "traffic": 266,
-      "heapMB": 198,
-      "rebases": 3,
-      "maxRebaseMs": 0.5,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": null,
-      "fxRebuilds": null,
-      "sb": {
-        "chunks": 16,
-        "ready": 16
-      },
-      "parcel": 0
-    },
-    {
-      "t": 189,
-      "frames": 2328,
-      "p50": 4.2,
-      "p95": 4.3,
-      "p99": 8.4,
-      "drawCalls": 228,
-      "triangles": 791944,
-      "traffic": 270,
-      "heapMB": 201,
-      "rebases": 4,
-      "maxRebaseMs": 0.5,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": null,
-      "fxRebuilds": null,
-      "sb": {
-        "chunks": 16,
-        "ready": 16
-      },
-      "parcel": 0
-    },
-    {
-      "t": 202,
-      "frames": 2882,
-      "p50": 4.2,
-      "p95": 8.3,
-      "p99": 8.4,
+      "p99": 4.4,
       "drawCalls": 233,
-      "triangles": 694461,
-      "traffic": 268,
-      "heapMB": 216,
-      "rebases": 4,
-      "maxRebaseMs": 0.5,
+      "triangles": 724742,
+      "traffic": 344,
+      "heapMB": 183,
+      "rebases": 2,
+      "maxRebaseMs": 0.30000000074505806,
       "tier": "high",
       "govSteps": 0,
-      "govFromStats": null,
-      "fxRebuilds": null,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 237.25
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 14
+      },
+      "parcel": 0
+    },
+    {
+      "t": 141,
+      "frames": 2385,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 233,
+      "triangles": 693046,
+      "traffic": 336,
+      "heapMB": 180,
+      "rebases": 3,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 239.54
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 15
+      },
+      "parcel": 0
+    },
+    {
+      "t": 154,
+      "frames": 2293,
+      "p50": 5.6,
+      "p95": 6.5,
+      "p99": 6.9,
+      "drawCalls": 233,
+      "triangles": 912677,
+      "traffic": 311,
+      "heapMB": 156,
+      "rebases": 3,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 168.68
+      },
+      "fxRebuilds": 1,
       "sb": {
         "chunks": 16,
         "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 164,
+      "frames": 1740,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 216,
+      "triangles": 717045,
+      "traffic": 274,
+      "heapMB": 165,
+      "rebases": 3,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 173.42
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 178,
+      "frames": 2433,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 221,
+      "triangles": 791681,
+      "traffic": 84,
+      "heapMB": 174,
+      "rebases": 3,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 174
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 188,
+      "frames": 1730,
+      "p50": 5.7,
+      "p95": 6.6,
+      "p99": 7.1,
+      "drawCalls": 236,
+      "triangles": 791245,
+      "traffic": 337,
+      "heapMB": 169,
+      "rebases": 4,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 166.31
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 201,
+      "frames": 2260,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 231,
+      "triangles": 845301,
+      "traffic": 331,
+      "heapMB": 185,
+      "rebases": 4,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 170.47
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 211,
+      "frames": 1740,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 237,
+      "triangles": 813854,
+      "traffic": 328,
+      "heapMB": 181,
+      "rebases": 4,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 172.26
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 225,
+      "frames": 2431,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 234,
+      "triangles": 851087,
+      "traffic": 320,
+      "heapMB": 172,
+      "rebases": 4,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 170.06
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 235,
+      "frames": 1738,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 229,
+      "triangles": 715484,
+      "traffic": 306,
+      "heapMB": 143,
+      "rebases": 5,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 170.42
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 248,
+      "frames": 2259,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 241,
+      "triangles": 804854,
+      "traffic": 80,
+      "heapMB": 175,
+      "rebases": 5,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 172.37
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 258,
+      "frames": 1741,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 237,
+      "triangles": 705931,
+      "traffic": 79,
+      "heapMB": 164,
+      "rebases": 5,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 173.23
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 272,
+      "frames": 2431,
+      "p50": 5.7,
+      "p95": 6.6,
+      "p99": 6.8,
+      "drawCalls": 220,
+      "triangles": 675522,
+      "traffic": 78,
+      "heapMB": 175,
+      "rebases": 5,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 172.85
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 282,
+      "frames": 1738,
+      "p50": 5.7,
+      "p95": 6.6,
+      "p99": 6.8,
+      "drawCalls": 235,
+      "triangles": 546309,
+      "traffic": 78,
+      "heapMB": 149,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 174.02
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 295,
+      "frames": 2250,
+      "p50": 5.7,
+      "p95": 6.6,
+      "p99": 7,
+      "drawCalls": 242,
+      "triangles": 739658,
+      "traffic": 79,
+      "heapMB": 178,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 168.9
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 15
+      },
+      "parcel": 0
+    },
+    {
+      "t": 305,
+      "frames": 1736,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 245,
+      "triangles": 699571,
+      "traffic": 78,
+      "heapMB": 165,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 171.61
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 14
+      },
+      "parcel": 0
+    },
+    {
+      "t": 319,
+      "frames": 2427,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.9,
+      "drawCalls": 233,
+      "triangles": 808963,
+      "traffic": 79,
+      "heapMB": 185,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 171.86
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 333,
+      "frames": 2433,
+      "p50": 5.6,
+      "p95": 6.5,
+      "p99": 7,
+      "drawCalls": 220,
+      "triangles": 224967,
+      "traffic": 167,
+      "heapMB": 112,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 171.71
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 346,
+      "frames": 2263,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 221,
+      "triangles": 244358,
+      "traffic": 162,
+      "heapMB": 110,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 170.92
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 356,
+      "frames": 1735,
+      "p50": 5.7,
+      "p95": 6.6,
+      "p99": 6.8,
+      "drawCalls": 233,
+      "triangles": 292299,
+      "traffic": 161,
+      "heapMB": 97,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 171.21
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 15
+      },
+      "parcel": 0
+    },
+    {
+      "t": 371,
+      "frames": 2439,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 247,
+      "triangles": 576517,
+      "traffic": 148,
+      "heapMB": 137,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 171.47
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 15
+      },
+      "parcel": 0
+    },
+    {
+      "t": 381,
+      "frames": 1742,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.7,
+      "drawCalls": 232,
+      "triangles": 493479,
+      "traffic": 88,
+      "heapMB": 116,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 173.05
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 394,
+      "frames": 2270,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.7,
+      "drawCalls": 249,
+      "triangles": 497794,
+      "traffic": 22,
+      "heapMB": 123,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 173.04
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 404,
+      "frames": 1744,
+      "p50": 5.7,
+      "p95": 6.6,
+      "p99": 6.8,
+      "drawCalls": 257,
+      "triangles": 375747,
+      "traffic": 23,
+      "heapMB": 139,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 172.98
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 418,
+      "frames": 2436,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 242,
+      "triangles": 477335,
+      "traffic": 22,
+      "heapMB": 117,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 171.48
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 428,
+      "frames": 1749,
+      "p50": 5.6,
+      "p95": 6.5,
+      "p99": 6.7,
+      "drawCalls": 239,
+      "triangles": 484318,
+      "traffic": 23,
+      "heapMB": 128,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 171.12
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 441,
+      "frames": 2270,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.7,
+      "drawCalls": 235,
+      "triangles": 381695,
+      "traffic": 24,
+      "heapMB": 128,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 173.57
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 451,
+      "frames": 1742,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 239,
+      "triangles": 358302,
+      "traffic": 24,
+      "heapMB": 106,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 168.55
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 465,
+      "frames": 2438,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.7,
+      "drawCalls": 229,
+      "triangles": 243017,
+      "traffic": 24,
+      "heapMB": 103,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 167.11
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 475,
+      "frames": 1744,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.7,
+      "drawCalls": 226,
+      "triangles": 375145,
+      "traffic": 23,
+      "heapMB": 102,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 171.94
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 488,
+      "frames": 2268,
+      "p50": 5.7,
+      "p95": 6.6,
+      "p99": 6.8,
+      "drawCalls": 239,
+      "triangles": 315389,
+      "traffic": 22,
+      "heapMB": 106,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 173.11
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 498,
+      "frames": 1738,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 248,
+      "triangles": 399907,
+      "traffic": 22,
+      "heapMB": 119,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 171.51
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 512,
+      "frames": 2426,
+      "p50": 5.7,
+      "p95": 6.6,
+      "p99": 6.9,
+      "drawCalls": 246,
+      "triangles": 624567,
+      "traffic": 22,
+      "heapMB": 123,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 168.07
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 522,
+      "frames": 1744,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 246,
+      "triangles": 673388,
+      "traffic": 22,
+      "heapMB": 131,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 168.58
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 535,
+      "frames": 2266,
+      "p50": 5.6,
+      "p95": 6.6,
+      "p99": 6.8,
+      "drawCalls": 237,
+      "triangles": 350592,
+      "traffic": 24,
+      "heapMB": 120,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 173.21
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 545,
+      "frames": 1740,
+      "p50": 5.6,
+      "p95": 6.6,
+      "p99": 6.8,
+      "drawCalls": 227,
+      "triangles": 391590,
+      "traffic": 24,
+      "heapMB": 118,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 171.7
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 559,
+      "frames": 2438,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 227,
+      "triangles": 451633,
+      "traffic": 24,
+      "heapMB": 108,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 167.85
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 569,
+      "frames": 1744,
+      "p50": 5.6,
+      "p95": 6.6,
+      "p99": 6.8,
+      "drawCalls": 232,
+      "triangles": 424902,
+      "traffic": 24,
+      "heapMB": 99,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 170.47
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 582,
+      "frames": 2274,
+      "p50": 5.6,
+      "p95": 6.5,
+      "p99": 6.7,
+      "drawCalls": 249,
+      "triangles": 404897,
+      "traffic": 23,
+      "heapMB": 93,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 172.39
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 592,
+      "frames": 1744,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 226,
+      "triangles": 270544,
+      "traffic": 21,
+      "heapMB": 103,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 172.26
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 606,
+      "frames": 2432,
+      "p50": 5.7,
+      "p95": 6.6,
+      "p99": 6.8,
+      "drawCalls": 241,
+      "triangles": 330723,
+      "traffic": 22,
+      "heapMB": 93,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 170.84
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 616,
+      "frames": 1749,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.7,
+      "drawCalls": 236,
+      "triangles": 359573,
+      "traffic": 21,
+      "heapMB": 112,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 172.8
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 630,
+      "frames": 2446,
+      "p50": 5.6,
+      "p95": 6.6,
+      "p99": 6.8,
+      "drawCalls": 188,
+      "triangles": 59270,
+      "traffic": 25,
+      "heapMB": 76,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 173.87
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 5
+      },
+      "parcel": 0
+    },
+    {
+      "t": 640,
+      "frames": 1748,
+      "p50": 5.6,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 192,
+      "triangles": 59842,
+      "traffic": 25,
+      "heapMB": 73,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 173.07
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 6
+      },
+      "parcel": 0
+    },
+    {
+      "t": 654,
+      "frames": 2451,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.7,
+      "drawCalls": 210,
+      "triangles": 77538,
+      "traffic": 25,
+      "heapMB": 77,
+      "rebases": 6,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 173.21
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 10
+      },
+      "parcel": 0
+    },
+    {
+      "t": 664,
+      "frames": 1745,
+      "p50": 5.6,
+      "p95": 6.6,
+      "p99": 6.8,
+      "drawCalls": 201,
+      "triangles": 128177,
+      "traffic": 24,
+      "heapMB": 84,
+      "rebases": 7,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 171.59
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 12
+      },
+      "parcel": 0
+    },
+    {
+      "t": 677,
+      "frames": 2268,
+      "p50": 5.7,
+      "p95": 6.6,
+      "p99": 6.8,
+      "drawCalls": 194,
+      "triangles": 82890,
+      "traffic": 24,
+      "heapMB": 68,
+      "rebases": 7,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 173.26
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 9
+      },
+      "parcel": 0
+    },
+    {
+      "t": 687,
+      "frames": 1746,
+      "p50": 5.6,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 190,
+      "triangles": 61024,
+      "traffic": 24,
+      "heapMB": 84,
+      "rebases": 7,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 173.68
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 5
+      },
+      "parcel": 0
+    },
+    {
+      "t": 701,
+      "frames": 2443,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.7,
+      "drawCalls": 192,
+      "triangles": 63053,
+      "traffic": 23,
+      "heapMB": 67,
+      "rebases": 7,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 172.59
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 7
+      },
+      "parcel": 0
+    },
+    {
+      "t": 711,
+      "frames": 1746,
+      "p50": 5.6,
+      "p95": 6.5,
+      "p99": 6.7,
+      "drawCalls": 189,
+      "triangles": 64546,
+      "traffic": 24,
+      "heapMB": 74,
+      "rebases": 8,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 172.35
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 7
+      },
+      "parcel": 0
+    },
+    {
+      "t": 724,
+      "frames": 2272,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 208,
+      "triangles": 67499,
+      "traffic": 24,
+      "heapMB": 79,
+      "rebases": 8,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 174.5
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 8
+      },
+      "parcel": 0
+    },
+    {
+      "t": 734,
+      "frames": 1749,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.7,
+      "drawCalls": 209,
+      "triangles": 76170,
+      "traffic": 24,
+      "heapMB": 81,
+      "rebases": 8,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 173.78
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 7
+      },
+      "parcel": 0
+    },
+    {
+      "t": 748,
+      "frames": 2437,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.7,
+      "drawCalls": 202,
+      "triangles": 59371,
+      "traffic": 27,
+      "heapMB": 92,
+      "rebases": 8,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 173.15
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 5
+      },
+      "parcel": 0
+    },
+    {
+      "t": 758,
+      "frames": 1750,
+      "p50": 5.6,
+      "p95": 6.5,
+      "p99": 6.7,
+      "drawCalls": 195,
+      "triangles": 58955,
+      "traffic": 27,
+      "heapMB": 67,
+      "rebases": 9,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 174
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 4
+      },
+      "parcel": 0
+    },
+    {
+      "t": 771,
+      "frames": 2271,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.7,
+      "drawCalls": 214,
+      "triangles": 61364,
+      "traffic": 26,
+      "heapMB": 65,
+      "rebases": 9,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 172.98
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 4
+      },
+      "parcel": 0
+    },
+    {
+      "t": 781,
+      "frames": 1745,
+      "p50": 5.7,
+      "p95": 6.6,
+      "p99": 6.7,
+      "drawCalls": 204,
+      "triangles": 62104,
+      "traffic": 26,
+      "heapMB": 66,
+      "rebases": 9,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 173.28
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 7
+      },
+      "parcel": 0
+    },
+    {
+      "t": 795,
+      "frames": 2443,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 199,
+      "triangles": 80505,
+      "traffic": 26,
+      "heapMB": 81,
+      "rebases": 9,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 172.16
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 9
+      },
+      "parcel": 0
+    },
+    {
+      "t": 805,
+      "frames": 1754,
+      "p50": 5.6,
+      "p95": 6.5,
+      "p99": 6.7,
+      "drawCalls": 197,
+      "triangles": 81949,
+      "traffic": 25,
+      "heapMB": 78,
+      "rebases": 10,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 172.49
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 10
+      },
+      "parcel": 0
+    },
+    {
+      "t": 818,
+      "frames": 2275,
+      "p50": 5.6,
+      "p95": 6.5,
+      "p99": 6.7,
+      "drawCalls": 208,
+      "triangles": 60433,
+      "traffic": 25,
+      "heapMB": 93,
+      "rebases": 10,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 173.92
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 6
+      },
+      "parcel": 0
+    },
+    {
+      "t": 828,
+      "frames": 1746,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.7,
+      "drawCalls": 214,
+      "triangles": 62341,
+      "traffic": 25,
+      "heapMB": 71,
+      "rebases": 10,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 173.61
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 6
+      },
+      "parcel": 0
+    },
+    {
+      "t": 842,
+      "frames": 2451,
+      "p50": 5.6,
+      "p95": 6.5,
+      "p99": 6.7,
+      "drawCalls": 210,
+      "triangles": 71832,
+      "traffic": 25,
+      "heapMB": 68,
+      "rebases": 10,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 172.39
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 8
+      },
+      "parcel": 0
+    },
+    {
+      "t": 852,
+      "frames": 1745,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.7,
+      "drawCalls": 202,
+      "triangles": 75007,
+      "traffic": 22,
+      "heapMB": 75,
+      "rebases": 11,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 174.22
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 8
+      },
+      "parcel": 0
+    },
+    {
+      "t": 865,
+      "frames": 2278,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.7,
+      "drawCalls": 207,
+      "triangles": 81761,
+      "traffic": 23,
+      "heapMB": 89,
+      "rebases": 11,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 174.68
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 6
+      },
+      "parcel": 0
+    },
+    {
+      "t": 875,
+      "frames": 1746,
+      "p50": 5.6,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 191,
+      "triangles": 65733,
+      "traffic": 22,
+      "heapMB": 74,
+      "rebases": 11,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 168.52
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 7
+      },
+      "parcel": 0
+    },
+    {
+      "t": 889,
+      "frames": 2442,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 182,
+      "triangles": 58837,
+      "traffic": 23,
+      "heapMB": 80,
+      "rebases": 11,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 173.84
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 4
+      },
+      "parcel": 0
+    },
+    {
+      "t": 899,
+      "frames": 1751,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.7,
+      "drawCalls": 194,
+      "triangles": 58829,
+      "traffic": 23,
+      "heapMB": 70,
+      "rebases": 12,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 173.68
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 3
+      },
+      "parcel": 0
+    },
+    {
+      "t": 912,
+      "frames": 2269,
+      "p50": 5.7,
+      "p95": 6.5,
+      "p99": 6.8,
+      "drawCalls": 200,
+      "triangles": 61677,
+      "traffic": 22,
+      "heapMB": 94,
+      "rebases": 12,
+      "maxRebaseMs": 0.30000000074505806,
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 172.38
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 7
       },
       "parcel": 0
     }
