@@ -493,6 +493,11 @@ export function FlyScene({ runtime }) {
   // Publish engine handles for the DOM HUD (reads at 10Hz) and later phases.
   useEffect(() => {
     runtime.engine = engine;
+    // R22 W2 (Fable arbitration, A's request #6): let the engine publish
+    // runtime.terraStats directly — production has no __fly dev handle, and
+    // consumers read `runtime.terraStats ?? runtime.engine?.terraStats`.
+    // Optional-call no-op when TERRA families are off (idempotent).
+    engine.attachRuntime?.(runtime);
     runtime.flight = flight;
     runtime.input = input;
     runtime.origin = origin;
