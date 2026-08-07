@@ -78,6 +78,7 @@ import {
   AERIAL_PERSPECTIVE,
   BOOST_METER,
   CLOUDS,
+  CLUTTER,
   CRASH,
   GLOBE,
   HILLSHADE,
@@ -116,6 +117,7 @@ import { ToyWorldLayer } from './ToyWorldLayer';
 import { SatBuildingLayer } from './SatBuildingLayer';
 import { SatRoadLayer } from './SatRoadLayer';
 import { SatSkylineLayer } from './SatSkylineLayer';
+import { SatClutterLayer } from './SatClutterLayer';
 import { SatCityGlow } from './SatCityGlow';
 import { SatEnvironment } from './SatEnvironment';
 import { PrecipLayer } from './PrecipLayer';
@@ -627,6 +629,10 @@ export function FlyScene({ runtime }) {
       const geo = engine.worldToGeo(flight.pos);
       flight.latDeg = geo.y;
       runtime.geo = geo; // the 1Hz poll key picks the new area up next tick
+      // R22 W0 pre-seed: tell the raster terrain a warp happened (the vector
+      // engines already get notifyWarp via warpEpoch; the quadtree never
+      // did). Optional-call no-op until A TERRA implements it (TERRA_PIPE.warp).
+      engine.notifyWarp?.(geo.x, geo.y);
       // DEM for the destination is rarely resident yet — 0 now, the
       // 3rd-frame ground sampler + the flight model's soft floor take over
       // as tiles stream in (high-elevation arrivals ride the floor up).
@@ -1084,6 +1090,13 @@ export function FlyScene({ runtime }) {
       if (elev != null) flight.groundElev = elev;
       runtime.geo = geo; // Vector3(lon, lat, altM) — HUD/polling read this
     }
+    // R22 W0 pre-seed: the VISUAL ground-elevation channel. Today a raw
+    // alias (behavior-identical); B SETTLE slew-limits it behind
+    // SETTLE_CALM.groundElevVis and re-points visual consumers (fade bands,
+    // skyline hole, parcel altK, veg cull) to it. The flight model and the
+    // crash floor keep reading flight.groundElev RAW — safety never reads a
+    // damped signal.
+    runtime.groundElevVis = flight.groundElev;
 
     // --- Phase 5: targeting + autopilot (uses traffic items from the
     // previous frame's update at -45 — 16ms of staleness is immaterial) ---
@@ -1854,6 +1867,13 @@ export function FlyScene({ runtime }) {
             &&-chain / same worldRoot reason as the two layers above. */}
         {mapStyle === 'satellite' && SAT_SKYLINE.enabled && qualityTier !== 'low' && (
           <SatSkylineLayer runtime={runtime} flight={flight} />
+        )}
+        {/* R22 (C CLUTTER): ground life — parked/moving cars + poles. Same
+            &&-chain / worldRoot reason as the layers above; W0 stub renders
+            null and CLUTTER.enabled is false, so this line is a no-op until
+            C's merge. */}
+        {mapStyle === 'satellite' && CLUTTER.enabled && qualityTier !== 'low' && (
+          <SatClutterLayer runtime={runtime} flight={flight} />
         )}
         {/* Round 17: keyed on the pick so a hangar swap is a clean remount —
             the old clone's graded materials dispose, the new GLB mounts. */}

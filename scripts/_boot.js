@@ -74,6 +74,19 @@ async function bootFly(
     // verify-tier-step / both soaks) are the ONLY harnesses that un-pin it
     // (per-gate, deliberately).
     window.__flyGovPin = 'hold';
+    // Round 22 (SANCTIONED harness edit, the same idiom): pin the four R22
+    // feature families to LEGACY behavior fleet-wide so every frozen gate
+    // keeps measuring the R21 world. 1 = legacy: TERRA (altitude LOD curve /
+    // z18 / vendored pipeline patches read the R21 values), SETTLE (birth
+    // fades + content-aware reveals + ladder fix disabled), CLUTTER (clock
+    // frozen at 0 AND pools empty), DEPTH (catcher/N8AO/nearReceive off).
+    // Inert while the R22 blocks are enabled:false (W0 state). ONLY the new
+    // R22 gates (verify-terra / verify-arrival / verify-settle /
+    // verify-clutter / verify-depth2) un-pin, per-gate, deliberately.
+    window.__flyTerraPin = 1;
+    window.__flySettlePin = 1;
+    window.__flyClutterPin = 1;
+    window.__flyDepthPin = 1;
     try {
       localStorage.setItem('fly-controls-seen', '1');
       // Round 10: the APP default is now satellite (PauseMenu defaults an
@@ -100,6 +113,10 @@ async function bootFly(
       window.__flyAerialOverride = 0; // round 19: same idiom, reload leg
       window.__flySatShadowOverride = 0;
       window.__flyGovPin = 'hold'; // round 21: same idiom, reload leg
+      window.__flyTerraPin = 1; // round 22: same idiom, reload leg
+      window.__flySettlePin = 1;
+      window.__flyClutterPin = 1;
+      window.__flyDepthPin = 1;
       localStorage.setItem('fly-controls-seen', '1');
       localStorage.setItem('fly-map-style-2', s || 'toy'); // round 10: default toy for harnesses
     }, style);
