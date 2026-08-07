@@ -1,0 +1,96 @@
+{
+  "mode": "owens",
+  "tag": "A1-z18dem15notable",
+  "families": [
+    "sharp"
+  ],
+  "bootMs": 10640,
+  "cfg": {
+    "style": "satellite",
+    "tier": "high",
+    "baseLod": 0.86,
+    "liveLod": 0.86,
+    "curveArmed": true,
+    "maxThreads": 10,
+    "steadyThreads": 10,
+    "maxLevel": 18,
+    "minLevel": 2,
+    "imgMaxLevel": 18,
+    "demMaxLevel": 15,
+    "imgDataType": "image",
+    "demDataType": "lerc",
+    "sizeZ0": 0,
+    "sharpOn": true,
+    "pipeOn": false,
+    "cacheOn": false,
+    "pinned": true
+  },
+  "runs": [
+    {
+      "threshold": 0.86,
+      "draws": 235,
+      "tris": 222988,
+      "terra": {
+        "camTileZ": 18,
+        "targetZ": 18,
+        "downloading": 0,
+        "sharp": true,
+        "aglM": 66,
+        "lodThreshold": 0.86,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 63571
+      },
+      "rtTerra": {
+        "camTileZ": 18,
+        "targetZ": 18,
+        "downloading": 0,
+        "sharp": true,
+        "aglM": 66,
+        "lodThreshold": 0.86,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 63571
+      },
+      "warp": null,
+      "cache": null,
+      "heapMB": 80
+    }
+  ],
+  "tex": {
+    "mb": 70,
+    "count": 209,
+    "maxAniso": 8
+  },
+  "zoomSeen": {
+    "img2": 11,
+    "img3": 30,
+    "img4": 45,
+    "img5": 57,
+    "dem5": 57,
+    "img6": 64,
+    "dem6": 66,
+    "img7": 37,
+    "dem7": 37,
+    "img8": 33,
+    "dem8": 33,
+    "img9": 34,
+    "dem9": 35,
+    "img10": 46,
+    "dem10": 46,
+    "img11": 49,
+    "dem11": 49,
+    "img12": 47,
+    "dem12": 48,
+    "img13": 61,
+    "dem13": 61,
+    "img14": 91,
+    "dem14": 95,
+    "img15": 134,
+    "dem15": 467,
+    "img16": 197,
+    "img17": 321,
+    "img18": 432
+  },
+  "pageerrors": []
+}

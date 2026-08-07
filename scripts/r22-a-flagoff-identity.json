@@ -1,0 +1,90 @@
+{
+  "gates": [
+    {
+      "n": "TERRA families all OFF",
+      "ok": true,
+      "d": "{\"s\":false,\"p\":false,\"c\":false}"
+    },
+    {
+      "n": "imagery ceiling is the R19 z17",
+      "ok": true,
+      "d": "imgMaxLevel 17"
+    },
+    {
+      "n": "DEM ceiling is the R21 z15",
+      "ok": true,
+      "d": "demMaxLevel 15"
+    },
+    {
+      "n": "stock loader dataTypes selected",
+      "ok": true,
+      "d": "image/lerc"
+    },
+    {
+      "n": "LODThreshold is the frozen 0.86 baseline",
+      "ok": true,
+      "d": "live 0.86"
+    },
+    {
+      "n": "altitude curve NOT armed",
+      "ok": true,
+      "d": ""
+    },
+    {
+      "n": "maxThreads is the R6 steady 10",
+      "ok": true,
+      "d": ""
+    },
+    {
+      "n": "runtime.terraStats === undefined (legacy contract)",
+      "ok": true,
+      "d": ""
+    },
+    {
+      "n": "engine.terraStats null (publisher never ran)",
+      "ok": true,
+      "d": ""
+    },
+    {
+      "n": "window.__flyStats.terra absent",
+      "ok": true,
+      "d": ""
+    },
+    {
+      "n": "raster-cache handle not installed",
+      "ok": true,
+      "d": ""
+    },
+    {
+      "n": "map.update NOT wrapped (no own property)",
+      "ok": true,
+      "d": ""
+    },
+    {
+      "n": "zero pageerrors",
+      "ok": true,
+      "d": ""
+    }
+  ],
+  "cfg": {
+    "style": "satellite",
+    "tier": "high",
+    "baseLod": 0.86,
+    "liveLod": 0.86,
+    "curveArmed": false,
+    "maxThreads": 10,
+    "steadyThreads": 10,
+    "maxLevel": 17,
+    "minLevel": 2,
+    "imgMaxLevel": 17,
+    "demMaxLevel": 15,
+    "imgDataType": "image",
+    "demDataType": "lerc",
+    "sizeZ0": 0,
+    "sharpOn": false,
+    "pipeOn": false,
+    "cacheOn": false,
+    "pinned": true
+  },
+  "errs": []
+}
