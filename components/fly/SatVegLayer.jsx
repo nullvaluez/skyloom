@@ -23,6 +23,7 @@ import {
   SAT_TINT,
   SAT_VEG,
   SUBURB_NIGHT,
+  SURFACE_CALM,
 } from '@/lib/fly/fly-constants';
 import { applyBendAnchor, getRimColor } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
@@ -56,6 +57,28 @@ const smoothstep = (a, b, v) => {
   const t = Math.min(1, Math.max(0, (v - a) / Math.max(1e-6, b - a)));
   return t * t * (3 - 2 * t);
 };
+
+/**
+ * Round 21 (C "SURFACE", S6) — RANGED upload of a pooled attribute.
+ *
+ * three uploads the ENTIRE typed array on `needsUpdate` unless the attribute
+ * carries update ranges (WebGLAttributes.updateBuffer). Four pooled satellite
+ * layers refill full buffers on ONE shared 2 s cadence, phase-locked from the
+ * first frame — roughly 1.7 MB of bufferSubData landing in a single frame,
+ * every two seconds, forever. Only `[0, max(n, prevN))` can possibly differ
+ * from what the GPU already holds: `0..n` is this pass's placement and
+ * `n..prevN` is the tail this pass just parked. Everything past that was
+ * uploaded parked (or was never written at all) and is outside `count`, so it
+ * cannot be drawn. Idiom and API names from TrafficTracers.jsx:460.
+ */
+function rangeUpload(attr, floats) {
+  if (!attr) return;
+  if (SURFACE_CALM.enabled && SURFACE_CALM.uploads.ranges) {
+    attr.clearUpdateRanges();
+    attr.addUpdateRange(0, Math.min(floats, attr.array.length));
+  }
+  attr.needsUpdate = true;
+}
 
 /**
  * Round 18 (A3 "GROUNDSKEEPER") — SATELLITE vegetation, and the mount point for
@@ -125,6 +148,32 @@ export function SatVegLayer({ runtime, flight }) {
 
   const meshRef = useRef(null);
   const statsAtRef = useRef(0);
+
+  // Round 21 (C) — publish the veg streamer on the runtime bus, narrowed to
+  // the ONE thing a consumer needs: its streaming stats. SatParcelHomes' regK
+  // is a RATIO of the building ring over the veg ring, and the R20 settle
+  // gate only ever tested the building side — so a settled building ring over
+  // a half-streamed veg ring read as a mapped town with no residential area
+  // and carpeted it. Mirrors SatBuildingLayer's `runtime.satBuildings = engine`
+  // (identity-guarded cleanup, mount-time is enough because the engine is
+  // memoised on `runtime`), but hands out a read-only view rather than the
+  // engine itself: nothing outside this file should be able to steer it.
+  const bus = useMemo(
+    () => ({
+      get stats() {
+        return engine.stats;
+      },
+    }),
+    [engine]
+  );
+  useEffect(() => {
+    // (`runtime` is the scene's mutable cross-component bus — FlyScene's
+    // RUNTIME CONTRACTS (R18) block — exactly as SatBuildingLayer writes it.)
+    runtime.satVeg = bus;
+    return () => {
+      if (runtime.satVeg === bus) runtime.satVeg = null;
+    };
+  }, [bus, runtime]);
   // byClass: round 19 — placed canopies per worker class id (index 0..6), the
   // value verify-groundlife's "Powell residential canopy" gate reads. It is
   // counted from the LIVE placement pass, not from the streamed rows, so it
@@ -134,6 +183,10 @@ export function SatVegLayer({ runtime, flight }) {
   // instance matrices it can already read. Never allocated in production.
   const placeRef = useRef({
     t: -Infinity,
+    first: true, // round 21: the one-time cadence phase nudge (S6)
+    sig: '', // …and the static-skip signature
+    atX: Infinity,
+    atZ: Infinity,
     placed: 0,
     altK: 0,
     byClass: new Uint32Array(8),
@@ -200,18 +253,40 @@ export function SatVegLayer({ runtime, flight }) {
     const mesh = meshRef.current;
     const st = placeRef.current;
     if (mesh && t - st.t >= SAT_VEG.placeCadenceSec) {
-      st.t = t;
+      // Round 21 (C, S6): the one-time phase nudge. The first pass is still
+      // immediate — this only moves where the STEADY cadence lands, so the
+      // four pooled layers stop refilling their buffers on the same frame.
+      const U = SURFACE_CALM.enabled ? SURFACE_CALM.uploads : null;
+      st.t = st.first && U ? t + U.stagger[0] * SAT_VEG.placeCadenceSec : t;
+      st.first = false;
       st.altK = 1 - smoothstep(SAT_VEG.altFade.onM, SAT_VEG.altFade.offM, eyeAgl);
-      st.placed = placeCanopy(
-        mesh,
-        engine,
-        flight,
-        st.altK,
-        pool,
-        perChunkCap,
-        st.byClass,
-        st.classAt
-      );
+      // …and the static skip. A parked or slow-moving aircraft over a settled
+      // ring re-derives an IDENTICAL pool and re-uploads it every 2 s. The
+      // signature is everything this pass reads: the ring's own streaming
+      // state and the altitude fade. Cheap by construction (the stats getter
+      // walks tens of chunks) and conservative — any difference runs the pass.
+      const sg = engine.stats;
+      const sig = U
+        ? `${sg.chunks}|${sg.ready}|${sg.empty}|${sg.vegPts}|${sg.clsChunks}|${st.altK.toFixed(3)}`
+        : '';
+      const moved2 = (flight.pos.x - st.atX) ** 2 + (flight.pos.z - st.atZ) ** 2;
+      if (!U || sig !== st.sig || moved2 >= U.staticSkipM ** 2) {
+        st.sig = sig;
+        st.atX = flight.pos.x;
+        st.atZ = flight.pos.z;
+        st.placed = placeCanopy(
+          mesh,
+          engine,
+          flight,
+          st.altK,
+          pool,
+          perChunkCap,
+          st.byClass,
+          st.classAt,
+          st.prevN ?? 0
+        );
+        st.prevN = st.placed;
+      }
     }
 
     if (
@@ -327,7 +402,7 @@ export function SatVegLayer({ runtime, flight }) {
  * Returns the placed count. Everything the look depends on — palette, jitter,
  * conifer shape, both fades — resolves HERE, so nothing runs per frame.
  */
-function placeCanopy(mesh, engine, flight, altK, pool, perChunkCap, byClass, classAt) {
+function placeCanopy(mesh, engine, flight, altK, pool, perChunkCap, byClass, classAt, prevN) {
   const S = SAT_VEG;
   const px = flight.pos.x;
   const pz = flight.pos.z;
@@ -438,8 +513,10 @@ function placeCanopy(mesh, engine, flight, altK, pool, perChunkCap, byClass, cla
   // THE OWENS INVARIANT: nothing placed = no draw. three already skips
   // primcount 0; `visible` states it as a contract a harness can read back.
   mesh.visible = n > 0;
-  mesh.instanceMatrix.needsUpdate = true;
-  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  // Round 21 (C, S6): upload only what can have changed (see rangeUpload).
+  const touched = Math.max(n, prevN | 0);
+  rangeUpload(mesh.instanceMatrix, touched * 16);
+  if (mesh.instanceColor) rangeUpload(mesh.instanceColor, touched * 3);
   mesh.boundingSphere.center.set(0, 0, 0);
   mesh.boundingSphere.radius = Math.sqrt(maxR2) + maxScale + maxD * maxD * MAX_BEND_K + 50;
   return n;

@@ -18,7 +18,7 @@ import {
   WebGLRenderTarget,
 } from 'three';
 import { RGBELoader } from 'three-stdlib';
-import { SKY, SKY_DUSK, SKY_LIVE } from '@/lib/fly/fly-constants';
+import { SKY, SKY_DUSK, SKY_LIVE, SURFACE_CALM } from '@/lib/fly/fly-constants';
 import { legacyBucket, resolveSky, skyDuskOn, skyKey, trueElevationDeg } from '@/lib/fly/sky-dusk';
 import { clearSkySun, setSkySunElevation } from './SkyDome';
 
@@ -296,6 +296,7 @@ export function SatEnvironment({ runtime, bucket }) {
   const swapsRef = useRef(0);
   const envRef = useRef(null); // damped intensities (null = snap on first frame)
   const bgRef = useRef(null);
+  const seedPendingRef = useRef(false); // round 21 (C, S8): validate the seed once
   // Round 19 (D): the elevation-keyed sky state. `desiredRef` holds the live
   // descriptor {a, b, s}; `skyState` is only its KEY, so React re-runs the
   // swap effect exactly once per step and never per frame. With the round
@@ -323,6 +324,18 @@ export function SatEnvironment({ runtime, bucket }) {
     };
     pmremRef.current = acquirePmrem(gl);
     aliveRef.current = true;
+    // Round 21 (C, S8): seed the damped intensities from what is ALREADY on
+    // the scene. Left null they meant "snap on the first frame", so every
+    // satellite (re)entry wrote a step change straight into
+    // scene.environmentIntensity / backgroundIntensity. The frame loop snaps
+    // anyway if this seed turns out to be a different style's (seedSnapDelta).
+    if (SURFACE_CALM.enabled && SURFACE_CALM.duskCalm.seedFromScene) {
+      const e = scene.environmentIntensity;
+      const b = scene.backgroundIntensity;
+      envRef.current = Number.isFinite(e) ? e : null;
+      bgRef.current = Number.isFinite(b) ? b : null;
+      seedPendingRef.current = envRef.current != null || bgRef.current != null;
+    }
     // The retired-target list is mutated in place and never reassigned, so
     // capturing it here is the same array the cleanup needs (and silences the
     // stale-ref-in-cleanup lint, which is aimed at ref'd DOM nodes).
@@ -404,7 +417,20 @@ export function SatEnvironment({ runtime, bucket }) {
         // A step WITHIN one pair gets a shallow dip; a new pair (a real
         // chroma cut) keeps the full certified dipDepth.
         const pair = blending || d ? `${d?.a}|${d?.b}` : key;
-        dipScaleRef.current = pairRef.current === pair ? SKY_DUSK.blendDipK : 1;
+        // Round 21 (C, S8): SKY_DUSK.blendSteps is 8, so a single dawn/dusk
+        // crossing fires EIGHT background dips — one per intra-pair step — and
+        // a staircase of dimming pulses is exactly the "everything flashes"
+        // symptom, arriving on the schedule of the feature that was supposed
+        // to make dusk smooth. A step WITHIN a pair is a 1/8 nudge between two
+        // already-similar skies and needs no mask at all; the full certified
+        // dip stays on a real pair/bucket CUT, which is the swap it was
+        // measured against.
+        dipScaleRef.current =
+          pairRef.current === pair
+            ? SURFACE_CALM.enabled
+              ? SURFACE_CALM.duskCalm.intraPairDip
+              : SKY_DUSK.blendDipK
+            : 1;
         pairRef.current = pair;
         swapsRef.current += 1;
         swapAtRef.current = performance.now();
@@ -500,6 +526,22 @@ export function SatEnvironment({ runtime, bucket }) {
     const bgT = base.bg * (1 - wd.bg * oc) * (1 - wd.bgFog * fg);
 
     const k = 1 - Math.exp(-(delta > 0.25 ? 0.25 : delta) / SKY_LIVE.hdriFade.rampSec);
+    // Round 21 (C, S8): a seeded ref that is FAR from this frame's target came
+    // from another style (toy leaves three's 1.0 defaults on the scene), and
+    // ramping across that gap would show three seconds of the wrong sky
+    // instead of one frame of it. Such a seed is dropped and the R20 snap
+    // stands; a near seed — a remount inside satellite, which is the case this
+    // exists for — rides the ramp and is continuous.
+    // ONCE, on the first frame after the seed — never again. The ordinary
+    // ramp must keep crossing large target changes (a day→night bucket move is
+    // a big gap and R16 damping it is the certified behaviour); this is only
+    // about whether the SEED was ours to ramp from.
+    if (seedPendingRef.current) {
+      seedPendingRef.current = false;
+      const s = SURFACE_CALM.duskCalm.seedSnapDelta;
+      if (envRef.current != null && Math.abs(envRef.current - envT) > s) envRef.current = null;
+      if (bgRef.current != null && Math.abs(bgRef.current - bgT) > s) bgRef.current = null;
+    }
     let env = envRef.current == null ? envT : envRef.current + (envT - envRef.current) * k;
     let bg = bgRef.current == null ? bgT : bgRef.current + (bgT - bgRef.current) * k;
     // Snap once the ramp is visually done, so a settled sky sits on the EXACT

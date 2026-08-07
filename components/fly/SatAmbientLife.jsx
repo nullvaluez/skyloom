@@ -259,7 +259,15 @@ export function SatAmbientLife({ engine, flight, tier }) {
         <instancedMesh
           ref={(m) => {
             boatRef.current = m;
-            if (m) {
+            // R21 SANCTIONED BUGFIX (C, P7 — unflagged, R20 D-CERT precedent).
+            // The SatVegLayer `__satVegInit` latch: an inline ref callback
+            // re-attaches on every parent re-render, and this reset undid the
+            // live placement each time. The boats are re-placed every frame so
+            // the blank is short — but "short" is exactly the flicker class
+            // this round is closing, and a latch cannot change settled-state
+            // output.
+            if (m && !m.userData.__satBoatInit) {
+              m.userData.__satBoatInit = true;
               m.instanceMatrix.setUsage(DynamicDrawUsage);
               m.frustumCulled = false; // ≤48 moving instances; the unit bound lies
               m.count = 0;
@@ -273,7 +281,10 @@ export function SatAmbientLife({ engine, flight, tier }) {
         <instancedMesh
           ref={(m) => {
             plumeRef.current = m;
-            if (m) {
+            // R21 SANCTIONED BUGFIX (C, P7 — unflagged, R20 D-CERT precedent).
+            // Same latch, same reason as the boats above.
+            if (m && !m.userData.__satPlumeInit) {
+              m.userData.__satPlumeInit = true;
               m.instanceMatrix.setUsage(DynamicDrawUsage);
               m.frustumCulled = false;
               m.renderOrder = 4; // additive, after the opaque ground layers

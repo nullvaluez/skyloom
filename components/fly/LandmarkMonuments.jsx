@@ -186,6 +186,20 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
     // this whole path is the pre-R20 code.
     const supEpoch = monumentSuppressionEpoch();
     if (!rebased && supEpoch === last.sup && t - last.t < LANDMARKS_3D.refreshSec) return;
+    // Round 21 (C, S7) — the double-draw instrument. MonumentModels stamps
+    // `bumpT` with the frame clock it bumped the epoch on; this stamps the
+    // frame clock it CONSUMED it on. Equal ⇒ same frame ⇒ the archetype is
+    // parked in the very frame its real model appears. A positive lag is the
+    // R20 behaviour: one frame of both. Dev only, and only on the rare frame
+    // where the epoch actually moved.
+    if (process.env.NODE_ENV !== 'production' && supEpoch !== last.sup) {
+      const stats = (window.__flyStats ??= {});
+      const mon = (stats.monuments ??= {});
+      mon.consumeT = +t.toFixed(4);
+      mon.lagSec = mon.bumpT != null ? +(t - mon.bumpT).toFixed(4) : -1;
+      mon.lateConsumes = (mon.lateConsumes ?? 0) + (mon.lagSec > 1e-6 ? 1 : 0);
+      mon.consumes = (mon.consumes ?? 0) + 1;
+    }
     last.t = t;
     last.ax = origin.anchor.x;
     last.az = origin.anchor.z;

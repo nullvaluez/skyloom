@@ -222,14 +222,28 @@ export function SatRoadLayer({ runtime, flight }) {
         <instancedMesh
           ref={(m) => {
             beaconRef.current = m;
-            if (m) {
+            // R21 SANCTIONED BUGFIX (C, P7 — unflagged, R20 D-CERT precedent).
+            // An inline ref callback re-attaches on EVERY re-render of this
+            // component, and FlyScene re-renders for entirely ordinary reasons
+            // (hovering a plane, a contract tick, a panel opening). `count = 0`
+            // below therefore wiped the whole beacon field on each of them —
+            // and unlike the boats, placement here only runs on the 2 s
+            // cadence, so the airport lights stayed BLANK for up to two
+            // seconds every time. This is the SatVegLayer latch idiom
+            // (`__satVegInit`, whose comment documents the same hazard) and it
+            // cannot change settled-state output: it only stops a re-render
+            // from undoing a pass that already ran.
+            if (m && !m.userData.__satBeaconInit) {
+              m.userData.__satBeaconInit = true;
               m.instanceMatrix.setUsage(DynamicDrawUsage);
               m.frustumCulled = false; // instances span the ring; the unit bound lies
               m.renderOrder = 4; // additive, after the road ribbons (renderOrder 3)
               m.count = 0; // parked until the first placement pass
-              if (process.env.NODE_ENV === 'development') window.__satBeacons = m;
-            } else if (process.env.NODE_ENV === 'development') {
-              delete window.__satBeacons;
+              beaconRefs.current.t = -Infinity; // …which is the very next frame
+            }
+            if (process.env.NODE_ENV === 'development') {
+              if (m) window.__satBeacons = m;
+              else delete window.__satBeacons;
             }
           }}
           args={[beaconGeometry, beaconMaterial, BEACON_POOL]}
