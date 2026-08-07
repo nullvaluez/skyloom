@@ -1,0 +1,1439 @@
+{
+  "mode": "dublin",
+  "tag": "pipe",
+  "families": [
+    "pipe"
+  ],
+  "bootMs": 9536,
+  "cfg": {
+    "style": "satellite",
+    "tier": "high",
+    "baseLod": 0.86,
+    "liveLod": 0.86,
+    "curveArmed": false,
+    "maxThreads": 10,
+    "steadyThreads": 10,
+    "maxLevel": 17,
+    "minLevel": 2,
+    "imgMaxLevel": 17,
+    "demMaxLevel": 15,
+    "imgDataType": "image",
+    "demDataType": "lerc",
+    "sizeZ0": 0,
+    "sharpOn": false,
+    "pipeOn": true,
+    "cacheOn": false,
+    "pinned": true
+  },
+  "runs": [
+    {
+      "label": "cold",
+      "reach": {
+        "z10": 1531,
+        "z11": null,
+        "z12": null,
+        "z13": null,
+        "z14": null
+      },
+      "trace": [
+        {
+          "ms": 517,
+          "z": 4,
+          "camTileZ": 3,
+          "targetZ": 13,
+          "dl": 10,
+          "draws": 69
+        },
+        {
+          "ms": 1025,
+          "z": 9,
+          "camTileZ": 5,
+          "targetZ": 13,
+          "dl": 12,
+          "draws": 93
+        },
+        {
+          "ms": 1531,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 8,
+          "draws": 138
+        },
+        {
+          "ms": 2044,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 153
+        },
+        {
+          "ms": 2550,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 153
+        },
+        {
+          "ms": 3058,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 153
+        },
+        {
+          "ms": 3573,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 4091,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 4611,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 5121,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 5635,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 6150,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 6656,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 155
+        },
+        {
+          "ms": 7166,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 155
+        },
+        {
+          "ms": 7683,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 155
+        },
+        {
+          "ms": 8190,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 8705,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 9215,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 9723,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 10234,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 10739,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 11248,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 11754,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 12273,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 12787,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 13294,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 13803,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 14315,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 14827,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 15338,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 15854,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 16372,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 16882,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 17386,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 17892,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 18408,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 144
+        },
+        {
+          "ms": 18922,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 144
+        },
+        {
+          "ms": 19438,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 144
+        },
+        {
+          "ms": 19949,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 144
+        },
+        {
+          "ms": 20461,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 20981,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 21495,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 22000,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 22528,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 23042,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 23560,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 24075,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 24589,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 148
+        },
+        {
+          "ms": 25102,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 148
+        },
+        {
+          "ms": 25616,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 148
+        },
+        {
+          "ms": 26136,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 148
+        },
+        {
+          "ms": 26654,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 148
+        },
+        {
+          "ms": 27173,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 148
+        },
+        {
+          "ms": 27683,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 148
+        },
+        {
+          "ms": 28193,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 28702,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 29221,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 146
+        },
+        {
+          "ms": 29738,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 146
+        },
+        {
+          "ms": 30242,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 146
+        },
+        {
+          "ms": 30757,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 146
+        },
+        {
+          "ms": 31264,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 146
+        },
+        {
+          "ms": 31772,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 146
+        },
+        {
+          "ms": 32280,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 146
+        },
+        {
+          "ms": 32789,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 146
+        },
+        {
+          "ms": 33297,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 146
+        },
+        {
+          "ms": 33805,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 146
+        },
+        {
+          "ms": 34311,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 149
+        },
+        {
+          "ms": 34817,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 149
+        },
+        {
+          "ms": 35335,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 149
+        },
+        {
+          "ms": 35840,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 149
+        },
+        {
+          "ms": 36352,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 149
+        },
+        {
+          "ms": 36861,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 149
+        },
+        {
+          "ms": 37368,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 143
+        },
+        {
+          "ms": 37876,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 143
+        },
+        {
+          "ms": 38382,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 143
+        },
+        {
+          "ms": 38888,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 143
+        },
+        {
+          "ms": 39397,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 143
+        },
+        {
+          "ms": 39905,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 143
+        },
+        {
+          "ms": 40414,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 143
+        }
+      ],
+      "probeZ": 10,
+      "draws": 143,
+      "tris": 66487,
+      "terra": {
+        "camTileZ": 10,
+        "targetZ": 13,
+        "downloading": 0,
+        "sharp": false,
+        "aglM": 8867,
+        "lodThreshold": 0.86,
+        "maxLevel": 17,
+        "burst": false,
+        "at": 61682.59999999404
+      },
+      "rtTerra": {
+        "camTileZ": 10,
+        "targetZ": 13,
+        "downloading": 0,
+        "sharp": false,
+        "aglM": 8867,
+        "lodThreshold": 0.86,
+        "maxLevel": 17,
+        "burst": false,
+        "at": 61682.59999999404
+      },
+      "warp": {
+        "urls": 34,
+        "done": 34,
+        "ms": 1072,
+        "cache": {
+          "hits": 0,
+          "misses": 0,
+          "writes": 68,
+          "errors": 0,
+          "bypass": 0
+        }
+      },
+      "cache": null,
+      "heapMB": 90
+    },
+    {
+      "label": "warm",
+      "reach": {
+        "z10": 1038,
+        "z11": null,
+        "z12": null,
+        "z13": null,
+        "z14": null
+      },
+      "trace": [
+        {
+          "ms": 520,
+          "z": 8,
+          "camTileZ": 5,
+          "targetZ": 13,
+          "dl": 15,
+          "draws": 166
+        },
+        {
+          "ms": 1038,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 143
+        },
+        {
+          "ms": 1548,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 153
+        },
+        {
+          "ms": 2056,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 153
+        },
+        {
+          "ms": 2565,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 153
+        },
+        {
+          "ms": 3077,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 153
+        },
+        {
+          "ms": 3585,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 4091,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 4600,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 5110,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 5616,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 6128,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 155
+        },
+        {
+          "ms": 6639,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 155
+        },
+        {
+          "ms": 7152,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 155
+        },
+        {
+          "ms": 7665,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 155
+        },
+        {
+          "ms": 8169,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 8678,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 9183,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 9702,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 10207,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 10717,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 11230,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 11737,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 154
+        },
+        {
+          "ms": 12252,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 12760,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 13269,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 13786,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 14306,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 14823,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 15337,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 15849,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 16364,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 16873,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 17390,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 145
+        },
+        {
+          "ms": 17906,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 144
+        },
+        {
+          "ms": 18418,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 144
+        },
+        {
+          "ms": 18937,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 144
+        },
+        {
+          "ms": 19448,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 144
+        },
+        {
+          "ms": 19952,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 144
+        },
+        {
+          "ms": 20472,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 20992,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 21497,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 22014,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 22523,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 23039,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 23552,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 24069,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 24586,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 148
+        },
+        {
+          "ms": 25095,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 148
+        },
+        {
+          "ms": 25613,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 148
+        },
+        {
+          "ms": 26130,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 148
+        },
+        {
+          "ms": 26641,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 148
+        },
+        {
+          "ms": 27149,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 148
+        },
+        {
+          "ms": 27660,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 148
+        },
+        {
+          "ms": 28177,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 148
+        },
+        {
+          "ms": 28681,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 148
+        },
+        {
+          "ms": 29194,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 29702,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 30217,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 30751,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 31267,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 31775,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 32292,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 32809,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 33326,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 33846,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 34362,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 150
+        },
+        {
+          "ms": 34879,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 150
+        },
+        {
+          "ms": 35390,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 150
+        },
+        {
+          "ms": 35904,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 150
+        },
+        {
+          "ms": 36420,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 150
+        },
+        {
+          "ms": 36933,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 150
+        },
+        {
+          "ms": 37440,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 147
+        },
+        {
+          "ms": 37954,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 144
+        },
+        {
+          "ms": 38459,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 144
+        },
+        {
+          "ms": 38967,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 144
+        },
+        {
+          "ms": 39485,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 144
+        },
+        {
+          "ms": 40002,
+          "z": 10,
+          "camTileZ": 10,
+          "targetZ": 13,
+          "dl": 0,
+          "draws": 144
+        }
+      ],
+      "probeZ": 10,
+      "draws": 144,
+      "tris": 67537,
+      "terra": {
+        "camTileZ": 10,
+        "targetZ": 13,
+        "downloading": 0,
+        "sharp": false,
+        "aglM": 8867,
+        "lodThreshold": 0.86,
+        "maxLevel": 17,
+        "burst": false,
+        "at": 115918.09999999404
+      },
+      "rtTerra": {
+        "camTileZ": 10,
+        "targetZ": 13,
+        "downloading": 0,
+        "sharp": false,
+        "aglM": 8867,
+        "lodThreshold": 0.86,
+        "maxLevel": 17,
+        "burst": false,
+        "at": 115918.09999999404
+      },
+      "warp": {
+        "urls": 34,
+        "done": 34,
+        "ms": 204,
+        "cache": {
+          "hits": 0,
+          "misses": 0,
+          "writes": 68,
+          "errors": 0,
+          "bypass": 0
+        }
+      },
+      "cache": null,
+      "heapMB": 98
+    }
+  ],
+  "cold": {
+    "z10": 1531,
+    "z11": null,
+    "z12": null,
+    "z13": null,
+    "z14": null
+  },
+  "warm": {
+    "z10": 1038,
+    "z11": null,
+    "z12": null,
+    "z13": null,
+    "z14": null
+  },
+  "warmRatio": {
+    "z10": 0.68,
+    "z11": null,
+    "z12": null,
+    "z13": null,
+    "z14": null
+  },
+  "zoomSeen": {
+    "img2": 28,
+    "img3": 86,
+    "img4": 93,
+    "dem5": 101,
+    "img5": 101,
+    "dem6": 99,
+    "img6": 97,
+    "dem7": 113,
+    "img7": 112,
+    "dem8": 109,
+    "img8": 109,
+    "img9": 99,
+    "dem9": 100,
+    "dem10": 91,
+    "img10": 91,
+    "dem11": 70,
+    "img11": 70,
+    "dem12": 63,
+    "img12": 63,
+    "dem13": 42,
+    "img13": 42,
+    "dem14": 19,
+    "img14": 19,
+    "dem15": 34,
+    "img15": 26,
+    "img16": 38,
+    "img17": 18
+  },
+  "pageerrors": []
+}
