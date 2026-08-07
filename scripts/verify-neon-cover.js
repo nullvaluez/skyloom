@@ -47,11 +47,34 @@ const path = require('path');
 const { bootFly } = require('./_boot');
 
 // --- frozen pre-R19-F worker output (NEON_COVER.enabled:false) --------------
+//
+// R21 SANCTIONED RE-BASELINE (upstream planet drift 20260802, controlled 3-way)
+// — EXACTLY TWO of the five values move, and NOT because any R21 code touched
+// them. D PIPELINE proved it with a three-way control that included a stash of
+// the PRISTINE scaffolding tree `e1077f8`: `manhattan-full` and `manhattan-mid`
+// were ALREADY red there, before a line of R21 product code existed.
+// OpenFreeMap published planet build `20260802_080001_pt` on the day R20
+// closed. The building layer at 14/4824/6157 still reports exactly 1481
+// features, so the drift is in another layer of the same tile.
+//   manhattan-full  176e2e75 → 1a509f39
+//   manhattan-mid   a6805b95 → 2fa4a264
+// The other THREE reproduce byte-exactly on the R21 tree with the (widened)
+// toy-path-off control state — measured this run: powell-full 33d299d9,
+// powell-mid 8b699579, manhattan-far 473596c0. That 3-of-5 split is itself the
+// evidence: a code regression would move all five, or move them by scene, not
+// spare Powell entirely and hit one tile's two rings.
+//
+// THE CODE INVARIANT IS UNTOUCHED AND INDEPENDENTLY PROVEN. "Flag-off is
+// byte-identical for identical input" now rests on verify-seam's in-process
+// worker fixture, which builds the SAME tile twice and compares FNV hashes of
+// the position and index arrays — a determinism test that does not depend on
+// anybody else's release schedule. See FLY_ROUND21.md §5b: a hash gate whose
+// input is a LIVE tileset needs pinned fixture tiles (R22).
 const R18_ROLL = {
   'powell-full': '33d299d9',
   'powell-mid': '8b699579',
-  'manhattan-full': '176e2e75',
-  'manhattan-mid': 'a6805b95',
+  'manhattan-full': '1a509f39', // R21 SANCTIONED RE-BASELINE: 176e2e75 → 1a509f39
+  'manhattan-mid': '2fa4a264', // R21 SANCTIONED RE-BASELINE: a6805b95 → 2fa4a264
   'manhattan-far': '473596c0',
 };
 // The satellite builders whose output must be independent of NEON_COVER.
@@ -170,8 +193,27 @@ const TRI_MAX = 2.0e6; // 0.2 M headroom under the 2.2 M gate
   // from the worker source every run, so the day a future round reaches one of
   // them from the toy path, the gate says so instead of the hashes silently
   // going red.
-  const R20_FLAGS = ['NEON_COVER', 'TOY_MID_SUBURB', 'MONUMENT_MODELS', 'PARCEL_HOMES', 'SAT_POLY_COVER'];
-  const EXPECTED_TOY_FLAGS = ['NEON_COVER', 'TOY_MID_SUBURB', 'MONUMENT_MODELS'];
+  // R21 SANCTIONED GATE-MECHANICS (Fable ruling, W2) — the inventory gains the
+  // R21 worker-side flag. D PIPELINE's `TILE_PIPELINE` is the ONLY R21 block
+  // the worker source references at all (measured: 25 references; STREAM_KEEPER
+  // / SURFACE_CALM / PERF_GOVERNOR / FX_STABILITY / PREWARM are 0 — they live in
+  // the engines, the layers and the canvas, which this source scan does not and
+  // should not reach). It IS toy-reachable — the toy tail carries the `'zero'`
+  // empty-reason tag — and D deliberately spelled every reference out so gate
+  // 3a's attribution can see it rather than having it hide behind a local.
+  // THE FIVE HASH VALUES ARE NOT TOUCHED BY THIS EDIT; what widens is again the
+  // control state a tree must be in to reproduce them. (The two Manhattan
+  // hashes DO move, for an unrelated and separately-ruled reason — see the
+  // R18_ROLL block at the top of this file.)
+  const R20_FLAGS = [
+    'NEON_COVER',
+    'TOY_MID_SUBURB',
+    'MONUMENT_MODELS',
+    'PARCEL_HOMES',
+    'SAT_POLY_COVER',
+    'TILE_PIPELINE',
+  ];
+  const EXPECTED_TOY_FLAGS = ['NEON_COVER', 'TOY_MID_SUBURB', 'MONUMENT_MODELS', 'TILE_PIPELINE'];
   const apiStart = bounds.find((b) => b.name === 'api')?.start ?? 0;
   const apiBody = bodyOf('api') || '';
   // The toy pass is everything in `api` AFTER the satellite early-returns —

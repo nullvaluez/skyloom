@@ -222,7 +222,34 @@ async function changedFrac(fileA, fileB, region, thr = 6) {
   // runs: 0.27/1.04, 0.29/0.79, 0.62/0.43). For scale, the SAME layer flipped
   // at the SAME distance when it is genuinely drawing moves ~9% of its crop —
   // see the cruise gate below. 1.2% is "nothing", with a 7× discriminator.
-  const NEAR_CEIL = Math.max(0.012, nearNoise * 2);
+  // R21 SANCTIONED DEMOTION (Fable ruling, W3) — the NOISE-RATIO half of this
+  // ceiling is retired; the ABSOLUTE 1.2% bar it was max()'d with becomes the
+  // whole gate. B flagged the pair as a coin (one run FAIL at signal 1.451% vs
+  // noise 1.375%, the next PASS on the identical tree with signal BELOW noise),
+  // and a 6-run distribution on the integrated tree (3 same-config pairs, the
+  // R20 verify-groundlife method) settles it:
+  //
+  //     run   signal   noise    ratio
+  //      1    0.467%   0.682%   0.68  <- control >= signal
+  //      2    0.808%   0.510%   1.58
+  //      3    0.804%   0.321%   2.50
+  //      4    0.580%   0.150%   3.87
+  //      5    0.232%   0.571%   0.41  <- control >= signal
+  //      6    0.342%   0.362%   0.94  <- control >= signal
+  //     mean  0.539%   0.433%   pooled 1.24x
+  //
+  // The control EXCEEDS the signal in 3 of 6 runs and the pooled ratio is
+  // 1.24x — the two distributions are the same distribution, exactly the R20
+  // groundlife signature (pooled 1.04x). A `nearNoise * 2` term computed from a
+  // control that wanders 0.150-0.682% cannot discriminate anything; on a quiet
+  // frame it collapses the bar and on a busy one it triples it.
+  //
+  // NOTHING IS WEAKENED. All six runs measured <= 0.808%, comfortably inside
+  // the absolute 1.2% the original author already called "the real bar, with a
+  // 7x discriminator" — so the gate passes on exactly the evidence it always
+  // passed on, minus a term that was deciding by coin flip. The measured pair
+  // is still printed above for the record.
+  const NEAR_CEIL = 0.012;
   gate(
     'skyline draws NOTHING inside the hole (near-crop |Δ| ≈ noise)',
     nearMass <= NEAR_CEIL,
