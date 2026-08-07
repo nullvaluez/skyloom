@@ -481,9 +481,16 @@ const SCENES = [
       [40.1578, -83.0752, 900, 1.9, -0.3]
     );
     await page.waitForTimeout(30000); // settle: first full ring fill
+    const engineCounters = () =>
+      page.evaluate(() => ({
+        sb: window.__satBuildings?.stats ?? null,
+        sky: window.__satSkyline?.stats ?? null,
+      }));
+    const before = await engineCounters();
     counting = true;
     await page.waitForTimeout(60000); // the 60 s steady-state window
     counting = false;
+    const after = await engineCounters();
     const repeats = [...reqs.entries()].filter(([, n]) => n > 1).sort((a, b) => b[1] - a[1]);
     const worst = repeats[0]?.[1] ?? 1;
     const healCap = C.STREAM_KEEPER?.healCap ?? 3;
@@ -515,6 +522,45 @@ const SCENES = [
         !!stats.sbReason,
         JSON.stringify({ sb: stats.sbReason, sky: stats.skyReason })
       );
+    // --- (8b) THE HEAL/RETRY LOOP, MEASURED AT THE ENGINE ------------------
+    // This is the load-bearing replacement for gate (7). D's persistent Cache
+    // API made (7) blind to any loop whose re-reads hit the cache
+    // (`caches.match()` is not a fetch, so Playwright sees no request), and B's
+    // own group-hole fault injection was unmeasurable through Playwright
+    // routing because module-worker fetches are unroutable. B's counters are
+    // what remains, and they are better: they count the loop itself rather
+    // than its network shadow. A SETTLED pose over a fully-mapped suburb must
+    // heal a bounded number of times and must not churn its ring.
+    const delta = (a, b, k) => Math.max(0, (b?.[k] ?? 0) - (a?.[k] ?? 0));
+    const sbHeals = delta(before.sb, after.sb, 'heals');
+    const skyHeals = delta(before.sky, after.sky, 'heals');
+    const sbEvict = delta(before.sb, after.sb, 'evictions');
+    const skyEvict = delta(before.sky, after.sky, 'evictions');
+    const sbRetries = delta(before.sb, after.sb, 'errorRetries');
+    const skyRetries = delta(before.sky, after.sky, 'errorRetries');
+    const ringChunks = after.sb?.chunks ?? 16;
+    if (before.sb?.heals === undefined)
+      soft('(8b) heal / retry counters', 'B', 'gate (7) is the standing proxy and is cache-blind');
+    else {
+      gate(
+        `(8b) HEALING IS BOUNDED over a settled 60 s (<= healCap ${healCap} per ring)`,
+        sbHeals <= healCap && skyHeals <= healCap,
+        `satBuildings heals +${sbHeals}, skyline heals +${skyHeals} (absolute ${after.sb?.heals}/${after.sky?.heals})`
+      );
+      gate(
+        `(8c) A SETTLED RING DOES NOT CHURN (evictions <= its own chunk count ${ringChunks})`,
+        sbEvict <= ringChunks && skyEvict <= ringChunks,
+        `satBuildings evictions +${sbEvict}, skyline +${skyEvict} over the window ` +
+          `(absolute ${after.sb?.evictions}/${after.sky?.evictions})`
+      );
+      gate(
+        '(8d) NO ERROR-RETRY HAMMER (the R20 infinite 2 s retry)',
+        sbRetries === 0 && skyRetries === 0,
+        `errorRetries +${sbRetries}/+${skyRetries}`
+      );
+      red.push(['P2/P6 heal loop (engine-side)', 'verify-seam (8b)', `+${sbHeals}/+${skyHeals}`, `<= ${healCap}`]);
+    }
+
     gate('(9) zero pageerrors in the browser leg', errs.length === 0, errs.slice(0, 3).join(' | '));
     browserOut = { distinct: reqs.size, repeats: repeats.slice(0, 20), stats };
     await browser.close();

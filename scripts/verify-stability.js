@@ -266,10 +266,14 @@ const FALSE_CULL_CENSUS = () => {
   let falseCulls = 0;
   let overDraw = 0;
   let maxDropM = 0;
+  let marginShort = 0;
+  let marginMissing = 0;
+  let worstShortM = 0;
+  const shortList = [];
   const byRoot = {};
   const worst = [];
   for (const [name, root] of roots) {
-    byRoot[name] = { tested: 0, falseCulls: 0 };
+    byRoot[name] = { tested: 0, falseCulls: 0, marginShort: 0 };
     root.updateMatrixWorld?.(true);
     root.traverse((o) => {
       if (!o.isMesh || !o.visible || !o.frustumCulled) return;
@@ -285,12 +289,41 @@ const FALSE_CULL_CENSUS = () => {
       const bent = inside(c.x, c.y - drop, c.z, r);
       tested += 1;
       byRoot[name].tested += 1;
+      // R21 W3 — THE REFORMULATED INVARIANT (Fable ruling). The engines now
+      // stamp the margin each mesh actually received. A margin that covers the
+      // drop makes a false cull IMPOSSIBLE: the bent geometry lies inside the
+      // grown sphere three tests. So the assertion is per-mesh and exact —
+      // `dropAtCentre <= bendMarginM` — instead of a COUNT of translated-sphere
+      // disagreements, which cannot reach zero however large the margin is
+      // (a translation test keeps a disagreement band of width ~drop at every
+      // frustum plane; that is why the count plateaued at 1-5 post-fix).
+      const margin = o.userData?.bendMarginM;
+      if (margin === undefined) marginMissing += 1;
+      else if (drop > margin) {
+        marginShort += 1;
+        byRoot[name].marginShort += 1;
+        if (drop - margin > worstShortM) worstShortM = drop - margin;
+        if (shortList.length < 6)
+          shortList.push({
+            root: name,
+            dM: Math.round(d),
+            dropM: Math.round(drop),
+            marginM: Math.round(margin),
+            shortM: Math.round(drop - margin),
+          });
+      }
       if (!raw && bent) {
         falseCulls += 1;
         byRoot[name].falseCulls += 1;
         if (drop > maxDropM) maxDropM = drop;
         if (worst.length < 6)
-          worst.push({ root: name, dM: Math.round(d), dropM: Math.round(drop), r: Math.round(r) });
+          worst.push({
+            root: name,
+            dM: Math.round(d),
+            dropM: Math.round(drop),
+            r: Math.round(r),
+            marginM: margin === undefined ? null : Math.round(margin),
+          });
       } else if (raw && !bent) overDraw += 1;
     });
   }
@@ -302,6 +335,10 @@ const FALSE_CULL_CENSUS = () => {
     bendK: k,
     byRoot,
     worst,
+    marginShort,
+    marginMissing,
+    worstShortM: Math.round(worstShortM),
+    shortList,
   };
 };
 
@@ -635,6 +672,10 @@ const lsq = (xs, ys) => {
           `engines never mount and there are no chunk meshes to test.`
       );
     const maxFalse = ok.length ? Math.max(...ok.map((s) => s.falseCulls)) : -1;
+    const maxShort = ok.length ? Math.max(...ok.map((s) => s.marginShort ?? 0)) : -1;
+    const maxMissing = ok.length ? Math.max(...ok.map((s) => s.marginMissing ?? 0)) : -1;
+    const worstShort = ok.length ? Math.max(...ok.map((s) => s.worstShortM ?? 0)) : -1;
+    const shortSample = ok.find((s) => (s.marginShort ?? 0) === maxShort)?.shortList ?? [];
     const sumTested = ok.length ? Math.max(...ok.map((s) => s.tested)) : -1;
     const worstSample = ok.find((s) => s.falseCulls === maxFalse) ?? {};
     // Draw-collapse evidence: biggest single-frame drop and the deepest dip
@@ -653,7 +694,24 @@ const lsq = (xs, ys) => {
         `max=${Math.max(...series)} dip=${(dipFrac * 100).toFixed(1)}% worstStepDrop=${maxStepDrop}` +
         (worstSample.worst?.length ? ` · worst=${JSON.stringify(worstSample.worst)}` : '')
     );
-    return { maxFalse, sumTested, worstSample, med, dipFrac, maxStepDrop, series };
+    console.log(
+      `      MARGIN[${tag}]: meshes short of their own bend margin = ${maxShort} ` +
+        `(worst shortfall ${worstShort} m) · unstamped meshes = ${maxMissing}` +
+        (shortSample.length ? ` · ${JSON.stringify(shortSample)}` : '')
+    );
+    return {
+      maxFalse,
+      maxShort,
+      maxMissing,
+      worstShort,
+      shortSample,
+      sumTested,
+      worstSample,
+      med,
+      dipFrac,
+      maxStepDrop,
+      series,
+    };
   };
 
   const satOrbit = await orbitLeg(page, 'satellite NYC 900m', ORBIT_SEC, -0.28, 'r21-e-stability-02-sat-orbit.png');
@@ -663,16 +721,18 @@ const lsq = (xs, ys) => {
     `tested=${satOrbit.sumTested} (a tier below medium mounts no satellite engines)`
   );
   gate(
-    `(7) satellite orbit: no chunk culled while the bend has it on screen (=== ${MAX_FALSE_CULLS})`,
-    satOrbit.maxFalse === MAX_FALSE_CULLS,
-    `maxFalseCulls=${satOrbit.maxFalse} of ${satOrbit.sumTested} chunk meshes · ` +
-      `worst drop ${satOrbit.worstSample.maxDropM}m`
+    '(7) SATELLITE ORBIT: every chunk mesh carries a bend margin that COVERS its own drop',
+    satOrbit.maxShort === 0 && satOrbit.maxMissing === 0,
+    `meshes short of margin=${satOrbit.maxShort} (worst shortfall ${satOrbit.worstShort} m), ` +
+      `unstamped=${satOrbit.maxMissing}, of ${satOrbit.sumTested} meshes · ` +
+      `translated-sphere disagreements (informational, cannot reach 0 by construction): ` +
+      `${satOrbit.maxFalse}, worst drop ${satOrbit.worstSample.maxDropM} m`
   );
   red.push([
-    'P1 false frustum cull (satellite)',
+    'P1 bend margin short of drop (satellite)',
     'verify-stability (7)',
-    satOrbit.maxFalse,
-    `=== ${MAX_FALSE_CULLS}`,
+    `${satOrbit.maxShort} short / ${satOrbit.worstShort} m`,
+    '=== 0',
   ]);
   console.log(
     `INFO satellite orbit draw dip ${(satOrbit.dipFrac * 100).toFixed(1)}% ` +
@@ -778,16 +838,18 @@ const lsq = (xs, ys) => {
   );
   const toyOrbit = await orbitLeg(toy, 'toy FL260', ORBIT_SEC, -0.18, 'r21-e-stability-03-toy-orbit.png');
   gate(
-    `(9) toy orbit: no chunk culled while the bend has it on screen (=== ${MAX_FALSE_CULLS})`,
-    toyOrbit.maxFalse === MAX_FALSE_CULLS,
-    `maxFalseCulls=${toyOrbit.maxFalse} of ${toyOrbit.sumTested} chunk meshes · ` +
-      `worst drop ${toyOrbit.worstSample.maxDropM}m`
+    '(9) TOY ORBIT: every chunk mesh carries a bend margin that COVERS its own drop',
+    toyOrbit.maxShort === 0 && toyOrbit.maxMissing === 0,
+    `meshes short of margin=${toyOrbit.maxShort} (worst shortfall ${toyOrbit.worstShort} m), ` +
+      `unstamped=${toyOrbit.maxMissing}, of ${toyOrbit.sumTested} meshes · ` +
+      `translated-sphere disagreements (informational): ${toyOrbit.maxFalse}, ` +
+      `worst drop ${toyOrbit.worstSample.maxDropM} m`
   );
   red.push([
-    'P1 false frustum cull (toy ultra ring)',
+    'P1 bend margin short of drop (toy ultra ring)',
     'verify-stability (9)',
-    toyOrbit.maxFalse,
-    `=== ${MAX_FALSE_CULLS}`,
+    `${toyOrbit.maxShort} short / ${toyOrbit.worstShort} m`,
+    '=== 0',
   ]);
   const toyRemounts = await toy.evaluate(() => window.__flyStats?.sceneRemounts ?? -1);
   gate('(10) toy leg: scene subtree never bounced', toyRemounts === 0, `sceneRemounts=${toyRemounts}`);

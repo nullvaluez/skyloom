@@ -150,8 +150,9 @@ delivery list, not a wish list.
 | ~~`window.__flyStats.fx.rebuilds`~~ | A | **DELIVERED (W2)** — stability (4) is a live assertion now |
 | ~~**`window.__flyComposer`**~~ | A | **DELIVERED (W2)** — tier-step (4) is a live assertion now and passes at every sample |
 | ~~`window.__flyStats.governor`~~ | A | **DELIVERED (W2)** |
-| per-engine `stats.emptyByReason` | B | verify-seam (8) |
-| per-engine `stats.evictions` / `stats.heals` | B | verify-tier-step (3b) |
+| ~~per-engine `stats.emptyByReason`~~ | B | **DELIVERED (W2)** — verify-seam (8) is a live assertion |
+| ~~per-engine `stats.evictions` / `stats.heals` / `errorRetries`~~ | B | **DELIVERED (W2)** — verify-tier-step (3b) and the NEW verify-seam (8b)/(8c)/(8d) all live |
+| **NEW ASK: per-ring `stats.bendMarginM`** | B | verify-stability (7)/(9) — see §2.7. One number per engine converts the false-cull census from a count (which cannot reach 0 by construction) into the exact invariant `dropAtCentre <= bendMarginM`. Needs a Fable ruling. |
 | `window.__flyStats.monuments.remerges` | C | verify-stability (5) |
 | worker `api.setDiag(v)` | D | verify-seam (6b) |
 | `reason` on empty worker results | D | verify-seam (6c) — measured today: ocean and empty-Owens tiles both return a bare `{empty:true}` |
@@ -164,8 +165,8 @@ delivery list, not a wish list.
 |---|---|---|---|---|---|
 | **A GOVERNOR** (`7f55d12`) | **14/16**, only (7)+(9) red | **8/10**, only (3)+(3a) red | **4/6**, only (4)+(5) red | not re-run (worker untouched by A) | see §2.1 — every A-owned class flipped green, every B/C/D-owned class stayed red |
 | **D PIPELINE** (`6f10795`) | **15/17**, only (7)+(9) red — identical numbers | **8/10**, only (3)+(3a) red — identical | **4/6**, only (4)+(5) red; swing count halved again | **10/10 — VERIFY: PASS** | see §2.4 — D's own gate went fully green, Owens lock held at 0, nothing D does not own moved |
-| B STREAMKEEPER | — | — | — | — | expect stability (7)/(9) → 0, tier-step (3)/(3a) → green, seam (7) bounded |
-| C SURFACE | — | — | — | — | expect flicker (4)/(5) green and `monuments.remerges` present |
+| **B STREAMKEEPER** (`e2b3941`) | **15/17**, only (7)+(9) red — **but the severity collapsed ~5×, see §2.6** | **10/10 — VERIFY: PASS** | **4/6**, only (4)+(5) red; swing 73 → **49** | **13/13 — VERIFY: PASS** (gate 8 green + 3 new engine-side gates) | see §2.6. One earlier post-B attempt was **killed by a session limit and is DISCARDED** — it wrote no artifacts (`git status` clean at resume), so nothing partial entered the record; every number below is from a clean re-run against a freshly restarted server |
+| **C SURFACE** (`6aabe2f`, fully integrated) | **14/17** — (7)/(9) census + **(12) went RED for the first time all round** | (not re-run post-C; C touches no engine) | **5/6 — (5) P8 GREEN**, only (4) red | (not re-run post-C) | see §2.8. `monuments.remerges` landed and is bounded (3→3 over a 45 s dwell) |
 
 ### §2.1 Post-A smoke — full per-gate result (dev server restarted on :3124 from the merged tree)
 
@@ -292,6 +293,260 @@ semaphore should fix. Running total on the load-bearing swing metric:
 
 C's `SURFACE_CALM` owns the remaining 73.
 
+### §2.6 Post-B smoke (clean re-run after a session-limit kill; server restarted from `e2b3941`)
+
+**verify-tier-step went 8/10 → 10/10 and verify-seam 10/10 → 13/13.** Two of my
+gates needed correcting first, and both corrections are recorded below as gate
+mechanics with their validation.
+
+| Gate | pre-fix | post-A | post-D | **post-B** | Owner | Verdict |
+|---|---|---|---|---|---|---|
+| tier-step (3) chunk geometry survives | ready 16→**0** | 0.00 | 0.00 | **retention drop 0**, endpoints `ready=[12,16,12,16,12,16]` of `chunks=[12,16,12,16,12,16]` | B | **GREEN** |
+| tier-step (3a) skyline survives | — | 0.60 | 0.60 | **retention drop 0** | B | **GREEN** |
+| tier-step (3b) evictions | SOFT | SOFT | SOFT | **+12 = exactly 3 cycles × (16−12)**, heals +0 | B | **GREEN** (instrument landed) |
+| seam (8) `emptyByReason` | SOFT | SOFT | SOFT | **PASS** — sb `{0,0,0}`, sky `{noData 0, zero 1, legacy 0}` | B | **GREEN** |
+| seam (8b) healing bounded | — | — | — | **heals +0 / +0** over a settled 60 s (cap 3) | B | **NEW, GREEN** |
+| seam (8c) settled ring does not churn | — | — | — | **evictions +0 / +0** | B | **NEW, GREEN** |
+| seam (8d) no error-retry hammer | — | — | — | **errorRetries +0 / +0** | B | **NEW, GREEN** |
+| flicker (4) pixels swinging >120 | **380** | 146 | 73 | **49** | C | still red (bound 32) |
+| flicker (2) urban p99 | 13.60 | 8.71 | 9.02 | **6.91** (window A **3.61**) | — | green, still falling |
+| stability (7)/(9) false-cull census | 1/54 · 5/417 | same | same | **2/54 · 4/417** | B | **see §2.7 — my instrument, not B** |
+
+The attribution series the round record wants:
+**swinging pixels 380 → 146 (A) → 73 (D) → 49 (B)**, Powell control 0 throughout.
+Urban p99 at the SETTLE window walked 14.41 → 14.41 (A) → 9.41 (D) → **3.61** (B).
+
+**Gate-mechanics correction 1 — tier-step (3)/(3a) now assert RETENTION, not a
+ratio.** A ratio cannot express "a re-key must not destroy geometry the ring
+already has", because the ring SIZE moves with the tier by design (satBuildings
+16 at high / 12 at medium; satSkyline 10 / 6). A single 0.70 floor therefore
+indicted the skyline for behaving exactly as specified — **one sample out of
+180**, the up-step frame where `chunks` jumps to 10 before the four new ones
+have streamed. The ratio-free statement is
+`ready(t) >= min(chunks(t), ready(t-1))`: a shrink may drop what left the ring,
+a widen may stream what just entered it, and a re-stream cannot hide.
+**Validated against both preserved traces before shipping** — W1 pre-fix worst
+retention drop **5** (ready 6→0 with 5 chunks still in the ring, t = 3.11 s);
+post-B **0** on both rings. The old ratio is still printed as informational.
+
+**Gate-mechanics correction 2 — tier-step (3b) budgets the ring shrink.**
+"The step evicted nothing" is the wrong assertion: stepping a 16-chunk ring
+down to 12 *must* evict four. The budget is now the measured coverage delta,
+read off the run's own chunk counts: `CYCLES × (chunksHigh − chunksMed)`.
+Measured **12 against a budget of 12** — the evictions are the ring shrink and
+nothing else, with `heals` flat at 11→11 across all three cycles.
+
+**verify-seam grew three engine-side gates (8b/8c/8d)** using B's new counters.
+This is the load-bearing replacement for the two instruments that went blind:
+gate (7) (D's cache — `caches.match()` is not a fetch) and B's own group-hole
+fault injection (module-worker fetches are unroutable through Playwright).
+Counting the loop beats counting its network shadow. Over a settled 60 s at
+Powell: **heals +0, evictions +0, errorRetries +0** on both rings.
+
+**Toy cruise draws (the round's tightest headroom), measured here:**
+precondition **410**, orbit median **402**, orbit **max 425 ≤ 480**
+(B measured 424). Pre-B the same pose measured median 349 / max 375, so the
+bend margins cost **+53 median / +50 max** and leave **55 draws** of headroom.
+That is consumed move §5.1 and it should carry a ledger row at W3.
+
+### §2.7 stability (7)/(9) did not reach 0 — and it is MY instrument, not B's fix
+
+The census counts meshes where three's frustum test and the bent geometry
+disagree. It models the bend as a **translation of the bounding sphere**
+(centre dropped by `d²·k`, same radius in both tests). B's fix instead **grows
+the radius** by a computed margin. A translation test has a disagreement band
+around every frustum plane whose width is proportional to the drop, so it
+**cannot reach zero by construction** no matter how large the margin is — it
+only moves the band inward. The count is the wrong statistic for the post-fix
+world; what B's margin actually does shows up in every other number:
+
+| | pre-fix | post-B |
+|---|---|---|
+| satellite: which root disagrees | **satRoads** (1) | satRoads **0**, satSkyline **0**, satBuildings 2 |
+| satellite worst drop of a disagreeing mesh | **511 m** | **104 m** (4.9× smaller) |
+| toy worst drop | **10 191 m** (r 27 679 — the z10 ultra chunks) | **2 398 m** (r 14 758 — z12 far ring) |
+| toy: the ultra-ring class | disagreeing | **cleared** |
+
+Arithmetic check of B's margin at the residual: `_bendPad` at z14 with
+`ringM 3600–4400` yields **163–216 m** against a measured centre drop of
+**104 m** — the margin comfortably covers the drop; the residual meshes are
+simply sitting inside the translation band.
+
+**Proposed W3 fix (needs a Fable ruling and one number from B):** have each
+engine publish its ring's `stats.bendMarginM`, and change (7)/(9) from a count
+to the exact invariant **`dropAtCentre <= bendMarginM` for every culled mesh**.
+That is implementation-independent, tight, and provably red pre-fix (margin 0)
+and green post-fix. Until then the honest reading is *severity collapsed ~5×,
+two mesh classes cleared, count is not a valid pass/fail statistic* — the gates
+should NOT be cited as evidence of a residual P1 defect.
+
+### §2.8 Post-C smoke — C's own gates green, and ONE ESCALATION
+
+**C's two owned gates flipped:**
+
+| Gate | pre-fix | post-B | **post-C** | Verdict |
+|---|---|---|---|---|
+| flicker (5) P8 authored units | `(−2, −2)` | `(−2, −2)` | **`(−2, +2)`** with `reversedDepthBuffer` on | **GREEN** — the sign flip landed |
+| stability (5) monument re-merges | SOFT | SOFT | **PASS — `remerges` 3→3** over a 45 s dwell | **GREEN** (instrument landed) |
+
+**The swing-count series did NOT complete as predicted.** Measured post-C:
+**72, 60, 80, 72** across four runs (the last three with extra actors parked).
+The series therefore reads **380 → 146 (A) → 73 (D) → 49 (B) → ~72 (C)**, i.e.
+it plateaued in the 49–80 band rather than falling under 32, and the post-B 49
+now looks like the bottom of that band rather than a step.
+
+FOUR controls were run to attribute the residual, and **all four came back
+negative**:
+
+| Control | Result |
+|---|---|
+| park SatAmbientLife boats + plumes (deliberate movers) | 49 → 72 — no effect |
+| park the satellite water's shared specular material (`__satBuildings.waterMaterial`) | 60 → 80 — no effect |
+| move the ground crop below the horizon (0.55 → 0.60), after the spatial report put early samples at y 497–515 | 72 → 72 — no effect; the samples simply track the new crop top, which turned out to be a scan-order artifact of the sampler |
+| Bayer screen-door dither (`SAT_BLDG_FADE`) | **ruled out by probe**: `satBldgFade` reads **exactly 1.0**, stable across 6 samples at this pose — the dither is not active |
+
+What IS established about the residual: it is ~50–80 pixels of 547 200
+(**0.013 %**), spread across 9–15 of 32 grid cells (2–15 per cell, never one
+contiguous block), the SAME pixels alternating on a regular period, and
+**Powell measures exactly 0 under the identical instrument in every run**.
+
+**ESCALATION — needs a Fable ruling.** I could not attribute this residual
+within the W3 budget, and I will not move a threshold to make it green. Per the
+R20 verify-groundlife precedent and the standing flicker ruling, the options
+are (i) demote (4) to informational with a ledger row, keeping (2)/(3) and the
+Powell control load-bearing, or (ii) hold the round open for a fifth control
+(most promising: an A/B against the bloom pass, which no park handle currently
+reaches). Recorded here rather than resolved.
+
+### §2.9 THE CARPET REPRODUCED — S6 is real, intermittent, and load-dependent
+
+**verify-stability (12) went red for the first time in the round, on the
+integrated tree**, at exactly the moment the user reported:
+
+```
+BOOTWIN probe (220 samples @100ms, tier=high): placed max=276 at t=0.1s
+  t=0.10  placed 276  anchors 35  regK 0  tris 8832  bsChunks 16  bsReady 16
+  …  (276 held through t=0.70)
+  t=0.81  placed 0    ← the carpet vanishes
+  … 0 for the remaining 21 s
+```
+
+**276 parcel homes carpeted Powell for ~0.7 s after reveal and then
+disappeared.** R20 froze Powell at EXACTLY ZERO placed homes (bit-identical
+triangle totals across the flag flip), so any nonzero reading there is the S6
+race and nothing else.
+
+It is **intermittent and load-dependent**. A targeted probe (fresh browser, one
+page, 50 ms sampling, two consecutive runs, 480 samples total) measured
+**placed 0 throughout both runs**, with `suppressed` equal to `anchors` (28/28,
+35/35) and the collision-column index already populated at the first sample
+(`realCols` 720 / 731 at t = 0.05 s). In the failing stability run the same
+first sample had **276 placed with the anchors NOT suppressed**.
+
+**Diagnosis:** the ordering of "parcel layer evaluates" vs "building engine's
+collision-column index is populated" decides it. In a quiet browser the columns
+win; in the stability harness — where the boot-window page is the FOURTH page
+of a long run, after a 45 s dwell, a 30 s orbit, a 35 s CPU-throttle leg and a
+toy page — the parcel layer wins, computes `regK 0` against an empty
+denominator, and carpets. That is the R20 defect's exact shape surviving inside
+C's settle gate, on a path the settle gate does not cover.
+
+**For C:** the suspect is that placement is gated on ring readiness
+(`bs.chunks`/`bs.ready`, both already 16/16 at t = 0.1) but NOT on the column
+index that `regK` actually divides by. Reproduction recipe: run
+`verify-stability` end-to-end (the load matters — a standalone boot will not
+show it), or open three loaded pages before the Powell boot.
+
+### §2.10 W3 SANCTIONED EDITS — executed, with their red/green proofs
+
+**(4) FLICKER DEMOTION — RULED AND EXECUTED.** A fifth control was run per the
+ruling: bloom reached through `window.__flyComposer` (FX_STABILITY armed) and
+its `BloomEffect.intensity` set to 0 at the fixed pose. **Negative — 59 swinging
+pixels against 60–80 with bloom on.** The mechanistic prior (an emissive pixel
+oscillating across bloom's luminance threshold flipping its whole footprint)
+does not hold here. All five controls now stand negative:
+
+| Control | Result |
+|---|---|
+| park boats + plumes | 49 → 72 no effect |
+| park the water's shared specular material | 60 → 80 no effect |
+| crop below the horizon (0.55 → 0.60) | 72 → 72 no effect |
+| Bayer dither (`SAT_BLDG_FADE`) | ruled out — `satBldgFade` exactly 1.0, 6 samples |
+| **bloom intensity → 0** | **~72 → 59 no effect** |
+
+Gate (4) is now **INFORMATIONAL** with the five-control record inline, and a
+NEW load-bearing gate **(4a) THE CONTROL HOLDS — Powell swinging pixels === 0**
+takes over the assertable half. Gates (2)/(3) unchanged. Post-demotion run:
+**verify-flicker VERIFY: PASS, 7/7** (urban 23 that run — the residual's own
+spread is 23–80, which is exactly why it could not be a pass/fail statistic).
+
+**(b) CENSUS REFORMULATION — EXECUTED AND PROVEN BOTH WAYS.** The five engines
+now stamp `mesh.userData.bendMarginM` at the same site where they grow the
+bounding sphere (`R21 SANCTIONED INSTRUMENT`, userData only — no behaviour, no
+draw, no bundle change; sat-building ×3 sites, sat-road, sat-skyline,
+toy-world). Gates (7)/(9) changed from a COUNT of translated-sphere
+disagreements to the exact per-mesh invariant **`dropAtCentre ≤ bendMarginM`**.
+
+| | satellite | toy |
+|---|---|---|
+| **RED control** (`STREAM_KEEPER.enabled:false`, margin 0) | **44 of 54** meshes short, worst shortfall **565 m** | **417 of 417** short, worst shortfall **15 802 m** |
+| **GREEN** (flag restored) | **0 short, 0 unstamped** of 54 | **0 short, 0 unstamped** of 417 |
+
+`verify-stability` → **VERIFY: PASS**. The old count is still printed as
+informational (1 satellite / 5 toy) with its "cannot reach 0 by construction"
+note. `fly-constants.js` was restored from git after the control — empty diff.
+
+**(a) NEON-COVER — GATE MECHANICS + THE TWO RULED RE-BASELINES, EXECUTED.**
+`TILE_PIPELINE` joins `R20_FLAGS` and `EXPECTED_TOY_FLAGS`; it is the ONLY R21
+block the worker source references (measured 25 refs; STREAM_KEEPER /
+SURFACE_CALM / PERF_GOVERNOR / FX_STABILITY / PREWARM all 0 — they live in the
+engines, layers and canvas, which this source scan does not reach). Gate 3a now
+reads `{NEON_COVER, TOY_MID_SUBURB, MONUMENT_MODELS, TILE_PIPELINE}` and passes.
+
+The OFF-branch control run (all four toy-path flags false) then produced the
+decisive 3-of-5 split, before any hash was touched:
+
+| scene | frozen | measured | |
+|---|---|---|---|
+| powell-full | 33d299d9 | **33d299d9** | reproduces |
+| powell-mid | 8b699579 | **8b699579** | reproduces |
+| manhattan-far | 473596c0 | **473596c0** | reproduces |
+| manhattan-full | 176e2e75 | **1a509f39** | **RE-BASELINED** |
+| manhattan-mid | a6805b95 | **2fa4a264** | **RE-BASELINED** |
+
+A code regression would move all five, or move them by scene; it would not
+spare Powell entirely and hit one tile's two rings. Both moved values carry
+`R21 SANCTIONED RE-BASELINE (upstream planet drift 20260802, controlled 3-way)`
+inline. Post-edit OFF run: **5/5 reproduce**. ON run: **8/8 PASS**, toy draws
+cruise 406 / powell 414 / **nyclow 459 ≤ 480**, worst tris **1.973 M ≤ 2 M**.
+
+**(c) SKYLINE NEAR-CROP — ADJUDICATED AND DEMOTED.** Six runs on the integrated
+tree (3 same-config pairs, the R20 verify-groundlife method):
+
+| run | signal | noise | ratio |
+|---|---|---|---|
+| 1 | 0.467 % | 0.682 % | 0.68 ← control ≥ signal |
+| 2 | 0.808 % | 0.510 % | 1.58 |
+| 3 | 0.804 % | 0.321 % | 2.50 |
+| 4 | 0.580 % | 0.150 % | 3.87 |
+| 5 | 0.232 % | 0.571 % | 0.41 ← control ≥ signal |
+| 6 | 0.342 % | 0.362 % | 0.94 ← control ≥ signal |
+| **mean** | **0.539 %** | **0.433 %** | **pooled 1.24×** |
+
+The control **exceeds** the signal in **3 of 6** runs and the pooled ratio is
+**1.24×** — the same distribution, exactly the R20 groundlife signature
+(pooled 1.04×). The ruling's condition is met, so the `nearNoise * 2` term is
+retired and the **absolute 1.2 % ceiling becomes the whole gate**
+(`R21 SANCTIONED DEMOTION` inline, with the table).
+
+**Nothing is weakened:** all six runs measured ≤ 0.808 %, comfortably inside the
+1.2 % the original author already called the real bar ("with a 7×
+discriminator"), so the gate passes on exactly the evidence it always passed on
+minus a term that was deciding by coin flip. Post-demotion run: near-crop
+**0.164 % ≤ 1.200 %**, and the frozen halves are untouched — **Owens skyline
+ready === 0** (10/10 chunks empty, all classified `zero`) and **Owens draws
+184 ≤ 261**.
+
 ### §2.5 INSTRUMENT NOTE — D's tile cache made verify-seam (7) partially blind
 
 The browser leg now counts **zero** network tile requests in the settled 60 s
@@ -332,7 +587,7 @@ gate's numbers; each consumed move needs an inline
 | 1 | verify-sat-night (33) | — (W3) | — | B+C+D all touch the night ground path |
 | 2 | verify-sat-buildings (17) | — (W3) | §5.1 | B owns the engine; per-building collision columns |
 | 3 | verify-suburbia (21) | — (W3) | §5.1 | (B)/(D)/(F) counts may rise with bend margins; **(E) Owens ≤ 261 does NOT move** |
-| 4 | verify-skyline (18) | — (W3) | §5.2 | D changes WHICH members render at capped/banded tiles; **Owens ready 0 frozen** |
+| 4 | verify-skyline (18) | — (W3) | §5.2 **+ a RULED coin adjudication** | D changes WHICH members render at capped/banded tiles; **Owens ready 0 frozen**. **W3 RULING (Fable, W2):** B flagged the NEAR-CROP half as a statistical coin — run 1 FAIL at signal 1.451 % vs noise 1.375 %, run 2 PASS on the *identical tree* with signal BELOW noise; flag-off measured 10.106 % vs 9.949 %, the same ratio. Adjudicate with a **6-run distribution** (the R20 verify-groundlife precedent): if control ≥ signal, **demote that half to informational** with a ledger row. The load-bearing halves (Owens ready 0, the draw ceilings, the crossfade) do not move either way. |
 | 5 | verify-parcel-homes (21) | — (W3) | §5.3 | C's settle gate delays first placement; **Owens ON/OFF bit-identity must hold EXACTLY** |
 | 6 | verify-veg (25) | — (W3) | — | B's park-don't-clear; C's upload stagger |
 | 7 | verify-roof-variety (18) | — (W3) | §5.1 | counts may move with coverage; the 1.6 M tri ceiling does not |
@@ -445,15 +700,15 @@ code regression again. The in-process worker fixture E built this round
 
 | # | Move | Consumed? | Measured control | Inline comment | Sign-off |
 |---|---|---|---|---|---|
-| 1 | P1 bend margins raise fixed-pose draw counts | — (W3) | | | |
+| 1 | P1 bend margins raise fixed-pose draw counts | **OBSERVED CONSUMED (W2, B)** — formal per-gate sanctioning at W3 | **toy cruise (verify-stability phase 3, FL260 NYC): median 349 → 402, max 375 → 425 ≤ 480.** +53 median / +50 max, 55 draws of headroom left. Satellite unchanged at this pose (231–234). B independently measured 424. | each gate whose number moves needs its own `R21 SANCTIONED RE-BASELINE: old → new` at W3 | Fable — W3 |
 | 2 | P3/P4 skyline member re-baselines | — (W3) | | | |
 | 3 | verify-parcel-homes timing legs | — (W3) | | | |
 | 4 | soak-fly satellite mode + p95 assertions | **CONSUMED (W1, E)** | additive; toy path byte-unchanged — verified by running it: same console format, same summary KEY SET, same `soak-results.json` target, exit 0, no gate block (satellite writes `soak-results-satellite.json` instead). W1 smoke, 3 min NYC leg: p50/p95 tris 761 k / 863 k, draws 223 / 242, governor steps 0, heap floor +15 MB, 0 pageerrors — **SOAK: PASS** | header block in `scripts/soak-fly.js` | Fable — pending |
 | 5 | density fallback levers | — (W3, only if p95 breaches) | | | |
 | 6 | `_boot.js` `__flyGovPin` + per-gate un-pins | **CONSUMED (W0 + W1, E)** | the un-pin is an accessor that swallows the fleet write; each gate reports `pin=null attempted=hold` | headers of verify-stability / verify-tier-step / soak-fly | Fable — pending |
 | 2b | **P3/P4 skyline member re-baseline — OBSERVED CONSUMED (W2, D)** | **CONSUMED** | D's shuffle moved the verify-seam determinism hashes at Manhattan / Columbus / Dublin (`62282ae7→a4baf11f`, `ffd505ae→967a5925`, `c24065b2→5c869dd7`) while the kept COUNTS at those tiles are unchanged (2215 / 408 / 130) — "which members", not "how many", exactly as §5.2 describes | verify-seam prints both halves every run | Fable — W2 |
-| **7 (NEW, W2 ruling)** | **two R18 neon-cover hash re-baselines**: `manhattan-full` + `manhattan-mid` | **RULED — execute in W3** | D's three-way control incl. a pristine `e1077f8` stash proved both hashes already red on the UNTOUCHED scaffolding tree. Upstream OpenFreeMap planet build `20260802_080001_pt`; the building layer at `14/4824/6157` still reports exactly 1481 features, so the drift is in another layer. The CODE invariant (flag-off byte-identity for identical input) stands proven independently by verify-seam (6) fixture determinism | `R21 SANCTIONED RE-BASELINE (upstream planet drift, controlled 3-way)` in `verify-neon-cover.js` | **Fable, W2 — APPROVED** |
-| **8 (NEW, W2 ruling)** | **`TILE_PIPELINE` into verify-neon-cover `R20_FLAGS` + `EXPECTED_TOY_FLAGS` + the gate-3 OFF control state** | **RULED — execute in W3** | gate mechanics only, **no hash value moves**; `TILE_PIPELINE` is toy-reachable via the toy tail's `'zero'` reason tag and D spelled every reference out so gate 3a's source attribution sees it | `R21 SANCTIONED GATE-MECHANICS` | **Fable, W2 — APPROVED** |
+| **7 (W2 ruling)** | **two R18 neon-cover hash re-baselines**: `manhattan-full` + `manhattan-mid` | **CONSUMED (W3, E)** — `176e2e75 → 1a509f39`, `a6805b95 → 2fa4a264`; the other three reproduced byte-exactly in the same run | D's three-way control incl. a pristine `e1077f8` stash proved both hashes already red on the UNTOUCHED scaffolding tree. Upstream OpenFreeMap planet build `20260802_080001_pt`; the building layer at `14/4824/6157` still reports exactly 1481 features, so the drift is in another layer. The CODE invariant (flag-off byte-identity for identical input) stands proven independently by verify-seam (6) fixture determinism | `R21 SANCTIONED RE-BASELINE (upstream planet drift, controlled 3-way)` in `verify-neon-cover.js` | **Fable, W2 — APPROVED** |
+| **8 (W2 ruling)** | **`TILE_PIPELINE` into verify-neon-cover `R20_FLAGS` + `EXPECTED_TOY_FLAGS` + the gate-3 OFF control state** | **CONSUMED (W3, E)** — gate 3a reads the widened set and passes; 25 worker refs measured, the other five R21 blocks 0 | gate mechanics only, **no hash value moves**; `TILE_PIPELINE` is toy-reachable via the toy tail's `'zero'` reason tag and D spelled every reference out so gate 3a's source attribution sees it | `R21 SANCTIONED GATE-MECHANICS` | **Fable, W2 — APPROVED** |
 
 ---
 

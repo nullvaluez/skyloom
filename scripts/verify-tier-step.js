@@ -354,6 +354,52 @@ const PIN_POSE = ([lat, lon, altM, heading, pitch]) => {
   const minFrac = fracs.length ? Math.min(...fracs) : -1;
   const skyFracs = trace.filter((r) => (r.skyChunks ?? 0) > 0).map((r) => (r.sky ?? 0) / r.skyChunks);
   const minSkyFrac = skyFracs.length ? Math.min(...skyFracs) : -1;
+
+  /**
+   * THE RETENTION INVARIANT (W2, post-B — replaces the ready/chunks RATIO).
+   *
+   * The claim this gate exists for is "a re-key must not destroy geometry the
+   * ring already has". A ratio cannot state that, because the ring SIZE moves
+   * with the tier by design: satBuildings covers 16 chunks at high and 12 at
+   * medium, satSkyline 10 and 6 (SAT_SKYLINE.maxChunksByTier). So the ratio's
+   * floor is a different number for every ring — 12/16 = 0.75 for buildings,
+   * 6/10 = 0.60 for the skyline — and a single 0.70 threshold indicted the
+   * skyline for behaving exactly as designed (ONE sample of 180, the up-step
+   * frame where chunks jumps to 10 before the 4 new ones have streamed).
+   *
+   * The ratio-free statement is: between two consecutive samples, a chunk that
+   * was ready and is still IN the ring must still be ready, i.e.
+   *      ready(t) >= min(chunks(t), ready(t-1))
+   * A shrink 16 -> 12 requires 12 (the four that left are allowed to go). A
+   * widen 12 -> 16 requires 12 (the four new ones may stream). A RE-STREAM
+   * requires 12 and delivers 0, which is the defect.
+   *
+   * Validated on both preserved traces before shipping:
+   *   W1 pre-fix : buildings worst retention drop 5 (ready 6 -> 0 with 5 chunks
+   *                still in the ring, t=3.11 s) — RED
+   *   W2 post-B  : buildings 0, skyline 0 — GREEN
+   * The skyline reads 0 on the pre-fix trace too, so (3a) as a ratio was never
+   * a valid red; the retention form is the honest instrument for both rings.
+   */
+  const retentionDrop = (readyKey, chunkKey) => {
+    let worst = 0;
+    let at = null;
+    for (let i = 1; i < trace.length; i++) {
+      const prev = trace[i - 1];
+      const cur = trace[i];
+      const chunks = cur[chunkKey] ?? 0;
+      if (!chunks) continue;
+      const floor = Math.min(chunks, prev[readyKey] ?? 0);
+      const drop = floor - (cur[readyKey] ?? 0);
+      if (drop > worst) {
+        worst = drop;
+        at = `${prev.t}s->${cur.t}s ready ${prev[readyKey]}->${cur[readyKey]} of ${chunks} chunks`;
+      }
+    }
+    return { worst, at };
+  };
+  const bldRet = retentionDrop('ready', 'chunks');
+  const skyRet = retentionDrop('sky', 'skyChunks');
   console.log(
     `TRACE (${trace.length} samples @100ms): tiers=${JSON.stringify(tiersSeen)} ` +
       `dpr=${JSON.stringify(dprSeen)} · satBuildings.ready ${base.sb?.ready} -> min ${minReady} · ` +
@@ -382,31 +428,36 @@ const PIN_POSE = ([lat, lon, altM, heading, pitch]) => {
   // PASS) while ready collapsed 16 -> 5 in the same window — a gate on `chunks`
   // alone is exactly the kind of vacuous pass the R20 close ruling demoted.
   gate(
-    `(3) CHUNK GEOMETRY SURVIVES the step (ready/chunks never below ${READY_FRAC_MIN}; settled 1.00)`,
-    minFrac >= READY_FRAC_MIN,
-    `min ready/chunks=${minFrac.toFixed(2)} (ready floor ${minReady}) · ` +
+    '(3) CHUNK GEOMETRY SURVIVES the step — a chunk still in the ring never loses its geometry',
+    bldRet.worst === 0,
+    `worst retention drop=${bldRet.worst}${bldRet.at ? ` (${bldRet.at})` : ''} · ` +
+      `informational ready/chunks floor ${minFrac.toFixed(2)} (legit dip = the coverage widen: 12 of 16) · ` +
       `chunks=${JSON.stringify(cycles.flatMap((c) => [c.down.sb?.chunks, c.up.sb?.chunks]))} ` +
       `ready=${JSON.stringify(cycles.flatMap((c) => [c.down.sb?.ready, c.up.sb?.ready]))}`
   );
-  red.push([
-    'S3 tier step re-streams the ring',
-    'verify-tier-step (3)',
-    minFrac.toFixed(2),
-    `>= ${READY_FRAC_MIN}`,
-  ]);
+  red.push(['S3 tier step re-streams the ring', 'verify-tier-step (3)', bldRet.worst, '=== 0']);
   gate(
-    `(3a) the SKYLINE ring survives the step too (ready/chunks >= ${READY_FRAC_MIN})`,
-    minSkyFrac >= READY_FRAC_MIN,
-    `min ready/chunks=${minSkyFrac.toFixed(2)} (settled ${base.sky?.ready}/${base.sky?.chunks}, floor ${minSky})`
+    '(3a) the SKYLINE ring keeps its geometry through the step too',
+    skyRet.worst === 0,
+    `worst retention drop=${skyRet.worst}${skyRet.at ? ` (${skyRet.at})` : ''} · ` +
+      `informational ready/chunks floor ${minSkyFrac.toFixed(2)} (this ring is 6 at medium / 10 at high, so its legit floor is 0.60)`
   );
+  // (3b) EVICTIONS. "Evicted nothing" is the wrong assertion: stepping a
+  // 16-chunk ring down to a 12-chunk one MUST evict the four chunks that left
+  // coverage. What must never happen is eviction BEYOND the ring shrink — that
+  // is the re-stream. The budget is therefore the measured coverage delta per
+  // cycle, read off this run's own chunk counts rather than hard-coded.
   const ev = cycles[cycles.length - 1].up.sb?.evictions;
+  const chunksHigh = Math.max(...cycles.map((c) => c.up.sb?.chunks ?? 0));
+  const chunksMed = Math.min(...cycles.map((c) => c.down.sb?.chunks ?? 0));
+  const evBudget = CYCLES * Math.max(0, chunksHigh - chunksMed);
   if (ev === null || ev === undefined)
-    soft('(3b) eviction counter', 'B', 'chunk-count survival is the standing proxy');
+    soft('(3b) eviction counter', 'B', 'the retention invariant above is the standing proxy');
   else
     gate(
-      '(3b) the step evicted nothing',
-      ev - (base.sb?.evictions ?? 0) === 0,
-      `evictions ${base.sb?.evictions}->${ev}`
+      `(3b) nothing evicts BEYOND the ring shrink (<= ${evBudget} = ${CYCLES} cycles x ${chunksHigh}-${chunksMed})`,
+      ev - (base.sb?.evictions ?? 0) <= evBudget,
+      `evictions ${base.sb?.evictions}->${ev} (delta ${ev - (base.sb?.evictions ?? 0)}) · heals ${base.sb?.heals}->${cycles[cycles.length - 1].up.sb?.heals}`
     );
 
   // --- (4) composer buffer === drawing buffer ------------------------------

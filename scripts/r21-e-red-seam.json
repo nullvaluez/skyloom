@@ -1,5 +1,5 @@
 {
- "when": "2026-08-07T01:04:47.126Z",
+ "when": "2026-08-07T02:10:24.822Z",
  "lock": 40,
  "ramp": {
   "lockLo": 24,
@@ -2512,7 +2512,17 @@
     "queued": 0,
     "building": 0,
     "draping": 0,
-    "ringOn": true
+    "ringOn": true,
+    "emptyByReason": {
+     "noData": 0,
+     "zero": 0,
+     "legacy": 0
+    },
+    "errorRetries": 0,
+    "evictions": 26,
+    "heals": 6,
+    "waterBackfillArmed": true,
+    "waterBackfilling": 0
    },
    "sky": {
     "chunks": 10,
@@ -2525,12 +2535,28 @@
     "building": 0,
     "draping": 0,
     "ringOn": true,
-    "maxChunks": 10
+    "maxChunks": 10,
+    "emptyByReason": {
+     "noData": 0,
+     "zero": 1,
+     "legacy": 0
+    },
+    "errorRetries": 0,
+    "evictions": 12,
+    "heals": 0
    },
-   "sbReason": null,
-   "skyReason": null,
-   "evictions": null,
-   "heals": null
+   "sbReason": {
+    "noData": 0,
+    "zero": 0,
+    "legacy": 0
+   },
+   "skyReason": {
+    "noData": 0,
+    "zero": 1,
+    "legacy": 0
+   },
+   "evictions": 26,
+   "heals": 6
   }
  },
  "red": [
@@ -2557,10 +2583,14 @@
    "verify-seam (7)",
    "1x",
    "<= 4x"
+  ],
+  [
+   "P2/P6 heal loop (engine-side)",
+   "verify-seam (8b)",
+   "+0/+0",
+   "<= 3"
   ]
  ],
  "fails": [],
- "softs": [
-  "(8) emptyByReason telemetry"
- ]
+ "softs": []
 }
