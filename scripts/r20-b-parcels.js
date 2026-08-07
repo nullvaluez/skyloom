@@ -79,6 +79,19 @@ const latToY = (lat, z) => {
     timeout: 60000,
   });
 
+  // R21 (D PIPELINE): `vegMeta` is a full SECOND parse of every tile and no
+  // engine reads it, so TILE_PIPELINE.diagMetaDefaultOff turns it OFF in
+  // production. This probe is its only consumer — arm it explicitly. Older
+  // workers (or TILE_PIPELINE.enabled:false) have no `setDiag` / ignore it and
+  // still emit the telemetry, so the call is optional-by-construction.
+  await page.evaluate(async () => {
+    try {
+      await window.__toyWorld.worker.setDiag(true);
+    } catch {
+      /* pre-R21 worker: vegMeta is always-on there */
+    }
+  });
+
   const jobs = [];
   for (const [name, lat, lon] of SCENES) {
     const x0 = lonToX(lon, 14);
