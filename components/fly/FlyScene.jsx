@@ -357,6 +357,42 @@ function SatShadowCatcher({ flight, origin, radiusM }) {
  * tile that outlives the rig would be an invisible, permanent fill-rate tax.
  */
 const _rigV = /* @__PURE__ */ new Vector3();
+const _swept = { tiles: 0, leaves: 0 };
+
+/**
+ * ROUND 22 (D, W3 FIX) — how a terrain tile is actually made to receive.
+ *
+ * `model.receiveShadow = true` DOES NOT STICK, and nothing reports that it
+ * failed. three-tile's `Tile._update()` calls `_updateShadow()` on every tile
+ * on every frame (vendor index.js:233 and :237), and that is
+ * `this.model?.syncShadow(this._root)` — which copies castShadow/receiveShadow
+ * from the ROOT tile onto the model. `TileMap.update()` in turn re-stamps the
+ * root from `map.castShadow` / `map.receiveShadow` (:1882), and the map's own
+ * flags are false. So the library re-asserts "no tile receives" every frame,
+ * after every useFrame callback has run. Measured directly: written true, read
+ * back true, false again 1.5 s later with the object still attached to the
+ * tree — which is exactly the shape verify-depth2 (3) reported as "0 of 167".
+ *
+ * The library-sanctioned lever is `map.receiveShadow = true`, but that is the
+ * WHOLE quadtree — the fill-rate cost R13 rejected, and the opposite of a near
+ * ring. So instead of fighting `syncShadow`, an enlisted model gets its OWN
+ * `syncShadow`: the root still drives castShadow (the library keeps its
+ * contract), and the receive flag survives because this tile is in the near
+ * set. Reversible by `delete` — the prototype method comes back — and no
+ * vendored file is touched, which matters because lib/fly/vendor/** is A's.
+ */
+function _receiveSync(root) {
+  this.castShadow = root.castShadow;
+  this.receiveShadow = true;
+}
+function _enlistReceiver(o) {
+  o.syncShadow = _receiveSync;
+  o.receiveShadow = true;
+}
+function _delistReceiver(o) {
+  delete o.syncShadow; // back to the class method
+  o.receiveShadow = false;
+}
 
 function countCastersNear(root, px, pz, radiusM) {
   // Manual recursion, NOT Object3D.traverse: traverse does not stop at an
@@ -409,13 +445,44 @@ function SatDepthRig({ runtime, flight, origin, engine, scene }) {
     meshes: 0,
   });
 
+  // Charter rule 4's second dev handle (the first is __flyN8AO in Effects.jsx).
+  // `set(bool)` drives the SAME master arm the AO handle drives, so an A/B leg
+  // never has to know which of the four sub-features it is toggling; `get()`
+  // returns the live census, which is what makes "the catcher mounted because
+  // N casters were in the frustum" an assertion rather than a claim.
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development' || typeof window === 'undefined') return;
+    window.__flyCatcher = {
+      set: (v) => {
+        if (v == null) delete window.__flyDepthArm;
+        else window.__flyDepthArm = v ? 1 : 0;
+      },
+      sub: (o) => {
+        window.__flyDepthSub = o ?? undefined;
+      },
+      get: () => ({
+        catcher: !!stateRef.current.__armed,
+        casters: {
+          buildings: stateRef.current.buildings,
+          instanced: stateRef.current.instanced,
+          meshes: stateRef.current.meshes,
+        },
+        receivers: stateRef.current.receivers.size,
+        casterFlips: stateRef.current.casters.size,
+      }),
+    };
+    return () => {
+      if (window.__flyCatcher) delete window.__flyCatcher;
+    };
+  }, []);
+
   // Restore every flag this rig set, on unmount. A leaked receiveShadow=true on
   // a tile that survives into a non-shadow frame is an invisible fill cost with
   // no owner.
   useEffect(() => {
     const st = stateRef.current;
     return () => {
-      for (const o of st.receivers) o.receiveShadow = false;
+      for (const o of st.receivers) _delistReceiver(o);
       st.receivers.clear();
       for (const o of st.casters) o.castShadow = false;
       st.casters.clear();
@@ -460,6 +527,7 @@ function SatDepthRig({ runtime, flight, origin, engine, scene }) {
       } else {
         st.buildings = st.instanced = st.meshes = 0;
       }
+      st.__armed = want;
       if (want !== armed) setArmed(want);
       if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
         (window.__flyStats ??= {}).depthRig = {
@@ -472,6 +540,23 @@ function SatDepthRig({ runtime, flight, origin, engine, scene }) {
           },
           receivers: st.receivers.size,
           casterFlips: st.casters.size,
+          sweep: {
+            walked: st.walked ?? null,
+            leaves: st.leaves ?? null,
+            near: st.leavesNear ?? null,
+            // Do the flags SURVIVE? A count of the enlisted objects that still
+            // read receiveShadow true and still have a parent — the difference
+            // between "the sweep selected 22" and "22 tiles are receiving".
+            live: (() => {
+              let n = 0;
+              let orphan = 0;
+              for (const o of st.receivers) {
+                if (o.receiveShadow === true) n++;
+                if (!o.parent) orphan++;
+              }
+              return { flagged: n, orphaned: orphan, size: st.receivers.size };
+            })(),
+          },
         };
       }
     }
@@ -488,10 +573,14 @@ function SatDepthRig({ runtime, flight, origin, engine, scene }) {
       const reach = SAT_SHADOWS.orthoRadiusM + (NR.padM ?? 0);
       const cap = NR.maxTiles ?? 48;
       const root = engine?.object;
+      _swept.tiles = 0;
+      _swept.leaves = 0;
       const walkTiles = (t) => {
         if (!t || !t.visible || next.size >= cap) return;
         if (t.isTile) {
+          _swept.tiles++;
           if (t.isLeaf) {
+            _swept.leaves++;
             const m = t.model;
             if (m) {
               const e = t.matrixWorld.elements;
@@ -514,6 +603,12 @@ function SatDepthRig({ runtime, flight, origin, engine, scene }) {
         for (let i = 0; i < kids.length; i++) walkTiles(kids[i]);
       };
       if (root) walkTiles(root);
+      // Sweep telemetry — verify-depth2 (3) asserts the enlistment count, and
+      // when it reads 0 the ONLY useful question is which of the three stages
+      // dropped it: no tree, no leaves, or no leaf inside the radius.
+      st.walked = _swept.tiles;
+      st.leaves = _swept.leaves;
+      st.leavesNear = next.size;
 
       // Parcel homes join as RECEIVERS only (never casters — the R20 rig is
       // hash-stable placement and a 2,000-instance caster set is a different
@@ -535,12 +630,22 @@ function SatDepthRig({ runtime, flight, origin, engine, scene }) {
     // Diff, so a steady pose costs zero writes.
     const prev = st.receivers;
     if (next) {
-      for (const o of prev) if (!next.has(o)) o.receiveShadow = false;
-      for (const o of next) if (!prev.has(o)) o.receiveShadow = true;
+      for (const o of prev) if (!next.has(o)) _delistReceiver(o);
+      for (const o of next) if (!prev.has(o)) _enlistReceiver(o);
       st.receivers = next;
-    } else if (prev.size) {
-      for (const o of prev) o.receiveShadow = false;
-      prev.clear();
+    } else {
+      // Disarmed: zero the telemetry too, or the last armed sweep's counts sit
+      // in __flyStats forever and read as "48 tiles enlisted" on a leg where
+      // nothing is enlisted at all.
+      _swept.tiles = 0;
+      _swept.leaves = 0;
+      st.walked = 0;
+      st.leaves = 0;
+      st.leavesNear = 0;
+      if (prev.size) {
+        for (const o of prev) _delistReceiver(o);
+        prev.clear();
+      }
     }
 
     // ---- (3) caster flips ------------------------------------------------

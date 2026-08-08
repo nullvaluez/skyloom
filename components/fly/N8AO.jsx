@@ -245,6 +245,12 @@ export function createN8AOPass({ gl, scene, camera, cfg = DEPTH_PASS.n8ao, size 
   const w = Math.max(1, size?.width ?? 1);
   const h = Math.max(1, size?.height ?? 1);
   const pass = new FlyN8AOPass(scene, proxy, camera, w, h);
+  // postprocessing's Pass defaults `name` to the class name it was given at
+  // super(), which for N8AOPostPass is the bare string "Pass". verify-depth2
+  // (7) identifies the AO pass by /n8ao/i over the composer's pass list, so an
+  // unnamed pass reads as ABSENT — the gate reported "no AO pass in the
+  // composer" while the AO was running. Naming it is the whole fix.
+  pass.name = 'N8AOPass';
 
   // ---- transparency: OFF, and this took measuring to get right -----------
   // N8AOPostPass's CONSTRUCTOR calls `detectTransparency()` (src line ~145),

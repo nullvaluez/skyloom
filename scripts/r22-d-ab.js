@@ -143,6 +143,7 @@ const med = (a) => {
       draws: window.__flyStats?.drawCalls ?? null,
       tris: window.__flyStats?.triangles ?? null,
       rig: window.__flyStats?.depthRig ?? null,
+      aerial: (() => { try { return window.__flyAerial.get(); } catch { return null; } })(),
     }));
 
   const pose = async (lat, lon, altM, settleMs) => {
