@@ -148,6 +148,7 @@ export function SatClutterLayer({ runtime, flight }) {
     colSuppressed: 0,
     juncSuppressed: 0,
     realCols: 0,
+    insideColumns: 0, // R22 W3: exact containment census (dev-only)
     nightK: 0,
     parkedAltK: 0,
     poleAltK: 0,
@@ -155,6 +156,7 @@ export function SatClutterLayer({ runtime, flight }) {
     prevParked: 0,
     prevPoles: 0,
     slots: [], // mover slots: cadence-selected, per-frame advanced
+    slotSig: '', // …and the resident-chunk signature they were selected from
     atX: Infinity,
     atZ: Infinity,
   });
@@ -208,15 +210,24 @@ export function SatClutterLayer({ runtime, flight }) {
       // flag rather than mesh.visible, because the cadence would overwrite a
       // visibility poke on its next pass — R19's lesson that object visibility
       // cannot park an actor whose owner rewrites it every frame.
-      const handle = (key) => ({
+      // Each handle also exposes the live `mesh`, because a determinism gate
+      // wants the INSTANCE MATRICES from the same name it uses to park the pool
+      // — verify-clutter's MATRIX_HASH resolves `m.isInstancedMesh ? m : m.mesh`
+      // and got `null` for all three pools until this getter existed, which made
+      // its two hash gates compare null to null and agree vacuously. A getter,
+      // not a snapshot: the ref is null until r3f attaches it.
+      const handle = (key, meshRef) => ({
         set: (v) => {
           globalThis[key] = !v;
         },
         get: () => !globalThis[key],
+        get mesh() {
+          return meshRef.current;
+        },
       });
-      window.__flyClutterParked = handle('__flyClutterCarsOff');
-      window.__flyClutterMoving = handle('__flyClutterMoversOff');
-      window.__flyClutterPoles = handle('__flyClutterPolesOff');
+      window.__flyClutterParked = handle('__flyClutterCarsOff', parkedRef);
+      window.__flyClutterMoving = handle('__flyClutterMoversOff', moverRef);
+      window.__flyClutterPoles = handle('__flyClutterPolesOff', poleRef);
       window.__flyClutter = {
         parked: window.__flyClutterParked,
         moving: window.__flyClutterMoving,
@@ -271,9 +282,22 @@ export function SatClutterLayer({ runtime, flight }) {
     const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
     engine.update(t, flight.pos.x, flight.pos.z, eyeAgl);
 
-    // The mover clock. `'freeze'` and the legacy pin both pin it at 0, which is
-    // what makes a pinned pose bit-stable across two boots.
-    const moverT = pin === 0 ? t : 0;
+    // THE MOVER CLOCK, and why the pin is read LIVE here while the POOLS above
+    // read it once at mount.
+    //
+    // Pool SIZE is a mount-time fact — an InstancedMesh cannot grow, so sizing
+    // it from a live read would mean rebuilding the mesh mid-flight. The CLOCK
+    // is the opposite: verify-clutter arms the fleet live (`setPin(page,
+    // 'freeze')` is a page.evaluate AFTER boot, because the determinism leg and
+    // the Owens leg want different pins in one session). Reading the mount-time
+    // value here meant the gate's `'freeze'` never reached the movers at all —
+    // they kept driving, and gate 16 measured 4 s of honest traffic and called
+    // it nondeterminism. `armed` deliberately stays mount-time: a pin flipped
+    // after mount can freeze the world, but it cannot conjure a pool.
+    const livePin =
+      typeof window === 'undefined' ? pin : (window.__flyClutterPin ?? pin ?? 0);
+    const frozen = livePin !== 0;
+    const moverT = frozen ? 0 : t;
 
     if (t - st.t >= CLUTTER.placeCadenceSec) {
       st.t = t;
@@ -289,9 +313,10 @@ export function SatClutterLayer({ runtime, flight }) {
         st,
         parkedPool,
         polePool,
-        t
+        t,
+        frozen
       );
-      selectMovers(engine, flight, st, movingPool, t);
+      selectMovers(engine, flight, st, movingPool, t, frozen);
     }
     if (moverRef.current) advanceMovers(moverRef.current, engine, flight, st, moverT);
     // ONE material write per frame, for all three pools.
@@ -318,9 +343,26 @@ export function SatClutterLayer({ runtime, flight }) {
       // assertion then survives anything else in the round moving the scene
       // total (and it is what makes "Owens +0" testable at any pose).
       window.__flyStats.clutter = {
-        parked: { count: st.parked, tris: st.parked * tpi.car, anchors: st.anchors },
+        parked: {
+          count: st.parked,
+          tris: st.parked * tpi.car,
+          // `anchors` is a COUNT (anchor candidates inside rangeM), not a list
+          // — the R22 W3 gate read it as an array of [x,z] pairs. The exact
+          // containment census it actually wants is `insideColumns`, computed
+          // by the owner in the absolute frame with the distance test
+          // queryColumns deliberately omits (see censusInsideColumns).
+          anchors: st.anchors,
+          insideColumns: st.insideColumns,
+        },
         moving: { count: st.movers, tris: st.movers * tpi.mover, anchors: st.moverAnchors },
         poles: { count: st.poles, tris: st.poles * tpi.pole, anchors: st.poleAnchors },
+        // The clutter ring's own streaming state, so a settle predicate can
+        // gate on THIS ring rather than falling through to the building ring's
+        // (verify-clutter's CLUTTER_SETTLED reads exactly these two names, and
+        // without them its `ringOk` term short-circuits to true).
+        ready: dev.stats.ready,
+        chunks: dev.stats.chunks,
+        realCols: st.realCols,
         baseDraws: Math.max(0, (window.__flyStats.drawCalls ?? 0) - myDraws),
         draws: myDraws,
         trisPerInstance: tpi,
@@ -646,6 +688,45 @@ function occupiedAt(wx, wz) {
   return _occ[z * OCC_N + x] === 1;
 }
 
+/**
+ * R22 W3 — THE EXACT ANTI-DUP CENSUS, and why it cannot be `queryColumns(x,z,0)
+ * .length > 0`.
+ *
+ * `queryColumns` is documented BUCKET LOOKUP ONLY ("no per-column distance
+ * math", sat-building-engine.js): it returns every cylinder whose spatial-hash
+ * bucket overlaps the query box. A non-empty answer therefore means "a building
+ * shares this car's hash cell", which for a parked car is not a defect — it is
+ * the definition of a parking space. Containment needs the distance test the
+ * index deliberately does not do, and this is it.
+ *
+ * DELIBERATELY INDEPENDENT of the machinery it audits: it re-reads the matrices
+ * that were actually written and re-queries the LIVE index, rather than
+ * consulting `_occ`. An instrument built out of the mechanism it validates can
+ * only ever agree with it. Dev-only, once per 2 s cadence.
+ */
+function censusInsideColumns(mesh, runtime, n, ox, oz) {
+  const sb = runtime.satBuildings;
+  if (!sb?.queryColumns || !mesh || n === 0) return 0;
+  const a = mesh.instanceMatrix.array;
+  let inside = 0;
+  for (let i = 0; i < n; i++) {
+    // ABSOLUTE world — the frame queryColumns speaks. Instance translations are
+    // relative to the pool origin (the float32-precision rule), so a raw read
+    // is short by ~9.2e6 near Ohio and would answer about the null island.
+    const wx = a[i * 16 + 12] + ox;
+    const wz = a[i * 16 + 14] + oz;
+    const cols = sb.queryColumns(wx, wz, 0);
+    for (let j = 0; j < cols.length; j++) {
+      const c = cols[j];
+      if ((wx - c.x) ** 2 + (wz - c.z) ** 2 < c.r * c.r) {
+        inside += 1;
+        break;
+      }
+    }
+  }
+  return inside;
+}
+
 /** Claim a car cell; false = something is already parked there (term 2). */
 function claimCar(wx, wz) {
   const x = ((wx - _grid.ox) / CAR_CELL) | 0;
@@ -658,9 +739,23 @@ function claimCar(wx, wz) {
 
 // --- placement ----------------------------------------------------------------
 
-/** B SETTLE's birth ramp: 0 → 1 over rampSec from a chunk's first ready frame. */
-function birthK(chunk, now) {
-  if (!SETTLE_CALM.enabled) return 1;
+/**
+ * B SETTLE's birth ramp: 0 → 1 over rampSec from a chunk's first ready frame.
+ *
+ * R22 W3 FIX — `frozen` completes it instantly, and this is not a convenience.
+ * The ramp is the ONE term in these three pools that reads the WALL CLOCK
+ * rather than the pinned mover clock, and it multiplies SCALE (matrix elements
+ * 0/5/10). A chunk that evicts and re-streams gets a fresh `bornAt`, so its
+ * cars and lamps re-ramp — which across two boots lands the SAME instances at
+ * DIFFERENT scales while the counts match exactly. That is precisely the W3
+ * symptom ("poles not bit-identical cross-boot, counts 117 = 117"), and it was
+ * a hole in the freeze contract rather than in the placement law: `__flyClutterPin`
+ * promised a pose that is a pure function of place, and a birth ramp keyed to
+ * when a tile happened to arrive is a function of the network. Under any pin
+ * the world is declared already born.
+ */
+function birthK(chunk, now, frozen) {
+  if (frozen || !SETTLE_CALM.enabled) return 1;
   const r = SETTLE_CALM.births.rampSec;
   if (!(r > 0) || chunk.bornAt === undefined) return 1;
   return Math.min(1, (now - chunk.bornAt) / r);
@@ -692,7 +787,7 @@ function parkTail(mesh, n, prevN) {
  * the same ready chunks nearest-first and share the one collision grid, so the
  * expensive part — `queryColumns` — is paid once.
  */
-function placeStatic(parkedMesh, poleMesh, engine, runtime, flight, st, parkedPool, polePool, now) {
+function placeStatic(parkedMesh, poleMesh, engine, runtime, flight, st, parkedPool, polePool, now, frozen) {
   const P = CLUTTER.cars.parked;
   const L = CLUTTER.poles;
   const px = flight.pos.x;
@@ -738,7 +833,7 @@ function placeStatic(parkedMesh, poleMesh, engine, runtime, flight, st, parkedPo
 
   for (const chunk of engine.nearest(px, pz)) {
     if ((!parkedOn || nc >= parkedPool) && (!polesOn || np >= polePool)) break;
-    const bk = birthK(chunk, now);
+    const bk = birthK(chunk, now, frozen);
 
     // --- parked cars ---------------------------------------------------------
     const pk = chunk.parking;
@@ -861,6 +956,9 @@ function placeStatic(parkedMesh, poleMesh, engine, runtime, flight, st, parkedPo
   if (parkedMesh) {
     parkTail(parkedMesh, nc, st.prevParked);
     st.prevParked = nc;
+    if (process.env.NODE_ENV === 'development') {
+      st.insideColumns = censusInsideColumns(parkedMesh, runtime, nc, ox, oz);
+    }
     parkedMesh.boundingSphere.center.set(0, 0, 0);
     parkedMesh.boundingSphere.radius =
       Math.sqrt(carR2) + 12 + carD * carD * MAX_BEND_K + 30;
@@ -884,24 +982,51 @@ function placeStatic(parkedMesh, poleMesh, engine, runtime, flight, st, parkedPo
  * only advances arc, which is what keeps a 300-car fleet at a few hundred
  * microseconds.
  */
-function selectMovers(engine, flight, st, pool, now) {
+function selectMovers(engine, flight, st, pool, now, frozen) {
   const M = CLUTTER.cars.moving;
-  st.slots.length = 0;
-  st.moverAnchors = 0;
-  if (pool <= 0) return;
+  if (pool <= 0) {
+    st.slots.length = 0;
+    st.moverAnchors = 0;
+    return;
+  }
   const px = flight.pos.x;
   const pz = flight.pos.z;
   const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
   st.moverAltK = 1 - smoothstep(M.altFade.onM, M.altFade.offM, eyeAgl);
   if (process.env.NODE_ENV === 'development' && globalThis.__flyClutterMoversOff) st.moverAltK = 0;
-  if (st.moverAltK <= 0.001) return;
+  if (st.moverAltK <= 0.001) {
+    st.slots.length = 0;
+    st.moverAnchors = 0;
+    st.slotSig = '';
+    return;
+  }
+  const ready = engine.nearest(px, pz);
+  // R22 W3 FIX — HOLD THE SLOT TABLE WHILE FROZEN AND THE RING IS UNCHANGED.
+  //
+  // Measured: at a settled, pinned P-LEWIS the mover pool went 33 → 34 across
+  // 4 s with every position frozen — the pose was not moving, the TABLE was
+  // being rebuilt. Selection admits a path on its FIRST POINT against rangeM
+  // while the per-frame pass culls each CAR against the same rangeM, so a chain
+  // that starts just inside the disc and carries a car just outside it (or the
+  // reverse) can flip between two rebuilds that are otherwise identical. Under
+  // `'freeze'` the fleet is promised a pose that is a pure function of place,
+  // and "a redundant rebuild resolves a boundary differently" is not a pose
+  // change — it is churn. So while the pin holds and the resident chunk set is
+  // the same, the previous table stands. Live (pin 0) rebuilds every cadence
+  // exactly as before: traffic is supposed to breathe at the ring edge.
+  let sig = '';
+  for (let i = 0; i < ready.length; i++) sig += ready[i].key + '|';
+  if (frozen && sig === st.slotSig && st.slots.length > 0) return;
+  st.slotSig = sig;
+  st.slots.length = 0;
+  st.moverAnchors = 0;
   const mercK = mercatorScale(flight.latDeg);
   const rangeSq = M.rangeM ** 2;
-  for (const chunk of engine.nearest(px, pz)) {
+  for (const chunk of ready) {
     if (st.slots.length >= pool) break;
     const paths = chunk.paths;
     if (!paths) continue;
-    const bk = birthK(chunk, now);
+    const bk = birthK(chunk, now, frozen);
     const { pts, offsets, cls } = paths;
     for (let p = 0; p < cls.length && st.slots.length < pool; p++) {
       const s0 = offsets[p];
