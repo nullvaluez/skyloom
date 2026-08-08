@@ -1,462 +1,750 @@
 {
   "poses": {
     "P-LEWIS": {
-      "agl": 160,
+      "agl": 156,
       "drawsOff": {
-        "draws": 218,
-        "tris": 236577,
+        "draws": 236,
+        "tris": 306254,
         "rig": {
           "catcher": false,
-          "agl": 160,
+          "agl": 156,
           "casters": {
             "buildings": 0,
             "instanced": 0,
             "meshes": 0
           },
           "receivers": 0,
-          "casterFlips": 0
+          "casterFlips": 0,
+          "sweep": {
+            "walked": null,
+            "leaves": null,
+            "near": null,
+            "live": {
+              "flagged": 0,
+              "orphaned": 0,
+              "size": 0
+            }
+          }
+        },
+        "aerial": {
+          "strength": 0.55,
+          "startM": 800,
+          "bandStartM": 800,
+          "endM": 14000,
+          "heightFalloffM": 1200,
+          "rim": [
+            0.7764705882352941,
+            0.8431372549019608,
+            0.9098039215686274
+          ],
+          "nearStartM": 0,
+          "nearMaxMix": 0
         }
       },
       "features": {
         "AA": {
           "off": [
-            3.167,
-            3.158,
-            3.028
+            1.3,
+            1.291,
+            1.244
           ],
           "on": [
-            3.181,
-            2.985,
-            2.543
+            1.286,
+            1.28,
+            1.309
           ],
           "deltas": [
-            0.014,
-            -0.173,
-            -0.485
+            -0.014,
+            -0.011,
+            0.065
           ],
-          "medianDelta": -0.173,
+          "medianDelta": -0.011,
           "p95Off": null,
           "p95On": null
         },
         "catcher": {
           "off": [
-            2.946,
-            3.324,
-            3.095,
-            2.937
+            1.257,
+            1.341,
+            1.197,
+            1.205
           ],
           "on": [
-            3.129,
-            3.265,
-            2.894,
-            3.429
+            1.325,
+            1.309,
+            1.297,
+            1.271
           ],
           "deltas": [
-            0.183,
-            -0.059,
-            -0.201,
-            0.492
+            0.068,
+            -0.032,
+            0.1,
+            0.066
           ],
-          "medianDelta": 0.183,
+          "medianDelta": 0.068,
           "p95Off": null,
           "p95On": null,
           "draws": {
-            "draws": 219,
-            "tris": 236627,
+            "draws": 237,
+            "tris": 306304,
             "rig": {
               "catcher": true,
-              "agl": 160,
+              "agl": 156,
               "casters": {
-                "buildings": 49,
+                "buildings": 66,
                 "instanced": 0,
                 "meshes": 0
               },
               "receivers": 0,
-              "casterFlips": 0
+              "casterFlips": 0,
+              "sweep": {
+                "walked": null,
+                "leaves": null,
+                "near": null,
+                "live": {
+                  "flagged": 0,
+                  "orphaned": 0,
+                  "size": 0
+                }
+              }
+            },
+            "aerial": {
+              "strength": 0.55,
+              "startM": 800,
+              "bandStartM": 800,
+              "endM": 14000,
+              "heightFalloffM": 1200,
+              "rim": [
+                0.7764705882352941,
+                0.8431372549019608,
+                0.9098039215686274
+              ],
+              "nearStartM": 0,
+              "nearMaxMix": 0
             }
           }
         },
         "nearReceive": {
           "off": [
-            3.174,
-            3.023,
-            3.046,
-            3.074
+            1.287,
+            1.19,
+            1.331,
+            1.191
           ],
           "on": [
-            3.066,
-            2.974,
-            3.13,
-            3.038
+            1.263,
+            1.305,
+            1.365,
+            1.305
           ],
           "deltas": [
-            -0.108,
-            -0.049,
-            0.084,
-            -0.036
+            -0.024,
+            0.115,
+            0.034,
+            0.114
           ],
-          "medianDelta": -0.036,
+          "medianDelta": 0.114,
           "p95Off": null,
           "p95On": null,
           "draws": {
-            "draws": 218,
-            "tris": 236675,
+            "draws": 236,
+            "tris": 306256,
             "rig": {
               "catcher": false,
-              "agl": 160,
+              "agl": 156,
               "casters": {
                 "buildings": 0,
                 "instanced": 0,
                 "meshes": 0
               },
-              "receivers": 39,
-              "casterFlips": 0
+              "receivers": 49,
+              "casterFlips": 0,
+              "sweep": {
+                "walked": 204,
+                "leaves": 148,
+                "near": 48,
+                "live": {
+                  "flagged": 49,
+                  "orphaned": 0,
+                  "size": 49
+                }
+              }
+            },
+            "aerial": {
+              "strength": 0.55,
+              "startM": 800,
+              "bandStartM": 800,
+              "endM": 14000,
+              "heightFalloffM": 1200,
+              "rim": [
+                0.7764705882352941,
+                0.8431372549019608,
+                0.9098039215686274
+              ],
+              "nearStartM": 0,
+              "nearMaxMix": 0
             }
           }
         },
         "n8ao": {
           "off": [
-            3.147,
-            2.972,
-            2.965,
-            3.18
+            1.322,
+            1.176,
+            1.244,
+            1.224
           ],
           "on": [
-            3.328,
-            3.052,
-            3.194,
-            3.39
+            1.474,
+            1.369,
+            1.427,
+            1.408
           ],
           "deltas": [
-            0.181,
-            0.08,
-            0.229,
-            0.21
+            0.152,
+            0.193,
+            0.183,
+            0.184
           ],
-          "medianDelta": 0.21,
+          "medianDelta": 0.184,
           "p95Off": null,
           "p95On": null,
           "draws": {
-            "draws": 224,
-            "tris": 236681,
+            "draws": 242,
+            "tris": 306164,
             "rig": {
               "catcher": false,
-              "agl": 160,
+              "agl": 156,
               "casters": {
                 "buildings": 0,
                 "instanced": 0,
                 "meshes": 0
               },
               "receivers": 0,
-              "casterFlips": 0
+              "casterFlips": 0,
+              "sweep": {
+                "walked": 204,
+                "leaves": 148,
+                "near": 48,
+                "live": {
+                  "flagged": 0,
+                  "orphaned": 0,
+                  "size": 0
+                }
+              }
+            },
+            "aerial": {
+              "strength": 0.55,
+              "startM": 800,
+              "bandStartM": 800,
+              "endM": 14000,
+              "heightFalloffM": 1200,
+              "rim": [
+                0.7764705882352941,
+                0.8431372549019608,
+                0.9098039215686274
+              ],
+              "nearStartM": 0,
+              "nearMaxMix": 0
             }
           }
         },
         "aerialNear": {
           "off": [
-            2.835,
-            2.918,
-            2.777,
-            3.077
+            1.285,
+            1.263,
+            1.226,
+            1.251
           ],
           "on": [
-            3.132,
-            2.988,
-            3.151,
-            2.867
+            1.312,
+            1.215,
+            1.228,
+            1.302
           ],
           "deltas": [
-            0.297,
-            0.07,
-            0.374,
-            -0.21
+            0.027,
+            -0.048,
+            0.002,
+            0.051
           ],
-          "medianDelta": 0.297,
+          "medianDelta": 0.027,
           "p95Off": null,
           "p95On": null,
           "draws": {
-            "draws": 218,
-            "tris": 236675,
+            "draws": 236,
+            "tris": 306156,
             "rig": {
               "catcher": false,
-              "agl": 160,
+              "agl": 156,
               "casters": {
                 "buildings": 0,
                 "instanced": 0,
                 "meshes": 0
               },
               "receivers": 0,
-              "casterFlips": 0
+              "casterFlips": 0,
+              "sweep": {
+                "walked": 204,
+                "leaves": 148,
+                "near": 48,
+                "live": {
+                  "flagged": 0,
+                  "orphaned": 0,
+                  "size": 0
+                }
+              }
+            },
+            "aerial": {
+              "strength": 0.55,
+              "startM": 420,
+              "bandStartM": 800,
+              "endM": 14000,
+              "heightFalloffM": 1200,
+              "rim": [
+                0.7764705882352941,
+                0.8431372549019608,
+                0.9098039215686274
+              ],
+              "nearStartM": 420,
+              "nearMaxMix": 0.1
             }
           }
         },
         "all": {
           "off": [
-            2.905,
-            3.221,
-            3.337,
-            3.042
+            1.276,
+            1.308,
+            1.291,
+            1.242
           ],
           "on": [
-            2.963,
-            3.626,
-            3.256,
-            3.293
+            1.49,
+            1.46,
+            1.463,
+            1.428
           ],
           "deltas": [
-            0.058,
-            0.405,
-            -0.081,
-            0.251
+            0.214,
+            0.152,
+            0.172,
+            0.186
           ],
-          "medianDelta": 0.251,
+          "medianDelta": 0.186,
           "p95Off": null,
           "p95On": null,
           "draws": {
-            "draws": 225,
-            "tris": 236729,
+            "draws": 243,
+            "tris": 306212,
             "rig": {
               "catcher": true,
-              "agl": 160,
+              "agl": 156,
               "casters": {
-                "buildings": 49,
+                "buildings": 66,
                 "instanced": 0,
                 "meshes": 0
               },
-              "receivers": 39,
-              "casterFlips": 0
+              "receivers": 49,
+              "casterFlips": 0,
+              "sweep": {
+                "walked": 204,
+                "leaves": 148,
+                "near": 48,
+                "live": {
+                  "flagged": 49,
+                  "orphaned": 0,
+                  "size": 49
+                }
+              }
+            },
+            "aerial": {
+              "strength": 0.55,
+              "startM": 420,
+              "bandStartM": 800,
+              "endM": 14000,
+              "heightFalloffM": 1200,
+              "rim": [
+                0.7764705882352941,
+                0.8431372549019608,
+                0.9098039215686274
+              ],
+              "nearStartM": 420,
+              "nearMaxMix": 0.1
             }
           }
         }
       }
     },
     "OWENS": {
-      "agl": 420,
+      "agl": 418,
       "drawsOff": {
         "draws": 195,
-        "tris": 186734,
+        "tris": 185992,
         "rig": {
           "catcher": false,
-          "agl": 420,
+          "agl": 418,
           "casters": {
             "buildings": 0,
             "instanced": 0,
             "meshes": 0
           },
           "receivers": 0,
-          "casterFlips": 0
+          "casterFlips": 0,
+          "sweep": {
+            "walked": 204,
+            "leaves": 148,
+            "near": 48,
+            "live": {
+              "flagged": 0,
+              "orphaned": 0,
+              "size": 0
+            }
+          }
+        },
+        "aerial": {
+          "strength": 0.55,
+          "startM": 800,
+          "bandStartM": 800,
+          "endM": 14000,
+          "heightFalloffM": 1200,
+          "rim": [
+            0.7764705882352941,
+            0.8431372549019608,
+            0.9098039215686274
+          ],
+          "nearStartM": 0,
+          "nearMaxMix": 0
         }
       },
       "features": {
         "AA": {
           "off": [
-            2.68,
-            3.055,
-            2.442
+            0.951,
+            0.981,
+            0.967
           ],
           "on": [
-            2.78,
-            2.55,
-            2.591
+            0.908,
+            0.929,
+            0.914
           ],
           "deltas": [
-            0.1,
-            -0.505,
-            0.149
+            -0.043,
+            -0.052,
+            -0.053
           ],
-          "medianDelta": 0.1,
+          "medianDelta": -0.052,
           "p95Off": null,
           "p95On": null
         },
         "catcher": {
           "off": [
-            2.853,
-            2.779,
-            2.751,
-            2.683
+            0.914,
+            0.924,
+            0.931,
+            0.965
           ],
           "on": [
-            2.697,
-            2.607,
-            2.893,
-            2.718
+            0.903,
+            0.929,
+            0.971,
+            0.971
           ],
           "deltas": [
-            -0.156,
-            -0.172,
-            0.142,
-            0.035
+            -0.011,
+            0.005,
+            0.04,
+            0.006
           ],
-          "medianDelta": 0.035,
+          "medianDelta": 0.006,
           "p95Off": null,
           "p95On": null,
           "draws": {
             "draws": 196,
-            "tris": 186880,
+            "tris": 186138,
             "rig": {
               "catcher": true,
-              "agl": 420,
+              "agl": 418,
               "casters": {
                 "buildings": 949,
                 "instanced": 0,
                 "meshes": 0
               },
               "receivers": 0,
-              "casterFlips": 0
+              "casterFlips": 0,
+              "sweep": {
+                "walked": 204,
+                "leaves": 148,
+                "near": 48,
+                "live": {
+                  "flagged": 0,
+                  "orphaned": 0,
+                  "size": 0
+                }
+              }
+            },
+            "aerial": {
+              "strength": 0.55,
+              "startM": 800,
+              "bandStartM": 800,
+              "endM": 14000,
+              "heightFalloffM": 1200,
+              "rim": [
+                0.7764705882352941,
+                0.8431372549019608,
+                0.9098039215686274
+              ],
+              "nearStartM": 0,
+              "nearMaxMix": 0
             }
           }
         },
         "n8ao": {
           "off": [
-            2.678,
-            3.188,
-            3.316,
-            3.503
+            0.934,
+            0.933,
+            0.916,
+            0.951
           ],
           "on": [
-            2.906,
-            4.04,
-            3.873,
-            3.498
+            1.046,
+            1.093,
+            1.057,
+            1.094
           ],
           "deltas": [
-            0.228,
-            0.852,
-            0.557,
-            -0.005
+            0.112,
+            0.16,
+            0.141,
+            0.143
           ],
-          "medianDelta": 0.557,
+          "medianDelta": 0.143,
           "p95Off": null,
           "p95On": null,
           "draws": {
             "draws": 201,
-            "tris": 186838,
+            "tris": 186096,
             "rig": {
               "catcher": false,
-              "agl": 420,
+              "agl": 418,
               "casters": {
                 "buildings": 0,
                 "instanced": 0,
                 "meshes": 0
               },
               "receivers": 0,
-              "casterFlips": 0
+              "casterFlips": 0,
+              "sweep": {
+                "walked": 204,
+                "leaves": 148,
+                "near": 48,
+                "live": {
+                  "flagged": 0,
+                  "orphaned": 0,
+                  "size": 0
+                }
+              }
+            },
+            "aerial": {
+              "strength": 0.55,
+              "startM": 800,
+              "bandStartM": 800,
+              "endM": 14000,
+              "heightFalloffM": 1200,
+              "rim": [
+                0.7764705882352941,
+                0.8431372549019608,
+                0.9098039215686274
+              ],
+              "nearStartM": 0,
+              "nearMaxMix": 0
             }
           }
         },
         "all": {
           "off": [
-            2.619,
-            2.776,
-            2.7,
-            2.864
+            0.958,
+            0.965,
+            0.921,
+            0.929
           ],
           "on": [
-            2.94,
-            2.911,
-            2.923,
-            3.016
+            1.08,
+            1.14,
+            1.088,
+            1.091
           ],
           "deltas": [
-            0.321,
-            0.135,
-            0.223,
-            0.152
+            0.122,
+            0.175,
+            0.167,
+            0.162
           ],
-          "medianDelta": 0.223,
+          "medianDelta": 0.167,
           "p95Off": null,
           "p95On": null,
           "draws": {
             "draws": 202,
-            "tris": 186886,
+            "tris": 186144,
             "rig": {
               "catcher": true,
-              "agl": 420,
+              "agl": 418,
               "casters": {
                 "buildings": 949,
                 "instanced": 0,
                 "meshes": 0
               },
               "receivers": 30,
-              "casterFlips": 0
+              "casterFlips": 0,
+              "sweep": {
+                "walked": 221,
+                "leaves": 166,
+                "near": 30,
+                "live": {
+                  "flagged": 30,
+                  "orphaned": 0,
+                  "size": 30
+                }
+              }
+            },
+            "aerial": {
+              "strength": 0.55,
+              "startM": 420,
+              "bandStartM": 800,
+              "endM": 14000,
+              "heightFalloffM": 1200,
+              "rim": [
+                0.7764705882352941,
+                0.8431372549019608,
+                0.9098039215686274
+              ],
+              "nearStartM": 420,
+              "nearMaxMix": 0.1
             }
           }
         }
       }
     },
     "RIDGE-SIERRA": {
-      "agl": 2548,
+      "agl": 85,
       "drawsOff": {
         "draws": 226,
-        "tris": 461577,
+        "tris": 462209,
         "rig": {
           "catcher": false,
-          "agl": 2548,
+          "agl": 85,
           "casters": {
             "buildings": 0,
             "instanced": 0,
             "meshes": 0
           },
           "receivers": 0,
-          "casterFlips": 0
+          "casterFlips": 0,
+          "sweep": {
+            "walked": 221,
+            "leaves": 166,
+            "near": 30,
+            "live": {
+              "flagged": 0,
+              "orphaned": 0,
+              "size": 0
+            }
+          }
+        },
+        "aerial": {
+          "strength": 0.55,
+          "startM": 800,
+          "bandStartM": 800,
+          "endM": 14000,
+          "heightFalloffM": 1200,
+          "rim": [
+            0.7764705830100772,
+            0.8431372515308532,
+            0.9098039202201844
+          ],
+          "nearStartM": 0,
+          "nearMaxMix": 0
         }
       },
       "features": {
         "AA": {
           "off": [
-            3.178,
-            3.076,
-            3.226
+            1.27,
+            1.271,
+            1.305
           ],
           "on": [
-            3.266,
-            3.253,
-            3.438
+            1.307,
+            1.305,
+            1.381
           ],
           "deltas": [
-            0.088,
-            0.177,
-            0.212
+            0.037,
+            0.034,
+            0.076
           ],
-          "medianDelta": 0.177,
+          "medianDelta": 0.037,
           "p95Off": null,
           "p95On": null
         },
         "nearReceive": {
           "off": [
-            3.315,
-            3.134,
-            3.159,
-            3.403
+            1.303,
+            1.252,
+            1.237,
+            1.239
           ],
           "on": [
-            3.102,
-            3.193,
-            3.046,
-            3.143
+            1.397,
+            1.307,
+            1.322,
+            1.271
           ],
           "deltas": [
-            -0.213,
-            0.059,
-            -0.113,
-            -0.26
+            0.094,
+            0.055,
+            0.085,
+            0.032
           ],
-          "medianDelta": -0.113,
+          "medianDelta": 0.085,
           "p95Off": null,
           "p95On": null,
           "draws": {
             "draws": 226,
-            "tris": 461383,
+            "tris": 462403,
             "rig": {
               "catcher": false,
-              "agl": 2548,
+              "agl": 85,
               "casters": {
                 "buildings": 0,
                 "instanced": 0,
                 "meshes": 0
               },
               "receivers": 48,
-              "casterFlips": 0
+              "casterFlips": 0,
+              "sweep": {
+                "walked": 225,
+                "leaves": 161,
+                "near": 48,
+                "live": {
+                  "flagged": 48,
+                  "orphaned": 0,
+                  "size": 48
+                }
+              }
+            },
+            "aerial": {
+              "strength": 0.55,
+              "startM": 800,
+              "bandStartM": 800,
+              "endM": 14000,
+              "heightFalloffM": 1200,
+              "rim": [
+                0.7764705882344577,
+                0.8431372549014211,
+                0.9098039215684116
+              ],
+              "nearStartM": 0,
+              "nearMaxMix": 0
             }
           }
         }
@@ -465,8 +753,8 @@
     "MANHATTAN-DPR1.5": {
       "agl": 485,
       "drawsOff": {
-        "draws": 241,
-        "tris": 718962,
+        "draws": 240,
+        "tris": 675839,
         "rig": {
           "catcher": false,
           "agl": 485,
@@ -476,55 +764,79 @@
             "meshes": 0
           },
           "receivers": 0,
-          "casterFlips": 0
+          "casterFlips": 0,
+          "sweep": {
+            "walked": 225,
+            "leaves": 161,
+            "near": 48,
+            "live": {
+              "flagged": 0,
+              "orphaned": 0,
+              "size": 0
+            }
+          }
+        },
+        "aerial": {
+          "strength": 0.55,
+          "startM": 800,
+          "bandStartM": 800,
+          "endM": 14000,
+          "heightFalloffM": 1200,
+          "rim": [
+            0.7764705882352941,
+            0.8431372549019608,
+            0.9098039215686274
+          ],
+          "nearStartM": 0,
+          "nearMaxMix": 0
         }
       },
       "features": {
         "AA": {
           "off": [
-            3.68,
-            3.642,
-            3.151
+            1.423,
+            1.391,
+            1.381
           ],
           "on": [
-            3.635,
-            3.752,
-            3.268
+            1.429,
+            1.406,
+            1.416
           ],
           "deltas": [
-            -0.045,
-            0.11,
-            0.117
+            0.006,
+            0.015,
+            0.035
           ],
-          "medianDelta": 0.11,
+          "medianDelta": 0.015,
           "p95Off": null,
           "p95On": null
         },
         "n8ao": {
           "off": [
-            3.596,
-            3.628,
-            3.176,
-            3.212
+            1.409,
+            1.409,
+            1.409,
+            1.438
           ],
           "on": [
-            3.764,
-            3.2,
-            3.538,
-            4.356
+            1.651,
+            1.663,
+            1.614,
+            1.589
           ],
           "deltas": [
-            0.168,
-            -0.428,
-            0.362,
-            1.144
+            0.242,
+            0.254,
+            0.205,
+            0.151
           ],
-          "medianDelta": 0.362,
+          "medianDelta": 0.242,
           "p95Off": null,
           "p95On": null,
           "draws": {
-            "draws": 247,
-            "tris": 718968,
+            "draws": 246,
+            "tris": 676143,
             "rig": {
               "catcher": false,
               "agl": 485,
@@ -534,35 +846,59 @@
                 "meshes": 0
               },
               "receivers": 0,
-              "casterFlips": 0
+              "casterFlips": 0,
+              "sweep": {
+                "walked": 225,
+                "leaves": 161,
+                "near": 48,
+                "live": {
+                  "flagged": 0,
+                  "orphaned": 0,
+                  "size": 0
+                }
+              }
+            },
+            "aerial": {
+              "strength": 0.55,
+              "startM": 800,
+              "bandStartM": 800,
+              "endM": 14000,
+              "heightFalloffM": 1200,
+              "rim": [
+                0.7764705882352941,
+                0.8431372549019608,
+                0.9098039215686274
+              ],
+              "nearStartM": 0,
+              "nearMaxMix": 0
             }
           }
         },
         "nearReceive": {
           "off": [
-            4.528,
-            4.458,
-            3.185,
-            3.237
+            1.411,
+            1.401,
+            1.423,
+            1.42
           ],
           "on": [
-            4.44,
-            3.444,
-            3.094,
-            3.7
+            1.41,
+            1.408,
+            1.422,
+            1.34
           ],
           "deltas": [
-            -0.088,
-            -1.014,
-            -0.091,
-            0.463
+            -0.001,
+            0.007,
+            -0.001,
+            -0.08
           ],
-          "medianDelta": -0.088,
+          "medianDelta": -0.001,
           "p95Off": null,
           "p95On": null,
           "draws": {
-            "draws": 241,
-            "tris": 718962,
+            "draws": 240,
+            "tris": 676037,
             "rig": {
               "catcher": false,
               "agl": 485,
@@ -572,35 +908,59 @@
                 "meshes": 0
               },
               "receivers": 42,
-              "casterFlips": 0
+              "casterFlips": 0,
+              "sweep": {
+                "walked": 257,
+                "leaves": 193,
+                "near": 42,
+                "live": {
+                  "flagged": 42,
+                  "orphaned": 0,
+                  "size": 42
+                }
+              }
+            },
+            "aerial": {
+              "strength": 0.55,
+              "startM": 800,
+              "bandStartM": 800,
+              "endM": 14000,
+              "heightFalloffM": 1200,
+              "rim": [
+                0.7764705882352941,
+                0.8431372549019608,
+                0.9098039215686274
+              ],
+              "nearStartM": 0,
+              "nearMaxMix": 0
             }
           }
         },
         "all": {
           "off": [
-            3.66,
-            3.468,
-            3.615,
-            3.304
+            1.421,
+            1.427,
+            1.386,
+            1.419
           ],
           "on": [
-            3.706,
-            3.664,
-            3.747,
-            3.999
+            1.646,
+            1.616,
+            1.626,
+            1.608
           ],
           "deltas": [
-            0.046,
-            0.196,
-            0.132,
-            0.695
+            0.225,
+            0.189,
+            0.24,
+            0.189
           ],
-          "medianDelta": 0.196,
+          "medianDelta": 0.225,
           "p95Off": null,
           "p95On": null,
           "draws": {
-            "draws": 248,
-            "tris": 718816,
+            "draws": 247,
+            "tris": 676191,
             "rig": {
               "catcher": true,
               "agl": 485,
@@ -610,38 +970,62 @@
                 "meshes": 0
               },
               "receivers": 42,
-              "casterFlips": 0
+              "casterFlips": 0,
+              "sweep": {
+                "walked": 257,
+                "leaves": 193,
+                "near": 42,
+                "live": {
+                  "flagged": 42,
+                  "orphaned": 0,
+                  "size": 42
+                }
+              }
+            },
+            "aerial": {
+              "strength": 0.55,
+              "startM": 420,
+              "bandStartM": 800,
+              "endM": 14000,
+              "heightFalloffM": 1200,
+              "rim": [
+                0.7764705882352941,
+                0.8431372549019608,
+                0.9098039215686274
+              ],
+              "nearStartM": 420,
+              "nearMaxMix": 0.1
             }
           }
         }
       }
     }
   },
-  "bootMs": 6706,
+  "bootMs": 7010,
   "gpuTimer": "ok",
   "casterStandIn": {
     "off": [
-      3.512,
-      3.454,
-      3.189,
-      3.811
+      1.446,
+      1.484,
+      1.455,
+      1.442
     ],
     "on": [
-      3.582,
-      3.288,
-      3.641,
-      3.545
+      1.464,
+      1.405,
+      1.45,
+      1.403
     ],
     "deltas": [
-      0.07,
-      -0.166,
-      0.452,
-      -0.266
+      0.018,
+      -0.079,
+      -0.005,
+      -0.039
     ],
-    "medianDelta": 0.07,
+    "medianDelta": -0.005,
     "draws": {
-      "draws": 243,
-      "tris": 733064,
+      "draws": 242,
+      "tris": 690539,
       "rig": {
         "catcher": false,
         "agl": 485,
@@ -651,44 +1035,68 @@
           "meshes": 0
         },
         "receivers": 0,
-        "casterFlips": 1
+        "casterFlips": 1,
+        "sweep": {
+          "walked": 257,
+          "leaves": 193,
+          "near": 42,
+          "live": {
+            "flagged": 0,
+            "orphaned": 0,
+            "size": 0
+          }
+        }
+      },
+      "aerial": {
+        "strength": 0.55,
+        "startM": 800,
+        "bandStartM": 800,
+        "endM": 14000,
+        "heightFalloffM": 1200,
+        "rim": [
+          0.7764705882352941,
+          0.8431372549019608,
+          0.9098039215686274
+        ],
+        "nearStartM": 0,
+        "nearMaxMix": 0
       }
     }
   },
   "tierCycleOff": [
     [
       "high(start)",
-      97
-    ],
-    [
-      "medium",
       108
     ],
     [
+      "medium",
+      119
+    ],
+    [
       "low",
-      94
+      104
     ],
     [
       "high",
-      107
+      114
     ]
   ],
   "tierCycleOn": [
     [
       "high(start)",
-      107
+      114
     ],
     [
       "medium",
-      110
+      117
     ],
     [
       "low",
-      97
+      104
     ],
     [
       "high",
-      107
+      114
     ]
   ],
   "pageerrors": []

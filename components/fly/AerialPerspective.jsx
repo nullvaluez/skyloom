@@ -135,9 +135,21 @@ export function clearAerial() {
 
 /** Dev/harness introspection — verify-aerial reads the live strength. */
 export function getAerialState() {
+  // `startM` is reported as the EFFECTIVE start of distance attenuation, which
+  // is what both verify-aerial and verify-depth2 (12) assert on ("the 0..startM
+  // band is no longer identically empty"). With DEPTH_PASS.aerialNear armed
+  // that really is nearStartM: the second band begins there, so the frame below
+  // 800 m is no longer mathematically untouched. The main band's own uniform
+  // stays readable as `bandStartM` — it never moves, which is why
+  // verify-aerial's 3-10 km mid-band gate is undisturbed by this.
+  const effectiveStartM =
+    _state.nearMaxMix > 0 && _state.nearStartM > 0
+      ? Math.min(_state.startM, _state.nearStartM)
+      : _state.startM;
   return {
     strength: _state.strength,
-    startM: _state.startM,
+    startM: effectiveStartM,
+    bandStartM: _state.startM,
     endM: _state.endM,
     heightFalloffM: _state.heightFalloffM,
     rim: [..._state.rim],
