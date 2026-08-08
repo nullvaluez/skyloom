@@ -88,32 +88,71 @@ export function WarpFlash({ runtime }) {
         if (!ts || !Number.isFinite(ts.camTileZ) || !Number.isFinite(ts.targetZ)) return null;
         return ts.targetZ - ts.camTileZ;
       };
-      const d0 = gate ? deficitOf() : null;
-      const localCap = WARP.flashMs + (d0 != null && d0 > L.localHoldDeficit ? L.maxMs : 0);
-      stats({ holdCapMs: localCap, deficit: d0 }); // armed, in flight
-      if (d0 == null || d0 <= L.localHoldDeficit) {
-        timers.push(
-          setTimeout(() => {
-            if (cancelled) return;
-            markReveal('warp');
-            note({ localHeld: false, deficit: d0 });
-            setStage(null);
-          }, WARP.flashMs)
-        );
-      } else {
+      // W3 FIX (verify-arrival 9b was RED: deficit 3 revealed with a 0 ms
+      // hold). TWO defects, both in this branch, both found by E's instrument:
+      //
+      //  (i)  THE DEFICIT WAS SAMPLED AT WARP DISPATCH. At that instant
+      //       `terraStats.camTileZ` is still the leaf under the DEPARTURE
+      //       pose — the camera has been teleported but the quadtree has not
+      //       re-evaluated and the stats publish at 2 Hz — so the deficit read
+      //       ~0 and the hold could never arm. The destination's coarseness
+      //       only becomes a fact after the flash, which is exactly where E
+      //       measures it (camTileZ before vs after). So the deficit is now
+      //       evaluated AT FLASH-END and re-polled, never at dispatch.
+      //  (ii) THE HOLD HAD NO OBSERVABLE STAGE. The local branch renders the
+      //       flash markup, which carries no `data-testid="warp-hold"` — so a
+      //       hold of any length measured 0 ms, because E's trace (and the
+      //       player) had nothing to see. The extension now renders a real,
+      //       brief veil carrying the testid and `data-stage="hold"`.
+      //
+      // THE 250 ms CONTRACT: verify-warp-arrival asserts `local warp → plain
+      // flash (no hold)` sampled 250 ms after the click, and that gate is
+      // FROZEN. The extension begins at WARP.flashMs (900 ms) and the flash
+      // stage is left exactly as it was, testid and all — so the common case
+      // (deficit <= localHoldDeficit, or no terraStats at all) is the R21
+      // 900 ms flash to the millisecond, and the frozen gate never sees a
+      // hold because at 250 ms there is none to see.
+      const endFlash = () => {
+        if (cancelled) return;
+        // `gate &&` is load-bearing, not defensive: without it the hold arms
+        // with ARRIVAL_GATE disabled, which breaks the block's flag-off
+        // byte-identity contract. (Caught by the control arm of
+        // scripts/r22-b-localwarp.js holding 1468 ms with the flag off.)
+        const d = gate ? deficitOf() : null;
+        if (d == null || d <= L.localHoldDeficit) {
+          markReveal('warp');
+          // `terraSeen` makes the no-hold case SELF-DESCRIBING: a gate that
+          // finds holdMs 0 needs to know whether the deficit was genuinely
+          // small (feature working) or unknowable because A's terraStats was
+          // absent (fleet pin / TERRA off ⇒ the documented legacy path). Those
+          // are opposite verdicts and they looked identical before.
+          note({
+            localHeld: false,
+            deficit: d,
+            terraSeen: !!runtimeRef.current?.terraStats,
+            reason: d == null ? 'no-deficit-signal' : 'flash',
+          });
+          setStage(null);
+          return;
+        }
+        // Genuinely coarse ground: a bounded veil while it sharpens.
+        setStage('localhold');
+        stats({ holdCapMs: WARP.flashMs + L.maxMs, deficit: d });
         const poll = setInterval(() => {
           const el = performance.now() - t0;
-          const d = deficitOf();
-          const done = (d != null && d <= L.localHoldDeficit) || el >= WARP.flashMs + L.maxMs;
-          if (!done) return;
+          const dd = deficitOf();
+          const capped = el >= WARP.flashMs + L.maxMs;
+          if (!((dd != null && dd <= L.localHoldDeficit) || capped)) return;
           clearInterval(poll);
           if (cancelled) return;
           markReveal('warp');
-          note({ localHeld: true, deficit: d, capped: el >= WARP.flashMs + L.maxMs });
+          note({ localHeld: true, deficit: dd, capped, reason: capped ? 'cap' : 'content' });
           setStage(null);
         }, 120);
         timers.push({ _i: poll });
-      }
+      };
+      stats({ holdCapMs: WARP.flashMs }); // armed; raised if the extension fires
+      timers.push(setTimeout(endFlash, WARP.flashMs));
     } else {
       setStage('streak');
       timers.push(setTimeout(() => !cancelled && setStage('hold'), WARP.flashMs));
@@ -204,6 +243,30 @@ export function WarpFlash({ runtime }) {
           Warp
         </div>
       </div>
+    );
+  }
+
+  // --- local warp: the bounded post-flash veil (R22 W3) -------------------
+  // Deliberately NOT the far-warp ink curtain: a short hop that blacked the
+  // screen out would be a worse experience than the blur it is hiding. This is
+  // the tail of the flash held at a low constant value for at most
+  // localHold.maxMs, which is enough to keep a 3-levels-coarse ground off the
+  // screen while it sharpens and little enough to read as the flash settling.
+  // It carries the warp-hold testid so the hold is MEASURABLE — the 9b defect
+  // was as much "no instrument" as "no hold".
+  if (stage === 'localhold') {
+    return (
+      <div
+        key={warpEpoch}
+        className="pointer-events-none absolute inset-0 z-30"
+        data-testid="warp-hold"
+        data-stage="hold"
+        style={{
+          background:
+            'radial-gradient(circle at 50% 50%, rgba(255,255,255,0.42) 0%, rgba(199,222,255,0.28) 40%, rgba(120,170,255,0.08) 75%, transparent 100%)',
+          transition: 'opacity 220ms ease-out',
+        }}
+      />
     );
   }
 
