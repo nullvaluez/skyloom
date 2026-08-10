@@ -12,9 +12,10 @@ satellite world you can fly across.
 
 [![SkyLoom trailer — click to watch](trailer/poster.jpg)](trailer/skyloom-trailer.mp4?raw=true)
 
-**[▶ Watch the trailer](trailer/skyloom-trailer.mp4?raw=true)** — a 78-second cut
-of in-engine captures (satellite day/night, the Neon world, real monuments,
-boost, the Atlas). Every world frame is an unretouched screenshot produced by
+**[▶ Watch the trailer](trailer/skyloom-trailer.mp4?raw=true)** — a 48-second,
+beat-synced cut of in-engine captures (satellite day/night, the Neon world,
+real monuments, boost, the Atlas). Every world frame is an unretouched
+screenshot produced by
 the repo's verification harnesses; the soundtrack is synthesized by the build
 script itself. Rebuild it with `node trailer/build.mjs` (see the header of that
 file for its two ad-hoc dev dependencies). With a dev server running locally,

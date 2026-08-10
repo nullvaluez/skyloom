@@ -42,6 +42,11 @@ fs.mkdirSync(WORK, { recursive: true });
 // ---------------------------------------------------------------------------
 // 1. Storyboard
 // ---------------------------------------------------------------------------
+// The cut is beat-synced: the score runs at 120 BPM, so one bar = 2.0 s and
+// EVERY duration below is a multiple of 2.0 — every hard cut lands on a
+// downbeat. Shots are fast (one bar) with aggressive Ken Burns moves plus a
+// 6-frame punch-in at each cut; the two 4 s shots (Eiffel, boost) are the
+// held "hero" beats.
 // kind 'shot': Ken Burns over scripts/<src>.
 //   move 'push' zooms 1 -> 1+amp at focus (fx,fy); move 'pan' holds zoom and
 //   slides the focus x from fx to fx2 at height fy.
@@ -50,24 +55,25 @@ fs.mkdirSync(WORK, { recursive: true });
 //   replaces the Ken Burns still for this slot, same duration.
 // kind 'card': Chromium-rendered title card (built below), fades in/out.
 const BOARD = [
-  { kind: 'card', id: 'title', dur: 4.2 },
-  { kind: 'shot', src: 'r18a1-manhattan-roofs.png', dur: 4.6, move: 'push', amp: 0.1, fx: 0.5, fy: 0.42, live: 'sat-manhattan' },
-  { kind: 'shot', src: 'r13-bldg-tokyo.png', dur: 4.6, move: 'pan', zoom: 1.08, fx: 0.18, fx2: 0.55, fy: 0.4 },
-  { kind: 'shot', src: 'weather-09-dusk-walk.png', dur: 4.4, move: 'push', amp: 0.08, fx: 0.5, fy: 0.35, live: 'photo-orbit' },
-  { kind: 'card', id: 'real', dur: 3.2 },
-  { kind: 'shot', src: 'p5-03-formation.png', dur: 4.6, move: 'push', amp: 0.1, fx: 0.46, fy: 0.42, live: 'traffic-cinema' },
-  { kind: 'shot', src: 'r21b-on-heal-sf.png', dur: 4.4, move: 'pan', zoom: 1.08, fx: 0.25, fx2: 0.6, fy: 0.45 },
-  { kind: 'card', id: 'night', dur: 2.8 },
-  { kind: 'shot', src: 'r16-satnight-01-manhattan-night.png', dur: 4.8, move: 'pan', zoom: 1.08, fx: 0.6, fx2: 0.25, fy: 0.45 },
-  { kind: 'shot', src: 'r20-c-eiffel-satellite-after.png', dur: 4.8, move: 'push', amp: 0.11, fx: 0.5, fy: 0.45, live: 'eiffel-night' },
-  { kind: 'shot', src: 'hangar-01-fighter.png', dur: 4.4, move: 'push', amp: 0.09, fx: 0.5, fy: 0.45, live: 'neon-night' },
-  { kind: 'shot', src: 'neon-01-manhattan.png', dur: 4.4, move: 'pan', zoom: 1.07, fx: 0.38, fx2: 0.6, fy: 0.5 },
-  { kind: 'shot', src: 'f5-02-skyline.png', dur: 4.4, move: 'push', amp: 0.1, fx: 0.7, fy: 0.45 },
-  { kind: 'shot', src: 'edge-05-boost-ribbons.png', dur: 3.6, move: 'push', amp: 0.16, fx: 0.5, fy: 0.45, live: 'boost' },
-  { kind: 'card', id: 'features', dur: 3.4 },
-  { kind: 'shot', src: 'atlas-01-open.png', dur: 4.0, move: 'push', amp: 0.06, fx: 0.5, fy: 0.5 },
-  { kind: 'shot', src: 'r20-c-esb-satellite-after.png', dur: 4.6, move: 'push', amp: 0.09, fx: 0.5, fy: 0.4, live: 'liberty' },
-  { kind: 'card', id: 'end', dur: 6.5 },
+  { kind: 'card', id: 'title', dur: 4.0 },
+  { kind: 'shot', src: 'r18a1-manhattan-roofs.png', dur: 2.0, move: 'push', amp: 0.16, fx: 0.5, fy: 0.42, live: 'sat-manhattan' },
+  { kind: 'shot', src: 'r13-bldg-tokyo.png', dur: 2.0, move: 'pan', zoom: 1.1, fx: 0.15, fx2: 0.6, fy: 0.4 },
+  { kind: 'shot', src: 'r21b-on-heal-sf.png', dur: 2.0, move: 'pan', zoom: 1.1, fx: 0.22, fx2: 0.62, fy: 0.45, live: 'liberty' },
+  { kind: 'shot', src: 'weather-09-dusk-walk.png', dur: 2.0, move: 'push', amp: 0.14, fx: 0.5, fy: 0.35, live: 'photo-orbit' },
+  { kind: 'card', id: 'real', dur: 2.0 },
+  { kind: 'shot', src: 'p5-03-formation.png', dur: 2.0, move: 'push', amp: 0.18, fx: 0.46, fy: 0.42, live: 'traffic-cinema' },
+  { kind: 'shot', src: 'warp-03-sat-tokyo.png', dur: 2.0, move: 'push', amp: 0.14, fx: 0.5, fy: 0.4 },
+  { kind: 'card', id: 'night', dur: 2.0 },
+  { kind: 'shot', src: 'r16-satnight-01-manhattan-night.png', dur: 2.0, move: 'pan', zoom: 1.1, fx: 0.58, fx2: 0.25, fy: 0.45 },
+  { kind: 'shot', src: 'r20-c-eiffel-satellite-after.png', dur: 4.0, move: 'push', amp: 0.16, fx: 0.5, fy: 0.45, live: 'eiffel-night' },
+  { kind: 'shot', src: 'hangar-01-fighter.png', dur: 2.0, move: 'push', amp: 0.18, fx: 0.5, fy: 0.45, live: 'neon-night' },
+  { kind: 'shot', src: 'globe-02-neon-down.png', dur: 2.0, move: 'push', amp: 0.2, fx: 0.5, fy: 0.5 },
+  { kind: 'shot', src: 'neon-01-manhattan.png', dur: 2.0, move: 'pan', zoom: 1.09, fx: 0.35, fx2: 0.62, fy: 0.5 },
+  { kind: 'shot', src: 'neon-03-kjfk-runways.png', dur: 2.0, move: 'push', amp: 0.15, fx: 0.5, fy: 0.5 },
+  { kind: 'shot', src: 'edge-05-boost-ribbons.png', dur: 4.0, move: 'push', amp: 0.3, fx: 0.5, fy: 0.45, live: 'boost' },
+  { kind: 'card', id: 'features', dur: 2.0 },
+  { kind: 'shot', src: 'atlas-01-open.png', dur: 2.0, move: 'push', amp: 0.1, fx: 0.5, fy: 0.5 },
+  { kind: 'card', id: 'end', dur: 6.0 },
 ];
 const TOTAL = BOARD.reduce((s, b) => s + b.dur, 0);
 console.log(`storyboard: ${BOARD.length} segments, ${TOTAL.toFixed(1)}s`);
@@ -122,12 +128,12 @@ const CARDS = {
   }),
   real: cardHtml({
     title: 'Every plane up there<br>is real',
-    sub: 'Live ADS-B traffic — <b>real aircraft, real routes</b>,<br>streamed into a flyable world',
+    sub: '<b>Live ADS-B traffic</b>',
   }),
   night: cardHtml({ title: 'Chase the night' }),
   features: cardHtml({
-    title: 'Real monuments.<br>Nine flyable aircraft.',
-    sub: 'Contracts &nbsp;·&nbsp; photo mode &nbsp;·&nbsp; logbook &nbsp;·&nbsp; a whole living planet',
+    title: 'A whole living planet',
+    sub: 'Real monuments &nbsp;·&nbsp; <b>nine aircraft</b> &nbsp;·&nbsp; contracts &nbsp;·&nbsp; photo mode',
   }),
   end: cardHtml({
     kicker: 'Keyless · open source · runs in your browser',
@@ -177,110 +183,188 @@ async function renderCards() {
 }
 
 // ---------------------------------------------------------------------------
-// 3. Soundtrack — offline ambient synth (saw pads + sub, slow chords)
+// 3. Soundtrack — offline synthwave engine (120 BPM, the cut's bar grid)
 // ---------------------------------------------------------------------------
+// Four-on-the-floor kick, offbeat hats, snare on 2 & 4, driving eighth-note
+// bass and a 16th-note arp with a dotted-eighth echo, all sidechain-ducked
+// against the kick. Crashes land on every card and on the boost shot. First
+// bar is a drum+riser count-in under the title; drums stop one bar into the
+// end card and the final chord rings out.
 function synthAudio(outWav) {
   const SR = 44100;
+  const BEAT = 0.5; // 120 BPM
+  const BAR = 4 * BEAT;
   const N = Math.ceil(TOTAL * SR);
   const L = new Float64Array(N);
   const R = new Float64Array(N);
   const midiHz = (m) => 440 * 2 ** ((m - 69) / 12);
-
-  // A-minor progression, one chord per ~8 s, final chord holds to the end.
-  const PROG = [
-    [45, 52, 59, 60], // Am9
-    [41, 48, 52, 57], // Fmaj7
-    [48, 55, 64], // C
-    [43, 50, 59], // G
-    [45, 52, 59, 60], // Am9
-    [41, 48, 52, 57], // Fmaj7
-    [50, 57, 64, 65], // Dm9
-    [45, 52, 57, 60], // Am (final)
-  ];
-  const CHORD_S = 8;
   let rs = 42;
   const rnd = () => ((rs = (rs * 16807) % 2147483647) / 2147483647);
 
-  const renderChord = (notes, t0, t1, gain) => {
-    const att = 2.6;
-    const rel = 3.2;
-    const s0 = Math.max(0, Math.floor(t0 * SR));
-    const s1 = Math.min(N, Math.ceil((t1 + rel) * SR));
-    const voices = [];
-    for (const m of notes) {
-      const f = midiHz(m);
-      for (const det of [-0.0016, 0.0013]) {
-        voices.push({ f: f * (1 + det), ph: rnd(), pan: rnd() * 0.7 + 0.15 });
-      }
+  // Cut-sheet timing hooks.
+  let cursor = 0;
+  const crashAt = [];
+  let endCardT = TOTAL - 6;
+  for (const b of BOARD) {
+    if (b.kind === 'card') {
+      crashAt.push(cursor);
+      if (b.id === 'end') endCardT = cursor;
     }
-    // sub an octave below the root
-    voices.push({ f: midiHz(notes[0] - 12), ph: 0, pan: 0.5, sine: true, g: 0.9 });
-    for (const v of voices) {
-      const g = (gain * (v.g ?? 0.32)) / Math.sqrt(voices.length);
-      let phase = v.ph;
-      const inc = v.f / SR;
-      let lpL = 0;
-      const lpC = 1 - Math.exp((-2 * Math.PI * 950) / SR);
-      for (let s = s0; s < s1; s++) {
-        const t = s / SR;
-        let env;
-        if (t < t0 + att) env = (t - t0) / att;
-        else if (t > t1) env = Math.max(0, 1 - (t - t1) / rel);
-        else env = 1;
-        env *= env;
-        phase += inc;
-        if (phase >= 1) phase -= 1;
-        let x = v.sine ? Math.sin(2 * Math.PI * phase) : phase * 2 - 1;
-        lpL += lpC * (x - lpL);
-        x = v.sine ? x : lpL;
-        const a = x * env * g;
-        L[s] += a * (1 - v.pan);
-        R[s] += a * v.pan;
+    if (b.live === 'boost' || b.src === 'edge-05-boost-ribbons.png') crashAt.push(cursor);
+    cursor += b.dur;
+  }
+  const drumsEnd = Math.min(TOTAL, endCardT + BAR); // one bar into the end card
+  const grooveT0 = BAR; // bar 0 = count-in, groove from bar 1
+
+  // Am / F / C / G, one chord per bar; the bar that starts the end card and
+  // everything after it holds Am so the outro resolves.
+  const CHORDS = [
+    [45, 48, 52, 57], // Am
+    [41, 45, 48, 52], // F
+    [43, 48, 52, 55], // C
+    [43, 47, 50, 55], // G
+  ];
+  const chordAtBar = (bar) => (bar * BAR >= endCardT - 0.01 ? CHORDS[0] : CHORDS[bar % 4]);
+
+  // --- tiny event renderers -------------------------------------------------
+  const addKick = (t) => {
+    const s0 = Math.floor(t * SR);
+    for (let i = 0; i < SR * 0.28; i++) {
+      const tt = i / SR;
+      const f = 48 + 112 * Math.exp(-tt / 0.028);
+      const a = Math.exp(-tt / 0.085) * 0.95 * Math.sin(2 * Math.PI * f * tt);
+      const s = s0 + i;
+      if (s < N) {
+        L[s] += a;
+        R[s] += a;
       }
     }
   };
-
-  for (let i = 0; i < PROG.length; i++) {
-    const t0 = i * CHORD_S;
-    const t1 = i === PROG.length - 1 ? TOTAL - 3.5 : (i + 1) * CHORD_S;
-    if (t0 > TOTAL) break;
-    renderChord(PROG[i], t0, Math.min(t1, TOTAL), 0.5);
-  }
-
-  // Gentle filtered-noise swells rising into each title card.
-  let tCursor = 0;
-  const swells = [];
-  for (const b of BOARD) {
-    if (b.kind === 'card' && tCursor > 1) swells.push(tCursor);
-    tCursor += b.dur;
-  }
-  for (const at of swells) {
-    const dur = 1.6;
-    const s0 = Math.max(0, Math.floor((at - dur) * SR));
-    const s1 = Math.min(N, Math.floor((at + 0.35) * SR));
+  const addNoise = (t, dur, gain, lpHz, hp = false) => {
+    const s0 = Math.floor(t * SR);
+    const n = Math.floor(dur * SR);
     let lp = 0;
-    const lpC = 1 - Math.exp((-2 * Math.PI * 640) / SR);
+    const c = 1 - Math.exp((-2 * Math.PI * lpHz) / SR);
+    for (let i = 0; i < n; i++) {
+      const w = rnd() * 2 - 1;
+      lp += c * (w - lp);
+      const x = hp ? w - lp : lp;
+      const a = x * Math.exp((-i / n) * 5) * gain;
+      const s = s0 + i;
+      if (s < N) {
+        L[s] += a;
+        R[s] += a;
+      }
+    }
+  };
+  const addSnare = (t) => {
+    addNoise(t, 0.14, 0.34, 1800, true);
+    const s0 = Math.floor(t * SR);
+    for (let i = 0; i < SR * 0.08; i++) {
+      const tt = i / SR;
+      const a = Math.exp(-tt / 0.03) * 0.25 * Math.sin(2 * Math.PI * 195 * tt);
+      const s = s0 + i;
+      if (s < N) {
+        L[s] += a;
+        R[s] += a;
+      }
+    }
+  };
+  // pluck: short enveloped saw through a one-pole, with optional echo
+  const addPluck = (t, midi, dur, gain, lpHz, pan) => {
+    const f = midiHz(midi);
+    const s0 = Math.floor(t * SR);
+    const n = Math.min(N - s0, Math.floor(dur * SR));
+    if (n <= 0) return;
+    let ph = 0;
+    let lp = 0;
+    const c = 1 - Math.exp((-2 * Math.PI * lpHz) / SR);
+    for (let i = 0; i < n; i++) {
+      ph += f / SR;
+      if (ph >= 1) ph -= 1;
+      lp += c * (ph * 2 - 1 - lp);
+      const env = Math.min(1, i / (SR * 0.004)) * Math.exp((-i / SR) / (dur * 0.38));
+      const a = lp * env * gain;
+      const s = s0 + i;
+      L[s] += a * (1 - pan);
+      R[s] += a * pan;
+    }
+  };
+
+  // --- pattern sequencing ---------------------------------------------------
+  const bars = Math.ceil(TOTAL / BAR);
+  for (let bar = 0; bar < bars; bar++) {
+    const t0 = bar * BAR;
+    if (t0 >= TOTAL) break;
+    const ch = chordAtBar(bar);
+    const root = ch[0];
+    const inGroove = t0 >= grooveT0 - 0.01 && t0 < drumsEnd - 0.01;
+
+    // drums
+    if (t0 < drumsEnd - 0.01) {
+      for (let b = 0; b < 4; b++) {
+        const bt = t0 + b * BEAT;
+        if (bt >= drumsEnd) break;
+        addKick(bt);
+        if (inGroove) {
+          addNoise(bt + BEAT / 2, 0.03, 0.16, 6000, true); // offbeat hat
+          if (b === 1 || b === 3) addSnare(bt);
+        }
+      }
+    }
+    // bass: driving eighths on the root, octave pop on the last eighth
+    if (inGroove) {
+      for (let e = 0; e < 8; e++) {
+        const et = t0 + e * (BEAT / 2);
+        addPluck(et, root - 12 + (e === 7 ? 12 : 0), 0.22, 0.5, 420, 0.5);
+      }
+      // arp: 16ths cycling chord tones over two octaves + dotted-eighth echo
+      for (let x = 0; x < 16; x++) {
+        const xt = t0 + x * (BEAT / 4);
+        const seq = [0, 1, 2, 3, 2, 1, 3, 2];
+        const m = ch[seq[x % 8] % ch.length] + (x % 8 >= 4 ? 12 : 0) + 12;
+        const pan = 0.3 + 0.4 * ((x % 4) / 3);
+        addPluck(xt, m, 0.16, 0.2, 2400, pan);
+        addPluck(xt + 0.375, m, 0.14, 0.075, 1900, 1 - pan); // echo
+      }
+    }
+    // pad: sustained chord through the whole bar (rings past drumsEnd)
+    for (const m of ch) {
+      addPluck(t0, m, t0 >= endCardT ? 5.5 : BAR * 1.1, 0.11, 900, 0.35 + 0.3 * rnd());
+    }
+  }
+  // count-in riser into the first groove bar, and one into the boost/cards
+  for (const at of [grooveT0, ...crashAt]) {
+    const dur = Math.min(1.6, at);
+    const s0 = Math.max(0, Math.floor((at - dur) * SR));
+    const s1 = Math.floor(at * SR);
+    let lp = 0;
+    const c = 1 - Math.exp((-2 * Math.PI * 900) / SR);
     for (let s = s0; s < s1; s++) {
       const p = (s - s0) / (s1 - s0);
-      const env = p < 0.82 ? (p / 0.82) ** 2.4 : 1 - (p - 0.82) / 0.18;
-      lp += lpC * (rnd() * 2 - 1 - lp);
-      const a = lp * env * 0.055;
+      lp += c * (rnd() * 2 - 1 - lp);
+      const a = lp * p * p * 0.11;
       L[s] += a;
       R[s] += a;
     }
   }
+  for (const at of crashAt) addNoise(at, 0.9, 0.2, 7500, true);
 
-  // Master: slow width LFO, fade in/out, normalize, 16-bit WAV.
+  // Sidechain duck everything (except the kicks we just re-add) + master.
+  // Cheap trick: duck the WHOLE mix a hair after each beat, then re-add kick
+  // punch via the exponential itself — reads as pumping without bus routing.
   let peak = 0;
   for (let s = 0; s < N; s++) {
     const t = s / SR;
-    const lfo = 1 + 0.06 * Math.sin(2 * Math.PI * t * 0.05);
-    const fade = Math.min(1, t / 1.2, Math.max(0, (TOTAL - t) / 4));
-    L[s] *= lfo * fade;
-    R[s] *= (2 - lfo) * fade;
+    const inPump = t >= grooveT0 && t < drumsEnd;
+    const phase = ((t % BEAT) + BEAT) % BEAT;
+    const duck = inPump ? 1 - 0.42 * Math.exp(-phase / 0.07) : 1;
+    const fade = Math.min(1, t / 0.4, Math.max(0, (TOTAL - t) / 2.5));
+    L[s] *= duck * fade;
+    R[s] *= duck * fade;
     peak = Math.max(peak, Math.abs(L[s]), Math.abs(R[s]));
   }
-  const norm = 0.62 / (peak || 1);
+  const norm = 0.78 / (peak || 1);
   const buf = Buffer.alloc(44 + N * 4);
   buf.write('RIFF', 0);
   buf.writeUInt32LE(36 + N * 4, 4);
@@ -332,23 +416,27 @@ function buildSegment(b, i) {
   }
   if (b.kind === 'card') {
     const img = path.join(WORK, `card-${b.id}.png`);
-    const fadeOut = (b.dur - 0.6).toFixed(2);
+    // Big cards (title/end) breathe; the fast mid-cards snap in and out.
+    const fIn = b.dur > 3 ? 0.4 : 0.2;
+    const fOut = b.dur > 3 ? 0.6 : 0.25;
     run(
       ['-y', '-loop', '1', '-t', b.dur.toFixed(3), '-i', img, '-vf',
-        `fps=${FPS},scale=${W}:${H},fade=t=in:st=0:d=0.5,fade=t=out:st=${fadeOut}:d=0.6,format=yuv420p`,
+        `fps=${FPS},scale=${W}:${H},fade=t=in:st=0:d=${fIn},fade=t=out:st=${(b.dur - fOut).toFixed(2)}:d=${fOut},format=yuv420p`,
         ...enc],
       `card ${b.id}`
     );
   } else {
     const img = path.join(ROOT, 'scripts', b.src);
     const M = nf - 1;
+    // 6-frame punch-in at the head of every shot = the cut lands ON the beat.
+    const punch = `0.05*min(on,6)/6`;
     let z, x, y;
     if (b.move === 'push') {
-      z = `1+${b.amp}*on/${M}`;
+      z = `1+${punch}+${b.amp}*on/${M}`;
       x = `(iw-iw/zoom)*${b.fx}`;
       y = `(ih-ih/zoom)*${b.fy}`;
     } else {
-      z = String(b.zoom);
+      z = `${b.zoom}+${punch}`;
       x = `(iw-iw/zoom)*(${b.fx}+(${b.fx2}-${b.fx})*on/${M})`;
       y = `(ih-ih/zoom)*${b.fy}`;
     }
