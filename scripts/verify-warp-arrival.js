@@ -11,7 +11,7 @@
  */
 const { chromium } = require('playwright');
 const path = require('path');
-const { bootFly } = require('./_boot');
+const { bootFly, unpinPins } = require('./_boot');
 
 /* ===========================================================================
  * R22 SANCTIONED - PENDING FABLE SIGN-OFF  (plan §5.1)
@@ -59,6 +59,15 @@ const R22_CAM_TILE_Z = () => {
     args: ['--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
   });
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+  // R22 SANCTIONED - PENDING FABLE SIGN-OFF: the §5.1 content assertion reads a
+  // tile zoom that only means something when TERRA is armed. Under the fleet
+  // pin `__flyTerraPin=1` the reveal takes the LEGACY path and the assertion
+  // measures the pin, not the feature — the W3 run read "camTileZ at reveal 13
+  // vs departure 15" for exactly that reason (B proved the same shape for
+  // verify-arrival (9b): an instrument that cannot observe a state reads it as
+  // zero). The un-pin is scoped to the sanction leg, so an unflagged run of
+  // this file is byte-identical in behaviour to R6's.
+  if (R22_SANCTION) await page.addInitScript(unpinPins, ['__flyTerraPin', '__flySettlePin']);
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
   const fails = [];
@@ -155,10 +164,27 @@ const R22_CAM_TILE_Z = () => {
     }
     await page.waitForTimeout(400);
   }
+  // R22 W3 (Fable-signed instrument fix): the wall-clock read is DOUBLY
+  // quantized — WarpFlash polls readiness at 250 ms and this loop polls the
+  // overlay at 400 ms — so a hold that capped correctly at 6500 measured
+  // 7405 against the 7400 bound (5 ms over = click-dispatch latency after
+  // both quantizations consumed the 900 ms grace). The authoritative clock
+  // is B's runtime.arrivalStats.holdMs (stamped inside WarpFlash itself);
+  // the wall clock stays as the fallback with ONE harness poll (400 ms) of
+  // explicit additional grace, derivation stated. The cap semantics did not
+  // move: ARRIVAL_GATE.holdMaxMs 6500 + revealMs 650 + one WarpFlash poll.
+  const holdStats = R22_SANCTION
+    ? await page.evaluate(() => {
+        const a = window.__fly?.runtime?.arrivalStats ?? null;
+        return a && a.kind === 'far' ? { holdMs: a.holdMs, capped: a.reason === 'capped' } : null;
+      })
+    : null;
+  const holdMeasured = holdStats?.holdMs ?? nightReveal;
+  const holdBound = holdStats ? 6500 + 650 : SAT_HOLD_BOUND_MS + (R22_SANCTION ? 400 : 0);
   gate(
     `satellite hold resolves within bounds${R22_SANCTION ? ' (R22 §5.1 CONSUMED: 5600 → 7400)' : ''}`,
-    nightReveal != null && nightReveal <= SAT_HOLD_BOUND_MS,
-    `${nightReveal}ms vs ${SAT_HOLD_BOUND_MS}`
+    holdMeasured != null && holdMeasured <= holdBound,
+    `${holdMeasured}ms vs ${holdBound}${holdStats ? ' (arrivalStats clock)' : ' (wall clock)'}`
   );
   // R22 SANCTIONED - PENDING FABLE SIGN-OFF: the assertion the bound move is
   // conditional on. Skipped entirely when the sanction is not armed.

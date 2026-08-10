@@ -1,0 +1,137 @@
+{
+ "when": "2026-08-09T14:43:01.872Z",
+ "shots": {
+  "lewis-before": {
+   "camTileZ": 17,
+   "maxLeafZ": 17,
+   "aglM": 126,
+   "draws": 228,
+   "tris": 249583,
+   "clutter": {
+    "parked": 0,
+    "moving": 0,
+    "poles": 0
+   },
+   "veg": 42
+  },
+  "owens-before": {
+   "camTileZ": 16,
+   "maxLeafZ": 17,
+   "aglM": 401,
+   "draws": 224,
+   "tris": 207392,
+   "clutter": {
+    "parked": 0,
+    "moving": 0,
+    "poles": 0
+   },
+   "veg": 42
+  },
+  "lewis-after": {
+   "camTileZ": 18,
+   "maxLeafZ": 18,
+   "aglM": 126,
+   "draws": 237,
+   "tris": 501194,
+   "clutter": {
+    "parked": 212,
+    "moving": 35,
+    "poles": 130
+   },
+   "veg": 58
+  },
+  "owens-after": {
+   "camTileZ": 16,
+   "maxLeafZ": 17,
+   "aglM": 401,
+   "draws": 225,
+   "tris": 375025,
+   "clutter": {
+    "parked": 0,
+    "moving": 0,
+    "poles": 0
+   },
+   "veg": 58
+  },
+  "dublin-before-at-reveal": {
+   "camTileZ": 10,
+   "maxLeafZ": 12,
+   "aglM": 8867,
+   "draws": 146,
+   "tris": 66281,
+   "clutter": {
+    "parked": 0,
+    "moving": 0,
+    "poles": 0
+   },
+   "veg": 42,
+   "holdMs": 2330
+  },
+  "dublin-before-settled": {
+   "camTileZ": 10,
+   "maxLeafZ": 12,
+   "aglM": 8867,
+   "draws": 147,
+   "tris": 76596,
+   "clutter": {
+    "parked": 0,
+    "moving": 0,
+    "poles": 0
+   },
+   "veg": 42
+  },
+  "dublin-after-at-reveal": {
+   "camTileZ": 10,
+   "maxLeafZ": 12,
+   "aglM": 8867,
+   "draws": 132,
+   "tris": 67401,
+   "clutter": {
+    "parked": 0,
+    "moving": 0,
+    "poles": 0
+   },
+   "veg": 58,
+   "holdMs": 2359
+  },
+  "dublin-after-settled": {
+   "camTileZ": 10,
+   "maxLeafZ": 12,
+   "aglM": 8867,
+   "draws": 133,
+   "tris": 67642,
+   "clutter": {
+    "parked": 0,
+    "moving": 0,
+    "poles": 0
+   },
+   "veg": 58
+  },
+  "depth-off": {
+   "camTileZ": 18,
+   "maxLeafZ": 18,
+   "aglM": 126,
+   "draws": 237,
+   "tris": 501584,
+   "clutter": {
+    "parked": 212,
+    "moving": 35,
+    "poles": 130
+   },
+   "veg": 58
+  },
+  "depth-on": {
+   "camTileZ": 18,
+   "maxLeafZ": 18,
+   "aglM": 126,
+   "draws": 243,
+   "tris": 501686,
+   "clutter": {
+    "parked": 212,
+    "moving": 35,
+    "poles": 130
+   },
+   "veg": 58
+  }
+ }
+}

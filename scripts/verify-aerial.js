@@ -36,6 +36,7 @@
  */
 const { chromium } = require('playwright');
 const path = require('path');
+const fs = require('fs');
 const { bootFly } = require('./_boot');
 const sharp = require('sharp');
 
@@ -381,8 +382,26 @@ async function lumaMean(file, region) {
       eyeAgl: f.pos.y - f.groundElev,
     };
   });
-  const t = Math.min(1, Math.max(0, (quiltHigh.eyeAgl - 4000) / (9000 - 4000)));
-  const expect = 0.35 * (t * t * (3 - 2 * t));
+  /* R22 §5.7 CONSUMED — THE RAMP CONSTANTS ARE READ, NOT COPIED.
+   * This gate hard-coded `0.35 * smoothstep(4000, 9000)`, i.e. a second copy of
+   * SAT_QUILT's ramp living in the harness. R22 consumed §5.7 (desatMax
+   * 0.35 → 0.22, outAglM 9000 → 12000 — A's measured proposal, checkpoint #6
+   * reviews the taste) and this gate went red at 0.174 vs an "expected" 0.350
+   * while the SHADER WAS EXACTLY RIGHT: at 9650 m AGL,
+   *     t = (9650-4000)/(12000-4000) = 0.706 → smoothstep 0.792 → ×0.22 = 0.174.
+   * A gate that keeps its own copy of a sanctioned constant fails the round for
+   * doing what the round sanctioned. The expectation is now DERIVED from the
+   * shipped source, so this class of red cannot recur — the arithmetic is
+   * asserted, the values are not. */
+  const qsrc = fs.readFileSync(path.join(__dirname, '..', 'lib', 'fly', 'fly-constants.js'), 'utf8');
+  const qblk = qsrc.slice(qsrc.indexOf('export const SAT_QUILT'), qsrc.indexOf('export const SAT_QUILT') + 1400);
+  const num = (k, d) => {
+    const m = qblk.match(new RegExp(k + String.raw`:\s*([0-9.]+)`));
+    return m ? +m[1] : d;
+  };
+  const Q = { desatMax: num('desatMax', 0.35), inAglM: num('inAglM', 4000), outAglM: num('outAglM', 9000) };
+  const t = Math.min(1, Math.max(0, (quiltHigh.eyeAgl - Q.inAglM) / (Q.outAglM - Q.inAglM)));
+  const expect = Q.desatMax * (t * t * (3 - 2 * t));
   console.log(
     `cruise quilt: eyeAgl ${Math.round(quiltHigh.eyeAgl)} m → desat ${quiltHigh.desat.toFixed(3)} (ramp expects ${expect.toFixed(3)}) · A/B ${cruiseD.toFixed(2)} vs noise ${cruiseNoise.toFixed(2)}`
   );
@@ -393,8 +412,9 @@ async function lumaMean(file, region) {
   );
   gate(
     'quilt grade tracks its AGL ramp',
-    Math.abs(quiltHigh.desat - expect) < 0.01 && quiltHigh.desat > 0.3,
-    `desat ${quiltHigh.desat.toFixed(3)} vs ramp ${expect.toFixed(3)} at ${Math.round(quiltHigh.eyeAgl)} m AGL`
+    Math.abs(quiltHigh.desat - expect) < 0.01 && quiltHigh.desat > Q.desatMax * 0.6,
+    `desat ${quiltHigh.desat.toFixed(3)} vs ramp ${expect.toFixed(3)} at ${Math.round(quiltHigh.eyeAgl)} m AGL ` +
+      `(ramp read from source: desatMax ${Q.desatMax}, inAglM ${Q.inAglM}, outAglM ${Q.outAglM})`
   );
 
   // ---------------------------------------------------- 6: satellite shadows -

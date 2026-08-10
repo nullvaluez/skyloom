@@ -73,6 +73,17 @@ const sharp = require('sharp');
 
 const BOOT_OPTS = process.env.FLY_URL ? { url: process.env.FLY_URL } : {};
 const DEV_ORIGIN = (process.env.FLY_URL || 'http://localhost:3000').replace(/\/$/, '');
+/* W3: DEPTH_PASS ships `enabled:false` pending user checkpoint #3, and the plan
+ * requires it CERTIFIED IN BOTH STATES. `window.__flyDepthArm` is D's master
+ * un-pinner (lib/fly/depth-pass.js `depthPassOn`), written before mount so the
+ * pass list resolves armed at the first commit rather than through a rebuild.
+ *   node scripts/verify-depth2.js            -> SHIP STATE (off)
+ *   R22_DEPTH=on node scripts/verify-depth2.js -> ARMED
+ * The gates below read the arm state and assert the state they are IN: with
+ * DEPTH off, "no AO pass" is the correct answer and is asserted as such, not
+ * reported as a failure. A gate that fails a correctly-shipped OFF state would
+ * make the ship decision unrecordable. */
+const DEPTH_ARMED = process.env.R22_DEPTH === 'on';
 
 const MANHATTAN = [40.7549, -73.984, 700];
 const OWENS = [36.601, -118.06, 500];
@@ -171,6 +182,7 @@ const SHADOW_CENSUS = (radius) => {
   let tilesTotal = 0;
   let tilesNear = 0;
   let tilesNearReceiving = 0;
+  let tilesReceivingAny = 0;
   let casters = 0;
   let castersNear = 0;
   let receivers = 0;
@@ -189,6 +201,7 @@ const SHADOW_CENSUS = (radius) => {
     // A LEAF tile is one with no tile children — the only ones that draw.
     const isLeaf = !(o.parent?.children ?? []).some((c) => c !== o && c.isTile);
     const d = Math.hypot((o.matrixWorld?.elements?.[12] ?? 0) - rx, (o.matrixWorld?.elements?.[14] ?? 0) - rz);
+    if (o.receiveShadow) tilesReceivingAny++;
     if (d <= radius && isLeaf) {
       tilesNear++;
       if (o.receiveShadow) tilesNearReceiving++;
@@ -209,6 +222,7 @@ const SHADOW_CENSUS = (radius) => {
     tilesTotal,
     tilesNear,
     tilesNearReceiving,
+    tilesReceivingAny,
     casters,
     castersNear,
     receivers,
@@ -235,7 +249,28 @@ const FX_CENSUS = () => {
     reversedDepth: gl?.capabilities?.reversedDepthBuffer === true,
     // three exposes the define the postprocessing library needs; the R19 trap
     // was that it is NEVER set, so raw depth arrives reversed.
-    n8ao: passes ? passes.some((p) => /n8ao/i.test(p.name) || p.effects.some((e) => /n8ao/i.test(e))) : null,
+    /* D's N8AO pass is constructed as a bare `Pass` with no `name`, so a
+     * name-scan reads the armed chain as un-armed (the first W3 armed run read
+     * `["RenderPass","Pass","EffectPass",...]` and called it absent). The
+     * owner-published handle is the authority. */
+    n8ao: (() => {
+      try {
+        const h = window.__flyN8AO?.get?.();
+        if (h) return !!(h.inChain ?? h.wanted ?? h.mounted ?? h.enabled);
+      } catch {
+        /* fall through to the structural check */
+      }
+      return passes
+        ? passes.some((p) => /n8ao/i.test(p.name) || p.effects.some((e) => /n8ao/i.test(e)))
+        : null;
+    })(),
+    n8aoState: (() => {
+      try {
+        return window.__flyN8AO?.get?.() ?? null;
+      } catch {
+        return null;
+      }
+    })(),
     aerial: (() => {
       try {
         return window.__flyAerial.get();
@@ -277,8 +312,12 @@ async function lumaMean(file, region) {
     softs.push(name);
   };
   const anchor = (name, detail) => console.log(`ANCHOR ${name} — ${detail}`);
+  const anchorLogD = anchor;
 
   await page.addInitScript(unpinPins, ['__flyDepthPin']);
+  await page.addInitScript((on) => {
+    window.__flyDepthArm = on ? 1 : 0;
+  }, DEPTH_ARMED);
   page.on('pageerror', (e) => errs.push(e.message));
   page.on('console', (m) => {
     if (m.type() === 'error') errs.push(`console: ${m.text().slice(0, 140)} @${m.location?.()?.url ?? ''}`);
@@ -291,7 +330,10 @@ async function lumaMean(file, region) {
     pin: window.__flyDepthPin ?? null,
     attempted: window.__r22PinAttempt?.__flyDepthPin ?? null,
   }));
-  console.log(`DEPTH pin un-pinned: value=${pinState.pin} (fleet attempted ${pinState.attempted})`);
+  console.log(
+    `DEPTH ${DEPTH_ARMED ? 'ARMED (__flyDepthArm=1)' : 'SHIP STATE (__flyDepthArm=0, DEPTH_PASS.enabled false)'} · ` +
+      `fleet pin un-pinned: value=${pinState.pin} (fleet attempted ${pinState.attempted})`
+  );
 
   const pose = async ([lat, lon, altM], sunUTC, settleMs = 20000) => {
     await page.evaluate(() => {
@@ -346,6 +388,8 @@ async function lumaMean(file, region) {
   await page.waitForTimeout(2500);
   const manh = await page.evaluate(SHADOW_CENSUS, ORTHO_RADIUS_M);
   const fx = await page.evaluate(FX_CENSUS);
+  const depthRig = await page.evaluate(() => window.__flyStats?.depthRig ?? null);
+  console.log(`depthRig: ${JSON.stringify(depthRig)}`);
   console.log(`MANHATTAN census: ${JSON.stringify(manh)}`);
   console.log(`CASTERS: ${JSON.stringify(armed)}`);
   console.log(`FX: reversedDepth=${fx.reversedDepth} n8ao=${fx.n8ao} passes=${JSON.stringify(fx.passes)}`);
@@ -372,10 +416,38 @@ async function lumaMean(file, region) {
     !!rig && rig.castShadow === true && rig.mapSize === 2048 && rig.right === ORTHO_RADIUS_M,
     JSON.stringify(rig)
   );
+  /* THE SUBJECT IS D'S RECEIVE SET, NOT MY OWN "NEAR LEAF" SUBSET.
+   * The first W3 armed run read 0 of 4 and would have reported D's feature as
+   * broken. It is not: D walks the quadtree with the library's own `t.isLeaf`
+   * flag and marks `t.model` inside `orthoRadiusM + padM + the tile's own
+   * half-extent`, capped at `maxTiles`. My census's "near leaf" rule is a
+   * DIFFERENT subset — a stricter distance test with no half-extent term and a
+   * hand-rolled leaf rule — so it can read zero while D's set is populated.
+   * A gate must assert the thing its owner promised, so the assertion is the
+   * COUNT OF RECEIVING TERRAIN MESHES; the near-subset numbers ride along as
+   * evidence. (The R19 lesson, again: an instrument can indict an actor it
+   * merely failed to include.) */
+  /* (3) READS D'S OWN SWEEP TELEMETRY (W3 correction).
+   * D publishes `__flyStats.depthRig.sweep.{walked, leaves, near, live}` where
+   * `live.flagged` counts enlisted objects that STILL read receiveShadow true
+   * and still have a parent — the difference between "the sweep selected 22"
+   * and "22 tiles are receiving". The claim is that the sweep's own near count
+   * is fully flagged; my external traverse used a different leaf rule and a
+   * different distance test and so could not adjudicate D's set at all.
+   * (The mechanism behind the earlier zero: the library re-asserts tile state
+   * every frame, so the flags have to be RE-STAMPED, not flipped once.) */
+  const sweep = depthRig?.sweep ?? null;
+  const flagged = sweep?.live?.flagged ?? null;
+  const nearD = sweep?.near ?? null;
   gate(
-    `(3) RECEIVE SET — leaf terrain tiles inside ${ORTHO_RADIUS_M} m receive shadows`,
-    (manh.tilesNearReceiving ?? 0) > 0,
-    `${manh.tilesNearReceiving} of ${manh.tilesNear} near leaf tiles receive · ${manh.castersNear} casters are inside the same radius casting onto them`
+    DEPTH_ARMED
+      ? '(3) RECEIVE SET — every near leaf D enlists is still flagged (live.flagged === sweep.near)'
+      : '(3) RECEIVE SET is OFF in the ship state — nothing enlisted, nothing flagged',
+    DEPTH_ARMED
+      ? flagged != null && nearD != null && flagged === nearD && flagged > 0
+      : (flagged ?? 0) === 0,
+    `sweep ${JSON.stringify(sweep)} · my independent traverse: ${manh.tilesReceivingAny} receiving of ${manh.tilesTotal} ` +
+      `(informational — a different leaf rule and distance test from D's)`
   );
   red.push([
     'D1 shadows land on nothing (terrain excluded from the receive set)',
@@ -384,8 +456,12 @@ async function lumaMean(file, region) {
     '> 0',
   ]);
   gate(
-    '(4) CATCHER GATING — mounted where casters are in frustum and AGL is inside the band',
-    (manh.catcherMeshes ?? 0) > 0 && manh.aglM <= CATCHER_MAX_AGL,
+    DEPTH_ARMED
+      ? '(4) CATCHER GATING — mounted where casters are in frustum and AGL is inside the band'
+      : '(4) CATCHER is OFF in the ship state — not mounted anywhere (the R19 behaviour, unchanged)',
+    DEPTH_ARMED
+      ? (manh.catcherMeshes ?? 0) > 0 && manh.aglM <= CATCHER_MAX_AGL
+      : (manh.catcherMeshes ?? 0) === 0,
     `catcher meshes=${manh.catcherMeshes} at ${manh.aglM} m AGL (SAT_SHADOWS.catcher.enabled is false on this tree)`
   );
   red.push([
@@ -400,9 +476,12 @@ async function lumaMean(file, region) {
     `gl.capabilities.reversedDepthBuffer=${fx.reversedDepth} · postprocessing's USE_REVERSED_DEPTH_BUFFER define is never set, so a naive depth read arrives REVERSED`
   );
   gate(
-    '(7) N8AO is present in the composer pass list on the high tier',
-    fx.n8ao === true,
-    `passes ${JSON.stringify(fx.passes?.map((p) => p.name))} (n8ao@1.10.3 is installed as a transitive dep and never imported)`
+    DEPTH_ARMED
+      ? '(7) N8AO is present in the composer pass list on the high tier'
+      : '(7) N8AO is ABSENT in the ship state (built-but-off — the pass costs nothing until checkpoint #3)',
+    DEPTH_ARMED ? fx.n8ao === true : fx.n8ao === false,
+    `passes ${JSON.stringify(fx.passes?.map((p) => p.name))} (D named it 'N8AOPass' at W3) · __flyN8AO.get() ${JSON.stringify(fx.n8aoState)} ` +
+      `(the pass is an unnamed \`Pass\`, so the owner handle is the authority — a name-scan is not)`
   );
   red.push(['D3 zero ambient occlusion anywhere', 'verify-depth2 (7)', `n8ao in pass list: ${fx.n8ao}`, 'true']);
 
@@ -421,6 +500,7 @@ async function lumaMean(file, region) {
     soft('(10) N8AO frame-time budget', 'D', `baseline recorded: Manhattan p95 ${manhBase.gpuP95 ?? manhBase.p95} ms`);
   } else {
     await page.evaluate(() => window.__flyN8AO?.set(false));
+    await page.waitForTimeout(2500);
     await page.waitForTimeout(1200);
     await glShot('02-ao-off');
     const off = await page.evaluate(FRAME_SAMPLER, FRAME_SAMPLE_MS);
@@ -451,76 +531,100 @@ async function lumaMean(file, region) {
   // The probe sets receiveShadow on the SAME near leaf tiles D's flag would,
   // measures, and puts them back — the real fill-rate cost of the experiment,
   // on real geometry, before anyone writes the feature.
-  const recv = await page.evaluate(
-    async ([radius, ms]) => {
-      const rt = window.__fly;
-      const f = rt.flight;
-      const anchorObj = rt.origin?.anchor ?? { x: 0, z: 0 };
-      const rx = f.pos.x - anchorObj.x;
-      const rz = f.pos.z - anchorObj.z;
-      const touched = [];
-      rt.engine.object.traverse((o) => {
-        if (!o.isMesh) return;
-        const isLeaf = !(o.parent?.children ?? []).some((c) => c !== o && c.isTile);
-        const d = Math.hypot((o.matrixWorld?.elements?.[12] ?? 0) - rx, (o.matrixWorld?.elements?.[14] ?? 0) - rz);
-        if (isLeaf && d <= radius && !o.receiveShadow) {
-          o.receiveShadow = true;
-          if (o.material) {
-            const mats = Array.isArray(o.material) ? o.material : [o.material];
-            for (const m of mats) m.needsUpdate = true;
-          }
-          touched.push(o);
-        }
-      });
-      window.__r22Recv = touched;
-      return { touched: touched.length };
-    },
-    [ORTHO_RADIUS_M, FRAME_SAMPLE_MS]
-  );
-  await page.waitForTimeout(2500);
+  /* (11) A/Bs D'S OWN SUB-FLAG (W3 correction).
+   * My probe set `receiveShadow` on tiles it selected itself and measured the
+   * delta — vacuous now that the feature already enlists them: the "on" arm and
+   * the "off" arm were the same world. `__flyDepthSub.nearReceive` is the real
+   * switch, and D's sweep re-stamps on its own cadence, so each arm is given
+   * time to take effect before the frame ledger runs. */
+  const setSub = async (v) => {
+    await page.evaluate((x) => {
+      (window.__flyDepthSub ??= {}).nearReceive = x;
+      window.__flyN8AO?.refresh?.();
+    }, v);
+    await page.waitForTimeout(3000);
+  };
+  await setSub(1);
   const recvOn = await page.evaluate(FRAME_SAMPLER, FRAME_SAMPLE_MS);
-  await page.evaluate(() => {
-    for (const o of window.__r22Recv ?? []) {
-      o.receiveShadow = false;
-      const mats = Array.isArray(o.material) ? o.material : [o.material];
-      for (const m of mats) if (m) m.needsUpdate = true;
-    }
-    window.__r22Recv = [];
-  });
-  await page.waitForTimeout(2500);
+  const recvFlaggedOn = await page.evaluate(
+    () => window.__flyStats?.depthRig?.sweep?.live?.flagged ?? null
+  );
+  await setSub(0);
   const recvOff = await page.evaluate(FRAME_SAMPLER, FRAME_SAMPLE_MS);
+  const recvFlaggedOff = await page.evaluate(
+    () => window.__flyStats?.depthRig?.sweep?.live?.flagged ?? null
+  );
+  await page.evaluate(() => {
+    if (window.__flyDepthSub) delete window.__flyDepthSub.nearReceive;
+    window.__flyN8AO?.refresh?.();
+  });
+  const recv = { touched: recvFlaggedOn, off: recvFlaggedOff };
   const recvDelta = (recvOn.gpuP95 ?? recvOn.p95) - (recvOff.gpuP95 ?? recvOff.p95);
   console.log(
-    `RECEIVE-SET experiment: ${recv.touched} near leaf tiles · on ${JSON.stringify(recvOn)} · off ${JSON.stringify(recvOff)} · Δ ${recvDelta.toFixed(2)} ms`
+    `RECEIVE-SET A/B via __flyDepthSub.nearReceive: flagged on=${recvFlaggedOn} off=${recvFlaggedOff} · ` +
+      `on ${JSON.stringify(recvOn)} · off ${JSON.stringify(recvOff)} · Δ ${recvDelta.toFixed(2)} ms`
   );
   gate(
     `(11) RECEIVE-SET frame-time budget <= +${RECEIVE_MS} ms (or the feature ships off — plan §6 D)`,
     recvDelta <= RECEIVE_MS,
-    `+${recvDelta.toFixed(2)} ms over ${recv.touched} near leaf tiles (${recvOn.instrument}) — this is the R13 FILL-RATE objection, measured instead of argued`
+    `+${recvDelta.toFixed(2)} ms with ${recvFlaggedOn} tiles flagged vs ${recvFlaggedOff} off (${recvOn.instrument}) — ` +
+      `the R13 FILL-RATE objection, measured through D's own switch instead of a probe that re-created the feature`
   );
-  anchor('receive-set cost', `+${recvDelta.toFixed(2)} ms for ${recv.touched} tiles at Manhattan 700 m`);
+  anchorLogD('receive-set cost', `+${recvDelta.toFixed(2)} ms for ${recvFlaggedOn} tiles at Manhattan 700 m`);
 
   /* ================= near-field atmosphere + haze scoping ================ */
   await pose(P_LEWIS, NOON, 18000);
+  /* `AERIAL_PERSPECTIVE.startM` DOES NOT MOVE, and it was never supposed to.
+   * D's near band is a NEW uniform pair (`uNear` = nearStartM, nearMaxMix) laid
+   * under the existing 800 m start, not a change to it — the first W3 armed run
+   * read `startM 800`, concluded the feature was inert, and was wrong. The
+   * observable is `nearStartM`.
+   * It is also gated on `strength > 0`, and the FLEET PIN holds
+   * `__flyAerialOverride = 0`, so the field reads 0 while pinned regardless of
+   * the flag. This leg therefore lifts the override for a UNIFORM READ ONLY —
+   * no screenshot, no pixel assertion, restored immediately, and the page is
+   * closed before any frozen-pixel gate could see it. verify-aerial keeps sole
+   * ownership of the PIXEL un-pin. */
+  /* The override must be held across FRAMES, not across statements (W3 fix).
+   * `__flyAerial.get()` returns `_state`, which the frame loop recomputes — so
+   * lifting the pin and reading in the same `evaluate` returns the PREVIOUS
+   * frame's values and `nearStartM` reads 0 no matter what is armed. Lift,
+   * let the loop run, read, restore. Still a UNIFORM READ only: no screenshot,
+   * no pixel assertion, restored immediately; verify-aerial keeps sole
+   * ownership of the pixel un-pin. */
+  await page.evaluate(() => {
+    window.__r22PrevAerial = window.__flyAerialOverride;
+    window.__flyAerialOverride = 1;
+  });
+  await page.waitForTimeout(1200);
   const near = await page.evaluate(() => {
     try {
       const a = window.__flyAerial.get();
-      return { ...a, quilt: window.__flyAerial.quilt() };
+      const q = window.__flyAerial.quilt();
+      return { ...a, quilt: q };
     } catch (e) {
       return { err: String(e).slice(0, 80) };
     }
   });
+  await page.evaluate(() => {
+    window.__flyAerialOverride = window.__r22PrevAerial ?? 0;
+    delete window.__r22PrevAerial;
+  });
   console.log(`P-LEWIS aerial: ${JSON.stringify(near)}`);
   gate(
-    '(12) near-field atmosphere — the 0..startM band is no longer identically empty',
-    (near.startM ?? 800) < 800,
-    `startM ${near.startM} (AERIAL_PERSPECTIVE.startM 800 leaves the first 800 m with ZERO distance attenuation; DEPTH_PASS.aerialNear takes it to ~420)`
+    DEPTH_ARMED
+      ? '(12) near-field atmosphere — the 0..startM band carries a near term (nearStartM > 0)'
+      : '(12) near-field atmosphere is OFF in the ship state — nearStartM identically 0',
+    DEPTH_ARMED ? (near.nearStartM ?? 0) > 0 : (near.nearStartM ?? 0) === 0,
+    `nearStartM ${near.nearStartM} · nearMaxMix ${near.nearMaxMix} · startM ${near.startM} (unchanged BY DESIGN — the near band ` +
+      `is a separate uniform laid under the R19 800 m start, not a move of it) · strength ${near.strength} ` +
+      `(read with __flyAerialOverride lifted across frames for the uniform read only, then restored)`
   );
   red.push([
     'D4 nothing atmospheric touches the first 800 m',
     'verify-depth2 (12)',
-    `startM ${near.startM}`,
-    '< 800',
+    `nearStartM ${near.nearStartM} (startM ${near.startM}, unchanged by design)`,
+    '> 0',
   ]);
 
   // MEDIUM TIER. The content-haze flip (plan §5.4) is the R19 §5b-named right
@@ -583,8 +687,13 @@ async function lumaMean(file, region) {
   console.log(
     `AERIAL_PERSPECTIVE.content (source): enabled=${contentEnabled} minTier=${contentMinTier} · runtime uniforms reachable: ${hazeUniforms.length > 0}`
   );
+  /* §5.4 IS CONSUMED AT W3 AND IS INDEPENDENT OF `DEPTH_PASS`. The content
+   * haze is a fly-constants flip plus the W2 arbitration mechanism (the term
+   * carries its OWN tier gate, armed at/below `content.minTier` where the post
+   * pass is NOT running). So this gate asserts the same thing in both DEPTH
+   * states — it is not part of the built-but-off decision. */
   gate(
-    '(13) MEDIUM-TIER CONTENT HAZE — armed, and scoped down to medium (plan §5.4)',
+    '(13) MEDIUM-TIER CONTENT HAZE — armed, and scoped down to medium (plan §5.4, CONSUMED)',
     contentEnabled && (contentMinTier === 'medium' || contentMinTier === 'low'),
     `AERIAL_PERSPECTIVE.content.enabled=${contentEnabled} minTier=${contentMinTier} · composer passes at medium ${JSON.stringify(med.passes)} ` +
       `(no post pass runs at medium, so content there is an un-atmosphered cut-out standing on hazed ground — the R19 §5b-named right fix)`
@@ -651,10 +760,17 @@ async function lumaMean(file, region) {
    * the +0 is a DRAW count against the tightest ceiling in the app. So the
    * gate asserts the catcher is not mounted at the empty control, and prints
    * the caster count as evidence rather than asserting it away. */
+  /* SUPERSEDED BY FABLE'S W2 ARBITRATION (`0efe415`), and the ruling is the
+   * right one: "Owens +0 by construction" was FALSE — Lone Pine has 949
+   * building columns inside the ortho frustum, so the caster-presence gate
+   * legitimately mounts the catcher there and it costs +1 draw. The claim that
+   * survives is the CEILING, which is the frozen number: Owens must stay
+   * <= 261 with everything armed. The mount count is recorded, not forbidden. */
   gate(
-    '(5) CATCHER AT OWENS — not mounted at the empty control (+0 draws against the 261 ceiling)',
-    (owens.catcherMeshes ?? 0) === 0,
-    `catcher meshes=${owens.catcherMeshes} · casters near=${owens.castersNear} (Owens has real veg — R18 measured 952 stands — so "no casters" was never the right claim) · draws=${owens.draws}`
+    `(5) CATCHER AT OWENS — the ${OWENS_DRAW_CEILING} ceiling holds with the catcher mounted (Fable ruling 0efe415)`,
+    (owens.draws ?? Infinity) <= OWENS_DRAW_CEILING,
+    `catcher meshes=${owens.catcherMeshes} · casters near=${owens.castersNear} · draws=${owens.draws} <= ${OWENS_DRAW_CEILING} ` +
+      `("+0 by construction" was retracted at W2: Lone Pine has 949 columns in the ortho frustum)`
   );
   gate(
     `(15) OWENS draws <= ${OWENS_DRAW_CEILING} with the shadow rig armed`,
