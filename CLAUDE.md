@@ -12,7 +12,56 @@
 > describes deleted code (markers, panels, Leaflet-era plans); do not act
 > on it.
 
-> **⚠️ NEWEST — READ FIRST:** **Round 21 "Steady State" is BUILT and pushed
+> **⚠️ NEWEST — READ FIRST:** **Round 22 "Terrain & Immersion" is BUILT and
+> SHIPPED (2026-08-10): [FLY_ROUND22_PLAN.md](FLY_ROUND22_PLAN.md) is the
+> approved plan; [FLY_ROUND22.md](FLY_ROUND22.md) + the per-harness ledger
+> [`scripts/r22-close-sweep.md`](scripts/r22-close-sweep.md) are the record**
+> (FIVE Opus 5 agents — A TERRA / B SETTLE / C CLUTTER / D DEPTH / E CERT —
+> under Fable orchestration; vendored three-tile v0.12.1 with a patch ledger
+> in `lib/fly/vendor/three-tile/VENDOR.md`; WORKER_PROTOCOL 17→18). **What
+> shipped ON:** z18 imagery + demMaxZoom 16 + an altitude-keyed live LOD
+> curve (P-LEWIS leaf z13→z18 in 4 s; the plan's own 1.0-threshold proposal
+> was REJECTED by measurement — Owens 291>261); a persistent Esri
+> imagery/DEM Cache API layer (`fly-raster-v1` — second-visit warps 906→22
+> requests low-AGL, 306→0 at FL300) + warp pyramid prefetch + two vendored
+> pipeline patches (parallel imagery‖DEM, DFS-bail fix); content-aware
+> "hold until sharp" warp reveals (`ARRIVAL_GATE` — far hold ≤6500 ms
+> sanctioned, local warps hold ≤1500 ms only on a >2-level deficit; boot
+> reveal timing FROZEN — `bootTerms:false` by measured escalation, +2.6 s);
+> the settle/calm layer (`SETTLE_CALM` — prewarm env-race fix + idle-rAF
+> compile slicing kills the post-reveal stutter 700→150 ms worst frame,
+> birth fades on every streaming layer with ZERO new cache keys, parcel
+> ease, governor ladder gains sub-native DPR rungs at dpr 1, damped
+> `groundElevVis` ~384→≤4 m/frame); and GROUND CLUTTER (`CLUTTER` — trees2
+> merged trunk+crown 58 tris same one draw, parked cars off service-chain
+> anchors (OFM ships NO parking polygons — measured), moving cars on
+> protocol-18 road centerlines, street poles phase-locked to the shader's
+> 42 m lamp pools; +3 draws at content poses, **Owens 0 instances / +0
+> draws / bit-identical totals BY CONSTRUCTION**, deterministic under
+> `__flyClutterPin` incl. cross-boot bit-identity with same-tick XZ
+> pinning). **`DEPTH_PASS` (ground-catcher shadows + near-ring tile
+> receivers + N8AO + near-field haze) is BUILT-BUT-OFF pending the user
+> checkpoint** — fully measured (nearReceive ≤+0.114 ms, N8AO ≤+0.242 ms
+> +6 draws, Owens 211≤261 fully armed; four n8ao reversed-depth library
+> defects found+fixed with three-way proof; the vendored quadtree re-stamps
+> receiveShadow from the ROOT every frame — ridden via per-tile syncShadow,
+> not fought). Five NEW RED-calibrated gates: verify-terra / verify-arrival
+> / verify-settle / verify-clutter / verify-depth2; sanctions §5.1/.4/.5/
+> .7/.8/.9 consumed with inline comments, §5.2 DECLINED on A's own
+> measurement (68 MB vs the 300 MB gate). **The FL300 "content at reveal"
+> defect was RETIRED as an instrument artifact** (three-tile never refines
+> out-of-frustum tiles — camTileZ saturates at cruise by design; the real
+> defect was LOCAL warps, fixed). **Certification: every frozen number
+> green on the fully-armed tree (Owens 179–211 ≤ 261), the R21 stability
+> quartet green, all five new gates green vs their frozen reds; the 15-min
+> soaks were WAIVED BY USER (2026-08-10, ship-now directive) and run
+> post-ship — see the ledger §6 for the honest verdict.** §6 user
+> checkpoints PENDING (P-LEWIS/P-DUBLIN money shots, the DEPTH_PASS on/off
+> decision live on the user's machine via `__flyDepthArm`, quilt/tree/car/
+> warp-hold taste). Cinematic Night (FLY_ROUND22_HANDOFF.md) remains the
+> R23 seed, untouched.**
+>
+> Earlier: **Round 21 "Steady State" is BUILT and pushed
 > (2026-08-07): [FLY_ROUND21.md](FLY_ROUND21.md) is the record** (plan
 > [FLY_ROUND21_PLAN.md](FLY_ROUND21_PLAN.md); FIVE Opus 5 agents — A GOVERNOR
 > / B STREAMKEEPER / C SURFACE / D PIPELINE / E CERT — under Fable
