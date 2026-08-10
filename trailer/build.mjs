@@ -45,25 +45,28 @@ fs.mkdirSync(WORK, { recursive: true });
 // kind 'shot': Ken Burns over scripts/<src>.
 //   move 'push' zooms 1 -> 1+amp at focus (fx,fy); move 'pan' holds zoom and
 //   slides the focus x from fx to fx2 at height fy.
+//   live: if trailer/live/<live>.mp4 exists (recorded by trailer/capture.mjs
+//   against a dev server with real network + GPU), that LIVE gameplay footage
+//   replaces the Ken Burns still for this slot, same duration.
 // kind 'card': Chromium-rendered title card (built below), fades in/out.
 const BOARD = [
   { kind: 'card', id: 'title', dur: 4.2 },
-  { kind: 'shot', src: 'r18a1-manhattan-roofs.png', dur: 4.6, move: 'push', amp: 0.1, fx: 0.5, fy: 0.42 },
+  { kind: 'shot', src: 'r18a1-manhattan-roofs.png', dur: 4.6, move: 'push', amp: 0.1, fx: 0.5, fy: 0.42, live: 'sat-manhattan' },
   { kind: 'shot', src: 'r13-bldg-tokyo.png', dur: 4.6, move: 'pan', zoom: 1.08, fx: 0.18, fx2: 0.55, fy: 0.4 },
-  { kind: 'shot', src: 'weather-09-dusk-walk.png', dur: 4.4, move: 'push', amp: 0.08, fx: 0.5, fy: 0.35 },
+  { kind: 'shot', src: 'weather-09-dusk-walk.png', dur: 4.4, move: 'push', amp: 0.08, fx: 0.5, fy: 0.35, live: 'photo-orbit' },
   { kind: 'card', id: 'real', dur: 3.2 },
-  { kind: 'shot', src: 'p5-03-formation.png', dur: 4.6, move: 'push', amp: 0.1, fx: 0.46, fy: 0.42 },
+  { kind: 'shot', src: 'p5-03-formation.png', dur: 4.6, move: 'push', amp: 0.1, fx: 0.46, fy: 0.42, live: 'traffic-cinema' },
   { kind: 'shot', src: 'r21b-on-heal-sf.png', dur: 4.4, move: 'pan', zoom: 1.08, fx: 0.25, fx2: 0.6, fy: 0.45 },
   { kind: 'card', id: 'night', dur: 2.8 },
   { kind: 'shot', src: 'r16-satnight-01-manhattan-night.png', dur: 4.8, move: 'pan', zoom: 1.08, fx: 0.6, fx2: 0.25, fy: 0.45 },
-  { kind: 'shot', src: 'r20-c-eiffel-satellite-after.png', dur: 4.8, move: 'push', amp: 0.11, fx: 0.5, fy: 0.45 },
-  { kind: 'shot', src: 'hangar-01-fighter.png', dur: 4.4, move: 'push', amp: 0.09, fx: 0.5, fy: 0.45 },
+  { kind: 'shot', src: 'r20-c-eiffel-satellite-after.png', dur: 4.8, move: 'push', amp: 0.11, fx: 0.5, fy: 0.45, live: 'eiffel-night' },
+  { kind: 'shot', src: 'hangar-01-fighter.png', dur: 4.4, move: 'push', amp: 0.09, fx: 0.5, fy: 0.45, live: 'neon-night' },
   { kind: 'shot', src: 'neon-01-manhattan.png', dur: 4.4, move: 'pan', zoom: 1.07, fx: 0.38, fx2: 0.6, fy: 0.5 },
   { kind: 'shot', src: 'f5-02-skyline.png', dur: 4.4, move: 'push', amp: 0.1, fx: 0.7, fy: 0.45 },
-  { kind: 'shot', src: 'edge-05-boost-ribbons.png', dur: 3.6, move: 'push', amp: 0.16, fx: 0.5, fy: 0.45 },
+  { kind: 'shot', src: 'edge-05-boost-ribbons.png', dur: 3.6, move: 'push', amp: 0.16, fx: 0.5, fy: 0.45, live: 'boost' },
   { kind: 'card', id: 'features', dur: 3.4 },
   { kind: 'shot', src: 'atlas-01-open.png', dur: 4.0, move: 'push', amp: 0.06, fx: 0.5, fy: 0.5 },
-  { kind: 'shot', src: 'r20-c-esb-satellite-after.png', dur: 4.6, move: 'push', amp: 0.09, fx: 0.5, fy: 0.4 },
+  { kind: 'shot', src: 'r20-c-esb-satellite-after.png', dur: 4.6, move: 'push', amp: 0.09, fx: 0.5, fy: 0.4, live: 'liberty' },
   { kind: 'card', id: 'end', dur: 6.5 },
 ];
 const TOTAL = BOARD.reduce((s, b) => s + b.dur, 0);
@@ -316,6 +319,17 @@ function buildSegment(b, i) {
   // mpegts demux (encode is fine, reading back crashes); mp4 read is clean.
   const seg = path.join(WORK, `seg-${String(i).padStart(2, '0')}.mp4`);
   const enc = ['-c:v', 'libx264', '-preset', 'medium', '-crf', '19', '-r', String(FPS), seg];
+  const liveSrc = b.live && path.join(ROOT, 'trailer', 'live', `${b.live}.mp4`);
+  if (liveSrc && fs.existsSync(liveSrc)) {
+    // Live gameplay footage from trailer/capture.mjs — normalize and slot in.
+    run(
+      ['-y', '-i', liveSrc, '-vf', `fps=${FPS},scale=${W}:${H},format=yuv420p`,
+        '-t', b.dur.toFixed(3), '-an', ...enc],
+      `live ${b.live}`
+    );
+    console.log(`seg ${i} (LIVE ${b.live}) ${b.dur}s`);
+    return seg;
+  }
   if (b.kind === 'card') {
     const img = path.join(WORK, `card-${b.id}.png`);
     const fadeOut = (b.dur - 0.6).toFixed(2);

@@ -17,7 +17,10 @@ of in-engine captures (satellite day/night, the Neon world, real monuments,
 boost, the Atlas). Every world frame is an unretouched screenshot produced by
 the repo's verification harnesses; the soundtrack is synthesized by the build
 script itself. Rebuild it with `node trailer/build.mjs` (see the header of that
-file for its two ad-hoc dev dependencies).
+file for its two ad-hoc dev dependencies). With a dev server running locally,
+`node trailer/capture.mjs` first records **live gameplay segments** (golden-hour
+Manhattan, a real-traffic cinema chase, the Eiffel night approach, photo-mode
+orbit, Neon night, boost) and the build swaps them in for the matching stills.
 
 ## Features
 
