@@ -1,16 +1,17 @@
 {
- "when": "2026-08-07T22:57:51.199Z",
+ "when": "2026-08-08T00:45:23.061Z",
  "manh": {
-  "tilesTotal": 170,
+  "tilesTotal": 164,
   "tilesNear": 4,
-  "tilesNearReceiving": 0,
+  "tilesNearReceiving": 4,
+  "tilesReceivingAny": 22,
   "casters": 20,
-  "castersNear": 5,
-  "receivers": 0,
-  "catcherMeshes": 0,
+  "castersNear": 6,
+  "receivers": 23,
+  "catcherMeshes": 1,
   "aglM": 682,
-  "draws": 242,
-  "tris": 1262115,
+  "draws": 246,
+  "tris": 1284995,
   "tier": "high"
  },
  "armed": {
@@ -28,6 +29,10 @@
   "passes": [
    {
     "name": "RenderPass",
+    "effects": []
+   },
+   {
+    "name": "N8AOPass",
     "effects": []
    },
    {
@@ -56,10 +61,24 @@
    }
   ],
   "reversedDepth": true,
-  "n8ao": false,
+  "n8ao": true,
+  "n8aoState": {
+   "mounted": true,
+   "reversed": true,
+   "depthBufferType": "Reverse",
+   "halfRes": true,
+   "downsamplePatch": "ok",
+   "warm": "5/5",
+   "gpuMs": 0,
+   "drawsPerFrame": null,
+   "proxyResyncs": 24,
+   "projZ": -1.0000083,
+   "wanted": true
+  },
   "aerial": {
    "strength": 0,
    "startM": 800,
+   "bandStartM": 800,
    "endM": 14000,
    "heightFalloffM": 1200,
    "rim": [
@@ -75,45 +94,47 @@
   "frames": 1439,
   "p50": 4.2,
   "p95": 4.3,
-  "gpuSamples": 718,
-  "gpuP50": 3.321,
-  "gpuP95": 3.669,
+  "gpuSamples": 719,
+  "gpuP50": 2.856,
+  "gpuP95": 3.298,
   "instrument": "EXT_disjoint_timer_query_webgl2"
  },
  "recv": {
-  "touched": 4
+  "touched": 22,
+  "off": 0
  },
  "recvOn": {
   "frames": 1438,
   "p50": 4.2,
   "p95": 4.3,
-  "gpuSamples": 717,
-  "gpuP50": 3.427,
-  "gpuP95": 3.766,
+  "gpuSamples": 718,
+  "gpuP50": 2.843,
+  "gpuP95": 3.263,
   "instrument": "EXT_disjoint_timer_query_webgl2"
  },
  "recvOff": {
-  "frames": 1439,
+  "frames": 1438,
   "p50": 4.2,
   "p95": 4.3,
   "gpuSamples": 718,
-  "gpuP50": 3.411,
-  "gpuP95": 3.78,
+  "gpuP50": 2.877,
+  "gpuP95": 3.351,
   "instrument": "EXT_disjoint_timer_query_webgl2"
  },
- "recvDelta": -0.01399999999999979,
+ "recvDelta": -0.08800000000000008,
  "near": {
-  "strength": 0,
-  "startM": 800,
+  "strength": 0.55,
+  "startM": 420,
+  "bandStartM": 800,
   "endM": 14000,
   "heightFalloffM": 1200,
   "rim": [
-   0,
-   0,
-   0
+   0.7764705882352941,
+   0.8431372549019608,
+   0.9098039215686274
   ],
-  "nearStartM": 0,
-  "nearMaxMix": 0,
+  "nearStartM": 420,
+  "nearMaxMix": 0.1,
   "quilt": {
    "desat": 0,
    "flatten": 0
@@ -136,80 +157,74 @@
  "owens": {
   "tilesTotal": 164,
   "tilesNear": 15,
-  "tilesNearReceiving": 0,
+  "tilesNearReceiving": 15,
+  "tilesReceivingAny": 30,
   "casters": 4,
   "castersNear": 4,
-  "receivers": 0,
-  "catcherMeshes": 0,
+  "receivers": 31,
+  "catcherMeshes": 1,
   "aglM": 417,
-  "draws": 204,
-  "tris": 189156,
+  "draws": 211,
+  "tris": 188872,
   "tier": "high"
  },
  "owensFrame": {
   "frames": 1439,
   "p50": 4.2,
   "p95": 4.3,
-  "gpuSamples": 717,
-  "gpuP50": 3.278,
-  "gpuP95": 3.593,
+  "gpuSamples": 718,
+  "gpuP50": 3.492,
+  "gpuP95": 3.805,
   "instrument": "EXT_disjoint_timer_query_webgl2"
  },
  "aboveBand": {
   "tilesTotal": 140,
   "tilesNear": 2,
-  "tilesNearReceiving": 0,
+  "tilesNearReceiving": 2,
+  "tilesReceivingAny": 10,
   "casters": 4,
   "castersNear": 4,
-  "receivers": 0,
+  "receivers": 10,
   "catcherMeshes": 0,
   "aglM": 2868,
-  "draws": 168,
-  "tris": 66367,
+  "draws": 174,
+  "tris": 65099,
   "tier": "high"
  },
  "red": [
   [
    "D1 shadows land on nothing (terrain excluded from the receive set)",
    "verify-depth2 (3)",
-   "0/4 near leaf tiles receive",
+   "4/4 near leaf tiles receive",
    "> 0"
   ],
   [
    "D2 the ground catcher ships off — open ground catches nothing",
    "verify-depth2 (4)",
-   "0 catcher meshes with 5 casters in frustum",
+   "1 catcher meshes with 6 casters in frustum",
    "> 0"
   ],
   [
    "D3 zero ambient occlusion anywhere",
    "verify-depth2 (7)",
-   "n8ao in pass list: false",
+   "n8ao in pass list: true",
    "true"
   ],
   [
    "D4 nothing atmospheric touches the first 800 m",
    "verify-depth2 (12)",
-   "startM 800",
-   "< 800"
+   "nearStartM 420 (startM 420, unchanged by design)",
+   "> 0"
   ],
   [
    "D5 medium/low content is an un-atmosphered cut-out",
    "verify-depth2 (13)",
-   "content.enabled=false minTier=high",
+   "content.enabled=true minTier=medium",
    "enabled + minTier medium"
   ]
  ],
- "fails": [
-  "(3) RECEIVE SET — leaf terrain tiles inside 1500 m receive shadows",
-  "(4) CATCHER GATING — mounted where casters are in frustum and AGL is inside the band",
-  "(7) N8AO is present in the composer pass list on the high tier",
-  "(12) near-field atmosphere — the 0..startM band is no longer identically empty",
-  "(13) MEDIUM-TIER CONTENT HAZE — armed, and scoped down to medium (plan §5.4)"
- ],
+ "fails": [],
  "softs": [
-  "(9) N8AO luma sanity",
-  "(10) N8AO frame-time budget",
   "(13b) runtime haze uniform"
  ]
 }

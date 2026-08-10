@@ -93,9 +93,38 @@ const { bootFly, unpinPins } = require('./_boot');
 const BOOT_OPTS = process.env.FLY_URL ? { url: process.env.FLY_URL } : {};
 const DEV_ORIGIN = (process.env.FLY_URL || 'http://localhost:3000').replace(/\/$/, '');
 const SETTLE_MS = +(process.env.TERRA_SETTLE_MS ?? 10000);
-const TERRA_ARMED = process.env.R22_TERRA === 'on';
+/* W3: THE DEFAULT IS THE SHIP STATE, not the control.
+ * At W1/W2 this gate defaulted to forcing all three TERRA families OFF, so a
+ * bare run always re-measured the red. That was right while the constants were
+ * `enabled:false` and wrong the moment they flipped: the first W3 run of this
+ * file re-measured the CONTROL (camTileZ 13, no z18, no cache) on an ARMED tree
+ * and would have been recorded as a certification failure of a feature it had
+ * switched off itself. A certification gate must certify WHAT SHIPS.
+ *   (bare)            -> ship state: no override at all, the constants decide
+ *   R22_TERRA=on      -> force ARMED   (W2 smoke against an unflipped tree)
+ *   R22_TERRA=off     -> force CONTROL (re-measure the frozen red)
+ */
+/* W3, THIRD CORRECTION — AND THE DEFAULT IS `on`.
+ * The W1/W2 default forced TERRA OFF (always re-measure the red). The first W3
+ * fix changed it to "ship state = no override, the constants decide" — which
+ * was ALSO wrong, and wrong in a way that reads like a product failure:
+ * `scripts/_boot.js` pins `__flyTerraPin = 1` fleet-wide, and
+ * `terraSharpOn()` is `enabled && !terraPinned()`. With no override the pin
+ * wins, so a "ship state" run measured the FLEET-PINNED legacy world and
+ * reported every TERRA feature as inert on a tree where all three are ON.
+ * The pin exists so LEGACY harnesses keep measuring the R21 world; the five
+ * R22 gates are the ones that un-pin. So this gate arms by default.
+ *   (bare)         -> ARMED (certifies what ships)
+ *   R22_TERRA=off  -> forced CONTROL (re-measure the frozen red)
+ *   R22_TERRA=ship -> no override at all (diagnostic: shows the pin's effect)
+ * Gate (0) below asserts the arm actually took, so this class of error cannot
+ * pass silently again. */
+const TERRA_MODE = process.env.R22_TERRA ?? 'on';
+const TERRA_ARMED = TERRA_MODE === 'on';
+const TERRA_FORCED = TERRA_MODE !== 'ship';
 /** A's per-family override, installed before mount. See the header. */
-const FORCE_TERRA = (on) => {
+const FORCE_TERRA = ([forced, on]) => {
+  if (!forced) return; // ship state — the constants and the fleet pin decide
   window.__flyTerraForce = { sharp: on, pipe: on, cache: on };
 };
 
@@ -330,7 +359,7 @@ const UNFREEZE = () => {
 
   const newFlyPage = async () => {
     const p = await context.newPage();
-    await p.addInitScript(FORCE_TERRA, TERRA_ARMED);
+    await p.addInitScript(FORCE_TERRA, [TERRA_FORCED, TERRA_ARMED]);
     return p;
   };
 
@@ -352,7 +381,7 @@ const UNFREEZE = () => {
     terraStats: window.__fly?.terraStats ?? window.__fly?.engine?.terraStats ?? null,
   }));
   console.log(
-    `TERRA ${TERRA_ARMED ? 'ARMED' : 'CONTROL (forced OFF)'} via __flyTerraForce=${JSON.stringify(pinState.force)} ` +
+    `TERRA ${TERRA_FORCED ? (TERRA_ARMED ? 'FORCED ARMED' : 'FORCED CONTROL (off)') : 'SHIP STATE (constants decide)'} · __flyTerraForce=${JSON.stringify(pinState.force)} ` +
       `· fleet pin left untouched at ${pinState.fleetPin} · terraStats ${pinState.terraStats ? 'published' : 'absent (legacy, as expected in control)'}`
   );
 
@@ -390,6 +419,25 @@ const UNFREEZE = () => {
     .first()
     .screenshot({ path: path.join(__dirname, 'r22-e-terra-01-lewis.png') });
 
+  /* GATE (0) — DID THE ARM ACTUALLY TAKE?
+   * Three W3 runs of this file measured a world it had itself switched off:
+   * once by defaulting to the control, once by deferring to a fleet pin that
+   * suppresses the very feature under test. Both times every downstream gate
+   * dutifully reported the feature as absent, which is indistinguishable from
+   * a real regression. `terraStats` is published ONLY when TERRA_SHARP is
+   * armed, so its presence is the arm's own receipt — and asserting it FIRST
+   * means a mis-armed run fails at gate (0) with the reason, instead of
+   * producing six plausible-looking product failures. */
+  const armProof = await page.evaluate(
+    () => (window.__fly?.terraStats ?? window.__fly?.engine?.terraStats) != null
+  );
+  gate(
+    `(0) THE ARM TOOK — TERRA is ${TERRA_ARMED ? 'ARMED' : 'CONTROL'} and the engine agrees`,
+    TERRA_ARMED ? armProof : !armProof,
+    `terraStats ${armProof ? 'published' : 'absent'} · __flyTerraForce=${JSON.stringify(pinState.force)} · ` +
+      `fleet pin ${pinState.fleetPin} (note: with NO override the pin wins and TERRA reads inert — that is the ` +
+      `fleet pin doing its job for legacy harnesses, not a product regression)`
+  );
   gate(
     '(1) precondition: satellite settled at P-LEWIS on the high tier',
     !lewis.err && lewis.tier === 'high' && lewis.camTileZ != null && lewis.aglM > 40 && lewis.aglM < 400,
@@ -465,13 +513,61 @@ const UNFREEZE = () => {
     terra: window.__fly.terraStats ?? null,
   }));
   const curveArmed = bands.some((b) => Math.abs((b.lod ?? 0) - (bands[0].lod ?? 0)) > 1e-6);
+  /* THE CURVE IS READ FROM SOURCE, NOT COPIED (W3 — the SAT_QUILT lesson again).
+   * This gate asserted the PLAN's starting curve (1.0 at low AGL). A
+   * RE-MEASURED it before shipping — the plan's 1.0 took Owens to 291, which
+   * BREAKS the 261 ceiling — and shipped [600,0.86][3000,0.82][9000,0.78]. The
+   * harness held the stale copy and failed the round for honouring its own
+   * measurement. So the expectation is DERIVED from `TERRA_SHARP.lodCurve`, and
+   * what is asserted is the shape: monotone non-increasing with altitude, every
+   * band within tolerance of the shipped interpolation. */
+  const tsrc = fs.readFileSync(path.join(__dirname, '..', 'lib', 'fly', 'fly-constants.js'), 'utf8');
+  const tblk = tsrc.slice(tsrc.indexOf('export const TERRA_SHARP'), tsrc.indexOf('export const TERRA_PIPE'));
+  // Bracket-DEPTH scan to the outer array's close. `indexOf('],')` finds the
+  // end of the FIRST inner pair, which parsed one entry and then "disagreed"
+  // with the two the curve actually has.
+  const ci = tblk.indexOf('lodCurve:');
+  let cblk = '';
+  if (ci >= 0) {
+    const open = tblk.indexOf('[', ci);
+    let depth = 0;
+    for (let i = open; i < tblk.length; i++) {
+      if (tblk[i] === '[') depth++;
+      else if (tblk[i] === ']') {
+        depth--;
+        if (depth === 0) {
+          cblk = tblk.slice(open, i + 1);
+          break;
+        }
+      }
+    }
+  }
+  const curve = [...cblk.matchAll(/\[\s*([0-9.]+)\s*,\s*([0-9.]+)\s*\]/g)].map((m) => [+m[1], +m[2]]);
+  const lodFor = (agl) => {
+    if (!curve.length) return null;
+    if (agl <= curve[0][0]) return curve[0][1];
+    for (let i = 1; i < curve.length; i++) {
+      const [a0, v0] = curve[i - 1];
+      const [a1, v1] = curve[i];
+      if (agl <= a1) return v0 + ((v1 - v0) * (agl - a0)) / Math.max(1e-6, a1 - a0);
+    }
+    return curve[curve.length - 1][1];
+  };
+  const curveErr = curveArmed
+    ? Math.max(...bands.map((b) => Math.abs((b.lod ?? 0) - (lodFor(b.aglM) ?? b.lod ?? 0))))
+    : 0;
+  const curveMonotone = bands.every(
+    (b, i) => i === 0 || (b.lod ?? 0) <= (bands[i - 1].lod ?? 0) + 1e-9
+  );
   gate(
-    '(4) live LODThreshold honours its contract (R19 flat-by-tier 0.86, or A\'s altitude curve)',
+    '(4) live LODThreshold matches the SHIPPED contract (R19 flat 0.86, or TERRA_SHARP.lodCurve as authored)',
     curveArmed
-      ? bands[0].lod >= 0.99 && bands[bands.length - 1].lod <= 0.9
+      ? curve.length > 0 && curveErr < 0.01 && curveMonotone
       : Math.abs((flags.lod ?? 0) - 0.86) < 1e-6,
     curveArmed
-      ? `ALTITUDE CURVE armed: ${bands.map((b) => `${b.aglM}m:${b.lod}`).join(' ')}`
+      ? `ALTITUDE CURVE armed: ${bands.map((b) => `${b.aglM}m:${(b.lod ?? 0).toFixed(4)}`).join(' ')} · ` +
+        `source curve ${JSON.stringify(curve)} · worst |Δ| ${curveErr.toFixed(5)} · monotone ${curveMonotone} ` +
+        `(A re-measured the plan's 1.0-at-low-AGL: it took Owens to 291, breaking 261)`
       : `flat ${flags.lod} (R19 lodThresholdByTier.high) — TERRA_SHARP.lodCurve not armed`
   );
   red.push([
@@ -522,9 +618,13 @@ const UNFREEZE = () => {
   // The budget moves 300 -> 450 MB WITH the sanction (plan §5.2), and the
   // sanction is consumed only when z18 is actually streaming. Reading the cap
   // off the observed zoom keeps the gate honest in both states.
-  const texCap = cold.maxImgZ >= 18 ? 450 : 300;
+  /* §5.2 WAS **NOT** CONSUMED (Fable W3, on A's own recommendation: 68 MB
+   * measured at z18 against a 300 MB cap, so raising it would only hide a
+   * future regression). The cap therefore stays 300 even with z18 streaming;
+   * the 450 branch is retired rather than left to relabel a pass. */
+  const texCap = 300;
   gate(
-    `(12) tile texture budget at P-LEWIS <= ${texCap} MB${texCap === 450 ? ' (plan §5.2 consumed)' : ''}`,
+    `(12) tile texture budget at P-LEWIS <= ${texCap} MB (§5.2 NOT consumed — the 300 cap holds under z18)`,
     tex.mb <= texCap,
     `≈${tex.mb} MB across ${tex.count} textures · max anisotropy ${tex.maxAniso}`
   );

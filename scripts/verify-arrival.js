@@ -71,7 +71,25 @@ const DEV_ORIGIN = (process.env.FLY_URL || 'http://localhost:3000').replace(/\/$
 
 const P_DUBLIN = [40.0992, -83.1141, 9144]; // FL300 over Dublin OH
 const FAR_START = [36.75, -118.05, 9144]; // Owens Valley — >3000 km away
-const TERRA_ARMED = process.env.R22_TERRA === 'on';
+// W3: default is the SHIP STATE — see verify-terra's TERRA_MODE comment.
+/* W3, THIRD CORRECTION — AND THE DEFAULT IS `on`.
+ * The W1/W2 default forced TERRA OFF (always re-measure the red). The first W3
+ * fix changed it to "ship state = no override, the constants decide" — which
+ * was ALSO wrong, and wrong in a way that reads like a product failure:
+ * `scripts/_boot.js` pins `__flyTerraPin = 1` fleet-wide, and
+ * `terraSharpOn()` is `enabled && !terraPinned()`. With no override the pin
+ * wins, so a "ship state" run measured the FLEET-PINNED legacy world and
+ * reported every TERRA feature as inert on a tree where all three are ON.
+ * The pin exists so LEGACY harnesses keep measuring the R21 world; the five
+ * R22 gates are the ones that un-pin. So this gate arms by default.
+ *   (bare)         -> ARMED (certifies what ships)
+ *   R22_TERRA=off  -> forced CONTROL (re-measure the frozen red)
+ *   R22_TERRA=ship -> no override at all (diagnostic: shows the pin's effect)
+ * Gate (0) below asserts the arm actually took, so this class of error cannot
+ * pass silently again. */
+const TERRA_MODE = process.env.R22_TERRA ?? 'on';
+const TERRA_ARMED = TERRA_MODE === 'on';
+const TERRA_FORCED = TERRA_MODE !== 'ship';
 const LOCAL_DEFICIT = 2; // ARRIVAL_GATE.localHold.localHoldDeficit
 const HOLD_MIN_MS = 2200; // WARP.far.holdMinMs (frozen)
 const HOLD_MAX_LEGACY = 3500; // WARP.far.holdMaxMs today
@@ -199,10 +217,18 @@ const PROBE = () => {
     // SETTLE stays on the shared fleet-pin accessor (B's family has no
     // per-family override). TERRA is armed through A's own
     // `__flyTerraForce` — the fleet pin is never touched here (W2).
-    await p.addInitScript(unpinPins, ['__flySettlePin']);
-    await p.addInitScript((on) => {
+    /* `__flyTerraPin` IS UN-PINNED HERE (W3 correction, B's proof).
+     * The local-hold decision reads a tileZ DEFICIT out of `terraStats`, and
+     * terraStats is published only when TERRA is armed. Under the fleet pin the
+     * deficit is `null`, the hold correctly takes the legacy no-signal path, and
+     * my (9b) red was measuring the PIN rather than the feature: B measured
+     * pinned = 0 ms hold, un-pinned = deficit 6 with a 1322 ms hold, capped
+     * false. An instrument that cannot observe a state reads it as zero. */
+    await p.addInitScript(unpinPins, ['__flySettlePin', '__flyTerraPin']);
+    await p.addInitScript(([forced, on]) => {
+      if (!forced) return; // ship state — the constants and the fleet pin decide
       window.__flyTerraForce = { sharp: on, pipe: on, cache: on };
-    }, TERRA_ARMED);
+    }, [TERRA_FORCED, TERRA_ARMED]);
     if (extra) await p.addInitScript(extra);
     p.on('pageerror', (e) => errs.push(e.message));
     p.on('console', (m) => {
@@ -284,7 +310,7 @@ const PROBE = () => {
   }));
   console.log(
     `SETTLE un-pinned: ${pinState.settle} (fleet attempted ${JSON.stringify(pinState.attempted)}) · ` +
-      `TERRA ${TERRA_ARMED ? 'ARMED' : 'CONTROL (forced OFF)'} via __flyTerraForce, fleet pin untouched at ${pinState.terra}`
+      `TERRA ${TERRA_FORCED ? (TERRA_ARMED ? 'FORCED ARMED' : 'FORCED CONTROL') : 'SHIP STATE'} via __flyTerraForce, fleet pin untouched at ${pinState.terra}`
   );
 
   // Park at Owens first so the destination pyramid is genuinely cold.
@@ -425,8 +451,15 @@ const PROBE = () => {
   ]);
   gate(
     '(4b) the destination eventually reaches the departure\'s zoom (the descent is not stalled)',
-    settledZ >= departZ,
-    `settled leaf z${settledZ} vs departure leaf z${departZ} after ${((SETTLE_MS + 6000) / 1000).toFixed(0)} s · ` +
+    /* ±1 TOLERANCE, and it is measured, not granted. `maxLeafZ` at FL300 is a
+     * 12-13 quantity in BOTH arms: A read 13 control / 12 armed
+     * (r22-a-dublin-prof-*.json); I read 12 (W2 control), 13 (W2 armed), 12
+     * (W3). Asserting exact equality on a quantity with a ±1 spread is a coin
+     * that flips per run — the thing this sweep has retired five times. What
+     * the gate still catches is a real STALL: the W1 red was a THREE-level gap
+     * (settled 10 vs departure 13) with the loader idle. */
+    settledZ >= departZ - 1,
+    `settled leaf z${settledZ} vs departure leaf z${departZ} (±1 tolerance: a 12-13 quantity in both arms) after ${((SETTLE_MS + 6000) / 1000).toFixed(0)} s · ` +
       `downloading at reveal ${revealRow?.dl}. NOTE camTileZ is NOT the statistic here: at FL300 it is capped by ` +
       `three-tile own out-of-frustum LOD rule, so "camTileZ stalled" is the library being correct, not the pipeline being slow.`
   );
@@ -498,18 +531,28 @@ const PROBE = () => {
     }
     return null;
   });
-  let local = { kind: null, holdMs: null, skipped: true };
+  let local = { kind: null, holdMs: null, skipped: true, reason: null, terraSeen: null };
   if (localOut) {
     await page.waitForTimeout(1200);
     await page.evaluate(() => document.querySelector('[data-testid="inspect-warp"]')?.click());
     await page.waitForTimeout(4000);
     const rows = await page.evaluate(READ_TRACE, 'local');
+    // B's local hold now renders `data-stage="hold"` — before this it was
+    // invisible to the trace, so a hold could not have been SEEN even when it
+    // happened. The 250 ms local-flash contract is untouched (verify-warp-arrival
+    // still passes); this only makes the hold observable.
     const holdRows = rows.filter((r) => r.stage === 'hold' || r.stage === 'streak');
+    const st = await page.evaluate(() => window.__fly?.arrivalStats ?? null);
     local = {
       kind: await page.evaluate(() => window.__flyStore.getState().warpKind),
       holdMs: holdRows.length ? Math.round((holdRows[holdRows.length - 1].t - holdRows[0].t) * 1000) : 0,
       zBefore: rows[0]?.z ?? null,
       zAfter: rows[rows.length - 1]?.z ?? null,
+      // B's self-describing contract: 'no-deficit-signal' | 'flash' | 'content'.
+      reason: st?.reason ?? st?.note?.reason ?? null,
+      terraSeen: st?.terraSeen ?? st?.note?.terraSeen ?? null,
+      statHoldMs: st?.holdMs ?? null,
+      capped: st?.capped ?? null,
       skipped: false,
     };
   } else {
@@ -544,11 +587,26 @@ const PROBE = () => {
      * localHoldDeficit). This gate is red today and greenable by that feature,
      * which is what the FL300 gates are not. */
     const deficit = (local.zAfter ?? 0) - (local.zBefore ?? 0);
+    /* THE ASSERTION IS ON `reason`, NOT ON THE RAW DEFICIT (W3, B's contract).
+     * Three states are legitimate and only one is a defect:
+     *   'content'            a real deficit was seen and a bounded hold ran
+     *   'flash'              the deficit was small — the 250 ms flash is right
+     *   'no-deficit-signal'  terraStats absent, so no deficit could be COMPUTED
+     * The third is the one my W1/W3 reds were actually measuring, and with
+     * `__flyTerraPin` un-pinned it must not occur: a signal-absent reveal on an
+     * armed tree means the gate is measuring its own pin again. */
+    const okReason =
+      local.reason === 'content'
+        ? local.holdMs > 0 && local.holdMs <= 1500
+        : local.reason === 'flash'
+          ? deficit <= LOCAL_DEFICIT
+          : false;
     gate(
-      `(9b) LOCAL WARP CONTENT — a deficit over ${LOCAL_DEFICIT} levels earns a bounded hold`,
-      deficit <= LOCAL_DEFICIT || (local.holdMs > 0 && local.holdMs <= 1500),
-      `deficit ${deficit} levels (camTileZ ${local.zBefore} → ${local.zAfter}) with a ${local.holdMs} ms hold — ` +
-        `a local warp today is a 900 ms flash with NO readiness poll at all (WarpFlash keys the poll on kind === 'far')`
+      `(9b) LOCAL WARP CONTENT — the reveal reason is self-describing and correct for the deficit`,
+      okReason,
+      `reason=${local.reason} terraSeen=${local.terraSeen} · deficit ${deficit} levels (camTileZ ${local.zBefore} → ${local.zAfter}) · ` +
+        `hold ${local.holdMs} ms (arrivalStats says ${local.statHoldMs}, capped=${local.capped}) · ` +
+        `'no-deficit-signal' on an ARMED tree means the harness is measuring a pin, not the feature`
     );
     red.push([
       'T9 a local warp reveals a 7-level deficit with no readiness poll',

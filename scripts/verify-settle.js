@@ -82,7 +82,8 @@ const DEV_ORIGIN = (process.env.FLY_URL || 'http://localhost:3000').replace(/\/$
 const POWELL = { lat: 40.1578, lon: -83.0752 };
 const MELTON = [-37.6833, 144.5833, 700]; // Melton AU — R20 measured 2,068 parcel homes
 const SIERRA = [36.578, -118.292, 4200]; // Mt Whitney ridge: ~2500 m of DEM relief
-const POPIN_GRACE_MS = 2500; // plan §7
+const POPIN_GRACE_MS = 2500; // plan §7 — the no-fade bound
+const POPIN_BIRTHED_MS = 8000; // the WITH-fade bound (B's proposal, ruled + frozen)
 const MAX_LONG_FRAMES = 2; // plan §7 (printed; the long-frame COUNT did not separate B's arms)
 /* The gated stutter scalar (W2). B's measured arms: prewarm OFF 576-714 ms
  * worst frame, ON 132-165 ms. 200 sits above the fixed arm's ceiling and far
@@ -200,7 +201,7 @@ const LAYERS = [
  *            population it SETTLES to, and never drops below it again. This is
  *            "the layer is assembled", and it is what the gate reads.
  */
-function analysePopin(trace, revealMs) {
+function analysePopin(trace, revealMs, popinRef) {
   const first = {};
   const t90 = {};
   const settled = {};
@@ -227,9 +228,22 @@ function analysePopin(trace, revealMs) {
     }
     t90[k] = at;
   }
-  const late = LAYERS.filter(
-    (k) => t90[k] != null && revealMs != null && t90[k] - revealMs > POPIN_GRACE_MS
-  );
+  /* THE FROZEN POP-IN DEFECT PREDICATE (W3, B's proposal, ruled and frozen):
+   *      defect  <=>  (birthed === false AND t90 > reveal + 2500 ms)
+   *               OR  (birthed === true  AND first-appearance > reveal + 8000 ms)
+   * A layer that arrives late WITH a birth fade running is not a pop — it is a
+   * fade, which is the fix. What stays a defect is a late layer with no fade at
+   * all, or a fade that starts so late the player is looking at absence. Boot
+   * assembly at +3.7 s WITH fades is ACCEPTABLE-WITH-FADES by ruling
+   * (`ARRIVAL_GATE.bootTerms` stays false on B's measured escalation: the boot
+   * content terms cost +2.6 s against an envelope plan section 4 freezes). */
+  const birthedOf = (k) => popinRef?.layers?.[k]?.birthed ?? null;
+  const late = LAYERS.filter((k) => {
+    if (revealMs == null) return false;
+    const b = birthedOf(k);
+    if (b === true) return first[k] != null && first[k] - revealMs > POPIN_BIRTHED_MS;
+    return t90[k] != null && t90[k] - revealMs > POPIN_GRACE_MS;
+  });
   const never = LAYERS.filter((k) => first[k] == null);
   return { first, t90, settled, late, never };
 }
@@ -272,7 +286,12 @@ function longFrames(frames, t0, t1) {
   };
   const newFlyPage = async (extra) => {
     const p = await context.newPage();
-    await p.addInitScript(unpinPins, ['__flySettlePin']);
+    /* BOTH pins (W3 correction, B's proof). My +9.5 s satRoads red was the
+     * LEGACY reveal running under `__flyTerraPin`: with both pins lifted B
+     * measured roads t90 at reveal MINUS 1301 ms, roadFrac 0.875 over the
+     * settled 16-chunk ring. A content-aware reveal cannot be judged with the
+     * content signal pinned off. */
+    await p.addInitScript(unpinPins, ['__flySettlePin', '__flyTerraPin']);
     if (extra) await p.addInitScript(extra);
     await p.addInitScript(INSTALL_BOOT_TRACE);
     p.on('pageerror', (e) => errs.push(e.message));
@@ -314,8 +333,8 @@ function longFrames(frames, t0, t1) {
 
   const revealRow = rows.find((r) => r.boot === 100);
   const revealT = revealRow ? revealRow.t * 1000 : null;
-  const analyse = (trace, reveal) => analysePopin(trace, reveal);
-  const boot = analyse(rows, revealT);
+  const bootPopin = rows.map((r) => r.popin).filter(Boolean).pop() ?? null;
+  const boot = analysePopin(rows, revealT, bootPopin);
   console.log(
     `POWELL BOOT: reveal @${Math.round(revealT ?? -1)} ms (bootFly measured ${bootMs} ms) · per layer [first population] / [90% of settled]:`
   );
@@ -344,7 +363,7 @@ function longFrames(frames, t0, t1) {
    * "the world is assembled", and it is the number the plan's own §7 criterion
    * is really about. First appearance is kept and printed, as evidence. */
   gate(
-    `(2a) BOOT — no layer reaches 90% of its settled population later than reveal + ${POPIN_GRACE_MS} ms`,
+    `(2a) BOOT — no layer is a POP (no-fade t90 > +${POPIN_GRACE_MS} ms, or faded first-appearance > +${POPIN_BIRTHED_MS} ms)`,
     boot.late.length === 0,
     boot.late.length
       ? boot.late.map((k) => `${k} +${Math.round(boot.t90[k] - revealT)} ms`).join(', ')
@@ -464,7 +483,8 @@ function longFrames(frames, t0, t1) {
     wIdx = lastHold >= 0 ? lastHold + 1 : -1;
   }
   const warpRevealT = wIdx >= 0 ? warpTrace.rows[wIdx].t * 1000 : null;
-  const warp = analysePopin(warpTrace.rows, warpRevealT);
+  const warpPopin = warpTrace.rows.map((r) => r.popin).filter(Boolean).pop() ?? null;
+  const warp = analysePopin(warpTrace.rows, warpRevealT, warpPopin);
   console.log(`POWELL FAR WARP: reveal @${Math.round(warpRevealT ?? -1)} ms · per layer [first] / [t90]:`);
   for (const k of LAYERS)
     console.log(
@@ -479,7 +499,7 @@ function longFrames(frames, t0, t1) {
     .first()
     .screenshot({ path: path.join(__dirname, 'r22-e-settle-03-powell-warp.png') });
   gate(
-    `(2b) WARP — no layer reaches 90% of its settled population later than reveal + ${POPIN_GRACE_MS} ms`,
+    `(2b) WARP — no layer is a POP (no-fade t90 > +${POPIN_GRACE_MS} ms, or faded first-appearance > +${POPIN_BIRTHED_MS} ms)`,
     warpRevealT != null && warp.late.length === 0,
     warp.late.length
       ? warp.late.map((k) => `${k} +${Math.round(warp.t90[k] - warpRevealT)} ms`).join(', ')
@@ -683,10 +703,22 @@ function longFrames(frames, t0, t1) {
       `${(birthFrac * 100).toFixed(1)}% in one sample at ${(birthScaleFrac * 100).toFixed(0)}% scale`,
       `<= ${MAX_BIRTH_FRAC * 100}% or born <= 60% scale`,
     ]);
-    gate(
-      `(8b) the growK scale step is continuous (<= ${MAX_SCALE_JUMP * 100}% per sample)`,
-      worstJump <= MAX_SCALE_JUMP,
-      `worst ${(worstJump * 100).toFixed(1)}% ${jumpAt ? `· ${jumpAt}` : ''} — NOT RED-CALIBRATED: \`provisional\` was false for this whole run, so growK never left 1 and the 0.55→1.0 step did not fire at this pose`
+    /* (8b) IS RETIRED AT W3, and it is retired for the right reason: it was
+     * measuring the FIX as a defect.
+     *
+     * A RELATIVE step is meaningless during a birth ramp that starts near
+     * zero. With SETTLE_CALM.births ON, the pool is born at 4% of settled
+     * scale and eases up over ~600 ms — sampled at 100 ms that is a legitimate
+     * 0.646 -> 3.171 between two samples, i.e. "+390%", and the gate called it
+     * a discrete step. The claim (8b) was written for — the R21 growK 0.55→1.0
+     * jump — was never red at this pose anyway (`provisional` stayed false all
+     * run, so growK never left 1), and gate (8) above already carries the real
+     * assertion in a form the ramp satisfies: born small, or grown gradually.
+     * The number is still printed, as evidence of the ramp's shape. */
+    console.log(
+      `INFO (8b) growK scale step ${(worstJump * 100).toFixed(1)}% ${jumpAt ? `· ${jumpAt}` : ''} — RETIRED as a gate at W3: ` +
+        `a relative step is meaningless during a birth ramp that starts near zero, and this number IS the ramp working. ` +
+        `Gate (8) carries the claim.`
     );
     gate(
       '(9) parcel deletes are not instantaneous (no >50% population drop in one sample)',

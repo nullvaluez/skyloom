@@ -2,13 +2,13 @@
   "summary": {
     "minutes": 15,
     "samples": 76,
-    "worstP95ms": 6.6,
-    "fpsFloorApprox": 151.5,
-    "maxDrawCalls": 257,
-    "maxTriangles": 942039,
-    "heapStartMB": 162,
-    "heapEndMB": 94,
-    "maxRebaseMs": 0.30000000074505806,
+    "worstP95ms": 4.3,
+    "fpsFloorApprox": 232.6,
+    "maxDrawCalls": 253,
+    "maxTriangles": 873412,
+    "heapStartMB": 189,
+    "heapEndMB": 97,
+    "maxRebaseMs": 0.29999999701976776,
     "pageErrors": 0,
     "style": "satellite",
     "route": [
@@ -16,19 +16,19 @@
       "powell-suburb",
       "union-rural"
     ],
-    "p50Triangles": 391590,
-    "p95Triangles": 845301,
+    "p50Triangles": 303297,
+    "p95Triangles": 824202,
     "p50DrawCalls": 230,
-    "p95DrawCalls": 249,
-    "p50FrameMs": 6.5,
-    "p95FrameMs": 6.6,
+    "p95DrawCalls": 248,
+    "p50FrameMs": 4.3,
+    "p95FrameMs": 4.3,
     "governorSteps": 0,
     "governorLog": [],
     "governorStats": {
       "dprSteps": 0,
       "tierSteps": 0,
       "latched": false,
-      "emaFps": 172.38,
+      "emaFps": 239.78,
       "refresh": 144,
       "rung": 0,
       "rungs": 3,
@@ -36,33 +36,119 @@
       "tier": "high",
       "pinned": false
     },
-    "heapFloorStartMB": 143,
-    "heapFloorEndMB": 65,
-    "heapFloorClimbMB": -78,
+    "heapFloorStartMB": 159,
+    "heapFloorEndMB": 78,
+    "heapFloorClimbMB": -81,
     "tiersSeen": [
       "high"
+    ],
+    "gpuInstrument": "EXT_disjoint_timer_query_webgl2",
+    "gpuP95Worst": 3.68,
+    "gpuP95Median": 3.34,
+    "gpuP95Series": [
+      3.34,
+      3.21,
+      3.31,
+      3.49,
+      2.95,
+      2.86,
+      2.87,
+      3.05,
+      2.82,
+      2.83,
+      3,
+      3.03,
+      3.05,
+      3.24,
+      3.3,
+      3.24,
+      3.15,
+      3.29,
+      3.25,
+      3.52,
+      3.26,
+      3.32,
+      3.27,
+      3.34,
+      3.07,
+      3.08,
+      3.28,
+      2.96,
+      2.97,
+      3.03,
+      3.18,
+      3.34,
+      3.35,
+      3.37,
+      3.36,
+      3.35,
+      3.35,
+      3.41,
+      3.44,
+      3.46,
+      3.49,
+      3.48,
+      3.48,
+      3.68,
+      3.36,
+      3.49,
+      3.62,
+      3.5,
+      3.44,
+      3.32,
+      3.46,
+      3.43,
+      3.33,
+      3.42,
+      3.35,
+      3.59,
+      3.4,
+      3.35,
+      3.45,
+      3.45,
+      3.24,
+      3.26,
+      3.27,
+      3.31,
+      3.48,
+      3.31,
+      3.25,
+      3.22,
+      3.26,
+      3.27,
+      3.37,
+      3.49,
+      3.46,
+      3.39,
+      3.43,
+      3.34
     ]
   },
   "samples": [
     {
-      "t": 23,
-      "frames": 3208,
+      "t": 24,
+      "frames": 3179,
       "p50": 4.2,
       "p95": 4.3,
       "p99": 12.5,
-      "drawCalls": 223,
-      "triangles": 770002,
-      "traffic": 95,
-      "heapMB": 162,
+      "drawCalls": 222,
+      "triangles": 834958,
+      "traffic": 541,
+      "heapMB": 189,
       "rebases": 0,
       "maxRebaseMs": 0,
+      "gpuFrameMs": {
+        "n": 1587,
+        "p50": 2.97,
+        "p95": 3.34
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 229.41
+        "emaFps": 229.17
       },
       "fxRebuilds": 1,
       "sb": {
@@ -72,105 +158,29 @@
       "parcel": 0
     },
     {
-      "t": 37,
-      "frames": 3342,
-      "p50": 4.2,
-      "p95": 4.3,
-      "p99": 4.3,
-      "drawCalls": 230,
-      "triangles": 619295,
-      "traffic": 93,
-      "heapMB": 185,
-      "rebases": 0,
-      "maxRebaseMs": 0,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": {
-        "dprSteps": 0,
-        "tierSteps": 0,
-        "latched": false,
-        "emaFps": 237.78
-      },
-      "fxRebuilds": 1,
-      "sb": {
-        "chunks": 16,
-        "ready": 16
-      },
-      "parcel": 0
-    },
-    {
-      "t": 47,
-      "frames": 2388,
-      "p50": 4.2,
-      "p95": 4.3,
-      "p99": 4.3,
-      "drawCalls": 234,
-      "triangles": 635382,
-      "traffic": 93,
-      "heapMB": 184,
-      "rebases": 0,
-      "maxRebaseMs": 0,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": {
-        "dprSteps": 0,
-        "tierSteps": 0,
-        "latched": false,
-        "emaFps": 236.97
-      },
-      "fxRebuilds": 1,
-      "sb": {
-        "chunks": 16,
-        "ready": 16
-      },
-      "parcel": 0
-    },
-    {
-      "t": 60,
-      "frames": 3100,
-      "p50": 4.2,
-      "p95": 4.3,
-      "p99": 4.3,
-      "drawCalls": 236,
-      "triangles": 835219,
-      "traffic": 343,
-      "heapMB": 187,
-      "rebases": 1,
-      "maxRebaseMs": 0.30000000074505806,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": {
-        "dprSteps": 0,
-        "tierSteps": 0,
-        "latched": false,
-        "emaFps": 232.7
-      },
-      "fxRebuilds": 1,
-      "sb": {
-        "chunks": 16,
-        "ready": 16
-      },
-      "parcel": 0
-    },
-    {
-      "t": 70,
-      "frames": 2383,
+      "t": 38,
+      "frames": 3332,
       "p50": 4.2,
       "p95": 4.3,
       "p99": 4.4,
-      "drawCalls": 236,
-      "triangles": 796721,
-      "traffic": 338,
-      "heapMB": 193,
-      "rebases": 1,
-      "maxRebaseMs": 0.30000000074505806,
+      "drawCalls": 232,
+      "triangles": 658606,
+      "traffic": 536,
+      "heapMB": 194,
+      "rebases": 0,
+      "maxRebaseMs": 0,
+      "gpuFrameMs": {
+        "n": 1665,
+        "p50": 2.91,
+        "p95": 3.21
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 231.84
+        "emaFps": 236.66
       },
       "fxRebuilds": 1,
       "sb": {
@@ -180,24 +190,29 @@
       "parcel": 0
     },
     {
-      "t": 84,
-      "frames": 3343,
+      "t": 48,
+      "frames": 2375,
       "p50": 4.2,
       "p95": 4.3,
       "p99": 4.3,
-      "drawCalls": 232,
-      "triangles": 715336,
-      "traffic": 338,
-      "heapMB": 158,
-      "rebases": 1,
-      "maxRebaseMs": 0.30000000074505806,
+      "drawCalls": 233,
+      "triangles": 604252,
+      "traffic": 526,
+      "heapMB": 191,
+      "rebases": 0,
+      "maxRebaseMs": 0,
+      "gpuFrameMs": {
+        "n": 1186,
+        "p50": 2.97,
+        "p95": 3.31
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 236.57
+        "emaFps": 230.05
       },
       "fxRebuilds": 1,
       "sb": {
@@ -207,24 +222,93 @@
       "parcel": 0
     },
     {
-      "t": 94,
-      "frames": 2385,
+      "t": 61,
+      "frames": 3061,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 8.3,
+      "drawCalls": 236,
+      "triangles": 828585,
+      "traffic": 759,
+      "heapMB": 205,
+      "rebases": 1,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1513,
+        "p50": 2.88,
+        "p95": 3.49
+      },
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 235.8
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 71,
+      "frames": 2360,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 8.3,
+      "drawCalls": 230,
+      "triangles": 742238,
+      "traffic": 746,
+      "heapMB": 199,
+      "rebases": 1,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1180,
+        "p50": 2.63,
+        "p95": 2.95
+      },
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 222.65
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 85,
+      "frames": 3328,
       "p50": 4.2,
       "p95": 4.3,
       "p99": 4.3,
       "drawCalls": 227,
-      "triangles": 635841,
-      "traffic": 325,
-      "heapMB": 146,
-      "rebases": 2,
-      "maxRebaseMs": 0.30000000074505806,
+      "triangles": 649942,
+      "traffic": 730,
+      "heapMB": 177,
+      "rebases": 1,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1663,
+        "p50": 2.56,
+        "p95": 2.86
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 233.27
+        "emaFps": 233.58
       },
       "fxRebuilds": 1,
       "sb": {
@@ -234,24 +318,29 @@
       "parcel": 0
     },
     {
-      "t": 107,
-      "frames": 3089,
+      "t": 95,
+      "frames": 2368,
       "p50": 4.2,
       "p95": 4.3,
       "p99": 4.4,
-      "drawCalls": 247,
-      "triangles": 811363,
-      "traffic": 279,
-      "heapMB": 158,
+      "drawCalls": 227,
+      "triangles": 620907,
+      "traffic": 719,
+      "heapMB": 164,
       "rebases": 2,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1184,
+        "p50": 2.58,
+        "p95": 2.87
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 233.03
+        "emaFps": 222.03
       },
       "fxRebuilds": 1,
       "sb": {
@@ -261,24 +350,445 @@
       "parcel": 0
     },
     {
-      "t": 117,
+      "t": 108,
+      "frames": 3039,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 8.4,
+      "drawCalls": 247,
+      "triangles": 736364,
+      "traffic": 699,
+      "heapMB": 184,
+      "rebases": 2,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1519,
+        "p50": 2.65,
+        "p95": 3.05
+      },
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 215.07
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 118,
+      "frames": 2343,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 8.3,
+      "drawCalls": 253,
+      "triangles": 824202,
+      "traffic": 744,
+      "heapMB": 194,
+      "rebases": 2,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1171,
+        "p50": 2.43,
+        "p95": 2.82
+      },
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 223.53
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 132,
+      "frames": 3304,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 8.3,
+      "drawCalls": 233,
+      "triangles": 707398,
+      "traffic": 762,
+      "heapMB": 202,
+      "rebases": 2,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1651,
+        "p50": 2.51,
+        "p95": 2.83
+      },
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 235.13
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 14
+      },
+      "parcel": 0
+    },
+    {
+      "t": 142,
+      "frames": 2364,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 8.3,
+      "drawCalls": 233,
+      "triangles": 660300,
+      "traffic": 757,
+      "heapMB": 205,
+      "rebases": 3,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1182,
+        "p50": 2.63,
+        "p95": 3
+      },
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 238.49
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 15
+      },
+      "parcel": 0
+    },
+    {
+      "t": 155,
+      "frames": 3077,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 8.3,
+      "drawCalls": 233,
+      "triangles": 873412,
+      "traffic": 734,
+      "heapMB": 188,
+      "rebases": 3,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1537,
+        "p50": 2.66,
+        "p95": 3.03
+      },
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 226.98
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 165,
+      "frames": 2366,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.4,
+      "drawCalls": 215,
+      "triangles": 721443,
+      "traffic": 497,
+      "heapMB": 202,
+      "rebases": 3,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1183,
+        "p50": 2.65,
+        "p95": 3.05
+      },
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 236.06
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 179,
+      "frames": 3317,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 226,
+      "triangles": 814757,
+      "traffic": 499,
+      "heapMB": 203,
+      "rebases": 3,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1658,
+        "p50": 2.9,
+        "p95": 3.24
+      },
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 238.35
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 189,
+      "frames": 2367,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 8.2,
+      "drawCalls": 237,
+      "triangles": 822304,
+      "traffic": 499,
+      "heapMB": 215,
+      "rebases": 4,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1183,
+        "p50": 2.96,
+        "p95": 3.3
+      },
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 220.14
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 202,
+      "frames": 2891,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 8.4,
+      "drawCalls": 237,
+      "triangles": 773222,
+      "traffic": 492,
+      "heapMB": 192,
+      "rebases": 4,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1443,
+        "p50": 2.79,
+        "p95": 3.24
+      },
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 206.72
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 212,
+      "frames": 2376,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 242,
+      "triangles": 687966,
+      "traffic": 485,
+      "heapMB": 191,
+      "rebases": 4,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1188,
+        "p50": 2.77,
+        "p95": 3.15
+      },
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 233.09
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 226,
+      "frames": 3322,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 8.2,
+      "drawCalls": 239,
+      "triangles": 709188,
+      "traffic": 506,
+      "heapMB": 178,
+      "rebases": 4,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1661,
+        "p50": 2.94,
+        "p95": 3.29
+      },
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 234.96
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 236,
+      "frames": 2370,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.4,
+      "drawCalls": 233,
+      "triangles": 621288,
+      "traffic": 508,
+      "heapMB": 189,
+      "rebases": 5,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1184,
+        "p50": 2.93,
+        "p95": 3.25
+      },
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 232.59
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 249,
+      "frames": 3077,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 8.3,
+      "drawCalls": 236,
+      "triangles": 761450,
+      "traffic": 509,
+      "heapMB": 182,
+      "rebases": 5,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1535,
+        "p50": 2.98,
+        "p95": 3.52
+      },
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 234.68
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 259,
       "frames": 2377,
       "p50": 4.2,
       "p95": 4.3,
       "p99": 4.3,
-      "drawCalls": 253,
-      "triangles": 942039,
-      "traffic": 347,
-      "heapMB": 191,
-      "rebases": 2,
-      "maxRebaseMs": 0.30000000074505806,
+      "drawCalls": 228,
+      "triangles": 748540,
+      "traffic": 506,
+      "heapMB": 205,
+      "rebases": 5,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1189,
+        "p50": 2.93,
+        "p95": 3.26
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 230.82
+        "emaFps": 232.04
       },
       "fxRebuilds": 1,
       "sb": {
@@ -288,375 +798,93 @@
       "parcel": 0
     },
     {
-      "t": 131,
-      "frames": 3341,
+      "t": 273,
+      "frames": 3314,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 8.2,
+      "drawCalls": 217,
+      "triangles": 618706,
+      "traffic": 512,
+      "heapMB": 195,
+      "rebases": 5,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1654,
+        "p50": 2.96,
+        "p95": 3.32
+      },
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 237.59
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 16
+      },
+      "parcel": 0
+    },
+    {
+      "t": 283,
+      "frames": 2375,
       "p50": 4.2,
       "p95": 4.3,
       "p99": 4.4,
-      "drawCalls": 233,
-      "triangles": 724742,
-      "traffic": 344,
-      "heapMB": 183,
-      "rebases": 2,
-      "maxRebaseMs": 0.30000000074505806,
+      "drawCalls": 236,
+      "triangles": 534949,
+      "traffic": 505,
+      "heapMB": 159,
+      "rebases": 6,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1186,
+        "p50": 2.91,
+        "p95": 3.27
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 237.25
+        "emaFps": 225.34
       },
       "fxRebuilds": 1,
       "sb": {
         "chunks": 16,
-        "ready": 14
+        "ready": 16
       },
       "parcel": 0
     },
     {
-      "t": 141,
-      "frames": 2385,
+      "t": 296,
+      "frames": 3026,
       "p50": 4.2,
       "p95": 4.3,
-      "p99": 4.3,
-      "drawCalls": 233,
-      "triangles": 693046,
-      "traffic": 336,
-      "heapMB": 180,
-      "rebases": 3,
-      "maxRebaseMs": 0.30000000074505806,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": {
-        "dprSteps": 0,
-        "tierSteps": 0,
-        "latched": false,
-        "emaFps": 239.54
-      },
-      "fxRebuilds": 1,
-      "sb": {
-        "chunks": 16,
-        "ready": 15
-      },
-      "parcel": 0
-    },
-    {
-      "t": 154,
-      "frames": 2293,
-      "p50": 5.6,
-      "p95": 6.5,
-      "p99": 6.9,
-      "drawCalls": 233,
-      "triangles": 912677,
-      "traffic": 311,
-      "heapMB": 156,
-      "rebases": 3,
-      "maxRebaseMs": 0.30000000074505806,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": {
-        "dprSteps": 0,
-        "tierSteps": 0,
-        "latched": false,
-        "emaFps": 168.68
-      },
-      "fxRebuilds": 1,
-      "sb": {
-        "chunks": 16,
-        "ready": 16
-      },
-      "parcel": 0
-    },
-    {
-      "t": 164,
-      "frames": 1740,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.8,
-      "drawCalls": 216,
-      "triangles": 717045,
-      "traffic": 274,
-      "heapMB": 165,
-      "rebases": 3,
-      "maxRebaseMs": 0.30000000074505806,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": {
-        "dprSteps": 0,
-        "tierSteps": 0,
-        "latched": false,
-        "emaFps": 173.42
-      },
-      "fxRebuilds": 1,
-      "sb": {
-        "chunks": 16,
-        "ready": 16
-      },
-      "parcel": 0
-    },
-    {
-      "t": 178,
-      "frames": 2433,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.8,
-      "drawCalls": 221,
-      "triangles": 791681,
-      "traffic": 84,
-      "heapMB": 174,
-      "rebases": 3,
-      "maxRebaseMs": 0.30000000074505806,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": {
-        "dprSteps": 0,
-        "tierSteps": 0,
-        "latched": false,
-        "emaFps": 174
-      },
-      "fxRebuilds": 1,
-      "sb": {
-        "chunks": 16,
-        "ready": 16
-      },
-      "parcel": 0
-    },
-    {
-      "t": 188,
-      "frames": 1730,
-      "p50": 5.7,
-      "p95": 6.6,
-      "p99": 7.1,
-      "drawCalls": 236,
-      "triangles": 791245,
-      "traffic": 337,
-      "heapMB": 169,
-      "rebases": 4,
-      "maxRebaseMs": 0.30000000074505806,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": {
-        "dprSteps": 0,
-        "tierSteps": 0,
-        "latched": false,
-        "emaFps": 166.31
-      },
-      "fxRebuilds": 1,
-      "sb": {
-        "chunks": 16,
-        "ready": 16
-      },
-      "parcel": 0
-    },
-    {
-      "t": 201,
-      "frames": 2260,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.8,
-      "drawCalls": 231,
-      "triangles": 845301,
-      "traffic": 331,
-      "heapMB": 185,
-      "rebases": 4,
-      "maxRebaseMs": 0.30000000074505806,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": {
-        "dprSteps": 0,
-        "tierSteps": 0,
-        "latched": false,
-        "emaFps": 170.47
-      },
-      "fxRebuilds": 1,
-      "sb": {
-        "chunks": 16,
-        "ready": 16
-      },
-      "parcel": 0
-    },
-    {
-      "t": 211,
-      "frames": 1740,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.8,
-      "drawCalls": 237,
-      "triangles": 813854,
-      "traffic": 328,
-      "heapMB": 181,
-      "rebases": 4,
-      "maxRebaseMs": 0.30000000074505806,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": {
-        "dprSteps": 0,
-        "tierSteps": 0,
-        "latched": false,
-        "emaFps": 172.26
-      },
-      "fxRebuilds": 1,
-      "sb": {
-        "chunks": 16,
-        "ready": 16
-      },
-      "parcel": 0
-    },
-    {
-      "t": 225,
-      "frames": 2431,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.8,
-      "drawCalls": 234,
-      "triangles": 851087,
-      "traffic": 320,
-      "heapMB": 172,
-      "rebases": 4,
-      "maxRebaseMs": 0.30000000074505806,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": {
-        "dprSteps": 0,
-        "tierSteps": 0,
-        "latched": false,
-        "emaFps": 170.06
-      },
-      "fxRebuilds": 1,
-      "sb": {
-        "chunks": 16,
-        "ready": 16
-      },
-      "parcel": 0
-    },
-    {
-      "t": 235,
-      "frames": 1738,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.8,
-      "drawCalls": 229,
-      "triangles": 715484,
-      "traffic": 306,
-      "heapMB": 143,
-      "rebases": 5,
-      "maxRebaseMs": 0.30000000074505806,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": {
-        "dprSteps": 0,
-        "tierSteps": 0,
-        "latched": false,
-        "emaFps": 170.42
-      },
-      "fxRebuilds": 1,
-      "sb": {
-        "chunks": 16,
-        "ready": 16
-      },
-      "parcel": 0
-    },
-    {
-      "t": 248,
-      "frames": 2259,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.8,
-      "drawCalls": 241,
-      "triangles": 804854,
-      "traffic": 80,
-      "heapMB": 175,
-      "rebases": 5,
-      "maxRebaseMs": 0.30000000074505806,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": {
-        "dprSteps": 0,
-        "tierSteps": 0,
-        "latched": false,
-        "emaFps": 172.37
-      },
-      "fxRebuilds": 1,
-      "sb": {
-        "chunks": 16,
-        "ready": 16
-      },
-      "parcel": 0
-    },
-    {
-      "t": 258,
-      "frames": 1741,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.8,
-      "drawCalls": 237,
-      "triangles": 705931,
-      "traffic": 79,
-      "heapMB": 164,
-      "rebases": 5,
-      "maxRebaseMs": 0.30000000074505806,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": {
-        "dprSteps": 0,
-        "tierSteps": 0,
-        "latched": false,
-        "emaFps": 173.23
-      },
-      "fxRebuilds": 1,
-      "sb": {
-        "chunks": 16,
-        "ready": 16
-      },
-      "parcel": 0
-    },
-    {
-      "t": 272,
-      "frames": 2431,
-      "p50": 5.7,
-      "p95": 6.6,
-      "p99": 6.8,
-      "drawCalls": 220,
-      "triangles": 675522,
-      "traffic": 78,
-      "heapMB": 175,
-      "rebases": 5,
-      "maxRebaseMs": 0.30000000074505806,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": {
-        "dprSteps": 0,
-        "tierSteps": 0,
-        "latched": false,
-        "emaFps": 172.85
-      },
-      "fxRebuilds": 1,
-      "sb": {
-        "chunks": 16,
-        "ready": 16
-      },
-      "parcel": 0
-    },
-    {
-      "t": 282,
-      "frames": 1738,
-      "p50": 5.7,
-      "p95": 6.6,
-      "p99": 6.8,
+      "p99": 8.4,
       "drawCalls": 235,
-      "triangles": 546309,
-      "traffic": 78,
-      "heapMB": 149,
+      "triangles": 754520,
+      "traffic": 497,
+      "heapMB": 188,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1502,
+        "p50": 2.79,
+        "p95": 3.34
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 174.02
+        "emaFps": 230.56
       },
       "fxRebuilds": 1,
       "sb": {
@@ -666,51 +894,29 @@
       "parcel": 0
     },
     {
-      "t": 295,
-      "frames": 2250,
-      "p50": 5.7,
-      "p95": 6.6,
-      "p99": 7,
-      "drawCalls": 242,
-      "triangles": 739658,
-      "traffic": 79,
-      "heapMB": 178,
+      "t": 306,
+      "frames": 2348,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 8.3,
+      "drawCalls": 243,
+      "triangles": 640204,
+      "traffic": 489,
+      "heapMB": 225,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1174,
+        "p50": 2.73,
+        "p95": 3.07
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 168.9
-      },
-      "fxRebuilds": 1,
-      "sb": {
-        "chunks": 16,
-        "ready": 15
-      },
-      "parcel": 0
-    },
-    {
-      "t": 305,
-      "frames": 1736,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.8,
-      "drawCalls": 245,
-      "triangles": 699571,
-      "traffic": 78,
-      "heapMB": 165,
-      "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": {
-        "dprSteps": 0,
-        "tierSteps": 0,
-        "latched": false,
-        "emaFps": 171.61
+        "emaFps": 231.76
       },
       "fxRebuilds": 1,
       "sb": {
@@ -720,24 +926,29 @@
       "parcel": 0
     },
     {
-      "t": 319,
-      "frames": 2427,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.9,
+      "t": 320,
+      "frames": 3278,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 8.3,
       "drawCalls": 233,
-      "triangles": 808963,
-      "traffic": 79,
-      "heapMB": 185,
+      "triangles": 788503,
+      "traffic": 511,
+      "heapMB": 212,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1639,
+        "p50": 2.69,
+        "p95": 3.08
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 171.86
+        "emaFps": 232.56
       },
       "fxRebuilds": 1,
       "sb": {
@@ -747,24 +958,29 @@
       "parcel": 0
     },
     {
-      "t": 333,
-      "frames": 2433,
-      "p50": 5.6,
-      "p95": 6.5,
-      "p99": 7,
-      "drawCalls": 220,
-      "triangles": 224967,
-      "traffic": 167,
-      "heapMB": 112,
+      "t": 334,
+      "frames": 3183,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 8.4,
+      "drawCalls": 223,
+      "triangles": 213399,
+      "traffic": 816,
+      "heapMB": 108,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1591,
+        "p50": 2.78,
+        "p95": 3.28
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 171.71
+        "emaFps": 234.63
       },
       "fxRebuilds": 1,
       "sb": {
@@ -774,24 +990,29 @@
       "parcel": 0
     },
     {
-      "t": 346,
-      "frames": 2263,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.8,
-      "drawCalls": 221,
-      "triangles": 244358,
-      "traffic": 162,
-      "heapMB": 110,
+      "t": 347,
+      "frames": 3065,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 8.3,
+      "drawCalls": 224,
+      "triangles": 234398,
+      "traffic": 842,
+      "heapMB": 118,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1533,
+        "p50": 2.52,
+        "p95": 2.96
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 170.92
+        "emaFps": 233.07
       },
       "fxRebuilds": 1,
       "sb": {
@@ -801,24 +1022,29 @@
       "parcel": 0
     },
     {
-      "t": 356,
-      "frames": 1735,
-      "p50": 5.7,
-      "p95": 6.6,
-      "p99": 6.8,
-      "drawCalls": 233,
-      "triangles": 292299,
-      "traffic": 161,
-      "heapMB": 97,
+      "t": 357,
+      "frames": 2367,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 8.2,
+      "drawCalls": 231,
+      "triangles": 292020,
+      "traffic": 829,
+      "heapMB": 117,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1183,
+        "p50": 2.65,
+        "p95": 2.97
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 171.21
+        "emaFps": 228.12
       },
       "fxRebuilds": 1,
       "sb": {
@@ -829,23 +1055,28 @@
     },
     {
       "t": 371,
-      "frames": 2439,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.8,
-      "drawCalls": 247,
-      "triangles": 576517,
-      "traffic": 148,
-      "heapMB": 137,
+      "frames": 3307,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 8.3,
+      "drawCalls": 242,
+      "triangles": 386345,
+      "traffic": 730,
+      "heapMB": 123,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1653,
+        "p50": 2.63,
+        "p95": 3.03
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 171.47
+        "emaFps": 235.06
       },
       "fxRebuilds": 1,
       "sb": {
@@ -856,23 +1087,28 @@
     },
     {
       "t": 381,
-      "frames": 1742,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.7,
-      "drawCalls": 232,
-      "triangles": 493479,
-      "traffic": 88,
-      "heapMB": 116,
+      "frames": 2378,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 236,
+      "triangles": 376970,
+      "traffic": 310,
+      "heapMB": 134,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1189,
+        "p50": 2.82,
+        "p95": 3.18
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 173.05
+        "emaFps": 234.47
       },
       "fxRebuilds": 1,
       "sb": {
@@ -883,23 +1119,28 @@
     },
     {
       "t": 394,
-      "frames": 2270,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.7,
-      "drawCalls": 249,
-      "triangles": 497794,
-      "traffic": 22,
-      "heapMB": 123,
+      "frames": 3090,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.4,
+      "drawCalls": 248,
+      "triangles": 364481,
+      "traffic": 153,
+      "heapMB": 124,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1545,
+        "p50": 2.98,
+        "p95": 3.34
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 173.04
+        "emaFps": 236.69
       },
       "fxRebuilds": 1,
       "sb": {
@@ -910,23 +1151,28 @@
     },
     {
       "t": 404,
-      "frames": 1744,
-      "p50": 5.7,
-      "p95": 6.6,
-      "p99": 6.8,
-      "drawCalls": 257,
-      "triangles": 375747,
-      "traffic": 23,
-      "heapMB": 139,
+      "frames": 2380,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 253,
+      "triangles": 354510,
+      "traffic": 163,
+      "heapMB": 136,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1190,
+        "p50": 3.05,
+        "p95": 3.35
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 172.98
+        "emaFps": 233.52
       },
       "fxRebuilds": 1,
       "sb": {
@@ -937,23 +1183,28 @@
     },
     {
       "t": 418,
-      "frames": 2436,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.8,
+      "frames": 3330,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
       "drawCalls": 242,
-      "triangles": 477335,
-      "traffic": 22,
-      "heapMB": 117,
+      "triangles": 371183,
+      "traffic": 162,
+      "heapMB": 129,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1664,
+        "p50": 3,
+        "p95": 3.37
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 171.48
+        "emaFps": 235.75
       },
       "fxRebuilds": 1,
       "sb": {
@@ -964,23 +1215,28 @@
     },
     {
       "t": 428,
-      "frames": 1749,
-      "p50": 5.6,
-      "p95": 6.5,
-      "p99": 6.7,
-      "drawCalls": 239,
-      "triangles": 484318,
-      "traffic": 23,
-      "heapMB": 128,
+      "frames": 2384,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 238,
+      "triangles": 355376,
+      "traffic": 271,
+      "heapMB": 126,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1191,
+        "p50": 3.06,
+        "p95": 3.36
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 171.12
+        "emaFps": 231.92
       },
       "fxRebuilds": 1,
       "sb": {
@@ -991,23 +1247,28 @@
     },
     {
       "t": 441,
-      "frames": 2270,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.7,
-      "drawCalls": 235,
-      "triangles": 381695,
-      "traffic": 24,
+      "frames": 3096,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.4,
+      "drawCalls": 236,
+      "triangles": 244780,
+      "traffic": 279,
       "heapMB": 128,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1547,
+        "p50": 3.03,
+        "p95": 3.35
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 173.57
+        "emaFps": 232.68
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1018,23 +1279,28 @@
     },
     {
       "t": 451,
-      "frames": 1742,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.8,
-      "drawCalls": 239,
-      "triangles": 358302,
-      "traffic": 24,
-      "heapMB": 106,
+      "frames": 2380,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 241,
+      "triangles": 260264,
+      "traffic": 278,
+      "heapMB": 111,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1190,
+        "p50": 3.06,
+        "p95": 3.35
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 168.55
+        "emaFps": 233.01
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1045,23 +1311,28 @@
     },
     {
       "t": 465,
-      "frames": 2438,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.7,
-      "drawCalls": 229,
-      "triangles": 243017,
-      "traffic": 24,
-      "heapMB": 103,
+      "frames": 3322,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.4,
+      "drawCalls": 227,
+      "triangles": 220286,
+      "traffic": 277,
+      "heapMB": 136,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1660,
+        "p50": 3.07,
+        "p95": 3.41
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 167.11
+        "emaFps": 232.32
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1072,23 +1343,28 @@
     },
     {
       "t": 475,
-      "frames": 1744,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.7,
-      "drawCalls": 226,
-      "triangles": 375145,
-      "traffic": 23,
-      "heapMB": 102,
+      "frames": 2383,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.4,
+      "drawCalls": 223,
+      "triangles": 244633,
+      "traffic": 280,
+      "heapMB": 129,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1191,
+        "p50": 3.09,
+        "p95": 3.44
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 171.94
+        "emaFps": 229.02
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1099,23 +1375,28 @@
     },
     {
       "t": 488,
-      "frames": 2268,
-      "p50": 5.7,
-      "p95": 6.6,
-      "p99": 6.8,
-      "drawCalls": 239,
-      "triangles": 315389,
-      "traffic": 22,
-      "heapMB": 106,
+      "frames": 3101,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 237,
+      "triangles": 272007,
+      "traffic": 174,
+      "heapMB": 108,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1550,
+        "p50": 3.08,
+        "p95": 3.46
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 173.11
+        "emaFps": 237.73
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1126,23 +1407,28 @@
     },
     {
       "t": 498,
-      "frames": 1738,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.8,
-      "drawCalls": 248,
-      "triangles": 399907,
-      "traffic": 22,
-      "heapMB": 119,
+      "frames": 2382,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.4,
+      "drawCalls": 243,
+      "triangles": 299971,
+      "traffic": 173,
+      "heapMB": 120,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1190,
+        "p50": 3.18,
+        "p95": 3.49
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 171.51
+        "emaFps": 237.43
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1153,23 +1439,28 @@
     },
     {
       "t": 512,
-      "frames": 2426,
-      "p50": 5.7,
-      "p95": 6.6,
-      "p99": 6.9,
-      "drawCalls": 246,
-      "triangles": 624567,
-      "traffic": 22,
-      "heapMB": 123,
+      "frames": 3325,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.4,
+      "drawCalls": 240,
+      "triangles": 450015,
+      "traffic": 173,
+      "heapMB": 142,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1663,
+        "p50": 3.17,
+        "p95": 3.48
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 168.07
+        "emaFps": 226.25
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1180,23 +1471,28 @@
     },
     {
       "t": 522,
-      "frames": 1744,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.8,
-      "drawCalls": 246,
-      "triangles": 673388,
-      "traffic": 22,
-      "heapMB": 131,
+      "frames": 2380,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.4,
+      "drawCalls": 242,
+      "triangles": 530003,
+      "traffic": 176,
+      "heapMB": 145,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1190,
+        "p50": 3.18,
+        "p95": 3.48
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 168.58
+        "emaFps": 229.54
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1207,77 +1503,92 @@
     },
     {
       "t": 535,
-      "frames": 2266,
-      "p50": 5.6,
-      "p95": 6.6,
-      "p99": 6.8,
-      "drawCalls": 237,
-      "triangles": 350592,
-      "traffic": 24,
-      "heapMB": 120,
+      "frames": 3093,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.4,
+      "drawCalls": 232,
+      "triangles": 303297,
+      "traffic": 177,
+      "heapMB": 134,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1538,
+        "p50": 3.18,
+        "p95": 3.68
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 173.21
+        "emaFps": 239.03
       },
       "fxRebuilds": 1,
       "sb": {
         "chunks": 16,
-        "ready": 16
+        "ready": 15
       },
       "parcel": 0
     },
     {
       "t": 545,
-      "frames": 1740,
-      "p50": 5.6,
-      "p95": 6.6,
-      "p99": 6.8,
-      "drawCalls": 227,
-      "triangles": 391590,
-      "traffic": 24,
-      "heapMB": 118,
+      "frames": 2380,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.4,
+      "drawCalls": 226,
+      "triangles": 315019,
+      "traffic": 175,
+      "heapMB": 134,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1187,
+        "p50": 3.07,
+        "p95": 3.36
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 171.7
+        "emaFps": 228.56
       },
       "fxRebuilds": 1,
       "sb": {
         "chunks": 16,
-        "ready": 16
+        "ready": 15
       },
       "parcel": 0
     },
     {
       "t": 559,
-      "frames": 2438,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.8,
+      "frames": 3336,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.4,
       "drawCalls": 227,
-      "triangles": 451633,
-      "traffic": 24,
-      "heapMB": 108,
+      "triangles": 314585,
+      "traffic": 179,
+      "heapMB": 116,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1667,
+        "p50": 3.15,
+        "p95": 3.49
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 167.85
+        "emaFps": 235.57
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1288,23 +1599,28 @@
     },
     {
       "t": 569,
-      "frames": 1744,
-      "p50": 5.6,
-      "p95": 6.6,
-      "p99": 6.8,
-      "drawCalls": 232,
-      "triangles": 424902,
-      "traffic": 24,
-      "heapMB": 99,
+      "frames": 2388,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 230,
+      "triangles": 346144,
+      "traffic": 178,
+      "heapMB": 117,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1193,
+        "p50": 3.27,
+        "p95": 3.62
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 170.47
+        "emaFps": 228.72
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1315,23 +1631,28 @@
     },
     {
       "t": 582,
-      "frames": 2274,
-      "p50": 5.6,
-      "p95": 6.5,
-      "p99": 6.7,
+      "frames": 3101,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
       "drawCalls": 249,
-      "triangles": 404897,
-      "traffic": 23,
-      "heapMB": 93,
+      "triangles": 237459,
+      "traffic": 175,
+      "heapMB": 126,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1549,
+        "p50": 3.17,
+        "p95": 3.5
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 172.39
+        "emaFps": 225.3
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1342,23 +1663,28 @@
     },
     {
       "t": 592,
-      "frames": 1744,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.8,
-      "drawCalls": 226,
-      "triangles": 270544,
-      "traffic": 21,
-      "heapMB": 103,
+      "frames": 2384,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 230,
+      "triangles": 234478,
+      "traffic": 173,
+      "heapMB": 115,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1191,
+        "p50": 3.13,
+        "p95": 3.44
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 172.26
+        "emaFps": 232.79
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1369,23 +1695,28 @@
     },
     {
       "t": 606,
-      "frames": 2432,
-      "p50": 5.7,
-      "p95": 6.6,
-      "p99": 6.8,
-      "drawCalls": 241,
-      "triangles": 330723,
-      "traffic": 22,
-      "heapMB": 93,
+      "frames": 3329,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 240,
+      "triangles": 289864,
+      "traffic": 171,
+      "heapMB": 115,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1664,
+        "p50": 3.05,
+        "p95": 3.32
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 170.84
+        "emaFps": 235.6
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1396,23 +1727,28 @@
     },
     {
       "t": 616,
-      "frames": 1749,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.7,
-      "drawCalls": 236,
-      "triangles": 359573,
-      "traffic": 21,
-      "heapMB": 112,
+      "frames": 2392,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 234,
+      "triangles": 238310,
+      "traffic": 169,
+      "heapMB": 121,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1194,
+        "p50": 3.17,
+        "p95": 3.46
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 172.8
+        "emaFps": 234.42
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1423,23 +1759,28 @@
     },
     {
       "t": 630,
-      "frames": 2446,
-      "p50": 5.6,
-      "p95": 6.6,
-      "p99": 6.8,
-      "drawCalls": 188,
-      "triangles": 59270,
-      "traffic": 25,
-      "heapMB": 76,
+      "frames": 3338,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 190,
+      "triangles": 64616,
+      "traffic": 171,
+      "heapMB": 93,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1669,
+        "p50": 3.04,
+        "p95": 3.43
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 173.87
+        "emaFps": 239.73
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1450,23 +1791,28 @@
     },
     {
       "t": 640,
-      "frames": 1748,
-      "p50": 5.6,
-      "p95": 6.5,
-      "p99": 6.8,
-      "drawCalls": 192,
-      "triangles": 59842,
-      "traffic": 25,
-      "heapMB": 73,
+      "frames": 2395,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 193,
+      "triangles": 65054,
+      "traffic": 175,
+      "heapMB": 78,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1197,
+        "p50": 3.03,
+        "p95": 3.33
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 173.07
+        "emaFps": 239.42
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1477,23 +1823,28 @@
     },
     {
       "t": 654,
-      "frames": 2451,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.7,
-      "drawCalls": 210,
-      "triangles": 77538,
-      "traffic": 25,
-      "heapMB": 77,
+      "frames": 3356,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 211,
+      "triangles": 80822,
+      "traffic": 177,
+      "heapMB": 98,
       "rebases": 6,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1677,
+        "p50": 3.09,
+        "p95": 3.42
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 173.21
+        "emaFps": 236.15
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1504,23 +1855,28 @@
     },
     {
       "t": 664,
-      "frames": 1745,
-      "p50": 5.6,
-      "p95": 6.6,
-      "p99": 6.8,
-      "drawCalls": 201,
-      "triangles": 128177,
-      "traffic": 24,
-      "heapMB": 84,
+      "frames": 2395,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 202,
+      "triangles": 129457,
+      "traffic": 175,
+      "heapMB": 82,
       "rebases": 7,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1196,
+        "p50": 3.05,
+        "p95": 3.35
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 171.59
+        "emaFps": 237.62
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1531,23 +1887,28 @@
     },
     {
       "t": 677,
-      "frames": 2268,
-      "p50": 5.7,
-      "p95": 6.6,
-      "p99": 6.8,
-      "drawCalls": 194,
-      "triangles": 82890,
-      "traffic": 24,
-      "heapMB": 68,
+      "frames": 3115,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 195,
+      "triangles": 83444,
+      "traffic": 162,
+      "heapMB": 103,
       "rebases": 7,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1556,
+        "p50": 3.21,
+        "p95": 3.59
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 173.26
+        "emaFps": 233.11
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1558,23 +1919,28 @@
     },
     {
       "t": 687,
-      "frames": 1746,
-      "p50": 5.6,
-      "p95": 6.5,
-      "p99": 6.8,
-      "drawCalls": 190,
-      "triangles": 61024,
-      "traffic": 24,
-      "heapMB": 84,
+      "frames": 2396,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 192,
+      "triangles": 66260,
+      "traffic": 163,
+      "heapMB": 101,
       "rebases": 7,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1197,
+        "p50": 3.1,
+        "p95": 3.4
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 173.68
+        "emaFps": 239.53
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1585,23 +1951,28 @@
     },
     {
       "t": 701,
-      "frames": 2443,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.7,
+      "frames": 3357,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
       "drawCalls": 192,
-      "triangles": 63053,
-      "traffic": 23,
-      "heapMB": 67,
+      "triangles": 67573,
+      "traffic": 165,
+      "heapMB": 103,
       "rebases": 7,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1678,
+        "p50": 3.09,
+        "p95": 3.35
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 172.59
+        "emaFps": 239.78
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1612,23 +1983,28 @@
     },
     {
       "t": 711,
-      "frames": 1746,
-      "p50": 5.6,
-      "p95": 6.5,
-      "p99": 6.7,
+      "frames": 2393,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
       "drawCalls": 189,
-      "triangles": 64546,
-      "traffic": 24,
-      "heapMB": 74,
+      "triangles": 68716,
+      "traffic": 170,
+      "heapMB": 91,
       "rebases": 8,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1196,
+        "p50": 3.11,
+        "p95": 3.45
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 172.35
+        "emaFps": 237.75
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1639,23 +2015,28 @@
     },
     {
       "t": 724,
-      "frames": 2272,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.8,
+      "frames": 3119,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
       "drawCalls": 208,
-      "triangles": 67499,
-      "traffic": 24,
-      "heapMB": 79,
+      "triangles": 70177,
+      "traffic": 169,
+      "heapMB": 95,
       "rebases": 8,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1559,
+        "p50": 3.11,
+        "p95": 3.45
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 174.5
+        "emaFps": 239.59
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1666,23 +2047,28 @@
     },
     {
       "t": 734,
-      "frames": 1749,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.7,
-      "drawCalls": 209,
-      "triangles": 76170,
-      "traffic": 24,
-      "heapMB": 81,
+      "frames": 2399,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 212,
+      "triangles": 80145,
+      "traffic": 167,
+      "heapMB": 84,
       "rebases": 8,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1199,
+        "p50": 3,
+        "p95": 3.24
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 173.78
+        "emaFps": 239.53
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1692,24 +2078,29 @@
       "parcel": 0
     },
     {
-      "t": 748,
-      "frames": 2437,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.7,
-      "drawCalls": 202,
-      "triangles": 59371,
-      "traffic": 27,
-      "heapMB": 92,
+      "t": 749,
+      "frames": 3351,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 204,
+      "triangles": 64815,
+      "traffic": 172,
+      "heapMB": 82,
       "rebases": 8,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1675,
+        "p50": 3,
+        "p95": 3.26
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 173.15
+        "emaFps": 238.86
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1719,24 +2110,29 @@
       "parcel": 0
     },
     {
-      "t": 758,
-      "frames": 1750,
-      "p50": 5.6,
-      "p95": 6.5,
-      "p99": 6.7,
-      "drawCalls": 195,
-      "triangles": 58955,
-      "traffic": 27,
-      "heapMB": 67,
+      "t": 759,
+      "frames": 2400,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 193,
+      "triangles": 63813,
+      "traffic": 175,
+      "heapMB": 91,
       "rebases": 9,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1200,
+        "p50": 3,
+        "p95": 3.27
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 174
+        "emaFps": 239.6
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1746,24 +2142,29 @@
       "parcel": 0
     },
     {
-      "t": 771,
-      "frames": 2271,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.7,
-      "drawCalls": 214,
-      "triangles": 61364,
-      "traffic": 26,
-      "heapMB": 65,
+      "t": 772,
+      "frames": 3110,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 211,
+      "triangles": 65990,
+      "traffic": 182,
+      "heapMB": 85,
       "rebases": 9,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1555,
+        "p50": 3.01,
+        "p95": 3.31
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 172.98
+        "emaFps": 239.22
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1773,24 +2174,29 @@
       "parcel": 0
     },
     {
-      "t": 781,
-      "frames": 1745,
-      "p50": 5.7,
-      "p95": 6.6,
-      "p99": 6.7,
+      "t": 782,
+      "frames": 2398,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
       "drawCalls": 204,
-      "triangles": 62104,
-      "traffic": 26,
-      "heapMB": 66,
+      "triangles": 67586,
+      "traffic": 182,
+      "heapMB": 103,
       "rebases": 9,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1199,
+        "p50": 3.18,
+        "p95": 3.48
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 173.28
+        "emaFps": 238.93
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1800,24 +2206,29 @@
       "parcel": 0
     },
     {
-      "t": 795,
-      "frames": 2443,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.8,
+      "t": 796,
+      "frames": 3359,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
       "drawCalls": 199,
-      "triangles": 80505,
-      "traffic": 26,
-      "heapMB": 81,
+      "triangles": 84997,
+      "traffic": 179,
+      "heapMB": 93,
       "rebases": 9,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1679,
+        "p50": 3,
+        "p95": 3.31
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 172.16
+        "emaFps": 239.74
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1827,24 +2238,29 @@
       "parcel": 0
     },
     {
-      "t": 805,
-      "frames": 1754,
-      "p50": 5.6,
-      "p95": 6.5,
-      "p99": 6.7,
-      "drawCalls": 197,
-      "triangles": 81949,
-      "traffic": 25,
-      "heapMB": 78,
+      "t": 806,
+      "frames": 2389,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 201,
+      "triangles": 88855,
+      "traffic": 191,
+      "heapMB": 87,
       "rebases": 10,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1194,
+        "p50": 2.91,
+        "p95": 3.25
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 172.49
+        "emaFps": 239.55
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1854,24 +2270,29 @@
       "parcel": 0
     },
     {
-      "t": 818,
-      "frames": 2275,
-      "p50": 5.6,
-      "p95": 6.5,
-      "p99": 6.7,
-      "drawCalls": 208,
-      "triangles": 60433,
-      "traffic": 25,
-      "heapMB": 93,
+      "t": 819,
+      "frames": 3115,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 209,
+      "triangles": 65535,
+      "traffic": 192,
+      "heapMB": 81,
       "rebases": 10,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1558,
+        "p50": 2.88,
+        "p95": 3.22
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 173.92
+        "emaFps": 237.79
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1881,24 +2302,29 @@
       "parcel": 0
     },
     {
-      "t": 828,
-      "frames": 1746,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.7,
-      "drawCalls": 214,
-      "triangles": 62341,
-      "traffic": 25,
-      "heapMB": 71,
+      "t": 829,
+      "frames": 2397,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 217,
+      "triangles": 68041,
+      "traffic": 187,
+      "heapMB": 91,
       "rebases": 10,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1198,
+        "p50": 2.97,
+        "p95": 3.26
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 173.61
+        "emaFps": 238.38
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1908,24 +2334,29 @@
       "parcel": 0
     },
     {
-      "t": 842,
-      "frames": 2451,
-      "p50": 5.6,
-      "p95": 6.5,
-      "p99": 6.7,
+      "t": 843,
+      "frames": 3360,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
       "drawCalls": 210,
-      "triangles": 71832,
-      "traffic": 25,
-      "heapMB": 68,
+      "triangles": 76392,
+      "traffic": 185,
+      "heapMB": 94,
       "rebases": 10,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1680,
+        "p50": 2.97,
+        "p95": 3.27
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 172.39
+        "emaFps": 239.68
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1935,24 +2366,29 @@
       "parcel": 0
     },
     {
-      "t": 852,
-      "frames": 1745,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.7,
+      "t": 853,
+      "frames": 2393,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
       "drawCalls": 202,
-      "triangles": 75007,
-      "traffic": 22,
-      "heapMB": 75,
+      "triangles": 80573,
+      "traffic": 179,
+      "heapMB": 85,
       "rebases": 11,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1197,
+        "p50": 3.04,
+        "p95": 3.37
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 174.22
+        "emaFps": 239.77
       },
       "fxRebuilds": 1,
       "sb": {
@@ -1962,51 +2398,29 @@
       "parcel": 0
     },
     {
-      "t": 865,
-      "frames": 2278,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.7,
-      "drawCalls": 207,
-      "triangles": 81761,
-      "traffic": 23,
-      "heapMB": 89,
+      "t": 866,
+      "frames": 3119,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 204,
+      "triangles": 87753,
+      "traffic": 178,
+      "heapMB": 91,
       "rebases": 11,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1558,
+        "p50": 3.16,
+        "p95": 3.49
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 174.68
-      },
-      "fxRebuilds": 1,
-      "sb": {
-        "chunks": 16,
-        "ready": 6
-      },
-      "parcel": 0
-    },
-    {
-      "t": 875,
-      "frames": 1746,
-      "p50": 5.6,
-      "p95": 6.5,
-      "p99": 6.8,
-      "drawCalls": 191,
-      "triangles": 65733,
-      "traffic": 22,
-      "heapMB": 74,
-      "rebases": 11,
-      "maxRebaseMs": 0.30000000074505806,
-      "tier": "high",
-      "govSteps": 0,
-      "govFromStats": {
-        "dprSteps": 0,
-        "tierSteps": 0,
-        "latched": false,
-        "emaFps": 168.52
+        "emaFps": 239.83
       },
       "fxRebuilds": 1,
       "sb": {
@@ -2016,24 +2430,61 @@
       "parcel": 0
     },
     {
-      "t": 889,
-      "frames": 2442,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.8,
-      "drawCalls": 182,
-      "triangles": 58837,
-      "traffic": 23,
-      "heapMB": 80,
+      "t": 876,
+      "frames": 2394,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 191,
+      "triangles": 73165,
+      "traffic": 185,
+      "heapMB": 82,
       "rebases": 11,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1197,
+        "p50": 3.16,
+        "p95": 3.46
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 173.84
+        "emaFps": 234.48
+      },
+      "fxRebuilds": 1,
+      "sb": {
+        "chunks": 16,
+        "ready": 7
+      },
+      "parcel": 0
+    },
+    {
+      "t": 890,
+      "frames": 3357,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 182,
+      "triangles": 65871,
+      "traffic": 185,
+      "heapMB": 82,
+      "rebases": 11,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1678,
+        "p50": 3.05,
+        "p95": 3.39
+      },
+      "tier": "high",
+      "govSteps": 0,
+      "govFromStats": {
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "latched": false,
+        "emaFps": 239.69
       },
       "fxRebuilds": 1,
       "sb": {
@@ -2043,24 +2494,29 @@
       "parcel": 0
     },
     {
-      "t": 899,
-      "frames": 1751,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.7,
-      "drawCalls": 194,
-      "triangles": 58829,
-      "traffic": 23,
-      "heapMB": 70,
+      "t": 900,
+      "frames": 2394,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
+      "drawCalls": 198,
+      "triangles": 65201,
+      "traffic": 190,
+      "heapMB": 89,
       "rebases": 12,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1197,
+        "p50": 3.07,
+        "p95": 3.43
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 173.68
+        "emaFps": 237.05
       },
       "fxRebuilds": 1,
       "sb": {
@@ -2070,24 +2526,29 @@
       "parcel": 0
     },
     {
-      "t": 912,
-      "frames": 2269,
-      "p50": 5.7,
-      "p95": 6.5,
-      "p99": 6.8,
+      "t": 913,
+      "frames": 3120,
+      "p50": 4.2,
+      "p95": 4.3,
+      "p99": 4.3,
       "drawCalls": 200,
-      "triangles": 61677,
-      "traffic": 22,
-      "heapMB": 94,
+      "triangles": 67787,
+      "traffic": 189,
+      "heapMB": 97,
       "rebases": 12,
-      "maxRebaseMs": 0.30000000074505806,
+      "maxRebaseMs": 0.29999999701976776,
+      "gpuFrameMs": {
+        "n": 1559,
+        "p50": 2.97,
+        "p95": 3.34
+      },
       "tier": "high",
       "govSteps": 0,
       "govFromStats": {
         "dprSteps": 0,
         "tierSteps": 0,
         "latched": false,
-        "emaFps": 172.38
+        "emaFps": 239.78
       },
       "fxRebuilds": 1,
       "sb": {
