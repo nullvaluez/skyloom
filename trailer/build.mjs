@@ -61,7 +61,7 @@ const BOARD = [
   { kind: 'shot', src: 'r21b-on-heal-sf.png', dur: 2.0, move: 'pan', zoom: 1.1, fx: 0.22, fx2: 0.62, fy: 0.45, live: 'liberty' },
   { kind: 'shot', src: 'weather-09-dusk-walk.png', dur: 2.0, move: 'push', amp: 0.14, fx: 0.5, fy: 0.35, live: 'photo-orbit' },
   { kind: 'card', id: 'real', dur: 2.0 },
-  { kind: 'shot', src: 'p5-03-formation.png', dur: 2.0, move: 'push', amp: 0.18, fx: 0.46, fy: 0.42, live: 'traffic-cinema' },
+  { kind: 'shot', src: 'r13-water-nyharbor.png', dur: 2.0, move: 'push', amp: 0.16, fx: 0.5, fy: 0.45, live: 'traffic-cinema' },
   { kind: 'shot', src: 'warp-03-sat-tokyo.png', dur: 2.0, move: 'push', amp: 0.14, fx: 0.5, fy: 0.4 },
   { kind: 'card', id: 'night', dur: 2.0 },
   { kind: 'shot', src: 'r16-satnight-01-manhattan-night.png', dur: 2.0, move: 'pan', zoom: 1.1, fx: 0.58, fx2: 0.25, fy: 0.45 },
