@@ -279,6 +279,36 @@ convened to investigate.
 
 ---
 
+### 4d ⚠️ THE FLEET OVERWRITES ITS OWN ARCHIVE — found by accident, now guarded
+
+Running `verify-sat-night` during this round **overwrote
+`scripts/r16-satnight-01..05.png`** — the exact archived certified frames the
+R23 thresholds in §1b are derived from — with blank grey blockade frames. Every
+browser harness in the fleet writes its screenshots to **fixed filenames under
+`scripts/`**, so any run in a degraded environment silently replaces the
+historical record with a picture of the degradation.
+
+It was caught by `git status`, not by anything in the tooling, and it came
+within one command of being invisible: a re-derivation had already been run
+against the corrupted frames and had rewritten
+`scripts/r23-c-archive-metrics.json`. Had that landed in a commit, **the round's
+thresholds would have been silently re-derived from a world with no tiles** — a
+calibration quietly re-deriving itself off whatever happens to be on disk.
+
+- **Recovered:** `git checkout --` the five PNGs and the JSON; the restored R16
+  frame re-measures **20.248% lit / 47.7% warm / p95 120**, i.e. the committed
+  calibration exactly.
+- **Guarded:** `r23-c-archive-metrics.js` now pins the first 16 hex of each
+  source frame's SHA-256 and **exits 1 with the `git checkout` command to run**
+  if any of the ten no longer matches. The two `R23-BLOCKED` rows are
+  deliberately NOT pinned — `verify-night-alive` rewrites them every run, which
+  is the same hazard, self-inflicted, and harmless because nothing is derived
+  from them.
+- **Not fixed, and named as a follow-up:** the hazard is fleet-wide. Any round
+  that treats an old `scripts/*.png` as evidence is one blocked harness run away
+  from losing it. The general fix (per-round output subdirectories, or a
+  read-only archive set) is out of scope here and belongs in an R24 seed.
+
 ## §5 Instrument asks for A (read-only `__flyStats` fields)
 
 None of these is a product change; each is a field C could not read.

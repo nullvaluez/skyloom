@@ -41,7 +41,38 @@
  */
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { metricsOf, fmtMetrics } = require('./_night-metrics');
+
+/**
+ * ⚠️ THE SOURCE FRAMES ARE MUTABLE, AND THIS ROUND WATCHED THEM MUTATE.
+ *
+ * Every browser harness in the fleet writes its screenshots to FIXED filenames
+ * under `scripts/`. Running `verify-sat-night` during this round therefore
+ * OVERWROTE `r16-satnight-01..05` — the exact archived certified frames these
+ * thresholds are derived from — with blank grey blockade frames, and a
+ * re-derivation afterwards silently produced numbers from a world with no
+ * tiles. Caught by `git status`, not by anything in the tooling.
+ *
+ * So the derivation now pins the first 16 hex of each source frame's SHA-256.
+ * A mismatch is FATAL: a calibration that silently re-derives itself off
+ * whatever happens to be on disk is worse than no calibration. Recovery is
+ * `git checkout -- scripts/<frame>.png`.
+ */
+const FRAME_SHA16 = {
+  'r16-satnight-01-manhattan-night.png': '2627e7b4a4881989',
+  'r16-satnight-02-manhattan-night-after-ab.png': '380c5ff401b1cea3',
+  'r16-satnight-07-jfk-night.png': '04e0f11967fb199b',
+  'r16-satnight-08-cruise-glow.png': 'ce6de48c6793dc32',
+  'r19-c-powell-night-houselights.png': '940ae1e09391d836',
+  'r19-c-powell-night-down.png': '4c682270d4c5a981',
+  'r19-c-night-on.png': '6df621daf8fdd12f',
+  'r19-c-night-off.png': '5adac5b34b183593',
+  'r20-b-melton-au-night-on.png': 'ef06556e8287a090',
+  'r20-b-melton-au-night-off.png': '7ad91a1c2d316c69',
+};
+const sha16 = (p) =>
+  crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex').slice(0, 16);
 
 /* Each row: the frame, the pose it stands for, the band verify-night-alive uses
  * for that pose, and what is wrong with the frame. */
@@ -132,7 +163,7 @@ const FRAMES = [
     round: 'R23-BLOCKED',
     band: [0.55, 0.98],
     xBand: [0.02, 0.85],
-    note: 'TODAY, egress-blocked: no imagery, no vector content. Here so the blockade signature is on the record next to a real frame.',
+    note: 'TODAY, egress-blocked: no imagery, no vector content. Here so the blockade signature is on the record next to a real frame. VOLATILE BY DESIGN and deliberately NOT hash-pinned — verify-night-alive rewrites this file every run, which is exactly the mutable-filename hazard documented above, self-inflicted and harmless because nothing is derived from it.',
   },
   {
     f: 'r23-c-red-man-unpinned-live.png',
@@ -146,11 +177,21 @@ const FRAMES = [
 
 (async () => {
   const rows = [];
+  const tampered = [];
   for (const r of FRAMES) {
     const p = path.join(__dirname, r.f);
     if (!fs.existsSync(p)) {
       console.log(`MISSING ${r.f}`);
       continue;
+    }
+    const want = FRAME_SHA16[r.f];
+    if (want) {
+      const got = sha16(p);
+      if (got !== want) {
+        console.log(`TAMPERED ${r.f} — sha16 ${got}, expected ${want}`);
+        tampered.push(r.f);
+        continue;
+      }
     }
     const m = await metricsOf(p, { groundBand: r.band, xBand: r.xBand });
     rows.push({ ...r, m: { ...m, hist: undefined } });
@@ -195,4 +236,14 @@ const FRAMES = [
         `— the WARM metric separates the two states ${(powOn.warmLitFrac / Math.max(1e-9, powOff.warmLitFrac) / (powOn.litFrac / powOff.litFrac)).toFixed(1)}x better than litFrac alone`
     );
   console.log('\nwritten: scripts/r23-c-archive-metrics.json');
+  if (tampered.length) {
+    console.error(
+      `\nFATAL — ${tampered.length} calibration source frame(s) no longer match their pinned ` +
+        `hash: ${tampered.join(', ')}. A harness has overwritten the archive (every browser ` +
+        `harness writes fixed filenames under scripts/). Recover with:\n` +
+        `  git checkout -- ${tampered.map((f) => 'scripts/' + f).join(' ')}\n` +
+        `The numbers printed above are INCOMPLETE and must not be used to move a threshold.`
+    );
+    process.exit(1);
+  }
 })();
