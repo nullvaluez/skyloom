@@ -39,3 +39,15 @@ Thumbs.db
 .probe-c-why/*.png
 .probe-c-flash*/
 .probe-c-trace*/
+
+# R22.1 C: probe scratch. Evidence files are force-added and stay tracked;
+# everything else here is reproducible from scripts/r22p1-c-probe*.js.
+.probe-c-adj/
+.probe-c-uni/
+.probe-c-chan/
+.probe-c-hdr/
+.probe-c-tri/
+.probe-c-degen/
+.probe-c-degen-green/
+.probe-c-look/
+.r22p1-c-*.log
