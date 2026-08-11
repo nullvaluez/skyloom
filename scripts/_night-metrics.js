@@ -152,7 +152,18 @@ function nightMetrics(raw, opts = {}) {
   const minBlob = opts.whiteMinBlob ?? WHITE_MIN_BLOB;
   const [y0, y1] = bandRows(height, band);
   const bh = y1 - y0;
-  const n = width * bh;
+  /* OPTIONAL horizontal crop, same fraction convention as `groundBand`.
+   * Live legs never use it — they park the DOM, so there is no HUD to exclude.
+   * It exists for the ARCHIVE calibration (`r23-c-archive-metrics.js`), whose
+   * source frames are historical `glShot`s taken with the HUD and minimap
+   * composited in: the minimap alone is a bright saturated disc in the bottom
+   * right of exactly the band the metric wants. Cropping it out is honest;
+   * pretending it is city light would not be. */
+  const xb = opts.xBand ?? [0, 1];
+  const x0 = Math.max(0, Math.min(width - 1, Math.floor(width * clamp01(xb[0]))));
+  const x1 = Math.max(x0 + 1, Math.min(width, Math.ceil(width * clamp01(xb[1]))));
+  const bw = x1 - x0;
+  const n = bw * bh;
 
   const hist = new Uint32Array(256);
   const white = new Uint8Array(n); // white-glow candidate mask, band-local
@@ -165,7 +176,7 @@ function nightMetrics(raw, opts = {}) {
   const ladder = new Uint32Array(LIT_LADDER.length);
 
   for (let y = y0; y < y1; y++) {
-    for (let x = 0; x < width; x++) {
+    for (let x = x0; x < x1; x++) {
       const o = (y * width + x) * channels;
       const r = data[o];
       const g = data[o + 1];
@@ -186,7 +197,7 @@ function nightMetrics(raw, opts = {}) {
         const mn = r < g ? (r < b ? r : b) : g < b ? g : b;
         const sat = mx === 0 ? 0 : (mx - mn) / mx;
         if (sat <= whiteSat) {
-          white[(y - y0) * width + x] = 1;
+          white[(y - y0) * bw + (x - x0)] = 1;
           whiteN += 1;
         }
       }
@@ -208,7 +219,7 @@ function nightMetrics(raw, opts = {}) {
       stack[sp++] = i;
       seen[i] = 1;
       let size = 0;
-      let minX = width;
+      let minX = bw;
       let maxX = -1;
       let minY = bh;
       let maxY = -1;
@@ -216,8 +227,8 @@ function nightMetrics(raw, opts = {}) {
       let cy = 0;
       while (sp > 0) {
         const p = stack[--sp];
-        const px = p % width;
-        const py = (p - px) / width;
+        const px = p % bw;
+        const py = (p - px) / bw;
         size += 1;
         cx += px;
         cy += py;
@@ -226,12 +237,12 @@ function nightMetrics(raw, opts = {}) {
         if (py < minY) minY = py;
         if (py > maxY) maxY = py;
         if (px > 0 && white[p - 1] && !seen[p - 1]) (seen[p - 1] = 1), (stack[sp++] = p - 1);
-        if (px < width - 1 && white[p + 1] && !seen[p + 1])
+        if (px < bw - 1 && white[p + 1] && !seen[p + 1])
           (seen[p + 1] = 1), (stack[sp++] = p + 1);
-        if (py > 0 && white[p - width] && !seen[p - width])
-          (seen[p - width] = 1), (stack[sp++] = p - width);
-        if (py < bh - 1 && white[p + width] && !seen[p + width])
-          (seen[p + width] = 1), (stack[sp++] = p + width);
+        if (py > 0 && white[p - bw] && !seen[p - bw])
+          (seen[p - bw] = 1), (stack[sp++] = p - bw);
+        if (py < bh - 1 && white[p + bw] && !seen[p + bw])
+          (seen[p + bw] = 1), (stack[sp++] = p + bw);
       }
       if (size >= minBlob) {
         blobs += 1;
@@ -240,11 +251,11 @@ function nightMetrics(raw, opts = {}) {
       if (size > blobPx) {
         blobPx = size;
         blobBox = {
-          x: minX,
+          x: minX + x0,
           y: minY + y0,
           w: maxX - minX + 1,
           h: maxY - minY + 1,
-          cx: Math.round(cx / size),
+          cx: Math.round(cx / size) + x0,
           cy: Math.round(cy / size) + y0,
         };
       }
@@ -258,6 +269,7 @@ function nightMetrics(raw, opts = {}) {
 
   return {
     band: [+band[0].toFixed(3), +band[1].toFixed(3)],
+    xBand: [+xb[0].toFixed(3), +xb[1].toFixed(3)],
     bandPx: n,
     frame: { w: width, h: height },
     mean: sum / n,
