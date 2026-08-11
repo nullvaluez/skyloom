@@ -220,35 +220,193 @@ OpenFreeMap footprints, not the extruder in general.
 
 ---
 
-## 4. Instruments
+## 3.6 The fix — `FLASH_GUARD`
+
+New constants block `FLASH_GUARD` (fly-constants.js, appended after
+`STEP_SAFE`) + `dropDegenerateTris()` in `lib/fly/toy-world/sat-building-engine.js`,
+called in `_finalizePending` immediately before `setIndex` and
+`computeVertexNormals`.
+
+* **An AREA test, not a point dedupe.** The wall degenerates would fall to a
+  consecutive-duplicate dedupe on the footprint ring; the roof-earcut one that
+  was actually caught painting would not. The test is on area, at the end of
+  the pipeline, so it catches every producer including any the drape creates.
+* **On the DRAPED positions**, engine-side. The worker is untouched —
+  `WORKER_PROTOCOL` does not move, and no other worker consumer is disturbed.
+* **Before `computeVertexNormals`**, so a degenerate cannot contribute a
+  zero/NaN face normal to its neighbours' shading either.
+* **`minArea2: 0`** — exactly-degenerate only. Measured-safe rather than
+  guessed: the census `tiny` bucket (0 < area2 < 1e-6) was **empty in every
+  chunk**, so 0 removes the entire measured population without touching one
+  real triangle.
+* Compacts **in place** on the worker-transferred buffer the engine owns, and
+  returns the input array untouched when nothing is dropped — a clean chunk
+  allocates nothing.
+
+**Revert contract:** `FLASH_GUARD.enabled: false` ⇒ the index buffer is used
+verbatim, one branch, byte-identical to R22. Runtime pin `__flyFlashPin='off'`
+gives the same RED tree without a rebuild (A's `__flyStepSafePin` idiom); it is
+never set by the app or by `scripts/_boot.js`.
+
+**Not shipped: the cloud fade.** `cloudNearFade: false`, with the reasoning
+inline in the constants block. Clouds are refuted 7/7 by same-frame bisection,
+and a near-camera fade would move cloud placement — which several frozen pixel
+gates read — to fix an actor that has been shown not to be the actor.
+
+**Not triangle-count-neutral, deliberately.** Index counts fall 6–9 % on dense
+chunks. Pixels do not change (a zero-area triangle contributes none when it
+behaves); `verify-sat-buildings` confirms the content instruments are unmoved
+(§5). Nothing in the fleet asserts an exact sat-building index count, and the
+tris budgets are ceilings this only lowers.
+
+---
+
+## 4. Numbers
+
+### 4.1 RED vs GREEN — same gate, same machine, same session
+
+| leg | pale frames | zero-area triangles live | verdict |
+| --- | --- | --- | --- |
+| **RED** (`FLASH_PIN_OFF=1`, NYC) | **6 / 43,435** | **5,068** | FAIL (4)(6) — the calibration |
+| GREEN NYC baseline | **0 / 48,707** | 0 | PASS 9/9 |
+| GREEN Powell baseline | **0 / 42,681** | 0 | PASS 9/9 |
+| GREEN Powell **live weather** | **0 / 45,159** | 0 | PASS 9/9 |
+
+**GREEN total: 136,547 composed frames, zero pale, zero black.** Powell is the
+user's own pose; live weather is the arm the entire harness fleet is blind to
+(`__flyWeatherOverride='baseline'` is a fleet pin), which is exactly what A's
+open risk 5 asked for.
+
+Earlier RED evidence from the probes, same tree, NYC baseline: **12 pale in
+24,617 frames** (probes 6/8/9/10/11) ≈ 1 per 2,051.
+
+### 4.2 The filter's own arithmetic
+
+Census before: 28 meshes, 482,740 tris, **34,405 zero-area**.
+Census after: 28 meshes, 448,335 tris, **0 zero-area**.
+Per chunk, exact: 70,393 verts 35,824 → 33,296 tris (−2,528, the measured
+count); 36,776 verts 18,372 → 16,915 (−1,457). Nothing but the degenerates
+left.
+
+Over a 260 s NYC window the engine reports `degenScanned 4,052,557 /
+degenDropped 280,503 / degenChunks 217`.
+
+---
+
+## 5. Frozen gates
+
+Run against `:3021`. **No frozen assertion number was moved.**
+
+| harness | result | note |
+| --- | --- | --- |
+| verify-flash-guard RED (`FLASH_PIN_OFF=1`) | FAIL (4)(6) | the calibration — it must fail on the defective tree |
+| verify-flash-guard × 3 GREEN legs | PASS | 9/9 each; §4.1 |
+| verify-sat-buildings | **PASS** | draws 226 ≤ 375, kept 6,965, columns 6,964, maxR 305.9 — all unmoved |
+| verify-stability | **PASS** | |
+| verify-settle | **PASS** | |
+| verify-round11 | **PASS** | |
+| verify-weather | *(see §5.2)* | |
+| **verify-flicker** | **FAIL (2)** | **PRE-EXISTING — not mine, proven in control** |
+| `npm run build` | **PASS** | |
+
+### 5.1 verify-flicker (2) is not mine, and the control says so
+
+Gate (2) URBAN FLICKER wants p99 per-pixel temporal stddev ≤ 12.
+
+| run | p99 | other |
+| --- | --- | --- |
+| first run, armed | 14.869 | also FAIL (6): a resource 404 |
+| quiet re-run, armed | **12.072** | (6) cleared |
+| **control — `FLASH_GUARD.enabled:false`** | **13.833** | **also FAIL (4a)** Powell suburb=5 |
+
+The tree **without** my change is redder than the tree with it, and fails an
+extra gate. So (2) is pre-existing on this machine, and FLASH_GUARD *improves*
+it. The first run's shape also matches A's §6.6 exactly — a content red
+downstream of a network red — but I am not claiming contamination for the
+re-run: 12.072 against a bound of 12 is a real 0.6 % overshoot, on a machine
+that has been running heavy probes all session. **I did not move the bound and
+I am not asking for it to be moved.** It is reported as inherited.
+
+The control was run by flipping the constant to `false`, running, and flipping
+it back; `git diff` on `fly-constants.js` was confirmed empty afterwards.
+
+---
+
+## 6. Instruments
 
 | script | what it establishes |
 | --- | --- |
 | `scripts/r22p1-c-probe6.js` | actor adjudication on every pale event: scene-level bisection incl. clouds, chunk-age census (H1), matrixWorld vs previous frame, CPU bounding-sphere projection, unbent-material discriminator, culprit-hidden control |
 | `scripts/r22p1-c-probe7.js` | single-input uniform/light/fog/colour toggles on the frozen pale frame |
-| `scripts/r22p1-c-probe8.js` | depth vs colour channel; which pass/effect paints it |
+| `scripts/r22p1-c-probe8.js` | channel (depth/colour/raw render) + pass & effect sweep + float64 CPU bend replication |
+| `scripts/r22p1-c-probe9.js` | reads the composer's HDR input buffer as FLOAT; drives bloom by its own parameters |
+| `scripts/r22p1-c-probe10.js` | pixels — full / culprit-isolated / culprit-hidden PNGs + mean HDR rgb |
+| `scripts/r22p1-c-probe11.js` | **drawRange binary search — names the single triangle** |
+| `scripts/r22p1-c-probe12.js` | static zero-area census across every streamed chunk |
+| `scripts/verify-flash-guard.js` | the shipped gate, 9 gates, RED-calibrated |
 
 All read the default framebuffer in-page per composed frame (A's §2.2 finding:
 CDP screencast is blind to single-frame events).
 
 ---
 
-## 5. Decisions
+## 7. Decisions
 
-**5.1 Kept the branch name `r22p1/clouds`.** The evidence moved off clouds; the
+**7.1 Kept the branch name `r22p1/clouds`.** The evidence moved off clouds; the
 name is a historical artifact. Noted rather than churned.
 
-**5.2 Retracted my own arrival finding.** I opened by calling the predecessor's
+**7.2 Retracted my own arrival finding.** I opened by calling the predecessor's
 byte-identical isolation PNGs a probe bug. They are not — at `pr = 1.0` an
 isolation render is *expected* to be byte-identical. Recorded in §1 rather than
 quietly dropped.
 
+**7.3 Fixed engine-side, not in the worker.** The worker's wall loop is the
+cheaper site (it would save the wasted vertices too, not just the indices) and
+the structural `loadGeometry` closing-point duplicate is right there. But it
+only produces the COINCIDENT kind. The triangle actually measured painting the
+screen comes from the roof earcut, which the wall-loop guard would not touch.
+One area test at the end of the pipeline covers every producer; a worker-side
+edge guard is a follow-up perf win, not the correctness fix.
+
+**7.4 Did not ship the cloud fade.** See §3.6. Refuted actor, and the fade
+moves geometry frozen pixel gates read.
+
+**7.5 Two gate bugs found by the RED leg, both fixed.** Gate 2 read
+`degenScanned` where the guard's state is `degenDropped`; gate 9 failed on a
+live-network 404. That is the RED leg doing its job.
+
+**7.6 Moved gate 1's own precondition** from a live-triangle threshold
+(calibrated on Manhattan) to cumulative `degenScanned`, because Powell
+legitimately holds 4,845 live triangles and a threshold that fails the sparse
+pose for being correct is a bad threshold. This is my own new gate, not a
+frozen number.
+
 ---
 
-## 6. Open, unproven, honest
+## 8. Open, unproven, honest
 
-1. **A's clouds-off 0/30,499 is unexplained.** Clouds do not paint the pale
-   (7/7 same-frame). Why parking them drove the *rate* to zero is not measured.
-2. **Powell is owed a run.** Everything so far is the NYC ~800 m spawn. The
-   user was at Powell, 233 m AGL, live weather, production build.
-3. **The depth hypothesis (§3.3) is not yet proven.**
+1. **A's clouds-off 0 / 30,499 is still unexplained.** Clouds do not paint
+   these pixels — 7/7 same-frame, with `__flyClouds` in the swept sibling list.
+   Why parking 55 lit billboards drove A's *rate* to zero is not measured. The
+   plausible reading is that removing them shifts frame cost and therefore
+   which poses get sampled, since the defect is pose-dependent rather than
+   time-dependent — but that is a hypothesis. Anyone re-opening the cloud
+   question should start here.
+2. **verify-flicker (2) is inherited red** (§5.1), 12.072 vs a bound of 12,
+   redder without my fix. Not moved, not smoothed.
+3. **`minArea2: 0` catches exactly-zero only.** The census found no near-zero
+   triangles at all, so there is nothing measured for a positive epsilon to
+   catch — but a *near*-zero sliver is subject to the same determinant
+   instability in principle. If a future pose produces one, the value is there
+   to raise **against a measurement**.
+4. **The wasted vertices remain.** The filter drops indices, not the ~4 verts
+   per degenerate wall edge. They still cost transfer, memory and the O(nVerts)
+   drape walk. A worker-side edge guard would recover that (§7.3).
+5. **Only satellite buildings are fixed.** The same `loadGeometry` closing-point
+   duplicate feeds the toy/Neon polygon path and the skyline builder, which
+   have their own extruders. I did not census them. If the flash is ever
+   reported in Neon, look there first.
+6. **The user's recording was 1280x720 at Powell 233 m AGL banked, in
+   production.** I reproduced at Powell and in production, but never at that
+   exact bank/speed — the pose is uncontrolled in the harness. The mechanism is
+   pose-independent, so this is a coverage gap, not a doubt about the cause.

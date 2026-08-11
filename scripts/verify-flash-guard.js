@@ -197,31 +197,45 @@ async function main() {
   console.log(`  census: ${cen.tris} tris over ${cen.meshes} meshes · zero-area ${cen.zero}`);
   console.log(`  engine: degenScanned ${cen.degenScanned} degenDropped ${cen.degenDropped} degenChunks ${cen.degenChunks}\n`);
 
+  // `window.__satBuildings` is NODE_ENV==='development' only, so against a
+  // production build the census gates cannot run. `__flyComposer` is NOT
+  // dev-gated and `__flyFlashPin` is a plain runtime check, so the pale-frame
+  // gates and BOTH legs still work there — the production run is a real
+  // confirmation, just a narrower one. It is reported, never silently skipped.
+  const PROD = !!cen.err;
+  if (PROD) console.log('  [production build: dev handle __satBuildings absent — census gates (2)-(5) N/A]\n');
+
   // The precondition is on CUMULATIVE streaming (degenScanned), not on the
   // live triangle count: a suburban pose legitimately holds ~5k triangles
   // where Manhattan holds ~65k, and a live-count threshold calibrated on the
   // dense pose fails the sparse one for being correct. What must be true on
   // both is that real geometry streamed through the filter during the window.
   gate(1, 'precondition: booted, instrumented, ring streamed, frames composed',
-    inst.ok && !cen.err && cen.chunks > 4 && frames > 2000 && cen.tris > 1000 && cen.degenScanned > 100000,
-    `install=${inst.ok} chunks=${cen.chunks} frames=${frames} liveTris=${cen.tris} scanned=${cen.degenScanned}`);
+    inst.ok && frames > 2000 && (PROD || (cen.chunks > 4 && cen.tris > 1000 && cen.degenScanned > 100000)),
+    PROD
+      ? `install=${inst.ok} frames=${frames} (production)`
+      : `install=${inst.ok} chunks=${cen.chunks} frames=${frames} liveTris=${cen.tris} scanned=${cen.degenScanned}`);
 
   // degenScanned counts triangles EXAMINED and is incremented on both legs
   // (the pin returns before filtering, not before counting), so the state of
   // the guard is read off degenDropped, not degenScanned.
+  if (!PROD)
   gate(2, 'the guard is in the expected state for this leg',
     cen.degenScanned > 0 && (PIN_OFF ? cen.degenDropped === 0 : cen.degenDropped > 0),
     `degenScanned=${cen.degenScanned} degenDropped=${cen.degenDropped}` +
       (PIN_OFF ? ' (RED leg: dropped must be 0)' : ` over ${cen.degenChunks} chunks`));
 
+  if (!PROD)
   gate(3, 'there WERE degenerates to drop — the defect is present in this content, so (4) is not vacuous',
     PIN_OFF ? cen.zero > 0 : cen.degenDropped > 0,
     PIN_OFF ? `zero-area still present: ${cen.zero}` : `degenDropped=${cen.degenDropped}`);
 
+  if (!PROD)
   gate(4, 'ZERO zero-area triangles remain in any streamed chunk',
     cen.zero === 0,
     `zero-area=${cen.zero}${cen.worst.length ? ` worst=${JSON.stringify(cen.worst)}` : ''}`);
 
+  if (!PROD)
   gate(5, 'index arithmetic: scanned = kept + dropped',
     PIN_OFF || cen.degenScanned === cen.degenDropped + cen.tris || cen.degenScanned >= cen.tris,
     `scanned=${cen.degenScanned} kept=${cen.tris} dropped=${cen.degenDropped} (evictions make scanned >= kept)`);
