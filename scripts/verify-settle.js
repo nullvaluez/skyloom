@@ -573,7 +573,32 @@ function longFrames(frames, t0, t1) {
 
   /* ============ LEG 3 — the parcel ramp at Melton AU ==================== */
   const parcel = await context.newPage();
-  await parcel.addInitScript(unpinPins, ['__flySettlePin']);
+  /* R23 (C NIGHT-CERT) — the last un-pin site in this file, and the one the R22
+   * W3 correction did not reach. `newFlyPage` above lifts BOTH pins
+   * (`__flySettlePin` + `__flyTerraPin`) since B's proof that "a content-aware
+   * reveal cannot be judged with the content signal pinned off"; this leg
+   * builds its page by hand and kept lifting only SETTLE, so the parcel ramp —
+   * a shipped SETTLE_CALM feature — was still being measured over R21 terrain.
+   *
+   * THE ARGUMENT AGAINST, recorded because it is real: the R22 un-pin table
+   * withheld `__flyTerraPin` from verify-settle on the grounds that "letting
+   * A's pipeline change the stream-in ordering underneath them makes every
+   * number a two-variable experiment", and unlike the reveal legs this one
+   * measures a birth ramp at a frozen pose, where the reveal argument does not
+   * directly apply. THE ARGUMENT FOR, which is why it changes: R23 exists
+   * because fleet pins let a whole defect class ship green, and the parcel ramp
+   * a user sees runs over R22 terrain whose DEM depth and LOD curve feed the
+   * collision index the two-ring settle trusts. Measuring it over R21 terrain
+   * is measuring a world nobody has.
+   *
+   * ⚠️ UNVALIDATED IN THE SESSION THAT MADE THIS CHANGE. This worktree's egress
+   * policy answers 403 to CONNECT for tiles.openfreemap.org and
+   * server.arcgisonline.com, so Melton streams nothing and verify-settle cannot
+   * run here at all. Gate (8)'s frozen numbers were NOT re-measured under the
+   * lifted pin. FIRST RUN WITH EGRESS MUST CHECK (8) SPECIFICALLY, and if it
+   * moves, the move is adjudicated harness-vs-product rather than absorbed —
+   * see scripts/r23-close-sweep.md §2. */
+  await parcel.addInitScript(unpinPins, ['__flySettlePin', '__flyTerraPin']);
   parcel.on('pageerror', (e) => errs.push(e.message));
   await bootFly(parcel, { style: 'satellite', ...BOOT_OPTS });
   await parcel.evaluate(() => window.__flyStore.getState().setQualityTier('high'));

@@ -90,6 +90,18 @@ const { bootFly } = require('./_boot');
   }));
   console.log('stats:', JSON.stringify(s), 'pageErrors:', errs.length);
   if (errs.length) console.log('errors:', errs.slice(0, 5));
+  /* R23 (C NIGHT-CERT) — INHERITED HARNESS DEBT ("prints no VERIFY line yet
+   * exits 0", R22 close §6.3). This one was the near miss of the four: it
+   * ALREADY exits 1 on a pageerror, but it only printed a `VERIFY` line from
+   * the catch block — so a clean run was silent and a sweep scraping for
+   * `VERIFY:` recorded nothing for it either way. One line, no contract
+   * change; the exit code it returns is unmoved. It remains a CAPTURE script:
+   * the four globe2-*.png shots are the artifact and nothing here judges them. */
+  console.log(
+    errs.length
+      ? `VERIFY: FAIL (pageerrors: ${errs.length})`
+      : 'VERIFY: PASS (capture script — asserts zero pageerrors ONLY; the PNGs are the artifact)'
+  );
   await browser.close();
   process.exit(errs.length === 0 ? 0 : 1);
 })().catch((e) => {
