@@ -1,0 +1,717 @@
+{
+  "generatedAt": "2026-08-11T12:13:21.082Z",
+  "pose": {
+    "name": "P-MAN",
+    "geo": [
+      40.758,
+      -73.9855
+    ],
+    "altM": 800,
+    "heading": 200,
+    "pitch": -18,
+    "sunUtc": 1785214800000
+  },
+  "errors": [],
+  "rows": [
+    {
+      "condition": "user",
+      "clock": "night",
+      "tierAsked": "high",
+      "tier": "high",
+      "dpr": 1,
+      "aerialOverride": null,
+      "sunFrac": 0,
+      "hdriBucket": "night",
+      "draws": 0,
+      "windows": {
+        "nightEnabled": true,
+        "emissiveIntensity": 1.3,
+        "hasEmissiveMap": true,
+        "emissive": [
+          1,
+          0.694,
+          0.366
+        ],
+        "facadeEnabled": true
+      },
+      "roadsMounted": true,
+      "skylineMounted": true,
+      "clutterMounted": true,
+      "beacons": {
+        "placed": 2,
+        "nightK": 1,
+        "on": true
+      },
+      "cityGlowPlaced": 27,
+      "cityGlowNightK": 1,
+      "houseLights": {
+        "placed": 0,
+        "nightK": 1,
+        "fromHouse": 0,
+        "fromVeg": 0
+      },
+      "contentHaze": {
+        "startM": 800,
+        "endM": 14000,
+        "max": 0
+      },
+      "postAerial": {
+        "strength": 0.55,
+        "startM": 420,
+        "bandStartM": 800,
+        "endM": 14000,
+        "heightFalloffM": 1200,
+        "rim": [
+          0.06274509803921569,
+          0.10196078431372549,
+          0.18823529411764706
+        ],
+        "nearStartM": 420,
+        "nearMaxMix": 0.1
+      },
+      "quilt": {
+        "desat": 0,
+        "flatten": 0
+      }
+    },
+    {
+      "condition": "user",
+      "clock": "night",
+      "tierAsked": "medium",
+      "tier": "medium",
+      "dpr": 1,
+      "aerialOverride": null,
+      "sunFrac": 0,
+      "hdriBucket": "night",
+      "draws": 0,
+      "windows": {
+        "nightEnabled": false,
+        "emissiveIntensity": 0,
+        "hasEmissiveMap": false,
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "facadeEnabled": true
+      },
+      "roadsMounted": true,
+      "skylineMounted": true,
+      "clutterMounted": true,
+      "beacons": {
+        "placed": 2,
+        "nightK": 1,
+        "on": false
+      },
+      "cityGlowPlaced": 27,
+      "cityGlowNightK": 1,
+      "houseLights": {
+        "placed": 0,
+        "nightK": 1,
+        "fromHouse": 0,
+        "fromVeg": 0
+      },
+      "contentHaze": {
+        "startM": 800,
+        "endM": 14000,
+        "max": 0.55
+      },
+      "postAerial": {
+        "strength": 0,
+        "startM": 800,
+        "bandStartM": 800,
+        "endM": 14000,
+        "heightFalloffM": 1200,
+        "rim": [
+          0.06274509803921569,
+          0.10196078431372549,
+          0.18823529411764706
+        ],
+        "nearStartM": 420,
+        "nearMaxMix": 0
+      },
+      "quilt": {
+        "desat": 0,
+        "flatten": 0
+      }
+    },
+    {
+      "condition": "user",
+      "clock": "night",
+      "tierAsked": "low",
+      "tier": "low",
+      "dpr": 1,
+      "aerialOverride": null,
+      "sunFrac": 0,
+      "hdriBucket": "night",
+      "draws": 0,
+      "windows": {
+        "mounted": false
+      },
+      "roadsMounted": false,
+      "skylineMounted": false,
+      "clutterMounted": false,
+      "beacons": {
+        "placed": 2,
+        "nightK": 1,
+        "on": false
+      },
+      "cityGlowPlaced": 27,
+      "cityGlowNightK": 1,
+      "houseLights": {
+        "placed": 0,
+        "nightK": 1,
+        "fromHouse": 0,
+        "fromVeg": 0
+      },
+      "contentHaze": {
+        "startM": 800,
+        "endM": 14000,
+        "max": 0
+      },
+      "postAerial": {
+        "strength": 0,
+        "startM": 800,
+        "bandStartM": 800,
+        "endM": 14000,
+        "heightFalloffM": 1200,
+        "rim": [
+          0.06274509803921569,
+          0.10196078431372549,
+          0.18823529411764706
+        ],
+        "nearStartM": 420,
+        "nearMaxMix": 0
+      },
+      "quilt": {
+        "desat": 0,
+        "flatten": 0
+      }
+    },
+    {
+      "condition": "user",
+      "clock": "noon",
+      "tierAsked": "high",
+      "tier": "high",
+      "dpr": 1,
+      "aerialOverride": null,
+      "sunFrac": 1,
+      "hdriBucket": "day",
+      "draws": 0,
+      "windows": {
+        "nightEnabled": true,
+        "emissiveIntensity": 0,
+        "hasEmissiveMap": true,
+        "emissive": [
+          1,
+          0.694,
+          0.366
+        ],
+        "facadeEnabled": true
+      },
+      "roadsMounted": true,
+      "skylineMounted": true,
+      "clutterMounted": true,
+      "beacons": {
+        "placed": 2,
+        "nightK": 0,
+        "on": true
+      },
+      "cityGlowPlaced": 27,
+      "cityGlowNightK": 0,
+      "houseLights": {
+        "placed": 0,
+        "nightK": 0,
+        "fromHouse": 0,
+        "fromVeg": 0
+      },
+      "contentHaze": {
+        "startM": 800,
+        "endM": 14000,
+        "max": 0
+      },
+      "postAerial": {
+        "strength": 0.55,
+        "startM": 420,
+        "bandStartM": 800,
+        "endM": 14000,
+        "heightFalloffM": 1200,
+        "rim": [
+          0.7764705882352941,
+          0.8431372549019608,
+          0.9098039215686274
+        ],
+        "nearStartM": 420,
+        "nearMaxMix": 0.1
+      },
+      "quilt": {
+        "desat": 0,
+        "flatten": 0
+      }
+    },
+    {
+      "condition": "user",
+      "clock": "noon",
+      "tierAsked": "medium",
+      "tier": "medium",
+      "dpr": 1,
+      "aerialOverride": null,
+      "sunFrac": 1,
+      "hdriBucket": "day",
+      "draws": 0,
+      "windows": {
+        "nightEnabled": false,
+        "emissiveIntensity": 0,
+        "hasEmissiveMap": false,
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "facadeEnabled": true
+      },
+      "roadsMounted": true,
+      "skylineMounted": true,
+      "clutterMounted": true,
+      "beacons": {
+        "placed": 2,
+        "nightK": 0,
+        "on": false
+      },
+      "cityGlowPlaced": 27,
+      "cityGlowNightK": 0,
+      "houseLights": {
+        "placed": 0,
+        "nightK": 0,
+        "fromHouse": 0,
+        "fromVeg": 0
+      },
+      "contentHaze": {
+        "startM": 800,
+        "endM": 14000,
+        "max": 0.55
+      },
+      "postAerial": {
+        "strength": 0,
+        "startM": 800,
+        "bandStartM": 800,
+        "endM": 14000,
+        "heightFalloffM": 1200,
+        "rim": [
+          0.7764705882352941,
+          0.8431372549019608,
+          0.9098039215686274
+        ],
+        "nearStartM": 420,
+        "nearMaxMix": 0
+      },
+      "quilt": {
+        "desat": 0,
+        "flatten": 0
+      }
+    },
+    {
+      "condition": "user",
+      "clock": "noon",
+      "tierAsked": "low",
+      "tier": "low",
+      "dpr": 1,
+      "aerialOverride": null,
+      "sunFrac": 1,
+      "hdriBucket": "day",
+      "draws": 0,
+      "windows": {
+        "mounted": false
+      },
+      "roadsMounted": false,
+      "skylineMounted": false,
+      "clutterMounted": false,
+      "beacons": {
+        "placed": 2,
+        "nightK": 0,
+        "on": false
+      },
+      "cityGlowPlaced": 27,
+      "cityGlowNightK": 0,
+      "houseLights": {
+        "placed": 0,
+        "nightK": 0,
+        "fromHouse": 0,
+        "fromVeg": 0
+      },
+      "contentHaze": {
+        "startM": 800,
+        "endM": 14000,
+        "max": 0
+      },
+      "postAerial": {
+        "strength": 0,
+        "startM": 800,
+        "bandStartM": 800,
+        "endM": 14000,
+        "heightFalloffM": 1200,
+        "rim": [
+          0.7764705882352941,
+          0.8431372549019608,
+          0.9098039215686274
+        ],
+        "nearStartM": 420,
+        "nearMaxMix": 0
+      },
+      "quilt": {
+        "desat": 0,
+        "flatten": 0
+      }
+    },
+    {
+      "condition": "fleet",
+      "clock": "night",
+      "tierAsked": "high",
+      "tier": "high",
+      "dpr": 1,
+      "aerialOverride": 0,
+      "sunFrac": 0,
+      "hdriBucket": "night",
+      "draws": 0,
+      "windows": {
+        "nightEnabled": true,
+        "emissiveIntensity": 1.3,
+        "hasEmissiveMap": true,
+        "emissive": [
+          1,
+          0.694,
+          0.366
+        ],
+        "facadeEnabled": true
+      },
+      "roadsMounted": true,
+      "skylineMounted": true,
+      "clutterMounted": true,
+      "beacons": {
+        "placed": 2,
+        "nightK": 1,
+        "on": true
+      },
+      "cityGlowPlaced": 27,
+      "cityGlowNightK": 1,
+      "houseLights": {
+        "placed": 0,
+        "nightK": 1,
+        "fromHouse": 0,
+        "fromVeg": 0
+      },
+      "contentHaze": {
+        "startM": 800,
+        "endM": 14000,
+        "max": 0
+      },
+      "postAerial": {
+        "strength": 0,
+        "startM": 800,
+        "bandStartM": 800,
+        "endM": 14000,
+        "heightFalloffM": 1200,
+        "rim": [
+          0,
+          0,
+          0
+        ],
+        "nearStartM": 0,
+        "nearMaxMix": 0
+      },
+      "quilt": {
+        "desat": 0,
+        "flatten": 0
+      }
+    },
+    {
+      "condition": "fleet",
+      "clock": "night",
+      "tierAsked": "medium",
+      "tier": "medium",
+      "dpr": 1,
+      "aerialOverride": 0,
+      "sunFrac": 0,
+      "hdriBucket": "night",
+      "draws": 0,
+      "windows": {
+        "nightEnabled": false,
+        "emissiveIntensity": 0,
+        "hasEmissiveMap": false,
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "facadeEnabled": true
+      },
+      "roadsMounted": true,
+      "skylineMounted": true,
+      "clutterMounted": true,
+      "beacons": {
+        "placed": 2,
+        "nightK": 1,
+        "on": false
+      },
+      "cityGlowPlaced": 27,
+      "cityGlowNightK": 1,
+      "houseLights": {
+        "placed": 0,
+        "nightK": 1,
+        "fromHouse": 0,
+        "fromVeg": 0
+      },
+      "contentHaze": {
+        "startM": 800,
+        "endM": 14000,
+        "max": 0
+      },
+      "postAerial": {
+        "strength": 0,
+        "startM": 800,
+        "bandStartM": 800,
+        "endM": 14000,
+        "heightFalloffM": 1200,
+        "rim": [
+          0,
+          0,
+          0
+        ],
+        "nearStartM": 0,
+        "nearMaxMix": 0
+      },
+      "quilt": {
+        "desat": 0,
+        "flatten": 0
+      }
+    },
+    {
+      "condition": "fleet",
+      "clock": "night",
+      "tierAsked": "low",
+      "tier": "low",
+      "dpr": 1,
+      "aerialOverride": 0,
+      "sunFrac": 0,
+      "hdriBucket": "night",
+      "draws": 0,
+      "windows": {
+        "mounted": false
+      },
+      "roadsMounted": false,
+      "skylineMounted": false,
+      "clutterMounted": false,
+      "beacons": {
+        "placed": 2,
+        "nightK": 1,
+        "on": false
+      },
+      "cityGlowPlaced": 27,
+      "cityGlowNightK": 1,
+      "houseLights": {
+        "placed": 0,
+        "nightK": 1,
+        "fromHouse": 0,
+        "fromVeg": 0
+      },
+      "contentHaze": {
+        "startM": 800,
+        "endM": 14000,
+        "max": 0
+      },
+      "postAerial": {
+        "strength": 0,
+        "startM": 800,
+        "bandStartM": 800,
+        "endM": 14000,
+        "heightFalloffM": 1200,
+        "rim": [
+          0,
+          0,
+          0
+        ],
+        "nearStartM": 0,
+        "nearMaxMix": 0
+      },
+      "quilt": {
+        "desat": 0,
+        "flatten": 0
+      }
+    },
+    {
+      "condition": "fleet",
+      "clock": "noon",
+      "tierAsked": "high",
+      "tier": "high",
+      "dpr": 1,
+      "aerialOverride": 0,
+      "sunFrac": 1,
+      "hdriBucket": "day",
+      "draws": 50,
+      "windows": {
+        "nightEnabled": true,
+        "emissiveIntensity": 0,
+        "hasEmissiveMap": true,
+        "emissive": [
+          1,
+          0.694,
+          0.366
+        ],
+        "facadeEnabled": true
+      },
+      "roadsMounted": true,
+      "skylineMounted": true,
+      "clutterMounted": true,
+      "beacons": {
+        "placed": 2,
+        "nightK": 0,
+        "on": true
+      },
+      "cityGlowPlaced": 27,
+      "cityGlowNightK": 0,
+      "houseLights": {
+        "placed": 0,
+        "nightK": 0,
+        "fromHouse": 0,
+        "fromVeg": 0
+      },
+      "contentHaze": {
+        "startM": 800,
+        "endM": 14000,
+        "max": 0
+      },
+      "postAerial": {
+        "strength": 0,
+        "startM": 800,
+        "bandStartM": 800,
+        "endM": 14000,
+        "heightFalloffM": 1200,
+        "rim": [
+          0,
+          0,
+          0
+        ],
+        "nearStartM": 0,
+        "nearMaxMix": 0
+      },
+      "quilt": {
+        "desat": 0,
+        "flatten": 0
+      }
+    },
+    {
+      "condition": "fleet",
+      "clock": "noon",
+      "tierAsked": "medium",
+      "tier": "medium",
+      "dpr": 1,
+      "aerialOverride": 0,
+      "sunFrac": 1,
+      "hdriBucket": "day",
+      "draws": 50,
+      "windows": {
+        "nightEnabled": false,
+        "emissiveIntensity": 0,
+        "hasEmissiveMap": false,
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "facadeEnabled": true
+      },
+      "roadsMounted": true,
+      "skylineMounted": true,
+      "clutterMounted": true,
+      "beacons": {
+        "placed": 2,
+        "nightK": 0,
+        "on": false
+      },
+      "cityGlowPlaced": 27,
+      "cityGlowNightK": 0,
+      "houseLights": {
+        "placed": 0,
+        "nightK": 0,
+        "fromHouse": 0,
+        "fromVeg": 0
+      },
+      "contentHaze": {
+        "startM": 800,
+        "endM": 14000,
+        "max": 0
+      },
+      "postAerial": {
+        "strength": 0,
+        "startM": 800,
+        "bandStartM": 800,
+        "endM": 14000,
+        "heightFalloffM": 1200,
+        "rim": [
+          0,
+          0,
+          0
+        ],
+        "nearStartM": 0,
+        "nearMaxMix": 0
+      },
+      "quilt": {
+        "desat": 0,
+        "flatten": 0
+      }
+    },
+    {
+      "condition": "fleet",
+      "clock": "noon",
+      "tierAsked": "low",
+      "tier": "low",
+      "dpr": 1,
+      "aerialOverride": 0,
+      "sunFrac": 1,
+      "hdriBucket": "day",
+      "draws": 50,
+      "windows": {
+        "mounted": false
+      },
+      "roadsMounted": false,
+      "skylineMounted": false,
+      "clutterMounted": false,
+      "beacons": {
+        "placed": 2,
+        "nightK": 0,
+        "on": false
+      },
+      "cityGlowPlaced": 27,
+      "cityGlowNightK": 0,
+      "houseLights": {
+        "placed": 0,
+        "nightK": 0,
+        "fromHouse": 0,
+        "fromVeg": 0
+      },
+      "contentHaze": {
+        "startM": 800,
+        "endM": 14000,
+        "max": 0
+      },
+      "postAerial": {
+        "strength": 0,
+        "startM": 800,
+        "bandStartM": 800,
+        "endM": 14000,
+        "heightFalloffM": 1200,
+        "rim": [
+          0,
+          0,
+          0
+        ],
+        "nearStartM": 0,
+        "nearMaxMix": 0
+      },
+      "quilt": {
+        "desat": 0,
+        "flatten": 0
+      }
+    }
+  ]
+}
