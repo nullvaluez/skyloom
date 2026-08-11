@@ -306,7 +306,29 @@ open risk 5 asked for.
 Earlier RED evidence from the probes, same tree, NYC baseline: **12 pale in
 24,617 frames** (probes 6/8/9/10/11) ≈ 1 per 2,051.
 
-### 4.2 The filter's own arithmetic
+### 4.2 What the filter costs
+
+It runs inside `_finalizePending`, which is budgeted (`drapeBudgetMs: 1.0`,
+`finalizePerFrame: 1`), so the per-frame worst case is one chunk's scan.
+Measured standalone on the largest chunk shape in the census (44,157 tris),
+using the real index layout — the wall extruder pushes 4 CONSECUTIVE verts per
+quad, so access is spatially coherent:
+
+| layout | median | p95 | max |
+| --- | --- | --- | --- |
+| coherent (realistic) | **0.264 ms** | 0.758 ms | 0.956 ms |
+| random indices (cache-hostile, not the real layout) | 0.454 ms | 2.752 ms | 9.171 ms |
+
+The realistic figure fits inside the 1.0 ms budget on the biggest chunk that
+exists. The random-index row is reported because I measured it first and it
+looks alarming — it is not the shipped access pattern, but the honest reading
+is that this filter is memory-bound, so a future geometry layout that
+scatters indices would make it expensive.
+
+Empirically there is no regression: `verify-settle` (the stutter gate) and
+`verify-stability` both PASS, and the GREEN windows sustained ~187 fps.
+
+### 4.3 The filter's own arithmetic
 
 Census before: 28 meshes, 482,740 tris, **34,405 zero-area**.
 Census after: 28 meshes, 448,335 tris, **0 zero-area**.
