@@ -353,7 +353,7 @@ Run against `:3021`. **No frozen assertion number was moved.**
 | verify-stability | **PASS** | |
 | verify-settle | **PASS** | |
 | verify-round11 | **PASS** | |
-| verify-weather | **PASS** | first run FAILED on a HARNESS error I caused — §5.2 |
+| verify-weather | **PASS** | 28/28 on the quiet re-run; two detours, both mine to explain — §5.2, §5.3 |
 | **verify-flicker** | **FAIL (2)** | **PRE-EXISTING — not mine, proven in control** |
 | `npm run build` | **PASS** | |
 
@@ -371,6 +371,39 @@ quiet re-run is green.
 
 Rule for the next agent: **never build while a browser gate is running against
 the dev server.** Sequence the production leg after the dev sweep.
+
+### 5.3 verify-weather's rim gate is a coin, and I have four throws to show it
+
+The armed tree failed `rim stays a smooth gradient` at **19.0/255** against a
+bound of 18. I did not accept that as flake on the shape of it — the whole
+point of §5.1 was that a control decides ownership — so I ran the control, and
+the control **passed at 1.2**. That is the OPPOSITE of the flicker result and
+it looked like I had broken something.
+
+So I re-armed and ran it again:
+
+| run | tree | rim step | verdict |
+| --- | --- | --- | --- |
+| 1 | armed | *(no reading)* | harness error I caused (§5.2) |
+| 2 | armed | **19.0** | FAIL |
+| 3 | **control, `FLASH_GUARD.enabled:false`** | **1.2** | PASS |
+| 4 | armed | **8.7** | **PASS — 28/28** |
+
+Three readings across two code states: **19.0, 1.2, 8.7** — a 17.8/255 spread
+on a bound of 18. The gate's own header already says so, in the comment above
+the probe: *"run 1 passed at 14.1, run 3 failed >18 on identical code."*
+
+Why it is a coin: `RIM_BAND` is marked `[pencil]`, its header documents
+coordinates for a 1600×900 frame the harness does not use, and **the probe
+hides nothing** — no player, no traffic. That is exactly the R17 §7.1 lesson
+("a pixel-probe gate must not contain an actor it doesn't control"), still
+live in this gate. There is also no mechanism on my side: the filter removes
+triangles that contribute no pixels and no normals (§3.6b), and the rim band is
+sky.
+
+**Reported as flake, not smoothed** — and note that with 3 samples I cannot
+prove it. If someone wants certainty here, the fix is to give that probe a
+controlled pose, not to re-roll it.
 
 ### 5.1 verify-flicker (2) is not mine, and the control says so
 
