@@ -443,10 +443,25 @@ frozen number.
 4. **The wasted vertices remain.** The filter drops indices, not the ~4 verts
    per degenerate wall edge. They still cost transfer, memory and the O(nVerts)
    drape walk. A worker-side edge guard would recover that (§7.3).
-5. **Only satellite buildings are fixed.** The same `loadGeometry` closing-point
-   duplicate feeds the toy/Neon polygon path and the skyline builder, which
-   have their own extruders. I did not census them. If the flash is ever
-   reported in Neon, look there first.
+5. **Only satellite buildings are fixed, and I have CONFIRMED two more sites
+   carry the identical pattern.** The wall extrusion at
+   `lib/fly/toy-world/vector-tile.worker.js:1739` is the one I fixed
+   (downstream). The exact same wrap-around loop —
+   `for (let e = 0, j = ring.length - 1; e < ring.length; j = e++)` over rings
+   that `loadGeometry` has already closed with a clone of `ring[0]` — appears
+   at:
+   * **:3106** — the sat SKYLINE builder (`buildSatSkyline`), same
+     `pushV`-per-edge quad shape.
+   * **:4579** — the TOY/NEON building extruder.
+   (`:362` also matches the grep but is a point-in-polygon test, harmless.)
+
+   Both therefore emit ~2 zero-area wall triangles per ring by construction, as
+   satellite did. **I did not census or fix them** — whether they can flash
+   depends on their own material `side` mode and whether a bend perturbs their
+   projection, and each sits behind a different certification surface. The
+   user's report was satellite. If the flash is ever reported in Neon, or in
+   the skyline ring at altitude, start at those two line numbers, not from
+   scratch. The engine-side filter idiom here ports directly.
 6. **The user's recording was 1280x720 at Powell 233 m AGL banked, in
    production.** I reproduced at Powell and in production, but never at that
    exact bank/speed — the pose is uncontrolled in the harness. The mechanism is
