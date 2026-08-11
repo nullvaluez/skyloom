@@ -104,7 +104,6 @@ const path = require('path');
 const fs = require('fs');
 const { bootFly, unpinPins } = require('./_boot');
 const {
-  metricsOf,
   nightMetrics,
   decodeRaw,
   fmtMetrics,

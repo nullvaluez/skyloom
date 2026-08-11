@@ -6,6 +6,22 @@
  * same screenshots, so an A/B claim made in A's memo is directly comparable to
  * a threshold frozen in C's gate.
  *
+ * HOW TO USE IT (A and B — four lines, and please do not fork it):
+ *
+ *     const { nightMetrics, decodeRaw, fmtMetrics, readCensus, fmtCensus,
+ *             deltaMetrics } = require('./_night-metrics');
+ *     const census = await readCensus(page);                 // live __flyStats
+ *     const buf = await page.locator('.fixed.inset-0 canvas').first().screenshot();
+ *     const m = nightMetrics(await decodeRaw(buf), { groundBand: [0.55, 0.98] });
+ *     console.log(fmtCensus('before', census), fmtMetrics('before', m));
+ *     // …flip your flag, shoot again, then:
+ *     console.log(deltaMetrics(after, m));   // signed A−B on every scalar
+ *
+ * The canonical poses and their FROZEN bands live in
+ * `scripts/verify-night-alive.js` (P_MAN / P_POW / P_OWE / P_BB) — copy the
+ * band with the pose, always, or two agents' numbers stop being comparable
+ * for a reason neither of them will find quickly.
+ *
  * WHAT IT MEASURES, AND WHY EACH ONE EXISTS (plan §0 symptoms in brackets)
  *
  *   litFrac      [S1 "almost silent black"] — the share of GROUND-BAND pixels
