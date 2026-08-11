@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-11T12:22:25.009Z",
+  "generatedAt": "2026-08-11T13:08:14.729Z",
   "pose": {
     "name": "P-MAN",
     "geo": [
@@ -22,7 +22,7 @@
       "aerialOverride": null,
       "sunFrac": 0,
       "hdriBucket": "night",
-      "draws": 74,
+      "draws": 0,
       "windows": {
         "nightEnabled": true,
         "emissiveIntensity": 1.3,
@@ -83,7 +83,7 @@
       "aerialOverride": null,
       "sunFrac": 0,
       "hdriBucket": "night",
-      "draws": 74,
+      "draws": 0,
       "windows": {
         "nightEnabled": false,
         "emissiveIntensity": 0,
@@ -144,7 +144,7 @@
       "aerialOverride": null,
       "sunFrac": 0,
       "hdriBucket": "night",
-      "draws": 74,
+      "draws": 0,
       "windows": {
         "mounted": false
       },
@@ -197,7 +197,7 @@
       "aerialOverride": null,
       "sunFrac": 1,
       "hdriBucket": "day",
-      "draws": 74,
+      "draws": 47,
       "windows": {
         "nightEnabled": true,
         "emissiveIntensity": 0,
@@ -258,7 +258,7 @@
       "aerialOverride": null,
       "sunFrac": 1,
       "hdriBucket": "day",
-      "draws": 74,
+      "draws": 47,
       "windows": {
         "nightEnabled": false,
         "emissiveIntensity": 0,
@@ -319,7 +319,7 @@
       "aerialOverride": null,
       "sunFrac": 1,
       "hdriBucket": "day",
-      "draws": 74,
+      "draws": 47,
       "windows": {
         "mounted": false
       },
@@ -494,7 +494,7 @@
       "aerialOverride": 0,
       "sunFrac": 0,
       "hdriBucket": "night",
-      "draws": 0,
+      "draws": 47,
       "windows": {
         "mounted": false
       },
@@ -547,7 +547,7 @@
       "aerialOverride": 0,
       "sunFrac": 1,
       "hdriBucket": "day",
-      "draws": 46,
+      "draws": 47,
       "windows": {
         "nightEnabled": true,
         "emissiveIntensity": 0,
@@ -608,7 +608,7 @@
       "aerialOverride": 0,
       "sunFrac": 1,
       "hdriBucket": "day",
-      "draws": 46,
+      "draws": 47,
       "windows": {
         "nightEnabled": false,
         "emissiveIntensity": 0,
@@ -669,7 +669,7 @@
       "aerialOverride": 0,
       "sunFrac": 1,
       "hdriBucket": "day",
-      "draws": 46,
+      "draws": 47,
       "windows": {
         "mounted": false
       },
