@@ -491,6 +491,25 @@ const NIGHT_CENSUS = () => {
     },
     layers,
     emissive,
+    /* R23 W2 — A NIGHT-TRUTH's telemetry block, recorded verbatim and NEVER
+     * merged into the `night` block above: that one is C's own read of the
+     * layer stats and these are A's 2 Hz wall-clocked samples, and two
+     * instruments that agree are evidence only while they stay separable.
+     * `null` on any tree that predates A's merge — consumers must treat it as
+     * "not measured", never as "measured zero". */
+    telemetry: S.night ?? null,
+    /* The LIVE atmosphere state, read through FlyScene's own dev handle
+     * (`getAerialState` / `getQuiltGrade` / `getSatContentHaze`). `haze.max` is
+     * the CONTENT haze — the term A's F1 finding is about — and it is readable
+     * WITHOUT tiles, because it is a uniform, not a pixel. That is what makes
+     * the content-haze legs exercisable in an egress-blocked session. */
+    aerial: window.__flyAerial
+      ? {
+          post: window.__flyAerial.get?.() ?? null,
+          quilt: window.__flyAerial.quilt?.() ?? null,
+          haze: window.__flyAerial.haze?.() ?? null,
+        }
+      : null,
     pose: f
       ? {
           altM: Math.round(f.pos.y),
@@ -510,6 +529,10 @@ const NIGHT_CENSUS = () => {
       depth: window.__flyDepthPin ?? null,
       gov: window.__flyGovPin ?? null,
       weather: window.__flyWeatherOverride ?? null,
+      // R23 W2: the R19 plain-window aerial pin. `null` here means RELEASED
+      // (FlyScene tests `!= null`), which is what an un-pinned night leg wants.
+      aerialOverride: window.__flyAerialOverride ?? null,
+      satShadowOverride: window.__flySatShadowOverride ?? null,
       unpinned: window.__r22Unpinned ?? null,
       attempted: window.__r22PinAttempt ?? null,
     },
@@ -528,7 +551,12 @@ function fmtCensus(tag, c) {
     `el=${c.sky.elDeg}° state=${c.sky.state} roadMixN=${n.roadMix?.night ?? '—'} ` +
     `roads=${n.roads?.ready ?? '—'} bldg=${n.buildings?.ready ?? '—'} fade=${n.bldgFade ?? '—'} ` +
     `houseLights=${n.houseLights?.placed ?? '—'} glow=${n.cityGlow?.placed ?? '—'} ` +
-    `emissive=${c.emissive.meshes}(noMap ${c.emissive.withoutMap}) agl=${c.pose?.aglM ?? '—'}`
+    `emissive=${c.emissive.meshes}(noMap ${c.emissive.withoutMap}) agl=${c.pose?.aglM ?? '—'} ` +
+    `aerialPin=${c.pins?.aerialOverride ?? 'RELEASED'} contentHaze=${c.aerial?.haze?.max ?? '—'} ` +
+    `postAerial=${c.aerial?.post?.strength ?? '—'}` +
+    (c.telemetry
+      ? ` tel{tier=${c.telemetry.tier} haze=${c.telemetry.contentHaze} winEI=${c.telemetry.lit?.windowEI} winMap=${c.telemetry.lit?.windowMap}}`
+      : ' tel=absent')
   );
 }
 

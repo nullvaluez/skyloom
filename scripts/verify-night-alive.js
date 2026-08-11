@@ -69,6 +69,10 @@
  * GATES
  *   (0)  PRECONDITION — the un-pin took on the un-pinned pages, and the control
  *        page is genuinely pinned (`__r22PinAttempt` proof, never assumed).
+ *   (0b) PRECONDITION — the R19 `__flyAerialOverride` pin is RELEASED on the
+ *        un-pinned pages (A NIGHT-TRUTH's escalation §5.2). Without this the
+ *        gate inherits the fleet pin and reads `contentHaze 0` forever — the
+ *        F1 blindness, reproduced inside the instrument built to end it.
  *   (1)  PRECONDITION — every leg is DEEP NIGHT: skyElDeg <= -12, state 'night'.
  *   (2)  PRECONDITION — `DEPTH_PASS.enabled` is still false in source, so this
  *        harness's un-touched depth pin still represents the ship state.
@@ -91,6 +95,9 @@
  *  (12)  P-OWE DARK CONTROL — lit ceiling, dark floor, draws <= 261 (plan §5.1).
  *  (13)  P-BB low-AGL bridge pose — lit floor. Pose is a FROZEN STAND-IN, see
  *        the P_BB comment.
+ *  (13b) S2 GUARD — `windowEI > 0 ⇒ windowMap === true`, off A's telemetry.
+ *        Tile-independent and pixel-independent: the ONE assertion here that a
+ *        blocked session can certify once A's block exists. SOFT until then.
  *  (14)  zero page/console errors (app-origin; upstream tile noise classified).
  *
  * Run:  FLY_URL=http://localhost:3023 node scripts/verify-night-alive.js
@@ -352,6 +359,39 @@ const nightMsFor = (lon) => {
   return base + (23 - lon / 15) * 3600e3;
 };
 
+/**
+ * RELEASE THE R19 AERIAL PIN — A NIGHT-TRUTH's escalation §5.2, and it closes a
+ * hole this gate was about to ship with.
+ *
+ * `scripts/_boot.js` pins `window.__flyAerialOverride = 0` fleet-wide, and
+ * FlyScene multiplies BOTH the post-pass gate and the CONTENT-haze gate by it.
+ * As first built, this harness un-pinned the four R22 families and then
+ * inherited that pin like everyone else — so a gate whose entire purpose is
+ * "measure the world the user actually flies" would have read `contentHaze 0`
+ * forever, which is the F1 blindness reproduced inside the instrument built to
+ * end it.
+ *
+ * MECHANICS DIFFER from the four R22 pins deliberately: aerial is the R19-idiom
+ * PLAIN WINDOW VARIABLE, not the `unpinPins` accessor, and FlyScene tests
+ * `window.__flyAerialOverride != null` per frame. So "released" is `delete` —
+ * `undefined` fails the null check and the constants decide — and it can be
+ * done post-boot, which is exactly how verify-aerial (the one harness that owns
+ * this pin) drives it.
+ *
+ * ⚠️ NECESSARY, NOT SUFFICIENT, and the harness says so rather than implying a
+ * coverage it does not have: `contentGate` is `ch.enabled && !highTier && …`,
+ * so at tier HIGH the content term is 0 BY CONSTRUCTION however this pin is
+ * set. Every leg on this machine resolves 'high', so releasing the pin here
+ * makes the term OBSERVABLE (recorded per leg) but cannot make it NON-ZERO.
+ * The tier at which it exists is covered by verify-aerial's new medium legs.
+ */
+const releaseAerial = async (page) => {
+  await page.evaluate(() => {
+    delete window.__flyAerialOverride;
+  });
+  return page.evaluate(() => window.__flyAerialOverride ?? null);
+};
+
 /* ───────────────────────────────── main ──────────────────────────────── */
 (async () => {
   const browser = await chromium.launch({
@@ -551,6 +591,7 @@ const nightMsFor = (lon) => {
    * pre-mount is what the user gets, and measuring it is the entire point. */
   const live = await newFlyPage({ unpin: true });
   const bootLive = await bootFly(live, { style: 'satellite', ...BOOT_OPTS });
+  const aerialLive = await releaseAerial(live);
   info(`live-tier page booted in ${bootLive.ms} ms (tier NOT pinned)`);
   const manLive = await leg(live, 'MAN/unpinned/live', P_MAN, {
     dwell: DWELL_1,
@@ -574,6 +615,7 @@ const nightMsFor = (lon) => {
   /* ═════════════════ PAGE 2 — the user's world, tier pinned HIGH ══════════ */
   const high = await newFlyPage({ unpin: true });
   await bootFly(high, { style: 'satellite', ...BOOT_OPTS });
+  const aerialHigh = await releaseAerial(high);
   await high.evaluate(() => window.__flyStore.getState().setQualityTier('high'));
   await high.waitForTimeout(2500); // material/composer rebuild after a tier write
   const manHigh = await leg(high, 'MAN/unpinned/high', P_MAN, {
@@ -592,6 +634,16 @@ const nightMsFor = (lon) => {
    * opinion — and it is immune to upstream imagery drift, because both legs of
    * the ratio are measured in the same session against the same tileset (the
    * R21 lesson that a frozen number over a live tileset has a shelf life). */
+  /* THE CONTROL PAGE KEEPS THE AERIAL PIN, deliberately, and this changes what
+   * the ratio gates (9)/(10) mean — so it is stated rather than left implicit.
+   * The control is not "the R21 world": `__flyAerialOverride = 0` is a HARNESS
+   * pin, not a ship state, at R21 or any other round. What the control IS, is
+   * exactly the world the FLEET certifies — the R22 families pinned to legacy
+   * and R19's atmosphere pinned off — i.e. the frame verify-sat-night's 33
+   * gates have always graded. So the ratio spans "the world the user flies"
+   * against "the world the fleet certifies", which is a strictly more useful
+   * comparison for this round than either alone, and it is what the gate names
+   * say. Both aerial states are recorded per leg. */
   let manCtl = null;
   let powCtl = null;
   if (!process.env.R23_SKIP_CONTROL) {
@@ -702,6 +754,18 @@ const nightMsFor = (lon) => {
         pinsOf(manCtl).depth === 1,
       JSON.stringify(pinsOf(manCtl))
     );
+
+  // (0b) THE AERIAL PIN IS RELEASED on the un-pinned pages, and still set on
+  //      the control. A's escalation §5.2 — proved, not assumed, exactly like
+  //      the R22 pins above.
+  gate(
+    'the R19 AERIAL pin is RELEASED on both un-pinned pages (A §5.2)',
+    aerialLive === null && aerialHigh === null,
+    `live=${aerialLive} high=${aerialHigh}` +
+      (manCtl ? ` · control still pinned at ${pinsOf(manCtl).aerialOverride}` : '') +
+      ` · NOTE contentGate is !highTier-gated, so at tier '${manLive.census.tier}' the content` +
+      ` term is 0 BY CONSTRUCTION however this pin is set — verify-aerial's medium legs cover it`
+  );
 
   // (1) DEEP NIGHT everywhere.
   const allLegs = Object.values(results.legs);
@@ -822,6 +886,47 @@ const nightMsFor = (lon) => {
     bbLive.m.litFrac >= T.BB_LIT,
     `${(bbLive.m.litFrac * 100).toFixed(3)}% warm=${(bbLive.m.warmLitFrac * 100).toFixed(1)}% agl=${bbLive.census.pose?.aglM}`
   );
+
+  /* (13b) THE S2 BUILDING-PATH GUARD — tile-independent, and the only gate in
+   * this file that would have caught "some buildings have a white glow" at its
+   * mechanism rather than at its pixels. An emissive with a live intensity and
+   * no bound map renders as a flat white-ish glow (plan §2 H3), and A's
+   * telemetry publishes both halves, so the invariant is one line:
+   *      windowEI > 0  ⇒  windowMap === true
+   * It needs no imagery, no vector tiles and no pixels — which is why it is the
+   * one new assertion that can be certified in an egress-blocked session, once
+   * A's block exists. SOFT until then: an assertion over a field that is
+   * `undefined` is not a pass, it is a measurement that did not happen. */
+  {
+    const withTel = allLegs.filter((r) => r.census.telemetry?.lit);
+    if (!withTel.length) {
+      soft(
+        'S2 guard: window emissive without a map (windowEI > 0 ⇒ windowMap)',
+        '__flyStats.night.lit absent — owner A, lands with the R23 merge (this branch predates it)'
+      );
+    } else {
+      const bad = withTel.filter(
+        (r) => (r.census.telemetry.lit.windowEI ?? 0) > 0 && r.census.telemetry.lit.windowMap !== true
+      );
+      gate(
+        'S2 guard: no window emissive is lit WITHOUT its atlas (windowEI > 0 ⇒ windowMap)',
+        bad.length === 0,
+        bad.length
+          ? bad
+              .map(
+                (r) =>
+                  `${r.legTag} EI=${r.census.telemetry.lit.windowEI} map=${r.census.telemetry.lit.windowMap}`
+              )
+              .join(' | ')
+          : withTel
+              .map(
+                (r) =>
+                  `${r.legTag} EI=${r.census.telemetry.lit.windowEI}/map=${r.census.telemetry.lit.windowMap}`
+              )
+              .join(' · ')
+      );
+    }
+  }
 
   // (14) errors.
   if (externalBlips.length)
