@@ -243,6 +243,32 @@ called in `_finalizePending` immediately before `setIndex` and
   returns the input array untouched when nothing is dropped — a clean chunk
   allocates nothing.
 
+### 3.6b The fix is provably shading-neutral
+
+I wrote in the first draft of the code comment that filtering before
+`computeVertexNormals` "stops a degenerate perturbing its neighbours'
+shading". **That overclaimed, and checking it produced a better fact.**
+
+`computeVertexNormals` accumulates a face normal per triangle as
+`cross(c-b, a-b)`. For a coincident-vertex triangle and for a collinear one
+that cross product is exactly `(0,0,0)` — so a degenerate contributes
+*nothing* to the accumulation and never perturbed anything. Verified directly
+against this repo's three build with a quad plus one coincident and one
+collinear degenerate:
+
+```
+with degenerates   : 0,0,1, 0,0,1, 0,0,1, 0,0,1
+without degenerates: 0,0,1, 0,0,1, 0,0,1, 0,0,1
+NORMALS IDENTICAL on the real vertices: true
+```
+
+So the correct statement is the stronger one: **removing these triangles
+cannot change the shading of any surviving vertex.** Combined with the fact
+that a zero-area triangle covers no pixels when it rasterizes correctly, the
+fix is pixel-neutral on every well-behaved frame by construction, and the only
+frames it changes are the defective ones. The comment in the source now says
+that instead.
+
 **Revert contract:** `FLASH_GUARD.enabled: false` ⇒ the index buffer is used
 verbatim, one branch, byte-identical to R22. Runtime pin `__flyFlashPin='off'`
 gives the same RED tree without a rebuild (A's `__flyStepSafePin` idiom); it is
