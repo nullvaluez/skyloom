@@ -20,3 +20,11 @@ repomix-output.xml
 *.log
 .DS_Store
 Thumbs.db
+.probe-out-*/
+.probe-selftest/
+.probe-calib/
+.probe-red15/
+.probe-red15t/
+.probe-nat/
+.probe-green15/
+.probe-red-pin/

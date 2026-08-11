@@ -18,6 +18,7 @@ import {
   EffectAttribute,
 } from 'postprocessing';
 import { FX_STABILITY } from '@/lib/fly/fly-constants';
+import { registerStepSafeComposer } from '@/lib/fly/step-safe';
 
 /**
  * ROUND 21 (A GOVERNOR, S2 + S3) — a vendored fork of
@@ -190,6 +191,20 @@ const StableEffectComposer = /* @__PURE__ */ memo(
       return () => {
         if (window.__flyComposer === composer) delete window.__flyComposer;
       };
+    }, [composer]);
+
+    // ROUND 22.1 (A FLASH, STEP_SAFE): the in-tick resize seam. The size
+    // effect below is PASSIVE — it lands a whole frame after r3f has already
+    // reallocated the drawing buffer, and the frame composed in between runs
+    // against buffers of the wrong size (measured: exactly one per DPR step).
+    // Handing the live composer to the rig lets the DPR step resize renderer
+    // and post chain in the same animation frame, before anything draws. The
+    // effect below stays exactly as it was: it is still the ONLY resize path
+    // for a window resize, for the flag-off tree, and for the ladder's own
+    // catch-up (where it now finds the buffers already correct and skips).
+    useEffect(() => {
+      if (!composer) return undefined;
+      return registerStepSafeComposer(composer);
     }, [composer]);
 
     // ---- (ii) size, keyed on CSS size AND device pixel ratio -------------
