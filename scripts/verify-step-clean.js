@@ -82,6 +82,7 @@
  *  (8) zero draw-count collapses (the world never vanishes for a frame)
  *  (9) the React catch-up is a true no-op — exactly one realloc per step
  * (10) a live un-pinned window at the pose holds (4)-(8)
+ * (12) SAME-FRAME PROOF — the frame that resized is the frame that drew
  * (11) zero pageerrors
  *
  * Run: FLY_URL=http://localhost:3021 node scripts/verify-step-clean.js
@@ -135,8 +136,12 @@ const INSTALL_TRACE = () => {
   window.__traceOn = false;
   window.__inRaf = false;
   window.__drawCount = 0;
+  window.__rafSeq = 0;
   const push = (ev, o) => {
-    if (window.__traceOn) T.push(Object.assign({ t: +performance.now().toFixed(2), ev }, o));
+    if (window.__traceOn)
+      T.push(
+        Object.assign({ t: +performance.now().toFixed(2), ev, raf: window.__rafSeq }, o)
+      );
   };
   window.__tracePush = push;
 
@@ -172,9 +177,20 @@ const INSTALL_TRACE = () => {
   patch(window.WebGLRenderingContext?.prototype);
   patch(window.WebGL2RenderingContext?.prototype);
 
+  // Every animation-frame CALLBACK BATCH shares one sequence number: r3f, the
+  // HUD and troika each schedule their own rAF, and the browser runs all the
+  // callbacks registered for a given frame back to back. Bumping on the first
+  // callback whose timestamp differs from the last is what makes __rafSeq
+  // identify the FRAME rather than the callback — which is exactly what the
+  // same-frame proof (gate 12) needs.
+  let lastTs = -1;
   const raf = window.requestAnimationFrame.bind(window);
   window.requestAnimationFrame = (cb) =>
     raf((ts) => {
+      if (ts !== lastTs) {
+        lastTs = ts;
+        window.__rafSeq++;
+      }
       window.__inRaf = true;
       try {
         return cb(ts);
@@ -191,9 +207,14 @@ const INSTALL_TRACE = () => {
  * i.e. the pixels the compositor is about to present.
  */
 const PATCH_COMPOSER = () => {
-  const gl = window.__flyGl;
   const comp = window.__flyComposer;
+  // `window.__flyGl` is dev-only (FlyCanvas onCreated). `__flyComposer` is
+  // published unconditionally and postprocessing's composer owns the renderer,
+  // so this gate can also be pointed at a PRODUCTION build — which is where
+  // the user's frame came from.
+  const gl = window.__flyGl ?? comp?.getRenderer?.() ?? comp?.renderer ?? null;
   if (!gl || !comp) return { gl: !!gl, composer: !!comp };
+  window.__flyGlResolved = gl;
   const p = window.__tracePush;
 
   const sp = gl.setPixelRatio.bind(gl);
@@ -240,6 +261,7 @@ const PATCH_COMPOSER = () => {
       }
       S.push({
         t: +performance.now().toFixed(2),
+        raf: window.__rafSeq,
         d: window.__drawCount - d0,
         bw: comp.inputBuffer?.width ?? 0,
         dbw: W,
@@ -292,7 +314,7 @@ async function leg(browser, dsf, out) {
     unpinnedGov: window.__r21GovPinAttempt !== undefined,
     unpinnedSettle: window.__r22PinAttempt?.__flySettlePin !== undefined,
     style: window.__flyStore?.getState?.().mapStyle ?? null,
-    dbw: window.__flyGl?.getContext?.().drawingBufferWidth ?? null,
+    dbw: window.__flyGlResolved?.getContext?.().drawingBufferWidth ?? null,
   }));
 
   await page.evaluate(() => {
@@ -305,7 +327,7 @@ async function leg(browser, dsf, out) {
   const steps = [];
   for (let s = 0; s < STEP_N; s++) {
     const dir = s % 2 === 0 ? -1 : +1;
-    const before = await page.evaluate(() => window.__flyGl.getContext().drawingBufferWidth);
+    const before = await page.evaluate(() => window.__flyGlResolved.getContext().drawingBufferWidth);
     // Force from INSIDE a rAF: the production path is PerfGovernor's useFrame
     // raising the state change, and React schedules a rAF-raised update
     // differently from one raised in a plain task.
@@ -322,7 +344,7 @@ async function leg(browser, dsf, out) {
     );
     await page.waitForTimeout(900);
     const after = await page.evaluate(() => ({
-      dbw: window.__flyGl.getContext().drawingBufferWidth,
+      dbw: window.__flyGlResolved.getContext().drawingBufferWidth,
       st: window.__flyGov.state(),
     }));
     steps.push({ s, dir, before, after: after.dbw, dpr: after.st.dpr, rung: after.st.rung });
@@ -384,11 +406,21 @@ function analyse(phase) {
       }
     }
   }
+  // THE SAME-FRAME PROOF. For every drawing-buffer realloc, was there a
+  // composed frame IN THAT SAME animation frame, and did it render at the NEW
+  // size? If yes, the compositor never had a chance to see the reallocated
+  // (cleared) surface: the frame that resized is the frame that drew.
+  const widthReallocs = trace.filter((r) => r.ev === 'realloc.width');
+  const sameFrame = widthReallocs.filter((r) =>
+    composed.some((s) => s.raf === r.raf && s.dbw === r.to)
+  );
   return {
     frames: composed.length,
     reallocs: reallocs.length,
     outRaf: outRaf.length,
     mismatch: mismatch.length,
+    widthReallocs: widthReallocs.length,
+    sameFrame: sameFrame.length,
     medL,
     medD,
     pale: paleF.length,
@@ -479,6 +511,12 @@ async function main() {
       `(10) live window holds ${p}`,
       L.outRaf === 0 && L.mismatch === 0 && L.pale === 0 && L.black === 0 && L.collapse === 0,
       `outRaf ${L.outRaf} mismatch ${L.mismatch} pale ${L.pale} black ${L.black} collapse ${L.collapse}`
+    );
+    gate(
+      `(12) SAME-FRAME PROOF — the animation frame that resized also drew at the new size ${p}`,
+      F.widthReallocs > 0 && F.sameFrame === F.widthReallocs,
+      `${F.sameFrame}/${F.widthReallocs} reallocs followed by a composed frame with the ` +
+        `same __rafSeq and the new drawing-buffer width (RED 0/12)`
     );
     gate(`(11) zero pageerrors ${p}`, r.errs.length === 0, r.errs.slice(0, 3).join(' | '));
   }
