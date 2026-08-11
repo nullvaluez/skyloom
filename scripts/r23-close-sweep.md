@@ -226,7 +226,7 @@ machine.*
 | Harness | Baseline | Note |
 |---|---|---|
 | `verify-night-alive` (NEW) | **BLOCKED** (exit 2) | its own gate (3b) reports the blockade by name; `r23-c-red-baseline.txt` |
-| `verify-sat-night` (33) | **BLOCKED** | see §4c for the exact failure signature |
+| `verify-sat-night` (33) | **BLOCKED**, run TERMINATED | **8 PASS / 7 FAIL** through the (E) climb before C killed it; see §4c for the exact signature and for two reds that are the WRONG red |
 | `verify-dusk` (15) | **BLOCKED** — not run | needs Powell imagery + the sky ladder |
 | `verify-terra` (17) | **BLOCKED** — not run | every gate is a tile-zoom or a request count; with 0 successful requests it can only report the network |
 | `verify-settle` (14) | **BLOCKED** — not run | ⚠️ also carries C's unvalidated un-pin (§2 item 3) |
@@ -245,8 +245,12 @@ not assumed.**
 
 ### 4c `verify-sat-night` under the blockade — the signature
 
-Run in full on base `f009263` against `:3023`; log preserved as
-**`scripts/r23-c-satnight-blocked.txt`**. It is recorded because the round's
+Run on base `f009263` against `:3023` and **TERMINATED by C after the (E) climb
+block** — it had produced the whole signature by then, and it was stalled in the
+(E) quiescence loop (13 min on one block) with nothing left to learn from JFK or
+cruise on a world with no tiles. Log preserved, with that annotation appended to
+it, as **`scripts/r23-c-satnight-blocked.txt`**. **Recorded as TERMINATED, never
+as PASS or FAIL.** It is recorded because the round's
 central legacy gate must be *distinguishable* from a real failure the next time
 it is red, and because the answer to "does the legacy fleet self-report a
 blockade?" turns out to be **yes, but only structurally, and not by name**.
@@ -264,7 +268,7 @@ blockade?" turns out to be **yes, but only structurally, and not by name**.
 | noon road mix | **PASS** — `{night:0, day:1}`; `emptyByReason {noData:16}`, `errorRetries 80` | by now the backoff has classified all 16 chunks as `noData` (§5b.3) |
 
 **The lesson to carry.** Under a total upstream blackout verify-sat-night goes
-red — but **six of its assertions still PASS**, including its headline "the sun
+red — but **8 of its 15 executed assertions still PASS**, including its headline "the sun
 is pinned to night" and its fade-curve gate, and two of its reds are the *wrong
 red* (a sampling artefact reported as a draw-budget breach; a census invariant
 that is vacuously true at zero). Nothing in its output contains the words

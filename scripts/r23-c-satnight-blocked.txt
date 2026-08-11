@@ -28,3 +28,10 @@ FAIL ring ALIVE past the old R13 evict altitude (ready ≥ 3 at 2700 m) — {"re
 PASS cull fade is mid-dissolve at 2700 m (0 < fade < 1) — fade=0.5001908144255611
 FADE @3100: {"ready":0,"fade":0,"agl":3100}
 FAIL fully dithered away by 3100 m (fade ≈ 0, chunks still resident) — {"ready":0,"fade":0,"agl":3100}
+
+--- TERMINATED BY C (R23), not a completed run ---
+Killed after the (E) climb block. The run had already produced the full blockade
+signature recorded in scripts/r23-close-sweep.md 4c, and the remaining legs
+(JFK / cruise / kill-switch) can add nothing on a world with no tiles. It was
+stalled in the (E) quiescence loop and would otherwise have hit its own 25-minute
+wall-clock timeout. Recorded as TERMINATED, never as PASS or FAIL.
