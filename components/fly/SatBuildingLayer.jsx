@@ -5,6 +5,7 @@ import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
 import { SatBuildingEngine } from '@/lib/fly/toy-world/sat-building-engine';
 import {
+  NIGHT_CITY_R23,
   PARCEL_HOMES,
   SAT_AMBIENT,
   SAT_BLDG_FADE,
@@ -26,6 +27,7 @@ import {
   makeUniformBirth,
   notePopin,
 } from '@/lib/fly/settle';
+import { nightCityOn } from '@/lib/fly/night-city';
 import { getSatBldgFade, setSatBldgFade } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
 import { SatVegLayer } from './SatVegLayer';
@@ -67,9 +69,26 @@ export function SatBuildingLayer({ runtime, flight }) {
     engine.setFacadeEnabled(
       SAT_BUILDINGS.facade.enabled && atLeastTier(qualityTier, SAT_BUILDINGS.facade.minTier)
     );
+    // R23 (B CITY-LIGHT) — THE TIER QUESTION, behind NIGHT_CITY_R23.tier.
+    // `SAT_BUILDINGS.night.minTier` ('high') is a 2026-07 perf call, and it is
+    // the reason a session that settles at MEDIUM has no window lights at all —
+    // which is exactly the user's "very few show lights in windows". The
+    // constant is NOT edited: armed, the gate reads NIGHT_CITY_R23.tier's floor
+    // instead, so the shipped tree is unchanged and the flip is one review.
+    const nightMinTier = nightCityOn('tier')
+      ? NIGHT_CITY_R23.tier.nightMinTier
+      : SAT_BUILDINGS.night.minTier;
     engine.setNightWindowsEnabled(
-      SAT_BUILDINGS.night.enabled && atLeastTier(qualityTier, SAT_BUILDINGS.night.minTier)
+      SAT_BUILDINGS.night.enabled && atLeastTier(qualityTier, nightMinTier)
     );
+    if (process.env.NODE_ENV === 'development' && window.__flyStats) {
+      window.__flyStats.satNightGate = {
+        tier: qualityTier,
+        minTier: nightMinTier,
+        shippedMinTier: SAT_BUILDINGS.night.minTier,
+        on: SAT_BUILDINGS.night.enabled && atLeastTier(qualityTier, nightMinTier),
+      };
+    }
   }, [engine, qualityTier]);
   // Round 19 (A HOMESTEAD, P2) — HIGH-TIER-ONLY coverage widen. The field
   // study found building coverage effectively zero outside downtown cores:
