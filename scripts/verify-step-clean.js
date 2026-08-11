@@ -302,8 +302,15 @@ async function leg(browser, dsf, out) {
 
   const { ms } = await bootFly(page, { ...BOOT_OPTS, style: 'satellite' });
   const patched = await page.evaluate(PATCH_COMPOSER);
-  await page.evaluate(
-    ([la, lo, al]) => window.__fly.warpToGeo(la, lo, { altM: al, name: 'Powell OH' }),
+  // `window.__fly` is dev-only. Against a PRODUCTION build the gate flies from
+  // the boot spawn instead — the pose changes what is on screen, not what the
+  // ladder does to the drawing buffer, so every assertion here still holds.
+  const warped = await page.evaluate(
+    ([la, lo, al]) => {
+      if (!window.__fly?.warpToGeo) return false;
+      window.__fly.warpToGeo(la, lo, { altM: al, name: 'Powell OH' });
+      return true;
+    },
     [POSE.lat, POSE.lon, POSE.altM]
   );
   await page.waitForTimeout(9000);
@@ -313,7 +320,7 @@ async function leg(browser, dsf, out) {
     gov: window.__flyGov?.state?.() ?? null,
     unpinnedGov: window.__r21GovPinAttempt !== undefined,
     unpinnedSettle: window.__r22PinAttempt?.__flySettlePin !== undefined,
-    style: window.__flyStore?.getState?.().mapStyle ?? null,
+    style: window.__flyStore?.getState?.().mapStyle ?? 'unknown-prod',
     dbw: window.__flyGlResolved?.getContext?.().drawingBufferWidth ?? null,
   }));
 
@@ -382,7 +389,7 @@ async function leg(browser, dsf, out) {
   });
 
   await ctx.close();
-  return { dsf, bootMs: ms, patched, env, steps, forced, live, liveSteps, errs, out };
+  return { dsf, bootMs: ms, patched, warped, env, steps, forced, live, liveSteps, errs, out };
 }
 
 function analyse(phase) {
@@ -415,6 +422,8 @@ function analyse(phase) {
     composed.some((s) => s.raf === r.raf && s.dbw === r.to)
   );
   return {
+    paleRows: paleF.slice(0, 6),
+    blackRows: blackF.slice(0, 6),
     frames: composed.length,
     reallocs: reallocs.length,
     outRaf: outRaf.length,
@@ -468,11 +477,35 @@ async function main() {
         `pale ${L.pale} black ${L.black} collapse ${L.collapse}`
     );
 
+    // A failing content gate must SHOW what it saw, and against which step:
+    // "3 pale frames" is not actionable, "3 pale frames, none within 200 ms of
+    // a realloc, median draws normal" is.
+    for (const [phase, A] of [
+      ['FORCED', F],
+      ['LIVE', L],
+    ]) {
+      for (const row of [...A.paleRows, ...A.blackRows]) {
+        const near = (phase === 'FORCED' ? r.forced.trace : r.live.trace)
+          .filter((t) => t.ev === 'realloc.width' && Math.abs(t.t - row.t) < 200)
+          .map((t) => `${(row.t - t.t).toFixed(0)}ms after ${t.from}->${t.to}`);
+        console.log(
+          `   ANOMALY ${phase} cframe ${row.i} t ${row.t} raf ${row.raf} L ${row.L} ` +
+            `max ${row.mx} paleRun ${row.pr} draws ${row.d} bw ${row.bw} dbw ${row.dbw} · ` +
+            `nearest realloc: ${near.length ? near.join(', ') : 'NONE within 200 ms'}`
+        );
+      }
+    }
+
     const p = `dsf${dsf}`;
     gate(
       `(1) precondition ${p}`,
-      r.env.style === 'satellite' && !!r.env.gov && r.patched.composer === true && F.frames > 200,
-      `style ${r.env.style} composer ${r.patched.composer} frames ${F.frames}`
+      // `style` and `warped` come off dev-only handles; against a production
+      // build they read 'unknown-prod' / false and the gate rests on the
+      // handles that ARE published in production (governor + composer) plus a
+      // real frame population.
+      !!r.env.gov && r.patched.composer === true && F.frames > 200,
+      `style ${r.env.style} composer ${r.patched.composer} frames ${F.frames} ` +
+        `warped ${r.warped}`
     );
     const ss = r.forced.stepSafe;
     if (PIN_OFF) {

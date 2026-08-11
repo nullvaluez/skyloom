@@ -5,6 +5,77 @@ Branch `r22p1/flash` off main `5d6c09d`. Worktree
 
 ---
 
+## ⚠ HEADLINE — THE DIAGNOSIS WAS WRONG, AND I HAVE THE RIGHT ONE
+
+**The user's flash is a CLOUD BILLBOARD passing across the camera for one
+frame. It is not the DPR step, and it is not a compositor artifact.**
+
+Reproduced, on this machine, in BOTH the dev and the production build, and
+A/B-proven:
+
+| leg | composed frames | pale frames |
+| --- | --- | --- |
+| clouds ON (satellite, default NYC spawn, ALT 2625 ft) | 2,236 / 3,189 / 3,749 / 3,791 / 23,987 across five runs | ~1 per 1,600 |
+| **`window.__flyClouds.visible = false`, everything else identical** | **30,499** | **0** |
+
+`scripts/r22p1-a-cloudflash-partial.png` is a captured frame with the middle
+scanline 86.4% pale: a uniform pale field with a **dead-straight vertical
+boundary** and the live world — sky, horizon, city — fully rendered beyond it.
+`scripts/r22p1-a-cloudflash-next.png` is the very next composed frame: a
+perfectly normal scene. That pair is the user's f691/f692.
+
+What this corrects, point by point:
+
+* **The right-hand strip was never "stale".** It is the world beyond the edge
+  of the cloud quad. I had already measured this without believing it: in the
+  user's clip the right band changes between f690 and f691 by 0.72 mean abs
+  diff against 1.07 for a two-frame step — a normal one-frame advance, not a
+  frozen region.
+* **The straight vertical boundary is the billboard's edge**, which is exactly
+  why it is straight to ±1 px over 41 sixteen-row bands.
+* **1067/1280 = 0.8333 = 1.25/1.5 is a COINCIDENCE.** My own captured frame
+  puts the same boundary at 0.864, and other captures at 0.731 and 0.837. The
+  coverage fraction is a continuous variable set by how the puff happens to
+  sit in front of the lens, not a fixed ladder ratio.
+* **The pale colour is a lit white cloud saturating the post chain.** That is
+  why §1.2's uniform-white calibration matched the recorded frame to ±4/255 —
+  the input really was saturated white.
+* **The HUD stays intact, the draw count is normal, and the draw list is
+  byte-identical to the previous frame** (measured via
+  `renderBufferDirect`) — because nothing about the scene changed except where
+  one puff was.
+
+Bisection trail, in order, each one eliminating a suspect: post-chain uniforms
+(every effect's uniforms identical on the pale frame vs the one before it) →
+`scene.background` / `backgroundIntensity` / `environmentIntensity` /
+`toneMapping` / exposure (all identical) → the draw list (identical) →
+tracers parked (2 pale in 3,249 — not them) → **clouds parked (0 in 30,499)**.
+
+Mechanism, as far as the code shows: `CloudField` places every puff at a
+toroidal offset from the player, `wrap(p.cx*f + p.dx + driftX - px, half,
+cell)`, with **no near-camera exclusion in XZ**. A puff whose wrap or drift
+brings it directly over the camera subtends the whole frustum; its material is
+`#ffffff`, `lit: true`, so under the daylight key + env it clears 1.0 linear
+and saturates. Line-level attribution inside CloudField (why it is exactly ONE
+frame rather than a visible pass-through) is NOT done — that belongs to
+whoever owns that file, with the cloud gates in hand.
+
+**Recommended fix (not implemented here — out of my brief and it moves cloud
+placement, which several frozen pixel gates read):** a near-camera exclusion
+or opacity ramp in `CloudField` — refuse to place, or fade out, any puff whose
+distance to the camera is below its own billboard radius. Gates that would
+need re-running: verify-round11, verify-weather, verify-sat-night,
+verify-dusk, verify-flicker.
+
+**What I did ship** is below: `STEP_SAFE`, which fixes a real, measured,
+100%-reproducible LATENT hazard in the same area (the drawing buffer is
+reallocated between animation frames, and one composed frame per DPR step runs
+against post-chain buffers of the wrong size). It is proven, flag-reversible
+and green on every frozen gate — but it does **not** fix the user's flash, and
+this ledger must not be read as claiming it does.
+
+---
+
 ## 0. The brief, and what actually turned out to be true
 
 The defect: on the shipped R22 production build (shadowads.netlify.app), the
@@ -123,23 +194,20 @@ Two hazards fall out, both measured:
 
 Neither hazard is disputable; both are 100% reproducible.
 
-### 2.1 What I could NOT reproduce, stated plainly
+### 2.1 The DPR step never produced a pale frame — and that was the clue
 
-**The pale frame itself never appeared on this machine.** ~46 forced steps and
-4 natural ladder descents, across: headless Chrome, headed Chrome (real GPU),
-dev build, 6x and 8x CPU throttling, dsf 1.5 and 1.0, both step directions.
-The mismatch frame (H2) renders correctly here — postprocessing's final pass
-resamples a 1920-wide input into a 1600-wide viewport and covers it fully.
+~46 forced steps and 4 natural ladder descents, across headless Chrome, headed
+Chrome (real GPU), dev, 6x and 8x CPU throttling, dsf 1.5 and 1.0, both
+directions: **zero pale frames**. The mismatch frame (H2) renders correctly
+here — postprocessing's final pass resamples a 1920-wide input into a
+1600-wide viewport and covers it fully.
 
-So the causal chain "DPR step → pale frame" is **evidenced, not reproduced**:
-the geometry pins the trigger to the 1.5→1.25 rung with an exact ratio and a
-straight boundary, and the fix closes the only two windows in which anything
-other than a correctly-sized freshly-drawn frame can reach the compositor.
-What remains unproven is **which upstream value saturated to white**. I ruled
-out: a cleared buffer (black, §1.3), a background-only frame (that renders the
-HDRI sky, not white — screenshot in `.probe-selftest/held-blank.png`), and the
-scene fog colour `#c6d7e8` (it grades to a blue-ish 211/219/225, not the
-observed neutral 228/228/228).
+I treated that as "not reproduced on this hardware" for too long. It was
+actually the correct answer: the DPR step does not do this. The pale frame
+turned up the moment I ran the gate against a pose the fleet never flies (the
+un-warped default spawn, which the production leg had to use because
+`window.__fly` is dev-only) — see the headline. Two hazards were real all the
+same, and STEP_SAFE closes them; the flash was somewhere else entirely.
 
 ### 2.2 The instrument had to be replaced, and that is itself a finding
 
@@ -323,13 +391,45 @@ Zero frozen assertion numbers moved. No sanctions requested.
 
 ---
 
+## 7.1 The production leg — where the real defect surfaced
+
+`npm run build` passes. The gate can be pointed at `next start` (it resolves
+the renderer off `composer.getRenderer()` because `window.__flyGl` is
+dev-only), and against production it flies the un-warped default spawn because
+`window.__fly.warpToGeo` is dev-only too.
+
+Production leg, dsf 1.5, 16 forced steps + a 45 s live window:
+
+| gate | result |
+| --- | --- |
+| (2) STEP_SAFE armed + consuming | PASS — 16 requested / 16 applied / valve 0 |
+| (3) every step moved the drawing buffer | PASS — 16/16, 1920 ↔ 1600 |
+| (4) no realloc outside a rAF | PASS — 0/32 |
+| (5) no buffer mismatch | PASS — 0 |
+| (12) same-frame proof | PASS — 16/16 |
+| (6)/(10) no PALE composed frame | **FAIL — 5 pale frames** |
+
+STEP_SAFE therefore works identically under the production React build. The
+PALE failures are the cloud defect, at a pose the frozen fleet never flies:
+3 of the 5 were nowhere near a realloc, all had normal draw counts and
+agreeing buffers, and two were 313 ms apart. That failure is the reason this
+round has a real root cause instead of a plausible one — the content gate did
+its job on the first pose that was not the pinned harness pose.
+
+**Consequence for the gate:** with no warp available, the pose is
+uncontrolled, so the PALE/BLACK content gates cannot distinguish "the world
+went white" from "a cloud crossed the lens". They stay BLOCKING at the
+controlled Powell pose (dev), where they are 0 over 66,213 frames. Whoever
+adds a production leg to the fleet must either demote them to informational
+there or park the cloud deck first.
+
+---
+
 ## 8. Open risks
 
-1. **The pale colour is unexplained.** The fix closes the presentation
-   windows; if the white came from somewhere else entirely (a one-frame
-   saturated grade/exposure/environment value) and merely COINCIDED with a DPR
-   step, it can recur. The gate's PALE/BLACK read-back gates are the tripwire
-   for that, and they run over the live window too.
+1. **THE USER'S DEFECT IS STILL OPEN.** STEP_SAFE does not fix it. The cloud
+   fix is unimplemented and unowned. Until it lands the user will keep seeing
+   the flash, and a re-report must not be read as "the fix failed".
 2. **Window resizes are not covered.** A CSS `size` change goes through the
    same r3f subscriber, outside the frame loop, and STEP_SAFE only intercepts
    the DPR path. Deliberate: minimal, targeted change. A resize is user-driven
@@ -340,7 +440,13 @@ Zero frozen assertion numbers moved. No sanctions requested.
 4. **The legacy PerformanceMonitor path still has the defect.** Untouched by
    design (byte-identity contract). It is only reachable with
    `PERF_GOVERNOR.enabled:false`.
-5. **Not reproduced on the user's hardware.** The proof that this fixes the
-   user's frame is circumstantial (the exact 5/6 ratio + the straight
-   boundary + the ordering). A live confirmation on the user's machine is the
-   only thing that closes it.
+5. **The cloud reproduction is at the NYC default spawn, not the user's
+   Powell pose.** At Powell (AGL 233 m, weather pinned baseline) I saw zero
+   pale frames in 66,213 composed frames. The user was at AGL 233 m too — but
+   in production, with LIVE weather, which drives cloud coverage and the deck
+   the harness fleet never sees (`__flyWeatherOverride='baseline'` is a fleet
+   pin). Whoever takes the cloud fix should reproduce with the weather pin
+   OFF, not just at a different pose.
+6. **A defect this visible survived a full R22 certification** because every
+   browser gate flies pinned weather, a pinned pose and a pinned governor. The
+   first uncontrolled pose in this round found it in under three minutes.
