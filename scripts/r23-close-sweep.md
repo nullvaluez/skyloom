@@ -235,7 +235,7 @@ machine.*
 | `verify-flicker` (7) | **BLOCKED** — not run | |
 | `verify-sat-depth` | **BLOCKED** — not run | |
 | `verify-skyline` (17) | **BLOCKED** — not run | |
-| `verify-player-nose` | **BLOCKED** | boot times out at `.fixed.inset-0 canvas` — the TOY world streams from the same vector host, so the blockade is not satellite-only |
+| `verify-player-nose` | **BLOCKED** | `bootFly` reached `__flyBoot.pct === 100` and then timed out 30 s later waiting for `.fixed.inset-0 canvas` to be VISIBLE. The TOY world streams from the same vector host, so the blockade is **not satellite-only** — this is the row that proves it |
 
 **The rows marked "not run" were not run**, and that is a deliberate call rather
 than an omission: each costs 5–20 minutes to produce a foregone conclusion, and
@@ -245,9 +245,33 @@ not assumed.**
 
 ### 4c `verify-sat-night` under the blockade — the signature
 
-*(filled from `scripts/r23-c-satnight-blocked.txt`)*
+Run in full on base `f009263` against `:3023`; log preserved as
+**`scripts/r23-c-satnight-blocked.txt`**. It is recorded because the round's
+central legacy gate must be *distinguishable* from a real failure the next time
+it is red, and because the answer to "does the legacy fleet self-report a
+blockade?" turns out to be **yes, but only structurally, and not by name**.
 
-<!-- FILLED AT THE END OF W1 — see the file. -->
+| Gate | Reading | What it actually detected |
+|---|---|---|
+| sun pinned to night (road night mix ≈ 1) | **PASS** — `mix {night:1, day:0}`, `hdri night`, `sunFrac 0` | the sky machinery is entirely local: the night pin, the HDRI bucket and the road mix are all correct with zero tiles. **A night harness can be fully green on its sky and have no ground at all** |
+| road chunks stream (ready ≥ 3) | **FAIL** — `ready 0, chunks 8, queued 10, building 2, ringOn true, errorRetries 18` | the first honest red, and it names streaming, not lighting |
+| eye AGL / toy-invariant / stats-reported | **PASS** | pose and style plumbing are local too |
+| night roads draw measurably (layer Δ ≥ 1) | **FAIL** — `layerΔ 0 (133→133)` | correct: there is no layer |
+| total draws ≤ 375 at Manhattan night | **FAIL** — `draws = 0` | ⚠️ **an instrument artefact, not a budget breach.** `__flyStats.drawCalls` publishes on `frameCount % 60`; the probe sampled between a publish and a reset. The gate's own form (`draws > 0 && draws <= 375`) turns a *missing* sample into a *ceiling* failure. Same field read 133 seconds later in the same run |
+| SUN DRIVES UNIFORMS ONLY | **FAIL** — `night 0/0 meshes · noon 0/0 · materials 0/0 same=true · uRoadNight 1→0` | ⚠️ **the most interesting row.** The R19 census invariant (`meshes === ready === visible`, one shared material, uuid stable) is **vacuously satisfiable at zero**: `0/0`, `same=true`. Only the added `perChunk` term (`meshes > 0`) saves it. A future refactor that drops that term makes this gate pass on an empty world |
+| buildings solid below the fade band | **FAIL** — `ready 0, fade 1` | note `fade 1`, not 0 — this run is fleet-PINNED, so `settleOn()` is false and `birthK` returns 1 immediately (§5b.1) |
+| cull fade mid-dissolve at 2700 m | **PASS** — `fade 0.500` | the fade curve is pure altitude arithmetic and does not know the ring is empty |
+| noon road mix | **PASS** — `{night:0, day:1}`; `emptyByReason {noData:16}`, `errorRetries 80` | by now the backoff has classified all 16 chunks as `noData` (§5b.3) |
+
+**The lesson to carry.** Under a total upstream blackout verify-sat-night goes
+red — but **six of its assertions still PASS**, including its headline "the sun
+is pinned to night" and its fade-curve gate, and two of its reds are the *wrong
+red* (a sampling artefact reported as a draw-budget breach; a census invariant
+that is vacuously true at zero). Nothing in its output contains the words
+"tiles", "network" or "unreachable". An operator reading this log without
+`scripts/r23-c-preflight.js` would reasonably conclude the night ground had
+been deleted — which is, almost exactly, the conclusion this round was
+convened to investigate.
 
 ---
 
@@ -317,13 +341,22 @@ S2 white glow is, this census found no emissive-without-a-map anywhere, on any
 leg, in either pin state. It also could not have found one on a building that
 never streamed, which is exactly why instrument ask #2 in §5 exists.
 
-**3. The road engine reports `errorRetries: 18` with `ready 0, queued 10,
-building 2, ringOn true` at Manhattan night** (`verify-sat-night`'s own probe,
-§4c). The engine's reason codes stay at `{noData:0, zero:0, legacy:0}` — i.e.
-the R21 reason-coded TTL/backoff classifies a hard upstream failure as *retry*,
-not as any of its three named empty reasons. Not a defect; noting it because a
-user on a flaky connection lands in the same state, and no field in
-`__flyStats.satRoads` says "the network is refusing me".
+**3. The R21 reason-coded backoff takes ~80 retries to admit defeat, and its
+verdict is `noData`.** `verify-sat-night`'s own probe at Manhattan, 26 s after
+the warp: `ready 0, queued 10, building 2, ringOn true, errorRetries 18` with
+reason codes still all zero — i.e. mid-flight the engine has classified nothing.
+By the noon leg (a further ~60 s at the same pose) it reads `chunks 16, empty 16,
+errorRetries 80, emptyByReason {noData: 16, zero: 0, legacy: 0}`.
+
+Not a defect — the ladder is doing what R21 built it to do. Worth carrying for
+two reasons. First, **a user on a flaky connection lands in exactly this state**,
+and `noData` is indistinguishable in `__flyStats` from "OpenFreeMap genuinely has
+nothing here", which is the *legitimate* rural case R19/R20 spent a round on. No
+field says "the network refused me". Second, the transient window is long: for
+the first ~30 s the engine reports a busy, healthy-looking ring
+(`ringOn true, queued 10, building 2`) that will never produce a chunk — long
+enough that a harness which samples once at 26 s (most of the fleet) reads
+"still streaming", not "failed".
 
 ## §6 VERDICT (W1)
 
