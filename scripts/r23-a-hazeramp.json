@@ -1,0 +1,162 @@
+{
+  "generatedAt": "2026-08-11T12:32:58.116Z",
+  "note": "BEFORE the F1 fix this column is a constant 0.55 at every sample (the term read no sun input).",
+  "tier": "medium",
+  "errors": [],
+  "rows": [
+    {
+      "utcHour": 16,
+      "sunFrac": 1,
+      "hdri": "day",
+      "haze": 0.55,
+      "nightTele": {
+        "tier": "medium",
+        "contentHaze": 0.55,
+        "windowsArmed": false
+      }
+    },
+    {
+      "utcHour": 18,
+      "sunFrac": 1,
+      "hdri": "day",
+      "haze": 0.55,
+      "nightTele": {
+        "tier": "medium",
+        "contentHaze": 0.55,
+        "windowsArmed": false
+      }
+    },
+    {
+      "utcHour": 20,
+      "sunFrac": 0.926734773166828,
+      "hdri": "day",
+      "haze": 0.55,
+      "nightTele": {
+        "tier": "medium",
+        "contentHaze": 0.55,
+        "windowsArmed": false
+      }
+    },
+    {
+      "utcHour": 21,
+      "sunFrac": 0.7304990213234155,
+      "hdri": "day",
+      "haze": 0.55,
+      "nightTele": {
+        "tier": "medium",
+        "contentHaze": 0.55,
+        "windowsArmed": false
+      }
+    },
+    {
+      "utcHour": 22,
+      "sunFrac": 0.5033874381631058,
+      "hdri": "day",
+      "haze": 0.55,
+      "nightTele": {
+        "tier": "medium",
+        "contentHaze": 0.55,
+        "windowsArmed": false
+      }
+    },
+    {
+      "utcHour": 22.5,
+      "sunFrac": 0.3830358337494345,
+      "hdri": "dusk",
+      "haze": 0.55,
+      "nightTele": {
+        "tier": "medium",
+        "contentHaze": 0.55,
+        "windowsArmed": false
+      }
+    },
+    {
+      "utcHour": 23,
+      "sunFrac": 0.2608773027586368,
+      "hdri": "dusk",
+      "haze": 0.5240985551656823,
+      "nightTele": {
+        "tier": "medium",
+        "contentHaze": 0.5240985551656823,
+        "windowsArmed": false
+      }
+    },
+    {
+      "utcHour": 23.5,
+      "sunFrac": 0.139002011524708,
+      "hdri": "dusk",
+      "haze": 0.3337722235459636,
+      "nightTele": {
+        "tier": "medium",
+        "contentHaze": 0.3337722235459636,
+        "windowsArmed": false
+      }
+    },
+    {
+      "utcHour": 24,
+      "sunFrac": 0.015763185491099924,
+      "hdri": "night",
+      "haze": 0.04277424371821665,
+      "nightTele": {
+        "tier": "medium",
+        "contentHaze": 0.04277424371821665,
+        "windowsArmed": false
+      }
+    },
+    {
+      "utcHour": 24.5,
+      "sunFrac": 0,
+      "hdri": "night",
+      "haze": 0,
+      "nightTele": {
+        "tier": "medium",
+        "contentHaze": 0,
+        "windowsArmed": false
+      }
+    },
+    {
+      "utcHour": 25,
+      "sunFrac": 0,
+      "hdri": "night",
+      "haze": 0,
+      "nightTele": {
+        "tier": "medium",
+        "contentHaze": 0,
+        "windowsArmed": false
+      }
+    },
+    {
+      "utcHour": 26,
+      "sunFrac": 0,
+      "hdri": "night",
+      "haze": 0,
+      "nightTele": {
+        "tier": "medium",
+        "contentHaze": 0,
+        "windowsArmed": false
+      }
+    },
+    {
+      "utcHour": 27,
+      "sunFrac": 0,
+      "hdri": "night",
+      "haze": 0,
+      "nightTele": {
+        "tier": "medium",
+        "contentHaze": 0,
+        "windowsArmed": false
+      }
+    },
+    {
+      "utcHour": 29,
+      "sunFrac": 0,
+      "hdri": "night",
+      "haze": 0,
+      "nightTele": {
+        "tier": "medium",
+        "contentHaze": 0,
+        "windowsArmed": false
+      }
+    }
+  ]
+}

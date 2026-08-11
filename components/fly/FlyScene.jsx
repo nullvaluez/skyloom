@@ -91,6 +91,7 @@ import {
   HILLSHADE,
   MONUMENT_MODELS,
   MOON,
+  NIGHT_TRUTH_R23,
   SAT_BUILDINGS,
   SAT_CITY_GLOW,
   SAT_QUILT,
@@ -1512,6 +1513,14 @@ export function FlyScene({ runtime }) {
   }, [spawn, engine, flight, rebase]);
 
   const frameCount = useRef(0);
+  // R23 (A): the night telemetry's own WALL-CLOCK cadence. It deliberately does
+  // not ride `frameCount % 60`: the whole point of the instrument is to report
+  // a machine that is running BADLY, and on a machine at 8 fps a 60-frame gate
+  // publishes every 7.5 s and hands back numbers that are stale exactly when
+  // they matter most (measured in this worktree: the 60-frame block skipped six
+  // consecutive clock samples and reported a haze value from three minutes
+  // earlier). A wall clock is the same cost and cannot lie about its own age.
+  const nightStatAt = useRef(0);
   // Round 13 fix (live-caught "night at noon" boot): the frame loop can tick
   // BEFORE React flushes the spawn-placement effect below, so the first geo
   // samples came from the UNPLACED flight.pos at the world origin — publishing
@@ -2048,6 +2057,29 @@ export function FlyScene({ runtime }) {
       ) {
         contentGate *= window.__flyAerialOverride;
       }
+      // R23 (A NIGHT-TRUTH, F1) — THE NIGHT TERM THIS HAZE NEVER HAD.
+      //
+      // Measured defect (scripts/r23-a-tiernight.json): the content haze reads
+      // 0.55 at sunFrac 0 and 0.55 at sunFrac 1 — its strength is a pure
+      // function of distance. By day the mix target is the bright rim and that
+      // is correct aerial perspective; at night `_atmoRim` is the deep-night
+      // keyframe #101a30, so the same 0.55 washes the city — and its injection
+      // site is after the lighting chunks on gl_FragColor, so it takes the
+      // emissive window light down with it. Armed at medium/low only, where
+      // the night windows are ALREADY off, on a term the whole harness fleet
+      // reads as 0 (see the NIGHT_TRUTH_R23 header for the paired proof).
+      //
+      // Retire it on the SAME ramp the windows and the road network arrive on,
+      // so the two hand off instead of fighting. retire 1 ⇒ exactly 0 at deep
+      // night = R21's certified state; noon is untouched by arithmetic.
+      const hn = NIGHT_TRUTH_R23.enabled && NIGHT_TRUTH_R23.hazeNight.enabled
+        ? NIGHT_TRUTH_R23.hazeNight
+        : null;
+      if (hn && contentGate > 0) {
+        const nightT =
+          Math.min(1, Math.max(0, 1 - (runtime.sun?.frac ?? 1) / hn.dayFrac)) ** hn.gamma;
+        contentGate *= 1 - hn.retire * nightT;
+      }
       if (contentGate > 0) {
         setSatContentHaze(
           ch.startM,
@@ -2260,6 +2292,65 @@ export function FlyScene({ runtime }) {
         stats.edgeFadeStartM = ef.startM;
         stats.groundHorizonM = ef.endM;
         stats.aircraft = aircraftStat; // round 17: verify-hangar reads this
+      }
+      // R23 (A NIGHT-TRUTH, F2) — THE NIGHT CHAIN, IN ONE READ.
+      //
+      // The one thing R23 A could NOT establish is which quality tier a real
+      // machine resolves to and what that does to the night city, because the
+      // governor is fleet-pinned 'hold' and no gate has ever observed a live
+      // step. Nothing in the build reported it either. This does.
+      //
+      // Read-only, dev-only, no draws, no product behaviour. It is deliberately
+      // a FLAT object of primitives so `copy(__flyStats.night)` from a console
+      // on the user's own hardware is a complete diagnosis: what tier we are
+      // at, whether the windows are armed, what the two haze terms are
+      // actually multiplying by, and how much of the light network exists.
+      //
+      // The `lit` sub-object is the answer to "why is it black": each entry is
+      // a night light SOURCE and whether it is live right now.
+      const nt = NIGHT_TRUTH_R23.telemetry;
+      if (NIGHT_TRUTH_R23.enabled && nt.enabled) {
+        const tNow = performance.now();
+        if (tNow - nightStatAt.current >= 1000 / Math.max(0.1, nt.hz)) {
+          nightStatAt.current = tNow;
+          const stats = (window.__flyStats ??= {});
+          const bE = runtime.satBuildings;
+          const bM = bE?.material;
+          const gov = window.__flyGov?.state?.() ?? null;
+          stats.night = {
+            // --- what the machine settled on -------------------------------
+            tier: flyState.qualityTier,
+            dpr: gl.getPixelRatio(),
+            govRung: gov?.rung ?? null,
+            govRungs: gov?.rungs ?? null,
+            govLatched: gov?.latched ?? null,
+            govTierSteps: gov?.tierSteps ?? null,
+            govDprSteps: gov?.dprSteps ?? null,
+            govEmaFps: gov ? Math.round(gov.emaFps) : null,
+            govTargetFps: gov?.targetFps ?? null,
+            // --- what the sun is doing -------------------------------------
+            sunFrac: runtime.sun?.frac ?? null,
+            hdri: stats.hdriBucket ?? null,
+            // --- the two terms that REMOVE light ---------------------------
+            // contentHaze: in-shader, sat buildings + skyline, medium/low only.
+            // postAerial: the depth post pass, high only. Both mix toward the
+            // night rim; R23 A gave the first a night term, the second is
+            // R19-shipped and deliberately untouched (see R23_A_ROOTCAUSE §5.3).
+            contentHaze: getSatContentHaze().max,
+            postAerial: getAerialState().strength ?? null,
+            // --- the night light sources -----------------------------------
+            lit: {
+              windowsArmed: bE?.nightEnabled ?? false, // SAT_BUILDINGS.night.minTier 'high'
+              windowEI: bM?.emissiveIntensity ?? 0, // the sun ramp's output
+              windowMap: !!bM?.emissiveMap, // false + EI>0 would be a white glow
+              buildingsReady: bE?.stats?.ready ?? 0,
+              roadsReady: runtime.satRoads?.stats?.ready ?? 0,
+              cityGlow: stats.satCityGlowPlaced ?? 0,
+              houseLights: stats.houseLights?.placed ?? 0,
+              beaconsOn: stats.satBeacons?.on ?? false,
+            },
+          };
+        }
       }
       gl.info.reset();
     }
