@@ -298,7 +298,23 @@ tris budgets are ceilings this only lowers.
 | GREEN Powell baseline | **0 / 42,681** | 0 | PASS 9/9 |
 | GREEN Powell **live weather** | **0 / 45,159** | 0 | PASS 9/9 |
 
-**GREEN total: 136,547 composed frames, zero pale, zero black.** Powell is the
+### 4.1b PRODUCTION — the user's environment, repro then fix
+
+`npm run build` + `next start -p 3022`, dev server stopped first (§5.2).
+`__satBuildings` is dev-only so the census gates report N/A, but `__flyComposer`
+is not dev-gated and `__flyFlashPin` is a plain runtime check, so **both legs
+run against the real production bundle**:
+
+| production leg | pale frames | verdict |
+| --- | --- | --- |
+| **RED** (`FLASH_PIN_OFF=1`) | **6 / 34,096** | FAIL (6) — the defect, reproduced in production |
+| **GREEN** (armed) | **0 / 35,521** | **PASS 5/5** |
+
+This is the leg that matters most: the user hit this on a production build, and
+A's §7.1 production run is where the defect first surfaced at all.
+
+**GREEN total: 136,547 dev + 35,521 production = 172,068 composed frames, zero
+pale, zero black.** Powell is the
 user's own pose; live weather is the arm the entire harness fleet is blind to
 (`__flyWeatherOverride='baseline'` is a fleet pin), which is exactly what A's
 open risk 5 asked for.
@@ -356,6 +372,8 @@ Run against `:3021`. **No frozen assertion number was moved.**
 | verify-weather | **PASS** | 28/28 on the quiet re-run; two detours, both mine to explain — §5.2, §5.3 |
 | **verify-flicker** | **FAIL (2)** | **PRE-EXISTING — not mine, proven in control** |
 | `npm run build` | **PASS** | |
+| production RED (`next start`) | FAIL (6) — 6 pale / 34,096 | the defect in the user's environment |
+| production GREEN (`next start`) | **PASS 5/5** — 0 pale / 35,521 | §4.1b |
 
 ### 5.2 I contaminated verify-weather, and it is my fault, not the gate's
 
