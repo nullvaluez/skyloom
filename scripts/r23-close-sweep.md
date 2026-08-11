@@ -6,6 +6,16 @@
 > integrated-tree cell reads `— (W3)`. `scripts/r22-close-sweep.md` is the shape
 > this follows.
 
+**A note on "base", so the record is exact.** This ledger says base `f009263`
+(the R23 scaffolding commit). The worktrees were forked from **`5d6c09d`**, the
+R22 close — `f009263` is its child and I fast-forwarded onto it before starting,
+so the literal merge-base of this branch with the round branch is `5d6c09d`.
+Behaviourally the two are the same tree: `f009263` adds `FLY_ROUND23_PLAN.md`
+and two **inert `enabled:false`** constants exports and changes nothing that
+executes. Every measurement here is valid against either label; the round record
+should use `5d6c09d` where a merge-base is meant and `f009263` where the
+measured tree is meant.
+
 Dev server for every run: **this worktree's own server on its own port**
 (`npm run dev -- -p 3023`), pointed at with `FLY_URL`. Never `:3000` / `:3002` /
 another agent's port (the R19 §4.1 deviation note, still standing).
@@ -187,6 +197,8 @@ Ordered. Nothing below has been validated in this session.
 | 6 | Re-derive `MAN_BLOB` and the Owens pair | the two weakest numbers in §1b |
 | 7 | **Expect step 1 to possibly CRASH rather than measure** | §4e: 18 of the 19 assertions have never executed. Budget five minutes for it |
 | 8 | Watch every run for `WARN screenshot path for …: viewport-fallback` | §4e: the element-screenshot stability hang killed two runs here. If the fallback fires on a healthy machine too, the element path should be retired FLEET-WIDE rather than patched per-harness — `verify-sat-night`'s `shot64` has the same hang |
+| 9 | `verify-aerial` legs **12/13** on the merged tree | W2-added, and **UNEXERCISED in this file** — the 11 frozen pixel gates ahead of them need imagery. Their claim is measured independently by `r23-c-haze-probe.js` (§4f), but the legs themselves have never run. Once `NIGHT_TRUTH_R23.hazeNight` is armed, gate 13 flips from "record the red" to a hard ≤ 0.05 |
+| 10 | `verify-night-alive` gate **(13b)** — the S2 window-map guard | SOFT on this branch (A's `__flyStats.night.lit` does not exist here); becomes a live assertion on the merged tree, and needs no tiles |
 
 ---
 
@@ -355,6 +367,40 @@ reach past page 1.
 without throwing. The first egress-enabled run may discover a crash rather than a
 measurement. That is a five-minute fix when it happens and a bad surprise if it
 is not expected — so it is written down here rather than left to be discovered.
+
+## §4f W2 — A's F1 REPRODUCED ON THIS BRANCH, and the blindness shown in one row
+
+Fable's W2 items 1/2 asked for the aerial pin to be released and for
+verify-aerial to grow a medium+night leg. Both landed — and because the content
+haze is a **uniform, not a pixel**, the finding is fully measurable in this
+egress-blocked session. `scripts/r23-c-haze-probe.js`, evidence
+`scripts/r23-c-haze-probe.json`, run on `f009263` (no part of A's fix present):
+
+| tier | clock | aerial pin | `contentHaze` | `postAerial` |
+|---|---|---|---|---|
+| high | noon (el +52.1°) | RELEASED | **0** | 0.55 |
+| high | night (el −26.9°) | RELEASED | **0** | 0.55 |
+| medium | noon | RELEASED | **0.55** | 0 |
+| **medium** | **night (el −26.9°)** | RELEASED | **0.55** ← **F1, the defect** | 0 |
+| medium | night | **FLEET-PINNED 0** | **0** ← **the blindness, in one row** | 0 |
+
+Rows 1–2 are the tier lock (`contentGate`'s `!highTier`), which is the room
+verify-aerial has always run in. Row 4 is a **full-strength haze over a
+deep-night city**. Row 5 is the same cell as row 4 with `_boot.js`'s pin intact —
+**zero** — which is why no gate in the fleet could see it. The two locks, one
+table.
+
+This also makes verify-aerial's new legs measurement-backed rather than
+aspirational: gate 12 expects 0.55 and measures 0.55; gate 13's red branch
+expects 0.55 and measures 0.55.
+
+**SEEN IN PASSING — not mine to rule on, escalated to A.** `postAerial` reads
+**0.55 at high tier at deep night** (rows 1–2). `AERIAL_PERSPECTIVE.maxMix`
+carries no sun term either, so the **POST pass appears to have the same shape of
+defect at the tier F1 explicitly excludes** — and high is the tier this machine
+resolves, and the tier verify-sat-night has always certified under a pinned-off
+aerial. Whether that is a defect or intended is A's call; the number is recorded
+so the question gets asked.
 
 ## §5 Instrument asks for A (read-only `__flyStats` fields)
 
