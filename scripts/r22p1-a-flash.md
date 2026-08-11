@@ -206,7 +206,7 @@ is reached without a rebuild via `window.__flyStepSafePin='off'`.
 | realloc writes outside a rAF | **24 / 24** | **0 / 40** |
 | `composer.setSize` lag after the realloc | 9.0 – 23.6 ms | **0.3 – 1.1 ms** |
 | composed frames with composer buffer ≠ drawing buffer | **10–12 / 12 steps** | **0** |
-| same-frame proof (realloc followed by a composed frame with the same `__rafSeq` AND the new width) | **0 / 12** | **n/n** |
+| same-frame proof (realloc followed by a composed frame with the same `__rafSeq` AND the new width) | **0 / 12** | **20 / 20 per arm** |
 | PALE composed frames | 0 (not reproduced) | 0 |
 | BLACK composed frames | 0 | 0 |
 | draw-count collapses | 0 | 0 |
@@ -279,7 +279,16 @@ The census closure captured the original array; reassigning the global gave me
 an empty one to read. Caught by gate (1) reporting `frames 0` — which is
 exactly why that precondition gate exists. Fixed with `.length = 0`.
 
-**6.5 Contamination, re-run quietly.** Agent B was working the same machine.
+**6.5 Running the R21/R22 gates REWRITES their tracked artifacts.**
+verify-stability / verify-tier-step / verify-flicker / verify-settle each
+overwrite `scripts/r21-e-*.png|json` and `scripts/r22-e-*.png|json` in place —
+E's frozen RED-calibration artifacts. My first commit swept them up (74k lines
+of churn in `r21-e-red-stability.json` alone). They were restored to
+`5d6c09d` and the commit amended; the branch diff is now only my own files.
+Anyone running these gates on a dirty tree should check `git status` before
+staging.
+
+**6.6 Contamination, re-run quietly.** Agent B was working the same machine.
 Three gate reds proved to be contamination and cleared on a quiet re-run —
 recorded here rather than smoothed:
 
