@@ -328,8 +328,9 @@ user on a flaky connection lands in the same state, and no field in
 ## §6 VERDICT (W1)
 
 - **Built and committed:** `scripts/_night-metrics.js` (the shared instrument),
-  `scripts/verify-night-alive.js` (the un-pinned night gate, 15 gates + a third
-  BLOCKED outcome), `scripts/r23-c-archive-metrics.js` (the threshold
+  `scripts/verify-night-alive.js` (the un-pinned night gate — **19 gate
+  assertions** across 8 pose-legs on 3 pin/tier pages, plus a third BLOCKED
+  outcome), `scripts/r23-c-archive-metrics.js` (the threshold
   derivation, reproducible), five inherited harness debts closed.
 - **Proven in this session:** the un-pin mechanism (with `__r22PinAttempt`
   receipts); per-pose deep-night pinning (−26.8° / −27.4° / −30.8°); the

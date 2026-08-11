@@ -595,12 +595,28 @@ const nightMsFor = (lon) => {
     (manCtl?.census.night.roads?.ready ?? 0) > 0 ||
     (manCtl?.census.night.buildings?.ready ?? 0) > 0;
   const worldOk = net.img > 0 && net.vec > 0 && anyVector;
+  /* R23_FORCE_GATES — an EXERCISE lever, not a bypass. Without egress the
+   * BLOCKED branch is the only path this file has ever executed, so a crash in
+   * the gate block below would lie dormant until the first session that CAN
+   * measure — which is the run that can least afford to discover one. This
+   * flag walks the gate block on whatever data exists and, by construction,
+   * can never produce a green: it pushes a permanent failure. Used once, to
+   * prove the gate path runs; recorded in scripts/r23-close-sweep.md §4d. */
+  const forceGates = !!process.env.R23_FORCE_GATES && !worldOk;
+  if (forceGates) {
+    console.log(
+      'WARN R23_FORCE_GATES — the world-content precondition is OVERRIDDEN. This run EXERCISES ' +
+        'the gate path against a world that never streamed; it is NOT a certification and it ' +
+        'cannot pass (a permanent failure is appended below).'
+    );
+    fails.push('R23_FORCE_GATES (exercise run, never a certification)');
+  }
   console.log(
     `WORLD tiles: imagery ${net.img} ok / ${net.imgFail} failed · vector ${net.vec} ok / ${net.vecFail} failed · ` +
       `vector content resident at P-MAN: ${anyVector}` +
       (net.hosts.size ? ` · unreachable hosts: ${[...net.hosts].join(', ')}` : '')
   );
-  if (!worldOk) {
+  if (!worldOk && !forceGates) {
     console.log(
       'BLOCKED the world never streamed — imagery and/or vector tiles are unreachable from this ' +
         'session, so every pixel metric above describes the NETWORK, not the product. ' +
