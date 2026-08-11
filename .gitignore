@@ -31,3 +31,11 @@ Thumbs.db
 .catch*.png
 .prod-pose.png
 .r22p1-a-*.log
+
+# R22.1 C salvage: bulky probe dumps (evidence JSON/PNGs are committed selectively)
+.probe-c-bisect/
+.probe-c-lag/
+.probe-c-stochastic/
+.probe-c-why/*.png
+.probe-c-flash*/
+.probe-c-trace*/
