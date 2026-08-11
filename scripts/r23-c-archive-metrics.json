@@ -1,0 +1,711 @@
+[
+  {
+    "f": "r16-satnight-01-manhattan-night.png",
+    "pose": "P-MAN",
+    "round": "R16",
+    "band": [
+      0.55,
+      0.98
+    ],
+    "xBand": [
+      0.02,
+      0.85
+    ],
+    "note": "the R16 CERTIFIED read at the exact verify-sat-night Manhattan pose; HUD text, POI letters and the player jet are in frame",
+    "m": {
+      "band": [
+        0.55,
+        0.98
+      ],
+      "xBand": [
+        0.02,
+        0.85
+      ],
+      "bandPx": 513936,
+      "frame": {
+        "w": 1600,
+        "h": 900
+      },
+      "mean": 28.73383911781949,
+      "p5": 5,
+      "p50": 10,
+      "p95": 120,
+      "p99": 216,
+      "litFrac": 0.20248435602876622,
+      "litLadder": {
+        "8": 0.6961820148812303,
+        "16": 0.36928917219264656,
+        "24": 0.305028252545064,
+        "40": 0.20248435602876622,
+        "60": 0.13284533482768282,
+        "90": 0.08448522773263598,
+        "128": 0.04312404657389247,
+        "180": 0.018558731048223902
+      },
+      "darkFrac": 0.30375182902151243,
+      "warmLitFrac": 0.4769372693726937,
+      "coolLitFrac": 0.15477014145141452,
+      "warmOfBand": 0.0965723358550481,
+      "whiteFrac": 0.015472743687930014,
+      "whiteBlobPx": 1756,
+      "whiteBlobFrac": 0.0034167678465801187,
+      "whiteBlobs": 13,
+      "whiteBlobArea": 0.014283879704865976,
+      "whiteBlobBox": {
+        "x": 66,
+        "y": 681,
+        "w": 57,
+        "h": 48,
+        "cx": 93,
+        "cy": 703
+      }
+    }
+  },
+  {
+    "f": "r16-satnight-02-manhattan-night-after-ab.png",
+    "pose": "P-MAN",
+    "round": "R16",
+    "band": [
+      0.55,
+      0.98
+    ],
+    "xBand": [
+      0.02,
+      0.85
+    ],
+    "note": "same pose, post-A/B (a second sample of the same certified state)",
+    "m": {
+      "band": [
+        0.55,
+        0.98
+      ],
+      "xBand": [
+        0.02,
+        0.85
+      ],
+      "bandPx": 513936,
+      "frame": {
+        "w": 1600,
+        "h": 900
+      },
+      "mean": 28.52629798585115,
+      "p5": 5,
+      "p50": 10,
+      "p95": 117,
+      "p99": 216,
+      "litFrac": 0.2009355250459201,
+      "litLadder": {
+        "8": 0.7028871299150089,
+        "16": 0.3698262040409701,
+        "24": 0.3049971202640017,
+        "40": 0.2009355250459201,
+        "60": 0.13074196008841568,
+        "90": 0.08205885557734816,
+        "128": 0.040820257775287194,
+        "180": 0.018692989010304785
+      },
+      "darkFrac": 0.2968015472743688,
+      "warmLitFrac": 0.4833830421815083,
+      "coolLitFrac": 0.13812604098074913,
+      "warmOfBand": 0.09712882537903553,
+      "whiteFrac": 0.015521387877089754,
+      "whiteBlobPx": 1756,
+      "whiteBlobFrac": 0.0034167678465801187,
+      "whiteBlobs": 13,
+      "whiteBlobArea": 0.014291662775131534,
+      "whiteBlobBox": {
+        "x": 66,
+        "y": 681,
+        "w": 57,
+        "h": 48,
+        "cx": 93,
+        "cy": 703
+      }
+    }
+  },
+  {
+    "f": "r16-satnight-07-jfk-night.png",
+    "pose": "JFK",
+    "round": "R16",
+    "band": [
+      0.55,
+      0.98
+    ],
+    "xBand": [
+      0.02,
+      0.85
+    ],
+    "note": "airfield night — sparse point lights, the case a mean is blind to",
+    "m": {
+      "band": [
+        0.55,
+        0.98
+      ],
+      "xBand": [
+        0.02,
+        0.85
+      ],
+      "bandPx": 513936,
+      "frame": {
+        "w": 1600,
+        "h": 900
+      },
+      "mean": 32.33789585200575,
+      "p5": 11,
+      "p50": 28,
+      "p95": 64,
+      "p99": 113,
+      "litFrac": 0.25340314747361536,
+      "litLadder": {
+        "8": 0.9654781918371159,
+        "16": 0.8654112574328321,
+        "24": 0.6183532579932132,
+        "40": 0.25340314747361536,
+        "60": 0.06814078017496342,
+        "90": 0.015651754304037858,
+        "128": 0.007183773855110364,
+        "180": 0.0018873945393979017
+      },
+      "darkFrac": 0.03451597086018492,
+      "warmLitFrac": 0.048305728962705304,
+      "coolLitFrac": 0.8540001382138168,
+      "warmOfBand": 0.012240823760156908,
+      "whiteFrac": 0.0025703589552006478,
+      "whiteBlobPx": 39,
+      "whiteBlobFrac": 0.00007588493508919399,
+      "whiteBlobs": 1,
+      "whiteBlobArea": 0.00007588493508919399,
+      "whiteBlobBox": {
+        "x": 32,
+        "y": 857,
+        "w": 10,
+        "h": 11,
+        "cx": 35,
+        "cy": 862
+      }
+    }
+  },
+  {
+    "f": "r16-satnight-08-cruise-glow.png",
+    "pose": "CRUISE",
+    "round": "R16",
+    "band": [
+      0.55,
+      0.98
+    ],
+    "xBand": [
+      0.02,
+      0.85
+    ],
+    "note": "SatCityGlow at 6 km — the far-city read with the road ring disarmed",
+    "m": {
+      "band": [
+        0.55,
+        0.98
+      ],
+      "xBand": [
+        0.02,
+        0.85
+      ],
+      "bandPx": 513936,
+      "frame": {
+        "w": 1600,
+        "h": 900
+      },
+      "mean": 27.7532942420997,
+      "p5": 5,
+      "p50": 20,
+      "p95": 76,
+      "p99": 139,
+      "litFrac": 0.16646041530462938,
+      "litLadder": {
+        "8": 0.8767297873665203,
+        "16": 0.6271092120419663,
+        "24": 0.3805415460290775,
+        "40": 0.16646041530462938,
+        "60": 0.13417429407552692,
+        "90": 0.024756000747174746,
+        "128": 0.019506319853055634,
+        "180": 0.002185096977055509
+      },
+      "darkFrac": 0.12279739111484698,
+      "warmLitFrac": 0.020526008182349502,
+      "coolLitFrac": 0.3366218585622443,
+      "warmOfBand": 0.0034167678465801187,
+      "whiteFrac": 0.002239578468914417,
+      "whiteBlobPx": 39,
+      "whiteBlobFrac": 0.00007588493508919399,
+      "whiteBlobs": 1,
+      "whiteBlobArea": 0.00007588493508919399,
+      "whiteBlobBox": {
+        "x": 32,
+        "y": 857,
+        "w": 10,
+        "h": 11,
+        "cx": 35,
+        "cy": 862
+      }
+    }
+  },
+  {
+    "f": "r19-c-powell-night-houselights.png",
+    "pose": "P-POW",
+    "round": "R19",
+    "band": [
+      0.45,
+      1
+    ],
+    "xBand": [
+      0.02,
+      0.98
+    ],
+    "note": "Powell suburban night at a flying attitude; player+traffic PARKED, DOM not hidden",
+    "m": {
+      "band": [
+        0.45,
+        1
+      ],
+      "xBand": [
+        0.02,
+        0.98
+      ],
+      "bandPx": 760320,
+      "frame": {
+        "w": 1600,
+        "h": 900
+      },
+      "mean": 7.067889194549705,
+      "p5": 2,
+      "p50": 5,
+      "p95": 18,
+      "p99": 34,
+      "litFrac": 0.008863373316498316,
+      "litLadder": {
+        "8": 0.2334175084175084,
+        "16": 0.06384417087542088,
+        "24": 0.02032433712121212,
+        "40": 0.008863373316498316,
+        "60": 0.005842276936026936,
+        "90": 0.00452572601010101,
+        "128": 0.002696233164983165,
+        "180": 0.0009088278619528619
+      },
+      "darkFrac": 0.7665824915824916,
+      "warmLitFrac": 0.051788099124499186,
+      "coolLitFrac": 0.19913933818073898,
+      "warmOfBand": 0.0004590172558922559,
+      "whiteFrac": 0.0007378472222222222,
+      "whiteBlobPx": 54,
+      "whiteBlobFrac": 0.00007102272727272727,
+      "whiteBlobs": 3,
+      "whiteBlobArea": 0.00016703493265993267,
+      "whiteBlobBox": {
+        "x": 782,
+        "y": 880,
+        "w": 10,
+        "h": 17,
+        "cx": 786,
+        "cy": 891
+      }
+    }
+  },
+  {
+    "f": "r19-c-powell-night-down.png",
+    "pose": "P-POW-down",
+    "round": "R19",
+    "band": [
+      0.2,
+      0.95
+    ],
+    "xBand": [
+      0.16,
+      0.84
+    ],
+    "note": "the R19 measurement crop looking straight down at the subdivision (band ~ verify-groundlife CROP 260,430,1080,400)",
+    "m": {
+      "band": [
+        0.2,
+        0.95
+      ],
+      "xBand": [
+        0.16,
+        0.84
+      ],
+      "bandPx": 734400,
+      "frame": {
+        "w": 1600,
+        "h": 900
+      },
+      "mean": 7.928272175665041,
+      "p5": 2,
+      "p50": 5,
+      "p95": 21,
+      "p99": 53,
+      "litFrac": 0.012054738562091502,
+      "litLadder": {
+        "8": 0.24865059912854032,
+        "16": 0.0955718954248366,
+        "24": 0.035358115468409584,
+        "40": 0.012054738562091502,
+        "60": 0.009739923747276688,
+        "90": 0.008371459694989107,
+        "128": 0.005337690631808279,
+        "180": 0.0007502723311546841
+      },
+      "darkFrac": 0.7513398692810458,
+      "warmLitFrac": 0.6293911668361007,
+      "coolLitFrac": 0.060996272450016945,
+      "warmOfBand": 0.007587145969498911,
+      "whiteFrac": 0,
+      "whiteBlobPx": 0,
+      "whiteBlobFrac": 0,
+      "whiteBlobs": 0,
+      "whiteBlobArea": 0,
+      "whiteBlobBox": null
+    }
+  },
+  {
+    "f": "r19-c-night-on.png",
+    "pose": "P-POW-down",
+    "round": "R19",
+    "band": [
+      0.2,
+      0.95
+    ],
+    "xBand": [
+      0.16,
+      0.84
+    ],
+    "note": "R19 A/B, night sources ON  (its own litFrac over the CROP was 1.156%)",
+    "m": {
+      "band": [
+        0.2,
+        0.95
+      ],
+      "xBand": [
+        0.16,
+        0.84
+      ],
+      "bandPx": 734400,
+      "frame": {
+        "w": 1600,
+        "h": 900
+      },
+      "mean": 7.942199883999106,
+      "p5": 2,
+      "p50": 5,
+      "p95": 21,
+      "p99": 53,
+      "litFrac": 0.012076525054466231,
+      "litLadder": {
+        "8": 0.24919253812636166,
+        "16": 0.09583605664488018,
+        "24": 0.036036220043572986,
+        "40": 0.012076525054466231,
+        "60": 0.009739923747276688,
+        "90": 0.008375544662309367,
+        "128": 0.005325435729847495,
+        "180": 0.0007584422657952069
+      },
+      "darkFrac": 0.7508006535947712,
+      "warmLitFrac": 0.6298342541436464,
+      "coolLitFrac": 0.0613372420791521,
+      "warmOfBand": 0.007606209150326797,
+      "whiteFrac": 0,
+      "whiteBlobPx": 0,
+      "whiteBlobFrac": 0,
+      "whiteBlobs": 0,
+      "whiteBlobArea": 0,
+      "whiteBlobBox": null
+    }
+  },
+  {
+    "f": "r19-c-night-off.png",
+    "pose": "P-POW-down",
+    "round": "R19",
+    "band": [
+      0.2,
+      0.95
+    ],
+    "xBand": [
+      0.16,
+      0.84
+    ],
+    "note": "R19 A/B, night sources OFF (its own litFrac over the CROP was 0.465%) — THE CONTRAST THAT DEFINES A USEFUL WARM FLOOR",
+    "m": {
+      "band": [
+        0.2,
+        0.95
+      ],
+      "xBand": [
+        0.16,
+        0.84
+      ],
+      "bandPx": 734400,
+      "frame": {
+        "w": 1600,
+        "h": 900
+      },
+      "mean": 6.8863477995721665,
+      "p5": 2,
+      "p50": 4,
+      "p95": 20,
+      "p99": 31,
+      "litFrac": 0.0051525054466230935,
+      "litLadder": {
+        "8": 0.23531454248366013,
+        "16": 0.08378131808278867,
+        "24": 0.026978485838779955,
+        "40": 0.0051525054466230935,
+        "60": 0.0035838779956427016,
+        "90": 0.0027083333333333334,
+        "128": 0.0012064270152505447,
+        "180": 0.000027233115468409585
+      },
+      "darkFrac": 0.7646854575163399,
+      "warmLitFrac": 0.13477801268498943,
+      "coolLitFrac": 0.14085623678646936,
+      "warmOfBand": 0.0006944444444444445,
+      "whiteFrac": 0,
+      "whiteBlobPx": 0,
+      "whiteBlobFrac": 0,
+      "whiteBlobs": 0,
+      "whiteBlobArea": 0,
+      "whiteBlobBox": null
+    }
+  },
+  {
+    "f": "r20-b-melton-au-night-on.png",
+    "pose": "P-MEL",
+    "round": "R20",
+    "band": [
+      0.45,
+      1
+    ],
+    "xBand": [
+      0.02,
+      0.98
+    ],
+    "note": "Melton AU parcel homes at night, ON",
+    "m": {
+      "band": [
+        0.45,
+        1
+      ],
+      "xBand": [
+        0.02,
+        0.98
+      ],
+      "bandPx": 760320,
+      "frame": {
+        "w": 1600,
+        "h": 900
+      },
+      "mean": 18.398925812042457,
+      "p5": 1,
+      "p50": 12,
+      "p95": 55,
+      "p99": 129,
+      "litFrac": 0.09347117003367003,
+      "litLadder": {
+        "8": 0.6407210122053872,
+        "16": 0.3956728745791246,
+        "24": 0.22500920664983165,
+        "40": 0.09347117003367003,
+        "60": 0.04231507786195286,
+        "90": 0.020298032407407407,
+        "128": 0.010231218434343435,
+        "180": 0.002602851430976431
+      },
+      "darkFrac": 0.3588370686026936,
+      "warmLitFrac": 0.2742725277199302,
+      "coolLitFrac": 0.5440423256599314,
+      "warmOfBand": 0.025636574074074076,
+      "whiteFrac": 0.0008141308922558923,
+      "whiteBlobPx": 39,
+      "whiteBlobFrac": 0.00005129419191919192,
+      "whiteBlobs": 2,
+      "whiteBlobArea": 0.00009601220538720539,
+      "whiteBlobBox": {
+        "x": 32,
+        "y": 857,
+        "w": 10,
+        "h": 11,
+        "cx": 35,
+        "cy": 862
+      }
+    }
+  },
+  {
+    "f": "r20-b-melton-au-night-off.png",
+    "pose": "P-MEL",
+    "round": "R20",
+    "band": [
+      0.45,
+      1
+    ],
+    "xBand": [
+      0.02,
+      0.98
+    ],
+    "note": "Melton AU parcel homes at night, OFF",
+    "m": {
+      "band": [
+        0.45,
+        1
+      ],
+      "xBand": [
+        0.02,
+        0.98
+      ],
+      "bandPx": 760320,
+      "frame": {
+        "w": 1600,
+        "h": 900
+      },
+      "mean": 17.022937877226052,
+      "p5": 1,
+      "p50": 11,
+      "p95": 52,
+      "p99": 116,
+      "litFrac": 0.08486689814814814,
+      "litLadder": {
+        "8": 0.6089041456228956,
+        "16": 0.36724800084175085,
+        "24": 0.20501762415824915,
+        "40": 0.08486689814814814,
+        "60": 0.0372014414983165,
+        "90": 0.01636679292929293,
+        "128": 0.007371896043771043,
+        "180": 0.0014191393097643097
+      },
+      "darkFrac": 0.3908209701178451,
+      "warmLitFrac": 0.22426618727334718,
+      "coolLitFrac": 0.6009980472987633,
+      "warmOfBand": 0.019032775673400674,
+      "whiteFrac": 0.0007523148148148148,
+      "whiteBlobPx": 39,
+      "whiteBlobFrac": 0.00005129419191919192,
+      "whiteBlobs": 2,
+      "whiteBlobArea": 0.00009601220538720539,
+      "whiteBlobBox": {
+        "x": 32,
+        "y": 857,
+        "w": 10,
+        "h": 11,
+        "cx": 35,
+        "cy": 862
+      }
+    }
+  },
+  {
+    "f": "r23-c-red-man-pinned-high.png",
+    "pose": "P-MAN",
+    "round": "R23-BLOCKED",
+    "band": [
+      0.55,
+      0.98
+    ],
+    "xBand": [
+      0.02,
+      0.85
+    ],
+    "note": "TODAY, egress-blocked: no imagery, no vector content. Here so the blockade signature is on the record next to a real frame. VOLATILE BY DESIGN and deliberately NOT hash-pinned — verify-night-alive rewrites this file every run, which is exactly the mutable-filename hazard documented above, self-inflicted and harmless because nothing is derived from it.",
+    "m": {
+      "band": [
+        0.55,
+        0.98
+      ],
+      "xBand": [
+        0.02,
+        0.85
+      ],
+      "bandPx": 513936,
+      "frame": {
+        "w": 1600,
+        "h": 900
+      },
+      "mean": 54.71636452011773,
+      "p5": 25,
+      "p50": 59,
+      "p95": 69,
+      "p99": 80,
+      "litFrac": 0.8532579932131628,
+      "litLadder": {
+        "8": 1,
+        "16": 0.998457006319853,
+        "24": 0.9617909622988077,
+        "40": 0.8532579932131628,
+        "60": 0.4567669904423897,
+        "90": 0.000003891535132779179,
+        "128": 0,
+        "180": 0
+      },
+      "darkFrac": 0,
+      "warmLitFrac": 0,
+      "coolLitFrac": 0.14540727902946274,
+      "warmOfBand": 0,
+      "whiteFrac": 0,
+      "whiteBlobPx": 0,
+      "whiteBlobFrac": 0,
+      "whiteBlobs": 0,
+      "whiteBlobArea": 0,
+      "whiteBlobBox": null
+    }
+  },
+  {
+    "f": "r23-c-red-man-unpinned-live.png",
+    "pose": "P-MAN",
+    "round": "R23-BLOCKED",
+    "band": [
+      0.55,
+      0.98
+    ],
+    "xBand": [
+      0.02,
+      0.85
+    ],
+    "note": "TODAY, egress-blocked, un-pinned leg",
+    "m": {
+      "band": [
+        0.55,
+        0.98
+      ],
+      "xBand": [
+        0.02,
+        0.85
+      ],
+      "bandPx": 513936,
+      "frame": {
+        "w": 1600,
+        "h": 900
+      },
+      "mean": 19.472813745301504,
+      "p5": 3,
+      "p50": 5,
+      "p95": 77,
+      "p99": 77,
+      "litFrac": 0.24104363189190872,
+      "litLadder": {
+        "8": 0.2644298122723452,
+        "16": 0.25986115002646243,
+        "24": 0.25800488776812674,
+        "40": 0.24104363189190872,
+        "60": 0.14083660222284486,
+        "90": 0,
+        "128": 0,
+        "180": 0
+      },
+      "darkFrac": 0.7355701877276548,
+      "warmLitFrac": 0,
+      "coolLitFrac": 0.10724808485562758,
+      "warmOfBand": 0,
+      "whiteFrac": 0,
+      "whiteBlobPx": 0,
+      "whiteBlobFrac": 0,
+      "whiteBlobs": 0,
+      "whiteBlobArea": 0,
+      "whiteBlobBox": null
+    }
+  }
+]
