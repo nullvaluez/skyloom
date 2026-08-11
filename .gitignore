@@ -28,3 +28,6 @@ Thumbs.db
 .probe-nat/
 .probe-green15/
 .probe-red-pin/
+.catch*.png
+.prod-pose.png
+.r22p1-a-*.log
