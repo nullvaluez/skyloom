@@ -197,9 +197,14 @@ async function main() {
   console.log(`  census: ${cen.tris} tris over ${cen.meshes} meshes · zero-area ${cen.zero}`);
   console.log(`  engine: degenScanned ${cen.degenScanned} degenDropped ${cen.degenDropped} degenChunks ${cen.degenChunks}\n`);
 
+  // The precondition is on CUMULATIVE streaming (degenScanned), not on the
+  // live triangle count: a suburban pose legitimately holds ~5k triangles
+  // where Manhattan holds ~65k, and a live-count threshold calibrated on the
+  // dense pose fails the sparse one for being correct. What must be true on
+  // both is that real geometry streamed through the filter during the window.
   gate(1, 'precondition: booted, instrumented, ring streamed, frames composed',
-    inst.ok && !cen.err && cen.chunks > 4 && frames > 2000 && cen.tris > 50000,
-    `install=${inst.ok} chunks=${cen.chunks} frames=${frames} tris=${cen.tris}`);
+    inst.ok && !cen.err && cen.chunks > 4 && frames > 2000 && cen.tris > 1000 && cen.degenScanned > 100000,
+    `install=${inst.ok} chunks=${cen.chunks} frames=${frames} liveTris=${cen.tris} scanned=${cen.degenScanned}`);
 
   // degenScanned counts triangles EXAMINED and is incremented on both legs
   // (the pin returns before filtering, not before counting), so the state of
