@@ -610,7 +610,7 @@
       0.02,
       0.85
     ],
-    "note": "TODAY, egress-blocked: no imagery, no vector content. Here so the blockade signature is on the record next to a real frame.",
+    "note": "TODAY, egress-blocked: no imagery, no vector content. Here so the blockade signature is on the record next to a real frame. VOLATILE BY DESIGN and deliberately NOT hash-pinned — verify-night-alive rewrites this file every run, which is exactly the mutable-filename hazard documented above, self-inflicted and harmless because nothing is derived from it.",
     "m": {
       "band": [
         0.55,
@@ -625,39 +625,32 @@
         "w": 1600,
         "h": 900
       },
-      "mean": 56.82021195250702,
-      "p5": 30,
-      "p50": 57,
-      "p95": 68,
-      "p99": 215,
-      "litFrac": 0.8854935244855391,
+      "mean": 54.71636452011773,
+      "p5": 25,
+      "p50": 59,
+      "p95": 69,
+      "p99": 80,
+      "litFrac": 0.8532579932131628,
       "litLadder": {
         "8": 1,
-        "16": 1,
-        "24": 0.993302668036487,
-        "40": 0.8854935244855391,
-        "60": 0.4155984402727188,
-        "90": 0.023485414526322343,
-        "128": 0.01587940910930544,
-        "180": 0.01350362691074375
+        "16": 0.998457006319853,
+        "24": 0.9617909622988077,
+        "40": 0.8532579932131628,
+        "60": 0.4567669904423897,
+        "90": 0.000003891535132779179,
+        "128": 0,
+        "180": 0
       },
       "darkFrac": 0,
       "warmLitFrac": 0,
-      "coolLitFrac": 0.02244845491081925,
+      "coolLitFrac": 0.14540727902946274,
       "warmOfBand": 0,
-      "whiteFrac": 0.01373517325114411,
-      "whiteBlobPx": 1781,
-      "whiteBlobFrac": 0.0034654120357398587,
-      "whiteBlobs": 6,
-      "whiteBlobArea": 0.01373517325114411,
-      "whiteBlobBox": {
-        "x": 63,
-        "y": 689,
-        "w": 57,
-        "h": 49,
-        "cx": 90,
-        "cy": 712
-      }
+      "whiteFrac": 0,
+      "whiteBlobPx": 0,
+      "whiteBlobFrac": 0,
+      "whiteBlobs": 0,
+      "whiteBlobArea": 0,
+      "whiteBlobBox": null
     }
   },
   {
@@ -687,39 +680,32 @@
         "w": 1600,
         "h": 900
       },
-      "mean": 26.62979106151011,
-      "p5": 4,
-      "p50": 7,
-      "p95": 83,
-      "p99": 215,
-      "litFrac": 0.2722381775162666,
+      "mean": 19.472813745301504,
+      "p5": 3,
+      "p50": 5,
+      "p95": 77,
+      "p99": 77,
+      "litFrac": 0.24104363189190872,
       "litLadder": {
-        "8": 0.4176453877525606,
-        "16": 0.32317837240434605,
-        "24": 0.304843404626257,
-        "40": 0.2722381775162666,
-        "60": 0.2257790853335824,
-        "90": 0.019146352853273558,
-        "128": 0.014768375828896983,
-        "180": 0.013421904672955388
+        "8": 0.2644298122723452,
+        "16": 0.25986115002646243,
+        "24": 0.25800488776812674,
+        "40": 0.24104363189190872,
+        "60": 0.14083660222284486,
+        "90": 0,
+        "128": 0,
+        "180": 0
       },
-      "darkFrac": 0.5823546122474393,
+      "darkFrac": 0.7355701877276548,
       "warmLitFrac": 0,
-      "coolLitFrac": 0.18194878245767013,
+      "coolLitFrac": 0.10724808485562758,
       "warmOfBand": 0,
-      "whiteFrac": 0.01364177640795741,
-      "whiteBlobPx": 1767,
-      "whiteBlobFrac": 0.0034381712898104043,
-      "whiteBlobs": 6,
-      "whiteBlobArea": 0.01364177640795741,
-      "whiteBlobBox": {
-        "x": 67,
-        "y": 686,
-        "w": 56,
-        "h": 48,
-        "cx": 94,
-        "cy": 708
-      }
+      "whiteFrac": 0,
+      "whiteBlobPx": 0,
+      "whiteBlobFrac": 0,
+      "whiteBlobs": 0,
+      "whiteBlobArea": 0,
+      "whiteBlobBox": null
     }
   }
 ]

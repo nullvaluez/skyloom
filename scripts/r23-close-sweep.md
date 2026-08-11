@@ -99,7 +99,7 @@ both hosts, at (for P-MAN) the identical pose.
 | `r19-c-night-off.png` (R19 crop) | R19 | P-POW-down, sources OFF | 0.130% | **8.0%** | 2/4/20 | 0 |
 | `r20-b-melton-au-night-on.png` | R20 | P-MEL | 9.347% | 27.4% | 1/12/55 | 39 px |
 | `r20-b-melton-au-night-off.png` | R20 | P-MEL | 8.487% | 22.4% | 1/11/52 | 39 px |
-| `r23-c-red-man-pinned-high.png` | **R23 BLOCKED** | P-MAN | 88.549% | **0.0%** | 30/57/68 | 0 |
+| `r23-c-red-man-pinned-high.png` | **R23 BLOCKED** | P-MAN | 85.326% | **0.0%** | 25/59/69 | 0 |
 
 **Instrument validation, and it is a strong one.** Given R19's own archived A/B
 pair and R19's own crop, this module reproduces R19's published `litFrac` (mine
@@ -185,6 +185,7 @@ Ordered. Nothing below has been validated in this session.
 | 4 | `verify-sat-night` (33) | the R16 deep-night contract; it must STAY green. §4 records exactly how it fails under the blockade so a real failure is distinguishable |
 | 5 | The rest of §4's table | every row currently BLOCKED |
 | 6 | Re-derive `MAN_BLOB` and the Owens pair | the two weakest numbers in §1b |
+| 7 | **Expect step 1 to possibly CRASH rather than measure** | §4e: 18 of the 19 assertions have never executed. Budget five minutes for it |
 
 ---
 
@@ -304,10 +305,37 @@ calibration quietly re-deriving itself off whatever happens to be on disk.
   deliberately NOT pinned — `verify-night-alive` rewrites them every run, which
   is the same hazard, self-inflicted, and harmless because nothing is derived
   from them.
+- **It happened a second time, to this round's own evidence.** The §4e exercise
+  run overwrote four of the committed `r23-c-red-*-live.png` baseline frames.
+  Restored the same way; the derivation JSON was regenerated and now matches the
+  committed `r23-c-red-baseline.txt` line for line (pinned P-MAN 85.326% lit,
+  un-pinned live 24.104%). Two occurrences in one session is not bad luck.
 - **Not fixed, and named as a follow-up:** the hazard is fleet-wide. Any round
   that treats an old `scripts/*.png` as evidence is one blocked harness run away
   from losing it. The general fix (per-round output subdirectories, or a
   read-only archive set) is out of scope here and belongs in an R24 seed.
+
+### 4e ⚠️ THE GATE BLOCK HAS NEVER EXECUTED — the honest gap in this deliverable
+
+Without egress, `verify-night-alive` reaches its `VERIFY: BLOCKED` exit before a
+single pixel gate runs. Everything from `worldOk` onward — 18 of the 19
+assertions, the ratio arithmetic, the tier anchor, the emissive audit, the
+structural diff, the `SUGGEST` block — **has never run.**
+
+`R23_FORCE_GATES=1` was added for exactly this (an exercise lever that appends a
+permanent failure and so can never produce a green), and **the exercise run did
+not complete**: page 1 finished all four legs — which did exercise `leg()`, the
+census, the parking, the metric, the screenshot path and the JSON write — and the
+run then stalled for ~12 minutes on the page-2 boot and was killed. Two long
+harness runs stalled the same way in this session (this one and
+`verify-sat-night`'s (E) quiescence loop), both on a machine whose every tile
+fetch is a failing retry; the stall is not attributed to the tree and is not
+attributed to the harness either, because nothing here can tell those apart.
+
+**What is therefore UNKNOWN, stated plainly:** whether the gate block runs
+without throwing. The first egress-enabled run may discover a crash rather than a
+measurement. That is a five-minute fix when it happens and a bad surprise if it
+is not expected — so it is written down here rather than left to be discovered.
 
 ## §5 Instrument asks for A (read-only `__flyStats` fields)
 
@@ -403,9 +431,9 @@ enough that a harness which samples once at 26 s (most of the fleet) reads
   receipts); per-pose deep-night pinning (−26.8° / −27.4° / −30.8°); the
   DEPTH_PASS source guard; the metric reproducing R19's published numbers on
   R19's own archived frames; the blockade, three ways.
-- **NOT proven in this session, and named:** every absolute threshold, every
-  legacy fleet row, `verify-settle` gate (8) under C's un-pin, and whether the
-  user's defect reproduces here at all.
+- **NOT proven in this session, and named:** every absolute threshold; every
+  legacy fleet row; `verify-settle` gate (8) under C's un-pin; **whether the gate
+  block executes at all (§4e)**; and whether the user's defect reproduces here.
 - **The honest verdict:** the never-again gate exists and is structurally sound;
   its calibration is borrowed and must be re-frozen on the first run with
   egress, and until then §2 is the standing to-do list.
