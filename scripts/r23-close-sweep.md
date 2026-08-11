@@ -502,3 +502,21 @@ enough that a harness which samples once at 26 s (most of the fleet) reads
 - **The honest verdict:** the never-again gate exists and is structurally sound;
   its calibration is borrowed and must be re-frozen on the first run with
   egress, and until then §2 is the standing to-do list.
+
+## §7 W3 — INTEGRATED TREE (Fable, post-merge `1714e73`)
+
+Merge order A (`0e0080f`) → B (`9073d6a`) → C (`1714e73`); constants conflicts
+resolved as A's block + B's full block; plan file + seeds restored (the fork-
+point ruling, FLY_ROUND23.md §4.3). Runs on the merged tree, this environment
+(egress still blocked — pixel rows remain UNRUN per §2):
+
+| Instrument | Result |
+|---|---|
+| `r23-c-haze-probe.js` (uniform reads, no tiles needed) | **medium+night+released contentHaze 0.55 → 0.00** (F1 fix live); medium+noon 0.55 preserved; fleet-pinned cells 0 unchanged; high legs 0 by construction, postAerial 0.55 (ruling §4.1); zero pageerrors. `scripts/r23-c-haze-probe.json` |
+| `verify-night-city-identity.mjs` | **12/12 PASS** on the merged tree (flag-off GLSL byte-identical to base with A's changes present) |
+| `verify-classify.mjs` / `verify-warbirds.mjs` / `verify-daily.mjs` | **PASS / PASS / PASS** |
+| `verify-sun` | PASS 7/7 (A, pre-merge tree — unchanged by B/C) |
+
+The §2 ordered re-run list is unchanged and stands as the W3 debt for the
+first egress-enabled machine (the user's, or this environment with
+`server.arcgisonline.com` + `tiles.openfreemap.org` allowed).

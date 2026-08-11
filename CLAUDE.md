@@ -12,7 +12,44 @@
 > describes deleted code (markers, panels, Leaflet-era plans); do not act
 > on it.
 
-> **⚠️ NEWEST — READ FIRST:** **Round 22 "Terrain & Immersion" is BUILT and
+> **⚠️ NEWEST — READ FIRST:** **Round 23 "Night Alive" is BUILT (2026-08-11):
+> [FLY_ROUND23.md](FLY_ROUND23.md) is the record**
+> ([FLY_ROUND23_PLAN.md](FLY_ROUND23_PLAN.md) the plan; THREE Opus 5 agents —
+> A NIGHT-TRUTH / B CITY-LIGHT / C NIGHT-CERT — under Fable orchestration),
+> against the user's same-day defect report: satellite night "almost silent
+> black / white-glow buildings / very few lit windows". **THE ROOT CAUSE
+> (F1, fixed ON by default behind `NIGHT_TRUTH_R23.hazeNight`):** R22 §5.4
+> armed the content haze at medium/low with **no sun term** — measured 0.55
+> at noon AND deep night, injected after lighting on exactly the two variants
+> carrying the night city — and it was **structurally invisible to the whole
+> fleet** (aerial pinned 0 fleet-wide; the ONE un-pinner runs at high tier
+> where `!highTier` excludes the term by construction; sat-night pins tier
+> high while windows are high-tier-only — the R19 §7 lesson's THIRD
+> occurrence). Fix: the haze retires on the windows' own dayFrac/gamma ramp
+> (deep night exactly 0 = R21's certified state, noon keeps R22's 0.55
+> bit-for-bit, no shader text change = no cache-key move); independently
+> reproduced by C's probe (base 0.55 → merged 0.00, fleet cells unchanged).
+> **B's enhancement pass ships `NIGHT_CITY_R23.enabled:false`** (road night
+> re-sweep shadowing the swept uniforms, two-colour traffic off vertex-parity
+> `aRoadSide` — no worker change, protocol stays 18; per-building window
+> variance off `aBendAnchor`; the medium-tier window proposal — **GPU cost
+> UNMEASURED, default not flipped**; flag-off GLSL byte-identical, gate
+> `verify-night-city-identity.mjs` 12/12). **C built the never-again gate**
+> `verify-night-alive` (un-pinned world, deep night, live-tier leg, third
+> outcome `VERIFY: BLOCKED`, releases the aerial pin WITH proof, keeps the
+> depth pin BY ANALYSIS) + `_night-metrics.js` + five inherited harness
+> debts closed. **⚠️ CERT HONESTY: this cloud environment 403-blocks BOTH
+> tile hosts (Esri + OpenFreeMap) — no pixel claim was measurable; night-
+> alive's absolute thresholds are archive-derived PROVISIONAL, its main gate
+> block is UNEXERCISED, and `scripts/r23-close-sweep.md` §2 is the ordered
+> re-run list for the first egress-enabled machine.** `__flyStats.night`
+> (2 Hz, wall-clocked) is the one-read user-machine diagnosis; FLY_ROUND23.md
+> §6 = the user checkpoints (fly it, `copy(__flyStats.night)`, taste-flip
+> NIGHT_CITY_R23). R24 seeds: skyline night lighting (the biggest remaining
+> silent-black contributor at altitude), bloom-clip white glow (S2, detector
+> built), postAerial sun-term taste, per-round harness output dirs.**
+>
+> Earlier: **Round 22 "Terrain & Immersion" is BUILT and
 > SHIPPED (2026-08-10): [FLY_ROUND22_PLAN.md](FLY_ROUND22_PLAN.md) is the
 > approved plan; [FLY_ROUND22.md](FLY_ROUND22.md) + the per-harness ledger
 > [`scripts/r22-close-sweep.md`](scripts/r22-close-sweep.md) are the record**
