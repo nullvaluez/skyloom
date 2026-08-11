@@ -1,0 +1,96 @@
+{
+  "when": "2026-08-11T13:23:25.710Z",
+  "rows": {
+    "high/noon/released": {
+      "tier": "high",
+      "aerialPin": null,
+      "haze": {
+        "startM": 800,
+        "endM": 14000,
+        "max": 0
+      },
+      "post": 0.55,
+      "quilt": {
+        "desat": 0,
+        "flatten": 0
+      },
+      "elDeg": 52.123,
+      "state": "day",
+      "sunFrac": 1,
+      "tel": null
+    },
+    "high/night/released": {
+      "tier": "high",
+      "aerialPin": null,
+      "haze": {
+        "startM": 800,
+        "endM": 14000,
+        "max": 0
+      },
+      "post": 0.55,
+      "quilt": {
+        "desat": 0,
+        "flatten": 0
+      },
+      "elDeg": -26.865,
+      "state": "night",
+      "sunFrac": 0,
+      "tel": null
+    },
+    "medium/noon/released": {
+      "tier": "medium",
+      "aerialPin": null,
+      "haze": {
+        "startM": 800,
+        "endM": 14000,
+        "max": 0.55
+      },
+      "post": 0,
+      "quilt": {
+        "desat": 0,
+        "flatten": 0
+      },
+      "elDeg": 52.123,
+      "state": "day",
+      "sunFrac": 1,
+      "tel": null
+    },
+    "medium/night/released": {
+      "tier": "medium",
+      "aerialPin": null,
+      "haze": {
+        "startM": 800,
+        "endM": 14000,
+        "max": 0.55
+      },
+      "post": 0,
+      "quilt": {
+        "desat": 0,
+        "flatten": 0
+      },
+      "elDeg": -26.865,
+      "state": "night",
+      "sunFrac": 0,
+      "tel": null
+    },
+    "medium/night/FLEET-PINNED": {
+      "tier": "medium",
+      "aerialPin": 0,
+      "haze": {
+        "startM": 800,
+        "endM": 14000,
+        "max": 0
+      },
+      "post": 0,
+      "quilt": {
+        "desat": 0,
+        "flatten": 0
+      },
+      "elDeg": -26.865,
+      "state": "night",
+      "sunFrac": 0,
+      "tel": null
+    }
+  },
+  "errs": []
+}

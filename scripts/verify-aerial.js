@@ -33,6 +33,16 @@
  *   9  anisotropy 8 on streamed tile textures (high tier)
  *  10  tile texture bytes ≤ 300 MB at 300 m AGL under z17
  *  11  zero pageerrors
+ *
+ * R23 (C NIGHT-CERT) ADDITIVE — nothing above this line moved:
+ *  12  medium tier + NOON: the CONTENT haze is armed at its source `max`
+ *  13  medium tier + DEEP NIGHT: it retires (A's fix) — or, on an unarmed
+ *      tree, it still reads `max`, which is A's F1 RED, recorded not failed
+ *  Both run LAST, after every frozen assertion, and both read a UNIFORM
+ *  (`__flyAerial.haze()`) rather than pixels — so they need no tiles. They
+ *  exist because THIS FILE held one of the two locks that hid F1: it is the
+ *  one harness that releases `__flyAerialOverride`, and it pinned tier HIGH,
+ *  where `contentGate`'s `!highTier` excludes the term by construction.
  */
 const { chromium } = require('playwright');
 const path = require('path');
@@ -538,6 +548,142 @@ async function lumaMean(file, region) {
   console.log(`OWENS VALLEY 500m AGL, aerial+shadows ARMED: draws ${owens.draws} · tris ${owens.tris}`);
   gate('Owens Valley draws ≤ 261 with everything armed', owens.draws <= 261, `draws ${owens.draws}`);
   await glShot('aerial-09-owens-armed');
+
+  /* ==========================================================================
+   * 12/13 — R23 (C NIGHT-CERT), ADDITIVE: THE CONTENT HAZE, AT THE ONE TIER
+   * AND THE ONE CLOCK WHERE IT EXISTS.  (A NIGHT-TRUTH's escalation §5.1)
+   * ==========================================================================
+   * A's F1: `AERIAL_PERSPECTIVE.content` was armed for medium/low in R22 W3 at
+   * max 0.55 and has NO NIGHT TERM — 0.55 at noon AND at deep night, hazing the
+   * one thing the user says is missing. It shipped fleet-invisible through a
+   * two-lock blindness, and BOTH locks are in this file's neighbourhood:
+   *   · `scripts/_boot.js` pins `__flyAerialOverride = 0` fleet-wide, so no
+   *     legacy harness can see the term at all; and
+   *   · this file — THE one harness that releases that pin — pins tier HIGH,
+   *     where `contentGate`'s `!highTier` excludes the term BY CONSTRUCTION.
+   * So the single instrument with the key ran it in the one room the lock does
+   * not open. These two legs are that room.
+   *
+   * ADDITIVE BY CONSTRUCTION — nothing above this line moved. They run LAST,
+   * after every frozen assertion has been made at tier high, so the tier write
+   * below cannot disturb a single one of them; only the pageerror gate follows,
+   * and it should cover these legs too.
+   *
+   * TILE-INDEPENDENT: both gates read `getSatContentHaze().max` through
+   * FlyScene's `__flyAerial` dev handle. That is a UNIFORM, not a pixel — it is
+   * set from `qualityTier`, the constants and the sun, none of which need a
+   * tile — so these legs are fully exercisable in a session whose tile hosts
+   * are unreachable, which is the session that wrote them.
+   *
+   * WHAT IS ASSERTED, and why the night one is conditional. The noon value is
+   * the R22 ship state and does not move with A's fix (A's fix is night-only;
+   * noon is bit-identical), so it is gated flat. The night value depends on
+   * whether `NIGHT_TRUTH_R23.hazeNight` is ARMED in the tree under test, so the
+   * gate PARSES that from source and asserts the contract that tree actually
+   * ships — the verify-terra idiom, "a certification gate must certify WHAT
+   * SHIPS" — printing which contract it applied. On an unarmed tree it records
+   * A's measured RED (0.55 at deep night) instead of inventing a failure.
+   */
+  {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'fly', 'fly-constants.js'), 'utf8');
+    /* Slice the WHOLE object literal, from its `export const` to the closing
+     * `\n};`. A fixed-length window is what a first draft used and it silently
+     * truncated: `AERIAL_PERSPECTIVE` carries 25 lines of comment before
+     * `content:`, so a 1200-char slice reported `content.enabled=false` on a
+     * tree where it is plainly true — a source gate that reads the wrong answer
+     * from the right file is worse than no source gate. */
+    const blk = (name) => {
+      const i = src.indexOf(`export const ${name}`);
+      if (i < 0) return '';
+      const end = src.indexOf('\n};', i);
+      return end < 0 ? src.slice(i) : src.slice(i, end + 3);
+    };
+    const nt = blk('NIGHT_TRUTH_R23');
+    const hazeNightArmed =
+      /enabled:\s*true/.test(nt) && /hazeNight\s*:\s*\{[^}]*enabled:\s*true/s.test(nt);
+    const ch = blk('AERIAL_PERSPECTIVE');
+    const contentEnabled = /content\s*:\s*\{[^}]*enabled:\s*true/s.test(ch);
+    const contentMax = +(ch.match(/content\s*:\s*\{[^}]*?max:\s*([\d.]+)/s)?.[1] ?? NaN);
+    console.log(
+      `R23 content-haze legs — source contract: AERIAL_PERSPECTIVE.content.enabled=${contentEnabled} ` +
+        `max=${contentMax} · NIGHT_TRUTH_R23.hazeNight armed=${hazeNightArmed}`
+    );
+
+    // Medium tier, and PROVE the write took: a silent tier failure here would
+    // make both gates read 0 and pass for the wrong reason.
+    await page.evaluate(() => window.__flyStore.getState().setQualityTier('medium'));
+    await page.waitForTimeout(2500); // material/composer rebuild
+    await setAerial(1); // released/armed — the fleet pin is what hid this term
+    const readHaze = () =>
+      page.evaluate(() => ({
+        tier: window.__flyStore?.getState?.().qualityTier ?? null,
+        haze: window.__flyAerial?.haze?.() ?? null,
+        post: window.__flyAerial?.get?.()?.strength ?? null,
+        aerialPin: window.__flyAerialOverride ?? null,
+        tel: window.__flyStats?.night ?? null, // A's block; null pre-merge
+      }));
+
+    // --- 12: medium + NOON — the R22 ship state, unmoved by A's night fix ---
+    await pose(40.7075, -74.0113, 792, NOON, 12000);
+    const mNoon = await readHaze();
+    console.log(`MEDIUM/NOON: ${JSON.stringify(mNoon)}`);
+    gate(
+      'tier write took (medium) — the precondition both content-haze gates rest on',
+      mNoon.tier === 'medium',
+      `tier=${mNoon.tier}`
+    );
+    if (contentEnabled) {
+      gate(
+        `content haze IS armed at medium+noon (max ≈ ${contentMax}) — the R22 ship state`,
+        mNoon.haze != null && Math.abs(mNoon.haze.max - contentMax) < 0.02,
+        `max=${mNoon.haze?.max} vs source ${contentMax} · post-pass strength=${mNoon.post} (0 expected: !highTier)`
+      );
+    } else {
+      console.log(
+        `INFO content haze legs INERT — AERIAL_PERSPECTIVE.content.enabled is false in source; ` +
+          `measured max=${mNoon.haze?.max}. Nothing to assert until the §5.4 flip.`
+      );
+    }
+
+    // --- 13: medium + DEEP NIGHT — the F1 defect, or A's fix ---------------
+    // NYC lon −74.01 ⇒ local solar ≈ UTC − 4.93 h; 04:00 UTC ≈ 23:04 local.
+    const NIGHT = Date.UTC(2026, 6, 18, 4, 0);
+    await pose(40.7075, -74.0113, 792, NIGHT, 12000);
+    const mNight = await readHaze();
+    console.log(`MEDIUM/NIGHT: ${JSON.stringify(mNight)}`);
+    if (!contentEnabled) {
+      console.log('INFO medium+night content-haze gate skipped — content term disabled in source.');
+    } else if (hazeNightArmed) {
+      gate(
+        'content haze RETIRES at medium + deep night (max ≈ 0) — A NIGHT-TRUTH F1',
+        mNight.haze != null && mNight.haze.max <= 0.05,
+        `max=${mNight.haze?.max} (armed contract; flag-off reads ${contentMax} — A's measured RED)`
+      );
+    } else {
+      // The pre-fix tree. Record the red; do NOT manufacture a failure out of
+      // a flag that is honestly off (verify-terra's "certify what ships").
+      console.log(
+        `RED medium+deep-night content haze = ${mNight.haze?.max} (A's F1: no night term; ` +
+          `expected ≈ ${contentMax}). NIGHT_TRUTH_R23.hazeNight is NOT armed in this tree, so this ` +
+          `is the documented pre-fix state and is recorded, not failed. Arm the flag and this ` +
+          `becomes a hard gate at ≤ 0.05.`
+      );
+      gate(
+        'medium+deep-night content haze matches the DOCUMENTED pre-fix value (the frozen red)',
+        mNight.haze != null && Math.abs(mNight.haze.max - contentMax) < 0.02,
+        `max=${mNight.haze?.max} vs the ${contentMax} A measured — if this drifts, the red moved ` +
+          `under us and the fix's target moved with it`
+      );
+    }
+    console.log(
+      `R23 telemetry cross-check — A's __flyStats.night: ` +
+        (mNight.tel
+          ? `contentHaze=${mNight.tel.contentHaze} tier=${mNight.tel.tier} (vs uniform ${mNight.haze?.max})`
+          : 'absent (pre-merge tree; the uniform read above is the instrument)')
+    );
+    // Restore the tier so nothing after this block inherits medium.
+    await page.evaluate(() => window.__flyStore.getState().setQualityTier('high'));
+  }
 
   gate('zero pageerrors', errs.length === 0, errs.slice(0, 3).join(' | '));
   console.log(fails.length ? `VERIFY: FAIL (${fails.join(', ')})` : 'VERIFY: PASS');
