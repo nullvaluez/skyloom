@@ -129,19 +129,94 @@ not in this material's uniform state.
 Vertical profile of the pale: `[0.97, 1, 1, 1, 1, 1, 1, 1, 0.97]` over nine
 scanlines — near-total frame coverage, consistent with the user's 83%.
 
-### 3.3 Where this points
+### 3.3 It is ONE zero-area triangle (probes 8–12)
 
-The satellite post chain runs `AerialPerspective` (R19 B, merged into the
-existing EffectPass, reads scene depth, and is the round that discovered
-`postprocessing` delivers **reversed** depth because `USE_REVERSED_DEPTH_BUFFER`
-is never defined — R22 D then found four more reversed-depth defects in the
-n8ao library). A depth-keyed full-screen effect fed a wrong depth over the whole
-frame is exactly a uniform pale field that survives a black material and no
-lights.
+I chased a post-process explanation first and it was wrong. Recording the
+detour because the wrong turn is instructive:
 
-Under test in probe 8: `depthWrite=false` / `colorWrite=false` on the culprit, a
-raw `renderer.render` that bypasses the composer, and a per-pass / per-effect
-disable sweep. **Not yet proven — this section is a lead, not a conclusion.**
+* `rawSceneRender` (a direct `renderer.render` to the default framebuffer) is
+  **not** pale — which looked like proof the post chain invents it. It is not
+  proof: the composer's RenderPass writes an HDR HalfFloat target with **no**
+  tone mapping, while a direct render writes the LDR default framebuffer
+  **with** it. The second clamps exactly what the first passes on.
+* Reading the composer's own input buffer as FLOAT settles it: **the pale is
+  already in the scene render.** lumMean 0.213 → 0.853, fraction of samples
+  over luminance 1.0 0.015 → 0.45, and hiding the culprit puts it back to
+  0.211. Not a post artifact.
+* Bloom exonerated properly — by `intensity = 0` and `threshold = 99`, not by
+  `blendFunction`. Probe 8 showed per-effect `blendFunction = 0` is an
+  unreliable disable: on HueSaturation it blacked the entire frame.
+
+**The culprit chunk rendered ALONE fills the whole frame with a flat,
+featureless pale field** (`.probe-c-look/iso-180.png`). Flat and featureless is
+the signature of one enormous primitive, not of a city block. So probe 11
+binary-searched the index draw range:
+
+| draw range | result |
+| --- | --- |
+| all 109,503 indices | `pr` 0.731 |
+| `[0, 61410)` | `pr` **0.000** (black) |
+| **`[61410, 61413)` — ONE TRIANGLE** | **`pr` 0.731** — the whole thing |
+
+Its three vertices:
+
+```
+i=40221  pos [805.5746459960938, 34.12337875366211, 331.4261779785156]
+i=40222  pos [805.5746459960938, 34.12337875366211, 326.64886474609375]
+i=40223  pos [805.5746459960938, 34.12337875366211, 326.22686767578125]
+```
+
+x identical, y identical, z spanning 5 m — **three collinear points, a
+zero-area triangle.** All attributes finite; all three share one anchor and
+therefore one bend drop (148.90 m), so the bend does not shear it.
+
+### 3.4 Why a zero-area triangle paints the screen
+
+A zero-area triangle is mathematically invisible, but it is numerically
+unstable to rasterize: the area determinant is ~0, so the sign and magnitude
+are decided by the last bits of the projected coordinates. The material is
+**`side: DoubleSide`**, so backface culling — which removes about half of these
+by winding — never runs. The bend adds a per-vertex float32 offset
+(`bendD * bendD * uBendK`) that perturbs the projection just enough to tip the
+determinant, which is exactly why `uBendK = 0` and `uBendCenter = camera` both
+collapse the pale and why nothing else does.
+
+It also explains the thing that confused me for two probes: **the pale
+reproduces on demand from the frozen frame state.** This is not a timing race.
+It is a pose-dependent numerical condition — as the aircraft moves, `bendD`
+changes every frame, and only at certain poses does the determinant tip. That
+is why it is ~1 frame in 1,600 and why the user saw exactly one frame.
+
+My float64 CPU replication of the bend disagreed with the GPU (it put the
+geometry 2.6 km away in the lower-left, ndcX −4.4..−0.12). That disagreement is
+not a bug in the replication — it is the finding. float64 never tips.
+
+### 3.5 Prevalence — this is systemic, not one bad building
+
+Probe 12 censuses every streamed chunk (NYC, settled):
+
+| chunk | tris | zero-area | % | coincident |
+| --- | --- | --- | --- | --- |
+| fb6c0469 | 35,824 | 2,528 | **7.06 %** | 2,526 |
+| 68a5692b | 18,372 | 1,457 | **7.93 %** | 1,456 |
+| 83336648 | 36,501 | 3,152 | **8.64 %** | 3,150 |
+| 873be0c1 | 41,933 | 2,802 | **6.68 %** | 2,802 |
+| d44701b8 | 44,157 | 2,806 | **6.36 %** | 2,804 |
+| a1ce53a3 | 28,122 | 2,082 | **7.40 %** | 2,082 |
+
+**Every large building chunk carries 6–9 % exactly-zero-area triangles.** Two
+distinct kinds, and the difference matters for the fix:
+
+* **coincident** (≈99.9 %) — two vertices byte-identical, e.g.
+  `pa = pc = [358.298583984375, -4.965739727020264, 330.8290100097656]`. A wall
+  quad extruded over a zero-length footprint edge (duplicate consecutive
+  footprint points).
+* **collinear but distinct** (≈2 per chunk) — the probe-11 painter. A ring
+  dedupe would NOT remove these, so the fix must be an **area** test, not a
+  point dedupe.
+
+Small chunks (127–602 tris) carry **zero** degenerates, so this tracks dense
+OpenFreeMap footprints, not the extruder in general.
 
 ---
 
