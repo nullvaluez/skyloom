@@ -186,6 +186,7 @@ Ordered. Nothing below has been validated in this session.
 | 5 | The rest of §4's table | every row currently BLOCKED |
 | 6 | Re-derive `MAN_BLOB` and the Owens pair | the two weakest numbers in §1b |
 | 7 | **Expect step 1 to possibly CRASH rather than measure** | §4e: 18 of the 19 assertions have never executed. Budget five minutes for it |
+| 8 | Watch every run for `WARN screenshot path for …: viewport-fallback` | §4e: the element-screenshot stability hang killed two runs here. If the fallback fires on a healthy machine too, the element path should be retired FLEET-WIDE rather than patched per-harness — `verify-sat-night`'s `shot64` has the same hang |
 
 ---
 
@@ -324,13 +325,31 @@ structural diff, the `SUGGEST` block — **has never run.**
 
 `R23_FORCE_GATES=1` was added for exactly this (an exercise lever that appends a
 permanent failure and so can never produce a green), and **the exercise run did
-not complete**: page 1 finished all four legs — which did exercise `leg()`, the
-census, the parking, the metric, the screenshot path and the JSON write — and the
-run then stalled for ~12 minutes on the page-2 boot and was killed. Two long
-harness runs stalled the same way in this session (this one and
-`verify-sat-night`'s (E) quiescence loop), both on a machine whose every tile
-fetch is a failing retry; the stall is not attributed to the tree and is not
-attributed to the harness either, because nothing here can tell those apart.
+not complete**: page 1 finished all four legs — exercising `leg()`, the census,
+the parking, the metric, the screenshot path and the JSON write — and the run
+then stalled and was killed.
+
+**FIRST DIAGNOSIS WRONG, CORRECTED FROM THE STACK.** I recorded the stall as
+"the page-2 boot". The trace says otherwise: `verify-night-alive.js:471` reached
+from `:553` — `bootFly(high)` had **completed**, the tier had been set, and the
+hang was inside the **element screenshot's "waiting for element to be stable"
+step on the second page**. That is the exact failure mode documented in `leg()`'s
+own comment, which `bringToFront()` was supposed to have fixed. It does not fix
+it for page 2+.
+
+**And it explains the other stall.** `verify-sat-night`'s (E) quiescence loop
+hangs in `shot64()` — also an element screenshot, also on a long run. One
+mechanism, two dead runs, ~25 minutes of wall clock.
+
+**Fixed here, bounded:** the element shot keeps a 20 s try — it stays the fleet
+idiom and is what every archived frame was captured with — with a **clipped
+viewport screenshot as fallback**, which skips the stability wait entirely. At
+these poses the two are the same rectangle (`.fixed.inset-0` fills the viewport
+and `parkForeground` has already hidden every non-canvas element), so the
+fallback's pixels are the element's pixels. The path taken is **printed** on any
+fallback: a fallback nobody can see is a measurement nobody can trust. **The fix
+itself is unexercised** — it is one `try/catch` on a path this session cannot
+reach past page 1.
 
 **What is therefore UNKNOWN, stated plainly:** whether the gate block runs
 without throwing. The first egress-enabled run may discover a crash rather than a

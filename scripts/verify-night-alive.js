@@ -468,7 +468,33 @@ const nightMsFor = (lon) => {
     // timeout with no error that says why. Cost me one smoke run; recorded here
     // so it costs nobody else one.
     await page.bringToFront();
-    const buf = await page.locator('.fixed.inset-0 canvas').first().screenshot();
+    /* …AND `bringToFront()` IS NOT ENOUGH, measured. Two long runs in this
+     * session died here, both on their SECOND page, both inside the element
+     * screenshot's "waiting for element to be stable" step, after their boot
+     * had completed cleanly (verify-night-alive.js:471 reached from :553, and
+     * verify-sat-night's own `shot64` in its (E) loop). Playwright's ELEMENT
+     * screenshot waits for the bounding box to stop moving across animation
+     * frames; a viewport screenshot does not.
+     *
+     * So the element shot keeps its 20 s try — it stays the fleet idiom and it
+     * is what every frozen archive frame was captured with — and a CLIPPED
+     * PAGE screenshot is the fallback. At these poses the two are the same
+     * rectangle: `.fixed.inset-0` fills the viewport and `parkForeground` has
+     * already hidden every non-canvas element, so the fallback's pixels are the
+     * element's pixels. Which path produced the frame is PRINTED, never
+     * silent — a fallback nobody can see is a measurement nobody can trust. */
+    let buf;
+    let shotVia = 'element';
+    try {
+      buf = await page.locator('.fixed.inset-0 canvas').first().screenshot({ timeout: 20000 });
+    } catch (e) {
+      shotVia = `viewport-fallback (${e.message.split('\n')[0].slice(0, 60)})`;
+      buf = await page.screenshot({
+        clip: { x: 0, y: 0, width: 1600, height: 900 },
+        timeout: 20000,
+      });
+    }
+    if (shotVia !== 'element') console.log(`WARN screenshot path for ${legTag}: ${shotVia}`);
     fs.writeFileSync(OUT(shot), buf);
     await parkForeground(page, true);
     const raw = await decodeRaw(buf);
