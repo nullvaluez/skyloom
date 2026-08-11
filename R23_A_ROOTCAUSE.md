@@ -186,12 +186,58 @@ building, and the cost must be measured, not assumed.**
 
 ---
 
-## §4 WHAT I AM SHIPPING
+## §4 WHAT I SHIPPED
 
 | Fix | Root cause | Flagged? | Rationale |
 |---|---|---|---|
-| **Night term on the content haze** | F1 — a distance haze with no sun input, newly armed at medium/low | behind `NIGHT_TRUTH_R23` (default **on**) | It has taste surface (how fast the haze should retire at dusk), so per plan §4A it is flagged. Flag off = today's shipped behavior, so the revert contract is exact. By day the term is identity, so every daylight gate is untouched. |
+| **Night term on the content haze** | F1 — a distance haze with no sun input, newly armed at medium/low | behind `NIGHT_TRUTH_R23.hazeNight` (default **on**) | It has taste surface (how fast the haze should retire at dusk), so per plan §4A it is flagged. Flag off = today's shipped behavior, so the revert contract is exact. By day the term is identity, so every daylight gate is untouched. |
 | **`__flyStats.night` telemetry** | F2 — nothing reports the night chain's live state | unflagged, dev-only, read-only | Adds no draws, no product behavior. This is the artifact that makes the user's machine diagnosable in one read, which is the only way F2's trigger gets settled. |
+
+### F1 A/B — exactly one of twelve cells moved
+
+`scripts/r23-a-tiernight.json` (before = commit `a529b51`):
+
+| condition / clock / tier | BEFORE | AFTER |
+|---|---:|---:|
+| **user / night / medium** | **0.55** | **0.00** |
+| user / noon / medium | 0.55 | 0.55 |
+| user / night / high · low | 0 | 0 |
+| user / noon / high · low | 0 | 0 |
+| all six **fleet** cells | 0.00 | 0.00 |
+
+The fleet cells cannot move: `contentGate` is already 0 there, and the new
+multiply sits behind `if (hn && contentGate > 0)`.
+
+### F1 dusk ramp — an ease, not a step
+
+`scripts/r23-a-hazeramp.json`, 14 clock samples, medium tier. Before the fix
+this column is a constant **0.55 at every sample**:
+
+| UTC | 16h | 20h | 22h | 22.5h | 23h | 23.5h | 24h | 24.5h → 29h |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| sunFrac | 1.00 | 0.93 | 0.50 | 0.38 | 0.26 | 0.14 | 0.016 | 0 |
+| contentHaze | 0.55 | 0.55 | 0.55 | 0.55 | 0.524 | 0.334 | 0.043 | **0** |
+
+Smooth and monotone across the dusk crossing, so the R19 dusk ladder sees an
+ease rather than a flash.
+
+### Regression checking — what this environment could and could not do
+
+- **`verify-sun`: PASS** (7/7, zero pageerrors) — a real check that the FlyScene
+  edit did not disturb the day cycle or the boot.
+- **`verify-dusk`: NOT A USABLE INSTRUMENT HERE.** Two of its gates fail on the
+  **untouched base tree** (`pinned noon is the certified DAY sky` — env/bg
+  0.8448/0.9955 vs an exact-0.85/1.0 assertion, an un-settled SatEnvironment
+  ramp; and `cirrus +1 draw` — armed 118 vs parked 118), and two separate runs
+  died mid-flight (dev server killed once, browser closed once). One further
+  gate (`overcast lid is up at dusk`) passed on base and failed once on the
+  fixed tree, and my re-run crashed before reaching it — **I am recording that
+  as UNATTRIBUTED rather than claiming exoneration.** The mechanism argument
+  that it cannot be mine is strong (the diff multiplies a local `contentGate`
+  and writes a dev-only stats object; it touches no weather path) but a
+  mechanism argument is not a measurement, and this is exactly the R19 §7 trap
+  applied to myself. **It needs one re-run on a machine with egress.**
+- Everything pixel-based, including this fix, is **uncertified here** (§0).
 
 ---
 
@@ -210,6 +256,31 @@ building, and the cost must be measured, not assumed.**
    was live on the user's machine through R21, and the R21 night read was
    certified good, so it is *not* a regression. It is a strong candidate for
    B's night grade work.
+4. **To B — the skyline has NO night lighting at all.** `sat-skyline-engine.js`
+   declares it in its own header: *"no water, no facade atlas, no night
+   windows, no collision columns"*. The R18 Bayer crossfade means the city
+   **becomes** that ring as you climb (buildings dissolve 2400→3000 m, evict at
+   3200 m), so **climbing out of a city at night hands the whole skyline over to
+   unlit dark masses.** That is by design and not an R22 regression, so it is
+   not mine to change — but if the user flies at altitude it is a far larger
+   contributor to "almost silent black" than anything in §2, and it is squarely
+   B's delta.
+5. **To B — the leading hypothesis for S2 ("white glow"), unproven.** I could
+   not find any building-side source (H3 refuted by measurement) and the night
+   palette is deliberately warm — `SAT_CITY_GLOW.coreColor '#ffd9a3'` even
+   carries the comment *"clears bloom without going white"*. But satellite bloom
+   **breathes at night**: `SKY_LIVE.bloomNight` lerps intensity 0.7 → **1.0**
+   and the luminance threshold 0.85 → **0.62** as the sun goes down
+   (`Effects.jsx:311`). A warm core bloomed at 1.0 through a 0.62 threshold
+   clipping toward white is the most plausible mechanism for "some buildings
+   have a white glow", and bloom night tune is B's delta 2c — with the
+   five-control `verify-flicker` protocol before AND after, per plan §4B.
+   **This needs pixels; I could not test it.**
+6. **Note for whoever runs low tier.** At `low` the night city does not exist at
+   all: buildings, roads, skyline and clutter never mount (`qualityTier !==
+   'low'`), and `BLOOM_SCALE.low = 0` drops bloom entirely. What remains is 27
+   unbloomed city-glow domes. If any user machine resolves to low, "almost
+   silent black" is a literal description of the intended build.
 4. **To Fable.** No frozen assertion number moved and none is requested. No
    sanction consumed.
 5. **To Fable / the round.** This worktree cannot certify anything pixel-based.
