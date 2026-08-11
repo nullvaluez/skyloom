@@ -305,9 +305,24 @@ Run against `:3021`. **No frozen assertion number was moved.**
 | verify-stability | **PASS** | |
 | verify-settle | **PASS** | |
 | verify-round11 | **PASS** | |
-| verify-weather | *(see §5.2)* | |
+| verify-weather | **PASS** | first run FAILED on a HARNESS error I caused — §5.2 |
 | **verify-flicker** | **FAIL (2)** | **PRE-EXISTING — not mine, proven in control** |
 | `npm run build` | **PASS** | |
+
+### 5.2 I contaminated verify-weather, and it is my fault, not the gate's
+
+The first verify-weather run died with
+`page.evaluate: TypeError: window.__fly.warpToGeo is not a function`. That is
+not a content failure and it is not flake: **I ran `npm run build` against the
+same `.next` the dev server was serving from, while the gate was in flight.**
+`next dev` and `next build` share one `.next` and Next 16 has no `distDir`
+flag — the R19 close recorded exactly this hazard for a second dev server, and
+a production build is worse. A health check after the build confirmed the dev
+server had recovered (`warp: function`, `__satBuildings: object`), and the
+quiet re-run is green.
+
+Rule for the next agent: **never build while a browser gate is running against
+the dev server.** Sequence the production leg after the dev sweep.
 
 ### 5.1 verify-flicker (2) is not mine, and the control says so
 
