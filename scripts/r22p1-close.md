@@ -16,8 +16,9 @@ appended as they landed.
 
 **Contents.** §0 what this round certifies · §1 the three new gates, GREEN and
 RED · §2 frozen subset · §3 the two open reds, adjudicated · §4 cloud closure ·
-§4b the pale-frame watch · §5 named R23 follow-ups · §6 the satellite soak ·
-§7 verdict.
+§4b the pale-frame watch · §6 the satellite soak · §7 verdict · §8 named R23
+follow-ups. (§5 was renumbered to §8 when the follow-ups moved to the end;
+there is no §5.)
 
 ---
 
@@ -161,7 +162,7 @@ Every row below was run on `r22p1/integrate` with all three R22.1 flags
 | **verify-sat-buildings** | **PASS** | draws **226 ≤ 375** · kept **6,965** (max 500/chunk over 16) · columns **6,964** · maxR **305.9 m** — every number identical to C2's read, i.e. FLASH_GUARD moved none of them |
 | **verify-sat-depth** | **PASS** | satellite low-AGL draws **215 ≤ 261** · aniso 8 · z16 requested · hillshade mean \|Δ\| 10.70 |
 | **verify-round11** | **PASS** | draws **236 ≤ 480** · 0 page/console errors |
-| **verify-weather** | **PASS 28/28** | rim step **0.9/255** against a bound of 18 — a FOURTH throw of the coin documented in §5 F13 |
+| **verify-weather** | **PASS 28/28** | rim step **0.9/255** against a bound of 18 — a FOURTH throw of the coin documented in §8 F13 |
 | **verify-fleet** | **PASS** | count arithmetic FROZEN, unmoved |
 
 **13 of 13 batch gates PASS. `grep '^FAIL'` across every log in the batch
@@ -309,7 +310,7 @@ The Esri DEM probe re-confirms R22's own measurement exactly: z15 and z16 real
 (2) from `camTileZ` to the forward profile or to `maxLeafZ` is the obvious
 repair and it is A TERRA's instrument to re-point, not a certifier's — the same
 line R22's W2 re-base drew when it retired the cruise form. It is carried as
-**F10** in §5.
+**F10** in §8.
 
 **The one thing here that is NOT an instrument artifact, and is new:** on the
 second visit to a pose, the region under the camera did not re-refine within
@@ -625,7 +626,7 @@ make it worth** — and F10, F14, F15 and F16 are that lesson written as work.
 
 ---
 
-## §5 NAMED R23 FOLLOW-UPS
+## §8 NAMED R23 FOLLOW-UPS
 
 Carried out of this round by name, so none of them can be lost to "it was
 mentioned somewhere". Each says who found it and what would close it.
