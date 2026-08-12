@@ -155,6 +155,40 @@ const PROBE = (want) => {
     maxZ: eng.map?.maxLevel ?? eng.map?.maxZoom ?? null,
     downloading: eng.downloading ?? null,
     tier: window.__flyStore?.getState?.().qualityTier ?? null,
+    /* THE FRUSTUM RULE, read directly. Vendored three-tile line 215:
+     *   `this.inFrustum && !this.subTiles && this._loadSubTiles(e)`
+     * — a tile OUTSIDE the frustum is never subdivided, and `_getDistRatio`
+     * multiplies its ratio by 5 rather than 0.8 (line 276). So "the leaf under
+     * the aeroplane is coarse" has two completely different explanations and
+     * `inFrustum` on the containing chain tells them apart. */
+    cam: (() => {
+      try {
+        const c = rt.camera; // FlyScene.jsx:949 publishes the live camera
+        if (!c) return null;
+        const e = c.matrixWorld?.elements;
+        const v = e ? { x: -e[8], y: -e[9], z: -e[10] } : { x: 0, y: 0, z: 0 };
+        return {
+          y: Math.round(c.position?.y ?? 0),
+          fov: c.fov ?? null,
+          near: c.near ?? null,
+          far: c.far ?? null,
+          fwd: { x: +v.x.toFixed(3), y: +v.y.toFixed(3), z: +v.z.toFixed(3) },
+          // the down-angle of the camera's own forward axis, in degrees
+          pitchDeg: +((Math.asin(Math.max(-1, Math.min(1, v.y))) * 180) / Math.PI).toFixed(1),
+          // the angle from that forward axis to straight DOWN. If this exceeds
+          // ~half the vertical FOV plus half the horizontal spread, the ground
+          // directly under the aeroplane is outside the frustum and the library
+          // is CORRECT not to subdivide it.
+          toNadirDeg: +(
+            (Math.acos(Math.max(-1, Math.min(1, -v.y))) * 180) /
+            Math.PI
+          ).toFixed(1),
+        };
+      } catch {
+        return null;
+      }
+    })(),
+    flight: { pitch: +(f.pitch ?? 0).toFixed(3), bank: +(f.bank ?? 0).toFixed(3) },
     // the forward profile — A's frustum-immune statistic
     profile: (() => {
       try {
@@ -261,6 +295,9 @@ const PROBE = (want) => {
         `AGL=${last.aglM} m (ground ${last.groundElev} m) lodThreshold=${last.lodThreshold} downloading=${last.downloading} tier=${last.tier}`
     );
     console.log(`  forward profile (km→leafZ): ${JSON.stringify(last.profile)}`);
+    console.log(
+      `  camera: ${JSON.stringify(last.cam)} · flight ${JSON.stringify(last.flight)}`
+    );
     console.log(`  resident tiles per z: ${JSON.stringify(last.byZ)}`);
     console.log(`  containing-tile chain:`);
     for (const c of last.chain)
