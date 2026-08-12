@@ -78,6 +78,16 @@
  *
  * Run: FLY_URL=http://localhost:3022 node scripts/verify-frame-pace.js
  * Env: PACE_FLY_SEC (default 22) — per-arm measured window
+ *      PACE_PIN_OFF=1 — THE RED LEG (added R22.1 by D CERT; gate mechanics
+ *        only, the default path is untouched). This gate is the one member of
+ *        the R22.1 trio whose defective tree is ALREADY inside every run — the
+ *        OFF arms are the shipped-R22 program — but that is not the same thing
+ *        as proving the gate can FAIL. With PACE_PIN_OFF=1 the middle arm
+ *        boots with `__flyPaceForce=false` too, so all three arms are the
+ *        defective tree: (1) reports the arm is not armed and (4)/(5) compare
+ *        an OFF arm against OFF arms, so the ratios collapse to ~1 and the
+ *        gate goes red. That is the same `*_PIN_OFF=1` idiom
+ *        verify-step-clean and verify-flash-guard use for their RED legs.
  */
 const { chromium } = require('playwright');
 const path = require('path');
@@ -85,6 +95,7 @@ const { bootFly, unpinPins } = require('./_boot');
 
 const BOOT_OPTS = process.env.FLY_URL ? { url: process.env.FLY_URL } : {};
 const FLY_SEC = +(process.env.PACE_FLY_SEC ?? 22);
+const PIN_OFF = process.env.PACE_PIN_OFF === '1';
 
 /** The user's recorded pose. altM is MSL; Powell ground is ~282 m. */
 const POSE = { lat: 40.1748, lon: -83.1079, altM: 515, hdgDeg: 155 };
@@ -272,7 +283,10 @@ const med = (a) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
   const a1 = await arm(false, 'OFF-1');
   await a1.page.close();
   await a1.ctx.close();
-  const b = await arm(true, 'ON');
+  // PACE_PIN_OFF=1 makes the middle arm defective too — the RED leg. See the
+  // header. Nothing else in the run changes, so the gate's own arithmetic is
+  // what decides the verdict.
+  const b = await arm(!PIN_OFF, PIN_OFF ? 'ON(RED: pinned off)' : 'ON');
   const a2 = await arm(false, 'OFF-2');
   await a2.page.close();
   await a2.ctx.close();
