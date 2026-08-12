@@ -12,7 +12,38 @@
 > describes deleted code (markers, panels, Leaflet-era plans); do not act
 > on it.
 
-> **⚠️ NEWEST — READ FIRST:** **Round 22 "Terrain & Immersion" is BUILT and
+> **⚠️ NEWEST — READ FIRST:** **R22.1 "World Stability" hotfix is BUILT +
+> CERTIFIED (2026-08-11)** — the user-recorded one-frame WHITE FLASH and the
+> banking MICRO-STUTTER, both fixed at the root off frame-level forensics of
+> the user's own recording. **The flash was a ZERO-AREA TRIANGLE** in a
+> sat-buildings chunk (`@mapbox/vector-tile` `loadGeometry()` closes every
+> ring with a clone of `ring[0]` → 6–9% of every large chunk's triangles are
+> exactly degenerate; DoubleSide = never culled; the bend shader's float32
+> offset tips the ~0 area determinant into a near-full-screen white splat —
+> pose-dependent, NOT a race, bisected to ONE triangle by drawRange search)
+> — fixed by `FLASH_GUARD` (area filter on draped positions at drape
+> finalize, 0.26 ms, RED 6/~40k → **GREEN 0/305,200 frames** incl.
+> production + live weather). **The stutter was three-tile's
+> `getBoundaryEdges` skirt builder on the main thread** (67% of stall
+> samples) — vendored patch #5 `skirtEdges` behind `FRAME_PACE`, output
+> identical by construction (91→0–2.7 stalls/min, worst 87.5→29 ms).
+> `STEP_SAFE` additionally fixes a latent DPR-step defect (resize presented
+> before draw; composer resize a frame late). THREE new RED-calibrated gates:
+> verify-flash-guard / verify-frame-pace / verify-step-clean. Frozen subset
+> 13/13 + soak ×2 green, zero re-baselines, both handed-over reds adjudicated
+> INSTRUMENT/NOISE by control (verify-terra (2) camTileZ is frustum-decided
+> at frozen low-AGL poses — F10; verify-flicker (2) needs a quiescence
+> precondition — F14). **En route, TWO plausible theories were REFUTED by
+> measurement (the DPR-resize theory and a cloud-billboard theory) — read
+> `scripts/r22p1-close.md` §3–§4 before re-opening either.** Agent ledgers:
+> `scripts/r22p1-a-flash.md` / `-b-stutter.md` / `-c-flash.md`; **16 named
+> R23 follow-ups in the close ledger §8** (headliners: two MORE zero-area
+> sites in `vector-tile.worker.js:3106`/`:4579` unfixed; skirt-to-worker;
+> F11 second-visit-never-re-refines). Verdict: **CERTIFIED FOR HANDOFF, six
+> stated caveats (close ledger §7)** — the wide ~35-harness fleet was NOT
+> re-run, and the user's machine has confirmed nothing yet.
+>
+> Earlier: **Round 22 "Terrain & Immersion" is BUILT and
 > SHIPPED (2026-08-10): [FLY_ROUND22_PLAN.md](FLY_ROUND22_PLAN.md) is the
 > approved plan; [FLY_ROUND22.md](FLY_ROUND22.md) + the per-harness ledger
 > [`scripts/r22-close-sweep.md`](scripts/r22-close-sweep.md) are the record**
