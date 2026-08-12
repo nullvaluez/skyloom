@@ -1,0 +1,36 @@
+{
+  "flag-off(shipped)": {
+    "roadKey": "world-bend-road-satnight-r19",
+    "bldgKey": "world-bend-anchor-satbldg-r19",
+    "roadSideAttr": 0,
+    "nightGate": {
+      "tier": "high",
+      "minTier": "high",
+      "shippedMinTier": "high",
+      "on": true
+    },
+    "handle": true,
+    "draws": 84,
+    "tris": 58131,
+    "programs": 61,
+    "bootMs": 58813,
+    "pageerrors": 0
+  },
+  "armed": {
+    "roadKey": "world-bend-road-satnight-r23",
+    "bldgKey": "world-bend-anchor-satbldg-r23",
+    "roadSideAttr": 0,
+    "nightGate": {
+      "tier": "high",
+      "minTier": "medium",
+      "shippedMinTier": "high",
+      "on": true
+    },
+    "handle": true,
+    "draws": 87,
+    "tris": 58137,
+    "programs": 61,
+    "bootMs": 58761,
+    "pageerrors": 0
+  }
+}

@@ -13,7 +13,13 @@ import {
 import { SatRoadEngine } from '@/lib/fly/toy-world/sat-road-engine';
 import { buildPoiList } from '@/lib/fly/poi-data';
 import { SAT_AIRPORT_BEACONS, SAT_ROADS, SETTLE_CALM } from '@/lib/fly/fly-constants';
-import { applyBendAnchor, getSatBldgFade, getSatRoadMix } from '@/lib/fly/toy-world/world-bend';
+import { installNightCityDevHandle } from '@/lib/fly/night-city';
+import {
+  applyBendAnchor,
+  getNightCityRoads,
+  getSatBldgFade,
+  getSatRoadMix,
+} from '@/lib/fly/toy-world/world-bend';
 import { arrivalEpoch, birthK, groundElevVis, makeBirth, notePopin } from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
 
@@ -122,11 +128,21 @@ export function SatRoadLayer({ runtime, flight }) {
         console.warn('[sat-roads] TileJSON init failed:', err?.message ?? err);
     });
     engine.setWorker(api);
-    if (process.env.NODE_ENV === 'development') window.__satRoads = engine; // harness introspection
+    if (process.env.NODE_ENV === 'development') {
+      window.__satRoads = engine; // harness introspection
+      // R23 (B): the night-knob A/B lever (window.__flyNightCity). Installed
+      // from here because this layer mounts exactly when the satellite ground
+      // light network exists; the handle itself writes module-level world-bend
+      // uniforms, so it covers the building windows too.
+      installNightCityDevHandle();
+    }
     return () => {
       engine.dispose();
       worker.terminate();
-      if (process.env.NODE_ENV === 'development') delete window.__satRoads;
+      if (process.env.NODE_ENV === 'development') {
+        delete window.__satRoads;
+        delete window.__flyNightCity;
+      }
     };
   }, [engine, runtime]);
 
@@ -247,6 +263,10 @@ export function SatRoadLayer({ runtime, flight }) {
         nightK: beaconRefs.current.nightK,
         on: beaconsOn,
       };
+      // R23 (B): the night-city road uniforms as the GPU has them — the A/B
+      // captures and any future gate read THIS, never the constants (the
+      // getSatRoadNight()/getEdgeFade() discipline).
+      stats.nightCityRoads = getNightCityRoads();
     }
   }, -46);
 

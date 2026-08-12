@@ -1,0 +1,272 @@
+{
+  "generatedAt": "2026-08-11T11:57:20.014Z",
+  "tier": "",
+  "dwellMs": 45000,
+  "rows": [
+    {
+      "leg": "L1",
+      "legLabel": "un-pinned (R22 world)",
+      "pose": "P-MAN",
+      "poseKey": "man",
+      "tierPin": null,
+      "bootMs": 46750,
+      "hidden": [
+        "player"
+      ],
+      "errors": [],
+      "shot": "r23-a-man-L1.png",
+      "census": {
+        "tier": "high",
+        "dpr": 1,
+        "gov": {
+          "rung": 0,
+          "rungs": 5,
+          "dpr": 1,
+          "tier": "high",
+          "ceilingIdx": 0,
+          "latched": false,
+          "emaFps": 0,
+          "refresh": 0,
+          "targetFps": 60,
+          "dprSteps": 0,
+          "tierSteps": 0,
+          "sampled": 0
+        },
+        "govPin": "hold",
+        "pinAttempt": {
+          "__flyTerraPin": 1,
+          "__flySettlePin": 1,
+          "__flyClutterPin": 1,
+          "__flyDepthPin": 1
+        },
+        "unpinned": null,
+        "sunFrac": 0,
+        "sunEl": null,
+        "trueEl": null,
+        "hdriBucket": "night",
+        "draws": 94,
+        "tris": 58305,
+        "bldg": {
+          "chunks": 13,
+          "ready": 0,
+          "nightEnabled": true,
+          "facadeEnabled": true,
+          "emissiveIntensity": 1.3,
+          "emissive": [
+            1,
+            0.694,
+            0.366
+          ],
+          "hasEmissiveMap": true,
+          "hasMap": true,
+          "toneMapped": true
+        },
+        "roads": {
+          "chunks": 10,
+          "ready": 0
+        },
+        "satRoadsStats": {
+          "chunks": 10,
+          "ready": 0,
+          "empty": 0,
+          "queued": 10,
+          "building": 2,
+          "draping": 0,
+          "ringOn": true,
+          "night": {
+            "street5": 0.24,
+            "street6": 0.34,
+            "daySeam": 0.14
+          },
+          "cacheKey": "world-bend-road-satnight-r19",
+          "emptyByReason": {
+            "noData": 0,
+            "zero": 0,
+            "legacy": 0
+          },
+          "errorRetries": 24,
+          "evictions": 3,
+          "heals": 0
+        },
+        "satBeacons": {
+          "placed": 2,
+          "nightK": 1,
+          "on": true
+        },
+        "cityGlow": null,
+        "houseLights": {
+          "placed": 0,
+          "nightK": 1,
+          "fromHouse": 0,
+          "fromVeg": 0
+        },
+        "satSkyline": {
+          "chunks": 5,
+          "ready": 0,
+          "drawn": 0,
+          "empty": 3,
+          "tris": 0,
+          "verts": 0,
+          "queued": 5,
+          "building": 8,
+          "draping": 0,
+          "ringOn": true,
+          "maxChunks": 10,
+          "emptyByReason": {
+            "noData": 0,
+            "zero": 3,
+            "legacy": 0
+          },
+          "errorRetries": 30,
+          "evictions": 35,
+          "heals": 0
+        },
+        "satVeg": {
+          "placed": 0,
+          "pool": 5000,
+          "altK": 1,
+          "ready": 0,
+          "vegPts": 0,
+          "byClass": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "clutter": {
+          "parked": {
+            "count": 0,
+            "tris": 0,
+            "anchors": 0,
+            "insideColumns": 0
+          },
+          "moving": {
+            "count": 0,
+            "tris": 0,
+            "anchors": 0
+          },
+          "poles": {
+            "count": 0,
+            "tris": 0,
+            "anchors": 0
+          },
+          "ready": 0,
+          "chunks": 6,
+          "realCols": 0,
+          "baseDraws": 94,
+          "draws": 0,
+          "trisPerInstance": {
+            "car": 22,
+            "mover": 22,
+            "pole": 20
+          }
+        },
+        "satTint": {
+          "polys": 0,
+          "verts": 0,
+          "chunks": 0,
+          "visible": false
+        },
+        "aerial": null,
+        "quilt": null,
+        "terra": {
+          "camTileZ": 12,
+          "targetZ": 17,
+          "downloading": 8,
+          "sharp": false,
+          "sharpReason": null,
+          "aglM": 821,
+          "lodThreshold": 0.856,
+          "maxLevel": 18,
+          "burst": false,
+          "at": 104052.70000000019
+        },
+        "settle": null,
+        "emissiveCount": 4,
+        "emissive": [
+          {
+            "name": "Mesh",
+            "visible": false,
+            "ei": 0.78,
+            "emissive": [
+              1,
+              0.584,
+              0.254
+            ],
+            "hasMap": true,
+            "mapImage": "64x32"
+          },
+          {
+            "name": "Mesh",
+            "visible": false,
+            "ei": 2.8,
+            "emissive": [
+              1,
+              1,
+              1
+            ],
+            "hasMap": true,
+            "mapImage": "2x2"
+          },
+          {
+            "name": "Mesh",
+            "visible": false,
+            "ei": 2.8,
+            "emissive": [
+              1,
+              1,
+              1
+            ],
+            "hasMap": true,
+            "mapImage": "2x2"
+          },
+          {
+            "name": "Mesh",
+            "visible": false,
+            "ei": 2.8,
+            "emissive": [
+              1,
+              1,
+              1
+            ],
+            "hasMap": true,
+            "mapImage": "2x2"
+          }
+        ]
+      },
+      "ground": {
+        "w": 1600,
+        "bh": 450,
+        "px": 720000,
+        "litFrac": 0.015426,
+        "warmFrac": 0.005843,
+        "warmShare": 0.3788,
+        "whiteGlowFrac": 0.001238,
+        "p5": 11.34,
+        "p50": 22.75,
+        "p95": 28.75,
+        "p99": 94.55,
+        "mean": 22.46
+      },
+      "frame": {
+        "w": 1600,
+        "bh": 900,
+        "px": 1440000,
+        "litFrac": 0.012689,
+        "warmFrac": 0.003578,
+        "warmShare": 0.282,
+        "whiteGlowFrac": 0.00191,
+        "p5": 13.34,
+        "p50": 25.75,
+        "p95": 34.94,
+        "p99": 63.46,
+        "mean": 26.03
+      }
+    }
+  ]
+}
