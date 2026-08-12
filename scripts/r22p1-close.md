@@ -4,6 +4,8 @@ Branch `r22p1/integrate`, worktree `.claude/worktrees/r22-fable`, dev server
 `:3021`. Final tree = STEP_SAFE (A) + FRAME_PACE (B) + FLASH_GUARD (C2), all
 three `enabled: true`.
 
+**Verdict up front: see §7.**
+
 Conventions follow `scripts/r22-close-sweep.md`: every row carries its
 NUMBERS, every red carries an ADJUDICATION reached by control rather than by
 re-baselining, and everything unrun is named rather than assumed.
@@ -473,7 +475,153 @@ the STOP condition never came up.
 convention: the three-leg route (NYC city → warp Powell OH suburb → rural Union
 County OH), the perf governor UN-PINNED, five BLOCKING gates.
 
-*(filled below)*
+**Run twice, and why.** Run 1 was in flight when an account session limit
+terminated this agent. The soak is a detached node process, so it kept going and
+finished on its own: 76 samples, contiguous minute stamps 0m → 15m, all three
+legs entered (`[leg] nyc-city @0.0m` · `powell-suburb @5.2m` · `union-rural
+@10.1m`), a complete summary and `SOAK: PASS`, exit 0. That is a finished run,
+not a half-finished one — but it finished across the boundary of a session being
+killed, so rather than argue about whether the machine was quiet I ran it
+**again from scratch on a verified-quiet machine**. Both runs are reported.
+Run 1's raw results were copied out before `git checkout --` restored the
+tracked `scripts/soak-results-satellite.json`.
+
+### 6.1 SATELLITE 15 min — BOTH RUNS PASS, all five blocking gates
+
+| Blocking gate | Bound | **R22.1 run 1** | **R22.1 run 2 (quiet)** | R22 close |
+|---|---|---|---|---|
+| p95 triangles | ≤ 2 200 000 | **844 657** (p50 380 386, max 861 601) | **848 123** (p50 399 399, max 896 676) | 824 202 (p50 303 297, max 873 412) |
+| p95 draw calls | ≤ 375 | **247** (p50 231, max 253) | **252** (p50 229, max 255) | 248 (p50 230, max 253) |
+| heap climb (last-third floor vs first-third) | < 60 MB | **−76 MB** (148 → 72) | **−76 MB** (148 → 72) | −81 MB (159 → 78) |
+| governor steps | ≤ 4 | **0** | **0** | 0 |
+| pageerrors | 0 | **0** | **0** | 0 |
+| **verdict** | | **SOAK: PASS** | **SOAK: PASS** | SOAK: PASS |
+
+Both runs: 15 minutes, **76 samples**, all three legs, tier `high` throughout,
+`dprSteps 0` / `tierSteps 0` / `latched false` — the session-latching governor
+never had to move.
+
+Informational:
+
+| Series | R22.1 run 1 | R22.1 run 2 (quiet) | R22 close |
+|---|---|---|---|
+| worst p95 frame | 12.5 ms | **4.3 ms** | — (satellite worst not printed; the toy soak read 12.5) |
+| fps floor (approx) | ≈ 80 | **≈ 233** | — |
+| `gpuFrameMs` p95 (real GPU timer, `EXT_disjoint_timer_query_webgl2`) | worst 5.19 ms, median 3.53 | worst **3.39 ms**, median **3.26** | worst 3.68 ms, median 3.34 |
+| worst rebase | 0.40 ms | **0.30 ms** | 0.4 ms |
+| traffic peak | 556 live aircraft | 371 | — |
+
+**Read against R22.** Draws are flat (p95 **247 / 252** vs 248; max **253 /
+255** vs 253). Triangles are up ~3 % at p95 and the max straddles R22's
+(861 601 / 896 676 vs 873 412). The heap floor still **falls 76 MB**, the
+governor still never steps, and there are still zero page errors. Nothing in
+this round was expected to move a soak total: FLASH_GUARD only removes triangles
+that draw no pixels, FRAME_PACE is output-identical by construction
+(verify-frame-pace gate (2): 24 live buffers, 46,295 triangles, 0 mismatches;
+gate (6): 223 tiles resident in both arms, 0 differ), and STEP_SAFE re-orders a
+resize. The p50-triangle spread (303 k → 380 k → 399 k) tracks the live traffic
+and the route's own breathing, which is the statistic R20 demoted for exactly
+this reason.
+
+**The one number that looked like it moved, resolved by the second run.** Run 1
+read `gpuFrameMs` p95 worst **5.19 ms** against R22's 3.68 and I flagged it as
+recorded-not-adjudicated. Run 2 on the quiet machine reads **3.39 ms — better
+than R22's 3.68** — with the median at 3.26 vs R22's 3.34. So the 5.19 was a
+transient in a run that finished while a session was being torn down, not a
+property of the tree. Both are far under the 12 ms R23 blocking-candidate
+target, and the number is informational by R22's own §5.10 ruling either way.
+
+**No pale frame.** The §4b STOP condition stayed armed through both runs
+(30 minutes of satellite flight, 152 samples, three legs each) and never fired,
+so C2's bisect instruments were never invoked.
+
+---
+
+## §7 VERDICT
+
+### 7.1 What is green, and what that green is worth
+
+| Claim | Evidence |
+|---|---|
+| The three fixes work on the integrated tree | flash-guard **9/9** (0 pale in 45,925 frames, 0 zero-area of 109,141 live tris) · frame-pace **7/7** (stalls 95.5/177.5 → **2.7**/min, worst frame 91.5 → **29.2 ms**) · step-clean **12/12 × 2 dsf legs** (0 out-of-rAF reallocs of 80, 0 mismatch, same-frame 40/40, 70,285 live frames clean) |
+| Each new gate can still FAIL on this tree | flash-guard RED **FAIL (4)(6)** — 9,500 zero-area, 2 pale · frame-pace RED **FAIL (1)–(5)** — ratios collapse to 1.6× and 0.74× · step-clean RED **FAIL (4)(5)(12)** — 40/40 out-of-rAF, 20 mismatched frames, composer lag 13.4–18.3 ms |
+| Nothing frozen moved | **13/13** frozen-number harnesses PASS with unchanged assertions; `grep '^FAIL'` over every batch log returns nothing; Owens **200 ≤ 261** and **200 = 200** against terra's own flag-off baseline; sat-buildings **226 / 6,965 / 6,964 / 305.9** identical to C2's read |
+| The world holds for 15 minutes | satellite soak **PASS, all five blocking gates, twice** (p95 tris 844 657 / 848 123 ≤ 2.2 M · p95 draws 247 / 252 ≤ 375 · heap floor **−76 MB** both runs · governor **0** steps · **0** pageerrors) |
+| The production bundle compiles | `npm run build` **PASS** (exit 0, run strictly after every browser gate — the shared `.next` hazard C2 measured) |
+| Both open reds are explained by control, not smoothed | terra (2) → INSTRUMENT (§3.1) · flicker (2) → NOISE, the only red was the control tree (§3.2) |
+| The clouds question is closed | 7/7 same-frame refutation + the rate-instability arithmetic (§4); **305,200 composed frames with clouds live and zero pale** across C2's runs and mine |
+
+**Zero frozen assertion numbers moved. Zero sanctions requested. Zero
+re-baselines.** One gate gained a RED lever (`PACE_PIN_OFF`, env-gated,
+default path untouched) — gate mechanics, not a product change.
+
+### 7.2 What this certification does NOT cover — by name
+
+1. **The wide fleet was not run.** This close ran the three new gates in both
+   directions, thirteen frozen-number harnesses and the soak — the subset the
+   brief named. The other ~35 harnesses in R22's §3.2b (icons, parcel-homes,
+   veg, groundlife, monuments, monuments-sat, roofs, roof-variety, window-grids,
+   rim, edge-fx, globe, globe2, dusk, sun, poi, atlas, tracers, chase-cam, feel,
+   freelook, airbend, crash, juice, spicy, contracts, living-contracts, logbook,
+   photo, neon-alt, neon-cover, skyline, suburbia, sat-night, sat-mobile,
+   aerial, hangar, boot, warp-arrival, mobile, mobile-layout, and the three node
+   gates) were **NOT run this round.** They rest on the content-identity
+   arguments in §1 — patch #5 proven output-identical on live buffers, the flash
+   filter proven to remove only triangles that draw no pixels and contribute no
+   normals, STEP_SAFE proven to change ordering and not content — plus
+   verify-sat-buildings and verify-neon-cover's own frozen numbers being unmoved
+   where they were measured. That is a strong argument. **It is an argument, not
+   a green** (F16).
+2. **Nothing here was measured on a production build.** A and C2 both ran
+   production legs on their own branches (C2's is the load-bearing one: RED 6
+   pale / 34,096 vs GREEN 0 / 35,521 against the real bundle). This close ran
+   the dev server throughout, because `window.__fly` is dev-only. `npm run build`
+   compiling is not the same as the bundle being certified.
+3. **The user's own machine has not confirmed anything.** All three defects were
+   reported from a recording of the shipped build. Nobody has yet flown the
+   fixed build on the user's hardware. That is the only test that closes the
+   round.
+4. **Four instruments in this fleet are load-decided** and were caught being so
+   this round: verify-terra (2), verify-flicker (2), verify-weather's rim, and
+   the three contention reds A recorded in his §6.6. Every green above was taken
+   on a quiet machine; a busy one can flip at least four of them (F15).
+5. **Two more zero-area-triangle sites are known and unfixed** —
+   `vector-tile.worker.js:3106` (sat skyline) and `:4579` (toy/Neon) — confirmed
+   by grep, never censused (F1). If the flash is ever reported in Neon or in the
+   skyline ring, it starts there.
+6. **The residual stutter is not zero.** FRAME_PACE takes stalls to 0–2.7/min
+   with a worst frame of 20.8–33.3 ms; the skirt builder is still on the main
+   thread, five to six times cheaper rather than gone (F2).
+
+### 7.3 The verdict
+
+> ## CERTIFIED FOR HANDOFF
+>
+> The R22.1 integrated tree — STEP_SAFE + FRAME_PACE + FLASH_GUARD, all three
+> `enabled: true` — is certified for handoff on the evidence above, with the six
+> caveats in §7.2 stated as caveats rather than buried.
+>
+> Each of the three fixes is measured, each has a one-flag revert, and each has
+> a gate that was **proven able to go red on this exact tree** rather than
+> merely observed green on it. The thirteen frozen-number harnesses that could
+> have caught a regression did not, and their numbers are unmoved to the digit.
+> The two reds handed to me were both resolved by control and neither is a
+> product regression: the terra red is a statistic the library's own frustum
+> rule makes unreliable at a frozen low-AGL pose, and the flicker red appeared
+> **only on the tree with R22.1 switched off**.
+>
+> **The certification is of the SUBSET that was run.** The wide fleet, a
+> production leg and the user's own machine are outstanding, and §7.2 names them
+> rather than letting the word "certified" cover them.
+
+### 7.4 The one thing a reader should take away
+
+The round found its real defect the moment somebody flew a pose the fleet does
+not fly (A's §7.1: a production leg at an un-warped spawn, red in three
+minutes), and it spent most of a wave arguing about two reds that turned out to
+be instruments rather than the world. Both halves are the same lesson in
+different directions — **a gate is only worth what its pose and its machine
+make it worth** — and F10, F14, F15 and F16 are that lesson written as work.
 
 ---
 
@@ -494,7 +642,9 @@ mentioned somewhere". Each says who found it and what would close it.
 | **F8** | **Window resizes are not covered by STEP_SAFE.** A CSS `size` change goes through the same r3f subscriber outside the frame loop; STEP_SAFE only intercepts the DPR path. Deliberate (a resize is user-driven and already visually eventful; a governor step is not). The `FX_STABILITY`-off configuration only gets the renderer half, and the legacy `PerformanceMonitor` path (reachable only with `PERF_GOVERNOR.enabled:false`) still has the original defect untouched by design. | A | Extend the rig to the size path, or record the exclusion permanently. |
 | **F10** | **verify-terra (2) needs a frustum-immune statistic.** `camTileZ` at a frozen low-AGL pose is decided by whether the aircraft's own tile fell in the LOD walk's frustum — measured swinging 10 ↔ 13 ↔ 18 at the same poses on one tree in one session (§3.1). R22's W2 re-base already retired it at cruise for the same reason; the low-AGL form has the same fault. | D (this round) | Re-point gate (2) at `maxLeafZ` and/or A's forward ground profile (both already in the gate's own `PROBE`), or make the leg fly rather than freeze. **A TERRA's instrument to re-point — a certifier does not re-aim another agent's gate.** Until then the gate is a coin at low AGL and must not be read as a product signal in either direction. |
 | **F11** | **A second visit to a pose does not re-refine, with the loader IDLE.** Returning to P-LEWIS 20 s after leaving it left the tile under the camera at z13 with `downloading = 0`, 0 DEM requests and only 10 imagery responses in the whole leg, while `maxLeafZ` stayed 18 on the previous pose's leftovers. Not an instrument artifact — the tree declined to come back. | D (this round) | Same family as R21's sticky-empty tiles / reason-coded backoff. Needs an owner and a repro at a controlled pose pair. |
+| **F16** | **The R22.1 wave never ran the WIDE fleet.** This close ran the three new gates in both directions, thirteen frozen-number harnesses and one soak — the subset the brief named. It did NOT run the ~35 other harnesses R22's §3.2b lists (icons, parcel-homes, veg, groundlife, monuments, monuments-sat, roofs, roof-variety, window-grids, rim, edge-fx, globe, globe2, dusk, sun, poi, atlas, tracers, chase-cam, feel, freelook, airbend, crash, juice, spicy, contracts, living-contracts, logbook, photo, neon-alt, neon-cover, skyline, suburbia, sat-night, sat-mobile, aerial, hangar, boot, warp-arrival, mobile, mobile-layout, classify, warbirds, daily). | D (this round) | Named, not assumed — see §7. Those rest on the content-identity arguments in §1, not on a fresh green. A full matrix before the next feature round would retire the assumption. |
 | **F12** | **`verify-globe2`, `verify-fly-models`, `verify-fly-formation`, `verify-player-nose` still print no verdict line** — they exit 0 without a `VERIFY:`/`RESULT:` row, so they cannot be counted green mechanically. R22's close named this and it is still true. | R22 close / carried | Give each one a verdict line. Until then they are "no verdict", never "PASS". |
+| **F15** | **Three gate families are now known to be load-decided, and nobody has counted how many more are.** verify-terra (2) reads 13 vs 18 depending on machine speed (§3.1), verify-flicker (2) reads 6.2 vs 16.1 depending on whether streaming finished (§3.2), verify-weather's rim reads 0.9 vs 19.0 (F13), and A's §6.6 recorded three more reds that were only contention. That is four instruments in one hotfix wave whose verdict a busy box can flip. | A / C2 / D | Worth one deliberate pass: run the fleet under measured CPU load and list every gate whose verdict changes. A gate that a loaded machine can flip is a gate that will eventually cost a round a day of investigation — this one cost most of a wave. |
 | **F9** | **The toy soak still has no instrument that can judge a toy draw regression.** R21 read 481 and R22 read 483 against a fixed-pose ceiling of 480, and BOTH were ruled unjudgeable by the R20 scene-total demotion. Two rounds have now recorded a number nobody is allowed to act on. | R20 close / R22 close / carried | Give the toy soak a fixed-pose probe leg so it asserts something, or stop printing the number. |
 | **F14** | **verify-flicker (2) needs a quiescence precondition, not a new bound.** Five runs today spanned p99 **6.167 → 16.105** with the ONLY red on the control tree, and the red run's own `movingFrac` was **0.1176** against 0.02 everywhere else — the scene was still streaming when the 12-frame window opened (§3.2). | D (this round), on C2's and A's readings | Gate the sample on `movingFrac` (or on a chunk-arrival count) being quiet for N frames before the window opens, and re-take the window if it is not. The instrument already computes the number it needs. **Do not move the bound of 12** — R21 calibrated it against a real defect and it still separates. |
 | **F13** | **`verify-weather`'s rim gate is a coin and everyone knows it.** C2 threw it four times across two code states and read **19.0 / 1.2 / 8.7** against a bound of **18** — a 17.8/255 spread on an 18 bound. The gate's own header already admits "run 1 passed at 14.1, run 3 failed >18 on identical code". `RIM_BAND` is marked `[pencil]` and documents coordinates for a 1600×900 frame the harness does not use, and **the probe hides nothing** — no player, no traffic — which is the R17 §7.1 lesson still live inside a shipped gate. | C2 (four throws) | Give the probe a controlled pose and park the actors it does not own. Do NOT re-roll it and do NOT move the bound. |
