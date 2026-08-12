@@ -1,0 +1,3101 @@
+{
+ "frames": 2971,
+ "hits": [
+  {
+   "n": 1208,
+   "L": 195.7,
+   "pr": 0.664,
+   "ring": [
+    {
+     "n": 1203,
+     "L": 144.3,
+     "pr": 0,
+     "u": {
+      "diffuse": [
+       1,
+       1,
+       1
+      ],
+      "opacity": 1,
+      "map": "tex",
+      "mapTransform": "mat9",
+      "alphaMap": null,
+      "alphaMapTransform": "mat9",
+      "alphaTest": 0,
+      "specularMap": null,
+      "specularMapTransform": "mat9",
+      "envMap": "tex",
+      "envMapRotation": "mat9",
+      "reflectivity": 1,
+      "refractionRatio": 0.98,
+      "dfgLUT": "tex",
+      "aoMap": null,
+      "aoMapIntensity": 1,
+      "aoMapTransform": "mat9",
+      "lightMap": null,
+      "lightMapIntensity": 1,
+      "lightMapTransform": "mat9",
+      "emissiveMap": "tex",
+      "emissiveMapTransform": "mat9",
+      "bumpMap": null,
+      "bumpMapTransform": "mat9",
+      "bumpScale": 1,
+      "normalMap": null,
+      "normalMapTransform": "mat9",
+      "normalScale": [
+       1,
+       1
+      ],
+      "displacementMap": null,
+      "displacementMapTransform": "mat9",
+      "displacementScale": 1,
+      "displacementBias": 0,
+      "fogDensity": 0.0000075,
+      "fogNear": 1,
+      "fogFar": 2000,
+      "fogColor": [
+       0.6185364853304006,
+       0.5715146968445991,
+       0.5100326699562601
+      ],
+      "ambientLightColor": [
+       0,
+       0,
+       0
+      ],
+      "lightProbe": "arr9",
+      "directionalLights": [
+       {
+        "direction": {
+         "x": 0.5548008622208013,
+         "y": 0.7218339768062849,
+         "z": 0.41370486244070115
+        },
+        "color": 16777215
+       }
+      ],
+      "directionalLightShadows": [],
+      "directionalShadowMatrix": [],
+      "spotLights": [],
+      "spotLightShadows": [],
+      "spotLightMap": [],
+      "spotLightMatrix": [],
+      "pointLights": [],
+      "pointLightShadows": [],
+      "pointShadowMatrix": [],
+      "hemisphereLights": [
+       {
+        "direction": {
+         "x": 1.2542852607759072e-19,
+         "y": 0.9987335978932642,
+         "z": 0.05031103695190138
+        },
+        "skyColor": 5726573,
+        "groundColor": 2238750
+       }
+      ],
+      "rectAreaLights": [],
+      "ltc_1": null,
+      "ltc_2": null,
+      "probesSH": null,
+      "probesMin": [
+       0,
+       0,
+       0
+      ],
+      "probesMax": [
+       0,
+       0,
+       0
+      ],
+      "probesResolution": [
+       0,
+       0,
+       0
+      ],
+      "emissive": [
+       0,
+       0,
+       0
+      ],
+      "envMapIntensity": 0.5960024618434494,
+      "uBendCenter": [
+       0,
+       -3709.200998988934
+      ],
+      "uBendK": 0.000005,
+      "uSatBldgFade": 1,
+      "uSatHaze": [
+       800,
+       14000
+      ],
+      "uSatHazeColor": [
+       0,
+       0,
+       0
+      ],
+      "uSatHazeMax": 0,
+      "clippingPlanes": null
+     },
+     "chunks": 27
+    },
+    {
+     "n": 1204,
+     "L": 144.3,
+     "pr": 0,
+     "u": {
+      "diffuse": [
+       1,
+       1,
+       1
+      ],
+      "opacity": 1,
+      "map": "tex",
+      "mapTransform": "mat9",
+      "alphaMap": null,
+      "alphaMapTransform": "mat9",
+      "alphaTest": 0,
+      "specularMap": null,
+      "specularMapTransform": "mat9",
+      "envMap": "tex",
+      "envMapRotation": "mat9",
+      "reflectivity": 1,
+      "refractionRatio": 0.98,
+      "dfgLUT": "tex",
+      "aoMap": null,
+      "aoMapIntensity": 1,
+      "aoMapTransform": "mat9",
+      "lightMap": null,
+      "lightMapIntensity": 1,
+      "lightMapTransform": "mat9",
+      "emissiveMap": "tex",
+      "emissiveMapTransform": "mat9",
+      "bumpMap": null,
+      "bumpMapTransform": "mat9",
+      "bumpScale": 1,
+      "normalMap": null,
+      "normalMapTransform": "mat9",
+      "normalScale": [
+       1,
+       1
+      ],
+      "displacementMap": null,
+      "displacementMapTransform": "mat9",
+      "displacementScale": 1,
+      "displacementBias": 0,
+      "fogDensity": 0.0000075,
+      "fogNear": 1,
+      "fogFar": 2000,
+      "fogColor": [
+       0.6185364853304006,
+       0.5715146968445991,
+       0.5100326699562601
+      ],
+      "ambientLightColor": [
+       0,
+       0,
+       0
+      ],
+      "lightProbe": "arr9",
+      "directionalLights": [
+       {
+        "direction": {
+         "x": 0.5548008622208013,
+         "y": 0.7218339768062849,
+         "z": 0.41370486244070115
+        },
+        "color": 16777215
+       }
+      ],
+      "directionalLightShadows": [],
+      "directionalShadowMatrix": [],
+      "spotLights": [],
+      "spotLightShadows": [],
+      "spotLightMap": [],
+      "spotLightMatrix": [],
+      "pointLights": [],
+      "pointLightShadows": [],
+      "pointShadowMatrix": [],
+      "hemisphereLights": [
+       {
+        "direction": {
+         "x": 1.2542852607759072e-19,
+         "y": 0.9987335978932642,
+         "z": 0.05031103695190138
+        },
+        "skyColor": 5726573,
+        "groundColor": 2238750
+       }
+      ],
+      "rectAreaLights": [],
+      "ltc_1": null,
+      "ltc_2": null,
+      "probesSH": null,
+      "probesMin": [
+       0,
+       0,
+       0
+      ],
+      "probesMax": [
+       0,
+       0,
+       0
+      ],
+      "probesResolution": [
+       0,
+       0,
+       0
+      ],
+      "emissive": [
+       0,
+       0,
+       0
+      ],
+      "envMapIntensity": 0.5960024618434494,
+      "uBendCenter": [
+       0,
+       -3711.433278097771
+      ],
+      "uBendK": 0.000005,
+      "uSatBldgFade": 1,
+      "uSatHaze": [
+       800,
+       14000
+      ],
+      "uSatHazeColor": [
+       0,
+       0,
+       0
+      ],
+      "uSatHazeMax": 0,
+      "clippingPlanes": null
+     },
+     "chunks": 27
+    },
+    {
+     "n": 1205,
+     "L": 144.3,
+     "pr": 0,
+     "u": {
+      "diffuse": [
+       1,
+       1,
+       1
+      ],
+      "opacity": 1,
+      "map": "tex",
+      "mapTransform": "mat9",
+      "alphaMap": null,
+      "alphaMapTransform": "mat9",
+      "alphaTest": 0,
+      "specularMap": null,
+      "specularMapTransform": "mat9",
+      "envMap": "tex",
+      "envMapRotation": "mat9",
+      "reflectivity": 1,
+      "refractionRatio": 0.98,
+      "dfgLUT": "tex",
+      "aoMap": null,
+      "aoMapIntensity": 1,
+      "aoMapTransform": "mat9",
+      "lightMap": null,
+      "lightMapIntensity": 1,
+      "lightMapTransform": "mat9",
+      "emissiveMap": "tex",
+      "emissiveMapTransform": "mat9",
+      "bumpMap": null,
+      "bumpMapTransform": "mat9",
+      "bumpScale": 1,
+      "normalMap": null,
+      "normalMapTransform": "mat9",
+      "normalScale": [
+       1,
+       1
+      ],
+      "displacementMap": null,
+      "displacementMapTransform": "mat9",
+      "displacementScale": 1,
+      "displacementBias": 0,
+      "fogDensity": 0.0000075,
+      "fogNear": 1,
+      "fogFar": 2000,
+      "fogColor": [
+       0.6185364853304006,
+       0.5715146968445991,
+       0.5100326699562601
+      ],
+      "ambientLightColor": [
+       0,
+       0,
+       0
+      ],
+      "lightProbe": "arr9",
+      "directionalLights": [
+       {
+        "direction": {
+         "x": 0.5548008622208013,
+         "y": 0.7218339768062849,
+         "z": 0.41370486244070115
+        },
+        "color": 16777215
+       }
+      ],
+      "directionalLightShadows": [],
+      "directionalShadowMatrix": [],
+      "spotLights": [],
+      "spotLightShadows": [],
+      "spotLightMap": [],
+      "spotLightMatrix": [],
+      "pointLights": [],
+      "pointLightShadows": [],
+      "pointShadowMatrix": [],
+      "hemisphereLights": [
+       {
+        "direction": {
+         "x": 1.2542852607759072e-19,
+         "y": 0.9987335978932642,
+         "z": 0.05031103695190138
+        },
+        "skyColor": 5726573,
+        "groundColor": 2238750
+       }
+      ],
+      "rectAreaLights": [],
+      "ltc_1": null,
+      "ltc_2": null,
+      "probesSH": null,
+      "probesMin": [
+       0,
+       0,
+       0
+      ],
+      "probesMax": [
+       0,
+       0,
+       0
+      ],
+      "probesResolution": [
+       0,
+       0,
+       0
+      ],
+      "emissive": [
+       0,
+       0,
+       0
+      ],
+      "envMapIntensity": 0.5960024618434494,
+      "uBendCenter": [
+       0,
+       -3713.7842954602093
+      ],
+      "uBendK": 0.000005,
+      "uSatBldgFade": 1,
+      "uSatHaze": [
+       800,
+       14000
+      ],
+      "uSatHazeColor": [
+       0,
+       0,
+       0
+      ],
+      "uSatHazeMax": 0,
+      "clippingPlanes": null
+     },
+     "chunks": 27
+    },
+    {
+     "n": 1206,
+     "L": 144.3,
+     "pr": 0,
+     "u": {
+      "diffuse": [
+       1,
+       1,
+       1
+      ],
+      "opacity": 1,
+      "map": "tex",
+      "mapTransform": "mat9",
+      "alphaMap": null,
+      "alphaMapTransform": "mat9",
+      "alphaTest": 0,
+      "specularMap": null,
+      "specularMapTransform": "mat9",
+      "envMap": "tex",
+      "envMapRotation": "mat9",
+      "reflectivity": 1,
+      "refractionRatio": 0.98,
+      "dfgLUT": "tex",
+      "aoMap": null,
+      "aoMapIntensity": 1,
+      "aoMapTransform": "mat9",
+      "lightMap": null,
+      "lightMapIntensity": 1,
+      "lightMapTransform": "mat9",
+      "emissiveMap": "tex",
+      "emissiveMapTransform": "mat9",
+      "bumpMap": null,
+      "bumpMapTransform": "mat9",
+      "bumpScale": 1,
+      "normalMap": null,
+      "normalMapTransform": "mat9",
+      "normalScale": [
+       1,
+       1
+      ],
+      "displacementMap": null,
+      "displacementMapTransform": "mat9",
+      "displacementScale": 1,
+      "displacementBias": 0,
+      "fogDensity": 0.0000075,
+      "fogNear": 1,
+      "fogFar": 2000,
+      "fogColor": [
+       0.6185364853304006,
+       0.5715146968445991,
+       0.5100326699562601
+      ],
+      "ambientLightColor": [
+       0,
+       0,
+       0
+      ],
+      "lightProbe": "arr9",
+      "directionalLights": [
+       {
+        "direction": {
+         "x": 0.5548008622208013,
+         "y": 0.7218339768062849,
+         "z": 0.41370486244070115
+        },
+        "color": 16777215
+       }
+      ],
+      "directionalLightShadows": [],
+      "directionalShadowMatrix": [],
+      "spotLights": [],
+      "spotLightShadows": [],
+      "spotLightMap": [],
+      "spotLightMatrix": [],
+      "pointLights": [],
+      "pointLightShadows": [],
+      "pointShadowMatrix": [],
+      "hemisphereLights": [
+       {
+        "direction": {
+         "x": 1.2542852607759072e-19,
+         "y": 0.9987335978932642,
+         "z": 0.05031103695190138
+        },
+        "skyColor": 5726573,
+        "groundColor": 2238750
+       }
+      ],
+      "rectAreaLights": [],
+      "ltc_1": null,
+      "ltc_2": null,
+      "probesSH": null,
+      "probesMin": [
+       0,
+       0,
+       0
+      ],
+      "probesMax": [
+       0,
+       0,
+       0
+      ],
+      "probesResolution": [
+       0,
+       0,
+       0
+      ],
+      "emissive": [
+       0,
+       0,
+       0
+      ],
+      "envMapIntensity": 0.5960024618434494,
+      "uBendCenter": [
+       0,
+       -3715.75535041932
+      ],
+      "uBendK": 0.000005,
+      "uSatBldgFade": 1,
+      "uSatHaze": [
+       800,
+       14000
+      ],
+      "uSatHazeColor": [
+       0,
+       0,
+       0
+      ],
+      "uSatHazeMax": 0,
+      "clippingPlanes": null
+     },
+     "chunks": 27
+    },
+    {
+     "n": 1207,
+     "L": 144.3,
+     "pr": 0,
+     "u": {
+      "diffuse": [
+       1,
+       1,
+       1
+      ],
+      "opacity": 1,
+      "map": "tex",
+      "mapTransform": "mat9",
+      "alphaMap": null,
+      "alphaMapTransform": "mat9",
+      "alphaTest": 0,
+      "specularMap": null,
+      "specularMapTransform": "mat9",
+      "envMap": "tex",
+      "envMapRotation": "mat9",
+      "reflectivity": 1,
+      "refractionRatio": 0.98,
+      "dfgLUT": "tex",
+      "aoMap": null,
+      "aoMapIntensity": 1,
+      "aoMapTransform": "mat9",
+      "lightMap": null,
+      "lightMapIntensity": 1,
+      "lightMapTransform": "mat9",
+      "emissiveMap": "tex",
+      "emissiveMapTransform": "mat9",
+      "bumpMap": null,
+      "bumpMapTransform": "mat9",
+      "bumpScale": 1,
+      "normalMap": null,
+      "normalMapTransform": "mat9",
+      "normalScale": [
+       1,
+       1
+      ],
+      "displacementMap": null,
+      "displacementMapTransform": "mat9",
+      "displacementScale": 1,
+      "displacementBias": 0,
+      "fogDensity": 0.0000075,
+      "fogNear": 1,
+      "fogFar": 2000,
+      "fogColor": [
+       0.6185364853304006,
+       0.5715146968445991,
+       0.5100326699562601
+      ],
+      "ambientLightColor": [
+       0,
+       0,
+       0
+      ],
+      "lightProbe": "arr9",
+      "directionalLights": [
+       {
+        "direction": {
+         "x": 0.5548008622208013,
+         "y": 0.7218339768062849,
+         "z": 0.41370486244070115
+        },
+        "color": 16777215
+       }
+      ],
+      "directionalLightShadows": [],
+      "directionalShadowMatrix": [],
+      "spotLights": [],
+      "spotLightShadows": [],
+      "spotLightMap": [],
+      "spotLightMatrix": [],
+      "pointLights": [],
+      "pointLightShadows": [],
+      "pointShadowMatrix": [],
+      "hemisphereLights": [
+       {
+        "direction": {
+         "x": 1.2542852607759072e-19,
+         "y": 0.9987335978932642,
+         "z": 0.05031103695190138
+        },
+        "skyColor": 5726573,
+        "groundColor": 2238750
+       }
+      ],
+      "rectAreaLights": [],
+      "ltc_1": null,
+      "ltc_2": null,
+      "probesSH": null,
+      "probesMin": [
+       0,
+       0,
+       0
+      ],
+      "probesMax": [
+       0,
+       0,
+       0
+      ],
+      "probesResolution": [
+       0,
+       0,
+       0
+      ],
+      "emissive": [
+       0,
+       0,
+       0
+      ],
+      "envMapIntensity": 0.5960024618434494,
+      "uBendCenter": [
+       0,
+       -3717.7264066990465
+      ],
+      "uBendK": 0.000005,
+      "uSatBldgFade": 1,
+      "uSatHaze": [
+       800,
+       14000
+      ],
+      "uSatHazeColor": [
+       0,
+       0,
+       0
+      ],
+      "uSatHazeMax": 0,
+      "clippingPlanes": null
+     },
+     "chunks": 27
+    },
+    {
+     "n": 1208,
+     "L": 195.7,
+     "pr": 0.664,
+     "u": {
+      "diffuse": [
+       1,
+       1,
+       1
+      ],
+      "opacity": 1,
+      "map": "tex",
+      "mapTransform": "mat9",
+      "alphaMap": null,
+      "alphaMapTransform": "mat9",
+      "alphaTest": 0,
+      "specularMap": null,
+      "specularMapTransform": "mat9",
+      "envMap": "tex",
+      "envMapRotation": "mat9",
+      "reflectivity": 1,
+      "refractionRatio": 0.98,
+      "dfgLUT": "tex",
+      "aoMap": null,
+      "aoMapIntensity": 1,
+      "aoMapTransform": "mat9",
+      "lightMap": null,
+      "lightMapIntensity": 1,
+      "lightMapTransform": "mat9",
+      "emissiveMap": "tex",
+      "emissiveMapTransform": "mat9",
+      "bumpMap": null,
+      "bumpMapTransform": "mat9",
+      "bumpScale": 1,
+      "normalMap": null,
+      "normalMapTransform": "mat9",
+      "normalScale": [
+       1,
+       1
+      ],
+      "displacementMap": null,
+      "displacementMapTransform": "mat9",
+      "displacementScale": 1,
+      "displacementBias": 0,
+      "fogDensity": 0.0000075,
+      "fogNear": 1,
+      "fogFar": 2000,
+      "fogColor": [
+       0.6185364853304006,
+       0.5715146968445991,
+       0.5100326699562601
+      ],
+      "ambientLightColor": [
+       0,
+       0,
+       0
+      ],
+      "lightProbe": "arr9",
+      "directionalLights": [
+       {
+        "direction": {
+         "x": 0.5548008622208013,
+         "y": 0.7218339768062849,
+         "z": 0.41370486244070115
+        },
+        "color": 16777215
+       }
+      ],
+      "directionalLightShadows": [],
+      "directionalShadowMatrix": [],
+      "spotLights": [],
+      "spotLightShadows": [],
+      "spotLightMap": [],
+      "spotLightMatrix": [],
+      "pointLights": [],
+      "pointLightShadows": [],
+      "pointShadowMatrix": [],
+      "hemisphereLights": [
+       {
+        "direction": {
+         "x": 1.2542852607759072e-19,
+         "y": 0.9987335978932642,
+         "z": 0.05031103695190138
+        },
+        "skyColor": 5726573,
+        "groundColor": 2238750
+       }
+      ],
+      "rectAreaLights": [],
+      "ltc_1": null,
+      "ltc_2": null,
+      "probesSH": null,
+      "probesMin": [
+       0,
+       0,
+       0
+      ],
+      "probesMax": [
+       0,
+       0,
+       0
+      ],
+      "probesResolution": [
+       0,
+       0,
+       0
+      ],
+      "emissive": [
+       0,
+       0,
+       0
+      ],
+      "envMapIntensity": 0.5960024618434494,
+      "uBendCenter": [
+       0,
+       -3719.86369664222
+      ],
+      "uBendK": 0.000005,
+      "uSatBldgFade": 1,
+      "uSatHaze": [
+       800,
+       14000
+      ],
+      "uSatHazeColor": [
+       0,
+       0,
+       0
+      ],
+      "uSatHazeMax": 0,
+      "clippingPlanes": null
+     },
+     "chunks": 27
+    }
+   ],
+   "lights": [
+    {
+     "t": "HemisphereLight",
+     "i": 0.154,
+     "c": "cfe5ff",
+     "gc": "5a6b53",
+     "vis": true
+    },
+    {
+     "t": "DirectionalLight",
+     "i": 1.355,
+     "c": "ffffff",
+     "gc": null,
+     "vis": true
+    }
+   ],
+   "vert": [
+    0.66,
+    0.67,
+    0.66,
+    0.66,
+    0.66,
+    0.66,
+    0.67,
+    0.66,
+    0.65
+   ],
+   "fog": {
+    "type": "Fog",
+    "color": "cec7bd",
+    "density": 0.0000075
+   },
+   "culpritUuid": "7ee77bc3",
+   "trials": {
+    "bendK=0": {
+     "L": 134.9,
+     "pr": 0.009
+    },
+    "fade=1": {
+     "L": 195.7,
+     "pr": 0.664
+    },
+    "hazeMax=0": {
+     "L": 195.7,
+     "pr": 0.664
+    },
+    "bendCenter=cam": {
+     "L": 144.3,
+     "pr": 0
+    },
+    "hemi=0": {
+     "L": 195.7,
+     "pr": 0.664
+    },
+    "dir=0": {
+     "L": 195.7,
+     "pr": 0.664
+    },
+    "fog=null": {
+     "L": 195.7,
+     "pr": 0.664
+    },
+    "envInt=0": {
+     "L": 195.7,
+     "pr": 0.664
+    },
+    "matBlack": {
+     "L": 195.7,
+     "pr": 0.664
+    }
+   },
+   "matU": {
+    "diffuse": [
+     1,
+     1,
+     1
+    ],
+    "opacity": 1,
+    "map": "tex",
+    "mapTransform": "mat9",
+    "alphaMap": null,
+    "alphaMapTransform": "mat9",
+    "alphaTest": 0,
+    "specularMap": null,
+    "specularMapTransform": "mat9",
+    "envMap": "tex",
+    "envMapRotation": "mat9",
+    "reflectivity": 1,
+    "refractionRatio": 0.98,
+    "dfgLUT": "tex",
+    "aoMap": null,
+    "aoMapIntensity": 1,
+    "aoMapTransform": "mat9",
+    "lightMap": null,
+    "lightMapIntensity": 1,
+    "lightMapTransform": "mat9",
+    "emissiveMap": "tex",
+    "emissiveMapTransform": "mat9",
+    "bumpMap": null,
+    "bumpMapTransform": "mat9",
+    "bumpScale": 1,
+    "normalMap": null,
+    "normalMapTransform": "mat9",
+    "normalScale": [
+     1,
+     1
+    ],
+    "displacementMap": null,
+    "displacementMapTransform": "mat9",
+    "displacementScale": 1,
+    "displacementBias": 0,
+    "fogDensity": 0.0000075,
+    "fogNear": 1,
+    "fogFar": 2000,
+    "fogColor": [
+     0.6185364853304006,
+     0.5715146968445991,
+     0.5100326699562601
+    ],
+    "ambientLightColor": [
+     0,
+     0,
+     0
+    ],
+    "lightProbe": "arr9",
+    "directionalLights": [
+     {
+      "direction": {
+       "x": 0.5548008622250493,
+       "y": 0.7218874180433528,
+       "z": 0.4136116039777457
+      },
+      "color": {
+       "isColor": true,
+       "r": 1.3547521560142353,
+       "g": 1.3547521560142353,
+       "b": 1.3547521560142353
+      }
+     }
+    ],
+    "directionalLightShadows": [],
+    "directionalShadowMatrix": [],
+    "spotLights": [],
+    "spotLightShadows": [],
+    "spotLightMap": [],
+    "spotLightMatrix": [],
+    "pointLights": [],
+    "pointLightShadows": [],
+    "pointShadowMatrix": [],
+    "hemisphereLights": [
+     {
+      "direction": {
+       "x": 1.260850344497322e-21,
+       "y": 0.9987400893301515,
+       "z": 0.050182008377515144
+      },
+      "skyColor": {
+       "isColor": true,
+       "r": 0.09605814612263208,
+       "g": 0.12062494458891747,
+       "b": 0.15394910863798128
+      },
+      "groundColor": {
+       "isColor": true,
+       "r": 0.015740023673137458,
+       "g": 0.022634716621255754,
+       "b": 0.013316669025997265
+      }
+     }
+    ],
+    "rectAreaLights": [],
+    "ltc_1": null,
+    "ltc_2": null,
+    "probesSH": null,
+    "probesMin": [
+     0,
+     0,
+     0
+    ],
+    "probesMax": [
+     0,
+     0,
+     0
+    ],
+    "probesResolution": [
+     0,
+     0,
+     0
+    ],
+    "emissive": [
+     0,
+     0,
+     0
+    ],
+    "envMapIntensity": 0.5960024618434494,
+    "uBendCenter": [
+     0,
+     -3719.86369664222
+    ],
+    "uBendK": 0.000005,
+    "uSatBldgFade": 1,
+    "uSatHaze": [
+     800,
+     14000
+    ],
+    "uSatHazeColor": [
+     0,
+     0,
+     0
+    ],
+    "uSatHazeMax": 0,
+    "clippingPlanes": null
+   },
+   "matInfo": {
+    "vertexColors": true,
+    "side": 2,
+    "emissive": "ffd9a3",
+    "emissiveIntensity": 0,
+    "color": "ffffff",
+    "fog": true,
+    "toneMapped": true,
+    "transparent": false,
+    "opacity": 1,
+    "envMap": false,
+    "envMapIntensity": 1,
+    "lightMap": false
+   }
+  },
+  {
+   "n": 2170,
+   "L": 226.9,
+   "pr": 1,
+   "ring": [
+    {
+     "n": 2165,
+     "L": 144.4,
+     "pr": 0,
+     "u": {
+      "diffuse": [
+       1,
+       1,
+       1
+      ],
+      "opacity": 1,
+      "map": "tex",
+      "mapTransform": "mat9",
+      "alphaMap": null,
+      "alphaMapTransform": "mat9",
+      "alphaTest": 0,
+      "specularMap": null,
+      "specularMapTransform": "mat9",
+      "envMap": "tex",
+      "envMapRotation": "mat9",
+      "reflectivity": 1,
+      "refractionRatio": 0.98,
+      "dfgLUT": "tex",
+      "aoMap": null,
+      "aoMapIntensity": 1,
+      "aoMapTransform": "mat9",
+      "lightMap": null,
+      "lightMapIntensity": 1,
+      "lightMapTransform": "mat9",
+      "emissiveMap": "tex",
+      "emissiveMapTransform": "mat9",
+      "bumpMap": null,
+      "bumpMapTransform": "mat9",
+      "bumpScale": 1,
+      "normalMap": null,
+      "normalMapTransform": "mat9",
+      "normalScale": [
+       1,
+       1
+      ],
+      "displacementMap": null,
+      "displacementMapTransform": "mat9",
+      "displacementScale": 1,
+      "displacementBias": 0,
+      "fogDensity": 0.0000075,
+      "fogNear": 1,
+      "fogFar": 2000,
+      "fogColor": [
+       0.6185364853304006,
+       0.5715146968445991,
+       0.5100326699562601
+      ],
+      "ambientLightColor": [
+       0,
+       0,
+       0
+      ],
+      "lightProbe": "arr9",
+      "directionalLights": [
+       {
+        "direction": {
+         "x": 0.5548008622229308,
+         "y": 0.7218692808941385,
+         "z": 0.4136432576243352
+        },
+        "color": 16777215
+       }
+      ],
+      "directionalLightShadows": [],
+      "directionalShadowMatrix": [],
+      "spotLights": [],
+      "spotLightShadows": [],
+      "spotLightMap": [],
+      "spotLightMatrix": [],
+      "pointLights": [],
+      "pointLightShadows": [],
+      "pointShadowMatrix": [],
+      "hemisphereLights": [
+       {
+        "direction": {
+         "x": 1.549247309350397e-20,
+         "y": 0.99873788793913,
+         "z": 0.050225802083052315
+        },
+        "skyColor": 5726573,
+        "groundColor": 2238750
+       }
+      ],
+      "rectAreaLights": [],
+      "ltc_1": null,
+      "ltc_2": null,
+      "probesSH": null,
+      "probesMin": [
+       0,
+       0,
+       0
+      ],
+      "probesMax": [
+       0,
+       0,
+       0
+      ],
+      "probesResolution": [
+       0,
+       0,
+       0
+      ],
+      "emissive": [
+       0,
+       0,
+       0
+      ],
+      "envMapIntensity": 0.5960024618434494,
+      "uBendCenter": [
+       0,
+       -5077.54103363771
+      ],
+      "uBendK": 0.000005,
+      "uSatBldgFade": 1,
+      "uSatHaze": [
+       800,
+       14000
+      ],
+      "uSatHazeColor": [
+       0,
+       0,
+       0
+      ],
+      "uSatHazeMax": 0,
+      "clippingPlanes": null
+     },
+     "chunks": 28
+    },
+    {
+     "n": 2166,
+     "L": 144.4,
+     "pr": 0,
+     "u": {
+      "diffuse": [
+       1,
+       1,
+       1
+      ],
+      "opacity": 1,
+      "map": "tex",
+      "mapTransform": "mat9",
+      "alphaMap": null,
+      "alphaMapTransform": "mat9",
+      "alphaTest": 0,
+      "specularMap": null,
+      "specularMapTransform": "mat9",
+      "envMap": "tex",
+      "envMapRotation": "mat9",
+      "reflectivity": 1,
+      "refractionRatio": 0.98,
+      "dfgLUT": "tex",
+      "aoMap": null,
+      "aoMapIntensity": 1,
+      "aoMapTransform": "mat9",
+      "lightMap": null,
+      "lightMapIntensity": 1,
+      "lightMapTransform": "mat9",
+      "emissiveMap": "tex",
+      "emissiveMapTransform": "mat9",
+      "bumpMap": null,
+      "bumpMapTransform": "mat9",
+      "bumpScale": 1,
+      "normalMap": null,
+      "normalMapTransform": "mat9",
+      "normalScale": [
+       1,
+       1
+      ],
+      "displacementMap": null,
+      "displacementMapTransform": "mat9",
+      "displacementScale": 1,
+      "displacementBias": 0,
+      "fogDensity": 0.0000075,
+      "fogNear": 1,
+      "fogFar": 2000,
+      "fogColor": [
+       0.6185364853304006,
+       0.5715146968445991,
+       0.5100326699562601
+      ],
+      "ambientLightColor": [
+       0,
+       0,
+       0
+      ],
+      "lightProbe": "arr9",
+      "directionalLights": [
+       {
+        "direction": {
+         "x": 0.5548008622229308,
+         "y": 0.7218692808941385,
+         "z": 0.4136432576243352
+        },
+        "color": 16777215
+       }
+      ],
+      "directionalLightShadows": [],
+      "directionalShadowMatrix": [],
+      "spotLights": [],
+      "spotLightShadows": [],
+      "spotLightMap": [],
+      "spotLightMatrix": [],
+      "pointLights": [],
+      "pointLightShadows": [],
+      "pointShadowMatrix": [],
+      "hemisphereLights": [
+       {
+        "direction": {
+         "x": 1.549247309350397e-20,
+         "y": 0.99873788793913,
+         "z": 0.050225802083052315
+        },
+        "skyColor": 5726573,
+        "groundColor": 2238750
+       }
+      ],
+      "rectAreaLights": [],
+      "ltc_1": null,
+      "ltc_2": null,
+      "probesSH": null,
+      "probesMin": [
+       0,
+       0,
+       0
+      ],
+      "probesMax": [
+       0,
+       0,
+       0
+      ],
+      "probesResolution": [
+       0,
+       0,
+       0
+      ],
+      "emissive": [
+       0,
+       0,
+       0
+      ],
+      "envMapIntensity": 0.5960024618434494,
+      "uBendCenter": [
+       0,
+       -5078.728582075797
+      ],
+      "uBendK": 0.000005,
+      "uSatBldgFade": 1,
+      "uSatHaze": [
+       800,
+       14000
+      ],
+      "uSatHazeColor": [
+       0,
+       0,
+       0
+      ],
+      "uSatHazeMax": 0,
+      "clippingPlanes": null
+     },
+     "chunks": 28
+    },
+    {
+     "n": 2167,
+     "L": 144.4,
+     "pr": 0,
+     "u": {
+      "diffuse": [
+       1,
+       1,
+       1
+      ],
+      "opacity": 1,
+      "map": "tex",
+      "mapTransform": "mat9",
+      "alphaMap": null,
+      "alphaMapTransform": "mat9",
+      "alphaTest": 0,
+      "specularMap": null,
+      "specularMapTransform": "mat9",
+      "envMap": "tex",
+      "envMapRotation": "mat9",
+      "reflectivity": 1,
+      "refractionRatio": 0.98,
+      "dfgLUT": "tex",
+      "aoMap": null,
+      "aoMapIntensity": 1,
+      "aoMapTransform": "mat9",
+      "lightMap": null,
+      "lightMapIntensity": 1,
+      "lightMapTransform": "mat9",
+      "emissiveMap": "tex",
+      "emissiveMapTransform": "mat9",
+      "bumpMap": null,
+      "bumpMapTransform": "mat9",
+      "bumpScale": 1,
+      "normalMap": null,
+      "normalMapTransform": "mat9",
+      "normalScale": [
+       1,
+       1
+      ],
+      "displacementMap": null,
+      "displacementMapTransform": "mat9",
+      "displacementScale": 1,
+      "displacementBias": 0,
+      "fogDensity": 0.0000075,
+      "fogNear": 1,
+      "fogFar": 2000,
+      "fogColor": [
+       0.6185364853304006,
+       0.5715146968445991,
+       0.5100326699562601
+      ],
+      "ambientLightColor": [
+       0,
+       0,
+       0
+      ],
+      "lightProbe": "arr9",
+      "directionalLights": [
+       {
+        "direction": {
+         "x": 0.5548008622229308,
+         "y": 0.7218692808941385,
+         "z": 0.4136432576243352
+        },
+        "color": 16777215
+       }
+      ],
+      "directionalLightShadows": [],
+      "directionalShadowMatrix": [],
+      "spotLights": [],
+      "spotLightShadows": [],
+      "spotLightMap": [],
+      "spotLightMatrix": [],
+      "pointLights": [],
+      "pointLightShadows": [],
+      "pointShadowMatrix": [],
+      "hemisphereLights": [
+       {
+        "direction": {
+         "x": 1.549247309350397e-20,
+         "y": 0.99873788793913,
+         "z": 0.050225802083052315
+        },
+        "skyColor": 5726573,
+        "groundColor": 2238750
+       }
+      ],
+      "rectAreaLights": [],
+      "ltc_1": null,
+      "ltc_2": null,
+      "probesSH": null,
+      "probesMin": [
+       0,
+       0,
+       0
+      ],
+      "probesMax": [
+       0,
+       0,
+       0
+      ],
+      "probesResolution": [
+       0,
+       0,
+       0
+      ],
+      "emissive": [
+       0,
+       0,
+       0
+      ],
+      "envMapIntensity": 0.5960024618434494,
+      "uBendCenter": [
+       0,
+       -5079.773625055328
+      ],
+      "uBendK": 0.000005,
+      "uSatBldgFade": 1,
+      "uSatHaze": [
+       800,
+       14000
+      ],
+      "uSatHazeColor": [
+       0,
+       0,
+       0
+      ],
+      "uSatHazeMax": 0,
+      "clippingPlanes": null
+     },
+     "chunks": 28
+    },
+    {
+     "n": 2168,
+     "L": 144.4,
+     "pr": 0,
+     "u": {
+      "diffuse": [
+       1,
+       1,
+       1
+      ],
+      "opacity": 1,
+      "map": "tex",
+      "mapTransform": "mat9",
+      "alphaMap": null,
+      "alphaMapTransform": "mat9",
+      "alphaTest": 0,
+      "specularMap": null,
+      "specularMapTransform": "mat9",
+      "envMap": "tex",
+      "envMapRotation": "mat9",
+      "reflectivity": 1,
+      "refractionRatio": 0.98,
+      "dfgLUT": "tex",
+      "aoMap": null,
+      "aoMapIntensity": 1,
+      "aoMapTransform": "mat9",
+      "lightMap": null,
+      "lightMapIntensity": 1,
+      "lightMapTransform": "mat9",
+      "emissiveMap": "tex",
+      "emissiveMapTransform": "mat9",
+      "bumpMap": null,
+      "bumpMapTransform": "mat9",
+      "bumpScale": 1,
+      "normalMap": null,
+      "normalMapTransform": "mat9",
+      "normalScale": [
+       1,
+       1
+      ],
+      "displacementMap": null,
+      "displacementMapTransform": "mat9",
+      "displacementScale": 1,
+      "displacementBias": 0,
+      "fogDensity": 0.0000075,
+      "fogNear": 1,
+      "fogFar": 2000,
+      "fogColor": [
+       0.6185364853304006,
+       0.5715146968445991,
+       0.5100326699562601
+      ],
+      "ambientLightColor": [
+       0,
+       0,
+       0
+      ],
+      "lightProbe": "arr9",
+      "directionalLights": [
+       {
+        "direction": {
+         "x": 0.5548008622229308,
+         "y": 0.7218692808941385,
+         "z": 0.4136432576243352
+        },
+        "color": 16777215
+       }
+      ],
+      "directionalLightShadows": [],
+      "directionalShadowMatrix": [],
+      "spotLights": [],
+      "spotLightShadows": [],
+      "spotLightMap": [],
+      "spotLightMatrix": [],
+      "pointLights": [],
+      "pointLightShadows": [],
+      "pointShadowMatrix": [],
+      "hemisphereLights": [
+       {
+        "direction": {
+         "x": 1.549247309350397e-20,
+         "y": 0.99873788793913,
+         "z": 0.050225802083052315
+        },
+        "skyColor": 5726573,
+        "groundColor": 2238750
+       }
+      ],
+      "rectAreaLights": [],
+      "ltc_1": null,
+      "ltc_2": null,
+      "probesSH": null,
+      "probesMin": [
+       0,
+       0,
+       0
+      ],
+      "probesMax": [
+       0,
+       0,
+       0
+      ],
+      "probesResolution": [
+       0,
+       0,
+       0
+      ],
+      "emissive": [
+       0,
+       0,
+       0
+      ],
+      "envMapIntensity": 0.5960024618434494,
+      "uBendCenter": [
+       0,
+       -5080.842419010587
+      ],
+      "uBendK": 0.000005,
+      "uSatBldgFade": 1,
+      "uSatHaze": [
+       800,
+       14000
+      ],
+      "uSatHazeColor": [
+       0,
+       0,
+       0
+      ],
+      "uSatHazeMax": 0,
+      "clippingPlanes": null
+     },
+     "chunks": 28
+    },
+    {
+     "n": 2169,
+     "L": 144.4,
+     "pr": 0,
+     "u": {
+      "diffuse": [
+       1,
+       1,
+       1
+      ],
+      "opacity": 1,
+      "map": "tex",
+      "mapTransform": "mat9",
+      "alphaMap": null,
+      "alphaMapTransform": "mat9",
+      "alphaTest": 0,
+      "specularMap": null,
+      "specularMapTransform": "mat9",
+      "envMap": "tex",
+      "envMapRotation": "mat9",
+      "reflectivity": 1,
+      "refractionRatio": 0.98,
+      "dfgLUT": "tex",
+      "aoMap": null,
+      "aoMapIntensity": 1,
+      "aoMapTransform": "mat9",
+      "lightMap": null,
+      "lightMapIntensity": 1,
+      "lightMapTransform": "mat9",
+      "emissiveMap": "tex",
+      "emissiveMapTransform": "mat9",
+      "bumpMap": null,
+      "bumpMapTransform": "mat9",
+      "bumpScale": 1,
+      "normalMap": null,
+      "normalMapTransform": "mat9",
+      "normalScale": [
+       1,
+       1
+      ],
+      "displacementMap": null,
+      "displacementMapTransform": "mat9",
+      "displacementScale": 1,
+      "displacementBias": 0,
+      "fogDensity": 0.0000075,
+      "fogNear": 1,
+      "fogFar": 2000,
+      "fogColor": [
+       0.6185364853304006,
+       0.5715146968445991,
+       0.5100326699562601
+      ],
+      "ambientLightColor": [
+       0,
+       0,
+       0
+      ],
+      "lightProbe": "arr9",
+      "directionalLights": [
+       {
+        "direction": {
+         "x": 0.5548008622229308,
+         "y": 0.7218692808941385,
+         "z": 0.4136432576243352
+        },
+        "color": 16777215
+       }
+      ],
+      "directionalLightShadows": [],
+      "directionalShadowMatrix": [],
+      "spotLights": [],
+      "spotLightShadows": [],
+      "spotLightMap": [],
+      "spotLightMatrix": [],
+      "pointLights": [],
+      "pointLightShadows": [],
+      "pointShadowMatrix": [],
+      "hemisphereLights": [
+       {
+        "direction": {
+         "x": 1.549247309350397e-20,
+         "y": 0.99873788793913,
+         "z": 0.050225802083052315
+        },
+        "skyColor": 5726573,
+        "groundColor": 2238750
+       }
+      ],
+      "rectAreaLights": [],
+      "ltc_1": null,
+      "ltc_2": null,
+      "probesSH": null,
+      "probesMin": [
+       0,
+       0,
+       0
+      ],
+      "probesMax": [
+       0,
+       0,
+       0
+      ],
+      "probesResolution": [
+       0,
+       0,
+       0
+      ],
+      "emissive": [
+       0,
+       0,
+       0
+      ],
+      "envMapIntensity": 0.5960024618434494,
+      "uBendCenter": [
+       0,
+       -5081.934963941574
+      ],
+      "uBendK": 0.000005,
+      "uSatBldgFade": 1,
+      "uSatHaze": [
+       800,
+       14000
+      ],
+      "uSatHazeColor": [
+       0,
+       0,
+       0
+      ],
+      "uSatHazeMax": 0,
+      "clippingPlanes": null
+     },
+     "chunks": 28
+    },
+    {
+     "n": 2170,
+     "L": 226.9,
+     "pr": 1,
+     "u": {
+      "diffuse": [
+       1,
+       1,
+       1
+      ],
+      "opacity": 1,
+      "map": "tex",
+      "mapTransform": "mat9",
+      "alphaMap": null,
+      "alphaMapTransform": "mat9",
+      "alphaTest": 0,
+      "specularMap": null,
+      "specularMapTransform": "mat9",
+      "envMap": "tex",
+      "envMapRotation": "mat9",
+      "reflectivity": 1,
+      "refractionRatio": 0.98,
+      "dfgLUT": "tex",
+      "aoMap": null,
+      "aoMapIntensity": 1,
+      "aoMapTransform": "mat9",
+      "lightMap": null,
+      "lightMapIntensity": 1,
+      "lightMapTransform": "mat9",
+      "emissiveMap": "tex",
+      "emissiveMapTransform": "mat9",
+      "bumpMap": null,
+      "bumpMapTransform": "mat9",
+      "bumpScale": 1,
+      "normalMap": null,
+      "normalMapTransform": "mat9",
+      "normalScale": [
+       1,
+       1
+      ],
+      "displacementMap": null,
+      "displacementMapTransform": "mat9",
+      "displacementScale": 1,
+      "displacementBias": 0,
+      "fogDensity": 0.0000075,
+      "fogNear": 1,
+      "fogFar": 2000,
+      "fogColor": [
+       0.6185364853304006,
+       0.5715146968445991,
+       0.5100326699562601
+      ],
+      "ambientLightColor": [
+       0,
+       0,
+       0
+      ],
+      "lightProbe": "arr9",
+      "directionalLights": [
+       {
+        "direction": {
+         "x": 0.5548008622229308,
+         "y": 0.7218692808941385,
+         "z": 0.4136432576243352
+        },
+        "color": 16777215
+       }
+      ],
+      "directionalLightShadows": [],
+      "directionalShadowMatrix": [],
+      "spotLights": [],
+      "spotLightShadows": [],
+      "spotLightMap": [],
+      "spotLightMatrix": [],
+      "pointLights": [],
+      "pointLightShadows": [],
+      "pointShadowMatrix": [],
+      "hemisphereLights": [
+       {
+        "direction": {
+         "x": 1.549247309350397e-20,
+         "y": 0.99873788793913,
+         "z": 0.050225802083052315
+        },
+        "skyColor": 5726573,
+        "groundColor": 2238750
+       }
+      ],
+      "rectAreaLights": [],
+      "ltc_1": null,
+      "ltc_2": null,
+      "probesSH": null,
+      "probesMin": [
+       0,
+       0,
+       0
+      ],
+      "probesMax": [
+       0,
+       0,
+       0
+      ],
+      "probesResolution": [
+       0,
+       0,
+       0
+      ],
+      "emissive": [
+       0,
+       0,
+       0
+      ],
+      "envMapIntensity": 0.5960024618434494,
+      "uBendCenter": [
+       0,
+       -5083.027509233914
+      ],
+      "uBendK": 0.000005,
+      "uSatBldgFade": 1,
+      "uSatHaze": [
+       800,
+       14000
+      ],
+      "uSatHazeColor": [
+       0,
+       0,
+       0
+      ],
+      "uSatHazeMax": 0,
+      "clippingPlanes": null
+     },
+     "chunks": 28
+    }
+   ],
+   "lights": [
+    {
+     "t": "HemisphereLight",
+     "i": 0.154,
+     "c": "cfe5ff",
+     "gc": "5a6b53",
+     "vis": true
+    },
+    {
+     "t": "DirectionalLight",
+     "i": 1.355,
+     "c": "ffffff",
+     "gc": null,
+     "vis": true
+    }
+   ],
+   "vert": [
+    0.97,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    0.97
+   ],
+   "fog": {
+    "type": "Fog",
+    "color": "cec7bd",
+    "density": 0.0000075
+   },
+   "culpritUuid": "cefddd25",
+   "trials": {
+    "bendK=0": {
+     "L": 138.4,
+     "pr": 0.007
+    },
+    "fade=1": {
+     "L": 226.9,
+     "pr": 1
+    },
+    "hazeMax=0": {
+     "L": 226.9,
+     "pr": 1
+    },
+    "bendCenter=cam": {
+     "L": 144.4,
+     "pr": 0
+    },
+    "hemi=0": {
+     "L": 226.9,
+     "pr": 1
+    },
+    "dir=0": {
+     "L": 226.9,
+     "pr": 1
+    },
+    "fog=null": {
+     "L": 226.9,
+     "pr": 1
+    },
+    "envInt=0": {
+     "L": 226.9,
+     "pr": 1
+    },
+    "matBlack": {
+     "L": 226.9,
+     "pr": 1
+    }
+   },
+   "matU": {
+    "diffuse": [
+     1,
+     1,
+     1
+    ],
+    "opacity": 1,
+    "map": "tex",
+    "mapTransform": "mat9",
+    "alphaMap": null,
+    "alphaMapTransform": "mat9",
+    "alphaTest": 0,
+    "specularMap": null,
+    "specularMapTransform": "mat9",
+    "envMap": "tex",
+    "envMapRotation": "mat9",
+    "reflectivity": 1,
+    "refractionRatio": 0.98,
+    "dfgLUT": "tex",
+    "aoMap": null,
+    "aoMapIntensity": 1,
+    "aoMapTransform": "mat9",
+    "lightMap": null,
+    "lightMapIntensity": 1,
+    "lightMapTransform": "mat9",
+    "emissiveMap": "tex",
+    "emissiveMapTransform": "mat9",
+    "bumpMap": null,
+    "bumpMapTransform": "mat9",
+    "bumpScale": 1,
+    "normalMap": null,
+    "normalMapTransform": "mat9",
+    "normalScale": [
+     1,
+     1
+    ],
+    "displacementMap": null,
+    "displacementMapTransform": "mat9",
+    "displacementScale": 1,
+    "displacementBias": 0,
+    "fogDensity": 0.0000075,
+    "fogNear": 1,
+    "fogFar": 2000,
+    "fogColor": [
+     0.6185364853304006,
+     0.5715146968445991,
+     0.5100326699562601
+    ],
+    "ambientLightColor": [
+     0,
+     0,
+     0
+    ],
+    "lightProbe": "arr9",
+    "directionalLights": [
+     {
+      "direction": {
+       "x": 0.5548008622250493,
+       "y": 0.7218874180433528,
+       "z": 0.4136116039777457
+      },
+      "color": {
+       "isColor": true,
+       "r": 1.3547521560142353,
+       "g": 1.3547521560142353,
+       "b": 1.3547521560142353
+      }
+     }
+    ],
+    "directionalLightShadows": [],
+    "directionalShadowMatrix": [],
+    "spotLights": [],
+    "spotLightShadows": [],
+    "spotLightMap": [],
+    "spotLightMatrix": [],
+    "pointLights": [],
+    "pointLightShadows": [],
+    "pointShadowMatrix": [],
+    "hemisphereLights": [
+     {
+      "direction": {
+       "x": 1.260850344497322e-21,
+       "y": 0.9987400893301515,
+       "z": 0.050182008377515144
+      },
+      "skyColor": {
+       "isColor": true,
+       "r": 0.09605814612263208,
+       "g": 0.12062494458891747,
+       "b": 0.15394910863798128
+      },
+      "groundColor": {
+       "isColor": true,
+       "r": 0.015740023673137458,
+       "g": 0.022634716621255754,
+       "b": 0.013316669025997265
+      }
+     }
+    ],
+    "rectAreaLights": [],
+    "ltc_1": null,
+    "ltc_2": null,
+    "probesSH": null,
+    "probesMin": [
+     0,
+     0,
+     0
+    ],
+    "probesMax": [
+     0,
+     0,
+     0
+    ],
+    "probesResolution": [
+     0,
+     0,
+     0
+    ],
+    "emissive": [
+     0,
+     0,
+     0
+    ],
+    "envMapIntensity": 0.5960024618434494,
+    "uBendCenter": [
+     0,
+     -5083.027509233914
+    ],
+    "uBendK": 0.000005,
+    "uSatBldgFade": 1,
+    "uSatHaze": [
+     800,
+     14000
+    ],
+    "uSatHazeColor": [
+     0,
+     0,
+     0
+    ],
+    "uSatHazeMax": 0,
+    "clippingPlanes": null
+   },
+   "matInfo": {
+    "vertexColors": true,
+    "side": 2,
+    "emissive": "ffd9a3",
+    "emissiveIntensity": 0,
+    "color": "ffffff",
+    "fog": true,
+    "toneMapped": true,
+    "transparent": false,
+    "opacity": 1,
+    "envMap": false,
+    "envMapIntensity": 1,
+    "lightMap": false
+   }
+  },
+  {
+   "n": 2628,
+   "L": 226.7,
+   "pr": 0.997,
+   "ring": [
+    {
+     "n": 2623,
+     "L": 144.6,
+     "pr": 0,
+     "u": {
+      "diffuse": [
+       1,
+       1,
+       1
+      ],
+      "opacity": 1,
+      "map": "tex",
+      "mapTransform": "mat9",
+      "alphaMap": null,
+      "alphaMapTransform": "mat9",
+      "alphaTest": 0,
+      "specularMap": null,
+      "specularMapTransform": "mat9",
+      "envMap": "tex",
+      "envMapRotation": "mat9",
+      "reflectivity": 1,
+      "refractionRatio": 0.98,
+      "dfgLUT": "tex",
+      "aoMap": null,
+      "aoMapIntensity": 1,
+      "aoMapTransform": "mat9",
+      "lightMap": null,
+      "lightMapIntensity": 1,
+      "lightMapTransform": "mat9",
+      "emissiveMap": "tex",
+      "emissiveMapTransform": "mat9",
+      "bumpMap": null,
+      "bumpMapTransform": "mat9",
+      "bumpScale": 1,
+      "normalMap": null,
+      "normalMapTransform": "mat9",
+      "normalScale": [
+       1,
+       1
+      ],
+      "displacementMap": null,
+      "displacementMapTransform": "mat9",
+      "displacementScale": 1,
+      "displacementBias": 0,
+      "fogDensity": 0.0000075,
+      "fogNear": 1,
+      "fogFar": 2000,
+      "fogColor": [
+       0.6185364853304006,
+       0.5715146968445991,
+       0.5100326699562601
+      ],
+      "ambientLightColor": [
+       0,
+       0,
+       0
+      ],
+      "lightProbe": "arr9",
+      "directionalLights": [
+       {
+        "direction": {
+         "x": 0.5548008622250488,
+         "y": 0.7218846992318336,
+         "z": 0.41361634915620493
+        },
+        "color": 16777215
+       }
+      ],
+      "directionalLightShadows": [],
+      "directionalShadowMatrix": [],
+      "spotLights": [],
+      "spotLightShadows": [],
+      "spotLightMap": [],
+      "spotLightMatrix": [],
+      "pointLights": [],
+      "pointLightShadows": [],
+      "pointShadowMatrix": [],
+      "hemisphereLights": [
+       {
+        "direction": {
+         "x": 1.2875618563239275e-21,
+         "y": 0.9987397594468431,
+         "z": 0.050188573401341315
+        },
+        "skyColor": 5726573,
+        "groundColor": 2238750
+       }
+      ],
+      "rectAreaLights": [],
+      "ltc_1": null,
+      "ltc_2": null,
+      "probesSH": null,
+      "probesMin": [
+       0,
+       0,
+       0
+      ],
+      "probesMax": [
+       0,
+       0,
+       0
+      ],
+      "probesResolution": [
+       0,
+       0,
+       0
+      ],
+      "emissive": [
+       0,
+       0,
+       0
+      ],
+      "envMapIntensity": 0.5960024618434494,
+      "uBendCenter": [
+       0,
+       -5666.677809534594
+      ],
+      "uBendK": 0.000005,
+      "uSatBldgFade": 1,
+      "uSatHaze": [
+       800,
+       14000
+      ],
+      "uSatHazeColor": [
+       0,
+       0,
+       0
+      ],
+      "uSatHazeMax": 0,
+      "clippingPlanes": null
+     },
+     "chunks": 28
+    },
+    {
+     "n": 2624,
+     "L": 144.6,
+     "pr": 0,
+     "u": {
+      "diffuse": [
+       1,
+       1,
+       1
+      ],
+      "opacity": 1,
+      "map": "tex",
+      "mapTransform": "mat9",
+      "alphaMap": null,
+      "alphaMapTransform": "mat9",
+      "alphaTest": 0,
+      "specularMap": null,
+      "specularMapTransform": "mat9",
+      "envMap": "tex",
+      "envMapRotation": "mat9",
+      "reflectivity": 1,
+      "refractionRatio": 0.98,
+      "dfgLUT": "tex",
+      "aoMap": null,
+      "aoMapIntensity": 1,
+      "aoMapTransform": "mat9",
+      "lightMap": null,
+      "lightMapIntensity": 1,
+      "lightMapTransform": "mat9",
+      "emissiveMap": "tex",
+      "emissiveMapTransform": "mat9",
+      "bumpMap": null,
+      "bumpMapTransform": "mat9",
+      "bumpScale": 1,
+      "normalMap": null,
+      "normalMapTransform": "mat9",
+      "normalScale": [
+       1,
+       1
+      ],
+      "displacementMap": null,
+      "displacementMapTransform": "mat9",
+      "displacementScale": 1,
+      "displacementBias": 0,
+      "fogDensity": 0.0000075,
+      "fogNear": 1,
+      "fogFar": 2000,
+      "fogColor": [
+       0.6185364853304006,
+       0.5715146968445991,
+       0.5100326699562601
+      ],
+      "ambientLightColor": [
+       0,
+       0,
+       0
+      ],
+      "lightProbe": "arr9",
+      "directionalLights": [
+       {
+        "direction": {
+         "x": 0.5548008622250488,
+         "y": 0.7218846992318336,
+         "z": 0.41361634915620493
+        },
+        "color": 16777215
+       }
+      ],
+      "directionalLightShadows": [],
+      "directionalShadowMatrix": [],
+      "spotLights": [],
+      "spotLightShadows": [],
+      "spotLightMap": [],
+      "spotLightMatrix": [],
+      "pointLights": [],
+      "pointLightShadows": [],
+      "pointShadowMatrix": [],
+      "hemisphereLights": [
+       {
+        "direction": {
+         "x": 1.2875618563239275e-21,
+         "y": 0.9987397594468431,
+         "z": 0.050188573401341315
+        },
+        "skyColor": 5726573,
+        "groundColor": 2238750
+       }
+      ],
+      "rectAreaLights": [],
+      "ltc_1": null,
+      "ltc_2": null,
+      "probesSH": null,
+      "probesMin": [
+       0,
+       0,
+       0
+      ],
+      "probesMax": [
+       0,
+       0,
+       0
+      ],
+      "probesResolution": [
+       0,
+       0,
+       0
+      ],
+      "emissive": [
+       0,
+       0,
+       0
+      ],
+      "envMapIntensity": 0.5960024618434494,
+      "uBendCenter": [
+       0,
+       -5668.079201254062
+      ],
+      "uBendK": 0.000005,
+      "uSatBldgFade": 1,
+      "uSatHaze": [
+       800,
+       14000
+      ],
+      "uSatHazeColor": [
+       0,
+       0,
+       0
+      ],
+      "uSatHazeMax": 0,
+      "clippingPlanes": null
+     },
+     "chunks": 28
+    },
+    {
+     "n": 2625,
+     "L": 144.6,
+     "pr": 0,
+     "u": {
+      "diffuse": [
+       1,
+       1,
+       1
+      ],
+      "opacity": 1,
+      "map": "tex",
+      "mapTransform": "mat9",
+      "alphaMap": null,
+      "alphaMapTransform": "mat9",
+      "alphaTest": 0,
+      "specularMap": null,
+      "specularMapTransform": "mat9",
+      "envMap": "tex",
+      "envMapRotation": "mat9",
+      "reflectivity": 1,
+      "refractionRatio": 0.98,
+      "dfgLUT": "tex",
+      "aoMap": null,
+      "aoMapIntensity": 1,
+      "aoMapTransform": "mat9",
+      "lightMap": null,
+      "lightMapIntensity": 1,
+      "lightMapTransform": "mat9",
+      "emissiveMap": "tex",
+      "emissiveMapTransform": "mat9",
+      "bumpMap": null,
+      "bumpMapTransform": "mat9",
+      "bumpScale": 1,
+      "normalMap": null,
+      "normalMapTransform": "mat9",
+      "normalScale": [
+       1,
+       1
+      ],
+      "displacementMap": null,
+      "displacementMapTransform": "mat9",
+      "displacementScale": 1,
+      "displacementBias": 0,
+      "fogDensity": 0.0000075,
+      "fogNear": 1,
+      "fogFar": 2000,
+      "fogColor": [
+       0.6185364853304006,
+       0.5715146968445991,
+       0.5100326699562601
+      ],
+      "ambientLightColor": [
+       0,
+       0,
+       0
+      ],
+      "lightProbe": "arr9",
+      "directionalLights": [
+       {
+        "direction": {
+         "x": 0.5548008622250488,
+         "y": 0.7218846992318336,
+         "z": 0.41361634915620493
+        },
+        "color": 16777215
+       }
+      ],
+      "directionalLightShadows": [],
+      "directionalShadowMatrix": [],
+      "spotLights": [],
+      "spotLightShadows": [],
+      "spotLightMap": [],
+      "spotLightMatrix": [],
+      "pointLights": [],
+      "pointLightShadows": [],
+      "pointShadowMatrix": [],
+      "hemisphereLights": [
+       {
+        "direction": {
+         "x": 1.2875618563239275e-21,
+         "y": 0.9987397594468431,
+         "z": 0.050188573401341315
+        },
+        "skyColor": 5726573,
+        "groundColor": 2238750
+       }
+      ],
+      "rectAreaLights": [],
+      "ltc_1": null,
+      "ltc_2": null,
+      "probesSH": null,
+      "probesMin": [
+       0,
+       0,
+       0
+      ],
+      "probesMax": [
+       0,
+       0,
+       0
+      ],
+      "probesResolution": [
+       0,
+       0,
+       0
+      ],
+      "emissive": [
+       0,
+       0,
+       0
+      ],
+      "envMapIntensity": 0.5960024618434494,
+      "uBendCenter": [
+       0,
+       -5669.575602578931
+      ],
+      "uBendK": 0.000005,
+      "uSatBldgFade": 1,
+      "uSatHaze": [
+       800,
+       14000
+      ],
+      "uSatHazeColor": [
+       0,
+       0,
+       0
+      ],
+      "uSatHazeMax": 0,
+      "clippingPlanes": null
+     },
+     "chunks": 28
+    },
+    {
+     "n": 2626,
+     "L": 144.6,
+     "pr": 0,
+     "u": {
+      "diffuse": [
+       1,
+       1,
+       1
+      ],
+      "opacity": 1,
+      "map": "tex",
+      "mapTransform": "mat9",
+      "alphaMap": null,
+      "alphaMapTransform": "mat9",
+      "alphaTest": 0,
+      "specularMap": null,
+      "specularMapTransform": "mat9",
+      "envMap": "tex",
+      "envMapRotation": "mat9",
+      "reflectivity": 1,
+      "refractionRatio": 0.98,
+      "dfgLUT": "tex",
+      "aoMap": null,
+      "aoMapIntensity": 1,
+      "aoMapTransform": "mat9",
+      "lightMap": null,
+      "lightMapIntensity": 1,
+      "lightMapTransform": "mat9",
+      "emissiveMap": "tex",
+      "emissiveMapTransform": "mat9",
+      "bumpMap": null,
+      "bumpMapTransform": "mat9",
+      "bumpScale": 1,
+      "normalMap": null,
+      "normalMapTransform": "mat9",
+      "normalScale": [
+       1,
+       1
+      ],
+      "displacementMap": null,
+      "displacementMapTransform": "mat9",
+      "displacementScale": 1,
+      "displacementBias": 0,
+      "fogDensity": 0.0000075,
+      "fogNear": 1,
+      "fogFar": 2000,
+      "fogColor": [
+       0.6185364853304006,
+       0.5715146968445991,
+       0.5100326699562601
+      ],
+      "ambientLightColor": [
+       0,
+       0,
+       0
+      ],
+      "lightProbe": "arr9",
+      "directionalLights": [
+       {
+        "direction": {
+         "x": 0.5548008622250488,
+         "y": 0.7218846992318336,
+         "z": 0.41361634915620493
+        },
+        "color": 16777215
+       }
+      ],
+      "directionalLightShadows": [],
+      "directionalShadowMatrix": [],
+      "spotLights": [],
+      "spotLightShadows": [],
+      "spotLightMap": [],
+      "spotLightMatrix": [],
+      "pointLights": [],
+      "pointLightShadows": [],
+      "pointShadowMatrix": [],
+      "hemisphereLights": [
+       {
+        "direction": {
+         "x": 1.2875618563239275e-21,
+         "y": 0.9987397594468431,
+         "z": 0.050188573401341315
+        },
+        "skyColor": 5726573,
+        "groundColor": 2238750
+       }
+      ],
+      "rectAreaLights": [],
+      "ltc_1": null,
+      "ltc_2": null,
+      "probesSH": null,
+      "probesMin": [
+       0,
+       0,
+       0
+      ],
+      "probesMax": [
+       0,
+       0,
+       0
+      ],
+      "probesResolution": [
+       0,
+       0,
+       0
+      ],
+      "emissive": [
+       0,
+       0,
+       0
+      ],
+      "envMapIntensity": 0.5960024618434494,
+      "uBendCenter": [
+       0,
+       -5670.7632231954485
+      ],
+      "uBendK": 0.000005,
+      "uSatBldgFade": 1,
+      "uSatHaze": [
+       800,
+       14000
+      ],
+      "uSatHazeColor": [
+       0,
+       0,
+       0
+      ],
+      "uSatHazeMax": 0,
+      "clippingPlanes": null
+     },
+     "chunks": 28
+    },
+    {
+     "n": 2627,
+     "L": 144.6,
+     "pr": 0.001,
+     "u": {
+      "diffuse": [
+       1,
+       1,
+       1
+      ],
+      "opacity": 1,
+      "map": "tex",
+      "mapTransform": "mat9",
+      "alphaMap": null,
+      "alphaMapTransform": "mat9",
+      "alphaTest": 0,
+      "specularMap": null,
+      "specularMapTransform": "mat9",
+      "envMap": "tex",
+      "envMapRotation": "mat9",
+      "reflectivity": 1,
+      "refractionRatio": 0.98,
+      "dfgLUT": "tex",
+      "aoMap": null,
+      "aoMapIntensity": 1,
+      "aoMapTransform": "mat9",
+      "lightMap": null,
+      "lightMapIntensity": 1,
+      "lightMapTransform": "mat9",
+      "emissiveMap": "tex",
+      "emissiveMapTransform": "mat9",
+      "bumpMap": null,
+      "bumpMapTransform": "mat9",
+      "bumpScale": 1,
+      "normalMap": null,
+      "normalMapTransform": "mat9",
+      "normalScale": [
+       1,
+       1
+      ],
+      "displacementMap": null,
+      "displacementMapTransform": "mat9",
+      "displacementScale": 1,
+      "displacementBias": 0,
+      "fogDensity": 0.0000075,
+      "fogNear": 1,
+      "fogFar": 2000,
+      "fogColor": [
+       0.6185364853304006,
+       0.5715146968445991,
+       0.5100326699562601
+      ],
+      "ambientLightColor": [
+       0,
+       0,
+       0
+      ],
+      "lightProbe": "arr9",
+      "directionalLights": [
+       {
+        "direction": {
+         "x": 0.5548008622250488,
+         "y": 0.7218846992318336,
+         "z": 0.41361634915620493
+        },
+        "color": 16777215
+       }
+      ],
+      "directionalLightShadows": [],
+      "directionalShadowMatrix": [],
+      "spotLights": [],
+      "spotLightShadows": [],
+      "spotLightMap": [],
+      "spotLightMatrix": [],
+      "pointLights": [],
+      "pointLightShadows": [],
+      "pointShadowMatrix": [],
+      "hemisphereLights": [
+       {
+        "direction": {
+         "x": 1.2875618563239275e-21,
+         "y": 0.9987397594468431,
+         "z": 0.050188573401341315
+        },
+        "skyColor": 5726573,
+        "groundColor": 2238750
+       }
+      ],
+      "rectAreaLights": [],
+      "ltc_1": null,
+      "ltc_2": null,
+      "probesSH": null,
+      "probesMin": [
+       0,
+       0,
+       0
+      ],
+      "probesMax": [
+       0,
+       0,
+       0
+      ],
+      "probesResolution": [
+       0,
+       0,
+       0
+      ],
+      "emissive": [
+       0,
+       0,
+       0
+      ],
+      "envMapIntensity": 0.5960024618434494,
+      "uBendCenter": [
+       0,
+       -5671.998348637484
+      ],
+      "uBendK": 0.000005,
+      "uSatBldgFade": 1,
+      "uSatHaze": [
+       800,
+       14000
+      ],
+      "uSatHazeColor": [
+       0,
+       0,
+       0
+      ],
+      "uSatHazeMax": 0,
+      "clippingPlanes": null
+     },
+     "chunks": 28
+    },
+    {
+     "n": 2628,
+     "L": 226.7,
+     "pr": 0.997,
+     "u": {
+      "diffuse": [
+       1,
+       1,
+       1
+      ],
+      "opacity": 1,
+      "map": "tex",
+      "mapTransform": "mat9",
+      "alphaMap": null,
+      "alphaMapTransform": "mat9",
+      "alphaTest": 0,
+      "specularMap": null,
+      "specularMapTransform": "mat9",
+      "envMap": "tex",
+      "envMapRotation": "mat9",
+      "reflectivity": 1,
+      "refractionRatio": 0.98,
+      "dfgLUT": "tex",
+      "aoMap": null,
+      "aoMapIntensity": 1,
+      "aoMapTransform": "mat9",
+      "lightMap": null,
+      "lightMapIntensity": 1,
+      "lightMapTransform": "mat9",
+      "emissiveMap": "tex",
+      "emissiveMapTransform": "mat9",
+      "bumpMap": null,
+      "bumpMapTransform": "mat9",
+      "bumpScale": 1,
+      "normalMap": null,
+      "normalMapTransform": "mat9",
+      "normalScale": [
+       1,
+       1
+      ],
+      "displacementMap": null,
+      "displacementMapTransform": "mat9",
+      "displacementScale": 1,
+      "displacementBias": 0,
+      "fogDensity": 0.0000075,
+      "fogNear": 1,
+      "fogFar": 2000,
+      "fogColor": [
+       0.6185364853304006,
+       0.5715146968445991,
+       0.5100326699562601
+      ],
+      "ambientLightColor": [
+       0,
+       0,
+       0
+      ],
+      "lightProbe": "arr9",
+      "directionalLights": [
+       {
+        "direction": {
+         "x": 0.5548008622250488,
+         "y": 0.7218846992318336,
+         "z": 0.41361634915620493
+        },
+        "color": 16777215
+       }
+      ],
+      "directionalLightShadows": [],
+      "directionalShadowMatrix": [],
+      "spotLights": [],
+      "spotLightShadows": [],
+      "spotLightMap": [],
+      "spotLightMatrix": [],
+      "pointLights": [],
+      "pointLightShadows": [],
+      "pointShadowMatrix": [],
+      "hemisphereLights": [
+       {
+        "direction": {
+         "x": 1.2875618563239275e-21,
+         "y": 0.9987397594468431,
+         "z": 0.050188573401341315
+        },
+        "skyColor": 5726573,
+        "groundColor": 2238750
+       }
+      ],
+      "rectAreaLights": [],
+      "ltc_1": null,
+      "ltc_2": null,
+      "probesSH": null,
+      "probesMin": [
+       0,
+       0,
+       0
+      ],
+      "probesMax": [
+       0,
+       0,
+       0
+      ],
+      "probesResolution": [
+       0,
+       0,
+       0
+      ],
+      "emissive": [
+       0,
+       0,
+       0
+      ],
+      "envMapIntensity": 0.5960024618434494,
+      "uBendCenter": [
+       0,
+       -5673.328483725898
+      ],
+      "uBendK": 0.000005,
+      "uSatBldgFade": 1,
+      "uSatHaze": [
+       800,
+       14000
+      ],
+      "uSatHazeColor": [
+       0,
+       0,
+       0
+      ],
+      "uSatHazeMax": 0,
+      "clippingPlanes": null
+     },
+     "chunks": 28
+    }
+   ],
+   "lights": [
+    {
+     "t": "HemisphereLight",
+     "i": 0.154,
+     "c": "cfe5ff",
+     "gc": "5a6b53",
+     "vis": true
+    },
+    {
+     "t": "DirectionalLight",
+     "i": 1.355,
+     "c": "ffffff",
+     "gc": null,
+     "vis": true
+    }
+   ],
+   "vert": [
+    0.97,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    0.97
+   ],
+   "fog": {
+    "type": "Fog",
+    "color": "cec7bd",
+    "density": 0.0000075
+   },
+   "culpritUuid": "cefddd25",
+   "trials": {
+    "bendK=0": {
+     "L": 138.1,
+     "pr": 0.016
+    },
+    "fade=1": {
+     "L": 226.7,
+     "pr": 0.997
+    },
+    "hazeMax=0": {
+     "L": 226.7,
+     "pr": 0.997
+    },
+    "bendCenter=cam": {
+     "L": 144.6,
+     "pr": 0
+    },
+    "hemi=0": {
+     "L": 226.7,
+     "pr": 0.997
+    },
+    "dir=0": {
+     "L": 226.7,
+     "pr": 0.997
+    },
+    "fog=null": {
+     "L": 226.7,
+     "pr": 0.997
+    },
+    "envInt=0": {
+     "L": 226.7,
+     "pr": 0.997
+    },
+    "matBlack": {
+     "L": 226.7,
+     "pr": 0.997
+    }
+   },
+   "matU": {
+    "diffuse": [
+     1,
+     1,
+     1
+    ],
+    "opacity": 1,
+    "map": "tex",
+    "mapTransform": "mat9",
+    "alphaMap": null,
+    "alphaMapTransform": "mat9",
+    "alphaTest": 0,
+    "specularMap": null,
+    "specularMapTransform": "mat9",
+    "envMap": "tex",
+    "envMapRotation": "mat9",
+    "reflectivity": 1,
+    "refractionRatio": 0.98,
+    "dfgLUT": "tex",
+    "aoMap": null,
+    "aoMapIntensity": 1,
+    "aoMapTransform": "mat9",
+    "lightMap": null,
+    "lightMapIntensity": 1,
+    "lightMapTransform": "mat9",
+    "emissiveMap": "tex",
+    "emissiveMapTransform": "mat9",
+    "bumpMap": null,
+    "bumpMapTransform": "mat9",
+    "bumpScale": 1,
+    "normalMap": null,
+    "normalMapTransform": "mat9",
+    "normalScale": [
+     1,
+     1
+    ],
+    "displacementMap": null,
+    "displacementMapTransform": "mat9",
+    "displacementScale": 1,
+    "displacementBias": 0,
+    "fogDensity": 0.0000075,
+    "fogNear": 1,
+    "fogFar": 2000,
+    "fogColor": [
+     0.6185364853304006,
+     0.5715146968445991,
+     0.5100326699562601
+    ],
+    "ambientLightColor": [
+     0,
+     0,
+     0
+    ],
+    "lightProbe": "arr9",
+    "directionalLights": [
+     {
+      "direction": {
+       "x": 0.5548008622250493,
+       "y": 0.7218874180433528,
+       "z": 0.4136116039777457
+      },
+      "color": {
+       "isColor": true,
+       "r": 1.3547521560142353,
+       "g": 1.3547521560142353,
+       "b": 1.3547521560142353
+      }
+     }
+    ],
+    "directionalLightShadows": [],
+    "directionalShadowMatrix": [],
+    "spotLights": [],
+    "spotLightShadows": [],
+    "spotLightMap": [],
+    "spotLightMatrix": [],
+    "pointLights": [],
+    "pointLightShadows": [],
+    "pointShadowMatrix": [],
+    "hemisphereLights": [
+     {
+      "direction": {
+       "x": 1.260850344497322e-21,
+       "y": 0.9987400893301515,
+       "z": 0.050182008377515144
+      },
+      "skyColor": {
+       "isColor": true,
+       "r": 0.09605814612263208,
+       "g": 0.12062494458891747,
+       "b": 0.15394910863798128
+      },
+      "groundColor": {
+       "isColor": true,
+       "r": 0.015740023673137458,
+       "g": 0.022634716621255754,
+       "b": 0.013316669025997265
+      }
+     }
+    ],
+    "rectAreaLights": [],
+    "ltc_1": null,
+    "ltc_2": null,
+    "probesSH": null,
+    "probesMin": [
+     0,
+     0,
+     0
+    ],
+    "probesMax": [
+     0,
+     0,
+     0
+    ],
+    "probesResolution": [
+     0,
+     0,
+     0
+    ],
+    "emissive": [
+     0,
+     0,
+     0
+    ],
+    "envMapIntensity": 0.5960024618434494,
+    "uBendCenter": [
+     0,
+     -5673.328483725898
+    ],
+    "uBendK": 0.000005,
+    "uSatBldgFade": 1,
+    "uSatHaze": [
+     800,
+     14000
+    ],
+    "uSatHazeColor": [
+     0,
+     0,
+     0
+    ],
+    "uSatHazeMax": 0,
+    "clippingPlanes": null
+   },
+   "matInfo": {
+    "vertexColors": true,
+    "side": 2,
+    "emissive": "ffd9a3",
+    "emissiveIntensity": 0,
+    "color": "ffffff",
+    "fog": true,
+    "toneMapped": true,
+    "transparent": false,
+    "opacity": 1,
+    "envMap": false,
+    "envMapIntensity": 1,
+    "lightMap": false
+   }
+  }
+ ]
+}

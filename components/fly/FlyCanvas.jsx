@@ -8,9 +8,10 @@ import { Effects } from './Effects';
 import { PhotoCapture } from './PhotoCapture';
 import { JuiceSystems } from './JuiceSystems';
 import { PrewarmRig } from './PrewarmRig';
-import { CANVAS, PERF_GOVERNOR, PREWARM } from '@/lib/fly/fly-constants';
+import { CANVAS, PERF_GOVERNOR, PREWARM, STEP_SAFE } from '@/lib/fly/fly-constants';
 import { autoTierCeiling } from '@/lib/fly/fly-settings';
 import { PerfGovernor } from '@/lib/fly/perf-governor';
+import { StepSafeRig } from '@/lib/fly/step-safe';
 import { useFlyStore } from '@/stores/fly-store';
 
 function initialDpr() {
@@ -123,6 +124,16 @@ export function FlyCanvas({ runtime }) {
               default incline bound at vsync-locked steady state, and
               flipflops=Infinity means it never latches). */}
           <PerfGovernor setDpr={setDpr} />
+          {/* Round 22.1 (A FLASH): applies a pending DPR step — renderer AND
+              composer — inside the animation frame that then draws it, so the
+              compositor can never present a reallocated (cleared) drawing
+              buffer or a frame composed against buffers of the wrong size.
+              Mounted only on the governor path: the legacy PerformanceMonitor
+              branch below steps DPR with a FUNCTIONAL setState that has no
+              value to park, and R22's one-flag revert for that path is that it
+              stays byte-identical. STEP_SAFE.enabled:false ⇒ not mounted and
+              perf-governor's applyDpr keeps its R22 line. */}
+          {STEP_SAFE.enabled && <StepSafeRig setDpr={setDpr} />}
           {sceneTree}
         </>
       ) : (

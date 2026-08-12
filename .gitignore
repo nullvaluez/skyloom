@@ -20,3 +20,34 @@ repomix-output.xml
 *.log
 .DS_Store
 Thumbs.db
+.probe-out-*/
+.probe-selftest/
+.probe-calib/
+.probe-red15/
+.probe-red15t/
+.probe-nat/
+.probe-green15/
+.probe-red-pin/
+.catch*.png
+.prod-pose.png
+.r22p1-a-*.log
+
+# R22.1 C salvage: bulky probe dumps (evidence JSON/PNGs are committed selectively)
+.probe-c-bisect/
+.probe-c-lag/
+.probe-c-stochastic/
+.probe-c-why/*.png
+.probe-c-flash*/
+.probe-c-trace*/
+
+# R22.1 C: probe scratch. Evidence files are force-added and stay tracked;
+# everything else here is reproducible from scripts/r22p1-c-probe*.js.
+.probe-c-adj/
+.probe-c-uni/
+.probe-c-chan/
+.probe-c-hdr/
+.probe-c-tri/
+.probe-c-degen/
+.probe-c-degen-green/
+.probe-c-look/
+.r22p1-c-*.log

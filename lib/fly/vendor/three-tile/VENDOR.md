@@ -47,6 +47,34 @@ each patched site executes the byte-equivalent upstream expression.
 | 2 | A TERRA | `lodBailFix` | `Tile._update` (index.js ~:184) **returned** whenever `downloadingThreads + 4 >= maxThreads`. Because the walk is depth-first from the root, that truncated the entire remainder of the tree for the frame — including the deep near-camera tiles that sort last in DFS order. ON keeps walking while busy but starts no work (no `_updateModel`, no `LOD()`), so the thread budget is spent by whoever the walk reaches rather than by a fixed DFS prefix. OFF is the original `if (!(busy \|\| loading))` guard. | landed, R22 W1 |
 | 3 | A TERRA | `demErrorTable` | The martini decimation targets for the LERC DEM path. **The VENDOR.md premise above was wrong and is corrected here:** `le = Ee(21)` at :441 is *not* the table this app's DEM uses. `TerrainLercLoader.doLoad` posts the blob to an embedded worker (the `fe` source string, ~:1118) which decodes **and decimates** inside itself, carrying its own copy of the curve (`P = W(21)`, consumed by `ie()`). The patch therefore (a) threads an optional `errTable` parameter through the worker's `ie()`/`le()`/`onmessage` — absent ⇒ upstream's `P[z]||0` exactly — and (b) adds `errTable` to the message `TerrainLercLoader.doLoad` posts. `le` at :441 is left **byte-verbatim**: it serves only the Mapbox terrain-rgb / terrain-dem loaders and `TileGeometry.setData()`, none of which this app uses. | landed, R22 W1 |
 | 4 | A TERRA | *(exports only)* | Three new named exports — `setFlyPatch`, `setDemErrorTable`, `flyGetPatch` — appended to the export block. No upstream export was renamed, removed or reordered. | landed, R22 W1 |
+| 5 | B STUTTER (R22.1) | `skirtEdges` | `getBoundaryEdges` (`We`, index.js ~:673) — the skirt builder's boundary-edge finder, run ON THE MAIN THREAD for every DEM tile inside `TerrainLercLoader.doLoad` → `TileGeometry.setAttributes` → `addSkirt`. Upstream allocates 3·T two-element arrays, sorts them with a JS comparator running four `Math.min`/`Math.max` per comparison (~165k comparator calls on a 4k-triangle tile), then de-duplicates adjacent reverse pairs. **Measured as 67% of every stalled millisecond** in the live low-AGL stutter (scripts/r22p1-b-stutter.md; 1,107 ms of a 30 s window, bursting because `Tile._loadSubTiles` resolves four children in one microtask drain). ON counts each undirected edge in a module-scoped open-addressed Int32Array table (generation-stamped, reused, zero per-tile allocation) and keeps the ones seen once. OFF is the original body verbatim. | landed, R22.1 |
+| 6 | B STUTTER (R22.1) | *(exports only)* | Three new named exports — `flyBoundaryEdgesFast`, `flyBoundaryEdgesRef`, `flySkirtStats` — appended to the export block so `verify-frame-pace` can prove output identity on live tile index buffers and prove the fast path was exercised (`{fast, bail, upstream, tris}`) rather than merely armed. No upstream export was renamed, removed or reordered. | landed, R22.1 |
+
+### Patch #5 — why the output is IDENTICAL, not merely equivalent
+
+`getBoundaryEdges` returns an ordered list of directed edges, and the skirt's
+winding is built from that order and direction, so "same set" would not be
+enough. Three properties make the replacement exact:
+
+1. **Order.** Upstream sorts by `(min(u,v), max(u,v))` ascending and pushes in
+   that order. The fast path sorts the surviving slots by the same `(min, max)`
+   pair. Every boundary edge is unique under that key, so no tie-break exists
+   to disagree about.
+2. **Direction.** Upstream pushes the surviving *entry*, i.e. the triangle's own
+   `[u, v]`. The fast path records the position of the single occurrence and
+   re-reads `[i[t+e], i[t+next]]` from the index array — the same two numbers.
+3. **Refusal.** The fast path RETURNS NULL — falling through to the verbatim
+   upstream body — for every input it does not claim: an index array whose
+   length is not a multiple of 3, a negative index, a third occurrence of one
+   undirected edge, or two occurrences that are **not exact reverses**. That
+   last case is the only one where upstream's pairwise dedup keeps both halves,
+   and it is the one a naive "count == 1" filter would get wrong.
+
+Node fixture (85 meshes: regular grids 1×1…64×64, 80 randomly holed grids in
+`Uint16Array` and `Uint32Array`, plus four deliberately non-manifold cases)
+reports **85 identical, 4 bailed to upstream, 0 mismatches**. Measured speedup
+4.9–6.1× across T = 2 048 … 32 768 (`ref 9.72 ms → fast 1.79 ms` at T = 32 768).
+Live: 2 354 tiles in a 25 s Powell run, **0 bails**.
 
 ### Not patched (deliberately)
 
