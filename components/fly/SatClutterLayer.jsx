@@ -83,6 +83,23 @@ function paceSec(baseSec, speedMps) {
  * frozen number moves. That is also why the defect shipped. A dense-pose gate
  * (Manhattan / Chicago Loop, where the pool DOES bind) is the missing
  * instrument; it is named in E's motion-hold notes rather than invented here.
+ *
+ * HONEST NOTE ON THE COST (D's review, B2): the divisor is the STATIC
+ * `CLUTTER.maxChunks`, not the count actually resident, so with N < maxChunks
+ * chunks streamed the pool is reachable only to N/maxChunks of its capacity —
+ * at a saturating pose, 4 of 6 chunks resident means at most two thirds of the
+ * cars. The ceiling is taken against the RUNNING TOTAL (`Math.min(pool, nc +
+ * share)`), so a chunk that under-fills never eats a later chunk's share — but
+ * its unused slots are NOT redistributed either, so the shortfall is real. It
+ * is bounded in the safe direction (never over budget, never a hard radius) and
+ * a fully resident ring reaches the pool exactly; what it costs is a slight
+ * density dip during fast flight, which is precisely when the resident count
+ * dips. That is the honest trade: a slightly thinner car park, for a car park
+ * that stops re-shuffling. Dividing by the LIVE resident count instead would
+ * remove the dip and re-introduce the churn — every arrival would re-scale
+ * every chunk's share and the whole pool would re-derive — so it is
+ * deliberately not what this does. Inherited, with its cost, from the SAT_VEG
+ * original.
  */
 function fairShare(pool) {
   if (!POOL_FAIR.enabled) return pool; // flag off ⇒ the whole pool, as before
