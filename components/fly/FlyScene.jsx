@@ -79,7 +79,13 @@ import {
 import { resolveSky, skyDuskOn, trueElevationDeg } from '@/lib/fly/sky-dusk';
 // R22 (B SETTLE) — the two FlyScene regions this round's B agent owns: the
 // groundElev damper (the -50 block) and the HDRI bucket re-pick interval.
-import { groundElevVisStep, settleOn, sinceRevealMs } from '@/lib/fly/settle';
+import {
+  groundElevVis,
+  groundElevVisStep,
+  motionSubOn,
+  settleOn,
+  sinceRevealMs,
+} from '@/lib/fly/settle';
 import {
   AERIAL_PERSPECTIVE,
   BOOST_METER,
@@ -91,6 +97,7 @@ import {
   HILLSHADE,
   MONUMENT_MODELS,
   MOON,
+  MOTION_R24,
   NIGHT_TRUTH_R23,
   SAT_BUILDINGS,
   SAT_CITY_GLOW,
@@ -1513,6 +1520,12 @@ export function FlyScene({ runtime }) {
   }, [spawn, engine, flight, rebase]);
 
   const frameCount = useRef(0);
+  // R24 (C, MOTION_R24.elevGate — BUILT, OFF): the last DEM sample that came
+  // from a tile at or above `minTileZ`. Read ONLY as the visual-publish input
+  // (see the ground-sample block); `null` until the first accepted sample, at
+  // which point the site falls back to the raw value, so an armed session
+  // before any fine tile exists behaves exactly like an un-armed one.
+  const elevVisSrcRef = useRef(null);
   // R23 (A): the night telemetry's own WALL-CLOCK cadence. It deliberately does
   // not ride `frameCount % 60`: the whole point of the instrument is to report
   // a machine that is running BADLY, and on a machine at 8 fps a 60-frame gate
@@ -1563,11 +1576,50 @@ export function FlyScene({ runtime }) {
 
     // Terrain raycasts are ~fractions of a ms but not free — sample the
     // ground under the aircraft every 3rd frame.
+    //
+    // ── R24 (C MOTION-STATE), `MOTION_R24.elevGate` — BUILT, SHIPS OFF ──────
+    // MEASURED ASYMMETRY: this sample has NO tile-zoom quality gate, while the
+    // two traffic samplers ~600 lines below both carry one —
+    // `if (!s || s.tileZ < 11) return null` — under the comment "a coarse
+    // fallback DEM tile 'answers' with plateau garbage — planes got pinned
+    // mid-air forever". The player's own ground got the gate the traffic got,
+    // never. `getElevationAt` (terrain-engine.js) returns `info.location.z` and
+    // DISCARDS the zoom that `getGroundAt` — the same raycast, one line over —
+    // hands back for free. Under fast motion the resident leaf under the
+    // aircraft changes zoom constantly (the R22.1 close ledger §3.1(d) measured
+    // camTileZ swinging 10 <-> 13 <-> 18 at the SAME poses in one session), so
+    // this value jitters by whole DEM levels precisely when moving.
+    //
+    // THE SAFE SHAPE, and it is the whole reason this is not a one-line change:
+    // `flight.groundElev` also feeds the CRASH FLOOR (crashSys.update reads
+    // flight.floorContact, written by flight.step off this value) and
+    // `flight.agl`. Rejecting a coarse answer makes the value HOLD its previous
+    // reading, which is right for a fade band and a change of behaviour for a
+    // safety system. So the gate applies to the VISUAL PUBLISH ONLY: the raw
+    // assignment below is untouched at every flag state, and only the input to
+    // groundElevVisStep is gated. R22's rule stands verbatim — safety never
+    // reads a damped OR a gated signal.
+    //
+    // DEPENDENCY FOR A TERRA (TILE_HOLD): `minTileZ: 11` is derived from
+    // TODAY'S DEM ceiling (demMaxZoom 16, z17 a 67-byte degenerate surface) and
+    // mirrors the traffic samplers' own frozen 11. If TILE_HOLD moves the DEM
+    // ceiling or the LOD curve, this floor must be RE-DERIVED, not inherited.
     if (spawnPlacedRef.current && frameCount.current++ % 3 === 0) {
       const geo = engine.worldToGeo(flight.pos);
       flight.latDeg = geo.y;
-      const elev = engine.getElevationAt(geo.x, geo.y);
-      if (elev != null) flight.groundElev = elev;
+      if (motionSubOn('elevGate')) {
+        // Same raycast, one extra returned field. (`getGroundAt` also
+        // self-calibrates the engine's `_sizeZ0` — idempotent, and the terra
+        // stats tick already does it on its own 2 Hz beat.)
+        const s = engine.getGroundAt(geo.x, geo.y);
+        if (s && s.elev != null) {
+          flight.groundElev = s.elev; // RAW, exactly as below — safety's input
+          if ((s.tileZ ?? 0) >= MOTION_R24.elevGate.minTileZ) elevVisSrcRef.current = s.elev;
+        }
+      } else {
+        const elev = engine.getElevationAt(geo.x, geo.y);
+        if (elev != null) flight.groundElev = elev;
+      }
       runtime.geo = geo; // Vector3(lon, lat, altM) — HUD/polling read this
     }
     // R22 (B SETTLE): the VISUAL ground-elevation channel, slew-limited.
@@ -1581,7 +1633,16 @@ export function FlyScene({ runtime }) {
     // Flag off / fleet-pinned it returns the raw value, so this line is the
     // W0 alias exactly. The flight model and the crash floor keep reading
     // flight.groundElev RAW — safety never reads a damped signal.
-    runtime.groundElevVis = groundElevVisStep(flight.groundElev, dt, flyState.warpEpoch);
+    //
+    // R24 (C): `elevVisSrc` is `flight.groundElev` VERBATIM with elevGate off
+    // (the shipped state), so this line is byte-identical to R22's. Armed, it
+    // is the last DEM sample that came from a tile at or above minTileZ — the
+    // visual channel stops inheriting plateau garbage while the safety channel
+    // above keeps every sample it has always had.
+    const elevVisSrc = motionSubOn('elevGate')
+      ? (elevVisSrcRef.current ?? flight.groundElev)
+      : flight.groundElev;
+    runtime.groundElevVis = groundElevVisStep(elevVisSrc, dt, flyState.warpEpoch);
 
     // --- Phase 5: targeting + autopilot (uses traffic items from the
     // previous frame's update at -45 — 16ms of staleness is immaterial) ---
@@ -1906,6 +1967,18 @@ export function FlyScene({ runtime }) {
       // tod tracks slowly (runtime.sun updates on the 60s cadence + on warp).
       const aa = SKY.altAtmo;
       const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
+      // ── R24 (C MOTION-STATE), `MOTION_R24.grades` — SHIPS ON ──────────────
+      // A SECOND binding, deliberately, rather than a re-point of `eyeAgl`.
+      // `eyeAgl` above feeds `targetAltT`, which is already expApproach-damped
+      // at `aa.smoothSec` before anything consumes it — the atmosphere was
+      // never the defect and moving it would silently shift verify-weather's
+      // rim band and verify-rim's frozen numbers for no gain. Only SAT_QUILT
+      // (below) reads `eyeAglVis`, so the blast radius is exactly the one term
+      // this round adjudicated. Flag off ⇒ the two are the same number and the
+      // grade takes its verbatim R22 input.
+      const eyeAglVis = motionSubOn('grades')
+        ? Math.max(0, flight.pos.y - groundElevVis(runtime, flight))
+        : eyeAgl;
       const targetAltT = Math.min(
         1,
         Math.max(0, (eyeAgl - aa.aglStartM) / (aa.aglFullM - aa.aglStartM))
@@ -2098,10 +2171,22 @@ export function FlyScene({ runtime }) {
       // screen, while the hillshade/micro-detail contracts own that band. So
       // the grade fades IN with eye AGL and is exactly 0 below inAglM, which is
       // also what keeps verify-sat-depth's low-altitude crops untouched.
+      //
+      // R24 (C, MOTION_R24.grades — ON): the input is now the DAMPED ground.
+      // This is a UNIFORM write over the tile imagery — desaturation plus luma
+      // flatten — so when the raw DEM sample steps (R22 measured ~384 m/frame
+      // as it refines under the aircraft) it repaints EVERY ground pixel on one
+      // frame, with no geometry change and no draw-count change. That is why
+      // nothing in the fleet can see it: draw gates and censuses are blind to a
+      // uniform, and every satellite pixel gate FREEZES the flight — a frozen
+      // aircraft has a settled groundElev. It is the strongest candidate this
+      // round owns for the user's "the satellite ground plane itself glitches".
+      // The four sibling content layers have read `groundElevVis` since R22;
+      // this makes the ground plane agree with the things standing on it.
       if (SAT_QUILT.enabled && aerialGate > 0) {
         let qt = Math.min(
           1,
-          Math.max(0, (eyeAgl - SAT_QUILT.inAglM) / (SAT_QUILT.outAglM - SAT_QUILT.inAglM))
+          Math.max(0, (eyeAglVis - SAT_QUILT.inAglM) / (SAT_QUILT.outAglM - SAT_QUILT.inAglM))
         );
         qt = qt * qt * (3 - 2 * qt);
         const q = qt * aerialGate;
@@ -2205,17 +2290,32 @@ export function FlyScene({ runtime }) {
     const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
     const rimDrop = dipStartM * dipStartM * bendK + eyeAgl;
     setSkyDip(rimDrop / Math.hypot(rimDrop, dipStartM));
+    // R24 (C, MOTION_R24.grades — ON): the damped sibling, for the micro-detail
+    // grade below ONLY. `rimDrop` above keeps the RAW value on purpose: the sky
+    // dip is where the DRAWN ground meets the dome, and the drawn ground is
+    // bent off the true eye height (setBendEye is fed raw too, two blocks up),
+    // so damping it would open a seam between the terrain and the sky — the
+    // exact class of bug this round is closing, inverted. Flag off ⇒ identical.
+    const eyeAglVis = motionSubOn('grades')
+      ? Math.max(0, flight.pos.y - groundElevVis(runtime, flight))
+      : eyeAgl;
 
     // Round 13 (P4): low-AGL ground micro-detail. The noise-grain uniform fades
     // IN below HILLSHADE.micro.inAglM and OUT by outAglM (satellite only; the
     // SKY.altAtmo eyeAgl pattern), tier-gated (low → 0). Pure uniform write —
     // 0 above the band / off-satellite compiles the term to a ×1.0 no-op.
+    //
+    // R24 (C, MOTION_R24.grades — ON): reads the DAMPED ground for the same
+    // reason SAT_QUILT does. This is the OTHER whole-ground-plane uniform, and
+    // it lives in the low-AGL band (mc.inAglM/outAglM) where a raw DEM step is
+    // proportionally largest — the noise grain switched on or off across the
+    // entire terrain in a single frame. Flag off ⇒ the verbatim raw input.
     const mc = HILLSHADE.micro;
     const microMax =
       flyState.mapStyle === 'satellite'
         ? (mc.strengthByTier[flyState.qualityTier] ?? 0)
         : 0;
-    let mt = Math.min(1, Math.max(0, (eyeAgl - mc.inAglM) / (mc.outAglM - mc.inAglM)));
+    let mt = Math.min(1, Math.max(0, (eyeAglVis - mc.inAglM) / (mc.outAglM - mc.inAglM)));
     mt = mt * mt * (3 - 2 * mt);
     let microStrength = microMax * (1 - mt);
     // Dev A/B handle (like __flySunOverride): pin micro-detail strength for the
