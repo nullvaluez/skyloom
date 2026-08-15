@@ -164,6 +164,25 @@ const _moonDir = [0, 1, 0]; // scratch (no per-cadence allocation)
 const _lidZenith = [0, 0, 0];
 const _spotPos = new Vector3();
 const _warpPos = new Vector3();
+// R24 (C MOTION-STATE): the AGL-divergence trace channel, read by
+// scripts/r24-c-agl.js. Module scratch, mutated in place (the _atmoRim
+// discipline — zero allocation in the frame loop), published only while a probe
+// has set `window.__flyMotionTrace`, and compiled out of production by the
+// NODE_ENV test at the write site. The R23 `__flyStats.night` precedent: a
+// read-only flat object of primitives is the whole diagnosis.
+const _motionTrace = {
+  t: 0,
+  x: 0,
+  z: 0,
+  y: 0,
+  elevRaw: 0, // flight.groundElev — what safety reads
+  elevVis: 0, // runtime.groundElevVis — what the visuals read
+  aglRaw: 0,
+  aglVis: 0,
+  quilt: 0, // SAT_QUILT desat output (0 off-band / off-satellite)
+  micro: 0, // HILLSHADE.micro strength
+  camTileZ: 0, // which DEM zoom answered the ground raycast
+};
 
 // Round 13 Phase 1: satellite atmosphere (the rim triple). Precompute the
 // SKY.altAtmo time-of-day keyframes as sRGB 0..1 triples once (SKY is a
@@ -2191,8 +2210,10 @@ export function FlyScene({ runtime }) {
         qt = qt * qt * (3 - 2 * qt);
         const q = qt * aerialGate;
         setQuiltGrade(SAT_QUILT.desatMax * q, SAT_QUILT.lumaFlatten * q);
+        _motionTrace.quilt = SAT_QUILT.desatMax * q; // R24 (C): trace channel
       } else {
         setQuiltGrade(0, 0);
+        _motionTrace.quilt = 0;
       }
       setSkyAtmo(_atmoRim[0], _atmoRim[1], _atmoRim[2], _atmoVoid[0], _atmoVoid[1], _atmoVoid[2]);
       // R19 scaffolding (Fable): the SkyDome sun feed for D GOLDENHOUR's
@@ -2377,6 +2398,30 @@ export function FlyScene({ runtime }) {
     if (store.speedPreset !== cmd.speedPreset) store.setSpeedPreset(cmd.speedPreset);
 
     if (process.env.NODE_ENV === 'development') {
+      // R24 (C MOTION-STATE) — THE AGL-DIVERGENCE TRACE, per frame, opt-in.
+      //
+      // The R24 Wave-1 finding is that the two ground truths in this frame
+      // disagree — the visuals ride a damped `groundElevVis` while the raw DEM
+      // sample under the aircraft steps by whole levels at speed — and no
+      // existing instrument can see it, because every frozen-pose pixel gate
+      // has a SETTLED groundElev by construction. A trace needs per-FRAME
+      // resolution (a single-frame delta is the whole claim), so this cannot
+      // ride the 60-frame block or the 2 Hz night beat. It costs one property
+      // read per frame unless a probe has armed it, and nothing at all in a
+      // production build. scripts/r24-c-agl.js is the only consumer.
+      if (window.__flyMotionTrace) {
+        _motionTrace.t = performance.now();
+        _motionTrace.x = flight.pos.x;
+        _motionTrace.y = flight.pos.y;
+        _motionTrace.z = flight.pos.z;
+        _motionTrace.elevRaw = flight.groundElev;
+        _motionTrace.elevVis = runtime.groundElevVis ?? flight.groundElev;
+        _motionTrace.aglRaw = eyeAgl;
+        _motionTrace.aglVis = eyeAglVis;
+        _motionTrace.micro = microStrength;
+        _motionTrace.camTileZ = runtime.terraStats?.camTileZ ?? 0;
+        window.__flyMotionTrace(_motionTrace); // the probe copies out; never retains
+      }
       // The EffectComposer's per-pass renders reset gl.info mid-frame —
       // accumulate manually so calls/triangles cover the WHOLE frame.
       if (gl.info.autoReset) gl.info.autoReset = false;

@@ -508,6 +508,133 @@ gate(
   ''
 );
 
+// ───────────────────────────────────────────────────────────────────────────
+// (h) THE P2 PROBE'S ANALYSIS HALF — exercised HERE, because it cannot be
+//     exercised there. `playwright` is absent from this repo's node_modules in
+//     the R24 environment, so scripts/r24-c-agl.js's DRIVING half has never
+//     run. Its reducer is the part a human actually acts on (it is what says
+//     what `stepSnapM` should be), and an unexercised reducer is precisely the
+//     dormant crash R23 §4d warns about. So the reducer is exported, and this
+//     runs it against synthetic rows whose answers are known by hand.
+// ───────────────────────────────────────────────────────────────────────────
+{
+  const require_ = (await import('node:module')).createRequire(import.meta.url);
+  let probe = null;
+  try {
+    probe = require_('./r24-c-agl.js');
+  } catch (e) {
+    gate('(h0) the P2 probe can be required without a browser', false, e.message);
+  }
+  if (probe) {
+    gate(
+      '(h0) the P2 probe can be required without a browser (playwright is lazy)',
+      typeof probe.summarize === 'function' && typeof probe.coveredTrueMeters === 'function',
+      `exports: ${Object.keys(probe).join(', ')}`
+    );
+
+    // [t, x, y, z, elevRaw, elevVis, aglRaw, aglVis, quilt, micro, camTileZ]
+    // A DEM refinement crawl, then a 395 m discontinuity that coincides with a
+    // camTileZ 13 -> 16 change, with the damped channel gliding behind it.
+    const R = [
+      [0, 0, 300, 0, 0, 0, 300, 300, 0, 0.5, 13],
+      [16, 100, 300, 0, 5, 5, 295, 295, 0, 0.5, 13],
+      [32, 200, 300, 0, 5, 5, 295, 295, 0, 0.5, 13],
+      [48, 300, 300, 0, 400, 6.3, 0, 293.7, 0.3, 0, 16],
+      [64, 400, 300, 0, 400, 7.6, 0, 292.4, 0.3, 0, 16],
+      [80, 500, 300, 0, 400, 8.9, 0, 291.1, 0.3, 0, 16],
+    ];
+    const s = probe.summarize(R, { bigStepM: 20 });
+    gate(
+      '(h1) summarize: max single-frame deltas',
+      s.maxSingleFrame.elevRaw === 395 &&
+        s.maxSingleFrame.elevVis === 5 &&
+        s.maxSingleFrame.quilt === 0.3 &&
+        s.maxSingleFrame.micro === 0.5,
+      `elevRaw ${s.maxSingleFrame.elevRaw} · elevVis ${s.maxSingleFrame.elevVis} · quilt ${s.maxSingleFrame.quilt} · micro ${s.maxSingleFrame.micro}`
+    );
+    gate(
+      '(h2) summarize: raw-step percentiles separate the crawl from the discontinuity',
+      s.rawStepPercentiles.p50 === 0 && s.rawStepPercentiles.max === 395,
+      `p50 ${s.rawStepPercentiles.p50} · p90 ${s.rawStepPercentiles.p90} · p99 ${s.rawStepPercentiles.p99} · max ${s.rawStepPercentiles.max}`
+    );
+    gate(
+      '(h3) summarize: the damped channel\'s LAG behind the raw one is reported',
+      Math.abs(s.maxLagM - 393.7) < 0.011,
+      `max |raw - vis| = ${s.maxLagM} m (hand-computed 393.7)`
+    );
+    gate(
+      '(h4) summarize: a big step is attributed to a camTileZ change (DEM refinement) vs real terrain',
+      s.bigSteps.total === 1 && s.bigSteps.withCamTileZChange === 1 && s.bigSteps.withoutChange === 0,
+      `total ${s.bigSteps.total} · withZChange ${s.bigSteps.withCamTileZChange} · without ${s.bigSteps.withoutChange}`
+    );
+    const wantM = 500 * Math.cos((40.17 * Math.PI) / 180);
+    gate(
+      '(h5) coveredTrueMeters: world units -> TRUE metres (the units every R24 number is quoted in)',
+      Math.abs(probe.coveredTrueMeters(R, 40.17) - wantM) < 1e-6,
+      `500 world u at lat 40.17 -> ${probe.coveredTrueMeters(R, 40.17).toFixed(2)} m true (expected ${wantM.toFixed(2)})`
+    );
+    let degenerateOk = true;
+    try {
+      const a = probe.summarize([]);
+      const b = probe.summarize([R[0]]);
+      degenerateOk = a.frames === 0 && b.frames === 1 && a.maxLagM === 0;
+    } catch {
+      degenerateOk = false;
+    }
+    gate(
+      '(h6) summarize: a BLOCKED-length trace (0 or 1 rows) returns zeros instead of throwing',
+      degenerateOk,
+      'the reducer runs on the exact input a blocked machine produces'
+    );
+    gate(
+      '(h7) the P2 probe declares its legs and its row layout as data (sampler/reducer cannot drift)',
+      Object.keys(probe.LEGS).length >= 3 && probe.COL.elevRaw === 4 && probe.COL.camTileZ === 10,
+      `legs: ${Object.keys(probe.LEGS).join(', ')}`
+    );
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// (i) THE RESIDUAL RAW-AGL CENSUS — RECORDED, NOT JUDGED
+//
+// R24's aglTruth scope was adjudicated as the veg + clutter stack and the two
+// ground grades, and that scope is now closed. This census walks the WHOLE
+// component tree for the same pattern so the remainder is a NAMED list rather
+// than an assumption — the R20 "recorded and not judged" idiom. It deliberately
+// does not fail: these sites were not in R24's ship set and are not C's files.
+// Every line printed here is an R25 candidate, and each needs its own ruling,
+// because a raw read is not automatically wrong (see the two exclusions).
+// ───────────────────────────────────────────────────────────────────────────
+{
+  const { readdirSync } = await import('node:fs');
+  const dir = path.join(ROOT, 'components/fly');
+  const RAW = /Math\.max\(0, *flight\.pos\.y - flight\.groundElev\)/g;
+  // Sites that are CORRECT raw and must not be "fixed": the bend's own eye and
+  // the sky dip both describe where the DRAWN ground is, and the drawn ground is
+  // bent off the TRUE eye height — damping them would open a terrain/sky seam.
+  const EXCLUDE = new Set(['FlyScene.jsx']);
+  const hits = [];
+  for (const f of readdirSync(dir)) {
+    if (!f.endsWith('.jsx') || EXCLUDE.has(f)) continue;
+    const n = (read(path.join('components/fly', f)).match(RAW) || []).length;
+    if (n) hits.push(`${f} x${n}`);
+  }
+  console.log('');
+  console.log(
+    `CENSUS residual raw-AGL reads outside R24's scope (recorded, NOT judged): ` +
+      (hits.length ? hits.join(' · ') : 'none')
+  );
+  if (hits.length) {
+    console.log(
+      '       Each is an AGL-keyed FADE on a raw DEM sample, i.e. the same class R24 closed for ' +
+        'veg/clutter — but each needs its own ruling. PlayerGroundShadow is the instructive one: ' +
+        'its disc POSITION must stay raw (a contact shadow has to sit on the ground the player ' +
+        'will actually hit) while its OPACITY fade need not. R25 candidates; C did not touch them ' +
+        'because they are not C\'s files and were not in the adjudicated ship set.'
+    );
+  }
+}
+
 console.log('');
 console.log(
   `VERIFY: ${fails === 0 ? 'PASS' : 'FAIL'}${fails ? ` (${fails} gate${fails > 1 ? 's' : ''})` : ''}`
