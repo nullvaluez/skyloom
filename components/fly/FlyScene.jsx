@@ -166,10 +166,19 @@ const _spotPos = new Vector3();
 const _warpPos = new Vector3();
 // R24 (C MOTION-STATE): the AGL-divergence trace channel, read by
 // scripts/r24-c-agl.js. Module scratch, mutated in place (the _atmoRim
-// discipline — zero allocation in the frame loop), published only while a probe
-// has set `window.__flyMotionTrace`, and compiled out of production by the
-// NODE_ENV test at the write site. The R23 `__flyStats.night` precedent: a
-// read-only flat object of primitives is the whole diagnosis.
+// discipline — zero allocation in the frame loop), and published only while a
+// probe has set `window.__flyMotionTrace`. The R23 `__flyStats.night`
+// precedent: a read-only flat object of primitives is the whole diagnosis.
+//
+// EVERY write site carries `process.env.NODE_ENV === 'development'` — the
+// eleven in the dev block at the foot of the frame callback, AND the two at the
+// SAT_QUILT grade, which sit outside that block because the value they capture
+// is scoped to the satellite branch. That is what makes "this costs nothing in
+// production" a statement about the bundle rather than about the measurement:
+// the constant folds and the branches are dropped. (R24 D's review caught the
+// two grade writes running unguarded; C1 guarded them rather than softening
+// this sentence — a comment that is true of eleven writes and not of two is
+// how a hot path acquires cost nobody remembers agreeing to.)
 const _motionTrace = {
   t: 0,
   x: 0,
@@ -2210,10 +2219,25 @@ export function FlyScene({ runtime }) {
         qt = qt * qt * (3 - 2 * qt);
         const q = qt * aerialGate;
         setQuiltGrade(SAT_QUILT.desatMax * q, SAT_QUILT.lumaFlatten * q);
-        _motionTrace.quilt = SAT_QUILT.desatMax * q; // R24 (C): trace channel
+        // R24 (C review fix C1): the trace channel's only write outside the dev
+        // block at the foot of this callback, and it carries the SAME predicate
+        // as the publish site there — deliberately, for two reasons. The
+        // NODE_ENV half is what makes the `_motionTrace` header's "compiled out
+        // of production" claim literally true (the bundler folds the constant
+        // and drops the branch), rather than true-of-eleven-writes-and-not-two.
+        // The armed half is a correctness property, not a saving: sharing the
+        // test with the READER is what guarantees the published `quilt` is THIS
+        // frame's value and never whatever the last armed frame left behind.
+        // The predicate is repeated in the else arm rather than hoisted so the
+        // production expression above stays byte-identical to what shipped.
+        if (process.env.NODE_ENV === 'development' && window.__flyMotionTrace) {
+          _motionTrace.quilt = SAT_QUILT.desatMax * q;
+        }
       } else {
         setQuiltGrade(0, 0);
-        _motionTrace.quilt = 0;
+        if (process.env.NODE_ENV === 'development' && window.__flyMotionTrace) {
+          _motionTrace.quilt = 0;
+        }
       }
       setSkyAtmo(_atmoRim[0], _atmoRim[1], _atmoRim[2], _atmoVoid[0], _atmoVoid[1], _atmoVoid[2]);
       // R19 scaffolding (Fable): the SkyDome sun feed for D GOLDENHOUR's
