@@ -12,7 +12,97 @@
 > describes deleted code (markers, panels, Leaflet-era plans); do not act
 > on it.
 
-> **⚠️ NEWEST — READ FIRST:** **R22.1 "World Stability" hotfix is BUILT +
+> **⚠️ NEWEST — READ FIRST:** **Round 24 "Motion Hold" is BUILT and
+> NODE-CERTIFIED — and BROWSER-UNCERTIFIED, by proven environmental
+> impossibility (2026-08-15): [FLY_ROUND24.md](FLY_ROUND24.md) is the record**
+> ([FLY_ROUND24_PLAN.md](FLY_ROUND24_PLAN.md) the plan, `scripts/r24-close.md`
+> the 17-commit ledger; FIVE agents — A TERRA / B STREAM / C MOTION /
+> D SCAFFOLD-REVIEW-RECORD / E CERT — under Fable orchestration; scaffold
+> `6fafa5a` pre-seeded all six constants blocks, zero constants conflicts an
+> eighth straight round). Against the user's same-day report: in SATELLITE,
+> **"buildings and shrubs/vegetation appear/disappear, the satellite ground
+> plane itself glitches, worst when moving fast"** — with **"we've tried to
+> solve this multiple times."** **THE ROOT CAUSE (A-R1, fixed ON by default
+> behind `TILE_HOLD.mergeDwellMs`):** vendored three-tile's `_getDistRatio`
+> returns `dist/size × 0.8` in frustum and **× 5** out of it (`index.js:276`)
+> — a **6.25× discontinuity** — meeting a `_LODEvaluate` (`:265`) that
+> subdivides at `ratio <= T` and merges at `ratio > T`, **the same threshold
+> both ways, zero hysteresis**. A tile that subdivided had `d/s <= 1.075`;
+> out of frustum its ratio clears 0.86 for any `d/s > 0.172`, so
+> **essentially EVERY subdivided tile that leaves the frustum is DESTROYED**
+> (`_removeSubTiles` → `unloadSubTiles` disposes every fine descendant), and
+> turning back re-descends from the coarse leaf. R22 deepened the tree two
+> levels and `lodBailFix` removed upstream's accidental throttle. **The
+> number was already in the repo, measured, for two rounds:** R22.1's own
+> stutter probe recorded **2,123 DEM tile meshes built in 22 s (~96/s)
+> against a resident set of 223** — the whole terrain rebuilding every two
+> seconds. R22.1 made each build 5–6× cheaper and the stutter went away;
+> **nobody asked why there were ninety-six a second.** Downstream (A-R2)
+> that collapse drives `getGroundAt().tileZ` coarse — the value **five
+> streamed-actor engines gate their drape on** — firing the heal-EVICT path;
+> it is also the mechanism behind R22.1's **F11** and behind the **F10**
+> `camTileZ` swing that was ruled an instrument (**upheld as a gate verdict,
+> OVERTURNED as a product verdict**). Also shipped ON: `RING_HOLD` (the
+> nearest-N ring had NO hysteresis and NO fade — `SAT_BLDG_FADE` is wired
+> only to the ALTITUDE cull), `LEAD_SAFE` (R21's velocity lookahead walked
+> the short rings off the player — exact bisection: **SAT_VEG's guarantee
+> 2417 → 1164 u against a `distFade.endM` of 2400**, CLUTTER 2885 → 1646
+> against 2200, i.e. canopies and cars cut by a MISSING CHUNK at full scale,
+> proportional to speed), `POOL_FAIR`, `COMMIT_BUDGET` (closes R22.1 **F3**,
+> found independently three times) and `MOTION_R24.aglTruth/grades`.
+> **BUILT-BUT-OFF on the DEPTH_PASS precedent:** `lodHysteresis`,
+> `frustumPenalty` (**sweep it on texture BYTES, not draws — out-of-frustum
+> tiles issue zero draws**), `elevGate`, `elevSlew`, `paceBySpeed`.
+> **⚠️ WHY FOUR ROUNDS MISSED IT — the round's real finding:** the fleet is
+> blind to this defect class BY CONSTRUCTION. `scripts/_boot.js:86` pins
+> `__flyTerraPin = 1` **fleet-wide**, so ~30 of ~35 harnesses **and BOTH
+> SOAKS** measure the R21 terrain, not the shipped one (`soak-fly.js:62`
+> un-pins only `__flyGovPin`); `verify-flicker.js:1` is titled *"does a
+> FROZEN scene hold still?"* and never un-pins; `verify-stability.js:655`
+> orbits **without translating**, so per R21's own note "speed 0 =
+> bit-identical centre" the lookahead is **exactly zero** in every gate that
+> asserts; the false-cull census (`:227-234`) omits the terrain root,
+> SatClutter, SatParcelHomes and SatTintLayer; and `verify-terra.js:287`
+> states the problem — *"a 350 kt aeroplane crosses a z17 tile in under a
+> second, so an unfrozen settle measures travel"* — then **freezes the
+> aeroplane.** Fourth recurrence of the R19 pins lesson.
+> **⚠️ CERT HONESTY — READ BEFORE TRUSTING ANY GREEN:** this environment is
+> **provably incapable** of the measurement — no GPU (SwiftShader ~1 fps),
+> **both tile hosts 403**, and a per-frame `dt` clamp that makes commanded
+> boost ≈ **1 km/min** against the ~250 m/s the defect needs, i.e. **a "fast
+> flight" harness run here IS a slow flight harness.** Green is
+> `npm run build` 8.4 s + `verify-ringhold` 14/14 + `r24-c-motion-unit`
+> 32/32 + `r24-a-unit` 29/29, **zero assertion numbers moved by anyone all
+> round**; every browser gate ships a third outcome `VERIFY: BLOCKED`
+> (exit 2 = NOT RUN, never green), every RED is **predicted-pending-egress**,
+> and `verify-motion-hold`'s absolute thresholds are **PROVISIONAL**,
+> re-frozen by its own printed `SUGGEST` block **as a threshold MOVE, not a
+> measurement**. FLY_ROUND24.md §6.4 is the ordered egress re-run list.
+> **⭐ THE HEADLINE USER CHECKPOINT IS THIRTY SECONDS AND NEEDS NO CODE.**
+> A quality-ladder **TIER STEP UNMOUNTS THE ENTIRE SATELLITE CONTENT STACK**
+> (every `Sat*` layer is gated `qualityTier !== 'low'` in FlyScene,
+> `SatVegLayer` is mounted INSIDE `SatBuildingLayer`) and `PERF_GOVERNOR`'s
+> latch can make it **permanent for the session** — and the fleet is pinned
+> blind to it (`__flyGovPin = 'hold'`). R23 shipped the telemetry for exactly
+> this and **nobody has ever read it on the user's hardware.** Fly satellite
+> 10+ minutes including the fast low passes, then run
+> **`copy(__flyStats.night)`** and paste it: `govTierSteps >= 1` ⇒ the layers
+> UNMOUNTED (and if `govLatched`, they are gone for the session);
+> `govTierSteps 0` + `govDprSteps >= 1` ⇒ the governor is not the defect;
+> both 0 at tier `high` ⇒ the governor hypothesis is REFUTED for that machine
+> and this round's AGL-truth work carries the whole explanation. **R24 ships
+> NO governor code change — that probe is why.** R25 seeds in FLY_ROUND24.md
+> §7 (headliners: the death fade, which needs a cache-key move; `frustumPenalty`
+> and `lodHysteresis` arming; **F16 the wide fleet, now implicated in a REAL
+> defect** — `verify-roof-variety`'s `waterReady` is the gate that would have
+> caught review finding B1; D8, adding the terrain root to the false-cull
+> census; and a THIRD unguarded zero-area site, satellite water at
+> `sat-building-engine.js:727`). **SUPERSEDES the R22.1×R23 merge note below
+> where it says the combined tree needs a harness sweep: E's findings show
+> that sweep CANNOT run in this environment at all — it moves to the egress
+> list, and the R22.1 trio has still never run on the merged tree.**
+>
+> Earlier: **R22.1 "World Stability" hotfix is BUILT +
 > CERTIFIED (2026-08-11)** — the user-recorded one-frame WHITE FLASH and the
 > banking MICRO-STUTTER, both fixed at the root off frame-level forensics of
 > the user's own recording. **The flash was a ZERO-AREA TRIANGLE** in a
