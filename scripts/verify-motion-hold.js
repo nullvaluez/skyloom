@@ -35,6 +35,19 @@
  * the user actually runs. This one un-pins seven and states the two it keeps.
  *
  * ===========================================================================
+ * THE COMPANION PROBE — `scripts/r24-a-churn.js` (A TILE, same round)
+ * ===========================================================================
+ * The two files split verdict from curve, and neither duplicates the other.
+ * THIS file is the VERDICT-BEARING gate: it grades pass/fail/blocked at ONE
+ * configuration — the shipped one — and it is what a close sweep reads.
+ * A's probe is the CURVE-PRODUCING instrument: it sweeps `TILE_HOLD`'s
+ * `mergeDwellMs` and `frustumPenalty` across values to show how churn responds,
+ * which is how those knobs get chosen. A sweep cannot be a verdict (it has no
+ * single configuration to certify) and a verdict cannot be a sweep (it would
+ * be grading numbers it had just moved). If you want to know whether the world
+ * holds, run this gate; if you want to know what to set the knobs to, run A's.
+ *
+ * ===========================================================================
  * WHAT IT MEASURES, AND WHY THESE INSTRUMENTS
  * ===========================================================================
  * A temporal standard deviation is useless here by construction — everything
