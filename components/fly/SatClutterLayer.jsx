@@ -17,13 +17,78 @@ import {
   Vector3,
 } from 'three';
 import { mercatorScale } from '@/lib/fly/coords';
-import { CLUTTER, GLOBE, SAT_ROADS, SETTLE_CALM } from '@/lib/fly/fly-constants';
+import { CLUTTER, GLOBE, POOL_FAIR, SAT_ROADS, SETTLE_CALM } from '@/lib/fly/fly-constants';
+import * as settle from '@/lib/fly/settle';
 import { SatClutterEngine } from '@/lib/fly/toy-world/sat-clutter-engine';
 import { applyBendAnchor } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
 
 const _dummy = new Object3D();
 const _col = new Color();
+
+// --- Round 24 — C MOTION's spec, B's call sites -----------------------------
+// settle.js is reached through a NAMESPACE import on purpose. `groundElevVis`
+// and `motionSubOn` are C's, already exported; `paceCadenceSec` is C's and lands
+// in the same round, and a missing NAMED import is a hard link error, so the
+// namespace makes this file order-independent with respect to C's merge. It is
+// not a fallback in the "hope it works" sense: `MOTION_R24.paceBySpeed` ships
+// OFF, so the identity branch below IS the shipped behaviour either way.
+
+/**
+ * THE AGL THIS LAYER GATES ON. R22 introduced `groundElevVis` — the slew-limited
+ * VISUAL ground elevation — precisely because a raw DEM sample refining under
+ * the aircraft steps hundreds of metres in one frame (measured ~384 m/frame raw
+ * vs ≤4 m/frame damped) and every altitude fade downstream of it then jumps.
+ * SatBuildingLayer moved onto it; this layer and SatVegLayer kept reading the
+ * raw value, so a refinement step could snap a whole pool's `altK` between two
+ * cadence passes. Flag off ⇒ byte-identical to the raw read.
+ */
+function aglOf(runtime, flight) {
+  const ground = settle.motionSubOn('aglTruth')
+    ? settle.groundElevVis(runtime, flight)
+    : flight.groundElev;
+  return Math.max(0, flight.pos.y - ground);
+}
+
+/** C's speed-scaled cadence; identity when the helper or the flag is absent. */
+function paceSec(baseSec, speedMps) {
+  return settle.paceCadenceSec ? settle.paceCadenceSec(baseSec, speedMps) : baseSec;
+}
+
+/**
+ * R24 (B STREAM) — POOL_FAIR. Every pooled instancer here consumed its budget
+ * `engine.nearest()`-first with NO per-chunk share, and the CLUTTER block itself
+ * records that the budget binds ("maxChunks × maxParkingPerChunk … is well over
+ * the parked pool, so the pool binds and not the stream", fly-constants.js:5057).
+ * A budget consumed in nearest-first order with a moving player is a cut whose
+ * FRONTIER MOVES: the same car is drawn or not depending on where its chunk
+ * happens to rank this pass, so a pool re-shuffles wholesale as the ring
+ * translates.
+ *
+ * SAT_VEG solved this in R18 and wrote the rule down: "maxChunks × cap ≤ pool is
+ * what makes the pool cut impossible, and a pool cut is a hard radius that pops
+ * as the player moves" (fly-constants.js:3141). R22's CLUTTER and R20's
+ * PARCEL_HOMES did not inherit it. This is that rule, ported.
+ *
+ * NOT PORTED: SAT_VEG's within-chunk index stride. It exists there to make the
+ * DECIMATION player-independent, and these three pools already are — a parked
+ * anchor's position in `chunk.parking`, a lamp's arc along a road chain and a
+ * mover's path index are all properties of the TILE, not of the camera. Adding
+ * a distance sort inside a chunk would introduce exactly the blink SAT_VEG's
+ * comment refuses ("never a distance sort").
+ *
+ * HONEST NOTE ON GATES: no existing harness pose saturates any of these pools —
+ * R22 measured 242 / 34 / 132 placed at P-LEWIS against caps of 1500 / 300 / 900,
+ * and Owens places 0/0/0 — so the per-chunk share can never bind there and no
+ * frozen number moves. That is also why the defect shipped. A dense-pose gate
+ * (Manhattan / Chicago Loop, where the pool DOES bind) is the missing
+ * instrument; it is named in E's motion-hold notes rather than invented here.
+ */
+function fairShare(pool) {
+  if (!POOL_FAIR.enabled) return pool; // flag off ⇒ the whole pool, as before
+  const n = Math.max(1, CLUTTER.maxChunks);
+  return Math.max(1, Math.floor(pool / n));
+}
 
 // Worst-case bend drop pad for the CPU bounding sphere — SatVegLayer's value and
 // its reasoning (the GPU pushes far geometry DOWN by d²k and the CPU bound
@@ -279,7 +344,7 @@ export function SatClutterLayer({ runtime, flight }) {
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
     const st = stRef.current;
-    const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
+    const eyeAgl = aglOf(runtime, flight); // R24 (C's spec): the damped ground
     engine.update(t, flight.pos.x, flight.pos.z, eyeAgl);
 
     // THE MOVER CLOCK, and why the pin is read LIVE here while the POOLS above
@@ -299,7 +364,11 @@ export function SatClutterLayer({ runtime, flight }) {
     const frozen = livePin !== 0;
     const moverT = frozen ? 0 : t;
 
-    if (t - st.t >= CLUTTER.placeCadenceSec) {
+    // R24 (C's spec): the cadence is a WALL-CLOCK interval, so at 250 m/s a 2 s
+    // pass is a 500 m pass. `paceCadenceSec` scales it by ground speed. It ships
+    // OFF (MOTION_R24.paceBySpeed) because it raises worker load exactly when
+    // the loader is most saturated, so `paceSec` is the identity today.
+    if (t - st.t >= paceSec(CLUTTER.placeCadenceSec, flight.speed)) {
       st.t = t;
       const N = CLUTTER.night;
       const nt = Math.min(1, Math.max(0, 1 - (runtime.sun?.frac ?? 1) / N.dayFrac));
@@ -316,7 +385,7 @@ export function SatClutterLayer({ runtime, flight }) {
         t,
         frozen
       );
-      selectMovers(engine, flight, st, movingPool, t, frozen);
+      selectMovers(engine, runtime, flight, st, movingPool, t, frozen);
     }
     if (moverRef.current) advanceMovers(moverRef.current, engine, flight, st, moverT);
     // ONE material write per frame, for all three pools.
@@ -792,7 +861,7 @@ function placeStatic(parkedMesh, poleMesh, engine, runtime, flight, st, parkedPo
   const L = CLUTTER.poles;
   const px = flight.pos.x;
   const pz = flight.pos.z;
-  const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
+  const eyeAgl = aglOf(runtime, flight); // R24 (C's spec): the damped ground
   const mercK = mercatorScale(flight.latDeg);
   st.parkedAltK = 1 - smoothstep(P.altFade.onM, P.altFade.offM, eyeAgl);
   st.poleAltK = 1 - smoothstep(L.altFade.onM, L.altFade.offM, eyeAgl);
@@ -830,15 +899,24 @@ function placeStatic(parkedMesh, poleMesh, engine, runtime, flight, st, parkedPo
   const poleRangeSq = L.rangeM ** 2;
   const lampSpacing = L.spacingM * mercK; // TRUE m → local; the shader's period
   const juncSq = (L.juncSuppressM * mercK) ** 2;
+  // R24 (B) — POOL_FAIR. Each resident chunk gets its own guaranteed share, so
+  // the budget can no longer be eaten by whichever chunks happen to rank first
+  // this pass. `fairShare(pool) × CLUTTER.maxChunks <= pool` by construction.
+  const parkedShare = fairShare(parkedPool);
+  const poleShare = fairShare(polePool);
 
   for (const chunk of engine.nearest(px, pz)) {
     if ((!parkedOn || nc >= parkedPool) && (!polesOn || np >= polePool)) break;
     const bk = birthK(chunk, now, frozen);
+    // …the per-chunk ceilings, clamped by the global pool so the hard bound the
+    // InstancedMesh capacity enforces still wins.
+    const ncCap = Math.min(parkedPool, nc + parkedShare);
+    const npCap = Math.min(polePool, np + poleShare);
 
     // --- parked cars ---------------------------------------------------------
     const pk = chunk.parking;
-    if (parkedOn && pk && nc < parkedPool) {
-      for (let i = 0; i + 3 < pk.length && nc < parkedPool; i += 4) {
+    if (parkedOn && pk && nc < ncCap) {
+      for (let i = 0; i + 3 < pk.length && nc < ncCap; i += 4) {
         const lx = pk[i];
         const lz = pk[i + 1];
         const wx = chunk.cx + lx;
@@ -883,9 +961,9 @@ function placeStatic(parkedMesh, poleMesh, engine, runtime, flight, st, parkedPo
     // `exp(-min(f, 1-f)^2 * k)` on `f = fract(aRoadArc / uStreetSpacing)`, whose
     // maximum is f = 0. A lamp anywhere else would stand between two pools.
     const paths = chunk.paths;
-    if (polesOn && paths && np < polePool) {
+    if (polesOn && paths && np < npCap) {
       const { pts, offsets, cls, junctions } = paths;
-      for (let p = 0; p < cls.length && np < polePool; p++) {
+      for (let p = 0; p < cls.length && np < npCap; p++) {
         const c = cls[p];
         if (c < 4) continue; // cls 1-3 are arteries: no residential lamp grid
         const off = (HALF_W_BY_CLS[c] + L.offsetM) * mercK;
@@ -894,14 +972,14 @@ function placeStatic(parkedMesh, poleMesh, engine, runtime, flight, st, parkedPo
         let acc = 0;
         let next = 0;
         let lamp = 0;
-        for (let v = s0 + 1; v < s1 && np < polePool; v++) {
+        for (let v = s0 + 1; v < s1 && np < npCap; v++) {
           const ax = pts[(v - 1) * 2];
           const az = pts[(v - 1) * 2 + 1];
           const seg = Math.hypot(pts[v * 2] - ax, pts[v * 2 + 1] - az);
           if (seg < 1e-6) continue;
           const ux = (pts[v * 2] - ax) / seg;
           const uz = (pts[v * 2 + 1] - az) / seg;
-          while (next <= acc + seg && np < polePool) {
+          while (next <= acc + seg && np < npCap) {
             const tt = next - acc;
             const cxp = ax + ux * tt;
             const czp = az + uz * tt;
@@ -982,7 +1060,7 @@ function placeStatic(parkedMesh, poleMesh, engine, runtime, flight, st, parkedPo
  * only advances arc, which is what keeps a 300-car fleet at a few hundred
  * microseconds.
  */
-function selectMovers(engine, flight, st, pool, now, frozen) {
+function selectMovers(engine, runtime, flight, st, pool, now, frozen) {
   const M = CLUTTER.cars.moving;
   if (pool <= 0) {
     st.slots.length = 0;
@@ -991,7 +1069,7 @@ function selectMovers(engine, flight, st, pool, now, frozen) {
   }
   const px = flight.pos.x;
   const pz = flight.pos.z;
-  const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
+  const eyeAgl = aglOf(runtime, flight); // R24 (C's spec): the damped ground
   st.moverAltK = 1 - smoothstep(M.altFade.onM, M.altFade.offM, eyeAgl);
   if (process.env.NODE_ENV === 'development' && globalThis.__flyClutterMoversOff) st.moverAltK = 0;
   if (st.moverAltK <= 0.001) {
@@ -1022,13 +1100,15 @@ function selectMovers(engine, flight, st, pool, now, frozen) {
   st.moverAnchors = 0;
   const mercK = mercatorScale(flight.latDeg);
   const rangeSq = M.rangeM ** 2;
+  const moverShare = fairShare(pool); // R24 (B) — POOL_FAIR
   for (const chunk of ready) {
     if (st.slots.length >= pool) break;
     const paths = chunk.paths;
     if (!paths) continue;
     const bk = birthK(chunk, now, frozen);
+    const slotCap = Math.min(pool, st.slots.length + moverShare);
     const { pts, offsets, cls } = paths;
-    for (let p = 0; p < cls.length && st.slots.length < pool; p++) {
+    for (let p = 0; p < cls.length && st.slots.length < slotCap; p++) {
       const s0 = offsets[p];
       const s1 = offsets[p + 1];
       if (s1 - s0 < 2) continue;
@@ -1044,7 +1124,7 @@ function selectMovers(engine, flight, st, pool, now, frozen) {
       const trueKm = (len / mercK) / 1000;
       const want = Math.min(6, Math.round(trueKm * M.perKm));
       st.moverAnchors += want;
-      for (let m = 0; m < want && st.slots.length < pool; m++) {
+      for (let m = 0; m < want && st.slots.length < slotCap; m++) {
         const h = hash(fx * 0.917 + fz * 1.733 + m * 13.17);
         const h2 = hash(fz * 2.311 - fx * 0.577 + m * 5.31);
         st.slots.push({

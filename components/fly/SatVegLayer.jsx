@@ -30,11 +30,37 @@ import {
   SURFACE_CALM,
 } from '@/lib/fly/fly-constants';
 import { applyBendAnchor, getRimColor } from '@/lib/fly/toy-world/world-bend';
+import * as settle from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
 import { SatAmbientLife } from './SatAmbientLife';
 import { SatHouseLights } from './SatHouseLights';
 import { SatParcelHomes } from './SatParcelHomes';
 import { SatTintLayer } from './SatTintLayer';
+
+// --- Round 24 — C MOTION's spec, B's call sites -----------------------------
+// settle.js through a NAMESPACE import: `groundElevVis`/`motionSubOn` are C's
+// and already exported, `paceCadenceSec` is C's and lands the same round, and a
+// missing NAMED import is a hard link error — so this file is order-independent
+// with respect to C's merge. `MOTION_R24.paceBySpeed` ships OFF, so the identity
+// branch in `paceSec` is the shipped behaviour regardless.
+//
+// (POOL_FAIR is not needed in this file: the canopy pool is ALREADY fair-shared.
+// `perChunkCap = floor(pool / maxChunks)` at :142 is the original of the rule
+// R24 ports into SatClutterLayer and SatParcelHomes, and SAT_VEG's own constants
+// block is where it is written down.)
+
+/** See SatClutterLayer's copy for the full note on why the damped ground. */
+function aglOf(runtime, flight) {
+  const ground = settle.motionSubOn('aglTruth')
+    ? settle.groundElevVis(runtime, flight)
+    : flight.groundElev;
+  return Math.max(0, flight.pos.y - ground);
+}
+
+/** C's speed-scaled cadence; identity when the helper or the flag is absent. */
+function paceSec(baseSec, speedMps) {
+  return settle.paceCadenceSec ? settle.paceCadenceSec(baseSec, speedMps) : baseSec;
+}
 
 const _dummy = new Object3D();
 const _col = new Color();
@@ -279,12 +305,15 @@ export function SatVegLayer({ runtime, flight }) {
   // road network at -46 — the ground layers run in streaming order.
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
-    const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
+    const eyeAgl = aglOf(runtime, flight); // R24 (C's spec): the damped ground
     engine.update(t, flight.pos.x, flight.pos.z, eyeAgl);
 
     const mesh = meshRef.current;
     const st = placeRef.current;
-    if (mesh && t - st.t >= SAT_VEG.placeCadenceSec) {
+    // R24 (C's spec): a 2 s WALL-CLOCK cadence is a 500 m cadence at 250 m/s.
+    // `paceCadenceSec` scales it by ground speed; it ships OFF, so this is the
+    // identity today (see the header note on the namespace import).
+    if (mesh && t - st.t >= paceSec(SAT_VEG.placeCadenceSec, flight.speed)) {
       // Round 21 (C, S6): the one-time phase nudge. The first pass is still
       // immediate — this only moves where the STEADY cadence lands, so the
       // four pooled layers stop refilling their buffers on the same frame.

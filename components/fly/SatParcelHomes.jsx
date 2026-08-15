@@ -20,6 +20,8 @@ import { mercatorScale } from '@/lib/fly/coords';
 import {
   GLOBE,
   PARCEL_HOMES,
+  POOL_FAIR,
+  SAT_VEG,
   SETTLE_CALM,
   SUBURB_NIGHT,
   SURFACE_CALM,
@@ -1009,12 +1011,26 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
     }
     st.regK = regK;
 
+    // R24 (B) — POOL_FAIR. This field's budget was consumed `nearest()`-first
+    // with no per-chunk share, so which parcels got houses depended on how the
+    // resident chunks happened to RANK this pass — and the rank order changes
+    // every time the ring translates. SAT_VEG solved this in R18 and wrote the
+    // rule down at fly-constants.js:3141 ("maxChunks × cap ≤ pool is what makes
+    // the pool cut impossible, and a pool cut is a hard radius that pops as the
+    // player moves"); these anchors ride SatVegEngine's own chunks, so the
+    // denominator is that engine's ring cap, read from the engine rather than
+    // re-derived here. Flag off ⇒ `share` is the whole pool ⇒ verbatim pre-R24.
+    //
+    // The distance THINNING a few lines below (`P.thin`) already softens the
+    // radial edge; it never bounded the POOL, which is what this does.
+    const ringN = Math.max(1, engine.maxChunks ?? SAT_VEG.maxChunksByTier.high ?? 1);
+    const share = POOL_FAIR.enabled ? Math.max(1, Math.floor(pool / ringN)) : pool;
     for (const chunk of engine.nearest(px, pz)) {
       if (n >= pool) break;
       const par = chunk.parcel;
       if (!par) continue;
-      for (let i = 0; i < par.length; i += 2) {
-        if (n >= pool) break;
+      const nCap = Math.min(pool, n + share);
+      for (let i = 0; i < par.length && n < nCap; i += 2) {
         const lx = par[i];
         const lz = par[i + 1];
         const wx = chunk.cx + lx;
@@ -1068,6 +1084,11 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
         const yaw = hash(lx * 0.731 - lz * 1.117) * Math.PI * 2;
         const cs = Math.cos(yaw);
         const sn = Math.sin(yaw);
+        // R24 (B) — POOL_FAIR is checked at the ANCHOR boundary above, not
+        // here: a cluster is a housing block and truncating one mid-way would
+        // trade a pool artifact for a geometry artifact. So a chunk may overrun
+        // its share by at most `P.perAnchor - 1` houses, and the HARD bound is
+        // still `pool`, exactly as before.
         for (let k = 0; k < want && n < pool; k++) {
           const cx = k % P.cols;
           const cz = (k / P.cols) | 0;
