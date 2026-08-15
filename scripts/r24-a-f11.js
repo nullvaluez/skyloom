@@ -63,6 +63,11 @@
  * CONNECT, so no tile lifecycle exists to count.
  *
  * RUN: node scripts/r24-a-f11.js [--off]          (dev server on :3019)
+ *
+ * ⚠ STATUS: UNEXERCISED — never run, not even to its BLOCKED path (no
+ * playwright on the build machine; both tile hosts 403 at CONNECT). node
+ * --check clean, page-side API verified against source. R20 §5: a brand-new
+ * harness is itself a red until it has run. Expect to debug it first.
  */
 
 const { chromium } = require('playwright');

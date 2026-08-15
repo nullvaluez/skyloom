@@ -66,6 +66,20 @@
  * numbers are the deliverable; a human reads the table.
  *
  * RUN: node scripts/r24-a-churn.js          (needs the dev server on :3019)
+ *
+ * ===========================================================================
+ * ⚠ STATUS: UNEXERCISED. This file has never been run — not once, not even to
+ * its own BLOCKED path. Playwright is not installed on the machine R24 was
+ * built on, and both Esri hosts plus OpenFreeMap answer 403 to CONNECT, so a
+ * run would have been uninformative even with it. It is `node --check` clean
+ * and its page-side API surface was verified against source (bootFly's
+ * signature, warpToGeo's shape, `flight.heading`, `cmd.speedOverride`,
+ * `runtime.geo`, `__flyStats.drawCalls`, and the map's own tile-loaded /
+ * tile-unload vocabulary) — that pass found two wrong assumptions, both fixed
+ * before commit. R20 §5 is the standing precedent: a brand-new harness is
+ * itself a red until it has run. FIRST RUN ON AN EGRESS-ENABLED MACHINE SHOULD
+ * EXPECT TO DEBUG THIS FILE, not to read its numbers.
+ * ===========================================================================
  */
 
 const { chromium } = require('playwright');
