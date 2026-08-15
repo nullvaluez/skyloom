@@ -59,6 +59,31 @@
  * and EXACTLY ZERO such pixels under the identical instrument.
  * ---------------------------------------------------------------------------
  *
+ * ---------------------------------------------------------------------------
+ * R24 — WHAT THIS GATE IS NOT, AND THE WORLD-CONTENT PRECONDITION
+ * ---------------------------------------------------------------------------
+ * THIS GATE FREEZES THE POSE, AND THAT IS CORRECT. Its statistic is a
+ * per-pixel temporal standard deviation, which motion saturates: R21's own
+ * calibration note (verify-stability.js:143-149) records that an unfrozen
+ * 350 kt aeroplane repaints the whole crop between two shots and reads a flat
+ * ~21 units of pure flight. So the frozen pose is not a limitation to be fixed
+ * here — it is what makes the number mean anything.
+ *
+ * The consequence is that a defect which only appears WHILE MOVING is
+ * structurally invisible to this file. That half now has its own gate:
+ * **scripts/verify-motion-hold.js** (R24), which flies sustained straight-line
+ * legs over streaming content and measures presence/appearance with
+ * motion-invariant instruments instead of a temporal stddev. Per the R24
+ * ruling, no quiescence precondition is added here — the streaming leg lives
+ * there, and R22.1 F14 is closed by that split rather than by a new bound.
+ *
+ * WHAT IS ADDED HERE is the one thing this file got wrong on its own terms: it
+ * graded an EMPTY WORLD. Under a 403 tile blockade on 2026-08-15 it reported
+ * sb/sky/veg/parcel/lights all zero and still passed (1)-(5), urban p99 0.287
+ * against a bound of 12. A world-content precondition (shared helper
+ * scripts/_world-precondition.js) now exits `VERIFY: BLOCKED` (code 2) before
+ * any bound is graded. No assertion number moved.
+ *
  * GATES
  *  (1) park census: every actor this gate does not want is parked at its root
  *  (2) URBAN FLICKER — p99 per-pixel temporal stddev over 12 frames <= bound
@@ -79,6 +104,7 @@ const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
 const { bootFly } = require('./_boot');
+const { wireWorldTally, checkWorldContent, exitBlocked } = require('./_world-precondition');
 
 const BOOT_OPTS = process.env.FLY_URL ? { url: process.env.FLY_URL } : {};
 const FRAMES = +(process.env.FLICK_FRAMES ?? 12);
@@ -378,6 +404,9 @@ const TEMPORAL = async ([frames, y0f, y1f]) => {
     args: ['--enable-gpu', '--ignore-gpu-blocklist'],
   });
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+  // R24 (E): upstream-tile tally, attached before navigation. See the
+  // WORLD-CONTENT PRECONDITION note in the header.
+  const net = wireWorldTally(page);
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
   page.on('console', (m) => {
@@ -403,6 +432,38 @@ const TEMPORAL = async ([frames, y0f, y1f]) => {
   });
   await page.evaluate((v) => { window.__r21BloomOff = v; }, !!process.env.FLICK_BLOOM_OFF);
   await page.mouse.move(800, 450);
+
+  /* R24 (E) — THE WORLD-CONTENT PRECONDITION. Evaluated HERE: after boot (so
+   * the tally and the engines have real readings) and before the first leg (so
+   * a blocked run grades nothing AND overwrites none of this gate's committed
+   * PNG/JSON evidence — the R24 gate-output hygiene finding).
+   *
+   * WHY IT EXISTS: measured 2026-08-15 under a 403 tile blockade, this file
+   * passed (1)-(5) with sb/sky/veg/parcel/lights all zero and urban p99 0.287
+   * against a bound of 12 — green by a factor of 42 on a blank grey field. A
+   * flicker statistic over a world that never streamed describes the NETWORK.
+   * No assertion number moved; only the right to grade them is gated.
+   *
+   * `resident` is this gate's OWN in-scene evidence, so a warm Cache API hit —
+   * which produces no network request at all — still counts as a streamed
+   * world. bootFly has already waited for __flyBoot.pct === 100, so the ring
+   * has had its chance; a short settle covers the first post-reveal frames. */
+  await page.waitForTimeout(3000);
+  const preScene = await page.evaluate(() => ({
+    sb: window.__satBuildings?.stats?.ready ?? null,
+    chunks: window.__satBuildings?.stats?.chunks ?? null,
+    sky: window.__satSkyline?.stats?.ready ?? null,
+  }));
+  const world = checkWorldContent(net, {
+    resident: (preScene.sb ?? 0) > 0 || (preScene.sky ?? 0) > 0,
+  });
+  console.log(`${world.line} · at-boot scene=${JSON.stringify(preScene)}`);
+  if (!world.ok) {
+    await exitBlocked(world.report, {
+      browser,
+      label: 'upstream tile hosts unreachable — flicker bounds not graded',
+    });
+  }
 
   const shot64 = () =>
     page
