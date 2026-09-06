@@ -31,6 +31,23 @@
  * instead of silently measuring a half-built world.
  */
 
+/**
+ * The 1-minute load average, reported beside every settle time.
+ *
+ * Five agents share four cores here, and a settle time without it is not a
+ * number anyone can use: the same Manhattan pose gave up at z11 of 14 after
+ * 427 s at load 15, and the identical code settles far sooner on quiet cores.
+ * A wall-clock measurement in a contended container is only meaningful when
+ * the contention is written down next to it.
+ */
+function loadAvg() {
+  try {
+    return +require('os').loadavg()[0].toFixed(2);
+  } catch {
+    return null;
+  }
+}
+
 const DEFAULTS = {
   minZ: 14,
   capMs: 420000,
@@ -98,6 +115,7 @@ async function settleWorld(page, opts = {}) {
         settled: true,
         why: got ? 'terrain + chunks + fresh totals' : 'terrain + chunks (totals stale)',
         ms: Date.now() - t0,
+        load: loadAvg(),
         ...last,
       };
     }
@@ -113,6 +131,7 @@ async function settleWorld(page, opts = {}) {
     settled: false,
     why: why.join('; ') || 'cap reached',
     ms: Date.now() - t0,
+    load: loadAvg(),
     ...(last || {}),
   };
 }
