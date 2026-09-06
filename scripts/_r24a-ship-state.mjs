@@ -51,6 +51,10 @@ export const SHIP = {
     keepResident: true,
     walkWhileSaturated: true,
     bboxCache: true,
+    // The DRAW half of keepResident: retention must not cost draw calls.
+    // Pass 2b measured one fixed Owens pose at 152 -> 279 draws between a 45 s
+    // and a 600 s sweep with identical flags. Ships ON with keepResident.
+    parkOffscreen: true,
     // OFF, each with the run it waits for (see scripts/r24-a-pace.md §12):
     skirtWorker: false, // needs one real-hardware run (the LERC worker path is unreachable in the fixture)
     bendSphere: false, // needs one real-hardware run (it submits tiles that are culled today)

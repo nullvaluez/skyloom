@@ -1517,6 +1517,166 @@ it is the row that would have caught this site and the veg site both.
 
 ---
 
+## §18 The Owens breach: retention was charging rent in draw calls
+
+Pass 2b held every yaw contract — merges 35 → 0, on-screen replacements 27 → 0,
+0 URL and 0 position mismatches, no page errors — and broke the frozen desert
+control: **Owens draws off 152 / on 279**, ceiling 261.
+
+### The measurement that named it
+
+E's addendum is what settled the mechanism, and it did so without a renderer:
+the SAME pose with the SAME flags read **185 draws after a 45 s sweep and 279
+after a 600 s sweep**, resident tiles 62 → 103, at 113.7 MB and still climbing.
+The only variable was **how long the camera had been turning**.
+
+That is not a cull margin and not a one-off pose. It is **retention with no
+bound and no separation between being RESIDENT and being ISSUED** — draw calls
+that grow for as long as the session runs. On a real GPU at 60+ fps the
+accumulation is an order of magnitude faster than on this fixture, and the user
+was flying `8240539` while this was being read.
+
+### Attribution, switch by switch
+
+Measured on one synthetic yaw against the real vendored classes:
+
+| arm | issued | off-frustum | maxZ |
+|---|---|---|---|
+| flag-off | 103 | 83 | 13 |
+| mergeHysteresis | 103 | 83 | 13 |
+| timerFix | 103 | 83 | 13 |
+| walkWhileSaturated | 103 | 84 | 13 |
+| bboxCache | 103 | 83 | 13 |
+| **keepResident** | **190** | **142** | **17** |
+| ON (all) | 190 | 142 | 17 |
+| ON minus keepResident | 103 | 84 | 13 |
+
+**`keepResident` alone.** Every other switch reads identical to flag-off, and
+removing keepResident from the full ON set returns the flag-off number exactly.
+
+Two of the three hypotheses are refuted by measurement rather than argument:
+
+- **Not double-issue.** `doubleIssued` is **0 in both arms** — a parent and its
+  children are never drawn together. The shape that would have produced exactly
+  this (+41 tiles, ×2.4 tris) does not occur, because `_loadSubTiles` unloads
+  the parent's model on the success path and `_removeSubTiles` unloads the
+  children on its own.
+- **Not `bendSphere`.** It ships `false` and is never armed; my own constants
+  comment already said it "necessarily submits tiles that are culled today".
+
+What is left is the honest finding: keepResident retains everything the camera
+has ever refined, in every direction, and **all of it stayed attached to the
+scene graph**.
+
+### The fix, in two halves — because the requirement is two things
+
+**1. Retention must not cost draw calls (PATCH 26, `TERRA_PACE.parkOffscreen`).**
+A tile out of frustum keeps its model, its textures and its place in the tree —
+nothing disposed, nothing re-downloaded — but its **model** is parked invisible,
+so three skips the whole subtree in `projectObject`: no draw, and no per-mesh
+cull either. Coming back is one boolean.
+
+It is the MODEL that is parked, never the tile: a tile's children hang off the
+tile, so hiding the tile would hide in-frustum descendants. And a parent whose
+box contains an in-frustum child is itself in frustum, so a visible tile can
+never be orphaned behind a parked ancestor.
+
+| 240-frame yaw | unparked | parked |
+|---|---|---|
+| issued (drawable) | 190 | **48** |
+| issued OFF-FRUSTUM | 142 | **0** |
+| resident tiles | 190 | **190** (unchanged) |
+| merges / refetches | 0 / 0 | 0 / 0 |
+
+And the property that actually closes pass 2b — **the drawn set stops growing
+with sweep duration**: unparked it climbs (142 → 151 from 240 to 720 frames);
+parked it is bounded by the frustum (48 → 39), which is the only thing that
+should bound it.
+
+**No upstream line is edited.** The `_update` pre-pass computes `_inFrustum` on
+its own added line so the upstream comma-expression stays byte-verbatim — the
+vendor gate's edited-line count does not move, and gate 8 stays at 2.
+
+**2. Residency has a cap, and an LRU that is a real recency order.**
+`TILES.lruBudgetBytes` (140 MB) was the only trigger, and pass 2b proved a byte
+budget alone is not a bound: Owens sat at **113.7 MB the whole time**, under
+budget, while the tile count doubled — so this module elected **nothing**. *A
+budget a session cannot reach is not a budget.* Tiles are also what cost draw
+calls, and draw calls are the frozen ceiling, so the count is the honest second
+unit: `TERRA_PACE.residency.maxResidentTiles`.
+
+The LRU is now ordered by **last visible frame** (PATCH 26 stamps
+`_r24LastVisible` on every walk that sees a tile in frustum), distance breaking
+ties. A tile just behind you after a 180° turn is CLOSE but stale, and is the
+right thing to shed before something far away you are flying toward — distance
+alone gets that backwards.
+
+### The headline had to survive its own brake
+
+The round's headline is *zero refetches on yaw*. A cap below a full 360°
+working set would evict on every turn and kill it. So the cap is **measured
+against the working set, not guessed**:
+
+| cap | resident | merges | refetches | on-screen swaps |
+|---|---|---|---|---|
+| none | 190 | 0 | 0 | 0 |
+| **260 (shipped)** | 190 | **0** | **0** | **0** |
+| 120 | 144 | 80 | 80 | 4 |
+| 60 | 137 | 72 | 72 | 6 |
+
+Gate 26 asserts the shipped cap **exceeds the measured working set**, reading
+the constant out of `fly-constants.js` — so editing the cap without re-measuring
+fails the gate rather than silently reintroducing the churn.
+
+### What a cap is NOT, stated rather than papered over
+
+Driving the cap to 120 sheds real tiles (80 elections, 190 → 144) but does not
+reach 120, and at 60 it settles at 137. That is by design: the election is
+**out-of-frustum only**, because collapsing a tile the camera is looking at is
+pure thrash — the next walk refines it straight back. So the cap is a **brake on
+a set still being refined, converging toward the in-frustum floor**, not a hard
+ceiling. Gate 28 asserts exactly that shape. A gate asserting `resident <= cap`
+would be asserting something this design deliberately does not promise, and
+would have been a lie that passed.
+
+The 4 and 6 on-screen replacements at those tight caps are the upstream defect
+resurfacing under pressure — recorded because it is the honest cost of an
+aggressive cap, and the reason the shipped one has headroom.
+
+### Gates
+
+`verify-terra-residency` 22 → **32**. RED-calibrated by neutering `r24Park`:
+**20, 23 and 24 fail** (off-frustum issued 142 → 142; the growth contrast can no
+longer be demonstrated). The census counts what three would DRAW — a model
+attached AND visible through every ancestor — not merely what is attached,
+because visibility is the entire mechanism.
+
+### What this does NOT claim
+
+The residual in-frustum count is still higher than flag-off (20 → 48 on the
+fixture yaw), because the trio lets the tree reach z17 where upstream's
+collapse-on-yaw pinned it at z13. **That is more detail, not leakage**, and it
+is the part of the draw delta that parking cannot remove. Whether Owens now
+lands under 261 live is E's re-take to measure, not mine to assert: this
+container has no renderer, and every number above is a count or a decision.
+
+### Lessons
+
+1. **Resident and issued are different questions**, and a design that conflates
+   them will pay for retention in draw calls forever. The fix was not to retain
+   less; it was to stop drawing what was retained.
+2. **A budget nothing ever reaches is not a budget.** 140 MB looked like a cap
+   for a whole round and had never once fired.
+3. **Pick the unit the ceiling is denominated in.** The frozen number is draw
+   calls; the brake was in megabytes.
+4. **An LRU ordered by distance is not an LRU.** Recency and proximity disagree
+   exactly where turning is involved, which is the case this round exists for.
+5. **The duration was the variable.** Two runs of the same pose with the same
+   flags, differing only in how long the camera turned, named the mechanism
+   before any renderer was involved.
+
+---
+
 ## §10 Commits
 
 | # | Commit | What |
