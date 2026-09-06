@@ -117,6 +117,21 @@ export function setSkySunElevation(elDeg) {
 export function clearSkySun() {
   sun.active = false;
   sun.elValid = false;
+  _lobeDir[0] = 0;
+  _lobeDir[1] = 1;
+  _lobeDir[2] = 0;
+  _lobeLive = false;
+}
+
+// R24 C (ONE_SUN, recon L3): the dome's OWN resolved lobe direction, stashed
+// where the frame loop writes uSunDir so `verify-one-sun` reads what the dome
+// is actually using rather than re-deriving it from the same inputs (which
+// would prove nothing). `live` is false whenever the lobe is off (strength 0,
+// toy, flag off) — a gate must not compare a direction nobody is using.
+const _lobeDir = [0, 1, 0];
+let _lobeLive = false;
+export function getSkySunDir() {
+  return { live: _lobeLive, dir: [_lobeDir[0], _lobeDir[1], _lobeDir[2]] };
 }
 
 /**
@@ -461,9 +476,18 @@ export function SkyDome({
         const er = elDeg * DEG2RAD;
         const ce = Math.cos(er);
         u.uSunDir.value.set(-Math.sin(sun.az) * ce, Math.sin(er), Math.cos(sun.az) * ce);
+        // R24 C (ONE_SUN): mirror it for getSkySunDir(). Pure bookkeeping —
+        // three writes, no branch, nothing the shader reads.
+        _lobeDir[0] = u.uSunDir.value.x;
+        _lobeDir[1] = u.uSunDir.value.y;
+        _lobeDir[2] = u.uSunDir.value.z;
+        _lobeLive = true;
+      } else {
+        _lobeLive = false;
       }
     } else if (g[0] !== 0) {
       g[0] = 0;
+      _lobeLive = false;
     }
   });
 

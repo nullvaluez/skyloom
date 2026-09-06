@@ -8,6 +8,7 @@ import {
   DataTexture,
   DoubleSide,
   Matrix4,
+  MeshLambertMaterial,
   MeshToonMaterial,
   NearestFilter,
   Quaternion,
@@ -16,7 +17,14 @@ import {
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { buildPoiList } from '@/lib/fly/poi-data';
-import { LANDMARKS_3D, MONUMENT_MODELS, SURFACE_CALM, TOY_WORLD } from '@/lib/fly/fly-constants';
+import {
+  LAMBERT_ENV,
+  LANDMARKS_3D,
+  MONUMENT_MODELS,
+  ONE_SUN,
+  SURFACE_CALM,
+  TOY_WORLD,
+} from '@/lib/fly/fly-constants';
 import { applyBendAnchorMonument } from '@/lib/fly/toy-world/world-bend';
 import { loadMonumentGeometries } from '@/lib/fly/monument-loader';
 import { setSuppressedMonuments } from '@/lib/fly/monument-models';
@@ -144,6 +152,20 @@ export function MonumentModels({ flight, origin, engine, mapStyle }) {
     // Free models vary wildly in winding hygiene and several are open shells —
     // a monument you can see through is a worse artifact than a slightly flat
     // backface, and at these triangle counts DoubleSide is free.
+    // R24 C (ONE_SUN, recon L3 fix 2 + R20 §5b.4): the marquee follows the
+    // archetypes to MeshLambert in satellite — same draw count, same DoubleSide
+    // policy, same vertex-colour albedo — so the two representations of one
+    // monument stay interchangeable (the R20 invariant) and the marquee finally
+    // takes the same scene.environment its OFM neighbours take. This is the
+    // move that closes the Taj night residual at its stated root: "the excess
+    // is the satellite night key itself (MeshToonMaterial takes no envMap)".
+    if (!isToy && ONE_SUN.enabled && ONE_SUN.monumentsLambert) {
+      ramp.dispose();
+      const ml = new MeshLambertMaterial({ vertexColors: true, side: DoubleSide });
+      if (LAMBERT_ENV.enabled) ml.reflectivity = LAMBERT_ENV.reflectivity;
+      applyBendAnchorMonument(ml);
+      return ml;
+    }
     const m = new MeshToonMaterial({ vertexColors: true, gradientMap: ramp, side: DoubleSide });
     m.userData.__ramp = ramp;
     applyBendAnchorMonument(m);
