@@ -30,6 +30,9 @@
 #   scripts/r24-cert-run.sh [port]        # default 3100
 #
 # ENV
+#   CERT_PROOF_ONLY=1  stop after the boot proof and LEAVE THE SERVER UP. The
+#                      proof is the go/no-go for a whole certification run, so
+#                      it is worth being able to ask for it alone.
 #   CERT_SKIP_NODE=1   skip the node gates (they are seconds; rarely worth it)
 #   CERT_K             content-gate budget scaler (default 40)
 #   CERT_FIXTURE_K     the fixture census's own K (default 200 — Manhattan's
@@ -196,6 +199,14 @@ if [ "$BP_RC" != 0 ]; then
   say "*** BOOT PROOF FAILED — stopping. No browser row can mean anything until"
   say "*** the app mounts. See $OUT/bootproof.log."
   exit 1
+fi
+
+if [ "${CERT_PROOF_ONLY:-0}" = 1 ]; then
+  say ""
+  say "CERT_PROOF_ONLY: stopping after the boot proof. The dev server (PID ${DEV_PID:-unknown})"
+  say "is LEFT RUNNING on :$PORT for whoever launches the rows."
+  trap - EXIT INT TERM      # do not tear down the server we were asked to leave up
+  exit 0
 fi
 
 # --- 5. the rows -------------------------------------------------------------
