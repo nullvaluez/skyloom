@@ -41,6 +41,9 @@ import {
   lodStats,
   tickLodFades,
 } from '@/lib/fly/lod-crossfade';
+// E's frame-phase attribution: a no-op with FRAME_STATS off, so this costs the
+// flag-off tree one function call per frame and nothing else.
+import { markPhase } from '@/lib/fly/frame-stats';
 import { PALETTE } from '@/lib/fly/toy-world/toy-palette';
 import {
   SkyDome,
@@ -1453,6 +1456,7 @@ export function FlyScene({ runtime }) {
     // clock (early-returns after one add when nothing is fading, which is the
     // resting state and the whole flag-off cost).
     tickLodFades(dt);
+    markPhase('lod-fade');
     if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
       ((window.__flyStats ??= {}).terra ??= {}).fades = lodStats;
     }

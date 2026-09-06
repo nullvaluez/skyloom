@@ -19,6 +19,7 @@
  * Run:  node scripts/verify-lod-fade.mjs
  */
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ShaderChunk } from 'three';
@@ -40,30 +41,37 @@ const vendored = fs.readFileSync(path.join(ROOT, 'lib/fly/vendor/three-tile/inde
 const ledger = fs.readFileSync(path.join(ROOT, 'lib/fly/vendor/three-tile/VENDOR.md'), 'utf8');
 
 const markers = [...vendored.matchAll(/\/\/\s*R24\s+D\s+PATCH\s+(\d+)\s*\(([^)]+)\)/g)].map((m) => m[1]);
-ok('the three D patch markers are present', markers.join(',') === '3,1,2', `markers=[${markers.join(',')}]`);
+ok('the three D patch markers are present (5 is the holder + its export)',
+  [...new Set(markers)].sort().join(',') === '5,6,7', `markers=[${markers.join(',')}]`);
 ok('every D marker names LOD_CROSSFADE as its switch',
   [...vendored.matchAll(/\/\/\s*R24\s+D\s+PATCH\s+\d+\s*\(([^)]+)\)/g)].every((m) => m[1] === 'LOD_CROSSFADE'));
-for (const n of ['1', '2', '3']) {
+for (const n of ['5', '6', '7']) {
   ok(`VENDOR.md has a ledger row for D patch ${n}`,
     new RegExp(`^\\|\\s*${n}\\s*\\|\\s*D\\s*\\|`, 'm').test(ledger));
 }
 
-const vLines = vendored.split('\n');
-const upPath = path.join(ROOT, 'node_modules/three-tile/dist/index.js');
-if (fs.existsSync(upPath)) {
-  const uLines = fs.readFileSync(upPath, 'utf8').split('\n');
-  let i = 0;
-  let missing = 0;
-  for (const ln of uLines) {
-    let j = i;
-    while (j < vLines.length && vLines[j] !== ln) j++;
-    if (j >= vLines.length) missing++;
-    else i = j + 1;
-  }
-  ok('the vendored diff is INSERT-ONLY (every upstream line survives, in order)',
-    missing === 0, `upstream ${uLines.length} lines, vendored ${vLines.length}, ${missing} missing`);
-} else {
-  ok('INSERT-ONLY leg', true, 'SKIPPED — node_modules/three-tile absent (see VENDOR.md sha leg)');
+// D's OWN hunks must be INSERT-ONLY. A's gate 8 bounds the WHOLE bundle's
+// edited-upstream-line budget (1 today, spent by A's `_getDistRatio` optional
+// parameter); this narrows it to D: every hunk whose added lines name `R24 D`
+// must delete nothing, i.e. D leaves every upstream statement it guards
+// verbatim. That is the machine-checkable form of VENDOR.md switch-idiom
+// rule 2, scoped to this owner so it cannot be satisfied by someone else's
+// budget.
+const VENDOR_COMMIT = 'b64457b';
+try {
+  const diff = execFileSync('git', ['diff', '-U0', VENDOR_COMMIT, '--', 'lib/fly/vendor/three-tile/index.js'],
+    { cwd: ROOT, maxBuffer: 32 * 1024 * 1024 }).toString('utf8');
+  const hunks = diff.split(/^@@/m).slice(1);
+  const dHunks = hunks.filter((h) =>
+    h.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).some((l) => /R24 D/.test(l)));
+  const dDeletes = dHunks.reduce((n, h) =>
+    n + h.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---')).length, 0);
+  const dAdds = dHunks.reduce((n, h) =>
+    n + h.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).length, 0);
+  ok("D's vendor hunks are INSERT-ONLY (zero upstream lines edited or deleted)",
+    dHunks.length >= 3 && dDeletes === 0, `${dHunks.length} D hunks, +${dAdds} / -${dDeletes}`);
+} catch (e) {
+  ok("D's vendor hunks are INSERT-ONLY", false, `git diff unavailable: ${e.message}`);
 }
 
 // Placement: patch 1 must run BEFORE the refine return expression (the parent
@@ -71,12 +79,12 @@ if (fs.existsSync(upPath)) {
 // must hold _loadState across its await.
 const refineHook = vendored.indexOf('ir && ir.onRefine(this, o, h);');
 const refineRet = vendored.indexOf('return h ? this.unloadSubTiles()');
-ok('patch 1 calls the hook BEFORE the refine return (the parent map is still alive)',
+ok('patch 6 calls the hook BEFORE the refine return (the parent map is still alive)',
   refineHook > 0 && refineRet > refineHook, `hook@${refineHook} return@${refineRet}`);
 const mergeBlock = vendored.slice(vendored.indexOf('const _w = ir.onMerge(this, o);'), vendored.indexOf('return l ? this.unloadModel()'));
-ok('patch 2 holds _loadState at "loading" across its await (freezes the subtree)',
+ok('patch 7 holds _loadState at "loading" across its await (freezes the subtree)',
   /_loadState = "loading";[\s\S]*await _w;[\s\S]*_loadState = "loaded";/.test(mergeBlock));
-ok('patch 2 runs before the merge return expression', mergeBlock.length > 0 && mergeBlock.length < 800);
+ok('patch 7 runs before the merge return expression', mergeBlock.length > 0 && mergeBlock.length < 800);
 ok('the hook holder defaults to null (the off-state)', /let ir = null;/.test(vendored));
 ok('the library reads the hook nowhere else',
   (vendored.match(/\bir\b(?!\s*=\s*null)/g) ?? []).filter((x) => x).length > 0 &&

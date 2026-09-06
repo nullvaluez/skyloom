@@ -39,6 +39,16 @@ import { imageryTile, tileHue, zBorderRGB, tileBandRGB } from './imagery.mjs';
 import { aircraftPayload } from './aircraft.mjs';
 import { SCENES, RURAL, tile2lon, tile2lat, lon2tile, lat2tile, isEmptyBodyTile } from './scenes.mjs';
 
+/**
+ * FIXTURE_REV — bump this whenever a fixture PAYLOAD changes (a scene moves, a
+ * layer gains a field, the stamp changes). Five agents share this container
+ * and each may leave a server on 3199; `startFixture` REUSES a healthy server
+ * only when its rev matches, and otherwise walks to the next free port. A
+ * stale server serving a previous round's scenes to someone else's gate is the
+ * exact class of silent wrongness the fixture exists to remove.
+ */
+export const FIXTURE_REV = 'r24-e.2-sierra';
+
 const stats = { total: 0, byUrl: new Map(), byKind: new Map() };
 
 function bump(kind, url) {
@@ -70,7 +80,8 @@ export function createFixtureServer(opts = {}) {
     if (log) process.stderr.write(`[fixture] ${req.method} ${req.url}\n`);
 
     try {
-      if (p === '/__health') return send(res, 200, JSON.stringify({ ok: true }), 'application/json');
+      if (p === '/__health')
+        return send(res, 200, JSON.stringify({ ok: true, rev: FIXTURE_REV }), 'application/json');
 
       if (p === '/__stats/reset') {
         stats.total = 0;
@@ -202,22 +213,59 @@ export function createFixtureServer(opts = {}) {
   return server;
 }
 
-/** Start and resolve to { url, port, server, close() }. */
-export function startFixture(opts = {}) {
-  const port = Number(opts.port ?? process.env.FLY_FIXTURE_PORT ?? 3199);
-  const server = createFixtureServer(opts);
-  return new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(port, '127.0.0.1', () => {
-      const p = server.address().port;
-      resolve({
-        url: `http://127.0.0.1:${p}`,
-        port: p,
-        server,
-        close: () => new Promise((r) => server.close(r)),
+/**
+ * Start and resolve to { url, port, server, close() }.
+ *
+ * If the port is already taken by ANOTHER fixture (five agents share this
+ * container and each may leave one running), we reuse it rather than fail:
+ * the payloads are a pure function of (z,x,y), so a shared server is
+ * byte-identical to a private one. Only a foreign occupant is an error.
+ */
+export async function startFixture(opts = {}) {
+  const first = Number(opts.port ?? process.env.FLY_FIXTURE_PORT ?? 3199);
+  for (let port = first; port < first + 10; port++) {
+    let occupied = false;
+    try {
+      const r = await fetch(`http://127.0.0.1:${port}/__health`, {
+        signal: AbortSignal.timeout(700),
       });
-    });
-  });
+      const j = await r.json();
+      occupied = true;
+      if (j.ok && j.rev === FIXTURE_REV) {
+        return {
+          url: `http://127.0.0.1:${port}`,
+          port,
+          server: null,
+          reused: true,
+          close: async () => {},
+        };
+      }
+      // Same port, DIFFERENT payload revision — never reuse it.
+      process.stderr.write(
+        `[fixture] port ${port} holds rev ${j.rev} (want ${FIXTURE_REV}) — trying ${port + 1}\n`
+      );
+      continue;
+    } catch {
+      if (occupied) continue; // something non-fixture answered; move on
+    }
+    const server = createFixtureServer(opts);
+    try {
+      await new Promise((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(port, '127.0.0.1', resolve);
+      });
+    } catch {
+      continue; // raced another agent to the port
+    }
+    const p = server.address().port;
+    return {
+      url: `http://127.0.0.1:${p}`,
+      port: p,
+      server,
+      close: () => new Promise((r) => server.close(r)),
+    };
+  }
+  throw new Error(`fixture: no free port in ${first}..${first + 9}`);
 }
 
 export { demSize, tileHue, zBorderRGB, tileBandRGB, tile2lon, tile2lat, lon2tile, lat2tile };

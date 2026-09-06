@@ -93,9 +93,9 @@ agent — gets a row here.
 | 1 | A | `TERRA_PACE.timerFix` | `index.js` · `Timer.reset()` | T3 — upstream `reset()` zeroes only `_currentTime`, so `TileMap.update`'s `getElapsed() > updateInterval/1e3` guard is permanently true after 50 ms of uptime and the FULL quadtree walk runs every frame instead of at 20 Hz | the two upstream statements, unchanged |
 | 2 | A | `TERRA_PACE.mergeHysteresis` · `TERRA_PACE.keepResident` | `index.js` · `Tile._LODEvaluate()` | T1 — one threshold both ways with no hysteresis (refine↔merge flip), and a merge test that is satisfied the instant a tile leaves the frustum, so every yaw collapses the field behind the camera and re-downloads a coarser parent ("tiles swapping for other ones") | the single upstream `return` expression, unchanged, below the branch |
 | 3 | A | `TERRA_PACE.keepResident` | `index.js` · `Tile._getDistRatio()` | T1 — PATCH 2's merge test needs the in-frustum distance law in every direction; re-scaling the ×5 result would not be the same float | an early return reachable only when a caller passes `true`; every upstream call site passes nothing |
-| 1 | D | `LOD_CROSSFADE.enabled` | `index.js` · `Tile._loadSubTiles` · one inserted statement before the return expression (~:290) | T4(b/c) — the refine is an atomic single-frame swap in which texture sharpness AND Martini relief change together (the user's "terrain tiles swapping for other ones") | `ir` (the hook) is null → the inserted line is a short-circuited `&&`; the upstream `return h ? … : (this.add(...o), …, this.unloadModel()), !h;` expression is byte-verbatim and unconditional |
-| 2 | D | `LOD_CROSSFADE.enabled` | `index.js` · `Tile._removeSubTiles` · one inserted `if` block before the return expression (~:318) | T4(b/c) — merges use the same atomic pattern | `ir` is null → nothing is awaited and `_loadState` is never touched; the upstream return expression is byte-verbatim |
-| 3 | D | (holder for 1 and 2) | `index.js` · module scope after the version consts (~:3-13) + one export line | infrastructure for 1 and 2 | `ir` is null until the app calls `setLodFadeHook`; nothing in the library reads it elsewhere |
+| 5 | D | `LOD_CROSSFADE.enabled` | `index.js` · module scope + the export list | T4(b/c) — infrastructure: the bundle must not import app code, so the app installs a `{ onRefine, onMerge }` object through `setLodFadeHook()` and every policy decision (flag, boot/warp suppression, concurrency bound, clock, parent-texture lifetime) lives in `lib/fly/lod-crossfade.js` | the holder is `null`, nothing in the library reads it, and patches 6 and 7 short-circuit |
+| 6 | D | `LOD_CROSSFADE.enabled` | `index.js` · `Tile._loadSubTiles()` | T4(b/c) — a refine is an atomic single-frame swap in which texture sharpness AND Martini relief (91 m error at z13 vs 11 m at z15) change together, which is what the user reported as "terrain tiles swapping for other ones" | the hook is `null` → one short-circuited `&&`; the upstream `return h ? this.unloadSubTiles() : (this.add(...o), …, this.unloadModel()), !h;` expression is byte-verbatim and unconditional |
+| 7 | D | `LOD_CROSSFADE.enabled` | `index.js` · `Tile._removeSubTiles()` | T4(b/c) — merges use the same atomic pattern; the leaf children dissolve INTO the freshly loaded parent imagery before the geometry swap | the hook is `null` → nothing is awaited, `_loadState` is never touched, and the upstream return expression is byte-verbatim |
 
 **Blast radius notes.** PATCH 1 touches a class (`Timer`) that has exactly one
 other instance in bundle + plugin (`plugin.js:381`), and that instance calls
@@ -105,7 +105,7 @@ which `scripts/verify-terra-residency.mjs` gate 7 proves by running a
 fixed-heading approach in both arms and comparing refine counts, request
 counts and the loaded-tile census.
 
-### D's patches in detail (LOD_CROSSFADE)
+### D's patches in detail (LOD_CROSSFADE — rows 5, 6, 7)
 
 All POLICY lives in `lib/fly/lod-crossfade.js`, not here: the flag, the boot
 window (`skipBootMs` — boot reveal timing is frozen, and a world that assembles
@@ -114,14 +114,14 @@ suppression (`WARP.flashMs` 250 already masks a cut), the concurrency bound,
 the clock (driven from FlyScene's -50 block on the frame dt) and the parent-
 texture lifetime. The library gets two call sites and a holder.
 
-**Why patch 1 must sit exactly where it does.** `unloadModel()` disposes the
+**Why patch 6 must sit exactly where it does.** `unloadModel()` disposes the
 parent's texture in the same expression that adds the children. The hook runs
 one statement earlier, detaches `material.map` from the parent material (so the
 dispose walk cannot reach it), refcounts it, and hands it to the four children
 as a second sampler with a clip-UV rectangle. Moving the call after the return
 expression would blend against a disposed texture.
 
-**Why patch 2 holds `_loadState` at "loading" across its await.** `_update()`
+**Why patch 7 holds `_loadState` at "loading" across its await.** `_update()`
 skips a tile whose `loadState` is `"loading"` and, because children are only
 visited inside that same branch, skips its whole subtree. Without the hold, a
 parent whose model is loaded but not yet added would be re-evaluated mid-blend
@@ -137,7 +137,7 @@ finding, an ordered screen-door dither under SMAA-only AA reads as shimmer.
 
 ### D note (2026-09-06): gate 6 and the insert-only invariant
 
-`verify-vendor-three-tile` gate 6 asserts the vendored `index.js` is
+SUPERSEDED (A, 2026-09-06): the gate is now git-anchored (it hashes the files AS OF the vendoring commit and proves the working copy differs only inside marked hunks), so this note is history. It read: `verify-vendor-three-tile` gate 6 asserts the vendored `index.js` is
 BYTE-IDENTICAL to upstream. That is exactly right at the vendoring commit and
 cannot survive any patch, so it goes RED the moment patch 1 lands. The
 replacement assertion that keeps A's intent — "byte-verbatim upstream when off"
