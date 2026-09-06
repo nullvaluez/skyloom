@@ -34,6 +34,80 @@
  *   FLY_TILE_FIXTURE=1 FLY_URL=http://localhost:3105 \
  *     node -r ./scripts/_pw-shim.js scripts/verify-fade.js
  */
+/**
+ * THE PROBE'S OWN RED (`FADE_PROBE_SELFTEST=1 node scripts/verify-fade.js`).
+ *
+ * Pass 2b's row reported `presence channel = none` and 29/29 hard births on a
+ * tree where CHUNK_FADE.enabled is TRUE — the probe was measuring its own
+ * blindness. It looked for four GUESSED uniform names on `material.uniforms`,
+ * while B's fade rides a pooled twin whose uniform is injected through
+ * onBeforeCompile and published for probes at
+ * `material.userData.__fadeU` (lib/fly/toy-world/chunk-fade.js:98-102). Both
+ * engines use that pool (sat-building-engine.js:345, 821-868; sat-skyline
+ * -engine.js:163-171, `uSkyFade`), so ONE channel covers both.
+ *
+ * This self-test runs THE REAL `presenceOf` — extracted from this file's own
+ * source, not a copy — against synthetic materials, so it cannot drift from
+ * the code it certifies. If the extraction fails it says so and exits non-zero
+ * rather than quietly testing nothing.
+ */
+if (process.env.FADE_PROBE_SELFTEST) {
+  const src = require('fs').readFileSync(__filename, 'utf8');
+  // The marker is BUILT, not written literally: a self-test that searches its
+  // own source for a string finds that string in itself first. The first
+  // attempt did exactly that and extracted three characters of its own
+  // comment.
+  const MARK = '// @presence' + '-probe';
+  const mark = src.indexOf(MARK);
+  const from = mark < 0 ? -1 : src.indexOf('const presenceOf = (o) => {', mark);
+  const to = from < 0 ? -1 : src.indexOf('\n  };', from);
+  if (from < 0 || to < 0) {
+    console.log('FAIL  the presenceOf block could not be extracted — the self-test tested NOTHING');
+    process.exit(1);
+  }
+  const body = src.slice(from + 'const presenceOf = '.length, to + '\n  }'.length);
+  let sp = 0;
+  let sf = 0;
+  const check = (name, ok, detail) => {
+    ok ? sp++ : sf++;
+    console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}  — ${detail}`);
+  };
+  const mk = (material) => ({ material });
+  const run = (obj) => {
+    const S = { presenceChannel: null };
+    // eslint-disable-next-line no-new-func
+    const fn = new Function('S', `return (${body});`)(S);
+    return { v: fn(obj), ch: S.presenceChannel };
+  };
+
+  // 1. B's published channel, mid-birth.
+  let r = run(mk({ userData: { __fadeU: { value: 0.37 } } }));
+  check("(1) B's twin channel is read FIRST", r.ch === 'userData.__fadeU' && r.v === 0.37, `channel ${r.ch} value ${r.v}`);
+
+  // 2. A twin at rest reads 1 — present, not absent. The distinction matters:
+  //    'none' means blind, 1 on __fadeU means "fully arrived".
+  r = run(mk({ userData: { __fadeU: { value: 1 } } }));
+  check('(2) a settled twin reads presence 1 on a NAMED channel', r.ch === 'userData.__fadeU' && r.v === 1, `channel ${r.ch} value ${r.v}`);
+
+  // 3. THE RED IS PRESERVED. A plain shared material — the flag-off tree — must
+  //    still report 'none' and presence 1, so every birth classifies HARD and
+  //    pass 1's 14/14 and this run's 29/29 remain reproducible.
+  r = run(mk({ userData: {} }));
+  check('(3) RED PRESERVED — a shared material still reads none/1', r.ch === 'none' && r.v === 1, `channel ${r.ch} value ${r.v}`);
+
+  // 4. The legacy names still work, so an engine that adopts one is not
+  //    silently ignored.
+  r = run(mk({ userData: { shader: { uniforms: { uBirth: { value: 0.5 } } } } }));
+  check('(4) the guessed names still resolve', r.ch === 'uBirth' && r.v === 0.5, `channel ${r.ch} value ${r.v}`);
+
+  // 5. Opacity remains the last resort.
+  r = run(mk({ userData: {}, transparent: true, opacity: 0.25 }));
+  check('(5) transparent opacity is the fallback', r.ch === 'opacity' && r.v === 0.25, `channel ${r.ch} value ${r.v}`);
+
+  console.log(`\n${sp} passed, ${sf} failed`);
+  process.exit(sf ? 1 : 0);
+}
+
 const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
 
@@ -78,9 +152,30 @@ const INSTALL_FADE_WATCH = () => {
     readySeries: [],
   });
   const prev = new Map(); // uuid -> {presence, frames}
+  // @presence-probe (extraction sentinel for FADE_PROBE_SELFTEST)
   const presenceOf = (o) => {
     const m = o.material;
     if (!m) return 1;
+    // B'S PUBLISHED PROBE CONTRACT, FIRST. `chunk-fade.js:102` puts the twin
+    // material's OWN fade uniform at `material.userData.__fadeU`, with a
+    // comment saying in as many words that it exists "so a probe can read the
+    // EFFECTIVE per-mesh alpha the GPU will see", and that a shared material
+    // has no `__fadeU` and reads the module uniform instead — which is exactly
+    // the distinction this census needs.
+    //
+    // MEASURED (pass 2b): this probe did not read it. It looked at
+    // `material.userData.shader.uniforms` and `material.uniforms` for four
+    // GUESSED names, found nothing, reported `presence channel = none`, and
+    // defaulted every mesh to presence 1 — so all 29 births and all 20 deaths
+    // were classified HARD on a tree where CHUNK_FADE.enabled is true. The
+    // gate was measuring its own blindness. Same failure family as the
+    // lod-fade NaN (close sweep §2.10a): a counter read across an ownership
+    // boundary must be read by the name its OWNER publishes, not by a name the
+    // harness expects.
+    if (m.userData && m.userData.__fadeU && typeof m.userData.__fadeU.value === 'number') {
+      S.presenceChannel ??= 'userData.__fadeU';
+      return m.userData.__fadeU.value;
+    }
     const u = m.userData?.shader?.uniforms || m.uniforms || null;
     for (const k of ['uBirth', 'uChunkFade', 'uFade', 'uChunkBirth']) {
       if (u && u[k] && typeof u[k].value === 'number') {
@@ -224,6 +319,20 @@ async function serpentine(page, ms) {
     heals: window.__satBuildings?.stats?.heals ?? null,
   }));
 
+  // The channel reading is only interpretable NEXT TO the flag it depends on,
+  // so the gate prints both together. Pass 2b printed "presence channel = none"
+  // on a tree where CHUNK_FADE.enabled is true, and 29/29 hard births read as a
+  // product failure until someone checked the constant.
+  const fadeTel = await page.evaluate(() => ({
+    stats: window.__satBuildings?.stats ?? null,
+    fadeKeys: Object.keys(window.__satBuildings?.stats ?? {}).filter((k) => /fade|birth|dying/i.test(k)),
+  }));
+  console.log(
+    `  CHUNK_FADE runtime evidence: ${JSON.stringify(fadeTel.fadeKeys)}` +
+      (fadeTel.stats?.fadeBudgetMiss !== undefined
+        ? ` · fadeBudgetMiss=${fadeTel.stats.fadeBudgetMiss}`
+        : ' · (no fade counters on the engine stats — the feature may not have armed)')
+  );
   console.log(
     `\nSERPENTINE: ${w.frames} frames · births ${w.births} (HARD ${w.hardBirths}) · ` +
       `deaths ${w.deaths} (HARD ${w.hardDeaths}) · frames with a partial-presence mesh ` +
@@ -246,7 +355,7 @@ async function serpentine(page, ms) {
     w.births > 0 && w.hardBirths === 0,
     `${w.hardBirths} of ${w.births} hard` +
       (w.presenceChannel === 'none'
-        ? '  [presence channel is "none": no material carries a fade uniform or transparent opacity — ' +
+        ? '  [presence channel is "none": no material carries __fadeU, a fade uniform, or transparent opacity — ' +
           'this IS the flag-off state, i.e. the RED]'
         : '')
   );
