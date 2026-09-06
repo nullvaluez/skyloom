@@ -644,3 +644,46 @@ should precede it are recorded here instead.
 - **Ships `enabled: false`. RECOMMENDED ON AT CLOSE, after E re-baselines the
   neon-cover / seam hashes off the A/B in §7.1–7.2.**
 
+---
+
+## §8 WHICH MECHANISM MAKES A BUILDING VANISH
+
+The user's report is *"buildings appearing and disappearing, and terrain tiles
+swapping for other ones."* This is every mechanism on THIS tree that can remove
+a building from the screen, each with file:line evidence, whether it is a
+single-frame event, which flag closes it, and the measured count before and
+after. **Where a row has no number, it says so.**
+
+Measurement venue for the counted rows: `scripts/r24-b-engine-proof.js`
+(the REAL `SatBuildingEngine` + the REAL worker, headless, 2,700 frames / 90 s
+at 120 m/s over a serpentine with the DEM refining twice) and
+`scripts/r24-b-bend-proof.mjs` / `-groundvis-proof.mjs` (pure arithmetic).
+
+| # | mechanism | evidence on THIS tree | single-frame? | fixed by | measured before → after |
+|---|---|---|---|---|---|
+| 1 | **Arrival at the ring edge** — a finished chunk is added fully opaque, in view, 3.6–4.4 km ahead | `sat-building-engine.js` finalize `this.object.add(mesh)`; `sat-skyline-engine.js` finalize | **yes** | `CHUNK_FADE` (birth ramp) | part of **92 → 2** single-frame pops; ramp steps **0 → 600** |
+| 2 | **Eviction behind / ring shift** — `remove + geometry.dispose()` the frame the desired set changes | `sat-building-engine.js:_evict`, `sat-skyline-engine.js:_evict` | **yes** | `CHUNK_FADE` (deferred evict, `maxDying` 4) | same run; **both residual pops are `fadeBudgetMiss` = 2**, i.e. attributable |
+| 3 | **Heal on DEM refinement** — evict + refetch leaves a HOLE for the whole worker roundtrip, up to `healCap` 3× per key | `sat-building-engine.js:869` heal loop → `_evict` | no — a **multi-frame hole** | `HEAL_IN_PLACE` | heals **16, of which 0 patched in place → 21, of which 21 patched in place**; evictions **40 → 24** |
+| 4 | **Bend-margin false cull AT SPEED** — an on-screen chunk frustum-culled while the camera turns | `bendMarginM(ringAliveR, halfDiag)` in all four engines; lead is `(1+0.35)·ringR` | **yes** | `BEND_LEAD` | pad deficit at the lead edge, metres: **54 / 558 / 747 / 241 / 1,205 / 3,405 / 31,412 on 7 of 7 rings → 0** |
+| 5 | **A pooled layer culls AS ONE OBJECT** — a whole forest, suburb or landcover sheet, because `maxD` is one 2 s cadence stale | `SatVegLayer.jsx:521`, `SatParcelHomes.jsx:1052`, `SatTintLayer.jsx:285` (the last unnamed by the recon) | **yes** | `BEND_LEAD.poolLeadM` | pad now covers **2 s × 750 m/s = 1,500 m** of travel; per-pool draw census not run here |
+| 6 | **The pale splat** — a zero-area wall triangle covers the frustum, so everything vanishes behind a uniform pale field | worker `:1731` / `:4284` wall loops over CLOSED rings + `DoubleSide` + the per-vertex bend | **yes**, exactly one frame | `FLASH_GUARD` (main thread) + `RING_DEDUPE` (source) | resident degenerate triangles **15,984 (14.19 %) → 0**; per-builder **14.22 % / 14.84 % → 0** |
+| 7 | **Parcel homes appear at full size in one frame** | `SatParcelHomes.jsx` `growK` was a discrete `provisional ? 0.55 : 1` step | **yes** | `CHUNK_FADE.parcelGrowSec` | archived R22 RED **1,874 homes in one 100 ms sample at 100 % scale**; now a ≥600 ms in-place ease. Not re-counted here |
+| 8 | **Every AGL-keyed band steps at once** when the DEM under the aircraft refines (buildings, skyline, roads, letters, micro, quilt, altAtmo) | `FlyScene.jsx:1084` raw `groundElev` → 7 visual consumers | **yes** | `GROUND_VIS` | worst single-frame visual step **384.0 m → 4.000 m**, converging in 95 frames |
+| 9 | **Mid-flight recompile storm** — the world stalls for hundreds of ms at the first dusk step and at the first high↔medium step | `WebGLPrograms.js:60-64/:359` (env height + shadow count in the key); day 2k vs twilight 1k; `prewarm.js:669` one warm per session | no — a **stall**, not a vanish | `ENV_UNIFORM` | **NOT MEASURED HERE.** Needs `programsDelta` on a real GPU with `__flyGovPin` AND `__flySatShadowOverride` released — E's run |
+| 10 | **Skyline group `visible` flip** | `sat-skyline-engine.js` `_updateVisibility`: parks a group only when its FARTHEST corner is inside `uSkyHole.x` | yes, but **PIXEL-NEUTRAL BY CONSTRUCTION** — every anchor is already inside the shader's hole and discarding (the engine's own comment: "a full fragment-kill for zero pixels. Park it") | **nothing — deliberately** | hypothesis row; E's fixture pixel A/B across a park/unpark at Manhattan decides it |
+| 11 | **Skyline AGL evict / re-arm** at 10,000 / 9,200 m | `STREAM_KEEPER.skylineHysteresis` | yes, but **pixel-neutral by construction**: `SAT_SKYLINE.fade.endM` is **9,000**, so BOTH ends sit above the fade end and the ring is fully dithered away before either fires | nothing needed (R21 sized it that way on purpose) | arithmetic, above |
+| 12 | **Water tier flip** | `sat-building-engine.js:572` `setWaterEnabled(false)` evicts only the water meshes; the ENABLE direction was the city-wide re-stream and R21's `waterInPlace` already fixed it | yes, but water only — **no building leaves the screen** | already closed by R21 `STREAM_KEEPER.waterInPlace` | — |
+| 13 | **`SAT_BLDG_FADE` Bayer band** at 2,400–3,000 m | `world-bend.js:1453`, a 4×4 ordered dither under `multisampling={0}` | no — a **shimmer**, not a vanish | **not B's** (A7 residual / C's AA work) | R21 closed with 49 swinging pixels vs a bound of 32 |
+| 14 | **Shadow-map re-rasterization** — an un-snapped 2048² ortho that follows the plane re-rasterizes every building silhouette each frame | C's measurement (relayed) | no — an **edge flicker** | **C, `SHADOW_CALM`** | C owns the number. Listed so this root is not attributed to a chunk birth |
+| 15 | **Toy/Neon chunk births and the ultra-ring arm** | `toy-world-engine.js:844` `addMesh`, `:613` heal evict, `STREAM_KEEPER.stagedRingShift` | **yes** | **NOT SHIPPED — see §9** | toy degenerate **14.84 % → 0** is fixed (FLASH_GUARD/RING_DEDUPE); the toy BIRTH ramp is not |
+| 16 | **Terrain LOD swap** — "tiles swapping for other ones" | three-tile's atomic parent↔4-children swap; merge on frustum exit with no hysteresis | **yes** | **A (`TERRA_PACE`) and D (`LOD_CROSSFADE`)** | not B's; listed because it is the second half of the user's sentence |
+
+**Reading of the table.** Of the twelve mechanisms that genuinely remove a
+building from the screen, **six are closed by B this round with measured
+before/after numbers** (rows 1–6, 8), **two were already pixel-neutral by
+construction and correctly left alone** (10, 11), **one was closed by R21**
+(12), **two belong to other agents** (14, 16) and **one is deferred with its
+design written down** (15). The single most-counted event — 92 single-frame
+pops in 90 s of ordinary flight — is rows 1 and 2, and it drops to 2, both
+attributable.
+
