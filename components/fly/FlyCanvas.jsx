@@ -8,9 +8,10 @@ import { Effects } from './Effects';
 import { PhotoCapture } from './PhotoCapture';
 import { JuiceSystems } from './JuiceSystems';
 import { PrewarmRig } from './PrewarmRig';
-import { CANVAS, PERF_GOVERNOR, PREWARM } from '@/lib/fly/fly-constants';
+import { CANVAS, FRAME_STATS, PERF_GOVERNOR, PREWARM } from '@/lib/fly/fly-constants';
 import { autoTierCeiling } from '@/lib/fly/fly-settings';
 import { PerfGovernor } from '@/lib/fly/perf-governor';
+import { FrameStatsRig } from '@/lib/fly/frame-stats';
 import { useFlyStore } from '@/stores/fly-store';
 
 function initialDpr() {
@@ -114,6 +115,12 @@ export function FlyCanvas({ runtime }) {
         }
       }}
     >
+      {/* Round 24 (E CERT): the frame-pace instrument. Priority -101 puts it
+          ahead of the governor (-100) and A's STEP_SAFE rig (-99), so its dt
+          is the raw inter-frame delta of the frame that just presented. Not
+          mounted at all when FRAME_STATS.enabled is false — no ring, no
+          observer, no window.__flyStats.frame (recon HARN-GAP-4). */}
+      {FRAME_STATS.enabled && <FrameStatsRig />}
       {PERF_GOVERNOR.enabled ? (
         <>
           {/* Round 21 (A GOVERNOR): the EMA + dwell + cooldown + session-latch

@@ -589,9 +589,25 @@ const lsq = (xs, ys) => {
       remounts: window.__flyStats?.sceneRemounts ?? -1,
       draws: window.__flyStats?.drawCalls ?? -1,
       tris: window.__flyStats?.triangles ?? -1,
+      // Round 24 (E CERT): the in-app frame-pace instrument, when FRAME_STATS
+      // is on. INFORMATIONAL and additive — this harness has no frame-time
+      // collector to replace (its private collector counts DRAWS), and no
+      // assertion here reads it. `null` with the flag off, so the R21 quartet
+      // is untouched either way. On the user's machine this is what turns
+      // gate (1)'s "did the governor step at a steady pose" into "and what
+      // did the frames actually do while it decided".
+      frame: window.__flyStats?.frame?.sample ? window.__flyStats.frame.sample() : null,
     };
   });
   const dwellSeries = await drawSlice(page, dwellDraw0);
+  if (w.frame)
+    console.log(
+      `FRAME_STATS (dwell, informational): p50 ${w.frame.p50.toFixed(2)}ms p95 ${w.frame.p95.toFixed(2)}ms ` +
+        `p99 ${w.frame.p99.toFixed(2)}ms worst ${w.frame.worstDt.toFixed(1)}ms · stalls/min ${w.frame.stallsPerMin} ` +
+        `(threshold ${w.frame.stallThresholdMs.toFixed(1)}ms) · >33ms/min ${w.frame.long33PerMin} · >100ms/min ` +
+        `${w.frame.long100PerMin} · longtasks ${w.frame.longtasks} · programs +${w.frame.programsDelta}` +
+        (w.frame.lastStall ? ` · last stall ${w.frame.lastStall.dtMs.toFixed(0)}ms [${w.frame.lastStall.phases.join(',') || 'untagged'}]` : '')
+    );
   await glShot(page, 'r21-e-stability-01-dwell.png');
   // GC-floor slope: the minimum of each third of the dwell, regressed on time.
   const thirds = [0, 1, 2].map((i) => {
