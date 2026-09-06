@@ -1542,3 +1542,66 @@ moved.
 `verify-c-flagoff` 37/37 · `verify-shadow-calm` 33/33 · `verify-depth-offset`
 7/7 · `verify-worker-normals` 12/12 · all four `r24-c-*-proof.mjs` PASS ·
 `no-undef` over the changed file 0.
+
+---
+
+## `__flyLinearHazeOverride` — the runtime pin LINEAR_HAZE never had
+
+E's rebuilt `verify-linear-haze` A/Bs Δ_on against Δ_off. That needs a RUNTIME
+pin: the alternative is two builds, and two builds cannot be compared
+frame-for-frame on one machine. LINEAR_HAZE shipped without one, so the ON arm
+read NOT CALIBRATED.
+
+**The accessor.** `linearHazeOn()` (world-bend.js, exported) is now the ONE
+reader of `LINEAR_HAZE.enabled` anywhere in the tree, with the R24 pin idiom
+(`lod-crossfade.js` `cfg()` / `step-safe.js` `resolveStepSafe()`):
+
+| `window.__flyLinearHazeOverride` | result |
+|---|---|
+| absent | the constant — flag-off identity untouched BY CONSTRUCTION (the branch is not evaluated at all) |
+| `{ enabled: false }` | the sRGB-authored path (the R21 numbers) |
+| `{ enabled: true }` | the decoded path |
+| a partial object | merged over the constant, like every other R24 pin |
+
+`process.env.NODE_ENV === 'development'` leads the condition, so production
+compiles the pin out and this is a plain constant read again; the `!= null`
+guard precedes the spread, so the only allocation happens on a pinned dev tree.
+
+**Answering the module-init question: NO SITE decodes at module init.** There
+were exactly TWO readers of the raw constant and both evaluate at setter/frame
+time — `hazeC` (world-bend, called only from the five `set*Haze`/`set*Fade`
+setters, all of which FlyScene drives per frame) and `AerialPerspective`'s
+`update()`, which postprocessing calls immediately before the pass draws. So a
+fleet pin installed by `addInitScript` governs the whole tree; there is no
+channel that already baked the constant in and would leave E measuring a mixed
+build.
+
+That second reader mattered. `AerialPerspective.jsx` lives in another file and
+carried its own `if (LINEAR_HAZE.enabled)`. Had the pin routed only through
+world-bend, a pinned A/B would have flipped the tile setters while `uHazeColor`
+— the aerial haze target, the very channel the seam contract is about — stayed
+on the other path. It now imports `linearHazeOn` from world-bend.
+
+**New source gate (verify-c-flagoff 37 → 40).** Three gates: the accessor falls
+through to the constant when no pin is set; the pin is dev-only and null-guarded
+before it is read; and a **reader census across ten files** proving the raw
+`LINEAR_HAZE.enabled` has exactly one reader and that it is inside
+`linearHazeOn()`. The census skips lines that OPEN as a comment — R20 §7's *"a
+grep gate reads comments too"*, and this file's own header names the constant in
+prose — while a trailing comment still counts, which fails loud rather than
+hiding a reader. RED-calibrated: adding one `const _x = LINEAR_HAZE.enabled;` to
+`SkyDome.jsx` turns it red and names the file and line.
+
+The two pre-existing regexes that pinned the literal `LINEAR_HAZE.enabled` at
+the two dispatch sites were re-pointed at the accessor. That is tracking my own
+refactor, not a frozen-number move: both still assert the same property (the
+decode is branch-gated, and the false branch is the R21 call).
+
+**Node-only, no browser and no dev server:** verify-c-flagoff 40/40 (RED-
+calibrated) · verify-shadow-calm 33/33 · verify-depth-offset 7/7 ·
+verify-worker-normals 12/12 · four proofs PASS · eslint over the three changed
+files 0 errors 0 warnings. Not run here: a full `next build`. The new
+`AerialPerspective → world-bend` import edge is cross-checked textually (the
+export exists, the specifier matches, world-bend imports only fly-constants so
+no cycle) — the honest residual after the import-welding lesson, where only the
+module resolver caught the defect.

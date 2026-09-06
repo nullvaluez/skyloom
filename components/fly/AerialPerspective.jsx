@@ -51,7 +51,11 @@
  */
 import { Effect, EffectAttribute } from 'postprocessing';
 import { Uniform, Vector2, Vector3, Color, SRGBColorSpace } from 'three';
-import { DEPTH_FIX, LINEAR_HAZE } from '@/lib/fly/fly-constants';
+import { DEPTH_FIX } from '@/lib/fly/fly-constants';
+// R24 C: the flag is read through world-bend's ONE accessor (which carries the
+// __flyLinearHazeOverride dev pin), never off the constant — otherwise a pinned
+// A/B would decode the tile setters and leave this uniform on the other path.
+import { linearHazeOn } from '@/lib/fly/toy-world/world-bend';
 
 /**
  * Module-scope frame state. One satellite scene exists at a time, so a plain
@@ -284,7 +288,7 @@ export class AerialPerspectiveEffect extends Effect {
     // space, i.e. no conversion — which is exactly the L1 defect. Naming
     // SRGBColorSpace decodes the authored triple into the linear buffer the
     // composer actually renders into. Flag off = the R19 call, unchanged.
-    if (LINEAR_HAZE.enabled) {
+    if (linearHazeOn()) {
       u.get('uHazeColor').value.setRGB(s.rim[0], s.rim[1], s.rim[2], SRGBColorSpace);
     } else {
       u.get('uHazeColor').value.setRGB(s.rim[0], s.rim[1], s.rim[2]);

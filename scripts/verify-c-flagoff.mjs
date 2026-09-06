@@ -108,8 +108,18 @@ for (const [f, want] of Object.entries(SHIP)) {
 // ---- (2) the injections are branch-gated ----------------------------------
 const wb = read('lib/fly/toy-world/world-bend.js');
 gate(
-  'haze setters decode only under LINEAR_HAZE',
-  /function hazeC\(c\) \{\s*return LINEAR_HAZE\.enabled \? srgbToLinear\(c\) : c;/.test(wb)
+  'haze setters decode only under the LINEAR_HAZE accessor',
+  /function hazeC\(c\) \{\s*return linearHazeOn\(\) \? srgbToLinear\(c\) : c;/.test(wb)
+);
+gate(
+  'linearHazeOn() falls through to the constant when no pin is set',
+  /export function linearHazeOn\(\) \{[\s\S]{0,600}?\n  return LINEAR_HAZE\.enabled;\n\}/.test(wb)
+);
+gate(
+  'the pin is DEV-ONLY and null-guarded before it is read',
+  /process\.env\.NODE_ENV === 'development' &&\s*\n\s*typeof window !== 'undefined' &&\s*\n\s*window\.__flyLinearHazeOverride != null/.test(
+    wb
+  )
 );
 gate(
   'groundOverlayOffset returns null with SHADOW_CALM off',
@@ -142,9 +152,50 @@ gate(
   /const SKY_TEST = DEPTH_FIX\.enabled \? '[^']+' : 'd >= 0\.999999';/.test(ap)
 );
 gate(
-  'uHazeColor decodes only under LINEAR_HAZE',
-  /if \(LINEAR_HAZE\.enabled\) \{[\s\S]{0,200}SRGBColorSpace\);\s*\} else \{/.test(ap)
+  'uHazeColor decodes only under the LINEAR_HAZE accessor',
+  /if \(linearHazeOn\(\)\) \{[\s\S]{0,200}SRGBColorSpace\);\s*\} else \{/.test(ap)
 );
+// THE PIN'S ONLY REAL CONTRACT. `__flyLinearHazeOverride` governs the tree only
+// while `linearHazeOn()` is the sole reader: one surviving `LINEAR_HAZE.enabled`
+// anywhere else — a new content layer, a second uniform, a "small" inline
+// ternary — silently splits a pinned A/B into a half-decoded tree, and the
+// measurement would look like a tuning result instead of a mixed build. So this
+// gate counts readers across the WHOLE source tree, not just the two files
+// above, and allows exactly the accessor's own fall-through.
+{
+  const files = [
+    'lib/fly/toy-world/world-bend.js',
+    'components/fly/AerialPerspective.jsx',
+    'components/fly/FlyScene.jsx',
+    'components/fly/Effects.jsx',
+    'components/fly/SkyDome.jsx',
+    'components/fly/FlyEffectComposer.jsx',
+    'lib/fly/prewarm.js',
+    'lib/fly/cloud-material.js',
+    'lib/fly/post-policy.js',
+    'lib/fly/shadow-kernel.js',
+  ];
+  const raw = [];
+  for (const f of files) {
+    const src = read(f);
+    const lines = src.split('\n');
+    for (const m of src.matchAll(/LINEAR_HAZE\.enabled/g)) {
+      const line = src.slice(0, m.index).split('\n').length;
+      // R20 §7: a grep gate reads comments too. Skip lines that OPEN as a
+      // comment (`//`, `/*`, or a docblock's `*`) — this file's own header
+      // names the constant in prose. A trailing comment still counts, which
+      // fails LOUD instead of hiding a reader: the conservative direction.
+      const t = (lines[line - 1] || '').trim();
+      if (t.startsWith('*') || t.startsWith('//') || t.startsWith('/*')) continue;
+      raw.push(`${f}:${line}`);
+    }
+  }
+  gate(
+    'the raw LINEAR_HAZE.enabled has exactly ONE reader — linearHazeOn()',
+    raw.length === 1 && raw[0].startsWith('lib/fly/toy-world/world-bend.js:'),
+    `readers: ${raw.join(', ') || 'none'}`
+  );
+}
 const fx = read('components/fly/Effects.jsx');
 gate(
   'the pass reorder is a POST_ORDER ternary over ONE descriptor list',
