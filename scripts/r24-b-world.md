@@ -799,3 +799,44 @@ What IS measured here is everything that is a pure function of tile bytes,
 index buffers, constants or scene-graph state — which, for this charter, turned
 out to be the majority of it.
 
+---
+
+## §12 The one browser run B did make — and a bug found in E's harness
+
+`FLY_TILE_FIXTURE=1 FLY_URL=http://localhost:3102 FLY_FIXTURE_SETTLE_MS=45000
+node -r ./scripts/_pw-shim.js scripts/verify-fixture.js`, on `r24/b` with every
+B flag OFF:
+
+```
+PASS (1) DETERMINISTIC BYTES — mvt/dem/img identical on re-fetch — mvt 12021B dem 1817B img 46864B
+PASS (2) 200-WITH-EMPTY-BODY tile — OFM's real "zero" shape is reachable — status=200 bytes=0
+PASS (3) SATELLITE BOOTS ON THE FIXTURE — img=76 dem=80 mvt=127 tilejson=20
+         boot=136.9s (pct100 at 92.9s)
+```
+
+**The app boots the whole offline world with B's 11 commits in the tree and
+every flag off** — no page error, no module error, and `next dev` compiles the
+route clean (HTTP 200, 13.8 s cold compile). That is the flag-off smoke this
+branch can honestly claim.
+
+Boot took **136.9 s here against E's reported ~49 s**, on the same fixture and
+the same container: five agents plus Fable share four cores. **Scale every wait
+by env, never by a default** — the same lesson E already wrote, confirmed from
+a second worktree.
+
+**Gate (4) onward could not run: `scripts/verify-fixture.js` throws at :182.**
+
+```js
+for (const [name, pose_] of Object.entries(POSES)) {
+    await page.evaluate(PIN_POSE, pose);   // ← `pose` is the FUNCTION
+    scenes[name] = await pose(page, pose_, settle);
+```
+
+`pose` is the `async function pose(page, p, settleMs)` declared above, so
+Playwright is handed a function where the pose object belongs and throws
+`Attempting to serialize unexpected value`. The loop variable is `pose_`. Line
+:182 is also redundant — `pose()` already does `page.evaluate(PIN_POSE, p)` as
+its first step — so **deleting :182 is the fix**, and passing `pose_` is the
+alternative. Reported to E; not patched here, because the harness is E's file
+and a two-agent edit to it would collide at merge.
+
