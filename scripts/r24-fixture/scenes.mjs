@@ -60,6 +60,15 @@ export const SCENES = [
   { id: 'powell', kind: 'suburb', lat: 40.13, lon: -83.13, r: 0.26, base: 274, relief: 22 },
   { id: 'blagnac', kind: 'suburb', lat: 43.63379, lon: 1.38366, r: 0.14, base: 150, relief: 30 },
   { id: 'owens', kind: 'desert', lat: 36.6, lon: -118.09, r: 0.34, base: 1132, relief: 7 },
+  // R24 (C request): verify-sat-depth's hillshade A/B crops are shot at the
+  // SIERRA NEVADA pose 36.578/-118.29 at 3600 m — 0.16 deg from the Owens
+  // centre, i.e. inside the desert. A flat DEM there gives hillshade nothing
+  // to shade and the "> 2/255" margin is unmeasurable. This is a RELIEF-only
+  // scene (kind 'hills': zero buildings, arterial roads only), radius kept
+  // tight so the Owens floor poses (36.6/-118.1, 36.601/-118.06, Lone Pine
+  // 36.6061/-118.0632) all fall OUTSIDE it and stay flat — measured
+  // dist/r 1.39, 2.1 and 1.67 respectively against the 1.15 blend cutoff.
+  { id: 'sierra', kind: 'hills', lat: 36.578, lon: -118.29, r: 0.11, base: 2450, relief: 940 },
   { id: 'melton', kind: 'parcel', lat: -37.68172, lon: 144.57398, r: 0.2, base: 118, relief: 24 },
   { id: 'smokies', kind: 'hills', lat: 35.65, lon: -83.5, r: 0.3, base: 430, relief: 620 },
 ];
@@ -99,7 +108,7 @@ function elevParams(lon, lat) {
   let ridge = 0;
   for (const s of SCENES) {
     const d = sceneDist(s, lon, lat);
-    const w = 1 - smoothstep(0.75, 1.45, d);
+    const w = 1 - smoothstep(0.85, 1.15, d);
     if (w <= 0) continue;
     wSum += w;
     base += s.base * w;
