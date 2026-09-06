@@ -40,13 +40,21 @@ FAIL=0
 SKIP=0
 ROWS=()
 
+# run <name> <script-path> <command...>
+#
+# The SCRIPT PATH is an explicit argument. It used to be inferred from the
+# command's first word, which is `node` or `env` — so the presence check tested
+# for a file called "node", every row reported "absent", and the whole smoke
+# exited 0 with "0 passed, 0 failed, 9 skipped". That is the R20 false-green
+# shape exactly: a gate that cannot find itself must be LOUD, never green.
 run() {
   local name="$1"; shift
+  local script="$1"; shift
   local log="$OUT/smoke-${name}.log"
   printf '\n=== %s ===\n' "$name"
-  if [ ! -f "$1" ] && [ ! -f "scripts/$1" ]; then
-    printf 'SKIP  %s (script not present on this tree)\n' "$name"
-    SKIP=$((SKIP+1)); ROWS+=("SKIP  $name  (absent)"); return
+  if [ ! -f "$script" ]; then
+    printf 'SKIP  %s (%s not present on this tree)\n' "$name" "$script"
+    SKIP=$((SKIP+1)); ROWS+=("SKIP  $name  ($script absent)"); return
   fi
   local t0; t0=$(date +%s)
   if "$@" >"$log" 2>&1; then
@@ -61,8 +69,8 @@ run() {
   fi
 }
 
-node_gate() { run "$1" node "scripts/$1"; }
-browser_gate() { run "$1" node -r ./scripts/_pw-shim.js "scripts/$1"; }
+node_gate() { run "$1" "scripts/$1" node "scripts/$1"; }
+browser_gate() { run "$1" "scripts/$1" node -r ./scripts/_pw-shim.js "scripts/$1"; }
 
 printf 'R24 SMOKE — target %s — fixture ON\n' "$URL"
 curl -s -o /dev/null -w 'dev server: HTTP %{http_code}\n' --max-time 60 "$URL/" || {
@@ -78,7 +86,8 @@ node_gate verify-terra-residency.mjs     # A (R24): merge/refetch on a yaw sweep
 
 # --- the fixture's own gate. If this is red, every browser number below is
 #     meaningless, so it runs first and its failure is the headline.
-run verify-fixture.js env FLY_FIXTURE_SETTLE_MS="${SMOKE_FIXTURE_SETTLE:-45000}" \
+run verify-fixture.js scripts/verify-fixture.js \
+  env FLY_FIXTURE_SETTLE_MS="${SMOKE_FIXTURE_SETTLE:-240000}" \
   node -r ./scripts/_pw-shim.js scripts/verify-fixture.js
 
 # --- browser gates that are hardware-independent (counts, census, source scans,
@@ -94,6 +103,23 @@ fi
 printf '\n--------------------------------------------------\n'
 for r in "${ROWS[@]}"; do printf '%s\n' "$r"; done
 printf '\n%s passed, %s failed, %s skipped\n' "$PASS" "$FAIL" "$SKIP"
+
+# A smoke that ran nothing is a FAILURE, not a pass. Same for a run in which
+# every row was skipped: the only honest reading of "0 passed" is "this told
+# you nothing".
+VERDICT=0
+if [ "$FAIL" -gt 0 ]; then VERDICT=1; fi
+if [ "$PASS" -eq 0 ]; then
+  printf '\n*** SMOKE FAILED: ZERO gates actually ran (%s skipped). A smoke that skips\n' "$SKIP"
+  printf '*** everything and exits 0 is a false green — check the paths above.\n'
+  VERDICT=2
+fi
+if [ "$SKIP" -gt 0 ] && [ "$VERDICT" -eq 0 ]; then
+  printf '\n*** SMOKE INCOMPLETE: %s gate(s) were skipped as absent. Verify that each is\n' "$SKIP"
+  printf '*** genuinely not on this tree before treating this run as green.\n'
+  VERDICT=3
+fi
+
 cat <<'NOTE'
 
 NOT COVERED BY THIS SMOKE (by construction, not by omission):
@@ -108,4 +134,4 @@ NOT COVERED BY THIS SMOKE (by construction, not by omission):
 See scripts/r24-close-sweep.md for the user-machine run list.
 NOTE
 
-exit $(( FAIL > 0 ? 1 : 0 ))
+exit $VERDICT
