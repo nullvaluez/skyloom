@@ -826,7 +826,7 @@ RED:
 | Leg | Subsection | Owner of the feature | Pass 1 | Pass 2 |
 |---|---|---|---|---|
 | `verify-fixture` | §5.1 | E (the venue itself) | **10/10**, all four settled | pending |
-| `verify-flash-guard` | §5.2 | B (`FLASH_GUARD`) | **RED, 5/1** | pending |
+| `verify-flash-guard` | §5.2 | B (`FLASH_GUARD`) | **RED, 5/1** | **attempt 1 VOID** (starvation) |
 | `verify-fade` | §5.3 | B (`CHUNK_FADE`) | **RED, 4/2** | pending |
 | `verify-lod-fade` | §5.4 | D (`LOD_CROSSFADE`) + A (streamer) | **RED, 2/5** | pending |
 | `verify-step-clean` | §5.5 | A (`STEP_SAFE`) | **RED, 4/4** | pending |
@@ -890,8 +890,67 @@ trailing `flagOn(probe)=true` reported an absent runtime pin as "the flag is
 on". Both are fixed (`8ca7bdf`, `ff5d9a1`); the census numbers above are
 untouched by either fix and stand.
 
-**PASS 2 (flipped).** *pending* — (3) exactly 0 at every resident site, (5)
-per-site triangle counts only falling, (1a)/(1b) still non-empty.
+**PASS 2 (attempt 1, integration `91141fe`): VOID — VENUE STARVATION, not a
+reading.** `3 passed, 4 failed`, rc 1, 542 s.
+
+The census found **0 meshes / 0 triangles at BOTH poses** — sat-buildings,
+sat-skyline and toy-world all empty, where pass 1 at the same K=40 resolved
+Powell 3 meshes / 31,576 tris and Manhattan 14 meshes / 126,116 tris.
+
+| Leg | Verdict | Number |
+|---|---|---|
+| (1a) census has something to count, Powell | **FAIL** | tris **0** across **0** meshes |
+| (1b) census has something to count, Manhattan | **FAIL** | tris **0** across **0** meshes |
+| (2) RED calibration — the population exists | **FAIL** | **0** zero-area (0.00 %) |
+| (3) GREEN — exactly 0 with the guard armed | "PASS" — **on an empty census** | `zero=0 tris=0` |
+| (4a) no false positive | **FAIL** | 8 in 290 frames (see below) |
+| (4b) the detector fires | PASS | exactly 1 from `__paleSelfTest()` |
+| (5) triangle count only ever falls | **NOT CALIBRATED** | one leg resolved no triangles |
+| (6) no page errors | PASS | clean |
+
+`FLASH_GUARD telemetry: {"telemetry":null,"runtimePin":null}` — the module
+published nothing, because no builder ever ran.
+
+**(3) is the shape this whole ledger exists to catch.** "Zero-area count is
+exactly 0" is trivially true of a world with no triangles in it, and on its own
+it reads as the round's headline fix landing. Only (1a)/(1b) — the census
+preconditions added because §2.10 asked what an empty population would do —
+stop it being reported as a green. Had those legs not existed, this run would
+have produced a PASS line for the A1 fix on a scene that contained no buildings.
+
+**MECHANISM** (A, from `lib/fly/finalize-pace.js:74-79`): `mayFinalize(done)`
+with `done === 0` returned `lastDtMs <= FINALIZE_PACE.longFrameMs` (24 ms).
+Every SwiftShader frame here is 300–1000 ms, so **the first finalize of every
+frame was refused** and no sat-building chunk ever became ready. `budgetK()`
+scales the COUNT budget (`S.finalizePerFrame * budgetK()`), but that wall-clock
+rule sits in front of it at `sat-building-engine.js:1362`, so the scaler never
+got a say. Every content row in the pass — flash-guard, fade, lod-fade,
+terra-live's poses, fixture — would have starved identically. Not a product
+regression and not a harness bug: a venue property that the flag-off tree
+happened not to expose.
+
+Fixed in integration `3d388ec`: rule 1 is now a SPIKE test (frame >
+`longFrameMs` **and** > `spikeK` 2 × the EMA of the frames before it) with a
+`maxRefuseFrames` 3 cap, so a steady venue makes it a no-op by construction and
+rule 1 needs no harness seam at all. Cold-seed note for reading pass 2b: the
+EMA seeds at 24 ms, so this venue refuses ~6 of its first 40 frames (worst run
+3) and then never again — comfortably inside every settle.
+
+**(4a)'s 8 hits were the detector, not the world.** The hits came in
+CONSECUTIVE pairs at identical levels — `f:141` and `f:142` both mean 222.1 /
+med 145.5; `f:229` and `f:230` both 240.8 / 153.8. Two adjacent frames at the
+same level are a sustained bright FIELD, not a one-frame flash, which is a
+different picture with a different cause. The detector now counts a candidate
+only when its run length is exactly 1, and reports longer runs separately as
+`sustained`. Replayed against this run's own pattern: **8 → 0 isolated, 2
+sustained runs**, while the self-test's single white frame still scores exactly
+1 (so (4b) is unmoved). Note the naive form of the rule — "the previous frame
+was not a candidate" — still admits the LAST frame of every run; only run
+length works.
+
+**PASS 2b (flipped, on the fixed tree).** *pending* — (3) exactly 0 at every
+resident site **with (1a)/(1b) proving the census is non-empty**, (5) per-site
+triangle counts only falling.
 
 ---
 
