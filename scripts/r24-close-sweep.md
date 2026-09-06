@@ -835,7 +835,7 @@ RED:
 | `verify-linear-haze` | §5.8 | C/D (colour space) | **VOID — instrument** | pending |
 | `verify-depth-roundtrip` | §5.9 | C (`DEPTH_FIX`) | **NOT RUNNABLE** | pending |
 | `verify-terra-live` | §5.10 | A (`TERRA_PACE`) | **8/1 — leg 6 FAIL** | pending |
-| `verify-frame-pace` | §5.11 | E (`FRAME_STATS`) | **instrument absent** | pending |
+| `verify-frame-pace` | §5.11 | E (`FRAME_STATS`) | **instrument absent** | **5/0/1 NOTCAL** — instrument live, tear legs uncalibrated |
 | `verify-env-uniform` | §5.12 | C (`ENV_UNIFORM`) | pending | pending |
 | `verify-shadow-calm` | §5.13 | C (`SHADOW_CALM`) | **GREEN node-side 32/32** | pixels UM |
 
@@ -1634,9 +1634,48 @@ Since that run the tear legs print **(3a) ARMED** with the resize count, or
 **NOT CALIBRATED** — "0 of 0 outside a rAF" is what a window that never crossed
 a DPR or tier step reports, and that was passing (§2.10).
 
-**PASS 2 (flipped).** Structural legs only. **Every pacing number is UM**:
-SwiftShader at ~1 fps cannot produce a p95, a long-frame rate or a stall count.
-§2.3 is where the user's machine owns this row.
+**PASS 2b: THE INSTRUMENT WORKS, AND THE VACUITY GUARD EARNED ITS PLACE.**
+`5 passed, 0 failed, 1 NOT CALIBRATED`, rc 1, 260 s.
+
+(1) `window.__flyStats.frame` publishes **27 fields** with `sample()`/`ring()`/
+`reset()`; (2) the 13 the ledger quotes are all present. FRAME_STATS shipping ON
+(`6c26fe9`) is what made this row exist at all — pass 2a had no instrument.
+
+**(3a) fired: `no resize occurred in the window — resizes 0 over 107 frames`.**
+Without the §2.10 guard added in `9cba1b6`, this row would have printed
+`(3) EVERY RESIZE / DPR COMMIT IS INSIDE A rAF — 0 of 0 outside  PASS` and
+`(4) bufferMatchesDrawing NEVER GOES FALSE — 0 of 107 frames  PASS`, and the
+tear mechanism would have read **clean** on a window in which nothing resized.
+Both legs now carry `[NOT CALIBRATED — nothing resized; this is not evidence]`
+inline.
+
+**The phase attribution works, and it names an owner.** Serpentine 90 s, 100
+frames: p50 **829 ms**, p95 **3,641 ms**, p99 **4,062 ms**; stalls 21 (11/min
+against a 1,658 ms threshold); longtasks 68 (92,897 ms); **programs delta 0** —
+no recompile storm. And:
+
+```
+last stall 3660ms during [finalize:sat-roads ×16]
+```
+
+**A finding for A that follows from it:** `sat-road-engine.js:526` bounds its
+finalize with a module const `FINALIZE_PER_FRAME = 1` that is **not multiplied
+by `budgetK()`** — unlike the other engines, which all read
+`S.finalizePerFrame * budgetK()`. It is therefore the **seventh** budget site
+and the one the harness scaler now misses (veg was the sixth, fixed in
+`59b4e97`). At K=40 or K=200 every other engine speeds up and roads does not,
+which both starves the road ring and concentrates the stall there — exactly
+where the phase marker points. Not fixed here: it is A's engine, and the veg
+site was changed only on A's request.
+
+The pacing legs (5)–(8) print INFORMATIONAL by design and the numbers are the
+container's, not the product's: at ~1 fps every dt is a stall and any bound
+would be a statement about SwiftShader. `FRAME_PACE_STRICT=1` on the user's
+machine arms them, and that first run establishes the RED.
+
+**PASS 2c / user machine.** Structural legs only here. **Every pacing number is
+UM**; §2.3 is where the user's machine owns this row, and the tear LINE is not
+measurable anywhere in software.
 
 ---
 
