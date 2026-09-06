@@ -1164,7 +1164,65 @@ correct and my precondition was not. Fixed in `9cba1b6`.
 parent's TEXTURE into the child and disposes the parent model as before — it
 deliberately never co-displays. The ON leg recomputes (5) only to say so.
 
-**PASS 2 (flipped).** *pending* — the ON leg (gates 9–19) exists as of
+**PASS 2b (integration `ec53fd3`): THE ON LEG PROVED THE REFINE PATH, THEN THE
+GATE CRASHED.** rc 1, 860 s, ending at
+`ReferenceError: notCalibrated is not defined` — gate (14)'s NOT CALIBRATED
+path calling a helper the file never imported. The require was written in the
+same batch as the other seven gates, but that one replace had **no assert** and
+matched nothing. Seven files had it; this one did not.
+
+**What the ON leg produced before it died — D reads this as the refine path
+PROVEN:**
+
+| | OFF arm | ON arm |
+|---|---|---|
+| `refines` / `merges` | 4 / 0 | 4 / 0 |
+| `hardSwaps` | **4** | **0** |
+| `faded` | **0** | **4** |
+| `skip.*` | `disabled 4` | **all seven 0** |
+| ladder identity | 4 = 4+0 ✓ | 4 = 0+4 ✓ |
+
+`skip.disabled 0` proves the pin reached the ladder; `skip.unpatched 0` proves it
+reached it **before the materials were patched**. Warp settle steady at 3 after
+17 frames; `peakActive` 8 of 32; Owens 229 draws (OFF, fixture).
+
+**(3) went 27 → 0 re-appearances on a pure yaw** — A's residency trio, measured
+by this instrument. D's crossfade baseline is therefore **4 hard refines, not
+20**.
+
+**Three things in that row were the instrument, not the world:**
+
+1. **`active 8 / retained 2` is not a leak and not stuck.** `waitUntil` returned
+   *held*, so `active === 0` **was** observed; `retained` counts distinct parent
+   TEXTURES while `active` counts MATERIALS, and a refine arms four children off
+   one parent — 8/2 is exactly **two refine events in flight**, a 4:1 ratio no
+   stuck set lands on by coincidence. The yaw interval keeps pinning the final
+   heading, so the camera stops but the streamer does not, and each round trip
+   is several rendered frames.
+2. **(6)'s 20-of-59 refetch was my yaw step.** `START_YAW` swept `h0 + u·4π`
+   over 40 wall-clock seconds — **~51° of heading between displayed frames** at
+   this venue, precisely A's measured refetch regime (51°/frame → 28,
+   0.85°/frame → 0). (3) was the same experiment.
+3. **(5) asserted a mechanism D did not build.** `parentBlend` blends the parent
+   TEXTURE into the child material via clip-UV and disposes the parent model
+   exactly as upstream does, so a mesh co-display census reads **0 by
+   construction forever** — and its 0 was being written into the RED table as a
+   defect measurement.
+
+**Fixed for the re-take** (`cba7b45`, `356e32d`, `1187c47`, `b5a638a`): the yaw
+is per RENDERED frame at 0.85°/frame with a 360° minimum arc and
+`FLY_LOD_SWEEP_MS`; (3)/(6) read NOT CALIBRATED on a short arc; the drain
+returns **the snapshot that satisfied it**; a second read 12 frames later
+attributes a non-zero `active` to arrivals or calls it stuck; the leak signature
+is asserted on both reads as `active === 0 && retained > 0`; the free invariant
+`retained ≤ active ≤ 4 × retained` runs where the active set is non-empty; and
+(5) is replaced by D's handle — `terra.fades.active` sampled per frame, giving
+`maxBlendRun`, the crossfade window.
+
+**(14)'s ±25 % comparability guard would have fired on this run** — 46 vs 26
+frames, ratio 0.57. The refines matching at 4 was luck, not control.
+
+**PASS 2c (standalone re-take).** *pending* — the ON leg (gates 9–19) as of
 `9cba1b6`/`f7fe5f2`: `refines+merges === hardSwaps+faded` on both arms,
 `refines+merges` flat within ±25 % frame-count tolerance, `faded` rises /
 `hardSwaps` drops, `active === 0 && retained === 0` by poll, `0 < peakActive ≤ 32`,
@@ -1194,8 +1252,43 @@ steps, so none of the four failures is a 0-of-0. **Not measurable here: the
 tear LINE** — that is a compositor/vsync property, user-machine only, and a
 phone camera beats a software recorder because a recorder composites.
 
-**PASS 2 (flipped).** *pending* — all four failing legs to 0 with (1) still
-showing accepted steps > 0.
+**PASS 2b (integration `ec53fd3`): HALF THE WRITES MOVED INSIDE THE FRAME.**
+`4 passed, 4 failed`, rc 1, 241 s — and the shape of the remainder is what
+attributed it.
+
+| Leg | Pass 1 (flag-off) | Pass 2b |
+|---|---|---|
+| (2) canvas width/height outside a rAF | **18 of 18** | **12 of 30** |
+| (3) `setPixelRatio` outside | 6 of 6 | **6 of 12** |
+| (3) `setSize` outside | 12 of 12 | **12 of 24** |
+
+**The totals DOUBLED while the outside count stayed flat** — 6 → 12
+`setPixelRatio`, 12 → 24 `setSize`, with exactly half outside in each case.
+That is not a partial fix; it is a **double apply**, and A attributed it from
+source: the rig applies inside the frame, its React `setDpr` schedules a commit,
+r3f's `Canvas` layout effect runs an awaited `root.configure({dpr})`, and r3f's
+zustand subscriber re-applies `gl.setPixelRatio` + `gl.setSize` **outside any
+frame**. Six rig + six r3f.
+
+A's fix is `installResizeGuard` (`r24/a a0c1484`): a resize request for the
+state the renderer is already in never reaches the canvas, with
+`window.__flyStats.stepGuard` counting suppressions, plus a new
+`verify-step-guard.mjs` (13/13, standing RED control). **A says this gate needs
+no change** — (2)/(3) failed honestly and the guard makes them true — and
+expects (2) 0 of ~18, (3) 0 of 6 / 0 of 12, **with the totals falling** as the
+redundant calls stop.
+
+The gate gains one leg for the re-take, in A's own safest form: **(7) exactly
+one application per governor step, inside the frame** — per accepted step,
+`step.n` +1 **and** zero writes outside a rAF **and** `stepGuard` strictly
+increased. Not the obvious assertion, because `stepGuard` counts SUPPRESSED
+calls, is cumulative for the page's life, and counts redundant in-frame calls
+too, so `suppressed == outside-writes` is not a safe equality; and ABSENT is
+ambiguous unless paired with `step.n`. The expected totals drop is printed, not
+failed on.
+
+**PASS 2c (standalone re-take).** *pending* — all four failing legs to 0 with
+(1) still showing accepted steps > 0, and (7) green.
 
 ---
 
@@ -1232,6 +1325,38 @@ single tier step; forced step 0 → 1 with `{"n":1,"dpr":0.875,"applyMs":466.8,
 "canvasW":560,"canvasH":315,"composer":true,"viaValve":false}` — **inside a
 frame, not through the safety valve** — and composer buffers [560,315] equal
 the drawing buffer.
+
+**PASS 2b: 12/13 and 7/6 — the ladder is green, and gate 13 found something
+else entirely.** Every ladder leg passed on the flipped tree (rungs
+`0.875`/`0.75` before the tier rungs, refresh 144 with target **144**, the
+stutterer steps down, the clean control never does, dpr `[0.875, 0.75, 1]` then
+`["medium"]`, forced step 0 → 1 applied **inside a frame** with `applyMs` **2.5**
+against pass 1's 466.8, buffers `[560,315]` equal to the drawing buffer). The
+RED arm still fails 1, 2, 6, 7, 9 and 11 with the flags pinned off, so the
+calibration holds both ways.
+
+**But gate 13 fails on BOTH arms with a repeated uncaught exception:**
+`Cannot read properties of undefined (reading 'byteLength')` — ×31 on the fix
+arm, ×3 on the red arm. Pass 1 was clean, so it is a flipped-flag path; and
+because it appears with the pins **set and unset**, it is not `LADDER_FIX` or
+`STEP_SAFE`. These two rows are also **the only TOY boots in the pass** — every
+satellite row is clean — which is the bisection that pointed at the toy chunk
+path.
+
+**Attributed** (B, by headless attribute census): A's `FINALIZE_PACE`,
+`toy-world-engine.js:972` `geo.setIndex(idx)` with a raw `Uint32Array` under the
+paced branch. three wraps only plain arrays, so the typed array becomes
+`geometry.index` with no `.array` and `WebGLAttributes` throws at first upload.
+2×2 proof: `FINALIZE_PACE` ON → **80 broken LAND meshes**, OFF → **0**;
+`FLASH_GUARD` irrelevant.
+
+**The lesson this row pays for:** the gate printed the message thirty-one times
+and nothing else. Thirty-one copies of one message is ONE finding, and without a
+stack frame the row can only say it happened — attribution then costs two rows
+and three hypotheses. Every "no page errors" gate in the fleet now prints the
+first three UNIQUE exceptions **with stacks**, deduplicated by message
+(`scripts/_pageerrors.js`). One line would have attributed this in the first
+run.
 
 Why this row is the template: legs 3, 4, 8, 12 and 13 are green in BOTH arms.
 A control that passes in the red arm is what makes a failing leg mean
