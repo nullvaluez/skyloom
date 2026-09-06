@@ -483,7 +483,11 @@ above `8240539`, which is why the user's test build moves with it): E `e1a67f8`
 makes **B's headless attribute census node gate 17** — in the smoke set and in
 `cert-run`'s node-first block, asserting **`BROKEN=0` with
 `--noflag=FINALIZE_PACE` as the control**, so the toy index defect can never
-return unnoticed; **node smoke is 17/17 from here on**. It also takes
+return unnoticed; **node smoke is 17/17 from here on**. **The two node counts in
+this record are two SETS, not a discrepancy**: `SMOKE_NODE_ONLY=1
+scripts/r24-smoke.sh` runs **17** (its list carries `verify-seam` and the
+smoke-only rows), while `cert-run`'s **node-first block runs 16**, `attr-proof`
+included, because it does not repeat them. It also takes
 `verify-terra-live.js` **VERBATIM from the merged tree** — A's both-arms pin,
 the `__fxYaw` read and E's `attachPageErrors` together — rather than re-deriving
 it, so ruling 2 cannot come back as a second conflict; adds a per-pose
@@ -504,8 +508,8 @@ takes **the seventh budget site**: `sat-road-engine`'s finalize bound is now
 `Math.max(1, FINALIZE_PER_FRAME * budgetK())` and `verify-finalize-pace` goes
 **21 → 22** with the site-count gate at **6 → 7**. **That merge shipped broken
 for about two minutes** — the incident is §5.4 — and **`9bcaace`** is the fix
-(dedupe of a duplicated `budgetK` import; **17/17**, import-integrity **4/4**,
-finalize-pace **22/22**). **`9bcaace` is the tip the user is testing and the tree
+(dedupe of a duplicated `budgetK` import; **node smoke 17/17**, import-integrity
+**4/4**, finalize-pace **22/22**). **`9bcaace` is the tip the user is testing and the tree
 the re-take runs on**, the main worktree having been fast-forwarded to it with
 `:3100` free.
 
@@ -559,8 +563,8 @@ residency fix lands, because its open row is a product question and not an
 instrument one.
 
 **Re-take header, started 23:37:28 at load 0.45 — the quietest conditions any
-pass has had.** Tree at start `9bcaace`; **node gates 16/16 including
-`r24-b-attr-proof.js` at `BROKEN=0`** — on `ec53fd3` the un-pinned run read **80
+pass has had.** Tree at start `9bcaace`; **`cert-run`'s node-first block
+16/16, including `r24-b-attr-proof.js` at `BROKEN=0`** — on `ec53fd3` the un-pinned run read **80
 broken LAND meshes**, so **A's `FINALIZE_PACE` fix is CONFIRMED in node, in under
 a second, with no GL context, and the defect can no longer reach a browser row**;
 dev `:3100` **PID 26928 / PGID 26915**, distinct — the exact case where trusting
@@ -1033,8 +1037,8 @@ orchestrator's shell chain then **pushed `66ad406` BEFORE reading the gate line*
 — *the chain's exit status was `tail`'s, not the gate's* — so a tip that fails
 import-integrity (**"Identifier 'budgetK' has already been declared"**, which
 would fail the app's own compile) sat on the remote for **about two minutes**.
-Fixed in **`9bcaace`** (dedupe; 17/17, import-integrity 4/4, finalize-pace
-22/22), and **the push is now gated on the literal string `"17 passed, 0
+Fixed in **`9bcaace`** (dedupe; **node smoke 17/17**, import-integrity 4/4,
+finalize-pace 22/22), and **the push is now gated on the literal string `"17 passed, 0
 failed"`**. Two takeaways, the second being the structural one: **a push chained
 after a gate in one shell line is a push gated on nothing** (it pairs with
 lessons 16 and 54), and the fix for the duplicate-import CLASS is that **an owner
