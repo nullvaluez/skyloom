@@ -1605,3 +1605,35 @@ files 0 errors 0 warnings. Not run here: a full `next build`. The new
 export exists, the specifier matches, world-bend imports only fly-constants so
 no cycle) — the honest residual after the import-welding lesson, where only the
 module resolver caught the defect.
+
+---
+
+## Merge-review follow-up — the dead `SURFACE_CALM` import in FlyScene.jsx
+
+`fd7d28d` replaced FlyScene's inline `SURFACE_CALM.enabled &&
+SURFACE_CALM.depthOffsetFix && …` polygonOffset expression with the T11
+`offsetUnits()` helper and left the import behind. Removed on the merged tree
+(r24/c fast-forwarded to `9bcaace`, so the edit lands on the current file, not
+on a pre-merge copy).
+
+The two linter rules answer different questions and only one of them could see
+this: `no-undef` — the rule I run before every commit since `ad01d32` — cannot
+name an import that resolves fine and is simply never used; `no-unused-vars`
+names it exactly. The project's default config does not enable the latter for
+this file, so the RED had to be asked for:
+
+```
+RED   npx eslint --rule '{"no-unused-vars":["error",{"varsIgnorePattern":"^_"}]}'
+      components/fly/FlyScene.jsx
+      120:3  error  'SURFACE_CALM' is defined but never used.
+GREEN same command, 0 · default eslint 0/0 · grep SURFACE_CALM in FlyScene.jsx = 0
+```
+
+So the pre-commit discipline stands as written, with one addition worth
+carrying: **a helper extraction leaves a dead import behind, and `no-undef` is
+structurally blind to it.** An extraction commit should run both rules.
+
+Gates on the merged tree, node-only: verify-c-flagoff 40/40 ·
+verify-shadow-calm 33/33 · verify-depth-offset 7/7 · verify-worker-normals
+12/12 · four proofs PASS · verify-import-integrity 4/0. No browser, no dev
+server — E's re-take owns :3100.
