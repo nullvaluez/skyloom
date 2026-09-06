@@ -41,6 +41,9 @@ const { GROUND_VIS } = await import('../lib/fly/fly-constants.js');
 const { groundElevVis, stepGroundVis } = await import('../lib/fly/ground-vis.js');
 
 const STEP_M = 384; // the archived R22 measurement
+// Both legs are driven explicitly below, so this gate is independent of the
+// shipped flag — but it must hand the module back exactly as it found it.
+const SHIPPED = GROUND_VIS.enabled;
 let fails = 0;
 const gate = (n, ok, d = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`);
@@ -91,7 +94,7 @@ stepGroundVis(rt, fl, 0);
 fl.groundElev = 900;
 for (let i = 0; i < 10; i++) stepGroundVis(rt, fl, 0);
 gate('(5) SEAM the flight model keeps the RAW value', fl.groundElev === 900, `flight.groundElev ${fl.groundElev} · visual ${groundElevVis(rt, fl).toFixed(1)}`);
-GROUND_VIS.enabled = false;
+GROUND_VIS.enabled = SHIPPED; // restore the SHIP state, never a hard-coded one
 
 console.log(`\nVERIFY: ${fails ? 'FAIL' : 'PASS'}`);
 process.exit(fails ? 1 : 0);

@@ -21,8 +21,13 @@
  * A **HOLE** is a heal event that removed a resident mesh (evict + refetch)
  * rather than patching it in place.
  *
- * Run:  node scripts/r24-b-engine-proof.js
- *       node scripts/r24-b-engine-proof.js --on     (force all three flags on)
+ * Run:  node scripts/r24-b-engine-proof.js            (the SHIP state)
+ *       node scripts/r24-b-engine-proof.js --off      (force the flags OFF: RED)
+ *       node scripts/r24-b-engine-proof.js --on       (force the flags ON)
+ *
+ * The default leg reads the constants AS THEY SHIP, so it asserts whatever
+ * state the round closed in. `--off` is what keeps the flag-off branch under
+ * test after the close flip — the leg that would otherwise silently rot.
  */
 const path = require('path');
 const fs = require('fs');
@@ -64,6 +69,7 @@ const { encodeTile, scene, installFetchStub } = require('./r24-b-fixture.js');
 
 const EARTH_R = 6378137;
 const FORCE_ON = process.argv.includes('--on');
+const FORCE_OFF = process.argv.includes('--off');
 
 (async () => {
   const fails = [];
@@ -84,10 +90,13 @@ const FORCE_ON = process.argv.includes('--on');
   const api = globalThis.__r24BApi;
   await api.init();
 
-  if (FORCE_ON) {
-    C.CHUNK_FADE.enabled = true;
-    C.HEAL_IN_PLACE.enabled = true;
-    C.FLASH_GUARD.enabled = true;
+  // The engines read these flags at CALL time, so forcing them here after the
+  // module has loaded exercises the real branch without a second process.
+  if (FORCE_ON || FORCE_OFF) {
+    const v = FORCE_ON;
+    C.CHUNK_FADE.enabled = v;
+    C.HEAL_IN_PLACE.enabled = v;
+    C.FLASH_GUARD.enabled = v;
   }
   console.log(
     `\nflags: CHUNK_FADE ${C.CHUNK_FADE.enabled} · HEAL_IN_PLACE ${C.HEAL_IN_PLACE.enabled}` +

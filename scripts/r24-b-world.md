@@ -888,21 +888,41 @@ and a two-agent edit to it would collide at merge.
 
 ---
 
-## §13 THE FLIP TABLE — B's recommendation per flag at close
+## §13 THE SHIP TABLE — B's flags AS FLIPPED at close
 
-Fable flips the Level A blocks in ONE integration commit at cert; this is B's
-recommendation with the evidence each one rests on. **Every block in this branch
-ships `enabled: false`.**
+**This is the state committed in `lib/fly/fly-constants.js`, not a
+recommendation.** Five ON, two OFF. Each row carries the evidence the state
+rests on and the cost that comes with it.
 
-| flag | recommend | evidence | what it costs |
+| flag | SHIPPED | evidence | what it costs |
 |---|---|---|---|
 | **`FLASH_GUARD`** | **ON** — **satellite buildings PROVEN (Powell, Manhattan); skyline = INSURANCE; toy site NOT EXERCISED** | E's browser RED legs: Powell **8.28 %** (31,576 tris / 2,616 zero-area), Manhattan **13.98 %** worst chunk (42,364 tris / 5,820), coincident-vertex; B's headless serpentine **15,984 (14.19 %) → 0**; normals bit-identical across the filter; clean chunks return the same array object | **Zero bundle bytes moved, zero cache keys, zero draws, no frozen-gate exposure at all.** Index counts only fall. The cheap 95 % of the win. See §15 for what "insurance" and "not exercised" mean precisely |
 | **`BEND_LEAD`** | **ON** | pad deficit at the lead edge on **7 of 7 rings** — 54 / 558 / 747 / 241 / 1,205 / 3,405 / 31,412 m → 0; `padON ≥ padOFF` everywhere, so the pad can only ever KEEP geometry | a handful of ring-edge draw submissions; Owens cannot move (nothing to keep) |
 | **`CHUNK_FADE`** | **ON** | single-frame pops **92 → 2**, and both residuals are `fadeBudgetMiss` = 2, i.e. attributable; ramp steps 0 → 600 | `maxDying` 4 transient draws; **Owens exactly 0 by construction**. Needs E's `programsDelta`-flat run to confirm the pooled twins compile nothing |
 | **`HEAL_IN_PLACE`** | **ON** | heals **16 (0 in place) → 21 (21 in place)**; evictions 40 → 24 | one extra Float32Array per chunk (per-run ground); no keys, no draws |
 | **`GROUND_VIS`** | **ON** | worst single-frame visual step **384.0 m → 4.000 m**, converging in 95 frames; warp snaps; the flight model provably keeps RAW | a metre of visual lag on a refining DEM |
-| **`ENV_UNIFORM`** | **ON only after E's two runs** | noon bit-identical BY CONSTRUCTION (day-width normalisation + endpoint bypass) | needs (a) `programsDelta` flat across a dusk crossing AND a forced high↔medium step with `__flyGovPin` AND `__flySatShadowOverride` released, and (b) a twilight fixture A/B at the `verify-dusk` / `verify-sat-night` poses. **This is the one B feature whose flip I do not recommend on construction alone** |
-| **`RING_DEDUPE`** | **OFF — built but off** | live-winding A/B on E's tiles: sat verts −15.6 %, **skyline +31.6 % (`ring[0]` restored)**, **Powell toy +17.4 % (roof-form dispatch moving on the restored corner count)**, degenerate → 0, **Owens lock holds in BOTH legs** | It moves roof-form outcomes on four certified gates (`verify-roofs` 394/2985, `verify-roof-variety`, `verify-window-grids` 403, `verify-neon-city` 379) and carries a live hash re-baseline. **`FLASH_GUARD` alone already removes the entire degenerate population from the GPU with zero bundle-byte movement and no gate exposure — that is the cheap 95 % of the win.** The change RING_DEDUPE makes is in the CORRECT direction: the corner was real and was being eaten by a collinearity walk that saw a zero-length edge. But **correct and certified are different claims and only the second is a merge gate.** It becomes a follow-up: a roof re-certification under a controlled A/B, with the live hash re-baseline going with it |
+| **`ENV_UNIFORM`** | **OFF** — built, source-gated, browser proof NOT RUN | noon bit-identical BY CONSTRUCTION (day-width normalisation + endpoint bypass) | needs (a) `programsDelta` flat across a dusk crossing AND a forced high↔medium step with `__flyGovPin` AND `__flySatShadowOverride` released, and (b) a twilight fixture A/B at the `verify-dusk` / `verify-sat-night` poses. **This is the one B feature whose flip I do not recommend on construction alone** |
+| **`RING_DEDUPE`** | **OFF** — built and measured | live-winding A/B on E's tiles: sat verts −15.6 %, **skyline +31.6 % (`ring[0]` restored)**, **Powell toy +17.4 % (roof-form dispatch moving on the restored corner count)**, degenerate → 0, **Owens lock holds in BOTH legs** | It moves roof-form outcomes on four certified gates (`verify-roofs` 394/2985, `verify-roof-variety`, `verify-window-grids` 403, `verify-neon-city` 379) and carries a live hash re-baseline. **`FLASH_GUARD` alone already removes the entire degenerate population from the GPU with zero bundle-byte movement and no gate exposure — that is the cheap 95 % of the win.** The change RING_DEDUPE makes is in the CORRECT direction: the corner was real and was being eaten by a collinearity walk that saw a zero-length edge. But **correct and certified are different claims and only the second is a merge gate.** It becomes a follow-up: a roof re-certification under a controlled A/B, with the live hash re-baseline going with it — **and it carries the skyline lost-corner fix (§15.1) with it, which is the reason to come back to this flag rather than drop it** |
+
+### 13.1 Two things about this table that are easy to misread
+
+**`verify-flash-guard` (3) goes green on PASS 2, not pass 1.** E's pass-1 row
+was **RED by design**: the harness's runtime pin only knows `'off'`, so on a
+tree where `FLASH_GUARD` still shipped `enabled:false` the "guard on" leg had
+no way to exist. Running the SAME certification script again on this flipped
+tree is what turns it green — the gate did not change, the tree did.
+
+**Three of B's node gates now default to the SHIP state**, so `--off` / a
+forced-off leg is what keeps the flag-off branch under test after the flip:
+
+| gate | ship-state leg | flag-off leg |
+|---|---|---|
+| `r24-b-engine-proof.js` | default — 2 pops, 600 ramps, 21/21 heals in place, 0 degenerate | `--off` — **92 pops, 0 ramps, 0 heals in place, 15,984 degenerate** |
+| `r24-b-worker-proof.js` | default — `RING_DEDUPE` off, so the RED census legs still hold | `--dedupe` — the flag-on A/B |
+| `r24-b-groundvis-proof.mjs` | drives both legs explicitly and now restores the SHIPPED flag value instead of a hard-coded `false` | both, always |
+
+A gate that only ever asserts the state it happens to find is not a gate; every
+one of these still fails on the branch it is meant to protect.
 
 ---
 
