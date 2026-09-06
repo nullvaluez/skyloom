@@ -21,7 +21,7 @@
  * they are one-line facts that a future edit could silently undo: every chunk
  * engine calls the shared brake, and the toy index build is a typed array.
  */
-import { mkdirSync, copyFileSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { checkShip } from './_r24a-ship-state.mjs';
