@@ -28,7 +28,39 @@ scripts/r24-smoke.sh 3105          # the subset that runs in this container
 Legend: ✔ green · ✘ red · — not run · **UM** user machine only · *(fx)* fixture
 column · *(live)* live column.
 
-### 1.1 Node gates (no browser, no GPU, no network — run anywhere)
+### 1.1 Node gates — ALL GREEN on the INTEGRATED tree (E's worktree, 2026-09-06)
+
+Run: `node scripts/<gate>` from the merged tree at `990c7b5`.
+
+| Gate | Result | Numbers |
+|---|---|---|
+| `verify-classify.mjs` | **PASS** | |
+| `verify-warbirds.mjs` | **PASS** | |
+| `verify-daily.mjs` | **PASS** | |
+| `verify-depth-offset.mjs` | **PASS** | 7 gates |
+| `verify-terra-residency.mjs` | **PASS** | 21 passed, 0 failed |
+| `verify-c-flagoff.mjs` | **PASS** | 26 gates |
+| `verify-worker-normals.mjs` | **PASS** | 12 gates; **node-proven, user machine for pixels** |
+| `verify-skirt-worker.mjs` | **PASS** | 8 passed, 0 failed |
+| `verify-lod-fade.mjs` (D's node half) | **PASS** | 51 passed, 0 failed |
+| `verify-vendor-three-tile.mjs` | **PASS** | 19 passed, 0 failed |
+| `verify-skirt-fast.mjs` | **PASS** | 12 passed, 0 failed |
+| `verify-frame-step.mjs` | **PASS** | 10 passed, 0 failed |
+| `verify-finalize-pace.mjs` | **PASS** | 11 passed, 0 failed |
+| `verify-artifact-hygiene.mjs` | **PASS** | 5 passed, 0 failed |
+| **`verify-seam.js` node leg (offline, fixture-pinned)** | **PASS** | 9 gates; 149 z14 tiles; Owens hatchKept **0**; worst slope 2.5; ramp 0/149 disagree; 0 seam pairs; determinism manhattan kept **311** `8d36f2aa:89218640:13605`, columbus kept **193** `2eefc447:49bbe703:8715` |
+
+**The seam hashes are IDENTICAL to the pre-merge run on `r24/e` alone.** With
+every R24 flag off, five agents' merges leave the worker's output byte-identical
+on 149 fixture tiles — which is the flag-off byte-identity claim, measured
+rather than asserted.
+
+The artifact redirect is proven in the same run: `verify-seam` wrote its
+calibration JSON to `scripts/r24-out/fixture-r21-e-red-seam.json` and the
+tracked `scripts/r21-e-red-seam.json` was untouched (`verify-artifact-hygiene`
+5/5, working tree clean).
+
+### 1.1b Node gate inventory (what each is for)
 
 | Gate | Fixture | Live | Notes |
 |---|---|---|---|
