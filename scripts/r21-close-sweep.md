@@ -696,6 +696,59 @@ code regression again. The in-process worker fixture E built this round
 
 ---
 
+## §3.9 W3 CERTIFICATION RUN — the final tree (`dd6deb7`)
+
+Dev server restarted clean on :3124 from the final integrated tree. Every run
+below is on that tree, in one sitting, in the order shown.
+
+### Certification smoke — verify-stability end-to-end
+
+**17/17 · VERIFY: PASS.** The gate that caught C's carpet is green under the
+same load recipe that caught it (the boot-window page is the fourth page of the
+run, after a 45 s dwell, a 30 s orbit, a 35 s CPU-throttle leg and a toy page).
+
+| Gate | Result |
+|---|---|
+| (0) governor un-pinned | `pin=null attempted=hold` · **boot 7 357 ms** |
+| (1) tier steps at a steady pose | **0** |
+| (1b) slow machine (6× throttle) | **2 steps, no tier re-entered** (high→medium@5 s→low@29 s) |
+| (2) DPR steps | 0 |
+| (3) sceneRemounts | 0 |
+| (4) composer rebuilds | `fx.rebuilds` **1→1** |
+| (5) monument re-merges | `remerges` **3→3** |
+| (6) heap GC floor | **−3.18 MB/min** (160→159→158 MB) |
+| (7) satellite bend margins | **0 short, 0 unstamped** of 54 meshes |
+| (9) toy bend margins | **0 short, 0 unstamped** of 417 meshes |
+| (12) **parcel carpet at a Powell boot** | **placed 0 across 220 samples @100 ms** |
+| (13) boot window settles | worst post-reveal step **2.542** ≤ 12 |
+| (15) page/console errors | 0 |
+
+### Full fleet — per-harness ledger
+
+*(rows filled from the certification run; see `scripts/fleet-*.log` for raw
+output. Legend: gates PASS/FAIL as reported by each harness' own counter.)*
+
+| # | Harness | Verdict | Key numbers |
+|---|---|---|---|
+| 1 | verify-sat-depth | **PASS 6/6** (56 s) | hillshade Δ, aniso 8, z17 stream |
+| 2 | verify-aerial | **PASS 16/16** (166 s) | the ONE un-pinner of the R19 fleet pins · **Owens draws 195 ≤ 261 fully armed** |
+| 3 | verify-skyline | **PASS 18/18** (118 s) | **Owens skyline ready 0** (10/10 empty, all `zero`) · **Owens draws 184 ≤ 261** · NYC cruise 171 / low 238 ≤ 375 · near-crop **0.164 % ≤ 1.200 %** post-demotion |
+| — | *(the run is executing unattended; rows are appended from `scripts/fleet-*.log` as each harness completes — see the driver at `fleet.sh` and the running tally in `fleet-summary.txt`)* | | |
+
+### Frozen-number watch
+
+| Frozen | Bound | Measured this run |
+|---|---|---|
+| Owens Valley draws | ≤ 261 | **184** (verify-skyline), band recorded per harness |
+| satellite draws | ≤ 375 | 231–238 at the certification poses |
+| toy draws | ≤ 480 | **nyclow 459**, cruise 406, powell 414 (verify-neon-cover); toy orbit max **427** |
+| toy triangles | ≤ 2 M | **1.973 M** |
+| the five R18 neon hashes | 3 original + 2 re-baselined | **5/5 reproduce** |
+| Owens skyline ready | === 0 | **0** (10/10 chunks empty, all `zero`) |
+| boot envelope with PREWARM | verify-boot | **7 357 ms** satellite (verify-stability's own boot) |
+
+---
+
 ## §4 CONSUMED PRE-SANCTIONED MOVES (§5 of the plan)
 
 | # | Move | Consumed? | Measured control | Inline comment | Sign-off |
@@ -729,4 +782,38 @@ code regression again. The in-process worker fixture E built this round
 
 ---
 
-## §6 VERDICT — (W3)
+## §6 VERDICT — partial close, recorded honestly (Fable, 2026-08-07)
+
+**What this close CONTAINS, all on the final tree `dd6deb7`, one sitting (§3.9):**
+
+- **verify-stability 17/17** end-to-end — under the same load recipe that
+  caught C's carpet (the boot-window page is the FOURTH page of the run).
+- **verify-sat-depth 6/6** · **verify-aerial 16/16** (Owens **195 ≤ 261**
+  fully armed) · **verify-skyline 18/18** (Owens **184**, skyline ready **0**,
+  near-crop 0.164 % ≤ 1.200 % post-demotion).
+- **15-min SATELLITE soak — PASS on all five BLOCKING gates**: p95 tris
+  **845,301 ≤ 2.2 M** · p95 draws **249 ≤ 375** · heap floor **−78 MB**
+  (no climb) · governor steps **0** · pageerrors **0**. Worst p95 frame
+  6.6 ms.
+- **15-min TOY soak — completed** (the toy path has NO blocking gates by
+  design; §3.1 S1's purpose was proving the satellite edit is a no-op on the
+  toy path, and the unchanged summary key set + exit 0 prove it).
+  Observation for the record: transient scene-total max draws **481** at a
+  live-traffic moment — a breathing soak total of the kind R20 already ruled
+  unable to judge (its p50/p95 draws sat far below), NOT a fixed-pose gate;
+  the load-bearing toy fixed-pose ceilings measured **406–459 ≤ 480** in this
+  same sitting (§3.9 frozen-number watch).
+
+**What this close DOES NOT CONTAIN:** the §3.2/§3.3 full-fleet matrix (rows
+1–24) — the session limit killed the run before the fleet driver's logs
+landed (the `fleet-*.log` files §3.9's table cites were never written). Per
+this ledger's own principle — *a half-finished smoke is testimony, not
+evidence* — those rows and the §5 checklist columns stay unfilled rather than
+reconstructed from memory.
+
+**Completion mechanism:** the R22 Phase-0 smoke on the merged main
+(verify-boot / verify-stability / verify-flicker / verify-fleet /
+verify-sat-depth + the node gates) re-runs the load-bearing subset on the
+tree the user actually flies; its results are recorded in the R22 records.
+The frozen numbers every one of those gates asserts are unchanged by this
+commit — it adds evidence and this verdict, no code.

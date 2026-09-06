@@ -20,3 +20,4 @@ repomix-output.xml
 *.log
 .DS_Store
 Thumbs.db
+scripts/r24-out/

@@ -12,7 +12,43 @@
 > describes deleted code (markers, panels, Leaflet-era plans); do not act
 > on it.
 
-> **⚠️ NEWEST — READ FIRST:** **Round 21 "Steady State" is BUILT and pushed
+> **⚠️ NEWEST — READ FIRST (2026-09-06): `main` was RESET to the Round 21
+> "Steady State" tree (`3592656`) and Round 24 "Smooth World" is SCAFFOLDED
+> on it — [FLY_ROUND24_PLAN.md](FLY_ROUND24_PLAN.md) is the active plan,
+> [FLY_ROUND24_KICKOFF.md](FLY_ROUND24_KICKOFF.md) the orchestrator prompt,
+> [`scripts/r24-recon.md`](scripts/r24-recon.md) the six-reader evidence
+> ledger.** Rounds 22, 22.1 and 23 (Terrain & Immersion / World Stability /
+> Night Alive) are **ARCHIVED, NOT MERGED** — branch
+> `archive/r22-r23-main-44ec502`, tag `r23-archived-44ec502` (tag local-only; the branch is the durable ref) — because the
+> user reported screen glitches on those builds and R22 shipped on a soak
+> waiver, R22.1 certified a 13-harness subset, R23 could not stream tiles, and
+> the two parallel rounds were merged build-only with no cross-round sweep.
+> Their ledgers remain valuable DIAGNOSES (the one-frame white flash is a
+> zero-area DoubleSide wall triangle from the vector-tile ring closure; the
+> banking micro-stutter is three-tile's main-thread skirt sort; a DPR step
+> resizes the canvas outside the frame) and the defect sites are verbatim in
+> this tree — R24 re-implements those fixes cleanly and never cherry-picks
+> them. **What the recon found at the root, ranked:** main-thread skirt
+> builds + a quadtree that walks every frame and collapses tiles behind the
+> camera (every yaw re-streams the near field); per-chunk finalize and
+> first-draw uploads inside the render; dusk/tier program-key flips that
+> recompile every lit material mid-flight; no fixed timestep; the HUD label
+> canvas one frame behind the GL frame; haze/fade colors authored in sRGB but
+> mixed as linear since the composer took over (the horizon band cannot match
+> by construction); four sun directions per frame across a Standard/Lambert/
+> Toon/Basic material zoo; postprocessing double-converting reversed depth
+> under three r185 (toy DOF is a uniform blur); SMAA before tone mapping with
+> no dither; last-writer flat terrain normals; unlit cloud billboards. W0
+> scaffolding in this commit: `WORKER_PROTOCOL 17→18` at all six pin sites
+> lockstep, 26 pre-seeded `enabled:false` owner blocks at the end of
+> `lib/fly/fly-constants.js`, the R21 close records imported verbatim (docs
+> only — the close commit touched no code). **Environment truth for the cloud
+> container: tile hosts 403-blocked, WebGL = SwiftShader ~1 fps, Chrome
+> absent — E CERT builds an offline world fixture first; every fps/ms/tearing
+> number is the user's machine's.** The R22 "Cinematic Night" handoff is
+> superseded by the R24 plan (its deltas are folded into C LIGHT / D ATMOS).
+
+> Earlier: **Round 21 "Steady State" is BUILT and pushed
 > (2026-08-07): [FLY_ROUND21.md](FLY_ROUND21.md) is the record** (plan
 > [FLY_ROUND21_PLAN.md](FLY_ROUND21_PLAN.md); FIVE Opus 5 agents — A GOVERNOR
 > / B STREAMKEEPER / C SURFACE / D PIPELINE / E CERT — under Fable
