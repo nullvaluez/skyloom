@@ -606,6 +606,43 @@ which catches the clip-intersection case where two points land a few float ulps
 apart — **the SLIVER half of the WB-1 hypothesis, as opposed to the coincident
 half that dominates the census.**
 
+### 7.2b THE LIVE-WINDING COLUMN — and a finding bigger than the dedupe
+
+**B's own MVT encoder winds rings POSITIVE; the live OpenFreeMap planet — and
+E's fixture, which reproduces it — wind them NEGATIVE.**
+`classifyRings`/`classifyRingsSat` branch on that sign, so every number in
+§7.1/§7.2 exercises the OPPOSITE branch from the one the user's machine runs.
+§7.1 is still the right instrument for **flag-off byte identity** (a hash that
+does not move cannot move on either branch), but **anything E re-baselines a
+frozen gate against must come from the live winding.** That is gate (8), on E's
+own tiles:
+
+| E tile / builder | verts OFF → ON | degenerate OFF → ON |
+|---|---|---|
+| manhattan sat-buildings | 43,790 → **36,941** (−15.6 %) | 2,936 → **0** |
+| manhattan sat-skyline | 4,570 → **6,015** (+31.6 %) | 0 → 0 |
+| manhattan toy `full` | 32,696 → 27,779 (−15.0 %) | 2,288 → **0** |
+| powell sat-buildings | 22,723 → 20,399 (−10.2 %) | 908 → **0** |
+| powell toy `full` | 11,927 → **13,999 (+17.4 %)** | 956 → **0** |
+| owens (all three) | `empty` reason `'zero'` in BOTH legs — **the Owens lock holds** | — |
+
+**Powell's toy bundle getting BIGGER is the important one, and it says
+`RING_DEDUPE` is not a pure removal.** Restoring `ring[0]` changes each
+footprint's CORNER COUNT, and corner count drives **roof-form dispatch** in both
+pipelines: `simplifyRing(outer, RS.simplifyTolTile)` at worker `:1817` feeds the
+satellite band dispatch, `simplifyRing(outer, 2)` at `:2000` and `:4371` feeds
+the toy one, and those bands test for an EXACT 4-corner ring (a gable) among
+other counts. A suburban footprint that was silently rendering as a 3-corner
+ring now reads as the 4-corner ring it always was — and takes a different, more
+detailed roof.
+
+**That makes `RING_DEDUPE` a re-CERTIFICATION item, not merely a hash
+re-baseline.** `verify-roofs` (394/2985), `verify-roof-variety`,
+`verify-window-grids` (403) and `verify-neon-city` (379) all stand on roof-form
+outcomes. The change is in the CORRECT direction — the corner was real and was
+being eaten — but "correct" and "certified" are different claims, and only the
+second one is a merge gate.
+
 ### 7.4 Frozen hashes this touches
 
 `verify-neon-cover`'s five frozen R18 bundle hashes and `verify-seam`'s

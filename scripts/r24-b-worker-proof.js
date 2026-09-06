@@ -406,7 +406,69 @@ function drape(pos, anchor) {
     soft('(6) cross-check vs E fixture', 'E', String(e?.message ?? e));
   }
 
-  console.log('\n--- (5) WORKER FINGERPRINTS (M2 byte-identity baseline) ---');
+  /* ---- (8) E-TILE FINGERPRINTS — the LIVE-WINDING column ----------------- */
+  // WHY THIS EXISTS AND WHY IT OUTRANKS TABLE (5). B's own MVT encoder winds
+  // rings POSITIVE; the live OpenFreeMap planet — and E's fixture, which
+  // reproduces it — wind them NEGATIVE. classifyRings / classifyRingsSat branch
+  // on that sign, so every number in table (5) exercises the OPPOSITE branch
+  // from the one the user's machine runs. Table (5) is still the right
+  // instrument for FLAG-OFF BYTE IDENTITY (a hash that does not move cannot
+  // move on either branch), but any number E re-baselines a frozen gate
+  // against must come from the LIVE winding. That is this table.
+  try {
+    const { mvtTile } = await import(pathToFileURL(path.join(ROOT, 'scripts/r24-fixture/mvt.mjs')).href);
+    const S2 = await import(pathToFileURL(path.join(ROOT, 'scripts/r24-fixture/scenes.mjs')).href);
+    const E_POSES = [
+      ['manhattan', -74.0113, 40.7075],
+      ['powell', -83.0752, 40.1578],
+      ['owens', -118.1, 36.6],
+    ];
+    const rows = [];
+    for (const [nm, lon, lat] of E_POSES) {
+      const ex = Math.floor(S2.lon2tile(lon, 14));
+      const ey = Math.floor(S2.lat2tile(lat, 14));
+      const eb = mvtTile(14, ex, ey);
+      const rst = installFetchStub(() => eb);
+      for (const [detail, slot] of BUILDS) {
+        const rr = await api.buildTile(14, ex, ey, detail);
+        const bb = rr?.[slot];
+        if (!bb?.idx) {
+          rows.push([nm, detail, '—', '—', rr?.empty ? `empty:${rr.reason ?? '-'}` : 'no-slot', '—']);
+          continue;
+        }
+        const dd = drape(bb.pos, bb.anchor);
+        const cc = census(bb.idx, dd);
+        rows.push([nm, detail, bb.pos.length / 3, bb.idx.length, fnv(bb.pos), fnv(bb.idx), cc.degen]);
+      }
+      rst();
+    }
+    console.log(
+      `\n--- (8) E-TILE FINGERPRINTS — LIVE WINDING (negative first-ring signedArea) ---` +
+        `\n    RING_DEDUPE.enabled = ${C.RING_DEDUPE.enabled}. THIS is the column E re-baselines against.`
+    );
+    console.log('scene      builder        verts   idxLen  fnv(pos)  fnv(idx)  degen');
+    for (const r of rows)
+      console.log(
+        `${String(r[0]).padEnd(10)} ${String(r[1]).padEnd(14)} ${String(r[2]).padStart(6)} ${String(r[3]).padStart(7)}  ` +
+          `${String(r[4]).padEnd(9)} ${String(r[5]).padEnd(9)} ${String(r[6])}`
+      );
+    const owens = rows.filter((r) => r[0] === 'owens');
+    gate(
+      '(8) THE OWENS LOCK holds on E tiles in BOTH flag legs — the desert issues nothing',
+      owens.every((r) => r[2] === '—'),
+      owens.map((r) => `${r[1]}:${r[4]}`).join(' ')
+    );
+  } catch (e) {
+    soft('(8) E-tile fingerprints', 'E', String(e?.message ?? e));
+  }
+
+  console.log('\n--- (5) WORKER FINGERPRINTS — B ENCODER, POSITIVE WINDING ---');
+  console.log(
+    '    Flag-off byte-identity instrument. B\'s encoder winds rings POSITIVE,'
+  );
+  console.log(
+    '    i.e. the OPPOSITE classifyRings branch from live OFM — see table (8).'
+  );
   console.log('scene      builder        verts   idxLen  fnv(pos)  fnv(idx)  fnv(col)  fnv(anchor)');
   for (const r of fps)
     console.log(
