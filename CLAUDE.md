@@ -12,7 +12,96 @@
 > describes deleted code (markers, panels, Leaflet-era plans); do not act
 > on it.
 
-> **⚠️ NEWEST — READ FIRST (2026-09-06): `main` was RESET to the Round 21
+> **⚠️ NEWEST — READ FIRST (2026-09-06): Round 24 "Smooth World" is BUILT on
+> the integration branch `claude/skyloom-r24-orchestration-6753n2` — `main` is
+> NOT fast-forwarded, that is the user's call — and
+> [FLY_ROUND24.md](FLY_ROUND24.md) is the record** (plan
+> [FLY_ROUND24_PLAN.md](FLY_ROUND24_PLAN.md); FIVE agents — A PACE / B WORLD /
+> C LIGHT / D ATMOS / E CERT — under orchestration, plus a sixth for the close;
+> W0 scaffolding `6116fc5` moved `WORKER_PROTOCOL 17→18` at all six pin sites
+> lockstep and pre-seeded 26 `enabled:false` owner blocks — zero constants
+> conflicts a fourth straight round). **The user's report was: "really bad
+> screen tearing and glitching, mainly buildings appearing and disappearing,
+> and terrain tiles swapping for other ones"** (build not named; the machine
+> questions were never answered, so the plan's defaults — DPR-1 60 Hz desktop,
+> Chrome, satellite — were used). **Buildings**: the R21 bend-margin census ran
+> at speed 0 where the lookahead lead is 0, so the pad is short on 7 of 7 rings
+> the moment you move (54–31,412 m → `BEND_LEAD` covers all seven, and the
+> pooled veg/parcel/tint layers cull as ONE object); every chunk birth and
+> eviction is a CUT (`CHUNK_FADE` + `HEAL_IN_PLACE`: single-frame pops
+> **92 → 2**, both attributable, heals **16 (0 in place) → 21 (all in place)**,
+> evictions 40 → 24, on the REAL engine + REAL worker over 2,700 headless
+> frames); the vector-tile ring closure still puts two exactly-degenerate
+> DoubleSide triangles on every ring (`FLASH_GUARD`: **15,984 resident
+> degenerate → 0** in node, and live fixture REDs of **Powell 8.28 % /
+> Manhattan worst chunk 13.98 %** — while sat-skyline reads EXACTLY 0, so the
+> guard is INSURANCE there, and the toy site is not exercised by any browser
+> row); one DEM refinement sweeps every AGL-keyed band **384.0 m in one frame**
+> (`GROUND_VIS` → 4.000 m, converging in 95); and on a DPR-1 display the
+> governor's FIRST step is a TIER step that unmounts the building layers
+> (`LADDER_FIX` + `STEP_SAFE`). **Tiles**: three-tile merges on frustum exit
+> with a ×5 factor and no hysteresis — a 720° yaw at a parked position gave
+> **merges 22 → 0, tiles replaced ON SCREEN 17 → 0, parent refetches 178 → 0**
+> (`TERRA_PACE.keepResident` is the closing switch; hysteresis alone cannot
+> beat the ×5) — plus `Timer.reset` never zeroing `_elapsed` and a whole-tree
+> freeze while the loader is saturated (which E measured stalling the quadtree
+> at maxZ 6 with drapes restarting forever), the main-thread skirt sort
+> (`skirtFast`, output-identical, 7.1×/6.5× isolated), and the atomic LOD swap
+> (`LOD_CROSSFADE`, RED measured, ships OFF pending a pinned ON leg). **Also
+> found and fixed, none of it on the shopping list:** three r185 adds the
+> shadow bias UNCONDITIONALLY in the PCF branch (VSM and BASIC have the
+> reversed-depth `#ifdef`), so every receiver was biased toward shadowed by
+> ~1.6 m and `normalBias 4` was hiding it; `HueSaturationEffect`'s
+> `min(color, 1.0)` ran BEFORE the tone map since R13, so a 3.2-linear window
+> and a 12.0-linear runway light were the same 8-bit **228** (now 254/255);
+> reversed depth is double-converted, so the Neon tilt-shift CoC was flat
+> 0.176 from 5 m to 300 km; haze targets authored in sRGB were mixed as linear
+> (seam 9.3–99.2 per 255 → **0.000**, zero constants moved); and **the
+> satellite key light never moved with the sun on ANY tier, on the whole
+> harness fleet**, because the position write lived inside the shadow gate
+> `scripts/_boot.js` pins to 0 (`live:false`, key↔hill 10.50° measured).
+> **CERTIFICATION VENUE TRUTH:** the cloud container 403-blocks Esri/OFM/adsb,
+> its WebGL is SwiftShader at ~1–3 fps and Chrome is absent, so E built an
+> OFFLINE WORLD FIXTURE and **every fps / ms / stall / tearing number belongs
+> to the user's machine.** 15 node gates green on the integrated tree, the
+> worker byte-identical across five merges on 149 fixture tiles, Owens 184 ≤
+> 261 / satellite 153–176 ≤ 375 / toy 91 ≤ 480 in the FIXTURE column (which
+> bounds nothing live), and a boot proof of 62.5 s with zero errors on
+> `5ca8e15`; the browser rows run in TWO passes (flag-off, then flipped) and
+> are still in flight <!-- CERT PENDING -->. **The user's machine has confirmed
+> NOTHING this round — the diagnosis pack (`scripts/r24-user-diag.md`) went out
+> and Part A never came back, so there is no before and no performance
+> verdict.** **The three-import incident:** W3's first certification run was
+> VOID because three agents had each shipped a helper without its import — D's
+> was at MODULE SCOPE and took the whole `components/fly` chunk down in both
+> styles — from an un-asserted `String.replace` that silently no-ops on a miss,
+> invisible to a project ESLint with no `no-undef`, to a compile check that
+> resolves modules and not identifiers, and to branches whose last browser gate
+> predated the commit. **New gates:** verify-shadow-calm (32/33, it runs the
+> ShaderChunk patch against three's real text and the texel snap numerically),
+> verify-import-integrity ("can the app EVALUATE"), verify-atmo-law (41–45),
+> verify-lod-fade (51), verify-terra-residency (21), verify-c-flagoff (37),
+> verify-worker-normals (12), verify-skirt-fast (12), verify-skirt-worker (8),
+> verify-finalize-pace (11), verify-frame-step (10), verify-vendor-three-tile
+> (19), verify-depth-offset (7), verify-artifact-hygiene (5), plus E's fixture
+> fleet (fixture / flash-guard / fade / lod-fade / step-clean / one-sun /
+> linear-haze / depth-roundtrip / frame-pace) and `r24-smoke.sh`. **SHIP
+> STATE:** ON at close — FLASH_GUARD, BEND_LEAD, CHUNK_FADE, HEAL_IN_PLACE,
+> GROUND_VIS, LINEAR_HAZE, ONE_SUN (dayK 1.0), POST_ORDER, DEPTH_FIX,
+> SHADOW_CALM, TERRAIN_LIGHT (tile half), CLOUD_LIT, LAMBERT_ENV, TERRA_PACE
+> {timerFix, mergeHysteresis, keepResident, skirtFast, walkWhileSaturated,
+> bboxCache}, LADDER_FIX, STEP_SAFE, HUD_SYNC, REBASE_CALM, FINALIZE_PACE,
+> FRAME_STATS, AERIAL_LAW.nightRamp; OFF — AERIAL_LAW (no pixel A/B exists),
+> LOD_CROSSFADE (pending its pinned ON leg), ENV_UNIFORM, RING_DEDUPE,
+> SKY_PROCEDURAL, FRAME_STEP (a "not landed" row: the sim half ships, no
+> consumer reads the smoother pose), skirtWorker + bendSphere +
+> workerNormals (one real-hardware run each). **Read
+> [FLY_ROUND24.md](FLY_ROUND24.md) §4 for what was and was not certified,
+> §5 for the postmortem, §6 for the user checkpoints (all pending), and
+> [`scripts/r24-close-sweep.md`](scripts/r24-close-sweep.md) §2.7 for the
+> user-machine run list.**
+
+> **Earlier (2026-09-06, W0): `main` was RESET to the Round 21
 > "Steady State" tree (`3592656`) and Round 24 "Smooth World" is SCAFFOLDED
 > on it — [FLY_ROUND24_PLAN.md](FLY_ROUND24_PLAN.md) is the active plan,
 > [FLY_ROUND24_KICKOFF.md](FLY_ROUND24_KICKOFF.md) the orchestrator prompt,
