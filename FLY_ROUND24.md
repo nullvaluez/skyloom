@@ -85,6 +85,15 @@ unsupported by the shader.
 | **Hard LOD pop** (T4 b/c) | a refine or merge is an atomic parent↔children swap in ONE synchronous block — no frame draws both, none draws neither — and the relief snaps with the texture (`7000·(1−z/17)³`: z13 ≈ 91 m, z15 ≈ 11 m) | D `LOD_CROSSFADE` (parent-texture clip-UV blend on refine AND merge, ~0 extra draws) | **RED on the fixture** (Powell altitude ladder 4000→1600→800→380→1600→4000 m, 640×360, A's pacing ON): **hardSwaps 20 / faded 0**, `skip.disabled 20` — un-faded because the flag is off, not because a guard fired; A's counters read refine 16 / replacedOnScreen 0 / **merges 0** (that zero is `keepResident` working, which is why D's value lands on REFINES). **The ON leg was never obtained** (§5.1) |
 | **Skirt built on the main thread** (T2/A2) | `getBoundaryEdges` allocates 3·T pair-arrays and sorts them with a boxed comparator per DEM tile (~98 k arrays, ~1.6 M comparisons at 129²), on the MAIN thread, four children per microtask. Archived R22.1 profiling: 37 % + its comparator 30 % = **67 % of every stalled millisecond** | A `skirtFast`; `skirtWorker` BUILT-OFF | `verify-skirt-fast` **12/12** element-by-element identical through the PUBLIC `setAttributes` on 13 cases incl. six real Martini tiles up to **116,079 indices**, four non-manifold cases BAILING to the verbatim body; isolated algorithm timing **7.1× / 6.5×** (this container's CPU, not a frame time); table reuse proven (heap 16.5 → 9.2 MB / 25 tiles). `verify-skirt-worker` **8/8** node-identical (6,912 / 26,112 / 101,376 indices) |
 
+**Why the live symptom reads worse than any fixture number.** The fixture
+serves deterministic bytes per (z, x, y); Esri does not. A merge REPLACES four
+children with a coarser parent, so on the fixture that parent is consistent
+imagery and the swap reads as a resolution change — on the user's machine it is
+a **DIFFERENT CAPTURE** (season, sun angle, colour), which the URL/position
+probe cannot see because both are correct (§4.2, terra-live arm A: 0 mismatches
+in 62 of 64 tiles). It is still LOD policy and the fix is unchanged; it is only
+the reason no fixture number conveys how violent the live event looks.
+
 ### Symptom C — "screen tearing" (what this venue can and cannot say)
 
 A tear line is a compositor/vsync property: no screenshot and no JS timer can
@@ -255,13 +264,22 @@ reading of E's live flash-guard REDs (§4.2).
 | `LINEAR_HAZE` | `f15f044` | five haze/fade setters + `uHazeColor` decoded to linear; `getRimColor()` reads an authored-sRGB stash so SatVegLayer, which already decoded correctly, cannot double-decode | ON — seam 0.000 by construction |
 | `ONE_SUN` | `967524a`, `08e6518` | key follows `runtime.sun` at EVERY tier; TRUE elevation, floored only while the shadow camera casts; anti-solar moon blended over [0°, −8°]; hillshade weight on its own `uHillElev`; satellite monuments Toon → Lambert in BOTH representations (a second `directionalLight` was REFUSED: `NUM_DIR_LIGHTS` 1→2 re-keys every lit material) | ON, `hill.dayK` **1.0**, `monumentsLambert` true |
 | `POST_ORDER` + `DEPTH_FIX` | `4146eb7` | ACES before the grade, SMAA last (`smaaPreset 'high'`) with a per-pixel hash dither (`post-policy.js`, from BOTH assemblers so the warm compiles the same program), CoC un-double-converted, the dead sky early-out fixed | ON — grade re-tune measured (0.037 vs 0.05) and **declined** at 0.23/255 |
+| depth probe hook | `e59445d` | `window.__flyDepthProbe(x, y) → { raw, viewZ, coc, reversed, near, far, drawingBuffer, source, cocSource, cocReason, error }` (drawing-buffer pixels, top-left origin, landing on the texel centre) + `window.__flyDof`; installed from `FlyEffectComposer` under a **statically false `NODE_ENV` branch** (the R19 park-handle idiom — production byte-identical, nothing allocated until a harness calls it). `raw` is `composer.depthTexture` **AS STORED** — no un-reversing, no normalisation, the same texel AerialPerspective and the CoC material read; `coc` is the DoF effect's `renderTargetCoC` at the same normalised UV (null with a `cocReason` when DoF is not mounted — toy + high is the only composition that mounts it); `reversed` comes from the renderer's `getReversed()`, not from the request. The depth attachment cannot be `readPixels`'d, so the probe samples it into a 1×1 FloatType target and **returns an `error` without `EXT_color_buffer_float` rather than a number it cannot stand behind** (8-bit is useless at 3.6e-3 reversed depth). **The precision ladder is quantified** (`7dae48b` + proof, ledger `974ce23`): `EXT_color_buffer_float` → FloatType, `precision 'float32'`, worst **0.000002 %** of z; `EXT_color_buffer_half_float` → HalfFloatType, `'float16'`, worst **0.0754 %** (50 m 0.0165 %, 700 m 0.0150 %, 4000 m 0.0754 %) — **every float16 path is 13× inside the gate's 1 % bound**; neither extension → **no number and an `error` naming both**. HALF_FLOAT `readPixels` returns 16-bit patterns, decoded ONCE with three's `DataUtils.fromHalfFloat` from a `Uint16Array`, and **the proof scans the probe for `"1.0 -"` so the L2 double-conversion cannot be reintroduced inside the instrument that measures it**. The return carries `precision`, `precisionWorstPct` and `precisionNote`, and the gate prints the precision beside its verdict; eight further proof gates, including **"the constants the probe DECLARES are the measured ones — a declared cost may overstate and never understate"** | ON (dev-only) |
 | `SHADOW_CALM` + T11 | `fd7d28d`, `a9e30cc` | PCF bias sign, world-locked kernel, texel snap in light space, catcher armed on `queryColumns` + AGL, one `offsetUnits()`/`groundOverlayOffset()` implementation; the patch refactored into a pure `r24PatchShadowChunk(src, opts)` so a gate can EXECUTE it | ON (`biasSignFix`, `kernel 'world'`, `texelSnap`, `satCadence` 0), in C's own words: *"shader edits and snap arithmetic proven node-side (32 gates); mount/arm logic structural; pixels, draw counts and whether the catcher actually receives a shadow unmeasured — user's machine."* |
 | `TERRAIN_LIGHT` | `9783586`, `0e2f7cb` | fragment-stage N·L, `microFwidth` grain fade, area-weighted smooth worker normals (PATCH 8, spliced at build time like `__DECODE__`), skirts inherit their edge normal | tile half ON (`fragmentHill`, `microFwidth`); `workerNormals` **FALSE** |
 | `CLOUD_LIT` + `LAMBERT_ENV` | `a5c403e` | fake-hemisphere normal + Henyey-Greenstein forward lobe on drei's instancer via a prototype ACCESSOR (drei overwrites a constructor assignment one line later), same ONE draw; Lambert `reflectivity` 1 → 0.15 on 4 content + 2 monument materials, uniform-only | ON — the cloud variant takes the registry key and NOT a warm-set entry: a documented exception with a measurement condition attached |
 | shared | `9783586` | `r24VariantKey(base, tokens)`, fixed order **e** ONE_SUN · **f** TERRAIN_LIGHT · **a** AERIAL_LAW · **l** LOD_CROSSFADE, plain booleans, all-off ⇒ the bare R19 key | — |
 | F4 + F11 | `6ac995f`, `98cc33d` | three monument material-contract gates added ADDITIVELY to `verify-monuments-sat` (its eleven frozen numbers unmoved), the fourth as a source-level unreachability proof; the two key-NEUTRAL shader edits documented in the registry header | ON |
 
-Node gates: depth-offset **7** · c-flagoff **26 → 37** · worker-normals **12**
+Node gates: depth-offset **7** · depth-roundtrip-proof (it **EXTRACTS both
+return expressions of three's `perspectiveDepthToViewZ` from the installed
+build** and evaluates them against the JS mirror: **8,004 comparisons across
+four frustums** including the shadow ortho's 1/8000, both branches, the full
+[0,1] range with endpoints, **BIT-IDENTICAL under `Object.is`** — so the mirror
+cannot carry its own copy of the double-conversion bug and goes red if three's
+formula changes; plus six contract gates: as-stored, no `"1.0 -"` anywhere,
+reversed from the renderer, refuses instead of guessing, names its sources, both
+handles production-dead) · c-flagoff **26 → 37** · worker-normals **12**
 (3.34° last-writer → **0.26°** area-weighted) · shadow-calm **32** (**33/33**
 flipped; the browser could not host it — its first term is the fleet pin
 `__flySatShadowOverride`). **Zero constants moved, in six milestones.** What the
@@ -291,6 +309,12 @@ receiver move — say which one a number came from.
 | `AERIAL_LAW.nightRamp` (A8) | `bc408e7`, `327950b` | post-pass strength on the city windows' own `dayFrac` curve — exactly 1 at noon, exactly 0 at deep night, uniform-only, no shader text | **TRUE with `enabled` false**: FlyScene gates A8 on `nightRamp` alone and applies it to the LEGACY post strength on the `lawOn === false` branch, so noon identity keeps `verify-aerial`'s 0.55 exact |
 | `LOD_CROSSFADE` | `e7993ee`, `bc408e7` | vendored PATCH 5/6/7 (**+68 / −0**, insert-only, so D spends none of A's deleted-lines budget), parent-texture clip-UV blend on refine AND merge, `lod-crossfade.js`, `__flyStats.terra.fades` with enumerated skip reasons; `fadeSec` 0.25 = un-hitched FRAME time (the −50 block clamps dt at 50 ms), `maxConcurrent` 12 → **32** because it counts MATERIALS and a refine arms four (≈ 8 concurrent refines ≈ 2.7 MB of retained parent textures) | OFF pending the pass-1 `verify-lod-fade` row (§8) |
 | `SKY_PROCEDURAL` | — | **NOT BUILT**; design in D's ledger §4.5 | OFF |
+
+**A boundary D put on the record before the pass-2 number exists:** the Powell
+yaw sweep produced **merges 1**, so the crossfade's MERGE path is effectively
+unexercised at that pose. **A green pinned ON leg therefore proves the REFINE
+path, not the merge path**, and D's go/no-go will say so rather than let one
+merge stand in for the mechanism.
 
 Node gates: `verify-atmo-law` **41 → 45** (GLSL parsed by a subset interpreter
 against the JS mirror at 4,160 points, 0 relative error; flag-on minus the law
@@ -382,15 +406,16 @@ merges after the run; the 15/15 above predates it.
 |---|---|---|---|---|
 | **boot proof** | **PASS — `BOOT OK in 62.5 s`**, zero console errors, zero page errors, zero failed `/_next/` chunk requests | <!-- CERT:boot-proof PASS2 PENDING --> | — | a boot WALL TIME here is a SwiftShader number, never a budget |
 | `verify-fixture.js` | <!-- CERT:verify-fixture PASS1 PENDING --> | <!-- CERT:verify-fixture PASS2 PENDING --> | — | n/a — it certifies the venue |
-| `verify-flash-guard.js` | **rc=1, 534 s, 5 passed / 1 failed — RED calibrated**, and the failure is BY DESIGN (below) | <!-- CERT:verify-flash-guard PASS2 PENDING --> | PENDING — the pale FRAME itself | the pale detector is probabilistic (live rate 1 per 1,600 to 1 per 20,389 composed frames); **the census decides the gate** |
-| `verify-fade.js` | **rc=1, 338 s, 4 passed / 2 failed — RED calibrated** (below) | <!-- CERT:verify-fade PASS2 PENDING --> | PENDING — the LOOK of the fade | — |
-| `verify-lod-fade.js` | <!-- CERT:verify-lod-fade PASS1 PENDING --> | <!-- CERT:verify-lod-fade PASS2 PENDING --> | PENDING — whether swaps are still visible at real frame rate | the fade's real DURATION (a 250 ms blend completes inside one SwiftShader frame) |
-| `verify-step-clean.js` | **rc=1, 229 s, 4 passed / 4 failed — RED calibrated** (below) | <!-- CERT:verify-step-clean PASS2 PENDING --> | PENDING — and the ladder the user's real DPR has | the tear LINE |
-| `verify-ladder-fix.js` (+ `FLY_LADDER_RED=1`) | **rc=0, 90 s, 13 passed / 0 failed — GREEN, pinned ON** (below); the RED arm is running | <!-- CERT:verify-ladder-fix PASS2 PENDING --> | PENDING — governor behaviour in real time | — |
-| `verify-one-sun.js` | **rc=1, 251 s, 20 passed / 7 failed — RED calibrated** (below) | <!-- CERT:verify-one-sun PASS2 PENDING --> | PENDING — the LOOK (checkpoint 5) | — |
-| `verify-linear-haze.js` | **VOID — reader outside rAF; re-run pass 2** (below) | <!-- CERT:verify-linear-haze PASS2 PENDING --> | PENDING — whether live colours land in the same band | — |
-| `verify-depth-roundtrip.js` | **NOT RUNNABLE — probe hook absent; C building; pass 2** (below) | <!-- CERT:verify-depth-roundtrip PASS2 PENDING --> | — | needs `window.__flyDepthProbe`; absent ⇒ the row reads NOT RUNNABLE, never RED |
-| `verify-terra-live.js` | <!-- CERT:verify-terra-live PASS1 PENDING --> | <!-- CERT:verify-terra-live PASS2 PENDING --> | PENDING — the residency trio's live draw evidence | never completed in this container |
+| `verify-flash-guard.js` | **rc=1, 534 s, 5 passed / 1 failed — RED calibrated**; legs below. **Three readings that change how the flag is described:** the **skyline site is INSURANCE, not a fix** — its path runs `simplifyRing` before the wall loop and the collinearity test drops the closing clone, so the zero-length wall edge never exists there and a green at that site repairs nothing (recon A1b predicted it; nobody had measured it — B ledger §15.1); **Powell's 8.28 % lands inside R22.1's live 6.36–8.64 % band** while Manhattan's worst chunk at **13.98 %** is above it, the expected shape rather than a contradiction (the band was quoted for *every large chunk*, the defect is a fixed count per ring, so a chunk with small or few footprints is proportionally worse — B's 4-corner fixture reads 14.22 % for the same reason); and **the toy site is NOT EXERCISED by any row this round** — both poses run satellite, the toy extruder carries the same wrap-around loop at `vector-tile.worker.js:4285`, and the close ruled no toy leg is added, so B's node legs (toy `full` **14.84 % → 0**; 2,288 → 0 on E's Manhattan tile) are **evidence that the code works and not a certified browser leg**. **`(4) PALE DETECTOR` — `frames=256 pale=168 worstScanlineMean=222.3` — is VOID and must never be quoted as a result**: the scanline sat 55 % up the frame and a banked serpentine spends much of its time looking at a clear daytime sky (~213 luma), so 168 identical-mean frames are a sustained bright FIELD, not the one-frame jump the detector exists to catch — R17 §7.1 arriving as false POSITIVES for once. Fixed at `r24/e e1b7905` (running median of 24 frames, scanline at 0.25 height bottom-up, a hit needs jump > 60 over the median AND min > median + 40 AND absolute > 180; renamed `worstJumpOverMedian`), **not yet RED-calibrated** — it owes a synthetic one-frame jump scoring exactly one hit and a serpentine scoring zero | <!-- CERT:verify-flash-guard PASS2 PENDING --> | PENDING — the pale FRAME itself | the pale detector is probabilistic (live rate 1 per 1,600 to 1 per 20,389 composed frames); **the census decides the gate** |
+| `verify-fade.js` | **rc=1, 338 s, 4/2 — RED calibrated.** (1) births **14** / deaths **10** over 94 frames; (2) **14 of 14 hard births** — *"presence channel is none: no material carries a fade uniform"*, which IS the flag-off state; (3) **10 of 10 hard deaths**; (4) `ready` tracks CHUNKS, not presence (ready 0 of 16 during the serpentine); (5) **THE OWENS LOCK — sbReady 0, skyReady 0, draws 156** (a FIXTURE number; the live ≤ 261 is not re-baselineable from here); (6) clean. **GREEN needs pass 2** — the gate carries no ON pin | <!-- CERT:verify-fade PASS2 PENDING --> | PENDING — the LOOK of the fade | — |
+| `verify-lod-fade.js` | **rc=1, 317 s, 2 passed / 5 failed — RED calibrated** (Powell, a 40 s PURE YAW with the position frozen). (1) `residentTiles` 0 / `estMB` undefined — A's byte LRU only tracks with `TERRA_PACE` on, expected in pass 1; (2) 47 frames, 61 events; (3) **27 RE-appearances on a pure yaw** = A's T1/T3 bend-blind re-stream, measured from the other side; (4) **8 hard refines + 3 hard merges** = D's T4 atomic swap; (5) crossfade window **0 frames**; (6) **15 tile URLs refetched**, worst 2× `/img/6/23/17` = A's refetch defect; (7) Owens FIXTURE draws **174** / tris **166,659**; (8) zero page errors. **A gap the row exposed:** as written the gate has **no ON leg** — it never sets `window.__flyLodFadeOverride` — so the one feature that ships OFF *pending a measurement* could not have obtained it from either pass. E is adding a pinned ON leg for pass 2 (D reviewing it, §5.2); expected then: (3) and (6) GREEN from `TERRA_PACE`, (4) and (5) still RED in the OFF leg because LOD ships OFF, and **the pinned ON leg decides D's go/no-go** | <!-- CERT:verify-lod-fade PASS2 PENDING --> | PENDING — whether swaps are still visible at real frame rate | the fade's real DURATION (a 250 ms blend completes inside one SwiftShader frame) |
+| `verify-step-clean.js` | **rc=1, 229 s, 4/4 — RED calibrated**, viewport DPR 1.5, governor pin RELEASED (the fleet's `'hold'` was written and the accessor swallowed it). (0) pin released; (1) **the released term is reachable** — 6/6 forced steps ACCEPTED, 6 DPR applications, DPRs seen `[1.25, 1.5]`; (2) **18 of 18 `canvas.width/height` writes OUTSIDE a rAF** (width 1600 at t=171932, `inRaf:false`); (3) `setPixelRatio` 6/6 and `setSize` 12/12 outside; (3b) `composer.setSize` **6/6 outside** — the passive-effect lag; (4) `bufferMatchesDrawing` **false on 22 of 46 frames** (composer 1920×1080 vs drawing buffer 1600×900 at frame 7); (5) the composer is **RESIZED, not rebuilt** — rebuilds 1 → 1, resizes 6, R21's `FX_STABILITY` holding; (6) clean. GREEN for (2)/(3)/(3b)/(4) is expected in pass 2 with `STEP_SAFE` on. **The gate states in its own output that the tear LINE is not measurable here** | <!-- CERT:verify-step-clean PASS2 PENDING --> | PENDING — and the ladder the user's real DPR has | the tear LINE |
+| `verify-ladder-fix.js` | **rc=0, 90 s, 13/0 — GREEN, and a measured ON leg**: the gate boots TOY and arms `LADDER_FIX` + `STEP_SAFE` through their runtime pins. (1) **two sub-native rungs on a DPR-1 display**, 0.875/high and 0.75/high; (2) both BEFORE the first tier rung (last sub-native index 2, first tier rung 3); (3) boot rung still index 0 at native DPR and boot tier; (4) tier rungs unchanged in order and count; (5) refresh estimated from the frame cadence = **144 Hz**; (6) `nativeRefresh` target **144** vs refresh 144; (7) **a stuttering session steps DOWN on a healthy mean** — rung 3 at `emaFps` **53.4** (at/above the 51 fps down bound), `longFrac` 0.1, the pattern the EMA cannot see; (8) CONTROL: a clean 60 fps session never steps (rung 0, dprSteps 0, tierSteps 0); (9) dpr steps [0.875, 0.75, 1] then tiers ["medium"]; (10) a forced step moved the ladder 0 → 1; (11) **`STEP_SAFE` applied it INSIDE a frame, not via the valve** (n=1, `applyMs` 466.8 — a SwiftShader number, `composer=true`); (12) composer buffers ARE the drawing buffer ([560, 315] both); (13) clean. **The R20 flap condition `[1/high, 1/medium, 1/low]` is now the five-rung ladder, measured** |
+| `verify-ladder-fix.js` + `FLY_LADDER_RED=1` (the control arm) | **rc=1, 94 s, 7 passed / 6 failed — EXACTLY the expected RED, i.e. the control arm is a control.** (1) **0** sub-native rungs; (2) last sub-native **−1**, first tier rung **1**; (6) target **60** vs refresh 144 — the 60 Hz cap; (7) rung 0 at `emaFps` 53.4 with `longFrac` **0**, no stutter step-down; (9) dpr steps **[]** then tiers **[]**; (11) `STEP_SAFE` "no record"; controls (3)(4)(5)(8)(10)(12)(13) pass with buffers [640, 360] matching. **A's hardening of the omitted-pin trap, holding on the flag-off tree** (lesson 26) | <!-- CERT:verify-ladder-fix PASS2 PENDING --> | PENDING — governor behaviour in real time | — |
+| `verify-one-sun.js` | **rc=1, 251 s, 20/7 — RED calibrated.** Both pins released (`__flySunOverride` null → null, `__flySatShadowOverride` 0 → 1) and **`live === true` at high AND medium**, so the released term is proven reachable before anything is asserted. Azimuth key === hill, **Δ 0.00e+0°** at every tier and time. **Key ELEVATION stuck near 45° — 39.552° high/noon, 45.291° high/dusk, 45.142° elsewhere — against a true solar 55 / 2 / −14, at high AND medium**: recon L3, measured in the shipped app. **Medium azimuth spread 0.0000°** is the RED itself. Gate (5) — "water reads the same directional, Δ undefined°" — **PASSED on an absent reading**, i.e. vacuous; E is fixing it. No page errors | <!-- CERT:verify-one-sun PASS2 PENDING --> | PENDING — the LOOK (checkpoint 5) | — |
+| `verify-linear-haze.js` | **VOID — reader outside rAF; re-run pass 2.** rc=1, 240 s, 4 passed / 2 failed, and not one of the six means anything: both poses read **terrain L 0.0 / sky L 0.0**, an all-zero luma profile and "horizon row 6 of 540, step 0.0", because the seam reader ran from `page.evaluate` **outside any animation frame** against a `preserveDrawingBuffer:false` context, so `readPixels` returned a CLEARED default framebuffer. (1a)/(1b) failed honestly ("no horizon in the frame"); (2a), (2b) and (3) then PASSED — "RIM SEAM ≤ 12/255 Δ 0.0" and "seam independent of time of day, spread 0.0" — **on black against black**. E's rewrite samples at the start of the NEXT animation frame on the renderer's own context (the pale detector's idiom, which is why the census rows worked) and makes (2)/(3) print **NOT CALIBRATED** whenever (1) fails. `verify-depth-roundtrip` has no `readPixels` path and is not the same shape | <!-- CERT:verify-linear-haze PASS2 PENDING --> | PENDING — whether live colours land in the same band | — |
+| `verify-depth-roundtrip.js` | **rc=1, 220 s, 1 passed / 1 failed — NOT RUNNABLE, not RED** (toy, tier high, renderer `reversedDepth=true`). Gate (0) refused because **`window.__flyDepthProbe(x, y)` was ABSENT** — *"this gate cannot reconstruct viewZ without the renderer's own conversion; re-implementing it in the harness would test the harness's copy of the bug"* — required signature `{ viewZ, coc, raw, reversed }` over drawing-buffer pixels, top-left origin, owner C under `DEPTH_FIX`; it printed `dof=null`, and gate (0b) "the DoF pass is present" then PASSED on an inference from style and tier while `dof` was null — **the fourth vacuous pass of the day**; E is making it read a handle. C has since built the hook (`e59445d`, §3), so **the PASS 2 marker stands**. Note for pass 2: an `error` there means **neither float target renders** — recorded with the probe's own string, and read as NOT RUNNABLE HERE rather than as a defect | <!-- CERT:verify-depth-roundtrip PASS2 PENDING --> | — | needs `window.__flyDepthProbe`; absent ⇒ the row reads NOT RUNNABLE, never RED |
+| `verify-terra-live.js` | **arm A (TERRA_PACE OFF) printed; the cell stays** <!-- CERT:verify-terra-live PASS1 PENDING --> **until arm B does.** Content probe: **64 resident tiles, 62 with an imagery URL, 0 URL mismatches, 0 position mismatches** — a cache/URL mix-up is RULED OUT as a separate cause of "tiles swapping" in this code path (A's §9 row 8, now answered on the fixture; the live-capture variant stays a user-machine item). Yaw sweep: merges 1, replacedOnScreen 0, refetchParent 1, imagery requests 33. Poses (FIXTURE): Powell draws 161 / tris 294,870, Owens draws 161 / tris 182,645, `residentMB` 0 both — it reads 0 with the LRU off. **Two limits at exactly A's strength:** the fixture serves deterministic bytes per (z,x,y) and Esri does not, so the merge that REPLACES four children with a coarser parent reads here as a resolution change and on the user's machine as a **DIFFERENT CAPTURE** (season, sun, colour) the probe cannot see because URL and position are both correct — still LOD policy, the fix unchanged, and the reason the symptom reads more violently live than any fixture number shows; and the denominator is **62 of 64** — the probe only tests tiles whose material already has a map, and the two skipped were mid-load, the likeliest moment for a mismatch | <!-- CERT:verify-terra-live PASS2 PENDING --> | PENDING — the residency trio's live draw evidence | never completed in this container |
 | `verify-frame-pace.js` | <!-- CERT:verify-frame-pace PASS1 PENDING --> | <!-- CERT:verify-frame-pace PASS2 PENDING --> | PENDING — **everything**: stalls/min, worst dt, p99, >100 ms/min | the pacing legs are not asserted here; flag-off it correctly reads "instrument absent — unmeasurable, not a renderer failure" |
 | `verify-seam.js` browser leg | <!-- CERT:verify-seam-browser PASS1 PENDING --> | <!-- CERT:verify-seam-browser PASS2 PENDING --> | PENDING | — |
 | `verify-env-uniform.js` | <!-- CERT:verify-env-uniform PASS1 PENDING --> | n/a — the feature ships OFF | PENDING — the ms a compile storm costs | the proof B asked for and never ran |
@@ -407,64 +432,6 @@ merges after the run; the 15/15 above predates it.
 | (4) PALE DETECTOR | **VOID** — below |
 | (5) | **was VACUOUS**: a tautology printing `pinned=n/a`, i.e. a PASS asserting nothing; and `flagOn(probe)=true` was misleading — it read the pin's ABSENCE, not the constant. Both fixed at `r24/e ff5d9a1` (post-run): (5) now compares the sat-buildings degenerate RATE between legs or prints **NOT CALIBRATED** |
 | (6) | clean |
-
-Three readings that change how the flag should be described:
-
-- **The skyline site is INSURANCE, not a fix.** Its path runs `simplifyRing`
-  before the wall loop and the collinearity test drops the closing clone, so
-  the zero-length wall edge never exists there — **a green at that site repairs
-  nothing.** Recon A1b predicted it; nobody had measured it (B ledger §15.1).
-- **Powell's 8.28 % lands inside R22.1's live 6.36–8.64 % band** — an archived
-  live measurement reproduced offline, on a different fixture, by a different
-  agent. Manhattan's worst chunk at **13.98 %** is above it, and that is the
-  expected shape, not a contradiction: the band was quoted for *every large
-  chunk*, the defect is a fixed count per ring, so a chunk with small or few
-  footprints is proportionally worse (B's 4-corner fixture reads 14.22 % for
-  the same reason).
-- **The toy site is NOT EXERCISED by any row this round.** Both poses run
-  satellite, so no toy chunk is resident; the toy extruder carries the same
-  wrap-around loop at `vector-tile.worker.js:4285`. Ruling at the close: no toy
-  leg is added. B's node legs DID drive that path (toy `full` **14.84 % → 0**;
-  2,288 → 0 on E's Manhattan tile) — **evidence that the code works, and not a
-  certified browser leg. The two are different claims.**
-
-**The `(4) PALE DETECTOR` line — `frames=256 pale=168
-worstScanlineMean=222.3` — is VOID and must never be quoted as a result.** The
-scanline sat 55 % up the frame, and a banked serpentine spends much of its time
-looking at a clear daytime sky (~213 luma), so 168 identical-mean frames are a
-sustained bright FIELD, not the one-frame jump the detector exists to catch —
-R17 §7.1's rule ("a pixel probe must not contain an actor it does not
-control"), arriving as false POSITIVES for once. Fixed at `r24/e e1b7905`
-(running median of 24 frames, scanline at 0.25 height bottom-up, a hit needs
-jump > 60 over the median AND min > median + 40 AND absolute > 180; the
-statistic is renamed `worstJumpOverMedian`) — and **it is not yet
-RED-calibrated**: it owes a synthetic one-frame jump scoring exactly one hit
-and a serpentine scoring zero.
-
-**`verify-fade`, pass 1** (`K=40`, flag-off): **rc=1, 338 s, 4 passed /
-2 failed = RED calibrated.** (1) births **14** / deaths **10** over 94 frames;
-(2) **14 of 14 hard births** — *"presence channel is none: no material carries
-a fade uniform"*, which IS the flag-off state; (3) **10 of 10 hard deaths**;
-(4) `ready` tracks CHUNKS, not presence (ready 0 of 16 during the serpentine,
-series in the log); (5) **THE OWENS LOCK — sbReady 0, skyReady 0, draws 156**
-(a FIXTURE number; the live ≤ 261 is not re-baselineable from here); (6) clean.
-**GREEN needs pass 2** — the gate carries no ON pin.
-
-**`verify-step-clean`, pass 1** (no `K`, viewport DPR 1.5, the governor pin
-RELEASED — the fleet's `'hold'` was written and the accessor swallowed it):
-**rc=1, 229 s, 4 passed / 4 failed = RED calibrated.** (0) pin released;
-(1) **the released term is reachable** — 6/6 forced governor steps ACCEPTED,
-6 DPR applications, DPRs seen `[1.25, 1.5]`; (2) **18 of 18
-`canvas.width/height` writes OUTSIDE a rAF** (e.g. width 1600 at t=171932,
-`inRaf:false`); (3) `setPixelRatio` 6/6 and `setSize` 12/12 outside;
-(3b) `composer.setSize` **6/6 outside** — the passive-effect lag;
-(4) `bufferMatchesDrawing` **false on 22 of 46 frames** (composer 1920×1080 vs
-drawing buffer 1600×900 at frame 7); (5) the composer is **RESIZED, not
-rebuilt**, across a step — rebuilds 1 → 1, resizes 6, i.e. R21's `FX_STABILITY`
-holding; (6) clean. GREEN for (2), (3), (3b) and (4) is expected in pass 2 with
-`STEP_SAFE` on. **The gate states in its own output that the tear LINE is not
-measurable here**: tearing is a compositor/vsync property no JS timer or
-screenshot can observe.
 
 ### 4.3 Inherited gates and frozen numbers
 
@@ -615,22 +582,21 @@ worktrees — **branch defects, not merge resolutions**:
 | **C** | `offsetUnits` in `FlyScene.jsx` (the `SHADOW_CALM` catcher's material) | inside a `useMemo`, when `SatShadowCatcher` builds its material | unreachable on the shipped tree: needs `SHADOW_CALM.enabled` AND satellite AND tier high AND `__flySatShadowOverride ≠ 0` |
 
 **A's and D's share one mechanism, arrived at independently: an un-asserted
-`String.replace` in an edit script.** A's anchor (`import {\n  HUD_SYNC,`) did
-not exist in CloudField, whose constants import has a different shape; D's was
-`AerialPerspective.jsx`'s two-line prologue, and by the time D's script ran the
-C merge had added `SRGBColorSpace` to the second line. **A miss is a silent
-no-op**, both scripts reported success, and the helper landed while its import
-did not. Five of D's six edits had an `assert old in s`; **the one that did not
-is the one that broke.** Four blind spots, each a rule someone was following:
-(1) the project ESLint config does not enable `no-undef`, so both agents
-compared totals that could never contain this class; (2) a compile check
-resolves MODULES, not IDENTIFIERS — `GET / 200` was true and meaningless;
-(3) **no browser gate ran after the offending commits** (A's last was
-`verify-ladder-fix` at `36792a0`, one commit earlier; D's `lodprobe-on.log` at
-16:52 postdates `bc408e7` at 16:45); (4) C's was behind the flag AND a fleet
-pin — the first run that could mount the catcher is `verify-shadow-calm`, whose
-recipe says step one is un-pinning `__flySatShadowOverride` and which did not
-exist until `a9e30cc`. HARN-GAP-5, twice in one round.
+`String.replace`.** A's anchor (`import {\n  HUD_SYNC,`) does not exist in
+CloudField; D's was `AerialPerspective.jsx`'s two-line prologue, which the C
+merge had already changed by adding `SRGBColorSpace`. **A miss is a silent
+no-op**, both scripts reported success, and each helper landed without its
+import. Five of D's six edits had an `assert old in s`; **the one that did not
+is the one that broke.** Four blind spots, each a rule someone was following: (1) the project ESLint
+config does not enable `no-undef`, so both agents compared totals that could
+never contain this class; (2) a compile check resolves MODULES, not IDENTIFIERS
+— `GET / 200` was true and meaningless; (3) **no browser gate ran after the
+offending commits** (A's last was `verify-ladder-fix` at `36792a0`, one commit
+earlier; D's `lodprobe-on.log` at 16:52 postdates `bc408e7` at 16:45); (4) C's
+was behind the flag AND a fleet pin — the first run that could mount the catcher
+is `verify-shadow-calm`, whose recipe says step one is un-pinning
+`__flySatShadowOverride`, and which did not exist until `a9e30cc`. HARN-GAP-5,
+twice in one round.
 
 **D's correction, made in its own ledger (§4.95):** the flag-ON LOD leg did not
 "time out under load" — `bootFly` waits on `__flyBoot`, which never exists when
@@ -657,11 +623,29 @@ tree where nothing could boot at all (lesson 19).
 **E's instrument-defect count for the session is SEVEN**, each with a defence in
 the tree: the context race; the artifact overwrite (§5.4); the straw-man port
 guard; the sky inside the pale crop; the vacuous gate (5); the misleading
-`flagOn(probe)` that read a pin's absence rather than a constant; and the seam
+`flagOn(probe)`, which read a pin's absence rather than a constant; and the seam
 reader that sampled a cleared framebuffer from outside any animation frame and
-passed three assertions on black against black (§4.2). **Four vacuous passes in one
+passed three assertions on black against black. **Four vacuous passes in one
 day** — flash-guard (5), one-sun (5), linear-haze (2a)/(2b)/(3), depth-roundtrip
 (0b) — is what makes lesson 24 a rule rather than an anecdote.
+
+**D's review of E's LOD ON leg found four venue-dependence defects, all fixed
+before pass 2**: a 10-rendered-frame drain for a 250 fade-ms fade is 500 ms here
+and 167 ms at 60 fps — a HARD gate that fails on a healthy machine; the 20-frame
+warp settle is 18 frames here, 54 at 60 fps and ~130 at 144 Hz; the OFF and ON
+arms took their snapshots after different settles; and strict equality of
+`refines + merges` across two boots at 1–3 fps is a coin unless the frame counts
+are within ±25 %. The corrected criterion (D `8d1599a`, tip `51a95bc`) **polls
+`active === 0` with a 90-rendered-frame cap and PRINTS the count, and polls
+`skip.warp` unchanged across two reads** — 250 fade-ms being 5 frames here and
+15 at 60 fps. **The 10-frame number was D's own §4.10 criterion**, corrected in
+the same commit.
+
+**C reported the same class against itself.** The depth-precision work landed as
+two commits (`7dae48b` code + proof, `974ce23` ledger) because C's edit script
+aborted before the ledger write while its commit ran — **the un-asserted
+mechanical-edit class of §5.1, a third time in one round**, this time caught by
+its author and costing only a split commit.
 
 Two process facts from the same hour: a second `cert-run.sh` raced the first
 run's server into an `EADDRINUSE` (killed by PID 5023/5024/5038), and an
@@ -682,10 +666,9 @@ The limit hit at ~16:50 and reset at 18:30 UTC. **D and E were killed mid-task**
 (D coherent at `d30fc4c` with a complete ledger; E clean at `c7d538c`, settled
 census undelivered, no final report), and the adversarial reviews died
 mid-verification: **A 0/6 reviewers ran; C 2/6 dimensions with 0/11 findings
-verified; B 12/90 agents with ONE confirmed.** The orchestrator merged A, B, C
-and D by direct review, re-derived C's eleven findings on the merged tree (six
-fixed in `66a2f0c`, two not defects, two carried to §5b), and resumed the agents
-after the reset.
+verified; B 12/90 agents with ONE confirmed.** The orchestrator merged all four
+by direct review, re-derived C's eleven findings on the merged tree (six fixed
+in `66a2f0c`, two not defects, two carried to §5b), and resumed the agents.
 
 **The one confirmed finding was worth the whole workflow.** B's `ENV_UNIFORM`
 alternate-shadow-state warm (a) ran INSIDE the boot gate, so it could extend the
@@ -697,31 +680,29 @@ shadows snap on and off. **A `programsDelta` gate would have read flat**: the
 programs are the ones wanted; the defect is WHEN and against WHAT they were
 minted. The fix (`f361543`) warms a STAND-IN scene of CLONED lights with
 `castShadow` inverted, carrying the live `environment` and `fog` — both are in
-three's program cache key, so a stand-in missing either would mint a THIRD
-program — queued strictly after `_state.done` on the idle drain. It still ships
-OFF.
+three's program cache key, so a stand-in missing either mints a THIRD program —
+queued strictly after `_state.done` on the idle drain. It still ships OFF.
 
 ### 5.4 Four more incidents worth the record
 
 - **Four agents collided on one cache key.** `world-bend-fade-hill-r19` was
   about to be emitted under two mutually exclusive expressions (C's `-c24` vs
   D's `-d24`), both patching `applyHillshade` — the round-4 wrong-cached-program
-  defect **arriving from a MERGE, not from one author**. Caught by C reading D's
-  branch; resolved by `r24VariantKey` with a fixed token order.
-- **A commit that did not build reached another agent.** C's `9783586` shipped
-  four welded import prologues; D merged it and got `GET / 500`; C fixed it at
+  defect **arriving from a MERGE, not one author**; caught by C reading D's
+  branch, resolved by `r24VariantKey` with a fixed token order.
+- **A commit that did not build reached another agent**: C's `9783586` shipped
+  four welded import prologues, D merged it and got `GET / 500`, C fixed it at
   `1d17a6b`. **The module resolver is the only instrument**, and the `GET / 200`
   merge-acceptance step came out of it — one second per merge.
-- **A harness overwrote a record nobody can re-measure.** E's `b8b32f9` rewrote
+- **A harness overwrote a record nobody can re-measure**: E's `b8b32f9` rewrote
   the tracked `scripts/r21-e-red-seam.json` — R21's LIVE-tileset RED — with
-  synthetic numbers (**1,015 of 1,528 lines**), and the commit carried it with
-  nothing failing or warning. Restored (`453119e`, `a996b9e`) behind three
-  defences: the restore, an fs-level write redirect under the fixture env, and
-  an OUTCOME gate.
-- **The CRLF rewrite.** `npm uninstall three-tile` rewrote `next.config.mjs`
+  synthetic numbers (**1,015 of 1,528 lines**), nothing failing or warning.
+  Restored (`453119e`, `a996b9e`) behind three defences: the restore, an
+  fs-level write redirect under the fixture env, and an OUTCOME gate.
+- **The CRLF rewrite**: `npm uninstall three-tile` rewrote `next.config.mjs`
   (**72 → 0** CRLF lines) and `package.json` (**58 → 0**) to LF, turning a
-  13-line change into an 8.4 k-line diff. Restored by hand in `4bedab1`;
-  a preserve-line-endings rule went round-wide (599 CRLF files, no
+  13-line change into an 8.4 k-line diff. Restored by hand in `4bedab1`; a
+  preserve-line-endings rule went round-wide (599 CRLF files, no
   `.gitattributes`).
 
 ### 5.5 Ledger disagreements, resolved
@@ -746,66 +727,69 @@ quotable.
 
 ## §5b Follow-ups
 
-- **`ENV_UNIFORM`** ships OFF. The stand-in fix is in; the flip still needs the
-  `programsDelta`-flat run across a forced dusk crossing AND a forced
-  high↔medium step with `__flyGovPin` and `__flySatShadowOverride` both
-  released, plus a twilight fixture A/B (noon is bit-identical by construction;
-  twilight is an upsample).
+- **`ENV_UNIFORM`** ships OFF; the stand-in fix is in, but the flip still needs
+  the `programsDelta`-flat run across a forced dusk crossing AND a forced
+  high↔medium step with `__flyGovPin` and `__flySatShadowOverride` both released,
+  plus a twilight fixture A/B (noon is bit-identical by construction, twilight is
+  an upsample).
 - **`RING_DEDUPE`** needs a roof RE-CERTIFICATION, not a hash re-baseline —
-  `verify-roofs` (394/2985), `verify-roof-variety`, `verify-window-grids`
-  (403), `verify-neon-city` (379) all stand on roof-form outcomes that move
-  with the restored corner count — plus a live worker-hash re-baseline.
-- **Restore the skyline's first corner** (B-owned, ledger §15.1). The
-  collinearity walk that saves the skyline from the flash defect is the same
-  one that discards `ring[0]` with the closing clone, so **every z14 block-mass
-  ring silently loses a genuine corner**. A different bug from the flash,
-  measured by no gate but measured by B: Manhattan sat-skyline **4,570 → 6,015
-  verts (+31.6 %)** under `RING_DEDUPE` on live-winding tiles. **`RING_DEDUPE`
-  IS its fix**, and it is built-but-off precisely because it is a worker change
-  that moves `WORKER_PROTOCOL`, `verify-skyline`'s frozen numbers and the
-  roof-form dispatch. Next worker round.
-- **`AERIAL_LAW`**: the horizon pixel-gate re-baseline batch (C's L1 + D's law,
-  ONE batch, with a fixture column) was never executed, and no pixel A/B exists
-  at any pose. Unbuilt: the content and air/anchor variants. The C-off/D-on rim
-  seam at 60–120 km needs one fixture pixel A/B.
+  `verify-roofs` (394/2985), `verify-roof-variety`, `verify-window-grids` (403)
+  and `verify-neon-city` (379) all stand on roof-form outcomes that move with the
+  restored corner count — plus a live worker-hash re-baseline.
+- **Restore the skyline's first corner** (B, ledger §15.1): the collinearity walk
+  that saves the skyline from the flash defect also discards `ring[0]` with the
+  closing clone, so **every z14 block-mass ring silently loses a genuine
+  corner** — a different bug, measured by no gate but measured by B at Manhattan
+  sat-skyline **4,570 → 6,015 verts (+31.6 %)** under `RING_DEDUPE`, which IS its
+  fix and is built-but-off because it moves `WORKER_PROTOCOL`, `verify-skyline`'s
+  frozen numbers and the roof-form dispatch. Next worker round.
+- **`AERIAL_LAW`**: the one-time horizon pixel-gate re-baseline batch (C's L1 +
+  D's law, ONE batch, with a fixture column) was never executed and no pixel A/B
+  exists at any pose; the content and air/anchor variants are unbuilt; the
+  C-off/D-on rim seam at 60–120 km needs one fixture pixel A/B.
 - **`LOD_CROSSFADE`'s ON leg**, which pass 1 proved the gate could not produce
-  (§4.2). The pinned leg (`{ enabled: true, skipBootMs: 0 }` — the shipped
-  6000 fade-clock ms is 120 rendered frames, longer than the whole sweep at
-  1–3 fps) settles ≥ 20 rendered frames after the warp, because warp
-  suppression is 900 fade-ms = 18 frames, and asserts the criteria in §8.
+  (§4.2): the pinned leg (`{ enabled: true, skipBootMs: 0 }` — the shipped 6000
+  fade-clock ms is 120 rendered frames, longer than the whole sweep at 1–3 fps)
+  settles ≥ 20 rendered frames after the warp, warp suppression being 900
+  fade-ms = 18 frames, and asserts the §8 criteria.
+- **`window.__flyDepthProbe` + `window.__flyDof`** (C, `DEPTH_FIX`) if pass 2
+  cannot land the hook: without it `verify-depth-roundtrip` stays NOT RUNNABLE
+  and the browser round-trip of the depth fix has no evidence at all.
 - **`FRAME_STEP` consumer opt-in**: four call sites (`PlayerPlane.jsx:74`,
   `lib/fly/chase-camera.js`, `Contrail.jsx:146-148`, `PlayerGroundShadow.jsx`)
   and the certification list in A's ledger §8c.
 - **Built-off, one real-hardware run each**: `skirtWorker`, `bendSphere`,
-  `TERRAIN_LIGHT.workerNormals`. Cross-tile normal agreement additionally needs
-  the decode to RETURN the raster and its side length, read from the payload
-  and never assumed to be 257.
-- **`verify-shadow-calm`'s browser half** — the catcher's +1 draw in cities and
-  0 at Owens, the sparkle temporal std, the acne A/B at `normalBias 1`. The
-  node gate proves the string edits and the arithmetic; it cannot prove a pixel.
-- **`window.__flyDepthProbe` + `window.__flyDof`** (C, `DEPTH_FIX`) if pass 2
-  cannot land the hook: without it `verify-depth-roundtrip` stays NOT RUNNABLE
-  and the browser round-trip of the depth fix has no evidence at all.
+  `TERRAIN_LIGHT.workerNormals`; cross-tile normal agreement additionally needs
+  the decode to RETURN the raster and its side length, read from the payload and
+  never assumed to be 257.
+- **`verify-shadow-calm`'s browser half** — the catcher's +1 draw in cities and 0
+  at Owens, the sparkle temporal std, the acne A/B at `normalBias 1`. The node
+  gate proves the string edits and the arithmetic; it cannot prove a pixel.
 - **RED-calibrate the rewritten pale detector** (`e1b7905`): a synthetic
-  one-frame jump must score exactly one hit, a serpentine zero.
+  one-frame jump must score exactly one hit, a serpentine zero. **Re-run the
+  rewritten seam reader** (linear-haze) in pass 2.
+- **`verify-terra-live`'s content probe should count and report SKIPPED tiles**
+  (one line): its denominator was 62 of 64 because it only tests tiles whose
+  material already has a map, and the two it skipped were mid-load — the
+  likeliest moment for a mismatch.
 - **A toy leg for the degenerate census** — no row this round boots toy, so
   `vector-tile.worker.js:4285` has node evidence and no certified browser leg.
 - **`verify-terra-live`** draw evidence on a real GPU, plus the URL↔position
   probe that distinguishes a WRONG tile from LOD policy.
-- **The skyline park/unpark pixel A/B** at Manhattan — the one hypothesis row
-  in B's mechanism table.
+- **The skyline park/unpark pixel A/B** at Manhattan — the one hypothesis row in
+  B's mechanism table.
 - **`hill.dayK 0.65`** is a PROPOSAL, and shipping 1.0 keeps the demotion
   built-and-off by construction. The v1 Sierra A/B produced 13.961/255 and was
-  DECLARED INVALID by its own author (|Δ| rose monotonically with capture order
-  — a streaming world and an animating cloud deck inside the crop); instrument
-  v2 (parks every mover, interleaves controls, prints a drift floor, refuses a
+  DECLARED INVALID by its own author (|Δ| rose monotonically with capture order —
+  a streaming world and an animating cloud deck inside the crop); instrument v2
+  (parks every mover, interleaves controls, prints a drift floor, refuses a
   margin when it is unreadable) is committed and unrun.
 - **`LADDER_FIX.nativeRefresh` has no measurement behind it** (§6 item 4) and
-  recon FL-04's question — native refresh, or is a 60 Hz cap preferred? — is
-  unanswered. The revert is one word.
-- **Toy/Neon chunk births (`uBirth`)**: not shipped, design in B's ledger §9.
-  Also the roads/toy in-place heal (grid-delta variant) and the sat-roads birth
-  fade, which needs a sanctioned `verify-sat-night` contract move.
+  recon FL-04's question — native refresh, or a 60 Hz cap? — is unanswered. The
+  revert is one word.
+- **Toy/Neon chunk births (`uBirth`)**: not shipped, design in B's ledger §9;
+  likewise the roads/toy in-place heal (grid-delta variant) and the sat-roads
+  birth fade, which needs a sanctioned `verify-sat-night` contract move.
 - **Attribution string follows `x-adsb-source`** — carried from R19.
 
 ---
@@ -821,7 +805,7 @@ two that are the reason the round exists.
 | **1** | **THE DIAG PACK FIRST** — Part A on the build you have now, THEN on this build | stalls/min, worst dt, p99, and the per-second `dReady` / `adds` / `removes` deltas during a 30 s low serpentine. **This is the round's RED; without it there is no before** |
 | **1b** | The four questions in Part 0 | which build(s) showed it; which symptoms (a crossed-out symptom is as useful as a ticked one); the machine facts; which style. All four are still unanswered, and the round ran on the plan's defaults |
 | **2** | Buildings appearing/disappearing — Powell → Columbus at 200–400 m AGL, turning hard | nothing pops in one frame at the ring edge; nothing vanishes behind you while still on screen; heals do not blink |
-| **3** | Tiles swapping — a slow 360° yaw at a parked pose, then the serpentine | the field behind you stays refined; no coarse parent replaces four children in view; refines dissolve (if `LOD_CROSSFADE` is ON) |
+| **3** | Tiles swapping — a slow 360° yaw at a parked pose, then the serpentine | the field behind you stays refined; no coarse parent replaces four children in view; refines dissolve (if `LOD_CROSSFADE` is ON). **Live, a merge swaps in a DIFFERENT Esri CAPTURE — season, sun, colour — which no fixture number can show**, so your eyes are the only instrument for how violent it looks |
 | **4** | **`LADDER_FIX`, two questions.** The taste one: softer-under-load (0.875 / 0.75 render scale) vs a tier hitch — is the softness acceptable? `__flyGov.state()` shows the rung. And the **unmeasured** one: `nativeRefresh` ships ON per plan §0 ruling 6 with **no measurement behind it** — an exact no-op at 60 Hz (`min(60, 60)`), but on a 120/144 Hz display it raises the governor's target and recon FL-04's question is still open. **The revert is one word** | does a 144 Hz machine feel better targeting 144, or is a 60 Hz cap preferable? |
 | 5 | Linear haze + one sun: noon and dusk horizon vs R21; the Neon rim melting to `#1a2246` **as authored** | the seam is gone; the key light moves with the sun on medium too. The Neon rim is ~89/255 darker at the melt, and that is the fix, not a regression |
 | 6 | Shadows: catcher on in cities, sparkle gone, floating fixed | shadows land on the ground; edges do not crawl in motion. **No browser gate covers this** |
@@ -846,29 +830,28 @@ Carries forward the still-open R15–R21 §6 tables.
    in the branches it thought about (VSM/BASIC), not the one you use (PCF) —
    R21's `polygonOffset` defect, one library level lower.
 4. **"Correct" and "certified" are different claims, and only the second is a
-   merge gate** (`RING_DEDUPE` restores a real corner and moves four certified
-   gates' roof forms; the toy flash site has node evidence and no browser leg).
+   merge gate** — `RING_DEDUPE` restores a real corner and moves four certified
+   gates' roof forms; the toy flash site has node evidence and no browser leg.
 5. **A smoke that skips everything and exits 0 is the R20 false-green shape** —
    zero passes must be a failure. (E CERT.)
 6. **A per-frame budget is a per-frame-RATE contract**; at 1 fps it is a
    different product. Scale it for content gates, never for pacing gates.
    (E CERT.)
 7. **`pkill -f <pattern>` kills the shell whose command line carries the
-   pattern** — and a process NAME is not an identity in a shared container.
+   pattern** — a process NAME is not an identity in a shared container.
 8. **A route-fulfilled tile can starve the loader and freeze the quadtree** — a
    fixture must be a SOURCE, not a proxy, for anything with a concurrency rule.
 9. **A valid import is not a correct import.** A scripted specifier insertion
-   welded four files' imports; ESLint passed and only the module resolver saw
-   it.
+   welded four files' imports; ESLint passed and only the module resolver saw it.
 10. **A per-tile normal field is still per-tile**: smooth normals inside a tile
-    do not agree across a Martini-error boundary, and the decode must return
-    the raster — reading its side from the payload, never assuming 257.
+    do not agree across a Martini-error boundary, and the decode must return the
+    raster — reading its side from the payload, never assuming 257.
 11. **A fixture run that writes where a live gate writes REPLACES a record
-    nobody can re-measure.** A mechanism can be bypassed by the next harness;
-    an OUTCOME check cannot.
+    nobody can re-measure.** A mechanism can be bypassed by the next harness; an
+    OUTCOME check cannot.
 12. **A determinism pin and a ship-state visual can be the same switch.** The
-    satellite key-light write lived inside the shadow gate `_boot.js` pins to
-    0, so the whole fleet certified a world lit by a constant — `live:false`,
+    satellite key-light write lived inside the shadow gate `_boot.js` pins to 0,
+    so the whole fleet certified a world lit by a constant — `live:false`,
     key↔hill 10.50°.
 13. **"Settled" is a condition, not a duration.** A sleep-and-count gate at
     1–3 fps counted coarse z5 drapes as a built city. (E CERT.)
@@ -879,69 +862,80 @@ Carries forward the still-open R15–R21 §6 tables.
     means 12 was only three refines. (D ATMOS.)
 16. **A module-scope reference to an unimported symbol takes the whole chunk
     down in every style, and no flag can gate it.** Lint the delta for
-    `no-undef` before any browser gate — a node-only check costing a second
-    that would have saved this round's certification run. (The gate is E's.)
+    `no-undef` before any browser gate: a node-only check costing a second that
+    would have saved this round's certification run. (The gate is E's.)
 17. **An agent's browser evidence is DATED.** A commit made after the last boot
     is unbooted code, and a timeout on an unbooted tree is the signature of the
     breakage, not of contention.
 18. **An instrument must never be the FIRST to ask for a resource the subject
     owns.** A canvas has one context and the first caller decides its
     attributes. (E CERT.)
-19. **Fixing the right bug and explaining the wrong failure are different
-    acts.** A real `getContext` race was fixed and initially offered as the
-    cause of the void rows; it was not, and saying so is what made the record
-    correct. (E CERT.)
+19. **Fixing the right bug and explaining the wrong failure are different acts.**
+    A real `getContext` race was fixed and initially offered as the cause of the
+    void rows; it was not, and saying so is what made the record correct.
+    (E CERT.)
 20. **Every mechanical edit needs its own assertion.** `String.replace` on a
     miss is a silent no-op, and two agents shipped a helper without its import
     from exactly that shape, hours apart. (A PACE and D ATMOS.)
 21. **The fleet had ~60 browser gates, a dozen node gates, and no gate at all
     for "can the app EVALUATE"** — unowned because it belonged to no feature.
-    The questions nobody's feature raises are the ones that take the whole
-    chunk down. (E CERT.)
+    The questions nobody's feature raises are the ones that take the whole chunk
+    down. (E CERT.)
 22. **A guard is only as good as the question it asks, and a test that passes
     against something the guard CAN see proves nothing about the thing it
     cannot.** The port guard was verified against a python server and was blind
     to the `next dev` listener it existed to catch. (E CERT.)
 23. **A gate that EXECUTES the thing beats a gate that READS it.** Refactoring
-    the shadow patch into a pure function let a node gate run it against
-    three's real chunk text — "here is the GLSL three would receive", not "the
-    code looks right" — and it found a defect in its own module on the first
-    run. (C LIGHT.)
+    the shadow patch into a pure function let a node gate run it against three's
+    real chunk text — "here is the GLSL three would receive", not "the code looks
+    right" — and it found a defect in its own module on the first run. (C LIGHT.)
 24. **A gate that passes without asserting anything is indistinguishable from a
     gate that works** — read the PASS lines as sceptically as the FAIL lines.
     Four in one day: flash-guard (5) printed `pinned=n/a`, one-sun (5) did the
-    same shape, linear-haze passed "RIM SEAM ≤ 12/255 Δ 0.0" on a black frame
-    against a black frame, and depth-roundtrip (0b) asserted "the DoF pass is
-    present" from style and tier while its own `dof` read null. **A downstream assertion must go NOT
+    same shape, linear-haze passed "RIM SEAM ≤ 12/255 Δ 0.0" on black against
+    black, and depth-roundtrip (0b) asserted "the DoF pass is present" from style
+    and tier while its own `dof` read null. **A downstream assertion must go NOT
     CALIBRATED when its precondition fails**, never green. (E CERT.)
 25. **Ask an instrument what ELSE could produce this reading.** The pale
     detector's 168 hits, the Sierra A/B's monotone-in-capture-order margin, the
-    `getContext` probe, the lsof port guard: **every one was an instrument that
-    had not been asked "what else could produce this reading?"** (E CERT.)
+    `getContext` probe, the lsof port guard: every one was an instrument that had
+    not been asked that question. (E CERT.)
 26. **An unpinned control arm silently becomes the treatment the day the flag
     ships.** `verify-ladder-fix`'s RED arm and `verify-terra-live`'s arm A both
-    OMITTED the pin, which is the defect state only while the constant is
-    false; both now state the state they want in both directions. (A PACE.)
+    OMITTED the pin; both now state the state they want in both directions, and
+    the ladder-red row proves the hardening holds. (A PACE.)
 27. **Ship state and behaviour are two claims and need two gates.** A flag
     silently reverted to false would leave every behaviour gate green while the
-    fix was gone from the build — hence a gate that reads the block's literal
-    out of the constants file. (A PACE.)
+    fix was gone from the build — hence a gate that reads the block's literal out
+    of the constants file. (A PACE.)
 28. **A gate that asserts a flag is off FOREVER goes red the day the feature
-    ships, which trains people to edit gates.** The durable invariant is that
-    the state is DECLARED and LEGAL and the RED counter works in either state —
-    and the source properties (the false branch is R21 verbatim; the variant key
-    is bare when every token is false) keep proving the round is one flag flip
-    from R21 even with the flags on. (D ATMOS and C LIGHT, independently; it is
-    the anti-rot for R20 §7's "a one-flag revert contract rots as flags
-    accumulate".)
-
-29. **A criterion the record cites must be the one the gate asserts.** D
-    struck its own "`hardSwaps` flat at 20" from the `LOD_CROSSFADE` go/no-go
-    once the counter turned out to PARTITION events rather than count them —
-    the citation and the assertion had drifted apart. (D ATMOS.)
+    ships, which trains people to edit gates.** The durable invariant is that the
+    state is DECLARED and LEGAL and the RED counter works in either state, while
+    the source properties (false branch = R21 verbatim; the variant key is bare
+    when every token is false) keep proving the round is one flag flip from R21.
+    (D ATMOS and C LIGHT, independently; the anti-rot for R20 §7.)
+29. **A criterion the record cites must be the one the gate asserts.** D struck
+    its own "`hardSwaps` flat at 20" from the `LOD_CROSSFADE` go/no-go once the
+    counter turned out to PARTITION events rather than count them. (D ATMOS.)
 30. **Never compare counters across poses.** The 20 that nearly became a
-    shipping criterion was measured at a different pose from the one the ON
-    leg runs. (D ATMOS.)
+    shipping criterion was measured at a different pose from the ON leg's.
+    (D ATMOS.)
+31. **A mirror of a formula is proven by EXTRACTING the formula, not by
+    re-deriving it.** The depth proof pulls both return expressions of three's
+    `perspectiveDepthToViewZ` out of the installed build and compares them with
+    the JS mirror bit-for-bit, so the mirror cannot carry its own copy of the bug
+    and goes red the day three changes. (C LIGHT.)
+32. **A frame-count settle is a venue constant, not a duration — poll the
+    condition and report the frames it took.** Ten rendered frames is 500 ms at
+    1–3 fps and 167 ms at 60 fps, so a hard frame-count drain fails on a healthy
+    machine; the corrected leg polls `active === 0` under a 90-frame cap and
+    prints the count. The 10-frame number was D's own criterion. (D ATMOS.)
+
+33. **The constants an instrument DECLARES must be the ones it measured, and a
+    declared cost may overstate but never understate.** The depth probe's
+    precision ladder is asserted against measured worst-case error — float32
+    0.000002 %, float16 0.0754 %, both far inside the 1 % bound — rather than
+    quoted from a datasheet. (C LIGHT.)
 
 ---
 
@@ -965,7 +959,7 @@ has been certified on the user's machine.**
 | `LINEAR_HAZE` | seam 0.000 by construction, from 9.3 / 19.9 / 76.3 / 99.2 / 89.4 per 255 | <!-- FLIP:LINEAR_HAZE PENDING --> |
 | `ONE_SUN` — `hill.dayK` **1.0**, `monumentsLambert` true | key az −56° at every hour → the sun at every tier; `live:false` closed. **dayK 1.0 makes the daytime demotion built-and-off BY CONSTRUCTION** (the weight is exactly 1, so `uHillStrength * uHillElev` is bit-identical to R21 and `verify-sat-depth`'s margin does not move); 0.65 would have spent up to 35 % of a frozen margin on an unmeasured argument | <!-- FLIP:ONE_SUN PENDING --> |
 | `POST_ORDER` (`smaaPreset 'high'`, dither) | 228/228 → 254/255 with midtones unmoved; merged pass count FALLS (sat 4→3, toy 6→5) | <!-- FLIP:POST_ORDER PENDING --> |
-| `DEPTH_FIX` | node proof (`depth-roundtrip-proof`: RED flat **0.176–0.177** CoC, viewZ **−2.50 m**; GREEN error 0.000000) + `verify-depth-offset` **7/7**; **the browser round-trip is pending C's probe hook** (§4.2) | <!-- FLIP:DEPTH_FIX PENDING --> |
+| `DEPTH_FIX` | node proof (`depth-roundtrip-proof`: RED flat **0.176–0.177** CoC, viewZ **−2.50 m**; GREEN error 0.000000; the mirror proven by EXTRACTING three's own formula, 8,004 comparisons bit-identical) + `verify-depth-offset` **7/7**; the browser round-trip runs in pass 2 against C's probe hook `e59445d` | <!-- FLIP:DEPTH_FIX PENDING --> |
 | `SHADOW_CALM` (`biasSignFix`, `kernel 'world'`, `texelSnap`, `satCadence` 0) | shader edits and snap arithmetic **proven node-side (32/33 gates)**; mount/arm logic structural; **pixels, draw counts and whether the catcher actually receives a shadow unmeasured — user's machine.** Note for any program census: it changes the compiled TEXT of every shadow receiver with NO cache key, so a key census is blind by construction and a source-hash census sees every receiver move | <!-- FLIP:SHADOW_CALM PENDING --> |
 | `TERRAIN_LIGHT` — `fragmentHill`, `microFwidth`; `workerNormals` **false** | the tile half ships; the worker half is node-proven (3.34° → 0.26°) with zero pixels behind it, and ON would make `verify-skirt-worker`'s identity leg RED by design | <!-- FLIP:TERRAIN_LIGHT PENDING --> |
 | `CLOUD_LIT` + `LAMBERT_ENV` (0.15) | same ONE draw; uniform-only for Lambert; the cloud variant's warm-set exception has a measurement condition attached | <!-- FLIP:CLOUD_LIT PENDING --> <!-- FLIP:LAMBERT_ENV PENDING --> |
@@ -980,7 +974,7 @@ has been certified on the user's machine.**
 
 | Flag | Condition |
 |---|---|
-| `LOD_CROSSFADE` | **decided by pass 2's pinned ON leg** — pass 1 proved the gate as written has no ON leg at all (§4.2). D struck its own earlier "`hardSwaps` flat at 20": **the 20 came from a different pose, and the counter PARTITIONS events rather than counting them.** The criteria the leg asserts, and the only ones this record cites: `refines + merges === hardSwaps + faded` on BOTH legs · `refines + merges` FLAT OFF→ON · `hardSwaps` DROPS toward 0 while `faded` RISES on the ON leg · after the sweep plus ≥ 10 rendered frames of settle, **`active === 0` AND `retained === 0`** (a non-zero `retained` at rest is a parent-texture leak — the single most important thing the leg can catch) · `0 < peakActive ≤ 32` (a session high-water mark, boot included) · `skip.concurrency > 0` acceptable ONLY with `peakActive === 32` · `skip.shape`, `skip.noParentMap`, `skip.unpatched` all **0** · Owens draws/tris EQUAL to the OFF leg's fixture numbers (**174 / 166,659**), not merely ≤ 261 · zero page errors · **NOT CALIBRATED** (not red) when `refines + merges` in the measured window is 0. Otherwise it holds at OFF with its RED on the record. <!-- FLIP:LOD_CROSSFADE PENDING --> |
+| `LOD_CROSSFADE` | **decided by pass 2's pinned ON leg** — pass 1 proved the gate as written has no ON leg at all (§4.2). D struck its own earlier "`hardSwaps` flat at 20": **the 20 came from a different pose, and the counter PARTITIONS events rather than counting them.** The criteria the leg asserts, and the only ones this record cites: `refines + merges === hardSwaps + faded` on BOTH legs · `refines + merges` FLAT OFF→ON · `hardSwaps` DROPS toward 0 while `faded` RISES on the ON leg · after the sweep plus ≥ 10 rendered frames of settle, **`active === 0` AND `retained === 0`** (a non-zero `retained` at rest is a parent-texture leak — the single most important thing the leg can catch) · `0 < peakActive ≤ 32` (a session high-water mark, boot included) · `skip.concurrency > 0` acceptable ONLY with `peakActive === 32` · `skip.shape`, `skip.noParentMap`, `skip.unpatched` all **0** · Owens draws/tris EQUAL to the OFF leg's fixture numbers (**174 / 166,659**), not merely ≤ 261 · zero page errors · **NOT CALIBRATED** (not red) when `refines + merges` in the measured window is 0. The pass-2 leg polls `active === 0` (90-rendered-frame cap, count printed) and `skip.warp` unchanged across two reads, rather than trusting a frame-count settle (D `8d1599a`/`51a95bc`). **And a green there proves the REFINE path only**: the Powell sweep produced merges 1, so the MERGE path is effectively unexercised at that pose. Otherwise it holds at OFF with its RED on the record. <!-- FLIP:LOD_CROSSFADE PENDING --> |
 | `AERIAL_LAW` (the law itself) | OFF this round. ON only after the horizon re-baseline batch runs with a fixture column AND one fixed-pose Owens draw row — D's own words: flipping it ON without the re-baseline "would be flipping a look nobody has seen". <!-- FLIP:AERIAL_LAW PENDING --> |
 
 ### OFF at close
