@@ -825,7 +825,7 @@ RED:
 
 | Leg | Subsection | Owner of the feature | Pass 1 | Pass 2 |
 |---|---|---|---|---|
-| `verify-fixture` | §5.1 | E (the venue itself) | **10/10** | pending |
+| `verify-fixture` | §5.1 | E (the venue itself) | **10/10**, all four settled | pending |
 | `verify-flash-guard` | §5.2 | B (`FLASH_GUARD`) | **RED, 5/1** | pending |
 | `verify-fade` | §5.3 | B (`CHUNK_FADE`) | **RED, 4/2** | pending |
 | `verify-lod-fade` | §5.4 | D (`LOD_CROSSFADE`) + A (streamer) | **RED, 2/5** | pending |
@@ -847,6 +847,14 @@ RED:
 the boot times and what each row certifies are in §1.4 and are not repeated
 here. This gate has no RED: it is the only one whose job is to prove the
 instrument, not the world.
+
+**Re-run at `FK` with a 900 s per-pose cap — Manhattan finally settles.** The
+§1.4 table's Manhattan row was a FLOOR (four of sixteen chunks still resident at
+300 s / K=40); at the higher budget it settles in **256 s** at **189 draws /
+496,466 tris / sb 16 of 16**. Powell and Melton settle in **200 s**. **Owens
+settles in 38 s at 166 draws / 183,709 tris, sb ready 0 / empty 16** — the lock,
+and still the cheapest trustworthy column this venue produces. Toy leg to
+follow; §1.4 is superseded by these numbers where they differ.
 
 **PASS 2 (flipped).** *pending* — re-run and diff §1.4. A flag that adds draws
 or triangles shows up as a delta against that table; the Owens row is the one
@@ -1164,7 +1172,14 @@ Note also fixed since this run: leg 7/8 read `v == null || v <= 261`, i.e. "an
 absent draw count is under the ceiling". It is not. `686db21` — absence is NOT
 CALIBRATED; only a finite number gets a verdict.
 
-**PASS 2 (flipped).** *pending*.
+**PASS 2 (flipped).** *pending* — and it runs LONGER. A's `b74e5be` makes the
+yaw **frame-based** (0.85°/frame, **360° minimum arc**) instead of wall-clock,
+so pass 2 invokes the row with `FLY_TERRA_SWEEP_MS=600000`: ~424 rendered
+frames, 7–8 minutes per arm here, ~30–35 minutes for the row. That is the price
+of leg 6 meaning what it says — under a wall-clock window at 1–3 fps the sweep
+never completed a revolution, so "the same tile URL is not fetched twice **as
+the heading comes back round**" was asserting over a heading that never came
+back round.
 
 ---
 

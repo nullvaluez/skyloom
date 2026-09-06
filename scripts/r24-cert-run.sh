@@ -304,7 +304,15 @@ run linear-haze  -   verify-linear-haze.js
 run depth-rt     -   verify-depth-roundtrip.js
 run ladder-fix   -   verify-ladder-fix.js
 run ladder-red   -   verify-ladder-fix.js FLY_LADDER_RED=1
-run terra-live  "$K" verify-terra-live.js FLY_TERRA_ARMS=both
+# terra-live's yaw is FRAME-based as of A's b74e5be — 0.85 deg/frame with a
+# 360 deg MINIMUM arc, so the sweep length is set in frames, not wall clock. At
+# this venue's 1-3 fps that is ~424 rendered frames, i.e. 7-8 minutes per arm,
+# and the row wants ~30-35 minutes of the budget with both arms. The point of
+# paying for it: under the old wall-clock window gate 6 could not complete a
+# full revolution, so "the same tile URL is not fetched twice as the heading
+# comes back round" never actually brought the heading back round. It asserts
+# for real at this length.
+run terra-live  "$K" verify-terra-live.js FLY_TERRA_ARMS=both FLY_TERRA_SWEEP_MS=600000
 run frame-pace   -   verify-frame-pace.js
 # LAST, and longest: the four-pose census. Manhattan's sixteen dense chunks do
 # not settle at K=40 in this venue (measured: 12 still draping at 300 s on
