@@ -620,7 +620,7 @@ is the un-blended SHARE of the events.
 |---|---|---|
 | 1 | `refines + merges` **flat** OFF→ON | the feature must not change how often the LOD refines — only whether the swap is blended |
 | 2 | `hardSwaps` **drops** toward 0; `faded` **rises** | a flat `hardSwaps` would mean the feature did nothing |
-| 3 | `active === 0` **and** `retained === 0` after ≥ 10 rendered frames of settle | every blend completed and every retained parent texture was released; `retained > 0` at rest is a texture LEAK and is the most valuable thing this leg can catch |
+| 3 | `active === 0` **and** `retained === 0`, reached by **polling to the condition** with a frame cap (NOT a fixed frame count — see below) | every blend completed and every retained parent texture was released; `retained > 0` at rest is a texture LEAK and is the most valuable thing this leg can catch |
 | 4 | `0 < peakActive <= 32` | blends actually ran, and the bound held |
 | 5 | `skip.concurrency` read **together with** `peakActive` | `> 0` with `peakActive === 32` is the bound doing its job (report); `> 0` with `peakActive < 32` is a bug in D's accounting (fail) |
 | 6 | `skip.shape`, `skip.noParentMap`, `skip.unpatched` all **0** | each is a real defect: the 2-child z0/4326 path, a parent with no map, materials not patched at arm time |
@@ -640,6 +640,33 @@ red that really reads "the boot suppression never expired". `lodFadeWarp()`
 sets a 900 ms window = **18 frames** = 6–18 s of a 40 s sweep, hence the
 settle. Both suppressions are POLICY and are already gated structurally by
 `verify-lod-fade` §5; this leg's job is "does the blend happen".
+
+**CORRECTION (2026-09-06, found reviewing E's leg): "≥ 10 rendered frames" was
+my number and it is wrong on any fast GPU.** A drain must cover `fadeSec` of
+FADE CLOCK, and the fade clock advances `min(delta, 0.05)` per rendered frame.
+At this venue's ~50 ms frames, 250 fade-ms is 5 frames and 10 is comfortable.
+At 60 fps it is 16.7 ms per frame, so 10 frames buys only 167 ms — **less than
+the 250 ms blend** — and an `active === 0` assertion fails on a healthy
+machine, reporting a D defect that is really a too-short wait. The same
+arithmetic breaks the warp settle: 900 fade-ms is 18 frames here but **54 at
+60 fps and ~130 at 144 Hz**, so a fixed 20 clears the cut only at this venue.
+
+**The rule, replacing both counts: poll to the CONDITION with a frame cap, and
+report the frames it took.** `active === 0` for the drain; `skip.warp`
+unchanged across two consecutive reads for the warp settle. That is
+fps-independent, it absorbs a blend armed by streaming during the drain, and it
+is the only form that survives moving to the user's machine — which is where
+every timing claim of this round has to end up. Any fixed frame count in a
+gate that waits on the fade clock is a venue constant wearing a portable
+number's clothes.
+
+**A comparison is only controlled if both arms were measured the same way.**
+The `refines + merges` flatness check compares two separate boots of a
+streaming world; `_update` issues refines per frame walk, so the arms must get
+the SAME pre-sweep settle and must render comparable numbers of frames. If
+they do not, the honest output is NOT CALIBRATED — "the two arms did not
+render comparable numbers of frames" — not a red. Plan §4's rule applies
+directly: a load-decided instrument gets a control, never a new bound.
 
 **Two reading rules that prevent false conclusions:**
 - **The counters have no reset.** `resetLodFades()` clears only `active`,
