@@ -452,7 +452,7 @@ merges after the run; the 15/15 above predates it.
 |---|---|---|---|---|
 | **boot proof** | **PASS — `BOOT OK in 62.5 s`**, zero console errors, zero page errors, zero failed `/_next/` chunk requests | <!-- CERT:boot-proof PASS2 PENDING --> | — | a boot WALL TIME here is a SwiftShader number, never a budget |
 | `verify-fixture.js` | **rc=0, 2,045 s, 10/10** at K=200 with a 900 s settle cap. (1) deterministic bytes — mvt 12,021 B / dem 1,817 B / img 46,864 B; (2) the 200-with-empty-body tile reachable; (3) satellite boots the fixture in **124.1 s** (`pct 100` at 54.6 s), img 74 / dem 74 / mvt 67 / tilejson 20; (4) **Manhattan is a city** — satBuilding meshes **22**, tris 496,466, settled in **256 s** at load 4.1, draws **189**, meshes 216 (satBuilding 22, satSkyline 10, toyChunk 110), sb **16/16**, maxZ 14, tiles 125; (5) **Powell is a suburb** — 16 satBuilding meshes, sb 16/16, draws **194**, tris 368,119, **parcel homes 555**, settled 200 s, maxZ 15, tiles 161; (6) **THE OWENS LOCK** — bld 0 / sky 0 / parcel 0, draws **166**, tris 183,709, sb ready 0 / **empty 16**, settled in **38 s**, maxZ 16, tiles 177 (FIXTURE column, informational against the live ≤ 261); Melton draws 184, tris 486,321, **1,836 parcel homes from zero footprints**; (8) traffic stub 300 tracks, 69 aircraft requests; (9) toy boots on the fixture — toyChunks 98, tris 273,567, boot 141.3 s, draws 212; (10) both boots clean | <!-- CERT:verify-fixture PASS2 PENDING --> | — | n/a — it certifies the venue |
-| `verify-flash-guard.js` | **rc=1, 534 s, 5 passed / 1 failed — RED calibrated**; legs below. **Three readings that change how the flag is described:** the **skyline site is INSURANCE, not a fix** — its path runs `simplifyRing` before the wall loop and the collinearity test drops the closing clone, so the zero-length wall edge never exists there and a green at that site repairs nothing (recon A1b predicted it; nobody had measured it — B ledger §15.1); **Powell's 8.28 % lands inside R22.1's live 6.36–8.64 % band** while Manhattan's worst chunk at **13.98 %** is above it, the expected shape rather than a contradiction (the band was quoted for *every large chunk*, the defect is a fixed count per ring, so a chunk with small or few footprints is proportionally worse — B's 4-corner fixture reads 14.22 % for the same reason); and **the toy site is NOT EXERCISED by any row this round** — both poses run satellite, the toy extruder carries the same wrap-around loop at `vector-tile.worker.js:4285`, and the close ruled no toy leg is added, so B's node legs (toy `full` **14.84 % → 0**; 2,288 → 0 on E's Manhattan tile) are **evidence that the code works and not a certified browser leg**. **`(4) PALE DETECTOR` — `frames=256 pale=168 worstScanlineMean=222.3` — is VOID and must never be quoted as a result**: the scanline sat 55 % up the frame and a banked serpentine spends much of its time looking at a clear daytime sky (~213 luma), so 168 identical-mean frames are a sustained bright FIELD, not the one-frame jump the detector exists to catch — R17 §7.1 arriving as false POSITIVES for once. Fixed at `r24/e e1b7905` (running median of 24 frames, scanline at 0.25 height bottom-up, a hit needs jump > 60 over the median AND min > median + 40 AND absolute > 180; renamed `worstJumpOverMedian`), **not yet RED-calibrated** — it owes a synthetic one-frame jump scoring exactly one hit and a serpentine scoring zero | <!-- CERT:verify-flash-guard PASS2 PENDING --> | PENDING — the pale FRAME itself | the pale detector is probabilistic (live rate 1 per 1,600 to 1 per 20,389 composed frames); **the census decides the gate** |
+| `verify-flash-guard.js` | **rc=1, 534 s, 5 passed / 1 failed — RED calibrated**; legs below. **Three readings that change how the flag is described:** the **skyline site is INSURANCE, not a fix** — its path runs `simplifyRing` before the wall loop and the collinearity test drops the closing clone, so the zero-length wall edge never exists there and a green at that site repairs nothing (recon A1b predicted it; nobody had measured it — B ledger §15.1); **Powell's 8.28 % lands inside R22.1's live 6.36–8.64 % band** while Manhattan's worst chunk at **13.98 %** is above it, the expected shape rather than a contradiction (the band was quoted for *every large chunk*, the defect is a fixed count per ring, so a chunk with small or few footprints is proportionally worse — B's 4-corner fixture reads 14.22 % for the same reason); and **the toy site is NOT EXERCISED by any row this round** — both poses run satellite, the toy extruder carries the same wrap-around loop at `vector-tile.worker.js:4285`, and the close ruled no toy leg is added, so B's node legs (toy `full` **14.84 % → 0**; 2,288 → 0 on E's Manhattan tile) are **evidence that the code works and not a certified browser leg**. **`(4) PALE DETECTOR` — `frames=256 pale=168 worstScanlineMean=222.3` — is VOID and must never be quoted as a result**: the scanline sat 55 % up the frame and a banked serpentine spends much of its time looking at a clear daytime sky (~213 luma), so 168 identical-mean frames are a sustained bright FIELD, not the one-frame jump the detector exists to catch — R17 §7.1 arriving as false POSITIVES for once. Fixed at `r24/e e1b7905` (running median of 24 frames, scanline at 0.25 height bottom-up, a hit needs jump > 60 over the median AND min > median + 40 AND absolute > 180; renamed `worstJumpOverMedian`), **not yet RED-calibrated** — it owes a synthetic one-frame jump scoring exactly one hit and a serpentine scoring zero | **pass 2a VOID — the venue starved the content** (below); the marker stands for the restart <!-- CERT:verify-flash-guard PASS2 PENDING --> | PENDING — the pale FRAME itself | the pale detector is probabilistic (live rate 1 per 1,600 to 1 per 20,389 composed frames); **the census decides the gate** |
 | `verify-fade.js` | **rc=1, 338 s, 4/2 — RED calibrated.** (1) births **14** / deaths **10** over 94 frames; (2) **14 of 14 hard births** — *"presence channel is none: no material carries a fade uniform"*, which IS the flag-off state; (3) **10 of 10 hard deaths**; (4) `ready` tracks CHUNKS, not presence (ready 0 of 16 during the serpentine); (5) **THE OWENS LOCK — sbReady 0, skyReady 0, draws 156** (a FIXTURE number; the live ≤ 261 is not re-baselineable from here); (6) clean. **GREEN needs pass 2** — the gate carries no ON pin | <!-- CERT:verify-fade PASS2 PENDING --> | PENDING — the LOOK of the fade | — |
 | `verify-lod-fade.js` | **rc=1, 317 s, 2 passed / 5 failed — RED calibrated** (Powell, a 40 s PURE YAW with the position frozen). (1) `residentTiles` 0 / `estMB` undefined — A's byte LRU only tracks with `TERRA_PACE` on, expected in pass 1; (2) 47 frames, 61 events; (3) **27 RE-appearances on a pure yaw** = A's T1/T3 bend-blind re-stream, measured from the other side; (4) **8 hard refines + 3 hard merges** = D's T4 atomic swap; (5) crossfade window **0 frames**; (6) **15 tile URLs refetched**, worst 2× `/img/6/23/17` = A's refetch defect; (7) Owens FIXTURE draws **174** / tris **166,659**; (8) zero page errors. **A gap the row exposed:** as written the gate has **no ON leg** — it never sets `window.__flyLodFadeOverride` — so the one feature that ships OFF *pending a measurement* could not have obtained it from either pass. E is adding a pinned ON leg for pass 2 (D reviewing it, §5.2); expected then: (3) and (6) GREEN from `TERRA_PACE`, (4) and (5) still RED in the OFF leg because LOD ships OFF, and **the pinned ON leg decides D's go/no-go** | <!-- CERT:verify-lod-fade PASS2 PENDING --> | PENDING — whether swaps are still visible at real frame rate | the fade's real DURATION (a 250 ms blend completes inside one SwiftShader frame) |
 | `verify-step-clean.js` | **rc=1, 229 s, 4/4 — RED calibrated**, viewport DPR 1.5, governor pin RELEASED (the fleet's `'hold'` was written and the accessor swallowed it). (0) pin released; (1) **the released term is reachable** — 6/6 forced steps ACCEPTED, 6 DPR applications, DPRs seen `[1.25, 1.5]`; (2) **18 of 18 `canvas.width/height` writes OUTSIDE a rAF** (width 1600 at t=171932, `inRaf:false`); (3) `setPixelRatio` 6/6 and `setSize` 12/12 outside; (3b) `composer.setSize` **6/6 outside** — the passive-effect lag; (4) `bufferMatchesDrawing` **false on 22 of 46 frames** (composer 1920×1080 vs drawing buffer 1600×900 at frame 7); (5) the composer is **RESIZED, not rebuilt** — rebuilds 1 → 1, resizes 6, R21's `FX_STABILITY` holding; (6) clean. GREEN for (2)/(3)/(3b)/(4) is expected in pass 2 with `STEP_SAFE` on. **The gate states in its own output that the tear LINE is not measurable here** | <!-- CERT:verify-step-clean PASS2 PENDING --> | PENDING — and the ladder the user's real DPR has | the tear LINE |
@@ -466,6 +466,30 @@ merges after the run; the 15/15 above predates it.
 | `verify-seam.js` browser leg | <!-- CERT:verify-seam-browser PASS1 PENDING --> | <!-- CERT:verify-seam-browser PASS2 PENDING --> | PENDING | — |
 | `verify-env-uniform.js` | <!-- CERT:verify-env-uniform PASS1 PENDING --> | n/a — the feature ships OFF | PENDING — the ms a compile storm costs | the proof B asked for and never ran |
 | `verify-shadow-calm.mjs` | **PASS 32/32 in node** (§1, §4.1) | **33/33** on C's flipped branch | PENDING — sparkle, acne, whether the catcher receives a shadow | no browser leg exists and none could be afforded (its mount begins with the fleet pin). **No pixel, no draw count; "Owens is 0 by construction" rests on `queryColumns` answering `[]`, which is a browser fact** |
+
+**PASS 2a IS VOID, and it is the round's own pacing rule that voided it.** The
+first pass-2 row ran on the flipped tree (`TREE UNDER TEST 91141fe`, boot proof
+62.3 s) and came back `rc=1, 542 s, 3 passed / 4 failed` with **Powell 0 meshes
+/ 0 tris and Manhattan 0 / 0** — (1a), (1b) and (2) FAIL on an empty world, (5)
+NOT CALIBRATED, and **(3) printing "GREEN zero=0 tris=0" ON AN EMPTY CENSUS**,
+which is precisely the case E's own gate header warned about. The mechanism was
+then read from source rather than inferred: `lib/fly/finalize-pace.js:74-79` —
+`mayFinalize(done)` with `done === 0` returns `lastDtMs <=
+FINALIZE_PACE.longFrameMs` (24 ms), and **every SwiftShader frame here is
+300–1000 ms**, so rule 1 refuses the FIRST finalize of EVERY frame and
+`sat-building-engine.js:1366` never lets a chunk finalize. **`FINALIZE_PACE`
+shipped ON starves every content gate in this venue**, and E's harness budget
+could not save it: `budgetK()` scales only the COUNT budget at `:1362`, which
+sits BEHIND the wall-clock rule. A's fix (in flight) has `finalize-pace.js` read
+`budgetK()` so that K > 1 turns rule 1 off and multiplies `budgetMs`, while
+**K exactly 1 — production and every non-fixture run — stays byte-identical**;
+`verify-finalize-pace` keeps its K=1 RED/GREEN and gains K=1 / K=40 long-frame
+rows. Pass 2 restarts from the top on the corrected tree. Two other readings
+from the same run stand: **(4b) the pale self-test fires exactly once**, so the
+rewritten detector finally has its own RED, and **(4a) still reported 8 pale
+hits in 290 frames including consecutive identical-mean frames** (f:141/142 both
+mean 222.1 against a median of 145.5) — a sustained field again, not a one-frame
+jump, so E is adding an isolation rule.
 
 **`verify-flash-guard`, pass 1, leg by leg** (`K=40`, `__flyFlashPin='off'`):
 
@@ -850,6 +874,11 @@ quotable.
   (one line): its denominator was 62 of 64 because it only tests tiles whose
   material already has a map, and the two it skipped were mid-load — the
   likeliest moment for a mismatch.
+- **Audit every per-frame pacing rule against the harness budget.** Pass 2a
+  found the second one the hard way: `budgetK()` covered the COUNT budget and
+  not `FINALIZE_PACE`'s wall-clock rule, and the same class can hide in any
+  future per-frame rule. **The content-gate list in close sweep §1.5 is the
+  checklist** — anything on it must be reachable with the budget scaler on.
 - **A toy leg for the degenerate census** — no row this round boots toy, so
   `vector-tile.worker.js:4285` has node evidence and no certified browser leg.
 - **`verify-terra-live` on a real GPU.** The FIXTURE column is in (§4.2: merges
@@ -1029,7 +1058,13 @@ Carries forward the still-open R15–R21 §6 tables.
     gate was measuring the venue's step, not the feature. It now steps
     0.85°/frame inside a rAF and prints SKIP / NOT CALIBRATED when the arc falls
     short. (A PACE.)
-35. **The constants an instrument DECLARES must be the ones it measured, and a
+35. **A shipped pacing rule can starve the venue that certifies content.** The
+    harness budget must cover EVERY pacing rule, not only the count budget: W1's
+    budget scaler found the count budget, and the close found the wall-clock one
+    — `FINALIZE_PACE`'s "the first chunk is not free" refuses every finalize on a
+    300–1000 ms frame, so the flipped tree certified an empty world until the
+    scaler reached that rule too. (The orchestrator and E CERT, jointly.)
+36. **The constants an instrument DECLARES must be the ones it measured, and a
     declared cost may overstate but never understate.** The depth probe's
     precision ladder is asserted against measured worst-case error — float32
     0.000002 %, float16 0.0754 %, both far inside the 1 % bound — rather than
