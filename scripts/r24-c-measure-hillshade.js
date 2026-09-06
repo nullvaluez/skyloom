@@ -13,6 +13,38 @@
  * rather than by flipping ONE_SUN, so ONE boot measures the whole curve and
  * nothing depends on a rebuild.
  *
+ * ── V2, AND WHY V1's NUMBERS WERE THROWN AWAY ────────────────────────────
+ * V1 ran off / 0.55 / x0.80 / x0.65 / x0.50 in that order and produced
+ *   off 0.000 · r21 12.613 · dayK065 13.961 · dayK080 14.413 · dayK050 15.379
+ * — mean |Δ| RISING as the hillshade got WEAKER, which is impossible for a
+ * hillshade A/B and is instead perfectly monotone in CAPTURE ORDER. Two
+ * uncontrolled actors were in the crop:
+ *
+ *   1. the world was still streaming (SwiftShader at ~1 fps under load 19, and
+ *      `drapeBudgetMs`/`finalizePerFrame` are PER FRAME, so "settled" takes
+ *      minutes), so each later shot differed more from the first simply
+ *      because more terrain had arrived;
+ *   2. the cumulus deck ANIMATES (drei `<Cloud speed>`), and CloudField's own
+ *      R19 comment says so in as many words: "an animated deck makes every
+ *      pixel A/B in this scene noisy by construction — a harness that wants a
+ *      STATIC frame has to be able to park it". The affordance
+ *      (`window.__flyClouds`) was put there for exactly this and V1 did not
+ *      use it.
+ *
+ * That is the R17 §7.1 trap ("a pixel-probe gate must not contain an actor it
+ * doesn't control") and the R16 lesson ("animated layers pollute their own A/B
+ * noise") in one run. V2 fixes both AND adds the control the round's own rule
+ * demands of a load-decided instrument:
+ *
+ *   • park every known mover at the handles verify-flicker parks them at;
+ *   • INTERLEAVE the legs with `off` shots — off, leg, off, leg, … — and score
+ *     each leg against its NEAREST-IN-TIME control, so residual drift cannot
+ *     accumulate into the signal;
+ *   • report the DRIFT FLOOR explicitly as the mean |Δ| between consecutive
+ *     `off` shots. A leg is only attributable to the hillshade by the amount
+ *     it EXCEEDS that floor, and if the floor is not comfortably below the
+ *     legs the run says so instead of producing a margin.
+ *
  * RUN
  *   FLY_TILE_FIXTURE=1 FLY_FIXTURE_STAMP=off FLY_FIXTURE_TRAFFIC=off \
  *   FLY_URL=http://localhost:3103 NODE_PATH=/opt/node22/lib/node_modules \
@@ -93,6 +125,41 @@ async function lumaStd(file, region) {
     await page.mouse.move(320, 180);
   };
 
+  // Park every known mover, at the handles verify-flicker uses. Anything still
+  // moving inside the crop is an actor this probe does not control, and a
+  // number that includes it is a number about that actor.
+  const parked = await page.evaluate(() => {
+    const park = (o) => {
+      if (!o) return 0;
+      let n = 0;
+      o.traverse?.((c) => {
+        if (c.visible) n++;
+        c.visible = false;
+      });
+      if (o.visible !== undefined) o.visible = false;
+      return n || 1;
+    };
+    const out = {
+      clouds: park(window.__flyClouds),
+      cirrus: park(window.__flyCirrus),
+      player: park(window.__flyPlayer),
+      traffic: park(window.__flyTraffic),
+      tracers: park(window.__flyTracers),
+      boats: park(window.__satVeg?.ambient?.boatMesh),
+      plumes: park(window.__satVeg?.ambient?.plumeMesh),
+    };
+    // Satellite water is a specular-only Phong over a SCROLLING normal map, so
+    // it twinkles at a frozen pose (verify-flicker's W3 diagnosis). Park the
+    // engine's own shared material — nothing rewrites it per frame.
+    const wm = window.__satBuildings?.waterMaterial;
+    if (wm) {
+      wm.visible = false;
+      out.water = 1;
+    }
+    return out;
+  });
+  console.log('parked movers:', JSON.stringify(parked));
+
   const live = await page.evaluate(() => window.__flyHill.get());
   const sun = await page.evaluate(() => window.__flyStats?.sun ?? null);
   console.log('live hillshade:', JSON.stringify(live));
@@ -100,33 +167,65 @@ async function lumaStd(file, region) {
 
   const base = live.strength || 0.55;
   const LEGS = [
-    ['off', 0],
     ['r21', base],
     ['dayK065', base * 0.65],
     ['dayK080', base * 0.8],
     ['dayK050', base * 0.5],
   ];
-  for (const [name, v] of LEGS) {
-    await setHill(v);
-    await shot(name);
+  // INTERLEAVED: off, leg, off, leg, … so every leg has a control taken within
+  // one step of it, and consecutive controls measure the drift between them.
+  const offs = [];
+  for (let i = 0; i < LEGS.length; i++) {
+    await setHill(0);
+    await shot(`off${i}`);
+    offs.push(`off${i}`);
+    await setHill(LEGS[i][1]);
+    await shot(LEGS[i][0]);
   }
+  await setHill(0);
+  await shot(`off${LEGS.length}`);
+  offs.push(`off${LEGS.length}`);
   await setHill(base);
 
-  console.log('\nSierra relief crop 1000x380 @ (300,450) — verify-sat-depth\'s own region/metric');
-  console.log(['leg', 'strength', 'mean |Δ| vs off', 'luma std'].map((h) => h.padEnd(20)).join(''));
-  console.log('-'.repeat(80));
-  const off = path.join(OUT, 'hill-off.png');
-  const stdOff = await lumaStd(off, REGION);
-  for (const [name, v] of LEGS) {
-    const f = path.join(OUT, `hill-${name}.png`);
-    const mad = name === 'off' ? 0 : await meanAbsDiff(f, off, REGION);
-    const std = await lumaStd(f, REGION);
+  const P = (n) => path.join(OUT, `hill-${n}.png`);
+
+  // THE CONTROL, and it is reported first because it decides whether anything
+  // below is readable: two `off` frames differ ONLY by whatever this probe does
+  // not control.
+  console.log('\nDRIFT FLOOR — mean |Δ| between consecutive OFF controls:');
+  let floor = 0;
+  for (let i = 0; i + 1 < offs.length; i++) {
+    const d = await meanAbsDiff(P(offs[i]), P(offs[i + 1]), REGION);
+    floor = Math.max(floor, d);
+    console.log(`  ${offs[i]} → ${offs[i + 1]}: ${d.toFixed(3)}/255`);
+  }
+  console.log(`  worst drift floor: ${floor.toFixed(3)}/255`);
+
+  console.log('\nSierra relief crop — verify-sat-depth\'s own region/metric');
+  console.log(
+    ['leg', 'strength', 'mean |Δ| vs its own off', 'above floor', 'luma std'].map((h) => h.padEnd(24)).join('')
+  );
+  console.log('-'.repeat(120));
+  const stdOff = await lumaStd(P(offs[0]), REGION);
+  for (let i = 0; i < LEGS.length; i++) {
+    const [name, v] = LEGS[i];
+    const mad = await meanAbsDiff(P(name), P(offs[i]), REGION);
+    const std = await lumaStd(P(name), REGION);
     console.log(
-      [name, v.toFixed(4), mad.toFixed(3), `${std.toFixed(2)} (off ${stdOff.toFixed(2)})`]
-        .map((c) => String(c).padEnd(20))
+      [
+        name,
+        v.toFixed(4),
+        mad.toFixed(3),
+        (mad - floor).toFixed(3),
+        `${std.toFixed(2)} (off ${stdOff.toFixed(2)})`,
+      ]
+        .map((c) => String(c).padEnd(24))
         .join('')
     );
   }
+  console.log(
+    `\nREADABLE? ${floor < 2 ? 'yes — the drift floor is under the 2/255 contract itself' : 'NO — the drift floor is at or above the contract; this run cannot answer the question'}`
+  );
   console.log(`\npageerrors: ${errs.length}${errs.length ? ' — ' + errs.slice(0, 3).join(' | ') : ''}`);
   console.log('CONTRACT: verify-sat-depth gates mean |Δ| > 2/255. Read the dayK065 row.');
   await browser.close();

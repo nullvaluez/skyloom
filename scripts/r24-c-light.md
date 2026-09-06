@@ -958,6 +958,17 @@ contract is `> 2/255`; the question is only whether the measured margin has
 8. **When the venue cannot run the code at all, say so in the same sentence as
    the number.** The worker normals have a 3.34° → 0.26° RED/GREEN and zero
    pixels behind it, and both facts belong together.
+9. **A monotone-in-capture-order result is a drift signature, not a finding.**
+   My own Sierra A/B produced a clean-looking 13.961/255 for `dayK 0.65` that
+   was a measurement of the streaming world and an animating cloud deck. The
+   tell was that the number rose as the effect got *weaker*. **Read the
+   ordering before reading the value.**
+10. **Two rounds had already written down the trap I fell into.** R16's
+   "animated layers pollute their own A/B noise" and R17 §7.1's "a pixel-probe
+   gate must not contain an actor it doesn't control" are both in this repo,
+   and the affordance to obey them (`window.__flyClouds`) was already there.
+   Reading the lessons file is not the same as using it; the probe should have
+   started from `verify-flicker`'s park list rather than from a blank page.
 
 ---
 
@@ -1017,7 +1028,59 @@ environment notes warn about. The run survived it — the audit above is
 post-warp — but the discipline failed, and the next attempt is numbered
 accordingly rather than being presented as a first try.
 
-**If it does not land, `hill.dayK 0.65` stays a PROPOSAL and no number is
+### Attempt 4 LANDED — and its numbers are THROWN AWAY, with a reason
+
+```
+leg        strength   mean |Δ| vs off   luma std        pageerrors: 0
+off        0.0000     0.000             49.76
+r21        0.5500     12.613            52.44
+dayK065    0.3575     13.961            52.61
+dayK080    0.4400     14.413            56.67
+dayK050    0.2750     15.379            57.21
+```
+
+**The mean |Δ| RISES as the hillshade gets WEAKER.** That is impossible for a
+hillshade A/B, and the values are instead perfectly monotone in **capture
+order** — 12.613 → 13.961 → 14.413 → 15.379 for legs taken 1st, 2nd, 3rd, 4th
+after the control, regardless of strength (0.55 → 0.3575 → 0.44 → 0.275). The
+`dayK065` row is 13.961 and it would have been trivially easy to report it as
+"comfortably above the 2/255 contract". It is not a hillshade number at all.
+
+**Two uncontrolled actors were inside the crop:**
+
+1. **the world was still streaming.** SwiftShader at ~1 fps under load 19, and
+   `drapeBudgetMs` / `finalizePerFrame` are PER FRAME, so "settled" takes
+   minutes; each later shot differed more from the first simply because more
+   terrain had arrived.
+2. **the cumulus deck animates** (drei `<Cloud speed>`), and CloudField's own
+   R19 comment says so in as many words: *"an animated deck makes every pixel
+   A/B in this scene noisy by construction — a harness that wants a STATIC
+   frame has to be able to park it."* The affordance (`window.__flyClouds`)
+   was put there for exactly this, and my instrument did not use it.
+
+That is the **R17 §7.1 trap** ("a pixel-probe gate must not contain an actor it
+doesn't control") and the **R16 lesson** ("animated layers pollute their own A/B
+noise") in a single run — both already written down in this repo, by earlier
+rounds, and both walked into anyway.
+
+### Instrument v2 (committed, unrun — browser-gate moratorium)
+
+- **Park every known mover** at the handles `verify-flicker` parks them at:
+  clouds, cirrus, player, traffic, tracers, harbour boats, industrial plumes,
+  and the satellite water material (a specular-only Phong over a scrolling
+  normal map, which twinkles at a frozen pose — verify-flicker's own W3
+  diagnosis).
+- **Interleave** the legs with controls — `off, leg, off, leg, …` — and score
+  each leg against the control taken one step from it, so residual drift cannot
+  accumulate into the signal.
+- **Report the DRIFT FLOOR first**: the mean |Δ| between consecutive `off`
+  shots. A leg is attributable only by the amount it EXCEEDS that floor, and if
+  the floor is not comfortably under 2/255 the run prints
+  `READABLE? NO` and refuses to produce a margin. That is the round's own rule
+  for a load-decided instrument — *one quiet re-run, then a CONTROL, never a
+  new bound* — applied to my own probe.
+
+**Until v2 runs, `hill.dayK 0.65` stays a PROPOSAL and no number is
 invented.** The arithmetic that would be tested: the demotion multiplies the
 hillshade envelope by 0.65 at a high sun, so `verify-sat-depth`'s mean |Δ|
 shrinks by at most 35 %; the contract is `> 2/255`; the only open question is
