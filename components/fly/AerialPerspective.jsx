@@ -51,7 +51,7 @@
  */
 import { Effect, EffectAttribute } from 'postprocessing';
 import { Uniform, Vector2, Vector3, Color, SRGBColorSpace } from 'three';
-import { AERIAL_LAW, DEPTH_FIX, LINEAR_HAZE } from '@/lib/fly/fly-constants';
+import { AERIAL_LAW, DEPTH_FIX } from '@/lib/fly/fly-constants';
 // R24 D (AERIAL_LAW): the ONE atmosphere law — the same GLSL string and the
 // same uniform block the per-material term in world-bend injects, so the two
 // evaluators cannot drift. scripts/verify-atmo-law.mjs parses this very text.
@@ -61,6 +61,10 @@ import {
   atmoUniforms,
   getAtmoLaw,
 } from '@/lib/fly/atmo-law';
+// R24 C: the flag is read through world-bend's ONE accessor (which carries the
+// __flyLinearHazeOverride dev pin), never off the constant — otherwise a pinned
+// A/B would decode the tile setters and leave this uniform on the other path.
+import { linearHazeOn } from '@/lib/fly/toy-world/world-bend';
 
 /**
  * Module-scope frame state. One satellite scene exists at a time, so a plain
@@ -418,7 +422,7 @@ export class AerialPerspectiveEffect extends Effect {
     // space, i.e. no conversion — which is exactly the L1 defect. Naming
     // SRGBColorSpace decodes the authored triple into the linear buffer the
     // composer actually renders into. Flag off = the R19 call, unchanged.
-    if (LINEAR_HAZE.enabled) {
+    if (linearHazeOn()) {
       u.get('uHazeColor').value.setRGB(s.rim[0], s.rim[1], s.rim[2], SRGBColorSpace);
     } else {
       u.get('uHazeColor').value.setRGB(s.rim[0], s.rim[1], s.rim[2]);

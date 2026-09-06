@@ -1416,3 +1416,192 @@ bare R19 key when every token is false. Those are properties of the SOURCE, not
 of the flag's value — so they go on proving the round is one flag flip away from
 R21 now that the flags are on. That is the anti-rot for R20 §7's *"a one-flag
 revert contract rots as flags accumulate"*.
+
+---
+
+## Pass 2b triage — three reds read from source, node-only
+
+Two of E's cert-3 rows came back red against the flipped tree. All three
+questions are answered here from source; two of the three are mine and fixed in
+this commit.
+
+### (a) `verify-linear-haze` seam Δ ≈ 51/255 — NOT LINEAR_HAZE, and not the
+### reader's row either
+
+**The reader's sides are right.** `verify-linear-haze.js` reads with
+`readPixels`, whose rows are bottom-up, and takes `terrain = avg(bestY − GAP −
+BAND, bestY − GAP)` — lower buffer y = lower on screen — against `sky = avg(bestY
++ GAP, …)`. That is the correct assignment, and the printed profile agrees with
+its own labels (the first 13 entries, below the seam, are the ~212 side). So
+"the reader's horizon row is on the wrong side" is eliminated from source, not
+from a guess.
+
+**There is no melt in that frame to measure.** The gate boots through
+`bootFly`, which pins `window.__flyAerialOverride = 0` (`scripts/_boot.js`:83
+and :119, both the boot and the reload leg), and the gate releases only
+`__flySunOverride`. At `FlyScene.jsx`:1659-1666 that pin multiplies `aerialGate`
+to exactly 0, and R19 B built all three atmosphere channels to take their
+IDENTITY path at 0 — `clearAerial()` (no post pass), `setSatContentHaze(start,
+end, 0, 0, 0, 0)`, `setQuiltGrade(0, 0)`. Meanwhile in satellite the two
+scene-side haze channels contribute nothing at this pose by construction:
+`WORLD_EDGE.fade.satellite` is **60 km → 120 km** (nothing in an offline fixture
+frame is within 60 km of the eye), and `setDepthHaze(..., mapStyle === 'toy' ?
+haze.max : 0)` (`FlyScene.jsx`:1011) is **literally 0 in satellite**. So the far
+terrain in the measured frame is at **0 % melt**, not "not reaching 100 %".
+
+The gate's own profile corroborates it independently: across the 13 rows below
+the seam — which at a horizon span a very large distance range — the luma sits
+at 210-214 with no trend toward 161, then falls to 159.5 in ONE row. A melt
+completing at the horizon would have swept most of the 51 across those rows.
+
+**And ≤ 12/255 is unreachable at that pose even with the pin released.**
+`AERIAL_PERSPECTIVE.maxMix` is **0.55**, commented *"never fully swallows the
+mid-band"*, so the terrain keeps ≥ 45 % of its own colour: 0.45 × 51 ≈ 23 > 12
+before the `heightFalloffM` 1200 term is even applied, and the eye in `POSE` is
+4200 m — 3.5 e-folds above that scale height. The satellite melt is designed to
+be FINISHED by the world-bend edge fade out at 60-120 km, which a fixture frame
+never reaches.
+
+So the row is void as posed, and the remedy is E's: release
+`__flyAerialOverride` with the same accessor idiom the gate already uses for the
+sun, assert tier `high`, and then either re-pose into TOY — where the band is
+14-26 km and breathes with altitude, where `setDepthHaze` actually carries
+`haze.max`, and where R12 already proved the ground disc reaches the rim — or
+re-express the contract as an A/B against the flag-off tree rather than an
+absolute seam equality. **This run cannot discriminate whether the haze target
+also disagrees with the dome's colour: with the melt at 0 the gate is blind to
+that term.** If a Δ survives the pin release, that is the next candidate, and it
+is a TUNING equality I refused this round (M1 refusal), not a decode defect.
+
+**On the oracle.** `scripts/r24-c-linear-haze-proof.mjs` predicts 0.000 for the
+DECODE ROUND-TRIP — that the value each setter writes equals
+`srgbToLinear(authored triple)`. It never predicted a 0.000 seam delta. A 0
+seam additionally needs (i) the melt to reach 1.0 at the horizon row and (ii)
+the rim triple to equal the dome's horizon colour; (i) is structurally absent
+here and (ii) is the re-tune I refused. The gate's expected value should not
+have been sourced from that proof.
+
+### (b) `casting` — MINE, fixed
+
+`verify-one-sun` reads `s.casting` (:249) and `s.minElRadDeg` (:248) and
+`s.hillMinDeg` / `s.hillMaxDeg` (:262) off `__flyStats.sun`. I published
+`casting` on `__flyStats.**shadow**` and never published the other three at all,
+so clause (2)'s floor term and clause (3) entirely could not be evaluated —
+`casting=undefined` on every line, `(3) SKIP`. That is my instrument, not
+ONE_SUN: the key light was following `runtime.sun` correctly on every leg (key
+and hill agree to 0.00° in azimuth AND elevation at all six).
+
+Fixed: `casting`, `minElRadDeg`, `hillMinDeg`, `hillMaxDeg` now publish on
+`stats.sun` as well. `casting` stays on `stats.shadow` too — it is a term in
+both contracts.
+
+### (c) `water: "key"` — MINE by semantics, now a vector
+
+The string was my by-reference semantics: satellite water is MeshPhong and its
+specular lobe is built from the scene's single directional. There is exactly one
+`<directionalLight>` in the world scene (`FlyScene.jsx`:2141; the two others live
+in the inspect turntable's own Canvas), so the water direction IS the key by
+reference, and clause (5) is **Δ 0 by identity**. `angleBetween` needs a vector,
+so it now publishes one, plus `waterSource: 'key-light'` naming the semantics.
+
+I did not add a scene light census to give clause (5) teeth: a full traverse on
+the frame loop's stats cadence would perturb E's FRAME_STATS timings during a
+perf-certification round. The honest instrument for "one sun" is the static
+source fact above — a grep gate, not a runtime probe.
+
+### The shared root cause behind both rows' time-of-day legs
+
+Both gates redefine `window.__flySunOverride` as an accessor over
+`window.__r24Sun` and then write `__r24Sun = { elDeg }`, while the app consumes
+that handle as a **timestamp** (`FlyScene.jsx`:1041 → `computeSun(lon, lat, t)`).
+`computeSun` guards with `const t = Number.isFinite(tMs) ? tMs : Date.now();`
+(`lib/fly/sun-model.js`:73), so a non-finite override is silently replaced by the
+wall clock — no throw, no NaN, no tell. Even a correct timestamp would not have
+landed: `apply()` reads the handle only at mount, on the `SKY.dayCycle.refreshSec
+= 60` interval, and when `[mapStyle, warpEpochForSun, runtime, spawn]` change, and
+the gate warps once at boot BEFORE writing any sun. `verify-dusk` documents the
+required order at its own line 48 — *"Sun pins are set BEFORE each warp —
+warpEpoch re-runs the day-cycle effect, which is the only reader of
+`__flySunOverride`."*
+
+That is why the key elevation read a constant ~23° across a commanded 55 → 2 →
+−14 swing, why the azimuth drifted 0.25° monotonically over a 263 s row (wall
+clock, not command), why `moonK` stayed 0 at the "−14°" leg (my moon blend keys
+on `trueElevationDeg(sinEl)` and would be 1 there), and why linear-haze's night
+frame is byte-identical to its noon frame. E is re-basing both gates on a
+timestamp derived from the app's own model.
+
+**Clause (6)'s > 1° azimuth expectation is E's, not mine.** ONE_SUN never
+predicted azimuth motion from an elevation change; in the solar model azimuth is
+the hour angle, so a time-driven gate that moves the sun from 55° to 2° at Powell
+moves the hour angle by hours and the azimuth by TENS of degrees. > 1° is a floor
+a time-driven gate clears trivially — it failed here only because time never
+moved.
+
+**Gates after this commit (node-only, no browser, no dev server):**
+`verify-c-flagoff` 37/37 · `verify-shadow-calm` 33/33 · `verify-depth-offset`
+7/7 · `verify-worker-normals` 12/12 · all four `r24-c-*-proof.mjs` PASS ·
+`no-undef` over the changed file 0.
+
+---
+
+## `__flyLinearHazeOverride` — the runtime pin LINEAR_HAZE never had
+
+E's rebuilt `verify-linear-haze` A/Bs Δ_on against Δ_off. That needs a RUNTIME
+pin: the alternative is two builds, and two builds cannot be compared
+frame-for-frame on one machine. LINEAR_HAZE shipped without one, so the ON arm
+read NOT CALIBRATED.
+
+**The accessor.** `linearHazeOn()` (world-bend.js, exported) is now the ONE
+reader of `LINEAR_HAZE.enabled` anywhere in the tree, with the R24 pin idiom
+(`lod-crossfade.js` `cfg()` / `step-safe.js` `resolveStepSafe()`):
+
+| `window.__flyLinearHazeOverride` | result |
+|---|---|
+| absent | the constant — flag-off identity untouched BY CONSTRUCTION (the branch is not evaluated at all) |
+| `{ enabled: false }` | the sRGB-authored path (the R21 numbers) |
+| `{ enabled: true }` | the decoded path |
+| a partial object | merged over the constant, like every other R24 pin |
+
+`process.env.NODE_ENV === 'development'` leads the condition, so production
+compiles the pin out and this is a plain constant read again; the `!= null`
+guard precedes the spread, so the only allocation happens on a pinned dev tree.
+
+**Answering the module-init question: NO SITE decodes at module init.** There
+were exactly TWO readers of the raw constant and both evaluate at setter/frame
+time — `hazeC` (world-bend, called only from the five `set*Haze`/`set*Fade`
+setters, all of which FlyScene drives per frame) and `AerialPerspective`'s
+`update()`, which postprocessing calls immediately before the pass draws. So a
+fleet pin installed by `addInitScript` governs the whole tree; there is no
+channel that already baked the constant in and would leave E measuring a mixed
+build.
+
+That second reader mattered. `AerialPerspective.jsx` lives in another file and
+carried its own `if (LINEAR_HAZE.enabled)`. Had the pin routed only through
+world-bend, a pinned A/B would have flipped the tile setters while `uHazeColor`
+— the aerial haze target, the very channel the seam contract is about — stayed
+on the other path. It now imports `linearHazeOn` from world-bend.
+
+**New source gate (verify-c-flagoff 37 → 40).** Three gates: the accessor falls
+through to the constant when no pin is set; the pin is dev-only and null-guarded
+before it is read; and a **reader census across ten files** proving the raw
+`LINEAR_HAZE.enabled` has exactly one reader and that it is inside
+`linearHazeOn()`. The census skips lines that OPEN as a comment — R20 §7's *"a
+grep gate reads comments too"*, and this file's own header names the constant in
+prose — while a trailing comment still counts, which fails loud rather than
+hiding a reader. RED-calibrated: adding one `const _x = LINEAR_HAZE.enabled;` to
+`SkyDome.jsx` turns it red and names the file and line.
+
+The two pre-existing regexes that pinned the literal `LINEAR_HAZE.enabled` at
+the two dispatch sites were re-pointed at the accessor. That is tracking my own
+refactor, not a frozen-number move: both still assert the same property (the
+decode is branch-gated, and the false branch is the R21 call).
+
+**Node-only, no browser and no dev server:** verify-c-flagoff 40/40 (RED-
+calibrated) · verify-shadow-calm 33/33 · verify-depth-offset 7/7 ·
+verify-worker-normals 12/12 · four proofs PASS · eslint over the three changed
+files 0 errors 0 warnings. Not run here: a full `next build`. The new
+`AerialPerspective → world-bend` import edge is cross-checked textually (the
+export exists, the specifier matches, world-bend imports only fly-constants so
+no cycle) — the honest residual after the import-welding lesson, where only the
+module resolver caught the defect.
