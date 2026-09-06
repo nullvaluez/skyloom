@@ -116,7 +116,7 @@ async function pose(page, p, settleMs) {
   // drapeMaxTries on a shallow DEM). settleMs is the CAP, not the wait.
   const st = await settleWorld(page, { capMs: settleMs });
   const c = await page.evaluate(CENSUS);
-  return { ...c, settle: { settled: st.settled, why: st.why, ms: st.ms, maxZ: st.maxZ, tiles: st.tiles, groundElev: st.groundElev } };
+  return { ...c, settle: { settled: st.settled, why: st.why, ms: st.ms, load: st.load, maxZ: st.maxZ, tiles: st.tiles, groundElev: st.groundElev } };
 }
 
 let pass = 0;
@@ -183,7 +183,7 @@ function gate(name, ok, detail) {
     console.log(
       `  ${name.padEnd(10)} draws=${sc.draws} tris=${sc.tris} meshes=${sc.meshes} ` +
         `counts=${JSON.stringify(sc.counts)} sb=${JSON.stringify(sc.sb)}\n` +
-        `             settled=${sc.settle.settled} in ${(sc.settle.ms / 1000).toFixed(0)}s ` +
+        `             settled=${sc.settle.settled} in ${(sc.settle.ms / 1000).toFixed(0)}s at load ${sc.settle.load} ` +
         `(${sc.settle.why}) · maxZ=${sc.settle.maxZ} tiles=${sc.settle.tiles} ground=${sc.settle.groundElev?.toFixed?.(1)}m`
     );
   }
