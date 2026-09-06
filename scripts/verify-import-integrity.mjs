@@ -67,13 +67,31 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-// First-party source roots. `scripts/` is deliberately NOT here: harnesses are
-// node programs with their own globals and are exercised by running them.
-const TARGETS = ['lib', 'components', 'app', 'hooks', 'stores'].filter((d) =>
+// First-party source roots — AND `scripts/`.
+//
+// `scripts/` was deliberately excluded, on the reasoning that harnesses are
+// node programs "exercised by running them". Pass 2b priced that reasoning:
+// verify-lod-fade.js called `notCalibrated(...)` on a path this container had
+// never reached, the import was missing, and the gate died with a
+// ReferenceError at 860 SECONDS — after the whole ON leg had run and produced
+// the numbers the round needed. "Exercised by running them" only exercises the
+// paths a run takes, and the NOT CALIBRATED paths are by definition the ones a
+// healthy run does not.
+//
+// It is the same defect class this round already found in the app tree (the
+// AerialPerspective ReferenceError that voided every browser row), in the same
+// week, and the sweep that catches it had been pointed away from half the tree.
+const TARGETS = ['lib', 'components', 'app', 'hooks', 'stores', 'scripts'].filter((d) =>
   fs.existsSync(path.join(ROOT, d))
 );
 
-const IGNORES = ['lib/fly/vendor/three-tile/plugin.js', '**/*.built.js'];
+const IGNORES = [
+  'lib/fly/vendor/three-tile/plugin.js',
+  '**/*.built.js',
+  // Generated / vendored under scripts/, and the fixture's own node modules.
+  'scripts/r24-out/**',
+  'scripts/r24-fixture/**',
+];
 
 let pass = 0;
 let fail = 0;
@@ -188,10 +206,12 @@ gate(
     : 'the ignore list currently hides nothing at all'
 );
 gate(
-  '(3) THE IGNORE LIST IS THE TWO DOCUMENTED PATTERNS, UNCHANGED',
-  IGNORES.length === 2 &&
+  '(3) THE IGNORE LIST IS THE FOUR DOCUMENTED PATTERNS, UNCHANGED',
+  IGNORES.length === 4 &&
     IGNORES[0] === 'lib/fly/vendor/three-tile/plugin.js' &&
-    IGNORES[1] === '**/*.built.js',
+    IGNORES[1] === '**/*.built.js' &&
+    IGNORES[2] === 'scripts/r24-out/**' &&
+    IGNORES[3] === 'scripts/r24-fixture/**',
   IGNORES.join(' , ')
 );
 
