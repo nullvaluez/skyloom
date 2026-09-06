@@ -23,7 +23,11 @@
  *   3. The frozen draw ceilings at the settled canonical poses, both arms.
  *
  * Every number here is a COUNT. This container renders on SwiftShader at ~1 fps,
- * so nothing about frame time is measured or claimed.
+ * so nothing about frame time is measured or claimed. Because the yaw sweep
+ * advances PER FRAME, a slow venue buys its arc with wall clock: set
+ * FLY_TERRA_SWEEP_MS (default 45000) high enough that both arms clear
+ * YAW_MIN_ARC_DEG, and the arc actually swept is printed beside gate 6's
+ * verdict — pass, fail or skip — so the reader never has to assume it.
  *
  * TODO WHEN THIS IS NEXT TOUCHED (no code change now — the gate is mid-
  * certification): the content probe SILENTLY SKIPS tiles whose material has no
@@ -39,7 +43,13 @@ const { attachFixture } = require('./_fixture');
 
 const URL_ = process.env.FLY_URL || 'http://localhost:3101';
 const SETTLE = Number(process.env.FLY_TERRA_SETTLE_MS || 30000);
-const YAW_MS = Number(process.env.FLY_TERRA_YAW_MS || 45000);
+// Sweep length. FLY_TERRA_SWEEP_MS is the name to reach for; FLY_TERRA_YAW_MS
+// is kept as its alias so existing invocations do not move. The default is the
+// original 45000, so an unset environment is byte-identical to before this env
+// existed. On a ~1 fps venue 360 deg at 0.85 deg/frame is ~424 rendered frames
+// — roughly 7-8 minutes per arm — so gate 6 needs this raised there (600000
+// gives 10 minutes of headroom) rather than a lowered arc minimum.
+const YAW_MS = Number(process.env.FLY_TERRA_SWEEP_MS || process.env.FLY_TERRA_YAW_MS || 45000);
 // 0.85 deg/frame is 51 deg/s at 60 fps — a brisk but ordinary turn. It is a
 // PER-FRAME figure on purpose (see PIN_YAW): what must match across arms is the
 // ARC swept, not the wall-clock time spent.
@@ -376,7 +386,12 @@ async function runArm(context, fx, paceOn) {
   const imgOff = off.yawStats.byKind?.img ?? 0;
   const imgOn = on.yawStats.byKind?.img ?? 0;
   console.log('');
-  console.log(`  YAW SWEEP (${(YAW_MS / 1000).toFixed(0)}s in place, ~51 deg/s)`);
+  console.log(`  YAW SWEEP (${(YAW_MS / 1000).toFixed(0)}s in place, ${YAW_DEG_PER_FRAME} deg/frame)`);
+  console.log(
+    `    arc swept             off ${off.yawArc.deg.toFixed(0)} deg / ${off.yawArc.frames} frames` +
+      `   on ${on.yawArc.deg.toFixed(0)} deg / ${on.yawArc.frames} frames` +
+      `   (gate 6 needs >= ${YAW_MIN_ARC_DEG} deg)`
+  );
   console.log(`    imagery requests      off ${imgOff}   on ${imgOn}`);
   console.log(`    URLs fetched >1 time  off ${dupOff}   on ${dupOn}`);
   console.log(`    engine merges         off ${off.yawCensus.lod?.merge}   on ${on.yawCensus.lod?.merge}`);
@@ -405,12 +420,16 @@ async function runArm(context, fx, paceOn) {
     Math.abs(off.yawArc.deg - on.yawArc.deg) <= 0.1 * Math.max(off.yawArc.deg, on.yawArc.deg);
   if (bothArms && arcOk) {
     gate('6 YAW: the same tile URL is not fetched twice as the heading comes back round',
-      dupOn <= dupOff, `${dupOff} -> ${dupOn} URLs fetched more than once`);
+      dupOn <= dupOff,
+      `${dupOff} -> ${dupOn} URLs fetched more than once over ${on.yawArc.deg.toFixed(0)} deg / ` +
+        `${on.yawArc.frames} frames (off ${off.yawArc.deg.toFixed(0)} deg / ${off.yawArc.frames} frames)`);
   } else if (bothArms) {
     console.log(
       `SKIP  6 YAW duplicate-URL comparison NOT CALIBRATED — arcs off ${off.yawArc.deg.toFixed(0)} deg / ` +
-        `on ${on.yawArc.deg.toFixed(0)} deg (need >= ${YAW_MIN_ARC_DEG}, within 10% of each other). ` +
-        `Raise FLY_TERRA_YAW_MS, or FLY_TERRA_YAW_DEG_PER_FRAME on a machine that cannot reach the arc.`
+        `${off.yawArc.frames} frames, on ${on.yawArc.deg.toFixed(0)} deg / ${on.yawArc.frames} frames ` +
+        `(need >= ${YAW_MIN_ARC_DEG} deg each, within 10% of each other). ` +
+        `Raise FLY_TERRA_SWEEP_MS (the arc is frames x ${YAW_DEG_PER_FRAME} deg, so a slow venue needs ` +
+        `proportionally longer), not FLY_TERRA_YAW_MIN_ARC.`
     );
   }
 

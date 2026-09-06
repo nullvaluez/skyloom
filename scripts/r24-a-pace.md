@@ -1017,10 +1017,29 @@ other; otherwise it prints `SKIP … NOT CALIBRATED` with the two arcs rather
 than a red.
 
 **Consequence for pass 2, stated plainly:** at ~1 fps, 45 s × 0.85 °/frame is
-about 38° of arc, so gate 6 will SKIP in this container rather than produce a
-number. That is the correct outcome — the row needs either a much longer
-`FLY_TERRA_YAW_MS` or the user's machine. A skip that says why beats a red that
-measures the venue.
+about 38° of arc, so gate 6 would SKIP in this container rather than produce a
+number. That is the correct outcome — the row needs either a much longer sweep
+or the user's machine. A skip that says why beats a red that measures the venue.
+
+**And then the sweep length became reachable** (Fable's ruling, same round):
+rather than leave the row skipped here, the sweep is now a harness-only env,
+`FLY_TERRA_SWEEP_MS`, defaulting to the original 45000 so an unset environment
+is byte-identical to the gate before the env existed (`FLY_TERRA_YAW_MS` is
+kept as its alias, so no existing invocation moves). The arithmetic Fable has
+to pay: 360° ÷ 0.85 °/frame ≈ **424 rendered frames**, which at this venue's
+~1 fps is ~7–8 minutes of wall clock **per arm**; pass 2 runs it at 600000
+(10 min/arm) with `FLY_TERRA_ARMS=both`, so gate 6 asserts for real here
+instead of skipping. `page.waitForTimeout` is not bounded by Playwright's
+default timeout, so the only cost is wall clock — budget roughly +20 minutes
+over pass 1's 715 s for the row.
+
+The arc is now printed **beside the verdict on every path**, not only on the
+skip: a new `arc swept` line in the YAW SWEEP block carries both arms'
+degrees and frames, gate 6's PASS/FAIL detail string repeats them, and the SKIP
+text names `FLY_TERRA_SWEEP_MS` as the knob to raise (explicitly **not**
+`FLY_TERRA_YAW_MIN_ARC` — lowering the arc minimum would restore exactly the
+under-calibrated comparison that produced the 1 → 17). A reader of the log can
+now always see what arc the number was measured over.
 
 **Still worth having (E, pass 2):** the per-prefix breakdown. It is no longer
 load-bearing for this attribution, but an eviction-refetch cycle would show in
