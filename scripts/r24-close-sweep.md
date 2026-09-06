@@ -827,7 +827,7 @@ RED:
 |---|---|---|---|---|
 | `verify-fixture` | §5.1 | E (the venue itself) | **10/10**, all four settled | pending |
 | `verify-flash-guard` | §5.2 | B (`FLASH_GUARD`) | **RED, 5/1** | 2a VOID · 2b census proven, **green leg VOID**, re-take pending |
-| `verify-fade` | §5.3 | B (`CHUNK_FADE`) | **RED, 4/2** | pending |
+| `verify-fade` | §5.3 | B (`CHUNK_FADE`) | **RED, 4/2** | 2b **VOID** (probe blind), re-take pending |
 | `verify-lod-fade` | §5.4 | D (`LOD_CROSSFADE`) + A (streamer) | **RED, 2/5** | pending |
 | `verify-step-clean` | §5.5 | A (`STEP_SAFE`) | **RED, 4/4** | pending |
 | `verify-ladder-fix` | §5.6 | A (`PERF_LADDER`) | **RED arm 7/6** | **GREEN 13/13** |
@@ -1034,8 +1034,69 @@ why "ready never falls" is NOT the invariant (§2.10).
 Since this run, (4) requires finite readings and (5) no longer coerces `?? 0`:
 an absent ready count would have certified the Owens lock on no data.
 
-**PASS 2 (flipped).** *pending* — (2) and (3) → 0 hard, presence channel names
-a real uniform, (1) (4) (5) (6) all still green.
+**PASS 2b (integration `ec53fd3`): VOID — THE PROBE WAS BLIND TO THE CHANNEL.**
+`4 passed, 2 failed`, rc 1, 346 s. Serpentine 122 frames, births 29 (HARD 29),
+deaths 20 (HARD 20), `presence channel = none`, evictions 40, **heals 9**.
+
+**`CHUNK_FADE.enabled` is `true` on this tree** — B shipped it, with an engine
+proof of single-frame pops **92 → 2** over a 2,700-frame serpentine, both
+residuals attributable to `fadeBudgetMiss`. So 29/29 hard is not a product
+reading. The mismatch is the probe's, arbitrated from both sides at `ec53fd3`:
+
+| | file:line | what it does |
+|---|---|---|
+| **my probe** | `verify-fade.js:81-95` | reads `material.userData.shader.uniforms` / `material.uniforms` for four **guessed** names (`uBirth`, `uChunkFade`, `uFade`, `uChunkBirth`), then `transparent` + `opacity`, then `'none'` → presence 1 |
+| **B's fade** | `chunk-fade.js:98-102` | publishes the pooled twin's uniform at **`material.userData.__fadeU`**, explicitly "so a probe can read the EFFECTIVE per-mesh alpha the GPU will see" |
+
+The GLSL uniforms behind it are `uSatBldgFade` / `uSkyFade`, injected through
+`applyBendAnchor*`'s `onBeforeCompile` — so they are **not** `material.uniforms`
+entries and the guessed names could never have found them. Both engines build
+twins through the one pool (`sat-building-engine.js:345`,
+`sat-skyline-engine.js:167`), and the twin is swapped onto the mesh at `:848`
+(birth) and `:874` (death), so the census was looking at the right object and
+the wrong property. Same family as the lod-fade NaN, §2.10a.
+
+**A SECOND defect, which the first fix would not have cured.** The channel label
+used `??=` — first-write-wins. B's twin is on a mesh **only during a ramp**: on
+birth completion `b.mesh.material = this.material` and the twin returns to the
+pool; dying meshes leave the scene. A resident chunk **at rest therefore has no
+`__fadeU`**, and that is the correct steady state, not a missing instrument. The
+first mesh sampled is almost always one at rest, so the label would have latched
+to `'none'` for the whole run **even after reading `__fadeU` correctly**. The
+label is now the most specific channel seen anywhere in the run; self-test (5c)
+is that exact sequence.
+
+**What the re-take should show, per B:**
+
+- **(2) births → SOFT.** `_startBirth` writes `value 0` in the same synchronous
+  block as `object.add` (`:847`), so the first displayed frame is presence 0.
+- **(3) deaths are HARD BY CONSTRUCTION HERE, whatever the feature does.**
+  `_startDeath` writes `value = _altFade` (1.0 at these poses, `:873`) and the
+  value only moves on the **next** `_stepFades`; at ~2.84 s per rendered frame a
+  0.3 s `evictSec` ramp cannot span two samples. B's fix is a frame-count floor
+  — `progress = min(elapsed/sec, framesSince/CHUNK_FADE.minFrames)`, `minFrames`
+  3 — so a ramp spans ≥ 3 partial samples at any frame rate while `elapsed`
+  still governs at 60 fps. The gate prints this as a venue note rather than
+  letting the number read as a defect.
+- **(3) is read against the CAP, not against 0.** `maxDying` is 4, and both the
+  eviction loop (`:1077`) and the AGL cull (`:1020`) can present more at once;
+  every refusal is counted as `fadeBudgetMiss` (`:857`). B's own rule, now
+  applied and printed: `hardDeaths ≤ fadeBudgetMiss` = capped as designed;
+  `hardDeaths > fadeBudgetMiss` = the unexplained remainder that is the defect.
+
+**The legs that did read correctly** — a VOID row is not a worthless row: (1)
+the watch had 29 births / 20 deaths to watch; (4) ready 4 of 16, series
+`[[5,0]…[7,0],[0,0],[0,1]…[3,10]]`; **(5) the Owens lock held — sbReady 0 /
+skyReady 0 / draws 190** (up from 156 flag-off, still far under the live 261
+ceiling); (6) clean.
+
+**The probe now has its own RED** (`FADE_PROBE_SELFTEST=1`, 7/7): it extracts
+the REAL `presenceOf` from this file's own source — not a copy, so it cannot
+drift — and asserts a shared material still reads `none`/1, which keeps pass 1's
+14/14 and this run's 29/29 exactly reproducible on a flag-off tree.
+
+**PASS 2c (standalone re-take).** *pending* — with `flash-guard`, after B's
+`minFrames` merge.
 
 ---
 
