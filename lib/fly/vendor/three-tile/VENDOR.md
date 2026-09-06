@@ -106,6 +106,13 @@ patch keeps its row, marked WITHDRAWN.
 | 22 | A | `TERRA_PACE.walkWhileSaturated` | `index.js` · `Tile._update()` | T3 (second half) — upstream freezes the ENTIRE quadtree walk while `downloadingThreads + 4 >= maxThreads` (six of ten loads), so a busy queue pins the tree at whatever depth it reached; E CERT measured dl 9/10, maxZ stuck at 6 and every building drape restarting | the verbatim upstream `if (!(…saturated…))` body |
 | 23 | A | `TERRA_PACE.walkWhileSaturated` | `index.js` · `Tile.LOD()` | T3 — PATCH 22's companion: compute and return the LOD decision while saturated but withhold the ACTION, so no load is started that upstream would not have | an early return reachable only when a caller passes `true`; every upstream call site passes one argument |
 | 24 | A | `TERRA_PACE.bboxCache` | `index.js` · `Tile.BBox` getter | T3 (allocation half) — every tile visit allocates a Box3 + two Vector3s, and the walk touches every tile; PATCH 22 roughly doubles the visits, so the per-visit allocation has to go | the verbatim upstream two-line getter body |
+| 25 | A | `R24_SWITCHES.onPhase` (E CERT's FRAME_STATS) | `index.js` · module scope + `We()` + `Tile.update()` | HARN-GAP-4 — the skirt build and the quadtree walk both run on the main thread inside or beside `renderer.render`, so a stall in either is indistinguishable from a draw; tagging them is what turns "it froze for 40 ms" into "during a skirt build" in the user's own ring buffer | `onPhase` is null and both sites are a single null check |
+
+**PATCH 25: attribution by inversion.** The bundle must never import app code —
+that is what keeps it a leaf and its patches switchable from one place — so the
+`FRAME_STATS` attribution hook is INSTALLED rather than imported:
+`lib/fly/terrain-engine.js` sets `R24_SWITCHES.onPhase = markPhase`, and the two
+call sites are a null check on paths that already do real work.
 
 **PATCH 20/21: the worker source rule.** three-tile ships its DEM workers as
 MINIFIED SOURCE STRINGS turned into Blob URLs at runtime. Hand-editing one of
