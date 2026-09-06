@@ -758,34 +758,102 @@ position after `warpTo` — all on a machine that can run them.
 
 ---
 
+## §8d Attribution — E's `markPhase` in the terrain and finalize paths
+
+Six call sites, all no-ops until E's instrument is live: `skirt` (the boundary
+scan, 67% of every stalled ms on the R22 tree), `lod-walk` (the quadtree walk,
+which runs INSIDE `renderer.render` and is otherwise indistinguishable from a
+draw), and `finalize:<engine>` for the four chunk assemblies.
+
+The two vendored sites go in **by inversion** (PATCH 25): the bundle must never
+import app code, so `terrain-engine.js` sets `R24_SWITCHES.onPhase = markPhase`
+and the sites are a null check on paths that already do real work.
+
+---
+
 ## §9 Could not measure here (honest list)
 
-Everything in this section needs the user's machine, or E's offline fixture,
-or both. Nothing below has a number from this container.
+Nothing in this section has a number from this container. The venue is
+SwiftShader at ~1 fps under the game's load, four cores shared by five agents
+and Fable (load average 14–17 during this round's browser work), and Esri /
+OpenFreeMap / adsb.lol are 403-blocked.
 
 | # | Claim that needs a real measurement | Venue |
 |---|---|---|
-| 1 | Draws/tris identity across the vendoring commit at Owens/Powell/Manhattan | E's fixture (structural) — runs here once it lands |
-| 5 | Draw counts at the settled canonical poses with the residency trio ON (the ceilings argument above) | E's fixture |
-| 6 | Whether `bendSphere` (T14) can be enabled without moving Owens ≤ 261 / sat ≤ 375 | E's fixture |
-| 7 | Stalls/min, worst frame and the felt smoothness of the residency trio | User's machine (`__flyTerraPaceOverride` A/B) |
-| 8 | Whether a WRONG tile (cache/URL mix-up) is also in play, as distinct from LOD policy | E's z/x/y-stamped fixture + the URL↔position probe |
-| 9 | `skirtWorker` end to end: the production LERC path builds its geometry in a worker; E's fixture serves terrain-rgb, whose loader builds on the MAIN thread, so the patched path is never reached here | User's machine (Esri egress) |
+| 1 | Draws/tris identity across the vendoring commit at Owens/Powell/Manhattan | E's fixture (structural) |
+| 2 | Any fps / ms / stalls-per-minute / worst-frame number | User's machine only |
+| 3 | Governor behaviour in real time, DPR-step timing, tearing | User's machine only |
+| 4 | Live tile-URL identity against Esri | User's machine (egress) |
+| 5 | Draw counts at the settled canonical poses with the residency trio ON | E's fixture |
+| 6 | Whether `bendSphere` (T14) can be enabled inside Owens ≤ 261 / sat ≤ 375 | E's fixture |
+| 7 | Stalls/min and felt smoothness of the residency trio | User's machine (`__flyTerraPaceOverride` A/B) |
+| 8 | Whether a WRONG tile (cache/URL mix-up) is also in play, as distinct from LOD policy | E's z/x/y-stamped fixture + my URL↔position probe in `verify-terra-live.js` |
+| 9 | `skirtWorker` end to end — the production LERC path builds geometry in a worker; the fixture's terrain-rgb loader builds on the MAIN thread, so the patched path is never reached here | User's machine (Esri egress) |
 | 10 | Whether `walkWhileSaturated`'s 2.5× traversal is invisible in a real frame budget | User's machine |
 | 11 | Whether `FINALIZE_PACE` removes a FELT hitch (the rule's shape is proven; the frame time is not) | User's machine, via E's FRAME_STATS long-frame count |
-| 12 | `HUD_SYNC`: that the label swim is gone in a turn — it is a visual, and this container renders at ~1 fps | User's machine |
-| 13 | `REBASE_CALM` T12: that the micro-grain no longer re-phases at a rebase — same reason | User's machine |
+| 12 | `HUD_SYNC`: that the label swim is gone in a turn — it is a visual | User's machine |
+| 13 | `REBASE_CALM` T12: that the micro-grain no longer re-phases at a rebase | User's machine |
 | 14 | `FRAME_STEP`'s consumer opt-in: that a render-pose consumer still lands on a harness-pinned `flight.pos` | A machine that can run the fleet (see §8c) |
-| 2 | Any fps / ms / stalls-per-minute / worst-frame number | User's machine only |
-| 3 | Governor behaviour, DPR-step timing, tearing | User's machine only |
-| 4 | Live tile-URL identity against Esri | User's machine (egress) |
 
----
+**The one thing I attempted here and could not finish:** the satellite fixture
+A/B in `scripts/verify-terra-live.js` (the content probe + the live draw
+ceilings). Two runs died — the first on a fixture-server 502 from E's
+since-fixed server-reuse bug, the second on a timeout at load average 14 — and
+rather than report a partial number I stopped, made the arms separable
+(`FLY_TERRA_ARMS=on|off|both`), added per-stage progressive logging and wrapped
+every fixture-stats call so a dead fixture degrades the counters instead of
+killing the arm. The harness is committed and ready for a quieter machine.
+The ladder gate boots TOY precisely to avoid that cost: the ladder and the DPR
+step are style-independent and toy streams no tiles.
 
 ## §10 Commits
 
 | # | Commit | What |
 |---|---|---|
-| 1 | `b64457b` | M1 vendor three-tile 0.12.1 verbatim |
-| 2 | `4bedab1` | M1 follow-up: restore CRLF on next.config.mjs + package.json |
-| 3 | _(this commit)_ | M2a residency trio: timerFix / mergeHysteresis / keepResident + byte LRU + counters + A10 handle |
+| 1 | `b64457b` | M1 vendor three-tile 0.12.1 VERBATIM + `verify-vendor-three-tile` |
+| 2 | `4bedab1` | M1 follow-up: restore CRLF on `next.config.mjs` + `package.json` |
+| 3 | `407691b` | M2a the residency trio — `timerFix` / `mergeHysteresis` / `keepResident` + the byte LRU + the LOD counters + the A10 handle; `verify-terra-residency` |
+| 4 | `5247d06` | M2b `skirtFast` — the O(E) boundary scan; `verify-skirt-fast` |
+| 5 | `e990616` | M2b ledger §4 (docs) |
+| 6 | `3158584` | M2c `skirtWorker` (built-OFF) + the readable worker-source rule + `build-tile-worker`; M2d `walkWhileSaturated` + `bboxCache`; E's fixture merged; `verify-skirt-worker` |
+| 7 | `ab67ffe` | the splice also fires on C's `TERRAIN_LIGHT.workerNormals` |
+| 8 | `36792a0` | M3 `LADDER_FIX` + `STEP_SAFE`; `verify-ladder-fix` (RED-calibrated) |
+| 9 | `2fadaa6` | M5a `HUD_SYNC` (+ the two FL-06 companions) and `REBASE_CALM` (FL-09 + T12); `lib/fly/fly-pins.js` |
+| 10 | `f8c6a4a` | M5b `FINALIZE_PACE`; `verify-finalize-pace` |
+| 11 | `ed773b8` | M4 `FRAME_STEP` sim half + `verify-frame-step`; consumer opt-in NOT landed (§8c) |
+| 12 | `70b9f42` | E's `FRAME_STATS` `markPhase` attribution in the terrain + finalize paths (PATCH 25, by inversion) |
+
+### Gates added
+
+| Gate | Assertions | Venue |
+|---|---|---|
+| `scripts/verify-vendor-three-tile.mjs` | 19 | node, anywhere |
+| `scripts/verify-terra-residency.mjs` | 21 | node, anywhere |
+| `scripts/verify-skirt-fast.mjs` | 12 | node, anywhere |
+| `scripts/verify-skirt-worker.mjs` | 8 | node, anywhere |
+| `scripts/verify-finalize-pace.mjs` | 11 | node, anywhere |
+| `scripts/verify-frame-step.mjs` | 10 | node, anywhere |
+| `scripts/verify-ladder-fix.js` | 13 | browser (toy boot, seconds); RED via `FLY_LADDER_RED=1` |
+| `scripts/verify-terra-live.js` | 9 | browser + E's fixture; **has not completed here** (§9) |
+
+Plus `scripts/build-tile-worker.mjs` (the worker stringifier, `--check` wired
+into the vendor gate).
+
+## §11 Merge notes for Fable
+
+Files I touched that another agent is likely to have touched too:
+
+| File | My hunks | Note |
+|---|---|---|
+| `components/fly/FlyScene.jsx` | the `rebase` callback (REBASE_CALM), a `noteFinalizeFrame(delta)` line at the top of the −50 block, the FRAME_STEP branch around `flight.step`, `camera.updateMatrixWorld()` at the end of the −50 block, the `__flyTerra` dev-handle effect, four `useMemo`s + one `useCallback` above `rebase`, and four constants imports | every hunk is annotated `// R24 A`; none touches shading, weather, sun or the atmosphere blocks |
+| `components/fly/FlyCanvas.jsx` | one `useState` for `stepSafeOn`, the `<StepSafeRig>` mount inside the PERF_GOVERNOR branch, `<HudSyncRig>` in the shared `sceneTree`, two imports | **E mounts a −101 rig here** — different JSX slots, but the same two regions; my rig is inside the `PERF_GOVERNOR.enabled` branch and E's is not |
+| `components/fly/FlyEffectComposer.jsx` | a keyed `registerComposer` effect right after the `__flyComposer` effect, an in-frame buffer check at the top of the `enabled` branch of its `useFrame`, one `useRef`, two module scratch `Vector2`s, two imports | **C added one-line `finishPassChain` hooks here** — C's are in the pass-assembly path, mine are in the size/render path |
+| `lib/fly/perf-governor.js` | `resolveLadderFix()`, the sub-native rung loop in `buildLadder`, the `targetFps` line, the long-frame block before the EMA, the `r24Stutter` term in the down decision, three `g.*` fields, two `state()` fields, the `applyDpr` park | nobody else should be in this file |
+| `lib/fly/vendor/three-tile/index.js` | patches 0–4 and 20–25 | D holds 5–7 and C 8–19; `verify-vendor-three-tile` gates the ledger both ways, and gate 7 rejects any hunk without an `R24` marker |
+| `lib/fly/toy-world/*.js` | one `if (!mayFinalize(done)) break;` + one `markPhase(...)` per finalize loop; the veg commit cap; the toy typed-array index | **deliberately NOT folded into the `done < X.finalizePerFrame` bound** where E's `budgetK()` multiplier sits — gate 11 of `verify-finalize-pace` enforces that |
+| `lib/fly/tile-sources.js` | the vendored imports (mine) + E's two fixture hunks re-applied on top | take mine for the imports, E's for the fixture body |
+| `package.json` / `package-lock.json` | three-tile + overrides removed (mine), geojson-vt + vt-pbf added (E's) | both preserved, CRLF intact |
+| NEW, uncontested | `lib/fly/step-safe.js`, `lib/fly/fly-pins.js`, `lib/fly/finalize-pace.js`, `lib/fly/frame-step.js`, `lib/fly/tile-residency.js`, `components/fly/StepSafeRig.jsx`, `components/fly/HudSyncRig.jsx`, `lib/fly/vendor/three-tile/**`, six `scripts/verify-*` | |
+
+I touched **no** world-bend cache key, no shader text, no prewarm entry, and no
+constants block but my own.
