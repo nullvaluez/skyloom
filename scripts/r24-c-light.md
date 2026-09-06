@@ -647,14 +647,128 @@ can only **grow** on slopes, never shrink. **[pending fixture]** for all of it.
 
 ## M5 — TERRAIN_LIGHT (recon L8, T6, T7, T12, T13) — PARTIAL, and honestly so
 
-### What is DONE (this tree)
+### The tile half
 
-- **`uHillElev`** — the sun-elevation weight as its own uniform, with the FINAL
-  tile key derived from the flag combination (see the ONE_SUN section; the key
-  suffix is built from the actual flags so two different texts can never share
-  one key — the R4 lesson).
+- **`uHillElev`** — the sun-elevation weight as its own uniform (see ONE_SUN;
+  this is the change that saved `verify-sat-depth`'s frozen 0.55 assertion).
+- **`fragmentHill`** — the hillshade's N·L moves out of the vertex stage. R21
+  computed it in `<defaultnormal_vertex>` and Gouraud-interpolated the CLAMPED
+  DOT; combined with last-writer normals (below) the relief facets by
+  construction. The vertex now carries the world-space NORMAL
+  (`vec4(transformedNormal, 0.0) * viewMatrix` is the transpose product back to
+  world, so the fragment needs no matrix work) and the fragment takes the dot.
+  Identical algebra, ~4 ALU. It does not fix the normals — that is the worker
+  half — but **interpolating an arbitrary normal field is still arbitrary**, so
+  the two halves are only worth having together.
+- **`microFwidth` (T13)** — a 5.5 m value-noise cell covering under ~2 px cannot
+  be resolved, and SMAA cannot help because it filters geometric edges, not
+  procedural frequency. `fwidth` of the noise coordinate IS cells-per-pixel; the
+  grain fades out above the threshold, scaled by the 2.7× second octave since
+  the wider of the two decides. **This is the term in this charter that speaks
+  most directly to the user's "tearing" report** — a sub-pixel grain with
+  nothing to filter it is a crawl, and it is on the ground, everywhere, below
+  1.5 km AGL.
 
-### What is BLOCKED on A, and why it must be
+### THE SHARED VARIANT-KEY HELPER (Fable ruling; C proposal)
+
+R24 is the first round in which TWO owners inject GLSL into the SAME patch
+function — C's `uHillElev` / fragment-stage N·L and D's per-material atmosphere
+term both land inside `applyHillshade`, and D's `LOD_CROSSFADE` adds a sampler
+and a swapped `map_fragment` on top. Two independent key expressions (`-c24`,
+`-d24`) are mutually exclusive branches, so with both flags on the surviving
+branch would name a key that **does not describe the emitted text**, and three
+would serve a program compiled from different GLSL. That is the round-4 defect
+this registry exists for, **arriving for the first time from a MERGE rather than
+from one author**.
+
+```js
+export function r24VariantKey(base, tokens) {   // [[boolean, token], …]
+  let t = '';
+  for (const [on, tok] of tokens) if (on) t += tok;
+  return t ? base + '-' + t + '24' : base;
+}
+```
+
+Fixed token order **e** ONE_SUN (C) · **f** TERRAIN_LIGHT (C) · **a**
+AERIAL_LAW (D) · **l** LOD_CROSSFADE (D) · **b** CHUNK_FADE (B, deferred). All
+off ⇒ the base key character-for-character. Entries are **plain booleans, never
+flag objects**, because a contributor's predicate is not always a constants
+read: D's `l` is "the `lodFade` argument to `applyHillshade` is non-null",
+decided by the app. That third parameter is already in the signature, so D's
+merge is a one-line body change and the key line never moves again.
+
+### NEW GATE — `scripts/verify-c-flagoff.mjs` (node, 26 gates, runs anywhere)
+
+Proves the one property every R24 feature must have and that no pixel gate can
+prove cheaply: every C flag ships `enabled:false`; every GLSL injection sits
+inside a predicate ternary whose FALSE branch is **the R21 string verbatim**
+(the vertex N·L line and the micro-grain line are asserted character-for-
+character); the tile key goes through the shared helper in the fixed order.
+**Structural on purpose** — a pixel A/B can only show that two frames matched at
+the poses someone thought to sample; this shows the alternate branch is
+unreachable.
+
+### The worker half — LANDED (A's `ab67ffe` merged at `7c02de7`; PATCH 8)
+
+**RED / GREEN [closed-form]** — `node scripts/verify-worker-normals.mjs`,
+12 gates. On a synthetic Martini-shaped mesh (16×16 quads, **flipped diagonals**
+— a regular grid hides this defect, and Martini's real output is anything but
+regular) over a smooth analytic surface, mean angular error against the TRUE
+surface normal at interior vertices:
+
+| | mean angular error |
+|---|---|
+| RED — upstream last-writer (`t[n] = t[s] = t[o] = g * w`) | **3.34°** |
+| GREEN — `r24SmoothNormals` | **0.26°** |
+
+Upstream ASSIGNS each triangle's face normal to all three of its vertices, with
+no accumulation and no normalisation, so a shared vertex keeps whichever
+triangle happened to be last. The fix accumulates the UN-normalised cross
+product and normalises once; the cross product's magnitude is 2·area, so the
+accumulation is **area-weighted for free** — which matters here specifically,
+because it is what stops Martini's long thin slivers from out-voting the real
+surface at a vertex they merely touch.
+
+**Orientation, not winding.** The result is flipped to +z rather than trusted to
+the triangle winding. Tile-local +z IS world up on this path (A's skirt builder
+drops `position[i*3+2]`), so asserting it makes the function independent of a
+convention **recon WB-1/A1 already caught being wrong once elsewhere** — proven
+by a gate that reverses every triangle and gets a bit-identical field back.
+
+**Skirts** inherit their edge vertex's normal instead of upstream's hard-coded
+`(0,0,1)`, so a near-vertical curtain stops being lit as flat ground — the
+smeared-cliff half of recon T7's LOD seam.
+
+**PATCH 8** is one line in A's splice, with VENDOR.md row 8 (vendor gates
+17/18/19 green): a Blob worker cannot see `R24_SWITCHES`, and the BUILT tail
+must stay flag-independent (gate 19 diffs it against the `.src.js`), so the
+switch is substituted at splice time exactly the way `__DECODE__` is. `false`
+leaves the branch dead and A's skirt output **element-for-element identical** —
+asserted in both directions by the node test.
+
+### COULD NOT MEASURE HERE — the worker half, in a browser, at all
+
+The spliced worker runs **only** on three-tile's Esri LERC path. The terrain-rgb
+loader E's fixture serves builds its geometry on the MAIN thread, and
+`elevation3d.arcgis.com` is 403-blocked in this container. So there is no
+configuration in which this code executes in a browser here. Every number above
+is arithmetic about the function; **pixels are unmeasured**.
+
+`verify-skirt-worker`'s element-by-element identity leg is expected to go RED
+with `workerNormals` ON, **by design** — normals differ; positions, uv and
+indices do not. It needs a flag-on ARM, not a re-baseline of A's number.
+
+### What it does NOT fix, recorded rather than glossed
+
+Normals remain per-TILE, so two tiles at different Martini errors can still
+disagree at a shared edge. That needs central differences over the FULL decoded
+DEM grid, and the grid is **not reachable from the readable tail** —
+`__DECODE__` returns the Martini mesh only. The follow-up ask is one line of
+upstream shape: have the decode also return the raster and its side length,
+READ from the payload and **never assumed to be 257** (the terrain-rgb path
+resizes to `clamp((z+2)*3, 2, 64)` and Martini throws unless the grid is 2^k+1).
+
+### Historical: why it was blocked until A's `ab67ffe`
 
 The worker half — smooth central-difference normals from the FULL DEM grid and
 error-bounded skirts — has to live inside three-tile's LERC worker. On this tree
@@ -756,3 +870,91 @@ to Lambert. **Uniform-only**: a material PARAMETER, so the program is unchanged
 and no cache key moves — only the envmap intensity term. **[pending fixture]**
 for the noon/dusk A/B at the certified poses.
 
+
+---
+
+## Could not measure here — the honest list
+
+Every item below was attempted or scoped, and is NOT reported as a number.
+
+| what | why not here | who can |
+|---|---|---|
+| The worker DEM normals, in a browser | The spliced worker runs only on three-tile's **Esri LERC** path; the fixture's terrain-rgb loader builds geometry on the MAIN thread, and `elevation3d.arcgis.com` is 403 here. There is no configuration in which this code executes in a browser in this container. | the user's machine |
+| `POST_ORDER`'s per-pixel **temporal std** at Manhattan settled, before/after, through verify-flicker's five controls | needs a real frame SEQUENCE; SwiftShader runs the app at ~1 fps at 1280×720 and the venue was at load 12.9 on 4 cores with 24 browser processes for most of this round | E's fixture (slowly) or the user |
+| SMAA HIGH's cost (~+0.2–0.4 ms at 1080p, hypothesis) | no fps/ms number is measurable here, by rule | the user's machine |
+| The Taj **night blue-minus-red** re-measurement (R20 §5b.4) at the Agra pose | needs the fixture at a night sun with the marquee placed | E's fixture |
+| `SHADOW_CALM`'s acne/peter-pan A/B at `normalBias 1` | needs shadows rendering at high tier with the fleet pin released | E's fixture / the user |
+| `LAMBERT_ENV` noon-vs-dusk A/B at the certified poses | fixture pixel A/B, not yet run | E's fixture |
+| **The Sierra `hill.dayK 0.65` margin** against verify-sat-depth's `> 2/255` contract | attempted three times; see below | E's fixture |
+| The rim-seam luma delta live (vs the closed-form 9.3 / 99.2 / 89.4) | same venue contention | E's fixture |
+
+### On the Sierra run specifically
+
+The instrument is written and committed (`scripts/r24-c-measure-hillshade.js`):
+one boot, verify-sat-depth's own pose, own crop (scaled to 640×360 per E's venue
+guidance) and own metric, stepping `__flyHill.set()` through
+off / 0.55 / ×0.8 / ×0.65 / ×0.5 so a single boot measures the whole curve
+without a rebuild. **The demotion is applied through the harness handle rather
+than by flipping `ONE_SUN`, which is what makes one boot enough.**
+
+Three attempts: (1) 1600×900 — pct 100 and the boot screen cleared, but the
+canvas never became "visible" to Playwright inside 30 s, and the fixture rev in
+hand was the one E later fixed for the z6 download-queue stall; (2) 640×360 —
+`bootFly`'s 180 s pct-100 wait timed out at load 12.9 with 24 browser processes
+alive; (3) re-run at `timeoutMs: 900000` on the final tree. **If it does not
+land, `dayK 0.65` stays a PROPOSAL with its arithmetic and no number is
+invented.** The arithmetic is: the demotion multiplies the hillshade envelope by
+0.65 at a high sun, so verify-sat-depth's mean |Δ| shrinks by at most 35 %; the
+contract is `> 2/255`; the question is only whether the measured margin has
+35 % of headroom, and that is a measurement, not an argument.
+
+---
+
+## Decisions, and the ones that were refusals
+
+1. **No constants moved, in four milestones running.** LINEAR_HAZE's re-tune
+   (any gain ≠ 1 re-opens the seam), POST_ORDER's grade re-fit (0.23/255 rms),
+   `satCadence` (the ortho follows the aircraft), a second `directionalLight`
+   for the moon (NUM_DIR_LIGHTS 1→2 re-keys every lit program) — each measured
+   or derived first, then declined with the number that justified declining.
+2. **`verify-monuments-sat`'s sanction was spent ADDITIVELY.** The harness
+   asserts nothing about the material, so Toon → Lambert moves none of its
+   eleven numbers; the sanction bought four new material-contract gates instead.
+3. **`uHillElev` as its own uniform** rather than folded into `uHillStrength` —
+   which saved `verify-sat-depth`'s frozen 0.55 assertion AND kept the harness's
+   own A/B restore honest (the R17 §7.1 rule: a probe must contain what it
+   claims).
+4. **T12 ceded to A** (anchor quantisation needs no shader change).
+5. **The cloud material takes the registry entry and not the warm set**, with
+   the reason stated and a measurement condition attached (E's
+   `programsDelta` style-flip leg).
+
+## Lessons
+
+1. **A library can handle a device contract in two of its three branches.**
+   three r185 flips the reversed-depth bias sign for VSM and BASIC and not for
+   PCF — the branch this app runs. R21 found the same shape in `polygonOffset`
+   (three negates the factor, not the units). When a renderer-wide contract is
+   opt-in, audit **every** branch that reads it, not the one you happen to use.
+2. **"Right by accident" is a defect with no symptom.** AerialPerspective's
+   distance term is correct through THREE conversions that cancel; its sky
+   early-out, which depends on the same chain, has never fired. The working half
+   was hiding the broken half.
+3. **A clamp authored for legibility becomes a lie when another consumer reads
+   it as a fact.** `runtime.sun.el` is clamped into the hillshade band; every
+   consumer that read it inherited a shading preference as the sun's elevation.
+4. **An effect can destroy dynamic range before the tone curve ever sees it.**
+   `HueSaturationEffect`'s `min(color, 1.0)` ran pre-curve for three rounds.
+   Order in a post chain is not a preference.
+5. **A valid import is not a correct import, and lint cannot tell.** Four files
+   compiled clean through ESLint with the `three` import welded to the constants
+   import; only the module resolver saw it.
+6. **A one-implementation rule earns its keep immediately.** `verify-depth-offset`
+   found `prewarm.js` warming a twin with the pre-R21 offset sign on the day it
+   was written.
+7. **Structural proofs and pixel proofs answer different questions.** A pixel
+   A/B shows two frames matched where someone sampled; a branch-reachability
+   gate shows the other frame cannot exist.
+8. **When the venue cannot run the code at all, say so in the same sentence as
+   the number.** The worker normals have a 3.34° → 0.26° RED/GREEN and zero
+   pixels behind it, and both facts belong together.
