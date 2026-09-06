@@ -2,10 +2,12 @@
 
 > Round 24 "Smooth World", agent **A PACE**, milestone W1a (`FLY_ROUND24_PLAN.md`
 > §3 A.1; evidence `scripts/r24-recon.md` A2 / T1–T5 / FL-02 / FL-03).
-> **This copy is BYTE-VERBATIM upstream at this commit** except the ONE import
-> rewrite recorded below. The patch ledger at the bottom is empty by design:
-> vendoring lands as its own commit so `git log` can prove the copy is clean
-> before any behaviour changes it.
+> **The copy landed BYTE-VERBATIM** (except the ONE import rewrite recorded
+> below) in its own commit, `b64457b`, so `git` holds a permanent verbatim
+> baseline that every later patch is diffed against. Patches are listed in the
+> PATCH LEDGER at the bottom; `scripts/verify-vendor-three-tile.mjs` proves
+> both that the baseline is upstream and that the working copy differs from
+> the baseline ONLY inside marked patch hunks.
 
 ## What was vendored
 
@@ -82,12 +84,23 @@ under review, with this ledger.
 
 ## PATCH LEDGER
 
-**Zero patches at the vendoring commit.** Every later patch — by ANY agent —
-gets a row here.
+**Zero patches at the vendoring commit `b64457b`.** Every later patch — by ANY
+agent — gets a row here.
 
 | # | Owner | Switch | File · function · lines | Reason (recon id) | Off-state |
 |---|---|---|---|---|---|
-| _(none)_ | — | — | — | — | — |
+| 0 | A | `R24_SWITCHBOARD` | `index.js` · module scope, after the version const | infrastructure: the bundle must not import app code, so the app pokes `R24_SWITCHES` (from `lib/fly/terrain-engine.js`) and a node fixture flips the same fields directly | an exported object nobody reads; every field `false` |
+| 1 | A | `TERRA_PACE.timerFix` | `index.js` · `Timer.reset()` | T3 — upstream `reset()` zeroes only `_currentTime`, so `TileMap.update`'s `getElapsed() > updateInterval/1e3` guard is permanently true after 50 ms of uptime and the FULL quadtree walk runs every frame instead of at 20 Hz | the two upstream statements, unchanged |
+| 2 | A | `TERRA_PACE.mergeHysteresis` · `TERRA_PACE.keepResident` | `index.js` · `Tile._LODEvaluate()` | T1 — one threshold both ways with no hysteresis (refine↔merge flip), and a merge test that is satisfied the instant a tile leaves the frustum, so every yaw collapses the field behind the camera and re-downloads a coarser parent ("tiles swapping for other ones") | the single upstream `return` expression, unchanged, below the branch |
+| 3 | A | `TERRA_PACE.keepResident` | `index.js` · `Tile._getDistRatio()` | T1 — PATCH 2's merge test needs the in-frustum distance law in every direction; re-scaling the ×5 result would not be the same float | an early return reachable only when a caller passes `true`; every upstream call site passes nothing |
+
+**Blast radius notes.** PATCH 1 touches a class (`Timer`) that has exactly one
+other instance in bundle + plugin (`plugin.js:381`), and that instance calls
+neither `reset()` nor `getElapsed()`. PATCH 2 and 3 are confined to the LOD
+decision; the REFINE arm is byte-identical to upstream in both switch states,
+which `scripts/verify-terra-residency.mjs` gate 7 proves by running a
+fixed-heading approach in both arms and comparing refine counts, request
+counts and the loaded-tile census.
 
 ### The switch idiom every patch must follow
 
@@ -119,16 +132,29 @@ minified blob in `index.js` is never hand-edited.
 ## How this is verified
 
 `node scripts/verify-vendor-three-tile.mjs` (runs anywhere, no browser, no
-network):
+network, 18 assertions):
 
-1. Recomputes the sha256 of both vendored files.
-2. If `node_modules/three-tile` is present, diffs the vendored files against it
-   line by line and asserts: `index.js` identical; `plugin.js` differs in
-   exactly the one line, which must be line 2 and must be exactly the recorded
-   rewrite. After `npm uninstall three-tile` the package is gone, so the gate
-   falls back to the recorded sha256 pair above and says which leg it ran.
-3. Asserts no source file outside `lib/fly/vendor/` still imports the bare
-   `three-tile` specifier, that `package.json` has no `three-tile` dependency
-   or override, and that `next.config.mjs` no longer transpiles it.
-4. Asserts every `// R24 <X> PATCH <n>` marker in the vendored files has a row
-   in this ledger and vice versa (both empty today).
+1. **The baseline is upstream.** It hashes `index.js` and `plugin.js` *as of
+   commit `b64457b`* (`git show`) and compares them to the recorded upstream
+   sha256s. That proof does not decay as patches land, and it does not need the
+   npm package to still be installed.
+2. **The one rewrite.** While `node_modules/three-tile` is still present it
+   also does the real line-by-line diff and asserts plugin.js differed on
+   exactly line 2; afterwards it asserts line 2 carries the rewritten import.
+   It always prints which leg it ran.
+3. **No unmarked edits.** `git diff -U0 b64457b` over both files: every hunk
+   must contain an added line mentioning `R24`, i.e. every edit sits in a
+   marked patch. The count of upstream lines *replaced* rather than left
+   verbatim is compared to the number this ledger declares (today: 1 — the
+   `_getDistRatio()` signature).
+4. **The import list is still `three` alone** (plus `./index.js` in the
+   plugin), so the bundle can never start importing app code.
+5. **No second copy**: no source file imports the bare `three-tile` specifier;
+   exactly two files import the vendored path; `package.json`,
+   `package-lock.json` and `next.config.mjs` are clean of it.
+6. **Markers and ledger agree** in both directions.
+
+Behavioural proof of the patches themselves lives in
+`scripts/verify-terra-residency.mjs` (node, 18 assertions), which drives these
+Tile/TileMap classes with a synthetic camera path and a stub loader and reports
+refine / merge / refetch / on-screen-replacement counts per switch.
