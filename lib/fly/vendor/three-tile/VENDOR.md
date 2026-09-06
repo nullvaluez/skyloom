@@ -87,15 +87,63 @@ under review, with this ledger.
 **Zero patches at the vendoring commit `b64457b`.** Every later patch — by ANY
 agent — gets a row here.
 
+**Row-number allocation (Fable, R24):** A holds **0–4**, D takes **5–7**, C
+takes **8–19**, and A's LATER patches take **20 upward** (A's work outgrew its
+first block after the allocation was published; taking a fresh high block
+rather than eating into D's 5–7 or C's 8+ is why these are numbered 20–23).
+Numbers are permanent and are never renumbered once COMMITTED; a withdrawn
+patch keeps its row, marked WITHDRAWN.
+
 | # | Owner | Switch | File · function · lines | Reason (recon id) | Off-state |
 |---|---|---|---|---|---|
 | 0 | A | `R24_SWITCHBOARD` | `index.js` · module scope, after the version const | infrastructure: the bundle must not import app code, so the app pokes `R24_SWITCHES` (from `lib/fly/terrain-engine.js`) and a node fixture flips the same fields directly | an exported object nobody reads; every field `false` |
 | 1 | A | `TERRA_PACE.timerFix` | `index.js` · `Timer.reset()` | T3 — upstream `reset()` zeroes only `_currentTime`, so `TileMap.update`'s `getElapsed() > updateInterval/1e3` guard is permanently true after 50 ms of uptime and the FULL quadtree walk runs every frame instead of at 20 Hz | the two upstream statements, unchanged |
 | 2 | A | `TERRA_PACE.mergeHysteresis` · `TERRA_PACE.keepResident` | `index.js` · `Tile._LODEvaluate()` | T1 — one threshold both ways with no hysteresis (refine↔merge flip), and a merge test that is satisfied the instant a tile leaves the frustum, so every yaw collapses the field behind the camera and re-downloads a coarser parent ("tiles swapping for other ones") | the single upstream `return` expression, unchanged, below the branch |
 | 3 | A | `TERRA_PACE.keepResident` | `index.js` · `Tile._getDistRatio()` | T1 — PATCH 2's merge test needs the in-frustum distance law in every direction; re-scaling the ×5 result would not be the same float | an early return reachable only when a caller passes `true`; every upstream call site passes nothing |
+| 4 | A | `TERRA_PACE.skirtFast` | `index.js` · module scope + `We()` (getBoundaryEdges) | T2 / FL-02 / A2 — the boundary-edge finder allocates 3 two-element arrays per triangle and sorts all 3T with a boxed comparator; R22.1 profiled it + its comparator at 67% of every stalled ms while streaming | an early-out at the top of `We`; the entire upstream body follows, unchanged |
 | 5 | D | `LOD_CROSSFADE.enabled` | `index.js` · module scope + the export list | T4(b/c) — infrastructure: the bundle must not import app code, so the app installs a `{ onRefine, onMerge }` object through `setLodFadeHook()` and every policy decision (flag, boot/warp suppression, concurrency bound, clock, parent-texture lifetime) lives in `lib/fly/lod-crossfade.js` | the holder is `null`, nothing in the library reads it, and patches 6 and 7 short-circuit |
 | 6 | D | `LOD_CROSSFADE.enabled` | `index.js` · `Tile._loadSubTiles()` | T4(b/c) — a refine is an atomic single-frame swap in which texture sharpness AND Martini relief (91 m error at z13 vs 11 m at z15) change together, which is what the user reported as "terrain tiles swapping for other ones" | the hook is `null` → one short-circuited `&&`; the upstream `return h ? this.unloadSubTiles() : (this.add(...o), …, this.unloadModel()), !h;` expression is byte-verbatim and unconditional |
 | 7 | D | `LOD_CROSSFADE.enabled` | `index.js` · `Tile._removeSubTiles()` | T4(b/c) — merges use the same atomic pattern; the leaf children dissolve INTO the freshly loaded parent imagery before the geometry swap | the hook is `null` → nothing is awaited, `_loadState` is never touched, and the upstream return expression is byte-verbatim |
+| 20 | A | `TERRA_PACE.skirtWorker` | `index.js` · module scope + `qe()` / `nt()` (the two geometry-returning DEM worker factories) | T2 / FL-02 / A2 (F2) — the skirt is built on the MAIN thread in the promise continuation after the worker returns; this moves scan + skirt + attribute concat INTO the worker and returns transferables | the verbatim upstream factory body; the splice returns null and the stock worker is created |
+| 21 | A | `TERRA_PACE.skirtWorker` | `index.js` · `TileGeometry.setAttributes()` | T2 — with PATCH 5 the arrays arrive finished, so the main-thread skirt build must not run twice | an inserted early return taken only when the worker set `r24Skirted`; upstream's body follows unchanged |
+| 22 | A | `TERRA_PACE.walkWhileSaturated` | `index.js` · `Tile._update()` | T3 (second half) — upstream freezes the ENTIRE quadtree walk while `downloadingThreads + 4 >= maxThreads` (six of ten loads), so a busy queue pins the tree at whatever depth it reached; E CERT measured dl 9/10, maxZ stuck at 6 and every building drape restarting | the verbatim upstream `if (!(…saturated…))` body |
+| 23 | A | `TERRA_PACE.walkWhileSaturated` | `index.js` · `Tile.LOD()` | T3 — PATCH 22's companion: compute and return the LOD decision while saturated but withhold the ACTION, so no load is started that upstream would not have | an early return reachable only when a caller passes `true`; every upstream call site passes one argument |
+| 24 | A | `TERRA_PACE.bboxCache` | `index.js` · `Tile.BBox` getter | T3 (allocation half) — every tile visit allocates a Box3 + two Vector3s, and the walk touches every tile; PATCH 22 roughly doubles the visits, so the per-visit allocation has to go | the verbatim upstream two-line getter body |
+
+**PATCH 20/21: the worker source rule.** three-tile ships its DEM workers as
+MINIFIED SOURCE STRINGS turned into Blob URLs at runtime. Hand-editing one of
+those strings is how a vendored patch becomes unreviewable, so it is forbidden.
+Worker-side work is authored in a readable file under
+`lib/fly/vendor/three-tile/workers/*.src.js`, stringified by
+`scripts/build-tile-worker.mjs` into `*.built.js`, and SPLICED into three-tile's
+own source in place of its `self.onmessage = …` tail — every upstream byte
+survives, and only the new code is in a file a reviewer can read. If the tail
+shape is ever absent the splice returns null and the stock worker is created,
+so the switch degrades to off rather than half-applying. This is also the seam
+another agent extends for worker-side DEM normals (recon T6): add a function to
+the readable source, call it from the handler, give it its own switch, and take
+the next ledger row. `verify-vendor-three-tile` runs the builder with `--check`,
+so a source edit that was never re-stringified goes red instead of shipping
+stale. **This is why the bundle is allowed exactly ONE non-`three` import**
+(`./workers/skirt-tail.built.js`); it still imports no app code, and the gate
+allows that path and nothing else.
+
+**PATCH 4 identity.** Upstream's output is exactly "the directed edges whose
+`(min,max)` key occurs once, ordered by `(min,max)`" — its sort groups equal
+keys and its dedupe pass drops precisely the adjacent reverse pairs. The fast
+path computes that directly with an undirected-edge count in a module-scoped,
+generation-stamped open-addressed table (never cleared, only re-stamped) and
+sorts only the perimeter. It returns `null` — falling through to the verbatim
+body — for every input it does not claim: a length that is not a multiple of 3,
+a negative index, a degenerate `a === b` edge (whose min/max collapse makes it
+its own reverse), an edge seen three times, or two occurrences with the SAME
+winding, which is the one case upstream KEEPS both of.
+`scripts/verify-skirt-fast.mjs` drives the public
+`TileGeometry.setAttributes()` in both arms and compares position / uv / normal
+/ index element by element: identical on six real Martini tiles (up to 116 k
+output indices), on regular grids with Uint16 and Uint32 indices, and on a
+holed grid with a real interior boundary; and all four bail inputs both BAIL
+and stay identical.
 
 **Blast radius notes.** PATCH 1 touches a class (`Timer`) that has exactly one
 other instance in bundle + plugin (`plugin.js:381`), and that instance calls

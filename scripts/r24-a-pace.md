@@ -325,6 +325,170 @@ MEASURED-HERE in the live app: with the pin set, the residency wrapper installs
 and the census runs (19 resident tiles / 6.3 MB on a 403-blocked boot), 0
 pageerrors; with no pin, `map.update` is unwrapped and nothing extra runs.
 
+---
+
+## §4 M2b — `skirtFast`: the O(E) boundary scan (T2 / FL-02 / A2)
+
+### Mechanism
+
+`We` (getBoundaryEdges) pushes **three two-element arrays per triangle**, sorts
+all 3T of them with a boxed JS comparator that does four `min`/`max` per
+comparison, then dedupes. At a 129² Martini tile that is ~98 k small arrays and
+a ~1.6 M-comparison sort, run on the MAIN THREAD in a promise continuation, per
+DEM tile. R22.1's profiler put that function at 37% and its comparator at a
+further 30% — **67% of every stalled millisecond** while streaming.
+
+Upstream's output is exactly *"the directed edges whose `(min,max)` key occurs
+once, ordered by `(min,max)`"*: the sort groups equal keys and the dedupe pass
+drops precisely the adjacent reverse pairs. So the same answer is an O(E)
+undirected-edge count in a module-scoped, generation-stamped open-addressed
+table (never cleared, only re-stamped — zero per-tile allocation), keeping the
+count-1 edges and sorting only the **perimeter** (hundreds, not 3T).
+
+### Bail contract
+
+It returns `null` — falling through to the verbatim upstream body — for every
+input it does not claim: length not a multiple of 3, a negative index, a
+degenerate `a === b` edge (whose min/max collapse makes it its own reverse), an
+edge seen three times, or two occurrences with the SAME winding, **which is the
+one case upstream KEEPS both of**.
+
+### RED → GREEN (MEASURED-HERE, `scripts/verify-skirt-fast.mjs`, 12 gates)
+
+The gate does not poke the private function: it drives the PUBLIC
+`TileGeometry.setAttributes(data, z)` — the call three-tile makes on every DEM
+tile — in both arms and compares position / uv / normal / index **element by
+element**. That covers the skirt vertices, the appended triangles, the
+attribute concatenation and the ordering, not merely the edge list.
+
+| case | out indices | path | geometry |
+|---|---|---|---|
+| Martini 129² ridge z15 | 736 | fast | identical |
+| Martini 129² cliff z15 | 876 | fast | identical |
+| Martini 129² noise z16 | 33,743 | fast | identical |
+| Martini 257² ridge z15 | 736 | fast | identical |
+| Martini 257² noise z13 | **116,079** | fast | identical |
+| Martini 65² flat z15 | 10 | fast | identical |
+| regular grid 65² Uint32 | 8,704 | fast | identical |
+| regular grid 65² Uint16 | 8,704 | fast | identical |
+| holed grid 65² (real interior boundary) | 8,614 | fast | identical |
+| non-manifold: edge in 3 triangles | 17 | **BAILED** | identical |
+| duplicate winding on a shared edge | 14 | **BAILED** | identical |
+| degenerate triangle (a, a, b) | 10 | **BAILED** | identical |
+| index length not a multiple of 3 | 13 | **BAILED** | identical |
+
+**Timing — this container's CPU, isolated and single-threaded. It measures the
+ALGORITHM, which is legitimately measurable here; it does NOT measure the
+user's frame time.**
+
+| grid | triangles | off | on | speedup |
+|---|---|---|---|---|
+| 129×129 | 32,768 | 44.95 ms | 6.35 ms | **7.1×** |
+| 257×257 | 131,072 | 202.60 ms | 31.04 ms | **6.5×** |
+
+(Archived R22.1 measured 4.9–6.1× isolated on a different tree and CPU; the
+shape agrees.) Gate 12 proves the table is reused rather than reallocated:
+heap 16.5 → 9.2 MB across 25 consecutive 129² tiles.
+
+### What this does NOT claim
+
+A 7× algorithmic win is not a stall-rate. The archived live figure (stalls/min
+91 → 2.4, worst frame 87.5 → 29.2 ms) was measured on a DIFFERENT tree with a
+denser DEM ring; this tree's rate is unknown until the user runs it. §9.
+
+---
+
+## §5 M2c — `skirtWorker`: the skirt built in the DEM worker (T2 / A2, F2)
+
+**Status: BUILT, ships OFF.** `skirtFast` cut the main-thread cost 7×; this
+removes the residual by moving the whole build — boundary scan, skirt vertices,
+attribute concatenation — into three-tile's DEM worker and returning the
+finished arrays as **transferables**, so the main thread only wraps them in
+`BufferAttribute`s.
+
+### The worker-source rule (this is the part C needs)
+
+three-tile ships its DEM workers as MINIFIED SOURCE STRINGS turned into Blob
+URLs at runtime. Hand-editing one is exactly how a vendored patch becomes
+unreviewable, so VENDOR.md forbids it. Instead:
+
+- `lib/fly/vendor/three-tile/workers/skirt-tail.src.js` — a **readable** file,
+- `scripts/build-tile-worker.mjs` stringifies it into `skirt-tail.built.js`
+  (`--check` fails if the built file is stale; `verify-vendor-three-tile` runs
+  that check, so an unbuilt edit goes red instead of shipping),
+- PATCH 20 **splices** that string into three-tile's own source in place of its
+  `self.onmessage = …` tail. Every upstream byte survives; only the new code is
+  in a file a reviewer can read. If the tail shape is ever absent the splice
+  returns null and the stock worker is created — the switch degrades to off
+  rather than half-applying.
+
+That is the seam for worker-side DEM normals (recon T6): add a function to the
+readable source, call it from the handler, give it its own switch, take the
+next ledger row.
+
+### Evidence (MEASURED-HERE, `scripts/verify-skirt-worker.mjs`, 8 gates)
+
+The tail is executed in a sandbox with a stubbed decode step and what it posts
+is compared element by element with the main-thread path:
+
+| case | out indices | skirted | transferables | vs main thread |
+|---|---|---|---|---|
+| grid 33² Uint32 z15 | 6,912 | true | 4 | identical |
+| grid 65² Uint16 z16 | 26,112 | true | 4 | identical |
+| grid 129² Uint32 z13 | 101,376 | true | 4 | identical |
+
+Plus: the splice target still exists in **both** geometry-returning DEM workers
+(decode entry points `le` and `Z`); the built string matches its source; z=0
+produces no skirt in either arm; and an input the boundary scan declines comes
+back UNSKIRTED so the main thread runs upstream's build exactly as today.
+
+### Why it ships OFF
+
+**The production path is unexercisable in this container.** E's offline fixture
+serves terrain-rgb, and three-tile's terrain-rgb loader builds its geometry on
+the MAIN thread (`setData`); the geometry-returning worker path is only reached
+by Esri LERC tiles, which are 403-blocked here. Node-level identity is proven;
+end-to-end streaming is not. It needs one run on the user's machine before it
+goes on. §9.
+
+---
+
+## §6 M2d — `walkWhileSaturated` + `bboxCache` (T3, both halves)
+
+Fable relayed E CERT's live measurement on the R24 fixture: fulfilling imagery
+through a Playwright route kept three-tile's download queue at **dl 9/10**, and
+upstream freezes the ENTIRE quadtree walk while `downloadingThreads + 4 >=
+maxThreads` — six of ten. Nothing is re-evaluated then: not frustum flags, not
+merges, not the descent. **The tree stalled at maxZ 6, `groundElev` answered
+193 m where the true elevation at Powell is 276 m, every satellite building
+drape sample saw `tileZ 6 < demZ 12`, and the drape restarted forever.** E fixed
+the fixture side; the freeze rule is upstream's and is still live in production.
+
+**PATCH 22/23** make the rule per-tile and strictly conservative: keep walking
+and keep the frustum/LOD state current, but START no load while saturated —
+neither a refine nor a version reload. It can only evaluate more; it can never
+issue a download upstream would not have.
+
+**MEASURED-HERE** (`verify-terra-residency` leg I, 14-frame tile latency against
+maxThreads 10, so the loader is held saturated): nodes visited **444 → 4,248**,
+refines 19 → 19, requests **72 → 72**. Upstream evaluates a tenth of the tree
+and starts exactly the same loads. What this leg CANNOT show is the harm at
+depth — my stub loader always drains, so both arms still reach z9; the depth
+evidence is E's live measurement above, and it is quoted, not re-derived.
+
+**The cost is real and the gate says so.** Two switches make the walk do more:
+`keepResident` keeps a deeper tree resident and `walkWhileSaturated` keeps
+evaluating it — upstream's smaller number is a FROZEN tree, not an efficient
+one. Nodes visited per walk **36 → 233** on the serpentine; `timerFix` runs the
+walk at 20 Hz instead of 60, so traversal work per unit time is 4,230 → 10,891
+(bounded by the gate at 4×). **PATCH 24 (`bboxCache`)** is what makes those
+visits affordable: `Tile.BBox` allocated a `Box3` and two `Vector3`s on EVERY
+visit (recon T3's allocation half), and the box only moves on a floating-origin
+rebase or when the tile's own max height changes. Heap over 400 walks:
+**1,398 → 771 KB**.
+
+---
+
 ## §9 Could not measure here (honest list)
 
 Everything in this section needs the user's machine, or E's offline fixture,
@@ -337,6 +501,8 @@ or both. Nothing below has a number from this container.
 | 6 | Whether `bendSphere` (T14) can be enabled without moving Owens ≤ 261 / sat ≤ 375 | E's fixture |
 | 7 | Stalls/min, worst frame and the felt smoothness of the residency trio | User's machine (`__flyTerraPaceOverride` A/B) |
 | 8 | Whether a WRONG tile (cache/URL mix-up) is also in play, as distinct from LOD policy | E's z/x/y-stamped fixture + the URL↔position probe |
+| 9 | `skirtWorker` end to end: the production LERC path builds its geometry in a worker; E's fixture serves terrain-rgb, whose loader builds on the MAIN thread, so the patched path is never reached here | User's machine (Esri egress) |
+| 10 | Whether `walkWhileSaturated`'s 2.5× traversal is invisible in a real frame budget | User's machine |
 | 2 | Any fps / ms / stalls-per-minute / worst-frame number | User's machine only |
 | 3 | Governor behaviour, DPR-step timing, tearing | User's machine only |
 | 4 | Live tile-URL identity against Esri | User's machine (egress) |

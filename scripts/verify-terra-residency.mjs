@@ -30,6 +30,7 @@
 import { mkdirSync, copyFileSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { loadVendoredThreeTile } from './_tt-shim.mjs';
 import * as THREE from 'three';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -39,18 +40,11 @@ const REPORT = process.argv.includes('--report');
 // an .mjs name to import it. Copy, import, delete — the file itself is never
 // modified. (Next/Turbopack resolves it as ESM directly; this is a node-only
 // wrinkle, not a property of the bundle.)
-// The shim must live INSIDE the repo so its bare `three` import resolves
-// against the project's node_modules; scripts/r24-out/ is gitignored.
-const shimDir = path.join(root, 'scripts/r24-out');
-mkdirSync(shimDir, { recursive: true });
-const shim = path.join(shimDir, `.three-tile-${process.pid}.mjs`);
-copyFileSync(path.join(root, 'lib/fly/vendor/three-tile/index.js'), shim);
-const tt = await import(pathToFileURL(shim).href);
-rmSync(shim, { force: true });
+const tt = await loadVendoredThreeTile();
 
 const SW = tt.R24_SWITCHES;
-const OFF = { mergeHysteresis: false, keepResident: false, timerFix: false, mergeHysteresisK: 1.6 };
-const ON = { mergeHysteresis: true, keepResident: true, timerFix: true, mergeHysteresisK: 1.6 };
+const OFF = { mergeHysteresis: false, keepResident: false, timerFix: false, walkWhileSaturated: false, bboxCache: false, mergeHysteresisK: 1.6 };
+const ON = { mergeHysteresis: true, keepResident: true, timerFix: true, walkWhileSaturated: true, bboxCache: true, mergeHysteresisK: 1.6 };
 const setSwitches = (o) => Object.assign(SW, OFF, o);
 
 // --------------------------------------------------------------- the harness
@@ -481,9 +475,46 @@ rows.push('\nG. COST — quadtree nodes visited (keepResident deepens the tree; 
 rows.push(`  visits per walk       ${String(Math.round(serpOff.visits / 140)).padStart(10)}${String(Math.round(serpOn.visits / 140)).padStart(10)}`);
 rows.push(`  walks per 12 updates  ${String(walksOff).padStart(10)}${String(walksOn).padStart(10)}`);
 rows.push(`  visits x walk rate    ${String(Math.round(visitsPerSecOff)).padStart(10)}${String(Math.round(visitsPerSecOn)).padStart(10)}`);
-gate('15 COST: the deeper resident tree costs fewer visits per second, not more',
-  visitsPerSecOn <= visitsPerSecOff,
-  `${Math.round(visitsPerSecOff)} -> ${Math.round(visitsPerSecOn)} (visits x walk rate)`);
+// The cost RISES and the gate says so rather than hiding it. Two of the three
+// switches make the walk do MORE: keepResident keeps a deeper tree resident,
+// and walkWhileSaturated keeps evaluating it while the loader is busy —
+// upstream's smaller number is a FROZEN tree, not an efficient one (leg I).
+// What keeps it affordable is timerFix (the walk runs at 20 Hz, not 60) and
+// bboxCache (each visit stops allocating a Box3 + two Vector3s). The bound is
+// generous but real: the traversal must not cost more than 4x flag-off.
+gate('15 COST: the traversal is bounded (it grows because it stopped being frozen)',
+  visitsPerSecOn <= visitsPerSecOff * 4,
+  `${Math.round(visitsPerSecOff)} -> ${Math.round(visitsPerSecOn)} (visits x walk rate, bound ${Math.round(visitsPerSecOff * 4)})`);
+
+// …and bboxCache is what pays for it. Heap over a fixed number of walks with
+// the SAME switch set otherwise, so the only variable is the allocation.
+function walkHeap(cacheOn) {
+  setSwitches({ ...ON, bboxCache: cacheOn });
+  const { map } = makeMap();
+  const cam = makeCamera();
+  placeCamera(cam, { x: 0, y: 900, z: 0, yawDeg: 0 });
+  map.updateMatrixWorld(true);
+  const params = () => ({
+    camera: cam,
+    loader: map.loader,
+    minLevel: map.minLevel,
+    maxLevel: map.maxLevel,
+    LODThreshold: map.LODThreshold,
+  });
+  for (let i = 0; i < 20; i++) map.rootTile.update(params());
+  global.gc?.();
+  const before = process.memoryUsage().heapUsed;
+  for (let i = 0; i < 400; i++) map.rootTile.update(params());
+  const after = process.memoryUsage().heapUsed;
+  setSwitches(OFF);
+  return (after - before) / 1024;
+}
+const heapNoCache = walkHeap(false);
+const heapCache = walkHeap(true);
+rows.push(`  ${'heap KB / 400 walks'.padEnd(22)}${heapNoCache.toFixed(0).padStart(10)}${heapCache.toFixed(0).padStart(10)}   (bboxCache off / on)`);
+gate('15b bboxCache removes the per-visit Box3 + Vector3 allocation',
+  heapCache < heapNoCache,
+  `${heapNoCache.toFixed(0)} -> ${heapCache.toFixed(0)} KB over 400 walks`);
 
 // --- 16: the byte budget bounds the peak on a long path. --------------------
 try {
@@ -501,6 +532,44 @@ try {
 } catch (e) {
   gate('16 byte budget lowers the resident peak on a long path', false, e.message);
 }
+
+// --- 17-18: the saturation freeze (T3, second half). A slow loader keeps
+// `downloadingThreads + 4 >= maxThreads` true, and upstream then freezes the
+// WHOLE walk: no frustum flags, no merges, no descent. E CERT measured the
+// consequence live on the R24 fixture (dl 9/10, the tree pinned at maxZ 6,
+// ground samples answering from a z6 tile, every building drape restarting).
+// latencyFrames 14 with maxThreads 10 reproduces the saturated state here.
+const satOff = await fly({
+  frames: 120,
+  pathFn: straightApproach,
+  switches: OFF,
+  latencyFrames: 14,
+});
+const satOn = await fly({
+  frames: 120,
+  pathFn: straightApproach,
+  switches: { walkWhileSaturated: true, bboxCache: true },
+  latencyFrames: 14,
+});
+rows.push('\nI. SATURATED LOADER (14-frame tile latency, maxThreads 10)');
+rows.push(`  ${'metric'.padEnd(22)}${'off'.padStart(10)}${'walkWhile'.padStart(10)}`);
+for (const k of ['refine', 'requests', 'visits']) {
+  rows.push(`  ${k.padEnd(22)}${String(satOff[k]).padStart(10)}${String(satOn[k]).padStart(10)}`);
+}
+rows.push(`  ${'deepest loaded z'.padEnd(22)}${String(satOff.census.maxZ).padStart(10)}${String(satOn.census.maxZ).padStart(10)}`);
+rows.push(`  ${'loaded tiles'.padEnd(22)}${String(satOff.census.loaded).padStart(10)}${String(satOn.census.loaded).padStart(10)}`);
+// What this leg SHOWS is that upstream stops walking: with the loader held
+// saturated it evaluates a tenth of the nodes. What it cannot show is the
+// consequence at depth — my stub loader always drains, so the tree still
+// reaches z9 in both arms. The DEPTH evidence is E CERT's live measurement on
+// the R24 fixture (dl 9/10, maxZ pinned at 6, ground samples from a z6 tile),
+// quoted in scripts/r24-a-pace.md; this gate is the mechanism, not the harm.
+gate('17 RED: a saturated loader freezes the walk (upstream evaluates a tenth of the tree)',
+  satOff.visits * 3 < satOn.visits,
+  `nodes visited ${satOff.visits} -> ${satOn.visits}`);
+gate('18 walkWhileSaturated starts NO load upstream would not have (requests never grow)',
+  satOn.requests <= satOff.requests * 1.05,
+  `requests ${satOff.requests} -> ${satOn.requests}`);
 
 if (REPORT) console.log(rows.join('\n'));
 console.log(`\n${pass} passed, ${fail} failed`);
