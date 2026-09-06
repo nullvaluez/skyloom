@@ -34,7 +34,13 @@
  *   const fx = await attachFixture(context);   // idempotent per context
  *   ... await fx.stats() ... await fx.resetStats() ...
  */
+const fs = require('fs');
+const path = require('path');
+
 const FIXTURE_ENV = 'FLY_TILE_FIXTURE';
+const REPO = path.resolve(__dirname, '..');
+const SCRIPTS = path.join(REPO, 'scripts');
+const OUT = path.join(SCRIPTS, 'r24-out');
 
 let shared = null; // one server per node process
 
@@ -198,8 +204,82 @@ async function installNodeFetchFixture() {
   };
 }
 
+/**
+ * Where a fixture run's artifacts belong.
+ *
+ * HARN-HYG-9, and it BIT US: running the offline verify-seam leg on the
+ * integrated tree REWROTE the TRACKED R21 calibration artifact
+ * `scripts/r21-e-red-seam.json` in place, with fixture data. That file is
+ * R21's LIVE-tileset RED record — the evidence a future round compares
+ * against — and a fixture run silently overwriting it is how a project loses
+ * the only copy of a number nobody can re-measure.
+ *
+ * The convention (`scripts/verify-*.js` write beside themselves) is thirty
+ * harnesses deep, so the fix is not thirty edits: it is one redirect at the
+ * ONE place a file actually reaches disk.
+ */
+function fixtureOut(name) {
+  return path.join(OUT, `fixture-${path.basename(name)}`);
+}
+
+/**
+ * Redirect every write that lands directly in `scripts/` to
+ * `scripts/r24-out/fixture-<name>` for the lifetime of this process.
+ *
+ * It wraps `fs.writeFileSync`, `fs.writeFile` and `fs.promises.writeFile` —
+ * the last is what Playwright's `page.screenshot({ path })` uses, so canvas
+ * PNGs are covered without touching a single harness. Reads are untouched:
+ * a gate that READS a committed baseline still reads the real one.
+ *
+ * Installed automatically at module load when FLY_TILE_FIXTURE is set, so
+ * every gate that requires `_boot.js` gets it with no per-gate opt-in.
+ */
+function installArtifactRedirect() {
+  if (installArtifactRedirect.done) return;
+  installArtifactRedirect.done = true;
+  try {
+    fs.mkdirSync(OUT, { recursive: true });
+  } catch {
+    /* best effort */
+  }
+  const redirect = (p) => {
+    try {
+      if (typeof p !== 'string') return p;
+      const abs = path.resolve(p);
+      // Only files written DIRECTLY into scripts/ — never r24-out itself, and
+      // never anything outside the repo's scripts directory.
+      if (path.dirname(abs) !== SCRIPTS) return p;
+      const to = fixtureOut(abs);
+      if (!redirect.warned) {
+        redirect.warned = true;
+        process.stderr.write(
+          `[fixture] artifact writes into scripts/ are redirected to ${path.relative(REPO, OUT)}/ ` +
+            '(a fixture run must never overwrite a tracked LIVE calibration artifact)\n'
+        );
+      }
+      return to;
+    } catch {
+      return p;
+    }
+  };
+  const wfs = fs.writeFileSync.bind(fs);
+  fs.writeFileSync = (p, ...rest) => wfs(redirect(p), ...rest);
+  const wf = fs.writeFile.bind(fs);
+  fs.writeFile = (p, ...rest) => wf(redirect(p), ...rest);
+  if (fs.promises && fs.promises.writeFile) {
+    const pwf = fs.promises.writeFile.bind(fs.promises);
+    fs.promises.writeFile = (p, ...rest) => pwf(redirect(p), ...rest);
+  }
+  const cws = fs.createWriteStream.bind(fs);
+  fs.createWriteStream = (p, ...rest) => cws(redirect(p), ...rest);
+}
+
+if (fixtureEnabled()) installArtifactRedirect();
+
 module.exports = {
   attachFixture,
+  fixtureOut,
+  installArtifactRedirect,
   fixtureEnabled,
   fixturePin,
   installNodeFetchFixture,

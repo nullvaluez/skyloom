@@ -183,6 +183,27 @@ Any gate may set it: it changes only how long the harness is willing to wait.
 
 ---
 
+## §1.6 WHAT THE FLEET PINS HID — the R24 additions
+
+R21 closed with a six-row table of ship-state visuals no gate could see, all
+neutralised by `scripts/_boot.js`'s determinism pins (HARN-GAP-5). R24 found
+more, and each one is a number, not a suspicion.
+
+| Pin | What it hid | Measured | Who un-pins it now |
+|---|---|---|---|
+| `__flySatShadowOverride = 0` | **the satellite key light never moves with the sun** — R21's key-position write lives INSIDE the shadow gate, so the branch never executes under the fleet pin. `__flyStats.sun` reads key az −55.8° / el 47.9° = `MOODS.satellite.lightDir` (the baked kloofendal texel) to six figures, against hill az −58.3° / el 37.5°: **key ↔ hill 10.50° apart AT HIGH TIER**, `live: false` | C, Sierra pose, tier high, flag-off tree | `verify-one-sun` (gate 0a/0b asserts `live === true`; `live === false` is recorded as the RED) and `verify-env-uniform` |
+| `__flyGovPin = 'hold'` | every DPR/tier step and therefore the whole resize path | `verify-step-clean` measured 0 steps until it forced them CORRECTLY (see §3.3) | `verify-step-clean`, `verify-env-uniform` |
+| `__flySunOverride` (28 sites) | any claim about time of day | key azimuth spread 0 across three sun elevations on medium | `verify-one-sun`, `verify-linear-haze`, `verify-env-uniform` |
+| `FRAME_STATS.enabled = false` | frame pace, long frames, program growth | `verify-frame-pace` on the integrated flag-off tree: "instrument absent — unmeasurable, not a renderer failure" | the flag itself |
+
+The pattern is the R19 §7 lesson for the third time: **a determinism pin and a
+ship-state visual can be the same switch**, and when they are, the fleet is
+structurally blind to the thing the user actually sees. Every R24 feature
+therefore ships its own override AND exactly one gate that releases it and
+proves the released term is REACHABLE before asserting anything about it.
+
+---
+
 ## §2 THE USER-MACHINE RUN LIST
 
 Everything in this section is impossible in the build container. Copy-paste,
@@ -265,6 +286,34 @@ current build BEFORE any R24 flag flips**, or the round has no before.
 - How the world looks on a GPU that is not SwiftShader: precision, anisotropy
   and half-float behaviour are driver-dependent, and R16 §9 already cost this
   project one such surprise (Apple GPUs and `FloatType` HDRIs).
+
+---
+
+## §2.8 Harness hygiene (HARN-HYG-9), and the incident that earned it
+
+Running R24's OFFLINE `verify-seam` leg **rewrote the tracked
+`scripts/r21-e-red-seam.json` in place with fixture data**, and the commit
+carried it: R21's live-tileset RED record — numbers measured against
+OpenFreeMap bytes that nobody can re-measure — replaced by numbers from a
+synthetic planet. Nothing failed and nothing warned; the file simply stopped
+meaning what its name says. Restored from the round's base on both the branch
+and integration.
+
+Two defences now, because a mechanism alone can be bypassed by the next
+harness someone writes:
+
+1. **The redirect.** `scripts/_fixture.js` installs it at module load whenever
+   `FLY_TILE_FIXTURE` is set: every write landing DIRECTLY in `scripts/` is
+   rewritten to `scripts/r24-out/fixture-<name>`. It wraps `fs.writeFileSync`,
+   `fs.writeFile`, `fs.promises.writeFile` (what Playwright's
+   `page.screenshot({ path })` uses) and `fs.createWriteStream` — one redirect
+   at the one place a file reaches disk, instead of thirty harness edits.
+   Reads are untouched, so a gate that READS a committed baseline still reads
+   the real one.
+2. **The outcome gate.** `scripts/verify-artifact-hygiene.mjs` (node, 5 gates,
+   in the smoke): `git diff --stat <base> -- 'scripts/r1*-*' 'scripts/r2[0-3]-*'
+   'scripts/soak-results*.json'` must be EMPTY, plus the mechanism checks and
+   an unstaged-dirty check for the run that just happened.
 
 ---
 

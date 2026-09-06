@@ -53,18 +53,42 @@ const ELEVATIONS = [
 ];
 const TIERS = (process.env.SUN_TIERS || 'high,medium').split(',');
 
+/**
+ * TWO pins, and the second one is not optional.
+ *
+ * C measured this on the flag-off tree at the Sierra pose, tier HIGH:
+ * `__flyStats.sun` reads key az -55.8 deg / el 47.9 deg — which is
+ * `MOODS.satellite.lightDir`, the baked kloofendal texel, to six figures —
+ * against hill az -58.3 deg / el 37.5 deg, the real sun. **key <-> hill 10.50
+ * deg apart at HIGH tier**, with `live: false`: the satellite key-light
+ * position branch NEVER EXECUTED during the entire boot and settle, because
+ * `scripts/_boot.js` pins `__flySatShadowOverride = 0` and R21's position
+ * write lives inside that shadow gate.
+ *
+ * So on the ENTIRE browser fleet, at every tier, the satellite key light has
+ * never moved with the sun, and no frozen gate could see it. That is
+ * HARN-GAP-5 with a number on it.
+ *
+ * A gate that un-pinned only `__flySunOverride` would therefore measure the
+ * PINNED CONSTANT at every tier and call it agreement. `__flyStats.sun.live`
+ * is the tell, and this gate asserts it before anything else.
+ */
 const UNPIN_SUN = () => {
-  try {
-    Object.defineProperty(window, '__flySunOverride', {
-      configurable: true,
-      get: () => window.__r24Sun,
-      set: (v) => {
-        window.__r24SunPinAttempt = v;
-      },
-    });
-  } catch {
-    /* blocked — reported below */
-  }
+  const mk = (name, store) => {
+    try {
+      Object.defineProperty(window, name, {
+        configurable: true,
+        get: () => window[store],
+        set: (v) => {
+          window[store + 'PinAttempt'] = v;
+        },
+      });
+    } catch {
+      /* blocked — the probe reports it */
+    }
+  };
+  mk('__flySunOverride', '__r24Sun');
+  mk('__flySatShadowOverride', '__r24Shadow');
 };
 
 const deg = (r) => (r * 180) / Math.PI;
@@ -113,14 +137,21 @@ function skip(name, why) {
     POSE
   );
 
+  // Arm the shadow rig: the satellite key-light POSITION write lives inside it.
+  await page.evaluate(() => {
+    window.__r24Shadow = 1;
+  });
   const pinProbe = await page.evaluate(() => ({
-    attempted: window.__r24SunPinAttempt ?? null,
-    live: window.__flySunOverride ?? null,
+    sunAttempted: window.__r24SunPinAttempt ?? null,
+    sunLive: window.__flySunOverride ?? null,
+    shadowAttempted: window.__r24ShadowPinAttempt ?? null,
+    shadowLive: window.__flySatShadowOverride ?? null,
   }));
   gate(
-    '(0) THE SUN PIN IS RELEASED — the fleet wrote it, the accessor swallowed it',
-    pinProbe.live == null,
-    `fleet attempted ${JSON.stringify(pinProbe.attempted)} · live ${JSON.stringify(pinProbe.live)}`
+    '(0) BOTH PINS RELEASED — the fleet wrote them, the accessors swallowed them',
+    pinProbe.sunLive == null && pinProbe.shadowLive === 1,
+    `sun attempted ${JSON.stringify(pinProbe.sunAttempted)} -> ${JSON.stringify(pinProbe.sunLive)} · ` +
+      `satShadow attempted ${JSON.stringify(pinProbe.shadowAttempted)} -> ${JSON.stringify(pinProbe.shadowLive)}`
   );
 
   const rows = [];
@@ -152,6 +183,30 @@ function skip(name, why) {
           `${hillEl?.toFixed(3)} · dome az ${domeAz == null ? 'null' : domeAz.toFixed(4)} · ` +
           `key↔hill ${angleBetween(s.key, s.hill)?.toFixed(2)}°`
       );
+
+      // --- clause 0: DID THE KEY LIGHT MOVE AT ALL?
+      // `live: false` means the satellite key-light position branch never ran,
+      // so `key` is the baked MOODS.satellite.lightDir constant and every
+      // clause below would be comparing a constant to the sun and reporting
+      // the disagreement as a measurement. Record it as the RED; do not
+      // assert past it.
+      gate(
+        `(0${tier === 'high' ? 'a' : 'b'}) ${tier}/${label} THE KEY LIGHT IS LIVE — the position branch executed`,
+        s.live === true,
+        `live=${s.live}` +
+          (s.live === true
+            ? ''
+            : ' — the key is MOODS.satellite.lightDir (the baked kloofendal texel), not the sun. ' +
+              'C measured key<->hill 10.50 deg at HIGH tier on the flag-off tree with the fleet ' +
+              'pin in place. This is the RED.')
+      );
+      if (s.live !== true)
+        red.push([
+          'L3 satellite key light never moves (the fleet pin hid it)',
+          `verify-one-sun (0${tier === 'high' ? 'a' : 'b'})`,
+          `live=${s.live}, key<->hill ${angleBetween(s.key, s.hill)?.toFixed(2)} deg`,
+          'live=true',
+        ]);
 
       // --- clause 1: azimuth agreement (except under moonlight)
       if (s.moonK > 0) {

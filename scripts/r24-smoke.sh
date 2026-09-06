@@ -99,11 +99,18 @@ node_gate verify-worker-normals.mjs      # C (R24): area-weighted DEM normals, 3
 # that flag is on, this needs a flag-on ARM, NOT a re-baseline of A's number.
 node_gate verify-skirt-worker.mjs
 
-# --- verify-seam's NODE leg now runs offline too (HARN-GAP-7): its api.init()
-#     is pinned to the fixture by a global-fetch wrapper. Gates 0-6c are the
-#     fastest deterministic instrument in the fleet; the browser leg (7-9) is
-#     skipped here unless FLY_URL is exported, which it is.
-node_gate verify-seam.js
+node_gate verify-artifact-hygiene.mjs    # E (R24): no R15-R23 calibration artifact may change
+
+# --- verify-seam's NODE leg runs offline (HARN-GAP-7): its api.init() is
+#     pinned to the fixture by a global-fetch wrapper. Gates 0-6c are the
+#     fastest deterministic instrument in the fleet.
+#     FLY_URL IS UNSET FOR THIS ROW ON PURPOSE. The smoke exports FLY_URL for
+#     the whole run, and verify-seam.js:452 takes that as "also run the browser
+#     leg" — which then does require('playwright') with no shim preload and
+#     dies with "Cannot find module 'playwright'" AFTER nine green node gates.
+#     The node leg is the fixture column; the browser leg is a browser_gate row.
+run verify-seam.js scripts/verify-seam.js env -u FLY_URL node scripts/verify-seam.js
+
 
 # --- the fixture's own gate. If this is red, every browser number below is
 #     meaningless, so it runs first and its failure is the headline.
@@ -117,6 +124,10 @@ run verify-fixture.js scripts/verify-fixture.js \
 # PACING gates — these must NEVER see FLY_FINALIZE_BUDGET_K.
 browser_gate verify-frame-pace.js
 browser_gate verify-step-clean.js
+browser_gate verify-ladder-step.js       # A (R24): FLY_LADDER_RED=1 = 6/13 fail flag-off; boots TOY
+# verify-seam's BROWSER leg (gates 7-9: engine counters over a settled 60 s).
+run verify-seam-browser scripts/verify-seam.js \
+  node -r ./scripts/_pw-shim.js scripts/verify-seam.js
 # CONTENT gates — counts, census and single-frame transitions. Their
 # assertions are on WHAT the world contains and on transition COUNTS, never on
 # how long a drape took, so a wider per-frame budget cannot change an answer.
