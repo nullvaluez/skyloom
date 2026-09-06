@@ -14,6 +14,7 @@ import {
 } from 'three';
 import { CLOUDS, CLOUD_LIT, HUD_SYNC, SKY_CIRRUS, TOY_WORLD, WEATHER, WORLD_EDGE } from '@/lib/fly/fly-constants';
 import { clearCloudLight, LitCloudMaterial, setCloudLight } from '@/lib/fly/cloud-material';
+import { pinned } from '@/lib/fly/fly-pins';
 import { expApproach } from '@/lib/fly/coords';
 import { puffPresence } from '@/lib/fly/weather-model';
 import { applyBend, bendDrop, getBend, getEdgeFade } from '@/lib/fly/toy-world/world-bend';
