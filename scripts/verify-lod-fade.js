@@ -980,6 +980,7 @@ function soft(name, detail) {
       // final heading, so the camera stops but the streamer does not, and each
       // round trip is several rendered frames. D's rule: counters advanced ⇒
       // arrivals (INFO); counters flat with active > 0 ⇒ stuck (FAIL).
+      let lateActive = null;
       const later = await waitUntilSnap(
         p2,
         () => {
@@ -988,9 +989,18 @@ function soft(name, detail) {
         },
         { capFrames: 12, label: 'second read, 12 frames after the drain' }
       );
+      lateActive = later.snap?.active ?? null;
       const arrived =
         later.snap && f2 ? later.snap.refines + later.snap.merges > f2.refines + f2.merges : null;
-      if ((later.snap?.active ?? 0) > 0) {
+      if (arrived === null)
+        notCalibrated(
+          '(16b) A NON-ZERO ACTIVE SET IS ACCOUNTED FOR BY NEW ARRIVALS',
+          `a fades snapshot was unavailable (drain ${f2 ? 'ok' : 'null'}, second read ` +
+            `${later.snap ? 'ok' : 'null'}), so arrivals could not be attributed. Without the guard ` +
+            'this fell through to "no new work arrived, so the blends are stuck" — a hard FAIL ' +
+            'whose real cause is an untaken snapshot'
+        );
+      else if ((later.snap?.active ?? 0) > 0) {
         if (arrived)
           console.log(
             `  INFO active ${f2?.active} -> ${later.snap.active} while refines+merges advanced ` +
@@ -1034,13 +1044,31 @@ function soft(name, detail) {
       // diverged, which is a real defect and not a pacing artifact. (Pass 2b's
       // 8 active / 2 retained is exactly two refine events in flight — a 4:1
       // ratio no stuck set lands on by coincidence.)
-      if (d('merges') === 0 && f2 && f2.active > 0)
-        gate(
-          '(16d) THE FREE INVARIANT — retained <= active <= 4 x retained (refines only)',
-          f2.retained <= f2.active && f2.active <= 4 * f2.retained,
-          `active ${f2.active} materials · retained ${f2.retained} parent textures = ` +
-            `${(f2.active / Math.max(1, f2.retained)).toFixed(1)}:1 (a refine arms 4 children off 1 parent)`
+      // [D-E2] IT MUST BE EVALUATED WHERE THE ACTIVE SET IS NON-EMPTY. Guarding
+      // it on `f2` alone made it vacuous on every healthy run: f2 is the
+      // snapshot that SATISFIED the drain, so `f2.active === 0` exactly when
+      // the drain held, and the invariant only ever evaluated on a capped
+      // drain — the one case where the numbers mean least. It now runs on the
+      // second read (which is where pass 2b's 8-active / 2-retained reading
+      // came from) and additionally on f2 when the drain did NOT hold.
+      const freeChecks = [];
+      if (later.snap && later.snap.active > 0) freeChecks.push(['second read', later.snap]);
+      if (!drain.ok && f2 && f2.active > 0) freeChecks.push(['capped drain', f2]);
+      if (d('merges') === 0 && freeChecks.length === 0)
+        console.log(
+          '  INFO (16d) not evaluated — no read caught a non-empty active set, which on a healthy ' +
+            'run means the blends drained and nothing re-armed. Not a pass.'
         );
+      if (d('merges') === 0)
+        for (const [where, snap] of freeChecks)
+          gate(
+            `(16d) THE FREE INVARIANT ${where} — retained <= active <= 4 x retained (refines only)`,
+            snap.retained <= snap.active && snap.active <= 4 * snap.retained,
+            `active ${snap.active} materials · retained ${snap.retained} parent textures = ` +
+              `${(snap.active / Math.max(1, snap.retained)).toFixed(1)}:1 (a refine arms 4 children ` +
+              'off 1 parent, so the ratio is bounded; outside the band the refcount and the active ' +
+              'set have diverged)'
+          );
 
       gate(
         '(16) EVERY BLEND DRAINS, AND NOTHING IS RETAINED AT REST',
@@ -1081,29 +1109,53 @@ function soft(name, detail) {
       `longest run of frames with terra.fades.active > 0: ${w2.maxBlendRun} (blend frames ` +
         `${w2.blendFrames} of ${w2.frames}, peak active in the window ${w2.peakActiveInWindow}). ` +
         'This is the number (5) was reaching for; the mesh co-display census cannot see it because ' +
-        'parentBlend never keeps the parent drawn'
+        'parentBlend never keeps the parent drawn. NOTE: >= 5 is expected for a COMPLETE blend — ' +
+        '0.25 s of fade clock is 5 clamped frames at any frame rate (FlyScene clamps dt to 0.05) — ' +
+        'so a run of 2 to 4 means the sweep ended mid-blend, not that the blend is short'
     );
     // The blend is on REAL TILES, not merely counted: values strictly inside
     // (0,1) are mid-ramp materials, and their count must equal `active`.
+    // [D-E1] EVERY TILE MESH CARRIES A MATERIAL ARRAY. three-tile's tile model
+    // is `class Z extends Mesh { constructor(g, m) { super(g, m ?? []) } }` and
+    // `syncMaterials()` assigns `this.material[i]`, so `n.material.userData` is
+    // undefined on an array and this census would have come back EMPTY on a
+    // perfectly healthy run — printing "0 materials carry __lodFade" with a
+    // fallback that made the nothing look expected. Same shape as the whole
+    // §6 family: a value read across a boundary in the wrong container.
     const mixes = await p2.evaluate(() => {
       const out = [];
+      let materials = 0;
       const map = window.__flyTerra?.engine?.()?.map ?? window.__flyTerra?.get?.();
       const stack = map ? [map] : [];
       while (stack.length) {
         const n = stack.pop();
         if (!n) continue;
-        const v = n.material?.userData?.__lodFade?.mix?.value;
-        if (typeof v === 'number') out.push(+v.toFixed(3));
+        const mats = Array.isArray(n.material) ? n.material : n.material ? [n.material] : [];
+        for (const m of mats) {
+          if (!m) continue;
+          materials++;
+          const v = m.userData?.__lodFade?.mix?.value;
+          if (typeof v === 'number') out.push(+v.toFixed(3));
+        }
         const k = n.children;
         if (k) for (let i = 0; i < k.length; i++) stack.push(k[i]);
       }
-      return out;
+      return { out, materials };
     });
-    const midRamp = mixes.filter((v) => v > 0 && v < 1);
+    const midRamp = mixes.out.filter((v) => v > 0 && v < 1);
     console.log(
-      `  INFO blend mixes on resident tiles: ${mixes.length} materials carry __lodFade.mix, ` +
-        `${midRamp.length} strictly inside (0,1) — e.g. ${JSON.stringify(midRamp.slice(0, 6))}` +
-        (midRamp.length ? '' : '  [none mid-ramp at this instant — expected once the sweep has drained]')
+      `  INFO blend mixes: ${mixes.out.length} of ${mixes.materials} tile materials carry ` +
+        `__lodFade.mix, ${midRamp.length} strictly inside (0,1) — e.g. ` +
+        `${JSON.stringify(midRamp.slice(0, 6))}`
+    );
+    // The equality D asked for: a mid-ramp material is exactly a member of the
+    // active set, so these two counts must agree at the same instant. They are
+    // read one round trip apart, so a mismatch is reported, not asserted —
+    // but a LARGE mismatch means the census and the counter disagree about
+    // what is blending, which is the defect this row exists to exclude.
+    console.log(
+      `  INFO mid-ramp ${midRamp.length} vs terra.fades.active ${lateActive ?? '?'} at the second ` +
+        'read (one round trip apart; a large gap means the census and the counter disagree)'
     );
 
     soft(
