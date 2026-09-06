@@ -45,6 +45,7 @@
  */
 const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
+const { settleWorld } = require('./_settle');
 
 const POWELL = [40.1578, -83.0752, 900, 1.9, -0.3];
 const OWENS = [36.6, -118.1, 2600, 1.2, -0.18];
@@ -187,26 +188,65 @@ const SNAP_FADES = () => {
 };
 
 /**
- * Wait for N RENDERED frames, not N milliseconds. Everything about the fade
- * ladder is measured on the fade clock, which FlyScene advances by
- * `min(delta, 0.05)` per rendered frame — so at this venue's 1-3 fps a
- * wall-clock wait says nothing about how far the fade clock has moved.
+ * Poll a page-side predicate until it holds, capped in RENDERED FRAMES.
+ *
+ * [D-C1] Every "wait N frames" in this file was fps-dependent in the WRONG
+ * direction. The fade clock advances `min(delta, 0.05)` per rendered frame, so
+ * ten frames is 500 ms of fade clock at this venue's 1-3 fps but only 167 ms at
+ * 60 fps — a 250 ms blend is comfortably drained here and still running there.
+ * A hard `active === 0` after a fixed frame count is therefore a FALSE RED on
+ * a healthy machine, which is the worst kind of gate: it fails precisely where
+ * the feature works. Poll instead, and report how long it took. (The
+ * `waitFrames` helper this replaced is gone: there was no frame count that was
+ * right on both machines, which is the whole finding.)
  */
-async function waitFrames(pg, n, timeoutMs = 180000) {
-  const start = await pg.evaluate(
+async function waitUntil(pg, fnSrc, { capFrames = 90, label = '' } = {}) {
+  const t0 = await pg.evaluate(
     () => window.__flyStats?.frame?.count ?? window.__lodWatch?.frames ?? 0
   );
-  await pg
-    .waitForFunction(
-      ([s0, want]) => (window.__flyStats?.frame?.count ?? window.__lodWatch?.frames ?? 0) - s0 >= want,
-      [start, n],
-      { timeout: timeoutMs, polling: 250 }
-    )
-    .catch(() => {});
-  return (await pg.evaluate(() => window.__flyStats?.frame?.count ?? window.__lodWatch?.frames ?? 0)) - start;
+  let frames = 0;
+  let ok = false;
+  for (;;) {
+    ok = await pg.evaluate(fnSrc).catch(() => false);
+    frames =
+      (await pg.evaluate(() => window.__flyStats?.frame?.count ?? window.__lodWatch?.frames ?? 0)) - t0;
+    if (ok || frames >= capFrames) break;
+    await pg.waitForTimeout(250);
+  }
+  if (label) console.log(`  waitUntil(${label}): ${ok ? 'held' : 'CAPPED'} after ${frames} rendered frames`);
+  return { ok, frames };
 }
 
-const { notCalibrated, notCalCount, notCalSummary } = require('./_notcal');
+/**
+ * Wait until a counter STOPS ADVANCING across two consecutive reads.
+ *
+ * [D-C2] The warp cut is 900 ms of fade clock — 18 rendered frames here, ~54
+ * at 60 fps, ~130 at 144 Hz. There is no frame count that is right on every
+ * machine, so the gate waits for the SYMPTOM to stop instead of guessing at
+ * its duration.
+ */
+async function waitSettled(pg, readSrc, { capFrames = 240, label = '' } = {}) {
+  const t0 = await pg.evaluate(
+    () => window.__flyStats?.frame?.count ?? window.__lodWatch?.frames ?? 0
+  );
+  let prev = await pg.evaluate(readSrc).catch(() => null);
+  let frames = 0;
+  for (;;) {
+    await pg.waitForTimeout(400);
+    const now = await pg.evaluate(readSrc).catch(() => null);
+    frames =
+      (await pg.evaluate(() => window.__flyStats?.frame?.count ?? window.__lodWatch?.frames ?? 0)) - t0;
+    if (now === prev || frames >= capFrames) {
+      if (label)
+        console.log(
+          `  waitSettled(${label}): ${now === prev ? `steady at ${now}` : `CAPPED at ${now}`} after ` +
+            `${frames} rendered frames`
+        );
+      return { value: now, frames, steady: now === prev };
+    }
+    prev = now;
+  }
+}
 
 let pass = 0;
 let fail = 0;
@@ -244,6 +284,13 @@ function soft(name, detail) {
   // --- Powell: the residency + swap legs
   await page.evaluate(PIN_POSE, POWELL);
   await page.waitForTimeout(SETTLE);
+  // [D-C3] THE TWO ARMS MUST BE SETTLED THE SAME WAY. The ON arm waits for the
+  // warp cut to stop suppressing fades before it snapshots; if the OFF arm did
+  // not, the two `refines + merges` totals gate (14) compares would differ for
+  // a reason that is load, not feature. Same call, same place, both legs.
+  const offWarp = await waitSettled(page, () => window.__flyStats?.terra?.fades?.skip?.warp ?? 0, {
+    label: 'OFF skip.warp',
+  });
   // (1) is a PRECONDITION, so it must be readable in BOTH arms. A's `mem()`
   // cannot be: `residency.update()` is only wrapped into `map.update` when
   // TERRA_PACE.keepResident is ON (terrain-engine.js), so on the flag-off tree
@@ -422,17 +469,21 @@ function soft(name, detail) {
   }
 
   // --- Owens: the draw ceiling must not move because of a fade
+  //
+  // [D note] SETTLED, not "waited SETTLE ms". Gate (18) asserts the two arms'
+  // draw and triangle counts are EQUAL, and a fixed wait makes that equality a
+  // race with the streamer: a chunk that lands one poll later on one leg moves
+  // the number. `settleWorld` returns only when terrain has reached its zoom,
+  // the ground elevation has stopped moving, every chunk has resolved
+  // ready-or-empty, and `__flyStats` has REPUBLISHED since we asked — so the
+  // number it hands back is a settled scene's, not a snapshot of one still
+  // assembling.
   await page.evaluate(PIN_POSE, OWENS);
-  await page.waitForTimeout(SETTLE);
-  await page.evaluate(() => {
-    if (window.__flyStats) window.__flyStats.drawCalls = null;
-  });
-  await page
-    .waitForFunction(() => typeof window.__flyStats?.drawCalls === 'number', undefined, {
-      timeout: 240000,
-      polling: 500,
-    })
-    .catch(() => {});
+  const owensSettleOff = await settleWorld(page, { capMs: 300000 });
+  console.log(
+    `  OFF Owens settle: ${owensSettleOff.settled ? 'SETTLED' : `NOT settled — ${owensSettleOff.why}`} ` +
+      `in ${(owensSettleOff.ms / 1000).toFixed(0)}s (maxZ ${owensSettleOff.maxZ}, load ${owensSettleOff.load})`
+  );
   const owens = await page.evaluate(() => ({
     draws: window.__flyStats?.drawCalls ?? null,
     tris: window.__flyStats?.triangles ?? null,
@@ -594,8 +645,14 @@ function soft(name, detail) {
 
     await p2.evaluate(PIN_POSE, POWELL);
     await p2.waitForTimeout(SETTLE);
-    // [D3] the warp suppression window is 900 fade-ms = 18 rendered frames.
-    const warpFrames = await waitFrames(p2, 20);
+    // [D3]/[D-C2] the warp cut is 900 ms of FADE CLOCK — 18 rendered frames at
+    // this venue, ~54 at 60 fps, ~130 at 144 Hz. No frame count is right on
+    // every machine, so wait for skip.warp to STOP ADVANCING instead of
+    // guessing at the duration. Identical call on the OFF arm (see above).
+    const onWarp = await waitSettled(p2, () => window.__flyStats?.terra?.fades?.skip?.warp ?? 0, {
+      label: 'ON skip.warp',
+    });
+    const warpFrames = onWarp.frames;
 
     const f0 = await p2.evaluate(SNAP_FADES);
     if (fx2) await fx2.resetStats();
@@ -609,8 +666,16 @@ function soft(name, detail) {
     await p2.waitForTimeout(YAW_SEC * 1000 + 4000);
     const w2 = await p2.evaluate(() => ({ ...window.__lodWatch, seenEver: undefined, samples: undefined }));
     const f1 = await p2.evaluate(SNAP_FADES);
-    // [D5] the drain read is a FRAME count, not a wall-clock wait.
-    const drainFrames = await waitFrames(p2, 10);
+    // [D5]/[D-C1] THE DRAIN IS A POLL, NOT A FRAME COUNT. A fixed
+    // waitFrames(10) is 500 ms of fade clock here and 167 ms at 60 fps, so a
+    // hard `active === 0` after it is a FALSE RED on a fast machine — the gate
+    // would fail exactly where the feature works. Poll to the cap and report
+    // what it took; the cap being hit is itself the finding.
+    const drain = await waitUntil(p2, () => (window.__flyStats?.terra?.fades?.active ?? 1) === 0, {
+      capFrames: 90,
+      label: 'blend drain (active -> 0)',
+    });
+    const drainFrames = drain.frames;
     const f2 = await p2.evaluate(SNAP_FADES);
     const d = (k) => (f1 && f0 ? (f1[k] ?? 0) - (f0[k] ?? 0) : NaN);
     const ds = (k) => (f1 && f0 ? (f1.skip?.[k] ?? 0) - (f0.skip?.[k] ?? 0) : NaN);
@@ -682,25 +747,59 @@ function soft(name, detail) {
         `${d('refines')} + ${d('merges')} = ${swapsON} vs ${d('hardSwaps')} + ${d('faded')} = ` +
           `${d('hardSwaps') + d('faded')}`
       );
-      gate(
-        '(14) THE FEATURE DOES NOT CHANGE HOW OFTEN THE LOD REFINES — refines + merges FLAT',
-        Number.isFinite(offLeg.refines) && offLeg.refines + offLeg.merges === swapsON,
-        `OFF ${offLeg.refines + offLeg.merges} -> ON ${swapsON}. A crossfade may only put a blend ` +
-          'over the swaps the quadtree already makes; changing their COUNT would mean it moved the ' +
-          'streamer, which is A\'s territory and a different flag'
-      );
-      gate(
-        '(15) THE MASS MOVED — faded RISES and hardSwaps DROPS toward 0',
-        d('faded') > 0 && d('hardSwaps') < offLeg.hardSwapsD,
-        `faded ${offLeg.fadedD} -> ${d('faded')} · hardSwaps ${offLeg.hardSwapsD} -> ${d('hardSwaps')}. ` +
-          "D's flip criterion, stated the way the counters actually work"
-      );
+      // [D-C4] BOTH OF THESE COMPARE AGAINST THE OFF ARM, so they need the
+      // OFF arm's own calibration guard — the mirror of (11). An OFF leg that
+      // was offered no swaps makes "flat" and "dropped" readings of an empty
+      // population, and a comparison against 0 is not a red.
+      const swapsOFF = offLeg.refines + offLeg.merges;
+      // [D-C3] …and the two arms only render comparable numbers of frames by
+      // luck at 1-3 fps. Strict equality of a per-frame-ish count across two
+      // legs that rendered 47 and 12 frames would be a coin. The window has to
+      // be comparable before the equality means anything.
+      const framesOFF = offLeg.frames;
+      const framesON = w2.frames;
+      const frameRatio = framesOFF > 0 ? framesON / framesOFF : NaN;
+      const comparable = Number.isFinite(frameRatio) && frameRatio >= 0.75 && frameRatio <= 1.25;
+      if (!Number.isFinite(swapsOFF) || swapsOFF === 0)
+        notCalibrated(
+          '(14)/(15) THE OFF-ARM COMPARISONS',
+          `the OFF leg recorded ${swapsOFF} refines + merges — with no swaps on that side, "flat" ` +
+            'and "hardSwaps dropped" are both comparisons against an empty population'
+        );
+      else {
+        if (!comparable)
+          notCalibrated(
+            '(14) THE FEATURE DOES NOT CHANGE HOW OFTEN THE LOD REFINES — refines + merges FLAT',
+            `the two arms did not render comparable numbers of frames (OFF ${framesOFF} -> ON ` +
+              `${framesON}, ratio ${Number.isFinite(frameRatio) ? frameRatio.toFixed(2) : frameRatio}, ` +
+              'tolerance ±25%). At 1-3 fps the swap count follows the frame count, so equality here ' +
+              'would be decided by load rather than by the feature'
+          );
+        else
+          gate(
+            '(14) THE FEATURE DOES NOT CHANGE HOW OFTEN THE LOD REFINES — refines + merges FLAT',
+            swapsOFF === swapsON,
+            `OFF ${swapsOFF} -> ON ${swapsON} over ${framesOFF} -> ${framesON} frames (ratio ` +
+              `${frameRatio.toFixed(2)}). A crossfade may only put a blend over the swaps the ` +
+              "quadtree already makes; changing their COUNT would mean it moved the streamer, " +
+              "which is A's territory and a different flag"
+          );
+        gate(
+          '(15) THE MASS MOVED — faded RISES and hardSwaps DROPS toward 0',
+          d('faded') > 0 && d('hardSwaps') < offLeg.hardSwapsD,
+          `faded ${offLeg.fadedD} -> ${d('faded')} · hardSwaps ${offLeg.hardSwapsD} -> ${d('hardSwaps')}. ` +
+            "D's flip criterion, stated the way the counters actually work. NOTE: with skipBootMs " +
+            'pinned to 0 the BOOT itself fades, so peakActive may have been set before the sweep — ' +
+            'faded > 0 IN THE WINDOW is the sweep proof, not the high-water mark'
+        );
+      }
       gate(
         '(16) EVERY BLEND DRAINS, AND NOTHING IS RETAINED AT REST',
         f2 != null && f2.active === 0 && f2.retained === 0,
-        `active ${f2?.active} · retained ${f2?.retained}, ${drainFrames} rendered frames after the ` +
-          'camera stopped. retained > 0 at rest is a PARENT-TEXTURE LEAK — a parent map kept alive ' +
-          'past unloadModel() forever — and is the single most important thing this leg can catch'
+        `active ${f2?.active} · retained ${f2?.retained} after ${drainFrames} rendered frames ` +
+          `(${drain.ok ? 'drained' : `NEVER DRAINED — hit the ${90}-frame cap`}). retained > 0 at ` +
+          'rest is a PARENT-TEXTURE LEAK — a parent map kept alive past unloadModel() forever — ' +
+          'and is the single most important thing this leg can catch'
       );
       gate(
         '(17) CONCURRENCY IS BOUNDED AND WAS EXERCISED — 0 < peakActive <= maxConcurrent',
@@ -733,29 +832,35 @@ function soft(name, detail) {
     );
 
     await p2.evaluate(PIN_POSE, OWENS);
-    await p2.waitForTimeout(SETTLE);
-    await p2.evaluate(() => {
-      if (window.__flyStats) window.__flyStats.drawCalls = null;
-    });
-    await p2
-      .waitForFunction(() => typeof window.__flyStats?.drawCalls === 'number', undefined, {
-        timeout: 240000,
-        polling: 500,
-      })
-      .catch(() => {});
+    const owensSettleOn = await settleWorld(p2, { capMs: 300000 });
+    console.log(
+      `  ON  Owens settle: ${owensSettleOn.settled ? 'SETTLED' : `NOT settled — ${owensSettleOn.why}`} ` +
+        `in ${(owensSettleOn.ms / 1000).toFixed(0)}s (maxZ ${owensSettleOn.maxZ}, load ${owensSettleOn.load})`
+    );
     const owens2 = await p2.evaluate(() => ({
       draws: window.__flyStats?.drawCalls ?? null,
       tris: window.__flyStats?.triangles ?? null,
     }));
     console.log(`ON  Owens (fixture column): draws=${owens2.draws} tris=${owens2.tris}`);
     // [D8] EQUAL to the OFF leg's fixture numbers, not "under the live ceiling".
-    gate(
-      '(18) OWENS IS BIT-FOR-BIT THE SAME SCENE — draws AND triangles equal the OFF leg',
-      owens2.draws != null && owens2.draws === offLeg.owensDraws && owens2.tris === offLeg.owensTris,
-      `ON ${owens2.draws} draws / ${owens2.tris} tris vs OFF ${offLeg.owensDraws} / ${offLeg.owensTris}. ` +
-        'Equality is the assertion — the live <= 261 ceiling is not what this leg is for; a ' +
-        'crossfade adds nothing where there is nothing to fade'
-    );
+    if (!owensSettleOff.settled || !owensSettleOn.settled)
+      notCalibrated(
+        '(18) OWENS IS BIT-FOR-BIT THE SAME SCENE — draws AND triangles equal the OFF leg',
+        `an arm did not settle (OFF ${owensSettleOff.settled} — ${owensSettleOff.why} · ON ` +
+          `${owensSettleOn.settled} — ${owensSettleOn.why}). Read: ON ${owens2.draws}/${owens2.tris} ` +
+          `vs OFF ${offLeg.owensDraws}/${offLeg.owensTris}. Equality across an unsettled scene is a ` +
+          'race with the streamer, not a property of the flag'
+      );
+    else
+      gate(
+        '(18) OWENS IS BIT-FOR-BIT THE SAME SCENE — draws AND triangles equal the OFF leg',
+        Number.isFinite(owens2.draws) &&
+          owens2.draws === offLeg.owensDraws &&
+          owens2.tris === offLeg.owensTris,
+        `ON ${owens2.draws} draws / ${owens2.tris} tris vs OFF ${offLeg.owensDraws} / ${offLeg.owensTris}. ` +
+          'Equality is the assertion — the live <= 261 ceiling is not what this leg is for; a ' +
+          'crossfade adds nothing where there is nothing to fade'
+      );
     gate('(19) NO PAGE ERRORS ON THE ON LEG', errors2.length === 0, errors2.slice(0, 3).join(' | ') || 'clean');
     await ctx2.close();
   }
