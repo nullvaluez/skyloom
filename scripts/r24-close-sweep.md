@@ -103,13 +103,13 @@ this venue structurally cannot produce the number and the user's machine owns it
 | `verify-flash-guard` | **rc 1 BY DESIGN, 5 passed / 1 failed.** (2) RED > 0: Powell **2,616 / 31,576 = 8.28 %** coincident-vertex — inside R22.1's live **6.36–8.64 %** band; Manhattan **5,820 / 126,116 = 4.61 %**, worst chunk **13.98 %**. (3) FAILs as intended. **Sat-skyline 0 / 83,752 and toy 0 / 0 — those two sites are NOT EXERCISED here** | **PENDING** — (3) zero-area **exactly 0** at every resident site; (5) triangle count only ever falls, per site; (1a)/(1b) census still non-empty | `__flyFlashPin` |
 | `verify-fade` | **rc 1 BY DESIGN, 4 passed / 2 failed.** (2) **14 of 14 hard births**, (3) **10 of 10 hard deaths**, presence channel **`none`** — no material carries a fade uniform, which IS the flag-off state. Watch was live: births 14 / deaths 10 over 94 frames | **PENDING** — (2) and (3) → **0 hard**, presence channel names a real uniform, and (1) (4) (5) (6) all stay green | — |
 | `verify-lod-fade` | **rc 1 BY DESIGN, 2 passed / 5 failed, 317 s.** (3) **27 re-appearances on a pure yaw** — A's T1/T3, the position never moved; (4) **8 hard refines + 3 hard merges** — D's T4; (5) co-display run **0**; (6) **15 tile URLs refetched**, worst 2×; (7) Owens **174 draws / 166,659 tris** (fixture); (8) clean. (1) FAILed for an **instrument** reason, not a world reason — see below. Node leg **GREEN** in §1.1 | **PENDING — the leg now exists.** `9cba1b6` adds the ON leg (gates 9–19) against D's reviewed criteria: `refines+merges === hardSwaps+faded` on both arms, `refines+merges` FLAT across the flip, `faded` rises / `hardSwaps` drops, `active === 0 && retained === 0` at rest, `0 < peakActive ≤ 32`, `skip.{shape,noParentMap,unpatched}` each 0, Owens draws **and** tris EQUAL to 174 / 166,659 | `__flyLodFadeOverride` `{enabled:true, skipBootMs:0}` |
-| `verify-step-clean` | **PENDING** — resizes land outside the frame | **PENDING** — every accepted DPR/tier step resizes inside the rAF; **accepted-step count must be > 0 or the gate reads NOT CALIBRATED**, never a silent pass | `__flyGovPin` |
+| `verify-step-clean` | **rc 1 BY DESIGN, 4 passed / 4 failed — the round's cleanest RED.** (1) the ladder ACCEPTED **6 of 6 forced steps** across DPR 1.25↔1.5 (so nothing here is vacuous); (2) **18 of 18 canvas width/height writes outside a rAF**; (3) setPixelRatio **6/6** and setSize **12/12** outside; (3b) composer.setSize **6/6** outside; (4) **22 of 46 frames** with `bufferMatchesDrawing` false, e.g. composer 1920×1080 against a 1600×900 drawing buffer. (5) composer resized not rebuilt (1→1) and (6) clean already hold | **PENDING** — every accepted DPR/tier step resizes inside the rAF; **accepted-step count must be > 0 or the gate reads NOT CALIBRATED**, never a silent pass | `__flyGovPin` |
 | `verify-frame-pace` | **INSTRUMENT ABSENT** on the 19:14 tree — `FRAME_STATS.enabled:false`, so the row is structurally vacuous there. **`6c26fe9` ships FRAME_STATS ON**, so the gate only has an instrument from the flipped tree onward. Its tear legs now print **(3a) ARMED / NOT CALIBRATED** so a window with no resize cannot read as a pass | **UM** for every pacing number — SwiftShader at ~1 fps cannot produce a p95, a long-frame rate, or a stall count | — |
-| `verify-one-sun` | **PENDING** — key azimuth spread 0 on medium (one sun *by accident*), non-zero where the material zoo diverges | **PENDING** — exactly one key direction across every lit material, all tiers | `__flySunOverride` + tier |
+| `verify-one-sun` | **rc 1 BY DESIGN, 20 passed / 7 failed, 251 s.** (2) key elevation pinned at **~45°** against a true 55 / 2 / −14 at **high AND medium** — C's L3; (6) medium azimuth spread **0.0000°**. Preconditions held: (0) both pins released, (0a)/(0b) `live=true`, (1) azimuth Δ 0 everywhere, (7) clean. **One vacuous pass caught in the read**: (5) water passed six times on `Δ undefined°` — fixed `686db21` | **PENDING** — exactly one key direction across every lit material, all tiers | `__flySunOverride` + tier |
 | `verify-env-uniform` | **PENDING** — `programsDelta` non-zero across a dusk crossing and across a tier step | **PENDING** — 0 across both crossings | `__flyGovPin` + `__flySatShadowOverride` |
 | `verify-shadow-calm` | **GREEN NODE-SIDE, 32/32** (C, `a9e30cc`): the ShaderChunk patch run against three's real chunk text both ways; reversal reproduces three **byte-exact**; texel snap is a staircase, 11 positions / 10 texels | **UM** for pixels, draws and the catcher shadow — the node leg cannot see any of them | `__flySatShadowOverride` |
-| `verify-linear-haze` | **PENDING** — rim-seam luma delta outside band (sRGB authored, linear mixed) | **PENDING** — the horizon band matches by construction | — |
-| `verify-depth-roundtrip` | **PENDING** — \|viewZ\| **2.50–2.51 m** at all three pixels, i.e. the double conversion | **PENDING** — \|viewZ\| equals the known depth at all three pixels | — |
+| `verify-linear-haze` | **VOID — INSTRUMENT, not a reading.** Both poses returned terrain L **0.0** / sky L **0.0** / an all-zero luma profile: the seam reader ran from `page.evaluate`, i.e. BETWEEN frames, and on a `preserveDrawingBuffer:false` context the default framebuffer is undefined once presented. (1a)/(1b) correctly said "no horizon"; (2a)/(2b)/(3) then **passed on Δ 0.0 — black against black**. Fixed `686db21`: the read happens inside a rAF, and (2)/(3) are NOT CALIBRATED whenever (1) fails | **PENDING** — the horizon band matches by construction | — |
+| `verify-depth-roundtrip` | **NOT RUNNABLE, not RED** — rc 1, 1 passed / 1 failed, 220 s. `window.__flyDepthProbe` **ABSENT**; (0) refused and printed the contract and the owner. The gate will not reconstruct viewZ itself — a harness that re-implements the renderer's conversion tests its own copy of the bug. See §2.7c | **PENDING** — \|viewZ\| equals the known depth at all three pixels; the RED signature is all three collapsing to 2.50–2.51 m | needs C's `__flyDepthProbe` + `__flyDof` |
 
 `verify-import-integrity` and `verify-artifact-hygiene` are flag-independent
 node gates and are certified once, in §1.1 — there is no second column for
@@ -402,10 +402,37 @@ current build BEFORE any R24 flag flips**, or the round has no before.
 | `verify-one-sun` | **yes** | nothing — the vectors are arithmetic. The LOOK (noon and dusk horizon) is checkpoint 5 | `FLY_URL=… node scripts/verify-one-sun.js` |
 | `verify-env-uniform` | **yes** | the STALL a compile storm costs in ms; the program COUNT is honest here | `FLY_URL=… node scripts/verify-env-uniform.js` |
 | `verify-linear-haze` | **yes** (fixture pixels) | whether the live Esri/OFM colours land in the same band; the fixture bound is a fixture bound | `FLY_URL=… node scripts/verify-linear-haze.js` |
-| `verify-depth-roundtrip` | **yes** | nothing — it is a reconstruction check | `FLY_URL=… node scripts/verify-depth-roundtrip.js` |
+| `verify-depth-roundtrip` | **only once C ships the hook** (§2.7c) | nothing — it is a reconstruction check | `FLY_URL=… node scripts/verify-depth-roundtrip.js` |
 | `verify-shadow-calm` | **yes** | sparkle, which is temporal and needs real frames | `FLY_URL=… node scripts/verify-shadow-calm.js` |
 | `verify-artifact-hygiene.mjs` | **yes**, anywhere | nothing | `node scripts/verify-artifact-hygiene.mjs` |
 | `verify-seam` node leg | **yes**, offline | the LIVE hashes — the fixture column is a different planet | `FLY_URL=… node scripts/verify-seam.js` |
+
+### 2.7c THE ONE HANDLE ANOTHER OWNER MUST SHIP FOR A ROW TO EXIST
+
+`verify-depth-roundtrip` is **NOT RUNNABLE**, which is a different verdict from
+RED: pass 1 printed `1 passed, 1 failed` with `window.__flyDepthProbe` **absent**,
+so nothing about the defect was measured in either direction. The gate refuses
+rather than reconstructing viewZ itself, deliberately — a harness that
+re-implements the renderer's depth conversion is testing its own copy of the
+bug.
+
+Two handles, both **owned by C (DEPTH_FIX)**, both dev-only:
+
+| Handle | Contract | What refuses without it |
+|---|---|---|
+| `window.__flyDepthProbe(x, y)` | → `{ viewZ, coc, raw, reversed }`. `x`/`y` in **drawing-buffer pixels, top-left origin**. Returns null (or a non-finite `viewZ`) when the pixel has no depth | gates (1)–(4): the whole round trip |
+| `window.__flyDof` | the **live `DepthOfFieldEffect` instance**, or `null` when the chain has none | gate (0b) |
+
+`(0b)` is the cautionary one. It used to infer the DoF pass from
+`style === 'toy' && tier === 'high'` and **passed while printing `dof=null`** —
+it was asserting the CONFIGURATION that is supposed to produce a pass, not the
+pass. It now reads `__flyDof` and prints NOT CALIBRATED when the handle is
+unpublished. A gate may not certify a thing by describing the conditions under
+which that thing usually exists.
+
+When the hook lands, the row runs unchanged and its RED signature is the one C
+measured: all three pixels reconstructing to 2.50–2.51 m, i.e. `−cameraNear`,
+every fragment collapsed by the double un-reversal.
 
 ### 2.7b What we will still not know afterwards
 

@@ -143,15 +143,38 @@ function gate(name, ok, detail) {
     tier: window.__flyStore?.getState?.().qualityTier ?? null,
     style: window.__flyStore?.getState?.().mapStyle ?? null,
     dof: window.__flyStats?.effects?.dof ?? null,
+    dofLive: typeof window.__flyDof !== 'undefined' ? window.__flyDof != null : null,
   }));
-  console.log(`  renderer reversedDepth=${state.reversed} · style=${state.style} · tier=${state.tier} · dof=${JSON.stringify(state.dof)}`);
-  gate(
-    '(0b) THE DoF PASS IS PRESENT — the released term is reachable in this tier',
-    state.style === 'toy' && state.tier === 'high',
-    `style ${state.style} tier ${state.tier} — the toy DepthOfField pass is the consumer this gate ` +
-      'is about; asserting depth with no depth reader would be a green that means nothing'
+  console.log(
+    `  renderer reversedDepth=${state.reversed} · style=${state.style} · tier=${state.tier} · ` +
+      `dof=${JSON.stringify(state.dof)} · __flyDof ${state.dofLive === null ? 'UNPUBLISHED' : state.dofLive}`
   );
+  // (0b) USED TO INFER PRESENCE FROM style/tier AND PASSED WHILE PRINTING
+  // `dof=null`. "the tier that is supposed to have a DoF pass" is not "a DoF
+  // pass": the released CoC term is what this gate's (3)/(4) read, and
+  // asserting it from a store field is asserting the configuration, not the
+  // renderer. It now reads C's live handle.
+  if (state.dofLive === null)
+    notCalibrated(
+      '(0b) THE DoF PASS IS PRESENT — the released term is reachable in this tier',
+      `window.__flyDof is unpublished (style ${state.style}, tier ${state.tier}). Required: ` +
+        '`window.__flyDof` = the live DepthOfFieldEffect instance, or null when the chain has none. ' +
+        'Owner: C (DEPTH_FIX). Without it this gate can only read the configuration it was asked ' +
+        'to verify'
+    );
+  else
+    gate(
+      '(0b) THE DoF PASS IS PRESENT — the released term is reachable in this tier',
+      state.dofLive === true && state.style === 'toy' && state.tier === 'high',
+      `__flyDof ${state.dofLive} · style ${state.style} · tier ${state.tier} — the toy ` +
+        'DepthOfField pass is the consumer this gate is about'
+    );
   if (!hasProbe) {
+    notCalibrated(
+      '(1)-(4) THE DEPTH ROUND TRIP',
+      'the probe hook is absent, so no pixel was read. This row is NOT RUNNABLE, which is a ' +
+        'different thing from RED: nothing about the defect has been measured either way'
+    );
     console.log(`\n${pass} passed, ${fail} failed${notCalSummary()}`);
     await browser.close();
     process.exit(1);
@@ -199,18 +222,36 @@ function gate(name, ok, detail) {
       `  ${label.padEnd(11)} px(${p.px},${p.py}) on ${p.obj} · true ${trueZ.toFixed(1)}m · ` +
         `reconstructed ${gotZ.toFixed(2)}m · err ${errPct.toFixed(1)}% · coc ${probe?.coc ?? 'n/a'} · raw ${probe?.raw}`
     );
-    numGate(gate)(
-      `(2) ${label}: |reconstructed − true| / true ≤ ${TOL_PCT}%`,
-      errPct,
-      errPct <= TOL_PCT,
-      `${errPct.toFixed(2)}% (true ${trueZ.toFixed(1)}m vs ${gotZ.toFixed(2)}m)`,
-      `errPct is ${errPct} (true ${trueZ}, reconstructed ${gotZ}) — the depth read produced no ` +
-        'number, so there is nothing to compare against the tolerance'
-    );
+    // THE HOOK CAN EXIST AND STILL RETURN NOTHING at a given pixel — an
+    // out-of-range read, a fragment the depth texture never received, a probe
+    // that answers before the first render. Every downstream assertion then
+    // reads NOT CALIBRATED and quotes the probe's own reason, rather than
+    // turning "no reading" into a percentage.
+    if (!probe || !Number.isFinite(probe.viewZ))
+      notCalibrated(
+        `(2) ${label}: |reconstructed − true| / true ≤ ${TOL_PCT}%`,
+        `__flyDepthProbe(${p.px}, ${p.py}) returned ${JSON.stringify(probe)} — viewZ is not a ` +
+          `finite number, so nothing was reconstructed at that pixel (true distance ${trueZ.toFixed(1)} m)`
+      );
+    else
+      numGate(gate)(
+        `(2) ${label}: |reconstructed − true| / true ≤ ${TOL_PCT}%`,
+        errPct,
+        errPct <= TOL_PCT,
+        `${errPct.toFixed(2)}% (true ${trueZ.toFixed(1)}m vs ${gotZ.toFixed(2)}m)`,
+        `errPct is ${errPct} (true ${trueZ}, reconstructed ${gotZ})`
+      );
   }
 
   // The RED signature, stated exactly as C measured it.
-  const allNearNear = rows.length === 3 && rows.every((r) => r.gotZ > 2.4 && r.gotZ < 2.6);
+  const measured = rows.filter((r) => Number.isFinite(r.gotZ));
+  if (measured.length < rows.length)
+    notCalibrated(
+      'THE RED SIGNATURE (all three collapse to −cameraNear)',
+      `${measured.length} of ${rows.length} pixels produced a finite reconstruction; the signature ` +
+        'needs all three'
+    );
+  const allNearNear = measured.length === 3 && measured.every((r) => r.gotZ > 2.4 && r.gotZ < 2.6);
   if (allNearNear)
     console.log(
       '\n  ^^ THE RED SIGNATURE: all three reconstruct to 2.50-2.51 m, i.e. −cameraNear. Every ' +
