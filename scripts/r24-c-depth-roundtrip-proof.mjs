@@ -96,10 +96,132 @@ console.log(`  RED   test  d >= 0.999999 with d = 1-depth = ${1 - libUnreverse(s
 console.log(`  GREEN test  depth >= 0.999999            = ${libUnreverse(skyRaw)}  -> fires, and fires`);
 console.log(`  on a NON-reversed device too (standard clear 1.0, readDepth is identity there).`);
 
+// ---------------------------------------------------------------------------
+// THE MIRROR TEST — the probe's JS `perspectiveDepthToViewZ` against three's
+// own GLSL, same inputs, same outputs.
+//
+// `lib/fly/depth-probe.js` reconstructs the view Z the harness judges. If that
+// mirror ever drifts from the shader — or is written with the very
+// double-conversion this round is fixing — the gate would certify the probe's
+// copy of the bug and report it as a pass. So the two return expressions are
+// EXTRACTED from the installed three build and evaluated directly: they are
+// pure arithmetic over `depth`, `near` and `far`, so the GLSL text is valid JS
+// as written and needs no translation that could itself introduce an error.
+// ---------------------------------------------------------------------------
+const THREE_SRC = readFileSync(
+  new URL('../node_modules/three/build/three.module.js', import.meta.url),
+  'utf8'
+);
+function glslPerspectiveDepthToViewZ() {
+  const i = THREE_SRC.indexOf('var packing = ');
+  const q = THREE_SRC.indexOf('"', i);
+  const e = THREE_SRC.indexOf('";', q + 1);
+  const chunk = JSON.parse(THREE_SRC.slice(q, e + 1));
+  const a = chunk.indexOf('float perspectiveDepthToViewZ(');
+  const body = chunk.slice(a, chunk.indexOf('\n}', a));
+  const rev = /#ifdef USE_REVERSED_DEPTH_BUFFER\s*return ([^;]+);/.exec(body);
+  const std = /#else\s*return ([^;]+);/.exec(body);
+  if (!rev || !std) throw new Error('three\'s perspectiveDepthToViewZ no longer parses — the mirror cannot be checked');
+  return {
+    reversedExpr: rev[1].trim(),
+    standardExpr: std[1].trim(),
+    reversed: new Function('depth', 'near', 'far', `return ${rev[1]};`),
+    standard: new Function('depth', 'near', 'far', `return ${std[1]};`),
+  };
+}
+
+const PROBE_SRC = readFileSync(new URL('../lib/fly/depth-probe.js', import.meta.url), 'utf8');
+const mirror = new Function(
+  `${PROBE_SRC.replace(/^import[\s\S]*?from 'three';/m, '').replace(/\bexport\s+function\b/g, 'function')}
+   return perspectiveDepthToViewZ;`
+)();
+
+console.log('\nMIRROR TEST — lib/fly/depth-probe.js vs three\'s own GLSL');
+const G = glslPerspectiveDepthToViewZ();
+console.log(`  GLSL reversed : ${G.reversedExpr}`);
+console.log(`  GLSL standard : ${G.standardExpr}`);
+let worstRev = 0;
+let worstStd = 0;
+for (let i = 0; i <= 2000; i++) {
+  const d = i / 2000; // the whole [0,1] depth range, endpoints included
+  for (const [n, f] of [
+    [near, far],
+    [0.1, 1000],
+    [2.5, 600000],
+    [1, 8000], // the shadow ortho's near/far, for good measure
+  ]) {
+    const a = mirror(d, n, f, true);
+    const b = G.reversed(d, n, f);
+    const c = mirror(d, n, f, false);
+    const e = G.standard(d, n, f);
+    // Exact equality is the right bar: same operations, same order, same
+    // doubles. Anything else means the mirror was re-derived, not transcribed.
+    if (!Object.is(a, b)) worstRev = Math.max(worstRev, Math.abs(a - b) || Infinity);
+    if (!Object.is(c, e)) worstStd = Math.max(worstStd, Math.abs(c - e) || Infinity);
+  }
+}
+const mirrorOk = worstRev === 0 && worstStd === 0;
+console.log(
+  `  8004 comparisons across 4 frustums, both branches: ${
+    mirrorOk ? 'BIT-IDENTICAL' : `MISMATCH (rev ${worstRev}, std ${worstStd})`
+  }`
+);
+
+// The probe must also be dev-only and must not invent a number it cannot stand
+// behind — both are properties of its source, and both are what keep a green
+// gate honest.
+const probeGates = [
+  [
+    'the probe reports the depth attachment AS STORED (no un-reversing)',
+    /out\.raw = buf\[0\];/.test(PROBE_SRC) && !/1\.0 - /.test(PROBE_SRC),
+  ],
+  [
+    'the probe reads `reversed` from the renderer, not from the request',
+    /gl\.state\?\.buffers\?\.depth\?\.getReversed\?\.\(\) === true/.test(PROBE_SRC),
+  ],
+  [
+    'the probe refuses rather than guessing when it cannot resolve to 1%',
+    /EXT_color_buffer_float unavailable — refusing/.test(PROBE_SRC),
+  ],
+  [
+    'the probe names which buffer every number came from',
+    /source: 'composer\.depthTexture/.test(PROBE_SRC) && /cocSource/.test(PROBE_SRC),
+  ],
+  [
+    'the probe is installed from a production-dead branch',
+    /process\.env\.NODE_ENV === 'production'\) return undefined;\s*\n\s*return installDepthProbe/.test(
+      readFileSync(new URL('../components/fly/FlyEffectComposer.jsx', import.meta.url), 'utf8')
+    ),
+  ],
+  [
+    'window.__flyDof is published from the same dev-only idiom',
+    /process\.env\.NODE_ENV !== 'production' && typeof window !== 'undefined'\) \{\s*\n\s*window\.__flyDof = o \?\? null;/.test(
+      readFileSync(new URL('../components/fly/Effects.jsx', import.meta.url), 'utf8')
+    ),
+  ],
+];
+console.log('');
+let probeOk = true;
+for (const [name, ok] of probeGates) {
+  if (!ok) probeOk = false;
+  console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${name}`);
+}
+
 console.log('\nGate recipe for E (verify-depth-roundtrip):');
-console.log('  Toy high tier, Neon NYC, camera parked. Read __flyStats.dofProbe (or sample the');
-console.log('  CoC render target) at three pixels whose true view distance is known from a');
-console.log('  raycast: ~50 m, ~700 m (the focus plane), ~4000 m.');
+console.log('  Toy high tier, Neon NYC, camera parked. Call window.__flyDepthProbe(x, y) at');
+console.log('  three pixels whose true view distance is known from a raycast: ~50 m,');
+console.log('  ~700 m (the focus plane), ~4000 m.');
 console.log('  RED  : reconstructed |viewZ| is 2.50-2.51 m at ALL THREE (this table).');
 console.log('  GREEN: |reconstructed - true| / true <= 1% at all three, and the CoC at the');
 console.log('         focus plane is < 0.02 while the 4 km sample is > 0.5.');
+console.log('  HOOK : window.__flyDepthProbe(x, y) -> { raw, viewZ, coc, reversed, near, far,');
+console.log('         drawingBuffer, source, cocSource, cocReason, error }. x/y are');
+console.log('         DRAWING-BUFFER pixels, top-left origin. window.__flyDof is the live');
+console.log('         DepthOfFieldEffect (or null). Both dev-only.');
+
+console.log(
+  mirrorOk && probeOk
+    ? '\nPROOF: PASS (mirror bit-identical to three\'s GLSL; probe contract intact)'
+    : '\nPROOF: FAIL'
+);
+process.exit(mirrorOk && probeOk ? 0 : 1);

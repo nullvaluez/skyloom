@@ -1315,12 +1315,69 @@ nothing; a census that hashes program source will see every shadow receiver
 move, and both readings are correct. `LAMBERT_ENV` is uniform-only and moves
 neither.
 
+### THE DEPTH PROBE HOOK — `window.__flyDepthProbe(x, y)`
+
+Pass 1's `verify-depth-roundtrip` stopped at gate (0): the hook did not exist,
+and the gate correctly refused to re-implement the reconstruction itself,
+because **a harness that re-derives the conversion tests the harness's copy of
+the bug**. So the app publishes the number and the harness only judges it.
+
+`lib/fly/depth-probe.js`, installed from `FlyEffectComposer` (which owns the
+composer, and `composer.depthTexture` is the attachment every
+`EffectAttribute.DEPTH` effect reads):
+
+```
+window.__flyDepthProbe(x, y) ->
+  { raw, viewZ, coc, reversed, near, far, drawingBuffer,
+    source, cocSource, cocReason, error }
+window.__flyDof -> the live DepthOfFieldEffect, or null
+```
+`x`/`y` are DRAWING-BUFFER pixels, **top-left origin** (the probe flips to the
+texture's bottom-left v and lands on the texel CENTRE, so it cannot straddle two
+texels under NearestFilter).
+
+**Which buffer each number came from is in the return value, not just in a
+comment.** `raw` is `composer.depthTexture` **as stored** — no un-reversing, no
+normalisation, no packing — which is the same texel AerialPerspective and the
+CoC material read, and the whole subject of recon L2. `coc` is the DoF effect's
+own `renderTargetCoC`, *sampled* at the same normalised UV rather than read back
+(that target is half-resolution, and a normalised UV is resolution-independent);
+`null` with a `cocReason` when DoF is not mounted.
+
+**Why a copy pass:** a depth ATTACHMENT cannot be `readPixels`'d, so the probe
+samples it into a 1×1 `FloatType` target and reads that. 8-bit would be useless
+(reversed depth at 700 m is 3.6e-3, and the reconstruction's relative error is
+the texel's), and half float's ~11-bit mantissa would put ~0.05 % on a gate whose
+bound is 1 %. **Without `EXT_color_buffer_float` the probe returns an `error`
+rather than a number it cannot stand behind.**
+
+**Production byte-identical**, the R19 park-handle idiom: both the probe and
+`__flyDof` are installed from `process.env.NODE_ENV` branches that are
+statically false in a production build — nothing constructed, no render target
+allocated, no global written. The probe also renders nothing on its own
+schedule: it draws one 1×1 quad only when a harness calls it.
+
+**THE MIRROR CANNOT CARRY ITS OWN COPY OF THE BUG.**
+`r24-c-depth-roundtrip-proof.mjs` now **extracts both `return` expressions of
+three's `perspectiveDepthToViewZ` from the installed build** and evaluates them
+against the probe's JS mirror — the GLSL is pure arithmetic over
+`depth`/`near`/`far`, so it is valid JS as written and needs no translation that
+could itself introduce an error. **8,004 comparisons across four frustums
+(including the shadow ortho's 1/8000), both branches, the full [0,1] depth range
+with endpoints: BIT-IDENTICAL** — `Object.is`, not a tolerance, because same
+operations in the same order on the same doubles is the only acceptable result
+for a transcription. Six further gates assert the probe's contract: it reports
+the attachment as stored, reads `reversed` from the RENDERER rather than from
+the request, refuses instead of guessing, names its sources, and both handles
+are production-dead.
+
 ### Gates on the flipped branch
 
 `verify-c-flagoff` **37/37** · `verify-shadow-calm` **33/33** ·
 `verify-depth-offset` 7/7 · `verify-worker-normals` 12/12 ·
 `verify-vendor-three-tile` 19/19 · post-order proof PASS · linear-haze proof
-(RED 99.2 worst / GREEN 0.000) · depth round-trip proof (RED flat 0.176–0.177).
+(RED 99.2 worst / GREEN 0.000) · depth round-trip proof (RED flat 0.176–0.177,
+**mirror bit-identical to three's GLSL, probe contract intact**).
 `no-undef` over the changed files: **0**.
 
 **Gate (1) of `verify-c-flagoff` is the only assertion in either file whose
