@@ -326,8 +326,26 @@ fi
 #   K = the finalize-budget scaler. "-" means the row must NOT see it: it
 #   measures pacing, per-frame ordering or program counts, and a wider budget
 #   changes which work lands in which frame.
+# CERT_ROWS="a b c" runs ONLY those rows, everything else in the list is skipped
+# with a reason. This exists so a RE-TAKE reuses this script — the port refusal,
+# the PGID read at launch, the node-gates-first stop, the boot proof and the
+# cleanup that verifies the port was released — instead of a second runner that
+# drifts from it. A re-take is the same run with a shorter row list, and it
+# should not be a different program.
+#
+# CERT_ROW_ENV_<name> injects extra env for ONE row (e.g.
+# CERT_ROW_ENV_haze_red="HAZE_RED=1"), so a calibration arm needs no edit here.
+row_selected() {
+  [ -z "${CERT_ROWS:-}" ] && return 0
+  case " $CERT_ROWS " in *" $1 "*) return 0 ;; *) return 1 ;; esac
+}
+
 run() {
   local name="$1" k="$2" script="$3"; shift 3
+  if ! row_selected "$name"; then
+    printf '\nSKIP  %s (not in CERT_ROWS="%s")\n' "$name" "$CERT_ROWS"
+    return
+  fi
   [ -f "scripts/$script" ] || { printf '\nSKIP  %s (scripts/%s absent)\n' "$name" "$script"; return; }
   local t0; t0=$(date +%s)
   printf '\n=== %s (K=%s) %s\n' "$name" "$k" "$(date +%T)"
@@ -351,6 +369,10 @@ run lod-fade    "$K" verify-lod-fade.js
 run step-clean   -   verify-step-clean.js
 run one-sun      -   verify-one-sun.js
 run linear-haze  -   verify-linear-haze.js
+# The A/B's OWN red: both arms pinned { enabled: false }. It must NOT separate,
+# and what it reports is the reader's noise floor — the number below which any
+# A/B claim is noise. Not in the default list; select it with CERT_ROWS.
+run haze-red     -   verify-linear-haze.js HAZE_RED=1
 # depth-rt is a SETTLED-POSE PIXEL PROBE — a content gate by §1.5, not a pacing
 # row: its raycast needs the world resident at the moment of the pick, and pass
 # 2b measured "0 raycast hits" running it with no budget scaler.
