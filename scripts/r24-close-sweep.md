@@ -28,7 +28,39 @@ scripts/r24-smoke.sh 3105          # the subset that runs in this container
 Legend: ✔ green · ✘ red · — not run · **UM** user machine only · *(fx)* fixture
 column · *(live)* live column.
 
-### 1.1 Node gates (no browser, no GPU, no network — run anywhere)
+### 1.1 Node gates — ALL GREEN on the INTEGRATED tree (E's worktree, 2026-09-06)
+
+Run: `node scripts/<gate>` from the merged tree at `990c7b5`.
+
+| Gate | Result | Numbers |
+|---|---|---|
+| `verify-classify.mjs` | **PASS** | |
+| `verify-warbirds.mjs` | **PASS** | |
+| `verify-daily.mjs` | **PASS** | |
+| `verify-depth-offset.mjs` | **PASS** | 7 gates |
+| `verify-terra-residency.mjs` | **PASS** | 21 passed, 0 failed |
+| `verify-c-flagoff.mjs` | **PASS** | 26 gates |
+| `verify-worker-normals.mjs` | **PASS** | 12 gates; **node-proven, user machine for pixels** |
+| `verify-skirt-worker.mjs` | **PASS** | 8 passed, 0 failed |
+| `verify-lod-fade.mjs` (D's node half) | **PASS** | 51 passed, 0 failed |
+| `verify-vendor-three-tile.mjs` | **PASS** | 19 passed, 0 failed |
+| `verify-skirt-fast.mjs` | **PASS** | 12 passed, 0 failed |
+| `verify-frame-step.mjs` | **PASS** | 10 passed, 0 failed |
+| `verify-finalize-pace.mjs` | **PASS** | 11 passed, 0 failed |
+| `verify-artifact-hygiene.mjs` | **PASS** | 5 passed, 0 failed |
+| **`verify-seam.js` node leg (offline, fixture-pinned)** | **PASS** | 9 gates; 149 z14 tiles; Owens hatchKept **0**; worst slope 2.5; ramp 0/149 disagree; 0 seam pairs; determinism manhattan kept **311** `8d36f2aa:89218640:13605`, columbus kept **193** `2eefc447:49bbe703:8715` |
+
+**The seam hashes are IDENTICAL to the pre-merge run on `r24/e` alone.** With
+every R24 flag off, five agents' merges leave the worker's output byte-identical
+on 149 fixture tiles — which is the flag-off byte-identity claim, measured
+rather than asserted.
+
+The artifact redirect is proven in the same run: `verify-seam` wrote its
+calibration JSON to `scripts/r24-out/fixture-r21-e-red-seam.json` and the
+tracked `scripts/r21-e-red-seam.json` was untouched (`verify-artifact-hygiene`
+5/5, working tree clean).
+
+### 1.1b Node gate inventory (what each is for)
 
 | Gate | Fixture | Live | Notes |
 |---|---|---|---|
@@ -78,20 +110,62 @@ column · *(live)* live column.
 | `verify-boot` | pct monotonic, 100 exactly at reveal | — | — | |
 | `soak-fly --satellite --minutes 15` | p95 tris ≤ 2.2 M, p95 draws ≤ 375, heap no-climb, governor steps ≤ 4 | **UM** | **UM** | reads FRAME_STATS when the flag is on |
 
-### 1.4 Draw ceilings (never re-baselineable)
+### 1.4 THE FIXTURE COLUMN — four poses + the toy leg, SETTLED
 
-| Pose | Ceiling | Fixture column | Live |
+`FLY_TILE_FIXTURE=1 FLY_FINALIZE_BUDGET_K=40 FLY_BOOT_SCALE=6
+FLY_FIXTURE_SETTLE_MS=300000 node -r ./scripts/_pw-shim.js
+scripts/verify-fixture.js` — flag-off tree, tier high, 1280×720, load 4–6.
+**10 passed, 0 failed.**
+
+| Pose | draws | tris | meshes | satBuilding | satSkyline | parcelHomes | terrain tiles | `sb` | settled | maxZ | ground |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Manhattan 40.7075/−74.0113 @792 m | **176** | 344,430 | 211 | 7 | 10 | 0 | 161 | {16, ready 4, empty 0} | **false** @300 s — "12 chunks still draping" | 16 | 14.8 m |
+| Powell 40.1578/−83.0752 @900 m | *(stale)* | 385,393 | 247 | **16** | 0 | **671** | 185 | {16, **ready 16**, empty 0} | **true** in 305 s | **17** | 275.3 m |
+| **Owens 36.6/−118.1 @2600 m** | **184** | 208,987 | 253 | **0** | **0** | **0** | 225 | {16, ready 0, **empty 16**} | **true in 53 s** | 17 | 1128.3 m |
+| **Melton −37.68172/144.574 @700 m** | **153** | 451,149 | 165 | **0** | 0 | **1,836** | 117 | {16, ready 0, **empty 16**} | **true in 154 s** | 14 | 113.9 m |
+| toy / Powell | **91** | 66,500 | 172 | — | — | — | 50 chunks | — | — | — | — |
+
+Boot: satellite **111.9 s** wall, `pct 100` at **47.7 s**; toy **174.4 s**.
+Traffic: **300 tracks**, 76 `/api/aircraft` polls. Zero page errors.
+
+**What each row certifies.**
+
+- **Owens is the lock, and it is cheap.** 0 building, 0 skyline, 0 parcel
+  meshes; all sixteen chunks resolve `empty`, in **53 seconds**. Empty tiles
+  never drape, which is why this and Melton are the two most trustworthy
+  columns this venue produces.
+- **Powell settled COMPLETELY** — sixteen of sixteen chunks ready, terrain at
+  z17, ground 275.3 m against the fixture's true 276.3 m. And parcel homes
+  read **671**, not the 2,992 an unsettled Powell reported earlier: with the
+  buildings resident the two-term anti-duplication finally has a collision
+  index to suppress against. That is the R20 story reproducing.
+- **Melton places 1,836 homes from ZERO footprints** — the R20 carpet, exactly.
+- **Manhattan does not finish in 300 s even on quiet cores at K=40**; the
+  terrain settles (z16, ground converged) but four of sixteen chunks are
+  resident. Its numbers are a FLOOR. Recommendation for a settled Manhattan
+  column: **K=200** (the clamp allows 500) or a 900 s cap.
+
+`draws` at Powell reads `null` because the settle returned "totals stale" —
+`__flyStats` republishes only every 60 frames and the fresh-publish wait timed
+out inside the cap. Not a defect; the gate says so rather than printing the
+previous pose's number.
+
+### 1.4a Draw ceilings (never re-baselineable)
+
+| Pose | Ceiling | Fixture column (settled unless noted) | Live |
 |---|---|---|---|
-| Owens Valley | ≤ 261 | 152 *(flag-off, 1280×720, tier high)* | frozen |
-| satellite | ≤ 375 | Manhattan 110 · Powell 131 · Melton 68 *(flag-off)* | frozen |
-| toy | ≤ 480 | — | frozen |
-| fixed-pose triangles | ≤ 2.0 M | Manhattan 169,552 · Powell 266,114 · Melton 328,079 *(flag-off)* | frozen |
+| Owens Valley | ≤ 261 | **184** | frozen |
+| satellite | ≤ 375 | Melton **153** · Manhattan **176** *(floor)* | frozen |
+| toy | ≤ 480 | Powell **91** | frozen |
+| fixed-pose triangles | ≤ 2.0 M | Melton 451,149 · Powell 385,393 · Manhattan 344,430 · Owens 208,987 | frozen |
 
-**Read those fixture draw numbers with the caveat in `r24-e-cert.md` §1.2b**:
-they were taken with the satellite building chunks still draping, so they are
-a FLOOR, not the settled figure. They also fall under `POST_ORDER` (C measures
-the merged EffectPass count DROPPING: sat 4→3, toy 6→5), so a flag-on column
-reading lower is a decrease, not drift.
+Every one is comfortably inside its live ceiling, but a fixture draw count is
+NOT a live draw count — the fixture's scenes are less dense than the real
+planet's, so these bound nothing on the user's machine. They are a
+**regression baseline for THIS venue**: a flag that adds draws here will show
+up here. They also fall under `POST_ORDER`, where C measures the merged
+EffectPass count DROPPING (sat 4→3, toy 6→5), so a flag-on column reading lower
+is a decrease, not drift.
 
 ---
 
@@ -279,7 +353,24 @@ i.e. their real DPR — so the rungs under test are the rungs they fly on.
 `scripts/r24-user-diag.md`, Parts 0, A and B. **Part A must be run on the
 current build BEFORE any R24 flag flips**, or the round has no before.
 
-### 2.7 What we will still not know afterwards
+### 2.7 The R24 gates, one line each: what they need from the user's machine
+
+| Gate | Runs here? | What the user's machine adds | Command |
+|---|---|---|---|
+| `verify-frame-pace` | instrument only | **everything**: stalls/min, worst dt, p99, >100 ms/min. The pacing legs are not asserted here at all | `FRAME_PACE_STRICT=1 FLY_URL=… node scripts/verify-frame-pace.js` |
+| `verify-flash-guard` | census **yes**, pale detector **no** | the pale frame itself — the live rate was 1 per 1,600 to 1 per 20,389 composed frames, so it needs real frame rate and minutes of banked flying | `FLASH_SERPENTINE_MS=180000 FLY_URL=… node scripts/verify-flash-guard.js` |
+| `verify-step-clean` | mechanism **yes** | the tear LINE, and the ladder the user's DPR actually has (a DPR-1 display has zero DPR rungs) | `STEP_DSF=<their real DPR> FLY_URL=… node scripts/verify-step-clean.js` |
+| `verify-fade` | **yes** | nothing structural; the LOOK of the fade is a taste checkpoint | `FLY_URL=… node scripts/verify-fade.js` |
+| `verify-lod-fade` | **yes** | the LOOK of the crossfade, and whether tile swaps are still visible at real frame rate | `FLY_URL=… node scripts/verify-lod-fade.js` |
+| `verify-one-sun` | **yes** | nothing — the vectors are arithmetic. The LOOK (noon and dusk horizon) is checkpoint 5 | `FLY_URL=… node scripts/verify-one-sun.js` |
+| `verify-env-uniform` | **yes** | the STALL a compile storm costs in ms; the program COUNT is honest here | `FLY_URL=… node scripts/verify-env-uniform.js` |
+| `verify-linear-haze` | **yes** (fixture pixels) | whether the live Esri/OFM colours land in the same band; the fixture bound is a fixture bound | `FLY_URL=… node scripts/verify-linear-haze.js` |
+| `verify-depth-roundtrip` | **yes** | nothing — it is a reconstruction check | `FLY_URL=… node scripts/verify-depth-roundtrip.js` |
+| `verify-shadow-calm` | **yes** | sparkle, which is temporal and needs real frames | `FLY_URL=… node scripts/verify-shadow-calm.js` |
+| `verify-artifact-hygiene.mjs` | **yes**, anywhere | nothing | `node scripts/verify-artifact-hygiene.mjs` |
+| `verify-seam` node leg | **yes**, offline | the LIVE hashes — the fixture column is a different planet | `FLY_URL=… node scripts/verify-seam.js` |
+
+### 2.7b What we will still not know afterwards
 
 - Whether a tear LINE is present — only the user's eyes and a phone camera can
   answer that (a software recorder composites it away).
@@ -319,9 +410,68 @@ harness someone writes:
 
 ## §3 Deviations, honestly
 
-*(filled in at close — every place a run differed from the written recipe, the
-way R19 §4.1 recorded its trimmed sweep)*
+Every place a run differed from the written recipe, the way R19 §4.1 recorded
+its trimmed sweep.
+
+1. **Two harness-only scalers were added mid-round** (`FLY_FINALIZE_BUDGET_K`,
+   `FLY_BOOT_SCALE`) and both are ON for the fixture runs in this sweep. Both
+   are inert without the fixture env and both were sanctioned; §1.5 enumerates
+   which gates may set which. Any fixture number below was taken with the K
+   named in its row.
+2. **The Manhattan fixture column is a FLOOR, not a settled figure.** At K=40
+   with a 300 s cap, four of sixteen building chunks were resident; the settle
+   predicate reported `settled=false — 12 chunks still draping`. The
+   certification run re-takes it at K=200 with a 900 s cap. Do not compare a
+   K=40 Manhattan row with a K=200 one.
+3. **`draws` is `null` in the Powell row.** `__flyStats` republishes only every
+   60 frames, and the fresh-publish wait expired inside the cap; the gate
+   reports "totals stale" rather than printing the previous pose's number.
+4. **Wall-clock numbers here are contended.** Five agents share four cores. The
+   SAME Manhattan pose gave up at z11 of 14 after 427 s at load 15 and reached
+   z16 in 300 s at load 5. Every settle time in this sweep carries its load
+   average; no wall-clock number here is a budget.
+5. **One certification row was VOIDED BY E.** A `ps | grep | kill` loop of mine
+   matched Fable's `verify-fixture` row and killed it 62 s in
+   (`Target page, context or browser has been closed at bootFly`). That `rc=1
+   62s` is not a result. The rule that came out of it — kill only PIDs you
+   spawned, never by pattern, never `fuser -k` on a port that is not yours —
+   applies to every agent and is in `r24-e-cert.md` §5.
+6. **`verify-seam` runs its NODE leg in the smoke with `FLY_URL` unset.** The
+   smoke exports `FLY_URL` for the whole run, and `verify-seam.js:452` reads
+   that as "also run the browser leg", which then `require`s playwright with no
+   shim preload and dies AFTER nine green node gates. The browser leg is a
+   separate row with the shim.
+7. **`verify-frame-pace` and `verify-env-uniform` cannot be green on the
+   flag-off tree by construction**: both read `__flyStats.frame`, which does
+   not exist while `FRAME_STATS.enabled` is false. Their flag-off line
+   ("instrument absent — unmeasurable, not a renderer failure") is the correct
+   calibration output, not a failure to be fixed.
+8. **TWO CERTIFICATION ROWS ARE VOID, BOTH BECAUSE OF E.** The `fixture` row
+   of the first run (killed by my process-pattern kill, `rc=1 62s`) and the
+   `flash-guard` row of the second (`rc=1 601s` — my pale-detector probe raced
+   three for the canvas context and hung the boot; fixed in `cbd7c8a`).
+   `linear-haze` in the same run carries the identical probe bug. None of the
+   three is a result; re-take them from `cbd7c8a`.
+9. **`verify-depth-roundtrip` needs a hook that may not exist yet.** It refuses
+   to reconstruct viewZ with harness-side arithmetic — that would test the
+   harness's copy of the bug — and instead fails loudly with the required
+   signature `window.__flyDepthProbe(x, y) → { viewZ, coc, raw, reversed }`.
+   If C has not published it, the row reads NOT RUNNABLE, not RED.
 
 ## §4 Verdict
 
-*(filled in at close)*
+*(Fable fills this at close. The honest shape it must take, given this venue:)*
+
+- **What this container certified:** every structural, count, census,
+  determinism, source-scan, byte-identity and fixed-pose claim — 15 node gates
+  green on the integrated tree, the worker's output byte-identical across five
+  merges on 149 fixture tiles, the Owens lock and the Melton carpet reproduced,
+  and the flag-off RED calibrated for each new gate.
+- **What it did not, and could not:** every fps, frame-time, stall, governor,
+  tearing and driver claim, and the LOOK of anything on a real GPU over real
+  Esri and OpenFreeMap bytes. Those are §2's user-machine list, and until the
+  user runs it the round has no performance verdict at all — only a structural
+  one.
+- **The round's real RED is still pending**: `scripts/r24-user-diag.md` Part A
+  on the CURRENT build, before any flag flips. Without it there is no before,
+  and "smoother" is an opinion.

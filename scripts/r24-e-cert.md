@@ -527,9 +527,16 @@ refetches → 0/0/0) and `scripts/verify-depth-offset.mjs` (C — RED 6/7 on
 
 ### 3.1 Fixture baseline columns
 
-| Gate | FIXTURE column | Live column | Notes |
-|---|---|---|---|
-| *(pending)* | | | |
+The full table lives in `r24-close-sweep.md` (§1.1 node gates, §1.4 the
+four-pose census, §1.4a draw ceilings, §1.4b the seam node leg) so there is one
+place to read it. The headline entries:
+
+| Gate | FIXTURE column | Live column |
+|---|---|---|
+| 15 node gates | **all green** on the integrated tree; `SMOKE_NODE_ONLY=1` runs them in 13 s | n/a — hardware-independent |
+| `verify-seam` node leg | 9/9 · 149 z14 tiles · Owens hatchKept **0** · manhattan kept 311 `8d36f2aa:89218640:13605` · columbus kept 193 `2eefc447:49bbe703:8715` — **unchanged across all five merges** | the five R18 hashes stay frozen |
+| `verify-fixture` | 10/10 · Owens draws **184**, 0 building/skyline/parcel · Powell 16/16 chunks ready, 671 parcel homes · Melton **1,836** homes from zero footprints · toy draws **91** | n/a |
+| draw ceilings | Owens 184 ≤ 261 · Melton 153 / Manhattan 176 ≤ 375 · toy 91 ≤ 480 | frozen; a fixture draw bounds nothing live |
 
 ### 3.2 New gates, RED first
 
@@ -546,19 +553,6 @@ refetches → 0/0/0) and `scripts/verify-depth-offset.mjs` (C — RED 6/7 on
 | verify-linear-haze | | — | pending |
 | verify-depth-roundtrip | RED by construction (recon L2 / FL-07) | — | pending |
 | verify-frame-pace | **user machine only** | — | pending |
-
----
-
-## §4 Could not measure here (kept honest, per item)
-
-| Claim | Why not | Where it must be measured |
-|---|---|---|
-| any fps / frame-ms / p99 / stalls-per-minute | SwiftShader, ~1 fps under load | user's machine |
-| governor behaviour (steps, dwell, latch) | the ladder collapses instantly at 1 fps; the fleet pins it to `hold` | user's machine or a GPU runner |
-| tearing (a real tear line) | a compositor/vsync property; no JS timer or screenshot can see it. Only the MECHANISM is assertable here | user's machine (a phone camera beats a software recorder for this) |
-| boot wall time as a BUDGET | 48.7 s here is a SwiftShader number, not a regression signal | user's machine |
-| live tileset drift, live traffic | hosts 403-blocked | user's machine |
-| GPU-driver artifacts (precision, aniso, half-float) | one software rasteriser only | user's machine |
 
 ---
 
@@ -584,6 +578,25 @@ Two lessons, both now in the gates:
 
 ---
 
+---
+
+## §4 Could not measure here (kept honest, per item)
+
+| Claim | Why not | Where it must be measured |
+|---|---|---|
+| any fps / frame-ms / p99 / stalls-per-minute | SwiftShader, ~1 fps under load | user's machine |
+| governor behaviour (steps, dwell, latch) | the ladder collapses instantly at 1 fps; the fleet pins it to `hold` | user's machine or a GPU runner |
+| tearing (a real tear line) | a compositor/vsync property; no JS timer or screenshot can see it. Only the MECHANISM is assertable here | user's machine (a phone camera beats a software recorder for this) |
+| boot wall time as a BUDGET | 48.7 s here is a SwiftShader number, not a regression signal | user's machine |
+| live tileset drift, live traffic | hosts 403-blocked | user's machine |
+| GPU-driver artifacts (precision, aniso, half-float) | one software rasteriser only | user's machine |
+| the one-frame PALE FRAME itself | probabilistic: the live rate was 1 per 1,600 to 1 per 20,389 composed frames, and this venue renders 1–3 per second. The DEGENERATE CENSUS is deterministic and is what decides `verify-flash-guard`; the pale detector is informational here | user's machine, ≥ 3 min of banked serpentine |
+| a settled MANHATTAN building column | 16 dense chunks × ~400 full-quadtree raycasts each; not finished in 300 s at K=40 even on quiet cores. K=200 / 900 s is the recommendation, and it is a venue cost, not a defect | here, with a longer cap — or the user's machine in seconds |
+| the LOOK of anything | SwiftShader is bit-stable, so a fixture pixel A/B is sound — but it is a picture of the FIXTURE's planet, not of Esri's | user's machine |
+| whether a fixture bound transfers | the fixture's scenes are less dense than the real planet's, so a fixture draw/tri number bounds nothing live. It is a regression baseline FOR THIS VENUE | user's machine |
+
+---
+
 ## §5 Open risks
 
 1. **SwiftShader determinism is bit-stable at a fixed pose, but the SCENE is
@@ -603,7 +616,30 @@ Two lessons, both now in the gates:
 4. **`FIXTURE_REV` discipline.** A stale server on 3199 serving a previous
    payload revision to another agent's gate is the one way this fixture can
    lie. The rev check makes that loud; it only works if the rev is bumped.
-5. **The tile cache.** `TILE_PIPELINE.cache` is a persistent Cache API store.
+5. **Two process-hygiene incidents, both mine, both the same root.** A
+   `pkill -f "<pattern>"` killed my own shell (the pattern appeared in the
+   shell's own command line); later a `ps | grep | kill` loop on
+   `verify-fixture` killed **Fable's certification run**, because their row's
+   command line contains the same script name. In a container five agents
+   share, a process-NAME pattern is not an identity. The rule that came out of
+   it, now standing for every agent: kill only PIDs you spawned yourself, never
+   by pattern, never `fuser -k` on a port that is not yours.
+6. **An instrument must never be the FIRST to ask for a resource the subject
+   owns.** Three incidents this round, all mine, all the same shape:
+   - `INSTALL_PALE` polled `canvas.getContext('webgl2')` from page load. A
+     canvas has ONE context and the first caller decides its attributes; the
+     probe raced three for it, and when it won, the app's renderer got a
+     context it never asked for and **the boot never completed** — a 601 s
+     timeout on an idle machine, in a certification row.
+   - `verify-seam`'s offline leg wrote its calibration JSON to the path R21's
+     tracked live-tileset record occupies.
+   - a `ps | grep | kill` loop killed another agent's certification process
+     because the pattern matched its command line.
+   In each case the harness reached for something the app — or another agent —
+   already had. The three defences are: read the renderer's own handle
+   (`window.__flyGl.getContext()`), redirect artifact writes at the fs level
+   plus an outcome gate, and kill only PIDs you spawned.
+7. **The tile cache.** `TILE_PIPELINE.cache` is a persistent Cache API store.
    Fresh Playwright contexts get fresh storage, so gates are unaffected — but a
    long-lived context that changes `FIXTURE_REV` mid-run would serve stale
    bodies from the browser's own cache.
