@@ -12,6 +12,38 @@
  * the visibility toggle (Δ 1–15); (6) the POI letter floats above the
  * monument top (satellite letters lift now — round 11); (7) draws ≤ 480,
  * zero page/console errors. ALWAYS eyeball the screenshots.
+ *
+ * ── ROUND 24 (C LIGHT) — THE SANCTIONED EVOLUTION, SPENT ADDITIVELY ──────
+ * This harness is FROZEN, and ONE_SUN moves satellite monuments from MeshToon
+ * to MeshLambert (recon L3 fix 2; it is also what closes the R20 §5b.4 Taj
+ * night residual, whose own diagnosis was "the excess is the satellite night
+ * key itself — MeshToonMaterial takes no envMap"). Reading all of the above
+ * first: NONE of the eleven existing gates asserts anything about the
+ * material. They are pool mounts, placement distance, raw-DEM height, letter
+ * lift, a Δdraws budget and the draw ceiling — every one of which the swap
+ * leaves numerically unmoved (same draw count, same instancing, same geometry,
+ * same anchor bend). So the sanction is NOT spent moving a number. It is spent
+ * ADDING the material contract this harness never had:
+ *
+ *   (8)  the satellite monument material is MeshLambert with vertexColors
+ *   (9)  it is a class three r185 gives `scene.environment` to, and the scene
+ *        actually has one — which IS the mechanism (WebGLPrograms.js:60-63
+ *        lists Standard/Lambert/Phong and nothing else), not a proxy for it
+ *   (10) the marquee batch and the procedural archetypes are the SAME material
+ *        class — the R20 interchangeability invariant, never previously pinned
+ *
+ * Gates 8–10 are RED on a flag-off tree (MeshToonMaterial, which takes no
+ * envMap and is a different class from nothing else, since flag-off makes both
+ * representations Toon and gate 10 passes trivially — see its comment).
+ *
+ * The fourth contract C's ledger describes — "toy monuments are still MeshToon
+ * with their 3-step ramp" — deliberately does NOT live here. This harness boots
+ * SATELLITE, and flipping style at the end to check the other one would add a
+ * remount to a gate whose eleven frozen numbers are the point. It is a claim
+ * about an UNREACHABLE BRANCH, and a node structural gate proves unreachability
+ * better than a browser gate proves absence: it is asserted in
+ * `scripts/verify-c-flagoff.mjs`, which also carries the RED/GREEN calibration
+ * for gates 8–10 (see §"monument material contract" there).
  */
 const { chromium } = require('playwright');
 const path = require('path');
@@ -67,6 +99,51 @@ const monumentProbe = (lm) => {
     distM,
     demElev: ground ? ground.elev : null,
     slots: (f.poiSlots ?? []).map((p) => p.name),
+  };
+};
+
+/**
+ * Round 24 (C LIGHT): the MATERIAL probe. Deliberately a SECOND function rather
+ * than extra fields on `monumentProbe` — that probe's return shape feeds the
+ * eleven frozen gates, and the cheapest way to keep them frozen is not to touch
+ * it. Reads the live materials off the scene graph: the archetypes are the
+ * `landmark-*` InstancedMeshes the frozen probe already finds, and the marquee
+ * is the single merged mesh named `monument-marquee` (MonumentModels.jsx:400),
+ * which the frozen probe skips because it filters on `isInstancedMesh`.
+ */
+const materialProbe = () => {
+  const f = window.__fly;
+  let root = f.engine.object;
+  while (root.parent) root = root.parent;
+  const read = (m) =>
+    m
+      ? {
+          type: m.type,
+          vertexColors: m.vertexColors === true,
+          hasGradientMap: !!m.gradientMap,
+          reflectivity: typeof m.reflectivity === 'number' ? m.reflectivity : null,
+        }
+      : null;
+  let archetype = null;
+  let marquee = null;
+  let archetypeName = null;
+  root.traverse((o) => {
+    if (!archetype && o.isInstancedMesh && /^landmark-/.test(o.name) && o.name !== 'landmark-halo') {
+      archetype = read(o.material);
+      archetypeName = o.name;
+    }
+    if (!marquee && o.name === 'monument-marquee') marquee = read(o.material);
+  });
+  return {
+    archetype,
+    archetypeName,
+    marquee,
+    // `scene.environment` is the OTHER half of "takes the IBL": the class
+    // decides whether three WOULD apply one, the scene decides whether there
+    // is one to apply. Both are required and both are asserted.
+    sceneEnvironment: !!root.environment,
+    envMapClasses: ['MeshStandardMaterial', 'MeshLambertMaterial', 'MeshPhongMaterial'],
+    oneSun: window.__flyStats?.sun?.oneSun === true,
   };
 };
 
@@ -197,6 +274,40 @@ const monumentProbe = (lm) => {
   }));
   console.log(`draws ${s.draws} · heap ${s.heapMB}MB`);
   gate('draw budget (≤ 480)', (s.draws ?? 0) <= 480, `draws=${s.draws}`);
+
+  // ---- Round 24 (C LIGHT): the material contract, added not moved ---------
+  // Placed AFTER every frozen gate and after the screenshots, so nothing above
+  // can be perturbed by anything below.
+  const mp = await page.evaluate(materialProbe);
+  console.log('material probe:', JSON.stringify(mp));
+  const ENVMAP_OK = (t) => mp.envMapClasses.includes(t);
+  gate(
+    'satellite monument material is MeshLambert with vertexColors',
+    mp.archetype?.type === 'MeshLambertMaterial' && mp.archetype?.vertexColors === true,
+    `${mp.archetypeName}: ${mp.archetype?.type} vertexColors=${mp.archetype?.vertexColors}`
+  );
+  gate(
+    'satellite monument material takes scene.environment',
+    !!mp.archetype && ENVMAP_OK(mp.archetype.type) && mp.sceneEnvironment,
+    // The mechanism, not a proxy for it: three r185 applies scene.environment
+    // to Standard/Lambert/Phong and to nothing else (WebGLPrograms.js:60-63),
+    // so a Toon monument was lit by the single directional and nothing else
+    // while every building beside it took the HDRI.
+    `class=${mp.archetype?.type} scene.environment=${mp.sceneEnvironment}`
+  );
+  gate(
+    'marquee and archetype monuments are the SAME material class',
+    // The R20 interchangeability invariant: a marquee model and the procedural
+    // archetype it replaces must read as the same object. This passes trivially
+    // on a flag-off tree (both are Toon) — it is here to catch a FUTURE change
+    // that moves one representation and forgets the other, which is exactly
+    // what R20 §5b.4 describes happening to the Taj.
+    mp.marquee === null || mp.marquee.type === mp.archetype?.type,
+    mp.marquee === null
+      ? 'marquee not mounted at this pose (archetype-only) — vacuous, not asserted'
+      : `marquee=${mp.marquee.type} archetype=${mp.archetype?.type}`
+  );
+
   gate('zero page/console errors', errs.length === 0, errs.slice(0, 3).join(' | '));
 
   console.log(fails.length ? `VERIFY: FAIL (${fails.join(', ')})` : 'VERIFY: PASS');
