@@ -688,6 +688,56 @@ testable — rather than a red. If `faded` is 0 while `skip.boot` and
 `skip.warp` are both 0 and `refines + merges > 0`, that is a genuine RED
 against D's code and I want it.
 
+## §4.10b THE RE-TAKE GO/NO-GO — mechanical, decided before the numbers land
+
+Written ahead of the row on purpose. A criterion invented after seeing the
+measurement is not a criterion. Every line below is evaluated on the re-take's
+`verify-lod-fade.js` output; if the conditions hold, `LOD_CROSSFADE.enabled`
+flips to `true` in a one-line commit and §4.9 changes to SHIPPED ON.
+
+**PRECONDITIONS — if any fails, the run is NOT CALIBRATED and decides nothing.**
+
+| # | condition | source |
+|---|---|---|
+| P1 | `(9)` no pace pin on either page — both arms on the shipped `TERRA_PACE` | otherwise the two columns describe two different streamers |
+| P2 | `(10)` `skip.disabled === 0` on the ON arm | the pin reached the ladder |
+| P3 | `(12)` `skip.shape` = `skip.noParentMap` = `skip.unpatched` = 0 | `unpatched` in particular means the pin landed after patching |
+| P4 | `(11)` ON `refines + merges > 0` **and** OFF `refines + merges > 0` | both arms were offered swaps |
+| P5 | arc ≥ `MIN_ARC_DEG` on both arms, and `framesON / framesOFF` ∈ [0.75, 1.25] | the comparison is controlled; pass 2b was 0.57 and its matching `refines` was luck |
+| P6 | `(18)` both arms reached `settleWorld` | equality across an unsettled scene is a race with the streamer |
+
+**FLIP CONDITIONS — all six, on a run whose preconditions held.**
+
+| # | condition | why this and not something else |
+|---|---|---|
+| F1 | `refines + merges === hardSwaps + faded` on **both** arms | the ladder's own bookkeeping; if it fails every number below is suspect |
+| F2 | `refines + merges` **equal** OFF vs ON | the crossfade may only blend the swaps the quadtree already makes; changing the COUNT means it moved the streamer, which is A's flag |
+| F3 | `faded` (ON, in-window delta) **> 0** and `hardSwaps` (ON) **< `hardSwaps` (OFF)** | the mass moved. `faded > 0` IN THE WINDOW is the proof — with `skipBootMs: 0` the boot fades too, so `peakActive` is not evidence |
+| F4 | `(5-ON)` `maxBlendRun >= 2`, and **reported against 5** | 0.25 s of fade clock is ≥ 5 rendered frames at ANY fps (the −50 dt clamp), so a run under 5 means the sweep ended mid-blend, not that the blend was short |
+| F5 | at the drain snapshot: `active === 0`; and **NOT** (`active === 0 && retained > 0`) on **both** reads; and on the second read, `active > 0` only with `refines + merges` advanced (arrivals), never flat (stuck); and `retained <= active <= 4 × retained` while `merges === 0` | the leak signature is `active === 0 && retained > 0` and nothing else — `finish()` releases every owned texture before deleting from `_active`, so a retained texture with nothing active cannot be in-flight work |
+| F6 | `(18)` Owens ON draws **and** tris **equal** the OFF arm, and `(19)` zero pageerrors on both | neither feature adds a mesh; equality is the assertion, not the ≤ 261 live ceiling |
+
+**WHAT A GREEN ROW WILL AND WILL NOT HAVE PROVEN.** It proves the REFINE path:
+armed, blending, bounded, draining, leak-free, at no cost in draws or triangles
+at the empty control. It does **not** prove the merge path — `merges` is 0 at
+every pose measured (D's ladder 0, A's sweep 1, pass 2b 0) because
+`keepResident` removed the frustum-exit merges by design, and forcing them
+would mean measuring `keepResident: false`, a tree that does not ship. The
+merge path stays **structurally gated only**: `verify-lod-fade.mjs` asserts the
+hunk placement, the `_loadState` hold across the await and the flag-off byte
+identity, and the mechanism is the refine machinery run backwards on the same
+uniform, sampler, clip-UV transform and clock. When the call is made it will
+say *the refine path is measured and the merge path is inferred from shared
+machinery* — the inference is strong, but it is an inference and gets the
+weaker word.
+
+**And what no fixture row can settle**, so it goes to the user's machine
+regardless of the verdict: whether a 250 ms blend reads as smooth or as mush at
+60 or 144 Hz, and whether the crossfade removes the reported "terrain tiles
+swapping" or merely leaves the relief snap a texture blend cannot morph
+(§3.2 — above `demMaxZoom` 15 the geometry is a crop of the z15 DEM and the
+blend covers the swap completely; below it the surface genuinely moves).
+
 ## §4.11 A gate must not assert what another owner ships
 
 Found by Fable's dry-run merge of all five flipped branches. Three of D's key
