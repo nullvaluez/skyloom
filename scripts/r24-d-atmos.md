@@ -620,7 +620,7 @@ is the un-blended SHARE of the events.
 |---|---|---|
 | 1 | `refines + merges` **flat** OFF→ON | the feature must not change how often the LOD refines — only whether the swap is blended |
 | 2 | `hardSwaps` **drops** toward 0; `faded` **rises** | a flat `hardSwaps` would mean the feature did nothing |
-| 3 | `active === 0` **and** `retained === 0`, reached by **polling to the condition** with a frame cap (NOT a fixed frame count — see below) | every blend completed and every retained parent texture was released; `retained > 0` at rest is a texture LEAK and is the most valuable thing this leg can catch |
+| 3 | `active === 0` **and** `retained === 0`, reached by **polling until `active === 0`, cap 90 rendered frames, reporting the frames it took** (NOT a fixed frame count — see below) | every blend completed and every retained parent texture was released; `retained > 0` at rest is a texture LEAK and is the most valuable thing this leg can catch |
 | 4 | `0 < peakActive <= 32` | blends actually ran, and the bound held |
 | 5 | `skip.concurrency` read **together with** `peakActive` | `> 0` with `peakActive === 32` is the bound doing its job (report); `> 0` with `peakActive < 32` is a bug in D's accounting (fail) |
 | 6 | `skip.shape`, `skip.noParentMap`, `skip.unpatched` all **0** | each is a real defect: the 2-child z0/4326 path, a parent with no map, materials not patched at arm time |
@@ -652,8 +652,11 @@ arithmetic breaks the warp settle: 900 fade-ms is 18 frames here but **54 at
 60 fps and ~130 at 144 Hz**, so a fixed 20 clears the cut only at this venue.
 
 **The rule, replacing both counts: poll to the CONDITION with a frame cap, and
-report the frames it took.** `active === 0` for the drain; `skip.warp`
-unchanged across two consecutive reads for the warp settle. That is
+report the frames it took.** For the drain, poll until **`active === 0`, cap 90
+rendered frames**, and print the frames consumed. For the warp settle, poll
+until **`skip.warp` is unchanged across two consecutive reads** — 90 covers
+250 fade-ms at any frame rate down to ~2.8 ms/frame, and printing the count is
+what turns a slow drain into a diagnosis instead of a mystery. That is
 fps-independent, it absorbs a blend armed by streaming during the drain, and it
 is the only form that survives moving to the user's machine — which is where
 every timing claim of this round has to end up. Any fixed frame count in a
