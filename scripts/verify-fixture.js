@@ -44,52 +44,71 @@ const PIN_POSE = ([lat, lon, altM, heading, pitch]) => {
 };
 
 /**
- * The scene root is reached through the fleet's own idiom (verify-aerial:107).
- * Draw/triangle totals come from `window.__flyStats`, which FlyScene republishes
- * every 60 frames — at SwiftShader's ~1 fps that is once a minute, so the
- * caller NULLS the field first and waits for a fresh number rather than
- * sleeping and hoping (a stale total would describe the previous pose).
+ * The census reads the ENGINE HANDLES rather than guessing at mesh names:
+ * `window.__satBuildings.object` is named 'sat-buildings'
+ * (sat-building-engine.js:304) and `__satSkyline.object` 'sat-skyline'
+ * (:121), but their per-chunk children are unnamed, so a name scan over the
+ * scene finds nothing. Draw/triangle totals come from `window.__flyStats`,
+ * which FlyScene republishes every 60 frames (FlyScene.jsx:1737) — at
+ * SwiftShader's ~1 fps that is once a minute, so the caller NULLS the field
+ * first and waits for a fresh number rather than sleeping and hoping.
  */
 const CENSUS = () => {
+  const drawable = (o) => o.isMesh || o.isInstancedMesh || o.isPoints || o.isLine;
+  const countIn = (root) => {
+    let n = 0;
+    root?.traverse?.((o) => {
+      if (drawable(o) && o.visible) n++;
+    });
+    return n;
+  };
   let scene = window.__flyPlayer ?? window.__fly?.engine?.object ?? null;
   while (scene && scene.parent) scene = scene.parent;
-  const counts = {
-    satBuilding: 0,
-    satSkyline: 0,
-    satRoads: 0,
-    satVeg: 0,
-    parcel: 0,
-    toyChunk: 0,
-    tile: 0,
-  };
   let meshes = 0;
   scene?.traverse((o) => {
-    if (!o.isMesh && !o.isInstancedMesh && !o.isPoints && !o.isLine) return;
-    meshes++;
-    const n = (o.name || '') + '|' + (o.parent?.name || '');
-    if (n.includes('sat-building') || n.includes('satbldg')) counts.satBuilding++;
-    else if (n.includes('skyline')) counts.satSkyline++;
-    else if (n.includes('sat-road') || n.includes('satroad')) counts.satRoads++;
-    else if (n.includes('veg') || n.includes('canopy') || n.includes('tree')) counts.satVeg++;
-    else if (n.includes('parcel') || n.includes('home')) counts.parcel++;
-    else if (n.includes('chunk')) counts.toyChunk++;
-    else if (n.includes('tile') || o.isTileMesh) counts.tile++;
+    if (drawable(o)) meshes++;
   });
   const st = window.__flyStats || {};
   return {
     draws: st.drawCalls ?? null,
     tris: st.triangles ?? null,
     meshes,
-    counts,
-    sb: window.__satBuildings?.stats ?? null,
-    sky: window.__satSkyline?.stats ?? null,
-    veg: window.__satVeg?.stats ?? null,
+    counts: {
+      satBuilding: countIn(window.__satBuildings?.object),
+      satSkyline: countIn(window.__satSkyline?.object),
+      satVeg: countIn(window.__satVeg?.object ?? window.__satVeg?.group),
+      parcel: st.parcelHomes?.placed ?? 0,
+      toyChunk: countIn(window.__toyWorld?.object ?? window.__fly?.engine?.object),
+    },
+    sb: window.__satBuildings?.stats
+      ? { chunks: window.__satBuildings.stats.chunks, ready: window.__satBuildings.stats.ready, empty: window.__satBuildings.stats.empty }
+      : null,
+    sky: window.__satSkyline?.stats
+      ? { chunks: window.__satSkyline.stats.chunks, ready: window.__satSkyline.stats.ready }
+      : null,
+    tier: window.__flyStore?.getState?.().qualityTier ?? null,
+    remounts: st.sceneRemounts ?? null,
     traffic: st.traffic ?? window.__fly?.traffic?.size ?? null,
   };
 };
 
-/** Force a fresh 60-frame stats publish, then census. */
-async function census(page, settleMs) {
+/**
+ * Pin a pose and census it.
+ *
+ * `runtime.warpToGeo` is NULLED on FlyScene's effect cleanup (FlyScene.jsx:745)
+ * and re-registered on the next run, so any remount leaves a window in which
+ * it is not a function. Waiting for it (rather than calling it blind) is the
+ * difference between a gate that measures the world and a gate that reports
+ * "warpToGeo is not a function". MEASURED here: editing a source file while a
+ * browser gate runs triggers exactly that remount through Next's HMR — do not
+ * edit during a run (the R13 lesson, re-learned).
+ */
+async function pose(page, p, settleMs) {
+  await page.waitForFunction(() => typeof window.__fly?.warpToGeo === 'function', undefined, {
+    timeout: 120000,
+    polling: 250,
+  });
+  await page.evaluate(PIN_POSE, p);
   await page.waitForTimeout(settleMs);
   await page.evaluate(() => {
     if (window.__flyStats) window.__flyStats.drawCalls = null;
@@ -159,9 +178,9 @@ function gate(name, ok, detail) {
 
   const settle = Number(process.env.FLY_FIXTURE_SETTLE_MS || 60000);
   const scenes = {};
-  for (const [name, pose] of Object.entries(POSES)) {
+  for (const [name, pose_] of Object.entries(POSES)) {
     await page.evaluate(PIN_POSE, pose);
-    scenes[name] = await census(page, settle);
+    scenes[name] = await pose(page, pose_, settle);
     console.log(`  ${name.padEnd(10)} draws=${scenes[name].draws} tris=${scenes[name].tris} meshes=${scenes[name].meshes} counts=${JSON.stringify(scenes[name].counts)} sb=${JSON.stringify(scenes[name].sb)}`);
   }
 
@@ -190,8 +209,7 @@ function gate(name, ok, detail) {
   await bootFly(page2, { style: 'toy', timeoutMs: 600000, settleMs: 8000 });
   const toyBootMs = Date.now() - t1;
   await page2.evaluate(() => window.__flyStore.getState().setQualityTier('high'));
-  await page2.evaluate(PIN_POSE, POSES.powell);
-  const toy = await census(page2, settle);
+  const toy = await pose(page2, POSES.powell, settle);
   console.log(`  toy/powell draws=${toy.draws} tris=${toy.tris} meshes=${toy.meshes} counts=${JSON.stringify(toy.counts)}`);
   gate('(9) TOY BOOTS ON THE FIXTURE — the vector chunk pipeline finalises chunks',
     toy.counts.toyChunk > 0 || toy.tris > 20000,

@@ -225,6 +225,33 @@ const UNPIN_GOVERNOR = () => {
         heapMB: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null,
         rebases: window.__flyStats?.rebases ?? 0,
         maxRebaseMs: window.__flyStats?.maxRebaseMs ?? 0,
+        // Round 24 (E CERT): the in-app instrument, when FRAME_STATS is on.
+        // The private `window.__soak` rAF collector above STAYS — it is the
+        // fallback, it is what every R20/R21 number was measured with, and
+        // the R21 quartet must stay green with the flag off. This key is
+        // simply absent (null) then, so soak-results.json keeps its key set
+        // shape and no existing assertion can see a difference.
+        frame: window.__flyStats?.frame?.sample
+          ? (() => {
+              const f = window.__flyStats.frame.sample();
+              const out = {
+                p50: +f.p50.toFixed(2),
+                p95: +f.p95.toFixed(2),
+                p99: +f.p99.toFixed(2),
+                worstDt: +f.worstDt.toFixed(1),
+                long33PerMin: f.long33PerMin,
+                long100PerMin: f.long100PerMin,
+                stallsPerMin: f.stallsPerMin,
+                stallThresholdMs: +f.stallThresholdMs.toFixed(1),
+                longtasks: f.longtasks,
+                programs: f.programs,
+                programsDelta: f.programsDelta,
+                lastStall: f.lastStall,
+              };
+              window.__flyStats.frame.reset();
+              return out;
+            })()
+          : null,
         // Round 21: satellite-mode telemetry ONLY. Spread in under the flag so
         // the toy sample object — and therefore soak-results.json — keeps
         // exactly the R20 key set.
@@ -255,7 +282,10 @@ const UNPIN_GOVERNOR = () => {
     samples.push(s);
     console.log(
       `[${Math.round((Date.now() - t0) / 60000)}m] p50 ${s.p50}ms p95 ${s.p95}ms draws ${s.drawCalls} tris ${s.triangles} traffic ${s.traffic} heap ${s.heapMB}MB` +
-        (SAT ? ` tier ${s.tier} gov ${s.govSteps} sb ${s.sb?.ready}/${s.sb?.chunks}` : '')
+        (SAT ? ` tier ${s.tier} gov ${s.govSteps} sb ${s.sb?.ready}/${s.sb?.chunks}` : '') +
+        (s.frame
+          ? ` | FRAME p99 ${s.frame.p99}ms worst ${s.frame.worstDt}ms stalls/min ${s.frame.stallsPerMin} long100/min ${s.frame.long100PerMin} prog+${s.frame.programsDelta}`
+          : '')
     );
   }
 
