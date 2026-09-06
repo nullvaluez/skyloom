@@ -31,10 +31,29 @@
 // worktree (its own .next) on a free port and pass FLY_URL.
 const BOOT_URL = process.env.FLY_URL || 'http://localhost:3000';
 
+// Round 24 (E CERT, SANCTIONED harness edit — the ONE env-guarded branch this
+// file gains). With FLY_TILE_FIXTURE set, every gate boots against the OFFLINE
+// WORLD FIXTURE (scripts/r24-fixture/) instead of Esri + OpenFreeMap + adsb,
+// which this container 403-blocks (recon HARN-ENV-2, measured). With the env
+// UNSET this file behaves byte-identically to R21 — the require is lazy and
+// nothing below runs.
+const { attachFixture, fixtureEnabled, fixturePin } = require('./_fixture');
+
 async function bootFly(
   page,
   { style = null, url = BOOT_URL, timeoutMs = 180000, settleMs = 2500 } = {}
 ) {
+  // Round 24 (E CERT): the fixture, when asked for. attachFixture installs the
+  // Playwright routes for OpenFreeMap / Esri imagery / /api/aircraft /
+  // /api/weather; the init script below hands the app the DEM source
+  // (lib/fly/tile-sources.js reads window.__flyTileFixture, weather-model
+  // idiom). Both are no-ops without the env var.
+  if (fixtureEnabled()) {
+    const fx = await attachFixture(page);
+    await page.addInitScript((pin) => {
+      window.__flyTileFixture = pin;
+    }, fixturePin(fx.url, Number(process.env.FLY_FIXTURE_DEM_MAXZOOM || 15)));
+  }
   await page.addInitScript((s) => {
     // Round 16 (SANCTIONED harness edit): pin the LIVE WEATHER off for the
     // whole browser fleet. Every satellite harness now flies under a real sky
