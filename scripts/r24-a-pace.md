@@ -787,13 +787,37 @@ OpenFreeMap / adsb.lol are 403-blocked.
 | 5 | Draw counts at the settled canonical poses with the residency trio ON | E's fixture |
 | 6 | Whether `bendSphere` (T14) can be enabled inside Owens ≤ 261 / sat ≤ 375 | E's fixture |
 | 7 | Stalls/min and felt smoothness of the residency trio | User's machine (`__flyTerraPaceOverride` A/B) |
-| 8 | Whether a WRONG tile (cache/URL mix-up) is also in play, as distinct from LOD policy | E's z/x/y-stamped fixture + my URL↔position probe in `verify-terra-live.js` |
+| 8 | Whether a WRONG tile (cache/URL mix-up) is also in play, as distinct from LOD policy | **ANSWERED on the fixture** — see below |
 | 9 | `skirtWorker` end to end — the production LERC path builds geometry in a worker; the fixture's terrain-rgb loader builds on the MAIN thread, so the patched path is never reached here | User's machine (Esri egress) |
 | 10 | Whether `walkWhileSaturated`'s 2.5× traversal is invisible in a real frame budget | User's machine |
 | 11 | Whether `FINALIZE_PACE` removes a FELT hitch (the rule's shape is proven; the frame time is not) | User's machine, via E's FRAME_STATS long-frame count |
 | 12 | `HUD_SYNC`: that the label swim is gone in a turn — it is a visual | User's machine |
 | 13 | `REBASE_CALM` T12: that the micro-grain no longer re-phases at a rebase | User's machine |
 | 14 | `FRAME_STEP`'s consumer opt-in: that a render-pose consumer still lands on a harness-pinned `flight.pos` | A machine that can run the fleet (see §8c) |
+
+**Row 8 — ANSWERED on the fixture (pass 1, arm A, Fable's run):** 64 resident
+tiles, **0/62 URL mismatches, 0/64 position mismatches** with `TERRA_PACE` off.
+No resident tile was displaying imagery from another tile's address, so a cache
+or URL mix-up is NOT producing the "tiles swapping for other ones" symptom in
+the code path, and the LOD-policy attribution in §3 does not rest on an
+unexamined alternative.
+
+Two limits, so the result is read at the strength it carries:
+
+1. **The fixture serves deterministic bytes per (z,x,y); Esri does not.** The
+   finding in §3 is that a merge REPLACES four children with a coarser parent.
+   Against the fixture that parent is consistent imagery, so the swap reads as a
+   resolution change. On the user's machine it is a DIFFERENT CAPTURE — other
+   season, other sun, sometimes visibly different colour. This probe cannot see
+   that class at all, because the URL and the position are both correct and only
+   the pixels differ. It is still LOD policy and it does not change the fix, but
+   it is why the symptom reads more violently on their screen than any fixture
+   number will ever show. **The live-capture variant remains a user-machine
+   item.**
+2. **The denominator is 62, not 64.** The probe only tests tiles whose material
+   already carries a map; the two without a URL were skipped SILENTLY, and those
+   are the mid-load tiles — the likeliest moment for a mismatch if one existed.
+   Not a reason to doubt the result, but the honest figure.
 
 **The one thing I attempted here and could not finish:** the satellite fixture
 A/B in `scripts/verify-terra-live.js` (the content probe + the live draw

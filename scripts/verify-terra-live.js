@@ -24,6 +24,14 @@
  *
  * Every number here is a COUNT. This container renders on SwiftShader at ~1 fps,
  * so nothing about frame time is measured or claimed.
+ *
+ * TODO WHEN THIS IS NEXT TOUCHED (no code change now — the gate is mid-
+ * certification): the content probe SILENTLY SKIPS tiles whose material has no
+ * map yet, so its "0 mismatches" is over the tiles it could test, not over the
+ * resident set. Pass 1 measured 0/62 URL against 64 resident tiles, and the two
+ * it skipped were mid-load — the likeliest moment for a mismatch if one
+ * existed. Count the skipped tiles and report them beside the total, so the
+ * denominator is visible in the output rather than only in the ledger.
  */
 const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
