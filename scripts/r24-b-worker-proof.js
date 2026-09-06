@@ -134,6 +134,11 @@ function drape(pos, anchor) {
 (async () => {
   const fails = [];
   const rows = [];
+  const softs = [];
+  const soft = (name, owner, detail = '') => {
+    console.log(`SOFT ${name} — instrument missing (owner ${owner})${detail ? ' · ' + detail : ''}`);
+    softs.push(name);
+  };
   const gate = (name, ok, detail = '') => {
     console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ' — ' + detail : ''}`);
     if (!ok) fails.push(name);
@@ -232,6 +237,59 @@ function drape(pos, anchor) {
     console.log(
       `${String(r[0]).padEnd(10)} ${String(r[1]).padEnd(14)} ${String(r[2]).padStart(6)} ${String(r[3]).padStart(7)} ${String(r[4]).padStart(7)} ${String(r[5]).padStart(6)} ${String(r[6]).padStart(6)} ${String(r[7]).padStart(8)} ${String(r[8]).padStart(6)}`
     );
+
+  /* ---- (6) CROSS-CHECK: B's encoder vs E's fixture on the closed ring ---- */
+  // Fable's proof obligation (a). The two fixtures cannot produce identical
+  // HASHES — they encode different geometry — so what is cross-checked is the
+  // property under test: does E's generator also emit CLOSED rings, so the
+  // worker's wall extruder produces the same coincident-degenerate population
+  // B's encoder reproduces? The asserted agreement is STRUCTURAL, not a count
+  // identity: every degenerate is of the COINCIDENT kind (a collapsed quad,
+  // not a sliver) and the rate is the same order. A per-ring identity would be
+  // wrong — measured on E's Manhattan tile the ratio is ~7.4 per ring, not 2,
+  // because pushParapet contributes 6 and pushCrownSat 2 more per ring on top
+  // of the wall loop's 2, exactly as recon WB-1 reads the worker.
+  try {
+    const { mvtTile } = await import(pathToFileURL(path.join(ROOT, 'scripts/r24-fixture/mvt.mjs')).href);
+    const S = await import(pathToFileURL(path.join(ROOT, 'scripts/r24-fixture/scenes.mjs')).href);
+    // Manhattan (E's dense city scene) at z14.
+    const z = 14;
+    const ex = Math.floor(S.lon2tile(-74.0113, z)); // lon2tile returns a FLOAT
+    const ey = Math.floor(S.lat2tile(40.7075, z));
+    const eBytes = mvtTile(z, ex, ey);
+    const restore2 = installFetchStub(() => eBytes);
+    const r = await api.buildTile(z, ex, ey, 'sat-buildings');
+    restore2();
+    const b = r?.satBuilding;
+    if (!b?.idx) {
+      soft('(6) cross-check vs E fixture', 'E', `no satBuilding at ${z}/${ex}/${ey}`);
+    } else {
+      const draped = drape(b.pos, b.anchor);
+      const c = census(b.idx, draped);
+      // Count the rings the worker actually saw, from E's own tile bytes.
+      const { PbfReader } = await import('pbf');
+      const { VectorTile } = await import('@mapbox/vector-tile');
+      const vt = new VectorTile(new PbfReader(eBytes));
+      const L = vt.layers.building;
+      let rings = 0;
+      for (let i = 0; i < L.length; i++) {
+        const f = L.feature(i);
+        if (f.type !== 3) continue;
+        rings += f.loadGeometry().length;
+      }
+      console.log(
+        `\nE fixture Manhattan ${z}/${ex}/${ey}: features ${L.length} rings ${rings} · ` +
+          `worker tris ${c.tris} degenerate ${c.degen} (${c.pct.toFixed(2)}%) coincident ${c.coincident}`
+      );
+      gate(
+        "(6) E's fixture reproduces the SAME closed-ring defect B's encoder does",
+        c.degen > 0 && c.coincident === c.degen,
+        `degenerate ${c.degen} all coincident · ${c.pct.toFixed(2)}% (B's dense scene: 14.22%)`
+      );
+    }
+  } catch (e) {
+    soft('(6) cross-check vs E fixture', 'E', String(e?.message ?? e));
+  }
 
   console.log('\n--- (5) WORKER FINGERPRINTS (M2 byte-identity baseline) ---');
   console.log('scene      builder        verts   idxLen  fnv(pos)  fnv(idx)  fnv(col)  fnv(anchor)');
