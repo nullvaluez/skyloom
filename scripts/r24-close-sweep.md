@@ -1432,3 +1432,48 @@ names to world), which is why it carries a kernel allow-list.
 **PASS 2 / user machine: UM for everything visual** — pixels, draws, the
 catcher shadow and sparkle. The node leg cannot see any of them; sparkle in
 particular is temporal and needs real frames.
+
+---
+
+## §6 THE ROUND'S INSTRUMENT LESSON — a number read across an ownership boundary
+
+Five times in two passes, a gate reported a number that was about the gate
+rather than about the world. They look like five unrelated bugs. They are one:
+
+| The reading | What it was taken to mean | What it actually meant |
+|---|---|---|
+| `refines NaN · merges NaN · parentRefetches NaN` | nothing — it printed and passed | A publishes `refine` / `merge` / `refetchParent`, **singular**. NaN compares false against every threshold, so the gate went quiet exactly where it should shout |
+| `presence channel = none`, 29/29 hard births | CHUNK_FADE is not fading | B publishes the twin's uniform at `material.userData.__fadeU`; my four guessed names could never have found an `onBeforeCompile` uniform |
+| `heals 9` | nine holes | six exhaustive outcomes, of which **one** (`healsQueueFull`) is a hole; `healsInPlace` is the fix working |
+| `pale 8 in 290 frames` | eight one-frame flashes | two-frame runs at identical means — a sustained **field**, a different picture with a different cause |
+| `residentTiles=0` | the fixture is too small | the residency pass is only installed when `TERRA_PACE.keepResident` is on; 0 was correct |
+
+**The rule this round earned:** *a value read across an ownership boundary must
+be read by the name its owner publishes, with the owner's definition of what it
+counts, and an absent reading must be a loud failure rather than a default.*
+
+Three corollaries, each paid for:
+
+1. **Absence must never coerce.** `?? 0` on the Owens lock, `v == null ||
+   v <= 261` on a ceiling, `null < 1e-4` on an angle, `undefined === undefined`
+   on a rebuild count — every one of them turns "I could not measure" into
+   "PASS". That is what `NOTCAL` (§2.10a, `scripts/_notcal.js`) exists for.
+2. **A precondition must be readable in BOTH arms.** A precondition that only
+   the feature can satisfy is not a precondition; it is the feature under test,
+   asserted before it exists.
+3. **The label must be the best reading of the run, not the first.** `??=` on a
+   channel name latched `none` from the first mesh sampled — and would have
+   done so again *after* the channel was read correctly.
+
+**Why it kept happening:** every one of these gates was written against a
+feature that did not exist yet, from a plan describing what it would do. The
+plan says "the fade rides a uniform"; the implementation publishes
+`userData.__fadeU`. Nothing is wrong with writing the gate first — it is how the
+RED gets calibrated — but **a gate written before its feature must be re-read
+against the implementation before its output is trusted**, and the cheapest
+moment to do that is when the owner merges, not when the row is red at 21:30.
+
+**What actually caught them:** not the FAIL lines. Every one of these was found
+by reading a **PASS** line sceptically, or by a self-test the gate ran against
+itself (`__paleSelfTest`, `FADE_PROBE_SELFTEST`). §2.10 was written before the
+rows landed for exactly this reason, and it earned its place.
