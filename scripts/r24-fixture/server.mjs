@@ -47,7 +47,7 @@ import { SCENES, RURAL, tile2lon, tile2lat, lon2tile, lat2tile, isEmptyBodyTile 
  * stale server serving a previous round's scenes to someone else's gate is the
  * exact class of silent wrongness the fixture exists to remove.
  */
-export const FIXTURE_REV = 'r24-e.2-sierra';
+export const FIXTURE_REV = 'r24-e.3-imgsource';
 
 const stats = { total: 0, byUrl: new Map(), byKind: new Map() };
 
@@ -223,6 +223,14 @@ export function createFixtureServer(opts = {}) {
  */
 export async function startFixture(opts = {}) {
   const first = Number(opts.port ?? process.env.FLY_FIXTURE_PORT ?? 3199);
+  // REUSE IS OPT-IN. It looked like a courtesy between five agents; it is a
+  // flakiness source. MEASURED: a harness reused a server owned by another
+  // node process, that process exited, and every later proxy fetch answered
+  // 502 — which surfaced as "[sat-buildings] TileJSON init failed: 502" and
+  // an empty world, i.e. a fixture failure that reads exactly like a code
+  // failure. Each run therefore BINDS ITS OWN port unless FLY_FIXTURE_REUSE=1
+  // (or FLY_FIXTURE_URL names an external one, handled in _fixture.js).
+  const mayReuse = (opts.reuse ?? process.env.FLY_FIXTURE_REUSE) === '1' || opts.reuse === true;
   for (let port = first; port < first + 10; port++) {
     let occupied = false;
     try {
@@ -231,7 +239,7 @@ export async function startFixture(opts = {}) {
       });
       const j = await r.json();
       occupied = true;
-      if (j.ok && j.rev === FIXTURE_REV) {
+      if (mayReuse && j.ok && j.rev === FIXTURE_REV) {
         return {
           url: `http://127.0.0.1:${port}`,
           port,
@@ -240,9 +248,8 @@ export async function startFixture(opts = {}) {
           close: async () => {},
         };
       }
-      // Same port, DIFFERENT payload revision — never reuse it.
       process.stderr.write(
-        `[fixture] port ${port} holds rev ${j.rev} (want ${FIXTURE_REV}) — trying ${port + 1}\n`
+        `[fixture] port ${port} busy (rev ${j.rev}${mayReuse ? `, want ${FIXTURE_REV}` : ', reuse off'}) — trying ${port + 1}\n`
       );
       continue;
     } catch {
