@@ -273,7 +273,50 @@ merges, so LOD_CROSSFADE's measured value is on REFINES and on whatever merges
 survive under memory pressure. The two fixes compose — A stops the swaps that
 should never have happened, D softens the ones that must.
 
-(numbers: §3.5, filled from the probe runs)
+### 3.5 Numbers (fixture, Powell altitude ladder 4000→1600→800→380→1600→4000 m,
+640×360, A's pacing switches ON, `r24-e.3-imgsource`)
+
+| leg | pin | A: refine / merge / replacedOnScreen | D: hardSwaps / faded | active / peak | resident | pageerrors |
+|---|---|---|---|---|---|---|
+| **flag OFF (RED)** | none | 16 / 0 / 0 | **20 / 0** | 0 / 0 | 39 → 70 | 0 |
+| flag ON, shipping | `{enabled:true}` | (pending — moratorium) | | | | |
+
+The RED is unambiguous: **20 refines, 20 of them single-frame hard swaps, zero
+blended**, and `skip.disabled: 20` proves every one was un-faded because the
+flag is off rather than because a guard fired. `merge 0` across the whole
+ladder is A's `keepResident` working — the frustum-exit merges are simply gone
+— which is why D's measured value is on REFINES.
+
+A's counter reads 16 where D's reads 20 because A's wrapper increments at the
+top of `_loadSubTiles` (including the `z < minLevel−1` early path) and is reset
+by `__flyTerra.reset()` at the start of the ladder, while D's accumulates from
+boot. The four-count delta is the four refines between boot-settle and the
+reset. Not a disagreement.
+
+### 3.6 What the first ON leg found, which is worth more than the leg
+
+The first ON attempt read `active 12` STUCK, `faded 3`, `skip.concurrency 9`.
+Neither number is a bug in the fade; both are facts nobody had written down:
+
+1. **The fade clock rides a CLAMPED dt.** FlyScene's −50 block computes
+   `const dt = Math.min(delta, 0.05)`, so `tickLodFades` advances 50 ms per
+   RENDERED FRAME whatever the wall clock does. On SwiftShader at ~1 fps a
+   `fadeSec: 6` probe pin is 120 frames — two minutes of wall time per blend,
+   which no ladder step waits for. This is the right behaviour for a crossfade
+   (a blend wants a frame COUNT; a "250 ms" fade that renders twice is a
+   two-step pop, i.e. the defect), so the constant's comment now says so and
+   the probe pins a frame count instead of a duration.
+2. **`maxConcurrent` counts MATERIALS, and a refine arms four.** 12 was
+   therefore only THREE concurrent refines, and the ladder denied 9 of 19
+   refines a fade with `skip.concurrency`. Raised to 32 = 8 concurrent refines.
+   The bound is not about draws or samplers — the sampler is on the tile
+   program either way and an idle fade skips its branch. It bounds RETAINED
+   PARENT TEXTURES: a refine keeps its parent's map alive past `unloadModel()`
+   until the last child finishes, so 32 materials ≈ 8 retained 256² tile
+   textures ≈ **2.7 MB** against the 300 MB texture gate.
+
+That the enumerated skip reasons made both diagnosable in one read is the
+argument for shipping them; a bare "0 fades" would have been a bisection.
 
 ## §3x M2 — old header (kept so the section numbering does not shift)
 
@@ -291,9 +334,117 @@ Boot is fade-free (`skipBootMs`, reveal timing frozen); warps skip the fade
 
 ---
 
+## §2.5 M1 — AERIAL_LAW, as wired
+
+The law is not a library this round; it is evaluated.
+
+**High tier — the post pass.** `AerialPerspective.jsx` gains a LAW variant of
+its shader, chosen ONCE at construction from a module const so production and
+the PREWARM twin cannot compile different programs (the Effects.jsx el()/raw()
+rule). Everything structural is unchanged — the depth reconstruction, the
+reversed-depth DETECTION (never assumption: three downgrades the request when
+`EXT_clip_control` is missing and a hard-coded flip would invert the world on
+exactly those devices), and both early-outs. What changes is the four lines
+that WERE the atmosphere:
+
+```
+  old:  mix( color, uHazeColor, uMaxMix * smoothstep(uBand, dist) * exp(-h/H) )
+  new:  atmoApply( color, vec3( dist, h, cosSun ) )
+```
+
+`dist` is `length(viewPos)` and `cosSun` divides the same ray by the same
+`max(dist, 1e-4)` that `atmoPack` uses in the vertex stage, so the two
+evaluators measure the same ray BY CONSTRUCTION rather than by agreement.
+
+**Medium/low — the per-material term**, injected in `applyHillshade`
+immediately before `<dithering_fragment>`, the last chunk in three's fragment.
+That placement is the load-bearing decision. It deliberately does NOT touch the
+after-fog lines the base fade patch and C's `LINEAR_HAZE` own, and it buys two
+things:
+- the 16–55 km tile band is retired by **amplitude** — FlyScene writes its max
+  to 0 under the flag — rather than by editing another owner's injection, so a
+  merge in either order composes;
+- the 60–120 km rim melt is **absorbed**: by the time the edge fade has mixed
+  to `uEdgeColor` the law's transmittance is already ~0, so the final colour is
+  the law's LINEAR inscatter either way. That is what "fold the rim melt into
+  extinction → 1" means in code.
+
+**The tier split is what makes "one law" true at the pixel** rather than only
+in the source: at high the post pass reads the law and the materials read 0; at
+medium/low the reverse. Never both, so nothing double-hazes. The two gates
+share a uniform NAME (`uAtmoStrength`) in two different programs, which is
+exactly the shape of the thing.
+
+**The fleet pin is split out of the tier gate.** The law runs at medium/low, so
+`__flyAerialOverride` must still reach it while the tier gate must not; the
+rebuilt `aerialGate` expression is bit-identical to R21's.
+
+**A8** rides the EXACT `SAT_BUILDINGS.night` curve the city windows come up on —
+exactly 1 at `frac ≥ dayFrac` (noon keeps 0.55 bit-for-bit), exactly 0 at deep
+night. CPU multiply on an existing uniform: no shader text, no key move, and
+its own flag (`AERIAL_LAW.nightRamp`) so it can ship without the law.
+
+**Keys.** No new key expression exists in D's code. C's `hillKey(lodFade)` =
+`r24VariantKey('world-bend-fade-hill-r19', [[e],[f],[a],[l]])` carries both of
+D's tokens — 'a' for `AERIAL_LAW.enabled`, 'l' for the crossfade slot — in a
+fixed order, which is what stops two owners emitting one text under two
+mutually exclusive key expressions (the R4 wrong-cached-program defect).
+
+**Flag-off identity is proven on the generated TEXT**, not on tokens:
+`verify-atmo-law` §7 flips `AERIAL_LAW.enabled`, compiles `applyHillshade`
+twice against a stub shader, and asserts *flag-on VERTEX minus the law ===
+flag-off VERTEX* and the same for the fragment, character for character — plus
+that the ten law uniforms are wired BY REFERENCE to the shared block
+(`shader.uniforms.uAtmoBeta === atmoUniforms.uAtmoBeta`), i.e. the post pass
+and the materials read one set of numbers rather than two that agree.
+
+**NOT BUILT this round, and reported as such rather than implied:** the content
+slot (`applyBendAnchorSat` / `…SatSkyline`) and the air/anchor variants
+(traffic, monuments, veg, parcel homes, town glow, roads, water) do not yet
+carry the law. At high tier the post pass already covers every depth-writing
+one of them from the same depth buffer, so the visible gap is medium/low
+content standing on hazed ground. Each is a separate `-a24` key with the same
+two-entry-point dispatch (`atmoApply` for opaque, `atmoExtinct` for additive —
+inscatter into an ADDITIVE layer would ADD light where the atmosphere should
+remove it).
+
 ## §4 Frozen gates touched
 
-(populated as work lands)
+| gate | state | note |
+|---|---|---|
+| `world-bend-fade-hill-r19` (FINAL tile key) | MOVES under either D flag | through C's shared `r24VariantKey` with fixed token order e/f/a/l; all-off is the verbatim R19 key, proven by gate |
+| every horizon pixel gate (`verify-rim`, `verify-sat-depth`, `verify-aerial`, `verify-neon-alt`, `verify-sat-night`, `verify-dusk`, `verify-edge-fx`) | RE-BASELINE PENDING, one batch with C's L1 | not executed by D; the batch is C's, with E's FIXTURE column |
+| `verify-aerial`'s `__flyAerialOverride` pin | STILL HONOURED | the pin is split out of the tier gate but still multiplies both the post gate and the per-material gate, so a pinned frame is strength 0 = the bit-identity early-out |
+| Owens ≤ 261 / satellite ≤ 375 / toy ≤ 480 draws | UNCHANGED BY CONSTRUCTION, measurement pending | neither feature adds a mesh: the law is ALU on programs that already run, and the crossfade blends geometry that was already drawn |
+| `verify-flicker` bound of 12 | untouched | nothing here touches emissives or bloom |
+| `PREWARM` warm set | follows automatically | prewarm builds through the same `applyHillshade(m, HILLSHADE, attachLodFade(m))` and the same `AerialPerspectiveEffect` constructor |
+| `DELETED_UPSTREAM_LINES` (A's vendor budget) | D spends 0 | D's four vendor hunks are +68 / −0, gated |
+
+## §4.5 M3 — SKY_PROCEDURAL: NOT BUILT
+
+Reported honestly rather than half-shipped. It ships OFF regardless (plan §0
+ruling 5), it is the only item of mine with no user-visible defect behind it —
+L10 is a `[low]` hypothesis, not a measured symptom — and the session went to
+the two items the user's own report named. The design, so a later round does
+not re-derive it:
+
+- Analytic sky in the dome fragment (Preetham/Hosek-lite, ~40–60 ALU per sky
+  pixel, 0 draws) from `runtime.sun`, replacing four cross-faded photographs
+  and the 0.45 background dip per cut. The dome material is a raw
+  `ShaderMaterial` with no `customProgramCacheKey`, so the key discipline is a
+  PREWARM entry, not a registry bump.
+- The same function OUTPUTS the rim/inscatter colour that `setAtmoLaw` is fed,
+  which is the point: today the rim triple is a five-keyframe table
+  (`SKY.altAtmo.tod`) that can drift from what the HDRI shows, and every
+  mismatch has a compensating term (the golden lobe, the texel cap, the dip,
+  the star clamps). With the sky and the atmosphere reading one function they
+  agree by construction and every compensator can be retired.
+- HDRIs kept as IBL only (or PMREM the procedural sky on a low-res target every
+  few minutes — that trade needs a GPU measurement this venue cannot make).
+- Weather stays on the existing overcast lid; stars/moon layers unchanged.
+
+Cost is a GPU number (sky pixels are ~30–50 % of the frame at altitude), so it
+could not be ranked here even if it had been built.
 
 ## §5 Decisions
 
@@ -309,8 +460,28 @@ Boot is fade-free (`skipBootMs`, reveal timing frozen); warps skip the fade
 - **D-3. The law owns its own sRGB→linear decode** rather than reading C's
   setters (see §2.2), so a merge in either flag order is correct.
 
+- **D-4. AERIAL_LAW is scoped to the tile material + the post pass this round.**
+  The content and air/anchor variants are designed, dispatched
+  (`atmoApply`/`atmoExtinct` on `material.blending`) and un-built. Reported as
+  a gap in §2.5 rather than implied by "one law".
+- **D-5. The per-material term lands before `<dithering_fragment>`, not in the
+  after-fog slot.** The after-fog slot is owned by the base fade patch and, this
+  round, by C's `LINEAR_HAZE`. Injecting one chunk later retires the old tile
+  band by amplitude instead of by editing another owner's lines, so the merge
+  composes in either order and the rim melt is absorbed for free.
+- **D-6. `maxConcurrent` bounds retained parent TEXTURES, not draws.** 32
+  materials = 8 concurrent refines ≈ 2.7 MB against the 300 MB texture gate.
+  The previous 12 was silently only three refines and denied 9 of 19 a fade.
+
 ## §6 Open risks
 
+- **A merge-order hazard I could not close from here.** C's `LINEAR_HAZE`
+  decodes `uEdgeColor` to linear at the setter. With C's flag OFF and mine ON,
+  the edge fade still targets a raw-sRGB colour while the law targets linear —
+  but the law saturates BEFORE the fade band, so the fade mixes a colour that is
+  already the law's, and the visible result is the law's. With both on they
+  decode the same triple through the same curve. Neither ordering is wrong; the
+  case worth a fixture pixel A/B at close is C-off / D-on at the 60–120 km rim.
 - The per-material term interpolates `(d, h, cosSun)` linearly across a
   triangle. For large distant terrain triangles the cosSun component is an
   approximation; the Mie lobe is broad (g 0.76) so this should read as a
