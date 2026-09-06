@@ -32,6 +32,16 @@
  * to sRGB because a white balance is a photographic gamma-space operation;
  * this is a scene-space blend and must not be.)
  *
+ * R24 C (LINEAR_HAZE, recon L1) — the R19 reasoning above is sound and its
+ * conclusion was still wrong, because "the same space" was the WRONG space for
+ * BOTH of them. The buffer is linear (the composer's HalfFloat RT makes three's
+ * <colorspace_fragment> an identity), the fog and the SkyDome decode their copy
+ * of the same triple with SRGBColorSpace, and the tile band + this pass did not.
+ * With LINEAR_HAZE on, world-bend's setters and this uniform both decode, so the
+ * three-way agreement the R19 header was reaching for finally holds against the
+ * sky as well as against the tiles. Still no inputColorSpace override: the BLEND
+ * stays a scene-space blend; only the TARGET colour is decoded.
+ *
  * DRIVEN BY MODULE SETTERS: FlyScene's -50 block already computes the live rim
  * triple, the bend uniforms, the ground reference and the tier/style gates one
  * step before the composer renders at priority 1. It pushes them here; the
@@ -40,7 +50,8 @@
  * reads, and the copy happens at the latest possible moment.
  */
 import { Effect, EffectAttribute } from 'postprocessing';
-import { Uniform, Vector2, Vector3, Color } from 'three';
+import { Uniform, Vector2, Vector3, Color, SRGBColorSpace } from 'three';
+import { LINEAR_HAZE } from '@/lib/fly/fly-constants';
 
 /**
  * Module-scope frame state. One satellite scene exists at a time, so a plain
@@ -243,7 +254,15 @@ export class AerialPerspectiveEffect extends Effect {
     }
     u.get('uReverseDepth').value = this._reversed ?? 0;
     u.get('uMaxMix').value = s.strength;
-    u.get('uHazeColor').value.setRGB(s.rim[0], s.rim[1], s.rim[2]);
+    // R24 C (LINEAR_HAZE): Color.setRGB's default colorSpace is the WORKING
+    // space, i.e. no conversion — which is exactly the L1 defect. Naming
+    // SRGBColorSpace decodes the authored triple into the linear buffer the
+    // composer actually renders into. Flag off = the R19 call, unchanged.
+    if (LINEAR_HAZE.enabled) {
+      u.get('uHazeColor').value.setRGB(s.rim[0], s.rim[1], s.rim[2], SRGBColorSpace);
+    } else {
+      u.get('uHazeColor').value.setRGB(s.rim[0], s.rim[1], s.rim[2]);
+    }
     u.get('uBand').value.set(s.startM, s.endM);
     u.get('uHeightFalloff').value = Math.max(1, s.heightFalloffM);
     u.get('uTanHalfFov').value = s.tanHalfFov;
