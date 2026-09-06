@@ -176,8 +176,14 @@ const readFrame = (page) =>
   // --- LEG B: a forced tier step, with shadows on.
   await page.evaluate(() => window.__flyStats.frame.reset());
   const b0 = await readFrame(page);
+  // force(dir) takes a NUMBER (perf-governor.js:158 reads `dir < 0 ? 1 : -1`):
+  // -1 steps DOWN the ladder, +1 steps UP. A string makes every step a silent
+  // no-op — measured on the integrated tree, and it is why a first run of this
+  // gate can report a flat programsDelta that means nothing.
+  let stepsAccepted = 0;
   for (let i = 0; i < 4; i++) {
-    await page.evaluate((dir) => window.__flyGov?.force?.(dir), i % 2 === 0 ? 'down' : 'up');
+    const ok = await page.evaluate((d) => window.__flyGov?.force?.(d) ?? null, i % 2 === 0 ? -1 : 1);
+    if (ok === true) stepsAccepted++;
     await page.waitForTimeout(DWELL);
   }
   const b1 = await readFrame(page);
@@ -200,8 +206,9 @@ const readFrame = (page) =>
 
   gate(
     '(3) THE FORCED STEPS ACTUALLY HAPPENED — a gate that forces nothing proves nothing',
-    b1.count > 0 && pins.hasGov === 'object',
-    `frames sampled ${b1.count}, __flyGov ${pins.hasGov}, tier ${tiersSeen}`
+    stepsAccepted > 0 && b1.count > 0 && pins.hasGov === 'object',
+    `${stepsAccepted}/4 forced steps accepted by the ladder, frames sampled ${b1.count}, ` +
+      `__flyGov ${pins.hasGov}, tier ${tiersSeen}. Zero accepted ⇒ gate (2) above is VACUOUS.`
   );
   gate('(4) NO PAGE ERRORS', errors.length === 0, errors.slice(0, 3).join(' | ') || 'clean');
 

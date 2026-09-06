@@ -394,6 +394,31 @@ locally (`PW_CHANNEL=chrome` documented as the user-machine restore).
 
 ---
 
+### 2.3 Two inherited gates, improved without moving a bound
+
+**`verify-seam`'s node leg now runs OFFLINE** (HARN-GAP-7). It imports the real
+worker in-process and calls `api.init()`, which fetched `TILEJSON_URL` — a
+module constant with no injection seam. But the worker calls the GLOBAL fetch,
+and in node that is ours: `installNodeFetchFixture()` answers the OFM TileJSON
+and any `.pbf` from the fixture and passes everything else through. No app
+change. Full green on the flag-off tree in ~40 s with no browser and no GPU;
+the numbers are in `r24-close-sweep.md` §1.4b, including two honest places
+where the fixture is WEAKER than live.
+
+**`verify-flicker` gains a QUIESCENCE PRECONDITION** (recon A7). The bound of
+12 does not move — the plan freezes it and this does not touch it. What moves
+is the guarantee that the asserted window opens on a quiet scene. R22.1 §3.2
+ran the harness five times on ONE tree: urban p99 6.957 / 6.613 / 9.742 /
+6.167 / **16.105**, and the only red carried `movingFrac` 0.1176 against ~0.02
+for the others. A gate whose verdict is decided by load is a coin, and its red
+is unattributable — which is exactly why R21 closed with the Manhattan
+residual un-attributed. A 3-frame probe now gates the window on
+`movingFrac ≤ FLICK_QUIET` (0.05), retrying; if the scene never quiets the leg
+reports **NOT QUIET** and its p99 is printed as SOFT rather than asserted. The
+honest answer is "this run could not judge".
+
+---
+
 ## §3 M3 — fixture baseline columns and the new gates
 
 Priority order (Fable ruling, after the user reported *buildings appearing and
