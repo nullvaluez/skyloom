@@ -181,17 +181,28 @@ async function runArm(context, fx, paceOn) {
   const page = await context.newPage();
   const errs = [];
   page.on('pageerror', (e) => errs.push(String(e.message).slice(0, 160)));
-  if (paceOn) {
-    await page.addInitScript(() => {
-      window.__flyTerraPaceOverride = {
-        enabled: true,
-        timerFix: true,
-        mergeHysteresis: true,
-        keepResident: true,
-        skirtFast: true,
-      };
-    });
-  }
+  // Both arms pin EXPLICITLY. Since the R24 close the constants ship ON, so an
+  // unpinned "off" arm would silently be the on arm — an A/B whose control is
+  // the treatment. The arm states what it wants in both directions.
+  await page.addInitScript((on) => {
+    window.__flyTerraPaceOverride = on
+      ? {
+          enabled: true,
+          timerFix: true,
+          mergeHysteresis: true,
+          keepResident: true,
+          skirtFast: true,
+        }
+      : {
+          enabled: false,
+          timerFix: false,
+          mergeHysteresis: false,
+          keepResident: false,
+          skirtFast: false,
+          walkWhileSaturated: false,
+          bboxCache: false,
+        };
+  }, !!paceOn);
   // The fleet's bootFly hard-codes a 30 s wait for the GL canvas to become
   // VISIBLE after __flyBoot.pct hits 100. Under SwiftShader with the fixture's
   // full world that reveal fade can outlast it. This gate needs the RUNTIME,

@@ -24,6 +24,7 @@
 import { mkdirSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { checkShip } from './_r24a-ship-state.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPORT = process.argv.includes('--report');
@@ -50,11 +51,20 @@ const gate = (name, ok, detail = '') => {
 
 console.log('verify-frame-step — the fixed-timestep accumulator and the render pose (FL-04)\n');
 
-// ------------------------------------------------------------ 1. flag off
+// ------------------------------------------------------ 0. the SHIP state
+// FRAME_STEP is the one A block that ships OFF, and the gate says so
+// explicitly: the accumulator below is proven, the CONSUMER OPT-IN is what did
+// not land (§8c). Asserting the shipped false stops it being turned on by a
+// well-meaning sweep that reads "10/10 green" as "ready".
+const shipFS = checkShip('FRAME_STEP');
+gate('0 FRAME_STEP ships OFF — the consumer opt-in did not land (ledger §8c)',
+  shipFS.ok, shipFS.detail);
+
+// ------------------------------------------------------- 1. forced flag off
 const flyScene = readFileSync(path.join(root, 'components/fly/FlyScene.jsx'), 'utf8');
-gate('1 flag off: the -50 block still calls flight.step(dt, cmd) verbatim',
+gate('1 with the flag off the -50 block still calls flight.step(dt, cmd) verbatim',
   /\} else \{\n\s+flight\.step\(dt, apCmd \?\? cmd\);\n\s+\}/.test(flyScene));
-gate('2 flag off: no accumulator is created at all',
+gate('2 with the flag off no accumulator is created at all',
   /return cfg\.enabled \? createFrameStep\(cfg\) : null;/.test(flyScene));
 gate('3 the sim state is never replaced — the render pose is a NEW field',
   /flight\.renderPos = renderPose;/.test(flyScene) &&

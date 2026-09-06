@@ -848,6 +848,64 @@ should run before every commit that adds a call site, not just before a merge.
 
 ---
 
+## §12 SHIP STATE — what A flipped on at the close
+
+One line per switch, and every OFF one names the run it is waiting for. Nothing
+here is off by omission.
+
+| Flag / switch | Ships | Why, in one line |
+|---|---|---|
+| `TERRA_PACE.enabled` | **ON** | the umbrella for the terrain work below |
+| `…timerFix` | **ON** | `updateInterval` gates the quadtree walk again: 10/12 updates walked the whole tree → 4/12 |
+| `…mergeHysteresis` | **ON** | kills the refine↔merge flip: on a vertical bob, flips 27→16, merges 21→11, refetches 89→63 |
+| `…keepResident` | **ON** | the "tiles swapping" fix: on a pure yaw sweep, merges 22→0, on-screen replacements 17→0, refetches 178→0 |
+| `…skirtFast` | **ON** | 7.1×/6.5× on the measured 67%-of-stalls hot spot, byte-identical geometry over 13 cases |
+| `…walkWhileSaturated` | **ON** | ends the global freeze that pinned E's tree at z6; strictly conservative — visits 444→4,248, refines and requests unchanged |
+| `…bboxCache` | **ON** | pays for the above: heap 1,398→771 KB per 400 walks |
+| `…skirtWorker` | OFF | **needs one real-hardware run.** Proven output-identical in node (8/8), but the fixture's terrain-rgb loader builds geometry on the MAIN thread, so only Esri LERC tiles reach the patched path — nothing here has ever exercised it |
+| `…bendSphere` | OFF | **needs one real-hardware run** at the canonical poses: it fixes the bend-blind cull by SUBMITTING far tiles that are culled today, which is a draw-count change against Owens ≤ 261 / sat ≤ 375 |
+| `…parallelLoad`, `imageBitmap`, `preUpload`, `lodOutsideRender` | OFF | **not implemented this round.** W0 scaffolding switches that no patch reads: turning one on changes nothing. Said plainly in the constants so nobody flips one and waits |
+| `STEP_SAFE` | **ON** | the DPR step lands inside the frame that draws it: `{dpr:0.875, applyMs:2.3, composer:true, viaValve:false}` where flag-off recorded nothing at all |
+| `LADDER_FIX` | **ON** | `[1/high, 1/medium, 1/low]` → five rungs with 0.875 and 0.75 first, so the first step is no longer a tier step |
+| `…nativeRefresh` | **ON** | plan §0 ruling 6. **The one flipped value with no measurement behind it** — an exact no-op at 60 Hz (`min(60,60)`), and on 120/144 Hz it raises the target while recon FL-04's own question to the user is still unanswered |
+| `HUD_SYNC` | **ON** | the overlay stops being a picture of frame N−1 (~30 px of label swim per turn at 60°/s) |
+| `FINALIZE_PACE` | **ON** | one shared per-frame brake across four engines, and the first chunk is no longer free after a long frame |
+| `REBASE_CALM` | **ON** | the dead store bump, the narrowed matrix update, and the 704 m quantised anchor so the micro-grain stops re-phasing every 10 km |
+| `FRAME_STEP` | OFF | **the consumer opt-in did not land** (§8c). The accumulator and the interpolated pose are proven (10/10, incl. the substep-boundary identity); pointing PlayerPlane / chase cam / Contrail / ground shadow at `renderPos` is the half that can move a harness pose, and it cannot be certified in this venue. On today it would change the sim integration with nothing reading the smoother pose: all the risk, none of the benefit |
+
+### The gate change the flip forced
+
+Every one of my gates drives its feature by setting the switch ITSELF — which
+is correct, because the property under test is *"off = the R21 arithmetic,
+on = the fix"*, not *"the flag happens to be false"*. But that makes all of
+them blind to the SHIP STATE: a flag silently reverted to `false` would leave
+every behaviour gate green while the fix was gone from the build. **Those are
+two separate claims and both now have a gate.** `scripts/_r24a-ship-state.mjs`
+reads the literal out of `fly-constants.js` by brace-matching (not a copy, not
+an import — the file that ships), and each gate asserts its own block against
+the ruled state while keeping its forced-state behaviour arms.
+
+Three arms had to be hardened for the same reason, and this is the interesting
+half of the flip:
+
+- `verify-finalize-pace` gate 1 now says **forced** off, not flag-off.
+- `verify-ladder-fix`'s RED arm used to *omit* the pin. With the constants
+  shipping ON, an omitted pin IS the shipped state, so the RED calibration
+  would have gone quietly green while claiming to measure the defect. It now
+  FORCES both features off.
+- `verify-terra-live`'s arm A had the same shape — an unpinned control that
+  had become the treatment. **An A/B whose control arm is the treatment is not
+  an A/B**, which is the same lesson as the stutter arm in §7, arriving from
+  the opposite direction: there the control moved, here it silently stopped
+  being a control at all.
+
+`verify-vendor-three-tile` gained gate 16b: the vendored switchboard's own
+literal must default every switch to `false` regardless of what the app ships,
+because the bundle is imported by node fixtures and by the app alike and only
+`terrain-engine.js` decides what is on.
+
+---
+
 ## §10 Commits
 
 | # | Commit | What |
@@ -865,18 +923,19 @@ should run before every commit that adds a call site, not just before a merge.
 | 11 | `ed773b8` | M4 `FRAME_STEP` sim half + `verify-frame-step`; consumer opt-in NOT landed (§8c) |
 | 12 | `70b9f42` | E's `FRAME_STATS` `markPhase` attribution in the terrain + finalize paths (PATCH 25, by inversion) |
 | 13 | `f739cb3` | ledger §9/§10/§11 |
-| 14 | _(this commit)_ | **BLOCKER FIX**: the missing `pinned` import in CloudField.jsx (§9b) |
+| 14 | `8b91bc5` | **BLOCKER FIX**: the missing `pinned` import in CloudField.jsx (§9b) |
+| 15 | _(this commit)_ | **W3 ship-state flip** (§12) + the ship-state gates and the three hardened control arms |
 
 ### Gates added
 
 | Gate | Assertions | Venue |
 |---|---|---|
-| `scripts/verify-vendor-three-tile.mjs` | 19 | node, anywhere |
-| `scripts/verify-terra-residency.mjs` | 21 | node, anywhere |
-| `scripts/verify-skirt-fast.mjs` | 12 | node, anywhere |
-| `scripts/verify-skirt-worker.mjs` | 8 | node, anywhere |
-| `scripts/verify-finalize-pace.mjs` | 11 | node, anywhere |
-| `scripts/verify-frame-step.mjs` | 10 | node, anywhere |
+| `scripts/verify-vendor-three-tile.mjs` | 20 | node, anywhere |
+| `scripts/verify-terra-residency.mjs` | 22 | node, anywhere |
+| `scripts/verify-skirt-fast.mjs` | 13 | node, anywhere |
+| `scripts/verify-skirt-worker.mjs` | 9 | node, anywhere |
+| `scripts/verify-finalize-pace.mjs` | 12 | node, anywhere |
+| `scripts/verify-frame-step.mjs` | 11 | node, anywhere |
 | `scripts/verify-ladder-fix.js` | 13 | browser (toy boot, seconds); RED via `FLY_LADDER_RED=1` |
 | `scripts/verify-terra-live.js` | 9 | browser + E's fixture; **has not completed here** (§9) |
 

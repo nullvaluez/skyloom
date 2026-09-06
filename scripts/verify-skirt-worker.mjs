@@ -33,6 +33,7 @@
 import { mkdirSync, copyFileSync, rmSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { checkShip } from './_r24a-ship-state.mjs';
 import { loadVendoredThreeTile } from './_tt-shim.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -52,6 +53,15 @@ const gate = (name, ok, detail = '') => {
 };
 
 console.log('verify-skirt-worker — the DEM worker tail (recon T2 / A2, the F2 half)\n');
+
+// ---------------------------------------------------------- 0. the SHIP state
+// This gate is 8/8 green and the feature still ships OFF: the path it patches
+// is unreachable in the fixture (three-tile's terrain-rgb loader builds
+// geometry on the MAIN thread; only Esri LERC tiles reach the geometry
+// worker). A green gate is not a certification of a path nothing exercised.
+const shipSW = checkShip('TERRA_PACE');
+gate('0 skirtWorker ships OFF pending one real-hardware run',
+  shipSW.got.skirtWorker === false, `skirtWorker=${shipSW.got.skirtWorker}`);
 
 // ------------------------------------------------------- 1. the build is fresh
 const srcText = readFileSync(
@@ -131,7 +141,6 @@ function runTail(data, z) {
     posted = msg;
     transfer = t;
   };
-  // eslint-disable-next-line no-new-func
   const run = new Function('self', '__r24decode', src);
   run(fakeSelf, () => data);
   fakeSelf.onmessage({ data: { demData: null, z, clipBounds: [0, 0, 1, 1] } });

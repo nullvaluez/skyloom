@@ -209,6 +209,19 @@ gate('15 next.config transpilePackages no longer names three-tile',
 const lock = read(path.join(root, 'package-lock.json'));
 gate('16 package-lock has no three-tile entry', !/"node_modules\/three-tile"/.test(lock));
 
+// ------------------------------- 3b. the bundle's own defaults stay inert
+// The switchboard's literal defaults must ALL be false regardless of what the
+// app ships: the bundle is imported by a node fixture and by the app alike,
+// and only lib/fly/terrain-engine.js decides what is on. A `true` creeping
+// into the literal would arm a patch for every importer, including the gates
+// whose whole method is forcing each state themselves.
+const swBlock = read(vIndex).match(/export const R24_SWITCHES = \{[\s\S]*?\n\};/);
+const swTrue = swBlock
+  ? [...swBlock[0].matchAll(/^\s*(\w+):\s*true\s*,/gm)].map((m) => m[1])
+  : ['<block not found>'];
+gate('16b the vendored switchboard literal defaults to every switch OFF',
+  !!swBlock && swTrue.length === 0, swTrue.join(', '));
+
 // ------------------------------------------------- 4. patch ledger consistency
 const doc = read(vDoc);
 const markerRe = /\/\/\s*R24\s+([A-E])\s+PATCH\s+(\d+)\s*\(([^)]+)\)/g;
