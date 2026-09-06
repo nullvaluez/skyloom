@@ -1063,3 +1063,196 @@ a certified browser leg, and the two are different claims. The distinction is
 the same one §7.6 draws about `RING_DEDUPE`: correct and certified are not the
 same, and only the second is a merge gate.
 
+---
+
+## §16 THE FRAME-COUNT FLOOR — a fade you cannot see is not a fade
+
+### 16.1 Why the seconds-only ramp was not enough
+
+`CHUNK_FADE`'s ramps were in SECONDS, which is right on a machine that renders
+in milliseconds and useless on one that does not. At the cloud venue's measured
+**2.84 s/frame**, a 0.3 s eviction ramp begins and ends **between two samples** —
+so E's `verify-fade` pass 2b saw **20 of 20 HARD deaths on a tree where
+`CHUNK_FADE` was ON**, which is the correct reading of what that venue can
+observe.
+
+**And it is not only a venue problem.** A HITCH on a real machine does exactly
+the same thing for one frame — and a hitch is precisely the moment a pop is most
+visible. A fade that a stall can skip is a fade that fails when it matters.
+
+### 16.2 The fix
+
+```
+progress = min(elapsed / sec, framesSince / CHUNK_FADE.minFrames)
+```
+
+in both engines, for both ramps (`rampT`, `chunk-fade.js`). Every birth and
+death record carries `f0`, the engine's monotone `_fadeFrame` at creation;
+`_stepFades` advances that counter once per frame.
+
+**It changes nothing on a normal machine, by construction.** At 60 Hz the 0.3 s
+eviction ramp is **18 frames** and the 0.4 s birth ramp **24**, both far above
+`minFrames` 4 — so `elapsed / sec` is the smaller term and governs alone. The
+floor binds only when a frame is longer than `sec / minFrames` (75 ms), i.e.
+only when the seconds term would have skipped the fade.
+
+**Why `minFrames` is 4 and not the 3 that was specified.** A BIRTH starts at
+presence 0, so it is already partial on its first frame and N frames give N
+partial samples. A DEATH starts at full presence *by definition*, so N frames
+give only **N−1**. Three partial samples on both ramps therefore needs 4, and
+the death is the case an observer has to catch. Flagged rather than silently
+shipped.
+
+### 16.3 Measured — `scripts/r24-b-engine-proof.js`, new `--dt=` and `--hitch`
+
+| regime | single-frame pops | partial samples per ramp |
+|---|---:|---|
+| **`--dt=2.84`** (the venue) | **0** (was 92 flag-off) | births ≥ 1, **deaths ≥ 3** |
+| **`--dt=0.0167`** (60 Hz) | 4, all `fadeBudgetMiss` | births ≥ 23, **deaths ≥ 17** — the elapsed term governs and the ramp length is unchanged (0.3 s × 60 Hz ≈ 18) |
+| **`--dt=0.0167 --hitch`** (a 500 ms frame every 40) | **0** | births ≥ 3, deaths ≥ 17 — **a hitch can no longer complete a ramp in one sample** |
+| **`--off`** | **92**, 0 ramps | flag off never reaches the floor — byte-identical RED |
+
+### 16.4 A second finding the venue forced out: the heal outcome ledger
+
+Running at 2.84 s/frame made gate (B) fail — and it was the GATE that was wrong,
+not the code. `healsInPlace + healsNoop >= heals` is not an invariant: a heal can
+legitimately end in five other ways. The engine now counts every one, so the
+ledger is **exhaustive** and the gate asserts equality rather than an
+inequality:
+
+| outcome | meaning |
+|---|---|
+| `healsInPlace` | patched the resident buffer — the intended path |
+| `healsNoop` | re-sampled, nothing moved past `minDeltaM`; the chunk stops asking |
+| `healsQueueFull` | `HEAL_IN_PLACE.maxConcurrent` spent ⇒ degraded to R21 evict+refetch |
+| `healsAborted` | the chunk was evicted or re-streamed under the job — the heal is MOOT, not failed: there is no hole because there is no chunk |
+| `healsNoRecord` | no drape record (water-only chunk) — nothing to patch |
+| `healsCoalesced` | a re-drape for that key was already in flight; the second request is a no-op |
+| `redraping` | still draining when the sample was taken |
+
+**Any hole that survives the feature is now attributable to a named outcome.**
+That is the same discipline as `fadeBudgetMiss`, and it was only discovered
+because a hostile frame rate broke an assertion that looked true at 30 fps.
+
+---
+
+## §17 Pass-2b toy gate 13 — attributed to `FINALIZE_PACE`, not to B
+
+E's pass-2b toy row failed gate 13 with a repeated uncaught
+**`Cannot read properties of undefined (reading 'byteLength')`**. Fable's first
+hypothesis was B's `guardIndex` on the toy call sites. **It is not B's, and the
+2×2 says so without ambiguity.**
+
+### 17.1 The measurement
+
+New gate `scripts/r24-b-attr-proof.js` drives the **integrated** `ToyWorldEngine`
+headless against the fixture and censuses every geometry index/attribute for a
+missing `.array` — the exact shape three reads `byteLength` from at upload,
+found **without a GL context**. Run with `--root=` at an extracted tree:
+
+| `FLASH_GUARD` | `FINALIZE_PACE` | meshes with a broken index |
+|---|---|---:|
+| ON | ON | **80** |
+| **OFF** | ON | **80** |
+| ON | **OFF** | **0** |
+| OFF | OFF | **0** |
+
+**Independent of `FLASH_GUARD`; fully determined by `FINALIZE_PACE`.** Every
+broken mesh is the **LAND** mesh — the one toy site B deliberately did *not*
+guard (§1.3). On `r24/b`, which carries no A code, the same gate is PASS.
+
+### 17.1b The FULL per-flag bisect — one flag moves it, and it is not B's
+
+One flag off at a time on the otherwise-flipped integration tree; the number is
+LAND meshes whose `geometry.index` is not a BufferAttribute:
+
+```
+  none forced off   80      HUD_SYNC          80
+  FLASH_GUARD       80      REBASE_CALM       80
+  CHUNK_FADE        80      LADDER_FIX        80
+  HEAL_IN_PLACE     80      STEP_SAFE         80
+  GROUND_VIS        80      PERF_GOVERNOR     80
+  BEND_LEAD         80      NEON_COVER        80
+  TERRA_PACE        80      STREAM_KEEPER     80
+  FINALIZE_PACE      0   ← the only one that moves it
+```
+
+**All five B flags leave it at 80.** So does every other flag tried, including
+`LADDER_FIX` and `STEP_SAFE` — which is why the ladder-red arm still threw:
+that arm pinned those two off, but `FINALIZE_PACE` is *also* A's and was still
+ON. The ×3-vs-×31 difference between the arms is how many toy LAND chunks
+reached upload before the row ended, not a different cause.
+
+Fable's fallback case — "if no flag moves it, it is on the flag-off tree too and
+pass 1's clean boot needs explaining" — does not arise: one flag does move it,
+and pass 1 was clean precisely because `FINALIZE_PACE` was off there.
+
+### 17.1c The trap, proven directly in three
+
+```
+setIndex(new Uint32Array([0,1,2])) → index.array = undefined · count = undefined
+setIndex([0,1,2])                  → index.array = Uint16Array(3) · count = 3
+Array.isArray(new Uint32Array(3))  → false
+reading index.array.byteLength     → "Cannot read properties of undefined (reading 'byteLength')"
+```
+
+The last line is the reported message, verbatim, from the shape the first line
+produces.
+
+### 17.2 Root cause, one line
+
+`toy-world-engine.js`, land block, under `finalizePaceOn()`:
+
+```js
+idx = new Uint32Array(base + extra);   // …then:
+geo.setIndex(idx);
+```
+
+`BufferGeometry.setIndex` wraps its argument in a `BufferAttribute` **only when
+`Array.isArray(index)` is true — which is false for a typed array**, so three
+assigns the raw `Uint32Array` as `geometry.index`. That object has no `.array`
+and no `.count`, and `WebGLAttributes` throws on `attribute.array.byteLength`
+the first time it uploads it. The flag-OFF branch builds a **plain** array,
+where `Array.isArray` is true and three wraps it correctly — which is exactly
+why pass 1 was clean and pass 2b was not.
+
+The hunk's own comment states the mistaken premise — *"Identical values and
+identical order — only the container changes."* The container is exactly what
+`setIndex` dispatches on.
+
+**Fix (one line, flag-off-identical by construction):**
+
+```js
+-  geo.setIndex(idx);
++  // setIndex wraps its argument in a BufferAttribute ONLY when
++  // Array.isArray(index) is true — FALSE for a typed array, so a raw
++  // Uint32Array becomes geometry.index itself, with no .array and no .count,
++  // and WebGLAttributes throws on array.byteLength at upload.
++  geo.setIndex(Array.isArray(idx) ? idx : new BufferAttribute(idx, 1));
+```
+
+`BufferAttribute` is already imported in that file, and the `Array.isArray`
+guard leaves the flag-off (plain-array) branch on its existing path untouched.
+
+**It cannot be committed on `r24/b`: the defective line does not exist there.**
+`finalizePaceOn()` and the typed-array branch arrive with A's merge; B's branch
+still carries the base's plain-array block. The fix has to land on A's branch or
+on the integration branch, which is why this section ships the patch and the RED
+gate rather than a B commit.
+
+### 17.3 Two notes for A alongside the fix
+
+- The paced branch always allocates **Uint32**, while `setIndex(plainArray)`
+  lets three's `arrayNeedsUint32` pick **Uint16** when the vertex count allows.
+  Not the bug, but it silently doubles the land index buffer on every toy chunk.
+- `setIndex(rawTypedArray)` is a general trap, not a one-off: any other
+  `setIndex` added this round should be checked for the same shape. This gate
+  will catch all of them at once.
+
+### 17.4 Why no structural gate saw it
+
+The scene graph, the mesh counts, the draw list and every ready/chunk number
+are all correct — the geometry is fully built. The defect exists only in the
+*type* of one object and only surfaces when a GL context uploads it. That is
+the class of bug a headless attribute census is for, and it is now a gate.
+
