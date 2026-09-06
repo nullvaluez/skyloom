@@ -408,6 +408,36 @@ harness someone writes:
 
 ---
 
+### 1.4d `verify-flash-guard` — THE A1 DEFECT REPRODUCES ON THE FIXTURE
+
+First certification row, Powell pose, `__flyFlashPin='off'`, K=40, tree
+`5ca8e15`:
+
+```
+powell: 3 meshes, 31,576 tris, 2,616 ZERO-AREA (8.28%)
+   sat-buildings  meshes=3  tris=31,576  zero=2,616  worstChunk 8.34%
+                  sample [1047.43, 231.91, 410.25]  coincident=TRUE
+   sat-skyline    0 / 0 / 0
+   toy-world      0 / 0 / 0
+PASS (1a) THE CENSUS HAS SOMETHING TO COUNT at powell
+PASS (2)  RED CALIBRATION — the zero-area population EXISTS with the pin off
+```
+
+**8.28% against R22.1's 6.36–8.64%** measured on the LIVE planet (34,405 of
+482,740 triangles, 99.9% coincident-vertex — recon A1), and the sampled
+degenerate is coincident-vertex here too. The A1 defect reproduces on a
+completely different planet's tiles, offline, with no GPU.
+
+That is worth more than a green: it is independent corroboration of the
+diagnosis *and* of the fixture. The population exists in fixture tiles **by
+construction** — `@mapbox/vector-tile` re-appends the closing clone on
+`ClosePath`, the wall extruders walk the ring as if it were open, and the
+zero-length wrap-around edge emits two coincident-vertex triangles per ring and
+per hole. A fixture that had quietly emitted unclosed rings would have shown 0
+here and certified a fix that fixes nothing.
+
+---
+
 ## §2.9 Which tree the certification run actually measured
 
 **`5ca8e15`, not `7a00df0`.** The run's banner stamped `7a00df0` at 19:14:00;
