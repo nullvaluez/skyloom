@@ -74,41 +74,78 @@ tracked `scripts/r21-e-red-seam.json` was untouched (`verify-artifact-hygiene`
 | `verify-skirt-worker.mjs` | — | **UM for pixels** | A (R24). ⚠ its element-by-element identity leg is RED **by design** with `TERRAIN_LIGHT.workerNormals` on: the NORMAL array is meant to change while positions / uv / indices stay identical. Needs a FLAG-ON ARM, never a re-baseline of A's number |
 | `verify-seam.js` (node leg) | **GREEN 9/9** | — | pinned to fixture tiles; see §1.4b |
 
-### 1.2 R24 gates (new this round)
+### 1.2 R24 gates (new this round) — TWO COLUMNS PER ROW
 
-| Gate | RED (flag-off) | Fixture | Live | Releases |
+A round that fixes defects has to be certified twice, and the two runs mean
+opposite things:
+
+- **FLAG-OFF PASS (pass 1) — the RED.** The tree with every R24 constants block
+  `enabled:false`. A gate "passes" here when **the defect it was written for
+  reproduces with a number attached**, which for most of these gates means the
+  process **exits non-zero on purpose**. `rc != 0` in this column is the
+  evidence, not the failure. A gate that comes back all-green flag-off has
+  proven nothing about itself — it is either mis-aimed or vacuous, and §2.10
+  is where I say which of mine are at risk of that.
+- **FLIPPED PASS (pass 2) — the GREEN.** The integrated tree with the ship
+  table's flags on. The defect leg reads its target (usually exactly 0) and
+  **every other leg of the same gate stays green** — the second half matters,
+  because a "fix" that also stops the watch from having anything to watch is
+  how a gate turns into a coin.
+
+A row is only closed when BOTH columns carry measured numbers from a named
+tree. "PENDING" below means the row has not run yet in that column; **UM** means
+this venue structurally cannot produce the number and the user's machine owns it
+(§2).
+
+| Gate | FLAG-OFF PASS — the RED reproduces | FLIPPED PASS — the fix holds | Un-pin / releases |
+|---|---|---|---|
+| `verify-fixture` | **rc 0, 10/10** — this gate certifies the venue and has no RED. Four poses settled, §1.4 | **PENDING** — re-run and diff §1.4: a flag that adds draws or triangles shows as a delta against that table | — |
+| `verify-flash-guard` | **rc 1 BY DESIGN, 5 passed / 1 failed.** (2) RED > 0: Powell **2,616 / 31,576 = 8.28 %** coincident-vertex — inside R22.1's live **6.36–8.64 %** band; Manhattan **5,820 / 126,116 = 4.61 %**, worst chunk **13.98 %**. (3) FAILs as intended. **Sat-skyline 0 / 83,752 and toy 0 / 0 — those two sites are NOT EXERCISED here** | **PENDING** — (3) zero-area **exactly 0** at every resident site; (5) triangle count only ever falls, per site; (1a)/(1b) census still non-empty | `__flyFlashPin` |
+| `verify-fade` | **rc 1 BY DESIGN, 4 passed / 2 failed.** (2) **14 of 14 hard births**, (3) **10 of 10 hard deaths**, presence channel **`none`** — no material carries a fade uniform, which IS the flag-off state. Watch was live: births 14 / deaths 10 over 94 frames | **PENDING** — (2) and (3) → **0 hard**, presence channel names a real uniform, and (1) (4) (5) (6) all stay green | — |
+| `verify-lod-fade` | **PENDING** (browser leg in flight 19:29). Node leg already **GREEN** in §1.1 | **PENDING** — 0 leave-and-return on a pure yaw; refetch 0 **with a non-zero fetch denominator** (§2.10 WEAK) | — |
+| `verify-step-clean` | **PENDING** — resizes land outside the frame | **PENDING** — every accepted DPR/tier step resizes inside the rAF; **accepted-step count must be > 0 or the gate reads NOT CALIBRATED**, never a silent pass | `__flyGovPin` |
+| `verify-frame-pace` | **INSTRUMENT ABSENT** on the 19:14 tree — `FRAME_STATS.enabled:false`, so the row is structurally vacuous there. **`6c26fe9` ships FRAME_STATS ON**, so the gate only has an instrument from the flipped tree onward | **UM** for every pacing number — SwiftShader at ~1 fps cannot produce a p95, a long-frame rate, or a stall count | — |
+| `verify-one-sun` | **PENDING** — key azimuth spread 0 on medium (one sun *by accident*), non-zero where the material zoo diverges | **PENDING** — exactly one key direction across every lit material, all tiers | `__flySunOverride` + tier |
+| `verify-env-uniform` | **PENDING** — `programsDelta` non-zero across a dusk crossing and across a tier step | **PENDING** — 0 across both crossings | `__flyGovPin` + `__flySatShadowOverride` |
+| `verify-shadow-calm` | **GREEN NODE-SIDE, 32/32** (C, `a9e30cc`): the ShaderChunk patch run against three's real chunk text both ways; reversal reproduces three **byte-exact**; texel snap is a staircase, 11 positions / 10 texels | **UM** for pixels, draws and the catcher shadow — the node leg cannot see any of them | `__flySatShadowOverride` |
+| `verify-linear-haze` | **PENDING** — rim-seam luma delta outside band (sRGB authored, linear mixed) | **PENDING** — the horizon band matches by construction | — |
+| `verify-depth-roundtrip` | **PENDING** — \|viewZ\| **2.50–2.51 m** at all three pixels, i.e. the double conversion | **PENDING** — \|viewZ\| equals the known depth at all three pixels | — |
+
+`verify-import-integrity` and `verify-artifact-hygiene` are flag-independent
+node gates and are certified once, in §1.1 — there is no second column for
+them because there is no flag they can be on the wrong side of.
+
+### 1.3 Inherited gates the round touches — TWO COLUMNS PER ROW
+
+The two columns mean something different here, and it is the more important
+pair of the two sections:
+
+- **FLAG-OFF PASS = IDENTITY.** The frozen number comes back **unmoved** on the
+  flag-off integrated tree. That is the measurement that says +N lines of R24
+  compose to a no-op — the R20 idiom, and the only honest basis for a one-flag
+  revert contract.
+- **FLIPPED PASS = STILL THE SAME NUMBER.** A frozen number that moves when a
+  flag flips is a **re-baseline**, and a re-baseline is an escalation with a
+  control experiment attached, never a quiet edit. The one candidate this round
+  is `verify-neon-cover` under `RING_DEDUPE`.
+
+| Gate | Frozen number it carries | FLAG-OFF PASS (identity) | FLIPPED PASS (unmoved unless sanctioned) | Notes |
 |---|---|---|---|---|
-| `verify-fixture` | n/a (certifies the venue) | — | n/a | — |
-| `verify-flash-guard` | zero-area census > 0 | — | **UM** for the pale detector | `__flyFlashPin` |
-| `verify-step-clean` | resizes outside rAF | — | **UM** for the tear line | `__flyGovPin` |
-| `verify-fade` | every birth is hard | — | — | — |
-| `verify-lod-fade` | tiles leave and return on a pure yaw | — | — | — |
-| `verify-frame-pace` | **UM** — instrument only here | — | **UM** | — |
-| `verify-one-sun` | key azimuth spread 0 on medium | — | — | `__flySunOverride` + tier |
-| `verify-env-uniform` | `programsDelta` non-zero across a dusk crossing and a tier step | — | — | `__flyGovPin` + `__flySatShadowOverride` |
-| `verify-shadow-calm` | `biasSign` false / `kernel` null | — | — | `__flySatShadowOverride` |
-| `verify-linear-haze` | rim-seam luma delta | — | — | — |
-| `verify-depth-roundtrip` | \|viewZ\| 2.50–2.51 m at all three pixels | — | — | — |
-
-### 1.3 Inherited gates the round touches
-
-| Gate | Frozen number it carries | Fixture | Live | Notes |
-|---|---|---|---|---|
-| `verify-stability` | R21 quartet, 17 | — | **UM** for (1)/(1b) | gains an INFORMATIONAL FRAME_STATS line |
-| `verify-flicker` | bound of 12, never moves | — | **UM** | + the quiescence precondition (A7) |
-| `verify-tier-step` | 10 | — | **UM** | |
-| `verify-seam` | 13; determinism hashes | **node leg GREEN, 9/9** *(fx)* | — | node leg pinned to fixture tiles (HARN-GAP-7 closed) |
-| `verify-neon-cover` | five R18 FNV hashes | — | frozen | **re-baseline candidate under `RING_DEDUPE`** — record BOTH a flag-off and a flag-on fixture column; the live hashes stay frozen and become a user-machine item only if the flag flips at close |
-| `verify-sat-buildings` | draws 226 / kept 6,965 / columns 6,964 | — | frozen | |
-| `verify-skyline` | 17 | — | frozen | |
-| `verify-parcel-homes` | Powell 0 placed, bit-identical tris | — | frozen | fixture Owens/Melton legs are the cheap, trustworthy ones |
-| `verify-suburbia` | nothing in (25, 35) m | — | frozen | |
-| `verify-sat-depth` | hillshade A/B > 2/255, aniso ≥ 4, z16 request | — | frozen | needs the **sierra** fixture scene (394 m of relief at the crop pose) |
-| `verify-aerial` | boot ≤ +20%, quilt exactly 0 below inAglM, textures ≤ 300 MB | — | frozen | |
-| `verify-rim` / `verify-dusk` / `verify-sat-night` | pixel bands | — | frozen | C's L1 one-time re-baseline lands here |
-| `verify-monuments-sat` | FROZEN | — | frozen | moves only via C's sanctioned evolution |
-| `verify-boot` | pct monotonic, 100 exactly at reveal | — | — | |
-| `soak-fly --satellite --minutes 15` | p95 tris ≤ 2.2 M, p95 draws ≤ 375, heap no-climb, governor steps ≤ 4 | **UM** | **UM** | reads FRAME_STATS when the flag is on |
+| `verify-stability` | R21 quartet, 17 | **PENDING** | **PENDING** | **UM** for (1)/(1b); gains an INFORMATIONAL FRAME_STATS line |
+| `verify-flicker` | bound of 12, never moves | **PENDING** | **PENDING** | **UM**; + the quiescence precondition (A7) |
+| `verify-tier-step` | 10 | **PENDING** | **PENDING** | **UM** |
+| `verify-seam` | 13; determinism hashes | **GREEN 9/9 offline** — manhattan kept **311** `8d36f2aa:89218640:13605`, columbus **193** `2eefc447:49bbe703:8715`, Owens **0**, 149 tiles (§1.4b) | **PENDING** — the same four hashes, byte-identical | node leg pinned to fixture tiles (HARN-GAP-7 closed). Hashes already proved **identical across all five agents' merges** |
+| `verify-neon-cover` | five R18 FNV hashes | **PENDING** | **RE-BASELINE CANDIDATE under `RING_DEDUPE`** — record a fixture column BOTH ways; the live hashes stay frozen and become a user-machine item only if the flag ships | the one row where the two columns are *expected* to differ |
+| `verify-sat-buildings` | draws 226 / kept 6,965 / columns 6,964 | **PENDING** | **PENDING** | |
+| `verify-skyline` | 17 | **PENDING** | **PENDING** | |
+| `verify-parcel-homes` | Powell 0 placed, bit-identical tris | **PENDING** | **PENDING** | fixture Owens/Melton legs are the cheap, trustworthy ones |
+| `verify-suburbia` | nothing in (25, 35) m | **PENDING** | **PENDING** | |
+| `verify-sat-depth` | hillshade A/B > 2/255, aniso ≥ 4, z16 request | **PENDING** | **PENDING** | needs the **sierra** fixture scene (394 m of relief at the crop pose) |
+| `verify-aerial` | boot ≤ +20 %, quilt exactly 0 below inAglM, textures ≤ 300 MB | **PENDING** | **PENDING** | |
+| `verify-rim` / `verify-dusk` / `verify-sat-night` | pixel bands | **PENDING** | **PENDING** | C's L1 one-time re-baseline lands in the FLIPPED column, with its control |
+| `verify-monuments-sat` | FROZEN | **PENDING** | **PENDING** | moves only via C's sanctioned evolution |
+| `verify-boot` | pct monotonic, 100 exactly at reveal | **PENDING** | **PENDING** | |
+| `soak-fly --satellite --minutes 15` | p95 tris ≤ 2.2 M, p95 draws ≤ 375, heap no-climb, governor steps ≤ 4 | **UM** | **UM** | reads FRAME_STATS now that the flag ships |
 
 ### 1.4 THE FIXTURE COLUMN — four poses + the toy leg, SETTLED
 
@@ -520,6 +557,26 @@ leaving it in a log for someone to notice later.
 
 Boot proof on that tree: **`BOOT OK in 62.5 s`**, zero console errors, zero
 pageerrors, zero failed `/_next/` chunk requests, after 15/15 node gates.
+
+**The same drift applies to the INSTRUMENTS, and it bit one row.** The
+`flash-guard` row wrote its log at 19:24; the two fixes to that instrument
+landed on `r24/e` at 19:24:04 (`8ca7bdf`, the pale detector's own RED) and
+19:25:26 (`ff5d9a1`, gate (5) turned from a tautology into a degenerate-RATE
+comparison). Neither was in the integrated tree the run served, so
+`flash-guard.log` is the **pre-fix instrument**:
+
+- its `(4) PALE DETECTOR` line — `pale=168 of 256 frames`, every hit reading a
+  mean of exactly 212.9 — is the **false positive I later diagnosed as the
+  detector reading the SKY**, not a one-frame flash. Ignore that line; the
+  jump-over-median rewrite plus `__paleSelfTest()` is what pass 2 runs.
+- its trailing `flagOn(probe)=true` is the **misleading line**: the probe was
+  reporting an absent runtime pin as "the flag is on". Now it reports the data
+  and lets the reader draw the conclusion.
+- the RED numbers in that log — Powell 2,616 / 31,576 and Manhattan 5,820 /
+  126,116 — are from the census, which neither fix touched, so **they stand**.
+
+Lesson, filed with the tree-stamp one: **a harness fleet drifts on the same
+clock as the source it tests.** Stamp the instrument, not just the tree.
 
 ---
 
