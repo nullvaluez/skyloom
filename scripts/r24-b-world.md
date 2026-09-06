@@ -171,5 +171,9 @@ the flag is off).
 - `minArea2` stays **0**. Raising it is a taste decision with a real risk of
   eating thin real geometry, and the census says there is nothing between 0
   and 1e-6 to catch.
-- Shipped `enabled: true` (see §8 for the flag-state decision).
+- **Ships `enabled: false`** per Fable's W1 ruling: every block stays off until
+  the close, where Fable flips the Level A blocks ON in ONE integration commit
+  and E calibrates every new gate RED on the literal flag-off tree.
+  **RECOMMENDED ON AT CLOSE** on the evidence in §1.1/§1.4. Once it is on,
+  `window.__flyFlashPin = 'off'` is the same-session RED leg.
 
