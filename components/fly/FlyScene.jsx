@@ -31,6 +31,10 @@ import {
   getBend,
 } from '@/lib/fly/toy-world/world-bend';
 import { setAerial, clearAerial, getAerialState } from './AerialPerspective';
+// R24 D (AERIAL_LAW): the ONE atmosphere law — see lib/fly/atmo-law.js. The
+// setter decodes the raw sRGB rim triple to linear itself, so the law is
+// correct in the composer's linear buffer whatever state C's LINEAR_HAZE is in.
+import { setAtmoLaw, clearAtmoLaw, getAtmoLaw } from '@/lib/fly/atmo-law';
 // R24 D (LOD_CROSSFADE): the tile refine/merge crossfade. Its counters are the
 // RED and are installed in EVERY session, flag or no flag — `hardSwaps` is the
 // number of single-frame parent<->children swaps that happened with no blend
@@ -92,6 +96,7 @@ import {
 } from '@/lib/fly/weather-model';
 import { resolveSky, skyDuskOn, trueElevationDeg } from '@/lib/fly/sky-dusk';
 import {
+  AERIAL_LAW,
   AERIAL_PERSPECTIVE,
   BOOST_METER,
   CLOUDS,
@@ -247,6 +252,9 @@ const _ATMO_TOD = SKY.altAtmo.tod.map((k) => ({
 }));
 const _ATMO_HI_RIM = _hex2rgb(SKY.altAtmo.highAltRim);
 const _ATMO_HI_VOID = _hex2rgb(SKY.altAtmo.highAltVoid);
+// R24 D: the law's warm forward-lobe tint, parsed once (raw sRGB 0..1; the
+// law's setter decodes it to linear alongside the rim).
+const _ATMO_SUN_TINT = _hex2rgb(AERIAL_LAW.sunTint);
 const _atmoRim = [0, 0, 0];
 const _atmoVoid = [0, 0, 0];
 // Round 19 (B): the aerial-perspective feed, a module scratch object reused
@@ -927,7 +935,6 @@ export function FlyScene({ runtime }) {
     [engine]
   );
 
-<<<<<<< HEAD
   // R24 D (LOD_CROSSFADE): install the crossfade hook into the vendored
   // three-tile (VENDOR.md patches 1-3) for the life of this engine. Installed
   // unconditionally: with the flag off every call returns immediately after
@@ -974,14 +981,13 @@ export function FlyScene({ runtime }) {
       if (window.__flyTerra?.__owner === owner) delete window.__flyTerra;
     };
   }, [engine]);
-=======
+
   // R24 C (ONE_SUN): the stashed style/tier hillshade base + the last TRUE sun
   // elevation the day cycle resolved (90 = "no sun published yet" ⇒ dayK, the
   // same answer a noon sun gives, so a pre-spawn frame is never brighter than
   // the settled one). Declared next to their first writer.
   const hillBaseRef = useRef(null);
   const hillElDegRef = useRef(90);
->>>>>>> 9783586
 
   // Hillshade style gate (live uniform — no re-patch, survives hot-swaps).
   // Round 11: tier-aware strength (uniform flip, free on degrade).
@@ -1680,7 +1686,13 @@ export function FlyScene({ runtime }) {
         _atmoRim[2],
         // Murk widens the aerial haze as well as the fog (hazeAdd is 0 at
         // baseline → the certified SKY.haze.max).
-        wx ? weatherHazeMax(SKY.haze.max, wx) : SKY.haze.max
+        // R24 D: under AERIAL_LAW this band is RETIRED (max 0) — its 16-55 km
+        // smoothstep IS the second fog, and the law covers 0 → extinction 1 on
+        // one continuous function. The band values are still written so every
+        // harness that reads them keeps reading them; only the amplitude goes.
+        AERIAL_LAW.enabled && !!AERIAL_LAW.styles?.satellite
+          ? 0
+          : wx ? weatherHazeMax(SKY.haze.max, wx) : SKY.haze.max
       );
       // --- Round 19 (B "DEEPFIELD"): the atmosphere + depth feed ------------
       // Placed HERE on purpose: _atmoRim is final (computeSatAtmo wrote it,
@@ -1697,22 +1709,92 @@ export function FlyScene({ runtime }) {
       // frame is bit-identical to R18 rather than merely close — which is what
       // lets every frozen satellite pixel gate keep its numbers.
       const highTier = flyState.qualityTier === 'high';
-      let aerialGate = highTier ? 1 : 0;
+      // R24 D: the fleet PIN is split out of the tier gate because the law runs
+      // at medium/low too — the pin must still reach it, the tier gate must
+      // not. `aerialGate` below is bit-identical to the R21 expression.
+      let aerialPin = 1;
       if (
         process.env.NODE_ENV === 'development' &&
         typeof window !== 'undefined' &&
         window.__flyAerialOverride != null
       ) {
-        aerialGate *= window.__flyAerialOverride;
+        aerialPin = window.__flyAerialOverride;
+      }
+      let aerialGate = (highTier ? 1 : 0) * aerialPin;
+
+      // --- R24 D (A8): the NIGHT RAMP -------------------------------------
+      // recon A8: the post pass mixes 0.55 toward the rim with NO sun term, at
+      // deep night included — and the deep-night rim is #101a30, so the same
+      // 0.55 DARKENS distant terrain instead of hazing it. The multiplier is
+      // the EXACT SAT_BUILDINGS.night curve the city windows come up on, so
+      // the atmosphere fades out on the same clock the lights arrive on. It is
+      // exactly 1 at frac >= dayFrac (noon keeps 0.55 bit-for-bit) and exactly
+      // 0 at frac 0. CPU multiply on an existing uniform: no shader text, no
+      // key move, and it is gated on its OWN flag so it can ship without the
+      // law (verify-atmo-law gates all three properties as a pure function).
+      let atmoNightMul = 1;
+      if (AERIAL_LAW.nightRamp) {
+        const nr = AERIAL_LAW.night;
+        const nt = Math.min(1, Math.max(0, 1 - (runtime.sun?.frac ?? 1) / nr.dayFrac));
+        atmoNightMul = 1 - nt ** nr.gamma;
+      }
+
+      // --- R24 D (AERIAL_LAW): the single atmosphere law -------------------
+      // ONE analytic f(distance, height, sunDir), evaluated per material at
+      // medium/low and as the post pass at high, out of ONE module over ONE
+      // uniform block. What it replaces: a 0.8-14 km post band (3-D from the
+      // camera, exp height falloff) handing off to a 16-55 km tile band (XZ
+      // from the bend centre, no height term) across a 2 km window where the
+      // total mix is mathematically CONSTANT — and nothing at all inside 16 km
+      // on medium/low. See scripts/r24-d-atmos.md §1.1 for the measured table.
+      //
+      // SATELLITE ONLY. Toy keeps its certified TOY.haze on the strength-0
+      // identity path: every symptom L4 names is a satellite symptom, and
+      // moving Neon would move every certified Neon pixel gate for no defect.
+      const lawOn = AERIAL_LAW.enabled && !!AERIAL_LAW.styles?.satellite;
+      if (lawOn) {
+        camera.updateMatrixWorld();
+        const lm = camera.matrixWorld.elements;
+        const ls = runtime.sun;
+        // The SAME basis setHillDir is fed (R16 hour-angle convention), so the
+        // Mie forward lobe points where the hillshade thinks the sun is.
+        const lcos = ls ? Math.cos(ls.el) : 0;
+        const lb = AERIAL_LAW.beta;
+        // Tier split: at high the post pass owns the law and the materials read
+        // 0; at medium/low the reverse. Never both — that is what makes "one
+        // law" true at the pixel rather than only in the source.
+        const lawK = AERIAL_LAW.strength * aerialPin * atmoNightMul;
+        setAtmoLaw({
+          eye: [lm[12], lm[13], lm[14]],
+          sunDir: ls ? [-Math.sin(ls.az) * lcos, Math.sin(ls.el), Math.cos(ls.az) * lcos] : [0, 1, 0],
+          groundY: flight.groundElev,
+          beta: [lb.base * lb.tilt[0], lb.base * lb.tilt[1], lb.base * lb.tilt[2]],
+          scaleH: AERIAL_LAW.scaleHM,
+          eyeH: Math.max(0, lm[13] - flight.groundElev),
+          rimSRGB: _atmoRim,
+          sunTintSRGB: _ATMO_SUN_TINT,
+          mieK: AERIAL_LAW.mie.k,
+          mieG: AERIAL_LAW.mie.g,
+          strength: highTier ? 0 : lawK,
+          postStrength: highTier ? lawK : 0,
+        });
+      } else {
+        clearAtmoLaw();
       }
 
       // (a) the depth post pass. Feeds the camera basis from matrixWorld — the
       // chase/cinema/photo rigs updated it ~40 lines above and the composer
       // renders at priority 1, so these values are this frame's, not last's.
-      if (AERIAL_PERSPECTIVE.enabled && aerialGate > 0) {
+      if ((AERIAL_PERSPECTIVE.enabled && aerialGate > 0) || (lawOn && getAtmoLaw().postStrength > 0)) {
         camera.updateMatrixWorld();
         const me = camera.matrixWorld.elements;
-        _aerialFeed.strength = AERIAL_PERSPECTIVE.maxMix * aerialGate;
+        // R24 D (A8): the night ramp multiplies the EXISTING uniform. Under
+        // AERIAL_LAW the pass reads its gate from the law instead (this value
+        // is kept in sync so verify-aerial's strength introspection still
+        // reports what is on screen).
+        _aerialFeed.strength = lawOn
+          ? getAtmoLaw().postStrength
+          : AERIAL_PERSPECTIVE.maxMix * aerialGate * atmoNightMul;
         _aerialFeed.startM = AERIAL_PERSPECTIVE.startM;
         _aerialFeed.endM = AERIAL_PERSPECTIVE.endM;
         _aerialFeed.heightFalloffM = AERIAL_PERSPECTIVE.heightFalloffM;
@@ -1842,6 +1924,7 @@ export function FlyScene({ runtime }) {
       // value behind would put a satellite grade on the Neon world — the exact
       // class of bug clearSkyWeather was added for in R16.
       clearAerial();
+      clearAtmoLaw(); // R24 D: the law's uniforms are shared with the toy programs
       setQuiltGrade(0, 0);
       setSatContentHaze(AERIAL_PERSPECTIVE.content.startM, AERIAL_PERSPECTIVE.content.endM, 0, 0, 0, 0);
       const target = groundHorizonTargetM(ah, skyFade.endM, ah.maxM);
@@ -1863,6 +1946,7 @@ export function FlyScene({ runtime }) {
       clearSkyAtmo();
       clearSkyWeather();
       clearAerial(); // round 19 (B): same reason as the toy branch above
+      clearAtmoLaw(); // R24 D: same reason
       setQuiltGrade(0, 0);
       setSatContentHaze(AERIAL_PERSPECTIVE.content.startM, AERIAL_PERSPECTIVE.content.endM, 0, 0, 0, 0);
     }

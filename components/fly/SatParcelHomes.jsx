@@ -1,28 +1,37 @@
 'use client';
 
+import { useEffect, useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import {
+  BufferAttribute,
   BufferGeometry,
   CanvasTexture,
   Color,
   DynamicDrawUsage,
-  LAMBERT_ENV,
   LinearFilter,
   MeshLambertMaterial,
   Object3D,
-  PARCEL_HOMES,
   RepeatWrapping,
+  Sphere,
   SRGBColorSpace,
+  Vector3,
+} from 'three';
+import { mercatorScale } from '@/lib/fly/coords';
+import {
+  GLOBE,
+  LAMBERT_ENV,
+  PARCEL_HOMES,
   SUBURB_NIGHT,
   SURFACE_CALM,
-  Sphere,
-  Vector3,
-  useEffect,
-  useMemo,
-  useRef } from 'react'; import { useFrame } from '@react-three/fiber'; import {   BufferAttribute,
-  } from 'three'; import { mercatorScale } from '@/lib/fly/coords'; import { GLOBE,
 } from '@/lib/fly/fly-constants';
 import { applyBendAnchor } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
+// D W1 REPAIR (reported to Fable): C's 9783586 shipped this file with its
+// whole import prologue collapsed onto two lines — react/r3f/three/app names
+// merged into one list, so app CONSTANTS were imported FROM 'three' and the
+// build failed with "The export STREAM_KEEPER was not found in module three".
+// The prologue below is the pre-C one verbatim, plus exactly the names C's
+// change needs. C's body edits are untouched.
 
 const _dummy = new Object3D();
 const _col = new Color();

@@ -1,26 +1,30 @@
 'use client';
 
+import { useEffect, useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { wrap } from 'comlink';
 import {
+  Color,
   DynamicDrawUsage,
-  LAMBERT_ENV,
   MeshLambertMaterial,
   Object3D,
+  Sphere,
+  SphereGeometry,
+  SRGBColorSpace,
+  Vector3,
+} from 'three';
+import { SatVegEngine } from '@/lib/fly/toy-world/sat-veg-engine';
+import {
+  GLOBE,
+  LAMBERT_ENV,
   PARCEL_HOMES,
   SAT_AMBIENT,
   SAT_GROUND_LIFE,
   SAT_SHADOWS,
   SAT_TINT,
   SAT_VEG,
-  SRGBColorSpace,
   SUBURB_NIGHT,
   SURFACE_CALM,
-  Sphere,
-  SphereGeometry,
-  Vector3,
-  useEffect,
-  useMemo,
-  useRef } from 'react'; import { useFrame } from '@react-three/fiber'; import { wrap } from 'comlink'; import {   Color,
-  } from 'three'; import { SatVegEngine } from '@/lib/fly/toy-world/sat-veg-engine'; import {   GLOBE,
 } from '@/lib/fly/fly-constants';
 import { applyBendAnchor, getRimColor } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
@@ -28,6 +32,12 @@ import { SatAmbientLife } from './SatAmbientLife';
 import { SatHouseLights } from './SatHouseLights';
 import { SatParcelHomes } from './SatParcelHomes';
 import { SatTintLayer } from './SatTintLayer';
+// D W1 REPAIR (reported to Fable): C's 9783586 shipped this file with its
+// whole import prologue collapsed onto two lines — react/r3f/three/app names
+// merged into one list, so app CONSTANTS were imported FROM 'three' and the
+// build failed with "The export STREAM_KEEPER was not found in module three".
+// The prologue below is the pre-C one verbatim, plus exactly the names C's
+// change needs. C's body edits are untouched.
 
 const _dummy = new Object3D();
 const _col = new Color();

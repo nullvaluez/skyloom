@@ -41,11 +41,15 @@ const POSE = { lat: 40.1578, lon: -83.0752, heading: 1.9, pitch: -0.3 };
 
 const PIN = {
   off: null,
-  on: { enabled: true },
-  // `slow` is the same code path with the blend stretched so SwiftShader can
-  // photograph it; boot suppression is shortened for the same reason (6 s of
-  // frame-clock is 6 frames here, which is most of the settle).
-  slow: { enabled: true, fadeSec: 6, skipBootMs: 1500 },
+  on: { enabled: true, skipBootMs: 1500 },
+  // `slow` is the same code path with the blend stretched so a screenshot can
+  // land mid-fade. MEASURED, and the reason the first ON leg read `active 12`
+  // stuck: FlyScene's -50 block clamps dt at 50 ms, so the fade clock advances
+  // 50 ms per RENDERED FRAME whatever the wall clock does. At ~1 fps a
+  // `fadeSec: 6` pin is 120 frames — two minutes of wall time per blend, which
+  // no ladder step waits for. The SHIPPING 0.25 is 5 frames and completes; 0.6
+  // is 12 frames, long enough to photograph and still finish inside a step.
+  slow: { enabled: true, fadeSec: 0.6, skipBootMs: 1500 },
 }[LEG];
 
 (async () => {
