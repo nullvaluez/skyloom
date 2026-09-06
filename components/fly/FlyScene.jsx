@@ -20,6 +20,7 @@ import {
   setEdgeFade,
   setEdgeFadeRGB,
   setHillDir,
+  setHillElev,
   setHillshade,
   setHillV2,
   setMicroDetail,
@@ -928,7 +929,12 @@ export function FlyScene({ runtime }) {
     hillBaseRef.current = sat
       ? (HILLSHADE.strengthByTier[qualityTier] ?? HILLSHADE.strength)
       : 0;
-    setHillshade(hillBaseRef.current * hillElevWeight(hillElDegRef.current));
+    setHillshade(hillBaseRef.current);
+    // R24 C (ONE_SUN): the elevation weight rides its OWN uniform — never
+    // multiplied into `strength`, which is the STYLE/TIER gate and carries
+    // verify-sat-depth's frozen "satellite default 0.55" assertion. Exactly 1
+    // with the flag off.
+    setHillElev(hillElevWeight(hillElDegRef.current));
     // Round 13 (P4): hillshade v2 (slope AO + slope saturation) rides the same
     // tier/style gate; both live INSIDE the uHillStrength envelope so the
     // verify-sat-depth strength-0 A/B toggle captures them and toy stays 0.
@@ -1019,9 +1025,10 @@ export function FlyScene({ runtime }) {
       // style/tier base, never the live uniform, so this cadence and the
       // style/tier effect can run in either order without compounding.
       hillElDegRef.current = trueElevationDeg(sun.sinEl);
-      if (ONE_SUN.enabled && hillBaseRef.current != null) {
-        setHillshade(hillBaseRef.current * hillElevWeight(hillElDegRef.current));
-      }
+      // Pure uniform write on the existing 60 s cadence; `strength` is left to
+      // the style/tier effect alone, so the two writers own disjoint values and
+      // cannot compound (the sunBaseRef/ocDim rule, applied structurally).
+      setHillElev(hillElevWeight(hillElDegRef.current));
       // Round 16: satellite's night sky. nightT is an inverse smoothstep of
       // frac (exactly 0 in daylight → the dome's new terms vanish), and the
       // moon rides the ANTI-solar hour angle so it rises as the sun sets.
@@ -2006,6 +2013,8 @@ export function FlyScene({ runtime }) {
           key: [+_kx.toFixed(6), +_ky.toFixed(6), +_kz.toFixed(6)],
           hill: getHillshade().dir.map((v) => +v.toFixed(6)),
           hillStrength: +getHillshade().strength.toFixed(4),
+          hillElev: +(getHillshade().elev ?? 1).toFixed(4),
+          hillEffective: +(getHillshade().effective ?? getHillshade().strength).toFixed(4),
           dome: _sd.live ? _sd.dir.map((v) => +v.toFixed(6)) : null,
           water: 'key', // one directional in the rig — the same vector by construction
         };
