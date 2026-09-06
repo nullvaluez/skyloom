@@ -116,7 +116,8 @@ if [ "${CERT_SKIP_NODE:-0}" != 1 ]; then
            verify-daily.mjs verify-depth-offset.mjs verify-terra-residency.mjs \
            verify-c-flagoff.mjs verify-worker-normals.mjs verify-skirt-worker.mjs \
            verify-lod-fade.mjs verify-vendor-three-tile.mjs verify-skirt-fast.mjs \
-           verify-frame-step.mjs verify-finalize-pace.mjs verify-artifact-hygiene.mjs; do
+           verify-frame-step.mjs verify-finalize-pace.mjs verify-artifact-hygiene.mjs \
+           r24-b-attr-proof.js; do
     [ -f "scripts/$g" ] || { printf 'SKIP  %s (absent)\n' "$g"; continue; }
     if node "scripts/$g" > "$OUT/node-$g.log" 2>&1; then
       printf 'PASS  %s\n' "$g"
@@ -364,7 +365,14 @@ run ladder-red   -   verify-ladder-fix.js FLY_LADDER_RED=1
 # full revolution, so "the same tile URL is not fetched twice as the heading
 # comes back round" never actually brought the heading back round. It asserts
 # for real at this length.
-run terra-live  "$K" verify-terra-live.js FLY_TERRA_ARMS=both FLY_TERRA_SWEEP_MS=600000
+# 900000, not 600000. MEASURED in pass 2b: the arc is FRAMES x 0.85 deg, and the
+# two arms do not render the same number of frames — the trio-ON arm does more
+# work per frame, so it swept 305 deg / 359 frames (0.6 fps) against the OFF
+# arm's 383 deg / 450 frames (0.8 fps), and gate 6 correctly read NOT CALIBRATED
+# for want of a full revolution on the SLOWER arm. A slow venue buys its arc
+# with wall clock; the ±10% arm-symmetry check may still be a coin at these
+# frame rates, and if it is, the row reports NOTCAL rather than loosening it.
+run terra-live  "$K" verify-terra-live.js FLY_TERRA_ARMS=both FLY_TERRA_SWEEP_MS=900000
 run frame-pace   -   verify-frame-pace.js
 # LAST, and longest: the four-pose census. Manhattan's sixteen dense chunks do
 # not settle at K=40 in this venue (measured: 12 still draping at 300 s on

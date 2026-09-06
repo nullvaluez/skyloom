@@ -117,6 +117,16 @@ node_gate verify-worker-normals.mjs      # C (R24): area-weighted DEM normals, 3
 node_gate verify-skirt-worker.mjs
 
 node_gate verify-artifact-hygiene.mjs    # E (R24): no R15-R23 calibration artifact may change
+# B (R24), gate 17. A defect that exists only in the TYPE of one object:
+# `setIndex(new Uint32Array(...))` assigns the raw typed array as
+# `geometry.index` — no `.array`, no `.count` — because BufferGeometry wraps
+# only when `Array.isArray(x)`. Every structural census (scene graph, mesh
+# counts, ready/chunk numbers, draw lists) reads CORRECT, and it throws only
+# when a GL context uploads: pass 2b's toy rows failed with 31 and 3 copies of
+# `Cannot read properties of undefined (reading 'byteLength')` and nothing else.
+# This finds it with NO GL context at all, which is why it belongs beside
+# verify-import-integrity rather than in the browser fleet.
+node_gate r24-b-attr-proof.js            # B (R24): BROKEN=0 — every index/attribute has an array
 node_gate verify-vendor-three-tile.mjs   # A (R24): the vendored copy is verbatim
 node_gate verify-skirt-fast.mjs          # A (R24): O(V) boundary scan is output-identical
 node_gate verify-frame-step.mjs          # A (R24): fixed-timestep sim / interpolated render pose
