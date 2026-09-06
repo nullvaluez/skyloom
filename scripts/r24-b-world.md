@@ -678,8 +678,17 @@ every wall's `computeVertexNormals` result, and under `DoubleSide` +
 performance win nobody has measured. The one-line change and the gate that
 should precede it are recorded here instead.
 
-- **Ships `enabled: false`. RECOMMENDED ON AT CLOSE, after E re-baselines the
-  neon-cover / seam hashes off the A/B in §7.1–7.2.**
+### 7.6 Recommendation — REVISED after §7.2b
+
+**Ships `enabled: false`, and B's recommendation is now OFF at close** unless
+Fable wants to spend a roof re-certification on it. `FLASH_GUARD` alone already
+removes the entire degenerate population from the GPU (**14.19 % → 0 resident**,
+measured end to end on the engine proof) with **zero bundle-byte movement and no
+frozen-gate exposure whatsoever**. That is the cheap 95 % of the win.
+`RING_DEDUPE` adds the buffer-size saving and the honest `ring[0]` restoration —
+both real — at the price of moving roof-form outcomes on four certified toy and
+satellite gates. Correct and certified are different claims; only the second is
+a merge gate.
 
 ---
 
