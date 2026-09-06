@@ -719,6 +719,49 @@ building, before/after, through verify-flicker's five controls.
    block that asked. A failed string match leaves them `false` / `null` and the
    gate sees the truth.
 
+### NEW GATE — `scripts/verify-shadow-calm.mjs` (node, 32 gates, runs anywhere)
+
+The browser gate does not exist and could not: it would have to un-pin
+`__flySatShadowOverride` — the FIRST term of the catcher's four-term mount
+condition — and the container's browser budget belongs to certification. So
+SHADOW_CALM would otherwise have shipped on structural scans alone. **It does
+not have to**, because the load-bearing half is two edits to a STRING and one
+piece of arithmetic, and both are executable in node:
+
+- **(A) the ShaderChunk patch runs against three's REAL chunk text.** The patch
+  was refactored into a pure `r24PatchShadowChunk(src, opts)` for exactly this,
+  and the gate drives it with the options forced both ways. That is a stronger
+  statement than any source scan — not "the code looks right" but **"here is the
+  GLSL three would receive"**. It asserts: options-off returns the chunk
+  byte-identical; both anchors occur EXACTLY once in three's text (so a replace
+  cannot land in a sibling branch — VSM and BASIC must not be touched); the
+  defect is still present upstream (`z += shadowBias` unconditional in PCF)
+  while VSM and BASIC still carry the `#ifdef` (the precedent); after the patch
+  the reversed-depth `#ifdef` count goes 2 → 3; the preprocessor pairs stay
+  balanced; **reversing the edit reproduces three's text exactly**, so nothing
+  outside the PCF `getShadow` moved; `getPointShadow`'s screen-space rotation is
+  deliberately untouched; and patching twice is a no-op.
+- **(B) the texel snap is checked numerically**, by lifting FlyScene's own
+  `snapToShadowTexel` body and running it against a real three shadow-camera
+  basis: a snapped point lands on the light-space texel lattice; **stepping the
+  target by 0.4 texel moves the snapped target by 0.00e+0 m**; stepping by 1.4
+  texels moves it by exactly one texel (1.46484 m against a texel of
+  1.46484375 m); and 401 samples across 10 texels of continuous travel produce
+  exactly **11 distinct positions — a staircase, not a slide**, which IS the
+  defect being fixed.
+
+**The gate found a real defect in my own module on its first run.** `PHI_TO`
+treated every unrecognised `kernel` name as `'world'`, so a typo in the
+constants block would have silently shipped a kernel nobody asked for — in a
+feature whose entire subject is a kernel nobody could see. It is now an
+allow-list (`'world' | 'fixed'`; anything else, including `'three'`, leaves
+three's rotation alone), and the constants comment says why.
+
+**NOT proven here, and it stays in the ship table that way:** no pixel moves, no
+draw count, no evidence that the catcher receives a shadow. "Owens is 0 by
+construction" rests on `queryColumns` answering `[]` over empty terrain, which
+is a browser fact. Those rows belong to the user's machine.
+
 ### Cost
 
 0 draws over empty terrain, +1 where casters exist. The kernel edits are
