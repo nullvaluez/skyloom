@@ -256,3 +256,172 @@ forest, suburb or landcover sheet vanishing at once).
   (§10 hand-off).
 - **Ships `enabled: false`. RECOMMENDED ON AT CLOSE.**
 
+---
+
+## §3 M3 — CHUNK_FADE (WB-2, A6): nothing arrives or leaves in one frame
+
+### 3.1 RED — measured end to end, in node
+
+`node scripts/r24-b-engine-proof.js` runs the REAL `SatBuildingEngine` in node
+(it is pure three scene-graph + typed-array work — nothing touches a GL context
+until something renders) driven by the REAL `vector-tile.worker.js` against the
+closed-ring fixture bytes, over a 90 s / 2,700-frame serpentine at 120 m/s with
+the pseudo-DEM refining twice.
+
+The instrument is the **effective per-mesh alpha**: the value of the
+`uSatBldgFade` uniform the mesh's material actually carries (a fade twin
+publishes its own on `material.userData.__fadeU`; a shared material reads the
+module uniform) times `visible`. A **POP** is any mesh whose effective alpha
+moves by a full 1.0 between two consecutive frames.
+
+| | flags OFF (RED) | flags ON (GREEN) |
+|---|---:|---:|
+| single-frame **POPS** | **92** | **2** (both attributable — see below) |
+| ramp steps | **0** | 600 |
+| evictions | 40 | 24 |
+| heals | 16 | 21 |
+| …of which patched in place | **0** | **21** |
+| resident degenerate tris | **15,984 (14.19 %)** | **0** |
+| fade twins live | 0 | 8 (pooled, bounded) |
+
+**92 single-frame pops in 90 s of ordinary flight, and zero ramps: on this tree
+every chunk arrival and every eviction is a cut.** That is the measurement
+behind the user's "buildings appearing and disappearing".
+
+### 3.2 Mechanism
+
+`_finalizePending` does `this.object.add(mesh)` the frame a chunk completes;
+`_evict` does `remove + geometry.dispose()` the frame the desired set changes.
+The only dissolve that exists is ALTITUDE-keyed and driven by ONE
+module-shared uniform (`setSatBldgFade`, world-bend.js:1473), which cannot
+express a per-mesh ramp — and it cannot, because **three re-uploads a
+material's uniforms only when the MATERIAL changes between draws**
+(`refreshMaterial` is keyed on `currentMaterialId !== material.id`), so a
+per-draw write against one shared material is simply never uploaded for the
+2nd..Nth mesh.
+
+### 3.3 Fix
+
+`lib/fly/toy-world/chunk-fade.js` + a **twin material**: a ramping chunk wears
+a POOLED clone of its engine's shared material carrying its OWN fade uniform,
+and is handed back to the shared material the frame the ramp completes.
+Steady state is therefore ONE shared material per engine, exactly as today.
+
+- `applyBendAnchorSat(material, fadeUniform)` and
+  `applyBendAnchorSatSkyline(material, fadeUniform)` gain ONE optional
+  argument. **No GLSL text changes — same declarations, same discard, same
+  cache key — so this is uniform plumbing, NOT a key move**, and a caller that
+  omits the argument gets the R21 behaviour verbatim.
+- Per-mesh value = `altitudeFade × ramp(t)`: a chunk born at 2.8 km AGL
+  arrives already thinned rather than solid, and the ramp MULTIPLIES the
+  existing altitude law instead of replacing it.
+- A chunk evicted mid-birth carries its ramp value across (`k0`) so it dims
+  from where it actually is instead of flashing to solid for one frame.
+- **Warp, tier arm, style flip and `dispose()` all land every ramp
+  immediately** — a cut is never a crossfade, and a twin's program key follows
+  `USE_MAP`/`USE_EMISSIVEMAP` so a tier arm must not leave one behind.
+- Parcel homes: `growK` is eased over `parcelGrowSec` 0.6 s by applying the
+  scale RATIO to the resident instance matrices in place (uniform scale on the
+  3×3 basis, translation untouched) with a ranged upload — R22's RED measured
+  1,874 Melton homes arriving in one 100 ms sample at 100 % of settled scale.
+  Zero keys, zero draws, and the buffer is walked only while an ease runs.
+
+### 3.4 Why it compiles nothing
+
+The twin is built with the same constructor parameters, the same
+`map`/`emissiveMap`/`emissive` state (mirrored on every acquire) and the same
+`customProgramCacheKey`, so three's program cache returns the SAME
+`WebGLProgram` and increments its refcount. Releasing a twin cannot delete the
+program because the shared material still holds a reference. **This is E's
+proof obligation, not an assumption** — `programs.length` must be flat across
+a serpentine and across a tier step (§10).
+
+### 3.5 Counts, draws and budgets
+
+- **A birth changes NO count.** The chunk is `ready` from the frame it
+  finalizes exactly as before, so verify-sat-buildings / verify-roof-variety /
+  verify-skyline see what they see today; only pixels move for ~0.4 s.
+- **Only the DYING set adds draws.** A dying mesh has already left
+  `this.chunks` (so every `ready`/`columns` count is unchanged) and keeps
+  drawing while it dims, bounded by `maxDying` 4. **Owens has nothing to fade,
+  so it takes exactly 0 extra draws BY CONSTRUCTION.**
+- When a budget is spent the engine degrades to today's instant behaviour and
+  COUNTS it (`stats.fadeBudgetMiss`). The gate asserts
+  `pops <= fadeBudgetMiss`: **both residual pops in the GREEN run are
+  attributable**, so nothing unexplained survives the feature.
+
+### 3.6 Decisions
+
+- **sat-roads is DELIBERATELY EXCLUDED.** `verify-sat-night`'s frozen gate
+  asserts that ONE material instance carries every road mesh (by uuid, at two
+  legs minutes apart) and that `meshes === ready === visible`. A twin material
+  or a dying mesh turns that assertion into a load-decided coin — the exact
+  R21 anti-pattern (a load-decided instrument gets one quiet re-run and a
+  CONTROL, never a new bound). Road ribbons are also the least visible pop in
+  the set. Revisiting this needs a sanctioned gate change and is not worth it
+  this round.
+- **The skyline's binary `visible` flip is NOT a visual pop and is left
+  alone.** A group is parked only when its FARTHEST corner is inside
+  `uSkyHole.x`, at which point every one of its anchors already fails
+  `smoothstep(hole, hole+feather, vSkyDist)` and every fragment is discarded —
+  the engine's own comment says so ("a draw call, a vertex shader pass and a
+  full fragment-kill for zero pixels. Park it"). It is a DRAW-COUNT
+  optimization on already-invisible geometry, i.e. pixel-neutral by
+  construction. R21's inline reading of it as "a 4.9 km block of city blinking
+  on and off" is not supported by the shader; the real blink sources are the
+  bend-margin false cull (§2) and the arrival/eviction cut (§3). Marked
+  hypothesis-level in §7 pending a fixture pixel A/B.
+- **Ships `enabled: false`. RECOMMENDED ON AT CLOSE.**
+
+---
+
+## §4 M4a — HEAL_IN_PLACE (WB-8, T8): a heal is no longer a hole
+
+### 4.1 RED
+
+Same run: **16 heals with the flag off, every one of them an evict + refetch**
+— the chunk is GONE for the whole worker roundtrip + drape + finalize latency,
+up to `healCap` 3 times per key on hilly terrain. R21 bounded how MANY times
+that can happen; it never stopped a single heal from being a HOLE. Each one
+also takes the chunk's collision columns and house anchors with it, which is
+what replays the R21 parcel-home placement race on every DEM refinement.
+
+### 4.2 Fix
+
+At finalize the engine now retains a **per-run drape record** — one entry per
+BUILDING (its chunk-local anchor, its vertex span, and the ground it was draped
+on), built inside the anchor-run walk that already exists, plus a
+`houseRun` index so a porch light moves with its own building. A few thousand
+floats per chunk, not per-vertex.
+
+A heal then re-samples the DEM per building on its OWN budget
+(`HEAL_IN_PLACE.budgetMs` 0.6 ms, below `SAT_BUILDINGS.drapeBudgetMs` so a heal
+can never cost more than the arrival it replaces) and patches:
+
+- the **resident position buffer** (`arr[v*3+1] += delta` over the run's span),
+  with a **ranged upload** over the touched span only;
+- the collision **column tops** (`buildColumnGrid` preserves run order, so
+  column `r` IS run `r`);
+- the **porch-light anchors** via `houseRun`;
+- the bounding sphere (+ the R21/R24 bend pad).
+
+A run whose ground moved less than `minDeltaM` is skipped, and a heal that
+moves nothing at all marks the chunk's `drapeZ` so it stops asking (that is
+evidence, not a transient). The job is invalidated by RECORD IDENTITY
+(`chunks.get(key) !== chunk`), which is what an evict-and-re-stream actually
+does — a generation counter would not catch it.
+
+**GREEN: 21 heals, 21 patched in place, 0 holes.** Evictions fall 40 → 24 in
+the same run because a heal is no longer an eviction at all.
+
+### 4.3 Scope and follow-ups
+
+Scoped to the **satellite building ring** — the user's symptom, and the only
+engine whose drape is per-anchor. `sat-road-engine.js:333-354` and
+`toy-world-engine.js:598-615` carry the identical evict-then-rebuild shape but
+drape on bilinear GRIDS, so an in-place patch there means retaining the chunk's
+sample grid and computing `heightNew(x,z) − heightOld(x,z)` per vertex from the
+mesh's own (unchanged) XZ. That is a clean follow-up, not a port. Named in §8.
+
+- **Ships `enabled: false`. RECOMMENDED ON AT CLOSE.**
+
