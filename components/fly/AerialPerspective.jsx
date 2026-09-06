@@ -150,6 +150,75 @@ export function getAerialState() {
 // The height term stays as the second guard.
 const SKY_TEST = DEPTH_FIX.enabled ? 'depth >= 0.999999' : 'd >= 0.999999';
 
+/**
+ * ROUND 24 (D ATMOS) — the LAW variant of this pass.
+ *
+ * Same reconstruction, same reversed-depth handling, same two early-outs. What
+ * changes is the four lines that used to BE the atmosphere:
+ *
+ *   old:  mix( color, uHazeColor, uMaxMix * smoothstep(uBand, dist) * exp(-h/H) )
+ *   new:  atmoApply( color, vec3( dist, h, cosSun ) )
+ *
+ * The old form is a band with two edges and no sun term, and it hands off at
+ * 14 km to a tile haze with a different distance metric and no height term at
+ * all — the 2 km dead band recon L4 measured. `atmoApply` is the same analytic
+ * function the per-material term evaluates at medium/low, out of the same
+ * module, over the same uniform block: `lib/fly/atmo-law.js`. The two cannot
+ * drift, which matters because no pose exercises both tiers at once.
+ *
+ * `uAtmoStrength` here is THIS program's gate — the post gate — while the
+ * identically-named uniform in the patched materials carries the per-material
+ * gate. That is the tier split, and it is why the two never double-haze: at
+ * high the materials read 0 and this reads the law, at medium/low the reverse.
+ *
+ * The distance is `length(viewPos)` and `cosSun` divides the same ray by the
+ * same `max(dist, 1e-4)` that `atmoPack` uses in the vertex stage, so the two
+ * evaluators measure the same ray by construction, not by agreement.
+ */
+const lawFragmentShader = /* glsl */ `
+${ATMO_GLSL_DECL}
+uniform float uTanHalfFov;
+uniform vec3 uCamRight;
+uniform vec3 uCamUp;
+uniform vec3 uCamZ;
+uniform vec2 uBendCenter;
+uniform float uBendK;
+uniform float uReverseDepth;
+${ATMO_GLSL_FRAGMENT}
+
+void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth, out vec4 outputColor) {
+  // REVERSED DEPTH — detected from the live renderer, never assumed (see the
+  // legacy shader below for the full reasoning; three downgrades the request
+  // when EXT_clip_control is missing and a hard-coded flip would invert the
+  // world on exactly those devices).
+  float d = uReverseDepth > 0.5 ? 1.0 - depth : depth;
+  // Two early-outs, both load-bearing: strength 0 is the fleet pin / tier gate
+  // / style gate and returns the input UNMODIFIED (bit-identity, not "close");
+  // sky pixels keep the cleared far depth and must be skipped, because the
+  // dome already paints the tone this pass mixes toward.
+  if ( uAtmoStrength <= 0.0 || d >= 0.999999 ) {
+    outputColor = inputColor;
+    return;
+  }
+  float viewZ = getViewZ( d );
+  float linZ = -viewZ;
+  vec2 ndc = uv * 2.0 - 1.0;
+  vec3 viewPos = vec3( ndc.x * aspect * uTanHalfFov * linZ, ndc.y * uTanHalfFov * linZ, viewZ );
+  float dist = length( viewPos );
+  // Back to the rebased world frame through the camera's own basis columns.
+  vec3 ray = uCamRight * viewPos.x + uCamUp * viewPos.y + uCamZ * viewPos.z;
+  vec3 world = uAtmoEye + ray;
+  // UNDO THE MINI-PLANET BEND before asking how high this fragment is: at the
+  // satellite k, ground 14 km out has been pushed ~980 m down, so distant
+  // peaks would read as valley floors and the height term would collapse into
+  // a second distance term.
+  float dXZ = distance( world.xz, uBendCenter );
+  float trueY = world.y + dXZ * dXZ * uBendK;
+  float cosSun = dot( ray / max( dist, 1.0e-4 ), uAtmoSunDir );
+  outputColor = vec4( atmoApply( inputColor.rgb, vec3( dist, trueY - uAtmoGroundY, cosSun ) ), inputColor.a );
+}
+`;
+
 const fragmentShader = /* glsl */ `
 uniform vec3 uHazeColor;
 uniform vec2 uBand;
@@ -237,12 +306,41 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth,
 }
 `;
 
+/**
+ * R24 D: which pass ships. Read ONCE at construction, from a module const, so
+ * production and the PREWARM twin (which builds through this same constructor)
+ * can never compile different programs — the Effects.jsx el()/raw() rule.
+ */
+const LAW = () => AERIAL_LAW.enabled && !!AERIAL_LAW.styles?.satellite;
+
 export class AerialPerspectiveEffect extends Effect {
   constructor() {
-    super('AerialPerspectiveEffect', fragmentShader, {
+    const law = LAW();
+    super('AerialPerspectiveEffect', law ? lawFragmentShader : fragmentShader, {
       // This is what makes the composer allocate + bind its depth texture.
       attributes: EffectAttribute.DEPTH,
-      uniforms: new Map([
+      uniforms: new Map(law ? [
+        // The law's own block, mirrored per program. update() COPIES the live
+        // values out of atmo-law's shared uniforms every frame, so the numbers
+        // that define the law are one source and only the GATE differs.
+        ['uAtmoEye', new Uniform(new Vector3())],
+        ['uAtmoSunDir', new Uniform(new Vector3(0, 1, 0))],
+        ['uAtmoGroundY', new Uniform(0)],
+        ['uAtmoBeta', new Uniform(new Vector3())],
+        ['uAtmoScaleH', new Uniform(1200)],
+        ['uAtmoEyeH', new Uniform(0)],
+        ['uAtmoInscatter', new Uniform(new Color(0, 0, 0))],
+        ['uAtmoSunTint', new Uniform(new Color(0, 0, 0))],
+        ['uAtmoMie', new Uniform(new Vector3(0, 0.76, 0))],
+        ['uAtmoStrength', new Uniform(0)],
+        ['uTanHalfFov', new Uniform(0.5)],
+        ['uCamRight', new Uniform(new Vector3(1, 0, 0))],
+        ['uCamUp', new Uniform(new Vector3(0, 1, 0))],
+        ['uCamZ', new Uniform(new Vector3(0, 0, -1))],
+        ['uBendCenter', new Uniform(new Vector2())],
+        ['uBendK', new Uniform(0)],
+        ['uReverseDepth', new Uniform(0)],
+      ] : [
         ['uHazeColor', new Uniform(new Color(0, 0, 0))],
         ['uBand', new Uniform(new Vector2(800, 14000))],
         ['uMaxMix', new Uniform(0)],
@@ -258,6 +356,7 @@ export class AerialPerspectiveEffect extends Effect {
         ['uReverseDepth', new Uniform(0)],
       ]),
     });
+    this._law = law;
     // Resolved from the live renderer on the first update() — see the shader.
     this._reversed = null;
   }
@@ -279,6 +378,32 @@ export class AerialPerspectiveEffect extends Effect {
       if (got !== undefined) this._reversed = got ? 1 : 0;
     }
     u.get('uReverseDepth').value = this._reversed ?? 0;
+    if (this._law) {
+      // Copy the LAW out of atmo-law's shared uniform block (the same objects
+      // the patched materials reference) and take the POST gate for this
+      // program's uStrength. Camera basis, bend and FOV still come from the
+      // per-frame feed above, which FlyScene writes one step before the
+      // composer renders.
+      const a = atmoUniforms;
+      const post = getAtmoLaw().postStrength;
+      u.get('uAtmoEye').value.set(a.uAtmoEye.value.x, a.uAtmoEye.value.y, a.uAtmoEye.value.z);
+      u.get('uAtmoSunDir').value.set(a.uAtmoSunDir.value.x, a.uAtmoSunDir.value.y, a.uAtmoSunDir.value.z);
+      u.get('uAtmoGroundY').value = a.uAtmoGroundY.value;
+      u.get('uAtmoBeta').value.set(a.uAtmoBeta.value.x, a.uAtmoBeta.value.y, a.uAtmoBeta.value.z);
+      u.get('uAtmoScaleH').value = a.uAtmoScaleH.value;
+      u.get('uAtmoEyeH').value = a.uAtmoEyeH.value;
+      u.get('uAtmoInscatter').value.setRGB(a.uAtmoInscatter.value.r, a.uAtmoInscatter.value.g, a.uAtmoInscatter.value.b);
+      u.get('uAtmoSunTint').value.setRGB(a.uAtmoSunTint.value.r, a.uAtmoSunTint.value.g, a.uAtmoSunTint.value.b);
+      u.get('uAtmoMie').value.set(a.uAtmoMie.value.x, a.uAtmoMie.value.y, 0);
+      u.get('uAtmoStrength').value = post;
+      u.get('uTanHalfFov').value = s.tanHalfFov;
+      u.get('uCamRight').value.set(s.camRight[0], s.camRight[1], s.camRight[2]);
+      u.get('uCamUp').value.set(s.camUp[0], s.camUp[1], s.camUp[2]);
+      u.get('uCamZ').value.set(s.camZ[0], s.camZ[1], s.camZ[2]);
+      u.get('uBendCenter').value.set(s.bendCx, s.bendCz);
+      u.get('uBendK').value = s.bendK;
+      return;
+    }
     u.get('uMaxMix').value = s.strength;
     // R24 C (LINEAR_HAZE): Color.setRGB's default colorSpace is the WORKING
     // space, i.e. no conversion — which is exactly the L1 defect. Naming

@@ -101,6 +101,9 @@ patch keeps its row, marked WITHDRAWN.
 | 2 | A | `TERRA_PACE.mergeHysteresis` · `TERRA_PACE.keepResident` | `index.js` · `Tile._LODEvaluate()` | T1 — one threshold both ways with no hysteresis (refine↔merge flip), and a merge test that is satisfied the instant a tile leaves the frustum, so every yaw collapses the field behind the camera and re-downloads a coarser parent ("tiles swapping for other ones") | the single upstream `return` expression, unchanged, below the branch |
 | 3 | A | `TERRA_PACE.keepResident` | `index.js` · `Tile._getDistRatio()` | T1 — PATCH 2's merge test needs the in-frustum distance law in every direction; re-scaling the ×5 result would not be the same float | an early return reachable only when a caller passes `true`; every upstream call site passes nothing |
 | 4 | A | `TERRA_PACE.skirtFast` | `index.js` · module scope + `We()` (getBoundaryEdges) | T2 / FL-02 / A2 — the boundary-edge finder allocates 3 two-element arrays per triangle and sorts all 3T with a boxed comparator; R22.1 profiled it + its comparator at 67% of every stalled ms while streaming | an early-out at the top of `We`; the entire upstream body follows, unchanged |
+| 5 | D | `LOD_CROSSFADE.enabled` | `index.js` · module scope + the export list | T4(b/c) — infrastructure: the bundle must not import app code, so the app installs a `{ onRefine, onMerge }` object through `setLodFadeHook()` and every policy decision (flag, boot/warp suppression, concurrency bound, clock, parent-texture lifetime) lives in `lib/fly/lod-crossfade.js` | the holder is `null`, nothing in the library reads it, and patches 6 and 7 short-circuit |
+| 6 | D | `LOD_CROSSFADE.enabled` | `index.js` · `Tile._loadSubTiles()` | T4(b/c) — a refine is an atomic single-frame swap in which texture sharpness AND Martini relief (91 m error at z13 vs 11 m at z15) change together, which is what the user reported as "terrain tiles swapping for other ones" | the hook is `null` → one short-circuited `&&`; the upstream `return h ? this.unloadSubTiles() : (this.add(...o), …, this.unloadModel()), !h;` expression is byte-verbatim and unconditional |
+| 7 | D | `LOD_CROSSFADE.enabled` | `index.js` · `Tile._removeSubTiles()` | T4(b/c) — merges use the same atomic pattern; the leaf children dissolve INTO the freshly loaded parent imagery before the geometry swap | the hook is `null` → nothing is awaited, `_loadState` is never touched, and the upstream return expression is byte-verbatim |
 | 8 | C | `TERRAIN_LIGHT.workerNormals` | `index.js` · `r24SpliceWorkerTail()` (the PATCH 20 splice) + `workers/skirt-tail.src.js` · `r24SmoothNormals()` and `r24AddSkirt()`'s normal writes | T6 / L8 / T7 — three-tile's per-vertex normal pass is `t[n] = t[s] = t[o] = g * w`: every vertex is ASSIGNED its triangle's face normal with no accumulation and no normalisation, so a shared vertex keeps whichever triangle was LAST, and since Martini triangulates gentle slopes into long slivers that choice is arbitrary exactly where the eye expects a smooth hillside — the faceted relief. Skirt vertices additionally get a hard-coded world-up normal, so a near-vertical curtain is lit as flat ground (the smeared-cliff half of the LOD seam). | the substituted literal is `false`, so the `if (r24Normals)` branch is dead and `r24AddSkirt` takes its verbatim upstream-shaped `else` — A's skirt output is element-for-element identical |
 | 20 | A | `TERRA_PACE.skirtWorker` **or** C's `TERRAIN_LIGHT.workerNormals` | `index.js` · module scope + `qe()` / `nt()` (the two geometry-returning DEM worker factories) | T2 / FL-02 / A2 (F2) — the skirt is built on the MAIN thread in the promise continuation after the worker returns; this moves scan + skirt + attribute concat INTO the worker and returns transferables | the verbatim upstream factory body; the splice returns null and the stock worker is created |
 | 21 | A | `TERRA_PACE.skirtWorker` | `index.js` · `TileGeometry.setAttributes()` | T2 — with PATCH 5 the arrays arrive finished, so the main-thread skirt build must not run twice | an inserted early return taken only when the worker set `r24Skirted`; upstream's body follows unchanged |
@@ -157,6 +160,53 @@ decision; the REFINE arm is byte-identical to upstream in both switch states,
 which `scripts/verify-terra-residency.mjs` gate 7 proves by running a
 fixed-heading approach in both arms and comparing refine counts, request
 counts and the loaded-tile census.
+
+### D's patches in detail (LOD_CROSSFADE — rows 5, 6, 7)
+
+All POLICY lives in `lib/fly/lod-crossfade.js`, not here: the flag, the boot
+window (`skipBootMs` — boot reveal timing is frozen, and a world that assembles
+itself out of blurry parents is a different first impression), the warp
+suppression (`WARP.flashMs` 250 already masks a cut), the concurrency bound,
+the clock (driven from FlyScene's -50 block on the frame dt) and the parent-
+texture lifetime. The library gets two call sites and a holder.
+
+**Why patch 6 must sit exactly where it does.** `unloadModel()` disposes the
+parent's texture in the same expression that adds the children. The hook runs
+one statement earlier, detaches `material.map` from the parent material (so the
+dispose walk cannot reach it), refcounts it, and hands it to the four children
+as a second sampler with a clip-UV rectangle. Moving the call after the return
+expression would blend against a disposed texture.
+
+**Why patch 7 holds `_loadState` at "loading" across its await.** `_update()`
+skips a tile whose `loadState` is `"loading"` and, because children are only
+visited inside that same branch, skips its whole subtree. Without the hold, a
+parent whose model is loaded but not yet added would be re-evaluated mid-blend
+and could call `_loadSubTiles` on itself. The hook's promise is capped
+(`fadeSec + 400 ms`) so a tile unloaded mid-blend can never leave the library
+awaiting forever.
+
+**Zero extra draws.** The children were already the drawn geometry in both
+directions; the blend is one extra `texture2D` in the tile fragment. The
+rejected alternative (keep the parent drawn under the children and dither it
+out) costs a transient draw per in-flight quad and, per the archived R22.1 B3
+finding, an ordered screen-door dither under SMAA-only AA reads as shimmer.
+
+### D note (2026-09-06): gate 6 and the insert-only invariant
+
+SUPERSEDED (A, 2026-09-06): the gate is now git-anchored (it hashes the files AS OF the vendoring commit and proves the working copy differs only inside marked hunks), so this note is history. It read: `verify-vendor-three-tile` gate 6 asserts the vendored `index.js` is
+BYTE-IDENTICAL to upstream. That is exactly right at the vendoring commit and
+cannot survive any patch, so it goes RED the moment patch 1 lands. The
+replacement assertion that keeps A's intent — "byte-verbatim upstream when off"
+— without being trivially satisfiable is:
+
+> **every upstream line still appears in the vendored file, in order** (the
+> diff is INSERT-ONLY).
+
+That is the machine-checkable form of switch-idiom rule 2: an insert-only diff
+cannot have edited or deleted an upstream statement, only added guarded ones
+around it. D's three patches satisfy it today (upstream 1,987 lines, vendored
+2,028, zero upstream lines missing or reordered). Flagged to A/Fable rather
+than edited here, because `scripts/verify-vendor-three-tile.mjs` is A's file.
 
 ### The switch idiom every patch must follow
 
