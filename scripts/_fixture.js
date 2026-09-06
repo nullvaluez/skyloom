@@ -141,6 +141,18 @@ function fixturePin(baseUrl, demMaxZoom = 15) {
       maxLevel: demMaxZoom,
       attribution: 'r24-fixture',
     },
+    // Imagery is pinned as a SOURCE rather than routed. Measured: routing
+    // every imagery tile through context.route kept three-tile's download
+    // queue full, and its quadtree walk freezes while
+    // `downloadingThreads + 4 >= maxThreads` — the tree stalled at z6, so
+    // every satellite building drape sample read below SAT_BUILDINGS.demZ and
+    // the pipeline retried forever. The ArcGIS route below stays as a net.
+    // NOTE the path order: ArcGIS World_Imagery is {z}/{y}/{x}.
+    img: {
+      url: `${baseUrl}/img/{z}/{y}/{x}`,
+      minLevel: 0,
+      attribution: 'r24-fixture',
+    },
   };
 }
 
