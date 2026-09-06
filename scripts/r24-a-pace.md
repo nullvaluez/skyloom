@@ -1200,6 +1200,162 @@ I have not touched it: it is E's file and E's seam.
 
 ---
 
+## §15 Pass-2b step-clean: the rig was not the only writer — r3f was the other
+
+Second defect found in a shipped R24 feature, and the same shape as §14: a
+claim in a header that I never measured.
+
+### What pass 2b measured
+
+Tree `ec53fd3`, STEP_SAFE + LADDER_FIX ON, DPR 1.5, governor pin released:
+6 forced steps, **12 DPR applications, exactly 6 inside a rAF and 6 outside**,
+and **12 of 30 canvas.width/height writes outside a frame**. Each outside
+application carries the **same value** as the inside one, 46–117 ms later:
+
+    setPixelRatio: {d:1.25,inRaf:true, t:178239.6}
+                   {d:1.25,inRaf:false,t:182942.8}
+                   {d:1.5, inRaf:true, t:184117.3}
+                   {d:1.5, inRaf:false,t:184181.2}   …
+
+Same value, one per step, shortly after. That is not a race and not the
+governor stepping twice — it is a **second writer applying what the rig has
+already applied**.
+
+### The chain, named exactly
+
+`FlyCanvas` holds the DPR in **React state** and passes `<Canvas dpr={dpr}>`.
+The `setDpr` the rig calls is that React setter, not r3f's store setter. So:
+
+1. rig applies to three inside the frame (`setPixelRatio` → `setSize` →
+   `composer.setSize`) — the 6 inside applications;
+2. rig calls `setDpr(d)` → React schedules a render;
+3. on commit, r3f's `Canvas` layout effect runs
+   `await root.current.configure({ …, dpr, … })` — an **await**, so the store
+   write lands a task later (`@react-three/fiber` 9.6.1,
+   `react-three-fiber.esm.js:62-77`);
+4. r3f's zustand subscriber then re-applies, unconditionally
+   (`events-b389eeca.esm.js:1158-1166`):
+
+        if (size.width !== oldSize.width || … || viewport.dpr !== oldDpr) {
+          updateCamera(camera, size);
+          if (viewport.dpr > 0) gl.setPixelRatio(viewport.dpr);
+          gl.setSize(size.width, size.height, updateStyle);
+        }
+
+   — outside any animation frame. The 6 outside applications.
+
+The arithmetic checks out exactly. Per application three does one
+`setPixelRatio` (which internally calls `setSize` once) plus one explicit
+`setSize` = 1 + 2. Six rig applications and six r3f applications give
+**12 setPixelRatio and 24 setSize**, which is precisely what the log reports,
+with half of each outside.
+
+It cannot be pre-empted from the rig: `configure` is async, and the subscriber
+is captured in `createRoot`'s closure with nothing exported to reach it.
+`flushSync` does not help either — the `await` defers the store write past the
+flush.
+
+### What I got wrong, in my own words
+
+The rig's header said:
+
+> r3f's own catch-up then re-applies identical numbers on its next commit, and
+> **Chromium does not reallocate on an unchanged `canvas.width`** — which is
+> why calling `setDpr` here as well is not a second resize.
+
+I never measured that, and the HTML spec says the opposite: assigning `width`
+or `height` resets the canvas bitmap. I knew there was a second writer — I
+wrote it down — and then argued it away with an unverified claim instead of
+either measuring it or removing it. **That is how a second writer survived a
+design whose entire claim is that there is one writer.** Both headers now carry
+the retraction rather than a quiet edit.
+
+### The fix: `installResizeGuard`
+
+When the rig owns the step, a resize request for the state the renderer is
+**already in** must not reach the canvas. The rig installs an instance-level
+guard on `gl.setPixelRatio` / `gl.setSize` from an effect keyed on the
+renderer, and removes it on unmount.
+
+It skips **only** redundancy, never work:
+
+- a real DPR step resizes (its target differs);
+- a real container resize resizes (same, on the other axis);
+- an unsettled CSS style is not "already satisfied" and delegates;
+- `xr.isPresenting` and a non-null `renderer.output` **always** delegate,
+  because three takes different paths there and a skip would drop
+  `output.setSize`. The app sets neither — this is insurance, not a live case.
+
+On a skip it still calls `setViewport(0, 0, w, h)`, which is the one side
+effect three's `setSize` has that a bare `return` would drop. That makes the
+skip a **semantic no-op** rather than a behaviour change, which is the only
+form of suppression worth shipping.
+
+### Why not the other three options
+
+| option | why not |
+|---|---|
+| stop calling `setDpr` from the rig | `viewport.dpr` goes stale, and the next genuine container resize re-applies the STALE dpr from r3f's subscriber — it would undo the governor's step |
+| `flushSync(() => setDpr(d))` | r3f's `configure` is `await`ed, so the store write lands after the flush regardless |
+| shadow `canvas.width`/`height` with a no-op setter | suppresses the *reallocation* but not the *call*, so `verify-step-clean` (3) stays red — and its greenness would then depend on whether my instance property or the harness's prototype patch is outermost. A fix whose proof depends on instrumentation ordering is not a fix |
+
+### Proof — `scripts/verify-step-guard.mjs`, NEW, 13 gates
+
+The browser gate can only see the consequence, so the whole **decision table**
+is pinned in node against a fake renderer that reimplements three r185's
+`setPixelRatio`/`setSize` verbatim and counts canvas assignments. **Gate 0
+re-derives that fake from `three.module.js`'s real source text** (seven
+behaviours), so the fake cannot rot into agreeing with a guard that is wrong.
+
+RED-calibrated by neutering the guard: **gates 2 and 10 fail** (4 canvas writes
+on a redundant catch-up; owner LOST after a StrictMode double-mount). Gate 1 is
+a standing RED control — it runs an *unguarded* renderer through the same
+redundant catch-up and asserts it writes, so the gate carries its own
+before-picture on every run.
+
+Two instrument bugs of my own, caught on the first run and both worth naming:
+
+1. the fake counted a canvas write only when the **value changed**, so it
+   scored the defect **zero** and gate 1 went red on a correct guard. A
+   reallocation happens on every assignment; that is the entire defect.
+2. the shim bound `const STEP_SAFE = globalThis.__sgCfg` **once at import**, so
+   the flag-OFF row silently tested the flag-ON build. Now getters.
+
+Both are the §9b family again — *an instrument that cannot express the defect
+cannot certify the fix* — and both were caught because the gate had a RED arm
+to disagree with.
+
+### What this means for `verify-step-clean` — E's gate, unchanged
+
+`verify-step-clean.js` is **E's** (`686db21`), so I did not touch it, and it
+**needs no change**: its assertions (2) "every canvas.width/height write is
+inside a rAF" and (3) "every `gl.setPixelRatio`/`gl.setSize` is inside a rAF"
+are already the right ones, they failed honestly on the defect, and the guard
+makes them true. Fable's suggested "exactly one application per step, inside
+the frame" is a *stronger* claim and a good one — the guard satisfies it, and
+`window.__flyStats.stepGuard` now counts suppressed calls so a browser gate can
+assert it directly — but adding it is E's call, not mine.
+
+Note for the re-take: (3b) already passed at 0/6 before this fix, because the
+rig owns the composer resize and r3f never touches the composer. And (4)
+`bufferMatchesDrawing` was **0 mismatched of 43** (pass 1: 22 of 46), so the
+user-facing symptom was already closed by the rig alone — this fix closes the
+*mechanism claim*, which is what stops it coming back.
+
+### Lessons
+
+1. **A design whose claim is "there is exactly one writer" must enumerate the
+   writers.** I had r3f's catch-up written down in my own header and reasoned
+   it away instead of counting it.
+2. **An unmeasured platform claim is the most dangerous kind of comment**,
+   because it reads like a fact and closes the question for the next reader —
+   who was me, twice.
+3. **Suppression is only safe when it is a semantic no-op.** The `setViewport`
+   on the skip path is what separates this from "return early and hope".
+4. **Prefer the fix whose proof does not depend on instrumentation ordering.**
+
+---
+
 ## §10 Commits
 
 | # | Commit | What |
