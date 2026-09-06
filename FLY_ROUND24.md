@@ -223,7 +223,13 @@ composites.**
   **`91141fe`** (D `fe269b9` — conflict in `scripts/verify-lod-fade.mjs`, D's
   anchored superset taken). **The merged tree is byte-identical to the dry-run
   worktree**, `no-undef` reads 0 over the 50-file R24 delta, node smoke is
-  **16/16**, and it is pushed. **PASS 2 is GO at `91141fe`.** **A dry-run merge of all five
+  **16/16**, and it is pushed. **PASS 2 is GO at `91141fe`** — and pass 2a was stopped after one row (§4.2),
+so two more close merges followed: **`3d388ec`** (close merge 6, A `abd127c` —
+the `FINALIZE_PACE` spike detector) and **`ec53fd3`** (close merge 7, E
+`59b4e97` + `a2d95a3` — the sixth harness-budget site and the pale detector's
+isolation rule), both pushed with node smoke 16/16. **PASS 2b started 21:13:59
+at `ec53fd3`** (`CERT_OUT scripts/r24-out/cert3`, summary `cert-run4.log`);
+pass 2a's logs are kept as diagnosis. **A dry-run merge of all five
   flipped branches into a scratch worktree produced exactly one resolvable
   conflict** — `FlyEffectComposer.jsx`, where A's `registerComposer` effect and
   C's `installDepthProbe` effect both land and both were kept — **and node smoke
@@ -517,12 +523,20 @@ admits every frame**; (15) 20 fps and the 1 fps venue converge with worst run
 **3** in a row — shipped worst run 20; (16) one 40 ms hitch amid 16.7 ms frames
 is refused **AND ONLY THAT FRAME**, which passes BOTH ways — i.e. **the fix did
 not move the behaviour rule 1 was written for**; (18) rule 2's budget is 3 ms at
-K=1 and 120 ms at K=40. Pass 2 restarts from the top on the corrected tree. Two other readings
-from the same run stand: **(4b) the pale self-test fires exactly once**, so the
-rewritten detector finally has its own RED, and **(4a) still reported 8 pale
-hits in 290 frames including consecutive identical-mean frames** (f:141/142 both
-mean 222.1 against a median of 145.5) — a sustained field again, not a one-frame
-jump, so E is adding an isolation rule.
+K=1 and 120 ms at K=40. Pass 2 restarts from the top on the corrected tree. The close sweep records the row's real
+danger in one sentence: *"gate (3) PASSED on an empty census; only the (1a)/(1b)
+preconditions added after the §2.10 audit stopped that being reported as the A1
+fix landing."* Two other readings from the same run stand: **(4b) the pale
+self-test fires exactly once**, so the rewritten detector finally has its own
+RED, and **(4a) still reported 8 pale hits in 290 frames including consecutive
+identical-mean frames** (f:141/142 both mean 222.1 against a median of 145.5) —
+a sustained field, not a one-frame jump. E's isolation rule (`a2d95a3`) is now
+in: **a candidate counts only when its run length is exactly 1**, and longer
+runs are recorded separately as "sustained" with their extents, so the voided
+run's 8 hits replay as **0 isolated + 2 sustained** while the self-test's single
+white frame still scores exactly **1**. E notes why the obvious form was
+rejected: a naive "f−1 and f+1 are not pale" test **would still admit the last
+frame of every run** — run length is the right rule.
 
 **`verify-flash-guard`, pass 1, leg by leg** (`K=40`, `__flyFlashPin='off'`):
 
@@ -723,15 +737,16 @@ killed by the orchestrator at ~19:12 while diagnosing.
 request** — the demonstrated cause is D's module-scope `ReferenceError`, on a
 tree where nothing could boot at all (lesson 19).
 
-**E's instrument-defect count for the session is EIGHT**, each with a defence in
+**E's instrument-defect count for the session is NINE**, each with a defence in
 the tree: the context race; the artifact overwrite (§5.4); the straw-man port
 guard; the sky inside the pale crop; the vacuous gate (5); the misleading
 `flagOn(probe)`, which read a pin's absence rather than a constant; the seam
 reader that sampled a cleared framebuffer from outside any animation frame and
 passed three assertions on black against black; and **`r24-cert-run.sh`'s
 summary grep, which did not match `NOT CALIBRATED` — so a third verdict would
-have been a SILENT row in the run summary**. Each was found by E and fixed by E,
-which is the difference between an instrument-defect count and a defect count. **Four vacuous passes in one
+have been a SILENT row in the run summary**; and the one-generation cleanup trap
+below. Each was found by E and fixed by E, which is the difference between an
+instrument-defect count and a defect count. **Four vacuous passes in one
 day** — flash-guard (5), one-sun (5), linear-haze (2a)/(2b)/(3), depth-roundtrip
 (0b) — is what makes lesson 24 a rule rather than an anecdote.
 
@@ -753,10 +768,17 @@ aborted before the ledger write while its commit ran — **the un-asserted
 mechanical-edit class of §5.1, a third time in one round**, this time caught by
 its author and costing only a split commit.
 
-**One more, at the close:** E's pass-1 dev server was still listening after
-CERT DONE, because that version of E's script had no PID in its trap; the
-orchestrator killed the three PIDs — recorded here as the orchestrator's own,
-not as E's, since it was the orchestrator that reached for another process.
+**One more, at the close, and it makes NINE:** E's pass-1 dev server was still
+listening after CERT DONE, because that version of E's script had no PID in its
+trap; the orchestrator killed the three PIDs — recorded as the orchestrator's
+own, since it was the orchestrator that reached for another process. The defect
+underneath was **a one-generation cleanup trap**: `npm run dev` is four
+processes and the FORKED `next-server` worker was the pass-1 orphan. The cert
+runner now kills by process **GROUP** — `setsid` at launch, the PGID read from
+`/proc/<pid>/stat` field 5 **parsed from the last `)`**, because `$!` can name a
+parent that exits while the real leader is elsewhere — TERM, 10 s, then KILL,
+after which the port is re-checked and either "port released" or a warning is
+printed. Proven on a throwaway `setsid` tree: three members, zero survivors.
 
 Two process facts from the same hour: a second `cert-run.sh` raced the first
 run's server into an `EADDRINUSE` (killed by PID 5023/5024/5038), and an
@@ -911,10 +933,15 @@ quotable.
   (A's ask, next round): `FINALIZE_PACE`'s was the one that starved, but a
   threshold on an absolute frame time is a threshold on the user's hardware
   wherever it appears.
-- **`sat-veg-engine.js:516` is the same seam, one layer along**: veg commits are
-  capped at `vegPerFrame` (1) whenever the brake is on, and `budgetK` does not
-  scale it — at 1 fps that is one veg chunk per second, so veg content here reads
-  **partly populated**. E is adding the multiply before pass 2b.
+- ~~`sat-veg-engine.js` veg cap~~ **CLOSED before pass 2b** (E `59b4e97`, merged
+  `ec53fd3`): the **sixth** harness-budget site is now
+  `cap = finalizePaceOn() ? Math.max(1, FINALIZE_PACE.vegPerFrame * budgetK()) :
+  Infinity`, **exactly 1 in production**. Worth keeping for the pattern: A's
+  `verify-finalize-pace` gate 10 had pinned the OLD expression verbatim and went
+  RED **correctly**, so E moved the assertion WITH the expression — it now
+  requires the multiply AND the harness-budget import — 11/11, recorded as E's
+  edit to A's engine and gate at A's request. Expect veg counts to move in pass
+  2b's fixture row for this reason and not a feature change.
 - **Every per-frame REFUSAL must have a starvation bound, and every pacing rule
   must be reachable with the harness budget on.** `finalize-pace.js`'s header
   asserted an invariant it did not have — "neither rule can starve a chunk" —
