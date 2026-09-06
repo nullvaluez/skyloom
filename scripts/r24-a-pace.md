@@ -325,6 +325,79 @@ MEASURED-HERE in the live app: with the pin set, the residency wrapper installs
 and the census runs (19 resident tiles / 6.3 MB on a 403-blocked boot), 0
 pageerrors; with no pin, `map.update` is unwrapped and nothing extra runs.
 
+---
+
+## §4 M2b — `skirtFast`: the O(E) boundary scan (T2 / FL-02 / A2)
+
+### Mechanism
+
+`We` (getBoundaryEdges) pushes **three two-element arrays per triangle**, sorts
+all 3T of them with a boxed JS comparator that does four `min`/`max` per
+comparison, then dedupes. At a 129² Martini tile that is ~98 k small arrays and
+a ~1.6 M-comparison sort, run on the MAIN THREAD in a promise continuation, per
+DEM tile. R22.1's profiler put that function at 37% and its comparator at a
+further 30% — **67% of every stalled millisecond** while streaming.
+
+Upstream's output is exactly *"the directed edges whose `(min,max)` key occurs
+once, ordered by `(min,max)`"*: the sort groups equal keys and the dedupe pass
+drops precisely the adjacent reverse pairs. So the same answer is an O(E)
+undirected-edge count in a module-scoped, generation-stamped open-addressed
+table (never cleared, only re-stamped — zero per-tile allocation), keeping the
+count-1 edges and sorting only the **perimeter** (hundreds, not 3T).
+
+### Bail contract
+
+It returns `null` — falling through to the verbatim upstream body — for every
+input it does not claim: length not a multiple of 3, a negative index, a
+degenerate `a === b` edge (whose min/max collapse makes it its own reverse), an
+edge seen three times, or two occurrences with the SAME winding, **which is the
+one case upstream KEEPS both of**.
+
+### RED → GREEN (MEASURED-HERE, `scripts/verify-skirt-fast.mjs`, 12 gates)
+
+The gate does not poke the private function: it drives the PUBLIC
+`TileGeometry.setAttributes(data, z)` — the call three-tile makes on every DEM
+tile — in both arms and compares position / uv / normal / index **element by
+element**. That covers the skirt vertices, the appended triangles, the
+attribute concatenation and the ordering, not merely the edge list.
+
+| case | out indices | path | geometry |
+|---|---|---|---|
+| Martini 129² ridge z15 | 736 | fast | identical |
+| Martini 129² cliff z15 | 876 | fast | identical |
+| Martini 129² noise z16 | 33,743 | fast | identical |
+| Martini 257² ridge z15 | 736 | fast | identical |
+| Martini 257² noise z13 | **116,079** | fast | identical |
+| Martini 65² flat z15 | 10 | fast | identical |
+| regular grid 65² Uint32 | 8,704 | fast | identical |
+| regular grid 65² Uint16 | 8,704 | fast | identical |
+| holed grid 65² (real interior boundary) | 8,614 | fast | identical |
+| non-manifold: edge in 3 triangles | 17 | **BAILED** | identical |
+| duplicate winding on a shared edge | 14 | **BAILED** | identical |
+| degenerate triangle (a, a, b) | 10 | **BAILED** | identical |
+| index length not a multiple of 3 | 13 | **BAILED** | identical |
+
+**Timing — this container's CPU, isolated and single-threaded. It measures the
+ALGORITHM, which is legitimately measurable here; it does NOT measure the
+user's frame time.**
+
+| grid | triangles | off | on | speedup |
+|---|---|---|---|---|
+| 129×129 | 32,768 | 44.95 ms | 6.35 ms | **7.1×** |
+| 257×257 | 131,072 | 202.60 ms | 31.04 ms | **6.5×** |
+
+(Archived R22.1 measured 4.9–6.1× isolated on a different tree and CPU; the
+shape agrees.) Gate 12 proves the table is reused rather than reallocated:
+heap 16.5 → 9.2 MB across 25 consecutive 129² tiles.
+
+### What this does NOT claim
+
+A 7× algorithmic win is not a stall-rate. The archived live figure (stalls/min
+91 → 2.4, worst frame 87.5 → 29.2 ms) was measured on a DIFFERENT tree with a
+denser DEM ring; this tree's rate is unknown until the user runs it. §9.
+
+---
+
 ## §9 Could not measure here (honest list)
 
 Everything in this section needs the user's machine, or E's offline fixture,
