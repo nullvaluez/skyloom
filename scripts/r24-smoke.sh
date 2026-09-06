@@ -34,6 +34,13 @@ mkdir -p "$OUT"
 export FLY_URL="$URL"
 export FLY_TILE_FIXTURE=1
 export PW_SHIM_QUIET=1
+# Post-reveal waits in bootFly are fixed 30 s on a GPU machine's assumption;
+# under SwiftShader with five agents on four cores they time out AFTER pct 100
+# has already been reached. Scaling them does not weaken the boot contract.
+export FLY_BOOT_SCALE="${SMOKE_BOOT_SCALE:-6}"
+# The finalize-budget scaler, for the CONTENT gates only. Enumerated here on
+# purpose: a pacing gate must never see it (see lib/fly/harness-budget.js).
+CONTENT_K="${SMOKE_FINALIZE_K:-40}"
 
 PASS=0
 FAIL=0
@@ -87,17 +94,26 @@ node_gate verify-terra-residency.mjs     # A (R24): merge/refetch on a yaw sweep
 # --- the fixture's own gate. If this is red, every browser number below is
 #     meaningless, so it runs first and its failure is the headline.
 run verify-fixture.js scripts/verify-fixture.js \
-  env FLY_FIXTURE_SETTLE_MS="${SMOKE_FIXTURE_SETTLE:-240000}" \
+  env FLY_FIXTURE_SETTLE_MS="${SMOKE_FIXTURE_SETTLE:-120000}" \
+      FLY_FINALIZE_BUDGET_K="$CONTENT_K" \
   node -r ./scripts/_pw-shim.js scripts/verify-fixture.js
 
 # --- browser gates that are hardware-independent (counts, census, source scans,
 #     buffer identity). Ordered cheapest first.
+# PACING gates — these must NEVER see FLY_FINALIZE_BUDGET_K.
 browser_gate verify-frame-pace.js
 browser_gate verify-step-clean.js
-browser_gate verify-flash-guard.js
+# CONTENT gates — counts, census and single-frame transitions. Their
+# assertions are on WHAT the world contains and on transition COUNTS, never on
+# how long a drape took, so a wider per-frame budget cannot change an answer.
+content_gate() {
+  run "$1" "scripts/$1" env FLY_FINALIZE_BUDGET_K="$CONTENT_K" \
+    node -r ./scripts/_pw-shim.js "scripts/$1"
+}
+content_gate verify-flash-guard.js
 if [ "${SMOKE_SKIP_SLOW:-0}" != "1" ]; then
-  browser_gate verify-lod-fade.js
-  browser_gate verify-fade.js
+  content_gate verify-lod-fade.js
+  content_gate verify-fade.js
 fi
 
 printf '\n--------------------------------------------------\n'
