@@ -23,7 +23,9 @@
  *
  * Run:  node scripts/verify-atmo-law.mjs
  */
+import fs from 'node:fs';
 import {
+  ATMO_GLSL_DECL,
   ATMO_GLSL_VERTEX,
   ATMO_GLSL_FRAGMENT,
   atmoUniforms,
@@ -485,6 +487,96 @@ ok('deep night (frac 0) multiplier is EXACTLY 0', nightMul(0) === 0);
   ok('ramp is monotone in sun.frac (no flap at the dusk crossing)', mono);
   console.log(`     frac 0.00 -> ${nightMul(0).toFixed(3)}   0.10 -> ${nightMul(0.1).toFixed(3)}   ` +
     `0.20 -> ${nightMul(0.2).toFixed(3)}   0.30 -> ${nightMul(0.3).toFixed(3)}   1.00 -> ${nightMul(1).toFixed(3)}`);
+}
+
+// --------------------------------------------------------------------------
+// [7] FLAG-OFF STRUCTURAL IDENTITY — the generated text, not a token check.
+//
+// AERIAL_LAW injects into the FINAL TILE program, which is the one program
+// BOTH styles compile, so "flag-off is byte-identical" has to be proven on the
+// text three actually receives, not asserted. `AERIAL_LAW.enabled` is a
+// property of a live object, so the gate flips it and compiles the patch twice
+// against a stub shader — the same instrument verify-lod-fade uses.
+// --------------------------------------------------------------------------
+console.log('\n[7] AERIAL_LAW flag-off is byte-identical (generated text + key)');
+{
+  const { register } = await import('node:module');
+  register('./_alias-loader.mjs', import.meta.url);
+  const wb = await import('../lib/fly/toy-world/world-bend.js');
+  const { AERIAL_LAW } = await import('../lib/fly/fly-constants.js');
+  const STUB_V = ['#include <common>', '#include <defaultnormal_vertex>', '#include <project_vertex>'].join('\n');
+  const STUB_F = ['#include <common>', '#include <clipping_planes_fragment>', '#include <map_fragment>',
+    '#include <color_fragment>', '#include <fog_fragment>', '#include <dithering_fragment>'].join('\n');
+  const HILL = { ambient: 0.35, lift: 0.15, micro: { scaleM: 40, amp: 0.06 }, quiltAnchor: 0.42 };
+  const compile = () => {
+    const m = { userData: {}, needsUpdate: false };
+    wb.applyBendFade(m);
+    wb.applyHillshade(m, HILL, null);
+    const shader = { uniforms: {}, vertexShader: STUB_V, fragmentShader: STUB_F };
+    m.onBeforeCompile(shader, null);
+    return { shader, key: m.customProgramCacheKey() };
+  };
+  const was = AERIAL_LAW.enabled;
+  AERIAL_LAW.enabled = false;
+  const off = compile();
+  AERIAL_LAW.enabled = true;
+  const on = compile();
+  AERIAL_LAW.enabled = was;
+
+  ok('flag-off VERTEX text carries no uAtmo/atmoPack token',
+    !/uAtmo|atmoPack|vAtmoDHC/.test(off.shader.vertexShader));
+  ok('flag-off FRAGMENT text carries no uAtmo/atmoApply token',
+    !/uAtmo|atmoApply|vAtmoDHC/.test(off.shader.fragmentShader));
+  ok('flag-off leaves <dithering_fragment> untouched',
+    off.shader.fragmentShader.includes('#include <dithering_fragment>') &&
+    !off.shader.fragmentShader.includes('atmoApply'));
+  ok('flag-off wires no uAtmo* uniform',
+    !Object.keys(off.shader.uniforms).some((k) => k.startsWith('uAtmo')),
+    Object.keys(off.shader.uniforms).filter((k) => k.startsWith('uAtmo')).join(',') || '(none)');
+  ok("flag-off FINAL tile key carries no 'a' token", !/-[a-z]*a[a-z]*24$/.test(off.key), off.key);
+  ok("flag-on FINAL tile key carries the 'a' token through the shared helper",
+    on.key === 'world-bend-fade-hill-r19-a24', on.key);
+  ok('flag-on wires the WHOLE shared law block by reference (one source of numbers)',
+    Object.keys(on.shader.uniforms).filter((k) => k.startsWith('uAtmo')).length === 10 &&
+    on.shader.uniforms.uAtmoBeta === atmoUniforms.uAtmoBeta,
+    `${Object.keys(on.shader.uniforms).filter((k) => k.startsWith('uAtmo')).length} uAtmo uniforms, by reference`);
+  ok('flag-on applies the law in the LAST fragment slot, before the dither',
+    /if \( uAtmoStrength > 0\.0 \)[\s\S]{0,120}atmoApply\( gl_FragColor\.rgb, vAtmoDHC \);[\s\S]{0,20}#include <dithering_fragment>/.test(on.shader.fragmentShader));
+  ok('flag-on does NOT touch the after-fog lines the base patch and C own',
+    on.shader.fragmentShader.includes("gl_FragColor.rgb = mix( gl_FragColor.rgb, uHazeColor,") ===
+    off.shader.fragmentShader.includes("gl_FragColor.rgb = mix( gl_FragColor.rgb, uHazeColor,"));
+  {
+    // The strong form: strip ONLY the law's additions and the two texts must
+    // coincide character for character.
+    const vStripped = on.shader.vertexShader
+      .replace(ATMO_GLSL_DECL + ATMO_GLSL_VERTEX + 'varying vec3 vAtmoDHC;\n', '')
+      .replace(/vec3 wA = [\s\S]*?vAtmoDHC = atmoPack\([^\n]*\n/, '');
+    ok('flag-on VERTEX minus the law === flag-off VERTEX',
+      vStripped === off.shader.vertexShader,
+      vStripped === off.shader.vertexShader ? '' : 'texts diverge beyond the law');
+    const fStripped = on.shader.fragmentShader
+      .replace('varying vec3 vAtmoDHC;' + ATMO_GLSL_DECL + ATMO_GLSL_FRAGMENT, '')
+      .replace(/if \( uAtmoStrength > 0\.0 \) \{\n\tgl_FragColor\.rgb = atmoApply\( gl_FragColor\.rgb, vAtmoDHC \);\n\}\n\t/, '');
+    ok('flag-on FRAGMENT minus the law === flag-off FRAGMENT',
+      fStripped === off.shader.fragmentShader,
+      fStripped === off.shader.fragmentShader ? '' : 'texts diverge beyond the law');
+  }
+}
+
+// --------------------------------------------------------------------------
+console.log('\n[8] the post pass ships ONE program per flag state');
+{
+  const src = fs.readFileSync(new URL('../components/fly/AerialPerspective.jsx', import.meta.url), 'utf8');
+  ok('the LAW shader calls atmoApply', /lawFragmentShader[\s\S]*atmoApply\( inputColor\.rgb/.test(src));
+  ok('the LEGACY shader is still the R19 text (uMaxMix * t * hFall)',
+    src.includes('mix( inputColor.rgb, uHazeColor, uMaxMix * t * hFall )'));
+  ok('the variant is resolved ONCE at construction, from a module const',
+    /const law = LAW\(\);\n\s*super\('AerialPerspectiveEffect', law \? lawFragmentShader : fragmentShader/.test(src),
+    'production and the PREWARM twin cannot compile different programs');
+  ok('both early-outs survive in the LAW shader (bit-identity at strength 0, sky skipped)',
+    /uAtmoStrength <= 0\.0 \|\| d >= 0\.999999/.test(src));
+  ok('the LAW shader still DETECTS reversed depth rather than assuming it',
+    /lawFragmentShader[\s\S]*uReverseDepth > 0\.5 \? 1\.0 - depth : depth/.test(src));
 }
 
 console.log(`\n${fail === 0 ? 'PASS' : 'FAIL'}  ${pass} passed, ${fail} failed\n`);
