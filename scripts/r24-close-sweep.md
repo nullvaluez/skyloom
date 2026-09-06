@@ -102,9 +102,9 @@ this venue structurally cannot produce the number and the user's machine owns it
 | `verify-fixture` | **rc 0, 10/10** — this gate certifies the venue and has no RED. Four poses settled, §1.4 | **PENDING** — re-run and diff §1.4: a flag that adds draws or triangles shows as a delta against that table | — |
 | `verify-flash-guard` | **rc 1 BY DESIGN, 5 passed / 1 failed.** (2) RED > 0: Powell **2,616 / 31,576 = 8.28 %** coincident-vertex — inside R22.1's live **6.36–8.64 %** band; Manhattan **5,820 / 126,116 = 4.61 %**, worst chunk **13.98 %**. (3) FAILs as intended. **Sat-skyline 0 / 83,752 and toy 0 / 0 — those two sites are NOT EXERCISED here** | **PENDING** — (3) zero-area **exactly 0** at every resident site; (5) triangle count only ever falls, per site; (1a)/(1b) census still non-empty | `__flyFlashPin` |
 | `verify-fade` | **rc 1 BY DESIGN, 4 passed / 2 failed.** (2) **14 of 14 hard births**, (3) **10 of 10 hard deaths**, presence channel **`none`** — no material carries a fade uniform, which IS the flag-off state. Watch was live: births 14 / deaths 10 over 94 frames | **PENDING** — (2) and (3) → **0 hard**, presence channel names a real uniform, and (1) (4) (5) (6) all stay green | — |
-| `verify-lod-fade` | **PENDING** (browser leg in flight 19:29). Node leg already **GREEN** in §1.1 | **PENDING** — 0 leave-and-return on a pure yaw; refetch 0 **with a non-zero fetch denominator** (§2.10 WEAK) | — |
+| `verify-lod-fade` | **rc 1 BY DESIGN, 2 passed / 5 failed, 317 s.** (3) **27 re-appearances on a pure yaw** — A's T1/T3, the position never moved; (4) **8 hard refines + 3 hard merges** — D's T4; (5) co-display run **0**; (6) **15 tile URLs refetched**, worst 2×; (7) Owens **174 draws / 166,659 tris** (fixture); (8) clean. (1) FAILed for an **instrument** reason, not a world reason — see below. Node leg **GREEN** in §1.1 | **PENDING — the leg now exists.** `9cba1b6` adds the ON leg (gates 9–19) against D's reviewed criteria: `refines+merges === hardSwaps+faded` on both arms, `refines+merges` FLAT across the flip, `faded` rises / `hardSwaps` drops, `active === 0 && retained === 0` at rest, `0 < peakActive ≤ 32`, `skip.{shape,noParentMap,unpatched}` each 0, Owens draws **and** tris EQUAL to 174 / 166,659 | `__flyLodFadeOverride` `{enabled:true, skipBootMs:0}` |
 | `verify-step-clean` | **PENDING** — resizes land outside the frame | **PENDING** — every accepted DPR/tier step resizes inside the rAF; **accepted-step count must be > 0 or the gate reads NOT CALIBRATED**, never a silent pass | `__flyGovPin` |
-| `verify-frame-pace` | **INSTRUMENT ABSENT** on the 19:14 tree — `FRAME_STATS.enabled:false`, so the row is structurally vacuous there. **`6c26fe9` ships FRAME_STATS ON**, so the gate only has an instrument from the flipped tree onward | **UM** for every pacing number — SwiftShader at ~1 fps cannot produce a p95, a long-frame rate, or a stall count | — |
+| `verify-frame-pace` | **INSTRUMENT ABSENT** on the 19:14 tree — `FRAME_STATS.enabled:false`, so the row is structurally vacuous there. **`6c26fe9` ships FRAME_STATS ON**, so the gate only has an instrument from the flipped tree onward. Its tear legs now print **(3a) ARMED / NOT CALIBRATED** so a window with no resize cannot read as a pass | **UM** for every pacing number — SwiftShader at ~1 fps cannot produce a p95, a long-frame rate, or a stall count | — |
 | `verify-one-sun` | **PENDING** — key azimuth spread 0 on medium (one sun *by accident*), non-zero where the material zoo diverges | **PENDING** — exactly one key direction across every lit material, all tiers | `__flySunOverride` + tier |
 | `verify-env-uniform` | **PENDING** — `programsDelta` non-zero across a dusk crossing and across a tier step | **PENDING** — 0 across both crossings | `__flyGovPin` + `__flySatShadowOverride` |
 | `verify-shadow-calm` | **GREEN NODE-SIDE, 32/32** (C, `a9e30cc`): the ShaderChunk patch run against three's real chunk text both ways; reversal reproduces three **byte-exact**; texel snap is a staircase, 11 positions / 10 texels | **UM** for pixels, draws and the catcher shadow — the node leg cannot see any of them | `__flySatShadowOverride` |
@@ -593,25 +593,57 @@ the remaining rows land so it cannot be tuned to them.
 | Gate / leg | How its PASS could be empty | Guard now in place |
 |---|---|---|
 | `verify-fade` (2)(3) no hard birth / death | if the serpentine never leaves the resident ring, births = deaths = 0 and both "pass" over an empty population | (1) asserts `births + deaths > 0` FIRST and says "lengthen FADE_RUN_MS, do not weaken the gate" |
-| `verify-fade` (4) ready invariant | `ready <= chunks && ready >= 0` is nearly a tautology; it cannot fail unless the engine is corrupt | **WEAK — flag it.** The real invariant is that ready does not FALL across the window; the series is printed but not asserted |
+| `verify-fade` (4) ready invariant | `ready <= chunks && ready >= 0` is nearly a tautology; it cannot fail unless the engine is corrupt | **STILL WEAK.** "ready never falls" is not the fix either — the measured serpentine series `[[2,0]…[4,0],[0,0],[0,1]…]` falls legitimately when the run leaves the ring. The honest invariant is per-chunk: a RESIDENT chunk must never go ready → not-ready. Needs a per-chunk watch the fade census does not yet keep |
 | `verify-fade` (5) Owens lock | Owens legitimately has nothing, so 0/0 passes whether or not the fade works | it is a LOCK, not a fade test — correct as written, but it proves absence of harm only |
 | `verify-lod-fade` (3)(4)(5) | if the yaw sweep produces no tile events at all, "no reappears / no hard swaps" pass vacuously | (2) asserts `frames > 20 && appears + disappears > 0` first |
-| `verify-lod-fade` (6) refetch | with `/__stats` reset and a short sweep, "0 refetched" can mean "nothing was fetched" | **WEAK — flag it.** It should assert some tiles WERE fetched before claiming none were re-fetched |
+| `verify-lod-fade` (6) refetch | with `/__stats` reset and a short sweep, "0 refetched" can mean "nothing was fetched" | **CLOSED `9cba1b6`** — (6a) asserts ≥ 8 distinct tile URLs were fetched in the window first, and prints the denominator beside the numerator |
 | `verify-step-clean` (2)–(5) | 0-of-0 with no step observed | already fixed: prints `NOT CALIBRATED`, non-zero exit, and (1) proves the ladder accepted a forced step |
-| `verify-frame-pace` (3)(4) tear mechanism | if no resize happens in the window, "0 outside rAF" passes over nothing | **WEAK — flag it.** It does not require a resize to have occurred, unlike `verify-step-clean` |
+| `verify-frame-pace` (3)(4) tear mechanism | if no resize happens in the window, "0 outside rAF" passes over nothing | **CLOSED `9cba1b6`** — (3a) prints ARMED with the resize count, or NOT CALIBRATED, and both tear legs carry the caveat inline when nothing resized |
 | `verify-one-sun` clauses 1–5 | a null `dome`, a missing `hillMinDeg`, or `moonK === 0` SKIPs a clause; a run where every clause skips would print no failures | clause 0 (`live === true`) must pass first, and SKIPs are printed distinctly from PASSes — but the count of skips is not asserted |
 | `verify-env-uniform` (1)(2) | `programsDelta === 0` passes if the dusk walk or the tier steps never happened | (3) asserts `stepsAccepted > 0`; the dusk walk has no equivalent check that the HDRI bucket actually changed |
 | `verify-linear-haze` (2) | if the frame has no horizon, terrain and sky crops are the same band and Δ ≈ 0 passes | (1) asserts a real luma step at the found horizon row |
 | `verify-flash-guard` (1a)(1b) | census over an empty scene | asserts `totalTris > 10000` |
 | `verify-fixture` (6) Owens lock | passes if the world never loaded at all | the settle predicate now reports `settled` and WHY; (3) proves imagery/DEM/MVT were served |
 | `verify-artifact-hygiene` (1) | passes if the glob matches nothing | (0) asserts the base commit resolves; the patterns are printed |
-| `verify-import-integrity` (1) | passes if the target dirs are empty or unparsed | the linted FILE COUNT is printed (200) — but not asserted |
+| `verify-import-integrity` (1) | passes if the target dirs are empty or unparsed | **CLOSED `9cba1b6`** — (1a) asserts ≥ 120 files linted (floor far under the real 200, so it catches a COLLAPSE, not growth) |
 
-**Four are flagged WEAK and should be tightened before anyone reads their green
-as evidence**: `verify-fade` (4), `verify-lod-fade` (6), `verify-frame-pace`
-(3)(4), and `verify-import-integrity` (1)'s unasserted file count. None is
-wrong; each can pass over an empty population, which is the failure mode this
-section exists to name.
+**Three of the four are now CLOSED** (`9cba1b6`): `verify-lod-fade` (6),
+`verify-frame-pace` (3)(4) and `verify-import-integrity` (1) each assert their
+denominator before reading their numerator. `verify-fade` (4) stays open, and
+the audit was wrong about its fix — see the row.
+
+### 2.10a THE FAILURE MODE THIS SECTION MISSED: a counter read by the wrong name
+
+The audit above looks for gates that pass over an EMPTY population. The
+`lod-fade` row exposed a second shape, and it is worse, because the gate prints
+its own defect and passes anyway:
+
+```
+__flyTerra.lod(): refines NaN · merges NaN · parentRefetches NaN · replacedOnScreen 3
+```
+
+`tile-residency.js` publishes `{ refine, merge, refetchParent, replacedOnScreen }`
+— **singular** — and my gate asked for the plural names. Three of four reads
+were `undefined - 0 = NaN`. **NaN compares false against every threshold**, so
+a gate built on `x > 0` goes silent exactly when it should shout, and one built
+on `x === 0` fails for a reason that has nothing to do with the world. The
+fourth name happened to match, which is why the line looked half-alive.
+
+Two other reads in the same gate were wrong in the same family: `mem().estMB`
+(the field is `residentMB`) and, worse, a PRECONDITION built on
+`residentTiles`, which only moves when `TERRA_PACE.keepResident` is ON —
+`terrain-engine.js` wraps `map.update` only in that arm — so flag-off it is 0
+**by construction**. I read `residentTiles=0 estMB=undefined` as "the fixture
+is too small". It was neither. The gate now does its own tile-tree census with
+residency's own predicate (`isTile && model`), which reads the same in both
+arms.
+
+**The rule, for every gate in the fleet:** a counter read across an ownership
+boundary must be read BY NAME with an existence check, and an absent name must
+be a LOUD failure that prints the keys actually present. `verify-lod-fade` (1b)
+now does exactly that. And a precondition must be readable in BOTH arms, or it
+is not a precondition — it is the feature under test, asserted before it
+exists.
 
 ---
 
