@@ -12,7 +12,7 @@ import {
   Sphere,
   Vector3,
 } from 'three';
-import { GLOBE, SAT_TINT, SAT_VEG, SURFACE_CALM } from '@/lib/fly/fly-constants';
+import { BEND_LEAD, GLOBE, SAT_TINT, SAT_VEG, SURFACE_CALM } from '@/lib/fly/fly-constants';
 import { applyBendFade } from '@/lib/fly/toy-world/world-bend';
 
 // Worst-case bend drop pad for the CPU bounding sphere (the SatVegLayer
@@ -282,7 +282,15 @@ function fillTint(mesh, engine, flight, st) {
   st.prevV = nV;
   st.prevI = nI;
   geo.boundingSphere.center.set(0, 0, 0);
-  geo.boundingSphere.radius = Math.sqrt(maxR2) + maxD * maxD * MAX_BEND_K + 50;
+  // R24 B (BEND_LEAD, recon WB-6) — `maxD` was measured at THIS placement pass,
+  // but the pool is only refilled on the 2 s cadence, so by the next pass the
+  // player can be BEND_LEAD.poolLeadM further from these instances (the fleet's
+  // fastest airframe boosts at 750 m/s). The bend drop is quadratic in that
+  // distance, so a stale maxD under-pads the sphere and the whole pooled layer
+  // frustum-culls while the camera turns at speed — a forest, a suburb or a
+  // landcover sheet vanishing as one object. Flag-off adds exactly 0.
+  const leadD = maxD + (BEND_LEAD.enabled ? BEND_LEAD.poolLeadM : 0);
+  geo.boundingSphere.radius = Math.sqrt(maxR2) + leadD * leadD * MAX_BEND_K + 50;
   // THE OWENS LEVER: below minPolys the pooled mesh is invisible, so a sparse
   // scene pays nothing at all. Counted in TRIANGLES, which is what the poly
   // budget actually buys (the worker's per-tile cap is in polygons, but a

@@ -18,7 +18,7 @@ import {
   WebGLRenderTarget,
 } from 'three';
 import { RGBELoader } from 'three-stdlib';
-import { SKY, SKY_DUSK, SKY_LIVE, SURFACE_CALM } from '@/lib/fly/fly-constants';
+import { ENV_UNIFORM, SKY, SKY_DUSK, SKY_LIVE, SURFACE_CALM } from '@/lib/fly/fly-constants';
 import { legacyBucket, resolveSky, skyDuskOn, skyKey, trueElevationDeg } from '@/lib/fly/sky-dusk';
 import { clearSkySun, setSkySunElevation } from './SkyDome';
 
@@ -389,15 +389,41 @@ export function SatEnvironment({ runtime, bucket }) {
         // exact R18 path, which is what keeps a settled day/night sky
         // bit-identical. Only a genuine intermediate step pays for the
         // composite, and only while a crossing is in progress.
-        const tex = blending
-          ? renderBlend(
-              gl,
-              (blenderRef.current ??= makeBlender(SKY_DUSK.blendSize)),
-              texA,
-              texB,
-              d.s
-            )
-          : texA;
+        // R24 B (ENV_UNIFORM, recon WB-4 / FL-10) — THE RECOMPILE STORM.
+        // three folds `envMapCubeUVHeight` into the program cache key of EVERY
+        // MeshStandard/Lambert/Phong material, and PMREMGenerator sizes its
+        // output from `texture.image.width / 4`. The day sky is a 2k file, the
+        // three twilight files are 1k, and the blend scratch is 1k-class — so
+        // the FIRST dusk blend step re-keys every lit material in the scene
+        // (tiles, buildings, canopy, homes, traffic), and dawn's return to the
+        // raw day file re-keys them all back. That is a multi-hundred-ms
+        // compile stall landing exactly when frames are already slow.
+        //
+        // The fix is to make every PMREM INPUT the same width. The target IS
+        // the day file's width, so the day endpoint BYPASSES entirely and noon
+        // stays bit-identical BY CONSTRUCTION; only the twilight endpoints are
+        // upsampled (through the blender at mix 0 — no new shader, no new
+        // render path), which is the direction that leaves the most-certified
+        // state untouched. The alternative (shipping the day sky at 1k) is
+        // cheaper per bake and moves every certified noon pixel; this one costs
+        // ~4x the bake area at twilight, which is work FL-10 wants sliced off
+        // the frame loop anyway.
+        const W = ENV_UNIFORM.enabled ? ENV_UNIFORM.equirectWidth : SKY_DUSK.blendSize;
+        const needsResize =
+          ENV_UNIFORM.enabled && !blending && (texA.image?.width ?? W) !== W;
+        const tex =
+          blending || needsResize
+            ? renderBlend(
+                gl,
+                (blenderRef.current ??= makeBlender(W)),
+                texA,
+                // A pure endpoint that only needs resizing blends the SAME
+                // texture with itself at mix 0: one copy through the existing
+                // fullscreen pass, no interpolation error, no new material.
+                blending ? texB : texA,
+                blending ? d.s : 0
+              )
+            : texA;
         const rt = pm.fromEquirectangular(tex);
         // ATOMIC: the new cubemap becomes both the IBL and the visible sky in
         // one go. The old target only dies a frame later (below), so the

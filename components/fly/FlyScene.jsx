@@ -108,6 +108,8 @@ import { pinned } from '@/lib/fly/fly-pins';
 import { noteFinalizeFrame } from '@/lib/fly/finalize-pace';
 import { createFrameStep, lerpAngle, lerpPose } from '@/lib/fly/frame-step';
 import { useFlyStore } from '@/stores/fly-store';
+// R24 B (GROUND_VIS, recon A6/T8) — the damped VISUAL ground elevation.
+import { eyeAglVis, groundElevVis, stepGroundVis } from '@/lib/fly/ground-vis';
 import { usePassportStore } from '@/stores/passport-store';
 import { PlayerPlane } from './PlayerPlane';
 import { CloudField } from './CloudField';
@@ -1195,6 +1197,11 @@ export function FlyScene({ runtime }) {
       if (elev != null) flight.groundElev = elev;
       runtime.geo = geo; // Vector3(lon, lat, altM) — HUD/polling read this
     }
+    // R24 B (GROUND_VIS): the damped twin, stepped EVERY frame (the raw sample
+    // above is every 3rd) and snapped on a warp. Visual consumers only — the
+    // flight model, crash floor, ground shadow, cameras and every placement
+    // sample keep `flight.groundElev`. Flag-off this mirrors the raw value.
+    stepGroundVis(runtime, flight, useFlyStore.getState().warpEpoch);
 
     // --- Phase 5: targeting + autopilot (uses traffic items from the
     // previous frame's update at -45 — 16ms of staleness is immaterial) ---
@@ -1524,7 +1531,7 @@ export function FlyScene({ runtime }) {
     // reads as "more airborne" by the local lift (≤ 0.7×elev) inside the
     // 150–900m blend band — second-order next to the 420m-at-600m-elev bug
     // the ryd transform fixes.
-    setBendEye(flight.pos.y, flight.groundElev);
+    setBendEye(flight.pos.y, groundElevVis(runtime, flight)); // R24 B (GROUND_VIS)
 
     // Round 12 "Neon Planet": in toy the ground fade band BREATHES with
     // altitude — END chases sqrt(eyeAGL/k)·frac (floored at the static band
@@ -1545,7 +1552,7 @@ export function FlyScene({ runtime }) {
       // The altitude term is expApproach-smoothed so a dive can't pop the band;
       // tod tracks slowly (runtime.sun updates on the 60s cadence + on warp).
       const aa = SKY.altAtmo;
-      const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
+      const eyeAgl = eyeAglVis(runtime, flight); // R24 B (GROUND_VIS)
       const targetAltT = Math.min(
         1,
         Math.max(0, (eyeAgl - aa.aglStartM) / (aa.aglFullM - aa.aglStartM))
@@ -1794,7 +1801,7 @@ export function FlyScene({ runtime }) {
     // covers the pre-style-effect boot frame (uniform boots "disabled").
     const liveFadeStart = getEdgeFade().startM;
     const dipStartM = liveFadeStart > 1e8 ? skyFade.startM : liveFadeStart;
-    const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
+    const eyeAgl = eyeAglVis(runtime, flight); // R24 B (GROUND_VIS)
     const rimDrop = dipStartM * dipStartM * bendK + eyeAgl;
     setSkyDip(rimDrop / Math.hypot(rimDrop, dipStartM));
 

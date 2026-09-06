@@ -15,6 +15,8 @@ import { buildPoiList } from '@/lib/fly/poi-data';
 import { SAT_AIRPORT_BEACONS, SAT_ROADS } from '@/lib/fly/fly-constants';
 import { applyBendAnchor, getSatBldgFade, getSatRoadMix } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
+// R24 B (GROUND_VIS, recon A6/T8) — AGL fade bands read the DAMPED ground.
+import { eyeAglVis } from '@/lib/fly/ground-vis';
 
 const TIERS = ['low', 'medium', 'high']; // mirrors FlyCanvas's quality ladder
 const atLeastTier = (tier, min) => TIERS.indexOf(tier) >= TIERS.indexOf(min);
@@ -125,7 +127,7 @@ export function SatRoadLayer({ runtime, flight }) {
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
     nowRef.current = t;
-    const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
+    const eyeAgl = eyeAglVis(runtime, flight); // R24 B (GROUND_VIS)
     // sunFrac is REQUIRED by the engine contract: omitting it falls back to noon
     // (1) and the whole network stays dark forever.
     engine.update(t, flight.pos.x, flight.pos.z, eyeAgl, runtime.sun?.frac);

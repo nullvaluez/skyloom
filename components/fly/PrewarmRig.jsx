@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useThree } from '@react-three/fiber';
-import { PREWARM } from '@/lib/fly/fly-constants';
-import { prewarmState, runPrewarm } from '@/lib/fly/prewarm';
+import { useFrame, useThree } from '@react-three/fiber';
+import { ENV_UNIFORM, PREWARM } from '@/lib/fly/fly-constants';
+import { prewarmState, pumpRequeue, requeueForEnvironment, runPrewarm } from '@/lib/fly/prewarm';
 import { useFlyStore } from '@/stores/fly-store';
 
 /**
@@ -73,6 +73,20 @@ export function PrewarmRig({ runtime }) {
       }
     };
   }, [gl, camera, scene, runtime]);
+
+  // R24 B (ENV_UNIFORM, recon A5) — the late-HDRI repair. When the warm ran
+  // WITHOUT a scene.environment (a throttled network beat PREWARM.envWaitMs),
+  // every lit material warmed its no-environment permutation and the real ones
+  // compile after the reveal, inside the frame loop. This re-queues them and
+  // drains ONE per IDLE frame — a frame slower than ENV_UNIFORM.idleFrameMs is
+  // skipped entirely, so the repair only ever spends headroom that already
+  // exists. Flag-off both calls return immediately and this useFrame is a
+  // single boolean test; priority 3 puts it after the render.
+  useFrame((_, dt) => {
+    if (!ENV_UNIFORM.enabled) return;
+    requeueForEnvironment({ gl, camera, scene });
+    pumpRequeue(dt * 1000);
+  }, 3);
 
   return null;
 }

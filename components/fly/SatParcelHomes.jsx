@@ -17,7 +17,8 @@ import {
   Vector3,
 } from 'three';
 import { mercatorScale } from '@/lib/fly/coords';
-import { GLOBE, PARCEL_HOMES, SUBURB_NIGHT, SURFACE_CALM } from '@/lib/fly/fly-constants';
+import { BEND_LEAD, CHUNK_FADE, GLOBE, PARCEL_HOMES, SUBURB_NIGHT, SURFACE_CALM } from '@/lib/fly/fly-constants';
+import { chunkFadeOn } from '@/lib/fly/toy-world/chunk-fade';
 import { applyBendAnchor } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
 
@@ -158,6 +159,12 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
     stale: false, // the ring timed out unresolved: treat it as resolved as it gets
     provisional: false, // placed past maxHoldSec on an unresolved ring
     settled: false,
+    // R24 B (CHUNK_FADE, recon A6) — the provisional→confirmed grow was a
+    // DISCRETE step: R22's RED measured 1,874 Melton homes arriving in one
+    // 100 ms sample at 100% of settled scale. growK is now eased toward
+    // growTarget and applied to the resident matrices in place.
+    growK: 1,
+    growTarget: 1,
   });
 
   const geometry = useMemo(() => buildHouseGeometry(), []);
@@ -234,6 +241,34 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
       st.nightK = nt ** H.gamma;
       placeHomes(mesh, engine, runtime, flight, st, pool, t);
     }
+    // R24 B (CHUNK_FADE, recon A6) — ease the provisional grow instead of
+    // stepping it. The placement pass writes matrices at the CURRENT growK; in
+    // between passes the ratio is applied to the resident matrices IN PLACE
+    // (uniform scale on the 3x3 basis, translation untouched), so a field grows
+    // over ~600 ms instead of ~1,900 houses jumping to full size in one frame.
+    // Zero cache keys, zero new draws, and it only walks the buffer while an
+    // ease is actually running.
+    if (chunkFadeOn() && st.growK !== st.growTarget && st.placed > 0) {
+      const dt = Math.max(0, Math.min(0.1, t - (st.growT ?? t)));
+      const step = CHUNK_FADE.parcelGrowSec > 0 ? dt / CHUNK_FADE.parcelGrowSec : 1;
+      const d = st.growTarget - st.growK;
+      const next = Math.abs(d) <= step ? st.growTarget : st.growK + Math.sign(d) * step;
+      const ratio = st.growK !== 0 ? next / st.growK : 1;
+      if (ratio !== 1) {
+        const arr = mesh.instanceMatrix.array;
+        const end = st.placed * 16;
+        for (let o = 0; o < end; o += 16) {
+          arr[o] *= ratio; arr[o + 1] *= ratio; arr[o + 2] *= ratio;
+          arr[o + 4] *= ratio; arr[o + 5] *= ratio; arr[o + 6] *= ratio;
+          arr[o + 8] *= ratio; arr[o + 9] *= ratio; arr[o + 10] *= ratio;
+        }
+        rangeUpload(mesh.instanceMatrix, end);
+      }
+      st.growK = next;
+    } else if (!chunkFadeOn()) {
+      st.growK = st.growTarget;
+    }
+    st.growT = t;
     // ONE material write per frame.
     mesh.material.emissiveIntensity = st.nightK * PARCEL_HOMES.night.intensity;
 
@@ -256,6 +291,7 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
         settled: st.settled,
         held: st.held,
         provisional: st.provisional,
+        growK: st.growK, // R24 B (CHUNK_FADE) — the eased provisional grow
         zeroPasses: st.zeroPasses,
         tris: st.placed * (geometry.index.count / 3),
       };
@@ -965,7 +1001,12 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
         // size and then be deleted; a small field growing is a world loading,
         // a full field vanishing is a bug. (Scale is uniform, so the height
         // band verify-suburbia (G) freezes only ever gets SMALLER.)
-        const growK = C && st.provisional ? C.growScale : 1;
+        // R24 B (CHUNK_FADE): the target is the same discrete decision; only
+        // the VALUE this pass writes is the eased one. Flag-off growK tracks
+        // the target exactly (the ease step below snaps), so this is the R21
+        // expression verbatim.
+        st.growTarget = C && st.provisional ? C.growScale : 1;
+        const growK = chunkFadeOn() ? st.growK : st.growTarget;
         const fscale = (1 + (P.farScale.mul - 1) * ft) * st.altK * growK;
         // One yaw for the whole cluster: every house on a street shares it.
         const yaw = hash(lx * 0.731 - lz * 1.117) * Math.PI * 2;
@@ -1049,6 +1090,14 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
   if (mesh.instanceColor) rangeUpload(mesh.instanceColor, touched * 3);
   st.prevN = n;
   mesh.boundingSphere.center.set(0, 0, 0);
-  mesh.boundingSphere.radius = Math.sqrt(maxR2) + maxScale + maxD * maxD * MAX_BEND_K + 50;
+  // R24 B (BEND_LEAD, recon WB-6) — `maxD` was measured at THIS placement pass,
+  // but the pool is only refilled on the 2 s cadence, so by the next pass the
+  // player can be BEND_LEAD.poolLeadM further from these instances (the fleet's
+  // fastest airframe boosts at 750 m/s). The bend drop is quadratic in that
+  // distance, so a stale maxD under-pads the sphere and the whole pooled layer
+  // frustum-culls while the camera turns at speed — a forest, a suburb or a
+  // landcover sheet vanishing as one object. Flag-off adds exactly 0.
+  const leadD = maxD + (BEND_LEAD.enabled ? BEND_LEAD.poolLeadM : 0);
+  mesh.boundingSphere.radius = Math.sqrt(maxR2) + maxScale + leadD * leadD * MAX_BEND_K + 50;
   st.placed = n;
 }
