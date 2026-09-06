@@ -489,6 +489,68 @@ rebase or when the tile's own max height changes. Heap over 400 walks:
 
 ---
 
+## §7 M3 — `LADDER_FIX` + `STEP_SAFE`: the other user symptom
+
+The user's second report is **"buildings appearing and disappearing."** Recon A4
+names the mechanism and this round reproduced it: on a `devicePixelRatio`-1
+display — the most common desktop — `CANVAS.dprMax 1.5 / dprMin 1 / dprStep
+0.25` makes `buildLadder`'s DPR loop run **zero times**, so the ladder is
+literally `[1/high, 1/medium, 1/low]` and **the governor's very first step is a
+structural TIER step**: the post chain rebuilds, the high-tier layers unmount.
+A transient — one bad second while a city streams — is enough to trigger it.
+
+### What ships
+
+| Switch | What |
+|---|---|
+| `LADDER_FIX` sub-native rungs | render-scale rungs (0.875, 0.75) BEFORE the first tier rung. `CANVAS.dprMin` is untouched — that is the canvas's own boot arithmetic; these exist for the governor alone |
+| `LADDER_FIX.nativeRefresh` | the target follows the display's estimated refresh instead of `min(60, refresh)` (FL-04: a 144 Hz monitor at ~100 fps never stepped while presentation alternated 7/14 ms) |
+| `LADDER_FIX.longFrameFrac` | a rolling FRACTION of frames longer than `longFrameK / targetFps` can step the ladder. Counted BEFORE the outlier drop, which exists so one stall is not a hardware verdict but also makes the EMA blind to exactly the pattern users call "not smooth" (FL-13). Being a fraction over a 240-frame window, one hitch can never trigger it |
+| `STEP_SAFE` | the governor PARKS the DPR (`lib/fly/step-safe.js`); a `useFrame(cb, -99)` rig applies `setPixelRatio` → `setSize` → `composer.setSize` → React `setDpr` in ONE tick, inside the frame that draws it. Plus the FL-05 in-frame buffer check in the composer's own `useFrame`, which closes the same window for the window-resize path the rig does not cover |
+
+Both are armed by runtime pins (`__flyLadderFixOverride`,
+`__flyStepSafeOverride`) — the R16 weather-pin idiom, the same one `TERRA_PACE`
+uses — so the A/B runs on the USER'S machine without editing constants, and no
+harness rewrites a constants file (HARN-HYG-9).
+
+### RED → GREEN (MEASURED-HERE, `scripts/verify-ladder-fix.js`, 13 gates)
+
+RED calibration on the flag-off tree is a single env var
+(`FLY_LADDER_RED=1`) and it fails **6 of 13**:
+
+| | flag-off (RED) | flag-on (GREEN) |
+|---|---|---|
+| ladder at DPR 1 | `[1/high, 1/medium, 1/low]` | `[1/high, 0.875/high, 0.75/high, 1/medium, 1/low]` |
+| sub-native rungs | **0** | **2**, both before the first tier rung |
+| refresh 144 Hz → target | 60 fps | **144 fps** |
+| a 55 fps-mean session with 10% long frames | never steps (longFrac 0) | steps, **render-scale rungs first**: dpr 0.875 → 0.75 → then medium |
+| CONTROL: a clean 60 fps session | never steps | never steps |
+| a forced step | `__flyStats.step` **null** — React only | `{n:1, dpr:0.875, applyMs:2.3, canvasW:560, canvasH:315, composer:true, viaValve:false}` |
+| composer buffers vs drawing buffer after the step | match | match |
+
+The stutter arm is worth its own note, because the first draft of it proved
+nothing: 1 frame in 8 at 45 ms drags the MEAN to 41.5 fps, so the EMA path
+stepped the ladder and the long-frame term was never tested (it even reached a
+TIER rung, which the gate then "passed" for the wrong reason). The shipped arm
+is 90% at 16.7 ms and 10% at 30 ms — mean **53.4 fps, above the 51 fps down
+bound** — so only `longFrac 0.10 > 0.08` can move it. An A/B whose control arm
+also moves is not an A/B.
+
+`__flyStats.step` is the hook E's `verify-step-clean` needs: it records the
+frame's DPR, the canvas backing size the rig wrote, whether a live composer was
+registered, and `viaValve` — false when the rig applied it in-frame, true when
+the 1000 ms safety valve did (hidden tab, or the canvas unmounted between the
+park and the next frame).
+
+### Frozen contracts held
+
+`__flyGov.state()` gains `longFrac` and `subNativeRungs` and moves nothing;
+with the pins absent the ladder, the target and the step path are the R21 code
+verbatim (the RED run above is that proof). `bufferMatchesDrawing`
+(verify-tier-step gate 4) is now true BY CONSTRUCTION rather than by timing.
+
+---
+
 ## §9 Could not measure here (honest list)
 
 Everything in this section needs the user's machine, or E's offline fixture,

@@ -9,8 +9,10 @@ import { PhotoCapture } from './PhotoCapture';
 import { JuiceSystems } from './JuiceSystems';
 import { PrewarmRig } from './PrewarmRig';
 import { CANVAS, PERF_GOVERNOR, PREWARM } from '@/lib/fly/fly-constants';
+import { resolveStepSafe } from '@/lib/fly/step-safe';
 import { autoTierCeiling } from '@/lib/fly/fly-settings';
 import { PerfGovernor } from '@/lib/fly/perf-governor';
+import { StepSafeRig } from './StepSafeRig';
 import { useFlyStore } from '@/stores/fly-store';
 
 function initialDpr() {
@@ -58,6 +60,9 @@ function stepQualityTier(dir) {
  */
 export function FlyCanvas({ runtime }) {
   const [dpr, setDpr] = useState(initialDpr);
+  // R24 A (STEP_SAFE): resolved once at mount — the pin is set before Fly mode
+  // mounts and never moves mid-session.
+  const [stepSafeOn] = useState(() => resolveStepSafe().enabled);
 
   // ROUND 21 (A GOVERNOR, S1): the scene subtree, shared by both quality
   // controllers so the two paths differ ONLY in what wraps it. With
@@ -123,6 +128,12 @@ export function FlyCanvas({ runtime }) {
               default incline bound at vsync-locked steady state, and
               flipflops=Infinity means it never latches). */}
           <PerfGovernor setDpr={setDpr} />
+          {/* Round 24 (A PACE, STEP_SAFE): applies a parked DPR at priority
+              -99 — after the governor's -100, before FlyScene's -50 and long
+              before the composer's +1 — so the canvas realloc, the composer's
+              render targets and the React state all move inside the frame that
+              draws them (recon A3). Renders nothing; inert with the flag off. */}
+          {stepSafeOn && <StepSafeRig setDpr={setDpr} />}
           {sceneTree}
         </>
       ) : (
