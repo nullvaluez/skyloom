@@ -1344,12 +1344,36 @@ own `renderTargetCoC`, *sampled* at the same normalised UV rather than read back
 (that target is half-resolution, and a normalised UV is resolution-independent);
 `null` with a `cocReason` when DoF is not mounted.
 
-**Why a copy pass:** a depth ATTACHMENT cannot be `readPixels`'d, so the probe
-samples it into a 1×1 `FloatType` target and reads that. 8-bit would be useless
-(reversed depth at 700 m is 3.6e-3, and the reconstruction's relative error is
-the texel's), and half float's ~11-bit mantissa would put ~0.05 % on a gate whose
-bound is 1 %. **Without `EXT_color_buffer_float` the probe returns an `error`
-rather than a number it cannot stand behind.**
+**Why a copy pass, and the precision ladder.** A depth ATTACHMENT cannot be
+`readPixels`'d, so the probe samples it into a 1×1 float target. 8-bit is not an
+option — reversed depth at 700 m is 3.6e-3 and the reconstruction's relative
+error **is** the texel's — so:
+
+| available | copy target | `precision` | worst error at 50 / 700 / 4000 m |
+|---|---|---|---|
+| `EXT_color_buffer_float` | `FloatType` | `float32` | 0.000002 % / 0.000000 % / 0.000001 % |
+| `EXT_color_buffer_half_float` | `HalfFloatType` | `float16` | **0.0165 % / 0.0150 % / 0.0754 %** |
+| neither | — | — | no number at all, and an `error` saying so |
+
+**The half-float rung exists because refusing outright was stricter than the
+gate it serves.** The first version returned an `error` without
+`EXT_color_buffer_float` — defensible while the cost was unquantified, and wrong
+once it was measured: every float16 path is **13× inside**
+`verify-depth-roundtrip`'s 1 % bound, so the refusal would have turned a runnable
+row into NOT RUNNABLE for a reason that no longer held. A half-float
+`readPixels` returns raw 16-bit PATTERNS, not numbers, so the buffer is a
+`Uint16Array` decoded with three's own `DataUtils.fromHalfFloat` — one decode, in
+one place, that does nothing else (**the proof scans for `1.0 -` anywhere in the
+probe precisely so the recon-L2 double-conversion cannot be reintroduced inside
+the instrument that exists to measure it**). The return value carries
+`precision`, `precisionWorstPct` and `precisionNote`, so **a green row says which
+number it is green on** rather than assuming the two paths are interchangeable.
+What the probe still refuses is a value when NEITHER target renders: an
+unquantified number is worse than an honest absence.
+
+The declared costs are **asserted against a live round-trip**, under the rule
+that a declared cost may overstate and never understate — so they cannot drift
+into optimism.
 
 **Production byte-identical**, the R19 park-handle idiom: both the probe and
 `__flyDof` are installed from `process.env.NODE_ENV` branches that are
@@ -1369,7 +1393,11 @@ operations in the same order on the same doubles is the only acceptable result
 for a transcription. Six further gates assert the probe's contract: it reports
 the attachment as stored, reads `reversed` from the RENDERER rather than from
 the request, refuses instead of guessing, names its sources, and both handles
-are production-dead.
+are production-dead. Eight more assert the precision ladder: every float16 path
+inside the bound and by how much, float32 exact, the declared constants never
+optimistic, the `float32 → float16 → refusal` order, the
+`DataUtils.fromHalfFloat` decode, and that `precision` / its cost / its
+provenance all reach the return value.
 
 ### Gates on the flipped branch
 
