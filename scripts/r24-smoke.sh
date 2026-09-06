@@ -94,6 +94,13 @@ fi
 
 # --- node gates: no browser, no GPU, no network. These run anywhere and are
 #     the fastest possible signal that a merge broke a data contract.
+# FIRST, and deliberately so: the cheapest possible "the app can EVALUATE"
+# signal. Every browser gate in the fleet is downstream of module evaluation,
+# so a red here makes every number after it meaningless. R24 lost four browser
+# rows to an unimported identifier in a module-scope template literal before
+# this gate existed.
+node_gate verify-import-integrity.mjs
+
 node_gate verify-classify.mjs
 node_gate verify-warbirds.mjs
 node_gate verify-daily.mjs
