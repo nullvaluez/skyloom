@@ -24,6 +24,7 @@
 import { mkdirSync, copyFileSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { checkShip } from './_r24a-ship-state.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPORT = process.argv.includes('--report');
@@ -57,11 +58,22 @@ const gate = (name, ok, detail = '') => {
 
 console.log('verify-finalize-pace — the shared per-frame finalize brake (WB-3 / A9 / WB-10)\n');
 
+// ------------------------------------------------------ 0. the SHIP state
+// Two separate claims, so two separate gates. This one is "the build actually
+// carries the ruled flag"; every gate below is "the code behaves correctly
+// under each state", which is why they force the state themselves. A silent
+// revert would leave the behaviour gates green and only this one red.
+const shipFP = checkShip('FINALIZE_PACE');
+gate('0 FINALIZE_PACE ships in the ruled state', shipFP.ok, shipFP.detail);
+
 // ---------------------------------------------------------- 1. flag off
+// FORCED off, not observed off: the property is "with the brake off the
+// engines run the R21 arithmetic", and that must stay provable now that the
+// shipped default is ON.
 globalThis.__fpCfg = { enabled: false, budgetMs: 3, longFrameMs: 24, vegPerFrame: 1 };
 fp.resetFinalizePace();
 fp.noteFinalizeFrame(0.2); // a 200 ms frame: as bad as it gets
-gate('1 flag off: the brake never defers anything (control flow unchanged)',
+gate('1 forced OFF: the brake never defers anything (control flow unchanged)',
   fp.mayFinalize(0) === true && fp.mayFinalize(5) === true && fp.finalizePaceOn() === false);
 
 // ------------------------------------------------- 2. rule 1, the first chunk

@@ -57,7 +57,6 @@ const DRIVE = ({ dpr0, tier0, frames, dtPlan, cfgPatch }) => {
   if (cfgPatch) args.cfg = cfgPatch;
   const g = mk(args);
   let clock = 0;
-  // eslint-disable-next-line no-eval
   const dtFn = new Function('i', dtPlan);
   for (let i = 0; i < frames; i++) {
     const dt = dtFn(i);
@@ -86,15 +85,22 @@ const DRIVE = ({ dpr0, tier0, frames, dtPlan, cfgPatch }) => {
   // the same one TERRA_PACE uses) rather than editing constants: a harness that
   // rewrites a constants file is the hygiene defect recon HARN-HYG-9 names, and
   // a pin is also how the user runs the A/B on their own machine.
-  // FLY_LADDER_RED=1 skips the pins: that is this gate's RED calibration on the
-  // flag-off tree, and it must FAIL. Recorded in scripts/r24-a-pace.md.
-  if (!process.env.FLY_LADDER_RED) {
-    await page.addInitScript(() => {
-      window.__flyLadderFixOverride = { enabled: true, nativeRefresh: true };
-      window.__flyStepSafeOverride = { enabled: true };
-    });
-  } else {
-    console.log('  (RED calibration: pins NOT set — this run is expected to fail)\n');
+  // FLY_LADDER_RED=1 FORCES both features off — it does not merely omit the
+  // pin. That distinction became load-bearing at the R24 close: the constants
+  // now ship ON, so an omitted pin is the SHIPPED state and the RED arm would
+  // have gone quietly green while claiming to calibrate against the defect.
+  // A calibration arm has to state the state it wants, not inherit it.
+  await page.addInitScript(
+    (red) => {
+      window.__flyLadderFixOverride = red
+        ? { enabled: false, nativeRefresh: false }
+        : { enabled: true, nativeRefresh: true };
+      window.__flyStepSafeOverride = { enabled: !red };
+    },
+    !!process.env.FLY_LADDER_RED
+  );
+  if (process.env.FLY_LADDER_RED) {
+    console.log('  (RED calibration: both features FORCED OFF — this run is expected to fail)\n');
   }
   await bootFly(page, { style: 'toy', timeoutMs: 600000, settleMs: 4000 });
 

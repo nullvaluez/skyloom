@@ -787,13 +787,37 @@ OpenFreeMap / adsb.lol are 403-blocked.
 | 5 | Draw counts at the settled canonical poses with the residency trio ON | E's fixture |
 | 6 | Whether `bendSphere` (T14) can be enabled inside Owens ≤ 261 / sat ≤ 375 | E's fixture |
 | 7 | Stalls/min and felt smoothness of the residency trio | User's machine (`__flyTerraPaceOverride` A/B) |
-| 8 | Whether a WRONG tile (cache/URL mix-up) is also in play, as distinct from LOD policy | E's z/x/y-stamped fixture + my URL↔position probe in `verify-terra-live.js` |
+| 8 | Whether a WRONG tile (cache/URL mix-up) is also in play, as distinct from LOD policy | **ANSWERED on the fixture** — see below |
 | 9 | `skirtWorker` end to end — the production LERC path builds geometry in a worker; the fixture's terrain-rgb loader builds on the MAIN thread, so the patched path is never reached here | User's machine (Esri egress) |
 | 10 | Whether `walkWhileSaturated`'s 2.5× traversal is invisible in a real frame budget | User's machine |
 | 11 | Whether `FINALIZE_PACE` removes a FELT hitch (the rule's shape is proven; the frame time is not) | User's machine, via E's FRAME_STATS long-frame count |
 | 12 | `HUD_SYNC`: that the label swim is gone in a turn — it is a visual | User's machine |
 | 13 | `REBASE_CALM` T12: that the micro-grain no longer re-phases at a rebase | User's machine |
 | 14 | `FRAME_STEP`'s consumer opt-in: that a render-pose consumer still lands on a harness-pinned `flight.pos` | A machine that can run the fleet (see §8c) |
+
+**Row 8 — ANSWERED on the fixture (pass 1, arm A, Fable's run):** 64 resident
+tiles, **0/62 URL mismatches, 0/64 position mismatches** with `TERRA_PACE` off.
+No resident tile was displaying imagery from another tile's address, so a cache
+or URL mix-up is NOT producing the "tiles swapping for other ones" symptom in
+the code path, and the LOD-policy attribution in §3 does not rest on an
+unexamined alternative.
+
+Two limits, so the result is read at the strength it carries:
+
+1. **The fixture serves deterministic bytes per (z,x,y); Esri does not.** The
+   finding in §3 is that a merge REPLACES four children with a coarser parent.
+   Against the fixture that parent is consistent imagery, so the swap reads as a
+   resolution change. On the user's machine it is a DIFFERENT CAPTURE — other
+   season, other sun, sometimes visibly different colour. This probe cannot see
+   that class at all, because the URL and the position are both correct and only
+   the pixels differ. It is still LOD policy and it does not change the fix, but
+   it is why the symptom reads more violently on their screen than any fixture
+   number will ever show. **The live-capture variant remains a user-machine
+   item.**
+2. **The denominator is 62, not 64.** The probe only tests tiles whose material
+   already carries a map; the two without a URL were skipped SILENTLY, and those
+   are the mid-load tiles — the likeliest moment for a mismatch if one existed.
+   Not a reason to doubt the result, but the honest figure.
 
 **The one thing I attempted here and could not finish:** the satellite fixture
 A/B in `scripts/verify-terra-live.js` (the content probe + the live draw
@@ -848,6 +872,185 @@ should run before every commit that adds a call site, not just before a merge.
 
 ---
 
+## §12 SHIP STATE — what A flipped on at the close
+
+One line per switch, and every OFF one names the run it is waiting for. Nothing
+here is off by omission.
+
+| Flag / switch | Ships | Why, in one line |
+|---|---|---|
+| `TERRA_PACE.enabled` | **ON** | the umbrella for the terrain work below |
+| `…timerFix` | **ON** | `updateInterval` gates the quadtree walk again: 10/12 updates walked the whole tree → 4/12 |
+| `…mergeHysteresis` | **ON** | kills the refine↔merge flip: on a vertical bob, flips 27→16, merges 21→11, refetches 89→63 |
+| `…keepResident` | **ON** | the "tiles swapping" fix: on a pure yaw sweep, merges 22→0, on-screen replacements 17→0, refetches 178→0 |
+| `…skirtFast` | **ON** | 7.1×/6.5× on the measured 67%-of-stalls hot spot, byte-identical geometry over 13 cases |
+| `…walkWhileSaturated` | **ON** | ends the global freeze that pinned E's tree at z6; strictly conservative — visits 444→4,248, refines and requests unchanged |
+| `…bboxCache` | **ON** | pays for the above: heap 1,398→771 KB per 400 walks |
+| `…skirtWorker` | OFF | **needs one real-hardware run.** Proven output-identical in node (8/8), but the fixture's terrain-rgb loader builds geometry on the MAIN thread, so only Esri LERC tiles reach the patched path — nothing here has ever exercised it |
+| `…bendSphere` | OFF | **needs one real-hardware run** at the canonical poses: it fixes the bend-blind cull by SUBMITTING far tiles that are culled today, which is a draw-count change against Owens ≤ 261 / sat ≤ 375 |
+| `…parallelLoad`, `imageBitmap`, `preUpload`, `lodOutsideRender` | OFF | **not implemented this round.** W0 scaffolding switches that no patch reads: turning one on changes nothing. Said plainly in the constants so nobody flips one and waits |
+| `STEP_SAFE` | **ON** | the DPR step lands inside the frame that draws it: `{dpr:0.875, applyMs:2.3, composer:true, viaValve:false}` where flag-off recorded nothing at all |
+| `LADDER_FIX` | **ON** | `[1/high, 1/medium, 1/low]` → five rungs with 0.875 and 0.75 first, so the first step is no longer a tier step |
+| `…nativeRefresh` | **ON** | plan §0 ruling 6. **The one flipped value with no measurement behind it** — an exact no-op at 60 Hz (`min(60,60)`), and on 120/144 Hz it raises the target while recon FL-04's own question to the user is still unanswered |
+| `HUD_SYNC` | **ON** | the overlay stops being a picture of frame N−1 (~30 px of label swim per turn at 60°/s) |
+| `FINALIZE_PACE` | **ON** | one shared per-frame brake across four engines, and the first chunk is no longer free after a long frame |
+| `REBASE_CALM` | **ON** | the dead store bump, the narrowed matrix update, and the 704 m quantised anchor so the micro-grain stops re-phasing every 10 km |
+| `FRAME_STEP` | OFF | **the consumer opt-in did not land** (§8c). The accumulator and the interpolated pose are proven (10/10, incl. the substep-boundary identity); pointing PlayerPlane / chase cam / Contrail / ground shadow at `renderPos` is the half that can move a harness pose, and it cannot be certified in this venue. On today it would change the sim integration with nothing reading the smoother pose: all the risk, none of the benefit |
+
+### The gate change the flip forced
+
+Every one of my gates drives its feature by setting the switch ITSELF — which
+is correct, because the property under test is *"off = the R21 arithmetic,
+on = the fix"*, not *"the flag happens to be false"*. But that makes all of
+them blind to the SHIP STATE: a flag silently reverted to `false` would leave
+every behaviour gate green while the fix was gone from the build. **Those are
+two separate claims and both now have a gate.** `scripts/_r24a-ship-state.mjs`
+reads the literal out of `fly-constants.js` by brace-matching (not a copy, not
+an import — the file that ships), and each gate asserts its own block against
+the ruled state while keeping its forced-state behaviour arms.
+
+Three arms had to be hardened for the same reason, and this is the interesting
+half of the flip:
+
+- `verify-finalize-pace` gate 1 now says **forced** off, not flag-off.
+- `verify-ladder-fix`'s RED arm used to *omit* the pin. With the constants
+  shipping ON, an omitted pin IS the shipped state, so the RED calibration
+  would have gone quietly green while claiming to measure the defect. It now
+  FORCES both features off.
+- `verify-terra-live`'s arm A had the same shape — an unpinned control that
+  had become the treatment. **An A/B whose control arm is the treatment is not
+  an A/B**, which is the same lesson as the stutter arm in §7, arriving from
+  the opposite direction: there the control moved, here it silently stopped
+  being a control at all.
+
+`verify-vendor-three-tile` gained gate 16b: the vendored switchboard's own
+literal must default every switch to `false` regardless of what the app ships,
+because the bundle is imported by node fixtures and by the app alike and only
+`terrain-engine.js` decides what is on.
+
+---
+
+## §13 Pass-1 gate 6 (`1 → 17` duplicate URLs): the LRU is NOT the cause
+
+Pass 1's terra-live row failed gate 6 — duplicate URLs `1 → 17` with the trio
+ON, the opposite direction from the node fixture's `178 → 0`. Three candidate
+causes were put to me. **It is none of them as stated, and the LRU hypothesis
+is dead twice over.**
+
+### The LRU is ruled out, by arithmetic and by its own effect being absent
+
+| | value |
+|---|---|
+| cap (`TILES.lruBudgetBytes`) | 140 MB |
+| fixture imagery tile, 256² sRGB + mips (`w·h·4·4/3`) | 341.3 KB |
+| fixture DEM geometry at the 33² grid (pos+uv+nrm+idx) | 58.0 KB |
+| ⇒ per resident tile | **≈ 399 KB** |
+| ⇒ what 140 MB admits | **≈ 358 tiles** |
+| observed arm B, Powell 41.3 MB | ≈ 106 tiles — **30% of cap** |
+| observed arm B, Owens 50 MB | ≈ 128 tiles — **36% of cap** |
+
+The cap was never within a factor of three of binding. And independently:
+**the byte LRU's ONLY effect path is setting `_r24Collapse`, which
+`_LODEvaluate` turns into a return of 2 — a MERGE.** Arm B reports
+`merges 0, refetchParent 0`. Had the LRU evicted anything, both would be
+non-zero. Budget headroom and absent effect are two independent refutations.
+
+(The counter semantics were the other candidate; E confirms `/__stats/reset`
+clears `byUrl` outright and each arm's window is its own sweep. Every fixture
+response is `no-store`, so the browser cache is not masking repeats either: the
+counts are honest, and — as E notes — an upper bound on live, where real cache
+headers and R21's persistent Cache API tile cache both apply.)
+
+### What it actually is: upstream's discard-after-download, at 51° per FRAME
+
+`_loadSubTiles` re-checks `_LODEvaluate` **after** awaiting the four children
+and calls `unloadSubTiles()` if the answer is no longer "refine" — it throws
+away downloads it has just made. Whether that fires depends on how far the
+camera turned DURING the download, i.e. on **degrees of heading change per
+FRAME**. The harness drove the yaw off the wall clock at ~51 °/s: 0.85 °/frame
+at 60 fps, but **~51 °/frame on this ~1 fps container**. At that rate the camera
+does not sweep, it teleports, and essentially every refine started in the sweep
+has its parent out of frustum before its children land.
+
+MEASURED node-side on the real vendored classes (`scripts/r24-out/probe-refetch.mjs`,
+throwaway; 60 frames, tile latency 2 frames):
+
+| arm | deg/frame | refines | merges | **discards** | unique | reqs | **dup URLs** |
+|---|---|---|---|---|---|---|---|
+| OFF | 0.85 | 45 | 1 | 0 | 176 | 177 | **1** |
+| trio | 0.85 | 45 | 0 | 0 | 176 | 176 | **0** |
+| trio + walkWhileSaturated | 0.85 | 45 | 0 | 0 | 176 | 176 | **0** |
+| OFF | 51 | 47 | 34 | 3 | 52 | 218 | **28** |
+| trio | 51 | 55 | 0 | 1 | 212 | 216 | **4** |
+| trio + walkWhileSaturated | 51 | 59 | 0 | 7 | 204 | 232 | **28** |
+
+At **0.85 °/frame — the same 51 °/s on a 60 fps machine — the trio takes
+duplicate URLs 1 → 0.** At 51 °/frame the same code goes 28 → 28: the 34 merges
+the fix removes are replaced, one for one in kind, by discards.
+`walkWhileSaturated` raises them further (4 → 28) and that is not a bug in it:
+it correctly restores the refine STARTS that upstream's freeze rule was
+suppressing, and at 51 °/frame every start is doomed.
+
+So the honest attribution has three parts, and the middle one matters:
+- the duplicates are **upstream's** waste path, not the trio's — the trio
+  removes merges (`1 → 0` live, `34 → 0` in the probe) and adds none;
+- they are **surfaced by the venue's frame pacing**, not by the fix. 45 s at
+  1 fps is 45 discrete 51° jumps, which is not a turn;
+- and `walkWhileSaturated` makes them **more visible**, because it stops the
+  freeze from hiding refine starts. That is the fix working, seen through an
+  instrument calibrated for a different machine.
+
+**Not claimed:** that the discard path is harmless on the user's machine. The
+probe says it is zero at 0.85 °/frame with a 2-frame latency; a real machine has
+longer network latency, and the product (deg/frame × latency) is what governs
+it. That is a user-machine item, and a genuinely cheap follow-up if it shows up:
+re-check the frustum BEFORE issuing the four child loads, not only after they
+land.
+
+### The instrument fix
+
+`PIN_YAW` now advances the heading **per frame** (`FLY_TERRA_YAW_DEG_PER_FRAME`,
+default 0.85) instead of per wall-clock second, so both arms sweep the same ARC
+at any frame rate, and it publishes `window.__fxYaw = {frames, deg}`. Gate 6
+refuses to compare two arms unless both swept ≥ 360° and within 10% of each
+other; otherwise it prints `SKIP … NOT CALIBRATED` with the two arcs rather
+than a red.
+
+**Consequence for pass 2, stated plainly:** at ~1 fps, 45 s × 0.85 °/frame is
+about 38° of arc, so gate 6 would SKIP in this container rather than produce a
+number. That is the correct outcome — the row needs either a much longer sweep
+or the user's machine. A skip that says why beats a red that measures the venue.
+
+**And then the sweep length became reachable** (Fable's ruling, same round):
+rather than leave the row skipped here, the sweep is now a harness-only env,
+`FLY_TERRA_SWEEP_MS`, defaulting to the original 45000 so an unset environment
+is byte-identical to the gate before the env existed (`FLY_TERRA_YAW_MS` is
+kept as its alias, so no existing invocation moves). The arithmetic Fable has
+to pay: 360° ÷ 0.85 °/frame ≈ **424 rendered frames**, which at this venue's
+~1 fps is ~7–8 minutes of wall clock **per arm**; pass 2 runs it at 600000
+(10 min/arm) with `FLY_TERRA_ARMS=both`, so gate 6 asserts for real here
+instead of skipping. `page.waitForTimeout` is not bounded by Playwright's
+default timeout, so the only cost is wall clock — budget roughly +20 minutes
+over pass 1's 715 s for the row.
+
+The arc is now printed **beside the verdict on every path**, not only on the
+skip: a new `arc swept` line in the YAW SWEEP block carries both arms'
+degrees and frames, gate 6's PASS/FAIL detail string repeats them, and the SKIP
+text names `FLY_TERRA_SWEEP_MS` as the knob to raise (explicitly **not**
+`FLY_TERRA_YAW_MIN_ARC` — lowering the arc minimum would restore exactly the
+under-calibrated comparison that produced the 1 → 17). A reader of the log can
+now always see what arc the number was measured over.
+
+**Still worth having (E, pass 2):** the per-prefix breakdown. It is no longer
+load-bearing for this attribution, but an eviction-refetch cycle would show in
+`img` AND `dem` together and nowhere else, so it is the cheapest confirmation if
+the question ever reopens. Also unaddressed by the arc fix, and E's own catch:
+the stats reset is not atomic with the yaw pin, so boot-tail requests land in
+the window and the ON arm holds more resident state at that moment — a second,
+smaller contributor to the 1 vs 17 asymmetry.
+
+---
+
 ## §10 Commits
 
 | # | Commit | What |
@@ -865,18 +1068,21 @@ should run before every commit that adds a call site, not just before a merge.
 | 11 | `ed773b8` | M4 `FRAME_STEP` sim half + `verify-frame-step`; consumer opt-in NOT landed (§8c) |
 | 12 | `70b9f42` | E's `FRAME_STATS` `markPhase` attribution in the terrain + finalize paths (PATCH 25, by inversion) |
 | 13 | `f739cb3` | ledger §9/§10/§11 |
-| 14 | _(this commit)_ | **BLOCKER FIX**: the missing `pinned` import in CloudField.jsx (§9b) |
+| 14 | `8b91bc5` | **BLOCKER FIX**: the missing `pinned` import in CloudField.jsx (§9b) |
+| 15 | `5ddf5dc` | **W3 ship-state flip** (§12) + the ship-state gates and the three hardened control arms |
+| 16 | `5a41680` | row 8 recorded — the content probe answered on the fixture |
+| 17 | _(this commit)_ | §13 — pass-1 gate 6 attributed (NOT the LRU) + the per-frame yaw arc and gate 6's calibration guard |
 
 ### Gates added
 
 | Gate | Assertions | Venue |
 |---|---|---|
-| `scripts/verify-vendor-three-tile.mjs` | 19 | node, anywhere |
-| `scripts/verify-terra-residency.mjs` | 21 | node, anywhere |
-| `scripts/verify-skirt-fast.mjs` | 12 | node, anywhere |
-| `scripts/verify-skirt-worker.mjs` | 8 | node, anywhere |
-| `scripts/verify-finalize-pace.mjs` | 11 | node, anywhere |
-| `scripts/verify-frame-step.mjs` | 10 | node, anywhere |
+| `scripts/verify-vendor-three-tile.mjs` | 20 | node, anywhere |
+| `scripts/verify-terra-residency.mjs` | 22 | node, anywhere |
+| `scripts/verify-skirt-fast.mjs` | 13 | node, anywhere |
+| `scripts/verify-skirt-worker.mjs` | 9 | node, anywhere |
+| `scripts/verify-finalize-pace.mjs` | 12 | node, anywhere |
+| `scripts/verify-frame-step.mjs` | 11 | node, anywhere |
 | `scripts/verify-ladder-fix.js` | 13 | browser (toy boot, seconds); RED via `FLY_LADDER_RED=1` |
 | `scripts/verify-terra-live.js` | 9 | browser + E's fixture; **has not completed here** (§9) |
 

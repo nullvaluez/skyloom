@@ -30,6 +30,7 @@
 import { mkdirSync, copyFileSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { checkShip } from './_r24a-ship-state.mjs';
 import { loadVendoredThreeTile } from './_tt-shim.mjs';
 import * as THREE from 'three';
 
@@ -305,7 +306,14 @@ console.log('verify-terra-residency — T1/T3 LOD residency on the vendored bund
 console.log('  venue: node, no GPU, no network. Decision COUNTS only — every ms/fps');
 console.log('  number in this round comes from the user\'s machine.\n');
 
-// --- 1-3: RED. The disease is present with the switches off. ----------------
+// --- 0: the SHIP state. Every arm below FORCES its switches, which is right
+// (the property is "off = upstream, on = the fix") and is also why none of
+// them can see a flag silently reverted in the build. This gate can.
+const shipTP = checkShip('TERRA_PACE');
+gate('0 TERRA_PACE ships in the ruled state (6 on, 6 off with reasons)',
+  shipTP.ok, shipTP.detail);
+
+// --- 1-3: RED. The disease is present with the switches FORCED off. ---------
 const yawOff = await fly({ frames: 90, pathFn: yawOnly, switches: OFF });
 const yawOn = await fly({ frames: 90, pathFn: yawOnly, switches: ON });
 table('A. PURE YAW SWEEP (camera stationary, heading turns 720 deg over 90 frames)',
