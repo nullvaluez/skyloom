@@ -17,7 +17,7 @@ import {
   Vector3,
 } from 'three';
 import { mercatorScale } from '@/lib/fly/coords';
-import { GLOBE, PARCEL_HOMES, SUBURB_NIGHT, SURFACE_CALM } from '@/lib/fly/fly-constants';
+import { BEND_LEAD, GLOBE, PARCEL_HOMES, SUBURB_NIGHT, SURFACE_CALM } from '@/lib/fly/fly-constants';
 import { applyBendAnchor } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
 
@@ -1049,6 +1049,14 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
   if (mesh.instanceColor) rangeUpload(mesh.instanceColor, touched * 3);
   st.prevN = n;
   mesh.boundingSphere.center.set(0, 0, 0);
-  mesh.boundingSphere.radius = Math.sqrt(maxR2) + maxScale + maxD * maxD * MAX_BEND_K + 50;
+  // R24 B (BEND_LEAD, recon WB-6) — `maxD` was measured at THIS placement pass,
+  // but the pool is only refilled on the 2 s cadence, so by the next pass the
+  // player can be BEND_LEAD.poolLeadM further from these instances (the fleet's
+  // fastest airframe boosts at 750 m/s). The bend drop is quadratic in that
+  // distance, so a stale maxD under-pads the sphere and the whole pooled layer
+  // frustum-culls while the camera turns at speed — a forest, a suburb or a
+  // landcover sheet vanishing as one object. Flag-off adds exactly 0.
+  const leadD = maxD + (BEND_LEAD.enabled ? BEND_LEAD.poolLeadM : 0);
+  mesh.boundingSphere.radius = Math.sqrt(maxR2) + maxScale + leadD * leadD * MAX_BEND_K + 50;
   st.placed = n;
 }

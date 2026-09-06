@@ -177,3 +177,82 @@ the flag is off).
   **RECOMMENDED ON AT CLOSE** on the evidence in §1.1/§1.4. Once it is on,
   `window.__flyFlashPin = 'off'` is the same-session RED leg.
 
+---
+
+## §2 M-BEND — BEND_LEAD (WB-6): the on-screen chunk that gets culled
+
+Taken OUT OF CHARTER ORDER (before CHUNK_FADE/HEAL_IN_PLACE), approved by
+Fable: it is four one-line engine changes plus three pool lines, and it is the
+most literal form of the user's report — a chunk that is **on screen** being
+frustum-culled while the camera turns at speed.
+
+### 2.1 RED — the false-cull window is open on EVERY ring
+
+`node scripts/r24-b-bend-proof.mjs` (pure arithmetic over the constants; runs
+anywhere). `maxLeadFrac 0.35 · pad 1.15`, metres:
+
+| ring | ringR | halfDiag | padOFF | padON | worst drop at the alive edge | **deficit OFF** |
+|---|---:|---:|---:|---:|---:|---:|
+| sat-buildings z14 | 3,600 | 1,730 | 163 | 250 | 217 | **54** |
+| sat-roads z13 | 12,000 | 3,459 | 1,374 | 2,222 | 1,932 | **558** |
+| sat-skyline z14×2 | 14,000 | 3,459 | 1,753 | 2,875 | 2,500 | **747** |
+| toy full z14 | 8,000 | 1,730 | 544 | 903 | 785 | **241** |
+| toy mid z13 | 18,000 | 3,459 | 2,648 | 4,431 | 3,853 | **1,205** |
+| toy far z12 | 30,000 | 6,918 | 7,837 | 12,929 | 11,242 | **3,405** |
+| toy ultra z10 | 89,650 | 27,673 | 79,147 | 127,143 | 110,559 | **31,412** |
+
+**7 of 7 rings are short with the flag off.** For scale, R21's census RED
+measured a worst drop of 10,191 m on the toy ultra ring — and that census ran
+on the ORBIT phase at **speed 0, where the lead is exactly 0**
+(FLY_ROUND21.md:112-113). The deficit above is what opens up the moment the
+aircraft moves.
+
+### 2.2 Mechanism
+
+`bendMarginM(ringAliveR, halfDiag)` models the worst vertex distance from the
+player as `ringR + halfDiag`. R21's lookahead centres the DESIRED SET on the
+lead point (`lead = min(sp·leadSec, maxLeadFrac·ringR)`,
+sat-building-engine.js:414, desired set at :750), so a chunk is legitimately
+alive out to `(1 + 0.35)·ringR + halfDiag`. The shader's drop is `d²·k`, so a
+35% radius excess is ~82% more drop than the sphere was padded for. Same shape
+at sat-road-engine.js:234/:571, sat-skyline-engine.js:198/:680,
+toy-world-engine.js:342.
+
+The pooled instanced layers have the same bug in a different clothing: they pad
+with `maxD` measured at the LAST placement pass and refill only on the 2 s
+cadence, so the player can be one cadence × fleet-max-speed further away before
+the pad is recomputed — and a pooled layer culls **as one object** (a whole
+forest, suburb or landcover sheet vanishing at once).
+
+### 2.3 Fix
+
+- `bendMarginM` in all four engines: `d = ringAliveR * leadMul + halfDiag`
+  where `leadMul = BEND_LEAD.enabled ? 1 + maxLeadFrac : 1`. **Flag-off the
+  multiplier is exactly 1 and the line is the R21 body verbatim.** The skyline
+  keeps its `max(cullMarginM, …)` floor, so the flag can only ever widen.
+- `SatVegLayer.jsx:521`, `SatParcelHomes.jsx:1052`, `SatTintLayer.jsx:285`:
+  `leadD = maxD + (BEND_LEAD.enabled ? BEND_LEAD.poolLeadM : 0)`.
+  `poolLeadM: 1500` = 2 s `SAT_VEG.placeCadenceSec` × 750 m/s (the fleet's
+  fastest airframe). Stated in B's own block rather than read from
+  `FLIGHT.bars.maxSpeedMps` (a hangar-UI normalizer that happens to hold the
+  same number) so the coupling is deliberate.
+- `SatTintLayer` is included even though the recon only named the veg and
+  parcel pools: it is the same one-line pattern, the same cadence and the same
+  vanish-as-one-object failure.
+
+### 2.4 Proof, cost, frozen numbers
+
+- Gates (1) RED / (2) GREEN / (3) SAFETY / (4) POOLS all PASS —
+  `padON >= worstDrop` on every ring, and `padON >= padOFF` everywhere (the
+  pad can only ever KEEP geometry, never drop it).
+- Cost: a handful of extra ring-edge draw submissions. Culling stays effective
+  — the pad grows ~55% on a radius that is already a small fraction of the ring.
+  **Owens has no buildings, skyline, roads or parcel homes to keep, so its draw
+  count cannot move** (its chunks are `empty` and issue no mesh).
+- No cache keys, no worker change, no protocol move, no shader text.
+- Frozen gates touched: `verify-stability`'s false-cull census reads
+  `mesh.userData.bendMarginM` and asserts `dropAtCentre <= bendMarginM` — that
+  assertion gets EASIER, never harder. E owns the moving-leg census sample
+  (§10 hand-off).
+- **Ships `enabled: false`. RECOMMENDED ON AT CLOSE.**
+
