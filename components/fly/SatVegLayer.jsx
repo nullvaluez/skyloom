@@ -17,6 +17,7 @@ import { SatVegEngine } from '@/lib/fly/toy-world/sat-veg-engine';
 import {
   BEND_LEAD,
   GLOBE,
+  LAMBERT_ENV,
   PARCEL_HOMES,
   SAT_AMBIENT,
   SAT_GROUND_LIFE,
@@ -204,7 +205,15 @@ export function SatVegLayer({ runtime, flight }) {
   // pool is ~126k tris for the whole world's vegetation, in ONE draw.
   const geometry = useMemo(() => new SphereGeometry(1, 7, 4), []);
   const material = useMemo(() => {
+    // R24 C (LAMBERT_ENV, recon WB-7): three r185 applies `scene.environment`
+    // to Lambert (WebGLPrograms.js:60-63) and Lambert's defaults are
+    // `combine = MultiplyOperation`, `reflectivity = 1` — a FULL-STRENGTH
+    // mirror lookup of the HDRI on every surface. Roofs take the zenith
+    // colour, facades take the horizon band, and the twilight HDRI's bright
+    // azimuth band lights one facade direction after dark. Uniform-only: a
+    // material PARAMETER, so the program and the cache key are unmoved.
     const m = new MeshLambertMaterial({ vertexColors: false });
+    if (LAMBERT_ENV.enabled) m.reflectivity = LAMBERT_ENV.reflectivity;
     applyBendAnchor(m); // existing variant, unmodified — no new cache key
     return m;
   }, []);

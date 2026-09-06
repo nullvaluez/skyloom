@@ -4,7 +4,7 @@
   "private": true,
   "license": "MIT",
   "author": "nullvaluez",
-  "description": "A keyless, real-time 3D flight tracker — fly through a stylized mini-globe of live ADS-B air traffic.",
+  "description": "A keyless, real-time 3D flight tracker \u2014 fly through a stylized mini-globe of live ADS-B air traffic.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

@@ -17,7 +17,7 @@ import {
   Vector3,
 } from 'three';
 import { mercatorScale } from '@/lib/fly/coords';
-import { BEND_LEAD, CHUNK_FADE, GLOBE, PARCEL_HOMES, SUBURB_NIGHT, SURFACE_CALM } from '@/lib/fly/fly-constants';
+import { BEND_LEAD, CHUNK_FADE, GLOBE, LAMBERT_ENV, PARCEL_HOMES, SUBURB_NIGHT, SURFACE_CALM } from '@/lib/fly/fly-constants';
 import { chunkFadeOn } from '@/lib/fly/toy-world/chunk-fade';
 import { applyBendAnchor } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
@@ -175,6 +175,10 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
       emissiveIntensity: 0, // the γ ramp owns this; 0 = the day frame exactly
       emissiveMap: buildWindowTexture(),
     });
+    // R24 C (LAMBERT_ENV, recon WB-7): the same tamed env multiply the sat
+    // buildings, skyline and canopy take — a material PARAMETER, so no program
+    // and no cache key moves. See the LAMBERT_ENV block for the derivation.
+    if (LAMBERT_ENV.enabled) m.reflectivity = LAMBERT_ENV.reflectivity;
     // Rigid instanced GROUND objects ride the ANCHOR bend, never the per-vertex
     // one (round-6 lesson 2) — the SAME existing variant the canopy, the porch
     // lights, TownGlow and the airport beacons share, unmodified, so this layer
