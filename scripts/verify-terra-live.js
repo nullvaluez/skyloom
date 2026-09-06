@@ -196,11 +196,44 @@ const CONTENT_PROBE = () => {
 
 const CENSUS = () => {
   const st = window.__flyStats || {};
+  // E (R24, after pass 2b): RESIDENT vs VISIBLE, split at the pose.
+  //
+  // Pass 2b's Owens breach (draws 152 -> 279 against a frozen 261) is
+  // ambiguous from draws alone: a residency change and a culling change look
+  // identical in that number. They are different defects with different fixes,
+  // so the census reports both halves — tiles HELD in the tree, and tiles
+  // actually issued to the draw list — and the ratio between them. A residency
+  // fix moves `resident`; a culling fix moves `visible` while `resident`
+  // stands still.
+  let resident = 0;
+  let visible = 0;
+  let withModel = 0;
+  const map = window.__flyTerra?.engine?.()?.map ?? window.__flyTerra?.get?.();
+  const stack = map ? [map] : [];
+  while (stack.length) {
+    const n = stack.pop();
+    if (!n) continue;
+    if (n.isTile) {
+      resident++;
+      if (n.model) withModel++;
+      // "Issued to the draw list" is the tile's own visibility AND every
+      // ancestor's — an invisible parent hides a visible child, and
+      // Object3D.traverse does NOT stop at one (R19 §5's instrument artifact).
+      let vis = !!n.visible && !!n.model;
+      for (let a = n.parent; vis && a; a = a.parent) if (a.visible === false) vis = false;
+      if (vis) visible++;
+    }
+    const k = n.children;
+    if (k) for (let i = 0; i < k.length; i++) stack.push(k[i]);
+  }
   return {
     draws: st.drawCalls ?? null,
     tris: st.triangles ?? null,
     lod: window.__flyTerra?.lod?.() ?? null,
     mem: window.__flyTerra?.mem?.() ?? null,
+    resident,
+    withModel,
+    visible,
   };
 };
 
@@ -311,7 +344,14 @@ async function runArm(context, fx, paceOn) {
     await page.evaluate(PIN_POSE, p);
     await settleDraws(page, SETTLE);
     poses[name] = await page.evaluate(CENSUS);
-    console.log(`    pose ${name}: draws ${poses[name].draws} tris ${poses[name].tris} residentMB ${poses[name].mem?.residentMB}`);
+    console.log(
+      `    pose ${name}: draws ${poses[name].draws} tris ${poses[name].tris} residentMB ` +
+        `${poses[name].mem?.residentMB} · tiles resident ${poses[name].resident} ` +
+        `(with a model ${poses[name].withModel}) visible ${poses[name].visible}` +
+        (poses[name].resident
+          ? ` = ${((100 * poses[name].visible) / poses[name].resident).toFixed(0)}% drawn`
+          : '')
+    );
   }
   await page.close();
   return { content, yawStats, yawCensus, yawArc, poses, errs, errNote: errsNote(), bootFallback };
