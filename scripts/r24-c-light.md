@@ -264,6 +264,34 @@ had:
 
 That is written up for E; the existing eleven gates keep their numbers.
 
+**CLOSED (F4, sha `6ac995f`).** Three of the four are now IN
+`scripts/verify-monuments-sat.js`, appended after every frozen gate and after
+the screenshots, reading a SECOND probe function so the frozen probe's return
+shape is untouched (it also finds `monument-marquee`, which the frozen probe
+skips because it filters on `isInstancedMesh`). Its `gate()` count is now 13 =
+10 frozen + zero-errors + the three added, none removed.
+
+The fourth — "toy monuments are still MeshToon with their 3-step ramp" — lives
+in `verify-c-flagoff.mjs` instead, deliberately: it is a claim about an
+UNREACHABLE BRANCH, unreachability is a source property, and asserting it in a
+satellite-booting harness would mean adding a style flip to a gate whose eleven
+frozen numbers are the point.
+
+**RED/GREEN calibrated without a browser, and it answers a stricter question.**
+The browser-gate budget belongs to certification, so the calibration is nine
+node gates (`verify-c-flagoff` 26 → 37). A browser gate reads whichever material
+happened to be constructed at one pose in one style; these prove **which branch
+can run**, in both styles, under both flag states, from source — including the
+RED itself as a source fact: with `ONE_SUN` off the guarded early return is not
+taken and the satellite archetype falls through to the R13 stone-ramp Toon,
+which fails gate 8 (not Lambert) and gate 9 (Toon is not one of the three
+classes three gives `scene.environment` to). **Gate 10 passes trivially on a
+flag-off tree** because both representations are Toon — it is a guard against a
+future half-move, which is exactly what R20 §5b.4 describes happening to the
+Taj, not a RED, and its own comment says so. Also asserted: three's envmap class
+list has not moved under us, and both monument Lamberts read
+`LAMBERT_ENV.reflectivity`.
+
 ### Cost
 
 0 draws, 0 new programs at medium/low (the directional already existed and its
@@ -909,6 +937,18 @@ contract is `> 2/255`; the question is only whether the measured margin has
 35 % of headroom, and that is a measurement, not an argument.
 
 ---
+
+## Two key-NEUTRAL shader-text edits (F11, sha `6ac995f`)
+
+The world-bend registry header now lists them, because that header is the
+inventory and a reader must not conclude from absence that no other shader text
+moves. In both cases having **no** cache key is CORRECT rather than an omission,
+and the header says why:
+
+| edit | why no key |
+|---|---|
+| `lib/fly/shadow-kernel.js` — two string edits to three's shared `ShaderChunk.shadowmap_pars_fragment` (the PCF reversed-depth `#ifdef`; the world-locked Vogel rotation) | **No MATERIAL is touched.** three's program cache key is a function of material state, not of chunk contents — every shadow receiver simply compiles a different chunk body. That is exactly the property three's `CSM.js` lacks: it patches through `onBeforeCompile`, the hook all 15 world-bend variants already own, and would re-key every one of them. |
+| `components/fly/Effects.jsx` `patchDofDepth` — deletes postprocessing's own `depth=1.0-depth;` from one CoC material instance | The CoC material is **postprocessing's**, not a world-bend variant, and carries no `customProgramCacheKey` at all — its identity IS its instance. The **el()/raw() twin rule** covers it instead: `patchDofDepth` is called from both, so the pre-warm cannot compile a program production never binds. |
 
 ## Decisions, and the ones that were refusals
 
