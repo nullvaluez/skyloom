@@ -256,10 +256,92 @@ gate('7 every chunk engine calls the shared brake in its finalize loop',
   missing.length === 0, missing.join(', '));
 
 const toy = readFileSync(path.join(root, 'lib/fly/toy-world/toy-world-engine.js'), 'utf8');
+// The typed container is still the WB-10 win; gate 20 pins WHICH width and
+// gate 19 pins that it reaches three wrapped. This row only says the boxed
+// plain array is gone from the armed path.
 gate('8 the toy merged index is built into a typed array when armed (WB-10)',
-  /idx = new Uint32Array\(base \+ extra\)/.test(toy));
+  /const merged = new \(needs32 \? Uint32Array : Uint16Array\)\(base \+ extra\);/.test(toy) &&
+    /merged\.set\(groundIdx, 0\);/.test(toy));
 gate('9 …and the upstream spread survives verbatim on the flag-off branch',
   /idx = data\n\s+\? \[\.\.\.groundIdx, \.\.\.Array\.from\(data\.idx, \(v\) => v \+ w \* w\)\]\n\s+: groundIdx;/.test(toy));
+
+// ------------- 19-22. WB-10's index buffer: WRAPPED, and the RIGHT WIDTH
+// THE DEFECT. `BufferGeometry.setIndex(x)` wraps x in a BufferAttribute ONLY
+// when `Array.isArray(x)` (three r185, three.core.js:18404). A TYPED array is
+// assigned RAW as `geometry.index`, so it has no `.array` and WebGLAttributes
+// throws on `attribute.array.byteLength` at first upload. WB-10 changed the
+// merged land index from a plain array to a Uint32Array and kept the bare
+// `setIndex(idx)`, so the flag-ON path broke every land mesh — the pass-2b
+// toy-boot pageerror (x31 ladder-fix, x3 ladder-red, both arms), attributed by
+// B's headless attribute census (r24-b-attr-proof): FINALIZE_PACE ON = 80
+// broken LAND meshes, OFF = 0. The flag-OFF branch is a plain array, which
+// three wraps — which is why pass 1 was clean and pass 2b was not.
+gate('19 the merged land index is WRAPPED in a BufferAttribute, never passed raw',
+  /idx = new BufferAttribute\(merged, 1\);/.test(toy) && !/geo\.setIndex\(new Uint/.test(toy));
+
+// And the width must MIRROR three's own choice, or the ON path silently
+// doubles every toy land index buffer — the opposite of what WB-10 is for.
+gate('20 the container width mirrors three’s arrayNeedsUint32 rather than defaulting to 32-bit',
+  /new \(needs32 \? Uint32Array : Uint16Array\)\(base \+ extra\)/.test(toy) &&
+    /const INDEX_U32_MIN = 65535;/.test(toy));
+
+// three's threshold is >= 65535, NOT > 65535 (PRIMITIVE_RESTART_FIXED_INDEX,
+// three #24565). Read it out of three's real source so a future three bump
+// that moves it fails here instead of silently desynchronising the two paths.
+const threeSrc = readFileSync(path.join(root, 'node_modules/three/build/three.core.js'), 'utf8');
+const needs32Src = threeSrc.slice(
+  threeSrc.indexOf('function arrayNeedsUint32'),
+  threeSrc.indexOf('function arrayNeedsUint32') + 500
+);
+const threeBound = /array\[ i \] >= (\d+)/.exec(needs32Src)?.[1];
+gate('21 …and that threshold is still the number three actually uses',
+  threeBound === '65535', `three says >= ${threeBound}, we say >= 65535`);
+
+// The DECISION itself, executed — not restated. The two declarations are
+// module-level and import nothing, so they can be lifted verbatim and run.
+const decl = [
+  /const INDEX_U32_MIN = \d+;/.exec(toy)?.[0],
+  /function anyAtLeast\(arr, min\) \{[\s\S]*?\n\}/.exec(toy)?.[0],
+].filter(Boolean);
+let widthRows = [];
+if (decl.length === 2) {
+  const dshim = path.join(out, `.wb10-${process.pid}.mjs`);
+  writeFileSync(dshim, `${decl.join('\n')}\nexport { INDEX_U32_MIN, anyAtLeast };\n`);
+  const wb = await import(pathToFileURL(dshim).href);
+  rmSync(dshim, { force: true });
+  // three's own predicate, over the array the flag-OFF branch actually builds.
+  const threeWants32 = (arr) => {
+    for (let i = arr.length - 1; i >= 0; i--) if (arr[i] >= 65535) return true;
+    return false;
+  };
+  // ON's decomposition: ground values, plus overlay values shifted by off.
+  const mine32 = (ground, overlay, off) =>
+    wb.anyAtLeast(ground, wb.INDEX_U32_MIN) ||
+    (overlay.length > 0 && wb.anyAtLeast(overlay, wb.INDEX_U32_MIN - off));
+  const cases = [
+    ['a small chunk', [0, 5, 900], [0, 3], 1024],
+    ['exactly at the bound (65535 must be 32-bit — three #24565)', [65535], [], 4096],
+    ['one below the bound', [65534], [], 4096],
+    ['the OVERLAY is what crosses it', [10, 20], [1000], 65000],
+    ['the overlay crosses it exactly', [10], [535], 65000],
+    ['no overlay at all', [4, 4095], [], 4096],
+    ['an empty overlay array with a huge offset', [7], [], 70000],
+  ];
+  const bad = [];
+  for (const [name, ground, overlay, off] of cases) {
+    const merged = [...ground, ...overlay.map((v) => v + off)];
+    const want = threeWants32(merged);
+    const got = mine32(ground, overlay, off);
+    widthRows.push(`  ${want === got ? 'ok  ' : 'BAD '} ${name}: three ${want ? 'u32' : 'u16'} · ours ${got ? 'u32' : 'u16'}`);
+    if (want !== got) bad.push(name);
+  }
+  gate('22 the ON width decision equals three’s answer on the OFF array, case by case',
+    bad.length === 0, bad.length ? bad.join(' · ') : `${cases.length} cases agree`);
+} else {
+  gate('22 the ON width decision equals three’s answer on the OFF array, case by case',
+    false, 'could not lift INDEX_U32_MIN / anyAtLeast from the engine source');
+}
+rows.push(...widthRows);
 
 const veg = readFileSync(path.join(root, 'lib/fly/toy-world/sat-veg-engine.js'), 'utf8');
 // E (pass 2b): the cap now carries the harness scaler, at A's request — this
