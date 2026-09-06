@@ -410,9 +410,62 @@ harness someone writes:
 
 ## §3 Deviations, honestly
 
-*(filled in at close — every place a run differed from the written recipe, the
-way R19 §4.1 recorded its trimmed sweep)*
+Every place a run differed from the written recipe, the way R19 §4.1 recorded
+its trimmed sweep.
+
+1. **Two harness-only scalers were added mid-round** (`FLY_FINALIZE_BUDGET_K`,
+   `FLY_BOOT_SCALE`) and both are ON for the fixture runs in this sweep. Both
+   are inert without the fixture env and both were sanctioned; §1.5 enumerates
+   which gates may set which. Any fixture number below was taken with the K
+   named in its row.
+2. **The Manhattan fixture column is a FLOOR, not a settled figure.** At K=40
+   with a 300 s cap, four of sixteen building chunks were resident; the settle
+   predicate reported `settled=false — 12 chunks still draping`. The
+   certification run re-takes it at K=200 with a 900 s cap. Do not compare a
+   K=40 Manhattan row with a K=200 one.
+3. **`draws` is `null` in the Powell row.** `__flyStats` republishes only every
+   60 frames, and the fresh-publish wait expired inside the cap; the gate
+   reports "totals stale" rather than printing the previous pose's number.
+4. **Wall-clock numbers here are contended.** Five agents share four cores. The
+   SAME Manhattan pose gave up at z11 of 14 after 427 s at load 15 and reached
+   z16 in 300 s at load 5. Every settle time in this sweep carries its load
+   average; no wall-clock number here is a budget.
+5. **One certification row was VOIDED BY E.** A `ps | grep | kill` loop of mine
+   matched Fable's `verify-fixture` row and killed it 62 s in
+   (`Target page, context or browser has been closed at bootFly`). That `rc=1
+   62s` is not a result. The rule that came out of it — kill only PIDs you
+   spawned, never by pattern, never `fuser -k` on a port that is not yours —
+   applies to every agent and is in `r24-e-cert.md` §5.
+6. **`verify-seam` runs its NODE leg in the smoke with `FLY_URL` unset.** The
+   smoke exports `FLY_URL` for the whole run, and `verify-seam.js:452` reads
+   that as "also run the browser leg", which then `require`s playwright with no
+   shim preload and dies AFTER nine green node gates. The browser leg is a
+   separate row with the shim.
+7. **`verify-frame-pace` and `verify-env-uniform` cannot be green on the
+   flag-off tree by construction**: both read `__flyStats.frame`, which does
+   not exist while `FRAME_STATS.enabled` is false. Their flag-off line
+   ("instrument absent — unmeasurable, not a renderer failure") is the correct
+   calibration output, not a failure to be fixed.
+8. **`verify-depth-roundtrip` needs a hook that may not exist yet.** It refuses
+   to reconstruct viewZ with harness-side arithmetic — that would test the
+   harness's copy of the bug — and instead fails loudly with the required
+   signature `window.__flyDepthProbe(x, y) → { viewZ, coc, raw, reversed }`.
+   If C has not published it, the row reads NOT RUNNABLE, not RED.
 
 ## §4 Verdict
 
-*(filled in at close)*
+*(Fable fills this at close. The honest shape it must take, given this venue:)*
+
+- **What this container certified:** every structural, count, census,
+  determinism, source-scan, byte-identity and fixed-pose claim — 15 node gates
+  green on the integrated tree, the worker's output byte-identical across five
+  merges on 149 fixture tiles, the Owens lock and the Melton carpet reproduced,
+  and the flag-off RED calibrated for each new gate.
+- **What it did not, and could not:** every fps, frame-time, stall, governor,
+  tearing and driver claim, and the LOOK of anything on a real GPU over real
+  Esri and OpenFreeMap bytes. Those are §2's user-machine list, and until the
+  user runs it the round has no performance verdict at all — only a structural
+  one.
+- **The round's real RED is still pending**: `scripts/r24-user-diag.md` Part A
+  on the CURRENT build, before any flag flips. Without it there is no before,
+  and "smoother" is an opinion.
