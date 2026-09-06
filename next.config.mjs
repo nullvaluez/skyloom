@@ -5,7 +5,9 @@ const nextConfig = {
   // Required for the three.js ecosystem (Fly mode). Do NOT enable
   // experimental.cacheComponents — it breaks R3F canvas re-init on
   // back/forward navigation (pmndrs/react-three-fiber#3595).
-  transpilePackages: ['three', 'three-stdlib', 'three-tile'],
+  // R24 A (W1a): three-tile was removed from the dependency list — it is
+  // VENDORED at lib/fly/vendor/three-tile/ (app source, transpiled anyway).
+  transpilePackages: ['three', 'three-stdlib'],
 
   images: {
     remotePatterns: [

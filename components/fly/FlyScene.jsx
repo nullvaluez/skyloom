@@ -917,6 +917,39 @@ export function FlyScene({ runtime }) {
   const hillBaseRef = useRef(null);
   const hillElDegRef = useRef(90);
 
+  // R24 A (recon A10 + T1) — the terrain diagnostic handle. Installed from a
+  // keyed effect with an OWNER-CHECKED disposer, never from the TerrainEngine
+  // constructor: React 19 StrictMode double-invokes the useMemo that builds
+  // the engine, so a constructor-installed global binds to the DISCARDED
+  // instance and every later read is a corpse (R22.1 measured sizeZ0 0 /
+  // stats null against a live map with 185 meshes). The owner check is what
+  // makes the double-mount safe — the second mount's cleanup must not delete
+  // the first mount's handle, or vice versa.
+  //   __flyTerra.lod()  -> refines / merges / parent refetches / tiles
+  //                        REPLACED WHILE ON SCREEN — the counters behind the
+  //                        "terrain tiles swapping for other ones" report.
+  //   __flyTerra.mem()  -> resident tiles + estimated bytes + LRU activity.
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') return undefined;
+    const owner = {};
+    const handle = {
+      __owner: owner,
+      get: () => engine.map,
+      engine: () => engine,
+      lod: () => ({ ...(engine.lodStats ?? {}) }),
+      mem: () => {
+        const s = engine.residency?.stats;
+        return s ? { ...s, residentMB: +(s.residentBytes / 1048576).toFixed(1) } : null;
+      },
+      instrument: () => engine.residency?.instrument(),
+      reset: () => engine.residency?.resetStats(),
+    };
+    window.__flyTerra = handle;
+    return () => {
+      if (window.__flyTerra?.__owner === owner) delete window.__flyTerra;
+    };
+  }, [engine]);
+
   // Hillshade style gate (live uniform — no re-patch, survives hot-swaps).
   // Round 11: tier-aware strength (uniform flip, free on degrade).
   useEffect(() => {
