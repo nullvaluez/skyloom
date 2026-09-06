@@ -18,6 +18,7 @@
 const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
 const { attachFixture } = require('./_fixture');
+const { settleWorld } = require('./_settle');
 
 const POSES = {
   // [lat, lon, altM, heading, pitch] — grepped from the fleet, see scenes.mjs
@@ -109,17 +110,13 @@ async function pose(page, p, settleMs) {
     polling: 250,
   });
   await page.evaluate(PIN_POSE, p);
-  await page.waitForTimeout(settleMs);
-  await page.evaluate(() => {
-    if (window.__flyStats) window.__flyStats.drawCalls = null;
-  });
-  await page
-    .waitForFunction(() => typeof window.__flyStats?.drawCalls === 'number', undefined, {
-      timeout: 240000,
-      polling: 500,
-    })
-    .catch(() => {});
-  return page.evaluate(CENSUS);
+  // "Settled" is a CONDITION, not a duration — see scripts/_settle.js for the
+  // two ways a fixed sleep gets it wrong here (a z6 ground at 45 s; a chunk
+  // that reached `ready` at 13 s with coarse:true because its drape exhausted
+  // drapeMaxTries on a shallow DEM). settleMs is the CAP, not the wait.
+  const st = await settleWorld(page, { capMs: settleMs });
+  const c = await page.evaluate(CENSUS);
+  return { ...c, settle: { settled: st.settled, why: st.why, ms: st.ms, maxZ: st.maxZ, tiles: st.tiles, groundElev: st.groundElev } };
 }
 
 let pass = 0;
@@ -176,11 +173,19 @@ function gate(name, ok, detail) {
     (st1.byKind.img || 0) > 0 && (st1.byKind.dem || 0) > 0 && (st1.byKind.mvt || 0) > 0,
     `img=${st1.byKind.img} dem=${st1.byKind.dem} mvt=${st1.byKind.mvt} tilejson=${st1.byKind.tilejson} boot=${(bootMs / 1000).toFixed(1)}s (pct100 at ${(boot.ms / 1000).toFixed(1)}s)`);
 
-  const settle = Number(process.env.FLY_FIXTURE_SETTLE_MS || 60000);
+  // A CAP now, not a sleep. Content poses under SwiftShader need the terrain
+  // to reach z14+ (~150 s at Powell) before a building drape can commit.
+  const settle = Number(process.env.FLY_FIXTURE_SETTLE_MS || 420000);
   const scenes = {};
   for (const [name, pose_] of Object.entries(POSES)) {
     scenes[name] = await pose(page, pose_, settle);
-    console.log(`  ${name.padEnd(10)} draws=${scenes[name].draws} tris=${scenes[name].tris} meshes=${scenes[name].meshes} counts=${JSON.stringify(scenes[name].counts)} sb=${JSON.stringify(scenes[name].sb)}`);
+    const sc = scenes[name];
+    console.log(
+      `  ${name.padEnd(10)} draws=${sc.draws} tris=${sc.tris} meshes=${sc.meshes} ` +
+        `counts=${JSON.stringify(sc.counts)} sb=${JSON.stringify(sc.sb)}\n` +
+        `             settled=${sc.settle.settled} in ${(sc.settle.ms / 1000).toFixed(0)}s ` +
+        `(${sc.settle.why}) · maxZ=${sc.settle.maxZ} tiles=${sc.settle.tiles} ground=${sc.settle.groundElev?.toFixed?.(1)}m`
+    );
   }
 
   gate('(4) MANHATTAN IS A CITY — the dense scene builds real satellite geometry',
