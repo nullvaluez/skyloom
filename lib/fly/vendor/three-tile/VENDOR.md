@@ -87,7 +87,56 @@ gets a row here.
 
 | # | Owner | Switch | File · function · lines | Reason (recon id) | Off-state |
 |---|---|---|---|---|---|
-| _(none)_ | — | — | — | — | — |
+| 1 | D | `LOD_CROSSFADE.enabled` | `index.js` · `Tile._loadSubTiles` · one inserted statement before the return expression (~:290) | T4(b/c) — the refine is an atomic single-frame swap in which texture sharpness AND Martini relief change together (the user's "terrain tiles swapping for other ones") | `ir` (the hook) is null → the inserted line is a short-circuited `&&`; the upstream `return h ? … : (this.add(...o), …, this.unloadModel()), !h;` expression is byte-verbatim and unconditional |
+| 2 | D | `LOD_CROSSFADE.enabled` | `index.js` · `Tile._removeSubTiles` · one inserted `if` block before the return expression (~:318) | T4(b/c) — merges use the same atomic pattern | `ir` is null → nothing is awaited and `_loadState` is never touched; the upstream return expression is byte-verbatim |
+| 3 | D | (holder for 1 and 2) | `index.js` · module scope after the version consts (~:3-13) + one export line | infrastructure for 1 and 2 | `ir` is null until the app calls `setLodFadeHook`; nothing in the library reads it elsewhere |
+
+### D's patches in detail (LOD_CROSSFADE)
+
+All POLICY lives in `lib/fly/lod-crossfade.js`, not here: the flag, the boot
+window (`skipBootMs` — boot reveal timing is frozen, and a world that assembles
+itself out of blurry parents is a different first impression), the warp
+suppression (`WARP.flashMs` 250 already masks a cut), the concurrency bound,
+the clock (driven from FlyScene's -50 block on the frame dt) and the parent-
+texture lifetime. The library gets two call sites and a holder.
+
+**Why patch 1 must sit exactly where it does.** `unloadModel()` disposes the
+parent's texture in the same expression that adds the children. The hook runs
+one statement earlier, detaches `material.map` from the parent material (so the
+dispose walk cannot reach it), refcounts it, and hands it to the four children
+as a second sampler with a clip-UV rectangle. Moving the call after the return
+expression would blend against a disposed texture.
+
+**Why patch 2 holds `_loadState` at "loading" across its await.** `_update()`
+skips a tile whose `loadState` is `"loading"` and, because children are only
+visited inside that same branch, skips its whole subtree. Without the hold, a
+parent whose model is loaded but not yet added would be re-evaluated mid-blend
+and could call `_loadSubTiles` on itself. The hook's promise is capped
+(`fadeSec + 400 ms`) so a tile unloaded mid-blend can never leave the library
+awaiting forever.
+
+**Zero extra draws.** The children were already the drawn geometry in both
+directions; the blend is one extra `texture2D` in the tile fragment. The
+rejected alternative (keep the parent drawn under the children and dither it
+out) costs a transient draw per in-flight quad and, per the archived R22.1 B3
+finding, an ordered screen-door dither under SMAA-only AA reads as shimmer.
+
+### D note (2026-09-06): gate 6 and the insert-only invariant
+
+`verify-vendor-three-tile` gate 6 asserts the vendored `index.js` is
+BYTE-IDENTICAL to upstream. That is exactly right at the vendoring commit and
+cannot survive any patch, so it goes RED the moment patch 1 lands. The
+replacement assertion that keeps A's intent — "byte-verbatim upstream when off"
+— without being trivially satisfiable is:
+
+> **every upstream line still appears in the vendored file, in order** (the
+> diff is INSERT-ONLY).
+
+That is the machine-checkable form of switch-idiom rule 2: an insert-only diff
+cannot have edited or deleted an upstream statement, only added guarded ones
+around it. D's three patches satisfy it today (upstream 1,987 lines, vendored
+2,028, zero upstream lines missing or reordered). Flagged to A/Fable rather
+than edited here, because `scripts/verify-vendor-three-tile.mjs` is A's file.
 
 ### The switch idiom every patch must follow
 

@@ -30,6 +30,17 @@ import {
   getBend,
 } from '@/lib/fly/toy-world/world-bend';
 import { setAerial, clearAerial, getAerialState } from './AerialPerspective';
+// R24 D (LOD_CROSSFADE): the tile refine/merge crossfade. Its counters are the
+// RED and are installed in EVERY session, flag or no flag — `hardSwaps` is the
+// number of single-frame parent<->children swaps that happened with no blend
+// over them, which on the flag-off tree is every swap (recon T4).
+import {
+  attachLodFade,
+  installLodFade,
+  lodFadeWarp,
+  lodStats,
+  tickLodFades,
+} from '@/lib/fly/lod-crossfade';
 import { PALETTE } from '@/lib/fly/toy-world/toy-palette';
 import {
   SkyDome,
@@ -778,7 +789,10 @@ export function FlyScene({ runtime }) {
     () =>
       engine.onTileMaterial((m) => {
         applyBendFade(m);
-        applyHillshade(m, HILLSHADE);
+        // R24 D: the third argument is the per-material LOD crossfade slot —
+        // null (and therefore an exact R19 program, key and text) whenever
+        // LOD_CROSSFADE is off.
+        applyHillshade(m, HILLSHADE, attachLodFade(m));
         // Round 11: tier-aware aniso, read imperatively so NEW tiles pick up
         // a live tier change without re-uploading the streamed field (no
         // degrade hitch; the field converges as tiles stream).
@@ -791,6 +805,20 @@ export function FlyScene({ runtime }) {
         }
       }),
     [engine]
+  );
+
+  // R24 D (LOD_CROSSFADE): install the crossfade hook into the vendored
+  // three-tile (VENDOR.md patches 1-3) for the life of this engine. Installed
+  // unconditionally: with the flag off every call returns immediately after
+  // bumping `hardSwaps`, which is the instrument E's verify-lod-fade calibrates
+  // its RED against.
+  useEffect(() => installLodFade((h) => engine.setLodFadeHook(h)), [engine]);
+
+  // A warp is a CUT (WARP.flashMs already masks it) — suppress fades across it
+  // rather than dissolving the departure world into the arrival one.
+  useEffect(
+    () => useFlyStore.subscribe((st) => st.warpEpoch, () => lodFadeWarp()),
+    []
   );
 
   // Hillshade style gate (live uniform — no re-patch, survives hot-swaps).
@@ -1387,6 +1415,14 @@ export function FlyScene({ runtime }) {
     // 150–900m blend band — second-order next to the 420m-at-600m-elev bug
     // the ryd transform fixes.
     setBendEye(flight.pos.y, flight.groundElev);
+
+    // R24 D (LOD_CROSSFADE): advance every in-flight tile blend on the frame
+    // clock (early-returns after one add when nothing is fading, which is the
+    // resting state and the whole flag-off cost).
+    tickLodFades(dt);
+    if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+      ((window.__flyStats ??= {}).terra ??= {}).fades = lodStats;
+    }
 
     // Round 12 "Neon Planet": in toy the ground fade band BREATHES with
     // altitude — END chases sqrt(eyeAGL/k)·frac (floored at the static band
