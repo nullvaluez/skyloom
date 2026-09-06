@@ -87,12 +87,34 @@ under review, with this ledger.
 **Zero patches at the vendoring commit `b64457b`.** Every later patch — by ANY
 agent — gets a row here.
 
+**Row-number allocation (Fable, R24):** A holds **0–4**, D takes **5–7**, C
+takes **8 upward**. Numbers are permanent and are never renumbered; a withdrawn
+patch keeps its row, marked WITHDRAWN.
+
 | # | Owner | Switch | File · function · lines | Reason (recon id) | Off-state |
 |---|---|---|---|---|---|
 | 0 | A | `R24_SWITCHBOARD` | `index.js` · module scope, after the version const | infrastructure: the bundle must not import app code, so the app pokes `R24_SWITCHES` (from `lib/fly/terrain-engine.js`) and a node fixture flips the same fields directly | an exported object nobody reads; every field `false` |
 | 1 | A | `TERRA_PACE.timerFix` | `index.js` · `Timer.reset()` | T3 — upstream `reset()` zeroes only `_currentTime`, so `TileMap.update`'s `getElapsed() > updateInterval/1e3` guard is permanently true after 50 ms of uptime and the FULL quadtree walk runs every frame instead of at 20 Hz | the two upstream statements, unchanged |
 | 2 | A | `TERRA_PACE.mergeHysteresis` · `TERRA_PACE.keepResident` | `index.js` · `Tile._LODEvaluate()` | T1 — one threshold both ways with no hysteresis (refine↔merge flip), and a merge test that is satisfied the instant a tile leaves the frustum, so every yaw collapses the field behind the camera and re-downloads a coarser parent ("tiles swapping for other ones") | the single upstream `return` expression, unchanged, below the branch |
 | 3 | A | `TERRA_PACE.keepResident` | `index.js` · `Tile._getDistRatio()` | T1 — PATCH 2's merge test needs the in-frustum distance law in every direction; re-scaling the ×5 result would not be the same float | an early return reachable only when a caller passes `true`; every upstream call site passes nothing |
+| 4 | A | `TERRA_PACE.skirtFast` | `index.js` · module scope + `We()` (getBoundaryEdges) | T2 / FL-02 / A2 — the boundary-edge finder allocates 3 two-element arrays per triangle and sorts all 3T with a boxed comparator; R22.1 profiled it + its comparator at 67% of every stalled ms while streaming | an early-out at the top of `We`; the entire upstream body follows, unchanged |
+
+**PATCH 4 identity.** Upstream's output is exactly "the directed edges whose
+`(min,max)` key occurs once, ordered by `(min,max)`" — its sort groups equal
+keys and its dedupe pass drops precisely the adjacent reverse pairs. The fast
+path computes that directly with an undirected-edge count in a module-scoped,
+generation-stamped open-addressed table (never cleared, only re-stamped) and
+sorts only the perimeter. It returns `null` — falling through to the verbatim
+body — for every input it does not claim: a length that is not a multiple of 3,
+a negative index, a degenerate `a === b` edge (whose min/max collapse makes it
+its own reverse), an edge seen three times, or two occurrences with the SAME
+winding, which is the one case upstream KEEPS both of.
+`scripts/verify-skirt-fast.mjs` drives the public
+`TileGeometry.setAttributes()` in both arms and compares position / uv / normal
+/ index element by element: identical on six real Martini tiles (up to 116 k
+output indices), on regular grids with Uint16 and Uint32 indices, and on a
+holed grid with a real interior boundary; and all four bail inputs both BAIL
+and stay identical.
 
 **Blast radius notes.** PATCH 1 touches a class (`Timer`) that has exactly one
 other instance in bundle + plugin (`plugin.js:381`), and that instance calls
