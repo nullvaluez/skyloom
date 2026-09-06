@@ -355,6 +355,27 @@ trustworthy fixture columns this venue produces.
   measured frame rate fell from 18.5 fps to 2.6 fps as the scene filled AND as
   other work landed. Contention is part of every wall-clock number here; treat
   a 2–3× spread between runs as normal and never read a timing from it.
+- **A `curl` health check proves a PORT answers, not that YOUR server answers.**
+  A certification run's `npm run dev -- -p 3100` died instantly with
+  `EADDRINUSE` because an older server still held the port; the health check
+  passed against that older process and every gate in the run then measured a
+  tree nobody had chosen. Two `next dev -p 3100` process pairs were live at
+  once. A launcher must assert the server it STARTED is the one answering —
+  by binding a fresh port, or by checking the PID it spawned is the listener.
+- **"Zero canvas elements and `window.__flyBoot` undefined" is a NAMED state,
+  not a mystery.** `app/page.js` mounts FlyMode through
+  `dynamic(..., { ssr: false })` whose `loading` is one empty dark div, and
+  `__flyBoot` is published by BootScreen INSIDE that chunk. Until the chunk
+  loads there is no canvas, no `__flyBoot` and no error. So that symptom is
+  always upstream of WebGL, upstream of the fixture and upstream of any probe
+  that touches the canvas — read it as "the FlyMode chunk has not arrived",
+  and look at `/_next/static/chunks/*` responses before anything else.
+- **A latent race is not automatically the cause of the failure in front of
+  you.** My `canvas.getContext` race was real and is fixed, and I reported it
+  as the cause of a 601 s boot timeout. The evidence that arrived afterwards —
+  zero canvas, no `__flyBoot`, at 140 s — is upstream of any canvas, so the
+  race cannot have produced it. Fixing the right bug and explaining the wrong
+  failure are different acts, and conflating them costs someone else a re-run.
 - **A smoke that cannot find its own scripts must be LOUD.** `r24-smoke.sh`'s
   first version tested the presence of `$1` after a `shift`, i.e. of a file
   called `node`, skipped all nine rows and exited 0. It now exits non-zero on
