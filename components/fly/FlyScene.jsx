@@ -117,7 +117,6 @@ import {
   SKY,
   SKY_DUSK,
   SKY_LIVE,
-  SURFACE_CALM,
   TOY,
   TOY_WORLD,
   TRAFFIC_HORIZON,
