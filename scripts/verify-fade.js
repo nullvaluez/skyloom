@@ -75,7 +75,6 @@ if (process.env.FADE_PROBE_SELFTEST) {
   const mk = (material) => ({ material });
   const run = (obj) => {
     const S = { presenceChannel: null };
-    // eslint-disable-next-line no-new-func
     const fn = new Function('S', `return (${body});`)(S);
     return { v: fn(obj), ch: S.presenceChannel };
   };
