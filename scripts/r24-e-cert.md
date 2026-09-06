@@ -559,6 +559,10 @@ refetches → 0/0/0) and `scripts/verify-depth-offset.mjs` (C — RED 6/7 on
 | boot wall time as a BUDGET | 48.7 s here is a SwiftShader number, not a regression signal | user's machine |
 | live tileset drift, live traffic | hosts 403-blocked | user's machine |
 | GPU-driver artifacts (precision, aniso, half-float) | one software rasteriser only | user's machine |
+| the one-frame PALE FRAME itself | probabilistic: the live rate was 1 per 1,600 to 1 per 20,389 composed frames, and this venue renders 1–3 per second. The DEGENERATE CENSUS is deterministic and is what decides `verify-flash-guard`; the pale detector is informational here | user's machine, ≥ 3 min of banked serpentine |
+| a settled MANHATTAN building column | 16 dense chunks × ~400 full-quadtree raycasts each; not finished in 300 s at K=40 even on quiet cores. K=200 / 900 s is the recommendation, and it is a venue cost, not a defect | here, with a longer cap — or the user's machine in seconds |
+| the LOOK of anything | SwiftShader is bit-stable, so a fixture pixel A/B is sound — but it is a picture of the FIXTURE's planet, not of Esri's | user's machine |
+| whether a fixture bound transfers | the fixture's scenes are less dense than the real planet's, so a fixture draw/tri number bounds nothing live. It is a regression baseline FOR THIS VENUE | user's machine |
 
 ---
 
@@ -603,7 +607,15 @@ Two lessons, both now in the gates:
 4. **`FIXTURE_REV` discipline.** A stale server on 3199 serving a previous
    payload revision to another agent's gate is the one way this fixture can
    lie. The rev check makes that loud; it only works if the rev is bumped.
-5. **The tile cache.** `TILE_PIPELINE.cache` is a persistent Cache API store.
+5. **Two process-hygiene incidents, both mine, both the same root.** A
+   `pkill -f "<pattern>"` killed my own shell (the pattern appeared in the
+   shell's own command line); later a `ps | grep | kill` loop on
+   `verify-fixture` killed **Fable's certification run**, because their row's
+   command line contains the same script name. In a container five agents
+   share, a process-NAME pattern is not an identity. The rule that came out of
+   it, now standing for every agent: kill only PIDs you spawned yourself, never
+   by pattern, never `fuser -k` on a port that is not yours.
+6. **The tile cache.** `TILE_PIPELINE.cache` is a persistent Cache API store.
    Fresh Playwright contexts get fresh storage, so gates are unaffected — but a
    long-lived context that changes `FIXTURE_REV` mid-run would serve stale
    bodies from the browser's own cache.
