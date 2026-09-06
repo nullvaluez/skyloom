@@ -300,6 +300,34 @@ draw/triangle totals, fingerprints, fixed-pose pixels. Those answers do not
 depend on how many frames the drape took to finish, which is precisely why
 scaling is sound for them and unsound for anything else.
 
+### 1.2d What the fixture looks like WITH the scaler and the settle predicate
+
+First run with `FLY_FINALIZE_BUDGET_K=40`, `FLY_BOOT_SCALE=8`, the `_settle.js`
+condition and a 427 s cap, at load ~15 with four other agents' browsers live:
+
+```
+manhattan  draws=148  tris=323,022  meshes=164
+           satBuilding meshes 5 · satSkyline 10 · sb {chunks 16, ready 3, empty 0}
+           settled=FALSE at the cap — "terrain only reached z11 of 14;
+                                       9 chunk(s) still draping"
+           maxZ 11 · 101 tiles · ground 15.6 m
+```
+
+Compare the same pose before the scaler: `satBuilding 0`, `sb {16, ready 0,
+empty 0}` after six minutes. Buildings now stream.
+
+And note what the gate SAYS: `settled=false` with the reason. That is the
+`_settle.js` contract working — the alternative is a census of a half-built
+world presented as a column. 148 draws is far under the 375 satellite ceiling,
+but it is a FLOOR (three of sixteen chunks resident), not the settled figure,
+and the ledger records it as such.
+
+**Contention is the long pole.** At load 15–17 on four cores the terrain
+descent costs roughly ten times its uncontended wall time, and the descent is
+what every content column waits on. Owens and Melton settle quickly because
+empty tiles need no drape at all — which is also why they are the two most
+trustworthy fixture columns this venue produces.
+
 ### 1.3 Environment findings that cost time (so nobody else pays them)
 
 - **Never edit a source file while a browser gate runs.** Next's HMR remounts
