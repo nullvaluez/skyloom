@@ -148,6 +148,18 @@ for (const f of main.files) {
 }
 
 const total = main.files.reduce((n, f) => n + f.errs.length, 0);
+// THE DENOMINATOR FIRST (§2.10 WEAK, now closed). "zero errors" is also what a
+// sweep that linted nothing reports — a moved directory, a bad glob, or an
+// ESLint config that silently matched no files would all print a clean green.
+// The floor is deliberately far below the real count (200 at the time of
+// writing) so it catches a COLLAPSE, not growth.
+const LINT_FLOOR = 120;
+gate(
+  '(1a) THE SWEEP HAS SOMETHING TO LINT',
+  main.linted >= LINT_FLOOR,
+  `${main.linted} files linted across ${TARGETS.join(' ')} (floor ${LINT_FLOOR}) — below this, ` +
+    'a clean (1) means the glob missed the tree, not that the tree is clean'
+);
 gate(
   '(1) EVERY FIRST-PARTY MODULE CAN EVALUATE — zero no-undef errors',
   total === 0,
