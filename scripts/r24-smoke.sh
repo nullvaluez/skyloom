@@ -92,6 +92,12 @@ node_gate verify-depth-offset.mjs        # C (R24): reversed-depth polygonOffset
 node_gate verify-terra-residency.mjs     # A (R24): merge/refetch on a yaw sweep
 node_gate verify-c-flagoff.mjs           # C (R24): every C flag off + GLSL false-branch verbatim
 node_gate verify-d-flagoff.mjs           # D (R24): same shape (appears when D merges)
+node_gate verify-worker-normals.mjs      # C (R24): area-weighted DEM normals, 3.34 deg -> 0.26 deg
+# A's skirt-worker identity gate. NOTE (C, 0e2f7cb): its element-by-element
+# identity leg goes RED with TERRAIN_LIGHT.workerNormals ON *by design* — the
+# NORMAL array is meant to change; positions, uv and indices must not. When
+# that flag is on, this needs a flag-on ARM, NOT a re-baseline of A's number.
+node_gate verify-skirt-worker.mjs
 
 # --- verify-seam's NODE leg now runs offline too (HARN-GAP-7): its api.init()
 #     is pinned to the fixture by a global-fetch wrapper. Gates 0-6c are the

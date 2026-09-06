@@ -37,6 +37,10 @@ column · *(live)* live column.
 | `verify-daily.mjs` | — | — | deterministic daily set |
 | `verify-depth-offset.mjs` | — | — | C (R24); RED 6/7 on `6116fc5`, GREEN 7/7 |
 | `verify-terra-residency.mjs` | — | — | A (R24); RED 22 merges / 17 replaced / 178 refetches → 0/0/0 |
+| `verify-c-flagoff.mjs` | — | — | C (R24); 26 gates: every C flag `enabled:false`, every GLSL injection's FALSE branch verbatim R21, `r24VariantKey` returns the bare R19 key |
+| `verify-worker-normals.mjs` | — | **UM for pixels** | C (R24); 12 gates. **node-proven; user machine for pixels** — the spliced worker cannot run in a browser here (LERC 403, terrain-rgb builds on the main thread). Mean angular error 3.34° (upstream last-writer) → 0.26° (area-weighted), orientation +z, reversed winding bit-identical |
+| `verify-skirt-worker.mjs` | — | **UM for pixels** | A (R24). ⚠ its element-by-element identity leg is RED **by design** with `TERRAIN_LIGHT.workerNormals` on: the NORMAL array is meant to change while positions / uv / indices stay identical. Needs a FLAG-ON ARM, never a re-baseline of A's number |
+| `verify-seam.js` (node leg) | **GREEN 9/9** | — | pinned to fixture tiles; see §1.4b |
 
 ### 1.2 R24 gates (new this round)
 
