@@ -208,6 +208,7 @@ const CENSUS = () => {
   let resident = 0;
   let visible = 0;
   let withModel = 0;
+  let parked = 0; // has a model, but the model is parked invisible (PATCH 26)
   const map = window.__flyTerra?.engine?.()?.map ?? window.__flyTerra?.get?.();
   const stack = map ? [map] : [];
   while (stack.length) {
@@ -215,11 +216,29 @@ const CENSUS = () => {
     if (!n) continue;
     if (n.isTile) {
       resident++;
-      if (n.model) withModel++;
-      // "Issued to the draw list" is the tile's own visibility AND every
-      // ancestor's — an invisible parent hides a visible child, and
-      // Object3D.traverse does NOT stop at one (R19 §5's instrument artifact).
-      let vis = !!n.visible && !!n.model;
+      if (n.model) {
+        withModel++;
+        if (n.model.visible === false) parked++;
+      }
+      // "Issued to the draw list" is the MODEL's visibility, the tile's, and
+      // every ancestor's.
+      //
+      // THE MODEL'S FLAG IS THE ONE THAT MOVES, and reading only the tile's
+      // would have made this census blind to the very fix it exists to
+      // measure. A's PATCH 26 parks `model.visible = inFrustum` and
+      // DELIBERATELY never touches the tile (VENDOR.md #26: "a tile's children
+      // hang off the tile, and a parent whose box contains an in-frustum child
+      // is itself in frustum, so a visible tile can never be orphaned behind a
+      // parked ancestor"). A census that tested `n.visible && !!n.model` would
+      // have reported `visible` UNCHANGED across the fix — the §6 failure mode,
+      // in the instrument written to adjudicate it, caught by reading the
+      // owner's patch before the run rather than explaining a flat number
+      // afterwards.
+      //
+      // The ancestor walk stays: an invisible parent hides a visible child and
+      // Object3D.traverse does not stop at one (R19 §5's instrument artifact,
+      // which indicted actors it had merely failed to exclude).
+      let vis = !!n.visible && !!n.model && n.model.visible !== false;
       for (let a = n.parent; vis && a; a = a.parent) if (a.visible === false) vis = false;
       if (vis) visible++;
     }
@@ -234,6 +253,7 @@ const CENSUS = () => {
     resident,
     withModel,
     visible,
+    parked,
   };
 };
 
@@ -347,7 +367,8 @@ async function runArm(context, fx, paceOn) {
     console.log(
       `    pose ${name}: draws ${poses[name].draws} tris ${poses[name].tris} residentMB ` +
         `${poses[name].mem?.residentMB} · tiles resident ${poses[name].resident} ` +
-        `(with a model ${poses[name].withModel}) visible ${poses[name].visible}` +
+        `(with a model ${poses[name].withModel}, parked ${poses[name].parked}) visible ` +
+        `${poses[name].visible}` +
         (poses[name].resident
           ? ` = ${((100 * poses[name].visible) / poses[name].resident).toFixed(0)}% drawn`
           : '')

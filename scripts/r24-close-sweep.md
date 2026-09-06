@@ -825,7 +825,7 @@ RED:
 
 | Leg | Subsection | Owner of the feature | Pass 1 | Pass 2 |
 |---|---|---|---|---|
-| `verify-fixture` | §5.1 | E (the venue itself) | **10/10**, all four settled | pending |
+| `verify-fixture` | §5.1 | E (the venue itself) | **10/10** | **9/1** — all four settled; the red is the toy byteLength |
 | `verify-flash-guard` | §5.2 | B (`FLASH_GUARD`) | **RED, 5/1** | 2a VOID · 2b census proven, **green leg VOID**, re-take pending |
 | `verify-fade` | §5.3 | B (`CHUNK_FADE`) | **RED, 4/2** | 2b **VOID** (probe blind), re-take pending |
 | `verify-lod-fade` | §5.4 | D (`LOD_CROSSFADE`) + A (streamer) | **RED, 2/5** | pending |
@@ -856,9 +856,34 @@ settles in 38 s at 166 draws / 183,709 tris, sb ready 0 / empty 16** — the loc
 and still the cheapest trustworthy column this venue produces. Toy leg to
 follow; §1.4 is superseded by these numbers where they differ.
 
-**PASS 2 (flipped).** *pending* — re-run and diff §1.4. A flag that adds draws
-or triangles shows up as a delta against that table; the Owens row is the one
-to read first.
+**PASS 2b: 9 passed, 1 failed — ALL FOUR POSES SETTLED, and the one red is not
+this gate's.** rc 1, 1,464 s, K=200 with the 900 s per-pose cap. Satellite boot
+**122.2 s** (`pct 100` at 53.4 s); toy boot **130.2 s**; fixture served img 625
+/ dem 810 / mvt 442 / tilejson 27 / aircraft 145 / weather 5.
+
+| Pose | draws | tris | meshes | satBldg | skyline | parcel | toyChunk | `sb` | settled | maxZ | ground |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Manhattan | 233 | 549,471 | 259 | **23** | 10 | 0 | 152 | 16/16 ready | **287 s** | 14 | 14.8 m |
+| Powell | 288 | 662,426 | 318 | **16** | 0 | **555** | 230 | 16/16 ready | **238 s** | 16 | 276.3 m |
+| **Owens** | **219** | 266,720 | 310 | **0** | **0** | **0** | 254 | **16 empty** | **45 s** | 17 | 1114.6 m |
+| Melton | 81 | 193,342 | 88 | 0 | 0 | **1,836** | 21 | 16 empty | **29 s** | 17 | 0.0 m |
+| toy / Powell | 112 | 375,424 | 598 | — | — | — | **302** | — | — | — | — |
+
+**Every pose settled for the first time**, Manhattan included — the row that was
+a FLOOR in §1.4 (four of sixteen chunks still resident at 300 s / K=40) now
+resolves all sixteen in 287 s. The Owens lock holds at **0 / 0 / 0** in 45 s,
+Melton still places 1,836 homes from zero footprints, and traffic reaches the
+engine (300 tracks, 53 requests).
+
+**(10) is the only red, and it is the toy `byteLength` throw** — A's
+`FINALIZE_PACE` `setIndex(new Uint32Array(…))`, the same defect the two ladder
+rows found, on the same `ec53fd3` tree that predates A's fix. Not a venue defect
+and not this gate's: the fixture served every byte the toy pipeline asked for,
+and 302 chunks finalised before the upload threw.
+
+**PASS 2c (re-take).** *pending* — re-run and diff this table. The Owens row is
+the one to read first, and (10) should be clean on `9bcaace`, where
+`r24-b-attr-proof.js` already reads `BROKEN=0` in node.
 
 ---
 
