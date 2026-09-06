@@ -64,3 +64,9 @@ notes, not user docs.
 
 Third-party assets bundled or fetched by this project retain their own licenses;
 see [CREDITS.md](CREDITS.md).
+
+**Vendored third-party code:** [three-tile](https://github.com/sxguojf/three-tile)
+0.12.1 by GuoJF (MIT) is vendored verbatim into `lib/fly/vendor/three-tile/` so
+the terrain pipeline can be patched under review — see that folder's
+`VENDOR.md` for the copy's provenance, the one import rewrite it carries and
+the patch ledger.
