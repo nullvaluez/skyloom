@@ -123,7 +123,9 @@ const clone = (d) => ({
 
 /** Run the tail in a sandbox and return what it posts. */
 function runTail(data, z) {
-  const src = R24_WORKER_SKIRT_TAIL.replace(/__DECODE__/g, '__r24decode');
+  // R24 (Fable, post-merge audit): C's PATCH 8 added a second splice-time token —
+  // substitute it exactly as index.js does, flag-OFF, so this is the identity arm.
+  const src = R24_WORKER_SKIRT_TAIL.replace(/__DECODE__/g, '__r24decode').replace(/__R24_NORMALS__/g, 'false');
   const fakeSelf = {};
   let posted = null;
   let transfer = null;
