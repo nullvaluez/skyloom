@@ -558,3 +558,89 @@ Telemetry: `__flyStats.prewarm.{shadowStates, requeued, requeuePending}`
   pixel A/B and the programs-flat run** — this is the one B feature whose flip
   I do not recommend on construction alone.
 
+---
+
+## §7 M2 — RING_DEDUPE (WB-1) + the skyline `ring[0]` fix (A1b)
+
+### 7.1 Flag-off byte identity — proven, not asserted
+
+`scripts/r24-b-worker-proof.js` fingerprints every emitted buffer (FNV-1a over
+positions, indices, colors and anchors) for 3 scenes × 3 builders. **Before and
+after the worker edit, with `RING_DEDUPE.enabled:false`, the table is
+`diff`-identical:**
+
+```
+dense  sat-buildings 42314 verts 62682 idx  pos 7f085911  idx 72a47c3d  col 3d9474ae  anchor 6e0243e
+dense  sat-skyline    4500       6300       pos 98f2aee1  idx 817b60ff  col b1d6cb0f  anchor cfd83f54
+dense  full          33908      50376       pos 95b52f27  idx 65ab066e  col ce271afc  anchor a88d8fd1
+suburb sat-buildings  7355      10914       pos 9cd2f5ab  idx bc967747  col aa54cca3  anchor 18e4a1cf
+suburb sat-skyline     960       1344       pos 36809291  idx 68d8d5ac  col 272356a4  anchor aec0fef5
+suburb full           1600       2304       pos 649a3cf9  idx 6231d5aa  col 479a6f65  anchor a76b120d
+desert all three      empty (reason 'zero')
+```
+
+### 7.2 Flag-on — the controlled A/B
+
+| scene / builder | verts OFF → ON | tris OFF → ON | degenerate OFF → ON |
+|---|---|---|---|
+| dense sat-buildings | 42,314 → **35,856** (−15.3 %) | 20,894 → 17,922 | 2,972 → **0** |
+| dense sat-skyline | 4,500 → **6,000** (+33.3 %) | 2,100 → 3,000 | 0 → 0 |
+| dense toy `full` | 33,908 → **28,600** (−15.7 %) | 16,792 → 14,300 | 2,492 → **0** |
+| suburb sat-buildings | 7,355 → 5,763 | 3,638 → 2,874 | 512 → **0** |
+| suburb sat-skyline | 960 → **1,280** | 448 → 640 | 0 → 0 |
+| E's Manhattan tile | — | 21,653 → 18,451 | 2,936 → **0** |
+
+**The skyline going UP by exactly one corner per ring is A1b's defect closing.**
+`simplifyRing` walks the ring cyclically and drops any point whose two edges
+are collinear; for the closing clone `bc` is (0,0) and for `ring[0]` `ab` is
+(0,0) — so BOTH are discarded and every z14 block-mass ring silently loses its
+genuine first corner. **With the clone gone `ring[0]` survives on its own
+merits, and `simplifyRing` itself is not touched at all.** A 4-corner footprint
+stops rendering as 3.
+
+### 7.3 The sliver guard
+
+`dedupeRing` removes exact duplicates. The extruders additionally skip a wall
+edge shorter than `RING_DEDUPE.minEdgeTile` (1e-3 tile units ≈ 0.15 mm at z14),
+which catches the clip-intersection case where two points land a few float ulps
+apart — **the SLIVER half of the WB-1 hypothesis, as opposed to the coincident
+half that dominates the census.**
+
+### 7.4 Frozen hashes this touches
+
+`verify-neon-cover`'s five frozen R18 bundle hashes and `verify-seam`'s
+determinism hashes are **re-baseline CANDIDATES** under this flag, with §7.1
+(flag-off identity) and §7.2 (the flag-on pair) as the controlled A/B and the
+kept-count identity. The Cache API stores RAW tile bytes, so nothing needs
+invalidating. **`verify-neon-cover` gate 4a greps satellite builder bodies —
+comments included — for toy flag names: the worker hunks name only
+`RING_DEDUPE`, which is neither a toy nor a satellite-specific flag name.**
+
+### 7.5 WB-5 prep — measured, NOT flipped (as charged)
+
+Gate (7) censuses the real worker output without changing one emitted index:
+
+- **Wall-normal outwardness: 0.3750** over 12,800 near-vertical triangles.
+  **This number is CONFOUNDED and must not be read as a verdict** — the census
+  counts every near-vertical triangle, and a parapet's INNER band is correctly
+  inward-facing, as are crown step sides. It is a floor.
+- **Source rings: first-ring `signedArea` > 0 in 325 of 325 features, 0 features
+  with a hole sharing the outer sign ⇒ CONSISTENT winding at the source.**
+  That, not the normal census, is the precondition `FrontSide` needs, and R18
+  measured the same consistency on the LIVE planet (0 positive first-rings
+  across building / landcover / landuse / water on both Manhattan and Chicago).
+- **Caveat recorded in the harness output:** B's encoder winds rings POSITIVE
+  while live OFM (and E's fixture) wind them NEGATIVE. The finding that
+  transfers is CONSISTENT-vs-MIXED, never the sign itself.
+
+**Conclusion for C/WB-5:** the ring winding is consistent, so an outward wall
+emission driven by `classifyRingsSat`'s `extSign` is reachable, and `FrontSide`
+after it. It is NOT done this round: flipping the wall index order also flips
+every wall's `computeVertexNormals` result, and under `DoubleSide` +
+`gl_FrontFacing` that is a pixel change on certified satellite gates for a
+performance win nobody has measured. The one-line change and the gate that
+should precede it are recorded here instead.
+
+- **Ships `enabled: false`. RECOMMENDED ON AT CLOSE, after E re-baselines the
+  neon-cover / seam hashes off the A/B in §7.1–7.2.**
+

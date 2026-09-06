@@ -161,6 +161,10 @@ function drape(pos, anchor) {
   }
   await api.init();
 
+  // `--dedupe` flips RING_DEDUPE on AFTER the worker module is loaded. The
+  // worker reads the flag at CALL time (inside dedupeRing), so this measures
+  // the real flag-on bundle without a second process.
+  if (process.argv.includes('--dedupe')) C.RING_DEDUPE.enabled = true;
   console.log(
     `\nflags: FLASH_GUARD.enabled=${C.FLASH_GUARD.enabled} minArea2=${C.FLASH_GUARD.minArea2}` +
       ` · RING_DEDUPE.enabled=${C.RING_DEDUPE.enabled} · protocol=${C.WORKER_PROTOCOL ?? '(worker-private)'}\n`
@@ -229,7 +233,13 @@ function drape(pos, anchor) {
     }
   }
 
-  gate('(1) RED census: the raw worker emits degenerate triangles', anyDegen > 0, `${anyDegen} of ${anyTris} tris`);
+  if (C.RING_DEDUPE.enabled) {
+    // RING_DEDUPE removes the population AT THE SOURCE, so the census that is
+    // the RED with the flag off must read exactly 0 with it on.
+    gate('(1) GREEN RING_DEDUPE: the worker emits NO degenerate triangles', anyDegen === 0, `${anyDegen} of ${anyTris} tris`);
+  } else {
+    gate('(1) RED census: the raw worker emits degenerate triangles', anyDegen > 0, `${anyDegen} of ${anyTris} tris`);
+  }
 
   console.log('\n--- (1) DEGENERATE CENSUS (raw worker output, draped) ---');
   console.log('scene      builder        tris    degen   pct     coinc  colin  dropped  after');
@@ -237,6 +247,107 @@ function drape(pos, anchor) {
     console.log(
       `${String(r[0]).padEnd(10)} ${String(r[1]).padEnd(14)} ${String(r[2]).padStart(6)} ${String(r[3]).padStart(7)} ${String(r[4]).padStart(7)} ${String(r[5]).padStart(6)} ${String(r[6]).padStart(6)} ${String(r[7]).padStart(8)} ${String(r[8]).padStart(6)}`
     );
+
+  /* ---- (7) WB-5 PREP: are wall quads wound OUTWARD? --------------------- */
+  // The satellite building material is `side: DoubleSide` with the comment
+  // "every wall shades correctly despite the worker's inconsistent ring
+  // winding". FrontSide would halve the building fragment work over downtowns
+  // — but only if the winding is actually consistent. This MEASURES it, on the
+  // real worker output, without changing a single emitted index.
+  //
+  // Method, assumption-light: take every NEAR-VERTICAL triangle (|n.y| < 0.1 —
+  // walls and parapet bands, never roof caps), and test whether its normal
+  // points AWAY from that building's own footprint-centroid anchor, which the
+  // worker already stamps on every vertex as aBendAnchor. `outwardFrac` is the
+  // fraction that does. 1.0 (or 0.0) = a CONSISTENT winding that FrontSide
+  // could use after one global flip; ~0.5 = genuinely mixed, and the DoubleSide
+  // comment is right.
+  {
+    const r = await api.buildTile(14, 0, 6000, 'sat-buildings');
+    const b = r?.satBuilding;
+    if (!b?.idx) {
+      soft('(7) wall winding census', 'B', 'no satBuilding');
+    } else {
+      const pos = drape(b.pos, b.anchor);
+      let vert = 0;
+      let outward = 0;
+      for (let i = 0; i + 2 < b.idx.length; i += 3) {
+        const A = b.idx[i] * 3;
+        const B2 = b.idx[i + 1] * 3;
+        const Cc = b.idx[i + 2] * 3;
+        const abx = pos[B2] - pos[A];
+        const aby = pos[B2 + 1] - pos[A + 1];
+        const abz = pos[B2 + 2] - pos[A + 2];
+        const acx = pos[Cc] - pos[A];
+        const acy = pos[Cc + 1] - pos[A + 1];
+        const acz = pos[Cc + 2] - pos[A + 2];
+        const nx = aby * acz - abz * acy;
+        const ny = abz * acx - abx * acz;
+        const nz = abx * acy - aby * acx;
+        const len = Math.hypot(nx, ny, nz);
+        if (len === 0 || Math.abs(ny / len) >= 0.1) continue; // not a wall
+        vert += 1;
+        // centroid of the triangle vs this building's anchor, in XZ
+        const cxT = (pos[A] + pos[B2] + pos[Cc]) / 3;
+        const czT = (pos[A + 2] + pos[B2 + 2] + pos[Cc + 2]) / 3;
+        const ax = b.anchor[b.idx[i] * 2];
+        const az = b.anchor[b.idx[i] * 2 + 1];
+        if (nx * (cxT - ax) + nz * (czT - az) > 0) outward += 1;
+      }
+      const frac = vert ? outward / vert : 0;
+      // THE CONFOUND, stated because it changes the reading: this census counts
+      // every near-vertical triangle, and a PARAPET's inner band is *correctly*
+      // inward-facing, as are crown step sides. So outwardFrac is NOT expected
+      // to be 1.0 even under a perfectly consistent ring winding — the number
+      // below is a floor, not a verdict. The precondition FrontSide actually
+      // needs is that the SOURCE RINGS wind consistently, which is measured
+      // directly underneath from the tile bytes.
+      const { PbfReader: P2 } = await import('pbf');
+      const { VectorTile: V2 } = await import('@mapbox/vector-tile');
+      const L2 = new V2(new P2(bytes.dense)).layers.building;
+      let pos1 = 0;
+      let neg1 = 0;
+      let mixedFeatures = 0;
+      for (let i = 0; i < L2.length; i++) {
+        const f = L2.feature(i);
+        if (f.type !== 3) continue;
+        const rings = f.loadGeometry();
+        let first = 0;
+        let mixed = false;
+        rings.forEach((r, ri) => {
+          let sum = 0;
+          for (let k = 0, len = r.length, j2 = len - 1; k < len; j2 = k++)
+            sum += (r[k].x - r[j2].x) * (r[k].y + r[j2].y);
+          const sg = sum > 0 ? 1 : -1;
+          if (ri === 0) {
+            first = sg;
+            if (sg > 0) pos1 += 1;
+            else neg1 += 1;
+          } else if (sg === first) mixed = true; // a HOLE sharing the outer sign
+        });
+        if (mixed) mixedFeatures += 1;
+      }
+      console.log(
+        `\nWB-5 wall winding: ${vert} near-vertical triangles · outwardFrac ${frac.toFixed(4)}` +
+          ` (confounded by parapet inner bands — a floor, not a verdict)` +
+          `\nWB-5 source rings: first-ring signedArea >0 in ${pos1} features, <0 in ${neg1};` +
+          ` ${mixedFeatures} features have a HOLE sharing the outer sign` +
+          `\n     ⇒ ${pos1 === 0 || neg1 === 0 ? 'CONSISTENT' : 'MIXED'} winding at the source` +
+          ` — classifyRingsSat's extSign is ${pos1 === 0 || neg1 === 0 ? 'a single global sign here' : 'genuinely per-feature'}` +
+          `\n     CAVEAT: B's encoder winds rings POSITIVE; the live OpenFreeMap` +
+          ` planet winds them NEGATIVE (R18 measured 0 positive first-rings across` +
+          ` building/landcover/landuse/water on Manhattan AND Chicago), and E's` +
+          ` fixture reproduces the live sign. The finding that transfers is` +
+          ` CONSISTENT-vs-MIXED, not the sign itself.`
+      );
+      // Informational THIS ROUND by charter: measured, not flipped.
+      gate(
+        '(7) WB-5 PREP wall winding + source-ring census ran',
+        vert > 0,
+        `outwardFrac ${frac.toFixed(4)} over ${vert} wall triangles · rings +${pos1}/-${neg1}`
+      );
+    }
+  }
 
   /* ---- (6) CROSS-CHECK: B's encoder vs E's fixture on the closed ring ---- */
   // Fable's proof obligation (a). The two fixtures cannot produce identical
@@ -282,9 +393,13 @@ function drape(pos, anchor) {
           `worker tris ${c.tris} degenerate ${c.degen} (${c.pct.toFixed(2)}%) coincident ${c.coincident}`
       );
       gate(
-        "(6) E's fixture reproduces the SAME closed-ring defect B's encoder does",
-        c.degen > 0 && c.coincident === c.degen,
-        `degenerate ${c.degen} all coincident · ${c.pct.toFixed(2)}% (B's dense scene: 14.22%)`
+        C.RING_DEDUPE.enabled
+          ? "(6) GREEN E's fixture tile carries NO degenerate triangle either"
+          : "(6) E's fixture reproduces the SAME closed-ring defect B's encoder does",
+        C.RING_DEDUPE.enabled
+          ? c.degen === 0
+          : c.degen > 0 && c.coincident === c.degen,
+        `degenerate ${c.degen}${c.degen ? ' all coincident' : ''} · ${c.pct.toFixed(2)}%`
       );
     }
   } catch (e) {
