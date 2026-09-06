@@ -9,6 +9,7 @@
  * Run: node scripts/r24-c-depth-roundtrip-proof.mjs
  */
 import { readFileSync } from 'node:fs';
+import { DataUtils } from 'three';
 
 const C = readFileSync(new URL('../lib/fly/fly-constants.js', import.meta.url), 'utf8');
 const near = +/^\s*near:\s*([0-9.]+)/m.exec(C)[1];
@@ -167,21 +168,114 @@ console.log(
   }`
 );
 
+// ---------------------------------------------------------------------------
+// THE COPY-TARGET PRECISION LADDER — what each float path costs the
+// reconstruction, and whether the probe's DECLARED numbers are the real ones.
+//
+// The probe cannot read a depth attachment directly, so it samples it into a
+// 1x1 float target. `EXT_color_buffer_float` gives FloatType; without it,
+// `EXT_color_buffer_half_float` gives HalfFloatType — a rung that exists
+// because refusing outright would have been stricter than the gate it serves.
+// This section round-trips the reversed texel through BOTH formats at the
+// gate's own probe depths and asserts (a) every path is inside the 1% bound and
+// (b) the constants the probe reports as `precisionWorstPct` are those numbers,
+// so a green row cannot be green on a precision claim nobody checked.
+// ---------------------------------------------------------------------------
+const f32 = (v) => Math.fround(v);
+const f16 = (v) => DataUtils.fromHalfFloat(DataUtils.toHalfFloat(v));
+const PROBE_Z = [50, 700, 4000];
+console.log('\nCOPY-TARGET PRECISION — reconstruction error as a % of the true distance');
+console.log(['z (m)', 'reversed raw', 'float32', 'float16'].map((h) => h.padEnd(18)).join(''));
+console.log('-'.repeat(72));
+let worst16 = 0;
+let worst32 = 0;
+for (const z of PROBE_Z) {
+  const v = rawReversedDepth(z);
+  const t = viewZ_reversedFormula(v);
+  const e32 = (Math.abs(viewZ_reversedFormula(f32(v)) - t) / z) * 100;
+  const e16 = (Math.abs(viewZ_reversedFormula(f16(v)) - t) / z) * 100;
+  worst32 = Math.max(worst32, e32);
+  worst16 = Math.max(worst16, e16);
+  console.log(
+    [z, v.toExponential(4), e32.toFixed(6) + '%', e16.toFixed(4) + '%']
+      .map((c) => String(c).padEnd(18))
+      .join('')
+  );
+}
+console.log(`\n  worst float32 ${worst32.toFixed(6)}%   worst float16 ${worst16.toFixed(4)}%`);
+console.log('  verify-depth-roundtrip bounds the reconstruction at 1%.');
+
+const precGates = [
+  ['every float16 path is inside the 1% bound', worst16 < 1, `${worst16.toFixed(4)}%`],
+  ['…with at least 10x of margin', worst16 < 0.1, `${(1 / worst16).toFixed(0)}x inside`],
+  ['float32 is exact for this gate', worst32 < 0.001, `${worst32.toFixed(6)}%`],
+  [
+    'the table matches the values the probe declares',
+    (() => {
+      const m = /const PRECISION_WORST_PCT = \{ float32: ([\d.e-]+), float16: ([\d.e-]+) \};/.exec(
+        PROBE_SRC
+      );
+      if (!m) return false;
+      // The probe rounds for readability; require it to be no OPTIMISTIC than
+      // the measurement — a declared cost may overstate, never understate.
+      return +m[2] >= worst16 - 5e-5 && +m[1] >= worst32 - 5e-7;
+    })(),
+    'declared >= measured, never optimistic',
+  ],
+  [
+    'the probe ladders float32 -> float16 -> honest refusal',
+    /EXT_color_buffer_float'\)\s*\?\s*FloatType[\s\S]{0,200}EXT_color_buffer_half_float'\)\s*\n?\s*\?\s*HalfFloatType[\s\S]{0,120}: null;/.test(
+      PROBE_SRC
+    ),
+  ],
+  [
+    'half-float texels are decoded with three\'s own DataUtils.fromHalfFloat',
+    /DataUtils\.fromHalfFloat\(buf\[i\]\)/.test(PROBE_SRC) &&
+      /new Uint16Array\(4\)/.test(PROBE_SRC),
+    'a HALF_FLOAT readback returns raw 16-bit patterns, not numbers',
+  ],
+  [
+    'the refusal survives for the case where NEITHER float target renders',
+    /neither EXT_color_buffer_float nor EXT_color_buffer_half_float renders here/.test(PROBE_SRC),
+  ],
+  [
+    'precision, its cost and its provenance are all in the return value',
+    /precision: null,/.test(PROBE_SRC) &&
+      /precisionWorstPct: null,/.test(PROBE_SRC) &&
+      /precisionNote: null,/.test(PROBE_SRC),
+  ],
+];
+console.log('');
+let precOk = true;
+for (const [name, ok, detail] of precGates) {
+  if (!ok) precOk = false;
+  console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
+}
+
 // The probe must also be dev-only and must not invent a number it cannot stand
 // behind — both are properties of its source, and both are what keep a green
 // gate honest.
 const probeGates = [
   [
+    // The property, restated for the two-format probe: `raw` is texel 0 passed
+    // through `px()`, and `px()` decodes a half-float BIT PATTERN and does
+    // nothing else — no un-reversing, no normalisation, no packing. The
+    // `1.0 -` scan is the one that would catch the recon-L2 mistake being
+    // reintroduced inside the probe itself.
     'the probe reports the depth attachment AS STORED (no un-reversing)',
-    /out\.raw = buf\[0\];/.test(PROBE_SRC) && !/1\.0 - /.test(PROBE_SRC),
+    /out\.raw = px\(0\);/.test(PROBE_SRC) &&
+      /const px = \(i\) => \(precision === 'float16' \? DataUtils\.fromHalfFloat\(buf\[i\]\) : buf\[i\]\);/.test(
+        PROBE_SRC
+      ) &&
+      !/1\.0 - /.test(PROBE_SRC),
   ],
   [
     'the probe reads `reversed` from the renderer, not from the request',
     /gl\.state\?\.buffers\?\.depth\?\.getReversed\?\.\(\) === true/.test(PROBE_SRC),
   ],
   [
-    'the probe refuses rather than guessing when it cannot resolve to 1%',
-    /EXT_color_buffer_float unavailable — refusing/.test(PROBE_SRC),
+    'the probe refuses rather than guessing when it can quantify nothing',
+    /renders here — refusing to report a depth this probe cannot quantify/.test(PROBE_SRC),
   ],
   [
     'the probe names which buffer every number came from',
@@ -215,13 +309,19 @@ console.log('  RED  : reconstructed |viewZ| is 2.50-2.51 m at ALL THREE (this ta
 console.log('  GREEN: |reconstructed - true| / true <= 1% at all three, and the CoC at the');
 console.log('         focus plane is < 0.02 while the 4 km sample is > 0.5.');
 console.log('  HOOK : window.__flyDepthProbe(x, y) -> { raw, viewZ, coc, reversed, near, far,');
-console.log('         drawingBuffer, source, cocSource, cocReason, error }. x/y are');
-console.log('         DRAWING-BUFFER pixels, top-left origin. window.__flyDof is the live');
-console.log('         DepthOfFieldEffect (or null). Both dev-only.');
+console.log('         drawingBuffer, precision, precisionWorstPct, precisionNote, source,');
+console.log('         cocSource, cocReason, error }. x/y are DRAWING-BUFFER pixels,');
+console.log('         top-left origin. window.__flyDof is the live DepthOfFieldEffect (or');
+console.log('         null). Both dev-only.');
+console.log('         PRINT `precision` WITH THE RESULT: float32 costs 0.000002% of z and');
+console.log('         float16 costs at worst 0.0754%, both inside the 1% bound, but a green');
+console.log('         row should say which number it is green on. An `error` means NEITHER');
+console.log('         float target renders — record it as NOT RUNNABLE with that reason.');
 
+const allOk = mirrorOk && probeOk && precOk;
 console.log(
-  mirrorOk && probeOk
-    ? '\nPROOF: PASS (mirror bit-identical to three\'s GLSL; probe contract intact)'
+  allOk
+    ? '\nPROOF: PASS (mirror bit-identical to three\'s GLSL; precision ladder quantified; probe contract intact)'
     : '\nPROOF: FAIL'
 );
-process.exit(mirrorOk && probeOk ? 0 : 1);
+process.exit(allOk ? 0 : 1);
