@@ -624,7 +624,22 @@ Two lessons, both now in the gates:
    share, a process-NAME pattern is not an identity. The rule that came out of
    it, now standing for every agent: kill only PIDs you spawned yourself, never
    by pattern, never `fuser -k` on a port that is not yours.
-6. **The tile cache.** `TILE_PIPELINE.cache` is a persistent Cache API store.
+6. **An instrument must never be the FIRST to ask for a resource the subject
+   owns.** Three incidents this round, all mine, all the same shape:
+   - `INSTALL_PALE` polled `canvas.getContext('webgl2')` from page load. A
+     canvas has ONE context and the first caller decides its attributes; the
+     probe raced three for it, and when it won, the app's renderer got a
+     context it never asked for and **the boot never completed** — a 601 s
+     timeout on an idle machine, in a certification row.
+   - `verify-seam`'s offline leg wrote its calibration JSON to the path R21's
+     tracked live-tileset record occupies.
+   - a `ps | grep | kill` loop killed another agent's certification process
+     because the pattern matched its command line.
+   In each case the harness reached for something the app — or another agent —
+   already had. The three defences are: read the renderer's own handle
+   (`window.__flyGl.getContext()`), redirect artifact writes at the fs level
+   plus an outcome gate, and kill only PIDs you spawned.
+7. **The tile cache.** `TILE_PIPELINE.cache` is a persistent Cache API store.
    Fresh Playwright contexts get fresh storage, so gates are unaffected — but a
    long-lived context that changes `FIXTURE_REV` mid-run would serve stale
    bodies from the browser's own cache.

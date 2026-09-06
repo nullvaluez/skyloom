@@ -446,7 +446,13 @@ its trimmed sweep.
    not exist while `FRAME_STATS.enabled` is false. Their flag-off line
    ("instrument absent — unmeasurable, not a renderer failure") is the correct
    calibration output, not a failure to be fixed.
-8. **`verify-depth-roundtrip` needs a hook that may not exist yet.** It refuses
+8. **TWO CERTIFICATION ROWS ARE VOID, BOTH BECAUSE OF E.** The `fixture` row
+   of the first run (killed by my process-pattern kill, `rc=1 62s`) and the
+   `flash-guard` row of the second (`rc=1 601s` — my pale-detector probe raced
+   three for the canvas context and hung the boot; fixed in `cbd7c8a`).
+   `linear-haze` in the same run carries the identical probe bug. None of the
+   three is a result; re-take them from `cbd7c8a`.
+9. **`verify-depth-roundtrip` needs a hook that may not exist yet.** It refuses
    to reconstruct viewZ with harness-side arithmetic — that would test the
    harness's copy of the bug — and instead fails loudly with the required
    signature `window.__flyDepthProbe(x, y) → { viewZ, coc, raw, reversed }`.
