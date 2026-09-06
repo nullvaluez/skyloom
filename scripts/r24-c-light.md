@@ -618,6 +618,67 @@ polygonOffset is GL state, not a shader define, so this is a state-fidelity fix,
 not a cache-key one.) That is exactly the drift a one-implementation rule exists
 to prevent, caught by the rule on the day it was written.
 
+### DEFECT — `offsetUnits` was never imported into FlyScene.jsx (fixed, see below)
+
+The T11 change made the catcher's material read the shared helper —
+`polygonOffsetUnits: offsetUnits(gl, -1)` — and **did not add `offsetUnits` to
+FlyScene.jsx's `world-bend` import list**. It is a `ReferenceError` the instant
+that `useMemo` runs.
+
+**Exactly which flag/tier/style reaches that line**, because that is the
+condition under which the catcher would have crashed the scene:
+
+```
+satShadowsOn = mapStyle === 'satellite'
+            && SAT_SHADOWS.enabled            (true)
+            && qualityTier === 'high'
+            && satShadowPin                   (false whenever __flySatShadowOverride === 0)
+
+mount        = satShadowsOn && (SAT_SHADOWS.catcher.enabled || SHADOW_CALM.enabled)
+                               (false)          (ships false)
+```
+
+So the line is reached only with **`SHADOW_CALM.enabled = true` AND satellite
+AND tier `high` AND the satellite-shadow dev pin NOT 0.** Every one of those
+four must hold; on the shipped tree the flag alone rules it out, so the
+component never mounts and the ReferenceError is unreachable.
+
+**Which of my browser gates ran after `fd7d28d` with SHADOW_CALM armed: NONE,
+and there are two independent reasons — which is precisely why nothing tripped
+it.**
+
+1. **No run of mine ever armed the flag.** Every fixture attempt was a flag-off
+   measurement; the live audit printed `oneSun:false` and `hillElev:1`, and
+   `SHADOW_CALM` shipped `enabled:false` throughout. The one instrument I wrote
+   (`r24-c-measure-hillshade.js`) drives `__flyHill.set()`, which does not touch
+   this component.
+2. **Even armed, the fleet could not have reached it.** `scripts/_boot.js` pins
+   `__flySatShadowOverride = 0` for every browser harness, which makes
+   `satShadowPin` false and `satShadowsOn` false — so the mount condition fails
+   on its FIRST term regardless of the flag. **The first run that could ever
+   mount this catcher is `verify-shadow-calm`, the gate whose own recipe in this
+   ledger says it "must un-pin `__flySatShadowOverride` and prove the pass is
+   reachable at high tier" — and that gate does not exist yet.** The defect was
+   sitting behind the exact pin whose removal my own gate recipe identifies as
+   step one.
+
+That is recon **HARN-GAP-5** biting a second time in one round, on my own code:
+the fleet pins neutralise exactly the ship-state visuals this pass changes, so
+an unmounted component is indistinguishable from a working one. And my node
+gate could not see it either — `verify-c-flagoff` asserts branch *gating*, not
+identifier *resolution*; those are different properties and only a linter with
+`no-undef` (or a module load) answers the second.
+
+**Fixed** by adding `offsetUnits` to the import list, one line, nothing else.
+RED/GREEN, node-only:
+
+```
+RED   (fix stashed) components/fly/FlyScene.jsx:351:27  'offsetUnits' is not defined.
+GREEN (28 changed files, no-undef): 0 errors
+      residual 7 = react-hooks/immutability, all pre-existing
+      (CloudField 463/499, FlyCanvas 32, FlyEffectComposer 236/312/313/334)
+```
+
 ### Instrument for E — `__flyStats.shadow`
 
 `{ enabled, installed, biasSign, kernel, casting, mapSize, radiusM, texelM,
@@ -1003,7 +1064,14 @@ and the header says why:
    was a measurement of the streaming world and an animating cloud deck. The
    tell was that the number rose as the effect got *weaker*. **Read the
    ordering before reading the value.**
-10. **Two rounds had already written down the trap I fell into.** R16's
+10. **A flag-off tree hides a crash as well as it hides a feature.** The
+   catcher's missing `offsetUnits` import is a ReferenceError that needed four
+   conditions to fire, and the shipped flag state removes one of them — so it
+   was invisible to every gate, including my own flag-off gate, which asserts
+   branch GATING and not identifier RESOLUTION. Those are different properties;
+   `no-undef` over the changed files answers the second in milliseconds and now
+   belongs in the per-agent close list.
+11. **Two rounds had already written down the trap I fell into.** R16's
    "animated layers pollute their own A/B noise" and R17 §7.1's "a pixel-probe
    gate must not contain an actor it doesn't control" are both in this repo,
    and the affordance to obey them (`window.__flyClouds`) was already there.

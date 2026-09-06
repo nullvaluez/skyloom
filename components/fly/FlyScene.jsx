@@ -13,6 +13,7 @@ import {
   getHillshade,
   groundHorizonTargetM,
   horizonFade,
+  offsetUnits,
   setBend,
   setBendEye,
   setDepthHaze,
