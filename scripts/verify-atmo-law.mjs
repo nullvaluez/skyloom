@@ -500,6 +500,26 @@ ok('deep night (frac 0) multiplier is EXACTLY 0', nightMul(0) === 0);
 // --------------------------------------------------------------------------
 console.log('\n[7] AERIAL_LAW flag-off is byte-identical (generated text + key)');
 {
+  // R24 CLOSE: report the SHIP STATE from the block, and assert the ONE thing
+  // that must hold across it — A8 is gated on its own field, so it can ship ON
+  // while the law ships OFF. If those two ever became one flag, the night fix
+  // would be hostage to a re-baseline batch it does not need.
+  const cs = fs.readFileSync(new URL('../lib/fly/fly-constants.js', import.meta.url), 'utf8');
+  const blk = cs.match(/export const AERIAL_LAW = \{[\s\S]*?\n\};/)[0];
+  const lawOn = /^\s*enabled:\s*true\s*,/m.test(blk);
+  const rampOn = /^\s*nightRamp:\s*true\s*,/m.test(blk);
+  ok('AERIAL_LAW declares an explicit ship state for the law', /^\s*enabled:\s*(true|false)\s*,/m.test(blk),
+    `law ships ${lawOn ? 'ON' : 'OFF'}`);
+  ok('A8 declares an explicit ship state of its own', /^\s*nightRamp:\s*(true|false)\s*,/m.test(blk),
+    `night ramp ships ${rampOn ? 'ON' : 'OFF'}`);
+  const fscene = fs.readFileSync(new URL('../components/fly/FlyScene.jsx', import.meta.url), 'utf8');
+  ok('A8 is gated on nightRamp ALONE (it can ship with the law off)',
+    /if \(AERIAL_LAW\.nightRamp\) \{/.test(fscene) &&
+    !/AERIAL_LAW\.enabled\s*&&\s*AERIAL_LAW\.nightRamp/.test(fscene));
+  ok('with the law off, the night multiplier reaches the LEGACY post strength',
+    /AERIAL_PERSPECTIVE\.maxMix \* aerialGate \* atmoNightMul/.test(fscene));
+}
+{
   const { register } = await import('node:module');
   register('./_alias-loader.mjs', import.meta.url);
   const wb = await import('../lib/fly/toy-world/world-bend.js');

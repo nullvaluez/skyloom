@@ -229,8 +229,20 @@ console.log('\n[5] policy + instrument contract');
 {
   const src = fs.readFileSync(path.join(ROOT, 'lib/fly/fly-constants.js'), 'utf8');
   const m = src.match(/export const LOD_CROSSFADE = \{[\s\S]*?\n\};/);
-  ok('LOD_CROSSFADE ships enabled:false', /enabled:\s*false/.test(m[0]));
-  const fade = parseFloat(m[0].match(/fadeSec:\s*([0-9.]+)/)[1]);
+  // R24 CLOSE: read the SHIP STATE out of the block rather than pinning a
+  // literal. A gate that asserts `enabled:false` forever is a gate that goes
+  // red the day the feature ships, which trains people to edit gates. What is
+  // actually invariant is that the state is declared, is one of the two legal
+  // values, and that the RED counter works in EITHER state — `hardSwaps` is
+  // incremented before the flag is consulted, which is what makes the
+  // flag-off tree calibratable without editing constants.
+  const shipEnabled = /^\s*enabled:\s*true\s*,/m.test(m[0]);
+  ok('LOD_CROSSFADE declares an explicit ship state', /^\s*enabled:\s*(true|false)\s*,/m.test(m[0]),
+    `ships ${shipEnabled ? 'ON' : 'OFF'}`);
+  // Anchored to the KEY line: the block comment quotes `fadeSec: 6` as the
+  // probe pin that exposed the clamped-dt behaviour, and a loose regex matches
+  // the prose before the key (Fable caught this on integration).
+  const fade = parseFloat(m[0].match(/^\s*fadeSec:\s*([0-9.]+)/m)[1]);
   ok('fadeSec is inside the charter bound of 300 ms', fade > 0 && fade <= 0.3, `${fade * 1000} ms`);
   ok('boot is fade-free (skipBootMs > 0 — reveal timing is frozen)',
     parseFloat(m[0].match(/skipBootMs:\s*([0-9]+)/)[1]) > 0);
