@@ -2018,6 +2018,10 @@ export function FlyScene({ runtime }) {
         // water is MeshPhong and its specular comes from that one directional
         // — there is no second light in the rig, FlyScene :1806-1827). Dev
         // only, on the existing 60-frame cadence, zero production cost.
+        // R24 C (pass 2b): also publish the CLAMP TERMS (`casting`,
+        // `minElRadDeg`, `hillMinDeg`, `hillMaxDeg`) and `water` as a real
+        // vector — verify-one-sun read all four and found them absent, so its
+        // floor and hill-clamp clauses could not be evaluated at all.
         const _sd = getSkySunDir();
         // The key is read off the LIGHT ITSELF (position − target, normalised),
         // never off the branch that wrote it: with ONE_SUN off at medium/low
@@ -2050,7 +2054,27 @@ export function FlyScene({ runtime }) {
           hillElev: +(getHillshade().elev ?? 1).toFixed(4),
           hillEffective: +(getHillshade().effective ?? getHillshade().strength).toFixed(4),
           dome: _sd.live ? _sd.dir.map((v) => +v.toFixed(6)) : null,
-          water: 'key', // one directional in the rig — the same vector by construction
+          // R24 C: the WATER specular direction, as a VECTOR. Satellite water is
+          // MeshPhong and its specular lobe is built from the scene's single
+          // directional — there is exactly one `<directionalLight>` in the world
+          // scene (the two others live in the inspect turntable's own Canvas), so
+          // this is the key light BY REFERENCE, not a second copy of the solar
+          // math. A consumer gate therefore reads Δ 0 BY IDENTITY; the assertion
+          // with teeth is `waterSource`, i.e. that no second light was added.
+          water: [+_kx.toFixed(6), +_ky.toFixed(6), +_kz.toFixed(6)],
+          waterSource: 'key-light',
+          // R24 C: the two CLAMPS a consumer needs to predict what it is
+          // reading, published from the constants the code actually applies
+          // (never re-declared in the gate, the R16 `__flySunModel` idiom).
+          // `casting` is the shadow-camera arm state: the key elevation is
+          // floored at SAT_SHADOWS.minElRad ONLY while the shadow camera casts,
+          // so a gate cannot evaluate the floor clause without it. It is also
+          // published on `stats.shadow` (verify-shadow-calm's home); it belongs
+          // on BOTH because it is a term in both contracts.
+          casting: satShadowRef.current === true,
+          minElRadDeg: +((SAT_SHADOWS.minElRad * 180) / Math.PI).toFixed(4),
+          hillMinDeg: +((HILLSHADE.minElRad * 180) / Math.PI).toFixed(4),
+          hillMaxDeg: +((HILLSHADE.maxElRad * 180) / Math.PI).toFixed(4),
         };
         // R24 C (SHADOW_CALM): what the shadow rig is ACTUALLY running — the
         // patched-or-not kernel state comes from the module that did (or did
