@@ -244,10 +244,17 @@ console.log('\n[5] policy + instrument contract');
   // the prose before the key (Fable caught this on integration).
   const fade = parseFloat(m[0].match(/^\s*fadeSec:\s*([0-9.]+)/m)[1]);
   ok('fadeSec is inside the charter bound of 300 ms', fade > 0 && fade <= 0.3, `${fade * 1000} ms`);
+  // Anchored to the KEY line, like fadeSec above and for the same reason: the
+  // block comment now spells out the harness pin `{ skipBootMs: 0 }`, and a
+  // loose regex reads the PROSE. Second time this exact trap fired in this
+  // gate — a config-reading assertion must anchor on `^\s*key:`, always.
   ok('boot is fade-free (skipBootMs > 0 — reveal timing is frozen)',
-    parseFloat(m[0].match(/skipBootMs:\s*([0-9]+)/)[1]) > 0);
-  ok('warps skip the fade (WARP.flashMs already masks the cut)', /skipOnWarp:\s*true/.test(m[0]));
-  ok('there is a concurrency bound', parseInt(m[0].match(/maxConcurrent:\s*([0-9]+)/)[1], 10) > 0);
+    parseFloat(m[0].match(/^\s*skipBootMs:\s*([0-9]+)/m)[1]) > 0,
+    `${m[0].match(/^\s*skipBootMs:\s*([0-9]+)/m)[1]} ms of fade clock`);
+  ok('warps skip the fade (WARP.flashMs already masks the cut)', /^\s*skipOnWarp:\s*true/m.test(m[0]));
+  ok('there is a concurrency bound',
+    parseInt(m[0].match(/^\s*maxConcurrent:\s*([0-9]+)/m)[1], 10) > 0,
+    `${m[0].match(/^\s*maxConcurrent:\s*([0-9]+)/m)[1]} materials`);
 }
 {
   const fields = ['hardSwaps', 'faded', 'refines', 'merges', 'active', 'peakActive', 'retained', 'skip'];

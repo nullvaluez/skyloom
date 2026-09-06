@@ -496,7 +496,7 @@ matched the prose before the key.
 |---|---|---|---|---|---|---|
 | **A8** (night ramp) | verify-atmo-law §6 + §7, as a pure function AND as a source-gated independence proof | none touched (uniform-only) | none possible (no shader text, no key) | untouched | not needed — noon multiplier is EXACTLY 1, so noon is bit-identical | **SHIPPED ON** |
 | **AERIAL_LAW** | verify-atmo-law 45/45 incl. GLSL≡JS at 4,160 points and flag-off text identity | unmeasured here; adds no mesh | prewarm builds through the same `applyHillshade` + the same Effect constructor | untouched (nothing touches emissives or bloom) | **NOT CAPTURED** | **SHIPPED OFF.** ON only after the horizon re-baseline batch runs with a fixture column, and after one fixed-pose Owens draw row. Not before. |
-| **LOD_CROSSFADE** | verify-lod-fade 51/51 (Fable's regex fix included) | Owens row unmeasured | tile program is prewarmed with the slot | untouched | RED captured, ON leg NOT captured | **SHIPPED OFF — pending pass-1 row.** Flips to ON on: `faded > 0`, `hardSwaps` flat at 20, Owens draws unchanged, 0 pageerrors, `active`/`peakActive` well under 32 AND returning, `skip.concurrency` 0. |
+| **LOD_CROSSFADE** | verify-lod-fade 51/51 (Fable's regex fix included) | Owens row unmeasured | tile program is prewarmed with the slot | untouched | RED captured, ON leg NOT captured | **SHIPPED OFF — pending the pass-1 ON row.** Flip criteria in §4.10. |
 | **SKY_PROCEDURAL** | — | — | — | — | — | **SHIPPED OFF** (not built; design in §4.5) |
 
 What each recommendation rests on, and what it does not:
@@ -594,6 +594,69 @@ ReferenceError.
 matches the `fadeSec: 6` quoted in the block COMMENT before the real
 `fadeSec: 0.25` key. Fable has already fixed it on integration (anchored to the
 key line); duplicating the fix here would only make a conflict.
+
+## §4.10 LOD_CROSSFADE flip criteria — the corrected set
+
+An earlier draft of this table said "`hardSwaps` flat at 20". **That was wrong
+and is struck.** It came from loose wording on my part — I meant "the event
+count must not change" — and from a number measured at a different pose. A
+criterion the record cites must be the one the gate asserts, so here is the
+set, derived from what the counters actually mean in
+`lib/fly/lod-crossfade.js`.
+
+**What the counters mean.** `onRefine` / `onMerge` each increment
+`refines` / `merges` unconditionally, then increment EITHER `hardSwaps` (no
+blend) OR `faded` (a blend was armed). So `hardSwaps` is not an event count; it
+is the un-blended SHARE of the events.
+
+**Invariant, both legs, always:**
+
+    refines + merges === hardSwaps + faded
+
+**Flip criteria (ON leg vs the OFF leg, SAME pose, SAME sweep, SAME
+`TERRA_PACE`):**
+
+| # | criterion | why it is the right one |
+|---|---|---|
+| 1 | `refines + merges` **flat** OFF→ON | the feature must not change how often the LOD refines — only whether the swap is blended |
+| 2 | `hardSwaps` **drops** toward 0; `faded` **rises** | a flat `hardSwaps` would mean the feature did nothing |
+| 3 | `active === 0` **and** `retained === 0` after ≥ 10 rendered frames of settle | every blend completed and every retained parent texture was released; `retained > 0` at rest is a texture LEAK and is the most valuable thing this leg can catch |
+| 4 | `0 < peakActive <= 32` | blends actually ran, and the bound held |
+| 5 | `skip.concurrency` read **together with** `peakActive` | `> 0` with `peakActive === 32` is the bound doing its job (report); `> 0` with `peakActive < 32` is a bug in D's accounting (fail) |
+| 6 | `skip.shape`, `skip.noParentMap`, `skip.unpatched` all **0** | each is a real defect: the 2-child z0/4326 path, a parent with no map, materials not patched at arm time |
+| 7 | Owens **equal** to the OFF leg's fixture numbers (draws 174 / tris 166,659) | neither feature adds a mesh, so anything but equality IS the finding — not merely ≤ 261 |
+| 8 | 0 pageerrors | |
+
+**How the leg must be pinned, and why — this is a venue fact, not a
+preference.** `window.__flyLodFadeOverride = { enabled: true, skipBootMs: 0 }`,
+plus a **≥ 20 rendered-frame post-warp settle before the counters are
+snapshotted**.
+
+`skipBootMs` is 6000 **fade-clock** ms and the fade clock advances at most
+50 ms per RENDERED frame (FlyScene clamps `dt`), so 6000 ms is **120 frames**.
+A 40 s sweep at 1–3 fps is only ~40–120 frames, with boot already having burned
+an unknown share. Unpinned, `skip.boot` eats the refines and the leg prints a
+red that really reads "the boot suppression never expired". `lodFadeWarp()`
+sets a 900 ms window = **18 frames** = 6–18 s of a 40 s sweep, hence the
+settle. Both suppressions are POLICY and are already gated structurally by
+`verify-lod-fade` §5; this leg's job is "does the blend happen".
+
+**Two reading rules that prevent false conclusions:**
+- **The counters have no reset.** `resetLodFades()` clears only `active`,
+  `retained` and `skip.*`; `hardSwaps`, `faded`, `refines`, `merges` and
+  `peakActive` accumulate for the session. Diff before/after snapshots — and
+  `peakActive` is a high-water mark that CANNOT be diffed; read it absolute and
+  note it includes boot.
+- **Do not equate D's counters with E's frame-differ.** E's "8 hard refines +
+  3 hard merges" is a frame-diff observation; `refines`/`merges` are call-site
+  counters that see entries E's differ cannot. Report both, assert neither
+  against the other.
+
+**Honest exit condition.** If `refines + merges` is 0 in the measured window,
+the leg must print **NOT CALIBRATED** — no LOD events occurred, so nothing was
+testable — rather than a red. If `faded` is 0 while `skip.boot` and
+`skip.warp` are both 0 and `refines + merges > 0`, that is a genuine RED
+against D's code and I want it.
 
 ## §5 Decisions
 
