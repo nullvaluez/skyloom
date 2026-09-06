@@ -7,6 +7,8 @@ import { SatSkylineEngine } from '@/lib/fly/toy-world/sat-skyline-engine';
 import { SAT_SKYLINE } from '@/lib/fly/fly-constants';
 import { getSatSkyline } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
+// R24 B (GROUND_VIS, recon A6/T8) — AGL fade bands read the DAMPED ground.
+import { eyeAglVis } from '@/lib/fly/ground-vis';
 
 /**
  * Round 18 (A2 "SKYLINE") — mounts the DISTANT BLOCK-MASS streamer inside
@@ -88,7 +90,7 @@ export function SatSkylineLayer({ runtime, flight }) {
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
     nowRef.current = t;
-    const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
+    const eyeAgl = eyeAglVis(runtime, flight); // R24 B (GROUND_VIS)
     // groundElev rides along as the fallback for far DEM samples that have not
     // streamed yet — sea level would sink a mountain city's skyline.
     engine.update(t, flight.pos.x, flight.pos.z, eyeAgl, flight.groundElev);

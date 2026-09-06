@@ -8,6 +8,8 @@ import { LABEL_DECLUTTER, LETTERS, SKY, TOY_WORLD } from '@/lib/fly/fly-constant
 import { letterLiftM } from '@/lib/fly/landmarks-3d';
 import { bendDrop, getBend } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
+// R24 B (GROUND_VIS, recon A6/T8) — AGL fade bands read the DAMPED ground.
+import { eyeAglVis } from '@/lib/fly/ground-vis';
 
 const FONT = '/fonts/ArchivoBlack-Regular.ttf'; // OFL, self-hosted
 
@@ -184,7 +186,7 @@ export function PoiLetters({ runtime, flight, origin }) {
       // and behaviour is byte-identical (verify-poi's continuity contract).
       let selected = ideal;
       if (LABEL_DECLUTTER.enabled && ideal.length > LABEL_DECLUTTER.topN) {
-        const eyeAgl = Math.max(0, flight.pos.y - (flight.groundElev ?? 0));
+        const eyeAgl = eyeAglVis(runtime, flight); // R24 B (GROUND_VIS)
         if (eyeAgl >= LABEL_DECLUTTER.aglOnM) {
           // ROUND-ROBIN across kinds, not a straight rank sort: cities alone
           // can fill the whole budget (quota 6 = topN 6), and an altitude pass

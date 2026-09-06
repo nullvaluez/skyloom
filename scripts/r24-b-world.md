@@ -425,3 +425,56 @@ mesh's own (unchanged) XZ. That is a clean follow-up, not a port. Named in §8.
 
 - **Ships `enabled: false`. RECOMMENDED ON AT CLOSE.**
 
+---
+
+## §5 M4b — GROUND_VIS (A6, T8): one DEM refinement no longer sweeps every band
+
+### 5.1 RED / GREEN
+
+`node scripts/r24-b-groundvis-proof.mjs` (pure function of the constants + the
+slew helper; runs anywhere):
+
+| gate | measured |
+|---|---|
+| (1) RED — flag off, the visual ground takes the raw step whole | **384.0 m in one frame** |
+| (2) GREEN — no frame moves it by more than `maxStepM` | 4.000 m ≤ 4 |
+| (3) GREEN — and it still CONVERGES | after 95 frames (~1.58 s at 60 Hz) |
+| (4) WARP — a `warpEpoch` bump SNAPS | 364.0 m in one frame, by design |
+| (5) SEAM — the flight model keeps the RAW value | `flight.groundElev` 900 while the visual reads 82 |
+
+384 m is the archived R22 measurement, reproduced here as the flag-off
+behaviour of the same expression.
+
+### 5.2 Mechanism and the seam
+
+`flight.groundElev` is a raw quadtree raycast sampled every 3rd frame
+(FlyScene.jsx:1084) and handed to everyone at once, so a finer DEM tile landing
+under the aircraft steps the bend datum, the building / skyline / road fade
+bands, the POI letter horizon, the low-AGL micro-detail and quilt ramps and the
+altitude atmosphere simultaneously.
+
+`runtime.groundElevVis` is the damped twin. **The split is the whole feature:**
+
+| reads the DAMPED value | keeps the RAW value |
+|---|---|
+| `setBendEye` (FlyScene:1389) | the flight model + its soft floor |
+| `SKY.altAtmo` altitude term (:1417) | the crash floor and respawn |
+| sky dip + micro-detail + `SAT_QUILT` (:1666) | `PlayerGroundShadow` |
+| `SatBuildingLayer` AGL fade | cinema and photo cameras |
+| `SatSkylineLayer` AGL fade | the skyline's `refGroundY` drape fallback |
+| `SatRoadLayer` AGL fade | every engine placement / drape sample |
+| POI letter declutter + (via `setBendEye`) the letter horizon | `SatVegLayer` / `SatParcelHomes` (placement, not just fade) |
+
+A visual ramp may lag reality by a metre; a collision floor may not.
+
+`maxStepM` is per FRAME, not per second, deliberately: the quantity it protects
+is a per-frame visual delta, and a frame-rate-independent rate would let a
+hitch deliver the whole step at once — exactly the event being damped. A warp
+snaps, and so does the first sample.
+
+**Merge note for Fable:** the write is ONE line in FlyScene's −50 block,
+immediately after the raw write, annotated `// R24 B`. It is a sibling field on
+`runtime`, so it does not collide with A's `FRAME_STEP` `renderPos`.
+
+- **Ships `enabled: false`. RECOMMENDED ON AT CLOSE.**
+

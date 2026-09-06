@@ -17,6 +17,8 @@ import {
 } from '@/lib/fly/fly-constants';
 import { useFlyStore } from '@/stores/fly-store';
 import { SatVegLayer } from './SatVegLayer';
+// R24 B (GROUND_VIS, recon A6/T8) — AGL fade bands read the DAMPED ground.
+import { eyeAglVis } from '@/lib/fly/ground-vis';
 
 const TIERS = ['low', 'medium', 'high']; // mirrors FlyCanvas's quality ladder
 const atLeastTier = (tier, min) => TIERS.indexOf(tier) >= TIERS.indexOf(min);
@@ -146,7 +148,7 @@ export function SatBuildingLayer({ runtime, flight }) {
 
   useFrame(({ clock }) => {
     nowRef.current = clock.elapsedTime;
-    const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
+    const eyeAgl = eyeAglVis(runtime, flight); // R24 B (GROUND_VIS)
     // Windows light up as the sun goes down (runtime.sun is the R13 day cycle,
     // republished on a 60s cadence — this just reads it; one uniform write).
     engine.setNightMix(runtime.sun?.frac);
