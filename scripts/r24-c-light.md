@@ -607,6 +607,29 @@ with the flag ON, the catcher's draw contribution is 0 (visible false) while at
 Columbus it is exactly +1; (4) per-pixel temporal std on the shadowed side of a
 building, before/after, through verify-flicker's five controls.
 
+### Flag-off confirmation (Fable, for merge arbitration)
+
+1. **The ShaderChunk edits are applied ONLY when `SHADOW_CALM.enabled` is true.**
+   `installShadowKernel()`'s first statement is
+   `if (_state.installed || !SHADOW_CALM.enabled) return _state;` — with the flag
+   off the function returns before reading `ShaderChunk.shadowmap_pars_fragment`
+   at all, so three's chunk text is byte-verbatim and the flag-off tree compiles
+   exactly R21's shadow programs.
+2. **Install site:** `components/fly/FlyScene.jsx`, MODULE BODY, one bare
+   statement `installShadowKernel();` immediately after the `_sunAudit` /
+   `_moonKeyDir` module scratch declarations and before `snapToShadowTexel` —
+   i.e. inside the module's top-level statement list, not inside any component.
+   (`components/fly/FlyCanvas.jsx` imports `./FlyScene` at line 6 and
+   `./PrewarmRig` at line 10, and `prewarm.js`'s module body compiles nothing —
+   its `compileAsync` runs from a component effect — so the chunk is patched
+   before ANY material in this app compiles, prewarm's warm scene included.)
+3. **The warm and live programs therefore read the same text**: there is one
+   `ShaderChunk` table, it is mutated once, before either.
+4. **`__flyStats.shadow.biasSign` / `.kernel` are read from `shadowKernelState()`
+   — the module's record of what it ACTUALLY patched**, not from the constants
+   block that asked. A failed string match leaves them `false` / `null` and the
+   gate sees the truth.
+
 ### Cost
 
 0 draws over empty terrain, +1 where casters exist. The kernel edits are
