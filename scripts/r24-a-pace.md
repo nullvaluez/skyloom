@@ -1051,6 +1051,155 @@ smaller contributor to the 1 vs 17 asymmetry.
 
 ---
 
+## §14 THE ROUND'S FIRST DEFECT IN A SHIPPED FEATURE — rule 1 tested a level
+
+Found where the close flip met the venue, in **my own** feature, after it had
+already been ruled ON. It is the most serious thing in this ledger, so it gets
+stated plainly rather than folded into a follow-up list.
+
+### What shipped, and what it did
+
+Rule 1 of FINALIZE_PACE read:
+
+    if (done === 0) return lastDtMs <= c.longFrameMs;   // longFrameMs = 24
+
+That is a test for a **level**, not for a spike. On any machine whose frames are
+*steadily* longer than 24 ms — **anything below ~41 fps** — every frame is
+"long", so rule 1 refuses the first finalize of **every** frame, forever. Each
+engine's `if (!mayFinalize(done)) break;` fires before its loop body has run
+once, so `done` never reaches 1 and rule 2 is never even consulted. No chunk
+ever finalizes.
+
+The symptom is not a stutter. **Buildings never appear at all.**
+
+| machine | frame time | rule 1 as shipped |
+|---|---|---|
+| 60 fps desktop | 16.7 ms | fine — this is the machine the round assumed |
+| ~41 fps | 24 ms | the threshold |
+| 30 fps laptop | 33 ms | **starved** |
+| 20 fps integrated GPU | 50 ms | **starved** |
+| fixture venue (SwiftShader) | 300–1000 ms | **starved, totally** |
+
+Those middle two rows are laptops and integrated GPUs — *exactly the machines
+that report the symptoms this round exists to fix*. I shipped a fix for
+stuttering that would have stopped the world from streaming in on the hardware
+that stutters.
+
+### How it surfaced
+
+Not on a machine. On the **venue**: pass 2's flash-guard census read **0 meshes
+and 0 triangles at Powell AND Manhattan** after the same 60 s settle that gave
+**31,576 / 126,116 triangles in pass 1**, when FINALIZE_PACE was off. At
+300–1000 ms per frame the starvation is absolute rather than graded, which is
+the only reason it was visible at all. **The venue did not cause the defect. It
+converted a graded failure into an absolute one, and so exposed it.**
+
+The first diagnosis — mine — was that this was a venue artifact needing a
+harness seam, and I wired `budgetK()` into rule 1 so the scaler would switch it
+off. Fable rejected that and was right to: a harness exemption would have left
+the defect live on every user machine below 41 fps and removed the only
+instrument that could ever have caught it. **The bug was never that the venue is
+slow. It was that "long" was defined absolutely.**
+
+### The fix, in the product
+
+Rule 1 now refuses only a **spike**: the frame must exceed **both**
+`longFrameMs` **and** `spikeK` × a running EMA of recent frame times.
+
+- a 40 ms hitch amid 16 ms frames is 2.4× its baseline → refused, which is the
+  hitch train rule 1 was written to break;
+- a steady 33 ms machine is never refused — its own baseline is 33 ms, it is not
+  spiking, it is simply slower;
+- a steady 1 fps venue is a **no-op by construction**, for the same reason. That
+  line is the proof the fix belongs to the product: *the harness needs no
+  exemption from a rule that correctly ignores it*, and rule 1 carries no K seam
+  at all now.
+
+The spike is measured against the EMA **of the frames before it**, never one the
+spike has been folded into — otherwise a large enough hitch raises its own
+threshold and hides itself.
+
+Plus a **hard starvation cap**: no more than `maxRefuseFrames` (3) consecutive
+refusals, then one frame is admitted whatever the EMA says. Rule 1 is an
+optimisation, and an optimisation that can starve is worse than not having it.
+
+Two knobs added to `FINALIZE_PACE`, both documented in the block: `spikeK: 2`
+(generous on purpose — a missed hitch costs one late upload, a false positive
+costs the whole world) and `maxRefuseFrames: 3`.
+
+The EMA seeds at `longFrameMs`, not at the first frame observed: a cold start
+has no baseline, and seeding from the first frame would make every first frame
+un-spikeable by definition. The visible consequence is honest and bounded — a
+very slow machine refuses a handful of frames while the baseline climbs (the
+venue arm measures 6 of the first 40, worst run 3, then never again), and the
+starvation cap is what bounds it. Gate 15 asserts that shape rather than hiding
+it behind a slice.
+
+### Proof
+
+`verify-finalize-pace.mjs` 14 → **17 gates**, RED-calibrated by reverting rule 1
+to the shipped line: **14, 15 and 17 fail**, with 14 reading **0/40 frames
+admitted** — the defect's exact signature. 16 passes both ways, which is correct
+and is the point: *the fix did not move the hitch behaviour it was written for.*
+
+| gate | asserts | on the shipped rule |
+|---|---|---|
+| 2 / 3 | a cold 50 ms frame is a spike (2.08× the 24 ms seed) and is refused; a 16.7 ms frame is not | unchanged — PASS both ways |
+| 14 | steady 33 ms (~30 fps) finalizes on **every** frame | **FAIL, 0/40 admitted** |
+| 15 | 20 fps and the 1 fps venue converge to permanent admission, worst run ≤ 3 | **FAIL, 0/40, worst run 40** |
+| 16 | one 40 ms hitch amid 16.7 ms frames is refused, **and only that frame** | PASS both ways |
+| 17 | a hitch TRAIN never defers more than 3 in a row | **FAIL, worst run 20** |
+| 18 | rule 2's shared budget is `budgetMs × budgetK()` — 3 ms at K=1, 120 ms at K=40 | unchanged |
+
+Gate 18 keeps E's scaler on rule 2 only, matching the five engine sites where E
+already scales the count budgets. `lib/fly/harness-budget.js` is imported by the
+gate **for real** (copied beside the shim, not inlined), so it exercises E's
+actual clamp and its actual `typeof window === 'undefined'` branch rather than a
+stand-in that agrees with my reading of it — that branch is also why the K arm
+has to define a `window`.
+
+### The sentence in my own header that was false
+
+> "Neither rule can starve a chunk: a deferred chunk keeps its place in
+> `pendingFinalize` and is retried next frame."
+
+"Retried next frame" is worth nothing if next frame refuses on the same grounds
+forever. The claim was true of rule 2 and false of rule 1, and I wrote it while
+believing it of both. It is corrected in place in the module header, with the
+correction marked rather than quietly edited.
+
+### Still open, and NOT mine to close — flagged for E and Fable
+
+`sat-veg-engine.js:516` caps veg commits at `FINALIZE_PACE.vegPerFrame` (1)
+whenever `finalizePaceOn()`, and **E's `budgetK()` does not scale it** — it is
+the one budget site of the six that the scaler misses. This is a *different and
+much milder* shape than the rule 1 defect: a cap of 1 per frame still makes
+monotone progress, where rule 1 made none. But at 1 fps it is one veg chunk per
+second, so any veg content gate on this venue will read a partially populated
+world and should either raise `vegPerFrame` via the pin or wait proportionally.
+I have not touched it: it is E's file and E's seam.
+
+### Lessons
+
+1. **A threshold on an absolute frame time is a threshold on the user's
+   hardware.** "Long" only means anything relative to what that machine normally
+   does. Every fixed-millisecond frame-time comparison in this codebase deserves
+   the same question asked of it.
+2. **A pacing rule that can refuse must have a starvation cap**, independent of
+   how sound its per-frame reasoning is. The cap is not a workaround for a bad
+   heuristic; it is the property that makes the heuristic safe to ship.
+3. **My first instinct — "the venue is slow, give it a harness seam" — was the
+   wrong shape**, and would have hidden a live user-facing defect behind a test
+   flag. When a feature misbehaves *only* on the slowest machine available, that
+   is not evidence it is a venue artifact. It is the machine where a graded
+   defect became measurable.
+4. **A shipped flag is not a certified flag.** FINALIZE_PACE was flipped ON at
+   the close with all its gates green, because every one of those gates fed it
+   frame times from a healthy machine. The gate suite tested the rule I meant to
+   write, not the rule on the hardware users have.
+
+---
+
 ## §10 Commits
 
 | # | Commit | What |
