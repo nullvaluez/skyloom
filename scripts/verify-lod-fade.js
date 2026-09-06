@@ -850,6 +850,11 @@ function soft(name, detail) {
     const d = (k) => (f1 && f0 ? (f1[k] ?? 0) - (f0[k] ?? 0) : NaN);
     const ds = (k) => (f1 && f0 ? (f1.skip?.[k] ?? 0) - (f0.skip?.[k] ?? 0) : NaN);
     const swapsON = d('refines') + d('merges');
+    // Declared HERE, not inside the branch below: the mix census that reads it
+    // sits outside that block. The extended no-undef sweep caught this within
+    // minutes of my writing it — which is the whole argument for sweeping
+    // scripts/.
+    let lateActive = null;
 
     console.log(
       `ON  SWEEP: ${w2.frames} frames · ${w2.appears} appearances / ${w2.disappears} disappearances · ` +
@@ -980,7 +985,6 @@ function soft(name, detail) {
       // final heading, so the camera stops but the streamer does not, and each
       // round trip is several rendered frames. D's rule: counters advanced ⇒
       // arrivals (INFO); counters flat with active > 0 ⇒ stuck (FAIL).
-      let lateActive = null;
       const later = await waitUntilSnap(
         p2,
         () => {
