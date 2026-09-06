@@ -626,6 +626,65 @@ user can run the A/B from a console line before boot.
 
 ---
 
+## §8b M5b — `FINALIZE_PACE` (WB-3, A9, WB-10)
+
+Drape SAMPLING is budgeted per millisecond in all four chunk engines, but the
+final ASSEMBLY is atomic per chunk: a merge, `computeVertexNormals` (two passes
+over V+I), `computeBoundingSphere` (two more), a collision-column run walk, and
+then three's first-draw `bufferData` of four or five attributes on the next
+render. A 2×2 skyline group is **~135 k verts / ~5.9 MB of attributes in one
+frame** (the per-tile numbers are frozen in fly-constants.js:3020-3022). Only
+the toy engine has a wall-clock brake, and its guard is `done > 0 &&` — so the
+FIRST chunk always lands however late the frame already is, and the four engines
+cannot see each other: each may spend its own allowance in the same frame.
+
+`lib/fly/finalize-pace.js` replaces that with two rules:
+
+1. **The first chunk is not free.** If the PREVIOUS frame overran `longFrameMs`
+   (24 ms ≈ 1.5 frames at 60 Hz), no engine finalizes anything this frame. A
+   frame that is already late is the worst moment to add a 6 MB upload, and
+   "always let the first one through" is how a hitch train sustains itself.
+2. **The budget is shared.** `budgetLeftMs()` counts from the START OF THE
+   FRAME — stamped once from FlyScene's −50 block, before any layer's
+   `useFrame` reaches its engine — so four engines plus veg draw on ONE
+   allowance instead of four.
+
+Neither rule can starve a chunk: a deferred chunk keeps its place in
+`pendingFinalize` and is retried next frame. **`ready` counts do not move** —
+this changes WHEN work lands, never WHETHER it does.
+
+Two companions ride the same flag: **A9** — `SatVegEngine._commitPending` gets
+the one-chunk-per-frame budget every other engine already had (it flipped every
+finished chunk ready on one tick, and the pooled canopy layers all re-sign on
+that tick — a synchronised POP rather than a stall, but the last uncapped
+commit); and **WB-10** — the toy merged index is built into a `Uint32Array`
+instead of spreading up to ~100 k boxed numbers into a plain array purely to
+hand it to `BufferAttribute`, which copies it again. Same values, same order.
+
+### MEASURED-HERE (`scripts/verify-finalize-pace.mjs`, 11 gates)
+
+The brake is pure logic with an injected clock, so it is node-testable: flag-off
+never defers (control flow unchanged); a 50 ms previous frame defers the first
+chunk while a 16.7 ms one does not; the allowance reads 2.97 ms at frame start
+and −1.05 ms after 4 ms of work by ONE engine, and a second chunk is then
+refused; a fresh frame restores it. Three gates are source-inspection facts a
+future edit could silently undo — every engine calls the brake, the toy typed
+array exists **and its upstream spread survives verbatim on the flag-off
+branch**, and the veg cap is in place.
+
+**Gate 11 is a merge-safety gate, not a behaviour gate:** it asserts the brake
+is a SEPARATE guard and never folded into the `done < X.finalizePerFrame` loop
+bound. E's harness budget multiplier sits on exactly that expression, and two
+owners editing one expression is how a merge silently drops one of them.
+
+### What this does NOT claim
+
+No frame time. The rule's SHAPE is proven; whether it removes a felt hitch is
+the user's machine's to say, and the honest instrument for it is E's
+`FRAME_STATS` long-frame count before and after. §9.
+
+---
+
 ## §9 Could not measure here (honest list)
 
 Everything in this section needs the user's machine, or E's offline fixture,
@@ -640,6 +699,9 @@ or both. Nothing below has a number from this container.
 | 8 | Whether a WRONG tile (cache/URL mix-up) is also in play, as distinct from LOD policy | E's z/x/y-stamped fixture + the URL↔position probe |
 | 9 | `skirtWorker` end to end: the production LERC path builds its geometry in a worker; E's fixture serves terrain-rgb, whose loader builds on the MAIN thread, so the patched path is never reached here | User's machine (Esri egress) |
 | 10 | Whether `walkWhileSaturated`'s 2.5× traversal is invisible in a real frame budget | User's machine |
+| 11 | Whether `FINALIZE_PACE` removes a FELT hitch (the rule's shape is proven; the frame time is not) | User's machine, via E's FRAME_STATS long-frame count |
+| 12 | `HUD_SYNC`: that the label swim is gone in a turn — it is a visual, and this container renders at ~1 fps | User's machine |
+| 13 | `REBASE_CALM` T12: that the micro-grain no longer re-phases at a rebase — same reason | User's machine |
 | 2 | Any fps / ms / stalls-per-minute / worst-frame number | User's machine only |
 | 3 | Governor behaviour, DPR-step timing, tearing | User's machine only |
 | 4 | Live tile-URL identity against Esri | User's machine (egress) |

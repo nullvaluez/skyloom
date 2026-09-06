@@ -104,6 +104,7 @@ import {
   HUD_SYNC,
 } from '@/lib/fly/fly-constants';
 import { pinned } from '@/lib/fly/fly-pins';
+import { noteFinalizeFrame } from '@/lib/fly/finalize-pace';
 import { useFlyStore } from '@/stores/fly-store';
 import { usePassportStore } from '@/stores/passport-store';
 import { PlayerPlane } from './PlayerPlane';
@@ -1128,6 +1129,10 @@ export function FlyScene({ runtime }) {
   // it visible.)
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
+    // R24 A (FINALIZE_PACE): stamp the frame ONCE, before any layer's useFrame
+    // reaches its engine, so the four chunk engines plus veg share one
+    // allowance and all of them can see whether the LAST frame overran.
+    noteFinalizeFrame(delta);
     const flyState = useFlyStore.getState();
     const paused = flyState.phase === 'paused';
     // Inspect modal / Atlas count as a soft pause for the stick: the world
