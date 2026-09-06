@@ -541,12 +541,32 @@ merges after the run; the 15/15 above predates it.
 
 ### 4.2 Browser gates — two passes
 
-**The re-take is GO on `9bcaace`** (`CERT_OUT=scripts/r24-out/retake`, `:3100`
-free): **ten rows** — flash-guard, fade, lod-fade, step-clean, one-sun,
-linear-haze, **haze-red**, depth-rt, ladder-fix, ladder-red — run by the same
-`cert-run` through its new `CERT_ROWS` selection, so every hardening of this
-round applies unchanged. **`terra-live` is DEFERRED** until A's residency fix
-lands, because its open row is a product question and not an instrument one.
+**The re-take is RUNNING on `9bcaace`** (`CERT_OUT=scripts/r24-out/retake`,
+`:3100` free), and it is **NINE rows in the batch plus one standalone**. The
+batch — flash-guard, fade, step-clean, one-sun, linear-haze, **haze-red**,
+depth-rt, ladder-fix, ladder-red — runs through `cert-run`'s new `CERT_ROWS`
+selection, so every hardening of this round applies unchanged. **`lod-fade` runs
+STANDALONE immediately after**, against a `CERT_PROOF_ONLY=1` server with
+`FLY_LOD_SWEEP_MS=900000` and its own timeout, **because it does not fit the
+runner's per-row `timeout 2400`**: 360° at 0.85°/frame is **424 rendered frames
+per arm**, pass 2b measured that gate's arms at **0.65 and 1.15 fps**, so two
+sweeps alone are **~1,000–1,300 s** on top of two boots (~120 s each), two
+settles (45 s) and two Owens `settleWorld` passes (~220 s each) — **~2,500–2,800
+s**. A row killed at 2,400 s **loses even the OFF leg**, and shortening the sweep
+would return a capped arc: an honest NOT CALIBRATED under E's guard, but not the
+measurement D's §4.10b template needs. **`terra-live` is DEFERRED** until A's
+residency fix lands, because its open row is a product question and not an
+instrument one.
+
+**Re-take header, started 23:37:28 at load 0.45 — the quietest conditions any
+pass has had.** Tree at start `9bcaace`; **node gates 16/16 including
+`r24-b-attr-proof.js` at `BROKEN=0`** — on `ec53fd3` the un-pinned run read **80
+broken LAND meshes**, so **A's `FINALIZE_PACE` fix is CONFIRMED in node, in under
+a second, with no GL context, and the defect can no longer reach a browser row**;
+dev `:3100` **PID 26928 / PGID 26915**, distinct — the exact case where trusting
+`$!` names a corpse; `TREE UNDER TEST 9bcaace` with **no drift**; **BOOT OK
+63.2 s** against 2b's 60.9 s and 2a's 62.3 s, so **neither of A's fixes cost boot
+time**.
 
 | Gate | PASS 1 — flag-off (`5ca8e15`) | PASS 2 — flipped | LIVE | NOT MEASURABLE HERE |
 |---|---|---|---|---|
@@ -916,7 +936,11 @@ runner now kills by process **GROUP** — `setsid` at launch, the PGID read from
 `/proc/<pid>/stat` field 5 **parsed from the last `)`**, because `$!` can name a
 parent that exits while the real leader is elsewhere — TERM, 10 s, then KILL,
 after which the port is re-checked and either "port released" or a warning is
-printed. Proven on a throwaway `setsid` tree: three members, zero survivors.
+printed. Proven on a throwaway `setsid` tree: three members, zero survivors —
+**and proven in production at the close**: pass 2b's teardown printed *"stopping
+the dev server process group I started (PGID 32314)"* and then *"port :3100
+released"*, **the first of three passes to end with no surviving
+`next-server`.**
 
 Two process facts from the same hour: a second `cert-run.sh` raced the first
 run's server into an `EADDRINUSE` (killed by PID 5023/5024/5038), and an
@@ -1180,10 +1204,17 @@ quotable.
   requires the multiply AND the harness-budget import — 11/11, recorded as E's
   edit to A's engine and gate at A's request. Expect veg counts to move in pass
   2b's fixture row for this reason and not a feature change.
-- **`SURFACE_CALM` is imported at `FlyScene.jsx:120` and used nowhere** (routed
-  to C): pre-existing at `ec53fd3` — `fd7d28d` replaced the
-  `SURFACE_CALM.depthOffsetFix` polygonOffset expression and left the import
-  behind. Found by the merge review's lost-hunk sweep, not a merge defect.
+- ~~`SURFACE_CALM` imported at `FlyScene.jsx:120` and used nowhere~~ **CLOSED**
+  (C `2e1d700`, `r24/c` fast-forwarded to `9bcaace` + 1, held for the
+  post-re-take batch; import removed, **0 occurrences**). Pre-existing at
+  `ec53fd3` — `fd7d28d` replaced the `SURFACE_CALM.depthOffsetFix` polygonOffset
+  expression and left the import behind — found by the merge review's lost-hunk
+  sweep, **not a merge defect**. Worth keeping: **the RED had to be asked for
+  explicitly** — `npx eslint --rule '{"no-unused-vars":["error",{"varsIgnorePattern":"^_"}]}'
+  components/fly/FlyScene.jsx` → **120:3 defined but never used**; GREEN 0,
+  default eslint 0/0, grep 0. C's node gates on the merged tree: c-flagoff 40/40,
+  shadow-calm 33/33, depth-offset 7/7, worker-normals 12/12, four proofs,
+  import-integrity 4/0.
 - **`copyFileSync` is imported at `verify-finalize-pace.mjs:24` and unused**
   (routed to A): pre-existing at the base, confirmed by one lens before the 429
   took the other two.
@@ -1584,6 +1615,16 @@ Carries forward the still-open R15–R21 §6 tables.
     import is upstream of the merge: **an owner merges the integration branch
     into their branch BEFORE new work**, so the collision surfaces in the owner's
     worktree. (The orchestrator; pairs with lessons 16 and 54.)
+
+61. **`no-undef` and `no-unused-vars` answer different questions, and an
+    extraction commit needs both.** `no-undef` has run before every commit since
+    `ad01d32` and caught the MISSING `offsetUnits` import — and it is
+    **structurally blind** to an import that resolves and is never read;
+    `no-unused-vars` names that one, and the project config does not enable it
+    for the file, so the RED had to be asked for explicitly. **A helper
+    EXTRACTION leaves a dead import only `no-unused-vars` sees; a helper
+    ADOPTION leaves a missing import only `no-undef` sees.** (C LIGHT; pairs
+    with lesson 16.)
 
 ---
 
