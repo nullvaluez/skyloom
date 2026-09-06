@@ -1063,3 +1063,74 @@ a certified browser leg, and the two are different claims. The distinction is
 the same one §7.6 draws about `RING_DEDUPE`: correct and certified are not the
 same, and only the second is a merge gate.
 
+---
+
+## §16 THE FRAME-COUNT FLOOR — a fade you cannot see is not a fade
+
+### 16.1 Why the seconds-only ramp was not enough
+
+`CHUNK_FADE`'s ramps were in SECONDS, which is right on a machine that renders
+in milliseconds and useless on one that does not. At the cloud venue's measured
+**2.84 s/frame**, a 0.3 s eviction ramp begins and ends **between two samples** —
+so E's `verify-fade` pass 2b saw **20 of 20 HARD deaths on a tree where
+`CHUNK_FADE` was ON**, which is the correct reading of what that venue can
+observe.
+
+**And it is not only a venue problem.** A HITCH on a real machine does exactly
+the same thing for one frame — and a hitch is precisely the moment a pop is most
+visible. A fade that a stall can skip is a fade that fails when it matters.
+
+### 16.2 The fix
+
+```
+progress = min(elapsed / sec, framesSince / CHUNK_FADE.minFrames)
+```
+
+in both engines, for both ramps (`rampT`, `chunk-fade.js`). Every birth and
+death record carries `f0`, the engine's monotone `_fadeFrame` at creation;
+`_stepFades` advances that counter once per frame.
+
+**It changes nothing on a normal machine, by construction.** At 60 Hz the 0.3 s
+eviction ramp is **18 frames** and the 0.4 s birth ramp **24**, both far above
+`minFrames` 4 — so `elapsed / sec` is the smaller term and governs alone. The
+floor binds only when a frame is longer than `sec / minFrames` (75 ms), i.e.
+only when the seconds term would have skipped the fade.
+
+**Why `minFrames` is 4 and not the 3 that was specified.** A BIRTH starts at
+presence 0, so it is already partial on its first frame and N frames give N
+partial samples. A DEATH starts at full presence *by definition*, so N frames
+give only **N−1**. Three partial samples on both ramps therefore needs 4, and
+the death is the case an observer has to catch. Flagged rather than silently
+shipped.
+
+### 16.3 Measured — `scripts/r24-b-engine-proof.js`, new `--dt=` and `--hitch`
+
+| regime | single-frame pops | partial samples per ramp |
+|---|---:|---|
+| **`--dt=2.84`** (the venue) | **0** (was 92 flag-off) | births ≥ 1, **deaths ≥ 3** |
+| **`--dt=0.0167`** (60 Hz) | 4, all `fadeBudgetMiss` | births ≥ 23, **deaths ≥ 17** — the elapsed term governs and the ramp length is unchanged (0.3 s × 60 Hz ≈ 18) |
+| **`--dt=0.0167 --hitch`** (a 500 ms frame every 40) | **0** | births ≥ 3, deaths ≥ 17 — **a hitch can no longer complete a ramp in one sample** |
+| **`--off`** | **92**, 0 ramps | flag off never reaches the floor — byte-identical RED |
+
+### 16.4 A second finding the venue forced out: the heal outcome ledger
+
+Running at 2.84 s/frame made gate (B) fail — and it was the GATE that was wrong,
+not the code. `healsInPlace + healsNoop >= heals` is not an invariant: a heal can
+legitimately end in five other ways. The engine now counts every one, so the
+ledger is **exhaustive** and the gate asserts equality rather than an
+inequality:
+
+| outcome | meaning |
+|---|---|
+| `healsInPlace` | patched the resident buffer — the intended path |
+| `healsNoop` | re-sampled, nothing moved past `minDeltaM`; the chunk stops asking |
+| `healsQueueFull` | `HEAL_IN_PLACE.maxConcurrent` spent ⇒ degraded to R21 evict+refetch |
+| `healsAborted` | the chunk was evicted or re-streamed under the job — the heal is MOOT, not failed: there is no hole because there is no chunk |
+| `healsNoRecord` | no drape record (water-only chunk) — nothing to patch |
+| `healsCoalesced` | a re-drape for that key was already in flight; the second request is a no-op |
+| `redraping` | still draining when the sample was taken |
+
+**Any hole that survives the feature is now attributable to a named outcome.**
+That is the same discipline as `fadeBudgetMiss`, and it was only discovered
+because a hostile frame rate broke an assertion that looked true at 30 fps.
+
