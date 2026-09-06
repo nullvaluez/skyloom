@@ -202,6 +202,64 @@ republishes `__flyStats` only every 60 frames — at ~1 fps that is once a
 minute, so `verify-fixture` NULLS `drawCalls` and waits for a fresh number
 instead of sleeping and hoping.
 
+### 1.2b THE VENUE'S BINDING CONSTRAINT: per-FRAME work budgets at ~1 fps
+
+The four-pose census exposed something every agent needs to know before
+reading a fixture number:
+
+```
+manhattan  draws=110 tris=169,552 meshes=122  sb={chunks:16, ready:0,  empty:0}
+powell     draws=131 tris=266,114 meshes=135  sb={chunks:16, ready:0,  empty:0}   parcelHomes 2,992
+owens      draws=152 tris=161,147 meshes=159  sb={chunks:16, ready:0,  empty:16}  parcelHomes 0
+melton     draws=68  tris=328,079 meshes=76   sb={chunks:16, ready:0,  empty:16}  parcelHomes 1,836
+traffic 300 tracks · 12 /api/aircraft polls · 0 page errors
+```
+
+Read that carefully: **`empty` is 16 exactly where the fixture intends it**
+(Owens and Melton have no footprints), **and `ready` is 0 exactly where there
+IS content**. The fixture is right; the venue is the constraint.
+
+`SatBuildingEngine._drapePending` spends at most `SAT_BUILDINGS.drapeBudgetMs`
+(1.0 ms) **per FRAME**, and `_finalizePending` uploads at most
+`finalizePerFrame` (1) chunk per frame. On the calibration GPU at 120 fps that
+is 120 ms of drape per second and a chunk lands in well under a second. Here,
+at 1–13 fps, it is 1–13 ms per second: a Powell chunk with 22,723 drape
+vertices needs minutes. An empty tile has no drape at all, which is why the
+Owens and Melton legs resolve instantly and the content legs do not.
+
+Measured directly (`scripts/r24-out/drape-probe.js`, 640×360, Powell pinned):
+
+```
+t=12s  fps 50.5  pending 2   drape 1,121/22,723
+t=45s  fps 17.3  pending 16  drape 21,464/22,723
+t=58s  fps 13.6  pending 16  drape 1,461/22,723   <-- RESTARTED
+t=159s fps  8.7  pending 16  drape 20,124/22,723
+t=171s fps 12.3  pending 16  drape 1,351/20,892   <-- different chunk
+```
+
+The restart is not a fixture artefact either: `_finalizePending` retries the
+whole drape (`p.vi = 0`) when `badFrac > 0.05`, i.e. when more than 5% of the
+DEM samples came back missing or below `SAT_BUILDINGS.demZ` (12). So a slow
+venue and a shallow DEM quadtree compound: the drape never finishes before the
+retry condition is re-evaluated. **Under investigation** — the open question is
+whether the fixture DEM is answering at all at the near ring (probe running).
+
+Consequences, and they are load-bearing for every agent's fixture legs:
+
+- **Structural satellite-building numbers need a small viewport.** 640×360
+  measured 8–50 fps against ~1 fps at 1280×720, i.e. the per-frame budgets are
+  spent 8–50× more often. Use it for count/census gates; keep the real viewport
+  only where pixels matter.
+- **Settles for content poses are MINUTES, not seconds**, and a gate that
+  waits 45 s at Powell will read `ready: 0` and think the world is broken.
+- **The Owens and Melton legs are cheap and trustworthy** — they are the ones
+  that resolve immediately, and they are also the two that carry the round's
+  most load-bearing invariants (the Owens lock, the parcel carpet).
+- Powell's `parcelHomes: 2,992` in this state is a CONSEQUENCE, not a defect:
+  the two-term anti-duplication reads the collision-column index, and with no
+  building chunk finalised there is no index to suppress against. The number is
+  meaningless until the buildings land; do not quote it.
+
 ### 1.3 Environment findings that cost time (so nobody else pays them)
 
 - **Never edit a source file while a browser gate runs.** Next's HMR remounts
@@ -312,6 +370,52 @@ SKIP it then, do not fail. Pins released: `__flySunOverride` and the tier
 (medium AND high; **medium is where the RED lives**). Flag-off RED: the key
 never moves (azimuth −56° every hour on medium/low; key↔hill 119.4° at dusk).
 
+**`verify-shadow-calm` contract (from C, SHADOW_CALM at `fd7d28d`).**
+Instrument `__flyStats.shadow = { enabled, installed, biasSign, kernel,
+casting, mapSize, radiusM, texelM, normalBias, bias, lightPos, target }`, with
+`biasSign` / `kernel` reported by the module that DID the ShaderChunk patch —
+never by the flag. Recipe: (1) flag-on → `biasSign` true + `kernel` 'world';
+flag-off → false / null (the RED); (2) parked at Manhattan settled, step the
+aircraft by HALF a shadow texel (`texelM`) → `target` must NOT move; by 1.5
+texels → `target` must move by exactly one texel; (3) the catcher contributes
+**0 draws at Owens** flag-ON (`queryColumns` answers empty where nothing
+streamed) and exactly **+1** at Columbus / Manhattan; (4) per-pixel temporal
+std on a building's shadowed side, before/after, through verify-flicker's five
+controls. PIN RELEASED: `__flySatShadowOverride` (accessor-swallow) — and the
+shadow pass must be PROVEN reachable at tier high in satellite before anything
+is asserted. Background for the RED: three r185's PCF branch adds `shadowBias`
+without the reversed-depth `#ifdef` (VSM/BASIC have it), so every receiver was
+biased toward shadowed by ~1.6 m and `normalBias 4` hid it; the Vogel kernel is
+rotated by a screen-space hash, which is the sparkle.
+
+**`verify-depth-roundtrip` contract (from C).** Toy HIGH, Neon NYC, camera
+parked; three pixels whose true view distance is known from a raycast (~50 m,
+~700 m, ~4 km). RED (flag off): reconstructed |viewZ| is **2.50–2.51 m at all
+three** — every fragment collapses to −cameraNear. GREEN: |reconstructed −
+true| / true ≤ 1 % at all three, CoC < 0.02 at the focus plane and > 0.5 at
+4 km. Releases no fleet pin (toy high is the fleet default) but needs the DoF
+pass present, i.e. tier high.
+
+**`POST_ORDER` highlight separation (from C), as a fixture pixel gate.** On the
+R21 chain `HueSaturationEffect`'s `min(color, 1.0)` clips every fragment above
+1.0 linear to white BEFORE the tone map, so a 3.2-linear lit window and a
+12.0-linear runway light both land at 8-bit **228**. RED = the two crops are
+EQUAL; GREEN = they separate (254 vs 255) while midtones are unmoved (0.030 →
+26 and 0.180 → 127 both ways, crop delta ≤ 1/255). Pose: the Neon night
+window-grid vs runway-light pixels — the fixture puts a real runway in every
+city and suburb scene for exactly this.
+**Note for the fixture draw columns:** C measures the merged EffectPass count
+FALLING under POST_ORDER (sat 4→3 / 4→3 / 3→2, toy 6→5 / 4→3 / 3→2). Flag-on
+draw columns will therefore read LOWER than flag-off ones. That is a decrease,
+not drift; both columns get recorded, and the exact-delta gates ("cirrus is
+exactly +1 draw") are unaffected.
+
+**Node gates to add to the smoke set (no browser, no GPU):**
+`scripts/verify-terra-residency.mjs` (A — 22 merges / 17 replaced / 178
+refetches → 0/0/0) and `scripts/verify-depth-offset.mjs` (C — RED 6/7 on
+`6116fc5`, GREEN 7/7), alongside the three that always ran here
+(`verify-classify.mjs`, `verify-warbirds.mjs`, `verify-daily.mjs`).
+
 *(status: in progress — the tables below fill in as each gate is calibrated)*
 
 ### 3.1 Fixture baseline columns
@@ -324,10 +428,12 @@ never moves (azimuth −56° every hour on medium/low; key↔hill 119.4° at dus
 
 | Gate | RED on flag-off tree | Pin released | Status |
 |---|---|---|---|
-| verify-flash-guard | | `__flyFlashPin` (B) | pending |
-| verify-step-clean | | `__flyGovPin` | pending |
-| verify-fade | | — | pending |
-| verify-lod-fade | | — | pending |
+| verify-flash-guard | written; census + default-framebuffer pale detector | `__flyFlashPin` (B) | written, awaiting a content-ready pose |
+| verify-step-clean | written; canvas/gl/composer resize watch + buffer identity | `__flyGovPin` (accessor-swallow) | written |
+| verify-fade | written; hard-birth / hard-death census + Owens lock | — | written |
+| verify-lod-fade | written; displayed-tile z/x/y census + A's `__flyTerra.lod()` | — | written |
+| verify-frame-pace | written; pacing legs INFORMATIONAL here, tear-mechanism legs hard | — | written |
+| verify-shadow-calm | spec received from C | `__flySatShadowOverride` | pending |
 | verify-one-sun | key never moves; key↔hill 119.4° at dusk (C, measured) | `__flySunOverride` + tier | pending |
 | verify-linear-haze | | — | pending |
 | verify-depth-roundtrip | RED by construction (recon L2 / FL-07) | — | pending |

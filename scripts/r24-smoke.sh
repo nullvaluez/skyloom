@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+#
+# R24 (E CERT) — the POST-MERGE SMOKE. One command per W2 merge (E → A → B → C
+# → D). It runs the subset that (a) actually runs in this container and (b)
+# finishes in a workable time, and it says out loud what it is NOT covering.
+#
+#   scripts/r24-smoke.sh [port]        # default 3105 (E's port)
+#
+# It expects a dev server ALREADY RUNNING on that port from the worktree under
+# test, and it never starts or stops one — a smoke that boots its own server
+# would race the one the agent is using.
+#
+# ENV
+#   FLY_URL          overrides the whole target (wins over the port argument)
+#   SMOKE_SKIP_SLOW  '1' drops the two long browser gates (fade, lod-fade)
+#   SMOKE_OUT        artifact directory (default scripts/r24-out)
+#
+# WHAT THIS SMOKE CANNOT SEE — say it in the report, every time:
+#   · any fps / frame-ms / stalls-per-minute number (SwiftShader, ~1 fps)
+#   · the governor's real ladder behaviour
+#   · tearing (a vsync property; only its MECHANISM is asserted, in
+#     verify-step-clean and verify-frame-pace)
+#   · live tileset drift and live traffic (hosts are 403-blocked)
+# Those belong to the user-machine run list in scripts/r24-close-sweep.md.
+
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 1
+
+PORT="${1:-3105}"
+URL="${FLY_URL:-http://localhost:${PORT}}"
+OUT="${SMOKE_OUT:-scripts/r24-out}"
+mkdir -p "$OUT"
+
+export FLY_URL="$URL"
+export FLY_TILE_FIXTURE=1
+export PW_SHIM_QUIET=1
+
+PASS=0
+FAIL=0
+SKIP=0
+ROWS=()
+
+run() {
+  local name="$1"; shift
+  local log="$OUT/smoke-${name}.log"
+  printf '\n=== %s ===\n' "$name"
+  if [ ! -f "$1" ] && [ ! -f "scripts/$1" ]; then
+    printf 'SKIP  %s (script not present on this tree)\n' "$name"
+    SKIP=$((SKIP+1)); ROWS+=("SKIP  $name  (absent)"); return
+  fi
+  local t0; t0=$(date +%s)
+  if "$@" >"$log" 2>&1; then
+    local dt=$(( $(date +%s) - t0 ))
+    printf 'PASS  %s  (%ss)  %s\n' "$name" "$dt" "$log"
+    PASS=$((PASS+1)); ROWS+=("PASS  $name  ${dt}s")
+  else
+    local dt=$(( $(date +%s) - t0 ))
+    printf 'FAIL  %s  (%ss)  %s\n' "$name" "$dt" "$log"
+    tail -25 "$log" | sed 's/^/      /'
+    FAIL=$((FAIL+1)); ROWS+=("FAIL  $name  ${dt}s  -> $log")
+  fi
+}
+
+node_gate() { run "$1" node "scripts/$1"; }
+browser_gate() { run "$1" node -r ./scripts/_pw-shim.js "scripts/$1"; }
+
+printf 'R24 SMOKE — target %s — fixture ON\n' "$URL"
+curl -s -o /dev/null -w 'dev server: HTTP %{http_code}\n' --max-time 60 "$URL/" || {
+  echo "dev server not answering on $URL — start it in the worktree under test first"; exit 2; }
+
+# --- node gates: no browser, no GPU, no network. These run anywhere and are
+#     the fastest possible signal that a merge broke a data contract.
+node_gate verify-classify.mjs
+node_gate verify-warbirds.mjs
+node_gate verify-daily.mjs
+node_gate verify-depth-offset.mjs        # C (R24): reversed-depth polygonOffset
+node_gate verify-terra-residency.mjs     # A (R24): merge/refetch on a yaw sweep
+
+# --- the fixture's own gate. If this is red, every browser number below is
+#     meaningless, so it runs first and its failure is the headline.
+run verify-fixture.js env FLY_FIXTURE_SETTLE_MS="${SMOKE_FIXTURE_SETTLE:-45000}" \
+  node -r ./scripts/_pw-shim.js scripts/verify-fixture.js
+
+# --- browser gates that are hardware-independent (counts, census, source scans,
+#     buffer identity). Ordered cheapest first.
+browser_gate verify-frame-pace.js
+browser_gate verify-step-clean.js
+browser_gate verify-flash-guard.js
+if [ "${SMOKE_SKIP_SLOW:-0}" != "1" ]; then
+  browser_gate verify-lod-fade.js
+  browser_gate verify-fade.js
+fi
+
+printf '\n--------------------------------------------------\n'
+for r in "${ROWS[@]}"; do printf '%s\n' "$r"; done
+printf '\n%s passed, %s failed, %s skipped\n' "$PASS" "$FAIL" "$SKIP"
+cat <<'NOTE'
+
+NOT COVERED BY THIS SMOKE (by construction, not by omission):
+  · every fps / frame-ms / p99 / stalls-per-minute number — this container
+    renders the game at ~1 fps on a software rasteriser
+  · the perf governor's real ladder, dwell and latch behaviour
+  · tearing itself (only its mechanism is asserted here)
+  · live OpenFreeMap / Esri / adsb bytes, and therefore every LIVE frozen
+    hash and pixel band — the fixture columns are separate numbers and never
+    re-baseline a live one
+  · the 15-minute satellite soak
+See scripts/r24-close-sweep.md for the user-machine run list.
+NOTE
+
+exit $(( FAIL > 0 ? 1 : 0 ))
