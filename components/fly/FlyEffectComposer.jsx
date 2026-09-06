@@ -18,6 +18,7 @@ import {
   EffectAttribute,
 } from 'postprocessing';
 import { FX_STABILITY } from '@/lib/fly/fly-constants';
+import { registerComposer, resolveStepSafe } from '@/lib/fly/step-safe';
 
 /**
  * ROUND 21 (A GOVERNOR, S2 + S3) — a vendored fork of
@@ -75,6 +76,10 @@ import { FX_STABILITY } from '@/lib/fly/fly-constants';
  * what makes `__flyStats.fx.rebuilds` a meaningful instrument.
  */
 
+// R24 A (STEP_SAFE): module scratch, so the in-frame buffer check on the hot
+// path allocates nothing.
+const _fxSize = new Vector2();
+const _fxCss = new Vector2();
 const isConvolution = (effect) =>
   (effect.getAttributes() & EffectAttribute.CONVOLUTION) === EffectAttribute.CONVOLUTION;
 
@@ -192,6 +197,17 @@ const StableEffectComposer = /* @__PURE__ */ memo(
       };
     }, [composer]);
 
+    // R24 A (STEP_SAFE): hand the LIVE composer to the -99 DPR rig, from a
+    // keyed effect with an OWNER-CHECKED disposer. Owner-checked because React
+    // 19 StrictMode double-invokes effects: an unconditional cleanup would let
+    // the second mount's teardown clear the first mount's registration, and the
+    // rig would then resize the renderer but not the composer — precisely the
+    // half-applied state STEP_SAFE exists to prevent.
+    useEffect(() => {
+      if (!resolveStepSafe().enabled || !composer) return undefined;
+      return registerComposer(composer);
+    }, [composer]);
+
     // ---- (ii) size, keyed on CSS size AND device pixel ratio -------------
     useEffect(() => {
       if (!composer) return;
@@ -231,6 +247,26 @@ const StableEffectComposer = /* @__PURE__ */ memo(
     useFrame(
       (_, delta) => {
         if (enabled) {
+          // R24 A (STEP_SAFE, recon FL-05): the composer's own size effect is
+          // PASSIVE, so on any resize it lags the renderer by at least a frame
+          // and that frame is composed from buffers of the wrong size and
+          // resampled onto the new canvas. Comparing the buffers HERE, in the
+          // render, closes the window for every resize path — including the
+          // window-resize path the rig does not cover. It is two integer
+          // comparisons on the hot path and it keeps
+          // `__flyStats.fx.bufferMatchesDrawing` (verify-tier-step gate 4)
+          // true by construction rather than by timing.
+          if (stepSafeOn.current && composer) {
+            const db = gl.getDrawingBufferSize(_fxSize);
+            const buf = composer.inputBuffer;
+            if (!buf || buf.width !== db.width || buf.height !== db.height) {
+              const css = gl.getSize(_fxCss);
+              composer.setSize(css.width, css.height);
+              bumpFxStat({
+                inFrameResizes: (window.__flyStats?.fx?.inFrameResizes ?? 0) + 1,
+              });
+            }
+          }
           const currentAutoClear = gl.autoClear;
           gl.autoClear = autoClear;
           if (stencilBuffer && !autoClear) gl.clearStencil();
@@ -242,6 +278,8 @@ const StableEffectComposer = /* @__PURE__ */ memo(
     );
 
     // ---- (i) + (iii) pass assembly, reconciled not rebuilt ---------------
+    // R24 A (STEP_SAFE): resolved once, read on the hot path as a ref.
+    const stepSafeOn = useRef(resolveStepSafe().enabled);
     const group = useRef(null);
     const built = useRef({ objects: null, passes: [], composer: null, camera: null });
 

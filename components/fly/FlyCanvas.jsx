@@ -9,9 +9,12 @@ import { PhotoCapture } from './PhotoCapture';
 import { JuiceSystems } from './JuiceSystems';
 import { PrewarmRig } from './PrewarmRig';
 import { CANVAS, FRAME_STATS, PERF_GOVERNOR, PREWARM } from '@/lib/fly/fly-constants';
+import { resolveStepSafe } from '@/lib/fly/step-safe';
 import { autoTierCeiling } from '@/lib/fly/fly-settings';
 import { PerfGovernor } from '@/lib/fly/perf-governor';
 import { FrameStatsRig } from '@/lib/fly/frame-stats';
+import { StepSafeRig } from './StepSafeRig';
+import { HudSyncRig } from './HudSyncRig';
 import { useFlyStore } from '@/stores/fly-store';
 
 function initialDpr() {
@@ -59,6 +62,9 @@ function stepQualityTier(dir) {
  */
 export function FlyCanvas({ runtime }) {
   const [dpr, setDpr] = useState(initialDpr);
+  // R24 A (STEP_SAFE): resolved once at mount — the pin is set before Fly mode
+  // mounts and never moves mid-session.
+  const [stepSafeOn] = useState(() => resolveStepSafe().enabled);
 
   // ROUND 21 (A GOVERNOR, S1): the scene subtree, shared by both quality
   // controllers so the two paths differ ONLY in what wraps it. With
@@ -76,6 +82,11 @@ export function FlyCanvas({ runtime }) {
           .distM is this frame's value when the near-miss scan reads it. */}
       <JuiceSystems runtime={runtime} />
       <BootFramePulse runtime={runtime} />
+      {/* Round 24 (A PACE, HUD_SYNC): drives the DOM label overlay from
+          addAfterEffect, i.e. after renderer.render has refreshed the camera
+          matrices, so the HUD stops being a picture of the previous frame
+          (recon FL-01). Renders nothing; inert with the flag off. */}
+      <HudSyncRig runtime={runtime} />
       {/* Round 21 (A): boot shader pre-warm. Adds no object to the scene and
           issues no draw — see components/fly/PrewarmRig.jsx. */}
       {PREWARM.enabled && <PrewarmRig runtime={runtime} />}
@@ -130,6 +141,12 @@ export function FlyCanvas({ runtime }) {
               default incline bound at vsync-locked steady state, and
               flipflops=Infinity means it never latches). */}
           <PerfGovernor setDpr={setDpr} />
+          {/* Round 24 (A PACE, STEP_SAFE): applies a parked DPR at priority
+              -99 — after the governor's -100, before FlyScene's -50 and long
+              before the composer's +1 — so the canvas realloc, the composer's
+              render targets and the React state all move inside the frame that
+              draws them (recon A3). Renders nothing; inert with the flag off. */}
+          {stepSafeOn && <StepSafeRig setDpr={setDpr} />}
           {sceneTree}
         </>
       ) : (

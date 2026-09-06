@@ -12,7 +12,9 @@ import {
   MeshLambertMaterial,
   Object3D,
 } from 'three';
-import { CLOUDS, SKY_CIRRUS, TOY_WORLD, WEATHER, WORLD_EDGE } from '@/lib/fly/fly-constants';
+import { CLOUDS, SKY_CIRRUS, TOY_WORLD, WEATHER, WORLD_EDGE,
+  HUD_SYNC,
+} from '@/lib/fly/fly-constants';
 import { expApproach } from '@/lib/fly/coords';
 import { puffPresence } from '@/lib/fly/weather-model';
 import { applyBend, bendDrop, getBend, getEdgeFade } from '@/lib/fly/toy-world/world-bend';
@@ -71,6 +73,12 @@ const _cloudDrift = [0, 0]; // dev stat scratch (no per-frame allocation)
  * identity with no weather — same puff positions, same scales, same opacity,
  * same draw count as R15 — which is what keeps the whole harness fleet green.
  */
+/** R24 A: resolved at render, not per frame. */
+const _hudFramePriority = () => {
+  const c = pinned(HUD_SYNC, '__flyHudSyncOverride');
+  return c.enabled && c.framePriority;
+};
+
 export function CloudField({ runtime, flight, origin }) {
   const qualityTier = useFlyStore((s) => s.qualityTier);
   const mapStyle = useFlyStore((s) => s.mapStyle);
@@ -256,6 +264,13 @@ export function CloudField({ runtime, flight, origin }) {
     };
   }, [shadows]);
 
+  // R24 A (HUD_SYNC.framePriority, recon FL-06): an EXPLICIT negative priority.
+  // Same-priority useFrame subscribers run in SUBSCRIPTION order, and React
+  // fires a child's layout effects before its parent's — so drei's <Clouds>
+  // child (default priority 0) decomposes each puff's matrixWorld BEFORE this
+  // parent updates it. The inline comment at :125 assumed the opposite order.
+  // -10 makes the order explicit rather than incidental, and it stays behind
+  // FlyScene's -50 so the flight pose it reads is still this frame's.
   useFrame((state, delta) => {
     const t = state.clock.elapsedTime;
     const dt = Math.min(delta, 0.05);
@@ -480,7 +495,7 @@ export function CloudField({ runtime, flight, origin }) {
       _cloudDrift[1] = driftZ;
       window.__flyStats.cloudDrift = _cloudDrift;
     }
-  });
+  }, _hudFramePriority() ? -10 : undefined);
 
   // Round 13 Phase 1: satellite uses MeshLambertMaterial (sun/hemi/env shape
   // the deck for real) + the softer cumulus sprite (CLOUDS.textureSat) + a
