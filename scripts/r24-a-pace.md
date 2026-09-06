@@ -1356,6 +1356,135 @@ user-facing symptom was already closed by the rig alone — this fix closes the
 
 ---
 
+## §16 The pass-2b toy-boot pageerror: WB-10's index was never wrapped
+
+Third defect in a shipped R24 feature, same family as §14 and §15 and the
+cheapest of the three to have prevented. **Attributed by B**, from a headless
+attribute census, and confirmed from source by Fable before it reached me — I
+am recording that plainly because the finding is not mine.
+
+### The defect
+
+`BufferGeometry.setIndex(x)` wraps `x` in a `BufferAttribute` **only** when
+`Array.isArray(x)` is true (three r185, `three.core.js:18404`):
+
+    setIndex( index ) {
+      if ( Array.isArray( index ) ) {
+        this.index = new ( arrayNeedsUint32( index ) ? Uint32BufferAttribute
+                                                     : Uint16BufferAttribute )( index, 1 );
+      } else {
+        this.index = index;                     // ← a typed array lands HERE
+      }
+    }
+
+`Array.isArray` is **false** for a typed array. WB-10 changed the merged land
+index from a plain array to a `Uint32Array` and left the call as
+`geo.setIndex(idx)`, so `geometry.index` became a raw `Uint32Array` with no
+`.array` and no `.count`. Nothing structural notices — the scene graph, the
+counts and the draw list are all correct — and then `WebGLAttributes` reads
+`attribute.array.byteLength` at first upload and throws, **once per land mesh**.
+
+That is the pass-2b toy-boot pageerror: `Cannot read properties of undefined
+(reading 'byteLength')`, ×31 on ladder-fix and ×3 on ladder-red, on **both**
+arms — both arms because the flag was ON in both.
+
+**Why pass 1 was clean and pass 2b was not:** the flag-OFF branch builds a
+plain array, which three wraps *and* sizes for you. The bug was reachable only
+with FINALIZE_PACE armed, and FINALIZE_PACE was flipped ON at the close.
+
+### The 2×2, reproduced here
+
+B's `scripts/r24-b-attr-proof.js` (r24/b `8bb4164`), run against this worktree
+through a symlinked probe root so nothing of B's lands on r24/a:
+
+| tree | FLASH_GUARD | FINALIZE_PACE | broken meshes |
+|---|---|---|---|
+| shipped line restored | off | **on** | **80** (every land mesh) |
+| shipped line restored | off | off | 0 |
+| **fixed** | off | **on** | **0** |
+| **fixed** | on | on | 0 |
+| **fixed** | off | off | 0 |
+| **fixed** | on | off | 0 |
+
+160 meshes over 138 chunks, 80 ready. B's numbers reproduce exactly.
+
+### The fix, and the half of it that is easy to miss
+
+1. **Wrap it** — `idx = new BufferAttribute(merged, 1)`.
+2. **Keep the width three would have chosen.** Defaulting to `Uint32Array`
+   would have silently **doubled every toy land index buffer**, which is the
+   exact opposite of what WB-10 exists to do (B's note 1). So the armed branch
+   mirrors `arrayNeedsUint32` (`three.core.js:1779`): `Uint16Array` unless some
+   index is `>= 65535`. The bound is **65535 and not 65536** in three's own
+   source — `PRIMITIVE_RESTART_FIXED_INDEX`, three #24565 — so it is mirrored,
+   not re-derived.
+
+An element of the merged array is either a `groundIdx` value or
+`data.idx[k] + off`, so three's "any element ≥ 65535" **decomposes exactly**
+into two scans and the array never has to be built twice to be measured.
+
+It is scanned, **not inferred from `total - 1`**. A bound is not the same claim
+as a maximum: if the chunk has ≥ 65536 vertices but no index actually reaches
+65535, three picks `Uint16` and an inferred answer would pick `Uint32` — the
+two paths would then differ in TYPE while agreeing in values, which is exactly
+the equivalence this is supposed to preserve.
+
+### Every other `setIndex` in reach, checked rather than assumed
+
+23 call sites. Three pass a bare variable; the rest already pass a
+`BufferAttribute` or an array literal.
+
+| site | argument | verdict |
+|---|---|---|
+| `toy-world-engine.js:1007` | typed array under the flag | **THE DEFECT — fixed** |
+| `SatTintLayer.jsx:124` | `new BufferAttribute(new Uint32Array(...), 1)` | safe, read it myself |
+| `Contrail.jsx:89` | a plain `[]` built by `push` | safe, read it myself |
+| `PrecipLayer.jsx:176` | an array literal | safe |
+| 19 others | `new BufferAttribute(...)` | safe |
+
+Fable told me two of those answers in advance and both were right; I read them
+anyway, because "someone said it was fine" is how §15 happened.
+
+### Proof
+
+`verify-finalize-pace` 17 → **21 gates**, RED-calibrated by restoring the
+shipped line: **8, 19 and 20 fail**.
+
+- **19** the index is wrapped, and no `setIndex(new Uint…)` survives anywhere;
+- **20** the width mirrors `arrayNeedsUint32` and the constant is present;
+- **21** reads the threshold out of `three.core.js`'s **real source text** and
+  compares it to ours, so a three bump that moves the number fails here instead
+  of silently desynchronising the two paths;
+- **22** *executes the decision*: `INDEX_U32_MIN` and `anyAtLeast` are lifted
+  verbatim out of the engine (both are module-level and import nothing) and run
+  against three's own predicate over the array the flag-OFF branch actually
+  builds, across 7 cases — including exactly-at-the-bound both ways, and the
+  case where it is the OVERLAY's offset that crosses the line. All 7 agree.
+
+Gate 22 is deliberately not a restatement of the rule. A gate that re-implements
+the logic it is checking agrees with the author, not with three.
+
+The flag-OFF branch is **untouched** — the diff contains no `-`/`+` line inside
+it, and gate 9 still asserts the upstream spread verbatim.
+
+### Lessons
+
+1. **Changing a container type is an API change, not an optimisation.** WB-10
+   read as "same values, same order, only the container changes" — and the
+   container was precisely what `setIndex` branches on.
+2. **A flag-gated micro-optimisation inherits the flag's blast radius.** This
+   was unreachable until the close flip, so every gate that had ever run on it
+   ran on the other branch. §14 was the same sentence about a different feature.
+3. **When you replace what a library was doing for you, replace ALL of it.**
+   three was not only wrapping the array, it was choosing its width. Taking over
+   the first job and not the second is how the "optimisation" would have doubled
+   the buffer it set out to shrink.
+4. **Read the sites you were told are fine.** Two of the three bare-variable
+   call sites had already been cleared for me; reading them cost a minute and is
+   the only reason I can put my name on the table above.
+
+---
+
 ## §10 Commits
 
 | # | Commit | What |
