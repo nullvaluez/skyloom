@@ -182,9 +182,6 @@ function gate(name, ok, detail) {
     headless: true,
     args: ['--enable-gpu', '--ignore-gpu-blocklist'],
   });
-  const context = await browser.newContext({ viewport: { width: 960, height: 540 } });
-  if (process.env.FLY_TILE_FIXTURE) await require('./_fixture').attachFixture(context);
-  const page = await context.newPage();
   // One verdict path, used by the early return as well: a run that stops
   // because it could not measure must still print its counts and close the
   // browser, and must still exit non-zero.
@@ -197,10 +194,71 @@ function gate(name, ok, detail) {
   };
 
   const errors = [];
-  const errorsNote = attachPageErrors(page, errors);
-  await page.addInitScript(UNPIN_SUN);
 
-  await bootFly(page, { style: 'satellite', timeoutMs: 600000, settleMs: 8000 });
+  /**
+   * ONE ARM OF THE A/B — a whole boot with LINEAR_HAZE pinned one way.
+   *
+   * BOTH ARMS ARE PINNED EXPLICITLY, and that is not belt-and-braces: the
+   * constant now SHIPS ON, so an unpinned "off" arm would silently be the
+   * TREATMENT and the comparison would be treatment-against-treatment. Same
+   * shape as A's both-arms pin in verify-terra-live, and as A's FLY_LADDER_RED
+   * forcing the flags off rather than omitting the pin.
+   *
+   * C's pin (`ee10642`) is read by `linearHazeOn()` at
+   * lib/fly/toy-world/world-bend.js:518 with the R24 idiom — absent means the
+   * constant, a partial object merges over it, NODE_ENV-led so production
+   * compiles it out. C found TWO raw readers, not one: AerialPerspective.jsx's
+   * own `if (LINEAR_HAZE.enabled)` on `uHazeColor` — THE EXACT CHANNEL this
+   * seam Δ measures — now goes through the accessor as well, so a pinned arm is
+   * a whole tree rather than a half-decoded one. No site decodes at module
+   * init (the five set*Haze/set*Fade setters run per frame from FlyScene;
+   * AerialPerspective decodes inside update()), so an addInitScript pin
+   * governs everything.
+   */
+  async function runArm(hazeEnabled, armLabel) {
+    const context = await browser.newContext({ viewport: { width: 960, height: 540 } });
+    if (process.env.FLY_TILE_FIXTURE) await require('./_fixture').attachFixture(context);
+    const page = await context.newPage();
+    const errorsNote = attachPageErrors(page, errors, `${armLabel}: `);
+    await page.addInitScript(UNPIN_SUN);
+    await page.addInitScript((on) => {
+      window.__flyLinearHazeOverride = { enabled: on };
+    }, hazeEnabled);
+    console.log(`\n=== ARM ${armLabel} — __flyLinearHazeOverride { enabled: ${hazeEnabled} } ===`);
+    return { context, page, errorsNote };
+  }
+
+  const RED_MODE = !!process.env.HAZE_RED;
+  // THE RED CALIBRATION: pin BOTH arms off. The A/B must then NOT pass — two
+  // identical trees cannot produce Δ_on < Δ_off except by reader noise, and the
+  // number that comes back IS the reader's noise floor, recorded rather than
+  // assumed.
+  const ARMS = RED_MODE
+    ? [
+        [false, 'RED-A (off)'],
+        [false, 'RED-B (off)'],
+      ]
+    : [
+        [false, 'OFF'],
+        [true, 'ON'],
+      ];
+  if (RED_MODE)
+    console.log(
+      'HAZE_RED=1 — both arms pinned { enabled: false }. The A/B must NOT pass; the delta between ' +
+        "two identical trees is this reader's noise floor."
+    );
+
+  const arms = {};
+  for (const [hazeEnabled, armLabel] of ARMS) {
+    const { context, page, errorsNote } = await runArm(hazeEnabled, armLabel);
+    arms[armLabel] = await measurePoses(page, errorsNote, armLabel);
+    await context.close();
+  }
+  await abCompare(arms, RED_MODE);
+  await finish();
+
+  async function measurePoses(page, errorsNote, armLabel) {
+    await bootFly(page, { style: 'satellite', timeoutMs: 600000, settleMs: 8000 });
   await page.evaluate(() => window.__flyStore.getState().setQualityTier('high'));
   await page.waitForFunction(() => typeof window.__fly?.warpToGeo === 'function', undefined, {
     timeout: 120000,
@@ -217,6 +275,7 @@ function gate(name, ok, detail) {
   // frame twice. The Δ ≈ 51 itself is a real reading of the seam at that hour;
   // the TIME-OF-DAY INDEPENDENCE claim in (3) is what was void.
   const { findSunTime } = await import('./_sun-time.mjs');
+    const results = {};
   // RELEASE THE AERIAL PIN, or the frame has no melt in it to measure.
   //
   // C proved from source why pass 2b's Δ ≈ 51 is VOID AS POSED: bootFly pins
@@ -246,7 +305,6 @@ function gate(name, ok, detail) {
   });
   await page.waitForTimeout(4000);
 
-  const results = {};
   for (const [label, elDeg] of [
     ['noon', 55],
     ['night', -14],
@@ -315,6 +373,11 @@ function gate(name, ok, detail) {
       continue;
     }
     results[label] = s;
+    // The arm's melt gate travels WITH the reading: the A/B refuses to compare
+    // two frames that were rendered with the atmosphere switched off, and it
+    // must be able to see that per arm rather than trusting the last value a
+    // loop happened to leave behind.
+    results[label].armGate = melt.gate;
     console.log(
       `\n${label} (sun ${elDeg}°): ${s.W}x${s.H} · horizon row ${s.horizonY} (step ${s.step.toFixed(1)}) · ` +
         `terrain L ${s.terrainLuma.toFixed(1)} · sky L ${s.skyLuma.toFixed(1)} · Δ ${s.delta.toFixed(1)}`
@@ -343,7 +406,7 @@ function gate(name, ok, detail) {
           `${s.terrainLuma.toFixed(1)}, sky L ${s.skyLuma.toFixed(1)}). Δ ${s.delta.toFixed(1)} is a ` +
           'comparison between two bands of the same undifferentiated frame'
       );
-    else
+    else {
       // THE ABSOLUTE BOUND IS UNREACHABLE AT THIS POSE AND IS NOT THE CLAIM.
       // C's arithmetic: maxMix 0.55 leaves 0.45 x Δ ≈ 23 even fully unpinned,
       // and an eye at 4200 m is 3.5 e-folds over heightFalloffM 1200. C's node
@@ -355,59 +418,90 @@ function gate(name, ok, detail) {
         `  ${label}: Δ ${s.delta.toFixed(1)} (terrain ${s.terrainLuma.toFixed(1)} · sky ` +
           `${s.skyLuma.toFixed(1)}) — recorded for the A/B, not judged against an absolute bound`
       );
-      const hazeOn = await page.evaluate(() => window.__flyStats?.haze?.linear ?? null);
-      if (hazeOn == null)
+    }
+  }
+
+    // THE SPREAD, PER ARM. It needs no absolute bound and is the tell that two
+    // different colour FUNCTIONS were tuned to agree at one sun elevation:
+    // a seam that is the SAME at 55° and −14° is ONE function.
+    if (!results.noon || !results.night)
+      notCalibrated(
+        `(3) ${armLabel} THE SEAM DOES NOT DEPEND ON THE TIME OF DAY`,
+        `one of the two poses produced no reading (noon ${!!results.noon}, night ${!!results.night})`
+      );
+    else {
+      const spread = Math.abs(results.noon.delta - results.night.delta);
+      numGate(gate)(
+        `(3) ${armLabel} THE SEAM DOES NOT DEPEND ON THE TIME OF DAY`,
+        spread,
+        spread <= 0.5,
+        `noon Δ ${results.noon.delta.toFixed(1)} vs night Δ ${results.night.delta.toFixed(1)} — ` +
+          `spread ${spread.toFixed(1)}, bound 0.5. (Pass 2b read 0.1 — but both legs were the same ` +
+          'wall-clock frame, so it proved nothing; with the sun really moving, this has teeth.)'
+      );
+    }
+    gate(`(4) ${armLabel} NO PAGE ERRORS`, errors.length === 0, errorsNote());
+    return results;
+  }
+
+  /**
+   * THE A/B ITSELF. Δ with the decode ON must be SMALLER than Δ with it off, at
+   * the same pose, on the same fixture, with the melt released in both arms.
+   */
+  async function abCompare(armResults, redMode) {
+    const names = Object.keys(armResults);
+    const [aName, bName] = names;
+    const A = armResults[aName];
+    const B = armResults[bName];
+    console.log(`\n=== A/B: ${aName} vs ${bName} ===`);
+    for (const label of ['noon', 'night']) {
+      const a = A?.[label];
+      const b = B?.[label];
+      if (!a || !b) {
+        notCalibrated(`(5${label === 'noon' ? 'a' : 'b'}) THE A/B (${label})`, `an arm produced no ${label} reading`);
+        continue;
+      }
+      // C's note, and it is the difference between a comparison and noise: the
+      // pin changes the haze COLOUR, not whether haze is applied. At aerialGate
+      // 0 the two arms render the SAME FRAME, so Δ_on < Δ_off would be
+      // comparing the reader against itself.
+      if (!(Number(a.armGate) > 0) || !(Number(b.armGate) > 0)) {
         notCalibrated(
-          `(2${label === 'noon' ? 'a' : 'b'}) RIM SEAM A/B (${label})`,
-          `Δ ${s.delta.toFixed(1)} measured with the melt released, but LINEAR_HAZE publishes no ` +
-            'runtime state and has no pin, so this run is ONE ARM of a two-arm comparison. The ' +
-            'flag-on arm needs either a runtime override in the same idiom as the sun and the ' +
-            'aerial gate, or a tree with LINEAR_HAZE.enabled true'
+          `(5${label === 'noon' ? 'a' : 'b'}) THE A/B (${label})`,
+          `aerialGate ${a.armGate} / ${b.armGate} — the pin changes the haze COLOUR, not whether ` +
+            'haze is applied, so with the gate at 0 both arms are the same frame and the ' +
+            'comparison is noise'
         );
-      else
-        numGate(gate)(
-          `(2${label === 'noon' ? 'a' : 'b'}) RIM SEAM A/B (${label}) — flag ${hazeOn ? 'ON' : 'OFF'}`,
-          s.delta,
-          true,
-          `Δ ${s.delta.toFixed(1)} with LINEAR_HAZE ${hazeOn ? 'ON' : 'OFF'}`,
-          `delta is ${s.delta}`
+        continue;
+      }
+      const better = b.delta < a.delta;
+      console.log(
+        `  ${label}: Δ ${aName} ${a.delta.toFixed(1)} vs ${bName} ${b.delta.toFixed(1)} — ` +
+          `difference ${(a.delta - b.delta).toFixed(2)}`
+      );
+      if (redMode)
+        gate(
+          `(5${label === 'noon' ? 'a' : 'b'}) RED CALIBRATION (${label}) — two identical arms must NOT separate`,
+          Math.abs(a.delta - b.delta) <= 0.5,
+          `|Δ − Δ| ${Math.abs(a.delta - b.delta).toFixed(2)} between two arms both pinned ` +
+            "{ enabled: false }. THIS NUMBER IS THE READER'S NOISE FLOOR, and any A/B claim below " +
+            'it is noise. Record it.'
         );
-    red.push([
-      `L1 sRGB haze mixed as linear (${label})`,
-      `verify-linear-haze (2${label === 'noon' ? 'a' : 'b'})`,
-      `Δ ${s.delta.toFixed(1)}`,
-      `≤ ${MAX_DELTA}`,
-    ]);
+      else {
+        gate(
+          `(5${label === 'noon' ? 'a' : 'b'}) THE A/B (${label}) — decode ON reads a SMALLER seam`,
+          better,
+          `Δ off ${a.delta.toFixed(1)} → on ${b.delta.toFixed(1)}`
+        );
+        red.push([
+          `L1 sRGB haze mixed as linear (${label})`,
+          `verify-linear-haze (5${label === 'noon' ? 'a' : 'b'})`,
+          `Δ off ${a.delta.toFixed(1)} / on ${b.delta.toFixed(1)}`,
+          'on < off',
+        ]);
+      }
+    }
   }
-
-  if (!results.noon || !results.night) {
-    notCalibrated(
-      '(3) THE SEAM DOES NOT DEPEND ON THE TIME OF DAY',
-      `one of the two poses produced no reading (noon ${!!results.noon}, night ${!!results.night})`
-    );
-    finish();
-    return;
-  }
-  const spread = Math.abs(results.noon.delta - results.night.delta);
-  numGate(gate)(
-    '(3) THE SEAM DOES NOT DEPEND ON THE TIME OF DAY',
-    spread,
-    spread <= 0.5,
-    `noon Δ ${results.noon.delta.toFixed(1)} vs night Δ ${results.night.delta.toFixed(1)} — spread ` +
-      `${spread.toFixed(1)}, bound 0.5. THIS is the one-colour-function tell and it does not depend ` +
-      'on an absolute bound: two different colour FUNCTIONS can be tuned to agree at one sun ' +
-      'elevation and nowhere else, so a seam that is the SAME at 55° and −14° is one function. ' +
-      '(Pass 2b read a spread of 0.1 — but both legs were the same wall-clock frame, so it proved ' +
-      'nothing; with the sun really moving, this number has teeth.)'
-  );
-  gate('(4) NO PAGE ERRORS', errors.length === 0, errorsNote());
-
-  console.log(
-    `\nBOUND NOTE: ${MAX_DELTA}/255 is a STARTING bound (HAZE_MAX_DELTA). What matters is the ` +
-      'flag-off RED this run measured; record it in the ledger and set the bound from the ' +
-      'flag-on measurement, never the other way round.'
-  );
-  await finish();
 })().catch((e) => {
   console.error(e);
   process.exit(1);
