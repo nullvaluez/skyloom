@@ -1485,6 +1485,38 @@ it, and gate 9 still asserts the upstream spread verbatim.
 
 ---
 
+## §17 The seventh harness-budget site (E CERT's find)
+
+E CERT attributed pass 2b's **longest single stall — 3660 ms under
+`[finalize:sat-roads x16]`** — to `sat-road-engine.js`: its finalize bound was a
+bare module const, `done < FINALIZE_PER_FRAME`, that `budgetK()` never touched.
+Every other engine reads `perFrame * budgetK()`. At K=40/200 every other engine
+speeds up and roads does not, so the road ring starves and the stall
+concentrates exactly where `markPhase` pointed — the attribution hook finding
+the site it was built to find.
+
+E offered it rather than taking it, because the scaler idiom is mine. Fixed with
+the same shape as the veg site (`59b4e97`):
+
+    const perFrame = Math.max(1, FINALIZE_PER_FRAME * budgetK());
+
+`budgetK()` is exactly 1 without `FLY_FINALIZE_BUDGET_K`, so the production
+arithmetic is byte-identical.
+
+**Gate 23** pins the expression, the loop bound and the import together, the way
+gate 10 does for veg — an assertion that moves WITH the expression it guards
+rather than merely tolerating it.
+
+**The site census is INFO here, not a gate, and deliberately.** Five of the
+seven sites do not exist on `r24/a` — they are E's, and they arrive at the
+merge. A census asserting "all seven carry the scaler" would be RED on this
+branch and green only after integration, which is a gate that measures the
+BRANCH rather than the code. It prints `1/9 on this branch` and says so.
+**Promote it to a gate on the merged tree** — that is the right home for it, and
+it is the row that would have caught this site and the veg site both.
+
+---
+
 ## §10 Commits
 
 | # | Commit | What |
