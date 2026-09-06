@@ -45,12 +45,21 @@
  */
 const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
+const { attachPageErrors } = require('./_pageerrors');
 const { settleWorld } = require('./_settle');
+const { notCalibrated, notCalCount, notCalSummary } = require('./_notcal');
 
 const POWELL = [40.1578, -83.0752, 900, 1.9, -0.3];
 const OWENS = [36.6, -118.1, 2600, 1.2, -0.18];
 const SETTLE = Number(process.env.LOD_SETTLE_MS || 45000);
-const YAW_SEC = Number(process.env.LOD_YAW_SEC || 40);
+// A's step. 360 deg at 0.85 deg/frame is ~424 rendered frames — seconds on a
+// real GPU, ~20 minutes here, which is why the cap is an env with the OLD
+// default so no existing invocation changes length: a short run now reports a
+// short ARC and refuses to judge, where before it silently judged a 720 deg
+// wall-clock spin taken 51 deg at a time.
+const DEG_PER_FRAME = Number(process.env.LOD_DEG_PER_FRAME || 0.85);
+const SWEEP_MS = Number(process.env.FLY_LOD_SWEEP_MS || 40000);
+const MIN_ARC_DEG = Number(process.env.LOD_MIN_ARC_DEG || 360);
 
 const PIN_POSE = ([lat, lon, altM, heading, pitch]) => {
   window.__fly.warpToGeo(lat, lon, { altM, name: null });
@@ -73,21 +82,58 @@ const PIN_POSE = ([lat, lon, altM, heading, pitch]) => {
  * idiom). Position frozen means the streaming rings do not move, so anything
  * that leaves and comes back left because of CULLING, not because of distance.
  */
-const START_YAW = ([secs]) => {
+/**
+ * THE YAW IS DRIVEN PER RENDERED FRAME, NOT PER MILLISECOND.
+ *
+ * The first version swept `h0 + u·4π` over 40 wall-clock seconds. At this
+ * venue's ~2.84 s per rendered frame that is **~51° of heading between one
+ * displayed frame and the next** — and A measured exactly that regime as the
+ * cause of the refetches this gate then blamed on the streamer: an upstream
+ * refine's downloads are discarded inside a single round trip when the camera
+ * has already swung past them (A's node probe: 51°/frame → 28 refetches,
+ * 0.85°/frame → 0). So (6) was measuring the instrument's step size, and (3)'s
+ * re-appearance count was the same experiment.
+ *
+ * Now the heading advances `DEG_PER_FRAME` (A's 0.85) on each rAF, so the
+ * sweep is a fixed ARC rather than a fixed duration and reads the same on a
+ * 1 fps container and a 144 Hz display. `FLY_LOD_SWEEP_MS` bounds it in wall
+ * time; the gate reports the arc actually swept and refuses to judge a sweep
+ * that never came back round.
+ */
+const START_YAW = ([capMs, degPerFrame]) => {
   const f = window.__fly.flight;
   const p = { x: f.pos.x, y: f.pos.y, z: f.pos.z };
   const h0 = f.heading;
   const t0 = performance.now();
+  const step = (degPerFrame * Math.PI) / 180;
+  const S = (window.__lodYaw = { frames: 0, arcDeg: 0, done: false, capped: false });
   if (window.__lodPin) clearInterval(window.__lodPin);
+  // The position pin stays on a short interval — it only has to hold the
+  // camera still — but the HEADING advances once per rendered frame.
   window.__lodPin = setInterval(() => {
-    const u = Math.min(1, (performance.now() - t0) / (secs * 1000));
     f.pos.x = p.x;
     f.pos.y = p.y;
     f.pos.z = p.z;
-    f.heading = h0 + u * Math.PI * 4;
     f.bank = 0;
     f.speed = 0;
   }, 8);
+  const spin = () => {
+    if (S.done) return;
+    if (performance.now() - t0 > capMs) {
+      S.capped = true;
+      S.done = true;
+      return;
+    }
+    S.frames++;
+    S.arcDeg += degPerFrame;
+    f.heading = h0 + S.frames * step;
+    if (S.arcDeg >= 360) {
+      S.done = true;
+      return;
+    }
+    requestAnimationFrame(spin);
+  };
+  requestAnimationFrame(spin);
 };
 
 /**
@@ -109,12 +155,22 @@ const INSTALL_TILE_CENSUS = () => {
     disappears: 0,
     crossfadeFrames: 0, // frames where a parent AND >=1 of its children are both displayed
     maxOverlapRun: 0,
+    // D's handle for the crossfade window, and it needs no app change:
+    // `__flyStats.terra.fades.active` IS `_active.size`, rewritten in arm()
+    // and finish() on the same object reference every frame. Sampling it per
+    // frame gives the number (5) was reaching for — the co-display census
+    // never could, because parentBlend blends the parent TEXTURE into the
+    // child material and disposes the parent model exactly as upstream does.
+    blendFrames: 0, // frames with active > 0
+    maxBlendRun: 0, // THE CROSSFADE WINDOW
+    peakActiveInWindow: 0, // attributable, unlike the session high-water mark
     reappears: 0, // a tile that left and came back (the culling signature)
     samples: [],
     seenEver: {},
   });
   let prev = new Set();
   let overlapRun = 0;
+  let blendRun = 0;
   const parentKey = (k) => {
     const [z, x, y] = k.split('-').map(Number);
     return z > 0 ? `${z - 1}-${x >> 1}-${y >> 1}` : null;
@@ -164,6 +220,14 @@ const INSTALL_TILE_CENSUS = () => {
       if (overlapRun > S.maxOverlapRun) S.maxOverlapRun = overlapRun;
     } else overlapRun = 0;
 
+    const act = window.__flyStats?.terra?.fades?.active ?? 0;
+    if (act > 0) {
+      S.blendFrames++;
+      blendRun++;
+      if (blendRun > S.maxBlendRun) S.maxBlendRun = blendRun;
+      if (act > S.peakActiveInWindow) S.peakActiveInWindow = act;
+    } else blendRun = 0;
+
     if (appeared || gone)
       S.samples.push({ f: S.frames, in: inNow.slice(0, 6), out: outNow.slice(0, 6), overlap });
     if (S.samples.length > 300) S.samples.shift();
@@ -200,6 +264,29 @@ const SNAP_FADES = () => {
  * `waitFrames` helper this replaced is gone: there was no frame count that was
  * right on both machines, which is the whole finding.)
  */
+/**
+ * Poll a predicate that ALSO returns the state it judged, so the gate reports
+ * the reading that decided it rather than a later one. See the drain call for
+ * the measured reason this exists.
+ */
+async function waitUntilSnap(pg, fnSrc, { capFrames = 90, label = '' } = {}) {
+  const t0 = await pg.evaluate(
+    () => window.__flyStats?.frame?.count ?? window.__lodWatch?.frames ?? 0
+  );
+  let frames = 0;
+  let last = null;
+  for (;;) {
+    last = await pg.evaluate(fnSrc).catch(() => null);
+    frames =
+      (await pg.evaluate(() => window.__flyStats?.frame?.count ?? window.__lodWatch?.frames ?? 0)) - t0;
+    if (last?.ok || frames >= capFrames) break;
+    await pg.waitForTimeout(250);
+  }
+  if (label)
+    console.log(`  waitUntilSnap(${label}): ${last?.ok ? 'held' : 'CAPPED'} after ${frames} rendered frames`);
+  return { ok: !!last?.ok, frames, snap: last?.snap ?? null };
+}
+
 async function waitUntil(pg, fnSrc, { capFrames = 90, label = '' } = {}) {
   const t0 = await pg.evaluate(
     () => window.__flyStats?.frame?.count ?? window.__lodWatch?.frames ?? 0
@@ -259,6 +346,28 @@ async function waitSettled(pg, readSrc, { capFrames = 240, label = '' } = {}) {
   }
 }
 
+/**
+ * Run one sweep and report what it ACTUALLY swept. Both legs use this, so the
+ * ±25% frame-comparability guard on (14) compares like with like.
+ */
+async function runSweep(pg) {
+  await pg.evaluate(START_YAW, [SWEEP_MS, DEG_PER_FRAME]);
+  await pg
+    .waitForFunction(() => window.__lodYaw?.done === true, undefined, {
+      timeout: SWEEP_MS + 120000,
+      polling: 500,
+    })
+    .catch(() => {});
+  await pg.waitForTimeout(3000);
+  const y = await pg.evaluate(() => ({ ...(window.__lodYaw || {}) }));
+  console.log(
+    `  arc swept: ${(y.arcDeg ?? 0).toFixed(0)}° over ${y.frames ?? 0} rendered frames at ` +
+      `${DEG_PER_FRAME}°/frame` +
+      (y.capped ? `  [CAPPED at FLY_LOD_SWEEP_MS=${SWEEP_MS} before the arc completed]` : '')
+  );
+  return y;
+}
+
 let pass = 0;
 let fail = 0;
 const red = [];
@@ -282,7 +391,7 @@ function soft(name, detail) {
     : null;
   const page = await context.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(String(e)));
+  const errorsNote = attachPageErrors(page, errors);
   await page.addInitScript(INSTALL_TILE_CENSUS);
 
   await bootFly(page, { style: 'satellite', timeoutMs: 600000, settleMs: 8000 });
@@ -363,12 +472,12 @@ function soft(name, detail) {
     const S = window.__lodWatch;
     S.frames = S.hardSwaps = S.hardMerges = S.appears = S.disappears = 0;
     S.crossfadeFrames = S.maxOverlapRun = S.reappears = 0;
+    S.blendFrames = S.maxBlendRun = S.peakActiveInWindow = 0;
     S.samples.length = 0;
     window.__lod0 = window.__flyTerra?.lod?.() ?? null;
   });
 
-  await page.evaluate(START_YAW, [YAW_SEC]);
-  await page.waitForTimeout(YAW_SEC * 1000 + 4000);
+  const yawOff = await runSweep(page);
 
   const w = await page.evaluate(() => ({
     ...window.__lodWatch,
@@ -391,7 +500,12 @@ function soft(name, detail) {
     : [];
 
   console.log(
-    `\nYAW SWEEP (${YAW_SEC}s, position frozen): ${w.frames} frames · ` +
+    `  ATTRIBUTION: ${w.reappears} re-appearances here vs 27 on the flag-off tree = A's residency ` +
+      "trio, measured by E's instrument. D's baseline for the crossfade is therefore 4 hard " +
+      'refines, not the 20 the flag-off tree showed.'
+  );
+  console.log(
+    `\nYAW SWEEP (${(yawOff.arcDeg ?? 0).toFixed(0)}° arc, position frozen): ${w.frames} frames · ` +
       `${w.appears} tile appearances / ${w.disappears} disappearances · ` +
       `${w.reappears} RE-appearances · ${w.hardSwaps} hard refines · ${w.hardMerges} hard merges · ` +
       `crossfade frames ${w.crossfadeFrames} (longest run ${w.maxOverlapRun})`
@@ -435,7 +549,20 @@ function soft(name, detail) {
     w.frames > 20 && w.appears + w.disappears > 0,
     `frames=${w.frames} events=${w.appears + w.disappears}`
   );
-  gate(
+  // A SHORT ARC CANNOT ANSWER THESE. (3) is "does a tile come BACK ROUND", (6)
+  // is "is it re-fetched as the heading returns" — both need the heading to
+  // have actually returned. A capped sweep judges neither.
+  const arcOff = yawOff.arcDeg ?? 0;
+  const fullArcOff = arcOff >= MIN_ARC_DEG;
+  if (!fullArcOff)
+    notCalibrated(
+      '(3)/(6) THE RETURN-SWEEP LEGS',
+      `the sweep sped only ${arcOff.toFixed(0)}° of the ${MIN_ARC_DEG}° minimum before ` +
+        `FLY_LOD_SWEEP_MS=${SWEEP_MS} capped it. "A tile leaves and comes back round" and "the same ` +
+        'URL is fetched twice as the heading comes back round" both require the heading to have ' +
+        'come back round'
+    );
+  else gate(
     '(3) NO TILE LEAVES AND COMES BACK ON A PURE YAW (culling re-stream)',
     w.reappears === 0,
     `${w.reappears} re-appearances — the position never moved, so anything that came back left ` +
@@ -448,15 +575,26 @@ function soft(name, detail) {
     `refines ${w.hardSwaps} · merges ${w.hardMerges}`
   );
   red.push(['T4 atomic all-four-or-nothing LOD swap', 'verify-lod-fade (4)', `${w.hardSwaps}+${w.hardMerges}`, '0']);
-  gate(
-    '(5) A PARENT-RETAINED CROSSFADE WINDOW EXISTS',
-    w.maxOverlapRun >= 2,
-    `longest run of frames with a parent and its child both displayed: ${w.maxOverlapRun} ` +
-      '(1 or 0 means the swap is atomic — this is the LOD_CROSSFADE contract)'
+  // (5) ASSERTED A MECHANISM D DID NOT BUILD, so it was never going to read
+  // anything but 0 — on EITHER leg. This census counts a parent MESH displayed
+  // alongside its children; D's crossfade blends the parent's TEXTURE into the
+  // child's material through clip-UV and never keeps the parent drawn (which is
+  // deliberate: archived R22.1 B3 measured an ordered dither under SMAA-only AA
+  // reading as shimmer, the artifact class this round exists to remove). A mesh
+  // co-display census is therefore 0 BY CONSTRUCTION under D's mechanism, and
+  // its 0 was being written into the RED table as though it were a defect
+  // measurement. It is NOT MEASURABLE by this instrument, on either leg, until
+  // D names the handle that exposes the blend; the number is still printed
+  // because it is the right number for the mechanism it does describe.
+  notCalibrated(
+    '(5) A PARENT-RETAINED CROSSFADE WINDOW',
+    `longest run of frames with a parent MESH and its child both displayed: ${w.maxOverlapRun}. ` +
+      "D's crossfade blends the parent TEXTURE into the child material and never co-displays the " +
+      'meshes, so this census reads 0 by construction whatever the flag does. Awaiting D\'s blend ' +
+      'handle; the ON leg reads faded/hardSwaps for the same question'
   );
-  red.push(['T4 no crossfade window', 'verify-lod-fade (5)', `${w.maxOverlapRun} frames`, '>= 2 frames']);
 
-  if (fx) {
+  if (fx && fullArcOff) {
     // THE DENOMINATOR FIRST (§2.10 WEAK, now closed). "0 refetched" is also
     // what a sweep that fetched NOTHING reports — `/__stats/reset` was called
     // right before the yaw, so an empty window would sail through (6) while
@@ -507,7 +645,7 @@ function soft(name, detail) {
       'the empty-desert pose, i.e. a crossfade adds nothing where there is nothing to fade.'
   );
 
-  gate('(8) NO PAGE ERRORS', errors.length === 0, errors.slice(0, 3).join(' | ') || 'clean');
+  gate('(8) NO PAGE ERRORS', errors.length === 0, errorsNote());
 
   // ===========================================================================
   // THE ON LEG — LOD_CROSSFADE pinned on, same pose, same sweep, same census.
@@ -628,7 +766,7 @@ function soft(name, detail) {
     const fx2 = process.env.FLY_TILE_FIXTURE ? await require('./_fixture').attachFixture(ctx2) : null;
     const p2 = await ctx2.newPage();
     const errors2 = [];
-    p2.on('pageerror', (e) => errors2.push(String(e)));
+    const errors2Note = attachPageErrors(p2, errors2);
     await p2.addInitScript(INSTALL_TILE_CENSUS);
     await p2.addInitScript(([pin]) => {
       window.__flyLodFadeOverride = pin;
@@ -671,10 +809,10 @@ function soft(name, detail) {
       const S = window.__lodWatch;
       S.frames = S.hardSwaps = S.hardMerges = S.appears = S.disappears = 0;
       S.crossfadeFrames = S.maxOverlapRun = S.reappears = 0;
+    S.blendFrames = S.maxBlendRun = S.peakActiveInWindow = 0;
       S.samples.length = 0;
     });
-    await p2.evaluate(START_YAW, [YAW_SEC]);
-    await p2.waitForTimeout(YAW_SEC * 1000 + 4000);
+    const yawOn = await runSweep(p2);
     const w2 = await p2.evaluate(() => ({ ...window.__lodWatch, seenEver: undefined, samples: undefined }));
     const f1 = await p2.evaluate(SNAP_FADES);
     // [D5]/[D-C1] THE DRAIN IS A POLL, NOT A FRAME COUNT. A fixed
@@ -682,15 +820,42 @@ function soft(name, detail) {
     // hard `active === 0` after it is a FALSE RED on a fast machine — the gate
     // would fail exactly where the feature works. Poll to the cap and report
     // what it took; the cap being hit is itself the finding.
-    const drain = await waitUntil(p2, () => (window.__flyStats?.terra?.fades?.active ?? 1) === 0, {
-      capFrames: 90,
-      label: 'blend drain (active -> 0)',
-    });
+    // THE SNAPSHOT MUST BE THE ONE THAT SATISFIED THE CONDITION. Pass 2b
+    // printed `held after 26 rendered frames` and then `active now 8`, which
+    // is unreadable: it cannot be told from the log whether the drain reached
+    // 0 and streaming re-armed fades between the poll and the snapshot, or
+    // whether the cap was hit and "held" was a lie. The poll now returns the
+    // fades object it tested, so the number reported IS the number that
+    // decided the gate, and a capped poll says CAPPED.
+    const drain = await waitUntilSnap(
+      p2,
+      () => {
+        const f = window.__flyStats?.terra?.fades;
+        if (!f) return null;
+        const snap = JSON.parse(JSON.stringify(f));
+        return { ok: (f.active ?? 1) === 0, snap };
+      },
+      { capFrames: 90, label: 'blend drain (active -> 0)' }
+    );
     const drainFrames = drain.frames;
-    const f2 = await p2.evaluate(SNAP_FADES);
+    const f2 = drain.snap;
+    const f2Now = await p2.evaluate(SNAP_FADES);
+    console.log(
+      `  drain: ${drain.ok ? `HELD (active 0) after ${drainFrames} rendered frames` : `CAPPED after ${drainFrames} rendered frames — active never reached 0`}` +
+        ` · at that instant retained=${f2?.retained} · a later read shows active=${f2Now?.active}` +
+        ` retained=${f2Now?.retained}` +
+        (drain.ok && (f2Now?.active ?? 0) > 0
+          ? '  [the later value is streaming RE-ARMING fades after the drain, not a leak]'
+          : '')
+    );
     const d = (k) => (f1 && f0 ? (f1[k] ?? 0) - (f0[k] ?? 0) : NaN);
     const ds = (k) => (f1 && f0 ? (f1.skip?.[k] ?? 0) - (f0.skip?.[k] ?? 0) : NaN);
     const swapsON = d('refines') + d('merges');
+    // Declared HERE, not inside the branch below: the mix census that reads it
+    // sits outside that block. The extended no-undef sweep caught this within
+    // minutes of my writing it — which is the whole argument for sweeping
+    // scripts/.
+    let lateActive = null;
 
     console.log(
       `ON  SWEEP: ${w2.frames} frames · ${w2.appears} appearances / ${w2.disappears} disappearances · ` +
@@ -795,6 +960,17 @@ function soft(name, detail) {
               "quadtree already makes; changing their COUNT would mean it moved the streamer, " +
               "which is A's territory and a different flag"
           );
+        // (4) MERGES ARE UNEXERCISED AT EVERY POSE, AND THAT IS keepResident
+        // WORKING. Frustum-exit merges no longer happen, so there is nothing to
+        // fade out. Forcing them would mean measuring a tree that does not
+        // ship; the merge path stays structurally gated (verify-lod-fade.mjs)
+        // and the go/no-go reads "refine measured, merge inferred".
+        if (d('merges') === 0)
+          console.log(
+            '  NOTE merges 0 in the window — keepResident removed the frustum-exit merge, so the ' +
+              'merge ramp is unexercised BY DESIGN. Structurally gated in verify-lod-fade.mjs; not ' +
+              'chased here, because forcing a merge measures a tree that does not ship.'
+          );
         gate(
           '(15) THE MASS MOVED — faded RISES and hardSwaps DROPS toward 0',
           d('faded') > 0 && d('hardSwaps') < offLeg.hardSwapsD,
@@ -804,11 +980,107 @@ function soft(name, detail) {
             'faded > 0 IN THE WINDOW is the sweep proof, not the high-water mark'
         );
       }
+      // (b) A SECOND READ, N FRAMES LATER, WITH THE COUNTERS ALONGSIDE. A
+      // non-zero `active` after a held drain is not evidence of anything until
+      // you know whether new work ARRIVED: the yaw interval keeps pinning the
+      // final heading, so the camera stops but the streamer does not, and each
+      // round trip is several rendered frames. D's rule: counters advanced ⇒
+      // arrivals (INFO); counters flat with active > 0 ⇒ stuck (FAIL).
+      const later = await waitUntilSnap(
+        p2,
+        () => {
+          const f = window.__flyStats?.terra?.fades;
+          return f ? { ok: true, snap: JSON.parse(JSON.stringify(f)) } : null;
+        },
+        { capFrames: 12, label: 'second read, 12 frames after the drain' }
+      );
+      lateActive = later.snap?.active ?? null;
+      const arrived =
+        later.snap && f2 ? later.snap.refines + later.snap.merges > f2.refines + f2.merges : null;
+      if (arrived === null)
+        notCalibrated(
+          '(16b) A NON-ZERO ACTIVE SET IS ACCOUNTED FOR BY NEW ARRIVALS',
+          `a fades snapshot was unavailable (drain ${f2 ? 'ok' : 'null'}, second read ` +
+            `${later.snap ? 'ok' : 'null'}), so arrivals could not be attributed. Without the guard ` +
+            'this fell through to "no new work arrived, so the blends are stuck" — a hard FAIL ' +
+            'whose real cause is an untaken snapshot'
+        );
+      else if ((later.snap?.active ?? 0) > 0) {
+        if (arrived)
+          console.log(
+            `  INFO active ${f2?.active} -> ${later.snap.active} while refines+merges advanced ` +
+              `${f2.refines + f2.merges} -> ${later.snap.refines + later.snap.merges}: the non-zero ` +
+              'active is ARRIVALS, not stuck blends'
+          );
+        else
+          gate(
+            '(16b) A NON-ZERO ACTIVE SET IS ACCOUNTED FOR BY NEW ARRIVALS',
+            false,
+            `active ${later.snap.active} twelve frames after the drain held, with refines+merges ` +
+              `FLAT at ${later.snap.refines + later.snap.merges} — no new work arrived, so the ` +
+              'blends are stuck'
+          );
+      }
+
+      // (c) THE LEAK SIGNATURE, ON BOTH READS. `finish()` releases the texture
+      // for every owned entry before deleting it from `_active`, so a retained
+      // texture with NOTHING active is the only shape that means a leak.
+      // retained > 0 WITH active > 0 is in-flight work and must not be indicted.
+      for (const [label, snap] of [
+        ['at the drain', f2],
+        ['12 frames later', later.snap],
+      ]) {
+        if (!snap) continue;
+        gate(
+          `(16c) NO PARENT-TEXTURE LEAK ${label} — retained > 0 with active === 0`,
+          !(snap.active === 0 && snap.retained > 0),
+          `active ${snap.active} · retained ${snap.retained}` +
+            (snap.active === 0 && snap.retained > 0
+              ? ' — LEAK: finish() releases every owned texture before deleting from _active, so a ' +
+                'retained texture with nothing active cannot be in-flight work'
+              : ' — in-flight work, not a leak')
+        );
+      }
+
+      // (d) THE FREE INVARIANT, while only refines are in flight. A refine arms
+      // FOUR child materials off ONE parent texture, so `active` counts
+      // materials and `retained` counts distinct parent textures: the ratio is
+      // bounded. Outside the band the refcount and the active set have
+      // diverged, which is a real defect and not a pacing artifact. (Pass 2b's
+      // 8 active / 2 retained is exactly two refine events in flight — a 4:1
+      // ratio no stuck set lands on by coincidence.)
+      // [D-E2] IT MUST BE EVALUATED WHERE THE ACTIVE SET IS NON-EMPTY. Guarding
+      // it on `f2` alone made it vacuous on every healthy run: f2 is the
+      // snapshot that SATISFIED the drain, so `f2.active === 0` exactly when
+      // the drain held, and the invariant only ever evaluated on a capped
+      // drain — the one case where the numbers mean least. It now runs on the
+      // second read (which is where pass 2b's 8-active / 2-retained reading
+      // came from) and additionally on f2 when the drain did NOT hold.
+      const freeChecks = [];
+      if (later.snap && later.snap.active > 0) freeChecks.push(['second read', later.snap]);
+      if (!drain.ok && f2 && f2.active > 0) freeChecks.push(['capped drain', f2]);
+      if (d('merges') === 0 && freeChecks.length === 0)
+        console.log(
+          '  INFO (16d) not evaluated — no read caught a non-empty active set, which on a healthy ' +
+            'run means the blends drained and nothing re-armed. Not a pass.'
+        );
+      if (d('merges') === 0)
+        for (const [where, snap] of freeChecks)
+          gate(
+            `(16d) THE FREE INVARIANT ${where} — retained <= active <= 4 x retained (refines only)`,
+            snap.retained <= snap.active && snap.active <= 4 * snap.retained,
+            `active ${snap.active} materials · retained ${snap.retained} parent textures = ` +
+              `${(snap.active / Math.max(1, snap.retained)).toFixed(1)}:1 (a refine arms 4 children ` +
+              'off 1 parent, so the ratio is bounded; outside the band the refcount and the active ' +
+              'set have diverged)'
+          );
+
       gate(
         '(16) EVERY BLEND DRAINS, AND NOTHING IS RETAINED AT REST',
         f2 != null && f2.active === 0 && f2.retained === 0,
-        `active ${f2?.active} · retained ${f2?.retained} after ${drainFrames} rendered frames ` +
-          `(${drain.ok ? 'drained' : `NEVER DRAINED — hit the ${90}-frame cap`}). retained > 0 at ` +
+        `at the instant the drain held: active ${f2?.active} · retained ${f2?.retained}, after ` +
+          `${drainFrames} rendered frames ` +
+          `(${drain.ok ? 'drained' : 'NEVER DRAINED — hit the 90-frame cap'}). retained > 0 at ` +
           'rest is a PARENT-TEXTURE LEAK — a parent map kept alive past unloadModel() forever — ' +
           'and is the single most important thing this leg can catch'
       );
@@ -834,8 +1106,65 @@ function soft(name, detail) {
         );
     }
 
+    // (5-ON) THE CROSSFADE WINDOW, MEASURED — by D's handle, not by the census
+    // that reads 0 by construction.
+    gate(
+      '(5-ON) A CROSSFADE WINDOW EXISTS — consecutive frames with a live blend set',
+      w2.maxBlendRun >= 2,
+      `longest run of frames with terra.fades.active > 0: ${w2.maxBlendRun} (blend frames ` +
+        `${w2.blendFrames} of ${w2.frames}, peak active in the window ${w2.peakActiveInWindow}). ` +
+        'This is the number (5) was reaching for; the mesh co-display census cannot see it because ' +
+        'parentBlend never keeps the parent drawn. NOTE: >= 5 is expected for a COMPLETE blend — ' +
+        '0.25 s of fade clock is 5 clamped frames at any frame rate (FlyScene clamps dt to 0.05) — ' +
+        'so a run of 2 to 4 means the sweep ended mid-blend, not that the blend is short'
+    );
+    // The blend is on REAL TILES, not merely counted: values strictly inside
+    // (0,1) are mid-ramp materials, and their count must equal `active`.
+    // [D-E1] EVERY TILE MESH CARRIES A MATERIAL ARRAY. three-tile's tile model
+    // is `class Z extends Mesh { constructor(g, m) { super(g, m ?? []) } }` and
+    // `syncMaterials()` assigns `this.material[i]`, so `n.material.userData` is
+    // undefined on an array and this census would have come back EMPTY on a
+    // perfectly healthy run — printing "0 materials carry __lodFade" with a
+    // fallback that made the nothing look expected. Same shape as the whole
+    // §6 family: a value read across a boundary in the wrong container.
+    const mixes = await p2.evaluate(() => {
+      const out = [];
+      let materials = 0;
+      const map = window.__flyTerra?.engine?.()?.map ?? window.__flyTerra?.get?.();
+      const stack = map ? [map] : [];
+      while (stack.length) {
+        const n = stack.pop();
+        if (!n) continue;
+        const mats = Array.isArray(n.material) ? n.material : n.material ? [n.material] : [];
+        for (const m of mats) {
+          if (!m) continue;
+          materials++;
+          const v = m.userData?.__lodFade?.mix?.value;
+          if (typeof v === 'number') out.push(+v.toFixed(3));
+        }
+        const k = n.children;
+        if (k) for (let i = 0; i < k.length; i++) stack.push(k[i]);
+      }
+      return { out, materials };
+    });
+    const midRamp = mixes.out.filter((v) => v > 0 && v < 1);
+    console.log(
+      `  INFO blend mixes: ${mixes.out.length} of ${mixes.materials} tile materials carry ` +
+        `__lodFade.mix, ${midRamp.length} strictly inside (0,1) — e.g. ` +
+        `${JSON.stringify(midRamp.slice(0, 6))}`
+    );
+    // The equality D asked for: a mid-ramp material is exactly a member of the
+    // active set, so these two counts must agree at the same instant. They are
+    // read one round trip apart, so a mismatch is reported, not asserted —
+    // but a LARGE mismatch means the census and the counter disagree about
+    // what is blending, which is the defect this row exists to exclude.
+    console.log(
+      `  INFO mid-ramp ${midRamp.length} vs terra.fades.active ${lateActive ?? '?'} at the second ` +
+        'read (one round trip apart; a large gap means the census and the counter disagree)'
+    );
+
     soft(
-      '(4-ON)/(5-ON) RECOMPUTED BY THE SAME CENSUS THAT MEASURED 0',
+      '(4-ON) RECOMPUTED BY THE SAME CENSUS THAT MEASURED 0',
       `hard refines ${w2.hardSwaps} · hard merges ${w2.hardMerges} · longest co-display run ` +
         `${w2.maxOverlapRun}. The co-display run is EXPECTED to stay at ${offLeg.overlapRun}: ` +
         'parentBlend never keeps the parent drawn, so this number is not a flip criterion. The ' +
@@ -872,7 +1201,7 @@ function soft(name, detail) {
           'Equality is the assertion — the live <= 261 ceiling is not what this leg is for; a ' +
           'crossfade adds nothing where there is nothing to fade'
       );
-    gate('(19) NO PAGE ERRORS ON THE ON LEG', errors2.length === 0, errors2.slice(0, 3).join(' | ') || 'clean');
+    gate('(19) NO PAGE ERRORS ON THE ON LEG', errors2.length === 0, errors2Note());
     await ctx2.close();
   }
 

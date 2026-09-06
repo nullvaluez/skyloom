@@ -826,8 +826,8 @@ RED:
 | Leg | Subsection | Owner of the feature | Pass 1 | Pass 2 |
 |---|---|---|---|---|
 | `verify-fixture` | §5.1 | E (the venue itself) | **10/10**, all four settled | pending |
-| `verify-flash-guard` | §5.2 | B (`FLASH_GUARD`) | **RED, 5/1** | **attempt 1 VOID** (starvation) |
-| `verify-fade` | §5.3 | B (`CHUNK_FADE`) | **RED, 4/2** | pending |
+| `verify-flash-guard` | §5.2 | B (`FLASH_GUARD`) | **RED, 5/1** | 2a VOID · 2b census proven, **green leg VOID**, re-take pending |
+| `verify-fade` | §5.3 | B (`CHUNK_FADE`) | **RED, 4/2** | 2b **VOID** (probe blind), re-take pending |
 | `verify-lod-fade` | §5.4 | D (`LOD_CROSSFADE`) + A (streamer) | **RED, 2/5** | pending |
 | `verify-step-clean` | §5.5 | A (`STEP_SAFE`) | **RED, 4/4** | pending |
 | `verify-ladder-fix` | §5.6 | A (`PERF_LADDER`) | **RED arm 7/6** | **GREEN 13/13** |
@@ -948,9 +948,65 @@ sustained runs**, while the self-test's single white frame still scores exactly
 was not a candidate" — still admits the LAST frame of every run; only run
 length works.
 
-**PASS 2b (flipped, on the fixed tree).** *pending* — (3) exactly 0 at every
-resident site **with (1a)/(1b) proving the census is non-empty**, (5) per-site
-triangle counts only falling.
+**PASS 2b (attempt 2, integration `ec53fd3`): CENSUS PROVEN · GREEN LEG VOID ·
+SELF-TEST RED.** `6 passed, 1 failed`, rc 1, 571 s.
+
+**The census is alive again, and it reproduces pass 1 EXACTLY** — which is the
+cleanest possible confirmation of A's rule-1 fix, because the same instrument
+that read 0 meshes in 2a now reads pass 1's numbers to the triangle:
+
+| | Powell | Manhattan |
+|---|---|---|
+| meshes / tris | **3 / 31,576** | **14 / 126,116** |
+| zero-area | **2,616 (8.28 %)**, worst chunk 8.34 % | **5,820 (4.61 %)**, worst chunk 13.98 % |
+| identical to pass 1? | **yes, to the triangle** | **yes** |
+
+(1a) and (1b) PASS. (2) RED PASS. Sat-skyline is still 0 / 83,752 and toy 0 / 0
+— **NOT EXERCISED**, unchanged.
+
+**But (3) passed on an empty census for the SECOND time**: the green leg read
+`powell (no pin): 0 meshes, 0 tris`, (5) read NOT CALIBRATED, and
+`FLASH_GUARD telemetry: {"telemetry":null,"runtimePin":null}`. **FLASH_GUARD's
+green is still unmeasured.** `FLASH_GUARD.enabled` IS `true` on this tree, so
+this is not a flag-state question.
+
+**MECHANISM — page starvation, and it is the gate's fault.** The gate never
+closed page 1 before `context.newPage()`, so the green leg booted while the RED
+page was still alive and rendering: two pages of the same app sharing four
+cores at ~1 fps are not two independent measurements, they are one measurement
+and its handicap. Pass 1's green leg scraped **2 meshes / 20,935 tris** —
+marginal, and it passed unnoticed. On the flipped tree, with more work per
+frame, it settled **none**. Fixed: page 1 is closed (its rAF chain stopped on
+purpose, not torn down mid-read) before page 2 is created, and **both legs now
+settle on `_settle.js`'s CONDITION under a cap instead of a fixed 60 s**, with
+the settle time and reason printed.
+
+**(4a) reads correctly and the isolation rule works.** `0 isolated in 266
+frames`, with **3 sustained runs recorded separately** — `107–111` (len 5),
+`221–226` (len 6), `240–241` (len 2), means 214–238 against medians 140–173.
+Those are the sky at the scanline, exactly the false positive the rule was
+written for, and they are now visible as fields rather than counted as flashes.
+
+**(4b) went RED — my own rule broke my own self-test, and the self-test caught
+it.** `0 hits from __paleSelfTest()`. Two independent causes, both real:
+
+1. **The run only closes on the next NON-candidate frame**, and the gate read
+   the counter in the same round trip that armed the test — at ~1 fps that race
+   is lost more often than won.
+2. **The synthetic frame can land adjacent to a real sustained run** (this venue
+   produced one at 240–241) and be absorbed into it, so (4b) would fail for a
+   reason with nothing to do with the detector.
+
+The harness's own frame is now accounted **apart** from the world's run
+bookkeeping: the open run is closed under the normal rule, the synthetic frame
+is scored on its own counter, the bookkeeping restarts clean, and the gate
+**waits for `selfDone`** rather than for a duration. Replayed against this run's
+own shape — self-test immediately after a sustained pair, read with no trailing
+frame — it now scores exactly 1, while a self-test that genuinely read no pale
+frame still scores 0 and fails.
+
+**The row is RE-TAKEN STANDALONE after pass 2b's end line, on the same tree.**
+That re-run, not this one, decides FLASH_GUARD's green.
 
 ---
 
@@ -978,8 +1034,103 @@ why "ready never falls" is NOT the invariant (§2.10).
 Since this run, (4) requires finite readings and (5) no longer coerces `?? 0`:
 an absent ready count would have certified the Owens lock on no data.
 
-**PASS 2 (flipped).** *pending* — (2) and (3) → 0 hard, presence channel names
-a real uniform, (1) (4) (5) (6) all still green.
+**PASS 2b (integration `ec53fd3`): VOID — THE PROBE WAS BLIND TO THE CHANNEL.**
+`4 passed, 2 failed`, rc 1, 346 s. Serpentine 122 frames, births 29 (HARD 29),
+deaths 20 (HARD 20), `presence channel = none`, evictions 40, **heals 9**.
+
+**`CHUNK_FADE.enabled` is `true` on this tree** — B shipped it, with an engine
+proof of single-frame pops **92 → 2** over a 2,700-frame serpentine, both
+residuals attributable to `fadeBudgetMiss`. So 29/29 hard is not a product
+reading. The mismatch is the probe's, arbitrated from both sides at `ec53fd3`:
+
+| | file:line | what it does |
+|---|---|---|
+| **my probe** | `verify-fade.js:81-95` | reads `material.userData.shader.uniforms` / `material.uniforms` for four **guessed** names (`uBirth`, `uChunkFade`, `uFade`, `uChunkBirth`), then `transparent` + `opacity`, then `'none'` → presence 1 |
+| **B's fade** | `chunk-fade.js:98-102` | publishes the pooled twin's uniform at **`material.userData.__fadeU`**, explicitly "so a probe can read the EFFECTIVE per-mesh alpha the GPU will see" |
+
+The GLSL uniforms behind it are `uSatBldgFade` / `uSkyFade`, injected through
+`applyBendAnchor*`'s `onBeforeCompile` — so they are **not** `material.uniforms`
+entries and the guessed names could never have found them. Both engines build
+twins through the one pool (`sat-building-engine.js:345`,
+`sat-skyline-engine.js:167`), and the twin is swapped onto the mesh at `:848`
+(birth) and `:874` (death), so the census was looking at the right object and
+the wrong property. Same family as the lod-fade NaN, §2.10a.
+
+**A SECOND defect, which the first fix would not have cured.** The channel label
+used `??=` — first-write-wins. B's twin is on a mesh **only during a ramp**: on
+birth completion `b.mesh.material = this.material` and the twin returns to the
+pool; dying meshes leave the scene. A resident chunk **at rest therefore has no
+`__fadeU`**, and that is the correct steady state, not a missing instrument. The
+first mesh sampled is almost always one at rest, so the label would have latched
+to `'none'` for the whole run **even after reading `__fadeU` correctly**. The
+label is now the most specific channel seen anywhere in the run; self-test (5c)
+is that exact sequence.
+
+**What the re-take should show, per B:**
+
+- **(2) births → SOFT.** `_startBirth` writes `value 0` in the same synchronous
+  block as `object.add` (`:847`), so the first displayed frame is presence 0.
+- **(3) deaths are HARD BY CONSTRUCTION HERE, whatever the feature does.**
+  `_startDeath` writes `value = _altFade` (1.0 at these poses, `:873`) and the
+  value only moves on the **next** `_stepFades`; at ~2.84 s per rendered frame a
+  0.3 s `evictSec` ramp cannot span two samples. B's fix is a frame-count floor
+  — `progress = min(elapsed/sec, framesSince/CHUNK_FADE.minFrames)`, `minFrames`
+  3 — so a ramp spans ≥ 3 partial samples at any frame rate while `elapsed`
+  still governs at 60 fps. The gate prints this as a venue note rather than
+  letting the number read as a defect.
+- **(3) is read against the CAP, not against 0.** `maxDying` is 4, and both the
+  eviction loop (`:1077`) and the AGL cull (`:1020`) can present more at once;
+  every refusal is counted as `fadeBudgetMiss` (`:857`). B's own rule, now
+  applied and printed: `hardDeaths ≤ fadeBudgetMiss` = capped as designed;
+  `hardDeaths > fadeBudgetMiss` = the unexplained remainder that is the defect.
+
+**B's ramp floor is committed (`r24/b 45e2cde`)** — `progress = min(elapsed/sec,
+framesSince/minFrames)` through `rampT`, in both engines and both ramps, with
+**`minFrames` 4, not 3**. Births and deaths do not give the same sample count
+and the gate now says so: **a birth starts at 0, so N frames give N partial
+samples; a death starts at FULL presence, so N frames give N−1.** The venue
+should therefore show deaths spanning **≥ 3** partial samples, not ≥ 4. At 60 Hz
+a 0.3 s ramp is 18 frames, far above the floor, so `elapsed` still governs and
+the shipped look is unchanged. B's proof rows: dt 2.84 s → **pops 0** (was 92
+flag-off); dt 16.7 ms → 4 pops, **all `fadeBudgetMiss`**; a 500 ms hitch
+mid-ramp cannot complete a ramp; `--off` → 92 pops **byte-identical**.
+
+**HEAL_IN_PLACE: the heal TOTAL is not the hole count.** B's engine now counts
+every outcome exhaustively, with equality asserted in B's own gate, and only one
+of them is a hole:
+
+| Outcome | Is it a hole? |
+|---|---|
+| `healsInPlace` | no — the drape landed on the resident mesh; this IS the fix |
+| `healsNoop` | no — nothing to do |
+| **`healsQueueFull`** | **YES — the budget was spent. The only hole.** |
+| `healsAborted` | no — the chunk was evicted under the job: **moot, no chunk no hole** |
+| `healsNoRecord` | no — water-only |
+| `healsCoalesced` | no — a re-drape for that key was already in flight |
+| `redraping` | no — still draining |
+
+So a residual heal hole in any browser row is read against **`healsQueueFull`
+only**. Reading it against `heals` would indict four outcomes working exactly as
+designed — the same mistake shape as counting a sustained field as a flash, or
+an absent `__fadeU` as a missing instrument. This row's `heals 9` is, on its
+own, uninterpretable; the re-take prints the full taxonomy.
+
+**Expected re-take reading on this venue:** births **29/29 SOFT**, deaths
+spanning **≥ 3 partial samples**, hard deaths **≤ `fadeBudgetMiss`**.
+
+**The legs that did read correctly** — a VOID row is not a worthless row: (1)
+the watch had 29 births / 20 deaths to watch; (4) ready 4 of 16, series
+`[[5,0]…[7,0],[0,0],[0,1]…[3,10]]`; **(5) the Owens lock held — sbReady 0 /
+skyReady 0 / draws 190** (up from 156 flag-off, still far under the live 261
+ceiling); (6) clean.
+
+**The probe now has its own RED** (`FADE_PROBE_SELFTEST=1`, 7/7): it extracts
+the REAL `presenceOf` from this file's own source — not a copy, so it cannot
+drift — and asserts a shared material still reads `none`/1, which keeps pass 1's
+14/14 and this run's 29/29 exactly reproducible on a flag-off tree.
+
+**PASS 2c (standalone re-take).** *pending* — with `flash-guard`, after B's
+`minFrames` merge.
 
 ---
 
@@ -1013,7 +1164,65 @@ correct and my precondition was not. Fixed in `9cba1b6`.
 parent's TEXTURE into the child and disposes the parent model as before — it
 deliberately never co-displays. The ON leg recomputes (5) only to say so.
 
-**PASS 2 (flipped).** *pending* — the ON leg (gates 9–19) exists as of
+**PASS 2b (integration `ec53fd3`): THE ON LEG PROVED THE REFINE PATH, THEN THE
+GATE CRASHED.** rc 1, 860 s, ending at
+`ReferenceError: notCalibrated is not defined` — gate (14)'s NOT CALIBRATED
+path calling a helper the file never imported. The require was written in the
+same batch as the other seven gates, but that one replace had **no assert** and
+matched nothing. Seven files had it; this one did not.
+
+**What the ON leg produced before it died — D reads this as the refine path
+PROVEN:**
+
+| | OFF arm | ON arm |
+|---|---|---|
+| `refines` / `merges` | 4 / 0 | 4 / 0 |
+| `hardSwaps` | **4** | **0** |
+| `faded` | **0** | **4** |
+| `skip.*` | `disabled 4` | **all seven 0** |
+| ladder identity | 4 = 4+0 ✓ | 4 = 0+4 ✓ |
+
+`skip.disabled 0` proves the pin reached the ladder; `skip.unpatched 0` proves it
+reached it **before the materials were patched**. Warp settle steady at 3 after
+17 frames; `peakActive` 8 of 32; Owens 229 draws (OFF, fixture).
+
+**(3) went 27 → 0 re-appearances on a pure yaw** — A's residency trio, measured
+by this instrument. D's crossfade baseline is therefore **4 hard refines, not
+20**.
+
+**Three things in that row were the instrument, not the world:**
+
+1. **`active 8 / retained 2` is not a leak and not stuck.** `waitUntil` returned
+   *held*, so `active === 0` **was** observed; `retained` counts distinct parent
+   TEXTURES while `active` counts MATERIALS, and a refine arms four children off
+   one parent — 8/2 is exactly **two refine events in flight**, a 4:1 ratio no
+   stuck set lands on by coincidence. The yaw interval keeps pinning the final
+   heading, so the camera stops but the streamer does not, and each round trip
+   is several rendered frames.
+2. **(6)'s 20-of-59 refetch was my yaw step.** `START_YAW` swept `h0 + u·4π`
+   over 40 wall-clock seconds — **~51° of heading between displayed frames** at
+   this venue, precisely A's measured refetch regime (51°/frame → 28,
+   0.85°/frame → 0). (3) was the same experiment.
+3. **(5) asserted a mechanism D did not build.** `parentBlend` blends the parent
+   TEXTURE into the child material via clip-UV and disposes the parent model
+   exactly as upstream does, so a mesh co-display census reads **0 by
+   construction forever** — and its 0 was being written into the RED table as a
+   defect measurement.
+
+**Fixed for the re-take** (`cba7b45`, `356e32d`, `1187c47`, `b5a638a`): the yaw
+is per RENDERED frame at 0.85°/frame with a 360° minimum arc and
+`FLY_LOD_SWEEP_MS`; (3)/(6) read NOT CALIBRATED on a short arc; the drain
+returns **the snapshot that satisfied it**; a second read 12 frames later
+attributes a non-zero `active` to arrivals or calls it stuck; the leak signature
+is asserted on both reads as `active === 0 && retained > 0`; the free invariant
+`retained ≤ active ≤ 4 × retained` runs where the active set is non-empty; and
+(5) is replaced by D's handle — `terra.fades.active` sampled per frame, giving
+`maxBlendRun`, the crossfade window.
+
+**(14)'s ±25 % comparability guard would have fired on this run** — 46 vs 26
+frames, ratio 0.57. The refines matching at 4 was luck, not control.
+
+**PASS 2c (standalone re-take).** *pending* — the ON leg (gates 9–19) as of
 `9cba1b6`/`f7fe5f2`: `refines+merges === hardSwaps+faded` on both arms,
 `refines+merges` flat within ±25 % frame-count tolerance, `faded` rises /
 `hardSwaps` drops, `active === 0 && retained === 0` by poll, `0 < peakActive ≤ 32`,
@@ -1043,8 +1252,43 @@ steps, so none of the four failures is a 0-of-0. **Not measurable here: the
 tear LINE** — that is a compositor/vsync property, user-machine only, and a
 phone camera beats a software recorder because a recorder composites.
 
-**PASS 2 (flipped).** *pending* — all four failing legs to 0 with (1) still
-showing accepted steps > 0.
+**PASS 2b (integration `ec53fd3`): HALF THE WRITES MOVED INSIDE THE FRAME.**
+`4 passed, 4 failed`, rc 1, 241 s — and the shape of the remainder is what
+attributed it.
+
+| Leg | Pass 1 (flag-off) | Pass 2b |
+|---|---|---|
+| (2) canvas width/height outside a rAF | **18 of 18** | **12 of 30** |
+| (3) `setPixelRatio` outside | 6 of 6 | **6 of 12** |
+| (3) `setSize` outside | 12 of 12 | **12 of 24** |
+
+**The totals DOUBLED while the outside count stayed flat** — 6 → 12
+`setPixelRatio`, 12 → 24 `setSize`, with exactly half outside in each case.
+That is not a partial fix; it is a **double apply**, and A attributed it from
+source: the rig applies inside the frame, its React `setDpr` schedules a commit,
+r3f's `Canvas` layout effect runs an awaited `root.configure({dpr})`, and r3f's
+zustand subscriber re-applies `gl.setPixelRatio` + `gl.setSize` **outside any
+frame**. Six rig + six r3f.
+
+A's fix is `installResizeGuard` (`r24/a a0c1484`): a resize request for the
+state the renderer is already in never reaches the canvas, with
+`window.__flyStats.stepGuard` counting suppressions, plus a new
+`verify-step-guard.mjs` (13/13, standing RED control). **A says this gate needs
+no change** — (2)/(3) failed honestly and the guard makes them true — and
+expects (2) 0 of ~18, (3) 0 of 6 / 0 of 12, **with the totals falling** as the
+redundant calls stop.
+
+The gate gains one leg for the re-take, in A's own safest form: **(7) exactly
+one application per governor step, inside the frame** — per accepted step,
+`step.n` +1 **and** zero writes outside a rAF **and** `stepGuard` strictly
+increased. Not the obvious assertion, because `stepGuard` counts SUPPRESSED
+calls, is cumulative for the page's life, and counts redundant in-frame calls
+too, so `suppressed == outside-writes` is not a safe equality; and ABSENT is
+ambiguous unless paired with `step.n`. The expected totals drop is printed, not
+failed on.
+
+**PASS 2c (standalone re-take).** *pending* — all four failing legs to 0 with
+(1) still showing accepted steps > 0, and (7) green.
 
 ---
 
@@ -1082,6 +1326,38 @@ single tier step; forced step 0 → 1 with `{"n":1,"dpr":0.875,"applyMs":466.8,
 frame, not through the safety valve** — and composer buffers [560,315] equal
 the drawing buffer.
 
+**PASS 2b: 12/13 and 7/6 — the ladder is green, and gate 13 found something
+else entirely.** Every ladder leg passed on the flipped tree (rungs
+`0.875`/`0.75` before the tier rungs, refresh 144 with target **144**, the
+stutterer steps down, the clean control never does, dpr `[0.875, 0.75, 1]` then
+`["medium"]`, forced step 0 → 1 applied **inside a frame** with `applyMs` **2.5**
+against pass 1's 466.8, buffers `[560,315]` equal to the drawing buffer). The
+RED arm still fails 1, 2, 6, 7, 9 and 11 with the flags pinned off, so the
+calibration holds both ways.
+
+**But gate 13 fails on BOTH arms with a repeated uncaught exception:**
+`Cannot read properties of undefined (reading 'byteLength')` — ×31 on the fix
+arm, ×3 on the red arm. Pass 1 was clean, so it is a flipped-flag path; and
+because it appears with the pins **set and unset**, it is not `LADDER_FIX` or
+`STEP_SAFE`. These two rows are also **the only TOY boots in the pass** — every
+satellite row is clean — which is the bisection that pointed at the toy chunk
+path.
+
+**Attributed** (B, by headless attribute census): A's `FINALIZE_PACE`,
+`toy-world-engine.js:972` `geo.setIndex(idx)` with a raw `Uint32Array` under the
+paced branch. three wraps only plain arrays, so the typed array becomes
+`geometry.index` with no `.array` and `WebGLAttributes` throws at first upload.
+2×2 proof: `FINALIZE_PACE` ON → **80 broken LAND meshes**, OFF → **0**;
+`FLASH_GUARD` irrelevant.
+
+**The lesson this row pays for:** the gate printed the message thirty-one times
+and nothing else. Thirty-one copies of one message is ONE finding, and without a
+stack frame the row can only say it happened — attribution then costs two rows
+and three hypotheses. Every "no page errors" gate in the fleet now prints the
+first three UNIQUE exceptions **with stacks**, deduplicated by message
+(`scripts/_pageerrors.js`). One line would have attributed this in the first
+run.
+
 Why this row is the template: legs 3, 4, 8, 12 and 13 are green in BOTH arms.
 A control that passes in the red arm is what makes a failing leg mean
 something — (8) holding in both is why (7) measures the stutter term rather
@@ -1107,8 +1383,48 @@ READS THE SAME DIRECTIONAL AS KEY passed **six times** on `Δ undefined°`.
 `null < 1e-4` is TRUE in JavaScript. Fixed in `686db21`; that leg now reads
 NOT CALIBRATED with the two vectors printed.
 
-**PASS 2 (flipped).** *pending* — exactly one key direction across every lit
-material at every tier, and the azimuth spread tracking the sun.
+**PASS 2b: VOID — THE SUN NEVER MOVED.** `14 passed, 7 failed, 6 NOT
+CALIBRATED`, rc 1, 263 s.
+
+Commanded 55° / 2° / −14°; the key measured **23.132 → 23.132 → 22.938**, and
+the key azimuth drifted monotonically **−64.6081 → −64.8665 → −65.1123** across
+the six samples. A 69° commanded swing cannot produce a 0.2° key drift, and a
+monotone azimuth walk across four minutes is a **clock**, not a command.
+
+**Cause, arbitrated from source:** the gate redefined `window.__flySunOverride`
+as an accessor backed by `__r24Sun` and wrote `{ elDeg: 55 }` into it — but the
+app consumes that override as a **TIMESTAMP IN MILLISECONDS**
+(`FlyScene.jsx:939`, `:1155`), and nothing in `lib/` or `components/` reads
+`__r24Sun` or an `elDeg` field at all. An object where a number belongs yields
+NaN inside `computeSun` or a truthy fall-through, so the app kept its wall
+clock. **`ONE_SUN.enabled` is `true` on this tree**, so without this arbitration
+the row read as C's feature failing.
+
+The six NOT CALIBRATED lines are the §2.10a fix working: clause (5) would have
+printed `PASS … Δ undefined°` six times on this same tree.
+
+**Two contract mismatches also surfaced, both now fixed:**
+
+- **`water` was the string `'key'`** — a documented sentinel meaning "one
+  directional in the rig, the same vector by construction". C's `ad0849f` now
+  publishes a real vector plus `waterSource`, and the gate asserts **both** the
+  angle ≤ 0.5° **and** `waterSource === 'key-light'`: an angle of 0 between two
+  INDEPENDENT lights is a coincidence that holds until someone moves one. New
+  **(8)** counts `<directionalLight>` in `FlyScene.jsx` from SOURCE and requires
+  exactly 1 (measured: 1) — teeth without a runtime census that would perturb
+  FRAME_STATS.
+- **`casting` reads `undefined`** because it lives on `stats.shadow`, not
+  `stats.sun`. C's `ad0849f` publishes it on both, along with `minElRadDeg`,
+  `hillMinDeg`, `hillMaxDeg` — which also un-SKIPs clause (3).
+
+**Fixed for the re-take** (`d9e5d57`): the sun is commanded by TIME, searched
+with the app's own `computeSun` (`scripts/_sun-time.mjs` reading raw `sinEl`, so
+a night target is reachable at all), and **no clause runs until the app reports
+the commanded elevation within 0.5°** — the precondition whose absence let a
+stationary sun read as a stationary key.
+
+**PASS 2c (standalone re-take).** *pending* — exactly one key direction across
+every lit material at every tier, with the azimuth spread tracking the sun.
 
 ---
 
@@ -1131,8 +1447,49 @@ Fixed in `686db21`: the read happens inside a rAF (the pale detector's idiom,
 which is why its census rows read real pixels), and (2)/(3) are NOT CALIBRATED
 whenever (1) fails.
 
-**PASS 2 (flipped).** *pending*, and it needs a fresh PASS-1 too — this row has
-no valid flag-off column yet.
+**PASS 2b: THE INSTRUMENT FIX WORKED, AND THE ROW IS STILL VOID AS POSED.**
+`4 passed, 2 failed`, rc 1, 243 s.
+
+The rAF read fixed the black frame — this row produced the pass's first
+genuine seam measurement:
+
+```
+noon   horizon row 227 (step 54.6) · terrain L 212.4 · sky L 161.5 · Δ 50.9
+night  horizon row 227 (step 54.7) · terrain L 212.3 · sky L 161.5 · Δ 50.8
+```
+
+(1a)/(1b) found a real horizon with a 54-luma step and the profile shows the
+seam cleanly (`…208.2, 159.5, 160.0…`), against pass 2a's all-zero profile.
+
+**But C proved from source that the frame has ZERO PERCENT MELT in it.**
+`bootFly` pins `__flyAerialOverride = 0` (`_boot.js:95`, `:143`), which drives
+`aerialGate` to 0, so all three atmosphere channels take their R19 identity
+paths, `WORLD_EDGE.fade.satellite` (60–120 km) never enters a fixture frame, and
+`setDepthHaze` is literally 0 in satellite (`FlyScene.jsx:1011`). **The gate's
+own luma profile says so** if you read it: thirteen terrain rows flat at 210–214
+and then a one-row cliff. A delta measured across a seam with no melt is not a
+reading of the seam.
+
+**And both legs were the same frame** — the sun defect above — which is why noon
+and night agreed to 0.1. That agreement proved nothing.
+
+**The bound was unreachable too**, and must not be sourced from C's node proof:
+`maxMix` 0.55 leaves 0.45 × 51 ≈ **23** even fully unpinned, and an eye at
+4200 m is 3.5 e-folds over `heightFalloffM` 1200. C's node proof predicts 0.000
+for the **decode round trip only**, never for a seam.
+
+**Re-expressed for the re-take** (`d9e5d57`): the aerial pin is released with
+the same accessor idiom as the sun; tier high **and** `aerialGate > 0` are a
+precondition or the row is NOT CALIBRATED; the absolute bound is gone and the
+claim is the **A/B** — same pose, `LINEAR_HAZE` on must read a smaller Δ than
+off; (3)'s spread tightens to **≤ 0.5** as the one-colour-function tell, the
+assertion that needs no absolute bound; and C's free check is asserted —
+**`moonK` must read 1** at a landed −14° sun, since it keys on
+`trueElevationDeg`. The ON arm stays NOT CALIBRATED until C's
+`__flyLinearHazeOverride` lands. A toy pose, where `setDepthHaze` carries
+`haze.max`, is a second INFORMATIONAL leg only.
+
+**PASS 2c (standalone re-take).** *pending*.
 
 ---
 
@@ -1156,9 +1513,33 @@ The renderer state that run: `reversedDepth=true · style=toy · tier=high`.
 
 Handles required, both C-owned — see §2.7c for the contracts.
 
-**PASS 2 (flipped).** *pending* — the RED signature to look for is all three
-pixels reconstructing to **2.50–2.51 m**, i.e. `−cameraNear`, every fragment
-collapsed.
+**PASS 2b: THE HOOK ARRIVED AND THE GATE STILL MEASURED NOTHING.**
+`3 passed, 1 failed, 1 NOT CALIBRATED`, rc 1, 244 s.
+
+C's hook works: **(0) `__flyDepthProbe` PRESENT**, **(0b) `__flyDof` true** —
+the gate reads the live handle now instead of inferring the pass from
+`style`/`tier`, which is the fix that stopped it passing while printing
+`dof=null`. Renderer `reversedDepth=true`, style toy, tier high.
+
+**But (1) failed with `0 raycast hits`**, so the probe was never called on a
+real pixel, and (3)/(4) read NOT CALIBRATED for want of a finite `coc` — the
+third verdict doing its job on a row that measured nothing.
+
+**Cause: the row ran with no budget scaler.** It sat in cert-run's PACING list,
+so on the flipped tree with `FINALIZE_PACE`'s cold seed and a fixed settle the
+toy chunks were not resident at the moment of the pick. By the §1.5 table this
+is a **settled-pose pixel probe — a content gate**, and it takes `K`.
+
+**Fixed for the re-take** (`d9e5d57`): the row moves to the `K` list; it settles
+on `_settle.js`'s condition before picking; the raycast returns a REASON when it
+misses (which handle was absent, or no intersection) instead of a bare null;
+the hits are printed with their distances and the objects they struck; and fewer
+than three picks reads **NOT CALIBRATED, not FAIL** — the round trip was never
+exercised, which is not the same as failing it.
+
+**PASS 2c (standalone re-take).** *pending* — the RED signature to look for is
+all three pixels reconstructing to **2.50–2.51 m**, i.e. `−cameraNear`, every
+fragment collapsed.
 
 ---
 
@@ -1281,3 +1662,48 @@ names to world), which is why it carries a kernel allow-list.
 **PASS 2 / user machine: UM for everything visual** — pixels, draws, the
 catcher shadow and sparkle. The node leg cannot see any of them; sparkle in
 particular is temporal and needs real frames.
+
+---
+
+## §6 THE ROUND'S INSTRUMENT LESSON — a number read across an ownership boundary
+
+Five times in two passes, a gate reported a number that was about the gate
+rather than about the world. They look like five unrelated bugs. They are one:
+
+| The reading | What it was taken to mean | What it actually meant |
+|---|---|---|
+| `refines NaN · merges NaN · parentRefetches NaN` | nothing — it printed and passed | A publishes `refine` / `merge` / `refetchParent`, **singular**. NaN compares false against every threshold, so the gate went quiet exactly where it should shout |
+| `presence channel = none`, 29/29 hard births | CHUNK_FADE is not fading | B publishes the twin's uniform at `material.userData.__fadeU`; my four guessed names could never have found an `onBeforeCompile` uniform |
+| `heals 9` | nine holes | six exhaustive outcomes, of which **one** (`healsQueueFull`) is a hole; `healsInPlace` is the fix working |
+| `pale 8 in 290 frames` | eight one-frame flashes | two-frame runs at identical means — a sustained **field**, a different picture with a different cause |
+| `residentTiles=0` | the fixture is too small | the residency pass is only installed when `TERRA_PACE.keepResident` is on; 0 was correct |
+
+**The rule this round earned:** *a value read across an ownership boundary must
+be read by the name its owner publishes, with the owner's definition of what it
+counts, and an absent reading must be a loud failure rather than a default.*
+
+Three corollaries, each paid for:
+
+1. **Absence must never coerce.** `?? 0` on the Owens lock, `v == null ||
+   v <= 261` on a ceiling, `null < 1e-4` on an angle, `undefined === undefined`
+   on a rebuild count — every one of them turns "I could not measure" into
+   "PASS". That is what `NOTCAL` (§2.10a, `scripts/_notcal.js`) exists for.
+2. **A precondition must be readable in BOTH arms.** A precondition that only
+   the feature can satisfy is not a precondition; it is the feature under test,
+   asserted before it exists.
+3. **The label must be the best reading of the run, not the first.** `??=` on a
+   channel name latched `none` from the first mesh sampled — and would have
+   done so again *after* the channel was read correctly.
+
+**Why it kept happening:** every one of these gates was written against a
+feature that did not exist yet, from a plan describing what it would do. The
+plan says "the fade rides a uniform"; the implementation publishes
+`userData.__fadeU`. Nothing is wrong with writing the gate first — it is how the
+RED gets calibrated — but **a gate written before its feature must be re-read
+against the implementation before its output is trusted**, and the cheapest
+moment to do that is when the owner merges, not when the row is red at 21:30.
+
+**What actually caught them:** not the FAIL lines. Every one of these was found
+by reading a **PASS** line sceptically, or by a self-test the gate ran against
+itself (`__paleSelfTest`, `FADE_PROBE_SELFTEST`). §2.10 was written before the
+rows landed for exactly this reason, and it earned its place.

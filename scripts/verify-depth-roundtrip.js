@@ -46,6 +46,8 @@
  */
 const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
+const { settleWorld } = require('./_settle');
+const { attachPageErrors } = require('./_pageerrors');
 
 // Neon NYC, parked low over Midtown — the toy pose the fleet already uses.
 const POSE = [40.7549, -73.984, 900, 2.6, -0.28];
@@ -79,7 +81,13 @@ const RAYCAST = ([px, py]) => {
   const cam = window.__flyCamera || window.__fly?.camera?.cam || null;
   let scene = window.__flyPlayer ?? window.__fly?.engine?.object ?? null;
   while (scene && scene.parent) scene = scene.parent;
-  if (!gl || !cam || !scene || !THREE) return null;
+  // A bare null could not be told from "the scene is empty": pass 2b reported
+  // "0 raycast hits" and the row could not say whether the handles were
+  // missing, the camera was wrong, or nothing was resident.
+  if (!gl || !cam || !scene || !THREE)
+    return {
+      miss: `handle absent — THREE ${!!THREE} gl ${!!gl} cam ${!!cam} scene ${!!scene}`,
+    };
   const W = gl.domElement.width;
   const H = gl.domElement.height;
   const ndc = new THREE.Vector2((px / W) * 2 - 1, -(py / H) * 2 + 1);
@@ -87,7 +95,7 @@ const RAYCAST = ([px, py]) => {
   rc.setFromCamera(ndc, cam);
   rc.far = 60000;
   const hits = rc.intersectObject(scene, true).filter((h) => h.distance > 0.5);
-  if (!hits.length) return null;
+  if (!hits.length) return { miss: 'no intersection', roots: scene.children?.length ?? 0 };
   // view-space Z is the distance along the camera forward axis, not the ray.
   const fwd = new THREE.Vector3();
   cam.getWorldDirection(fwd);
@@ -115,7 +123,7 @@ function gate(name, ok, detail) {
   if (process.env.FLY_TILE_FIXTURE) await require('./_fixture').attachFixture(context);
   const page = await context.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(String(e)));
+  const errorsNote = attachPageErrors(page, errors);
 
   // TOY, tier high — the DoF pass only exists there.
   await bootFly(page, { style: 'toy', timeoutMs: 600000, settleMs: 8000 });
@@ -185,12 +193,24 @@ function gate(name, ok, detail) {
   const W = await page.evaluate(() => window.__flyGl.domElement.width);
   const H = await page.evaluate(() => window.__flyGl.domElement.height);
   const candidates = [];
+  const misses = [];
+  // (a) THIS IS A SETTLED-POSE PIXEL PROBE, i.e. a content gate by the §1.5
+  // table — so it settles on the condition, not on a fixed wait, before it
+  // picks anything. The row also needs the finalize budget scaler; without it
+  // the toy chunks may simply not be resident at the moment of the pick, and
+  // the raycast then reports an empty world as a gate failure.
+  const st = await settleWorld(page, { capMs: Number(process.env.DEPTH_SETTLE_CAP_MS || 300000) });
+  console.log(
+    `  settle: ${st.settled ? 'SETTLED' : `NOT settled — ${st.why}`} in ${(st.ms / 1000).toFixed(0)}s ` +
+      `(maxZ ${st.maxZ}, load ${st.load})`
+  );
   for (const fy of [0.86, 0.72, 0.6, 0.55, 0.52]) {
     for (const fx of [0.3, 0.5, 0.7]) {
       const px = Math.round(W * fx);
       const py = Math.round(H * fy);
       const r = await page.evaluate(RAYCAST, [px, py]);
-      if (r) candidates.push({ px, py, ...r });
+      if (r && !r.miss) candidates.push({ px, py, ...r });
+      else misses.push(`(${px},${py}) ${r?.miss ?? 'null'}`);
     }
   }
   const pick = (target) =>
@@ -205,11 +225,28 @@ function gate(name, ok, detail) {
     ['far ~4 km', pick(4000)],
   ].filter(([, p]) => p);
 
-  gate(
-    '(1) THREE PIXELS WITH A KNOWN TRUE DISTANCE WERE FOUND',
-    picks.length === 3,
-    `${candidates.length} raycast hits; picked ${picks.map(([l, p]) => `${l}=${Math.abs(p.viewZ).toFixed(0)}m`).join(', ')}`
+  console.log(
+    `  raycast: ${candidates.length} hits at distances ` +
+      `${JSON.stringify(candidates.map((c) => +Math.abs(c.viewZ).toFixed(0)))} on ` +
+      `${JSON.stringify([...new Set(candidates.map((c) => c.object))].slice(0, 6))}` +
+      (misses.length ? `; ${misses.length} miss(es): ${misses.slice(0, 3).join(' · ')}` : '')
   );
+  // (c) FEWER THAN THREE IS NOT CALIBRATED, NOT A FAILURE. The gate needs
+  // three pixels whose true distance is known; if the raycast found none, the
+  // depth round trip was never exercised and the row measured nothing about it.
+  if (picks.length < 3) {
+    notCalibrated(
+      '(1) THREE PIXELS WITH A KNOWN TRUE DISTANCE WERE FOUND',
+      `${candidates.length} raycast hits of ${candidates.length + misses.length} probes; picked ` +
+        `${picks.length}. Misses: ${misses.slice(0, 4).join(' · ') || 'none recorded'}. Settled: ` +
+        `${st.settled} (${st.why || 'ok'})`
+    );
+  } else
+    gate(
+      '(1) THREE PIXELS WITH A KNOWN TRUE DISTANCE WERE FOUND',
+      true,
+      `${candidates.length} raycast hits; picked ${picks.map(([l, p]) => `${l}=${Math.abs(p.viewZ).toFixed(0)}m`).join(', ')}`
+    );
 
   const rows = [];
   for (const [label, p] of picks) {
@@ -281,7 +318,7 @@ function gate(name, ok, detail) {
     );
   }
 
-  gate('(5) NO PAGE ERRORS', errors.length === 0, errors.slice(0, 3).join(' | ') || 'clean');
+  gate('(5) NO PAGE ERRORS', errors.length === 0, errorsNote());
   console.log('\nRED TABLE (defect · gate · measured · green target)');
   for (const r of red) console.log(`  ${r[0]} | ${r[1]} | measured ${r[2]} | ${r[3]}`);
   console.log(`\n${pass} passed, ${fail} failed${notCalSummary()}`);

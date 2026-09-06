@@ -54,10 +54,17 @@
  */
 const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
+const { attachPageErrors } = require('./_pageerrors');
+const { settleWorld } = require('./_settle');
 
 const POWELL = [40.1578, -83.0752, 900, 1.9, -0.3];
 const MANHATTAN = [40.7075, -74.0113, 792, 2.6, -0.12];
-const SETTLE = Number(process.env.FLASH_SETTLE_MS || 60000);
+// A CONDITION WITH A CAP, not a duration. `settleWorld` returns when the
+// terrain has reached its zoom, the ground has stopped moving, every chunk has
+// resolved ready-or-empty and __flyStats has republished since we asked — so
+// the census counts a settled scene rather than whatever existed 60 s in. The
+// cap only bounds the wait; the gate prints whether it was reached.
+const SETTLE_CAP = Number(process.env.FLASH_SETTLE_CAP_MS || 420000);
 const SERPENTINE_MS = Number(process.env.FLASH_SERPENTINE_MS || 45000);
 
 const PIN_POSE = ([lat, lon, altM, heading, pitch]) => {
@@ -156,6 +163,17 @@ const INSTALL_PALE = () => {
     /** length of the current run of candidate frames; only a run of 1 counts. */
     runLen: 0,
     lastCand: null,
+    /**
+     * The self-test frame is SYNTHETIC — the harness painted it — so it takes
+     * no part in the world's run bookkeeping. It is counted here, separately,
+     * and `selfDone` lets the gate wait for the frame to have actually
+     * happened instead of racing the next rAF.
+     */
+    selfHits: 0,
+    selfDone: false,
+    selfSaw: null,
+    /** set by the gate before it closes a page; the tick chain ends here. */
+    stop: false,
     /** candidates that had a candidate neighbour — a field, not a flash. */
     sustained: 0,
     sustainedRuns: [],
@@ -226,10 +244,16 @@ const INSTALL_PALE = () => {
       return true;
     };
     const tick = () => {
+      // The gate sets `stop` before closing a page so the rAF chain ends on
+      // purpose rather than being torn down mid-read. A flag nothing honours
+      // is worse than no flag.
+      if (S.stop) return;
       try {
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        let isSelf = false;
         if (S.selfTest > 0) {
           S.selfTest = 0;
+          isSelf = true;
           gl.clearColor(1, 1, 1, 1);
           gl.clear(gl.COLOR_BUFFER_BIT);
         }
@@ -271,7 +295,29 @@ const INSTALL_PALE = () => {
           // candidate and the held hit always lands — (4b) still reads exactly
           // one.
           const cand = jump > 60 && min > med + 40 && mean > 180;
-          if (cand) {
+          if (isSelf) {
+            // ISOLATED BY CONSTRUCTION, not by luck. MEASURED (pass 2b): the
+            // run-length rule scored the self-test 0 twice over — the run only
+            // closes on the next NON-candidate frame, and the gate read the
+            // counter before that frame existed; and the synthetic frame can
+            // land adjacent to a real sustained run (this venue produced runs
+            // at 107-111, 221-226 and 240-241) and be absorbed into it, which
+            // would make (4b) fail for a reason that has nothing to do with
+            // the detector. So the harness's own frame is accounted APART: the
+            // open run is closed first under the normal rule, the synthetic
+            // frame is scored on its own, and the bookkeeping restarts clean.
+            if (S.runLen === 1) {
+              S.pale++;
+              if (S.hits.length < 8) S.hits.push(S.lastCand);
+            } else if (S.runLen > 1) {
+              S.sustained++;
+            }
+            S.runLen = 0;
+            S.lastCand = null;
+            if (cand) S.selfHits++;
+            S.selfSaw = { f: S.frames, mean: +mean.toFixed(1), med: +med.toFixed(1), min: +min.toFixed(1), cand };
+            S.selfDone = true;
+          } else if (cand) {
             S.runLen++;
             S.lastCand = { f: S.frames, mean: +mean.toFixed(1), med: +med.toFixed(1), min: +min.toFixed(1) };
           } else {
@@ -347,7 +393,7 @@ async function serpentine(page, ms) {
   if (process.env.FLY_TILE_FIXTURE) await require('./_fixture').attachFixture(context);
   const page = await context.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(String(e)));
+  const errorsNote = attachPageErrors(page, errors);
 
   // THE RED LEG: B's runtime pin, set before the app mounts, so the two legs
   // are one boot apart — not one build apart.
@@ -368,7 +414,11 @@ async function serpentine(page, ms) {
       polling: 250,
     });
     await page.evaluate(PIN_POSE, pose);
-    await page.waitForTimeout(SETTLE);
+    const st = await settleWorld(page, { capMs: SETTLE_CAP });
+    console.log(
+      `  ${name} settle: ${st.settled ? 'SETTLED' : `NOT settled — ${st.why}`} in ${(st.ms / 1000).toFixed(0)}s ` +
+        `(maxZ ${st.maxZ}, sb ${JSON.stringify(st.sb)}, load ${st.load})`
+    );
     const c = await page.evaluate(CENSUS);
     scenesRed[name] = c;
     const pct = c.totalTris ? (100 * c.totalZero) / c.totalTris : 0;
@@ -409,10 +459,21 @@ async function serpentine(page, ms) {
   // detector produced 168 of 256 — it was reading the sky), and a synthetic
   // one-frame white clear must produce EXACTLY ONE.
   const serpentineHits = paleRed.pale;
-  await page.evaluate(() => window.__paleSelfTest?.());
+  // WAIT FOR THE SYNTHETIC FRAME TO HAVE HAPPENED. Reading the counter in the
+  // same round trip that arms the self-test races the next rAF, and at ~1 fps
+  // that race is lost more often than won. `selfDone` is set by the tick that
+  // painted and read the white frame, so this waits for the event rather than
+  // for a duration.
+  await page.evaluate(() => {
+    window.__pale.selfDone = false;
+    window.__paleSelfTest?.();
+  });
+  await page
+    .waitForFunction(() => window.__pale?.selfDone === true, undefined, { timeout: 60000, polling: 200 })
+    .catch(() => {});
   await page.waitForTimeout(8000);
   const afterSelf = await page.evaluate(() => window.__pale);
-  const selfHits = afterSelf.pale - serpentineHits;
+  const selfHits = afterSelf.selfHits ?? 0;
   gate(
     '(4a) NO FALSE POSITIVE — the banked serpentine registers ZERO ISOLATED pale frames',
     serpentineHits === 0,
@@ -423,6 +484,8 @@ async function serpentine(page, ms) {
     '(4b) THE DETECTOR FIRES — one synthetic white frame registers EXACTLY ONE hit',
     selfHits === 1,
     `${selfHits} hit(s) from __paleSelfTest()` +
+      (afterSelf.selfSaw ? ` — the synthetic frame read ${JSON.stringify(afterSelf.selfSaw)}` : '') +
+      (afterSelf.selfDone ? '' : '  [the synthetic frame never rendered — the detector was not asked]') +
       (afterSelf.hits.length ? ` · ${JSON.stringify(afterSelf.hits.slice(-1))}` : '') +
       (selfHits === 0 ? '  [the instrument cannot see the event it exists for]' : '')
   );
@@ -440,9 +503,22 @@ async function serpentine(page, ms) {
       'evidence. On the user machine it is the leg that reproduces the symptom.'
   );
 
-  // THE GREEN LEG: same build, same fixture, no pin.
+  // THE GREEN LEG: same build, same fixture, no pin — AND THE FIRST PAGE IS
+  // CLOSED FIRST.
+  //
+  // MEASURED (pass 2b, and marginally in pass 1): page1 was left open and
+  // rendering while page2 booted, so the second boot got roughly half of four
+  // shared cores at ~1 fps. Pass 1's green leg scraped 2 meshes / 20,935 tris;
+  // on the flipped tree, with more work per frame, it settled NONE — and gate
+  // (3) then read "zero-area is exactly 0" off an empty scene and PASSED. Two
+  // pages of the same app are not two independent measurements at this venue;
+  // they are one measurement and its handicap.
+  await page.evaluate(() => {
+    if (window.__pale) window.__pale.stop = true;
+  });
+  await page.close();
   const page2 = await context.newPage();
-  page2.on('pageerror', (e) => errors.push('green: ' + String(e)));
+  const errorsNote2 = attachPageErrors(page2, errors, 'green: ');
   await page2.addInitScript(INSTALL_PALE);
   await bootFly(page2, { style: 'satellite', timeoutMs: 600000, settleMs: 8000 });
   await page2.evaluate(() => window.__flyStore.getState().setQualityTier('high'));
@@ -451,7 +527,11 @@ async function serpentine(page, ms) {
     polling: 250,
   });
   await page2.evaluate(PIN_POSE, POWELL);
-  await page2.waitForTimeout(SETTLE);
+  const st2 = await settleWorld(page2, { capMs: SETTLE_CAP });
+  console.log(
+    `  green-leg settle: ${st2.settled ? 'SETTLED' : `NOT settled — ${st2.why}`} in ` +
+      `${(st2.ms / 1000).toFixed(0)}s (maxZ ${st2.maxZ}, sb ${JSON.stringify(st2.sb)}, load ${st2.load})`
+  );
   const green = await page2.evaluate(CENSUS);
   // NOT "is the flag on" — an absent runtime pin on a page that never set one
   // says nothing about FLASH_GUARD.enabled. Report what is actually knowable:
@@ -500,7 +580,7 @@ async function serpentine(page, ms) {
         'two boots — they settle different chunk counts — so the gate is on the ratio. A degenerate ' +
         'contributes nothing to computeVertexNormals, so removing it is provably shading-neutral.'
     );
-  gate('(6) NO PAGE ERRORS', errors.length === 0, errors.slice(0, 3).join(' | ') || 'clean');
+  gate('(6) NO PAGE ERRORS', errors.length === 0, errorsNote());
 
   console.log(`\nFLASH_GUARD telemetry on the armed leg: ${JSON.stringify(flagOn)}`);
   console.log(

@@ -39,6 +39,7 @@
  */
 const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
+const { attachPageErrors } = require('./_pageerrors');
 const { attachFixture } = require('./_fixture');
 
 const URL_ = process.env.FLY_URL || 'http://localhost:3101';
@@ -229,7 +230,7 @@ async function settleDraws(page, ms) {
 async function runArm(context, fx, paceOn) {
   const page = await context.newPage();
   const errs = [];
-  page.on('pageerror', (e) => errs.push(String(e.message).slice(0, 160)));
+  const errsNote = attachPageErrors(page, errs);
   // Both arms pin EXPLICITLY. Since the R24 close the constants ship ON, so an
   // unpinned "off" arm would silently be the on arm — an A/B whose control is
   // the treatment. The arm states what it wants in both directions.
@@ -313,7 +314,7 @@ async function runArm(context, fx, paceOn) {
     console.log(`    pose ${name}: draws ${poses[name].draws} tris ${poses[name].tris} residentMB ${poses[name].mem?.residentMB}`);
   }
   await page.close();
-  return { content, yawStats, yawCensus, yawArc, poses, errs, bootFallback };
+  return { content, yawStats, yawCensus, yawArc, poses, errs, errNote: errsNote(), bootFallback };
 }
 
 (async () => {
@@ -504,7 +505,7 @@ async function runArm(context, fx, paceOn) {
   ceilPair('8 CEILING: satellite draws <= 375 at the suburb pose in every arm that ran',
     375, off.poses.powell.draws, on.poses.powell.draws, 'neither arm reported a suburb draw count');
   gate('9 no page errors in either arm', off.errs.length === 0 && on.errs.length === 0,
-    [...off.errs, ...on.errs].join(' | '));
+    [...off.errs, ...on.errs].slice(0, 6).join(' | ') || 'clean');
 
   console.log(`\n${pass} passed, ${fail} failed${notCalSummary()}`);
   process.exit(fail || notCalCount() ? 1 : 0);

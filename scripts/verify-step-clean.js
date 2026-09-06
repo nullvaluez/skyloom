@@ -42,6 +42,7 @@
  */
 const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
+const { attachPageErrors } = require('./_pageerrors');
 
 const POWELL = [40.1578, -83.0752, 900, 1.9, -0.3];
 const SETTLE = Number(process.env.STEP_SETTLE_MS || 30000);
@@ -196,7 +197,7 @@ function soft(name, detail) {
   if (process.env.FLY_TILE_FIXTURE) await require('./_fixture').attachFixture(context);
   const page = await context.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(String(e)));
+  const errorsNote = attachPageErrors(page, errors);
   await page.addInitScript(UNPIN_GOVERNOR);
   await page.addInitScript(INSTALL_STEP_WATCH);
 
@@ -249,16 +250,80 @@ function soft(name, detail) {
   // boot and warp grace, a 1.5 s down-dwell, cooldowns and a session latch, so
   // at this venue's frame rate the EMA is below `downFrac` from frame one and
   // the ladder still may not move inside a harness window.
+  // A's stepGuard semantics, adopted verbatim, because the obvious assertion is
+  // wrong three ways: `__flyStats.stepGuard` is `{ setPixelRatio, setSize }`
+  // counting SUPPRESSED calls (not applications, not writes); it is CUMULATIVE
+  // for the page's life, so a per-step reading is a snapshot DIFFERENCE; it
+  // counts redundant calls from INSIDE the frame too, so `suppressed ===
+  // outside-writes` is not a safe equality; and ABSENT is ambiguous — "nothing
+  // has been suppressed yet" looks identical to "the guard was never
+  // installed", which is why the reading has to be paired with `step.n`.
+  const guardOf = () =>
+    page.evaluate(() => ({
+      guard: window.__flyStats?.stepGuard ?? null,
+      n: window.__flyStats?.step?.n ?? null,
+      outside: (window.__stepWatch?.outOfRafCanvas?.length ?? 0) +
+        (window.__stepWatch?.outOfRafSpr?.length ?? 0) +
+        (window.__stepWatch?.outOfRafSs?.length ?? 0),
+    }));
   const forced = [];
+  const guardRows = [];
   for (let i = 0; i < STEPS; i++) {
     const dir = i % 2 === 0 ? -1 : 1;
+    const before = await guardOf();
     const ok = await page.evaluate((d) => window.__flyGov?.force?.(d) ?? null, dir);
     forced.push({ dir, ok });
     await page.waitForTimeout(6000);
+    const after = await guardOf();
+    guardRows.push({ dir, ok, before, after });
   }
   await page.waitForTimeout(4000);
   const stepsTaken = forced.filter((f) => f.ok === true).length;
   console.log(`FORCED: ${JSON.stringify(forced)} → ${stepsTaken} accepted by the ladder`);
+
+  // (7) EXACTLY ONE APPLICATION PER GOVERNOR STEP, INSIDE THE FRAME.
+  const accepted = guardRows.filter((r) => r.ok === true);
+  const guardPresent = accepted.some((r) => r.after.guard != null);
+  const anyStep = accepted.some((r) => (r.after.n ?? 0) > (r.before.n ?? -1));
+  if (!guardPresent && anyStep)
+    notCalibrated(
+      '(7) ONE APPLICATION PER STEP, INSIDE THE FRAME',
+      `__flyStats.stepGuard is unpublished while __flyStats.step.n advanced (${accepted
+        .map((r) => `${r.before.n}->${r.after.n}`)
+        .join(', ')}) — the guard cannot be distinguished from "installed but nothing suppressed yet"`
+    );
+  else if (!accepted.length)
+    notCalibrated('(7) ONE APPLICATION PER STEP, INSIDE THE FRAME', 'the ladder accepted no step');
+  else {
+    const bad = accepted.filter((r) => {
+      const stepped = (r.after.n ?? 0) === (r.before.n ?? 0) + 1;
+      const noOutside = r.after.outside === r.before.outside;
+      const g0 = r.before.guard;
+      const g1 = r.after.guard;
+      const suppressedRose =
+        g1 && g0 ? g1.setPixelRatio + g1.setSize > g0.setPixelRatio + g0.setSize : !!g1;
+      return !(stepped && noOutside && suppressedRose);
+    });
+    gate(
+      '(7) ONE APPLICATION PER STEP, INSIDE THE FRAME',
+      bad.length === 0,
+      `${accepted.length} accepted step(s): step.n +1 each, zero writes outside a rAF, and ` +
+        'stepGuard strictly increased. ' +
+        guardRows
+          .filter((r) => r.ok === true)
+          .map(
+            (r) =>
+              `[n ${r.before.n}->${r.after.n} · outside ${r.before.outside}->${r.after.outside} · ` +
+              `guard ${JSON.stringify(r.before.guard)}->${JSON.stringify(r.after.guard)}]`
+          )
+          .join(' ')
+    );
+  }
+  console.log(
+    '      NOTE the TOTALS are expected to FALL with the guard on (setPixelRatio ~12 -> 6, setSize ' +
+      '~24 -> 6-12): the redundant calls stop reaching three. A drop is the fix working, not a ' +
+      'lost measurement — verify-step-guard gates 3/4 prove real resizes still happen.'
+  );
 
   const w = await page.evaluate(() => ({
     ...window.__stepWatch,
@@ -353,7 +418,7 @@ function soft(name, detail) {
         `rebuilds ${w.fx0} -> ${w.fxNow} (resizes ${w.resizes})`
       );
   }
-  gate('(6) NO PAGE ERRORS', errors.length === 0, errors.slice(0, 3).join(' | ') || 'clean');
+  gate('(6) NO PAGE ERRORS', errors.length === 0, errorsNote());
 
   console.log(
     '\nNOT MEASURABLE HERE: the tear LINE itself. Tearing is a compositor/vsync ' +
