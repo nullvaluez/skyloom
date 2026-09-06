@@ -181,6 +181,34 @@ function census(map) {
 }
 
 /**
+ * WHAT REACHES THE DRAW LIST. `census` counts what is RESIDENT; this counts what
+ * three would actually issue, which is a different question and the one pass-2b
+ * failed on. A tile is issued when its model is attached to the scene graph.
+ * A tile is DOUBLE-issued when an ancestor tile is issuing too — parent and
+ * child covering the same ground in the same frame.
+ */
+function drawCensus(map) {
+  const issued = [];
+  map.rootTile.traverse((o) => {
+    if (o?.isTile && o.model && o.model.parent) issued.push(o);
+  });
+  let doubleIssued = 0;
+  let offFrustum = 0;
+  const byLevel = {};
+  for (const t of issued) {
+    byLevel[t.z] = (byLevel[t.z] ?? 0) + 1;
+    if (!t.inFrustum) offFrustum++;
+    for (let p = t.parent; p; p = p.parent) {
+      if (p.isTile && p.model && p.model.parent) {
+        doubleIssued++;
+        break;
+      }
+    }
+  }
+  return { issued: issued.length, doubleIssued, offFrustum, byLevel };
+}
+
+/**
  * Run one scripted path. `path(i, n)` returns the camera placement for frame i.
  * Returns the counters plus a census of the final tree.
  */
@@ -242,6 +270,7 @@ async function fly({ frames, pathFn, switches, lodThreshold = 0.86, latencyFrame
     uniqueTiles: unique,
     refetches,
     census: census(map),
+    draw: drawCensus(map),
     residency: residency ? { ...residency.stats } : null,
   };
 }

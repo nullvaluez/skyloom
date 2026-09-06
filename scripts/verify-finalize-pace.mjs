@@ -355,6 +355,46 @@ gate('10 the veg commit is capped per frame (A9), and the cap carries the harnes
     /finalizePaceOn\(\) \? Math\.max\(1, FINALIZE_PACE\.vegPerFrame \* budgetK\(\)\)/.test(veg) &&
     /from '\.\.\/harness-budget'/.test(veg));
 
+// ------------------------- 23. the SEVENTH harness-budget site
+// E CERT (pass 2b) attributed the pass's longest stall — 3660 ms under
+// [finalize:sat-roads x16] — to sat-road-engine.js's finalize bound being a
+// bare module const that budgetK() never touched. At K=40/200 every other
+// engine speeds up and roads does not, so the road ring starves and the stall
+// concentrates exactly where markPhase pointed. Same idiom as the veg site.
+const road = readFileSync(path.join(root, 'lib/fly/toy-world/sat-road-engine.js'), 'utf8');
+gate('23 the sat-road finalize bound carries the harness scaler (E CERT’s seventh site)',
+  /const perFrame = Math\.max\(1, FINALIZE_PER_FRAME \* budgetK\(\)\);/.test(road) &&
+    /done < perFrame;/.test(road) &&
+    /from '\.\.\/harness-budget'/.test(road));
+
+// INFO, not a gate, and deliberately so: five of the seven budget sites do not
+// exist on this branch — they are E's, and they arrive at the merge. A census
+// that asserted "all seven carry the scaler" would be red here and green only
+// after integration, which is a gate that measures the branch rather than the
+// code. Promote it to a gate on the merged tree.
+{
+  const SITES = [
+    ['sat-building finalize', 'lib/fly/toy-world/sat-building-engine.js', /finalizePerFrame \* budgetK\(\)/],
+    ['sat-building drape', 'lib/fly/toy-world/sat-building-engine.js', /drapeBudgetMs \* budgetK\(\)/],
+    ['sat-skyline finalize', 'lib/fly/toy-world/sat-skyline-engine.js', /finalizePerFrame \* budgetK\(\)/],
+    ['sat-skyline drape', 'lib/fly/toy-world/sat-skyline-engine.js', /drapeBudgetMs \* budgetK\(\)/],
+    ['toy-world finalize', 'lib/fly/toy-world/toy-world-engine.js', /finalizePerFrame \* budgetK\(\)/],
+    ['toy-world drape', 'lib/fly/toy-world/toy-world-engine.js', /drapeBudgetMs \* budgetK\(\)/],
+    ['sat-road drape', 'lib/fly/toy-world/sat-road-engine.js', /drapeBudgetMs \* budgetK\(\)/],
+    ['sat-veg commit', 'lib/fly/toy-world/sat-veg-engine.js', /vegPerFrame \* budgetK\(\)/],
+    ['sat-road finalize', 'lib/fly/toy-world/sat-road-engine.js', /FINALIZE_PER_FRAME \* budgetK\(\)/],
+  ];
+  const have = SITES.filter(([, rel, re]) => re.test(readFileSync(path.join(root, rel), 'utf8')));
+  rows.push(
+    `  harness-budget sites carrying budgetK() on THIS branch: ${have.length}/${SITES.length}` +
+      ` — ${have.map(([n]) => n).join(', ') || 'none'}`
+  );
+  console.log(
+    `INFO  budget-site census: ${have.length}/${SITES.length} carry budgetK() here` +
+      ' (five are E’s and land at the merge; promote to a gate on the merged tree)'
+  );
+}
+
 // The brake must be a SEPARATE statement, not folded into the loop bound: E's
 // harness budget multiplier sits on that expression, and two owners editing one
 // expression is how a merge silently drops one of them.
