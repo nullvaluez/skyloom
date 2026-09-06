@@ -954,6 +954,17 @@ function soft(name, detail) {
               "quadtree already makes; changing their COUNT would mean it moved the streamer, " +
               "which is A's territory and a different flag"
           );
+        // (4) MERGES ARE UNEXERCISED AT EVERY POSE, AND THAT IS keepResident
+        // WORKING. Frustum-exit merges no longer happen, so there is nothing to
+        // fade out. Forcing them would mean measuring a tree that does not
+        // ship; the merge path stays structurally gated (verify-lod-fade.mjs)
+        // and the go/no-go reads "refine measured, merge inferred".
+        if (d('merges') === 0)
+          console.log(
+            '  NOTE merges 0 in the window — keepResident removed the frustum-exit merge, so the ' +
+              'merge ramp is unexercised BY DESIGN. Structurally gated in verify-lod-fade.mjs; not ' +
+              'chased here, because forcing a merge measures a tree that does not ship.'
+          );
         gate(
           '(15) THE MASS MOVED — faded RISES and hardSwaps DROPS toward 0',
           d('faded') > 0 && d('hardSwaps') < offLeg.hardSwapsD,
