@@ -91,7 +91,8 @@ node_gate verify-daily.mjs
 node_gate verify-depth-offset.mjs        # C (R24): reversed-depth polygonOffset
 node_gate verify-terra-residency.mjs     # A (R24): merge/refetch on a yaw sweep
 node_gate verify-c-flagoff.mjs           # C (R24): every C flag off + GLSL false-branch verbatim
-node_gate verify-d-flagoff.mjs           # D (R24): same shape (appears when D merges)
+# D shipped its node coverage as feature gates rather than one flag-off gate:
+node_gate verify-lod-fade.mjs            # D (R24): the node half; the BROWSER half is E's verify-lod-fade.js
 node_gate verify-worker-normals.mjs      # C (R24): area-weighted DEM normals, 3.34 deg -> 0.26 deg
 # A's skirt-worker identity gate. NOTE (C, 0e2f7cb): its element-by-element
 # identity leg goes RED with TERRAIN_LIGHT.workerNormals ON *by design* — the
@@ -100,6 +101,10 @@ node_gate verify-worker-normals.mjs      # C (R24): area-weighted DEM normals, 3
 node_gate verify-skirt-worker.mjs
 
 node_gate verify-artifact-hygiene.mjs    # E (R24): no R15-R23 calibration artifact may change
+node_gate verify-vendor-three-tile.mjs   # A (R24): the vendored copy is verbatim
+node_gate verify-skirt-fast.mjs          # A (R24): O(V) boundary scan is output-identical
+node_gate verify-frame-step.mjs          # A (R24): fixed-timestep sim / interpolated render pose
+node_gate verify-finalize-pace.mjs       # A (R24): wall-clock finalize brake
 
 # --- verify-seam's NODE leg runs offline (HARN-GAP-7): its api.init() is
 #     pinned to the fixture by a global-fetch wrapper. Gates 0-6c are the
@@ -124,7 +129,7 @@ run verify-fixture.js scripts/verify-fixture.js \
 # PACING gates — these must NEVER see FLY_FINALIZE_BUDGET_K.
 browser_gate verify-frame-pace.js
 browser_gate verify-step-clean.js
-browser_gate verify-ladder-step.js       # A (R24): FLY_LADDER_RED=1 = 6/13 fail flag-off; boots TOY
+browser_gate verify-ladder-fix.js        # A (R24): FLY_LADDER_RED=1 = 6/13 fail flag-off; boots TOY
 # verify-seam's BROWSER leg (gates 7-9: engine counters over a settled 60 s).
 run verify-seam-browser scripts/verify-seam.js \
   node -r ./scripts/_pw-shim.js scripts/verify-seam.js
