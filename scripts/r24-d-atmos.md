@@ -279,7 +279,13 @@ should never have happened, D softens the ones that must.
 | leg | pin | A: refine / merge / replacedOnScreen | D: hardSwaps / faded | active / peak | resident | pageerrors |
 |---|---|---|---|---|---|---|
 | **flag OFF (RED)** | none | 16 / 0 / 0 | **20 / 0** | 0 / 0 | 39 → 70 | 0 |
-| flag ON, shipping | `{enabled:true}` | (pending — moratorium) | | | | |
+| flag ON, shipping | `{enabled:true, skipBootMs:1500}` | **NOT MEASURED** — `bootFly` timed out at its 180 s `waitForFunction` under load; the run was never repeated before the session ended | | | | |
+
+The ON row is blank and stays blank. It is not "presumed green": the only ON
+evidence on this tree is the first, discarded attempt at `fadeSec: 6`, whose
+`active 12` reading was the clamped-dt artefact of §3.6 rather than a fade
+measurement. Owens `drawCalls`/`triangles` were added to the probe for exactly
+this leg and are likewise unmeasured.
 
 The RED is unambiguous: **20 refines, 20 of them single-frame hard swaps, zero
 blended**, and `skip.disabled: 20` proves every one was un-faded because the
@@ -445,6 +451,47 @@ not re-derive it:
 
 Cost is a GPU number (sky pixels are ~30–50 % of the frame at altitude), so it
 could not be ranked here even if it had been built.
+
+## §4.9 M4 — GO / NO-GO
+
+| feature | gates | ceilings | new lazy compiles | verify-flicker | fixture A/B | RECOMMENDATION |
+|---|---|---|---|---|---|---|
+| **A8** (night ramp) | verify-atmo-law §6, 4/4 as a pure function | none touched (uniform-only) | none possible (no shader text, no key) | untouched | not needed — noon multiplier is EXACTLY 1, so noon is bit-identical | **FLIP ON** |
+| **AERIAL_LAW** | verify-atmo-law 41/41 incl. GLSL≡JS at 4,160 points and flag-off text identity | unmeasured here; adds no mesh | prewarm builds through the same `applyHillshade` + the same Effect constructor | untouched (nothing touches emissives or bloom) | **NOT CAPTURED** | **ON only after the horizon re-baseline batch runs with a fixture column, and after one fixed-pose Owens draw row.** Not before. |
+| **LOD_CROSSFADE** | verify-lod-fade 51/51 (Fable's regex fix included) | Owens row unmeasured | tile program is prewarmed with the slot | untouched | RED captured, ON leg NOT captured | **HOLD at OFF for this round** unless the certification run's browser leg lands the ON row. |
+| **SKY_PROCEDURAL** | — | — | — | — | — | **OFF** (not built; design in §4.5) |
+
+What each recommendation rests on, and what it does not:
+
+- **A8 is the only unconditional GO.** It is a CPU multiply on a uniform that
+  already exists, on a curve that is already in the tree, and its identity at
+  noon is exact rather than approximate — `1 − clamp01(1 − frac/0.3)^1.5` is
+  EXACTLY 1 for every `frac ≥ 0.3`. There is nothing for a pixel gate to catch.
+  It closes a real defect (0.55 of the deep-night rim mixed into distant
+  terrain, with no sun term) that R23 already ruled a taste question rather
+  than a regression, so it is also the one item where "ship it and look" is
+  cheap to undo.
+- **AERIAL_LAW's evidence is structural, and that is not sufficient on its
+  own.** What is proven: the law is one function, the GLSL text equals the JS
+  mirror to 0.00e+0 relative error at 4,160 points, flag-off is byte-identical
+  in generated text / uniforms / key, the two evaluators never both run, and
+  the four REDs are real and computed rather than eyeballed. What is NOT
+  proven: what it looks like. No fixture pixel A/B was captured at any
+  canonical pose, and every horizon pixel gate moves by construction. Flipping
+  it ON without the re-baseline batch would be flipping a look nobody has seen.
+- **LOD_CROSSFADE has a clean RED and no GREEN.** 20 refines, 20 hard
+  single-frame swaps, 0 blended, `skip.disabled 20` — the defect the user
+  reported, counted. The ON leg timed out in `bootFly` under load and was never
+  re-run, so "the blend happens, on which swaps, how many at once" is
+  unmeasured on this tree. The mechanism is gated structurally and the flag-off
+  identity is proven, but a feature whose whole claim is visual should not ship
+  on a RED alone.
+- **What only the user's machine can settle, for both Level B features:** every
+  ms and every fps; whether the 250 ms blend reads as smooth or as mush at 60
+  or 144 Hz; whether the law's cruise clearing (mix 0.55 → 0.14 at eye 9 km,
+  §2.4) reads as "the air thinned" or as "the haze broke"; and whether the
+  crossfade actually removes the reported "terrain tiles swapping" or merely
+  moves it to the relief snap that a texture blend cannot morph (§3.2).
 
 ## §5 Decisions
 
