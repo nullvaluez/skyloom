@@ -472,7 +472,7 @@ merges after the run; the 15/15 above predates it.
 |---|---|---|---|---|
 | **boot proof** | **PASS — `BOOT OK in 62.5 s`**, zero console errors, zero page errors, zero failed `/_next/` chunk requests | <!-- CERT:boot-proof PASS2 PENDING --> | — | a boot WALL TIME here is a SwiftShader number, never a budget |
 | `verify-fixture.js` | **rc=0, 2,045 s, 10/10** at K=200 with a 900 s settle cap. (1) deterministic bytes — mvt 12,021 B / dem 1,817 B / img 46,864 B; (2) the 200-with-empty-body tile reachable; (3) satellite boots the fixture in **124.1 s** (`pct 100` at 54.6 s), img 74 / dem 74 / mvt 67 / tilejson 20; (4) **Manhattan is a city** — satBuilding meshes **22**, tris 496,466, settled in **256 s** at load 4.1, draws **189**, meshes 216 (satBuilding 22, satSkyline 10, toyChunk 110), sb **16/16**, maxZ 14, tiles 125; (5) **Powell is a suburb** — 16 satBuilding meshes, sb 16/16, draws **194**, tris 368,119, **parcel homes 555**, settled 200 s, maxZ 15, tiles 161; (6) **THE OWENS LOCK** — bld 0 / sky 0 / parcel 0, draws **166**, tris 183,709, sb ready 0 / **empty 16**, settled in **38 s**, maxZ 16, tiles 177 (FIXTURE column, informational against the live ≤ 261); Melton draws 184, tris 486,321, **1,836 parcel homes from zero footprints**; (8) traffic stub 300 tracks, 69 aircraft requests; (9) toy boots on the fixture — toyChunks 98, tris 273,567, boot 141.3 s, draws 212; (10) both boots clean | <!-- CERT:verify-fixture PASS2 PENDING --> | — | n/a — it certifies the venue |
-| `verify-flash-guard.js` | **rc=1, 534 s, 5 passed / 1 failed — RED calibrated**; legs below. **Three readings that change how the flag is described:** the **skyline site is INSURANCE, not a fix** — its path runs `simplifyRing` before the wall loop and the collinearity test drops the closing clone, so the zero-length wall edge never exists there and a green at that site repairs nothing (recon A1b predicted it; nobody had measured it — B ledger §15.1); **Powell's 8.28 % lands inside R22.1's live 6.36–8.64 % band** while Manhattan's worst chunk at **13.98 %** is above it, the expected shape rather than a contradiction (the band was quoted for *every large chunk*, the defect is a fixed count per ring, so a chunk with small or few footprints is proportionally worse — B's 4-corner fixture reads 14.22 % for the same reason); and **the toy site is NOT EXERCISED by any row this round** — both poses run satellite, the toy extruder carries the same wrap-around loop at `vector-tile.worker.js:4285`, and the close ruled no toy leg is added, so B's node legs (toy `full` **14.84 % → 0**; 2,288 → 0 on E's Manhattan tile) are **evidence that the code works and not a certified browser leg**. **`(4) PALE DETECTOR` — `frames=256 pale=168 worstScanlineMean=222.3` — is VOID and must never be quoted as a result**: the scanline sat 55 % up the frame and a banked serpentine spends much of its time looking at a clear daytime sky (~213 luma), so 168 identical-mean frames are a sustained bright FIELD, not the one-frame jump the detector exists to catch — R17 §7.1 arriving as false POSITIVES for once. Fixed at `r24/e e1b7905` (running median of 24 frames, scanline at 0.25 height bottom-up, a hit needs jump > 60 over the median AND min > median + 40 AND absolute > 180; renamed `worstJumpOverMedian`), **not yet RED-calibrated** — it owes a synthetic one-frame jump scoring exactly one hit and a serpentine scoring zero | **pass 2a VOID — the venue starved the content** (below); the marker stands for the restart <!-- CERT:verify-flash-guard PASS2 PENDING --> | PENDING — the pale FRAME itself | the pale detector is probabilistic (live rate 1 per 1,600 to 1 per 20,389 composed frames); **the census decides the gate** |
+| `verify-flash-guard.js` | **rc=1, 534 s, 5 passed / 1 failed — RED calibrated**; legs below. **Three readings that change how the flag is described:** the **skyline site is INSURANCE, not a fix** — its path runs `simplifyRing` before the wall loop and the collinearity test drops the closing clone, so the zero-length wall edge never exists there and a green at that site repairs nothing (recon A1b predicted it; nobody had measured it — B ledger §15.1); **Powell's 8.28 % lands inside R22.1's live 6.36–8.64 % band** while Manhattan's worst chunk at **13.98 %** is above it, the expected shape rather than a contradiction (the band was quoted for *every large chunk*, the defect is a fixed count per ring, so a chunk with small or few footprints is proportionally worse — B's 4-corner fixture reads 14.22 % for the same reason); and **the toy site is NOT EXERCISED by any row this round** — both poses run satellite, the toy extruder carries the same wrap-around loop at `vector-tile.worker.js:4285`, and the close ruled no toy leg is added, so B's node legs (toy `full` **14.84 % → 0**; 2,288 → 0 on E's Manhattan tile) are **evidence that the code works and not a certified browser leg**. **`(4) PALE DETECTOR` — `frames=256 pale=168 worstScanlineMean=222.3` — is VOID and must never be quoted as a result**: the scanline sat 55 % up the frame and a banked serpentine spends much of its time looking at a clear daytime sky (~213 luma), so 168 identical-mean frames are a sustained bright FIELD, not the one-frame jump the detector exists to catch — R17 §7.1 arriving as false POSITIVES for once. Fixed at `r24/e e1b7905` (running median of 24 frames, scanline at 0.25 height bottom-up, a hit needs jump > 60 over the median AND min > median + 40 AND absolute > 180; renamed `worstJumpOverMedian`), **not yet RED-calibrated** — it owes a synthetic one-frame jump scoring exactly one hit and a serpentine scoring zero | **pass 2b: rc=1, 571 s, 6 passed / 1 failed — the census is ALIVE, the green leg is void again, and the detector lost its own self-test** (below). Marker stands for the standalone re-take <!-- CERT:verify-flash-guard PASS2 PENDING --> | PENDING — the pale FRAME itself | the pale detector is probabilistic (live rate 1 per 1,600 to 1 per 20,389 composed frames); **the census decides the gate** |
 | `verify-fade.js` | **rc=1, 338 s, 4/2 — RED calibrated.** (1) births **14** / deaths **10** over 94 frames; (2) **14 of 14 hard births** — *"presence channel is none: no material carries a fade uniform"*, which IS the flag-off state; (3) **10 of 10 hard deaths**; (4) `ready` tracks CHUNKS, not presence (ready 0 of 16 during the serpentine); (5) **THE OWENS LOCK — sbReady 0, skyReady 0, draws 156** (a FIXTURE number; the live ≤ 261 is not re-baselineable from here); (6) clean. **GREEN needs pass 2** — the gate carries no ON pin | <!-- CERT:verify-fade PASS2 PENDING --> | PENDING — the LOOK of the fade | — |
 | `verify-lod-fade.js` | **rc=1, 317 s, 2 passed / 5 failed — RED calibrated** (Powell, a 40 s PURE YAW with the position frozen). (1) `residentTiles` 0 / `estMB` undefined — A's byte LRU only tracks with `TERRA_PACE` on, expected in pass 1; (2) 47 frames, 61 events; (3) **27 RE-appearances on a pure yaw** = A's T1/T3 bend-blind re-stream, measured from the other side; (4) **8 hard refines + 3 hard merges** = D's T4 atomic swap; (5) crossfade window **0 frames**; (6) **15 tile URLs refetched**, worst 2× `/img/6/23/17` = A's refetch defect; (7) Owens FIXTURE draws **174** / tris **166,659**; (8) zero page errors. **A gap the row exposed:** as written the gate has **no ON leg** — it never sets `window.__flyLodFadeOverride` — so the one feature that ships OFF *pending a measurement* could not have obtained it from either pass. E is adding a pinned ON leg for pass 2 (D reviewing it, §5.2); expected then: (3) and (6) GREEN from `TERRA_PACE`, (4) and (5) still RED in the OFF leg because LOD ships OFF, and **the pinned ON leg decides D's go/no-go** | <!-- CERT:verify-lod-fade PASS2 PENDING --> | PENDING — whether swaps are still visible at real frame rate | the fade's real DURATION (a 250 ms blend completes inside one SwiftShader frame) |
 | `verify-step-clean.js` | **rc=1, 229 s, 4/4 — RED calibrated**, viewport DPR 1.5, governor pin RELEASED (the fleet's `'hold'` was written and the accessor swallowed it). (0) pin released; (1) **the released term is reachable** — 6/6 forced steps ACCEPTED, 6 DPR applications, DPRs seen `[1.25, 1.5]`; (2) **18 of 18 `canvas.width/height` writes OUTSIDE a rAF** (width 1600 at t=171932, `inRaf:false`); (3) `setPixelRatio` 6/6 and `setSize` 12/12 outside; (3b) `composer.setSize` **6/6 outside** — the passive-effect lag; (4) `bufferMatchesDrawing` **false on 22 of 46 frames** (composer 1920×1080 vs drawing buffer 1600×900 at frame 7); (5) the composer is **RESIZED, not rebuilt** — rebuilds 1 → 1, resizes 6, R21's `FX_STABILITY` holding; (6) clean. GREEN for (2)/(3)/(3b)/(4) is expected in pass 2 with `STEP_SAFE` on. **The gate states in its own output that the tear LINE is not measurable here** | <!-- CERT:verify-step-clean PASS2 PENDING --> | PENDING — and the ladder the user's real DPR has | the tear LINE |
@@ -537,6 +537,35 @@ run's 8 hits replay as **0 isolated + 2 sustained** while the self-test's single
 white frame still scores exactly **1**. E notes why the obvious form was
 rejected: a naive "f−1 and f+1 are not pale" test **would still admit the last
 frame of every run** — run length is the right rule.
+
+**PASS 2b, and it reads in three parts** (K=40, tree `ec53fd3`, boot 60.9 s;
+`rc=1, 571 s, 6 passed / 1 failed`).
+
+1. **THE CENSUS IS ALIVE — and that closes pass 2a's mechanism.** The RED leg
+   (`__flyFlashPin='off'`) reproduces pass 1 **EXACTLY on the flipped tree**:
+   Powell 3 meshes / 31,576 tris / **2,616 zero-area (8.28 %)**, Manhattan 14 /
+   126,116 / **5,820 (4.61 %)**, with (1a), (1b) and (2) PASS. **A's rule-1 spike
+   fix is confirmed on the venue by the same instrument that read 0 meshes in
+   2a** — the strongest form of that proof available here.
+2. **THE GREEN LEG IS VOID AGAIN, for a different reason.** "powell (no pin): 0
+   meshes, 0 tris", so (3) printed **"PASS zero=0 tris=0" on an empty census**
+   once more and (5) is NOT CALIBRATED. The cause this time is the harness: **the
+   gate boots its second page while the first is still alive and rendering**, so
+   the green boot gets roughly half the CPU and settles no chunk inside a fixed
+   60 s — pass 1's same leg settled 2 meshes / 20,935 tris, which was already
+   marginal, and the flipped tree does more per frame. **`FLASH_GUARD`'s green
+   remains UNMEASURED.** E is closing page 1 before page 2 and replacing the
+   fixed settle with the settle CONDITION, and the row is re-taken **standalone**
+   after pass 2b's end line on the same tree; **that re-take decides the §8
+   `FLASH_GUARD` row**, which stays ON per the ship table with "green leg pending
+   re-take" until it lands.
+3. **THE DETECTOR: the isolation rule works, and the self-test broke.** (4a)
+   **0 isolated pale frames in 266**, with 3 sustained runs recorded separately
+   and now labelled as the sky they are — len 5 at f107–111 (mean 214.8 against a
+   median 152.3), len 6 at f221–226, len 2 at f240–241 — so the rule does its job
+   on the false positives. But **(4b) the self-test registered 0 hits LIVE where
+   E's replay scored 1**: *the instrument cannot see the event it exists for*.
+   That is E's TENTH instrument defect and is under investigation.
 
 **`verify-flash-guard`, pass 1, leg by leg** (`K=40`, `__flyFlashPin='off'`):
 
@@ -737,8 +766,9 @@ killed by the orchestrator at ~19:12 while diagnosing.
 request** — the demonstrated cause is D's module-scope `ReferenceError`, on a
 tree where nothing could boot at all (lesson 19).
 
-**E's instrument-defect count for the session is NINE**, each with a defence in
-the tree: the context race; the artifact overwrite (§5.4); the straw-man port
+**E's instrument-defect count for the session is TEN**, each with a defence in
+the tree (the tenth, pass 2b's pale self-test registering 0 hits live where the
+replay scores 1, is open at the time of writing): the context race; the artifact overwrite (§5.4); the straw-man port
 guard; the sky inside the pale crop; the vacuous gate (5); the misleading
 `flagOn(probe)`, which read a pin's absence rather than a constant; the seam
 reader that sampled a cleared framebuffer from outside any animation frame and
@@ -1145,7 +1175,13 @@ Carries forward the still-open R15–R21 §6 tables.
     compare against the machine's own recent history, exclude the frame under
     test from that history so a hitch cannot raise its own threshold, and cap the
     consequence. (A PACE.)
-37. **The constants an instrument DECLARES must be the ones it measured, and a
+37. **A green "exactly zero" with an EMPTY population is a void row, not a
+    fix.** Every "exactly zero" gate needs its population gate in FRONT of it —
+    `verify-flash-guard`'s (3) printed "PASS zero=0 tris=0" on an empty census
+    twice, in two different runs, for two different reasons, and only the
+    preconditions added after the §2.10 audit kept it from being read as the fix
+    landing. (E CERT, from the gate's own header.)
+38. **The constants an instrument DECLARES must be the ones it measured, and a
     declared cost may overstate but never understate.** The depth probe's
     precision ladder is asserted against measured worst-case error — float32
     0.000002 %, float16 0.0754 %, both far inside the 1 % bound — rather than
@@ -1167,7 +1203,7 @@ leg. **Nothing here has been certified on the user's machine.**
 
 | Flag | Rests on | Marker |
 |---|---|---|
-| `FLASH_GUARD` | **satellite buildings proven (Powell 8.28 %, Manhattan worst chunk 13.98 %); skyline = INSURANCE, its population is 0 by construction; toy site NOT EXERCISED** by any browser row. 15,984 → 0 in node; normals bit-identical; zero keys, zero bundle bytes, zero draws. Pass-2 go/no-go is the gate's leg (3) | **ON**, merged `7face8f` |
+| `FLASH_GUARD` | **satellite buildings proven (Powell 8.28 %, Manhattan worst chunk 13.98 %); skyline = INSURANCE, its population is 0 by construction; toy site NOT EXERCISED** by any browser row. **The GREEN leg is still unmeasured** — voided twice, in 2a by the pacing rule and in 2b by a two-page CPU split — and a standalone re-take decides it (§4.2). 15,984 → 0 in node; normals bit-identical; zero keys, zero bundle bytes, zero draws. Pass-2 go/no-go is the gate's leg (3) | **ON**, merged `7face8f` |
 | `BEND_LEAD` | `padON ≥ worstDrop` on 7/7 rings; Owens 0 by construction | **ON**, merged `7face8f` |
 | `CHUNK_FADE` | pops 92 → 2, both attributable; `maxDying` 4 is the only draw term | **ON**, merged `7face8f` |
 | `HEAL_IN_PLACE` | heals 16 (0 in place) → 21 (all in place); evictions 40 → 24 | **ON**, merged `7face8f` |
