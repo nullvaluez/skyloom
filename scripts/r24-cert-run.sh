@@ -113,13 +113,29 @@ if [ "$CODE" != "200" ]; then
 fi
 say "dev :$PORT -> 200, PID ${DEV_PID:-unknown}  load $(load)"
 
+# Everything this script spawns, so an interrupt does not leave a headless
+# browser and a dev server behind. MEASURED the hard way: a `timeout 60` around
+# a first test of this script killed the shell but left the boot proof's node
+# process AND its chromium running, still holding a fixture port — because a
+# child is not in the parent's kill path unless you track it. Only PIDs THIS
+# script started are ever touched.
+SPAWNED=""
 cleanup() {
+  local rc=$?
+  for p in $SPAWNED; do
+    if kill -0 "$p" 2>/dev/null; then
+      say "stopping child I started (PID $p)"
+      for c in $(pgrep -P "$p" 2>/dev/null); do kill "$c" 2>/dev/null; done
+      kill "$p" 2>/dev/null
+    fi
+  done
   if [ -n "${DEV_PID:-}" ] && kill -0 "$DEV_PID" 2>/dev/null; then
     say "stopping the dev server I started (PID $DEV_PID)"
     kill "$DEV_PID" 2>/dev/null
   fi
+  return $rc
 }
-trap cleanup EXIT
+trap cleanup EXIT INT TERM
 
 export FLY_TILE_FIXTURE=1
 export FLY_URL="http://localhost:$PORT"
@@ -170,7 +186,12 @@ const { bootFly } = require('../../_boot');
   }
 })();
 PROOF
-if ! timeout 600 node -r ./scripts/_pw-shim.js "$OUT/_bootproof.js" 2>&1 | tee "$OUT/bootproof.log"; then
+timeout 600 node -r ./scripts/_pw-shim.js "$OUT/_bootproof.js" > "$OUT/bootproof.log" 2>&1 &
+BP=$!
+SPAWNED="$SPAWNED $BP"
+wait "$BP"; BP_RC=$?
+cat "$OUT/bootproof.log"
+if [ "$BP_RC" != 0 ]; then
   say ""
   say "*** BOOT PROOF FAILED — stopping. No browser row can mean anything until"
   say "*** the app mounts. See $OUT/bootproof.log."
