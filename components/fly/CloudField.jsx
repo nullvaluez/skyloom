@@ -57,12 +57,12 @@ function wrap(v, half, cell) {
 }
 
 const _geo = { x: 0, y: 0, z: 0 };
-const _cloudDrift = [0, 0];
+const _cloudDrift = [0, 0]; // dev stat scratch (no per-frame allocation)
 // R24 C (CLOUD_LIT): per-cadence scratch — no allocation on the 10 s tick.
 const _cloudDir = [0, 1, 0];
 const _lit = new Color();
 const _shade = new Color();
-const _grey = new Color(); // dev stat scratch (no per-frame allocation)
+const _grey = new Color();
 
 /**
  * An endless cumulus field: puffs live at fixed ABSOLUTE positions inside a

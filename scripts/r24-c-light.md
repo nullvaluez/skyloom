@@ -958,3 +958,69 @@ contract is `> 2/255`; the question is only whether the measured margin has
 8. **When the venue cannot run the code at all, say so in the same sentence as
    the number.** The worker normals have a 3.34° → 0.26° RED/GREEN and zero
    pixels behind it, and both facts belong together.
+
+---
+
+## Fixture measurements (E's offline world, SwiftShader, bit-stable at a parked pose)
+
+### The L3 RED, measured — `__flyStats.sun` at the certified Sierra pose
+
+Satellite, tier high, `__flySunOverride` = the frozen 9am PDT pose,
+hillshade strength 0.55 as certified, flags OFF:
+
+```
+key : [0.554801, 0.741734, 0.376865]   az −55.8°   el 47.9°
+hill: [0.674557, 0.609318, 0.416778]   az −58.3°   el 37.5°
+oneSun:false  hillElev:1  hillEffective:0.55  live:false  dome:null
+```
+
+**key ↔ hill = 10.50°** at HIGH tier, on the pose `verify-sat-depth` certifies.
+The key sits on `MOODS.satellite.lightDir` = [0.555, 0.742, 0.377] — the
+kloofendal HDRI's brightest texel — to six figures, while the hillshade is on
+the real sun. The closed-form proof predicted the shape; the fixture shows it in
+the shipped app.
+
+**`live: false` at high tier is recon HARN-GAP-5, measured.** The satellite
+key-light branch never executed once across the whole boot and settle, because
+`scripts/_boot.js` pins `__flySatShadowOverride = 0` and the R21 position write
+lives inside that shadow gate. So across the ENTIRE browser fleet, at every
+tier, the satellite key light has never moved with the sun — and no frozen gate
+could have seen it, because the pin closes the only branch that writes it. That
+is also the argument for `ONE_SUN` being a correctness fix rather than a
+feature: **the position write was gated on a shadow map it has nothing to do
+with.**
+
+`oneSun:false`, `hillElev:1`, `hillEffective == hillStrength == 0.55` confirm
+flag-off identity live, and confirm that `verify-sat-depth`'s frozen "strength
+gated to satellite default" assertion still reads exactly 0.55 on this tree —
+which is what the `uHillElev` split was for.
+
+**For E's `verify-one-sun`:** the gate MUST un-pin `__flySatShadowOverride`
+before asserting anything about the key vector, or it will measure the pinned
+`MOODS` constant at every tier and call it a pass. `__flyStats.sun.live` is the
+tell — false whenever the branch has not run, which is the state the fleet has
+been in since R19.
+
+### The Sierra `dayK` A/B — attempts, and what each one cost
+
+| # | what happened | whose fault |
+|---|---|---|
+| 1 | 1600×900: pct hit 100 and the boot screen cleared, but the canvas never became "visible" to Playwright inside 30 s; the fixture rev in hand was also the one E later fixed for the z6 download-queue stall | venue + a stale fixture |
+| 2 | 640×360 per E's guidance: `bootFly`'s 180 s pct-100 wait timed out at load 12.9 with 24 browser processes alive | venue contention |
+| 3 | `timeoutMs: 900000` on the final tree: **booted, warped, published the audit above**, then `locator.screenshot` timed out on "waiting for element to be stable" — a live GL canvas on a loaded box never satisfies Playwright's stability wait | instrument design |
+| 4 | `page.screenshot({ clip })` instead — same pixels, no stability wait — re-run at load ~19 | in flight at the time of writing |
+
+**Recorded against me, not the venue:** during attempt 3 I edited
+`components/fly/CloudField.jsx` (a comment-only fix) while that gate was live,
+and the dev log shows HMR fired mid-run. That is exactly the trap the round's
+environment notes warn about. The run survived it — the audit above is
+post-warp — but the discipline failed, and the next attempt is numbered
+accordingly rather than being presented as a first try.
+
+**If it does not land, `hill.dayK 0.65` stays a PROPOSAL and no number is
+invented.** The arithmetic that would be tested: the demotion multiplies the
+hillshade envelope by 0.65 at a high sun, so `verify-sat-depth`'s mean |Δ|
+shrinks by at most 35 %; the contract is `> 2/255`; the only open question is
+whether the measured margin has 35 % of headroom. That is a measurement, not an
+argument, and it belongs to E's fixture column with the live column marked
+"user machine pending".

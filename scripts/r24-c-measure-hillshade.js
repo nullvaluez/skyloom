@@ -76,8 +76,17 @@ async function lumaStd(file, region) {
   await page.waitForTimeout(SETTLE);
   await page.mouse.move(320, 180);
 
+  // page.screenshot with a clip, NOT locator.screenshot: the locator variant
+  // waits for the element's bounding box to be STABLE, and a live GL canvas on
+  // a loaded box never satisfies that (measured: "waiting for element to be
+  // stable" then a 21 s timeout). The viewport IS the canvas here, so a clipped
+  // page shot is the same pixels with no stability wait.
   const shot = (n) =>
-    page.locator('.fixed.inset-0 canvas').first().screenshot({ path: path.join(OUT, `hill-${n}.png`) });
+    page.screenshot({
+      path: path.join(OUT, `hill-${n}.png`),
+      clip: { x: 0, y: 0, width: 640, height: 360 },
+      animations: 'disabled',
+    });
   const setHill = async (v) => {
     await page.evaluate((s) => window.__flyHill.set(s), v);
     await page.waitForTimeout(4000); // ~1 fps on SwiftShader: give it real frames
