@@ -74,7 +74,7 @@ if (process.env.FADE_PROBE_SELFTEST) {
   };
   const mk = (material) => ({ material });
   const run = (obj) => {
-    const S = { presenceChannel: null };
+    const S = { presenceChannel: null, channelSeen: {} };
     const fn = new Function('S', `return (${body});`)(S);
     return { v: fn(obj), ch: S.presenceChannel };
   };
@@ -99,9 +99,35 @@ if (process.env.FADE_PROBE_SELFTEST) {
   r = run(mk({ userData: { shader: { uniforms: { uBirth: { value: 0.5 } } } } }));
   check('(4) the guessed names still resolve', r.ch === 'uBirth' && r.v === 0.5, `channel ${r.ch} value ${r.v}`);
 
-  // 5. Opacity remains the last resort.
+  // 5b. B's REST CONTRACT: a chunk at rest wears the SHARED material and has no
+  //     __fadeU, and that must read presence 1 — "fully arrived", not
+  //     "unreadable". Proven above by case (3); this asserts the pairing that
+  //     matters, that a rest sample must not overwrite a __fadeU channel the
+  //     run has already seen (the `??=` latch that made pass 2b report 'none').
+  {
+    const S = { presenceChannel: null, channelSeen: {} };
+    const fn = new Function('S', `return (${body});`)(S);
+    const ramping = fn(mk({ userData: { __fadeU: { value: 0.4 } } }));
+    const atRest = fn(mk({ userData: {} }));
+    check(
+      '(5b) a rest sample after a ramp keeps the channel label',
+      S.presenceChannel === 'userData.__fadeU' && ramping === 0.4 && atRest === 1,
+      `channel ${S.presenceChannel} · ramping ${ramping} · at rest ${atRest}`
+    );
+    const S2 = { presenceChannel: null, channelSeen: {} };
+    const fn2 = new Function('S', `return (${body});`)(S2);
+    fn2(mk({ userData: {} }));
+    fn2(mk({ userData: { __fadeU: { value: 0.4 } } }));
+    check(
+      '(5c) …and a rest sample BEFORE the first ramp does not latch none',
+      S2.presenceChannel === 'userData.__fadeU',
+      `channel ${S2.presenceChannel} (pass 2b latched 'none' here and reported 29/29 hard)`
+    );
+  }
+
+  // 6. Opacity remains the last resort.
   r = run(mk({ userData: {}, transparent: true, opacity: 0.25 }));
-  check('(5) transparent opacity is the fallback', r.ch === 'opacity' && r.v === 0.25, `channel ${r.ch} value ${r.v}`);
+  check('(6) transparent opacity is the fallback', r.ch === 'opacity' && r.v === 0.25, `channel ${r.ch} value ${r.v}`);
 
   console.log(`\n${sp} passed, ${sf} failed`);
   process.exit(sf ? 1 : 0);
@@ -147,6 +173,8 @@ const INSTALL_FADE_WATCH = () => {
     partialFramesSeen: 0,
     maxBirthFrames: 0,
     presenceChannel: null,
+    /** every channel observed anywhere in the run — the label is the best of these. */
+    channelSeen: {},
     samples: [],
     readySeries: [],
   });
@@ -172,20 +200,35 @@ const INSTALL_FADE_WATCH = () => {
     // boundary must be read by the name its OWNER publishes, not by a name the
     // harness expects.
     if (m.userData && m.userData.__fadeU && typeof m.userData.__fadeU.value === 'number') {
-      S.presenceChannel ??= 'userData.__fadeU';
+      // BEST-EVER, NOT FIRST-EVER. `??=` is first-write-wins, and B's twin is
+      // on the mesh ONLY during a ramp (chunk-fade.js: on birth completion
+      // `b.mesh.material = this.material` and the twin returns to the pool;
+      // dying meshes leave the scene). A resident chunk AT REST therefore has
+      // no __fadeU — the correct steady state, not a missing instrument — so
+      // the first mesh sampled would latch the channel to 'none' for the whole
+      // run even after this fix. The channel now records the most specific one
+      // ever observed.
+      S.channelSeen.fadeU = true;
+      S.presenceChannel = 'userData.__fadeU';
       return m.userData.__fadeU.value;
     }
     const u = m.userData?.shader?.uniforms || m.uniforms || null;
     for (const k of ['uBirth', 'uChunkFade', 'uFade', 'uChunkBirth']) {
       if (u && u[k] && typeof u[k].value === 'number') {
-        S.presenceChannel ??= k;
+        S.channelSeen[k] = true;
+        if (!S.channelSeen.fadeU) S.presenceChannel = k;
         return u[k].value;
       }
     }
     if (m.transparent && typeof m.opacity === 'number') {
-      S.presenceChannel ??= 'opacity';
+      S.channelSeen.opacity = true;
+      if (!S.channelSeen.fadeU) S.presenceChannel = 'opacity';
       return m.opacity;
     }
+    // ABSENT IS PRESENCE 1, AND THAT IS CORRECT. A chunk at rest carries the
+    // shared material by design; only a mesh mid-ramp wears a twin. So this is
+    // "fully arrived", not "unreadable" — and it must not overwrite a channel
+    // already seen elsewhere in the run.
     S.presenceChannel ??= 'none';
     return 1;
   };
@@ -359,10 +402,35 @@ async function serpentine(page, ms) {
         : '')
   );
   red.push(['WB-2 no birth fade on any streamed chunk', 'verify-fade (2)', `${w.hardBirths}/${w.births}`, '0']);
+  // (d) THE CAP IS A DESIGNED DEGRADATION, SO THE GATE MUST PRICE IT IN.
+  // `CHUNK_FADE.maxDying` is 4, and both the eviction loop and the AGL cull can
+  // present more than four deaths at once; every refusal is COUNTED at
+  // sat-building-engine.js:857 as `fadeBudgetMiss`. So a hard death is only a
+  // defect when it is NOT attributable:
+  //     hardDeaths <= fadeBudgetMiss  -> capped as designed
+  //     hardDeaths >  fadeBudgetMiss  -> an unexplained remainder, the defect
+  // Same rule as B's own engine proof (pops <= fadeBudgetMiss). The gate prints
+  // both numbers so the reader never has to take the verdict on trust.
+  const budgetMiss = fadeTel.stats?.fadeBudgetMiss ?? null;
+  const deathsAttributable = budgetMiss != null && w.hardDeaths <= budgetMiss;
   gate(
     '(3) NO HARD DEATH — a chunk never leaves from full presence',
     w.hardDeaths === 0,
-    `${w.hardDeaths} of ${w.deaths} hard`
+    `${w.hardDeaths} of ${w.deaths} hard · cumulative fadeBudgetMiss ${budgetMiss ?? 'unpublished'}` +
+      (budgetMiss == null
+        ? '  [the engine published no fadeBudgetMiss — the cap rule cannot be applied]'
+        : deathsAttributable
+          ? '  [<= fadeBudgetMiss: CAPPED AS DESIGNED (maxDying 4, and the evict loop + AGL cull can ' +
+            'present more at once), not an unexplained remainder]'
+          : '  [> fadeBudgetMiss: an UNEXPLAINED remainder — this is the defect shape]')
+  );
+  console.log(
+    '      VENUE NOTE for (3): `_startDeath` writes value = _altFade (1.0 at these poses) and the ' +
+      'value only moves on the NEXT _stepFades. At ~2.84 s per frame here, a 0.3 s evictSec ramp ' +
+      'cannot span two samples, so EVERY death reads hard BY CONSTRUCTION regardless of the ' +
+      "feature — until B's frame-count floor lands (progress = min(elapsed/sec, framesSince/" +
+      'minFrames), minFrames 3, so a ramp spans >= 3 partial samples at any frame rate while ' +
+      'elapsed still governs at 60 fps). Read (3) here against fadeBudgetMiss, not against 0.'
   );
   red.push(['WB-2 evict is a single-frame disappearance', 'verify-fade (3)', `${w.hardDeaths}/${w.deaths}`, '0']);
   gate(
