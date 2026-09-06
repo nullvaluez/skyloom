@@ -40,6 +40,13 @@ const { attachFixture } = require('./_fixture');
 const URL_ = process.env.FLY_URL || 'http://localhost:3101';
 const SETTLE = Number(process.env.FLY_TERRA_SETTLE_MS || 30000);
 const YAW_MS = Number(process.env.FLY_TERRA_YAW_MS || 45000);
+// 0.85 deg/frame is 51 deg/s at 60 fps — a brisk but ordinary turn. It is a
+// PER-FRAME figure on purpose (see PIN_YAW): what must match across arms is the
+// ARC swept, not the wall-clock time spent.
+const YAW_DEG_PER_FRAME = Number(process.env.FLY_TERRA_YAW_DEG_PER_FRAME || 0.85);
+// Below this much swept arc the yaw leg has not brought a heading back round at
+// all, so its duplicate-URL column is not evidence in either direction.
+const YAW_MIN_ARC_DEG = Number(process.env.FLY_TERRA_YAW_MIN_ARC || 360);
 
 // Canonical poses (same numbers as verify-fixture, grepped from the fleet).
 const POSES = {
@@ -63,22 +70,44 @@ const PIN_POSE = ([lat, lon, altM, heading, pitch]) => {
   }, 8);
 };
 
-/** Spin the heading in place: the camera never moves, only its yaw. */
-const PIN_YAW = ([lat, lon, altM]) => {
+/**
+ * Spin the heading in place: the camera never moves, only its yaw.
+ *
+ * PER FRAME, NOT PER SECOND — and that distinction is why pass 1's gate 6 read
+ * 1 -> 17. Driving the heading off the wall clock at ~51 deg/s is 0.85 deg per
+ * FRAME at 60 fps but ~51 deg per FRAME on this ~1 fps container. At 51
+ * deg/frame the camera does not sweep, it teleports: any tile that starts
+ * refining this frame is out of the frustum by the time its children land, so
+ * upstream's post-await re-check in `_loadSubTiles` throws the download away
+ * (`unloadSubTiles`) and refetches it when the heading comes back round. That
+ * is a real upstream waste path, but the venue manufactures it, and an arm that
+ * manufactures the thing it is measuring is not an arm.
+ *
+ * Driving from rAF makes the ARC the constant instead of the time: both arms
+ * sweep the same degrees whatever the frame rate. The achieved arc is published
+ * so the gate can refuse to compare two arms that did not sweep the same
+ * distance.
+ */
+const PIN_YAW = ([lat, lon, altM, degPerFrame]) => {
   window.__fly.warpToGeo(lat, lon, { altM, name: null });
   const f = window.__fly.flight;
   const p = { x: f.pos.x, y: f.pos.y, z: f.pos.z };
   if (window.__fxPin) clearInterval(window.__fxPin);
-  const t0 = performance.now();
-  window.__fxPin = setInterval(() => {
+  if (window.__fxYawRaf) cancelAnimationFrame(window.__fxYawRaf);
+  window.__fxYaw = { frames: 0, deg: 0 };
+  const step = () => {
+    window.__fxYawRaf = requestAnimationFrame(step);
+    window.__fxYaw.frames++;
+    window.__fxYaw.deg += degPerFrame;
     f.pos.x = p.x;
     f.pos.y = p.y;
     f.pos.z = p.z;
-    f.heading = ((performance.now() - t0) / 1000) * 0.9; // ~51 deg/s
+    f.heading = (window.__fxYaw.deg * Math.PI) / 180;
     f.pitch = -0.25;
     f.bank = 0;
     f.speed = 0;
-  }, 8);
+  };
+  step();
 };
 
 /**
@@ -251,10 +280,15 @@ async function runArm(context, fx, paceOn) {
   };
   await safe(() => fx.resetStats(), null);
   await page.evaluate(() => window.__flyTerra?.reset?.());
-  await page.evaluate(PIN_YAW, POSES.powell);
+  await page.evaluate(PIN_YAW, [...POSES.powell.slice(0, 3), YAW_DEG_PER_FRAME]);
   await page.waitForTimeout(YAW_MS);
+  const yawArc = await page.evaluate(() => window.__fxYaw ?? { frames: 0, deg: 0 });
   const yawStats = await safe(() => fx.stats(), { byKind: {}, byUrl: {} });
   const yawCensus = await page.evaluate(CENSUS);
+  console.log(
+    `    yaw arc: ${yawArc.deg.toFixed(0)} deg over ${yawArc.frames} frames ` +
+      `(${(yawArc.frames / (YAW_MS / 1000)).toFixed(1)} fps)`
+  );
   console.log(`    yaw sweep: merges ${yawCensus.lod?.merge}, replacedOnScreen ${yawCensus.lod?.replacedOnScreen}, ` +
     `refetchParent ${yawCensus.lod?.refetchParent}, imagery requests ${yawStats.byKind?.img ?? 'n/a'}`);
 
@@ -267,7 +301,7 @@ async function runArm(context, fx, paceOn) {
     console.log(`    pose ${name}: draws ${poses[name].draws} tris ${poses[name].tris} residentMB ${poses[name].mem?.residentMB}`);
   }
   await page.close();
-  return { content, yawStats, yawCensus, poses, errs, bootFallback };
+  return { content, yawStats, yawCensus, yawArc, poses, errs, bootFallback };
 }
 
 (async () => {
@@ -292,6 +326,7 @@ async function runArm(context, fx, paceOn) {
     content: { total: 0, withUrl: 0, urlMismatch: 0, posMismatch: 0, bad: [] },
     yawStats: { byKind: {}, byUrl: {} },
     yawCensus: { lod: null, mem: null },
+    yawArc: { frames: 0, deg: 0 },
     poses: Object.fromEntries(Object.keys(POSES).map((k) => [k, { draws: null, tris: null, mem: null }])),
     errs: [],
     skipped: true,
@@ -354,8 +389,30 @@ async function runArm(context, fx, paceOn) {
   if (!on.skipped) gate('5 YAW: no tile is replaced while it is on screen',
     (on.yawCensus.lod?.replacedOnScreen ?? 1) === 0,
     `${off.yawCensus.lod?.replacedOnScreen} -> ${on.yawCensus.lod?.replacedOnScreen}`);
-  if (bothArms) gate('6 YAW: the same tile URL is not fetched twice as the heading comes back round',
-    dupOn <= dupOff, `${dupOff} -> ${dupOn} URLs fetched more than once`);
+  // Gate 6 compares two arms only when they SWEPT THE SAME ARC and the arc was
+  // long enough to bring a heading back round. Pass 1 failed this 1 -> 17 on a
+  // ~1 fps container where the heading advanced ~51 deg PER FRAME: at that rate
+  // every refine's parent leaves the frustum before its children land, so
+  // upstream's post-await re-check in `_loadSubTiles` DISCARDS the download and
+  // refetches it later — duplicates the fix has nothing to do with. Reporting
+  // that as a red on the fix would have been measuring the venue.
+  // MEASURED node-side (scripts/r24-a-pace.md §13): at 0.85 deg/frame the trio
+  // takes duplicate URLs 1 -> 0; at 51 deg/frame the same code goes 28 -> 28,
+  // with the merges it removes replaced by exactly those discards.
+  const arcOk =
+    off.yawArc.deg >= YAW_MIN_ARC_DEG &&
+    on.yawArc.deg >= YAW_MIN_ARC_DEG &&
+    Math.abs(off.yawArc.deg - on.yawArc.deg) <= 0.1 * Math.max(off.yawArc.deg, on.yawArc.deg);
+  if (bothArms && arcOk) {
+    gate('6 YAW: the same tile URL is not fetched twice as the heading comes back round',
+      dupOn <= dupOff, `${dupOff} -> ${dupOn} URLs fetched more than once`);
+  } else if (bothArms) {
+    console.log(
+      `SKIP  6 YAW duplicate-URL comparison NOT CALIBRATED — arcs off ${off.yawArc.deg.toFixed(0)} deg / ` +
+        `on ${on.yawArc.deg.toFixed(0)} deg (need >= ${YAW_MIN_ARC_DEG}, within 10% of each other). ` +
+        `Raise FLY_TERRA_YAW_MS, or FLY_TERRA_YAW_DEG_PER_FRAME on a machine that cannot reach the arc.`
+    );
+  }
 
   // -------------------------------------------------------- draw ceilings
   console.log('');

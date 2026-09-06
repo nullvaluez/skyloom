@@ -930,6 +930,108 @@ because the bundle is imported by node fixtures and by the app alike and only
 
 ---
 
+## §13 Pass-1 gate 6 (`1 → 17` duplicate URLs): the LRU is NOT the cause
+
+Pass 1's terra-live row failed gate 6 — duplicate URLs `1 → 17` with the trio
+ON, the opposite direction from the node fixture's `178 → 0`. Three candidate
+causes were put to me. **It is none of them as stated, and the LRU hypothesis
+is dead twice over.**
+
+### The LRU is ruled out, by arithmetic and by its own effect being absent
+
+| | value |
+|---|---|
+| cap (`TILES.lruBudgetBytes`) | 140 MB |
+| fixture imagery tile, 256² sRGB + mips (`w·h·4·4/3`) | 341.3 KB |
+| fixture DEM geometry at the 33² grid (pos+uv+nrm+idx) | 58.0 KB |
+| ⇒ per resident tile | **≈ 399 KB** |
+| ⇒ what 140 MB admits | **≈ 358 tiles** |
+| observed arm B, Powell 41.3 MB | ≈ 106 tiles — **30% of cap** |
+| observed arm B, Owens 50 MB | ≈ 128 tiles — **36% of cap** |
+
+The cap was never within a factor of three of binding. And independently:
+**the byte LRU's ONLY effect path is setting `_r24Collapse`, which
+`_LODEvaluate` turns into a return of 2 — a MERGE.** Arm B reports
+`merges 0, refetchParent 0`. Had the LRU evicted anything, both would be
+non-zero. Budget headroom and absent effect are two independent refutations.
+
+(The counter semantics were the other candidate; E confirms `/__stats/reset`
+clears `byUrl` outright and each arm's window is its own sweep. Every fixture
+response is `no-store`, so the browser cache is not masking repeats either: the
+counts are honest, and — as E notes — an upper bound on live, where real cache
+headers and R21's persistent Cache API tile cache both apply.)
+
+### What it actually is: upstream's discard-after-download, at 51° per FRAME
+
+`_loadSubTiles` re-checks `_LODEvaluate` **after** awaiting the four children
+and calls `unloadSubTiles()` if the answer is no longer "refine" — it throws
+away downloads it has just made. Whether that fires depends on how far the
+camera turned DURING the download, i.e. on **degrees of heading change per
+FRAME**. The harness drove the yaw off the wall clock at ~51 °/s: 0.85 °/frame
+at 60 fps, but **~51 °/frame on this ~1 fps container**. At that rate the camera
+does not sweep, it teleports, and essentially every refine started in the sweep
+has its parent out of frustum before its children land.
+
+MEASURED node-side on the real vendored classes (`scripts/r24-out/probe-refetch.mjs`,
+throwaway; 60 frames, tile latency 2 frames):
+
+| arm | deg/frame | refines | merges | **discards** | unique | reqs | **dup URLs** |
+|---|---|---|---|---|---|---|---|
+| OFF | 0.85 | 45 | 1 | 0 | 176 | 177 | **1** |
+| trio | 0.85 | 45 | 0 | 0 | 176 | 176 | **0** |
+| trio + walkWhileSaturated | 0.85 | 45 | 0 | 0 | 176 | 176 | **0** |
+| OFF | 51 | 47 | 34 | 3 | 52 | 218 | **28** |
+| trio | 51 | 55 | 0 | 1 | 212 | 216 | **4** |
+| trio + walkWhileSaturated | 51 | 59 | 0 | 7 | 204 | 232 | **28** |
+
+At **0.85 °/frame — the same 51 °/s on a 60 fps machine — the trio takes
+duplicate URLs 1 → 0.** At 51 °/frame the same code goes 28 → 28: the 34 merges
+the fix removes are replaced, one for one in kind, by discards.
+`walkWhileSaturated` raises them further (4 → 28) and that is not a bug in it:
+it correctly restores the refine STARTS that upstream's freeze rule was
+suppressing, and at 51 °/frame every start is doomed.
+
+So the honest attribution has three parts, and the middle one matters:
+- the duplicates are **upstream's** waste path, not the trio's — the trio
+  removes merges (`1 → 0` live, `34 → 0` in the probe) and adds none;
+- they are **surfaced by the venue's frame pacing**, not by the fix. 45 s at
+  1 fps is 45 discrete 51° jumps, which is not a turn;
+- and `walkWhileSaturated` makes them **more visible**, because it stops the
+  freeze from hiding refine starts. That is the fix working, seen through an
+  instrument calibrated for a different machine.
+
+**Not claimed:** that the discard path is harmless on the user's machine. The
+probe says it is zero at 0.85 °/frame with a 2-frame latency; a real machine has
+longer network latency, and the product (deg/frame × latency) is what governs
+it. That is a user-machine item, and a genuinely cheap follow-up if it shows up:
+re-check the frustum BEFORE issuing the four child loads, not only after they
+land.
+
+### The instrument fix
+
+`PIN_YAW` now advances the heading **per frame** (`FLY_TERRA_YAW_DEG_PER_FRAME`,
+default 0.85) instead of per wall-clock second, so both arms sweep the same ARC
+at any frame rate, and it publishes `window.__fxYaw = {frames, deg}`. Gate 6
+refuses to compare two arms unless both swept ≥ 360° and within 10% of each
+other; otherwise it prints `SKIP … NOT CALIBRATED` with the two arcs rather
+than a red.
+
+**Consequence for pass 2, stated plainly:** at ~1 fps, 45 s × 0.85 °/frame is
+about 38° of arc, so gate 6 will SKIP in this container rather than produce a
+number. That is the correct outcome — the row needs either a much longer
+`FLY_TERRA_YAW_MS` or the user's machine. A skip that says why beats a red that
+measures the venue.
+
+**Still worth having (E, pass 2):** the per-prefix breakdown. It is no longer
+load-bearing for this attribution, but an eviction-refetch cycle would show in
+`img` AND `dem` together and nowhere else, so it is the cheapest confirmation if
+the question ever reopens. Also unaddressed by the arc fix, and E's own catch:
+the stats reset is not atomic with the yaw pin, so boot-tail requests land in
+the window and the ON arm holds more resident state at that moment — a second,
+smaller contributor to the 1 vs 17 asymmetry.
+
+---
+
 ## §10 Commits
 
 | # | Commit | What |
@@ -948,7 +1050,9 @@ because the bundle is imported by node fixtures and by the app alike and only
 | 12 | `70b9f42` | E's `FRAME_STATS` `markPhase` attribution in the terrain + finalize paths (PATCH 25, by inversion) |
 | 13 | `f739cb3` | ledger §9/§10/§11 |
 | 14 | `8b91bc5` | **BLOCKER FIX**: the missing `pinned` import in CloudField.jsx (§9b) |
-| 15 | _(this commit)_ | **W3 ship-state flip** (§12) + the ship-state gates and the three hardened control arms |
+| 15 | `5ddf5dc` | **W3 ship-state flip** (§12) + the ship-state gates and the three hardened control arms |
+| 16 | `5a41680` | row 8 recorded — the content probe answered on the fixture |
+| 17 | _(this commit)_ | §13 — pass-1 gate 6 attributed (NOT the LRU) + the per-frame yaw arc and gate 6's calibration guard |
 
 ### Gates added
 
