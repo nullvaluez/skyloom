@@ -826,7 +826,7 @@ RED:
 | Leg | Subsection | Owner of the feature | Pass 1 | Pass 2 |
 |---|---|---|---|---|
 | `verify-fixture` | §5.1 | E (the venue itself) | **10/10**, all four settled | pending |
-| `verify-flash-guard` | §5.2 | B (`FLASH_GUARD`) | **RED, 5/1** | **attempt 1 VOID** (starvation) |
+| `verify-flash-guard` | §5.2 | B (`FLASH_GUARD`) | **RED, 5/1** | 2a VOID · 2b census proven, **green leg VOID**, re-take pending |
 | `verify-fade` | §5.3 | B (`CHUNK_FADE`) | **RED, 4/2** | pending |
 | `verify-lod-fade` | §5.4 | D (`LOD_CROSSFADE`) + A (streamer) | **RED, 2/5** | pending |
 | `verify-step-clean` | §5.5 | A (`STEP_SAFE`) | **RED, 4/4** | pending |
@@ -948,9 +948,65 @@ sustained runs**, while the self-test's single white frame still scores exactly
 was not a candidate" — still admits the LAST frame of every run; only run
 length works.
 
-**PASS 2b (flipped, on the fixed tree).** *pending* — (3) exactly 0 at every
-resident site **with (1a)/(1b) proving the census is non-empty**, (5) per-site
-triangle counts only falling.
+**PASS 2b (attempt 2, integration `ec53fd3`): CENSUS PROVEN · GREEN LEG VOID ·
+SELF-TEST RED.** `6 passed, 1 failed`, rc 1, 571 s.
+
+**The census is alive again, and it reproduces pass 1 EXACTLY** — which is the
+cleanest possible confirmation of A's rule-1 fix, because the same instrument
+that read 0 meshes in 2a now reads pass 1's numbers to the triangle:
+
+| | Powell | Manhattan |
+|---|---|---|
+| meshes / tris | **3 / 31,576** | **14 / 126,116** |
+| zero-area | **2,616 (8.28 %)**, worst chunk 8.34 % | **5,820 (4.61 %)**, worst chunk 13.98 % |
+| identical to pass 1? | **yes, to the triangle** | **yes** |
+
+(1a) and (1b) PASS. (2) RED PASS. Sat-skyline is still 0 / 83,752 and toy 0 / 0
+— **NOT EXERCISED**, unchanged.
+
+**But (3) passed on an empty census for the SECOND time**: the green leg read
+`powell (no pin): 0 meshes, 0 tris`, (5) read NOT CALIBRATED, and
+`FLASH_GUARD telemetry: {"telemetry":null,"runtimePin":null}`. **FLASH_GUARD's
+green is still unmeasured.** `FLASH_GUARD.enabled` IS `true` on this tree, so
+this is not a flag-state question.
+
+**MECHANISM — page starvation, and it is the gate's fault.** The gate never
+closed page 1 before `context.newPage()`, so the green leg booted while the RED
+page was still alive and rendering: two pages of the same app sharing four
+cores at ~1 fps are not two independent measurements, they are one measurement
+and its handicap. Pass 1's green leg scraped **2 meshes / 20,935 tris** —
+marginal, and it passed unnoticed. On the flipped tree, with more work per
+frame, it settled **none**. Fixed: page 1 is closed (its rAF chain stopped on
+purpose, not torn down mid-read) before page 2 is created, and **both legs now
+settle on `_settle.js`'s CONDITION under a cap instead of a fixed 60 s**, with
+the settle time and reason printed.
+
+**(4a) reads correctly and the isolation rule works.** `0 isolated in 266
+frames`, with **3 sustained runs recorded separately** — `107–111` (len 5),
+`221–226` (len 6), `240–241` (len 2), means 214–238 against medians 140–173.
+Those are the sky at the scanline, exactly the false positive the rule was
+written for, and they are now visible as fields rather than counted as flashes.
+
+**(4b) went RED — my own rule broke my own self-test, and the self-test caught
+it.** `0 hits from __paleSelfTest()`. Two independent causes, both real:
+
+1. **The run only closes on the next NON-candidate frame**, and the gate read
+   the counter in the same round trip that armed the test — at ~1 fps that race
+   is lost more often than won.
+2. **The synthetic frame can land adjacent to a real sustained run** (this venue
+   produced one at 240–241) and be absorbed into it, so (4b) would fail for a
+   reason with nothing to do with the detector.
+
+The harness's own frame is now accounted **apart** from the world's run
+bookkeeping: the open run is closed under the normal rule, the synthetic frame
+is scored on its own counter, the bookkeeping restarts clean, and the gate
+**waits for `selfDone`** rather than for a duration. Replayed against this run's
+own shape — self-test immediately after a sustained pair, read with no trailing
+frame — it now scores exactly 1, while a self-test that genuinely read no pale
+frame still scores 0 and fails.
+
+**The row is RE-TAKEN STANDALONE after pass 2b's end line, on the same tree.**
+That re-run, not this one, decides FLASH_GUARD's green.
 
 ---
 
