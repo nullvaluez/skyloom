@@ -1383,8 +1383,48 @@ READS THE SAME DIRECTIONAL AS KEY passed **six times** on `Δ undefined°`.
 `null < 1e-4` is TRUE in JavaScript. Fixed in `686db21`; that leg now reads
 NOT CALIBRATED with the two vectors printed.
 
-**PASS 2 (flipped).** *pending* — exactly one key direction across every lit
-material at every tier, and the azimuth spread tracking the sun.
+**PASS 2b: VOID — THE SUN NEVER MOVED.** `14 passed, 7 failed, 6 NOT
+CALIBRATED`, rc 1, 263 s.
+
+Commanded 55° / 2° / −14°; the key measured **23.132 → 23.132 → 22.938**, and
+the key azimuth drifted monotonically **−64.6081 → −64.8665 → −65.1123** across
+the six samples. A 69° commanded swing cannot produce a 0.2° key drift, and a
+monotone azimuth walk across four minutes is a **clock**, not a command.
+
+**Cause, arbitrated from source:** the gate redefined `window.__flySunOverride`
+as an accessor backed by `__r24Sun` and wrote `{ elDeg: 55 }` into it — but the
+app consumes that override as a **TIMESTAMP IN MILLISECONDS**
+(`FlyScene.jsx:939`, `:1155`), and nothing in `lib/` or `components/` reads
+`__r24Sun` or an `elDeg` field at all. An object where a number belongs yields
+NaN inside `computeSun` or a truthy fall-through, so the app kept its wall
+clock. **`ONE_SUN.enabled` is `true` on this tree**, so without this arbitration
+the row read as C's feature failing.
+
+The six NOT CALIBRATED lines are the §2.10a fix working: clause (5) would have
+printed `PASS … Δ undefined°` six times on this same tree.
+
+**Two contract mismatches also surfaced, both now fixed:**
+
+- **`water` was the string `'key'`** — a documented sentinel meaning "one
+  directional in the rig, the same vector by construction". C's `ad0849f` now
+  publishes a real vector plus `waterSource`, and the gate asserts **both** the
+  angle ≤ 0.5° **and** `waterSource === 'key-light'`: an angle of 0 between two
+  INDEPENDENT lights is a coincidence that holds until someone moves one. New
+  **(8)** counts `<directionalLight>` in `FlyScene.jsx` from SOURCE and requires
+  exactly 1 (measured: 1) — teeth without a runtime census that would perturb
+  FRAME_STATS.
+- **`casting` reads `undefined`** because it lives on `stats.shadow`, not
+  `stats.sun`. C's `ad0849f` publishes it on both, along with `minElRadDeg`,
+  `hillMinDeg`, `hillMaxDeg` — which also un-SKIPs clause (3).
+
+**Fixed for the re-take** (`d9e5d57`): the sun is commanded by TIME, searched
+with the app's own `computeSun` (`scripts/_sun-time.mjs` reading raw `sinEl`, so
+a night target is reachable at all), and **no clause runs until the app reports
+the commanded elevation within 0.5°** — the precondition whose absence let a
+stationary sun read as a stationary key.
+
+**PASS 2c (standalone re-take).** *pending* — exactly one key direction across
+every lit material at every tier, with the azimuth spread tracking the sun.
 
 ---
 
@@ -1407,8 +1447,49 @@ Fixed in `686db21`: the read happens inside a rAF (the pale detector's idiom,
 which is why its census rows read real pixels), and (2)/(3) are NOT CALIBRATED
 whenever (1) fails.
 
-**PASS 2 (flipped).** *pending*, and it needs a fresh PASS-1 too — this row has
-no valid flag-off column yet.
+**PASS 2b: THE INSTRUMENT FIX WORKED, AND THE ROW IS STILL VOID AS POSED.**
+`4 passed, 2 failed`, rc 1, 243 s.
+
+The rAF read fixed the black frame — this row produced the pass's first
+genuine seam measurement:
+
+```
+noon   horizon row 227 (step 54.6) · terrain L 212.4 · sky L 161.5 · Δ 50.9
+night  horizon row 227 (step 54.7) · terrain L 212.3 · sky L 161.5 · Δ 50.8
+```
+
+(1a)/(1b) found a real horizon with a 54-luma step and the profile shows the
+seam cleanly (`…208.2, 159.5, 160.0…`), against pass 2a's all-zero profile.
+
+**But C proved from source that the frame has ZERO PERCENT MELT in it.**
+`bootFly` pins `__flyAerialOverride = 0` (`_boot.js:95`, `:143`), which drives
+`aerialGate` to 0, so all three atmosphere channels take their R19 identity
+paths, `WORLD_EDGE.fade.satellite` (60–120 km) never enters a fixture frame, and
+`setDepthHaze` is literally 0 in satellite (`FlyScene.jsx:1011`). **The gate's
+own luma profile says so** if you read it: thirteen terrain rows flat at 210–214
+and then a one-row cliff. A delta measured across a seam with no melt is not a
+reading of the seam.
+
+**And both legs were the same frame** — the sun defect above — which is why noon
+and night agreed to 0.1. That agreement proved nothing.
+
+**The bound was unreachable too**, and must not be sourced from C's node proof:
+`maxMix` 0.55 leaves 0.45 × 51 ≈ **23** even fully unpinned, and an eye at
+4200 m is 3.5 e-folds over `heightFalloffM` 1200. C's node proof predicts 0.000
+for the **decode round trip only**, never for a seam.
+
+**Re-expressed for the re-take** (`d9e5d57`): the aerial pin is released with
+the same accessor idiom as the sun; tier high **and** `aerialGate > 0` are a
+precondition or the row is NOT CALIBRATED; the absolute bound is gone and the
+claim is the **A/B** — same pose, `LINEAR_HAZE` on must read a smaller Δ than
+off; (3)'s spread tightens to **≤ 0.5** as the one-colour-function tell, the
+assertion that needs no absolute bound; and C's free check is asserted —
+**`moonK` must read 1** at a landed −14° sun, since it keys on
+`trueElevationDeg`. The ON arm stays NOT CALIBRATED until C's
+`__flyLinearHazeOverride` lands. A toy pose, where `setDepthHaze` carries
+`haze.max`, is a second INFORMATIONAL leg only.
+
+**PASS 2c (standalone re-take).** *pending*.
 
 ---
 
@@ -1432,9 +1513,33 @@ The renderer state that run: `reversedDepth=true · style=toy · tier=high`.
 
 Handles required, both C-owned — see §2.7c for the contracts.
 
-**PASS 2 (flipped).** *pending* — the RED signature to look for is all three
-pixels reconstructing to **2.50–2.51 m**, i.e. `−cameraNear`, every fragment
-collapsed.
+**PASS 2b: THE HOOK ARRIVED AND THE GATE STILL MEASURED NOTHING.**
+`3 passed, 1 failed, 1 NOT CALIBRATED`, rc 1, 244 s.
+
+C's hook works: **(0) `__flyDepthProbe` PRESENT**, **(0b) `__flyDof` true** —
+the gate reads the live handle now instead of inferring the pass from
+`style`/`tier`, which is the fix that stopped it passing while printing
+`dof=null`. Renderer `reversedDepth=true`, style toy, tier high.
+
+**But (1) failed with `0 raycast hits`**, so the probe was never called on a
+real pixel, and (3)/(4) read NOT CALIBRATED for want of a finite `coc` — the
+third verdict doing its job on a row that measured nothing.
+
+**Cause: the row ran with no budget scaler.** It sat in cert-run's PACING list,
+so on the flipped tree with `FINALIZE_PACE`'s cold seed and a fixed settle the
+toy chunks were not resident at the moment of the pick. By the §1.5 table this
+is a **settled-pose pixel probe — a content gate**, and it takes `K`.
+
+**Fixed for the re-take** (`d9e5d57`): the row moves to the `K` list; it settles
+on `_settle.js`'s condition before picking; the raycast returns a REASON when it
+misses (which handle was absent, or no intersection) instead of a bare null;
+the hits are printed with their distances and the objects they struck; and fewer
+than three picks reads **NOT CALIBRATED, not FAIL** — the round trip was never
+exercised, which is not the same as failing it.
+
+**PASS 2c (standalone re-take).** *pending* — the RED signature to look for is
+all three pixels reconstructing to **2.50–2.51 m**, i.e. `−cameraNear`, every
+fragment collapsed.
 
 ---
 
