@@ -1238,3 +1238,96 @@ shrinks by at most 35 %; the contract is `> 2/255`; the only open question is
 whether the measured margin has 35 % of headroom. That is a measurement, not an
 argument, and it belongs to E's fixture column with the live column marked
 "user machine pending".
+
+---
+
+## W3 — THE SHIP-STATE FLIP
+
+Ruled by Fable at the close. Only C's own blocks in `lib/fly/fly-constants.js`
+moved; no component, engine or shader file was touched by the flip.
+
+| flag | ships | notes |
+|---|---|---|
+| `LINEAR_HAZE` | **ON** | zero constants moved with it — gain 1 is the only value that closes the seam |
+| `ONE_SUN` | **ON**, `hill.dayK` **1.0** | `monumentsLambert` on. **The daytime-hillshade demotion ships OFF** — see below |
+| `POST_ORDER` | **ON** | `smaaPreset 'high'`, `dither true` |
+| `DEPTH_FIX` | **ON** | CoC patch + the AerialPerspective sky early-out |
+| `SHADOW_CALM` | **ON** | `biasSignFix`, `kernel 'world'`, `texelSnap`; `satCadence 0` (the documented refusal) |
+| `TERRAIN_LIGHT` | **ON, tile half only** | `fragmentHill`, `microFwidth`; **`workerNormals` OFF** — see below |
+| `CLOUD_LIT` | **ON** | |
+| `LAMBERT_ENV` | **ON** | `reflectivity 0.15` |
+
+### `hill.dayK` ships at 1.0 — the demotion is built and OFF
+
+`dayK 0.65` was always a **user-checkpoint knob whose only justification was
+going to be a measurement**, and that measurement never landed: the Sierra A/B
+is unrun and its v1 result was a drift signature. Shipping 0.65 would spend up
+to 35 % of `verify-sat-depth`'s hillshade A/B margin on an argument. At 1.0 the
+weight is exactly 1 at every elevation, so `uHillElev` is the identity, the tile
+fragment's `uHillStrength * uHillElev` is **bit-identical to R21's
+`uHillStrength`**, and that frozen margin does not move at all. One edit away
+the moment there is a number.
+
+### `workerNormals` ships OFF, and it is not an oversight
+
+Turning it on makes `verify-skirt-worker`'s element-by-element identity leg go
+**RED by design** (normals differ; positions, uv and indices do not). It needs
+its own certification with a flag-on ARM, and it has never been exercisable in a
+browser here at all (LERC-only path, 403). The 12 node gates stand; the pixels
+do not exist yet. **The tile half ships; the worker half waits.**
+
+### FINAL CACHE KEYS LIVE AT BOOT (for pass 2's PREWARM census)
+
+**Tile program — `world-bend-fade-hill-r19-ef24`.** Derived by `hillKey()` from
+`hillVariantKey`'s fixed token order: **`e`** (ONE_SUN) + **`f`**
+(TERRAIN_LIGHT.fragmentHill). `a` (D's `AERIAL_LAW`) and `l` (D's per-material
+`lodFade`) are **not set on r24/c** — on the integrated tree with D's flags on
+the key becomes `…-efa24`, and `…-efal24` on any material D hands a `lodFade`.
+The census must read the key from the material, not assume C's.
+
+**Cloud program — `cloud-lit-c24`.** Live (satellite decks only; toy is
+MeshBasic and never sees the class). **Deliberately NOT in the prewarm warm
+set** — it compiles once at boot with the deck it belongs to and adds no new
+mid-flight state flip. E's `programsDelta` style-flip leg is the outstanding
+measurement; if it re-links on the flip back, it belongs in B's
+re-warm-on-style-flip.
+
+**Post chain — the el()/raw() twins are the REORDERED list.** Satellite high:
+`bloom | speed, aerial, tone, sat-hue, sat-bc, sat-wb, vignette | smaa` = **3
+EffectPasses** (was 4). Toy high: `bloom | speed | toy-dof | tone, toy-hue,
+toy-bc, toy-noise, vignette | smaa` = **5** (was 6). Every composition's pass
+count FALLS or holds; none rises. The last pass additionally carries
+`#define DITHERING`, applied through `lib/fly/post-policy.js` from **both** the
+live composer and `prewarm`'s `buildWarmPasses` — a dithered pass is a different
+program, so a census that sees them differ means one assembler missed the call.
+SMAA is our own instance (`SMAAPreset.HIGH`, `EdgeDetectionMode.LUMA`), and
+`DEPTH_FIX` additionally changes the AerialPerspective fragment text and the CoC
+material text.
+
+**No key moves, but the TEXT moves — the case a census must not miss.**
+`SHADOW_CALM`'s `ShaderChunk.shadowmap_pars_fragment` edits change the compiled
+text of **every shadow-receiving program in the scene** while changing **no
+cache key at all**, because three's key is a function of material state and not
+of chunk contents. That is safe here only because the patch is installed from
+FlyScene's module body **before any material compiles**, warm scene included —
+so warm and live read one mutated table. A census that counts keys will see
+nothing; a census that hashes program source will see every shadow receiver
+move, and both readings are correct. `LAMBERT_ENV` is uniform-only and moves
+neither.
+
+### Gates on the flipped branch
+
+`verify-c-flagoff` **37/37** · `verify-shadow-calm` **33/33** ·
+`verify-depth-offset` 7/7 · `verify-worker-normals` 12/12 ·
+`verify-vendor-three-tile` 19/19 · post-order proof PASS · linear-haze proof
+(RED 99.2 worst / GREEN 0.000) · depth round-trip proof (RED flat 0.176–0.177).
+`no-undef` over the changed files: **0**.
+
+**Gate (1) of `verify-c-flagoff` is the only assertion in either file whose
+expectation moved with the flip.** Gates (2) and (3) do not, and that is the
+reason to keep the file after the close: they assert that the FALSE branch of
+every injection is the R21 string verbatim and that `r24VariantKey` returns the
+bare R19 key when every token is false. Those are properties of the SOURCE, not
+of the flag's value — so they go on proving the round is one flag flip away from
+R21 now that the flags are on. That is the anti-rot for R20 §7's *"a one-flag
+revert contract rots as flags accumulate"*.

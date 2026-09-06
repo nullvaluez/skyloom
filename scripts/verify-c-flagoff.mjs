@@ -9,7 +9,10 @@
  * that two frames matched at the poses someone thought to sample, while this
  * shows that the alternate branch is unreachable. Three checks:
  *
- *   (1) every C flag ships `enabled: false`;
+ *   (1) every C flag ships the RULED SHIP STATE (W3 close flip — this was
+ *       "every flag ships enabled:false" through W1/W2, and it is the ONLY
+ *       gate here whose expectation moves with the flip; (2) and (3) below do
+ *       NOT, and that is the point of them — see the note above gate (1));
  *   (2) every GLSL injection C added is inside a predicate ternary whose false
  *       branch is the R21 string (so flag-off cannot reach new text);
  *   (3) the FINAL tile key goes through the shared `r24VariantKey` helper and
@@ -35,22 +38,71 @@ const gate = (name, ok, detail = '') => {
   console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
 };
 
-// ---- (1) every C flag ships off -------------------------------------------
-const C_FLAGS = [
-  'LINEAR_HAZE',
-  'ONE_SUN',
-  'POST_ORDER',
-  'DEPTH_FIX',
-  'SHADOW_CALM',
-  'TERRAIN_LIGHT',
-  'CLOUD_LIT',
-  'LAMBERT_ENV',
-];
+// ---- (1) every C flag ships the RULED SHIP STATE ---------------------------
+// W3 CLOSE FLIP. Through W1/W2 this read "every C flag ships enabled:false".
+// It is the ONE gate in this file whose expectation moves with the flip, and
+// the reason the other two do not is the whole argument for keeping this file
+// after the close: gates (2) and (3) assert that the FALSE branch of every
+// injection is the R21 string verbatim and that `r24VariantKey` returns the
+// bare R19 key when every token is false. Those are properties of the SOURCE,
+// not of the flag's value — so they keep proving that the round is one flag
+// flip away from R21 even now that the flags are on, which is exactly what a
+// revert contract is for (R20 §7: "a one-flag revert contract rots as flags
+// accumulate" — this is the anti-rot).
+//
+// Sub-values are asserted too, not just `enabled`: the ruled state is a state,
+// not a boolean, and `dayK` in particular is a number the round deliberately
+// did NOT spend (see the constants comment).
+const SHIP = {
+  LINEAR_HAZE: { enabled: true },
+  ONE_SUN: { enabled: true, extra: [[/dayK:\s*1\.0\b/, 'dayK 1.0 (the demotion ships OFF — unmeasured)'], [/monumentsLambert:\s*true/, 'monumentsLambert']] },
+  POST_ORDER: { enabled: true, extra: [[/smaaPreset:\s*'high'/, "smaaPreset 'high'"], [/dither:\s*true/, 'dither']] },
+  DEPTH_FIX: { enabled: true },
+  SHADOW_CALM: {
+    enabled: true,
+    extra: [
+      [/biasSignFix:\s*true/, 'biasSignFix'],
+      [/kernel:\s*'world'/, "kernel 'world'"],
+      [/texelSnap:\s*true/, 'texelSnap'],
+      [/satCadence:\s*0\b/, 'satCadence 0 (the documented refusal)'],
+    ],
+  },
+  TERRAIN_LIGHT: {
+    enabled: true,
+    extra: [
+      [/fragmentHill:\s*true/, 'fragmentHill'],
+      [/microFwidth:\s*true/, 'microFwidth'],
+      // THE ONE SUB-FLAG THAT STAYS OFF, and it is not an oversight: turning it
+      // on makes `verify-skirt-worker`'s element-by-element identity leg go RED
+      // BY DESIGN (normals differ; positions, uv and indices do not), so it
+      // needs its own certification with a flag-on ARM. The tile half ships;
+      // the worker half waits for that.
+      [/workerNormals:\s*false/, 'workerNormals OFF — needs its own certification'],
+    ],
+  },
+  CLOUD_LIT: { enabled: true },
+  LAMBERT_ENV: { enabled: true, extra: [[/reflectivity:\s*0\.15/, 'reflectivity 0.15']] },
+};
 const consts = read('lib/fly/fly-constants.js');
-for (const f of C_FLAGS) {
+const blockOf = (f) => {
   const i = consts.indexOf(`export const ${f} = `);
-  const head = i < 0 ? '' : consts.slice(i, i + 400);
-  gate(`${f} ships enabled:false`, i >= 0 && /enabled:\s*false/.test(head));
+  if (i < 0) return '';
+  const semi = consts.indexOf('\n};', i);
+  const line = consts.indexOf('\n', i);
+  // single-line block (`= { … };`) or multi-line (`= {\n … \n};`)
+  return semi > i && semi < i + 4000 ? consts.slice(i, semi + 3) : consts.slice(i, line);
+};
+for (const [f, want] of Object.entries(SHIP)) {
+  const b = blockOf(f);
+  const en = new RegExp(`enabled:\\s*${want.enabled}`).test(b);
+  const missing = (want.extra ?? []).filter(([re]) => !re.test(b)).map(([, n]) => n);
+  gate(
+    `${f} ships the ruled state (enabled:${want.enabled}${
+      want.extra ? ', ' + want.extra.map(([, n]) => n).join(', ') : ''
+    })`,
+    b !== '' && en && missing.length === 0,
+    missing.length ? `MISSING: ${missing.join(' | ')}` : ''
+  );
 }
 
 // ---- (2) the injections are branch-gated ----------------------------------
