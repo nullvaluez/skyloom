@@ -199,7 +199,7 @@ composites.**
 ## §3 Per-agent shipped
 
 Every block ships `enabled:false` through W2 and W3; the flips are the close
-commit's (§8).
+commit's (§8). Prose is compressed here — the ledgers hold the derivations.
 
 ### A PACE (`r24/a`, W1 head `f739cb3`, 13 commits; W3 `8b91bc5`; flip `5ddf5dc`) — [ledger](scripts/r24-a-pace.md)
 
@@ -217,25 +217,17 @@ commit's (§8).
 | `FRAME_STEP` (sim half) | `ed773b8` | 120 Hz accumulator, ≤4 substeps, `renderPos`/`renderAtt`/`renderAlpha` as NEW fields; `flight.pos` stays the sim truth | **OFF — "not landed"**: no consumer reads the smoother pose (§8) |
 | `markPhase` | `70b9f42` | six sites, two vendored ones **by inversion** (`R24_SWITCHES.onPhase`, so the bundle never imports app code) | ON with `FRAME_STATS` |
 
-Node gates: vendor **19 → 20** · terra-residency **21 → 22** · skirt-fast
-**12 → 13** · skirt-worker **8 → 9** · finalize-pace **11 → 12** · frame-step
-**10 → 11** (the second number is the flipped branch, where each gained a ship-
-state row). Browser: ladder-fix **13**; `verify-terra-live` **9 — never
-completed here** (a fixture 502, then a load-14 timeout).
-
-Three gate findings the flip itself produced, all A's:
-
-- **`scripts/_r24a-ship-state.mjs`** reads each block's literal out of
-  `fly-constants.js` by brace matching, because **"a flag silently reverted to
-  false would leave every behaviour gate green while the fix was gone from the
-  build"** — ship state and behaviour are two claims and now have two gates.
-- **`verify-ladder-fix`'s RED arm used to OMIT the pin**, and with the constants
-  shipping ON **an omitted pin IS the shipped state**, so the calibration would
-  have gone quietly green while claiming to measure the defect;
-  `verify-terra-live`'s arm A had the same shape. Both now state the state they
-  want, in both directions (§7 lesson 26).
-- **`verify-vendor-three-tile` gate 16b**: the vendored switchboard's own
-  literal defaults every switch to false regardless of what the app ships.
+Node gates (second number = the flipped branch, each grown by a ship-state row):
+vendor **19 → 20** · terra-residency **21 → 22** · skirt-fast **12 → 13** ·
+skirt-worker **8 → 9** · finalize-pace **11 → 12** · frame-step **10 → 11**.
+Browser: ladder-fix **13**; `verify-terra-live` **9 — never completed here**
+(a fixture 502, then a load-14 timeout). Three findings the flip produced:
+`_r24a-ship-state.mjs` reads each block's literal by brace matching, because
+*"a flag silently reverted to false would leave every behaviour gate green
+while the fix was gone from the build"*; `verify-ladder-fix`'s RED arm and
+`verify-terra-live`'s arm A both OMITTED the pin, which with the constants ON
+**is the shipped state** (lesson 26); and vendor gate **16b** — the vendored
+switchboard's own literal defaults every switch to false.
 
 ### B WORLD (`r24/b`, W1 head `06b8f1d`, 16 commits; W3 `f361543`; ledger `6d38245`; flip `070b95b`) — [ledger](scripts/r24-b-world.md)
 
@@ -248,15 +240,13 @@ Three gate findings the flip itself produced, all A's:
 | `ENV_UNIFORM` | `42e6f66`, `f361543` | constant PMREM height (the day endpoint bypasses the resize ⇒ noon bit-identical), both shadow states warmed, late-HDRI idle re-queue | **OFF** (§5.3) |
 | `RING_DEDUPE` | `720c5d2`, `995f0da`, `8f9861e` | source-side ring dedupe + the skyline's restored `ring[0]` + a sliver guard | BUILT-OFF (roof re-certification owed) |
 
-Node proofs, outside the smoke: `r24-b-engine-proof.js`,
-`r24-b-worker-proof.js`, `r24-b-bend-proof.mjs`, `r24-b-groundvis-proof.mjs`,
-`r24-b-fixture.js`, and `r24-b-prewarm-proof.mjs` (**9/9**; `--red` **5/9**
-against the defective `06b8f1d`; gates 1–2 self-calibrate against base
-`6116fc5`, because the invariant is *B added nothing here*). B's ledger §8 is
-the round's most useful single table: **16 mechanisms that can remove a
-building from the screen**, each with file:line, single-frame or not, the flag
-that closes it, and the measured before/after; §15 is B's reading of E's live
-flash-guard REDs (§4.2).
+Node proofs outside the smoke: `r24-b-engine-proof.js`, `-worker-proof.js`,
+`-bend-proof.mjs`, `-groundvis-proof.mjs`, `-fixture.js`, and
+`r24-b-prewarm-proof.mjs` (**9/9**, `--red` **5/9** against the defective
+`06b8f1d`; gates 1–2 self-calibrate against base `6116fc5`, the invariant being
+*B added nothing here*). Ledger §8 = **16 mechanisms that can remove a building
+from the screen**, each with file:line and its measured before/after; §15 = B's
+reading of E's live flash-guard REDs (§4.2).
 
 ### C LIGHT (`r24/c`, W1 head `871f9be`; W3 `ad01d32`, `a9e30cc`; flip `81338da`) — [ledger](scripts/r24-c-light.md)
 
@@ -271,43 +261,27 @@ flash-guard REDs (§4.2).
 | shared | `9783586` | `r24VariantKey(base, tokens)`, fixed order **e** ONE_SUN · **f** TERRAIN_LIGHT · **a** AERIAL_LAW · **l** LOD_CROSSFADE, plain booleans, all-off ⇒ the bare R19 key | — |
 | F4 + F11 | `6ac995f`, `98cc33d` | three monument material-contract gates added ADDITIVELY to `verify-monuments-sat` (its eleven frozen numbers unmoved), the fourth as a source-level unreachability proof; the two key-NEUTRAL shader edits documented in the registry header | ON |
 
-Node gates: `verify-depth-offset` **7** · `verify-c-flagoff` **26 → 37** ·
-`verify-worker-normals` **12** (3.34° last-writer → **0.26°** area-weighted) ·
-`verify-shadow-calm.mjs` **32** (**33/33** on the flipped branch; the browser
-could not host it — its first term is the fleet pin `__flySatShadowOverride`,
-and the container's browser budget belongs to certification). **Zero constants
-moved, in six milestones**, each refusal carrying the number that justified it.
-
-**What the flip itself decided, in C's words and worth keeping:**
-
-- **`hill.dayK` 1.0 makes the daytime-hillshade demotion BUILT-AND-OFF by
-  construction** — the weight is exactly 1 at every elevation, so
-  `uHillStrength * uHillElev` is bit-identical to R21 and `verify-sat-depth`'s
-  hillshade margin does not move. 0.65 would have spent up to **35 %** of a
-  frozen margin on an argument nobody has measured (§6 item 7).
-- **`workerNormals` stays OFF** because ON makes `verify-skirt-worker`'s
-  identity leg RED **by design** (normals differ; positions, uv and indices do
-  not) and it was never exercisable in a browser here. The tile half ships; the
-  worker half waits for hardware.
-- **`verify-c-flagoff` gate (1) now asserts the SHIP STATE including
-  sub-values**, while gates (2) and (3) are untouched because they prove SOURCE
-  properties — the false branch is R21 verbatim, `r24VariantKey` returns the
-  bare key when every token is false — so with the flags ON they keep proving
-  the round is **one flag flip from R21**. That is the anti-rot for R20 §7's
-  "a one-flag revert contract rots as flags accumulate".
-- **Live keys at boot on the integrated tree**: the tile FINAL key is
-  `world-bend-fade-hill-r19` + the tokens actually set — `a` is UNSET because
-  `AERIAL_LAW.enabled` ships false, so expect `-ef24` unless D's `lodFade` adds
-  `l`; **read it off the material rather than predicting it.** Plus
-  `cloud-lit-c24` on the satellite decks (deliberately outside the warm set —
-  C's ledger gives the reason) and the reordered post twins (satellite high
-  **3** EffectPasses, was 4; toy high **5**, was 6; `DITHERING` applied from
-  both the live composer and prewarm's `buildWarmPasses`).
-- **A caveat for any program census**: `SHADOW_CALM` changes the compiled TEXT
-  of every shadow-receiving program with **no cache key** (three keys on
-  material state), so a KEY census is blind by construction while a SOURCE-hash
-  census sees every receiver move. Both readings are correct; say which one a
-  number came from.
+Node gates: depth-offset **7** · c-flagoff **26 → 37** · worker-normals **12**
+(3.34° last-writer → **0.26°** area-weighted) · shadow-calm **32** (**33/33**
+flipped; the browser could not host it — its first term is the fleet pin
+`__flySatShadowOverride`). **Zero constants moved, in six milestones.** What the
+flip decided: `hill.dayK` **1.0** keeps the daytime demotion built-and-off BY
+CONSTRUCTION (weight exactly 1 ⇒ `uHillStrength * uHillElev` bit-identical to
+R21, `verify-sat-depth`'s margin unmoved; 0.65 would have spent up to **35 %**
+of a frozen margin on an unmeasured argument); `workerNormals` stays OFF because
+ON makes `verify-skirt-worker`'s identity leg RED by design; `verify-c-flagoff`
+gate (1) now asserts the SHIP STATE including sub-values while (2)/(3) keep
+proving the SOURCE properties (false branch = R21 verbatim, `r24VariantKey` bare
+when every token is false), so the flags ON still prove the round is **one flag
+flip from R21** — the anti-rot for R20 §7. **Live keys at boot**:
+`world-bend-fade-hill-r19` + the tokens actually set — `a` is UNSET because
+`AERIAL_LAW.enabled` ships false, so expect `-ef24` unless D's `lodFade` adds
+`l`; **read it off the material, do not predict it** — plus `cloud-lit-c24` on
+the satellite decks and the reordered post twins (satellite high **3**
+EffectPasses, was 4; toy high **5**, was 6). **Census caveat**: `SHADOW_CALM`
+changes the compiled TEXT of every shadow receiver with **no cache key**, so a
+KEY census is blind by construction while a SOURCE-hash census sees every
+receiver move — say which one a number came from.
 
 ### D ATMOS (`r24/d`, W1 tip `6dc8817`; W3 `1620e32`; flip `327950b`) — [ledger](scripts/r24-d-atmos.md)
 
@@ -318,17 +292,16 @@ moved, in six milestones**, each refusal carrying the number that justified it.
 | `LOD_CROSSFADE` | `e7993ee`, `bc408e7` | vendored PATCH 5/6/7 (**+68 / −0**, insert-only, so D spends none of A's deleted-lines budget), parent-texture clip-UV blend on refine AND merge, `lod-crossfade.js`, `__flyStats.terra.fades` with enumerated skip reasons; `fadeSec` 0.25 = un-hitched FRAME time (the −50 block clamps dt at 50 ms), `maxConcurrent` 12 → **32** because it counts MATERIALS and a refine arms four (≈ 8 concurrent refines ≈ 2.7 MB of retained parent textures) | OFF pending the pass-1 `verify-lod-fade` row (§8) |
 | `SKY_PROCEDURAL` | — | **NOT BUILT**; design in D's ledger §4.5 | OFF |
 
-Node gates: `verify-atmo-law` **41 → 45** (the GLSL parsed by a subset
-interpreter and compared with the JS mirror at 4,160 points, 0 relative error;
-flag-on minus the law === flag-off character for character; four ship-state /
-independence rows added at the flip) and `verify-lod-fade.mjs` **51/51**,
-reading the DECLARED state. D's rationale, which the round should keep: **"a
-gate that asserts a flag is off forever goes red the day the feature ships,
+Node gates: `verify-atmo-law` **41 → 45** (GLSL parsed by a subset interpreter
+against the JS mirror at 4,160 points, 0 relative error; flag-on minus the law
+=== flag-off character for character; four ship-state rows added at the flip)
+and `verify-lod-fade.mjs` **51/51**, reading the DECLARED state. D's rationale:
+**"a gate that asserts a flag is off forever goes red the day the feature ships,
 which trains people to edit gates; the invariant is that the state is declared
-and legal and the RED counter works in either state."** **Not built and
-reported as such**: the content and air/anchor law variants (satbldg,
-satskyline, anchor, monument, air, air-anchor, road, water) — the dispatch is
-designed (`atmoApply` opaque / `atmoExtinct` additive), the variants are not.
+and legal and the RED counter works in either state."** **Not built, reported as
+such**: the content and air/anchor variants (satbldg, satskyline, anchor,
+monument, air, air-anchor, road, water) — dispatch designed (`atmoApply` opaque
+/ `atmoExtinct` additive), variants not built.
 
 ### E CERT (`r24/e`, W1 tip `c7d538c` → `299cc1a` → head `3a21403`) — [ledger](scripts/r24-e-cert.md)
 
@@ -346,8 +319,8 @@ designed (`atmoApply` opaque / `atmoExtinct` additive), the variants are not.
 | `scripts/r24-cert-run.sh` | `af0bb76` → `3a21403` | the certification run with its failure modes designed out: one server, a port guard that asks *does anything ANSWER* (§5.2), `CERT_PROOF_ONLY=1`, every child tracked, `TREE UNDER TEST` stamped at first page load |
 | new gates + smoke | `d5fe40f`, `b81a10a`, `964a7e6`, `cbd7c8a`, `e1b7905`, `ff5d9a1` | verify-flash-guard / -fade / -lod-fade / -step-clean / -one-sun / -env-uniform / -linear-haze / -depth-roundtrip / -frame-pace; `verify-flicker`'s quiescence precondition (bound of 12 **unmoved**); `r24-smoke.sh` (zero passes = failure; `SMOKE_NODE_ONLY=1` runs the node set in 13 s) |
 
----
 
+---
 ## §4 Certification
 
 Per-gate detail, the user-machine command list and the deviation log are in
@@ -413,10 +386,10 @@ merges after the run; the 15/15 above predates it.
 | `verify-fade.js` | **rc=1, 338 s, 4 passed / 2 failed — RED calibrated** (below) | <!-- CERT:verify-fade PASS2 PENDING --> | PENDING — the LOOK of the fade | — |
 | `verify-lod-fade.js` | <!-- CERT:verify-lod-fade PASS1 PENDING --> | <!-- CERT:verify-lod-fade PASS2 PENDING --> | PENDING — whether swaps are still visible at real frame rate | the fade's real DURATION (a 250 ms blend completes inside one SwiftShader frame) |
 | `verify-step-clean.js` | **rc=1, 229 s, 4 passed / 4 failed — RED calibrated** (below) | <!-- CERT:verify-step-clean PASS2 PENDING --> | PENDING — and the ladder the user's real DPR has | the tear LINE |
-| `verify-ladder-fix.js` (+ `FLY_LADDER_RED=1`) | <!-- CERT:verify-ladder-fix PASS1 PENDING --> | <!-- CERT:verify-ladder-fix PASS2 PENDING --> | PENDING — governor behaviour in real time | — |
-| `verify-one-sun.js` | <!-- CERT:verify-one-sun PASS1 PENDING --> | <!-- CERT:verify-one-sun PASS2 PENDING --> | PENDING — the LOOK (checkpoint 5) | — |
+| `verify-ladder-fix.js` (+ `FLY_LADDER_RED=1`) | **rc=0, 90 s, 13 passed / 0 failed — GREEN, pinned ON** (below); the RED arm is running | <!-- CERT:verify-ladder-fix PASS2 PENDING --> | PENDING — governor behaviour in real time | — |
+| `verify-one-sun.js` | **rc=1, 251 s, 20 passed / 7 failed — RED calibrated** (below) | <!-- CERT:verify-one-sun PASS2 PENDING --> | PENDING — the LOOK (checkpoint 5) | — |
 | `verify-linear-haze.js` | **VOID — reader outside rAF; re-run pass 2** (below) | <!-- CERT:verify-linear-haze PASS2 PENDING --> | PENDING — whether live colours land in the same band | — |
-| `verify-depth-roundtrip.js` | <!-- CERT:verify-depth-roundtrip PASS1 PENDING --> | <!-- CERT:verify-depth-roundtrip PASS2 PENDING --> | — | needs `window.__flyDepthProbe`; absent ⇒ the row reads NOT RUNNABLE, never RED |
+| `verify-depth-roundtrip.js` | **NOT RUNNABLE — probe hook absent; C building; pass 2** (below) | <!-- CERT:verify-depth-roundtrip PASS2 PENDING --> | — | needs `window.__flyDepthProbe`; absent ⇒ the row reads NOT RUNNABLE, never RED |
 | `verify-terra-live.js` | <!-- CERT:verify-terra-live PASS1 PENDING --> | <!-- CERT:verify-terra-live PASS2 PENDING --> | PENDING — the residency trio's live draw evidence | never completed in this container |
 | `verify-frame-pace.js` | <!-- CERT:verify-frame-pace PASS1 PENDING --> | <!-- CERT:verify-frame-pace PASS2 PENDING --> | PENDING — **everything**: stalls/min, worst dt, p99, >100 ms/min | the pacing legs are not asserted here; flag-off it correctly reads "instrument absent — unmeasurable, not a renderer failure" |
 | `verify-seam.js` browser leg | <!-- CERT:verify-seam-browser PASS1 PENDING --> | <!-- CERT:verify-seam-browser PASS2 PENDING --> | PENDING | — |
@@ -539,6 +512,53 @@ the R20 anti-duplication story reproducing once the collision index exists.
 - **Still pending:** `scripts/r24-user-diag.md` Part A on the CURRENT build.
   **Without it there is no before, and "smoother" is an opinion.**
 
+**`verify-ladder-fix`, pass 1: GREEN — and it is a measured ON leg.** The gate
+boots TOY and arms `LADDER_FIX` and `STEP_SAFE` through their runtime pins, so
+it certifies the shipped behaviour on the flag-off tree: **rc=0, 90 s, 13 passed
+/ 0 failed.** (1) **two sub-native render-scale rungs exist on a DPR-1 display**
+— 0.875/high and 0.75/high; (2) both come BEFORE the first tier rung (last
+sub-native at index 2, first tier rung at 3); (3) the boot rung is still index 0
+at native DPR and boot tier (1/high); (4) the tier rungs are unchanged in order
+and count (1/medium, 1/low); (5) the governor estimates the display refresh from
+the frame cadence — **144 Hz** on a synthetic cadence; (6) `nativeRefresh`
+target **144** vs refresh 144; (7) **a stuttering session steps DOWN although
+its mean fps is healthy** — rung 3 at `emaFps` **53.4** (at or above the 51 fps
+down bound) with `longFrac` 0.1, which is exactly the pattern the EMA cannot
+see; (8) CONTROL: a clean 60 fps session never steps (rung 0, dprSteps 0,
+tierSteps 0); (9) render-scale rungs are spent before any tier step — dpr steps
+[0.875, 0.75, 1] then tiers ["medium"]; (10) a forced step moved the ladder
+0 → 1; (11) **`STEP_SAFE` applied it INSIDE a frame, not through the safety
+valve** (n=1, `applyMs` 466.8 — a SwiftShader number, `composer=true`); (12) the
+composer buffers ARE the drawing buffer after the step ([560, 315] both);
+(13) clean. **The R20 flap condition `[1/high, 1/medium, 1/low]` is now the
+five-rung ladder, measured.**
+
+**`verify-depth-roundtrip`, pass 1: NOT RUNNABLE, not RED.** rc=1, 220 s,
+1 passed / 1 failed, toy at tier high with the renderer reporting
+`reversedDepth=true`. Gate (0) refused because **`window.__flyDepthProbe(x, y)`
+is ABSENT** — *"this gate cannot reconstruct viewZ without the renderer's own
+conversion; re-implementing it in the harness would test the harness's copy of
+the bug"* — required signature `__flyDepthProbe(x, y) → { viewZ, coc, raw,
+reversed }` over drawing-buffer pixels, top-left origin, owner C under
+`DEPTH_FIX`; it printed `dof=null`. Gate (0b) "the DoF pass is present" then
+PASSED on an inference from style and tier **while `dof` was null** — the
+FOURTH vacuous pass of the day; E is making it read a handle. C is building the
+hook on `r24/c` as a dev-only, `NODE_ENV`-guarded handle (production
+byte-identical) whose JS mirror of three's reversed `perspectiveDepthToViewZ`
+is proven against the GLSL text in its node proof, plus `window.__flyDof`; the
+row re-runs in pass 2.
+
+**`verify-one-sun`, pass 1**: **rc=1, 251 s, 20 passed / 7 failed = RED
+calibrated.** Both pins released (`__flySunOverride` null → null,
+`__flySatShadowOverride` 0 → 1) and **`live === true` at high AND medium**, so
+the released term is proven reachable before anything is asserted. Azimuth:
+key === hill, **Δ 0.00e+0°** at every tier and time. **Key ELEVATION is stuck
+near 45° — 39.552° at high/noon, 45.291° at high/dusk, 45.142° everywhere else
+— against a true solar 55 / 2 / −14, at high AND medium**: recon L3, measured
+in the shipped app. **Medium azimuth spread 0.0000°** is the RED itself. Gate
+(5) — "water reads the same directional, Δ undefined°" — **PASSED on an absent
+reading**, i.e. vacuous; E is fixing it. No page errors.
+
 **`verify-linear-haze`, pass 1: VOID, instrument.** rc=1, 240 s, 4 passed /
 2 failed — and not one of the six means anything. Both poses read **terrain
 L 0.0 / sky L 0.0**, a luma profile of all zeros, and "horizon row 6 of 540,
@@ -582,10 +602,11 @@ D's go/no-go**.
 ### 5.1 Three unimported symbols, on three branches, one mechanism
 
 The certification run was VOIDED: a control probe (no init scripts, fixture,
-satellite, 640×360) on `bf319ca` reported `ReferenceError: ATMO_GLSL_DECL is
-not defined` **at module evaluation**, body "Something went wrong", **0
-canvas**, `__flyBoot` undefined. `eslint --rule no-undef` over the 50-file
-delta (vendor `plugin.js` excluded) found three:
+satellite, 640×360) on `bf319ca` reported `ReferenceError: ATMO_GLSL_DECL is not
+defined` **at module evaluation**, body "Something went wrong", **0 canvas**,
+`__flyBoot` undefined. `eslint --rule no-undef` over the 50-file delta (vendor
+`plugin.js` excluded) found three, all present on the branch tips and in clean
+worktrees — **branch defects, not merge resolutions**:
 
 | Owner | Symbol(s) | Where it throws | Reach |
 |---|---|---|---|
@@ -593,159 +614,133 @@ delta (vendor `plugin.js` excluded) found three:
 | **A** | `pinned` in `CloudField.jsx` | render time, in a helper that is **not behind the flag** | reachable with every flag OFF, in both styles |
 | **C** | `offsetUnits` in `FlyScene.jsx` (the `SHADOW_CALM` catcher's material) | inside a `useMemo`, when `SatShadowCatcher` builds its material | unreachable on the shipped tree: needs `SHADOW_CALM.enabled` AND satellite AND tier high AND `__flySatShadowOverride ≠ 0` |
 
-All three were on the branch tips and in clean worktrees — **branch defects,
-not merge resolutions.**
-
 **A's and D's share one mechanism, arrived at independently: an un-asserted
 `String.replace` in an edit script.** A's anchor (`import {\n  HUD_SYNC,`) did
-not exist in CloudField, whose constants import has a different shape; D's
-anchor was `AerialPerspective.jsx`'s two-line import prologue, and by the time
-D's script ran the C merge had added `SRGBColorSpace` to the second line.
-**`String.replace` on a miss is a silent no-op**, both scripts reported
-success, and in each case the helper landed while its import did not. Five of
-D's six edits had an `assert old in s` in front of them; **the one that did not
-is the one that broke.**
+not exist in CloudField, whose constants import has a different shape; D's was
+`AerialPerspective.jsx`'s two-line prologue, and by the time D's script ran the
+C merge had added `SRGBColorSpace` to the second line. **A miss is a silent
+no-op**, both scripts reported success, and the helper landed while its import
+did not. Five of D's six edits had an `assert old in s`; **the one that did not
+is the one that broke.** Four blind spots, each a rule someone was following:
+(1) the project ESLint config does not enable `no-undef`, so both agents
+compared totals that could never contain this class; (2) a compile check
+resolves MODULES, not IDENTIFIERS — `GET / 200` was true and meaningless;
+(3) **no browser gate ran after the offending commits** (A's last was
+`verify-ladder-fix` at `36792a0`, one commit earlier; D's `lodprobe-on.log` at
+16:52 postdates `bc408e7` at 16:45); (4) C's was behind the flag AND a fleet
+pin — the first run that could mount the catcher is `verify-shadow-calm`, whose
+recipe says step one is un-pinning `__flySatShadowOverride` and which did not
+exist until `a9e30cc`. HARN-GAP-5, twice in one round.
 
-Four blind spots, each of them a rule someone was following:
+**D's correction, made in its own ledger (§4.95):** the flag-ON LOD leg did not
+"time out under load" — `bootFly` waits on `__flyBoot`, which never exists when
+the chunk throws, so the 180 s timeout **is the signature of D's own defect on a
+tree D had broken seven minutes earlier**. The RED leg (`lod-off.json`, 16:23,
+before `bc408e7`) is VALID; **the ON leg was never booted, on any tree, at any
+time.**
 
-1. **The project's ESLint config does not enable `no-undef`** — both agents
-   compared totals that could never contain this class.
-2. **A compile check resolves MODULES, not IDENTIFIERS.** `GET / 200` was true
-   and meaningless.
-3. **No browser gate ran after the offending commits.** A's last browser run
-   was `verify-ladder-fix` at `36792a0`, one commit earlier; D's own
-   `lodprobe-on.log` (16:52) postdates `bc408e7` (16:45).
-4. **C's defect was behind the flag AND a fleet pin.** The first run that could
-   mount the catcher is `verify-shadow-calm` — whose recipe says step one is
-   un-pinning `__flySatShadowOverride`, and which did not exist until `a9e30cc`
-   (node-side; the browser half still does not). HARN-GAP-5, twice in one round.
+### 5.2 The void rows, seven instrument defects, and the port guard
 
-**A correction D owes the record, and made:** the flag-ON LOD leg was reported
-as "timed out in `bootFly` under load". It did not. `bootFly` waits on
-`__flyBoot`, which is never defined when the chunk throws — the 180 s timeout
-**is the signature of D's own defect on a tree D had broken seven minutes
-earlier**. Contention was a guess, and it was wrong. The **RED** leg
-(`lod-off.json`, 16:23, before `bc408e7`) is VALID; **the ON leg was never
-booted, on any tree, at any time** (D ledger §4.95).
-
-### 5.2 The void rows, and six instrument defects
-
-Three rows of the two attempts are not results and must be re-taken:
-
-1. **`fixture`, run 1 — killed by E**: a `ps | grep | kill` loop matched the
-   orchestrator's row and killed it 62 s in (`rc=1 62s`).
-2. **`flash-guard`, run 2 — `rc=1 601 s`**: E's `INSTALL_PALE` probe polled
-   `canvas.getContext('webgl2')` from page load; **a canvas has ONE context and
-   the first caller decides its attributes**, so the probe raced three and the
-   boot never completed. Fixed in `cbd7c8a` (read the renderer's own handle,
-   `window.__flyGl.getContext()`); `linear-haze` in the same run carried the
-   identical bug.
-3. **`fade`, run 2** — killed by the orchestrator at ~19:12 while diagnosing.
+Three rows of the two attempts are not results: **`fixture` run 1** (`rc=1 62s`
+— E's `ps | grep | kill` loop matched the orchestrator's row); **`flash-guard`
+run 2** (`rc=1 601 s` — E's `INSTALL_PALE` probe polled
+`canvas.getContext('webgl2')` from page load, and **a canvas has ONE context
+whose attributes the first caller decides**, so the probe raced three and the
+boot never completed; fixed in `cbd7c8a` by reading `window.__flyGl`;
+`linear-haze` in the same run carried the identical bug); and **`fade` run 2**,
+killed by the orchestrator at ~19:12 while diagnosing.
 
 **E's `getContext` race is recorded as REAL BUT NOT THE CAUSE, at E's own
-request.** The demonstrated cause is D's module-scope `ReferenceError`: on that
-tree nothing could boot at all. E asked for its own finding to be downgraded
-from "the cause" to "a real bug that was also present" — the correct reading of
-the evidence, and the origin of lesson 19.
+request** — the demonstrated cause is D's module-scope `ReferenceError`, on a
+tree where nothing could boot at all (lesson 19).
 
-**E's instrument-defect count for the session is SEVEN**, each now with a
-defence in the tree: the context race; the artifact overwrite (§5.4); the
-straw-man port guard (below); the sky inside the pale crop (§4.2); the vacuous
-gate (5); the misleading `flagOn(probe)` that read a pin's absence rather than
-a constant; and the seam reader that sampled a cleared framebuffer from outside
-any animation frame and then passed three assertions on black against black
-(§4.2). **Three vacuous passes were found in one day** — flash-guard (5),
-one-sun (5) and linear-haze (2a)/(2b)/(3) — which is what makes lesson 24 a
-rule and not an anecdote.
+**E's instrument-defect count for the session is SEVEN**, each with a defence in
+the tree: the context race; the artifact overwrite (§5.4); the straw-man port
+guard; the sky inside the pale crop; the vacuous gate (5); the misleading
+`flagOn(probe)` that read a pin's absence rather than a constant; and the seam
+reader that sampled a cleared framebuffer from outside any animation frame and
+passed three assertions on black against black (§4.2). **Four vacuous passes in one
+day** — flash-guard (5), one-sun (5), linear-haze (2a)/(2b)/(3), depth-roundtrip
+(0b) — is what makes lesson 24 a rule rather than an anecdote.
 
-Two process facts from the same hour: a second `cert-run.sh` invocation raced
-the first run's server and produced an `EADDRINUSE` (killed by PID
-5023/5024/5038); and an `ss`-based "is anything listening" check reported the
-live server absent and stopped a good run. **Then the guard written to prevent
-exactly that EADDRINUSE turned out to be blind in the same way**: `lsof -i:PORT
--sTCP:LISTEN` does **not** see a live `next dev` listener here — it shows only
-that server's ESTABLISHED connections, because Next binds dual-stack — while
-the same command happily finds a `python http.server`. The guard had been
+Two process facts from the same hour: a second `cert-run.sh` raced the first
+run's server into an `EADDRINUSE` (killed by PID 5023/5024/5038), and an
+`ss`-based "is anything listening" check reported the live server absent and
+stopped a good run. **Then the guard written to prevent that EADDRINUSE proved
+blind in the same way**: `lsof -i:PORT -sTCP:LISTEN` does not see a live
+`next dev` listener here (it shows only ESTABLISHED rows, because Next binds
+dual-stack) while it happily finds a `python http.server` — the guard had been
 verified against the python server, i.e. **tested against something it could
-see**, which is also why the live run printed "PID unknown" and left its trap
-with nothing to kill. Rewritten (`dd6b332`) to ask *does anything ANSWER* (a
-`curl` status other than 000) and *who* from `/proc`, and verified against the
-live server: "REFUSING TO START: something already ANSWERS on port 3100 / PID
-12117 … It is not mine to kill."
+see**, which is also why the run printed "PID unknown" and left its trap with
+nothing to kill. Rewritten (`dd6b332`) to ask *does anything ANSWER* (`curl`
+status ≠ 000) and *who* from `/proc`, verified live: "REFUSING TO START:
+something already ANSWERS on port 3100 / PID 12117 … It is not mine to kill."
 
-### 5.3 Session limits, and what they cost
+### 5.3 Session limits, and the one review finding that landed
 
-The session limit hit at ~16:50 and reset at 18:30 UTC. **D and E were killed
-mid-task** (D's tree coherent at `d30fc4c` with a complete ledger; E clean at
-`c7d538c`, settled census undelivered, no final report), and the adversarial
-review workflows died mid-verification: **A 0/6 reviewers ran; C 2/6 dimensions
-with 0/11 findings verified; B 12/90 agents with ONE finding confirmed.** The
-orchestrator merged A, B, C and D by direct review, re-derived C's eleven
-findings on the merged tree (six fixed in `66a2f0c`, two not defects, two
-carried to §5b), and resumed the agents after the reset.
+The limit hit at ~16:50 and reset at 18:30 UTC. **D and E were killed mid-task**
+(D coherent at `d30fc4c` with a complete ledger; E clean at `c7d538c`, settled
+census undelivered, no final report), and the adversarial reviews died
+mid-verification: **A 0/6 reviewers ran; C 2/6 dimensions with 0/11 findings
+verified; B 12/90 agents with ONE confirmed.** The orchestrator merged A, B, C
+and D by direct review, re-derived C's eleven findings on the merged tree (six
+fixed in `66a2f0c`, two not defects, two carried to §5b), and resumed the agents
+after the reset.
 
-**The one confirmed review finding was worth the whole workflow.** B's
-`ENV_UNIFORM` alternate-shadow-state warm (a) ran INSIDE the boot gate, so it
-could extend the reveal to the 3000 ms cap — violating a frozen rule B's own
-ledger had asserted it respected — and (b) **flipped the LIVE directional's
-`castShadow` across an awaited compile while `frameloop="always"` kept
-rendering**, so every frame in that window re-keyed every lit material and, on
-a slow HDRI, the user could SEE shadows snap on and off. **A `programsDelta`
-gate would have read flat**: the programs are exactly the ones wanted; the
-defect is WHEN and against WHAT they were minted. The fix (`f361543`) warms a
-STAND-IN scene of CLONED lights with `castShadow` inverted, carrying the live
-`environment` and `fog` — both are in three's program cache key, so a stand-in
-missing either would mint a THIRD program — queued strictly after `_state.done`
-on the idle drain. `ENV_UNIFORM` still ships OFF.
+**The one confirmed finding was worth the whole workflow.** B's `ENV_UNIFORM`
+alternate-shadow-state warm (a) ran INSIDE the boot gate, so it could extend the
+reveal to the 3000 ms cap — violating a frozen rule B's own ledger asserted it
+respected — and (b) **flipped the LIVE directional's `castShadow` across an
+awaited compile while `frameloop="always"` kept rendering**, so every frame in
+that window re-keyed every lit material and, on a slow HDRI, the user could SEE
+shadows snap on and off. **A `programsDelta` gate would have read flat**: the
+programs are the ones wanted; the defect is WHEN and against WHAT they were
+minted. The fix (`f361543`) warms a STAND-IN scene of CLONED lights with
+`castShadow` inverted, carrying the live `environment` and `fog` — both are in
+three's program cache key, so a stand-in missing either would mint a THIRD
+program — queued strictly after `_state.done` on the idle drain. It still ships
+OFF.
 
 ### 5.4 Four more incidents worth the record
 
 - **Four agents collided on one cache key.** `world-bend-fade-hill-r19` was
   about to be emitted under two mutually exclusive expressions (C's `-c24` vs
   D's `-d24`), both patching `applyHillshade` — the round-4 wrong-cached-program
-  defect **arriving from a MERGE rather than from one author**. Caught by C
-  reading D's branch; resolved by `r24VariantKey` with a fixed token order.
+  defect **arriving from a MERGE, not from one author**. Caught by C reading D's
+  branch; resolved by `r24VariantKey` with a fixed token order.
 - **A commit that did not build reached another agent.** C's `9783586` shipped
-  four files with welded import prologues; D merged it and got `GET / 500`. C
-  fixed it one commit later (`1d17a6b`). **The module resolver is the only
-  instrument** for this, and the `GET / 200` merge-acceptance step came out of
-  it — one second per merge.
+  four welded import prologues; D merged it and got `GET / 500`; C fixed it at
+  `1d17a6b`. **The module resolver is the only instrument**, and the `GET / 200`
+  merge-acceptance step came out of it — one second per merge.
 - **A harness overwrote a record nobody can re-measure.** E's `b8b32f9` rewrote
   the tracked `scripts/r21-e-red-seam.json` — R21's LIVE-tileset RED — with
-  synthetic-planet numbers (1,015 of 1,528 lines), and the commit carried it.
-  Nothing failed and nothing warned. Restored (`453119e`, `a996b9e`) with three
+  synthetic numbers (**1,015 of 1,528 lines**), and the commit carried it with
+  nothing failing or warning. Restored (`453119e`, `a996b9e`) behind three
   defences: the restore, an fs-level write redirect under the fixture env, and
   an OUTCOME gate.
 - **The CRLF rewrite.** `npm uninstall three-tile` rewrote `next.config.mjs`
-  (72 → 0 CRLF lines) and `package.json` (58 → 0) to LF, turning a 13-line
-  change into an 8.4 k-line diff. Restored by hand in `4bedab1`; a
-  preserve-line-endings rule was issued round-wide (599 CRLF files, no
+  (**72 → 0** CRLF lines) and `package.json` (**58 → 0**) to LF, turning a
+  13-line change into an 8.4 k-line diff. Restored by hand in `4bedab1`;
+  a preserve-line-endings rule went round-wide (599 CRLF files, no
   `.gitattributes`).
 
 ### 5.5 Ledger disagreements, resolved
 
-Four numbers differ between ledgers, in every case because they were measured
-on different trees. The **later-dated** one is what to quote:
-
-1. **The `pinned` line number.** A's ledger says `CloudField.jsx:78` (on
-   `r24/a`); the integration sweep says **82** (on `bf319ca`, after four
-   merges). Same defect, shifted by merged hunks.
-2. **The `offsetUnits` line number.** C says `FlyScene.jsx:351`, D's §4.95 says
-   `:373`, the integration sweep says **381**. Quote 381 for the integrated
-   tree.
-3. **A's traversal cost.** A §3 reports visits/walk 36 → **74** and 4,230 →
-   **3,431** for the residency trio alone; A §6 reports 36 → **233** and
-   4,230 → **10,891** with `walkWhileSaturated`. Both are correct for their
-   arm; §1 quotes the chain.
-4. **Which process inventory works here.** The mid-round rule "`lsof -t -i:PORT`
-   works, `ss -ltnp` does not" was right about `ss` and **wrong about `lsof`
-   for a `next dev` listener**, per E's later `dd6b332`. Neither inventory is
-   authoritative: ask whether the port ANSWERS.
-
-A fifth, smaller one: E's §1.2b four-pose census (Manhattan 110 draws / Powell
-131 / Owens 152 / Melton 68) predates the budget scaler and the settle
-predicate and is superseded by §4.4 (176 / — / 184 / 153). E's own ledger flags
-it as caveated; only the §4.4 numbers are quotable.
+Four numbers differ between ledgers because they were measured on different
+trees; the **later-dated** one is what to quote. (1) The `pinned` line number —
+A says `CloudField.jsx:78` (on `r24/a`), the integration sweep says **82** (on
+`bf319ca`, after four merges). (2) The `offsetUnits` line number — C says
+`FlyScene.jsx:351`, D's §4.95 says `:373`, the sweep says **381**. (3) A's
+traversal cost — A §3 reports visits/walk 36 → **74** and 4,230 → **3,431** for
+the residency trio alone, A §6 reports 36 → **233** and 4,230 → **10,891** with
+`walkWhileSaturated`; both are correct for their arm and §1 quotes the chain.
+(4) Which process inventory works here — the mid-round rule "`lsof` works, `ss`
+does not" was right about `ss` and **wrong about `lsof` for a `next dev`
+listener** (E's later `dd6b332`); neither is authoritative, ask whether the port
+ANSWERS. A fifth, smaller: E's §1.2b four-pose census (Manhattan 110 draws /
+Powell 131 / Owens 152 / Melton 68) predates the budget scaler and the settle
+predicate and is superseded by §4.4 (176 / — / 184 / 153); only §4.4 is
+quotable.
 
 ---
 
@@ -788,6 +783,9 @@ it as caveated; only the §4.4 numbers are quotable.
 - **`verify-shadow-calm`'s browser half** — the catcher's +1 draw in cities and
   0 at Owens, the sparkle temporal std, the acne A/B at `normalBias 1`. The
   node gate proves the string edits and the arithmetic; it cannot prove a pixel.
+- **`window.__flyDepthProbe` + `window.__flyDof`** (C, `DEPTH_FIX`) if pass 2
+  cannot land the hook: without it `verify-depth-roundtrip` stays NOT RUNNABLE
+  and the browser round-trip of the depth fix has no evidence at all.
 - **RED-calibrate the rewritten pale detector** (`e1b7905`): a synthetic
   one-frame jump must score exactly one hit, a serpentine zero.
 - **A toy leg for the degenerate census** — no row this round boots toy, so
@@ -911,9 +909,10 @@ Carries forward the still-open R15–R21 §6 tables.
     run. (C LIGHT.)
 24. **A gate that passes without asserting anything is indistinguishable from a
     gate that works** — read the PASS lines as sceptically as the FAIL lines.
-    Three in one day: flash-guard (5) printed `pinned=n/a`, one-sun (5) did the
-    same shape, and linear-haze passed "RIM SEAM ≤ 12/255 Δ 0.0" on a black
-    frame against a black frame. **A downstream assertion must go NOT
+    Four in one day: flash-guard (5) printed `pinned=n/a`, one-sun (5) did the
+    same shape, linear-haze passed "RIM SEAM ≤ 12/255 Δ 0.0" on a black frame
+    against a black frame, and depth-roundtrip (0b) asserted "the DoF pass is
+    present" from style and tier while its own `dof` read null. **A downstream assertion must go NOT
     CALIBRATED when its precondition fails**, never green. (E CERT.)
 25. **Ask an instrument what ELSE could produce this reading.** The pale
     detector's 168 hits, the Sierra A/B's monotone-in-capture-order margin, the
@@ -966,7 +965,7 @@ has been certified on the user's machine.**
 | `LINEAR_HAZE` | seam 0.000 by construction, from 9.3 / 19.9 / 76.3 / 99.2 / 89.4 per 255 | <!-- FLIP:LINEAR_HAZE PENDING --> |
 | `ONE_SUN` — `hill.dayK` **1.0**, `monumentsLambert` true | key az −56° at every hour → the sun at every tier; `live:false` closed. **dayK 1.0 makes the daytime demotion built-and-off BY CONSTRUCTION** (the weight is exactly 1, so `uHillStrength * uHillElev` is bit-identical to R21 and `verify-sat-depth`'s margin does not move); 0.65 would have spent up to 35 % of a frozen margin on an unmeasured argument | <!-- FLIP:ONE_SUN PENDING --> |
 | `POST_ORDER` (`smaaPreset 'high'`, dither) | 228/228 → 254/255 with midtones unmoved; merged pass count FALLS (sat 4→3, toy 6→5) | <!-- FLIP:POST_ORDER PENDING --> |
-| `DEPTH_FIX` | viewZ error 47.4–299,997.5 m → 0.000000 | <!-- FLIP:DEPTH_FIX PENDING --> |
+| `DEPTH_FIX` | node proof (`depth-roundtrip-proof`: RED flat **0.176–0.177** CoC, viewZ **−2.50 m**; GREEN error 0.000000) + `verify-depth-offset` **7/7**; **the browser round-trip is pending C's probe hook** (§4.2) | <!-- FLIP:DEPTH_FIX PENDING --> |
 | `SHADOW_CALM` (`biasSignFix`, `kernel 'world'`, `texelSnap`, `satCadence` 0) | shader edits and snap arithmetic **proven node-side (32/33 gates)**; mount/arm logic structural; **pixels, draw counts and whether the catcher actually receives a shadow unmeasured — user's machine.** Note for any program census: it changes the compiled TEXT of every shadow receiver with NO cache key, so a key census is blind by construction and a source-hash census sees every receiver move | <!-- FLIP:SHADOW_CALM PENDING --> |
 | `TERRAIN_LIGHT` — `fragmentHill`, `microFwidth`; `workerNormals` **false** | the tile half ships; the worker half is node-proven (3.34° → 0.26°) with zero pixels behind it, and ON would make `verify-skirt-worker`'s identity leg RED by design | <!-- FLIP:TERRAIN_LIGHT PENDING --> |
 | `CLOUD_LIT` + `LAMBERT_ENV` (0.15) | same ONE draw; uniform-only for Lambert; the cloud variant's warm-set exception has a measurement condition attached | <!-- FLIP:CLOUD_LIT PENDING --> <!-- FLIP:LAMBERT_ENV PENDING --> |
