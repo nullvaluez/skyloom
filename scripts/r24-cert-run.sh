@@ -30,6 +30,9 @@
 #   scripts/r24-cert-run.sh [port]        # default 3100
 #
 # ENV
+#   CERT_PROOF_ONLY=1  stop after the boot proof and LEAVE THE SERVER UP. The
+#                      proof is the go/no-go for a whole certification run, so
+#                      it is worth being able to ask for it alone.
 #   CERT_SKIP_NODE=1   skip the node gates (they are seconds; rarely worth it)
 #   CERT_K             content-gate budget scaler (default 40)
 #   CERT_FIXTURE_K     the fixture census's own K (default 200 — Manhattan's
@@ -52,17 +55,57 @@ mkdir -p "$OUT"
 load() { uptime | sed 's/.*average: //'; }
 say() { printf '%s\n' "$*"; }
 
+# Who holds this port? MEASURED IN THIS CONTAINER: `lsof -i:PORT -sTCP:LISTEN`
+# does NOT see a `next dev` listener — it shows only that server's ESTABLISHED
+# connections — while it happily sees a python http.server on the same kind of
+# port. Next binds 0.0.0.0/dual-stack and this lsof view misses the LISTEN row.
+# So a guard built on lsof alone would have failed to stop exactly the
+# EADDRINUSE collision it exists to prevent. The authoritative question is not
+# "does lsof see a socket" but "does anything ANSWER on this port", and the
+# answer to "who" comes from /proc, not from lsof.
+port_answers() {
+  local c
+  c="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://127.0.0.1:$1/" 2>/dev/null)"
+  [ -n "$c" ] && [ "$c" != "000" ]
+}
+dev_pid_for() {   # PID of a `next dev -p <port>` started from THIS tree
+  local port="$1" here p a
+  here="$(pwd -P)"
+  for p in /proc/[0-9]*; do
+    p="${p#/proc/}"
+    a="$(tr '\0' ' ' < "/proc/$p/cmdline" 2>/dev/null)"
+    case "$a" in
+      *"next dev -p $port"*)
+        [ "$(readlink -f "/proc/$p/cwd" 2>/dev/null)" = "$here" ] && { printf '%s' "$p"; return 0; } ;;
+    esac
+  done
+  return 1
+}
+holder_desc() {
+  local port="$1" p a
+  for p in /proc/[0-9]*; do
+    p="${p#/proc/}"
+    a="$(tr '\0' ' ' < "/proc/$p/cmdline" 2>/dev/null)"
+    case "$a" in
+      *"-p $port"*|*":$port"*)
+        printf 'PID %s  cwd=%s  %s' "$p" "$(readlink -f "/proc/$p/cwd" 2>/dev/null)" "$(printf '%s' "$a" | head -c 110)"
+        return 0 ;;
+    esac
+  done
+  printf 'not identifiable from /proc (lsof: %s)' "$(lsof -t -i:"$port" 2>/dev/null | tr '\n' ' ')"
+}
+
 # --- 1. the port must be OURS ------------------------------------------------
-HOLDER="$(lsof -t -i:"$PORT" -sTCP:LISTEN 2>/dev/null | head -1)"
-if [ -n "$HOLDER" ]; then
-  say "REFUSING TO START: port $PORT already has a listener, PID $HOLDER"
-  say "  $(ps -o args= -p "$HOLDER" 2>/dev/null | head -c 160)"
+if port_answers "$PORT"; then
+  say "REFUSING TO START: something already ANSWERS on port $PORT"
+  say "  $(holder_desc "$PORT")"
   say "  It is not mine to kill. Stop it yourself, or pass another port."
   exit 2
 fi
 
+TREE_AT_START="$(git rev-parse --short HEAD 2>/dev/null)"
 say "=== R24 CERTIFICATION RUN  $(date +%T)  port $PORT  load $(load)"
-say "tree: $(git rev-parse --short HEAD 2>/dev/null)  $(git log -1 --format=%s 2>/dev/null | head -c 70)"
+say "tree at start: $TREE_AT_START  $(git log -1 --format=%s 2>/dev/null | head -c 70)"
 
 # --- 2. node gates first -----------------------------------------------------
 NODE_FAIL=0
@@ -97,29 +140,53 @@ fi
 say ""
 say "--- starting one dev server on :$PORT ---"
 (npm run dev -- -p "$PORT" > "$OUT/dev.log" 2>&1 &)
-sleep 2
-DEV_PID="$(lsof -t -i:"$PORT" -sTCP:LISTEN 2>/dev/null | head -1)"
 CODE=000
 for _ in $(seq 1 90); do
+  sleep 2
   CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "http://127.0.0.1:$PORT/" 2>/dev/null)"
   [ "$CODE" = "200" ] && break
-  sleep 2
-  DEV_PID="${DEV_PID:-$(lsof -t -i:"$PORT" -sTCP:LISTEN 2>/dev/null | head -1)}"
 done
 if [ "$CODE" != "200" ]; then
   say "dev server never answered 200 on :$PORT (last $CODE). Tail of $OUT/dev.log:"
   tail -20 "$OUT/dev.log" | sed 's/^/      /'
   exit 2
 fi
-say "dev :$PORT -> 200, PID ${DEV_PID:-unknown}  load $(load)"
+# Re-read the PID AFTER the 200. MEASURED: the first attempt captured it two
+# seconds after launch, before the listener existed, and the retry loop only
+# refilled it on a FAILED curl — so a server that came up quickly printed
+# "PID unknown" and the cleanup trap had nothing to kill. A script that starts
+# a server must know which one it started, or it cannot promise to stop it.
+DEV_PID="$(dev_pid_for "$PORT" || true)"
+if [ -z "$DEV_PID" ]; then
+  say "started a dev server on :$PORT but cannot identify its PID — refusing to"
+  say "continue, because I could not promise to clean it up afterwards."
+  exit 2
+fi
+say "dev :$PORT -> 200, PID $DEV_PID  load $(load)"
 
+# Everything this script spawns, so an interrupt does not leave a headless
+# browser and a dev server behind. MEASURED the hard way: a `timeout 60` around
+# a first test of this script killed the shell but left the boot proof's node
+# process AND its chromium running, still holding a fixture port — because a
+# child is not in the parent's kill path unless you track it. Only PIDs THIS
+# script started are ever touched.
+SPAWNED=""
 cleanup() {
+  local rc=$?
+  for p in $SPAWNED; do
+    if kill -0 "$p" 2>/dev/null; then
+      say "stopping child I started (PID $p)"
+      for c in $(pgrep -P "$p" 2>/dev/null); do kill "$c" 2>/dev/null; done
+      kill "$p" 2>/dev/null
+    fi
+  done
   if [ -n "${DEV_PID:-}" ] && kill -0 "$DEV_PID" 2>/dev/null; then
     say "stopping the dev server I started (PID $DEV_PID)"
     kill "$DEV_PID" 2>/dev/null
   fi
+  return $rc
 }
-trap cleanup EXIT
+trap cleanup EXIT INT TERM
 
 export FLY_TILE_FIXTURE=1
 export FLY_URL="http://localhost:$PORT"
@@ -130,7 +197,21 @@ export PW_SHIM_QUIET=1
 # One throwaway page. If it cannot reach pct 100 the run stops HERE, with the
 # console errors printed — rather than after twelve minutes of browser rows all
 # dying at the same wait for the same reason.
+# WHICH TREE IS ACTUALLY UNDER TEST? Not necessarily the one in the banner.
+# MEASURED: a run stamped 7a00df0 at 19:14:00, a merge landed at 19:14:14, and
+# the dev server started at 19:14:15 — so every module the server compiled on
+# demand came from 5ca8e15 and the banner named a tree the rows never touched.
+# `next dev` serves the WORKING TREE at compile time, not the commit the script
+# started on, so the honest stamp is taken here, next to the first page load,
+# and a drift is called out rather than left in a log for someone to notice.
+TREE_AT_BOOT="$(git rev-parse --short HEAD 2>/dev/null)"
 say ""
+if [ "$TREE_AT_BOOT" != "$TREE_AT_START" ]; then
+  say "*** TREE MOVED DURING STARTUP: $TREE_AT_START -> $TREE_AT_BOOT"
+  say "*** The dev server compiles the WORKING TREE on demand, so the rows below"
+  say "*** measure $TREE_AT_BOOT. Record that sha, not the banner's."
+fi
+say "TREE UNDER TEST: $TREE_AT_BOOT"
 say "--- boot proof (throwaway page, satellite, fixture) ---"
 cat > "$OUT/_bootproof.js" <<'PROOF'
 const { chromium } = require('playwright');
@@ -170,11 +251,24 @@ const { bootFly } = require('../../_boot');
   }
 })();
 PROOF
-if ! timeout 600 node -r ./scripts/_pw-shim.js "$OUT/_bootproof.js" 2>&1 | tee "$OUT/bootproof.log"; then
+timeout 600 node -r ./scripts/_pw-shim.js "$OUT/_bootproof.js" > "$OUT/bootproof.log" 2>&1 &
+BP=$!
+SPAWNED="$SPAWNED $BP"
+wait "$BP"; BP_RC=$?
+cat "$OUT/bootproof.log"
+if [ "$BP_RC" != 0 ]; then
   say ""
   say "*** BOOT PROOF FAILED — stopping. No browser row can mean anything until"
   say "*** the app mounts. See $OUT/bootproof.log."
   exit 1
+fi
+
+if [ "${CERT_PROOF_ONLY:-0}" = 1 ]; then
+  say ""
+  say "CERT_PROOF_ONLY: stopping after the boot proof. The dev server (PID ${DEV_PID:-unknown})"
+  say "is LEFT RUNNING on :$PORT for whoever launches the rows."
+  trap - EXIT INT TERM      # do not tear down the server we were asked to leave up
+  exit 0
 fi
 
 # --- 5. the rows -------------------------------------------------------------
@@ -194,7 +288,9 @@ run() {
   fi
   local rc=$? dt=$(( $(date +%s) - t0 ))
   printf 'rc=%s %ss load=%s\n' "$rc" "$dt" "$(load)"
-  grep -E "^(PASS|FAIL|SKIP|RED|GREEN|INFO|NOT CALIBRATED|VERIFY)" "$OUT/$name.log" | head -40
+  # NOTCAL is the third verdict (scripts/_notcal.js) — a leg that measured nothing.
+  # It must appear in the run summary or a NOT CALIBRATED row reads as a silent row.
+  grep -E "^(PASS|FAIL|SKIP|NOTCAL|RED|GREEN|INFO|NOT CALIBRATED|VERIFY)" "$OUT/$name.log" | head -40
 }
 
 # CONTENT rows — they ask what the world CONTAINS once settled.
@@ -208,7 +304,15 @@ run linear-haze  -   verify-linear-haze.js
 run depth-rt     -   verify-depth-roundtrip.js
 run ladder-fix   -   verify-ladder-fix.js
 run ladder-red   -   verify-ladder-fix.js FLY_LADDER_RED=1
-run terra-live  "$K" verify-terra-live.js FLY_TERRA_ARMS=both
+# terra-live's yaw is FRAME-based as of A's b74e5be — 0.85 deg/frame with a
+# 360 deg MINIMUM arc, so the sweep length is set in frames, not wall clock. At
+# this venue's 1-3 fps that is ~424 rendered frames, i.e. 7-8 minutes per arm,
+# and the row wants ~30-35 minutes of the budget with both arms. The point of
+# paying for it: under the old wall-clock window gate 6 could not complete a
+# full revolution, so "the same tile URL is not fetched twice as the heading
+# comes back round" never actually brought the heading back round. It asserts
+# for real at this length.
+run terra-live  "$K" verify-terra-live.js FLY_TERRA_ARMS=both FLY_TERRA_SWEEP_MS=600000
 run frame-pace   -   verify-frame-pace.js
 # LAST, and longest: the four-pose census. Manhattan's sixteen dense chunks do
 # not settle at K=40 in this venue (measured: 12 still draping at 300 s on

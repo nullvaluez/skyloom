@@ -143,6 +143,8 @@ const INSTALL_FADE_WATCH = () => {
   requestAnimationFrame(tick);
 };
 
+const { notCalibrated, notCalCount, notCalSummary } = require('./_notcal');
+
 let pass = 0;
 let fail = 0;
 const red = [];
@@ -257,7 +259,10 @@ async function serpentine(page, ms) {
   red.push(['WB-2 evict is a single-frame disappearance', 'verify-fade (3)', `${w.hardDeaths}/${w.deaths}`, '0']);
   gate(
     '(4) A FADE NEVER CHANGES WHAT IS READY — ready tracks chunks, not presence',
-    w.ready1.sb <= w.ready1.chunks && w.ready1.sb >= 0,
+    Number.isFinite(w.ready1?.sb) &&
+      Number.isFinite(w.ready1?.chunks) &&
+      w.ready1.sb <= w.ready1.chunks &&
+      w.ready1.sb >= 0,
     `ready ${w.ready1.sb} of ${w.ready1.chunks} chunks; the series is in the JSON below. A fade that ` +
       'made a ready chunk un-ready would be re-streaming, i.e. the R21 disappearing-chunks bug ' +
       'wearing a nicer coat'
@@ -282,20 +287,32 @@ async function serpentine(page, ms) {
     sky: window.__satSkyline?.stats?.ready ?? null,
   }));
   console.log(`\nOwens: draws=${owens.draws} tris=${owens.tris} sbReady=${owens.sb} skyReady=${owens.sky}`);
-  gate(
-    '(5) THE OWENS LOCK — the empty desert issues no building or skyline chunks to fade',
-    (owens.sb ?? 0) === 0 && (owens.sky ?? 0) === 0,
-    `sbReady=${owens.sb} skyReady=${owens.sky} draws=${owens.draws} (FIXTURE column; the live ` +
-      'ceiling of <= 261 is not re-baselineable from here)'
-  );
+  // `?? 0` WAS A VACUOUS PASS WAITING TO HAPPEN. An ABSENT reading — the engine
+  // handle not published, the stats object renamed — coerced to 0 and
+  // certified the Owens lock on no data at all. The lock is the round's most
+  // load-bearing control; it does not get to pass on a missing number.
+  const owensRead = Number.isFinite(owens.sb) && Number.isFinite(owens.sky);
+  if (!owensRead)
+    notCalibrated(
+      '(5) THE OWENS LOCK',
+      `sbReady=${owens.sb} skyReady=${owens.sky} — one of the two engine handles published no ` +
+        'ready count. Absent is not zero, and the lock is the control every building gate leans on'
+    );
+  else
+    gate(
+      '(5) THE OWENS LOCK — the empty desert issues no building or skyline chunks to fade',
+      owens.sb === 0 && owens.sky === 0,
+      `sbReady=${owens.sb} skyReady=${owens.sky} draws=${owens.draws} (FIXTURE column; the live ` +
+        'ceiling of <= 261 is not re-baselineable from here)'
+    );
   gate('(6) NO PAGE ERRORS', errors.length === 0, errors.slice(0, 3).join(' | ') || 'clean');
 
   console.log(`\nreadySeries (every 5th frame, [sb, skyline]): ${JSON.stringify(w.readySeries.slice(0, 40))}`);
   console.log('\nRED TABLE (defect · gate · measured · green target)');
   for (const r of red) console.log(`  ${r[0]} | ${r[1]} | measured ${r[2]} | ${r[3]}`);
-  console.log(`\n${pass} passed, ${fail} failed`);
+  console.log(`\n${pass} passed, ${fail} failed${notCalSummary()}`);
   await browser.close();
-  process.exit(fail ? 1 : 0);
+  process.exit(fail || notCalCount() ? 1 : 0);
 })().catch((e) => {
   console.error(e);
   process.exit(1);

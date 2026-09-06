@@ -156,6 +156,8 @@ const CENSUS = () => {
   };
 };
 
+const { notCalibrated, notCalCount, notCalSummary } = require('./_notcal');
+
 let pass = 0;
 let fail = 0;
 const gate = (name, ok, detail = '') => {
@@ -325,6 +327,51 @@ async function runArm(context, fx, paceOn) {
   console.log(`  YAW SWEEP (${(YAW_MS / 1000).toFixed(0)}s in place, ~51 deg/s)`);
   console.log(`    imagery requests      off ${imgOff}   on ${imgOn}`);
   console.log(`    URLs fetched >1 time  off ${dupOff}   on ${dupOn}`);
+  // E: THE NUMERATOR AND THE DENOMINATOR ARE DIFFERENT POPULATIONS, and the two
+  // lines sit next to each other, which invites reading "17 of 36 imagery tiles
+  // were refetched". `imagery requests` is byKind.img; `URLs fetched >1 time`
+  // filters byUrl with NO prefix test, so /dem/, /mvt/, /api/aircraft,
+  // /api/weather and /planet are all in that count. Before attributing a jump
+  // to the residency LRU, read the breakdown below: an eviction/refetch cycle
+  // shows up in /img/ and /dem/, and nowhere else.
+  //
+  // (Counter semantics, checked against r24-fixture/server.mjs for A's
+  // attribution: `/__stats/reset` CLEARS byUrl/byKind/total outright, and
+  // runArm calls it AFTER that arm's boot and immediately before the yaw pin.
+  // Arm A's page is closed before arm B's is created. So these numbers are
+  // per-arm sweep windows, NOT cumulative across the two boots — a second
+  // boot's first fetch of a URL the first boot already pulled does not count.)
+  const byPrefix = (st) => {
+    const acc = {};
+    for (const [u, n] of Object.entries(st?.byUrl || {})) {
+      const k = u.startsWith('/img/')
+        ? 'img'
+        : u.startsWith('/dem/')
+          ? 'dem'
+          : u.startsWith('/mvt/')
+            ? 'mvt'
+            : u.startsWith('/api/')
+              ? 'api'
+              : 'other';
+      acc[k] ??= { urls: 0, reqs: 0, dup: 0, worst: 0 };
+      acc[k].urls++;
+      acc[k].reqs += n;
+      if (n > 1) acc[k].dup++;
+      if (n > acc[k].worst) acc[k].worst = n;
+    }
+    return acc;
+  };
+  const pOff = byPrefix(off.yawStats);
+  const pOn = byPrefix(on.yawStats);
+  for (const k of ['img', 'dem', 'mvt', 'api', 'other']) {
+    const a = pOff[k];
+    const b = pOn[k];
+    if (!a && !b) continue;
+    console.log(
+      `      ${k.padEnd(5)} off ${a ? `${a.dup}/${a.urls} urls dup, ${a.reqs} reqs, worst ${a.worst}x` : '—'}` +
+        `   on ${b ? `${b.dup}/${b.urls} urls dup, ${b.reqs} reqs, worst ${b.worst}x` : '—'}`
+    );
+  }
   console.log(`    engine merges         off ${off.yawCensus.lod?.merge}   on ${on.yawCensus.lod?.merge}`);
   console.log(
     `    replaced ON SCREEN    off ${off.yawCensus.lod?.replacedOnScreen}   on ${on.yawCensus.lod?.replacedOnScreen}`
@@ -347,19 +394,25 @@ async function runArm(context, fx, paceOn) {
         `   resident MB on ${on.poses[name].mem?.residentMB}`
     );
   }
-  const ceilOk = (v) => v == null || v <= 261;
-  gate('7 CEILING: Owens draws <= 261 in every arm that ran (the frozen desert control)',
-    ceilOk(off.poses.owens.draws) && ceilOk(on.poses.owens.draws),
-    `off ${off.poses.owens.draws} / on ${on.poses.owens.draws}`);
-  const satOk = (v) => v == null || v <= 375;
-  gate('8 CEILING: satellite draws <= 375 at the suburb pose in every arm that ran',
-    satOk(off.poses.powell.draws) && satOk(on.poses.powell.draws),
-    `off ${off.poses.powell.draws} / on ${on.poses.powell.draws}`);
+  // `v == null || v <= CEILING` reads "an absent draw count is under the
+  // ceiling". It is not — it is an absent draw count, and a ceiling gate that
+  // passes when the arm did not report is the one gate in this file that must
+  // never be able to do that. Absence is NOT CALIBRATED; only a finite number
+  // gets a verdict. (E, R24 close sweep §2.10a.)
+  const ceilPair = (name, ceiling, a, b, why) => {
+    if (!Number.isFinite(a) && !Number.isFinite(b)) return notCalibrated(name, `${why}: off ${a} / on ${b}`);
+    const parts = [a, b].filter((v) => Number.isFinite(v));
+    return gate(name, parts.every((v) => v <= ceiling), `off ${a} / on ${b} (ceiling ${ceiling})`);
+  };
+  ceilPair('7 CEILING: Owens draws <= 261 in every arm that ran (the frozen desert control)',
+    261, off.poses.owens.draws, on.poses.owens.draws, 'neither arm reported an Owens draw count');
+  ceilPair('8 CEILING: satellite draws <= 375 at the suburb pose in every arm that ran',
+    375, off.poses.powell.draws, on.poses.powell.draws, 'neither arm reported a suburb draw count');
   gate('9 no page errors in either arm', off.errs.length === 0 && on.errs.length === 0,
     [...off.errs, ...on.errs].join(' | '));
 
-  console.log(`\n${pass} passed, ${fail} failed`);
-  process.exit(fail ? 1 : 0);
+  console.log(`\n${pass} passed, ${fail} failed${notCalSummary()}`);
+  process.exit(fail || notCalCount() ? 1 : 0);
 })().catch((e) => {
   console.error(e);
   process.exit(1);

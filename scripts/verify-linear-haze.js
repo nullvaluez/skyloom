@@ -82,7 +82,26 @@ const PIN_POSE = ([lat, lon, altM, heading, pitch]) => {
  * Read the seam IN THE PAGE, off the default framebuffer, rather than through
  * a screenshot: a `page.screenshot` composites the DOM HUD over the canvas and
  * would put label pixels in the crop.
+ *
+ * IT MUST RUN INSIDE AN ANIMATION FRAME. The first version of this gate called
+ * the reader straight from `page.evaluate`, i.e. between frames, and every
+ * pose came back terrain L 0.0 / sky L 0.0 with a luma profile of zeros: on a
+ * `preserveDrawingBuffer: false` context the default framebuffer's contents are
+ * UNDEFINED once the frame has been presented, and here that is black. (1)
+ * correctly reported "no horizon"; (2) and (3) then PASSED on Δ 0.0, which is
+ * black against black — a vacuous pass produced by the instrument, not the
+ * world.
+ *
+ * So the reader is wrapped in a promise resolved from a rAF callback — the
+ * same idiom the flash-guard pale detector uses, which is why its census rows
+ * read real pixels while this one read none. `page.evaluate` awaits a returned
+ * promise, so the harness side is unchanged.
  */
+const SEAM_AT_FRAME = () =>
+  new Promise((resolve) => {
+    requestAnimationFrame(() => resolve(window.__r24ReadSeam()));
+  });
+
 const SEAM = () => {
   // The renderer's OWN context — never canvas.getContext(), which would create
   // one with the wrong attributes if it ever won the race with three (see the
@@ -141,6 +160,12 @@ const SEAM = () => {
   };
 };
 
+const INSTALL_SEAM = (fnSrc) => {
+  window.__r24ReadSeam = new Function('return (' + fnSrc + ')')();
+};
+
+const { numGate, notCalibrated, notCalCount, notCalSummary } = require('./_notcal');
+
 let pass = 0;
 let fail = 0;
 const red = [];
@@ -158,6 +183,17 @@ function gate(name, ok, detail) {
   const context = await browser.newContext({ viewport: { width: 960, height: 540 } });
   if (process.env.FLY_TILE_FIXTURE) await require('./_fixture').attachFixture(context);
   const page = await context.newPage();
+  // One verdict path, used by the early return as well: a run that stops
+  // because it could not measure must still print its counts and close the
+  // browser, and must still exit non-zero.
+  const finish = async () => {
+    console.log('\nRED TABLE (defect · gate · measured · green target)');
+    for (const r of red) console.log(`  ${r[0]} | ${r[1]} | measured ${r[2]} | ${r[3]}`);
+    console.log(`\n${pass} passed, ${fail} failed${notCalSummary()}`);
+    await browser.close();
+    process.exit(fail || notCalCount() ? 1 : 0);
+  };
+
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.addInitScript(UNPIN_SUN);
@@ -180,7 +216,8 @@ function gate(name, ok, detail) {
       window.__r24Sun = { elDeg: el };
     }, elDeg);
     await page.waitForTimeout(20000);
-    const s = await page.evaluate(SEAM);
+    await page.evaluate(INSTALL_SEAM, SEAM.toString());
+    const s = await page.evaluate(SEAM_AT_FRAME);
     if (s.error) {
       gate(`(1${label === 'noon' ? 'a' : 'b'}) READ THE DEFAULT FRAMEBUFFER (${label})`, false, s.error);
       continue;
@@ -191,17 +228,37 @@ function gate(name, ok, detail) {
         `terrain L ${s.terrainLuma.toFixed(1)} · sky L ${s.skyLuma.toFixed(1)} · Δ ${s.delta.toFixed(1)}`
     );
     console.log(`  luma profile around the seam: ${JSON.stringify(s.profile)}`);
+    const horizonFound =
+      Number.isFinite(s.horizonY) &&
+      s.horizonY > 10 &&
+      s.horizonY < s.H - 10 &&
+      Number.isFinite(s.step) &&
+      s.step > 2;
     gate(
       `(1${label === 'noon' ? 'a' : 'b'}) A HORIZON WAS FOUND AT ALL (${label})`,
-      s.horizonY > 10 && s.horizonY < s.H - 10 && s.step > 2,
+      horizonFound,
       `row ${s.horizonY} of ${s.H}, step ${s.step.toFixed(1)} — a step of ~0 means the frame has no ` +
         'horizon in it and the delta below is meaningless'
     );
-    gate(
-      `(2${label === 'noon' ? 'a' : 'b'}) RIM SEAM: |terrain − dome| ≤ ${MAX_DELTA}/255 (${label})`,
-      s.delta <= MAX_DELTA,
-      `Δ ${s.delta.toFixed(1)}`
-    );
+    // (2) IS DOWNSTREAM OF (1). When no horizon was found the delta is the
+    // difference between two arbitrary bands of the same thing — on the run
+    // that exposed this, black against black, Δ 0.0, PASS. A gate whose
+    // precondition failed does not get to return a verdict.
+    if (!horizonFound)
+      notCalibrated(
+        `(2${label === 'noon' ? 'a' : 'b'}) RIM SEAM (${label})`,
+        `(1) found no horizon (row ${s.horizonY}, step ${s.step.toFixed(1)}, terrain L ` +
+          `${s.terrainLuma.toFixed(1)}, sky L ${s.skyLuma.toFixed(1)}). Δ ${s.delta.toFixed(1)} is a ` +
+          'comparison between two bands of the same undifferentiated frame'
+      );
+    else
+      numGate(gate)(
+        `(2${label === 'noon' ? 'a' : 'b'}) RIM SEAM: |terrain − dome| ≤ ${MAX_DELTA}/255 (${label})`,
+        s.delta,
+        s.delta <= MAX_DELTA,
+        `Δ ${s.delta.toFixed(1)}`,
+        `delta is ${s.delta}`
+      );
     red.push([
       `L1 sRGB haze mixed as linear (${label})`,
       `verify-linear-haze (2${label === 'noon' ? 'a' : 'b'})`,
@@ -210,9 +267,18 @@ function gate(name, ok, detail) {
     ]);
   }
 
+  if (!results.noon || !results.night) {
+    notCalibrated(
+      '(3) THE SEAM DOES NOT DEPEND ON THE TIME OF DAY',
+      `one of the two poses produced no reading (noon ${!!results.noon}, night ${!!results.night})`
+    );
+    finish();
+    return;
+  }
   const spread = Math.abs(results.noon.delta - results.night.delta);
-  gate(
+  numGate(gate)(
     '(3) THE SEAM DOES NOT DEPEND ON THE TIME OF DAY',
+    spread,
     spread <= MAX_DELTA,
     `noon Δ ${results.noon.delta.toFixed(1)} vs night Δ ${results.night.delta.toFixed(1)} — spread ` +
       `${spread.toFixed(1)}. A large spread is the signature of the defect: two different colour ` +
@@ -225,11 +291,7 @@ function gate(name, ok, detail) {
       'flag-off RED this run measured; record it in the ledger and set the bound from the ' +
       'flag-on measurement, never the other way round.'
   );
-  console.log('\nRED TABLE (defect · gate · measured · green target)');
-  for (const r of red) console.log(`  ${r[0]} | ${r[1]} | measured ${r[2]} | ${r[3]}`);
-  console.log(`\n${pass} passed, ${fail} failed`);
-  await browser.close();
-  process.exit(fail ? 1 : 0);
+  await finish();
 })().catch((e) => {
   console.error(e);
   process.exit(1);

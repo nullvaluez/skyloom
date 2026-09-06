@@ -167,6 +167,8 @@ const INSTALL_STEP_WATCH = () => {
   requestAnimationFrame(tick);
 };
 
+const { notCalibrated, notCalCount, notCalSummary } = require('./_notcal');
+
 let pass = 0;
 let fail = 0;
 const red = [];
@@ -335,11 +337,22 @@ function soft(name, detail) {
     `${w.mismatch} mismatched frames of ${w.frames}` +
       (w.mismatchSample ? ` e.g. ${JSON.stringify(w.mismatchSample)}` : '')
   );
-  if (stepped) gate(
-    '(5) THE COMPOSER IS RESIZED, NOT REBUILT, ACROSS A STEP',
-    w.fxNow === w.fx0,
-    `rebuilds ${w.fx0} -> ${w.fxNow} (resizes ${w.resizes})`
-  );
+  // `undefined === undefined` IS TRUE. If the composer never published a
+  // rebuild counter, this gate certified "not rebuilt" on two absent readings.
+  if (stepped) {
+    if (!Number.isFinite(w.fx0) || !Number.isFinite(w.fxNow))
+      notCalibrated(
+        '(5) THE COMPOSER IS RESIZED, NOT REBUILT, ACROSS A STEP',
+        `rebuild counter absent (fx0 ${w.fx0} -> fxNow ${w.fxNow}) — undefined === undefined is ` +
+          'true, so this would otherwise pass on two readings that do not exist'
+      );
+    else
+      gate(
+        '(5) THE COMPOSER IS RESIZED, NOT REBUILT, ACROSS A STEP',
+        w.fxNow === w.fx0,
+        `rebuilds ${w.fx0} -> ${w.fxNow} (resizes ${w.resizes})`
+      );
+  }
   gate('(6) NO PAGE ERRORS', errors.length === 0, errors.slice(0, 3).join(' | ') || 'clean');
 
   console.log(
@@ -350,9 +363,9 @@ function soft(name, detail) {
   );
   console.log('\nRED TABLE (defect · gate · measured · green target)');
   for (const r of red) console.log(`  ${r[0]} | ${r[1]} | measured ${r[2]} | ${r[3]}`);
-  console.log(`\n${pass} passed, ${fail} failed`);
+  console.log(`\n${pass} passed, ${fail} failed${notCalSummary()}`);
   await browser.close();
-  process.exit(fail ? 1 : 0);
+  process.exit(fail || notCalCount() ? 1 : 0);
 })().catch((e) => {
   console.error(e);
   process.exit(1);
