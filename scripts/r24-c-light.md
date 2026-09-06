@@ -283,3 +283,187 @@ fetches for the Lambert env chunk on ≤ 15 draws.
 - Medium tier leaves the R19 byte-freeze for `ONE_SUN` under plan §0 ruling 4;
   phones stay capped at medium.
 
+
+---
+
+## M3 — POST_ORDER (recon L6) + DEPTH_FIX (recon L2 / FL-07)
+
+### DEPTH_FIX — RED [closed-form]
+
+`node scripts/r24-c-depth-roundtrip-proof.mjs` (committed). Every formula is
+transcribed verbatim from the installed libraries with its file:line.
+
+three r185 injects `USE_REVERSED_DEPTH_BUFFER` into every non-raw ShaderMaterial
+(`three.module.js:6829/:6999`, off `renderer.state.buffers.depth.getReversed()`
+at `:7495`) **and** switches its `<packing>` `perspectiveDepthToViewZ` to a
+reversed-INPUT formula (`:463`). postprocessing 6.39.2 **also** un-reverses, in
+its own `readDepth`, under the same define — `CircleOfConfusionMaterial`
+(`index.js:4939`) and the merged `EffectMaterial` (`:14646`). Two conversions
+where the formula wanted zero.
+
+| true dist | raw d (reversed) | RED viewZ | RED err | GREEN viewZ | GREEN err |
+|---|---|---|---|---|---|
+| 50 m | 5.00e-2 | **−2.632** | 47.4 | −50.000 | 0.000000 |
+| 700 m | 3.57e-3 | **−2.509** | 697.5 | −700.000 | 0.000000 |
+| 8 km | 3.08e-4 | **−2.501** | 7997.5 | −8000.000 | 0.000000 |
+| 300 km | 4.17e-6 | **−2.500** | 299997.5 | −300000.000 | 0.000000 |
+
+Every fragment reconstructs at ≈ −2.5 m = −`cameraNear`. The toy DoF CoC is
+therefore **flat 0.1762 – 0.1773 across 5 m to 300 km** — a uniform 18 % mix of
+the half-res blur over the whole frame, which is the "Neon reads globally soft"
+complaint. GREEN is 0.0000 in the focus band and rises monotonically to 1.0,
+which is what a tilt-shift diorama is.
+
+### DEPTH_FIX — the fix, and the patch that was NOT needed
+
+One token: delete `depth=1.0-depth;` from the CoC material instance's
+`fragmentShader` so the raw reversed value reaches three's reversed-aware
+formula. Safe on a device that did not get a reversed buffer — the define is
+absent there, the `#elif` branch never ran, and removing its body changes
+nothing. Applied in `patchDofDepth()`, called from **both** the `el()` ref
+callback and the `raw()` twin so the pre-warm compiles the same text.
+
+`getViewPosition` needs **no** patch, and that deserves stating because it looks
+wrong: it builds `vec3(uv, depth) * 2.0 − 1.0`, the WebGL [−1,1] NDC-z
+convention, while reversed depth runs zero-to-one clip control. But row 2 of the
+inverse of three's reversed perspective matrix is `[0, 0, 0, −1]` — the
+reconstructed view Z comes from the clip W, which the shader builds **from
+viewZ** (`projectionMatrix[2][3]*viewZ + [3][3] = −viewZ`), and the bogus NDC z
+multiplies a zero column. X and Y scale by w alone. The reconstruction is exact
+once viewZ is.
+
+### DEPTH_FIX — AerialPerspective's sky early-out was DEAD
+
+| | value |
+|---|---|
+| sky raw depth (reversed clear) | 0 |
+| after the merged `EffectMaterial` readDepth (`index.js:14646`) | 1.0 |
+| RED test `d >= 0.999999` where `d = 1.0 − depth` | **0.0 → never fires** |
+| GREEN test `depth >= 0.999999` | 1.0 → fires |
+
+The R19 header's premise — *"a define NEITHER library ever sets (the string does
+not occur anywhere in three's source)"* — is false for three 0.185.1, and the
+R19 manual flip is therefore a **third** conversion that lands on the correct
+math by accident. The distance term has always been right; the sky was saved
+only by the height term (an un-bent fragment 600 km out reads ~1,800 km high, so
+`exp(−h/1200)` underflows). That is a load-bearing accident with no comment on
+it. GREEN tests the value `readDepth` **normalises**, which is far = 1.0 in both
+orientations, so one test is correct on every device and needs no uniform. The
+header now says why.
+
+### POST_ORDER — the reorder [source-derived]
+
+`node scripts/r24-c-post-order-proof.mjs` reads the descriptor ids out of
+`Effects.jsx` itself, so the proof cannot drift from the shipped list.
+
+| composition | RED passes | GREEN passes |
+|---|---|---|
+| satellite / high | bloom → speed → aerial → grade → vignette → smaa → **tone** (4) | bloom → speed → aerial → **tone** → grade → vignette → smaa (**3**) |
+| satellite / medium, low | 4, 3 | **3, 2** |
+| toy / high | bloom → speed → hue → bc → **dof** → noise → vignette → smaa → **tone** (6) | bloom → speed → **dof** → **tone** → hue → bc → noise → vignette → smaa (**5**) |
+| toy / medium, low | 4, 3 | **3, 2** |
+
+Every composition is a **permutation** of the same list and the merged
+EffectPass count **can only fall** — load-bearing, because Owens has zero draw
+headroom at 261 and a fullscreen pass is a draw. Bloom stays first and
+pre-curve (it is a sensor effect on scene radiance, and R21's bloom luma gates
+were calibrated there). Aerial stays pre-curve for the R19 reason (the tile band
+and the dome rim are baked in the scene render). **DoF stays pre-curve** — a
+lens blur is radiance averaging, and averaging after a filmic curve darkens
+bright bokeh.
+
+### POST_ORDER — the clip nobody had documented [closed-form]
+
+`HueSaturationEffect`'s shader ends `outputColor = vec4(min(color, 1.0), a)`.
+On the R21 chain that effect runs **before** the tone map, on sRGB-encoded
+scene-linear values — so **every fragment brighter than 1.0 linear was hard
+clipped to white before the filmic curve ever saw it**. The ACES pass added in
+R13 has been rolling off an already-clipped signal.
+
+| pixel class | scene linear | RED 8-bit | GREEN 8-bit |
+|---|---|---|---|
+| deep sky / void | 0.004 | 0 | 0 |
+| unlit facade | 0.030 | 26 | 26 |
+| lit ground | 0.180 | 127 | 127 |
+| road ribbon (additive) | 0.900 | 225 | 228 |
+| window emissive | 3.200 | **228** | 254 |
+| runway light / crown | 12.000 | **228** | 255 |
+
+A lit window at 3.2 and a runway light at 12.0 are the **same 8-bit value**
+today. The grade also sees an input range of 0 … 2.92 (a knob defined for [0,1]),
+and so does SMAA's edge detector — which is why dark edges were under-weighted
+and emissive edges over-weighted. After the reorder both see 0 … 1 by
+construction.
+
+### POST_ORDER — the grade re-tune: MEASURED, then declined
+
+The charter budgeted a post-curve re-tune of `SKY.grade` / `TOY.saturation` /
+`TOY.contrast`. A least-squares fit over the midtones (0.004 – 0.6 linear,
+60 log-spaced samples, grayscale, neutral white balance, screen centre) gives a
+best post-curve satellite contrast of **0.037** against the shipped **0.05** —
+and leaving the knob alone costs **1.33/255 rms** versus **1.10/255** for the
+re-fit. **0.23/255 is not worth moving a constant this agent does not own**, and
+the R21 midtone look survives the reorder to within 1.33/255 rms. So POST_ORDER,
+like LINEAR_HAZE, moves **zero constants**. The highlights are supposed to
+change — that is the defect.
+
+### POST_ORDER — the dither
+
+`lib/fly/post-policy.js` `finishPassChain()` sets `dithering = true` on the LAST
+EffectPass, from **both** assemblers (the forked composer and prewarm's
+`buildWarmPasses`), because `EffectPass.dithering` sets `material.dithering`,
+three injects `#define DITHERING`, and a dithered pass is a **different
+program** — a pre-warm that missed it would compile a program production never
+binds.
+
+Per Fable's ruling this is explicitly **not** an ordered / Bayer / screen-door
+pattern: three's `<dithering_fragment>` is a **per-pixel hash of
+`gl_FragCoord`** at ±0.5 LSB, applied after `<colorspace_fragment>` and
+immediately before quantisation. An ordered matrix is a fixed spatial texture
+that survives in the same place every frame and can itself crawl at reduced DPR
+(recon A7's complaint about the R21 Bayer dissolve); a hash has no repeating
+structure to alias. `encodeOutput` needed no change — `ENCODE_OUTPUT` is already
+`"1"` on every EffectMaterial and only the last pass renders to screen, so
+`<colorspace_fragment>` is an identity on the intermediates.
+
+### SMAA
+
+`SMAAPreset.HIGH` + `EdgeDetectionMode.LUMA`, mounted as our own instance via
+`<primitive>` rather than drei's `<SMAA>`: drei's `wrapEffect` spreads
+constructor options back onto the effect as R3F props, and `applyProps` would
+try `effect.preset = …` (SMAAEffect exposes only `applyPreset`), so the
+option-carrying element and the `raw()` twin could not be built the same way
+through it. The instance is built by calling `smaaSpec({}).raw()` — literally
+the pre-warm's own constructor call.
+
+**Honest caveat:** postprocessing converts the buffer back to linear at the end
+of each merged pass, so SMAA's input is tone-mapped **linear** in [0,1], not
+sRGB-encoded. The reorder therefore fixes the *unboundedness* (0…2.92 → 0…1),
+which is the substantive half of L6's complaint, but not the *encoding*. Stated
+rather than glossed.
+
+### Cost
+
+0 draws (pass count falls), 0 new render targets. SMAA HIGH ≈ +0.2–0.4 ms at
+1080p — **[pending user machine]**, never measurable here. The DoF patch is a
+shader-text change on one existing pass.
+
+### Frozen gates touched
+
+Every toy high-tier pixel moves (the DoF finally has a band): `verify-neon-*`,
+roofs, window-grids, edge-fx. Every graded pixel above ~1.0 linear moves
+(the clip is gone). **[pending fixture]** for the A/B and the re-baseline; the
+live column stays "user machine pending".
+
+### Fable's note (1): "does anything you add read as tearing?"
+
+Nothing added is an ordered pattern (above). The per-pixel **temporal std** at
+the Manhattan settled pose, before/after, through `verify-flicker`'s five-control
+protocol, is **[pending fixture]** — it needs a real frame sequence and this
+container renders ~1 fps of SwiftShader. What CAN be said from here: the dither
+is a *static* function of `gl_FragCoord`, so it contributes **zero** temporal
+variance at a parked camera by construction, and SMAA HIGH strictly increases
+the search radius of an existing spatial filter — neither introduces a
+frame-to-frame term. The one thing that could raise temporal std is the DoF band
+becoming real, and that is bounded by the CoC ramp being monotone in distance.
+

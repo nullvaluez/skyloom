@@ -51,7 +51,7 @@
  */
 import { Effect, EffectAttribute } from 'postprocessing';
 import { Uniform, Vector2, Vector3, Color, SRGBColorSpace } from 'three';
-import { LINEAR_HAZE } from '@/lib/fly/fly-constants';
+import { DEPTH_FIX, LINEAR_HAZE } from '@/lib/fly/fly-constants';
 
 /**
  * Module-scope frame state. One satellite scene exists at a time, so a plain
@@ -124,6 +124,32 @@ export function getAerialState() {
   };
 }
 
+// R24 C (DEPTH_FIX, recon L2/FL-07) — THE SKY TEST WAS DEAD, and the reason is
+// one library line the R19 header did not know about.
+//
+// The merged EffectMaterial's own readDepth (postprocessing index.js:14646)
+// carries `#elif defined(USE_REVERSED_DEPTH_BUFFER) depth = 1.0 - depth;`, and
+// three r185 DOES define that macro on every non-raw ShaderMaterial while the
+// renderer's depth state is reversed (three.module.js:6829/:6999, :7495). So
+// `depth` arriving in mainImage is already STANDARD (near 0, far 1) — the R19
+// header's "a define NEITHER library ever sets" is false for this three.
+//
+// That makes the shader's `d = 1.0 - depth` a RE-reverse back to raw, which is
+// exactly what three's own reversed-aware perspectiveDepthToViewZ wants, so the
+// distance term has always been correct — right by accident, through three
+// conversions. But it also means the sky, whose RAW value is 0 (the reversed
+// clear) and whose post-readDepth value is 1.0, reaches this test as d = 0.0.
+// `d >= 0.999999` could therefore never fire, and the sky was saved only by the
+// height term downstream (an un-bent fragment 600 km out reads ~1,800 km high,
+// so exp(-h/1200) underflows). That is a load-bearing accident with no comment
+// on it.
+//
+// The fix is to test the value readDepth NORMALISES: `depth` is far = 1.0 in
+// BOTH orientations (reversed → un-reversed by the library; not reversed → the
+// standard clear), so one test is correct on every device and needs no uniform.
+// The height term stays as the second guard.
+const SKY_TEST = DEPTH_FIX.enabled ? 'depth >= 0.999999' : 'd >= 0.999999';
+
 const fragmentShader = /* glsl */ `
 uniform vec3 uHazeColor;
 uniform vec2 uBand;
@@ -165,7 +191,7 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth,
   //     keep the CLEARED far depth. They must be skipped: the dome already
   //     paints the rim gradient this effect mixes toward, and hazing it would
   //     wash the zenith toward the horizon colour.
-  if ( uMaxMix <= 0.0 || d >= 0.999999 ) {
+  if ( uMaxMix <= 0.0 || ${SKY_TEST} ) {
     outputColor = inputColor;
     return;
   }

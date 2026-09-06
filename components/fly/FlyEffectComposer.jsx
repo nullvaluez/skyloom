@@ -17,6 +17,7 @@ import {
   Pass,
   EffectAttribute,
 } from 'postprocessing';
+import { finishPassChain } from '@/lib/fly/post-policy';
 import { FX_STABILITY } from '@/lib/fly/fly-constants';
 
 /**
@@ -302,6 +303,11 @@ const StableEffectComposer = /* @__PURE__ */ memo(
           passes.push(child);
         }
       }
+      // R24 C (POST_ORDER): per-PASS policy the descriptor list cannot express
+      // — today the output dither on the LAST pass. Called from here AND from
+      // prewarm's identical assembly so the warmed program carries the same
+      // DITHERING define production compiles. No-op with the flag off.
+      finishPassChain(passes);
       for (const pass of passes) composer.addPass(pass);
       if (normalPass) normalPass.enabled = true;
       if (downSamplingPass) downSamplingPass.enabled = true;
