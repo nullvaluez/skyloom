@@ -279,7 +279,13 @@ should never have happened, D softens the ones that must.
 | leg | pin | A: refine / merge / replacedOnScreen | D: hardSwaps / faded | active / peak | resident | pageerrors |
 |---|---|---|---|---|---|---|
 | **flag OFF (RED)** | none | 16 / 0 / 0 | **20 / 0** | 0 / 0 | 39 → 70 | 0 |
-| flag ON, shipping | `{enabled:true}` | (pending — moratorium) | | | | |
+| flag ON, shipping | `{enabled:true, skipBootMs:1500}` | **NOT MEASURED** — `bootFly` timed out at its 180 s `waitForFunction` under load; the run was never repeated before the session ended | | | | |
+
+The ON row is blank and stays blank. It is not "presumed green": the only ON
+evidence on this tree is the first, discarded attempt at `fadeSec: 6`, whose
+`active 12` reading was the clamped-dt artefact of §3.6 rather than a fade
+measurement. Owens `drawCalls`/`triangles` were added to the probe for exactly
+this leg and are likewise unmeasured.
 
 The RED is unambiguous: **20 refines, 20 of them single-frame hard swaps, zero
 blended**, and `skip.disabled: 20` proves every one was un-faded because the
@@ -445,6 +451,111 @@ not re-derive it:
 
 Cost is a GPU number (sky pixels are ~30–50 % of the frame at altitude), so it
 could not be ranked here even if it had been built.
+
+## §4.9 M4 — GO / NO-GO
+
+| feature | gates | ceilings | new lazy compiles | verify-flicker | fixture A/B | RECOMMENDATION |
+|---|---|---|---|---|---|---|
+| **A8** (night ramp) | verify-atmo-law §6, 4/4 as a pure function | none touched (uniform-only) | none possible (no shader text, no key) | untouched | not needed — noon multiplier is EXACTLY 1, so noon is bit-identical | **FLIP ON** |
+| **AERIAL_LAW** | verify-atmo-law 41/41 incl. GLSL≡JS at 4,160 points and flag-off text identity | unmeasured here; adds no mesh | prewarm builds through the same `applyHillshade` + the same Effect constructor | untouched (nothing touches emissives or bloom) | **NOT CAPTURED** | **ON only after the horizon re-baseline batch runs with a fixture column, and after one fixed-pose Owens draw row.** Not before. |
+| **LOD_CROSSFADE** | verify-lod-fade 51/51 (Fable's regex fix included) | Owens row unmeasured | tile program is prewarmed with the slot | untouched | RED captured, ON leg NOT captured | **HOLD at OFF for this round** unless the certification run's browser leg lands the ON row. |
+| **SKY_PROCEDURAL** | — | — | — | — | — | **OFF** (not built; design in §4.5) |
+
+What each recommendation rests on, and what it does not:
+
+- **A8 is the only unconditional GO.** It is a CPU multiply on a uniform that
+  already exists, on a curve that is already in the tree, and its identity at
+  noon is exact rather than approximate — `1 − clamp01(1 − frac/0.3)^1.5` is
+  EXACTLY 1 for every `frac ≥ 0.3`. There is nothing for a pixel gate to catch.
+  It closes a real defect (0.55 of the deep-night rim mixed into distant
+  terrain, with no sun term) that R23 already ruled a taste question rather
+  than a regression, so it is also the one item where "ship it and look" is
+  cheap to undo.
+- **AERIAL_LAW's evidence is structural, and that is not sufficient on its
+  own.** What is proven: the law is one function, the GLSL text equals the JS
+  mirror to 0.00e+0 relative error at 4,160 points, flag-off is byte-identical
+  in generated text / uniforms / key, the two evaluators never both run, and
+  the four REDs are real and computed rather than eyeballed. What is NOT
+  proven: what it looks like. No fixture pixel A/B was captured at any
+  canonical pose, and every horizon pixel gate moves by construction. Flipping
+  it ON without the re-baseline batch would be flipping a look nobody has seen.
+- **LOD_CROSSFADE has a clean RED and no GREEN.** 20 refines, 20 hard
+  single-frame swaps, 0 blended, `skip.disabled 20` — the defect the user
+  reported, counted. The ON leg timed out in `bootFly` under load and was never
+  re-run, so "the blend happens, on which swaps, how many at once" is
+  unmeasured on this tree. The mechanism is gated structurally and the flag-off
+  identity is proven, but a feature whose whole claim is visual should not ship
+  on a RED alone.
+- **What only the user's machine can settle, for both Level B features:** every
+  ms and every fps; whether the 250 ms blend reads as smooth or as mush at 60
+  or 144 Hz; whether the law's cruise clearing (mix 0.55 → 0.14 at eye 9 km,
+  §2.4) reads as "the air thinned" or as "the haze broke"; and whether the
+  crossfade actually removes the reported "terrain tiles swapping" or merely
+  moves it to the relief snap that a texture blend cannot morph (§3.2).
+
+## §4.95 The AerialPerspective import blocker — how it happened, and what it voids
+
+**The defect.** `components/fly/AerialPerspective.jsx` used six symbols it never
+imported: `ATMO_GLSL_DECL` and `ATMO_GLSL_FRAGMENT` (module-scope template
+literal), `AERIAL_LAW`, `atmoUniforms`, `getAtmoLaw`. Because two of them are
+evaluated in a module-scope template literal, the ENTIRE `components/fly` chunk
+threw at evaluation: "Application error: ReferenceError: ATMO_GLSL_DECL is not
+defined", zero canvas, `__flyBoot` never defined, in both styles. Introduced by
+`bc408e7`, present through `6dc8817`.
+
+**Why it happened, precisely.** The wiring was applied by a python patch script
+whose edits are `str.replace` calls. Five of the six had an `assert old in s`
+in front of them. The import edit did not. Its anchor was
+
+```
+import { Effect, EffectAttribute } from 'postprocessing';
+import { Uniform, Vector2, Vector3, Color } from 'three';
+```
+
+and by the time the script ran, the C merge (`f7a3137`, 16:38) had already
+added `SRGBColorSpace` to that second line and a `DEPTH_FIX, LINEAR_HAZE`
+import under it. The anchor no longer matched, `str.replace` returned the
+string unchanged, and with no assertion the script reported success. **Every
+mechanical edit needs its own assertion; the one that did not have it is the
+one that broke.** That is the lesson, and it is not a subtle one.
+
+**Why no node gate caught it.** `verify-atmo-law` §8 reads
+`AerialPerspective.jsx` as TEXT (regex over the shader strings), and §7
+compiles `applyHillshade`, which lives in a different module. Nothing in D's
+gate set imports or evaluates `AerialPerspective.jsx`. The same blind spot C's
+`verify-c-flagoff` had, and the reason Fable's new `GET / 200` merge-acceptance
+step is the right fix at the process level. An `eslint --rule no-undef` over
+the round's changed files is the cheap gate-level fix.
+
+**What it voids, from the timestamps.**
+
+| artifact | written | tree | verdict |
+|---|---|---|---|
+| `lod-off.json` — the RED (20 refines / 20 hard swaps / 0 faded) | 16:23:06 | after `81424b2` (16:19), **before `bc408e7` (16:45)** | **VALID.** The app booted; the breakage did not exist yet. |
+| `lodprobe-on.log` — the flag-ON leg | 16:52:06 | after `bc408e7` | **VOID, and mis-attributed.** |
+
+**A correction I owe the record.** I reported the ON leg as having "timed out
+in `bootFly` under load". It did not. `bootFly` waits on `__flyBoot`, and
+`__flyBoot` is never defined when the chunk throws at module evaluation — so
+the 180 s `waitForFunction` timeout at 16:52 is the *signature of this very
+defect*, on a tree I had broken seven minutes earlier. Contention was a guess,
+and it was wrong. The ON leg was never booted, on any tree, at any time.
+
+**Also found by the same eslint sweep, NOT mine and NOT fixed here** (Fable's
+instruction was to change nothing else): `components/fly/FlyScene.jsx:373`
+uses `offsetUnits(gl, -1)` without importing it — C's `fd7d28d` (SHADOW_CALM /
+T11). It is exported from `lib/fly/toy-world/world-bend.js:381` and imported
+correctly in `SatTintLayer.jsx` and `prewarm.js`, so the fix is one name in
+FlyScene's existing world-bend import block. It sits inside a `useMemo`
+callback rather than at module scope, so it throws when SatShadowCatcher builds
+its material rather than at chunk evaluation — quieter than mine, and still a
+ReferenceError.
+
+**Known-red on this branch, deliberately not touched:** `verify-lod-fade`'s
+`fadeSec is inside the charter bound` gate reads 6000 ms, because its regex
+matches the `fadeSec: 6` quoted in the block COMMENT before the real
+`fadeSec: 0.25` key. Fable has already fixed it on integration (anchored to the
+key line); duplicating the fix here would only make a conflict.
 
 ## §5 Decisions
 
