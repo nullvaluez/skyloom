@@ -685,6 +685,79 @@ the user's machine's to say, and the honest instrument for it is E's
 
 ---
 
+## §8c M4 — `FRAME_STEP`: the sim half LANDED, the consumer half NOT
+
+Plan §0 ruling 2 says "perpetual rendering" includes *a fixed-timestep
+simulation with an interpolated render pose so motion stays smooth through any
+hitch*. Ruling 6 says `FRAME_STEP` ships ON at close **if the harness pose
+contracts hold**. This section says plainly which half landed.
+
+### The defect (FL-04)
+
+`flight.step(dt, cmd)` runs once per frame on the RENDER delta, clamped at
+50 ms, and `flight.pos` is simultaneously the sim state and the render pose:
+
+- motion smoothness IS frame pacing — every dropped frame is a jump;
+- a long frame **slows the world down** (the 50 ms clamp turns a stall into
+  time dilation) while traffic dead-reckoning keeps wall-clock time, so
+  relative motion glitches through every hitch;
+- explicit Euler on a varying delta means identical inputs give different
+  trajectories at different frame rates.
+
+### LANDED: the accumulator and the published render pose
+
+`lib/fly/frame-step.js` + one branch in FlyScene's −50 block. The model
+advances in fixed `1/hz` steps (≤ `maxSubsteps` per frame, so a stall cannot
+spiral), and the leftover `alpha` produces an interpolated pose published as
+**NEW fields** — `flight.renderPos`, `flight.renderAtt`, `flight.renderAlpha`.
+`flight.pos` and `flight.heading` remain the sim truth in both arms: the crash
+detector, the contracts and every harness pose read them and are untouched.
+
+MEASURED-HERE (`scripts/verify-frame-step.mjs`, 10 gates, node — the
+accumulator has no three and no React dependency):
+
+- **THE PROBE plan §3 A.5 asks for**: at a substep boundary (alpha 0) the
+  interpolated pose IS the sim pose, by `Object.is` and not by tolerance; at
+  alpha 1 it is the new one.
+- flag-off: no accumulator is constructed and the −50 block runs
+  `flight.step(dt, apCmd ?? cmd)` verbatim; `flight.pos` is never assigned
+  anywhere in FlyScene.
+- a 60 fps frame runs exactly two 120 Hz substeps with alpha 0.
+- 10 s of travel: 60 fps **100.000000**, 144 fps **99.916667** — and the
+  difference is *exactly* the step still sitting in the accumulator (both are
+  100.000000000 once the residual is counted). Frame-rate independence for an
+  accumulator is "equal to within the step not yet taken"; asserting bare
+  equality would have been asserting something false and would have needed a
+  fudged tolerance later.
+- a 500 ms stall runs 4 substeps (the cap), **counts the 55 it dropped**, and
+  leaves less than one step in the accumulator — bounded, and visible to a
+  soak rather than inferred.
+- heading interpolation takes the SHORT arc across the ±π wrap (the long way
+  would spin the model right round for one frame).
+
+### NOT LANDED: the consumer opt-in, and why
+
+PlayerPlane, the chase camera, Contrail and PlayerGroundShadow still read
+`flight.pos`. Wiring them to `renderPos` is the half that can move a harness
+pose, and **it cannot be certified in this container**: the fleet pins its
+poses THROUGH `flight.pos` with a `setInterval`, so proving a render-pose
+consumer still lands exactly on the pinned pose needs the fleet running at a
+useful rate, which this venue does not offer (SwiftShader, four browsers, load
+average 14–17). Shipping the seam and the probe with the consumer list written
+down is the honest half; shipping an unverified pose change into a fleet of ~57
+harnesses is not. Per Fable's ruling this is a **"not landed" row**, not half a
+feature.
+
+**The exact remaining work, for whoever takes it:** four consumers
+(`components/fly/PlayerPlane.jsx:74`, `lib/fly/chase-camera.js`,
+`components/fly/Contrail.jsx:146-148`, `components/fly/PlayerGroundShadow.jsx`)
+read `flight.pos`/`flight.heading` and would read `flight.renderPos ?? flight
+.pos` and `flight.renderAtt ?? flight`. The certification is: the R21 quartet,
+`verify-chase-cam`'s frozen framing gate, and any harness that asserts a
+position after `warpTo` — all on a machine that can run them.
+
+---
+
 ## §9 Could not measure here (honest list)
 
 Everything in this section needs the user's machine, or E's offline fixture,
@@ -702,6 +775,7 @@ or both. Nothing below has a number from this container.
 | 11 | Whether `FINALIZE_PACE` removes a FELT hitch (the rule's shape is proven; the frame time is not) | User's machine, via E's FRAME_STATS long-frame count |
 | 12 | `HUD_SYNC`: that the label swim is gone in a turn — it is a visual, and this container renders at ~1 fps | User's machine |
 | 13 | `REBASE_CALM` T12: that the micro-grain no longer re-phases at a rebase — same reason | User's machine |
+| 14 | `FRAME_STEP`'s consumer opt-in: that a render-pose consumer still lands on a harness-pinned `flight.pos` | A machine that can run the fleet (see §8c) |
 | 2 | Any fps / ms / stalls-per-minute / worst-frame number | User's machine only |
 | 3 | Governor behaviour, DPR-step timing, tearing | User's machine only |
 | 4 | Live tile-URL identity against Esri | User's machine (egress) |

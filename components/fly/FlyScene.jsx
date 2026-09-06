@@ -102,9 +102,11 @@ import {
   WORLD_EDGE,
   REBASE_CALM,
   HUD_SYNC,
+  FRAME_STEP,
 } from '@/lib/fly/fly-constants';
 import { pinned } from '@/lib/fly/fly-pins';
 import { noteFinalizeFrame } from '@/lib/fly/finalize-pace';
+import { createFrameStep, lerpAngle, lerpPose } from '@/lib/fly/frame-step';
 import { useFlyStore } from '@/stores/fly-store';
 import { usePassportStore } from '@/stores/passport-store';
 import { PlayerPlane } from './PlayerPlane';
@@ -481,6 +483,32 @@ export function FlyScene({ runtime }) {
     return !!(c.enabled && c.framePriority);
   }, []);
   const rebaseCalm = useMemo(() => pinned(REBASE_CALM, '__flyRebaseCalmOverride'), []);
+
+  // R24 A (FRAME_STEP): the accumulator and the interpolated-pose scratch.
+  // Created once; null when the flag is off, which is what the -50 block
+  // branches on, so flag-off is the R21 call site verbatim.
+  const frameStep = useMemo(() => {
+    const cfg = pinned(FRAME_STEP, '__flyFrameStepOverride');
+    return cfg.enabled ? createFrameStep(cfg) : null;
+  }, []);
+  const prevPose = useMemo(() => ({ x: 0, y: 0, z: 0 }), []);
+  const prevAtt = useMemo(() => ({ heading: 0, pitch: 0, bank: 0 }), []);
+  const renderPose = useMemo(() => ({ x: 0, y: 0, z: 0 }), []);
+  const renderAtt = useMemo(() => ({ heading: 0, pitch: 0, bank: 0 }), []);
+  const publishRenderPose = useCallback(
+    (alpha) => {
+      lerpPose(renderPose, prevPose, flight.pos, alpha);
+      renderAtt.heading = lerpAngle(prevAtt.heading, flight.heading, alpha);
+      renderAtt.pitch = lerpAngle(prevAtt.pitch, flight.pitch, alpha);
+      renderAtt.bank = lerpAngle(prevAtt.bank, flight.bank, alpha);
+      // NEW fields, never a mutation of the sim state. A consumer that has not
+      // opted in keeps reading `flight.pos` and is bit-identical.
+      flight.renderPos = renderPose;
+      flight.renderAtt = renderAtt;
+      flight.renderAlpha = alpha;
+    },
+    [flight, prevAtt, prevPose, renderAtt, renderPose]
+  );
 
   const rebase = useCallback(
     (x, z) => {
@@ -1296,7 +1324,34 @@ export function FlyScene({ runtime }) {
       runtime.boost = m; // {frac, armed} — A4's BoostBar reads this
     }
 
-    flight.step(dt, apCmd ?? cmd);
+    // R24 A (FRAME_STEP, recon FL-04) — the fixed-timestep seam.
+    // `flight.pos` / `flight.heading` REMAIN THE SIM TRUTH in both arms: the
+    // crash detector, the contracts and every harness pose read them. What the
+    // flag adds is (a) integration in fixed 1/hz steps so identical inputs give
+    // identical trajectories at any frame rate and a long frame catches up
+    // instead of dilating time, and (b) an INTERPOLATED pose published as NEW
+    // fields for render consumers to opt into. No consumer opts in yet — see
+    // scripts/r24-a-pace.md §8c for why that half is not this round's.
+    if (frameStep) {
+      const { steps, alpha } = frameStep.advance(delta);
+      if (steps === 0) {
+        // Not a whole step yet: hold the sim, advance only the render pose.
+        publishRenderPose(alpha);
+      } else {
+        for (let i = 0; i < steps; i++) {
+          prevPose.x = flight.pos.x;
+          prevPose.y = flight.pos.y;
+          prevPose.z = flight.pos.z;
+          prevAtt.heading = flight.heading;
+          prevAtt.pitch = flight.pitch;
+          prevAtt.bank = flight.bank;
+          flight.step(frameStep.fixed, apCmd ?? cmd);
+        }
+        publishRenderPose(alpha);
+      }
+    } else {
+      flight.step(dt, apCmd ?? cmd);
+    }
 
     // --- Round 18 (A5 GRAVITY): CRASH -------------------------------------
     // Detection reads flight.floorContact, which the model wrote microseconds
