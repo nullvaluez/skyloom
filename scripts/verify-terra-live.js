@@ -327,6 +327,51 @@ async function runArm(context, fx, paceOn) {
   console.log(`  YAW SWEEP (${(YAW_MS / 1000).toFixed(0)}s in place, ~51 deg/s)`);
   console.log(`    imagery requests      off ${imgOff}   on ${imgOn}`);
   console.log(`    URLs fetched >1 time  off ${dupOff}   on ${dupOn}`);
+  // E: THE NUMERATOR AND THE DENOMINATOR ARE DIFFERENT POPULATIONS, and the two
+  // lines sit next to each other, which invites reading "17 of 36 imagery tiles
+  // were refetched". `imagery requests` is byKind.img; `URLs fetched >1 time`
+  // filters byUrl with NO prefix test, so /dem/, /mvt/, /api/aircraft,
+  // /api/weather and /planet are all in that count. Before attributing a jump
+  // to the residency LRU, read the breakdown below: an eviction/refetch cycle
+  // shows up in /img/ and /dem/, and nowhere else.
+  //
+  // (Counter semantics, checked against r24-fixture/server.mjs for A's
+  // attribution: `/__stats/reset` CLEARS byUrl/byKind/total outright, and
+  // runArm calls it AFTER that arm's boot and immediately before the yaw pin.
+  // Arm A's page is closed before arm B's is created. So these numbers are
+  // per-arm sweep windows, NOT cumulative across the two boots — a second
+  // boot's first fetch of a URL the first boot already pulled does not count.)
+  const byPrefix = (st) => {
+    const acc = {};
+    for (const [u, n] of Object.entries(st?.byUrl || {})) {
+      const k = u.startsWith('/img/')
+        ? 'img'
+        : u.startsWith('/dem/')
+          ? 'dem'
+          : u.startsWith('/mvt/')
+            ? 'mvt'
+            : u.startsWith('/api/')
+              ? 'api'
+              : 'other';
+      acc[k] ??= { urls: 0, reqs: 0, dup: 0, worst: 0 };
+      acc[k].urls++;
+      acc[k].reqs += n;
+      if (n > 1) acc[k].dup++;
+      if (n > acc[k].worst) acc[k].worst = n;
+    }
+    return acc;
+  };
+  const pOff = byPrefix(off.yawStats);
+  const pOn = byPrefix(on.yawStats);
+  for (const k of ['img', 'dem', 'mvt', 'api', 'other']) {
+    const a = pOff[k];
+    const b = pOn[k];
+    if (!a && !b) continue;
+    console.log(
+      `      ${k.padEnd(5)} off ${a ? `${a.dup}/${a.urls} urls dup, ${a.reqs} reqs, worst ${a.worst}x` : '—'}` +
+        `   on ${b ? `${b.dup}/${b.urls} urls dup, ${b.reqs} reqs, worst ${b.worst}x` : '—'}`
+    );
+  }
   console.log(`    engine merges         off ${off.yawCensus.lod?.merge}   on ${on.yawCensus.lod?.merge}`);
   console.log(
     `    replaced ON SCREEN    off ${off.yawCensus.lod?.replacedOnScreen}   on ${on.yawCensus.lod?.replacedOnScreen}`

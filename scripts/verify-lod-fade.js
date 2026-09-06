@@ -224,6 +224,17 @@ async function waitUntil(pg, fnSrc, { capFrames = 90, label = '' } = {}) {
  * at 60 fps, ~130 at 144 Hz. There is no frame count that is right on every
  * machine, so the gate waits for the SYMPTOM to stop instead of guessing at
  * its duration.
+ *
+ * KNOW WHAT THIS POLL DOES NOT PROVE (D, on review). `skip.warp` only advances
+ * when a swap is OFFERED to the ladder, so at a pinned, settled pose it
+ * returns "steady at 0" on the first pair of reads — before the cut has
+ * necessarily passed. What actually clears the cut here is the 45 s
+ * `LOD_SETTLE_MS` that precedes this call: 900 fade-ms is 18 rendered frames,
+ * so anything above ~0.4 fps has cleared it long before we poll. **The safety
+ * is therefore a property of LOD_SETTLE_MS, not of this poll** — shorten that
+ * constant and the window re-opens. Soft (12b) is the alarm: a non-zero
+ * `skip.warp` delta in the measured window means the snapshot was taken inside
+ * the cut, and it reports the frames the settle actually got.
  */
 async function waitSettled(pg, readSrc, { capFrames = 240, label = '' } = {}) {
   const t0 = await pg.evaluate(

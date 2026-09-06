@@ -288,7 +288,9 @@ run() {
   fi
   local rc=$? dt=$(( $(date +%s) - t0 ))
   printf 'rc=%s %ss load=%s\n' "$rc" "$dt" "$(load)"
-  grep -E "^(PASS|FAIL|SKIP|RED|GREEN|INFO|NOT CALIBRATED|VERIFY)" "$OUT/$name.log" | head -40
+  # NOTCAL is the third verdict (scripts/_notcal.js) — a leg that measured nothing.
+  # It must appear in the run summary or a NOT CALIBRATED row reads as a silent row.
+  grep -E "^(PASS|FAIL|SKIP|NOTCAL|RED|GREEN|INFO|NOT CALIBRATED|VERIFY)" "$OUT/$name.log" | head -40
 }
 
 # CONTENT rows — they ask what the world CONTAINS once settled.

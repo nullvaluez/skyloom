@@ -786,3 +786,424 @@ its trimmed sweep.
 - **The round's real RED is still pending**: `scripts/r24-user-diag.md` Part A
   on the CURRENT build, before any flag flips. Without it there is no before,
   and "smoother" is an opinion.
+
+---
+
+## §5 THE PER-LEG RECORD — every browser row, both passes, gate by gate
+
+**Fable's ruling (2026-09-06): this section is the canonical home for every
+browser row.** `FLY_ROUND24.md` §4 carries ONE line per gate and cites the
+subsection here; the numbers themselves live only in this file, transcribed
+from the run logs in `scripts/r24-out/cert/` rather than summarised. §1.2 and
+§1.3 stay as the two-column INDEX — the shape of the round at a glance — and
+every cell there points into a subsection below.
+
+**How to read a leg.** Each subsection carries the two passes as separate
+blocks, because they mean opposite things (§1.2's preamble):
+
+- **PASS 1 — FLAG-OFF.** The R24 constants blocks are `enabled:false`. A
+  new gate passes here when its defect REPRODUCES WITH A NUMBER, which usually
+  means `rc != 0` on purpose; an inherited gate passes here by IDENTITY, its
+  frozen number unmoved.
+- **PASS 2 — FLIPPED.** The ship table's flags are on. The defect leg reads its
+  target and every other leg of the same gate stays green.
+
+**Three verdicts, not two.** `PASS` / `FAIL` / **`NOTCAL`**. NOT CALIBRATED
+(`scripts/_notcal.js`) means the leg could not measure: an operand was absent,
+a precondition failed, a population was empty. It is not a pass and not a
+failure of the thing under test, it counts toward a non-zero exit, and it is
+recorded here verbatim — a leg that measured nothing must never be summarised
+as a green. Two further row-level verdicts appear below and are distinct from
+RED:
+
+- **VOID** — the instrument, not the world, produced the reading (the pass-1
+  `linear-haze` black frame).
+- **NOT RUNNABLE** — a handle the gate depends on does not exist yet, so
+  nothing was measured in either direction (the pass-1 `depth-rt` row).
+
+### 5.0 Citation index
+
+| Leg | Subsection | Owner of the feature | Pass 1 | Pass 2 |
+|---|---|---|---|---|
+| `verify-fixture` | §5.1 | E (the venue itself) | **10/10** | pending |
+| `verify-flash-guard` | §5.2 | B (`FLASH_GUARD`) | **RED, 5/1** | pending |
+| `verify-fade` | §5.3 | B (`CHUNK_FADE`) | **RED, 4/2** | pending |
+| `verify-lod-fade` | §5.4 | D (`LOD_CROSSFADE`) + A (streamer) | **RED, 2/5** | pending |
+| `verify-step-clean` | §5.5 | A (`STEP_SAFE`) | **RED, 4/4** | pending |
+| `verify-ladder-fix` | §5.6 | A (`PERF_LADDER`) | **RED arm 7/6** | **GREEN 13/13** |
+| `verify-one-sun` | §5.7 | C (`ONE_SUN`) | **RED, 20/7** | pending |
+| `verify-linear-haze` | §5.8 | C/D (colour space) | **VOID — instrument** | pending |
+| `verify-depth-roundtrip` | §5.9 | C (`DEPTH_FIX`) | **NOT RUNNABLE** | pending |
+| `verify-terra-live` | §5.10 | A (`TERRA_PACE`) | **8/1 — leg 6 FAIL** | pending |
+| `verify-frame-pace` | §5.11 | E (`FRAME_STATS`) | **instrument absent** | pending |
+| `verify-env-uniform` | §5.12 | C (`ENV_UNIFORM`) | pending | pending |
+| `verify-shadow-calm` | §5.13 | C (`SHADOW_CALM`) | **GREEN node-side 32/32** | pixels UM |
+
+---
+
+### 5.1 `verify-fixture` — the venue certifies itself
+
+**PASS 1 (flag-off).** `10 passed, 0 failed`. Four poses settled; the table,
+the boot times and what each row certifies are in §1.4 and are not repeated
+here. This gate has no RED: it is the only one whose job is to prove the
+instrument, not the world.
+
+**PASS 2 (flipped).** *pending* — re-run and diff §1.4. A flag that adds draws
+or triangles shows up as a delta against that table; the Owens row is the one
+to read first.
+
+---
+
+### 5.2 `verify-flash-guard` — the one-frame white flash (A1)
+
+**PASS 1 (flag-off).** `5 passed, 1 failed`, **rc 1 by design**.
+
+| Leg | Verdict | Number |
+|---|---|---|
+| (1a) census has something to count, Powell | PASS | 31,576 tris over 3 meshes |
+| (1b) census has something to count, Manhattan | PASS | 126,116 tris over 14 meshes |
+| (2) RED CALIBRATION — the zero-area population EXISTS | PASS | **Powell 2,616 (8.28 %)**, worst chunk 8.34 %; **Manhattan 5,820 (4.61 %)**, worst chunk **13.98 %**; both `coincident=true` |
+| (3) GREEN — exactly 0 with the guard armed | **FAIL (intended)** | 1,744 of 20,935 |
+| (5) triangle count only ever falls | PASS | (see caveat) |
+| (6) no page errors | PASS | clean |
+
+**Powell's 8.28 % sits inside R22.1's live 6.36–8.64 % band**, which is what
+makes the offline fixture a legitimate stand-in for this defect.
+
+**Two sites are NOT EXERCISED here**, and the row must not be read as covering
+them: `sat-skyline` measured **0 of 83,752** — `simplifyRing` already drops the
+closing clone, so FLASH_GUARD at that site is insurance, not a repair — and
+`toy-world` measured **0 of 0** because no toy leg runs this round.
+
+**Instrument caveat (§2.9).** This log is the PRE-FIX instrument. Its
+`(4) PALE DETECTOR` line (`pale=168 of 256`, every hit a mean of exactly 212.9)
+is the false positive later diagnosed as the detector reading the SKY, and its
+trailing `flagOn(probe)=true` reported an absent runtime pin as "the flag is
+on". Both are fixed (`8ca7bdf`, `ff5d9a1`); the census numbers above are
+untouched by either fix and stand.
+
+**PASS 2 (flipped).** *pending* — (3) exactly 0 at every resident site, (5)
+per-site triangle counts only falling, (1a)/(1b) still non-empty.
+
+---
+
+### 5.3 `verify-fade` — chunk birth and death (WB-2)
+
+**PASS 1 (flag-off).** `4 passed, 2 failed`, **rc 1 by design**. Serpentine of
+94 frames; births 14 (HARD 14), deaths 10 (HARD 10); **presence channel =
+`none`** — no material carries a fade uniform or transparent opacity, which IS
+the flag-off state.
+
+| Leg | Verdict | Number |
+|---|---|---|
+| (1) the watch has something to watch | PASS | births 14, deaths 10 over 94 frames |
+| (2) NO HARD BIRTH | **FAIL (intended)** | **14 of 14 hard** |
+| (3) NO HARD DEATH | **FAIL (intended)** | **10 of 10 hard** |
+| (4) a fade never changes what is ready | PASS | ready 0 of 16 chunks; series printed |
+| (5) THE OWENS LOCK | PASS | sbReady 0 · skyReady 0 · draws 156 |
+| (6) no page errors | PASS | clean |
+
+`readySeries` (every 5th frame, `[sb, skyline]`):
+`[[2,0],[2,0],[2,0],[3,0],[3,0],[3,0],[3,0],[3,0],[3,0],[3,0],[3,0],[4,0],[0,0],[0,1],[0,3],[0,4],[0,6],[0,8]]`
+— note the legitimate fall from 4 to 0 when the run leaves the ring, which is
+why "ready never falls" is NOT the invariant (§2.10).
+
+Since this run, (4) requires finite readings and (5) no longer coerces `?? 0`:
+an absent ready count would have certified the Owens lock on no data.
+
+**PASS 2 (flipped).** *pending* — (2) and (3) → 0 hard, presence channel names
+a real uniform, (1) (4) (5) (6) all still green.
+
+---
+
+### 5.4 `verify-lod-fade` — tiles swapping for other tiles (T1/T3/T4)
+
+**PASS 1 (flag-off).** `2 passed, 5 failed`, **rc 1 by design**, 317 s.
+
+| Leg | Verdict | Number |
+|---|---|---|
+| (1) fixture produces a real resident tile field | FAIL — **instrument, not world** | `residentTiles=0 estMB=undefined` |
+| (2) the census has something to count | PASS | 47 frames, 61 events |
+| (3) NO TILE LEAVES AND COMES BACK ON A PURE YAW | **FAIL (intended)** | **27 re-appearances** |
+| (4) NO HARD LOD SWAP | **FAIL (intended)** | **8 hard refines + 3 hard merges** |
+| (5) a parent-retained crossfade window exists | **FAIL** | longest co-display run **0** |
+| (6) no unbounded tile refetch | **FAIL (intended)** | **15 URLs refetched**, worst 2× `/img/6/23/17` |
+| (7) Owens draw column | INFO | **174 draws / 166,659 tris** (fixture) |
+| (8) no page errors | PASS | clean |
+
+Sweep detail: 35 appearances / 26 disappearances over 47 frames, position
+frozen. **(3) is A's T1/T3 measured directly** — the camera never moved, so
+anything that came back left because it was culled.
+
+**(1) and the NaN line are MY defect, not the world's** (§2.10a): A's counters
+are singular (`refine`/`merge`/`refetchParent`) and I read plurals, so
+`__flyTerra.lod()` printed `refines NaN · merges NaN · parentRefetches NaN ·
+replacedOnScreen 3`; `mem().estMB` does not exist (it is `residentMB`); and
+`residentTiles` only moves when `TERRA_PACE.keepResident` is on, so 0 was
+correct and my precondition was not. Fixed in `9cba1b6`.
+
+**(5) is not a criterion this flag moves.** `mode: 'parentBlend'` blends the
+parent's TEXTURE into the child and disposes the parent model as before — it
+deliberately never co-displays. The ON leg recomputes (5) only to say so.
+
+**PASS 2 (flipped).** *pending* — the ON leg (gates 9–19) exists as of
+`9cba1b6`/`f7fe5f2`: `refines+merges === hardSwaps+faded` on both arms,
+`refines+merges` flat within ±25 % frame-count tolerance, `faded` rises /
+`hardSwaps` drops, `active === 0 && retained === 0` by poll, `0 < peakActive ≤ 32`,
+`skip.{shape,noParentMap,unpatched}` each 0, Owens draws AND tris equal
+174 / 166,659 with both arms settled through `_settle.js`.
+
+---
+
+### 5.5 `verify-step-clean` — the DPR-step tear mechanism (A3)
+
+**PASS 1 (flag-off).** `4 passed, 4 failed`, **rc 1 by design — the round's
+cleanest RED**, because its calibration leg is unambiguous.
+
+| Leg | Verdict | Number |
+|---|---|---|
+| (0) the pin is released | PASS | fleet attempted `hold`, live pin null, `__flyGov` object, DPR 1.5 |
+| (1) THE RELEASED TERM IS REACHABLE | PASS | **6 of 6 forced steps accepted**, 6 DPR applications, dprs seen [1.25, 1.5] |
+| (2) every canvas width/height write inside a rAF | **FAIL (intended)** | **18 of 18 outside** |
+| (3) every setPixelRatio / setSize inside a rAF | **FAIL (intended)** | setPixelRatio **6/6**, setSize **12/12** outside |
+| (3b) every composer.setSize inside a rAF | **FAIL (intended)** | **6/6 outside** |
+| (4) bufferMatchesDrawing never false | **FAIL (intended)** | **22 of 46 frames**, e.g. composer [1920,1080] vs drawing buffer [1600,900] |
+| (5) composer resized, not rebuilt | PASS | rebuilds 1 → 1 over 6 resizes |
+| (6) no page errors | PASS | clean |
+
+(1) is what makes the rest mean something: the ladder demonstrably took six
+steps, so none of the four failures is a 0-of-0. **Not measurable here: the
+tear LINE** — that is a compositor/vsync property, user-machine only, and a
+phone camera beats a software recorder because a recorder composites.
+
+**PASS 2 (flipped).** *pending* — all four failing legs to 0 with (1) still
+showing accepted steps > 0.
+
+---
+
+### 5.6 `verify-ladder-fix` — sub-native rungs, native refresh, the stutter term
+
+**THE MODEL ROW: both arms measured the same day, with the same control legs
+green in both.**
+
+**PASS 1 (RED arm, pins unset).** `7 passed, 6 failed`. Ladder
+`[1/high, 1/medium, 1/low]`.
+
+| Leg | Verdict | Number |
+|---|---|---|
+| 1 sub-native rungs exist on a DPR-1 display | **FAIL (intended)** | **0 rungs below native** |
+| 2 …all before the first tier rung | **FAIL (intended)** | last sub-native at −1, first tier rung at 1 |
+| 3 boot rung still index 0 | PASS (control) | 1/high |
+| 4 tier rungs unchanged | PASS (control) | 1/medium, 1/low |
+| 5 refresh estimated from cadence | PASS | 144 Hz |
+| 6 target follows the display | **FAIL (intended)** | **target 60 against 144 Hz** |
+| 7 a stuttering session steps down | **FAIL (intended)** | rung **0** at emaFps 53.4, longFrac 0 |
+| 8 CONTROL: a clean 60 fps session never steps | PASS (control) | rung 0, 0 steps |
+| 9 render-scale rungs spent before any tier step | **FAIL (intended)** | dpr steps [] then tiers [] |
+| 10 a forced step moved the ladder | PASS | 0 → 1 |
+| 11 STEP_SAFE applied it inside a frame | **FAIL (intended)** | **no record** (`__flyStats.step` null) |
+| 12 composer buffers are the drawing buffer | PASS (control) | [640,360] / [640,360] |
+| 13 no page errors | PASS | clean |
+
+**PASS 2 (GREEN arm).** `13 passed, 0 failed`. Ladder
+`[1/high, 0.875/high, 0.75/high, 1/medium, 1/low]` — 2 sub-native rungs, last
+at index 2, first tier rung at 3; refresh 144 Hz and **target 144**; the
+stutterer reaches **rung 3 at emaFps 53.4 / longFrac 0.1** while the clean
+60 fps control still never steps; dpr steps [0.875, 0.75, 1] spent before the
+single tier step; forced step 0 → 1 with `{"n":1,"dpr":0.875,"applyMs":466.8,
+"canvasW":560,"canvasH":315,"composer":true,"viaValve":false}` — **inside a
+frame, not through the safety valve** — and composer buffers [560,315] equal
+the drawing buffer.
+
+Why this row is the template: legs 3, 4, 8, 12 and 13 are green in BOTH arms.
+A control that passes in the red arm is what makes a failing leg mean
+something — (8) holding in both is why (7) measures the stutter term rather
+than the harness's ability to force a step.
+
+---
+
+### 5.7 `verify-one-sun` — four sun directions per frame (L3)
+
+**PASS 1 (flag-off).** `20 passed, 7 failed`, **rc 1 by design**, 251 s.
+
+Preconditions all held: (0) both pins released, (0a)/(0b) `live=true` at every
+tier and hour, (1) azimuth Δ 0 everywhere, (7) clean.
+
+| Leg | Verdict | Number |
+|---|---|---|
+| (2) key elevation === true | **FAIL (intended)** | key pinned at **~45°** against a true **55 / 2 / −14**, at **high AND medium** |
+| (6) THE MEDIUM-TIER RED | **FAIL (intended)** | key azimuth spread **0.0000°** across three sun elevations |
+
+**One vacuous pass, caught by reading the PASS lines** (§2.10a): (5) WATER
+READS THE SAME DIRECTIONAL AS KEY passed **six times** on `Δ undefined°`.
+`angleBetween` returns null when a vector is absent or zero-length, and
+`null < 1e-4` is TRUE in JavaScript. Fixed in `686db21`; that leg now reads
+NOT CALIBRATED with the two vectors printed.
+
+**PASS 2 (flipped).** *pending* — exactly one key direction across every lit
+material at every tier, and the azimuth spread tracking the sun.
+
+---
+
+### 5.8 `verify-linear-haze` — sRGB haze mixed as linear (L1)
+
+**PASS 1 (flag-off): VOID — the instrument, not the world.**
+
+Both poses returned `960x540 · horizon row 6 (step 0.0) · terrain L 0.0 ·
+sky L 0.0 · Δ 0.0`, with an all-zero luma profile. The seam reader ran from
+`page.evaluate`, i.e. BETWEEN frames, and on a `preserveDrawingBuffer:false`
+context the default framebuffer's contents are undefined once presented —
+here, black.
+
+(1a) and (1b) correctly reported "no horizon". **(2a), (2b) and (3) then
+PASSED on Δ 0.0 — black against black** — and the run printed
+`4 passed, 2 failed` while having measured nothing at all. The RED table even
+recorded "measured Δ 0.0" as if it were a reading of the defect.
+
+Fixed in `686db21`: the read happens inside a rAF (the pale detector's idiom,
+which is why its census rows read real pixels), and (2)/(3) are NOT CALIBRATED
+whenever (1) fails.
+
+**PASS 2 (flipped).** *pending*, and it needs a fresh PASS-1 too — this row has
+no valid flag-off column yet.
+
+---
+
+### 5.9 `verify-depth-roundtrip` — reversed depth double-converted (L2/FL-07)
+
+**PASS 1 (flag-off): NOT RUNNABLE — which is not RED.** `1 passed, 1 failed`,
+220 s. `window.__flyDepthProbe` **ABSENT**; (0) refused and printed the required
+signature and the owner. Nothing about the defect was measured in either
+direction.
+
+The gate refuses rather than reconstructing viewZ itself, deliberately: a
+harness that re-implements the renderer's depth conversion is testing its own
+copy of the bug.
+
+**(0b) was a second vacuous pass**: it PASSED while printing `dof=null`,
+because it inferred the DoF pass from `style === 'toy' && tier === 'high'` —
+asserting the configuration that usually produces a pass, not the pass. Fixed
+in `14238d9`; it now reads `window.__flyDof`.
+
+The renderer state that run: `reversedDepth=true · style=toy · tier=high`.
+
+Handles required, both C-owned — see §2.7c for the contracts.
+
+**PASS 2 (flipped).** *pending* — the RED signature to look for is all three
+pixels reconstructing to **2.50–2.51 m**, i.e. `−cameraNear`, every fragment
+collapsed.
+
+---
+
+### 5.10 `verify-terra-live` — the residency trio, both arms
+
+This gate runs BOTH arms in one process, so its two columns are internal to the
+row: arm A is `TERRA_PACE` off, arm B is the trio on.
+
+**PASS 1 (flag-off tree, both arms).** `8 passed, 1 failed`, rc 1, 715 s.
+
+| Leg | Verdict | Number |
+|---|---|---|
+| 1 content: every resident tile displays its OWN z/x/y (arm A) | PASS | 62 tiles, **0 mismatches** |
+| 2 content: quadtree address matches world position (arm A) | PASS | 64 tiles, 0 mismatches |
+| 3 content: the same with the trio on (arm B) | PASS | 59 url / 65 pos, 0 mismatches |
+| 4 the engine stops merging tiles the camera turned away from | PASS | merges **1 → 0** |
+| 5 no tile replaced while on screen | PASS | 0 → 0 |
+| **6 the same tile URL is not fetched twice** | **FAIL** | **1 → 17 URLs fetched more than once** (imagery requests 33 → 36) |
+| 7 Owens draws ≤ 261 in every arm | PASS | off **161** / on **185** |
+| 8 satellite draws ≤ 375 at the suburb pose | PASS | off **161** / on **183** |
+| 9 no page errors in either arm | PASS | clean |
+
+Also measured: `refetchParent` **1 → 0**; resident MB **0 → 41.3** (Powell) and
+**0 → 50** (Owens), i.e. the byte LRU only tracks in the ON arm; triangles fall
+in the ON arm at both poses (294,870 → 273,085 and 182,645 → 157,297).
+
+**THE `/__stats` SEMANTICS BEHIND LEG 6** (asked for before attribution):
+
+- `/__stats/reset` **clears `byUrl`, `byKind` and `total` outright**
+  (`server.mjs`: `stats.byUrl.clear()`), so a URL's count restarts at 0 and a
+  later first fetch reads 1.
+- `runArm` calls `fx.resetStats()` **after that arm's `bootFly`** and
+  immediately **before** the yaw pin, and reads `fx.stats()` right after the
+  sweep and before the pose walk.
+- Arm A's page is **closed** before arm B's page is created, so no background
+  page contributes to arm B's window.
+- Both arms share one fixture server (`ensureServer` caches it), but the
+  per-arm reset makes that irrelevant.
+
+**So the counter is NOT cumulative across arms.** Leg 6 measures each arm's own
+45 s yaw sweep; a second boot's first fetch of a URL the first boot already
+pulled does **not** count. A's reading stands on the LRU.
+
+**Two instrument caveats to fold in before attributing**, both recorded in the
+gate itself:
+
+1. **The numerator and the denominator are different populations.** `imagery
+   requests` is `byKind.img`; `URLs fetched >1 time` filters `byUrl` with **no
+   prefix test**, so `/dem/`, `/mvt/`, `/api/aircraft`, `/api/weather` and
+   `/planet` are all inside the 17. The two lines printed adjacently invite
+   "17 of 36 imagery tiles", which is not what was measured. A per-prefix
+   breakdown now prints under that line (`img` / `dem` / `mvt` / `api` /
+   `other`, each as `dup/urls, reqs, worst Nx`); an eviction-refetch cycle
+   appears in `img` and `dem` and nowhere else. The **assertion is unchanged** —
+   this is A's gate and A's number.
+2. **The reset is not atomic with the pin.** Between `resetStats()` and
+   `PIN_YAW` there is an in-page `__flyTerra.reset()` and the warp itself, so
+   requests still in flight from boot/settle land in the new window. Symmetric
+   in principle; the ON arm holds more resident state at that moment, so not
+   guaranteed symmetric in practice.
+
+**A fixture refetch count is an upper bound on live behaviour.** Every fixture
+response carries `cache-control: no-store`, and imagery and DEM are served as
+SOURCES straight to the fixture server rather than through `context.route`, so
+the browser never satisfies a tile from cache — every re-request is a real
+server hit. The live planet has Esri/OFM cache headers and R21's persistent
+Cache API tile cache in front of it.
+
+Note also fixed since this run: leg 7/8 read `v == null || v <= 261`, i.e. "an
+absent draw count is under the ceiling". It is not. `686db21` — absence is NOT
+CALIBRATED; only a finite number gets a verdict.
+
+**PASS 2 (flipped).** *pending*.
+
+---
+
+### 5.11 `verify-frame-pace` — the pacing instrument
+
+**PASS 1 (flag-off): INSTRUMENT ABSENT.** The 19:14 tree still had
+`FRAME_STATS.enabled:false`, so the row was structurally vacuous.
+**`6c26fe9` ships FRAME_STATS ON**, so the gate has an instrument only from the
+flipped tree onward.
+
+Since that run the tear legs print **(3a) ARMED** with the resize count, or
+**NOT CALIBRATED** — "0 of 0 outside a rAF" is what a window that never crossed
+a DPR or tier step reports, and that was passing (§2.10).
+
+**PASS 2 (flipped).** Structural legs only. **Every pacing number is UM**:
+SwiftShader at ~1 fps cannot produce a p95, a long-frame rate or a stall count.
+§2.3 is where the user's machine owns this row.
+
+---
+
+### 5.12 `verify-env-uniform` — program recompiles across dusk and tier steps
+
+**PASS 1 (flag-off).** *pending* — `programsDelta` non-zero across a dusk
+crossing and across a tier step.
+
+**PASS 2 (flipped).** *pending* — 0 across both crossings, with (3)'s
+`stepsAccepted > 0` proving the tier walk happened. Noted in §2.10: the dusk
+walk has no equivalent check that the HDRI bucket actually changed.
+
+---
+
+### 5.13 `verify-shadow-calm` — the shadow kernel and texel snap
+
+**PASS 1: GREEN NODE-SIDE, 32/32** (C, `a9e30cc`). The ShaderChunk patch run
+against three's real chunk text both ways; the reversal reproduces three
+**byte-exact**; the texel snap is a staircase, 11 positions over 10 texels. The
+gate also caught a real defect in its own module (`PHI_TO` defaulting unknown
+names to world), which is why it carries a kernel allow-list.
+
+**PASS 2 / user machine: UM for everything visual** — pixels, draws, the
+catcher shadow and sparkle. The node leg cannot see any of them; sparkle in
+particular is temporal and needs real frames.
