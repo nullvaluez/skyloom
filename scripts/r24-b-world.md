@@ -896,7 +896,7 @@ ships `enabled: false`.**
 
 | flag | recommend | evidence | what it costs |
 |---|---|---|---|
-| **`FLASH_GUARD`** | **ON** | resident degenerate triangles **15,984 (14.19 %) → 0** on a 2,700-frame headless serpentine; per-builder **14.22 % / 14.84 % → 0**; normals bit-identical across the filter; clean chunks return the same array object | **Zero bundle bytes moved, zero cache keys, zero draws, no frozen-gate exposure at all.** Index counts only fall. The cheap 95 % of the win |
+| **`FLASH_GUARD`** | **ON** — **satellite buildings PROVEN (Powell, Manhattan); skyline = INSURANCE; toy site NOT EXERCISED** | E's browser RED legs: Powell **8.28 %** (31,576 tris / 2,616 zero-area), Manhattan **13.98 %** worst chunk (42,364 tris / 5,820), coincident-vertex; B's headless serpentine **15,984 (14.19 %) → 0**; normals bit-identical across the filter; clean chunks return the same array object | **Zero bundle bytes moved, zero cache keys, zero draws, no frozen-gate exposure at all.** Index counts only fall. The cheap 95 % of the win. See §15 for what "insurance" and "not exercised" mean precisely |
 | **`BEND_LEAD`** | **ON** | pad deficit at the lead edge on **7 of 7 rings** — 54 / 558 / 747 / 241 / 1,205 / 3,405 / 31,412 m → 0; `padON ≥ padOFF` everywhere, so the pad can only ever KEEP geometry | a handful of ring-edge draw submissions; Owens cannot move (nothing to keep) |
 | **`CHUNK_FADE`** | **ON** | single-frame pops **92 → 2**, and both residuals are `fadeBudgetMiss` = 2, i.e. attributable; ramp steps 0 → 600 | `maxDying` 4 transient draws; **Owens exactly 0 by construction**. Needs E's `programsDelta`-flat run to confirm the pooled twins compile nothing |
 | **`HEAL_IN_PLACE`** | **ON** | heals **16 (0 in place) → 21 (21 in place)**; evictions 40 → 24 | one extra Float32Array per chunk (per-run ground); no keys, no draws |
@@ -968,4 +968,78 @@ render with a different state, and the fact that it produces the right programs
 is exactly what makes it invisible to a program-count gate. Warm against a
 stand-in, always — and "off the critical path" is a claim about a line number,
 so check the line number.
+
+---
+
+## §15 E's `verify-flash-guard` RED legs — three findings, recorded before close
+
+From E's certification run on the integrated tree (`5ca8e15`), K=40,
+`__flyFlashPin='off'`. These are E's browser numbers, not B's; B's node numbers
+stay in §1 and §7.
+
+### 15.1 The skyline site is INSURANCE, not a fix — and its real defect is a different bug
+
+| pose | layer | meshes | tris | zero-area |
+|---|---|---:|---:|---:|
+| Manhattan | sat-buildings | 4 | 42,364 | **5,820** (13.98 % worst chunk, coincident-vertex) |
+| Manhattan | **sat-skyline** | 10 | 83,752 | **exactly 0** |
+
+**Recon A1b predicted this and it is now measured live.** The skyline path runs
+`simplifyRing(poly.outer, SK.simplifyTol)` before its wall loop, and the
+collinearity test discards the closing clone — so the zero-length wall edge
+never exists there at all.
+
+**Therefore `FLASH_GUARD` at the skyline site removes nothing, and a green there
+repairs nothing.** It stays as cheap insurance against the earcut-collinear kind
+(and against any future emitter on that path), and the ship row now says so.
+This corrects the implicit impression in §1.3's call-site table that all four
+sites are equal: they are not.
+
+**The skyline's real defect is the price it pays for that accident.** The same
+collinearity test discards `ring[0]` along with the clone (`ab` is (0,0) for
+`ring[0]` once its predecessor is the clone), so **every z14 block-mass ring
+silently loses a genuine corner** — a 4-corner footprint renders as 3.
+
+- **It is a DIFFERENT bug from the flash**, and no gate measures it.
+- **B has measured it**: §7.2b, on E's own live-winding tiles, Manhattan
+  sat-skyline **4,570 → 6,015 verts (+31.6 %)** under `RING_DEDUPE`.
+- **`RING_DEDUPE` is its fix**, and that flag is built-but-off precisely
+  because it is a worker change that moves `WORKER_PROTOCOL`, `verify-skyline`'s
+  frozen numbers, and the roof-form dispatch of §7.2b.
+
+**OPEN ITEM, not this round:** restore the skyline's first corner. Owner: a
+future worker round, under the roof re-certification `RING_DEDUPE` already
+needs. Filed here rather than in §9 because §9 is about toy births.
+
+### 15.2 Powell reproduces A1's live band offline; Manhattan sits above it
+
+Powell **8.28 %** (31,576 tris / 2,616 zero-area) lands inside R22.1's live
+**6.36–8.64 %** band — the archived measurement reproduced offline, on a
+different fixture, by a different agent. Manhattan's **13.98 %** worst chunk is
+**above** that band.
+
+**Caveat, recorded so nobody reads 13.98 % as a contradiction:** R22.1 quoted
+6.36–8.64 % for *every large chunk*. The defect is 2 triangles per ring plus 6
+per parapet and 2 per crown step, independent of ring length, so a chunk whose
+footprints are small or few is proportionally WORSE. A worst-chunk figure above
+a large-chunk band is the expected shape, not a disagreement. (B's own fixture
+reads 14.22 % for the same structural reason — 4-corner rectangles.)
+
+### 15.3 The toy site is not exercised by the close
+
+E's toy-world site reads 0/0/0 at both poses **only because no toy chunk is
+resident in satellite**, which is the style both poses run. The toy extruder
+carries the same wrap-around loop at `vector-tile.worker.js:4285`.
+
+**Fable's ruling: no toy leg is added at the close.** The ship row says
+"toy site not exercised", and that is the honest state of the CERTIFICATION.
+
+For the record, and without contesting the ruling: B's node legs *did* exercise
+that site — `scripts/r24-b-worker-proof.js` measures the toy `full` bundle at
+**14.84 % → 0** (B fixture) and **2,288 → 0 on E's Manhattan tile**, and
+`scripts/r24-b-engine-proof.js` drives the toy engine's `guardIndex` call at
+`toy-world-engine.js:1007`. That is evidence the code path works; it is **not**
+a certified browser leg, and the two are different claims. The distinction is
+the same one §7.6 draws about `RING_DEDUPE`: correct and certified are not the
+same, and only the second is a merge gate.
 
