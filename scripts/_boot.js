@@ -53,6 +53,18 @@ async function bootFly(
     await page.addInitScript((pin) => {
       window.__flyTileFixture = pin;
     }, fixturePin(fx.url, Number(process.env.FLY_FIXTURE_DEM_MAXZOOM || 15)));
+    // Round 24 (E CERT), inside the SAME env-guarded branch: the finalize
+    // budget scaler (lib/fly/harness-budget.js). Opt-in per RUN, never
+    // fleet-wide — MEASURED here, a Powell satellite building chunk needs ~400
+    // full-quadtree raycasts and the 1.0 ms/frame drape budget cannot get
+    // through them at 1-3 fps, so after six minutes `ready` was still 0 with
+    // the terrain fully settled. A content gate exports FLY_FINALIZE_BUDGET_K;
+    // a PACING gate must not, and none of E's do.
+    const k = Number(process.env.FLY_FINALIZE_BUDGET_K || 0);
+    if (k > 1)
+      await page.addInitScript((v) => {
+        window.__flyFinalizeBudgetK = v;
+      }, k);
   }
   await page.addInitScript((s) => {
     // Round 16 (SANCTIONED harness edit): pin the LIVE WEATHER off for the
