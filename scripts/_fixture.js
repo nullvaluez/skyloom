@@ -156,4 +156,52 @@ function fixturePin(baseUrl, demMaxZoom = 15) {
   };
 }
 
-module.exports = { attachFixture, fixtureEnabled, fixturePin, FIXTURE_ENV };
+/**
+ * THE NODE LEG (recon HARN-GAP-7). `verify-seam` imports the real
+ * vector-tile worker in-process and calls `api.init()`, which fetches
+ * `TILEJSON_URL` — so the fastest deterministic instrument in the fleet
+ * (20 ms per tile, no browser, no GPU) still needed live OpenFreeMap, and
+ * could not run here at all.
+ *
+ * `TILEJSON_URL` is a module constant, so there is nothing to inject. But the
+ * worker calls the GLOBAL fetch, and in node that is ours to wrap. This
+ * answers the TileJSON and any `.pbf` from the fixture and passes everything
+ * else through untouched — no app change, and the R21 §5b follow-up ("a hash
+ * gate over LIVE tiles is a gate against someone else's release schedule; the
+ * fix is pinned fixture tiles") is closed for the node leg.
+ *
+ * Call it BEFORE `api.init()`. Returns `{ url, restore() }`.
+ */
+async function installNodeFetchFixture() {
+  const srv = await ensureServer();
+  const base = srv.url;
+  const real = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const url = typeof input === 'string' ? input : input?.url || String(input);
+    if (url.startsWith('https://tiles.openfreemap.org/')) {
+      const m = url.match(/(\d+)\/(\d+)\/(\d+)\.pbf$/);
+      const path = m ? `/mvt/${m[1]}/${m[2]}/${m[3]}.pbf` : '/planet';
+      return real(base + path, init);
+    }
+    if (url.includes('server.arcgisonline.com')) {
+      const m = url.match(/tile\/(\d+)\/(\d+)\/(\d+)/);
+      if (m) return real(`${base}/img/${m[1]}/${m[2]}/${m[3]}`, init);
+    }
+    return real(input, init);
+  };
+  return {
+    url: base,
+    restore: () => {
+      globalThis.fetch = real;
+    },
+    stats: async () => (await real(base + '/__stats')).json(),
+  };
+}
+
+module.exports = {
+  attachFixture,
+  fixtureEnabled,
+  fixturePin,
+  installNodeFetchFixture,
+  FIXTURE_ENV,
+};

@@ -233,13 +233,30 @@ function soft(name, detail) {
     window.__stepFx0 = window.__flyStats?.fx?.rebuilds ?? 0;
   });
 
-  // FORCE the steps, the way verify-tier-step does: the governor exposes
-  // force(dir) on window.__flyGov.
+  // FORCE the steps, the way verify-tier-step does.
+  //
+  // `force(dir)` TAKES A NUMBER: perf-governor.js:158 reads `dir < 0 ? 1 : -1`,
+  // so -1 steps DOWN the ladder and +1 steps UP. Passing the STRINGS 'down' /
+  // 'up' makes `dir < 0` false every time, which at index 0 resolves to the
+  // same index and returns false — every "forced" step is a silent no-op, and
+  // the gate then reports a vacuous "0 of 0 outside rAF" that looks like a
+  // green mechanism. (Measured exactly that on the integrated tree before this
+  // fix: "0 DPR applications, dprs seen []".)
+  //
+  // Waiting for a NATURAL step is not an option either: the R21 governor has
+  // boot and warp grace, a 1.5 s down-dwell, cooldowns and a session latch, so
+  // at this venue's frame rate the EMA is below `downFrac` from frame one and
+  // the ladder still may not move inside a harness window.
+  const forced = [];
   for (let i = 0; i < STEPS; i++) {
-    await page.evaluate((dir) => window.__flyGov?.force?.(dir), i % 2 === 0 ? 'down' : 'up');
+    const dir = i % 2 === 0 ? -1 : 1;
+    const ok = await page.evaluate((d) => window.__flyGov?.force?.(d) ?? null, dir);
+    forced.push({ dir, ok });
     await page.waitForTimeout(6000);
   }
   await page.waitForTimeout(4000);
+  const stepsTaken = forced.filter((f) => f.ok === true).length;
+  console.log(`FORCED: ${JSON.stringify(forced)} → ${stepsTaken} accepted by the ladder`);
 
   const w = await page.evaluate(() => ({
     ...window.__stepWatch,
@@ -262,31 +279,46 @@ function soft(name, detail) {
   if (cw.length) console.log('  canvas writes:', JSON.stringify(cw.slice(0, 8)));
   if (w.setPixelRatio.length) console.log('  setPixelRatio:', JSON.stringify(w.setPixelRatio.slice(0, 8)));
 
+  const stepped = w.setPixelRatio.length + w.setSize.length > 0;
   gate(
     '(1) THE RELEASED TERM IS REACHABLE — the governor actually stepped',
-    w.setPixelRatio.length + w.setSize.length > 0,
-    `${w.setPixelRatio.length} DPR applications, dprs seen ${JSON.stringify([...new Set(w.dprSeen)])}. ` +
-      'Zero here would mean the ladder had no rung to take at this deviceScaleFactor (recon A4) — ' +
-      'raise STEP_DSF, do not weaken the gate.'
+    stepped,
+    `${stepsTaken}/${STEPS} forced steps accepted · ${w.setPixelRatio.length} DPR applications, ` +
+      `dprs seen ${JSON.stringify([...new Set(w.dprSeen)])}. Zero means the ladder had no rung to ` +
+      'take at this deviceScaleFactor (recon A4: a DPR-1 display has ZERO DPR rungs) — raise ' +
+      'STEP_DSF, do not weaken the gate.'
   );
-  gate(
-    '(2) EVERY canvas.width/height WRITE IS INSIDE A rAF',
-    cw.length > 0 && outOfRafCanvas.length === 0,
-    `${outOfRafCanvas.length} of ${cw.length} outside` +
-      (outOfRafCanvas.length ? `: e.g. ${JSON.stringify(outOfRafCanvas[0])}` : '')
-  );
+  // A vacuous 0-of-0 must never read like a mechanism verdict, in EITHER
+  // direction: with no step observed there is nothing to be right or wrong
+  // about, and calling that a FAIL is as misleading as calling it a PASS.
+  if (!stepped || cw.length === 0) {
+    fail++;
+    console.log(
+      'NOT CALIBRATED  (2)/(3)/(3b)/(4)/(5) — no resize was observed in the window, so the ' +
+        'mechanism was never exercised. This is not a mechanism red and not a green: the gate ' +
+        `could not run. canvasWrites=${cw.length} setPixelRatio=${w.setPixelRatio.length} ` +
+        `setSize=${w.setSize.length} composerSetSize=${w.composerSetSize.length} forcedAccepted=${stepsTaken}`
+    );
+  } else {
+    gate(
+      '(2) EVERY canvas.width/height WRITE IS INSIDE A rAF',
+      outOfRafCanvas.length === 0,
+      `${outOfRafCanvas.length} of ${cw.length} outside` +
+        (outOfRafCanvas.length ? `: e.g. ${JSON.stringify(outOfRafCanvas[0])}` : '')
+    );
+  }
   red.push([
     'A3 DPR step reallocates the drawing buffer between frames',
     'verify-step-clean (2)',
     `${outOfRafCanvas.length}/${cw.length} outside rAF`,
     '0 outside',
   ]);
-  gate(
+  if (stepped) gate(
     '(3) EVERY gl.setPixelRatio / gl.setSize IS INSIDE A rAF',
     outOfRafSpr.length === 0 && outOfRafSs.length === 0,
     `setPixelRatio ${outOfRafSpr.length}/${w.setPixelRatio.length} · setSize ${outOfRafSs.length}/${w.setSize.length} outside`
   );
-  gate(
+  if (stepped) gate(
     '(3b) EVERY composer.setSize IS INSIDE A rAF (the passive-effect lag)',
     outOfRafComp.length === 0,
     `${outOfRafComp.length}/${w.composerSetSize.length} outside`
@@ -297,13 +329,13 @@ function soft(name, detail) {
       `frames=${w.frames} mismatches=${w.mismatch} — a null sample means the composer exposes no ` +
         'inputBuffer here; report it rather than faking a pass'
     );
-  gate(
+  if (stepped) gate(
     '(4) bufferMatchesDrawing NEVER GOES FALSE',
     w.mismatch === 0,
     `${w.mismatch} mismatched frames of ${w.frames}` +
       (w.mismatchSample ? ` e.g. ${JSON.stringify(w.mismatchSample)}` : '')
   );
-  gate(
+  if (stepped) gate(
     '(5) THE COMPOSER IS RESIZED, NOT REBUILT, ACROSS A STEP',
     w.fxNow === w.fx0,
     `rebuilds ${w.fx0} -> ${w.fxNow} (resizes ${w.resizes})`

@@ -260,6 +260,46 @@ Consequences, and they are load-bearing for every agent's fixture legs:
   building chunk finalised there is no index to suppress against. The number is
   meaningless until the buildings land; do not quote it.
 
+### 1.2c THE FIX: `lib/fly/harness-budget.js` (the finalize-budget scaler)
+
+Three probes, in sequence, established that §1.2b was not the whole story:
+
+1. **The terrain quadtree DOES settle on the fixture.** Measured level by
+   level at Powell (640×360): z5 at 15 s, z6 at 25 s, z7 at 39 s, z8 at 51 s,
+   z9 at 62 s, z12 at 96 s, z14 at 109 s, z16 at 121 s, **z17 at 153 s**, with
+   ground elevation converging 193.4 → 268.9 → 274.3 → 273.0 m against the
+   fixture's true **276.3 m**. The descent is throttled by three-tile's
+   `downloadingThreads + 4 >= maxThreads` freeze (recon T3): the probe measured
+   `dl` pinned at 8–9 of 10 for the whole descent, and `dl=0/10` once settled.
+2. **And yet after SIX MINUTES** `__satBuildings.stats` still read
+   `{chunks: 16, ready: 0, empty: 0}` with the terrain fully settled and
+   nothing downloading.
+3. **The arithmetic.** Each chunk's drape is ~400 `getElevationAt` calls, each
+   a full-quadtree raycast over 229 tiles (recon T9 / FL-08), against
+   `SAT_BUILDINGS.drapeBudgetMs` of 1.0 ms **per frame**. 120 fps → 120 ms of
+   drape per second and a chunk lands in under a second. 1–3 fps → 1–3 ms per
+   second, and it never lands.
+
+Left alone this would have made every satellite content gate here — including
+B's own `FLASH_GUARD` and `CHUNK_FADE` gates — certify a world whose buildings
+never arrived, reading 0 for counts that should be thousands. **That is a
+green that means nothing**, and it would have looked like a green.
+
+`budgetK()` is read live at five sites (sat-building drape + finalize,
+sat-skyline drape + finalize, toy-world drape + finalize, sat-road drape).
+`window.__flyFinalizeBudgetK` absent ⇒ returns exactly 1 ⇒ byte-identical
+arithmetic. Clamped to [1, 500] — a harness may only ever make the budget MORE
+generous, never tighter, so it cannot manufacture a green by starving
+something for frames. Wired through the SAME env-guarded `_boot.js` branch:
+`FLY_FINALIZE_BUDGET_K=40` alongside `FLY_TILE_FIXTURE=1`.
+
+**THE RULE.** It changes PACING. No gate that measures pacing, frame time,
+stalls or stream-in SHAPE may set it — and none of E's pacing gates do. It is
+for gates that ask what the world CONTAINS once settled: counts, census,
+draw/triangle totals, fingerprints, fixed-pose pixels. Those answers do not
+depend on how many frames the drape took to finish, which is precisely why
+scaling is sound for them and unsound for anything else.
+
 ### 1.3 Environment findings that cost time (so nobody else pays them)
 
 - **Never edit a source file while a browser gate runs.** Next's HMR remounts
@@ -277,6 +317,20 @@ Consequences, and they are load-bearing for every agent's fixture legs:
 - `window.__flyGl` (FlyCanvas `onCreated`, dev only) is the renderer handle —
   `gl.info.programs.length` is the only honest instrument for a recompile
   storm or an abandoned composer pass.
+- **Server reuse between agents is a flakiness source, not a courtesy.** A
+  harness reused a fixture server owned by another node process; that process
+  exited and every later proxy fetch answered 502, which surfaced as
+  `[sat-buildings] TileJSON init failed: TileJSON 502` and an empty world — a
+  fixture failure that reads exactly like a code failure. Reuse is now opt-in.
+- **Five agents share four cores.** While one probe ran, D's
+  `r24-d-lodprobe.js` and another agent's `diag.js` held fixture ports; the
+  measured frame rate fell from 18.5 fps to 2.6 fps as the scene filled AND as
+  other work landed. Contention is part of every wall-clock number here; treat
+  a 2–3× spread between runs as normal and never read a timing from it.
+- **A smoke that cannot find its own scripts must be LOUD.** `r24-smoke.sh`'s
+  first version tested the presence of `$1` after a `shift`, i.e. of a file
+  called `node`, skipped all nine rows and exited 0. It now exits non-zero on
+  `PASS === 0` and on any absent row.
 
 ---
 
@@ -337,6 +391,31 @@ Powell → Columbus serpentine at 200–400 m, the paste-backs, a 30-second
 `dReady` / `dSky` / `adds` / `removes` deltas so a timestamp in the clip can be
 lined up against the mechanism, and an optional Part C for running the fleet
 locally (`PW_CHANNEL=chrome` documented as the user-machine restore).
+
+---
+
+### 2.3 Two inherited gates, improved without moving a bound
+
+**`verify-seam`'s node leg now runs OFFLINE** (HARN-GAP-7). It imports the real
+worker in-process and calls `api.init()`, which fetched `TILEJSON_URL` — a
+module constant with no injection seam. But the worker calls the GLOBAL fetch,
+and in node that is ours: `installNodeFetchFixture()` answers the OFM TileJSON
+and any `.pbf` from the fixture and passes everything else through. No app
+change. Full green on the flag-off tree in ~40 s with no browser and no GPU;
+the numbers are in `r24-close-sweep.md` §1.4b, including two honest places
+where the fixture is WEAKER than live.
+
+**`verify-flicker` gains a QUIESCENCE PRECONDITION** (recon A7). The bound of
+12 does not move — the plan freezes it and this does not touch it. What moves
+is the guarantee that the asserted window opens on a quiet scene. R22.1 §3.2
+ran the harness five times on ONE tree: urban p99 6.957 / 6.613 / 9.742 /
+6.167 / **16.105**, and the only red carried `movingFrac` 0.1176 against ~0.02
+for the others. A gate whose verdict is decided by load is a coin, and its red
+is unattributable — which is exactly why R21 closed with the Manhattan
+residual un-attributed. A 3-frame probe now gates the window on
+`movingFrac ≤ FLICK_QUIET` (0.05), retrying; if the scene never quiets the leg
+reports **NOT QUIET** and its p99 is printed as SOFT rather than asserted. The
+honest answer is "this run could not judge".
 
 ---
 

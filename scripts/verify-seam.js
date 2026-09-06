@@ -192,6 +192,17 @@ const SCENES = [
     console.log('VERIFY: FAIL (worker fixture)');
     process.exit(1);
   }
+  // Round 24 (E CERT) — HARN-GAP-7 closed for the node leg. With
+  // FLY_TILE_FIXTURE set, wrap the GLOBAL fetch before init() so the worker's
+  // TileJSON and .pbf come from the offline fixture instead of OpenFreeMap.
+  // TILEJSON_URL is a module constant with no injection seam, but the worker
+  // calls globalThis.fetch and in node that is ours. No app change; without
+  // the env this file behaves exactly as it did in R21.
+  let nodeFixture = null;
+  if (process.env.FLY_TILE_FIXTURE) {
+    nodeFixture = await require('./_fixture').installNodeFetchFixture();
+    console.log(`WORKER: node leg pinned to the OFFLINE FIXTURE at ${nodeFixture.url}`);
+  }
   await api.init();
 
   // The ramp spec, MIRRORED from fly-constants (this harness is CommonJS at

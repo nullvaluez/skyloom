@@ -119,6 +119,18 @@ async function bootFly(
     }
   }, style);
 
+  // Round 24 (E CERT), SANCTIONED and still inside the fixture guard: the two
+  // FIXED 30 s post-reveal waits below are a GPU-machine assumption. Under the
+  // build container's SwiftShader renderer and five agents sharing four cores,
+  // `__flyBoot.pct` reaches 100 and then the canvas selector or the
+  // boot-screen unmount takes longer than 30 s — measured, and it threw a
+  // TimeoutError from this file for two agents on the same afternoon. Scaling
+  // them is not a weaker contract: the contract is `pct === 100`, which has
+  // already passed by then. FLY_BOOT_SCALE defaults to 1, and outside the
+  // fixture branch it is FORCED to 1, so every non-fixture run is
+  // byte-identical arithmetic.
+  const bootScale = fixtureEnabled() ? Math.max(1, Number(process.env.FLY_BOOT_SCALE || 1)) : 1;
+
   const t0 = Date.now();
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
 
@@ -148,13 +160,13 @@ async function bootFly(
   const ms = Date.now() - t0;
 
   // Reveal fade unmounts the overlay; the GL canvas is up underneath it.
-  await page.waitForSelector('.fixed.inset-0 canvas', { timeout: 30000 });
+  await page.waitForSelector('.fixed.inset-0 canvas', { timeout: 30000 * bootScale });
   await page.waitForFunction(
     () => !document.querySelector('[data-testid="boot-screen"]'),
-    { timeout: 30000 }
+    { timeout: 30000 * bootScale }
   );
   // Small settle: first post-reveal frames, labels, HUD.
-  await page.waitForTimeout(settleMs);
+  await page.waitForTimeout(settleMs * bootScale);
   return { ms };
 }
 
