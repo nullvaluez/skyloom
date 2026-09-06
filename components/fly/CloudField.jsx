@@ -12,7 +12,19 @@ import {
   MeshLambertMaterial,
   Object3D,
 } from 'three';
-import { CLOUDS, SKY_CIRRUS, TOY_WORLD, WEATHER, WORLD_EDGE } from '@/lib/fly/fly-constants';
+import {
+  CLOUDS,
+  CLOUD_LIT,
+  SKY_CIRRUS,
+  TOY_WORLD,
+  WEATHER,
+  WORLD_EDGE,
+} from '@/lib/fly/fly-constants';
+import {
+  clearCloudLight,
+  LitCloudMaterial,
+  setCloudLight,
+} from '@/lib/fly/cloud-material';
 import { expApproach } from '@/lib/fly/coords';
 import { puffPresence } from '@/lib/fly/weather-model';
 import { applyBend, bendDrop, getBend, getEdgeFade } from '@/lib/fly/toy-world/world-bend';
@@ -45,7 +57,12 @@ function wrap(v, half, cell) {
 }
 
 const _geo = { x: 0, y: 0, z: 0 };
-const _cloudDrift = [0, 0]; // dev stat scratch (no per-frame allocation)
+const _cloudDrift = [0, 0];
+// R24 C (CLOUD_LIT): per-cadence scratch — no allocation on the 10 s tick.
+const _cloudDir = [0, 1, 0];
+const _lit = new Color();
+const _shade = new Color();
+const _grey = new Color(); // dev stat scratch (no per-frame allocation)
 
 /**
  * An endless cumulus field: puffs live at fixed ABSOLUTE positions inside a
@@ -138,6 +155,7 @@ export function CloudField({ runtime, flight, origin }) {
   useEffect(() => {
     if (mapStyle !== 'satellite') {
       setSunTint(null);
+      clearCloudLight(); // R24 C: never strand a satellite sun over the Neon deck
       return;
     }
     const cfg = CLOUDS.dayTint;
@@ -163,6 +181,47 @@ export function CloudField({ runtime, flight, origin }) {
       if (greyT > 0) c.lerp(grey, greyT);
       const next = '#' + c.getHexString();
       const opacity = wx ? style.opacity * wx.opacityMul : style.opacity;
+      // R24 C (CLOUD_LIT, recon L7): the shaping feed rides THIS cadence — no
+      // new timer, no new React state, and it reads the same `runtime.sun` the
+      // tint above just consumed, so the deck's colour and its lighting cannot
+      // disagree about the time of day (the round-6 single-source rule).
+      if (CLOUD_LIT.enabled && style.lit) {
+        const sun = runtime.sun;
+        const elDeg = Number.isFinite(sun?.sinEl)
+          ? (Math.asin(Math.min(1, Math.max(-1, sun.sinEl))) * 180) / Math.PI
+          : 90;
+        const night = elDeg < CLOUD_LIT.moonElDeg;
+        // The key direction is the SAME basis every other consumer uses
+        // (-sin az·cos el, sin el, cos az·cos el), and after dark it is the
+        // ANTI-solar moon — the vector ONE_SUN swings the scene key onto and
+        // the one SkyDome hangs the moon disc on. One sun, including up here.
+        const az = sun?.az ?? 0;
+        const el = night ? 0.6 : Math.max(0.05, (elDeg * Math.PI) / 180);
+        const a = night ? az + Math.PI : az;
+        const ce = Math.cos(el);
+        _cloudDir[0] = -Math.sin(a) * ce;
+        _cloudDir[1] = Math.sin(el);
+        _cloudDir[2] = Math.cos(a) * ce;
+        // Overcast greys BOTH sides toward one flat ceiling tone — that is what
+        // an overcast deck IS, and it also removes the silver lining, which is
+        // correct: there is no direct sun to back-scatter.
+        _lit.set(night ? CLOUD_LIT.moon : CLOUD_LIT.sun);
+        _shade.set(night ? CLOUD_LIT.moonShade : CLOUD_LIT.shade);
+        const oc = wx ? wx.overcastT : 0;
+        if (oc > 0) {
+          _grey.set(CLOUD_LIT.overcastGrey);
+          _lit.lerp(_grey, oc);
+          _shade.lerp(_grey, oc);
+        }
+        setCloudLight(
+          _cloudDir,
+          _lit,
+          _shade,
+          CLOUD_LIT.rim * (1 - oc) * (night ? 0.45 : 1),
+          CLOUD_LIT.g,
+          CLOUD_LIT.mix
+        );
+      }
       if (process.env.NODE_ENV === 'development' && window.__flyStats) {
         window.__flyStats.cloudTint = next; // harness probe (verify-round11)
         window.__flyStats.cloudOpacity = opacity;
@@ -175,7 +234,10 @@ export function CloudField({ runtime, flight, origin }) {
     };
     apply();
     const id = setInterval(apply, WEATHER.smooth.tintMs);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      clearCloudLight();
+    };
   }, [mapStyle, runtime, style]);
 
   // Per-puff ground state (parallel to puffs): last sampled drawn-ground Y,
@@ -497,7 +559,13 @@ export function CloudField({ runtime, flight, origin }) {
       : mapStyle === 'toy'
         ? CLOUDS.textureToy
         : CLOUDS.texture;
-  const CloudMat = style.lit ? MeshLambertMaterial : MeshBasicMaterial;
+  // R24 C (CLOUD_LIT, recon L7): the LIT deck (satellite) gets the shaped
+  // variant of the same Lambert — same class family, same drei code path, same
+  // instancing attributes, same ONE draw. The toy deck is MeshBasic and never
+  // comes through here, so Neon is byte-identical.
+  const CloudMat = style.lit
+    ? (CLOUD_LIT.enabled && LitCloudMaterial) || MeshLambertMaterial
+    : MeshBasicMaterial;
   const boundsYFrac = style.boundsYFrac ?? 0.28;
   return (
     <>
