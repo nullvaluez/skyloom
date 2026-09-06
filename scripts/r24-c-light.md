@@ -642,3 +642,117 @@ Toy roof / edge-fx crops may move **by a texel** (the snap) and by the bias sign
 (shadow edges shift toward the caster instead of away). Road and water coverage
 can only **grow** on slopes, never shrink. **[pending fixture]** for all of it.
 
+
+---
+
+## M5 — TERRAIN_LIGHT (recon L8, T6, T7, T12, T13) — PARTIAL, and honestly so
+
+### What is DONE (this tree)
+
+- **`uHillElev`** — the sun-elevation weight as its own uniform, with the FINAL
+  tile key derived from the flag combination (see the ONE_SUN section; the key
+  suffix is built from the actual flags so two different texts can never share
+  one key — the R4 lesson).
+
+### What is BLOCKED on A, and why it must be
+
+The worker half — smooth central-difference normals from the FULL DEM grid and
+error-bounded skirts — has to live inside three-tile's LERC worker. On this tree
+that worker is a **minified inline string** (`const fe = '...'`, vendored
+`index.js:1118`) whose per-vertex normal function is the last-writer face-normal
+loop recon T6 names. A patch into a minified blob is unreviewable and unmergeable,
+and A's `skirtWorker` step replaces that string with a READABLE source plus a
+stringify script. **The correct move is to wait for it, not to work around it**,
+and Fable has ruled the same way. Patch numbering (8+), the `// R24 C PATCH <n>`
+site marker, the `VENDOR.md` row format and gate 7/8's constraints are recorded
+so the work can land as marked hunks the moment A's sha arrives.
+
+E's constraint is recorded with it: three-tile's terrain-rgb path resizes to
+`clamp((z+2)*3, 2, 64)` px and Martini **throws** unless the grid is `2^k+1`,
+and the LERC path has its own grid — so the normal computation must derive its
+size from the worker payload and **never assume 257**.
+
+
+---
+
+## M6 — CLOUD_LIT (recon L7) + LAMBERT_ENV (recon WB-7)
+
+### CLOUD_LIT — RED [source]
+
+`components/fly/CloudField.jsx:500` — `const CloudMat = style.lit ?
+MeshLambertMaterial : MeshBasicMaterial` on drei's `<Clouds>` sprite instancer.
+A billboard's normal points AT the camera, so `N·L` is **one constant per
+sprite**: the sun cannot shape a puff, there is no lit side and no shadow side,
+and the whole deck is a set of grey cotton discs whose only variation is the
+per-instance tint (recon L7; the R22 handoff's "flat grey-blue wash").
+
+### Fix
+
+`lib/fly/cloud-material.js` gives each fragment a **fake hemisphere normal**
+from its position on the sprite quad — `n = (p.x, p.y, sqrt(1 − |p|²))` in VIEW
+space is exactly the normal field of a sphere seen head-on — rotates it to world
+space, shades sun-side against shadow-side, and adds a **Henyey-Greenstein
+forward lobe** toward `runtime.sun`. The HG term IS the silver lining: real
+droplets scatter strongly toward the eye when the sun is behind the puff.
+
+**Same instancer, same ONE draw**, ~+20 ALU on the 5–10 % of pixels a deck
+covers, exact early-out at `uCloudMix <= 0`.
+
+### The hook is an ACCESSOR, and that is forced
+
+drei's `<Clouds material={X}>` builds `class CloudMaterial extends X` and, in
+**its own constructor** (`Cloud.js`), assigns `this.onBeforeCompile = …` to
+inject the per-instance `cloudOpacity` attribute. `super()` runs first, so
+anything our constructor assigns is overwritten one line later. The only stable
+hook is a prototype **accessor**: drei's assignment lands in our setter, and our
+getter returns a composed function that runs drei's edits FIRST. That ordering
+is required, not stylistic — our fragment edit rewrites the exact `gl_FragColor`
+line drei writes. If drei ever stops emitting it, the replace is a no-op and the
+deck falls back to plain Lambert: a missing flourish, never a broken frame.
+
+### The feed
+
+Rides CloudField's EXISTING ~10 s tint cadence — no new timer, no new React
+state — and reads the same `runtime.sun` the tint just consumed, so the deck's
+colour and its lighting cannot disagree about the time of day (the round-6
+single-source rule). After dark the key is the **anti-solar moon**: the same
+vector `ONE_SUN` swings the scene key onto and SkyDome hangs the moon disc on.
+Overcast greys BOTH sides toward one ceiling tone and removes the rim, which is
+correct — there is no direct sun to back-scatter.
+
+### The PREWARM exception — stated as an exception (Fable ruling)
+
+The shared rules say every new shader text gets a FINAL cache key **and** a
+PREWARM warm-set entry in the same change. This variant takes the key and
+**not** the warm-set entry, and that is a documented exception rather than an
+oversight:
+
+| | |
+|---|---|
+| world-bend registry header | **YES** — listed, with its reach and its 0-identity condition |
+| `customProgramCacheKey` | **YES** — `'cloud-lit-c24'` (the onBeforeCompile source is its identity) |
+| PREWARM warm set | **NO** |
+| why | It compiles once at boot with the deck it belongs to, and introduces **no new mid-flight state flip** — the style flip that swaps Lambert↔Basic already existed and already re-links this program's slot. Prewarm exists for mid-flight flips (recon WB-4), not for boot. Warming it would also mean replicating drei's runtime-generated inner subclass, which is a fragile twin by construction. |
+
+**The condition, accepted:** E's `verify-env-uniform` `programsDelta` run must
+include one satellite → toy → satellite style flip, so "no mid-flight compile"
+is MEASURED rather than argued. **If that run shows the lit cloud program
+re-linking on the flip back, this belongs in B's re-warm-on-style-flip**, not in
+a boot warm set — Fable routes it there. **[pending E]**
+
+### LAMBERT_ENV — RED [source]
+
+`three/src/renderers/webgl/WebGLPrograms.js:60-63` applies `scene.environment`
+to Lambert/Phong, and `MeshLambertMaterial`'s defaults are
+`combine = MultiplyOperation`, `reflectivity = 1` — i.e. a **full-strength
+mirror-reflection lookup** of the HDRI on every wall, roof, canopy and house
+(`envmap_fragment.glsl.js:41-43`). Roofs take the zenith colour, facades take
+the horizon band, and the twilight HDRI's bright azimuth band can light one
+facade direction at night — a plausible contributor to "white-glow buildings".
+
+`reflectivity 0.15` on the four Lambert content materials (sat buildings,
+skyline, canopy, parcel homes) plus the two monument materials `ONE_SUN` moved
+to Lambert. **Uniform-only**: a material PARAMETER, so the program is unchanged
+and no cache key moves — only the envmap intensity term. **[pending fixture]**
+for the noon/dusk A/B at the certified poses.
+

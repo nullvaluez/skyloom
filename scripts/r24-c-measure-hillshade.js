@@ -26,7 +26,8 @@ const { bootFly } = require('./_boot');
 const sharp = require('sharp');
 
 const OUT = path.join(__dirname, 'r24-out');
-const REGION = { left: 300, top: 450, width: 1000, height: 380 };
+// verify-sat-depth's region (300,450 1000x380 at 1600x900) scaled to 640x360.
+const REGION = { left: 120, top: 180, width: 400, height: 152 };
 const SETTLE = +(process.env.FLY_FIXTURE_SETTLE_MS || 45000);
 
 async function meanAbsDiff(a, b, region) {
@@ -58,26 +59,29 @@ async function lumaStd(file, region) {
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--enable-gpu'] });
-  const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+  // E's venue truth: 1280x720 runs ~1 fps here and drapeBudget/finalize are
+  // PER FRAME, so a content pose takes minutes to settle. 640x360 gets 8-50 fps;
+  // the crop is scaled to match verify-sat-depth's 1000x380 @ (300,450) region.
+  const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
   // bootFly installs the fixture itself under FLY_TILE_FIXTURE (_boot.js:52).
-  await bootFly(page, { style: 'satellite' });
+  await bootFly(page, { style: 'satellite', timeoutMs: 900000 });
   await page.evaluate(() => window.__flyStore.getState().setQualityTier('high'));
-  await page.mouse.move(800, 450);
+  await page.mouse.move(320, 180);
   await page.evaluate(() => {
     window.__flySunOverride = Date.UTC(2026, 6, 17, 16, 0); // 9am PDT, the frozen pose
     window.__fly.warpToGeo(36.578, -118.29, { altM: 3600, name: null });
   });
   await page.waitForTimeout(SETTLE);
-  await page.mouse.move(800, 450);
+  await page.mouse.move(320, 180);
 
   const shot = (n) =>
     page.locator('.fixed.inset-0 canvas').first().screenshot({ path: path.join(OUT, `hill-${n}.png`) });
   const setHill = async (v) => {
     await page.evaluate((s) => window.__flyHill.set(s), v);
     await page.waitForTimeout(4000); // ~1 fps on SwiftShader: give it real frames
-    await page.mouse.move(800, 450);
+    await page.mouse.move(320, 180);
   };
 
   const live = await page.evaluate(() => window.__flyHill.get());
