@@ -467,3 +467,155 @@ the search radius of an existing spatial filter — neither introduces a
 frame-to-frame term. The one thing that could raise temporal std is the DoF band
 becoming real, and that is bounded by the CoC ramp being monotone in distance.
 
+
+---
+
+## M4 — SHADOW_CALM (recon L5 / FL-12) + the T11 offset helper
+
+### RED 1 — THE BIAS SIGN [source, three 0.185.1]
+
+`ShaderChunk.shadowmap_pars_fragment` handles the reversed depth buffer in two
+of its three shadow paths and **not in the third**:
+
+| shadow type | bias line |
+|---|---|
+| `SHADOWMAP_TYPE_VSM` | `#ifdef USE_REVERSED_DEPTH_BUFFER  z -= bias  #else  z += bias` |
+| `SHADOWMAP_TYPE_BASIC` | `#ifdef USE_REVERSED_DEPTH_BUFFER  z -= bias  #else  z += bias` |
+| **`SHADOWMAP_TYPE_PCF`** | **`shadowCoord.z += shadowBias;` — unconditional** |
+
+PCF is the type this app runs (R3F's `shadows` → `PCFSoftShadowMap`, which three
+r185 deprecates to `PCFShadowMap` at `:9148`). Under a reversed shadow map
+near = 1, far = 0 and the comparison is `GreaterEqualCompare` (`:9312`), so
+biasing toward LIT means making the reference **larger** — and the authored bias
+is **negative** (`-0.0002` toy, `-0.0004` satellite), correct for the convention
+it was tuned in. `z += bias` therefore biases every receiver toward **shadowed**.
+
+**Scale:** the toy shadow camera is `near 1 / far 8000` orthographic, so depth is
+linear and 0.0002 of depth is `0.0002 × 7999 ≈ 1.6 m` of world depth pushed the
+wrong way. **`normalBias: 4` is what pays for it** — 4 m of normal offset on a
+`800 × 2 / 2048 = 0.78 m/texel` map is **5.1 texels of peter-panning** bought to
+hide a 1.6 m sign error. This is the R21 P8 polygonOffset defect one layer down:
+three flips the sign for you in the branches it thought about, not in the one you
+use.
+
+### RED 2 — THE ROTATING KERNEL [source]
+
+PCF's 5-tap Vogel disk is rotated by
+`interleavedGradientNoise( gl_FragCoord.xy ) * PI2` — a **screen-space** hash.
+When the camera moves, a fragment covering the same piece of world gets a
+different rotation than it had last frame, so the filtered edge changes shape
+every frame, and there is no temporal filter anywhere in this renderer to average
+it (recon FL-11). On buildings that reads as **the buildings flickering** — a
+shadow-side cause of the user's report that is independent of chunk births, and
+that is why it is called out separately in this ledger.
+
+### RED 3 — THE UN-SNAPPED FRUSTUM [source]
+
+`FlyScene.jsx:1689-1727` writes `sun.position` / `sunTarget.position` from
+continuous `rpx/rpz` every frame, so a 2048² map re-rasterises every silhouette
+into a sub-texel-shifted grid **every frame**, at 0.78 m/texel (toy) and
+1.46 m/texel (satellite).
+
+### Fix (flag `SHADOW_CALM.enabled`)
+
+1. **`lib/fly/shadow-kernel.js`** — two string edits to
+   `ShaderChunk.shadowmap_pars_fragment`, installed **once from FlyScene's module
+   body**, i.e. before any material in the scene can compile. A ShaderChunk edit
+   changes the text every shadow receiver compiles **without touching a single
+   material, a single FINAL cache key or a single prewarm entry** — which is the
+   precise property three's `CSM.js` does not have (it hooks `onBeforeCompile`,
+   the same hook all 15 world-bend variants own, and would re-key all of them —
+   recon L5). Edit (a) gives PCF the `#ifdef` form three already uses in VSM and
+   BASIC. Edit (b) replaces the screen-space `phi` with
+   `interleavedGradientNoise( shadowCoord.xy * shadowMapSize )` — identical cost,
+   identical tap statistics, but the rotation is glued to the **world**, so
+   camera motion cannot change any fragment's kernel. `kernel: 'fixed'`
+   (`phi = 0`) is kept as the fallback if 'world' still shimmers on the user's
+   machine; `'three'` leaves it alone.
+2. **Texel snap** — `snapToShadowTexel()` quantises the follow target to a whole
+   `2·orthoRadius / mapSize` in **light space**, using the shadow camera's own
+   `matrixWorldInverse` rather than a hand-built basis: a basis differing from
+   three's by a roll about the light axis would quantise onto a **rotated** grid
+   and snap to nothing. It is one frame stale, and the basis changes only when
+   the sun does (a 60 s cadence), so "one frame stale" is exact in every frame
+   that matters. Applied to both rigs; on satellite only while the shadow camera
+   is actually casting, since `ONE_SUN` now runs that branch at every tier.
+3. **`normalBias` 4 → 1 (toy), 2 → 1 (satellite)** — creditable only *because*
+   the sign is fixed. **[pending fixture]** for the acne A/B.
+4. **The ground catcher, armed** — mounted whenever `SHADOW_CALM` is on, and made
+   `visible` only where `runtime.satBuildings.queryColumns(px, pz, 1200)` returns
+   a caster and AGL < 1500 m, on a 10-frame cadence. **Owens is 0 draws BY
+   CONSTRUCTION, not by measurement**: `queryColumns`'s own docstring says it
+   answers with an empty array when nothing has streamed, and over Owens Valley
+   that is every frame of every pose. R19 shipped this disc off because an
+   unconditional +1 draw breaks a ceiling with no headroom; the gate is not "is
+   it enabled" but "is there anything to catch".
+5. **`satCadence` CONSIDERED AND LEFT AT 0.** The ortho follows the *aircraft*,
+   so skipping updates strands the shadow map behind the world it shadows — a
+   measured-nowhere GPU saving traded for a visible lag. Re-open only with a
+   number from the user's machine.
+
+### T11 — one polygonOffset sign rule
+
+`offsetUnits()` and `groundOverlayOffset()` now live once, in `world-bend.js`.
+`SatTintLayer` and the shadow catcher became **calls**; the streaming engines
+(roads, satellite water) get an offset **for the first time**, behind the flag,
+because they are `depthWrite:false, depthTest:true` additives draped on a 16×16
+bilinear grid at demZ 12 and depth-tested against the z15 tile mesh — on ground
+tilted away from the eye they simply lose the test (recon T8). Engines have no
+renderer in scope, so `FlyCanvas.onCreated` latches the live capability once via
+`setDepthReversed()`.
+
+### NEW GATE — `scripts/verify-depth-offset.mjs` (node, runs anywhere)
+
+**RED on the base tree `6116fc5`: 6 of 7 gates fail** (verified by archiving the
+base commit and running the gate against it):
+
+```
+FAIL  no raw polygonOffsetUnits literal outside world-bend.js
+        components/fly/FlyScene.jsx:278 | lib/fly/prewarm.js:279
+FAIL  the helper itself exists exactly once — declarations=0
+FAIL  offsetUnits is exported from world-bend.js
+FAIL  groundOverlayOffset is exported and flag-gated
+FAIL  setDepthReversed is latched from the live renderer at context creation
+FAIL  satellite shadow catcher uses the shared helper
+```
+GREEN on this tree: **7/7 PASS, 185 files scanned.**
+
+**The gate found a real offender on its first run:** `lib/fly/prewarm.js:280`
+warmed the `SatTintLayer` twin with a raw `polygonOffsetUnits: -2` while
+production has applied the R21 P8 sign flip since that round — the twin and the
+material it warms disagreed about the depth convention. (No program moves:
+polygonOffset is GL state, not a shader define, so this is a state-fidelity fix,
+not a cache-key one.) That is exactly the drift a one-implementation rule exists
+to prevent, caught by the rule on the day it was written.
+
+### Instrument for E — `__flyStats.shadow`
+
+`{ enabled, installed, biasSign, kernel, casting, mapSize, radiusM, texelM,
+normalBias, bias, lightPos, target }`. `biasSign` / `kernel` come from the module
+that **did or did not perform the patch**, never from the flag that asked for it.
+`casting` is fleet-pin-aware: `verify-shadow-calm` must un-pin
+`__flySatShadowOverride` (the accessor-swallow idiom) and prove the pass is
+reachable at high tier before asserting anything.
+
+**Gate recipe:** (1) `biasSign === true && kernel === 'world'` with the flag on,
+both false/null with it off; (2) park the camera at the Manhattan settled pose
+and step the aircraft by **half a shadow texel** — `target` must not move; step
+it by 1.5 texels — `target` must move by exactly one texel; (3) at the Owens pose
+with the flag ON, the catcher's draw contribution is 0 (visible false) while at
+Columbus it is exactly +1; (4) per-pixel temporal std on the shadowed side of a
+building, before/after, through verify-flicker's five controls.
+
+### Cost
+
+0 draws over empty terrain, +1 where casters exist. The kernel edits are
+text-only (same 5 taps, same instruction count ±1). The snap is one matrix pair
+per frame on one object.
+
+### Frozen gates touched
+
+Toy roof / edge-fx crops may move **by a texel** (the snap) and by the bias sign
+(shadow edges shift toward the caster instead of away). Road and water coverage
+can only **grow** on slopes, never shrink. **[pending fixture]** for all of it.
+

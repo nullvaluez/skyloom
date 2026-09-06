@@ -13,7 +13,7 @@ import {
   Vector3,
 } from 'three';
 import { GLOBE, SAT_TINT, SAT_VEG, SURFACE_CALM } from '@/lib/fly/fly-constants';
-import { applyBendFade } from '@/lib/fly/toy-world/world-bend';
+import { applyBendFade, offsetUnits } from '@/lib/fly/toy-world/world-bend';
 
 // Worst-case bend drop pad for the CPU bounding sphere (the SatVegLayer
 // recipe): the GPU pushes far geometry DOWN by d²k and the CPU bound cannot
@@ -38,10 +38,9 @@ const MAX_BEND_K = 1 / (2 * GLOBE.bendRadiusM.satellite);
  * eye". Detected off the live renderer (the extension can be missing, in which
  * case three silently runs a normal depth buffer and the R20 signs are right).
  */
-function offsetUnits(gl, units) {
-  const reversed = gl?.capabilities?.reversedDepthBuffer === true;
-  return SURFACE_CALM.enabled && SURFACE_CALM.depthOffsetFix && reversed ? -units : units;
-}
+// R24 C (recon T11): the implementation moved to world-bend.js so there is one
+// polygonOffset sign rule in the tree; behaviour here is unchanged (the same
+// test on the same live capability, with the same SURFACE_CALM gate).
 
 /** Round 21 (C, S6) — ranged upload; see SatVegLayer's rangeUpload docstring. */
 function rangeUpload(attr, elements) {
