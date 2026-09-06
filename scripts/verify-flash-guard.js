@@ -26,7 +26,14 @@
  *     34,405 of 482,740 triangles, 99.9% coincident-vertex). With FLASH_GUARD
  *     on it must be exactly 0 at every site.
  *
- * (B) THE PALE DETECTOR — a DEFAULT-FRAMEBUFFER readback, one scanline after
+ * (B) THE PALE DETECTOR — and it carries its OWN calibration, because a
+ *     detector that has never fired is not calibrated, it is quiet. Gate (4a)
+ *     requires the banked serpentine to register ZERO (the first version of
+ *     this detector reported 168 of 256, reading the SKY); gate (4b) arms one
+ *     synthetic pale frame through `window.__paleSelfTest()` — the next tick
+ *     clears the default framebuffer to white and reads that — and requires
+ *     EXACTLY ONE hit. Zero there means the instrument cannot see the event it
+ *     exists for. — a DEFAULT-FRAMEBUFFER readback, one scanline after
  *     the final pass, on EVERY composed frame. It exists because a CDP
  *     screencast is BLIND to a one-frame event (R22.1 A1) and a
  *     `page.screenshot` is blinder still. It is a PROBABILISTIC instrument:
@@ -198,9 +205,28 @@ const INSTALL_PALE = () => {
       const a = Array.prototype.slice.call(hist, 0, k).sort((x, y) => x - y);
       return a[k >> 1];
     };
+    // THE DETECTOR'S OWN RED, in-page and costing no extra browser run.
+    // A detector that has never fired is not calibrated, it is merely quiet —
+    // and this one has already been wrong in the other direction. Calling
+    // `window.__paleSelfTest()` arms exactly ONE synthetic pale frame: the next
+    // tick clears the default framebuffer to white and reads THAT, so the
+    // instrument sees precisely the event it exists to catch. The app redraws
+    // the same frame immediately, so nothing persists and the median absorbs a
+    // single sample out of 24.
+    S.selfTest = 0;
+    window.__paleSelfTest = () => {
+      S.selfTest = 1;
+      S.selfTestAt = S.frames;
+      return true;
+    };
     const tick = () => {
       try {
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        if (S.selfTest > 0) {
+          S.selfTest = 0;
+          gl.clearColor(1, 1, 1, 1);
+          gl.clear(gl.COLOR_BUFFER_BIT);
+        }
         // readPixels is bottom-up: 0.25 of the height is LOW on screen, where
         // the ground is at every pose this gate flies.
         const y = (gl.drawingBufferHeight * 0.25) | 0;
@@ -333,6 +359,31 @@ async function serpentine(page, ms) {
 
   await serpentine(page, SERPENTINE_MS);
   const paleRed = await page.evaluate(() => window.__pale);
+
+  // (4a)/(4b) THE DETECTOR'S OWN CALIBRATION. Fable's requirement, and the
+  // right one: an instrument that has never fired is not calibrated, it is
+  // quiet. The serpentine must produce ZERO (the first version of this
+  // detector produced 168 of 256 — it was reading the sky), and a synthetic
+  // one-frame white clear must produce EXACTLY ONE.
+  const serpentineHits = paleRed.pale;
+  await page.evaluate(() => window.__paleSelfTest?.());
+  await page.waitForTimeout(8000);
+  const afterSelf = await page.evaluate(() => window.__pale);
+  const selfHits = afterSelf.pale - serpentineHits;
+  gate(
+    '(4a) NO FALSE POSITIVE — the banked serpentine registers ZERO pale frames',
+    serpentineHits === 0,
+    `${serpentineHits} in ${paleRed.frames} frames · worst jump over median ` +
+      `${paleRed.worstJump.toFixed(1)} · baseline ${paleRed.baseline.toFixed(1)}`
+  );
+  gate(
+    '(4b) THE DETECTOR FIRES — one synthetic white frame registers EXACTLY ONE hit',
+    selfHits === 1,
+    `${selfHits} hit(s) from __paleSelfTest()` +
+      (afterSelf.hits.length ? ` · ${JSON.stringify(afterSelf.hits.slice(-1))}` : '') +
+      (selfHits === 0 ? '  [the instrument cannot see the event it exists for]' : '')
+  );
+
   info(
     '(4) PALE DETECTOR (probabilistic — absence is NOT proof)',
     `armed=${paleRed.armed} frames=${paleRed.frames} pale=${paleRed.pale} worstJumpOverMedian=${paleRed.worstJump.toFixed(1)} baseline=${paleRed.baseline.toFixed(1)}` +
