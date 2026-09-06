@@ -153,6 +153,12 @@ const CENSUS = () => {
  */
 const INSTALL_PALE = () => {
   const S = (window.__pale = {
+    /** length of the current run of candidate frames; only a run of 1 counts. */
+    runLen: 0,
+    lastCand: null,
+    /** candidates that had a candidate neighbour — a field, not a flash. */
+    sustained: 0,
+    sustainedRuns: [],
     frames: 0,
     pale: 0,
     worstJump: 0,
@@ -248,10 +254,45 @@ const INSTALL_PALE = () => {
           S.baseline = med;
           // A pale frame: far brighter than the recent world, uniformly so,
           // and absolutely bright. All three, or it is not the thing.
-          if (jump > 60 && min > med + 40 && mean > 180) {
-            S.pale++;
-            if (S.hits.length < 8)
-              S.hits.push({ f: S.frames, mean: +mean.toFixed(1), med: +med.toFixed(1), min: +min.toFixed(1) });
+          //
+          // …AND IT MUST BE ISOLATED. The defect is a ONE-FRAME white flash;
+          // two adjacent frames at the same level are a SUSTAINED field, which
+          // is a different picture with a different cause (a bright sky at the
+          // scanline, a reveal fade, an overexposed grade). Pass 2 measured
+          // exactly that: f:141 and f:142 both at mean 222.1 / med 145.5, and
+          // f:229 with f:230 likewise — consecutive identical means, counted as
+          // two hits each. So a candidate is HELD one frame and only counted
+          // when the frame AFTER it is not also a candidate; `prevCand` carries
+          // the held frame, and a run of any length collapses to zero hits
+          // rather than to its length.
+          //
+          // The self-test is exempt by construction, not by special-casing: it
+          // paints exactly ONE white frame, so its successor is never a
+          // candidate and the held hit always lands — (4b) still reads exactly
+          // one.
+          const cand = jump > 60 && min > med + 40 && mean > 180;
+          if (cand) {
+            S.runLen++;
+            S.lastCand = { f: S.frames, mean: +mean.toFixed(1), med: +med.toFixed(1), min: +min.toFixed(1) };
+          } else {
+            // A run of EXACTLY ONE is the flash. Any longer run is a field and
+            // counts zero — including its last frame, which a naive
+            // "previous frame was not a candidate" test would still admit.
+            if (S.runLen === 1) {
+              S.pale++;
+              if (S.hits.length < 8) S.hits.push(S.lastCand);
+            } else if (S.runLen > 1) {
+              S.sustained++;
+              if (S.sustainedRuns.length < 6)
+                S.sustainedRuns.push({
+                  from: S.lastCand.f - S.runLen + 1,
+                  to: S.lastCand.f,
+                  len: S.runLen,
+                  mean: S.lastCand.mean,
+                  med: S.lastCand.med,
+                });
+            }
+            S.runLen = 0;
           }
         }
         hist[n % RING] = mean;
@@ -373,7 +414,7 @@ async function serpentine(page, ms) {
   const afterSelf = await page.evaluate(() => window.__pale);
   const selfHits = afterSelf.pale - serpentineHits;
   gate(
-    '(4a) NO FALSE POSITIVE — the banked serpentine registers ZERO pale frames',
+    '(4a) NO FALSE POSITIVE — the banked serpentine registers ZERO ISOLATED pale frames',
     serpentineHits === 0,
     `${serpentineHits} in ${paleRed.frames} frames · worst jump over median ` +
       `${paleRed.worstJump.toFixed(1)} · baseline ${paleRed.baseline.toFixed(1)}`
@@ -388,7 +429,10 @@ async function serpentine(page, ms) {
 
   info(
     '(4) PALE DETECTOR (probabilistic — absence is NOT proof)',
-    `armed=${paleRed.armed} frames=${paleRed.frames} pale=${paleRed.pale} worstJumpOverMedian=${paleRed.worstJump.toFixed(1)} baseline=${paleRed.baseline.toFixed(1)}` +
+    `armed=${paleRed.armed} frames=${paleRed.frames} pale=${paleRed.pale} sustained=${paleRed.sustained} worstJumpOverMedian=${paleRed.worstJump.toFixed(1)} baseline=${paleRed.baseline.toFixed(1)}` +
+      (paleRed.sustainedRuns?.length
+        ? ` sustainedRuns=${JSON.stringify(paleRed.sustainedRuns)} (a bright FIELD, not a one-frame flash — not counted)`
+        : '') +
       (paleRed.hits.length ? ` hits=${JSON.stringify(paleRed.hits.slice(0, 4))}` : '')
   );
   console.log(

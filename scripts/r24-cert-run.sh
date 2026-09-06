@@ -139,7 +139,16 @@ fi
 # --- 3. exactly one dev server, ours ----------------------------------------
 say ""
 say "--- starting one dev server on :$PORT ---"
-(npm run dev -- -p "$PORT" > "$OUT/dev.log" 2>&1 &)
+# setsid puts the whole server in its own PROCESS GROUP, so cleanup can signal
+# every descendant at once with `kill -- -PGID`. MEASURED (pass 2, and pass 1
+# before it): `npm run dev` is FOUR processes — npm -> `sh -c next dev` ->
+# `node next dev` -> a forked `next-server` worker — and the worker is the one
+# holding the port. Killing DEV_PID and one generation of children left
+# `next-server` alive, reparented to init, still answering 200 on the port; the
+# next run then found the port busy and the leak was invisible until someone
+# curled it. A cleanup that walks one generation cannot promise to stop a
+# server that forks.
+setsid npm run dev -- -p "$PORT" > "$OUT/dev.log" 2>&1 &
 CODE=000
 for _ in $(seq 1 90); do
   sleep 2
@@ -162,7 +171,21 @@ if [ -z "$DEV_PID" ]; then
   say "continue, because I could not promise to clean it up afterwards."
   exit 2
 fi
-say "dev :$PORT -> 200, PID $DEV_PID  load $(load)"
+# The PGID is READ FROM /proc, not assumed from `$!`. `setsid` forks when its
+# caller is already a process-group leader, so the backgrounded PID can be a
+# parent that exits immediately while the real session leader is someone else —
+# `$!` would then name a corpse and the group kill would hit nothing. Field 5
+# of /proc/<pid>/stat is the process group id; the comm field can contain
+# spaces and parentheses, so it is parsed from the LAST ')' rather than by
+# field index.
+DEV_PGID="$(awk '{ s = substr($0, index($0, ")") + 2); split(s, f, " "); print f[3] }' "/proc/$DEV_PID/stat" 2>/dev/null || true)"
+if [ -z "$DEV_PGID" ] || [ "$DEV_PGID" = "0" ]; then
+  say "could not read the dev server's process group — refusing to continue,"
+  say "because a cleanup that cannot signal the group cannot promise to stop"
+  say "the next-server worker it forks."
+  exit 2
+fi
+say "dev :$PORT -> 200, PID $DEV_PID  PGID $DEV_PGID  load $(load)"
 
 # Everything this script spawns, so an interrupt does not leave a headless
 # browser and a dev server behind. MEASURED the hard way: a `timeout 60` around
@@ -180,9 +203,35 @@ cleanup() {
       kill "$p" 2>/dev/null
     fi
   done
+  # The dev server is stopped by PROCESS GROUP, not by PID: it forks a
+  # `next-server` worker that outlives its parents (see the launch comment).
+  # setsid made the group leader's PGID equal to DEV_PGID, so one signal
+  # reaches every descendant. TERM first so Next can close its sockets, then
+  # KILL anything that ignored it, then VERIFY the port actually let go —
+  # a cleanup that does not check is a cleanup that reports success either way.
+  if [ -n "${DEV_PGID:-}" ] && kill -0 -- "-$DEV_PGID" 2>/dev/null; then
+    say "stopping the dev server process group I started (PGID $DEV_PGID)"
+    kill -TERM -- "-$DEV_PGID" 2>/dev/null
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      kill -0 -- "-$DEV_PGID" 2>/dev/null || break
+      sleep 1
+    done
+    kill -KILL -- "-$DEV_PGID" 2>/dev/null
+  fi
   if [ -n "${DEV_PID:-}" ] && kill -0 "$DEV_PID" 2>/dev/null; then
     say "stopping the dev server I started (PID $DEV_PID)"
-    kill "$DEV_PID" 2>/dev/null
+    kill -KILL "$DEV_PID" 2>/dev/null
+  fi
+  if [ -n "${PORT:-}" ]; then
+    local left
+    left="$(curl -s -o /dev/null -w '%{http_code}' --max-time 4 "http://127.0.0.1:$PORT/" 2>/dev/null)"
+    if [ "$left" = "000" ]; then
+      say "port :$PORT released"
+    else
+      say "*** WARNING: :$PORT still answers $left after cleanup — something I"
+      say "*** started is still listening. Find it before the next run:"
+      say "***   for d in /proc/[0-9]*; do tr '\\0' ' ' < \$d/cmdline; echo \" <- \$d\"; done | grep next-server"
+    fi
   fi
   return $rc
 }

@@ -262,8 +262,16 @@ gate('9 …and the upstream spread survives verbatim on the flag-off branch',
   /idx = data\n\s+\? \[\.\.\.groundIdx, \.\.\.Array\.from\(data\.idx, \(v\) => v \+ w \* w\)\]\n\s+: groundIdx;/.test(toy));
 
 const veg = readFileSync(path.join(root, 'lib/fly/toy-world/sat-veg-engine.js'), 'utf8');
-gate('10 the veg commit is capped per frame (A9)',
-  /committed < cap/.test(veg) && /finalizePaceOn\(\) \? Math\.max\(1, FINALIZE_PACE\.vegPerFrame\)/.test(veg));
+// E (pass 2b): the cap now carries the harness scaler, at A's request — this
+// was the ONE budget site of six that budgetK() missed, so at ~1 fps the venue
+// committed one veg chunk per second and any veg reading was partly populated.
+// `budgetK()` is exactly 1 without FLY_FINALIZE_BUDGET_K, so the production
+// arithmetic is unchanged; the assertion moves with the expression it pins,
+// and gains the scaler as a REQUIREMENT rather than merely tolerating it.
+gate('10 the veg commit is capped per frame (A9), and the cap carries the harness scaler',
+  /committed < cap/.test(veg) &&
+    /finalizePaceOn\(\) \? Math\.max\(1, FINALIZE_PACE\.vegPerFrame \* budgetK\(\)\)/.test(veg) &&
+    /from '\.\.\/harness-budget'/.test(veg));
 
 // The brake must be a SEPARATE statement, not folded into the loop bound: E's
 // harness budget multiplier sits on that expression, and two owners editing one
