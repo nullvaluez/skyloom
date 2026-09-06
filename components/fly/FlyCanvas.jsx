@@ -9,6 +9,7 @@ import { PhotoCapture } from './PhotoCapture';
 import { JuiceSystems } from './JuiceSystems';
 import { PrewarmRig } from './PrewarmRig';
 import { CANVAS, PERF_GOVERNOR, PREWARM } from '@/lib/fly/fly-constants';
+import { setDepthReversed } from '@/lib/fly/toy-world/world-bend';
 import { autoTierCeiling } from '@/lib/fly/fly-settings';
 import { PerfGovernor } from '@/lib/fly/perf-governor';
 import { useFlyStore } from '@/stores/fly-store';
@@ -100,6 +101,11 @@ export function FlyCanvas({ runtime }) {
         reversedDepthBuffer: true,
       }}
       onCreated={({ gl }) => {
+        // R24 C (recon T11): latch the live depth convention for the streaming
+        // ENGINES, which build materials with no renderer in scope. Components
+        // keep passing `gl` and are unaffected. Production path, not dev-gated:
+        // an engine that guesses the sign wrong drops overlays on slopes.
+        setDepthReversed(gl?.capabilities?.reversedDepthBuffer === true);
         if (process.env.NODE_ENV === 'development') {
           console.info(
             '[fly] reversedDepthBuffer active:',

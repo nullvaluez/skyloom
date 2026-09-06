@@ -179,7 +179,6 @@ function gate(name, ok, detail) {
   const settle = Number(process.env.FLY_FIXTURE_SETTLE_MS || 60000);
   const scenes = {};
   for (const [name, pose_] of Object.entries(POSES)) {
-    await page.evaluate(PIN_POSE, pose);
     scenes[name] = await pose(page, pose_, settle);
     console.log(`  ${name.padEnd(10)} draws=${scenes[name].draws} tris=${scenes[name].tris} meshes=${scenes[name].meshes} counts=${JSON.stringify(scenes[name].counts)} sb=${JSON.stringify(scenes[name].sb)}`);
   }

@@ -1,29 +1,26 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
-import { wrap } from 'comlink';
 import {
-  Color,
   DynamicDrawUsage,
+  LAMBERT_ENV,
   MeshLambertMaterial,
   Object3D,
-  Sphere,
-  SphereGeometry,
-  SRGBColorSpace,
-  Vector3,
-} from 'three';
-import { SatVegEngine } from '@/lib/fly/toy-world/sat-veg-engine';
-import {
-  GLOBE,
   PARCEL_HOMES,
   SAT_AMBIENT,
   SAT_GROUND_LIFE,
   SAT_SHADOWS,
   SAT_TINT,
   SAT_VEG,
+  SRGBColorSpace,
   SUBURB_NIGHT,
   SURFACE_CALM,
+  Sphere,
+  SphereGeometry,
+  Vector3,
+  useEffect,
+  useMemo,
+  useRef } from 'react'; import { useFrame } from '@react-three/fiber'; import { wrap } from 'comlink'; import {   Color,
+  } from 'three'; import { SatVegEngine } from '@/lib/fly/toy-world/sat-veg-engine'; import {   GLOBE,
 } from '@/lib/fly/fly-constants';
 import { applyBendAnchor, getRimColor } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
@@ -203,7 +200,15 @@ export function SatVegLayer({ runtime, flight }) {
   // pool is ~126k tris for the whole world's vegetation, in ONE draw.
   const geometry = useMemo(() => new SphereGeometry(1, 7, 4), []);
   const material = useMemo(() => {
+    // R24 C (LAMBERT_ENV, recon WB-7): three r185 applies `scene.environment`
+    // to Lambert (WebGLPrograms.js:60-63) and Lambert's defaults are
+    // `combine = MultiplyOperation`, `reflectivity = 1` — a FULL-STRENGTH
+    // mirror lookup of the HDRI on every surface. Roofs take the zenith
+    // colour, facades take the horizon band, and the twilight HDRI's bright
+    // azimuth band lights one facade direction after dark. Uniform-only: a
+    // material PARAMETER, so the program and the cache key are unmoved.
     const m = new MeshLambertMaterial({ vertexColors: false });
+    if (LAMBERT_ENV.enabled) m.reflectivity = LAMBERT_ENV.reflectivity;
     applyBendAnchor(m); // existing variant, unmodified — no new cache key
     return m;
   }, []);

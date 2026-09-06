@@ -9,6 +9,7 @@ import {
   DataTexture,
   DynamicDrawUsage,
   MeshBasicMaterial,
+  MeshLambertMaterial,
   MeshToonMaterial,
   NearestFilter,
   Object3D,
@@ -16,7 +17,7 @@ import {
   SphereGeometry,
 } from 'three';
 import { buildPoiList } from '@/lib/fly/poi-data';
-import { LANDMARKS_3D, TOY_WORLD } from '@/lib/fly/fly-constants';
+import { LAMBERT_ENV, LANDMARKS_3D, ONE_SUN, TOY_WORLD } from '@/lib/fly/fly-constants';
 import { PALETTE } from '@/lib/fly/toy-world/toy-palette';
 import { applyBendAnchor } from '@/lib/fly/toy-world/world-bend';
 import { isMonumentSuppressed, monumentSuppressionEpoch } from '@/lib/fly/monument-models';
@@ -124,6 +125,34 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
       // by a role/height modulation — base grime, sky bounce, light-catching
       // cornices — without introducing a single hue. The toy material below
       // keeps its own neon vertex palette, untouched.
+      // R24 C (ONE_SUN, recon L3 fix 2): satellite monuments become
+      // MeshLambert. Same draw count, same vertex-colour value palette, same
+      // stone tint — but MeshToon is one of the materials three r185 gives NO
+      // environment map to (WebGLPrograms.js:60-63 lists Standard/Lambert/Phong
+      // only), so a Toon monument was lit by the single directional and nothing
+      // else while every building beside it took the HDRI. That is the "stepped
+      // clay on a photograph" read AND the R20 §5b.4 Taj night residual (+25.0
+      // blue-minus-red vs a +18.4 baseline: at night the cool key WAS its whole
+      // light). Lambert takes the same IBL the buildings take, so the monument
+      // and its neighbours finally agree about where the light is.
+      // The gradient ramp is dropped WITH the material class (a Lambert has no
+      // gradientMap) — the banding it provided came from the toon ramp, and the
+      // vertex-colour value modulation R18 added carries the form instead.
+      if (ONE_SUN.enabled && ONE_SUN.monumentsLambert) {
+        ramp.dispose();
+        const ml = new MeshLambertMaterial({
+          color: LANDMARKS_3D.satStyle.color,
+          vertexColors: true,
+        });
+        // Coupled to LAMBERT_ENV (recon WB-7): three's Lambert defaults are
+        // combine=MultiplyOperation / reflectivity=1, i.e. a mirror-reflection
+        // lookup of the environment at full strength. Left at the default a
+        // monument would take a view-dependent sky tint the buildings around it
+        // are about to stop taking. Same knob, same block, one contract.
+        if (LAMBERT_ENV.enabled) ml.reflectivity = LAMBERT_ENV.reflectivity;
+        applyBendAnchor(ml);
+        return ml;
+      }
       const m = new MeshToonMaterial({
         color: LANDMARKS_3D.satStyle.color,
         gradientMap: ramp,

@@ -17,17 +17,21 @@ import {
   BloomEffect,
   BrightnessContrastEffect,
   DepthOfFieldEffect,
+  EdgeDetectionMode,
   HueSaturationEffect,
   MaskFunction,
   NoiseEffect,
   SMAAEffect,
+  SMAAPreset,
   ToneMappingEffect,
   ToneMappingMode,
   VignetteEffect,
 } from 'postprocessing';
 import {
   AERIAL_PERSPECTIVE,
+  DEPTH_FIX,
   FLIGHT,
+  POST_ORDER,
   SKY,
   SKY_LIVE,
   SPEED_FEEL,
@@ -62,6 +66,55 @@ const TONE_MODES = {
 };
 
 const lerp = (a, b, t) => a + (b - a) * t;
+
+// ---------------------------------------------------------------------------
+// R24 C (DEPTH_FIX, recon L2 / FL-07) — the reversed-depth DOUBLE CONVERSION.
+//
+// This canvas runs `reversedDepthBuffer: true` (FlyCanvas.jsx:100), so three
+// r185 injects `#define USE_REVERSED_DEPTH_BUFFER` into every non-raw
+// ShaderMaterial program (three.module.js:6829/:6999 off the renderer's depth
+// state at :7495) AND its packing chunk switches `perspectiveDepthToViewZ` to
+// the reversed-input formula (:463 — `(near*far)/((near-far)*depth-near)`,
+// which expects the RAW reversed value).
+//
+// postprocessing 6.39.2's CircleOfConfusionMaterial (index.js:4939) ALSO
+// un-reverses, in its own readDepth, under the same define. Two conversions,
+// then a formula that wanted zero: every fragment reconstructs at ~-2.5 m
+// (= -cameraNear), which is why toy-high DoF is a flat ~0.177 CoC over the
+// whole frame instead of a sharp 700 m band. Proven numerically in
+// `scripts/r24-c-depth-roundtrip-proof.mjs`.
+//
+// The fix is to delete the library's un-reverse from THIS material instance so
+// the raw reversed value reaches three's reversed-aware formula. It is safe on
+// a device that did NOT get a reversed buffer: the define is absent there, the
+// `#elif` branch never ran, and removing its body changes nothing.
+//
+// `getViewPosition` needs no patch, and that is worth stating because it looks
+// wrong: it builds `vec3(uv, depth) * 2.0 - 1.0`, which is the WebGL [-1,1]
+// NDC-z convention while reversed depth runs zero-to-one clip control. But row
+// 2 of the inverse of three's perspective matrix is `[0, 0, 0, -1]` — the
+// reconstructed view Z comes from the CLIP W, i.e. from `viewZ`, and the
+// bogus NDC z multiplies a zero. X and Y likewise scale by w alone. So the
+// reconstruction is exact once viewZ is, and the one-token deletion is the
+// whole fix.
+const COC_UNREVERSE = '\ndepth=1.0-depth;';
+
+/** Patch one DepthOfFieldEffect's CoC material. Idempotent; never throws. */
+function patchDofDepth(effect) {
+  if (!DEPTH_FIX.enabled || !effect) return effect;
+  try {
+    const m = effect.cocMaterial;
+    if (!m || m.userData.__r24DepthFix) return effect;
+    if (m.fragmentShader.includes(COC_UNREVERSE)) {
+      m.fragmentShader = m.fragmentShader.replace(COC_UNREVERSE, '\n');
+      m.needsUpdate = true;
+    }
+    m.userData.__r24DepthFix = true;
+  } catch {
+    // A library shape change must cost a blur band, never a boot.
+  }
+  return effect;
+}
 
 /**
  * ROUND 21 (A GOVERNOR, S2/S4) — the post chain as DATA.
@@ -186,6 +239,7 @@ export function buildPassList(style, tier, ctx = {}) {
         el: () => (
           <DepthOfField
             key="toy-dof"
+            ref={ctx.setDof}
             worldFocusDistance={TOY.dofFocusM}
             worldFocusRange={TOY.dofRangeM}
             bokehScale={TOY.dofBokeh}
@@ -210,7 +264,10 @@ export function buildPassList(style, tier, ctx = {}) {
             height: undefined,
           });
           if (e.maskPass) e.maskPass.maskFunction = MaskFunction.MULTIPLY_RGB_SET_ALPHA;
-          return e;
+          // R24 C (DEPTH_FIX): the warm twin must carry the SAME CoC fragment
+          // text as production or the pre-warm compiles a program the real
+          // chain never uses — the el()/raw() contract in this file's header.
+          return patchDofDepth(e);
         },
       });
     }
@@ -235,19 +292,99 @@ export function buildPassList(style, tier, ctx = {}) {
     el: () => <Vignette key="vignette" eskil={false} offset={0.25} darkness={0.55} />,
     raw: () => new VignetteEffect({ eskil: false, offset: 0.25, darkness: 0.55 }),
   });
-  list.push({
-    id: 'smaa',
-    el: () => <SMAA key="smaa" />,
-    raw: () => new SMAAEffect({}),
-  });
-  if (toneMode != null) {
-    list.push({
-      id: 'tone',
-      el: () => <ToneMapping key="tone" mode={toneMode} />,
-      raw: () => new ToneMappingEffect({ mode: toneMode }),
-    });
+  list.push(smaaSpec(ctx));
+  if (toneMode != null) list.push(toneSpec(toneMode));
+
+  // ── R24 C (POST_ORDER, recon L6) ────────────────────────────────────────
+  // The chain above is R21's, verbatim, and it is what ships with the flag
+  // off. The reorder is expressed as a PERMUTATION of that same descriptor
+  // list rather than as a second list, so the el()/raw() twins cannot drift
+  // apart (Effects.jsx's whole contract: the pre-warm compiles `raw`, and if
+  // it stops matching `el` the warm compiles a program production never uses).
+  return POST_ORDER.enabled ? reorderForDisplaySpace(list) : list;
+}
+
+/**
+ * SMAA descriptor. With POST_ORDER on it is OUR instance mounted as a
+ * <primitive>, not drei's <SMAA>: drei's wrapper spreads constructor options
+ * back onto the effect as R3F props (`applyProps` would try `effect.preset =`,
+ * which SMAAEffect exposes only as `applyPreset`), so the option-carrying
+ * element and the raw() twin could not be built the same way through it.
+ */
+function smaaSpec(ctx) {
+  if (!POST_ORDER.enabled) {
+    return { id: 'smaa', el: () => <SMAA key="smaa" />, raw: () => new SMAAEffect({}) };
   }
-  return list;
+  const opts = {
+    preset: SMAAPreset[String(POST_ORDER.smaaPreset).toUpperCase()] ?? SMAAPreset.HIGH,
+    // LUMA over the default COLOR: the input is now TONE-MAPPED and bounded to
+    // [0,1] (see reorderForDisplaySpace), so a luma detector is both cheaper
+    // and better-conditioned. On the pre-R24 chain it would have been reading
+    // scene-linear HDR, where an emissive at 8.0 swamps every real edge.
+    edgeDetectionMode: EdgeDetectionMode.LUMA,
+  };
+  return {
+    id: 'smaa',
+    el: () => <primitive key="smaa" object={ctx.smaa} dispose={null} />,
+    raw: () => new SMAAEffect(opts),
+    opts,
+  };
+}
+
+function toneSpec(toneMode) {
+  return {
+    id: 'tone',
+    el: () => <ToneMapping key="tone" mode={toneMode} />,
+    raw: () => new ToneMappingEffect({ mode: toneMode }),
+  };
+}
+
+/**
+ * R24 C (POST_ORDER, recon L6) — move the filmic curve BEFORE the grade and
+ * leave SMAA last.
+ *
+ * R21 order: bloom → speed → aerial → grade → vignette → SMAA → ACES.
+ * R24 order: bloom → speed → aerial → ACES → grade → vignette → SMAA.
+ *
+ * Three separate defects, one permutation:
+ *
+ *  (1) The grade preceded the curve. HueSaturation / BrightnessContrast /
+ *      WhiteBalance all declare `inputColorSpace = SRGBColorSpace`, so the
+ *      merged pass encodes to sRGB before them and decodes after — but it was
+ *      encoding SCENE-LINEAR HDR, which is unbounded. A contrast knob applied
+ *      to a value of 8.0 and then re-curved by ACES is not a contrast knob; it
+ *      is a function of how bright the emissives happen to be. After the curve
+ *      the values are in [0,1] and the knobs behave like knobs.
+ *  (2) SMAA's edge detector saw the same unbounded values, so dark-region
+ *      edges (night window grids, road ribbons) were compressed below its
+ *      threshold and emissive edges were over-weighted. It now runs on the
+ *      tone-mapped signal.
+ *  (3) Nothing dithered the final 8-bit encode. See `finishPassChain`.
+ *
+ * BLOOM STAYS FIRST and stays pre-tonemap — that placement is correct (it is
+ * a lens/sensor effect on scene radiance) and R21's bloom luma gates were
+ * calibrated with it there. AERIAL STAYS PRE-CURVE for the R19 reason: the
+ * tile band and the SkyDome rim are baked in the SCENE render, so a post haze
+ * mixing toward the same rim colour has to happen in the same space they did
+ * or the horizon steps. DOF also stays pre-curve — a lens blur is radiance
+ * averaging, and averaging after a filmic curve darkens bright bokeh.
+ *
+ * PASS COUNT CAN ONLY FALL, never rise: the tone descriptor stops being a
+ * trailing non-convolution effect of its own and merges into the grade group.
+ * Satellite high 4 → 3 EffectPasses, toy high 6 → 5. That matters because
+ * Owens has zero draw headroom at 261.
+ */
+const PRE_CURVE = new Set(['bloom', 'speed', 'aerial', 'toy-dof']);
+
+function reorderForDisplaySpace(list) {
+  const tone = list.find((p) => p.id === 'tone');
+  if (!tone) return list; // toneName 'None' — nothing to move
+  const smaa = list.find((p) => p.id === 'smaa');
+  const pre = list.filter((p) => PRE_CURVE.has(p.id));
+  const post = list.filter(
+    (p) => !PRE_CURVE.has(p.id) && p.id !== 'tone' && p.id !== 'smaa'
+  );
+  return [...pre, tone, ...post, ...(smaa ? [smaa] : [])];
 }
 
 /**
@@ -335,6 +472,23 @@ export const Effects = memo(function Effects({ runtime }) {
   // it. Its uniforms are fed by FlyScene's -50 block through module setters, so
   // the instance itself is constructed once and never reconfigured.
   const aerial = useMemo(() => new AerialPerspectiveEffect(), []);
+
+  // ---- R24 C (POST_ORDER / DEPTH_FIX) -----------------------------------
+  // The SMAA instance we own, built through `smaaSpec().raw()` — literally the
+  // same constructor call the pre-warm makes, so the merged program can never
+  // differ between the warmed chain and the live one. Null (and unused) with
+  // the flag off, where drei's <SMAA> stays exactly as R21 shipped it.
+  const smaa = useMemo(() => (POST_ORDER.enabled ? smaaSpec({}).raw() : null), []);
+  useEffect(() => () => smaa?.dispose?.(), [smaa]);
+  // DEPTH_FIX reaches drei's <DepthOfField> through a CALLBACK ref, for the
+  // reason the bloom handle above documents: the wrapper memoises its
+  // constructor args on JSON.stringify(restProps), and JSON.stringify drops
+  // functions — an object ref would land the (circular) effect instance in
+  // that stringify. drei's DepthOfField is forwardRef onto its <primitive>, so
+  // this is the effect itself. patchDofDepth is idempotent and never throws.
+  const setDof = useCallback((o) => {
+    if (o) patchDofDepth(o);
+  }, []);
 
   // ---- Round 19 (E SLIPSTREAM): speed lines -----------------------------
   // HIGH TIER ONLY, and that is a §1 decision-2 constraint rather than taste:
@@ -449,11 +603,24 @@ export const Effects = memo(function Effects({ runtime }) {
         toneName,
         speedMount: speedMountPin,
         setBloom,
+        setDof,
         speedLines,
         aerial,
         whiteBalance,
+        smaa,
       }).map((p) => p.el()),
-    [mapStyle, qualityTier, toneName, speedMountPin, setBloom, speedLines, aerial, whiteBalance]
+    [
+      mapStyle,
+      qualityTier,
+      toneName,
+      speedMountPin,
+      setBloom,
+      setDof,
+      speedLines,
+      aerial,
+      whiteBalance,
+      smaa,
+    ]
   );
 
   return (

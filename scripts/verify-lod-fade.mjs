@@ -22,9 +22,15 @@ import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { register } from 'node:module';
 import { ShaderChunk } from 'three';
-import { applyBendFade, applyHillshade } from '../lib/fly/toy-world/world-bend.js';
-import { lodUvRect, lodStats } from '../lib/fly/lod-crossfade.js';
+// R24 C gave world-bend.js its first import (`@/lib/fly/fly-constants`), which
+// node cannot resolve on its own. Registering the alias hook keeps this gate on
+// the REAL module rather than downgrading it to source-parsing — and text
+// identity is the whole claim here, so parsing would not do.
+register('./_alias-loader.mjs', import.meta.url);
+const { applyBendFade, applyHillshade, r24VariantKey } = await import('../lib/fly/toy-world/world-bend.js');
+const { lodUvRect, lodStats } = await import('../lib/fly/lod-crossfade.js');
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let pass = 0, fail = 0;
@@ -141,7 +147,17 @@ ok('flag-off uniform set has no uLodFade* entries',
   !Object.keys(off.shader.uniforms).some((k) => k.startsWith('uLodFade')),
   Object.keys(off.shader.uniforms).filter((k) => k.startsWith('uLodFade')).join(',') || '(none)');
 ok('flag-off FINAL tile key is the R19 key', off.key === 'world-bend-fade-hill-r19', off.key);
-ok('flag-on FINAL tile key carries the -d24 suffix', on.key === 'world-bend-fade-hill-r19-d24', on.key);
+// R24: the FINAL tile key is the first key two owners bump, so it comes from
+// the shared `r24VariantKey` helper with a FIXED token order — e (ONE_SUN) /
+// f (TERRAIN_LIGHT) / a (AERIAL_LAW) / l (LOD_CROSSFADE). With only D's slot
+// present the key must be exactly the base plus 'l'; the token must NOT move
+// position, or a merged tree would serve one owner's program for another's.
+ok("flag-on FINAL tile key carries LOD_CROSSFADE's token 'l' via the shared helper",
+  on.key === 'world-bend-fade-hill-r19-l24', on.key);
+ok("the token is LAST in the fixed order (e/f/a/l) so C's tokens keep their places",
+  r24VariantKey('base', [[true, 'e'], [true, 'f'], [true, 'a'], [true, 'l']]) === 'base-efal24' &&
+  r24VariantKey('base', []) === 'base',
+  r24VariantKey('base', [[true, 'e'], [false, 'f'], [false, 'a'], [true, 'l']]));
 ok('flag-on wires exactly the three fade uniforms',
   ['uLodFadeMix', 'uLodFadeUV', 'uLodFadeMap'].every((k) => on.shader.uniforms[k]) &&
   on.shader.uniforms.uLodFadeMix === slot.mix && on.shader.uniforms.uLodFadeMap === slot.map);

@@ -20,6 +20,7 @@ import {
   setEdgeFade,
   setEdgeFadeRGB,
   setHillDir,
+  setHillElev,
   setHillshade,
   setHillV2,
   setMicroDetail,
@@ -55,6 +56,7 @@ import {
   setSkyWeather,
   clearSkyWeather,
   setSkySun,
+  getSkySunDir,
 } from './SkyDome';
 import { PoiLetters } from './PoiLetters';
 import { TrafficTracers } from './TrafficTracers';
@@ -79,6 +81,7 @@ import { DEG2RAD, expApproach, expApproachAngle, mercatorScale, wrapAngle } from
 import { CrashSystem, respawnPose } from '@/lib/fly/crash-system';
 import { crashStakesOn } from '@/lib/fly/fly-settings';
 import { computeSun, moonDirFromSun, nightWeight } from '@/lib/fly/sun-model';
+import { installShadowKernel, shadowKernelState } from '@/lib/fly/shadow-kernel';
 import { trackSpotAttrs } from '@/lib/fly/spot-attrs';
 import {
   applyWeatherAtmo,
@@ -92,6 +95,8 @@ import {
   AERIAL_PERSPECTIVE,
   BOOST_METER,
   CLOUDS,
+  ONE_SUN,
+  SHADOW_CALM,
   CRASH,
   GLOBE,
   HILLSHADE,
@@ -158,6 +163,72 @@ const _moonDir = [0, 1, 0]; // scratch (no per-cadence allocation)
 // Round 16: the overcast lid colours, derived from the (already grey-mixed)
 // rim triple each frame — scratch, no allocation.
 const _lidZenith = [0, 0, 0];
+// R24 C (ONE_SUN, recon L3): scratch for the moon-key blend and the ONE audit
+// record every sun consumer is compared against. `live` stays false until the
+// satellite key-light branch has actually run once, so verify-one-sun can tell
+// "the vectors disagree" from "nothing has published a vector yet".
+const _moonKeyDir = [0, 1, 0];
+const _sunAudit = { live: false, az: 0, elDeg: 90, moonK: 0 };
+
+// R24 C (SHADOW_CALM): three's shadow ShaderChunk is patched ONCE, here, in the
+// module body — before any material in this scene can compile, which is the
+// whole reason a ShaderChunk edit is cheaper than three's CSM.js (no material
+// is touched, so no FINAL cache key and no prewarm entry moves). Exact no-op
+// with the flag off.
+installShadowKernel();
+
+const _snapV = new Vector3();
+/**
+ * R24 C (SHADOW_CALM, recon FL-12) — TEXEL SNAP.
+ *
+ * The shadow ortho follows the aircraft at whatever sub-texel offset the flight
+ * model produces, so every frame re-rasterises the same silhouettes into a
+ * shifted grid and the filtered edge wobbles. Snapping the light's TARGET to a
+ * whole shadow texel in LIGHT space makes the map's texel grid world-stationary
+ * while the sun holds still, which is what turns a per-frame re-raster into a
+ * once-per-texel-of-travel one.
+ *
+ * The basis comes from the shadow camera's OWN `matrixWorldInverse` (Camera
+ * overrides updateMatrixWorld, so three keeps it current) rather than from a
+ * hand-built one: a basis that differs from three's by a roll about the light
+ * axis would quantise onto a ROTATED grid and snap to nothing. It is one frame
+ * stale, and the basis only changes when the sun moves — a 60 s cadence — so
+ * "one frame stale" is exact in every frame that matters. Before the first
+ * shadow update the matrix is identity and the snap lands in world axes, which
+ * is harmless for exactly one frame.
+ */
+function snapToShadowTexel(sun, tx, ty, tz, radiusM, mapSize) {
+  const cam = sun.shadow?.camera;
+  if (!cam || !mapSize) return null;
+  const texel = (2 * radiusM) / mapSize;
+  if (!(texel > 0)) return null;
+  _snapV.set(tx, ty, tz).applyMatrix4(cam.matrixWorldInverse);
+  _snapV.x = Math.round(_snapV.x / texel) * texel;
+  _snapV.y = Math.round(_snapV.y / texel) * texel;
+  _snapV.applyMatrix4(cam.matrixWorld);
+  return _snapV;
+}
+
+/**
+ * R24 C (ONE_SUN, recon L3 fix 4 / L8 fix c) — the hillshade's ELEVATION
+ * weight. Esri imagery already carries its capture-date sun; a full-strength
+ * second directional term at midday is a literal second sun and it is the
+ * loudest half of the "game-y" read. So the live term is DEMOTED to dayK at
+ * and above `dayDeg`, restored to 1.0 at and below `lowDeg` (dusk/night, where
+ * the baked shading is wrong anyway and the live term is the only relief cue),
+ * and smoothstepped between. Returns exactly 1 with the flag off — the R21
+ * strength, unmoved.
+ */
+function hillElevWeight(elDeg) {
+  if (!ONE_SUN.enabled) return 1;
+  const h = ONE_SUN.hill;
+  if (!Number.isFinite(elDeg)) return 1;
+  if (elDeg <= h.lowDeg) return 1;
+  if (elDeg >= h.dayDeg) return h.dayK;
+  let t = (elDeg - h.lowDeg) / Math.max(1e-6, h.dayDeg - h.lowDeg);
+  t = t * t * (3 - 2 * t);
+  return 1 + (h.dayK - 1) * t;
+}
 const _spotPos = new Vector3();
 const _warpPos = new Vector3();
 
@@ -273,8 +344,9 @@ const MOODS = {
  * problem, a flat ground-anchored disc that must follow the mini-planet
  * curvature. Without it the 900 m rim floats ~4 m over the bent terrain.
  */
-function SatShadowCatcher({ flight, origin }) {
+function SatShadowCatcher({ flight, origin, runtime }) {
   const ref = useRef();
+  const gateRef = useRef({ n: 0, on: false });
   const gl = useThree((s) => s.gl);
   const material = useMemo(() => {
     const m = new ShadowMaterial({
@@ -289,12 +361,8 @@ function SatShadowCatcher({ flight, origin }) {
       // Authoring the units with the opposite sign lands both positive, i.e.
       // both "toward the eye", which is what a catcher under terrain wants.
       // Same one-line fix as SatTintLayer's tint drape (see its offsetUnits).
-      polygonOffsetUnits:
-        SURFACE_CALM.enabled &&
-        SURFACE_CALM.depthOffsetFix &&
-        gl?.capabilities?.reversedDepthBuffer === true
-          ? 1
-          : -1,
+      // R24 C (recon T11): the same rule, from the one implementation.
+      polygonOffsetUnits: offsetUnits(gl, -1),
     });
     applyBend(m);
     return m;
@@ -309,6 +377,44 @@ function SatShadowCatcher({ flight, origin }) {
       flight.groundElev,
       flight.pos.z - origin.anchor.z
     );
+    // R24 C (SHADOW_CALM, recon L5) — THE ARM GATE, and why Owens is 0 BY
+    // CONSTRUCTION rather than by measurement.
+    //
+    // R19 built this disc and shipped it off because an unconditional +1 draw
+    // breaks the Owens ceiling, which has no headroom at 261. The gate is
+    // therefore not "is it enabled" but "is there anything to catch": a
+    // shadow catcher under empty terrain draws a transparent disc that
+    // receives nothing. `engine.queryColumns` is the R18 collision index —
+    // bucket lookups, no allocation beyond the result, and it answers with an
+    // EMPTY ARRAY when nothing has streamed (its own docstring), which over
+    // Owens Valley is every frame of every pose. So the draw is +1 in a city
+    // and +0 over empty ground without anyone measuring anything.
+    //
+    // The AGL gate is the second half: at cruise the disc is a sub-pixel speck
+    // under the aircraft and its shadows are invisible, so it is pure fill.
+    // Cadence, not per-frame: the answer changes at streaming speed, not at
+    // frame speed.
+    if (SHADOW_CALM.enabled) {
+      const g = gateRef.current;
+      if (g.n-- <= 0) {
+        g.n = SHADOW_CALM.catcher.everyNFrames;
+        const agl = flight.pos.y - flight.groundElev;
+        let on = agl >= 0 && agl < SHADOW_CALM.catcher.aglM;
+        if (on) {
+          const q = runtime?.satBuildings?.queryColumns;
+          on = q
+            ? q.call(
+                runtime.satBuildings,
+                flight.pos.x,
+                flight.pos.z,
+                SHADOW_CALM.catcher.casterRangeM
+              ).length > 0
+            : false;
+        }
+        g.on = on;
+      }
+      if (m.visible !== g.on) m.visible = g.on;
+    }
   }, -49);
   return (
     <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} receiveShadow material={material}>
@@ -395,15 +501,26 @@ export function FlyScene({ runtime }) {
         radiusM: SAT_SHADOWS.orthoRadiusM,
         farM: SAT_SHADOWS.farM,
         bias: SAT_SHADOWS.bias,
-        normalBias: SAT_SHADOWS.normalBias,
+        // R24 C (SHADOW_CALM): the peter-panning offset comes down once the
+        // reversed-depth bias SIGN is right (lib/fly/shadow-kernel.js) — the
+        // 2 m / 4 m values were buying cover for a bias pushing the wrong way.
+        normalBias:
+          SHADOW_CALM.enabled && SHADOW_CALM.biasSignFix
+            ? SHADOW_CALM.satNormalBias
+            : SAT_SHADOWS.normalBias,
       }
     : {
         mapSize: TOY.shadowMapSize[qualityTier] ?? TOY.shadowMapSize.medium,
         radiusM: TOY.shadowRadiusM,
         farM: 8000,
         bias: -0.0002,
-        normalBias: 4,
+        normalBias:
+          SHADOW_CALM.enabled && SHADOW_CALM.biasSignFix ? SHADOW_CALM.toyNormalBias : 4,
       };
+  // Render-time mirror so the -50 frame loop can read this frame's rig without
+  // a stale closure (the satShadowRef pattern, three lines above).
+  const shadowRigRef = useRef(shadowRig);
+  shadowRigRef.current = shadowRig;
   useEffect(() => {
     if (process.env.NODE_ENV !== 'development' || typeof window === 'undefined') return;
     // verify-aerial's A/B leg: the ONE harness that un-pins the shadows.
@@ -810,6 +927,7 @@ export function FlyScene({ runtime }) {
     [engine]
   );
 
+<<<<<<< HEAD
   // R24 D (LOD_CROSSFADE): install the crossfade hook into the vendored
   // three-tile (VENDOR.md patches 1-3) for the life of this engine. Installed
   // unconditionally: with the flag off every call returns immediately after
@@ -856,14 +974,33 @@ export function FlyScene({ runtime }) {
       if (window.__flyTerra?.__owner === owner) delete window.__flyTerra;
     };
   }, [engine]);
+=======
+  // R24 C (ONE_SUN): the stashed style/tier hillshade base + the last TRUE sun
+  // elevation the day cycle resolved (90 = "no sun published yet" ⇒ dayK, the
+  // same answer a noon sun gives, so a pre-spawn frame is never brighter than
+  // the settled one). Declared next to their first writer.
+  const hillBaseRef = useRef(null);
+  const hillElDegRef = useRef(90);
+>>>>>>> 9783586
 
   // Hillshade style gate (live uniform — no re-patch, survives hot-swaps).
   // Round 11: tier-aware strength (uniform flip, free on degrade).
   useEffect(() => {
     const sat = mapStyle === 'satellite';
-    setHillshade(
-      sat ? (HILLSHADE.strengthByTier[qualityTier] ?? HILLSHADE.strength) : 0
-    );
+    // R24 C (ONE_SUN): the style/tier BASE is stashed and the elevation weight
+    // is applied on top, the sunBaseRef/ocDim idiom that keeps two writers from
+    // compounding — this effect and the day-cycle effect below both multiply
+    // the SAME stashed base, never each other's output. Weight is exactly 1
+    // with the flag off, so this is the R21 call with an extra `* 1`.
+    hillBaseRef.current = sat
+      ? (HILLSHADE.strengthByTier[qualityTier] ?? HILLSHADE.strength)
+      : 0;
+    setHillshade(hillBaseRef.current);
+    // R24 C (ONE_SUN): the elevation weight rides its OWN uniform — never
+    // multiplied into `strength`, which is the STYLE/TIER gate and carries
+    // verify-sat-depth's frozen "satellite default 0.55" assertion. Exactly 1
+    // with the flag off.
+    setHillElev(hillElevWeight(hillElDegRef.current));
     // Round 13 (P4): hillshade v2 (slope AO + slope saturation) rides the same
     // tier/style gate; both live INSIDE the uHillStrength envelope so the
     // verify-sat-depth strength-0 A/B toggle captures them and toy stays 0.
@@ -948,6 +1085,16 @@ export function FlyScene({ runtime }) {
       // below the graze floor (night). Round 16: same convention, real sun.
       const cosEl = Math.cos(sun.el);
       setHillDir(-Math.sin(sun.az) * cosEl, Math.sin(sun.el), Math.cos(sun.az) * cosEl);
+      // R24 C (ONE_SUN): the hillshade's WEIGHT now moves with the sun too —
+      // TRUE elevation (computeSun clamps `el` into [8.6°, 51.6°] and can never
+      // report a low or negative sun; the R19 lesson). Multiplies the stashed
+      // style/tier base, never the live uniform, so this cadence and the
+      // style/tier effect can run in either order without compounding.
+      hillElDegRef.current = trueElevationDeg(sun.sinEl);
+      // Pure uniform write on the existing 60 s cadence; `strength` is left to
+      // the style/tier effect alone, so the two writers own disjoint values and
+      // cannot compound (the sunBaseRef/ocDim rule, applied structurally).
+      setHillElev(hillElevWeight(hillElDegRef.current));
       // Round 16: satellite's night sky. nightT is an inverse smoothstep of
       // frac (exactly 0 in daylight → the dome's new terms vanish), and the
       // moon rides the ANTI-solar hour angle so it rises as the sun sets.
@@ -1762,14 +1909,36 @@ export function FlyScene({ runtime }) {
     const sun = sunRef.current;
     if (sun && TOY.shadows && flyState.mapStyle === 'toy') {
       const dir = (MOODS[flyState.mapStyle] ?? MOODS.satellite).lightDir;
-      sun.position.set(
-        rpx + dir[0] * 2500,
-        flight.pos.y + dir[1] * 2500,
-        rpz + dir[2] * 2500
-      );
-      sunTarget.position.set(rpx, flight.pos.y, rpz);
+      let tx = rpx;
+      let ty = flight.pos.y;
+      let tz = rpz;
+      // R24 C (SHADOW_CALM): snap the follow target to a whole shadow texel.
+      // Same rig, same frustum, same tap count — the map just stops
+      // re-rasterising into a shifted grid every frame.
+      if (SHADOW_CALM.enabled && SHADOW_CALM.texelSnap) {
+        const sp = snapToShadowTexel(sun, tx, ty, tz, shadowRigRef.current.radiusM, shadowRigRef.current.mapSize);
+        if (sp) {
+          tx = sp.x;
+          ty = sp.y;
+          tz = sp.z;
+        }
+      }
+      sun.position.set(tx + dir[0] * 2500, ty + dir[1] * 2500, tz + dir[2] * 2500);
+      sunTarget.position.set(tx, ty, tz);
       sunTarget.updateMatrixWorld();
-    } else if (sun && satShadowRef.current && flyState.mapStyle === 'satellite') {
+    } else if (
+      sun &&
+      flyState.mapStyle === 'satellite' &&
+      // R24 C (ONE_SUN, recon L3): the key light follows runtime.sun at EVERY
+      // tier. Before this the position write lived INSIDE the high-tier shadow
+      // gate, so medium and low satellite kept MOODS.satellite.lightDir — the
+      // kloofendal HDRI's brightest texel, [0.555, 0.742, 0.377] — as "the
+      // sun", all day and all night, while the hillshade, the dome lobe and the
+      // HDRI each pointed somewhere else. Only the SHADOW-CAMERA props keep the
+      // high-tier gate (they are JSX, already driven by satShadowsOn), so this
+      // adds no shadow pass anywhere. Flag off = the R21 condition exactly.
+      (ONE_SUN.enabled || satShadowRef.current)
+    ) {
       // Round 19 (B): the SATELLITE shadow rig — the same small-ortho follow,
       // with two deliberate differences from the toy moon.
       // (1) It centres on the GROUND under the player, not on the player.
@@ -1784,19 +1953,80 @@ export function FlyScene({ runtime }) {
       //     appears. The hillshade applies the same floor for the same reason.
       const ss = runtime.sun;
       if (ss) {
-        const el = Math.max(SAT_SHADOWS.minElRad, ss.el);
+        // R24 C (ONE_SUN): the key's ELEVATION becomes the TRUE one.
+        // `runtime.sun.el` is clamped into the HILLSHADE band [8.6°, 51.6°] —
+        // a RELIEF-LEGIBILITY device (never flatten at noon, never graze at
+        // night), not a fact about where the sun is. Using it as the key
+        // direction capped every summer noon at 51.6° while the dome's golden
+        // lobe used the unclamped truth, which is two of the four suns L3
+        // counts. The grazing floor is kept, but ONLY while the shadow camera
+        // is actually casting: it exists because a near-horizontal ortho
+        // frustum stops containing anything and is where depth precision
+        // fails, which is a statement about the shadow map, not about light.
+        let el;
+        if (ONE_SUN.enabled && Number.isFinite(ss.sinEl)) {
+          const trueEl = Math.asin(Math.min(1, Math.max(-1, ss.sinEl)));
+          el = satShadowRef.current ? Math.max(SAT_SHADOWS.minElRad, trueEl) : trueEl;
+        } else {
+          el = Math.max(SAT_SHADOWS.minElRad, ss.el);
+        }
         const cosEl = Math.cos(el);
         // The SAME basis setHillDir is fed, so a cast shadow and the hillshade
         // it falls across can never disagree about where the sun is.
         const gy = flight.groundElev;
         const d = SAT_SHADOWS.distM;
-        sun.position.set(
-          rpx + -Math.sin(ss.az) * cosEl * d,
-          gy + Math.sin(el) * d,
-          rpz + Math.cos(ss.az) * cosEl * d
-        );
-        sunTarget.position.set(rpx, gy, rpz);
+        let kx = -Math.sin(ss.az) * cosEl;
+        let ky = Math.sin(el);
+        let kz = Math.cos(ss.az) * cosEl;
+        // R24 C (ONE_SUN): THE MOON KEY. Below the horizon `el` is floored at
+        // SAT_SHADOWS.minElRad, so the R21 key sat 8.6° above the horizon at
+        // the SOLAR azimuth — i.e. the night key came from the side of the sky
+        // the sun set on, while SkyDome hangs the moon disc anti-solar
+        // (moonDirFromSun) and the tracer/window night ramps key off the same
+        // moon. Blend the DIRECTION over [fadeStartDeg, fadeFullDeg] of TRUE
+        // elevation (runtime.sun.el is CLAMPED and cannot go negative — the R19
+        // lesson), then renormalise so the light never degenerates mid-blend.
+        // Colour and intensity are untouched: keyColor.night is already
+        // moonlight-cool and verify-sun's intensity contract holds unmoved.
+        if (ONE_SUN.enabled && Number.isFinite(ss.sinEl)) {
+          const mo = ONE_SUN.moon;
+          const elDeg = trueElevationDeg(ss.sinEl);
+          let mk = (mo.fadeStartDeg - elDeg) / Math.max(1e-6, mo.fadeStartDeg - mo.fadeFullDeg);
+          mk = mk < 0 ? 0 : mk > 1 ? 1 : mk;
+          mk = mk * mk * (3 - 2 * mk);
+          if (mk > 0) {
+            moonDirFromSun(ss.az, _moonKeyDir);
+            kx += (_moonKeyDir[0] - kx) * mk;
+            ky += (_moonKeyDir[1] - ky) * mk;
+            kz += (_moonKeyDir[2] - kz) * mk;
+            const kl = Math.hypot(kx, ky, kz) || 1;
+            kx /= kl;
+            ky /= kl;
+            kz /= kl;
+          }
+          _sunAudit.moonK = mk;
+          _sunAudit.elDeg = elDeg;
+        }
+        let tx = rpx;
+        let ty = gy;
+        let tz = rpz;
+        // R24 C (SHADOW_CALM): texel snap, and ONLY while the shadow camera is
+        // actually casting — with ONE_SUN the key-light branch now runs at every
+        // tier, and quantising a light that renders no shadow map would be
+        // arithmetic nobody reads.
+        if (SHADOW_CALM.enabled && SHADOW_CALM.texelSnap && satShadowRef.current) {
+          const sp = snapToShadowTexel(sun, tx, ty, tz, shadowRigRef.current.radiusM, shadowRigRef.current.mapSize);
+          if (sp) {
+            tx = sp.x;
+            ty = sp.y;
+            tz = sp.z;
+          }
+        }
+        sun.position.set(tx + kx * d, ty + ky * d, tz + kz * d);
+        sunTarget.position.set(tx, ty, tz);
         sunTarget.updateMatrixWorld();
+        _sunAudit.az = ss.az;
+        _sunAudit.live = true;
       }
     }
 
@@ -1819,6 +2049,76 @@ export function FlyScene({ runtime }) {
         stats.edgeFadeStartM = ef.startM;
         stats.groundHorizonM = ef.endM;
         stats.aircraft = aircraftStat; // round 17: verify-hangar reads this
+        // R24 C (ONE_SUN, recon L3): THE SUN AUDIT — every consumer's live
+        // direction, read from where that consumer actually stores it, so
+        // verify-one-sun compares vectors instead of re-deriving them from the
+        // same inputs (which would prove nothing). `key` is the directional's
+        // own position minus its target, normalised; `hill` is the world-bend
+        // uniform the tile fragment reads; `dome` is SkyDome's own uSunDir
+        // mirror; `water` is IDENTICAL to `key` by construction (satellite
+        // water is MeshPhong and its specular comes from that one directional
+        // — there is no second light in the rig, FlyScene :1806-1827). Dev
+        // only, on the existing 60-frame cadence, zero production cost.
+        const _sd = getSkySunDir();
+        // The key is read off the LIGHT ITSELF (position − target, normalised),
+        // never off the branch that wrote it: with ONE_SUN off at medium/low
+        // tier — or with the fleet's __flySatShadowOverride=0 pin at any tier —
+        // NO branch writes it at all and it sits on MOODS.satellite.lightDir
+        // forever. That stuck vector IS the RED this gate has to be able to see.
+        let _kx = 0;
+        let _ky = 1;
+        let _kz = 0;
+        if (sunRef.current) {
+          _kx = sunRef.current.position.x - sunTarget.position.x;
+          _ky = sunRef.current.position.y - sunTarget.position.y;
+          _kz = sunRef.current.position.z - sunTarget.position.z;
+          const _kl = Math.hypot(_kx, _ky, _kz) || 1;
+          _kx /= _kl;
+          _ky /= _kl;
+          _kz /= _kl;
+        }
+        stats.sun = {
+          live: _sunAudit.live,
+          az: +_sunAudit.az.toFixed(6),
+          elDeg: +_sunAudit.elDeg.toFixed(4),
+          moonK: +_sunAudit.moonK.toFixed(4),
+          oneSun: ONE_SUN.enabled,
+          style: flyState.mapStyle,
+          tier: flyState.qualityTier,
+          key: [+_kx.toFixed(6), +_ky.toFixed(6), +_kz.toFixed(6)],
+          hill: getHillshade().dir.map((v) => +v.toFixed(6)),
+          hillStrength: +getHillshade().strength.toFixed(4),
+          hillElev: +(getHillshade().elev ?? 1).toFixed(4),
+          hillEffective: +(getHillshade().effective ?? getHillshade().strength).toFixed(4),
+          dome: _sd.live ? _sd.dir.map((v) => +v.toFixed(6)) : null,
+          water: 'key', // one directional in the rig — the same vector by construction
+        };
+        // R24 C (SHADOW_CALM): what the shadow rig is ACTUALLY running — the
+        // patched-or-not kernel state comes from the module that did (or did
+        // not) patch it, never from the flag that asked. `casting` is the
+        // fleet-pin-aware truth: verify-shadow-calm must un-pin
+        // __flySatShadowOverride and prove the pass is reachable.
+        stats.shadow = {
+          ...shadowKernelState(),
+          casting: satShadowRef.current === true,
+          mapSize: shadowRigRef.current.mapSize,
+          radiusM: shadowRigRef.current.radiusM,
+          texelM: +((2 * shadowRigRef.current.radiusM) / shadowRigRef.current.mapSize).toFixed(4),
+          normalBias: shadowRigRef.current.normalBias,
+          bias: shadowRigRef.current.bias,
+          lightPos: sunRef.current
+            ? [
+                +sunRef.current.position.x.toFixed(3),
+                +sunRef.current.position.y.toFixed(3),
+                +sunRef.current.position.z.toFixed(3),
+              ]
+            : null,
+          target: [
+            +sunTarget.position.x.toFixed(3),
+            +sunTarget.position.y.toFixed(3),
+            +sunTarget.position.z.toFixed(3),
+          ],
+        };
       }
       gl.info.reset();
     }
@@ -2021,8 +2321,8 @@ export function FlyScene({ runtime }) {
       )}
       {/* Round 19 (B): the satellite shadow catcher — built, ships OFF (see
           the component header + plan §5's Owens arithmetic). */}
-      {satShadowsOn && SAT_SHADOWS.catcher.enabled && (
-        <SatShadowCatcher flight={flight} origin={origin} />
+      {satShadowsOn && (SAT_SHADOWS.catcher.enabled || SHADOW_CALM.enabled) && (
+        <SatShadowCatcher flight={flight} origin={origin} runtime={runtime} />
       )}
     </>
   );
