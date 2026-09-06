@@ -145,7 +145,14 @@ const CENSUS = () => {
  * screencast cannot.
  */
 const INSTALL_PALE = () => {
-  const S = (window.__pale = { frames: 0, pale: 0, worstMean: 0, hits: [], armed: false });
+  const S = (window.__pale = {
+    frames: 0,
+    pale: 0,
+    worstJump: 0,
+    hits: [],
+    armed: false,
+    baseline: 0,
+  });
   const start = () => {
     // NEVER call canvas.getContext() here.
     //
@@ -165,10 +172,38 @@ const INSTALL_PALE = () => {
     if (!gl) return false;
     const W = 64;
     const buf = new Uint8Array(W * 4);
+    // A ring of recent frames. THE PALE FRAME IS A JUMP, NOT A BRIGHTNESS.
+    //
+    // The first version of this detector flagged "uniformly bright mid-screen
+    // scanline" as pale, and the certification run duly reported 168 pale
+    // frames in 256 — all of them with an IDENTICAL mean of 212.9, i.e. a
+    // sustained bright field, not a one-frame event. The uncontrolled actor
+    // was the SKY: a scanline 55% up the frame spends much of a banked
+    // serpentine looking at it, and a clear daytime sky is uniformly ~213
+    // luma. That is the R17 §7.1 lesson again — a pixel probe must not contain
+    // an actor it does not control — and this time it produced FALSE POSITIVES,
+    // which are worse than the false negatives the header warns about.
+    //
+    // The measured signature (R22.1 C2) is a ONE-FRAME excursion: the scene's
+    // luminance mean goes 0.21 -> 0.85 and back. So the test is against the
+    // recent MEDIAN, not against a constant, and the scanline is taken low in
+    // the frame where the ground is. A sky that fills the crop raises the
+    // median with it and stops being a hit.
+    const RING = 24;
+    const hist = new Float64Array(RING);
+    let n = 0;
+    const median = () => {
+      const k = Math.min(n, RING);
+      if (k < 8) return null; // not enough history to judge a jump
+      const a = Array.prototype.slice.call(hist, 0, k).sort((x, y) => x - y);
+      return a[k >> 1];
+    };
     const tick = () => {
       try {
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        const y = (gl.drawingBufferHeight * 0.55) | 0;
+        // readPixels is bottom-up: 0.25 of the height is LOW on screen, where
+        // the ground is at every pose this gate flies.
+        const y = (gl.drawingBufferHeight * 0.25) | 0;
         const x = ((gl.drawingBufferWidth - W) / 2) | 0;
         gl.readPixels(x, y, W, 1, gl.RGBA, gl.UNSIGNED_BYTE, buf);
         let sum = 0;
@@ -180,15 +215,21 @@ const INSTALL_PALE = () => {
         }
         const mean = sum / W;
         S.frames++;
-        if (mean > S.worstMean) S.worstMean = mean;
-        // A pale frame is UNIFORMLY bright: the measured signature was
-        // lumMean 0.21 -> 0.85 with the whole scanline lifted, L ~ 226 with
-        // the post chain's vignette. A bright sky in the crop would raise the
-        // mean but not the MINIMUM of a mid-screen scanline over ground.
-        if (mean > 180 && min > 150) {
-          S.pale++;
-          S.hits.push({ f: S.frames, mean: +mean.toFixed(1), min });
+        const med = median();
+        if (med !== null) {
+          const jump = mean - med;
+          if (jump > S.worstJump) S.worstJump = jump;
+          S.baseline = med;
+          // A pale frame: far brighter than the recent world, uniformly so,
+          // and absolutely bright. All three, or it is not the thing.
+          if (jump > 60 && min > med + 40 && mean > 180) {
+            S.pale++;
+            if (S.hits.length < 8)
+              S.hits.push({ f: S.frames, mean: +mean.toFixed(1), med: +med.toFixed(1), min: +min.toFixed(1) });
+          }
         }
+        hist[n % RING] = mean;
+        n++;
       } catch {
         /* context lost / not ready */
       }
@@ -294,7 +335,7 @@ async function serpentine(page, ms) {
   const paleRed = await page.evaluate(() => window.__pale);
   info(
     '(4) PALE DETECTOR (probabilistic — absence is NOT proof)',
-    `armed=${paleRed.armed} frames=${paleRed.frames} pale=${paleRed.pale} worstScanlineMean=${paleRed.worstMean.toFixed(1)}` +
+    `armed=${paleRed.armed} frames=${paleRed.frames} pale=${paleRed.pale} worstJumpOverMedian=${paleRed.worstJump.toFixed(1)} baseline=${paleRed.baseline.toFixed(1)}` +
       (paleRed.hits.length ? ` hits=${JSON.stringify(paleRed.hits.slice(0, 4))}` : '')
   );
   console.log(
