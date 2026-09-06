@@ -886,3 +886,21 @@ its first step — so **deleting :182 is the fix**, and passing `pose_` is the
 alternative. Reported to E; not patched here, because the harness is E's file
 and a two-agent edit to it would collide at merge.
 
+---
+
+## §13 THE FLIP TABLE — B's recommendation per flag at close
+
+Fable flips the Level A blocks in ONE integration commit at cert; this is B's
+recommendation with the evidence each one rests on. **Every block in this branch
+ships `enabled: false`.**
+
+| flag | recommend | evidence | what it costs |
+|---|---|---|---|
+| **`FLASH_GUARD`** | **ON** | resident degenerate triangles **15,984 (14.19 %) → 0** on a 2,700-frame headless serpentine; per-builder **14.22 % / 14.84 % → 0**; normals bit-identical across the filter; clean chunks return the same array object | **Zero bundle bytes moved, zero cache keys, zero draws, no frozen-gate exposure at all.** Index counts only fall. The cheap 95 % of the win |
+| **`BEND_LEAD`** | **ON** | pad deficit at the lead edge on **7 of 7 rings** — 54 / 558 / 747 / 241 / 1,205 / 3,405 / 31,412 m → 0; `padON ≥ padOFF` everywhere, so the pad can only ever KEEP geometry | a handful of ring-edge draw submissions; Owens cannot move (nothing to keep) |
+| **`CHUNK_FADE`** | **ON** | single-frame pops **92 → 2**, and both residuals are `fadeBudgetMiss` = 2, i.e. attributable; ramp steps 0 → 600 | `maxDying` 4 transient draws; **Owens exactly 0 by construction**. Needs E's `programsDelta`-flat run to confirm the pooled twins compile nothing |
+| **`HEAL_IN_PLACE`** | **ON** | heals **16 (0 in place) → 21 (21 in place)**; evictions 40 → 24 | one extra Float32Array per chunk (per-run ground); no keys, no draws |
+| **`GROUND_VIS`** | **ON** | worst single-frame visual step **384.0 m → 4.000 m**, converging in 95 frames; warp snaps; the flight model provably keeps RAW | a metre of visual lag on a refining DEM |
+| **`ENV_UNIFORM`** | **ON only after E's two runs** | noon bit-identical BY CONSTRUCTION (day-width normalisation + endpoint bypass) | needs (a) `programsDelta` flat across a dusk crossing AND a forced high↔medium step with `__flyGovPin` AND `__flySatShadowOverride` released, and (b) a twilight fixture A/B at the `verify-dusk` / `verify-sat-night` poses. **This is the one B feature whose flip I do not recommend on construction alone** |
+| **`RING_DEDUPE`** | **OFF — built but off** | live-winding A/B on E's tiles: sat verts −15.6 %, **skyline +31.6 % (`ring[0]` restored)**, **Powell toy +17.4 % (roof-form dispatch moving on the restored corner count)**, degenerate → 0, **Owens lock holds in BOTH legs** | It moves roof-form outcomes on four certified gates (`verify-roofs` 394/2985, `verify-roof-variety`, `verify-window-grids` 403, `verify-neon-city` 379) and carries a live hash re-baseline. **`FLASH_GUARD` alone already removes the entire degenerate population from the GPU with zero bundle-byte movement and no gate exposure — that is the cheap 95 % of the win.** The change RING_DEDUPE makes is in the CORRECT direction: the corner was real and was being eaten by a collinearity walk that saw a zero-length edge. But **correct and certified are different claims and only the second is a merge gate.** It becomes a follow-up: a roof re-certification under a controlled A/B, with the live hash re-baseline going with it |
+
