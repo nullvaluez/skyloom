@@ -229,7 +229,9 @@ the `FINALIZE_PACE` spike detector) and **`ec53fd3`** (close merge 7, E
 `59b4e97` + `a2d95a3` — the sixth harness-budget site and the pale detector's
 isolation rule), both pushed with node smoke 16/16. **PASS 2b started 21:13:59
 at `ec53fd3`** (`CERT_OUT scripts/r24-out/cert3`, summary `cert-run4.log`);
-pass 2a's logs are kept as diagnosis. **A dry-run merge of all five
+pass 2a's logs are kept as diagnosis. **The five held tips then merged EARLY,
+before the re-take, at the user's request — integration tip `8240539`, pushed;
+the chain and its proofs are §4.1.** **A dry-run merge of all five
   flipped branches into a scratch worktree produced exactly one resolvable
   conflict** — `FlyEffectComposer.jsx`, where A's `registerComposer` effect and
   C's `installDepthProbe` effect both land and both were kept — **and node smoke
@@ -440,6 +442,31 @@ Numbers from the integrated tree at `990c7b5`; re-run **15/15** after the three
 import fixes and again before the certification run's boot proof. Where a
 second number appears it is the same gate on its owner's flipped branch, grown
 by a ship-state row.
+
+**The pre-re-take merge (PUSHED, tip `8240539` on
+`claude/skyloom-r24-orchestration-6753n2`).** It landed EARLY — before the
+standalone re-take set — because the user asked for it: *"can you at least push
+enough now so I can test."* Five merges, in order: **`d0dba79`** (merge 8, E
+`18bd5eb`; **ruling 2** in `verify-terra-live.js` — A's both-arms pin plus E's
+page-error hook, returning `yawArc` AND `errNote`) → **`fb9c294`** (merge 9, A
+`e7325cd` — the toy index container fix and the `STEP_SAFE` resize guard) →
+**`2112a49`** (merge 10, B `b459056`; **ruling 1** on the chunk-fade import —
+`rampT` taken, the duplicate `markPhase` import dropped) → **`718bea0`** (merge
+11, C `ee10642`; **ruling 3** on the `AerialPerspective` import block) →
+**`8240539`** (merge 12, D `1083168`). It was built on a FRESH worktree
+(`/home/user/skyloom-r24-int`, branch `r24/int-next`, checked out at `ec53fd3`)
+so the pass-2b browser run on the main worktree was never touched; that
+worktree's local branch is deliberately behind origin and is fast-forwarded
+after pass 2b's end line, and the re-take runs there. **Proofs on the merged
+worktree**: content **byte-identical to the dry tree `e6227c4`** (`git diff`
+empty), node smoke **16/16**, import-integrity **4/4**, `verify-c-flagoff`
+**40/40**, `attr-proof` **BROKEN=0** — and **the first real compile of the
+integrated tree**: `next dev` on `:3107`, `GET /` **200**, Turbopack compile
+**12.8 s**, no module errors, **which closes C's "no `next build`" residual on
+the `AerialPerspective` → `world-bend` import edge**. An adversarial review of
+the three resolutions plus a lost-hunk sweep across all five branches runs
+post-push; **a confirmed finding becomes a follow-up push, and is PENDING until
+that result lands.**
 
 | Gate | PASS 1 (flag-off) | LIVE | NOT MEASURABLE HERE |
 |---|---|---|---|
@@ -940,6 +967,16 @@ queued strictly after `_state.done` on the idle drain. It still ships OFF.
   removals. **A mechanical edit whose match is not asserted is the same defect
   in a document as it is in a module** (F SCRIBE).
 
+- **Two venue notes from the early merge, both about launching a server.**
+  Turbopack **refuses a symlinked `node_modules` that points outside the project
+  root** — `TurbopackInternalError: Symlink node_modules is invalid, it points
+  out of the filesystem root` — so the round's standard worktree idiom does not
+  compile; a **hardlinked copy (`cp -al`) works, with no extra disk**. And the
+  forked `next-server` worker **outlived a process-group TERM again**, because
+  the `setsid` wrapper had already exited and its `/proc` stat was gone, so the
+  PGID could not be read back; it was killed by cwd match instead. **The PGID
+  must be captured AT LAUNCH** — E's cert-run does, the ad-hoc launch did not.
+
 ### 5.4c A retraction A wrote against itself
 
 `STEP_SAFE`'s rig header claimed the r3f catch-up was free, "because Chromium
@@ -1109,6 +1146,14 @@ quotable.
 **Nothing in this table has been confirmed.** The diagnosis pack was sent and
 no reply arrived; every row is unconfirmed on the user's machine, including the
 two that are the reason the round exists.
+
+**The user is now testing `8240539`** — pushed early, at their request, before
+the standalone re-take (§4.1). It is **the first R24 build in the user's hands
+that contains the toy index container fix and the `STEP_SAFE` resize guard**, so
+the toy boot page error and the DPR double-apply are the two things this build
+answers that no earlier one could. **Nothing has come back from that machine
+yet**: every row below still reads PENDING, and a checkpoint is closed by the
+user's reply, not by this build existing.
 
 | # | Checkpoint | What to look for |
 |---|---|---|
