@@ -13,6 +13,7 @@ import { resolveStepSafe } from '@/lib/fly/step-safe';
 import { autoTierCeiling } from '@/lib/fly/fly-settings';
 import { PerfGovernor } from '@/lib/fly/perf-governor';
 import { StepSafeRig } from './StepSafeRig';
+import { HudSyncRig } from './HudSyncRig';
 import { useFlyStore } from '@/stores/fly-store';
 
 function initialDpr() {
@@ -80,6 +81,11 @@ export function FlyCanvas({ runtime }) {
           .distM is this frame's value when the near-miss scan reads it. */}
       <JuiceSystems runtime={runtime} />
       <BootFramePulse runtime={runtime} />
+      {/* Round 24 (A PACE, HUD_SYNC): drives the DOM label overlay from
+          addAfterEffect, i.e. after renderer.render has refreshed the camera
+          matrices, so the HUD stops being a picture of the previous frame
+          (recon FL-01). Renders nothing; inert with the flag off. */}
+      <HudSyncRig runtime={runtime} />
       {/* Round 21 (A): boot shader pre-warm. Adds no object to the scene and
           issues no draw — see components/fly/PrewarmRig.jsx. */}
       {PREWARM.enabled && <PrewarmRig runtime={runtime} />}

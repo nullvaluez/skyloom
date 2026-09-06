@@ -2,10 +2,13 @@
 
 import { useEffect, useRef } from 'react';
 import { Vector3 } from 'three';
-import { LABELS, LETTERS, MOBILE_UI, TOY_WORLD, TRAFFIC, WARP } from '@/lib/fly/fly-constants';
+import { LABELS, LETTERS, MOBILE_UI, TOY_WORLD, TRAFFIC, WARP,
+  HUD_SYNC,
+} from '@/lib/fly/fly-constants';
 import { M_TO_FT } from '@/lib/fly/coords';
 import { isPhoneClass } from '@/lib/fly/device-class';
 import { airDrop, bendDrop, getBend } from '@/lib/fly/toy-world/world-bend';
+import { pinned } from '@/lib/fly/fly-pins';
 import { useFlyStore } from '@/stores/fly-store';
 
 const _v = new Vector3();
@@ -266,7 +269,8 @@ export function LabelCanvas({ runtime }) {
     window.addEventListener('pointerdown', onDown);
 
     const draw = () => {
-      raf = requestAnimationFrame(draw);
+      // Only the self-driven path re-arms; under HUD_SYNC the GL frame calls us.
+      if (!syncToGl) raf = requestAnimationFrame(draw);
       // Round 17 — phone cadence. The overlay redraws at 30 Hz on a phone
       // (MOBILE_UI.label.phoneHz): labels still track smoothly at that rate,
       // and the GL frame gets back half of the 2D compositing cost on the one
@@ -533,9 +537,24 @@ export function LabelCanvas({ runtime }) {
       }
     };
 
-    draw();
+    // R24 A (HUD_SYNC, recon FL-01): drive the overlay from the GL FRAME
+    // instead of its own rAF. rAF callbacks run in registration order and both
+    // loops re-register first thing, so this one — registered when FlyMode
+    // mounts, before the GL canvas exists — is permanently ahead of the R3F
+    // loop and therefore permanently projects last frame's camera. Publishing
+    // the closure lets HudSyncRig call it from `addAfterEffect`, i.e. after
+    // renderer.render has refreshed the camera matrices, in the same task as
+    // the frame it annotates. The phone 30 Hz frameStep is INSIDE `draw`, so
+    // it survives either path unchanged.
+    const syncToGl = pinned(HUD_SYNC, '__flyHudSyncOverride').enabled;
+    if (syncToGl) {
+      runtime.hudDraw = draw;
+    } else {
+      draw();
+    }
     return () => {
       cancelAnimationFrame(raf);
+      if (runtime.hudDraw === draw) runtime.hudDraw = null;
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerdown', onDown);
       runtime.hoverHex = null;

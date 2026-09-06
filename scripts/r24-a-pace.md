@@ -551,6 +551,81 @@ verbatim (the RED run above is that proof). `bufferMatchesDrawing`
 
 ---
 
+## §8 M5a — `HUD_SYNC` (FL-01) and `REBASE_CALM` (FL-09 + T12)
+
+### HUD_SYNC — the HUD was a picture of the previous frame
+
+rAF callbacks run in REGISTRATION order, and both the label overlay's loop and
+R3F's re-register as their FIRST statement, so whichever registered first at
+boot stays first for the session. LabelCanvas registers first by construction:
+`FlyMode` renders it unconditionally while `FlyCanvas` waits on geolocation. So
+every overlay frame projected its tracks through the camera matrices left by
+the PREVIOUS `renderer.render` — a consistent picture of frame N−1 composited
+over GL frame N. **At 60 fps and ~60°/s of yaw that is ~1°, about 30 px on a
+1920-wide canvas**: labels, the lock reticle and the hover ring slide off their
+planes in every turn. It is one of the things "tearing" can honestly mean, and
+it is one of the three tear-shaped mechanisms this round can actually fix.
+
+The fix: LabelCanvas publishes its draw closure as `runtime.hudDraw` instead of
+self-driving, and a rig inside the Canvas calls it from R3F's
+`addAfterEffect` — after all roots render, so the camera matrices are the ones
+the frame was drawn with. The phone 30 Hz `frameStep` lives INSIDE the closure
+and is unaffected by which loop calls it. Cost: the same ~0.5–1 ms of 2D work,
+paid inside the GL frame's task instead of a separate rAF slot.
+
+Two FL-06 companions ride `HUD_SYNC.framePriority`:
+
+- **CloudField's `useFrame` gets an explicit −10.** Same-priority subscribers
+  run in SUBSCRIPTION order, and React fires a child's layout effects before its
+  parent's — so drei's `<Clouds>` child (default 0) decomposes each puff's
+  `matrixWorld` BEFORE the parent updates it. CloudField's own inline comment at
+  :125 assumes the opposite order; the recon could not settle it without a
+  probe, and an explicit priority makes the question moot.
+- **`camera.updateMatrixWorld()` at the end of the −50 block, unconditionally.**
+  Three refreshes it only inside `renderer.render` (priority +1), and the one
+  pre-render refresh this scene had was inside the satellite+high+aerial branch
+  — so outside that single configuration, every priority-0 reader that
+  decomposes `camera.matrixWorld` was a frame behind. It is idempotent (three
+  checks `matrixWorldNeedsUpdate`), so on a frame that did not move the camera
+  it is a flag test.
+
+### REBASE_CALM — three small things on the 10 km rebase
+
+1. **The dead store write.** `bumpRebaseEpoch()` wakes every zustand selector in
+   the tree on a field with ZERO consumers — grep `rebaseEpoch` outside the
+   store at `3592656` and there are none. Every layer that must re-place on a
+   rebase already compares `origin.anchor` itself (TownGlow, SatCityGlow,
+   LandmarkMonuments).
+2. **The traversal.** `root.updateMatrixWorld(true)` re-derives the matrix of
+   every tile mesh and chunk under `worldRoot`, in the same frame the renderer
+   is about to do it anyway. It exists so same-frame engine conversions see the
+   new anchor — but those conversions are `_anchor` arithmetic, not
+   `matrixWorld`. What DOES read `matrixWorld` in the same frame is the tile
+   raycast behind `getElevationAt`, so the update is narrowed to the tile-map
+   subtree and nothing else.
+3. **T12, the quantised anchor** (Fable's ruling; C declined a `uMicroAnchor`
+   uniform, and this route needs no shader change at all). The low-AGL
+   micro-detail grain is hashed on REBASED world metres — `vWorldXZ =
+   modelMatrix * position`, and `modelMatrix` carries −anchor — so an ARBITRARY
+   anchor shifts every fragment's noise input and the whole near-field grain
+   re-phases in one frame, every 10 km of travel. The anchor is snapped to a
+   multiple of **704 m = `HILLSHADE.micro.scaleM` (5.5) × 128**, which keeps the
+   noise field continuous across every rebase.
+
+   The cost, stated: the anchor can then sit up to 704 m from the aircraft
+   instead of exactly on it. Nothing minds — every consumer does `_anchor`
+   arithmetic and none reads it as the player's position — and the float
+   precision argument is unchanged, since 704 m is negligible against the
+   10 km rebase distance the precision budget was sized for.
+
+All three are one flag, and all three are pinned:
+`window.__flyRebaseCalmOverride` / `__flyHudSyncOverride`, via the new
+`lib/fly/fly-pins.js` (`pinned(base, globalName)`) — the R16 weather-pin idiom
+generalised, so a harness never rewrites a constants file (HARN-HYG-9) and the
+user can run the A/B from a console line before boot.
+
+---
+
 ## §9 Could not measure here (honest list)
 
 Everything in this section needs the user's machine, or E's offline fixture,
