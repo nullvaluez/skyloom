@@ -523,6 +523,41 @@ pageerrors, zero failed `/_next/` chunk requests, after 15/15 node gates.
 
 ---
 
+## §2.10 WHICH PASSES COULD BE VACUOUS — a sceptical audit of my own gates
+
+The R20 §5 lesson is that a probe green on a quiet boot is not a probe green
+under load; the R24 version, learned twice today, is that **a gate which passes
+without asserting anything is indistinguishable from a gate that works.** Two of
+mine were caught by reading the PASS lines rather than the FAIL lines
+(`verify-flash-guard` (5) was a tautology; its `flagOn` probe reported an absent
+runtime pin as "the flag is on"). This is the audit of the rest, written BEFORE
+the remaining rows land so it cannot be tuned to them.
+
+| Gate / leg | How its PASS could be empty | Guard now in place |
+|---|---|---|
+| `verify-fade` (2)(3) no hard birth / death | if the serpentine never leaves the resident ring, births = deaths = 0 and both "pass" over an empty population | (1) asserts `births + deaths > 0` FIRST and says "lengthen FADE_RUN_MS, do not weaken the gate" |
+| `verify-fade` (4) ready invariant | `ready <= chunks && ready >= 0` is nearly a tautology; it cannot fail unless the engine is corrupt | **WEAK — flag it.** The real invariant is that ready does not FALL across the window; the series is printed but not asserted |
+| `verify-fade` (5) Owens lock | Owens legitimately has nothing, so 0/0 passes whether or not the fade works | it is a LOCK, not a fade test — correct as written, but it proves absence of harm only |
+| `verify-lod-fade` (3)(4)(5) | if the yaw sweep produces no tile events at all, "no reappears / no hard swaps" pass vacuously | (2) asserts `frames > 20 && appears + disappears > 0` first |
+| `verify-lod-fade` (6) refetch | with `/__stats` reset and a short sweep, "0 refetched" can mean "nothing was fetched" | **WEAK — flag it.** It should assert some tiles WERE fetched before claiming none were re-fetched |
+| `verify-step-clean` (2)–(5) | 0-of-0 with no step observed | already fixed: prints `NOT CALIBRATED`, non-zero exit, and (1) proves the ladder accepted a forced step |
+| `verify-frame-pace` (3)(4) tear mechanism | if no resize happens in the window, "0 outside rAF" passes over nothing | **WEAK — flag it.** It does not require a resize to have occurred, unlike `verify-step-clean` |
+| `verify-one-sun` clauses 1–5 | a null `dome`, a missing `hillMinDeg`, or `moonK === 0` SKIPs a clause; a run where every clause skips would print no failures | clause 0 (`live === true`) must pass first, and SKIPs are printed distinctly from PASSes — but the count of skips is not asserted |
+| `verify-env-uniform` (1)(2) | `programsDelta === 0` passes if the dusk walk or the tier steps never happened | (3) asserts `stepsAccepted > 0`; the dusk walk has no equivalent check that the HDRI bucket actually changed |
+| `verify-linear-haze` (2) | if the frame has no horizon, terrain and sky crops are the same band and Δ ≈ 0 passes | (1) asserts a real luma step at the found horizon row |
+| `verify-flash-guard` (1a)(1b) | census over an empty scene | asserts `totalTris > 10000` |
+| `verify-fixture` (6) Owens lock | passes if the world never loaded at all | the settle predicate now reports `settled` and WHY; (3) proves imagery/DEM/MVT were served |
+| `verify-artifact-hygiene` (1) | passes if the glob matches nothing | (0) asserts the base commit resolves; the patterns are printed |
+| `verify-import-integrity` (1) | passes if the target dirs are empty or unparsed | the linted FILE COUNT is printed (200) — but not asserted |
+
+**Four are flagged WEAK and should be tightened before anyone reads their green
+as evidence**: `verify-fade` (4), `verify-lod-fade` (6), `verify-frame-pace`
+(3)(4), and `verify-import-integrity` (1)'s unasserted file count. None is
+wrong; each can pass over an empty population, which is the failure mode this
+section exists to name.
+
+---
+
 ## §3 Deviations, honestly
 
 Every place a run differed from the written recipe, the way R19 §4.1 recorded
