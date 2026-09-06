@@ -507,11 +507,12 @@ refetches → 0/0/0) and `scripts/verify-depth-offset.mjs` (C — RED 6/7 on
 
 | Gate | RED on flag-off tree | Pin released | Status |
 |---|---|---|---|
-| verify-flash-guard | written; census + default-framebuffer pale detector | `__flyFlashPin` (B) | written, awaiting a content-ready pose |
-| verify-step-clean | written; canvas/gl/composer resize watch + buffer identity | `__flyGovPin` (accessor-swallow) | written |
-| verify-fade | written; hard-birth / hard-death census + Owens lock | — | written |
-| verify-lod-fade | written; displayed-tile z/x/y census + A's `__flyTerra.lod()` | — | written |
-| verify-frame-pace | written; pacing legs INFORMATIONAL here, tear-mechanism legs hard | — | written |
+| verify-flash-guard | zero-area census over resident DRAPED index buffers + a default-framebuffer pale detector | `__flyFlashPin` (B) | written; needs a settled content pose (§1.2b/c) |
+| verify-step-clean | canvas / gl / composer resize watch + per-frame buffer identity | `__flyGovPin` (accessor-swallow) | written; **the vacuous case now reads NOT CALIBRATED, not FAIL** |
+| verify-fade | hard-birth / hard-death census + the READY invariant + the Owens lock | — | written |
+| verify-lod-fade | displayed-tile z/x/y census over a 720° yaw at a FROZEN position + A's `__flyTerra.lod()` + `/__stats` refetches | — | written |
+| verify-frame-pace | pacing legs INFORMATIONAL here (and they say so), tear-mechanism legs HARD everywhere | — | written; **RED-as-designed confirmed on the integrated flag-off tree** ("instrument absent — FRAME_STATS.enabled false; unmeasurable, not a renderer failure") |
+| verify-env-uniform | `programsDelta` flat across a dusk crossing and four forced tier steps WITH SHADOWS ON | `__flyGovPin` + `__flySatShadowOverride` + `__flySunOverride`, all three | written (the proof B asked for and has not run) |
 | verify-shadow-calm | spec received from C | `__flySatShadowOverride` | pending |
 | verify-one-sun | key never moves; key↔hill 119.4° at dusk (C, measured) | `__flySunOverride` + tier | pending |
 | verify-linear-haze | | — | pending |
@@ -530,6 +531,28 @@ refetches → 0/0/0) and `scripts/verify-depth-offset.mjs` (C — RED 6/7 on
 | boot wall time as a BUDGET | 48.7 s here is a SwiftShader number, not a regression signal | user's machine |
 | live tileset drift, live traffic | hosts 403-blocked | user's machine |
 | GPU-driver artifacts (precision, aniso, half-float) | one software rasteriser only | user's machine |
+
+---
+
+### 3.3 One gate bug worth remembering
+
+`force(dir)` on the perf governor TAKES A NUMBER: `perf-governor.js:158` reads
+`dir < 0 ? 1 : -1`, so −1 steps DOWN the ladder and +1 steps UP. Passing the
+strings `'down'` / `'up'` makes `dir < 0` false every time; at index 0 the next
+index clamps back to 0, `next === g.idx`, and `force()` returns **false**.
+Every "forced" step is a silent no-op, and the gate then reports a vacuous
+"0 of 0 outside rAF" that looks like a verdict. Measured on the integrated
+tree as *"0 DPR applications, dprs seen []"*.
+
+Two lessons, both now in the gates:
+
+1. **A gate that forces something must check that the force was ACCEPTED.**
+   Both verify-step-clean and verify-env-uniform now count and print how many
+   forced steps the ladder took.
+2. **A vacuous result must read as itself.** "0 of 0" is neither a red nor a
+   green — it is "the gate could not run". Calling it FAIL is as misleading as
+   calling it PASS, so it now prints one distinct `NOT CALIBRATED` line with
+   the counters, and exits non-zero.
 
 ---
 
