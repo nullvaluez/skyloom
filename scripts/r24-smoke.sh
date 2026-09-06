@@ -90,6 +90,14 @@ node_gate verify-warbirds.mjs
 node_gate verify-daily.mjs
 node_gate verify-depth-offset.mjs        # C (R24): reversed-depth polygonOffset
 node_gate verify-terra-residency.mjs     # A (R24): merge/refetch on a yaw sweep
+node_gate verify-c-flagoff.mjs           # C (R24): every C flag off + GLSL false-branch verbatim
+node_gate verify-d-flagoff.mjs           # D (R24): same shape (appears when D merges)
+
+# --- verify-seam's NODE leg now runs offline too (HARN-GAP-7): its api.init()
+#     is pinned to the fixture by a global-fetch wrapper. Gates 0-6c are the
+#     fastest deterministic instrument in the fleet; the browser leg (7-9) is
+#     skipped here unless FLY_URL is exported, which it is.
+node_gate verify-seam.js
 
 # --- the fixture's own gate. If this is red, every browser number below is
 #     meaningless, so it runs first and its failure is the headline.

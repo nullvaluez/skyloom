@@ -61,7 +61,7 @@ column · *(live)* live column.
 | `verify-stability` | R21 quartet, 17 | — | **UM** for (1)/(1b) | gains an INFORMATIONAL FRAME_STATS line |
 | `verify-flicker` | bound of 12, never moves | — | **UM** | + the quiescence precondition (A7) |
 | `verify-tier-step` | 10 | — | **UM** | |
-| `verify-seam` | 13; determinism hashes | — | — | node leg pinned to fixture tiles |
+| `verify-seam` | 13; determinism hashes | **node leg GREEN, 9/9** *(fx)* | — | node leg pinned to fixture tiles (HARN-GAP-7 closed) |
 | `verify-neon-cover` | five R18 FNV hashes | — | frozen | **re-baseline candidate under `RING_DEDUPE`** — record BOTH a flag-off and a flag-on fixture column; the live hashes stay frozen and become a user-machine item only if the flag flips at close |
 | `verify-sat-buildings` | draws 226 / kept 6,965 / columns 6,964 | — | frozen | |
 | `verify-skyline` | 17 | — | frozen | |
@@ -88,6 +88,94 @@ they were taken with the satellite building chunks still draping, so they are
 a FLOOR, not the settled figure. They also fall under `POST_ORDER` (C measures
 the merged EffectPass count DROPPING: sat 4→3, toy 6→5), so a flag-on column
 reading lower is a decrease, not drift.
+
+---
+
+### 1.4b `verify-seam` NODE LEG — the first full FIXTURE column
+
+`FLY_TILE_FIXTURE=1 node scripts/verify-seam.js` — **no browser, no GPU, ~40 s**,
+and it is now the fastest deterministic instrument in the fleet running
+entirely offline. Measured on the flag-off tree:
+
+| Gate | Result | Fixture number |
+|---|---|---|
+| (0) worker fixture loaded in-process | PASS | `api = setDiag, init, buildTile` |
+| (0b) the sweep measured tiles | PASS | **149 z14 tiles** |
+| (1) THE OWENS LOCK | PASS | hatchKept sum **0** |
+| (2) NO CLIFF (\|Δ\| ≤ 4 per candidate) | PASS | worst slope **2.5** |
+| (3) MONOTONE | PASS | — |
+| (4) RAMP SPEC | PASS | **0 / 149** tiles disagree |
+| (5) NO ALL-OR-NOTHING NEIGHBOURS | PASS | **0** seam pairs |
+| (6) DETERMINISM (same tile twice, byte-identical) | PASS | manhattan kept **311** hash `8d36f2aa:89218640:13605` · columbus kept **193** hash `2eefc447:49bbe703:8715` · dublin `empty` |
+| (6c) empty results carry a reason code | PASS | ocean `undefined`, owens `zero` |
+
+**Two honest differences from the live planet**, recorded rather than tuned
+away:
+
+- The fixture's Owens scene yields **no z14 tiles with candidates at all**, so
+  gate (1) passes "0 by construction" rather than by the ramp's lock. On live
+  tiles Owens has a handful (R19 measured max 1). The gate is therefore WEAKER
+  here than live; the live column stays the authority for it.
+- Suburb candidate counts read 0 where R19 measured Powell 2 and Dublin 12 on
+  the real planet; Columbus reads 17–97 against Chicago's 46. The fixture's
+  suburb buildings are shorter and more uniform than OpenFreeMap's, so the
+  far-mass selector finds nothing there. Any gate whose assertion depends on a
+  SMALL NON-ZERO suburb candidate count must use the live column.
+
+### 1.4c Cache-key registry audit (fills in at close)
+
+C's shared tile key is `world-bend-fade-hill-r19` + tokens
+`{e: ONE_SUN, f: TERRAIN_LIGHT, a: AERIAL_LAW, l: LOD_CROSSFADE}` + `'24'`,
+composed by `r24VariantKey` in that fixed order, returning the bare R19 key
+when every token is false. Each new key must also be in the PREWARM warm set.
+
+---
+
+## §1.5 The two harness-only scalers, and which gates may use them
+
+Both live behind the ONE env-guarded branch in `scripts/_boot.js` and are
+inert without it. Both default to a value that makes the arithmetic
+byte-identical to R21.
+
+### `FLY_FINALIZE_BUDGET_K` → `window.__flyFinalizeBudgetK` → `budgetK()`
+
+Widens the per-frame drape / finalize budget at five sites (sat-building drape
++ finalize, sat-skyline drape + finalize, toy-world drape + finalize, sat-road
+drape). **Absent ⇒ exactly 1 ⇒ identical arithmetic** — that is production and
+every harness that does not opt in. Clamped to **[1, 500]**: a harness may only
+ever make the budget MORE generous, never tighter, so it cannot manufacture a
+green by starving something for frames.
+
+Why it exists: at 1–3 fps the 1.0 ms/frame drape budget cannot get through a
+chunk's ~400 full-quadtree raycasts, so satellite building chunks never become
+`ready` and every content gate would certify an empty world. Full evidence in
+`r24-e-cert.md` §1.2b/§1.2c.
+
+| Gate | Sets it? | Why |
+|---|---|---|
+| `verify-fixture` | **yes** | asks what the world CONTAINS at four poses |
+| `verify-flash-guard` | **yes** | the degenerate census needs resident chunks |
+| `verify-fade` | **yes** | asserts hard-birth / hard-death COUNTS and the READY invariant — not timing |
+| `verify-lod-fade` | **yes** | asserts tile-swap COUNTS and the crossfade WINDOW in frames — not timing |
+| `verify-frame-pace` | **NEVER** | it measures pacing; that is the whole gate |
+| `verify-step-clean` | **NEVER** | resize-inside-rAF is a per-frame ordering claim |
+| `verify-env-uniform` | **NEVER** | `programsDelta` is per-frame; a wider budget changes what lands in which frame |
+| `soak-fly` | **NEVER** | p95 frame time, p95 draws, governor steps |
+| the R21 quartet | **NEVER** | stability / flicker / tier-step / seam all read per-frame behaviour |
+| pixel A/B gates (`verify-linear-haze`, `verify-sat-depth`, …) | **yes, at a settled pose** | the pixel is a function of the settled scene |
+
+`scripts/r24-smoke.sh` encodes this split: `content_gate` passes the env,
+`browser_gate` does not.
+
+### `FLY_BOOT_SCALE`
+
+Multiplies bootFly's two fixed 30 s POST-REVEAL waits and `settleMs`. It does
+**not** touch the boot contract — `__flyBoot.pct === 100` has already been
+awaited by the time those run; what times out is Playwright's wait for the
+canvas selector and for the boot-screen unmount, at 1 fps under contention.
+Forced to 1 outside the fixture branch. The smoke exports 6.
+
+Any gate may set it: it changes only how long the harness is willing to wait.
 
 ---
 
