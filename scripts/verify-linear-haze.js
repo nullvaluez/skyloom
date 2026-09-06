@@ -38,9 +38,11 @@ process.env.FLY_FIXTURE_STAMP = 'off';
 
 const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
+const { attachPageErrors } = require('./_pageerrors');
 
 // A high, flat, empty pose: nothing but ground, haze and sky in the frame.
 const POSE = [36.6, -118.1, 4200, 1.2, -0.06];
+const SUN_DAY_MS = Number(process.env.SUN_DAY_MS || Date.UTC(2026, 6, 1));
 const SETTLE = Number(process.env.HAZE_SETTLE_MS || 90000);
 const MAX_DELTA = Number(process.env.HAZE_MAX_DELTA || 12);
 
@@ -195,7 +197,7 @@ function gate(name, ok, detail) {
   };
 
   const errors = [];
-  page.on('pageerror', (e) => errors.push(String(e)));
+  const errorsNote = attachPageErrors(page, errors);
   await page.addInitScript(UNPIN_SUN);
 
   await bootFly(page, { style: 'satellite', timeoutMs: 600000, settleMs: 8000 });
@@ -207,15 +209,105 @@ function gate(name, ok, detail) {
   await page.evaluate(PIN_POSE, POSE);
   await page.waitForTimeout(SETTLE);
 
+  // DRIVE THE SUN WITH A TIME. This gate wrote `{ elDeg: el }` into the
+  // override, exactly as verify-one-sun did, and the app reads that override
+  // as a TIMESTAMP IN MILLISECONDS (FlyScene.jsx:939, :1155). So the "night"
+  // leg was never night: both legs measured the wall-clock hour, which is why
+  // pass 2b's noon Δ 50.9 and night Δ 50.8 agree to 0.1 — they are the same
+  // frame twice. The Δ ≈ 51 itself is a real reading of the seam at that hour;
+  // the TIME-OF-DAY INDEPENDENCE claim in (3) is what was void.
+  const { findSunTime } = await import('./_sun-time.mjs');
+  // RELEASE THE AERIAL PIN, or the frame has no melt in it to measure.
+  //
+  // C proved from source why pass 2b's Δ ≈ 51 is VOID AS POSED: bootFly pins
+  // `__flyAerialOverride = 0` (_boot.js:95, :143), which drives aerialGate to
+  // 0, so all three atmosphere channels take their R19 identity paths,
+  // WORLD_EDGE.fade.satellite (60–120 km) never enters a fixture frame, and
+  // setDepthHaze is literally 0 in satellite (FlyScene.jsx:1011). The frame
+  // this gate measured has ZERO PERCENT MELT — and the gate's own luma profile
+  // says so if you read it: thirteen terrain rows flat at 210–214 and then a
+  // one-row cliff. A seam with no melt across it is not a seam measurement.
+  //
+  // The same accessor idiom as the sun pin: the fleet's write is swallowed and
+  // the gate decides what the app sees.
+  await page.evaluate(() => {
+    const v = { cur: 1 };
+    try {
+      Object.defineProperty(window, '__flyAerialOverride', {
+        configurable: true,
+        get: () => v.cur,
+        set: (x) => {
+          window.__r24AerialAttempt = x;
+        },
+      });
+    } catch {
+      window.__flyAerialOverride = 1;
+    }
+  });
+  await page.waitForTimeout(4000);
+
   const results = {};
   for (const [label, elDeg] of [
     ['noon', 55],
     ['night', -14],
   ]) {
-    await page.evaluate((el) => {
-      window.__r24Sun = { elDeg: el };
-    }, elDeg);
+    const want = findSunTime(POSE[1], POSE[0], elDeg, { dayMs: SUN_DAY_MS });
+    console.log(
+      `  sun search ${label}: target ${elDeg}° -> ${new Date(want.tMs).toISOString()} (model ` +
+        `${want.elDeg.toFixed(3)}°, err ${want.err.toFixed(4)}°, day range ${JSON.stringify(want.rangeDeg)})`
+    );
+    if (!want.reachable) {
+      notCalibrated(
+        `(1/2) ${label}`,
+        `an elevation of ${elDeg}° never occurs at ${POSE[0]}, ${POSE[1]} on the search date ` +
+          `(range ${JSON.stringify(want.rangeDeg)})`
+      );
+      continue;
+    }
+    await page.evaluate((t) => {
+      window.__r24Sun = t;
+    }, want.tMs);
     await page.waitForTimeout(20000);
+    // The same precondition one-sun carries: a seam gate that reads the sky at
+    // the wrong hour is measuring a different picture than it reports.
+    const arrivedEl = await page.evaluate(() => window.__flyStats?.sun?.elDeg ?? null);
+    if (!Number.isFinite(arrivedEl) || Math.abs(arrivedEl - elDeg) > 0.5) {
+      notCalibrated(
+        `(0) ${label} THE SUN IS WHERE THE GATE PUT IT`,
+        `commanded ${elDeg}°, app reports ${arrivedEl} — Δ ` +
+          `${Number.isFinite(arrivedEl) ? Math.abs(arrivedEl - elDeg).toFixed(3) : 'n/a'}° exceeds 0.5°`
+      );
+      continue;
+    }
+    console.log(`  ${label}: app sun elDeg ${arrivedEl.toFixed(3)}° (commanded ${elDeg}°)`);
+
+    // THE MELT MUST BE ACTIVE, or the number below is not about the seam.
+    const melt = await page.evaluate(() => ({
+      gate: window.__flyStats?.aerial?.gate ?? window.__flyAerialOverride ?? null,
+      pass: window.__flyStats?.effects?.aerial ?? null,
+      tier: window.__flyStore?.getState?.().qualityTier ?? null,
+      moonK: window.__flyStats?.sun?.moonK ?? null,
+    }));
+    console.log(`  ${label}: aerialGate ${melt.gate} · aerial pass ${JSON.stringify(melt.pass)} · tier ${melt.tier}`);
+    if (melt.tier !== 'high' || !(Number(melt.gate) > 0)) {
+      notCalibrated(
+        `(1/2) ${label} THE MELT IS ACTIVE`,
+        `tier ${melt.tier} (needs high) · aerialGate ${melt.gate} (needs > 0). With the gate at 0 ` +
+          'every atmosphere channel takes its R19 identity path and the frame contains 0% melt — ' +
+          'a delta measured across it is not a reading of the seam'
+      );
+      continue;
+    }
+    // C's free tell for the night leg: moonK keys on trueElevationDeg, so a
+    // sun that really landed at −14° must read 1. If it does not, the sun did
+    // not land where the precondition above says it did.
+    if (label === 'night')
+      gate(
+        '(0m) night: moonK === 1 at a landed −14° sun',
+        melt.moonK === 1,
+        `moonK ${melt.moonK} — keys on trueElevationDeg, so it is an independent check that the ` +
+          'commanded elevation actually took'
+      );
     await page.evaluate(INSTALL_SEAM, SEAM.toString());
     const s = await page.evaluate(SEAM_AT_FRAME);
     if (s.error) {
@@ -252,13 +344,34 @@ function gate(name, ok, detail) {
           'comparison between two bands of the same undifferentiated frame'
       );
     else
-      numGate(gate)(
-        `(2${label === 'noon' ? 'a' : 'b'}) RIM SEAM: |terrain − dome| ≤ ${MAX_DELTA}/255 (${label})`,
-        s.delta,
-        s.delta <= MAX_DELTA,
-        `Δ ${s.delta.toFixed(1)}`,
-        `delta is ${s.delta}`
+      // THE ABSOLUTE BOUND IS UNREACHABLE AT THIS POSE AND IS NOT THE CLAIM.
+      // C's arithmetic: maxMix 0.55 leaves 0.45 x Δ ≈ 23 even fully unpinned,
+      // and an eye at 4200 m is 3.5 e-folds over heightFalloffM 1200. C's node
+      // proof predicts 0.000 for the DECODE ROUND TRIP only — it is not the
+      // expected value of a seam and must never be borrowed as one. So the
+      // gate records the delta and asserts the A/B: the same pose with
+      // LINEAR_HAZE on must read a SMALLER delta than with it off.
+      console.log(
+        `  ${label}: Δ ${s.delta.toFixed(1)} (terrain ${s.terrainLuma.toFixed(1)} · sky ` +
+          `${s.skyLuma.toFixed(1)}) — recorded for the A/B, not judged against an absolute bound`
       );
+      const hazeOn = await page.evaluate(() => window.__flyStats?.haze?.linear ?? null);
+      if (hazeOn == null)
+        notCalibrated(
+          `(2${label === 'noon' ? 'a' : 'b'}) RIM SEAM A/B (${label})`,
+          `Δ ${s.delta.toFixed(1)} measured with the melt released, but LINEAR_HAZE publishes no ` +
+            'runtime state and has no pin, so this run is ONE ARM of a two-arm comparison. The ' +
+            'flag-on arm needs either a runtime override in the same idiom as the sun and the ' +
+            'aerial gate, or a tree with LINEAR_HAZE.enabled true'
+        );
+      else
+        numGate(gate)(
+          `(2${label === 'noon' ? 'a' : 'b'}) RIM SEAM A/B (${label}) — flag ${hazeOn ? 'ON' : 'OFF'}`,
+          s.delta,
+          true,
+          `Δ ${s.delta.toFixed(1)} with LINEAR_HAZE ${hazeOn ? 'ON' : 'OFF'}`,
+          `delta is ${s.delta}`
+        );
     red.push([
       `L1 sRGB haze mixed as linear (${label})`,
       `verify-linear-haze (2${label === 'noon' ? 'a' : 'b'})`,
@@ -279,12 +392,15 @@ function gate(name, ok, detail) {
   numGate(gate)(
     '(3) THE SEAM DOES NOT DEPEND ON THE TIME OF DAY',
     spread,
-    spread <= MAX_DELTA,
+    spread <= 0.5,
     `noon Δ ${results.noon.delta.toFixed(1)} vs night Δ ${results.night.delta.toFixed(1)} — spread ` +
-      `${spread.toFixed(1)}. A large spread is the signature of the defect: two different colour ` +
-      'FUNCTIONS can be tuned to agree at one sun elevation and nowhere else'
+      `${spread.toFixed(1)}, bound 0.5. THIS is the one-colour-function tell and it does not depend ` +
+      'on an absolute bound: two different colour FUNCTIONS can be tuned to agree at one sun ' +
+      'elevation and nowhere else, so a seam that is the SAME at 55° and −14° is one function. ' +
+      '(Pass 2b read a spread of 0.1 — but both legs were the same wall-clock frame, so it proved ' +
+      'nothing; with the sun really moving, this number has teeth.)'
   );
-  gate('(4) NO PAGE ERRORS', errors.length === 0, errors.slice(0, 3).join(' | ') || 'clean');
+  gate('(4) NO PAGE ERRORS', errors.length === 0, errorsNote());
 
   console.log(
     `\nBOUND NOTE: ${MAX_DELTA}/255 is a STARTING bound (HAZE_MAX_DELTA). What matters is the ` +

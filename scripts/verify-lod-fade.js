@@ -45,6 +45,7 @@
  */
 const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
+const { attachPageErrors } = require('./_pageerrors');
 const { settleWorld } = require('./_settle');
 const { notCalibrated, notCalCount, notCalSummary } = require('./_notcal');
 
@@ -390,7 +391,7 @@ function soft(name, detail) {
     : null;
   const page = await context.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(String(e)));
+  const errorsNote = attachPageErrors(page, errors);
   await page.addInitScript(INSTALL_TILE_CENSUS);
 
   await bootFly(page, { style: 'satellite', timeoutMs: 600000, settleMs: 8000 });
@@ -644,7 +645,7 @@ function soft(name, detail) {
       'the empty-desert pose, i.e. a crossfade adds nothing where there is nothing to fade.'
   );
 
-  gate('(8) NO PAGE ERRORS', errors.length === 0, errors.slice(0, 3).join(' | ') || 'clean');
+  gate('(8) NO PAGE ERRORS', errors.length === 0, errorsNote());
 
   // ===========================================================================
   // THE ON LEG — LOD_CROSSFADE pinned on, same pose, same sweep, same census.
@@ -765,7 +766,7 @@ function soft(name, detail) {
     const fx2 = process.env.FLY_TILE_FIXTURE ? await require('./_fixture').attachFixture(ctx2) : null;
     const p2 = await ctx2.newPage();
     const errors2 = [];
-    p2.on('pageerror', (e) => errors2.push(String(e)));
+    const errors2Note = attachPageErrors(p2, errors2);
     await p2.addInitScript(INSTALL_TILE_CENSUS);
     await p2.addInitScript(([pin]) => {
       window.__flyLodFadeOverride = pin;
@@ -1200,7 +1201,7 @@ function soft(name, detail) {
           'Equality is the assertion — the live <= 261 ceiling is not what this leg is for; a ' +
           'crossfade adds nothing where there is nothing to fade'
       );
-    gate('(19) NO PAGE ERRORS ON THE ON LEG', errors2.length === 0, errors2.slice(0, 3).join(' | ') || 'clean');
+    gate('(19) NO PAGE ERRORS ON THE ON LEG', errors2.length === 0, errors2Note());
     await ctx2.close();
   }
 

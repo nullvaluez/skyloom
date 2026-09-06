@@ -40,6 +40,7 @@
  */
 const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
+const { attachPageErrors } = require('./_pageerrors');
 
 const POWELL = [40.1578, -83.0752, 900, 1.9, -0.3];
 const STRICT = process.env.FRAME_PACE_STRICT === '1';
@@ -166,7 +167,7 @@ async function serpentine(page, ms) {
   if (process.env.FLY_TILE_FIXTURE) await require('./_fixture').attachFixture(context);
   const page = await context.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(String(e)));
+  const errorsNote = attachPageErrors(page, errors);
   await page.addInitScript(INSTALL_TEAR_WATCH);
 
   await bootFly(page, { style: 'satellite', timeoutMs: 600000, settleMs: 8000 });
@@ -302,7 +303,7 @@ async function serpentine(page, ms) {
       '     software recorder, which composites the tear away).'
   );
 
-  gate('(9) NO PAGE ERRORS', errors.length === 0, errors.slice(0, 3).join(' | ') || 'clean');
+  gate('(9) NO PAGE ERRORS', errors.length === 0, errorsNote());
   console.log(`\n${pass} passed, ${fail} failed${notCalSummary()}`);
   await browser.close();
   process.exit(fail || notCalCount() ? 1 : 0);

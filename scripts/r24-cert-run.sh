@@ -350,7 +350,10 @@ run lod-fade    "$K" verify-lod-fade.js
 run step-clean   -   verify-step-clean.js
 run one-sun      -   verify-one-sun.js
 run linear-haze  -   verify-linear-haze.js
-run depth-rt     -   verify-depth-roundtrip.js
+# depth-rt is a SETTLED-POSE PIXEL PROBE — a content gate by §1.5, not a pacing
+# row: its raycast needs the world resident at the moment of the pick, and pass
+# 2b measured "0 raycast hits" running it with no budget scaler.
+run depth-rt    "$K" verify-depth-roundtrip.js
 run ladder-fix   -   verify-ladder-fix.js
 run ladder-red   -   verify-ladder-fix.js FLY_LADDER_RED=1
 # terra-live's yaw is FRAME-based as of A's b74e5be — 0.85 deg/frame with a

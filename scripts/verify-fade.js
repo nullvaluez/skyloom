@@ -135,6 +135,7 @@ if (process.env.FADE_PROBE_SELFTEST) {
 
 const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
+const { attachPageErrors } = require('./_pageerrors');
 
 const POWELL = [40.1578, -83.0752, 900, 1.9, -0.3];
 const COLUMBUS = [39.9612, -82.9988, 600, 1.9, -0.35];
@@ -316,7 +317,7 @@ async function serpentine(page, ms) {
   if (process.env.FLY_TILE_FIXTURE) await require('./_fixture').attachFixture(context);
   const page = await context.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(String(e)));
+  const errorsNote = attachPageErrors(page, errors);
   await page.addInitScript(INSTALL_FADE_WATCH);
 
   await bootFly(page, { style: 'satellite', timeoutMs: 600000, settleMs: 8000 });
@@ -525,7 +526,7 @@ async function serpentine(page, ms) {
       `sbReady=${owens.sb} skyReady=${owens.sky} draws=${owens.draws} (FIXTURE column; the live ` +
         'ceiling of <= 261 is not re-baselineable from here)'
     );
-  gate('(6) NO PAGE ERRORS', errors.length === 0, errors.slice(0, 3).join(' | ') || 'clean');
+  gate('(6) NO PAGE ERRORS', errors.length === 0, errorsNote());
 
   console.log(`\nreadySeries (every 5th frame, [sb, skyline]): ${JSON.stringify(w.readySeries.slice(0, 40))}`);
   console.log('\nRED TABLE (defect · gate · measured · green target)');

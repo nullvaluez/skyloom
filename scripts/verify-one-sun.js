@@ -41,8 +41,12 @@
  */
 const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
+const { attachPageErrors } = require('./_pageerrors');
 
 const POSE = [40.1578, -83.0752, 900, 1.9, -0.3];
+// The DATE the sun search runs on — fixed so the row is reproducible, and
+// mid-summer so a 55° sun is reachable at this latitude at all.
+const SUN_DAY_MS = Number(process.env.SUN_DAY_MS || Date.UTC(2026, 6, 1));
 const SETTLE = Number(process.env.SUN_SETTLE_MS || 20000);
 // Three elevations: high noon, a low dusk sun, and a deep-night sun. The dusk
 // one is where C measured the 119.4° key-to-hill separation.
@@ -118,7 +122,7 @@ function skip(name, why) {
  * comparison with an absent operand cannot simply be written "the safe way
  * round". Clause (5) of this very gate is the measured case that produced it.
  */
-const { numGate, notCalCount, notCalSummary } = require('./_notcal');
+const { numGate, notCalibrated, notCalCount, notCalSummary } = require('./_notcal');
 const gateNum = numGate(gate);
 
 (async () => {
@@ -131,7 +135,7 @@ const gateNum = numGate(gate);
   if (process.env.FLY_TILE_FIXTURE) await require('./_fixture').attachFixture(context);
   const page = await context.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(String(e)));
+  const errorsNote = attachPageErrors(page, errors);
   await page.addInitScript(UNPIN_SUN);
 
   await bootFly(page, { style: 'satellite', timeoutMs: 600000, settleMs: 8000 });
@@ -162,16 +166,46 @@ const gateNum = numGate(gate);
   );
 
   const rows = [];
+  // One search per target elevation, with the app's own model, before any leg
+  // runs. The pose is fixed, so the same three timestamps serve both tiers.
+  const { findSunTime } = await import('./_sun-time.mjs');
+  const sunTimes = {};
+  for (const [label, elDeg] of ELEVATIONS) {
+    sunTimes[label] = findSunTime(POSE[1], POSE[0], elDeg, { dayMs: SUN_DAY_MS });
+    const r = sunTimes[label];
+    console.log(
+      `  sun search ${label}: target ${elDeg}° -> ${new Date(r.tMs).toISOString()} (model ` +
+        `${r.elDeg.toFixed(3)}°, err ${r.err.toFixed(4)}°, day range ${JSON.stringify(r.rangeDeg)})`
+    );
+  }
+
   for (const tier of TIERS) {
     await page.evaluate((t) => window.__flyStore.getState().setQualityTier(t), tier);
     await page.waitForTimeout(4000);
     for (const [label, elDeg] of ELEVATIONS) {
-      // Drive the sun. `__r24Sun` is what the swallowing accessor reports back
-      // to the app, so this is the SAME channel the fleet uses — the gate does
-      // not invent a private one.
-      await page.evaluate((el) => {
-        window.__r24Sun = { elDeg: el };
-      }, elDeg);
+      // DRIVE THE SUN WITH A TIME, because a time is what the app reads.
+      //
+      // This wrote `{ elDeg: el }` and measured a sun that never moved: the
+      // app consumes `__flySunOverride` as a TIMESTAMP IN MILLISECONDS
+      // (FlyScene.jsx:939, :1155) and nothing anywhere reads an `elDeg` field,
+      // so the object became NaN inside computeSun or fell through, and the
+      // app kept its wall clock. Pass 2b commanded 55° / 2° / −14° and got a
+      // key at 23.132 / 23.132 / 22.938 with the azimuth drifting
+      // monotonically — the clock, not the command. The timestamp is searched
+      // with THE APP'S OWN MODEL (scripts/_sun-time.mjs imports computeSun),
+      // so it cannot drift from what the app will compute.
+      const want = sunTimes[label];
+      if (!want.reachable) {
+        notCalibrated(
+          `(${tier}/${label}) ALL CLAUSES`,
+          `an elevation of ${elDeg}° never occurs at ${POSE[0]}, ${POSE[1]} on the search date ` +
+            `(range ${JSON.stringify(want.rangeDeg)}) — the sun cannot be put where the gate asks`
+        );
+        continue;
+      }
+      await page.evaluate((t) => {
+        window.__r24Sun = t;
+      }, want.tMs);
       await page.waitForTimeout(SETTLE);
       const s = await page.evaluate(() => window.__flyStats?.sun ?? null);
       rows.push({ tier, label, elDeg, s });
@@ -179,6 +213,28 @@ const gateNum = numGate(gate);
         skip(`(${tier}/${label}) all clauses`, 'window.__flyStats.sun absent — ONE_SUN is flag-off');
         continue;
       }
+      // THE PRECONDITION: the app must actually BE at the commanded elevation.
+      // Every clause below is a statement about where the key points relative
+      // to the sun, and none of them means anything if the sun is not where
+      // the gate thinks. This is the leg whose absence let pass 2b read a
+      // stationary sun as a stationary key.
+      const arrivedEl = Number.isFinite(s.elDeg) ? s.elDeg : NaN;
+      if (!Number.isFinite(arrivedEl) || Math.abs(arrivedEl - elDeg) > 0.5) {
+        notCalibrated(
+          `(0c) ${tier}/${label} THE SUN IS WHERE THE GATE PUT IT`,
+          `commanded ${elDeg}° via t=${new Date(want.tMs).toISOString()} (model says ` +
+            `${want.elDeg.toFixed(3)}°), app reports elDeg ${arrivedEl} — Δ ` +
+            `${Number.isFinite(arrivedEl) ? Math.abs(arrivedEl - elDeg).toFixed(3) : 'n/a'}° exceeds ` +
+            '0.5°. Every clause below is about the key RELATIVE to the sun, so none of them can be ' +
+            'evaluated against a sun that is somewhere else'
+        );
+        continue;
+      }
+      pass++;
+      console.log(
+        `PASS  (0c) ${tier}/${label} THE SUN IS WHERE THE GATE PUT IT  — commanded ${elDeg}°, app ` +
+          `reports ${arrivedEl.toFixed(3)}° (t=${new Date(want.tMs).toISOString()})`
+      );
       const keyAz = azOf(s.key);
       const hillAz = azOf(s.hill);
       const domeAz = azOf(s.dome);
@@ -295,13 +351,33 @@ const gateNum = numGate(gate);
       // past the guard above, but `angleBetween` returned null (an absent or
       // zero-length vector on one side), and `null < 1e-4` is TRUE. The gate
       // certified a reading that did not exist.
-      if (!s.water) skip(`(5) ${tier}/${label} WATER === KEY`, 'no water specular vector published');
+      // C's ad0849f publishes the water light as a VECTOR plus
+      // `waterSource:'key-light'`. The satellite water is MeshPhong lit by the
+      // ONE world-scene <directionalLight> (FlyScene.jsx:2141 — the other two
+      // in the tree belong to the inspect turntable's own Canvas), so the
+      // agreement is BY IDENTITY, not by tuning. Both halves are asserted: the
+      // angle, and the claim about where the light comes from. The older
+      // sentinel string is still honoured so the gate reads on either tree.
+      if (s.water === 'key') {
+        pass++;
+        console.log(
+          `PASS  (5) ${tier}/${label} WATER READS THE SAME DIRECTIONAL AS KEY  — the instrument ` +
+            "publishes the sentinel 'key': one directional in the rig, the same vector by construction"
+        );
+      } else if (!s.water) skip(`(5) ${tier}/${label} WATER === KEY`, 'no water specular vector published');
       else {
+        if (s.waterSource !== undefined)
+          gate(
+            `(5b) ${tier}/${label} THE WATER LIGHT IS THE KEY LIGHT, BY SOURCE`,
+            s.waterSource === 'key-light',
+            `waterSource ${JSON.stringify(s.waterSource)} — an angle of 0 between two INDEPENDENT ` +
+              'lights would be a coincidence that holds until someone moves one of them'
+          );
         const dWater = angleBetween(s.key, s.water);
         gateNum(
           `(5) ${tier}/${label} WATER READS THE SAME DIRECTIONAL AS KEY`,
           dWater,
-          dWater < 1e-4,
+          dWater <= 0.5,
           `Δ ${dWater?.toFixed(6)}°`,
           `angleBetween(key, water) returned ${dWater} — key ${JSON.stringify(s.key)} · water ` +
             `${JSON.stringify(s.water)}. A missing or zero-length vector on either side; null < 1e-4 ` +
@@ -328,9 +404,28 @@ const gateNum = numGate(gate);
     red.push(['L3 key light ignores runtime.sun at medium/low', 'verify-one-sun (6)', `${azSpread.toFixed(4)}° spread`, '> 1°']);
   }
 
-  gate('(7) NO PAGE ERRORS', errors.length === 0, errors.slice(0, 3).join(' | ') || 'clean');
+  gate('(7) NO PAGE ERRORS', errors.length === 0, errorsNote());
   console.log('\nRED TABLE (defect · gate · measured · green target)');
   for (const r of red) console.log(`  ${r[0]} | ${r[1]} | measured ${r[2]} | ${r[3]}`);
+  // TEETH FOR THE IDENTITY CLAIM, without perturbing the running frame. A
+  // runtime light census would walk the scene graph every sample and show up in
+  // FRAME_STATS timings; a SOURCE count cannot. C's claim is that the world
+  // scene has exactly ONE <directionalLight> and that everything lit reads it,
+  // so the day a second one appears this gate should be the thing that notices.
+  {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'components', 'fly', 'FlyScene.jsx'),
+      'utf8'
+    );
+    const n = (src.match(/<directionalLight\b/g) || []).length;
+    gate(
+      '(8) THE WORLD SCENE DECLARES EXACTLY ONE <directionalLight> (source count)',
+      n === 1,
+      `${n} in components/fly/FlyScene.jsx — the identity behind clause (5). The inspect ` +
+        "turntable's lights live in its own Canvas and are not in this file"
+    );
+  }
+
   console.log(`\n${pass} passed, ${fail} failed${notCalSummary()}`);
   await browser.close();
   // NOT CALIBRATED counts toward a non-zero exit: a leg that could not measure

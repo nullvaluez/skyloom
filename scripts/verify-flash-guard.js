@@ -54,6 +54,7 @@
  */
 const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
+const { attachPageErrors } = require('./_pageerrors');
 const { settleWorld } = require('./_settle');
 
 const POWELL = [40.1578, -83.0752, 900, 1.9, -0.3];
@@ -392,7 +393,7 @@ async function serpentine(page, ms) {
   if (process.env.FLY_TILE_FIXTURE) await require('./_fixture').attachFixture(context);
   const page = await context.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(String(e)));
+  const errorsNote = attachPageErrors(page, errors);
 
   // THE RED LEG: B's runtime pin, set before the app mounts, so the two legs
   // are one boot apart — not one build apart.
@@ -517,7 +518,7 @@ async function serpentine(page, ms) {
   });
   await page.close();
   const page2 = await context.newPage();
-  page2.on('pageerror', (e) => errors.push('green: ' + String(e)));
+  const errorsNote2 = attachPageErrors(page2, errors, 'green: ');
   await page2.addInitScript(INSTALL_PALE);
   await bootFly(page2, { style: 'satellite', timeoutMs: 600000, settleMs: 8000 });
   await page2.evaluate(() => window.__flyStore.getState().setQualityTier('high'));
@@ -579,7 +580,7 @@ async function serpentine(page, ms) {
         'two boots — they settle different chunk counts — so the gate is on the ratio. A degenerate ' +
         'contributes nothing to computeVertexNormals, so removing it is provably shading-neutral.'
     );
-  gate('(6) NO PAGE ERRORS', errors.length === 0, errors.slice(0, 3).join(' | ') || 'clean');
+  gate('(6) NO PAGE ERRORS', errors.length === 0, errorsNote());
 
   console.log(`\nFLASH_GUARD telemetry on the armed leg: ${JSON.stringify(flagOn)}`);
   console.log(
