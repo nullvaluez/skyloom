@@ -452,14 +452,52 @@ not re-derive it:
 Cost is a GPU number (sky pixels are ~30–50 % of the frame at altitude), so it
 could not be ranked here even if it had been built.
 
+## §4.8 SHIP STATE AT CLOSE (W3 flip)
+
+| flag | ships | why, in one line |
+|---|---|---|
+| `AERIAL_LAW.nightRamp` (A8) | **ON** | uniform-only, own sub-flag, exact identity at noon — nothing for a pixel gate to catch |
+| `AERIAL_LAW.enabled` (the law) | **OFF** | complete structural evidence, zero pixels: no fixture A/B at any pose, and every horizon gate moves by construction |
+| `LOD_CROSSFADE.enabled` | **OFF — pending the pass-1 `verify-lod-fade` ON row** | clean RED (20/20 hard swaps), no GREEN: the ON leg was never booted on any tree |
+| `SKY_PROCEDURAL.enabled` | **OFF** | not built (§4.5) |
+
+**A8 ships ON while its parent ships OFF, and that is not a loophole.** The
+ramp is gated on `AERIAL_LAW.nightRamp` alone — FlyScene reads
+`if (AERIAL_LAW.nightRamp)` independently of `lawOn` and applies the multiplier
+to the LEGACY post strength on the `lawOn === false` branch — so with the law
+off, A8 is exactly what recon A8 asked for: a CPU multiply on an existing
+uniform, no shader text, no cache key, no program. `verify-atmo-law` §7 now
+asserts that independence rather than trusting it, because if those two ever
+collapsed into one flag the night fix would be hostage to a re-baseline batch
+it does not need.
+
+**A8 moves no frozen number, for a stated reason rather than by hope.**
+`verify-aerial`'s `aerial strength resolves to maxMix` assertion (0.55 ± 0.001)
+is taken at a NOON pose (`pose(36.75, -118.05, 2500, NOON, …)`), where
+`frac ≥ dayFrac` makes the multiplier EXACTLY 1. That identity is the property
+the ramp was shaped around. Below the band the legacy shader's own
+`uMaxMix <= 0.0` early-out returns the input unmodified, so deep night is
+bit-identical to no pass at all rather than merely darker.
+
+**Both gates now READ the ship state instead of pinning a literal.** A gate
+that asserts `enabled:false` forever is a gate that goes red the day the
+feature ships, which trains people to edit gates. What is invariant is that the
+state is declared, is one of the two legal values, and that the RED counter
+works in EITHER state — `hardSwaps` is incremented before the flag is
+consulted, which is what makes the flag-off tree calibratable without touching
+constants. `verify-lod-fade`'s `fadeSec` regex is also anchored to the KEY line
+(Fable's integration fix, adopted here): the block comment quotes `fadeSec: 6`
+as the probe pin that exposed the clamped-dt behaviour, and a loose regex
+matched the prose before the key.
+
 ## §4.9 M4 — GO / NO-GO
 
 | feature | gates | ceilings | new lazy compiles | verify-flicker | fixture A/B | RECOMMENDATION |
 |---|---|---|---|---|---|---|
-| **A8** (night ramp) | verify-atmo-law §6, 4/4 as a pure function | none touched (uniform-only) | none possible (no shader text, no key) | untouched | not needed — noon multiplier is EXACTLY 1, so noon is bit-identical | **FLIP ON** |
-| **AERIAL_LAW** | verify-atmo-law 41/41 incl. GLSL≡JS at 4,160 points and flag-off text identity | unmeasured here; adds no mesh | prewarm builds through the same `applyHillshade` + the same Effect constructor | untouched (nothing touches emissives or bloom) | **NOT CAPTURED** | **ON only after the horizon re-baseline batch runs with a fixture column, and after one fixed-pose Owens draw row.** Not before. |
-| **LOD_CROSSFADE** | verify-lod-fade 51/51 (Fable's regex fix included) | Owens row unmeasured | tile program is prewarmed with the slot | untouched | RED captured, ON leg NOT captured | **HOLD at OFF for this round** unless the certification run's browser leg lands the ON row. |
-| **SKY_PROCEDURAL** | — | — | — | — | — | **OFF** (not built; design in §4.5) |
+| **A8** (night ramp) | verify-atmo-law §6 + §7, as a pure function AND as a source-gated independence proof | none touched (uniform-only) | none possible (no shader text, no key) | untouched | not needed — noon multiplier is EXACTLY 1, so noon is bit-identical | **SHIPPED ON** |
+| **AERIAL_LAW** | verify-atmo-law 45/45 incl. GLSL≡JS at 4,160 points and flag-off text identity | unmeasured here; adds no mesh | prewarm builds through the same `applyHillshade` + the same Effect constructor | untouched (nothing touches emissives or bloom) | **NOT CAPTURED** | **SHIPPED OFF.** ON only after the horizon re-baseline batch runs with a fixture column, and after one fixed-pose Owens draw row. Not before. |
+| **LOD_CROSSFADE** | verify-lod-fade 51/51 (Fable's regex fix included) | Owens row unmeasured | tile program is prewarmed with the slot | untouched | RED captured, ON leg NOT captured | **SHIPPED OFF — pending the pass-1 ON row.** Flip criteria in §4.10. |
+| **SKY_PROCEDURAL** | — | — | — | — | — | **SHIPPED OFF** (not built; design in §4.5) |
 
 What each recommendation rests on, and what it does not:
 
@@ -556,6 +594,131 @@ ReferenceError.
 matches the `fadeSec: 6` quoted in the block COMMENT before the real
 `fadeSec: 0.25` key. Fable has already fixed it on integration (anchored to the
 key line); duplicating the fix here would only make a conflict.
+
+## §4.10 LOD_CROSSFADE flip criteria — the corrected set
+
+An earlier draft of this table said "`hardSwaps` flat at 20". **That was wrong
+and is struck.** It came from loose wording on my part — I meant "the event
+count must not change" — and from a number measured at a different pose. A
+criterion the record cites must be the one the gate asserts, so here is the
+set, derived from what the counters actually mean in
+`lib/fly/lod-crossfade.js`.
+
+**What the counters mean.** `onRefine` / `onMerge` each increment
+`refines` / `merges` unconditionally, then increment EITHER `hardSwaps` (no
+blend) OR `faded` (a blend was armed). So `hardSwaps` is not an event count; it
+is the un-blended SHARE of the events.
+
+**Invariant, both legs, always:**
+
+    refines + merges === hardSwaps + faded
+
+**Flip criteria (ON leg vs the OFF leg, SAME pose, SAME sweep, SAME
+`TERRA_PACE`):**
+
+| # | criterion | why it is the right one |
+|---|---|---|
+| 1 | `refines + merges` **flat** OFF→ON | the feature must not change how often the LOD refines — only whether the swap is blended |
+| 2 | `hardSwaps` **drops** toward 0; `faded` **rises** | a flat `hardSwaps` would mean the feature did nothing |
+| 3 | `active === 0` **and** `retained === 0`, reached by **polling until `active === 0`, cap 90 rendered frames, reporting the frames it took** (NOT a fixed frame count — see below) | every blend completed and every retained parent texture was released; `retained > 0` at rest is a texture LEAK and is the most valuable thing this leg can catch |
+| 4 | `0 < peakActive <= 32` | blends actually ran, and the bound held |
+| 5 | `skip.concurrency` read **together with** `peakActive` | `> 0` with `peakActive === 32` is the bound doing its job (report); `> 0` with `peakActive < 32` is a bug in D's accounting (fail) |
+| 6 | `skip.shape`, `skip.noParentMap`, `skip.unpatched` all **0** | each is a real defect: the 2-child z0/4326 path, a parent with no map, materials not patched at arm time |
+| 7 | Owens **equal** to the OFF leg's fixture numbers (draws 174 / tris 166,659) | neither feature adds a mesh, so anything but equality IS the finding — not merely ≤ 261 |
+| 8 | 0 pageerrors | |
+
+**How the leg must be pinned, and why — this is a venue fact, not a
+preference.** `window.__flyLodFadeOverride = { enabled: true, skipBootMs: 0 }`,
+plus a **≥ 20 rendered-frame post-warp settle before the counters are
+snapshotted**.
+
+`skipBootMs` is 6000 **fade-clock** ms and the fade clock advances at most
+50 ms per RENDERED frame (FlyScene clamps `dt`), so 6000 ms is **120 frames**.
+A 40 s sweep at 1–3 fps is only ~40–120 frames, with boot already having burned
+an unknown share. Unpinned, `skip.boot` eats the refines and the leg prints a
+red that really reads "the boot suppression never expired". `lodFadeWarp()`
+sets a 900 ms window = **18 frames** = 6–18 s of a 40 s sweep, hence the
+settle. Both suppressions are POLICY and are already gated structurally by
+`verify-lod-fade` §5; this leg's job is "does the blend happen".
+
+**CORRECTION (2026-09-06, found reviewing E's leg): "≥ 10 rendered frames" was
+my number and it is wrong on any fast GPU.** A drain must cover `fadeSec` of
+FADE CLOCK, and the fade clock advances `min(delta, 0.05)` per rendered frame.
+At this venue's ~50 ms frames, 250 fade-ms is 5 frames and 10 is comfortable.
+At 60 fps it is 16.7 ms per frame, so 10 frames buys only 167 ms — **less than
+the 250 ms blend** — and an `active === 0` assertion fails on a healthy
+machine, reporting a D defect that is really a too-short wait. The same
+arithmetic breaks the warp settle: 900 fade-ms is 18 frames here but **54 at
+60 fps and ~130 at 144 Hz**, so a fixed 20 clears the cut only at this venue.
+
+**The rule, replacing both counts: poll to the CONDITION with a frame cap, and
+report the frames it took.** For the drain, poll until **`active === 0`, cap 90
+rendered frames**, and print the frames consumed. For the warp settle, poll
+until **`skip.warp` is unchanged across two consecutive reads** — 90 covers
+250 fade-ms at any frame rate down to ~2.8 ms/frame, and printing the count is
+what turns a slow drain into a diagnosis instead of a mystery. That is
+fps-independent, it absorbs a blend armed by streaming during the drain, and it
+is the only form that survives moving to the user's machine — which is where
+every timing claim of this round has to end up. Any fixed frame count in a
+gate that waits on the fade clock is a venue constant wearing a portable
+number's clothes.
+
+**A comparison is only controlled if both arms were measured the same way.**
+The `refines + merges` flatness check compares two separate boots of a
+streaming world; `_update` issues refines per frame walk, so the arms must get
+the SAME pre-sweep settle and must render comparable numbers of frames. If
+they do not, the honest output is NOT CALIBRATED — "the two arms did not
+render comparable numbers of frames" — not a red. Plan §4's rule applies
+directly: a load-decided instrument gets a control, never a new bound.
+
+**Two reading rules that prevent false conclusions:**
+- **The counters have no reset.** `resetLodFades()` clears only `active`,
+  `retained` and `skip.*`; `hardSwaps`, `faded`, `refines`, `merges` and
+  `peakActive` accumulate for the session. Diff before/after snapshots — and
+  `peakActive` is a high-water mark that CANNOT be diffed; read it absolute and
+  note it includes boot.
+- **Do not equate D's counters with E's frame-differ.** E's "8 hard refines +
+  3 hard merges" is a frame-diff observation; `refines`/`merges` are call-site
+  counters that see entries E's differ cannot. Report both, assert neither
+  against the other.
+
+**Honest exit condition.** If `refines + merges` is 0 in the measured window,
+the leg must print **NOT CALIBRATED** — no LOD events occurred, so nothing was
+testable — rather than a red. If `faded` is 0 while `skip.boot` and
+`skip.warp` are both 0 and `refines + merges > 0`, that is a genuine RED
+against D's code and I want it.
+
+## §4.11 A gate must not assert what another owner ships
+
+Found by Fable's dry-run merge of all five flipped branches. Three of D's key
+assertions compared `applyHillshade`'s cache key against a LITERAL —
+`'world-bend-fade-hill-r19'`, `'…-l24'`, `'…-a24'` — which was correct on this
+branch and wrong on the integrated tree, where C ships `ONE_SUN` and
+`TERRAIN_LIGHT.fragmentHill` ON and the key is therefore `-ef24` / `-efl24` /
+`-efa24`. Three reds, none of them a defect.
+
+`world-bend-fade-hill-r19` is the ONE key two owners bump, so a literal in D's
+gate is D asserting what C ships. The expectation is now DERIVED: read the live
+`e`/`f` from the shipped constants, force only D's own token, and call the same
+`r24VariantKey` the material calls. What is asserted is the PROPERTY — D's
+token present exactly when D's flag is on, at its fixed position; the key with
+D's token off equal to whatever the other owners' tokens alone produce — plus,
+separately and world-independently, that **all four tokens false is the bare
+R19 key**, which is the flag-off identity proof and depends on nobody.
+
+Two details that would have made a wrong gate pass:
+- **`e` is `ONE_SUN.enabled || TERRAIN_LIGHT.enabled`, an OR** — not
+  `ONE_SUN.enabled` alone. Mirroring the shorthand instead of the source would
+  have made the gate green on a tree whose key is wrong.
+- The order is the contract, so the gate sweeps **all sixteen token states**
+  through the helper. A token that moved position would serve one owner's
+  program for another's — the R4 wrong-cached-program defect, which is the
+  whole reason the helper exists.
+
+Proven in BOTH worlds by running, not by arguing: green on this branch
+(`-r19` → `-r19-l24` / `-r19-a24`) and green with `ONE_SUN` and
+`TERRAIN_LIGHT` forced on (`-r19-ef24` → `-r19-efl24` / `-r19-efa24`), the
+constants restored afterwards. Gate counts rose 51 → 55 and 45 → 48.
 
 ## §5 Decisions
 
