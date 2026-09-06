@@ -359,6 +359,25 @@ async function serpentine(page, ms) {
     },
     evictions: window.__satBuildings?.stats?.evictions ?? null,
     heals: window.__satBuildings?.stats?.heals ?? null,
+    // B's EXHAUSTIVE heal outcomes (HEAL_IN_PLACE). The total alone cannot be
+    // read: four of the six outcomes are not holes at all.
+    healOutcomes: (() => {
+      const st = window.__satBuildings?.stats ?? null;
+      if (!st) return null;
+      const keys = [
+        'heals',
+        'healsInPlace',
+        'healsNoop',
+        'healsQueueFull',
+        'healsAborted',
+        'healsNoRecord',
+        'healsCoalesced',
+        'redraping',
+      ];
+      const out = {};
+      for (const k of keys) if (st[k] !== undefined) out[k] = st[k];
+      return out;
+    })(),
   }));
 
   // The channel reading is only interpretable NEXT TO the flag it depends on,
@@ -383,6 +402,27 @@ async function serpentine(page, ms) {
   console.log(
     `  ready sb ${w.ready0.sb} -> ${w.ready1.sb} · skyline ${w.ready0.sky} -> ${w.ready1.sky} · ` +
       `chunks ${w.ready0.chunks} -> ${w.ready1.chunks} · evictions ${w.evictions} · heals ${w.heals}`
+  );
+  // (b) HEAL_IN_PLACE — THE TOTAL IS NOT THE HOLE COUNT. B's engine counts every
+  // heal outcome exhaustively and asserts their equality in its own gate:
+  //   healsInPlace   the drape landed on the resident mesh — no hole, the fix
+  //   healsNoop      nothing to do
+  //   healsQueueFull the budget was spent — THE ONLY OUTCOME THAT IS A HOLE
+  //   healsAborted   the chunk was evicted under the job — MOOT: no chunk, no hole
+  //   healsNoRecord  water-only
+  //   healsCoalesced a re-drape for that key was already in flight
+  //   redraping      still draining
+  // So a residual heal hole in a browser row is read against healsQueueFull
+  // ONLY. Reading it against `heals` would indict four outcomes that are
+  // working exactly as designed — the same mistake shape as counting a
+  // sustained field as a flash, or an absent __fadeU as a missing instrument.
+  console.log(
+    `  HEAL OUTCOMES (holes are healsQueueFull ONLY): ${JSON.stringify(w.healOutcomes)}` +
+      (w.healOutcomes?.healsQueueFull === undefined
+        ? '  [healsQueueFull unpublished — the hole rule cannot be applied from this run]'
+        : w.healOutcomes.healsQueueFull === 0
+          ? '  [0 budget-starved heals: no hole is attributable to the heal path]'
+          : `  [${w.healOutcomes.healsQueueFull} budget-starved heals — these are the only holes]`)
   );
   if (w.samples.length) console.log('  first events:', JSON.stringify(w.samples.slice(0, 6)));
 
@@ -428,9 +468,13 @@ async function serpentine(page, ms) {
     '      VENUE NOTE for (3): `_startDeath` writes value = _altFade (1.0 at these poses) and the ' +
       'value only moves on the NEXT _stepFades. At ~2.84 s per frame here, a 0.3 s evictSec ramp ' +
       'cannot span two samples, so EVERY death reads hard BY CONSTRUCTION regardless of the ' +
-      "feature — until B's frame-count floor lands (progress = min(elapsed/sec, framesSince/" +
-      'minFrames), minFrames 3, so a ramp spans >= 3 partial samples at any frame rate while ' +
-      'elapsed still governs at 60 fps). Read (3) here against fadeBudgetMiss, not against 0.'
+      "feature — until B's frame-count floor lands (r24/b 45e2cde: progress = min(elapsed/sec, " +
+      'framesSince/minFrames) through rampT in chunk-fade.js, in BOTH engines and BOTH ramps). ' +
+      'minFrames is 4, not 3, and births and deaths do not give the same count: a birth starts at ' +
+      '0 so N frames give N partial samples, a death starts at FULL presence so N frames give ' +
+      'N-1 — expect deaths to span >= 3 partial samples here, not >= 4. At 60 Hz 0.3 s is 18 ' +
+      'frames, far above the floor, so elapsed still governs and the shipped look is unchanged. ' +
+      'Read (3) against fadeBudgetMiss, not against 0.'
   );
   red.push(['WB-2 evict is a single-frame disappearance', 'verify-fade (3)', `${w.hardDeaths}/${w.deaths}`, '0']);
   gate(

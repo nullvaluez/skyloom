@@ -1084,6 +1084,40 @@ is that exact sequence.
   applied and printed: `hardDeaths ≤ fadeBudgetMiss` = capped as designed;
   `hardDeaths > fadeBudgetMiss` = the unexplained remainder that is the defect.
 
+**B's ramp floor is committed (`r24/b 45e2cde`)** — `progress = min(elapsed/sec,
+framesSince/minFrames)` through `rampT`, in both engines and both ramps, with
+**`minFrames` 4, not 3**. Births and deaths do not give the same sample count
+and the gate now says so: **a birth starts at 0, so N frames give N partial
+samples; a death starts at FULL presence, so N frames give N−1.** The venue
+should therefore show deaths spanning **≥ 3** partial samples, not ≥ 4. At 60 Hz
+a 0.3 s ramp is 18 frames, far above the floor, so `elapsed` still governs and
+the shipped look is unchanged. B's proof rows: dt 2.84 s → **pops 0** (was 92
+flag-off); dt 16.7 ms → 4 pops, **all `fadeBudgetMiss`**; a 500 ms hitch
+mid-ramp cannot complete a ramp; `--off` → 92 pops **byte-identical**.
+
+**HEAL_IN_PLACE: the heal TOTAL is not the hole count.** B's engine now counts
+every outcome exhaustively, with equality asserted in B's own gate, and only one
+of them is a hole:
+
+| Outcome | Is it a hole? |
+|---|---|
+| `healsInPlace` | no — the drape landed on the resident mesh; this IS the fix |
+| `healsNoop` | no — nothing to do |
+| **`healsQueueFull`** | **YES — the budget was spent. The only hole.** |
+| `healsAborted` | no — the chunk was evicted under the job: **moot, no chunk no hole** |
+| `healsNoRecord` | no — water-only |
+| `healsCoalesced` | no — a re-drape for that key was already in flight |
+| `redraping` | no — still draining |
+
+So a residual heal hole in any browser row is read against **`healsQueueFull`
+only**. Reading it against `heals` would indict four outcomes working exactly as
+designed — the same mistake shape as counting a sustained field as a flash, or
+an absent `__fadeU` as a missing instrument. This row's `heals 9` is, on its
+own, uninterpretable; the re-take prints the full taxonomy.
+
+**Expected re-take reading on this venue:** births **29/29 SOFT**, deaths
+spanning **≥ 3 partial samples**, hard deaths **≤ `fadeBudgetMiss`**.
+
 **The legs that did read correctly** — a VOID row is not a worthless row: (1)
 the watch had 29 births / 20 deaths to watch; (4) ready 4 of 16, series
 `[[5,0]…[7,0],[0,0],[0,1]…[3,10]]`; **(5) the Owens lock held — sbReady 0 /
