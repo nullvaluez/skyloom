@@ -479,6 +479,29 @@ zero-length wrap-around edge emits two coincident-vertex triangles per ring and
 per hole. A fixture that had quietly emitted unclosed rings would have shown 0
 here and certified a fix that fixes nothing.
 
+**Row verdict: `rc=1`, 534 s, 5 passed / 1 failed — and the one failure is the
+RED calibration working.** Gate (3) GREEN requires zero degenerates with the
+guard armed, and `FLASH_GUARD.enabled` is FALSE in constants on this tree. The
+gate releases B's RUNTIME pin (`__flyFlashPin`), which is a different switch, so
+on a flag-off tree (3) CANNOT pass. Its own detail text says so. The green leg
+measured 1,744 / 20,935 = 8.33% at Powell — the same population, a third boot.
+
+**This row is therefore an expected FAIL until `FLASH_GUARD` ships ON**, and it
+is the go/no-go for that flip. Today's useful signal is gates (1a)(1b)(2)(5)(6)
+and the census numbers above.
+
+Two instrument defects found by reading the row rather than trusting it, both
+fixed:
+- gate (5) was **vacuous** — `green.totalTris <= 0 || > 0` is a tautology, and
+  it printed `pinned=n/a`. It now compares the sat-buildings degenerate RATE
+  between the two legs, because the legs are separate boots that settle
+  different chunk counts and absolute totals are not comparable; and when
+  either leg resolves no triangles it prints NOT CALIBRATED rather than a
+  verdict.
+- `flagOn(probe)=true` was **misleading**: it read `__flyFlashPin === undefined`
+  on a page that never set the pin. It now reports the feature's telemetry and
+  the runtime pin as data, and claims nothing about `FLASH_GUARD.enabled`.
+
 ---
 
 ## §2.9 Which tree the certification run actually measured

@@ -317,6 +317,7 @@ async function serpentine(page, ms) {
   await bootFly(page, { style: 'satellite', timeoutMs: 600000, settleMs: 8000 });
   await page.evaluate(() => window.__flyStore.getState().setQualityTier('high'));
 
+  const scenesRed = {};
   for (const [name, pose] of [
     ['powell', POWELL],
     ['manhattan', MANHATTAN],
@@ -328,6 +329,7 @@ async function serpentine(page, ms) {
     await page.evaluate(PIN_POSE, pose);
     await page.waitForTimeout(SETTLE);
     const c = await page.evaluate(CENSUS);
+    scenesRed[name] = c;
     const pct = c.totalTris ? (100 * c.totalZero) / c.totalTris : 0;
     console.log(
       `${name}: ${c.meshes} meshes, ${c.totalTris} tris, ${c.totalZero} ZERO-AREA (${pct.toFixed(2)}%)`
@@ -407,9 +409,13 @@ async function serpentine(page, ms) {
   await page2.evaluate(PIN_POSE, POWELL);
   await page2.waitForTimeout(SETTLE);
   const green = await page2.evaluate(CENSUS);
-  const flagOn = await page2.evaluate(
-    () => typeof window.__flyStats?.flashGuard === 'object' || window.__flyFlashPin === undefined
-  );
+  // NOT "is the flag on" — an absent runtime pin on a page that never set one
+  // says nothing about FLASH_GUARD.enabled. Report what is actually knowable:
+  // whether the feature published any telemetry at all.
+  const flagOn = await page2.evaluate(() => ({
+    telemetry: window.__flyStats?.flashGuard ?? null,
+    runtimePin: window.__flyFlashPin ?? null,
+  }));
   const gpct = green.totalTris ? (100 * green.totalZero) / green.totalTris : 0;
   console.log(
     `powell (no pin): ${green.meshes} meshes, ${green.totalTris} tris, ${green.totalZero} ZERO-AREA (${gpct.toFixed(2)}%)`
@@ -422,15 +428,42 @@ async function serpentine(page, ms) {
         ? '  [expected while FLASH_GUARD.enabled is false — this is the pre-fix state]'
         : '')
   );
-  gate(
-    '(5) TRIANGLE COUNT ONLY EVER FALLS — the filter removes degenerates, never real geometry',
-    green.totalTris <= 0 || green.totalTris > 0,
-    `pinned=${'n/a'} armed=${green.totalTris} (compared per-site in the ledger; a degenerate contributes ` +
-      'nothing to computeVertexNormals, so shading is provably unchanged)'
-  );
+  // (5) was VACUOUS as first written — `green.totalTris <= 0 || > 0` is a
+  // tautology and it printed "pinned=n/a", which is the shape this round has
+  // already been burned by twice. The honest comparison is per-site and
+  // NORMALISED: the two legs are separate boots that settle different numbers
+  // of chunks, so absolute totals are not comparable — the RATIO of degenerates
+  // to triangles is.
+  const pinnedRate = (() => {
+    const sb = (scenesRed.powell || {}).sites?.['sat-buildings'];
+    return sb && sb.tris ? sb.zero / sb.tris : null;
+  })();
+  const armedRate = (() => {
+    const sb = green.sites['sat-buildings'];
+    return sb && sb.tris ? sb.zero / sb.tris : null;
+  })();
+  if (pinnedRate === null || armedRate === null)
+    console.log(
+      'NOT CALIBRATED  (5) — one of the two legs resolved no sat-building triangles, so there is ' +
+        'nothing to compare. Not a pass and not a fail.'
+    );
+  else
+    gate(
+      '(5) THE DEGENERATE RATE FALLS, AND NEVER RISES, WITH THE GUARD ARMED',
+      armedRate <= pinnedRate + 1e-9,
+      `sat-buildings degenerate rate ${(pinnedRate * 100).toFixed(2)}% (pin off) -> ` +
+        `${(armedRate * 100).toFixed(2)}% (armed). Absolute totals are NOT comparable across the ` +
+        'two boots — they settle different chunk counts — so the gate is on the ratio. A degenerate ' +
+        'contributes nothing to computeVertexNormals, so removing it is provably shading-neutral.'
+    );
   gate('(6) NO PAGE ERRORS', errors.length === 0, errors.slice(0, 3).join(' | ') || 'clean');
 
-  console.log(`\nflagOn(probe)=${flagOn}`);
+  console.log(`\nFLASH_GUARD telemetry on the armed leg: ${JSON.stringify(flagOn)}`);
+  console.log(
+    'NOTE: gate (3) can only go GREEN once FLASH_GUARD.enabled is true in constants. This gate ' +
+      'releases B\'s RUNTIME pin, which is not the same switch — so on a flag-off tree a FAIL at ' +
+      '(3) is the RED calibration working, not a regression.'
+  );
   console.log('\nRED TABLE (defect · gate · measured · green target)');
   for (const r of red) console.log(`  ${r[0]} | ${r[1]} | measured ${r[2]} | ${r[3]}`);
   console.log(`\n${pass} passed, ${fail} failed`);
