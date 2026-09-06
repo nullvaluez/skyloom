@@ -264,6 +264,34 @@ had:
 
 That is written up for E; the existing eleven gates keep their numbers.
 
+**CLOSED (F4, sha `6ac995f`).** Three of the four are now IN
+`scripts/verify-monuments-sat.js`, appended after every frozen gate and after
+the screenshots, reading a SECOND probe function so the frozen probe's return
+shape is untouched (it also finds `monument-marquee`, which the frozen probe
+skips because it filters on `isInstancedMesh`). Its `gate()` count is now 13 =
+10 frozen + zero-errors + the three added, none removed.
+
+The fourth — "toy monuments are still MeshToon with their 3-step ramp" — lives
+in `verify-c-flagoff.mjs` instead, deliberately: it is a claim about an
+UNREACHABLE BRANCH, unreachability is a source property, and asserting it in a
+satellite-booting harness would mean adding a style flip to a gate whose eleven
+frozen numbers are the point.
+
+**RED/GREEN calibrated without a browser, and it answers a stricter question.**
+The browser-gate budget belongs to certification, so the calibration is nine
+node gates (`verify-c-flagoff` 26 → 37). A browser gate reads whichever material
+happened to be constructed at one pose in one style; these prove **which branch
+can run**, in both styles, under both flag states, from source — including the
+RED itself as a source fact: with `ONE_SUN` off the guarded early return is not
+taken and the satellite archetype falls through to the R13 stone-ramp Toon,
+which fails gate 8 (not Lambert) and gate 9 (Toon is not one of the three
+classes three gives `scene.environment` to). **Gate 10 passes trivially on a
+flag-off tree** because both representations are Toon — it is a guard against a
+future half-move, which is exactly what R20 §5b.4 describes happening to the
+Taj, not a RED, and its own comment says so. Also asserted: three's envmap class
+list has not moved under us, and both monument Lamberts read
+`LAMBERT_ENV.reflectivity`.
+
 ### Cost
 
 0 draws, 0 new programs at medium/low (the directional already existed and its
@@ -590,6 +618,67 @@ polygonOffset is GL state, not a shader define, so this is a state-fidelity fix,
 not a cache-key one.) That is exactly the drift a one-implementation rule exists
 to prevent, caught by the rule on the day it was written.
 
+### DEFECT — `offsetUnits` was never imported into FlyScene.jsx (fixed, see below)
+
+The T11 change made the catcher's material read the shared helper —
+`polygonOffsetUnits: offsetUnits(gl, -1)` — and **did not add `offsetUnits` to
+FlyScene.jsx's `world-bend` import list**. It is a `ReferenceError` the instant
+that `useMemo` runs.
+
+**Exactly which flag/tier/style reaches that line**, because that is the
+condition under which the catcher would have crashed the scene:
+
+```
+satShadowsOn = mapStyle === 'satellite'
+            && SAT_SHADOWS.enabled            (true)
+            && qualityTier === 'high'
+            && satShadowPin                   (false whenever __flySatShadowOverride === 0)
+
+mount        = satShadowsOn && (SAT_SHADOWS.catcher.enabled || SHADOW_CALM.enabled)
+                               (false)          (ships false)
+```
+
+So the line is reached only with **`SHADOW_CALM.enabled = true` AND satellite
+AND tier `high` AND the satellite-shadow dev pin NOT 0.** Every one of those
+four must hold; on the shipped tree the flag alone rules it out, so the
+component never mounts and the ReferenceError is unreachable.
+
+**Which of my browser gates ran after `fd7d28d` with SHADOW_CALM armed: NONE,
+and there are two independent reasons — which is precisely why nothing tripped
+it.**
+
+1. **No run of mine ever armed the flag.** Every fixture attempt was a flag-off
+   measurement; the live audit printed `oneSun:false` and `hillElev:1`, and
+   `SHADOW_CALM` shipped `enabled:false` throughout. The one instrument I wrote
+   (`r24-c-measure-hillshade.js`) drives `__flyHill.set()`, which does not touch
+   this component.
+2. **Even armed, the fleet could not have reached it.** `scripts/_boot.js` pins
+   `__flySatShadowOverride = 0` for every browser harness, which makes
+   `satShadowPin` false and `satShadowsOn` false — so the mount condition fails
+   on its FIRST term regardless of the flag. **The first run that could ever
+   mount this catcher is `verify-shadow-calm`, the gate whose own recipe in this
+   ledger says it "must un-pin `__flySatShadowOverride` and prove the pass is
+   reachable at high tier" — and that gate does not exist yet.** The defect was
+   sitting behind the exact pin whose removal my own gate recipe identifies as
+   step one.
+
+That is recon **HARN-GAP-5** biting a second time in one round, on my own code:
+the fleet pins neutralise exactly the ship-state visuals this pass changes, so
+an unmounted component is indistinguishable from a working one. And my node
+gate could not see it either — `verify-c-flagoff` asserts branch *gating*, not
+identifier *resolution*; those are different properties and only a linter with
+`no-undef` (or a module load) answers the second.
+
+**Fixed** by adding `offsetUnits` to the import list, one line, nothing else.
+RED/GREEN, node-only:
+
+```
+RED   (fix stashed) components/fly/FlyScene.jsx:351:27  'offsetUnits' is not defined.
+GREEN (28 changed files, no-undef): 0 errors
+      residual 7 = react-hooks/immutability, all pre-existing
+      (CloudField 463/499, FlyCanvas 32, FlyEffectComposer 236/312/313/334)
+```
+
 ### Instrument for E — `__flyStats.shadow`
 
 `{ enabled, installed, biasSign, kernel, casting, mapSize, radiusM, texelM,
@@ -910,6 +999,18 @@ contract is `> 2/255`; the question is only whether the measured margin has
 
 ---
 
+## Two key-NEUTRAL shader-text edits (F11, sha `6ac995f`)
+
+The world-bend registry header now lists them, because that header is the
+inventory and a reader must not conclude from absence that no other shader text
+moves. In both cases having **no** cache key is CORRECT rather than an omission,
+and the header says why:
+
+| edit | why no key |
+|---|---|
+| `lib/fly/shadow-kernel.js` — two string edits to three's shared `ShaderChunk.shadowmap_pars_fragment` (the PCF reversed-depth `#ifdef`; the world-locked Vogel rotation) | **No MATERIAL is touched.** three's program cache key is a function of material state, not of chunk contents — every shadow receiver simply compiles a different chunk body. That is exactly the property three's `CSM.js` lacks: it patches through `onBeforeCompile`, the hook all 15 world-bend variants already own, and would re-key every one of them. |
+| `components/fly/Effects.jsx` `patchDofDepth` — deletes postprocessing's own `depth=1.0-depth;` from one CoC material instance | The CoC material is **postprocessing's**, not a world-bend variant, and carries no `customProgramCacheKey` at all — its identity IS its instance. The **el()/raw() twin rule** covers it instead: `patchDofDepth` is called from both, so the pre-warm cannot compile a program production never binds. |
+
 ## Decisions, and the ones that were refusals
 
 1. **No constants moved, in four milestones running.** LINEAR_HAZE's re-tune
@@ -963,7 +1064,14 @@ contract is `> 2/255`; the question is only whether the measured margin has
    was a measurement of the streaming world and an animating cloud deck. The
    tell was that the number rose as the effect got *weaker*. **Read the
    ordering before reading the value.**
-10. **Two rounds had already written down the trap I fell into.** R16's
+10. **A flag-off tree hides a crash as well as it hides a feature.** The
+   catcher's missing `offsetUnits` import is a ReferenceError that needed four
+   conditions to fire, and the shipped flag state removes one of them — so it
+   was invisible to every gate, including my own flag-off gate, which asserts
+   branch GATING and not identifier RESOLUTION. Those are different properties;
+   `no-undef` over the changed files answers the second in milliseconds and now
+   belongs in the per-agent close list.
+11. **Two rounds had already written down the trap I fell into.** R16's
    "animated layers pollute their own A/B noise" and R17 §7.1's "a pixel-probe
    gate must not contain an actor it doesn't control" are both in this repo,
    and the affordance to obey them (`window.__flyClouds`) was already there.

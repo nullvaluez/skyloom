@@ -13,7 +13,13 @@
  *   (2) every GLSL injection C added is inside a predicate ternary whose false
  *       branch is the R21 string (so flag-off cannot reach new text);
  *   (3) the FINAL tile key goes through the shared `r24VariantKey` helper and
- *       returns the bare R19 key when every token is false.
+ *       returns the bare R19 key when every token is false;
+ *   (4) the MONUMENT MATERIAL CONTRACT (R24 C, F4) — the RED/GREEN calibration
+ *       for `verify-monuments-sat`'s three added gates, plus the fourth
+ *       contract ("toy monuments are still MeshToon with their 3-step ramp")
+ *       which lives here and only here because it is a claim about an
+ *       UNREACHABLE BRANCH, and unreachability is a source property that a
+ *       satellite-booting harness cannot assert without a style flip.
  *
  * Run: node scripts/verify-c-flagoff.mjs
  */
@@ -115,6 +121,122 @@ gate(
   'the cloud shader early-outs at mix 0',
   /if \( uCloudMix <= 0\.0 \) return col;/.test(cm)
 );
+
+// ---- monument material contract -------------------------------------------
+// R24 C (F4). `scripts/verify-monuments-sat.js` gained three browser gates for
+// the ONE_SUN material swap (Toon → Lambert in satellite). That harness needs a
+// browser, and this container's browser-gate budget belongs to certification —
+// so its RED/GREEN is calibrated HERE, structurally, from the two components'
+// own source. This is not a weaker substitute for the browser gate; it answers
+// a different and stricter question. A browser gate reads whichever material
+// happened to be constructed at one pose in one style; this proves WHICH
+// BRANCH CAN RUN, in both styles, under both flag states, without booting
+// anything.
+//
+// The fourth contract in C's ledger — "toy monuments are still MeshToon with
+// their 3-step ramp" — lives here and only here, deliberately: it is a claim
+// about an UNREACHABLE branch, and unreachability is a source property. A
+// satellite harness cannot assert it without a style flip, and a style flip in
+// a harness whose eleven frozen numbers are the point is a bad trade.
+const LM = read('components/fly/LandmarkMonuments.jsx');
+const MM = read('components/fly/MonumentModels.jsx');
+
+// The satellite swap is guarded by the flag in BOTH representations, and the
+// guard returns EARLY — so with the flag off the Toon construction below it is
+// the only reachable one. That is the RED the browser gates will read.
+gate(
+  'archetype: the Lambert swap is ONE_SUN-guarded and returns early',
+  /if \(ONE_SUN\.enabled && ONE_SUN\.monumentsLambert\) \{[\s\S]{0,400}?new MeshLambertMaterial\(\{[\s\S]{0,200}?vertexColors: true,[\s\S]{0,1600}?return ml;\s*\}/.test(
+    LM
+  )
+);
+gate(
+  'marquee: the Lambert swap is ONE_SUN-guarded, satellite-only, returns early',
+  /if \(!isToy && ONE_SUN\.enabled && ONE_SUN\.monumentsLambert\) \{[\s\S]{0,300}?new MeshLambertMaterial\(\{ vertexColors: true, side: DoubleSide \}\);[\s\S]{0,200}?return ml;\s*\}/.test(
+    MM
+  )
+);
+// GREEN side: both swaps produce the SAME class, which is what
+// verify-monuments-sat gate 10 (the R20 interchangeability invariant) asserts
+// at runtime. Proven here by construction rather than by coincidence of pose.
+gate(
+  'both representations swap to the SAME class (MeshLambertMaterial)',
+  (LM.match(/new MeshLambertMaterial\(/g) || []).length === 1 &&
+    (MM.match(/new MeshLambertMaterial\(/g) || []).length === 1
+);
+// MeshLambert is one of exactly three classes three r185 hands
+// scene.environment to (WebGLPrograms.js:60-63) — the mechanism behind
+// verify-monuments-sat gate 9, and behind the R20 §5b.4 Taj night residual
+// ("MeshToonMaterial takes no envMap"). Assert the list has not moved under us.
+{
+  const programs = read('node_modules/three/src/renderers/webgl/WebGLPrograms.js');
+  gate(
+    'three still gives scene.environment to Standard/Lambert/Phong only',
+    /isMeshStandardMaterial \|\| material\.isMeshLambertMaterial \|\| material\.isMeshPhongMaterial/.test(
+      programs.replace(/\s+/g, ' ')
+    ),
+    'the mechanism verify-monuments-sat gate 9 rests on'
+  );
+}
+// THE RED the three browser gates will read on a flag-off tree, stated as a
+// source fact rather than as an expectation: with ONE_SUN off the guarded early
+// return above is not taken, so the SATELLITE archetype falls through to the
+// R13 stone-ramp Toon — which fails gate 8 (not Lambert) and gate 9 (Toon is
+// not one of the three classes three gives scene.environment to). Gate 10
+// passes trivially there because BOTH representations are Toon, which is why
+// its own comment says it is a guard against a future half-move, not a RED.
+gate(
+  'flag-off satellite archetype still constructs MeshToon (the browser gates\' RED)',
+  /const m = new MeshToonMaterial\(\{\s*color: LANDMARKS_3D\.satStyle\.color,\s*gradientMap: ramp,\s*vertexColors: true,\s*\}\);/.test(
+    LM
+  ),
+  'and the marquee falls through to the shared Toon line asserted below'
+);
+
+// THE FOURTH CONTRACT: toy is untouched, in both representations.
+gate(
+  'toy archetype monuments are still MeshToon with a 3-step ramp',
+  /new DataTexture\(new Uint8Array\(\[110, 190, 255\]\), 3, 1, RedFormat\)/.test(
+    LM.replace(/\s+/g, ' ')
+  ) && /new MeshToonMaterial\(\{ vertexColors: true, gradientMap: ramp \}\)/.test(LM)
+);
+gate(
+  'toy marquee monuments are still MeshToon with a 3-step ramp',
+  /isToy \? \[110, 190, 255\] : LANDMARKS_3D\.satStyle\.ramp/.test(MM.replace(/\s+/g, ' ')) &&
+    /new MeshToonMaterial\(\{ vertexColors: true, gradientMap: ramp, side: DoubleSide \}\)/.test(MM)
+);
+// …and the toy branch cannot reach the Lambert swap at all: the marquee guard
+// begins with `!isToy`, and the archetype swap sits inside `if (!isToy)`.
+gate(
+  'the toy branch cannot reach either Lambert swap',
+  /if \(!isToy && ONE_SUN\.enabled/.test(MM) &&
+    LM.indexOf('if (!isToy) {') >= 0 &&
+    LM.indexOf('if (ONE_SUN.enabled && ONE_SUN.monumentsLambert) {') > LM.indexOf('if (!isToy) {')
+);
+// The Lambert env multiply is coupled in BOTH, so a monument cannot take a
+// full-strength mirror tint the buildings around it are about to stop taking.
+gate(
+  'both monument Lamberts read LAMBERT_ENV.reflectivity',
+  /if \(LAMBERT_ENV\.enabled\) ml\.reflectivity = LAMBERT_ENV\.reflectivity;/.test(LM) &&
+    /if \(LAMBERT_ENV\.enabled\) ml\.reflectivity = LAMBERT_ENV\.reflectivity;/.test(MM)
+);
+// The harness must actually carry the three gates this calibration is for.
+{
+  const H = read('scripts/verify-monuments-sat.js');
+  gate(
+    'verify-monuments-sat carries the three added material gates',
+    /satellite monument material is MeshLambert with vertexColors/.test(H) &&
+      /satellite monument material takes scene\.environment/.test(H) &&
+      /marquee and archetype monuments are the SAME material class/.test(H)
+  );
+  gate(
+    '…and its eleven frozen gates are untouched',
+    (H.match(/gate\(/g) || []).length === 13 &&
+      /gate\('draw budget \(≤ 480\)', \(s\.draws \?\? 0\) <= 480/.test(H) &&
+      /gate\('monument layer draws measurably, within budget', delta >= 1 && delta <= 15/.test(H),
+    '13 = 10 frozen + zero-errors + the three added, minus none removed'
+  );
+}
 
 // ---- (3) the shared key helper --------------------------------------------
 gate('r24VariantKey is exported', /export function r24VariantKey\(base, tokens\)/.test(wb));
