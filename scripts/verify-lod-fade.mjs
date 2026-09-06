@@ -230,7 +230,9 @@ console.log('\n[5] policy + instrument contract');
   const src = fs.readFileSync(path.join(ROOT, 'lib/fly/fly-constants.js'), 'utf8');
   const m = src.match(/export const LOD_CROSSFADE = \{[\s\S]*?\n\};/);
   ok('LOD_CROSSFADE ships enabled:false', /enabled:\s*false/.test(m[0]));
-  const fade = parseFloat(m[0].match(/fadeSec:\s*([0-9.]+)/)[1]);
+  // R24 (Fable, post-merge audit): match the KEY line only — the block comment
+  // above it quotes the `fadeSec: 6` probe pin and the old regex read that first.
+  const fade = parseFloat(m[0].match(/^\s*fadeSec:\s*([0-9.]+)/m)[1]);
   ok('fadeSec is inside the charter bound of 300 ms', fade > 0 && fade <= 0.3, `${fade * 1000} ms`);
   ok('boot is fade-free (skipBootMs > 0 — reveal timing is frozen)',
     parseFloat(m[0].match(/skipBootMs:\s*([0-9]+)/)[1]) > 0);
