@@ -12,6 +12,11 @@
 #
 # ENV
 #   FLY_URL          overrides the whole target (wins over the port argument)
+#   SMOKE_NODE_ONLY  '1' runs ONLY the node gates — no browser, no dev server
+#                    needed. Use it for a fast merge check, and whenever
+#                    someone else's browser owns the machine (five agents share
+#                    four cores; two browser runs at once make every wall-clock
+#                    number meaningless and can starve a certification run).
 #   SMOKE_SKIP_SLOW  '1' drops the two long browser gates (fade, lod-fade)
 #   SMOKE_OUT        artifact directory (default scripts/r24-out)
 #
@@ -79,9 +84,13 @@ run() {
 node_gate() { run "$1" "scripts/$1" node "scripts/$1"; }
 browser_gate() { run "$1" "scripts/$1" node -r ./scripts/_pw-shim.js "scripts/$1"; }
 
-printf 'R24 SMOKE — target %s — fixture ON\n' "$URL"
-curl -s -o /dev/null -w 'dev server: HTTP %{http_code}\n' --max-time 60 "$URL/" || {
-  echo "dev server not answering on $URL — start it in the worktree under test first"; exit 2; }
+NODE_ONLY="${SMOKE_NODE_ONLY:-0}"
+printf 'R24 SMOKE — target %s — fixture ON — %s\n' "$URL" \
+  "$([ "$NODE_ONLY" = 1 ] && echo 'NODE GATES ONLY' || echo 'node + browser')"
+if [ "$NODE_ONLY" != 1 ]; then
+  curl -s -o /dev/null -w 'dev server: HTTP %{http_code}\n' --max-time 60 "$URL/" || {
+    echo "dev server not answering on $URL — start it in the worktree under test first"; exit 2; }
+fi
 
 # --- node gates: no browser, no GPU, no network. These run anywhere and are
 #     the fastest possible signal that a merge broke a data contract.
@@ -116,6 +125,17 @@ node_gate verify-finalize-pace.mjs       # A (R24): wall-clock finalize brake
 #     The node leg is the fixture column; the browser leg is a browser_gate row.
 run verify-seam.js scripts/verify-seam.js env -u FLY_URL node scripts/verify-seam.js
 
+
+if [ "$NODE_ONLY" = 1 ]; then
+  printf '\n--------------------------------------------------\n'
+  for r in "${ROWS[@]}"; do printf '%s\n' "$r"; done
+  printf '\n%s passed, %s failed, %s skipped  (NODE GATES ONLY — no browser was run)\n' \
+    "$PASS" "$FAIL" "$SKIP"
+  [ "$PASS" -eq 0 ] && { echo '*** SMOKE FAILED: ZERO gates ran'; exit 2; }
+  [ "$FAIL" -gt 0 ] && exit 1
+  [ "$SKIP" -gt 0 ] && { echo "*** SMOKE INCOMPLETE: $SKIP absent"; exit 3; }
+  exit 0
+fi
 
 # --- the fixture's own gate. If this is red, every browser number below is
 #     meaningless, so it runs first and its failure is the headline.
