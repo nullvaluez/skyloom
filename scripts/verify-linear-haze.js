@@ -84,8 +84,12 @@ const PIN_POSE = ([lat, lon, altM, heading, pitch]) => {
  * would put label pixels in the crop.
  */
 const SEAM = () => {
-  const c = document.querySelector('canvas');
-  const gl = c.getContext('webgl2');
+  // The renderer's OWN context — never canvas.getContext(), which would create
+  // one with the wrong attributes if it ever won the race with three (see the
+  // note in verify-flash-guard.js: it hangs the boot).
+  const r = window.__flyGl;
+  const gl = r && typeof r.getContext === 'function' ? r.getContext() : null;
+  if (!gl) return { error: 'window.__flyGl absent — cannot read the default framebuffer' };
   const W = gl.drawingBufferWidth;
   const H = gl.drawingBufferHeight;
   const colW = Math.max(32, W >> 3);
@@ -177,6 +181,10 @@ function gate(name, ok, detail) {
     }, elDeg);
     await page.waitForTimeout(20000);
     const s = await page.evaluate(SEAM);
+    if (s.error) {
+      gate(`(1${label === 'noon' ? 'a' : 'b'}) READ THE DEFAULT FRAMEBUFFER (${label})`, false, s.error);
+      continue;
+    }
     results[label] = s;
     console.log(
       `\n${label} (sun ${elDeg}°): ${s.W}x${s.H} · horizon row ${s.horizonY} (step ${s.step.toFixed(1)}) · ` +

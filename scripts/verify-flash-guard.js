@@ -147,11 +147,21 @@ const CENSUS = () => {
 const INSTALL_PALE = () => {
   const S = (window.__pale = { frames: 0, pale: 0, worstMean: 0, hits: [], armed: false });
   const start = () => {
-    const c = document.querySelector('canvas');
-    if (!c) return false;
-    const gl = c.getContext('webgl2', { preserveDrawingBuffer: false });
-    // getContext returns the EXISTING context for the same attributes, so this
-    // is the app's own context, not a second one.
+    // NEVER call canvas.getContext() here.
+    //
+    // MEASURED, and it cost a 10-minute certification row: a canvas has ONE
+    // context, and whoever calls getContext FIRST decides its attributes. This
+    // probe polls from page load, the canvas element exists the moment r3f
+    // mounts it, and on a slow machine the poll can land between the element
+    // being inserted and three creating its context. The app's renderer is
+    // built with reversedDepthBuffer/alpha:false/stencil:false/
+    // powerPreference:'high-performance'; a probe that wins that race hands
+    // three a context it did not ask for, and the boot never reaches
+    // __flyBoot.pct 100 — a harness that hangs the app it is measuring.
+    //
+    // Take the context three ALREADY made instead, and only once it exists.
+    const r = window.__flyGl;
+    const gl = r && typeof r.getContext === 'function' ? r.getContext() : null;
     if (!gl) return false;
     const W = 64;
     const buf = new Uint8Array(W * 4);
