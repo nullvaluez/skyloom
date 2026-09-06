@@ -1134,3 +1134,65 @@ inequality:
 That is the same discipline as `fadeBudgetMiss`, and it was only discovered
 because a hostile frame rate broke an assertion that looked true at 30 fps.
 
+---
+
+## §17 Pass-2b toy gate 13 — attributed to `FINALIZE_PACE`, not to B
+
+E's pass-2b toy row failed gate 13 with a repeated uncaught
+**`Cannot read properties of undefined (reading 'byteLength')`**. Fable's first
+hypothesis was B's `guardIndex` on the toy call sites. **It is not B's, and the
+2×2 says so without ambiguity.**
+
+### 17.1 The measurement
+
+New gate `scripts/r24-b-attr-proof.js` drives the **integrated** `ToyWorldEngine`
+headless against the fixture and censuses every geometry index/attribute for a
+missing `.array` — the exact shape three reads `byteLength` from at upload,
+found **without a GL context**. Run with `--root=` at an extracted tree:
+
+| `FLASH_GUARD` | `FINALIZE_PACE` | meshes with a broken index |
+|---|---|---:|
+| ON | ON | **80** |
+| **OFF** | ON | **80** |
+| ON | **OFF** | **0** |
+| OFF | OFF | **0** |
+
+**Independent of `FLASH_GUARD`; fully determined by `FINALIZE_PACE`.** Every
+broken mesh is the **LAND** mesh — the one toy site B deliberately did *not*
+guard (§1.3). On `r24/b`, which carries no A code, the same gate is PASS.
+
+### 17.2 Root cause, one line
+
+`toy-world-engine.js`, land block, under `finalizePaceOn()`:
+
+```js
+idx = new Uint32Array(base + extra);   // …then:
+geo.setIndex(idx);
+```
+
+`BufferGeometry.setIndex` wraps its argument in a `BufferAttribute` **only when
+`Array.isArray(index)` is true — which is false for a typed array**, so three
+assigns the raw `Uint32Array` as `geometry.index`. That object has no `.array`
+and no `.count`, and `WebGLAttributes` throws on `attribute.array.byteLength`
+the first time it uploads it. The flag-OFF branch builds a **plain** array,
+where `Array.isArray` is true and three wraps it correctly — which is exactly
+why pass 1 was clean and pass 2b was not.
+
+**Fix (A's, one line):** `geo.setIndex(new BufferAttribute(idx, 1))`.
+
+### 17.3 Two notes for A alongside the fix
+
+- The paced branch always allocates **Uint32**, while `setIndex(plainArray)`
+  lets three's `arrayNeedsUint32` pick **Uint16** when the vertex count allows.
+  Not the bug, but it silently doubles the land index buffer on every toy chunk.
+- `setIndex(rawTypedArray)` is a general trap, not a one-off: any other
+  `setIndex` added this round should be checked for the same shape. This gate
+  will catch all of them at once.
+
+### 17.4 Why no structural gate saw it
+
+The scene graph, the mesh counts, the draw list and every ready/chunk number
+are all correct — the geometry is fully built. The defect exists only in the
+*type* of one object and only surfaces when a GL context uploads it. That is
+the class of bug a headless attribute census is for, and it is now a gate.
+
