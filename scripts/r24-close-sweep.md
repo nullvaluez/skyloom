@@ -78,20 +78,62 @@ column · *(live)* live column.
 | `verify-boot` | pct monotonic, 100 exactly at reveal | — | — | |
 | `soak-fly --satellite --minutes 15` | p95 tris ≤ 2.2 M, p95 draws ≤ 375, heap no-climb, governor steps ≤ 4 | **UM** | **UM** | reads FRAME_STATS when the flag is on |
 
-### 1.4 Draw ceilings (never re-baselineable)
+### 1.4 THE FIXTURE COLUMN — four poses + the toy leg, SETTLED
 
-| Pose | Ceiling | Fixture column | Live |
+`FLY_TILE_FIXTURE=1 FLY_FINALIZE_BUDGET_K=40 FLY_BOOT_SCALE=6
+FLY_FIXTURE_SETTLE_MS=300000 node -r ./scripts/_pw-shim.js
+scripts/verify-fixture.js` — flag-off tree, tier high, 1280×720, load 4–6.
+**10 passed, 0 failed.**
+
+| Pose | draws | tris | meshes | satBuilding | satSkyline | parcelHomes | terrain tiles | `sb` | settled | maxZ | ground |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Manhattan 40.7075/−74.0113 @792 m | **176** | 344,430 | 211 | 7 | 10 | 0 | 161 | {16, ready 4, empty 0} | **false** @300 s — "12 chunks still draping" | 16 | 14.8 m |
+| Powell 40.1578/−83.0752 @900 m | *(stale)* | 385,393 | 247 | **16** | 0 | **671** | 185 | {16, **ready 16**, empty 0} | **true** in 305 s | **17** | 275.3 m |
+| **Owens 36.6/−118.1 @2600 m** | **184** | 208,987 | 253 | **0** | **0** | **0** | 225 | {16, ready 0, **empty 16**} | **true in 53 s** | 17 | 1128.3 m |
+| **Melton −37.68172/144.574 @700 m** | **153** | 451,149 | 165 | **0** | 0 | **1,836** | 117 | {16, ready 0, **empty 16**} | **true in 154 s** | 14 | 113.9 m |
+| toy / Powell | **91** | 66,500 | 172 | — | — | — | 50 chunks | — | — | — | — |
+
+Boot: satellite **111.9 s** wall, `pct 100` at **47.7 s**; toy **174.4 s**.
+Traffic: **300 tracks**, 76 `/api/aircraft` polls. Zero page errors.
+
+**What each row certifies.**
+
+- **Owens is the lock, and it is cheap.** 0 building, 0 skyline, 0 parcel
+  meshes; all sixteen chunks resolve `empty`, in **53 seconds**. Empty tiles
+  never drape, which is why this and Melton are the two most trustworthy
+  columns this venue produces.
+- **Powell settled COMPLETELY** — sixteen of sixteen chunks ready, terrain at
+  z17, ground 275.3 m against the fixture's true 276.3 m. And parcel homes
+  read **671**, not the 2,992 an unsettled Powell reported earlier: with the
+  buildings resident the two-term anti-duplication finally has a collision
+  index to suppress against. That is the R20 story reproducing.
+- **Melton places 1,836 homes from ZERO footprints** — the R20 carpet, exactly.
+- **Manhattan does not finish in 300 s even on quiet cores at K=40**; the
+  terrain settles (z16, ground converged) but four of sixteen chunks are
+  resident. Its numbers are a FLOOR. Recommendation for a settled Manhattan
+  column: **K=200** (the clamp allows 500) or a 900 s cap.
+
+`draws` at Powell reads `null` because the settle returned "totals stale" —
+`__flyStats` republishes only every 60 frames and the fresh-publish wait timed
+out inside the cap. Not a defect; the gate says so rather than printing the
+previous pose's number.
+
+### 1.4a Draw ceilings (never re-baselineable)
+
+| Pose | Ceiling | Fixture column (settled unless noted) | Live |
 |---|---|---|---|
-| Owens Valley | ≤ 261 | 152 *(flag-off, 1280×720, tier high)* | frozen |
-| satellite | ≤ 375 | Manhattan 110 · Powell 131 · Melton 68 *(flag-off)* | frozen |
-| toy | ≤ 480 | — | frozen |
-| fixed-pose triangles | ≤ 2.0 M | Manhattan 169,552 · Powell 266,114 · Melton 328,079 *(flag-off)* | frozen |
+| Owens Valley | ≤ 261 | **184** | frozen |
+| satellite | ≤ 375 | Melton **153** · Manhattan **176** *(floor)* | frozen |
+| toy | ≤ 480 | Powell **91** | frozen |
+| fixed-pose triangles | ≤ 2.0 M | Melton 451,149 · Powell 385,393 · Manhattan 344,430 · Owens 208,987 | frozen |
 
-**Read those fixture draw numbers with the caveat in `r24-e-cert.md` §1.2b**:
-they were taken with the satellite building chunks still draping, so they are
-a FLOOR, not the settled figure. They also fall under `POST_ORDER` (C measures
-the merged EffectPass count DROPPING: sat 4→3, toy 6→5), so a flag-on column
-reading lower is a decrease, not drift.
+Every one is comfortably inside its live ceiling, but a fixture draw count is
+NOT a live draw count — the fixture's scenes are less dense than the real
+planet's, so these bound nothing on the user's machine. They are a
+**regression baseline for THIS venue**: a flag that adds draws here will show
+up here. They also fall under `POST_ORDER`, where C measures the merged
+EffectPass count DROPPING (sat 4→3, toy 6→5), so a flag-on column reading lower
+is a decrease, not drift.
 
 ---
 
