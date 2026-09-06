@@ -687,3 +687,115 @@ design written down** (15). The single most-counted event — 92 single-frame
 pops in 90 s of ordinary flight — is rows 1 and 2, and it drops to 2, both
 attributable.
 
+---
+
+## §9 NOT SHIPPED — toy/Neon chunk births (`uBirth`), with the design
+
+Deferred deliberately, on Fable's ruling ("a plain *not shipped, here is the
+design* row is the right outcome"), and because the cost/benefit is the worst
+in B's list:
+
+- The user's default style is **satellite**; toy/Neon is the other style.
+- The toy fade family has **no `discard` term to ride**, so a per-mesh birth
+  needs NEW GLSL — three FINAL cache-key bumps (`world-bend-fade-pulse-rwy-r8`,
+  `world-bend-fade-foam-r13`, `world-bend-fade-beacon-grid-r13` → `…-b24`) plus
+  matching PREWARM warm-set entries in the same change.
+- Those are exactly the keys the certified Neon pixel gates stand on
+  (verify-neon-city 379, verify-neon-alt 325 / void 0.19 %, verify-roofs
+  394/2985, verify-window-grids 403, verify-edge-fx 400/372/322). A key move
+  there is a re-certification round of its own — the R19 lesson, in the same
+  file family.
+
+**The design, if a later round wants it.** The toy building material is
+`MeshToonMaterial` with no fade term, so the cheapest correct birth is NOT a
+dither at all: it is the **anchor scale-in** the recon names as the
+alternative. Every toy building vertex already carries `aBendAnchor` (its
+footprint centroid), so a vertex can be lerped toward its own anchor by
+`(1 − birth)` in the vertex stage — buildings grow out of the ground instead of
+appearing. That is still new GLSL and still a key bump, but it needs **one**
+uniform, no fragment change, no `discard`, and it cannot interact with the
+Bayer/SMAA shimmer question (A7) the way a screen-door birth would. The land
+and water sheets can ride the same uniform as a Y-lift from the ground grid.
+
+What DID land for toy this round: **the toy extruder's degenerate population is
+closed** (`FLASH_GUARD` at `toy-world-engine.js:1007`/`:960` and `RING_DEDUPE`
+at the source — 14.84 % → 0), and toy inherits `BEND_LEAD` on all three of its
+rings plus the ultra ring (deficits 241 / 1,205 / 3,405 / 31,412 m → 0).
+
+---
+
+## §10 HAND-OFF TO E CERT
+
+Everything B built that E needs, in one place.
+
+**Instruments B publishes (all additive, all 0/1/unchanged with the flags off):**
+
+| where | field | meaning |
+|---|---|---|
+| `engine.censusDegenerate()` | `{meshes, tris, degenerate, coincident, collinear, frac}` | resident degenerate triangles over DRAPED positions — 0 with `FLASH_GUARD` on, 6–9 % (live) / 14 % (fixture) with `__flyFlashPin='off'`. **This is `verify-flash-guard`'s RED/GREEN pair inside ONE page.** |
+| `stats.degenerateDropped` | count | per engine, cumulative |
+| `stats.births` / `dying` / `fadeTwins` / `fadeBudgetMiss` | counts | `dying` is the ONLY term that adds draws; `fadeBudgetMiss` is what makes a residual pop attributable |
+| `stats.healsInPlace` / `healsNoop` / `redraping` | counts | `healsInPlace + healsNoop >= heals` is the "no hole" assertion |
+| `material.userData.__fadeU` | `{value}` | a fade twin's own uniform — the EFFECTIVE per-mesh alpha a pop census needs. A shared material has none and reads the module uniform |
+| `mesh.userData.bendMarginM` | metres | already R21's; grows under `BEND_LEAD`, so the census assertion only gets easier |
+| `__flyStats.prewarm.{shadowStates, requeued, requeuePending}` | counts | 1/0/0 with `ENV_UNIFORM` off |
+| `runtime.groundElevVis` | metres | the damped visual ground; equals `flight.groundElev` with `GROUND_VIS` off |
+| `__flyStats.parcelHomes.growK` | 0..1 | the eased provisional grow |
+
+**Runtime pins for same-session RED legs (the `__flyWeatherOverride` idiom):**
+`window.__flyFlashPin = 'off'` and `window.__flyFadePin = 'off'`.
+
+**`markPhase` tags B emits** (no-op until `FRAME_STATS` mounts):
+`drape:sat-building`, `finalize:sat-building`, `heal:sat-building`,
+`fade:sat-building`, `finalize:sat-skyline`, `fade:sat-skyline`.
+
+**Runs B owes but could NOT do here (see §11):**
+
+1. **`programsDelta` flat** across a forced dusk crossing AND a forced
+   high↔medium step **with shadows on**. Requires releasing `__flyGovPin`
+   (verify-tier-step owns it) *and* `__flySatShadowOverride` (accessor-swallow
+   idiom) — **the fleet pin hides the shadow half of WB-4 entirely**, which is
+   why no gate has ever seen it. This is the proof obligation for both
+   `CHUNK_FADE`'s pooled twins ("compiles nothing") and `ENV_UNIFORM`.
+2. **Twilight fixture pixel A/B** at the `verify-dusk` / `verify-sat-night`
+   poses, before `ENV_UNIFORM` may flip. Noon is bit-identical by construction
+   (day-width normalisation + endpoint bypass); twilight is an upsample.
+3. **`verify-neon-cover` / `verify-seam` hash re-baseline** for `RING_DEDUPE`,
+   off the §7.1/§7.2 A/B, with a FIXTURE column.
+4. **Skyline park/unpark pixel A/B** at Manhattan, to settle table row 10
+   (pixel-neutral by construction — a hypothesis, not a measurement).
+5. **The moving-leg false-cull census sample** for `BEND_LEAD`: the R21 census
+   ran on the ORBIT phase at speed 0, where the lead is exactly 0. A useful
+   sample is a straight leg at boost speed with a hard yaw at the ring edge —
+   Powell → Columbus at 200–400 m AGL, `__flyBoostInfinite` already pinned
+   fleet-wide, sampling `mesh.userData.bendMarginM` vs the drop at the chunk
+   centre on the frames where the camera is turning.
+6. **Draw-ceiling check with `CHUNK_FADE` on**: `maxDying` 4 is the only term
+   that can add draws. **Owens takes exactly 0 extra by construction** (nothing
+   to fade); Manhattan/satellite should read ≤ 375 and toy ≤ 480 unchanged.
+
+---
+
+## §11 COULD NOT MEASURE HERE — the honest column
+
+The container has no GPU worth the name (ANGLE/SwiftShader, ~1 fps under this
+app's load), and every tile host is 403-blocked. **Nothing in this ledger is an
+fps, ms, stutter, tearing or governor number.** Specifically NOT measured by B:
+
+- Any frame time, stall count, or the 0.26 ms/chunk cost of the `FLASH_GUARD`
+  filter (that figure is the ARCHIVED R22.1 measurement on a real machine,
+  quoted as provenance, not re-measured).
+- `programs.length` behaviour — the proof that pooled fade twins and the
+  two-state warm compile nothing. **Construction argument only.**
+- Any pixel A/B: the pale-frame RED/GREEN, the twilight `ENV_UNIFORM` shift,
+  the skyline park/unpark neutrality, the birth ramp's look.
+- Live draw counts under `CHUNK_FADE` (`maxDying` transient draws).
+- The dusk-crossing PMREM bake cost at 2k (4× the area, 8 steps per crossing).
+- Whether the user's reported symptom is any of rows 1–8 specifically. The
+  table says which mechanisms EXIST and are now closed; attributing the report
+  to one of them needs the user's machine.
+
+What IS measured here is everything that is a pure function of tile bytes,
+index buffers, constants or scene-graph state — which, for this charter, turned
+out to be the majority of it.
+
