@@ -68,6 +68,20 @@ important caveat on the record.
 | **The first perf step is a TIER step on DPR-1** (A4/FL-13) | `buildLadder`'s DPR loop runs ZERO times at `devicePixelRatio` 1, so the ladder is `[1/high, 1/medium, 1/low]` — rung 1 unmounts the building and precip layers and rebuilds the composer. One bad second while a city streams is enough | A `LADDER_FIX` + `STEP_SAFE` | `verify-ladder-fix` 13 gates, `FLY_LADDER_RED=1` fails **6/13**. Ladder → `[1/high, 0.875/high, 0.75/high, 1/medium, 1/low]`; a 144 Hz display targets **144**; a 53.4 fps-mean session with 10 % long frames steps **render-scale first** where the EMA never steps at all; the clean-60 control never steps |
 | **Shadow-map re-rasterization** (L5/FL-12) | a 2048² ortho following the plane at sub-texel steps (0.78 m/texel toy, 1.46 m satellite) with the PCF kernel rotated by a **screen-space** hash ⇒ every building silhouette re-rasterizes each frame — a second, independent root of "buildings flickering" | C `SHADOW_CALM` | `verify-shadow-calm.mjs` (node, **32 gates**, `a9e30cc` → `5ca8e15`; **33/33** on C's flipped branch) runs the patch against three's REAL chunk text both ways: off returns it byte-identical; both anchors occur EXACTLY once so VSM and BASIC cannot be touched; the reversed-depth `#ifdef` count goes **2 → 3**; reversing the edit reproduces three's text exactly. The snap runs numerically: 0.4 texel of travel moves the target **0.00e+0 m**, 1.4 texels moves it exactly one texel (**1.46484 m**), 401 samples over 10 texels give **11 distinct positions — a staircase, not a slide**. It caught a defect in its own module on the first run (`PHI_TO` defaulted every unrecognised kernel name to `'world'`; now an allow-list) |
 
+**And the round shipped one of its own into this symptom, caught at the close.**
+`FINALIZE_PACE`'s first rule — "the first chunk is not free" — compares
+`lastDtMs` against a FIXED `longFrameMs` of **24 ms**, which makes it a LEVEL
+detector rather than a spike detector: on any machine running steadily below
+**~41 fps** (33 ms frames at 30 fps, 50 ms at 20 fps — laptops and integrated
+GPUs, exactly the machines that report these symptoms) **every** frame is
+"long", the first finalize of every frame is refused forever, and no building,
+skyline, road or toy chunk ever lands. As merged at `91141fe` the flag would
+have reproduced **"buildings never appear"** on a steadily slow machine. The
+fixture venue only made it total (300–1000 ms frames) and is how it was found —
+§4.2, pass 2a. The module's own header claimed the opposite invariant
+("neither rule can starve a chunk — a deferred chunk is retried next frame"),
+and that claim is false under sustained slowness.
+
 Two mechanisms were examined and deliberately NOT touched (B ledger §8, rows
 10–11): the skyline group `visible` flip and its AGL evict/re-arm hysteresis
 are **pixel-neutral BY CONSTRUCTION** — a group parks only when its farthest
@@ -249,7 +263,7 @@ commit's (§8). Prose is compressed here — the ledgers hold the derivations.
 | `TERRA_PACE.bendSphere` (T14) | `3158584` | tile sphere inflation for resident-culled tiles (the unbent sphere is ~30 % short at 30 km, ~120 % at the fade end) | BUILT-OFF — it SUBMITS tiles culled today, i.e. a draw change against frozen ceilings |
 | `LADDER_FIX` + `STEP_SAFE` | `36792a0` | five rungs with two render-scale steps first, native-refresh target, long-frame fraction term, DPR applied inside the drawing frame (`step-safe.js` + `StepSafeRig`), plus the FL-05 in-frame buffer check in the composer | ON (§6 taste; `nativeRefresh` carries no measurement — §6 item 4) |
 | `HUD_SYNC` + FL-06 + `REBASE_CALM` | `2fadaa6` | labels drawn from `addAfterEffect` with THIS frame's matrices; CloudField priority −10; unconditional pre-render `camera.updateMatrixWorld()`; dead `rebaseEpoch` bump removed, matrix traversal narrowed to the tile subtree, anchor quantised to **704 m** = `HILLSHADE.micro.scaleM × 128` so the micro-grain no longer re-phases every 10 km | ON |
-| `FINALIZE_PACE` + veg cap + toy typed index | `f8c6a4a` | one shared per-frame brake for all four engines (the first chunk is not free; the budget counts from frame start); `SatVegEngine._commitPending` capped; the toy merged index built as a `Uint32Array` | ON — `ready` counts provably do not move |
+| `FINALIZE_PACE` + veg cap + toy typed index | `f8c6a4a` | one shared per-frame brake for all four engines (the first chunk is not free; the budget counts from frame start); `SatVegEngine._commitPending` capped; the toy merged index built as a `Uint32Array` | ON — but the module's header invariant ("neither rule can starve a chunk") **was false under sustained slowness**, and the close proved it: rule 1's fixed 24 ms threshold starves every finalize below ~41 fps (§1, §4.2). Ships with A's spike-detector + starvation-cap fix |
 | `FRAME_STEP` (sim half) | `ed773b8` | 120 Hz accumulator, ≤4 substeps, `renderPos`/`renderAtt`/`renderAlpha` as NEW fields; `flight.pos` stays the sim truth | **OFF — "not landed"**: no consumer reads the smoother pose (§8) |
 | `markPhase` | `70b9f42` | six sites, two vendored ones **by inversion** (`R24_SWITCHES.onPhase`, so the bundle never imports app code) | ON with `FRAME_STATS` |
 
@@ -478,13 +492,21 @@ then read from source rather than inferred: `lib/fly/finalize-pace.js:74-79` —
 FINALIZE_PACE.longFrameMs` (24 ms), and **every SwiftShader frame here is
 300–1000 ms**, so rule 1 refuses the FIRST finalize of EVERY frame and
 `sat-building-engine.js:1366` never lets a chunk finalize. **`FINALIZE_PACE`
-shipped ON starves every content gate in this venue**, and E's harness budget
-could not save it: `budgetK()` scales only the COUNT budget at `:1362`, which
-sits BEHIND the wall-clock rule. A's fix (in flight) has `finalize-pace.js` read
-`budgetK()` so that K > 1 turns rule 1 off and multiplies `budgetMs`, while
-**K exactly 1 — production and every non-fixture run — stays byte-identical**;
-`verify-finalize-pace` keeps its K=1 RED/GREEN and gains K=1 / K=40 long-frame
-rows. Pass 2 restarts from the top on the corrected tree. Two other readings
+shipped ON starves every content gate in this venue** — and the void is real AND
+**the mechanism is a SHIPPED DEFECT, not a venue artefact**: a fixed 24 ms
+threshold is a LEVEL detector, so **any machine steadily below ~41 fps** (33 ms
+at 30 fps, 50 ms at 20 fps) refuses the first finalize of every frame forever and
+never lands a chunk. The venue only made it total. E's harness budget could not
+save it either: `budgetK()` scales only the COUNT budget at `:1362`, BEHIND the
+wall-clock rule. **A's fix is a PRODUCT fix, not a harness one** (in flight):
+rule 1 becomes a **spike** detector — refuse only when `lastDtMs` exceeds BOTH
+`longFrameMs` AND `spikeK ×` a running EMA of frame time, so a 40 ms hitch among
+16 ms frames refuses while a steady 33 ms machine never does — plus a **hard
+starvation cap** (never refuse more than `maxRefuseFrames` consecutive frames,
+then admit one). On a steady 1 fps venue the EMA makes rule 1 a no-op by
+construction, **so the venue's fix and the product's fix are the same change**;
+`budgetMs × budgetK()` stays for the fixture's count budget, and
+`verify-finalize-pace` gains steady-slow, single-hitch, hitch-train and K rows. Pass 2 restarts from the top on the corrected tree. Two other readings
 from the same run stand: **(4b) the pale self-test fires exactly once**, so the
 rewritten detector finally has its own RED, and **(4a) still reported 8 pale
 hits in 290 frames including consecutive identical-mean frames** (f:141/142 both
@@ -874,10 +896,13 @@ quotable.
   (one line): its denominator was 62 of 64 because it only tests tiles whose
   material already has a map, and the two it skipped were mid-load — the
   likeliest moment for a mismatch.
-- **Audit every per-frame pacing rule against the harness budget.** Pass 2a
-  found the second one the hard way: `budgetK()` covered the COUNT budget and
-  not `FINALIZE_PACE`'s wall-clock rule, and the same class can hide in any
-  future per-frame rule. **The content-gate list in close sweep §1.5 is the
+- **Every per-frame REFUSAL must have a starvation bound, and every pacing rule
+  must be reachable with the harness budget on.** `finalize-pace.js`'s header
+  asserted an invariant it did not have — "neither rule can starve a chunk" —
+  and a fixed-threshold refusal starves forever on a steadily slow machine. Two
+  standing checks come out of it: a refusal rule states its bound (or carries a
+  `maxRefuseFrames` cap) and compares against the machine's own baseline rather
+  than a constant; and **the content-gate list in close sweep §1.5 is the
   checklist** — anything on it must be reachable with the budget scaler on.
 - **A toy leg for the degenerate census** — no row this round boots toy, so
   `vector-tile.worker.js:4285` has node evidence and no certified browser leg.
@@ -1058,12 +1083,16 @@ Carries forward the still-open R15–R21 §6 tables.
     gate was measuring the venue's step, not the feature. It now steps
     0.85°/frame inside a rAF and prints SKIP / NOT CALIBRATED when the arc falls
     short. (A PACE.)
-35. **A shipped pacing rule can starve the venue that certifies content.** The
-    harness budget must cover EVERY pacing rule, not only the count budget: W1's
-    budget scaler found the count budget, and the close found the wall-clock one
-    — `FINALIZE_PACE`'s "the first chunk is not free" refuses every finalize on a
-    300–1000 ms frame, so the flipped tree certified an empty world until the
-    scaler reached that rule too. (The orchestrator and E CERT, jointly.)
+35. **A pacing rule that compares to a fixed threshold is a LEVEL detector; a
+    hitch is a SPIKE.** Compare to the machine's own baseline, and cap any
+    refusal so it can never become starvation. `FINALIZE_PACE`'s 24 ms threshold
+    refuses the first finalize of every frame on anything steadily below ~41 fps
+    — buildings that never appear, on exactly the machines that report symptoms.
+    **The venue that certifies content found it because it is the slowest machine
+    there is.** A corollary from the same run: the harness budget must cover
+    EVERY pacing rule, not only the count budget — W1's scaler found the count
+    budget, the close found the wall-clock one. (The orchestrator and E CERT,
+    jointly.)
 36. **The constants an instrument DECLARES must be the ones it measured, and a
     declared cost may overstate but never understate.** The depth probe's
     precision ladder is asserted against measured worst-case error — float32
@@ -1101,7 +1130,7 @@ leg. **Nothing here has been certified on the user's machine.**
 | `TERRA_PACE` {`timerFix`, `mergeHysteresis`, `keepResident`, `skirtFast`, `walkWhileSaturated`, `bboxCache`} | 22/17/178 → 0/0/0; timer 10/12 → 4/12; the saturated walk strictly conservative; skirt output element-identical; **live-arm fixture evidence now in** — merges 1 → 0, refetchParent 1 → 0, Owens **161 → 185 ≤ 261**, Powell **161 → 183 ≤ 375**, draws rising because `keepResident` keeps more tiles drawn. `verify-terra-live` (6)'s 1 → 17 repeat fetches are **ATTRIBUTED to the harness's ~51°/frame wall-clock yaw at 1 fps, not to the feature** — the LRU had nothing to evict (peak 30–36 % of a 140 MB cap) and merges were 0; re-measured in pass 2 at 0.85°/frame over a full 360° | **ON** — `timerFix`, `mergeHysteresis`, `keepResident`, `skirtFast`, `walkWhileSaturated`, `bboxCache` all true; `skirtWorker` and `bendSphere` false, merged `5b13e35` |
 | `LADDER_FIX` (incl. `nativeRefresh`) + `STEP_SAFE` | RED 6/13; two render-scale rungs before the first tier rung; DPR applied inside the drawing frame. **`nativeRefresh` carries no measurement** — a no-op at 60 Hz, a target change at 120/144 (§6 item 4) | **ON** (incl. `nativeRefresh`), merged `5b13e35` **ON**, merged `5b13e35` |
 | `HUD_SYNC` + `REBASE_CALM` | labels drawn with this frame's matrices; 704 m quantised anchor | **ON**, merged `5b13e35` **ON** (`quantM` 704), merged `5b13e35` |
-| `FINALIZE_PACE` | one shared brake; `ready` counts provably unmoved | **ON**, merged `5b13e35` |
+| `FINALIZE_PACE` | one shared brake. **Its first rule shipped as a LEVEL detector and starves every finalize below ~41 fps** — found at the close, §1 and §4.2 — so it ships ON only with A's spike-detector (`lastDtMs` > `longFrameMs` AND > `spikeK ×` the frame-time EMA) plus a hard `maxRefuseFrames` starvation cap | **ON**, merged `5b13e35`; the pacing fix lands before pass 2 restarts |
 | `FRAME_STATS` | the round's only frame-pace instrument; flag-off byte-identical, and **flag-gated with no runtime pin**, so `verify-frame-pace` runs for the first time in pass 2 (flip `6c26fe9`) | **ON**, merged `19d90b0` |
 | `AERIAL_LAW.nightRamp` (A8) — **true while `AERIAL_LAW.enabled` is false** | FlyScene gates A8 on `nightRamp` alone and applies it to the LEGACY post strength on the `lawOn === false` branch; noon multiplier EXACTLY 1 keeps `verify-aerial`'s 0.55 exact, deep night EXACTLY 0; uniform-only | **ON with `AERIAL_LAW.enabled` false**, merged `91141fe` |
 
