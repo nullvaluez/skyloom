@@ -553,9 +553,42 @@ console.log('\n[7] AERIAL_LAW flag-off is byte-identical (generated text + key)'
   ok('flag-off wires no uAtmo* uniform',
     !Object.keys(off.shader.uniforms).some((k) => k.startsWith('uAtmo')),
     Object.keys(off.shader.uniforms).filter((k) => k.startsWith('uAtmo')).join(',') || '(none)');
-  ok("flag-off FINAL tile key carries no 'a' token", !/-[a-z]*a[a-z]*24$/.test(off.key), off.key);
-  ok("flag-on FINAL tile key carries the 'a' token through the shared helper",
-    on.key === 'world-bend-fade-hill-r19-a24', on.key);
+  // THE EXPECTED KEY IS COMPUTED, NEVER A LITERAL. `world-bend-fade-hill-r19`
+  // is the ONE key two owners bump, through the shared helper in a FIXED order:
+  //   e  ONE_SUN.enabled || TERRAIN_LIGHT.enabled          (C)
+  //   f  TERRAIN_LIGHT.enabled && TERRAIN_LIGHT.fragmentHill (C)
+  //   a  AERIAL_LAW.enabled                                 (D)
+  //   l  the lodFade slot is non-null                       (D)
+  // A literal here asserts what ANOTHER OWNER ships: C ships e and f ON on the
+  // integrated tree, so `-a24` goes red for a reason that is not a defect. The
+  // expectation is therefore derived from the live e/f with only D's token
+  // forced, and the PROPERTY is what is asserted. Note `e` is an OR, not
+  // `ONE_SUN.enabled` alone — mirroring the shorthand rather than the source
+  // would make this gate green on a tree whose key is wrong.
+  const HILL_BASE = 'world-bend-fade-hill-r19';
+  const hasTok = (k, t) => new RegExp(`-[efal]*${t}[efal]*24$`).test(k);
+  const consts = await import('../lib/fly/fly-constants.js');
+  const TK = {
+    e: !!(consts.ONE_SUN?.enabled || consts.TERRAIN_LIGHT?.enabled),
+    f: !!(consts.TERRAIN_LIGHT?.enabled && consts.TERRAIN_LIGHT?.fragmentHill),
+  };
+  const expectKey = (tk, a, l) =>
+    wb.r24VariantKey(HILL_BASE, [[tk.e, 'e'], [tk.f, 'f'], [a, 'a'], [l, 'l']]);
+  ok("flag-off FINAL tile key === the other owners' tokens alone (no 'a')",
+    off.key === expectKey(TK, false, false) && !hasTok(off.key, 'a'),
+    `${off.key} with e=${TK.e} f=${TK.f}`);
+  ok("flag-on FINAL tile key gains EXACTLY AERIAL_LAW's token 'a', in its fixed position",
+    on.key === expectKey(TK, true, false) && hasTok(on.key, 'a'),
+    `${off.key} -> ${on.key}`);
+  ok('ALL FOUR tokens false === the bare R19 key (the flag-off identity proof)',
+    expectKey({ e: false, f: false }, false, false) === HILL_BASE, HILL_BASE);
+  // Both worlds, demonstrated rather than argued: this branch ships C's tokens
+  // OFF, the integrated tree ships them ON. Same derivation, both answers.
+  for (const [world, tk] of [['this branch', TK], ["C's flipped tree", { e: true, f: true }]]) {
+    ok(`derivation holds in ${world}: 'a' absent off, present on`,
+      !hasTok(expectKey(tk, false, false), 'a') && hasTok(expectKey(tk, true, false), 'a'),
+      `${expectKey(tk, false, false)} -> ${expectKey(tk, true, false)}`);
+  }
   ok('flag-on wires the WHOLE shared law block by reference (one source of numbers)',
     Object.keys(on.shader.uniforms).filter((k) => k.startsWith('uAtmo')).length === 10 &&
     on.shader.uniforms.uAtmoBeta === atmoUniforms.uAtmoBeta,

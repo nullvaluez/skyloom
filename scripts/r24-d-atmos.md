@@ -688,6 +688,38 @@ testable — rather than a red. If `faded` is 0 while `skip.boot` and
 `skip.warp` are both 0 and `refines + merges > 0`, that is a genuine RED
 against D's code and I want it.
 
+## §4.11 A gate must not assert what another owner ships
+
+Found by Fable's dry-run merge of all five flipped branches. Three of D's key
+assertions compared `applyHillshade`'s cache key against a LITERAL —
+`'world-bend-fade-hill-r19'`, `'…-l24'`, `'…-a24'` — which was correct on this
+branch and wrong on the integrated tree, where C ships `ONE_SUN` and
+`TERRAIN_LIGHT.fragmentHill` ON and the key is therefore `-ef24` / `-efl24` /
+`-efa24`. Three reds, none of them a defect.
+
+`world-bend-fade-hill-r19` is the ONE key two owners bump, so a literal in D's
+gate is D asserting what C ships. The expectation is now DERIVED: read the live
+`e`/`f` from the shipped constants, force only D's own token, and call the same
+`r24VariantKey` the material calls. What is asserted is the PROPERTY — D's
+token present exactly when D's flag is on, at its fixed position; the key with
+D's token off equal to whatever the other owners' tokens alone produce — plus,
+separately and world-independently, that **all four tokens false is the bare
+R19 key**, which is the flag-off identity proof and depends on nobody.
+
+Two details that would have made a wrong gate pass:
+- **`e` is `ONE_SUN.enabled || TERRAIN_LIGHT.enabled`, an OR** — not
+  `ONE_SUN.enabled` alone. Mirroring the shorthand instead of the source would
+  have made the gate green on a tree whose key is wrong.
+- The order is the contract, so the gate sweeps **all sixteen token states**
+  through the helper. A token that moved position would serve one owner's
+  program for another's — the R4 wrong-cached-program defect, which is the
+  whole reason the helper exists.
+
+Proven in BOTH worlds by running, not by arguing: green on this branch
+(`-r19` → `-r19-l24` / `-r19-a24`) and green with `ONE_SUN` and
+`TERRAIN_LIGHT` forced on (`-r19-ef24` → `-r19-efl24` / `-r19-efa24`), the
+constants restored afterwards. Gate counts rose 51 → 55 and 45 → 48.
+
 ## §5 Decisions
 
 - **D-1. AERIAL_LAW is SATELLITE-scoped.** Toy/Neon keeps `TOY.haze` (a single

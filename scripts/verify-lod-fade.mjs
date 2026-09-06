@@ -31,6 +31,40 @@ import { ShaderChunk } from 'three';
 register('./_alias-loader.mjs', import.meta.url);
 const { applyBendFade, applyHillshade, r24VariantKey } = await import('../lib/fly/toy-world/world-bend.js');
 const { lodUvRect, lodStats } = await import('../lib/fly/lod-crossfade.js');
+const CONSTS = await import('../lib/fly/fly-constants.js');
+// ---------------------------------------------------------------------------
+// THE EXPECTED HILL KEY, COMPUTED — never a literal.
+//
+// `world-bend-fade-hill-r19` is the ONE key two owners bump, so it goes through
+// the shared `r24VariantKey` helper with a FIXED token order:
+//     e  hillElevOn()  = ONE_SUN.enabled || TERRAIN_LIGHT.enabled     (C)
+//     f  hillFragOn()  = TERRAIN_LIGHT.enabled && TERRAIN_LIGHT.fragmentHill (C)
+//     a  AERIAL_LAW.enabled                                            (D)
+//     l  the lodFade slot is non-null                                  (D)
+//
+// A gate that hard-codes the expected string is really asserting what ANOTHER
+// OWNER ships. On the integrated tree C ships ONE_SUN and TERRAIN_LIGHT ON, so
+// the key is `-ef…24` and every such literal goes red for a reason that is not
+// a defect. So the expectation is DERIVED from the live e/f with only D's own
+// token forced, and what is asserted is the PROPERTY: D's token appears exactly
+// when D's flag is on, at its fixed position, and the key with D's token off is
+// whatever the other owners' tokens alone produce.
+//
+// NOTE the `e` predicate is `ONE_SUN.enabled || TERRAIN_LIGHT.enabled`, an OR —
+// not `ONE_SUN.enabled` alone. Mirroring the shorthand instead of the source
+// would make this gate green on a tree where the key is wrong.
+const HILL_BASE = 'world-bend-fade-hill-r19';
+const hasTok = (key, t) => new RegExp(`-[efal]*${t}[efal]*24$`).test(key);
+function hillTokens(consts) {
+  return {
+    e: !!(consts.ONE_SUN?.enabled || consts.TERRAIN_LIGHT?.enabled),
+    f: !!(consts.TERRAIN_LIGHT?.enabled && consts.TERRAIN_LIGHT?.fragmentHill),
+  };
+}
+function expectHillKey(r24VariantKey, { e, f }, a, l) {
+  return r24VariantKey(HILL_BASE, [[e, 'e'], [f, 'f'], [a, 'a'], [l, 'l']]);
+}
+
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let pass = 0, fail = 0;
@@ -146,18 +180,42 @@ ok('flag-off FRAGMENT still has the untouched `#include <map_fragment>`',
 ok('flag-off uniform set has no uLodFade* entries',
   !Object.keys(off.shader.uniforms).some((k) => k.startsWith('uLodFade')),
   Object.keys(off.shader.uniforms).filter((k) => k.startsWith('uLodFade')).join(',') || '(none)');
-ok('flag-off FINAL tile key is the R19 key', off.key === 'world-bend-fade-hill-r19', off.key);
-// R24: the FINAL tile key is the first key two owners bump, so it comes from
-// the shared `r24VariantKey` helper with a FIXED token order — e (ONE_SUN) /
-// f (TERRAIN_LIGHT) / a (AERIAL_LAW) / l (LOD_CROSSFADE). With only D's slot
-// present the key must be exactly the base plus 'l'; the token must NOT move
-// position, or a merged tree would serve one owner's program for another's.
-ok("flag-on FINAL tile key carries LOD_CROSSFADE's token 'l' via the shared helper",
-  on.key === 'world-bend-fade-hill-r19-l24', on.key);
-ok("the token is LAST in the fixed order (e/f/a/l) so C's tokens keep their places",
-  r24VariantKey('base', [[true, 'e'], [true, 'f'], [true, 'a'], [true, 'l']]) === 'base-efal24' &&
-  r24VariantKey('base', []) === 'base',
-  r24VariantKey('base', [[true, 'e'], [false, 'f'], [false, 'a'], [true, 'l']]));
+{
+  const T = hillTokens(CONSTS);
+  const A = !!CONSTS.AERIAL_LAW?.enabled;
+  ok('flag-off FINAL tile key === the other owners\' tokens alone (no \'l\')',
+    off.key === expectHillKey(r24VariantKey, T, A, false) && !hasTok(off.key, 'l'),
+    `${off.key} with e=${T.e} f=${T.f} a=${A}`);
+  ok("flag-on FINAL tile key gains EXACTLY LOD_CROSSFADE's token 'l', in its fixed position",
+    on.key === expectHillKey(r24VariantKey, T, A, true) && hasTok(on.key, 'l'),
+    `${off.key} -> ${on.key}`);
+  ok("turning D's slot on changes ONLY the 'l' token",
+    on.key.replace(/l(?=24$)/, '') === off.key.replace(/-24$/, '') ||
+    on.key === expectHillKey(r24VariantKey, T, A, true),
+    `${off.key} -> ${on.key}`);
+  // World-independent: the ORDER is the contract, so sweep all sixteen token
+  // states through the helper. A token that moved position would serve one
+  // owner's program for another's — the R4 wrong-cached-program defect.
+  let bad = 0;
+  for (let m = 0; m < 16; m++) {
+    const b = [!!(m & 8), !!(m & 4), !!(m & 2), !!(m & 1)];
+    const want = ['e', 'f', 'a', 'l'].filter((_, i) => b[i]).join('');
+    const got = r24VariantKey(HILL_BASE, [[b[0], 'e'], [b[1], 'f'], [b[2], 'a'], [b[3], 'l']]);
+    if (got !== (want ? `${HILL_BASE}-${want}24` : HILL_BASE)) bad++;
+  }
+  ok('the fixed order e/f/a/l holds across all 16 token states', bad === 0, `${bad} of 16 wrong`);
+  ok('ALL FOUR tokens false === the bare R19 key (the flag-off identity proof)',
+    expectHillKey(r24VariantKey, { e: false, f: false }, false, false) === HILL_BASE,
+    HILL_BASE);
+  // Both worlds, demonstrated rather than argued: this branch ships C's tokens
+  // OFF, the integrated tree ships them ON. Same derivation, both answers.
+  for (const [world, tk] of [['this branch', T], ["C's flipped tree", { e: true, f: true }]]) {
+    const kOff = expectHillKey(r24VariantKey, tk, A, false);
+    const kOn = expectHillKey(r24VariantKey, tk, A, true);
+    ok(`derivation holds in ${world}: 'l' absent off, present on`,
+      !hasTok(kOff, 'l') && hasTok(kOn, 'l'), `${kOff} -> ${kOn}`);
+  }
+}
 ok('flag-on wires exactly the three fade uniforms',
   ['uLodFadeMix', 'uLodFadeUV', 'uLodFadeMap'].every((k) => on.shader.uniforms[k]) &&
   on.shader.uniforms.uLodFadeMix === slot.mix && on.shader.uniforms.uLodFadeMap === slot.map);
