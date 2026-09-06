@@ -18,6 +18,7 @@ import {
   EffectAttribute,
 } from 'postprocessing';
 import { finishPassChain } from '@/lib/fly/post-policy';
+import { installDepthProbe } from '@/lib/fly/depth-probe';
 import { FX_STABILITY } from '@/lib/fly/fly-constants';
 import { registerComposer, resolveStepSafe } from '@/lib/fly/step-safe';
 
@@ -208,6 +209,20 @@ const StableEffectComposer = /* @__PURE__ */ memo(
       if (!resolveStepSafe().enabled || !composer) return undefined;
       return registerComposer(composer);
     }, [composer]);
+
+    // ---- R24 C (DEPTH_FIX): the depth probe hook -------------------------
+    // `verify-depth-roundtrip` cannot reconstruct a view Z without the
+    // renderer's own conversion — re-implementing it in the harness would test
+    // the harness's copy of the bug. So the app publishes the number.
+    // Installed HERE because this component owns the composer, and
+    // `composer.depthTexture` is the attachment every EffectAttribute.DEPTH
+    // effect reads. Dev-only, the R19 park-handle idiom: in a production build
+    // this branch is statically false, so nothing is constructed, no render
+    // target is allocated and no global is written — production byte-identical.
+    useEffect(() => {
+      if (process.env.NODE_ENV === 'production') return undefined;
+      return installDepthProbe({ gl, composer, camera }) ?? undefined;
+    }, [gl, composer, camera]);
 
     // ---- (ii) size, keyed on CSS size AND device pixel ratio -------------
     useEffect(() => {
