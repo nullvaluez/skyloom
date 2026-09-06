@@ -1,0 +1,220 @@
+#!/usr/bin/env bash
+#
+# R24 (E CERT) — THE CERTIFICATION RUN, hardened.
+#
+# The sequence Fable ran by hand, with the three failure modes that cost this
+# round about an hour designed out of it:
+#
+#   1. A `curl` health check proves a PORT answers, not that YOUR server
+#      answers. A hand run's `next dev -p 3100` died instantly with EADDRINUSE
+#      because an earlier server still held the port; the check passed against
+#      that other process and every row after it measured a tree nobody had
+#      chosen. THIS SCRIPT REFUSES TO START if :3100 already has a listener,
+#      prints the PID, and NEVER kills it — it is not ours to kill.
+#   2. "Zero canvas, __flyBoot undefined" is the `dynamic(FlyMode,{ssr:false})`
+#      loading state: the chunk never evaluated. Twelve minutes of browser rows
+#      were spent discovering it twice. THIS SCRIPT PROVES THE BOOT FIRST with
+#      one throwaway page that must reach `__flyBoot.pct === 100`, and ABORTS
+#      with the page's console errors printed if it does not. That single step
+#      is what would have saved the 601 s row.
+#   3. Content gates and pacing gates need different environments.
+#      `FLY_FINALIZE_BUDGET_K` widens a per-frame budget, so it is correct for
+#      "what does the world CONTAIN" and WRONG for anything that measures
+#      pacing. The split below is exactly the table in
+#      scripts/r24-close-sweep.md §1.5 and is written per row, never globally.
+#
+# It also runs the node gates first — `verify-import-integrity` above all, the
+# cheapest possible "the app can evaluate" signal — because a red there makes
+# every browser number after it meaningless.
+#
+#   scripts/r24-cert-run.sh [port]        # default 3100
+#
+# ENV
+#   CERT_SKIP_NODE=1   skip the node gates (they are seconds; rarely worth it)
+#   CERT_K             content-gate budget scaler (default 40)
+#   CERT_FIXTURE_K     the fixture census's own K (default 200 — Manhattan's
+#                      sixteen dense chunks do not settle at 40 in this venue)
+#   CERT_BOOT_SCALE    FLY_BOOT_SCALE (default 6)
+#   CERT_OUT           log directory (default scripts/r24-out/cert)
+#
+# Logs: $CERT_OUT/<row>.log · summary on stdout with rc, seconds and load.
+# At the end it kills ONLY the dev-server PID it started.
+
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 1
+
+PORT="${1:-3100}"
+OUT="${CERT_OUT:-scripts/r24-out/cert}"
+K="${CERT_K:-40}"
+FK="${CERT_FIXTURE_K:-200}"
+mkdir -p "$OUT"
+
+load() { uptime | sed 's/.*average: //'; }
+say() { printf '%s\n' "$*"; }
+
+# --- 1. the port must be OURS ------------------------------------------------
+HOLDER="$(lsof -t -i:"$PORT" -sTCP:LISTEN 2>/dev/null | head -1)"
+if [ -n "$HOLDER" ]; then
+  say "REFUSING TO START: port $PORT already has a listener, PID $HOLDER"
+  say "  $(ps -o args= -p "$HOLDER" 2>/dev/null | head -c 160)"
+  say "  It is not mine to kill. Stop it yourself, or pass another port."
+  exit 2
+fi
+
+say "=== R24 CERTIFICATION RUN  $(date +%T)  port $PORT  load $(load)"
+say "tree: $(git rev-parse --short HEAD 2>/dev/null)  $(git log -1 --format=%s 2>/dev/null | head -c 70)"
+
+# --- 2. node gates first -----------------------------------------------------
+NODE_FAIL=0
+if [ "${CERT_SKIP_NODE:-0}" != 1 ]; then
+  say ""
+  say "--- node gates (no browser, no server) ---"
+  for g in verify-import-integrity.mjs verify-classify.mjs verify-warbirds.mjs \
+           verify-daily.mjs verify-depth-offset.mjs verify-terra-residency.mjs \
+           verify-c-flagoff.mjs verify-worker-normals.mjs verify-skirt-worker.mjs \
+           verify-lod-fade.mjs verify-vendor-three-tile.mjs verify-skirt-fast.mjs \
+           verify-frame-step.mjs verify-finalize-pace.mjs verify-artifact-hygiene.mjs; do
+    [ -f "scripts/$g" ] || { printf 'SKIP  %s (absent)\n' "$g"; continue; }
+    if node "scripts/$g" > "$OUT/node-$g.log" 2>&1; then
+      printf 'PASS  %s\n' "$g"
+    else
+      printf 'FAIL  %s   -> %s\n' "$g" "$OUT/node-$g.log"
+      tail -12 "$OUT/node-$g.log" | sed 's/^/      /'
+      NODE_FAIL=$((NODE_FAIL + 1))
+    fi
+  done
+  if [ "$NODE_FAIL" -gt 0 ]; then
+    say ""
+    say "*** $NODE_FAIL node gate(s) failed. STOPPING before the browser rows."
+    say "*** If verify-import-integrity is among them, the app cannot evaluate and"
+    say "*** every browser row would have died at bootFly with no canvas — which is"
+    say "*** exactly the half hour this script exists to stop repeating."
+    exit 1
+  fi
+fi
+
+# --- 3. exactly one dev server, ours ----------------------------------------
+say ""
+say "--- starting one dev server on :$PORT ---"
+(npm run dev -- -p "$PORT" > "$OUT/dev.log" 2>&1 &)
+sleep 2
+DEV_PID="$(lsof -t -i:"$PORT" -sTCP:LISTEN 2>/dev/null | head -1)"
+CODE=000
+for _ in $(seq 1 90); do
+  CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "http://127.0.0.1:$PORT/" 2>/dev/null)"
+  [ "$CODE" = "200" ] && break
+  sleep 2
+  DEV_PID="${DEV_PID:-$(lsof -t -i:"$PORT" -sTCP:LISTEN 2>/dev/null | head -1)}"
+done
+if [ "$CODE" != "200" ]; then
+  say "dev server never answered 200 on :$PORT (last $CODE). Tail of $OUT/dev.log:"
+  tail -20 "$OUT/dev.log" | sed 's/^/      /'
+  exit 2
+fi
+say "dev :$PORT -> 200, PID ${DEV_PID:-unknown}  load $(load)"
+
+cleanup() {
+  if [ -n "${DEV_PID:-}" ] && kill -0 "$DEV_PID" 2>/dev/null; then
+    say "stopping the dev server I started (PID $DEV_PID)"
+    kill "$DEV_PID" 2>/dev/null
+  fi
+}
+trap cleanup EXIT
+
+export FLY_TILE_FIXTURE=1
+export FLY_URL="http://localhost:$PORT"
+export FLY_BOOT_SCALE="${CERT_BOOT_SCALE:-6}"
+export PW_SHIM_QUIET=1
+
+# --- 4. THE BOOT PROOF -------------------------------------------------------
+# One throwaway page. If it cannot reach pct 100 the run stops HERE, with the
+# console errors printed — rather than after twelve minutes of browser rows all
+# dying at the same wait for the same reason.
+say ""
+say "--- boot proof (throwaway page, satellite, fixture) ---"
+cat > "$OUT/_bootproof.js" <<'PROOF'
+const { chromium } = require('playwright');
+const { bootFly } = require('../../_boot');
+(async () => {
+  const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--enable-gpu'] });
+  const ctx = await b.newContext({ viewport: { width: 640, height: 360 } });
+  const page = await ctx.newPage();
+  const errs = [];
+  page.on('pageerror', (e) => errs.push('PAGEERROR ' + String(e).slice(0, 300)));
+  page.on('console', (m) => { if (m.type() === 'error') errs.push('CONSOLE ' + m.text().slice(0, 300)); });
+  page.on('requestfailed', (r) => {
+    if (r.url().includes('/_next/')) errs.push('CHUNK FAILED ' + r.url().slice(-80) + ' ' + (r.failure()?.errorText || ''));
+  });
+  const t0 = Date.now();
+  try {
+    await bootFly(page, { style: 'satellite', timeoutMs: 300000, settleMs: 2000 });
+    console.log(`BOOT OK in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+    await b.close();
+    process.exit(0);
+  } catch (e) {
+    console.log(`BOOT FAILED after ${((Date.now() - t0) / 1000).toFixed(1)}s: ${String(e).split('\n')[0]}`);
+    const state = await page.evaluate(() => ({
+      canvases: document.querySelectorAll('canvas').length,
+      boot: typeof window.__flyBoot,
+      pct: window.__flyBoot?.pct ?? null,
+      body: (document.body.innerText || '').slice(0, 120),
+    })).catch(() => null);
+    console.log('PAGE STATE ' + JSON.stringify(state));
+    for (const x of errs.slice(0, 12)) console.log('  ' + x);
+    if (state && state.canvases === 0 && state.boot === 'undefined')
+      console.log('  DIAGNOSIS: zero canvases and no __flyBoot = the FlyMode dynamic chunk never\n' +
+                  '  evaluated. Look at a module-scope ReferenceError first (run\n' +
+                  '  node scripts/verify-import-integrity.mjs), then at /_next/ chunk responses.');
+    await b.close();
+    process.exit(1);
+  }
+})();
+PROOF
+if ! timeout 600 node -r ./scripts/_pw-shim.js "$OUT/_bootproof.js" 2>&1 | tee "$OUT/bootproof.log"; then
+  say ""
+  say "*** BOOT PROOF FAILED — stopping. No browser row can mean anything until"
+  say "*** the app mounts. See $OUT/bootproof.log."
+  exit 1
+fi
+
+# --- 5. the rows -------------------------------------------------------------
+# run <name> <K|-> <script> [extra env...]
+#   K = the finalize-budget scaler. "-" means the row must NOT see it: it
+#   measures pacing, per-frame ordering or program counts, and a wider budget
+#   changes which work lands in which frame.
+run() {
+  local name="$1" k="$2" script="$3"; shift 3
+  [ -f "scripts/$script" ] || { printf '\nSKIP  %s (scripts/%s absent)\n' "$name" "$script"; return; }
+  local t0; t0=$(date +%s)
+  printf '\n=== %s (K=%s) %s\n' "$name" "$k" "$(date +%T)"
+  if [ "$k" != "-" ]; then
+    env FLY_FINALIZE_BUDGET_K="$k" "$@" timeout 2400 node -r ./scripts/_pw-shim.js "scripts/$script" > "$OUT/$name.log" 2>&1
+  else
+    env "$@" timeout 2400 node -r ./scripts/_pw-shim.js "scripts/$script" > "$OUT/$name.log" 2>&1
+  fi
+  local rc=$? dt=$(( $(date +%s) - t0 ))
+  printf 'rc=%s %ss load=%s\n' "$rc" "$dt" "$(load)"
+  grep -E "^(PASS|FAIL|SKIP|RED|GREEN|INFO|NOT CALIBRATED|VERIFY)" "$OUT/$name.log" | head -40
+}
+
+# CONTENT rows — they ask what the world CONTAINS once settled.
+run flash-guard "$K" verify-flash-guard.js
+run fade        "$K" verify-fade.js
+run lod-fade    "$K" verify-lod-fade.js
+# PACING / ORDERING rows — these must NEVER see the budget scaler.
+run step-clean   -   verify-step-clean.js
+run one-sun      -   verify-one-sun.js
+run linear-haze  -   verify-linear-haze.js
+run depth-rt     -   verify-depth-roundtrip.js
+run ladder-fix   -   verify-ladder-fix.js
+run ladder-red   -   verify-ladder-fix.js FLY_LADDER_RED=1
+run terra-live  "$K" verify-terra-live.js FLY_TERRA_ARMS=both
+run frame-pace   -   verify-frame-pace.js
+# LAST, and longest: the four-pose census. Manhattan's sixteen dense chunks do
+# not settle at K=40 in this venue (measured: 12 still draping at 300 s on
+# quiet cores), so it gets its own K and a 900 s per-pose cap.
+run fixture     "$FK" verify-fixture.js FLY_FIXTURE_SETTLE_MS=900000
+
+say ""
+say "=== CERT DONE $(date +%T)  load $(load)"
+say "logs: $OUT/"
