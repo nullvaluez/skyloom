@@ -904,3 +904,68 @@ ships `enabled: false`.**
 | **`ENV_UNIFORM`** | **ON only after E's two runs** | noon bit-identical BY CONSTRUCTION (day-width normalisation + endpoint bypass) | needs (a) `programsDelta` flat across a dusk crossing AND a forced high↔medium step with `__flyGovPin` AND `__flySatShadowOverride` released, and (b) a twilight fixture A/B at the `verify-dusk` / `verify-sat-night` poses. **This is the one B feature whose flip I do not recommend on construction alone** |
 | **`RING_DEDUPE`** | **OFF — built but off** | live-winding A/B on E's tiles: sat verts −15.6 %, **skyline +31.6 % (`ring[0]` restored)**, **Powell toy +17.4 % (roof-form dispatch moving on the restored corner count)**, degenerate → 0, **Owens lock holds in BOTH legs** | It moves roof-form outcomes on four certified gates (`verify-roofs` 394/2985, `verify-roof-variety`, `verify-window-grids` 403, `verify-neon-city` 379) and carries a live hash re-baseline. **`FLASH_GUARD` alone already removes the entire degenerate population from the GPU with zero bundle-byte movement and no gate exposure — that is the cheap 95 % of the win.** The change RING_DEDUPE makes is in the CORRECT direction: the corner was real and was being eaten by a collinearity walk that saw a zero-length edge. But **correct and certified are different claims and only the second is a merge gate.** It becomes a follow-up: a roof re-certification under a controlled A/B, with the live hash re-baseline going with it |
 
+---
+
+## §14 CORRECTION — ENV_UNIFORM's two-state warm was wrong, and §6.2 was wrong about it
+
+Adversarial review of `r24/b` at `06b8f1d`, **confirmed by two independent
+verifiers**, found that the alternate shadow-state warm I shipped was wrong in
+two independent ways. **Both findings are correct, and my §6.2 sentence "off the
+boot gate's critical path" was false.** Recorded here rather than quietly
+patched, because the ledger is the record.
+
+**Defect (a) — it ran inside the boot gate.** The second `compileAsync` sat
+BEFORE `_state.done = true`, and `BootScreen.jsx:146` gates the reveal on
+`done || now - t0 >= PREWARM.maxMs`. So it could extend the reveal up to the
+3000 ms cap. **"Boot reveal timing may not lengthen" is a frozen rule** (plan
+§4), and I had asserted the opposite.
+
+**Defect (b) — it mutated the live scene while the renderer was running.**
+It flipped the LIVE directional's `castShadow` and held it across an awaited
+compile. `frameloop="always"` keeps rendering: every production frame in that
+window re-keys every lit material on `shadowMapEnabled` (blocking on the link)
+and renders a shadow pass at tiers that have none. With a slow HDRI
+(`envWaitMs` 4000 > `maxMs` 3000) the window can land AFTER the reveal, where
+the user SEES shadows snap on and off. **E's `programsDelta` gate would have
+read flat and not caught it** — the programs are exactly the ones we wanted;
+the defect is WHEN and against WHAT they were minted.
+
+**The fix.** The live scene is never touched, read-only, at any point:
+
+- The warm compiles against a **STAND-IN target scene** holding **clones** of
+  every live light with `castShadow` inverted on the shadow-capable ones (so the
+  light COUNTS in the program key are unchanged), carrying the live
+  `environment` and `fog` — **both are in three's program cache key, so a
+  stand-in missing either would mint a THIRD program instead of the shadow twin
+  it exists to seed.**
+- It is **queued strictly after `_state.done = true`** and drained on the SAME
+  idle path as the late-HDRI re-queue — one `compileAsync` per idle frame, and
+  a frame slower than `idleFrameMs` is skipped entirely.
+- It runs **at most twice per session**: once at `done`, and once more after an
+  env repair, because the first pass was seeded against whatever `environment`
+  existed then (on that path, nothing).
+- `stats.shadowStates` flips to 2 **only when the queued pass actually lands**,
+  never when it is merely queued.
+
+**New gate: `scripts/r24-b-prewarm-proof.mjs`** — a SOURCE gate, because
+`prewarm.js` statically imports JSX and cannot be loaded into bare node, and
+because the property under test is WHERE the calls are, not what a GPU returns
+(the `verify-warbirds` precedent). Gates (1) and (2) **self-calibrate against
+the R21 base revision `6116fc5`**: the invariant is not "some fixed number", it
+is *B added nothing here*, which only a diff against the base can state.
+
+| leg | result |
+|---|---|
+| working tree | **9/9 PASS** — 3 compiles before `done`, identical to R21 base; castShadow writes outside the clone builder are R21's `[o]` exactly |
+| `--red` (the defective `06b8f1d`) | **5 of 9 FAIL**, including both defects: 4 compiles before `done` vs the base's 3, and `[o, o, o]` castShadow writes vs the base's `[o]` |
+
+**`ENV_UNIFORM` still ships OFF this round** (Fable's ruling stands). The fix
+makes it a safe follow-up flip rather than a latent reveal-lengthening,
+shadow-snapping bug.
+
+**Lesson.** A warm that mutates the scene it is warming is not a warm; it is a
+render with a different state, and the fact that it produces the right programs
+is exactly what makes it invisible to a program-count gate. Warm against a
+stand-in, always — and "off the critical path" is a claim about a line number,
+so check the line number.
+
