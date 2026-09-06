@@ -201,7 +201,15 @@ composites.**
   on the flag-off tree, pass 2 on the flipped tree — and §4 carries a marker
   per row. The owners' flip commits are written and **held on their branches
   until pass 1 ends**: D `327950b`, B `070b95b`, C `81338da`, A `5ddf5dc`,
-  with E's `FRAME_STATS` flip still to come.
+  with E's `FRAME_STATS` flip still to come. **A dry-run merge of all five
+  flipped branches into a scratch worktree produced exactly one resolvable
+  conflict** — `FlyEffectComposer.jsx`, where A's `registerComposer` effect and
+  C's `installDepthProbe` effect both land and both were kept — **and node smoke
+  16/16 except three of D's key-expectation gates**, which assumed C's tokens
+  were off: the flipped hill key is `world-bend-fade-hill-r19-ef24` (e and f
+  from C) while those gates expected `-a24` / `-l24` literals. D is fixing them
+  to COMPUTE the expectation from the live token states rather than to spell
+  it.
 
 ---
 
@@ -349,7 +357,10 @@ monument, air, air-anchor, road, water) — dispatch designed (`atmoApply` opaqu
 
 Per-gate detail, the user-machine command list and the deviation log are in
 [`scripts/r24-close-sweep.md`](scripts/r24-close-sweep.md) — **§2.7 is the
-per-gate user-machine run list and is not duplicated here.**
+per-gate user-machine run list and is not duplicated here.** The pass-1 legs are
+written into the cells below while pass 2 runs; at the close they move to the
+close sweep, which becomes the per-LEG home for both passes, and each row here
+becomes one line citing E's section.
 
 Certification is **TWO PASSES**, and a row is not finished until both are in:
 
@@ -704,6 +715,30 @@ queued strictly after `_state.done` on the idle drain. It still ships OFF.
   13-line change into an 8.4 k-line diff. Restored by hand in `4bedab1`; a
   preserve-line-endings rule went round-wide (599 CRLF files, no
   `.gitattributes`).
+
+### 5.4b Three from the close itself
+
+- **The dry-run merge of the five flipped branches** produced ONE resolvable
+  conflict (`FlyEffectComposer.jsx`: A's `registerComposer` and C's
+  `installDepthProbe` effects, both kept) and node smoke **16/16 except three of
+  D's key-expectation gates**, which had spelled `-a24` / `-l24` literals while
+  the flipped tree's hill key is `world-bend-fade-hill-r19-ef24` — C's tokens.
+  D is making them compute the expectation from the live token states. **A gate
+  that spells a key it does not own is a coupling gate, not a key gate.**
+- **D signed off E's corrected LOD ON leg** (`r24/e f7fe5f2`, "mapping
+  correct"), noting two places where E went beyond the spec: `waitUntil`
+  evaluates BEFORE any wait, so an empty sweep returns frames 0 rather than
+  hanging, and `waitFrames` was DELETED rather than left for the next person.
+  D's non-blocking note, which E is writing into the leg: **the leg's warp
+  safety is a property of the 45 s `LOD_SETTLE_MS`, not of the `skip.warp`
+  poll.**
+- **The record's own author hit lesson 20.** While folding §4's prose into its
+  cells, one cut's end-marker matched PAST the block it was meant to bound and
+  took §4.3, §4.4 and §4.5 with it. A per-section line census before the commit
+  caught it — the numbers did not add up — and all three were restored
+  byte-verbatim from `HEAD`, so the committed diff contains only intended
+  removals. **A mechanical edit whose match is not asserted is the same defect
+  in a document as it is in a module** (F SCRIBE).
 
 ### 5.5 Ledger disagreements, resolved
 
