@@ -456,8 +456,20 @@ Two consequences for B:
 
 The **toy** site reads 0/0/0 at both poses only because neither pose has toy
 chunks resident in satellite. The toy extruder carries the same wrap-around
-loop (A1b), so it is **NOT EXERCISED** by this row and must not inherit the
-satellite green — it needs a toy-style leg.
+loop (A1b, `vector-tile.worker.js:4285`), so it is **NOT EXERCISED** by this
+row and must not inherit the satellite green.
+
+**RULING (Fable): no toy leg this round.** The machine belongs to the
+certification run, and adding a leg now would mean calibrating a NEW gate under
+load at the close — which is exactly how R20 §5 happened. The toy-world site is
+therefore recorded as **NOT EXERCISED** here, in §4, and in B's ship row.
+Manhattan covers the skyline site.
+
+One number with its caveat: sat-buildings' **worst chunk is 13.98%** at
+Manhattan, above R22.1's 6.36–8.64% band. That band was quoted for "every large
+chunk", and a smaller chunk can be proportionally worse, so this reads as
+consistent rather than contradictory — recorded with the caveat rather than
+smoothed over.
 
 That is worth more than a green: it is independent corroboration of the
 diagnosis *and* of the fixture. The population exists in fixture tiles **by
@@ -571,6 +583,17 @@ its trimmed sweep.
   green on the integrated tree, the worker's output byte-identical across five
   merges on 149 fixture tiles, the Owens lock and the Melton carpet reproduced,
   and the flag-off RED calibrated for each new gate.
+- **NOT EXERCISED (not the same as green):** the **toy-world** site of
+  `FLASH_GUARD`. Both `verify-flash-guard` poses boot satellite, so no toy
+  chunk was resident and its census read 0/0/0 for absence, not for health. The
+  toy extruder carries the same wrap-around loop as the satellite one
+  (`vector-tile.worker.js:4285`). Fable's ruling: no toy leg this round,
+  because calibrating a new gate under load at the close is how R20 §5
+  happened. It must appear in B's ship row as NOT EXERCISED.
+- **INSURANCE, not a repair:** the **skyline** site. Measured zero degenerates
+  over 83,752 triangles before any fix, because `simplifyRing` already removes
+  the closing clone (and a genuine corner with it). A green there repaired
+  nothing.
 - **What it did not, and could not:** every fps, frame-time, stall, governor,
   tearing and driver claim, and the LOOK of anything on a real GPU over real
   Esri and OpenFreeMap bytes. Those are §2's user-machine list, and until the
