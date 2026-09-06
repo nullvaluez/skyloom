@@ -423,10 +423,41 @@ PASS (1a) THE CENSUS HAS SOMETHING TO COUNT at powell
 PASS (2)  RED CALIBRATION — the zero-area population EXISTS with the pin off
 ```
 
+Manhattan, same run:
+
+```
+manhattan: 14 meshes, 126,116 tris, 5,820 ZERO-AREA (4.61%)
+   sat-buildings  meshes=4   tris=42,364  zero=5,820  worstChunk 13.98%
+                  sample [342.77, 8.21, 677.18]  coincident=TRUE
+   sat-skyline    meshes=10  tris=83,752  zero=0     worstChunk 0.00%
+   toy-world      0 / 0 / 0
+```
+
 **8.28% against R22.1's 6.36–8.64%** measured on the LIVE planet (34,405 of
 482,740 triangles, 99.9% coincident-vertex — recon A1), and the sampled
 degenerate is coincident-vertex here too. The A1 defect reproduces on a
 completely different planet's tiles, offline, with no GPU.
+
+**AND THE PER-SITE ATTRIBUTION IS THE REAL PRIZE.** Over 83,752 triangles in
+ten resident skyline meshes, the skyline site has **exactly zero** zero-area
+triangles — which is precisely what recon A1b predicted from a code read and
+nobody had measured. The skyline path runs `simplifyRing(poly.outer,
+SK.simplifyTol)` BEFORE its wall loop, and `simplifyRing`'s collinearity test
+discards the closing clone (`cross === 0`) *and* `ring[0]` with it. So the
+skyline never emits the zero-length wall edge — at the price of losing a
+genuine corner from every ring.
+
+Two consequences for B:
+- `FLASH_GUARD` at the **skyline** site is INSURANCE, not a fix: there is
+  nothing there to remove. Its green at that site must not be read as having
+  repaired anything.
+- The skyline's actual defect — the lost first corner — is a DIFFERENT bug that
+  this gate does not measure and no gate currently does.
+
+The **toy** site reads 0/0/0 at both poses only because neither pose has toy
+chunks resident in satellite. The toy extruder carries the same wrap-around
+loop (A1b), so it is **NOT EXERCISED** by this row and must not inherit the
+satellite green — it needs a toy-style leg.
 
 That is worth more than a green: it is independent corroboration of the
 diagnosis *and* of the fixture. The population exists in fixture tiles **by
