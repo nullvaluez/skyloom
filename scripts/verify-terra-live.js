@@ -156,6 +156,8 @@ const CENSUS = () => {
   };
 };
 
+const { notCalibrated, notCalCount, notCalSummary } = require('./_notcal');
+
 let pass = 0;
 let fail = 0;
 const gate = (name, ok, detail = '') => {
@@ -347,19 +349,25 @@ async function runArm(context, fx, paceOn) {
         `   resident MB on ${on.poses[name].mem?.residentMB}`
     );
   }
-  const ceilOk = (v) => v == null || v <= 261;
-  gate('7 CEILING: Owens draws <= 261 in every arm that ran (the frozen desert control)',
-    ceilOk(off.poses.owens.draws) && ceilOk(on.poses.owens.draws),
-    `off ${off.poses.owens.draws} / on ${on.poses.owens.draws}`);
-  const satOk = (v) => v == null || v <= 375;
-  gate('8 CEILING: satellite draws <= 375 at the suburb pose in every arm that ran',
-    satOk(off.poses.powell.draws) && satOk(on.poses.powell.draws),
-    `off ${off.poses.powell.draws} / on ${on.poses.powell.draws}`);
+  // `v == null || v <= CEILING` reads "an absent draw count is under the
+  // ceiling". It is not — it is an absent draw count, and a ceiling gate that
+  // passes when the arm did not report is the one gate in this file that must
+  // never be able to do that. Absence is NOT CALIBRATED; only a finite number
+  // gets a verdict. (E, R24 close sweep §2.10a.)
+  const ceilPair = (name, ceiling, a, b, why) => {
+    if (!Number.isFinite(a) && !Number.isFinite(b)) return notCalibrated(name, `${why}: off ${a} / on ${b}`);
+    const parts = [a, b].filter((v) => Number.isFinite(v));
+    return gate(name, parts.every((v) => v <= ceiling), `off ${a} / on ${b} (ceiling ${ceiling})`);
+  };
+  ceilPair('7 CEILING: Owens draws <= 261 in every arm that ran (the frozen desert control)',
+    261, off.poses.owens.draws, on.poses.owens.draws, 'neither arm reported an Owens draw count');
+  ceilPair('8 CEILING: satellite draws <= 375 at the suburb pose in every arm that ran',
+    375, off.poses.powell.draws, on.poses.powell.draws, 'neither arm reported a suburb draw count');
   gate('9 no page errors in either arm', off.errs.length === 0 && on.errs.length === 0,
     [...off.errs, ...on.errs].join(' | '));
 
-  console.log(`\n${pass} passed, ${fail} failed`);
-  process.exit(fail ? 1 : 0);
+  console.log(`\n${pass} passed, ${fail} failed${notCalSummary()}`);
+  process.exit(fail || notCalCount() ? 1 : 0);
 })().catch((e) => {
   console.error(e);
   process.exit(1);

@@ -133,6 +133,8 @@ const INSTALL_TEAR_WATCH = () => {
 
 let pass = 0;
 let fail = 0;
+const { notCalibrated, notCalCount, notCalSummary } = require('./_notcal');
+
 function gate(name, ok, detail) {
   ok ? pass++ : fail++;
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
@@ -254,8 +256,8 @@ async function serpentine(page, ms) {
   // CALIBRATED, not green.
   const tearArmed = tear.resizes > 0;
   if (!tearArmed)
-    info(
-      '(3a) TEAR LEGS NOT CALIBRATED — no resize occurred in the window',
+    notCalibrated(
+      '(3a) TEAR LEGS — no resize occurred in the window',
       `resizes ${tear.resizes} over ${tear.frames} frames. (3) and (4) below are therefore ` +
         'vacuous: they can only prove the mechanism when a size commit actually happened. Force a ' +
         'DPR or tier step (see verify-step-clean) or lengthen the window'
@@ -301,9 +303,9 @@ async function serpentine(page, ms) {
   );
 
   gate('(9) NO PAGE ERRORS', errors.length === 0, errors.slice(0, 3).join(' | ') || 'clean');
-  console.log(`\n${pass} passed, ${fail} failed`);
+  console.log(`\n${pass} passed, ${fail} failed${notCalSummary()}`);
   await browser.close();
-  process.exit(fail ? 1 : 0);
+  process.exit(fail || notCalCount() ? 1 : 0);
 })().catch((e) => {
   console.error(e);
   process.exit(1);

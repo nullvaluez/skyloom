@@ -206,6 +206,8 @@ async function waitFrames(pg, n, timeoutMs = 180000) {
   return (await pg.evaluate(() => window.__flyStats?.frame?.count ?? window.__lodWatch?.frames ?? 0)) - start;
 }
 
+const { notCalibrated, notCalCount, notCalSummary } = require('./_notcal');
+
 let pass = 0;
 let fail = 0;
 const red = [];
@@ -525,7 +527,7 @@ function soft(name, detail) {
     );
 
   if (process.env.LOD_OFF_ONLY) {
-    soft('(9)-(18) ON LEG SKIPPED', 'LOD_OFF_ONLY=1 — the RED legs above are the whole run');
+    notCalibrated('(9)-(19) THE ON LEG', 'LOD_OFF_ONLY=1 — the flag-on column was not measured by this run');
   } else {
     // maxConcurrent is SOURCE-PARSED rather than hard-coded: it is D's number,
     // and a gate that copies another owner's constant goes quietly stale the
@@ -667,8 +669,8 @@ function soft(name, detail) {
       );
 
     if (swapsON <= 0) {
-      soft(
-        '(13)-(17) NOT CALIBRATED',
+      notCalibrated(
+        '(13)-(17) THE ON-LEG FLIP CRITERIA',
         'refines + merges is 0 in the measured window — the ladder was never offered a swap, so ' +
           '"faded > 0" and "hardSwaps fell" would both be readings of an empty population'
       );
@@ -760,9 +762,9 @@ function soft(name, detail) {
 
   console.log('\nRED TABLE (defect · gate · measured · green target)');
   for (const r of red) console.log(`  ${r[0]} | ${r[1]} | measured ${r[2]} | ${r[3]}`);
-  console.log(`\n${pass} passed, ${fail} failed`);
+  console.log(`\n${pass} passed, ${fail} failed${notCalSummary()}`);
   await browser.close();
-  process.exit(fail ? 1 : 0);
+  process.exit(fail || notCalCount() ? 1 : 0);
 })().catch((e) => {
   console.error(e);
   process.exit(1);

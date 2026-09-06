@@ -113,6 +113,13 @@ function gate(name, ok, detail) {
 function skip(name, why) {
   console.log(`SKIP  ${name}  — ${why}`);
 }
+/**
+ * NOT CALIBRATED is the third verdict; see scripts/_notcal.js for why a
+ * comparison with an absent operand cannot simply be written "the safe way
+ * round". Clause (5) of this very gate is the measured case that produced it.
+ */
+const { numGate, notCalCount, notCalSummary } = require('./_notcal');
+const gateNum = numGate(gate);
 
 (async () => {
   const browser = await chromium.launch({
@@ -212,29 +219,43 @@ function skip(name, why) {
       if (s.moonK > 0) {
         skip(`(1) ${tier}/${label} AZIMUTH AGREEMENT`, `moonK=${s.moonK} — clause 4 governs instead`);
       } else {
-        const dAzHill = Math.abs(keyAz - hillAz);
-        gate(
+        const dAzHill = Number.isFinite(keyAz) && Number.isFinite(hillAz) ? Math.abs(keyAz - hillAz) : NaN;
+        gateNum(
           `(1) ${tier}/${label} AZIMUTH: key === hill to 1e-6`,
+          dAzHill,
           dAzHill < 1e-6,
-          `Δ ${dAzHill.toExponential(2)}°`
+          `Δ ${Number.isFinite(dAzHill) ? dAzHill.toExponential(2) : dAzHill}°`,
+          `key azimuth ${keyAz} · hill azimuth ${hillAz} — one of the two directionals is absent ` +
+            'or zero-length, so there is no angle to compare'
         );
         if (s.dome == null)
           skip(`(1b) ${tier}/${label} dome azimuth`, 'dome lobe envelope is 0 (night / toy / flag off)');
         else
-          gate(
-            `(1b) ${tier}/${label} AZIMUTH: key === dome to 1e-6`,
-            Math.abs(keyAz - domeAz) < 1e-6,
-            `Δ ${Math.abs(keyAz - domeAz).toExponential(2)}°`
-          );
+          (() => {
+            const dAzDome =
+              Number.isFinite(keyAz) && Number.isFinite(domeAz) ? Math.abs(keyAz - domeAz) : NaN;
+            gateNum(
+              `(1b) ${tier}/${label} AZIMUTH: key === dome to 1e-6`,
+              dAzDome,
+              dAzDome < 1e-6,
+              `Δ ${Number.isFinite(dAzDome) ? dAzDome.toExponential(2) : dAzDome}°`,
+              `key azimuth ${keyAz} · dome azimuth ${domeAz}`
+            );
+          })();
       }
 
       // --- clause 2: key elevation, floored only while casting
       const floorDeg = s.minElRadDeg ?? null;
       const expectKeyEl = s.casting && floorDeg != null ? Math.max(elDeg, floorDeg) : elDeg;
-      gate(
+      const dKeyEl =
+        Number.isFinite(keyEl) && Number.isFinite(expectKeyEl) ? Math.abs(keyEl - expectKeyEl) : NaN;
+      gateNum(
         `(2) ${tier}/${label} KEY ELEVATION === true (floored at minElRad only while casting)`,
-        Math.abs(keyEl - expectKeyEl) < 0.01,
-        `key ${keyEl?.toFixed(3)}° vs expected ${expectKeyEl?.toFixed?.(3) ?? expectKeyEl}° (casting=${s.casting})`
+        dKeyEl,
+        dKeyEl < 0.01,
+        `key ${keyEl?.toFixed(3)}° vs expected ${expectKeyEl?.toFixed?.(3) ?? expectKeyEl}° (casting=${s.casting})`,
+        `key elevation ${keyEl} · expected ${expectKeyEl} — Math.abs(null - x) is a NUMBER, so this ` +
+          'comparison used to be readable even when the key vector was absent'
       );
 
       // --- clause 3: hillshade clamp
@@ -242,31 +263,51 @@ function skip(name, why) {
         skip(`(3) ${tier}/${label} HILL CLAMP`, 'instrument does not publish hillMinDeg/hillMaxDeg');
       else {
         const expectHill = Math.min(Math.max(elDeg, s.hillMinDeg), s.hillMaxDeg);
-        gate(
+        const dHill =
+          Number.isFinite(hillEl) && Number.isFinite(expectHill) ? Math.abs(hillEl - expectHill) : NaN;
+        gateNum(
           `(3) ${tier}/${label} HILL ELEVATION === clamp(true, [min, max])`,
-          Math.abs(hillEl - expectHill) < 0.01,
-          `hill ${hillEl?.toFixed(3)}° vs expected ${expectHill.toFixed(3)}°`
+          dHill,
+          dHill < 0.01,
+          `hill ${hillEl?.toFixed(3)}° vs expected ${expectHill.toFixed(3)}°`,
+          `hill elevation ${hillEl} · expected ${expectHill}`
         );
       }
 
       // --- clause 4: moonlight
-      if (s.moonK === 1)
-        gate(
+      if (s.moonK === 1) {
+        const dMoon = s.moonExpected ? angleBetween(s.key, s.moonExpected) : null;
+        gateNum(
           `(4) ${tier}/${label} AT FULL MOON THE KEY IS moonDirFromSun(az)`,
-          s.moonExpected ? angleBetween(s.key, s.moonExpected) < 0.01 : false,
+          dMoon,
+          dMoon < 0.01,
+          `Δ ${dMoon?.toFixed(4)}°`,
           s.moonExpected
-            ? `Δ ${angleBetween(s.key, s.moonExpected)?.toFixed(4)}°`
+            ? `angleBetween(key, moonExpected) returned ${dMoon} — key ${JSON.stringify(s.key)} · ` +
+              `moonExpected ${JSON.stringify(s.moonExpected)}`
             : 'instrument does not publish moonExpected'
         );
+      }
 
       // --- clause 5: water reads the key
+      // THE MEASURED VACUOUS PASS. On the flag-off run this printed
+      // `PASS ... Δ undefined°` six times: `s.water` was truthy enough to get
+      // past the guard above, but `angleBetween` returned null (an absent or
+      // zero-length vector on one side), and `null < 1e-4` is TRUE. The gate
+      // certified a reading that did not exist.
       if (!s.water) skip(`(5) ${tier}/${label} WATER === KEY`, 'no water specular vector published');
-      else
-        gate(
+      else {
+        const dWater = angleBetween(s.key, s.water);
+        gateNum(
           `(5) ${tier}/${label} WATER READS THE SAME DIRECTIONAL AS KEY`,
-          angleBetween(s.key, s.water) < 1e-4,
-          `Δ ${angleBetween(s.key, s.water)?.toFixed(6)}°`
+          dWater,
+          dWater < 1e-4,
+          `Δ ${dWater?.toFixed(6)}°`,
+          `angleBetween(key, water) returned ${dWater} — key ${JSON.stringify(s.key)} · water ` +
+            `${JSON.stringify(s.water)}. A missing or zero-length vector on either side; null < 1e-4 ` +
+            'is TRUE in JS, which is how this passed six times on an absent reading'
         );
+      }
     }
   }
 
@@ -276,8 +317,9 @@ function skip(name, why) {
     ? Math.max(...med.map((r) => azOf(r.s.key))) - Math.min(...med.map((r) => azOf(r.s.key)))
     : null;
   if (azSpread != null) {
-    gate(
+    gateNum(
       '(6) THE MEDIUM-TIER RED — the key MOVES when the sun moves',
+      azSpread,
       azSpread > 1,
       `key azimuth spread across three sun elevations on medium: ${azSpread.toFixed(4)}°. ` +
         'C measured a spread of 0 on the flag-off tree (azimuth −56° every hour); a spread of 0 ' +
@@ -289,9 +331,12 @@ function skip(name, why) {
   gate('(7) NO PAGE ERRORS', errors.length === 0, errors.slice(0, 3).join(' | ') || 'clean');
   console.log('\nRED TABLE (defect · gate · measured · green target)');
   for (const r of red) console.log(`  ${r[0]} | ${r[1]} | measured ${r[2]} | ${r[3]}`);
-  console.log(`\n${pass} passed, ${fail} failed`);
+  console.log(`\n${pass} passed, ${fail} failed${notCalSummary()}`);
   await browser.close();
-  process.exit(fail ? 1 : 0);
+  // NOT CALIBRATED counts toward a non-zero exit: a leg that could not measure
+  // has not certified anything, and this fleet's charter is that a green means
+  // something. The line above names the count so the reason is never ambiguous.
+  process.exit(fail || notCalCount() ? 1 : 0);
 })().catch((e) => {
   console.error(e);
   process.exit(1);

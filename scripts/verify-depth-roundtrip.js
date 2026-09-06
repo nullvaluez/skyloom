@@ -95,6 +95,8 @@ const RAYCAST = ([px, py]) => {
   return { dist: hits[0].distance, viewZ: -v.dot(fwd), object: hits[0].object.name || '(unnamed)' };
 };
 
+const { numGate, notCalibrated, notCalCount, notCalSummary } = require('./_notcal');
+
 let pass = 0;
 let fail = 0;
 const red = [];
@@ -150,7 +152,7 @@ function gate(name, ok, detail) {
       'is about; asserting depth with no depth reader would be a green that means nothing'
   );
   if (!hasProbe) {
-    console.log(`\n${pass} passed, ${fail} failed`);
+    console.log(`\n${pass} passed, ${fail} failed${notCalSummary()}`);
     await browser.close();
     process.exit(1);
   }
@@ -197,10 +199,13 @@ function gate(name, ok, detail) {
       `  ${label.padEnd(11)} px(${p.px},${p.py}) on ${p.obj} · true ${trueZ.toFixed(1)}m · ` +
         `reconstructed ${gotZ.toFixed(2)}m · err ${errPct.toFixed(1)}% · coc ${probe?.coc ?? 'n/a'} · raw ${probe?.raw}`
     );
-    gate(
+    numGate(gate)(
       `(2) ${label}: |reconstructed − true| / true ≤ ${TOL_PCT}%`,
+      errPct,
       errPct <= TOL_PCT,
-      `${errPct.toFixed(2)}% (true ${trueZ.toFixed(1)}m vs ${gotZ.toFixed(2)}m)`
+      `${errPct.toFixed(2)}% (true ${trueZ.toFixed(1)}m vs ${gotZ.toFixed(2)}m)`,
+      `errPct is ${errPct} (true ${trueZ}, reconstructed ${gotZ}) — the depth read produced no ` +
+        'number, so there is nothing to compare against the tolerance'
     );
   }
 
@@ -220,19 +225,27 @@ function gate(name, ok, detail) {
 
   const near = rows.find((r) => r.label.startsWith('near'));
   const far = rows.find((r) => r.label.startsWith('far'));
-  if (near?.coc != null && far?.coc != null) {
-    gate('(3) CoC < 0.02 AT THE FOCUS PLANE', near.coc < 0.02, `near coc ${near.coc}`);
-    gate('(4) CoC > 0.5 AT 4 km', far.coc > 0.5, `far coc ${far.coc}`);
+  // An INFO line for "the probe returned nothing" reads as a clean run in a
+  // sweep table. It is NOT CALIBRATED: two legs did not execute. (And note
+  // `near.coc < 0.02` would have passed on a NULL coc, since null numifies
+  // to 0 — the guard above is load-bearing, not decorative.)
+  if (Number.isFinite(near?.coc) && Number.isFinite(far?.coc)) {
+    numGate(gate)('(3) CoC < 0.02 AT THE FOCUS PLANE', near.coc, near.coc < 0.02, `near coc ${near.coc}`);
+    numGate(gate)('(4) CoC > 0.5 AT 4 km', far.coc, far.coc > 0.5, `far coc ${far.coc}`);
   } else {
-    console.log('INFO  (3)/(4) CoC — the probe returned no coc; DoF separation not asserted');
+    notCalibrated(
+      '(3)/(4) CoC — DoF separation',
+      `the probe returned no finite coc (near ${near?.coc}, far ${far?.coc}); the depth-of-field ` +
+        'separation is not asserted by this run'
+    );
   }
 
   gate('(5) NO PAGE ERRORS', errors.length === 0, errors.slice(0, 3).join(' | ') || 'clean');
   console.log('\nRED TABLE (defect · gate · measured · green target)');
   for (const r of red) console.log(`  ${r[0]} | ${r[1]} | measured ${r[2]} | ${r[3]}`);
-  console.log(`\n${pass} passed, ${fail} failed`);
+  console.log(`\n${pass} passed, ${fail} failed${notCalSummary()}`);
   await browser.close();
-  process.exit(fail ? 1 : 0);
+  process.exit(fail || notCalCount() ? 1 : 0);
 })().catch((e) => {
   console.error(e);
   process.exit(1);
