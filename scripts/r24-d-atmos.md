@@ -187,7 +187,95 @@ vec3 float`). Anything else throws at parse time.
 
 ---
 
-## §3 M2 — LOD_CROSSFADE (in progress)
+## §3 M2 — LOD_CROSSFADE
+
+### 3.1 What was built
+
+`LOD_CROSSFADE.mode 'parentBlend'`. On a REFINE the four children are added
+already sampling the PARENT's texture through a clip-UV rectangle (each child
+covers one quadrant of the parent's [0,1] map) and cross-dissolve to their own
+map over `fadeSec` (250 ms shipped, ≤ 300 ms by charter). On a MERGE the same
+machinery runs backwards: the leaf children dissolve INTO the freshly loaded
+parent imagery (mix 0 → 1) and only then does the geometry swap, so the swap
+lands under a surface that already matches on both sides.
+
+**Zero extra draws.** The children were already the drawn geometry in both
+directions; the blend is one extra `texture2D` inside three's own map chunk.
+The rejected alternative — keep the parent mesh drawn under the children and
+dither it out — costs a transient draw per in-flight quad AND, per the archived
+R22.1 B3 finding, an ordered screen-door dither under SMAA-only AA reads as
+shimmer, which is the artifact class this round exists to remove.
+
+**Where it lives.** Three vendor patches (VENDOR.md rows D5 holder, D6
+`_loadSubTiles`, D7 `_removeSubTiles`), all INSERT-ONLY: 4 hunks, +68 / −0, so
+D spends none of A's `DELETED_UPSTREAM_LINES` budget. All POLICY is in
+`lib/fly/lod-crossfade.js` — the library gets two call sites and a holder, and
+its import list stays `three` + A's worker tail.
+
+**Two placement facts that are not style choices.**
+- D6 must run one statement BEFORE the refine return expression, because
+  `unloadModel()` disposes the parent texture inside that same expression. The
+  hook detaches `material.map` from the parent material first (so the dispose
+  walk cannot reach it) and refcounts it.
+- D7 holds `_loadState` at `"loading"` across its await. `_update()` skips a
+  loading tile AND, because children are only visited inside that branch, its
+  whole subtree — without the hold, a parent whose model is loaded but not yet
+  added would be re-evaluated mid-blend and could call `_loadSubTiles` on
+  itself. The hook caps its own promise (`fadeSec + 400 ms`) so a tile unloaded
+  mid-blend can never leave the library awaiting forever.
+
+**The map-chunk surgery.** The blend has to land on `sampledDiffuseColor`
+BEFORE it multiplies into `diffuseColor`, or the material's own colour and
+vertex factors would be divided out of the blend. Rather than transcribe
+three's `map_fragment` (version-brittle), the slot carries three's OWN
+`ShaderChunk.map_fragment` read at runtime and splices one line into it.
+`verify-lod-fade` gates the assumptions: the spliced line exists, occurs
+exactly once, and `sampledDiffuseColor` is declared before it.
+
+### 3.2 The relief snap, stated honestly
+
+A texture blend does not morph geometry. What it does is stop TWO cues changing
+on one frame. And above `TILES.demMaxZoom` (15) the z16/z17 geometry is a CROP
+of the z15 DEM, so the great majority of near-field refines change no relief at
+all and the blend covers them completely. Below it (z13→z15, mid-field) the
+surface genuinely moves; there the swap still happens on one frame, with the
+texture already matching across it.
+
+### 3.3 The SwiftShader caveat, and how the fade was photographed anyway
+
+This container advances the frame clock ~1000 ms per frame, so a shipped 250 ms
+blend completes INSIDE a single frame and cannot be captured — the crossfade is
+invisible here BY CONSTRUCTION, not because it is absent. The `slow` leg pins
+`fadeSec` to a few seconds through the dev override, which spreads the SAME
+code path across several frames. Because every fixture imagery tile is stamped
+with its own "z / x / y", a child rendering the PARENT's stamp IS the crossfade,
+photographed. The fade's real DURATION is a user-machine number.
+
+### 3.4 Measurement (fixture, `scripts/r24-d-lodprobe.js`)
+
+A serpentine is unaffordable at ~1 fps, so the probe forces the same events
+with an ALTITUDE LADDER at a pinned Powell lat/lon: descending shrinks
+`distance / tileSize` and refines the field, climbing merges it back — exactly
+the pair `_loadSubTiles` / `_removeSubTiles` implement. It reads A's
+`__flyTerra.lod()` and D's `__flyStats.terra.fades` side by side.
+
+**A DISCARDED RUN, recorded so it is not re-used.** The first RED table (31
+refines / 31 hard swaps) was taken on fixture rev `r24-e.2-sierra`, where
+route-fulfilled imagery kept three-tile's download queue saturated and the
+quadtree walk froze wholesale at z6 (E's measurement; recon T3). That table is
+a measurement of the freeze, not of LOD behaviour, and is void. Every number
+below is on `r24-e.3-imgsource` with A's pacing switches on — including
+`walkWhileSaturated`, which fixes the freeze at the root, so refine counts on
+the integrated tree differ from anything measured on `4bedab1`.
+
+**A's coupling, stated plainly:** `keepResident` removes the frustum-exit
+merges, so LOD_CROSSFADE's measured value is on REFINES and on whatever merges
+survive under memory pressure. The two fixes compose — A stops the swaps that
+should never have happened, D softens the ones that must.
+
+(numbers: §3.5, filled from the probe runs)
+
+## §3x M2 — old header (kept so the section numbering does not shift)
 
 See §1.3 for the RED. Design: `mode: 'parentBlend'` — children are added
 holding the PARENT's texture through a clip-UV transform (each child covers one

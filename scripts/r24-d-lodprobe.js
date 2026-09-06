@@ -51,7 +51,7 @@ const PIN = {
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 960, height: 540 } });
+  const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
   let closed = false;
   page.on('close', () => { closed = true; });
   const errors = [];
@@ -62,10 +62,17 @@ const PIN = {
   // frustum-exit merges, so the crossfade's measured value is on REFINES and
   // on whatever merges survive memory pressure. Measuring D against an A-off
   // tree would credit D with A's fix.
-  await page.addInitScript(() => {
-    window.__flyTerraPaceOverride = {
-      enabled: true, timerFix: true, mergeHysteresis: true, keepResident: true,
-    };
+  // A's pacing switches ON for both legs. keepResident is what stops the
+  // frustum-exit merges, and walkWhileSaturated is what stops the quadtree
+  // freezing at z6 behind a busy loader — measuring D against an A-off tree
+  // would both credit D with A's fix and measure a stalled tree.
+  await page.addInitScript((pace) => { window.__flyTerraPaceOverride = pace; }, {
+    enabled: true,
+    timerFix: true,
+    mergeHysteresis: true,
+    keepResident: true,
+    walkWhileSaturated: true,
+    bboxCache: true,
   });
 
   await bootFly(page, { style: 'satellite', settleMs: SETTLE });
