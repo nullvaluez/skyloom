@@ -415,7 +415,7 @@ merges after the run; the 15/15 above predates it.
 | `verify-step-clean.js` | **rc=1, 229 s, 4 passed / 4 failed — RED calibrated** (below) | <!-- CERT:verify-step-clean PASS2 PENDING --> | PENDING — and the ladder the user's real DPR has | the tear LINE |
 | `verify-ladder-fix.js` (+ `FLY_LADDER_RED=1`) | <!-- CERT:verify-ladder-fix PASS1 PENDING --> | <!-- CERT:verify-ladder-fix PASS2 PENDING --> | PENDING — governor behaviour in real time | — |
 | `verify-one-sun.js` | <!-- CERT:verify-one-sun PASS1 PENDING --> | <!-- CERT:verify-one-sun PASS2 PENDING --> | PENDING — the LOOK (checkpoint 5) | — |
-| `verify-linear-haze.js` | <!-- CERT:verify-linear-haze PASS1 PENDING --> | <!-- CERT:verify-linear-haze PASS2 PENDING --> | PENDING — whether live colours land in the same band | — |
+| `verify-linear-haze.js` | **VOID — reader outside rAF; re-run pass 2** (below) | <!-- CERT:verify-linear-haze PASS2 PENDING --> | PENDING — whether live colours land in the same band | — |
 | `verify-depth-roundtrip.js` | <!-- CERT:verify-depth-roundtrip PASS1 PENDING --> | <!-- CERT:verify-depth-roundtrip PASS2 PENDING --> | — | needs `window.__flyDepthProbe`; absent ⇒ the row reads NOT RUNNABLE, never RED |
 | `verify-terra-live.js` | <!-- CERT:verify-terra-live PASS1 PENDING --> | <!-- CERT:verify-terra-live PASS2 PENDING --> | PENDING — the residency trio's live draw evidence | never completed in this container |
 | `verify-frame-pace.js` | <!-- CERT:verify-frame-pace PASS1 PENDING --> | <!-- CERT:verify-frame-pace PASS2 PENDING --> | PENDING — **everything**: stalls/min, worst dt, p99, >100 ms/min | the pacing legs are not asserted here; flag-off it correctly reads "instrument absent — unmeasurable, not a renderer failure" |
@@ -539,6 +539,20 @@ the R20 anti-duplication story reproducing once the collision index exists.
 - **Still pending:** `scripts/r24-user-diag.md` Part A on the CURRENT build.
   **Without it there is no before, and "smoother" is an opinion.**
 
+**`verify-linear-haze`, pass 1: VOID, instrument.** rc=1, 240 s, 4 passed /
+2 failed — and not one of the six means anything. Both poses read **terrain
+L 0.0 / sky L 0.0**, a luma profile of all zeros, and "horizon row 6 of 540,
+step 0.0": the seam reader ran from `page.evaluate`, **outside any animation
+frame**, against a `preserveDrawingBuffer:false` context, so `readPixels`
+returned a CLEARED default framebuffer. (1a) and (1b) failed honestly ("no
+horizon in the frame"); (2a), (2b) and (3) then PASSED — "RIM SEAM ≤ 12/255
+Δ 0.0" and "seam independent of time of day, spread 0.0" — **on black against
+black.** E is rewriting the reader to sample at the start of the NEXT animation
+frame on the renderer's own context (the pale detector's idiom, which is
+exactly why the census rows worked) and making (2)/(3) print **NOT CALIBRATED**
+whenever (1) fails; the row is re-run in pass 2. `verify-depth-roundtrip` has
+no `readPixels` path, so it is not the same shape.
+
 **`verify-lod-fade`, pass 1** (`K=40`, flag-off, Powell, a 40 s PURE YAW with
 the position frozen): **rc=1, 317 s, 2 passed / 5 failed = RED calibrated.**
 (1) `residentTiles` 0 / `estMB` undefined — A's byte LRU only tracks with
@@ -634,11 +648,15 @@ tree nothing could boot at all. E asked for its own finding to be downgraded
 from "the cause" to "a real bug that was also present" — the correct reading of
 the evidence, and the origin of lesson 19.
 
-**E's instrument-defect count for the session is SIX**, each now with a defence
-in the tree: the context race; the artifact overwrite (§5.4); the straw-man
-port guard (below); the sky inside the pale crop (§4.2); the vacuous gate (5);
-and the misleading `flagOn(probe)` that read a pin's absence rather than a
-constant.
+**E's instrument-defect count for the session is SEVEN**, each now with a
+defence in the tree: the context race; the artifact overwrite (§5.4); the
+straw-man port guard (below); the sky inside the pale crop (§4.2); the vacuous
+gate (5); the misleading `flagOn(probe)` that read a pin's absence rather than
+a constant; and the seam reader that sampled a cleared framebuffer from outside
+any animation frame and then passed three assertions on black against black
+(§4.2). **Three vacuous passes were found in one day** — flash-guard (5),
+one-sun (5) and linear-haze (2a)/(2b)/(3) — which is what makes lesson 24 a
+rule and not an anecdote.
 
 Two process facts from the same hour: a second `cert-run.sh` invocation raced
 the first run's server and produced an `EADDRINUSE` (killed by PID
@@ -893,7 +911,10 @@ Carries forward the still-open R15–R21 §6 tables.
     run. (C LIGHT.)
 24. **A gate that passes without asserting anything is indistinguishable from a
     gate that works** — read the PASS lines as sceptically as the FAIL lines.
-    (E CERT; flash-guard's gate (5) printed `pinned=n/a` and passed.)
+    Three in one day: flash-guard (5) printed `pinned=n/a`, one-sun (5) did the
+    same shape, and linear-haze passed "RIM SEAM ≤ 12/255 Δ 0.0" on a black
+    frame against a black frame. **A downstream assertion must go NOT
+    CALIBRATED when its precondition fails**, never green. (E CERT.)
 25. **Ask an instrument what ELSE could produce this reading.** The pale
     detector's 168 hits, the Sierra A/B's monotone-in-capture-order margin, the
     `getContext` probe, the lsof port guard: **every one was an instrument that
