@@ -806,6 +806,48 @@ killing the arm. The harness is committed and ready for a quieter machine.
 The ladder gate boots TOY precisely to avoid that cost: the ladder and the DPR
 step are style-independent and toy streams no tiles.
 
+## §9b THE BLOCKER I SHIPPED — a missing import in CloudField.jsx
+
+**What it was.** `2fadaa6` (W1f, HUD_SYNC) added `_hudFramePriority()` to
+`components/fly/CloudField.jsx`, which calls `pinned(HUD_SYNC,
+'__flyHudSyncOverride')` — and never added the import. `pinned` is undefined in
+that module, the helper runs at RENDER, and the call is **not behind the flag**,
+so it is a `ReferenceError` on CloudField's first render in either style with
+every flag off. The scene dies. Fable caught it on the integrated tree;
+`eslint --rule no-undef` over my changed files reproduces it on my branch at
+`CloudField.jsx:78 'pinned' is not defined` — **one error before the fix, zero
+after**, with the other 7 reports being the project's pre-existing
+`react-hooks/immutability` ones on untouched lines.
+
+**How it got in.** My edit script for that commit did a `str.replace` whose
+anchor (`import {\n  HUD_SYNC,`) did not exist in this file — CloudField's
+constants import has a different shape. **`String.replace` on a miss is a
+silent no-op**, and unlike the other replacements in that script this one had
+no `assert`. The helper it was paired with landed; the import did not.
+
+**Why nothing caught it.** Three instruments, three blind spots, and they are
+worth naming because each is a rule I was following:
+
+1. `eslint` with the project config: `no-undef` is not enabled there, so my
+   "no new lint errors" check compared totals that never contained this class.
+2. The `curl` compile check: a bundler resolves modules, it does not resolve
+   *identifiers*. A free variable is a runtime `ReferenceError`, not a build
+   error, so `GET / 200` was true and meaningless for this.
+3. **No browser gate ran after `2fadaa6`.** This is the honest record: the last
+   browser run on this branch was `verify-ladder-fix` at `36792a0` (W1e), one
+   commit earlier, and `verify-terra-live` never completed at all. W1f, W1g,
+   W1h and W1i were committed on node gates and a compile check alone —
+   partly by my own sequencing, and from W1f onward under Fable's browser-gate
+   moratorium. A single boot would have caught this in seconds.
+
+**The lesson, in the round's own terms:** *a gate that cannot fail the way the
+code can fail is not covering it.* I had three green signals and none of them
+could see a free variable. The cheap fix is permanent — `no-undef` over the
+round's changed files is a node-only check that costs a second — and it is what
+should run before every commit that adds a call site, not just before a merge.
+
+---
+
 ## §10 Commits
 
 | # | Commit | What |
@@ -822,6 +864,8 @@ step are style-independent and toy streams no tiles.
 | 10 | `f8c6a4a` | M5b `FINALIZE_PACE`; `verify-finalize-pace` |
 | 11 | `ed773b8` | M4 `FRAME_STEP` sim half + `verify-frame-step`; consumer opt-in NOT landed (§8c) |
 | 12 | `70b9f42` | E's `FRAME_STATS` `markPhase` attribution in the terrain + finalize paths (PATCH 25, by inversion) |
+| 13 | `f739cb3` | ledger §9/§10/§11 |
+| 14 | _(this commit)_ | **BLOCKER FIX**: the missing `pinned` import in CloudField.jsx (§9b) |
 
 ### Gates added
 

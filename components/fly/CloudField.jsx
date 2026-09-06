@@ -15,6 +15,7 @@ import {
 import { CLOUDS, SKY_CIRRUS, TOY_WORLD, WEATHER, WORLD_EDGE,
   HUD_SYNC,
 } from '@/lib/fly/fly-constants';
+import { pinned } from '@/lib/fly/fly-pins';
 import { expApproach } from '@/lib/fly/coords';
 import { puffPresence } from '@/lib/fly/weather-model';
 import { applyBend, bendDrop, getBend, getEdgeFade } from '@/lib/fly/toy-world/world-bend';
