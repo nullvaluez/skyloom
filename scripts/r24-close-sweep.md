@@ -408,6 +408,25 @@ harness someone writes:
 
 ---
 
+## §2.9 Which tree the certification run actually measured
+
+**`5ca8e15`, not `7a00df0`.** The run's banner stamped `7a00df0` at 19:14:00;
+C's `verify-shadow-calm` merge landed at 19:14:14; the dev server started at
+19:14:15. `next dev` compiles the WORKING TREE on demand, so every module the
+rows exercised came from `5ca8e15` and the banner named a tree they never
+touched.
+
+That is a general hazard, not a one-off: **a script that stamps its commit at
+startup is describing the tree it was launched from, not the tree the server
+will serve.** The fix (on `r24/e`) re-stamps immediately before the boot proof,
+prints `TREE UNDER TEST`, and calls out the drift explicitly rather than
+leaving it in a log for someone to notice later.
+
+Boot proof on that tree: **`BOOT OK in 62.5 s`**, zero console errors, zero
+pageerrors, zero failed `/_next/` chunk requests, after 15/15 node gates.
+
+---
+
 ## §3 Deviations, honestly
 
 Every place a run differed from the written recipe, the way R19 §4.1 recorded

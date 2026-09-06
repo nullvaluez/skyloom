@@ -103,8 +103,9 @@ if port_answers "$PORT"; then
   exit 2
 fi
 
+TREE_AT_START="$(git rev-parse --short HEAD 2>/dev/null)"
 say "=== R24 CERTIFICATION RUN  $(date +%T)  port $PORT  load $(load)"
-say "tree: $(git rev-parse --short HEAD 2>/dev/null)  $(git log -1 --format=%s 2>/dev/null | head -c 70)"
+say "tree at start: $TREE_AT_START  $(git log -1 --format=%s 2>/dev/null | head -c 70)"
 
 # --- 2. node gates first -----------------------------------------------------
 NODE_FAIL=0
@@ -196,7 +197,21 @@ export PW_SHIM_QUIET=1
 # One throwaway page. If it cannot reach pct 100 the run stops HERE, with the
 # console errors printed — rather than after twelve minutes of browser rows all
 # dying at the same wait for the same reason.
+# WHICH TREE IS ACTUALLY UNDER TEST? Not necessarily the one in the banner.
+# MEASURED: a run stamped 7a00df0 at 19:14:00, a merge landed at 19:14:14, and
+# the dev server started at 19:14:15 — so every module the server compiled on
+# demand came from 5ca8e15 and the banner named a tree the rows never touched.
+# `next dev` serves the WORKING TREE at compile time, not the commit the script
+# started on, so the honest stamp is taken here, next to the first page load,
+# and a drift is called out rather than left in a log for someone to notice.
+TREE_AT_BOOT="$(git rev-parse --short HEAD 2>/dev/null)"
 say ""
+if [ "$TREE_AT_BOOT" != "$TREE_AT_START" ]; then
+  say "*** TREE MOVED DURING STARTUP: $TREE_AT_START -> $TREE_AT_BOOT"
+  say "*** The dev server compiles the WORKING TREE on demand, so the rows below"
+  say "*** measure $TREE_AT_BOOT. Record that sha, not the banner's."
+fi
+say "TREE UNDER TEST: $TREE_AT_BOOT"
 say "--- boot proof (throwaway page, satellite, fixture) ---"
 cat > "$OUT/_bootproof.js" <<'PROOF'
 const { chromium } = require('playwright');
