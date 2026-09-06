@@ -478,3 +478,83 @@ immediately after the raw write, annotated `// R24 B`. It is a sibling field on
 
 - **Ships `enabled: false`. RECOMMENDED ON AT CLOSE.**
 
+---
+
+## §6 M5a — ENV_UNIFORM (WB-4, A5, FL-10): nothing recompiles mid-flight
+
+### 6.1 The two recompile storms, as read on this tree
+
+three folds **`envMapCubeUVHeight`** AND **`shadowMapEnabled && shadows.length > 0`**
+into the program cache key of every MeshStandard / MeshLambert / MeshPhong
+material (`WebGLPrograms.js:60-64`, `:359`, `:443`). Two things flip those
+fields mid-session:
+
+1. **The sky bucket.** `PMREMGenerator._setSize(texture.image.width / 4)`, the
+   day sky is a **2k** file, the three twilight files are **1k** and the blend
+   scratch is `SKY_DUSK.blendSize` 1024 — so the FIRST dusk blend step re-keys
+   every lit material in the scene (tiles, buildings, canopy, homes, traffic)
+   and dawn's return to the raw day file re-keys them all back.
+2. **The tier step.** `SAT_SHADOWS` is gated on tier `'high'`
+   (FlyScene.jsx:365-369), so one governor step flips `shadows.length` 1↔0 —
+   **and the whole harness fleet is pinned `__flySatShadowOverride = 0`, so no
+   gate has ever seen it.**
+
+`prewarm` runs **once per session** (`prewarm.js:669`), so the OTHER state of
+each field is always compiled lazily, on first use, inside the frame loop.
+
+### 6.2 Fix
+
+**Uniform PMREM height.** Every PMREM input is normalised to
+`ENV_UNIFORM.equirectWidth`. The target IS the day file's width, chosen that
+way on purpose: **the day endpoint bypasses the resize entirely, so noon stays
+bit-identical BY CONSTRUCTION.** Only the twilight endpoints are upsampled, and
+they go through the EXISTING blend pass at mix 0 (the same texture blended with
+itself) — no new shader, no new render path, no new material.
+
+The alternative the recon offers — shipping the day sky at 1k — is cheaper per
+bake and moves every certified NOON pixel. This direction costs ~4× the bake
+area at twilight instead, which is work FL-10 wants sliced off the frame loop
+anyway. **Honest risk: twilight pixels DO shift slightly** (an upsample ahead of
+the PMREM blur), so `verify-dusk` / `verify-sat-night` need a fixture A/B at the
+twilight poses before this flips ON. That is a re-baseline CANDIDATE, not a
+taken one, and it is E's call with the numbers in front of it.
+
+**Both shadow states warmed.** `compile()` derives the shadow count by
+traversing the TARGET scene, so the warm compiles its set a second time with the
+live directional's `castShadow` flipped, restoring it in a `finally`. Cost: the
+warm set is compiled twice at boot, off the boot gate's critical path (the
+reveal already proceeds at `PREWARM.maxMs` regardless).
+
+**The late-HDRI re-queue.** `PREWARM.envWaitMs` caps the wait for the HDRI, so a
+throttled network makes the warm mint the NO-ENVIRONMENT permutation of every
+lit material and the real ones compile after the reveal (archived A5
+measurement: 179–714 ms worst frames at reveal + 10 s; a clean-network boot
+shows none). `requeueForEnvironment` re-warms the retained materials against the
+scene that now HAS an environment, drained at `idleBudget` (1) compile per
+**IDLE** frame — a frame slower than `idleFrameMs` (12) is skipped entirely.
+**It never runs inside the boot gate and never in bulk, so `BOOT.maxBootMs` and
+the reveal timing cannot move**; the repair only ever spends headroom that
+already exists. Slicing means handing `compileAsync` one mesh at a time; the
+clone shares its geometry AND material by reference, so the key it mints is
+production's and the retained warm scene is never restructured.
+
+Telemetry: `__flyStats.prewarm.{shadowStates, requeued, requeuePending}`
+(1/0/0 with the flag off).
+
+### 6.3 What could NOT be measured here
+
+- The **noon pixel cost A/B** between the two directions. It needs a real GPU
+  timing; the bypass argument is a construction argument, not a measurement.
+- **`programs.length` flat across a forced dusk crossing and a forced
+  high↔medium step with shadows on.** That is the actual proof of this feature
+  and it is a browser gate: it needs `__flyGovPin` released (verify-tier-step
+  owns that) AND `__flySatShadowOverride` released (the accessor-swallow idiom),
+  because the fleet pin hides the shadow half entirely. **E's FRAME_STATS
+  publishes `programsDelta` per frame — that is the instrument, and I have not
+  run it.** Handed to E in §10.
+- The dusk-crossing bake cost at 2k (4× the area, 8 steps per crossing).
+
+- **Ships `enabled: false`. RECOMMENDED ON AT CLOSE *only after* E's twilight
+  pixel A/B and the programs-flat run** — this is the one B feature whose flip
+  I do not recommend on construction alone.
+
