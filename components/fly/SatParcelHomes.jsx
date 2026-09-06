@@ -1,25 +1,28 @@
 'use client';
 
+import { useEffect, useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import {
+  BufferAttribute,
   BufferGeometry,
   CanvasTexture,
   Color,
   DynamicDrawUsage,
-  LAMBERT_ENV,
   LinearFilter,
   MeshLambertMaterial,
   Object3D,
-  PARCEL_HOMES,
   RepeatWrapping,
+  Sphere,
   SRGBColorSpace,
+  Vector3,
+} from 'three';
+import { mercatorScale } from '@/lib/fly/coords';
+import {
+  GLOBE,
+  LAMBERT_ENV,
+  PARCEL_HOMES,
   SUBURB_NIGHT,
   SURFACE_CALM,
-  Sphere,
-  Vector3,
-  useEffect,
-  useMemo,
-  useRef } from 'react'; import { useFrame } from '@react-three/fiber'; import {   BufferAttribute,
-  } from 'three'; import { mercatorScale } from '@/lib/fly/coords'; import { GLOBE,
 } from '@/lib/fly/fly-constants';
 import { applyBendAnchor } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';

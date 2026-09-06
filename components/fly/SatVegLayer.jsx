@@ -1,26 +1,30 @@
 'use client';
 
+import { useEffect, useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { wrap } from 'comlink';
 import {
+  Color,
   DynamicDrawUsage,
-  LAMBERT_ENV,
   MeshLambertMaterial,
   Object3D,
+  Sphere,
+  SphereGeometry,
+  SRGBColorSpace,
+  Vector3,
+} from 'three';
+import { SatVegEngine } from '@/lib/fly/toy-world/sat-veg-engine';
+import {
+  GLOBE,
+  LAMBERT_ENV,
   PARCEL_HOMES,
   SAT_AMBIENT,
   SAT_GROUND_LIFE,
   SAT_SHADOWS,
   SAT_TINT,
   SAT_VEG,
-  SRGBColorSpace,
   SUBURB_NIGHT,
   SURFACE_CALM,
-  Sphere,
-  SphereGeometry,
-  Vector3,
-  useEffect,
-  useMemo,
-  useRef } from 'react'; import { useFrame } from '@react-three/fiber'; import { wrap } from 'comlink'; import {   Color,
-  } from 'three'; import { SatVegEngine } from '@/lib/fly/toy-world/sat-veg-engine'; import {   GLOBE,
 } from '@/lib/fly/fly-constants';
 import { applyBendAnchor, getRimColor } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
