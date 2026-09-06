@@ -446,12 +446,36 @@ its trimmed sweep.
    not exist while `FRAME_STATS.enabled` is false. Their flag-off line
    ("instrument absent — unmeasurable, not a renderer failure") is the correct
    calibration output, not a failure to be fixed.
-8. **TWO CERTIFICATION ROWS ARE VOID, BOTH BECAUSE OF E.** The `fixture` row
-   of the first run (killed by my process-pattern kill, `rc=1 62s`) and the
-   `flash-guard` row of the second (`rc=1 601s` — my pale-detector probe raced
-   three for the canvas context and hung the boot; fixed in `cbd7c8a`).
-   `linear-haze` in the same run carries the identical probe bug. None of the
-   three is a result; re-take them from `cbd7c8a`.
+8. **FOUR BROWSER ROWS ARE VOID, AND THE MEASURED CAUSE IS A MODULE THAT
+   COULD NOT EVALUATE.** `components/fly/AerialPerspective.jsx` used
+   `ATMO_GLSL_DECL`, `ATMO_GLSL_FRAGMENT`, `AERIAL_LAW`, `atmoUniforms` and
+   `getAtmoLaw` with no import — two of them inside a module-scope template
+   literal — so the whole `components/fly` chunk threw
+   `ReferenceError: ATMO_GLSL_DECL is not defined` at MODULE EVALUATION, in
+   both styles. `app/page.js` mounts FlyMode through
+   `dynamic(..., { ssr: false })` whose `loading` is one empty dark div, so the
+   page sat there in silence: **zero canvas elements, `__flyBoot` undefined, no
+   error visible to a gate.** Two more of the same class were in the same tree
+   (`CloudField.jsx` calling an unimported `pinned()`, `FlyScene.jsx` calling an
+   unimported `offsetUnits()`), all three on the branches rather than in the
+   merges. Fixed on `8b68ae5`; `scripts/verify-import-integrity.mjs` now
+   calibrates RED on `bf319ca` and GREEN on `8b68ae5`, and runs FIRST in both
+   the smoke and the certification script.
+
+   Two of the void rows had a second, independent cause of their own, both
+   mine, and neither is the demonstrated cause of anything:
+   - the first run's `fixture` row (`rc=1 62s`) was killed by my
+     process-pattern kill;
+   - my pale-detector probe raced three for the canvas context — a real latent
+     race, fixed at `cbd7c8a`, **not** the demonstrated cause of the 601 s
+     `flash-guard` timeout.
+
+   **Fixing the right bug and explaining the wrong failure are different acts.**
+   I reported the `getContext` race as the cause of a timeout whose evidence —
+   zero canvas, no `__flyBoot`, at 140 s — is upstream of any canvas, so the
+   race could not have produced it. The cost of that conflation is someone
+   else's re-run, and the correction belongs in the record beside the fix.
+
 9. **`verify-depth-roundtrip` needs a hook that may not exist yet.** It refuses
    to reconstruct viewZ with harness-side arithmetic — that would test the
    harness's copy of the bug — and instead fails loudly with the required
