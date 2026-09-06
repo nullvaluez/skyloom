@@ -104,7 +104,7 @@ const PIN = {
     lod: window.__flyTerra?.lod?.() ?? null,
     fades: JSON.parse(JSON.stringify(window.__flyStats?.terra?.fades ?? null)),
       resident: window.__flyTerra?.mem?.()?.residentTiles ?? null,
-      draws: window.__flyStats?.draws ?? null,
+      draws: window.__flyStats?.drawCalls ?? null,
     })); } catch { return { lod: null, fades: null, resident: null, draws: null, lost: true }; }
   };
 
@@ -122,6 +122,29 @@ const PIN = {
       try { await page.screenshot({ path: path.join(OUT, `lod-${LEG}-powell-mid.png`) }); } catch {}
     }
   }
+  // Owens Valley — the EMPTY control, and the draw ceiling with zero headroom
+  // (<= 261, explicitly not re-baselineable). Neither feature adds a mesh: the
+  // law is ALU on programs that already run and the crossfade blends geometry
+  // that was already drawn, so this must read the same in both legs.
+  let owens = null;
+  if (!closed) {
+    try {
+      await page.evaluate(() => {
+        if (window.__lodPin) clearInterval(window.__lodPin);
+        window.__fly.warpToGeo(36.6, -118.1, { altM: 2600, name: null });
+      });
+      await page.waitForTimeout(SETTLE * 3);
+      owens = await page.evaluate(() => {
+        return {
+          draws: window.__flyStats?.drawCalls ?? null,
+          tris: window.__flyStats?.triangles ?? null,
+          fades: JSON.parse(JSON.stringify(window.__flyStats?.terra?.fades ?? null)),
+        };
+      });
+      await page.screenshot({ path: path.join(OUT, `lod-${LEG}-owens.png`) });
+    } catch { /* the browser died; `owens` stays null and the row says so */ }
+  }
+
   const after = await read();
   if (!closed) { try { await page.screenshot({ path: path.join(OUT, `lod-${LEG}-powell-final.png`) }); } catch {} }
 
@@ -140,8 +163,9 @@ const PIN = {
   console.log('\n  ladder totals:',
     `A: refine ${d('refine')} · merge ${d('merge')} · refetchParent ${d('refetchParent')} · replacedOnScreen ${d('replacedOnScreen')}`);
   console.log('  fades      :', JSON.stringify(after.fades));
+  console.log('  Owens      :', owens ? `draws ${owens.draws} · tris ${owens.tris}` : 'not reached');
   console.log('  pageerrors :', errors.length, errors.slice(0, 3).join(' | '));
-  fs.writeFileSync(path.join(OUT, `lod-${LEG}.json`), JSON.stringify({ leg: LEG, PIN, rows, before, after, errors }, null, 2));
+  fs.writeFileSync(path.join(OUT, `lod-${LEG}.json`), JSON.stringify({ leg: LEG, PIN, rows, before, after, owens, errors }, null, 2));
   console.log(`  wrote scripts/r24-out/lod-${LEG}.json + PNGs\n`);
   if (closed) console.log('  NOTE: the browser closed mid-run (SwiftShader/memory) — rows above are what was collected.');
   try { await browser.close(); } catch {}
