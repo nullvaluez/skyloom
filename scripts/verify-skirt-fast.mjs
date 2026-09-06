@@ -31,15 +31,11 @@
 import { mkdirSync, copyFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { loadVendoredThreeTile } from './_tt-shim.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPORT = process.argv.includes('--report');
-const shimDir = path.join(root, 'scripts/r24-out');
-mkdirSync(shimDir, { recursive: true });
-const shim = path.join(shimDir, `.skirt-tt-${process.pid}.mjs`);
-copyFileSync(path.join(root, 'lib/fly/vendor/three-tile/index.js'), shim);
-const tt = await import(pathToFileURL(shim).href);
-rmSync(shim, { force: true });
+const tt = await loadVendoredThreeTile();
 
 const SW = tt.R24_SWITCHES;
 const ST = tt.R24_STATS;

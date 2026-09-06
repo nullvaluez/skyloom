@@ -38,10 +38,12 @@ const EXPECT = {
 // only inside marked patch regions.
 const VENDOR_COMMIT = 'b64457b';
 // Upstream lines a patch is allowed to EDIT rather than leave verbatim (each
-// one is a ledger row that says why). Today: exactly one — `_getDistRatio()`
-// gains an optional parameter so PATCH 2 can ask for the in-frustum law; a
-// zero-argument call is unaffected.
-const DELETED_UPSTREAM_LINES = 1;
+// one is a ledger row that says why). Today: exactly TWO, both signature-only.
+//   `Tile._getDistRatio()` gains an optional parameter so PATCH 2 can ask for
+//   the in-frustum law; `Tile.LOD()` gains one so PATCH 22 can withhold a load
+//   start while the loader is saturated. Every upstream call site passes the
+//   original argument list and is unaffected.
+const DELETED_UPSTREAM_LINES = 2;
 // The ONE sanctioned difference: plugin.js line 2's core import.
 const REWRITE_FROM = 'from "three-tile";';
 const REWRITE_TO = 'from "./index.js";';
@@ -149,8 +151,13 @@ gate(`8 upstream lines EDITED rather than left verbatim <= the ${DELETED_UPSTREA
   deletedUpstream <= DELETED_UPSTREAM_LINES, `${deletedUpstream} upstream lines replaced`);
 
 // Leg D: the bundle still imports nothing but three (+ the plugin's core).
-gate('9 index.js imports only from "three"',
-  [...read(vIndex).matchAll(/from\s*["']([^"']+)["']/g)].every((m) => m[1] === 'three'));
+// The bundle may import `three` and — since PATCH 5 — its OWN generated worker
+// source next door. It may never import app code; that is what keeps the
+// vendored copy a leaf and its patches switchable from one place.
+const ALLOWED_INDEX_IMPORTS = new Set(['three', './workers/skirt-tail.built.js']);
+gate('9 index.js imports only three (+ its own generated worker source)',
+  [...read(vIndex).matchAll(/from\s*["']([^"']+)["']/g)].every((m) => ALLOWED_INDEX_IMPORTS.has(m[1])),
+  [...read(vIndex).matchAll(/from\s*["']([^"']+)["']/g)].map((m) => m[1]).join(', '));
 gate('10 plugin.js imports only from "three" and "./index.js"',
   [...read(vPlugin).matchAll(/from\s*["']([^"']+)["']/g)]
     .every((m) => m[1] === 'three' || m[1] === './index.js'));
@@ -223,6 +230,21 @@ gate('17 every PATCH marker in the vendored code has a VENDOR.md row',
 gate('18 every VENDOR.md patch row has a marker in the vendored code',
   ledgerKeys.every((k) => markerKeys.includes(k)),
   `markers=[${markerKeys.join(',')}] ledger=[${ledgerKeys.join(',')}]`);
+
+// ------------------------------------------- 5. the worker build is not stale
+let builderOut = '';
+let builderOk = true;
+try {
+  builderOut = execFileSync('node', ['scripts/build-tile-worker.mjs', '--check'], {
+    cwd: root,
+    encoding: 'utf8',
+  }).trim();
+} catch (e) {
+  builderOk = false;
+  builderOut = (e.stdout || e.message || '').toString().trim();
+}
+gate('19 the generated worker source is up to date with its readable .src.js',
+  builderOk, builderOut.split('\n').pop());
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

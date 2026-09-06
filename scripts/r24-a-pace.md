@@ -398,6 +398,97 @@ denser DEM ring; this tree's rate is unknown until the user runs it. §9.
 
 ---
 
+## §5 M2c — `skirtWorker`: the skirt built in the DEM worker (T2 / A2, F2)
+
+**Status: BUILT, ships OFF.** `skirtFast` cut the main-thread cost 7×; this
+removes the residual by moving the whole build — boundary scan, skirt vertices,
+attribute concatenation — into three-tile's DEM worker and returning the
+finished arrays as **transferables**, so the main thread only wraps them in
+`BufferAttribute`s.
+
+### The worker-source rule (this is the part C needs)
+
+three-tile ships its DEM workers as MINIFIED SOURCE STRINGS turned into Blob
+URLs at runtime. Hand-editing one is exactly how a vendored patch becomes
+unreviewable, so VENDOR.md forbids it. Instead:
+
+- `lib/fly/vendor/three-tile/workers/skirt-tail.src.js` — a **readable** file,
+- `scripts/build-tile-worker.mjs` stringifies it into `skirt-tail.built.js`
+  (`--check` fails if the built file is stale; `verify-vendor-three-tile` runs
+  that check, so an unbuilt edit goes red instead of shipping),
+- PATCH 20 **splices** that string into three-tile's own source in place of its
+  `self.onmessage = …` tail. Every upstream byte survives; only the new code is
+  in a file a reviewer can read. If the tail shape is ever absent the splice
+  returns null and the stock worker is created — the switch degrades to off
+  rather than half-applying.
+
+That is the seam for worker-side DEM normals (recon T6): add a function to the
+readable source, call it from the handler, give it its own switch, take the
+next ledger row.
+
+### Evidence (MEASURED-HERE, `scripts/verify-skirt-worker.mjs`, 8 gates)
+
+The tail is executed in a sandbox with a stubbed decode step and what it posts
+is compared element by element with the main-thread path:
+
+| case | out indices | skirted | transferables | vs main thread |
+|---|---|---|---|---|
+| grid 33² Uint32 z15 | 6,912 | true | 4 | identical |
+| grid 65² Uint16 z16 | 26,112 | true | 4 | identical |
+| grid 129² Uint32 z13 | 101,376 | true | 4 | identical |
+
+Plus: the splice target still exists in **both** geometry-returning DEM workers
+(decode entry points `le` and `Z`); the built string matches its source; z=0
+produces no skirt in either arm; and an input the boundary scan declines comes
+back UNSKIRTED so the main thread runs upstream's build exactly as today.
+
+### Why it ships OFF
+
+**The production path is unexercisable in this container.** E's offline fixture
+serves terrain-rgb, and three-tile's terrain-rgb loader builds its geometry on
+the MAIN thread (`setData`); the geometry-returning worker path is only reached
+by Esri LERC tiles, which are 403-blocked here. Node-level identity is proven;
+end-to-end streaming is not. It needs one run on the user's machine before it
+goes on. §9.
+
+---
+
+## §6 M2d — `walkWhileSaturated` + `bboxCache` (T3, both halves)
+
+Fable relayed E CERT's live measurement on the R24 fixture: fulfilling imagery
+through a Playwright route kept three-tile's download queue at **dl 9/10**, and
+upstream freezes the ENTIRE quadtree walk while `downloadingThreads + 4 >=
+maxThreads` — six of ten. Nothing is re-evaluated then: not frustum flags, not
+merges, not the descent. **The tree stalled at maxZ 6, `groundElev` answered
+193 m where the true elevation at Powell is 276 m, every satellite building
+drape sample saw `tileZ 6 < demZ 12`, and the drape restarted forever.** E fixed
+the fixture side; the freeze rule is upstream's and is still live in production.
+
+**PATCH 22/23** make the rule per-tile and strictly conservative: keep walking
+and keep the frustum/LOD state current, but START no load while saturated —
+neither a refine nor a version reload. It can only evaluate more; it can never
+issue a download upstream would not have.
+
+**MEASURED-HERE** (`verify-terra-residency` leg I, 14-frame tile latency against
+maxThreads 10, so the loader is held saturated): nodes visited **444 → 4,248**,
+refines 19 → 19, requests **72 → 72**. Upstream evaluates a tenth of the tree
+and starts exactly the same loads. What this leg CANNOT show is the harm at
+depth — my stub loader always drains, so both arms still reach z9; the depth
+evidence is E's live measurement above, and it is quoted, not re-derived.
+
+**The cost is real and the gate says so.** Two switches make the walk do more:
+`keepResident` keeps a deeper tree resident and `walkWhileSaturated` keeps
+evaluating it — upstream's smaller number is a FROZEN tree, not an efficient
+one. Nodes visited per walk **36 → 233** on the serpentine; `timerFix` runs the
+walk at 20 Hz instead of 60, so traversal work per unit time is 4,230 → 10,891
+(bounded by the gate at 4×). **PATCH 24 (`bboxCache`)** is what makes those
+visits affordable: `Tile.BBox` allocated a `Box3` and two `Vector3`s on EVERY
+visit (recon T3's allocation half), and the box only moves on a floating-origin
+rebase or when the tile's own max height changes. Heap over 400 walks:
+**1,398 → 771 KB**.
+
+---
+
 ## §9 Could not measure here (honest list)
 
 Everything in this section needs the user's machine, or E's offline fixture,
@@ -410,6 +501,8 @@ or both. Nothing below has a number from this container.
 | 6 | Whether `bendSphere` (T14) can be enabled without moving Owens ≤ 261 / sat ≤ 375 | E's fixture |
 | 7 | Stalls/min, worst frame and the felt smoothness of the residency trio | User's machine (`__flyTerraPaceOverride` A/B) |
 | 8 | Whether a WRONG tile (cache/URL mix-up) is also in play, as distinct from LOD policy | E's z/x/y-stamped fixture + the URL↔position probe |
+| 9 | `skirtWorker` end to end: the production LERC path builds its geometry in a worker; E's fixture serves terrain-rgb, whose loader builds on the MAIN thread, so the patched path is never reached here | User's machine (Esri egress) |
+| 10 | Whether `walkWhileSaturated`'s 2.5× traversal is invisible in a real frame budget | User's machine |
 | 2 | Any fps / ms / stalls-per-minute / worst-frame number | User's machine only |
 | 3 | Governor behaviour, DPR-step timing, tearing | User's machine only |
 | 4 | Live tile-URL identity against Esri | User's machine (egress) |
