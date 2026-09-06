@@ -114,7 +114,18 @@ if [ "$CODE" != "200" ]; then
   tail -20 "$OUT/dev.log" | sed 's/^/      /'
   exit 2
 fi
-say "dev :$PORT -> 200, PID ${DEV_PID:-unknown}  load $(load)"
+# Re-read the PID AFTER the 200. MEASURED: the first attempt captured it two
+# seconds after launch, before the listener existed, and the retry loop only
+# refilled it on a FAILED curl — so a server that came up quickly printed
+# "PID unknown" and the cleanup trap had nothing to kill. A script that starts
+# a server must know which one it started, or it cannot promise to stop it.
+DEV_PID="$(lsof -t -i:"$PORT" -sTCP:LISTEN 2>/dev/null | head -1)"
+if [ -z "$DEV_PID" ]; then
+  say "started a dev server on :$PORT but cannot identify its PID — refusing to"
+  say "continue, because I could not promise to clean it up afterwards."
+  exit 2
+fi
+say "dev :$PORT -> 200, PID $DEV_PID  load $(load)"
 
 # Everything this script spawns, so an interrupt does not leave a headless
 # browser and a dev server behind. MEASURED the hard way: a `timeout 60` around
