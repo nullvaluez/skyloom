@@ -55,11 +55,50 @@ mkdir -p "$OUT"
 load() { uptime | sed 's/.*average: //'; }
 say() { printf '%s\n' "$*"; }
 
+# Who holds this port? MEASURED IN THIS CONTAINER: `lsof -i:PORT -sTCP:LISTEN`
+# does NOT see a `next dev` listener — it shows only that server's ESTABLISHED
+# connections — while it happily sees a python http.server on the same kind of
+# port. Next binds 0.0.0.0/dual-stack and this lsof view misses the LISTEN row.
+# So a guard built on lsof alone would have failed to stop exactly the
+# EADDRINUSE collision it exists to prevent. The authoritative question is not
+# "does lsof see a socket" but "does anything ANSWER on this port", and the
+# answer to "who" comes from /proc, not from lsof.
+port_answers() {
+  local c
+  c="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://127.0.0.1:$1/" 2>/dev/null)"
+  [ -n "$c" ] && [ "$c" != "000" ]
+}
+dev_pid_for() {   # PID of a `next dev -p <port>` started from THIS tree
+  local port="$1" here p a
+  here="$(pwd -P)"
+  for p in /proc/[0-9]*; do
+    p="${p#/proc/}"
+    a="$(tr '\0' ' ' < "/proc/$p/cmdline" 2>/dev/null)"
+    case "$a" in
+      *"next dev -p $port"*)
+        [ "$(readlink -f "/proc/$p/cwd" 2>/dev/null)" = "$here" ] && { printf '%s' "$p"; return 0; } ;;
+    esac
+  done
+  return 1
+}
+holder_desc() {
+  local port="$1" p a
+  for p in /proc/[0-9]*; do
+    p="${p#/proc/}"
+    a="$(tr '\0' ' ' < "/proc/$p/cmdline" 2>/dev/null)"
+    case "$a" in
+      *"-p $port"*|*":$port"*)
+        printf 'PID %s  cwd=%s  %s' "$p" "$(readlink -f "/proc/$p/cwd" 2>/dev/null)" "$(printf '%s' "$a" | head -c 110)"
+        return 0 ;;
+    esac
+  done
+  printf 'not identifiable from /proc (lsof: %s)' "$(lsof -t -i:"$port" 2>/dev/null | tr '\n' ' ')"
+}
+
 # --- 1. the port must be OURS ------------------------------------------------
-HOLDER="$(lsof -t -i:"$PORT" -sTCP:LISTEN 2>/dev/null | head -1)"
-if [ -n "$HOLDER" ]; then
-  say "REFUSING TO START: port $PORT already has a listener, PID $HOLDER"
-  say "  $(ps -o args= -p "$HOLDER" 2>/dev/null | head -c 160)"
+if port_answers "$PORT"; then
+  say "REFUSING TO START: something already ANSWERS on port $PORT"
+  say "  $(holder_desc "$PORT")"
   say "  It is not mine to kill. Stop it yourself, or pass another port."
   exit 2
 fi
@@ -100,14 +139,11 @@ fi
 say ""
 say "--- starting one dev server on :$PORT ---"
 (npm run dev -- -p "$PORT" > "$OUT/dev.log" 2>&1 &)
-sleep 2
-DEV_PID="$(lsof -t -i:"$PORT" -sTCP:LISTEN 2>/dev/null | head -1)"
 CODE=000
 for _ in $(seq 1 90); do
+  sleep 2
   CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "http://127.0.0.1:$PORT/" 2>/dev/null)"
   [ "$CODE" = "200" ] && break
-  sleep 2
-  DEV_PID="${DEV_PID:-$(lsof -t -i:"$PORT" -sTCP:LISTEN 2>/dev/null | head -1)}"
 done
 if [ "$CODE" != "200" ]; then
   say "dev server never answered 200 on :$PORT (last $CODE). Tail of $OUT/dev.log:"
@@ -119,7 +155,7 @@ fi
 # refilled it on a FAILED curl — so a server that came up quickly printed
 # "PID unknown" and the cleanup trap had nothing to kill. A script that starts
 # a server must know which one it started, or it cannot promise to stop it.
-DEV_PID="$(lsof -t -i:"$PORT" -sTCP:LISTEN 2>/dev/null | head -1)"
+DEV_PID="$(dev_pid_for "$PORT" || true)"
 if [ -z "$DEV_PID" ]; then
   say "started a dev server on :$PORT but cannot identify its PID — refusing to"
   say "continue, because I could not promise to clean it up afterwards."
