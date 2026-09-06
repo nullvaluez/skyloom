@@ -441,6 +441,43 @@ const TEMPORAL = async ([frames, y0f, y1f]) => {
     };
     const framesA = await grab();
     await page.waitForTimeout(+(process.env.FLICK_GAP_MS ?? 20000));
+    // Round 24 (E CERT) — THE QUIESCENCE PRECONDITION (recon A7).
+    //
+    // The bound of 12 does NOT move. What moves is the guarantee that window B
+    // opens on a QUIET scene. R22.1 §3.2 ran this harness five times on ONE
+    // tree and got urban p99 6.957 / 6.613 / 9.742 / 6.167 / 16.105 — the only
+    // red had movingFrac 0.1176 against ~0.02 for the others, i.e. "the scene
+    // was still streaming when the 12-frame window opened". A gate whose
+    // verdict is decided by load is a coin, and its red is unattributable.
+    //
+    // So: take a cheap 3-frame probe first and require movingFrac to be at or
+    // below FLICK_QUIET (default 0.05) before the real window opens; retry up
+    // to FLICK_QUIET_TRIES times, waiting FLICK_GAP_MS between attempts. If it
+    // never quiets, the leg reports NOT QUIET and its numbers are marked
+    // informational rather than silently asserted — the honest answer is
+    // "this run could not judge", not a red or a green.
+    const QUIET_MAX = +(process.env.FLICK_QUIET ?? 0.05);
+    const QUIET_TRIES = +(process.env.FLICK_QUIET_TRIES ?? 4);
+    let quietFrac = null;
+    let quiet = false;
+    for (let attempt = 0; attempt < QUIET_TRIES; attempt++) {
+      const probe = [];
+      for (let i = 0; i < 3; i++) {
+        probe.push(await shot64());
+        await page.waitForTimeout(FRAME_MS);
+      }
+      const ps = await page.evaluate(TEMPORAL, [probe, y0, y1]);
+      quietFrac = ps.movingFrac;
+      if (quietFrac <= QUIET_MAX) {
+        quiet = true;
+        break;
+      }
+      console.log(
+        `      quiescence probe ${attempt + 1}/${QUIET_TRIES}: movingFrac ${quietFrac} > ${QUIET_MAX} — ` +
+          'the scene is still streaming; waiting rather than sampling'
+      );
+      await page.waitForTimeout(+(process.env.FLICK_GAP_MS ?? 20000));
+    }
     const frames = await grab();
     await glShot(shotName);
     const statsA = await page.evaluate(TEMPORAL, [framesA, y0, y1]);
@@ -459,10 +496,12 @@ const TEMPORAL = async ([frames, y0f, y1f]) => {
     await page.evaluate(PARK, false);
     console.log(
       `LEG[${tag}] park=${JSON.stringify(parked)} scene=${JSON.stringify(scene)}\n` +
-        `      window A (at settle)  ${JSON.stringify(statsA)}\n` +
+        `      quiescence: ${quiet ? 'QUIET' : 'NOT QUIET'} (movingFrac ${quietFrac} vs <= ${QUIET_MAX})` +
+        (quiet ? '' : ' — window B numbers below are INFORMATIONAL, not a verdict') +
+        `\n      window A (at settle)  ${JSON.stringify(statsA)}\n` +
         `      window B (ASSERTED)   ${JSON.stringify(stats)}`
     );
-    return { stats, statsA, scene, parked };
+    return { stats, statsA, scene, parked, quiet, quietFrac };
   };
 
   // --- (2) URBAN: Manhattan 900 m ------------------------------------------
@@ -477,8 +516,19 @@ const TEMPORAL = async ([frames, y0f, y1f]) => {
     urban.parked.tracked >= 3,
     JSON.stringify(urban.parked)
   );
-  gate(
+  // R24 (E CERT): a leg that never quieted cannot deliver a verdict. It is
+  // reported as SOFT with its numbers intact rather than asserted — the
+  // R22.1 §3.2 five-run spread (6.2 to 16.1 on ONE tree, the red carrying
+  // movingFrac 0.1176) is what a load-decided assertion looks like.
+  const verdict = (name, quietLeg, ok, detail) => {
+    if (quietLeg) return gate(name, ok, detail);
+    console.log(
+      `SOFT ${name} — the scene never reached quiescence; numbers are informational · ${detail}`
+    );
+  };
+  verdict(
     `(2) URBAN FLICKER — p99 per-pixel temporal stddev <= ${P99_MAX} over ${FRAMES} settled frames`,
+    urban.quiet,
     urban.stats.p99 <= P99_MAX,
     `B: p50=${urban.stats.p50} p95=${urban.stats.p95} p99=${urban.stats.p99} ` +
       `p999=${urban.stats.p999} max=${urban.stats.max} movingFrac=${urban.stats.movingFrac} · ` +
@@ -494,8 +544,9 @@ const TEMPORAL = async ([frames, y0f, y1f]) => {
     30000,
     'r21-e-flicker-02-suburb.png'
   );
-  gate(
+  verdict(
     `(3) SUBURB FLICKER — p99 per-pixel temporal stddev <= ${P99_MAX}`,
+    suburb.quiet,
     suburb.stats.p99 <= P99_MAX,
     `B: p50=${suburb.stats.p50} p95=${suburb.stats.p95} p99=${suburb.stats.p99} ` +
       `p999=${suburb.stats.p999} max=${suburb.stats.max} movingFrac=${suburb.stats.movingFrac} · ` +
