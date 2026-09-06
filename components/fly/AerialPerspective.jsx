@@ -51,7 +51,16 @@
  */
 import { Effect, EffectAttribute } from 'postprocessing';
 import { Uniform, Vector2, Vector3, Color, SRGBColorSpace } from 'three';
-import { DEPTH_FIX, LINEAR_HAZE } from '@/lib/fly/fly-constants';
+import { AERIAL_LAW, DEPTH_FIX, LINEAR_HAZE } from '@/lib/fly/fly-constants';
+// R24 D (AERIAL_LAW): the ONE atmosphere law — the same GLSL string and the
+// same uniform block the per-material term in world-bend injects, so the two
+// evaluators cannot drift. scripts/verify-atmo-law.mjs parses this very text.
+import {
+  ATMO_GLSL_DECL,
+  ATMO_GLSL_FRAGMENT,
+  atmoUniforms,
+  getAtmoLaw,
+} from '@/lib/fly/atmo-law';
 
 /**
  * Module-scope frame state. One satellite scene exists at a time, so a plain

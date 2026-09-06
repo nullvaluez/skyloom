@@ -493,6 +493,70 @@ What each recommendation rests on, and what it does not:
   crossfade actually removes the reported "terrain tiles swapping" or merely
   moves it to the relief snap that a texture blend cannot morph (§3.2).
 
+## §4.95 The AerialPerspective import blocker — how it happened, and what it voids
+
+**The defect.** `components/fly/AerialPerspective.jsx` used six symbols it never
+imported: `ATMO_GLSL_DECL` and `ATMO_GLSL_FRAGMENT` (module-scope template
+literal), `AERIAL_LAW`, `atmoUniforms`, `getAtmoLaw`. Because two of them are
+evaluated in a module-scope template literal, the ENTIRE `components/fly` chunk
+threw at evaluation: "Application error: ReferenceError: ATMO_GLSL_DECL is not
+defined", zero canvas, `__flyBoot` never defined, in both styles. Introduced by
+`bc408e7`, present through `6dc8817`.
+
+**Why it happened, precisely.** The wiring was applied by a python patch script
+whose edits are `str.replace` calls. Five of the six had an `assert old in s`
+in front of them. The import edit did not. Its anchor was
+
+```
+import { Effect, EffectAttribute } from 'postprocessing';
+import { Uniform, Vector2, Vector3, Color } from 'three';
+```
+
+and by the time the script ran, the C merge (`f7a3137`, 16:38) had already
+added `SRGBColorSpace` to that second line and a `DEPTH_FIX, LINEAR_HAZE`
+import under it. The anchor no longer matched, `str.replace` returned the
+string unchanged, and with no assertion the script reported success. **Every
+mechanical edit needs its own assertion; the one that did not have it is the
+one that broke.** That is the lesson, and it is not a subtle one.
+
+**Why no node gate caught it.** `verify-atmo-law` §8 reads
+`AerialPerspective.jsx` as TEXT (regex over the shader strings), and §7
+compiles `applyHillshade`, which lives in a different module. Nothing in D's
+gate set imports or evaluates `AerialPerspective.jsx`. The same blind spot C's
+`verify-c-flagoff` had, and the reason Fable's new `GET / 200` merge-acceptance
+step is the right fix at the process level. An `eslint --rule no-undef` over
+the round's changed files is the cheap gate-level fix.
+
+**What it voids, from the timestamps.**
+
+| artifact | written | tree | verdict |
+|---|---|---|---|
+| `lod-off.json` — the RED (20 refines / 20 hard swaps / 0 faded) | 16:23:06 | after `81424b2` (16:19), **before `bc408e7` (16:45)** | **VALID.** The app booted; the breakage did not exist yet. |
+| `lodprobe-on.log` — the flag-ON leg | 16:52:06 | after `bc408e7` | **VOID, and mis-attributed.** |
+
+**A correction I owe the record.** I reported the ON leg as having "timed out
+in `bootFly` under load". It did not. `bootFly` waits on `__flyBoot`, and
+`__flyBoot` is never defined when the chunk throws at module evaluation — so
+the 180 s `waitForFunction` timeout at 16:52 is the *signature of this very
+defect*, on a tree I had broken seven minutes earlier. Contention was a guess,
+and it was wrong. The ON leg was never booted, on any tree, at any time.
+
+**Also found by the same eslint sweep, NOT mine and NOT fixed here** (Fable's
+instruction was to change nothing else): `components/fly/FlyScene.jsx:373`
+uses `offsetUnits(gl, -1)` without importing it — C's `fd7d28d` (SHADOW_CALM /
+T11). It is exported from `lib/fly/toy-world/world-bend.js:381` and imported
+correctly in `SatTintLayer.jsx` and `prewarm.js`, so the fix is one name in
+FlyScene's existing world-bend import block. It sits inside a `useMemo`
+callback rather than at module scope, so it throws when SatShadowCatcher builds
+its material rather than at chunk evaluation — quieter than mine, and still a
+ReferenceError.
+
+**Known-red on this branch, deliberately not touched:** `verify-lod-fade`'s
+`fadeSec is inside the charter bound` gate reads 6000 ms, because its regex
+matches the `fadeSec: 6` quoted in the block COMMENT before the real
+`fadeSec: 0.25` key. Fable has already fixed it on integration (anchored to the
+key line); duplicating the fix here would only make a conflict.
+
 ## §5 Decisions
 
 - **D-1. AERIAL_LAW is SATELLITE-scoped.** Toy/Neon keeps `TOY.haze` (a single
