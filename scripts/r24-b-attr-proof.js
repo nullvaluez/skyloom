@@ -88,6 +88,17 @@ const { encodeTile, scene, installFetchStub } = require(path.join(ROOT, 'scripts
 
   if (process.argv.includes('--off') && C.FLASH_GUARD) C.FLASH_GUARD.enabled = false;
   if (process.argv.includes('--nopace') && C.FINALIZE_PACE) C.FINALIZE_PACE.enabled = false;
+  // --noflag=NAME (repeatable) turns ONE flag off on an otherwise flipped tree.
+  // That is the bisect: the flag whose absence takes the broken count to 0 owns
+  // the defect, and if NO flag does, the defect is on the flag-off tree too.
+  const offNames = process.argv
+    .filter((a) => a.startsWith('--noflag='))
+    .flatMap((a) => a.slice(9).split(','));
+  for (const n of offNames) {
+    if (C[n] && typeof C[n] === 'object' && 'enabled' in C[n]) C[n].enabled = false;
+    else console.log(`  (no such flag: ${n})`);
+  }
+  if (offNames.length) console.log(`  flags forced OFF: ${offNames.join(', ')}`);
   console.log(
     `root ${ROOT}\nFLASH_GUARD ${C.FLASH_GUARD?.enabled} · FINALIZE_PACE ${C.FINALIZE_PACE?.enabled}` +
       ` · BEND_LEAD ${C.BEND_LEAD?.enabled}\n`
@@ -138,7 +149,7 @@ const { encodeTile, scene, installFetchStub } = require(path.join(ROOT, 'scripts
   if (threw) console.log(`THREW during update: ${threw}`);
   const ok = bad.length === 0 && !threw;
   console.log(
-    `${ok ? 'PASS' : 'FAIL'} every geometry index/attribute is a real BufferAttribute with an array` +
+    `BROKEN=${bad.length}  ${ok ? 'PASS' : 'FAIL'} every geometry index/attribute is a real BufferAttribute with an array` +
       (bad.length ? ` — ${bad.length} bad:\n  ` + [...new Set(bad)].slice(0, 6).join('\n  ') : '')
   );
   restore();

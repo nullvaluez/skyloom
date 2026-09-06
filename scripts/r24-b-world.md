@@ -1161,6 +1161,44 @@ found **without a GL context**. Run with `--root=` at an extracted tree:
 broken mesh is the **LAND** mesh — the one toy site B deliberately did *not*
 guard (§1.3). On `r24/b`, which carries no A code, the same gate is PASS.
 
+### 17.1b The FULL per-flag bisect — one flag moves it, and it is not B's
+
+One flag off at a time on the otherwise-flipped integration tree; the number is
+LAND meshes whose `geometry.index` is not a BufferAttribute:
+
+```
+  none forced off   80      HUD_SYNC          80
+  FLASH_GUARD       80      REBASE_CALM       80
+  CHUNK_FADE        80      LADDER_FIX        80
+  HEAL_IN_PLACE     80      STEP_SAFE         80
+  GROUND_VIS        80      PERF_GOVERNOR     80
+  BEND_LEAD         80      NEON_COVER        80
+  TERRA_PACE        80      STREAM_KEEPER     80
+  FINALIZE_PACE      0   ← the only one that moves it
+```
+
+**All five B flags leave it at 80.** So does every other flag tried, including
+`LADDER_FIX` and `STEP_SAFE` — which is why the ladder-red arm still threw:
+that arm pinned those two off, but `FINALIZE_PACE` is *also* A's and was still
+ON. The ×3-vs-×31 difference between the arms is how many toy LAND chunks
+reached upload before the row ended, not a different cause.
+
+Fable's fallback case — "if no flag moves it, it is on the flag-off tree too and
+pass 1's clean boot needs explaining" — does not arise: one flag does move it,
+and pass 1 was clean precisely because `FINALIZE_PACE` was off there.
+
+### 17.1c The trap, proven directly in three
+
+```
+setIndex(new Uint32Array([0,1,2])) → index.array = undefined · count = undefined
+setIndex([0,1,2])                  → index.array = Uint16Array(3) · count = 3
+Array.isArray(new Uint32Array(3))  → false
+reading index.array.byteLength     → "Cannot read properties of undefined (reading 'byteLength')"
+```
+
+The last line is the reported message, verbatim, from the shape the first line
+produces.
+
 ### 17.2 Root cause, one line
 
 `toy-world-engine.js`, land block, under `finalizePaceOn()`:
@@ -1178,7 +1216,29 @@ the first time it uploads it. The flag-OFF branch builds a **plain** array,
 where `Array.isArray` is true and three wraps it correctly — which is exactly
 why pass 1 was clean and pass 2b was not.
 
-**Fix (A's, one line):** `geo.setIndex(new BufferAttribute(idx, 1))`.
+The hunk's own comment states the mistaken premise — *"Identical values and
+identical order — only the container changes."* The container is exactly what
+`setIndex` dispatches on.
+
+**Fix (one line, flag-off-identical by construction):**
+
+```js
+-  geo.setIndex(idx);
++  // setIndex wraps its argument in a BufferAttribute ONLY when
++  // Array.isArray(index) is true — FALSE for a typed array, so a raw
++  // Uint32Array becomes geometry.index itself, with no .array and no .count,
++  // and WebGLAttributes throws on array.byteLength at upload.
++  geo.setIndex(Array.isArray(idx) ? idx : new BufferAttribute(idx, 1));
+```
+
+`BufferAttribute` is already imported in that file, and the `Array.isArray`
+guard leaves the flag-off (plain-array) branch on its existing path untouched.
+
+**It cannot be committed on `r24/b`: the defective line does not exist there.**
+`finalizePaceOn()` and the typed-array branch arrive with A's merge; B's branch
+still carries the base's plain-array block. The fix has to land on A's branch or
+on the integration branch, which is why this section ships the patch and the RED
+gate rather than a B commit.
 
 ### 17.3 Two notes for A alongside the fix
 
