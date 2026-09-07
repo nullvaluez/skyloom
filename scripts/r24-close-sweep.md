@@ -444,6 +444,28 @@ When the hook lands, the row runs unchanged and its RED signature is the one C
 measured: all three pixels reconstructing to 2.50–2.51 m, i.e. `−cameraNear`,
 every fragment collapsed by the double un-reversal.
 
+### 2.7c-noise TWO NOISE FLOORS, AND WHY THE LARGER ONE BINDS
+
+`haze-red` — both arms pinned `{ enabled: false }`, two identical trees that
+cannot separate by construction — measured what this venue's seam reader does
+when nothing is different:
+
+| Floor | Measured | What it is |
+|---|---|---|
+| **WITHIN-RUN** | **0.00** luma noon, **0.45** night | two arms inside ONE process |
+| **CROSS-BOOT** | **~1.2** luma | the same configuration in two DIFFERENT processes — `haze-red`'s OFF arms read noon 59.3 / night 40.0 · 39.5, `linear-haze`'s OFF arm read 59.9 / 38.8, same tree, same poses |
+
+**The A/B's two arms are two boots, so cross-boot is its floor.** Judging
+against the within-run number would flatter every future result by 0.75 luma.
+
+This is only visible by putting two runs of one configuration side by side —
+which is what a calibration arm is *for*, and is a second return on a row whose
+stated job was merely to establish that identical arms do not separate.
+
+Applied: `HAZE_NOISE_FLOOR` defaults to **1.2**. The parked-tree night reading
+of **+2.6 clears it**, so that verdict is unchanged; what changes is the number
+a future A/B must beat.
+
 ### 2.7d THE POST-BATCH RE-RUN ORDER (R24 close)
 
 Rows that must run again, in this order, each because a named instrument or
