@@ -140,12 +140,12 @@
 > 0.85 / bg 1.0 EXACTLY once the settle waits on the value instead of the
 > clock, and the cirrus deck costs exactly +1 draw once its A/B stops reading
 > a stale publish — every earlier red an instrument's, now measured green),
-> and `flicker` **4/2** (**the R21 flicker SIGNATURE is
-> ABSENT** — 2 and 0 swinging pixels of 547,200 against a bound of 32 — while
-> the p99 reds measured tiles streaming IN during a 12-frame window that is
-> ~24 s here — attributed to a quiescence probe that sampled 3 frames and
-> could not bound a 12-frame statistic, and now re-measured with the asserted
-> window as its own control). **Every red among them is an instrument under the venue, none a
+> and `flicker` **URBAN MEASURED, SUBURB NOT** (**the R21 flicker SIGNATURE is
+> ABSENT** — 2 and 0 swinging pixels of 547,200 against a bound of 32 — and on
+> the re-run, with the asserted window now guaranteed to BE the window found
+> quiet, Manhattan reads **p99 6.138 against a bound of 12**; the suburb leg's
+> third quiescence attempt was still running when the row's wall clock killed
+> it, so it is neither red nor pass). **Every red among them is an instrument under the venue, none a
 > defect of the flag it certifies**; the attributions in progress and the
 > cheap re-runs ride the next server
 > <!-- NIGHT GATES: two attributions in progress, re-runs pending -->; four tail
