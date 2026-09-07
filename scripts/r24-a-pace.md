@@ -2179,6 +2179,82 @@ arithmetic has to close against a number you did not choose.
 
 ---
 
+## §23 CLOSE — the first settled Owens, and what the 279 actually was
+
+E's live re-read on the flipped tree (`scripts/r24-out/w6/owens-decomp.log`): a
+**fresh** warp to Owens, trio ON, no sweep before it, two censuses 60 s apart
+and identical.
+
+    dl 0 (SETTLED) · draws 140 · tris 193,522
+    terrain resident 225 / withModel 169 / parked 77 / stamp 141
+    drawableTiles 92 / meshesInView 92
+    byClass satBuilding 0 · skyline 0 · roads 0 · clouds 0 · cirrus 0 · player 4
+    stranded 0 of 0 · tier high at boot and at both censuses
+
+**140 ≤ 261, settled, with no stranding — the first settled Owens ON number of
+the round, and inside the frozen ceiling with room.** The residency trio, parked
+and capped, censused at rest at the empty-desert control: it passes.
+
+### So what was the 279?
+
+The **post-sweep** state, and only that: 465 tiles carried from Powell by
+keepResident/parkOffscreen, 303 parked, 80 by the stamp, non-terrain ≈ 195
+against ≈ 44 at the fresh pose. E's re-read did not replicate it — no 900 s
+sweep, no tier step observed, no stranding.
+
+My causal chain for it (a source rebuild during the sweep stranding 8; carried
+residency letting the content pipeline finalize where constant merging had
+starved it) is **inferred from source, not measured**, and is recorded as
+inferred. It explains every number in the row and it has not been demonstrated.
+
+### E's census calibrates my own bound, downward
+
+I bounded the post-sweep terrain draws with `drawn ≤ stamp` = 80. E's fresh
+census gives both terms for the first time: **stamp 141, meshesInView 92**. The
+stamp overstates what three actually draws by about a third, because it reads
+`_inFrustum` flags from the last walk while three culls on live matrices.
+
+So the post-sweep terrain term is not merely ≤ 80 — it is **plausibly nearer
+55**, and the non-terrain share of the 279 is *larger* than I argued, not
+smaller. The conclusion strengthens: **the breach was not terrain, and my no-
+change ruling on `LODThreshold` stands on a wider margin than the one I gave.**
+
+### What is not answered, and it is the honest gap
+
+The row's 279 is the state a player is actually in — you fly somewhere, you
+turn, you go somewhere else — and **nothing censuses that**. Both settled
+numbers this round are fresh-warp poses. The post-sweep pose is the one the
+frozen ceiling has never been measured against, on a fixture whose Owens
+carries ~149 toy chunks where the live desert carries near zero by R20's Owens
+lock. That gap is not closed by 140, and I would not let 140 be read as closing
+it.
+
+### R25, in my name
+
+1. **The stale-epoch dirty flag.** `_updateModel` advances `_loadedEpoch` only
+   when `loader.update` reports a content change, so a version-dirty tile whose
+   content is already correct never clears its flag and re-enters the update
+   path every walk, forever — a permanent phantom download count after any
+   source rebuild. Upstream, flag-independent, and it is why a settle criterion
+   asking for `dl === 0` is unsatisfiable on a stranded tree.
+2. **Park before the version-update return.** A dirty tile returns at
+   `_needVersionUpdate` before `_inFrustum` is recomputed and before `r24Park`,
+   so a stranded tile is frozen in its last visibility and never re-parked.
+   Worth ≤ 8 draws; the value is removing a state that is hard to reason about.
+3. **A post-sweep warp pose with a per-class draw split** in
+   `verify-terra-live`. The state above is the one the user flies into, and a
+   ceiling that is only ever measured on a fresh warp is measuring the easy
+   case.
+
+### Lesson
+
+**A settled number and a lived number are different numbers.** Every ceiling
+this round was certified on a fresh warp; the 279 came from a pose reached the
+way a player reaches it, and it was 2× the settled one. The gate was not wrong
+— it was answering a question nobody had noticed was narrower than the claim.
+
+---
+
 ## §10 Commits
 
 | # | Commit | What |
