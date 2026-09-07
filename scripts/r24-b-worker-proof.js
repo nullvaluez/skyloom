@@ -37,6 +37,24 @@ const COMLINK_STUB = 'file:///r24-b-comlink-stub.mjs';
 registerHooks({
   resolve(spec, ctx, next) {
     if (spec === 'comlink') return { url: COMLINK_STUB, shortCircuit: true };
+    // R24 B (post-merge): the tree now also uses the `@/` alias in modules this
+    // probe loads, so the hook resolves it the same way Next does — root-relative,
+    // with the extensionless probe applied to it too.
+    const aliasProbe = (base) => {
+      for (const ext of ['', '.js', '.mjs', '/index.js']) {
+        try {
+          if (fs.existsSync(base + ext) && fs.statSync(base + ext).isFile())
+            return pathToFileURL(base + ext).href;
+        } catch {
+          /* not this candidate */
+        }
+      }
+      return null;
+    };
+    if (spec.startsWith('@/')) {
+      const u = aliasProbe(path.join(ROOT, spec.slice(2)));
+      if (u) return { url: u, shortCircuit: true };
+    }
     if (/^\.{1,2}\//.test(spec) && !/\.[a-z]+$/i.test(spec) && ctx.parentURL?.startsWith('file:')) {
       for (const ext of ['.js', '.mjs', '/index.js']) {
         try {

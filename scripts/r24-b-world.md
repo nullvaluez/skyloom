@@ -1256,3 +1256,103 @@ are all correct — the geometry is fully built. The defect exists only in the
 *type* of one object and only surfaces when a GL context uploads it. That is
 the class of bug a headless attribute census is for, and it is now a gate.
 
+---
+
+## §18 The re-take's 8/26 and 6/11 — attributed, and two fixes
+
+The re-take (`9bcaace`, carrying the minFrames-4 floor and E's `__fadeU`
+reader) reads **8 of 26 hard births and 6 of 11 hard deaths with
+`fadeBudgetMiss` 0** — an unexplained remainder by B's own rule. Against pass
+2b's 29/29 and 20/20, the floor demonstrably works for 18 births and 5 deaths.
+This is what the other 8 and 6 are.
+
+### 18.1 It is a COVERAGE gap, not a floor failure
+
+`scripts/r24-b-fadecover-proof.js` drives all three satellite chunk engines
+headless **at the venue's own 2.84 s/frame** and applies E's exact presence rule
+per mesh, attributing every hard event to its layer:
+
+```
+layer           births  HARD   deaths  HARD   births wearing __fadeU
+sat-building        54     0       45     0   54 of 54
+```
+
+**Zero hard events on the fading layer at the venue's frame rate.** The floor is
+not the problem.
+
+Two layers under E's probed roots have **no fade channel at all**, so every one
+of their births reads presence 1 by construction:
+
+| layer | material | why the probe reads 1 |
+|---|---|---|
+| **`sat-roads`** (a probed root) | one shared `MeshBasicMaterial`, `transparent: true`, **opacity 1** | no `__fadeU`; the opacity fallback returns 1 |
+| **`sat-water`** (inside `__satBuildings.object`) | one shared additive `MeshPhongMaterial`, opacity **0.9** | no `__fadeU`; the opacity fallback returns 0.9, so water reads PARTIAL forever — it inflates `partialFramesSeen` but is *not* the hard remainder |
+
+**So the hard remainder is the ROAD ring.** Both exclusions are deliberate and
+already reasoned (§3.6: `verify-sat-night`'s frozen gate pins one material
+instance and `meshes === ready === visible` for that engine, and a pooled twin
+turns it into a load-decided coin). What was wrong is that the decision was
+documented **in prose only** — and an undeclared design decision is
+indistinguishable from a bug, which is exactly what happened here.
+
+### 18.2 Fix 1 — declare it, machine-readably
+
+Both shared materials now carry `userData.__noFade` with the reason. A presence
+probe can attribute those meshes instead of scoring an unexplained hard birth.
+New gate leg (2) of the fadecover proof: **every material a presence probe can
+meet either fades or declares `__noFade`.**
+
+| leg | result |
+|---|---|
+| working tree | **PASS** — building/skyline fade; roads/water declared |
+| `--root=` at pre-fix `9bf5f8a` | **FAIL** — `sat-water shared, sat-roads shared` undeclared |
+
+**Giving roads a real fade remains a scoped follow-up**, not a close-week
+change: it needs a `verify-sat-night` sanction, and introducing a load-decided
+coin into a frozen gate at close is the trade §7.6 already refused.
+
+### 18.3 Fix 2 — the heal loop had the SAME frame-rate bug as the fade ramp
+
+`HEAL_IN_PLACE.budgetMs` is a per-**frame** time budget, i.e. a
+frame-rate-dependent THROUGHPUT: 36 ms of sampling per second at 60 Hz, 0.2 ms
+per second at 0.35 fps. That is the identical shape to the seconds-only fade
+ramp, and it has the identical fix — a forward-progress floor:
+
+```
+HEAL_IN_PLACE.minRunsPerFrame = 64
+```
+
+Sample at least N anchor runs per frame however long the frame is; at 60 Hz the
+ms budget is reached first and governs alone, so a normal machine is unchanged.
+Measured with the ms budget forced spent (`--healstarve`, `budgetMs 0` — the
+limit of what a long frame does):
+
+| leg | anchor runs re-sampled | heals patched in place |
+|---|---:|---:|
+| floor 0 (RED) | **15** | 0 |
+| floor 64 (GREEN) | **580** | 2 |
+
+The gate asserts **forward progress** (`redrapeRuns`), not `healsInPlace` —
+because whether a job *completes* also depends on its chunk surviving, and an
+eviction is not a pacing failure.
+
+### 18.4 Is `healsInPlace 0` in that window a defect? No — and here is the window that would exercise it
+
+**By construction, and the taxonomy proves it:** heals 9 = `queueFull` 4 +
+`aborted` 4 + `coalesced` 1. `healsAborted` means the chunk was evicted or
+re-streamed under the job — **there is no hole, because there is no chunk**. At
+2.84 s/frame a serpentine at ~90 m/s moves ~250 m per frame, so a chunk's
+residency is a handful of frames, shorter than any budgeted multi-frame
+re-drape. The re-take's own `readySeries` shows the building ring going to
+**`sb ready` 3 → 0** mid-window: every in-flight job died with its ring.
+
+**The path is not broken:** at the SAME 0.35 fps, B's engine proof measures
+`healsInPlace 6–8 of 8–12` when chunks live long enough.
+
+**The window that WOULD exercise it, for E to pose:** a **stationary hold** — no
+warp, no serpentine — over a relief scene where the DEM refines under a resident
+chunk (E's Sierra fixture scene, 36.578 / −118.29, 394 m over 3 km), held for
+≥20 frames. Pin the pose once, do not move, and let `_pumpRedrape` drain. Read
+`healsInPlace` against `redrapeRuns`, and treat `healsAborted` as a correct
+outcome rather than a hole.
+

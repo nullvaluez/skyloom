@@ -40,6 +40,24 @@ const COMLINK_STUB = 'file:///r24-b-engine-comlink-stub.mjs';
 registerHooks({
   resolve(spec, ctx, next) {
     if (spec === 'comlink') return { url: COMLINK_STUB, shortCircuit: true };
+    // R24 B (post-merge): the tree now also uses the `@/` alias in modules this
+    // probe loads, so the hook resolves it the same way Next does — root-relative,
+    // with the extensionless probe applied to it too.
+    const aliasProbe = (base) => {
+      for (const ext of ['', '.js', '.mjs', '/index.js']) {
+        try {
+          if (fs.existsSync(base + ext) && fs.statSync(base + ext).isFile())
+            return pathToFileURL(base + ext).href;
+        } catch {
+          /* not this candidate */
+        }
+      }
+      return null;
+    };
+    if (spec.startsWith('@/')) {
+      const u = aliasProbe(path.join(ROOT, spec.slice(2)));
+      if (u) return { url: u, shortCircuit: true };
+    }
     if (/^\.{1,2}\//.test(spec) && !/\.[a-z]+$/i.test(spec) && ctx.parentURL?.startsWith('file:')) {
       for (const ext of ['.js', '.mjs', '/index.js']) {
         try {
@@ -75,6 +93,12 @@ const FORCE_OFF = process.argv.includes('--off');
 const DT_ARG = process.argv.find((a) => a.startsWith('--dt='));
 const DT = DT_ARG ? Number(DT_ARG.slice(5)) : 1 / 30;
 const HITCH = process.argv.includes('--hitch');
+// R24 B (W3) — the heal STARVATION leg. `HEAL_IN_PLACE.budgetMs` is a per-frame
+// TIME budget, so on a long frame the elapsed check trips after a handful of
+// raycasts and the job barely advances. budgetMs 0 is that condition's limit
+// and models it exactly: without a forward-progress floor the loop samples
+// nothing and no re-drape ever completes; with one it still makes progress.
+const STARVE = process.argv.includes('--healstarve');
 
 (async () => {
   const fails = [];
@@ -97,6 +121,8 @@ const HITCH = process.argv.includes('--hitch');
 
   // The engines read these flags at CALL time, so forcing them here after the
   // module has loaded exercises the real branch without a second process.
+  if (STARVE) C.HEAL_IN_PLACE.budgetMs = 0;
+  if (process.argv.includes('--nofloor')) C.HEAL_IN_PLACE.minRunsPerFrame = 0;
   if (FORCE_ON || FORCE_OFF) {
     const v = FORCE_ON;
     C.CHUNK_FADE.enabled = v;
@@ -211,7 +237,9 @@ const HITCH = process.argv.includes('--hitch');
       ` (${birthsSeen} seen) · deaths >= ${Number.isFinite(minDeathPartials) ? minDeathPartials : 'n/a'}` +
       ` (${deathsSeen} seen)\n`
   );
-  if (C.CHUNK_FADE.enabled && deathsSeen > 0) {
+  // Not in a starve leg: that leg deliberately perturbs streaming (more
+  // evictions, more spent fade budget), so it cannot judge the fade floor.
+  if (C.CHUNK_FADE.enabled && deathsSeen > 0 && !STARVE) {
     gate(
       `(D) FRAME FLOOR — every death is partial on >= ${C.CHUNK_FADE.minFrames - 1} samples at dt=${(DT * 1000).toFixed(0)} ms`,
       minDeathPartials >= C.CHUNK_FADE.minFrames - 1,
@@ -258,6 +286,23 @@ const HITCH = process.argv.includes('--hitch');
     );
   } else {
     gate('(B) RED heals exist and every one of them deleted a mesh', st.heals > 0, `heals ${st.heals}`);
+  }
+  if (STARVE) {
+    // The honest assertion is FORWARD PROGRESS, not `healsInPlace`: whether a
+    // job COMPLETES also depends on whether its chunk survives long enough,
+    // and at this frame rate a moving serpentine evicts chunks faster than any
+    // multi-frame re-drape can finish (that is `healsAborted`, which is a
+    // correct outcome, not a hole). What the floor owns is that the loop keeps
+    // sampling at all when the ms budget is already spent.
+    const floor = C.HEAL_IN_PLACE.minRunsPerFrame | 0;
+    gate(
+      `(E) HEAL FORWARD PROGRESS — ms budget spent, floor ${floor}: the re-drape loop still samples`,
+      // Without a floor the loop still gets ONE run per job entry before the
+      // elapsed check trips, so the honest RED bound is "negligible", not zero.
+      floor > 0 ? (st.redrapeRuns ?? 0) > 64 : (st.redrapeRuns ?? 0) <= 64,
+      `redrapeRuns ${st.redrapeRuns} · healsInPlace ${st.healsInPlace} · aborted ${st.healsAborted} ` +
+        `(eviction, not pacing) · queueFull ${st.healsQueueFull}`
+    );
   }
   if (C.FLASH_GUARD.enabled) {
     gate('(C) GREEN no degenerate triangle is resident', cen.degenerate === 0, `${cen.degenerate}/${cen.tris}`);
