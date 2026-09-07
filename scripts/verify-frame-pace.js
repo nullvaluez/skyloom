@@ -40,6 +40,7 @@
  */
 const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
+const { attachPageErrors } = require('./_pageerrors');
 
 const POWELL = [40.1578, -83.0752, 900, 1.9, -0.3];
 const STRICT = process.env.FRAME_PACE_STRICT === '1';
@@ -133,6 +134,8 @@ const INSTALL_TEAR_WATCH = () => {
 
 let pass = 0;
 let fail = 0;
+const { notCalibrated, notCalCount, notCalSummary } = require('./_notcal');
+
 function gate(name, ok, detail) {
   ok ? pass++ : fail++;
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
@@ -164,7 +167,7 @@ async function serpentine(page, ms) {
   if (process.env.FLY_TILE_FIXTURE) await require('./_fixture').attachFixture(context);
   const page = await context.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(String(e)));
+  const errorsNote = attachPageErrors(page, errors);
   await page.addInitScript(INSTALL_TEAR_WATCH);
 
   await bootFly(page, { style: 'satellite', timeoutMs: 600000, settleMs: 8000 });
@@ -243,17 +246,37 @@ async function serpentine(page, ms) {
     );
 
   // --- the tear MECHANISM: hard gates, here and everywhere.
+  //
+  // THE DENOMINATOR FIRST (§2.10 WEAK, now closed). "0 of 0 outside a rAF" is
+  // what a window in which NOTHING RESIZED reports, and that is the common
+  // case: a run that never crosses a DPR step or a tier step never commits a
+  // canvas size at all. verify-step-clean already learned this the hard way —
+  // `force(dir)` takes a NUMBER, my first version passed a string, and the
+  // gate read "0 DPR applications" as a pass. So (3a) says out loud when the
+  // tear legs are describing an empty population; they are then NOT
+  // CALIBRATED, not green.
+  const tearArmed = tear.resizes > 0;
+  if (!tearArmed)
+    notCalibrated(
+      '(3a) TEAR LEGS — no resize occurred in the window',
+      `resizes ${tear.resizes} over ${tear.frames} frames. (3) and (4) below are therefore ` +
+        'vacuous: they can only prove the mechanism when a size commit actually happened. Force a ' +
+        'DPR or tier step (see verify-step-clean) or lengthen the window'
+    );
+  else info('(3a) TEAR LEGS ARMED', `${tear.resizes} resize/DPR commits observed in the window`);
   gate(
     '(3) EVERY RESIZE / DPR COMMIT IS INSIDE A rAF (the tear mechanism)',
     tear.outOfRaf.length === 0,
     `${tear.outOfRaf.length} of ${tear.resizes} outside` +
-      (tear.outOfRaf.length ? `: e.g. ${JSON.stringify(tear.outOfRaf[0])}` : '')
+      (tear.outOfRaf.length ? `: e.g. ${JSON.stringify(tear.outOfRaf[0])}` : '') +
+      (tearArmed ? '' : '  [NOT CALIBRATED — nothing resized; this is not evidence]')
   );
   gate(
     '(4) bufferMatchesDrawing NEVER GOES FALSE',
     tear.mismatch === 0,
     `${tear.mismatch} of ${tear.frames} frames` +
-      (tear.mismatchSample ? ` e.g. ${JSON.stringify(tear.mismatchSample)}` : '')
+      (tear.mismatchSample ? ` e.g. ${JSON.stringify(tear.mismatchSample)}` : '') +
+      (tearArmed ? '' : '  [NOT CALIBRATED — nothing resized; this is not evidence]')
   );
 
   // --- the pacing legs.
@@ -280,10 +303,10 @@ async function serpentine(page, ms) {
       '     software recorder, which composites the tear away).'
   );
 
-  gate('(9) NO PAGE ERRORS', errors.length === 0, errors.slice(0, 3).join(' | ') || 'clean');
-  console.log(`\n${pass} passed, ${fail} failed`);
+  gate('(9) NO PAGE ERRORS', errors.length === 0, errorsNote());
+  console.log(`\n${pass} passed, ${fail} failed${notCalSummary()}`);
   await browser.close();
-  process.exit(fail ? 1 : 0);
+  process.exit(fail || notCalCount() ? 1 : 0);
 })().catch((e) => {
   console.error(e);
   process.exit(1);

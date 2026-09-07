@@ -17,6 +17,7 @@
  */
 const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
+const { attachPageErrors } = require('./_pageerrors');
 const { attachFixture } = require('./_fixture');
 const { settleWorld } = require('./_settle');
 
@@ -139,7 +140,7 @@ function gate(name, ok, detail) {
   const spec = await fx.spec();
   const errors = [];
   const page = await context.newPage();
-  page.on('pageerror', (e) => errors.push(String(e)));
+  const errorsNote = attachPageErrors(page, errors);
   page.on('console', (m) => {
     if (m.type() === 'error') errors.push(m.text());
   });
@@ -208,7 +209,7 @@ function gate(name, ok, detail) {
 
   // --- toy leg
   const page2 = await context.newPage();
-  page2.on('pageerror', (e) => errors.push('toy: ' + String(e)));
+  const errorsNote2 = attachPageErrors(page2, errors, 'toy: ');
   const t1 = Date.now();
   await bootFly(page2, { style: 'toy', timeoutMs: 600000, settleMs: 8000 });
   const toyBootMs = Date.now() - t1;
@@ -220,7 +221,7 @@ function gate(name, ok, detail) {
     `toyChunks=${toy.counts.toyChunk} tris=${toy.tris} boot=${(toyBootMs / 1000).toFixed(1)}s`);
 
   gate('(10) NO PAGE ERRORS during either boot', errors.length === 0,
-    errors.slice(0, 3).join(' | ') || 'clean');
+    errorsNote());
 
   const stats = await fx.stats();
   console.log('\nFIXTURE REQUESTS:', JSON.stringify(stats.byKind));

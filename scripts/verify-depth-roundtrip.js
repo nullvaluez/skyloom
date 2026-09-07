@@ -46,6 +46,8 @@
  */
 const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
+const { settleWorld } = require('./_settle');
+const { attachPageErrors } = require('./_pageerrors');
 
 // Neon NYC, parked low over Midtown — the toy pose the fleet already uses.
 const POSE = [40.7549, -73.984, 900, 2.6, -0.28];
@@ -73,27 +75,72 @@ const PIN_POSE = ([lat, lon, altM, heading, pitch]) => {
  * that pixel. This is the reference the reconstruction is compared against, so
  * it deliberately shares NO code with the depth path.
  */
-const RAYCAST = ([px, py]) => {
-  const THREE = window.__flyThree || null;
-  const gl = window.__flyGl;
-  const cam = window.__flyCamera || window.__fly?.camera?.cam || null;
-  let scene = window.__flyPlayer ?? window.__fly?.engine?.object ?? null;
-  while (scene && scene.parent) scene = scene.parent;
-  if (!gl || !cam || !scene || !THREE) return null;
-  const W = gl.domElement.width;
-  const H = gl.domElement.height;
-  const ndc = new THREE.Vector2((px / W) * 2 - 1, -(py / H) * 2 + 1);
-  const rc = new THREE.Raycaster();
-  rc.setFromCamera(ndc, cam);
-  rc.far = 60000;
-  const hits = rc.intersectObject(scene, true).filter((h) => h.distance > 0.5);
-  if (!hits.length) return null;
-  // view-space Z is the distance along the camera forward axis, not the ray.
-  const fwd = new THREE.Vector3();
-  cam.getWorldDirection(fwd);
-  const v = hits[0].point.clone().sub(cam.getWorldPosition(new THREE.Vector3()));
-  return { dist: hits[0].distance, viewZ: -v.dot(fwd), object: hits[0].object.name || '(unnamed)' };
-};
+/**
+ * THE TRUTH BELONGS TO THE OWNER, NOT TO THE HARNESS.
+ *
+ * This gate used to build its own THREE.Raycaster from `window.__flyThree` and
+ * `window.__flyCamera`. Neither exists — the re-take's miss table said so on
+ * all fifteen probes: "handle absent — THREE false, gl true, cam false, scene
+ * true". The page exposes the renderer and the scene and nothing else, so a
+ * raycast assembled from OUTSIDE the bundle can never establish a true
+ * distance, and an intermediate attempt to borrow r3f's own camera and
+ * raycaster off the canvas store was the same mistake wearing better clothes:
+ * a harness deciding what the renderer meant.
+ *
+ * C now publishes it. `window.__flyDepthTruth(x, y)` raycasts IN THE APP,
+ * through the composer's active camera, against the world's depth-writing
+ * geometry only, and returns `{ hit, distance, viewZ, object, source }` in the
+ * SAME UNITS as the probe's viewZ — or `{ hit: false, reason }`. Both numbers
+ * this gate compares therefore come from the renderer that produced the frame.
+ */
+const TRUTH = ([px, py]) =>
+  typeof window.__flyDepthTruth === 'function'
+    ? window.__flyDepthTruth(px, py)
+    : { hit: false, reason: 'window.__flyDepthTruth is not published' };
+
+// THE TRUTH FALSIFIES ITSELF, AND THAT IS READ FIRST.
+//
+// Every world vertex is displaced by `wPos.y -= bendD² · uBendK` in the VERTEX
+// SHADER, so the CPU geometry a raycaster sees is NOT the surface the depth
+// buffer recorded — at this gate's 4 km probe that is metres to tens of metres,
+// far outside the 1 % bound the comparison rests on. C's hook un-bends by
+// lifting the ray origin by the drop and iterating at the current hit (≤ 4
+// passes, 1 cm stop, k from getBend()'s live uniforms), and it publishes the
+// evidence that the fixed point actually converged:
+//
+//   residualM        did the iteration settle, in metres
+//   reprojectionPx   the answer projected BACK through the same camera, in
+//                    pixels from the pixel that was asked for
+//
+// A wrong space (floating origin), a stale matrix or a bad bend all surface as
+// a large `reprojectionPx` rather than as a plausible-looking distance. So a
+// probe that fails either check is an INSTRUMENT MISS carrying that reason —
+// never a DEPTH_FIX verdict, because a truth that did not converge cannot
+// convict the thing it was built to measure.
+const TRUTH_MAX_REPROJ_PX = Number(process.env.DEPTH_MAX_REPROJ_PX || 1);
+const TRUTH_MAX_RESIDUAL_M = Number(process.env.DEPTH_MAX_RESIDUAL_M || 0.05);
+
+function truthUsable(t) {
+  if (!t || !t.hit) return { ok: false, why: t?.reason ?? 'no truth returned' };
+  if (Number.isFinite(t.reprojectionPx) && t.reprojectionPx > TRUTH_MAX_REPROJ_PX)
+    return {
+      ok: false,
+      why:
+        `reprojectionPx ${t.reprojectionPx.toFixed(2)} > ${TRUTH_MAX_REPROJ_PX} — the un-bent hit ` +
+        'does not project back to the pixel it was asked for, so the truth is about a different ' +
+        'place than the probe',
+    };
+  if (Number.isFinite(t.residualM) && t.residualM > TRUTH_MAX_RESIDUAL_M)
+    return {
+      ok: false,
+      why:
+        `residualM ${t.residualM.toFixed(3)} m > ${TRUTH_MAX_RESIDUAL_M} m — the un-bend iteration ` +
+        `did not converge in ${t.bendIters ?? '?'} passes`,
+    };
+  return { ok: true };
+}
+
+const { numGate, notCalibrated, notCalCount, notCalSummary } = require('./_notcal');
 
 let pass = 0;
 let fail = 0;
@@ -113,7 +160,7 @@ function gate(name, ok, detail) {
   if (process.env.FLY_TILE_FIXTURE) await require('./_fixture').attachFixture(context);
   const page = await context.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(String(e)));
+  const errorsNote = attachPageErrors(page, errors);
 
   // TOY, tier high — the DoF pass only exists there.
   await bootFly(page, { style: 'toy', timeoutMs: 600000, settleMs: 8000 });
@@ -141,16 +188,45 @@ function gate(name, ok, detail) {
     tier: window.__flyStore?.getState?.().qualityTier ?? null,
     style: window.__flyStore?.getState?.().mapStyle ?? null,
     dof: window.__flyStats?.effects?.dof ?? null,
+    dofLive: typeof window.__flyDof !== 'undefined' ? window.__flyDof != null : null,
   }));
-  console.log(`  renderer reversedDepth=${state.reversed} · style=${state.style} · tier=${state.tier} · dof=${JSON.stringify(state.dof)}`);
-  gate(
-    '(0b) THE DoF PASS IS PRESENT — the released term is reachable in this tier',
-    state.style === 'toy' && state.tier === 'high',
-    `style ${state.style} tier ${state.tier} — the toy DepthOfField pass is the consumer this gate ` +
-      'is about; asserting depth with no depth reader would be a green that means nothing'
+  console.log(
+    `  renderer reversedDepth=${state.reversed} · style=${state.style} · tier=${state.tier} · ` +
+      `__flyDof ${state.dofLive === null ? 'UNPUBLISHED' : state.dofLive}` +
+      // The config mirror is INFORMATIONAL and stays out of the verdict:
+      // __flyStats.effects.dof reads null in compositions that DO mount the
+      // pass, which is how `dof=null` sat beside `__flyDof true` for two passes
+      // looking like a contradiction. The live handle is the fact.
+      `  (config mirror __flyStats.effects.dof=${JSON.stringify(state.dof)} — informational; it ` +
+      'reads null in compositions that mount the pass)'
   );
+  // (0b) USED TO INFER PRESENCE FROM style/tier AND PASSED WHILE PRINTING
+  // `dof=null`. "the tier that is supposed to have a DoF pass" is not "a DoF
+  // pass": the released CoC term is what this gate's (3)/(4) read, and
+  // asserting it from a store field is asserting the configuration, not the
+  // renderer. It now reads C's live handle.
+  if (state.dofLive === null)
+    notCalibrated(
+      '(0b) THE DoF PASS IS PRESENT — the released term is reachable in this tier',
+      `window.__flyDof is unpublished (style ${state.style}, tier ${state.tier}). Required: ` +
+        '`window.__flyDof` = the live DepthOfFieldEffect instance, or null when the chain has none. ' +
+        'Owner: C (DEPTH_FIX). Without it this gate can only read the configuration it was asked ' +
+        'to verify'
+    );
+  else
+    gate(
+      '(0b) THE DoF PASS IS PRESENT — the released term is reachable in this tier',
+      state.dofLive === true && state.style === 'toy' && state.tier === 'high',
+      `__flyDof ${state.dofLive} · style ${state.style} · tier ${state.tier} — the toy ` +
+        'DepthOfField pass is the consumer this gate is about'
+    );
   if (!hasProbe) {
-    console.log(`\n${pass} passed, ${fail} failed`);
+    notCalibrated(
+      '(1)-(4) THE DEPTH ROUND TRIP',
+      'the probe hook is absent, so no pixel was read. This row is NOT RUNNABLE, which is a ' +
+        'different thing from RED: nothing about the defect has been measured either way'
+    );
+    console.log(`\n${pass} passed, ${fail} failed${notCalSummary()}`);
     await browser.close();
     process.exit(1);
   }
@@ -160,31 +236,105 @@ function gate(name, ok, detail) {
   const W = await page.evaluate(() => window.__flyGl.domElement.width);
   const H = await page.evaluate(() => window.__flyGl.domElement.height);
   const candidates = [];
+  const misses = [];
+  // (a) THIS IS A SETTLED-POSE PIXEL PROBE, i.e. a content gate by the §1.5
+  // table — so it settles on the condition, not on a fixed wait, before it
+  // picks anything. The row also needs the finalize budget scaler; without it
+  // the toy chunks may simply not be resident at the moment of the pick, and
+  // the raycast then reports an empty world as a gate failure.
+  const st = await settleWorld(page, { capMs: Number(process.env.DEPTH_SETTLE_CAP_MS || 300000) });
+  console.log(
+    `  settle: ${st.settled ? 'SETTLED' : `NOT settled — ${st.why}`} in ${(st.ms / 1000).toFixed(0)}s ` +
+      `(maxZ ${st.maxZ}, load ${st.load})`
+  );
   for (const fy of [0.86, 0.72, 0.6, 0.55, 0.52]) {
     for (const fx of [0.3, 0.5, 0.7]) {
       const px = Math.round(W * fx);
       const py = Math.round(H * fy);
-      const r = await page.evaluate(RAYCAST, [px, py]);
-      if (r) candidates.push({ px, py, ...r });
+      const t = await page.evaluate(TRUTH, [px, py]);
+      const usable = truthUsable(t);
+      if (usable.ok)
+        candidates.push({
+          px,
+          py,
+          viewZ: t.viewZ,
+          dist: t.distance,
+          object: t.object,
+          source: t.source,
+          bendK: t.bendK,
+          bendDropM: t.bendDropM,
+          bendIters: t.bendIters,
+          residualM: t.residualM,
+          reprojectionPx: t.reprojectionPx,
+        });
+      else misses.push(`(${px},${py}) ${usable.why}`);
     }
   }
-  const pick = (target) =>
-    candidates.length
-      ? candidates.reduce((a, b) =>
-          Math.abs(Math.abs(b.viewZ) - target) < Math.abs(Math.abs(a.viewZ) - target) ? b : a
-        )
-      : null;
-  const picks = [
-    ['near ~50 m', pick(50)],
-    ['mid ~700 m', pick(700)],
-    ['far ~4 km', pick(4000)],
-  ].filter(([, p]) => p);
-
-  gate(
-    '(1) THREE PIXELS WITH A KNOWN TRUE DISTANCE WERE FOUND',
-    picks.length === 3,
-    `${candidates.length} raycast hits; picked ${picks.map(([l, p]) => `${l}=${Math.abs(p.viewZ).toFixed(0)}m`).join(', ')}`
+  // THREE DISTINCT PIXELS, THREE DISTINCT TRUTHS, IN ORDER.
+  //
+  // The nearest-to-a-target pick returned THE SAME PIXEL TWICE: "near ~50 m"
+  // and "mid ~700 m" both resolved to (480, 464) with the same truth
+  // (−1171.4 m), so two of the three legs were one measurement wearing two
+  // labels — and the gate reported 3/3 picks. A target-seeking pick has no
+  // reason to return distinct pixels when the scene contains nothing near the
+  // target, which at a 900 m pose it does not.
+  //
+  // So the picks are now ORDER STATISTICS of the truths actually found:
+  // nearest, median, farthest of the usable hits, deduplicated by pixel AND by
+  // truth. Labels name what they are rather than a distance the scene may not
+  // contain.
+  const byTruth = [...candidates].sort((a, b) => Math.abs(a.viewZ) - Math.abs(b.viewZ));
+  const distinct = [];
+  for (const c of byTruth) {
+    const dupPixel = distinct.some((d) => d.px === c.px && d.py === c.py);
+    const dupTruth = distinct.some((d) => Math.abs(Math.abs(d.viewZ) - Math.abs(c.viewZ)) < 1);
+    if (!dupPixel && !dupTruth) distinct.push(c);
+  }
+  const picks = (
+    distinct.length >= 3
+      ? [
+          ['nearest', distinct[0]],
+          ['median', distinct[Math.floor(distinct.length / 2)]],
+          ['farthest', distinct[distinct.length - 1]],
+        ]
+      : distinct.map((c, i) => [`pick ${i + 1}`, c])
+  ).filter(([, p]) => p);
+  console.log(
+    `  picks: ${distinct.length} distinct truths of ${candidates.length} usable hits — ` +
+      picks.map(([l, p]) => `${l} ${Math.abs(p.viewZ).toFixed(1)} m @(${p.px},${p.py})`).join(' · ')
   );
+
+  for (const c of candidates.slice(0, 8))
+    console.log(
+      `    truth (${c.px},${c.py}) viewZ ${c.viewZ?.toFixed?.(2)} m on ${c.object} · bendK ` +
+        `${c.bendK} drop ${c.bendDropM?.toFixed?.(2)} m in ${c.bendIters} iters · residual ` +
+        `${c.residualM?.toFixed?.(3)} m · reproject ${c.reprojectionPx?.toFixed?.(2)} px`
+    );
+  console.log(
+    `  depth truth (${candidates[0]?.source ?? 'n/a'}): ${candidates.length} hits at distances ` +
+      `${JSON.stringify(candidates.map((c) => +Math.abs(c.viewZ).toFixed(0)))} on ` +
+      `${JSON.stringify([...new Set(candidates.map((c) => c.object))].slice(0, 6))}` +
+      (misses.length ? `; ${misses.length} miss(es): ${misses.slice(0, 3).join(' · ')}` : '')
+  );
+  // (c) FEWER THAN THREE IS NOT CALIBRATED, NOT A FAILURE. The gate needs
+  // three pixels whose true distance is known; if the raycast found none, the
+  // depth round trip was never exercised and the row measured nothing about it.
+  if (picks.length < 3) {
+    notCalibrated(
+      '(1) THREE PIXELS WITH A KNOWN TRUE DISTANCE WERE FOUND',
+      `${candidates.length} USABLE truth hits of ${candidates.length + misses.length} probes ` +
+        '(a hit whose reprojectionPx or residualM is out of band counts as a MISS with its own ' +
+        'reason — an unconverged truth cannot convict DEPTH_FIX); ' +
+        `picked ` +
+        `${picks.length}. Misses: ${misses.slice(0, 4).join(' · ') || 'none recorded'}. Settled: ` +
+        `${st.settled} (${st.why || 'ok'})`
+    );
+  } else
+    gate(
+      '(1) THREE PIXELS WITH A KNOWN TRUE DISTANCE WERE FOUND',
+      true,
+      `${candidates.length} truth hits; picked ${picks.map(([l, p]) => `${l}=${Math.abs(p.viewZ).toFixed(0)}m`).join(', ')}`
+    );
 
   const rows = [];
   for (const [label, p] of picks) {
@@ -194,18 +344,67 @@ function gate(name, ok, detail) {
     const errPct = (100 * Math.abs(gotZ - trueZ)) / trueZ;
     rows.push({ label, px: p.px, py: p.py, trueZ, gotZ, errPct, coc: probe?.coc, raw: probe?.raw, obj: p.object });
     console.log(
-      `  ${label.padEnd(11)} px(${p.px},${p.py}) on ${p.obj} · true ${trueZ.toFixed(1)}m · ` +
-        `reconstructed ${gotZ.toFixed(2)}m · err ${errPct.toFixed(1)}% · coc ${probe?.coc ?? 'n/a'} · raw ${probe?.raw}`
+      `  ${label.padEnd(9)} px(${p.px},${p.py}) truth ${trueZ.toFixed(1)}m on ${p.object} · ` +
+        `probe ${gotZ.toFixed(2)}m raw ${probe?.raw} · err ${errPct.toFixed(2)}% · coc ` +
+        `${probe?.coc ?? 'n/a'}`
     );
-    gate(
-      `(2) ${label}: |reconstructed − true| / true ≤ ${TOL_PCT}%`,
-      errPct <= TOL_PCT,
-      `${errPct.toFixed(2)}% (true ${trueZ.toFixed(1)}m vs ${gotZ.toFixed(2)}m)`
-    );
+    // THE HOOK CAN EXIST AND STILL RETURN NOTHING at a given pixel — an
+    // out-of-range read, a fragment the depth texture never received, a probe
+    // that answers before the first render. Every downstream assertion then
+    // reads NOT CALIBRATED and quotes the probe's own reason, rather than
+    // turning "no reading" into a percentage.
+    // SAME PIXEL IS NOT SAME SURFACE.
+    //
+    // The "far ~4 km" leg picked a pixel whose TRUTH is terrain at 3144.7 m
+    // while the DEPTH BUFFER holds a depth-writing object at 34.45 m (raw
+    // 0.0726 — under reversed-Z a LARGER raw is NEARER; the player aircraft
+    // under the chase cam is the obvious occupant). That is not a round-trip
+    // error of two orders of magnitude; it is two different surfaces at one
+    // pixel, and calling it a DEPTH_FIX failure would convict the decode of the
+    // raycaster's blind spot.
+    //
+    // So an order-of-magnitude disagreement is a PICK MISS with that reason —
+    // either the truth's candidate set is incomplete (C's side) or the probe
+    // read an occluder the raycast did not consider. Only same-surface pairs
+    // are allowed to carry the round-trip verdict.
+    const ratio =
+      probe && Number.isFinite(probe.viewZ) && trueZ > 0 ? Math.abs(probe.viewZ) / trueZ : NaN;
+    if (Number.isFinite(ratio) && (ratio > 10 || ratio < 0.1)) {
+      notCalibrated(
+        `(2) ${label}: |probe.viewZ − truth.viewZ| / truth ≤ ${TOL_PCT}%`,
+        `probe ${Math.abs(probe.viewZ).toFixed(2)} m vs truth ${trueZ.toFixed(2)} m on ` +
+          `${p.object} — a factor of ${ratio > 1 ? ratio.toFixed(1) : (1 / ratio).toFixed(1)}. The ` +
+          'two hooks are looking at DIFFERENT SURFACES at this pixel (an occluder the raycast did ' +
+          "not consider, or an incomplete candidate set), not at a round-trip error. Probe raw " +
+          `${probe.raw} — under reversed-Z a LARGER raw is NEARER`
+      );
+      continue;
+    }
+    if (!probe || !Number.isFinite(probe.viewZ))
+      notCalibrated(
+        `(2) ${label}: |reconstructed − true| / true ≤ ${TOL_PCT}%`,
+        `__flyDepthProbe(${p.px}, ${p.py}) returned ${JSON.stringify(probe)} — viewZ is not a ` +
+          `finite number, so nothing was reconstructed at that pixel (true distance ${trueZ.toFixed(1)} m)`
+      );
+    else
+      numGate(gate)(
+        `(2) ${label}: |probe.viewZ − truth.viewZ| / truth ≤ ${TOL_PCT}%`,
+        errPct,
+        errPct <= TOL_PCT,
+        `${errPct.toFixed(2)}% (true ${trueZ.toFixed(1)}m vs ${gotZ.toFixed(2)}m)`,
+        `errPct is ${errPct} (true ${trueZ}, reconstructed ${gotZ})`
+      );
   }
 
   // The RED signature, stated exactly as C measured it.
-  const allNearNear = rows.length === 3 && rows.every((r) => r.gotZ > 2.4 && r.gotZ < 2.6);
+  const measured = rows.filter((r) => Number.isFinite(r.gotZ));
+  if (measured.length < rows.length)
+    notCalibrated(
+      'THE RED SIGNATURE (all three collapse to −cameraNear)',
+      `${measured.length} of ${rows.length} pixels produced a finite reconstruction; the signature ` +
+        'needs all three'
+    );
+  const allNearNear = measured.length === 3 && measured.every((r) => r.gotZ > 2.4 && r.gotZ < 2.6);
   if (allNearNear)
     console.log(
       '\n  ^^ THE RED SIGNATURE: all three reconstruct to 2.50-2.51 m, i.e. −cameraNear. Every ' +
@@ -220,19 +419,53 @@ function gate(name, ok, detail) {
 
   const near = rows.find((r) => r.label.startsWith('near'));
   const far = rows.find((r) => r.label.startsWith('far'));
-  if (near?.coc != null && far?.coc != null) {
-    gate('(3) CoC < 0.02 AT THE FOCUS PLANE', near.coc < 0.02, `near coc ${near.coc}`);
-    gate('(4) CoC > 0.5 AT 4 km', far.coc > 0.5, `far coc ${far.coc}`);
+  // An INFO line for "the probe returned nothing" reads as a clean run in a
+  // sweep table. It is NOT CALIBRATED: two legs did not execute. (And note
+  // `near.coc < 0.02` would have passed on a NULL coc, since null numifies
+  // to 0 — the guard above is load-bearing, not decorative.)
+  // (3)/(4) NAME THE PASS THEY READ. The re-take printed `dof=null` beside
+  // `__flyDof true` — two fields disagreeing about whether a DoF pass exists,
+  // and a CoC asserted without saying which pass produced it. C now publishes
+  // `cocSource`, so the gate reports the pass it actually read and refuses when
+  // the coc came from nowhere identifiable.
+  const cocSource = await page.evaluate(
+    () => window.__flyStats?.effects?.cocSource ?? window.__flyDof?.cocSource ?? null
+  );
+  console.log(`  coc source: ${JSON.stringify(cocSource)}`);
+  if (!cocSource)
+    notCalibrated(
+      '(3)/(4) CoC — DoF separation',
+      `near ${near?.coc} far ${far?.coc}, but no cocSource is published — the gate would be ` +
+        'asserting a number without knowing which pass produced it, which is how `dof=null` sat ' +
+        'beside `__flyDof true` for two passes'
+    );
+  else if (Number.isFinite(near?.coc) && Number.isFinite(far?.coc)) {
+    numGate(gate)(
+      `(3) CoC < 0.02 AT THE FOCUS PLANE (from ${cocSource})`,
+      near.coc,
+      near.coc < 0.02,
+      `near coc ${near.coc}`
+    );
+    numGate(gate)(
+      `(4) CoC > 0.5 AT 4 km (from ${cocSource})`,
+      far.coc,
+      far.coc > 0.5,
+      `far coc ${far.coc}`
+    );
   } else {
-    console.log('INFO  (3)/(4) CoC — the probe returned no coc; DoF separation not asserted');
+    notCalibrated(
+      '(3)/(4) CoC — DoF separation',
+      `the probe returned no finite coc (near ${near?.coc}, far ${far?.coc}); the depth-of-field ` +
+        'separation is not asserted by this run'
+    );
   }
 
-  gate('(5) NO PAGE ERRORS', errors.length === 0, errors.slice(0, 3).join(' | ') || 'clean');
+  gate('(5) NO PAGE ERRORS', errors.length === 0, errorsNote());
   console.log('\nRED TABLE (defect · gate · measured · green target)');
   for (const r of red) console.log(`  ${r[0]} | ${r[1]} | measured ${r[2]} | ${r[3]}`);
-  console.log(`\n${pass} passed, ${fail} failed`);
+  console.log(`\n${pass} passed, ${fail} failed${notCalSummary()}`);
   await browser.close();
-  process.exit(fail ? 1 : 0);
+  process.exit(fail || notCalCount() ? 1 : 0);
 })().catch((e) => {
   console.error(e);
   process.exit(1);

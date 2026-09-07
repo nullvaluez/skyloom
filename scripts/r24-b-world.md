@@ -888,21 +888,41 @@ and a two-agent edit to it would collide at merge.
 
 ---
 
-## §13 THE FLIP TABLE — B's recommendation per flag at close
+## §13 THE SHIP TABLE — B's flags AS FLIPPED at close
 
-Fable flips the Level A blocks in ONE integration commit at cert; this is B's
-recommendation with the evidence each one rests on. **Every block in this branch
-ships `enabled: false`.**
+**This is the state committed in `lib/fly/fly-constants.js`, not a
+recommendation.** Five ON, two OFF. Each row carries the evidence the state
+rests on and the cost that comes with it.
 
-| flag | recommend | evidence | what it costs |
+| flag | SHIPPED | evidence | what it costs |
 |---|---|---|---|
-| **`FLASH_GUARD`** | **ON** | resident degenerate triangles **15,984 (14.19 %) → 0** on a 2,700-frame headless serpentine; per-builder **14.22 % / 14.84 % → 0**; normals bit-identical across the filter; clean chunks return the same array object | **Zero bundle bytes moved, zero cache keys, zero draws, no frozen-gate exposure at all.** Index counts only fall. The cheap 95 % of the win |
+| **`FLASH_GUARD`** | **ON** — **satellite buildings PROVEN (Powell, Manhattan); skyline = INSURANCE; toy site NOT EXERCISED** | E's browser RED legs: Powell **8.28 %** (31,576 tris / 2,616 zero-area), Manhattan **13.98 %** worst chunk (42,364 tris / 5,820), coincident-vertex; B's headless serpentine **15,984 (14.19 %) → 0**; normals bit-identical across the filter; clean chunks return the same array object | **Zero bundle bytes moved, zero cache keys, zero draws, no frozen-gate exposure at all.** Index counts only fall. The cheap 95 % of the win. See §15 for what "insurance" and "not exercised" mean precisely |
 | **`BEND_LEAD`** | **ON** | pad deficit at the lead edge on **7 of 7 rings** — 54 / 558 / 747 / 241 / 1,205 / 3,405 / 31,412 m → 0; `padON ≥ padOFF` everywhere, so the pad can only ever KEEP geometry | a handful of ring-edge draw submissions; Owens cannot move (nothing to keep) |
 | **`CHUNK_FADE`** | **ON** | single-frame pops **92 → 2**, and both residuals are `fadeBudgetMiss` = 2, i.e. attributable; ramp steps 0 → 600 | `maxDying` 4 transient draws; **Owens exactly 0 by construction**. Needs E's `programsDelta`-flat run to confirm the pooled twins compile nothing |
 | **`HEAL_IN_PLACE`** | **ON** | heals **16 (0 in place) → 21 (21 in place)**; evictions 40 → 24 | one extra Float32Array per chunk (per-run ground); no keys, no draws |
 | **`GROUND_VIS`** | **ON** | worst single-frame visual step **384.0 m → 4.000 m**, converging in 95 frames; warp snaps; the flight model provably keeps RAW | a metre of visual lag on a refining DEM |
-| **`ENV_UNIFORM`** | **ON only after E's two runs** | noon bit-identical BY CONSTRUCTION (day-width normalisation + endpoint bypass) | needs (a) `programsDelta` flat across a dusk crossing AND a forced high↔medium step with `__flyGovPin` AND `__flySatShadowOverride` released, and (b) a twilight fixture A/B at the `verify-dusk` / `verify-sat-night` poses. **This is the one B feature whose flip I do not recommend on construction alone** |
-| **`RING_DEDUPE`** | **OFF — built but off** | live-winding A/B on E's tiles: sat verts −15.6 %, **skyline +31.6 % (`ring[0]` restored)**, **Powell toy +17.4 % (roof-form dispatch moving on the restored corner count)**, degenerate → 0, **Owens lock holds in BOTH legs** | It moves roof-form outcomes on four certified gates (`verify-roofs` 394/2985, `verify-roof-variety`, `verify-window-grids` 403, `verify-neon-city` 379) and carries a live hash re-baseline. **`FLASH_GUARD` alone already removes the entire degenerate population from the GPU with zero bundle-byte movement and no gate exposure — that is the cheap 95 % of the win.** The change RING_DEDUPE makes is in the CORRECT direction: the corner was real and was being eaten by a collinearity walk that saw a zero-length edge. But **correct and certified are different claims and only the second is a merge gate.** It becomes a follow-up: a roof re-certification under a controlled A/B, with the live hash re-baseline going with it |
+| **`ENV_UNIFORM`** | **OFF** — built, source-gated, browser proof NOT RUN | noon bit-identical BY CONSTRUCTION (day-width normalisation + endpoint bypass) | needs (a) `programsDelta` flat across a dusk crossing AND a forced high↔medium step with `__flyGovPin` AND `__flySatShadowOverride` released, and (b) a twilight fixture A/B at the `verify-dusk` / `verify-sat-night` poses. **This is the one B feature whose flip I do not recommend on construction alone** |
+| **`RING_DEDUPE`** | **OFF** — built and measured | live-winding A/B on E's tiles: sat verts −15.6 %, **skyline +31.6 % (`ring[0]` restored)**, **Powell toy +17.4 % (roof-form dispatch moving on the restored corner count)**, degenerate → 0, **Owens lock holds in BOTH legs** | It moves roof-form outcomes on four certified gates (`verify-roofs` 394/2985, `verify-roof-variety`, `verify-window-grids` 403, `verify-neon-city` 379) and carries a live hash re-baseline. **`FLASH_GUARD` alone already removes the entire degenerate population from the GPU with zero bundle-byte movement and no gate exposure — that is the cheap 95 % of the win.** The change RING_DEDUPE makes is in the CORRECT direction: the corner was real and was being eaten by a collinearity walk that saw a zero-length edge. But **correct and certified are different claims and only the second is a merge gate.** It becomes a follow-up: a roof re-certification under a controlled A/B, with the live hash re-baseline going with it — **and it carries the skyline lost-corner fix (§15.1) with it, which is the reason to come back to this flag rather than drop it** |
+
+### 13.1 Two things about this table that are easy to misread
+
+**`verify-flash-guard` (3) goes green on PASS 2, not pass 1.** E's pass-1 row
+was **RED by design**: the harness's runtime pin only knows `'off'`, so on a
+tree where `FLASH_GUARD` still shipped `enabled:false` the "guard on" leg had
+no way to exist. Running the SAME certification script again on this flipped
+tree is what turns it green — the gate did not change, the tree did.
+
+**Three of B's node gates now default to the SHIP state**, so `--off` / a
+forced-off leg is what keeps the flag-off branch under test after the flip:
+
+| gate | ship-state leg | flag-off leg |
+|---|---|---|
+| `r24-b-engine-proof.js` | default — 2 pops, 600 ramps, 21/21 heals in place, 0 degenerate | `--off` — **92 pops, 0 ramps, 0 heals in place, 15,984 degenerate** |
+| `r24-b-worker-proof.js` | default — `RING_DEDUPE` off, so the RED census legs still hold | `--dedupe` — the flag-on A/B |
+| `r24-b-groundvis-proof.mjs` | drives both legs explicitly and now restores the SHIPPED flag value instead of a hard-coded `false` | both, always |
+
+A gate that only ever asserts the state it happens to find is not a gate; every
+one of these still fails on the branch it is meant to protect.
 
 ---
 
@@ -968,4 +988,371 @@ render with a different state, and the fact that it produces the right programs
 is exactly what makes it invisible to a program-count gate. Warm against a
 stand-in, always — and "off the critical path" is a claim about a line number,
 so check the line number.
+
+---
+
+## §15 E's `verify-flash-guard` RED legs — three findings, recorded before close
+
+From E's certification run on the integrated tree (`5ca8e15`), K=40,
+`__flyFlashPin='off'`. These are E's browser numbers, not B's; B's node numbers
+stay in §1 and §7.
+
+### 15.1 The skyline site is INSURANCE, not a fix — and its real defect is a different bug
+
+| pose | layer | meshes | tris | zero-area |
+|---|---|---:|---:|---:|
+| Manhattan | sat-buildings | 4 | 42,364 | **5,820** (13.98 % worst chunk, coincident-vertex) |
+| Manhattan | **sat-skyline** | 10 | 83,752 | **exactly 0** |
+
+**Recon A1b predicted this and it is now measured live.** The skyline path runs
+`simplifyRing(poly.outer, SK.simplifyTol)` before its wall loop, and the
+collinearity test discards the closing clone — so the zero-length wall edge
+never exists there at all.
+
+**Therefore `FLASH_GUARD` at the skyline site removes nothing, and a green there
+repairs nothing.** It stays as cheap insurance against the earcut-collinear kind
+(and against any future emitter on that path), and the ship row now says so.
+This corrects the implicit impression in §1.3's call-site table that all four
+sites are equal: they are not.
+
+**The skyline's real defect is the price it pays for that accident.** The same
+collinearity test discards `ring[0]` along with the clone (`ab` is (0,0) for
+`ring[0]` once its predecessor is the clone), so **every z14 block-mass ring
+silently loses a genuine corner** — a 4-corner footprint renders as 3.
+
+- **It is a DIFFERENT bug from the flash**, and no gate measures it.
+- **B has measured it**: §7.2b, on E's own live-winding tiles, Manhattan
+  sat-skyline **4,570 → 6,015 verts (+31.6 %)** under `RING_DEDUPE`.
+- **`RING_DEDUPE` is its fix**, and that flag is built-but-off precisely
+  because it is a worker change that moves `WORKER_PROTOCOL`, `verify-skyline`'s
+  frozen numbers, and the roof-form dispatch of §7.2b.
+
+**OPEN ITEM, not this round:** restore the skyline's first corner. Owner: a
+future worker round, under the roof re-certification `RING_DEDUPE` already
+needs. Filed here rather than in §9 because §9 is about toy births.
+
+### 15.2 Powell reproduces A1's live band offline; Manhattan sits above it
+
+Powell **8.28 %** (31,576 tris / 2,616 zero-area) lands inside R22.1's live
+**6.36–8.64 %** band — the archived measurement reproduced offline, on a
+different fixture, by a different agent. Manhattan's **13.98 %** worst chunk is
+**above** that band.
+
+**Caveat, recorded so nobody reads 13.98 % as a contradiction:** R22.1 quoted
+6.36–8.64 % for *every large chunk*. The defect is 2 triangles per ring plus 6
+per parapet and 2 per crown step, independent of ring length, so a chunk whose
+footprints are small or few is proportionally WORSE. A worst-chunk figure above
+a large-chunk band is the expected shape, not a disagreement. (B's own fixture
+reads 14.22 % for the same structural reason — 4-corner rectangles.)
+
+### 15.3 The toy site is not exercised by the close
+
+E's toy-world site reads 0/0/0 at both poses **only because no toy chunk is
+resident in satellite**, which is the style both poses run. The toy extruder
+carries the same wrap-around loop at `vector-tile.worker.js:4285`.
+
+**Fable's ruling: no toy leg is added at the close.** The ship row says
+"toy site not exercised", and that is the honest state of the CERTIFICATION.
+
+For the record, and without contesting the ruling: B's node legs *did* exercise
+that site — `scripts/r24-b-worker-proof.js` measures the toy `full` bundle at
+**14.84 % → 0** (B fixture) and **2,288 → 0 on E's Manhattan tile**, and
+`scripts/r24-b-engine-proof.js` drives the toy engine's `guardIndex` call at
+`toy-world-engine.js:1007`. That is evidence the code path works; it is **not**
+a certified browser leg, and the two are different claims. The distinction is
+the same one §7.6 draws about `RING_DEDUPE`: correct and certified are not the
+same, and only the second is a merge gate.
+
+---
+
+## §16 THE FRAME-COUNT FLOOR — a fade you cannot see is not a fade
+
+### 16.1 Why the seconds-only ramp was not enough
+
+`CHUNK_FADE`'s ramps were in SECONDS, which is right on a machine that renders
+in milliseconds and useless on one that does not. At the cloud venue's measured
+**2.84 s/frame**, a 0.3 s eviction ramp begins and ends **between two samples** —
+so E's `verify-fade` pass 2b saw **20 of 20 HARD deaths on a tree where
+`CHUNK_FADE` was ON**, which is the correct reading of what that venue can
+observe.
+
+**And it is not only a venue problem.** A HITCH on a real machine does exactly
+the same thing for one frame — and a hitch is precisely the moment a pop is most
+visible. A fade that a stall can skip is a fade that fails when it matters.
+
+### 16.2 The fix
+
+```
+progress = min(elapsed / sec, framesSince / CHUNK_FADE.minFrames)
+```
+
+in both engines, for both ramps (`rampT`, `chunk-fade.js`). Every birth and
+death record carries `f0`, the engine's monotone `_fadeFrame` at creation;
+`_stepFades` advances that counter once per frame.
+
+**It changes nothing on a normal machine, by construction.** At 60 Hz the 0.3 s
+eviction ramp is **18 frames** and the 0.4 s birth ramp **24**, both far above
+`minFrames` 4 — so `elapsed / sec` is the smaller term and governs alone. The
+floor binds only when a frame is longer than `sec / minFrames` (75 ms), i.e.
+only when the seconds term would have skipped the fade.
+
+**Why `minFrames` is 4 and not the 3 that was specified.** A BIRTH starts at
+presence 0, so it is already partial on its first frame and N frames give N
+partial samples. A DEATH starts at full presence *by definition*, so N frames
+give only **N−1**. Three partial samples on both ramps therefore needs 4, and
+the death is the case an observer has to catch. Flagged rather than silently
+shipped.
+
+### 16.3 Measured — `scripts/r24-b-engine-proof.js`, new `--dt=` and `--hitch`
+
+| regime | single-frame pops | partial samples per ramp |
+|---|---:|---|
+| **`--dt=2.84`** (the venue) | **0** (was 92 flag-off) | births ≥ 1, **deaths ≥ 3** |
+| **`--dt=0.0167`** (60 Hz) | 4, all `fadeBudgetMiss` | births ≥ 23, **deaths ≥ 17** — the elapsed term governs and the ramp length is unchanged (0.3 s × 60 Hz ≈ 18) |
+| **`--dt=0.0167 --hitch`** (a 500 ms frame every 40) | **0** | births ≥ 3, deaths ≥ 17 — **a hitch can no longer complete a ramp in one sample** |
+| **`--off`** | **92**, 0 ramps | flag off never reaches the floor — byte-identical RED |
+
+### 16.4 A second finding the venue forced out: the heal outcome ledger
+
+Running at 2.84 s/frame made gate (B) fail — and it was the GATE that was wrong,
+not the code. `healsInPlace + healsNoop >= heals` is not an invariant: a heal can
+legitimately end in five other ways. The engine now counts every one, so the
+ledger is **exhaustive** and the gate asserts equality rather than an
+inequality:
+
+| outcome | meaning |
+|---|---|
+| `healsInPlace` | patched the resident buffer — the intended path |
+| `healsNoop` | re-sampled, nothing moved past `minDeltaM`; the chunk stops asking |
+| `healsQueueFull` | `HEAL_IN_PLACE.maxConcurrent` spent ⇒ degraded to R21 evict+refetch |
+| `healsAborted` | the chunk was evicted or re-streamed under the job — the heal is MOOT, not failed: there is no hole because there is no chunk |
+| `healsNoRecord` | no drape record (water-only chunk) — nothing to patch |
+| `healsCoalesced` | a re-drape for that key was already in flight; the second request is a no-op |
+| `redraping` | still draining when the sample was taken |
+
+**Any hole that survives the feature is now attributable to a named outcome.**
+That is the same discipline as `fadeBudgetMiss`, and it was only discovered
+because a hostile frame rate broke an assertion that looked true at 30 fps.
+
+---
+
+## §17 Pass-2b toy gate 13 — attributed to `FINALIZE_PACE`, not to B
+
+E's pass-2b toy row failed gate 13 with a repeated uncaught
+**`Cannot read properties of undefined (reading 'byteLength')`**. Fable's first
+hypothesis was B's `guardIndex` on the toy call sites. **It is not B's, and the
+2×2 says so without ambiguity.**
+
+### 17.1 The measurement
+
+New gate `scripts/r24-b-attr-proof.js` drives the **integrated** `ToyWorldEngine`
+headless against the fixture and censuses every geometry index/attribute for a
+missing `.array` — the exact shape three reads `byteLength` from at upload,
+found **without a GL context**. Run with `--root=` at an extracted tree:
+
+| `FLASH_GUARD` | `FINALIZE_PACE` | meshes with a broken index |
+|---|---|---:|
+| ON | ON | **80** |
+| **OFF** | ON | **80** |
+| ON | **OFF** | **0** |
+| OFF | OFF | **0** |
+
+**Independent of `FLASH_GUARD`; fully determined by `FINALIZE_PACE`.** Every
+broken mesh is the **LAND** mesh — the one toy site B deliberately did *not*
+guard (§1.3). On `r24/b`, which carries no A code, the same gate is PASS.
+
+### 17.1b The FULL per-flag bisect — one flag moves it, and it is not B's
+
+One flag off at a time on the otherwise-flipped integration tree; the number is
+LAND meshes whose `geometry.index` is not a BufferAttribute:
+
+```
+  none forced off   80      HUD_SYNC          80
+  FLASH_GUARD       80      REBASE_CALM       80
+  CHUNK_FADE        80      LADDER_FIX        80
+  HEAL_IN_PLACE     80      STEP_SAFE         80
+  GROUND_VIS        80      PERF_GOVERNOR     80
+  BEND_LEAD         80      NEON_COVER        80
+  TERRA_PACE        80      STREAM_KEEPER     80
+  FINALIZE_PACE      0   ← the only one that moves it
+```
+
+**All five B flags leave it at 80.** So does every other flag tried, including
+`LADDER_FIX` and `STEP_SAFE` — which is why the ladder-red arm still threw:
+that arm pinned those two off, but `FINALIZE_PACE` is *also* A's and was still
+ON. The ×3-vs-×31 difference between the arms is how many toy LAND chunks
+reached upload before the row ended, not a different cause.
+
+Fable's fallback case — "if no flag moves it, it is on the flag-off tree too and
+pass 1's clean boot needs explaining" — does not arise: one flag does move it,
+and pass 1 was clean precisely because `FINALIZE_PACE` was off there.
+
+### 17.1c The trap, proven directly in three
+
+```
+setIndex(new Uint32Array([0,1,2])) → index.array = undefined · count = undefined
+setIndex([0,1,2])                  → index.array = Uint16Array(3) · count = 3
+Array.isArray(new Uint32Array(3))  → false
+reading index.array.byteLength     → "Cannot read properties of undefined (reading 'byteLength')"
+```
+
+The last line is the reported message, verbatim, from the shape the first line
+produces.
+
+### 17.2 Root cause, one line
+
+`toy-world-engine.js`, land block, under `finalizePaceOn()`:
+
+```js
+idx = new Uint32Array(base + extra);   // …then:
+geo.setIndex(idx);
+```
+
+`BufferGeometry.setIndex` wraps its argument in a `BufferAttribute` **only when
+`Array.isArray(index)` is true — which is false for a typed array**, so three
+assigns the raw `Uint32Array` as `geometry.index`. That object has no `.array`
+and no `.count`, and `WebGLAttributes` throws on `attribute.array.byteLength`
+the first time it uploads it. The flag-OFF branch builds a **plain** array,
+where `Array.isArray` is true and three wraps it correctly — which is exactly
+why pass 1 was clean and pass 2b was not.
+
+The hunk's own comment states the mistaken premise — *"Identical values and
+identical order — only the container changes."* The container is exactly what
+`setIndex` dispatches on.
+
+**Fix (one line, flag-off-identical by construction):**
+
+```js
+-  geo.setIndex(idx);
++  // setIndex wraps its argument in a BufferAttribute ONLY when
++  // Array.isArray(index) is true — FALSE for a typed array, so a raw
++  // Uint32Array becomes geometry.index itself, with no .array and no .count,
++  // and WebGLAttributes throws on array.byteLength at upload.
++  geo.setIndex(Array.isArray(idx) ? idx : new BufferAttribute(idx, 1));
+```
+
+`BufferAttribute` is already imported in that file, and the `Array.isArray`
+guard leaves the flag-off (plain-array) branch on its existing path untouched.
+
+**It cannot be committed on `r24/b`: the defective line does not exist there.**
+`finalizePaceOn()` and the typed-array branch arrive with A's merge; B's branch
+still carries the base's plain-array block. The fix has to land on A's branch or
+on the integration branch, which is why this section ships the patch and the RED
+gate rather than a B commit.
+
+### 17.3 Two notes for A alongside the fix
+
+- The paced branch always allocates **Uint32**, while `setIndex(plainArray)`
+  lets three's `arrayNeedsUint32` pick **Uint16** when the vertex count allows.
+  Not the bug, but it silently doubles the land index buffer on every toy chunk.
+- `setIndex(rawTypedArray)` is a general trap, not a one-off: any other
+  `setIndex` added this round should be checked for the same shape. This gate
+  will catch all of them at once.
+
+### 17.4 Why no structural gate saw it
+
+The scene graph, the mesh counts, the draw list and every ready/chunk number
+are all correct — the geometry is fully built. The defect exists only in the
+*type* of one object and only surfaces when a GL context uploads it. That is
+the class of bug a headless attribute census is for, and it is now a gate.
+
+---
+
+## §18 The re-take's 8/26 and 6/11 — attributed, and two fixes
+
+The re-take (`9bcaace`, carrying the minFrames-4 floor and E's `__fadeU`
+reader) reads **8 of 26 hard births and 6 of 11 hard deaths with
+`fadeBudgetMiss` 0** — an unexplained remainder by B's own rule. Against pass
+2b's 29/29 and 20/20, the floor demonstrably works for 18 births and 5 deaths.
+This is what the other 8 and 6 are.
+
+### 18.1 It is a COVERAGE gap, not a floor failure
+
+`scripts/r24-b-fadecover-proof.js` drives all three satellite chunk engines
+headless **at the venue's own 2.84 s/frame** and applies E's exact presence rule
+per mesh, attributing every hard event to its layer:
+
+```
+layer           births  HARD   deaths  HARD   births wearing __fadeU
+sat-building        54     0       45     0   54 of 54
+```
+
+**Zero hard events on the fading layer at the venue's frame rate.** The floor is
+not the problem.
+
+Two layers under E's probed roots have **no fade channel at all**, so every one
+of their births reads presence 1 by construction:
+
+| layer | material | why the probe reads 1 |
+|---|---|---|
+| **`sat-roads`** (a probed root) | one shared `MeshBasicMaterial`, `transparent: true`, **opacity 1** | no `__fadeU`; the opacity fallback returns 1 |
+| **`sat-water`** (inside `__satBuildings.object`) | one shared additive `MeshPhongMaterial`, opacity **0.9** | no `__fadeU`; the opacity fallback returns 0.9, so water reads PARTIAL forever — it inflates `partialFramesSeen` but is *not* the hard remainder |
+
+**So the hard remainder is the ROAD ring.** Both exclusions are deliberate and
+already reasoned (§3.6: `verify-sat-night`'s frozen gate pins one material
+instance and `meshes === ready === visible` for that engine, and a pooled twin
+turns it into a load-decided coin). What was wrong is that the decision was
+documented **in prose only** — and an undeclared design decision is
+indistinguishable from a bug, which is exactly what happened here.
+
+### 18.2 Fix 1 — declare it, machine-readably
+
+Both shared materials now carry `userData.__noFade` with the reason. A presence
+probe can attribute those meshes instead of scoring an unexplained hard birth.
+New gate leg (2) of the fadecover proof: **every material a presence probe can
+meet either fades or declares `__noFade`.**
+
+| leg | result |
+|---|---|
+| working tree | **PASS** — building/skyline fade; roads/water declared |
+| `--root=` at pre-fix `9bf5f8a` | **FAIL** — `sat-water shared, sat-roads shared` undeclared |
+
+**Giving roads a real fade remains a scoped follow-up**, not a close-week
+change: it needs a `verify-sat-night` sanction, and introducing a load-decided
+coin into a frozen gate at close is the trade §7.6 already refused.
+
+### 18.3 Fix 2 — the heal loop had the SAME frame-rate bug as the fade ramp
+
+`HEAL_IN_PLACE.budgetMs` is a per-**frame** time budget, i.e. a
+frame-rate-dependent THROUGHPUT: 36 ms of sampling per second at 60 Hz, 0.2 ms
+per second at 0.35 fps. That is the identical shape to the seconds-only fade
+ramp, and it has the identical fix — a forward-progress floor:
+
+```
+HEAL_IN_PLACE.minRunsPerFrame = 64
+```
+
+Sample at least N anchor runs per frame however long the frame is; at 60 Hz the
+ms budget is reached first and governs alone, so a normal machine is unchanged.
+Measured with the ms budget forced spent (`--healstarve`, `budgetMs 0` — the
+limit of what a long frame does):
+
+| leg | anchor runs re-sampled | heals patched in place |
+|---|---:|---:|
+| floor 0 (RED) | **15** | 0 |
+| floor 64 (GREEN) | **580** | 2 |
+
+The gate asserts **forward progress** (`redrapeRuns`), not `healsInPlace` —
+because whether a job *completes* also depends on its chunk surviving, and an
+eviction is not a pacing failure.
+
+### 18.4 Is `healsInPlace 0` in that window a defect? No — and here is the window that would exercise it
+
+**By construction, and the taxonomy proves it:** heals 9 = `queueFull` 4 +
+`aborted` 4 + `coalesced` 1. `healsAborted` means the chunk was evicted or
+re-streamed under the job — **there is no hole, because there is no chunk**. At
+2.84 s/frame a serpentine at ~90 m/s moves ~250 m per frame, so a chunk's
+residency is a handful of frames, shorter than any budgeted multi-frame
+re-drape. The re-take's own `readySeries` shows the building ring going to
+**`sb ready` 3 → 0** mid-window: every in-flight job died with its ring.
+
+**The path is not broken:** at the SAME 0.35 fps, B's engine proof measures
+`healsInPlace 6–8 of 8–12` when chunks live long enough.
+
+**The window that WOULD exercise it, for E to pose:** a **stationary hold** — no
+warp, no serpentine — over a relief scene where the DEM refines under a resident
+chunk (E's Sierra fixture scene, 36.578 / −118.29, 394 m over 3 km), held for
+≥20 frames. Pin the pose once, do not move, and let `_pumpRedrape` drain. Read
+`healsInPlace` against `redrapeRuns`, and treat `healsAborted` as a correct
+outcome rather than a hole.
 

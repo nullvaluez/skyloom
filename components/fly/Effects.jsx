@@ -488,6 +488,13 @@ export const Effects = memo(function Effects({ runtime }) {
   // this is the effect itself. patchDofDepth is idempotent and never throws.
   const setDof = useCallback((o) => {
     if (o) patchDofDepth(o);
+    // R24 C (DEPTH_FIX): publish the live effect so verify-depth-roundtrip's
+    // gate (0b) reads a HANDLE rather than inferring one from a pixel. Same
+    // dev-only park-handle idiom as the probe itself; the branch is statically
+    // false in a production build, so nothing is written there.
+    if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
+      window.__flyDof = o ?? null;
+    }
   }, []);
 
   // ---- Round 19 (E SLIPSTREAM): speed lines -----------------------------

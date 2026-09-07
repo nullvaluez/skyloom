@@ -26,7 +26,14 @@
  *     34,405 of 482,740 triangles, 99.9% coincident-vertex). With FLASH_GUARD
  *     on it must be exactly 0 at every site.
  *
- * (B) THE PALE DETECTOR — a DEFAULT-FRAMEBUFFER readback, one scanline after
+ * (B) THE PALE DETECTOR — and it carries its OWN calibration, because a
+ *     detector that has never fired is not calibrated, it is quiet. Gate (4a)
+ *     requires the banked serpentine to register ZERO (the first version of
+ *     this detector reported 168 of 256, reading the SKY); gate (4b) arms one
+ *     synthetic pale frame through `window.__paleSelfTest()` — the next tick
+ *     clears the default framebuffer to white and reads that — and requires
+ *     EXACTLY ONE hit. Zero there means the instrument cannot see the event it
+ *     exists for. — a DEFAULT-FRAMEBUFFER readback, one scanline after
  *     the final pass, on EVERY composed frame. It exists because a CDP
  *     screencast is BLIND to a one-frame event (R22.1 A1) and a
  *     `page.screenshot` is blinder still. It is a PROBABILISTIC instrument:
@@ -47,10 +54,17 @@
  */
 const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
+const { attachPageErrors } = require('./_pageerrors');
+const { settleWorld } = require('./_settle');
 
 const POWELL = [40.1578, -83.0752, 900, 1.9, -0.3];
 const MANHATTAN = [40.7075, -74.0113, 792, 2.6, -0.12];
-const SETTLE = Number(process.env.FLASH_SETTLE_MS || 60000);
+// A CONDITION WITH A CAP, not a duration. `settleWorld` returns when the
+// terrain has reached its zoom, the ground has stopped moving, every chunk has
+// resolved ready-or-empty and __flyStats has republished since we asked — so
+// the census counts a settled scene rather than whatever existed 60 s in. The
+// cap only bounds the wait; the gate prints whether it was reached.
+const SETTLE_CAP = Number(process.env.FLASH_SETTLE_CAP_MS || 420000);
 const SERPENTINE_MS = Number(process.env.FLASH_SERPENTINE_MS || 45000);
 
 const PIN_POSE = ([lat, lon, altM, heading, pitch]) => {
@@ -145,7 +159,31 @@ const CENSUS = () => {
  * screencast cannot.
  */
 const INSTALL_PALE = () => {
-  const S = (window.__pale = { frames: 0, pale: 0, worstMean: 0, hits: [], armed: false });
+  const S = (window.__pale = {
+    /** length of the current run of candidate frames; only a run of 1 counts. */
+    runLen: 0,
+    lastCand: null,
+    /**
+     * The self-test frame is SYNTHETIC — the harness painted it — so it takes
+     * no part in the world's run bookkeeping. It is counted here, separately,
+     * and `selfDone` lets the gate wait for the frame to have actually
+     * happened instead of racing the next rAF.
+     */
+    selfHits: 0,
+    selfDone: false,
+    selfSaw: null,
+    /** set by the gate before it closes a page; the tick chain ends here. */
+    stop: false,
+    /** candidates that had a candidate neighbour — a field, not a flash. */
+    sustained: 0,
+    sustainedRuns: [],
+    frames: 0,
+    pale: 0,
+    worstJump: 0,
+    hits: [],
+    armed: false,
+    baseline: 0,
+  });
   const start = () => {
     // NEVER call canvas.getContext() here.
     //
@@ -165,10 +203,63 @@ const INSTALL_PALE = () => {
     if (!gl) return false;
     const W = 64;
     const buf = new Uint8Array(W * 4);
+    // A ring of recent frames. THE PALE FRAME IS A JUMP, NOT A BRIGHTNESS.
+    //
+    // The first version of this detector flagged "uniformly bright mid-screen
+    // scanline" as pale, and the certification run duly reported 168 pale
+    // frames in 256 — all of them with an IDENTICAL mean of 212.9, i.e. a
+    // sustained bright field, not a one-frame event. The uncontrolled actor
+    // was the SKY: a scanline 55% up the frame spends much of a banked
+    // serpentine looking at it, and a clear daytime sky is uniformly ~213
+    // luma. That is the R17 §7.1 lesson again — a pixel probe must not contain
+    // an actor it does not control — and this time it produced FALSE POSITIVES,
+    // which are worse than the false negatives the header warns about.
+    //
+    // The measured signature (R22.1 C2) is a ONE-FRAME excursion: the scene's
+    // luminance mean goes 0.21 -> 0.85 and back. So the test is against the
+    // recent MEDIAN, not against a constant, and the scanline is taken low in
+    // the frame where the ground is. A sky that fills the crop raises the
+    // median with it and stops being a hit.
+    const RING = 24;
+    const hist = new Float64Array(RING);
+    let n = 0;
+    const median = () => {
+      const k = Math.min(n, RING);
+      if (k < 8) return null; // not enough history to judge a jump
+      const a = Array.prototype.slice.call(hist, 0, k).sort((x, y) => x - y);
+      return a[k >> 1];
+    };
+    // THE DETECTOR'S OWN RED, in-page and costing no extra browser run.
+    // A detector that has never fired is not calibrated, it is merely quiet —
+    // and this one has already been wrong in the other direction. Calling
+    // `window.__paleSelfTest()` arms exactly ONE synthetic pale frame: the next
+    // tick clears the default framebuffer to white and reads THAT, so the
+    // instrument sees precisely the event it exists to catch. The app redraws
+    // the same frame immediately, so nothing persists and the median absorbs a
+    // single sample out of 24.
+    S.selfTest = 0;
+    window.__paleSelfTest = () => {
+      S.selfTest = 1;
+      S.selfTestAt = S.frames;
+      return true;
+    };
     const tick = () => {
+      // The gate sets `stop` before closing a page so the rAF chain ends on
+      // purpose rather than being torn down mid-read. A flag nothing honours
+      // is worse than no flag.
+      if (S.stop) return;
       try {
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        const y = (gl.drawingBufferHeight * 0.55) | 0;
+        let isSelf = false;
+        if (S.selfTest > 0) {
+          S.selfTest = 0;
+          isSelf = true;
+          gl.clearColor(1, 1, 1, 1);
+          gl.clear(gl.COLOR_BUFFER_BIT);
+        }
+        // readPixels is bottom-up: 0.25 of the height is LOW on screen, where
+        // the ground is at every pose this gate flies.
+        const y = (gl.drawingBufferHeight * 0.25) | 0;
         const x = ((gl.drawingBufferWidth - W) / 2) | 0;
         gl.readPixels(x, y, W, 1, gl.RGBA, gl.UNSIGNED_BYTE, buf);
         let sum = 0;
@@ -180,15 +271,78 @@ const INSTALL_PALE = () => {
         }
         const mean = sum / W;
         S.frames++;
-        if (mean > S.worstMean) S.worstMean = mean;
-        // A pale frame is UNIFORMLY bright: the measured signature was
-        // lumMean 0.21 -> 0.85 with the whole scanline lifted, L ~ 226 with
-        // the post chain's vignette. A bright sky in the crop would raise the
-        // mean but not the MINIMUM of a mid-screen scanline over ground.
-        if (mean > 180 && min > 150) {
-          S.pale++;
-          S.hits.push({ f: S.frames, mean: +mean.toFixed(1), min });
+        const med = median();
+        if (med !== null) {
+          const jump = mean - med;
+          if (jump > S.worstJump) S.worstJump = jump;
+          S.baseline = med;
+          // A pale frame: far brighter than the recent world, uniformly so,
+          // and absolutely bright. All three, or it is not the thing.
+          //
+          // …AND IT MUST BE ISOLATED. The defect is a ONE-FRAME white flash;
+          // two adjacent frames at the same level are a SUSTAINED field, which
+          // is a different picture with a different cause (a bright sky at the
+          // scanline, a reveal fade, an overexposed grade). Pass 2 measured
+          // exactly that: f:141 and f:142 both at mean 222.1 / med 145.5, and
+          // f:229 with f:230 likewise — consecutive identical means, counted as
+          // two hits each. So a candidate is HELD one frame and only counted
+          // when the frame AFTER it is not also a candidate; `prevCand` carries
+          // the held frame, and a run of any length collapses to zero hits
+          // rather than to its length.
+          //
+          // The self-test is exempt by construction, not by special-casing: it
+          // paints exactly ONE white frame, so its successor is never a
+          // candidate and the held hit always lands — (4b) still reads exactly
+          // one.
+          const cand = jump > 60 && min > med + 40 && mean > 180;
+          if (isSelf) {
+            // ISOLATED BY CONSTRUCTION, not by luck. MEASURED (pass 2b): the
+            // run-length rule scored the self-test 0 twice over — the run only
+            // closes on the next NON-candidate frame, and the gate read the
+            // counter before that frame existed; and the synthetic frame can
+            // land adjacent to a real sustained run (this venue produced runs
+            // at 107-111, 221-226 and 240-241) and be absorbed into it, which
+            // would make (4b) fail for a reason that has nothing to do with
+            // the detector. So the harness's own frame is accounted APART: the
+            // open run is closed first under the normal rule, the synthetic
+            // frame is scored on its own, and the bookkeeping restarts clean.
+            if (S.runLen === 1) {
+              S.pale++;
+              if (S.hits.length < 8) S.hits.push(S.lastCand);
+            } else if (S.runLen > 1) {
+              S.sustained++;
+            }
+            S.runLen = 0;
+            S.lastCand = null;
+            if (cand) S.selfHits++;
+            S.selfSaw = { f: S.frames, mean: +mean.toFixed(1), med: +med.toFixed(1), min: +min.toFixed(1), cand };
+            S.selfDone = true;
+          } else if (cand) {
+            S.runLen++;
+            S.lastCand = { f: S.frames, mean: +mean.toFixed(1), med: +med.toFixed(1), min: +min.toFixed(1) };
+          } else {
+            // A run of EXACTLY ONE is the flash. Any longer run is a field and
+            // counts zero — including its last frame, which a naive
+            // "previous frame was not a candidate" test would still admit.
+            if (S.runLen === 1) {
+              S.pale++;
+              if (S.hits.length < 8) S.hits.push(S.lastCand);
+            } else if (S.runLen > 1) {
+              S.sustained++;
+              if (S.sustainedRuns.length < 6)
+                S.sustainedRuns.push({
+                  from: S.lastCand.f - S.runLen + 1,
+                  to: S.lastCand.f,
+                  len: S.runLen,
+                  mean: S.lastCand.mean,
+                  med: S.lastCand.med,
+                });
+            }
+            S.runLen = 0;
+          }
         }
+        hist[n % RING] = mean;
+        n++;
       } catch {
         /* context lost / not ready */
       }
@@ -239,7 +393,7 @@ async function serpentine(page, ms) {
   if (process.env.FLY_TILE_FIXTURE) await require('./_fixture').attachFixture(context);
   const page = await context.newPage();
   const errors = [];
-  page.on('pageerror', (e) => errors.push(String(e)));
+  const errorsNote = attachPageErrors(page, errors);
 
   // THE RED LEG: B's runtime pin, set before the app mounts, so the two legs
   // are one boot apart — not one build apart.
@@ -250,6 +404,7 @@ async function serpentine(page, ms) {
   await bootFly(page, { style: 'satellite', timeoutMs: 600000, settleMs: 8000 });
   await page.evaluate(() => window.__flyStore.getState().setQualityTier('high'));
 
+  const scenesRed = {};
   for (const [name, pose] of [
     ['powell', POWELL],
     ['manhattan', MANHATTAN],
@@ -259,8 +414,13 @@ async function serpentine(page, ms) {
       polling: 250,
     });
     await page.evaluate(PIN_POSE, pose);
-    await page.waitForTimeout(SETTLE);
+    const st = await settleWorld(page, { capMs: SETTLE_CAP });
+    console.log(
+      `  ${name} settle: ${st.settled ? 'SETTLED' : `NOT settled — ${st.why}`} in ${(st.ms / 1000).toFixed(0)}s ` +
+        `(maxZ ${st.maxZ}, sb ${JSON.stringify(st.sb)}, load ${st.load})`
+    );
     const c = await page.evaluate(CENSUS);
+    scenesRed[name] = c;
     const pct = c.totalTris ? (100 * c.totalZero) / c.totalTris : 0;
     console.log(
       `${name}: ${c.meshes} meshes, ${c.totalTris} tris, ${c.totalZero} ZERO-AREA (${pct.toFixed(2)}%)`
@@ -292,9 +452,50 @@ async function serpentine(page, ms) {
 
   await serpentine(page, SERPENTINE_MS);
   const paleRed = await page.evaluate(() => window.__pale);
+
+  // (4a)/(4b) THE DETECTOR'S OWN CALIBRATION. Fable's requirement, and the
+  // right one: an instrument that has never fired is not calibrated, it is
+  // quiet. The serpentine must produce ZERO (the first version of this
+  // detector produced 168 of 256 — it was reading the sky), and a synthetic
+  // one-frame white clear must produce EXACTLY ONE.
+  const serpentineHits = paleRed.pale;
+  // WAIT FOR THE SYNTHETIC FRAME TO HAVE HAPPENED. Reading the counter in the
+  // same round trip that arms the self-test races the next rAF, and at ~1 fps
+  // that race is lost more often than won. `selfDone` is set by the tick that
+  // painted and read the white frame, so this waits for the event rather than
+  // for a duration.
+  await page.evaluate(() => {
+    window.__pale.selfDone = false;
+    window.__paleSelfTest?.();
+  });
+  await page
+    .waitForFunction(() => window.__pale?.selfDone === true, undefined, { timeout: 60000, polling: 200 })
+    .catch(() => {});
+  await page.waitForTimeout(8000);
+  const afterSelf = await page.evaluate(() => window.__pale);
+  const selfHits = afterSelf.selfHits ?? 0;
+  gate(
+    '(4a) NO FALSE POSITIVE — the banked serpentine registers ZERO ISOLATED pale frames',
+    serpentineHits === 0,
+    `${serpentineHits} in ${paleRed.frames} frames · worst jump over median ` +
+      `${paleRed.worstJump.toFixed(1)} · baseline ${paleRed.baseline.toFixed(1)}`
+  );
+  gate(
+    '(4b) THE DETECTOR FIRES — one synthetic white frame registers EXACTLY ONE hit',
+    selfHits === 1,
+    `${selfHits} hit(s) from __paleSelfTest()` +
+      (afterSelf.selfSaw ? ` — the synthetic frame read ${JSON.stringify(afterSelf.selfSaw)}` : '') +
+      (afterSelf.selfDone ? '' : '  [the synthetic frame never rendered — the detector was not asked]') +
+      (afterSelf.hits.length ? ` · ${JSON.stringify(afterSelf.hits.slice(-1))}` : '') +
+      (selfHits === 0 ? '  [the instrument cannot see the event it exists for]' : '')
+  );
+
   info(
     '(4) PALE DETECTOR (probabilistic — absence is NOT proof)',
-    `armed=${paleRed.armed} frames=${paleRed.frames} pale=${paleRed.pale} worstScanlineMean=${paleRed.worstMean.toFixed(1)}` +
+    `armed=${paleRed.armed} frames=${paleRed.frames} pale=${paleRed.pale} sustained=${paleRed.sustained} worstJumpOverMedian=${paleRed.worstJump.toFixed(1)} baseline=${paleRed.baseline.toFixed(1)}` +
+      (paleRed.sustainedRuns?.length
+        ? ` sustainedRuns=${JSON.stringify(paleRed.sustainedRuns)} (a bright FIELD, not a one-frame flash — not counted)`
+        : '') +
       (paleRed.hits.length ? ` hits=${JSON.stringify(paleRed.hits.slice(0, 4))}` : '')
   );
   console.log(
@@ -302,9 +503,22 @@ async function serpentine(page, ms) {
       'evidence. On the user machine it is the leg that reproduces the symptom.'
   );
 
-  // THE GREEN LEG: same build, same fixture, no pin.
+  // THE GREEN LEG: same build, same fixture, no pin — AND THE FIRST PAGE IS
+  // CLOSED FIRST.
+  //
+  // MEASURED (pass 2b, and marginally in pass 1): page1 was left open and
+  // rendering while page2 booted, so the second boot got roughly half of four
+  // shared cores at ~1 fps. Pass 1's green leg scraped 2 meshes / 20,935 tris;
+  // on the flipped tree, with more work per frame, it settled NONE — and gate
+  // (3) then read "zero-area is exactly 0" off an empty scene and PASSED. Two
+  // pages of the same app are not two independent measurements at this venue;
+  // they are one measurement and its handicap.
+  await page.evaluate(() => {
+    if (window.__pale) window.__pale.stop = true;
+  });
+  await page.close();
   const page2 = await context.newPage();
-  page2.on('pageerror', (e) => errors.push('green: ' + String(e)));
+  const errorsNote2 = attachPageErrors(page2, errors, 'green: ');
   await page2.addInitScript(INSTALL_PALE);
   await bootFly(page2, { style: 'satellite', timeoutMs: 600000, settleMs: 8000 });
   await page2.evaluate(() => window.__flyStore.getState().setQualityTier('high'));
@@ -313,11 +527,19 @@ async function serpentine(page, ms) {
     polling: 250,
   });
   await page2.evaluate(PIN_POSE, POWELL);
-  await page2.waitForTimeout(SETTLE);
-  const green = await page2.evaluate(CENSUS);
-  const flagOn = await page2.evaluate(
-    () => typeof window.__flyStats?.flashGuard === 'object' || window.__flyFlashPin === undefined
+  const st2 = await settleWorld(page2, { capMs: SETTLE_CAP });
+  console.log(
+    `  green-leg settle: ${st2.settled ? 'SETTLED' : `NOT settled — ${st2.why}`} in ` +
+      `${(st2.ms / 1000).toFixed(0)}s (maxZ ${st2.maxZ}, sb ${JSON.stringify(st2.sb)}, load ${st2.load})`
   );
+  const green = await page2.evaluate(CENSUS);
+  // NOT "is the flag on" — an absent runtime pin on a page that never set one
+  // says nothing about FLASH_GUARD.enabled. Report what is actually knowable:
+  // whether the feature published any telemetry at all.
+  const flagOn = await page2.evaluate(() => ({
+    telemetry: window.__flyStats?.flashGuard ?? null,
+    runtimePin: window.__flyFlashPin ?? null,
+  }));
   const gpct = green.totalTris ? (100 * green.totalZero) / green.totalTris : 0;
   console.log(
     `powell (no pin): ${green.meshes} meshes, ${green.totalTris} tris, ${green.totalZero} ZERO-AREA (${gpct.toFixed(2)}%)`
@@ -330,15 +552,42 @@ async function serpentine(page, ms) {
         ? '  [expected while FLASH_GUARD.enabled is false — this is the pre-fix state]'
         : '')
   );
-  gate(
-    '(5) TRIANGLE COUNT ONLY EVER FALLS — the filter removes degenerates, never real geometry',
-    green.totalTris <= 0 || green.totalTris > 0,
-    `pinned=${'n/a'} armed=${green.totalTris} (compared per-site in the ledger; a degenerate contributes ` +
-      'nothing to computeVertexNormals, so shading is provably unchanged)'
-  );
-  gate('(6) NO PAGE ERRORS', errors.length === 0, errors.slice(0, 3).join(' | ') || 'clean');
+  // (5) was VACUOUS as first written — `green.totalTris <= 0 || > 0` is a
+  // tautology and it printed "pinned=n/a", which is the shape this round has
+  // already been burned by twice. The honest comparison is per-site and
+  // NORMALISED: the two legs are separate boots that settle different numbers
+  // of chunks, so absolute totals are not comparable — the RATIO of degenerates
+  // to triangles is.
+  const pinnedRate = (() => {
+    const sb = (scenesRed.powell || {}).sites?.['sat-buildings'];
+    return sb && sb.tris ? sb.zero / sb.tris : null;
+  })();
+  const armedRate = (() => {
+    const sb = green.sites['sat-buildings'];
+    return sb && sb.tris ? sb.zero / sb.tris : null;
+  })();
+  if (pinnedRate === null || armedRate === null)
+    console.log(
+      'NOT CALIBRATED  (5) — one of the two legs resolved no sat-building triangles, so there is ' +
+        'nothing to compare. Not a pass and not a fail.'
+    );
+  else
+    gate(
+      '(5) THE DEGENERATE RATE FALLS, AND NEVER RISES, WITH THE GUARD ARMED',
+      armedRate <= pinnedRate + 1e-9,
+      `sat-buildings degenerate rate ${(pinnedRate * 100).toFixed(2)}% (pin off) -> ` +
+        `${(armedRate * 100).toFixed(2)}% (armed). Absolute totals are NOT comparable across the ` +
+        'two boots — they settle different chunk counts — so the gate is on the ratio. A degenerate ' +
+        'contributes nothing to computeVertexNormals, so removing it is provably shading-neutral.'
+    );
+  gate('(6) NO PAGE ERRORS', errors.length === 0, errorsNote());
 
-  console.log(`\nflagOn(probe)=${flagOn}`);
+  console.log(`\nFLASH_GUARD telemetry on the armed leg: ${JSON.stringify(flagOn)}`);
+  console.log(
+    'NOTE: gate (3) can only go GREEN once FLASH_GUARD.enabled is true in constants. This gate ' +
+      'releases B\'s RUNTIME pin, which is not the same switch — so on a flag-off tree a FAIL at ' +
+      '(3) is the RED calibration working, not a regression.'
+  );
   console.log('\nRED TABLE (defect · gate · measured · green target)');
   for (const r of red) console.log(`  ${r[0]} | ${r[1]} | measured ${r[2]} | ${r[3]}`);
   console.log(`\n${pass} passed, ${fail} failed`);

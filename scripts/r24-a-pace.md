@@ -787,13 +787,37 @@ OpenFreeMap / adsb.lol are 403-blocked.
 | 5 | Draw counts at the settled canonical poses with the residency trio ON | E's fixture |
 | 6 | Whether `bendSphere` (T14) can be enabled inside Owens ≤ 261 / sat ≤ 375 | E's fixture |
 | 7 | Stalls/min and felt smoothness of the residency trio | User's machine (`__flyTerraPaceOverride` A/B) |
-| 8 | Whether a WRONG tile (cache/URL mix-up) is also in play, as distinct from LOD policy | E's z/x/y-stamped fixture + my URL↔position probe in `verify-terra-live.js` |
+| 8 | Whether a WRONG tile (cache/URL mix-up) is also in play, as distinct from LOD policy | **ANSWERED on the fixture** — see below |
 | 9 | `skirtWorker` end to end — the production LERC path builds geometry in a worker; the fixture's terrain-rgb loader builds on the MAIN thread, so the patched path is never reached here | User's machine (Esri egress) |
 | 10 | Whether `walkWhileSaturated`'s 2.5× traversal is invisible in a real frame budget | User's machine |
 | 11 | Whether `FINALIZE_PACE` removes a FELT hitch (the rule's shape is proven; the frame time is not) | User's machine, via E's FRAME_STATS long-frame count |
 | 12 | `HUD_SYNC`: that the label swim is gone in a turn — it is a visual | User's machine |
 | 13 | `REBASE_CALM` T12: that the micro-grain no longer re-phases at a rebase | User's machine |
 | 14 | `FRAME_STEP`'s consumer opt-in: that a render-pose consumer still lands on a harness-pinned `flight.pos` | A machine that can run the fleet (see §8c) |
+
+**Row 8 — ANSWERED on the fixture (pass 1, arm A, Fable's run):** 64 resident
+tiles, **0/62 URL mismatches, 0/64 position mismatches** with `TERRA_PACE` off.
+No resident tile was displaying imagery from another tile's address, so a cache
+or URL mix-up is NOT producing the "tiles swapping for other ones" symptom in
+the code path, and the LOD-policy attribution in §3 does not rest on an
+unexamined alternative.
+
+Two limits, so the result is read at the strength it carries:
+
+1. **The fixture serves deterministic bytes per (z,x,y); Esri does not.** The
+   finding in §3 is that a merge REPLACES four children with a coarser parent.
+   Against the fixture that parent is consistent imagery, so the swap reads as a
+   resolution change. On the user's machine it is a DIFFERENT CAPTURE — other
+   season, other sun, sometimes visibly different colour. This probe cannot see
+   that class at all, because the URL and the position are both correct and only
+   the pixels differ. It is still LOD policy and it does not change the fix, but
+   it is why the symptom reads more violently on their screen than any fixture
+   number will ever show. **The live-capture variant remains a user-machine
+   item.**
+2. **The denominator is 62, not 64.** The probe only tests tiles whose material
+   already carries a map; the two without a URL were skipped SILENTLY, and those
+   are the mid-load tiles — the likeliest moment for a mismatch if one existed.
+   Not a reason to doubt the result, but the honest figure.
 
 **The one thing I attempted here and could not finish:** the satellite fixture
 A/B in `scripts/verify-terra-live.js` (the content probe + the live draw
@@ -848,6 +872,907 @@ should run before every commit that adds a call site, not just before a merge.
 
 ---
 
+## §12 SHIP STATE — what A flipped on at the close
+
+One line per switch, and every OFF one names the run it is waiting for. Nothing
+here is off by omission.
+
+| Flag / switch | Ships | Why, in one line |
+|---|---|---|
+| `TERRA_PACE.enabled` | **ON** | the umbrella for the terrain work below |
+| `…timerFix` | **ON** | `updateInterval` gates the quadtree walk again: 10/12 updates walked the whole tree → 4/12 |
+| `…mergeHysteresis` | **ON** | kills the refine↔merge flip: on a vertical bob, flips 27→16, merges 21→11, refetches 89→63 |
+| `…keepResident` | **ON** | the "tiles swapping" fix: on a pure yaw sweep, merges 22→0, on-screen replacements 17→0, refetches 178→0 |
+| `…skirtFast` | **ON** | 7.1×/6.5× on the measured 67%-of-stalls hot spot, byte-identical geometry over 13 cases |
+| `…walkWhileSaturated` | **ON** | ends the global freeze that pinned E's tree at z6; strictly conservative — visits 444→4,248, refines and requests unchanged |
+| `…bboxCache` | **ON** | pays for the above: heap 1,398→771 KB per 400 walks |
+| `…skirtWorker` | OFF | **needs one real-hardware run.** Proven output-identical in node (8/8), but the fixture's terrain-rgb loader builds geometry on the MAIN thread, so only Esri LERC tiles reach the patched path — nothing here has ever exercised it |
+| `…bendSphere` | OFF | **needs one real-hardware run** at the canonical poses: it fixes the bend-blind cull by SUBMITTING far tiles that are culled today, which is a draw-count change against Owens ≤ 261 / sat ≤ 375 |
+| `…parallelLoad`, `imageBitmap`, `preUpload`, `lodOutsideRender` | OFF | **not implemented this round.** W0 scaffolding switches that no patch reads: turning one on changes nothing. Said plainly in the constants so nobody flips one and waits |
+| `STEP_SAFE` | **ON** | the DPR step lands inside the frame that draws it: `{dpr:0.875, applyMs:2.3, composer:true, viaValve:false}` where flag-off recorded nothing at all |
+| `LADDER_FIX` | **ON** | `[1/high, 1/medium, 1/low]` → five rungs with 0.875 and 0.75 first, so the first step is no longer a tier step |
+| `…nativeRefresh` | **ON** | plan §0 ruling 6. **The one flipped value with no measurement behind it** — an exact no-op at 60 Hz (`min(60,60)`), and on 120/144 Hz it raises the target while recon FL-04's own question to the user is still unanswered |
+| `HUD_SYNC` | **ON** | the overlay stops being a picture of frame N−1 (~30 px of label swim per turn at 60°/s) |
+| `FINALIZE_PACE` | **ON** | one shared per-frame brake across four engines, and the first chunk is no longer free after a long frame |
+| `REBASE_CALM` | **ON** | the dead store bump, the narrowed matrix update, and the 704 m quantised anchor so the micro-grain stops re-phasing every 10 km |
+| `FRAME_STEP` | OFF | **the consumer opt-in did not land** (§8c). The accumulator and the interpolated pose are proven (10/10, incl. the substep-boundary identity); pointing PlayerPlane / chase cam / Contrail / ground shadow at `renderPos` is the half that can move a harness pose, and it cannot be certified in this venue. On today it would change the sim integration with nothing reading the smoother pose: all the risk, none of the benefit |
+
+### The gate change the flip forced
+
+Every one of my gates drives its feature by setting the switch ITSELF — which
+is correct, because the property under test is *"off = the R21 arithmetic,
+on = the fix"*, not *"the flag happens to be false"*. But that makes all of
+them blind to the SHIP STATE: a flag silently reverted to `false` would leave
+every behaviour gate green while the fix was gone from the build. **Those are
+two separate claims and both now have a gate.** `scripts/_r24a-ship-state.mjs`
+reads the literal out of `fly-constants.js` by brace-matching (not a copy, not
+an import — the file that ships), and each gate asserts its own block against
+the ruled state while keeping its forced-state behaviour arms.
+
+Three arms had to be hardened for the same reason, and this is the interesting
+half of the flip:
+
+- `verify-finalize-pace` gate 1 now says **forced** off, not flag-off.
+- `verify-ladder-fix`'s RED arm used to *omit* the pin. With the constants
+  shipping ON, an omitted pin IS the shipped state, so the RED calibration
+  would have gone quietly green while claiming to measure the defect. It now
+  FORCES both features off.
+- `verify-terra-live`'s arm A had the same shape — an unpinned control that
+  had become the treatment. **An A/B whose control arm is the treatment is not
+  an A/B**, which is the same lesson as the stutter arm in §7, arriving from
+  the opposite direction: there the control moved, here it silently stopped
+  being a control at all.
+
+`verify-vendor-three-tile` gained gate 16b: the vendored switchboard's own
+literal must default every switch to `false` regardless of what the app ships,
+because the bundle is imported by node fixtures and by the app alike and only
+`terrain-engine.js` decides what is on.
+
+---
+
+## §13 Pass-1 gate 6 (`1 → 17` duplicate URLs): the LRU is NOT the cause
+
+Pass 1's terra-live row failed gate 6 — duplicate URLs `1 → 17` with the trio
+ON, the opposite direction from the node fixture's `178 → 0`. Three candidate
+causes were put to me. **It is none of them as stated, and the LRU hypothesis
+is dead twice over.**
+
+### The LRU is ruled out, by arithmetic and by its own effect being absent
+
+| | value |
+|---|---|
+| cap (`TILES.lruBudgetBytes`) | 140 MB |
+| fixture imagery tile, 256² sRGB + mips (`w·h·4·4/3`) | 341.3 KB |
+| fixture DEM geometry at the 33² grid (pos+uv+nrm+idx) | 58.0 KB |
+| ⇒ per resident tile | **≈ 399 KB** |
+| ⇒ what 140 MB admits | **≈ 358 tiles** |
+| observed arm B, Powell 41.3 MB | ≈ 106 tiles — **30% of cap** |
+| observed arm B, Owens 50 MB | ≈ 128 tiles — **36% of cap** |
+
+The cap was never within a factor of three of binding. And independently:
+**the byte LRU's ONLY effect path is setting `_r24Collapse`, which
+`_LODEvaluate` turns into a return of 2 — a MERGE.** Arm B reports
+`merges 0, refetchParent 0`. Had the LRU evicted anything, both would be
+non-zero. Budget headroom and absent effect are two independent refutations.
+
+(The counter semantics were the other candidate; E confirms `/__stats/reset`
+clears `byUrl` outright and each arm's window is its own sweep. Every fixture
+response is `no-store`, so the browser cache is not masking repeats either: the
+counts are honest, and — as E notes — an upper bound on live, where real cache
+headers and R21's persistent Cache API tile cache both apply.)
+
+### What it actually is: upstream's discard-after-download, at 51° per FRAME
+
+`_loadSubTiles` re-checks `_LODEvaluate` **after** awaiting the four children
+and calls `unloadSubTiles()` if the answer is no longer "refine" — it throws
+away downloads it has just made. Whether that fires depends on how far the
+camera turned DURING the download, i.e. on **degrees of heading change per
+FRAME**. The harness drove the yaw off the wall clock at ~51 °/s: 0.85 °/frame
+at 60 fps, but **~51 °/frame on this ~1 fps container**. At that rate the camera
+does not sweep, it teleports, and essentially every refine started in the sweep
+has its parent out of frustum before its children land.
+
+MEASURED node-side on the real vendored classes (`scripts/r24-out/probe-refetch.mjs`,
+throwaway; 60 frames, tile latency 2 frames):
+
+| arm | deg/frame | refines | merges | **discards** | unique | reqs | **dup URLs** |
+|---|---|---|---|---|---|---|---|
+| OFF | 0.85 | 45 | 1 | 0 | 176 | 177 | **1** |
+| trio | 0.85 | 45 | 0 | 0 | 176 | 176 | **0** |
+| trio + walkWhileSaturated | 0.85 | 45 | 0 | 0 | 176 | 176 | **0** |
+| OFF | 51 | 47 | 34 | 3 | 52 | 218 | **28** |
+| trio | 51 | 55 | 0 | 1 | 212 | 216 | **4** |
+| trio + walkWhileSaturated | 51 | 59 | 0 | 7 | 204 | 232 | **28** |
+
+At **0.85 °/frame — the same 51 °/s on a 60 fps machine — the trio takes
+duplicate URLs 1 → 0.** At 51 °/frame the same code goes 28 → 28: the 34 merges
+the fix removes are replaced, one for one in kind, by discards.
+`walkWhileSaturated` raises them further (4 → 28) and that is not a bug in it:
+it correctly restores the refine STARTS that upstream's freeze rule was
+suppressing, and at 51 °/frame every start is doomed.
+
+So the honest attribution has three parts, and the middle one matters:
+- the duplicates are **upstream's** waste path, not the trio's — the trio
+  removes merges (`1 → 0` live, `34 → 0` in the probe) and adds none;
+- they are **surfaced by the venue's frame pacing**, not by the fix. 45 s at
+  1 fps is 45 discrete 51° jumps, which is not a turn;
+- and `walkWhileSaturated` makes them **more visible**, because it stops the
+  freeze from hiding refine starts. That is the fix working, seen through an
+  instrument calibrated for a different machine.
+
+**Not claimed:** that the discard path is harmless on the user's machine. The
+probe says it is zero at 0.85 °/frame with a 2-frame latency; a real machine has
+longer network latency, and the product (deg/frame × latency) is what governs
+it. That is a user-machine item, and a genuinely cheap follow-up if it shows up:
+re-check the frustum BEFORE issuing the four child loads, not only after they
+land.
+
+### The instrument fix
+
+`PIN_YAW` now advances the heading **per frame** (`FLY_TERRA_YAW_DEG_PER_FRAME`,
+default 0.85) instead of per wall-clock second, so both arms sweep the same ARC
+at any frame rate, and it publishes `window.__fxYaw = {frames, deg}`. Gate 6
+refuses to compare two arms unless both swept ≥ 360° and within 10% of each
+other; otherwise it prints `SKIP … NOT CALIBRATED` with the two arcs rather
+than a red.
+
+**Consequence for pass 2, stated plainly:** at ~1 fps, 45 s × 0.85 °/frame is
+about 38° of arc, so gate 6 would SKIP in this container rather than produce a
+number. That is the correct outcome — the row needs either a much longer sweep
+or the user's machine. A skip that says why beats a red that measures the venue.
+
+**And then the sweep length became reachable** (Fable's ruling, same round):
+rather than leave the row skipped here, the sweep is now a harness-only env,
+`FLY_TERRA_SWEEP_MS`, defaulting to the original 45000 so an unset environment
+is byte-identical to the gate before the env existed (`FLY_TERRA_YAW_MS` is
+kept as its alias, so no existing invocation moves). The arithmetic Fable has
+to pay: 360° ÷ 0.85 °/frame ≈ **424 rendered frames**, which at this venue's
+~1 fps is ~7–8 minutes of wall clock **per arm**; pass 2 runs it at 600000
+(10 min/arm) with `FLY_TERRA_ARMS=both`, so gate 6 asserts for real here
+instead of skipping. `page.waitForTimeout` is not bounded by Playwright's
+default timeout, so the only cost is wall clock — budget roughly +20 minutes
+over pass 1's 715 s for the row.
+
+The arc is now printed **beside the verdict on every path**, not only on the
+skip: a new `arc swept` line in the YAW SWEEP block carries both arms'
+degrees and frames, gate 6's PASS/FAIL detail string repeats them, and the SKIP
+text names `FLY_TERRA_SWEEP_MS` as the knob to raise (explicitly **not**
+`FLY_TERRA_YAW_MIN_ARC` — lowering the arc minimum would restore exactly the
+under-calibrated comparison that produced the 1 → 17). A reader of the log can
+now always see what arc the number was measured over.
+
+**Still worth having (E, pass 2):** the per-prefix breakdown. It is no longer
+load-bearing for this attribution, but an eviction-refetch cycle would show in
+`img` AND `dem` together and nowhere else, so it is the cheapest confirmation if
+the question ever reopens. Also unaddressed by the arc fix, and E's own catch:
+the stats reset is not atomic with the yaw pin, so boot-tail requests land in
+the window and the ON arm holds more resident state at that moment — a second,
+smaller contributor to the 1 vs 17 asymmetry.
+
+---
+
+## §14 THE ROUND'S FIRST DEFECT IN A SHIPPED FEATURE — rule 1 tested a level
+
+Found where the close flip met the venue, in **my own** feature, after it had
+already been ruled ON. It is the most serious thing in this ledger, so it gets
+stated plainly rather than folded into a follow-up list.
+
+### What shipped, and what it did
+
+Rule 1 of FINALIZE_PACE read:
+
+    if (done === 0) return lastDtMs <= c.longFrameMs;   // longFrameMs = 24
+
+That is a test for a **level**, not for a spike. On any machine whose frames are
+*steadily* longer than 24 ms — **anything below ~41 fps** — every frame is
+"long", so rule 1 refuses the first finalize of **every** frame, forever. Each
+engine's `if (!mayFinalize(done)) break;` fires before its loop body has run
+once, so `done` never reaches 1 and rule 2 is never even consulted. No chunk
+ever finalizes.
+
+The symptom is not a stutter. **Buildings never appear at all.**
+
+| machine | frame time | rule 1 as shipped |
+|---|---|---|
+| 60 fps desktop | 16.7 ms | fine — this is the machine the round assumed |
+| ~41 fps | 24 ms | the threshold |
+| 30 fps laptop | 33 ms | **starved** |
+| 20 fps integrated GPU | 50 ms | **starved** |
+| fixture venue (SwiftShader) | 300–1000 ms | **starved, totally** |
+
+Those middle two rows are laptops and integrated GPUs — *exactly the machines
+that report the symptoms this round exists to fix*. I shipped a fix for
+stuttering that would have stopped the world from streaming in on the hardware
+that stutters.
+
+### How it surfaced
+
+Not on a machine. On the **venue**: pass 2's flash-guard census read **0 meshes
+and 0 triangles at Powell AND Manhattan** after the same 60 s settle that gave
+**31,576 / 126,116 triangles in pass 1**, when FINALIZE_PACE was off. At
+300–1000 ms per frame the starvation is absolute rather than graded, which is
+the only reason it was visible at all. **The venue did not cause the defect. It
+converted a graded failure into an absolute one, and so exposed it.**
+
+The first diagnosis — mine — was that this was a venue artifact needing a
+harness seam, and I wired `budgetK()` into rule 1 so the scaler would switch it
+off. Fable rejected that and was right to: a harness exemption would have left
+the defect live on every user machine below 41 fps and removed the only
+instrument that could ever have caught it. **The bug was never that the venue is
+slow. It was that "long" was defined absolutely.**
+
+### The fix, in the product
+
+Rule 1 now refuses only a **spike**: the frame must exceed **both**
+`longFrameMs` **and** `spikeK` × a running EMA of recent frame times.
+
+- a 40 ms hitch amid 16 ms frames is 2.4× its baseline → refused, which is the
+  hitch train rule 1 was written to break;
+- a steady 33 ms machine is never refused — its own baseline is 33 ms, it is not
+  spiking, it is simply slower;
+- a steady 1 fps venue is a **no-op by construction**, for the same reason. That
+  line is the proof the fix belongs to the product: *the harness needs no
+  exemption from a rule that correctly ignores it*, and rule 1 carries no K seam
+  at all now.
+
+The spike is measured against the EMA **of the frames before it**, never one the
+spike has been folded into — otherwise a large enough hitch raises its own
+threshold and hides itself.
+
+Plus a **hard starvation cap**: no more than `maxRefuseFrames` (3) consecutive
+refusals, then one frame is admitted whatever the EMA says. Rule 1 is an
+optimisation, and an optimisation that can starve is worse than not having it.
+
+Two knobs added to `FINALIZE_PACE`, both documented in the block: `spikeK: 2`
+(generous on purpose — a missed hitch costs one late upload, a false positive
+costs the whole world) and `maxRefuseFrames: 3`.
+
+The EMA seeds at `longFrameMs`, not at the first frame observed: a cold start
+has no baseline, and seeding from the first frame would make every first frame
+un-spikeable by definition. The visible consequence is honest and bounded — a
+very slow machine refuses a handful of frames while the baseline climbs (the
+venue arm measures 6 of the first 40, worst run 3, then never again), and the
+starvation cap is what bounds it. Gate 15 asserts that shape rather than hiding
+it behind a slice.
+
+### Proof
+
+`verify-finalize-pace.mjs` 14 → **17 gates**, RED-calibrated by reverting rule 1
+to the shipped line: **14, 15 and 17 fail**, with 14 reading **0/40 frames
+admitted** — the defect's exact signature. 16 passes both ways, which is correct
+and is the point: *the fix did not move the hitch behaviour it was written for.*
+
+| gate | asserts | on the shipped rule |
+|---|---|---|
+| 2 / 3 | a cold 50 ms frame is a spike (2.08× the 24 ms seed) and is refused; a 16.7 ms frame is not | unchanged — PASS both ways |
+| 14 | steady 33 ms (~30 fps) finalizes on **every** frame | **FAIL, 0/40 admitted** |
+| 15 | 20 fps and the 1 fps venue converge to permanent admission, worst run ≤ 3 | **FAIL, 0/40, worst run 40** |
+| 16 | one 40 ms hitch amid 16.7 ms frames is refused, **and only that frame** | PASS both ways |
+| 17 | a hitch TRAIN never defers more than 3 in a row | **FAIL, worst run 20** |
+| 18 | rule 2's shared budget is `budgetMs × budgetK()` — 3 ms at K=1, 120 ms at K=40 | unchanged |
+
+Gate 18 keeps E's scaler on rule 2 only, matching the five engine sites where E
+already scales the count budgets. `lib/fly/harness-budget.js` is imported by the
+gate **for real** (copied beside the shim, not inlined), so it exercises E's
+actual clamp and its actual `typeof window === 'undefined'` branch rather than a
+stand-in that agrees with my reading of it — that branch is also why the K arm
+has to define a `window`.
+
+### The sentence in my own header that was false
+
+> "Neither rule can starve a chunk: a deferred chunk keeps its place in
+> `pendingFinalize` and is retried next frame."
+
+"Retried next frame" is worth nothing if next frame refuses on the same grounds
+forever. The claim was true of rule 2 and false of rule 1, and I wrote it while
+believing it of both. It is corrected in place in the module header, with the
+correction marked rather than quietly edited.
+
+### Still open, and NOT mine to close — flagged for E and Fable
+
+`sat-veg-engine.js:516` caps veg commits at `FINALIZE_PACE.vegPerFrame` (1)
+whenever `finalizePaceOn()`, and **E's `budgetK()` does not scale it** — it is
+the one budget site of the six that the scaler misses. This is a *different and
+much milder* shape than the rule 1 defect: a cap of 1 per frame still makes
+monotone progress, where rule 1 made none. But at 1 fps it is one veg chunk per
+second, so any veg content gate on this venue will read a partially populated
+world and should either raise `vegPerFrame` via the pin or wait proportionally.
+I have not touched it: it is E's file and E's seam.
+
+### Lessons
+
+1. **A threshold on an absolute frame time is a threshold on the user's
+   hardware.** "Long" only means anything relative to what that machine normally
+   does. Every fixed-millisecond frame-time comparison in this codebase deserves
+   the same question asked of it.
+2. **A pacing rule that can refuse must have a starvation cap**, independent of
+   how sound its per-frame reasoning is. The cap is not a workaround for a bad
+   heuristic; it is the property that makes the heuristic safe to ship.
+3. **My first instinct — "the venue is slow, give it a harness seam" — was the
+   wrong shape**, and would have hidden a live user-facing defect behind a test
+   flag. When a feature misbehaves *only* on the slowest machine available, that
+   is not evidence it is a venue artifact. It is the machine where a graded
+   defect became measurable.
+4. **A shipped flag is not a certified flag.** FINALIZE_PACE was flipped ON at
+   the close with all its gates green, because every one of those gates fed it
+   frame times from a healthy machine. The gate suite tested the rule I meant to
+   write, not the rule on the hardware users have.
+
+---
+
+## §15 Pass-2b step-clean: the rig was not the only writer — r3f was the other
+
+Second defect found in a shipped R24 feature, and the same shape as §14: a
+claim in a header that I never measured.
+
+### What pass 2b measured
+
+Tree `ec53fd3`, STEP_SAFE + LADDER_FIX ON, DPR 1.5, governor pin released:
+6 forced steps, **12 DPR applications, exactly 6 inside a rAF and 6 outside**,
+and **12 of 30 canvas.width/height writes outside a frame**. Each outside
+application carries the **same value** as the inside one, 46–117 ms later:
+
+    setPixelRatio: {d:1.25,inRaf:true, t:178239.6}
+                   {d:1.25,inRaf:false,t:182942.8}
+                   {d:1.5, inRaf:true, t:184117.3}
+                   {d:1.5, inRaf:false,t:184181.2}   …
+
+Same value, one per step, shortly after. That is not a race and not the
+governor stepping twice — it is a **second writer applying what the rig has
+already applied**.
+
+### The chain, named exactly
+
+`FlyCanvas` holds the DPR in **React state** and passes `<Canvas dpr={dpr}>`.
+The `setDpr` the rig calls is that React setter, not r3f's store setter. So:
+
+1. rig applies to three inside the frame (`setPixelRatio` → `setSize` →
+   `composer.setSize`) — the 6 inside applications;
+2. rig calls `setDpr(d)` → React schedules a render;
+3. on commit, r3f's `Canvas` layout effect runs
+   `await root.current.configure({ …, dpr, … })` — an **await**, so the store
+   write lands a task later (`@react-three/fiber` 9.6.1,
+   `react-three-fiber.esm.js:62-77`);
+4. r3f's zustand subscriber then re-applies, unconditionally
+   (`events-b389eeca.esm.js:1158-1166`):
+
+        if (size.width !== oldSize.width || … || viewport.dpr !== oldDpr) {
+          updateCamera(camera, size);
+          if (viewport.dpr > 0) gl.setPixelRatio(viewport.dpr);
+          gl.setSize(size.width, size.height, updateStyle);
+        }
+
+   — outside any animation frame. The 6 outside applications.
+
+The arithmetic checks out exactly. Per application three does one
+`setPixelRatio` (which internally calls `setSize` once) plus one explicit
+`setSize` = 1 + 2. Six rig applications and six r3f applications give
+**12 setPixelRatio and 24 setSize**, which is precisely what the log reports,
+with half of each outside.
+
+It cannot be pre-empted from the rig: `configure` is async, and the subscriber
+is captured in `createRoot`'s closure with nothing exported to reach it.
+`flushSync` does not help either — the `await` defers the store write past the
+flush.
+
+### What I got wrong, in my own words
+
+The rig's header said:
+
+> r3f's own catch-up then re-applies identical numbers on its next commit, and
+> **Chromium does not reallocate on an unchanged `canvas.width`** — which is
+> why calling `setDpr` here as well is not a second resize.
+
+I never measured that, and the HTML spec says the opposite: assigning `width`
+or `height` resets the canvas bitmap. I knew there was a second writer — I
+wrote it down — and then argued it away with an unverified claim instead of
+either measuring it or removing it. **That is how a second writer survived a
+design whose entire claim is that there is one writer.** Both headers now carry
+the retraction rather than a quiet edit.
+
+### The fix: `installResizeGuard`
+
+When the rig owns the step, a resize request for the state the renderer is
+**already in** must not reach the canvas. The rig installs an instance-level
+guard on `gl.setPixelRatio` / `gl.setSize` from an effect keyed on the
+renderer, and removes it on unmount.
+
+It skips **only** redundancy, never work:
+
+- a real DPR step resizes (its target differs);
+- a real container resize resizes (same, on the other axis);
+- an unsettled CSS style is not "already satisfied" and delegates;
+- `xr.isPresenting` and a non-null `renderer.output` **always** delegate,
+  because three takes different paths there and a skip would drop
+  `output.setSize`. The app sets neither — this is insurance, not a live case.
+
+On a skip it still calls `setViewport(0, 0, w, h)`, which is the one side
+effect three's `setSize` has that a bare `return` would drop. That makes the
+skip a **semantic no-op** rather than a behaviour change, which is the only
+form of suppression worth shipping.
+
+### Why not the other three options
+
+| option | why not |
+|---|---|
+| stop calling `setDpr` from the rig | `viewport.dpr` goes stale, and the next genuine container resize re-applies the STALE dpr from r3f's subscriber — it would undo the governor's step |
+| `flushSync(() => setDpr(d))` | r3f's `configure` is `await`ed, so the store write lands after the flush regardless |
+| shadow `canvas.width`/`height` with a no-op setter | suppresses the *reallocation* but not the *call*, so `verify-step-clean` (3) stays red — and its greenness would then depend on whether my instance property or the harness's prototype patch is outermost. A fix whose proof depends on instrumentation ordering is not a fix |
+
+### Proof — `scripts/verify-step-guard.mjs`, NEW, 13 gates
+
+The browser gate can only see the consequence, so the whole **decision table**
+is pinned in node against a fake renderer that reimplements three r185's
+`setPixelRatio`/`setSize` verbatim and counts canvas assignments. **Gate 0
+re-derives that fake from `three.module.js`'s real source text** (seven
+behaviours), so the fake cannot rot into agreeing with a guard that is wrong.
+
+RED-calibrated by neutering the guard: **gates 2 and 10 fail** (4 canvas writes
+on a redundant catch-up; owner LOST after a StrictMode double-mount). Gate 1 is
+a standing RED control — it runs an *unguarded* renderer through the same
+redundant catch-up and asserts it writes, so the gate carries its own
+before-picture on every run.
+
+Two instrument bugs of my own, caught on the first run and both worth naming:
+
+1. the fake counted a canvas write only when the **value changed**, so it
+   scored the defect **zero** and gate 1 went red on a correct guard. A
+   reallocation happens on every assignment; that is the entire defect.
+2. the shim bound `const STEP_SAFE = globalThis.__sgCfg` **once at import**, so
+   the flag-OFF row silently tested the flag-ON build. Now getters.
+
+Both are the §9b family again — *an instrument that cannot express the defect
+cannot certify the fix* — and both were caught because the gate had a RED arm
+to disagree with.
+
+### What this means for `verify-step-clean` — E's gate, unchanged
+
+`verify-step-clean.js` is **E's** (`686db21`), so I did not touch it, and it
+**needs no change**: its assertions (2) "every canvas.width/height write is
+inside a rAF" and (3) "every `gl.setPixelRatio`/`gl.setSize` is inside a rAF"
+are already the right ones, they failed honestly on the defect, and the guard
+makes them true. Fable's suggested "exactly one application per step, inside
+the frame" is a *stronger* claim and a good one — the guard satisfies it, and
+`window.__flyStats.stepGuard` now counts suppressed calls so a browser gate can
+assert it directly — but adding it is E's call, not mine.
+
+Note for the re-take: (3b) already passed at 0/6 before this fix, because the
+rig owns the composer resize and r3f never touches the composer. And (4)
+`bufferMatchesDrawing` was **0 mismatched of 43** (pass 1: 22 of 46), so the
+user-facing symptom was already closed by the rig alone — this fix closes the
+*mechanism claim*, which is what stops it coming back.
+
+### Lessons
+
+1. **A design whose claim is "there is exactly one writer" must enumerate the
+   writers.** I had r3f's catch-up written down in my own header and reasoned
+   it away instead of counting it.
+2. **An unmeasured platform claim is the most dangerous kind of comment**,
+   because it reads like a fact and closes the question for the next reader —
+   who was me, twice.
+3. **Suppression is only safe when it is a semantic no-op.** The `setViewport`
+   on the skip path is what separates this from "return early and hope".
+4. **Prefer the fix whose proof does not depend on instrumentation ordering.**
+
+---
+
+## §16 The pass-2b toy-boot pageerror: WB-10's index was never wrapped
+
+Third defect in a shipped R24 feature, same family as §14 and §15 and the
+cheapest of the three to have prevented. **Attributed by B**, from a headless
+attribute census, and confirmed from source by Fable before it reached me — I
+am recording that plainly because the finding is not mine.
+
+### The defect
+
+`BufferGeometry.setIndex(x)` wraps `x` in a `BufferAttribute` **only** when
+`Array.isArray(x)` is true (three r185, `three.core.js:18404`):
+
+    setIndex( index ) {
+      if ( Array.isArray( index ) ) {
+        this.index = new ( arrayNeedsUint32( index ) ? Uint32BufferAttribute
+                                                     : Uint16BufferAttribute )( index, 1 );
+      } else {
+        this.index = index;                     // ← a typed array lands HERE
+      }
+    }
+
+`Array.isArray` is **false** for a typed array. WB-10 changed the merged land
+index from a plain array to a `Uint32Array` and left the call as
+`geo.setIndex(idx)`, so `geometry.index` became a raw `Uint32Array` with no
+`.array` and no `.count`. Nothing structural notices — the scene graph, the
+counts and the draw list are all correct — and then `WebGLAttributes` reads
+`attribute.array.byteLength` at first upload and throws, **once per land mesh**.
+
+That is the pass-2b toy-boot pageerror: `Cannot read properties of undefined
+(reading 'byteLength')`, ×31 on ladder-fix and ×3 on ladder-red, on **both**
+arms — both arms because the flag was ON in both.
+
+**Why pass 1 was clean and pass 2b was not:** the flag-OFF branch builds a
+plain array, which three wraps *and* sizes for you. The bug was reachable only
+with FINALIZE_PACE armed, and FINALIZE_PACE was flipped ON at the close.
+
+### The 2×2, reproduced here
+
+B's `scripts/r24-b-attr-proof.js` (r24/b `8bb4164`), run against this worktree
+through a symlinked probe root so nothing of B's lands on r24/a:
+
+| tree | FLASH_GUARD | FINALIZE_PACE | broken meshes |
+|---|---|---|---|
+| shipped line restored | off | **on** | **80** (every land mesh) |
+| shipped line restored | off | off | 0 |
+| **fixed** | off | **on** | **0** |
+| **fixed** | on | on | 0 |
+| **fixed** | off | off | 0 |
+| **fixed** | on | off | 0 |
+
+160 meshes over 138 chunks, 80 ready. B's numbers reproduce exactly.
+
+### The fix, and the half of it that is easy to miss
+
+1. **Wrap it** — `idx = new BufferAttribute(merged, 1)`.
+2. **Keep the width three would have chosen.** Defaulting to `Uint32Array`
+   would have silently **doubled every toy land index buffer**, which is the
+   exact opposite of what WB-10 exists to do (B's note 1). So the armed branch
+   mirrors `arrayNeedsUint32` (`three.core.js:1779`): `Uint16Array` unless some
+   index is `>= 65535`. The bound is **65535 and not 65536** in three's own
+   source — `PRIMITIVE_RESTART_FIXED_INDEX`, three #24565 — so it is mirrored,
+   not re-derived.
+
+An element of the merged array is either a `groundIdx` value or
+`data.idx[k] + off`, so three's "any element ≥ 65535" **decomposes exactly**
+into two scans and the array never has to be built twice to be measured.
+
+It is scanned, **not inferred from `total - 1`**. A bound is not the same claim
+as a maximum: if the chunk has ≥ 65536 vertices but no index actually reaches
+65535, three picks `Uint16` and an inferred answer would pick `Uint32` — the
+two paths would then differ in TYPE while agreeing in values, which is exactly
+the equivalence this is supposed to preserve.
+
+### Every other `setIndex` in reach, checked rather than assumed
+
+23 call sites. Three pass a bare variable; the rest already pass a
+`BufferAttribute` or an array literal.
+
+| site | argument | verdict |
+|---|---|---|
+| `toy-world-engine.js:1007` | typed array under the flag | **THE DEFECT — fixed** |
+| `SatTintLayer.jsx:124` | `new BufferAttribute(new Uint32Array(...), 1)` | safe, read it myself |
+| `Contrail.jsx:89` | a plain `[]` built by `push` | safe, read it myself |
+| `PrecipLayer.jsx:176` | an array literal | safe |
+| 19 others | `new BufferAttribute(...)` | safe |
+
+Fable told me two of those answers in advance and both were right; I read them
+anyway, because "someone said it was fine" is how §15 happened.
+
+### Proof
+
+`verify-finalize-pace` 17 → **21 gates**, RED-calibrated by restoring the
+shipped line: **8, 19 and 20 fail**.
+
+- **19** the index is wrapped, and no `setIndex(new Uint…)` survives anywhere;
+- **20** the width mirrors `arrayNeedsUint32` and the constant is present;
+- **21** reads the threshold out of `three.core.js`'s **real source text** and
+  compares it to ours, so a three bump that moves the number fails here instead
+  of silently desynchronising the two paths;
+- **22** *executes the decision*: `INDEX_U32_MIN` and `anyAtLeast` are lifted
+  verbatim out of the engine (both are module-level and import nothing) and run
+  against three's own predicate over the array the flag-OFF branch actually
+  builds, across 7 cases — including exactly-at-the-bound both ways, and the
+  case where it is the OVERLAY's offset that crosses the line. All 7 agree.
+
+Gate 22 is deliberately not a restatement of the rule. A gate that re-implements
+the logic it is checking agrees with the author, not with three.
+
+The flag-OFF branch is **untouched** — the diff contains no `-`/`+` line inside
+it, and gate 9 still asserts the upstream spread verbatim.
+
+### Lessons
+
+1. **Changing a container type is an API change, not an optimisation.** WB-10
+   read as "same values, same order, only the container changes" — and the
+   container was precisely what `setIndex` branches on.
+2. **A flag-gated micro-optimisation inherits the flag's blast radius.** This
+   was unreachable until the close flip, so every gate that had ever run on it
+   ran on the other branch. §14 was the same sentence about a different feature.
+3. **When you replace what a library was doing for you, replace ALL of it.**
+   three was not only wrapping the array, it was choosing its width. Taking over
+   the first job and not the second is how the "optimisation" would have doubled
+   the buffer it set out to shrink.
+4. **Read the sites you were told are fine.** Two of the three bare-variable
+   call sites had already been cleared for me; reading them cost a minute and is
+   the only reason I can put my name on the table above.
+
+---
+
+## §17 The seventh harness-budget site (E CERT's find)
+
+E CERT attributed pass 2b's **longest single stall — 3660 ms under
+`[finalize:sat-roads x16]`** — to `sat-road-engine.js`: its finalize bound was a
+bare module const, `done < FINALIZE_PER_FRAME`, that `budgetK()` never touched.
+Every other engine reads `perFrame * budgetK()`. At K=40/200 every other engine
+speeds up and roads does not, so the road ring starves and the stall
+concentrates exactly where `markPhase` pointed — the attribution hook finding
+the site it was built to find.
+
+E offered it rather than taking it, because the scaler idiom is mine. Fixed with
+the same shape as the veg site (`59b4e97`):
+
+    const perFrame = Math.max(1, FINALIZE_PER_FRAME * budgetK());
+
+`budgetK()` is exactly 1 without `FLY_FINALIZE_BUDGET_K`, so the production
+arithmetic is byte-identical.
+
+**Gate 23** pins the expression, the loop bound and the import together, the way
+gate 10 does for veg — an assertion that moves WITH the expression it guards
+rather than merely tolerating it.
+
+**The site census is INFO here, not a gate, and deliberately.** Five of the
+seven sites do not exist on `r24/a` — they are E's, and they arrive at the
+merge. A census asserting "all seven carry the scaler" would be RED on this
+branch and green only after integration, which is a gate that measures the
+BRANCH rather than the code. It prints `1/9 on this branch` and says so.
+**Promote it to a gate on the merged tree** — that is the right home for it, and
+it is the row that would have caught this site and the veg site both.
+
+---
+
+## §18 The Owens breach: retention was charging rent in draw calls
+
+Pass 2b held every yaw contract — merges 35 → 0, on-screen replacements 27 → 0,
+0 URL and 0 position mismatches, no page errors — and broke the frozen desert
+control: **Owens draws off 152 / on 279**, ceiling 261.
+
+### The measurement that named it
+
+E's addendum is what settled the mechanism, and it did so without a renderer:
+the SAME pose with the SAME flags read **185 draws after a 45 s sweep and 279
+after a 600 s sweep**, resident tiles 62 → 103, at 113.7 MB and still climbing.
+The only variable was **how long the camera had been turning**.
+
+That is not a cull margin and not a one-off pose. It is **retention with no
+bound and no separation between being RESIDENT and being ISSUED** — draw calls
+that grow for as long as the session runs. On a real GPU at 60+ fps the
+accumulation is an order of magnitude faster than on this fixture, and the user
+was flying `8240539` while this was being read.
+
+### Attribution, switch by switch
+
+Measured on one synthetic yaw against the real vendored classes:
+
+| arm | issued | off-frustum | maxZ |
+|---|---|---|---|
+| flag-off | 103 | 83 | 13 |
+| mergeHysteresis | 103 | 83 | 13 |
+| timerFix | 103 | 83 | 13 |
+| walkWhileSaturated | 103 | 84 | 13 |
+| bboxCache | 103 | 83 | 13 |
+| **keepResident** | **190** | **142** | **17** |
+| ON (all) | 190 | 142 | 17 |
+| ON minus keepResident | 103 | 84 | 13 |
+
+**`keepResident` alone.** Every other switch reads identical to flag-off, and
+removing keepResident from the full ON set returns the flag-off number exactly.
+
+Two of the three hypotheses are refuted by measurement rather than argument:
+
+- **Not double-issue.** `doubleIssued` is **0 in both arms** — a parent and its
+  children are never drawn together. The shape that would have produced exactly
+  this (+41 tiles, ×2.4 tris) does not occur, because `_loadSubTiles` unloads
+  the parent's model on the success path and `_removeSubTiles` unloads the
+  children on its own.
+- **Not `bendSphere`.** It ships `false` and is never armed; my own constants
+  comment already said it "necessarily submits tiles that are culled today".
+
+What is left is the honest finding: keepResident retains everything the camera
+has ever refined, in every direction, and **all of it stayed attached to the
+scene graph**.
+
+### The fix, in two halves — because the requirement is two things
+
+**1. Retention must not cost draw calls (PATCH 26, `TERRA_PACE.parkOffscreen`).**
+A tile out of frustum keeps its model, its textures and its place in the tree —
+nothing disposed, nothing re-downloaded — but its **model** is parked invisible,
+so three skips the whole subtree in `projectObject`: no draw, and no per-mesh
+cull either. Coming back is one boolean.
+
+It is the MODEL that is parked, never the tile: a tile's children hang off the
+tile, so hiding the tile would hide in-frustum descendants. And a parent whose
+box contains an in-frustum child is itself in frustum, so a visible tile can
+never be orphaned behind a parked ancestor.
+
+| 240-frame yaw | unparked | parked |
+|---|---|---|
+| issued (drawable) | 190 | **48** |
+| issued OFF-FRUSTUM | 142 | **0** |
+| resident tiles | 190 | **190** (unchanged) |
+| merges / refetches | 0 / 0 | 0 / 0 |
+
+And the property that actually closes pass 2b — **the drawn set stops growing
+with sweep duration**: unparked it climbs (142 → 151 from 240 to 720 frames);
+parked it is bounded by the frustum (48 → 39), which is the only thing that
+should bound it.
+
+**No upstream line is edited.** The `_update` pre-pass computes `_inFrustum` on
+its own added line so the upstream comma-expression stays byte-verbatim — the
+vendor gate's edited-line count does not move, and gate 8 stays at 2.
+
+**2. Residency has a cap, and an LRU that is a real recency order.**
+`TILES.lruBudgetBytes` (140 MB) was the only trigger, and pass 2b proved a byte
+budget alone is not a bound: Owens sat at **113.7 MB the whole time**, under
+budget, while the tile count doubled — so this module elected **nothing**. *A
+budget a session cannot reach is not a budget.* Tiles are also what cost draw
+calls, and draw calls are the frozen ceiling, so the count is the honest second
+unit: `TERRA_PACE.residency.maxResidentTiles`.
+
+The LRU is now ordered by **last visible frame** (PATCH 26 stamps
+`_r24LastVisible` on every walk that sees a tile in frustum), distance breaking
+ties. A tile just behind you after a 180° turn is CLOSE but stale, and is the
+right thing to shed before something far away you are flying toward — distance
+alone gets that backwards.
+
+### The headline had to survive its own brake
+
+The round's headline is *zero refetches on yaw*. A cap below a full 360°
+working set would evict on every turn and kill it. So the cap is **measured
+against the working set, not guessed**:
+
+| cap | resident | merges | refetches | on-screen swaps |
+|---|---|---|---|---|
+| none | 190 | 0 | 0 | 0 |
+| **260 (shipped)** | 190 | **0** | **0** | **0** |
+| 120 | 144 | 80 | 80 | 4 |
+| 60 | 137 | 72 | 72 | 6 |
+
+Gate 26 asserts the shipped cap **exceeds the measured working set**, reading
+the constant out of `fly-constants.js` — so editing the cap without re-measuring
+fails the gate rather than silently reintroducing the churn.
+
+### What a cap is NOT, stated rather than papered over
+
+Driving the cap to 120 sheds real tiles (80 elections, 190 → 144) but does not
+reach 120, and at 60 it settles at 137. That is by design: the election is
+**out-of-frustum only**, because collapsing a tile the camera is looking at is
+pure thrash — the next walk refines it straight back. So the cap is a **brake on
+a set still being refined, converging toward the in-frustum floor**, not a hard
+ceiling. Gate 28 asserts exactly that shape. A gate asserting `resident <= cap`
+would be asserting something this design deliberately does not promise, and
+would have been a lie that passed.
+
+The 4 and 6 on-screen replacements at those tight caps are the upstream defect
+resurfacing under pressure — recorded because it is the honest cost of an
+aggressive cap, and the reason the shipped one has headroom.
+
+### Gates
+
+`verify-terra-residency` 22 → **32**. RED-calibrated by neutering `r24Park`:
+**20, 23 and 24 fail** (off-frustum issued 142 → 142; the growth contrast can no
+longer be demonstrated). The census counts what three would DRAW — a model
+attached AND visible through every ancestor — not merely what is attached,
+because visibility is the entire mechanism.
+
+### What this does NOT claim
+
+The residual in-frustum count is still higher than flag-off (20 → 48 on the
+fixture yaw), because the trio lets the tree reach z17 where upstream's
+collapse-on-yaw pinned it at z13. **That is more detail, not leakage**, and it
+is the part of the draw delta that parking cannot remove. Whether Owens now
+lands under 261 live is E's re-take to measure, not mine to assert: this
+container has no renderer, and every number above is a count or a decision.
+
+### Lessons
+
+1. **Resident and issued are different questions**, and a design that conflates
+   them will pay for retention in draw calls forever. The fix was not to retain
+   less; it was to stop drawing what was retained.
+2. **A budget nothing ever reaches is not a budget.** 140 MB looked like a cap
+   for a whole round and had never once fired.
+3. **Pick the unit the ceiling is denominated in.** The frozen number is draw
+   calls; the brake was in megabytes.
+4. **An LRU ordered by distance is not an LRU.** Recency and proximity disagree
+   exactly where turning is involved, which is the case this round exists for.
+5. **The duration was the variable.** Two runs of the same pose with the same
+   flags, differing only in how long the camera turned, named the mechanism
+   before any renderer was involved.
+
+---
+
+## §19 The 14 "refetched" DEM URLs: shared ancestors, not re-downloads
+
+E's standalone lod-fade row on `9bcaace` (pre-parkOffscreen, trio ON, no pace
+pin on either leg) is the strongest form of the residency result so far: over a
+full **360° arc at 0.85°/frame with the position frozen, 0 tile
+re-appearances**, `refetchParent 0`, `merge 0`. On the same run gate (6) read
+**14 of 552 distinct tile URLs refetched, worst 4× `/dem/15/8822/12386.png`** —
+and **every one of them DEM; no imagery URL was ever refetched.**
+
+### The asymmetry is the answer
+
+Imagery's ceiling is `satMaxZoomFor(tier)` = **17** at high tier. The DEM's is
+`TILES.demMaxZoom` = **15** (the Terrarium data ceiling). So imagery never
+exceeds its own source ceiling and every imagery tile gets its own URL. A tile
+deeper than a source's `maxLevel` does not, and that is upstream's own rule —
+vendored `index.js`, `de()`:
+
+    if (r <= i.maxLevel) return { url: i.getUrl(e, t, r), clipBounds: [0,0,1,1] };
+    const n = He(e, t, r, i.maxLevel), s = n.coord;
+    return { url: i.getUrl(s.x, s.y, s.z), clipBounds: n.bounds };
+
+Past the ceiling, three-tile requests the **ancestor's** URL at `maxLevel` and
+clips it. `He(x, y, 16, 15)` has `s = 2**(16-15) = 2`, so all four z16 children
+of z15 `8822/12386` — `(17644..17645, 24772..24773)` — map to
+`{x: 8822, y: 12386, z: 15}`. **Four distinct tiles, one URL, four requests.
+`worst 4×`, exactly.** A z17 descendant makes it up to 16.
+
+**These are not refetches.** They are N distinct tiles legitimately sharing one
+ancestor resource, and a per-URL counter cannot tell that from one tile being
+downloaded twice.
+
+### Against Fable's three candidates
+
+| candidate | verdict |
+|---|---|
+| (a) R21 reason-coded TTL/backoff re-requesting a 200-empty-body DEM | **No.** No empty body is involved; the fixture served these tiles normally, and the backoff path is not on this code path at all. |
+| (b) skirt rebuild or `walkWhileSaturated` re-requesting DEM | **No.** Neither issues source URLs, and both would show in imagery too — imagery never duplicated once. |
+| (c) a residency gap for DEM under the byte trigger | **No.** `refetchParent 0`, `merge 0`, 0 re-appearances on that same run, and the byte trigger never fired (§18: 113.7 MB under a 140 MB budget). |
+| (d) upstream source-level clamping | **Yes**, and it is correct behaviour. |
+
+### Reproduced on my own harness
+
+My node gate could not see this, and the reason is worth naming: its request
+counter is keyed **per TILE** (`z/x/y`), so ancestor sharing is invisible to it
+and it reads a truthful `0 refetches` for a question it was not asking. Adding a
+per-DEM-URL counter reproduces E's shape immediately:
+
+    distinct DEM URLs      224
+    URLs requested >1x       4  (worst 9x)
+    TILE-level refetches     0
+
+Two counters, two different questions, both right.
+
+### The gates, so this is distinguishable BY NAME
+
+**29** the DEM ceiling really is below the imagery ceiling (read from
+`TILES.demMaxZoom`, so raising it re-derives the prediction rather than
+invalidating the row); **30** residency holds at the TILE level — 0 tile
+refetches, 0 `refetchParent`, 0 merges; **31** every duplicated DEM URL is a
+ceiling-clamped ancestor at exactly `z = demMaxZoom`, never a re-download.
+
+Gate 31 is the one that earns its place: a real DEM refetch would duplicate a
+URL whose z is **not** the ceiling, and would be named rather than excused as
+sharing. The prediction comes from the tile census and the observation from the
+request log, so the two can disagree.
+
+### Do the same 14 recur on the parked tree?
+
+**Yes, unchanged** — reasoned from the code, for E to measure. `parkOffscreen`
+sets `model.visible`; the clamp fires in `de()` at LOAD time, long before
+anything is visible, so parking cannot touch it. The cap does not fire either
+(260 clears the working set). The count is a function of how many tiles the
+tree holds past z15 and nothing else.
+
+### What I could not supply
+
+Fable asked for the four fetch timestamps of that z15 tile against the sweep's
+frame clock. **The log carries counts only** — the fixture's `/__stats` `byUrl`
+is a count map with no timeline — so the timestamps do not exist in the
+artifact. Said plainly rather than reconstructed: the mechanism is deterministic
+from source and the arithmetic above is checkable without them, which is why
+this is a ruling and not a hypothesis.
+
+### Lessons
+
+1. **A per-URL counter and a per-tile counter answer different questions**, and
+   the difference is invisible until a source ceiling makes them disagree. Both
+   readings in E's log were correct; only their names collided.
+2. **An asymmetry in the data is the fastest attribution there is.** "All DEM,
+   no imagery" pointed at the one property the two sources do not share, and
+   the ceiling was the only candidate.
+3. This is the pass-1-gate-6 family again: *an instrument can report a real
+   number for a question nobody asked.*
+
+---
+
 ## §10 Commits
 
 | # | Commit | What |
@@ -865,18 +1790,21 @@ should run before every commit that adds a call site, not just before a merge.
 | 11 | `ed773b8` | M4 `FRAME_STEP` sim half + `verify-frame-step`; consumer opt-in NOT landed (§8c) |
 | 12 | `70b9f42` | E's `FRAME_STATS` `markPhase` attribution in the terrain + finalize paths (PATCH 25, by inversion) |
 | 13 | `f739cb3` | ledger §9/§10/§11 |
-| 14 | _(this commit)_ | **BLOCKER FIX**: the missing `pinned` import in CloudField.jsx (§9b) |
+| 14 | `8b91bc5` | **BLOCKER FIX**: the missing `pinned` import in CloudField.jsx (§9b) |
+| 15 | `5ddf5dc` | **W3 ship-state flip** (§12) + the ship-state gates and the three hardened control arms |
+| 16 | `5a41680` | row 8 recorded — the content probe answered on the fixture |
+| 17 | _(this commit)_ | §13 — pass-1 gate 6 attributed (NOT the LRU) + the per-frame yaw arc and gate 6's calibration guard |
 
 ### Gates added
 
 | Gate | Assertions | Venue |
 |---|---|---|
-| `scripts/verify-vendor-three-tile.mjs` | 19 | node, anywhere |
-| `scripts/verify-terra-residency.mjs` | 21 | node, anywhere |
-| `scripts/verify-skirt-fast.mjs` | 12 | node, anywhere |
-| `scripts/verify-skirt-worker.mjs` | 8 | node, anywhere |
-| `scripts/verify-finalize-pace.mjs` | 11 | node, anywhere |
-| `scripts/verify-frame-step.mjs` | 10 | node, anywhere |
+| `scripts/verify-vendor-three-tile.mjs` | 20 | node, anywhere |
+| `scripts/verify-terra-residency.mjs` | 22 | node, anywhere |
+| `scripts/verify-skirt-fast.mjs` | 13 | node, anywhere |
+| `scripts/verify-skirt-worker.mjs` | 9 | node, anywhere |
+| `scripts/verify-finalize-pace.mjs` | 12 | node, anywhere |
+| `scripts/verify-frame-step.mjs` | 11 | node, anywhere |
 | `scripts/verify-ladder-fix.js` | 13 | browser (toy boot, seconds); RED via `FLY_LADDER_RED=1` |
 | `scripts/verify-terra-live.js` | 9 | browser + E's fixture; **has not completed here** (§9) |
 

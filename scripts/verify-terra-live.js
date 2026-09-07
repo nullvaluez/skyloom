@@ -23,15 +23,41 @@
  *   3. The frozen draw ceilings at the settled canonical poses, both arms.
  *
  * Every number here is a COUNT. This container renders on SwiftShader at ~1 fps,
- * so nothing about frame time is measured or claimed.
+ * so nothing about frame time is measured or claimed. Because the yaw sweep
+ * advances PER FRAME, a slow venue buys its arc with wall clock: set
+ * FLY_TERRA_SWEEP_MS (default 45000) high enough that both arms clear
+ * YAW_MIN_ARC_DEG, and the arc actually swept is printed beside gate 6's
+ * verdict — pass, fail or skip — so the reader never has to assume it.
+ *
+ * TODO WHEN THIS IS NEXT TOUCHED (no code change now — the gate is mid-
+ * certification): the content probe SILENTLY SKIPS tiles whose material has no
+ * map yet, so its "0 mismatches" is over the tiles it could test, not over the
+ * resident set. Pass 1 measured 0/62 URL against 64 resident tiles, and the two
+ * it skipped were mid-load — the likeliest moment for a mismatch if one
+ * existed. Count the skipped tiles and report them beside the total, so the
+ * denominator is visible in the output rather than only in the ledger.
  */
 const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
+const { attachPageErrors } = require('./_pageerrors');
 const { attachFixture } = require('./_fixture');
 
 const URL_ = process.env.FLY_URL || 'http://localhost:3101';
 const SETTLE = Number(process.env.FLY_TERRA_SETTLE_MS || 30000);
-const YAW_MS = Number(process.env.FLY_TERRA_YAW_MS || 45000);
+// Sweep length. FLY_TERRA_SWEEP_MS is the name to reach for; FLY_TERRA_YAW_MS
+// is kept as its alias so existing invocations do not move. The default is the
+// original 45000, so an unset environment is byte-identical to before this env
+// existed. On a ~1 fps venue 360 deg at 0.85 deg/frame is ~424 rendered frames
+// — roughly 7-8 minutes per arm — so gate 6 needs this raised there (600000
+// gives 10 minutes of headroom) rather than a lowered arc minimum.
+const YAW_MS = Number(process.env.FLY_TERRA_SWEEP_MS || process.env.FLY_TERRA_YAW_MS || 45000);
+// 0.85 deg/frame is 51 deg/s at 60 fps — a brisk but ordinary turn. It is a
+// PER-FRAME figure on purpose (see PIN_YAW): what must match across arms is the
+// ARC swept, not the wall-clock time spent.
+const YAW_DEG_PER_FRAME = Number(process.env.FLY_TERRA_YAW_DEG_PER_FRAME || 0.85);
+// Below this much swept arc the yaw leg has not brought a heading back round at
+// all, so its duplicate-URL column is not evidence in either direction.
+const YAW_MIN_ARC_DEG = Number(process.env.FLY_TERRA_YAW_MIN_ARC || 360);
 
 // Canonical poses (same numbers as verify-fixture, grepped from the fleet).
 const POSES = {
@@ -55,22 +81,44 @@ const PIN_POSE = ([lat, lon, altM, heading, pitch]) => {
   }, 8);
 };
 
-/** Spin the heading in place: the camera never moves, only its yaw. */
-const PIN_YAW = ([lat, lon, altM]) => {
+/**
+ * Spin the heading in place: the camera never moves, only its yaw.
+ *
+ * PER FRAME, NOT PER SECOND — and that distinction is why pass 1's gate 6 read
+ * 1 -> 17. Driving the heading off the wall clock at ~51 deg/s is 0.85 deg per
+ * FRAME at 60 fps but ~51 deg per FRAME on this ~1 fps container. At 51
+ * deg/frame the camera does not sweep, it teleports: any tile that starts
+ * refining this frame is out of the frustum by the time its children land, so
+ * upstream's post-await re-check in `_loadSubTiles` throws the download away
+ * (`unloadSubTiles`) and refetches it when the heading comes back round. That
+ * is a real upstream waste path, but the venue manufactures it, and an arm that
+ * manufactures the thing it is measuring is not an arm.
+ *
+ * Driving from rAF makes the ARC the constant instead of the time: both arms
+ * sweep the same degrees whatever the frame rate. The achieved arc is published
+ * so the gate can refuse to compare two arms that did not sweep the same
+ * distance.
+ */
+const PIN_YAW = ([lat, lon, altM, degPerFrame]) => {
   window.__fly.warpToGeo(lat, lon, { altM, name: null });
   const f = window.__fly.flight;
   const p = { x: f.pos.x, y: f.pos.y, z: f.pos.z };
   if (window.__fxPin) clearInterval(window.__fxPin);
-  const t0 = performance.now();
-  window.__fxPin = setInterval(() => {
+  if (window.__fxYawRaf) cancelAnimationFrame(window.__fxYawRaf);
+  window.__fxYaw = { frames: 0, deg: 0 };
+  const step = () => {
+    window.__fxYawRaf = requestAnimationFrame(step);
+    window.__fxYaw.frames++;
+    window.__fxYaw.deg += degPerFrame;
     f.pos.x = p.x;
     f.pos.y = p.y;
     f.pos.z = p.z;
-    f.heading = ((performance.now() - t0) / 1000) * 0.9; // ~51 deg/s
+    f.heading = (window.__fxYaw.deg * Math.PI) / 180;
     f.pitch = -0.25;
     f.bank = 0;
     f.speed = 0;
-  }, 8);
+  };
+  step();
 };
 
 /**
@@ -148,13 +196,68 @@ const CONTENT_PROBE = () => {
 
 const CENSUS = () => {
   const st = window.__flyStats || {};
+  // E (R24, after pass 2b): RESIDENT vs VISIBLE, split at the pose.
+  //
+  // Pass 2b's Owens breach (draws 152 -> 279 against a frozen 261) is
+  // ambiguous from draws alone: a residency change and a culling change look
+  // identical in that number. They are different defects with different fixes,
+  // so the census reports both halves — tiles HELD in the tree, and tiles
+  // actually issued to the draw list — and the ratio between them. A residency
+  // fix moves `resident`; a culling fix moves `visible` while `resident`
+  // stands still.
+  let resident = 0;
+  let visible = 0;
+  let withModel = 0;
+  let parked = 0; // has a model, but the model is parked invisible (PATCH 26)
+  const map = window.__flyTerra?.engine?.()?.map ?? window.__flyTerra?.get?.();
+  const stack = map ? [map] : [];
+  while (stack.length) {
+    const n = stack.pop();
+    if (!n) continue;
+    if (n.isTile) {
+      resident++;
+      if (n.model) {
+        withModel++;
+        if (n.model.visible === false) parked++;
+      }
+      // "Issued to the draw list" is the MODEL's visibility, the tile's, and
+      // every ancestor's.
+      //
+      // THE MODEL'S FLAG IS THE ONE THAT MOVES, and reading only the tile's
+      // would have made this census blind to the very fix it exists to
+      // measure. A's PATCH 26 parks `model.visible = inFrustum` and
+      // DELIBERATELY never touches the tile (VENDOR.md #26: "a tile's children
+      // hang off the tile, and a parent whose box contains an in-frustum child
+      // is itself in frustum, so a visible tile can never be orphaned behind a
+      // parked ancestor"). A census that tested `n.visible && !!n.model` would
+      // have reported `visible` UNCHANGED across the fix — the §6 failure mode,
+      // in the instrument written to adjudicate it, caught by reading the
+      // owner's patch before the run rather than explaining a flat number
+      // afterwards.
+      //
+      // The ancestor walk stays: an invisible parent hides a visible child and
+      // Object3D.traverse does not stop at one (R19 §5's instrument artifact,
+      // which indicted actors it had merely failed to exclude).
+      let vis = !!n.visible && !!n.model && n.model.visible !== false;
+      for (let a = n.parent; vis && a; a = a.parent) if (a.visible === false) vis = false;
+      if (vis) visible++;
+    }
+    const k = n.children;
+    if (k) for (let i = 0; i < k.length; i++) stack.push(k[i]);
+  }
   return {
     draws: st.drawCalls ?? null,
     tris: st.triangles ?? null,
     lod: window.__flyTerra?.lod?.() ?? null,
     mem: window.__flyTerra?.mem?.() ?? null,
+    resident,
+    withModel,
+    visible,
+    parked,
   };
 };
+
+const { notCalibrated, notCalCount, notCalSummary } = require('./_notcal');
 
 let pass = 0;
 let fail = 0;
@@ -180,18 +283,29 @@ async function settleDraws(page, ms) {
 async function runArm(context, fx, paceOn) {
   const page = await context.newPage();
   const errs = [];
-  page.on('pageerror', (e) => errs.push(String(e.message).slice(0, 160)));
-  if (paceOn) {
-    await page.addInitScript(() => {
-      window.__flyTerraPaceOverride = {
-        enabled: true,
-        timerFix: true,
-        mergeHysteresis: true,
-        keepResident: true,
-        skirtFast: true,
-      };
-    });
-  }
+  const errsNote = attachPageErrors(page, errs);
+  // Both arms pin EXPLICITLY. Since the R24 close the constants ship ON, so an
+  // unpinned "off" arm would silently be the on arm — an A/B whose control is
+  // the treatment. The arm states what it wants in both directions.
+  await page.addInitScript((on) => {
+    window.__flyTerraPaceOverride = on
+      ? {
+          enabled: true,
+          timerFix: true,
+          mergeHysteresis: true,
+          keepResident: true,
+          skirtFast: true,
+        }
+      : {
+          enabled: false,
+          timerFix: false,
+          mergeHysteresis: false,
+          keepResident: false,
+          skirtFast: false,
+          walkWhileSaturated: false,
+          bboxCache: false,
+        };
+  }, !!paceOn);
   // The fleet's bootFly hard-codes a 30 s wait for the GL canvas to become
   // VISIBLE after __flyBoot.pct hits 100. Under SwiftShader with the fixture's
   // full world that reveal fade can outlast it. This gate needs the RUNTIME,
@@ -232,10 +346,15 @@ async function runArm(context, fx, paceOn) {
   };
   await safe(() => fx.resetStats(), null);
   await page.evaluate(() => window.__flyTerra?.reset?.());
-  await page.evaluate(PIN_YAW, POSES.powell);
+  await page.evaluate(PIN_YAW, [...POSES.powell.slice(0, 3), YAW_DEG_PER_FRAME]);
   await page.waitForTimeout(YAW_MS);
+  const yawArc = await page.evaluate(() => window.__fxYaw ?? { frames: 0, deg: 0 });
   const yawStats = await safe(() => fx.stats(), { byKind: {}, byUrl: {} });
   const yawCensus = await page.evaluate(CENSUS);
+  console.log(
+    `    yaw arc: ${yawArc.deg.toFixed(0)} deg over ${yawArc.frames} frames ` +
+      `(${(yawArc.frames / (YAW_MS / 1000)).toFixed(1)} fps)`
+  );
   console.log(`    yaw sweep: merges ${yawCensus.lod?.merge}, replacedOnScreen ${yawCensus.lod?.replacedOnScreen}, ` +
     `refetchParent ${yawCensus.lod?.refetchParent}, imagery requests ${yawStats.byKind?.img ?? 'n/a'}`);
 
@@ -245,10 +364,18 @@ async function runArm(context, fx, paceOn) {
     await page.evaluate(PIN_POSE, p);
     await settleDraws(page, SETTLE);
     poses[name] = await page.evaluate(CENSUS);
-    console.log(`    pose ${name}: draws ${poses[name].draws} tris ${poses[name].tris} residentMB ${poses[name].mem?.residentMB}`);
+    console.log(
+      `    pose ${name}: draws ${poses[name].draws} tris ${poses[name].tris} residentMB ` +
+        `${poses[name].mem?.residentMB} · tiles resident ${poses[name].resident} ` +
+        `(with a model ${poses[name].withModel}, parked ${poses[name].parked}) visible ` +
+        `${poses[name].visible}` +
+        (poses[name].resident
+          ? ` = ${((100 * poses[name].visible) / poses[name].resident).toFixed(0)}% drawn`
+          : '')
+    );
   }
   await page.close();
-  return { content, yawStats, yawCensus, poses, errs, bootFallback };
+  return { content, yawStats, yawCensus, yawArc, poses, errs, errNote: errsNote(), bootFallback };
 }
 
 (async () => {
@@ -273,6 +400,7 @@ async function runArm(context, fx, paceOn) {
     content: { total: 0, withUrl: 0, urlMismatch: 0, posMismatch: 0, bad: [] },
     yawStats: { byKind: {}, byUrl: {} },
     yawCensus: { lod: null, mem: null },
+    yawArc: { frames: 0, deg: 0 },
     poses: Object.fromEntries(Object.keys(POSES).map((k) => [k, { draws: null, tris: null, mem: null }])),
     errs: [],
     skipped: true,
@@ -322,9 +450,59 @@ async function runArm(context, fx, paceOn) {
   const imgOff = off.yawStats.byKind?.img ?? 0;
   const imgOn = on.yawStats.byKind?.img ?? 0;
   console.log('');
-  console.log(`  YAW SWEEP (${(YAW_MS / 1000).toFixed(0)}s in place, ~51 deg/s)`);
+  console.log(`  YAW SWEEP (${(YAW_MS / 1000).toFixed(0)}s in place, ${YAW_DEG_PER_FRAME} deg/frame)`);
+  console.log(
+    `    arc swept             off ${off.yawArc.deg.toFixed(0)} deg / ${off.yawArc.frames} frames` +
+      `   on ${on.yawArc.deg.toFixed(0)} deg / ${on.yawArc.frames} frames` +
+      `   (gate 6 needs >= ${YAW_MIN_ARC_DEG} deg)`
+  );
   console.log(`    imagery requests      off ${imgOff}   on ${imgOn}`);
   console.log(`    URLs fetched >1 time  off ${dupOff}   on ${dupOn}`);
+  // E: THE NUMERATOR AND THE DENOMINATOR ARE DIFFERENT POPULATIONS, and the two
+  // lines sit next to each other, which invites reading "17 of 36 imagery tiles
+  // were refetched". `imagery requests` is byKind.img; `URLs fetched >1 time`
+  // filters byUrl with NO prefix test, so /dem/, /mvt/, /api/aircraft,
+  // /api/weather and /planet are all in that count. Before attributing a jump
+  // to the residency LRU, read the breakdown below: an eviction/refetch cycle
+  // shows up in /img/ and /dem/, and nowhere else.
+  //
+  // (Counter semantics, checked against r24-fixture/server.mjs for A's
+  // attribution: `/__stats/reset` CLEARS byUrl/byKind/total outright, and
+  // runArm calls it AFTER that arm's boot and immediately before the yaw pin.
+  // Arm A's page is closed before arm B's is created. So these numbers are
+  // per-arm sweep windows, NOT cumulative across the two boots — a second
+  // boot's first fetch of a URL the first boot already pulled does not count.)
+  const byPrefix = (st) => {
+    const acc = {};
+    for (const [u, n] of Object.entries(st?.byUrl || {})) {
+      const k = u.startsWith('/img/')
+        ? 'img'
+        : u.startsWith('/dem/')
+          ? 'dem'
+          : u.startsWith('/mvt/')
+            ? 'mvt'
+            : u.startsWith('/api/')
+              ? 'api'
+              : 'other';
+      acc[k] ??= { urls: 0, reqs: 0, dup: 0, worst: 0 };
+      acc[k].urls++;
+      acc[k].reqs += n;
+      if (n > 1) acc[k].dup++;
+      if (n > acc[k].worst) acc[k].worst = n;
+    }
+    return acc;
+  };
+  const pOff = byPrefix(off.yawStats);
+  const pOn = byPrefix(on.yawStats);
+  for (const k of ['img', 'dem', 'mvt', 'api', 'other']) {
+    const a = pOff[k];
+    const b = pOn[k];
+    if (!a && !b) continue;
+    console.log(
+      `      ${k.padEnd(5)} off ${a ? `${a.dup}/${a.urls} urls dup, ${a.reqs} reqs, worst ${a.worst}x` : '—'}` +
+        `   on ${b ? `${b.dup}/${b.urls} urls dup, ${b.reqs} reqs, worst ${b.worst}x` : '—'}`
+    );
+  }
   console.log(`    engine merges         off ${off.yawCensus.lod?.merge}   on ${on.yawCensus.lod?.merge}`);
   console.log(
     `    replaced ON SCREEN    off ${off.yawCensus.lod?.replacedOnScreen}   on ${on.yawCensus.lod?.replacedOnScreen}`
@@ -335,8 +513,34 @@ async function runArm(context, fx, paceOn) {
   if (!on.skipped) gate('5 YAW: no tile is replaced while it is on screen',
     (on.yawCensus.lod?.replacedOnScreen ?? 1) === 0,
     `${off.yawCensus.lod?.replacedOnScreen} -> ${on.yawCensus.lod?.replacedOnScreen}`);
-  if (bothArms) gate('6 YAW: the same tile URL is not fetched twice as the heading comes back round',
-    dupOn <= dupOff, `${dupOff} -> ${dupOn} URLs fetched more than once`);
+  // Gate 6 compares two arms only when they SWEPT THE SAME ARC and the arc was
+  // long enough to bring a heading back round. Pass 1 failed this 1 -> 17 on a
+  // ~1 fps container where the heading advanced ~51 deg PER FRAME: at that rate
+  // every refine's parent leaves the frustum before its children land, so
+  // upstream's post-await re-check in `_loadSubTiles` DISCARDS the download and
+  // refetches it later — duplicates the fix has nothing to do with. Reporting
+  // that as a red on the fix would have been measuring the venue.
+  // MEASURED node-side (scripts/r24-a-pace.md §13): at 0.85 deg/frame the trio
+  // takes duplicate URLs 1 -> 0; at 51 deg/frame the same code goes 28 -> 28,
+  // with the merges it removes replaced by exactly those discards.
+  const arcOk =
+    off.yawArc.deg >= YAW_MIN_ARC_DEG &&
+    on.yawArc.deg >= YAW_MIN_ARC_DEG &&
+    Math.abs(off.yawArc.deg - on.yawArc.deg) <= 0.1 * Math.max(off.yawArc.deg, on.yawArc.deg);
+  if (bothArms && arcOk) {
+    gate('6 YAW: the same tile URL is not fetched twice as the heading comes back round',
+      dupOn <= dupOff,
+      `${dupOff} -> ${dupOn} URLs fetched more than once over ${on.yawArc.deg.toFixed(0)} deg / ` +
+        `${on.yawArc.frames} frames (off ${off.yawArc.deg.toFixed(0)} deg / ${off.yawArc.frames} frames)`);
+  } else if (bothArms) {
+    console.log(
+      `SKIP  6 YAW duplicate-URL comparison NOT CALIBRATED — arcs off ${off.yawArc.deg.toFixed(0)} deg / ` +
+        `${off.yawArc.frames} frames, on ${on.yawArc.deg.toFixed(0)} deg / ${on.yawArc.frames} frames ` +
+        `(need >= ${YAW_MIN_ARC_DEG} deg each, within 10% of each other). ` +
+        `Raise FLY_TERRA_SWEEP_MS (the arc is frames x ${YAW_DEG_PER_FRAME} deg, so a slow venue needs ` +
+        `proportionally longer), not FLY_TERRA_YAW_MIN_ARC.`
+    );
+  }
 
   // -------------------------------------------------------- draw ceilings
   console.log('');
@@ -347,19 +551,25 @@ async function runArm(context, fx, paceOn) {
         `   resident MB on ${on.poses[name].mem?.residentMB}`
     );
   }
-  const ceilOk = (v) => v == null || v <= 261;
-  gate('7 CEILING: Owens draws <= 261 in every arm that ran (the frozen desert control)',
-    ceilOk(off.poses.owens.draws) && ceilOk(on.poses.owens.draws),
-    `off ${off.poses.owens.draws} / on ${on.poses.owens.draws}`);
-  const satOk = (v) => v == null || v <= 375;
-  gate('8 CEILING: satellite draws <= 375 at the suburb pose in every arm that ran',
-    satOk(off.poses.powell.draws) && satOk(on.poses.powell.draws),
-    `off ${off.poses.powell.draws} / on ${on.poses.powell.draws}`);
+  // `v == null || v <= CEILING` reads "an absent draw count is under the
+  // ceiling". It is not — it is an absent draw count, and a ceiling gate that
+  // passes when the arm did not report is the one gate in this file that must
+  // never be able to do that. Absence is NOT CALIBRATED; only a finite number
+  // gets a verdict. (E, R24 close sweep §2.10a.)
+  const ceilPair = (name, ceiling, a, b, why) => {
+    if (!Number.isFinite(a) && !Number.isFinite(b)) return notCalibrated(name, `${why}: off ${a} / on ${b}`);
+    const parts = [a, b].filter((v) => Number.isFinite(v));
+    return gate(name, parts.every((v) => v <= ceiling), `off ${a} / on ${b} (ceiling ${ceiling})`);
+  };
+  ceilPair('7 CEILING: Owens draws <= 261 in every arm that ran (the frozen desert control)',
+    261, off.poses.owens.draws, on.poses.owens.draws, 'neither arm reported an Owens draw count');
+  ceilPair('8 CEILING: satellite draws <= 375 at the suburb pose in every arm that ran',
+    375, off.poses.powell.draws, on.poses.powell.draws, 'neither arm reported a suburb draw count');
   gate('9 no page errors in either arm', off.errs.length === 0 && on.errs.length === 0,
-    [...off.errs, ...on.errs].join(' | '));
+    [...off.errs, ...on.errs].slice(0, 6).join(' | ') || 'clean');
 
-  console.log(`\n${pass} passed, ${fail} failed`);
-  process.exit(fail ? 1 : 0);
+  console.log(`\n${pass} passed, ${fail} failed${notCalSummary()}`);
+  process.exit(fail || notCalCount() ? 1 : 0);
 })().catch((e) => {
   console.error(e);
   process.exit(1);

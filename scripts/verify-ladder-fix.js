@@ -57,7 +57,6 @@ const DRIVE = ({ dpr0, tier0, frames, dtPlan, cfgPatch }) => {
   if (cfgPatch) args.cfg = cfgPatch;
   const g = mk(args);
   let clock = 0;
-  // eslint-disable-next-line no-eval
   const dtFn = new Function('i', dtPlan);
   for (let i = 0; i < frames; i++) {
     const dt = dtFn(i);
@@ -81,20 +80,43 @@ const DRIVE = ({ dpr0, tier0, frames, dtPlan, cfgPatch }) => {
   });
   const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
   const errs = [];
-  page.on('pageerror', (e) => errs.push(String(e.message).slice(0, 160)));
+  // A MESSAGE WITHOUT A STACK NAMES NOTHING. Pass 2b logged 31 identical
+  // `Cannot read properties of undefined (reading 'byteLength')` lines and the
+  // row could say only that they happened — the first stack frame is what
+  // turns that into an address. Duplicates are counted rather than repeated,
+  // because thirty-one copies of one message is one finding, not thirty-one.
+  const errSeen = new Map();
+  page.on('pageerror', (e) => {
+    const msg = String(e.message).slice(0, 160);
+    const frame = String(e.stack || '')
+      .split('\n')
+      .slice(1)
+      .map((l) => l.trim())
+      .find((l) => l.startsWith('at ') && !l.includes('node_modules'));
+    const key = msg + ' @ ' + (frame || 'no stack');
+    errSeen.set(key, (errSeen.get(key) || 0) + 1);
+    errs.push(key);
+  });
   // Arm both features through their runtime pins (the R16 weather-pin idiom,
   // the same one TERRA_PACE uses) rather than editing constants: a harness that
   // rewrites a constants file is the hygiene defect recon HARN-HYG-9 names, and
   // a pin is also how the user runs the A/B on their own machine.
-  // FLY_LADDER_RED=1 skips the pins: that is this gate's RED calibration on the
-  // flag-off tree, and it must FAIL. Recorded in scripts/r24-a-pace.md.
-  if (!process.env.FLY_LADDER_RED) {
-    await page.addInitScript(() => {
-      window.__flyLadderFixOverride = { enabled: true, nativeRefresh: true };
-      window.__flyStepSafeOverride = { enabled: true };
-    });
-  } else {
-    console.log('  (RED calibration: pins NOT set — this run is expected to fail)\n');
+  // FLY_LADDER_RED=1 FORCES both features off — it does not merely omit the
+  // pin. That distinction became load-bearing at the R24 close: the constants
+  // now ship ON, so an omitted pin is the SHIPPED state and the RED arm would
+  // have gone quietly green while claiming to calibrate against the defect.
+  // A calibration arm has to state the state it wants, not inherit it.
+  await page.addInitScript(
+    (red) => {
+      window.__flyLadderFixOverride = red
+        ? { enabled: false, nativeRefresh: false }
+        : { enabled: true, nativeRefresh: true };
+      window.__flyStepSafeOverride = { enabled: !red };
+    },
+    !!process.env.FLY_LADDER_RED
+  );
+  if (process.env.FLY_LADDER_RED) {
+    console.log('  (RED calibration: both features FORCED OFF — this run is expected to fail)\n');
   }
   await bootFly(page, { style: 'toy', timeoutMs: 600000, settleMs: 4000 });
 
@@ -212,7 +234,15 @@ const DRIVE = ({ dpr0, tier0, frames, dtPlan, cfgPatch }) => {
   gate('12 the composer buffers ARE the drawing buffer after the step',
     after.fx?.bufferMatchesDrawing === true,
     `buffer ${JSON.stringify(after.fx?.buffer)} drawing ${JSON.stringify(after.fx?.drawing)}`);
-  gate('13 no page errors', errs.length === 0, errs.join(' | '));
+  const errSummary = [...errSeen.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => `${n}x ${k}`)
+    .join('\n        ');
+  gate(
+    '13 no page errors',
+    errs.length === 0,
+    errs.length ? `${errs.length} error(s), ${errSeen.size} distinct:\n        ${errSummary}` : 'clean'
+  );
 
   console.log(`\n${pass} passed, ${fail} failed`);
   await browser.close();
