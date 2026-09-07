@@ -124,8 +124,10 @@
 > continuously rendering canvas), and the one reading that got out —
 > `verify-dusk`'s intensities ~13 % short at a pinned noon — was read from
 > source as **the venue starving an R16 PER-FRAME ramp** (0.25 s of ramp per
-> FRAME at ~0.48 fps), not an R24 flag: the settle now waits on the value
-> instead of the clock <!-- NIGHT GATES PENDING -->; four tail
+> FRAME at ~0.48 fps), not an R24 flag; **on the re-run, waiting on the VALUE
+> instead of the clock, the pinned noon reads env 0.85 and bg 1.0 exactly and
+> dusk closes 14 of 15**, with sat-night at 26/2/1 and flicker still to run
+> <!-- NIGHT GATES PENDING -->; four tail
 > re-runs: **one-sun CLOSED at 42/42** against the restored 1e-6° bound,
 > **linear-haze CLOSED at 9/0/1** with the noon gain reproduced (5.90 luma)
 > and the night leg NOT SEPARATED at the venue's 1.2 cross-boot floor, and
