@@ -117,7 +117,6 @@ import {
   SKY,
   SKY_DUSK,
   SKY_LIVE,
-  SURFACE_CALM,
   TOY,
   TOY_WORLD,
   TRAFFIC_HORIZON,
@@ -182,7 +181,8 @@ const _lidZenith = [0, 0, 0];
 // satellite key-light branch has actually run once, so verify-one-sun can tell
 // "the vectors disagree" from "nothing has published a vector yet".
 const _moonKeyDir = [0, 1, 0];
-const _sunAudit = { live: false, az: 0, elDeg: 90, moonK: 0 };
+const _moonHillDir = [0, 1, 0]; // R24 C: the hill cadence's own scratch
+const _sunAudit = { live: false, az: 0, elDeg: 90, moonK: 0, moonValid: false, moonX: 0, moonY: 1, moonZ: 0 };
 
 // R24 C (SHADOW_CALM): three's shadow ShaderChunk is patched ONCE, here, in the
 // module body — before any material in this scene can compile, which is the
@@ -233,6 +233,25 @@ function snapToShadowTexel(sun, tx, ty, tz, radiusM, mapSize) {
  * and smoothstepped between. Returns exactly 1 with the flag off — the R21
  * strength, unmoved.
  */
+/**
+ * R24 C (ONE_SUN) — THE moon blend weight, and the only copy of it.
+ *
+ * 0 in daylight, 1 in deep night, smoothstepped across
+ * `ONE_SUN.moon.[fadeStartDeg, fadeFullDeg]` of TRUE solar elevation
+ * (`runtime.sun.el` is clamped into the hillshade band and cannot express a
+ * negative sun — the R19 lesson). TWO consumers read it: the per-frame key
+ * light and the 60 s hillshade cadence. They must not keep two copies — a
+ * hillshade that blended on a different curve than the key would put the
+ * ground and the buildings on different lights for the whole crossing, which
+ * is the R24 recon L3 defect in slow motion.
+ */
+function moonBlendK(elDeg) {
+  const mo = ONE_SUN.moon;
+  let k = (mo.fadeStartDeg - elDeg) / Math.max(1e-6, mo.fadeStartDeg - mo.fadeFullDeg);
+  k = k < 0 ? 0 : k > 1 ? 1 : k;
+  return k * k * (3 - 2 * k);
+}
+
 function hillElevWeight(elDeg) {
   if (!ONE_SUN.enabled) return 1;
   const h = ONE_SUN.hill;
@@ -1166,7 +1185,36 @@ export function FlyScene({ runtime }) {
       // evening, elevation clamped so relief never flattens (noon) nor drops
       // below the graze floor (night). Round 16: same convention, real sun.
       const cosEl = Math.cos(sun.el);
-      setHillDir(-Math.sin(sun.az) * cosEl, Math.sin(sun.el), Math.cos(sun.az) * cosEl);
+      // R24 C (ONE_SUN): THE HILL FOLLOWS THE MOON TOO. The three expressions
+      // below are the R21 call VERBATIM and are what `setHillDir` receives with
+      // ONE_SUN off — flag-off identity by construction. With it on, the same
+      // `moonBlendK` the key light uses carries the ground onto the same
+      // vector: at full moon both land exactly on `moonDirFromSun`, so the
+      // terrain is no longer shaded from the solar azimuth while every object
+      // in front of it is lit anti-solar (measured 137.03° apart at
+      // moonK = 1 — 180° in azimuth, reduced by the elevation difference).
+      // The graze floor still governs the sunlit end, where it is documented:
+      // `sun.el` is clamped into [HILLSHADE.minElRad, maxElRad] and mk is 0
+      // there, so nothing above the horizon moves by a bit.
+      let hx = -Math.sin(sun.az) * cosEl;
+      let hy = Math.sin(sun.el);
+      let hz = Math.cos(sun.az) * cosEl;
+      if (ONE_SUN.enabled && Number.isFinite(sun.sinEl)) {
+        const hmk = moonBlendK(trueElevationDeg(sun.sinEl));
+        if (hmk > 0) {
+          moonDirFromSun(sun.az, _moonHillDir);
+          hx += (_moonHillDir[0] - hx) * hmk;
+          hy += (_moonHillDir[1] - hy) * hmk;
+          hz += (_moonHillDir[2] - hz) * hmk;
+          // Renormalise: the lerp shortens the vector mid-blend and the tile
+          // fragment normalises nothing.
+          const hl = Math.hypot(hx, hy, hz) || 1;
+          hx /= hl;
+          hy /= hl;
+          hz /= hl;
+        }
+      }
+      setHillDir(hx, hy, hz);
       // R24 C (ONE_SUN): the hillshade's WEIGHT now moves with the sun too —
       // TRUE elevation (computeSun clamps `el` into [8.6°, 51.6°] and can never
       // report a low or negative sun; the R19 lesson). Multiplies the stashed
@@ -2185,11 +2233,8 @@ export function FlyScene({ runtime }) {
         // Colour and intensity are untouched: keyColor.night is already
         // moonlight-cool and verify-sun's intensity contract holds unmoved.
         if (ONE_SUN.enabled && Number.isFinite(ss.sinEl)) {
-          const mo = ONE_SUN.moon;
           const elDeg = trueElevationDeg(ss.sinEl);
-          let mk = (mo.fadeStartDeg - elDeg) / Math.max(1e-6, mo.fadeStartDeg - mo.fadeFullDeg);
-          mk = mk < 0 ? 0 : mk > 1 ? 1 : mk;
-          mk = mk * mk * (3 - 2 * mk);
+          const mk = moonBlendK(elDeg); // R24 C: shared with the hill cadence
           if (mk > 0) {
             moonDirFromSun(ss.az, _moonKeyDir);
             kx += (_moonKeyDir[0] - kx) * mk;
@@ -2202,6 +2247,14 @@ export function FlyScene({ runtime }) {
           }
           _sunAudit.moonK = mk;
           _sunAudit.elDeg = elDeg;
+          // R24 C: stash the MOON VECTOR the key actually blended toward, from
+          // the same array it was read out of — four assignments, no trig. The
+          // az/el conversion happens in the dev-only stats block, so production
+          // pays nothing for the instrument.
+          _sunAudit.moonValid = mk > 0;
+          _sunAudit.moonX = _moonKeyDir[0];
+          _sunAudit.moonY = _moonKeyDir[1];
+          _sunAudit.moonZ = _moonKeyDir[2];
         }
         let tx = rpx;
         let ty = gy;
@@ -2245,6 +2298,16 @@ export function FlyScene({ runtime }) {
         stats.edgeFadeStartM = ef.startM;
         stats.groundHorizonM = ef.endM;
         stats.aircraft = aircraftStat; // round 17: verify-hangar reads this
+        // R24 C: NINE decimals on every DIRECTION VECTOR, and that is a
+        // contract, not a taste. A unit component quantised to 1e-6 moves the
+        // azimuth derived from it by up to 4.05e-5 / cos(el) DEGREES — bigger
+        // than the 1e-6 deg agreement this instrument exists to demonstrate, so
+        // at toFixed(6) the reported disagreement was the ROUNDING, not the
+        // rig: the app's key and hill azimuths are bit-identical as float64 at
+        // every leg (measured 0.00e+0; see scripts/r24-c-light.md). At nine the
+        // artifact is ~3e-8 deg and the 1e-6 deg contract can be asserted for
+        // what it says. Scalars in degrees keep four — they are read, not
+        // differenced.
         // R24 C (ONE_SUN, recon L3): THE SUN AUDIT — every consumer's live
         // direction, read from where that consumer actually stores it, so
         // verify-one-sun compares vectors instead of re-deriving them from the
@@ -2255,6 +2318,10 @@ export function FlyScene({ runtime }) {
         // water is MeshPhong and its specular comes from that one directional
         // — there is no second light in the rig, FlyScene :1806-1827). Dev
         // only, on the existing 60-frame cadence, zero production cost.
+        // R24 C (pass 2b): also publish the CLAMP TERMS (`casting`,
+        // `minElRadDeg`, `hillMinDeg`, `hillMaxDeg`) and `water` as a real
+        // vector — verify-one-sun read all four and found them absent, so its
+        // floor and hill-clamp clauses could not be evaluated at all.
         const _sd = getSkySunDir();
         // The key is read off the LIGHT ITSELF (position − target, normalised),
         // never off the branch that wrote it: with ONE_SUN off at medium/low
@@ -2281,13 +2348,48 @@ export function FlyScene({ runtime }) {
           oneSun: ONE_SUN.enabled,
           style: flyState.mapStyle,
           tier: flyState.qualityTier,
-          key: [+_kx.toFixed(6), +_ky.toFixed(6), +_kz.toFixed(6)],
-          hill: getHillshade().dir.map((v) => +v.toFixed(6)),
+          key: [+_kx.toFixed(9), +_ky.toFixed(9), +_kz.toFixed(9)],
+          hill: getHillshade().dir.map((v) => +v.toFixed(9)),
           hillStrength: +getHillshade().strength.toFixed(4),
           hillElev: +(getHillshade().elev ?? 1).toFixed(4),
           hillEffective: +(getHillshade().effective ?? getHillshade().strength).toFixed(4),
-          dome: _sd.live ? _sd.dir.map((v) => +v.toFixed(6)) : null,
-          water: 'key', // one directional in the rig — the same vector by construction
+          dome: _sd.live ? _sd.dir.map((v) => +v.toFixed(9)) : null,
+          // R24 C: the WATER specular direction, as a VECTOR. Satellite water is
+          // MeshPhong and its specular lobe is built from the scene's single
+          // directional — there is exactly one `<directionalLight>` in the world
+          // scene (the two others live in the inspect turntable's own Canvas), so
+          // this is the key light BY REFERENCE, not a second copy of the solar
+          // math. A consumer gate therefore reads Δ 0 BY IDENTITY; the assertion
+          // with teeth is `waterSource`, i.e. that no second light was added.
+          water: [+_kx.toFixed(9), +_ky.toFixed(9), +_kz.toFixed(9)],
+          waterSource: 'key-light',
+          // R24 C: the two CLAMPS a consumer needs to predict what it is
+          // reading, published from the constants the code actually applies
+          // (never re-declared in the gate, the R16 `__flySunModel` idiom).
+          // `casting` is the shadow-camera arm state: the key elevation is
+          // floored at SAT_SHADOWS.minElRad ONLY while the shadow camera casts,
+          // so a gate cannot evaluate the floor clause without it. It is also
+          // published on `stats.shadow` (verify-shadow-calm's home); it belongs
+          // on BOTH because it is a term in both contracts.
+          casting: satShadowRef.current === true,
+          // R24 C: the MOON KEY the night contract needs. Same convention as
+          // `key`/`hill` above, which the gate derives with atan2(x, z) and
+          // asin(y/|v|): az = atan2(x, z) in degrees, el = asin(y) in degrees
+          // (moonDirFromSun returns a unit vector). null while moonK is 0 —
+          // the array is stale then and a stale vector reported as live is how
+          // an instrument invents a measurement.
+          moonKeyAzDeg: _sunAudit.moonValid
+            ? +((Math.atan2(_sunAudit.moonX, _sunAudit.moonZ) * 180) / Math.PI).toFixed(9)
+            : null,
+          moonKeyElDeg: _sunAudit.moonValid
+            ? +(
+                (Math.asin(Math.max(-1, Math.min(1, _sunAudit.moonY))) * 180) /
+                Math.PI
+              ).toFixed(9)
+            : null,
+          minElRadDeg: +((SAT_SHADOWS.minElRad * 180) / Math.PI).toFixed(4),
+          hillMinDeg: +((HILLSHADE.minElRad * 180) / Math.PI).toFixed(4),
+          hillMaxDeg: +((HILLSHADE.maxElRad * 180) / Math.PI).toFixed(4),
         };
         // R24 C (SHADOW_CALM): what the shadow rig is ACTUALLY running — the
         // patched-or-not kernel state comes from the module that did (or did

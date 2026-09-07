@@ -6,7 +6,8 @@
  * not exist: it would have to un-pin `__flySatShadowOverride` (the fleet pins
  * it to 0, which is the FIRST term of the catcher's four-term mount condition —
  * see the ledger), and this container's browser budget belongs to
- * certification. So the feature would otherwise ship on structural scans alone.
+ * certification. The feature SHIPS ON at the W3 close, so without this file it
+ * would ship on structural scans alone.
  *
  * It does not have to. The load-bearing half of SHADOW_CALM is two edits to a
  * STRING and one piece of arithmetic, and both are executable here:
@@ -74,6 +75,20 @@ const shipped = {
   satCadence: +(/satCadence:\s*([\d.]+)/.exec(SC_BLOCK) || [, NaN])[1],
 };
 console.log('shipped SHADOW_CALM:', JSON.stringify(shipped), '\n');
+
+// W3 CLOSE FLIP: the shipped state is now ON, and this gate asserts the RULED
+// state rather than merely printing whatever it finds. Everything below still
+// drives `r24PatchShadowChunk` with the options forced BOTH ways — the
+// both-ways execution is the point of this file and does not depend on what
+// ships, which is why the flip touches exactly this one assertion.
+gate(
+  'SHADOW_CALM ships the ruled state (enabled, biasSignFix, kernel world, satCadence 0)',
+  shipped.enabled === true &&
+    shipped.biasSignFix === true &&
+    shipped.kernel === 'world' &&
+    shipped.satCadence === 0,
+  JSON.stringify(shipped)
+);
 
 const BASE = ShaderChunk.shadowmap_pars_fragment;
 const K = kernelMod(ShaderChunk, { ...shipped, enabled: true });

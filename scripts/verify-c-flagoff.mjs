@@ -9,7 +9,10 @@
  * that two frames matched at the poses someone thought to sample, while this
  * shows that the alternate branch is unreachable. Three checks:
  *
- *   (1) every C flag ships `enabled: false`;
+ *   (1) every C flag ships the RULED SHIP STATE (W3 close flip — this was
+ *       "every flag ships enabled:false" through W1/W2, and it is the ONLY
+ *       gate here whose expectation moves with the flip; (2) and (3) below do
+ *       NOT, and that is the point of them — see the note above gate (1));
  *   (2) every GLSL injection C added is inside a predicate ternary whose false
  *       branch is the R21 string (so flag-off cannot reach new text);
  *   (3) the FINAL tile key goes through the shared `r24VariantKey` helper and
@@ -35,29 +38,88 @@ const gate = (name, ok, detail = '') => {
   console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
 };
 
-// ---- (1) every C flag ships off -------------------------------------------
-const C_FLAGS = [
-  'LINEAR_HAZE',
-  'ONE_SUN',
-  'POST_ORDER',
-  'DEPTH_FIX',
-  'SHADOW_CALM',
-  'TERRAIN_LIGHT',
-  'CLOUD_LIT',
-  'LAMBERT_ENV',
-];
+// ---- (1) every C flag ships the RULED SHIP STATE ---------------------------
+// W3 CLOSE FLIP. Through W1/W2 this read "every C flag ships enabled:false".
+// It is the ONE gate in this file whose expectation moves with the flip, and
+// the reason the other two do not is the whole argument for keeping this file
+// after the close: gates (2) and (3) assert that the FALSE branch of every
+// injection is the R21 string verbatim and that `r24VariantKey` returns the
+// bare R19 key when every token is false. Those are properties of the SOURCE,
+// not of the flag's value — so they keep proving that the round is one flag
+// flip away from R21 even now that the flags are on, which is exactly what a
+// revert contract is for (R20 §7: "a one-flag revert contract rots as flags
+// accumulate" — this is the anti-rot).
+//
+// Sub-values are asserted too, not just `enabled`: the ruled state is a state,
+// not a boolean, and `dayK` in particular is a number the round deliberately
+// did NOT spend (see the constants comment).
+const SHIP = {
+  LINEAR_HAZE: { enabled: true },
+  ONE_SUN: { enabled: true, extra: [[/dayK:\s*1\.0\b/, 'dayK 1.0 (the demotion ships OFF — unmeasured)'], [/monumentsLambert:\s*true/, 'monumentsLambert']] },
+  POST_ORDER: { enabled: true, extra: [[/smaaPreset:\s*'high'/, "smaaPreset 'high'"], [/dither:\s*true/, 'dither']] },
+  DEPTH_FIX: { enabled: true },
+  SHADOW_CALM: {
+    enabled: true,
+    extra: [
+      [/biasSignFix:\s*true/, 'biasSignFix'],
+      [/kernel:\s*'world'/, "kernel 'world'"],
+      [/texelSnap:\s*true/, 'texelSnap'],
+      [/satCadence:\s*0\b/, 'satCadence 0 (the documented refusal)'],
+    ],
+  },
+  TERRAIN_LIGHT: {
+    enabled: true,
+    extra: [
+      [/fragmentHill:\s*true/, 'fragmentHill'],
+      [/microFwidth:\s*true/, 'microFwidth'],
+      // THE ONE SUB-FLAG THAT STAYS OFF, and it is not an oversight: turning it
+      // on makes `verify-skirt-worker`'s element-by-element identity leg go RED
+      // BY DESIGN (normals differ; positions, uv and indices do not), so it
+      // needs its own certification with a flag-on ARM. The tile half ships;
+      // the worker half waits for that.
+      [/workerNormals:\s*false/, 'workerNormals OFF — needs its own certification'],
+    ],
+  },
+  CLOUD_LIT: { enabled: true },
+  LAMBERT_ENV: { enabled: true, extra: [[/reflectivity:\s*0\.15/, 'reflectivity 0.15']] },
+};
 const consts = read('lib/fly/fly-constants.js');
-for (const f of C_FLAGS) {
+const blockOf = (f) => {
   const i = consts.indexOf(`export const ${f} = `);
-  const head = i < 0 ? '' : consts.slice(i, i + 400);
-  gate(`${f} ships enabled:false`, i >= 0 && /enabled:\s*false/.test(head));
+  if (i < 0) return '';
+  const semi = consts.indexOf('\n};', i);
+  const line = consts.indexOf('\n', i);
+  // single-line block (`= { … };`) or multi-line (`= {\n … \n};`)
+  return semi > i && semi < i + 4000 ? consts.slice(i, semi + 3) : consts.slice(i, line);
+};
+for (const [f, want] of Object.entries(SHIP)) {
+  const b = blockOf(f);
+  const en = new RegExp(`enabled:\\s*${want.enabled}`).test(b);
+  const missing = (want.extra ?? []).filter(([re]) => !re.test(b)).map(([, n]) => n);
+  gate(
+    `${f} ships the ruled state (enabled:${want.enabled}${
+      want.extra ? ', ' + want.extra.map(([, n]) => n).join(', ') : ''
+    })`,
+    b !== '' && en && missing.length === 0,
+    missing.length ? `MISSING: ${missing.join(' | ')}` : ''
+  );
 }
 
 // ---- (2) the injections are branch-gated ----------------------------------
 const wb = read('lib/fly/toy-world/world-bend.js');
 gate(
-  'haze setters decode only under LINEAR_HAZE',
-  /function hazeC\(c\) \{\s*return LINEAR_HAZE\.enabled \? srgbToLinear\(c\) : c;/.test(wb)
+  'haze setters decode only under the LINEAR_HAZE accessor',
+  /function hazeC\(c\) \{\s*return linearHazeOn\(\) \? srgbToLinear\(c\) : c;/.test(wb)
+);
+gate(
+  'linearHazeOn() falls through to the constant when no pin is set',
+  /export function linearHazeOn\(\) \{[\s\S]{0,600}?\n  return LINEAR_HAZE\.enabled;\n\}/.test(wb)
+);
+gate(
+  'the pin is DEV-ONLY and null-guarded before it is read',
+  /process\.env\.NODE_ENV === 'development' &&\s*\n\s*typeof window !== 'undefined' &&\s*\n\s*window\.__flyLinearHazeOverride != null/.test(
+    wb
+  )
 );
 gate(
   'groundOverlayOffset returns null with SHADOW_CALM off',
@@ -90,9 +152,223 @@ gate(
   /const SKY_TEST = DEPTH_FIX\.enabled \? '[^']+' : 'd >= 0\.999999';/.test(ap)
 );
 gate(
-  'uHazeColor decodes only under LINEAR_HAZE',
-  /if \(LINEAR_HAZE\.enabled\) \{[\s\S]{0,200}SRGBColorSpace\);\s*\} else \{/.test(ap)
+  'uHazeColor decodes only under the LINEAR_HAZE accessor',
+  /if \(linearHazeOn\(\)\) \{[\s\S]{0,200}SRGBColorSpace\);\s*\} else \{/.test(ap)
 );
+// THE PIN'S ONLY REAL CONTRACT. `__flyLinearHazeOverride` governs the tree only
+// while `linearHazeOn()` is the sole reader: one surviving `LINEAR_HAZE.enabled`
+// anywhere else — a new content layer, a second uniform, a "small" inline
+// ternary — silently splits a pinned A/B into a half-decoded tree, and the
+// measurement would look like a tuning result instead of a mixed build. So this
+// gate counts readers across the WHOLE source tree, not just the two files
+// above, and allows exactly the accessor's own fall-through.
+{
+  const files = [
+    'lib/fly/toy-world/world-bend.js',
+    'components/fly/AerialPerspective.jsx',
+    'components/fly/FlyScene.jsx',
+    'components/fly/Effects.jsx',
+    'components/fly/SkyDome.jsx',
+    'components/fly/FlyEffectComposer.jsx',
+    'lib/fly/prewarm.js',
+    'lib/fly/cloud-material.js',
+    'lib/fly/post-policy.js',
+    'lib/fly/shadow-kernel.js',
+  ];
+  const raw = [];
+  for (const f of files) {
+    const src = read(f);
+    const lines = src.split('\n');
+    for (const m of src.matchAll(/LINEAR_HAZE\.enabled/g)) {
+      const line = src.slice(0, m.index).split('\n').length;
+      // R20 §7: a grep gate reads comments too. Skip lines that OPEN as a
+      // comment (`//`, `/*`, or a docblock's `*`) — this file's own header
+      // names the constant in prose. A trailing comment still counts, which
+      // fails LOUD instead of hiding a reader: the conservative direction.
+      const t = (lines[line - 1] || '').trim();
+      if (t.startsWith('*') || t.startsWith('//') || t.startsWith('/*')) continue;
+      raw.push(`${f}:${line}`);
+    }
+  }
+  gate(
+    'the raw LINEAR_HAZE.enabled has exactly ONE reader — linearHazeOn()',
+    raw.length === 1 && raw[0].startsWith('lib/fly/toy-world/world-bend.js:'),
+    `readers: ${raw.join(', ') || 'none'}`
+  );
+}
+// ---- ONE_SUN: the moon key, the hill that follows it, the published shape ---
+{
+  const fs = read('components/fly/FlyScene.jsx');
+  gate(
+    'the moon blend weight has exactly ONE formula, and both consumers call it',
+    /function moonBlendK\(elDeg\) \{/.test(fs) &&
+      (fs.match(/moonBlendK\(/g) || []).length === 3 &&
+      !/fadeStartDeg - elDeg\)[\s\S]{0,80}fadeFullDeg[\s\S]{0,400}fadeStartDeg - elDeg/.test(fs),
+    `${(fs.match(/moonBlendK\(/g) || []).length} references (1 declaration + 2 call sites)`
+  );
+  gate(
+    'the hill moon blend is gated on ONE_SUN and the R21 arguments survive verbatim',
+    /if \(ONE_SUN\.enabled && Number\.isFinite\(sun\.sinEl\)\) \{\s*\n\s*const hmk = moonBlendK\(/.test(
+      fs
+    ) &&
+      fs.includes('let hx = -Math.sin(sun.az) * cosEl;') &&
+      fs.includes('let hy = Math.sin(sun.el);') &&
+      fs.includes('let hz = Math.cos(sun.az) * cosEl;') &&
+      fs.includes('setHillDir(hx, hy, hz);')
+  );
+  gate(
+    'the published moon key is null while moonK is 0 (no stale vector)',
+    /moonKeyAzDeg: _sunAudit\.moonValid\s*\n?\s*\?/.test(fs) &&
+      /moonKeyElDeg: _sunAudit\.moonValid\s*\n?\s*\?/.test(fs) &&
+      /_sunAudit\.moonValid = mk > 0;/.test(fs)
+  );
+  // THE PUBLISHED SHAPE. verify-one-sun asserts against these names; a rename
+  // or a dropped field turns a clause into a silent NOTCAL rather than a red,
+  // which is exactly how pass 2b lost three clauses. RED by removing one name.
+  const SUN_FIELDS = [
+    'live',
+    'az',
+    'elDeg',
+    'moonK',
+    'moonKeyAzDeg',
+    'moonKeyElDeg',
+    'oneSun',
+    'style',
+    'tier',
+    'key',
+    'hill',
+    'hillStrength',
+    'hillElev',
+    'hillEffective',
+    'dome',
+    'water',
+    'waterSource',
+    'casting',
+    'minElRadDeg',
+    'hillMinDeg',
+    'hillMaxDeg',
+  ];
+  const block = (fs.match(/stats\.sun = \{[\s\S]*?\n        \};/) || [''])[0];
+  // INSTRUMENT PRECISION. A unit component rounded to 1e-6 moves the azimuth
+  // derived from it by up to 4.05e-5 / cos(el) DEGREES — larger than the
+  // 1e-6 deg agreement the audit exists to demonstrate, so at six decimals a
+  // gate differences its own rounding and reports it as a rig disagreement
+  // (verify-one-sun did, on four clauses). Nine decimals puts the artifact at
+  // ~3e-8 deg. This gate stops that from silently regressing.
+  gate(
+    'every published DIRECTION VECTOR carries NINE decimals, not six',
+    /key: \[\+_kx\.toFixed\(9\), \+_ky\.toFixed\(9\), \+_kz\.toFixed\(9\)\]/.test(block) &&
+      /hill: getHillshade\(\)\.dir\.map\(\(v\) => \+v\.toFixed\(9\)\)/.test(block) &&
+      /dome: _sd\.live \? _sd\.dir\.map\(\(v\) => \+v\.toFixed\(9\)\) : null/.test(block) &&
+      /water: \[\+_kx\.toFixed\(9\), \+_ky\.toFixed\(9\), \+_kz\.toFixed\(9\)\]/.test(block)
+  );
+  const missing = SUN_FIELDS.filter((f) => !new RegExp(`(^|\\s)${f}:`, 'm').test(block));
+  gate(
+    `__flyStats.sun publishes all ${SUN_FIELDS.length} fields verify-one-sun reads`,
+    block.length > 0 && missing.length === 0,
+    missing.length ? `missing: ${missing.join(', ')}` : `${SUN_FIELDS.length} present`
+  );
+}
+
+// ---- DEPTH_FIX: the truth raycast hook -------------------------------------
+// verify-depth-roundtrip read 0 raycast hits of 15 probes because a bundled app
+// publishes no window.THREE and no camera, so the gate could never establish a
+// true distance from outside. The truth is now the owner's hook. These gates
+// assert the two properties that make it trustworthy: it cannot exist in a
+// production build, and it cannot read a camera other than the one whose depth
+// the probe samples.
+{
+  const dp = read('lib/fly/depth-probe.js');
+  const fec = read('components/fly/FlyEffectComposer.jsx');
+  gate(
+    'the truth hook is published and torn down with the probe',
+    /window\.__flyDepthTruth = truth;/.test(dp) &&
+      /if \(window\.__flyDepthTruth === truth\) delete window\.__flyDepthTruth;/.test(dp)
+  );
+  gate(
+    'the truth hook cannot exist in production — same NODE_ENV guard, same install site',
+    /if \(process\.env\.NODE_ENV === 'production'\) return undefined;\s*\n\s*\/\/[\s\S]{0,400}?return installDepthProbe\(\{ gl, composer, camera, scene \}\)/.test(
+      fec
+    ),
+    'installDepthProbe({ gl, composer, camera, scene }) must sit under the production early-return'
+  );
+  gate(
+    'the truth raycast reads the COMPOSER\'s camera and scene, not a module-level one',
+    // the two objects the composer hands to its own RenderPass...
+    /effectComposer\.addPass\(new RenderPass\(scene, camera\)\);/.test(fec) &&
+      // ...are the two the hook is constructed with...
+      /export function installDepthProbe\(\{ gl, composer, camera, scene: worldScene \}\)/.test(dp) &&
+      // ...and every ray is built from that binding, with no module-scope shadow.
+      /raycaster2\.setFromCamera\(_ndc, camera\);/.test(dp) &&
+      !/^(const|let|var)\s+camera\b/m.test(dp)
+  );
+  gate(
+    'the truth candidate set is DEPTH-WRITING geometry, so it describes the buffer',
+    /mm\.depthWrite !== false/.test(dp) &&
+      /!mm\.isSpriteMaterial/.test(dp) &&
+      /for \(let a = o; a; a = a\.parent\) if \(!a\.visible\) return;/.test(dp)
+  );
+  gate(
+    'the truth un-bends by the LIVE uBendK and reports its own convergence',
+    /import \{ airDrop, getBend \} from '@\/lib\/fly\/toy-world\/world-bend';/.test(dp) &&
+      /const bend = getBend\(\);/.test(dp) &&
+      /out\.residualM = c\.residual;/.test(dp) &&
+      /out\.reprojectionPx = c\.reproj;/.test(dp) &&
+      /out\.converged = c\.converged;/.test(dp)
+  );
+  // THE DEGENERATE ZERO, gated so it cannot come back. A CPU raycast hit lies
+  // on its own ray by construction, so "the ray point at the hit's XZ" makes
+  // `impliedDrop` identically 0 for any UNLIFTED hit and an interval test
+  // `0 <= impliedDrop <= groundDrop` passes honestly — which is how a truth
+  // came to report un-bent geometry (2282.3 m) where the buffer held the bent
+  // surface (2356.3 m). Only convergence can exclude that.
+  gate(
+    'validity is CONVERGENCE + residual + reprojection, never an implied-drop interval',
+    /valid: converged && residual <= Math\.max\(0\.5, distance \* 1e-3\) && reproj <= 1\.5,/.test(
+      dp
+    ) && !/impliedDrop <= groundDrop \+ tol/.test(dp)
+  );
+  gate(
+    'the bend solve ITERATES the lift until it stops moving',
+    /if \(Math\.abs\(d - lift\) < 0\.05\) \{\s*\n\s*converged = true;/.test(dp) &&
+      /lift = d;/.test(dp) &&
+      /const cast = castAt\(px, py, lift, size, list\);/.test(dp)
+  );
+  // The displacement is not ONE function: ground/anchor geometry drops by
+  // d^2 k while air-anchor actors carry R7's altitude lift. Choosing per hit
+  // from the material's own world-bend cache key is what lets an air-bent actor
+  // in front of terrain be found at all.
+  gate(
+    'the drop is chosen PER HIT from the material world-bend variant, ground vs air',
+    /import \{ airDrop, getBend \} from '@\/lib\/fly\/toy-world\/world-bend';/.test(dp) &&
+      /const isAirBent = \(o\) => bendKeyOf\(o\)\.startsWith\('world-bend-air'\);/.test(dp) &&
+      /if \(isAirBent\(o\)\) return airDrop\(Math\.hypot\(dx, dz\), pt\.y, k\);/.test(dp)
+  );
+  gate(
+    'BOTH families are solved and the nearest valid candidate wins',
+    /for \(const wantAir of \[false, true\]\)/.test(dp) &&
+      /const valid = cands\.filter\(\(c\) => c\.valid\);/.test(dp) &&
+      /valid\.sort\(\(c1, c2\) => c1\.t - c2\.t\);/.test(dp)
+  );
+  gate(
+    'every candidate AND every raw ray hit is published, so a disagreement can be READ',
+    /out\.hits = r\.cands\.map/.test(dp) && /out\.rayHits = r\.pool\.slice\(0, 12\)/.test(dp)
+  );
+  gate(
+    'the truth publishes ONE TEXEL of surface slope, so the bound is measured not guessed',
+    /out\.slopeMPerPx = slope;/.test(dp) &&
+      /\[-1, 0\],\s*\n\s*\[1, 0\],\s*\n\s*\[0, -1\],\s*\n\s*\[0, 1\],/.test(dp)
+  );
+  gate(
+    'probe and truth are ONE synchronous read — no frame can land between them',
+    /out\.truth = truth\(x, y\);\s*\n\s*return out;/.test(dp) && /^      truth: null,$/m.test(dp)
+  );
+  gate(
+    'cocSource is mirrored onto __flyStats.effects, where the reader looks',
+    /\(st\.effects \?\?= \{\}\)\.cocSource = out\.cocSource;/.test(dp)
+  );
+}
+
 const fx = read('components/fly/Effects.jsx');
 gate(
   'the pass reorder is a POST_ORDER ternary over ONE descriptor list',

@@ -27,9 +27,10 @@
  * switches on. Both arms run in one process, so a green means the SAME build
  * produced both columns.
  */
-import { mkdirSync, copyFileSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { checkShip, readConst } from './_r24a-ship-state.mjs';
 import { loadVendoredThreeTile } from './_tt-shim.mjs';
 import * as THREE from 'three';
 
@@ -43,8 +44,13 @@ const REPORT = process.argv.includes('--report');
 const tt = await loadVendoredThreeTile();
 
 const SW = tt.R24_SWITCHES;
-const OFF = { mergeHysteresis: false, keepResident: false, timerFix: false, walkWhileSaturated: false, bboxCache: false, mergeHysteresisK: 1.6 };
-const ON = { mergeHysteresis: true, keepResident: true, timerFix: true, walkWhileSaturated: true, bboxCache: true, mergeHysteresisK: 1.6 };
+// The DEM data ceiling, read from the shipped constants: imagery reaches z17 at
+// high tier and DEM stops at z15, and that ASYMMETRY is the whole of gates
+// 29-31. Read, not hard-coded, so raising demMaxZoom re-derives the prediction.
+const DEM_MAX_LEVEL = readConst('TILES').demMaxZoom;
+
+const OFF = { mergeHysteresis: false, keepResident: false, timerFix: false, walkWhileSaturated: false, bboxCache: false, parkOffscreen: false, mergeHysteresisK: 1.6 };
+const ON = { mergeHysteresis: true, keepResident: true, timerFix: true, walkWhileSaturated: true, bboxCache: true, parkOffscreen: true, mergeHysteresisK: 1.6 };
 const setSwitches = (o) => Object.assign(SW, OFF, o);
 
 // --------------------------------------------------------------- the harness
@@ -68,7 +74,13 @@ function makeMap({ lodThreshold = 0.86, maxThreads = 10, latencyFrames = 2 } = {
   // shape (a load occupies a slot for `latencyFrames` frames) so the upstream
   // "freeze the whole tree while >= maxThreads-4 downloads are in flight" rule
   // is exercised exactly as in production.
-  const reqs = new Map(); // "z/x/y" -> count
+  const reqs = new Map(); // "z/x/y" -> count  (per TILE)
+  // Per DEM URL, which is a DIFFERENT question — see gates 29-31. A tile
+  // deeper than a source's maxLevel does not get its own URL: three-tile's
+  // `de()` requests the ANCESTOR at maxLevel with clip bounds, so N deep tiles
+  // legitimately share one URL. A per-URL counter that does not know this
+  // reports the sharing as a refetch.
+  const demUrls = new Map(); // "z/x/y" of the DEM ancestor -> count
   let inflight = 0;
   const pending = [];
   Object.defineProperty(map.loader, 'downloadingThreads', {
@@ -78,6 +90,11 @@ function makeMap({ lodThreshold = 0.86, maxThreads = 10, latencyFrames = 2 } = {
   map.loader.update = (tile, model) => {
     const key = `${tile.z}/${tile.x}/${tile.y}`;
     reqs.set(key, (reqs.get(key) ?? 0) + 1);
+    // The DEM URL this tile resolves to, by three-tile's own clamp rule.
+    const dz = Math.min(tile.z, DEM_MAX_LEVEL);
+    const shift = tile.z - dz;
+    const dkey = `${dz}/${tile.x >> shift}/${tile.y >> shift}`;
+    demUrls.set(dkey, (demUrls.get(dkey) ?? 0) + 1);
     inflight++;
     return new Promise((resolve) => {
       pending.push({
@@ -102,7 +119,7 @@ function makeMap({ lodThreshold = 0.86, maxThreads = 10, latencyFrames = 2 } = {
       }
     }
   };
-  return { map, reqs, drain, inflight: () => inflight };
+  return { map, reqs, demUrls, drain, inflight: () => inflight };
 }
 
 /** Counters, wrapped on the Tile PROTOTYPE so both arms are counted identically. */
@@ -180,20 +197,67 @@ function census(map) {
 }
 
 /**
+ * WHAT REACHES THE DRAW LIST. `census` counts what is RESIDENT; this counts what
+ * three would actually issue, which is a different question and the one pass-2b
+ * failed on. A tile is issued when its model is attached to the scene graph.
+ * A tile is DOUBLE-issued when an ancestor tile is issuing too — parent and
+ * child covering the same ground in the same frame.
+ */
+function drawCensus(map) {
+  // "Issued" is what three would DRAW: a model attached to the graph AND
+  // visible through every ancestor. `visible` is the whole point of PATCH 26 —
+  // three skips an invisible subtree in projectObject, so a parked tile costs
+  // neither a draw nor a cull.
+  const issued = [];
+  const visibleUp = (o) => {
+    for (let p = o; p; p = p.parent) if (p.visible === false) return false;
+    return true;
+  };
+  map.rootTile.traverse((o) => {
+    if (o?.isTile && o.model && o.model.parent && visibleUp(o.model)) issued.push(o);
+  });
+  let doubleIssued = 0;
+  let offFrustum = 0;
+  const byLevel = {};
+  for (const t of issued) {
+    byLevel[t.z] = (byLevel[t.z] ?? 0) + 1;
+    if (!t.inFrustum) offFrustum++;
+    for (let p = t.parent; p; p = p.parent) {
+      if (p.isTile && p.model && p.model.parent) {
+        doubleIssued++;
+        break;
+      }
+    }
+  }
+  return { issued: issued.length, doubleIssued, offFrustum, byLevel };
+}
+
+/**
  * Run one scripted path. `path(i, n)` returns the camera placement for frame i.
  * Returns the counters plus a census of the final tree.
  */
-async function fly({ frames, pathFn, switches, lodThreshold = 0.86, latencyFrames = 2, budgetBytes = null }) {
+async function fly({
+  frames,
+  pathFn,
+  switches,
+  lodThreshold = 0.86,
+  latencyFrames = 2,
+  budgetBytes = null,
+  maxTiles = null,
+  capPerVisible = null,
+}) {
   setSwitches(switches);
-  const { map, reqs, drain } = makeMap({ lodThreshold, latencyFrames });
+  const { map, reqs, demUrls, drain } = makeMap({ lodThreshold, latencyFrames });
   const cam = makeCamera();
   const inst = instrument();
   let residency = null;
-  if (budgetBytes != null) {
+  if (budgetBytes != null || maxTiles != null || capPerVisible != null) {
     const { TileResidency } = await import(pathToFileURL(path.join(root, 'scripts/r24-out/.residency.mjs')).href);
     residency = new TileResidency(map, {});
     residency.enabled = true;
-    residency.budgetBytes = budgetBytes;
+    residency.budgetBytes = budgetBytes ?? Infinity;
+    residency.maxTiles = maxTiles ?? Infinity;
+    residency.capPerVisible = capPerVisible ?? 0;
     residency.passIntervalMs = 0;
   }
   // Drive the quadtree walk DIRECTLY with the same params TileMap.update
@@ -240,7 +304,9 @@ async function fly({ frames, pathFn, switches, lodThreshold = 0.86, latencyFrame
     requests: [...reqs.values()].reduce((a, b) => a + b, 0),
     uniqueTiles: unique,
     refetches,
+    demUrls: new Map(demUrls),
     census: census(map),
+    draw: drawCensus(map),
     residency: residency ? { ...residency.stats } : null,
   };
 }
@@ -305,7 +371,14 @@ console.log('verify-terra-residency — T1/T3 LOD residency on the vendored bund
 console.log('  venue: node, no GPU, no network. Decision COUNTS only — every ms/fps');
 console.log('  number in this round comes from the user\'s machine.\n');
 
-// --- 1-3: RED. The disease is present with the switches off. ----------------
+// --- 0: the SHIP state. Every arm below FORCES its switches, which is right
+// (the property is "off = upstream, on = the fix") and is also why none of
+// them can see a flag silently reverted in the build. This gate can.
+const shipTP = checkShip('TERRA_PACE');
+gate('0 TERRA_PACE ships in the ruled state (6 on, 6 off with reasons)',
+  shipTP.ok, shipTP.detail);
+
+// --- 1-3: RED. The disease is present with the switches FORCED off. ---------
 const yawOff = await fly({ frames: 90, pathFn: yawOnly, switches: OFF });
 const yawOn = await fly({ frames: 90, pathFn: yawOnly, switches: ON });
 table('A. PURE YAW SWEEP (camera stationary, heading turns 720 deg over 90 frames)',
@@ -436,7 +509,7 @@ try {
     src.replace(
       /import \{ TILES, TERRA_PACE \} from '\.\/fly-constants';/,
       'const TILES = { lruBudgetBytes: 140 * 1024 * 1024 };\n' +
-        'const TERRA_PACE = { enabled: true, keepResident: true, residency: { passIntervalMs: 0, collapseHoldMs: 2000, maxCollapsePerPass: 32 } };'
+        'const TERRA_PACE = { enabled: true, keepResident: true, residency: { passIntervalMs: 0, collapseHoldMs: 2000, maxCollapsePerPass: 32, maxResidentTiles: 260, maxResidentPerVisible: 14 } };'
     )
   );
   // A budget small enough that the approach path must exceed it.
@@ -570,6 +643,238 @@ gate('17 RED: a saturated loader freezes the walk (upstream evaluates a tenth of
 gate('18 walkWhileSaturated starts NO load upstream would not have (requests never grow)',
   satOn.requests <= satOff.requests * 1.05,
   `requests ${satOff.requests} -> ${satOn.requests}`);
+
+
+// =====================================================================
+// I. RETENTION MUST NOT COST DRAW CALLS (recon T1, the draw half)
+//
+// THE DEFECT. keepResident is the round's headline: the field behind the
+// camera stops collapsing, so a yaw costs no merges and no refetches. But a
+// retained tile was still ATTACHED to the scene graph, so three walked it and
+// could draw it. Pass 2b measured ONE FIXED Owens pose going 152 -> 279 draws
+// between a 45 s and a 600 s sweep with IDENTICAL flags (62 -> 103 resident
+// tiles, tris x2.4, resident 113.7 MB and still climbing). The variable was
+// sweep DURATION: retention charging rent in draw calls, for as long as the
+// session runs, against a frozen ceiling that was never set on it. On a real
+// GPU at 60+ fps that accumulates an order of magnitude faster than here.
+//
+// Attribution, measured switch by switch on this same yaw: it is keepResident
+// ALONE. mergeHysteresis, timerFix, walkWhileSaturated and bboxCache each read
+// identical to flag-off (103 issued, maxZ 13), and "ON minus keepResident" is
+// the flag-off number exactly. It is NOT double-issue: `doubleIssued` is 0 in
+// BOTH arms, so a parent and its children are never drawn together. It is not
+// bendSphere either, which ships false and is never armed.
+rows.push('\nI. RETENTION vs THE DRAW LIST');
+const pkOff = await fly({ frames: 240, pathFn: yawOnly, switches: { ...ON, parkOffscreen: false } });
+const pkOn = await fly({ frames: 240, pathFn: yawOnly, switches: ON });
+rows.push(`  issued (drawable)     ${String(pkOff.draw.issued).padStart(6)}${String(pkOn.draw.issued).padStart(10)}`);
+rows.push(`  issued OFF-FRUSTUM    ${String(pkOff.draw.offFrustum).padStart(6)}${String(pkOn.draw.offFrustum).padStart(10)}`);
+rows.push(`  resident tiles        ${String(pkOff.census.loaded).padStart(6)}${String(pkOn.census.loaded).padStart(10)}`);
+
+gate('19 RED: retained tiles are ISSUED while off-frustum (draws grow with what was ever seen)',
+  pkOff.draw.offFrustum > 0, `${pkOff.draw.offFrustum} off-frustum tiles issued`);
+gate('20 parkOffscreen: NO off-frustum tile is issued to the draw list',
+  pkOn.draw.offFrustum === 0, `${pkOff.draw.offFrustum} -> ${pkOn.draw.offFrustum}`);
+gate('21 …and no tile is issued while SUPERSEDED (a parent drawn over its own children)',
+  pkOn.draw.doubleIssued === 0 && pkOff.draw.doubleIssued === 0,
+  `off ${pkOff.draw.doubleIssued} / on ${pkOn.draw.doubleIssued}`);
+gate('22 retention is UNCHANGED by parking — nothing disposed, nothing re-downloaded',
+  pkOn.census.loaded === pkOff.census.loaded && pkOn.refetch === 0 && pkOn.merge === 0,
+  `resident ${pkOff.census.loaded} -> ${pkOn.census.loaded}, refetch ${pkOn.refetch}, merges ${pkOn.merge}`);
+
+// The property that actually closes pass 2b: the drawn set must not GROW with
+// how long the camera has been turning. Unparked it does (the off-frustum
+// column climbs as the sweep lengthens); parked it is bounded by the frustum,
+// which is the only thing that should bound it.
+const longOff = await fly({ frames: 720, pathFn: yawOnly, switches: { ...ON, parkOffscreen: false } });
+const longOn = await fly({ frames: 720, pathFn: yawOnly, switches: ON });
+rows.push(`  issued after 720 frames${String(longOff.draw.issued).padStart(5)}${String(longOn.draw.issued).padStart(10)}`);
+gate('23 RED: unparked, the drawn set GROWS with sweep duration (240f -> 720f)',
+  longOff.draw.offFrustum >= pkOff.draw.offFrustum && longOff.draw.issued > longOn.draw.issued,
+  `off-frustum issued ${pkOff.draw.offFrustum} -> ${longOff.draw.offFrustum}`);
+gate('24 parked, it does not: the drawn set stays bounded by the FRUSTUM, not by history',
+  longOn.draw.offFrustum === 0 && longOn.draw.issued <= pkOn.draw.issued + 4,
+  `issued ${pkOn.draw.issued} (240f) -> ${longOn.draw.issued} (720f), off-frustum 0`);
+
+// =====================================================================
+// J. THE CAP — and the headline surviving it
+//
+// TILES.lruBudgetBytes (140 MB) was the only trigger, and pass 2b proved a byte
+// budget alone is not a bound: Owens sat at 113.7 MB the whole time, so nothing
+// was ever elected while the tile count doubled. A budget a session cannot
+// reach is not a budget. Tiles are also what cost draw calls, so the count is
+// the honest second unit, and the LRU is ordered by LAST VISIBLE FRAME (PATCH
+// 26 stamps it) rather than by distance — a tile just behind you after a
+// 180-degree turn is CLOSE but stale, and is the right thing to shed first.
+rows.push('\nJ. THE RESIDENCY CAP');
+// Read the SHIPPED constant, not a local copy: the gate must fail if the cap
+// is edited without re-measuring the working set it has to clear.
+const capShipped = readConst('TERRA_PACE').residency?.maxResidentTiles ?? Infinity;
+const capNone = await fly({ frames: 240, pathFn: yawOnly, switches: ON });
+const capShip = await fly({ frames: 240, pathFn: yawOnly, switches: ON, maxTiles: capShipped });
+const capTight = await fly({ frames: 240, pathFn: yawOnly, switches: ON, maxTiles: 120 });
+rows.push(`  uncapped resident     ${String(capNone.census.loaded).padStart(6)}`);
+rows.push(`  at the shipped cap    ${String(capShip.census.loaded).padStart(6)}  (cap ${capShipped}, merges ${capShip.merge})`);
+rows.push(`  at a cap of 120       ${String(capTight.census.loaded).padStart(6)}  (merges ${capTight.merge}, marks ${capTight.residency?.collapseMarks ?? 0})`);
+
+// THE ONE THAT MATTERS. The round's headline must survive its own memory
+// brake: at the SHIPPED cap a full yaw still costs zero merges, zero refetches
+// and zero on-screen replacements. That is only true because the cap clears a
+// full 360-degree working set — which is why the constant carries the measured
+// number and this gate, not a guess.
+gate('25 the yaw contract SURVIVES the cap: zero merges, refetches and on-screen swaps at the shipped cap',
+  capShip.merge === 0 && capShip.refetch === 0 && capShip.replacedOnScreen === 0,
+  `cap ${capShipped}, working set ${capShip.census.loaded}, merges ${capShip.merge}, refetch ${capShip.refetch}`);
+// REPAIRED. This gate used to assert the FLOOR alone cleared a 240-frame yaw's
+// working set, and that premise is exactly what failed on the venue: 260 sat
+// above 190 here and below the re-take's 650-frame revolution at z17. The
+// policy that has to clear the working set is floor OR k x drawn, whichever is
+// larger, and the ratio it must survive is the WORST measured (bob, 9.20), not
+// the yaw this round happens to be about.
+const capK = readConst('TERRA_PACE').residency?.maxResidentPerVisible ?? 0;
+const WORST_RATIO = 9.2; // measured; see the constants comment for the table
+gate('26 …and the POLICY clears the working set with headroom, at the worst measured ratio',
+  capK > WORST_RATIO && Math.max(capShipped, capK * capNone.draw.issued) > capNone.census.loaded,
+  `k=${capK} vs worst ratio ${WORST_RATIO}; effective ${Math.max(capShipped, capK * capNone.draw.issued)} vs ${capNone.census.loaded} resident`);
+// The count trigger must actually FIRE where the byte budget never did — that
+// is the whole defect. Proven by driving the cap below the working set: the
+// election runs, sheds out-of-frustum subtrees, and the resident set drops.
+gate('27 the COUNT trigger fires where the byte budget never did, and sheds',
+  capTight.merge > 0 && capTight.census.loaded < capNone.census.loaded,
+  `resident ${capNone.census.loaded} -> ${capTight.census.loaded}, ${capTight.merge} elections`);
+// Honest about what a cap IS. It is a brake on a set that is still being
+// refined, not a hard ceiling: it can only shed what is safe to shed
+// (out-of-frustum, non-thrashing), so a cap far below the in-frustum working
+// set converges toward that set and stops. Recorded rather than papered over —
+// a gate that asserted `resident <= cap` would be asserting something this
+// design deliberately does not promise.
+gate('28 a cap below the working set converges toward the in-frustum set rather than to the cap',
+  capTight.census.loaded > 120 && capTight.census.loaded < capNone.census.loaded,
+  `cap 120 -> resident ${capTight.census.loaded} (in-frustum floor, not the cap)`);
+
+
+// =====================================================================
+// K. "REFETCHED" vs "SHARED" — what a per-URL counter cannot tell you
+//
+// E's standalone lod-fade row read 0 tile re-appearances over a full 360-degree
+// yaw (residency at full arc, the strongest form of the result) and, on the
+// same run, "14 of 552 distinct tile URLs refetched, worst 4x
+// /dem/15/8822/12386.png" — ALL DEM, no imagery URL refetched ever.
+//
+// That asymmetry is the answer. Imagery's maxLevel is satMaxZoomFor(tier) = 17
+// and the DEM's is TILES.demMaxZoom = 15, so imagery NEVER exceeds its own
+// source ceiling and every imagery tile gets its own URL. A tile deeper than a
+// source's maxLevel does not: three-tile's `de()` (vendored index.js) takes
+// the `r <= i.maxLevel` branch only while the tile is within range, and
+// otherwise calls `He(x, y, z, maxLevel)` to request the ANCESTOR's URL with
+// clip bounds. So all four z16 children of one z15 DEM tile request that ONE
+// z15 URL — `worst 4x` exactly — and a z17 descendant would make it up to 16.
+//
+// These are not refetches. They are N distinct tiles legitimately sharing one
+// ancestor resource, and a per-URL counter cannot tell that from the same tile
+// being downloaded twice. It is NOT the R21 TTL/backoff (no empty body is
+// involved), NOT a skirt or walkWhileSaturated re-request (both would show in
+// imagery too, and neither issues source URLs), and NOT a residency gap
+// (`refetchParent` 0, `merge` 0, 0 re-appearances on that same run).
+//
+// This gate makes the two distinguishable BY NAME, so a real DEM refetch can
+// never again be excused as ancestor sharing — the prediction comes from the
+// TILE census and the observation from the request log, so they can disagree.
+rows.push('\nK. DEM URL SHARING vs REFETCH');
+const shareRun = await fly({ frames: 240, pathFn: yawOnly, switches: ON });
+let dupUrls = 0;
+let worstUrl = 0;
+for (const n of shareRun.demUrls.values()) {
+  if (n > 1) dupUrls++;
+  if (n > worstUrl) worstUrl = n;
+}
+rows.push(`  distinct DEM URLs      ${String(shareRun.demUrls.size).padStart(6)}`);
+rows.push(`  URLs requested >1x     ${String(dupUrls).padStart(6)}  (worst ${worstUrl}x)`);
+rows.push(`  TILE-level refetches   ${String(shareRun.refetches).padStart(6)}`);
+
+gate('29 the DEM ceiling really is below the imagery ceiling (the whole cause)',
+  DEM_MAX_LEVEL < 17, `demMaxZoom ${DEM_MAX_LEVEL} vs imagery 17 at high tier`);
+// The load-bearing one: residency is measured per TILE, and it is 0. A per-URL
+// duplicate is only ever allowed to be ancestor sharing.
+gate('30 residency holds on yaw at the TILE level — no tile is downloaded twice',
+  shareRun.refetches === 0 && shareRun.refetch === 0 && shareRun.merge === 0,
+  `tile refetches ${shareRun.refetches}, refetchParent ${shareRun.refetch}, merges ${shareRun.merge}`);
+// Every per-URL duplicate must be explained by a tile deeper than the DEM
+// ceiling. If a duplicate URL had NO deep tile behind it, that would be a real
+// refetch wearing the sharing costume — and this is what would catch it.
+const unexplained = [];
+for (const [key, n] of shareRun.demUrls) {
+  if (n <= 1) continue;
+  const z = Number(key.split('/')[0]);
+  if (z !== DEM_MAX_LEVEL) unexplained.push(`${key} x${n}`);
+}
+gate('31 every duplicated DEM URL is a ceiling-clamped ancestor, never a re-download',
+  unexplained.length === 0,
+  unexplained.length ? unexplained.join(' · ') : `${dupUrls} shared ancestors, all at z${DEM_MAX_LEVEL}`);
+
+
+// =====================================================================
+// L. THE CAP WAS SIZED ON THE WRONG PATH — and a constant cannot be right
+//
+// THE DEFECT, and it is mine. Gate 26 asserts the cap exceeds the MEASURED
+// working set, and I measured it on a 240-frame synthetic yaw that saturates
+// at 190 tiles. The re-take's venue runs a 650-frame revolution at z17 whose
+// flag-OFF arm alone carries 205 resident / 152 with a model at Owens, so the
+// constant 260 BOUND: the LRU elected off-frustum subtrees, their parents
+// collapsed, and the camera's return re-fetched them — merges 47 with 47
+// parent refetches on one revolution, where the same tree uncapped read 0.
+//
+// It is the cap, not the park. parkOffscreen writes `model.visible` and
+// NOTHING reads it: `_LODEvaluate`, `LOD`, `_update`, `_loadSubTiles`,
+// `_removeSubTiles` and tile-residency.js never consult visibility, and three
+// r185's raycaster tests LAYERS only (three.core.js:56188 `intersect`), so
+// elevation sampling through `getLocalInfoFromGeo` is unaffected too. The only
+// `.visible` read anywhere in the bundle is a `console.assert` inside the
+// raycast helper. A parked parent cannot make a merge legal.
+//
+// The measured shape, in one line: `replacedOnScreen` held at 65 -> 0. Every
+// one of those 47 merges was off-screen, which is the election working exactly
+// as designed — the user-visible contract never broke. The cost was bandwidth,
+// not a swap the player could see. But bandwidth on a revolution is still the
+// headline eroding, and a constant will be wrong again on the next longer
+// sweep or denser venue.
+rows.push('\nL. THE CAP MUST FOLLOW THE DRAWN SET');
+const REV = 650; // the re-take's revolution length, not a 240-frame stand-in
+const sat = await fly({ frames: REV, pathFn: yawOnly, switches: ON });
+const satSet = sat.census.loaded;
+// A constant sized BELOW the working set is the re-take's situation exactly.
+const tooSmall = Math.max(60, Math.round(satSet * 0.79));
+const constCap = await fly({ frames: REV, pathFn: yawOnly, switches: ON, maxTiles: tooSmall });
+const adaptCap = await fly({
+  frames: REV,
+  pathFn: yawOnly,
+  switches: ON,
+  maxTiles: tooSmall,
+  capPerVisible: readConst('TERRA_PACE').residency?.maxResidentPerVisible ?? 3,
+});
+rows.push(`  saturated working set  ${String(satSet).padStart(6)} tiles over ${REV} frames (drawn ${sat.draw.issued})`);
+rows.push(`  constant cap ${String(tooSmall).padStart(4)}      merges ${String(constCap.merge).padStart(4)} · refetch ${String(constCap.refetch).padStart(4)} · on-screen ${constCap.replacedOnScreen}`);
+rows.push(`  same floor, k-adaptive  merges ${String(adaptCap.merge).padStart(4)} · refetch ${String(adaptCap.refetch).padStart(4)} · cap ${adaptCap.residency?.effectiveCap ?? '?'} (drawn ${adaptCap.residency?.visibleTiles ?? '?'})`);
+
+gate('32 RED: a CONSTANT cap below the revolution working set collapses tiles and re-fetches parents',
+  constCap.merge > 0 && constCap.refetch > 0,
+  `cap ${tooSmall} vs ${satSet} resident: ${constCap.merge} merges, ${constCap.refetch} parent refetches`);
+gate('33 …and every one of them is OFF-SCREEN — the user-visible contract never breaks',
+  constCap.replacedOnScreen <= 1,
+  `${constCap.replacedOnScreen} replaced while on screen (the election is out-of-frustum only)`);
+gate('34 GREEN: the same floor, made a multiple of the DRAWN set, costs zero merges and zero refetches',
+  adaptCap.merge === 0 && adaptCap.refetch === 0,
+  `merges ${constCap.merge} -> ${adaptCap.merge}, refetch ${constCap.refetch} -> ${adaptCap.refetch}`);
+gate('35 …and the cap is STILL a bound — finite, and above the set it must hold',
+  Number.isFinite(adaptCap.residency?.effectiveCap) &&
+    adaptCap.residency.effectiveCap >= satSet &&
+    adaptCap.residency.effectiveCap < Infinity,
+  `effective cap ${adaptCap.residency?.effectiveCap} vs ${satSet} resident, ${adaptCap.residency?.visibleTiles} drawn`);
+// The reading that cost a re-take: a merge count alone cannot say whether the
+// LOD policy or the memory brake caused it. The pass now publishes evictions.
+gate('36 the residency pass PUBLISHES its eviction count, so a merge is never ambiguous again',
+  typeof constCap.residency?.evictions === 'number' && constCap.residency.evictions > 0,
+  `${constCap.residency?.evictions} evictions behind ${constCap.merge} merges`);
 
 if (REPORT) console.log(rows.join('\n'));
 console.log(`\n${pass} passed, ${fail} failed`);

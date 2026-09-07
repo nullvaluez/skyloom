@@ -1238,3 +1238,1302 @@ shrinks by at most 35 %; the contract is `> 2/255`; the only open question is
 whether the measured margin has 35 % of headroom. That is a measurement, not an
 argument, and it belongs to E's fixture column with the live column marked
 "user machine pending".
+
+---
+
+## W3 — THE SHIP-STATE FLIP
+
+Ruled by Fable at the close. Only C's own blocks in `lib/fly/fly-constants.js`
+moved; no component, engine or shader file was touched by the flip.
+
+| flag | ships | notes |
+|---|---|---|
+| `LINEAR_HAZE` | **ON** | zero constants moved with it — gain 1 is the only value that closes the seam |
+| `ONE_SUN` | **ON**, `hill.dayK` **1.0** | `monumentsLambert` on. **The daytime-hillshade demotion ships OFF** — see below |
+| `POST_ORDER` | **ON** | `smaaPreset 'high'`, `dither true` |
+| `DEPTH_FIX` | **ON** | CoC patch + the AerialPerspective sky early-out |
+| `SHADOW_CALM` | **ON** | `biasSignFix`, `kernel 'world'`, `texelSnap`; `satCadence 0` (the documented refusal) |
+| `TERRAIN_LIGHT` | **ON, tile half only** | `fragmentHill`, `microFwidth`; **`workerNormals` OFF** — see below |
+| `CLOUD_LIT` | **ON** | |
+| `LAMBERT_ENV` | **ON** | `reflectivity 0.15` |
+
+### `hill.dayK` ships at 1.0 — the demotion is built and OFF
+
+`dayK 0.65` was always a **user-checkpoint knob whose only justification was
+going to be a measurement**, and that measurement never landed: the Sierra A/B
+is unrun and its v1 result was a drift signature. Shipping 0.65 would spend up
+to 35 % of `verify-sat-depth`'s hillshade A/B margin on an argument. At 1.0 the
+weight is exactly 1 at every elevation, so `uHillElev` is the identity, the tile
+fragment's `uHillStrength * uHillElev` is **bit-identical to R21's
+`uHillStrength`**, and that frozen margin does not move at all. One edit away
+the moment there is a number.
+
+### `workerNormals` ships OFF, and it is not an oversight
+
+Turning it on makes `verify-skirt-worker`'s element-by-element identity leg go
+**RED by design** (normals differ; positions, uv and indices do not). It needs
+its own certification with a flag-on ARM, and it has never been exercisable in a
+browser here at all (LERC-only path, 403). The 12 node gates stand; the pixels
+do not exist yet. **The tile half ships; the worker half waits.**
+
+### FINAL CACHE KEYS LIVE AT BOOT (for pass 2's PREWARM census)
+
+**Tile program — `world-bend-fade-hill-r19-ef24`.** Derived by `hillKey()` from
+`hillVariantKey`'s fixed token order: **`e`** (ONE_SUN) + **`f`**
+(TERRAIN_LIGHT.fragmentHill). `a` (D's `AERIAL_LAW`) and `l` (D's per-material
+`lodFade`) are **not set on r24/c** — on the integrated tree with D's flags on
+the key becomes `…-efa24`, and `…-efal24` on any material D hands a `lodFade`.
+The census must read the key from the material, not assume C's.
+
+**Cloud program — `cloud-lit-c24`.** Live (satellite decks only; toy is
+MeshBasic and never sees the class). **Deliberately NOT in the prewarm warm
+set** — it compiles once at boot with the deck it belongs to and adds no new
+mid-flight state flip. E's `programsDelta` style-flip leg is the outstanding
+measurement; if it re-links on the flip back, it belongs in B's
+re-warm-on-style-flip.
+
+**Post chain — the el()/raw() twins are the REORDERED list.** Satellite high:
+`bloom | speed, aerial, tone, sat-hue, sat-bc, sat-wb, vignette | smaa` = **3
+EffectPasses** (was 4). Toy high: `bloom | speed | toy-dof | tone, toy-hue,
+toy-bc, toy-noise, vignette | smaa` = **5** (was 6). Every composition's pass
+count FALLS or holds; none rises. The last pass additionally carries
+`#define DITHERING`, applied through `lib/fly/post-policy.js` from **both** the
+live composer and `prewarm`'s `buildWarmPasses` — a dithered pass is a different
+program, so a census that sees them differ means one assembler missed the call.
+SMAA is our own instance (`SMAAPreset.HIGH`, `EdgeDetectionMode.LUMA`), and
+`DEPTH_FIX` additionally changes the AerialPerspective fragment text and the CoC
+material text.
+
+**No key moves, but the TEXT moves — the case a census must not miss.**
+`SHADOW_CALM`'s `ShaderChunk.shadowmap_pars_fragment` edits change the compiled
+text of **every shadow-receiving program in the scene** while changing **no
+cache key at all**, because three's key is a function of material state and not
+of chunk contents. That is safe here only because the patch is installed from
+FlyScene's module body **before any material compiles**, warm scene included —
+so warm and live read one mutated table. A census that counts keys will see
+nothing; a census that hashes program source will see every shadow receiver
+move, and both readings are correct. `LAMBERT_ENV` is uniform-only and moves
+neither.
+
+### THE DEPTH PROBE HOOK — `window.__flyDepthProbe(x, y)`
+
+Pass 1's `verify-depth-roundtrip` stopped at gate (0): the hook did not exist,
+and the gate correctly refused to re-implement the reconstruction itself,
+because **a harness that re-derives the conversion tests the harness's copy of
+the bug**. So the app publishes the number and the harness only judges it.
+
+`lib/fly/depth-probe.js`, installed from `FlyEffectComposer` (which owns the
+composer, and `composer.depthTexture` is the attachment every
+`EffectAttribute.DEPTH` effect reads):
+
+```
+window.__flyDepthProbe(x, y) ->
+  { raw, viewZ, coc, reversed, near, far, drawingBuffer,
+    source, cocSource, cocReason, error }
+window.__flyDof -> the live DepthOfFieldEffect, or null
+```
+`x`/`y` are DRAWING-BUFFER pixels, **top-left origin** (the probe flips to the
+texture's bottom-left v and lands on the texel CENTRE, so it cannot straddle two
+texels under NearestFilter).
+
+**Which buffer each number came from is in the return value, not just in a
+comment.** `raw` is `composer.depthTexture` **as stored** — no un-reversing, no
+normalisation, no packing — which is the same texel AerialPerspective and the
+CoC material read, and the whole subject of recon L2. `coc` is the DoF effect's
+own `renderTargetCoC`, *sampled* at the same normalised UV rather than read back
+(that target is half-resolution, and a normalised UV is resolution-independent);
+`null` with a `cocReason` when DoF is not mounted.
+
+**Why a copy pass, and the precision ladder.** A depth ATTACHMENT cannot be
+`readPixels`'d, so the probe samples it into a 1×1 float target. 8-bit is not an
+option — reversed depth at 700 m is 3.6e-3 and the reconstruction's relative
+error **is** the texel's — so:
+
+| available | copy target | `precision` | worst error at 50 / 700 / 4000 m |
+|---|---|---|---|
+| `EXT_color_buffer_float` | `FloatType` | `float32` | 0.000002 % / 0.000000 % / 0.000001 % |
+| `EXT_color_buffer_half_float` | `HalfFloatType` | `float16` | **0.0165 % / 0.0150 % / 0.0754 %** |
+| neither | — | — | no number at all, and an `error` saying so |
+
+**The half-float rung exists because refusing outright was stricter than the
+gate it serves.** The first version returned an `error` without
+`EXT_color_buffer_float` — defensible while the cost was unquantified, and wrong
+once it was measured: every float16 path is **13× inside**
+`verify-depth-roundtrip`'s 1 % bound, so the refusal would have turned a runnable
+row into NOT RUNNABLE for a reason that no longer held. A half-float
+`readPixels` returns raw 16-bit PATTERNS, not numbers, so the buffer is a
+`Uint16Array` decoded with three's own `DataUtils.fromHalfFloat` — one decode, in
+one place, that does nothing else (**the proof scans for `1.0 -` anywhere in the
+probe precisely so the recon-L2 double-conversion cannot be reintroduced inside
+the instrument that exists to measure it**). The return value carries
+`precision`, `precisionWorstPct` and `precisionNote`, so **a green row says which
+number it is green on** rather than assuming the two paths are interchangeable.
+What the probe still refuses is a value when NEITHER target renders: an
+unquantified number is worse than an honest absence.
+
+The declared costs are **asserted against a live round-trip**, under the rule
+that a declared cost may overstate and never understate — so they cannot drift
+into optimism.
+
+**Production byte-identical**, the R19 park-handle idiom: both the probe and
+`__flyDof` are installed from `process.env.NODE_ENV` branches that are
+statically false in a production build — nothing constructed, no render target
+allocated, no global written. The probe also renders nothing on its own
+schedule: it draws one 1×1 quad only when a harness calls it.
+
+**THE MIRROR CANNOT CARRY ITS OWN COPY OF THE BUG.**
+`r24-c-depth-roundtrip-proof.mjs` now **extracts both `return` expressions of
+three's `perspectiveDepthToViewZ` from the installed build** and evaluates them
+against the probe's JS mirror — the GLSL is pure arithmetic over
+`depth`/`near`/`far`, so it is valid JS as written and needs no translation that
+could itself introduce an error. **8,004 comparisons across four frustums
+(including the shadow ortho's 1/8000), both branches, the full [0,1] depth range
+with endpoints: BIT-IDENTICAL** — `Object.is`, not a tolerance, because same
+operations in the same order on the same doubles is the only acceptable result
+for a transcription. Six further gates assert the probe's contract: it reports
+the attachment as stored, reads `reversed` from the RENDERER rather than from
+the request, refuses instead of guessing, names its sources, and both handles
+are production-dead. Eight more assert the precision ladder: every float16 path
+inside the bound and by how much, float32 exact, the declared constants never
+optimistic, the `float32 → float16 → refusal` order, the
+`DataUtils.fromHalfFloat` decode, and that `precision` / its cost / its
+provenance all reach the return value.
+
+### Gates on the flipped branch
+
+`verify-c-flagoff` **37/37** · `verify-shadow-calm` **33/33** ·
+`verify-depth-offset` 7/7 · `verify-worker-normals` 12/12 ·
+`verify-vendor-three-tile` 19/19 · post-order proof PASS · linear-haze proof
+(RED 99.2 worst / GREEN 0.000) · depth round-trip proof (RED flat 0.176–0.177,
+**mirror bit-identical to three's GLSL, probe contract intact**).
+`no-undef` over the changed files: **0**.
+
+**Gate (1) of `verify-c-flagoff` is the only assertion in either file whose
+expectation moved with the flip.** Gates (2) and (3) do not, and that is the
+reason to keep the file after the close: they assert that the FALSE branch of
+every injection is the R21 string verbatim and that `r24VariantKey` returns the
+bare R19 key when every token is false. Those are properties of the SOURCE, not
+of the flag's value — so they go on proving the round is one flag flip away from
+R21 now that the flags are on. That is the anti-rot for R20 §7's *"a one-flag
+revert contract rots as flags accumulate"*.
+
+---
+
+## Pass 2b triage — three reds read from source, node-only
+
+Two of E's cert-3 rows came back red against the flipped tree. All three
+questions are answered here from source; two of the three are mine and fixed in
+this commit.
+
+### (a) `verify-linear-haze` seam Δ ≈ 51/255 — NOT LINEAR_HAZE, and not the
+### reader's row either
+
+**The reader's sides are right.** `verify-linear-haze.js` reads with
+`readPixels`, whose rows are bottom-up, and takes `terrain = avg(bestY − GAP −
+BAND, bestY − GAP)` — lower buffer y = lower on screen — against `sky = avg(bestY
++ GAP, …)`. That is the correct assignment, and the printed profile agrees with
+its own labels (the first 13 entries, below the seam, are the ~212 side). So
+"the reader's horizon row is on the wrong side" is eliminated from source, not
+from a guess.
+
+**There is no melt in that frame to measure.** The gate boots through
+`bootFly`, which pins `window.__flyAerialOverride = 0` (`scripts/_boot.js`:83
+and :119, both the boot and the reload leg), and the gate releases only
+`__flySunOverride`. At `FlyScene.jsx`:1659-1666 that pin multiplies `aerialGate`
+to exactly 0, and R19 B built all three atmosphere channels to take their
+IDENTITY path at 0 — `clearAerial()` (no post pass), `setSatContentHaze(start,
+end, 0, 0, 0, 0)`, `setQuiltGrade(0, 0)`. Meanwhile in satellite the two
+scene-side haze channels contribute nothing at this pose by construction:
+`WORLD_EDGE.fade.satellite` is **60 km → 120 km** (nothing in an offline fixture
+frame is within 60 km of the eye), and `setDepthHaze(..., mapStyle === 'toy' ?
+haze.max : 0)` (`FlyScene.jsx`:1011) is **literally 0 in satellite**. So the far
+terrain in the measured frame is at **0 % melt**, not "not reaching 100 %".
+
+The gate's own profile corroborates it independently: across the 13 rows below
+the seam — which at a horizon span a very large distance range — the luma sits
+at 210-214 with no trend toward 161, then falls to 159.5 in ONE row. A melt
+completing at the horizon would have swept most of the 51 across those rows.
+
+**And ≤ 12/255 is unreachable at that pose even with the pin released.**
+`AERIAL_PERSPECTIVE.maxMix` is **0.55**, commented *"never fully swallows the
+mid-band"*, so the terrain keeps ≥ 45 % of its own colour: 0.45 × 51 ≈ 23 > 12
+before the `heightFalloffM` 1200 term is even applied, and the eye in `POSE` is
+4200 m — 3.5 e-folds above that scale height. The satellite melt is designed to
+be FINISHED by the world-bend edge fade out at 60-120 km, which a fixture frame
+never reaches.
+
+So the row is void as posed, and the remedy is E's: release
+`__flyAerialOverride` with the same accessor idiom the gate already uses for the
+sun, assert tier `high`, and then either re-pose into TOY — where the band is
+14-26 km and breathes with altitude, where `setDepthHaze` actually carries
+`haze.max`, and where R12 already proved the ground disc reaches the rim — or
+re-express the contract as an A/B against the flag-off tree rather than an
+absolute seam equality. **This run cannot discriminate whether the haze target
+also disagrees with the dome's colour: with the melt at 0 the gate is blind to
+that term.** If a Δ survives the pin release, that is the next candidate, and it
+is a TUNING equality I refused this round (M1 refusal), not a decode defect.
+
+**On the oracle.** `scripts/r24-c-linear-haze-proof.mjs` predicts 0.000 for the
+DECODE ROUND-TRIP — that the value each setter writes equals
+`srgbToLinear(authored triple)`. It never predicted a 0.000 seam delta. A 0
+seam additionally needs (i) the melt to reach 1.0 at the horizon row and (ii)
+the rim triple to equal the dome's horizon colour; (i) is structurally absent
+here and (ii) is the re-tune I refused. The gate's expected value should not
+have been sourced from that proof.
+
+### (b) `casting` — MINE, fixed
+
+`verify-one-sun` reads `s.casting` (:249) and `s.minElRadDeg` (:248) and
+`s.hillMinDeg` / `s.hillMaxDeg` (:262) off `__flyStats.sun`. I published
+`casting` on `__flyStats.**shadow**` and never published the other three at all,
+so clause (2)'s floor term and clause (3) entirely could not be evaluated —
+`casting=undefined` on every line, `(3) SKIP`. That is my instrument, not
+ONE_SUN: the key light was following `runtime.sun` correctly on every leg (key
+and hill agree to 0.00° in azimuth AND elevation at all six).
+
+Fixed: `casting`, `minElRadDeg`, `hillMinDeg`, `hillMaxDeg` now publish on
+`stats.sun` as well. `casting` stays on `stats.shadow` too — it is a term in
+both contracts.
+
+### (c) `water: "key"` — MINE by semantics, now a vector
+
+The string was my by-reference semantics: satellite water is MeshPhong and its
+specular lobe is built from the scene's single directional. There is exactly one
+`<directionalLight>` in the world scene (`FlyScene.jsx`:2141; the two others live
+in the inspect turntable's own Canvas), so the water direction IS the key by
+reference, and clause (5) is **Δ 0 by identity**. `angleBetween` needs a vector,
+so it now publishes one, plus `waterSource: 'key-light'` naming the semantics.
+
+I did not add a scene light census to give clause (5) teeth: a full traverse on
+the frame loop's stats cadence would perturb E's FRAME_STATS timings during a
+perf-certification round. The honest instrument for "one sun" is the static
+source fact above — a grep gate, not a runtime probe.
+
+### The shared root cause behind both rows' time-of-day legs
+
+Both gates redefine `window.__flySunOverride` as an accessor over
+`window.__r24Sun` and then write `__r24Sun = { elDeg }`, while the app consumes
+that handle as a **timestamp** (`FlyScene.jsx`:1041 → `computeSun(lon, lat, t)`).
+`computeSun` guards with `const t = Number.isFinite(tMs) ? tMs : Date.now();`
+(`lib/fly/sun-model.js`:73), so a non-finite override is silently replaced by the
+wall clock — no throw, no NaN, no tell. Even a correct timestamp would not have
+landed: `apply()` reads the handle only at mount, on the `SKY.dayCycle.refreshSec
+= 60` interval, and when `[mapStyle, warpEpochForSun, runtime, spawn]` change, and
+the gate warps once at boot BEFORE writing any sun. `verify-dusk` documents the
+required order at its own line 48 — *"Sun pins are set BEFORE each warp —
+warpEpoch re-runs the day-cycle effect, which is the only reader of
+`__flySunOverride`."*
+
+That is why the key elevation read a constant ~23° across a commanded 55 → 2 →
+−14 swing, why the azimuth drifted 0.25° monotonically over a 263 s row (wall
+clock, not command), why `moonK` stayed 0 at the "−14°" leg (my moon blend keys
+on `trueElevationDeg(sinEl)` and would be 1 there), and why linear-haze's night
+frame is byte-identical to its noon frame. E is re-basing both gates on a
+timestamp derived from the app's own model.
+
+**Clause (6)'s > 1° azimuth expectation is E's, not mine.** ONE_SUN never
+predicted azimuth motion from an elevation change; in the solar model azimuth is
+the hour angle, so a time-driven gate that moves the sun from 55° to 2° at Powell
+moves the hour angle by hours and the azimuth by TENS of degrees. > 1° is a floor
+a time-driven gate clears trivially — it failed here only because time never
+moved.
+
+**Gates after this commit (node-only, no browser, no dev server):**
+`verify-c-flagoff` 37/37 · `verify-shadow-calm` 33/33 · `verify-depth-offset`
+7/7 · `verify-worker-normals` 12/12 · all four `r24-c-*-proof.mjs` PASS ·
+`no-undef` over the changed file 0.
+
+---
+
+## `__flyLinearHazeOverride` — the runtime pin LINEAR_HAZE never had
+
+E's rebuilt `verify-linear-haze` A/Bs Δ_on against Δ_off. That needs a RUNTIME
+pin: the alternative is two builds, and two builds cannot be compared
+frame-for-frame on one machine. LINEAR_HAZE shipped without one, so the ON arm
+read NOT CALIBRATED.
+
+**The accessor.** `linearHazeOn()` (world-bend.js, exported) is now the ONE
+reader of `LINEAR_HAZE.enabled` anywhere in the tree, with the R24 pin idiom
+(`lod-crossfade.js` `cfg()` / `step-safe.js` `resolveStepSafe()`):
+
+| `window.__flyLinearHazeOverride` | result |
+|---|---|
+| absent | the constant — flag-off identity untouched BY CONSTRUCTION (the branch is not evaluated at all) |
+| `{ enabled: false }` | the sRGB-authored path (the R21 numbers) |
+| `{ enabled: true }` | the decoded path |
+| a partial object | merged over the constant, like every other R24 pin |
+
+`process.env.NODE_ENV === 'development'` leads the condition, so production
+compiles the pin out and this is a plain constant read again; the `!= null`
+guard precedes the spread, so the only allocation happens on a pinned dev tree.
+
+**Answering the module-init question: NO SITE decodes at module init.** There
+were exactly TWO readers of the raw constant and both evaluate at setter/frame
+time — `hazeC` (world-bend, called only from the five `set*Haze`/`set*Fade`
+setters, all of which FlyScene drives per frame) and `AerialPerspective`'s
+`update()`, which postprocessing calls immediately before the pass draws. So a
+fleet pin installed by `addInitScript` governs the whole tree; there is no
+channel that already baked the constant in and would leave E measuring a mixed
+build.
+
+That second reader mattered. `AerialPerspective.jsx` lives in another file and
+carried its own `if (LINEAR_HAZE.enabled)`. Had the pin routed only through
+world-bend, a pinned A/B would have flipped the tile setters while `uHazeColor`
+— the aerial haze target, the very channel the seam contract is about — stayed
+on the other path. It now imports `linearHazeOn` from world-bend.
+
+**New source gate (verify-c-flagoff 37 → 40).** Three gates: the accessor falls
+through to the constant when no pin is set; the pin is dev-only and null-guarded
+before it is read; and a **reader census across ten files** proving the raw
+`LINEAR_HAZE.enabled` has exactly one reader and that it is inside
+`linearHazeOn()`. The census skips lines that OPEN as a comment — R20 §7's *"a
+grep gate reads comments too"*, and this file's own header names the constant in
+prose — while a trailing comment still counts, which fails loud rather than
+hiding a reader. RED-calibrated: adding one `const _x = LINEAR_HAZE.enabled;` to
+`SkyDome.jsx` turns it red and names the file and line.
+
+The two pre-existing regexes that pinned the literal `LINEAR_HAZE.enabled` at
+the two dispatch sites were re-pointed at the accessor. That is tracking my own
+refactor, not a frozen-number move: both still assert the same property (the
+decode is branch-gated, and the false branch is the R21 call).
+
+**Node-only, no browser and no dev server:** verify-c-flagoff 40/40 (RED-
+calibrated) · verify-shadow-calm 33/33 · verify-depth-offset 7/7 ·
+verify-worker-normals 12/12 · four proofs PASS · eslint over the three changed
+files 0 errors 0 warnings. Not run here: a full `next build`. The new
+`AerialPerspective → world-bend` import edge is cross-checked textually (the
+export exists, the specifier matches, world-bend imports only fly-constants so
+no cycle) — the honest residual after the import-welding lesson, where only the
+module resolver caught the defect.
+
+---
+
+## Merge-review follow-up — the dead `SURFACE_CALM` import in FlyScene.jsx
+
+`fd7d28d` replaced FlyScene's inline `SURFACE_CALM.enabled &&
+SURFACE_CALM.depthOffsetFix && …` polygonOffset expression with the T11
+`offsetUnits()` helper and left the import behind. Removed on the merged tree
+(r24/c fast-forwarded to `9bcaace`, so the edit lands on the current file, not
+on a pre-merge copy).
+
+The two linter rules answer different questions and only one of them could see
+this: `no-undef` — the rule I run before every commit since `ad01d32` — cannot
+name an import that resolves fine and is simply never used; `no-unused-vars`
+names it exactly. The project's default config does not enable the latter for
+this file, so the RED had to be asked for:
+
+```
+RED   npx eslint --rule '{"no-unused-vars":["error",{"varsIgnorePattern":"^_"}]}'
+      components/fly/FlyScene.jsx
+      120:3  error  'SURFACE_CALM' is defined but never used.
+GREEN same command, 0 · default eslint 0/0 · grep SURFACE_CALM in FlyScene.jsx = 0
+```
+
+So the pre-commit discipline stands as written, with one addition worth
+carrying: **a helper extraction leaves a dead import behind, and `no-undef` is
+structurally blind to it.** An extraction commit should run both rules.
+
+Gates on the merged tree, node-only: verify-c-flagoff 40/40 ·
+verify-shadow-calm 33/33 · verify-depth-offset 7/7 · verify-worker-normals
+12/12 · four proofs PASS · verify-import-integrity 4/0. No browser, no dev
+server — E's re-take owns :3100.
+
+---
+
+## RULING: the night key/hill split is a DEFECT (b), and the hill now follows the moon
+
+**One line first: (b) — a defect, and it is the R24 recon L3 defect at its
+sharpest. Fixed behind ONE_SUN in `446545b`.**
+
+### The evidence, reproduced from constants alone
+
+E measured, on the only re-take leg where the sun landed (high/night, commanded
+-14 deg, app -13.996 deg, moonK = 1): key az 45.19 / el 34.377 against hill az
+-134.81 / el 8.594, 137.03 deg apart. Every one of those numbers falls out of
+the shipped constants with no GPU:
+
+| number | where it comes from |
+|---|---|
+| hill el 8.594 deg | `HILLSHADE.minElRad` 0.15 rad — `computeSun` clamps `asin(max(0, sinEl))` up to the graze floor |
+| key el 34.377 deg | `SKY_LIVE.nightSky.moonElRad` 0.6 rad — the moon's FIXED elevation |
+| az gap exactly 180 deg | `moonDirFromSun` is anti-solar: `a = az + pi` |
+| 137.03 deg | `acos(cos 34.377 * cos 8.594 * cos 180 + sin 34.377 * sin 8.594)` = 137.04 |
+
+`scripts/r24-c-one-sun-proof.mjs` now prints three trees side by side and
+reproduces E's browser number to two decimals:
+
+```
+night (el -14deg, moonK 1) key<->hill, high tier:
+  R21 flag-off         0.00deg  (agreed - both on the SUN)
+  ONE_SUN pre-fix    137.03deg  (key on the moon, ground on the sun)
+  ONE_SUN this fix     0.00deg  (agreed - both on the MOON)
+  hill<->moon          0.00deg  =>  PASS
+```
+
+### Why (b) and not (a)
+
+1. **R21 AGREED at night.** The flag-off tree put key and hill on the same
+   vector (both at the solar azimuth, both at a graze floor) — 0.00 deg apart.
+   So there is no inherited contract that the ground may disagree with the
+   light: the disagreement is 100% ONE_SUN's, introduced by M2 moving the key to
+   the moon and leaving the ground behind. A regression I shipped.
+2. **Nothing in source asks the hillshade to stay solar at night.** The only
+   documented night intent is the ELEVATION clamp — `minElRad: 0.15, // graze
+   floor (night/dawn) — relief stays readable` — which is orthogonal to azimuth
+   and is preserved. The `az < 0 = morning` convention in `sun-model.js` is the
+   DAYTIME east/west sense, and the gate it cites, `verify-sat-depth`, turns out
+   to assert a hillshade STRENGTH A/B (`mad > 2`), not an azimuth or a flip.
+3. **The charter.** Recon L3 named four sun directions per frame as a root cause
+   of the mismatched look. A moonlit sky lighting buildings from az +45 over
+   ground shaded from az -135 is a 180 deg contradiction inside one frame — the
+   strongest instance of that defect the tree can produce.
+
+**I am overturning my own W2 text.** `r24-c-one-sun-proof.mjs`'s printed
+contract said clause 1 held *"except where moonK > 0, at which point the key is
+the anti-solar moon BY DESIGN"*. That carve-out was written before any night
+measurement existed: it justified the KEY moving and never asked whether the
+ground should follow. The contract lines are rewritten and a new clause 6 states
+the identity.
+
+### The fix
+
+`moonBlendK(elDeg)` is now the ONE copy of the blend weight, called by both the
+per-frame key branch and the 60 s hillshade cadence — two copies of a curve
+would put ground and buildings on different lights for the whole crossing, i.e.
+the same defect in slow motion. In `apply()` the three R21 expressions survive
+VERBATIM as `hx`/`hy`/`hz` and are what `setHillDir` receives with ONE_SUN off,
+so flag-off identity is by construction; with it on, the same `mk` carries the
+hill onto `moonDirFromSun` and renormalises.
+
+**One contract change E must fold in:** at moonK = 1 the hill elevation is now
+`moonElRad` (34.377 deg), not the clamp floor 8.594. So the clamp clause holds
+**where moonK is 0**; at full moon hill el == key el == 34.377, still inside the
+`[HILLSHADE.minElRad, maxElRad]` = [8.6, 51.6] band the hillshade is designed
+for, so relief legibility is not traded away. Clause (3) needs that qualifier or
+it will red on the night leg.
+
+### The moon publish
+
+`__flyStats.sun` gains `moonKeyAzDeg` / `moonKeyElDeg`, in the GATE's
+convention — `az = atan2(x, z)`, `el = asin(y)` in degrees — because the gate
+compares angles and a convention mismatch would look like a lighting bug. (Note
+the proof file's own `azOf` uses `atan2(-x, z)`, the `basis()` convention; the
+PUBLISHED numbers deliberately follow the gate, not the proof.) They are `null`
+while moonK is 0: `_moonKeyDir` is only written inside the `mk > 0` branch, and
+a stale vector reported as live is how an instrument invents a measurement.
+Production cost is four assignments and no trig — the az/el conversion happens
+in the dev-only stats block. `moonK` was already published and is the same `mk`
+the key used.
+
+### Gates
+
+verify-c-flagoff 40 -> **44**: the blend weight has exactly one formula and both
+consumers call it; the hill blend is ONE_SUN-gated with the R21 arguments
+verbatim; the published moon key is null while moonK is 0; and a
+**published-shape gate over all 21 `__flyStats.sun` fields** — a rename or a
+dropped field turns a clause into a silent NOTCAL rather than a red, which is
+exactly how pass 2b lost three clauses. RED-calibrated both ways (renaming
+`moonKeyElDeg` -> `missing: moonKeyElDeg`; dropping the `ONE_SUN.enabled` guard
+-> the hill gate reds).
+
+**Blast radius I cannot measure here.** This moves satellite NIGHT ground
+pixels — `verify-sat-night`, `verify-dusk` and `verify-flicker`'s night legs are
+the exposed gates, and every one needs a browser I am not allowed to start.
+Daylight is untouched by construction (mk is 0 above the horizon, so the uniform
+is bit-identical), and flag-off is untouched at every elevation.
+
+Node-only sweep: verify-c-flagoff 44/44 - verify-shadow-calm 33/33 -
+verify-depth-offset 7/7 - verify-worker-normals 12/12 - four proofs PASS -
+verify-import-integrity 4/0 - eslint over the three changed files 0/0.
+
+### Process note: the split commit, a second time
+
+The ledger edit for `446545b` asserted on a heading text that the merge had
+written with backticks, so the script aborted BEFORE writing — and the
+`git commit` on the following line ran anyway, because the two were separated by
+a newline rather than `&&`. Identical to the `7dae48b`/`974ce23` split earlier
+this round. The lesson was recorded then and not APPLIED: the fix is not "assert
+more carefully", it is that a write-then-commit sequence must be one `&&` chain
+so a failed edit cannot be followed by a commit. Done that way here.
+
+---
+
+## `__flyDepthTruth(x, y)` — the truth raycast, because the harness cannot build one
+
+`verify-depth-roundtrip` reached its gate (1) and read **0 raycast hits of 15
+probes**, every miss saying `handle absent — THREE false, gl true, cam false,
+scene true`. That is not a flaky pose: a bundled app publishes no
+`window.THREE` and no camera, so the gate can never establish a true distance
+from outside. The truth has to be computed where the camera and three are
+already in scope, which is here.
+
+### What it returns
+
+`{ hit, distance, viewZ, object, source }` as asked, plus the terms that let a
+reader judge the answer instead of trusting it: `bendK`, `bendDropM`,
+`bendIters`, `residualM`, `reprojectionPx`, `candidates`, and on a miss
+`{ hit: false, reason }` — never a zero.
+
+`viewZ` is three's view space, **negative in front of the camera, world
+metres** — the same convention and units `__flyDepthProbe(x, y).viewZ` returns,
+so `|probe.viewZ − truth.viewZ|` needs no conversion. `x`/`y` are drawing-buffer
+pixels with a top-left origin, and the NDC conversion is the exact inverse of
+the probe's own UV conversion, so both hooks address the same texel.
+
+### Which camera, which geometry
+
+`camera` and `scene` are the SAME two objects `FlyEffectComposer` hands to
+`new RenderPass(scene, camera)`, passed into `installDepthProbe` from the same
+production-dead effect. So the truth cannot read the inspect turntable's camera
+— that lives in a second Canvas with its own renderer — and it cannot drift from
+the camera whose depth the probe samples.
+
+Candidates are what WRITES DEPTH, or the truth would not describe the buffer:
+`isMesh`, visible through EVERY ancestor (R19's lesson that `traverse` does not
+stop at an invisible parent), a material with `depthWrite !== false` and not a
+sprite material. Billboarded traffic and the tracers are excluded by that test
+rather than by name.
+
+### THE BEND, which a naive raycast gets silently wrong
+
+Every world vertex is displaced by `wPos.y -= bendD * bendD * uBendK` in the
+vertex shader (world-bend.js:579), so the CPU geometry a `Raycaster` sees is NOT
+the surface the depth buffer recorded — at the gate's own 4 km probe the drop is
+metres to tens of metres, i.e. far outside the 1 % bound the gate wants to
+assert. A truth hook that ignored it would have handed E a confident wrong
+number, which is worse than the 0 hits it replaces.
+
+Shifting the ray ORIGIN up by the drop shifts the whole line vertically while
+leaving its XZ path identical, so "shifted line meets un-bent geometry" is the
+same equation as "original line meets bent geometry" for a locally constant
+drop. The drop is smooth, so iterating it at the current hit converges: at most
+four passes, stopping at 1 cm of change, `bendIters` reporting how many it took.
+`k` comes from `getBend()` — the CPU mirror of the LIVE uniforms, the
+`__flyAirDrop` / `horizonFade` idiom — never a constant.
+
+### It falsifies itself
+
+Two numbers exist so a wrong answer cannot look like a right one:
+
+* **`residualM`** — how far the answer sits off the ORIGINAL ray. The bend solve
+  is a fixed point, not an exact inverse; this says whether it converged at this
+  pose.
+* **`reprojectionPx`** — the answer projected back through the same camera,
+  distance in pixels from the pixel that was asked for. A wrong SPACE is the
+  obvious hazard (the floating origin: FlyScene rebases the camera back at
+  :1735, so a between-frames call should see camera and objects in one space —
+  but this hook does not get to assume that), and a stale matrix or a bad bend
+  land the same way. All three show up as a large `reprojectionPx` instead of as
+  a plausible distance.
+
+**Honest limit: I could not run this in a browser.** Every claim above is
+structural. `reprojectionPx` is exactly the instrument that decides it on E's
+machine, and E should read it before reading `distance`.
+
+### `dof=null` beside `__flyDof true` — which is right
+
+**`__flyDof` is right.** It is the live `DepthOfFieldEffect` instance, published
+by Effects.jsx's `setDof` callback ref at mount. `__flyStats.effects.dof` is a
+CONFIG mirror and reads null in compositions that do mount the pass, which is
+why the gate already judges (0b) on `dofLive` and merely prints the other. The
+probe's `cocSource` now names the pass it read — the effect's own constructor
+name plus the handle it came through — so (3)/(4) can say which term they are
+green on rather than inferring one from style and tier.
+
+### Gates
+
+verify-c-flagoff 44 -> **49**: the hook is published and torn down with the
+probe; it cannot exist in production (same `NODE_ENV` early-return, same install
+site, and the regex allows only COMMENTS between the guard and the call, so no
+statement can slip in); it reads the composer's own camera/scene binding with no
+module-scope `camera` to shadow it; the candidate set is depth-writing geometry;
+and it un-bends by the live `uBendK` while reporting its own convergence.
+RED-calibrated by deleting the `NODE_ENV` guard and by weakening the
+depth-write filter — both red, both restored.
+
+Two of my own instrument files needed a one-line follow: the roundtrip proof
+stripped only three's import before evaluating the mirror, and turned into a
+`SyntaxError` the moment the module grew a second one (now strips every
+top-level import); and its production-dead-branch regex demanded the call
+IMMEDIATELY after the guard (now allows comment lines, same property asserted).
+Both are my files tracking my own edit, not gate re-baselines.
+
+Node-only sweep: verify-c-flagoff 49/49 - verify-shadow-calm 33/33 -
+verify-depth-offset 7/7 - verify-worker-normals 12/12 - four proofs PASS -
+verify-import-integrity 4/0. eslint over the changed files: 0 new; the 4
+`react-hooks/immutability` errors in FlyEffectComposer.jsx are pre-existing
+(4 before the edit, 4 after, verified by stash).
+
+---
+
+## THE 1e-6 RESIDUAL IS MY INSTRUMENT, not the rig — and it is removed, not tolerated
+
+The post-batch one-sun row failed four clauses on an azimuth agreement of
+4.76e-6 deg (noon, both tiers) and 4.60e-5 deg (medium/dusk, and high/dusk
+against the dome). It is neither of the two candidates offered: **not a uniform
+round trip, not float32, and not two computations disagreeing. It is
+`toFixed(6)` in `__flyStats.sun`.**
+
+### The arithmetic
+
+A unit vector's component rounded to 1e-6 moves the azimuth derived from it by
+
+```
+|dAz| <= 5e-7 * sqrt(2) / cos(el)  rad  =  4.05e-5 / cos(el)  DEGREES
+```
+
+— 4.05e-5 at the horizon, 4.91e-5 at the moon's 34.377 deg, 7.06e-5 at 55 deg.
+Every failing number sits inside that bound. Evaluating the app's own two
+expressions in float64 and then quantising them the way the instrument does:
+
+| leg | elKey | elHill | \|dAz\| float64 | at toFixed(6) | at toFixed(9) |
+|---|---|---|---|---|---|
+| noon | 55.000 | 51.566 | **0.00e+0** | 2.45e-5 | 3.31e-8 |
+| dusk | 2.000 | 8.594 | **0.00e+0** | 2.60e-5 | 2.41e-8 |
+| night | −14.000 | 8.594 | **0.00e+0** | 2.42e-5 | 4.88e-9 |
+
+**The app's key and hill azimuths are bit-identical as doubles at every leg.**
+The gate was differencing its own rounding.
+
+### Why no float32 is involved
+
+Nothing on the READ path is float32. `Object3D.position` and `Object3D.scale`
+are `Vector3`s of plain JS numbers, i.e. float64; `getHillshade().dir` is the
+JS-side uniform value object, not a GPU read-back; the key is recovered as
+`position − target` and normalised, all in float64. The GPU copy is float32, but
+nothing reads it back — so a "uniform round trip" never happens on this path.
+
+### Are hill and key one computation or two?
+
+Two, and correctly so: they are two DIFFERENT directions by contract. `basis(az,
+el)` is evaluated once per consumer, from the same `az` double (`runtime.sun.az`
+is copied, not recomputed) but at deliberately different elevations — the key at
+the TRUE elevation (floored only while casting), the hill at the clamped one.
+The charter's "one sun" is about the DIRECTION SOURCE, and there is exactly one:
+one `az`, one `sinEl`, one `moonBlendK`. The azimuths coming out bit-identical
+in float64 is the evidence that it really is one source; nothing to fold.
+
+### The fix: publish nine decimals, do not widen the contract
+
+A tolerance would have written my instrument's rounding into the contract
+permanently. Nine decimals puts the artifact at ~3e-8 deg — three orders inside
+the 1e-6 deg clause — so the clause can be asserted for what it says. Cost:
+nothing (dev-only, existing 60-frame cadence, three more characters per number).
+`key` / `hill` / `dome` / `water` and the two moon angles moved 6 (and 4) -> 9;
+scalars in degrees keep four, because they are read rather than differenced.
+
+New gate (verify-c-flagoff 49 -> **50**): every published direction vector
+carries nine decimals. RED-calibrated by putting `hill` back to six. And one
+line in the `ONE_SUN` header records why, so the next person to "tidy" the
+precision reads the bound first.
+
+**E's 1e-3 deg tolerance is no longer needed for these four clauses** — but it is
+harmless, and it is E's call whether to keep it as slack. What should NOT survive
+is the belief that the rig disagreed.
+
+### The dusk sign: yes, expected
+
+medium/dusk, `casting=false`, sun el 2.002 deg: key el 2.002 (the TRUE
+elevation; `SAT_SHADOWS.minElRad` floors it only while the shadow camera casts,
+which is the clause-2 contract) against hill el 8.594 (`HILLSHADE.minElRad`,
+the graze floor `computeSun` clamps into). moonK is 0 there — `fadeStartDeg` is
+0, so a positive elevation cannot arm the moon blend. That is the clamp contract
+reading correctly, not a sign error.
+
+Node-only: verify-c-flagoff 50/50 - verify-shadow-calm 33/33 -
+verify-depth-offset 7/7 - verify-worker-normals 12/12 - four proofs PASS -
+verify-import-integrity 4/0 - eslint 0/0.
+
+---
+
+## RULING: LINEAR_HAZE SHIPS ON — the night regression is the refused tuning, not a decode defect
+
+**One line first: keep it ON. It is a correctness fix about which colour space a
+number is in — true independently of what the seam measures — and the venue
+agrees where it counts: the time-of-day SPREAD HALVED, 21.1 -> 11.7.**
+
+### (1) Why the ON arm reads a larger NIGHT seam — confirmed, with the numbers
+
+The reading is right, and the arithmetic makes it exact. `srgbToLinear(c) < c`
+for every c in (0,1): the decode can only DARKEN the haze target. Reconstructing
+the arms from the log (the dome is not on the decode path, so its luma is the
+same on both):
+
+| leg | dome | terrain OFF | terrain ON | terrain delta | seam OFF -> ON |
+|---|---|---|---|---|---|
+| noon | 161.6 | ~221.5 | 214.7 | **-6.8** | 59.9 -> 53.1 (narrower) |
+| night | 79.6 | ~40.8 | 38.2 | **-2.6** | 38.8 -> 41.4 (wider) |
+
+**One monotone darkening, read through two geometries.** By day the terrain sits
+ABOVE the dome, so darkening closes the gap; at night it sits BELOW, so the same
+darkening opens it. There is no night-specific behaviour in the decode at all —
+which is why the spread, the quantity that actually asks "is the seam the same
+at every hour", improved by half.
+
+And the reason the two legs move by such different amounts is the transfer
+function itself, applied to the two authored keyframes:
+
+```
+#c6d7e8 (day rim)   luminance 0.8338 -> 0.6643   x0.797
+#1a2246 (night rim) luminance 0.1369 -> 0.0181   x0.132
+```
+
+sRGB->linear is gentle on bright values and brutal on dark ones. The day target
+keeps 80 % of its luminance; the night target keeps **13 %**. So a global
+re-scale cannot fix this — any re-tune is PER KEYFRAME.
+
+**No decode defect.** The dome is correctly NOT on this path: its colour comes
+from the HDRI / procedural sky, which three already samples in the right space.
+The haze targets are authored hex constants that were being fed raw into a
+linear buffer, and decoding them is the fix. The residual is that those values
+were chosen by eye, pre-R13, in the WRONG space — so once they are interpreted
+correctly they no longer land near the dome. A decode that is right and a target
+that is wrong: the M1 refusal, showing its night face.
+
+### What the night target would have to be, and why I still refuse it
+
+For the seam to close, `srgbToLinear(authored_night_rim)` must equal the DOME's
+linear horizon colour at night. The decoded target renders to 38.2 against a
+dome at 79.6, so the authored triple has to go UP — but the exact value is not
+derivable from here: the chain between the uniform and the pixel runs through
+the aerial mix fraction (t < 1, `maxMix` 0.55), ACES, and the grade. It is a
+measurement, not an algebra problem. Three reasons the measurement cannot be
+taken this round:
+
+1. **I have no browser, and the venue is the wrong instrument anyway.** The
+   offline fixture's sky is synthetic and it renders on SwiftShader. Tuning the
+   SHIPPING rim triples against that would bake a fixture artifact into the
+   product — the R17 §7.1 mistake in a new costume.
+2. **The triple is a SINGLE SOURCE with four consumers.** `SKY.altAtmo`'s tod
+   keyframes feed the dome band, the tile edge fade, the tile depth haze and the
+   aerial pass, deliberately (`SKY.haze`'s own header: *"the SINGLE source for
+   the rim triple ... so all move TOGETHER per the round-6 rim rule"*). Moving it
+   moves verify-rim, verify-sat-depth, verify-sat-night and verify-dusk with it —
+   a round's worth of re-certification, at close, with no browser budget.
+3. **It is a look decision with a user checkpoint attached**, not a defect fix.
+   And it is per-keyframe work (see the 0.797 vs 0.132 above), not one edit.
+
+### (2) "aerial pass null" beside aerialGate 1 — the same instrument as `dof=null`
+
+The gate reads `window.__flyStats?.effects?.aerial`. That is the CONFIG mirror
+that already printed `dof=null` next to a live `__flyDof` on the depth-rt row.
+The aerial term is mounted and live: `aerialOn = sat && AERIAL_PERSPECTIVE.enabled
+&& tier === 'high'` (Effects.jsx:154) and it is composed as an EFFECT into the
+shared EffectPass (`el: () => <primitive object={ctx.aerial}>`), which is R19's
+"0 extra draws" — so there is no separate pass in `composer.passes` for a probe
+to enumerate. Null is the right answer to the wrong question.
+
+**Channels actually live on that frame** (satellite, tier high, aerialGate 1,
+AERIAL_LAW off):
+
+| channel | state | band |
+|---|---|---|
+| AerialPerspective `uHazeColor` | **LIVE, decoded** | 800 m -> 14 km, maxMix 0.55 — dominant at a horizon |
+| tile depth haze `uHazeColor` | **LIVE, decoded** | 16-55 km (AERIAL_LAW ships OFF, so the amplitude is `SKY.haze.max` 0.5) |
+| tile edge fade `uEdgeColor` | live, decoded, ~0 here | `WORLD_EDGE.fade.satellite` 60-120 km |
+| content haze | NOT live | `AERIAL_PERSPECTIVE.content.enabled: false` |
+| SAT_QUILT grade | live | desat/luma only — decodes no colour |
+
+So the A/B measured two decoded colour channels, and both take the SAME
+`_atmoRim` triple by the round-6 single-source rule. That is a clean measurement
+of one authored target, which is what makes the table above readable at all.
+
+### (3) The ship-state recommendation
+
+**ON.** The reasons, in order:
+
+1. It is a **space** fix, not a look knob. With the flag off the authored triples
+   are interpreted in a space the buffer is not in; that is wrong whatever the
+   seam reads.
+2. The venue's own **spread halved** (21.1 -> 11.7). That is the metric that
+   asks whether the seam behaves the same at every hour, and it improved by 44 %.
+3. The night regression is **smaller than the noon gain** (+2.6 vs -6.8) and is
+   a target-VALUE residual that exists identically with the flag off — OFF's
+   night seam is already 38.8. Turning the decode off does not close it; it
+   moves it to 38.8 and gives back the noon gain and the spread.
+4. Shipping OFF would be certifying a known-wrong colour space to make one
+   sub-clause green.
+
+Two caveats for the close, both honest:
+
+* **(5b) may not be a measurement.** +2.6 luma is small; if haze-red's noise
+  floor comes back at or above 2.6, that clause is noise and should be reported
+  as NOT CALIBRATED rather than as a regression.
+* **The <= 12/255 seam contract is unreachable at that pose regardless of this
+  flag** — `maxMix` 0.55 leaves the terrain >= 45 % of its own colour, so
+  0.45 x 51 ~ 23 > 12 before the 1200 m height falloff is applied to a 4200 m
+  eye. The seam gate belongs on the informational side for R24.
+
+**R25 item:** re-author `SKY.altAtmo`'s tod rim keyframes against the DOME's
+measured linear horizon colour, per bucket, on the user's machine — with
+verify-rim / verify-sat-depth / verify-sat-night / verify-dusk re-certified in
+the same round, because the triple has four consumers.
+
+No code moved: nothing in (1) or (2) is a decode defect.
+
+---
+
+## depth-rt retake2: THE FAR PICK MISSED because my own bend correction swept the ray over it
+
+Three findings, two of them mine and fixed here.
+
+### (2) The 34 m object — MY DEFECT, in the bend correction
+
+At the far pick the buffer held a depth-writing surface 34.45 m in front of the
+camera and the raycast reported 3,144.7 m of terrain. The cause is not the
+candidate set; it is the correction:
+
+**A rigid vertical lift is right for distant terrain and fatal in the near
+field.** The solve lifts the ray origin by the drop at the current hit. At
+`bendK` 5e-6 a 3 km hit means a lift of 3144² x 5e-6 = **49 m** — and a ray
+lifted 49 m at the camera passes about 49 m above anything a few tens of metres
+away. The player aircraft under the chase cam sits ~30 m ahead. The first
+iteration hit distant terrain, the lift went to tens of metres, and every
+subsequent cast flew straight over the aircraft. The candidate set was never the
+problem: the aircraft is a depth-writing visible Mesh and was in the list all
+along.
+
+**Fix: two casts and let the reprojection arbitrate.** An UNLIFTED cast (the
+near field, where the drop is 0.05 m at 100 m and cannot matter) and the
+bend-solved cast (distant terrain); each corrected point is projected back to
+the pixel and rejected above 1.5 px; the NEAREST survivor wins, because nearest
+is what a depth buffer keeps. Distant terrain found by the unlifted ray is
+pushed off the ray by its own drop and rejects itself — no special case
+anywhere. `via` reports which cast won, `tried`/`rejected` how many there were.
+
+### (1) The 36 m gap at the near/mid pick — ruled out, named, and made measurable
+
+Ruled out from source and arithmetic:
+
+* **The near plane.** 2.5 / 0.00207 = 1207.7 against a reported 1207.14: the
+  probe is reconstructing exactly `near / raw` for a reversed buffer with a
+  distant far plane. The reconstruction is faithful; the disagreement is about
+  WHICH SURFACE, not about the conversion.
+* **Texel addressing.** Both hooks take `gl.getDrawingBufferSize()` and use
+  exactly inverse conversions of the same `(px + 0.5)` centre. `reprojectionPx`
+  came back **0.00 on every probe**, which is the direct proof that the truth
+  point lands on the pixel that was asked for. No CSS/drawing-buffer scale
+  error exists.
+* **float16 precision.** At raw 0.00207 a half-float carries ~0.05 % relative
+  error — 60x too small for 3 %.
+
+What remains is the surface, and the log contains the evidence for it: **two
+probes of the SAME pixel (480, 464) read 1207.14 and 1209.63** — 2.5 m apart. A
+static surface cannot do that. The world was streaming between reads, so a truth
+taken in a different turn is a truth of a different world.
+
+Two fixes, both mine:
+
+1. **`truth` is now a field on the probe result**, computed in the same
+   synchronous turn as the depth read. No frame can land between them, so the
+   difference is about the surface and never about the clock. The standalone
+   `__flyDepthTruth(x, y)` stays for direct use.
+2. **`slopeMPerPx`** — the truth now casts the four neighbouring pixels and
+   publishes the largest view-Z step across one texel.
+
+**On the contract wording: <= 1 % is the wrong bound for a SURFACE comparison at
+1.2 km, and it should be**
+
+```
+|probe.viewZ - truth.viewZ|  <=  0.01 * |truth.viewZ|  +  truth.slopeMPerPx
+```
+
+One pixel at 1.2 km subtends metres of ground; on a grazing face — a tile skirt,
+a cliff, a seam between two LODs — the depth across one texel changes by tens of
+metres, and no reconstruction error is being measured there. The slope term is
+MEASURED at the probe's own pixel rather than guessed as a constant, so the
+bound is tight where the surface is flat and honest where it is not.
+
+### (3) `cocSource` was published — the gate read a different address
+
+`coc` and `cocSource` are assigned in the SAME branch off the same `cocTex`, so
+a finite `coc` PROVES a published `cocSource`; the log printing
+`coc 0.1411764770746231` with `coc source: null` is that contradiction. The gate
+reads `window.__flyStats?.effects?.cocSource ?? window.__flyDof?.cocSource`
+(verify-depth-roundtrip.js:381-383), and the name lives on the PROBE RESULT,
+which the same gate already destructures for `probe.coc` and `probe.raw` at
+:323. Nothing wrote the address it read.
+
+Fixed on my side rather than only reported: the probe now also mirrors the name
+onto `__flyStats.effects.cocSource`, so both read paths work and the class of
+"published, but somewhere else" is closed for this field.
+
+**And a finding for (3)/(4) while I was in there: the CoC texture is 8-BIT.**
+0.1411764770746231 is float32(36/255) and 0.16470588743686676 is float32(42/255)
+— exact 1/255 steps. So the CoC term is quantised to 0.0039, which is fine
+against (3)'s 0.02 bound but worth stating, because "0.141" looks like a
+continuous measurement and is not. (4) is not blocked by that: it read 0.165
+because the pixel held the aircraft at 34 m, not 4 km — the (2) defect, and E's
+pick change (distinct pixels with distinct truths) is the other half.
+
+### Gates
+
+verify-c-flagoff 50 -> **54**: both casts survive and the nearest valid one wins
+(RED-calibrated by replacing the reprojection filter with `slice(0, 1)`); one
+texel of slope is published; probe and truth are one synchronous read
+(RED-calibrated by deleting the `out.truth` line); `cocSource` is mirrored where
+the reader looks.
+
+Node-only: verify-c-flagoff 54/54 - verify-shadow-calm 33/33 -
+verify-depth-offset 7/7 - verify-worker-normals 12/12 - four proofs PASS -
+verify-import-integrity 4/0 - eslint 0/0. No browser.
+
+---
+
+## verify-dusk noon: NOT AN R24 FLAG — a per-FRAME ramp starved by a ~0.5 fps venue
+
+**One line: nothing this round writes `scene.environmentIntensity` or
+`scene.backgroundIntensity`; the env/bg ramp advances by at most 0.25 s per
+FRAME, and at the venue's frame rate the gate's 26 s wait bought about 3 s of
+ramp. The constant stays frozen and no flag's day path needs to change.**
+
+### The mechanism, and it is R16's
+
+`SatEnvironment.jsx`:553
+
+```js
+const k = 1 - Math.exp(-(delta > 0.25 ? 0.25 : delta) / SKY_LIVE.hdriFade.rampSec);
+```
+
+`delta` is r3f's frame delta (`useFrame((_, delta) => …)`), so this is a
+PER-FRAME exponential approach, not a wall-clock one, and the clamp caps each
+frame's advance at 0.25 s. `git log -L` puts the clamp and `rampSec: 1.5` in
+`4a1fe1f` (R16) and the `day: { env: 0.85, bg: 1.0 }` anchor in `d72adb1`
+(R13). None of the three moved this round.
+
+### The arithmetic says the same thing twice
+
+| reading | short of target | implied ramp time `−1.5·ln(short)` |
+|---|---|---|
+| env 0.7382 / 0.85 | 13.15 % | 3.04 s |
+| bg 0.8801 / 1.0 | 11.99 % | 3.18 s |
+
+At 0.25 s of ramp per frame that is **12–13 frames inside the gate's 26 s noon
+wait, i.e. ~0.48 fps** — exactly the SwiftShader regime the R24 environment
+truth records for this container. The two numbers are not two symptoms; they are
+one starved ramp measured on two channels, which is also why their ratios differ
+(0.8685 vs 0.8801): they ramp from different seeds — the previous bucket's
+values — toward different targets.
+
+On a machine with frames, 26 s buys 26 s of ramp: `exp(−26/1.5)` = 3.3e-8, and
+the explicit snap two lines further down —
+
+```js
+if (Math.abs(env - envT) < 1e-4) env = envT;
+```
+
+— then lands on **exactly** 0.85 / 1.0, which is precisely what the frozen cell's
+"exactly" requires. The gate is a settle contract; the venue cannot satisfy it at
+half a frame per second, whatever is flagged.
+
+### Clearing the candidates from source
+
+| candidate | verdict |
+|---|---|
+| **LAMBERT_ENV** | sets `material.reflectivity` on Lambert materials (LandmarkMonuments :152, MonumentModels :165, SatParcelHomes :181, SatVegLayer :216). Per-material, never the scene scalars. |
+| **CLOUD_LIT** | a material, not a scene scalar. |
+| **ONE_SUN** | `hill.dayK` is 1.0, the identity; nothing in the block touches env/bg. |
+| **POST_ORDER / tone mapping** | **cannot show here by construction**: the gate reads `__flyStats.envIntensity` / `bgIntensity`, which are written straight from `env` / `bgOut` at SatEnvironment :598-599 — PRE-tonemap scalars, before any pass runs. An exposure or pass-order move is invisible in those numbers. |
+| **ENV_UNIFORM (B)** | confirmed SHIPPED OFF in its own constants header. |
+| **FRAME_STATS (E)** | an instrument — no draw, no material state. It can only touch the frame RATE, which is the axis that matters, but it is not the mechanism. |
+
+The decisive structural fact: the ONLY writers of `scene.environmentIntensity`
+in the tree are `FlyScene.jsx`:2468 (the toy `<Environment>`, not satellite) and
+`SatEnvironment.jsx`:347 / :594. Nothing R24 added writes either scalar.
+
+### What should change, and it is the harness
+
+The gate sleeps 26 s and reads. A settle contract should **wait on the VALUE, not
+the clock** — and the snap above makes exact equality reachable, so
+
+```js
+await page.waitForFunction(() =>
+  window.__flyStats?.envIntensity === 0.85 && window.__flyStats?.bgIntensity === 1);
+```
+
+with a generous timeout is both stronger than the sleep and immune to venue
+speed. Offered, not landed: publishing `envTarget` / `bgTarget` beside the two
+values would let the harness poll convergence without hard-coding constants —
+two dev-only assignments in SatEnvironment's existing `if (dev …)` block. That
+file is B's, and at close I am not editing another owner's component
+unilaterally for an instrument nobody has asked for yet.
+
+No code moved: nothing here is an R24 defect.
+
+---
+
+## depth-rt tail: THE DROP MODEL WAS THE INSTRUMENT — corrected exactly, no model at all
+
+### RED 1 — the 205 m median. Mine, and the mechanism is in my own arbiter
+
+The previous truth subtracted the GROUND drop from every hit and rejected
+anything that then missed the pixel by more than 1.5 px. Both halves are wrong
+for that pick, and the numbers say so:
+
+* **The threshold rejects CORRECT candidates on a grazing ray.** At 1.7 km the
+  ground drop is 1728² x 5e-6 = **14.9 m**, and on a near-horizontal ray a
+  vertical displacement is almost entirely PERPENDICULAR to it. One pixel at
+  that range subtends ~1.7 m, so a correct candidate reprojects ~9 px away and
+  is thrown out. The row's own `1 cast(s) rejected of 2` is that happening.
+* **The ground formula is wrong for an AIR-bent actor by construction.** Traffic,
+  contrails and the player ride `world-bend-air-anchor`, whose `airDrop` carries
+  a LIFT term — R7's "high traffic reads UP". Correcting such a hit with the
+  ground drop over-drops it by tens of metres, which then fails the same
+  threshold. So the one class of actor most likely to be sitting in front of
+  terrain was the one class guaranteed to be rejected, and the truth fell
+  through to the ground 205 m behind.
+
+**The fix removes the model rather than tuning it.** Every bend variant in this
+tree displaces ONLY in Y — ground (`wPos.y -= bendD * bendD * uBendK`), the
+per-anchor variants, and the air bend — and none of them touch XZ. So the
+rendered position of an un-bent CPU hit has the SAME XZ, and the point the
+camera saw at that pixel is simply **the point on the original ray at that XZ**.
+Solve for it directly: the corrected point lies on the ray by construction,
+reprojection is 0 rather than a threshold, and it is exact for every bend
+family at once with no per-family case.
+
+`impliedDrop = hit.y − rayY(sameXZ)` then becomes a MEASUREMENT of how far the
+GPU moved that actor, and doubles as the validity test: the bend only moves
+things down, and the ground bend is the largest displacement any variant
+applies, so a candidate is real iff `0 <= impliedDrop <= groundDrop` within
+tolerance. A ground hit reads `impliedDrop == groundDrop`; an air-bent actor
+reads visibly less — **which is now the tell for which bend family the buffer
+was holding, printed rather than inferred.**
+
+Both casts (unlifted, and lifted so the ray can reach distant terrain whose CPU
+geometry sits above where it was drawn) now feed ONE pool of up to 8 hits each,
+every hit judged identically, nearest valid `t` wins. The casts are two ways of
+FINDING candidates, not two answers to arbitrate.
+
+**And the hook now publishes `hits`** — every candidate on the ray with its
+object, distance, implied drop, ground drop and validity. The next run does not
+need a theory: it prints what was on that ray and why each one was or was not
+the answer. That is the honest response to a disagreement I could not resolve
+from source.
+
+Refuted along the way, from source: there is **no `raycast` override and no
+`layers` manipulation anywhere** in `components/fly` or `lib/fly`, so
+InstancedMesh pools (traffic, monuments, clouds, precip, parcel homes, veg) are
+all in the candidate set and three's raycaster tests them. The candidate filter
+was never the problem — the correction was.
+
+### RED 2 — the CoC contract for E
+
+Not mine to fix, and E's gate shape is RIGHT. The numbers to build it on:
+
+* The toy DoF is driven with **world-space constants that do NOT follow the
+  chase distance**: `worldFocusDistance = TOY.dofFocusM = 700 m`,
+  `worldFocusRange = TOY.dofRangeM = 2600 m`, `bokehScale = 2.6`
+  (Effects.jsx:238-246). postprocessing converts both to normalised linear depth
+  against the camera's near/far, so with near 2.5 / far 600000 the focus sits at
+  `d = 0.001167` and the range is `0.004333`.
+* `CircleOfConfusionMaterial` computes
+  `magnitude = smoothstep(0, focusRange, abs(linearDepth − focusDistance))`.
+  Evaluated at the run's own truths: **35.9 m -> 0.1624** (measured 0.1608),
+  **3210 m -> 0.9965** (measured 1). Both inside the 8-bit quantum, which the
+  CoC target is: those readings are exact 1/255 steps.
+* So E's contract — *measured CoC ~ CoC(formula, truth distance) within the
+  quantum, at all three picks* — is exactly right, and it is stronger than a
+  focus-plane assertion because it tests that the DoF reads real depth without
+  assuming where focus sits.
+* And the band a "< 0.02 at the focus plane" pick must land in is
+  **482 m to 918 m** of world distance. 35.9 m is not near the focus plane; the
+  player jet was simply the nearest thing on that ray.
+* `window.__flyDof.cocMaterial` is exposed (Effects.jsx:106 already reaches it
+  for the DEPTH_FIX patch) with `focusDistance` / `focusRange` uniforms, so a
+  gate can read the live values rather than re-declaring the constants.
+
+### Gates
+
+verify-c-flagoff 54 -> **57**: the correction solves the ray at the hit XZ
+rather than modelling a drop; validity is the implied-drop interval, not a pixel
+threshold; both casts feed one pool with nearest-valid-t winning; every
+candidate is published. RED-calibrated by forcing `valid = true` and by
+reversing the sort.
+
+Node-only: verify-c-flagoff 57/57 - verify-shadow-calm 33/33 -
+verify-depth-offset 7/7 - verify-worker-normals 12/12 - four proofs PASS -
+verify-import-integrity 4/0 - eslint 0/0. `scripts/verify-depth-roundtrip.js`
+untouched. No browser.
+
+---
+
+## depth-rt w5: THE DEGENERATE ZERO — my "exact" correction was the un-bent answer
+
+The w5 arbiter is wrong and the diagnosis handed to me is exact. I record it in
+full because I got the geometry backwards in a way a source gate could not see.
+
+### What I got wrong
+
+I claimed the rendered point shares the CPU hit's XZ, so the truth is the ray
+point at that XZ. **That is true for a rigid displaced POINT and false for a
+continuous SURFACE.** The GPU LOWERS the world, so a pixel's ray meets the
+displaced surface FARTHER along and at a DIFFERENT XZ than it meets the CPU
+geometry. Worse, applied to an UNLIFTED cast the formula is circular: a raycast
+hit lies on its own ray by construction, so
+
+```
+impliedDrop = hit.y − rayY(sameXZ) ≡ 0
+```
+
+for every unlifted hit, the interval test `0 <= 0 <= groundDrop` passed
+HONESTLY, nearest-t won, and the truth became **the un-bent geometry with no
+bend correction at all** — which is why all 15 truths printed
+`drop 0.00 m · residual 0.000 m · reproject 0.00 px` and every pick read
+`via unlifted`. The errors are the ground drop divided by the tangent of a
+grazing ray: 26 m at 2282 m -> +74 m, 36 m at 2667 m -> +121 m. The previous
+tail run's `via bend-solved` far pick agreed to 0.00 %; I removed the thing that
+was working.
+
+### The fix: the iteration is restored, and the drop is now per-VARIANT
+
+* **Surfaces** get the bend solve back — lift the ray by the drop at the current
+  hit, re-cast, converge (0.05 m). At convergence `hit − (0, drop, 0)` lies on
+  the ORIGINAL ray, so residual and reprojection become the validity TEST rather
+  than a construction.
+* **Rigid air-bent actors** get their own displacement. Traffic, contrails and
+  the player carry `world-bend-air*` keys and drop by `airDrop(d, y)` with R7's
+  altitude lift, not by `d²k`. The family is read from the material's own
+  `customProgramCacheKey()` (world-bend.js:716/777/847), and the iteration runs
+  once per family, each matching only its own hits — which is what lets an
+  air-bent actor in front of terrain be found at all.
+* **Validity is CONVERGENCE + residual + reprojection.** Nothing else can
+  exclude the degenerate zero, because the degenerate zero satisfies any
+  interval test honestly.
+* `hits` (per-family candidates, with converged/iters/residual/reprojection) and
+  `rayHits` (every raw hit any cast met, with its bend key) are published, so
+  the next disagreement is read rather than theorised.
+
+### The calibration that could have caught it — and why the old one could not
+
+**verify-c-flagoff's RED calibration for the w5 revision (forcing `valid=true`,
+reversing the sort) was structurally incapable of catching this**, exactly as
+observed: a degenerate zero looks identical to a converged answer in the source.
+A calibration needs GEOMETRY with a known non-zero drop, so it now lives in
+`r24-c-depth-roundtrip-proof.mjs`, built backwards from the w5 median pick:
+
+```
+BENT-SURFACE CALIBRATION (the w5 median pick, solved backwards)
+  geometry: bendK 0.000005, ray depressed 19.4734deg, eye 760.85 m
+  RED   degenerate "ray point at the hit XZ": range 2282.30 m (implied drop 0.00 m,
+        interval test ACCEPTS) — off the buffer by 74.02 m
+  GREEN iterated lift: 4 passes, converged true, drop 24.68 m, range 2356.30 m
+        — off the buffer by 0.02 m, residual 0.0056 m
+  the w5 log measured this same gap as +74.01 m; here it is +74.00 m
+```
+
+The RED reproduces the logged error to **0.01 m** and passes the old validity
+test while doing it; the GREEN lands 0.02 m from what the depth buffer held.
+Source gates alone were never going to separate those two.
+
+### Atomicity — confirmed, and now measurable
+
+E's sweep-vs-assertion drift (median 2628.4 -> 2282.3, farthest 3052.9 -> 2667.3,
+nearest 1166.7 -> 1211.1, mixed signs) is NOT this defect. Two arguments:
+
+1. **Structural.** A per-pick read IS atomic: `probe()` samples
+   `composer.depthTexture` — the last rendered frame's attachment — and then
+   calls `truth()` in the SAME synchronous turn. JS is single-threaded, no rAF
+   can fire between them, so both see one depth texture, one scene graph and one
+   set of camera matrices. Nothing mutates the camera outside `useFrame`, and
+   FlyScene's floating-origin offset is applied and removed within one frame
+   (:1712 / :1735), so a between-frames call reads the pose the frame rendered.
+2. **The instrument cannot produce a DRIFT.** The sweep and the assertion ran
+   the SAME hook; a constant bias cancels in a comparison between two of its own
+   readings. Only the world moving under the pixel produces a difference — and
+   mixed signs are what motion produces when eye position and attitude both
+   change, since a grazing ray's ground intercept moves far more per metre of
+   eye travel than a steep one's (the two responded ~8:1 here).
+
+To make that a measurement rather than an argument, the truth now publishes
+**`eye`** — the camera world position the answer belongs to. If it differs
+between two reads, the world moved under the pixel and no comparison across them
+is meaningful.
+
+### E's corroboration, recorded
+
+Inverting the CoC smoothstep on the median's measured 0.8118 gives 2578.5 m
+Euclidean against the truth's 2496.5 — 82 m, **74 m in view-Z**, against clause
+(2)'s measured 74.01 m. A depth-texture read and the GPU's own CoC texture agree
+to a metre on the size of the truth hook's error. Two independent instruments
+convicting the same defect is the strongest evidence this round produced, and it
+also settles DEPTH_FIX's own claim: **the DoF's CoC agrees with the DEPTH
+BUFFER**, not with the geometry — the material formula at the PROBE's Euclidean
+distance gives 0.8112 (measured 0.8118) and 0.9713 (measured 0.9725), inside the
+8-bit quantum at all three picks. The DoF reads real depth. The disagreement was
+buffer-vs-geometry and it was the instrument's.
+
+### Gates
+
+verify-c-flagoff 57 -> **58**, with the truth block rewritten: validity is
+convergence + residual + reprojection and never an implied-drop interval; the
+lift ITERATES until it stops moving; the drop is chosen per hit from the
+material's world-bend variant (ground vs air); both families are solved and the
+nearest valid wins; every candidate and every raw ray hit is published.
+RED-calibrated by forcing `valid = true` and by deleting the air-drop branch.
+Two earlier gates were re-pointed at renamed identifiers (`raycaster2`, the
+two-name import) — same properties, my own refactor.
+
+Node-only: verify-c-flagoff 58/58 - verify-shadow-calm 33/33 -
+verify-depth-offset 7/7 - verify-worker-normals 12/12 - four proofs PASS (the
+roundtrip proof now carries the bent-surface calibration) - import-integrity 4/0
+- eslint 0/0, `no-unused-vars` 0 (three scratch vectors died with the rewrite).
+`scripts/verify-depth-roundtrip.js` untouched. No browser.
+
+---
+
+## CLOSE — DEPTH_FIX certified both ways, and one of my own arguments refuted
+
+w6 on the flipped tree (`d960fdb`, `ea30f64` served, E's rebuilt clauses, player
+parked): **11 passed / 0 failed, rc=0.**
+
+| pick | truth | probe | err |
+|---|---|---|---|
+| nearest | 1201.7 m | 1201.71 | 0.00 % |
+| median | 2399.3 m | 2399.39 | 0.00 % (0.05 m, where w5 read +74.01) |
+| farthest | 2836.6 m | 2836.79 | 0.01 % (0.22 m against a 48.58 m bound) |
+
+Every pick `via bend-solved · family ground · converged true`. The measured CoC
+equals the material's own formula at the probe's distance within the 8-bit
+quantum at all three (0.1373 / 0.8353 / 0.9804), and (4)'s ordering holds with a
+0.8431 spread. So DEPTH_FIX is certified in BOTH directions on the venue —
+buffer against geometry through the truth hook, and DoF against buffer through
+E's CoC clause — with the R24 double-un-reversal signature absent. **Every red
+this row ever showed was an instrument's, and every instrument was mine.**
+
+### The argument I got wrong, recorded because it was mine
+
+When E reported the w5 sweep-vs-assertion drift (hundreds of metres, mixed
+signs) I gave two reasons it could not be the arbiter. The first stands; **the
+second was wrong, and the field I added to settle it is what refuted me.**
+
+* **Stands:** a per-pick read is atomic — `probe()` samples
+  `composer.depthTexture` and calls `truth()` in one synchronous turn, so no rAF
+  can intervene and both see one depth texture, one scene graph, one camera.
+* **REFUTED:** *"a single instrument cannot produce a DRIFT between two of its
+  own readings — a constant bias cancels."* E's `eye` print shows the camera
+  moved **0.8 / 1.3 / 1.1 m** between the sweep and the assertion. A metre
+  cannot move a ground intercept by hundreds of metres, so the w5 shifts were
+  the degenerate arbiter picking a DIFFERENT SURFACE, not motion.
+
+The category error is the lesson: **the degenerate arbiter was not a bias, it
+was a SELECTOR.** Its validity test was trivially satisfied by every candidate,
+so `nearest-valid-t` was choosing among a pool on a knife edge, and a metre of
+camera travel could flip which surface won. A bias cancels between two readings
+of the same instrument; a selector AMPLIFIES the smallest input change into a
+discontinuous output. I reasoned about the first and shipped the second — and I
+had already been told, in this same round, that "a probe green on a quiet boot
+is not a probe green under load" (R21 §5). This is the same shape: an instrument
+whose answer is stable only while nothing moves.
+
+The `eye` field exists because I wanted "expected motion" to be a measurement
+rather than an argument. It became one, and it decided against me. That is the
+field earning its place, and the label now covers exactly the metre it should.
+
+### Standing node-only state at close
+
+verify-c-flagoff 58/58 - verify-shadow-calm 33/33 - verify-depth-offset 7/7 -
+verify-worker-normals 12/12 - four proofs PASS (the roundtrip proof carrying the
+bent-surface RED/GREEN calibration) - verify-import-integrity 4/0 - eslint 0/0 -
+`no-unused-vars` 0. No browser and no dev server was started from this worktree
+at any point in the close.

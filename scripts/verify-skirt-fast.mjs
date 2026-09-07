@@ -31,6 +31,7 @@
 import { mkdirSync, copyFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { checkShip } from './_r24a-ship-state.mjs';
 import { loadVendoredThreeTile } from './_tt-shim.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -168,6 +169,12 @@ console.log("  the ms column is this container's CPU, not the user's machine.\n"
 rows.push(
   `  ${'case'.padEnd(34)}${'in idx'.padStart(8)}${'out idx'.padStart(9)}${'path'.padStart(9)}${'geometry'.padStart(11)}`
 );
+
+// ---------------------------------------------------- 0 the SHIP state
+const shipSF = checkShip('TERRA_PACE');
+gate('0 skirtFast ships ON and skirtWorker ships OFF (the ruled state)',
+  shipSF.ok && shipSF.got.skirtFast === true && shipSF.got.skirtWorker === false,
+  `skirtFast=${shipSF.got.skirtFast} skirtWorker=${shipSF.got.skirtWorker}`);
 
 // ------------------------------------------------- 1-6 real Martini tiles
 const martiniCases = [
