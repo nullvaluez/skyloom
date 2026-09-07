@@ -84,16 +84,17 @@
 > issuing every tile it had ever seen, so the drawn set GREW with sweep duration
 > and broke the frozen Owens ceiling (279 against 261), fixed by parking
 > off-frustum models and a capped LRU — and then, when the CONSTANT cap was
-> measured binding on this venue, a cap that FOLLOWS THE DRAWN SET. **The
-> standalone certifies it at a full revolution on both arms (9/0, 671° and 607°):
-> merges 74 → 0, on-screen replacements 59 → 0 — the user's "tiles swapping",
-> measured to zero over a full turn — repeat URLs 301 → 24, Owens 104 ≤ 261 with
-> no re-baseline, and every ON-arm counter at Δ0.** Two readings ride with it: the
-> resident set had not SATURATED when the sweep ended (an R25 soak item, and the
-> OFF arm is unsaturated too), and the ON arm's Owens census is coarser because
-> the harness settled on a 30 s CLOCK — ~24 rendered frames at 0.8 fps — so that
-> one number is **not yet settled**
-> <!-- TERRA-LIVE CONVERGED RE-RUN PENDING -->.
+> measured binding on this venue, a cap that FOLLOWS THE DRAWN SET. **Two
+> standalone runs certify the yaw contracts, the second from a settled start:
+> merges 100 → 0, on-screen replacements 87 → 0 — the user's "tiles swapping",
+> measured to zero over a full turn — repeat URLs 289 → 18, content correct in
+> both arms, every ON counter at Δ0 with the adaptive cap never binding, and
+> Powell ON settling in 34 s at 194 draws.** **What is NOT closed: the Owens
+> ceiling.** The ON arm reads **279 against the frozen 261** — on a census that
+> never went quiet, because a tile whose content is already correct can never
+> clear its own dirty flag (an upstream defect a governor tier step can trigger
+> on any machine) — and the attribution is open across three owners with the 261
+> unmoved <!-- TERRA-LIVE CONVERGED RE-RUN PENDING -->.
 >
 > **SHIP STATE.** **ON**: `TERRA_PACE` (incl. `parkOffscreen` and
 > `maxResidentTiles`), `STEP_SAFE`, `LADDER_FIX`, `HUD_SYNC`, `FINALIZE_PACE`,
