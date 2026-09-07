@@ -12,7 +12,98 @@
 > describes deleted code (markers, panels, Leaflet-era plans); do not act
 > on it.
 
-> **⚠️ NEWEST — READ FIRST (2026-09-06): Round 24 "Smooth World" is BUILT on
+> **⚠️ NEWEST — READ FIRST (2026-09-07): Round 24 "Smooth World" is BUILT and
+> CERTIFIED ON THE FIXTURE — not on a GPU — and
+> [FLY_ROUND24.md](FLY_ROUND24.md) is the record** (plan
+> [FLY_ROUND24_PLAN.md](FLY_ROUND24_PLAN.md); FIVE agents — A PACE / B WORLD /
+> C LIGHT / D ATMOS / E CERT — under orchestration, plus a sixth (F SCRIBE) for
+> the close; per-harness ledger
+> [`scripts/r24-close-sweep.md`](scripts/r24-close-sweep.md) §5.1–§5.13).
+> **`main` is fast-forwarded to `a7a8739`** at the user's request; the
+> integration branch `claude/skyloom-r24-orchestration-6753n2` runs ahead of it
+> with scripts and ledgers <!-- FINAL TIP PENDING -->.
+>
+> **THE USER'S THREE SYMPTOMS, and where each landed.** *"Buildings appearing
+> and disappearing"* → `BEND_LEAD` (the R21 bend-margin census ran at speed 0
+> where the lookahead lead is 0, so the pad was short on 7 of 7 rings the moment
+> you move), `CHUNK_FADE` + `HEAL_IN_PLACE` (every chunk birth and eviction was
+> a CUT: pops 92 → 2, heals 16 with 0 in place → 21 all in place),
+> `FLASH_GUARD` (the vector-tile ring closure puts two exactly-degenerate
+> DoubleSide triangles on every ring: 15,984 → 0 in node, and **8.32 % → 0.00 %
+> on the venue with both legs settled**), `GROUND_VIS` (one DEM refinement swept
+> every AGL-keyed band 384.0 m in a frame → 4.000 m) and `LADDER_FIX` (on a
+> DPR-1 display the governor's FIRST step was a TIER step that unmounts the
+> building layers). *"Terrain tiles swapping for other ones"* → `TERRA_PACE`:
+> three-tile merges on frustum exit with a ×5 factor and no hysteresis, plus
+> `Timer.reset` never zeroing `_elapsed` and a whole-tree freeze while the
+> loader is saturated — **on the venue, merges 35 → 0 and on-screen replacements
+> 27 → 0 over a full 360° yaw, with content correct per tile in both arms**;
+> `LOD_CROSSFADE` (the atomic LOD swap) is BUILT and ships **OFF**, its
+> standalone run reading 61 of 62 refines faded with no parent-texture leak but
+> failing three of six preconditions <!-- LOD RULING PENDING -->. *"Screen
+> tearing"* → `STEP_SAFE`: **a quality-ladder step now applies the DPR, the
+> renderer size and the composer size inside ONE frame** (0 of 12 canvas writes
+> outside a rAF, was 22 of 46), the second writer being r3f's own zustand
+> subscriber; tearing itself is a vsync property no harness can observe, so only
+> the MECHANISM is certified.
+>
+> **THREE DEFECTS THE CERTIFICATION ITSELF FOUND AND FIXED**, none of them on
+> the shopping list: **the toy index container** — the paced branch handed
+> `setIndex` a raw `Uint32Array`, which three wraps only when `Array.isArray` is
+> true, so `WebGLAttributes` threw on `array.byteLength` once per toy land mesh
+> (80 broken meshes with `FINALIZE_PACE` on, 0 with it off; fixed, with the
+> index width mirrored from three's own bound); **the night hillshade** — the
+> key moved to the moon and the ground was left on the sun, a 180° azimuth
+> contradiction inside one frame, ruled a defect by its own author against his
+> own earlier "BY DESIGN" text; and **residency draws** — `keepResident` kept
+> issuing every tile it had ever seen, so the drawn set GREW with sweep duration
+> and broke the frozen Owens ceiling (279 against 261), fixed by parking
+> off-frustum models and a capped LRU <!-- TERRA-LIVE RE-RUN PENDING -->.
+>
+> **SHIP STATE.** **ON**: `TERRA_PACE` (incl. `parkOffscreen` and
+> `maxResidentTiles`), `STEP_SAFE`, `LADDER_FIX`, `HUD_SYNC`, `FINALIZE_PACE`,
+> `REBASE_CALM`, `FLASH_GUARD`, `CHUNK_FADE`, `HEAL_IN_PLACE`, `BEND_LEAD`,
+> `GROUND_VIS`, `LINEAR_HAZE`, `ONE_SUN` (with the moonlit hill), `POST_ORDER`,
+> `DEPTH_FIX`, `SHADOW_CALM`, `TERRAIN_LIGHT` (tile half), `CLOUD_LIT`,
+> `LAMBERT_ENV`, `FRAME_STATS`. **OFF**: `LOD_CROSSFADE` (pending its re-run),
+> `AERIAL_LAW`, `SKY_PROCEDURAL`, `FRAME_STEP`, `ENV_UNIFORM`, `RING_DEDUPE`.
+>
+> **THE INSTRUMENT LESSONS, one line each** (§7 has 83): a pin is only a pin if
+> it is the ONLY reader; an absent pin inherits the SHIPPED state, so both arms
+> must be pinned; a gate can be green on the very frame that contains the defect,
+> and the passing number can BE the symptom; before loosening a bound, quantise
+> the model's own numbers the way the instrument does; a per-URL counter and a
+> per-tile counter answer different questions; "settled" is a state of the
+> streamer, not an identity of the scene; a precondition that asserts a property
+> of the WORLD is a coin; truth is where the bend is, and an instrument that
+> cannot be browser-tested must publish its own falsifiers; a within-run floor
+> measures the reader while a cross-boot floor measures the venue; and read your
+> own publisher's precision before trusting a difference.
+>
+> **OPEN**: `LOD_CROSSFADE`'s one specified re-run; the night gates
+> (`verify-sat-night`, `verify-dusk`, `verify-flicker`) after the hill ruling
+> moved satellite night ground pixels <!-- NIGHT GATES PENDING -->; four tail
+> re-runs (one-sun, linear-haze, haze-red, depth-rt) <!-- TAIL RE-RUNS PENDING -->; and §5b's follow-ups —
+> R25 re-authoring the rim keyframes against the dome's measured horizon colour
+> (four consumers, re-certified together), a shared-DEM request coalescer
+> (offered and declined this round), a real road fade, a `FLASH_GUARD` counter
+> on `__flyStats`, and an informational stationary leg for the heal path.
+>
+> **ENVIRONMENT TRUTH — READ THIS BEFORE QUOTING A NUMBER.** The cloud container
+> 403-blocks Esri / OpenFreeMap / adsb, its WebGL is ANGLE/SwiftShader at ~1–3
+> fps, and Chrome is absent, so E built an OFFLINE WORLD FIXTURE and **every
+> fps, ms, stall and tearing number belongs to the user's machine**. **NOTHING
+> in this round has been confirmed on the user's machine**: the diagnosis pack
+> (`scripts/r24-user-diag.md`) went out and never came back, `main` was
+> fast-forwarded twice at the user's request with no report from either build,
+> and every §6 checkpoint is open. Node smoke reads **17/17**; the browser rows
+> ran in two passes plus a re-take, and **not one of their reds was a defect of
+> the flag it was certifying**. **Read [FLY_ROUND24.md](FLY_ROUND24.md) §4 for
+> what was and was not certified, §5 for the postmortem, §6 for the checkpoints,
+> §7 for the lessons, and `scripts/r24-close-sweep.md` §2.7 for the
+> user-machine run list.**
+
+> **Earlier (2026-09-06, W3 build): Round 24 "Smooth World" was BUILT on
 > the integration branch `claude/skyloom-r24-orchestration-6753n2` — `main` is
 > NOT fast-forwarded, that is the user's call — and
 > [FLY_ROUND24.md](FLY_ROUND24.md) is the record** (plan
