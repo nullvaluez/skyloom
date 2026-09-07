@@ -22,12 +22,15 @@
 > **`main` is fast-forwarded to `0adb010`** — advanced at the user's request
 > (*"just push to main if the work is done, I can also evaluate"*) **while
 > three w6 rows were still in flight**, with node smoke 17/17 and the ship
-> state verified by import; the integration branch
-> `claude/skyloom-r24-orchestration-6753n2` carries the same tree. **The
+> state verified by import. **The FINAL TIP under certification is `c0f034c`**
+> (merge 59, scripts and ledgers only); this record's own commit sits on top of
+> it and `main` is fast-forwarded to that commit, so what `main` carries is
+> `c0f034c` plus these documents. Every worktree but the integration one is gone,
+> the server is down, and nothing is in flight. **The
 > placeholders below are honest and deliberate — and the user's own machine is
 > where every fps, frame-time and tearing number will be read for the FIRST
 > time: every number in this round is the FIXTURE's**
-> <!-- FINAL TIP PENDING -->.
+> .
 >
 > **THE USER'S THREE SYMPTOMS, and where each landed.** *"Buildings appearing
 > and disappearing"* → `BEND_LEAD` (the R21 bend-margin census ran at speed 0
@@ -160,9 +163,14 @@
 > quiet, Manhattan reads **p99 6.138 against a bound of 12**; the suburb leg's
 > third quiescence attempt was still running when the row's wall clock killed
 > it, so it is neither red nor pass). **Every red among them is an instrument under the venue, none a
-> defect of the flag it certifies**; the attributions in progress and the
-> cheap re-runs ride the next server
-> <!-- NIGHT GATES: two attributions in progress, re-runs pending -->; four tail
+> defect of the flag it certifies** — **and both attributions are now SETTLED**:
+> the JFK pair to a 26-second dwell and to a fixture that places its only runway
+> 21.9 km outside the road ring, the eviction leg to a control whose
+> static-terrain premise a crossfade breaks. **Re-measured on the flipped tree,
+> sat-night reads 27/1/1, dusk 15/15 and flicker's urban leg p99 6.138 against a
+> bound of 12. The two things NOT measured there: flicker's SUBURB window** (the
+> venue's row budget, not the flag; not re-run this round) **and the Owens ceiling
+> on a settled post-sweep pose**; four tail
 > re-runs: **one-sun CLOSED at 42/42** against the restored 1e-6° bound,
 > **linear-haze CLOSED at 9/0/1** with the noon gain reproduced (5.90 luma)
 > and the night leg NOT SEPARATED at the venue's 1.2 cross-boot floor, and
@@ -170,8 +178,8 @@
 > every red was the instruments' and none the flag's, the round-trip reads
 > **0.00 / 0.00 / 0.01 %** at three picks and **the DoF's CoC agrees with the
 > DEPTH BUFFER inside the 8-bit quantum**, so buffer ↔ geometry and
-> DoF ↔ buffer are both proven and the collapse-to-near signature is absent
-> <!-- TAIL RE-RUNS PENDING -->; and §5b's follow-ups —
+> DoF ↔ buffer are both proven and the collapse-to-near signature is absent —
+> **all three closed**; and §5b's follow-ups —
 > R25 re-authoring the rim keyframes against the dome's measured horizon colour
 > (four consumers, re-certified together), a shared-DEM request coalescer
 > (offered and declined this round), a real road fade, a `FLASH_GUARD` counter
