@@ -1183,7 +1183,32 @@ function soft(name, detail) {
     }));
     console.log(`ON  Owens (fixture column): draws=${owens2.draws} tris=${owens2.tris}`);
     // [D8] EQUAL to the OFF leg's fixture numbers, not "under the live ceiling".
-    if (!owensSettleOff.settled || !owensSettleOn.settled)
+    // (18) COMPARES TWO SCENES, SO IT MUST FIRST CHECK THEY ARE THE SAME SCENE.
+    //
+    // MEASURED in the standalone run: the OFF leg settled Owens to maxZ 17 in
+    // 53 s and the ON leg to maxZ 16 in 197 s — DIFFERENT LOD DEPTHS — and the
+    // gate then compared their draw counts and failed. It read 275 vs 259: the
+    // ON arm has FEWER draws, which a crossfade cannot cause. The equality
+    // assertion silently presumed the two Owens scenes were identical and never
+    // checked, so it convicted the flag of a difference the streamer made.
+    //
+    // A settled scene is only comparable to another settled scene at the same
+    // zoom with the same tile field, so both are now preconditions.
+    const zOff = owensSettleOff.maxZ;
+    const zOn = owensSettleOn.maxZ;
+    const tOff = owensSettleOff.tiles;
+    const tOn = owensSettleOn.tiles;
+    const sameScene =
+      zOff === zOn && (!Number.isFinite(tOff) || !Number.isFinite(tOn) || tOff === tOn);
+    if (owensSettleOff.settled && owensSettleOn.settled && !sameScene)
+      notCalibrated(
+        '(18) OWENS IS BIT-FOR-BIT THE SAME SCENE — draws AND triangles equal the OFF leg',
+        `the two arms settled DIFFERENT scenes — maxZ ${zOff} vs ${zOn}, tiles ${tOff} vs ${tOn} ` +
+          `(OFF ${owensSettleOff.ms / 1000}s, ON ${owensSettleOn.ms / 1000}s). Read: ON ` +
+          `${owens2.draws}/${owens2.tris} vs OFF ${offLeg.owensDraws}/${offLeg.owensTris}. A draw ` +
+          'difference between two different zoom levels is the streamer, not the crossfade'
+      );
+    else if (!owensSettleOff.settled || !owensSettleOn.settled)
       notCalibrated(
         '(18) OWENS IS BIT-FOR-BIT THE SAME SCENE — draws AND triangles equal the OFF leg',
         `an arm did not settle (OFF ${owensSettleOff.settled} — ${owensSettleOff.why} · ON ` +
@@ -1193,7 +1218,7 @@ function soft(name, detail) {
       );
     else
       gate(
-        '(18) OWENS IS BIT-FOR-BIT THE SAME SCENE — draws AND triangles equal the OFF leg',
+        `(18) OWENS IS BIT-FOR-BIT THE SAME SCENE (both at maxZ ${zOff}, ${tOff} tiles) — draws AND triangles equal the OFF leg`,
         Number.isFinite(owens2.draws) &&
           owens2.draws === offLeg.owensDraws &&
           owens2.tris === offLeg.owensTris,
