@@ -136,9 +136,11 @@
 > source as **the venue starving an R16 PER-FRAME ramp**, not an R24 flag.
 > **All three now have rows**: `sat-night` **26/2/1** (its two JFK reds a
 > 26-second dwell and a fixture that places its only runway 21.9 km outside
-> the road ring), `dusk` **14/1** (pinned noon reads env 0.85 / bg 1.0 EXACTLY
-> once the settle waits on the value instead of the clock; the remainder is a
-> draw-pair instrument), and `flicker` **4/2** (**the R21 flicker SIGNATURE is
+> the road ring), `dusk` **15/15 on the flipped tree** (pinned noon reads env
+> 0.85 / bg 1.0 EXACTLY once the settle waits on the value instead of the
+> clock, and the cirrus deck costs exactly +1 draw once its A/B stops reading
+> a stale publish — every earlier red an instrument's, now measured green),
+> and `flicker` **4/2** (**the R21 flicker SIGNATURE is
 > ABSENT** — 2 and 0 swinging pixels of 547,200 against a bound of 32 — while
 > the p99 reds measured tiles streaming IN during a 12-frame window that is
 > ~24 s here — attributed to a quiescence probe that sampled 3 frames and
