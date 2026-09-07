@@ -1863,3 +1863,83 @@ verify-depth-offset 7/7 - verify-worker-normals 12/12 - four proofs PASS -
 verify-import-integrity 4/0. eslint over the changed files: 0 new; the 4
 `react-hooks/immutability` errors in FlyEffectComposer.jsx are pre-existing
 (4 before the edit, 4 after, verified by stash).
+
+---
+
+## THE 1e-6 RESIDUAL IS MY INSTRUMENT, not the rig — and it is removed, not tolerated
+
+The post-batch one-sun row failed four clauses on an azimuth agreement of
+4.76e-6 deg (noon, both tiers) and 4.60e-5 deg (medium/dusk, and high/dusk
+against the dome). It is neither of the two candidates offered: **not a uniform
+round trip, not float32, and not two computations disagreeing. It is
+`toFixed(6)` in `__flyStats.sun`.**
+
+### The arithmetic
+
+A unit vector's component rounded to 1e-6 moves the azimuth derived from it by
+
+```
+|dAz| <= 5e-7 * sqrt(2) / cos(el)  rad  =  4.05e-5 / cos(el)  DEGREES
+```
+
+— 4.05e-5 at the horizon, 4.91e-5 at the moon's 34.377 deg, 7.06e-5 at 55 deg.
+Every failing number sits inside that bound. Evaluating the app's own two
+expressions in float64 and then quantising them the way the instrument does:
+
+| leg | elKey | elHill | \|dAz\| float64 | at toFixed(6) | at toFixed(9) |
+|---|---|---|---|---|---|
+| noon | 55.000 | 51.566 | **0.00e+0** | 2.45e-5 | 3.31e-8 |
+| dusk | 2.000 | 8.594 | **0.00e+0** | 2.60e-5 | 2.41e-8 |
+| night | −14.000 | 8.594 | **0.00e+0** | 2.42e-5 | 4.88e-9 |
+
+**The app's key and hill azimuths are bit-identical as doubles at every leg.**
+The gate was differencing its own rounding.
+
+### Why no float32 is involved
+
+Nothing on the READ path is float32. `Object3D.position` and `Object3D.scale`
+are `Vector3`s of plain JS numbers, i.e. float64; `getHillshade().dir` is the
+JS-side uniform value object, not a GPU read-back; the key is recovered as
+`position − target` and normalised, all in float64. The GPU copy is float32, but
+nothing reads it back — so a "uniform round trip" never happens on this path.
+
+### Are hill and key one computation or two?
+
+Two, and correctly so: they are two DIFFERENT directions by contract. `basis(az,
+el)` is evaluated once per consumer, from the same `az` double (`runtime.sun.az`
+is copied, not recomputed) but at deliberately different elevations — the key at
+the TRUE elevation (floored only while casting), the hill at the clamped one.
+The charter's "one sun" is about the DIRECTION SOURCE, and there is exactly one:
+one `az`, one `sinEl`, one `moonBlendK`. The azimuths coming out bit-identical
+in float64 is the evidence that it really is one source; nothing to fold.
+
+### The fix: publish nine decimals, do not widen the contract
+
+A tolerance would have written my instrument's rounding into the contract
+permanently. Nine decimals puts the artifact at ~3e-8 deg — three orders inside
+the 1e-6 deg clause — so the clause can be asserted for what it says. Cost:
+nothing (dev-only, existing 60-frame cadence, three more characters per number).
+`key` / `hill` / `dome` / `water` and the two moon angles moved 6 (and 4) -> 9;
+scalars in degrees keep four, because they are read rather than differenced.
+
+New gate (verify-c-flagoff 49 -> **50**): every published direction vector
+carries nine decimals. RED-calibrated by putting `hill` back to six. And one
+line in the `ONE_SUN` header records why, so the next person to "tidy" the
+precision reads the bound first.
+
+**E's 1e-3 deg tolerance is no longer needed for these four clauses** — but it is
+harmless, and it is E's call whether to keep it as slack. What should NOT survive
+is the belief that the rig disagreed.
+
+### The dusk sign: yes, expected
+
+medium/dusk, `casting=false`, sun el 2.002 deg: key el 2.002 (the TRUE
+elevation; `SAT_SHADOWS.minElRad` floors it only while the shadow camera casts,
+which is the clause-2 contract) against hill el 8.594 (`HILLSHADE.minElRad`,
+the graze floor `computeSun` clamps into). moonK is 0 there — `fadeStartDeg` is
+0, so a positive elevation cannot arm the moon blend. That is the clamp contract
+reading correctly, not a sign error.
+
+Node-only: verify-c-flagoff 50/50 - verify-shadow-calm 33/33 -
+verify-depth-offset 7/7 - verify-worker-normals 12/12 - four proofs PASS -
+verify-import-integrity 4/0 - eslint 0/0.

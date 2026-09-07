@@ -249,6 +249,19 @@ gate(
     'hillMaxDeg',
   ];
   const block = (fs.match(/stats\.sun = \{[\s\S]*?\n        \};/) || [''])[0];
+  // INSTRUMENT PRECISION. A unit component rounded to 1e-6 moves the azimuth
+  // derived from it by up to 4.05e-5 / cos(el) DEGREES — larger than the
+  // 1e-6 deg agreement the audit exists to demonstrate, so at six decimals a
+  // gate differences its own rounding and reports it as a rig disagreement
+  // (verify-one-sun did, on four clauses). Nine decimals puts the artifact at
+  // ~3e-8 deg. This gate stops that from silently regressing.
+  gate(
+    'every published DIRECTION VECTOR carries NINE decimals, not six',
+    /key: \[\+_kx\.toFixed\(9\), \+_ky\.toFixed\(9\), \+_kz\.toFixed\(9\)\]/.test(block) &&
+      /hill: getHillshade\(\)\.dir\.map\(\(v\) => \+v\.toFixed\(9\)\)/.test(block) &&
+      /dome: _sd\.live \? _sd\.dir\.map\(\(v\) => \+v\.toFixed\(9\)\) : null/.test(block) &&
+      /water: \[\+_kx\.toFixed\(9\), \+_ky\.toFixed\(9\), \+_kz\.toFixed\(9\)\]/.test(block)
+  );
   const missing = SUN_FIELDS.filter((f) => !new RegExp(`(^|\\s)${f}:`, 'm').test(block));
   gate(
     `__flyStats.sun publishes all ${SUN_FIELDS.length} fields verify-one-sun reads`,

@@ -2298,6 +2298,16 @@ export function FlyScene({ runtime }) {
         stats.edgeFadeStartM = ef.startM;
         stats.groundHorizonM = ef.endM;
         stats.aircraft = aircraftStat; // round 17: verify-hangar reads this
+        // R24 C: NINE decimals on every DIRECTION VECTOR, and that is a
+        // contract, not a taste. A unit component quantised to 1e-6 moves the
+        // azimuth derived from it by up to 4.05e-5 / cos(el) DEGREES — bigger
+        // than the 1e-6 deg agreement this instrument exists to demonstrate, so
+        // at toFixed(6) the reported disagreement was the ROUNDING, not the
+        // rig: the app's key and hill azimuths are bit-identical as float64 at
+        // every leg (measured 0.00e+0; see scripts/r24-c-light.md). At nine the
+        // artifact is ~3e-8 deg and the 1e-6 deg contract can be asserted for
+        // what it says. Scalars in degrees keep four — they are read, not
+        // differenced.
         // R24 C (ONE_SUN, recon L3): THE SUN AUDIT — every consumer's live
         // direction, read from where that consumer actually stores it, so
         // verify-one-sun compares vectors instead of re-deriving them from the
@@ -2338,12 +2348,12 @@ export function FlyScene({ runtime }) {
           oneSun: ONE_SUN.enabled,
           style: flyState.mapStyle,
           tier: flyState.qualityTier,
-          key: [+_kx.toFixed(6), +_ky.toFixed(6), +_kz.toFixed(6)],
-          hill: getHillshade().dir.map((v) => +v.toFixed(6)),
+          key: [+_kx.toFixed(9), +_ky.toFixed(9), +_kz.toFixed(9)],
+          hill: getHillshade().dir.map((v) => +v.toFixed(9)),
           hillStrength: +getHillshade().strength.toFixed(4),
           hillElev: +(getHillshade().elev ?? 1).toFixed(4),
           hillEffective: +(getHillshade().effective ?? getHillshade().strength).toFixed(4),
-          dome: _sd.live ? _sd.dir.map((v) => +v.toFixed(6)) : null,
+          dome: _sd.live ? _sd.dir.map((v) => +v.toFixed(9)) : null,
           // R24 C: the WATER specular direction, as a VECTOR. Satellite water is
           // MeshPhong and its specular lobe is built from the scene's single
           // directional — there is exactly one `<directionalLight>` in the world
@@ -2351,7 +2361,7 @@ export function FlyScene({ runtime }) {
           // this is the key light BY REFERENCE, not a second copy of the solar
           // math. A consumer gate therefore reads Δ 0 BY IDENTITY; the assertion
           // with teeth is `waterSource`, i.e. that no second light was added.
-          water: [+_kx.toFixed(6), +_ky.toFixed(6), +_kz.toFixed(6)],
+          water: [+_kx.toFixed(9), +_ky.toFixed(9), +_kz.toFixed(9)],
           waterSource: 'key-light',
           // R24 C: the two CLAMPS a consumer needs to predict what it is
           // reading, published from the constants the code actually applies
@@ -2369,13 +2379,13 @@ export function FlyScene({ runtime }) {
           // the array is stale then and a stale vector reported as live is how
           // an instrument invents a measurement.
           moonKeyAzDeg: _sunAudit.moonValid
-            ? +((Math.atan2(_sunAudit.moonX, _sunAudit.moonZ) * 180) / Math.PI).toFixed(4)
+            ? +((Math.atan2(_sunAudit.moonX, _sunAudit.moonZ) * 180) / Math.PI).toFixed(9)
             : null,
           moonKeyElDeg: _sunAudit.moonValid
             ? +(
                 (Math.asin(Math.max(-1, Math.min(1, _sunAudit.moonY))) * 180) /
                 Math.PI
-              ).toFixed(4)
+              ).toFixed(9)
             : null,
           minElRadDeg: +((SAT_SHADOWS.minElRad * 180) / Math.PI).toFixed(4),
           hillMinDeg: +((HILLSHADE.minElRad * 180) / Math.PI).toFixed(4),
