@@ -253,6 +253,27 @@ function gate(name, ok, detail) {
   // picks anything. The row also needs the finalize budget scaler; without it
   // the toy chunks may simply not be resident at the moment of the pick, and
   // the raycast then reports an empty world as a gate failure.
+  // PARK THE PLAYER BEFORE ANYTHING IS PICKED (R17 §7.1: a pixel-probe gate
+  // must not contain an actor it does not control). The nearest pick of the
+  // previous run was the player jet at 35.9 m — `Jet_Cube024_1`, riding 30 m
+  // ahead on the chase cam — and every CoC conclusion drawn from it was about
+  // an aircraft, not about the terrain the gate exists to measure.
+  //
+  // HIDING IT IS THE RIGHT MECHANISM, not filtering `Jet_*` out of the truth's
+  // candidates. `visible = false` removes the jet from the depth buffer AND
+  // from the raycast together: depth-probe.js:504 walks each candidate's
+  // ancestor chain and drops anything hidden, so the two stay consistent. A
+  // name filter would fix only the raycast and leave the jet in the depth
+  // buffer — manufacturing exactly the probe-vs-truth mismatch this gate spent
+  // two passes attributing.
+  const parkedPlayer = await page.evaluate(() => {
+    if (!window.__flyPlayer) return false;
+    window.__flyPlayer.visible = false;
+    return true;
+  });
+  console.log(
+    `  player parked: ${parkedPlayer} — the picks are terrain and world, not the chase-cam jet`
+  );
   const st = await settleWorld(page, { capMs: Number(process.env.DEPTH_SETTLE_CAP_MS || 300000) });
   console.log(
     `  settle: ${st.settled ? 'SETTLED' : `NOT settled — ${st.why}`} in ${(st.ms / 1000).toFixed(0)}s ` +
@@ -385,6 +406,10 @@ function gate(name, ok, detail) {
       cocSource: probe?.cocSource,
       raw: probe?.raw,
       obj: p.object,
+      // For the CoC contract below: the one-texel depth gradient at this pixel,
+      // and the drawing buffer the pixel is addressed in.
+      slopeMPerPx: p.slopeMPerPx ?? null,
+      buf: probe?.drawingBuffer ?? null,
     });
     console.log(
       `  ${label.padEnd(9)} px(${p.px},${p.py}) truth ${trueZ.toFixed(1)}m on ${p.object} · ` +
@@ -507,25 +532,219 @@ function gate(name, ok, detail) {
         'asserting a number without knowing which pass produced it, which is how `dof=null` sat ' +
         'beside `__flyDof true` for two passes'
     );
-  else if (Number.isFinite(near?.coc) && Number.isFinite(far?.coc)) {
+  else if (rows.some((r) => Number.isFinite(r.coc))) {
     // THE CoC TEXTURE IS 8-BIT, so the term is quantised to 1/255 = 0.0039:
     // 0.1411764… is float32(36/255) and 0.1647058… is float32(42/255). "0.141"
     // is not a continuous measurement, and the quantum is comfortable against
     // (3)'s 0.02 bound — but a future tolerance below 0.004 would be asserting
     // precision the texture cannot carry.
-    console.log(`  CoC quantum: 1/255 = 0.0039 (8-bit texture) — near ${near.coc} far ${far.coc}`);
-    numGate(gate)(
-      `(3) CoC < 0.02 AT THE FOCUS PLANE (from ${cocSource}, 8-bit ±0.0039)`,
-      near.coc,
-      near.coc < 0.02,
-      `near coc ${near.coc}`
-    );
-    numGate(gate)(
-      `(4) CoC > 0.5 AT 4 km (from ${cocSource}, 8-bit ±0.0039)`,
-      far.coc,
-      far.coc > 0.5,
-      `far coc ${far.coc}`
-    );
+    console.log(`  CoC quantum: 1/255 = 0.0039 (8-bit texture)`);
+
+    // ---- (3)/(4) REBUILT: does the DoF read REAL DEPTH? --------------------
+    //
+    // WHAT THESE CLAUSES USED TO DO, AND WHY IT WAS WORTHLESS. (3) was named
+    // "AT THE FOCUS PLANE" and (4) "AT 4 km", but both read the pixel chosen by
+    // RANK — the nearest and farthest truth hits of whatever the pose happened
+    // to contain — and neither ever checked where that pixel actually was. On
+    // the fixture the near pick sat at 35.9 m against a focus plane at 700 m,
+    // so (3) asserted sharpness 664 m in FRONT of the sharp band and read a
+    // perfectly correct CoC of 0.161 as a DEPTH_FIX red. (4) failed identically
+    // in the other direction and got away with it: it PASSED at 3210 m while
+    // naming 4 km. A false red and a vacuous green, one cause.
+    //
+    // THE REPLACEMENT TESTS THE THING WE ACTUALLY CARE ABOUT: that the CoC the
+    // GPU wrote equals the CoC the material's own formula produces at the
+    // distance the raycast says is really there. It assumes nothing about where
+    // focus sits, so it survives anyone re-tuning dofFocusM, and it is strictly
+    // stronger than a focus-plane assertion.
+    //
+    // THE FORMULA, READ FROM THE SHIPPING SHADER rather than from memory
+    // (node_modules/postprocessing/build/index.js:4949-4950):
+    //
+    //   #define getDistance(viewPosition) length(viewPosition)
+    //   float signedDistance = distance - focusDistance;
+    //   float magnitude = smoothstep(0.0, focusRange, abs(signedDistance));
+    //   gl_FragColor.rg = magnitude * vec2(step(sd,0.0), step(0.0,sd));
+    //
+    // TWO THINGS THAT WOULD HAVE BITTEN A FORMULA WRITTEN FROM THE DOCS:
+    //
+    //   1. `distance` is the EUCLIDEAN length of the view-space position, NOT
+    //      -viewZ. At the centre of frame the two agree to 0.03 %, but the
+    //      previous run's far pick was at px 672 of 960 — 262 m of difference
+    //      between |viewZ| 3210 and the Euclidean 3472. It happened not to
+    //      matter there only because the pick was already saturated at
+    //      magnitude 1. Off-axis and mid-band, it is worth many quanta.
+    //   2. `focusDistance` / `focusRange` are in WORLD METRES here, not
+    //      normalised depth: `worldFocusDistance` is a pass-through alias in
+    //      this version of postprocessing (index.js:5031-5040), so the 700 /
+    //      2600 from TOY reach the uniforms unconverted.
+    //
+    // Both uniforms are read LIVE off the material, so the gate cannot drift
+    // from the app's configuration the way a re-declared constant would.
+    const dofCfg = await page.evaluate(() => {
+      const u = window.__flyDof?.cocMaterial?.uniforms;
+      const P = u?.projectionMatrix?.value?.elements ?? null;
+      return u
+        ? {
+            focusDistance: u.focusDistance?.value ?? null,
+            focusRange: u.focusRange?.value ?? null,
+            // Column-major: elements[0] = P00, elements[5] = P11.
+            p00: P ? P[0] : null,
+            p11: P ? P[5] : null,
+          }
+        : null;
+    });
+    const cfgOk =
+      dofCfg &&
+      Number.isFinite(dofCfg.focusDistance) &&
+      Number.isFinite(dofCfg.focusRange) &&
+      dofCfg.focusRange > 0 &&
+      Number.isFinite(dofCfg.p00) &&
+      Number.isFinite(dofCfg.p11);
+    console.log(`  DoF (live uniforms): ${JSON.stringify(dofCfg)}`);
+
+    const smoothstep = (e1, x) => {
+      const t = Math.min(1, Math.max(0, x / e1));
+      return t * t * (3 - 2 * t);
+    };
+    // Euclidean view distance of a pixel whose view-space Z is known. For a
+    // symmetric perspective matrix viewX = ndcX·(-viewZ)/P00 and likewise in Y,
+    // so |viewPos| = |viewZ|·sqrt(1 + (ndcX/P00)² + (ndcY/P11)²).
+    const euclid = (r) => {
+      const [w, h] = r.buf ?? [];
+      if (!Number.isFinite(w) || !Number.isFinite(h)) return null;
+      const ndcX = ((r.px + 0.5) / w) * 2 - 1;
+      const ndcY = (1 - (r.py + 0.5) / h) * 2 - 1;
+      return r.trueZ * Math.sqrt(1 + (ndcX / dofCfg.p00) ** 2 + (ndcY / dofCfg.p11) ** 2);
+    };
+
+    if (!cfgOk)
+      notCalibrated(
+        '(3) CoC tracks true depth',
+        `the CoC material did not yield finite focusDistance/focusRange/projection ` +
+          `(${JSON.stringify(dofCfg)}) — the formula cannot be evaluated, so nothing about the ` +
+          'DoF is asserted either way'
+      );
+    else {
+      const scored = [];
+      for (const r of rows) {
+        if (!Number.isFinite(r.coc)) {
+          notCalibrated(
+            `(3) ${r.label}: CoC tracks true depth`,
+            `no finite coc at px(${r.px},${r.py}) — the probe read none`
+          );
+          continue;
+        }
+        const d = euclid(r);
+        if (!Number.isFinite(d)) {
+          notCalibrated(
+            `(3) ${r.label}: CoC tracks true depth`,
+            `no drawing-buffer size on the probe result, so the pixel cannot be turned into a ` +
+              'view direction and the Euclidean distance is unknown'
+          );
+          continue;
+        }
+        const signed = d - dofCfg.focusDistance;
+        const expected = smoothstep(dofCfg.focusRange, Math.abs(signed));
+        // THE TOLERANCE IS THE TEXTURE'S OWN QUANTUM, plus what one texel of
+        // depth gradient is worth in CoC at this point on the curve. The CoC
+        // target is HALF resolution, so a texel there spans two screen pixels —
+        // hence 2 × slopeMPerPx. d(magnitude)/d(distance) = 6t(1-t)/focusRange,
+        // which is 0 at both ends of the ramp and largest in the middle, so the
+        // slope term only widens the bound where the curve is actually steep.
+        const t = Math.min(1, Math.abs(signed) / dofCfg.focusRange);
+        const dMagDDist = (6 * t * (1 - t)) / dofCfg.focusRange;
+        const texelM = 2 * (Number.isFinite(r.slopeMPerPx) ? Math.abs(r.slopeMPerPx) : 0);
+        const tol = 0.0039 + dMagDDist * texelM;
+        const delta = Math.abs(r.coc - expected);
+        scored.push({ r, d, signed, expected, delta, tol });
+        numGate(gate)(
+          `(3) ${r.label}: measured CoC ≡ CoC(material formula, TRUE distance) within the 8-bit ` +
+            `quantum (from ${cocSource})`,
+          delta,
+          delta <= tol,
+          `coc ${r.coc.toFixed(4)} vs expected ${expected.toFixed(4)} at Euclidean ` +
+            `${d.toFixed(1)} m (|viewZ| ${r.trueZ.toFixed(1)} m, signed ${signed.toFixed(1)} m) — ` +
+            `|Δ| ${delta.toFixed(4)} ≤ 0.0039 + ${(dMagDDist * texelM).toFixed(4)} ` +
+            `(${texelM.toFixed(1)} m of half-res texel × ${dMagDDist.toFixed(6)} /m) = ${tol.toFixed(4)}`
+        );
+      }
+
+      // (4) THE ORDERING, which is the "reads real depth" claim in its purest
+      // form and needs no pose to contain any particular distance: sort the
+      // picks by how far they are from the focus plane and the measured CoC
+      // must not go DOWN. A depth buffer that collapsed — the R24 red, every
+      // fragment at -cameraNear — produces one constant CoC at every pick and
+      // cannot order anything, which is exactly what this catches.
+      if (scored.length >= 2) {
+        const bySigned = [...scored].sort((a, b) => Math.abs(a.signed) - Math.abs(b.signed));
+        let worst = 0;
+        for (let i = 1; i < bySigned.length; i += 1) {
+          const drop = bySigned[i - 1].r.coc - bySigned[i].r.coc;
+          if (drop > worst) worst = drop;
+        }
+        const spread =
+          Math.max(...scored.map((x) => x.r.coc)) - Math.min(...scored.map((x) => x.r.coc));
+        const expSpread =
+          Math.max(...scored.map((x) => x.expected)) - Math.min(...scored.map((x) => x.expected));
+        const trail = bySigned
+          .map((x) => `${x.r.label} |signed| ${Math.abs(x.signed).toFixed(0)}m coc ${x.r.coc.toFixed(3)}`)
+          .join(' < ');
+        // A FLAT CoC MUST FAIL HERE, NOT WARN. Written first as "no backwards
+        // step", this clause PASSED on its own red: a collapsed depth buffer
+        // puts every fragment at -cameraNear, so all three picks read one
+        // identical CoC, no step is backwards, and the gate would have called
+        // the defect green with a warning nobody reads. Caught by evaluating
+        // the clause against the red by hand before running it.
+        //
+        // So the clause is now conditional on the pose being ABLE to separate:
+        // when the formula says these three picks should differ by more than a
+        // few quanta, the measurement must differ too. When it says they should
+        // not, there is nothing to order and the honest verdict is the third
+        // one.
+        if (expSpread <= 4 * 0.0039)
+          notCalibrated(
+            '(4) CoC ordering',
+            `the formula predicts these picks differ by only ${expSpread.toFixed(4)} of CoC ` +
+              '(≤ 4 quanta), so an ordering here would be reading noise — the pose does not ' +
+              'separate in CoC, which is a pose fact, not a DoF fact'
+          );
+        else
+          numGate(gate)(
+            '(4) THE MEASURED CoC ORDERS THE PICKS THE WAY TRUE DISTANCE FROM FOCUS DOES',
+            worst,
+            worst <= 0.0039 && spread >= expSpread / 2,
+            `worst backwards step ${worst.toFixed(4)} ≤ 0.0039 and measured spread ` +
+              `${spread.toFixed(4)} ≥ half the predicted ${expSpread.toFixed(4)}, across ${trail}` +
+              (spread < expSpread / 2
+                ? ' — THE MEASURED CoC IS FLATTER THAN THE WORLD: the depth the DoF reads does ' +
+                  'not vary the way the true distances do, which is the collapse signature'
+                : '')
+          );
+      } else
+        notCalibrated(
+          '(4) CoC ordering',
+          `only ${scored.length} pick(s) produced both a CoC and a distance; an ordering needs two`
+        );
+
+      // THE GATE CHECKS ITS OWN ARITHMETIC (§2.10). If my smoothstep or my
+      // Euclidean reconstruction were wrong, every clause above would be wrong
+      // in the same direction and still look self-consistent. C published two
+      // independently computed points off the live configuration; reproduce
+      // them, or say the formula is unverified.
+      if (dofCfg.focusDistance === 700 && dofCfg.focusRange === 2600) {
+        const chk = (dist) => smoothstep(2600, Math.abs(dist - 700));
+        const a = chk(35.9);
+        const b = chk(3210);
+        console.log(
+          `  formula self-test vs C's independently computed points: 35.9 m -> ${a.toFixed(4)} ` +
+            `(C 0.1624), 3210 m -> ${b.toFixed(4)} (C 0.9965) — ` +
+            (Math.abs(a - 0.1624) < 0.0039 && Math.abs(b - 0.9965) < 0.0039
+              ? 'AGREE within the quantum'
+              : '*** DISAGREE: my arithmetic, not the app')
+        );
+      }
+    }
   } else {
     notCalibrated(
       '(3)/(4) CoC — DoF separation',
