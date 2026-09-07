@@ -98,6 +98,48 @@ const TRUTH = ([px, py]) =>
     ? window.__flyDepthTruth(px, py)
     : { hit: false, reason: 'window.__flyDepthTruth is not published' };
 
+// THE TRUTH FALSIFIES ITSELF, AND THAT IS READ FIRST.
+//
+// Every world vertex is displaced by `wPos.y -= bendD² · uBendK` in the VERTEX
+// SHADER, so the CPU geometry a raycaster sees is NOT the surface the depth
+// buffer recorded — at this gate's 4 km probe that is metres to tens of metres,
+// far outside the 1 % bound the comparison rests on. C's hook un-bends by
+// lifting the ray origin by the drop and iterating at the current hit (≤ 4
+// passes, 1 cm stop, k from getBend()'s live uniforms), and it publishes the
+// evidence that the fixed point actually converged:
+//
+//   residualM        did the iteration settle, in metres
+//   reprojectionPx   the answer projected BACK through the same camera, in
+//                    pixels from the pixel that was asked for
+//
+// A wrong space (floating origin), a stale matrix or a bad bend all surface as
+// a large `reprojectionPx` rather than as a plausible-looking distance. So a
+// probe that fails either check is an INSTRUMENT MISS carrying that reason —
+// never a DEPTH_FIX verdict, because a truth that did not converge cannot
+// convict the thing it was built to measure.
+const TRUTH_MAX_REPROJ_PX = Number(process.env.DEPTH_MAX_REPROJ_PX || 1);
+const TRUTH_MAX_RESIDUAL_M = Number(process.env.DEPTH_MAX_RESIDUAL_M || 0.05);
+
+function truthUsable(t) {
+  if (!t || !t.hit) return { ok: false, why: t?.reason ?? 'no truth returned' };
+  if (Number.isFinite(t.reprojectionPx) && t.reprojectionPx > TRUTH_MAX_REPROJ_PX)
+    return {
+      ok: false,
+      why:
+        `reprojectionPx ${t.reprojectionPx.toFixed(2)} > ${TRUTH_MAX_REPROJ_PX} — the un-bent hit ` +
+        'does not project back to the pixel it was asked for, so the truth is about a different ' +
+        'place than the probe',
+    };
+  if (Number.isFinite(t.residualM) && t.residualM > TRUTH_MAX_RESIDUAL_M)
+    return {
+      ok: false,
+      why:
+        `residualM ${t.residualM.toFixed(3)} m > ${TRUTH_MAX_RESIDUAL_M} m — the un-bend iteration ` +
+        `did not converge in ${t.bendIters ?? '?'} passes`,
+    };
+  return { ok: true };
+}
+
 const { numGate, notCalibrated, notCalCount, notCalSummary } = require('./_notcal');
 
 let pass = 0;
@@ -150,7 +192,13 @@ function gate(name, ok, detail) {
   }));
   console.log(
     `  renderer reversedDepth=${state.reversed} · style=${state.style} · tier=${state.tier} · ` +
-      `dof=${JSON.stringify(state.dof)} · __flyDof ${state.dofLive === null ? 'UNPUBLISHED' : state.dofLive}`
+      `__flyDof ${state.dofLive === null ? 'UNPUBLISHED' : state.dofLive}` +
+      // The config mirror is INFORMATIONAL and stays out of the verdict:
+      // __flyStats.effects.dof reads null in compositions that DO mount the
+      // pass, which is how `dof=null` sat beside `__flyDof true` for two passes
+      // looking like a contradiction. The live handle is the fact.
+      `  (config mirror __flyStats.effects.dof=${JSON.stringify(state.dof)} — informational; it ` +
+      'reads null in compositions that mount the pass)'
   );
   // (0b) USED TO INFER PRESENCE FROM style/tier AND PASSED WHILE PRINTING
   // `dof=null`. "the tier that is supposed to have a DoF pass" is not "a DoF
@@ -204,8 +252,22 @@ function gate(name, ok, detail) {
       const px = Math.round(W * fx);
       const py = Math.round(H * fy);
       const t = await page.evaluate(TRUTH, [px, py]);
-      if (t && t.hit) candidates.push({ px, py, viewZ: t.viewZ, dist: t.distance, object: t.object, source: t.source });
-      else misses.push(`(${px},${py}) ${t?.reason ?? 'no truth returned'}`);
+      const usable = truthUsable(t);
+      if (usable.ok)
+        candidates.push({
+          px,
+          py,
+          viewZ: t.viewZ,
+          dist: t.distance,
+          object: t.object,
+          source: t.source,
+          bendK: t.bendK,
+          bendDropM: t.bendDropM,
+          bendIters: t.bendIters,
+          residualM: t.residualM,
+          reprojectionPx: t.reprojectionPx,
+        });
+      else misses.push(`(${px},${py}) ${usable.why}`);
     }
   }
   const pick = (target) =>
@@ -220,6 +282,12 @@ function gate(name, ok, detail) {
     ['far ~4 km', pick(4000)],
   ].filter(([, p]) => p);
 
+  for (const c of candidates.slice(0, 8))
+    console.log(
+      `    truth (${c.px},${c.py}) viewZ ${c.viewZ?.toFixed?.(2)} m on ${c.object} · bendK ` +
+        `${c.bendK} drop ${c.bendDropM?.toFixed?.(2)} m in ${c.bendIters} iters · residual ` +
+        `${c.residualM?.toFixed?.(3)} m · reproject ${c.reprojectionPx?.toFixed?.(2)} px`
+    );
   console.log(
     `  depth truth (${candidates[0]?.source ?? 'n/a'}): ${candidates.length} hits at distances ` +
       `${JSON.stringify(candidates.map((c) => +Math.abs(c.viewZ).toFixed(0)))} on ` +
@@ -232,7 +300,10 @@ function gate(name, ok, detail) {
   if (picks.length < 3) {
     notCalibrated(
       '(1) THREE PIXELS WITH A KNOWN TRUE DISTANCE WERE FOUND',
-      `${candidates.length} truth hits of ${candidates.length + misses.length} probes; picked ` +
+      `${candidates.length} USABLE truth hits of ${candidates.length + misses.length} probes ` +
+        '(a hit whose reprojectionPx or residualM is out of band counts as a MISS with its own ' +
+        'reason — an unconverged truth cannot convict DEPTH_FIX); ' +
+        `picked ` +
         `${picks.length}. Misses: ${misses.slice(0, 4).join(' · ') || 'none recorded'}. Settled: ` +
         `${st.settled} (${st.why || 'ok'})`
     );
