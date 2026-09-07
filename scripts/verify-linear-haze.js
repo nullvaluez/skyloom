@@ -571,14 +571,37 @@ function gate(name, ok, detail) {
       // result in either direction — it is the reader. HAZE_NOISE_FLOOR carries
       // it in from that row; without it the gate says so rather than pretending
       // a bare sign test is a verdict.
-      const floor = Number(process.env.HAZE_NOISE_FLOOR || NaN);
+      //
+      // THERE ARE TWO FLOORS, AND THE LARGER ONE IS THE ONE THAT BINDS.
+      //
+      //   WITHIN-RUN   0.00 luma at noon, 0.45 at night — two arms measured
+      //                inside ONE haze-red process.
+      //   CROSS-BOOT   ~1.2 luma — the same configuration measured in two
+      //                DIFFERENT processes: haze-red's OFF arms read noon 59.3
+      //                and night 40.0 / 39.5, while linear-haze's OFF arm read
+      //                59.9 / 38.8 at the same poses on the same tree.
+      //
+      // The A/B's two arms are two BOOTS, so cross-boot is its floor: a
+      // within-run number would flatter it by 0.75 luma. Recorded because the
+      // difference is invisible in any single row — you only see it by putting
+      // two runs of the same configuration side by side, which is exactly what
+      // a calibration arm is for.
+      //
+      // The parked-tree night reading of +2.6 clears 1.2, so that verdict does
+      // not change; what changes is the number a FUTURE A/B has to beat.
+      // Default to the CROSS-BOOT floor: an A/B whose arms are separate boots
+      // must clear the noise that separate boots make, not the tighter noise
+      // two arms make inside one.
+      const floor = Number(process.env.HAZE_NOISE_FLOOR || 1.2);
       if (!redMode && Number.isFinite(floor) && Math.abs(diff) < floor) {
         notCalibrated(
           `(5${label === 'noon' ? 'a' : 'b'}) THE A/B (${label}) — NOT SEPARATED`,
           `Δ off ${a.delta.toFixed(1)} → on ${b.delta.toFixed(1)}, difference ` +
-            `${diff.toFixed(2)} — below haze-red's measured noise floor of ${floor}. Neither a ` +
-            'pass nor a fail: the two arms did not separate by more than this reader separates ' +
-            'from itself'
+            `${diff.toFixed(2)} — below haze-red's measured noise floor of ${floor} luma ` +
+            '(CROSS-BOOT: haze-red measured 0.00 noon / 0.45 night WITHIN one run, but ~1.2 ' +
+            'between two boots of the same configuration, and these two arms are two boots). ' +
+            'Neither a pass nor a fail: the arms did not separate by more than this reader ' +
+            'separates from itself'
         );
         continue;
       }
