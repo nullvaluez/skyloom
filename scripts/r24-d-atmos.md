@@ -738,6 +738,118 @@ swapping" or merely leaves the relief snap a texture blend cannot morph
 (§3.2 — above `demMaxZoom` 15 the geometry is a crop of the z15 DEM and the
 blend covers the swap completely; below it the surface genuinely moves).
 
+## §4.10c THE RE-TAKE ROW, JUDGED — NO-GO on preconditions
+
+E's standalone row on the `9bcaace` worktree (CERT_PROOF_ONLY,
+`FLY_LOD_SWEEP_MS=900000`, K=40, both arms). §4.10b applied verbatim:
+
+**VERDICT: NO-GO. Three of six preconditions fail, so the run does not decide
+the flip; `LOD_CROSSFADE.enabled` stays `false`.**
+
+| # | precondition | reading | result |
+|---|---|---|---|
+| P1 | no pace pin on either page | (9) OFF null · ON null | **PASS** |
+| P2 | ON `skip.disabled === 0` | (10) 0 | **PASS** |
+| P3 | `shape` = `noParentMap` = `unpatched` = 0 | 0 · **1** · 0 | **FAIL** |
+| P4 | both arms offered swaps | OFF 72, ON 62 | **PASS** |
+| P5 | arc ≥ 360° both arms AND ratio ∈ [0.75, 1.25] | ON arc **264°**, ratio **0.74537** | **FAIL, both halves** |
+| P6 | both arms settled at Owens | both SETTLED, but **maxZ 17 vs 16** | **FAIL** |
+
+| # | flip condition | reading | result |
+|---|---|---|---|
+| F1 | ladder identity both arms | 72+0=72+0 · 62+0=1+61 | **HOLDS** |
+| F2 | `refines+merges` equal | 72 → 62 | **NOT EVALUABLE** (P5) |
+| F3 | `faded` > 0, `hardSwaps` drops | 0 → **61**, 72 → **1** | **HOLDS** |
+| F4 | `maxBlendRun` ≥ 2, read against 5 | **31**, blend frames 184/322 | **HOLDS** |
+| F5 | drain at `active 0`; no leak on both reads | held after 2 frames, 0/0 and 0/0 | **HOLDS** |
+| F6 | Owens draws AND tris equal | 259/323,170 vs 275/329,348 | **NOT EVALUABLE** |
+
+Four flip conditions hold on their own evidence; two cannot be read. The
+preconditions are what block the call — the template working, not failing.
+
+### The `noParentMap 1`, attributed
+
+It **is** the single `hardSwaps`: 62 refines = 61 faded + 1 hard, and
+`noParentMap` is the only non-zero denial, so that one swap is that one denial.
+It is a sweep-window delta, not a boot artifact, so reading P3 at the default
+`skipBootMs` would not have moved it.
+
+Cause, from source: `tileMap` reads `parent.model.material[0]`, and vendored
+`index.js:1236` replaces a FAILED imagery load with `_errorMaterial.clone()` —
+`MeshBasicMaterial({ color: 0, transparent, opacity: 0.2 })` at `:1142`, which
+carries **no `map`**. One missed fetch on a parent produces exactly this, once,
+benignly; the fixture served 614 fetches with 14 refetched, so a transient miss
+is entirely consistent. Two other paths reach the same line (a source that does
+not cover the tile; a parent unloaded during the await) and **the log cannot
+separate them, because the counter recorded no context — a gap in D's
+instrument, not E's.** Closed in this commit (§4.10d).
+
+**The behaviour is correct either way.** A parent with no map has no texture to
+blend from; the choices are to blend from nothing or to fall through to the
+verbatim upstream swap, and it does the latter. So **P3 as written asserts a
+property of the WORLD, not of D's code** — the error §4.11 names. Revised:
+`shape` and `unpatched` stay hard 0 (both mean the ladder was reached wrongly);
+`noParentMap` is reported always and fails only above ~5 % of window refines,
+or when the attribution shows the parent DID have a map.
+
+### Two instrument findings the row gave up
+
+1. **The ON arm is structurally slower, and it is the harness.** `ctx2` is
+   created while the OFF page is still open, so the ON sweep renders with TWO
+   live SwiftShader contexts where the OFF sweep had one. Everything the OFF
+   arm contributes is captured before `ctx2` exists (only gate (9)'s OFF pace
+   read comes later). That explains ratio 0.745 far better than load noise, and
+   raising the cap alone would not have fixed it.
+2. **(18) compared two different scenes.** Both arms reported SETTLED, at
+   **maxZ 17 vs 16** — one resolved a whole level deeper, which moves draws and
+   triangles by itself. This is independent of (and points the same way as) the
+   pre-`parkOffscreen` residency growth Fable attributes the gap to: the drawn
+   set grows with sweep length (185 after 45 s → 279 after 600 s), OFF swept
+   424 frames and ON 311, so the 16-draw / 6,178-tri gap is residency charging
+   for the longer sweep, not the crossfade adding or removing anything.
+   **"Settled" is not sufficient for an equality assertion.** On the re-run F6
+   must read `ON draws === OFF draws && ON tris === OFF tris`, PRECONDITIONED
+   on both arms reporting the same `maxZ`; otherwise NOT CALIBRATED, never
+   FAIL.
+
+One open item, not dressed up: per unit arc the ON arm refined MORE (0.235/°
+vs 0.200/°). Consistent with a shorter, differently-descended window; not
+evidence of a defect, and not evidence of flatness. F2 stays unread until the
+arcs match.
+
+### The one re-run that would settle it
+
+On A's parked tree (post `dead5e5`), one invocation, four changes:
+`page.close()` before `ctx2` is created (after capturing (9)'s OFF read) — the
+highest-value change, since it removes the systematic frame deficit that failed
+P5; `FLY_LOD_SWEEP_MS=1500000` (311 frames in 900 s ⇒ ~2.9 s/frame ⇒ 424 frames
+needs ~1,230 s); `skipBootMs: 0` KEPT, since the denial was in-window;
+F6 gated on equal `maxZ`, and P3 as revised above.
+
+## §4.10d The counter that could not name its own denial
+
+`lodStats.skip.noParentMap` counted a denial it could not describe, and one
+occurrence cost a three-way inference from source. The census now records the
+first four denials as `{ z, x, y, hasModel, matCount, matName }`.
+
+`matName` is the whole point: three-tile names its failed-imagery fallback
+`"error-material"`, so that one string separates a transient fetch miss from a
+real ladder gap — the question the pass-2b row could not answer.
+
+Three properties, all gated:
+- **`skip` stays NUMBERS ONLY.** E's browser leg diffs it key by key across two
+  snapshots, so a non-numeric member would be a trap for the next reader. The
+  context is a sibling (`noParentMapFirst`), not a member.
+- **Bounded and empty at rest.** Four samples; nothing is written on a run
+  where nothing is denied. It is a diagnosis, not a log.
+- **Unreachable with the flag off**, because `eligible()` refuses the swap
+  before `onRefine` ever reads the parent's map — so flag-off identity is
+  untouched by construction, not by care.
+
+`verify-lod-fade.mjs` §5b asserts all of it and **was RED-calibrated by
+deleting `matName`**: 62 passed / 2 failed, naming the missing field and the
+lost discriminator; restored, 64/64.
+
 ## §4.11 A gate must not assert what another owner ships
 
 Found by Fable's dry-run merge of all five flipped branches. Three of D's key

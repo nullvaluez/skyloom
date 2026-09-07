@@ -323,6 +323,51 @@ console.log('\n[5] policy + instrument contract');
   ok('the skip reasons are enumerated (a zero-fade run must be diagnosable)',
     ['disabled', 'boot', 'warp', 'concurrency', 'noParentMap', 'shape', 'unpatched']
       .every((k) => k in lodStats.skip), Object.keys(lodStats.skip).join(','));
+  // E's browser leg DIFFS `skip` key by key across two snapshots, so a
+  // non-numeric field in it would be a trap. The one denial that needs context
+  // rather than a count is a sibling, not a member.
+  ok('the skip census is NUMBERS ONLY (E diffs it key by key)',
+    Object.values(lodStats.skip).every((v) => typeof v === 'number'),
+    Object.entries(lodStats.skip).map(([k, v]) => `${k}:${typeof v}`).join(' '));
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n[5b] the noParentMap denial is NAMED, not merely counted');
+{
+  // Pass 2b denied exactly ONE refine a blend for `noParentMap`, and the
+  // counter could say only "one" — the cause had to be inferred from source
+  // across three reachable paths. This census exists so the next occurrence
+  // names itself. `matName` is the load-bearing field: three-tile's
+  // failed-imagery fallback is `MeshBasicMaterial({ name: 'error-material' })`
+  // with no `map`, so that one string separates a transient fetch miss from a
+  // real ladder gap.
+  //
+  // RED CALIBRATION: this gate fails if any of the six fields is removed from
+  // the record — verified by deleting `matName` and re-running before the fix
+  // shipped.
+  const WANT = ['z', 'x', 'y', 'hasModel', 'matCount', 'matName'];
+  ok('the context array exists and starts empty (nothing written when nothing is denied)',
+    Array.isArray(lodStats.noParentMapFirst) && lodStats.noParentMapFirst.length === 0);
+  const src = fs.readFileSync(new URL('../lib/fly/lod-crossfade.js', import.meta.url), 'utf8');
+  const push = src.match(/noParentMapFirst\.push\(\{([\s\S]*?)\}\);/);
+  ok('the recorder pushes a record at the denial site', !!push);
+  const fields = push ? [...push[1].matchAll(/^\s*([A-Za-z_$][\w$]*)\s*:/gm)].map((m) => m[1]) : [];
+  ok(`the record carries exactly ${WANT.join(', ')}`,
+    WANT.every((f) => fields.includes(f)) && fields.length === WANT.length,
+    `[${fields.join(', ')}]`);
+  ok("`matName` is the discriminator and reads the PARENT's material, not the tile",
+    /matName:\s*pm\?\.name/.test(push?.[1] ?? ''), 'pm is tileMap(parent)');
+  ok('the census is bounded (a diagnosis, not a log)',
+    /const NO_PARENT_MAP_SAMPLES = \d+;/.test(src) &&
+    /if \(lodStats\.noParentMapFirst\.length >= NO_PARENT_MAP_SAMPLES\) return;/.test(src),
+    src.match(/const NO_PARENT_MAP_SAMPLES = (\d+);/)?.[1] + ' samples');
+  ok('it is recorded at the denial, beside the counter it explains',
+    /lodStats\.skip\.noParentMap\+\+;\s*\n\s*recordNoParentMap\(parent, pm\);/.test(src));
+  ok('resetLodFades clears it with the skip counters',
+    /lodStats\.noParentMapFirst\.length = 0;/.test(src));
+  ok('it is unreachable with the flag off (eligible() refuses before the map is read)',
+    src.indexOf('if (!eligible(') < src.indexOf('const pm = tileMap(parent);'),
+    'the eligible() gate precedes the parent-map read in onRefine');
 }
 
 // ---------------------------------------------------------------------------
