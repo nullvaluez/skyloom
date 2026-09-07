@@ -58,7 +58,10 @@
 > own earlier "BY DESIGN" text; and **residency draws** — `keepResident` kept
 > issuing every tile it had ever seen, so the drawn set GREW with sweep duration
 > and broke the frozen Owens ceiling (279 against 261), fixed by parking
-> off-frustum models and a capped LRU <!-- TERRA-LIVE RE-RUN PENDING -->.
+> off-frustum models and a capped LRU — after which, at a full revolution on the
+> parked tree, **no tile is replaced while it is on screen (65 → 0)**, while the
+> capped arm's merges read 47 against 35 → 0 before the cap and the Owens draw
+> number is still unmeasured <!-- TERRA-LIVE RE-RUN PENDING -->.
 >
 > **SHIP STATE.** **ON**: `TERRA_PACE` (incl. `parkOffscreen` and
 > `maxResidentTiles`), `STEP_SAFE`, `LADDER_FIX`, `HUD_SYNC`, `FINALIZE_PACE`,
