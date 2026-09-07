@@ -384,6 +384,37 @@ function gate(name, ok, detail) {
 function soft(name, detail) {
   console.log(`INFO  ${name}  — ${detail}`);
 }
+// THE OFF ARM'S RED-TABLE LEGS ARE A CALIBRATION, NOT A VERDICT.
+//
+// This row carries its own red INSIDE the run: the OFF leg exists to make the
+// defect reproduce, so (3) and (4) are expected to be violated there. Reported
+// through `gate` they printed FAIL and drove `fail`, which meant rc=1 was
+// partly BY DESIGN and a reader scanning FAIL lines saw the control's success
+// looking exactly like a regression. An exit code that means two things means
+// nothing (R24 §6a, applied to my own row).
+//
+// So a red-table leg on the OFF arm prints RED when the defect reproduces and
+// is counted separately from failures. When it does NOT reproduce, the leg
+// still prints PASS exactly as before — no assertion moves — but it says out
+// loud that the control went quiet, because an ON-arm green is only worth what
+// its OFF-arm red is worth, and a red that stopped reproducing is a gate that
+// has quietly stopped proving anything.
+let redsIntended = 0;
+let redsSilent = 0;
+function redLeg(name, ok, detail) {
+  if (!ok) {
+    redsIntended++;
+    console.log(`RED   ${name}  — ${detail}  [INTENDED: this is the OFF arm, where the defect is supposed to reproduce]`);
+    return;
+  }
+  pass++;
+  console.log(
+    `PASS  ${name}  — ${detail}  *** NOTE: this is a RED-TABLE leg on the OFF arm and it did NOT ` +
+      'reproduce. The corresponding ON-arm green is only as strong as this control, so a silent ' +
+      'red is worth checking before the ON arm is believed.'
+  );
+  redsSilent++;
+}
 
 (async () => {
   const browser = await chromium.launch({
@@ -568,14 +599,14 @@ function soft(name, detail) {
         'URL is fetched twice as the heading comes back round" both require the heading to have ' +
         'come back round'
     );
-  else gate(
+  else redLeg(
     '(3) NO TILE LEAVES AND COMES BACK ON A PURE YAW (culling re-stream)',
     w.reappears === 0,
     `${w.reappears} re-appearances — the position never moved, so anything that came back left ` +
       'because it was culled, not because it was far'
   );
   red.push(['T1/T3 bend-blind merge re-streams the near field', 'verify-lod-fade (3)', `${w.reappears} reappears`, '0']);
-  gate(
+  redLeg(
     '(4) NO HARD LOD SWAP — a parent never leaves on the same frame its children arrive',
     w.hardSwaps === 0 && w.hardMerges === 0,
     `refines ${w.hardSwaps} · merges ${w.hardMerges}`
@@ -1318,7 +1349,13 @@ function soft(name, detail) {
 
   console.log('\nRED TABLE (defect · gate · measured · green target)');
   for (const r of red) console.log(`  ${r[0]} | ${r[1]} | measured ${r[2]} | ${r[3]}`);
-  console.log(`\n${pass} passed, ${fail} failed${notCalSummary()}`);
+  console.log(
+    `\n${pass} passed, ${fail} failed${notCalSummary()}` +
+      (redsIntended
+        ? ` · ${redsIntended} RED (intended — the OFF arm's calibration reproducing, not a regression)`
+        : '') +
+      (redsSilent ? ` · ${redsSilent} red-table leg(s) did NOT reproduce on the OFF arm` : '')
+  );
   await browser.close();
   process.exit(fail || notCalCount() ? 1 : 0);
 })().catch((e) => {
