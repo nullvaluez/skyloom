@@ -53,9 +53,14 @@
 > SUBSTITUTED rather than waived, so its owner ruled GO in one code line — faded
 > **0 → 69** against hardSwaps **72 → 3**, a **19-frame** blend window, every
 > blend draining with nothing retained, concurrency 20 of 32, and the refine rate
-> unchanged at ratio **1.00**. **What is not proven rides with it**: the MERGE
-> ramp is structurally gated by `keepResident` and was never exercised, and **a
-> w6 red attributable to the crossfade reverts the flip by the same one line**. *"Screen
+> unchanged at ratio **1.00** — **and w6 then CERTIFIED it on the flipped tree**
+> (depth-rt 11/11 · sat-night 27/1/1 · dusk 15/15 · flicker's urban p99 6.138
+> against 12 · terra-live's settled-start sweep with every ON counter at 0),
+> **with no red anywhere attributable to the crossfade and the one-line revert
+> never triggered**. **What is not proven rides with it**: the MERGE ramp is
+> structurally gated by `keepResident` and was never exercised, flicker's
+> SUBURB window ran out of row budget and was not re-run, and the Owens ceiling
+> on a settled post-sweep pose is unmeasured. *"Screen
 > tearing"* → `STEP_SAFE`: **a quality-ladder step now applies the DPR, the
 > renderer size and the composer size inside ONE frame** (0 of 12 canvas writes
 > outside a rAF, where pass 1 read 18 of 18 and pass 2b 12 of 30; the 22-of-46
