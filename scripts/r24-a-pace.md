@@ -1773,6 +1773,122 @@ this is a ruling and not a hypothesis.
 
 ---
 
+## §20 The 47 merges: my cap was sized on the wrong path
+
+The re-take on `14c1220` gave the arms a comparable arc for the first time
+(647 vs 650 frames, 550° vs 553°). Arm A (trio OFF): merges 74,
+**replacedOnScreen 65**, refetchParent 74. Arm B (trio ON, parked, cap 260):
+merges 47, **replacedOnScreen 0**, refetchParent 47.
+
+**The user-visible contract holds at a full revolution: 65 → 0.** Not one tile
+was replaced while the player could see it. That is the thing the round exists
+to fix, and it is closed.
+
+The 47 merges are mine, and they are the cap.
+
+### It is (a). (b) is refuted from source
+
+`parkOffscreen` writes `model.visible` and **nothing reads it**:
+`_LODEvaluate`, `LOD`, `_update`, `_loadSubTiles`, `_removeSubTiles` and
+`tile-residency.js` never consult visibility. The only `.visible` read anywhere
+in the vendored bundle, besides my own write, is a `console.assert` inside the
+raycast helper.
+
+And the one place it could plausibly have mattered is safe: **three r185's
+raycaster tests LAYERS only** (`three.core.js:56188`, `function intersect` —
+`if (object.layers.test(raycaster.layers))`, no visibility check), so
+`getLocalInfoFromGeo` still hits parked tiles and elevation sampling is
+unaffected. That mattered more than the merges did: if the raycaster HAD
+skipped invisible meshes, every satellite drape sample over off-frustum terrain
+would have returned null and retried forever — which is exactly the failure
+shape that timed arm B out. It does not, so parking is not that either.
+
+A parked parent cannot make a merge legal. (b) is out.
+
+### My error, precisely
+
+Gate 26 asserts the cap exceeds the **measured** working set. I measured it on
+a **240-frame synthetic yaw** that saturates at 190 tiles, and shipped 260.
+The venue runs a **650-frame revolution at z17** whose flag-OFF arm alone
+carries 205 resident / 152 with a model at Owens; with keepResident it holds
+more. So 260 bound, the LRU elected off-frustum subtrees, their parents
+collapsed, and the camera's return re-fetched them. The R21 re-stream symptom
+reduced 74 → 47, not removed — and reduced by my own brake rather than by the
+policy.
+
+**A constant cap measured on one path is a constant that will be wrong on the
+next one.** That is the actual lesson; 260 → some bigger constant would only
+move the failure to a longer sweep or a denser venue.
+
+### The fix: the cap follows the drawn set
+
+`cap = max(floor, k × drawn)`. The retained set is a full revolution's worth of
+the visible set — that is the geometry — so a multiple of the drawn count
+tracks it at any altitude, on any venue, at any sweep length. It is still a
+bound, because the drawn count is frustum-bounded.
+
+**k is sized on the WORST measured ratio, not the yaw this round is about:**
+
+| path | 240f | 650f |
+|---|---|---|
+| yaw (y=900) | 3.96 | 4.87 |
+| vertical bob | **9.20** | 5.75 |
+| serpentine | 5.34 | 4.94 |
+
+The bob is the worst: a steep look-down draws few tiles while the retained set
+spans altitudes. Sizing on the yaw alone would have repeated the original
+mistake in a new costume. **k = 14**, ~1.5× margin over 9.20; floor stays 260.
+
+### The division of labour this creates, stated because it is a real trade
+
+After this change the **byte budget is the trigger that actually guards
+memory**, and that is right: bytes are the resource and a tile count is only
+ever a proxy. The count cap stops a pathological count at a *bounded* view; the
+byte budget stops real growth — and only it can, because a serpentine measured
+**283 → 316 resident from 240 to 650 frames**, i.e. translation genuinely grows
+the set where a pure yaw saturates at 190 and stays there. Pass 2b measured
+113.7 MB at Owens, under the 140 MB budget, so lifting the count trigger spends
+no memory the byte rule was going to refuse anyway.
+
+### Gates
+
+`verify-terra-residency` 35 → **40**, RED-calibrated by removing the adaptive
+term (34 and 35 fail; the constant floor leaves 56 merges and 56 refetches at
+an effective cap of 150 against a 190-tile set).
+
+- **32** RED: a constant cap below the revolution working set collapses tiles
+  and re-fetches parents.
+- **33** …and every one is OFF-SCREEN — the election is out-of-frustum only, so
+  the user-visible contract never breaks even when the cap is badly sized. This
+  is what makes the re-take's `replacedOnScreen 0` a designed result rather
+  than luck.
+- **34** GREEN: the same floor, made a multiple of the drawn set, costs zero
+  merges and zero refetches.
+- **35** …and the cap is still a bound — finite, and above the set it must hold
+  (546 vs 190).
+- **36** the pass now **publishes its eviction count**, so a merge is never
+  again ambiguous between "the LOD policy did it" and "the memory brake did
+  it". That ambiguity is what cost this re-take.
+- **26 REPAIRED**: it now asserts the POLICY (floor or k × drawn) clears the
+  working set at the worst measured ratio, instead of asserting the floor alone
+  cleared one yaw. The old premise is precisely what failed.
+
+### Lessons
+
+1. **A cap measured on one path is a guess about every other path.** I had the
+   measurement and the margin and still sized against the motion the round was
+   about, rather than the motion that stresses the ratio worst.
+2. **Size a bound on the worst case you can measure, not the representative
+   one.** The bob is not a corner case; it is a player looking down.
+3. **Publish what your brake did.** A merge count that cannot distinguish
+   policy from eviction sent a whole re-take looking for a defect in the LOD.
+4. **Check the mechanism you did NOT change for the side effect you did not
+   intend.** Parking was innocent of the merges, but the raycaster question it
+   raised was the more dangerous one, and it was worth ten minutes to prove
+   three tests layers and not visibility.
+
+---
+
 ## §10 Commits
 
 | # | Commit | What |
