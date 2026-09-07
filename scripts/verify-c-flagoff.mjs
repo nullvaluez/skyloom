@@ -298,8 +298,8 @@ gate(
     /effectComposer\.addPass\(new RenderPass\(scene, camera\)\);/.test(fec) &&
       // ...are the two the hook is constructed with...
       /export function installDepthProbe\(\{ gl, composer, camera, scene: worldScene \}\)/.test(dp) &&
-      // ...and the ray is built from that binding, with no module-scope shadow.
-      /raycaster\.setFromCamera\(_ndc, camera\);/.test(dp) &&
+      // ...and every ray is built from that binding, with no module-scope shadow.
+      /raycaster2\.setFromCamera\(_ndc, camera\);/.test(dp) &&
       !/^(const|let|var)\s+camera\b/m.test(dp)
   );
   gate(
@@ -310,41 +310,49 @@ gate(
   );
   gate(
     'the truth un-bends by the LIVE uBendK and reports its own convergence',
-    /import \{ getBend \} from '@\/lib\/fly\/toy-world\/world-bend';/.test(dp) &&
-      /out\.residualM =/.test(dp) &&
-      /out\.reprojectionPx =/.test(dp)
+    /import \{ airDrop, getBend \} from '@\/lib\/fly\/toy-world\/world-bend';/.test(dp) &&
+      /const bend = getBend\(\);/.test(dp) &&
+      /out\.residualM = c\.residual;/.test(dp) &&
+      /out\.reprojectionPx = c\.reproj;/.test(dp) &&
+      /out\.converged = c\.converged;/.test(dp)
   );
-  // A rigid vertical lift is right for distant terrain and FATAL in the near
-  // field: at bendK 5e-6 a 3 km hit lifts the ray ~45 m, straight over anything
-  // within tens of metres — which is how the far pick missed a depth-writing
-  // object 34 m in front of the camera. Both casts must survive, and the
-  // reprojection must be the arbiter rather than a special case.
-  // The correction must not model the bend. Every variant in this tree displaces
-  // only in Y, so the rendered point is the ray point at the hit's XZ — exact
-  // for the ground bend, the anchor variants AND the air bend, with no
-  // per-family case and no reprojection threshold to reject correct candidates
-  // on a grazing ray.
+  // THE DEGENERATE ZERO, gated so it cannot come back. A CPU raycast hit lies
+  // on its own ray by construction, so "the ray point at the hit's XZ" makes
+  // `impliedDrop` identically 0 for any UNLIFTED hit and an interval test
+  // `0 <= impliedDrop <= groundDrop` passes honestly — which is how a truth
+  // came to report un-bent geometry (2282.3 m) where the buffer held the bent
+  // surface (2356.3 m). Only convergence can exclude that.
   gate(
-    'the truth corrects by solving the ray at the hit XZ, not by a drop model',
-    /const t = useX\s*\n\s*\? \(h\.point\.x - ray\.origin\.x\) \/ den\s*\n\s*: \(h\.point\.z - ray\.origin\.z\) \/ den;/.test(
+    'validity is CONVERGENCE + residual + reprojection, never an implied-drop interval',
+    /valid: converged && residual <= Math\.max\(0\.5, distance \* 1e-3\) && reproj <= 1\.5,/.test(
       dp
-    ) && /const impliedDrop = h\.point\.y - _p\.y;/.test(dp)
+    ) && !/impliedDrop <= groundDrop \+ tol/.test(dp)
   );
   gate(
-    'validity is the implied drop lying in [0, groundDrop], not a pixel threshold',
-    /const valid = impliedDrop >= -tol && impliedDrop <= groundDrop \+ tol;/.test(dp) &&
-      !/c\.reproj <= 1\.5/.test(dp)
+    'the bend solve ITERATES the lift until it stops moving',
+    /if \(Math\.abs\(d - lift\) < 0\.05\) \{\s*\n\s*converged = true;/.test(dp) &&
+      /lift = d;/.test(dp) &&
+      /const cast = castAt\(px, py, lift, size, list\);/.test(dp)
+  );
+  // The displacement is not ONE function: ground/anchor geometry drops by
+  // d^2 k while air-anchor actors carry R7's altitude lift. Choosing per hit
+  // from the material's own world-bend cache key is what lets an air-bent actor
+  // in front of terrain be found at all.
+  gate(
+    'the drop is chosen PER HIT from the material world-bend variant, ground vs air',
+    /import \{ airDrop, getBend \} from '@\/lib\/fly\/toy-world\/world-bend';/.test(dp) &&
+      /const isAirBent = \(o\) => bendKeyOf\(o\)\.startsWith\('world-bend-air'\);/.test(dp) &&
+      /if \(isAirBent\(o\)\) return airDrop\(Math\.hypot\(dx, dz\), pt\.y, k\);/.test(dp)
   );
   gate(
-    'both casts feed ONE pool and the nearest valid candidate wins',
-    /const pool = castAt\(px, py, 0, size, list, k, cx, cz\);/.test(dp) &&
-      /for \(const c of cast\) pool\.push\(c\);/.test(dp) &&
-      /const valid = pool\.filter\(\(c\) => c\.valid\);/.test(dp) &&
+    'BOTH families are solved and the nearest valid candidate wins',
+    /for \(const wantAir of \[false, true\]\)/.test(dp) &&
+      /const valid = cands\.filter\(\(c\) => c\.valid\);/.test(dp) &&
       /valid\.sort\(\(c1, c2\) => c1\.t - c2\.t\);/.test(dp)
   );
   gate(
-    'every candidate on the ray is published, so a disagreement can be READ',
-    /out\.hits = r\.pool/.test(dp) && /impliedDropM: \+h\.impliedDrop\.toFixed\(3\)/.test(dp)
+    'every candidate AND every raw ray hit is published, so a disagreement can be READ',
+    /out\.hits = r\.cands\.map/.test(dp) && /out\.rayHits = r\.pool\.slice\(0, 12\)/.test(dp)
   );
   gate(
     'the truth publishes ONE TEXEL of surface slope, so the bound is measured not guessed',

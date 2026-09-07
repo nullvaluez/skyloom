@@ -141,6 +141,86 @@ const mirror = new Function(
    return perspectiveDepthToViewZ;`
 )();
 
+
+// ---------------------------------------------------------------------------
+// BENT-SURFACE CALIBRATION — the RED that verify-c-flagoff could not catch.
+//
+// The w5 arbiter corrected a hit by "the ray point at the hit's XZ". For a CPU
+// raycast hit that is the hit itself, so `impliedDrop` was identically 0, the
+// interval test `0 <= 0 <= groundDrop` passed HONESTLY, and the truth became
+// the UN-BENT intersection. A source gate cannot see that: forcing valid=true
+// or reversing a sort leaves a degenerate zero looking exactly like a converged
+// answer. Only geometry with a KNOWN non-zero drop separates them, so the
+// calibration lives here.
+//
+// The scene is the w5 log's own median pick, solved backwards from it: a
+// grazing ray whose UN-BENT intersection is at 2282.3 m (what the truth
+// reported) and whose BENT intersection is at 2356.32 m (what the depth buffer
+// held), i.e. the ground drop divided by the tangent of the ray — +74.02 m
+// against the logged +74.01 m.
+// ---------------------------------------------------------------------------
+{
+  const K = 5e-6;                       // the run's bendK
+  const TH = (19.4734 * Math.PI) / 180; // depression angle, solved from the log
+  const R0 = 2282.3;                    // un-bent range  = what w5's truth said
+  const R1 = 2356.32;                   // bent range     = what the buffer held
+  const H = R0 * Math.sin(TH);          // eye height over the flat CPU surface
+
+  // Ray from (0, H, 0) toward +x, depressed by TH. CPU surface: the plane y = 0.
+  // GPU surface: y = -(xz distance)^2 * K, i.e. the world LOWERED with range.
+  const rayY = (R) => H - R * Math.sin(TH);
+  const rayX = (R) => R * Math.cos(TH);
+  const cpuHit = (lift) => (H + lift) / Math.sin(TH); // range to y = 0 from a lifted origin
+  const dropAt = (R) => rayX(R) * rayX(R) * K;
+
+  // THE REMOVED RULE: cast unlifted, correct by "ray point at the hit's XZ".
+  const degenerateR = cpuHit(0);
+  const degenerateImpliedDrop = 0; // by construction — the hit IS on its own ray
+  const degenerateAccepted =
+    degenerateImpliedDrop >= -0.5 && degenerateImpliedDrop <= dropAt(degenerateR) + 0.5;
+
+  // THE RESTORED RULE: lift the ray by the drop at the current hit, converge.
+  let lift = 0;
+  let R = cpuHit(0);
+  let iters = 0;
+  let converged = false;
+  for (let i = 0; i < 5; i += 1) {
+    R = cpuHit(lift);
+    const d = dropAt(R);
+    iters = i + 1;
+    if (Math.abs(d - lift) < 0.05) {
+      lift = d;
+      converged = true;
+      break;
+    }
+    lift = d;
+  }
+  // At convergence the displaced hit lies back on the ORIGINAL ray.
+  const displacedY = 0 - lift;                     // CPU surface y=0, dropped
+  const onRayResidual = Math.abs(displacedY - rayY(R));
+  const bentErr = Math.abs(R - R1);
+  const degErr = Math.abs(degenerateR - R1);
+
+  console.log('\nBENT-SURFACE CALIBRATION (the w5 median pick, solved backwards)');
+  console.log(`  geometry: bendK ${K}, ray depressed ${(TH * 180) / Math.PI}deg, eye ${H.toFixed(2)} m`);
+  console.log(`  RED   degenerate "ray point at the hit XZ": range ${degenerateR.toFixed(2)} m ` +
+    `(implied drop ${degenerateImpliedDrop.toFixed(2)} m, interval test ` +
+    `${degenerateAccepted ? 'ACCEPTS' : 'rejects'}) — off the buffer by ${degErr.toFixed(2)} m`);
+  console.log(`  GREEN iterated lift: ${iters} passes, converged ${converged}, drop ${lift.toFixed(2)} m, ` +
+    `range ${R.toFixed(2)} m — off the buffer by ${bentErr.toFixed(2)} m, residual ${onRayResidual.toFixed(4)} m`);
+  console.log(`  the w5 log measured this same gap as +74.01 m; here it is ` +
+    `+${(degenerateR ? R - degenerateR : 0).toFixed(2)} m`);
+  const ok =
+    degenerateAccepted &&          // the RED passes validity honestly — that is the point
+    degErr > 50 &&                 // ...and is wrong by the whole drop/tan(theta)
+    converged &&
+    bentErr < 1 &&                 // the GREEN lands on what the buffer held
+    onRayResidual < 0.05 &&        // ...and back on the original ray
+    Math.abs(R - degenerateR - 74.01) < 1.0;
+  console.log(`  => ${ok ? 'PASS' : 'FAIL'}`);
+  if (!ok) process.exitCode = 1;
+}
+
 console.log('\nMIRROR TEST — lib/fly/depth-probe.js vs three\'s own GLSL');
 const G = glslPerspectiveDepthToViewZ();
 console.log(`  GLSL reversed : ${G.reversedExpr}`);
