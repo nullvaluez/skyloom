@@ -1998,6 +1998,126 @@ zero that was.
 
 ---
 
+## §22 The 8 imagery refetches: two discarded refines, counted to the unit
+
+E's standalone lod-fade row (`scripts/r24-out/w5/lod-fade.log`, app `645d08c`,
+TERRA_PACE in its shipped state on both legs) held every residency contract on
+the OFF-crossfade leg — **0 re-appearances** over a 360° pure yaw with the
+position frozen, against 27 on the flag-off tree — and gate (6) read **8 genuine
+imagery refetches of 567 distinct tile URLs** (e.g. `/img/11/772/550` ×2), with
+7 further duplicates correctly excluded as z15 DEM ceiling-sharing (§19).
+
+With `merge 0` and `refetchParent 0` there was no obvious re-stream to explain a
+second request for the same z11 imagery URL.
+
+### The arithmetic is the answer, and it is exact
+
+| reading | value |
+|---|---|
+| refine STARTS (`lodStats.refine`) | **74** |
+| tile appearances in the frame-diff census | 288 |
+| ⇒ refines COMMITTED (288 ÷ 4 children) | **72** |
+| D's ladder bookkeeping, independently | 72 |
+| **starts − commits** | **2** |
+| 2 discarded refines × 4 children | **8 imagery URLs** |
+| genuine imagery refetches reported | **8**, worst ×2 |
+
+`refine` counts STARTS, not commits: `lib/fly/tile-residency.js:202` increments
+`stats.refine` at method entry, *before* `origLoad.call(this, params)`. So the
+gap between 74 and 72 is not noise, it is two refines that began and were
+thrown away. Worst ×2 is exactly what one discard-then-commit produces — not
+"about 8", but 8.
+
+### The mechanism, from source
+
+Vendored `index.js` `_loadSubTiles` downloads all four children and only *then*
+re-evaluates:
+
+    await Promise.all(a); o.forEach(c => c._loadState = 'loaded');
+    const h = this._LODEvaluate(r, n, s) !== 1;
+    return h ? this.unloadSubTiles() : (this.add(...o), …, this.unloadModel()), !h;
+
+At that re-check the children are **not yet added**, so `isLeaf`
+(`children.length <= 1`) is still true. If the tile left the frustum during its
+own download, `_getDistRatio()` returns `t * 5` instead of `t * 0.8`, the refine
+test fails, PATCH 2's branch reaches `if (this.isLeaf || this.z < e) return 0`,
+and `h` is true — so `unloadSubTiles()` **discards four completed downloads**.
+It also clears `_subTiles`, so the tile is immediately eligible again and the
+next walk that sees it in frustum **re-buys the same four URLs**.
+
+On a pure yaw the trigger is a tile whose bounding box is grazing a frustum
+plane: 0.83°/frame is enough to flip `inFrustum` inside one download
+round-trip. 2 of 74 is 2.7% of refines — the right order for an edge case.
+
+### The four candidates, ruled out with reasons
+
+| candidate | why not |
+|---|---|
+| `_errorMaterial` retry after a transient miss (`index.js:1316`) | It is on the **ON** leg (`noParentMap 3`) and the counts do not correspond. It also cannot duplicate on its own: the catch returns a clone **without** `userData.source`, so it would reload on the next `updateMaterial` — and nothing calls `updateMaterial` a second time for a tile that is not version-dirty. |
+| boot overlap leaking into the window's denominator | All 8 are accounted for by the 74/72 gap **inside** the window. There is nothing left for boot to explain. |
+| eviction under the fixture | 0 evictions, 0 over-budget passes. Eviction's only path is a merge, and `merge` read 0 — with `refetchParent` 0 behind it. |
+| a parent z11 tile unloaded and re-requested by the walk | That is precisely what `refetchParent` counts, and it read **0**. |
+
+### The fixture is the FAVOURABLE case — so this is not a NOTCAL
+
+The discard window *is* a download round-trip. A real network makes that window
+longer, so **more** tiles will have left the frustum by the time their children
+land, and **more** refines will be discarded. Serving from `127.0.0.1` is the
+best case this code path ever sees.
+
+That is the load-bearing reason gate (6)'s FAIL is honest and its bound does not
+move: the fixture is not causing the count, **the fixture is understating it.**
+
+### The defect is the discard, not the retry
+
+Upstream is protecting against committing children the camera no longer wants —
+but the bytes are already paid for. It throws away four completed downloads and
+then buys them again. The better behaviour is to **commit already-downloaded
+children and let the ordinary merge policy decide later**, which is exactly what
+`keepResident` does for everything else and which the adaptive cap (§20) now
+bounds.
+
+**R25 item**, shaped: a switch-gated vendored patch at the post-await re-check —
+when the children are already loaded, take the commit branch regardless and let
+the LOD policy merge them on a later walk. Not built this round: it changes
+commit behaviour on the critical path and there is no measurement budget left to
+certify it. It is not a knob, and it is never a re-baseline.
+
+### OPEN — the DEM asymmetry
+
+Those same 8 children should have re-requested their **DEM** as well, and no
+genuine DEM duplicate appears (all 7 DEM duplicates are z15 ceiling-sharing).
+What I checked and could not close it with:
+
+- the fixture DEM's `minLevel` is **0** (`scripts/_fixture.js:146`), so a z11
+  DEM request is not gated away;
+- there is **no URL cache** in the vendored bundle (the only `Map` cache is
+  `r24WorkerSrcCache`, for worker source text);
+- **no `THREE.Cache`** is enabled anywhere in `lib/fly/tile-sources.js` or
+  `lib/fly/terrain-engine.js` that I can find.
+
+So the imagery/DEM asymmetry is **unexplained**. It does not touch the
+attribution above — the imagery arithmetic is exact and self-contained — and it
+is recorded as open rather than rounded off. Fable has asked E for the raw
+`byUrl` entries for those 8 tiles from the w5 fixture stats if they survived
+teardown; the DEM rows would settle it in one read, and the answer belongs
+beside this question.
+
+### Lessons
+
+1. **Count starts and commits separately.** The entire attribution is one
+   subtraction, and it was only available because the instrument counts refine
+   STARTS while the census counts what actually arrived. Either alone would have
+   said nothing.
+2. **A discard is a refetch you have not seen yet.** Work thrown away after it
+   completed does not appear in any "wasted request" counter until the second
+   purchase, which is why this looked causeless.
+3. **Ask which direction the venue biases a number.** "The fixture is the
+   favourable case" turned a suspected fixture artifact into a load-bearing
+   argument for the opposite conclusion.
+
+---
+
 ## §10 Commits
 
 | # | Commit | What |
