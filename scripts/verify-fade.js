@@ -169,6 +169,13 @@ const INSTALL_FADE_WATCH = () => {
     frames: 0,
     births: 0,
     hardBirths: 0,
+    /** declared non-faders, per reason — attributed, never scored. */
+    noFade: {},
+    noFadeIds: new Set(),
+    channelOf: new Map(),
+    /** hard events on a material that neither fades NOR declares — the bug shape. */
+    unattributed: 0,
+    unattributedSample: null,
     deaths: 0,
     hardDeaths: 0,
     partialFramesSeen: 0,
@@ -211,6 +218,7 @@ const INSTALL_FADE_WATCH = () => {
       // ever observed.
       S.channelSeen.fadeU = true;
       S.presenceChannel = 'userData.__fadeU';
+      S.channelOf?.set(o.uuid, 'userData.__fadeU');
       return m.userData.__fadeU.value;
     }
     const u = m.userData?.shader?.uniforms || m.uniforms || null;
@@ -218,12 +226,14 @@ const INSTALL_FADE_WATCH = () => {
       if (u && u[k] && typeof u[k].value === 'number') {
         S.channelSeen[k] = true;
         if (!S.channelSeen.fadeU) S.presenceChannel = k;
+        S.channelOf?.set(o.uuid, k);
         return u[k].value;
       }
     }
     if (m.transparent && typeof m.opacity === 'number') {
       S.channelSeen.opacity = true;
       if (!S.channelSeen.fadeU) S.presenceChannel = 'opacity';
+      S.channelOf?.set(o.uuid, 'opacity');
       return m.opacity;
     }
     // ABSENT IS PRESENCE 1, AND THAT IS CORRECT. A chunk at rest carries the
@@ -231,6 +241,7 @@ const INSTALL_FADE_WATCH = () => {
     // "fully arrived", not "unreadable" — and it must not overwrite a channel
     // already seen elsewhere in the run.
     S.presenceChannel ??= 'none';
+    S.channelOf?.set(o.uuid, 'none');
     return 1;
   };
   const tick = () => {
@@ -247,6 +258,30 @@ const INSTALL_FADE_WATCH = () => {
       r.traverse((o) => {
         if (!o.isMesh && !o.isInstancedMesh) return;
         if (!o.visible) return;
+        // A DECLARED NON-FADER IS ATTRIBUTED, NEVER SCORED.
+        //
+        // B measured what my probed roots actually contain: `sat-roads` shares
+        // ONE MeshBasicMaterial, transparent at OPACITY 1 — so my opacity
+        // fallback returned 1 and every road birth and death scored HARD, which
+        // is the whole remainder of the 8/26 and 6/11 — and `sat-water` (inside
+        // __satBuildings.object) shares an additive MeshPhong at opacity 0.9,
+        // which the same fallback read as PARTIAL forever, inflating
+        // partialFramesSeen while contributing no hard events. Both exclusions
+        // were deliberate (verify-sat-night pins one material instance; the
+        // road engine's meshes === ready === visible), but they lived in prose
+        // — and an undeclared design decision is indistinguishable from a bug.
+        //
+        // They now declare themselves with `material.userData.__noFade =
+        // '<reason>'`. A declared mesh is counted under its reason and left out
+        // of the hard and partial tallies entirely; gates (2) and (3) then
+        // judge only materials that either fade or FAIL TO DECLARE.
+        const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+        const why = mats.map((m) => m?.userData?.__noFade).find((v) => typeof v === 'string');
+        if (why) {
+          S.noFade[why] = (S.noFade[why] ?? 0) + 1;
+          S.noFadeIds.add(o.uuid);
+          return;
+        }
         cur.set(o.uuid, presenceOf(o));
       });
     for (const [id, p] of cur) {
@@ -255,6 +290,10 @@ const INSTALL_FADE_WATCH = () => {
         S.births++;
         if (p >= 0.999) {
           S.hardBirths++;
+          if (S.channelOf.get(id) === 'none' || S.channelOf.get(id) === 'opacity') {
+            S.unattributed++;
+            S.unattributedSample ??= { ev: 'hardBirth', ch: S.channelOf.get(id), f: S.frames };
+          }
           if (S.samples.length < 40) S.samples.push({ f: S.frames, ev: 'hardBirth', p });
         } else S.partialFramesSeen++;
         cur.set(id, p);
@@ -265,6 +304,10 @@ const INSTALL_FADE_WATCH = () => {
         S.deaths++;
         if (was.p >= 0.999) {
           S.hardDeaths++;
+          if (S.channelOf.get(id) === 'none' || S.channelOf.get(id) === 'opacity') {
+            S.unattributed++;
+            S.unattributedSample ??= { ev: 'hardDeath', ch: S.channelOf.get(id), f: S.frames };
+          }
           if (S.samples.length < 40) S.samples.push({ f: S.frames, ev: 'hardDeath', p: was.p });
         }
       }
@@ -335,6 +378,11 @@ async function serpentine(page, ms) {
     const S = window.__fadeWatch;
     S.frames = S.births = S.hardBirths = S.deaths = S.hardDeaths = 0;
     S.partialFramesSeen = S.maxBirthFrames = 0;
+    S.noFade = {};
+    S.noFadeIds.clear();
+    S.channelOf.clear();
+    S.unattributed = 0;
+    S.unattributedSample = null;
     S.samples.length = 0;
     S.readySeries.length = 0;
     window.__fadeReady0 = {
@@ -395,6 +443,17 @@ async function serpentine(page, ms) {
         ? ` · fadeBudgetMiss=${fadeTel.stats.fadeBudgetMiss}`
         : ' · (no fade counters on the engine stats — the feature may not have armed)')
   );
+  const noFadeRows = Object.entries(w.noFade || {});
+  console.log(
+    `  DECLARED NON-FADERS (attributed, never scored): ` +
+      (noFadeRows.length
+        ? noFadeRows.map(([why, n]) => `${n}x "${why}"`).join(' · ')
+        : 'none — every mesh in the probed roots either fades or is expected to') +
+      '. B measured that sat-roads (one shared MeshBasicMaterial, transparent at opacity 1) ' +
+      'scored every birth and death HARD through the opacity fallback, and sat-water (shared ' +
+      'additive MeshPhong at 0.9) read PARTIAL forever. Both exclusions were deliberate; they are ' +
+      'now declared rather than inferred.'
+  );
   console.log(
     `\nSERPENTINE: ${w.frames} frames · births ${w.births} (HARD ${w.hardBirths}) · ` +
       `deaths ${w.deaths} (HARD ${w.hardDeaths}) · frames with a partial-presence mesh ` +
@@ -443,6 +502,20 @@ async function serpentine(page, ms) {
         : '')
   );
   red.push(['WB-2 no birth fade on any streamed chunk', 'verify-fade (2)', `${w.hardBirths}/${w.births}`, '0']);
+  // EVERY HARD EVENT MUST BE ATTRIBUTABLE. A hard birth or death on a material
+  // that neither carries __fadeU nor declares __noFade is the bug shape: an
+  // undeclared non-fader, or a fader that silently lost its channel. This leg
+  // is what keeps the __noFade exclusion honest — a declaration removes a mesh
+  // from the tallies, so without this a new shared material could quietly
+  // absorb a real regression by simply not being declared.
+  gate(
+    '(2b) EVERY HARD EVENT IS ATTRIBUTABLE — no hard event on an undeclared material',
+    w.unattributed === 0,
+    `${w.unattributed} hard event(s) on a material with neither __fadeU nor __noFade` +
+      (w.unattributedSample ? ` — e.g. ${JSON.stringify(w.unattributedSample)}` : '') +
+      '. A declared non-fader is excluded from the tallies; an UNdeclared one is the defect'
+  );
+
   // (d) THE CAP IS A DESIGNED DEGRADATION, SO THE GATE MUST PRICE IT IN.
   // `CHUNK_FADE.maxDying` is 4, and both the eviction loop and the AGL cull can
   // present more than four deaths at once; every refusal is COUNTED at

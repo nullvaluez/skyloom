@@ -48,6 +48,10 @@ const POSE = [40.1578, -83.0752, 900, 1.9, -0.3];
 // mid-summer so a 55° sun is reachable at this latitude at all.
 const SUN_DAY_MS = Number(process.env.SUN_DAY_MS || Date.UTC(2026, 6, 1));
 const SETTLE = Number(process.env.SUN_SETTLE_MS || 20000);
+// How long to WAIT for the sky effect's recompute to consume the override
+// before declaring the leg un-landed. Generous, because a miss here is a
+// NOT CALIBRATED leg rather than a slow one.
+const SUN_LAND_MS = Number(process.env.SUN_LAND_MS || 120000);
 // Three elevations: high noon, a low dusk sun, and a deep-night sun. The dusk
 // one is where C measured the 119.4° key-to-hill separation.
 const ELEVATIONS = [
@@ -170,6 +174,11 @@ const gateNum = numGate(gate);
   // runs. The pose is fixed, so the same three timestamps serve both tiers.
   const { findSunTime } = await import('./_sun-time.mjs');
   const sunTimes = {};
+  // (b) gate (6) is a statement about the key MOVING as the sun moves, so it
+  // needs at least two legs where the sun demonstrably went where it was told.
+  // The re-take's 0.0000° medium spread was a consequence of a STUCK SUN on
+  // that tier, not a measurement of the key.
+  const landedLegs = {};
   for (const [label, elDeg] of ELEVATIONS) {
     sunTimes[label] = findSunTime(POSE[1], POSE[0], elDeg, { dayMs: SUN_DAY_MS });
     const r = sunTimes[label];
@@ -206,6 +215,27 @@ const gateNum = numGate(gate);
       await page.evaluate((t) => {
         window.__r24Sun = t;
       }, want.tMs);
+      // WAIT FOR THE APP TO PICK IT UP, DO NOT WAIT A DURATION. The override is
+      // consumed on a RECOMPUTE (FlyScene.jsx:1155 reads
+      // `window.__flySunOverride || Date.now()` inside the sky effect), not on
+      // the frame after it is written. The re-take measured what a fixed wait
+      // does at ~2.84 s/frame: high/noon and high/dusk both reported −4.539°
+      // (the WALL CLOCK at boot — 00:15 UTC at Powell is −4.5°) against
+      // commanded 55° and 2°, and both medium day legs reported −13.996°, the
+      // PREVIOUS leg's value, stuck. Only night passed, and only because the
+      // recompute happened to fire before the sample. So the gate polls to a
+      // cap and measures when the sun has actually arrived.
+      const landed = await page
+        .waitForFunction(
+          ([want, tol]) => {
+            const el = window.__flyStats?.sun?.elDeg;
+            return typeof el === 'number' && Math.abs(el - want) <= tol;
+          },
+          [elDeg, 0.5],
+          { timeout: SUN_LAND_MS, polling: 500 }
+        )
+        .then(() => true)
+        .catch(() => false);
       await page.waitForTimeout(SETTLE);
       const s = await page.evaluate(() => window.__flyStats?.sun ?? null);
       rows.push({ tier, label, elDeg, s });
@@ -219,6 +249,11 @@ const gateNum = numGate(gate);
       // the gate thinks. This is the leg whose absence let pass 2b read a
       // stationary sun as a stationary key.
       const arrivedEl = Number.isFinite(s.elDeg) ? s.elDeg : NaN;
+      if (!landed)
+        console.log(
+          `      (0c) ${tier}/${label}: the poll never saw the commanded elevation within ` +
+            `${SUN_LAND_MS / 1000}s — the reading below is whatever the app last recomputed`
+        );
       if (!Number.isFinite(arrivedEl) || Math.abs(arrivedEl - elDeg) > 0.5) {
         notCalibrated(
           `(0c) ${tier}/${label} THE SUN IS WHERE THE GATE PUT IT`,
@@ -231,6 +266,7 @@ const gateNum = numGate(gate);
         continue;
       }
       pass++;
+      landedLegs[tier] = (landedLegs[tier] ?? 0) + 1;
       console.log(
         `PASS  (0c) ${tier}/${label} THE SUN IS WHERE THE GATE PUT IT  — commanded ${elDeg}°, app ` +
           `reports ${arrivedEl.toFixed(3)}° (t=${new Date(want.tMs).toISOString()})`
@@ -303,6 +339,37 @@ const gateNum = numGate(gate);
       // --- clause 2: key elevation, floored only while casting
       const floorDeg = s.minElRadDeg ?? null;
       const expectKeyEl = s.casting && floorDeg != null ? Math.max(elDeg, floorDeg) : elDeg;
+      // (d) UNDER MOONLIGHT THE KEY FOLLOWS THE MOON, so asserting the SUN's
+      // elevation at night is asserting the wrong thing. Clause (1) already
+      // SKIPs for `moonK > 0` and says "clause 4 governs instead" — but (2)
+      // went on asserting the solar expectation anyway, and the re-take duly
+      // reported `key 34.377° vs expected 8.594°` at night on both tiers as a
+      // FAIL. It is not a failure: ONE_SUN blends the key toward
+      // moonDirFromSun below the horizon, which is the feature.
+      //
+      // So at full moon (2) defers to the published moon direction, and reads
+      // NOT CALIBRATED — never FAIL — until C publishes it.
+      if (s.moonK === 1) {
+        const moonDir = s.moonExpected ?? s.moonDir ?? s.keyMoon ?? null;
+        const dMoon = moonDir ? angleBetween(s.key, moonDir) : null;
+        if (!Number.isFinite(dMoon))
+          notCalibrated(
+            `(2/4) ${tier}/${label} AT FULL MOON THE KEY IS THE MOON DIRECTION`,
+            `moonK=1, so the key follows moonDirFromSun (FlyScene.jsx:2193) and the SOLAR ` +
+              `expectation does not apply — key el ${keyEl?.toFixed(3)}°, sun ${elDeg}°. The ` +
+              'instrument publishes no moon direction on stats.sun yet, so there is nothing to ' +
+              'compare against; this is NOT a failure of ONE_SUN'
+          );
+        else
+          gateNum(
+            `(2/4) ${tier}/${label} AT FULL MOON THE KEY IS THE MOON DIRECTION`,
+            dMoon,
+            dMoon <= 0.5,
+            `Δ ${dMoon.toFixed(4)}° between the key and the published moon direction`,
+            `angleBetween(key, moonDir) returned ${dMoon}`
+          );
+        continue;
+      }
       const dKeyEl =
         Number.isFinite(keyEl) && Number.isFinite(expectKeyEl) ? Math.abs(keyEl - expectKeyEl) : NaN;
       gateNum(
@@ -392,7 +459,14 @@ const gateNum = numGate(gate);
   const azSpread = med.length
     ? Math.max(...med.map((r) => azOf(r.s.key))) - Math.min(...med.map((r) => azOf(r.s.key)))
     : null;
-  if (azSpread != null) {
+  if ((landedLegs.medium ?? 0) < 2)
+    notCalibrated(
+      '(6) THE MEDIUM-TIER RED — the key MOVES when the sun moves',
+      `the sun landed on only ${landedLegs.medium ?? 0} of 3 medium legs, so an azimuth spread ` +
+        'across them is a statement about a stuck sun, not about the key. The re-take read ' +
+        '0.0000° for exactly this reason'
+    );
+  else if (azSpread != null) {
     gateNum(
       '(6) THE MEDIUM-TIER RED — the key MOVES when the sun moves',
       azSpread,
@@ -417,12 +491,25 @@ const gateNum = numGate(gate);
       require('path').join(__dirname, '..', 'components', 'fly', 'FlyScene.jsx'),
       'utf8'
     );
-    const n = (src.match(/<directionalLight\b/g) || []).length;
+    // COMMENTS ARE NOT DECLARATIONS. The first version of this gate counted 2
+    // and failed — because C's own comment beside the water field says "there
+    // is exactly one `<directionalLight>` in the world scene", and a bare grep
+    // counts the sentence that states the invariant as a violation of it. R20
+    // §7 already wrote this lesson down ("grep-gates read comments too") and it
+    // still cost a red. Strip block comments, line comments and template/quoted
+    // text, then count only a JSX element at the start of a line.
+    const code = src
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '')
+      .replace(/`[^`]*`/g, '``');
+    const n = (code.match(/^\s*<directionalLight\b/gm) || []).length;
     gate(
       '(8) THE WORLD SCENE DECLARES EXACTLY ONE <directionalLight> (source count)',
       n === 1,
-      `${n} in components/fly/FlyScene.jsx — the identity behind clause (5). The inspect ` +
-        "turntable's lights live in its own Canvas and are not in this file"
+      `${n} JSX declaration(s) in components/fly/FlyScene.jsx — the identity behind clause (5). ` +
+        "The inspect turntable's lights live in its own Canvas and are not in this file. " +
+        'Comments and strings are stripped before counting: a comment that STATES the invariant ' +
+        'must not read as a breach of it'
     );
   }
 
