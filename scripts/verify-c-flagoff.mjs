@@ -257,6 +257,52 @@ gate(
   );
 }
 
+// ---- DEPTH_FIX: the truth raycast hook -------------------------------------
+// verify-depth-roundtrip read 0 raycast hits of 15 probes because a bundled app
+// publishes no window.THREE and no camera, so the gate could never establish a
+// true distance from outside. The truth is now the owner's hook. These gates
+// assert the two properties that make it trustworthy: it cannot exist in a
+// production build, and it cannot read a camera other than the one whose depth
+// the probe samples.
+{
+  const dp = read('lib/fly/depth-probe.js');
+  const fec = read('components/fly/FlyEffectComposer.jsx');
+  gate(
+    'the truth hook is published and torn down with the probe',
+    /window\.__flyDepthTruth = truth;/.test(dp) &&
+      /if \(window\.__flyDepthTruth === truth\) delete window\.__flyDepthTruth;/.test(dp)
+  );
+  gate(
+    'the truth hook cannot exist in production — same NODE_ENV guard, same install site',
+    /if \(process\.env\.NODE_ENV === 'production'\) return undefined;\s*\n\s*\/\/[\s\S]{0,400}?return installDepthProbe\(\{ gl, composer, camera, scene \}\)/.test(
+      fec
+    ),
+    'installDepthProbe({ gl, composer, camera, scene }) must sit under the production early-return'
+  );
+  gate(
+    'the truth raycast reads the COMPOSER\'s camera and scene, not a module-level one',
+    // the two objects the composer hands to its own RenderPass...
+    /effectComposer\.addPass\(new RenderPass\(scene, camera\)\);/.test(fec) &&
+      // ...are the two the hook is constructed with...
+      /export function installDepthProbe\(\{ gl, composer, camera, scene: worldScene \}\)/.test(dp) &&
+      // ...and the ray is built from that binding, with no module-scope shadow.
+      /raycaster\.setFromCamera\(_ndc, camera\);/.test(dp) &&
+      !/^(const|let|var)\s+camera\b/m.test(dp)
+  );
+  gate(
+    'the truth candidate set is DEPTH-WRITING geometry, so it describes the buffer',
+    /mm\.depthWrite !== false/.test(dp) &&
+      /!mm\.isSpriteMaterial/.test(dp) &&
+      /for \(let a = o; a; a = a\.parent\) if \(!a\.visible\) return;/.test(dp)
+  );
+  gate(
+    'the truth un-bends by the LIVE uBendK and reports its own convergence',
+    /import \{ getBend \} from '@\/lib\/fly\/toy-world\/world-bend';/.test(dp) &&
+      /out\.residualM =/.test(dp) &&
+      /out\.reprojectionPx =/.test(dp)
+  );
+}
+
 const fx = read('components/fly/Effects.jsx');
 gate(
   'the pass reorder is a POST_ORDER ternary over ONE descriptor list',
