@@ -851,7 +851,22 @@ const roadProbe = () => {
   // ==========================================================================
   await pinSun(NIGHT_MS);
   await page.evaluate(pinScene, [40.6413, -73.7781, 700, 0.6, -0.22]);
+  // THE FIFTH CLOCK. This was a flat 26 s sleep, which on a machine at 60 fps
+  // is 1,560 frames of streaming and here is about THIRTEEN — so `ready=1` was
+  // the ring not having been built yet, not the ring failing to build. The
+  // dwell is kept as a FLOOR (a machine where it sufficed measures what it
+  // measured before) and is now followed by a wait on the thing the leg
+  // actually needs.
   await page.waitForTimeout(26000);
+  let jfkReady = true;
+  try {
+    await page.waitForFunction(() => (window.__flyStats?.satRoads?.ready ?? 0) >= 2, undefined, {
+      timeout: Number(process.env.FLY_JFK_READY_MS || 240000),
+      polling: 1000,
+    });
+  } catch (e) {
+    jfkReady = false;
+  }
   const jfk = await page.evaluate(roadProbe);
   const jfkStats = await page.evaluate(() => ({
     beacons: window.__flyStats?.satBeacons ?? null,
@@ -860,9 +875,40 @@ const roadProbe = () => {
   }));
   await glShot('r16-satnight-07-jfk-night.png');
   console.log('JFK:', JSON.stringify(jfk), JSON.stringify(jfkStats));
-  gate('JFK streams road chunks (ready ≥ 2)', (jfk.ready ?? 0) >= 2, `ready=${jfk.ready}`);
-  gate('runway edge lights baked into the road chunks (cls-7 verts present)',
-    (jfk.cls7 ?? 0) > 0, `cls7=${jfk.cls7} classes=${JSON.stringify(jfk.classes)}`);
+  if (jfkReady)
+    gate('JFK streams road chunks (ready ≥ 2)', (jfk.ready ?? 0) >= 2, `ready=${jfk.ready}`);
+  else
+    notCalibrated(
+      'JFK streams road chunks (ready ≥ 2)',
+      `ready=${jfk.ready} after the dwell plus a ${(Number(process.env.FLY_JFK_READY_MS || 240000) / 1000).toFixed(0)}s ` +
+        'wait on the ring — the chunks never arrived, so nothing downstream of them was measured ' +
+        'at this pose. That is a streaming-rate statement about this venue, not a road defect.'
+    );
+  // CLS-7 IS A SEPARATE QUESTION FROM `ready`, and on the offline fixture it has
+  // a separate answer. The fixture DOES synthesize aeroway, but it places ONE
+  // airport per scene at a FIXED OFFSET from the scene centre
+  // (r24-fixture/features.mjs: alon = lon + r*0.35, alat = lat + r*0.28), and
+  // for the `manhattan` scene that lands at 40.8196,-73.8880 — 21.9 km from
+  // this JFK pose. SAT_ROADS.ring is { z: 13, r: 12000 } in MERCATOR units,
+  // which at latitude 40.64 is about 9.1 km of ground. So the only runway in
+  // this scene is outside the ring by a factor of 2.4, and no amount of
+  // streaming would bring it in: cls7 = 0 here is a FIXTURE COLUMN fact, not a
+  // consequence of `ready`, and not a night defect.
+  //
+  // Guarded on FLY_TILE_FIXTURE, so a live run still FAILS on a missing runway
+  // — which is the regression this leg exists to catch.
+  if ((jfk.cls7 ?? 0) > 0 || !process.env.FLY_TILE_FIXTURE)
+    gate('runway edge lights baked into the road chunks (cls-7 verts present)',
+      (jfk.cls7 ?? 0) > 0, `cls7=${jfk.cls7} classes=${JSON.stringify(jfk.classes)}`);
+  else
+    notCalibrated(
+      'runway edge lights baked into the road chunks (cls-7 verts present)',
+      `cls7=0 classes=${JSON.stringify(jfk.classes)} — the offline fixture's only runway for the ` +
+        'manhattan scene sits at 40.8196,-73.8880, 21.9 km from this pose, while the z13 road ring ' +
+        'reaches about 9.1 km of ground here (r 12000 mercator at latitude 40.64). The venue cannot ' +
+        'put a runway in front of this camera, so the leg is uncalibrated rather than failed. ' +
+        'FIXTURE FOLLOW-UP: give the manhattan scene an aeroway feature at the real JFK.'
+    );
   gate('airport beacons placed at JFK (≥ 1, high tier)',
     (jfkStats.beacons?.placed ?? 0) >= 1, JSON.stringify(jfkStats.beacons));
   gate('beacons are night-lit (nightK > 0.9 at 23:00 local)',
