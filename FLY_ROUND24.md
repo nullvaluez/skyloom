@@ -488,6 +488,66 @@ re-run on the merged tree after `terra-live`**; **daylight is bit-identical by
 construction** (`mk` is 0 above the horizon) and flag-off is untouched at every
 elevation; **a red there is C's to re-examine, never a re-baseline.**
 
+**AND THE DEPTH TRUTH HOOK** (`514eddd`, built on the merged `175e33e`, merge 25
+→ `4a95763`). `window.__flyDepthTruth(x, y)` returns
+`{ hit, distance, viewZ, object, source }` plus `bendK`, `bendDropM`,
+`bendIters`, `residualM`, `reprojectionPx`, `candidates`, and
+`{ hit: false, reason }` on a miss — **never a zero**. `viewZ` is three's view
+space, **negative in front of the camera, world metres — the same convention and
+units as `__flyDepthProbe`'s**, so E differences them directly, and x/y are
+drawing-buffer pixels converted as **the exact inverse of the probe's own UV** so
+both hooks address the same texel. **Camera and geometry**: the camera and scene
+are **the SAME two objects `FlyEffectComposer` hands its own `RenderPass`**,
+passed into `installDepthProbe` from the same production-dead effect, **so the
+hook cannot read the inspect turntable's camera** (a second Canvas with its own
+renderer); candidates are **depth-WRITING only** — `isMesh`, visible through
+EVERY ancestor (R19's traverse lesson), `depthWrite !== false`, not a sprite
+material — **so billboarded traffic and tracers fall out BY THAT TEST rather than
+by name**. **THE FINDING, C's and lesson-grade: a naive raycast would have been
+confidently WRONG.** Every world vertex is displaced by
+`wPos.y -= bendD² · uBendK` in the vertex shader (`world-bend.js:579`), so **the
+CPU geometry a `Raycaster` sees is not the surface the depth buffer recorded** —
+at the gate's own 4 km probe that is metres to tens of metres, **far outside the
+1 % bound** — and *"a truth hook that ignored it would have handed you a
+confident wrong number, which is worse than the 0 hits it replaces."* **The
+un-bend**: shifting the ray ORIGIN up by the drop shifts the whole line
+vertically while leaving its XZ path identical, so *"shifted line meets un-bent
+geometry"* is the same equation as *"original line meets bent geometry"* for a
+locally constant drop; the drop is smooth, so **iterating it at the current hit
+converges — at most four passes, stopping at 1 cm, with `bendIters` reporting how
+many** — and `k` comes from `getBend()`, **the CPU mirror of the LIVE uniforms**
+(the `__flyAirDrop` idiom), never a constant. **It checks itself, because C had
+no browser**: `residualM` reports whether the fixed point converged at that pose,
+and `reprojectionPx` projects the answer back through the same camera and reports
+**the pixel distance from the pixel asked for** — so a wrong SPACE (the floating
+origin; `FlyScene` rebases the camera at `:1735`, so a between-frames call should
+see camera and objects in one space, **but the hook does not assume it**), a
+stale matrix or a bad bend all surface as **a large `reprojectionPx` instead of a
+plausible distance**; E reads `reprojectionPx` and `residualM` **BEFORE**
+distance (1 px / 0.05 m per probe, else an instrument miss carrying that reason).
+**`dof=null` beside `__flyDof true` is resolved: `__flyDof` IS RIGHT** — it is
+the live `DepthOfFieldEffect` instance published by `Effects.jsx`'s `setDof`
+callback ref, while `__flyStats.effects.dof` is a CONFIG mirror that reads null in
+compositions that DO mount the pass, **which is exactly why (0b) already judges on
+the live one and merely prints the other**; the probe's `cocSource` now names the
+effect's constructor plus the handle it came through, so (3)/(4) can state which
+term they are green on. **`verify-c-flagoff` 44 → 49**: the hook is published and
+torn down with the probe; **cannot exist in production** (same `NODE_ENV`
+early-return, same install site, the regex admitting only COMMENTS between guard
+and call so no statement can slip in); reads the composer's own camera/scene
+binding with no module-scope camera to shadow it; the candidate set is
+depth-writing; it un-bends by the LIVE `uBendK` and reports its own convergence —
+RED-calibrated by deleting the guard and by weakening the depth-write filter. Two
+of C's own instrument files needed **one-line follows tracking the edit, not
+re-baselines**: `r24-c-depth-roundtrip-proof.mjs` stripped only three's import
+before evaluating the mirror and became a SyntaxError when the module grew a
+second (it strips every top-level import now), and its production-dead-branch
+regex demanded the call IMMEDIATELY after the guard (it allows comment lines now,
+same property). Node sweep: c-flagoff 49/49, shadow-calm 33/33, depth-offset 7/7,
+worker-normals 12/12, four proofs, import-integrity 4/0; **eslint 0 NEW** — the
+four `react-hooks` errors in `FlyEffectComposer.jsx` are pre-existing, 4 before /
+4 after, verified by stash (§5b).
+
 ### D ATMOS (`r24/d`, W1 tip `6dc8817`; W3 `1620e32`; flip `327950b`) — [ledger](scripts/r24-d-atmos.md)
 
 | flag | sha | what | state |
@@ -698,8 +758,10 @@ with `truth.hit`, **\|probe.viewZ − truth.viewZ\| within 1 %** against the
 reason** below three — and **the hand-built `Raycaster` is gone**. E's note is
 worth the line: *"I had a working fix that borrowed r3f's internals off the
 canvas store and deleted it before it ran — same mistake, better clothes; C owns
-the truth now."* **C's `__flyDepthTruth` hook is pending; `depth-rt` re-runs when
-both are in.**
+the truth now."* **Merge 25, `4a95763`, pushed** (C `514eddd`) lands the other half —
+`window.__flyDepthTruth`, un-bent by the live `uBendK` and publishing its own
+falsifiers (§3 C) — with `verify-c-flagoff` **49/49**, import-integrity 4/4 and
+node smoke 17/17 on the tip. **`depth-rt` re-runs post-batch, after `fade`.**
 
 **And `main` was fast-forwarded to it**, at the user's explicit request —
 *"Merge what is done so far into main so I can test"* — from the W0 scaffold
@@ -1507,6 +1569,9 @@ quotable.
   (36.578 / −118.29, 394 m over 3 km), pinned once, ≥ 20 frames so `_pumpRedrape`
   drains, reading `healsInPlace` against `redrapeRuns` and treating
   `healsAborted` as a correct outcome — the serpentine cannot exercise it.
+- **Four pre-existing `react-hooks` errors in `FlyEffectComposer.jsx`** — 4
+  before and 4 after C's truth hook, verified by stash, so the round added none;
+  noted because a future `eslint` sweep will meet them.
 - **Publish a `FLASH_GUARD` counter on `__flyStats`** (B): the re-take's green
   rests on the harness's own census because `FLASH_GUARD telemetry` reads null —
   the runtime pin and the constant are different switches — so the gate cannot
@@ -1573,7 +1638,7 @@ quotable.
 no reply arrived; every row is unconfirmed on the user's machine, including the
 two that are the reason the round exists.
 
-**The user is now testing `95907ce`** on the integration branch (`8240539` plus merges 13–24: the scripts-only ones, the import dedupe, **A's Owens fix**, C's dead-import removal, E's census repair, B's `__noFade` declarations + heal throughput floor, **C's night hill ruling** and E's waiting sun legs) — **`main` is at `9bf5f8a`** — **on `main` as well as on the integration branch**, `main` having been fast-forwarded to it at the user's request (§4.1) — pushed early, at their request, before
+**The user is now testing `4a95763`** on the integration branch (`8240539` plus merges 13–25: the scripts-only ones, the import dedupe, **A's Owens fix**, C's dead-import removal, E's census repair, B's `__noFade` declarations + heal throughput floor, **C's night hill ruling** and E's waiting sun legs) — **`main` is at `9bf5f8a`** — **on `main` as well as on the integration branch**, `main` having been fast-forwarded to it at the user's request (§4.1) — pushed early, at their request, before
 the standalone re-take (§4.1). It is **the first R24 build in the user's hands
 that contains the toy index container fix and the `STEP_SAFE` resize guard**, so
 the toy boot page error and the DPR double-apply are the two things this build
@@ -2015,6 +2080,18 @@ Carries forward the still-open R15–R21 §6 tables.
     CALIBRATION row whose arms cannot separate by construction is what exposed
     the lag.* (E CERT.)
 
+71. **Truth is where the bend is — and an instrument that cannot be
+    browser-tested must publish its own falsifiers.** A reference that ignores
+    the transform the GPU applied is not a reference: every world vertex is
+    displaced by `wPos.y -= bendD² · uBendK`, so a naive `Raycaster` at a 4 km
+    probe would have been wrong by metres to tens of metres — **a confident wrong
+    number, which is worse than the zero hits it replaces**. The un-bend is
+    exact for a locally constant drop and iterated to 1 cm off the LIVE uniform,
+    never a constant. And because its author had no browser, the hook reports a
+    RESIDUAL and a REPROJECTION in pixels, so a wrong space, a stale matrix or a
+    bad bend **surfaces as a large number instead of a plausible distance** — and
+    the consumer reads those before it reads the answer. (C LIGHT.)
+
 ---
 
 ## §8 Flag ship state at close
@@ -2039,7 +2116,7 @@ leg. **Nothing here has been certified on the user's machine.**
 | `LINEAR_HAZE` — pinned through `linearHazeOn()` (`ee10642`) | **decode round-trip proven by the node oracle** (each setter writes `srgbToLinear` of the authored triple; closed-form deltas 9.3 / 19.9 / 76.3 / 99.2 / 89.4 per 255 → 0.000). **The SEAM is UNMEASURED** — pose and pin: the fixture frame has 0 % melt because `bootFly` pins `__flyAerialOverride = 0`, and ≤ 12/255 is unreachable at that pose even released (§4.2). **A/B re-take pending** — the first attempt read 8 NOT CALIBRATED because the sun override never landed (§4.2), and it re-runs behind E's wait-for-landing fix; now calibratable: `linearHazeOn()` is the ONE reader of the flag (`verify-c-flagoff` 37 → 40), and the second raw reader in `AerialPerspective.jsx` is gone | **ON**, merged `a60bf17`; pin `ee10642` in the dry tree |
 | `ONE_SUN` — `hill.dayK` **1.0**, `monumentsLambert` true; **the identity clauses are CERTIFIED WHERE MEASURED** — water ≡ key **by source AND by angle** (`waterSource "key-light"`, Δ 0.000000° at both tiers), the hill clamp floor exact at **8.594°**, and the night sun landing **within 0.004°** of the commanded −14° — while **the noon/dusk legs and the moon expectation are UNMEASURED BY INSTRUMENT** (a recompute cadence the legs did not wait for, now waited on by E's `71f2c8c`) — **and the night hill/key split C first read as its moonlit key is RULED A DEFECT BY C, against C's own W2 text, and FIXED** (`446545b`): R21 flag-off already agreed at night, so the 137° split was 100 % `ONE_SUN`'s; the hill now follows the moon through one shared `moonBlendK`, **and the contract changes with it — at `moonK` = 1 hill el is `moonElRad` 34.377°, not the clamp floor, still inside [8.6°, 51.6°]** (§3 C). **Satellite NIGHT ground pixels move: sat-night, dusk and flicker's night legs re-run post-batch; daylight is bit-identical by construction.** **Re-run pending** — pass 2b's azimuth leg is exact (key === hill at Δ 0) while its elevation legs are VOID: the gate wrote an `{ elDeg }` object to a handle the app reads as a timestamp, so the app kept its wall clock (§4.2). **Not open-as-defect** | key az −56° at every hour → the sun at every tier; `live:false` closed. **dayK 1.0 makes the daytime demotion built-and-off BY CONSTRUCTION** (the weight is exactly 1, so `uHillStrength * uHillElev` is bit-identical to R21 and `verify-sat-depth`'s margin does not move); 0.65 would have spent up to 35 % of a frozen margin on an unmeasured argument | **ON** (`hill.dayK` 1.0, `monumentsLambert` true), merged `a60bf17` |
 | `POST_ORDER` (`smaaPreset 'high'`, dither) | 228/228 → 254/255 with midtones unmoved; merged pass count FALLS (sat 4→3, toy 6→5) | **ON** (`smaaPreset 'high'`, dither), merged `a60bf17` |
-| `DEPTH_FIX` | node proof (`depth-roundtrip-proof`: RED flat **0.176–0.177** CoC, viewZ **−2.50 m**; GREEN error 0.000000; the mirror proven by EXTRACTING three's own formula, 8,004 comparisons bit-identical) + `verify-depth-offset` **7/7**; the **hook is proven present and published** (pass 2b: `__flyDepthProbe` present, `__flyDof` true) and **the browser round-trip is UNMEASURED for want of a TRUTH SOURCE, re-run pending**: the re-take proves the hook and the settle (121 s, maxZ 15, the gate's first content run at K=40, `reversedDepth` true), but **(1) cannot be calibrated from the harness side AT ALL** — the page exposes the renderer and the scene and neither the camera nor `THREE`, so an out-of-bundle `Raycaster` can never establish a true distance. C is adding an in-app `__flyDepthTruth` through the composer's ACTIVE camera over depth-WRITING geometry only, and E asserts the probe against it within 1 % of the 2.50–2.51 m RED signature (§4.2) | **ON**, merged `a60bf17` |
+| `DEPTH_FIX` | node proof (`depth-roundtrip-proof`: RED flat **0.176–0.177** CoC, viewZ **−2.50 m**; GREEN error 0.000000; the mirror proven by EXTRACTING three's own formula, 8,004 comparisons bit-identical) + `verify-depth-offset` **7/7**; the **hook is proven present and published** (pass 2b: `__flyDepthProbe` present, `__flyDof` true) and **the browser round-trip is UNMEASURED for want of a TRUTH SOURCE, re-run pending**: the re-take proves the hook and the settle (121 s, maxZ 15, the gate's first content run at K=40, `reversedDepth` true), but **(1) cannot be calibrated from the harness side AT ALL** — the page exposes the renderer and the scene and neither the camera nor `THREE`, so an out-of-bundle `Raycaster` can never establish a true distance. **the truth is now PUBLISHED with its own self-check** (C `514eddd`): `__flyDepthTruth` through the composer's own camera and scene over depth-WRITING geometry only, **un-bent by the live `uBendK`** because the CPU geometry is not the surface the depth buffer recorded, reporting `residualM` and `reprojectionPx` so a wrong space reads as a large number rather than a plausible distance; E asserts the probe against it within 1 % of the 2.50–2.51 m RED signature, reading the falsifiers first (§3 C, §4.2) | **ON**, merged `a60bf17` |
 | `SHADOW_CALM` (`biasSignFix`, `kernel 'world'`, `texelSnap`, `satCadence` 0) | shader edits and snap arithmetic **proven node-side (32/33 gates)**; mount/arm logic structural; **pixels, draw counts and whether the catcher actually receives a shadow unmeasured — user's machine.** Note for any program census: it changes the compiled TEXT of every shadow receiver with NO cache key, so a key census is blind by construction and a source-hash census sees every receiver move | **ON** (`biasSignFix`, `kernel 'world'`, `texelSnap`, `satCadence` 0), merged `a60bf17` |
 | `TERRAIN_LIGHT` — `fragmentHill`, `microFwidth`; `workerNormals` **false** | the tile half ships; the worker half is node-proven (3.34° → 0.26°) with zero pixels behind it, and ON would make `verify-skirt-worker`'s identity leg RED by design | **ON** — `fragmentHill` and `microFwidth` true, **`workerNormals` false**, merged `a60bf17` |
 | `CLOUD_LIT` + `LAMBERT_ENV` (0.15) | same ONE draw; uniform-only for Lambert; the cloud variant's warm-set exception has a measurement condition attached | **ON**, merged `a60bf17` **ON** (`reflectivity` 0.15), merged `a60bf17` |
