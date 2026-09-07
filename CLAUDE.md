@@ -92,7 +92,13 @@
 > source as **the venue starving an R16 PER-FRAME ramp** (0.25 s of ramp per
 > FRAME at ~0.48 fps), not an R24 flag: the settle now waits on the value
 > instead of the clock <!-- NIGHT GATES PENDING -->; four tail
-> re-runs (one-sun, linear-haze, haze-red, depth-rt) <!-- TAIL RE-RUNS PENDING -->; and §5b's follow-ups —
+> re-runs: **one-sun CLOSED at 42/42** against the restored 1e-6° bound,
+> **linear-haze CLOSED at 9/0/1** with the noon gain reproduced (5.90 luma)
+> and the night leg NOT SEPARATED at the venue's 1.2 cross-boot floor, and
+> **depth-rt MEASURED at 7/2** — the kilometre round-trip reconstructing to
+> 0.00–0.10 % at both ends — with both its reds OPEN BY ATTRIBUTION (one
+> pixel's surface, and a CoC clause that read the player jet)
+> <!-- TAIL RE-RUNS PENDING -->; and §5b's follow-ups —
 > R25 re-authoring the rim keyframes against the dome's measured horizon colour
 > (four consumers, re-certified together), a shared-DEM request coalescer
 > (offered and declined this round), a real road fade, a `FLASH_GUARD` counter
