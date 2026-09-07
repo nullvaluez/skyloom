@@ -89,12 +89,15 @@
 > merges 100 → 0, on-screen replacements 87 → 0 — the user's "tiles swapping",
 > measured to zero over a full turn — repeat URLs 289 → 18, content correct in
 > both arms, every ON counter at Δ0 with the adaptive cap never binding, and
-> Powell ON settling in 34 s at 194 draws.** **What is NOT closed: the Owens
-> ceiling.** The ON arm reads **279 against the frozen 261** — on a census that
-> never went quiet, because a tile whose content is already correct can never
-> clear its own dirty flag (an upstream defect a governor tier step can trigger
-> on any machine) — and the attribution is open across three owners with the 261
-> unmoved <!-- TERRA-LIVE CONVERGED RE-RUN PENDING -->.
+> Powell ON settling in 34 s at 194 draws.** **The Owens ceiling is ATTRIBUTED,
+> not breached**: the post-sweep ON census reads 279 against the frozen 261, but
+> its TERRAIN term FELL (≤ 80 against ≤ 120) while content rose — the residency
+> trio **unstarves a chunk pipeline** the constant merging had been forcing to
+> retry — and **a fresh Owens on the same arm SETTLES at 140 ≤ 261 with nothing
+> stranded**. **The 261 does not move**, no threshold change ships, and the gate
+> now reads NOT CALIBRATED when an arm did not settle. **The fixture's Owens is
+> not the live desert that ceiling was frozen against — so the ON arm's Owens
+> number is readable only on the user's machine.**
 >
 > **SHIP STATE.** **ON**: `TERRA_PACE` (incl. `parkOffscreen` and
 > `maxResidentTiles`), `STEP_SAFE`, `LADDER_FIX`, `HUD_SYNC`, `FINALIZE_PACE`,
