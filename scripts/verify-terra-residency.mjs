@@ -27,7 +27,7 @@
  * switches on. Both arms run in one process, so a green means the SAME build
  * produced both columns.
  */
-import { mkdirSync, copyFileSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { checkShip, readConst } from './_r24a-ship-state.mjs';
@@ -44,6 +44,11 @@ const REPORT = process.argv.includes('--report');
 const tt = await loadVendoredThreeTile();
 
 const SW = tt.R24_SWITCHES;
+// The DEM data ceiling, read from the shipped constants: imagery reaches z17 at
+// high tier and DEM stops at z15, and that ASYMMETRY is the whole of gates
+// 29-31. Read, not hard-coded, so raising demMaxZoom re-derives the prediction.
+const DEM_MAX_LEVEL = readConst('TILES').demMaxZoom;
+
 const OFF = { mergeHysteresis: false, keepResident: false, timerFix: false, walkWhileSaturated: false, bboxCache: false, parkOffscreen: false, mergeHysteresisK: 1.6 };
 const ON = { mergeHysteresis: true, keepResident: true, timerFix: true, walkWhileSaturated: true, bboxCache: true, parkOffscreen: true, mergeHysteresisK: 1.6 };
 const setSwitches = (o) => Object.assign(SW, OFF, o);
@@ -69,7 +74,13 @@ function makeMap({ lodThreshold = 0.86, maxThreads = 10, latencyFrames = 2 } = {
   // shape (a load occupies a slot for `latencyFrames` frames) so the upstream
   // "freeze the whole tree while >= maxThreads-4 downloads are in flight" rule
   // is exercised exactly as in production.
-  const reqs = new Map(); // "z/x/y" -> count
+  const reqs = new Map(); // "z/x/y" -> count  (per TILE)
+  // Per DEM URL, which is a DIFFERENT question — see gates 29-31. A tile
+  // deeper than a source's maxLevel does not get its own URL: three-tile's
+  // `de()` requests the ANCESTOR at maxLevel with clip bounds, so N deep tiles
+  // legitimately share one URL. A per-URL counter that does not know this
+  // reports the sharing as a refetch.
+  const demUrls = new Map(); // "z/x/y" of the DEM ancestor -> count
   let inflight = 0;
   const pending = [];
   Object.defineProperty(map.loader, 'downloadingThreads', {
@@ -79,6 +90,11 @@ function makeMap({ lodThreshold = 0.86, maxThreads = 10, latencyFrames = 2 } = {
   map.loader.update = (tile, model) => {
     const key = `${tile.z}/${tile.x}/${tile.y}`;
     reqs.set(key, (reqs.get(key) ?? 0) + 1);
+    // The DEM URL this tile resolves to, by three-tile's own clamp rule.
+    const dz = Math.min(tile.z, DEM_MAX_LEVEL);
+    const shift = tile.z - dz;
+    const dkey = `${dz}/${tile.x >> shift}/${tile.y >> shift}`;
+    demUrls.set(dkey, (demUrls.get(dkey) ?? 0) + 1);
     inflight++;
     return new Promise((resolve) => {
       pending.push({
@@ -103,7 +119,7 @@ function makeMap({ lodThreshold = 0.86, maxThreads = 10, latencyFrames = 2 } = {
       }
     }
   };
-  return { map, reqs, drain, inflight: () => inflight };
+  return { map, reqs, demUrls, drain, inflight: () => inflight };
 }
 
 /** Counters, wrapped on the Tile PROTOTYPE so both arms are counted identically. */
@@ -230,7 +246,7 @@ async function fly({
   maxTiles = null,
 }) {
   setSwitches(switches);
-  const { map, reqs, drain } = makeMap({ lodThreshold, latencyFrames });
+  const { map, reqs, demUrls, drain } = makeMap({ lodThreshold, latencyFrames });
   const cam = makeCamera();
   const inst = instrument();
   let residency = null;
@@ -286,6 +302,7 @@ async function fly({
     requests: [...reqs.values()].reduce((a, b) => a + b, 0),
     uniqueTiles: unique,
     refetches,
+    demUrls: new Map(demUrls),
     census: census(map),
     draw: drawCensus(map),
     residency: residency ? { ...residency.stats } : null,
@@ -724,6 +741,66 @@ gate('27 the COUNT trigger fires where the byte budget never did, and sheds',
 gate('28 a cap below the working set converges toward the in-frustum set rather than to the cap',
   capTight.census.loaded > 120 && capTight.census.loaded < capNone.census.loaded,
   `cap 120 -> resident ${capTight.census.loaded} (in-frustum floor, not the cap)`);
+
+
+// =====================================================================
+// K. "REFETCHED" vs "SHARED" — what a per-URL counter cannot tell you
+//
+// E's standalone lod-fade row read 0 tile re-appearances over a full 360-degree
+// yaw (residency at full arc, the strongest form of the result) and, on the
+// same run, "14 of 552 distinct tile URLs refetched, worst 4x
+// /dem/15/8822/12386.png" — ALL DEM, no imagery URL refetched ever.
+//
+// That asymmetry is the answer. Imagery's maxLevel is satMaxZoomFor(tier) = 17
+// and the DEM's is TILES.demMaxZoom = 15, so imagery NEVER exceeds its own
+// source ceiling and every imagery tile gets its own URL. A tile deeper than a
+// source's maxLevel does not: three-tile's `de()` (vendored index.js) takes
+// the `r <= i.maxLevel` branch only while the tile is within range, and
+// otherwise calls `He(x, y, z, maxLevel)` to request the ANCESTOR's URL with
+// clip bounds. So all four z16 children of one z15 DEM tile request that ONE
+// z15 URL — `worst 4x` exactly — and a z17 descendant would make it up to 16.
+//
+// These are not refetches. They are N distinct tiles legitimately sharing one
+// ancestor resource, and a per-URL counter cannot tell that from the same tile
+// being downloaded twice. It is NOT the R21 TTL/backoff (no empty body is
+// involved), NOT a skirt or walkWhileSaturated re-request (both would show in
+// imagery too, and neither issues source URLs), and NOT a residency gap
+// (`refetchParent` 0, `merge` 0, 0 re-appearances on that same run).
+//
+// This gate makes the two distinguishable BY NAME, so a real DEM refetch can
+// never again be excused as ancestor sharing — the prediction comes from the
+// TILE census and the observation from the request log, so they can disagree.
+rows.push('\nK. DEM URL SHARING vs REFETCH');
+const shareRun = await fly({ frames: 240, pathFn: yawOnly, switches: ON });
+let dupUrls = 0;
+let worstUrl = 0;
+for (const n of shareRun.demUrls.values()) {
+  if (n > 1) dupUrls++;
+  if (n > worstUrl) worstUrl = n;
+}
+rows.push(`  distinct DEM URLs      ${String(shareRun.demUrls.size).padStart(6)}`);
+rows.push(`  URLs requested >1x     ${String(dupUrls).padStart(6)}  (worst ${worstUrl}x)`);
+rows.push(`  TILE-level refetches   ${String(shareRun.refetches).padStart(6)}`);
+
+gate('29 the DEM ceiling really is below the imagery ceiling (the whole cause)',
+  DEM_MAX_LEVEL < 17, `demMaxZoom ${DEM_MAX_LEVEL} vs imagery 17 at high tier`);
+// The load-bearing one: residency is measured per TILE, and it is 0. A per-URL
+// duplicate is only ever allowed to be ancestor sharing.
+gate('30 residency holds on yaw at the TILE level — no tile is downloaded twice',
+  shareRun.refetches === 0 && shareRun.refetch === 0 && shareRun.merge === 0,
+  `tile refetches ${shareRun.refetches}, refetchParent ${shareRun.refetch}, merges ${shareRun.merge}`);
+// Every per-URL duplicate must be explained by a tile deeper than the DEM
+// ceiling. If a duplicate URL had NO deep tile behind it, that would be a real
+// refetch wearing the sharing costume — and this is what would catch it.
+const unexplained = [];
+for (const [key, n] of shareRun.demUrls) {
+  if (n <= 1) continue;
+  const z = Number(key.split('/')[0]);
+  if (z !== DEM_MAX_LEVEL) unexplained.push(`${key} x${n}`);
+}
+gate('31 every duplicated DEM URL is a ceiling-clamped ancestor, never a re-download',
+  unexplained.length === 0,
+  unexplained.length ? unexplained.join(' · ') : `${dupUrls} shared ancestors, all at z${DEM_MAX_LEVEL}`);
 
 if (REPORT) console.log(rows.join('\n'));
 console.log(`\n${pass} passed, ${fail} failed`);

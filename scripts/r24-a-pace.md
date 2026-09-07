@@ -1677,6 +1677,102 @@ container has no renderer, and every number above is a count or a decision.
 
 ---
 
+## §19 The 14 "refetched" DEM URLs: shared ancestors, not re-downloads
+
+E's standalone lod-fade row on `9bcaace` (pre-parkOffscreen, trio ON, no pace
+pin on either leg) is the strongest form of the residency result so far: over a
+full **360° arc at 0.85°/frame with the position frozen, 0 tile
+re-appearances**, `refetchParent 0`, `merge 0`. On the same run gate (6) read
+**14 of 552 distinct tile URLs refetched, worst 4× `/dem/15/8822/12386.png`** —
+and **every one of them DEM; no imagery URL was ever refetched.**
+
+### The asymmetry is the answer
+
+Imagery's ceiling is `satMaxZoomFor(tier)` = **17** at high tier. The DEM's is
+`TILES.demMaxZoom` = **15** (the Terrarium data ceiling). So imagery never
+exceeds its own source ceiling and every imagery tile gets its own URL. A tile
+deeper than a source's `maxLevel` does not, and that is upstream's own rule —
+vendored `index.js`, `de()`:
+
+    if (r <= i.maxLevel) return { url: i.getUrl(e, t, r), clipBounds: [0,0,1,1] };
+    const n = He(e, t, r, i.maxLevel), s = n.coord;
+    return { url: i.getUrl(s.x, s.y, s.z), clipBounds: n.bounds };
+
+Past the ceiling, three-tile requests the **ancestor's** URL at `maxLevel` and
+clips it. `He(x, y, 16, 15)` has `s = 2**(16-15) = 2`, so all four z16 children
+of z15 `8822/12386` — `(17644..17645, 24772..24773)` — map to
+`{x: 8822, y: 12386, z: 15}`. **Four distinct tiles, one URL, four requests.
+`worst 4×`, exactly.** A z17 descendant makes it up to 16.
+
+**These are not refetches.** They are N distinct tiles legitimately sharing one
+ancestor resource, and a per-URL counter cannot tell that from one tile being
+downloaded twice.
+
+### Against Fable's three candidates
+
+| candidate | verdict |
+|---|---|
+| (a) R21 reason-coded TTL/backoff re-requesting a 200-empty-body DEM | **No.** No empty body is involved; the fixture served these tiles normally, and the backoff path is not on this code path at all. |
+| (b) skirt rebuild or `walkWhileSaturated` re-requesting DEM | **No.** Neither issues source URLs, and both would show in imagery too — imagery never duplicated once. |
+| (c) a residency gap for DEM under the byte trigger | **No.** `refetchParent 0`, `merge 0`, 0 re-appearances on that same run, and the byte trigger never fired (§18: 113.7 MB under a 140 MB budget). |
+| (d) upstream source-level clamping | **Yes**, and it is correct behaviour. |
+
+### Reproduced on my own harness
+
+My node gate could not see this, and the reason is worth naming: its request
+counter is keyed **per TILE** (`z/x/y`), so ancestor sharing is invisible to it
+and it reads a truthful `0 refetches` for a question it was not asking. Adding a
+per-DEM-URL counter reproduces E's shape immediately:
+
+    distinct DEM URLs      224
+    URLs requested >1x       4  (worst 9x)
+    TILE-level refetches     0
+
+Two counters, two different questions, both right.
+
+### The gates, so this is distinguishable BY NAME
+
+**29** the DEM ceiling really is below the imagery ceiling (read from
+`TILES.demMaxZoom`, so raising it re-derives the prediction rather than
+invalidating the row); **30** residency holds at the TILE level — 0 tile
+refetches, 0 `refetchParent`, 0 merges; **31** every duplicated DEM URL is a
+ceiling-clamped ancestor at exactly `z = demMaxZoom`, never a re-download.
+
+Gate 31 is the one that earns its place: a real DEM refetch would duplicate a
+URL whose z is **not** the ceiling, and would be named rather than excused as
+sharing. The prediction comes from the tile census and the observation from the
+request log, so the two can disagree.
+
+### Do the same 14 recur on the parked tree?
+
+**Yes, unchanged** — reasoned from the code, for E to measure. `parkOffscreen`
+sets `model.visible`; the clamp fires in `de()` at LOAD time, long before
+anything is visible, so parking cannot touch it. The cap does not fire either
+(260 clears the working set). The count is a function of how many tiles the
+tree holds past z15 and nothing else.
+
+### What I could not supply
+
+Fable asked for the four fetch timestamps of that z15 tile against the sweep's
+frame clock. **The log carries counts only** — the fixture's `/__stats` `byUrl`
+is a count map with no timeline — so the timestamps do not exist in the
+artifact. Said plainly rather than reconstructed: the mechanism is deterministic
+from source and the arithmetic above is checkable without them, which is why
+this is a ruling and not a hypothesis.
+
+### Lessons
+
+1. **A per-URL counter and a per-tile counter answer different questions**, and
+   the difference is invisible until a source ceiling makes them disagree. Both
+   readings in E's log were correct; only their names collided.
+2. **An asymmetry in the data is the fastest attribution there is.** "All DEM,
+   no imagery" pointed at the one property the two sources do not share, and
+   the ceiling was the only candidate.
+3. This is the pass-1-gate-6 family again: *an instrument can report a real
+   number for a question nobody asked.*
+
+---
+
 ## §10 Commits
 
 | # | Commit | What |
