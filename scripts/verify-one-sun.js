@@ -54,30 +54,42 @@ const SETTLE = Number(process.env.SUN_SETTLE_MS || 20000);
 const SUN_LAND_MS = Number(process.env.SUN_LAND_MS || 180000);
 
 /**
- * THE AZIMUTH TOLERANCE IS THE INSTRUMENT'S, NOT THE FEATURE'S.
+ * THE 1e-6° BOUND STANDS — AND THE FOUR FAILURES WERE THIS GATE'S OWN ROUNDING.
  *
- * Clauses (1) and (1b) asked for agreement to 1e-6°, and the post-batch run
- * failed four legs at Δ 4.76e-6° (noon, both tiers) and Δ 4.60e-5°
- * (medium/dusk, and high/dusk on the dome) — while medium/dusk's dome PASSED at
- * exactly 0.00e+0. A delta that is zero on one leg and 5e-5 on the next is not
- * a feature disagreeing with itself; it is arithmetic.
+ * The post-batch run failed four legs at Δ 4.76e-6° and Δ 4.60e-5° while
+ * medium/dusk's dome passed at exactly 0.00e+0. I read that pattern as float32
+ * noise and loosened the bound to 1e-3°. Wrong, and wrong in the direction that
+ * costs the most: a loosened bound bakes the instrument's own error into the
+ * feature's contract, and the next real drift hides under it.
  *
- * 4.6e-5° is 8e-7 radians. float32 carries ~1.2e-7 RELATIVE precision, so a
- * direction stored in a float32 uniform, read back, and put through sin/cos/
- * atan2 cannot hold 1e-6° at all — the bound was below the representable
- * resolution of the thing being measured, which makes it a coin, not a gate.
+ * C found the actual cause from source. The DELTAS WERE MADE BY THE PUBLISHER'S
+ * `toFixed(6)` on the direction VECTORS. A unit component rounded to 1e-6 moves
+ * the derived azimuth by up to 4.05e-5° / cos(el) — 4.05e-5 at the horizon,
+ * 4.91e-5 at the moon's 34.377°, 7.06e-5 at 55° — and every failing number sits
+ * inside that bound. Evaluating the app's own expressions in float64 gives
+ * |Δaz| exactly 0.00e+0 at noon, dusk and night: the key and hill azimuths are
+ * BIT-IDENTICAL doubles.
  *
- * 1e-3° is five orders of magnitude below the defect this clause exists to
- * catch (the pre-fix key↔hill divergence was 137°) and three above float32
- * noise. The measured delta is still printed, so a real drift toward the bound
- * is visible long before it trips.
+ * There is no float32 anywhere on the read path — `Object3D.position` and the
+ * hillshade dir are float64 JS numbers, and the GPU copy is never read back —
+ * so my precision argument was about a pipeline this measurement does not use.
+ * And key/hill are two computations of two DELIBERATELY DIFFERENT directions
+ * from one source (one az, one sinEl, one moonBlendK), so there was nothing to
+ * fold either.
  *
- * NOT settled by this: whether the hill and dome directions pass through a
- * float32 uniform or a SECOND trig path. If C finds two computations of one
- * direction where ONE_SUN's charter says one, that is a fold, not a tolerance,
- * and this constant goes back down.
+ * C's 7fa86cb publishes key/hill/dome/water and the two moon angles at NINE
+ * decimals (~3e-8°, three orders inside this clause) with a c-flagoff gate
+ * locking the precision. The artifact now supports the contract as written, so
+ * the contract is restored.
+ *
+ * Consequence to expect and not to mistake for drift: (2/4) may now print a Δ
+ * of ~1e-8 rather than exactly 0. That is the same agreement, reported
+ * honestly at the resolution the publisher offers.
+ *
+ * The knob stays an env so a future artifact change can be tested without an
+ * edit — but the DEFAULT is the contract.
  */
-const AZ_TOL = Number(process.env.SUN_AZ_TOL_DEG || 1e-3);
+const AZ_TOL = Number(process.env.SUN_AZ_TOL_DEG || 1e-6);
 // Three elevations: high noon, a low dusk sun, and a deep-night sun. The dusk
 // one is where C measured the 119.4° key-to-hill separation.
 const ELEVATIONS = [
