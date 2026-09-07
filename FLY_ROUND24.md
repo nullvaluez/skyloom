@@ -901,6 +901,31 @@ supplied**; and makes the row **name its live channels** (`aerialPass`,
 channel cannot attribute its own result."* `c0c7cec` (merge 34, C `0f54071`,
 ledger only) carries the ruling itself (§4.2).
 
+**FOOTNOTE — THE STALE-COUNT SWEEP.** Every gate count in this record was
+re-checked against the count the gate reads **today on the integration tip
+`f22fcac`** (merged into `r24/f` and run from that worktree; browser counts are
+read from the logs under `scripts/r24-out/`, each cited to its run). **Node, run
+today, all PASS**: import-integrity **4** · depth-offset **7** · terra-residency
+**35** · c-flagoff **54** · worker-normals **12** · skirt-worker **9** · lod-fade
+(node) **64** · vendor **20** · skirt-fast **13** · frame-step **11** ·
+finalize-pace **22** · artifact-hygiene **5** · `r24-b-attr-proof` **BROKEN=0** ·
+seam (node leg) **10 rows** · shadow-calm **33** · atmo-law **48** · step-guard
+**13** · `r24-b-prewarm-proof` **9** — and **`SMOKE_NODE_ONLY=1` reads 17 passed,
+0 failed.** **Six counts had gone stale and are corrected in the table above**:
+terra-residency (21 → 22 → 32 → **35**), c-flagoff (… 40 → 44 → 49 → 50 →
+**54**), lod-fade node (51 → 55 → **64**), finalize-pace (11 → 17 → 21 → **22**),
+atmo-law (41 → 45 → **48**) and the seam node leg (9 → **10 rows**). Two are not
+corrections but honesty: **`classify`'s "38 gates" is INHERITED from R15** — the
+gate prints no total, and shows 35 PASS rows today — and **`warbirds` and `daily`
+print no total either** (19 and 28 rows). **Browser counts, each cited to its
+run**: `scripts/r24-out/retake` — flash-guard **8/0**, step-clean **9/0**,
+ladder-fix **13/0**, ladder-red **7/6**, fade **4/2**, one-sun **12/4**,
+linear-haze **2/0**, haze-red **4/0**, depth-rt **3/0**;
+`scripts/r24-out/lodfade` — lod-fade **18/4**; `scripts/r24-out/retake2` — fade
+**7/0**, one-sun **38/4**, linear-haze **9/3**, haze-red **10/2**, depth-rt
+**4/3**. **Every browser number in §4.2 matches its log** (the NOT CALIBRATED
+counts sit beside these pass/fail pairs and are not part of them).
+
 **THE POST-BATCH RUN**, started 01:28:06 at load 0.72, `TREE UNDER TEST
 14c1220`, **BOOT OK 61.5 s** — with **every post-batch fix verified PRESENT in
 the tree before launch**: the warp re-issue at `verify-one-sun.js:238`,
@@ -926,28 +951,27 @@ the main worktree (still at `9bcaace`) is unaffected.
 
 | Gate | PASS 1 (flag-off) | LIVE | NOT MEASURABLE HERE |
 |---|---|---|---|
-| `verify-classify.mjs` | **PASS** (38 gates) | — | — |
+| `verify-classify.mjs` | **PASS** — the "38 gates" is INHERITED from R15; the gate prints no total and shows **35 PASS rows** today | — | — |
 | `verify-warbirds.mjs` | **PASS** | — | — |
 | `verify-daily.mjs` | **PASS** | — | — |
 | `verify-depth-offset.mjs` | **PASS** 7/7, 185 files; RED **6/7** on base `6116fc5` | — | — |
-| `verify-terra-residency.mjs` | **PASS** 21/21 (**22/22** flipped); 22 merges / 17 replaced / 178 refetches → 0/0/0 | — | felt smoothness |
-| `verify-c-flagoff.mjs` | **PASS** — 26 gates at `990c7b5`, **37/37** after C's F4 and on the flipped branch (gate (1) asserts the SHIP STATE, so it is green in both passes); **40/40** on the dry tree after the `linearHazeOn` pin added three gates (accessor exported · no other raw reader · the census skips comments), RED-calibrated by an added read in `SkyDome.jsx` | — | — |
+| `verify-terra-residency.mjs` | **PASS** — 21 as merged → **22** flipped → **32** after `dead5e5` (parkOffscreen + the cap) → **35** after `c7203b1` (the DEM-clamp gates 29–31); 22 merges / 17 replaced / 178 refetches → 0/0/0 | — | felt smoothness |
+| `verify-c-flagoff.mjs` | **PASS** — 26 gates at `990c7b5`, **37/37** after C's F4 and on the flipped branch (gate (1) asserts the SHIP STATE, so it is green in both passes); **40/40** on the dry tree after the `linearHazeOn` pin added three gates (accessor exported · no other raw reader · the census skips comments), RED-calibrated by an added read in `SkyDome.jsx`; then **44** (`446545b`, the night hill ruling) → **49** (`514eddd`, the truth hook) → **50** (`7fa86cb`, the nine-decimal publish) → **54 today** (`a44f4b7`) | — | — |
 | `verify-worker-normals.mjs` | **PASS** 12/12 (3.34° → 0.26°) | — | **pixels** — the spliced worker runs only on the Esri LERC path |
 | `verify-skirt-worker.mjs` | **PASS** 8/8 (**9/9** flipped), element-identical | — | end-to-end streaming; ⚠ its identity leg goes RED **by design** with `workerNormals` ON and needs a flag-on ARM, never a re-baseline |
-| `verify-lod-fade.mjs` (D's node half) | **PASS** 51/51, reading the declared state | — | — |
+| `verify-lod-fade.mjs` (D's node half) | **PASS** — 51 as merged, **55** at the flip, **64 today** after `5f9be56` (§4.10c/d and the `noParentMapFirst` recorder); reads the DECLARED state | — | — |
 | `verify-vendor-three-tile.mjs` | **PASS** 19/19 (**20/20** flipped, incl. gate 16b: the vendored switchboard's own literal defaults every switch to false) | live tile-URL identity (egress) | — |
 | `verify-skirt-fast.mjs` | **PASS** 12/12 (**13/13** flipped); 13 cases, 4 bails | — | stalls/min |
 | `verify-frame-step.mjs` | **PASS** 10/10 (**11/11** flipped) | — | the consumer opt-in against a pinned harness pose |
-| `verify-finalize-pace.mjs` | **PASS** 11/11 as merged; **17** after the rule-1 spike work and **21/21** after the index-container fix (§4.2) | — | whether it removes a FELT hitch |
+| `verify-finalize-pace.mjs` | **PASS** — 11 as merged; **17** after the rule-1 spike work, **21** after the index-container fix, **22 today** after `7890d1b` (the seventh budget site) (§4.2) | — | whether it removes a FELT hitch |
 | `verify-artifact-hygiene.mjs` | **PASS** 5/5, tree clean | — | — |
-| `verify-seam.js` **node leg**, offline | **PASS** 9/9 · 149 z14 tiles · Owens `hatchKept` **0** · worst slope 2.5 · ramp 0/149 · 0 seam pairs · manhattan kept **311** `8d36f2aa:89218640:13605`, columbus kept **193** `2eefc447:49bbe703:8715` — **identical to the pre-merge run on `r24/e` alone** | the LIVE hashes stay frozen | the fixture's Owens yields no z14 candidates at all, so gate (1) passes "0 by construction" and is WEAKER here than live |
+| `verify-seam.js` **node leg**, offline | **PASS** — 9 in the run this table was written from, **10 PASS rows today** (0, 0b, 1–6, 6b, 6c; the browser leg 7–9 skips without `FLY_URL`) · 149 z14 tiles · Owens `hatchKept` **0** · worst slope 2.5 · ramp 0/149 · 0 seam pairs · manhattan kept **311** `8d36f2aa:89218640:13605`, columbus kept **193** `2eefc447:49bbe703:8715` — **identical to the pre-merge run on `r24/e` alone** | the LIVE hashes stay frozen | the fixture's Owens yields no z14 candidates at all, so gate (1) passes "0 by construction" and is WEAKER here than live |
 
 **The flag-off byte-identity claim is measured, not asserted**: with every R24
 flag off, five agents' merges leave the worker's output byte-identical on 149
 fixture tiles.
 
-Node gates outside that 15: **`verify-shadow-calm.mjs` 32/32 (33/33 flipped)**,
-`verify-atmo-law.mjs` **41/41 (45/45 flipped)**, A's
+Node gates outside that 15: **`verify-shadow-calm.mjs` 32 → 33 (**33** today)**, `verify-atmo-law.mjs` 41 → 45 (**48** today), A's
 `scripts/_r24a-ship-state.mjs`, B's `r24-b-prewarm-proof.mjs` **9/9** / `--red`
 **5/9**, and B's four engine/worker/bend/groundvis proofs — the source of every
 Symptom-A number in §1. E's **`verify-import-integrity.mjs`** (RED 3 files /
