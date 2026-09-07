@@ -42,8 +42,25 @@ const { bootFly } = require('./_boot');
 const { attachPageErrors } = require('./_pageerrors');
 const { attachFixture } = require('./_fixture');
 
-const URL_ = process.env.FLY_URL || 'http://localhost:3101';
+// (No local URL constant: bootFly() reads FLY_URL itself. There used to be one
+// here with a DIFFERENT default (3101 vs bootFly's 3000), dead and misleading —
+// a reader could believe this harness defaulted to :3101 when it never did.)
+// The LEGACY fixed sleep, kept only as this change's RED: FLY_TERRA_SETTLE_LEGACY=1
+// restores the original wall-clock settle so the mid-refine census that the w5
+// run produced can be reproduced deliberately.
 const SETTLE = Number(process.env.FLY_TERRA_SETTLE_MS || 30000);
+const SETTLE_LEGACY = process.env.FLY_TERRA_SETTLE_LEGACY === '1';
+// Consecutive quiescent rAF ticks required. 12 at ~1 fps is ~15 s of nothing
+// happening; at 60 fps it is a fifth of a second, which is the point of
+// counting frames rather than seconds.
+const SETTLE_STABLE = Number(process.env.FLY_TERRA_SETTLE_STABLE || 12);
+// A floor, so a tree that happens to be momentarily quiet the instant the pose
+// is pinned cannot report itself settled before the warp has been walked at all.
+const SETTLE_MIN_FRAMES = Number(process.env.FLY_TERRA_SETTLE_MIN_FRAMES || 24);
+// The wall-clock cap. Hitting it is not a failure and not a silence: it prints
+// NOT SETTLED with the condition still moving, and the census beside it is
+// explicitly not a settled reading.
+const SETTLE_CAP_MS = Number(process.env.FLY_TERRA_SETTLE_CAP_MS || 240000);
 // Sweep length. FLY_TERRA_SWEEP_MS is the name to reach for; FLY_TERRA_YAW_MS
 // is kept as its alias so existing invocations do not move. The default is the
 // original 45000, so an unset environment is byte-identical to before this env
@@ -266,8 +283,96 @@ const gate = (name, ok, detail = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
 };
 
+/**
+ * Wait until the tile tree is QUIESCENT, counted in RENDERED FRAMES.
+ *
+ * WHY THIS REPLACED A SLEEP. This used to be `waitForTimeout(30000)` and
+ * nothing else. On a venue whose frame rate is a variable, wall clock is not a
+ * unit: 30 s is ~24 rendered frames at the 0.8 fps the w5 run measured, and a
+ * quadtree cannot warp to another continent and descend five to eight levels to
+ * z17 in 24 frames. The w5 ON arm censused Owens mid-refine and read 38% of the
+ * OFF arm's triangles, while Powell — which the yaw sweep leaves already
+ * refined, so it needs no re-stream — read 90%. That pose-order asymmetry is
+ * what named this as an instrument artifact rather than a policy result.
+ *
+ * I had already made the yaw sweep frame-based for exactly this reason and left
+ * the settle on a sleep one function away.
+ *
+ * CONVERGENCE = no downloads in flight, AND the deepest loaded level unchanged,
+ * AND the number of tiles carrying a model unchanged, for `stableFrames`
+ * consecutive rAF ticks. The third condition is a strengthening beyond the
+ * ruling: `maxZ` alone goes stable as soon as ONE tile reaches the deepest
+ * level, while the rest of the field is still filling in — and the reading in
+ * question is triangles, not depth. With `dl === 0` required, nothing can be
+ * arriving, so the count can only move through LOD actions and settles.
+ *
+ * It never waits silently: the frames and seconds it actually took are printed,
+ * and a run that hits the wall-clock cap prints NOT SETTLED with the condition
+ * that was still moving, so a capped census can never be mistaken for a
+ * converged one.
+ */
+const SETTLE_CONVERGE = ([stableFrames, minFrames, capMs]) =>
+  new Promise((resolve) => {
+    const t0 = performance.now();
+    let frames = 0;
+    let stable = 0;
+    let lastZ = -1;
+    let lastN = -1;
+    let moving = 'nothing yet';
+    const read = () => {
+      const eng = window.__flyTerra?.engine?.();
+      const map = eng?.map ?? window.__flyTerra?.get?.();
+      let maxZ = 0;
+      let withModel = 0;
+      const stack = map ? [map] : [];
+      while (stack.length) {
+        const n = stack.pop();
+        if (!n) continue;
+        if (n.isTile && n.model) {
+          withModel++;
+          if (n.z > maxZ) maxZ = n.z;
+        }
+        const k = n.children;
+        if (k) for (let i = 0; i < k.length; i++) stack.push(k[i]);
+      }
+      const dl = typeof eng?.downloading === 'number' ? eng.downloading : (map?.downloading ?? 0);
+      return { maxZ, withModel, dl };
+    };
+    const step = () => {
+      frames++;
+      const { maxZ, withModel, dl } = read();
+      if (dl !== 0) moving = `downloads in flight (${dl})`;
+      else if (maxZ !== lastZ) moving = `deepest level (${lastZ} -> ${maxZ})`;
+      else if (withModel !== lastN) moving = `tiles with a model (${lastN} -> ${withModel})`;
+      const quiet = dl === 0 && maxZ === lastZ && withModel === lastN;
+      lastZ = maxZ;
+      lastN = withModel;
+      stable = quiet ? stable + 1 : 0;
+      const ms = Math.round(performance.now() - t0);
+      if (frames >= minFrames && stable >= stableFrames) {
+        resolve({ converged: true, frames, ms, maxZ, withModel, moving: null });
+        return;
+      }
+      if (ms >= capMs) {
+        resolve({ converged: false, frames, ms, maxZ, withModel, moving });
+        return;
+      }
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+
 async function settleDraws(page, ms) {
-  await page.waitForTimeout(ms);
+  let info = null;
+  if (SETTLE_LEGACY) {
+    // The RED for this change, on a knob: the original fixed sleep, so the
+    // coarse mid-refine census can be reproduced on demand rather than only
+    // remembered.
+    await page.waitForTimeout(ms);
+    info = { converged: false, frames: null, ms, maxZ: null, withModel: null, moving: 'LEGACY SLEEP' };
+  } else {
+    info = await page.evaluate(SETTLE_CONVERGE, [SETTLE_STABLE, SETTLE_MIN_FRAMES, SETTLE_CAP_MS]);
+  }
   await page.evaluate(() => {
     if (window.__flyStats) window.__flyStats.drawCalls = null;
   });
@@ -277,7 +382,21 @@ async function settleDraws(page, ms) {
       polling: 500,
     })
     .catch(() => {});
+  return info;
 }
+
+/** One line describing how a pose settled — printed beside every census. */
+const settleNote = (i) => {
+  if (!i) return 'settle: n/a';
+  if (i.moving === 'LEGACY SLEEP') return `settle: LEGACY SLEEP ${(i.ms / 1000).toFixed(0)}s (NOT a convergence)`;
+  if (i.converged) {
+    return `SETTLED in ${(i.ms / 1000).toFixed(0)}s / ${i.frames} frames (maxZ ${i.maxZ}, ${i.withModel} tiles with a model)`;
+  }
+  return (
+    `NOT SETTLED — hit the ${(SETTLE_CAP_MS / 1000).toFixed(0)}s cap after ${i.frames} frames ` +
+    `(maxZ ${i.maxZ}, ${i.withModel} with a model, still moving: ${i.moving})`
+  );
+};
 
 /** One whole arm: boot, probe content, yaw sweep, settle at two poses. */
 async function runArm(context, fx, paceOn) {
@@ -327,7 +446,8 @@ async function runArm(context, fx, paceOn) {
 
   // --- content probe at a settled suburb pose
   await page.evaluate(PIN_POSE, POSES.powell);
-  await settleDraws(page, SETTLE);
+  const probeSettle = await settleDraws(page, SETTLE);
+  console.log(`    content-probe pose ${settleNote(probeSettle)}`);
   const content = await page.evaluate(CONTENT_PROBE);
 
   console.log(`    content probe: ${content.total} resident tiles, ${content.withUrl} with an imagery URL, ` +
@@ -448,8 +568,10 @@ async function runArm(context, fx, paceOn) {
   const poses = {};
   for (const [name, p] of Object.entries(POSES)) {
     await page.evaluate(PIN_POSE, p);
-    await settleDraws(page, SETTLE);
+    const info = await settleDraws(page, SETTLE);
     poses[name] = await page.evaluate(CENSUS);
+    poses[name].settled = info?.converged === true;
+    console.log(`    pose ${name} ${settleNote(info)}`);
     console.log(
       `    pose ${name}: draws ${poses[name].draws} tris ${poses[name].tris} residentMB ` +
         `${poses[name].mem?.residentMB} · tiles resident ${poses[name].resident} ` +

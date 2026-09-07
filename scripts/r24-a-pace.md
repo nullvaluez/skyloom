@@ -1889,6 +1889,115 @@ an effective cap of 150 against a 190-tile set).
 
 ---
 
+## §21 The settle was a sleep — and why E's model-fraction reading does not settle it
+
+`verify-terra-live`'s pose settle was `await page.waitForTimeout(30000)` and
+nothing else: no convergence condition, no frame count, and the one follow-up
+wait for a fresh `drawCalls` ends in `.catch(() => {})`, so even that is
+non-binding. **At the w5 ON arm's 0.8 fps, 30 s is ~24 rendered frames.** A
+quadtree cannot warp to another continent and descend five to eight levels to
+z17 in 24 frames.
+
+I had already made the yaw sweep frame-based for exactly this reason (§13) and
+left the settle on a sleep **one function away**. Half an instrument fixed is
+an instrument that lies in the other half.
+
+### The replacement
+
+Convergence, counted in **rendered frames**: no downloads in flight, the
+deepest loaded level unchanged, **and** the number of tiles carrying a model
+unchanged, for `stableFrames` consecutive rAF ticks, with a frame floor and a
+wall-clock cap.
+
+The third condition is a deliberate strengthening beyond the ruling: `maxZ`
+goes stable the instant ONE tile reaches the deepest level while the rest of
+the field is still filling in — and the reading in dispute is **triangles**,
+not depth. With `dl === 0` required, nothing can be arriving, so the count can
+only move through LOD actions and must settle.
+
+It never waits silently. Frames and seconds are printed for every pose, and a
+run that hits the cap prints **NOT SETTLED** with the condition still moving,
+so a capped census can never be read as a converged one. The RED is a knob:
+`FLY_TERRA_SETTLE_LEGACY=1` restores the original sleep, so the mid-refine
+census can be **reproduced on demand rather than only remembered**.
+
+Also removed a dead `URL_` constant whose default (`:3101`) differed from the
+one `bootFly` actually uses (`:3000`) — a reader could have believed this
+harness defaulted somewhere it never did.
+
+### E's counter-reading, and the source fact that undoes its instrument
+
+E argued the census already answers "resting coarser, not still catching up",
+on the model fraction: `withModel/resident` is 176/237 = 74.3% OFF against
+349/465 = 75.1% ON — indistinguishable — and reasoned that a tree still
+constructing models would show that fraction **depressed**.
+
+**It cannot.** Vendored `index.js` `_loadSubTiles`: the children are created,
+`this._subTiles = o` is set, each child gets a model and `_loadState =
+'loading'` — and `this.add(...o)` runs **only after the await**, on the success
+branch. In-flight children are therefore **not reachable from the map root**,
+and a census that walks `children` cannot see them at all. A tree mid-refine
+does not show a depressed model fraction; it shows a **smaller, fully-modelled,
+coarser tree** — which is exactly the observed shape. The fraction is ~constant
+by construction, so it is not evidence either way.
+
+That is not a criticism of E's reasoning, which was careful; it is a property
+of the instrument that neither of us could see without reading the refine path.
+
+### What still points which way
+
+- **For (i):** the pose ORDER. Powell needs no re-stream (the yaw sweep leaves
+  it refined) and reads 90% of OFF's triangles; Owens needs a full re-stream
+  and reads 38%. A policy would apply at both poses.
+- **For (i):** `visible 275` against `draws 104`. Those come from different
+  machinery — `visible` from `_inFrustum` stamps, `draws` from
+  `renderer.info` — and after a warp the stamps are stale until the walk
+  revisits each tile. Under a settled tree they would broadly agree.
+- **For (ii), and it is real:** triangles per visible tile, 1,572 OFF against
+  380 ON — about one quadtree level. E is right that this is the shape a
+  coarser leaf set would have. It is *also* the shape a mid-refine tree has,
+  for the reason above, so it does not discriminate on its own.
+
+**Neither reading is closed by this log.** One measurement closes it, and it is
+now buildable: settle Owens to convergence and see whether ON's triangles rise
+to meet OFF's. If they converge it was (i); if ON plateaus materially below OFF
+with the tree quiescent it is (ii), a product finding for R25 and a knob
+question (`mergeHysteresisK`, or the refine side of `LODThreshold`) — never a
+re-baseline.
+
+### E's caveat on gate 7, adopted verbatim into the record
+
+An under-settled census can only ever make a **ceiling** gate MORE likely to
+pass. So "Owens draws ≤ 261 at 104" is honest evidence the trio did not breach
+the ceiling, and is **not** evidence the trio improved anything. The
+104-vs-211 and 104,582-vs-276,704 comparisons are being read as an
+improvement, and that reading — unlike the ceiling — requires both censuses to
+be settled. It stands as "not yet a settled number" until the convergence run.
+
+### And a caveat on my own decoding rule
+
+I gave Fable "merges with 0 evictions = the LOD policy; merges tracking
+evictions = the cap". On the **OFF** arm the whole cap block reads zero —
+`effectiveCap 0`, `visibleTiles 0`, `residentMB 0`, evictions Δ0 — because the
+residency pass is **not installed at all** when `keepResident` is off. So the
+rule's first half is true there but is not an *inference*: there was no cap to
+have been idle. It is a real inference only on the ON arm, where the cap is
+live (1722) and measured idle (0 over-budget passes, 0 elections). Caught by E,
+and worth carrying because a zero that was never measured looks exactly like a
+zero that was.
+
+### Lessons
+
+1. **Fix an instrument in every place it is wrong, not the place you noticed.**
+   Frame-based sweep, wall-clock settle, same file, same venue, same round.
+2. **A census cannot see what the tree does not yet contain.** Before reading a
+   ratio as steady state, check what the code path does with work in flight —
+   here it holds it entirely outside the traversal.
+3. **A ceiling gate is a one-sided instrument.** Under-settling can only help
+   it pass, so it can support "did not breach" and never "improved".
+
+---
+
 ## §10 Commits
 
 | # | Commit | What |
