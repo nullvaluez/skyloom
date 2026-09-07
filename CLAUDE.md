@@ -123,11 +123,18 @@
 > legacy screenshot path (Playwright's actionability check never settles on a
 > continuously rendering canvas), and the one reading that got out —
 > `verify-dusk`'s intensities ~13 % short at a pinned noon — was read from
-> source as **the venue starving an R16 PER-FRAME ramp** (0.25 s of ramp per
-> FRAME at ~0.48 fps), not an R24 flag; **on the re-run, waiting on the VALUE
-> instead of the clock, the pinned noon reads env 0.85 and bg 1.0 exactly and
-> dusk closes 14 of 15**, with sat-night at 26/2/1 and flicker still to run
-> <!-- NIGHT GATES PENDING -->; four tail
+> source as **the venue starving an R16 PER-FRAME ramp**, not an R24 flag.
+> **All three now have rows**: `sat-night` **26/2/1** (its two JFK reds a
+> 26-second dwell and a fixture that places its only runway 21.9 km outside
+> the road ring), `dusk` **14/1** (pinned noon reads env 0.85 / bg 1.0 EXACTLY
+> once the settle waits on the value instead of the clock; the remainder is a
+> draw-pair instrument), and `flicker` **4/2** (**the R21 flicker SIGNATURE is
+> ABSENT** — 2 and 0 swinging pixels of 547,200 against a bound of 32 — while
+> the p99 reds measured tiles streaming IN during a 12-frame window that is
+> ~24 s here). **Every red among them is an instrument under the venue, none a
+> defect of the flag it certifies**; the attributions in progress and the
+> cheap re-runs ride the next server
+> <!-- NIGHT GATES: two attributions in progress, re-runs pending -->; four tail
 > re-runs: **one-sun CLOSED at 42/42** against the restored 1e-6° bound,
 > **linear-haze CLOSED at 9/0/1** with the noon gain reproduced (5.90 luma)
 > and the night leg NOT SEPARATED at the venue's 1.2 cross-boot floor, and
