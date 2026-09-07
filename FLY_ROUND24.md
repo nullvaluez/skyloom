@@ -1854,17 +1854,30 @@ quotable.
 
 ## §6 User checkpoints — ALL PENDING
 
-**Nothing in this table has been confirmed.** The diagnosis pack was sent and
-no reply arrived; every row is unconfirmed on the user's machine, including the
-two that are the reason the round exists.
+**THE USER-MACHINE TALLY, plainly: NOTHING has been confirmed from the user's
+machine this round.**
 
-**The user is now testing `a7a8739`** on `main` (integration is at `c0c7cec`, scripts and ledgers ahead; `8240539` plus merges 13–31: the scripts-only ones, the import dedupe, **A's Owens fix**, C's dead-import removal, E's census repair, B's `__noFade` declarations + heal throughput floor, **C's night hill ruling** and E's waiting sun legs, C's `toFixed(9)` publish) — **on `main`, which was fast-forwarded to the integration tip at the user's second request (§4.1), so `main` == integration** — pushed early, at their request, before
-the standalone re-take (§4.1). It is **the first R24 build in the user's hands
-that contains the toy index container fix and the `STEP_SAFE` resize guard**, so
-the toy boot page error and the DPR double-apply are the two things this build
-answers that no earlier one could. **Nothing has come back from that machine
-yet**: every row below still reads PENDING, and a checkpoint is closed by the
-user's reply, not by this build existing.
+- **The diagnosis pack was sent, and no reply arrived.** Part A and the four
+  questions in Part 0 are still unanswered, so the round ran on the plan's
+  defaults for which build showed the symptoms, which symptoms were present,
+  what the machine is, and which style was in use.
+- **`main` was fast-forwarded TWICE at the user's own request** — first to
+  `9bf5f8a` (*"Merge what is done so far into main so I can test"*), then to
+  `a7a8739` (*"Merge into main"*) — **and both builds were in the user's hands
+  with no report back.** `9bf5f8a` was the first build carrying the toy index
+  container fix and the `STEP_SAFE` resize guard; `a7a8739` adds A's Owens
+  residency fix, C's night hill ruling and C's nine-decimal publish.
+- **Every number in this record is the SwiftShader fixture's.** No fps, no frame
+  time, no stall count, no tear observation and no pixel judgement in §4 comes
+  from a GPU. The container renders at roughly 1 fps through ANGLE/SwiftShader,
+  the tile hosts are 403-blocked, and Chrome is absent — so "CERTIFIED ON THE
+  VENUE" means a fixture proved a mechanism, never that a machine felt better.
+- **The checkpoints below stay OPEN, each with the exact question it needs
+  answered.** A checkpoint closes on the user's reply; it does not close because
+  a build exists, because a gate is green, or because a mechanism is proven.
+
+**The build to test is `a7a8739` on `main`** (integration runs ahead of it with
+scripts and ledgers only; §4.1 carries the merge list).
 
 | # | Checkpoint | What to look for |
 |---|---|---|
