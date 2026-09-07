@@ -489,7 +489,38 @@ const TEMPORAL = async ([frames, y0f, y1f]) => {
       // destroy the statistic it exists to compute. Before the window opens is
       // the only place a terrain-stillness wait is compatible with it.
       await still.still(`${tag} window ${attempt + 1}`);
+      // D'S PRE-REGISTERED DISCRIMINATOR, read rather than argued (r24/d
+      // bbb0ec4). This gate counts SWINGING pixels, and a swing needs a
+      // REVERSAL. The crossfade's mix ramps 1 -> 0 through a smoothstep and
+      // never reverses inside a blend, so it is monotone by construction and
+      // should not move the swinging count. The one reachable non-monotone
+      // path is `arm()` re-arming an already-active material — `finish(prev,
+      // keepSlot)` then `slot.mix.value = p.from`, a jump back to 1 mid-ramp —
+      // and the only way in is a MERGE arming a leaf that is already
+      // mid-refine-fade, since refine children are created fresh. Merges have
+      // measured ~0 at every pose so far, so it is reachable in principle and
+      // near-unreachable in practice.
+      //
+      // Therefore: the merge count INSIDE the asserted window decides it. If
+      // this gate ever moves on the flipped tree with merges 0 in the window,
+      // that path is excluded BY MEASUREMENT and the cause is elsewhere. One
+      // number, printed either way.
+      const mergesBefore = await page
+        .evaluate(() => window.__flyTerra?.lod?.()?.merge ?? null)
+        .catch(() => null);
       frames = await grab();
+      const mergesAfter = await page
+        .evaluate(() => window.__flyTerra?.lod?.()?.merge ?? null)
+        .catch(() => null);
+      const mergesInWindow =
+        Number.isFinite(mergesBefore) && Number.isFinite(mergesAfter)
+          ? mergesAfter - mergesBefore
+          : null;
+      console.log(
+        `      merges inside window ${attempt + 1}: ${
+          mergesInWindow == null ? 'n/a' : mergesInWindow
+        } (the crossfade is monotone except through arm()-on-merge, so 0 here excludes it)`
+      );
       stats = await page.evaluate(TEMPORAL, [frames, y0, y1]);
       quietFrac = stats.movingFrac;
       if (quietFrac <= QUIET_MAX) {

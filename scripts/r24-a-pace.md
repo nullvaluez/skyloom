@@ -2255,6 +2255,80 @@ way a player reaches it, and it was 2× the settled one. The gate was not wrong
 
 ---
 
+### §23a Three corrections from E's decomposition, one of them to my own wording
+
+**1. The overcount figure, stated unambiguously.** §23 says the stamp
+"overstates what three actually draws by about a third". That is the right
+number against the wrong denominator, and E measured it properly: stamp **141**,
+tile meshes actually inside the live frustum **92**, i.e. 49 extra. So
+
+- **49/141 = 35%** — the share of the stamp that is not drawn (what §23 meant);
+- **49/92 = 53%** — the overcount relative to the drawn count (what "overstates
+  the drawn count" reads as).
+
+Both describe the same two numbers. The record should carry **53%** wherever
+the claim is "the stamp overstates the drawn count", and §23's sentence is
+corrected to that reading here rather than reworded in place.
+
+E extracted the frustum by hand from projection × view because no `THREE`
+namespace is published — the honest route, and the reason there is a measured
+number here at all.
+
+**2. "Two different instruments" — and why the bound survives it.** E is right
+that differencing the stamp against `renderer.info` draws is not a
+decomposition: they are different instruments answering different questions,
+and treating the stamp as a drawn count would be an error.
+
+The §22/(a) reading did not do that; it used `drawn ≤ stamp`, which is a
+genuine bound (a parked tile cannot draw, and a tile outside the stamp has no
+visible model), so `non-terrain = draws − terrain_drawn ≥ draws − stamp` holds.
+**E's measurement makes that bound tighter, not invalid**: with the true terrain
+term nearer 55 than 80, the non-terrain share of the 279 is larger than argued
+and the no-change ruling on `LODThreshold` stands on more room. The distinction
+worth keeping: *a bound built from two instruments is sound; an equality is not.*
+
+**3. Both Owens censuses were inadmissible, not just the ON one.** I wrote that
+the OFF arm's 186 "is an underestimate", which reads as though it were usable
+with a caveat. It was not: OFF capped at dl 6 and ON at dl 8, so **186 was
+exactly as inadmissible as 279**, and the clause was comparing two numbers
+neither of which was a settled reading. D's gate-7 change (approved by Fable,
+`c73b3b1`) now refuses an unsettled census outright. It withholds a verdict and
+never grants one; the 261 does not move.
+
+### The one test that would close R25 item 1, and it is written and unrun
+
+E has `scripts/r24-e-phantom-dl.js` (`c73b3b1` on r24/e): settle a held pose to
+`dl 0`, step the tier so the imagery source is rebuilt through
+`maxLevel: satMaxZoomFor(tier)`, and watch whether the count ever returns to 0.
+**A count that reached zero before the step and never after it is the
+stale-epoch mechanism reproduced on demand; a count that returns to zero
+falsifies it** and the perpetual count is something else. Ten minutes of venue.
+
+Until it runs, R25 item 1 stays **inferred from source**. E's straight-to-Owens
+census already establishes the necessary half — warping directly from boot
+gives **zero version-dirty tiles** by the getter's own rule and the pose settles
+at 140, while the same pose after a 900 s sweep caps at dl 8 — so the pose is
+not intrinsically unquiet; *a history makes it unquiet*, which is exactly the
+shape of a trigger that needs an epoch bump **after** tiles have loaded. What is
+missing is only that the tier step is the bump.
+
+### Process lesson, E's catch, and it belongs here because the file is mine
+
+E's branch predated `SETTLE_CONVERGE`, and editing `verify-terra-live.js` from
+it **would have silently reverted my converged settle inside E's own commit —
+no conflict, no warning**, because git merges disjoint hunks of a file happily
+and neither owner would see a marker. E caught it by grepping the file for my
+symbol before touching it, then merging the orchestration tip first.
+
+**A shared harness file edited from a stale branch reverts the other owner's
+work with no conflict and no warning.** The cheap discipline is the one E used:
+before editing a file you do not own, grep it for the other owner's most recent
+symbol, and if it is missing, merge before you edit. This round already paid for
+this lesson once in the other direction — my duplicate `budgetK` import at
+merge 15 — so it is the same defect class twice, from both sides.
+
+---
+
 ## §10 Commits
 
 | # | Commit | What |
