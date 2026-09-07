@@ -585,6 +585,19 @@ fast-forwarded and **E runs `terra-live` at 900 s against A's fix**.
 17/17): the resident/visible census repaired BEFORE it was pointed at that fix —
 §5.2 — and **`9bf5f8a` is the user's test tip**, scripts-only above `83462eb`.
 
+**And `main` was fast-forwarded to it**, at the user's explicit request —
+*"Merge what is done so far into main so I can test"* — from the W0 scaffold
+`6116fc5` to `9bf5f8a`: **a pure fast-forward** (`origin/main` was an ancestor),
+**212 commits, 133 files, +41,660 / −272**. The pre-push check is worth
+recording for its method: the built-but-off flags were read **by IMPORTING
+`fly-constants.js`** — `LOD_CROSSFADE`, `AERIAL_LAW`, `SKY_PROCEDURAL`,
+`FRAME_STEP`, `ENV_UNIFORM`, `RING_DEDUPE` all `enabled:false` — **after a regex
+over the block's first 2,500 characters failed to find the top-level key behind
+`LOD_CROSSFADE`'s long header comment**: the import is the honest read, the
+regex was not. `main` carries the **W0** `CLAUDE.md` notice; **the R24 notice and
+`FLY_ROUND24.md` land on `main` at the close**, with this branch. The re-take on
+the main worktree (still at `9bcaace`) is unaffected.
+
 | Gate | PASS 1 (flag-off) | LIVE | NOT MEASURABLE HERE |
 |---|---|---|---|
 | `verify-classify.mjs` | **PASS** (38 gates) | — | — |
@@ -1386,7 +1399,7 @@ quotable.
 no reply arrived; every row is unconfirmed on the user's machine, including the
 two that are the reason the round exists.
 
-**The user is now testing `9bf5f8a`** (`8240539`, plus merges 13–18: the scripts-only ones, the import dedupe, **A's Owens fix**, C's dead-import removal and E's census repair) — pushed early, at their request, before
+**The user is now testing `9bf5f8a`** (`8240539`, plus merges 13–18: the scripts-only ones, the import dedupe, **A's Owens fix**, C's dead-import removal and E's census repair) — **on `main` as well as on the integration branch**, `main` having been fast-forwarded to it at the user's request (§4.1) — pushed early, at their request, before
 the standalone re-take (§4.1). It is **the first R24 build in the user's hands
 that contains the toy index container fix and the `STEP_SAFE` resize guard**, so
 the toy boot page error and the DPR double-apply are the two things this build
