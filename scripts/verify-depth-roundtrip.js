@@ -610,12 +610,12 @@ function gate(name, ok, detail) {
     // Euclidean view distance of a pixel whose view-space Z is known. For a
     // symmetric perspective matrix viewX = ndcX·(-viewZ)/P00 and likewise in Y,
     // so |viewPos| = |viewZ|·sqrt(1 + (ndcX/P00)² + (ndcY/P11)²).
-    const euclid = (r) => {
+    const euclid = (r, viewZ) => {
       const [w, h] = r.buf ?? [];
-      if (!Number.isFinite(w) || !Number.isFinite(h)) return null;
+      if (!Number.isFinite(w) || !Number.isFinite(h) || !Number.isFinite(viewZ)) return null;
       const ndcX = ((r.px + 0.5) / w) * 2 - 1;
       const ndcY = (1 - (r.py + 0.5) / h) * 2 - 1;
-      return r.trueZ * Math.sqrt(1 + (ndcX / dofCfg.p00) ** 2 + (ndcY / dofCfg.p11) ** 2);
+      return viewZ * Math.sqrt(1 + (ndcX / dofCfg.p00) ** 2 + (ndcY / dofCfg.p11) ** 2);
     };
 
     if (!cfgOk)
@@ -635,7 +635,35 @@ function gate(name, ok, detail) {
           );
           continue;
         }
-        const d = euclid(r);
+        // (3) IS ABOUT THE DoF, NOT ABOUT THE TRUTH HOOK — so it evaluates the
+        // material's formula at the PROBE's distance, i.e. at the depth the GPU
+        // actually had. That makes it a DoF <-> DEPTH BUFFER consistency check,
+        // independent of the raycast entirely, and it is (2)'s job to compare
+        // the buffer against the geometry.
+        //
+        // WHY IT MOVED: written against the TRUTH's distance, all three clauses
+        // failed on a run where the CoC was demonstrably correct — the truth
+        // arbiter had degenerated (every hit "drop 0.00 m", every pick "via
+        // unlifted", so the un-bend correction was identically zero) and (3)
+        // inherited that error wholesale. Two links were being tested through
+        // one clause, so a break in either broke both and neither could be
+        // told apart. Now each link has its own clause and the row prints both
+        // distances, so a reader sees WHICH one broke.
+        //
+        // WHAT THIS COSTS, STATED SO NOBODY HAS TO REDISCOVER IT: (3) no longer
+        // participates in the round's RED. Comparing the CoC against the
+        // PROBE's distance means both sides come from the same depth buffer, so
+        // if that buffer collapses to -cameraNear the formula predicts 0.1773
+        // and the GPU wrote 0.1773 and the clause PASSES — correctly, because
+        // the DoF really is consistent with the depth it was given; the depth
+        // is what is wrong. On that red (2) fails at all three picks (probe vs
+        // truth, which is where a collapse belongs) and (4) reads NOT
+        // CALIBRATED, because a collapsed buffer makes every |signed| equal and
+        // there is nothing left to order. So the defect is still caught, by the
+        // clause that owns it — but (3) is a consistency check now, not a
+        // detector, and a green there says nothing about the depth being right.
+        const d = euclid(r, r.gotZ);
+        const dTruth = euclid(r, r.trueZ);
         if (!Number.isFinite(d)) {
           notCalibrated(
             `(3) ${r.label}: CoC tracks true depth`,
@@ -659,12 +687,15 @@ function gate(name, ok, detail) {
         const delta = Math.abs(r.coc - expected);
         scored.push({ r, d, signed, expected, delta, tol });
         numGate(gate)(
-          `(3) ${r.label}: measured CoC ≡ CoC(material formula, TRUE distance) within the 8-bit ` +
-            `quantum (from ${cocSource})`,
+          `(3) ${r.label}: measured CoC ≡ CoC(material formula, the PROBE's distance) within the ` +
+            `8-bit quantum — DoF ↔ depth buffer, independent of the truth hook (from ${cocSource})`,
           delta,
           delta <= tol,
-          `coc ${r.coc.toFixed(4)} vs expected ${expected.toFixed(4)} at Euclidean ` +
-            `${d.toFixed(1)} m (|viewZ| ${r.trueZ.toFixed(1)} m, signed ${signed.toFixed(1)} m) — ` +
+          `coc ${r.coc.toFixed(4)} vs expected ${expected.toFixed(4)} at the PROBE's Euclidean ` +
+            `${d.toFixed(1)} m (probe |viewZ| ${r.gotZ.toFixed(1)} m; the truth's Euclidean is ` +
+            `${Number.isFinite(dTruth) ? dTruth.toFixed(1) : 'n/a'} m from |viewZ| ` +
+            `${r.trueZ.toFixed(1)} m — that gap is (2)'s business, not this clause's), signed ` +
+            `${signed.toFixed(1)} m — ` +
             `|Δ| ${delta.toFixed(4)} ≤ 0.0039 + ${(dMagDDist * texelM).toFixed(4)} ` +
             `(${texelM.toFixed(1)} m of half-res texel × ${dMagDDist.toFixed(6)} /m) = ${tol.toFixed(4)}`
         );

@@ -59,12 +59,35 @@ function makeCanvasShot(page, selector = '.fixed.inset-0 canvas') {
     };
     return clip;
   };
+  // WITNESS A RENDERED FRAME BEFORE ASKING FOR ONE. `page.screenshot` needs a
+  // compositor frame; a long task on the main thread — the noon HDRI swap and
+  // the prewarm are both seconds here — can starve it past any budget. Waiting
+  // on a rAF tick first means the capture is requested at a moment the page has
+  // just proved it can produce frames, instead of at an arbitrary instant that
+  // may be the middle of a stall.
+  const frame = () =>
+    page
+      .evaluate(
+        () =>
+          new Promise((res) => {
+            requestAnimationFrame(() => requestAnimationFrame(() => res(true)));
+          }),
+        undefined
+      )
+      .catch(() => false);
+
   return {
     /** Buffer of the canvas region, or write it to `p` when given. */
-    shot: async (p) =>
-      page.screenshot({ clip: await box(), timeout: SHOT_TIMEOUT, ...(p ? { path: p } : {}) }),
-    shot64: async () =>
-      (await page.screenshot({ clip: await box(), timeout: SHOT_TIMEOUT })).toString('base64'),
+    shot: async (p) => {
+      const c = await box();
+      await frame();
+      return page.screenshot({ clip: c, timeout: SHOT_TIMEOUT, ...(p ? { path: p } : {}) });
+    },
+    shot64: async () => {
+      const c = await box();
+      await frame();
+      return (await page.screenshot({ clip: c, timeout: SHOT_TIMEOUT })).toString('base64');
+    },
     box,
   };
 }

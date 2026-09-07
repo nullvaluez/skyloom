@@ -94,6 +94,7 @@ const { chromium } = require('playwright');
 const path = require('path');
 const { bootFly } = require('./_boot');
 const { makeCanvasShot } = require('./_canvasshot');
+const { notCalibrated, notCalCount, notCalSummary } = require('./_notcal');
 
 // --- page-side helpers (single array arg — page.evaluate passes exactly one) --
 
@@ -178,7 +179,13 @@ const roadProbe = () => {
     errs.push(`console: ${m.text().slice(0, 200)}${url ? ` [${url.slice(0, 120)}]` : ''}`);
   });
   const fails = [];
+  // The number of gates that actually RAN. A row that dies mid-way reports a
+  // red with a plausible message and no hint that most of its gates never
+  // executed — which is exactly how this file reported "0 gates" and had it
+  // read as "no night legs moved" (R24 §6a). The count goes in the summary.
+  let gates = 0;
   const gate = (name, ok, detail = '') => {
+    gates += 1;
     console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ' — ' + detail : ''}`);
     if (!ok) fails.push(name);
   };
@@ -193,6 +200,43 @@ const roadProbe = () => {
   const glShot = (n) => cap.shot(path.join(__dirname, n));
   const shot64 = () => cap.shot64();
   const draws = () => page.evaluate(() => window.__flyStats?.drawCalls ?? -1);
+  // A DRAW COUNT THAT HAS NOT REPUBLISHED IS NOT A MEASUREMENT. This file's own
+  // comment at the A/B says `__flyStats.drawCalls` only republishes every 60
+  // FRAMES — and the A/B then waited 2500 ms of WALL CLOCK for it. On a machine
+  // at 60 fps those are the same second; at this venue's ~0.5-0.9 fps, 60
+  // frames is 60-120 SECONDS and 2500 ms is one or two frames, so both halves
+  // of the pair read the SAME stale published number and the layer delta was
+  // 0 (107 -> 107) BY CONSTRUCTION, whatever the roads did.
+  //
+  // So the read nulls the counter and waits for the app to publish a fresh one,
+  // and it reports whether it actually got one. The third instance of this
+  // round's settle lesson (verify-dusk's ramp, verify-terra-live's pose census,
+  // now this): wait on the event, not on a clock that assumes a frame rate.
+  const DRAWS_TIMEOUT = Number(process.env.FLY_DRAWS_TIMEOUT_MS || 240000);
+  let drawsStale = 0;
+  const freshDraws = async () => {
+    await page.evaluate(() => {
+      if (window.__flyStats) window.__flyStats.drawCalls = null;
+    });
+    let fresh = true;
+    try {
+      await page.waitForFunction(
+        () => typeof window.__flyStats?.drawCalls === 'number',
+        undefined,
+        { timeout: DRAWS_TIMEOUT, polling: 250 }
+      );
+    } catch (e) {
+      fresh = false;
+      drawsStale += 1;
+    }
+    const v = await draws();
+    if (!fresh)
+      console.log(
+        `    *** draw count did not republish within ${DRAWS_TIMEOUT / 1000}s — the value ` +
+          `below (${v}) is whatever was there, not a fresh publish`
+      );
+    return v;
+  };
 
   // Mean |Δ| per channel (0..255) between two canvas screenshots, restricted to
   // a horizontal band of the frame (the GROUND, below the horizon).
@@ -334,13 +378,9 @@ const roadProbe = () => {
     await page.waitForTimeout(500);
     const off = await shot64();
     const px = await bandDelta(on1, off, y0f, y1f);
-    const offDraws = await (async () => {
-      await page.waitForTimeout(2500);
-      return draws();
-    })();
+    const offDraws = await freshDraws();
     await setVisible(true);
-    await page.waitForTimeout(2500);
-    const onDraws = await draws();
+    const onDraws = await freshDraws();
     await setForegroundVisible(true);
     const out = {
       tag,
@@ -382,6 +422,8 @@ const roadProbe = () => {
     draws: window.__flyStats?.drawCalls ?? -1,
     toyBuilt: typeof window.__toyWorld !== 'undefined',
     eyeAgl: Math.round(window.__fly.flight.pos.y - window.__fly.flight.groundElev),
+    posY: Math.round(window.__fly.flight.pos.y),
+    groundElev: Math.round(window.__fly.flight.groundElev),
   }));
   await glShot('r16-satnight-01-manhattan-night.png');
   console.log('MANHATTAN NIGHT:', JSON.stringify(night));
@@ -397,8 +439,32 @@ const roadProbe = () => {
     night.roads !== null && typeof night.roads.chunks === 'number');
   gate('toy pipeline NEVER built in satellite (verify-round11 gate A)',
     night.toyBuilt === false);
-  gate('eye AGL is the low-AGL worst case (~2.6k ft)',
-    night.eyeAgl > 600 && night.eyeAgl < 1000, `agl=${night.eyeAgl}`);
+  // A POSE PRECONDITION THE VENUE CANNOT HOLD IS NOT CALIBRATED, NOT FAILED —
+  // and it is never a reason to widen 600-1000.
+  //
+  // `pinScene` captures p.y SYNCHRONOUSLY right after `warpToGeo`, and pins the
+  // aircraft to that ABSOLUTE world Y for the rest of the leg. `eyeAgl` is then
+  // `pos.y - groundElev`, and groundElev only becomes correct once the DEM for
+  // the new location has streamed in. On the offline fixture the DEM under this
+  // Manhattan pose is not the real one, so the same absolute altitude yields a
+  // different AGL: measured 560 against the 792 the pose asked for, i.e. a
+  // ground about 232 m up where the real city is about 10 m. On a machine with
+  // the live DEM this reads ~780 and passes.
+  //
+  // Both the altitude and the ground are printed now, so the next run says
+  // WHICH of the two moved instead of leaving it to arithmetic.
+  if (night.eyeAgl > 600 && night.eyeAgl < 1000)
+    gate('eye AGL is the low-AGL worst case (~2.6k ft)', true, `agl=${night.eyeAgl}`);
+  else {
+    notCalibrated(
+      'eye AGL is the low-AGL worst case (~2.6k ft)',
+      `agl=${night.eyeAgl} (pos.y ${night.posY ?? 'n/a'} m, groundElev ${night.groundElev ?? 'n/a'} m) ` +
+        'is outside 600-1000, so the low-AGL legs below did not run at the altitude they name. ' +
+        'The pose is pinned to an absolute Y captured before the DEM arrived, so an offline DEM ' +
+        'that differs from the real ground moves the AGL without moving the pose. NOT a night ' +
+        'defect, and NOT a reason to widen the band.'
+    );
+  }
 
   const abNight = await abProbe(setRoadsVisible, 'roads@night');
   const censusNight = await roadCensus(); // R19 ruling 1 — see roadCensus above
@@ -869,9 +935,16 @@ const roadProbe = () => {
     off.roads === false && off.beacons === false && off.glow === false, JSON.stringify(off));
 
   gate('zero page/console errors', errs.length === 0, errs.slice(0, 3).join(' | '));
+  // The gate COUNT is part of the result (R24 §6a): a row that asserted nothing
+  // must never be summarised by its exit code alone, and a NOT CALIBRATED leg
+  // must appear here or it reads as a silent row.
+  console.log(
+    `\nSAT-NIGHT: ${gates - fails.length} passed, ${fails.length} failed${notCalSummary()}` +
+      (drawsStale ? ` · ${drawsStale} draw read(s) never republished` : '')
+  );
   console.log(fails.length ? `VERIFY: FAIL (${fails.join(', ')})` : 'VERIFY: PASS');
   await browser.close();
-  process.exit(fails.length ? 1 : 0);
+  process.exit(fails.length || notCalCount() ? 1 : 0);
 })().catch((e) => {
   console.error('FAILED:', e.message);
   process.exit(1);
