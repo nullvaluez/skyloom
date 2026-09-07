@@ -52,6 +52,32 @@ const SETTLE = Number(process.env.SUN_SETTLE_MS || 20000);
 // before declaring the leg un-landed. Generous, because a miss here is a
 // NOT CALIBRATED leg rather than a slow one.
 const SUN_LAND_MS = Number(process.env.SUN_LAND_MS || 180000);
+
+/**
+ * THE AZIMUTH TOLERANCE IS THE INSTRUMENT'S, NOT THE FEATURE'S.
+ *
+ * Clauses (1) and (1b) asked for agreement to 1e-6°, and the post-batch run
+ * failed four legs at Δ 4.76e-6° (noon, both tiers) and Δ 4.60e-5°
+ * (medium/dusk, and high/dusk on the dome) — while medium/dusk's dome PASSED at
+ * exactly 0.00e+0. A delta that is zero on one leg and 5e-5 on the next is not
+ * a feature disagreeing with itself; it is arithmetic.
+ *
+ * 4.6e-5° is 8e-7 radians. float32 carries ~1.2e-7 RELATIVE precision, so a
+ * direction stored in a float32 uniform, read back, and put through sin/cos/
+ * atan2 cannot hold 1e-6° at all — the bound was below the representable
+ * resolution of the thing being measured, which makes it a coin, not a gate.
+ *
+ * 1e-3° is five orders of magnitude below the defect this clause exists to
+ * catch (the pre-fix key↔hill divergence was 137°) and three above float32
+ * noise. The measured delta is still printed, so a real drift toward the bound
+ * is visible long before it trips.
+ *
+ * NOT settled by this: whether the hill and dome directions pass through a
+ * float32 uniform or a SECOND trig path. If C finds two computations of one
+ * direction where ONE_SUN's charter says one, that is a fold, not a tolerance,
+ * and this constant goes back down.
+ */
+const AZ_TOL = Number(process.env.SUN_AZ_TOL_DEG || 1e-3);
 // Three elevations: high noon, a low dusk sun, and a deep-night sun. The dusk
 // one is where C measured the 119.4° key-to-hill separation.
 const ELEVATIONS = [
@@ -337,9 +363,9 @@ const gateNum = numGate(gate);
       } else {
         const dAzHill = Number.isFinite(keyAz) && Number.isFinite(hillAz) ? Math.abs(keyAz - hillAz) : NaN;
         gateNum(
-          `(1) ${tier}/${label} AZIMUTH: key === hill to 1e-6`,
+          `(1) ${tier}/${label} AZIMUTH: key === hill to ${AZ_TOL}°`,
           dAzHill,
-          dAzHill < 1e-6,
+          dAzHill < AZ_TOL,
           `Δ ${Number.isFinite(dAzHill) ? dAzHill.toExponential(2) : dAzHill}°`,
           `key azimuth ${keyAz} · hill azimuth ${hillAz} — one of the two directionals is absent ` +
             'or zero-length, so there is no angle to compare'
@@ -351,9 +377,9 @@ const gateNum = numGate(gate);
             const dAzDome =
               Number.isFinite(keyAz) && Number.isFinite(domeAz) ? Math.abs(keyAz - domeAz) : NaN;
             gateNum(
-              `(1b) ${tier}/${label} AZIMUTH: key === dome to 1e-6`,
+              `(1b) ${tier}/${label} AZIMUTH: key === dome to ${AZ_TOL}°`,
               dAzDome,
-              dAzDome < 1e-6,
+              dAzDome < AZ_TOL,
               `Δ ${Number.isFinite(dAzDome) ? dAzDome.toExponential(2) : dAzDome}°`,
               `key azimuth ${keyAz} · dome azimuth ${domeAz}`
             );
