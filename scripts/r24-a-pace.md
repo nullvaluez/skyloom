@@ -2019,8 +2019,8 @@ second request for the same z11 imagery URL.
 | ⇒ refines COMMITTED (288 ÷ 4 children) | **72** |
 | D's ladder bookkeeping, independently | 72 |
 | **starts − commits** | **2** |
-| 2 discarded refines × 4 children | **8 imagery URLs** |
-| genuine imagery refetches reported | **8**, worst ×2 |
+| 2 discarded refines × 4 children | 8 children — **but see §22a: each child fetches an imagery URL AND a DEM URL, so this maps to 16 duplicates, not 8** |
+| genuine refetches reported | **8**, worst ×2 |
 
 `refine` counts STARTS, not commits: `lib/fly/tile-residency.js:202` increments
 `stats.refine` at method entry, *before* `origLoad.call(this, params)`. So the
@@ -2083,7 +2083,7 @@ the LOD policy merge them on a later walk. Not built this round: it changes
 commit behaviour on the critical path and there is no measurement budget left to
 certify it. It is not a knob, and it is never a re-baseline.
 
-### OPEN — the DEM asymmetry
+### ~~OPEN~~ WITHDRAWN — the DEM asymmetry (see §22a: it does not exist)
 
 Those same 8 children should have re-requested their **DEM** as well, and no
 genuine DEM duplicate appears (all 7 DEM duplicates are z15 ceiling-sharing).
@@ -2102,6 +2102,67 @@ is recorded as open rather than rounded off. Fable has asked E for the raw
 `byUrl` entries for those 8 tiles from the w5 fixture stats if they survived
 teardown; the DEM rows would settle it in one read, and the answer belongs
 beside this question.
+
+### §22a CORRECTION — the count refutes my own arithmetic, and dissolves the open question
+
+E could not recover the w5 fixture's raw `byUrl` (the server was torn down by
+PGID), but pointed out that a DEM re-request by a discarded child **at or above
+z15 would land in the SHARED bucket by construction**, so "no genuine DEM
+duplicate appears" might be a property of the classifier rather than of the
+streamer. That is correct, and chasing it exposed a worse error in §22 above:
+**my own count does not survive.**
+
+**Each child fetches TWO URLs, not one.** `TileLoader.update` (vendored
+`index.js:1285`) awaits `updateMaterial` (imagery) *and* `updateGeometry`
+(DEM). So a re-bought child duplicates an imagery URL **and** a DEM URL.
+
+That refutes §22's mapping arithmetically:
+
+| account | children re-bought | duplicated URLs predicted | bucket read |
+|---|---|---|---|
+| §22 as written: 2 discards re-bought | 8 | 8 img + 8 dem = **16** | 8 — **excluded** |
+| corrected: 1 discard re-bought | 4 | 4 img + 4 dem = **8** | **8 ✓** |
+
+Only 15 URLs were duplicated in the whole window (7 ceiling-shares + 8
+refetched), so 16 was never available. §22's "8 imagery URLs" was an assumption
+smuggled in from the single named example (`/img/11/772/550`), and the example
+being imagery says nothing about the other seven.
+
+**The corrected account, which keeps the 74/72 finding intact:**
+
+- **2 refines were discarded** (74 starts − 72 commits). That number stands; it
+  is a subtraction of two independent instruments.
+- **One of them re-refined inside the window and re-bought its four children**
+  → 4 imagery + 4 DEM = **8 duplicated URLs, worst ×2**. Exactly the bucket.
+- **The other did not come back before the sweep ended**, so it wasted four
+  downloads and duplicated *nothing*. A discard only becomes a duplicate if the
+  tile refines again; at the end of a single revolution some will not.
+
+**The DEM asymmetry does not exist.** Four of the eight ARE DEM, at z11 —
+below the ceiling, so correctly classified as refetches rather than shares. The
+open sub-question in §22 was an artifact of my own unexamined assumption, and it
+is withdrawn rather than left open. E's classifier point remains true and worth
+keeping for the case it *would* apply to: a discarded child at z ≥ 16 would
+re-request the z15 ancestor and be invisible to the classification, so
+"no DEM refetch" can never be read as evidence on its own.
+
+**E is shipping the fix for the instrument** (r24/e, scripts-only): the row will
+dump the classified duplicate LIST — kind, z, url, count, bucket — instead of a
+count and two examples. Then "8 refetched" arrives with its eight URLs and this
+is a reading, not a derivation. It does not re-run in w6; it lands for R25 or
+the next lod-fade row.
+
+**None of this softens gate (6).** The FAIL stands, the bound does not move, the
+mechanism is unchanged, and the fixture is still the favourable case. What
+changed is the size of the observed waste: **one** re-bought refine, not two.
+
+**Lesson, and it is the sharper version of §22's:** *I derived a count from a
+mechanism and never checked it against the total the log already reported.* The
+15-duplicate line was on screen the whole time and 16 does not fit inside it.
+A derivation that agrees with the mechanism you like is not evidence — the
+arithmetic has to close against a number you did not choose.
+
+---
 
 ### Lessons
 
