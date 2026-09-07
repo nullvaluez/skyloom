@@ -1201,7 +1201,7 @@ and **lod-fade** (frame-based yaw — **and its pinned ON leg is what decides
 | `verify-sat-buildings` / `-skyline` / `-parcel-homes` / `-suburbia` | 226 draws / 6,965 kept / 6,964 columns · 17 · Powell 0 placed · nothing in (25, 35) m | not re-run | frozen |
 | `verify-rim` / `-dusk` / `-sat-night` / `-sat-depth` / `-aerial` / `-edge-fx` / `-neon-alt` | pixel bands; `verify-aerial`'s 0.55 | — | **the ONE-TIME sanctioned horizon re-baseline batch (C's L1 + D's law) was NEVER EXECUTED** — which is why `AERIAL_LAW.enabled` ships false. `verify-sat-depth`'s hillshade margin does not move (dayK 1.0) and `verify-aerial`'s 0.55 stays exact (A8's noon identity) |
 | `verify-monuments-sat` | eleven frozen numbers | **+3 gates, additively**; no frozen number moved | frozen |
-| **the three NIGHT gates** — `verify-sat-night` / `-dusk` / `-flicker`, run because C's hill-follows-moon ruling moves satellite NIGHT ground pixels | R19/R16 pixel bands | **FIRST ATTEMPT VOID ON THE HARNESS, plus ONE REAL READING.** `verify-sat-night` **rc=1 after 172 s with ZERO gates run** — *"locator.screenshot: Timeout 23971 ms exceeded"* after *"waiting for element to be stable"*: the R16 harness's screenshot waits on Playwright's ACTIONABILITY check, **which a canvas re-rendering continuously at fixture frame rates never satisfies** — a venue-vs-legacy-harness mismatch, **not a lighting result**; E is adapting the screenshot path (`page.screenshot` with a clip, or the harness's own `readPixels` probe) and re-running all three. `verify-dusk` **rc=1 after 177 s** and got **ONE reading out before the same timeout**: *"pinned noon is the certified DAY sky (day bucket, no blend, env/bg exactly 0.85 / 1.0) — FAIL — state=day s=0 env=0.7382 bg=0.8801 el=67.954°"* — **both `SatEnvironment` intensities scaled by ~0.868 at a PINNED NOON where `moonK` is 0**, so it is **NOT** the hill-follows-moon change: **something that shipped ON this round dims the satellite environment BY DAY**, and since this frozen R19 gate never ran on an R24 flipped tree until tonight it has read that way **since the flips at `ec53fd3`**. Routed to C (LAMBERT_ENV, CLOUD_LIT, `ONE_SUN`'s dayK, POST_ORDER first; B's `ENV_UNIFORM` confirmed OFF, E's `FRAME_STATS` inert), with the **default ruling that the constant stays FROZEN and the flag's day path becomes identity** | **PENDING** — the night look on a real display, and whether the day dimming is visible |
+| **the three NIGHT gates** — `verify-sat-night` / `-dusk` / `-flicker`, run because C's hill-follows-moon ruling moves satellite NIGHT ground pixels | R19/R16 pixel bands | **FIRST ATTEMPT VOID ON THE HARNESS, plus ONE REAL READING.** `verify-sat-night` **rc=1 after 172 s with ZERO gates run** — *"locator.screenshot: Timeout 23971 ms exceeded"* after *"waiting for element to be stable"*: the R16 harness's screenshot waits on Playwright's ACTIONABILITY check, **which a canvas re-rendering continuously at fixture frame rates never satisfies** — a venue-vs-legacy-harness mismatch, **not a lighting result**; E is adapting the screenshot path (`page.screenshot` with a clip, or the harness's own `readPixels` probe) and re-running all three. `verify-dusk` **rc=1 after 177 s** and got **ONE reading out before the same timeout**: *"pinned noon is the certified DAY sky (day bucket, no blend, env/bg exactly 0.85 / 1.0) — FAIL — state=day s=0 env=0.7382 bg=0.8801 el=67.954°"* — **both `SatEnvironment` intensities scaled by ~0.868 at a PINNED NOON where `moonK` is 0**, so it is **NOT** the hill-follows-moon change: **something that shipped ON this round dims the satellite environment BY DAY**, and since this frozen R19 gate never ran on an R24 flipped tree until tonight it has read that way **since the flips at `ec53fd3`**. **C CLOSED IT AT THE SOURCE, and it is NOT an R24 flag** (`739d3ee`, merge 40 a fast-forward): it is **a per-FRAME ramp starved by a ~0.5 fps venue**. `SatEnvironment.jsx:553` ramps both intensities with `k = 1 − Math.exp(−(delta > 0.25 ? 0.25 : delta) / SKY_LIVE.hdriFade.rampSec)` where `delta` is r3f's FRAME delta — **a per-frame exponential approach capped at 0.25 s of advance PER FRAME, not a wall-clock ramp** — and `git log -L` puts the clamp and `rampSec` 1.5 in R16's `4a1fe1f` and the `day: { env: 0.85, bg: 1.0 }` anchor in R13's `d72adb1`: **neither moved this round.** **The arithmetic says it twice**: env is 13.15 % short and bg 11.99 % short, implying **3.04 s and 3.18 s** of ramp time, i.e. **12–13 frames at 0.25 s each inside a 26 s wait — ~0.48 fps, exactly the SwiftShader regime**; and the two ratios are **NOT equal (0.8685 vs 0.8801) precisely because they ramp from different seeds toward different targets — one starved ramp measured on two channels, not two symptoms**. On a machine with frames, 26 s buys 26 s of ramp (`exp(−26/1.5)` = 3.3e-8) and the explicit snap two lines down lands on **EXACTLY** 0.85 / 1.0, which is what the frozen cell's "exactly" requires: *"the gate is a settle contract and the venue cannot satisfy it at half a frame per second, whatever is flagged."* **Every candidate cleared FROM SOURCE**: `LAMBERT_ENV` sets `material.reflectivity` on Lambert materials only (four named sites), per-material and never a scene scalar; `CLOUD_LIT` is a material; `ONE_SUN`'s `hill.dayK` is 1.0, the identity; **POST_ORDER and tone mapping cannot show in these numbers BY CONSTRUCTION** — the gate reads `__flyStats.envIntensity` / `bgIntensity`, written straight from `env` / `bgOut` at `SatEnvironment:598–599`, **pre-tonemap scalars before any pass runs**; `ENV_UNIFORM` is shipped OFF; `FRAME_STATS` adds no draw and no material state. **The decisive structural fact**: the ONLY writers of `scene.environmentIntensity` in the whole tree are `FlyScene.jsx:2468` (the TOY `<Environment>`) and `SatEnvironment.jsx:347`/`:594` — **nothing R24 added writes either scalar**. **WHAT CHANGES IS THE HARNESS** (E, scripts-only): a settle contract **waits on the VALUE, not the clock** — `await page.waitForFunction(() => window.__flyStats?.envIntensity === 0.85 && window.__flyStats?.bgIntensity === 1)` with a generous timeout, **strictly stronger than the 26 s sleep and immune to venue speed**, applied to **all fifteen legs** that sleep on the same assumption; **the assertions do not move — a venue adaptation of a settle, not a re-baseline**. C's offered `envTarget`/`bgTarget` publish was DECLINED by the orchestrator: the constants are known to the gate | **PENDING** — the night look on a real display, and whether the day dimming is visible |
 
 ### 4.4 The fixture column, for the record
 
@@ -1531,7 +1531,13 @@ PINNED NOON**, a day-path change that has been in the build since the flips at
 `ec53fd3` and that **not one of the round's eighteen browser rows was looking
 for**, because the row set was built around the round's own flags. **The row set
 is not the gate set**: a round that certifies its own changes can still ship a
-regression that only somebody else's frozen gate can see.
+regression that only somebody else's frozen gate can see. **The honest coda: it
+was NOT a regression.** Read from source, the red is an R16 per-frame ramp
+starved by a half-frame-per-second venue, with no R24 flag writing either scalar
+(§4.3) — **and the round could not have known which it was until somebody read
+the source.** That is the lesson either way: the gate outside the row set is the
+one that asks a question nobody on the round thought to ask, and the answer is
+sometimes the venue.
 
 **And one ruling that stood for exactly one merge.** The four micro-degree
 one-sun residuals were ruled a TOLERANCE question — the arithmetic was right that
@@ -2481,6 +2487,15 @@ Carries forward the still-open R15–R21 §6 tables.
     count**, so a merge is never again ambiguous between the policy and the
     brake — that ambiguity is what cost a re-take. (A PACE.)
 
+85. **A per-frame ramp is a frame-rate-dependent SETTLE, and a gate that sleeps
+    for a fixed time on a starved venue measures the venue's frame rate wearing
+    the feature's number.** `SatEnvironment` advances at most 0.25 s of ramp per
+    FRAME, so a 26 s wait bought 12–13 frames and two scalars landed 13.15 % and
+    11.99 % short — read at first as a day-dimming regression, and in fact
+    ~0.48 fps. The two channels disagreeing (0.8685 vs 0.8801) was the tell: one
+    starved ramp seen twice, not two symptoms. **Wait on the VALUE the code snaps
+    to**, never on the clock. (C LIGHT; pairs with 66 and with the fade floor.)
+
 ---
 
 ## §8 Flag ship state at close
@@ -2493,15 +2508,16 @@ state below is read from `91141fe:lib/fly/fly-constants.js` and cited to the
 merge that set it; **only `LOD_CROSSFADE` is still open**, on pass 2's pinned ON
 leg. **Nothing here has been certified on the user's machine.**
 
-**OPEN, and not yet under a flag**: `verify-dusk` reads **both `SatEnvironment`
-intensities scaled by ~0.868 at a pinned noon** on the flipped tree, where
-`moonK` is 0 — so the night ruling is exonerated and **something shipped ON this
-round dims the satellite environment BY DAY**, present since `ec53fd3` and caught
-only because a frozen gate outside the round's row set was finally run (§4.3,
-§5.2). C attributes it (LAMBERT_ENV, CLOUD_LIT, `ONE_SUN`'s dayK, POST_ORDER
-first), and **the default ruling is that the frozen constant stays frozen and the
-flag's day path becomes identity** — the row below will name the flag once C
-does.
+**CLOSED, and it was never a flag**: `verify-dusk`'s pinned-noon red is **the
+venue starving an R16 PER-FRAME ramp** — `SatEnvironment.jsx:553` advances both
+intensities by at most **0.25 s of ramp per FRAME**, so at ~0.48 fps the gate's
+26 s noon wait buys 12–13 frames of approach and the scalars land 13.15 % and
+11.99 % short. **No R24 flag writes either scalar** — the only writers of
+`scene.environmentIntensity` in the tree are the TOY `<Environment>` and
+`SatEnvironment` itself — **so the default ruling had nothing to apply to; the
+constant is already frozen and untouched**, and **the HARNESS changes instead**:
+the settle now waits on the VALUE the code snaps to, not on the clock (§4.3,
+§5.2).
 
 ### ON at close (Level A: green on the fixture or structurally proven, flag-off identity proven)
 
