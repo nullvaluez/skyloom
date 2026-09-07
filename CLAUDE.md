@@ -42,11 +42,14 @@
 > 360°); **the one FULL-revolution run read on-screen replacements 65 → 0 and
 > merges 47 on the ON arm**, the 47 attributed to A's own residency cap and
 > fixed, with the headline number pending the standalone re-run;
-> `LOD_CROSSFADE` (the atomic LOD swap) is BUILT and ships **OFF**, its
-> standalone run reading 61 of 62 refines faded with no parent-texture leak
-> while **THREE of six preconditions failed (P3, P5, P6), which under the owner's
-> own §4.10b template is a NO-GO — so it SHIPS OFF, and only the one specified
-> standalone re-run is pending** <!-- LOD RULING PENDING -->. *"Screen
+> `LOD_CROSSFADE` (the atomic LOD swap) **SHIPS ON**: its re-run standalone met
+> **all six preconditions and five of six flip conditions**, the sixth
+> SUBSTITUTED rather than waived, so its owner ruled GO in one code line — faded
+> **0 → 69** against hardSwaps **72 → 3**, a **19-frame** blend window, every
+> blend draining with nothing retained, concurrency 20 of 32, and the refine rate
+> unchanged at ratio **1.00**. **What is not proven rides with it**: the MERGE
+> ramp is structurally gated by `keepResident` and was never exercised, and **a
+> w6 red attributable to the crossfade reverts the flip by the same one line**. *"Screen
 > tearing"* → `STEP_SAFE`: **a quality-ladder step now applies the DPR, the
 > renderer size and the composer size inside ONE frame** (0 of 12 canvas writes
 > outside a rAF, where pass 1 read 18 of 18 and pass 2b 12 of 30; the 22-of-46
@@ -91,7 +94,8 @@
 > `REBASE_CALM`, `FLASH_GUARD`, `CHUNK_FADE`, `HEAL_IN_PLACE`, `BEND_LEAD`,
 > `GROUND_VIS`, `LINEAR_HAZE`, `ONE_SUN` (with the moonlit hill), `POST_ORDER`,
 > `DEPTH_FIX`, `SHADOW_CALM`, `TERRAIN_LIGHT` (tile half), `CLOUD_LIT`,
-> `LAMBERT_ENV`, `FRAME_STATS`. **OFF**: `LOD_CROSSFADE` (pending its re-run),
+> `LAMBERT_ENV`, `FRAME_STATS`, **`LOD_CROSSFADE`** (flipped at the close on its
+> owner's GO). **OFF**:
 > **`AERIAL_LAW` (the LAW off, but `nightRamp` ships ON — a live night
 > multiplier read outside the law's gate at `FlyScene.jsx:1896`; its `content`
 > and `airAnchor` sub-switches are pre-set and read by NOTHING in the tree)**,
@@ -116,8 +120,8 @@
 > **OPEN**: the **`terra-live` STANDALONE** on the adaptive-cap tree — the capped
 > arm's 47 merges were A's own residency cap binding on this venue's working set,
 > attributed and fixed by making the cap follow the drawn set, and that re-run
-> decides both the zero-merge headline and the Owens ceiling; `LOD_CROSSFADE`'s
-> one specified re-run; the night gates
+> decides both the zero-merge headline and the Owens ceiling; **w6 re-certifies
+> the whole set on the FLIPPED tree, `LOD_CROSSFADE` included**; the night gates
 > (`verify-sat-night`, `verify-dusk`, `verify-flicker`) after the hill ruling
 > moved satellite night ground pixels — their first attempt was VOID on the
 > legacy screenshot path (Playwright's actionability check never settles on a
