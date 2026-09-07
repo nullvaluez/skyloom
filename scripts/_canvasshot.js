@@ -32,6 +32,17 @@
  * reuse this one.
  */
 
+// A CAPTURE ALSO HAS ITS OWN BUDGET, and Playwright's default is 30 s.
+// MEASURED after the actionability fix: verify-sat-night got ten gates in and
+// then died on `page.screenshot: Timeout 30000ms exceeded — taking page
+// screenshot / waiting for fonts to load... / fonts loaded`. The capture has to
+// wait for a frame, and at this venue's ~0.4-0.8 fps under a load average of
+// 4.6 a single frame can be seconds; the whole capture then does not fit in
+// Playwright's default. That is the same venue fact as the actionability wait,
+// met a second time in the same call — so the budget is a knob with a generous
+// default, not a silent 30 s ceiling that turns a slow frame into a dead row.
+const SHOT_TIMEOUT = Number(process.env.FLY_SHOT_TIMEOUT_MS || 180000);
+
 function makeCanvasShot(page, selector = '.fixed.inset-0 canvas') {
   let clip = null;
   const box = async () => {
@@ -48,10 +59,35 @@ function makeCanvasShot(page, selector = '.fixed.inset-0 canvas') {
     };
     return clip;
   };
+  // WITNESS A RENDERED FRAME BEFORE ASKING FOR ONE. `page.screenshot` needs a
+  // compositor frame; a long task on the main thread — the noon HDRI swap and
+  // the prewarm are both seconds here — can starve it past any budget. Waiting
+  // on a rAF tick first means the capture is requested at a moment the page has
+  // just proved it can produce frames, instead of at an arbitrary instant that
+  // may be the middle of a stall.
+  const frame = () =>
+    page
+      .evaluate(
+        () =>
+          new Promise((res) => {
+            requestAnimationFrame(() => requestAnimationFrame(() => res(true)));
+          }),
+        undefined
+      )
+      .catch(() => false);
+
   return {
     /** Buffer of the canvas region, or write it to `p` when given. */
-    shot: async (p) => page.screenshot({ clip: await box(), ...(p ? { path: p } : {}) }),
-    shot64: async () => (await page.screenshot({ clip: await box() })).toString('base64'),
+    shot: async (p) => {
+      const c = await box();
+      await frame();
+      return page.screenshot({ clip: c, timeout: SHOT_TIMEOUT, ...(p ? { path: p } : {}) });
+    },
+    shot64: async () => {
+      const c = await box();
+      await frame();
+      return (await page.screenshot({ clip: c, timeout: SHOT_TIMEOUT })).toString('base64');
+    },
     box,
   };
 }
