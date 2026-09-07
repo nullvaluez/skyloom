@@ -49,17 +49,64 @@ const READ = () => {
   const dl = typeof eng?.downloading === 'number' ? eng.downloading : (map?.downloading ?? null);
   return { dl, tier: window.__flyStore?.getState?.().qualityTier ?? null };
 };
-const WAIT_ZERO = ([capMs]) =>
+// DRAINED, NOT "TOUCHED ZERO". The first run of this probe asked whether `dl`
+// ever equalled 0 and answered "yes, after 283 s" — and the very next line read
+// `dl: 4`. A count that oscillates through zero between requests is not a
+// drained queue, and a single-sample test cannot tell the two apart. It then
+// declared the AFTER leg drained in ONE FRAME, i.e. before the rebuild it was
+// meant to observe had issued anything at all, and printed a VERDICT
+// falsifying A's mechanism on the strength of it. That verdict was not
+// supported by its own output.
+//
+// So: zero must be SUSTAINED for `stableFrames` consecutive rendered frames,
+// and the run reports the min/max/last it actually saw, so a bouncing count is
+// visible instead of being collapsed into a boolean.
+const WAIT_DRAINED = ([stableFrames, capMs]) =>
   new Promise((resolve) => {
     const t0 = performance.now();
     let frames = 0;
+    let stable = 0;
+    let min = Infinity;
+    let max = -Infinity;
+    let last = null;
+    let touchedZero = false;
     const step = () => {
       frames++;
       const eng = window.__flyTerra?.engine?.();
       const map = eng?.map ?? window.__flyTerra?.get?.();
       const dl = typeof eng?.downloading === 'number' ? eng.downloading : (map?.downloading ?? null);
-      if (dl === 0) return resolve({ ok: true, frames, ms: performance.now() - t0 });
-      if (performance.now() - t0 > capMs) return resolve({ ok: false, frames, ms: performance.now() - t0, dl });
+      last = dl;
+      if (typeof dl === 'number') {
+        if (dl < min) min = dl;
+        if (dl > max) max = dl;
+        if (dl === 0) touchedZero = true;
+      }
+      stable = dl === 0 ? stable + 1 : 0;
+      if (stable >= stableFrames)
+        return resolve({ drained: true, frames, ms: performance.now() - t0, min, max, last, touchedZero });
+      if (performance.now() - t0 > capMs)
+        return resolve({ drained: false, frames, ms: performance.now() - t0, min, max, last, touchedZero });
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+
+// After the step, wait for the rebuild to MANIFEST before asking whether it
+// drained. "Drained in one frame" is not evidence that a rebuild drained; it is
+// evidence that nothing had started yet.
+const WAIT_RISE = ([capMs]) =>
+  new Promise((resolve) => {
+    const t0 = performance.now();
+    let frames = 0;
+    let peak = 0;
+    const step = () => {
+      frames++;
+      const eng = window.__flyTerra?.engine?.();
+      const map = eng?.map ?? window.__flyTerra?.get?.();
+      const dl = typeof eng?.downloading === 'number' ? eng.downloading : (map?.downloading ?? 0);
+      if (dl > peak) peak = dl;
+      if (peak > 0) return resolve({ rose: true, peak, frames, ms: performance.now() - t0 });
+      if (performance.now() - t0 > capMs) return resolve({ rose: false, peak, frames, ms: performance.now() - t0 });
       requestAnimationFrame(step);
     };
     requestAnimationFrame(step);
@@ -76,37 +123,66 @@ const WAIT_ZERO = ([capMs]) =>
   await page.evaluate(pinScene, POSE);
 
   const cap = Number(process.env.PHANTOM_CAP_MS || 600000);
-  const before = await page.evaluate(WAIT_ZERO, [cap]);
-  console.log(`BEFORE the tier step: downloads reached zero = ${before.ok} ` +
-    `(after ${(before.ms / 1000).toFixed(0)}s / ${before.frames} frames${before.ok ? '' : `, still ${before.dl} in flight`})`);
+  const STABLE = Number(process.env.PHANTOM_STABLE_FRAMES || 30);
+
+  const before = await page.evaluate(WAIT_DRAINED, [STABLE, cap]);
+  console.log(
+    `BEFORE the tier step: DRAINED (dl 0 held for ${STABLE} consecutive frames) = ${before.drained} ` +
+      `after ${(before.ms / 1000).toFixed(0)}s / ${before.frames} frames · dl min ${before.min} ` +
+      `max ${before.max} last ${before.last} · touched zero at least once: ${before.touchedZero}`
+  );
   console.log(`  state: ${JSON.stringify(await page.evaluate(READ))}`);
-  if (!before.ok) {
-    console.log('  CONTROL FAILED: this pose never reached zero even before a tier step, so the ' +
-      'experiment cannot attribute anything to the step. Not a refutation of A — a venue that ' +
-      'never goes quiet at this pose.');
+  if (!before.drained) {
+    console.log(
+      '\nNOT CALIBRATED: the control never drained, so nothing can be attributed to a tier step ' +
+        'here. Note what this DOES say: ' +
+        (before.touchedZero
+          ? 'the count reaches zero and leaves again, so it is a live queue that never empties at ' +
+            'this pose — NOT a stranded set sitting at a constant value.'
+          : 'the count never reached zero at all in the window.') +
+        ' A stranded set would hold a CONSTANT non-zero value; a queue that dips to 0 and back is ' +
+        'ordinary churn. Neither confirms nor refutes the stale-epoch mechanism.'
+    );
     await browser.close();
     return;
   }
 
-  // The trigger: a tier step, which is what the governor does under load and
-  // what rebuilds the imagery source (maxLevel: satMaxZoomFor(tier)).
   await page.evaluate(() => window.__flyStore.getState().setQualityTier('medium'));
   await page.waitForTimeout(4000);
   await page.evaluate(() => window.__flyStore.getState().setQualityTier('high'));
   console.log(`  tier stepped high -> medium -> high; state now ${JSON.stringify(await page.evaluate(READ))}`);
 
-  const after = await page.evaluate(WAIT_ZERO, [cap]);
-  console.log(`AFTER the tier step: downloads returned to zero = ${after.ok} ` +
-    `(after ${(after.ms / 1000).toFixed(0)}s / ${after.frames} frames${after.ok ? '' : `, still ${after.dl} in flight`})`);
+  const rise = await page.evaluate(WAIT_RISE, [120000]);
+  console.log(
+    `  did the step actually issue downloads? ${rise.rose} (peak ${rise.peak} after ` +
+      `${(rise.ms / 1000).toFixed(0)}s / ${rise.frames} frames)`
+  );
+  if (!rise.rose) {
+    console.log(
+      '\nNOT CALIBRATED: the tier step issued NO downloads, so there is no rebuild to observe ' +
+        'draining or not draining. Either the step did not rebuild the source at this tier pair, ' +
+        'or every tile it invalidated was already correct. The experiment has no treatment.'
+    );
+    await browser.close();
+    return;
+  }
+
+  const after = await page.evaluate(WAIT_DRAINED, [STABLE, cap]);
+  console.log(
+    `AFTER the tier step: DRAINED = ${after.drained} after ${(after.ms / 1000).toFixed(0)}s / ` +
+      `${after.frames} frames · dl min ${after.min} max ${after.max} last ${after.last}`
+  );
   console.log(`  state: ${JSON.stringify(await page.evaluate(READ))}`);
   console.log(
-    after.ok
-      ? '\nVERDICT: the count RETURNED to zero — a tier step does not strand downloads at this ' +
-        'pose, so the perpetual count in the certification row is NOT this mechanism.'
-      : '\nVERDICT: the count reached zero BEFORE the step and never again AFTER it — A\'s ' +
-        'phantom-download mechanism, reproduced on demand. A tier step can leave a permanent ' +
-        'non-zero download count on ANY machine, which makes "no downloads in flight" an ' +
-        'unreachable settle condition for any pose held across a governor step.'
+    after.drained
+      ? '\nVERDICT: the queue drained BEFORE the step and drained again AFTER it, with the step ' +
+        `proven to have issued work (peak ${rise.peak}). A tier step does not strand downloads at ` +
+        'this pose, so the perpetual count in the certification row is NOT this mechanism.'
+      : '\nVERDICT: the queue drained BEFORE the step and NEVER AGAIN after it (last ' +
+        `${after.last}, min ${after.min}) — A's stale-epoch mechanism, reproduced on demand. A ` +
+        'tier step can leave a permanent non-zero download count on ANY machine, which makes "no ' +
+        'downloads in flight" an unreachable settle condition for any pose held across a ' +
+        'governor step.'
   );
   await browser.close();
 })().catch((e) => { console.error('FAILED:', e.message); process.exit(1); });

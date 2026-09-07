@@ -2045,9 +2045,225 @@ re-baseline: the CONTRACT did not move, and both machines now wait for the same
 condition instead of the same duration. `FLY_DUSK_SETTLE_MS=0` restores the old
 program exactly, so the red is one env var rather than a citation.
 
+**(3) A shared harness file edited from a stale branch is a SILENT REVERT.**
+My branch's copy of `verify-terra-live.js` predated A's `SETTLE_CONVERGE`.
+Editing the ceiling clause on that base and committing it would have reverted
+A's converged settle **inside my own commit** — no conflict, no marker, no
+warning, because git merges disjoint hunks happily and neither owner is shown
+that the other's newest work was dropped. The number that would have come back
+is a settle silently returning to a 30 s sleep, which is the exact defect A had
+just spent a round removing.
+
+Caught by grepping the file for A's newest symbol before touching it, and
+merging the orchestration tip into my branch first. **The round paid for this
+defect class twice, from both directions**: A's duplicate `budgetK` import at
+merge 15 re-added at line 21 what my sixth-site change already had at line 2.
+Same failure, both sides, one round.
+
+*The rule:* before editing a file another owner also edits, grep it for the
+newest symbol they have published and merge first if it is missing. Neither
+`git status` nor a clean merge will tell you.
+
 **A gate that got this right by construction, for contrast:** `verify-flicker`
 takes two windows and asserts on the SECOND, and demotes its numbers to
 informational when a quiescence check says the scene is still moving. A starved
 ramp there shows up as *not quiet* and costs a verdict — it cannot forge one.
 The difference is not care; it is that flicker had to distinguish stream-in from
 a periodic defect, and building that control also bought immunity to this.
+
+
+---
+
+## §7 THE w6 CERTIFICATION RUN — the flipped tree, row by row
+
+Every number below is the **fixture's**, on this container. Nothing here is from
+the user's machine, and no row's numbers should be quoted as if it were.
+
+The w6 server ran one `CERT_PROOF_ONLY` dev server on `:3100` (PID 28039 /
+PGID 28026), torn down by process group at the end with `:3100` verified at
+`000` and zero survivors. The **served app** was `74b134f`'s compile throughout;
+the **harness** moved under it as scripts-only merges landed, so each row is
+stamped with the tree its harness came from.
+
+| Row | Harness tree | Result | rc | Time |
+|---|---|---|---|---|
+| depth-rt | `74b134f` | **11 passed, 0 failed** | 0 | 384 s |
+| sat-night | `74b134f` | 27 passed, 1 failed, 1 NOT CALIBRATED | 1 | ~2,000 s |
+| dusk | `0025614` | **15 passed, 0 failed** | 0 | 1,586 s |
+| flicker | `0025614` | urban PASS · suburb **not measured** | 124 | 2,400 s (row timeout) |
+| terra-live | `0025614` | 8 passed, 1 failed | 1 | 4,906 s |
+| evict-diag | `74b134f` | diagnostic — delta images + grids | 0 | — |
+| owens-decomp | `40ef1e0` | diagnostic — three readings | 0 | — |
+| phantom-dl | `40ef1e0` | **NOT CALIBRATED** (no treatment) | 0 | — |
+
+### 7.1 depth-rt — the first fully green depth-rt of the round
+
+`(2)` nearest **0.00 %**, median **0.00 %**, farthest **0.01 %**; `(3)` all three
+picks inside the 8-bit quantum; `(4)` worst backwards step 0.0000 with measured
+spread 0.8431 against a predicted 0.8422; the formula self-test reproduces C's
+two independently computed points exactly. The same clauses read **74.01 m and
+121.30 m** one run earlier, and all three picks moved from `via unlifted` to
+`via bend-solved` — C's arbiter fix is the whole difference.
+
+The `eye` print retired a theory of mine in one line: the camera moves
+**0.8–1.3 m** between the candidate sweep and the assertion, not the hundreds of
+metres I had inferred from the truth shifts. Those shifts were the arbiter
+choosing different surfaces, not the aircraft travelling.
+
+### 7.2 sat-night — 0 gates, then 10, then 29
+
+Three harness defects stood between this row and a verdict, and each hid the
+next: the actionability wait (0 gates), the capture's own 30 s budget (10
+gates), then the content legs. What the fixed row measures: **layerΔ 30
+(141→111)** where the stale counter had made it 0 by construction, SUN DRIVES
+UNIFORMS ONLY 8/8 night and 12/12 noon on one material, fade band, beacons,
+unmount and error legs all green.
+
+The AGL leg is NOT CALIBRATED with both terms printed — **pos.y 792 /
+groundElev 217** — confirming by measurement what I had previously inferred by
+subtraction: the pose is at the altitude it asked for and the fixture's ground
+is 217 m up where real Manhattan is about 10.
+
+The one FAIL is the **eviction leg**, and it is my instrument, not D's flip —
+see §7.6.
+
+### 7.3 dusk — clean, and the cirrus leg is the sixth clock's proof
+
+**`cirrus draws: armed 171 vs parked 170 (Δ 1)`** — exactly the "EXACTLY +1
+draw" the clause names, where the stale-counter version read `172 vs 172, Δ 0`.
+The value settle held again: `noon: env=0.85 bg=1 after 49.6s (frame 77)`, exact
+target. No witness capped, so no leg was measured on moving terrain.
+
+### 7.4 flicker — urban measured, suburb NOT measured
+
+**`rc=124` is the ROW TIMEOUT, not a hang**, and the runner said so in the log.
+
+- **Urban: PASS, p99 6.138 ≤ 12**, p50 0, on a window whose own `movingFrac` was
+  0.0417. Two earlier windows were **rejected on their own numbers** (0.1703 at
+  p99 29.288; 0.0976 at p99 19.182) — and the first of those is essentially the
+  w5 "red", now correctly refused instead of asserted.
+- **Suburb: NOT MEASURED.** Two windows rejected (0.1232 at p99 28.6; 0.0785 at
+  p99 11.6) and the third attempt was in flight when the 2,400 s wall clock
+  killed the browser.
+
+The honest quiescence search — full ~24 s windows, 20 s gaps, four tries — plus
+the terrain witness no longer fits the default row budget on this venue. **The
+suburb leg is recorded as not measured, never as a red.** The re-run at
+`CERT_ROW_TIMEOUT=4800` was not run this round.
+
+### 7.5 terra-live — the sweep re-certifies; both Owens censuses are inadmissible
+
+From a **settled** start, the sweep half is unambiguous: merges **100 → 0**,
+on-screen replacements **87 → 0**, twice-fetched URLs **289 → 18**, imagery
+requests **496 → 156**, both arms past 360°, content probe 0 URL and 0 position
+mismatches on both arms.
+
+| Pose | OFF | ON |
+|---|---|---|
+| content probe | SETTLED 381 s / 327 f | SETTLED 430 s / 392 f |
+| powell | **NOT SETTLED** (600 s cap, dl 8) · 269 draws / 614,271 tris | **SETTLED 34 s / 24 f** · 194 draws / 508,840 tris |
+| owens | **NOT SETTLED** (600 s cap, dl 6) · 186 draws / 197,254 tris | **NOT SETTLED** (600 s cap, dl 8) · 279 draws / 441,206 tris |
+
+Gate 7 read 279 > 261 and failed. **Both Owens censuses hit their cap**, so
+neither number is a settled reading and the OFF arm's 186 was exactly as
+inadmissible as the ON arm's 279 — the clause has since been changed to refuse
+an unsettled census (§7.7). The 261 does not move.
+
+The row was **restarted once**: the first attempt capped its content-probe pose
+at the 240 s default, and waiting 40 minutes to confirm what that already said
+would have cost a second full row. Re-run at `FLY_TERRA_SETTLE_CAP_MS=600000`,
+the same pose settled in **381 s** — the old cap was 63 % of what it needed.
+
+**The growth column changed its own meaning once the start was settled.** On w5
+the OFF arm read 81 → 129 → 129 → 241, which I reported as an unsaturated
+working set; on w6, from a settled start, it reads **269 → 265 → 249 → 241** —
+stable to declining. The w5 reading was an artifact of sampling `start` before
+the pose had converged, and I withdraw it.
+
+### 7.6 THE THREE POST-SWEEP FINDINGS ON THE FIXTURE'S OWENS
+
+**(1) The pose is not intrinsically unquiet — a HISTORY makes it unquiet.**
+Warped straight to Owens from boot with the trio ON, the pose reaches `dl 0`
+with **zero version-dirty tiles** (by the vendored getter's own rule) and
+settles at **140 draws**, resident 225. The same pose reached after a 900 s
+sweep and a Powell pose caps at `dl 8` with 279 draws and resident 509. Same
+pose, same flags, same venue, opposite outcome.
+
+**(2) A's `_inFrustum` stamp is not a drawn count.** Fully settled, the stamp
+reads **141 while 92 tile meshes are inside the live frustum** — 35 % of the
+stamp is not drawn, a 53 % overcount relative to the drawn count. So `visible
+80` at Owens ON is a stamp, and differencing it against `renderer.info` is not a
+decomposition. A's `drawn ≤ stamp` **bound** remains sound and my measurement
+tightens it — but only **at a settled pinned pose, while the map has exactly one
+imagery source**. (A established the second condition in source: `syncGroups`
+partitions by material with every group spanning the whole index, so a skirt
+cannot add a draw however it is built; a second imagery source would make every
+terrain tile submit twice, silently.)
+
+**(3) The class census rules out new geometry.** At Owens, satBuilding, skyline,
+roads, clouds and cirrus are all **zero** (it is desert); player 4. The
+remainder scales with the retained resident set — `keepResident` doing what it
+says.
+
+**Two columns are UNFILLED and are stated as unfilled rather than inferred:**
+the per-pose governor tier and the epoch, for the certification row itself. The
+row does not record either, and its pages were gone before the question was
+asked. Live, at the same pose, the tier read `high` at boot and at both censuses
+60 s apart. My probe's own two misses: I read `map._epoch`, but the epoch lives
+on the root **tile**; and `__flyGov` exposes `state()` as a **function**, which I
+read as a field.
+
+### 7.7 The phantom-download probe — NOT CALIBRATED, and what that does say
+
+A's stale-epoch mechanism predicts that a tier step rebuilds the imagery source
+(`maxLevel: satMaxZoomFor(tier)`, and `satMaxZoomByTier` really is
+`{high: 17, medium: 16}`) and strands tiles that can never clear their own dirty
+flag. The probe settles a held pose, steps the tier, and watches whether the
+download count returns.
+
+**Run 1 answered nothing and said so in its own output**: it reported
+`downloads reached zero = true` and printed `dl: 4` on the very next line,
+because it tested whether `dl` ever *touched* zero rather than whether it
+*stayed* there — and then declared the AFTER leg drained in **one frame**, i.e.
+before the rebuild it was meant to observe had issued anything. That verdict
+("not this mechanism") was not supported by its own evidence and is withdrawn.
+Caught by reading a PASS line sceptically, which is §2.10 working on my own
+instrument.
+
+**Run 2, with a sustained drain (dl 0 held for 30 consecutive rendered frames)
+and a rise check before the after-leg:** the control **drained honestly** —
+327 s / 327 frames, dl min 0 max 9 last 0 — and then **the tier step issued NO
+downloads at all** (peak 0 over 122 s / 97 frames). So there is no treatment to
+observe, and the row is **NOT CALIBRATED**.
+
+Two hypotheses remain and this probe cannot separate them:
+
+- the tier change did not actually rebuild the source in the running app
+  (the store's tier moved, but nothing re-requested); or
+- it did rebuild, and **every invalidated tile was already correct** — which is
+  precisely A's precondition, and would mean a tier step strands *dirtiness*
+  without issuing *downloads*.
+
+**The second would matter more than it first appears**: if the mechanism
+produces perpetual re-entry into `_updateModel` without producing downloads,
+then it does **not** explain a stuck `downloading` count of 8, and the
+certification row's perpetual count is something else again.
+
+**What would settle it is one measurement this probe already knows how to
+take**: scan for version-dirty tiles (the vendored rule, as
+`r24-e-owens-decomp.js` does) immediately after the tier step. Zero dirty tiles
+means no rebuild happened; a non-zero constant set is A's mechanism, with the
+download count exonerated. That is an R25 item and it is ten minutes of venue.
+
+### 7.8 What w6 cost, and what it bought
+
+Six harness defects were found and fixed across w5 and w6, **five of them the
+same lesson**: the capture's actionability wait, the capture's own 30 s budget,
+the dusk ramp's clock, sat-night's road draw-pair, dusk's cirrus draw-pair, and
+sat-night's JFK dwell. Two more were verdict-class holes — flicker's `SOFT`
+lines exiting 0, and sat-night reporting no gate count — and three were
+attribution fixes that kept a red off the wrong owner: JFK's cls-7 fixture gap,
+lod-fade's `(18)` scene mismatch, and the eviction leg's static-terrain premise.
+
+**Not one of them was a product defect.** Every red that survived attribution
+this round was an instrument, a venue limit, or a census that had not settled.
