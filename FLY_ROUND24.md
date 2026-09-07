@@ -1076,6 +1076,17 @@ into `scripts/r24-out/w5` (node gates **17/17** again). Tip `645d08c` = merge 41
 `482fe10`, runner knobs `8a5da27`, close sweep `17cffa6`, and the `terra-live`
 print patch `fc83e64` carrying A's three placement notes), pushed.
 
+**`main` WAS ADVANCED TO `0adb010` AT THE USER'S REQUEST — *"just push to main if
+the work is done, I can also evaluate"* — WITH THREE w6 ROWS STILL IN FLIGHT**
+(dusk, flicker and `terra-live`), the integration branch fast-forwarded onto this
+record docs-only over `0025614`, node smoke 17/17, and the ship state verified BY
+IMPORT (21 ON / 5 OFF). **So this record and the CLAUDE.md notice are public on
+`main` AS THEY STAND, with their honest placeholders** — the converged
+`terra-live` re-run, the `LOD_CROSSFADE` flip tag, and the final tip. **And the
+thing worth saying beside that push: the user's own machine is where every fps,
+frame-time and tearing number will be read FOR THE FIRST TIME. Every number in
+this round is the FIXTURE's.**
+
 **THE w5 SUMMARY, E's**: `terra-live` **9/0** · `sat-night` **26/2/1** · `dusk`
 **14/1** · `flicker` **4/2** · `lod-fade` **20/2/2** · `depth-rt` **7/4** — **six
 harness clocks or budgets fixed, two verdict-class holes closed, two attributions

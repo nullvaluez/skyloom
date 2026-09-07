@@ -19,9 +19,15 @@
 > C LIGHT / D ATMOS / E CERT — under orchestration, plus a sixth (F SCRIBE) for
 > the close; per-harness ledger
 > [`scripts/r24-close-sweep.md`](scripts/r24-close-sweep.md) §5.1–§5.13).
-> **`main` is fast-forwarded to `a7a8739`** at the user's request; the
-> integration branch `claude/skyloom-r24-orchestration-6753n2` runs ahead of it
-> with scripts and ledgers <!-- FINAL TIP PENDING -->.
+> **`main` is fast-forwarded to `0adb010`** — advanced at the user's request
+> (*"just push to main if the work is done, I can also evaluate"*) **while
+> three w6 rows were still in flight**, with node smoke 17/17 and the ship
+> state verified by import; the integration branch
+> `claude/skyloom-r24-orchestration-6753n2` carries the same tree. **The
+> placeholders below are honest and deliberate — and the user's own machine is
+> where every fps, frame-time and tearing number will be read for the FIRST
+> time: every number in this round is the FIXTURE's**
+> <!-- FINAL TIP PENDING -->.
 >
 > **THE USER'S THREE SYMPTOMS, and where each landed.** *"Buildings appearing
 > and disappearing"* → `BEND_LEAD` (the R21 bend-margin census ran at speed 0
