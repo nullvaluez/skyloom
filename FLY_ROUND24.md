@@ -2417,6 +2417,36 @@ Carries forward the still-open R15–R21 §6 tables.
     wrong shape. Cast the four neighbours and publish the largest one-texel step:
     **tight where the surface is flat, honest where it is not.** (C LIGHT.)
 
+83. **A certification round produces truth in one direction: a claim gets
+    weaker every time someone looks at it, and what survives is the record.**
+    Writing this file for a day, I watched the same shape happen fourteen times.
+    A row goes green and the green turns out to be an empty census; a row goes
+    red and the red turns out to be the gate's own rounding, its own yaw step,
+    its own channel name, its own lifted ray. **Of the eighteen browser rows in
+    §4.2, not one red was ever a defect of the flag it was certifying** — and
+    the round still found three real defects, every one of them fallen out of an
+    instrument being fixed. That is not an accident of this venue; it is what a
+    certification round IS, and it has three consequences for whoever writes the
+    next one.
+    **First, a verdict is only as durable as the sentence that says why.** The
+    numbers in this record moved constantly — 40 became 44 became 49 became 54,
+    "one tolerance" became "my own `toFixed(6)`", "the streamer refetches"
+    became "the DEM ceiling is lower than the imagery ceiling". The attributions
+    did not move. **Write the mechanism, and the number becomes a citation
+    rather than a claim.**
+    **Second, record the reversal, not just the conclusion.** Three rulings in
+    this round were overturned by their own authors — C's "BY DESIGN" carve-out,
+    the orchestrator's tolerance call, D's precondition — and each reversal is
+    on the page beside what it replaced, because *the trail of what we believed
+    is the only defence against believing it again*. A record that shows only
+    final answers teaches nothing and quietly re-licenses every mistake it
+    tidied away.
+    **Third, say what you did not measure, in the same voice you use for what
+    you did.** This record's most important sentence is not a green count; it is
+    that **nothing here has been confirmed on the user's machine**. A scribe's
+    job is not to make the round look finished — it is to leave the next round
+    able to tell a proof from a hope at a glance. (F SCRIBE.)
+
 ---
 
 ## §8 Flag ship state at close
