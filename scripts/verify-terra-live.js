@@ -346,8 +346,55 @@ async function runArm(context, fx, paceOn) {
   };
   await safe(() => fx.resetStats(), null);
   await page.evaluate(() => window.__flyTerra?.reset?.());
+  // The zero for every delta printed below. `__flyTerra.reset()` is
+  // `residency.resetStats()`, and the residency pass is only INSTALLED when
+  // TERRA_PACE.keepResident is on — so on the flag-off arm the reset is a
+  // no-op and `lod` is null. Capturing the pre-sweep census makes the deltas
+  // honest either way, instead of trusting a reset that may not have happened.
+  const before = await page.evaluate(CENSUS);
   await page.evaluate(PIN_YAW, [...POSES.powell.slice(0, 3), YAW_DEG_PER_FRAME]);
-  await page.waitForTimeout(YAW_MS);
+
+  // THE GROWTH COLUMN. A residency leak and a healthy steady state are
+  // INDISTINGUISHABLE from the final census alone — both end the sweep at some
+  // number of resident tiles, and only samples separated in time say whether
+  // that number was arrived at or is still climbing.
+  //
+  // SAMPLED BY ARC, NOT BY WALL CLOCK (A). PIN_YAW advances one step per
+  // RENDERED FRAME, so a tree-traversing evaluate fired at a wall-clock instant
+  // lands at a different point in each arm's frame sequence and spends
+  // different main-thread time in each — breaking exactly the arc comparability
+  // gate 6 depends on, and that this venue finally achieved (647 vs 650
+  // frames). Triggering on `__fxYaw.deg` puts both samples at the same HEADING
+  // in both arms, which is the comparable instant.
+  //
+  // AT 25 % AND 60 % OF THE ARC, NOT 50 % (A). The yaw working set saturates
+  // fast — A's node data reads 190 resident at 90 frames and 240 at both 720
+  // and the tail — so a half-way sample reports "mid equals final" for a set
+  // that stopped growing at 15 %, and the column says nothing.
+  const t0 = Date.now();
+  const sampleAtArc = async (frac) => {
+    const target = YAW_MIN_ARC_DEG * frac;
+    // Never let a sample outlive the sweep it is sampling. Playwright treats a
+    // timeout of 0 as "no timeout", which would hang the arm outright.
+    const budget = Math.max(1000, YAW_MS - (Date.now() - t0));
+    let onTime = true;
+    try {
+      await page.waitForFunction((d) => (window.__fxYaw?.deg ?? 0) >= d, target, {
+        timeout: budget,
+        polling: 500,
+      });
+    } catch (e) {
+      onTime = false;
+    }
+    const at = await page.evaluate(() => window.__fxYaw ?? { frames: 0, deg: 0 });
+    return { census: await page.evaluate(CENSUS), at, onTime, target };
+  };
+  const s25 = await sampleAtArc(0.25);
+  const s60 = await sampleAtArc(0.6);
+  // The sweep's LENGTH is unchanged: whatever the samples consumed, the arm
+  // still yaws for YAW_MS in total.
+  const remain = YAW_MS - (Date.now() - t0);
+  if (remain > 0) await page.waitForTimeout(remain);
   const yawArc = await page.evaluate(() => window.__fxYaw ?? { frames: 0, deg: 0 });
   const yawStats = await safe(() => fx.stats(), { byKind: {}, byUrl: {} });
   const yawCensus = await page.evaluate(CENSUS);
@@ -355,8 +402,47 @@ async function runArm(context, fx, paceOn) {
     `    yaw arc: ${yawArc.deg.toFixed(0)} deg over ${yawArc.frames} frames ` +
       `(${(yawArc.frames / (YAW_MS / 1000)).toFixed(1)} fps)`
   );
-  console.log(`    yaw sweep: merges ${yawCensus.lod?.merge}, replacedOnScreen ${yawCensus.lod?.replacedOnScreen}, ` +
-    `refetchParent ${yawCensus.lod?.refetchParent}, imagery requests ${yawStats.byKind?.img ?? 'n/a'}`);
+  // EVERY COUNTER PRINTED AS A DELTA OVER THE SWEEP (A). `stats.evictions` is
+  // cumulative for the PAGE'S LIFE, so an absolute number here would carry the
+  // boot and the content probe into a sweep column.
+  const dLod = (k) => {
+    const a = yawCensus.lod?.[k];
+    const b = before.lod?.[k];
+    if (!Number.isFinite(a)) return 'n/a';
+    return Number.isFinite(b) ? a - b : a;
+  };
+  console.log(
+    `    yaw sweep: merges Δ${dLod('merge')}, replacedOnScreen Δ${dLod('replacedOnScreen')}, ` +
+      `refetchParent Δ${dLod('refetchParent')}, evictions Δ${dLod('evictions')}, ` +
+      `imagery requests ${yawStats.byKind?.img ?? 'n/a'}`
+  );
+  // READING THE PAIR (A). `evictions` counts ELECTIONS — subtrees MARKED — not
+  // tiles shed: one election frees up to four children, and a mark can expire
+  // without a merge when the tile comes back into view (PATCH 2 spares it
+  // deliberately). So evictions >= merges is the EXPECTED relation, and the
+  // pair answers the causal question by itself: merges with 0 evictions is the
+  // LOD policy; merges tracking evictions is the cap. A merge count alone is
+  // ambiguous between the two — the reading that cost a whole re-take.
+  console.log(
+    `    yaw cap: effectiveCap ${yawCensus.lod?.effectiveCap}, visibleTiles ${yawCensus.lod?.visibleTiles}, ` +
+      `overBudgetPasses Δ${dLod('overBudgetPasses')}, residentMB ${yawCensus.mem?.residentMB}, ` +
+      `peakMB ${
+        Number.isFinite(yawCensus.mem?.peakResidentBytes)
+          ? +(yawCensus.mem.peakResidentBytes / 1048576).toFixed(1)
+          : 'n/a'
+      }`
+  );
+  const g = (c) => `${c.resident}/${c.visible}/${c.parked}`;
+  console.log(
+    `    yaw growth (resident/visible/parked): start ${g(before)} -> 25% arc ${g(s25.census)} -> ` +
+      `60% arc ${g(s60.census)} -> end ${g(yawCensus)}` +
+      `  [samples taken at ${s25.at.deg.toFixed(0)}deg/${s25.at.frames}f and ` +
+      `${s60.at.deg.toFixed(0)}deg/${s60.at.frames}f]` +
+      (s25.onTime && s60.onTime
+        ? ''
+        : '  *** AT LEAST ONE SAMPLE TIMED OUT BEFORE ITS ARC: it was taken where the sweep had ' +
+          'reached, not where it was asked for — the two arms are not sampled at the same heading')
+  );
 
   // --- the frozen ceilings at two settled poses
   const poses = {};
