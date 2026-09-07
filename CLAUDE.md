@@ -37,18 +37,34 @@
 > three-tile merges on frustum exit with a ×5 factor and no hysteresis, plus
 > `Timer.reset` never zeroing `_elapsed` and a whole-tree freeze while the
 > loader is saturated — **on the venue, merges 35 → 0 and on-screen replacements
-> 27 → 0 over a full 360° yaw, with content correct per tile in both arms**;
+> 27 → 0 with content correct per tile in both arms, on arcs of 383° OFF / 305°
+> ON** (that row's duplicate-URL gate read NOT CALIBRATED for falling short of
+> 360°); **the one FULL-revolution run read on-screen replacements 65 → 0 and
+> merges 47 on the ON arm**, the 47 attributed to A's own residency cap and
+> fixed, with the headline number pending the standalone re-run;
 > `LOD_CROSSFADE` (the atomic LOD swap) is BUILT and ships **OFF**, its
-> standalone run reading 61 of 62 refines faded with no parent-texture leak but
-> failing three of six preconditions <!-- LOD RULING PENDING -->. *"Screen
+> standalone run reading 61 of 62 refines faded with no parent-texture leak
+> while **THREE of six preconditions failed (P3, P5, P6), which under the owner's
+> own §4.10b template is a NO-GO — so it SHIPS OFF, and only the one specified
+> standalone re-run is pending** <!-- LOD RULING PENDING -->. *"Screen
 > tearing"* → `STEP_SAFE`: **a quality-ladder step now applies the DPR, the
 > renderer size and the composer size inside ONE frame** (0 of 12 canvas writes
-> outside a rAF, was 22 of 46), the second writer being r3f's own zustand
-> subscriber; tearing itself is a vsync property no harness can observe, so only
-> the MECHANISM is certified.
+> outside a rAF, where pass 1 read 18 of 18 and pass 2b 12 of 30; the 22-of-46
+> pair is gate (4)'s buffer mismatch, now 0), the second writer being r3f's own
+> zustand
+> subscriber; **`HUD_SYNC` and `TERRAIN_LIGHT.microFwidth` ship for the same
+> symptom** — the HUD label canvas was drawn a frame behind the GL frame, and the
+> hillshade grain shimmered under motion — and tearing itself is a vsync property
+> no harness can observe, so only the MECHANISM is certified.
 >
-> **THREE DEFECTS THE CERTIFICATION ITSELF FOUND AND FIXED**, none of them on
-> the shopping list: **the toy index container** — the paced branch handed
+> **FOUR DEFECTS THE CERTIFICATION ITSELF FOUND AND FIXED**, none of them on the
+> shopping list: **`FINALIZE_PACE`'s rule 1 was a LEVEL detector** — it compared
+> the frame time to a fixed 24 ms, so on any machine steadily below **~41 fps**
+> every frame is "long", the first finalize of every frame is refused forever and
+> **no building, skyline, road or toy chunk ever lands** — the round shipping a
+> reproduction of the user's own symptom class, caught at the close and fixed
+> (a spike test against an EMA of the preceding frames, a hard refusal cap, and
+> the harness budget wired through all seven sites); **the toy index container** — the paced branch handed
 > `setIndex` a raw `Uint32Array`, which three wraps only when `Array.isArray` is
 > true, so `WebGLAttributes` threw on `array.byteLength` once per toy land mesh
 > (80 broken meshes with `FINALIZE_PACE` on, 0 with it off; fixed, with the
@@ -69,7 +85,14 @@
 > `GROUND_VIS`, `LINEAR_HAZE`, `ONE_SUN` (with the moonlit hill), `POST_ORDER`,
 > `DEPTH_FIX`, `SHADOW_CALM`, `TERRAIN_LIGHT` (tile half), `CLOUD_LIT`,
 > `LAMBERT_ENV`, `FRAME_STATS`. **OFF**: `LOD_CROSSFADE` (pending its re-run),
-> `AERIAL_LAW`, `SKY_PROCEDURAL`, `FRAME_STEP`, `ENV_UNIFORM`, `RING_DEDUPE`.
+> **`AERIAL_LAW` (the LAW off, but `nightRamp` ships ON — a live night
+> multiplier read outside the law's gate at `FlyScene.jsx:1896`; its `content`
+> and `airAnchor` sub-switches are pre-set and read by NOTHING in the tree)**,
+> `SKY_PROCEDURAL` (**designed, NOT BUILT**), `FRAME_STEP` (the sim half ships;
+> no consumer reads the smoothed pose), `ENV_UNIFORM`, `RING_DEDUPE` — and
+> inside `TERRA_PACE`, which ships ON, the sub-switches **`skirtWorker`,
+> `bendSphere` and `TERRAIN_LIGHT.workerNormals` ship OFF**, each wanting one
+> real-hardware run.
 >
 > **THE INSTRUMENT LESSONS, one line each** (§7 has 83): a pin is only a pin if
 > it is the ONLY reader; an absent pin inherits the SHIPPED state, so both arms
@@ -83,7 +106,11 @@
 > measures the reader while a cross-boot floor measures the venue; and read your
 > own publisher's precision before trusting a difference.
 >
-> **OPEN**: `LOD_CROSSFADE`'s one specified re-run; the night gates
+> **OPEN**: the **`terra-live` STANDALONE** on the adaptive-cap tree — the capped
+> arm's 47 merges were A's own residency cap binding on this venue's working set,
+> attributed and fixed by making the cap follow the drawn set, and that re-run
+> decides both the zero-merge headline and the Owens ceiling; `LOD_CROSSFADE`'s
+> one specified re-run; the night gates
 > (`verify-sat-night`, `verify-dusk`, `verify-flicker`) after the hill ruling
 > moved satellite night ground pixels — their first attempt was VOID on the
 > legacy screenshot path (Playwright's actionability check never settles on a
@@ -115,11 +142,18 @@
 > (`scripts/r24-user-diag.md`) went out and never came back, `main` was
 > fast-forwarded twice at the user's request with no report from either build,
 > and every §6 checkpoint is open. Node smoke reads **17/17**; the browser rows
-> ran in two passes plus a re-take, and **not one of their reds was a defect of
-> the flag it was certifying**. **Read [FLY_ROUND24.md](FLY_ROUND24.md) §4 for
+> ran in two passes plus a re-take, and **in the nine-row re-take batch not one
+> red was a defect of the flag it was certifying** — outside that batch,
+> `terra-live` DID measure a feature defect: `keepResident` breaking the frozen
+> Owens ceiling (279 against 261), fixed by parking and a capped LRU. **Read [FLY_ROUND24.md](FLY_ROUND24.md) §4 for
 > what was and was not certified, §5 for the postmortem, §6 for the checkpoints,
 > §7 for the lessons, and `scripts/r24-close-sweep.md` §2.7 for the
-> user-machine run list.**
+> user-machine run list.** The per-agent ledgers are
+> [`scripts/r24-a-pace.md`](scripts/r24-a-pace.md),
+> [`-b-world`](scripts/r24-b-world.md), [`-c-light`](scripts/r24-c-light.md),
+> [`-d-atmos`](scripts/r24-d-atmos.md), [`-e-cert`](scripts/r24-e-cert.md), with
+> [`r24-recon.md`](scripts/r24-recon.md) the pre-round evidence ledger and
+> [`r24-user-diag.md`](scripts/r24-user-diag.md) the pack sent to the user.
 
 > **Earlier (2026-09-06, W3 build): Round 24 "Smooth World" was BUILT on
 > the integration branch `claude/skyloom-r24-orchestration-6753n2` — `main` is
@@ -165,7 +199,10 @@
 > and a 12.0-linear runway light were the same 8-bit **228** (now 254/255);
 > reversed depth is double-converted, so the Neon tilt-shift CoC was flat
 > 0.176 from 5 m to 300 km; haze targets authored in sRGB were mixed as linear
-> (seam 9.3–99.2 per 255 → **0.000**, zero constants moved); and **the
+> (the DECODE ROUND-TRIP 9.3–99.2 per 255 → **0.000**, zero constants moved —
+> **not** a zero rendered seam, which the close later measured at 53.1 noon /
+> 41.4 night with the decode ON, narrowing the day seam and halving the hour
+> dependence); and **the
 > satellite key light never moved with the sun on ANY tier, on the whole
 > harness fleet**, because the position write lived inside the shadow gate
 > `scripts/_boot.js` pins to 0 (`live:false`, key↔hill 10.50° measured).
