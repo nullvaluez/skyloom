@@ -2177,3 +2177,85 @@ the reader looks.
 Node-only: verify-c-flagoff 54/54 - verify-shadow-calm 33/33 -
 verify-depth-offset 7/7 - verify-worker-normals 12/12 - four proofs PASS -
 verify-import-integrity 4/0 - eslint 0/0. No browser.
+
+---
+
+## verify-dusk noon: NOT AN R24 FLAG — a per-FRAME ramp starved by a ~0.5 fps venue
+
+**One line: nothing this round writes `scene.environmentIntensity` or
+`scene.backgroundIntensity`; the env/bg ramp advances by at most 0.25 s per
+FRAME, and at the venue's frame rate the gate's 26 s wait bought about 3 s of
+ramp. The constant stays frozen and no flag's day path needs to change.**
+
+### The mechanism, and it is R16's
+
+`SatEnvironment.jsx`:553
+
+```js
+const k = 1 - Math.exp(-(delta > 0.25 ? 0.25 : delta) / SKY_LIVE.hdriFade.rampSec);
+```
+
+`delta` is r3f's frame delta (`useFrame((_, delta) => …)`), so this is a
+PER-FRAME exponential approach, not a wall-clock one, and the clamp caps each
+frame's advance at 0.25 s. `git log -L` puts the clamp and `rampSec: 1.5` in
+`4a1fe1f` (R16) and the `day: { env: 0.85, bg: 1.0 }` anchor in `d72adb1`
+(R13). None of the three moved this round.
+
+### The arithmetic says the same thing twice
+
+| reading | short of target | implied ramp time `−1.5·ln(short)` |
+|---|---|---|
+| env 0.7382 / 0.85 | 13.15 % | 3.04 s |
+| bg 0.8801 / 1.0 | 11.99 % | 3.18 s |
+
+At 0.25 s of ramp per frame that is **12–13 frames inside the gate's 26 s noon
+wait, i.e. ~0.48 fps** — exactly the SwiftShader regime the R24 environment
+truth records for this container. The two numbers are not two symptoms; they are
+one starved ramp measured on two channels, which is also why their ratios differ
+(0.8685 vs 0.8801): they ramp from different seeds — the previous bucket's
+values — toward different targets.
+
+On a machine with frames, 26 s buys 26 s of ramp: `exp(−26/1.5)` = 3.3e-8, and
+the explicit snap two lines further down —
+
+```js
+if (Math.abs(env - envT) < 1e-4) env = envT;
+```
+
+— then lands on **exactly** 0.85 / 1.0, which is precisely what the frozen cell's
+"exactly" requires. The gate is a settle contract; the venue cannot satisfy it at
+half a frame per second, whatever is flagged.
+
+### Clearing the candidates from source
+
+| candidate | verdict |
+|---|---|
+| **LAMBERT_ENV** | sets `material.reflectivity` on Lambert materials (LandmarkMonuments :152, MonumentModels :165, SatParcelHomes :181, SatVegLayer :216). Per-material, never the scene scalars. |
+| **CLOUD_LIT** | a material, not a scene scalar. |
+| **ONE_SUN** | `hill.dayK` is 1.0, the identity; nothing in the block touches env/bg. |
+| **POST_ORDER / tone mapping** | **cannot show here by construction**: the gate reads `__flyStats.envIntensity` / `bgIntensity`, which are written straight from `env` / `bgOut` at SatEnvironment :598-599 — PRE-tonemap scalars, before any pass runs. An exposure or pass-order move is invisible in those numbers. |
+| **ENV_UNIFORM (B)** | confirmed SHIPPED OFF in its own constants header. |
+| **FRAME_STATS (E)** | an instrument — no draw, no material state. It can only touch the frame RATE, which is the axis that matters, but it is not the mechanism. |
+
+The decisive structural fact: the ONLY writers of `scene.environmentIntensity`
+in the tree are `FlyScene.jsx`:2468 (the toy `<Environment>`, not satellite) and
+`SatEnvironment.jsx`:347 / :594. Nothing R24 added writes either scalar.
+
+### What should change, and it is the harness
+
+The gate sleeps 26 s and reads. A settle contract should **wait on the VALUE, not
+the clock** — and the snap above makes exact equality reachable, so
+
+```js
+await page.waitForFunction(() =>
+  window.__flyStats?.envIntensity === 0.85 && window.__flyStats?.bgIntensity === 1);
+```
+
+with a generous timeout is both stronger than the sleep and immune to venue
+speed. Offered, not landed: publishing `envTarget` / `bgTarget` beside the two
+values would let the harness poll convergence without hard-coding constants —
+two dev-only assignments in SatEnvironment's existing `if (dev …)` block. That
+file is B's, and at close I am not editing another owner's component
+unilaterally for an instrument nobody has asked for yet.
+
+No code moved: nothing here is an R24 defect.
