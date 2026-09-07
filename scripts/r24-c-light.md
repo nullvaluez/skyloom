@@ -2355,3 +2355,127 @@ Node-only: verify-c-flagoff 57/57 - verify-shadow-calm 33/33 -
 verify-depth-offset 7/7 - verify-worker-normals 12/12 - four proofs PASS -
 verify-import-integrity 4/0 - eslint 0/0. `scripts/verify-depth-roundtrip.js`
 untouched. No browser.
+
+---
+
+## depth-rt w5: THE DEGENERATE ZERO — my "exact" correction was the un-bent answer
+
+The w5 arbiter is wrong and the diagnosis handed to me is exact. I record it in
+full because I got the geometry backwards in a way a source gate could not see.
+
+### What I got wrong
+
+I claimed the rendered point shares the CPU hit's XZ, so the truth is the ray
+point at that XZ. **That is true for a rigid displaced POINT and false for a
+continuous SURFACE.** The GPU LOWERS the world, so a pixel's ray meets the
+displaced surface FARTHER along and at a DIFFERENT XZ than it meets the CPU
+geometry. Worse, applied to an UNLIFTED cast the formula is circular: a raycast
+hit lies on its own ray by construction, so
+
+```
+impliedDrop = hit.y − rayY(sameXZ) ≡ 0
+```
+
+for every unlifted hit, the interval test `0 <= 0 <= groundDrop` passed
+HONESTLY, nearest-t won, and the truth became **the un-bent geometry with no
+bend correction at all** — which is why all 15 truths printed
+`drop 0.00 m · residual 0.000 m · reproject 0.00 px` and every pick read
+`via unlifted`. The errors are the ground drop divided by the tangent of a
+grazing ray: 26 m at 2282 m -> +74 m, 36 m at 2667 m -> +121 m. The previous
+tail run's `via bend-solved` far pick agreed to 0.00 %; I removed the thing that
+was working.
+
+### The fix: the iteration is restored, and the drop is now per-VARIANT
+
+* **Surfaces** get the bend solve back — lift the ray by the drop at the current
+  hit, re-cast, converge (0.05 m). At convergence `hit − (0, drop, 0)` lies on
+  the ORIGINAL ray, so residual and reprojection become the validity TEST rather
+  than a construction.
+* **Rigid air-bent actors** get their own displacement. Traffic, contrails and
+  the player carry `world-bend-air*` keys and drop by `airDrop(d, y)` with R7's
+  altitude lift, not by `d²k`. The family is read from the material's own
+  `customProgramCacheKey()` (world-bend.js:716/777/847), and the iteration runs
+  once per family, each matching only its own hits — which is what lets an
+  air-bent actor in front of terrain be found at all.
+* **Validity is CONVERGENCE + residual + reprojection.** Nothing else can
+  exclude the degenerate zero, because the degenerate zero satisfies any
+  interval test honestly.
+* `hits` (per-family candidates, with converged/iters/residual/reprojection) and
+  `rayHits` (every raw hit any cast met, with its bend key) are published, so
+  the next disagreement is read rather than theorised.
+
+### The calibration that could have caught it — and why the old one could not
+
+**verify-c-flagoff's RED calibration for the w5 revision (forcing `valid=true`,
+reversing the sort) was structurally incapable of catching this**, exactly as
+observed: a degenerate zero looks identical to a converged answer in the source.
+A calibration needs GEOMETRY with a known non-zero drop, so it now lives in
+`r24-c-depth-roundtrip-proof.mjs`, built backwards from the w5 median pick:
+
+```
+BENT-SURFACE CALIBRATION (the w5 median pick, solved backwards)
+  geometry: bendK 0.000005, ray depressed 19.4734deg, eye 760.85 m
+  RED   degenerate "ray point at the hit XZ": range 2282.30 m (implied drop 0.00 m,
+        interval test ACCEPTS) — off the buffer by 74.02 m
+  GREEN iterated lift: 4 passes, converged true, drop 24.68 m, range 2356.30 m
+        — off the buffer by 0.02 m, residual 0.0056 m
+  the w5 log measured this same gap as +74.01 m; here it is +74.00 m
+```
+
+The RED reproduces the logged error to **0.01 m** and passes the old validity
+test while doing it; the GREEN lands 0.02 m from what the depth buffer held.
+Source gates alone were never going to separate those two.
+
+### Atomicity — confirmed, and now measurable
+
+E's sweep-vs-assertion drift (median 2628.4 -> 2282.3, farthest 3052.9 -> 2667.3,
+nearest 1166.7 -> 1211.1, mixed signs) is NOT this defect. Two arguments:
+
+1. **Structural.** A per-pick read IS atomic: `probe()` samples
+   `composer.depthTexture` — the last rendered frame's attachment — and then
+   calls `truth()` in the SAME synchronous turn. JS is single-threaded, no rAF
+   can fire between them, so both see one depth texture, one scene graph and one
+   set of camera matrices. Nothing mutates the camera outside `useFrame`, and
+   FlyScene's floating-origin offset is applied and removed within one frame
+   (:1712 / :1735), so a between-frames call reads the pose the frame rendered.
+2. **The instrument cannot produce a DRIFT.** The sweep and the assertion ran
+   the SAME hook; a constant bias cancels in a comparison between two of its own
+   readings. Only the world moving under the pixel produces a difference — and
+   mixed signs are what motion produces when eye position and attitude both
+   change, since a grazing ray's ground intercept moves far more per metre of
+   eye travel than a steep one's (the two responded ~8:1 here).
+
+To make that a measurement rather than an argument, the truth now publishes
+**`eye`** — the camera world position the answer belongs to. If it differs
+between two reads, the world moved under the pixel and no comparison across them
+is meaningful.
+
+### E's corroboration, recorded
+
+Inverting the CoC smoothstep on the median's measured 0.8118 gives 2578.5 m
+Euclidean against the truth's 2496.5 — 82 m, **74 m in view-Z**, against clause
+(2)'s measured 74.01 m. A depth-texture read and the GPU's own CoC texture agree
+to a metre on the size of the truth hook's error. Two independent instruments
+convicting the same defect is the strongest evidence this round produced, and it
+also settles DEPTH_FIX's own claim: **the DoF's CoC agrees with the DEPTH
+BUFFER**, not with the geometry — the material formula at the PROBE's Euclidean
+distance gives 0.8112 (measured 0.8118) and 0.9713 (measured 0.9725), inside the
+8-bit quantum at all three picks. The DoF reads real depth. The disagreement was
+buffer-vs-geometry and it was the instrument's.
+
+### Gates
+
+verify-c-flagoff 57 -> **58**, with the truth block rewritten: validity is
+convergence + residual + reprojection and never an implied-drop interval; the
+lift ITERATES until it stops moving; the drop is chosen per hit from the
+material's world-bend variant (ground vs air); both families are solved and the
+nearest valid wins; every candidate and every raw ray hit is published.
+RED-calibrated by forcing `valid = true` and by deleting the air-drop branch.
+Two earlier gates were re-pointed at renamed identifiers (`raycaster2`, the
+two-name import) — same properties, my own refactor.
+
+Node-only: verify-c-flagoff 58/58 - verify-shadow-calm 33/33 -
+verify-depth-offset 7/7 - verify-worker-normals 12/12 - four proofs PASS (the
+roundtrip proof now carries the bent-surface calibration) - import-integrity 4/0
+- eslint 0/0, `no-unused-vars` 0 (three scratch vectors died with the rewrite).
+`scripts/verify-depth-roundtrip.js` untouched. No browser.
