@@ -2259,3 +2259,99 @@ file is B's, and at close I am not editing another owner's component
 unilaterally for an instrument nobody has asked for yet.
 
 No code moved: nothing here is an R24 defect.
+
+---
+
+## depth-rt tail: THE DROP MODEL WAS THE INSTRUMENT — corrected exactly, no model at all
+
+### RED 1 — the 205 m median. Mine, and the mechanism is in my own arbiter
+
+The previous truth subtracted the GROUND drop from every hit and rejected
+anything that then missed the pixel by more than 1.5 px. Both halves are wrong
+for that pick, and the numbers say so:
+
+* **The threshold rejects CORRECT candidates on a grazing ray.** At 1.7 km the
+  ground drop is 1728² x 5e-6 = **14.9 m**, and on a near-horizontal ray a
+  vertical displacement is almost entirely PERPENDICULAR to it. One pixel at
+  that range subtends ~1.7 m, so a correct candidate reprojects ~9 px away and
+  is thrown out. The row's own `1 cast(s) rejected of 2` is that happening.
+* **The ground formula is wrong for an AIR-bent actor by construction.** Traffic,
+  contrails and the player ride `world-bend-air-anchor`, whose `airDrop` carries
+  a LIFT term — R7's "high traffic reads UP". Correcting such a hit with the
+  ground drop over-drops it by tens of metres, which then fails the same
+  threshold. So the one class of actor most likely to be sitting in front of
+  terrain was the one class guaranteed to be rejected, and the truth fell
+  through to the ground 205 m behind.
+
+**The fix removes the model rather than tuning it.** Every bend variant in this
+tree displaces ONLY in Y — ground (`wPos.y -= bendD * bendD * uBendK`), the
+per-anchor variants, and the air bend — and none of them touch XZ. So the
+rendered position of an un-bent CPU hit has the SAME XZ, and the point the
+camera saw at that pixel is simply **the point on the original ray at that XZ**.
+Solve for it directly: the corrected point lies on the ray by construction,
+reprojection is 0 rather than a threshold, and it is exact for every bend
+family at once with no per-family case.
+
+`impliedDrop = hit.y − rayY(sameXZ)` then becomes a MEASUREMENT of how far the
+GPU moved that actor, and doubles as the validity test: the bend only moves
+things down, and the ground bend is the largest displacement any variant
+applies, so a candidate is real iff `0 <= impliedDrop <= groundDrop` within
+tolerance. A ground hit reads `impliedDrop == groundDrop`; an air-bent actor
+reads visibly less — **which is now the tell for which bend family the buffer
+was holding, printed rather than inferred.**
+
+Both casts (unlifted, and lifted so the ray can reach distant terrain whose CPU
+geometry sits above where it was drawn) now feed ONE pool of up to 8 hits each,
+every hit judged identically, nearest valid `t` wins. The casts are two ways of
+FINDING candidates, not two answers to arbitrate.
+
+**And the hook now publishes `hits`** — every candidate on the ray with its
+object, distance, implied drop, ground drop and validity. The next run does not
+need a theory: it prints what was on that ray and why each one was or was not
+the answer. That is the honest response to a disagreement I could not resolve
+from source.
+
+Refuted along the way, from source: there is **no `raycast` override and no
+`layers` manipulation anywhere** in `components/fly` or `lib/fly`, so
+InstancedMesh pools (traffic, monuments, clouds, precip, parcel homes, veg) are
+all in the candidate set and three's raycaster tests them. The candidate filter
+was never the problem — the correction was.
+
+### RED 2 — the CoC contract for E
+
+Not mine to fix, and E's gate shape is RIGHT. The numbers to build it on:
+
+* The toy DoF is driven with **world-space constants that do NOT follow the
+  chase distance**: `worldFocusDistance = TOY.dofFocusM = 700 m`,
+  `worldFocusRange = TOY.dofRangeM = 2600 m`, `bokehScale = 2.6`
+  (Effects.jsx:238-246). postprocessing converts both to normalised linear depth
+  against the camera's near/far, so with near 2.5 / far 600000 the focus sits at
+  `d = 0.001167` and the range is `0.004333`.
+* `CircleOfConfusionMaterial` computes
+  `magnitude = smoothstep(0, focusRange, abs(linearDepth − focusDistance))`.
+  Evaluated at the run's own truths: **35.9 m -> 0.1624** (measured 0.1608),
+  **3210 m -> 0.9965** (measured 1). Both inside the 8-bit quantum, which the
+  CoC target is: those readings are exact 1/255 steps.
+* So E's contract — *measured CoC ~ CoC(formula, truth distance) within the
+  quantum, at all three picks* — is exactly right, and it is stronger than a
+  focus-plane assertion because it tests that the DoF reads real depth without
+  assuming where focus sits.
+* And the band a "< 0.02 at the focus plane" pick must land in is
+  **482 m to 918 m** of world distance. 35.9 m is not near the focus plane; the
+  player jet was simply the nearest thing on that ray.
+* `window.__flyDof.cocMaterial` is exposed (Effects.jsx:106 already reaches it
+  for the DEPTH_FIX patch) with `focusDistance` / `focusRange` uniforms, so a
+  gate can read the live values rather than re-declaring the constants.
+
+### Gates
+
+verify-c-flagoff 54 -> **57**: the correction solves the ray at the hit XZ
+rather than modelling a drop; validity is the implied-drop interval, not a pixel
+threshold; both casts feed one pool with nearest-valid-t winning; every
+candidate is published. RED-calibrated by forcing `valid = true` and by
+reversing the sort.
+
+Node-only: verify-c-flagoff 57/57 - verify-shadow-calm 33/33 -
+verify-depth-offset 7/7 - verify-worker-normals 12/12 - four proofs PASS -
+verify-import-integrity 4/0 - eslint 0/0. `scripts/verify-depth-roundtrip.js`
+untouched. No browser.
