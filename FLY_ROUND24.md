@@ -691,6 +691,15 @@ pushed** (E `ffe0893`, scripts-only; node smoke 17/17, import-integrity 4/4 over
 re-run the sky effect (§4.2) — and **the widened `scripts/` sweep caught E's
 first attempt** (`PIN_POSE` does not exist in `verify-one-sun`; it warps inline):
 **the fifth catch since the sweep was widened, the second within an hour.**
+**Merge 24, `95907ce`, pushed** (E `ba9c2ae`, scripts-only, node smoke 17/17):
+`verify-depth-roundtrip` now consumes **the owner's in-app truth** — three probes
+with `truth.hit`, **\|probe.viewZ − truth.viewZ\| within 1 %** against the
+2.50–2.51 m double-un-reversal signature, NOT CALIBRATED with **the truth's own
+reason** below three — and **the hand-built `Raycaster` is gone**. E's note is
+worth the line: *"I had a working fix that borrowed r3f's internals off the
+canvas store and deleted it before it ran — same mistake, better clothes; C owns
+the truth now."* **C's `__flyDepthTruth` hook is pending; `depth-rt` re-runs when
+both are in.**
 
 **And `main` was fast-forwarded to it**, at the user's explicit request —
 *"Merge what is done so far into main so I can test"* — from the W0 scaffold
@@ -771,6 +780,29 @@ fixed: **residency draws**. **NEXT**: E's `lod-fade` STANDALONE against a
 `FLY_LOD_SWEEP_MS=900000` with its own timeout, from which the `LOD_CROSSFADE`
 go/no-go follows per D's §4.10b template; then the main worktree fast-forwards to
 the merged tip (`175e33e` or later) and the post-batch list runs there.
+
+**The standalone IS RUNNING**, on the `9bcaace` worktree: the server started
+under `CERT_PROOF_ONLY=1` **with the PGID captured the moment it printed** (DEV_PID
+9184, DEV_PGID 9171, five group members, written to a scratch file as well as
+held in session) — *"that is the whole reason to capture at LAUNCH rather than at
+teardown: `CERT_PROOF_ONLY` disarms the cleanup trap, so there is no safety
+net"*; `TREE UNDER TEST 9bcaace`; **BOOT OK 65.4 s**. The invocation is
+`FLY_TILE_FIXTURE=1 FLY_FINALIZE_BUDGET_K=40 FLY_BOOT_SCALE=6
+FLY_LOD_SWEEP_MS=900000 LOD_SETTLE_MS=45000 timeout 5400 node -r
+./scripts/_pw-shim.js scripts/verify-lod-fade.js` — **the 5,400 s ceiling instead
+of `run()`'s 2,400 being exactly why this row is standalone** — two boots, two
+360° sweeps at 0.85°/frame (~424 rendered frames each) and two `settleWorld`
+passes at Owens. **The log carries D's §4.10b rows mechanically**: arc per leg
+with its frame count; the ladder identity **refines + merges === hardSwaps +
+faded** on both arms; the ±25 % frame-comparability guard on **(14)** that fired
+at 0.57 last time; `faded` rising while `hardSwaps` drops; `maxBlendRun` as the
+crossfade window, **≥ 5 a complete blend and 2–4 a sweep that ended mid-blend**;
+the drain snapshot **at the instant it held** plus a second read attributing any
+non-zero `active` to arrivals; the leak signature **`active === 0 && retained >
+0` on both reads**; the invariant **retained ≤ active ≤ 4 × retained**; and Owens
+draws and tris equal between arms with both settles. Logs:
+`scripts/r24-out/lodfade/lod-fade.log` and `lodfade-server.log`; teardown is TERM
+→ KILL on the PGID with a `curl` to 000 before "done".
 
 **Re-take header, started 23:37:28 at load 0.45 — the quietest conditions any
 pass has had.** Tree at start `9bcaace`; **`cert-run`'s node-first block
@@ -1541,7 +1573,7 @@ quotable.
 no reply arrived; every row is unconfirmed on the user's machine, including the
 two that are the reason the round exists.
 
-**The user is now testing `175e33e`** on the integration branch (`8240539` plus merges 13–23: the scripts-only ones, the import dedupe, **A's Owens fix**, C's dead-import removal, E's census repair, B's `__noFade` declarations + heal throughput floor, **C's night hill ruling** and E's waiting sun legs) — **`main` is at `9bf5f8a`** — **on `main` as well as on the integration branch**, `main` having been fast-forwarded to it at the user's request (§4.1) — pushed early, at their request, before
+**The user is now testing `95907ce`** on the integration branch (`8240539` plus merges 13–24: the scripts-only ones, the import dedupe, **A's Owens fix**, C's dead-import removal, E's census repair, B's `__noFade` declarations + heal throughput floor, **C's night hill ruling** and E's waiting sun legs) — **`main` is at `9bf5f8a`** — **on `main` as well as on the integration branch**, `main` having been fast-forwarded to it at the user's request (§4.1) — pushed early, at their request, before
 the standalone re-take (§4.1). It is **the first R24 build in the user's hands
 that contains the toy index container fix and the `STEP_SAFE` resize guard**, so
 the toy boot page error and the DPR double-apply are the two things this build
