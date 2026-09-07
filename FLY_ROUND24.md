@@ -926,6 +926,11 @@ linear-haze **2/0**, haze-red **4/0**, depth-rt **3/0**;
 **4/3**. **Every browser number in §4.2 matches its log** (the NOT CALIBRATED
 counts sit beside these pass/fail pairs and are not part of them).
 
+**Merge 39, `dd6502c`, pushed** (A `f3cf43b`; `verify-terra-residency` 35 →
+**40**, node smoke 17/17): the residency cap follows the drawn set, with the
+eviction count published so a merge can never again be ambiguous between the LOD
+policy and the memory brake (§4.2).
+
 **THE POST-BATCH RUN**, started 01:28:06 at load 0.72, `TREE UNDER TEST
 14c1220`, **BOOT OK 61.5 s** — with **every post-batch fix verified PRESENT in
 the tree before launch**: the warp re-issue at `verify-one-sun.js:238`,
@@ -1049,6 +1054,15 @@ the ±25 % guard) **and one fade was denied for `noParentMap`, a defect-shaped
 reason the template requires at 0. Under §4.10b as written that is NO FLIP this
 round**, unless a re-run on A's parked tree with a longer ON sweep (~1,500 s)
 passes it — **`LOD_CROSSFADE` ships OFF, and D states the mechanical verdict.**
+
+**THE REVISED CLOSING SEQUENCE**, after `terra-live` was killed by the row
+ceiling and A re-sized the cap: E finishes `verify-flicker` and the three tail
+re-runs (`one-sun`, `linear-haze` at floor **1.2**, `depth-rt`) on `3231f7d`;
+teardown; the main worktree fast-forwards to the tip (`dd6502c`, plus C's dusk
+fix if it lands first); **`terra-live` STANDALONE** on the adaptive-cap tree with
+the published eviction count; **the three NIGHT gates** with the adapted
+screenshot path (§4.3); and **`lod-fade` STANDALONE last**, from which D's ruling
+follows.
 
 **Re-take header, started 23:37:28 at load 0.45 — the quietest conditions any
 pass has had.** Tree at start `9bcaace`; **`cert-run`'s node-first block
@@ -1187,6 +1201,7 @@ and **lod-fade** (frame-based yaw — **and its pinned ON leg is what decides
 | `verify-sat-buildings` / `-skyline` / `-parcel-homes` / `-suburbia` | 226 draws / 6,965 kept / 6,964 columns · 17 · Powell 0 placed · nothing in (25, 35) m | not re-run | frozen |
 | `verify-rim` / `-dusk` / `-sat-night` / `-sat-depth` / `-aerial` / `-edge-fx` / `-neon-alt` | pixel bands; `verify-aerial`'s 0.55 | — | **the ONE-TIME sanctioned horizon re-baseline batch (C's L1 + D's law) was NEVER EXECUTED** — which is why `AERIAL_LAW.enabled` ships false. `verify-sat-depth`'s hillshade margin does not move (dayK 1.0) and `verify-aerial`'s 0.55 stays exact (A8's noon identity) |
 | `verify-monuments-sat` | eleven frozen numbers | **+3 gates, additively**; no frozen number moved | frozen |
+| **the three NIGHT gates** — `verify-sat-night` / `-dusk` / `-flicker`, run because C's hill-follows-moon ruling moves satellite NIGHT ground pixels | R19/R16 pixel bands | **FIRST ATTEMPT VOID ON THE HARNESS, plus ONE REAL READING.** `verify-sat-night` **rc=1 after 172 s with ZERO gates run** — *"locator.screenshot: Timeout 23971 ms exceeded"* after *"waiting for element to be stable"*: the R16 harness's screenshot waits on Playwright's ACTIONABILITY check, **which a canvas re-rendering continuously at fixture frame rates never satisfies** — a venue-vs-legacy-harness mismatch, **not a lighting result**; E is adapting the screenshot path (`page.screenshot` with a clip, or the harness's own `readPixels` probe) and re-running all three. `verify-dusk` **rc=1 after 177 s** and got **ONE reading out before the same timeout**: *"pinned noon is the certified DAY sky (day bucket, no blend, env/bg exactly 0.85 / 1.0) — FAIL — state=day s=0 env=0.7382 bg=0.8801 el=67.954°"* — **both `SatEnvironment` intensities scaled by ~0.868 at a PINNED NOON where `moonK` is 0**, so it is **NOT** the hill-follows-moon change: **something that shipped ON this round dims the satellite environment BY DAY**, and since this frozen R19 gate never ran on an R24 flipped tree until tonight it has read that way **since the flips at `ec53fd3`**. Routed to C (LAMBERT_ENV, CLOUD_LIT, `ONE_SUN`'s dayK, POST_ORDER first; B's `ENV_UNIFORM` confirmed OFF, E's `FRAME_STATS` inert), with the **default ruling that the constant stays FROZEN and the flag's day path becomes identity** | **PENDING** — the night look on a real display, and whether the day dimming is visible |
 
 ### 4.4 The fixture column, for the record
 
@@ -1508,6 +1523,15 @@ contract to accommodate my own instrument's error … the instinct was right and
 aimed at the wrong arithmetic … five of my instrument defects were reading
 someone else's value wrongly; this one was reading my OWN value at a resolution I
 had chosen and then blaming the source."*
+
+**A frozen gate outside the round's row set caught a change no R24 gate was
+watching.** `verify-dusk` — R19's, untouched, never run on an R24 flipped tree
+until the close — read **both `SatEnvironment` intensities scaled by ~0.868 at a
+PINNED NOON**, a day-path change that has been in the build since the flips at
+`ec53fd3` and that **not one of the round's eighteen browser rows was looking
+for**, because the row set was built around the round's own flags. **The row set
+is not the gate set**: a round that certifies its own changes can still ship a
+regression that only somebody else's frozen gate can see.
 
 **And one ruling that stood for exactly one merge.** The four micro-degree
 one-sun residuals were ruled a TOLERANCE question — the arithmetic was right that
@@ -2447,6 +2471,16 @@ Carries forward the still-open R15–R21 §6 tables.
     job is not to make the round look finished — it is to leave the next round
     able to tell a proof from a hope at a glance. (F SCRIBE.)
 
+84. **A cap sized on one motion is wrong on the next.** `maxResidentTiles` 260
+    was measured on a 240-frame synthetic yaw that saturates at 190 — and a
+    650-frame revolution, a bob and a serpentine all hold more, so the brake
+    bound and its evictions read as LOD churn: **74 merges reduced to 47 by the
+    brake, not by the policy**. Size the bound on **the worst ratio you can
+    measure** (retained/drawn, worst 9.20 across yaw, bob and serpentine at two
+    lengths) and let it follow the quantity it tracks; and **publish the eviction
+    count**, so a merge is never again ambiguous between the policy and the
+    brake — that ambiguity is what cost a re-take. (A PACE.)
+
 ---
 
 ## §8 Flag ship state at close
@@ -2458,6 +2492,16 @@ dry-run worktree, `no-undef` 0 over the R24 delta and node smoke 16/16. Every
 state below is read from `91141fe:lib/fly/fly-constants.js` and cited to the
 merge that set it; **only `LOD_CROSSFADE` is still open**, on pass 2's pinned ON
 leg. **Nothing here has been certified on the user's machine.**
+
+**OPEN, and not yet under a flag**: `verify-dusk` reads **both `SatEnvironment`
+intensities scaled by ~0.868 at a pinned noon** on the flipped tree, where
+`moonK` is 0 — so the night ruling is exonerated and **something shipped ON this
+round dims the satellite environment BY DAY**, present since `ec53fd3` and caught
+only because a frozen gate outside the round's row set was finally run (§4.3,
+§5.2). C attributes it (LAMBERT_ENV, CLOUD_LIT, `ONE_SUN`'s dayK, POST_ORDER
+first), and **the default ruling is that the frozen constant stays frozen and the
+flag's day path becomes identity** — the row below will name the flag once C
+does.
 
 ### ON at close (Level A: green on the fixture or structurally proven, flag-off identity proven)
 
@@ -2475,7 +2519,7 @@ leg. **Nothing here has been certified on the user's machine.**
 | `SHADOW_CALM` (`biasSignFix`, `kernel 'world'`, `texelSnap`, `satCadence` 0) | shader edits and snap arithmetic **proven node-side (32/33 gates)**; mount/arm logic structural; **pixels, draw counts and whether the catcher actually receives a shadow unmeasured — user's machine.** Note for any program census: it changes the compiled TEXT of every shadow receiver with NO cache key, so a key census is blind by construction and a source-hash census sees every receiver move | **ON** (`biasSignFix`, `kernel 'world'`, `texelSnap`, `satCadence` 0), merged `a60bf17` |
 | `TERRAIN_LIGHT` — `fragmentHill`, `microFwidth`; `workerNormals` **false** | the tile half ships; the worker half is node-proven (3.34° → 0.26°) with zero pixels behind it, and ON would make `verify-skirt-worker`'s identity leg RED by design | **ON** — `fragmentHill` and `microFwidth` true, **`workerNormals` false**, merged `a60bf17` |
 | `CLOUD_LIT` + `LAMBERT_ENV` (0.15) | same ONE draw; uniform-only for Lambert; the cloud variant's warm-set exception has a measurement condition attached | **ON**, merged `a60bf17` **ON** (`reflectivity` 0.15), merged `a60bf17` |
-| `TERRA_PACE` {`timerFix`, `mergeHysteresis`, `keepResident`, `skirtFast`, `walkWhileSaturated`, `bboxCache`} | 22/17/178 → 0/0/0; timer 10/12 → 4/12; the saturated walk strictly conservative; skirt output element-identical; **live-arm fixture evidence now in** — merges 1 → 0, refetchParent 1 → 0, Owens **161 → 185 ≤ 261**, Powell **161 → 183 ≤ 375**, draws rising because `keepResident` keeps more tiles drawn. `verify-terra-live` (6)'s 1 → 17 repeat fetches are **ATTRIBUTED to the harness's ~51°/frame wall-clock yaw at 1 fps, not to the feature** — the LRU had nothing to evict (peak 30–36 % of a 140 MB cap) and merges were 0; re-measured in pass 2 at 0.85°/frame over a full 360°. **THE ON-SCREEN CONTRACT IS CERTIFIED ON THE VENUE AT A FULL REVOLUTION**: with the arms comparable for the first time (647 vs 650 frames, 550° vs 553°), **`replacedOnScreen` reads 65 → 0** on the parked tree, content correct per tile in both arms (0 URL / 0 position mismatches). **But the zero-merge headline is PARTIALLY LOST on the CAPPED tree — merges 47 with 47 parent refetches, against 35 → 0 before the cap** — the working hypothesis being that `maxResidentTiles` 260 BINDS on this venue's working set (gate 26 sized it on a 240-frame yaw, not a 650-frame one), **attribution and fix with A**; and **the Owens draw number on the parked tree is STILL UNMEASURED**, the row having been killed by `run()`'s 2,400 s ceiling and re-running standalone (§4.2). Earlier, on the un-capped flipped tree: merges 35 → 0, on-screen replacements 27 → 0. **FIX LANDED, re-measure PENDING: the same row's ON arm read Owens 279 against the frozen 261** after a 600 s sweep (185 after 45 s in pass 1, same flags), with resident tiles 62 → 103 and `residentMB` 113.7 still climbing — **retention, not necessarily culling**, and **both requirements are met** — PATCH 26 `parkOffscreen` (off-frustum issued **142 → 0**, resident unchanged, the drawn set BOUNDED by the frustum instead of growing with sweep duration) and `maxResidentTiles` **260**, an LRU by last-visible frame with distance breaking ties, `verify-terra-residency` **22 → 32** RED-calibrated by neutering the park. **`keepResident` alone was the cause** (switch-by-switch, §3 A). **The 261 is not moved, and whether Owens lands under it is E's `terra-live` re-run to measure** | **ON** — `timerFix`, `mergeHysteresis`, `keepResident`, `skirtFast`, `walkWhileSaturated`, `bboxCache` all true; `skirtWorker` and `bendSphere` false, merged `5b13e35` |
+| `TERRA_PACE` {`timerFix`, `mergeHysteresis`, `keepResident`, `skirtFast`, `walkWhileSaturated`, `bboxCache`} | 22/17/178 → 0/0/0; timer 10/12 → 4/12; the saturated walk strictly conservative; skirt output element-identical; **live-arm fixture evidence now in** — merges 1 → 0, refetchParent 1 → 0, Owens **161 → 185 ≤ 261**, Powell **161 → 183 ≤ 375**, draws rising because `keepResident` keeps more tiles drawn. `verify-terra-live` (6)'s 1 → 17 repeat fetches are **ATTRIBUTED to the harness's ~51°/frame wall-clock yaw at 1 fps, not to the feature** — the LRU had nothing to evict (peak 30–36 % of a 140 MB cap) and merges were 0; re-measured in pass 2 at 0.85°/frame over a full 360°. **THE ON-SCREEN CONTRACT IS CERTIFIED ON THE VENUE AT A FULL REVOLUTION**: with the arms comparable for the first time (647 vs 650 frames, 550° vs 553°), **`replacedOnScreen` reads 65 → 0** on the parked tree, content correct per tile in both arms (0 URL / 0 position mismatches). **The zero-merge headline's loss on the CAPPED tree is ATTRIBUTED AND FIXED** — merges 47 with 47 refetches were **A's own brake**, `maxResidentTiles` 260 having been sized on a 240-frame yaw that saturates at 190 while this venue's revolution holds more, so the LRU elected off-frustum subtrees and the return re-fetched them; **the cap now follows the drawn set** (`max(260, 14 × drawn)`, `k` sized on the worst measured retained/drawn ratio of 9.20), `parkOffscreen` is refuted from source as a cause, and **`replacedOnScreen` 65 → 0 held BY DESIGN because election is out-of-frustum only** (§4.2); and **the Owens draw number on the parked tree is STILL UNMEASURED**, the row having been killed by `run()`'s 2,400 s ceiling and re-running standalone (§4.2). Earlier, on the un-capped flipped tree: merges 35 → 0, on-screen replacements 27 → 0. **FIX LANDED, re-measure PENDING: the same row's ON arm read Owens 279 against the frozen 261** after a 600 s sweep (185 after 45 s in pass 1, same flags), with resident tiles 62 → 103 and `residentMB` 113.7 still climbing — **retention, not necessarily culling**, and **both requirements are met** — PATCH 26 `parkOffscreen` (off-frustum issued **142 → 0**, resident unchanged, the drawn set BOUNDED by the frustum instead of growing with sweep duration) and `maxResidentTiles` **260**, an LRU by last-visible frame with distance breaking ties, `verify-terra-residency` **22 → 32** RED-calibrated by neutering the park. **`keepResident` alone was the cause** (switch-by-switch, §3 A). **The 261 is not moved, and whether Owens lands under it is E's `terra-live` re-run to measure** | **ON** — `timerFix`, `mergeHysteresis`, `keepResident`, `skirtFast`, `walkWhileSaturated`, `bboxCache` all true; `skirtWorker` and `bendSphere` false, merged `5b13e35` |
 | `LADDER_FIX` (incl. `nativeRefresh`) + `STEP_SAFE` | **BOTH CERTIFIED ON THE VENUE. `LADDER_FIX` reads 13/0**: two sub-native render-scale rungs spent before any tier drop, a refresh-FOLLOWING target, a stutter-aware step-down at healthy mean fps, the clean-session control never stepping, and the step applied in-frame with the composer buffers in lock-step — **and `nativeRefresh` is now MEASURED, not unmeasured: target 144 against a display refresh of 144** (§6 item 4 is answered on the venue; the taste question is still the user's). **Gate (13) is also the BROWSER confirmation of A's index fix** — no page errors on the toy boot that threw `byteLength` 31 times pre-fix. **`STEP_SAFE` reads 9/0**: a quality-ladder step now applies the DPR, the renderer size AND the composer size **inside one frame**, with **the second writer guarded** (`stepGuard` {setPixelRatio: 1, setSize: 2} per step is r3f's re-apply being suppressed) — **the tear mechanism, a canvas resized outside the frame, has no remaining path on this tree**: 0 of 12 canvas writes outside a rAF (was 22 of 46), 0/6 for `setPixelRatio`, `setSize` and `composer.setSize`, 0 buffer mismatches in 65 frames, composer resized not rebuilt (§4.2). RED 6/13; two render-scale rungs before the first tier rung; DPR applied inside the drawing frame — **and pass 2b closed the composer lag (`composer.setSize` outside a rAF 6/6 → 0/6) and the buffer mismatch (22 of 46 → 0 of 43)**. **The DPR double-apply is ATTRIBUTED and FIXED** (`a0c1484`): the second writer is r3f's own zustand subscriber, re-applying `setPixelRatio` + `setSize` outside any frame after an AWAITED `root.configure` — triggered by the rig's own `setDpr`, so within the flag's reach — and `installResizeGuard` drops a resize into the state the renderer already holds while keeping `setViewport`, with `verify-step-guard.mjs` 13/13 behind it (§4.2). **`nativeRefresh` measured at last** — target 144 following a 144 Hz display in the re-take, where it is a no-op at 60 Hz (§6 item 4 keeps only the taste half) | **ON** (incl. `nativeRefresh`), merged `5b13e35` **ON**, merged `5b13e35` |
 | `HUD_SYNC` + `REBASE_CALM` | labels drawn with this frame's matrices; 704 m quantised anchor | **ON**, merged `5b13e35` **ON** (`quantM` 704), merged `5b13e35` |
 | `FINALIZE_PACE` | **rule-1 spike fix CONFIRMED on the venue** (§4.2, flash-guard part 1) — and a SECOND defect attributed at the close: **the paced branch's toy merged index is a raw `Uint32Array` handed to `setIndex`, which wraps only a plain Array, so `WebGLAttributes` throws on `array.byteLength` once per toy land mesh** (80 broken meshes with the flag on in B's 2×2, 0 with it off, independent of `FLASH_GUARD`); **fixed in `e7325cd`** (wrapped, and the width mirrored from three rather than inferred), with `verify-finalize-pace` at **21/21** and B's census `BROKEN=0` on the dry tree; the ladder-fix re-take is the census leg. One shared brake. **Its first rule shipped as a LEVEL detector and starved every finalize below ~41 fps** — found at the close, §1 and §4.2 — and now refuses only on a genuine spike (> 24 ms AND > `spikeK` **2** × an EMA of the preceding frames) with a hard `maxRefuseFrames` **3** cap; `verify-finalize-pace` 14 → 17 gates, and the single-hitch gate passes both ways, so the behaviour the rule was written for did not move | **ON**, merged `5b13e35`, fix `abd127c` merged `3d388ec` |

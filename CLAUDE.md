@@ -85,7 +85,12 @@
 >
 > **OPEN**: `LOD_CROSSFADE`'s one specified re-run; the night gates
 > (`verify-sat-night`, `verify-dusk`, `verify-flicker`) after the hill ruling
-> moved satellite night ground pixels <!-- NIGHT GATES PENDING -->; four tail
+> moved satellite night ground pixels — their first attempt was VOID on the
+> legacy screenshot path (Playwright's actionability check never settles on a
+> continuously rendering canvas), and the one reading that got out is a NEW
+> OPEN item: `verify-dusk` reads both `SatEnvironment` intensities scaled by
+> ~0.868 at a PINNED NOON, so something shipped ON this round dims the
+> satellite environment BY DAY <!-- NIGHT GATES PENDING -->; four tail
 > re-runs (one-sun, linear-haze, haze-red, depth-rt) <!-- TAIL RE-RUNS PENDING -->; and §5b's follow-ups —
 > R25 re-authoring the rim keyframes against the dome's measured horizon colour
 > (four consumers, re-certified together), a shared-DEM request coalescer
