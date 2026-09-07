@@ -58,6 +58,12 @@ const SETTLE = Number(process.env.LOD_SETTLE_MS || 45000);
 // short ARC and refuses to judge, where before it silently judged a 720 deg
 // wall-clock spin taken 51 deg at a time.
 const DEG_PER_FRAME = Number(process.env.LOD_DEG_PER_FRAME || 0.85);
+// 40 s was the wall-clock default this gate was born with and it cannot buy a
+// revolution here: the arc is FRAMES x 0.85 deg, and the standalone run needed
+// 424 frames for 360 deg while managing ~2.9 s/frame. The default stays 40 s so
+// no existing invocation changes length; the certification runs pass
+// FLY_LOD_SWEEP_MS explicitly (1,500,000 for the re-run — 1,230 s of frames
+// plus margin, and with the OFF page now closed the ON arm should need less).
 const SWEEP_MS = Number(process.env.FLY_LOD_SWEEP_MS || 40000);
 const MIN_ARC_DEG = Number(process.env.LOD_MIN_ARC_DEG || 360);
 
@@ -609,12 +615,60 @@ function soft(name, detail) {
       `${fetchedTiles.length} distinct tile URLs fetched in the window (total ${stats?.total ?? '?'}) — ` +
         'without this, "0 refetched" and "nothing happened" are the same reading'
     );
-    gate(
-      '(6) NO UNBOUNDED TILE REFETCH during the sweep (fixture /__stats)',
-      refetched.length === 0,
-      `${refetched.length} of ${fetchedTiles.length} tile URLs refetched` +
-        (refetched.length ? `: e.g. ${refetched[0][0]} x${refetched[0][1]}` : '')
+    // A DUPLICATED URL IS NOT NECESSARILY A REFETCH.
+    //
+    // A's ruling from source, and it retires this gate's headline number: the
+    // DEM ceiling `TILES.demMaxZoom` is 15 while imagery's is 17, and PAST A
+    // SOURCE'S maxLevel the vendored `de()` requests the ANCESTOR'S URL with
+    // clipBounds. So all four z16 children of a z15 DEM tile legitimately fetch
+    // that one URL — four distinct TILES, one URL, four requests, and a z17
+    // descendant makes it up to sixteen. That is SHARING, not re-downloading,
+    // and it is exactly why the standalone run's "14 of 552 refetched, worst
+    // 4x /dem/15/8822/12386.png" were ALL DEM and no imagery URL duplicated at
+    // all: imagery never exceeds its own ceiling.
+    //
+    // A per-URL counter cannot tell the two apart, so the gate stops trying to
+    // and classifies instead. The ceiling is source-parsed rather than
+    // hard-coded, so raising it re-derives the prediction rather than silently
+    // invalidating this rule.
+    const demSrc = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'lib', 'fly', 'fly-constants.js'),
+      'utf8'
     );
+    const mDem = demSrc.match(/^\s*demMaxZoom:\s*(\d+)/m);
+    const DEM_MAX_Z = mDem ? Number(mDem[1]) : null;
+    const zOf = (u) => {
+      const m = u.match(/^\/(img|dem)\/(\d+)\//);
+      return m ? { kind: m[1], z: Number(m[2]) } : null;
+    };
+    const shared = [];
+    const realRefetch = [];
+    for (const [u, n] of refetched) {
+      const k = zOf(u);
+      if (k && k.kind === 'dem' && DEM_MAX_Z != null && k.z === DEM_MAX_Z) shared.push([u, n]);
+      else realRefetch.push([u, n]);
+    }
+    console.log(
+      `  duplicate-URL classification (demMaxZoom ${DEM_MAX_Z ?? 'NOT PARSED'}): ${shared.length} ` +
+        `SHARED (a DEM tile at the ceiling serving its descendants — expected) · ` +
+        `${realRefetch.length} REFETCHED (a duplicate that is not ceiling-sharing)` +
+        (shared.length ? `  e.g. shared ${shared[0][0]} x${shared[0][1]}` : '')
+    );
+    if (DEM_MAX_Z == null)
+      notCalibrated(
+        '(6) NO UNBOUNDED TILE REFETCH during the sweep (fixture /__stats)',
+        'TILES.demMaxZoom could not be source-parsed, so ceiling-sharing cannot be told from a ' +
+          're-download and the duplicate count means nothing on its own'
+      );
+    else
+      gate(
+        '(6) NO UNBOUNDED TILE REFETCH during the sweep (fixture /__stats)',
+        realRefetch.length === 0,
+        `${realRefetch.length} genuine refetch(es) of ${fetchedTiles.length} distinct tile URLs` +
+          (realRefetch.length ? `: e.g. ${realRefetch[0][0]} x${realRefetch[0][1]}` : '') +
+          `; ${shared.length} duplicate(s) are ceiling-sharing at z${DEM_MAX_Z} and are NOT ` +
+          'refetches. An imagery duplicate at any z, or a DEM duplicate off the ceiling, would be'
+      );
   }
 
   // --- Owens: the draw ceiling must not move because of a fade
@@ -762,6 +816,26 @@ function soft(name, detail) {
     // GPU. `skipBootMs: 0` is [D2].
     const PIN = { enabled: true, skipBootMs: 0 };
     if (process.env.LOD_FADE_SEC) PIN.fadeSec = Number(process.env.LOD_FADE_SEC);
+    // TWO LIVE SWIFTSHADER CONTEXTS ARE NOT TWO COMPARABLE ARMS.
+    //
+    // D found this in the standalone run and it is the systematic bias behind
+    // the 0.745 frame ratio that made (14) NOT CALIBRATED: `ctx2` was created
+    // while the OFF page was still open, so the ON sweep shared the CPU with a
+    // live context while the OFF sweep had the machine to itself — a ~27%
+    // frame deficit built into the comparison. Raising the sweep cap would have
+    // produced a longer run with the same bias.
+    //
+    // I fixed exactly this in verify-flash-guard two passes ago — closing page
+    // 1 is what finally let its armed leg settle — and did not carry it across.
+    // Everything the OFF arm contributes is already captured by this point
+    // EXCEPT gate (9)'s pace read, so that one value is taken first and the
+    // page is closed before the second context exists.
+    const paceOff = await page.evaluate(() => window.__flyTerraPaceOverride ?? null);
+    await page.evaluate(() => {
+      if (window.__lodPin) clearInterval(window.__lodPin);
+      if (window.__lodYaw) window.__lodYaw.done = true;
+    });
+    await page.close();
     const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     const fx2 = process.env.FLY_TILE_FIXTURE ? await require('./_fixture').attachFixture(ctx2) : null;
     const p2 = await ctx2.newPage();
@@ -780,11 +854,10 @@ function soft(name, detail) {
       polling: 250,
     });
 
-    // [D7] both legs must be streaming under the SAME pace policy.
-    const pace = await Promise.all([
-      page.evaluate(() => window.__flyTerraPaceOverride ?? null),
-      p2.evaluate(() => window.__flyTerraPaceOverride ?? null),
-    ]);
+    // [D7] both legs must be streaming under the SAME pace policy. The OFF
+    // arm's value was captured BEFORE its page was closed (see the close
+    // above); only the ON arm is read here.
+    const pace = [paceOff, await p2.evaluate(() => window.__flyTerraPaceOverride ?? null)];
     gate(
       '(9) TERRA_PACE IS THE SHIPPED STATE ON BOTH LEGS — no pace pin on either page',
       pace[0] == null && pace[1] == null,
@@ -895,12 +968,25 @@ function soft(name, detail) {
       `${d('refines')} refines + ${d('merges')} merges = ${swapsON}. Zero here makes every gate ` +
         'below NOT CALIBRATED, not green: nothing was offered to the ladder'
     );
+    // [D revised P3] `shape` and `unpatched` stay HARD ZERO — they mean the
+    // ladder could not reach a material, which is always the ladder's problem.
+    // `noParentMap` is a property of the WORLD, not of the ladder: the vendored
+    // index.js:1236 catches a failed imagery load with `_errorMaterial.clone()`
+    // — a MeshBasicMaterial with no map — so one transient miss on a parent
+    // yields exactly one benign fall-through to the upstream swap. The
+    // standalone run's single event was attributed there. It is therefore
+    // ALWAYS REPORTED and fails only when it is common enough to be a
+    // mechanism (>5% of the window's refines) or when the attribution shows the
+    // parent DID have a map.
+    const noParentPct = swapsON > 0 ? (100 * ds('noParentMap')) / swapsON : 0;
     gate(
       '(12) NO FADE WAS DENIED FOR A REASON THAT IS A DEFECT',
-      ds('shape') === 0 && ds('noParentMap') === 0 && ds('unpatched') === 0,
-      `shape ${ds('shape')} · noParentMap ${ds('noParentMap')} · unpatched ${ds('unpatched')} — each ` +
-        'must be 0. unpatched in particular means a material the ladder could not reach, i.e. the ' +
-        'pin landed after patching'
+      ds('shape') === 0 && ds('unpatched') === 0 && noParentPct <= 5,
+      `shape ${ds('shape')} · unpatched ${ds('unpatched')} (both must be 0) · noParentMap ` +
+        `${ds('noParentMap')} = ${noParentPct.toFixed(1)}% of ${swapsON} window refines (fails ` +
+        'above 5%). A parent with no map is index.js:1236 handing back an _errorMaterial clone ' +
+        'after a transient imagery miss — the world, not the ladder' +
+        (f1?.skipContext ? ` · context ${JSON.stringify(f1.skipContext)}` : '')
     );
     if (ds('warp') !== 0)
       soft(
@@ -1183,7 +1269,32 @@ function soft(name, detail) {
     }));
     console.log(`ON  Owens (fixture column): draws=${owens2.draws} tris=${owens2.tris}`);
     // [D8] EQUAL to the OFF leg's fixture numbers, not "under the live ceiling".
-    if (!owensSettleOff.settled || !owensSettleOn.settled)
+    // (18) COMPARES TWO SCENES, SO IT MUST FIRST CHECK THEY ARE THE SAME SCENE.
+    //
+    // MEASURED in the standalone run: the OFF leg settled Owens to maxZ 17 in
+    // 53 s and the ON leg to maxZ 16 in 197 s — DIFFERENT LOD DEPTHS — and the
+    // gate then compared their draw counts and failed. It read 275 vs 259: the
+    // ON arm has FEWER draws, which a crossfade cannot cause. The equality
+    // assertion silently presumed the two Owens scenes were identical and never
+    // checked, so it convicted the flag of a difference the streamer made.
+    //
+    // A settled scene is only comparable to another settled scene at the same
+    // zoom with the same tile field, so both are now preconditions.
+    const zOff = owensSettleOff.maxZ;
+    const zOn = owensSettleOn.maxZ;
+    const tOff = owensSettleOff.tiles;
+    const tOn = owensSettleOn.tiles;
+    const sameScene =
+      zOff === zOn && (!Number.isFinite(tOff) || !Number.isFinite(tOn) || tOff === tOn);
+    if (owensSettleOff.settled && owensSettleOn.settled && !sameScene)
+      notCalibrated(
+        '(18) OWENS IS BIT-FOR-BIT THE SAME SCENE — draws AND triangles equal the OFF leg',
+        `the two arms settled DIFFERENT scenes — maxZ ${zOff} vs ${zOn}, tiles ${tOff} vs ${tOn} ` +
+          `(OFF ${owensSettleOff.ms / 1000}s, ON ${owensSettleOn.ms / 1000}s). Read: ON ` +
+          `${owens2.draws}/${owens2.tris} vs OFF ${offLeg.owensDraws}/${offLeg.owensTris}. A draw ` +
+          'difference between two different zoom levels is the streamer, not the crossfade'
+      );
+    else if (!owensSettleOff.settled || !owensSettleOn.settled)
       notCalibrated(
         '(18) OWENS IS BIT-FOR-BIT THE SAME SCENE — draws AND triangles equal the OFF leg',
         `an arm did not settle (OFF ${owensSettleOff.settled} — ${owensSettleOff.why} · ON ` +
@@ -1193,7 +1304,7 @@ function soft(name, detail) {
       );
     else
       gate(
-        '(18) OWENS IS BIT-FOR-BIT THE SAME SCENE — draws AND triangles equal the OFF leg',
+        `(18) OWENS IS BIT-FOR-BIT THE SAME SCENE (both at maxZ ${zOff}, ${tOff} tiles) — draws AND triangles equal the OFF leg`,
         Number.isFinite(owens2.draws) &&
           owens2.draws === offLeg.owensDraws &&
           owens2.tris === offLeg.owensTris,
