@@ -58,6 +58,7 @@ const path = require('path');
 const sharp = require('sharp');
 const { bootFly } = require('./_boot');
 const { makeCanvasShot } = require('./_canvasshot');
+const { makeStillTerrain } = require('./_stillterrain');
 
 const BOOT_OPTS = process.env.FLY_URL ? { url: process.env.FLY_URL } : {};
 
@@ -282,6 +283,7 @@ async function meanAbsDiff(fileA, fileB, region) {
     // R24 E: see verify-sat-night — locator.screenshot()'s stability wait can
     // never be satisfied by a continuously rendering canvas on this venue.
     const cap = makeCanvasShot(page);
+    const still = makeStillTerrain(page, { label: 'dusk' });
     const glShot = (n) => cap.shot(path.join(__dirname, n));
     const draws = () => page.evaluate(() => window.__flyStats?.drawCalls ?? -1);
     // THE SIXTH CLOCK, and the same one verify-sat-night's road pair had.
@@ -572,6 +574,12 @@ async function meanAbsDiff(fileA, fileB, region) {
     // guessed at. The override is read per frame; 250 ms is ample.
     await setForegroundVisible(false);
     await page.waitForTimeout(600);
+    // Same premise, same witness as verify-sat-night's pairs: with
+    // LOD_CROSSFADE ON the terrain is a time-varying surface for seconds after
+    // any refine, and these four shots at 250 ms spacing are exactly the case
+    // that straddles a blend. The 250 ms spacing and every bound below are
+    // unchanged; only the moment the series STARTS moves.
+    await still.still('noon A/B series');
     await glShot('r19d-01-noon-on.png');
     await page.waitForTimeout(250);
     await glShot('r19d-02-noon-onb.png');
