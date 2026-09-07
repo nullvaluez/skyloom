@@ -325,6 +325,31 @@ function gate(name, ok, detail) {
     await page.evaluate((t) => {
       window.__r24Sun = t;
     }, want.tMs);
+    // WAIT FOR THE RECOMPUTE, not for a duration — the same defect verify-one-sun
+    // hit, at a second gate. The app consumes the override inside the sky
+    // effect (FlyScene.jsx:1155), so a fixed wait samples whatever the last
+    // recompute produced. MEASURED in the re-take: both arms reported the WALL
+    // CLOCK at the Owens pose (21.68° and 20.84°) for BOTH the 55° and the −14°
+    // command, so all four legs and the whole A/B read NOT CALIBRATED. The
+    // precondition refused correctly — an A/B run at the wrong hour on both
+    // arms would have compared two identical frames and called the difference a
+    // result.
+    const landed = await page
+      .waitForFunction(
+        ([wantEl, tol]) => {
+          const el = window.__flyStats?.sun?.elDeg;
+          return typeof el === 'number' && Math.abs(el - wantEl) <= tol;
+        },
+        [elDeg, 0.5],
+        { timeout: Number(process.env.SUN_LAND_MS || 120000), polling: 500 }
+      )
+      .then(() => true)
+      .catch(() => false);
+    if (!landed)
+      console.log(
+        `  ${label}: the sun poll never reached ${elDeg}° — the reading below is whatever the app ` +
+          'last recomputed'
+      );
     await page.waitForTimeout(20000);
     // The same precondition one-sun carries: a seam gate that reads the sky at
     // the wrong hour is measuring a different picture than it reports.
