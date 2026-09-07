@@ -95,6 +95,7 @@ const path = require('path');
 const { bootFly } = require('./_boot');
 const { makeCanvasShot } = require('./_canvasshot');
 const { notCalibrated, notCalCount, notCalSummary } = require('./_notcal');
+const { makeStillTerrain } = require('./_stillterrain');
 
 // --- page-side helpers (single array arg — page.evaluate passes exactly one) --
 
@@ -197,6 +198,7 @@ const roadProbe = () => {
   // This gate ran ZERO gates on the fixture for that reason alone. Same region,
   // same bytes, no wait. See scripts/_canvasshot.js.
   const cap = makeCanvasShot(page);
+  const still = makeStillTerrain(page, { label: 'sat-night' });
   const glShot = (n) => cap.shot(path.join(__dirname, n));
   const shot64 = () => cap.shot64();
   const draws = () => page.evaluate(() => window.__flyStats?.drawCalls ?? -1);
@@ -372,14 +374,25 @@ const roadProbe = () => {
   const abProbe = async (setVisible, tag, y0f = 0.55, y1f = 0.98) => {
     await setForegroundVisible(false);
     await page.waitForTimeout(250);
+    // THE PAIR'S UNSTATED PREMISE, now stated: nothing but the toggle changes
+    // between the two captures. With LOD_CROSSFADE shipped ON that is false
+    // while a blend is running — see scripts/_stillterrain.js for the measured
+    // case (the noise control rose FASTER than the signal, x3.96 vs x3.41, and
+    // both deltas covered the whole terrain band). The witness is taken before
+    // EACH capture, not once for the probe, because a blend can start between
+    // them.
+    await still.still(`${tag} on1`);
     const on1 = await shot64();
+    await still.still(`${tag} noise`);
     const noise = await bandDelta(on1, await shot64(), y0f, y1f); // no toggle
     await setVisible(false);
     await page.waitForTimeout(500);
+    await still.still(`${tag} off`);
     const off = await shot64();
     const px = await bandDelta(on1, off, y0f, y1f);
     const offDraws = await freshDraws();
     await setVisible(true);
+    await still.still(`${tag} on2`);
     const onDraws = await freshDraws();
     await setForegroundVisible(true);
     const out = {

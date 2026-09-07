@@ -2479,3 +2479,61 @@ verify-depth-offset 7/7 - verify-worker-normals 12/12 - four proofs PASS (the
 roundtrip proof now carries the bent-surface calibration) - import-integrity 4/0
 - eslint 0/0, `no-unused-vars` 0 (three scratch vectors died with the rewrite).
 `scripts/verify-depth-roundtrip.js` untouched. No browser.
+
+---
+
+## CLOSE — DEPTH_FIX certified both ways, and one of my own arguments refuted
+
+w6 on the flipped tree (`d960fdb`, `ea30f64` served, E's rebuilt clauses, player
+parked): **11 passed / 0 failed, rc=0.**
+
+| pick | truth | probe | err |
+|---|---|---|---|
+| nearest | 1201.7 m | 1201.71 | 0.00 % |
+| median | 2399.3 m | 2399.39 | 0.00 % (0.05 m, where w5 read +74.01) |
+| farthest | 2836.6 m | 2836.79 | 0.01 % (0.22 m against a 48.58 m bound) |
+
+Every pick `via bend-solved · family ground · converged true`. The measured CoC
+equals the material's own formula at the probe's distance within the 8-bit
+quantum at all three (0.1373 / 0.8353 / 0.9804), and (4)'s ordering holds with a
+0.8431 spread. So DEPTH_FIX is certified in BOTH directions on the venue —
+buffer against geometry through the truth hook, and DoF against buffer through
+E's CoC clause — with the R24 double-un-reversal signature absent. **Every red
+this row ever showed was an instrument's, and every instrument was mine.**
+
+### The argument I got wrong, recorded because it was mine
+
+When E reported the w5 sweep-vs-assertion drift (hundreds of metres, mixed
+signs) I gave two reasons it could not be the arbiter. The first stands; **the
+second was wrong, and the field I added to settle it is what refuted me.**
+
+* **Stands:** a per-pick read is atomic — `probe()` samples
+  `composer.depthTexture` and calls `truth()` in one synchronous turn, so no rAF
+  can intervene and both see one depth texture, one scene graph, one camera.
+* **REFUTED:** *"a single instrument cannot produce a DRIFT between two of its
+  own readings — a constant bias cancels."* E's `eye` print shows the camera
+  moved **0.8 / 1.3 / 1.1 m** between the sweep and the assertion. A metre
+  cannot move a ground intercept by hundreds of metres, so the w5 shifts were
+  the degenerate arbiter picking a DIFFERENT SURFACE, not motion.
+
+The category error is the lesson: **the degenerate arbiter was not a bias, it
+was a SELECTOR.** Its validity test was trivially satisfied by every candidate,
+so `nearest-valid-t` was choosing among a pool on a knife edge, and a metre of
+camera travel could flip which surface won. A bias cancels between two readings
+of the same instrument; a selector AMPLIFIES the smallest input change into a
+discontinuous output. I reasoned about the first and shipped the second — and I
+had already been told, in this same round, that "a probe green on a quiet boot
+is not a probe green under load" (R21 §5). This is the same shape: an instrument
+whose answer is stable only while nothing moves.
+
+The `eye` field exists because I wanted "expected motion" to be a measurement
+rather than an argument. It became one, and it decided against me. That is the
+field earning its place, and the label now covers exactly the metre it should.
+
+### Standing node-only state at close
+
+verify-c-flagoff 58/58 - verify-shadow-calm 33/33 - verify-depth-offset 7/7 -
+verify-worker-normals 12/12 - four proofs PASS (the roundtrip proof carrying the
+bent-surface RED/GREEN calibration) - verify-import-integrity 4/0 - eslint 0/0 -
+`no-unused-vars` 0. No browser and no dev server was started from this worktree
+at any point in the close.
