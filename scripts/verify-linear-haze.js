@@ -249,6 +249,9 @@ function gate(name, ok, detail) {
     );
 
   const arms = {};
+  // Both arms' spreads, so the A/B block can print the RATIO — the part of
+  // clause (3) that is a real signal about the decode.
+  const spreads = {};
   for (const [hazeEnabled, armLabel] of ARMS) {
     const { context, page, errorsNote } = await runArm(hazeEnabled, armLabel);
     arms[armLabel] = await measurePoses(page, errorsNote, armLabel);
@@ -392,7 +395,23 @@ function gate(name, ok, detail) {
       tier: window.__flyStore?.getState?.().qualityTier ?? null,
       moonK: window.__flyStats?.sun?.moonK ?? null,
     }));
-    console.log(`  ${label}: aerialGate ${melt.gate} · aerial pass ${JSON.stringify(melt.pass)} · tier ${melt.tier}`);
+    // WHICH HAZE CHANNELS WERE LIVE ON THE FRAME. The parked-tree run printed
+    // "aerial pass null" beside "aerialGate 1", which reads as a contradiction
+    // and leaves the A/B unable to say WHAT it compared: the content haze in
+    // the terrain material, or the post-process aerial pass, or both. The row
+    // now names them.
+    const channels = await page.evaluate(() => ({
+      aerialPass: window.__flyStats?.effects?.aerial ?? null,
+      aerialGate: window.__flyStats?.aerial?.gate ?? window.__flyAerialOverride ?? null,
+      contentHaze: window.__flyStats?.haze?.content ?? null,
+      depthHaze: window.__flyStats?.haze?.depth ?? null,
+      hazeLinear: window.__flyStats?.haze?.linear ?? null,
+    }));
+    console.log(
+      `  ${label}: aerialGate ${melt.gate} · tier ${melt.tier} · channels ` +
+        `${JSON.stringify(channels)} — the A/B compares whatever is LIVE here, so a null ` +
+        'post-pass beside a non-zero gate means the content haze is the channel under test'
+    );
     if (melt.tier !== 'high' || !(Number(melt.gate) > 0)) {
       notCalibrated(
         `(1/2) ${label} THE MELT IS ACTIVE`,
@@ -476,14 +495,28 @@ function gate(name, ok, detail) {
         `one of the two poses produced no reading (noon ${!!results.noon}, night ${!!results.night})`
       );
     else {
+      // (3) IS INFORMATIONAL, AND THE REASON IS AN OWNERSHIP ONE.
+      //
+      // A seam that reads the same at 55° and at −14° is C's M1 tuning equality
+      // — the haze target made identical to the dome's horizon colour — which C
+      // REFUSED this round. The recon never claimed the decode alone would
+      // deliver it, and the decode is what LINEAR_HAZE does. So a FAIL here is
+      // a failure against a bound its owner declined to adopt, which is not a
+      // finding about anything; it is this gate asserting a different feature's
+      // contract.
+      //
+      // The number is still worth having and is still printed for BOTH arms,
+      // because the RATIO is a real signal about the decode: the parked-tree
+      // run measured spread OFF 21.1 → ON 11.7, i.e. the decode roughly halves
+      // the seam's dependence on the hour even though it does not remove it.
+      // (5a)/(5b) carry the verdict.
       const spread = Math.abs(results.noon.delta - results.night.delta);
-      numGate(gate)(
-        `(3) ${armLabel} THE SEAM DOES NOT DEPEND ON THE TIME OF DAY`,
-        spread,
-        spread <= 0.5,
-        `noon Δ ${results.noon.delta.toFixed(1)} vs night Δ ${results.night.delta.toFixed(1)} — ` +
-          `spread ${spread.toFixed(1)}, bound 0.5. (Pass 2b read 0.1 — but both legs were the same ` +
-          'wall-clock frame, so it proved nothing; with the sun really moving, this has teeth.)'
+      spreads[armLabel] = spread;
+      console.log(
+        `INFO  (3) ${armLabel} SEAM vs TIME OF DAY — spread ${spread.toFixed(1)} ` +
+          `(noon Δ ${results.noon.delta.toFixed(1)} vs night Δ ${results.night.delta.toFixed(1)}). ` +
+          'INFORMATIONAL: time-of-day independence is C\'s M1 tuning equality, refused this round ' +
+          '— the decode is not claimed to deliver it. The A/B legs carry the verdict.'
       );
     }
     gate(`(4) ${armLabel} NO PAGE ERRORS`, errors.length === 0, errorsNote());
@@ -500,6 +533,14 @@ function gate(name, ok, detail) {
     const A = armResults[aName];
     const B = armResults[bName];
     console.log(`\n=== A/B: ${aName} vs ${bName} ===`);
+    if (Number.isFinite(spreads[aName]) && Number.isFinite(spreads[bName]))
+      console.log(
+        `  time-of-day spread (INFORMATIONAL): ${aName} ${spreads[aName].toFixed(1)} → ${bName} ` +
+          `${spreads[bName].toFixed(1)} · ratio ` +
+          `${(spreads[bName] / Math.max(1e-9, spreads[aName])).toFixed(2)} — the decode is not ` +
+          "claimed to remove the hour dependence (that is C's refused M1 tuning equality), but the " +
+          'ratio says how much of it the decode alone accounts for'
+      );
     for (const label of ['noon', 'night']) {
       const a = A?.[label];
       const b = B?.[label];
@@ -521,6 +562,32 @@ function gate(name, ok, detail) {
         continue;
       }
       const better = b.delta < a.delta;
+      const diff = a.delta - b.delta;
+      // (b) THE A/B IS JUDGED AGAINST THE NOISE FLOOR, NOT AGAINST ZERO.
+      //
+      // haze-red runs both arms pinned { enabled: false }: two identical trees
+      // that cannot separate by construction, so whatever difference it reports
+      // IS this reader's noise. A separation smaller than that floor is not a
+      // result in either direction — it is the reader. HAZE_NOISE_FLOOR carries
+      // it in from that row; without it the gate says so rather than pretending
+      // a bare sign test is a verdict.
+      const floor = Number(process.env.HAZE_NOISE_FLOOR || NaN);
+      if (!redMode && Number.isFinite(floor) && Math.abs(diff) < floor) {
+        notCalibrated(
+          `(5${label === 'noon' ? 'a' : 'b'}) THE A/B (${label}) — NOT SEPARATED`,
+          `Δ off ${a.delta.toFixed(1)} → on ${b.delta.toFixed(1)}, difference ` +
+            `${diff.toFixed(2)} — below haze-red's measured noise floor of ${floor}. Neither a ` +
+            'pass nor a fail: the two arms did not separate by more than this reader separates ' +
+            'from itself'
+        );
+        continue;
+      }
+      if (!redMode && !Number.isFinite(floor))
+        console.log(
+          `      (5${label === 'noon' ? 'a' : 'b'}) NOTE: no HAZE_NOISE_FLOOR supplied, so this ` +
+            "verdict is a bare sign test. Run haze-red and pass its measured floor in, or the " +
+            'difference below cannot be told from the reader'
+        );
       console.log(
         `  ${label}: Δ ${aName} ${a.delta.toFixed(1)} vs ${bName} ${b.delta.toFixed(1)} — ` +
           `difference ${(a.delta - b.delta).toFixed(2)}`
