@@ -764,15 +764,57 @@ async function runArm(context, fx, paceOn) {
   // passes when the arm did not report is the one gate in this file that must
   // never be able to do that. Absence is NOT CALIBRATED; only a finite number
   // gets a verdict. (E, R24 close sweep §2.10a.)
-  const ceilPair = (name, ceiling, a, b, why) => {
-    if (!Number.isFinite(a) && !Number.isFinite(b)) return notCalibrated(name, `${why}: off ${a} / on ${b}`);
-    const parts = [a, b].filter((v) => Number.isFinite(v));
-    return gate(name, parts.every((v) => v <= ceiling), `off ${a} / on ${b} (ceiling ${ceiling})`);
+  //
+  // A CEILING READ OFF AN UNSETTLED CENSUS IS NOT A MEASUREMENT (D's proposal,
+  // Fable approved). When the settle hits its cap the world is still arriving,
+  // so the census is of whatever the streamer had reached at that instant — it
+  // can land under the ceiling or over it for reasons that have nothing to do
+  // with the tree. On w6 BOTH arms' Owens censuses capped with a small constant
+  // download count (off dl 6, on dl 8) and this clause compared 186 against 279
+  // as though they were settled figures; the OFF number was as inadmissible as
+  // the ON one.
+  //
+  // So an arm that did not converge contributes NOTHING to the verdict, and if
+  // no arm converged the clause reads NOT CALIBRATED with both numbers and
+  // their status printed. A's `poses[name].settled` (info.converged) already
+  // carries the answer — it simply was not consulted.
+  //
+  // THE CEILINGS DO NOT MOVE. 261 and 375 stand exactly as frozen. This changes
+  // which readings are ADMISSIBLE, not what they must be under, and it can only
+  // ever withhold a verdict — never grant one. Same shape as verify-lod-fade's
+  // (18), which refuses to compare two arms that settled different scenes.
+  // RED: the w6 numbers themselves, 186 / 279, both unsettled.
+  const ceilPair = (name, ceiling, a, b, why, aSettled = true, bSettled = true) => {
+    const admissible = [];
+    if (Number.isFinite(a) && aSettled) admissible.push(['off', a]);
+    if (Number.isFinite(b) && bSettled) admissible.push(['on', b]);
+    const shown =
+      `off ${a}${Number.isFinite(a) && !aSettled ? ' (NOT SETTLED)' : ''} / ` +
+      `on ${b}${Number.isFinite(b) && !bSettled ? ' (NOT SETTLED)' : ''}`;
+    if (!admissible.length)
+      return notCalibrated(
+        name,
+        Number.isFinite(a) || Number.isFinite(b)
+          ? `${shown} — every arm that produced a number hit its settle cap, so each census is of ` +
+            'a world still arriving. The ceiling has nothing admissible to judge; this is the ' +
+            'convergence criterion refusing to certify a tree that never went quiet, not a pass ' +
+            'and not a breach.'
+          : `${why}: ${shown}`
+      );
+    return gate(
+      name,
+      admissible.every(([, v]) => v <= ceiling),
+      `${shown} (ceiling ${ceiling}) — judged on the ${admissible.map(([k]) => k).join(' + ')} arm${
+        admissible.length > 1 ? 's' : ' only'
+      }`
+    );
   };
   ceilPair('7 CEILING: Owens draws <= 261 in every arm that ran (the frozen desert control)',
-    261, off.poses.owens.draws, on.poses.owens.draws, 'neither arm reported an Owens draw count');
+    261, off.poses.owens.draws, on.poses.owens.draws, 'neither arm reported an Owens draw count',
+    off.poses.owens.settled !== false, on.poses.owens.settled !== false);
   ceilPair('8 CEILING: satellite draws <= 375 at the suburb pose in every arm that ran',
-    375, off.poses.powell.draws, on.poses.powell.draws, 'neither arm reported a suburb draw count');
+    375, off.poses.powell.draws, on.poses.powell.draws, 'neither arm reported a suburb draw count',
+    off.poses.powell.settled !== false, on.poses.powell.settled !== false);
   gate('9 no page errors in either arm', off.errs.length === 0 && on.errs.length === 0,
     [...off.errs, ...on.errs].slice(0, 6).join(' | ') || 'clean');
 
