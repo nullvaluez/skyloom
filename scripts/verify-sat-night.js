@@ -93,6 +93,7 @@
 const { chromium } = require('playwright');
 const path = require('path');
 const { bootFly } = require('./_boot');
+const { makeCanvasShot } = require('./_canvasshot');
 
 // --- page-side helpers (single array arg — page.evaluate passes exactly one) --
 
@@ -183,8 +184,14 @@ const roadProbe = () => {
   };
 
   const canvas = () => page.locator('.fixed.inset-0 canvas').first();
-  const glShot = (n) => canvas().screenshot({ path: path.join(__dirname, n) });
-  const shot64 = async () => (await canvas().screenshot()).toString('base64');
+  // R24 E: page.screenshot({ clip }) instead of locator.screenshot() — the
+  // locator form runs the actionability check and waits for the element to be
+  // STABLE, which a canvas rendering continuously at ~0.4 fps never satisfies.
+  // This gate ran ZERO gates on the fixture for that reason alone. Same region,
+  // same bytes, no wait. See scripts/_canvasshot.js.
+  const cap = makeCanvasShot(page);
+  const glShot = (n) => cap.shot(path.join(__dirname, n));
+  const shot64 = () => cap.shot64();
   const draws = () => page.evaluate(() => window.__flyStats?.drawCalls ?? -1);
 
   // Mean |Δ| per channel (0..255) between two canvas screenshots, restricted to

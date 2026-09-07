@@ -1538,8 +1538,44 @@ a night target is reachable at all), and **no clause runs until the app reports
 the commanded elevation within 0.5°** — the precondition whose absence let a
 stationary sun read as a stationary key.
 
-**PASS 2c (standalone re-take).** *pending* — exactly one key direction across
-every lit material at every tier, with the azimuth spread tracking the sun.
+**PASS 2c (tail re-run, integration `3231f7d`, 2026-09-07 03:02).**
+**42 passed, 0 failed, rc 0**, 419 s. GREEN, at the strict bound.
+
+The contract is `1e-6°` and it was met with **five orders of magnitude to
+spare**: the largest azimuth residual across the whole run is **2.41e-8°**, and
+three of the six azimuth legs read **exactly 0.00e+0°**. This is the number the
+round nearly lost — merge 30 had loosened this clause to `1e-3°` to cover four
+residuals that turned out to be **the instrument's own `toFixed(6)`** on the
+published direction vectors, not the feature's error. A `1e-3°` bound would have
+baked that rounding into the contract and hidden the next real drift five orders
+beneath it. C published nine decimals instead (`7fa86cb`); the bound went back
+to `1e-6` (`5a58f5e`); the tree meets it.
+
+| Leg | high | medium |
+|---|---|---|
+| (0c) the sun is where the gate put it | 54.998 / 2.002 / −14.001° vs commanded 55 / 2 / −14 | same three, identical |
+| (1) azimuth key ≡ hill | Δ 2.41e-8 / 0.00e+0 ° | Δ 2.60e-9 / 1.35e-8 ° |
+| (1b) azimuth key ≡ dome (dusk) | Δ 1.35e-8° | Δ 0.00e+0° |
+| (2) key elevation ≡ true | 54.998 vs 55.000 (casting **true**) | 54.998 vs 55.000 (casting **false**) |
+| (3) hill elevation ≡ clamp(true) | 51.566 vs 51.566° | 51.566 vs 51.566° |
+| (2/4) night: key ≡ published moon key | az 45.188 el 34.377, **Δ 0.0000** both | **Δ 0.0000** both |
+| (3m) night: hill follows the key | **Δ 0.0000** both | **Δ 0.0000** both |
+| (5)/(5b) water ≡ key, and BY SOURCE | Δ 0.000000°, `waterSource "key-light"` | same |
+
+**(6) THE MEDIUM-TIER RED reads 153.2958°** of key-azimuth spread across the
+three sun elevations, against the **0.0000°** C measured on the flag-off tree
+(azimuth −56° every hour). The red has teeth and the feature moves the light.
+
+**(8)** counts **1** `<directionalLight>` declaration in `FlyScene.jsx` from
+source, comments and strings stripped — the identity that makes clause (5)
+mean anything. **(7)** clean: no page errors.
+
+Two details worth keeping: `casting` differs by tier (**true** at high, **false**
+at medium) and clause (2) is written to floor at `minElRad` *only while casting*,
+so the same commanded sun is asserted differently at the two tiers by design —
+not a tolerance. And (0c), the precondition that the sun is where the gate put
+it, is what makes all forty-two of these numbers admissible; its absence in
+PASS 2b let a **stationary sun read as a stationary key**.
 
 ---
 
@@ -1659,6 +1695,27 @@ fragment collapsed.
 ---
 
 ### 5.10 `verify-terra-live` — the residency trio, both arms
+
+**BEFORE THE STANDALONE RE-RUN — two columns the close asked for that this
+harness does not print.** The close wants, beside the merge count, (a) the
+**eviction count** and (b) a **growth column**: the drawn set early in the sweep
+against the same set late in it. Both are already MEASURED — `CENSUS` returns
+`lod: window.__flyTerra.lod()`, which is A's whole `stats` object including
+`evictions`, `effectiveCap`, `visibleTiles`, `overBudgetPasses` — but the sweep's
+`console.log` selects four fields and the rest never reach the log, so they
+cannot be recovered from a run afterwards. The growth column additionally needs
+a SECOND census, taken partway through the sweep: a residency leak and a steady
+state produce the SAME final number, and only two samples separate them.
+
+This is A's harness (`verify-terra-live — Round 24 (A PACE)`), and the change is
+print-only — no assertion, no bound, no arm, no sweep length moves. The patch is
+prepared and is three `console.log` lines plus one mid-sweep `page.evaluate`;
+routing it is Fable's call. **Recorded here because the alternative is worse
+than the wait**: running the row without it produces a green (or a red) that
+cannot answer the two questions the close is asking of it, and a second full
+~90-minute two-arm run is the price of finding that out afterwards.
+
+---
 
 This gate runs BOTH arms in one process, so its two columns are internal to the
 row: arm A is `TERRA_PACE` off, arm B is the trio on.
@@ -1861,3 +1918,60 @@ moment to do that is when the owner merges, not when the row is red at 21:30.
 by reading a **PASS** line sceptically, or by a self-test the gate ran against
 itself (`__paleSelfTest`, `FADE_PROBE_SELFTEST`). §2.10 was written before the
 rows landed for exactly this reason, and it earned its place.
+
+---
+
+## §6a A SECOND CLASS, FOUND IN THE TAIL: the gate that produced no number, and the gate that measured at the wrong TIME
+
+§6 is about a number read wrongly. The three night gates failed a different way,
+and it is worth separating because the §6 discipline — read the owner's name,
+refuse to coerce absence — would not have caught either of them.
+
+**(1) A gate can fail without producing a verdict, and the summary cannot tell.**
+`verify-sat-night` reported `FAILED: locator.screenshot: Timeout 23971 ms` and
+ran **zero of its 33 gates**. In a run table that is one red cell, and the
+natural reading of "verify-sat-night: 0 gates" is *no night legs moved* — which
+is the precise conclusion C's change was under examination for. Nothing had been
+examined at all. The cause was Playwright's actionability check, which waits for
+the element to be STABLE (two consecutive frames at the same bounding box) — a
+condition a continuously rendering canvas never satisfies at ~0.4 fps. It is not
+a property of the world, the tree, or the flag; it is the harness's own wait
+mechanism being incompatible with its subject.
+
+*The rule:* **a row's gate COUNT is part of its result.** A row that asserted
+nothing must be reported as NOT CALIBRATED, never as a red, and never summarised
+by its exit code alone. `rc != 0` says the process was unhappy; it does not say
+the gate ran.
+
+**(2) A settle expressed in wall clock means different things on two machines.**
+`verify-dusk` slept 26 s and then asserted the sky was EXACTLY the certified
+`0.85 / 1.0`. SatEnvironment ramps both intensities **once per frame**, capped at
+0.25 s of advance per frame regardless of how long the frame took. On a machine
+with frames that is `exp(-26/1.5) = 3.3e-8` from target and lands on the explicit
+snap; here it is 12–13 frames ≈ 3.1 s of ramp, and the gate read env `0.7382`,
+bg `0.8801` — 13.15 % and 11.99 % short, two channels, two seeds, one starved
+ramp. A frozen cell that says "exactly" then fails for a reason with nothing to
+do with the sky, and the first instinct is to suspect the four R24 flags that
+touch lighting. (C cleared every one of them from source. The constant is
+frozen and untouched.)
+
+*The rule, and it is this seat's whole charter:* **a settle must be expressed in
+the units the thing being settled actually advances in.** A ramp that advances
+per FRAME cannot be waited on in SECONDS. Wait on the VALUE, and judge
+convergence over RENDERED FRAMES — a poll interval spanning zero frames reads
+"unchanged" on a frozen page and would call a stall a settle.
+
+**The adaptation must be a superset, not a substitute.** The value wait keeps the
+full original dwell first, so a machine where the clock already sufficed
+measures precisely what it measured before, and only a venue that needs more
+frames takes more. That is what makes it a venue adaptation rather than a
+re-baseline: the CONTRACT did not move, and both machines now wait for the same
+condition instead of the same duration. `FLY_DUSK_SETTLE_MS=0` restores the old
+program exactly, so the red is one env var rather than a citation.
+
+**A gate that got this right by construction, for contrast:** `verify-flicker`
+takes two windows and asserts on the SECOND, and demotes its numbers to
+informational when a quiescence check says the scene is still moving. A starved
+ramp there shows up as *not quiet* and costs a verdict — it cannot forge one.
+The difference is not care; it is that flicker had to distinguish stream-in from
+a periodic defect, and building that control also bought immunity to this.

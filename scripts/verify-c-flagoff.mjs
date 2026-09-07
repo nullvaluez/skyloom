@@ -319,12 +319,32 @@ gate(
   // within tens of metres — which is how the far pick missed a depth-writing
   // object 34 m in front of the camera. Both casts must survive, and the
   // reprojection must be the arbiter rather than a special case.
+  // The correction must not model the bend. Every variant in this tree displaces
+  // only in Y, so the rendered point is the ray point at the hit's XZ — exact
+  // for the ground bend, the anchor variants AND the air bend, with no
+  // per-family case and no reprojection threshold to reject correct candidates
+  // on a grazing ray.
   gate(
-    'the truth casts BOTH an unlifted and a bend-solved ray and takes the NEAREST valid one',
-    /cands\.push\(\{ \.\.\.a, via: 'unlifted' \}\);/.test(dp) &&
-      /cands\.push\(\{ \.\.\.b, via: 'bend-solved' \}\);/.test(dp) &&
-      /const valid = cands\.filter\(\(c\) => c\.reproj <= 1\.5\);/.test(dp) &&
-      /valid\.sort\(\(c1, c2\) => c1\.distance - c2\.distance\);/.test(dp)
+    'the truth corrects by solving the ray at the hit XZ, not by a drop model',
+    /const t = useX\s*\n\s*\? \(h\.point\.x - ray\.origin\.x\) \/ den\s*\n\s*: \(h\.point\.z - ray\.origin\.z\) \/ den;/.test(
+      dp
+    ) && /const impliedDrop = h\.point\.y - _p\.y;/.test(dp)
+  );
+  gate(
+    'validity is the implied drop lying in [0, groundDrop], not a pixel threshold',
+    /const valid = impliedDrop >= -tol && impliedDrop <= groundDrop \+ tol;/.test(dp) &&
+      !/c\.reproj <= 1\.5/.test(dp)
+  );
+  gate(
+    'both casts feed ONE pool and the nearest valid candidate wins',
+    /const pool = castAt\(px, py, 0, size, list, k, cx, cz\);/.test(dp) &&
+      /for \(const c of cast\) pool\.push\(c\);/.test(dp) &&
+      /const valid = pool\.filter\(\(c\) => c\.valid\);/.test(dp) &&
+      /valid\.sort\(\(c1, c2\) => c1\.t - c2\.t\);/.test(dp)
+  );
+  gate(
+    'every candidate on the ray is published, so a disagreement can be READ',
+    /out\.hits = r\.pool/.test(dp) && /impliedDropM: \+h\.impliedDrop\.toFixed\(3\)/.test(dp)
   );
   gate(
     'the truth publishes ONE TEXEL of surface slope, so the bound is measured not guessed',

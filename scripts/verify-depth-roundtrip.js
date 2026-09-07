@@ -93,10 +93,21 @@ const PIN_POSE = ([lat, lon, altM, heading, pitch]) => {
  * SAME UNITS as the probe's viewZ — or `{ hit: false, reason }`. Both numbers
  * this gate compares therefore come from the renderer that produced the frame.
  */
-const TRUTH = ([px, py]) =>
-  typeof window.__flyDepthTruth === 'function'
-    ? window.__flyDepthTruth(px, py)
-    : { hit: false, reason: 'window.__flyDepthTruth is not published' };
+/**
+ * ONE CALL, ONE TURN. `truth` is now a FIELD on the probe's own result,
+ * computed in the SAME SYNCHRONOUS TURN as the depth read.
+ *
+ * C attributed the 36 m gap to neither the near plane (2.5 / 0.00207 = 1207.7 —
+ * the reconstruction is exactly near/raw), nor texel addressing (reprojection
+ * was 0.00 px), nor float16 (0.05% at raw 0.002): THE SURFACE MOVES BETWEEN TWO
+ * READS. Two probes of one pixel in this gate read 1207.14 and 1209.63 — 2.5 m
+ * apart, from nothing but a frame landing in between. So the gate stops making
+ * a second call: no frame can land inside one turn.
+ */
+const PROBE = ([px, py]) =>
+  typeof window.__flyDepthProbe === 'function'
+    ? window.__flyDepthProbe(px, py)
+    : { viewZ: null, truth: { hit: false, reason: 'window.__flyDepthProbe is not published' } };
 
 // THE TRUTH FALSIFIES ITSELF, AND THAT IS READ FIRST.
 //
@@ -251,7 +262,8 @@ function gate(name, ok, detail) {
     for (const fx of [0.3, 0.5, 0.7]) {
       const px = Math.round(W * fx);
       const py = Math.round(H * fy);
-      const t = await page.evaluate(TRUTH, [px, py]);
+      const pr = await page.evaluate(PROBE, [px, py]);
+      const t = pr?.truth ?? { hit: false, reason: 'the probe result carries no truth field' };
       const usable = truthUsable(t);
       if (usable.ok)
         candidates.push({
@@ -266,6 +278,17 @@ function gate(name, ok, detail) {
           bendIters: t.bendIters,
           residualM: t.residualM,
           reprojectionPx: t.reprojectionPx,
+          // C's dual cast: an UNLIFTED ray and the bend-solved ray are both
+          // reprojected, anything above 1.5 px is rejected, and the NEAREST
+          // survivor wins. A rigid vertical lift by the bend drop is right for
+          // distant terrain and fatal in the near field — a 3,144 m first hit
+          // lifts the ray 49 m, and every later cast flew OVER the player
+          // aircraft ~30 m ahead, which was in the candidate list the whole
+          // time. `via` says which cast survived.
+          via: t.via,
+          tried: t.tried,
+          rejected: t.rejected,
+          slopeMPerPx: t.slopeMPerPx,
         });
       else misses.push(`(${px},${py}) ${usable.why}`);
     }
@@ -337,12 +360,32 @@ function gate(name, ok, detail) {
     );
 
   const rows = [];
-  for (const [label, p] of picks) {
-    const probe = await page.evaluate(([x, y]) => window.__flyDepthProbe(x, y), [p.px, p.py]);
+  for (let [label, p] of picks) {
+    // ONE CALL PER PICK, and its truth comes from the SAME turn. Re-probing a
+    // pixel and comparing against a truth captured earlier is exactly the 2.5 m
+    // drift C attributed: the surface moves between reads. `p` was captured in
+    // the sweep above, so the pair used for the verdict is re-read together
+    // here and `p`'s values are used only for the pick ORDER.
+    const probe = await page.evaluate(PROBE, [p.px, p.py]);
+    const tNow = probe?.truth ?? null;
+    if (tNow?.hit) {
+      p = { ...p, ...tNow, px: p.px, py: p.py };
+    }
     const trueZ = Math.abs(p.viewZ);
     const gotZ = Math.abs(probe?.viewZ ?? NaN);
     const errPct = (100 * Math.abs(gotZ - trueZ)) / trueZ;
-    rows.push({ label, px: p.px, py: p.py, trueZ, gotZ, errPct, coc: probe?.coc, raw: probe?.raw, obj: p.object });
+    rows.push({
+      label,
+      px: p.px,
+      py: p.py,
+      trueZ,
+      gotZ,
+      errPct,
+      coc: probe?.coc,
+      cocSource: probe?.cocSource,
+      raw: probe?.raw,
+      obj: p.object,
+    });
     console.log(
       `  ${label.padEnd(9)} px(${p.px},${p.py}) truth ${trueZ.toFixed(1)}m on ${p.object} · ` +
         `probe ${gotZ.toFixed(2)}m raw ${probe?.raw} · err ${errPct.toFixed(2)}% · coc ` +
@@ -380,6 +423,20 @@ function gate(name, ok, detail) {
       );
       continue;
     }
+    // THE BOUND GAINS A SLOPE TERM, AND THE NUMBER DOES NOT MOVE.
+    //
+    // C's attribution says the residual is the SURFACE, not the decode: at a
+    // skirt, a cliff or an LOD seam one texel of lateral error is metres of
+    // view-Z, and a flat 1% cannot express that without being wrong on flat
+    // ground. `slopeMPerPx` is the largest one-texel view-Z step measured from
+    // the four neighbours AT THIS PIXEL, so the tolerance is tight where the
+    // ground is flat and honest where it is not.
+    //
+    // This is the opposite of what I did to the azimuth clause: there I raised
+    // a number to cover an artifact; here the NUMBER stays 1% and the CONTRACT
+    // says what else is legitimately in the measurement. Both terms print.
+    const slope = Number.isFinite(p.slopeMPerPx) ? p.slopeMPerPx : 0;
+    const allowed = (TOL_PCT / 100) * trueZ + slope;
     if (!probe || !Number.isFinite(probe.viewZ))
       notCalibrated(
         `(2) ${label}: |reconstructed − true| / true ≤ ${TOL_PCT}%`,
@@ -388,11 +445,14 @@ function gate(name, ok, detail) {
       );
     else
       numGate(gate)(
-        `(2) ${label}: |probe.viewZ − truth.viewZ| / truth ≤ ${TOL_PCT}%`,
-        errPct,
-        errPct <= TOL_PCT,
-        `${errPct.toFixed(2)}% (true ${trueZ.toFixed(1)}m vs ${gotZ.toFixed(2)}m)`,
-        `errPct is ${errPct} (true ${trueZ}, reconstructed ${gotZ})`
+        `(2) ${label}: |probe.viewZ − truth.viewZ| ≤ ${TOL_PCT}%·|truth| + slopeMPerPx`,
+        Math.abs(gotZ - trueZ),
+        Math.abs(gotZ - trueZ) <= allowed,
+        `|Δ| ${Math.abs(gotZ - trueZ).toFixed(2)} m ≤ ${((TOL_PCT / 100) * trueZ).toFixed(2)} ` +
+          `(${TOL_PCT}% of ${trueZ.toFixed(1)} m) + ${slope.toFixed(2)} (one-texel slope) = ` +
+          `${allowed.toFixed(2)} m · ${errPct.toFixed(2)}% · via ${p.via ?? 'n/a'}` +
+          (p.rejected ? ` · ${p.rejected} cast(s) rejected of ${p.tried}` : ''),
+        `|Δ| is ${Math.abs(gotZ - trueZ)} (truth ${trueZ}, probe ${gotZ})`
       );
   }
 
@@ -428,9 +488,17 @@ function gate(name, ok, detail) {
   // and a CoC asserted without saying which pass produced it. C now publishes
   // `cocSource`, so the gate reports the pass it actually read and refuses when
   // the coc came from nowhere identifiable.
-  const cocSource = await page.evaluate(
-    () => window.__flyStats?.effects?.cocSource ?? window.__flyDof?.cocSource ?? null
-  );
+  // cocSource WAS PUBLISHED ALL ALONG — on the probe result, which this gate
+  // already destructures for `coc` and `raw`. My reader went to
+  // `__flyStats.effects.cocSource` and `__flyDof.cocSource`, an address nothing
+  // wrote, and reported "no cocSource is published" while holding it. Read it
+  // where the value lives; the mirrors are a fallback, not the source.
+  const cocSource =
+    near?.cocSource ??
+    far?.cocSource ??
+    (await page.evaluate(
+      () => window.__flyStats?.effects?.cocSource ?? window.__flyDof?.cocSource ?? null
+    ));
   console.log(`  coc source: ${JSON.stringify(cocSource)}`);
   if (!cocSource)
     notCalibrated(
@@ -440,14 +508,20 @@ function gate(name, ok, detail) {
         'beside `__flyDof true` for two passes'
     );
   else if (Number.isFinite(near?.coc) && Number.isFinite(far?.coc)) {
+    // THE CoC TEXTURE IS 8-BIT, so the term is quantised to 1/255 = 0.0039:
+    // 0.1411764… is float32(36/255) and 0.1647058… is float32(42/255). "0.141"
+    // is not a continuous measurement, and the quantum is comfortable against
+    // (3)'s 0.02 bound — but a future tolerance below 0.004 would be asserting
+    // precision the texture cannot carry.
+    console.log(`  CoC quantum: 1/255 = 0.0039 (8-bit texture) — near ${near.coc} far ${far.coc}`);
     numGate(gate)(
-      `(3) CoC < 0.02 AT THE FOCUS PLANE (from ${cocSource})`,
+      `(3) CoC < 0.02 AT THE FOCUS PLANE (from ${cocSource}, 8-bit ±0.0039)`,
       near.coc,
       near.coc < 0.02,
       `near coc ${near.coc}`
     );
     numGate(gate)(
-      `(4) CoC > 0.5 AT 4 km (from ${cocSource})`,
+      `(4) CoC > 0.5 AT 4 km (from ${cocSource}, 8-bit ±0.0039)`,
       far.coc,
       far.coc > 0.5,
       `far coc ${far.coc}`

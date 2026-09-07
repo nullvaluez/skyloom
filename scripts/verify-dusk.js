@@ -57,6 +57,7 @@ const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 const { bootFly } = require('./_boot');
+const { makeCanvasShot } = require('./_canvasshot');
 
 const BOOT_OPTS = process.env.FLY_URL ? { url: process.env.FLY_URL } : {};
 
@@ -278,7 +279,10 @@ async function meanAbsDiff(fileA, fileB, region) {
     await page.mouse.move(800, 450);
 
     const canvas = () => page.locator('.fixed.inset-0 canvas').first();
-    const glShot = (n) => canvas().screenshot({ path: path.join(__dirname, n) });
+    // R24 E: see verify-sat-night — locator.screenshot()'s stability wait can
+    // never be satisfied by a continuously rendering canvas on this venue.
+    const cap = makeCanvasShot(page);
+    const glShot = (n) => cap.shot(path.join(__dirname, n));
     const draws = () => page.evaluate(() => window.__flyStats?.drawCalls ?? -1);
 
     // Hide the bobbing hero, the breathing traffic AND both cloud decks for
@@ -347,19 +351,161 @@ async function meanAbsDiff(fileA, fileB, region) {
         };
       });
 
-    /** Pin the sun, THEN warp (warpEpoch re-runs the day-cycle effect). */
-    const goto = async (tMs, heading, ms) => {
+    // ---- THE SETTLE IS A VALUE, NOT A CLOCK ------------------------------
+    // SatEnvironment ramps env/bg toward their targets ONCE PER FRAME:
+    //   k = 1 - exp(-min(delta, 0.25) / SKY_LIVE.hdriFade.rampSec)   (1.5 s)
+    // so a frame advances the ramp by at most 0.25 s of its time constant no
+    // matter how long that frame took. The sleep below used to be 26 s of WALL
+    // CLOCK, which on a machine with frames is exp(-26/1.5) = 3.3e-8 from the
+    // target and lands on the explicit snap (|env - envT| < 1e-4) EXACTLY on
+    // the certified 0.85 / 1.0 — and on this ~0.48 fps container is 12-13
+    // frames, i.e. ~3.1 s of ramp, which measured env 0.7382 and bg 0.8801:
+    // 13.15 % and 11.99 % short of two different targets from two different
+    // seeds. One starved ramp, two channels, and a frozen cell that reads
+    // "exactly" failing for a reason that has nothing to do with the sky.
+    //
+    // So the wait is on the VALUE. It is a strict SUPERSET of the old sleep —
+    // the full original dwell still elapses first — so a machine where the
+    // clock was already sufficient measures precisely what it measured before,
+    // and only a venue that needs more frames takes more. That is the whole
+    // "a green means something here AND there" property: both machines now
+    // wait for the same CONDITION rather than for the same duration.
+    //
+    // Convergence is judged over RENDERED FRAMES, not polls. A poll interval
+    // spanning zero frames would read "unchanged" on a stalled page and call a
+    // freeze a settle — the same instrument defect this round has fixed five
+    // times elsewhere. The rAF counter below is the frame witness and is
+    // independent of FRAME_STATS (which may be flag-off).
+    await page.evaluate(() => {
+      if (window.__eSettle) return;
+      window.__eSettle = { frames: 0, lastEnv: null, lastBg: null, stableAt: 0 };
+      const tick = () => {
+        window.__eSettle.frames++;
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+
+    const SETTLE_TIMEOUT = Number(process.env.FLY_DUSK_SETTLE_MS || 300000);
+    // Named so the settle line says WHICH leg is waiting, not a raw epoch.
+    const SETTLE_LABEL = new Map([
+      [T_NOON, 'noon'],
+      [T_EL_P4, 'el +4'],
+      [T_P9, 'el +9'],
+      [T_EL_M10, 'el -10'],
+    ]);
+    const STABLE_FRAMES = 8;
+
+    /**
+     * Wait until env/bg have stopped moving (or, when the leg's target is a
+     * known constant, until they ARE it). Returns what it observed either way —
+     * a timeout is reported out loud with the values and the frame count, so a
+     * leg that could not settle says why instead of quietly asserting on a
+     * half-ramped sky.
+     */
+    const settleSky = async (label, target) => {
+      // FLY_DUSK_SETTLE_MS=0 restores the pre-adaptation program exactly: the
+      // dwell alone, no value wait. That is this gate's RED, and it is one env
+      // var rather than a citation — on this container it reproduces the
+      // measured failure (noon env 0.7382 / bg 0.8801 against 0.85 / 1.0), and
+      // on a machine with frames it passes, which is the two-sided evidence
+      // that the adaptation changed the INSTRUMENT and not the contract.
+      if (SETTLE_TIMEOUT <= 0) {
+        console.log(`    settle ${label}: SKIPPED (FLY_DUSK_SETTLE_MS=0 — the clock-only RED)`);
+        return false;
+      }
+      const t0 = Date.now();
+      await page.evaluate(() => {
+        const st = window.__eSettle;
+        st.lastEnv = null;
+        st.lastBg = null;
+        st.stableAt = st.frames;
+      });
+      let ok = true;
+      try {
+        await page.waitForFunction(
+          ([tgt, stableFrames]) => {
+            const s = window.__flyStats || {};
+            const env = s.envIntensity;
+            const bg = s.bgIntensity;
+            // Self-installing: the witness is created here if it is absent,
+            // so the settle does not silently depend on an earlier evaluate
+            // having survived (a navigation would drop it, and the predicate
+            // would then throw and report as a timeout naming the wrong
+            // cause). This gate never navigates after boot — checked — but a
+            // precondition that is only true by inspection is one edit from
+            // being false.
+            let st = window.__eSettle;
+            if (!st) {
+              st = window.__eSettle = { frames: 0, lastEnv: null, lastBg: null, stableAt: 0 };
+              const tick = () => {
+                window.__eSettle.frames++;
+                requestAnimationFrame(tick);
+              };
+              requestAnimationFrame(tick);
+              return false;
+            }
+            if (typeof env !== 'number' || typeof bg !== 'number') return false;
+            if (tgt) return env === tgt[0] && bg === tgt[1];
+            if (st.lastEnv !== env || st.lastBg !== bg) {
+              st.lastEnv = env;
+              st.lastBg = bg;
+              st.stableAt = st.frames;
+              return false;
+            }
+            return st.frames - st.stableAt >= stableFrames;
+          },
+          [target || null, STABLE_FRAMES],
+          { timeout: SETTLE_TIMEOUT, polling: 500 }
+        );
+      } catch (e) {
+        ok = false;
+      }
+      const seen = await page.evaluate(() => ({
+        env: window.__flyStats?.envIntensity ?? null,
+        bg: window.__flyStats?.bgIntensity ?? null,
+        frames: window.__eSettle?.frames ?? -1,
+      }));
+      const dt = ((Date.now() - t0) / 1000).toFixed(1);
+      if (ok) {
+        console.log(
+          `    settle ${label}: env=${seen.env} bg=${seen.bg} after ${dt}s ` +
+            `(frame ${seen.frames})${target ? ' [exact target]' : ' [converged]'}`
+        );
+      } else {
+        console.log(
+          `    *** settle ${label} TIMED OUT after ${dt}s at env=${seen.env} bg=${seen.bg} ` +
+            `(frame ${seen.frames}). The per-frame ramp advances by at most 0.25 s of a ` +
+            `1.5 s time constant, so this venue did not render enough frames — raise ` +
+            `FLY_DUSK_SETTLE_MS. Whatever the next gate asserts, it asserts on an ` +
+            `UNSETTLED sky.`
+        );
+      }
+      return ok;
+    };
+
+    /**
+     * Pin the sun, THEN warp (warpEpoch re-runs the day-cycle effect).
+     * `target` is the leg's known [env, bg] pair where the certified constants
+     * are known to this gate (the day anchors); omitted, the settle waits for
+     * convergence instead. C's offer to publish envTarget/bgTarget was
+     * declined for exactly this reason — the gate already knows the day
+     * anchors, and for every other leg "stopped moving" is the honest
+     * condition, not a number to be handed one.
+     */
+    const goto = async (tMs, heading, ms, target) => {
       await page.evaluate((t) => {
         window.__flySunOverride = t;
       }, tMs);
       await page.evaluate(pinScene, [POWELL.lat, POWELL.lon, POWELL.altM, heading, 0.02]);
       await page.waitForTimeout(ms);
+      await settleSky(SETTLE_LABEL.get(tMs) || `t=${tMs}`, target);
       await page.mouse.move(800, 450);
       return probe();
     };
 
     // ---- NOON: the round must be completely inert ------------------------
-    const noon = await goto(T_NOON, HDG_SUN, 26000);
+    const noon = await goto(T_NOON, HDG_SUN, 26000, [0.85, 1]);
     console.log('noon:', JSON.stringify(noon));
     gate(
       'pinned noon is the certified DAY sky (day bucket, no blend, env/bg exactly 0.85/1.0)',
