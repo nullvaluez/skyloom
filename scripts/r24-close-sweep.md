@@ -826,7 +826,7 @@ RED:
 | Leg | Subsection | Owner of the feature | Pass 1 | Pass 2 |
 |---|---|---|---|---|
 | `verify-fixture` | §5.1 | E (the venue itself) | **10/10** | **9/1** — all four settled; the red is the toy byteLength |
-| `verify-flash-guard` | §5.2 | B (`FLASH_GUARD`) | **RED, 5/1** | 2a VOID · 2b census proven, **green leg VOID**, re-take pending |
+| `verify-flash-guard` | §5.2 | B (`FLASH_GUARD`) | **RED, 5/1** | **2c GREEN 8/0** — 8.32 % → 0.00 %, both legs settled |
 | `verify-fade` | §5.3 | B (`CHUNK_FADE`) | **RED, 4/2** | 2b **VOID** (probe blind), re-take pending |
 | `verify-lod-fade` | §5.4 | D (`LOD_CROSSFADE`) + A (streamer) | **RED, 2/5** | pending |
 | `verify-step-clean` | §5.5 | A (`STEP_SAFE`) | **RED, 4/4** | pending |
@@ -1032,6 +1032,52 @@ frame still scores 0 and fails.
 
 **The row is RE-TAKEN STANDALONE after pass 2b's end line, on the same tree.**
 That re-run, not this one, decides FLASH_GUARD's green.
+
+---
+
+#### PASS 2c (re-take, integration `9bcaace`): **8 passed, 0 failed, rc 0** — FLASH_GUARD's first real green
+
+Three passes, three different reasons the row meant nothing. This is the first
+in which **every leg measured something**.
+
+| | pin off (RED leg) | armed (GREEN leg) |
+|---|---|---|
+| Powell settle | **SETTLED 422 s**, 16/16 ready, maxZ 17 | **SETTLED 274 s**, 16/16 ready, maxZ 17 |
+| meshes / tris | 16 / 165,520 | 16 / **151,754** |
+| zero-area | **13,766 = 8.32 %** (worst chunk 8.45 %, `coincident=true`) | **0 = 0.00 %** |
+
+**(3) is a verdict rather than a green over an empty scene.** 2a and 2b both
+printed `zero=0 tris=0` and passed; this reads `zero=0 tris=151,754`. Powell's
+8.32 % is still inside R22.1's live **6.36–8.64 %** band, so the fixture is
+standing in for the real defect.
+
+**(5) is deliberately a RATIO — 8.32 % → 0.00 %.** The two legs are separate
+boots that settle different chunk counts, so absolute totals across them are not
+comparable; the degenerate RATE is. A degenerate contributes nothing to
+`computeVertexNormals`, so its removal is provably shading-neutral.
+
+**Both instrument fixes proved out.** Closing page 1 before the armed leg boots
+is what let the green leg settle at all (274 s, against starving to zero while
+page 1 rendered). And **(4b) reads exactly 1** —
+`{"f":670,"mean":255,"med":20.2,"cand":true}` — after reading **0** in 2b when
+my own isolation rule swallowed the synthetic frame; scoring it outside the
+run-length bookkeeping fixed it. **(4a): 0 isolated in 668 frames, 0 sustained**
+(2b had 3 sustained runs) because the baseline here is **20.2**, a genuinely
+dark ground scene, rather than 2b's 237.8 sky at the scanline.
+
+**Two caveats, not smoothed over:**
+
+1. **Manhattan did NOT settle** — 12 of 16 chunks still draping at 420 s,
+   `ready 4`, maxZ 16. Its census (6 sat-building meshes / 87,680 tris / worst
+   chunk **13.97 %**) is a **FLOOR**, and (1b) passing means only that the
+   census had something to count. **The Powell pair is where the A/B lives**;
+   Manhattan corroborates at best.
+2. **`FLASH_GUARD telemetry: null`.** The gate's note is right that the runtime
+   pin and the constant are different switches — but it means (3)'s green rests
+   on the census rather than on the feature announcing itself. Worth B
+   publishing something.
+
+1,423 s, and the settles are both what cost it and what made it valid.
 
 ---
 
