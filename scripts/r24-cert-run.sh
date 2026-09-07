@@ -335,6 +335,9 @@ fi
 #
 # CERT_ROW_ENV_<name> injects extra env for ONE row (e.g.
 # CERT_ROW_ENV_haze_red="HAZE_RED=1"), so a calibration arm needs no edit here.
+# Dashes in a row name become underscores (terra-live -> CERT_ROW_ENV_terra_live).
+# CERT_ROW_TIMEOUT raises the per-row wall clock from the 2400 s default, for
+# the rows whose own sweep lengths exceed it.
 row_selected() {
   [ -z "${CERT_ROWS:-}" ] && return 0
   case " $CERT_ROWS " in *" $1 "*) return 0 ;; *) return 1 ;; esac
@@ -347,15 +350,31 @@ run() {
     return
   fi
   [ -f "scripts/$script" ] || { printf '\nSKIP  %s (scripts/%s absent)\n' "$name" "$script"; return; }
+  # CERT_ROW_ENV_<name> was DOCUMENTED above since this script was written and
+  # never implemented — a knob a reader would reach for that silently does
+  # nothing. Dashes are not legal in an environment variable name, so the row
+  # name is translated (terra-live -> CERT_ROW_ENV_terra_live), exactly as the
+  # comment's own haze_red example implies. Unquoted on purpose: the value is a
+  # word list of KEY=VALUE assignments for `env`.
+  local envvar; envvar="CERT_ROW_ENV_$(printf '%s' "$name" | tr '-' '_')"
+  local extra="${!envvar:-}"
+  [ -n "$extra" ] && printf '      row env: %s\n' "$extra"
+  # A row may need longer than the default wall clock: terra-live's two arms at
+  # 900 s of sweep each, plus two boots and four settles on a ~1 fps venue, do
+  # not fit in 2400 s, and a row killed by `timeout` reports rc=124 with a
+  # truncated log that looks exactly like a hang. The default is unchanged, so
+  # an unset environment runs the same program as before.
+  local tmo="${CERT_ROW_TIMEOUT:-2400}"
   local t0; t0=$(date +%s)
-  printf '\n=== %s (K=%s) %s\n' "$name" "$k" "$(date +%T)"
+  printf '\n=== %s (K=%s, timeout %ss) %s\n' "$name" "$k" "$tmo" "$(date +%T)"
   if [ "$k" != "-" ]; then
-    env FLY_FINALIZE_BUDGET_K="$k" "$@" timeout 2400 node -r ./scripts/_pw-shim.js "scripts/$script" > "$OUT/$name.log" 2>&1
+    env FLY_FINALIZE_BUDGET_K="$k" $extra "$@" timeout "$tmo" node -r ./scripts/_pw-shim.js "scripts/$script" > "$OUT/$name.log" 2>&1
   else
-    env "$@" timeout 2400 node -r ./scripts/_pw-shim.js "scripts/$script" > "$OUT/$name.log" 2>&1
+    env $extra "$@" timeout "$tmo" node -r ./scripts/_pw-shim.js "scripts/$script" > "$OUT/$name.log" 2>&1
   fi
   local rc=$? dt=$(( $(date +%s) - t0 ))
   printf 'rc=%s %ss load=%s\n' "$rc" "$dt" "$(load)"
+  [ "$rc" = 124 ] && printf '      rc=124 is the ROW TIMEOUT (%ss), not a hang: raise CERT_ROW_TIMEOUT.\n' "$tmo"
   # NOTCAL is the third verdict (scripts/_notcal.js) — a leg that measured nothing.
   # It must appear in the run summary or a NOT CALIBRATED row reads as a silent row.
   grep -E "^(PASS|FAIL|SKIP|NOTCAL|RED|GREEN|INFO|NOT CALIBRATED|VERIFY)" "$OUT/$name.log" | head -40

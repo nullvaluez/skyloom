@@ -79,6 +79,7 @@ const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
 const { bootFly } = require('./_boot');
+const { makeCanvasShot } = require('./_canvasshot');
 
 const BOOT_OPTS = process.env.FLY_URL ? { url: process.env.FLY_URL } : {};
 const FRAMES = +(process.env.FLICK_FRAMES ?? 12);
@@ -404,14 +405,12 @@ const TEMPORAL = async ([frames, y0f, y1f]) => {
   await page.evaluate((v) => { window.__r21BloomOff = v; }, !!process.env.FLICK_BLOOM_OFF);
   await page.mouse.move(800, 450);
 
-  const shot64 = () =>
-    page
-      .locator('.fixed.inset-0 canvas')
-      .first()
-      .screenshot()
-      .then((b) => b.toString('base64'));
-  const glShot = (n) =>
-    page.locator('.fixed.inset-0 canvas').first().screenshot({ path: path.join(__dirname, n) });
+  // R24 E: see verify-sat-night — the locator form's actionability wait cannot
+  // be satisfied by a canvas that never stops rendering, and this gate takes
+  // MANY captures per leg, so it is the most exposed of the three.
+  const cap = makeCanvasShot(page);
+  const shot64 = () => cap.shot64();
+  const glShot = (n) => cap.shot(path.join(__dirname, n));
 
   /**
    * One leg: pin, settle, park, capture TWO windows, unpark, measure.
