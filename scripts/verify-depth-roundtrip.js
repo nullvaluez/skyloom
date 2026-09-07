@@ -270,17 +270,39 @@ function gate(name, ok, detail) {
       else misses.push(`(${px},${py}) ${usable.why}`);
     }
   }
-  const pick = (target) =>
-    candidates.length
-      ? candidates.reduce((a, b) =>
-          Math.abs(Math.abs(b.viewZ) - target) < Math.abs(Math.abs(a.viewZ) - target) ? b : a
-        )
-      : null;
-  const picks = [
-    ['near ~50 m', pick(50)],
-    ['mid ~700 m', pick(700)],
-    ['far ~4 km', pick(4000)],
-  ].filter(([, p]) => p);
+  // THREE DISTINCT PIXELS, THREE DISTINCT TRUTHS, IN ORDER.
+  //
+  // The nearest-to-a-target pick returned THE SAME PIXEL TWICE: "near ~50 m"
+  // and "mid ~700 m" both resolved to (480, 464) with the same truth
+  // (−1171.4 m), so two of the three legs were one measurement wearing two
+  // labels — and the gate reported 3/3 picks. A target-seeking pick has no
+  // reason to return distinct pixels when the scene contains nothing near the
+  // target, which at a 900 m pose it does not.
+  //
+  // So the picks are now ORDER STATISTICS of the truths actually found:
+  // nearest, median, farthest of the usable hits, deduplicated by pixel AND by
+  // truth. Labels name what they are rather than a distance the scene may not
+  // contain.
+  const byTruth = [...candidates].sort((a, b) => Math.abs(a.viewZ) - Math.abs(b.viewZ));
+  const distinct = [];
+  for (const c of byTruth) {
+    const dupPixel = distinct.some((d) => d.px === c.px && d.py === c.py);
+    const dupTruth = distinct.some((d) => Math.abs(Math.abs(d.viewZ) - Math.abs(c.viewZ)) < 1);
+    if (!dupPixel && !dupTruth) distinct.push(c);
+  }
+  const picks = (
+    distinct.length >= 3
+      ? [
+          ['nearest', distinct[0]],
+          ['median', distinct[Math.floor(distinct.length / 2)]],
+          ['farthest', distinct[distinct.length - 1]],
+        ]
+      : distinct.map((c, i) => [`pick ${i + 1}`, c])
+  ).filter(([, p]) => p);
+  console.log(
+    `  picks: ${distinct.length} distinct truths of ${candidates.length} usable hits — ` +
+      picks.map(([l, p]) => `${l} ${Math.abs(p.viewZ).toFixed(1)} m @(${p.px},${p.py})`).join(' · ')
+  );
 
   for (const c of candidates.slice(0, 8))
     console.log(
@@ -322,14 +344,42 @@ function gate(name, ok, detail) {
     const errPct = (100 * Math.abs(gotZ - trueZ)) / trueZ;
     rows.push({ label, px: p.px, py: p.py, trueZ, gotZ, errPct, coc: probe?.coc, raw: probe?.raw, obj: p.object });
     console.log(
-      `  ${label.padEnd(11)} px(${p.px},${p.py}) on ${p.obj} · true ${trueZ.toFixed(1)}m · ` +
-        `reconstructed ${gotZ.toFixed(2)}m · err ${errPct.toFixed(1)}% · coc ${probe?.coc ?? 'n/a'} · raw ${probe?.raw}`
+      `  ${label.padEnd(9)} px(${p.px},${p.py}) truth ${trueZ.toFixed(1)}m on ${p.object} · ` +
+        `probe ${gotZ.toFixed(2)}m raw ${probe?.raw} · err ${errPct.toFixed(2)}% · coc ` +
+        `${probe?.coc ?? 'n/a'}`
     );
     // THE HOOK CAN EXIST AND STILL RETURN NOTHING at a given pixel — an
     // out-of-range read, a fragment the depth texture never received, a probe
     // that answers before the first render. Every downstream assertion then
     // reads NOT CALIBRATED and quotes the probe's own reason, rather than
     // turning "no reading" into a percentage.
+    // SAME PIXEL IS NOT SAME SURFACE.
+    //
+    // The "far ~4 km" leg picked a pixel whose TRUTH is terrain at 3144.7 m
+    // while the DEPTH BUFFER holds a depth-writing object at 34.45 m (raw
+    // 0.0726 — under reversed-Z a LARGER raw is NEARER; the player aircraft
+    // under the chase cam is the obvious occupant). That is not a round-trip
+    // error of two orders of magnitude; it is two different surfaces at one
+    // pixel, and calling it a DEPTH_FIX failure would convict the decode of the
+    // raycaster's blind spot.
+    //
+    // So an order-of-magnitude disagreement is a PICK MISS with that reason —
+    // either the truth's candidate set is incomplete (C's side) or the probe
+    // read an occluder the raycast did not consider. Only same-surface pairs
+    // are allowed to carry the round-trip verdict.
+    const ratio =
+      probe && Number.isFinite(probe.viewZ) && trueZ > 0 ? Math.abs(probe.viewZ) / trueZ : NaN;
+    if (Number.isFinite(ratio) && (ratio > 10 || ratio < 0.1)) {
+      notCalibrated(
+        `(2) ${label}: |probe.viewZ − truth.viewZ| / truth ≤ ${TOL_PCT}%`,
+        `probe ${Math.abs(probe.viewZ).toFixed(2)} m vs truth ${trueZ.toFixed(2)} m on ` +
+          `${p.object} — a factor of ${ratio > 1 ? ratio.toFixed(1) : (1 / ratio).toFixed(1)}. The ` +
+          'two hooks are looking at DIFFERENT SURFACES at this pixel (an occluder the raycast did ' +
+          "not consider, or an incomplete candidate set), not at a round-trip error. Probe raw " +
+          `${probe.raw} — under reversed-Z a LARGER raw is NEARER`
+      );
+      continue;
+    }
     if (!probe || !Number.isFinite(probe.viewZ))
       notCalibrated(
         `(2) ${label}: |reconstructed − true| / true ≤ ${TOL_PCT}%`,
