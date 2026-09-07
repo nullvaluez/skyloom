@@ -1943,3 +1943,130 @@ reading correctly, not a sign error.
 Node-only: verify-c-flagoff 50/50 - verify-shadow-calm 33/33 -
 verify-depth-offset 7/7 - verify-worker-normals 12/12 - four proofs PASS -
 verify-import-integrity 4/0 - eslint 0/0.
+
+---
+
+## RULING: LINEAR_HAZE SHIPS ON — the night regression is the refused tuning, not a decode defect
+
+**One line first: keep it ON. It is a correctness fix about which colour space a
+number is in — true independently of what the seam measures — and the venue
+agrees where it counts: the time-of-day SPREAD HALVED, 21.1 -> 11.7.**
+
+### (1) Why the ON arm reads a larger NIGHT seam — confirmed, with the numbers
+
+The reading is right, and the arithmetic makes it exact. `srgbToLinear(c) < c`
+for every c in (0,1): the decode can only DARKEN the haze target. Reconstructing
+the arms from the log (the dome is not on the decode path, so its luma is the
+same on both):
+
+| leg | dome | terrain OFF | terrain ON | terrain delta | seam OFF -> ON |
+|---|---|---|---|---|---|
+| noon | 161.6 | ~221.5 | 214.7 | **-6.8** | 59.9 -> 53.1 (narrower) |
+| night | 79.6 | ~40.8 | 38.2 | **-2.6** | 38.8 -> 41.4 (wider) |
+
+**One monotone darkening, read through two geometries.** By day the terrain sits
+ABOVE the dome, so darkening closes the gap; at night it sits BELOW, so the same
+darkening opens it. There is no night-specific behaviour in the decode at all —
+which is why the spread, the quantity that actually asks "is the seam the same
+at every hour", improved by half.
+
+And the reason the two legs move by such different amounts is the transfer
+function itself, applied to the two authored keyframes:
+
+```
+#c6d7e8 (day rim)   luminance 0.8338 -> 0.6643   x0.797
+#1a2246 (night rim) luminance 0.1369 -> 0.0181   x0.132
+```
+
+sRGB->linear is gentle on bright values and brutal on dark ones. The day target
+keeps 80 % of its luminance; the night target keeps **13 %**. So a global
+re-scale cannot fix this — any re-tune is PER KEYFRAME.
+
+**No decode defect.** The dome is correctly NOT on this path: its colour comes
+from the HDRI / procedural sky, which three already samples in the right space.
+The haze targets are authored hex constants that were being fed raw into a
+linear buffer, and decoding them is the fix. The residual is that those values
+were chosen by eye, pre-R13, in the WRONG space — so once they are interpreted
+correctly they no longer land near the dome. A decode that is right and a target
+that is wrong: the M1 refusal, showing its night face.
+
+### What the night target would have to be, and why I still refuse it
+
+For the seam to close, `srgbToLinear(authored_night_rim)` must equal the DOME's
+linear horizon colour at night. The decoded target renders to 38.2 against a
+dome at 79.6, so the authored triple has to go UP — but the exact value is not
+derivable from here: the chain between the uniform and the pixel runs through
+the aerial mix fraction (t < 1, `maxMix` 0.55), ACES, and the grade. It is a
+measurement, not an algebra problem. Three reasons the measurement cannot be
+taken this round:
+
+1. **I have no browser, and the venue is the wrong instrument anyway.** The
+   offline fixture's sky is synthetic and it renders on SwiftShader. Tuning the
+   SHIPPING rim triples against that would bake a fixture artifact into the
+   product — the R17 §7.1 mistake in a new costume.
+2. **The triple is a SINGLE SOURCE with four consumers.** `SKY.altAtmo`'s tod
+   keyframes feed the dome band, the tile edge fade, the tile depth haze and the
+   aerial pass, deliberately (`SKY.haze`'s own header: *"the SINGLE source for
+   the rim triple ... so all move TOGETHER per the round-6 rim rule"*). Moving it
+   moves verify-rim, verify-sat-depth, verify-sat-night and verify-dusk with it —
+   a round's worth of re-certification, at close, with no browser budget.
+3. **It is a look decision with a user checkpoint attached**, not a defect fix.
+   And it is per-keyframe work (see the 0.797 vs 0.132 above), not one edit.
+
+### (2) "aerial pass null" beside aerialGate 1 — the same instrument as `dof=null`
+
+The gate reads `window.__flyStats?.effects?.aerial`. That is the CONFIG mirror
+that already printed `dof=null` next to a live `__flyDof` on the depth-rt row.
+The aerial term is mounted and live: `aerialOn = sat && AERIAL_PERSPECTIVE.enabled
+&& tier === 'high'` (Effects.jsx:154) and it is composed as an EFFECT into the
+shared EffectPass (`el: () => <primitive object={ctx.aerial}>`), which is R19's
+"0 extra draws" — so there is no separate pass in `composer.passes` for a probe
+to enumerate. Null is the right answer to the wrong question.
+
+**Channels actually live on that frame** (satellite, tier high, aerialGate 1,
+AERIAL_LAW off):
+
+| channel | state | band |
+|---|---|---|
+| AerialPerspective `uHazeColor` | **LIVE, decoded** | 800 m -> 14 km, maxMix 0.55 — dominant at a horizon |
+| tile depth haze `uHazeColor` | **LIVE, decoded** | 16-55 km (AERIAL_LAW ships OFF, so the amplitude is `SKY.haze.max` 0.5) |
+| tile edge fade `uEdgeColor` | live, decoded, ~0 here | `WORLD_EDGE.fade.satellite` 60-120 km |
+| content haze | NOT live | `AERIAL_PERSPECTIVE.content.enabled: false` |
+| SAT_QUILT grade | live | desat/luma only — decodes no colour |
+
+So the A/B measured two decoded colour channels, and both take the SAME
+`_atmoRim` triple by the round-6 single-source rule. That is a clean measurement
+of one authored target, which is what makes the table above readable at all.
+
+### (3) The ship-state recommendation
+
+**ON.** The reasons, in order:
+
+1. It is a **space** fix, not a look knob. With the flag off the authored triples
+   are interpreted in a space the buffer is not in; that is wrong whatever the
+   seam reads.
+2. The venue's own **spread halved** (21.1 -> 11.7). That is the metric that
+   asks whether the seam behaves the same at every hour, and it improved by 44 %.
+3. The night regression is **smaller than the noon gain** (+2.6 vs -6.8) and is
+   a target-VALUE residual that exists identically with the flag off — OFF's
+   night seam is already 38.8. Turning the decode off does not close it; it
+   moves it to 38.8 and gives back the noon gain and the spread.
+4. Shipping OFF would be certifying a known-wrong colour space to make one
+   sub-clause green.
+
+Two caveats for the close, both honest:
+
+* **(5b) may not be a measurement.** +2.6 luma is small; if haze-red's noise
+  floor comes back at or above 2.6, that clause is noise and should be reported
+  as NOT CALIBRATED rather than as a regression.
+* **The <= 12/255 seam contract is unreachable at that pose regardless of this
+  flag** — `maxMix` 0.55 leaves the terrain >= 45 % of its own colour, so
+  0.45 x 51 ~ 23 > 12 before the 1200 m height falloff is applied to a 4200 m
+  eye. The seam gate belongs on the informational side for R24.
+
+**R25 item:** re-author `SKY.altAtmo`'s tod rim keyframes against the DOME's
+measured linear horizon colour, per bucket, on the user's machine — with
+verify-rim / verify-sat-depth / verify-sat-night / verify-dusk re-certified in
+the same round, because the triple has four consumers.
+
+No code moved: nothing in (1) or (2) is a decode defect.
