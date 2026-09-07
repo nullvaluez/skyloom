@@ -496,7 +496,7 @@ matched the prose before the key.
 |---|---|---|---|---|---|---|
 | **A8** (night ramp) | verify-atmo-law §6 + §7, as a pure function AND as a source-gated independence proof | none touched (uniform-only) | none possible (no shader text, no key) | untouched | not needed — noon multiplier is EXACTLY 1, so noon is bit-identical | **SHIPPED ON** |
 | **AERIAL_LAW** | verify-atmo-law 45/45 incl. GLSL≡JS at 4,160 points and flag-off text identity | unmeasured here; adds no mesh | prewarm builds through the same `applyHillshade` + the same Effect constructor | untouched (nothing touches emissives or bloom) | **NOT CAPTURED** | **SHIPPED OFF.** ON only after the horizon re-baseline batch runs with a fixture column, and after one fixed-pose Owens draw row. Not before. |
-| **LOD_CROSSFADE** | verify-lod-fade 51/51 (Fable's regex fix included) | Owens row unmeasured | tile program is prewarmed with the slot | untouched | RED captured, ON leg NOT captured | **SHIPPED OFF — pending the pass-1 ON row.** Flip criteria in §4.10. |
+| **LOD_CROSSFADE** | verify-lod-fade 64/64 + E's standalone row 20/2/2 | Owens read for per-tile cost, not equality (§4.10e) | tile program is prewarmed with the slot | untouched | RED and GREEN both captured on one run | **SHIPPED ON** (§4.10e). Reverts by one line if a w6 row goes red attributable to the crossfade. |
 | **SKY_PROCEDURAL** | — | — | — | — | — | **SHIPPED OFF** (not built; design in §4.5) |
 
 What each recommendation rests on, and what it does not:
@@ -849,6 +849,80 @@ Three properties, all gated:
 `verify-lod-fade.mjs` §5b asserts all of it and **was RED-calibrated by
 deleting `matName`**: 62 passed / 2 failed, naming the missing field and the
 lost discriminator; restored, 64/64.
+
+## §4.10e THE STANDALONE ROW — GO. `LOD_CROSSFADE` ships ON.
+
+E's standalone on `645d08c` / harness `3de0c50`: one browser (no overlap),
+`FLY_LOD_SWEEP_MS` 1,500,000, both arms 360° at 0.85°/frame, TERRA_PACE shipped
+on both legs. §4.10b applied verbatim.
+
+| # | precondition | reading | result |
+|---|---|---|---|
+| P1 | no pace pin either page | OFF null · ON null | **MET** |
+| P2 | ON `skip.disabled === 0` | 0 | **MET** |
+| P3 | `shape`/`unpatched` 0; `noParentMap` ≤ 5 % and not a parent that HAD a map | 0 · 0 · **3 = 4.17 %** | **MET** (see the caveat) |
+| P4 | both arms offered swaps | 72 and 72 | **MET** |
+| P5 | arc ≥ 360° both arms AND ratio ∈ [0.75, 1.25] | 360°/360°, **0.9977** | **MET** |
+| P6 | both arms reached `settleWorld` | SETTLED 61 s / 104 s | **MET** |
+
+| # | flip condition | reading | result |
+|---|---|---|---|
+| F1 | ladder identity both arms | 72+0=72+0 · 72+0=3+69 | **HOLDS** |
+| F2 | `refines+merges` equal | **72 → 72**, ratio 1.00 | **HOLDS** |
+| F3 | `faded` > 0, `hardSwaps` drops | **0 → 69**, **72 → 3** | **HOLDS** |
+| F4 | `maxBlendRun` ≥ 2, read against 5 | **19**, 246 blend frames of 433 | **HOLDS** |
+| F5 | drain at `active` 0, no leak either read | 0/0 at 7 frames and 12 later | **HOLDS** |
+| F6 | Owens draws AND tris equal | 285/377,732 vs 264/338,646 | **NOT EVALUABLE — substituted** |
+
+**The closure worth naming: `hardSwaps` 3 === `noParentMap` 3.** Every swap the
+ladder could blend, it blended; it declined exactly the three where the parent
+had no imagery to blend from. There is no residual category.
+
+### F6 was substituted, not waived — and the discriminator I named was wrong
+
+My §4.10c revision said F6 must be preconditioned on **equal `maxZ`**. Both arms
+reported maxZ 17 and the scenes still differed — **405 vs 473 tiles**. `maxZ` is
+a ceiling, not a census; the right discriminator is the resident tile count, and
+naming the weaker one was my error, the same shape as the "≥ 10 rendered frames"
+correction in §4.10.
+
+F6's PURPOSE is "the crossfade adds nothing where there is nothing to fade", and
+that purpose is met by two readings this run does support:
+- **No structural draw.** Read for per-tile cost rather than equality, Owens is
+  decisive in the opposite direction: draws/tile **fell** 0.652 → 0.603, and the
+  delta is **0.31 draws per extra tile** where a per-tile added draw would need
+  +473. The 21-draw gap tracks the 68-tile gap, not the flag.
+- **No transient draw.** The ON arm's mesh co-display run is **0** — no parent
+  mesh was ever retained beside its children. That is precisely the second draw
+  the dithered alternative would have cost, and it is measured, not argued.
+
+Both rest on the mechanism: `arm()` writes three uniforms on materials that
+already exist and already render; no mesh, material or geometry is created.
+
+**F6 is closed properly by `verify-terra-live` on the flipped tree**, which
+measures the streamer and the drawn set directly. If it goes red and the red is
+attributable to the crossfade, the flip reverts by the same one line.
+
+### The caveat on P3, stated because it is unread rather than untrue
+
+`noParentMap 3` is 4.17 %, under the 5 % bound, so P3's numeric half is met. Its
+attribution half — "not a parent that DID have a map" — is **unread**: the
+recorder added in 5f9be56 (`noParentMapFirst`, `{z,x,y,hasModel,matCount,
+matName}`) is not printed by E's leg, so the `_errorMaterial` attribution
+remains an inference from source, not a reading. It is a well-supported
+inference (it is the only path in the vendored bundle that yields a material
+with no `map` on a tile that has a model, and three-tile names it
+`"error-material"`), and it does not block. **One line in E's leg —
+`f1.noParentMapFirst` — turns it into a fact on the next run.**
+
+### Nothing else moves with the flip
+
+`skipBootMs` stays 6000, `fadeSec` 0.25, `maxConcurrent` 32, `mode`
+`parentBlend`, `onRefine`/`onMerge`/`skipOnWarp` unchanged. The evidence was
+taken with `skipBootMs` pinned to **0**, i.e. with MORE fading than ships, so
+the shipped value is strictly less activity than was measured; and peak
+concurrency reached 20 of 32 in a session that included boot fades the ship
+state suppresses.
 
 ## §4.11 A gate must not assert what another owner ships
 
