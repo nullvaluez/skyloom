@@ -310,6 +310,13 @@ function gate(name, ok, detail) {
           tried: t.tried,
           rejected: t.rejected,
           slopeMPerPx: t.slopeMPerPx,
+          // C's per-pick provenance (09a7cdb): where the camera was, which bend
+          // family the buffer held, and whether the solve converged.
+          eye: t.eye,
+          family: t.family,
+          converged: t.converged,
+          impliedDropM: t.impliedDropM,
+          groundDropM: t.groundDropM,
         });
       else misses.push(`(${px},${py}) ${usable.why}`);
     }
@@ -387,11 +394,28 @@ function gate(name, ok, detail) {
     // drift C attributed: the surface moves between reads. `p` was captured in
     // the sweep above, so the pair used for the verdict is re-read together
     // here and `p`'s values are used only for the pick ORDER.
+    const eyeSweep = p.eye ?? null;
     const probe = await page.evaluate(PROBE, [p.px, p.py]);
     const tNow = probe?.truth ?? null;
     if (tNow?.hit) {
       p = { ...p, ...tNow, px: p.px, py: p.py };
     }
+    // THE SWEEP-VS-ASSERTION DRIFT IS EXPECTED MOTION, NOT AN ANOMALY, and it
+    // is printed as such so nobody spends a pass theorising about it (I did).
+    // C confirmed the per-pick read is ATOMIC — one synchronous turn, one
+    // texture, one graph, one camera — so probe and truth cannot disagree
+    // because of time. Across TURNS they can and must: the aircraft is still
+    // flying between them at this frame rate, so the same pixel looks at a
+    // different ground point a few hundred metres later. Publishing the eye
+    // turns that from an argument into a measurement.
+    const eyeNow = p.eye ?? null;
+    let drift = null;
+    if (Array.isArray(eyeSweep) && Array.isArray(eyeNow))
+      drift = Math.hypot(
+        eyeNow[0] - eyeSweep[0],
+        eyeNow[1] - eyeSweep[1],
+        eyeNow[2] - eyeSweep[2]
+      );
     const trueZ = Math.abs(p.viewZ);
     const gotZ = Math.abs(probe?.viewZ ?? NaN);
     const errPct = (100 * Math.abs(gotZ - trueZ)) / trueZ;
@@ -416,6 +440,28 @@ function gate(name, ok, detail) {
         `probe ${gotZ.toFixed(2)}m raw ${probe?.raw} · err ${errPct.toFixed(2)}% · coc ` +
         `${probe?.coc ?? 'n/a'}`
     );
+    console.log(
+      `            eye ${eyeNow ? eyeNow.map((v) => v.toFixed(1)).join(',') : 'n/a'}` +
+        (drift == null
+          ? ''
+          : ` · the camera moved ${drift.toFixed(1)} m between the sweep and this read — EXPECTED ` +
+            'motion, not drift in the measurement: the read itself is atomic, so this only means ' +
+            'the pixel now looks at a different ground point than it did during the sweep') +
+        ` · family ${p.family ?? 'n/a'} · converged ${p.converged ?? 'n/a'} · via ${p.via ?? 'n/a'}` +
+        ` · impliedDrop ${p.impliedDropM ?? 'n/a'} m vs groundDrop ${p.groundDropM ?? 'n/a'} m`
+    );
+    // WHEN A PICK DISAGREES, PRINT WHAT WAS ON THE RAY rather than leaving the
+    // next reader to theorise. C publishes every candidate per family with its
+    // convergence, iteration count, residual and reprojection, and every raw
+    // hit with the bend key of the object it struck.
+    if (Math.abs(gotZ - trueZ) > 0.01 * trueZ) {
+      const hs = tNow?.hits;
+      const rh = tNow?.rayHits;
+      if (Array.isArray(hs) && hs.length)
+        console.log(`            hits: ${JSON.stringify(hs).slice(0, 700)}`);
+      if (Array.isArray(rh) && rh.length)
+        console.log(`            rayHits: ${JSON.stringify(rh).slice(0, 700)}`);
+    }
     // THE HOOK CAN EXIST AND STILL RETURN NOTHING at a given pixel — an
     // out-of-range read, a fragment the depth texture never received, a probe
     // that answers before the first render. Every downstream assertion then

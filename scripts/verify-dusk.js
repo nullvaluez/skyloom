@@ -284,6 +284,44 @@ async function meanAbsDiff(fileA, fileB, region) {
     const cap = makeCanvasShot(page);
     const glShot = (n) => cap.shot(path.join(__dirname, n));
     const draws = () => page.evaluate(() => window.__flyStats?.drawCalls ?? -1);
+    // THE SIXTH CLOCK, and the same one verify-sat-night's road pair had.
+    // `__flyStats.drawCalls` republishes every 60 FRAMES. The cirrus pair
+    // toggled the deck and waited 2600 ms of WALL CLOCK on each side — at 60
+    // fps that is 156 frames and the counter has certainly moved; at this
+    // venue's ~0.5 fps it is ONE frame, so both halves read the SAME stale
+    // publish and the delta was 0 BY CONSTRUCTION whatever the deck did
+    // (measured: armed 172, parked 172).
+    //
+    // A draw count that has not republished is not a measurement. This nulls
+    // the counter, waits for the app to publish a fresh one, and says so when
+    // it does not get one — a stale read can no longer look like a measured
+    // zero, which for a clause asserting "EXACTLY +1" is the difference
+    // between a green and a lie.
+    const DRAWS_TIMEOUT = Number(process.env.FLY_DRAWS_TIMEOUT_MS || 240000);
+    let drawsStale = 0;
+    const freshDraws = async () => {
+      await page.evaluate(() => {
+        if (window.__flyStats) window.__flyStats.drawCalls = null;
+      });
+      let fresh = true;
+      try {
+        await page.waitForFunction(
+          () => typeof window.__flyStats?.drawCalls === 'number',
+          undefined,
+          { timeout: DRAWS_TIMEOUT, polling: 250 }
+        );
+      } catch (e) {
+        fresh = false;
+        drawsStale += 1;
+      }
+      const v = await draws();
+      if (!fresh)
+        console.log(
+          `    *** draw count did not republish within ${DRAWS_TIMEOUT / 1000}s — ${v} is ` +
+            'whatever was there, not a fresh publish'
+        );
+      return v;
+    };
 
     // Hide the bobbing hero, the breathing traffic AND both cloud decks for
     // every pixel gate. The decks matter: drei's <Cloud> animates every frame
@@ -705,20 +743,18 @@ async function meanAbsDiff(fileA, fileB, region) {
 
     // ---- cirrus draw accounting -----------------------------------------
     const cirrusMounted = await page.evaluate(() => !!window.__flyCirrus);
-    const onDraws = await (async () => {
-      await page.waitForTimeout(2600);
-      return draws();
-    })();
+    const onDraws = await freshDraws();
     await page.evaluate(() => {
       if (window.__flyCirrus) window.__flyCirrus.visible = false;
     });
-    await page.waitForTimeout(2600);
-    const offDraws = await draws();
+    const offDraws = await freshDraws();
     await page.evaluate(() => {
       if (window.__flyCirrus) window.__flyCirrus.visible = true;
     });
-    await page.waitForTimeout(2600);
-    console.log(`  cirrus draws: armed ${onDraws} vs parked ${offDraws} (Δ ${onDraws - offDraws})`);
+    console.log(
+      `  cirrus draws: armed ${onDraws} vs parked ${offDraws} (Δ ${onDraws - offDraws})` +
+        (drawsStale ? ` — ${drawsStale} read(s) never republished` : '')
+    );
     gate(
       'the cirrus deck is mounted and costs EXACTLY +1 draw (one extra InstancedMesh)',
       cirrusMounted && onDraws - offDraws === 1,
