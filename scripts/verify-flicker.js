@@ -81,6 +81,7 @@ const fs = require('fs');
 const { bootFly } = require('./_boot');
 const { makeCanvasShot } = require('./_canvasshot');
 const { notCalibrated, notCalCount, notCalSummary } = require('./_notcal');
+const { makeStillTerrain } = require('./_stillterrain');
 
 const BOOT_OPTS = process.env.FLY_URL ? { url: process.env.FLY_URL } : {};
 const FRAMES = +(process.env.FLICK_FRAMES ?? 12);
@@ -410,6 +411,7 @@ const TEMPORAL = async ([frames, y0f, y1f]) => {
   // be satisfied by a canvas that never stops rendering, and this gate takes
   // MANY captures per leg, so it is the most exposed of the three.
   const cap = makeCanvasShot(page);
+  const still = makeStillTerrain(page, { label: 'flicker' });
   const shot64 = () => cap.shot64();
   const glShot = (n) => cap.shot(path.join(__dirname, n));
 
@@ -481,6 +483,12 @@ const TEMPORAL = async ([frames, y0f, y1f]) => {
     let frames = null;
     let stats = null;
     for (let attempt = 0; attempt < QUIET_TRIES; attempt++) {
+      // The witness goes HERE, at the window boundary — never between the
+      // frames of a window. This gate MEASURES temporal variation across
+      // consecutive frames; waiting for stillness inside the window would
+      // destroy the statistic it exists to compute. Before the window opens is
+      // the only place a terrain-stillness wait is compatible with it.
+      await still.still(`${tag} window ${attempt + 1}`);
       frames = await grab();
       stats = await page.evaluate(TEMPORAL, [frames, y0, y1]);
       quietFrac = stats.movingFrac;
