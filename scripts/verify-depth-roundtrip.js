@@ -75,33 +75,28 @@ const PIN_POSE = ([lat, lon, altM, heading, pitch]) => {
  * that pixel. This is the reference the reconstruction is compared against, so
  * it deliberately shares NO code with the depth path.
  */
-const RAYCAST = ([px, py]) => {
-  const THREE = window.__flyThree || null;
-  const gl = window.__flyGl;
-  const cam = window.__flyCamera || window.__fly?.camera?.cam || null;
-  let scene = window.__flyPlayer ?? window.__fly?.engine?.object ?? null;
-  while (scene && scene.parent) scene = scene.parent;
-  // A bare null could not be told from "the scene is empty": pass 2b reported
-  // "0 raycast hits" and the row could not say whether the handles were
-  // missing, the camera was wrong, or nothing was resident.
-  if (!gl || !cam || !scene || !THREE)
-    return {
-      miss: `handle absent — THREE ${!!THREE} gl ${!!gl} cam ${!!cam} scene ${!!scene}`,
-    };
-  const W = gl.domElement.width;
-  const H = gl.domElement.height;
-  const ndc = new THREE.Vector2((px / W) * 2 - 1, -(py / H) * 2 + 1);
-  const rc = new THREE.Raycaster();
-  rc.setFromCamera(ndc, cam);
-  rc.far = 60000;
-  const hits = rc.intersectObject(scene, true).filter((h) => h.distance > 0.5);
-  if (!hits.length) return { miss: 'no intersection', roots: scene.children?.length ?? 0 };
-  // view-space Z is the distance along the camera forward axis, not the ray.
-  const fwd = new THREE.Vector3();
-  cam.getWorldDirection(fwd);
-  const v = hits[0].point.clone().sub(cam.getWorldPosition(new THREE.Vector3()));
-  return { dist: hits[0].distance, viewZ: -v.dot(fwd), object: hits[0].object.name || '(unnamed)' };
-};
+/**
+ * THE TRUTH BELONGS TO THE OWNER, NOT TO THE HARNESS.
+ *
+ * This gate used to build its own THREE.Raycaster from `window.__flyThree` and
+ * `window.__flyCamera`. Neither exists — the re-take's miss table said so on
+ * all fifteen probes: "handle absent — THREE false, gl true, cam false, scene
+ * true". The page exposes the renderer and the scene and nothing else, so a
+ * raycast assembled from OUTSIDE the bundle can never establish a true
+ * distance, and an intermediate attempt to borrow r3f's own camera and
+ * raycaster off the canvas store was the same mistake wearing better clothes:
+ * a harness deciding what the renderer meant.
+ *
+ * C now publishes it. `window.__flyDepthTruth(x, y)` raycasts IN THE APP,
+ * through the composer's active camera, against the world's depth-writing
+ * geometry only, and returns `{ hit, distance, viewZ, object, source }` in the
+ * SAME UNITS as the probe's viewZ — or `{ hit: false, reason }`. Both numbers
+ * this gate compares therefore come from the renderer that produced the frame.
+ */
+const TRUTH = ([px, py]) =>
+  typeof window.__flyDepthTruth === 'function'
+    ? window.__flyDepthTruth(px, py)
+    : { hit: false, reason: 'window.__flyDepthTruth is not published' };
 
 const { numGate, notCalibrated, notCalCount, notCalSummary } = require('./_notcal');
 
@@ -208,9 +203,9 @@ function gate(name, ok, detail) {
     for (const fx of [0.3, 0.5, 0.7]) {
       const px = Math.round(W * fx);
       const py = Math.round(H * fy);
-      const r = await page.evaluate(RAYCAST, [px, py]);
-      if (r && !r.miss) candidates.push({ px, py, ...r });
-      else misses.push(`(${px},${py}) ${r?.miss ?? 'null'}`);
+      const t = await page.evaluate(TRUTH, [px, py]);
+      if (t && t.hit) candidates.push({ px, py, viewZ: t.viewZ, dist: t.distance, object: t.object, source: t.source });
+      else misses.push(`(${px},${py}) ${t?.reason ?? 'no truth returned'}`);
     }
   }
   const pick = (target) =>
@@ -226,7 +221,7 @@ function gate(name, ok, detail) {
   ].filter(([, p]) => p);
 
   console.log(
-    `  raycast: ${candidates.length} hits at distances ` +
+    `  depth truth (${candidates[0]?.source ?? 'n/a'}): ${candidates.length} hits at distances ` +
       `${JSON.stringify(candidates.map((c) => +Math.abs(c.viewZ).toFixed(0)))} on ` +
       `${JSON.stringify([...new Set(candidates.map((c) => c.object))].slice(0, 6))}` +
       (misses.length ? `; ${misses.length} miss(es): ${misses.slice(0, 3).join(' · ')}` : '')
@@ -237,7 +232,7 @@ function gate(name, ok, detail) {
   if (picks.length < 3) {
     notCalibrated(
       '(1) THREE PIXELS WITH A KNOWN TRUE DISTANCE WERE FOUND',
-      `${candidates.length} raycast hits of ${candidates.length + misses.length} probes; picked ` +
+      `${candidates.length} truth hits of ${candidates.length + misses.length} probes; picked ` +
         `${picks.length}. Misses: ${misses.slice(0, 4).join(' · ') || 'none recorded'}. Settled: ` +
         `${st.settled} (${st.why || 'ok'})`
     );
@@ -245,7 +240,7 @@ function gate(name, ok, detail) {
     gate(
       '(1) THREE PIXELS WITH A KNOWN TRUE DISTANCE WERE FOUND',
       true,
-      `${candidates.length} raycast hits; picked ${picks.map(([l, p]) => `${l}=${Math.abs(p.viewZ).toFixed(0)}m`).join(', ')}`
+      `${candidates.length} truth hits; picked ${picks.map(([l, p]) => `${l}=${Math.abs(p.viewZ).toFixed(0)}m`).join(', ')}`
     );
 
   const rows = [];
@@ -272,7 +267,7 @@ function gate(name, ok, detail) {
       );
     else
       numGate(gate)(
-        `(2) ${label}: |reconstructed − true| / true ≤ ${TOL_PCT}%`,
+        `(2) ${label}: |probe.viewZ − truth.viewZ| / truth ≤ ${TOL_PCT}%`,
         errPct,
         errPct <= TOL_PCT,
         `${errPct.toFixed(2)}% (true ${trueZ.toFixed(1)}m vs ${gotZ.toFixed(2)}m)`,
@@ -307,9 +302,35 @@ function gate(name, ok, detail) {
   // sweep table. It is NOT CALIBRATED: two legs did not execute. (And note
   // `near.coc < 0.02` would have passed on a NULL coc, since null numifies
   // to 0 — the guard above is load-bearing, not decorative.)
-  if (Number.isFinite(near?.coc) && Number.isFinite(far?.coc)) {
-    numGate(gate)('(3) CoC < 0.02 AT THE FOCUS PLANE', near.coc, near.coc < 0.02, `near coc ${near.coc}`);
-    numGate(gate)('(4) CoC > 0.5 AT 4 km', far.coc, far.coc > 0.5, `far coc ${far.coc}`);
+  // (3)/(4) NAME THE PASS THEY READ. The re-take printed `dof=null` beside
+  // `__flyDof true` — two fields disagreeing about whether a DoF pass exists,
+  // and a CoC asserted without saying which pass produced it. C now publishes
+  // `cocSource`, so the gate reports the pass it actually read and refuses when
+  // the coc came from nowhere identifiable.
+  const cocSource = await page.evaluate(
+    () => window.__flyStats?.effects?.cocSource ?? window.__flyDof?.cocSource ?? null
+  );
+  console.log(`  coc source: ${JSON.stringify(cocSource)}`);
+  if (!cocSource)
+    notCalibrated(
+      '(3)/(4) CoC — DoF separation',
+      `near ${near?.coc} far ${far?.coc}, but no cocSource is published — the gate would be ` +
+        'asserting a number without knowing which pass produced it, which is how `dof=null` sat ' +
+        'beside `__flyDof true` for two passes'
+    );
+  else if (Number.isFinite(near?.coc) && Number.isFinite(far?.coc)) {
+    numGate(gate)(
+      `(3) CoC < 0.02 AT THE FOCUS PLANE (from ${cocSource})`,
+      near.coc,
+      near.coc < 0.02,
+      `near coc ${near.coc}`
+    );
+    numGate(gate)(
+      `(4) CoC > 0.5 AT 4 km (from ${cocSource})`,
+      far.coc,
+      far.coc > 0.5,
+      `far coc ${far.coc}`
+    );
   } else {
     notCalibrated(
       '(3)/(4) CoC — DoF separation',
