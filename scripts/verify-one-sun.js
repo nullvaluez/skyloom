@@ -417,12 +417,25 @@ const gateNum = numGate(gate);
       require('path').join(__dirname, '..', 'components', 'fly', 'FlyScene.jsx'),
       'utf8'
     );
-    const n = (src.match(/<directionalLight\b/g) || []).length;
+    // COMMENTS ARE NOT DECLARATIONS. The first version of this gate counted 2
+    // and failed — because C's own comment beside the water field says "there
+    // is exactly one `<directionalLight>` in the world scene", and a bare grep
+    // counts the sentence that states the invariant as a violation of it. R20
+    // §7 already wrote this lesson down ("grep-gates read comments too") and it
+    // still cost a red. Strip block comments, line comments and template/quoted
+    // text, then count only a JSX element at the start of a line.
+    const code = src
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '')
+      .replace(/`[^`]*`/g, '``');
+    const n = (code.match(/^\s*<directionalLight\b/gm) || []).length;
     gate(
       '(8) THE WORLD SCENE DECLARES EXACTLY ONE <directionalLight> (source count)',
       n === 1,
-      `${n} in components/fly/FlyScene.jsx — the identity behind clause (5). The inspect ` +
-        "turntable's lights live in its own Canvas and are not in this file"
+      `${n} JSX declaration(s) in components/fly/FlyScene.jsx — the identity behind clause (5). ` +
+        "The inspect turntable's lights live in its own Canvas and are not in this file. " +
+        'Comments and strings are stripped before counting: a comment that STATES the invariant ' +
+        'must not read as a breach of it'
     );
   }
 
