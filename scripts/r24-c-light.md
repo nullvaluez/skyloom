@@ -1637,3 +1637,121 @@ Gates on the merged tree, node-only: verify-c-flagoff 40/40 ·
 verify-shadow-calm 33/33 · verify-depth-offset 7/7 · verify-worker-normals
 12/12 · four proofs PASS · verify-import-integrity 4/0. No browser, no dev
 server — E's re-take owns :3100.
+
+---
+
+## RULING: the night key/hill split is a DEFECT (b), and the hill now follows the moon
+
+**One line first: (b) — a defect, and it is the R24 recon L3 defect at its
+sharpest. Fixed behind ONE_SUN in `446545b`.**
+
+### The evidence, reproduced from constants alone
+
+E measured, on the only re-take leg where the sun landed (high/night, commanded
+-14 deg, app -13.996 deg, moonK = 1): key az 45.19 / el 34.377 against hill az
+-134.81 / el 8.594, 137.03 deg apart. Every one of those numbers falls out of
+the shipped constants with no GPU:
+
+| number | where it comes from |
+|---|---|
+| hill el 8.594 deg | `HILLSHADE.minElRad` 0.15 rad — `computeSun` clamps `asin(max(0, sinEl))` up to the graze floor |
+| key el 34.377 deg | `SKY_LIVE.nightSky.moonElRad` 0.6 rad — the moon's FIXED elevation |
+| az gap exactly 180 deg | `moonDirFromSun` is anti-solar: `a = az + pi` |
+| 137.03 deg | `acos(cos 34.377 * cos 8.594 * cos 180 + sin 34.377 * sin 8.594)` = 137.04 |
+
+`scripts/r24-c-one-sun-proof.mjs` now prints three trees side by side and
+reproduces E's browser number to two decimals:
+
+```
+night (el -14deg, moonK 1) key<->hill, high tier:
+  R21 flag-off         0.00deg  (agreed - both on the SUN)
+  ONE_SUN pre-fix    137.03deg  (key on the moon, ground on the sun)
+  ONE_SUN this fix     0.00deg  (agreed - both on the MOON)
+  hill<->moon          0.00deg  =>  PASS
+```
+
+### Why (b) and not (a)
+
+1. **R21 AGREED at night.** The flag-off tree put key and hill on the same
+   vector (both at the solar azimuth, both at a graze floor) — 0.00 deg apart.
+   So there is no inherited contract that the ground may disagree with the
+   light: the disagreement is 100% ONE_SUN's, introduced by M2 moving the key to
+   the moon and leaving the ground behind. A regression I shipped.
+2. **Nothing in source asks the hillshade to stay solar at night.** The only
+   documented night intent is the ELEVATION clamp — `minElRad: 0.15, // graze
+   floor (night/dawn) — relief stays readable` — which is orthogonal to azimuth
+   and is preserved. The `az < 0 = morning` convention in `sun-model.js` is the
+   DAYTIME east/west sense, and the gate it cites, `verify-sat-depth`, turns out
+   to assert a hillshade STRENGTH A/B (`mad > 2`), not an azimuth or a flip.
+3. **The charter.** Recon L3 named four sun directions per frame as a root cause
+   of the mismatched look. A moonlit sky lighting buildings from az +45 over
+   ground shaded from az -135 is a 180 deg contradiction inside one frame — the
+   strongest instance of that defect the tree can produce.
+
+**I am overturning my own W2 text.** `r24-c-one-sun-proof.mjs`'s printed
+contract said clause 1 held *"except where moonK > 0, at which point the key is
+the anti-solar moon BY DESIGN"*. That carve-out was written before any night
+measurement existed: it justified the KEY moving and never asked whether the
+ground should follow. The contract lines are rewritten and a new clause 6 states
+the identity.
+
+### The fix
+
+`moonBlendK(elDeg)` is now the ONE copy of the blend weight, called by both the
+per-frame key branch and the 60 s hillshade cadence — two copies of a curve
+would put ground and buildings on different lights for the whole crossing, i.e.
+the same defect in slow motion. In `apply()` the three R21 expressions survive
+VERBATIM as `hx`/`hy`/`hz` and are what `setHillDir` receives with ONE_SUN off,
+so flag-off identity is by construction; with it on, the same `mk` carries the
+hill onto `moonDirFromSun` and renormalises.
+
+**One contract change E must fold in:** at moonK = 1 the hill elevation is now
+`moonElRad` (34.377 deg), not the clamp floor 8.594. So the clamp clause holds
+**where moonK is 0**; at full moon hill el == key el == 34.377, still inside the
+`[HILLSHADE.minElRad, maxElRad]` = [8.6, 51.6] band the hillshade is designed
+for, so relief legibility is not traded away. Clause (3) needs that qualifier or
+it will red on the night leg.
+
+### The moon publish
+
+`__flyStats.sun` gains `moonKeyAzDeg` / `moonKeyElDeg`, in the GATE's
+convention — `az = atan2(x, z)`, `el = asin(y)` in degrees — because the gate
+compares angles and a convention mismatch would look like a lighting bug. (Note
+the proof file's own `azOf` uses `atan2(-x, z)`, the `basis()` convention; the
+PUBLISHED numbers deliberately follow the gate, not the proof.) They are `null`
+while moonK is 0: `_moonKeyDir` is only written inside the `mk > 0` branch, and
+a stale vector reported as live is how an instrument invents a measurement.
+Production cost is four assignments and no trig — the az/el conversion happens
+in the dev-only stats block. `moonK` was already published and is the same `mk`
+the key used.
+
+### Gates
+
+verify-c-flagoff 40 -> **44**: the blend weight has exactly one formula and both
+consumers call it; the hill blend is ONE_SUN-gated with the R21 arguments
+verbatim; the published moon key is null while moonK is 0; and a
+**published-shape gate over all 21 `__flyStats.sun` fields** — a rename or a
+dropped field turns a clause into a silent NOTCAL rather than a red, which is
+exactly how pass 2b lost three clauses. RED-calibrated both ways (renaming
+`moonKeyElDeg` -> `missing: moonKeyElDeg`; dropping the `ONE_SUN.enabled` guard
+-> the hill gate reds).
+
+**Blast radius I cannot measure here.** This moves satellite NIGHT ground
+pixels — `verify-sat-night`, `verify-dusk` and `verify-flicker`'s night legs are
+the exposed gates, and every one needs a browser I am not allowed to start.
+Daylight is untouched by construction (mk is 0 above the horizon, so the uniform
+is bit-identical), and flag-off is untouched at every elevation.
+
+Node-only sweep: verify-c-flagoff 44/44 - verify-shadow-calm 33/33 -
+verify-depth-offset 7/7 - verify-worker-normals 12/12 - four proofs PASS -
+verify-import-integrity 4/0 - eslint over the three changed files 0/0.
+
+### Process note: the split commit, a second time
+
+The ledger edit for `446545b` asserted on a heading text that the merge had
+written with backticks, so the script aborted BEFORE writing — and the
+`git commit` on the following line ran anyway, because the two were separated by
+a newline rather than `&&`. Identical to the `7dae48b`/`974ce23` split earlier
+this round. The lesson was recorded then and not APPLIED: the fix is not "assert
+more carefully", it is that a write-then-commit sequence must be one `&&` chain
+so a failed edit cannot be followed by a commit. Done that way here.
