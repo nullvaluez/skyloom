@@ -167,8 +167,8 @@
 > worker byte-identical across five merges on 149 fixture tiles, Owens 184 ≤
 > 261 / satellite 153–176 ≤ 375 / toy 91 ≤ 480 in the FIXTURE column (which
 > bounds nothing live), and a boot proof of 62.5 s with zero errors on
-> `5ca8e15`; the browser rows run in TWO passes (flag-off, then flipped) and
-> are still in flight <!-- CERT PENDING -->. **The user's machine has confirmed
+> `5ca8e15`; the browser rows ran in TWO passes (flag-off, then flipped), and
+> the re-take and post-batch runs that followed them are in the notice above. **The user's machine has confirmed
 > NOTHING this round — the diagnosis pack (`scripts/r24-user-diag.md`) went out
 > and Part A never came back, so there is no before and no performance
 > verdict.** **The three-import incident:** W3's first certification run was
