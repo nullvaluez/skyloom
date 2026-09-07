@@ -325,6 +325,27 @@ function gate(name, ok, detail) {
     await page.evaluate((t) => {
       window.__r24Sun = t;
     }, want.tMs);
+    // FORCE THE RECOMPUTE, do not wait for a starved timer.
+    //
+    // The sky effect applies the override on `setInterval(apply,
+    // SKY.dayCycle.refreshSec * 1000)` — SIXTY SECONDS of wall clock — with
+    // deps `[mapStyle, warpEpochForSun, runtime, spawn]` (FlyScene.jsx:1197).
+    // At this venue the main thread is saturated: verify-frame-pace measured
+    // 92,897 ms of long tasks inside a 90 s window, so a 60 s interval fires
+    // far less often than every 60 s and a poll can time out while the override
+    // sits unread.
+    //
+    // MEASURED, and it is the tell: haze-red's night leg reported 54.9987 — the
+    // NOON target, exactly — for a −14° command. The recompute fired once and
+    // read the PREVIOUS write. The value does land; it lands a write late, on a
+    // timer that starves.
+    //
+    // `warpEpochForSun` is `useFlyStore(s => s.warpEpoch)` and warpToGeo bumps
+    // it, so re-issuing the SAME pose re-runs the effect at once and the
+    // override is consumed on the spot. The pose does not change, so nothing
+    // about the frame moves except the clock the sky reads.
+    await page.evaluate(PIN_POSE, POSE);
+    await page.waitForTimeout(3000);
     // WAIT FOR THE RECOMPUTE, not for a duration — the same defect verify-one-sun
     // hit, at a second gate. The app consumes the override inside the sky
     // effect (FlyScene.jsx:1155), so a fixed wait samples whatever the last
@@ -341,7 +362,7 @@ function gate(name, ok, detail) {
           return typeof el === 'number' && Math.abs(el - wantEl) <= tol;
         },
         [elDeg, 0.5],
-        { timeout: Number(process.env.SUN_LAND_MS || 120000), polling: 500 }
+        { timeout: Number(process.env.SUN_LAND_MS || 180000), polling: 500 }
       )
       .then(() => true)
       .catch(() => false);
