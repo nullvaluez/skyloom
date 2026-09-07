@@ -924,6 +924,39 @@ the shipped value is strictly less activity than was measured; and peak
 concurrency reached 20 of 32 in a session that included boot fades the ship
 state suppresses.
 
+## §4.10f Correction: the 8 refetches are A's discarded refines, not my transient misses
+
+I guessed that the OFF arm's 8 refetches were the same transient imagery misses
+that produce `noParentMap`, and offered a one-step test (are the refetched URLs
+the parents named in `noParentMapFirst`?). **A's attribution supersedes it, from
+arithmetic rather than correlation** (`r24-a-pace.md` §22): the vendored
+`_loadSubTiles` re-evaluates the LOD after its await with the children not yet
+added, so a tile that leaves the frustum during its own download fails the
+refine test and `unloadSubTiles()` discards four COMPLETED downloads and clears
+`_subTiles` — the tile then re-buys them. Two such discards × 4 children = the 8
+refetches, worst ×2 exact.
+
+**My test would have come back negative, and for the right reason:** the
+refetched URLs are CHILDREN of discarded refines, not the PARENTS named in
+`noParentMapFirst`. Recorded because a negative result from a well-posed test is
+worth as much as a positive one, and because "my guess was superseded by
+someone else's arithmetic" is the kind of thing a ledger should say out loud.
+
+**The two instruments confirm each other by construction.** A's wrapper
+increments at the TOP of `_loadSubTiles` (every refine STARTED);
+`onRefine` returns early on `aborted` without incrementing, so `lodStats.refines`
+counts only refines COMMITTED. On the OFF arm that is A 74 vs D 72 — and the
+difference, 2, is exactly the discard count A's arithmetic needs. Neither
+counter is wrong; the subtraction between them measures the discard rate, and it
+only works because the `aborted` early-return is there.
+
+**Not caused by, and not fixable from, D's patch.** The discard is upstream
+behaviour in the same function PATCH 6 sits in, but the hook runs before the
+return expression and does nothing at all on the aborted path — it is one
+short-circuited call. `_errorMaterial` after a transient miss remains the
+explanation for `noParentMap` 3 (and therefore `hardSwaps` 3); A ruled it out
+for the refetches with counts.
+
 ## §4.11 A gate must not assert what another owner ships
 
 Found by Fable's dry-run merge of all five flipped branches. Three of D's key
