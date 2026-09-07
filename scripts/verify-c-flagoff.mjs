@@ -314,6 +314,31 @@ gate(
       /out\.residualM =/.test(dp) &&
       /out\.reprojectionPx =/.test(dp)
   );
+  // A rigid vertical lift is right for distant terrain and FATAL in the near
+  // field: at bendK 5e-6 a 3 km hit lifts the ray ~45 m, straight over anything
+  // within tens of metres — which is how the far pick missed a depth-writing
+  // object 34 m in front of the camera. Both casts must survive, and the
+  // reprojection must be the arbiter rather than a special case.
+  gate(
+    'the truth casts BOTH an unlifted and a bend-solved ray and takes the NEAREST valid one',
+    /cands\.push\(\{ \.\.\.a, via: 'unlifted' \}\);/.test(dp) &&
+      /cands\.push\(\{ \.\.\.b, via: 'bend-solved' \}\);/.test(dp) &&
+      /const valid = cands\.filter\(\(c\) => c\.reproj <= 1\.5\);/.test(dp) &&
+      /valid\.sort\(\(c1, c2\) => c1\.distance - c2\.distance\);/.test(dp)
+  );
+  gate(
+    'the truth publishes ONE TEXEL of surface slope, so the bound is measured not guessed',
+    /out\.slopeMPerPx = slope;/.test(dp) &&
+      /\[-1, 0\],\s*\n\s*\[1, 0\],\s*\n\s*\[0, -1\],\s*\n\s*\[0, 1\],/.test(dp)
+  );
+  gate(
+    'probe and truth are ONE synchronous read — no frame can land between them',
+    /out\.truth = truth\(x, y\);\s*\n\s*return out;/.test(dp) && /^      truth: null,$/m.test(dp)
+  );
+  gate(
+    'cocSource is mirrored onto __flyStats.effects, where the reader looks',
+    /\(st\.effects \?\?= \{\}\)\.cocSource = out\.cocSource;/.test(dp)
+  );
 }
 
 const fx = read('components/fly/Effects.jsx');

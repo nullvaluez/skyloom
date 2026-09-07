@@ -2070,3 +2070,110 @@ verify-rim / verify-sat-depth / verify-sat-night / verify-dusk re-certified in
 the same round, because the triple has four consumers.
 
 No code moved: nothing in (1) or (2) is a decode defect.
+
+---
+
+## depth-rt retake2: THE FAR PICK MISSED because my own bend correction swept the ray over it
+
+Three findings, two of them mine and fixed here.
+
+### (2) The 34 m object — MY DEFECT, in the bend correction
+
+At the far pick the buffer held a depth-writing surface 34.45 m in front of the
+camera and the raycast reported 3,144.7 m of terrain. The cause is not the
+candidate set; it is the correction:
+
+**A rigid vertical lift is right for distant terrain and fatal in the near
+field.** The solve lifts the ray origin by the drop at the current hit. At
+`bendK` 5e-6 a 3 km hit means a lift of 3144² x 5e-6 = **49 m** — and a ray
+lifted 49 m at the camera passes about 49 m above anything a few tens of metres
+away. The player aircraft under the chase cam sits ~30 m ahead. The first
+iteration hit distant terrain, the lift went to tens of metres, and every
+subsequent cast flew straight over the aircraft. The candidate set was never the
+problem: the aircraft is a depth-writing visible Mesh and was in the list all
+along.
+
+**Fix: two casts and let the reprojection arbitrate.** An UNLIFTED cast (the
+near field, where the drop is 0.05 m at 100 m and cannot matter) and the
+bend-solved cast (distant terrain); each corrected point is projected back to
+the pixel and rejected above 1.5 px; the NEAREST survivor wins, because nearest
+is what a depth buffer keeps. Distant terrain found by the unlifted ray is
+pushed off the ray by its own drop and rejects itself — no special case
+anywhere. `via` reports which cast won, `tried`/`rejected` how many there were.
+
+### (1) The 36 m gap at the near/mid pick — ruled out, named, and made measurable
+
+Ruled out from source and arithmetic:
+
+* **The near plane.** 2.5 / 0.00207 = 1207.7 against a reported 1207.14: the
+  probe is reconstructing exactly `near / raw` for a reversed buffer with a
+  distant far plane. The reconstruction is faithful; the disagreement is about
+  WHICH SURFACE, not about the conversion.
+* **Texel addressing.** Both hooks take `gl.getDrawingBufferSize()` and use
+  exactly inverse conversions of the same `(px + 0.5)` centre. `reprojectionPx`
+  came back **0.00 on every probe**, which is the direct proof that the truth
+  point lands on the pixel that was asked for. No CSS/drawing-buffer scale
+  error exists.
+* **float16 precision.** At raw 0.00207 a half-float carries ~0.05 % relative
+  error — 60x too small for 3 %.
+
+What remains is the surface, and the log contains the evidence for it: **two
+probes of the SAME pixel (480, 464) read 1207.14 and 1209.63** — 2.5 m apart. A
+static surface cannot do that. The world was streaming between reads, so a truth
+taken in a different turn is a truth of a different world.
+
+Two fixes, both mine:
+
+1. **`truth` is now a field on the probe result**, computed in the same
+   synchronous turn as the depth read. No frame can land between them, so the
+   difference is about the surface and never about the clock. The standalone
+   `__flyDepthTruth(x, y)` stays for direct use.
+2. **`slopeMPerPx`** — the truth now casts the four neighbouring pixels and
+   publishes the largest view-Z step across one texel.
+
+**On the contract wording: <= 1 % is the wrong bound for a SURFACE comparison at
+1.2 km, and it should be**
+
+```
+|probe.viewZ - truth.viewZ|  <=  0.01 * |truth.viewZ|  +  truth.slopeMPerPx
+```
+
+One pixel at 1.2 km subtends metres of ground; on a grazing face — a tile skirt,
+a cliff, a seam between two LODs — the depth across one texel changes by tens of
+metres, and no reconstruction error is being measured there. The slope term is
+MEASURED at the probe's own pixel rather than guessed as a constant, so the
+bound is tight where the surface is flat and honest where it is not.
+
+### (3) `cocSource` was published — the gate read a different address
+
+`coc` and `cocSource` are assigned in the SAME branch off the same `cocTex`, so
+a finite `coc` PROVES a published `cocSource`; the log printing
+`coc 0.1411764770746231` with `coc source: null` is that contradiction. The gate
+reads `window.__flyStats?.effects?.cocSource ?? window.__flyDof?.cocSource`
+(verify-depth-roundtrip.js:381-383), and the name lives on the PROBE RESULT,
+which the same gate already destructures for `probe.coc` and `probe.raw` at
+:323. Nothing wrote the address it read.
+
+Fixed on my side rather than only reported: the probe now also mirrors the name
+onto `__flyStats.effects.cocSource`, so both read paths work and the class of
+"published, but somewhere else" is closed for this field.
+
+**And a finding for (3)/(4) while I was in there: the CoC texture is 8-BIT.**
+0.1411764770746231 is float32(36/255) and 0.16470588743686676 is float32(42/255)
+— exact 1/255 steps. So the CoC term is quantised to 0.0039, which is fine
+against (3)'s 0.02 bound but worth stating, because "0.141" looks like a
+continuous measurement and is not. (4) is not blocked by that: it read 0.165
+because the pixel held the aircraft at 34 m, not 4 km — the (2) defect, and E's
+pick change (distinct pixels with distinct truths) is the other half.
+
+### Gates
+
+verify-c-flagoff 50 -> **54**: both casts survive and the nearest valid one wins
+(RED-calibrated by replacing the reprojection filter with `slice(0, 1)`); one
+texel of slope is published; probe and truth are one synchronous read
+(RED-calibrated by deleting the `out.truth` line); `cocSource` is mirrored where
+the reader looks.
+
+Node-only: verify-c-flagoff 54/54 - verify-shadow-calm 33/33 -
+verify-depth-offset 7/7 - verify-worker-normals 12/12 - four proofs PASS -
+verify-import-integrity 4/0 - eslint 0/0. No browser.
