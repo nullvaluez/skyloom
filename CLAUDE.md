@@ -144,13 +144,11 @@
 > re-runs: **one-sun CLOSED at 42/42** against the restored 1e-6° bound,
 > **linear-haze CLOSED at 9/0/1** with the noon gain reproduced (5.90 luma)
 > and the night leg NOT SEPARATED at the venue's 1.2 cross-boot floor, and
-> **depth-rt MEASURED at 7/2 and then re-run at 7/4 on the rebuilt gate** —
-> every red so far attributed to the INSTRUMENTS and none to the flag, and
-> the headline proven twice over: the probe reconstructs the kilometre regime
-> to 0.00 %, and **the DoF's CoC agrees with the DEPTH BUFFER inside the
-> 8-bit quantum at all three picks**, so DoF ↔ buffer is proven and only
-> buffer ↔ geometry is open — on a truth arbiter whose validity test is
-> identically zero for a hit that lies on the ray; re-run pending
+> **depth-rt CERTIFIED at 11/11 on the flipped tree** — after two runs whose
+> every red was the instruments' and none the flag's, the round-trip reads
+> **0.00 / 0.00 / 0.01 %** at three picks and **the DoF's CoC agrees with the
+> DEPTH BUFFER inside the 8-bit quantum**, so buffer ↔ geometry and
+> DoF ↔ buffer are both proven and the collapse-to-near signature is absent
 > <!-- TAIL RE-RUNS PENDING -->; and §5b's follow-ups —
 > R25 re-authoring the rim keyframes against the dome's measured horizon colour
 > (four consumers, re-certified together), a shared-DEM request coalescer
