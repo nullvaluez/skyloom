@@ -97,7 +97,12 @@
 > stranded**. **The 261 does not move**, no threshold change ships, and the gate
 > now reads NOT CALIBRATED when an arm did not settle. **The fixture's Owens is
 > not the live desert that ceiling was frozen against — so the ON arm's Owens
-> number is readable only on the user's machine.**
+> number is readable only on the user's machine.** And the round's own lesson
+> about it: **every ceiling here was certified on a FRESH WARP, while the 279
+> came from a pose reached the way a player reaches one — fly, turn, go
+> somewhere else — and it was 2× the settled number. A settled number and a
+> LIVED number are different numbers, and the user's machine reads the lived
+> ones first.**
 >
 > **SHIP STATE.** **ON**: `TERRA_PACE` (incl. `parkOffscreen` and
 > `maxResidentTiles`), `STEP_SAFE`, `LADDER_FIX`, `HUD_SYNC`, `FINALIZE_PACE`,
