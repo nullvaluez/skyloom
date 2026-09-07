@@ -802,6 +802,19 @@ its trimmed sweep.
    signature `window.__flyDepthProbe(x, y) → { viewZ, coc, raw, reversed }`.
    If C has not published it, the row reads NOT RUNNABLE, not RED.
 
+10. **A container restart killed a terra-live row mid-sweep — a VENUE EVENT,
+    not a gate result.** The standalone two-arm run on `645d08c`
+    (`scripts/r24-out/w4`) died at ~03:55 with `Target page, context or browser
+    has been closed` at `verify-terra-live.js:397`, taking the `:3100` server
+    with it. **Nothing was measured**, so `w4` holds no verdict of any kind and
+    must not be read as one: no arm completed, no census was taken, and the
+    log's last line is a boot-time content probe. The row was relaunched
+    unchanged on the same tree into `scripts/r24-out/w5`, and the dead `w4`
+    directory is kept precisely so the two are never confused. **A row that was
+    killed is not a row that failed** — the distinction is the same one §6a
+    draws about a gate that produced no verdict, and the reason the output
+    directory is versioned per attempt rather than overwritten.
+
 ## §4 Verdict
 
 *(Fable fills this at close. The honest shape it must take, given this venue:)*
@@ -1688,9 +1701,72 @@ the hits are printed with their distances and the objects they struck; and fewer
 than three picks reads **NOT CALIBRATED, not FAIL** — the round trip was never
 exercised, which is not the same as failing it.
 
-**PASS 2c (standalone re-take).** *pending* — the RED signature to look for is
-all three pixels reconstructing to **2.50–2.51 m**, i.e. `−cameraNear`, every
-fragment collapsed.
+**PASS 2c (tail re-run, integration `3231f7d`, 2026-09-07 03:19).**
+**7 passed, 2 failed**, rc 1, 406 s. **The RED signature is ABSENT** — the
+headline holds: nearest **0.10 %**, farthest **0.00 %**, nothing collapsed to
+`−cameraNear`. Both reds are attributed and neither convicts DEPTH_FIX.
+
+| Leg | Verdict | Number |
+|---|---|---|
+| (0)/(0b) hook + DoF pass present | PASS | `__flyDof true · style toy · tier high` |
+| (1) three pixels with a known true distance | PASS | 13 truth hits, 13 distinct; picks 31 / 1933 / 3487 m |
+| (2) nearest | PASS | \|Δ\| **0.04 m**, 0.10 % |
+| (2) median | **FAIL — C-open** | probe 1728.04 m vs truth 1933.4 m, **205.36 m / 10.62 %** against a 28.66 m bound |
+| (2) farthest | PASS | \|Δ\| **0.08 m**, 0.00 % |
+| (3) CoC at "the focus plane" | **FAIL — instrument, mine** | near coc 0.161 |
+| (4) CoC beyond "4 km" | PASS **(vacuous)** | far coc 1, measured at 3210 m |
+| (5) no page errors | PASS | clean |
+
+**The median 205 m is C's instrument, not a product disagreement.** C attributed
+it from source: the truth arbiter subtracted the **ground** drop from every
+candidate and rejected anything that then missed the pixel by > 1.5 px. On a
+grazing ray a 14.9 m drop reprojects ~9 px, and the ground formula is wrong by
+construction for an **air-bent** actor (traffic, contrails, player carry
+`airDrop` with R7's lift term) — so the class most likely to sit in front of
+terrain was the class guaranteed to be thrown out, and the truth fell through to
+ground 205 m behind. Fixed in C's `81d803a`: the ray is solved at the hit's XZ
+(every bend variant displaces only in Y, so the rendered point shares the hit's
+XZ), reprojection 0 by construction, no threshold, with `impliedDropM` /
+`groundDropM` / a full `hits` list now published so the next disagreement can be
+**read** rather than theorised.
+
+**Both CoC clauses were worthless, in opposite directions, and that is mine.**
+Each read the pixel chosen by RANK and neither checked where that pixel was.
+(3) is named "AT THE FOCUS PLANE" and read the nearest pick — **the player jet
+at 35.9 m**, against a focus plane at **700 m**, 664 m in front of the sharp
+band, where a CoC of 0.161 is the DoF working exactly as configured. `CoC < 0.02`
+holds only for **482–918 m**, so that pick could never have satisfied the clause
+whatever the DoF did. (4) failed the same way and got away with it: it **passed
+at 3210 m while naming 4 km**. A false red and a vacuous green, one cause.
+
+**Rebuilt** in `dbe3ed8` to the shape Fable specified and C confirmed: the
+player is parked before anything is picked (hiding it, not name-filtering it —
+`visible = false` drops the jet from the depth buffer **and** the raycast
+together, because `depth-probe.js:504` walks the ancestor chain, whereas a name
+filter would fix only the raycast and manufacture the very mismatch this row
+spent two passes attributing), and the contract becomes *measured CoC ≡ the
+material's own formula evaluated at the raycast's distance*, at all three picks,
+within the CoC texture's 8-bit quantum plus a half-res texel of depth gradient.
+Both uniforms and the projection are read **live** off `__flyDof.cocMaterial`.
+
+Two things in the shipping shader would have broken a formula written from the
+docs: `getDistance` is `length(viewPosition)` — **Euclidean**, not `−viewZ`
+(262 m apart at the previous run's off-axis far pick, harmless there only
+because it was already saturated) — and `focusDistance`/`focusRange` are in
+**world metres**, `worldFocusDistance` being a pass-through alias in this
+version.
+
+**The RED was calculated before it was run**, and it caught a hole in the new
+clause. On a collapsed buffer every fragment sits at 2.5 m and reads one CoC of
+0.1773 while the formula predicts 0.1226 / 0.4974 / 1.0000 — so (3) fails
+0.0547 / 0.3201 / 0.8227 — but (4), first written as "no backwards step in CoC",
+**passes**, because one constant value at every pick has no backwards step at
+all. It would have called the defect green with a warning nobody reads. (4) now
+demands the measured spread be at least half the predicted spread, and reads
+NOT CALIBRATED when the formula says the picks should differ by ≤ 4 quanta.
+
+**PASS 2d (re-run on `645d08c`).** *pending* — first run of the rebuilt clauses,
+after C's `81d803a` truth arbiter.
 
 ---
 
