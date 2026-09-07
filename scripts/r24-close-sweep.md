@@ -444,6 +444,28 @@ When the hook lands, the row runs unchanged and its RED signature is the one C
 measured: all three pixels reconstructing to 2.50–2.51 m, i.e. `−cameraNear`,
 every fragment collapsed by the double un-reversal.
 
+### 2.7d THE POST-BATCH RE-RUN ORDER (R24 close)
+
+Rows that must run again, in this order, each because a named instrument or
+product fix landed after the row was measured:
+
+| # | Row | Why it re-runs |
+|---|---|---|
+| 1 | **`lod-fade` STANDALONE** | its 360° two-arm sweep does not fit `run()`'s 2,400 s row timeout; a killed row loses even the OFF leg |
+| 2 | `one-sun` | the sun is now WAITED FOR, not waited on; (6) gated on the sun having landed; (2)/(4)/(3m) take C's moon-key contract |
+| 3 | `linear-haze` | same wait-for-landing fix; without it both arms sat on the wall clock at Owens |
+| 4 | `haze-red` | the noise floor is meaningless if the arms never differed |
+| 5 | `fade` | `__noFade` attribution + the new (2b) attributability leg |
+| 6 | `terra-live` | A's `parkOffscreen` fix, with the resident / parked / visible census — **read the drawn fraction before the draw number** |
+| 7 | `verify-sat-night` (33) | C's M2 moves satellite NIGHT ground pixels |
+| 8 | `verify-dusk` (15) | same |
+| 9 | `verify-flicker` night legs (7) | same; **the bound of 12 never moves** |
+
+Rows 7–9 are exposed frozen gates, not new ones. C's fix is bit-identical in
+daylight by construction — `moonK` is 0 above the horizon, and the flag-off tree
+is untouched at every elevation — so only the night legs can move. **If any of
+the three reads red, the fix is C's to re-examine; it is not a re-baseline.**
+
 ### 2.7b What we will still not know afterwards
 
 - Whether a tear LINE is present — only the user's eyes and a phone camera can

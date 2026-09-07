@@ -349,25 +349,58 @@ const gateNum = numGate(gate);
       //
       // So at full moon (2) defers to the published moon direction, and reads
       // NOT CALIBRATED — never FAIL — until C publishes it.
+      // UNDER MOONLIGHT THE KEY FOLLOWS THE MOON, AND SO DOES THE HILL.
+      //
+      // C publishes `moonKeyAzDeg` / `moonKeyElDeg` IN THIS GATE'S OWN
+      // CONVENTION (az = atan2(x, z), el = asin(y), degrees), and they are
+      // NULL while moonK is 0 — deliberately, because a stale vector reported
+      // as live is how an instrument invents a measurement. So null at
+      // moonK > 0 is NOT CALIBRATED, never a FAIL against the sun.
       if (s.moonK === 1) {
-        const moonDir = s.moonExpected ?? s.moonDir ?? s.keyMoon ?? null;
-        const dMoon = moonDir ? angleBetween(s.key, moonDir) : null;
-        if (!Number.isFinite(dMoon))
+        const mAz = s.moonKeyAzDeg;
+        const mEl = s.moonKeyElDeg;
+        if (!Number.isFinite(mAz) || !Number.isFinite(mEl))
           notCalibrated(
-            `(2/4) ${tier}/${label} AT FULL MOON THE KEY IS THE MOON DIRECTION`,
-            `moonK=1, so the key follows moonDirFromSun (FlyScene.jsx:2193) and the SOLAR ` +
-              `expectation does not apply — key el ${keyEl?.toFixed(3)}°, sun ${elDeg}°. The ` +
-              'instrument publishes no moon direction on stats.sun yet, so there is nothing to ' +
-              'compare against; this is NOT a failure of ONE_SUN'
+            `(2/4) ${tier}/${label} AT FULL MOON THE KEY IS THE MOON KEY DIRECTION`,
+            `moonK=1, so the SOLAR expectation does not apply — key az ${keyAz?.toFixed(3)}° el ` +
+              `${keyEl?.toFixed(3)}°, sun ${elDeg}°. moonKeyAzDeg/moonKeyElDeg are ` +
+              `${JSON.stringify(mAz)}/${JSON.stringify(mEl)}; nothing to compare against, and this ` +
+              'is NOT a failure of ONE_SUN'
           );
-        else
+        else {
+          const dAz = Math.abs(((keyAz - mAz + 540) % 360) - 180);
+          const dEl = Math.abs(keyEl - mEl);
           gateNum(
-            `(2/4) ${tier}/${label} AT FULL MOON THE KEY IS THE MOON DIRECTION`,
-            dMoon,
-            dMoon <= 0.5,
-            `Δ ${dMoon.toFixed(4)}° between the key and the published moon direction`,
-            `angleBetween(key, moonDir) returned ${dMoon}`
+            `(2/4) ${tier}/${label} AT FULL MOON THE KEY IS THE MOON KEY DIRECTION`,
+            Math.max(dAz, dEl),
+            dAz <= 0.5 && dEl <= 0.5,
+            `key az ${keyAz.toFixed(3)}° el ${keyEl.toFixed(3)}° vs published moon key az ` +
+              `${mAz.toFixed(3)}° el ${mEl.toFixed(3)}° — Δaz ${dAz.toFixed(4)}° Δel ${dEl.toFixed(4)}°`,
+            `az/el deltas are ${dAz}/${dEl}`
           );
+        }
+        // C's M2 FIX: the HILL follows the moon through the same
+        // moonBlendK(elDeg) the key uses — one copy of the blend weight, called
+        // by the per-frame key branch and by the 60 s hillshade cadence. So
+        // under moonlight the assertion is hill ≡ KEY, not hill ≡ the solar
+        // clamp.
+        //
+        // NOTE ON THE RE-TAKE: its (3) PASS at hill el 8.594° was on the
+        // PRE-FIX tree, where the hill stayed on the sun at the clamp floor
+        // while the key had already blended to the moon — 137.04° apart. That
+        // divergence was ruled a DEFECT of ONE_SUN's own M2 (the R21 flag-off
+        // tree had key and hill agreeing at 0.00° at night, both on the sun),
+        // so the old PASS is not a baseline to preserve.
+        const hAz = Number.isFinite(hillAz) ? Math.abs(((keyAz - hillAz + 540) % 360) - 180) : NaN;
+        const hEl = Number.isFinite(hillEl) ? Math.abs(keyEl - hillEl) : NaN;
+        gateNum(
+          `(3m) ${tier}/${label} UNDER MOONLIGHT THE HILL FOLLOWS THE KEY`,
+          Number.isFinite(hAz) && Number.isFinite(hEl) ? Math.max(hAz, hEl) : NaN,
+          hAz <= 0.5 && hEl <= 0.5,
+          `key az ${keyAz?.toFixed(3)}° el ${keyEl?.toFixed(3)}° vs hill az ${hillAz?.toFixed(3)}° ` +
+            `el ${hillEl?.toFixed(3)}° — Δaz ${hAz?.toFixed(4)}° Δel ${hEl?.toFixed(4)}°`,
+          `hill az ${hillAz} el ${hillEl}`
+        );
         continue;
       }
       const dKeyEl =
@@ -382,7 +415,15 @@ const gateNum = numGate(gate);
       );
 
       // --- clause 3: hillshade clamp
-      if (s.hillMinDeg == null || s.hillMaxDeg == null)
+      // Clause (3) is the SOLAR clamp, so it applies only above the moon blend.
+      // Below it the hill is on the moon and (3m) governs — asserting the solar
+      // clamp there would assert the pre-fix behaviour.
+      if (s.moonK > 0)
+        skip(
+          `(3) ${tier}/${label} HILL CLAMP`,
+          `moonK=${s.moonK} — the hill follows the moon through moonBlendK, so (3m) governs`
+        );
+      else if (s.hillMinDeg == null || s.hillMaxDeg == null)
         skip(`(3) ${tier}/${label} HILL CLAMP`, 'instrument does not publish hillMinDeg/hillMaxDeg');
       else {
         const expectHill = Math.min(Math.max(elDeg, s.hillMinDeg), s.hillMaxDeg);
