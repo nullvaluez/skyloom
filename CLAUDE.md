@@ -131,7 +131,9 @@
 > draw-pair instrument), and `flicker` **4/2** (**the R21 flicker SIGNATURE is
 > ABSENT** — 2 and 0 swinging pixels of 547,200 against a bound of 32 — while
 > the p99 reds measured tiles streaming IN during a 12-frame window that is
-> ~24 s here). **Every red among them is an instrument under the venue, none a
+> ~24 s here — attributed to a quiescence probe that sampled 3 frames and
+> could not bound a 12-frame statistic, and now re-measured with the asserted
+> window as its own control). **Every red among them is an instrument under the venue, none a
 > defect of the flag it certifies**; the attributions in progress and the
 > cheap re-runs ride the next server
 > <!-- NIGHT GATES: two attributions in progress, re-runs pending -->; four tail
