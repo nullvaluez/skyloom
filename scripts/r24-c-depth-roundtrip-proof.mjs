@@ -133,7 +133,11 @@ function glslPerspectiveDepthToViewZ() {
 
 const PROBE_SRC = readFileSync(new URL('../lib/fly/depth-probe.js', import.meta.url), 'utf8');
 const mirror = new Function(
-  `${PROBE_SRC.replace(/^import[\s\S]*?from 'three';/m, '').replace(/\bexport\s+function\b/g, 'function')}
+  // Strip EVERY top-level import, not just three's: the module grew a second
+  // one (world-bend's getBend, for the truth raycast's live bend) and a
+  // single-import strip turned this proof into a SyntaxError the moment it
+  // did. The mirror under test is pure arithmetic and imports nothing.
+  `${PROBE_SRC.replace(/^import[\s\S]*?from '[^']+';/gm, '').replace(/\bexport\s+function\b/g, 'function')}
    return perspectiveDepthToViewZ;`
 )();
 
@@ -283,7 +287,11 @@ const probeGates = [
   ],
   [
     'the probe is installed from a production-dead branch',
-    /process\.env\.NODE_ENV === 'production'\) return undefined;\s*\n\s*return installDepthProbe/.test(
+    // Comment lines are allowed between the guard and the call (the install now
+    // carries a note naming the camera/scene it hands over); what is asserted is
+    // unchanged — nothing but comments may sit between them, so no statement can
+    // slip in that runs in production.
+    /process\.env\.NODE_ENV === 'production'\) return undefined;\s*(?:\n\s*\/\/[^\n]*)*\n\s*return installDepthProbe/.test(
       readFileSync(new URL('../components/fly/FlyEffectComposer.jsx', import.meta.url), 'utf8')
     ),
   ],

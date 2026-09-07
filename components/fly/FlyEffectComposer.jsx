@@ -221,8 +221,11 @@ const StableEffectComposer = /* @__PURE__ */ memo(
     // target is allocated and no global is written — production byte-identical.
     useEffect(() => {
       if (process.env.NODE_ENV === 'production') return undefined;
-      return installDepthProbe({ gl, composer, camera }) ?? undefined;
-    }, [gl, composer, camera]);
+      // R24 C: `scene` and `camera` are the SAME two objects handed to
+      // `new RenderPass(scene, camera)` above, so the truth raycast can never
+      // read a different camera than the one whose depth the probe samples.
+      return installDepthProbe({ gl, composer, camera, scene }) ?? undefined;
+    }, [gl, composer, camera, scene]);
 
     // ---- (ii) size, keyed on CSS size AND device pixel ratio -------------
     useEffect(() => {

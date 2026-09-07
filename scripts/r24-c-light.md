@@ -1755,3 +1755,111 @@ a newline rather than `&&`. Identical to the `7dae48b`/`974ce23` split earlier
 this round. The lesson was recorded then and not APPLIED: the fix is not "assert
 more carefully", it is that a write-then-commit sequence must be one `&&` chain
 so a failed edit cannot be followed by a commit. Done that way here.
+
+---
+
+## `__flyDepthTruth(x, y)` — the truth raycast, because the harness cannot build one
+
+`verify-depth-roundtrip` reached its gate (1) and read **0 raycast hits of 15
+probes**, every miss saying `handle absent — THREE false, gl true, cam false,
+scene true`. That is not a flaky pose: a bundled app publishes no
+`window.THREE` and no camera, so the gate can never establish a true distance
+from outside. The truth has to be computed where the camera and three are
+already in scope, which is here.
+
+### What it returns
+
+`{ hit, distance, viewZ, object, source }` as asked, plus the terms that let a
+reader judge the answer instead of trusting it: `bendK`, `bendDropM`,
+`bendIters`, `residualM`, `reprojectionPx`, `candidates`, and on a miss
+`{ hit: false, reason }` — never a zero.
+
+`viewZ` is three's view space, **negative in front of the camera, world
+metres** — the same convention and units `__flyDepthProbe(x, y).viewZ` returns,
+so `|probe.viewZ − truth.viewZ|` needs no conversion. `x`/`y` are drawing-buffer
+pixels with a top-left origin, and the NDC conversion is the exact inverse of
+the probe's own UV conversion, so both hooks address the same texel.
+
+### Which camera, which geometry
+
+`camera` and `scene` are the SAME two objects `FlyEffectComposer` hands to
+`new RenderPass(scene, camera)`, passed into `installDepthProbe` from the same
+production-dead effect. So the truth cannot read the inspect turntable's camera
+— that lives in a second Canvas with its own renderer — and it cannot drift from
+the camera whose depth the probe samples.
+
+Candidates are what WRITES DEPTH, or the truth would not describe the buffer:
+`isMesh`, visible through EVERY ancestor (R19's lesson that `traverse` does not
+stop at an invisible parent), a material with `depthWrite !== false` and not a
+sprite material. Billboarded traffic and the tracers are excluded by that test
+rather than by name.
+
+### THE BEND, which a naive raycast gets silently wrong
+
+Every world vertex is displaced by `wPos.y -= bendD * bendD * uBendK` in the
+vertex shader (world-bend.js:579), so the CPU geometry a `Raycaster` sees is NOT
+the surface the depth buffer recorded — at the gate's own 4 km probe the drop is
+metres to tens of metres, i.e. far outside the 1 % bound the gate wants to
+assert. A truth hook that ignored it would have handed E a confident wrong
+number, which is worse than the 0 hits it replaces.
+
+Shifting the ray ORIGIN up by the drop shifts the whole line vertically while
+leaving its XZ path identical, so "shifted line meets un-bent geometry" is the
+same equation as "original line meets bent geometry" for a locally constant
+drop. The drop is smooth, so iterating it at the current hit converges: at most
+four passes, stopping at 1 cm of change, `bendIters` reporting how many it took.
+`k` comes from `getBend()` — the CPU mirror of the LIVE uniforms, the
+`__flyAirDrop` / `horizonFade` idiom — never a constant.
+
+### It falsifies itself
+
+Two numbers exist so a wrong answer cannot look like a right one:
+
+* **`residualM`** — how far the answer sits off the ORIGINAL ray. The bend solve
+  is a fixed point, not an exact inverse; this says whether it converged at this
+  pose.
+* **`reprojectionPx`** — the answer projected back through the same camera,
+  distance in pixels from the pixel that was asked for. A wrong SPACE is the
+  obvious hazard (the floating origin: FlyScene rebases the camera back at
+  :1735, so a between-frames call should see camera and objects in one space —
+  but this hook does not get to assume that), and a stale matrix or a bad bend
+  land the same way. All three show up as a large `reprojectionPx` instead of as
+  a plausible distance.
+
+**Honest limit: I could not run this in a browser.** Every claim above is
+structural. `reprojectionPx` is exactly the instrument that decides it on E's
+machine, and E should read it before reading `distance`.
+
+### `dof=null` beside `__flyDof true` — which is right
+
+**`__flyDof` is right.** It is the live `DepthOfFieldEffect` instance, published
+by Effects.jsx's `setDof` callback ref at mount. `__flyStats.effects.dof` is a
+CONFIG mirror and reads null in compositions that do mount the pass, which is
+why the gate already judges (0b) on `dofLive` and merely prints the other. The
+probe's `cocSource` now names the pass it read — the effect's own constructor
+name plus the handle it came through — so (3)/(4) can say which term they are
+green on rather than inferring one from style and tier.
+
+### Gates
+
+verify-c-flagoff 44 -> **49**: the hook is published and torn down with the
+probe; it cannot exist in production (same `NODE_ENV` early-return, same install
+site, and the regex allows only COMMENTS between the guard and the call, so no
+statement can slip in); it reads the composer's own camera/scene binding with no
+module-scope `camera` to shadow it; the candidate set is depth-writing geometry;
+and it un-bends by the live `uBendK` while reporting its own convergence.
+RED-calibrated by deleting the `NODE_ENV` guard and by weakening the
+depth-write filter — both red, both restored.
+
+Two of my own instrument files needed a one-line follow: the roundtrip proof
+stripped only three's import before evaluating the mirror, and turned into a
+`SyntaxError` the moment the module grew a second one (now strips every
+top-level import); and its production-dead-branch regex demanded the call
+IMMEDIATELY after the guard (now allows comment lines, same property asserted).
+Both are my files tracking my own edit, not gate re-baselines.
+
+Node-only sweep: verify-c-flagoff 49/49 - verify-shadow-calm 33/33 -
+verify-depth-offset 7/7 - verify-worker-normals 12/12 - four proofs PASS -
+verify-import-integrity 4/0. eslint over the changed files: 0 new; the 4
+`react-hooks/immutability` errors in FlyEffectComposer.jsx are pre-existing
+(4 before the edit, 4 after, verified by stash).
