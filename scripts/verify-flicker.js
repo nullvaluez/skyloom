@@ -80,6 +80,7 @@ const path = require('path');
 const fs = require('fs');
 const { bootFly } = require('./_boot');
 const { makeCanvasShot } = require('./_canvasshot');
+const { notCalibrated, notCalCount, notCalSummary } = require('./_notcal');
 
 const BOOT_OPTS = process.env.FLY_URL ? { url: process.env.FLY_URL } : {};
 const FRAMES = +(process.env.FLICK_FRAMES ?? 12);
@@ -457,30 +458,46 @@ const TEMPORAL = async ([frames, y0f, y1f]) => {
     // "this run could not judge", not a red or a green.
     const QUIET_MAX = +(process.env.FLICK_QUIET ?? 0.05);
     const QUIET_TRIES = +(process.env.FLICK_QUIET_TRIES ?? 4);
+    //
+    // R24 CORRECTION, and it is a correction to MY OWN precondition above. The
+    // probe was THREE frames and the assertion is TWELVE. Those are not the
+    // same statistic: `movingFrac` counts pixels that moved AT ALL across the
+    // window, so a longer window catches slower and more intermittent change,
+    // and a 3-frame sample cannot bound a 12-frame one. Measured on this venue:
+    // the probe certified movingFrac 0.008 and the window it admitted then
+    // measured 0.1444 — eighteen times the number that let it in — and both
+    // urban and suburb legs duly reported reds that their own quiescence
+    // control had declared quiet. A precondition measured with a WEAKER
+    // instrument than the assertion it guards is not a precondition.
+    //
+    // So there is no separate probe any more. Each attempt grabs a FULL window,
+    // and the window that gets ASSERTED is the very window that was found
+    // quiet — control and assertion are now the same frames, measured the same
+    // way, and the two numbers can no longer disagree by construction. If no
+    // attempt quiets, the LAST window is reported with quiet=false and its
+    // numbers are informational, exactly as before.
     let quietFrac = null;
     let quiet = false;
+    let frames = null;
+    let stats = null;
     for (let attempt = 0; attempt < QUIET_TRIES; attempt++) {
-      const probe = [];
-      for (let i = 0; i < 3; i++) {
-        probe.push(await shot64());
-        await page.waitForTimeout(FRAME_MS);
-      }
-      const ps = await page.evaluate(TEMPORAL, [probe, y0, y1]);
-      quietFrac = ps.movingFrac;
+      frames = await grab();
+      stats = await page.evaluate(TEMPORAL, [frames, y0, y1]);
+      quietFrac = stats.movingFrac;
       if (quietFrac <= QUIET_MAX) {
         quiet = true;
         break;
       }
       console.log(
-        `      quiescence probe ${attempt + 1}/${QUIET_TRIES}: movingFrac ${quietFrac} > ${QUIET_MAX} — ` +
-          'the scene is still streaming; waiting rather than sampling'
+        `      quiescence ${attempt + 1}/${QUIET_TRIES}: this window's own movingFrac ${quietFrac} > ` +
+          `${QUIET_MAX} (p99 ${stats.p99}) — the scene is still streaming; waiting and taking ` +
+          'another FULL window rather than asserting on this one'
       );
-      await page.waitForTimeout(+(process.env.FLICK_GAP_MS ?? 20000));
+      if (attempt < QUIET_TRIES - 1)
+        await page.waitForTimeout(+(process.env.FLICK_GAP_MS ?? 20000));
     }
-    const frames = await grab();
     await glShot(shotName);
     const statsA = await page.evaluate(TEMPORAL, [framesA, y0, y1]);
-    const stats = await page.evaluate(TEMPORAL, [frames, y0, y1]);
     const scene = await page.evaluate(() => ({
       sb: window.__satBuildings?.stats?.ready ?? null,
       chunks: window.__satBuildings?.stats?.chunks ?? null,
@@ -519,10 +536,19 @@ const TEMPORAL = async ([frames, y0f, y1f]) => {
   // reported as SOFT with its numbers intact rather than asserted — the
   // R22.1 §3.2 five-run spread (6.2 to 16.1 on ONE tree, the red carrying
   // movingFrac 0.1176) is what a load-decided assertion looks like.
+  //
+  // AND IT MUST COUNT. `SOFT` was a bare console line: a run where neither leg
+  // ever quieted printed two SOFT lines, recorded no failure, and exited 0 —
+  // indistinguishable in a sweep table from a run where both legs passed. A leg
+  // that measured nothing is the round's THIRD VERDICT (scripts/_notcal), not
+  // silence, and it must reach the exit code.
   const verdict = (name, quietLeg, ok, detail) => {
     if (quietLeg) return gate(name, ok, detail);
-    console.log(
-      `SOFT ${name} — the scene never reached quiescence; numbers are informational · ${detail}`
+    notCalibrated(
+      name,
+      `the scene never reached quiescence within ${
+        +(process.env.FLICK_QUIET_TRIES ?? 4)
+      } full windows; the numbers below are informational, not a verdict · ${detail}`
     );
   };
   verdict(
@@ -689,9 +715,10 @@ const TEMPORAL = async ([frames, y0f, y1f]) => {
       1
     )
   );
+  console.log(`\nFLICKER: ${fails.length} failed${notCalSummary()}`);
   console.log(fails.length ? `VERIFY: FAIL (${fails.join(', ')})` : 'VERIFY: PASS');
   await browser.close();
-  process.exit(fails.length ? 1 : 0);
+  process.exit(fails.length || notCalCount() ? 1 : 0);
 })().catch((e) => {
   console.error('FAILED:', e.message);
   process.exit(1);
