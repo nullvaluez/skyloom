@@ -68,12 +68,20 @@ function vectors(st, oneSun, tier) {
   // computeSun's clamped `el` — asin(max(0,sinEl)) then clamp to the band
   const clampedEl = Math.min(HILL_MAX, Math.max(HILL_MIN, Math.asin(Math.max(0, sinEl))));
   const shadowCasting = tier === 'high';
-  const hill = basis(st.az, clampedEl);
+  let hill = basis(st.az, clampedEl);
   const dome = basis(st.az, trueEl);
   const moon = (() => {
     const a = st.az + Math.PI, ce = Math.cos(MOON_EL);
     return [-Math.sin(a) * ce, Math.sin(MOON_EL), Math.cos(a) * ce];
   })();
+  const mkOf = () => smooth((ONE.fadeStartDeg - st.trueElDeg) / (ONE.fadeStartDeg - ONE.fadeFullDeg));
+  // R24 C (pass-3 ruling): with ONE_SUN on, the HILL takes the same moon blend
+  // the key does. RED keeps the R21 solar azimuth at the graze floor, which is
+  // what produced the measured 137.03° split at moonK = 1.
+  if (oneSun) {
+    const mk = mkOf();
+    if (mk > 0) hill = norm(hill.map((v, i) => v + (moon[i] - v) * mk));
+  }
   let key;
   if (!oneSun) {
     // R21: the position write lives INSIDE the shadow branch.
@@ -81,7 +89,7 @@ function vectors(st, oneSun, tier) {
   } else {
     const elKey = shadowCasting ? Math.max(SAT_MIN, trueEl) : trueEl;
     key = basis(st.az, elKey);
-    const mk = smooth((ONE.fadeStartDeg - st.trueElDeg) / (ONE.fadeStartDeg - ONE.fadeFullDeg));
+    const mk = mkOf();
     if (mk > 0) key = norm(key.map((v, i) => v + (moon[i] - v) * mk));
   }
   return { key, hill, dome, moon };
@@ -121,11 +129,40 @@ for (const tier of ['high', 'medium']) {
 }
 
 console.log('CONTRACT the GREEN column satisfies (this is what verify-one-sun should assert):');
-console.log('  1. AZIMUTH of key, hill and dome are EQUAL (to 1e-6) at every tier, except');
-console.log('     where moonK > 0, at which point the key is the anti-solar moon BY DESIGN.');
+console.log('  1. AZIMUTH of key, hill and dome are EQUAL (to 1e-6) at every tier. Under');
+console.log('     moonlight key AND hill ride the anti-solar moon together — the W2 text');
+console.log('     here carved the hill out; the pass-3 night measurement overturned that.');
 console.log('  2. key elevation == TRUE solar elevation, floored at SAT_SHADOWS.minElRad');
 console.log('     ONLY while the shadow camera casts (high tier).');
-console.log('  3. hill elevation == clamp(true, [HILLSHADE.minElRad, maxElRad]) — a relief');
-console.log('     legibility clamp, deliberately NOT a lighting fact.');
+console.log('  3. hill elevation == clamp(true, [HILLSHADE.minElRad, maxElRad]) WHERE moonK');
+console.log('     is 0 — a relief legibility clamp, deliberately NOT a lighting fact. At');
+console.log('     moonK == 1 it is moonElRad (34.4°), still inside that same band.');
 console.log('  4. at moonK == 1 the key IS moonDirFromSun(az) exactly (0.0° apart).');
 console.log('  5. water reads the same directional as key — there is no second light.');
+console.log('  6. at moonK == 1 key AND hill are the SAME vector (0.0° apart): the ground');
+console.log('     is no longer shaded from the side of the sky the sun set on.');
+
+// ---- the pass-3 assertion, in one number ----------------------------------
+{
+  // THREE trees, not two. The flag-off tree already AGREED at night — wrongly,
+  // with both the key and the ground on the sun's side of the sky. M2 moved the
+  // key to the moon and left the ground behind, which is the 137.03deg E
+  // measured on the re-take. This commit restores the agreement on the vector
+  // that is actually lighting the scene.
+  const night = STATES[2];
+  const r21 = vectors(night, false, 'high');
+  const now = vectors(night, true, 'high');
+  const shipped = { key: now.key, hill: r21.hill }; // ONE_SUN key + R21 hill
+  const dR21 = angle(r21.key, r21.hill);
+  const dShipped = angle(shipped.key, shipped.hill);
+  const dNow = angle(now.key, now.hill);
+  const dMoon = angle(now.hill, now.moon);
+  const ok = dNow < 1e-4 && dMoon < 1e-4 && dShipped > 100 && dR21 < 1e-4;
+  console.log('');
+  console.log('night (el -14deg, moonK 1) key<->hill, high tier:');
+  console.log(`  R21 flag-off      ${dR21.toFixed(2).padStart(7)}deg  (agreed - both on the SUN)`);
+  console.log(`  ONE_SUN pre-fix   ${dShipped.toFixed(2).padStart(7)}deg  (key on the moon, ground on the sun)`);
+  console.log(`  ONE_SUN this fix  ${dNow.toFixed(2).padStart(7)}deg  (agreed - both on the MOON)`);
+  console.log(`  hill<->moon       ${dMoon.toFixed(2).padStart(7)}deg  =>  ${ok ? 'PASS' : 'FAIL'}`);
+  if (!ok) process.exitCode = 1;
+}

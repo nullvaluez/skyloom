@@ -196,6 +196,67 @@ gate(
     `readers: ${raw.join(', ') || 'none'}`
   );
 }
+// ---- ONE_SUN: the moon key, the hill that follows it, the published shape ---
+{
+  const fs = read('components/fly/FlyScene.jsx');
+  gate(
+    'the moon blend weight has exactly ONE formula, and both consumers call it',
+    /function moonBlendK\(elDeg\) \{/.test(fs) &&
+      (fs.match(/moonBlendK\(/g) || []).length === 3 &&
+      !/fadeStartDeg - elDeg\)[\s\S]{0,80}fadeFullDeg[\s\S]{0,400}fadeStartDeg - elDeg/.test(fs),
+    `${(fs.match(/moonBlendK\(/g) || []).length} references (1 declaration + 2 call sites)`
+  );
+  gate(
+    'the hill moon blend is gated on ONE_SUN and the R21 arguments survive verbatim',
+    /if \(ONE_SUN\.enabled && Number\.isFinite\(sun\.sinEl\)\) \{\s*\n\s*const hmk = moonBlendK\(/.test(
+      fs
+    ) &&
+      fs.includes('let hx = -Math.sin(sun.az) * cosEl;') &&
+      fs.includes('let hy = Math.sin(sun.el);') &&
+      fs.includes('let hz = Math.cos(sun.az) * cosEl;') &&
+      fs.includes('setHillDir(hx, hy, hz);')
+  );
+  gate(
+    'the published moon key is null while moonK is 0 (no stale vector)',
+    /moonKeyAzDeg: _sunAudit\.moonValid\s*\n?\s*\?/.test(fs) &&
+      /moonKeyElDeg: _sunAudit\.moonValid\s*\n?\s*\?/.test(fs) &&
+      /_sunAudit\.moonValid = mk > 0;/.test(fs)
+  );
+  // THE PUBLISHED SHAPE. verify-one-sun asserts against these names; a rename
+  // or a dropped field turns a clause into a silent NOTCAL rather than a red,
+  // which is exactly how pass 2b lost three clauses. RED by removing one name.
+  const SUN_FIELDS = [
+    'live',
+    'az',
+    'elDeg',
+    'moonK',
+    'moonKeyAzDeg',
+    'moonKeyElDeg',
+    'oneSun',
+    'style',
+    'tier',
+    'key',
+    'hill',
+    'hillStrength',
+    'hillElev',
+    'hillEffective',
+    'dome',
+    'water',
+    'waterSource',
+    'casting',
+    'minElRadDeg',
+    'hillMinDeg',
+    'hillMaxDeg',
+  ];
+  const block = (fs.match(/stats\.sun = \{[\s\S]*?\n        \};/) || [''])[0];
+  const missing = SUN_FIELDS.filter((f) => !new RegExp(`(^|\\s)${f}:`, 'm').test(block));
+  gate(
+    `__flyStats.sun publishes all ${SUN_FIELDS.length} fields verify-one-sun reads`,
+    block.length > 0 && missing.length === 0,
+    missing.length ? `missing: ${missing.join(', ')}` : `${SUN_FIELDS.length} present`
+  );
+}
+
 const fx = read('components/fly/Effects.jsx');
 gate(
   'the pass reorder is a POST_ORDER ternary over ONE descriptor list',
