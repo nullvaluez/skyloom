@@ -16,6 +16,7 @@ import {
 } from 'three';
 import { expApproach, mercatorScale } from '@/lib/fly/coords';
 import { GLOBE, TRACERS } from '@/lib/fly/fly-constants';
+import { satelliteVisualsOn, SATELLITE_VISUALS } from '@/lib/fly/satellite-visuals';
 import { applyBendAir } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
 
@@ -94,7 +95,9 @@ function stepSunGain(state, mapStyle, runtime, dt) {
   // Width rides the SAME damped scalar (inverse-lerped back to 0..1) so
   // brightness and thickness can never disagree mid-transition.
   const dampedT = Math.min(1, Math.max(0, (state.sunGain - S.dayGain) / span));
-  return { gain: state.sunGain, widthK: S.dayWidthK + (1 - S.dayWidthK) * dampedT };
+  const quiet = satelliteVisualsOn('presentation');
+  return { gain: state.sunGain * (quiet ? SATELLITE_VISUALS.presentation.trailGain : 1),
+    widthK: (S.dayWidthK + (1 - S.dayWidthK) * dampedT) * (quiet ? SATELLITE_VISUALS.presentation.trailWidth : 1) };
 }
 
 /**

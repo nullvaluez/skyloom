@@ -15,6 +15,7 @@ import {
 import { GLOBE, SAT_TINT, SAT_VEG, SETTLE_CALM, SURFACE_CALM } from '@/lib/fly/fly-constants';
 import { applyBendFade } from '@/lib/fly/toy-world/world-bend';
 import { arrivalEpoch, birthK, makeBirth, notePopin } from '@/lib/fly/settle';
+import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
 
 // Worst-case bend drop pad for the CPU bounding sphere (the SatVegLayer
 // recipe): the GPU pushes far geometry DOWN by d²k and the CPU bound cannot
@@ -171,7 +172,9 @@ export function SatTintLayer({ engine, flight }) {
   const mesh = useMemo(() => {
     const m = new Mesh(geometry, material);
     m.frustumCulled = true;
-    m.renderOrder = 2;
+    // r185 reverses explicit ordering with reverse-Z. Grade after imagery,
+    // then water (-3) and street lighting (-4); retain the legacy comparison.
+    m.renderOrder = satelliteVisualsOn('ground') ? -2 : 2;
     m.visible = false; // parked until the first fill
     m.name = 'sat-tint';
     return m;

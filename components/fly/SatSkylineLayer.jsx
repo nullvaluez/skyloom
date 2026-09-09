@@ -5,7 +5,8 @@ import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
 import { SatSkylineEngine } from '@/lib/fly/toy-world/sat-skyline-engine';
 import { SAT_SKYLINE, SETTLE_CALM } from '@/lib/fly/fly-constants';
-import { getSatSkyline, setSatSkyline } from '@/lib/fly/toy-world/world-bend';
+import { getSatSkyline, setSatSkyline, getSatBldgFade } from '@/lib/fly/toy-world/world-bend';
+import { setSatelliteArchitectureCoverage } from '@/lib/fly/satellite-architecture-material';
 import {
   applyUniformBirth,
   arrivalEpoch,
@@ -15,6 +16,7 @@ import {
   makeUniformBirth,
   notePopin,
 } from '@/lib/fly/settle';
+import { satelliteVisualsOn, satelliteVisualProfile } from '@/lib/fly/satellite-visuals';
 import { useFlyStore } from '@/stores/fly-store';
 
 /**
@@ -64,10 +66,12 @@ export function SatSkylineLayer({ runtime, flight }) {
   // refresh; 0 (low) evicts everything immediately. No re-stream on a raise —
   // the desired set just grows.
   useEffect(() => {
-    engine.setMaxChunks(SAT_SKYLINE.maxChunksByTier[qualityTier] ?? 0);
+    engine.setMaxChunks((satelliteVisualsOn() ? satelliteVisualProfile(qualityTier).skylineChunks : SAT_SKYLINE.maxChunksByTier[qualityTier]) ?? 0);
   }, [engine, qualityTier]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability -- shared imperative runtime bus, matching building/road layers
+    runtime.satSkyline = engine;
     const worker = new Worker(
       new URL('../../lib/fly/toy-world/vector-tile.worker.js', import.meta.url),
       { type: 'module' }
@@ -82,6 +86,7 @@ export function SatSkylineLayer({ runtime, flight }) {
     return () => {
       engine.dispose();
       worker.terminate();
+      if (runtime.satSkyline === engine) runtime.satSkyline = null;
       if (process.env.NODE_ENV === 'development') delete window.__satSkyline;
     };
   }, [engine, runtime]);
@@ -109,6 +114,8 @@ export function SatSkylineLayer({ runtime, flight }) {
     const eyeAgl = Math.max(0, flight.pos.y - gVis);
     // groundElev rides along as the fallback for far DEM samples that have not
     // streamed yet — sea level would sink a mountain city's skyline.
+    engine.setNightMix(runtime.sun?.frac);
+    setSatelliteArchitectureCoverage(engine.material, runtime.satBuildings, runtime.origin?.anchor, getSatBldgFade());
     engine.update(t, flight.pos.x, flight.pos.z, eyeAgl, gVis);
     const ready = engine.stats.ready;
     const k = birthK(

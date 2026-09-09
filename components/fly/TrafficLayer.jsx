@@ -15,6 +15,8 @@ import {
 import { GLOBE, NAV_LIGHTS, SKY, TOY, TRAFFIC, TRAFFIC_HORIZON, WORLD } from '@/lib/fly/fly-constants';
 import { buildArchetypeGeometries } from '@/lib/fly/traffic-geometries';
 import { loadTrafficGeometries } from '@/lib/fly/model-loader';
+import { MODEL_SURFACE_ROLES } from '@/lib/fly/assets';
+import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
 import { applyBendAirAnchor, applyNavLights, horizonFade, setNavTime } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
 
@@ -23,6 +25,19 @@ const _color = new Color();
 const _fog = new Color(SKY.fogColor);
 // Stale traffic fades toward the style's haze, not always daylight blue
 const FOG_BY_STYLE = { satellite: SKY.fogColor, toy: TOY.fogColor };
+
+function setTrafficSurface(meshes, cinematic) {
+  if (meshes.__cinematicSurface === cinematic) return;
+  const surface = cinematic ? MODEL_SURFACE_ROLES.paintedAircraft :
+    { roughness: 0.35, metalness: 0.5, envMapIntensity: 1 };
+  for (const mesh of meshes) {
+    mesh.material.roughness = surface.roughness;
+    mesh.material.metalness = surface.metalness;
+    mesh.material.envMapIntensity = surface.envMapIntensity;
+  }
+  // Uniform-only style transition: retain geometry, materials and program keys.
+  meshes.__cinematicSurface = cinematic;
+}
 
 /**
  * Round 13 Phase 2: procedural far-LOD billboard sprite — a soft radial glow
@@ -191,6 +206,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
     const ax = origin.anchor.x;
     const az = origin.anchor.z;
     const mapStyleNow = useFlyStore.getState().mapStyle;
+    setTrafficSurface(meshes, mapStyleNow === 'satellite' && satelliteVisualsOn('models'));
     _fog.set(FOG_BY_STYLE[mapStyleNow] ?? SKY.fogColor);
     // Round 13 Phase 2: hull PRESENCE floor over dark ground — over-drive the
     // per-instance tint so lit hulls × dim moonlight never read as black cutouts.

@@ -1,4 +1,6 @@
 'use client';
+import { physicalBendCoefficient } from '@/lib/fly/render-scale';
+
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -125,6 +127,9 @@ import { CloudField } from './CloudField';
 import { VoidFloor } from './VoidFloor';
 import { TownGlow } from './TownGlow';
 import { LandmarkMonuments } from './LandmarkMonuments';
+import { satelliteVisualsOn, SATELLITE_VISUALS, graphicsReviewOn, satelliteEffectTier } from '@/lib/fly/satellite-visuals';
+import { setSatelliteWaterFrame } from '@/lib/fly/satellite-water';
+import { applySatelliteNightRim } from '@/lib/fly/satellite-atmosphere';
 import { MonumentModels } from './MonumentModels';
 import { Contrail } from './Contrail';
 import { PlayerGroundShadow } from './PlayerGroundShadow';
@@ -803,6 +808,9 @@ export function FlyScene({ runtime }) {
   const spawn = useFlyStore((s) => s.spawn);
   const mapStyle = useFlyStore((s) => s.mapStyle);
   const qualityTier = useFlyStore((s) => s.qualityTier);
+  const renderDpr = useThree((s) => s.viewport.dpr);
+  const effectsTier = mapStyle === 'satellite' && satelliteVisualsOn()
+    ? satelliteEffectTier(qualityTier, renderDpr) : qualityTier;
   const mood = MOODS[mapStyle] ?? MOODS.satellite;
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
@@ -845,7 +853,7 @@ export function FlyScene({ runtime }) {
   const satShadowsOn =
     mapStyle === 'satellite' &&
     SAT_SHADOWS.enabled &&
-    qualityTier === 'high' &&
+    effectsTier === 'high' &&
     satShadowPin;
   // Render-time mirror so the frame loop reads this frame's value with no
   // stale-closure window (the pattern styleRef uses).
@@ -1188,7 +1196,7 @@ export function FlyScene({ runtime }) {
     });
     useFlyStore.getState().setRuntimeReady(true);
 
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === 'development' || graphicsReviewOn()) {
       window.__fly = runtime;
       window.__flyStore = useFlyStore; // harnesses drive style/tier switches
       window.__passportStore = usePassportStore; // round 16: logbook/badge gates
@@ -1953,14 +1961,16 @@ export function FlyScene({ runtime }) {
     // between the rim and the sky.
     const rpx = flight.pos.x - origin.anchor.x;
     const rpz = flight.pos.z - origin.anchor.z;
-    const bendR = GLOBE.bendRadiusM[flyState.mapStyle] ?? GLOBE.bendRadiusM.satellite;
-    let bendK = 1 / (2 * bendR);
+    const cinematicScale = flyState.mapStyle === 'satellite' && satelliteVisualsOn('scale');
+    const bendR = cinematicScale ? SATELLITE_VISUALS.scale.bendRadiusM : GLOBE.bendRadiusM[flyState.mapStyle] ?? GLOBE.bendRadiusM.satellite;
+    let bendK = cinematicScale ? physicalBendCoefficient(bendR, mercatorScale(flight.latDeg)) : 1 / (2 * bendR);
     const flat = GLOBE.altFlatten;
     if (flat) {
       const over = Math.max(0, flight.pos.y - flat.startAltM);
       bendK *= Math.max(flat.minKFrac, Math.pow(2, -over / flat.halfAltM));
     }
     setBend(rpx, rpz, bendK);
+    setSatelliteWaterFrame({ enabled: flyState.mapStyle === 'satellite' && satelliteVisualsOn('water'), timeSec: _.clock.elapsedTime, originX: origin.anchor.x, originZ: origin.anchor.z, sunAz: runtime.sun?.az, sunSinEl: runtime.sun?.sinEl, overcast: runtime.weather?.wx?.overcastT, moonDirection: _moonDir });
     // The aircraft bend variant caps drops against the player's eye level —
     // grounded targets keep the full drop, high targets never sink below us.
     // Round 8.5 (H1) decision: groundElev stays TRUE-frame here even in toy
@@ -2018,6 +2028,9 @@ export function FlyScene({ runtime }) {
         dt
       ));
       computeSatAtmo(runtime.sun?.frac ?? 1, altT);
+      if (satelliteVisualsOn('atmosphere')) {
+        applySatelliteNightRim(_atmoRim, _atmoVoid, runtime.sun);
+      }
       // --- Round 16: the WEATHER post-pass ---------------------------------
       // Order is the whole contract. computeSatAtmo has just written the
       // clean time-of-day/altitude rim triple; stepWeather advances the
@@ -2075,7 +2088,9 @@ export function FlyScene({ runtime }) {
       // (shader early-out / skipped branch / untouched uniform), so a pinned
       // frame is bit-identical to R18 rather than merely close — which is what
       // lets every frozen satellite pixel gate keep its numbers.
-      const highTier = flyState.qualityTier === 'high';
+      // Match the actual post chain during sub-native DPR reductions. The
+      // inexpensive content haze takes over before building detail is reduced.
+      const highTier = effectsTier === 'high';
       let aerialGate = highTier ? 1 : 0;
       if (
         process.env.NODE_ENV === 'development' &&
@@ -2148,7 +2163,7 @@ export function FlyScene({ runtime }) {
       let contentGate =
         ch.enabled &&
         !highTier &&
-        (_tierRank[flyState.qualityTier] ?? 0) >= (_tierRank[ch.minTier] ?? 2)
+        (_tierRank[effectsTier] ?? 0) >= (_tierRank[ch.minTier] ?? 2)
           ? 1
           : 0;
       if (
@@ -2418,6 +2433,24 @@ export function FlyScene({ runtime }) {
       }
     }
 
+    if (graphicsReviewOn()) {
+      if (process.env.NODE_ENV !== 'development') gl.info.autoReset = false;
+      const review = (window.__graphicsReview ??= { nextAt: 0 });
+      if (performance.now() >= review.nextAt) {
+        review.nextAt = performance.now() + 500;
+        Object.assign(review, { drawCalls: gl.info.render.calls, triangles: gl.info.render.triangles,
+          textures: gl.info.memory.textures, geometries: gl.info.memory.geometries,
+          programs: gl.info.programs.length, tier: flyState.qualityTier, effectsTier,
+          dpr: gl.getPixelRatio(), buildings: runtime.satBuildings?.stats,
+          roads: runtime.satRoads?.stats, skyline: runtime.satSkyline?.stats,
+          parcels: runtime.parcelSettle,
+          skylineCoveredTiles: runtime.satSkyline?.material.userData.architecture?.uniforms.uArchitectureTileCount?.value,
+          cinematic: satelliteVisualsOn(),
+          terrain: runtime.terraStats,
+          sun: runtime.sun, weather: runtime.weather?.wx, aglM: flight.pos.y - flight.groundElev });
+      }
+      if (process.env.NODE_ENV !== 'development') gl.info.reset();
+    }
     // Discrete store sync only when the preset actually changes.
     if (store.speedPreset !== cmd.speedPreset) store.setSpeedPreset(cmd.speedPreset);
 
@@ -2611,7 +2644,7 @@ export function FlyScene({ runtime }) {
             worldRoot so chunk meshes ride the -anchor rebase like the toy chunks
             (anchor-bend uBendCenter frame stays in sync). Gated satellite +
             enabled + tier≥medium → byte-noop (no worker/engine/draws) elsewhere. */}
-        {mapStyle === 'satellite' && SAT_BUILDINGS.enabled && qualityTier !== 'low' && (
+        {mapStyle === 'satellite' && SAT_BUILDINGS.enabled && (qualityTier !== 'low' || satelliteVisualsOn()) && (
           <SatBuildingLayer runtime={runtime} flight={flight} />
         )}
         {/* Round 16 (A4): the satellite GROUND-LIGHT NETWORK (roads + runway
@@ -2620,13 +2653,13 @@ export function FlyScene({ runtime }) {
             the -anchor rebase, keeping the anchor-bend uBendCenter frame in sync.
             Same &&-chain shape as the buildings → off = no mount, no worker, no
             draws, no globals. */}
-        {mapStyle === 'satellite' && SAT_ROADS.enabled && qualityTier !== 'low' && (
+        {mapStyle === 'satellite' && SAT_ROADS.enabled && (qualityTier !== 'low' || satelliteVisualsOn()) && (
           <SatRoadLayer runtime={runtime} flight={flight} />
         )}
         {/* Round 18 (A2): the DISTANT BLOCK-MASS skyline ring — the city past
             the detail bubble, and the city that survives the climb. Same
             &&-chain / same worldRoot reason as the two layers above. */}
-        {mapStyle === 'satellite' && SAT_SKYLINE.enabled && qualityTier !== 'low' && (
+        {mapStyle === 'satellite' && SAT_SKYLINE.enabled && (qualityTier !== 'low' || satelliteVisualsOn()) && (
           <SatSkylineLayer runtime={runtime} flight={flight} />
         )}
         {/* R22 (C CLUTTER): ground life — parked/moving cars + poles. Same
@@ -2668,7 +2701,9 @@ export function FlyScene({ runtime }) {
           glow domes + warm cores at POI cities (2 instanced draws, always
           issued; the sun drives per-instance COLOR only). OUTSIDE worldRoot
           like TownGlow: it writes anchor-RELATIVE instance matrices itself. */}
-      {mapStyle === 'satellite' && SAT_CITY_GLOW.enabled && (
+      {/* Cinematic skyline windows replace the old solid city hemispheres,
+          whose silhouettes become exposed by the natural horizon. */}
+      {mapStyle === 'satellite' && SAT_CITY_GLOW.enabled && !satelliteVisualsOn('lighting') && (
         <SatCityGlow runtime={runtime} flight={flight} origin={origin} engine={engine} />
       )}
 
@@ -2676,6 +2711,7 @@ export function FlyScene({ runtime }) {
           satellite mounts them too (daylight restyle, raw-DEM ground) — the
           key remounts cleanly on a style switch so materials never hot-swap */}
       <LandmarkMonuments
+        runtime={runtime}
         key={mapStyle}
         flight={flight}
         origin={origin}
@@ -2691,6 +2727,7 @@ export function FlyScene({ runtime }) {
           grades are baked into the geometry, so a flip is a clean rebuild. */}
       {MONUMENT_MODELS.enabled && (
         <MonumentModels
+          runtime={runtime}
           key={`marquee-${mapStyle}`}
           flight={flight}
           origin={origin}

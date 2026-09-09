@@ -32,6 +32,8 @@ import {
 import { applyBendAnchor, getRimColor } from '@/lib/fly/toy-world/world-bend';
 import * as settle from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
+import { satelliteVisualsOn, satelliteVisualProfile } from '@/lib/fly/satellite-visuals';
+import { buildCinematicTreeGeometry, canopyForm, createCinematicTreeMaterial, GROUND_VISUAL_UNIFORMS } from '@/lib/fly/cinematic-ground';
 import { SatAmbientLife } from './SatAmbientLife';
 import { SatHouseLights } from './SatHouseLights';
 import { SatParcelHomes } from './SatParcelHomes';
@@ -150,18 +152,21 @@ export function SatVegLayer({ runtime, flight }) {
   // downward tier pins within seconds (the R16 §7/§10 lesson), so a live tier
   // read would flap the pool and rebuild the mesh mid-flight.
   const tier = useMemo(() => useFlyStore.getState().qualityTier ?? 'medium', []);
+  const cinematic = useMemo(() => satelliteVisualsOn('ground'), []);
+  // Fixed capacity across live tier changes. The cadence adjusts active density.
+  const poolTier = cinematic ? 'high' : tier;
   // Round 19 (C): the HIGH-TIER pool raise. A tile's residential/farmland
   // scatter is new content in the same buffer, so the R18 pool would have
   // decimated the park trees to make room for the suburb. Medium and low
   // resolve to the R18 value byte-identically (user decision 2 — phones get
   // the honesty, none of the spend), and SAT_GROUND_LIFE.enabled false
   // restores high too.
-  const basePool = SAT_VEG.enabled ? (SAT_VEG.poolByTier[tier] ?? 0) : 0;
+  const basePool = SAT_VEG.enabled ? (SAT_VEG.poolByTier[poolTier] ?? 0) : 0;
   const pool =
-    SAT_GROUND_LIFE.enabled && tier === 'high' && basePool > 0
+    SAT_GROUND_LIFE.enabled && poolTier === 'high' && basePool > 0
       ? SAT_GROUND_LIFE.poolHigh
       : basePool;
-  const maxChunks = SAT_VEG.maxChunksByTier[tier] ?? 0;
+  const maxChunks = SAT_VEG.maxChunksByTier[poolTier] ?? 0;
   // maxChunks × perChunkCap ≤ pool BY CONSTRUCTION: the pool can therefore
   // never bind, which makes a pool cut (a hard radius that pops as the player
   // moves) impossible rather than merely unlikely.
@@ -240,9 +245,10 @@ export function SatVegLayer({ runtime, flight }) {
   // R21 blob, so every frozen veg/groundlife count keeps measuring the same
   // trees; only E's verify-clutter clears it.
   const trees2 = useMemo(() => {
+    if (cinematic) return true;
     const p = typeof window === 'undefined' ? 1 : (window.__flyClutterPin ?? 0);
     return CLUTTER.enabled && CLUTTER.trees2.enabled && (p === 0 || p === 'freeze');
-  }, []);
+  }, [cinematic]);
 
   // R21 and before: a squashed low-poly blob — a 7×4 sphere is 42 triangles.
   // R22 trees2: ONE MERGED trunk + crown BufferGeometry, 58 triangles, in the
@@ -252,10 +258,11 @@ export function SatVegLayer({ runtime, flight }) {
   // full 5,000-deep high-tier pool is 290k tris for the whole world's
   // vegetation — inside the 320k budget (plan §5.9).
   const geometry = useMemo(
-    () => (trees2 ? buildTreeGeometry() : new SphereGeometry(1, 7, 4)),
-    [trees2]
+    () => cinematic ? buildCinematicTreeGeometry(pool) : (trees2 ? buildTreeGeometry() : new SphereGeometry(1, 7, 4)),
+    [cinematic, pool, trees2]
   );
   const material = useMemo(() => {
+    if (cinematic) return createCinematicTreeMaterial(applyBendAnchor);
     // vertexColors is the ONLY difference, and it is what carries the trees2
     // canopy underside darkening: COLOR_0 is a MULTIPLIER (the SatParcelHomes
     // rule) that three folds into instanceColor, so the fake self-shadow and
@@ -264,13 +271,15 @@ export function SatVegLayer({ runtime, flight }) {
     const m = new MeshLambertMaterial({ vertexColors: trees2 });
     applyBendAnchor(m); // existing variant, unmodified — no new cache key
     return m;
-  }, [trees2]);
+  }, [cinematic, trees2]);
+  const depthMaterial = useMemo(() => cinematic ? createCinematicTreeMaterial(applyBendAnchor, { depth: true }) : null, [cinematic]);
   useEffect(
     () => () => {
       geometry.dispose();
       material.dispose();
+      depthMaterial?.dispose();
     },
-    [geometry, material]
+    [geometry, material, depthMaterial]
   );
 
   useEffect(() => {
@@ -305,6 +314,9 @@ export function SatVegLayer({ runtime, flight }) {
   // road network at -46 — the ground layers run in streaming order.
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
+    const liveTier = cinematic ? (useFlyStore.getState().qualityTier ?? tier) : tier;
+    const density = cinematic ? satelliteVisualProfile(liveTier).vegetation : 1;
+    if (cinematic) GROUND_VISUAL_UNIFORMS.treeTime.value = window.__flyClutterPin === 'freeze' ? 0 : t;
     const eyeAgl = aglOf(runtime, flight); // R24 (C's spec): the damped ground
     engine.update(t, flight.pos.x, flight.pos.z, eyeAgl);
 
@@ -328,7 +340,7 @@ export function SatVegLayer({ runtime, flight }) {
       // walks tens of chunks) and conservative — any difference runs the pass.
       const sg = engine.stats;
       const sig = U
-        ? `${sg.chunks}|${sg.ready}|${sg.empty}|${sg.vegPts}|${sg.clsChunks}|${st.altK.toFixed(3)}`
+        ? `${sg.chunks}|${sg.ready}|${sg.empty}|${sg.vegPts}|${sg.clsChunks}|${st.altK.toFixed(3)}|${density}`
         : '';
       const moved2 = (flight.pos.x - st.atX) ** 2 + (flight.pos.z - st.atZ) ** 2;
       // R22 (C): …but never WHILE A BIRTH RAMP IS RUNNING. The skip's premise
@@ -346,13 +358,14 @@ export function SatVegLayer({ runtime, flight }) {
           flight,
           st.altK,
           pool,
-          perChunkCap,
+          Math.max(1, Math.floor(perChunkCap * density)),
           st.byClass,
           st.classAt,
           st.prevN ?? 0,
           trees2,
           st.born,
-          t
+          t,
+          cinematic
         );
         st.prevN = st.placed;
       }
@@ -434,6 +447,7 @@ export function SatVegLayer({ runtime, flight }) {
             placeRef.current.t = -Infinity; // place on the very next frame
           }}
           args={[geometry, material, pool]}
+          customDepthMaterial={depthMaterial ?? undefined}
         />
       )}
       {SAT_AMBIENT.enabled && (
@@ -588,7 +602,8 @@ function placeCanopy(
   prevN,
   trees2,
   born,
-  now
+  now,
+  cinematic = false
 ) {
   const S = SAT_VEG;
   const T2 = CLUTTER.trees2;
@@ -699,6 +714,11 @@ function placeCanopy(
         const y = trees2 ? gy : gy + (conifer ? r * cf.liftFrac : r * S.crownLiftFrac);
         _dummy.position.set(wx - ox, y, wz - oz);
         _dummy.scale.set(sxz, sy, sxz);
+        if (cinematic) {
+          const form = canopyForm(wx * 0.17 + wz * 0.31, conifer);
+          _dummy.scale.set(sxz * form.width, sy * form.height, sxz * form.depth);
+          mesh.geometry.attributes.aCanopyPhase.setX(n, hash(wx * 0.71 + wz * 0.53) * Math.PI * 2);
+        }
         // A hashed yaw breaks up the lat/long seams of a low-poly sphere so a
         // stand of trees does not read as one repeated stamp. Free — the matrix
         // is being composed either way.
@@ -739,6 +759,7 @@ function placeCanopy(
   const touched = Math.max(n, prevN | 0);
   rangeUpload(mesh.instanceMatrix, touched * 16);
   if (mesh.instanceColor) rangeUpload(mesh.instanceColor, touched * 3);
+  if (cinematic) rangeUpload(mesh.geometry.attributes.aCanopyPhase, touched);
   mesh.boundingSphere.center.set(0, 0, 0);
   mesh.boundingSphere.radius = Math.sqrt(maxR2) + maxScale + maxD * maxD * MAX_BEND_K + 50;
   return n;

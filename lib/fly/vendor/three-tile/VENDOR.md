@@ -55,6 +55,62 @@ each patched site executes the byte-equivalent upstream expression.
 | 7 | A MOTION HOLD (R24) | `unlockOnReject` | `Tile._loadSubTiles` / `_removeSubTiles` / `_updateModel` (index.js ~:421/~:472/~:485). All three are `async`, `LOD()` DISCARDS the promise they return (~:215), and `TileLoader.update` has a `try/finally` with **no catch** (~:1067) — so one rejection anywhere below permanently damages the tree: `_loadSubTiles` leaves `_subTiles` set and the guard `!this.subTiles` then means **that node can never refine again**, while `_removeSubTiles`/`_updateModel` leave `_loadState === "loading"`, which `_update`'s guard reads as "skip this node AND its entire subtree", forever. ON wraps each body in `try/catch` and restores exactly the pre-call invariant (`unloadSubTiles()`; `_subTiles` rebuilt from the surviving Tile children + `_loadState` cleared; `_loadState` cleared + `_loadedEpoch` advanced to stop a 20 Hz retry storm). OFF re-throws, i.e. upstream verbatim. | landed, R24 |
 | 8 | A MOTION HOLD (R24) | `rasterMark` | `TileLoader.updateMaterial` (index.js ~:1290). Upstream hands a failed tile a 20%-opacity BLACK `MeshBasicMaterial` with no reason code, no retry and no telemetry, and the tile keeps it until the LOD collapses it away. ON stamps `userData.source` + `userData.flyError` on the clone and counts it. **Read this next part before touching the site:** stamping `source` ALONE would have the OPPOSITE of the intended effect — the reuse test on the following line would then MATCH the error material and keep it forever — so the patch also excludes `flyError`-marked materials from that test, and *that* is what re-opens the re-ask. `flyError` is set nowhere else, so with the switch off the added guard reads `!undefined` and the test is upstream's. The retry/timeout half lives engine-side in `lib/fly/raster-cache.js` (`TILE_HOLD.raster`). | landed, R24 |
 | 9 | A MOTION HOLD (R24) | *(exports only)* | One new named export — `flyTileHoldStats` — appended to the export block, returning the live `{dwellArmed, dwellHeld, dwellFired, rejectLoad, rejectMerge, rejectUpdate, errorTiles, lastError}` receipt, so a gate can prove the patched path was EXERCISED rather than merely armed (the patch-#6/`flySkirtStats` precedent). No upstream export was renamed, removed or reordered. | landed, R24 |
+| 7a | Satellite graphics review | `unlockOnReject` | Extend #7 to successful-loader merge cancellation: `_removeSubTiles` refreshes its frustum membership from the latest root update before the post-await LOD verdict, then restores `_subTiles` from attached children when that verdict cancels the merge. This prevents a stale off-screen penalty from collapsing returned-to-view terrain and prevents canceled merges from permanently losing their scheduling index. OFF retains the prior completion path; no LOD thresholds or dwell values change. | landed, 2026-09-09 |
+| 8a | Satellite graphics review | `rasterMark` | Resident marked tiles receive a bounded material-only retry from `_update`, with per-tile exponential backoff, a two-request global cap, guarded completion/disposal, and the normal material-hook event. No epoch/geometry/LOD change. Details and regression command below. | landed, 2026-09-09 |
+
+### Patch #8a — resident imagery retry
+
+The mixed-terrain production soak found one resident `flyError` material. Patch
+#8's reuse exclusion permits a later request but never schedules one: a settled
+leaf otherwise keeps its error until an epoch change or LOD replacement. With
+`rasterMark` enabled, `_update` now schedules a material-only retry after 1s,
+then exponential backoff of 2/4/8/16/30s with at most two active retries globally.
+Normal loader-capacity checks still apply. Geometry, coordinates, UVs, parent
+imagery, LOD thresholds and tree epochs are unchanged.
+
+`TileLoader.updateMaterial` accepts an optional completion guard for these
+retries. A removed/replaced tile or changed root epoch discards and disposes its
+new material/textures, while preserving reused materials. Successful commits
+use the normal `syncMaterials`, shadow synchronization and `tile-loaded` event,
+so the ordinary bend/grading hooks run before rendering. Retry counts are in
+`flyTileHoldStats`; tile `_rasterRetryAttempts`/`_rasterRetryAt` expose scheduling.
+The existing raster transport retry policy remains unchanged.
+
+The first GPU marker fixture exposed a missing integration step: ordinary
+`TileMapLoader.update` converts raw tile coordinates into projected bounds,
+while a direct `updateMaterial(tile, ...)` call bypassed that step and threw in
+`_checkBounds`. `updateResidentMaterial` now provides the matching material-only
+entry on both loader classes; the map subclass uses its existing `_getTileCoords`
+without changing projection math. The regression includes the real map loader's
+bounds/clip checks, a failing direct-call control, and successful replacement.
+
+`node scripts/verify-raster-retry.mjs` exercises the real Tile/TileLoader path
+with delayed material loaders: recovery without epoch changes, retries after
+failure, concurrency/backoff, late-result disposal, hook installation, and
+flag-off identity. This is a lifecycle test, not a browser imagery pass.
+
+### Patch #7a — delayed merge completion
+
+While a merge awaits its coarse replacement, `_update` skips the loading node
+and its children, but the root still refreshes the shared camera and frustum.
+The completion verdict previously combined the current distance with stale
+visibility. A return to view could therefore keep the off-screen multiplier
+of 5 instead of 0.8 and dispose the fine terrain immediately. Independently,
+normal cancellation disposed the provisional parent model without restoring
+`_subTiles`; all four children remained attached, but future merge dispatch
+requires that missing index. The rejection branch already restored it.
+
+`node scripts/verify-terrain-merge.mjs` uses the real Tile implementation,
+camera/frustum, and delayed synthetic loaders. Before this patch it reported
+three failures: returned-to-view children **4 → 0**, canceled merge index
+**4 attached / 0 tracked**, and subsequent departure **1 loader call instead
+of 2**. The flag-off controls preserve those reproductions; the enabled arm
+requires retained fine terrain and a working subsequent merge. Parent models
+must remain detached while loading, so these transitions introduce no frame
+with parent and child terrain attached together. Refinement is tested too:
+its parent stays loaded and refreshes visibility during the busy walk, so a
+turn away already cancels correctly and that path remains unchanged. This is
+lifecycle evidence, not a moving-browser visual certification.
 
 ### Patch #6a — why the SETTLED tree is unmoved, and why that is the whole argument
 

@@ -29,6 +29,8 @@ import {
 } from '@/lib/fly/settle';
 import { nightCityOn } from '@/lib/fly/night-city';
 import { getSatBldgFade, setSatBldgFade } from '@/lib/fly/toy-world/world-bend';
+import { satelliteVisualsOn, satelliteVisualProfile } from '@/lib/fly/satellite-visuals';
+import { setSatelliteArchitectureDetail } from '@/lib/fly/satellite-architecture-material';
 import { useFlyStore } from '@/stores/fly-store';
 import { SatVegLayer } from './SatVegLayer';
 
@@ -59,7 +61,7 @@ export function SatBuildingLayer({ runtime, flight }) {
   // mounts at medium+ (FlyScene gate); this flips water on only at high, and off
   // (evicting the water meshes) on a high→medium degrade — no per-frame cost.
   useEffect(() => {
-    engine.setWaterEnabled(SAT_WATER.enabled && qualityTier === SAT_WATER.minTier);
+    engine.setWaterEnabled(SAT_WATER.enabled && (satelliteVisualsOn('water') ? satelliteVisualProfile(qualityTier).water : qualityTier === SAT_WATER.minTier));
   }, [engine, qualityTier]);
   // Round 15: facade windows (daylight `map`, medium+) and NIGHT windows
   // (`emissiveMap`, high only) are material swaps on the SAME shared material —
@@ -98,8 +100,9 @@ export function SatBuildingLayer({ runtime, flight }) {
   // (user decision 2). SAT_COVERAGE.enabled false does the same at high.
   useEffect(() => {
     engine.setCoverage(
-      SAT_COVERAGE.enabled && qualityTier === 'high' ? SAT_COVERAGE.high : null
+      satelliteVisualsOn() ? { ringM: SAT_COVERAGE.high.ringM, maxChunks: satelliteVisualProfile(qualityTier).buildingChunks } : SAT_COVERAGE.enabled && qualityTier === 'high' ? SAT_COVERAGE.high : null
     );
+    setSatelliteArchitectureDetail(engine.material, satelliteVisualProfile(qualityTier).normalMaps);
   }, [engine, qualityTier]);
   // Round 19 — the two SAT_SHADOWS mesh flags for THIS layer's meshes (the
   // plan's per-layer rule; B DEEPFIELD owns the light rig and FlyScene's

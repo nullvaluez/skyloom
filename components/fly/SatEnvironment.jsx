@@ -1,4 +1,7 @@
 'use client';
+import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
+import { resolveSatelliteAtmosphere } from '@/lib/fly/satellite-atmosphere';
+
 
 import { useEffect, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -522,8 +525,11 @@ export function SatEnvironment({ runtime, bucket }) {
     const oc = wx ? wx.overcastT : 0;
     const fg = wx ? wx.fogT : 0;
     const wd = SKY_LIVE.weatherDim;
-    const envT = base.env * (1 - wd.env * oc);
-    const bgT = base.bg * (1 - wd.bg * oc) * (1 - wd.bgFog * fg);
+    const atmosphere = satelliteVisualsOn('atmosphere') ? resolveSatelliteAtmosphere(runtime.sun, wx) : null;
+    // The cinematic resolver already includes true sun elevation and weather.
+    // Apply its final targets ONCE, inside the existing damped transition.
+    const envT = atmosphere ? atmosphere.environment : base.env * (1 - wd.env * oc);
+    const bgT = atmosphere ? atmosphere.background : base.bg * (1 - wd.bg * oc) * (1 - wd.bgFog * fg);
 
     const k = 1 - Math.exp(-(delta > 0.25 ? 0.25 : delta) / SKY_LIVE.hdriFade.rampSec);
     // Round 21 (C, S8): a seeded ref that is FAR from this frame's target came

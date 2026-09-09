@@ -1,4 +1,7 @@
 'use client';
+import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
+import { attachCinematicModelAttributes, createCinematicModelMaterial, updateCinematicModelNight } from '@/lib/fly/cinematic-models';
+
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -92,7 +95,7 @@ function makeEmptyGeometry() {
  * (`hM × 1.35 + 30`) floating above a marquee model's top, and it is why both
  * monument harnesses' letter gates still hold.
  */
-export function MonumentModels({ flight, origin, engine, mapStyle }) {
+export function MonumentModels({ flight, origin, engine, mapStyle, runtime }) {
   const isToy = mapStyle !== 'satellite';
   const [models, setModels] = useState(null);
 
@@ -127,6 +130,7 @@ export function MonumentModels({ flight, origin, engine, mapStyle }) {
   }, [models]);
 
   const material = useMemo(() => {
+    if (!isToy && satelliteVisualsOn('models')) return createCinematicModelMaterial(applyBendAnchorMonument, { merged: true });
     // Toy: the same 3-step toon ramp the city and the procedural monuments use
     // (the stepped bands ARE the Neon look) — the vertex colours carry the
     // palette-quantised albedo. Satellite: the R13 stone ramp for sculpted
@@ -191,6 +195,7 @@ export function MonumentModels({ flight, origin, engine, mapStyle }) {
   );
 
   useFrame(({ clock }) => {
+    updateCinematicModelNight(material, runtime?.sun?.frac);
     const mesh = meshRef.current;
     if (!mesh || !flight) return;
     const st = stateRef.current;
@@ -302,6 +307,7 @@ export function MonumentModels({ flight, origin, engine, mapStyle }) {
       const x = poi.wx - ax;
       const z = poi.wz - az;
       const g = k.s.geometry.clone();
+      if (!isToy && satelliteVisualsOn('models')) attachCinematicModelAttributes(g, { ...k.s.entry, poi: poi.name });
       _pos.set(x, k.groundY, z);
       _q.set(0, 0, 0, 1); // facing is baked in by monument-loader (yawFixRad)
       _scl.set(s, s, s);

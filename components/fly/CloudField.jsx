@@ -1,4 +1,7 @@
 'use client';
+import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
+import { resolveSatelliteAtmosphere, satelliteCloudShape } from '@/lib/fly/satellite-atmosphere';
+
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -75,6 +78,7 @@ export function CloudField({ runtime, flight, origin }) {
   const qualityTier = useFlyStore((s) => s.qualityTier);
   const mapStyle = useFlyStore((s) => s.mapStyle);
   const style = CLOUDS.byStyle[mapStyle] ?? CLOUDS.byStyle.satellite;
+  const cinematic = mapStyle === 'satellite' && satelliteVisualsOn('atmosphere');
   const count = Math.round(
     (CLOUDS.puffsByTier[qualityTier] ?? CLOUDS.puffsByTier.high) * (style.countScale ?? 1)
   );
@@ -123,6 +127,9 @@ export function CloudField({ runtime, flight, origin }) {
         // fraction — deterministic (same hash family), so a 5% "clear" sky
         // always keeps the SAME three puffs and harness layouts stay stable.
         rank: hash(i * 11 + 707),
+        // Precompute once: shared condensation bands and overlapping lobes
+        // retain their identity through coverage/tier changes and rebases.
+        cinematicShape: satelliteCloudShape(i, cl.count),
       };
     });
   }, []);
@@ -159,10 +166,12 @@ export function CloudField({ runtime, flight, origin }) {
       // every channel untouched, opacityMul 1 → style.opacity unchanged, so a
       // no-weather session renders the certified R15 deck bit-for-bit.
       const wx = runtime.weather?.wx;
+      const atmosphere = cinematic ? resolveSatelliteAtmosphere(runtime.sun, wx) : null;
+      if (atmosphere) c.setRGB(...atmosphere.cloudColor);
       const greyT = wx ? wx.overcastT * WEATHER.overcast.tintK : 0;
       if (greyT > 0) c.lerp(grey, greyT);
       const next = '#' + c.getHexString();
-      const opacity = wx ? style.opacity * wx.opacityMul : style.opacity;
+      const opacity = (wx ? style.opacity * wx.opacityMul : style.opacity) * (atmosphere?.cloudOpacity ?? 1);
       if (process.env.NODE_ENV === 'development' && window.__flyStats) {
         window.__flyStats.cloudTint = next; // harness probe (verify-round11)
         window.__flyStats.cloudOpacity = opacity;
@@ -176,7 +185,7 @@ export function CloudField({ runtime, flight, origin }) {
     apply();
     const id = setInterval(apply, WEATHER.smooth.tintMs);
     return () => clearInterval(id);
-  }, [mapStyle, runtime, style]);
+  }, [mapStyle, runtime, style, cinematic]);
 
   // Per-puff ground state (parallel to puffs): last sampled drawn-ground Y,
   // smoothed so a DEM tile streaming in can't pop a puff upward.
@@ -200,6 +209,17 @@ export function CloudField({ runtime, flight, origin }) {
   const driftRef = useRef({ x: 0, z: 0 });
 
   const groupRefs = useRef([]);
+  const hideCloud = (group) => {
+    group.visible = false;
+    if (cinematic) {
+      // drei renders Cloud sprites in a separate shared InstancedMesh and
+      // reads matrixWorld without consulting this wrapper's visible flag.
+      // A finite tiny scale retires those instances too (zero makes matrix
+      // decomposition singular), while keeping tier changes allocation-free.
+      group.scale.setScalar(1e-6);
+      group.updateMatrixWorld(true);
+    }
+  };
 
   // Round 19 (D) — THE HIGH DECK. Everything above the cumulus band was empty
   // sky: at cruise you flew under a bare HDRI with a cumulus carpet 8 km below
@@ -327,6 +347,7 @@ export function CloudField({ runtime, flight, origin }) {
     // --- Round 16: live weather (satellite only; `wx` is null everywhere
     // else, and every derived value below is then the exact identity) -------
     const wx = runtime.weather?.wx ?? null;
+    const atmosphere = cinematic ? resolveSatelliteAtmosphere(runtime.sun, wx) : null;
     const windX = wx ? wx.windX : CLOUDS.driftMps;
     const windZ = wx ? wx.windZ : 0;
     const dev = driftRef.current;
@@ -355,19 +376,21 @@ export function CloudField({ runtime, flight, origin }) {
         continue;
       }
       if (i >= count) {
-        g.visible = false;
+        hideCloud(g);
         hideShadow(i);
         continue;
       }
       const p = puffs[i];
+      const shape = cinematic ? p.cinematicShape : null;
       const gs = ground[i];
       // Nearest toroidal copy of the puff relative to the player (absolute),
       // then rebased for rendering. Drift is the integrated wind (baseline =
       // the constant +X breeze this deck has always had). Cluster centers ride
       // the spread factor; intra-cluster offsets don't (the clusters spread
       // apart but stay internally tight).
-      const ox = wrap(p.cx * f + p.dx + driftX - px, half, cell);
-      const oz = wrap(p.cz * f + p.dz + driftZ - pz, half, cell);
+      const spread = shape?.clusterSpread ?? 1;
+      const ox = wrap(p.cx * f + p.dx * spread + driftX - px, half, cell);
+      const oz = wrap(p.cz * f + p.dz * spread + driftZ - pz, half, cell);
       const dist = Math.hypot(ox, oz);
       // Distance dissolve: shrink puffs away BEFORE the bent terrain rim
       // can depth-slice them (drei re-reads our matrixWorld scale per frame)
@@ -379,7 +402,7 @@ export function CloudField({ runtime, flight, origin }) {
       const pi = thinning ? puffPresence(p.rank, presence, feather) : 1;
       const s = s0 * pi;
       if (s <= 0.02) {
-        g.visible = false;
+        hideCloud(g);
         hideShadow(i);
         continue;
       }
@@ -406,9 +429,10 @@ export function CloudField({ runtime, flight, origin }) {
       gs.lastOx = ox;
       gs.lastOz = oz;
 
+      const altitude = shape?.altitude ?? p.u;
       const y = Math.max(
-        style.altMin + p.u * (style.altMax - style.altMin),
-        gs.y + CLOUDS.clearanceM + p.u * CLOUDS.clearanceJitterM
+        style.altMin + altitude * (style.altMax - style.altMin),
+        gs.y + CLOUDS.clearanceM + altitude * CLOUDS.clearanceJitterM
       );
       if (y - gs.y < minAgl) minAgl = y - gs.y;
       if (y < flight.pos.y) belowEye += 1;
@@ -416,7 +440,8 @@ export function CloudField({ runtime, flight, origin }) {
       g.visible = true;
       // fScale: spread puffs grow with f^sizeExp so the deck reads from
       // altitude instead of shrinking to specks over the wider cell.
-      g.scale.setScalar(s * fScale * sizeMul);
+      const scale = s * fScale * sizeMul;
+      g.scale.set(scale, scale * (atmosphere?.cloudDepth ?? 1), scale);
       // Cloud billboards can't ride the vertex bend patch — drop them
       // CPU-side so nearby puffs still track the mini-planet curvature.
       const drop = bendDrop(dist, k);
@@ -435,6 +460,7 @@ export function CloudField({ runtime, flight, origin }) {
       }
     }
     shadows.mesh.visible = wantShadows;
+    shadows.mesh.material.opacity = CLOUDS.shadow.opacity * (atmosphere?.cloudShadowWeight ?? 1);
     if (wantShadows) shadows.mesh.instanceMatrix.needsUpdate = true;
 
     // --- Round 19 (D): the cirrus deck ------------------------------------
@@ -460,7 +486,7 @@ export function CloudField({ runtime, flight, origin }) {
         const dist = Math.hypot(ox, oz);
         const s = 1 - Math.min(1, Math.max(0, (dist - cf0) / (cf1 - cf0)));
         if (s <= 0.02) {
-          g.visible = false;
+          hideCloud(g);
           continue;
         }
         g.visible = true;
@@ -526,11 +552,12 @@ export function CloudField({ runtime, flight, origin }) {
           <Cloud
             seed={p.seed}
             segments={CLOUDS.segments}
-            bounds={[p.size, p.size * boundsYFrac, p.size]}
-            volume={p.size * 1.15}
-            opacity={sunTint?.opacity ?? style.opacity}
+            bounds={cinematic ? [p.size * p.cinematicShape.width, p.size * boundsYFrac * p.cinematicShape.height, p.size * p.cinematicShape.depth] : [p.size, p.size * boundsYFrac, p.size]}
+            volume={p.size * (cinematic ? p.cinematicShape.volume : 1.15)}
+            smallestVolume={cinematic ? p.cinematicShape.smallestVolume : 0.25}
+            opacity={(sunTint?.opacity ?? style.opacity) * (cinematic ? p.cinematicShape.opacity : 1)}
             fade={CLOUDS.fade}
-            speed={0.06}
+            speed={cinematic ? 0.025 : 0.06}
             color={sunTint?.color ?? style.color}
           />
         </group>

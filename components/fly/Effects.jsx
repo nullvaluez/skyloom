@@ -1,4 +1,7 @@
 'use client';
+import { satelliteVisualsOn, satelliteEffectTier } from '@/lib/fly/satellite-visuals';
+import { resolveSatelliteAtmosphere } from '@/lib/fly/satellite-atmosphere';
+
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Vector2 } from 'three';
@@ -333,9 +336,12 @@ function applyBloom(effect, frac) {
  * on discrete store transitions.
  */
 export const Effects = memo(function Effects({ runtime }) {
-  const qualityTier = useFlyStore((s) => s.qualityTier);
+  const sceneTier = useFlyStore((s) => s.qualityTier);
   const mapStyle = useFlyStore((s) => s.mapStyle);
   const sat = mapStyle === 'satellite';
+  const renderDpr = useThree((s) => s.viewport.dpr);
+  const qualityTier = sat && satelliteVisualsOn()
+    ? satelliteEffectTier(sceneTier, renderDpr) : sceneTier;
 
   // Tone-map mode: constant per style, with a dev-only live override so the
   // A/B capture (scripts/r13-tonemap-capture.js) can flip AgX/ACES/None
@@ -467,11 +473,16 @@ export const Effects = memo(function Effects({ runtime }) {
           lerp(g.cool[2], g.warm[2], t),
         ];
       }
+      const atmosphere = satelliteVisualsOn('atmosphere') ? resolveSatelliteAtmosphere(runtime.sun, runtime.weather?.wx) : null;
+      if (atmosphere) bal = atmosphere.balance;
       whiteBalance.setBalance(bal[0], bal[1], bal[2]);
       // Round 16: the night bloom rides this SAME 5s cadence — no new timer,
       // no new state, and it reads the frac that was just resolved.
       bloomFracRef.current = frac;
-      if (bloomRef.current) applyBloom(bloomRef.current, frac);
+      if (bloomRef.current) {
+        applyBloom(bloomRef.current, frac);
+        if (atmosphere) { bloomRef.current.intensity = atmosphere.bloomIntensity; bloomRef.current.luminanceMaterial.threshold = atmosphere.bloomThreshold; }
+      }
       if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
         (window.__flyStats ??= {}).gradeBalance = bal.map((v) => +v.toFixed(3));
         window.__flyStats.gradeFrac = +frac.toFixed(3);

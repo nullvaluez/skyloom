@@ -1,6 +1,9 @@
 # dependencies
 /node_modules
 
+# Reproducible graphics evidence; selected review images can be added explicitly.
+/.graphics-review/
+
 # next.js
 .next
 /out

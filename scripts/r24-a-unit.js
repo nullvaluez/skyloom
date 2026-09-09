@@ -408,7 +408,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     // three's build filename. `fs.rmSync` unlinks symlinks rather than
     // following them, so the cleanup below cannot reach the real tree.
     try {
-      fs.symlinkSync(path.resolve(__dirname, '../node_modules'), path.join(dir, 'node_modules'), 'dir');
+      fs.symlinkSync(path.resolve(__dirname, '../node_modules'), path.join(dir, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
     } catch {
       /* falls through to a clear ERR_MODULE_NOT_FOUND rather than a silent skip */
     }
