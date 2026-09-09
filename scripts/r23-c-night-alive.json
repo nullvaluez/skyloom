@@ -1,0 +1,2817 @@
+{
+  "legs": {
+    "MAN/unpinned/live": {
+      "legTag": "MAN/unpinned/live",
+      "pose": "P-MAN",
+      "band": [
+        0.55,
+        0.98
+      ],
+      "xBand": [
+        0.02,
+        0.85
+      ],
+      "shot": "r23-c-red-man-unpinned-live.png",
+      "census": {
+        "scene": {
+          "draws": 0,
+          "tris": 0,
+          "traffic": 0
+        },
+        "tier": "high",
+        "governor": {
+          "dprSteps": 0,
+          "tierSteps": 0,
+          "latched": false,
+          "emaFps": 0,
+          "refresh": 0,
+          "rung": 0,
+          "rungs": 5,
+          "dpr": 1,
+          "tier": "high",
+          "pinned": true
+        },
+        "dpr": 1,
+        "sky": {
+          "elDeg": -26.844,
+          "state": "night",
+          "blendS": 0,
+          "env": 0.2001,
+          "bg": 0.3047,
+          "hdri": "night",
+          "sunFrac": 0,
+          "envUrl": "/hdri/qwantani_night_puresky_1k.hdr"
+        },
+        "night": {
+          "roadMix": {
+            "night": 1,
+            "day": 0
+          },
+          "roads": {
+            "chunks": 8,
+            "ready": 0,
+            "empty": 0,
+            "queued": 13,
+            "building": 2,
+            "draping": 0,
+            "ringOn": true,
+            "night": {
+              "street5": 0.24,
+              "street6": 0.34,
+              "daySeam": 0.14
+            },
+            "cacheKey": "world-bend-road-satnight-r19",
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 0,
+              "legacy": 0
+            },
+            "errorRetries": 14,
+            "evictions": 0,
+            "heals": 0
+          },
+          "buildings": {
+            "chunks": 12,
+            "ready": 0,
+            "waterReady": 0,
+            "waterSynth": 0,
+            "columns": 0,
+            "empty": 0,
+            "queued": 6,
+            "building": 4,
+            "draping": 0,
+            "ringOn": true,
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 0,
+              "legacy": 0
+            },
+            "errorRetries": 35,
+            "evictions": 5,
+            "heals": 0,
+            "waterBackfillArmed": true,
+            "waterBackfilling": 0
+          },
+          "bldgFade": 0,
+          "skyline": {
+            "chunks": 6,
+            "ready": 0,
+            "drawn": 0,
+            "empty": 4,
+            "tris": 0,
+            "verts": 0,
+            "queued": 4,
+            "building": 8,
+            "draping": 0,
+            "ringOn": true,
+            "maxChunks": 10,
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 4,
+              "legacy": 0
+            },
+            "errorRetries": 18,
+            "evictions": 18,
+            "heals": 0
+          },
+          "houseLights": {
+            "placed": 0,
+            "nightK": 1,
+            "fromHouse": 0,
+            "fromVeg": 0
+          },
+          "cityGlow": {
+            "placed": 26,
+            "maxD": 89182.35834541595,
+            "nightK": 1
+          },
+          "beacons": {
+            "placed": 2,
+            "nightK": 1,
+            "on": true
+          },
+          "parcelHomes": {
+            "placed": 0,
+            "anchors": 0,
+            "suppressed": 0,
+            "pool": 5000,
+            "altK": 1,
+            "nightK": 1,
+            "realCols": 0,
+            "meanScalar": 0,
+            "meanDens": 0,
+            "maxDens": 0,
+            "regionalDens": 0,
+            "regK": 1,
+            "regKRaw": 1,
+            "settled": false,
+            "held": false,
+            "provisional": false,
+            "zeroPasses": 0,
+            "tris": 0
+          },
+          "clutter": {
+            "parked": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0,
+              "insideColumns": 0
+            },
+            "moving": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0
+            },
+            "poles": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0
+            },
+            "ready": 0,
+            "chunks": 4,
+            "realCols": 0,
+            "baseDraws": 0,
+            "draws": 0,
+            "trisPerInstance": {
+              "car": 22,
+              "mover": 22,
+              "pole": 20
+            }
+          },
+          "bloom": {
+            "intensity": 1,
+            "threshold": 0.62,
+            "nightT": 1
+          },
+          "popin": {
+            "revealKind": "warp",
+            "layers": {},
+            "longFrames": 4,
+            "worstMs": 5763,
+            "frames": 10
+          }
+        },
+        "layers": {
+          "satRoads": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satBuildings": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satSkyline": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satCityGlow": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 12672,
+            "instances": 96,
+            "mats": 1
+          },
+          "satVeg": null,
+          "satBeacons": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 160,
+            "instances": 2,
+            "mats": 1
+          },
+          "satClutter": null,
+          "monuments": null,
+          "clouds": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 864,
+            "instances": 432,
+            "mats": 1
+          },
+          "cirrus": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 60,
+            "instances": 30,
+            "mats": 1
+          },
+          "traffic": {
+            "meshes": 14,
+            "drawn": 14,
+            "tris": 0,
+            "instances": 0,
+            "mats": 14
+          },
+          "tracers": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 24576,
+            "instances": 1,
+            "mats": 1
+          }
+        },
+        "emissive": {
+          "meshes": 4,
+          "withMap": 4,
+          "withoutMap": 0,
+          "drawn": 0,
+          "worst": []
+        },
+        "pose": {
+          "altM": 792,
+          "groundElev": 0,
+          "aglM": 792,
+          "heading": 2.6,
+          "pitch": -0.12
+        },
+        "pins": {
+          "terra": null,
+          "settle": null,
+          "clutter": null,
+          "depth": 1,
+          "gov": "hold",
+          "weather": "baseline",
+          "unpinned": null,
+          "attempted": {
+            "__flyTerraPin": 1,
+            "__flySettlePin": 1,
+            "__flyClutterPin": 1
+          }
+        },
+        "terraStats": {
+          "camTileZ": 5,
+          "targetZ": 17,
+          "downloading": 8,
+          "sharp": false,
+          "sharpReason": null,
+          "aglM": 801,
+          "lodThreshold": 0.857,
+          "maxLevel": 18,
+          "burst": false,
+          "at": 106418.30000000028
+        }
+      },
+      "m": {
+        "band": [
+          0.55,
+          0.98
+        ],
+        "xBand": [
+          0.02,
+          0.85
+        ],
+        "bandPx": 513936,
+        "frame": {
+          "w": 1600,
+          "h": 900
+        },
+        "mean": 19.472813745301504,
+        "p5": 3,
+        "p50": 5,
+        "p95": 77,
+        "p99": 77,
+        "litFrac": 0.24104363189190872,
+        "litLadder": {
+          "8": 0.2644298122723452,
+          "16": 0.25986115002646243,
+          "24": 0.25800488776812674,
+          "40": 0.24104363189190872,
+          "60": 0.14083660222284486,
+          "90": 0,
+          "128": 0,
+          "180": 0
+        },
+        "darkFrac": 0.7355701877276548,
+        "warmLitFrac": 0,
+        "coolLitFrac": 0.10724808485562758,
+        "warmOfBand": 0,
+        "whiteFrac": 0,
+        "whiteBlobPx": 0,
+        "whiteBlobFrac": 0,
+        "whiteBlobs": 0,
+        "whiteBlobArea": 0,
+        "whiteBlobBox": null
+      }
+    },
+    "POW/unpinned/live": {
+      "legTag": "POW/unpinned/live",
+      "pose": "P-POW",
+      "band": [
+        0.4777777777777778,
+        0.9222222222222223
+      ],
+      "xBand": [
+        0.1625,
+        0.8375
+      ],
+      "shot": "r23-c-red-pow-unpinned-live.png",
+      "census": {
+        "scene": {
+          "draws": 58,
+          "tris": 55693,
+          "traffic": 0
+        },
+        "tier": "high",
+        "governor": {
+          "dprSteps": 0,
+          "tierSteps": 0,
+          "latched": false,
+          "emaFps": 0,
+          "refresh": 0,
+          "rung": 0,
+          "rungs": 5,
+          "dpr": 1,
+          "tier": "high",
+          "pinned": true
+        },
+        "dpr": 1,
+        "sky": {
+          "elDeg": -27.373,
+          "state": "night",
+          "blendS": 0,
+          "env": 0.16,
+          "bg": 0.26,
+          "hdri": "night",
+          "sunFrac": 0,
+          "envUrl": "/hdri/qwantani_night_puresky_1k.hdr"
+        },
+        "night": {
+          "roadMix": {
+            "night": 1,
+            "day": 0
+          },
+          "roads": {
+            "chunks": 5,
+            "ready": 0,
+            "empty": 0,
+            "queued": 13,
+            "building": 2,
+            "draping": 0,
+            "ringOn": true,
+            "night": {
+              "street5": 0.24,
+              "street6": 0.34,
+              "daySeam": 0.14
+            },
+            "cacheKey": "world-bend-road-satnight-r19",
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 0,
+              "legacy": 0
+            },
+            "errorRetries": 29,
+            "evictions": 10,
+            "heals": 0
+          },
+          "buildings": {
+            "chunks": 9,
+            "ready": 0,
+            "waterReady": 0,
+            "waterSynth": 0,
+            "columns": 0,
+            "empty": 0,
+            "queued": 8,
+            "building": 4,
+            "draping": 0,
+            "ringOn": true,
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 0,
+              "legacy": 0
+            },
+            "errorRetries": 67,
+            "evictions": 21,
+            "heals": 0,
+            "waterBackfillArmed": true,
+            "waterBackfilling": 0
+          },
+          "bldgFade": 0,
+          "skyline": {
+            "chunks": 3,
+            "ready": 0,
+            "drawn": 0,
+            "empty": 1,
+            "tris": 0,
+            "verts": 0,
+            "queued": 7,
+            "building": 8,
+            "draping": 0,
+            "ringOn": true,
+            "maxChunks": 10,
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 1,
+              "legacy": 0
+            },
+            "errorRetries": 36,
+            "evictions": 43,
+            "heals": 0
+          },
+          "houseLights": {
+            "placed": 0,
+            "nightK": 1,
+            "fromHouse": 0,
+            "fromVeg": 0
+          },
+          "cityGlow": {
+            "placed": 40,
+            "maxD": 88479.97999199705,
+            "nightK": 1
+          },
+          "beacons": {
+            "placed": 0,
+            "nightK": 1,
+            "on": true
+          },
+          "parcelHomes": {
+            "placed": 0,
+            "anchors": 0,
+            "suppressed": 0,
+            "pool": 5000,
+            "altK": 1,
+            "nightK": 1,
+            "realCols": 0,
+            "meanScalar": 0,
+            "meanDens": 0,
+            "maxDens": 0,
+            "regionalDens": 0,
+            "regK": 1,
+            "regKRaw": 1,
+            "settled": false,
+            "held": false,
+            "provisional": false,
+            "zeroPasses": 0,
+            "tris": 0
+          },
+          "clutter": {
+            "parked": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0,
+              "insideColumns": 0
+            },
+            "moving": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0
+            },
+            "poles": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0
+            },
+            "ready": 0,
+            "chunks": 4,
+            "realCols": 0,
+            "baseDraws": 58,
+            "draws": 0,
+            "trisPerInstance": {
+              "car": 22,
+              "mover": 22,
+              "pole": 20
+            }
+          },
+          "bloom": {
+            "intensity": 1,
+            "threshold": 0.62,
+            "nightT": 1
+          },
+          "popin": {
+            "revealKind": "warp",
+            "layers": {},
+            "longFrames": 8,
+            "worstMs": 2025,
+            "frames": 18
+          }
+        },
+        "layers": {
+          "satRoads": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satBuildings": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satSkyline": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satCityGlow": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 12672,
+            "instances": 96,
+            "mats": 1
+          },
+          "satVeg": null,
+          "satBeacons": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 0,
+            "instances": 0,
+            "mats": 1
+          },
+          "satClutter": null,
+          "monuments": null,
+          "clouds": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 864,
+            "instances": 432,
+            "mats": 1
+          },
+          "cirrus": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 60,
+            "instances": 30,
+            "mats": 1
+          },
+          "traffic": {
+            "meshes": 14,
+            "drawn": 14,
+            "tris": 0,
+            "instances": 0,
+            "mats": 14
+          },
+          "tracers": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 24576,
+            "instances": 1,
+            "mats": 1
+          }
+        },
+        "emissive": {
+          "meshes": 4,
+          "withMap": 4,
+          "withoutMap": 0,
+          "drawn": 0,
+          "worst": []
+        },
+        "pose": {
+          "altM": 600,
+          "groundElev": 0,
+          "aglM": 600,
+          "heading": 1.9,
+          "pitch": -1.15
+        },
+        "pins": {
+          "terra": null,
+          "settle": null,
+          "clutter": null,
+          "depth": 1,
+          "gov": "hold",
+          "weather": "baseline",
+          "unpinned": null,
+          "attempted": {
+            "__flyTerraPin": 1,
+            "__flySettlePin": 1,
+            "__flyClutterPin": 1
+          }
+        },
+        "terraStats": {
+          "camTileZ": 7,
+          "targetZ": 17,
+          "downloading": 8,
+          "sharp": false,
+          "sharpReason": null,
+          "aglM": 619,
+          "lodThreshold": 0.86,
+          "maxLevel": 18,
+          "burst": false,
+          "at": 157024.7000000002
+        }
+      },
+      "m": {
+        "band": [
+          0.478,
+          0.922
+        ],
+        "xBand": [
+          0.163,
+          0.838
+        ],
+        "bandPx": 432000,
+        "frame": {
+          "w": 1600,
+          "h": 900
+        },
+        "mean": 12.458449886568285,
+        "p5": 6,
+        "p50": 12,
+        "p95": 21,
+        "p99": 25,
+        "litFrac": 0,
+        "litLadder": {
+          "8": 0.8193449074074074,
+          "16": 0.22467361111111112,
+          "24": 0.011171296296296295,
+          "40": 0,
+          "60": 0,
+          "90": 0,
+          "128": 0,
+          "180": 0
+        },
+        "darkFrac": 0.1806550925925926,
+        "warmLitFrac": 0,
+        "coolLitFrac": 0,
+        "warmOfBand": 0,
+        "whiteFrac": 0,
+        "whiteBlobPx": 0,
+        "whiteBlobFrac": 0,
+        "whiteBlobs": 0,
+        "whiteBlobArea": 0,
+        "whiteBlobBox": null
+      }
+    },
+    "OWE/unpinned/live": {
+      "legTag": "OWE/unpinned/live",
+      "pose": "P-OWE",
+      "band": [
+        0.45,
+        1
+      ],
+      "xBand": [
+        0.02,
+        0.98
+      ],
+      "shot": "r23-c-red-owe-unpinned-live.png",
+      "census": {
+        "scene": {
+          "draws": 54,
+          "tris": 55005,
+          "traffic": 0
+        },
+        "tier": "high",
+        "governor": {
+          "dprSteps": 0,
+          "tierSteps": 0,
+          "latched": false,
+          "emaFps": 0,
+          "refresh": 0,
+          "rung": 0,
+          "rungs": 5,
+          "dpr": 1,
+          "tier": "high",
+          "pinned": true
+        },
+        "dpr": 1,
+        "sky": {
+          "elDeg": -30.791,
+          "state": "night",
+          "blendS": 0,
+          "env": 0.16,
+          "bg": 0.26,
+          "hdri": "night",
+          "sunFrac": 0,
+          "envUrl": "/hdri/qwantani_night_puresky_1k.hdr"
+        },
+        "night": {
+          "roadMix": {
+            "night": 1,
+            "day": 0
+          },
+          "roads": {
+            "chunks": 4,
+            "ready": 0,
+            "empty": 0,
+            "queued": 13,
+            "building": 2,
+            "draping": 0,
+            "ringOn": true,
+            "night": {
+              "street5": 0.24,
+              "street6": 0.34,
+              "daySeam": 0.14
+            },
+            "cacheKey": "world-bend-road-satnight-r19",
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 0,
+              "legacy": 0
+            },
+            "errorRetries": 43,
+            "evictions": 18,
+            "heals": 0
+          },
+          "buildings": {
+            "chunks": 8,
+            "ready": 0,
+            "waterReady": 0,
+            "waterSynth": 0,
+            "columns": 0,
+            "empty": 0,
+            "queued": 9,
+            "building": 4,
+            "draping": 0,
+            "ringOn": true,
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 0,
+              "legacy": 0
+            },
+            "errorRetries": 97,
+            "evictions": 36,
+            "heals": 0,
+            "waterBackfillArmed": true,
+            "waterBackfilling": 0
+          },
+          "bldgFade": 0,
+          "skyline": {
+            "chunks": 5,
+            "ready": 0,
+            "drawn": 0,
+            "empty": 3,
+            "tris": 0,
+            "verts": 0,
+            "queued": 5,
+            "building": 8,
+            "draping": 0,
+            "ringOn": true,
+            "maxChunks": 10,
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 3,
+              "legacy": 0
+            },
+            "errorRetries": 48,
+            "evictions": 64,
+            "heals": 0
+          },
+          "houseLights": {
+            "placed": 0,
+            "nightK": 1,
+            "fromHouse": 0,
+            "fromVeg": 0
+          },
+          "cityGlow": {
+            "placed": 0,
+            "maxD": 0,
+            "nightK": 1
+          },
+          "beacons": {
+            "placed": 0,
+            "nightK": 1,
+            "on": true
+          },
+          "parcelHomes": {
+            "placed": 0,
+            "anchors": 0,
+            "suppressed": 0,
+            "pool": 5000,
+            "altK": 1,
+            "nightK": 1,
+            "realCols": 0,
+            "meanScalar": 0,
+            "meanDens": 0,
+            "maxDens": 0,
+            "regionalDens": 0,
+            "regK": 1,
+            "regKRaw": 1,
+            "settled": false,
+            "held": false,
+            "provisional": false,
+            "zeroPasses": 0,
+            "tris": 0
+          },
+          "clutter": {
+            "parked": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0,
+              "insideColumns": 0
+            },
+            "moving": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0
+            },
+            "poles": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0
+            },
+            "ready": 0,
+            "chunks": 4,
+            "realCols": 0,
+            "baseDraws": 54,
+            "draws": 0,
+            "trisPerInstance": {
+              "car": 22,
+              "mover": 22,
+              "pole": 20
+            }
+          },
+          "bloom": {
+            "intensity": 1,
+            "threshold": 0.62,
+            "nightT": 1
+          },
+          "popin": {
+            "revealKind": "warp",
+            "layers": {},
+            "longFrames": 6,
+            "worstMs": 2382,
+            "frames": 24
+          }
+        },
+        "layers": {
+          "satRoads": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satBuildings": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satSkyline": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satCityGlow": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 12672,
+            "instances": 96,
+            "mats": 1
+          },
+          "satVeg": null,
+          "satBeacons": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 0,
+            "instances": 0,
+            "mats": 1
+          },
+          "satClutter": null,
+          "monuments": null,
+          "clouds": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 864,
+            "instances": 432,
+            "mats": 1
+          },
+          "cirrus": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 60,
+            "instances": 30,
+            "mats": 1
+          },
+          "traffic": {
+            "meshes": 14,
+            "drawn": 14,
+            "tris": 0,
+            "instances": 0,
+            "mats": 14
+          },
+          "tracers": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 24576,
+            "instances": 1,
+            "mats": 1
+          }
+        },
+        "emissive": {
+          "meshes": 4,
+          "withMap": 4,
+          "withoutMap": 0,
+          "drawn": 0,
+          "worst": []
+        },
+        "pose": {
+          "altM": 500,
+          "groundElev": 0,
+          "aglM": 500,
+          "heading": 1.5,
+          "pitch": -0.28
+        },
+        "pins": {
+          "terra": null,
+          "settle": null,
+          "clutter": null,
+          "depth": 1,
+          "gov": "hold",
+          "weather": "baseline",
+          "unpinned": null,
+          "attempted": {
+            "__flyTerraPin": 1,
+            "__flySettlePin": 1,
+            "__flyClutterPin": 1
+          }
+        },
+        "terraStats": {
+          "camTileZ": 4,
+          "targetZ": 17,
+          "downloading": 8,
+          "sharp": false,
+          "sharpReason": null,
+          "aglM": 511,
+          "lodThreshold": 0.86,
+          "maxLevel": 18,
+          "burst": false,
+          "at": 211564
+        }
+      },
+      "m": {
+        "band": [
+          0.45,
+          1
+        ],
+        "xBand": [
+          0.02,
+          0.98
+        ],
+        "bandPx": 760320,
+        "frame": {
+          "w": 1600,
+          "h": 900
+        },
+        "mean": 18.864676071149816,
+        "p5": 2,
+        "p50": 5,
+        "p95": 76,
+        "p99": 76,
+        "litFrac": 0.23156434132996634,
+        "litLadder": {
+          "8": 0.2470854377104377,
+          "16": 0.24341724537037038,
+          "24": 0.24225589225589225,
+          "40": 0.23156434132996634,
+          "60": 0.17102141203703702,
+          "90": 0,
+          "128": 0,
+          "180": 0
+        },
+        "darkFrac": 0.7529145622895623,
+        "warmLitFrac": 0,
+        "coolLitFrac": 0.15075853529702435,
+        "warmOfBand": 0,
+        "whiteFrac": 0,
+        "whiteBlobPx": 0,
+        "whiteBlobFrac": 0,
+        "whiteBlobs": 0,
+        "whiteBlobArea": 0,
+        "whiteBlobBox": null
+      }
+    },
+    "BB/unpinned/live": {
+      "legTag": "BB/unpinned/live",
+      "pose": "P-BB",
+      "band": [
+        0.5,
+        0.98
+      ],
+      "xBand": [
+        0.02,
+        0.98
+      ],
+      "shot": "r23-c-red-bb-unpinned-live.png",
+      "census": {
+        "scene": {
+          "draws": 54,
+          "tris": 55005,
+          "traffic": 0
+        },
+        "tier": "high",
+        "governor": {
+          "dprSteps": 0,
+          "tierSteps": 0,
+          "latched": false,
+          "emaFps": 0,
+          "refresh": 0,
+          "rung": 0,
+          "rungs": 5,
+          "dpr": 1,
+          "tier": "high",
+          "pinned": true
+        },
+        "dpr": 1,
+        "sky": {
+          "elDeg": -26.853,
+          "state": "night",
+          "blendS": 0,
+          "env": 0.16,
+          "bg": 0.26,
+          "hdri": "night",
+          "sunFrac": 0,
+          "envUrl": "/hdri/qwantani_night_puresky_1k.hdr"
+        },
+        "night": {
+          "roadMix": {
+            "night": 1,
+            "day": 0
+          },
+          "roads": {
+            "chunks": 5,
+            "ready": 0,
+            "empty": 0,
+            "queued": 12,
+            "building": 2,
+            "draping": 0,
+            "ringOn": true,
+            "night": {
+              "street5": 0.24,
+              "street6": 0.34,
+              "daySeam": 0.14
+            },
+            "cacheKey": "world-bend-road-satnight-r19",
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 0,
+              "legacy": 0
+            },
+            "errorRetries": 56,
+            "evictions": 26,
+            "heals": 0
+          },
+          "buildings": {
+            "chunks": 10,
+            "ready": 0,
+            "waterReady": 0,
+            "waterSynth": 0,
+            "columns": 0,
+            "empty": 0,
+            "queued": 6,
+            "building": 4,
+            "draping": 0,
+            "ringOn": true,
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 0,
+              "legacy": 0
+            },
+            "errorRetries": 125,
+            "evictions": 50,
+            "heals": 0,
+            "waterBackfillArmed": true,
+            "waterBackfilling": 0
+          },
+          "bldgFade": 0,
+          "skyline": {
+            "chunks": 4,
+            "ready": 0,
+            "drawn": 0,
+            "empty": 2,
+            "tris": 0,
+            "verts": 0,
+            "queued": 6,
+            "building": 8,
+            "draping": 0,
+            "ringOn": true,
+            "maxChunks": 10,
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 2,
+              "legacy": 0
+            },
+            "errorRetries": 65,
+            "evictions": 87,
+            "heals": 0
+          },
+          "houseLights": {
+            "placed": 0,
+            "nightK": 1,
+            "fromHouse": 0,
+            "fromVeg": 0
+          },
+          "cityGlow": {
+            "placed": 28,
+            "maxD": 89775.40182482007,
+            "nightK": 1
+          },
+          "beacons": {
+            "placed": 2,
+            "nightK": 1,
+            "on": true
+          },
+          "parcelHomes": {
+            "placed": 0,
+            "anchors": 0,
+            "suppressed": 0,
+            "pool": 5000,
+            "altK": 1,
+            "nightK": 1,
+            "realCols": 0,
+            "meanScalar": 0,
+            "meanDens": 0,
+            "maxDens": 0,
+            "regionalDens": 0,
+            "regK": 1,
+            "regKRaw": 1,
+            "settled": false,
+            "held": false,
+            "provisional": false,
+            "zeroPasses": 0,
+            "tris": 0
+          },
+          "clutter": {
+            "parked": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0,
+              "insideColumns": 0
+            },
+            "moving": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0
+            },
+            "poles": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0
+            },
+            "ready": 0,
+            "chunks": 5,
+            "realCols": 0,
+            "baseDraws": 54,
+            "draws": 0,
+            "trisPerInstance": {
+              "car": 22,
+              "mover": 22,
+              "pole": 20
+            }
+          },
+          "bloom": {
+            "intensity": 1,
+            "threshold": 0.62,
+            "nightT": 1
+          },
+          "popin": {
+            "revealKind": "warp",
+            "layers": {},
+            "longFrames": 10,
+            "worstMs": 1248,
+            "frames": 34
+          }
+        },
+        "layers": {
+          "satRoads": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satBuildings": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satSkyline": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satCityGlow": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 12672,
+            "instances": 96,
+            "mats": 1
+          },
+          "satVeg": null,
+          "satBeacons": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 160,
+            "instances": 2,
+            "mats": 1
+          },
+          "satClutter": null,
+          "monuments": null,
+          "clouds": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 864,
+            "instances": 432,
+            "mats": 1
+          },
+          "cirrus": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 60,
+            "instances": 30,
+            "mats": 1
+          },
+          "traffic": {
+            "meshes": 14,
+            "drawn": 14,
+            "tris": 0,
+            "instances": 0,
+            "mats": 14
+          },
+          "tracers": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 24576,
+            "instances": 1,
+            "mats": 1
+          }
+        },
+        "emissive": {
+          "meshes": 4,
+          "withMap": 4,
+          "withoutMap": 0,
+          "drawn": 0,
+          "worst": []
+        },
+        "pose": {
+          "altM": 300,
+          "groundElev": 0,
+          "aglM": 300,
+          "heading": -0.35,
+          "pitch": -0.14
+        },
+        "pins": {
+          "terra": null,
+          "settle": null,
+          "clutter": null,
+          "depth": 1,
+          "gov": "hold",
+          "weather": "baseline",
+          "unpinned": null,
+          "attempted": {
+            "__flyTerraPin": 1,
+            "__flySettlePin": 1,
+            "__flyClutterPin": 1
+          }
+        },
+        "terraStats": {
+          "camTileZ": 6,
+          "targetZ": 18,
+          "downloading": 8,
+          "sharp": false,
+          "sharpReason": null,
+          "aglM": 310,
+          "lodThreshold": 0.86,
+          "maxLevel": 18,
+          "burst": false,
+          "at": 261918.6000000001
+        }
+      },
+      "m": {
+        "band": [
+          0.5,
+          0.98
+        ],
+        "xBand": [
+          0.02,
+          0.98
+        ],
+        "bandPx": 663552,
+        "frame": {
+          "w": 1600,
+          "h": 900
+        },
+        "mean": 17.552679978358487,
+        "p5": 3,
+        "p50": 5,
+        "p95": 66,
+        "p99": 71,
+        "litFrac": 0.13683780623070987,
+        "litLadder": {
+          "8": 0.3130169150270062,
+          "16": 0.3103178047839506,
+          "24": 0.3087836371527778,
+          "40": 0.13683780623070987,
+          "60": 0.09425184461805555,
+          "90": 0.0030201099537037037,
+          "128": 0.002540870949074074,
+          "180": 0
+        },
+        "darkFrac": 0.6869830849729939,
+        "warmLitFrac": 0.023557528166609765,
+        "coolLitFrac": 0.12856969790416195,
+        "warmOfBand": 0.003223560474537037,
+        "whiteFrac": 0,
+        "whiteBlobPx": 0,
+        "whiteBlobFrac": 0,
+        "whiteBlobs": 0,
+        "whiteBlobArea": 0,
+        "whiteBlobBox": null
+      }
+    },
+    "MAN/unpinned/high": {
+      "legTag": "MAN/unpinned/high",
+      "pose": "P-MAN",
+      "band": [
+        0.55,
+        0.98
+      ],
+      "xBand": [
+        0.02,
+        0.85
+      ],
+      "shot": "r23-c-red-man-unpinned-high.png",
+      "census": {
+        "scene": {
+          "draws": 0,
+          "tris": 0,
+          "traffic": 0
+        },
+        "tier": "high",
+        "governor": {
+          "dprSteps": 0,
+          "tierSteps": 0,
+          "latched": false,
+          "emaFps": 0,
+          "refresh": 0,
+          "rung": 0,
+          "rungs": 5,
+          "dpr": 1,
+          "tier": "high",
+          "pinned": true
+        },
+        "dpr": 1,
+        "sky": {
+          "elDeg": -26.844,
+          "state": "night",
+          "blendS": 0,
+          "env": 0.1849,
+          "bg": 0.2876,
+          "hdri": "night",
+          "sunFrac": 0,
+          "envUrl": "/hdri/qwantani_night_puresky_1k.hdr"
+        },
+        "night": {
+          "roadMix": {
+            "night": 1,
+            "day": 0
+          },
+          "roads": {
+            "chunks": 9,
+            "ready": 0,
+            "empty": 0,
+            "queued": 10,
+            "building": 2,
+            "draping": 0,
+            "ringOn": true,
+            "night": {
+              "street5": 0.24,
+              "street6": 0.34,
+              "daySeam": 0.14
+            },
+            "cacheKey": "world-bend-road-satnight-r19",
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 0,
+              "legacy": 0
+            },
+            "errorRetries": 19,
+            "evictions": 0,
+            "heals": 0
+          },
+          "buildings": {
+            "chunks": 14,
+            "ready": 0,
+            "waterReady": 0,
+            "waterSynth": 0,
+            "columns": 0,
+            "empty": 0,
+            "queued": 4,
+            "building": 4,
+            "draping": 0,
+            "ringOn": true,
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 0,
+              "legacy": 0
+            },
+            "errorRetries": 33,
+            "evictions": 2,
+            "heals": 0,
+            "waterBackfillArmed": true,
+            "waterBackfilling": 0
+          },
+          "bldgFade": 0,
+          "skyline": {
+            "chunks": 7,
+            "ready": 0,
+            "drawn": 0,
+            "empty": 5,
+            "tris": 0,
+            "verts": 0,
+            "queued": 3,
+            "building": 8,
+            "draping": 0,
+            "ringOn": true,
+            "maxChunks": 10,
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 5,
+              "legacy": 0
+            },
+            "errorRetries": 19,
+            "evictions": 19,
+            "heals": 0
+          },
+          "houseLights": {
+            "placed": 0,
+            "nightK": 1,
+            "fromHouse": 0,
+            "fromVeg": 0
+          },
+          "cityGlow": {
+            "placed": 26,
+            "maxD": 89182.48532439957,
+            "nightK": 1
+          },
+          "beacons": {
+            "placed": 2,
+            "nightK": 1,
+            "on": true
+          },
+          "parcelHomes": {
+            "placed": 0,
+            "anchors": 0,
+            "suppressed": 0,
+            "pool": 5000,
+            "altK": 1,
+            "nightK": 1,
+            "realCols": 0,
+            "meanScalar": 0,
+            "meanDens": 0,
+            "maxDens": 0,
+            "regionalDens": 0,
+            "regK": 1,
+            "regKRaw": 1,
+            "settled": false,
+            "held": false,
+            "provisional": false,
+            "zeroPasses": 0,
+            "tris": 0
+          },
+          "clutter": {
+            "parked": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0,
+              "insideColumns": 0
+            },
+            "moving": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0
+            },
+            "poles": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0
+            },
+            "ready": 0,
+            "chunks": 4,
+            "realCols": 0,
+            "baseDraws": 0,
+            "draws": 0,
+            "trisPerInstance": {
+              "car": 22,
+              "mover": 22,
+              "pole": 20
+            }
+          },
+          "bloom": {
+            "intensity": 1,
+            "threshold": 0.62,
+            "nightT": 1
+          },
+          "popin": {
+            "revealKind": "warp",
+            "layers": {},
+            "longFrames": 6,
+            "worstMs": 3775,
+            "frames": 11
+          }
+        },
+        "layers": {
+          "satRoads": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satBuildings": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satSkyline": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satCityGlow": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 12672,
+            "instances": 96,
+            "mats": 1
+          },
+          "satVeg": null,
+          "satBeacons": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 160,
+            "instances": 2,
+            "mats": 1
+          },
+          "satClutter": null,
+          "monuments": null,
+          "clouds": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 864,
+            "instances": 432,
+            "mats": 1
+          },
+          "cirrus": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 60,
+            "instances": 30,
+            "mats": 1
+          },
+          "traffic": {
+            "meshes": 14,
+            "drawn": 14,
+            "tris": 0,
+            "instances": 0,
+            "mats": 14
+          },
+          "tracers": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 24576,
+            "instances": 1,
+            "mats": 1
+          }
+        },
+        "emissive": {
+          "meshes": 4,
+          "withMap": 4,
+          "withoutMap": 0,
+          "drawn": 0,
+          "worst": []
+        },
+        "pose": {
+          "altM": 792,
+          "groundElev": 0,
+          "aglM": 792,
+          "heading": 2.6,
+          "pitch": -0.12
+        },
+        "pins": {
+          "terra": null,
+          "settle": null,
+          "clutter": null,
+          "depth": 1,
+          "gov": "hold",
+          "weather": "baseline",
+          "unpinned": null,
+          "attempted": {
+            "__flyTerraPin": 1,
+            "__flySettlePin": 1,
+            "__flyClutterPin": 1
+          }
+        },
+        "terraStats": {
+          "camTileZ": 5,
+          "targetZ": 17,
+          "downloading": 8,
+          "sharp": false,
+          "sharpReason": null,
+          "aglM": 801,
+          "lodThreshold": 0.857,
+          "maxLevel": 18,
+          "burst": false,
+          "at": 110064.8999999999
+        }
+      },
+      "m": {
+        "band": [
+          0.55,
+          0.98
+        ],
+        "xBand": [
+          0.02,
+          0.85
+        ],
+        "bandPx": 513936,
+        "frame": {
+          "w": 1600,
+          "h": 900
+        },
+        "mean": 50.54093426650546,
+        "p5": 4,
+        "p50": 59,
+        "p95": 76,
+        "p99": 77,
+        "litFrac": 0.7519010149123626,
+        "litLadder": {
+          "8": 0.8467202141900937,
+          "16": 0.8431147068895738,
+          "24": 0.8225907505992964,
+          "40": 0.7519010149123626,
+          "60": 0.4693405404563992,
+          "90": 0,
+          "128": 0,
+          "180": 0
+        },
+        "darkFrac": 0.15327978580990628,
+        "warmLitFrac": 0,
+        "coolLitFrac": 0.7302971567868871,
+        "warmOfBand": 0,
+        "whiteFrac": 0,
+        "whiteBlobPx": 0,
+        "whiteBlobFrac": 0,
+        "whiteBlobs": 0,
+        "whiteBlobArea": 0,
+        "whiteBlobBox": null
+      }
+    },
+    "POW/unpinned/high": {
+      "legTag": "POW/unpinned/high",
+      "pose": "P-POW",
+      "band": [
+        0.4777777777777778,
+        0.9222222222222223
+      ],
+      "xBand": [
+        0.1625,
+        0.8375
+      ],
+      "shot": "r23-c-red-pow-unpinned-high.png",
+      "census": {
+        "scene": {
+          "draws": 51,
+          "tris": 55675,
+          "traffic": 0
+        },
+        "tier": "high",
+        "governor": {
+          "dprSteps": 0,
+          "tierSteps": 0,
+          "latched": false,
+          "emaFps": 0,
+          "refresh": 0,
+          "rung": 0,
+          "rungs": 5,
+          "dpr": 1,
+          "tier": "high",
+          "pinned": true
+        },
+        "dpr": 1,
+        "sky": {
+          "elDeg": -27.373,
+          "state": "night",
+          "blendS": 0,
+          "env": 0.16,
+          "bg": 0.26,
+          "hdri": "night",
+          "sunFrac": 0,
+          "envUrl": "/hdri/qwantani_night_puresky_1k.hdr"
+        },
+        "night": {
+          "roadMix": {
+            "night": 1,
+            "day": 0
+          },
+          "roads": {
+            "chunks": 4,
+            "ready": 0,
+            "empty": 0,
+            "queued": 12,
+            "building": 2,
+            "draping": 0,
+            "ringOn": true,
+            "night": {
+              "street5": 0.24,
+              "street6": 0.34,
+              "daySeam": 0.14
+            },
+            "cacheKey": "world-bend-road-satnight-r19",
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 0,
+              "legacy": 0
+            },
+            "errorRetries": 36,
+            "evictions": 10,
+            "heals": 0
+          },
+          "buildings": {
+            "chunks": 9,
+            "ready": 0,
+            "waterReady": 0,
+            "waterSynth": 0,
+            "columns": 0,
+            "empty": 0,
+            "queued": 7,
+            "building": 4,
+            "draping": 0,
+            "ringOn": true,
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 0,
+              "legacy": 0
+            },
+            "errorRetries": 64,
+            "evictions": 18,
+            "heals": 0,
+            "waterBackfillArmed": true,
+            "waterBackfilling": 0
+          },
+          "bldgFade": 0,
+          "skyline": {
+            "chunks": 4,
+            "ready": 0,
+            "drawn": 0,
+            "empty": 2,
+            "tris": 0,
+            "verts": 0,
+            "queued": 6,
+            "building": 8,
+            "draping": 0,
+            "ringOn": true,
+            "maxChunks": 10,
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 2,
+              "legacy": 0
+            },
+            "errorRetries": 35,
+            "evictions": 44,
+            "heals": 0
+          },
+          "houseLights": {
+            "placed": 0,
+            "nightK": 1,
+            "fromHouse": 0,
+            "fromVeg": 0
+          },
+          "cityGlow": {
+            "placed": 40,
+            "maxD": 88479.86681082992,
+            "nightK": 1
+          },
+          "beacons": {
+            "placed": 0,
+            "nightK": 1,
+            "on": true
+          },
+          "parcelHomes": {
+            "placed": 0,
+            "anchors": 0,
+            "suppressed": 0,
+            "pool": 5000,
+            "altK": 1,
+            "nightK": 1,
+            "realCols": 0,
+            "meanScalar": 0,
+            "meanDens": 0,
+            "maxDens": 0,
+            "regionalDens": 0,
+            "regK": 1,
+            "regKRaw": 1,
+            "settled": false,
+            "held": false,
+            "provisional": false,
+            "zeroPasses": 0,
+            "tris": 0
+          },
+          "clutter": {
+            "parked": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0,
+              "insideColumns": 0
+            },
+            "moving": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0
+            },
+            "poles": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0
+            },
+            "ready": 0,
+            "chunks": 4,
+            "realCols": 0,
+            "baseDraws": 51,
+            "draws": 0,
+            "trisPerInstance": {
+              "car": 22,
+              "mover": 22,
+              "pole": 20
+            }
+          },
+          "bloom": {
+            "intensity": 1,
+            "threshold": 0.62,
+            "nightT": 1
+          },
+          "popin": {
+            "revealKind": "warp",
+            "layers": {},
+            "longFrames": 9,
+            "worstMs": 1592,
+            "frames": 20
+          }
+        },
+        "layers": {
+          "satRoads": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satBuildings": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satSkyline": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satCityGlow": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 12672,
+            "instances": 96,
+            "mats": 1
+          },
+          "satVeg": null,
+          "satBeacons": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 0,
+            "instances": 0,
+            "mats": 1
+          },
+          "satClutter": null,
+          "monuments": null,
+          "clouds": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 864,
+            "instances": 432,
+            "mats": 1
+          },
+          "cirrus": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 60,
+            "instances": 30,
+            "mats": 1
+          },
+          "traffic": {
+            "meshes": 14,
+            "drawn": 14,
+            "tris": 0,
+            "instances": 0,
+            "mats": 14
+          },
+          "tracers": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 24576,
+            "instances": 1,
+            "mats": 1
+          }
+        },
+        "emissive": {
+          "meshes": 4,
+          "withMap": 4,
+          "withoutMap": 0,
+          "drawn": 0,
+          "worst": []
+        },
+        "pose": {
+          "altM": 600,
+          "groundElev": 0,
+          "aglM": 600,
+          "heading": 1.9,
+          "pitch": -1.048
+        },
+        "pins": {
+          "terra": null,
+          "settle": null,
+          "clutter": null,
+          "depth": 1,
+          "gov": "hold",
+          "weather": "baseline",
+          "unpinned": null,
+          "attempted": {
+            "__flyTerraPin": 1,
+            "__flySettlePin": 1,
+            "__flyClutterPin": 1
+          }
+        },
+        "terraStats": {
+          "camTileZ": 8,
+          "targetZ": 17,
+          "downloading": 8,
+          "sharp": false,
+          "sharpReason": null,
+          "aglM": 619,
+          "lodThreshold": 0.86,
+          "maxLevel": 18,
+          "burst": false,
+          "at": 155183.19999999972
+        }
+      },
+      "m": {
+        "band": [
+          0.478,
+          0.922
+        ],
+        "xBand": [
+          0.163,
+          0.838
+        ],
+        "bandPx": 432000,
+        "frame": {
+          "w": 1600,
+          "h": 900
+        },
+        "mean": 12.337804793976716,
+        "p5": 6,
+        "p50": 12,
+        "p95": 21,
+        "p99": 24,
+        "litFrac": 0,
+        "litLadder": {
+          "8": 0.8140069444444444,
+          "16": 0.2166712962962963,
+          "24": 0.009997685185185186,
+          "40": 0,
+          "60": 0,
+          "90": 0,
+          "128": 0,
+          "180": 0
+        },
+        "darkFrac": 0.18599305555555556,
+        "warmLitFrac": 0,
+        "coolLitFrac": 0,
+        "warmOfBand": 0,
+        "whiteFrac": 0,
+        "whiteBlobPx": 0,
+        "whiteBlobFrac": 0,
+        "whiteBlobs": 0,
+        "whiteBlobArea": 0,
+        "whiteBlobBox": null
+      }
+    },
+    "MAN/pinned/high": {
+      "legTag": "MAN/pinned/high",
+      "pose": "P-MAN",
+      "band": [
+        0.55,
+        0.98
+      ],
+      "xBand": [
+        0.02,
+        0.85
+      ],
+      "shot": "r23-c-red-man-pinned-high.png",
+      "census": {
+        "scene": {
+          "draws": 0,
+          "tris": 0,
+          "traffic": 0
+        },
+        "tier": "high",
+        "governor": {
+          "dprSteps": 0,
+          "tierSteps": 0,
+          "latched": false,
+          "emaFps": 0,
+          "refresh": 0,
+          "rung": 0,
+          "rungs": 3,
+          "dpr": 1,
+          "tier": "high",
+          "pinned": true
+        },
+        "dpr": 1,
+        "sky": {
+          "elDeg": -26.844,
+          "state": "night",
+          "blendS": 0,
+          "env": 0.2264,
+          "bg": 0.337,
+          "hdri": "night",
+          "sunFrac": 0,
+          "envUrl": "/hdri/qwantani_night_puresky_1k.hdr"
+        },
+        "night": {
+          "roadMix": {
+            "night": 1,
+            "day": 0
+          },
+          "roads": {
+            "chunks": 4,
+            "ready": 0,
+            "empty": 0,
+            "queued": 14,
+            "building": 2,
+            "draping": 0,
+            "ringOn": true,
+            "night": {
+              "street5": 0.24,
+              "street6": 0.34,
+              "daySeam": 0.14
+            },
+            "cacheKey": "world-bend-road-satnight-r19",
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 0,
+              "legacy": 0
+            },
+            "errorRetries": 14,
+            "evictions": 5,
+            "heals": 0
+          },
+          "buildings": {
+            "chunks": 8,
+            "ready": 0,
+            "waterReady": 0,
+            "waterSynth": 0,
+            "columns": 0,
+            "empty": 0,
+            "queued": 12,
+            "building": 4,
+            "draping": 0,
+            "ringOn": true,
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 0,
+              "legacy": 0
+            },
+            "errorRetries": 34,
+            "evictions": 12,
+            "heals": 0,
+            "waterBackfillArmed": true,
+            "waterBackfilling": 0
+          },
+          "bldgFade": 1,
+          "skyline": {
+            "chunks": 4,
+            "ready": 0,
+            "drawn": 0,
+            "empty": 1,
+            "tris": 0,
+            "verts": 0,
+            "queued": 6,
+            "building": 10,
+            "draping": 0,
+            "ringOn": true,
+            "maxChunks": 10,
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 1,
+              "legacy": 0
+            },
+            "errorRetries": 15,
+            "evictions": 20,
+            "heals": 0
+          },
+          "houseLights": {
+            "placed": 0,
+            "nightK": 1,
+            "fromHouse": 0,
+            "fromVeg": 0
+          },
+          "cityGlow": {
+            "placed": 26,
+            "maxD": 89182.48532439957,
+            "nightK": 1
+          },
+          "beacons": {
+            "placed": 2,
+            "nightK": 1,
+            "on": true
+          },
+          "parcelHomes": {
+            "placed": 0,
+            "anchors": 0,
+            "suppressed": 0,
+            "pool": 5000,
+            "altK": 1,
+            "nightK": 1,
+            "realCols": 0,
+            "meanScalar": 0,
+            "meanDens": 0,
+            "maxDens": 0,
+            "regionalDens": 0,
+            "regK": 1,
+            "regKRaw": 1,
+            "settled": false,
+            "held": false,
+            "provisional": false,
+            "zeroPasses": 0,
+            "tris": 0
+          },
+          "clutter": {
+            "parked": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0,
+              "insideColumns": 0
+            },
+            "moving": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0
+            },
+            "poles": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0
+            },
+            "ready": 0,
+            "chunks": 4,
+            "realCols": 0,
+            "baseDraws": 0,
+            "draws": 0,
+            "trisPerInstance": {
+              "car": 22,
+              "mover": 22,
+              "pole": 20
+            }
+          },
+          "bloom": {
+            "intensity": 1,
+            "threshold": 0.62,
+            "nightT": 1
+          },
+          "popin": {
+            "revealKind": "warp",
+            "layers": {},
+            "longFrames": 1,
+            "worstMs": 2175,
+            "frames": 7
+          }
+        },
+        "layers": {
+          "satRoads": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satBuildings": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satSkyline": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satCityGlow": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 12672,
+            "instances": 96,
+            "mats": 1
+          },
+          "satVeg": null,
+          "satBeacons": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 160,
+            "instances": 2,
+            "mats": 1
+          },
+          "satClutter": null,
+          "monuments": null,
+          "clouds": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 864,
+            "instances": 432,
+            "mats": 1
+          },
+          "cirrus": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 60,
+            "instances": 30,
+            "mats": 1
+          },
+          "traffic": {
+            "meshes": 14,
+            "drawn": 14,
+            "tris": 0,
+            "instances": 0,
+            "mats": 14
+          },
+          "tracers": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 24576,
+            "instances": 1,
+            "mats": 1
+          }
+        },
+        "emissive": {
+          "meshes": 1,
+          "withMap": 1,
+          "withoutMap": 0,
+          "drawn": 0,
+          "worst": []
+        },
+        "pose": {
+          "altM": 792,
+          "groundElev": 0,
+          "aglM": 792,
+          "heading": 2.6,
+          "pitch": -0.12
+        },
+        "pins": {
+          "terra": 1,
+          "settle": 1,
+          "clutter": 1,
+          "depth": 1,
+          "gov": "hold",
+          "weather": "baseline",
+          "unpinned": null,
+          "attempted": null
+        },
+        "terraStats": null
+      },
+      "m": {
+        "band": [
+          0.55,
+          0.98
+        ],
+        "xBand": [
+          0.02,
+          0.85
+        ],
+        "bandPx": 513936,
+        "frame": {
+          "w": 1600,
+          "h": 900
+        },
+        "mean": 54.71636452011773,
+        "p5": 25,
+        "p50": 59,
+        "p95": 69,
+        "p99": 80,
+        "litFrac": 0.8532579932131628,
+        "litLadder": {
+          "8": 1,
+          "16": 0.998457006319853,
+          "24": 0.9617909622988077,
+          "40": 0.8532579932131628,
+          "60": 0.4567669904423897,
+          "90": 0.000003891535132779179,
+          "128": 0,
+          "180": 0
+        },
+        "darkFrac": 0,
+        "warmLitFrac": 0,
+        "coolLitFrac": 0.14540727902946274,
+        "warmOfBand": 0,
+        "whiteFrac": 0,
+        "whiteBlobPx": 0,
+        "whiteBlobFrac": 0,
+        "whiteBlobs": 0,
+        "whiteBlobArea": 0,
+        "whiteBlobBox": null
+      }
+    },
+    "POW/pinned/high": {
+      "legTag": "POW/pinned/high",
+      "pose": "P-POW",
+      "band": [
+        0.4777777777777778,
+        0.9222222222222223
+      ],
+      "xBand": [
+        0.1625,
+        0.8375
+      ],
+      "shot": "r23-c-red-pow-pinned-high.png",
+      "census": {
+        "scene": {
+          "draws": 64,
+          "tris": 55073,
+          "traffic": 0
+        },
+        "tier": "high",
+        "governor": {
+          "dprSteps": 0,
+          "tierSteps": 0,
+          "latched": false,
+          "emaFps": 0,
+          "refresh": 0,
+          "rung": 0,
+          "rungs": 3,
+          "dpr": 1,
+          "tier": "high",
+          "pinned": true
+        },
+        "dpr": 1,
+        "sky": {
+          "elDeg": -27.373,
+          "state": "night",
+          "blendS": 0,
+          "env": 0.1604,
+          "bg": 0.2605,
+          "hdri": "night",
+          "sunFrac": 0,
+          "envUrl": "/hdri/qwantani_night_puresky_1k.hdr"
+        },
+        "night": {
+          "roadMix": {
+            "night": 1,
+            "day": 0
+          },
+          "roads": {
+            "chunks": 4,
+            "ready": 0,
+            "empty": 0,
+            "queued": 14,
+            "building": 2,
+            "draping": 0,
+            "ringOn": true,
+            "night": {
+              "street5": 0.24,
+              "street6": 0.34,
+              "daySeam": 0.14
+            },
+            "cacheKey": "world-bend-road-satnight-r19",
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 0,
+              "legacy": 0
+            },
+            "errorRetries": 25,
+            "evictions": 10,
+            "heals": 0
+          },
+          "buildings": {
+            "chunks": 9,
+            "ready": 0,
+            "waterReady": 0,
+            "waterSynth": 0,
+            "columns": 0,
+            "empty": 0,
+            "queued": 8,
+            "building": 4,
+            "draping": 0,
+            "ringOn": true,
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 0,
+              "legacy": 0
+            },
+            "errorRetries": 59,
+            "evictions": 24,
+            "heals": 0,
+            "waterBackfillArmed": true,
+            "waterBackfilling": 0
+          },
+          "bldgFade": 1,
+          "skyline": {
+            "chunks": 4,
+            "ready": 0,
+            "drawn": 0,
+            "empty": 2,
+            "tris": 0,
+            "verts": 0,
+            "queued": 6,
+            "building": 8,
+            "draping": 0,
+            "ringOn": true,
+            "maxChunks": 10,
+            "emptyByReason": {
+              "noData": 0,
+              "zero": 2,
+              "legacy": 0
+            },
+            "errorRetries": 29,
+            "evictions": 38,
+            "heals": 0
+          },
+          "houseLights": {
+            "placed": 0,
+            "nightK": 1,
+            "fromHouse": 0,
+            "fromVeg": 0
+          },
+          "cityGlow": {
+            "placed": 40,
+            "maxD": 88479.86681083165,
+            "nightK": 1
+          },
+          "beacons": {
+            "placed": 0,
+            "nightK": 1,
+            "on": true
+          },
+          "parcelHomes": {
+            "placed": 0,
+            "anchors": 0,
+            "suppressed": 0,
+            "pool": 5000,
+            "altK": 1,
+            "nightK": 1,
+            "realCols": 0,
+            "meanScalar": 0,
+            "meanDens": 0,
+            "maxDens": 0,
+            "regionalDens": 0,
+            "regK": 1,
+            "regKRaw": 1,
+            "settled": false,
+            "held": false,
+            "provisional": false,
+            "zeroPasses": 0,
+            "tris": 0
+          },
+          "clutter": {
+            "parked": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0,
+              "insideColumns": 0
+            },
+            "moving": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0
+            },
+            "poles": {
+              "count": 0,
+              "tris": 0,
+              "anchors": 0
+            },
+            "ready": 0,
+            "chunks": 4,
+            "realCols": 0,
+            "baseDraws": 64,
+            "draws": 0,
+            "trisPerInstance": {
+              "car": 22,
+              "mover": 22,
+              "pole": 20
+            }
+          },
+          "bloom": {
+            "intensity": 1,
+            "threshold": 0.62,
+            "nightT": 1
+          },
+          "popin": {
+            "revealKind": "warp",
+            "layers": {},
+            "longFrames": 7,
+            "worstMs": 2486,
+            "frames": 14
+          }
+        },
+        "layers": {
+          "satRoads": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satBuildings": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satSkyline": {
+            "meshes": 0,
+            "drawn": 0,
+            "tris": 0,
+            "instances": 0,
+            "mats": 0
+          },
+          "satCityGlow": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 12672,
+            "instances": 96,
+            "mats": 1
+          },
+          "satVeg": null,
+          "satBeacons": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 0,
+            "instances": 0,
+            "mats": 1
+          },
+          "satClutter": null,
+          "monuments": null,
+          "clouds": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 864,
+            "instances": 432,
+            "mats": 1
+          },
+          "cirrus": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 60,
+            "instances": 30,
+            "mats": 1
+          },
+          "traffic": {
+            "meshes": 14,
+            "drawn": 14,
+            "tris": 0,
+            "instances": 0,
+            "mats": 14
+          },
+          "tracers": {
+            "meshes": 1,
+            "drawn": 1,
+            "tris": 24576,
+            "instances": 1,
+            "mats": 1
+          }
+        },
+        "emissive": {
+          "meshes": 1,
+          "withMap": 1,
+          "withoutMap": 0,
+          "drawn": 0,
+          "worst": []
+        },
+        "pose": {
+          "altM": 600,
+          "groundElev": 0,
+          "aglM": 600,
+          "heading": 1.9,
+          "pitch": -1.15
+        },
+        "pins": {
+          "terra": 1,
+          "settle": 1,
+          "clutter": 1,
+          "depth": 1,
+          "gov": "hold",
+          "weather": "baseline",
+          "unpinned": null,
+          "attempted": null
+        },
+        "terraStats": null
+      },
+      "m": {
+        "band": [
+          0.478,
+          0.922
+        ],
+        "xBand": [
+          0.163,
+          0.838
+        ],
+        "bandPx": 432000,
+        "frame": {
+          "w": 1600,
+          "h": 900
+        },
+        "mean": 12.756828587486078,
+        "p5": 6,
+        "p50": 12,
+        "p95": 21,
+        "p99": 27,
+        "litFrac": 0,
+        "litLadder": {
+          "8": 0.8344305555555556,
+          "16": 0.24349074074074073,
+          "24": 0.02044675925925926,
+          "40": 0,
+          "60": 0,
+          "90": 0,
+          "128": 0,
+          "180": 0
+        },
+        "darkFrac": 0.16556944444444444,
+        "warmLitFrac": 0,
+        "coolLitFrac": 0,
+        "warmOfBand": 0,
+        "whiteFrac": 0,
+        "whiteBlobPx": 0,
+        "whiteBlobFrac": 0,
+        "whiteBlobs": 0,
+        "whiteBlobArea": 0,
+        "whiteBlobBox": null
+      }
+    }
+  },
+  "meta": {
+    "when": "2026-08-11T12:37:40.626Z",
+    "origin": "http://localhost:3023",
+    "blocked": true,
+    "net": {
+      "img": 0,
+      "imgFail": 2458,
+      "vec": 0,
+      "vecFail": 1880,
+      "hosts": [
+        "tiles.openfreemap.org",
+        "server.arcgisonline.com"
+      ]
+    },
+    "thresholds": {
+      "MAN_LIT": 0.1,
+      "MAN_WARM": 0.24,
+      "MAN_P95": 58,
+      "MAN_P50_MAX": 40,
+      "MAN_BLOB": 0.0025,
+      "POW_LIT": 0.005,
+      "POW_WARM": 0.4,
+      "RATIO_LIT": 0.8,
+      "RATIO_WARM": 0.8,
+      "TIER_RATIO": 0.8,
+      "OWE_LIT_MAX": 0.02,
+      "OWE_DARK_MIN": 0.5,
+      "OWE_DRAWS": 261,
+      "BB_LIT": 0.05,
+      "NIGHT_EL": -12
+    },
+    "poses": {
+      "P_MAN": {
+        "tag": "P-MAN",
+        "pose": [
+          40.7075,
+          -74.0113,
+          792,
+          2.6,
+          -0.12
+        ],
+        "band": [
+          0.55,
+          0.98
+        ],
+        "xBand": [
+          0.02,
+          0.85
+        ]
+      },
+      "P_POW": {
+        "tag": "P-POW",
+        "pose": [
+          40.1584,
+          -83.0752,
+          600,
+          1.9,
+          -1.15
+        ],
+        "band": [
+          0.4777777777777778,
+          0.9222222222222223
+        ],
+        "xBand": [
+          0.1625,
+          0.8375
+        ]
+      },
+      "P_OWE": {
+        "tag": "P-OWE",
+        "pose": [
+          36.601,
+          -118.06,
+          500,
+          1.5,
+          -0.28
+        ],
+        "band": [
+          0.45,
+          1
+        ],
+        "xBand": [
+          0.02,
+          0.98
+        ]
+      },
+      "P_BB": {
+        "tag": "P-BB",
+        "pose": [
+          40.698,
+          -73.993,
+          300,
+          -0.35,
+          -0.14
+        ],
+        "band": [
+          0.5,
+          0.98
+        ],
+        "xBand": [
+          0.02,
+          0.98
+        ]
+      }
+    },
+    "depthEnabledInSource": false
+  }
+}

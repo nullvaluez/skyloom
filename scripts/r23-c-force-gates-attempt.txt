@@ -1,0 +1,25 @@
+PASS DEPTH_PASS still ships OFF, so this gate's untouched depth pin == the ship state — source DEPTH_PASS.enabled=false (if this ever reads true, this harness must un-pin depth — see the header)
+INFO live-tier page booted in 53659 ms (tier NOT pinned)
+CENSUS[MAN/unpinned/live] tier=high dpr=1 draws=0 tris=0 el=-26.844° state=night roadMixN=1 roads=0 bldg=0 fade=0 houseLights=0 glow=26 emissive=4(noMap 0) agl=792
+METRIC[MAN/unpinned/live] lit=23.594% warm=0.0%-of-lit dark=74.2% p5/p50/p95=3/5/78 mean=19.49 white=0.0000% blob=0px(0.0000%)x0 band=0.55..0.98
+CENSUS[POW/unpinned/live] tier=high dpr=1 draws=62 tris=55069 el=-27.373° state=night roadMixN=1 roads=0 bldg=0 fade=0 houseLights=0 glow=40 emissive=4(noMap 0) agl=600
+METRIC[POW/unpinned/live] lit=0.000% warm=0.0%-of-lit dark=3.6% p5/p50/p95=8/14/27 mean=15.68 white=0.0000% blob=0px(0.0000%)x0 band=0.478..0.922
+CENSUS[OWE/unpinned/live] tier=high dpr=1 draws=62 tris=55069 el=-30.791° state=night roadMixN=1 roads=0 bldg=0 fade=0 houseLights=0 glow=0 emissive=4(noMap 0) agl=500
+METRIC[OWE/unpinned/live] lit=20.623% warm=0.0%-of-lit dark=78.5% p5/p50/p95=2/5/76 mean=17.53 white=0.0000% blob=0px(0.0000%)x0 band=0.45..1
+CENSUS[BB/unpinned/live] tier=high dpr=1 draws=57 tris=58111 el=-26.853° state=night roadMixN=1 roads=0 bldg=0 fade=0 houseLights=0 glow=28 emissive=4(noMap 0) agl=300
+METRIC[BB/unpinned/live] lit=12.585% warm=2.8%-of-lit dark=68.5% p5/p50/p95=3/5/65 mean=17.26 white=0.0000% blob=0px(0.0000%)x0 band=0.5..0.98
+FAILED: locator.screenshot: Target page, context or browser has been closed
+Call log:
+[2m  - taking element screenshot[22m
+[2m  - waiting for fonts to load...[22m
+[2m  - fonts loaded[22m
+[2m  - attempting scroll into view action[22m
+[2m    - waiting for element to be stable[22m
+
+    at leg (/home/user/skyloom/.claude/worktrees/agent-a6dfcf7c429823558/scripts/verify-night-alive.js:471:69)
+    at async /home/user/skyloom/.claude/worktrees/agent-a6dfcf7c429823558/scripts/verify-night-alive.js:553:19
+
+--- TERMINATED BY C (R23) ---
+R23_FORCE_GATES exercise run: page 1 completed all four legs, then stalled ~12
+minutes on the page-2 boot and was killed. The gate block (18 of 19 assertions)
+remains UNEXECUTED. See scripts/r23-close-sweep.md 4e.

@@ -1,0 +1,37 @@
+MANHATTAN NIGHT: {"roads":{"chunks":8,"ready":0,"empty":0,"queued":10,"building":2,"draping":0,"ringOn":true,"night":{"street5":0.24,"street6":0.34,"daySeam":0.14},"cacheKey":"world-bend-road-satnight-r19","emptyByReason":{"noData":0,"zero":0,"legacy":0},"errorRetries":18,"evictions":0,"heals":0},"mix":{"night":1,"day":0},"sunFrac":0,"hdri":"night","beacons":{"placed":2,"nightK":1,"on":true},"glow":26,"draws":0,"toyBuilt":false,"eyeAgl":792}
+PASS sun pinned to night (road night mix ≈ 1) — mix={"night":1,"day":0} frac=0 hdri=night
+FAIL road chunks stream in satellite (ready ≥ 3) — ready=0 chunks=8
+PASS road stats reported (__flyStats.satRoads)
+PASS toy pipeline NEVER built in satellite (verify-round11 gate A)
+PASS eye AGL is the low-AGL worst case (~2.6k ft) — agl=792
+AB[roads@night]: {"tag":"roads@night","mean":1.265895241171404,"noise":0.7260911929371232,"sparks":54,"noiseSparks":478,"px":619200,"onDraws":133,"offDraws":133,"layerDraws":0}
+ROAD CENSUS @night: {"meshes":0,"visible":0,"ready":0,"mats":[],"mix":{"night":1,"day":0}}
+PASS night road pixel probe (informational) — Δ=1.27/255 noise=0.73 corrected=0.54
+FAIL night roads draw measurably (layer Δ ≥ 1) — layerΔ=0 (133→133)
+FAIL total draws ≤ 375 at Manhattan night 2.6k ft — draws=0
+MANHATTAN NOON: {"roads":{"chunks":16,"ready":0,"empty":16,"queued":0,"building":0,"draping":0,"ringOn":true,"night":{"street5":0.24,"street6":0.34,"daySeam":0.14},"cacheKey":"world-bend-road-satnight-r19","emptyByReason":{"noData":16,"zero":0,"legacy":0},"errorRetries":80,"evictions":0,"heals":0},"mix":{"night":0,"day":1},"sunFrac":1,"hdri":"day","draws":133}
+PASS sun pinned to noon (road day mix ≈ 1) — mix={"night":0,"day":1} frac=1 hdri=day
+AB[roads@noon]: {"tag":"roads@noon","mean":2.249040159345392,"noise":1.5936918604651162,"sparks":10875,"noiseSparks":5558,"px":619200,"onDraws":133,"offDraws":133,"layerDraws":0}
+PASS daylight roads are near-invisible (corrected Δ < 1.2/255) — Δ=2.25 noise=1.59 corrected=0.66
+WARN night vs day pixel ratio (informational) — night=0.54 day=0.66
+WARN night network net sparks (informational) — sparks=54 noiseSparks=478
+ROAD CENSUS @noon: {"meshes":0,"visible":0,"ready":0,"mats":[],"mix":{"night":0,"day":1}}
+FAIL SUN DRIVES UNIFORMS ONLY — same meshes, same material, only the uniform moved — night 0/0 meshes ready=0 · noon 0/0 meshes ready=0 · materials 0/0 same=true · uRoadNight 1→0
+retired instrument (informational): layerDraws night=0 day=0 · scene totals night 133/133 day 133/133 · road chunk totals night=0 noon=0
+(E) PARKED — {"tracked":30,"added":30,"siblings":14,"clouds":true,"cirrus":true,"traffic":true,"tracers":true,"beacons":true,"skyline":true,"glow":true,"letters":10}
+FADE @2000: {"ready":0,"ringOn":true,"fade":1,"agl":2000}
+FAIL buildings solid below the fade band (ready ≥ 3, fade == 1) — {"ready":0,"ringOn":true,"fade":1,"agl":2000}
+(E) re-park before abSolid — {"tracked":30,"added":0,"siblings":14,"clouds":true,"cirrus":true,"traffic":true,"tracers":true,"beacons":true,"skyline":true,"glow":true,"letters":10}
+AB[buildings@2000]: {"tag":"buildings@2000","mean":0.497838608957795,"noise":0.31801087424633934,"sparks":0,"noiseSparks":0,"px":619200,"onDraws":102,"offDraws":102,"layerDraws":0}
+FADE @2700: {"ready":0,"ringOn":true,"fade":0.5001908144255611,"agl":2700}
+FAIL ring ALIVE past the old R13 evict altitude (ready ≥ 3 at 2700 m) — {"ready":0,"ringOn":true,"fade":0.5001908144255611,"agl":2700}
+PASS cull fade is mid-dissolve at 2700 m (0 < fade < 1) — fade=0.5001908144255611
+FADE @3100: {"ready":0,"fade":0,"agl":3100}
+FAIL fully dithered away by 3100 m (fade ≈ 0, chunks still resident) — {"ready":0,"fade":0,"agl":3100}
+
+--- TERMINATED BY C (R23), not a completed run ---
+Killed after the (E) climb block. The run had already produced the full blockade
+signature recorded in scripts/r23-close-sweep.md 4c, and the remaining legs
+(JFK / cruise / kill-switch) can add nothing on a world with no tiles. It was
+stalled in the (E) quiescence loop and would otherwise have hit its own 25-minute
+wall-clock timeout. Recorded as TERMINATED, never as PASS or FAIL.

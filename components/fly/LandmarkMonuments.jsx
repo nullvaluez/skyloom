@@ -1,4 +1,7 @@
 'use client';
+import { MeshStandardMaterial } from 'three';
+import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
+import { MONUMENT_MANIFEST } from '@/lib/fly/monument-models';
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -69,7 +72,8 @@ const HALO_POOL = ARCH_COUNT * LANDMARKS_3D.poolPerArchetype;
  * FlyScene keys this component by mapStyle, so a style switch is a clean
  * remount — materials never hot-swap mid-life.
  */
-export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyle }) {
+export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyle, runtime }) {
+  const cinematic = mapStyle === 'satellite' && satelliteVisualsOn('models');
   const isToy = mapStyle !== 'satellite';
   const haloOpacity = isToy
     ? LANDMARKS_3D.haloOpacity
@@ -106,6 +110,10 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
     return new SphereGeometry(1, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2);
   }, [isToy]);
   const material = useMemo(() => {
+    if (cinematic) {
+      const m = new MeshStandardMaterial({vertexColors:true,color:LANDMARKS_3D.satStyle.color,roughness:0.82,metalness:0.05,envMapIntensity:0.6});
+      applyBendAnchor(m); return m;
+    }
     if (!isToy) {
       // Round 13 (P4) satStyle v2: a two-tone STONE toon ramp (was a flat
       // Lambert tint that read as near-invisible clay). The day sun/hemi shade
@@ -243,6 +251,12 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
       if (!mesh) continue;
       let n = 0;
       for (const poi of sites.get(arch)) {
+        // A mapped architectural footprint is a better representation than a generic
+        // marker tower. Real model fallbacks keep their existing suppression contract.
+        if (cinematic && ['spire','crownTower','tower'].includes(poi.lm) && !MONUMENT_MANIFEST.some(m => m.poi === poi.name)) {
+          const mapped = runtime?.satBuildings?.queryColumns(poi.wx, poi.wz, 30) ?? [];
+          if (mapped.some(c => Math.hypot(c.x-poi.wx,c.z-poi.wz) < Math.min(c.r,45))) continue;
+        }
         if (n >= LANDMARKS_3D.poolPerArchetype) break;
         const d = Math.hypot(poi.wx - px, poi.wz - pz);
         if (d > LANDMARKS_3D.maxRangeM) continue;

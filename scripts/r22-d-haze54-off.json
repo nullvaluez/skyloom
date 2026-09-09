@@ -1,0 +1,22 @@
+{
+  "tag": "off",
+  "poses": {
+    "manhattan": {
+      "luma": 144.48,
+      "haze": null,
+      "tier": "medium",
+      "draws": 199,
+      "tris": 614587,
+      "agl": 1382
+    },
+    "lewis": {
+      "luma": 148.34,
+      "haze": null,
+      "tier": "medium",
+      "draws": 211,
+      "tris": 238929,
+      "agl": 437
+    }
+  },
+  "pageerrors": []
+}

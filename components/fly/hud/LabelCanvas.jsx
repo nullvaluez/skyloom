@@ -10,6 +10,7 @@ import { isPhoneClass } from '@/lib/fly/device-class';
 import { airDrop, bendDrop, getBend } from '@/lib/fly/toy-world/world-bend';
 import { pinned } from '@/lib/fly/fly-pins';
 import { useFlyStore } from '@/stores/fly-store';
+import { satelliteVisualsOn, SATELLITE_VISUALS } from '@/lib/fly/satellite-visuals';
 
 const _v = new Vector3();
 const _sample = new Vector3();
@@ -326,6 +327,9 @@ export function LabelCanvas({ runtime }) {
       hits.length = 0;
       const { k: bendK } = getBend(); // labels stick to the BENT positions
       let labeled = 0;
+      const labelState = useFlyStore.getState();
+      const quiet = labelState.mapStyle === 'satellite' && satelliteVisualsOn('presentation');
+      const labelLimit = quiet ? SATELLITE_VISUALS.presentation.trafficLabels : TRAFFIC.maxLabels;
 
       for (const it of items) {
         if (it.distM < LABELS.minDistM) continue;
@@ -352,9 +356,10 @@ export function LabelCanvas({ runtime }) {
         const hit = { hex: it.hex, sx, sy, name: it.meta?.flight || it.meta?.r || it.hex.toUpperCase(), rect: null };
         hits.push(hit);
 
-        if (labeled >= TRAFFIC.maxLabels) continue; // pick-only beyond the label set
+        const important = quiet && (it.hex === labelState.lockedHex || it.hex === labelState.inspectHex || it.hex === runtime.hoverHex);
+        if (labeled >= labelLimit && !important) continue; // all tracks stay pickable
         const cell = `${Math.round(sx / LABELS.cellW)}:${Math.round(sy / LABELS.cellH)}`;
-        if (grid.has(cell)) continue;
+        if (grid.has(cell) && !important) continue;
         grid.add(cell);
         labeled += 1;
 

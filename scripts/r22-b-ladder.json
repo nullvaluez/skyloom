@@ -1,0 +1,98 @@
+[
+  {
+    "on": false,
+    "dpr1": [
+      {
+        "dpr": 1,
+        "tier": "high"
+      },
+      {
+        "dpr": 1,
+        "tier": "medium"
+      },
+      {
+        "dpr": 1,
+        "tier": "low"
+      }
+    ],
+    "dpr15": [
+      {
+        "dpr": 1.5,
+        "tier": "high"
+      },
+      {
+        "dpr": 1.25,
+        "tier": "high"
+      },
+      {
+        "dpr": 1,
+        "tier": "high"
+      },
+      {
+        "dpr": 1,
+        "tier": "medium"
+      },
+      {
+        "dpr": 1,
+        "tier": "low"
+      }
+    ],
+    "devicePixelRatio": 1
+  },
+  {
+    "on": true,
+    "dpr1": [
+      {
+        "dpr": 1,
+        "tier": "high"
+      },
+      {
+        "dpr": 0.875,
+        "tier": "high"
+      },
+      {
+        "dpr": 0.75,
+        "tier": "high"
+      },
+      {
+        "dpr": 0.75,
+        "tier": "medium"
+      },
+      {
+        "dpr": 0.75,
+        "tier": "low"
+      }
+    ],
+    "dpr15": [
+      {
+        "dpr": 1.5,
+        "tier": "high"
+      },
+      {
+        "dpr": 1.25,
+        "tier": "high"
+      },
+      {
+        "dpr": 1,
+        "tier": "high"
+      },
+      {
+        "dpr": 0.875,
+        "tier": "high"
+      },
+      {
+        "dpr": 0.75,
+        "tier": "high"
+      },
+      {
+        "dpr": 0.75,
+        "tier": "medium"
+      },
+      {
+        "dpr": 0.75,
+        "tier": "low"
+      }
+    ],
+    "devicePixelRatio": 1
+  }
+]

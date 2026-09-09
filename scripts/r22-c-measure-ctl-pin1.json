@@ -1,0 +1,554 @@
+{
+  "pin": "1",
+  "poses": {
+    "lewis": {
+      "draws": 195,
+      "tris": 327181,
+      "clutter": {
+        "parked": 0,
+        "movers": 0,
+        "poles": 0,
+        "anchors": 0,
+        "colSuppressed": 0,
+        "dupSuppressed": 0,
+        "juncSuppressed": 0,
+        "realCols": 0,
+        "nightK": 0,
+        "pools": {
+          "parked": 0,
+          "moving": 0,
+          "poles": 0
+        },
+        "draws": 0,
+        "tris": 0,
+        "trisPerInstance": {
+          "car": 22,
+          "mover": 22,
+          "pole": 20
+        },
+        "stream": {
+          "chunks": 6,
+          "ready": 6,
+          "empty": 0,
+          "queued": 0,
+          "building": 0,
+          "sampling": 0,
+          "ringOn": true,
+          "parked": false,
+          "parkPts": 11369,
+          "paths": 897,
+          "pathPts": 5509,
+          "junctions": 151,
+          "emptyByReason": {
+            "noData": 0,
+            "zero": 0,
+            "legacy": 0
+          },
+          "errorRetries": 0,
+          "evictions": 6,
+          "heals": 13
+        }
+      },
+      "contract": {
+        "parked": {
+          "count": 0,
+          "tris": 0,
+          "anchors": 0
+        },
+        "moving": {
+          "count": 0,
+          "tris": 0,
+          "anchors": 0
+        },
+        "poles": {
+          "count": 0,
+          "tris": 0,
+          "anchors": 0
+        },
+        "baseDraws": 195,
+        "draws": 0,
+        "trisPerInstance": {
+          "car": 22,
+          "mover": 22,
+          "pole": 20
+        }
+      },
+      "treeGeo": {
+        "tris": 42,
+        "bboxY": [
+          -1,
+          1
+        ],
+        "bboxX": [
+          -1,
+          0.901
+        ],
+        "hasColor": false
+      },
+      "veg": {
+        "placed": 616,
+        "pool": 5000,
+        "altK": 1,
+        "ready": 9,
+        "vegPts": 3370,
+        "byClass": [
+          0,
+          0,
+          209,
+          10,
+          397,
+          0,
+          0,
+          0
+        ]
+      },
+      "parcel": {
+        "placed": 327,
+        "anchors": 72,
+        "suppressed": 0,
+        "pool": 5000,
+        "altK": 1,
+        "nightK": 0,
+        "realCols": 315,
+        "meanScalar": 0.5114245181702343,
+        "meanDens": 5.715901441206576,
+        "maxDens": 261.31481133669826,
+        "regionalDens": 300.1037286444894,
+        "regK": 0.5159617279927591,
+        "regKRaw": 0.5159617279927591,
+        "settled": true,
+        "held": false,
+        "provisional": false,
+        "zeroPasses": 0,
+        "tris": 10464
+      },
+      "agl": 120.43922762801543,
+      "hashes": {
+        "parked": {
+          "n": 0,
+          "h": "0"
+        },
+        "movers": {
+          "n": 0,
+          "h": "0"
+        },
+        "poles": {
+          "n": 0,
+          "h": "0"
+        }
+      }
+    },
+    "powell": {
+      "draws": 202,
+      "tris": 368892,
+      "clutter": {
+        "parked": 0,
+        "movers": 0,
+        "poles": 0,
+        "anchors": 0,
+        "colSuppressed": 0,
+        "dupSuppressed": 0,
+        "juncSuppressed": 0,
+        "realCols": 0,
+        "nightK": 0,
+        "pools": {
+          "parked": 0,
+          "moving": 0,
+          "poles": 0
+        },
+        "draws": 0,
+        "tris": 0,
+        "trisPerInstance": {
+          "car": 22,
+          "mover": 22,
+          "pole": 20
+        },
+        "stream": {
+          "chunks": 6,
+          "ready": 6,
+          "empty": 0,
+          "queued": 0,
+          "building": 0,
+          "sampling": 0,
+          "ringOn": true,
+          "parked": false,
+          "parkPts": 13644,
+          "paths": 1539,
+          "pathPts": 9242,
+          "junctions": 237,
+          "emptyByReason": {
+            "noData": 0,
+            "zero": 0,
+            "legacy": 0
+          },
+          "errorRetries": 0,
+          "evictions": 12,
+          "heals": 19
+        }
+      },
+      "contract": {
+        "parked": {
+          "count": 0,
+          "tris": 0,
+          "anchors": 0
+        },
+        "moving": {
+          "count": 0,
+          "tris": 0,
+          "anchors": 0
+        },
+        "poles": {
+          "count": 0,
+          "tris": 0,
+          "anchors": 0
+        },
+        "baseDraws": 202,
+        "draws": 0,
+        "trisPerInstance": {
+          "car": 22,
+          "mover": 22,
+          "pole": 20
+        }
+      },
+      "treeGeo": {
+        "tris": 42,
+        "bboxY": [
+          -1,
+          1
+        ],
+        "bboxX": [
+          -1,
+          0.901
+        ],
+        "hasColor": false
+      },
+      "veg": {
+        "placed": 740,
+        "pool": 5000,
+        "altK": 1,
+        "ready": 8,
+        "vegPts": 2663,
+        "byClass": [
+          0,
+          0,
+          144,
+          369,
+          227,
+          0,
+          0,
+          0
+        ]
+      },
+      "parcel": {
+        "placed": 0,
+        "anchors": 43,
+        "suppressed": 43,
+        "pool": 5000,
+        "altK": 1,
+        "nightK": 0,
+        "realCols": 738,
+        "meanScalar": 0,
+        "meanDens": 47.81003493395065,
+        "maxDens": 181.8029453139789,
+        "regionalDens": 1175.5345013498143,
+        "regK": 0,
+        "regKRaw": 0,
+        "settled": true,
+        "held": false,
+        "provisional": false,
+        "zeroPasses": 0,
+        "tris": 0
+      },
+      "agl": 260.09181382182163,
+      "hashes": {
+        "parked": {
+          "n": 0,
+          "h": "0"
+        },
+        "movers": {
+          "n": 0,
+          "h": "0"
+        },
+        "poles": {
+          "n": 0,
+          "h": "0"
+        }
+      }
+    },
+    "owens": {
+      "draws": 179,
+      "tris": 230286,
+      "clutter": {
+        "parked": 0,
+        "movers": 0,
+        "poles": 0,
+        "anchors": 0,
+        "colSuppressed": 0,
+        "dupSuppressed": 0,
+        "juncSuppressed": 0,
+        "realCols": 0,
+        "nightK": 0,
+        "pools": {
+          "parked": 0,
+          "moving": 0,
+          "poles": 0
+        },
+        "draws": 0,
+        "tris": 0,
+        "trisPerInstance": {
+          "car": 22,
+          "mover": 22,
+          "pole": 20
+        },
+        "stream": {
+          "chunks": 6,
+          "ready": 0,
+          "empty": 6,
+          "queued": 0,
+          "building": 0,
+          "sampling": 0,
+          "ringOn": true,
+          "parked": false,
+          "parkPts": 0,
+          "paths": 0,
+          "pathPts": 0,
+          "junctions": 0,
+          "emptyByReason": {
+            "noData": 0,
+            "zero": 6,
+            "legacy": 0
+          },
+          "errorRetries": 0,
+          "evictions": 19,
+          "heals": 19
+        }
+      },
+      "contract": {
+        "parked": {
+          "count": 0,
+          "tris": 0,
+          "anchors": 0
+        },
+        "moving": {
+          "count": 0,
+          "tris": 0,
+          "anchors": 0
+        },
+        "poles": {
+          "count": 0,
+          "tris": 0,
+          "anchors": 0
+        },
+        "baseDraws": 179,
+        "draws": 0,
+        "trisPerInstance": {
+          "car": 22,
+          "mover": 22,
+          "pole": 20
+        }
+      },
+      "treeGeo": {
+        "tris": 42,
+        "bboxY": [
+          -1,
+          1
+        ],
+        "bboxX": [
+          -1,
+          0.901
+        ],
+        "hasColor": false
+      },
+      "veg": {
+        "placed": 961,
+        "pool": 5000,
+        "altK": 1,
+        "ready": 9,
+        "vegPts": 3511,
+        "byClass": [
+          0,
+          243,
+          37,
+          544,
+          137,
+          0,
+          0,
+          0
+        ]
+      },
+      "parcel": {
+        "placed": 0,
+        "anchors": 69,
+        "suppressed": 69,
+        "pool": 5000,
+        "altK": 1,
+        "nightK": 0,
+        "realCols": 982,
+        "meanScalar": 0,
+        "meanDens": 120.92713394929318,
+        "maxDens": 423.40601248915567,
+        "regionalDens": 883.4300228319868,
+        "regK": 0,
+        "regKRaw": 0,
+        "settled": true,
+        "held": false,
+        "provisional": false,
+        "zeroPasses": 0,
+        "tris": 0
+      },
+      "agl": 500.0513291734678,
+      "hashes": {
+        "parked": {
+          "n": 0,
+          "h": "0"
+        },
+        "movers": {
+          "n": 0,
+          "h": "0"
+        },
+        "poles": {
+          "n": 0,
+          "h": "0"
+        }
+      }
+    },
+    "manhattan": {
+      "draws": 189,
+      "tris": 846555,
+      "clutter": {
+        "parked": 0,
+        "movers": 0,
+        "poles": 0,
+        "anchors": 0,
+        "colSuppressed": 0,
+        "dupSuppressed": 0,
+        "juncSuppressed": 0,
+        "realCols": 0,
+        "nightK": 0,
+        "pools": {
+          "parked": 0,
+          "moving": 0,
+          "poles": 0
+        },
+        "draws": 0,
+        "tris": 0,
+        "trisPerInstance": {
+          "car": 22,
+          "mover": 22,
+          "pole": 20
+        },
+        "stream": {
+          "chunks": 6,
+          "ready": 6,
+          "empty": 0,
+          "queued": 0,
+          "building": 0,
+          "sampling": 0,
+          "ringOn": true,
+          "parked": false,
+          "parkPts": 11015,
+          "paths": 4198,
+          "pathPts": 11357,
+          "junctions": 2233,
+          "emptyByReason": {
+            "noData": 0,
+            "zero": 0,
+            "legacy": 0
+          },
+          "errorRetries": 0,
+          "evictions": 26,
+          "heals": 27
+        }
+      },
+      "contract": {
+        "parked": {
+          "count": 0,
+          "tris": 0,
+          "anchors": 0
+        },
+        "moving": {
+          "count": 0,
+          "tris": 0,
+          "anchors": 0
+        },
+        "poles": {
+          "count": 0,
+          "tris": 0,
+          "anchors": 0
+        },
+        "baseDraws": 189,
+        "draws": 0,
+        "trisPerInstance": {
+          "car": 22,
+          "mover": 22,
+          "pole": 20
+        }
+      },
+      "treeGeo": {
+        "tris": 42,
+        "bboxY": [
+          -1,
+          1
+        ],
+        "bboxX": [
+          -1,
+          0.901
+        ],
+        "hasColor": false
+      },
+      "veg": {
+        "placed": 870,
+        "pool": 5000,
+        "altK": 1,
+        "ready": 9,
+        "vegPts": 2655,
+        "byClass": [
+          0,
+          221,
+          22,
+          615,
+          12,
+          0,
+          0,
+          0
+        ]
+      },
+      "parcel": {
+        "placed": 0,
+        "anchors": 4,
+        "suppressed": 4,
+        "pool": 5000,
+        "altK": 1,
+        "nightK": 0,
+        "realCols": 3388,
+        "meanScalar": 0,
+        "meanDens": 359.6656652082453,
+        "maxDens": 385.79841289403186,
+        "regionalDens": 59059.886792241414,
+        "regK": 0,
+        "regKRaw": 0,
+        "settled": true,
+        "held": false,
+        "provisional": false,
+        "zeroPasses": 0,
+        "tris": 0
+      },
+      "agl": 400.0099963377781,
+      "hashes": {
+        "parked": {
+          "n": 0,
+          "h": "0"
+        },
+        "movers": {
+          "n": 0,
+          "h": "0"
+        },
+        "poles": {
+          "n": 0,
+          "h": "0"
+        }
+      }
+    }
+  },
+  "errs": []
+}

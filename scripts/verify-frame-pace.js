@@ -42,6 +42,23 @@ const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
 const { attachPageErrors } = require('./_pageerrors');
 
+// A missing photographic world cannot certify a visual or loaded-world gate.
+async function requireResidentWorld(page, browser, label) {
+  const state = await page.evaluate(() => {
+    const rt = window.__fly;
+    const hit = rt?.engine?.getGroundInfoAtWorld?.(rt.flight.pos);
+    const material = hit?.object?.material;
+    const materials = Array.isArray(material) ? material : [material];
+    return { imagery: !!hit && materials.length > 0 && materials.every(m => m?.map?.image && !m.userData?.flyError),
+      buildings: (rt?.satBuildings ?? window.__satBuildings)?.stats?.ready ?? 0 };
+  });
+  if (!state.imagery || state.buildings < 1) {
+    await require('./_world-precondition').exitBlocked(JSON.stringify(state),
+      { browser, label: label + ': resident imagery/buildings unavailable; bounds not graded' });
+  }
+}
+
+
 const POWELL = [40.1578, -83.0752, 900, 1.9, -0.3];
 const STRICT = process.env.FRAME_PACE_STRICT === '1';
 const RUN_MS = Number(process.env.PACE_RUN_MS || 90000);
@@ -181,6 +198,20 @@ async function serpentine(page, ms) {
     POWELL
   );
   await page.waitForTimeout(SETTLE);
+  await requireResidentWorld(page, browser, 'verify-frame-pace.js');
+  if (STRICT) {
+    const renderer = await page.evaluate(() => {
+      const gl = document.createElement('canvas').getContext('webgl2');
+      const ext = gl?.getExtension('WEBGL_debug_renderer_info');
+      const name = ext && gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
+      gl?.getExtension('WEBGL_lose_context')?.loseContext();
+      return name;
+    });
+    if (!renderer || /swiftshader|software|llvmpipe/i.test(renderer)) {
+      await require('./_world-precondition').exitBlocked(String(renderer),
+        { browser, label: 'Strict pacing requires hardware WebGL; performance bounds not graded' });
+    }
+  }
 
   const present = await page.evaluate(() => ({
     has: typeof window.__flyStats?.frame?.sample === 'function',

@@ -5,9 +5,10 @@
 > **The copy landed BYTE-VERBATIM** (except the ONE import rewrite recorded
 > below) in its own commit, `b64457b`, so `git` holds a permanent verbatim
 > baseline that every later patch is diffed against. Patches are listed in the
-> PATCH LEDGER at the bottom; `scripts/verify-vendor-three-tile.mjs` proves
-> both that the baseline is upstream and that the working copy differs from
-> the baseline ONLY inside marked patch hunks.
+> PATCH LEDGER below; `scripts/verify-vendor-three-tile.mjs` proves the
+> upstream baseline and the original marked-patch rules against immutable
+> main `0ff2a3f`. The reviewed graphics integration is separately checked
+> against [vendor-three-tile-integration.json](../../../../scripts/vendor-three-tile-integration.json).
 
 ## What was vendored
 
@@ -238,8 +239,8 @@ minified blob in `index.js` is never hand-edited.
 
 ## How this is verified
 
-`node scripts/verify-vendor-three-tile.mjs` (runs anywhere, no browser, no
-network, 18 assertions):
+`node scripts/verify-vendor-three-tile.mjs` (installed project dependencies,
+no browser or network, 34 assertions):
 
 1. **The baseline is upstream.** It hashes `index.js` and `plugin.js` *as of
    commit `b64457b`* (`git show`) and compares them to the recorded upstream
@@ -249,19 +250,52 @@ network, 18 assertions):
    also does the real line-by-line diff and asserts plugin.js differed on
    exactly line 2; afterwards it asserts line 2 carries the rewritten import.
    It always prints which leg it ran.
-3. **No unmarked edits.** `git diff -U0 b64457b` over both files: every hunk
-   must contain an added line mentioning `R24`, i.e. every edit sits in a
-   marked patch. The count of upstream lines *replaced* rather than left
-   verbatim is compared to the number this ledger declares (today: 1 — the
-   `_getDistRatio()` signature).
+3. **Historical patch proof, then integration proof.** `git diff -U0 b64457b
+   0ff2a3f` over both files retains the original marked-hunk rule and the
+   unchanged allowance of two edited upstream signatures (`LOD` and
+   `_getDistRatio`). The current files must separately match the four
+   LF-normalized baseline/integration digests and the exact changed-function
+   inventory in `scripts/vendor-three-tile-integration.json`. That inventory is recomputed with
+   the installed Babel parser against immutable main; it is not a descriptive
+   list or a wider line-count allowance.
 4. **The import list is still `three` alone** (plus `./index.js` in the
    plugin), so the bundle can never start importing app code.
 5. **No second copy**: no source file imports the bare `three-tile` specifier;
-   exactly two files import the vendored path; `package.json`,
+   exactly two runtime files import the vendored path (Node fixtures are
+   excluded from that runtime count); `package.json`,
    `package-lock.json` and `next.config.mjs` are clean of it.
-6. **Markers and ledger agree** in both directions.
+6. **Markers and ledger agree.** All current markers retain their rows. Three
+   historical markers composed into the integration's rewritten methods
+   (A23, D6, D7) must exist in immutable main and map to the exact inventoried
+   methods. Other missing markers still fail.
+7. **The generated worker matches its readable source.** The builder's
+   `--check` normalizes physical CRLF and decoded worker-string CRLF to LF in
+   memory. Real source changes still fail; checking never rewrites app files.
 
 Behavioural proof of the patches themselves lives in
 `scripts/verify-terra-residency.mjs` (node, 18 assertions), which drives these
 Tile/TileMap classes with a synthetic camera path and a stub loader and reports
 refine / merge / refetch / on-screen-replacement counts per switch.
+
+## Satellite graphics integration (2026-09-09)
+
+The main renderer patch set above is retained. The parallel Motion Hold and graphics lineage is archived in [MOTION_HOLD_PATCHES.md](MOTION_HOLD_PATCHES.md). Both control surfaces remain exported. Main residency hysteresis and budget eviction take precedence; Motion Hold dwell does not defer a budget eviction. One saturated-tree walker serves both switches. Main worker skirts, normals, bounding-box cache, parking, timer and crossfade hooks remain intact.
+
+Additional merged sites: parallel imagery/DEM fetch, optional worker DEM error curve, cached image recovery with bounded material-only retries, failure-safe asynchronous tile lifecycle, and cancelled-merge child-index restoration. Merge completion rechecks the camera after an awaited crossfade and clears any unfinished borrowed texture blend before disposal. The reference skirt comparator bypasses both optimizations. Raster upload orientation remains in raster-cache.js.
+
+Validation belongs to the integrated tree; historical pass records are not certification of this merge. See GRAPHICS_OVERHAUL.md for the integration receipt.
+
+The integration receipt records compiled app source digest
+`d1e492cdefc5a70bba558080e6cd0b11acea77ff9d9470817ae8c65f4f242b1e` as
+provenance, not as a visual or performance verdict. The 24 changed/new functions
+in `index.js` are named and explained in `scripts/vendor-three-tile-integration.json`; `plugin.js`
+and both readable/generated skirt-worker files remain identical to main after
+physical newline normalization. Whole-file digests also cover module state,
+exports, and the inherited inline LERC `errTable` adaptation, which is not a
+top-level function in the AST inventory. Future vendor edits require a reviewed
+receipt update and focused regression evidence; there is no automatic refresh.
+
+The switch idiom and off-state text above describe the historical main patches.
+The integration composes those hooks with the separately documented Motion Hold
+lifecycle repairs; its safety claim rests on the named integration contracts and
+behavioral gates, not on pretending those repairs are insert-only upstream edits.

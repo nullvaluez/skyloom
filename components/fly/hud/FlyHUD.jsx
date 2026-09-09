@@ -1,4 +1,6 @@
 'use client';
+import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
+
 
 import { useEffect, useRef } from 'react';
 import { MPS_TO_KT, M_TO_FT, RAD2DEG } from '@/lib/fly/coords';
@@ -15,6 +17,8 @@ export function FlyHUD({ runtime }) {
   // invisible outside the pause menu, making "why does it look flat?"
   // undiagnosable mid-flight. Store-subscribed, so it is always current.
   const qualityTier = useFlyStore((s) => s.qualityTier);
+  const mapStyle = useFlyStore((s) => s.mapStyle);
+  const quiet = mapStyle === 'satellite' && satelliteVisualsOn('presentation');
   const { isTouch } = useDeviceLayout();
   const spdRef = useRef(null);
   const altRef = useRef(null);
@@ -198,7 +202,7 @@ export function FlyHUD({ runtime }) {
         </div>
       ) : (
         <div className="pointer-events-none absolute bottom-8 left-1/2 z-10 -translate-x-1/2 rounded bg-zinc-950/50 px-3 py-1 text-[11px] text-zinc-400">
-          Steer with the mouse · WASD/arrows · 1/2/3 speed · Shift boost · RMB look · click a plane (or T on a lock) to inspect &amp; warp · F intercept · P photo · Esc menu
+          {quiet ? 'M Atlas · L Logbook · Esc controls' : 'Steer with the mouse · WASD/arrows · 1/2/3 speed · Shift boost · RMB look · click a plane (or T on a lock) to inspect & warp · F intercept · P photo · Esc menu'}
           <span
             data-testid="hud-quality-tier"
             className="ml-2 font-mono text-[10px] uppercase tracking-widest text-zinc-500"

@@ -1,0 +1,553 @@
+{
+  "generated": "2026-08-07T17:54:04.382Z",
+  "imagery": {
+    "P-LEWIS": {
+      "16": {
+        "x": 17645,
+        "y": 24760,
+        "ok": true,
+        "status": 200,
+        "bytes": 15240,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      },
+      "17": {
+        "x": 35291,
+        "y": 49521,
+        "ok": true,
+        "status": 200,
+        "bytes": 12790,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      },
+      "18": {
+        "x": 70582,
+        "y": 99043,
+        "ok": true,
+        "status": 200,
+        "bytes": 13482,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      },
+      "19": {
+        "x": 141164,
+        "y": 198087,
+        "ok": true,
+        "status": 200,
+        "bytes": 12579,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      }
+    },
+    "P-DUBLIN": {
+      "16": {
+        "x": 17637,
+        "y": 24786,
+        "ok": true,
+        "status": 200,
+        "bytes": 24690,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      },
+      "17": {
+        "x": 35275,
+        "y": 49573,
+        "ok": true,
+        "status": 200,
+        "bytes": 26481,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      },
+      "18": {
+        "x": 70550,
+        "y": 99147,
+        "ok": true,
+        "status": 200,
+        "bytes": 27071,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      },
+      "19": {
+        "x": 141100,
+        "y": 198295,
+        "ok": true,
+        "status": 200,
+        "bytes": 19158,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      }
+    },
+    "OWENS": {
+      "16": {
+        "x": 11275,
+        "y": 25599,
+        "ok": true,
+        "status": 200,
+        "bytes": 19123,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      },
+      "17": {
+        "x": 22551,
+        "y": 51198,
+        "ok": true,
+        "status": 200,
+        "bytes": 19813,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      },
+      "18": {
+        "x": 45103,
+        "y": 102397,
+        "ok": true,
+        "status": 200,
+        "bytes": 16369,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      },
+      "19": {
+        "x": 90206,
+        "y": 204794,
+        "ok": true,
+        "status": 200,
+        "bytes": 14170,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      }
+    },
+    "MANHATTAN": {
+      "16": {
+        "x": 19299,
+        "y": 24629,
+        "ok": true,
+        "status": 200,
+        "bytes": 25718,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      },
+      "17": {
+        "x": 38598,
+        "y": 49258,
+        "ok": true,
+        "status": 200,
+        "bytes": 19803,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      },
+      "18": {
+        "x": 77197,
+        "y": 98517,
+        "ok": true,
+        "status": 200,
+        "bytes": 19129,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      },
+      "19": {
+        "x": 154394,
+        "y": 197035,
+        "ok": true,
+        "status": 200,
+        "bytes": 14971,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      }
+    },
+    "MELTON": {
+      "16": {
+        "x": 59088,
+        "y": 40183,
+        "ok": true,
+        "status": 200,
+        "bytes": 25335,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      },
+      "17": {
+        "x": 118177,
+        "y": 80367,
+        "ok": true,
+        "status": 200,
+        "bytes": 20820,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      },
+      "18": {
+        "x": 236354,
+        "y": 160735,
+        "ok": true,
+        "status": 200,
+        "bytes": 15509,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      },
+      "19": {
+        "x": 472708,
+        "y": 321471,
+        "ok": true,
+        "status": 200,
+        "bytes": 2521,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      }
+    },
+    "SIERRA": {
+      "16": {
+        "x": 11233,
+        "y": 25604,
+        "ok": true,
+        "status": 200,
+        "bytes": 17308,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      },
+      "17": {
+        "x": 22467,
+        "y": 51209,
+        "ok": true,
+        "status": 200,
+        "bytes": 13304,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      },
+      "18": {
+        "x": 44935,
+        "y": 102418,
+        "ok": true,
+        "status": 200,
+        "bytes": 10355,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      },
+      "19": {
+        "x": 89871,
+        "y": 204836,
+        "ok": true,
+        "status": 200,
+        "bytes": 6494,
+        "contentType": "image/jpeg",
+        "kind": "jpeg"
+      }
+    }
+  },
+  "dem": {
+    "P-LEWIS": {
+      "13": {
+        "x": 2205,
+        "y": 3095,
+        "ok": true,
+        "status": 200,
+        "bytes": 43861,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "14": {
+        "x": 4411,
+        "y": 6190,
+        "ok": true,
+        "status": 200,
+        "bytes": 43041,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "15": {
+        "x": 8822,
+        "y": 12380,
+        "ok": true,
+        "status": 200,
+        "bytes": 35003,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "16": {
+        "x": 17645,
+        "y": 24760,
+        "ok": true,
+        "status": 200,
+        "bytes": 32051,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "17": {
+        "x": 35291,
+        "y": 49521,
+        "ok": true,
+        "status": 200,
+        "bytes": 67,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI",
+        "body": "CntZImage \u000b\u0000\u0000\u0000\b\u0000\u0000\u0000\u0001\u0001\u0000\u0000\u0001\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002"
+      }
+    },
+    "P-DUBLIN": {
+      "13": {
+        "x": 2204,
+        "y": 3098,
+        "ok": true,
+        "status": 200,
+        "bytes": 44323,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "14": {
+        "x": 4409,
+        "y": 6196,
+        "ok": true,
+        "status": 200,
+        "bytes": 42554,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "15": {
+        "x": 8818,
+        "y": 12393,
+        "ok": true,
+        "status": 200,
+        "bytes": 36100,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "16": {
+        "x": 17637,
+        "y": 24786,
+        "ok": true,
+        "status": 200,
+        "bytes": 32131,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "17": {
+        "x": 35275,
+        "y": 49573,
+        "ok": true,
+        "status": 200,
+        "bytes": 67,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI",
+        "body": "CntZImage \u000b\u0000\u0000\u0000\b\u0000\u0000\u0000\u0001\u0001\u0000\u0000\u0001\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002"
+      }
+    },
+    "OWENS": {
+      "13": {
+        "x": 1409,
+        "y": 3199,
+        "ok": true,
+        "status": 200,
+        "bytes": 42960,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "14": {
+        "x": 2818,
+        "y": 6399,
+        "ok": true,
+        "status": 200,
+        "bytes": 41629,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "15": {
+        "x": 5637,
+        "y": 12799,
+        "ok": true,
+        "status": 200,
+        "bytes": 28259,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "16": {
+        "x": 11275,
+        "y": 25599,
+        "ok": true,
+        "status": 200,
+        "bytes": 20246,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "17": {
+        "x": 22551,
+        "y": 51198,
+        "ok": true,
+        "status": 200,
+        "bytes": 67,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI",
+        "body": "CntZImage \u000b\u0000\u0000\u0000\b\u0000\u0000\u0000\u0001\u0001\u0000\u0000\u0001\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002"
+      }
+    },
+    "MANHATTAN": {
+      "13": {
+        "x": 2412,
+        "y": 3078,
+        "ok": true,
+        "status": 200,
+        "bytes": 42961,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "14": {
+        "x": 4824,
+        "y": 6157,
+        "ok": true,
+        "status": 200,
+        "bytes": 39185,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "15": {
+        "x": 9649,
+        "y": 12314,
+        "ok": true,
+        "status": 200,
+        "bytes": 31488,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "16": {
+        "x": 19299,
+        "y": 24629,
+        "ok": true,
+        "status": 200,
+        "bytes": 23773,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "17": {
+        "x": 38598,
+        "y": 49258,
+        "ok": true,
+        "status": 200,
+        "bytes": 67,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI",
+        "body": "CntZImage \u000b\u0000\u0000\u0000\b\u0000\u0000\u0000\u0001\u0001\u0000\u0000\u0001\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002"
+      }
+    },
+    "MELTON": {
+      "13": {
+        "x": 7386,
+        "y": 5022,
+        "ok": true,
+        "status": 200,
+        "bytes": 39143,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "14": {
+        "x": 14772,
+        "y": 10045,
+        "ok": true,
+        "status": 200,
+        "bytes": 35923,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "15": {
+        "x": 29544,
+        "y": 20091,
+        "ok": true,
+        "status": 200,
+        "bytes": 29409,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "16": {
+        "x": 59088,
+        "y": 40183,
+        "ok": true,
+        "status": 200,
+        "bytes": 20830,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "17": {
+        "x": 118177,
+        "y": 80367,
+        "ok": true,
+        "status": 200,
+        "bytes": 67,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI",
+        "body": "CntZImage \u000b\u0000\u0000\u0000\b\u0000\u0000\u0000\u0001\u0001\u0000\u0000\u0001\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002"
+      }
+    },
+    "SIERRA": {
+      "13": {
+        "x": 1404,
+        "y": 3200,
+        "ok": true,
+        "status": 200,
+        "bytes": 82394,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "14": {
+        "x": 2808,
+        "y": 6401,
+        "ok": true,
+        "status": 200,
+        "bytes": 75171,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "15": {
+        "x": 5616,
+        "y": 12802,
+        "ok": true,
+        "status": 200,
+        "bytes": 70173,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "16": {
+        "x": 11233,
+        "y": 25604,
+        "ok": true,
+        "status": 200,
+        "bytes": 67796,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI"
+      },
+      "17": {
+        "x": 22467,
+        "y": 51209,
+        "ok": true,
+        "status": 200,
+        "bytes": 67,
+        "contentType": "application/octet-stream",
+        "kind": "lerc",
+        "head": "CntZI",
+        "body": "CntZImage \u000b\u0000\u0000\u0000\b\u0000\u0000\u0000\u0001\u0001\u0000\u0000\u0001\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0002"
+      }
+    }
+  }
+}

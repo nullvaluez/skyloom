@@ -1,0 +1,106 @@
+{
+  "mode": "quilt",
+  "tag": "quilt",
+  "families": [],
+  "bootMs": 9756,
+  "cfg": {
+    "style": "satellite",
+    "tier": "high",
+    "baseLod": 0.86,
+    "liveLod": 0.86,
+    "curveArmed": false,
+    "maxThreads": 10,
+    "steadyThreads": 10,
+    "maxLevel": 17,
+    "minLevel": 2,
+    "imgMaxLevel": 17,
+    "demMaxLevel": 15,
+    "imgDataType": "image",
+    "demDataType": "lerc",
+    "sizeZ0": 0,
+    "sharpOn": false,
+    "pipeOn": false,
+    "cacheOn": false,
+    "pinned": true
+  },
+  "runs": [],
+  "gradeOff": {
+    "desat": 0,
+    "flatten": 0
+  },
+  "gradeOn": {
+    "desat": 0.3492105283154554,
+    "flatten": 0.2494360916538967
+  },
+  "quiltOff": {
+    "sat": 0.085,
+    "luma": 150.4,
+    "lumaStd": 32.9
+  },
+  "quiltOn": {
+    "sat": 0.04,
+    "luma": 178.8,
+    "lumaStd": 32.5
+  },
+  "sweep": [
+    {
+      "k": 0.3,
+      "grade": {
+        "desat": 0.10476188837599068,
+        "flatten": 0.07482992026856478
+      },
+      "sat": 0.055,
+      "luma": 162.9,
+      "lumaStd": 29.3
+    },
+    {
+      "k": 0.5,
+      "grade": {
+        "desat": 0.17460111947527873,
+        "flatten": 0.12471508533948482
+      },
+      "sat": 0.046,
+      "luma": 168.8,
+      "lumaStd": 29.5
+    },
+    {
+      "k": 0.7,
+      "grade": {
+        "desat": 0.24443874111702005,
+        "flatten": 0.17459910079787147
+      },
+      "sat": 0.042,
+      "luma": 173.6,
+      "lumaStd": 30.6
+    }
+  ],
+  "zoomSeen": {
+    "img2": 8,
+    "img3": 18,
+    "img4": 24,
+    "img5": 27,
+    "dem5": 27,
+    "img6": 32,
+    "dem6": 33,
+    "img7": 44,
+    "dem7": 45,
+    "img8": 46,
+    "dem8": 46,
+    "img9": 40,
+    "dem9": 42,
+    "img10": 40,
+    "dem10": 41,
+    "img11": 32,
+    "dem11": 32,
+    "img12": 28,
+    "dem12": 29,
+    "img13": 24,
+    "dem13": 24,
+    "img14": 17,
+    "dem14": 17,
+    "img15": 26,
+    "dem15": 30,
+    "img16": 16
+  },
+  "pageerrors": []
+}

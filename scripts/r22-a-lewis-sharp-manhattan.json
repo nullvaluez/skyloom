@@ -1,0 +1,283 @@
+{
+  "mode": "lewis",
+  "tag": "sharp-manhattan",
+  "families": [
+    "sharp"
+  ],
+  "bootMs": 9876,
+  "cfg": {
+    "style": "satellite",
+    "tier": "high",
+    "baseLod": 0.86,
+    "liveLod": 0.86,
+    "curveArmed": true,
+    "maxThreads": 10,
+    "steadyThreads": 10,
+    "maxLevel": 18,
+    "minLevel": 2,
+    "imgMaxLevel": 18,
+    "demMaxLevel": 16,
+    "imgDataType": "image",
+    "demDataType": "lerc",
+    "sizeZ0": 0,
+    "sharpOn": true,
+    "pipeOn": false,
+    "cacheOn": false,
+    "pinned": true
+  },
+  "runs": [
+    {
+      "tMs": 2000,
+      "probeZ": 14,
+      "draws": 219,
+      "tris": 447061,
+      "terra": {
+        "camTileZ": 13,
+        "targetZ": 18,
+        "downloading": 8,
+        "sharp": false,
+        "aglM": 409,
+        "lodThreshold": 0.86,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 11420.09999999404
+      },
+      "rtTerra": {
+        "camTileZ": 13,
+        "targetZ": 18,
+        "downloading": 8,
+        "sharp": false,
+        "aglM": 409,
+        "lodThreshold": 0.86,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 11420.09999999404
+      },
+      "warp": null,
+      "cache": null,
+      "heapMB": 187
+    },
+    {
+      "tMs": 4000,
+      "probeZ": 17,
+      "draws": 235,
+      "tris": 747256,
+      "terra": {
+        "camTileZ": 14,
+        "targetZ": 18,
+        "downloading": 7,
+        "sharp": false,
+        "aglM": 391,
+        "lodThreshold": 0.86,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 13441
+      },
+      "rtTerra": {
+        "camTileZ": 14,
+        "targetZ": 18,
+        "downloading": 7,
+        "sharp": false,
+        "aglM": 391,
+        "lodThreshold": 0.86,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 13441
+      },
+      "warp": null,
+      "cache": null,
+      "heapMB": 224
+    },
+    {
+      "tMs": 6000,
+      "probeZ": 16,
+      "draws": 253,
+      "tris": 1018596,
+      "terra": {
+        "camTileZ": 16,
+        "targetZ": 18,
+        "downloading": 8,
+        "sharp": false,
+        "aglM": 387,
+        "lodThreshold": 0.86,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 15464.09999999404
+      },
+      "rtTerra": {
+        "camTileZ": 16,
+        "targetZ": 18,
+        "downloading": 8,
+        "sharp": false,
+        "aglM": 387,
+        "lodThreshold": 0.86,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 15464.09999999404
+      },
+      "warp": null,
+      "cache": null,
+      "heapMB": 200
+    },
+    {
+      "tMs": 8000,
+      "probeZ": 15,
+      "draws": 238,
+      "tris": 875800,
+      "terra": {
+        "camTileZ": 15,
+        "targetZ": 18,
+        "downloading": 0,
+        "sharp": true,
+        "aglM": 383,
+        "lodThreshold": 0.86,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 17470.29999999702
+      },
+      "rtTerra": {
+        "camTileZ": 15,
+        "targetZ": 18,
+        "downloading": 0,
+        "sharp": true,
+        "aglM": 383,
+        "lodThreshold": 0.86,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 17470.29999999702
+      },
+      "warp": null,
+      "cache": null,
+      "heapMB": 201
+    },
+    {
+      "tMs": 10000,
+      "probeZ": 16,
+      "draws": 239,
+      "tris": 878515,
+      "terra": {
+        "camTileZ": 16,
+        "targetZ": 18,
+        "downloading": 6,
+        "sharp": false,
+        "aglM": 384,
+        "lodThreshold": 0.86,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 19482.19999998808
+      },
+      "rtTerra": {
+        "camTileZ": 16,
+        "targetZ": 18,
+        "downloading": 6,
+        "sharp": false,
+        "aglM": 384,
+        "lodThreshold": 0.86,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 19482.19999998808
+      },
+      "warp": null,
+      "cache": null,
+      "heapMB": 191
+    },
+    {
+      "tMs": 15000,
+      "probeZ": 12,
+      "draws": 248,
+      "tris": 1119911,
+      "terra": {
+        "camTileZ": 16,
+        "targetZ": 18,
+        "downloading": 0,
+        "sharp": true,
+        "aglM": 391,
+        "lodThreshold": 0.86,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 21489.39999999106
+      },
+      "rtTerra": {
+        "camTileZ": 16,
+        "targetZ": 18,
+        "downloading": 0,
+        "sharp": true,
+        "aglM": 391,
+        "lodThreshold": 0.86,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 21489.39999999106
+      },
+      "warp": null,
+      "cache": null,
+      "heapMB": 189
+    },
+    {
+      "tMs": 25000,
+      "probeZ": 17,
+      "draws": 232,
+      "tris": 964764,
+      "terra": {
+        "camTileZ": 12,
+        "targetZ": 18,
+        "downloading": 0,
+        "sharp": false,
+        "aglM": 406,
+        "lodThreshold": 0.86,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 23500.09999999404
+      },
+      "rtTerra": {
+        "camTileZ": 12,
+        "targetZ": 18,
+        "downloading": 0,
+        "sharp": false,
+        "aglM": 406,
+        "lodThreshold": 0.86,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 23500.09999999404
+      },
+      "warp": null,
+      "cache": null,
+      "heapMB": 185
+    }
+  ],
+  "tex": {
+    "mb": 59,
+    "count": 176,
+    "maxAniso": 8
+  },
+  "zoomSeen": {
+    "img2": 8,
+    "img3": 18,
+    "img4": 29,
+    "img5": 25,
+    "dem5": 25,
+    "img6": 21,
+    "dem6": 21,
+    "img7": 25,
+    "dem7": 25,
+    "img8": 21,
+    "dem8": 21,
+    "img9": 21,
+    "dem9": 21,
+    "img10": 21,
+    "dem10": 22,
+    "img11": 25,
+    "dem11": 25,
+    "img12": 31,
+    "dem12": 32,
+    "img13": 36,
+    "dem13": 36,
+    "img14": 47,
+    "dem14": 47,
+    "img15": 50,
+    "dem15": 50,
+    "img16": 58,
+    "dem16": 98,
+    "img17": 60
+  },
+  "pageerrors": []
+}

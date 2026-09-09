@@ -1,0 +1,21 @@
+PASS DEPTH_PASS still ships OFF, so this gate's untouched depth pin == the ship state — source DEPTH_PASS.enabled=false (if this ever reads true, this harness must un-pin depth — see the header)
+INFO live-tier page booted in 59503 ms (tier NOT pinned)
+CENSUS[MAN/unpinned/live] tier=high dpr=1 draws=0 tris=0 el=-26.844° state=night roadMixN=1 roads=0 bldg=0 fade=0 houseLights=0 glow=26 emissive=4(noMap 0) agl=792
+METRIC[MAN/unpinned/live] lit=24.104% warm=0.0%-of-lit dark=73.6% p5/p50/p95=3/5/77 mean=19.47 white=0.0000% blob=0px(0.0000%)x0 band=0.55..0.98
+CENSUS[POW/unpinned/live] tier=high dpr=1 draws=58 tris=55693 el=-27.373° state=night roadMixN=1 roads=0 bldg=0 fade=0 houseLights=0 glow=40 emissive=4(noMap 0) agl=600
+METRIC[POW/unpinned/live] lit=0.000% warm=0.0%-of-lit dark=18.1% p5/p50/p95=6/12/21 mean=12.46 white=0.0000% blob=0px(0.0000%)x0 band=0.478..0.922
+CENSUS[OWE/unpinned/live] tier=high dpr=1 draws=54 tris=55005 el=-30.791° state=night roadMixN=1 roads=0 bldg=0 fade=0 houseLights=0 glow=0 emissive=4(noMap 0) agl=500
+METRIC[OWE/unpinned/live] lit=23.156% warm=0.0%-of-lit dark=75.3% p5/p50/p95=2/5/76 mean=18.86 white=0.0000% blob=0px(0.0000%)x0 band=0.45..1
+CENSUS[BB/unpinned/live] tier=high dpr=1 draws=54 tris=55005 el=-26.853° state=night roadMixN=1 roads=0 bldg=0 fade=0 houseLights=0 glow=28 emissive=4(noMap 0) agl=300
+METRIC[BB/unpinned/live] lit=13.684% warm=2.4%-of-lit dark=68.7% p5/p50/p95=3/5/66 mean=17.55 white=0.0000% blob=0px(0.0000%)x0 band=0.5..0.98
+CENSUS[MAN/unpinned/high] tier=high dpr=1 draws=0 tris=0 el=-26.844° state=night roadMixN=1 roads=0 bldg=0 fade=0 houseLights=0 glow=26 emissive=4(noMap 0) agl=792
+METRIC[MAN/unpinned/high] lit=75.190% warm=0.0%-of-lit dark=15.3% p5/p50/p95=4/59/76 mean=50.54 white=0.0000% blob=0px(0.0000%)x0 band=0.55..0.98
+CENSUS[POW/unpinned/high] tier=high dpr=1 draws=51 tris=55675 el=-27.373° state=night roadMixN=1 roads=0 bldg=0 fade=0 houseLights=0 glow=40 emissive=4(noMap 0) agl=600
+METRIC[POW/unpinned/high] lit=0.000% warm=0.0%-of-lit dark=18.6% p5/p50/p95=6/12/21 mean=12.34 white=0.0000% blob=0px(0.0000%)x0 band=0.478..0.922
+CENSUS[MAN/pinned/high] tier=high dpr=1 draws=0 tris=0 el=-26.844° state=night roadMixN=1 roads=0 bldg=0 fade=1 houseLights=0 glow=26 emissive=1(noMap 0) agl=792
+METRIC[MAN/pinned/high] lit=85.326% warm=0.0%-of-lit dark=0.0% p5/p50/p95=25/59/69 mean=54.72 white=0.0000% blob=0px(0.0000%)x0 band=0.55..0.98
+CENSUS[POW/pinned/high] tier=high dpr=1 draws=64 tris=55073 el=-27.373° state=night roadMixN=1 roads=0 bldg=0 fade=1 houseLights=0 glow=40 emissive=1(noMap 0) agl=600
+METRIC[POW/pinned/high] lit=0.000% warm=0.0%-of-lit dark=16.6% p5/p50/p95=6/12/21 mean=12.76 white=0.0000% blob=0px(0.0000%)x0 band=0.478..0.922
+WORLD tiles: imagery 0 ok / 2458 failed · vector 0 ok / 1880 failed · vector content resident at P-MAN: false · unreachable hosts: tiles.openfreemap.org, server.arcgisonline.com
+BLOCKED the world never streamed — imagery and/or vector tiles are unreachable from this session, so every pixel metric above describes the NETWORK, not the product. Diagnose with: curl -sS http://127.0.0.1:38989/__agentproxy/status (this session: 403 CONNECT for server.arcgisonline.com and tiles.openfreemap.org). The measurements above are kept and written to JSON as evidence of the blockade, NOT as a product baseline.
+VERIFY: BLOCKED (upstream tile hosts unreachable — gates not evaluated)

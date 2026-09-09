@@ -1,0 +1,217 @@
+{
+  "mode": "owens",
+  "tag": "sharp",
+  "families": [
+    "sharp"
+  ],
+  "bootMs": 10799,
+  "cfg": {
+    "style": "satellite",
+    "tier": "high",
+    "baseLod": 0.86,
+    "liveLod": 0.86,
+    "curveArmed": true,
+    "maxThreads": 10,
+    "steadyThreads": 10,
+    "maxLevel": 18,
+    "minLevel": 2,
+    "imgMaxLevel": 18,
+    "demMaxLevel": 16,
+    "imgDataType": "image",
+    "demDataType": "lerc",
+    "sizeZ0": 0,
+    "sharpOn": true,
+    "pipeOn": false,
+    "cacheOn": false,
+    "pinned": true
+  },
+  "runs": [
+    {
+      "threshold": 1,
+      "draws": 291,
+      "tris": 558674,
+      "terra": {
+        "camTileZ": 18,
+        "targetZ": 18,
+        "downloading": 0,
+        "sharp": true,
+        "aglM": 114,
+        "lodThreshold": 1,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 64877.5
+      },
+      "rtTerra": {
+        "camTileZ": 18,
+        "targetZ": 18,
+        "downloading": 0,
+        "sharp": true,
+        "aglM": 114,
+        "lodThreshold": 1,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 64877.5
+      },
+      "warp": null,
+      "cache": null,
+      "heapMB": 119
+    },
+    {
+      "threshold": 0.92,
+      "draws": 253,
+      "tris": 483409,
+      "terra": {
+        "camTileZ": 16,
+        "targetZ": 18,
+        "downloading": 0,
+        "sharp": true,
+        "aglM": 106,
+        "lodThreshold": 0.92,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 78008.79999999702
+      },
+      "rtTerra": {
+        "camTileZ": 16,
+        "targetZ": 18,
+        "downloading": 0,
+        "sharp": true,
+        "aglM": 106,
+        "lodThreshold": 0.92,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 78008.79999999702
+      },
+      "warp": null,
+      "cache": null,
+      "heapMB": 134
+    },
+    {
+      "threshold": 0.86,
+      "draws": 230,
+      "tris": 597856,
+      "terra": {
+        "camTileZ": 18,
+        "targetZ": 18,
+        "downloading": 6,
+        "sharp": false,
+        "aglM": 75,
+        "lodThreshold": 0.86,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 108278.20000000298
+      },
+      "rtTerra": {
+        "camTileZ": 18,
+        "targetZ": 18,
+        "downloading": 6,
+        "sharp": false,
+        "aglM": 75,
+        "lodThreshold": 0.86,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 108278.20000000298
+      },
+      "warp": null,
+      "cache": null,
+      "heapMB": 109
+    },
+    {
+      "threshold": 0.82,
+      "draws": 217,
+      "tris": 658826,
+      "terra": {
+        "camTileZ": 18,
+        "targetZ": 18,
+        "downloading": 0,
+        "sharp": true,
+        "aglM": 121,
+        "lodThreshold": 0.82,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 116332.29999999702
+      },
+      "rtTerra": {
+        "camTileZ": 18,
+        "targetZ": 18,
+        "downloading": 0,
+        "sharp": true,
+        "aglM": 121,
+        "lodThreshold": 0.82,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 116332.29999999702
+      },
+      "warp": null,
+      "cache": null,
+      "heapMB": 169
+    },
+    {
+      "threshold": 0.78,
+      "draws": 189,
+      "tris": 440846,
+      "terra": {
+        "camTileZ": 18,
+        "targetZ": 18,
+        "downloading": 0,
+        "sharp": true,
+        "aglM": 65,
+        "lodThreshold": 0.78,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 147075.90000000596
+      },
+      "rtTerra": {
+        "camTileZ": 18,
+        "targetZ": 18,
+        "downloading": 0,
+        "sharp": true,
+        "aglM": 65,
+        "lodThreshold": 0.78,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 147075.90000000596
+      },
+      "warp": null,
+      "cache": null,
+      "heapMB": 113
+    }
+  ],
+  "tex": {
+    "mb": 55,
+    "count": 164,
+    "maxAniso": 8
+  },
+  "zoomSeen": {
+    "img2": 11,
+    "img3": 27,
+    "img4": 45,
+    "img5": 51,
+    "dem5": 64,
+    "img6": 53,
+    "dem6": 69,
+    "img7": 50,
+    "dem7": 50,
+    "img8": 52,
+    "dem8": 53,
+    "img9": 45,
+    "dem9": 46,
+    "img10": 41,
+    "dem10": 43,
+    "img11": 48,
+    "dem11": 48,
+    "img12": 64,
+    "dem12": 64,
+    "img13": 94,
+    "dem13": 94,
+    "img14": 137,
+    "dem14": 144,
+    "img15": 234,
+    "dem15": 243,
+    "img16": 413,
+    "dem16": 1349,
+    "img17": 744,
+    "img18": 1128
+  },
+  "pageerrors": []
+}

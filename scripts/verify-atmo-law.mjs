@@ -24,6 +24,7 @@
  * Run:  node scripts/verify-atmo-law.mjs
  */
 import fs from 'node:fs';
+import { AERIAL_PERSPECTIVE, DEPTH_PASS } from '../lib/fly/fly-constants.js';
 import {
   ATMO_GLSL_DECL,
   ATMO_GLSL_VERTEX,
@@ -620,16 +621,71 @@ console.log('\n[7] AERIAL_LAW flag-off is byte-identical (generated text + key)'
 console.log('\n[8] the post pass ships ONE program per flag state');
 {
   const src = fs.readFileSync(new URL('../components/fly/AerialPerspective.jsx', import.meta.url), 'utf8');
-  ok('the LAW shader calls atmoApply', /lawFragmentShader[\s\S]*atmoApply\( inputColor\.rgb/.test(src));
-  ok('the LEGACY shader is still the R19 text (uMaxMix * t * hFall)',
-    src.includes('mix( inputColor.rgb, uHazeColor, uMaxMix * t * hFall )'));
+  const shader = (name) => src.match(new RegExp(`const ${name} = /\\* glsl \\*/ \x60([\\s\\S]*?)\x60;`))?.[1] ?? '';
+  const legacy = shader('fragmentShader');
+  const law = shader('lawFragmentShader');
+  ok('the LAW shader applies the shared law once and preserves alpha',
+    /outputColor = vec4\( atmoApply\( inputColor\.rgb, vec3\( dist, trueY - uAtmoGroundY, cosSun \) \), inputColor\.a \);/.test(law));
+  ok('the analytic LAW branch has no additional DEPTH_PASS near-haze term',
+    law.length > 0 && !/\buNear\b|\bnearT\b|\bmixAmt\b/.test(law));
+  ok('the LEGACY branch applies the combined band and preserves alpha',
+    /outputColor = vec4\( mix\( inputColor\.rgb, uHazeColor, mixAmt \), inputColor\.a \);/.test(legacy));
+
+  // Interpret the actual shipped statements, not a second copy of the new
+  // formula. The baseline reference remains the R19 expression. A vec3 here
+  // is only a container for the vec2 uniforms' scalar .x/.y accesses.
+  const statements = ['t', 'hFall', 'nearT', 'mixAmt'].map((name) => {
+    const statement = legacy.match(new RegExp(`\\bfloat ${name} = [^;]+;`))?.[0];
+    if (!statement) throw new Error(`missing legacy haze statement: ${name}`);
+    return statement;
+  }).join('\n');
+  BUILTINS.smoothstep = (a, b, x) => F(smoothstep(a.v, b.v, x.v));
+  const band = AERIAL_PERSPECTIVE;
+  const near = DEPTH_PASS.aerialNear;
+  const state = { rim: [], camPos: [], camRight: [], camUp: [], camZ: [] };
+  let nearOn = false;
+  const body = src.match(/export function setAerial\(s\) \{([\s\S]*?)^\}/m)?.[1];
+  if (!body) throw new Error('missing setAerial feed');
+  const setAerial = new Function('_state', 'depthSubOn', 'AERIAL_PERSPECTIVE', 'DEPTH_PASS',
+    `return function setAerial(s) {${body}}`)(state, (name) => nearOn && name === 'aerialNear', band, DEPTH_PASS);
+  const feed = { ...band, rim: [0.2, 0.3, 0.4], camPos: [0, 0, 0], camRight: [1, 0, 0],
+    camUp: [0, 1, 0], camZ: [0, 0, -1], tanHalfFov: 0.5, bendCx: 0, bendCz: 0, bendK: 0, groundY: 0 };
+  const uniforms = {
+    uBand: V([band.startM, band.endM, 0]), uHeightFalloff: F(band.heightFalloffM),
+    get uMaxMix() { return F(state.strength); },
+    get uNear() { return V([state.nearStartM, state.nearMaxMix, 0]); },
+  };
+  const sample = makeInterp(`float legacyMix(float dist, float h) { ${statements} return mixAmt; }`, uniforms);
+  const distances = [0, near.nearStartM - 1, near.nearStartM,
+    (near.nearStartM + band.startM) / 2, band.startM, band.startM + 1,
+    (band.startM + band.endM) / 2, band.endM - 1, band.endM, band.endM + 1, 60000];
+  let baselineExact = true, bounded = true, support = true, feedGated = true, samples = 0;
+  for (nearOn of [false, true]) for (const gate of [0, 0.25, 0.5, 1]) {
+    setAerial({ ...feed, strength: band.maxMix * gate });
+    feedGated &&= state.nearStartM === (nearOn && gate > 0 ? near.nearStartM : 0)
+      && state.nearMaxMix === (nearOn ? near.nearMaxMix * gate : 0);
+    for (const dist of distances) for (const height of [0, 30, 300, 1200, 4000]) {
+      const actual = sample.call('legacyMix', [F(dist), F(height)]).v;
+      const falloff = Math.exp(-height / band.heightFalloffM);
+      const baseline = state.strength * smoothstep(band.startM, band.endM, dist) * falloff;
+      if (!nearOn) baselineExact &&= actual === baseline;
+      bounded &&= Number.isFinite(actual) && actual >= baseline && actual <= state.strength * falloff;
+      if (dist <= near.nearStartM || dist >= band.endM || gate === 0) support &&= actual === baseline;
+      if (nearOn && gate > 0 && dist > near.nearStartM && dist < band.startM) support &&= actual > baseline;
+      samples++;
+    }
+  }
+  ok('DEPTH_PASS disabled preserves the exact R19 mix at every sample', baselineExact, `${samples} band/height/gate samples`);
+  ok('enabled near haze is finite, additive, and bounded by the original main-band ceiling', bounded);
+  ok('near haze occupies its intended range and retires at the far band / zero strength', support);
+  ok('the actual setAerial feed gates both near uniforms and scales them with the main strength', feedGated);
   ok('the variant is resolved ONCE at construction, from a module const',
     /const law = LAW\(\);\n\s*super\('AerialPerspectiveEffect', law \? lawFragmentShader : fragmentShader/.test(src),
     'production and the PREWARM twin cannot compile different programs');
   ok('both early-outs survive in the LAW shader (bit-identity at strength 0, sky skipped)',
-    /uAtmoStrength <= 0\.0 \|\| d >= 0\.999999/.test(src));
+    /uAtmoStrength <= 0\.0 \|\| d >= 0\.999999/.test(law));
   ok('the LAW shader still DETECTS reversed depth rather than assuming it',
-    /lawFragmentShader[\s\S]*uReverseDepth > 0\.5 \? 1\.0 - depth : depth/.test(src));
+    /uReverseDepth > 0\.5 \? 1\.0 - depth : depth/.test(law));
 }
 
 console.log(`\n${fail === 0 ? 'PASS' : 'FAIL'}  ${pass} passed, ${fail} failed\n`);

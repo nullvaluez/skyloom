@@ -1,4 +1,5 @@
 'use client';
+import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
 
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -465,7 +466,8 @@ export function Contracts({ runtime }) {
   // also simply the right answer to "crammed" on a 390px-wide screen. Desktop
   // is untouched. `expanded` lives here (not the store) because it is pure
   // view state that should reset when the panel unmounts.
-  const collapsed = isPhone && !expanded;
+  const mapStyle = useFlyStore((s) => s.mapStyle);
+  const collapsed = (isPhone || (mapStyle === 'satellite' && satelliteVisualsOn('presentation'))) && !expanded;
 
   return (
     <Zone

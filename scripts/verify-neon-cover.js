@@ -205,6 +205,19 @@ const TRI_MAX = 2.0e6; // 0.2 M headroom under the 2.2 M gate
   // control state a tree must be in to reproduce them. (The two Manhattan
   // hashes DO move, for an unrelated and separately-ruled reason — see the
   // R18_ROLL block at the top of this file.)
+  // R22 SANCTIONED GATE-MECHANICS - PENDING FABLE SIGN-OFF (W3): C CLUTTER's
+  // `CLUTTER` block is the ONE R22 family the worker source references (it
+  // emits `satRoadPaths` and `satParking` behind it under protocol 18). Like
+  // PARCEL_HOMES and SAT_POLY_COVER before it, it is referenced ONLY from
+  // satellite builder bodies the toy pass never calls — so it belongs in the
+  // inventory and NOT in EXPECTED_TOY_FLAGS, and gate 3a recomputes that
+  // membership from the worker source every run rather than trusting this
+  // comment. The five frozen hash values are NOT touched by this edit; what
+  // widens is the control state a tree must be in to reproduce them.
+  // INERT until armed: without R22_NEON_CLUTTER=1 the inventory is byte-for-
+  // byte R21's, so an unflagged run of this file asserts exactly what it did
+  // before. Fable arms it at W3, when CLUTTER is actually in the tree.
+  const R22_CLUTTER_INVENTORY = process.env.R22_NEON_CLUTTER === '1';
   const R20_FLAGS = [
     'NEON_COVER',
     'TOY_MID_SUBURB',
@@ -212,6 +225,7 @@ const TRI_MAX = 2.0e6; // 0.2 M headroom under the 2.2 M gate
     'PARCEL_HOMES',
     'SAT_POLY_COVER',
     'TILE_PIPELINE',
+    ...(R22_CLUTTER_INVENTORY ? ['CLUTTER'] : []),
   ];
   const EXPECTED_TOY_FLAGS = ['NEON_COVER', 'TOY_MID_SUBURB', 'MONUMENT_MODELS', 'TILE_PIPELINE'];
   const apiStart = bounds.find((b) => b.name === 'api')?.start ?? 0;

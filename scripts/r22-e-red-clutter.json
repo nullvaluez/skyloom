@@ -1,0 +1,146 @@
+{
+ "when": "2026-08-08T00:39:36.357Z",
+ "lewis": {
+  "draws": 238,
+  "tris": 272223,
+  "camTileZ": 17,
+  "aglM": 126,
+  "tier": "high",
+  "veg": {
+   "placed": 893,
+   "pool": 5000,
+   "altK": 1,
+   "ready": 9,
+   "vegPts": 3332,
+   "byClass": [
+    0,
+    0,
+    440,
+    44,
+    409,
+    0,
+    0,
+    0
+   ]
+  },
+  "clutter": {
+   "parked": {
+    "count": 212,
+    "tris": 4664,
+    "anchors": 412,
+    "insideColumns": 0
+   },
+   "moving": {
+    "count": 35,
+    "tris": 770,
+    "anchors": 56
+   },
+   "poles": {
+    "count": 130,
+    "tris": 2600,
+    "anchors": 131
+   },
+   "ready": 6,
+   "chunks": 6,
+   "realCols": 109,
+   "baseDraws": 235,
+   "draws": 3,
+   "trisPerInstance": {
+    "car": 22,
+    "mover": 22,
+    "pole": 20
+   }
+  }
+ },
+ "veg": {
+  "tris": 58,
+  "verts": 62,
+  "groups": 0,
+  "bbox": [
+   0,
+   1
+  ],
+  "count": 893,
+  "instances": 5000,
+  "materials": 1
+ },
+ "colIndex": {
+  "api": true,
+  "near": 109,
+  "sample": [
+   "x",
+   "z",
+   "topY",
+   "r"
+  ],
+  "stats": {
+   "chunks": 16,
+   "ready": 16,
+   "columns": 1844
+  }
+ },
+ "p99": 0.2145600000000009,
+ "owens": {
+  "draws": 224,
+  "tris": 227652,
+  "camTileZ": 16,
+  "aglM": 401,
+  "tier": "high",
+  "veg": {
+   "placed": 1315,
+   "pool": 5000,
+   "altK": 1,
+   "ready": 9,
+   "vegPts": 3600,
+   "byClass": [
+    0,
+    212,
+    0,
+    1103,
+    0,
+    0,
+    0,
+    0
+   ]
+  },
+  "clutter": {
+   "parked": {
+    "count": 0,
+    "tris": 0,
+    "anchors": 0,
+    "insideColumns": 0
+   },
+   "moving": {
+    "count": 0,
+    "tris": 0,
+    "anchors": 0
+   },
+   "poles": {
+    "count": 0,
+    "tris": 0,
+    "anchors": 0
+   },
+   "ready": 0,
+   "chunks": 6,
+   "realCols": 121,
+   "baseDraws": 224,
+   "draws": 0,
+   "trisPerInstance": {
+    "car": 22,
+    "mover": 22,
+    "pole": 20
+   }
+  }
+ },
+ "red": [
+  [
+   "C1 trees are untextured 42-tri spheres with no trunk",
+   "verify-clutter (2)",
+   "58 tris/instance",
+   "43..96"
+  ]
+ ],
+ "fails": [],
+ "softs": [],
+ "netErrs": 0
+}

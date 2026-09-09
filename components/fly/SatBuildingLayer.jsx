@@ -5,16 +5,32 @@ import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
 import { SatBuildingEngine } from '@/lib/fly/toy-world/sat-building-engine';
 import {
+  NIGHT_CITY_R23,
   PARCEL_HOMES,
   SAT_AMBIENT,
+  SAT_BLDG_FADE,
   SAT_BUILDINGS,
   SAT_COVERAGE,
   SAT_SHADOWS,
   SAT_TINT,
   SAT_VEG,
   SAT_WATER,
+  SETTLE_CALM,
   SUBURB_NIGHT,
 } from '@/lib/fly/fly-constants';
+import {
+  applyUniformBirth,
+  arrivalEpoch,
+  birthK,
+  makeBirth,
+  makeUniformBirth,
+  notePopin,
+} from '@/lib/fly/settle';
+import { nightCityOn } from '@/lib/fly/night-city';
+import { getSatBldgFade, setSatBldgFade } from '@/lib/fly/toy-world/world-bend';
+import { chunkFadeOn } from '@/lib/fly/toy-world/chunk-fade';
+import { satelliteVisualsOn, satelliteVisualProfile } from '@/lib/fly/satellite-visuals';
+import { setSatelliteArchitectureDetail } from '@/lib/fly/satellite-architecture-material';
 import { useFlyStore } from '@/stores/fly-store';
 import { SatVegLayer } from './SatVegLayer';
 // R24 B (GROUND_VIS, recon A6/T8) — AGL fade bands read the DAMPED ground.
@@ -47,7 +63,7 @@ export function SatBuildingLayer({ runtime, flight }) {
   // mounts at medium+ (FlyScene gate); this flips water on only at high, and off
   // (evicting the water meshes) on a high→medium degrade — no per-frame cost.
   useEffect(() => {
-    engine.setWaterEnabled(SAT_WATER.enabled && qualityTier === SAT_WATER.minTier);
+    engine.setWaterEnabled(SAT_WATER.enabled && (satelliteVisualsOn('water') ? satelliteVisualProfile(qualityTier).water : qualityTier === SAT_WATER.minTier));
   }, [engine, qualityTier]);
   // Round 15: facade windows (daylight `map`, medium+) and NIGHT windows
   // (`emissiveMap`, high only) are material swaps on the SAME shared material —
@@ -57,9 +73,26 @@ export function SatBuildingLayer({ runtime, flight }) {
     engine.setFacadeEnabled(
       SAT_BUILDINGS.facade.enabled && atLeastTier(qualityTier, SAT_BUILDINGS.facade.minTier)
     );
+    // R23 (B CITY-LIGHT) — THE TIER QUESTION, behind NIGHT_CITY_R23.tier.
+    // `SAT_BUILDINGS.night.minTier` ('high') is a 2026-07 perf call, and it is
+    // the reason a session that settles at MEDIUM has no window lights at all —
+    // which is exactly the user's "very few show lights in windows". The
+    // constant is NOT edited: armed, the gate reads NIGHT_CITY_R23.tier's floor
+    // instead, so the shipped tree is unchanged and the flip is one review.
+    const nightMinTier = nightCityOn('tier')
+      ? NIGHT_CITY_R23.tier.nightMinTier
+      : SAT_BUILDINGS.night.minTier;
     engine.setNightWindowsEnabled(
-      SAT_BUILDINGS.night.enabled && atLeastTier(qualityTier, SAT_BUILDINGS.night.minTier)
+      SAT_BUILDINGS.night.enabled && atLeastTier(qualityTier, nightMinTier)
     );
+    if (process.env.NODE_ENV === 'development' && window.__flyStats) {
+      window.__flyStats.satNightGate = {
+        tier: qualityTier,
+        minTier: nightMinTier,
+        shippedMinTier: SAT_BUILDINGS.night.minTier,
+        on: SAT_BUILDINGS.night.enabled && atLeastTier(qualityTier, nightMinTier),
+      };
+    }
   }, [engine, qualityTier]);
   // Round 19 (A HOMESTEAD, P2) — HIGH-TIER-ONLY coverage widen. The field
   // study found building coverage effectively zero outside downtown cores:
@@ -69,8 +102,9 @@ export function SatBuildingLayer({ runtime, flight }) {
   // (user decision 2). SAT_COVERAGE.enabled false does the same at high.
   useEffect(() => {
     engine.setCoverage(
-      SAT_COVERAGE.enabled && qualityTier === 'high' ? SAT_COVERAGE.high : null
+      satelliteVisualsOn() ? { ringM: SAT_COVERAGE.high.ringM, maxChunks: satelliteVisualProfile(qualityTier).buildingChunks } : SAT_COVERAGE.enabled && qualityTier === 'high' ? SAT_COVERAGE.high : null
     );
+    setSatelliteArchitectureDetail(engine.material, satelliteVisualProfile(qualityTier).normalMaps);
   }, [engine, qualityTier]);
   // Round 19 — the two SAT_SHADOWS mesh flags for THIS layer's meshes (the
   // plan's per-layer rule; B DEEPFIELD owns the light rig and FlyScene's
@@ -90,6 +124,14 @@ export function SatBuildingLayer({ runtime, flight }) {
   // react-hooks/purity); the warp subscription reads the current clock from here.
   const nowRef = useRef(0);
   const statsAtRef = useRef(0);
+  // R22 (B SETTLE) — the chunked-mesh BIRTH. No new shader, no new cache key:
+  // the ring already compiles an ordered Bayer-4 screen-door `discard` driven
+  // by the single `uSatBldgFade` uniform (R16's cull dissolve), so a birth is
+  // that same dither run in the other direction. The layer post-multiplies the
+  // engine's own per-frame write (see applyUniformBirth for why the read-back
+  // cannot simply be multiplied).
+  const birthRef = useRef(makeBirth());
+  const fadeRef = useRef(makeUniformBirth());
 
   // Round 18 (A1) — publish the engine on the runtime bus (the RUNTIME
   // CONTRACTS (R18) block in FlyScene). A5 GRAVITY's crash system calls
@@ -111,6 +153,13 @@ export function SatBuildingLayer({ runtime, flight }) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/immutability -- runtime is the scene's mutable bus (FlyScene RUNTIME CONTRACTS (R18))
     runtime.satBuildings = engine;
+    // R22 (B): the AGL band inside which this ring exists at all. ARRIVAL_GATE
+    // consults the building ready-fraction ONLY below it — above the band the
+    // ring is deliberately empty and holding a reveal for it would be holding
+    // for something that is never coming.
+    runtime.satBuildingsBandM = SAT_BLDG_FADE.enabled
+      ? SAT_BLDG_FADE.evictAglM
+      : SAT_BUILDINGS.cullAglOffM;
     return () => {
       if (runtime.satBuildings === engine) runtime.satBuildings = null;
     };
@@ -153,6 +202,26 @@ export function SatBuildingLayer({ runtime, flight }) {
     // republished on a 60s cadence — this just reads it; one uniform write).
     engine.setNightMix(runtime.sun?.frac);
     engine.update(clock.elapsedTime, flight.pos.x, flight.pos.z, eyeAgl);
+    // …and the birth, AFTER the engine's own uniform write.
+    const ready = engine.stats.ready;
+    const k = birthK(
+      birthRef.current,
+      clock.elapsedTime,
+      ready > 0,
+      arrivalEpoch(),
+      SETTLE_CALM.births.bayerSec
+    );
+    if (k < 1 && !chunkFadeOn()) {
+      applyUniformBirth(fadeRef.current, getSatBldgFade(), k, setSatBldgFade);
+    } else if (!Number.isNaN(fadeRef.current.lastWritten)) {
+      // The completion frame: restore the engine's own base exactly once, then
+      // hand the uniform back (lastWritten NaN ⇒ this branch never runs again
+      // until the next arrival re-arms the birth). With the flag off `k` is 1
+      // from the first frame and NOTHING here ever writes.
+      applyUniformBirth(fadeRef.current, getSatBldgFade(), 1, setSatBldgFade);
+      fadeRef.current.lastWritten = Number.NaN;
+    }
+    notePopin('satBuildings', ready > 0, birthRef.current.running || engine.stats.births > 0);
     if (
       process.env.NODE_ENV === 'development' &&
       window.__flyStats &&

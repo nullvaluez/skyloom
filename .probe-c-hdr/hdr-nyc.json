@@ -1,0 +1,215 @@
+{
+ "frames": 1967,
+ "hits": [
+  {
+   "n": 455,
+   "L": 213.5,
+   "pr": 0.864,
+   "normalHdr": {
+    "W": 1920,
+    "H": 990,
+    "samples": 28800,
+    "lumMin": 0.0084,
+    "lumMax": 1.07,
+    "lumMean": 0.213,
+    "fracOver1": 0.015,
+    "fracOver8": 0,
+    "maxAt": [
+     906,
+     247,
+     1.17,
+     1.06,
+     0.91
+    ]
+   },
+   "paleHdr": {
+    "W": 1920,
+    "H": 990,
+    "samples": 28800,
+    "lumMin": 0.0138,
+    "lumMax": 1.07,
+    "lumMean": 0.853,
+    "fracOver1": 0.45,
+    "fracOver8": 0,
+    "maxAt": [
+     906,
+     247,
+     1.17,
+     1.06,
+     0.91
+    ]
+   },
+   "bufNames": {
+    "input": null,
+    "out": null
+   },
+   "culpritUuid": "84b20128",
+   "hdrCulpritHidden": {
+    "W": 1920,
+    "H": 990,
+    "samples": 28800,
+    "lumMin": 0.0085,
+    "lumMax": 1.07,
+    "lumMean": 0.211,
+    "fracOver1": 0.013,
+    "fracOver8": 0,
+    "maxAt": [
+     912,
+     247,
+     1.17,
+     1.06,
+     0.91
+    ]
+   },
+   "effectNames": [
+    "AerialPerspectiveEffect",
+    "BloomEffect",
+    "SpeedLinesEffect",
+    "HueSaturationEffect",
+    "BrightnessContrastEffect",
+    "WhiteBalanceEffect",
+    "VignetteEffect"
+   ],
+   "bloomLum": {
+    "threshold": 0.85,
+    "smoothing": 0.2
+   },
+   "bloomInfo": {
+    "intensity": 0.7,
+    "radius": 0.85,
+    "levels": 8
+   },
+   "aerialU": {
+    "uHazeColor": "(obj)",
+    "uBand": "(obj)",
+    "uMaxMix": 0,
+    "uHeightFalloff": 1200,
+    "uTanHalfFov": 0.5,
+    "uCamPos": "(obj)",
+    "uCamRight": "(obj)",
+    "uCamUp": "(obj)",
+    "uCamZ": "(obj)",
+    "uBendCenter": "(obj)",
+    "uBendK": 0,
+    "uGroundY": 0,
+    "uReverseDepth": 1,
+    "uNear": "(obj)"
+   },
+   "trials": {
+    "bloom.intensity=0": {
+     "L": 213.5,
+     "pr": 0.864
+    },
+    "bloom.threshold=99": {
+     "L": 213.5,
+     "pr": 0.864
+    }
+   }
+  },
+  {
+   "n": 1664,
+   "L": 200.9,
+   "pr": 0.731,
+   "normalHdr": {
+    "W": 1920,
+    "H": 990,
+    "samples": 28800,
+    "lumMin": 0.0064,
+    "lumMax": 1.07,
+    "lumMean": 0.194,
+    "fracOver1": 0.001,
+    "fracOver8": 0,
+    "maxAt": [
+     1189,
+     433,
+     1.17,
+     1.06,
+     0.91
+    ]
+   },
+   "paleHdr": {
+    "W": 1920,
+    "H": 990,
+    "samples": 28800,
+    "lumMin": 0.0155,
+    "lumMax": 1.07,
+    "lumMean": 0.753,
+    "fracOver1": 0.39,
+    "fracOver8": 0,
+    "maxAt": [
+     906,
+     247,
+     1.17,
+     1.06,
+     0.91
+    ]
+   },
+   "bufNames": {
+    "input": null,
+    "out": null
+   },
+   "culpritUuid": "84b20128",
+   "hdrCulpritHidden": {
+    "W": 1920,
+    "H": 990,
+    "samples": 28800,
+    "lumMin": 0.0044,
+    "lumMax": 1.07,
+    "lumMean": 0.191,
+    "fracOver1": 0.001,
+    "fracOver8": 0,
+    "maxAt": [
+     1190,
+     433,
+     1.17,
+     1.06,
+     0.91
+    ]
+   },
+   "effectNames": [
+    "AerialPerspectiveEffect",
+    "BloomEffect",
+    "SpeedLinesEffect",
+    "HueSaturationEffect",
+    "BrightnessContrastEffect",
+    "WhiteBalanceEffect",
+    "VignetteEffect"
+   ],
+   "bloomLum": {
+    "threshold": 0.85,
+    "smoothing": 0.2
+   },
+   "bloomInfo": {
+    "intensity": 0.7,
+    "radius": 0.85,
+    "levels": 8
+   },
+   "aerialU": {
+    "uHazeColor": "(obj)",
+    "uBand": "(obj)",
+    "uMaxMix": 0,
+    "uHeightFalloff": 1200,
+    "uTanHalfFov": 0.5,
+    "uCamPos": "(obj)",
+    "uCamRight": "(obj)",
+    "uCamUp": "(obj)",
+    "uCamZ": "(obj)",
+    "uBendCenter": "(obj)",
+    "uBendK": 0,
+    "uGroundY": 0,
+    "uReverseDepth": 1,
+    "uNear": "(obj)"
+   },
+   "trials": {
+    "bloom.intensity=0": {
+     "L": 200.9,
+     "pr": 0.731
+    },
+    "bloom.threshold=99": {
+     "L": 200.9,
+     "pr": 0.731
+    }
+   }
+  }
+ ]
+}

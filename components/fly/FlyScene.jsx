@@ -1,4 +1,6 @@
 'use client';
+import { physicalBendCoefficient } from '@/lib/fly/render-scale';
+
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -50,6 +52,9 @@ import {
 // E's frame-phase attribution: a no-op with FRAME_STATS off, so this costs the
 // flag-off tree one function call per frame and nothing else.
 import { markPhase } from '@/lib/fly/frame-stats';
+// Round 22 (D DEPTH): the single arm for the catcher / near receive set /
+// caster flips (lib/fly/depth-pass.js header explains the three inputs).
+import { depthPassOn, depthSubOn, depthCasterOn } from '@/lib/fly/depth-pass';
 import { PALETTE } from '@/lib/fly/toy-world/toy-palette';
 import {
   SkyDome,
@@ -96,6 +101,13 @@ import {
   weatherHazeMax,
 } from '@/lib/fly/weather-model';
 import { resolveSky, skyDuskOn, trueElevationDeg } from '@/lib/fly/sky-dusk';
+// R22 (B SETTLE) — the two FlyScene regions this round's B agent owns: the
+// groundElev damper (the -50 block) and the HDRI bucket re-pick interval.
+import {
+  motionSubOn,
+  settleOn,
+  sinceRevealMs,
+} from '@/lib/fly/settle';
 import {
   AERIAL_LAW,
   AERIAL_PERSPECTIVE,
@@ -103,17 +115,22 @@ import {
   CLOUDS,
   ONE_SUN,
   SHADOW_CALM,
+  CLUTTER,
   CRASH,
+  DEPTH_PASS,
   GLOBE,
   HILLSHADE,
   MONUMENT_MODELS,
   MOON,
+  MOTION_R24,
+  NIGHT_TRUTH_R23,
   SAT_BUILDINGS,
   SAT_CITY_GLOW,
   SAT_QUILT,
   SAT_ROADS,
   SAT_SHADOWS,
   SAT_SKYLINE,
+  SETTLE_CALM,
   SKY,
   SKY_DUSK,
   SKY_LIVE,
@@ -133,13 +150,16 @@ import { noteFinalizeFrame } from '@/lib/fly/finalize-pace';
 import { createFrameStep, lerpAngle, lerpPose } from '@/lib/fly/frame-step';
 import { useFlyStore } from '@/stores/fly-store';
 // R24 B (GROUND_VIS, recon A6/T8) — the damped VISUAL ground elevation.
-import { eyeAglVis, groundElevVis, stepGroundVis } from '@/lib/fly/ground-vis';
+import { eyeAglVis as visualEyeAgl, groundElevVis, stepGroundVis } from '@/lib/fly/ground-vis';
 import { usePassportStore } from '@/stores/passport-store';
 import { PlayerPlane } from './PlayerPlane';
 import { CloudField } from './CloudField';
 import { VoidFloor } from './VoidFloor';
 import { TownGlow } from './TownGlow';
 import { LandmarkMonuments } from './LandmarkMonuments';
+import { satelliteVisualsOn, SATELLITE_VISUALS, graphicsReviewOn, satelliteEffectTier } from '@/lib/fly/satellite-visuals';
+import { setSatelliteWaterFrame } from '@/lib/fly/satellite-water';
+import { applySatelliteNightRim } from '@/lib/fly/satellite-atmosphere';
 import { MonumentModels } from './MonumentModels';
 import { Contrail } from './Contrail';
 import { PlayerGroundShadow } from './PlayerGroundShadow';
@@ -148,6 +168,7 @@ import { ToyWorldLayer } from './ToyWorldLayer';
 import { SatBuildingLayer } from './SatBuildingLayer';
 import { SatRoadLayer } from './SatRoadLayer';
 import { SatSkylineLayer } from './SatSkylineLayer';
+import { SatClutterLayer } from './SatClutterLayer';
 import { SatCityGlow } from './SatCityGlow';
 import { SatEnvironment } from './SatEnvironment';
 import { PrecipLayer } from './PrecipLayer';
@@ -264,6 +285,34 @@ function hillElevWeight(elDeg) {
 }
 const _spotPos = new Vector3();
 const _warpPos = new Vector3();
+// R24 (C MOTION-STATE): the AGL-divergence trace channel, read by
+// scripts/r24-c-agl.js. Module scratch, mutated in place (the _atmoRim
+// discipline — zero allocation in the frame loop), and published only while a
+// probe has set `window.__flyMotionTrace`. The R23 `__flyStats.night`
+// precedent: a read-only flat object of primitives is the whole diagnosis.
+//
+// EVERY write site carries `process.env.NODE_ENV === 'development'` — the
+// eleven in the dev block at the foot of the frame callback, AND the two at the
+// SAT_QUILT grade, which sit outside that block because the value they capture
+// is scoped to the satellite branch. That is what makes "this costs nothing in
+// production" a statement about the bundle rather than about the measurement:
+// the constant folds and the branches are dropped. (R24 D's review caught the
+// two grade writes running unguarded; C1 guarded them rather than softening
+// this sentence — a comment that is true of eleven writes and not of two is
+// how a hot path acquires cost nobody remembers agreeing to.)
+const _motionTrace = {
+  t: 0,
+  x: 0,
+  z: 0,
+  y: 0,
+  elevRaw: 0, // flight.groundElev — what safety reads
+  elevVis: 0, // runtime.groundElevVis — what the visuals read
+  aglRaw: 0,
+  aglVis: 0,
+  quilt: 0, // SAT_QUILT desat output (0 off-band / off-satellite)
+  micro: 0, // HILLSHADE.micro strength
+  camTileZ: 0, // which DEM zoom answered the ground raycast
+};
 
 // Round 13 Phase 1: satellite atmosphere (the rim triple). Precompute the
 // SKY.altAtmo time-of-day keyframes as sRGB 0..1 triples once (SKY is a
@@ -380,7 +429,7 @@ const MOODS = {
  * problem, a flat ground-anchored disc that must follow the mini-planet
  * curvature. Without it the 900 m rim floats ~4 m over the bent terrain.
  */
-function SatShadowCatcher({ flight, origin, runtime }) {
+function SatShadowCatcher({ flight, origin, runtime, radiusM }) {
   const ref = useRef();
   const gateRef = useRef({ n: 0, on: false });
   const gl = useThree((s) => s.gl);
@@ -430,7 +479,7 @@ function SatShadowCatcher({ flight, origin, runtime }) {
     // under the aircraft and its shadows are invisible, so it is pure fill.
     // Cadence, not per-frame: the answer changes at streaming speed, not at
     // frame speed.
-    if (SHADOW_CALM.enabled) {
+    if (SHADOW_CALM.enabled && !depthSubOn('catcher')) {
       const g = gateRef.current;
       if (g.n-- <= 0) {
         g.n = SHADOW_CALM.catcher.everyNFrames;
@@ -454,10 +503,444 @@ function SatShadowCatcher({ flight, origin, runtime }) {
   }, -49);
   return (
     <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} receiveShadow material={material}>
-      <circleGeometry args={[SAT_SHADOWS.catcher.radiusM, 48]} />
+      <circleGeometry args={[radiusM ?? SAT_SHADOWS.catcher.radiusM, 48]} />
     </mesh>
   );
 }
+
+/**
+ * ROUND 22 (D "DEPTH") — the satellite depth rig: everything that decides
+ * WHERE light lands, in one place, behind one flag.
+ *
+ * Mounted only inside `satShadowsOn` (satellite + high tier + SAT_SHADOWS on +
+ * the R19 fleet pin un-set), so with the depth flags off this component is a
+ * census that runs at 2 Hz and returns null — and with the R19 rig itself
+ * pinned off fleet-wide it never mounts at all. Three jobs:
+ *
+ * (1) THE CATCHER GATE. The R19 header says the disc "wants its own AGL/caster
+ *     gate, not an unconditional mount", and this is it. `maxAglM` because at
+ *     cruise a 900 m disc subtends nothing and every shadow that would land on
+ *     it is sub-pixel; `minCasters` because a catcher with nothing to catch is
+ *     a pure draw. The census is deliberately made of the two EXACT sources
+ *     rather than a scene-graph guess: the R18 building collision-column index
+ *     (`runtime.satBuildings.queryColumns` — the same instrument PARCEL_HOMES
+ *     anti-duplication uses) and a visibility-correct walk for instanced
+ *     content. Both counts are published so the Owens arithmetic is a MEASURED
+ *     number rather than an assumption.
+ *
+ * (2) THE NEAR RECEIVE SET. R13 refused terrain receivers on two grounds and
+ *     only one is still true. "A recompile on the hot tile path" is DEAD:
+ *     three r185 carries `receiveShadow` as a uniform (lights_pars_begin
+ *     `uniform bool receiveShadow`; WebGLRenderer sets it per object at :2687),
+ *     so a flip costs one uniform write and no program. Fill rate is the real
+ *     cost and the only judge — hence LEAF tiles only (a subdivided parent
+ *     draws nothing), inside the 1500 m ortho radius only (outside it the
+ *     shadow map has no data to sample anyway), hard-capped at `maxTiles`, and
+ *     graded by gpuFrameMs A/B rather than by any draw gate, which cannot see
+ *     fill rate at all. Roads stay OUT on purpose: additive, depthWrite:false
+ *     material cannot meaningfully receive.
+ *
+ * (3) THE CASTER FLIPS. C CLUTTER ships every car/pole/tree `castShadow:false`
+ *     and D owns the flip with per-kind gpuFrameMs. The seam is a MARKER, not
+ *     an import — any Object3D with `userData.r22Caster = 'trees' | 'carsParked'
+ *     | 'carsMoving' | 'poles'` is enlisted when that kind's flag is on — so
+ *     this works against C's merged meshes at W2 and against the stand-in
+ *     casters (`__flyCasterStandIn`) that produced the W1 numbers, with no
+ *     edit to either side.
+ *
+ * Everything it touches is restored on unmount: a receive flag left behind on a
+ * tile that outlives the rig would be an invisible, permanent fill-rate tax.
+ */
+const _rigV = /* @__PURE__ */ new Vector3();
+const _swept = { tiles: 0, leaves: 0 };
+
+/**
+ * ROUND 22 (D, W3 FIX) — how a terrain tile is actually made to receive.
+ *
+ * `model.receiveShadow = true` DOES NOT STICK, and nothing reports that it
+ * failed. three-tile's `Tile._update()` calls `_updateShadow()` on every tile
+ * on every frame (vendor index.js:233 and :237), and that is
+ * `this.model?.syncShadow(this._root)` — which copies castShadow/receiveShadow
+ * from the ROOT tile onto the model. `TileMap.update()` in turn re-stamps the
+ * root from `map.castShadow` / `map.receiveShadow` (:1882), and the map's own
+ * flags are false. So the library re-asserts "no tile receives" every frame,
+ * after every useFrame callback has run. Measured directly: written true, read
+ * back true, false again 1.5 s later with the object still attached to the
+ * tree — which is exactly the shape verify-depth2 (3) reported as "0 of 167".
+ *
+ * The library-sanctioned lever is `map.receiveShadow = true`, but that is the
+ * WHOLE quadtree — the fill-rate cost R13 rejected, and the opposite of a near
+ * ring. So instead of fighting `syncShadow`, an enlisted model gets its OWN
+ * `syncShadow`: the root still drives castShadow (the library keeps its
+ * contract), and the receive flag survives because this tile is in the near
+ * set. Reversible by `delete` — the prototype method comes back — and no
+ * vendored file is touched, which matters because lib/fly/vendor/** is A's.
+ */
+function _receiveSync(root) {
+  this.castShadow = root.castShadow;
+  this.receiveShadow = true;
+}
+function _enlistReceiver(o) {
+  o.syncShadow = _receiveSync;
+  o.receiveShadow = true;
+}
+function _delistReceiver(o) {
+  delete o.syncShadow; // back to the class method
+  o.receiveShadow = false;
+}
+
+function countCastersNear(root, px, pz, radiusM) {
+  // Manual recursion, NOT Object3D.traverse: traverse does not stop at an
+  // invisible parent (the R19 §5 postmortem lesson — it indicted actors that
+  // had already been parked), and a census that counts hidden casters would
+  // mount the disc over an empty world.
+  let instanced = 0;
+  let meshes = 0;
+  const r2 = radiusM * radiusM;
+  const walk = (o) => {
+    if (!o.visible) return;
+    if (o.castShadow && (o.isMesh || o.isInstancedMesh)) {
+      if (o.isInstancedMesh) {
+        // A pooled instancer's own transform sits at the pool origin and its
+        // bounding sphere is a hand-set unit sphere (SatVegLayer), so a
+        // distance test on it is meaningless. `count > 0` is the honest signal:
+        // these pools are placed around the player by construction.
+        if (o.count > 0) instanced++;
+      } else {
+        _rigV.setFromMatrixPosition(o.matrixWorld);
+        const dx = _rigV.x - px;
+        const dz = _rigV.z - pz;
+        // Chunk meshes are ~1 km across and anchored at a corner, so the
+        // geometry's own bounding sphere is added when it exists.
+        const br = o.geometry?.boundingSphere?.radius ?? 0;
+        const reach = radiusM + br;
+        if (dx * dx + dz * dz <= (br > 0 ? reach * reach : r2)) meshes++;
+      }
+    }
+    const kids = o.children;
+    for (let i = 0; i < kids.length; i++) walk(kids[i]);
+  };
+  walk(root);
+  return { instanced, meshes };
+}
+
+function SatDepthRig({ runtime, flight, origin, engine, scene }) {
+  const [armed, setArmed] = useState(false);
+  const stateRef = useRef({
+    // Seeded LARGE-but-finite, deliberately: `-Infinity + delta` is still
+    // -Infinity, so the accumulator would never reach the poll interval and
+    // both sweeps would be dead for the life of the session. A big finite
+    // number fires both on the very first frame instead.
+    t: 1e6,
+    sweepT: 1e6,
+    receivers: new Set(),
+    casters: new Set(),
+    buildings: 0,
+    instanced: 0,
+    meshes: 0,
+  });
+
+  // Charter rule 4's second dev handle (the first is __flyN8AO in Effects.jsx).
+  // `set(bool)` drives the SAME master arm the AO handle drives, so an A/B leg
+  // never has to know which of the four sub-features it is toggling; `get()`
+  // returns the live census, which is what makes "the catcher mounted because
+  // N casters were in the frustum" an assertion rather than a claim.
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development' || typeof window === 'undefined') return;
+    window.__flyCatcher = {
+      set: (v) => {
+        if (v == null) delete window.__flyDepthArm;
+        else window.__flyDepthArm = v ? 1 : 0;
+      },
+      sub: (o) => {
+        window.__flyDepthSub = o ?? undefined;
+      },
+      get: () => ({
+        catcher: !!stateRef.current.__armed,
+        casters: {
+          buildings: stateRef.current.buildings,
+          instanced: stateRef.current.instanced,
+          meshes: stateRef.current.meshes,
+        },
+        receivers: stateRef.current.receivers.size,
+        casterFlips: stateRef.current.casters.size,
+      }),
+    };
+    return () => {
+      if (window.__flyCatcher) delete window.__flyCatcher;
+    };
+  }, []);
+
+  // Restore every flag this rig set, on unmount. A leaked receiveShadow=true on
+  // a tile that survives into a non-shadow frame is an invisible fill cost with
+  // no owner.
+  useEffect(() => {
+    const st = stateRef.current;
+    return () => {
+      for (const o of st.receivers) _delistReceiver(o);
+      st.receivers.clear();
+      for (const o of st.casters) o.castShadow = false;
+      st.casters.clear();
+    };
+  }, []);
+
+  useFrame((_, delta) => {
+    const st = stateRef.current;
+    st.t += delta;
+    st.sweepT += delta;
+    const on = depthPassOn();
+    const px = flight.pos.x - origin.anchor.x;
+    const pz = flight.pos.z - origin.anchor.z;
+
+    // ---- (1) catcher census, at pollHz -----------------------------------
+    const C = DEPTH_PASS.catcher;
+    const pollDt = 1 / Math.max(0.5, C.pollHz ?? 2);
+    if (st.t >= pollDt) {
+      st.t = 0;
+      let want = false;
+      if (depthSubOn('catcher')) {
+        const agl = Number.isFinite(flight.agl) ? flight.agl : Infinity;
+        if (agl <= C.maxAglM) {
+          // EXACT for buildings: the R18 per-building collision column index,
+          // queried at the ortho frustum radius. Absent (no building layer, or
+          // a scene with none) it returns undefined and contributes 0.
+          const cols =
+            runtime.satBuildings?.queryColumns?.(
+              flight.pos.x,
+              flight.pos.z,
+              SAT_SHADOWS.orthoRadiusM
+            ) ?? null;
+          st.buildings = cols?.length ?? 0;
+          const walked = countCastersNear(scene, px, pz, SAT_SHADOWS.orthoRadiusM);
+          st.instanced = walked.instanced;
+          st.meshes = walked.meshes;
+          want =
+            st.buildings + st.instanced + st.meshes >= (C.minCasters ?? 1);
+        } else {
+          st.buildings = st.instanced = st.meshes = 0;
+        }
+      } else {
+        st.buildings = st.instanced = st.meshes = 0;
+      }
+      st.__armed = want;
+      if (want !== armed) setArmed(want);
+      if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+        (window.__flyStats ??= {}).depthRig = {
+          catcher: want,
+          agl: Math.round(flight.agl ?? -1),
+          casters: {
+            buildings: st.buildings,
+            instanced: st.instanced,
+            meshes: st.meshes,
+          },
+          receivers: st.receivers.size,
+          casterFlips: st.casters.size,
+          sweep: {
+            walked: st.walked ?? null,
+            leaves: st.leaves ?? null,
+            near: st.leavesNear ?? null,
+            // Do the flags SURVIVE? A count of the enlisted objects that still
+            // read receiveShadow true and still have a parent — the difference
+            // between "the sweep selected 22" and "22 tiles are receiving".
+            live: (() => {
+              let n = 0;
+              let orphan = 0;
+              for (const o of st.receivers) {
+                if (o.receiveShadow === true) n++;
+                if (!o.parent) orphan++;
+              }
+              return { flagged: n, orphaned: orphan, size: st.receivers.size };
+            })(),
+          },
+        };
+      }
+    }
+
+    // ---- (2) near receive set + (3) caster flips, at nearReceive.pollHz ---
+    const NR = DEPTH_PASS.nearReceive;
+    const sweepDt = 1 / Math.max(0.5, NR.pollHz ?? 6);
+    if (st.sweepT < sweepDt) return;
+    st.sweepT = 0;
+
+    const receiveOn = depthSubOn('nearReceive');
+    const next = receiveOn ? new Set() : null;
+    if (receiveOn) {
+      const reach = SAT_SHADOWS.orthoRadiusM + (NR.padM ?? 0);
+      const cap = NR.maxTiles ?? 48;
+      const root = engine?.object;
+      _swept.tiles = 0;
+      _swept.leaves = 0;
+      const walkTiles = (t) => {
+        if (!t || !t.visible || next.size >= cap) return;
+        if (t.isTile) {
+          _swept.tiles++;
+          if (t.isLeaf) {
+            _swept.leaves++;
+            const m = t.model;
+            if (m) {
+              const e = t.matrixWorld.elements;
+              _rigV.setFromMatrixPosition(t.matrixWorld);
+              // World half-extent from the matrix' own column lengths — the map
+              // is rotated -90 deg about X, so the ground plane's extents come
+              // out of columns 0 and 1. No decompose, no allocation.
+              const sx = Math.hypot(e[0], e[1], e[2]);
+              const sy = Math.hypot(e[4], e[5], e[6]);
+              const half = Math.max(sx, sy);
+              const dx = _rigV.x - px;
+              const dz = _rigV.z - pz;
+              const lim = reach + half;
+              if (dx * dx + dz * dz <= lim * lim) next.add(m);
+            }
+            return;
+          }
+        }
+        const kids = t.children;
+        for (let i = 0; i < kids.length; i++) walkTiles(kids[i]);
+      };
+      if (root) walkTiles(root);
+      // Sweep telemetry — verify-depth2 (3) asserts the enlistment count, and
+      // when it reads 0 the ONLY useful question is which of the three stages
+      // dropped it: no tree, no leaves, or no leaf inside the radius.
+      st.walked = _swept.tiles;
+      st.leaves = _swept.leaves;
+      st.leavesNear = next.size;
+
+      // Parcel homes join as RECEIVERS only (never casters — the R20 rig is
+      // hash-stable placement and a 2,000-instance caster set is a different
+      // measurement). Identified by the userData latch SatParcelHomes already
+      // sets on its own mesh, so no edit to B's file.
+      if (NR.parcelHomes) {
+        const walkParcel = (o) => {
+          if (!o.visible) return;
+          if (o.isInstancedMesh && o.userData.__parcelInit === true && o.count > 0) {
+            next.add(o);
+          }
+          const kids = o.children;
+          for (let i = 0; i < kids.length; i++) walkParcel(kids[i]);
+        };
+        walkParcel(scene);
+      }
+    }
+
+    // Diff, so a steady pose costs zero writes.
+    const prev = st.receivers;
+    if (next) {
+      for (const o of prev) if (!next.has(o)) _delistReceiver(o);
+      for (const o of next) if (!prev.has(o)) _enlistReceiver(o);
+      st.receivers = next;
+    } else {
+      // Disarmed: zero the telemetry too, or the last armed sweep's counts sit
+      // in __flyStats forever and read as "48 tiles enlisted" on a leg where
+      // nothing is enlisted at all.
+      _swept.tiles = 0;
+      _swept.leaves = 0;
+      st.walked = 0;
+      st.leaves = 0;
+      st.leavesNear = 0;
+      if (prev.size) {
+        for (const o of prev) _delistReceiver(o);
+        prev.clear();
+      }
+    }
+
+    // ---- (3) caster flips ------------------------------------------------
+    const nextC = new Set();
+    if (on) {
+      const walkCast = (o) => {
+        if (!o.visible) return;
+        const kind = o.userData?.r22Caster;
+        if (kind && depthCasterOn(kind)) nextC.add(o);
+        const kids = o.children;
+        for (let i = 0; i < kids.length; i++) walkCast(kids[i]);
+      };
+      walkCast(scene);
+    }
+    const prevC = st.casters;
+    for (const o of prevC) if (!nextC.has(o)) o.castShadow = false;
+    for (const o of nextC) if (!prevC.has(o)) o.castShadow = true;
+    st.casters = nextC;
+  }, -48); // after the catcher's own -49 pose write, before the composer
+
+  // The legacy path stays reachable: with DEPTH_PASS off, the disc mounts iff
+  // SAT_SHADOWS.catcher.enabled — exactly the R19 contract, byte-for-byte.
+  const legacy = !depthPassOn() && (SAT_SHADOWS.catcher.enabled || SHADOW_CALM.enabled);
+  return (
+    <>
+      {(armed || legacy) && <SatShadowCatcher flight={flight} origin={origin} runtime={runtime} />}
+      {process.env.NODE_ENV === 'development' && (
+        <StandInCasters flight={flight} origin={origin} />
+      )}
+    </>
+  );
+}
+
+/**
+ * ROUND 22 (D "DEPTH") — dev-only stand-in casters for the W1 caster-flip
+ * measurement.
+ *
+ * C CLUTTER's cars/poles/trees do not exist in this worktree yet (plan §3
+ * merges D LAST, after C, precisely so the shadow arithmetic is measured
+ * against the real world). But the flip's COST is a property of the shadow map
+ * — N extra small casters re-rendered into a 2048² depth target — not of what
+ * the casters look like, so a pool of unit boxes carrying the same
+ * `userData.r22Caster` marker C's meshes will carry produces a W1 gpuFrameMs
+ * number that W2 only has to re-confirm against real geometry.
+ *
+ * Renders NOTHING until `window.__flyCasterStandIn(kind, n)` is called, costs
+ * one draw when it does, and never exists in a production build.
+ */
+function StandInCasters({ flight, origin }) {
+  const ref = useRef();
+  const cfgRef = useRef({ kind: null, n: 0, epoch: 0 });
+  const [epoch, setEpoch] = useState(0);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.__flyCasterStandIn = (kind, n = 0) => {
+      cfgRef.current = { kind, n: Math.max(0, Math.min(2000, n | 0)), epoch: epoch + 1 };
+      setEpoch((e) => e + 1);
+      return cfgRef.current;
+    };
+    return () => {
+      if (window.__flyCasterStandIn) delete window.__flyCasterStandIn;
+    };
+  }, [epoch]);
+  useFrame(() => {
+    const m = ref.current;
+    const cfg = cfgRef.current;
+    if (!m) return;
+    if (!cfg.kind || cfg.n <= 0) {
+      m.count = 0;
+      m.visible = false;
+      return;
+    }
+    m.userData.r22Caster = cfg.kind; // the same marker contract C's meshes use
+    m.visible = true;
+    m.count = cfg.n;
+    // Deterministic ring inside the ortho frustum: a fixed lattice keyed off the
+    // instance index, re-anchored to the player each frame. Frozen under a
+    // pinned clock by construction (no time term at all).
+    const px = flight.pos.x - origin.anchor.x;
+    const pz = flight.pos.z - origin.anchor.z;
+    const gy = flight.groundElev;
+    for (let i = 0; i < cfg.n; i++) {
+      const a = i * 2.399963;
+      const r = SAT_SHADOWS.orthoRadiusM * 0.9 * Math.sqrt((i + 0.5) / cfg.n);
+      _standIn.position.set(px + Math.cos(a) * r, gy + 1.5, pz + Math.sin(a) * r);
+      _standIn.updateMatrix();
+      m.setMatrixAt(i, _standIn.matrix);
+    }
+    m.instanceMatrix.needsUpdate = true;
+    m.computeBoundingSphere();
+  }, -48);
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, 2000]} frustumCulled={false}>
+      <boxGeometry args={[4, 3, 2]} />
+      <meshLambertMaterial color="#8a8f98" />
+    </instancedMesh>
+  );
+}
+
+const _standIn = /* @__PURE__ */ new Object3D();
 
 /**
  * The Fly-mode scene graph + frame loop. Order per frame (useFrame
@@ -479,6 +962,9 @@ export function FlyScene({ runtime }) {
   const spawn = useFlyStore((s) => s.spawn);
   const mapStyle = useFlyStore((s) => s.mapStyle);
   const qualityTier = useFlyStore((s) => s.qualityTier);
+  const renderDpr = useThree((s) => s.viewport.dpr);
+  const effectsTier = mapStyle === 'satellite' && satelliteVisualsOn()
+    ? satelliteEffectTier(qualityTier, renderDpr) : qualityTier;
   const mood = MOODS[mapStyle] ?? MOODS.satellite;
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
@@ -521,7 +1007,7 @@ export function FlyScene({ runtime }) {
   const satShadowsOn =
     mapStyle === 'satellite' &&
     SAT_SHADOWS.enabled &&
-    qualityTier === 'high' &&
+    effectsTier === 'high' &&
     satShadowPin;
   // Render-time mirror so the frame loop reads this frame's value with no
   // stale-closure window (the pattern styleRef uses).
@@ -726,6 +1212,11 @@ export function FlyScene({ runtime }) {
   // Publish engine handles for the DOM HUD (reads at 10Hz) and later phases.
   useEffect(() => {
     runtime.engine = engine;
+    // R22 W2 (Fable arbitration, A's request #6): let the engine publish
+    // runtime.terraStats directly — production has no __fly dev handle, and
+    // consumers read `runtime.terraStats ?? runtime.engine?.terraStats`.
+    // Optional-call no-op when TERRA families are off (idempotent).
+    engine.attachRuntime?.(runtime);
     runtime.flight = flight;
     runtime.input = input;
     runtime.origin = origin;
@@ -862,6 +1353,10 @@ export function FlyScene({ runtime }) {
       const geo = engine.worldToGeo(flight.pos);
       flight.latDeg = geo.y;
       runtime.geo = geo; // the 1Hz poll key picks the new area up next tick
+      // R22 W0 pre-seed: tell the raster terrain a warp happened (the vector
+      // engines already get notifyWarp via warpEpoch; the quadtree never
+      // did). Optional-call no-op until A TERRA implements it (TERRA_PIPE.warp).
+      engine.notifyWarp?.(geo.x, geo.y);
       // DEM for the destination is rarely resident yet — 0 now, the
       // 3rd-frame ground sampler + the flight model's soft floor take over
       // as tiles stream in (high-elevation arrivals ride the floor up).
@@ -934,7 +1429,7 @@ export function FlyScene({ runtime }) {
     });
     useFlyStore.getState().setRuntimeReady(true);
 
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === 'development' || graphicsReviewOn()) {
       window.__fly = runtime;
       window.__flyStore = useFlyStore; // harnesses drive style/tier switches
       window.__passportStore = usePassportStore; // round 16: logbook/badge gates
@@ -1065,9 +1560,16 @@ export function FlyScene({ runtime }) {
   //   __flyTerra.mem()  -> resident tiles + estimated bytes + LRU activity.
   useEffect(() => {
     if (process.env.NODE_ENV === 'production') return undefined;
+    // Rebind constructor diagnostics to the live StrictMode engine before
+    // composing main's residency handle. Keep get() as the actual map; the
+    // legacy configuration snapshot has its own explicit config() accessor.
+    engine._installDevHandle?.();
+    const diagnostics = window.__flyTerra?.__owner === engine ? window.__flyTerra : {};
     const owner = {};
     const handle = {
+      ...diagnostics,
       __owner: owner,
+      config: diagnostics.get,
       get: () => engine.map,
       engine: () => engine,
       lod: () => ({ ...(engine.lodStats ?? {}) }),
@@ -1266,6 +1768,20 @@ export function FlyScene({ runtime }) {
       return;
     }
     const hc = SKY.hdriCycle;
+    // R22 (B SETTLE, arrivalCalm) — a bucket CROSSING remounts drei's
+    // <Environment> and re-bakes a PMREM, which is the single most expensive
+    // discrete event in a satellite session. Two guards, both bounded:
+    //  (a) POST-REVEAL GRACE. For arrivalCalm.graceSec after the world becomes
+    //      visible the bucket is held at whatever it arrived with. The sky the
+    //      player lands under is the sky they keep for the first seconds; a
+    //      warp already snaps the bucket on its own epoch (this effect's dep),
+    //      so the grace only ever suppresses a re-pick that would have moved
+    //      the sky UNDER a player who just arrived.
+    //  (b) HYSTERESIS. `frac` crawls, so a bucket edge sat on at 0.001/s
+    //      re-picks every 5 s forever. A new bucket must clear the boundary by
+    //      arrivalCalm.hdriHysteresis of the day/night span before it lands.
+    const H = SETTLE_CALM.arrivalCalm;
+    let held = null; // the bucket currently displayed, for the hysteresis test
     const pick = () => {
       const frac = runtime.sun?.frac ?? 1;
       const az = runtime.sun?.az ?? 0;
@@ -1273,6 +1789,16 @@ export function FlyScene({ runtime }) {
       if (frac >= hc.dayFrac) b = 'day';
       else if (frac < hc.nightFrac) b = 'night';
       else b = az < 0 ? 'dawn' : 'dusk';
+      if (settleOn() && held !== null && b !== held) {
+        const since = sinceRevealMs();
+        const inGrace = since >= 0 && since < H.graceSec * 1000;
+        // The margin the crossing has actually cleared, in `frac` units.
+        const edge = b === 'day' || held === 'day' ? hc.dayFrac : hc.nightFrac;
+        const span = Math.max(1e-3, hc.dayFrac - hc.nightFrac);
+        const cleared = Math.abs(frac - edge) / span;
+        if (inGrace || cleared < H.hdriHysteresis) b = held;
+      }
+      held = b;
       setHdriBucket((prev) => (prev === b ? prev : b));
       // Round 19 (Fable, v2): dusk-aware key-color MIX — same discrete 5 s
       // cadence, full {a, b, s} so the color effect can lerp instead of
@@ -1376,6 +1902,20 @@ export function FlyScene({ runtime }) {
   }, [spawn, engine, flight, rebase]);
 
   const frameCount = useRef(0);
+  // R24 (C, MOTION_R24.elevGate — BUILT, OFF): the last DEM sample that came
+  // from a tile at or above `minTileZ`. Read ONLY as the visual-publish input
+  // (see the ground-sample block); `null` until the first accepted sample, at
+  // which point the site falls back to the raw value, so an armed session
+  // before any fine tile exists behaves exactly like an un-armed one.
+  const elevVisSrcRef = useRef(null);
+  // R23 (A): the night telemetry's own WALL-CLOCK cadence. It deliberately does
+  // not ride `frameCount % 60`: the whole point of the instrument is to report
+  // a machine that is running BADLY, and on a machine at 8 fps a 60-frame gate
+  // publishes every 7.5 s and hands back numbers that are stale exactly when
+  // they matter most (measured in this worktree: the 60-frame block skipped six
+  // consecutive clock samples and reported a haze value from three minutes
+  // earlier). A wall clock is the same cost and cannot lie about its own age.
+  const nightStatAt = useRef(0);
   // Round 13 fix (live-caught "night at noon" boot): the frame loop can tick
   // BEFORE React flushes the spawn-placement effect below, so the first geo
   // samples came from the UNPLACED flight.pos at the world origin — publishing
@@ -1422,18 +1962,60 @@ export function FlyScene({ runtime }) {
 
     // Terrain raycasts are ~fractions of a ms but not free — sample the
     // ground under the aircraft every 3rd frame.
+    //
+    // ── R24 (C MOTION-STATE), `MOTION_R24.elevGate` — BUILT, SHIPS OFF ──────
+    // MEASURED ASYMMETRY: this sample has NO tile-zoom quality gate, while the
+    // two traffic samplers ~600 lines below both carry one —
+    // `if (!s || s.tileZ < 11) return null` — under the comment "a coarse
+    // fallback DEM tile 'answers' with plateau garbage — planes got pinned
+    // mid-air forever". The player's own ground got the gate the traffic got,
+    // never. `getElevationAt` (terrain-engine.js) returns `info.location.z` and
+    // DISCARDS the zoom that `getGroundAt` — the same raycast, one line over —
+    // hands back for free. Under fast motion the resident leaf under the
+    // aircraft changes zoom constantly (the R22.1 close ledger §3.1(d) measured
+    // camTileZ swinging 10 <-> 13 <-> 18 at the SAME poses in one session), so
+    // this value jitters by whole DEM levels precisely when moving.
+    //
+    // THE SAFE SHAPE, and it is the whole reason this is not a one-line change:
+    // `flight.groundElev` also feeds the CRASH FLOOR (crashSys.update reads
+    // flight.floorContact, written by flight.step off this value) and
+    // `flight.agl`. Rejecting a coarse answer makes the value HOLD its previous
+    // reading, which is right for a fade band and a change of behaviour for a
+    // safety system. So the gate applies to the VISUAL PUBLISH ONLY: the raw
+    // assignment below is untouched at every flag state, and only the input to
+    // groundElevVisStep is gated. R22's rule stands verbatim — safety never
+    // reads a damped OR a gated signal.
+    //
+    // DEPENDENCY FOR A TERRA (TILE_HOLD): `minTileZ: 11` is derived from
+    // TODAY'S DEM ceiling (demMaxZoom 16, z17 a 67-byte degenerate surface) and
+    // mirrors the traffic samplers' own frozen 11. If TILE_HOLD moves the DEM
+    // ceiling or the LOD curve, this floor must be RE-DERIVED, not inherited.
     if (spawnPlacedRef.current && frameCount.current++ % 3 === 0) {
       const geo = engine.worldToGeo(flight.pos);
       flight.latDeg = geo.y;
-      const elev = engine.getElevationAt(geo.x, geo.y);
-      if (elev != null) flight.groundElev = elev;
+      if (motionSubOn('elevGate')) {
+        // Same raycast, one extra returned field. (`getGroundAt` also
+        // self-calibrates the engine's `_sizeZ0` — idempotent, and the terra
+        // stats tick already does it on its own 2 Hz beat.)
+        const s = engine.getGroundAt(geo.x, geo.y);
+        if (s && s.elev != null) {
+          flight.groundElev = s.elev; // RAW, exactly as below — safety's input
+          if ((s.tileZ ?? 0) >= MOTION_R24.elevGate.minTileZ) elevVisSrcRef.current = s.elev;
+        }
+      } else {
+        const elev = engine.getElevationAt(geo.x, geo.y);
+        if (elev != null) flight.groundElev = elev;
+      }
       runtime.geo = geo; // Vector3(lon, lat, altM) — HUD/polling read this
     }
     // R24 B (GROUND_VIS): the damped twin, stepped EVERY frame (the raw sample
     // above is every 3rd) and snapped on a warp. Visual consumers only — the
     // flight model, crash floor, ground shadow, cameras and every placement
     // sample keep `flight.groundElev`. Flag-off this mirrors the raw value.
-    stepGroundVis(runtime, flight, useFlyStore.getState().warpEpoch);
+    // Keep main's single frame-bounded visual-ground writer. The optional
+    // DEM-quality gate supplies its accepted sample without changing physics.
+    stepGroundVis(runtime, motionSubOn('elevGate')
+      ? { groundElev: elevVisSrcRef.current ?? flight.groundElev } : flight, flyState.warpEpoch);
 
     // --- Phase 5: targeting + autopilot (uses traffic items from the
     // previous frame's update at -45 — 16ms of staleness is immaterial) ---
@@ -1743,14 +2325,16 @@ export function FlyScene({ runtime }) {
     // between the rim and the sky.
     const rpx = flight.pos.x - origin.anchor.x;
     const rpz = flight.pos.z - origin.anchor.z;
-    const bendR = GLOBE.bendRadiusM[flyState.mapStyle] ?? GLOBE.bendRadiusM.satellite;
-    let bendK = 1 / (2 * bendR);
+    const cinematicScale = flyState.mapStyle === 'satellite' && satelliteVisualsOn('scale');
+    const bendR = cinematicScale ? SATELLITE_VISUALS.scale.bendRadiusM : GLOBE.bendRadiusM[flyState.mapStyle] ?? GLOBE.bendRadiusM.satellite;
+    let bendK = cinematicScale ? physicalBendCoefficient(bendR, mercatorScale(flight.latDeg)) : 1 / (2 * bendR);
     const flat = GLOBE.altFlatten;
     if (flat) {
       const over = Math.max(0, flight.pos.y - flat.startAltM);
       bendK *= Math.max(flat.minKFrac, Math.pow(2, -over / flat.halfAltM));
     }
     setBend(rpx, rpz, bendK);
+    setSatelliteWaterFrame({ enabled: flyState.mapStyle === 'satellite' && satelliteVisualsOn('water'), timeSec: _.clock.elapsedTime, originX: origin.anchor.x, originZ: origin.anchor.z, sunAz: runtime.sun?.az, sunSinEl: runtime.sun?.sinEl, overcast: runtime.weather?.wx?.overcastT, moonDirection: _moonDir });
     // The aircraft bend variant caps drops against the player's eye level —
     // grounded targets keep the full drop, high targets never sink below us.
     // Round 8.5 (H1) decision: groundElev stays TRUE-frame here even in toy
@@ -1793,7 +2377,8 @@ export function FlyScene({ runtime }) {
       // The altitude term is expApproach-smoothed so a dive can't pop the band;
       // tod tracks slowly (runtime.sun updates on the 60s cadence + on warp).
       const aa = SKY.altAtmo;
-      const eyeAgl = eyeAglVis(runtime, flight); // R24 B (GROUND_VIS)
+      const eyeAgl = visualEyeAgl(runtime, flight); // R24 B (GROUND_VIS)
+      const eyeAglVis = eyeAgl;
       const targetAltT = Math.min(
         1,
         Math.max(0, (eyeAgl - aa.aglStartM) / (aa.aglFullM - aa.aglStartM))
@@ -1805,6 +2390,9 @@ export function FlyScene({ runtime }) {
         dt
       ));
       computeSatAtmo(runtime.sun?.frac ?? 1, altT);
+      if (satelliteVisualsOn('atmosphere')) {
+        applySatelliteNightRim(_atmoRim, _atmoVoid, runtime.sun);
+      }
       // --- Round 16: the WEATHER post-pass ---------------------------------
       // Order is the whole contract. computeSatAtmo has just written the
       // clean time-of-day/altitude rim triple; stepWeather advances the
@@ -1868,7 +2456,7 @@ export function FlyScene({ runtime }) {
       // (shader early-out / skipped branch / untouched uniform), so a pinned
       // frame is bit-identical to R18 rather than merely close — which is what
       // lets every frozen satellite pixel gate keep its numbers.
-      const highTier = flyState.qualityTier === 'high';
+      const highTier = effectsTier === 'high';
       // R24 D: the fleet PIN is split out of the tier gate because the law runs
       // at medium/low too — the pin must still reach it, the tier gate must
       // not. `aerialGate` below is bit-identical to the R21 expression.
@@ -1995,15 +2583,63 @@ export function FlyScene({ runtime }) {
       // the same depth buffer, and running both double-hazes the mid band. The
       // term exists for medium/low, where no post pass runs; see the
       // AERIAL_PERSPECTIVE.content header.
+      //
+      // R22 W2 (Fable arbitration, the plan §5.4 mechanism): D DEPTH measured
+      // the §5.4 flip as-written to be a NO-OP — this branch was gated on
+      // `aerialGate`, which is highTier-only, so the content term could never
+      // arm at the tiers it exists FOR, and `content.minTier` was read
+      // nowhere in the tree. The content haze now carries its OWN gate: armed
+      // at tiers >= content.minTier where the post pass is NOT running
+      // (highTier stays excluded — R19's double-haze finding), still zeroed
+      // by the `__flyAerialOverride` fleet pin exactly like the post pass.
+      // Defaults unchanged here (enabled:false) — the §5.4 flip is consumed
+      // at W3 with its medium-tier A/B.
       const ch = AERIAL_PERSPECTIVE.content;
-      if (ch.enabled && aerialGate > 0) {
+      const _tierRank = { low: 0, medium: 1, high: 2 };
+      let contentGate =
+        ch.enabled &&
+        !highTier &&
+        (_tierRank[effectsTier] ?? 0) >= (_tierRank[ch.minTier] ?? 2)
+          ? 1
+          : 0;
+      if (
+        process.env.NODE_ENV === 'development' &&
+        typeof window !== 'undefined' &&
+        window.__flyAerialOverride != null
+      ) {
+        contentGate *= window.__flyAerialOverride;
+      }
+      // R23 (A NIGHT-TRUTH, F1) — THE NIGHT TERM THIS HAZE NEVER HAD.
+      //
+      // Measured defect (scripts/r23-a-tiernight.json): the content haze reads
+      // 0.55 at sunFrac 0 and 0.55 at sunFrac 1 — its strength is a pure
+      // function of distance. By day the mix target is the bright rim and that
+      // is correct aerial perspective; at night `_atmoRim` is the deep-night
+      // keyframe #101a30, so the same 0.55 washes the city — and its injection
+      // site is after the lighting chunks on gl_FragColor, so it takes the
+      // emissive window light down with it. Armed at medium/low only, where
+      // the night windows are ALREADY off, on a term the whole harness fleet
+      // reads as 0 (see the NIGHT_TRUTH_R23 header for the paired proof).
+      //
+      // Retire it on the SAME ramp the windows and the road network arrive on,
+      // so the two hand off instead of fighting. retire 1 ⇒ exactly 0 at deep
+      // night = R21's certified state; noon is untouched by arithmetic.
+      const hn = NIGHT_TRUTH_R23.enabled && NIGHT_TRUTH_R23.hazeNight.enabled
+        ? NIGHT_TRUTH_R23.hazeNight
+        : null;
+      if (hn && contentGate > 0) {
+        const nightT =
+          Math.min(1, Math.max(0, 1 - (runtime.sun?.frac ?? 1) / hn.dayFrac)) ** hn.gamma;
+        contentGate *= 1 - hn.retire * nightT;
+      }
+      if (contentGate > 0) {
         setSatContentHaze(
           ch.startM,
           ch.endM,
           _atmoRim[0],
           _atmoRim[1],
           _atmoRim[2],
-          ch.max * aerialGate
+          ch.max * contentGate
         );
       } else {
         setSatContentHaze(ch.startM, ch.endM, 0, 0, 0, 0);
@@ -2014,16 +2650,45 @@ export function FlyScene({ runtime }) {
       // screen, while the hillshade/micro-detail contracts own that band. So
       // the grade fades IN with eye AGL and is exactly 0 below inAglM, which is
       // also what keeps verify-sat-depth's low-altitude crops untouched.
+      //
+      // R24 (C, MOTION_R24.grades — ON): the input is now the DAMPED ground.
+      // This is a UNIFORM write over the tile imagery — desaturation plus luma
+      // flatten — so when the raw DEM sample steps (R22 measured ~384 m/frame
+      // as it refines under the aircraft) it repaints EVERY ground pixel on one
+      // frame, with no geometry change and no draw-count change. That is why
+      // nothing in the fleet can see it: draw gates and censuses are blind to a
+      // uniform, and every satellite pixel gate FREEZES the flight — a frozen
+      // aircraft has a settled groundElev. It is the strongest candidate this
+      // round owns for the user's "the satellite ground plane itself glitches".
+      // The four sibling content layers have read `groundElevVis` since R22;
+      // this makes the ground plane agree with the things standing on it.
       if (SAT_QUILT.enabled && aerialGate > 0) {
         let qt = Math.min(
           1,
-          Math.max(0, (eyeAgl - SAT_QUILT.inAglM) / (SAT_QUILT.outAglM - SAT_QUILT.inAglM))
+          Math.max(0, (eyeAglVis - SAT_QUILT.inAglM) / (SAT_QUILT.outAglM - SAT_QUILT.inAglM))
         );
         qt = qt * qt * (3 - 2 * qt);
         const q = qt * aerialGate;
         setQuiltGrade(SAT_QUILT.desatMax * q, SAT_QUILT.lumaFlatten * q);
+        // R24 (C review fix C1): the trace channel's only write outside the dev
+        // block at the foot of this callback, and it carries the SAME predicate
+        // as the publish site there — deliberately, for two reasons. The
+        // NODE_ENV half is what makes the `_motionTrace` header's "compiled out
+        // of production" claim literally true (the bundler folds the constant
+        // and drops the branch), rather than true-of-eleven-writes-and-not-two.
+        // The armed half is a correctness property, not a saving: sharing the
+        // test with the READER is what guarantees the published `quilt` is THIS
+        // frame's value and never whatever the last armed frame left behind.
+        // The predicate is repeated in the else arm rather than hoisted so the
+        // production expression above stays byte-identical to what shipped.
+        if (process.env.NODE_ENV === 'development' && window.__flyMotionTrace) {
+          _motionTrace.quilt = SAT_QUILT.desatMax * q;
+        }
       } else {
         setQuiltGrade(0, 0);
+        if (process.env.NODE_ENV === 'development' && window.__flyMotionTrace) {
+          _motionTrace.quilt = 0;
+        }
       }
       setSkyAtmo(_atmoRim[0], _atmoRim[1], _atmoRim[2], _atmoVoid[0], _atmoVoid[1], _atmoVoid[2]);
       // R19 scaffolding (Fable): the SkyDome sun feed for D GOLDENHOUR's
@@ -2120,20 +2785,35 @@ export function FlyScene({ runtime }) {
     // covers the pre-style-effect boot frame (uniform boots "disabled").
     const liveFadeStart = getEdgeFade().startM;
     const dipStartM = liveFadeStart > 1e8 ? skyFade.startM : liveFadeStart;
-    const eyeAgl = eyeAglVis(runtime, flight); // R24 B (GROUND_VIS)
+    const eyeAgl = visualEyeAgl(runtime, flight); // R24 B (GROUND_VIS)
     const rimDrop = dipStartM * dipStartM * bendK + eyeAgl;
     setSkyDip(rimDrop / Math.hypot(rimDrop, dipStartM));
+    // R24 (C, MOTION_R24.grades — ON): the damped sibling, for the micro-detail
+    // grade below ONLY. `rimDrop` above keeps the RAW value on purpose: the sky
+    // dip is where the DRAWN ground meets the dome, and the drawn ground is
+    // bent off the true eye height (setBendEye is fed raw too, two blocks up),
+    // so damping it would open a seam between the terrain and the sky — the
+    // exact class of bug this round is closing, inverted. Flag off ⇒ identical.
+    const eyeAglVis = motionSubOn('grades')
+      ? Math.max(0, flight.pos.y - groundElevVis(runtime, flight))
+      : eyeAgl;
 
     // Round 13 (P4): low-AGL ground micro-detail. The noise-grain uniform fades
     // IN below HILLSHADE.micro.inAglM and OUT by outAglM (satellite only; the
     // SKY.altAtmo eyeAgl pattern), tier-gated (low → 0). Pure uniform write —
     // 0 above the band / off-satellite compiles the term to a ×1.0 no-op.
+    //
+    // R24 (C, MOTION_R24.grades — ON): reads the DAMPED ground for the same
+    // reason SAT_QUILT does. This is the OTHER whole-ground-plane uniform, and
+    // it lives in the low-AGL band (mc.inAglM/outAglM) where a raw DEM step is
+    // proportionally largest — the noise grain switched on or off across the
+    // entire terrain in a single frame. Flag off ⇒ the verbatim raw input.
     const mc = HILLSHADE.micro;
     const microMax =
       flyState.mapStyle === 'satellite'
         ? (mc.strengthByTier[flyState.qualityTier] ?? 0)
         : 0;
-    let mt = Math.min(1, Math.max(0, (eyeAgl - mc.inAglM) / (mc.outAglM - mc.inAglM)));
+    let mt = Math.min(1, Math.max(0, (eyeAglVis - mc.inAglM) / (mc.outAglM - mc.inAglM)));
     mt = mt * mt * (3 - 2 * mt);
     let microStrength = microMax * (1 - mt);
     // Dev A/B handle (like __flySunOverride): pin micro-detail strength for the
@@ -2279,10 +2959,52 @@ export function FlyScene({ runtime }) {
       }
     }
 
+    if (graphicsReviewOn()) {
+      if (process.env.NODE_ENV !== 'development') gl.info.autoReset = false;
+      const review = (window.__graphicsReview ??= { nextAt: 0 });
+      if (performance.now() >= review.nextAt) {
+        review.nextAt = performance.now() + 500;
+        Object.assign(review, { drawCalls: gl.info.render.calls, triangles: gl.info.render.triangles,
+          textures: gl.info.memory.textures, geometries: gl.info.memory.geometries,
+          programs: gl.info.programs.length, tier: flyState.qualityTier, effectsTier,
+          dpr: gl.getPixelRatio(), buildings: runtime.satBuildings?.stats,
+          roads: runtime.satRoads?.stats, skyline: runtime.satSkyline?.stats,
+          parcels: runtime.parcelSettle,
+          skylineCoveredTiles: runtime.satSkyline?.material.userData.architecture?.uniforms.uArchitectureTileCount?.value,
+          cinematic: satelliteVisualsOn(),
+          terrain: runtime.terraStats,
+          sun: runtime.sun, weather: runtime.weather?.wx, aglM: flight.pos.y - flight.groundElev });
+      }
+      if (process.env.NODE_ENV !== 'development') gl.info.reset();
+    }
     // Discrete store sync only when the preset actually changes.
     if (store.speedPreset !== cmd.speedPreset) store.setSpeedPreset(cmd.speedPreset);
 
     if (process.env.NODE_ENV === 'development') {
+      // R24 (C MOTION-STATE) — THE AGL-DIVERGENCE TRACE, per frame, opt-in.
+      //
+      // The R24 Wave-1 finding is that the two ground truths in this frame
+      // disagree — the visuals ride a damped `groundElevVis` while the raw DEM
+      // sample under the aircraft steps by whole levels at speed — and no
+      // existing instrument can see it, because every frozen-pose pixel gate
+      // has a SETTLED groundElev by construction. A trace needs per-FRAME
+      // resolution (a single-frame delta is the whole claim), so this cannot
+      // ride the 60-frame block or the 2 Hz night beat. It costs one property
+      // read per frame unless a probe has armed it, and nothing at all in a
+      // production build. scripts/r24-c-agl.js is the only consumer.
+      if (window.__flyMotionTrace) {
+        _motionTrace.t = performance.now();
+        _motionTrace.x = flight.pos.x;
+        _motionTrace.y = flight.pos.y;
+        _motionTrace.z = flight.pos.z;
+        _motionTrace.elevRaw = flight.groundElev;
+        _motionTrace.elevVis = runtime.groundElevVis ?? flight.groundElev;
+        _motionTrace.aglRaw = eyeAgl;
+        _motionTrace.aglVis = eyeAglVis;
+        _motionTrace.micro = microStrength;
+        _motionTrace.camTileZ = runtime.terraStats?.camTileZ ?? 0;
+        window.__flyMotionTrace(_motionTrace); // the probe copies out; never retains
+      }
       // The EffectComposer's per-pass renders reset gl.info mid-frame —
       // accumulate manually so calls/triangles cover the WHOLE frame.
       if (gl.info.autoReset) gl.info.autoReset = false;
@@ -2418,6 +3140,65 @@ export function FlyScene({ runtime }) {
           ],
         };
       }
+      // R23 (A NIGHT-TRUTH, F2) — THE NIGHT CHAIN, IN ONE READ.
+      //
+      // The one thing R23 A could NOT establish is which quality tier a real
+      // machine resolves to and what that does to the night city, because the
+      // governor is fleet-pinned 'hold' and no gate has ever observed a live
+      // step. Nothing in the build reported it either. This does.
+      //
+      // Read-only, dev-only, no draws, no product behaviour. It is deliberately
+      // a FLAT object of primitives so `copy(__flyStats.night)` from a console
+      // on the user's own hardware is a complete diagnosis: what tier we are
+      // at, whether the windows are armed, what the two haze terms are
+      // actually multiplying by, and how much of the light network exists.
+      //
+      // The `lit` sub-object is the answer to "why is it black": each entry is
+      // a night light SOURCE and whether it is live right now.
+      const nt = NIGHT_TRUTH_R23.telemetry;
+      if (NIGHT_TRUTH_R23.enabled && nt.enabled) {
+        const tNow = performance.now();
+        if (tNow - nightStatAt.current >= 1000 / Math.max(0.1, nt.hz)) {
+          nightStatAt.current = tNow;
+          const stats = (window.__flyStats ??= {});
+          const bE = runtime.satBuildings;
+          const bM = bE?.material;
+          const gov = window.__flyGov?.state?.() ?? null;
+          stats.night = {
+            // --- what the machine settled on -------------------------------
+            tier: flyState.qualityTier,
+            dpr: gl.getPixelRatio(),
+            govRung: gov?.rung ?? null,
+            govRungs: gov?.rungs ?? null,
+            govLatched: gov?.latched ?? null,
+            govTierSteps: gov?.tierSteps ?? null,
+            govDprSteps: gov?.dprSteps ?? null,
+            govEmaFps: gov ? Math.round(gov.emaFps) : null,
+            govTargetFps: gov?.targetFps ?? null,
+            // --- what the sun is doing -------------------------------------
+            sunFrac: runtime.sun?.frac ?? null,
+            hdri: stats.hdriBucket ?? null,
+            // --- the two terms that REMOVE light ---------------------------
+            // contentHaze: in-shader, sat buildings + skyline, medium/low only.
+            // postAerial: the depth post pass, high only. Both mix toward the
+            // night rim; R23 A gave the first a night term, the second is
+            // R19-shipped and deliberately untouched (see R23_A_ROOTCAUSE §5.3).
+            contentHaze: getSatContentHaze().max,
+            postAerial: getAerialState().strength ?? null,
+            // --- the night light sources -----------------------------------
+            lit: {
+              windowsArmed: bE?.nightEnabled ?? false, // SAT_BUILDINGS.night.minTier 'high'
+              windowEI: bM?.emissiveIntensity ?? 0, // the sun ramp's output
+              windowMap: !!bM?.emissiveMap, // false + EI>0 would be a white glow
+              buildingsReady: bE?.stats?.ready ?? 0,
+              roadsReady: runtime.satRoads?.stats?.ready ?? 0,
+              cityGlow: stats.satCityGlowPlaced ?? 0,
+              houseLights: stats.houseLights?.placed ?? 0,
+              beaconsOn: stats.satBeacons?.on ?? false,
+            },
+          };
+        }
+      }
       gl.info.reset();
     }
 
@@ -2519,7 +3300,7 @@ export function FlyScene({ runtime }) {
             worldRoot so chunk meshes ride the -anchor rebase like the toy chunks
             (anchor-bend uBendCenter frame stays in sync). Gated satellite +
             enabled + tier≥medium → byte-noop (no worker/engine/draws) elsewhere. */}
-        {mapStyle === 'satellite' && SAT_BUILDINGS.enabled && qualityTier !== 'low' && (
+        {mapStyle === 'satellite' && SAT_BUILDINGS.enabled && (qualityTier !== 'low' || satelliteVisualsOn()) && (
           <SatBuildingLayer runtime={runtime} flight={flight} />
         )}
         {/* Round 16 (A4): the satellite GROUND-LIGHT NETWORK (roads + runway
@@ -2528,14 +3309,21 @@ export function FlyScene({ runtime }) {
             the -anchor rebase, keeping the anchor-bend uBendCenter frame in sync.
             Same &&-chain shape as the buildings → off = no mount, no worker, no
             draws, no globals. */}
-        {mapStyle === 'satellite' && SAT_ROADS.enabled && qualityTier !== 'low' && (
+        {mapStyle === 'satellite' && SAT_ROADS.enabled && (qualityTier !== 'low' || satelliteVisualsOn()) && (
           <SatRoadLayer runtime={runtime} flight={flight} />
         )}
         {/* Round 18 (A2): the DISTANT BLOCK-MASS skyline ring — the city past
             the detail bubble, and the city that survives the climb. Same
             &&-chain / same worldRoot reason as the two layers above. */}
-        {mapStyle === 'satellite' && SAT_SKYLINE.enabled && qualityTier !== 'low' && (
+        {mapStyle === 'satellite' && SAT_SKYLINE.enabled && (qualityTier !== 'low' || satelliteVisualsOn()) && (
           <SatSkylineLayer runtime={runtime} flight={flight} />
+        )}
+        {/* R22 (C CLUTTER): ground life — parked/moving cars + poles. Same
+            &&-chain / worldRoot reason as the layers above; W0 stub renders
+            null and CLUTTER.enabled is false, so this line is a no-op until
+            C's merge. */}
+        {mapStyle === 'satellite' && CLUTTER.enabled && qualityTier !== 'low' && (
+          <SatClutterLayer runtime={runtime} flight={flight} />
         )}
         {/* Round 17: keyed on the pick so a hangar swap is a clean remount —
             the old clone's graded materials dispose, the new GLB mounts. */}
@@ -2569,7 +3357,9 @@ export function FlyScene({ runtime }) {
           glow domes + warm cores at POI cities (2 instanced draws, always
           issued; the sun drives per-instance COLOR only). OUTSIDE worldRoot
           like TownGlow: it writes anchor-RELATIVE instance matrices itself. */}
-      {mapStyle === 'satellite' && SAT_CITY_GLOW.enabled && (
+      {/* Cinematic skyline windows replace the old solid city hemispheres,
+          whose silhouettes become exposed by the natural horizon. */}
+      {mapStyle === 'satellite' && SAT_CITY_GLOW.enabled && !satelliteVisualsOn('lighting') && (
         <SatCityGlow runtime={runtime} flight={flight} origin={origin} engine={engine} />
       )}
 
@@ -2577,6 +3367,7 @@ export function FlyScene({ runtime }) {
           satellite mounts them too (daylight restyle, raw-DEM ground) — the
           key remounts cleanly on a style switch so materials never hot-swap */}
       <LandmarkMonuments
+        runtime={runtime}
         key={mapStyle}
         flight={flight}
         origin={origin}
@@ -2592,6 +3383,7 @@ export function FlyScene({ runtime }) {
           grades are baked into the geometry, so a flip is a clean rebuild. */}
       {MONUMENT_MODELS.enabled && (
         <MonumentModels
+          runtime={runtime}
           key={`marquee-${mapStyle}`}
           flight={flight}
           origin={origin}
@@ -2629,9 +3421,21 @@ export function FlyScene({ runtime }) {
         />
       )}
       {/* Round 19 (B): the satellite shadow catcher — built, ships OFF (see
-          the component header + plan §5's Owens arithmetic). */}
-      {satShadowsOn && (SAT_SHADOWS.catcher.enabled || SHADOW_CALM.enabled) && (
-        <SatShadowCatcher flight={flight} origin={origin} runtime={runtime} />
+          the component header + plan §5's Owens arithmetic).
+          Round 22 (D DEPTH): the mount now goes through SatDepthRig, which
+          carries the AGL + caster-presence gate the R19 header demanded plus
+          the near receive set and the C-clutter caster flips. With DEPTH_PASS
+          off (the shipped default AND every fleet-pinned harness) the rig's
+          only effect is that the disc mounts iff SAT_SHADOWS.catcher.enabled —
+          the R19 condition, unchanged. */}
+      {satShadowsOn && (
+        <SatDepthRig
+          runtime={runtime}
+          flight={flight}
+          origin={origin}
+          engine={engine}
+          scene={scene}
+        />
       )}
     </>
   );

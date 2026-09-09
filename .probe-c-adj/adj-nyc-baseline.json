@@ -1,0 +1,875 @@
+{
+ "frames": 15582,
+ "hits": [
+  {
+   "n": 1078,
+   "L": 226.8,
+   "pr": 1,
+   "chunks": 28,
+   "cam": [
+    0,
+    808.3,
+    -5108.5
+   ],
+   "top": [
+    {
+     "type": "HemisphereLight",
+     "uuid": "7a70ae23",
+     "handle": null,
+     "name": "",
+     "kids": 0,
+     "mat": null,
+     "col": null,
+     "pos": [
+      0,
+      1,
+      0
+     ],
+     "L": 146.5,
+     "pr": 0,
+     "clears": true
+    },
+    {
+     "type": "Group",
+     "uuid": "89a44afa",
+     "handle": null,
+     "name": "",
+     "kids": 12,
+     "mat": null,
+     "col": null,
+     "pos": [
+      8242596,
+      0,
+      4966606.3
+     ],
+     "L": 146.4,
+     "pr": 0,
+     "clears": true
+    }
+   ],
+   "cloudRow": {
+    "type": "Group",
+    "uuid": "2f94ced0",
+    "handle": "__flyClouds",
+    "name": "",
+    "kids": 55,
+    "mat": null,
+    "col": null,
+    "pos": [
+     0,
+     0,
+     0
+    ],
+    "L": 226.8,
+    "pr": 1,
+    "clears": false
+   },
+   "nTop": 36,
+   "culprit": {
+    "uuid": "e2fa624a",
+    "firstSeenFrame": 971,
+    "ageFrames": 107,
+    "addedThisFrame": false,
+    "mw": [
+     -1596.09,
+     0,
+     -9750.03
+    ],
+    "mwPrev": [
+     -1596.09,
+     0,
+     -9750.03
+    ],
+    "mwDelta": 0,
+    "parentMw": [
+     8242596,
+     0,
+     4966606.3
+    ],
+    "localPos": [
+     -8244192.12272597,
+     0,
+     -4976356.289478115
+    ],
+    "matrixAutoUpdate": true,
+    "matrixWorldNeedsUpdate": false,
+    "visible": true,
+    "frustumCulled": true,
+    "renderOrder": 0,
+    "verts": 36776,
+    "bsLocal": {
+     "c": [
+      77.8,
+      26.2,
+      0
+     ],
+     "r": 1891.7
+    },
+    "bsWorld": [
+     -1518.3,
+     26.2,
+     -9750
+    ],
+    "distToCam": 4945.7,
+    "proj": {
+     "depth": 4675,
+     "halfNdcX": 0.335,
+     "centerNdc": [
+      -0.269,
+      -0.188
+     ],
+     "coverX": 0.335,
+     "behind": false
+    },
+    "hasColor": true,
+    "colorCount": 36776,
+    "hasAnchor": true,
+    "anchorCount": 36776,
+    "matVertexColors": true,
+    "matUuid": "263e02d8",
+    "matShared": true,
+    "matNeedsUpdate": null,
+    "matVersion": 3,
+    "matSide": 2,
+    "matProgramReady": true
+   },
+   "unbent": {
+    "L": 146.5,
+    "pr": 0
+   },
+   "isoCulpritOnly": {
+    "L": 226.8,
+    "pr": 1
+   },
+   "isoCulpritHidden": {
+    "L": 0,
+    "pr": 0
+   }
+  },
+  {
+   "n": 1160,
+   "L": 226.7,
+   "pr": 0.997,
+   "chunks": 28,
+   "cam": [
+    0,
+    808.3,
+    -5326.2
+   ],
+   "top": [
+    {
+     "type": "HemisphereLight",
+     "uuid": "7a70ae23",
+     "handle": null,
+     "name": "",
+     "kids": 0,
+     "mat": null,
+     "col": null,
+     "pos": [
+      0,
+      1,
+      0
+     ],
+     "L": 146.6,
+     "pr": 0,
+     "clears": true
+    },
+    {
+     "type": "Group",
+     "uuid": "89a44afa",
+     "handle": null,
+     "name": "",
+     "kids": 12,
+     "mat": null,
+     "col": null,
+     "pos": [
+      8242596,
+      0,
+      4966606.3
+     ],
+     "L": 146.5,
+     "pr": 0,
+     "clears": true
+    }
+   ],
+   "cloudRow": {
+    "type": "Group",
+    "uuid": "2f94ced0",
+    "handle": "__flyClouds",
+    "name": "",
+    "kids": 55,
+    "mat": null,
+    "col": null,
+    "pos": [
+     0,
+     0,
+     0
+    ],
+    "L": 226.7,
+    "pr": 0.997,
+    "clears": false
+   },
+   "nTop": 36,
+   "culprit": {
+    "uuid": "e0f236c1",
+    "firstSeenFrame": 1017,
+    "ageFrames": 143,
+    "addedThisFrame": false,
+    "mw": [
+     -1596.09,
+     0,
+     -7304.05
+    ],
+    "mwPrev": [
+     -1596.09,
+     0,
+     -7304.05
+    ],
+    "mwDelta": 0,
+    "parentMw": [
+     8242596,
+     0,
+     4966606.3
+    ],
+    "localPos": [
+     -8244192.12272597,
+     0,
+     -4973910.304572989
+    ],
+    "matrixAutoUpdate": true,
+    "matrixWorldNeedsUpdate": false,
+    "visible": true,
+    "frustumCulled": true,
+    "renderOrder": 0,
+    "verts": 70393,
+    "bsLocal": {
+     "c": [
+      0,
+      116.2,
+      0
+     ],
+     "r": 1912.1
+    },
+    "bsWorld": [
+     -1596.1,
+     116.2,
+     -7304
+    ],
+    "distToCam": 2634.1,
+    "proj": {
+     "depth": 2010.3,
+     "halfNdcX": 0.787,
+     "centerNdc": [
+      -0.657,
+      -0.472
+     ],
+     "coverX": 0.565,
+     "behind": false
+    },
+    "hasColor": true,
+    "colorCount": 70393,
+    "hasAnchor": true,
+    "anchorCount": 70393,
+    "matVertexColors": true,
+    "matUuid": "263e02d8",
+    "matShared": true,
+    "matNeedsUpdate": null,
+    "matVersion": 3,
+    "matSide": 2,
+    "matProgramReady": true
+   },
+   "unbent": {
+    "L": 146.7,
+    "pr": 0
+   },
+   "isoCulpritOnly": {
+    "L": 226.3,
+    "pr": 0.997
+   },
+   "isoCulpritHidden": {
+    "L": 0,
+    "pr": 0
+   }
+  },
+  {
+   "n": 1268,
+   "L": 226.8,
+   "pr": 1,
+   "chunks": 28,
+   "cam": [
+    0,
+    808.3,
+    -5672
+   ],
+   "top": [
+    {
+     "type": "HemisphereLight",
+     "uuid": "7a70ae23",
+     "handle": null,
+     "name": "",
+     "kids": 0,
+     "mat": null,
+     "col": null,
+     "pos": [
+      0,
+      1,
+      0
+     ],
+     "L": 146.7,
+     "pr": 0,
+     "clears": true
+    },
+    {
+     "type": "Group",
+     "uuid": "89a44afa",
+     "handle": null,
+     "name": "",
+     "kids": 12,
+     "mat": null,
+     "col": null,
+     "pos": [
+      8242596,
+      0,
+      4966606.3
+     ],
+     "L": 146.5,
+     "pr": 0,
+     "clears": true
+    }
+   ],
+   "cloudRow": {
+    "type": "Group",
+    "uuid": "2f94ced0",
+    "handle": "__flyClouds",
+    "name": "",
+    "kids": 55,
+    "mat": null,
+    "col": null,
+    "pos": [
+     0,
+     0,
+     0
+    ],
+    "L": 226.8,
+    "pr": 1,
+    "clears": false
+   },
+   "nTop": 36,
+   "culprit": {
+    "uuid": "e2fa624a",
+    "firstSeenFrame": 971,
+    "ageFrames": 297,
+    "addedThisFrame": false,
+    "mw": [
+     -1596.09,
+     0,
+     -9750.03
+    ],
+    "mwPrev": [
+     -1596.09,
+     0,
+     -9750.03
+    ],
+    "mwDelta": 0,
+    "parentMw": [
+     8242596,
+     0,
+     4966606.3
+    ],
+    "localPos": [
+     -8244192.12272597,
+     0,
+     -4976356.289478115
+    ],
+    "matrixAutoUpdate": true,
+    "matrixWorldNeedsUpdate": false,
+    "visible": true,
+    "frustumCulled": true,
+    "renderOrder": 0,
+    "verts": 36776,
+    "bsLocal": {
+     "c": [
+      77.8,
+      26.2,
+      0
+     ],
+     "r": 1891.7
+    },
+    "bsWorld": [
+     -1518.3,
+     26.2,
+     -9750
+    ],
+    "distToCam": 4421.2,
+    "proj": {
+     "depth": 4112.4,
+     "halfNdcX": 0.381,
+     "centerNdc": [
+      -0.306,
+      -0.224
+     ],
+     "coverX": 0.381,
+     "behind": false
+    },
+    "hasColor": true,
+    "colorCount": 36776,
+    "hasAnchor": true,
+    "anchorCount": 36776,
+    "matVertexColors": true,
+    "matUuid": "263e02d8",
+    "matShared": true,
+    "matNeedsUpdate": null,
+    "matVersion": 3,
+    "matSide": 2,
+    "matProgramReady": true
+   },
+   "unbent": {
+    "L": 146.7,
+    "pr": 0
+   },
+   "isoCulpritOnly": {
+    "L": 226.8,
+    "pr": 1
+   },
+   "isoCulpritHidden": {
+    "L": 0,
+    "pr": 0
+   }
+  },
+  {
+   "n": 1571,
+   "L": 226.7,
+   "pr": 0.997,
+   "chunks": 28,
+   "cam": [
+    0,
+    808.3,
+    -6524.7
+   ],
+   "top": [
+    {
+     "type": "HemisphereLight",
+     "uuid": "7a70ae23",
+     "handle": null,
+     "name": "",
+     "kids": 0,
+     "mat": null,
+     "col": null,
+     "pos": [
+      0,
+      1,
+      0
+     ],
+     "L": 146.4,
+     "pr": 0,
+     "clears": true
+    },
+    {
+     "type": "Group",
+     "uuid": "89a44afa",
+     "handle": null,
+     "name": "",
+     "kids": 12,
+     "mat": null,
+     "col": null,
+     "pos": [
+      8242596,
+      0,
+      4966606.3
+     ],
+     "L": 146.3,
+     "pr": 0,
+     "clears": true
+    }
+   ],
+   "cloudRow": {
+    "type": "Group",
+    "uuid": "2f94ced0",
+    "handle": "__flyClouds",
+    "name": "",
+    "kids": 55,
+    "mat": null,
+    "col": null,
+    "pos": [
+     0,
+     0,
+     0
+    ],
+    "L": 226.7,
+    "pr": 0.997,
+    "clears": false
+   },
+   "nTop": 36,
+   "culprit": {
+    "uuid": "e0f236c1",
+    "firstSeenFrame": 1017,
+    "ageFrames": 554,
+    "addedThisFrame": false,
+    "mw": [
+     -1596.09,
+     0,
+     -7304.05
+    ],
+    "mwPrev": [
+     -1596.09,
+     0,
+     -7304.05
+    ],
+    "mwDelta": 0,
+    "parentMw": [
+     8242596,
+     0,
+     4966606.3
+    ],
+    "localPos": [
+     -8244192.12272597,
+     0,
+     -4973910.304572989
+    ],
+    "matrixAutoUpdate": true,
+    "matrixWorldNeedsUpdate": false,
+    "visible": true,
+    "frustumCulled": true,
+    "renderOrder": 0,
+    "verts": 70393,
+    "bsLocal": {
+     "c": [
+      0,
+      116.2,
+      0
+     ],
+     "r": 1912.1
+    },
+    "bsWorld": [
+     -1596.1,
+     116.2,
+     -7304
+    ],
+    "distToCam": 1906.3,
+    "proj": {
+     "depth": 813.3,
+     "halfNdcX": 1.946,
+     "centerNdc": [
+      -1.624,
+      -1.287
+     ],
+     "coverX": 0.661,
+     "behind": false
+    },
+    "hasColor": true,
+    "colorCount": 70393,
+    "hasAnchor": true,
+    "anchorCount": 70393,
+    "matVertexColors": true,
+    "matUuid": "263e02d8",
+    "matShared": true,
+    "matNeedsUpdate": null,
+    "matVersion": 3,
+    "matSide": 2,
+    "matProgramReady": true
+   },
+   "unbent": {
+    "L": 146.4,
+    "pr": 0
+   },
+   "isoCulpritOnly": {
+    "L": 226.3,
+    "pr": 0.997
+   },
+   "isoCulpritHidden": {
+    "L": 0,
+    "pr": 0
+   }
+  },
+  {
+   "n": 2071,
+   "L": 217.7,
+   "pr": 0.864,
+   "chunks": 28,
+   "cam": [
+    0,
+    808.3,
+    -7885.7
+   ],
+   "top": [
+    {
+     "type": "HemisphereLight",
+     "uuid": "7a70ae23",
+     "handle": null,
+     "name": "",
+     "kids": 0,
+     "mat": null,
+     "col": null,
+     "pos": [
+      0,
+      1,
+      0
+     ],
+     "L": 145.9,
+     "pr": 0,
+     "clears": true
+    },
+    {
+     "type": "Group",
+     "uuid": "89a44afa",
+     "handle": null,
+     "name": "",
+     "kids": 12,
+     "mat": null,
+     "col": null,
+     "pos": [
+      8242596,
+      0,
+      4966606.3
+     ],
+     "L": 145.7,
+     "pr": 0,
+     "clears": true
+    }
+   ],
+   "cloudRow": {
+    "type": "Group",
+    "uuid": "2f94ced0",
+    "handle": "__flyClouds",
+    "name": "",
+    "kids": 55,
+    "mat": null,
+    "col": null,
+    "pos": [
+     0,
+     0,
+     0
+    ],
+    "L": 217.7,
+    "pr": 0.864,
+    "clears": false
+   },
+   "nTop": 36,
+   "culprit": {
+    "uuid": "4c647a1f",
+    "firstSeenFrame": 1625,
+    "ageFrames": 446,
+    "addedThisFrame": false,
+    "mw": [
+     -1596.09,
+     0,
+     -9750.03
+    ],
+    "mwPrev": [
+     -1596.09,
+     0,
+     -9750.03
+    ],
+    "mwDelta": 0,
+    "parentMw": [
+     8242596,
+     0,
+     4966606.3
+    ],
+    "localPos": [
+     -8244192.12272597,
+     0,
+     -4976356.289478115
+    ],
+    "matrixAutoUpdate": true,
+    "matrixWorldNeedsUpdate": false,
+    "visible": true,
+    "frustumCulled": true,
+    "renderOrder": 0,
+    "verts": 36776,
+    "bsLocal": {
+     "c": [
+      77.8,
+      31.5,
+      0
+     ],
+     "r": 1891.9
+    },
+    "bsWorld": [
+     -1518.3,
+     31.5,
+     -9750
+    ],
+    "distToCam": 2526.7,
+    "proj": {
+     "depth": 1901.1,
+     "halfNdcX": 0.824,
+     "centerNdc": [
+      -0.661,
+      -0.576
+     ],
+     "coverX": 0.581,
+     "behind": false
+    },
+    "hasColor": true,
+    "colorCount": 36776,
+    "hasAnchor": true,
+    "anchorCount": 36776,
+    "matVertexColors": true,
+    "matUuid": "263e02d8",
+    "matShared": true,
+    "matNeedsUpdate": null,
+    "matVersion": 3,
+    "matSide": 2,
+    "matProgramReady": true
+   },
+   "unbent": {
+    "L": 146,
+    "pr": 0
+   },
+   "isoCulpritOnly": {
+    "L": 196.5,
+    "pr": 0.864
+   },
+   "isoCulpritHidden": {
+    "L": 0,
+    "pr": 0
+   }
+  },
+  {
+   "n": 15266,
+   "L": 226.6,
+   "pr": 0.997,
+   "chunks": 25,
+   "cam": [
+    0,
+    808.3,
+    -843.7
+   ],
+   "top": [
+    {
+     "type": "HemisphereLight",
+     "uuid": "7a70ae23",
+     "handle": null,
+     "name": "",
+     "kids": 0,
+     "mat": null,
+     "col": null,
+     "pos": [
+      0,
+      1,
+      0
+     ],
+     "L": 144.7,
+     "pr": 0,
+     "clears": true
+    },
+    {
+     "type": "Group",
+     "uuid": "89a44afa",
+     "handle": null,
+     "name": "",
+     "kids": 12,
+     "mat": null,
+     "col": null,
+     "pos": [
+      8242596,
+      0,
+      4996608.8
+     ],
+     "L": 144.6,
+     "pr": 0,
+     "clears": true
+    }
+   ],
+   "cloudRow": {
+    "type": "Group",
+    "uuid": "2f94ced0",
+    "handle": "__flyClouds",
+    "name": "",
+    "kids": 55,
+    "mat": null,
+    "col": null,
+    "pos": [
+     0,
+     0,
+     0
+    ],
+    "L": 226.6,
+    "pr": 0.997,
+    "clears": false
+   },
+   "nTop": 35,
+   "culprit": {
+    "uuid": "5e474c0a",
+    "firstSeenFrame": 13053,
+    "ageFrames": 2213,
+    "addedThisFrame": false,
+    "mw": [
+     849.9,
+     0,
+     -4207.34
+    ],
+    "mwPrev": [
+     849.9,
+     0,
+     -4207.34
+    ],
+    "mwDelta": 0,
+    "parentMw": [
+     8242596,
+     0,
+     4996608.8
+    ],
+    "localPos": [
+     -8241746.137820845,
+     0,
+     -5000816.138529371
+    ],
+    "matrixAutoUpdate": true,
+    "matrixWorldNeedsUpdate": false,
+    "visible": true,
+    "frustumCulled": true,
+    "renderOrder": 0,
+    "verts": 51941,
+    "bsLocal": {
+     "c": [
+      0,
+      14.5,
+      0
+     ],
+     "r": 1911.5
+    },
+    "bsWorld": [
+     849.9,
+     14.5,
+     -4207.3
+    ],
+    "distToCam": 3559,
+    "proj": {
+     "depth": 3399.1,
+     "halfNdcX": 0.465,
+     "centerNdc": [
+      0.207,
+      -0.295
+     ],
+     "coverX": 0.465,
+     "behind": false
+    },
+    "hasColor": true,
+    "colorCount": 51941,
+    "hasAnchor": true,
+    "anchorCount": 51941,
+    "matVertexColors": true,
+    "matUuid": "263e02d8",
+    "matShared": true,
+    "matNeedsUpdate": null,
+    "matVersion": 3,
+    "matSide": 2,
+    "matProgramReady": true
+   },
+   "unbent": {
+    "L": 144.7,
+    "pr": 0
+   },
+   "isoCulpritOnly": {
+    "L": 226.3,
+    "pr": 0.997
+   },
+   "isoCulpritHidden": {
+    "L": 0,
+    "pr": 0
+   }
+  }
+ ]
+}

@@ -12,8 +12,15 @@ import {
 } from 'three';
 import { SatRoadEngine } from '@/lib/fly/toy-world/sat-road-engine';
 import { buildPoiList } from '@/lib/fly/poi-data';
-import { SAT_AIRPORT_BEACONS, SAT_ROADS } from '@/lib/fly/fly-constants';
-import { applyBendAnchor, getSatBldgFade, getSatRoadMix } from '@/lib/fly/toy-world/world-bend';
+import { SAT_AIRPORT_BEACONS, SAT_ROADS, SETTLE_CALM } from '@/lib/fly/fly-constants';
+import { installNightCityDevHandle } from '@/lib/fly/night-city';
+import {
+  applyBendAnchor,
+  getNightCityRoads,
+  getSatBldgFade,
+  getSatRoadMix,
+} from '@/lib/fly/toy-world/world-bend';
+import { arrivalEpoch, birthK, groundElevVis, makeBirth, notePopin } from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
 // R24 B (GROUND_VIS, recon A6/T8) — AGL fade bands read the DAMPED ground.
 import { eyeAglVis } from '@/lib/fly/ground-vis';
@@ -59,6 +66,25 @@ export function SatRoadLayer({ runtime, flight }) {
   // — react-hooks/purity); the warp subscription reads the current clock here.
   const nowRef = useRef(0);
   const statsAtRef = useRef(0);
+  // R22 (B SETTLE) — the road network births on the shared material's OWN
+  // opacity. The network is ADDITIVE (blending: AdditiveBlending, src·srcAlpha
+  // added), so opacity is an exact 0 → identity dissolve with no shader change
+  // and no cache key; nothing in the engine or the layer ever wrote it before,
+  // so the settled value is 1 and flag-off is byte-identical.
+  const birthRef = useRef(makeBirth());
+
+  // R22 (B): the road engine joins the runtime bus (the R18 `satBuildings`
+  // contract) so ARRIVAL_GATE can read the ring's resolved fraction without a
+  // dev-only global. Off-satellite / low tier this layer never mounts and the
+  // field stays null, so the consumer needs no style test.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability -- runtime is the scene's mutable bus (FlyScene RUNTIME CONTRACTS (R18))
+    runtime.satRoads = engine;
+    runtime.satRoadsBandM = SAT_ROADS.cullAglOffM ?? Infinity;
+    return () => {
+      if (runtime.satRoads === engine) runtime.satRoads = null;
+    };
+  }, [engine, runtime]);
 
   // --- airport beacons -------------------------------------------------------
   // A STRICT high-tier flourish (mirrors how SatBuildingLayer gates the facade
@@ -104,11 +130,21 @@ export function SatRoadLayer({ runtime, flight }) {
         console.warn('[sat-roads] TileJSON init failed:', err?.message ?? err);
     });
     engine.setWorker(api);
-    if (process.env.NODE_ENV === 'development') window.__satRoads = engine; // harness introspection
+    if (process.env.NODE_ENV === 'development') {
+      window.__satRoads = engine; // harness introspection
+      // R23 (B): the night-knob A/B lever (window.__flyNightCity). Installed
+      // from here because this layer mounts exactly when the satellite ground
+      // light network exists; the handle itself writes module-level world-bend
+      // uniforms, so it covers the building windows too.
+      installNightCityDevHandle();
+    }
     return () => {
       engine.dispose();
       worker.terminate();
-      if (process.env.NODE_ENV === 'development') delete window.__satRoads;
+      if (process.env.NODE_ENV === 'development') {
+        delete window.__satRoads;
+        delete window.__flyNightCity;
+      }
     };
   }, [engine, runtime]);
 
@@ -131,6 +167,18 @@ export function SatRoadLayer({ runtime, flight }) {
     // sunFrac is REQUIRED by the engine contract: omitting it falls back to noon
     // (1) and the whole network stays dark forever.
     engine.update(t, flight.pos.x, flight.pos.z, eyeAgl, runtime.sun?.frac);
+    // …and the birth: one material property write, only while it is running.
+    const roadsReady = engine.stats.ready;
+    const bk = birthK(
+      birthRef.current,
+      t,
+      roadsReady > 0,
+      arrivalEpoch(),
+      SETTLE_CALM.births.bayerSec
+    );
+    // eslint-disable-next-line react-hooks/immutability -- the engine's shared material is the scene's, not React state (the beacon envelope below writes its own the same way)
+    if (engine.material.opacity !== bk) engine.material.opacity = bk;
+    notePopin('satRoads', roadsReady > 0, birthRef.current.running);
 
     // --- beacons: 2s placement + night ramp, per-frame flash envelope --------
     const mesh = beaconRef.current;
@@ -214,6 +262,10 @@ export function SatRoadLayer({ runtime, flight }) {
         nightK: beaconRefs.current.nightK,
         on: beaconsOn,
       };
+      // R23 (B): the night-city road uniforms as the GPU has them — the A/B
+      // captures and any future gate read THIS, never the constants (the
+      // getSatRoadNight()/getEdgeFade() discipline).
+      stats.nightCityRoads = getNightCityRoads();
     }
   }, -46);
 

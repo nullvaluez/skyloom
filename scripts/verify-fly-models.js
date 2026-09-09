@@ -1,4 +1,17 @@
-/** Visual check of the GLB asset pass: player plane + close-up traffic. */
+/** Visual check of the GLB asset pass: player plane + close-up traffic.
+ *
+ * R23 (C NIGHT-CERT) — INHERITED HARNESS DEBT, named in the R22 close as
+ * "prints no VERIFY line yet exits 0". A run of this file could not fail: it
+ * captured screenshots, printed prose and returned 0 whatever happened, so a
+ * sweep row reading "verify-fly-models: ok" meant only "the script finished".
+ *
+ * This is a CAPTURE script and it stays one — the screenshots are the artifact
+ * and no threshold here can judge how a model LOOKS. What it can assert is the
+ * one thing it already computes and then merely printed: every swapped model
+ * geometry must be FUSELAGE-ON-Z (the line below literally says "want z =
+ * length"). A harness that knows the answer and does not assert it is the
+ * weaker half of the R20 lesson. Plus the fleet's universal pageerror contract.
+ * A green here is NOT a statement about model quality. */
 const { chromium } = require('playwright');
 const path = require('path');
 const { bootFly } = require('./_boot');
@@ -72,7 +85,28 @@ const { bootFly } = require('./_boot');
 
   console.log('model warnings:', warns.join(' | ') || 'none');
   console.log('pageerrors:', errs.slice(0, 6).join(' | ') || 'none');
+
+  const fails = [];
+  // The assertion the header describes: z is the longest axis of every swapped
+  // model. `dims` is empty when no traffic archetype has streamed in (live
+  // ADS-B, not this harness's business) — that is a SKIP, not a pass.
+  const badAxis = dims.filter((d) => !(d.z >= d.x && d.z >= d.y));
+  if (dims.length === 0) {
+    console.log('SKIP model axis check — no swapped model geometries in the scene (no live traffic)');
+  } else if (badAxis.length) {
+    console.log(`FAIL model fuselage axis — ${badAxis.length}/${dims.length} not z-longest: ${JSON.stringify(badAxis)}`);
+    fails.push('model fuselage axis');
+  } else {
+    console.log(`PASS model fuselage axis — ${dims.length}/${dims.length} z-longest`);
+  }
+  if (errs.length) fails.push('pageerrors');
+  console.log(
+    fails.length
+      ? `VERIFY: FAIL (${fails.join(', ')})`
+      : `VERIFY: PASS (capture script — asserts fuselage axis + zero pageerrors ONLY; the screenshots are the artifact)`
+  );
   await browser.close();
+  process.exit(fails.length ? 1 : 0);
 })().catch((e) => {
   console.error('FAILED:', e.message);
   process.exit(1);

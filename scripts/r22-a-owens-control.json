@@ -1,0 +1,73 @@
+{
+  "mode": "owens",
+  "tag": "control",
+  "families": [],
+  "bootMs": 17689,
+  "cfg": {
+    "style": "satellite",
+    "tier": "high",
+    "baseLod": 0.86,
+    "liveLod": 0.86,
+    "curveArmed": false,
+    "maxThreads": 10,
+    "steadyThreads": 10,
+    "maxLevel": 17,
+    "minLevel": 2,
+    "imgMaxLevel": 17,
+    "demMaxLevel": 15,
+    "imgDataType": "image",
+    "demDataType": "lerc",
+    "sizeZ0": 0,
+    "sharpOn": false,
+    "pipeOn": false,
+    "cacheOn": false,
+    "pinned": true
+  },
+  "runs": [
+    {
+      "threshold": null,
+      "draws": 215,
+      "tris": 219772,
+      "terra": null,
+      "rtTerra": null,
+      "warp": null,
+      "cache": null,
+      "heapMB": 101
+    }
+  ],
+  "tex": {
+    "mb": 58,
+    "count": 173,
+    "maxAniso": 8
+  },
+  "zoomSeen": {
+    "img2": 10,
+    "img3": 26,
+    "img4": 42,
+    "img5": 45,
+    "dem5": 71,
+    "img6": 48,
+    "dem6": 84,
+    "img7": 24,
+    "dem7": 24,
+    "img8": 24,
+    "dem8": 24,
+    "img9": 24,
+    "dem9": 24,
+    "img10": 33,
+    "dem10": 33,
+    "img11": 41,
+    "dem11": 41,
+    "img12": 37,
+    "dem12": 37,
+    "img13": 43,
+    "dem13": 43,
+    "img14": 47,
+    "dem14": 48,
+    "img15": 56,
+    "dem15": 170,
+    "img16": 71,
+    "img17": 80
+  },
+  "pageerrors": []
+}

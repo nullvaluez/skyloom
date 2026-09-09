@@ -1,0 +1,211 @@
+{
+ "when": "2026-08-07T18:28:55.805Z",
+ "manh": {
+  "tilesTotal": 170,
+  "tilesNear": 4,
+  "tilesNearReceiving": 0,
+  "casters": 20,
+  "castersNear": 5,
+  "receivers": 0,
+  "catcherMeshes": 0,
+  "aglM": 682,
+  "draws": 245,
+  "tris": 1368850,
+  "tier": "high"
+ },
+ "armed": {
+  "already": 0,
+  "armed": 16,
+  "total": 16
+ },
+ "rig": {
+  "castShadow": true,
+  "mapSize": 2048,
+  "right": 1500,
+  "left": -1500
+ },
+ "fx": {
+  "passes": [
+   {
+    "name": "RenderPass",
+    "effects": []
+   },
+   {
+    "name": "EffectPass",
+    "effects": [
+     "AerialPerspectiveEffect",
+     "BloomEffect",
+     "SpeedLinesEffect",
+     "HueSaturationEffect",
+     "BrightnessContrastEffect",
+     "WhiteBalanceEffect",
+     "VignetteEffect"
+    ]
+   },
+   {
+    "name": "EffectPass",
+    "effects": [
+     "SMAAEffect"
+    ]
+   },
+   {
+    "name": "EffectPass",
+    "effects": [
+     "ToneMappingEffect"
+    ]
+   }
+  ],
+  "reversedDepth": true,
+  "n8ao": false,
+  "aerial": {
+   "strength": 0,
+   "startM": 800,
+   "endM": 14000,
+   "heightFalloffM": 1200,
+   "rim": [
+    0,
+    0,
+    0
+   ]
+  }
+ },
+ "manhBase": {
+  "frames": 943,
+  "p50": 8.2,
+  "p95": 8.4,
+  "gpuSamples": 471,
+  "gpuP50": 3.683,
+  "gpuP95": 4.224,
+  "instrument": "EXT_disjoint_timer_query_webgl2"
+ },
+ "recv": {
+  "touched": 4
+ },
+ "recvOn": {
+  "frames": 956,
+  "p50": 4.3,
+  "p95": 8.4,
+  "gpuSamples": 477,
+  "gpuP50": 3.585,
+  "gpuP95": 4.345,
+  "instrument": "EXT_disjoint_timer_query_webgl2"
+ },
+ "recvOff": {
+  "frames": 981,
+  "p50": 4.3,
+  "p95": 8.4,
+  "gpuSamples": 490,
+  "gpuP50": 3.575,
+  "gpuP95": 4.241,
+  "instrument": "EXT_disjoint_timer_query_webgl2"
+ },
+ "recvDelta": 0.10400000000000009,
+ "near": {
+  "strength": 0,
+  "startM": 800,
+  "endM": 14000,
+  "heightFalloffM": 1200,
+  "rim": [
+   0,
+   0,
+   0
+  ],
+  "quilt": {
+   "desat": 0,
+   "flatten": 0
+  }
+ },
+ "med": {
+  "tier": "medium",
+  "material": {
+   "bend": "anchor-sat",
+   "uniforms": null
+  },
+  "passes": [
+   "RenderPass",
+   "EffectPass",
+   "EffectPass",
+   "EffectPass"
+  ]
+ },
+ "high": null,
+ "owens": {
+  "tilesTotal": 164,
+  "tilesNear": 15,
+  "tilesNearReceiving": 0,
+  "casters": 4,
+  "castersNear": 4,
+  "receivers": 0,
+  "catcherMeshes": 0,
+  "aglM": 423,
+  "draws": 204,
+  "tris": 188860,
+  "tier": "high"
+ },
+ "owensFrame": {
+  "frames": 1160,
+  "p50": 4.2,
+  "p95": 8.4,
+  "gpuSamples": 579,
+  "gpuP50": 2.978,
+  "gpuP95": 3.888,
+  "instrument": "EXT_disjoint_timer_query_webgl2"
+ },
+ "aboveBand": {
+  "tilesTotal": 140,
+  "tilesNear": 2,
+  "tilesNearReceiving": 0,
+  "casters": 4,
+  "castersNear": 4,
+  "receivers": 0,
+  "catcherMeshes": 0,
+  "aglM": 2868,
+  "draws": 168,
+  "tris": 65877,
+  "tier": "high"
+ },
+ "red": [
+  [
+   "D1 shadows land on nothing (terrain excluded from the receive set)",
+   "verify-depth2 (3)",
+   "0/4 near leaf tiles receive",
+   "> 0"
+  ],
+  [
+   "D2 the ground catcher ships off — open ground catches nothing",
+   "verify-depth2 (4)",
+   "0 catcher meshes with 5 casters in frustum",
+   "> 0"
+  ],
+  [
+   "D3 zero ambient occlusion anywhere",
+   "verify-depth2 (7)",
+   "n8ao in pass list: false",
+   "true"
+  ],
+  [
+   "D4 nothing atmospheric touches the first 800 m",
+   "verify-depth2 (12)",
+   "startM 800",
+   "< 800"
+  ],
+  [
+   "D5 medium/low content is an un-atmosphered cut-out",
+   "verify-depth2 (13)",
+   "content.enabled=false minTier=high",
+   "enabled + minTier medium"
+  ]
+ ],
+ "fails": [
+  "(3) RECEIVE SET — leaf terrain tiles inside 1500 m receive shadows",
+  "(4) CATCHER GATING — mounted where casters are in frustum and AGL is inside the band",
+  "(7) N8AO is present in the composer pass list on the high tier",
+  "(12) near-field atmosphere — the 0..startM band is no longer identically empty",
+  "(13) MEDIUM-TIER CONTENT HAZE — armed, and scoped down to medium (plan §5.4)"
+ ],
+ "softs": [
+  "(9) N8AO luma sanity",
+  "(10) N8AO frame-time budget",
+  "(13b) runtime haze uniform"
+ ]
+}

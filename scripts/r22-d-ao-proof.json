@@ -1,0 +1,33 @@
+{
+  "shipped": {
+    "cfg": {
+      "depthBufferType": 3,
+      "camReversed": false,
+      "projZ": -1.000008
+    },
+    "mean": 225.7,
+    "sd": 4.67,
+    "darkFrac": 0.0027
+  },
+  "red-default": {
+    "cfg": {
+      "depthBufferType": 1,
+      "camReversed": false,
+      "projZ": -1.000008
+    },
+    "mean": 101.2,
+    "sd": 78.86,
+    "darkFrac": 0.731
+  },
+  "red-reversematrix": {
+    "cfg": {
+      "depthBufferType": 3,
+      "camReversed": true,
+      "projZ": 0.000004
+    },
+    "mean": 226.89,
+    "sd": 1.56,
+    "darkFrac": 0
+  },
+  "pageerrors": []
+}

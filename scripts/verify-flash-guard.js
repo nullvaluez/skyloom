@@ -55,6 +55,23 @@
 const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
 const { attachPageErrors } = require('./_pageerrors');
+
+// A missing photographic world cannot certify a visual or loaded-world gate.
+async function requireResidentWorld(page, browser, label) {
+  const state = await page.evaluate(() => {
+    const rt = window.__fly;
+    const hit = rt?.engine?.getGroundInfoAtWorld?.(rt.flight.pos);
+    const material = hit?.object?.material;
+    const materials = Array.isArray(material) ? material : [material];
+    return { imagery: !!hit && materials.length > 0 && materials.every(m => m?.map?.image && !m.userData?.flyError),
+      buildings: (rt?.satBuildings ?? window.__satBuildings)?.stats?.ready ?? 0 };
+  });
+  if (!state.imagery || state.buildings < 1) {
+    await require('./_world-precondition').exitBlocked(JSON.stringify(state),
+      { browser, label: label + ': resident imagery/buildings unavailable; bounds not graded' });
+  }
+}
+
 const { settleWorld } = require('./_settle');
 
 const POWELL = [40.1578, -83.0752, 900, 1.9, -0.3];
@@ -419,6 +436,7 @@ async function serpentine(page, ms) {
       `  ${name} settle: ${st.settled ? 'SETTLED' : `NOT settled — ${st.why}`} in ${(st.ms / 1000).toFixed(0)}s ` +
         `(maxZ ${st.maxZ}, sb ${JSON.stringify(st.sb)}, load ${st.load})`
     );
+    await requireResidentWorld(page, browser, 'flash-guard ' + name);
     const c = await page.evaluate(CENSUS);
     scenesRed[name] = c;
     const pct = c.totalTris ? (100 * c.totalZero) / c.totalTris : 0;
@@ -532,6 +550,7 @@ async function serpentine(page, ms) {
     `  green-leg settle: ${st2.settled ? 'SETTLED' : `NOT settled — ${st2.why}`} in ` +
       `${(st2.ms / 1000).toFixed(0)}s (maxZ ${st2.maxZ}, sb ${JSON.stringify(st2.sb)}, load ${st2.load})`
   );
+  await requireResidentWorld(page2, browser, 'flash-guard green');
   const green = await page2.evaluate(CENSUS);
   // NOT "is the flag on" — an absent runtime pin on a page that never set one
   // says nothing about FLASH_GUARD.enabled. Report what is actually knowable:

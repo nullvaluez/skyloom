@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
 import {
+  BufferAttribute,
+  BufferGeometry,
   Color,
   DynamicDrawUsage,
   MeshLambertMaterial,
@@ -16,6 +18,7 @@ import {
 import { SatVegEngine } from '@/lib/fly/toy-world/sat-veg-engine';
 import {
   BEND_LEAD,
+  CLUTTER,
   GLOBE,
   LAMBERT_ENV,
   PARCEL_HOMES,
@@ -24,15 +27,44 @@ import {
   SAT_SHADOWS,
   SAT_TINT,
   SAT_VEG,
+  SETTLE_CALM,
   SUBURB_NIGHT,
   SURFACE_CALM,
 } from '@/lib/fly/fly-constants';
 import { applyBendAnchor, getRimColor } from '@/lib/fly/toy-world/world-bend';
+import * as settle from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
+import { satelliteVisualsOn, satelliteVisualProfile } from '@/lib/fly/satellite-visuals';
+import { buildCinematicTreeGeometry, canopyForm, createCinematicTreeMaterial, GROUND_VISUAL_UNIFORMS } from '@/lib/fly/cinematic-ground';
 import { SatAmbientLife } from './SatAmbientLife';
 import { SatHouseLights } from './SatHouseLights';
 import { SatParcelHomes } from './SatParcelHomes';
 import { SatTintLayer } from './SatTintLayer';
+
+// --- Round 24 — C MOTION's spec, B's call sites -----------------------------
+// settle.js through a NAMESPACE import: `groundElevVis`/`motionSubOn` are C's
+// and already exported, `paceCadenceSec` is C's and lands the same round, and a
+// missing NAMED import is a hard link error — so this file is order-independent
+// with respect to C's merge. `MOTION_R24.paceBySpeed` ships OFF, so the identity
+// branch in `paceSec` is the shipped behaviour regardless.
+//
+// (POOL_FAIR is not needed in this file: the canopy pool is ALREADY fair-shared.
+// `perChunkCap = floor(pool / maxChunks)` at :142 is the original of the rule
+// R24 ports into SatClutterLayer and SatParcelHomes, and SAT_VEG's own constants
+// block is where it is written down.)
+
+/** See SatClutterLayer's copy for the full note on why the damped ground. */
+function aglOf(runtime, flight) {
+  const ground = settle.motionSubOn('aglTruth')
+    ? settle.groundElevVis(runtime, flight)
+    : flight.groundElev;
+  return Math.max(0, flight.pos.y - ground);
+}
+
+/** C's speed-scaled cadence; identity when the helper or the flag is absent. */
+function paceSec(baseSec, speedMps) {
+  return settle.paceCadenceSec ? settle.paceCadenceSec(baseSec, speedMps) : baseSec;
+}
 
 const _dummy = new Object3D();
 const _col = new Color();
@@ -122,18 +154,21 @@ export function SatVegLayer({ runtime, flight }) {
   // downward tier pins within seconds (the R16 §7/§10 lesson), so a live tier
   // read would flap the pool and rebuild the mesh mid-flight.
   const tier = useMemo(() => useFlyStore.getState().qualityTier ?? 'medium', []);
+  const cinematic = useMemo(() => satelliteVisualsOn('ground'), []);
+  // Fixed capacity across live tier changes. The cadence adjusts active density.
+  const poolTier = cinematic ? 'high' : tier;
   // Round 19 (C): the HIGH-TIER pool raise. A tile's residential/farmland
   // scatter is new content in the same buffer, so the R18 pool would have
   // decimated the park trees to make room for the suburb. Medium and low
   // resolve to the R18 value byte-identically (user decision 2 — phones get
   // the honesty, none of the spend), and SAT_GROUND_LIFE.enabled false
   // restores high too.
-  const basePool = SAT_VEG.enabled ? (SAT_VEG.poolByTier[tier] ?? 0) : 0;
+  const basePool = SAT_VEG.enabled ? (SAT_VEG.poolByTier[poolTier] ?? 0) : 0;
   const pool =
-    SAT_GROUND_LIFE.enabled && tier === 'high' && basePool > 0
+    SAT_GROUND_LIFE.enabled && poolTier === 'high' && basePool > 0
       ? SAT_GROUND_LIFE.poolHigh
       : basePool;
-  const maxChunks = SAT_VEG.maxChunksByTier[tier] ?? 0;
+  const maxChunks = SAT_VEG.maxChunksByTier[poolTier] ?? 0;
   // maxChunks × perChunkCap ≤ pool BY CONSTRUCTION: the pool can therefore
   // never bind, which makes a pool cut (a hard radius that pops as the player
   // moves) impossible rather than merely unlikely.
@@ -191,6 +226,11 @@ export function SatVegLayer({ runtime, flight }) {
     atZ: Infinity,
     placed: 0,
     altK: 0,
+    // R22 (C): per-chunk first-ready timestamps for B SETTLE's birth ramp, plus
+    // the "a ramp is in flight" latch the static skip has to respect. Owned
+    // HERE rather than on the chunk records because sat-veg-engine.js is not
+    // C's file this round (§2) and a birth time is a rendering concern anyway.
+    born: { m: new Map(), ramping: false },
     byClass: new Uint32Array(8),
     classAt:
       process.env.NODE_ENV === 'development'
@@ -201,10 +241,30 @@ export function SatVegLayer({ runtime, flight }) {
   // writes its mover telemetry into `.ambient` — one global, one contract.
   const dev = useMemo(() => ({}), []);
 
-  // Squashed low-poly blob: a 7×4 sphere is 42 triangles. Even a full 3000-deep
-  // pool is ~126k tris for the whole world's vegetation, in ONE draw.
-  const geometry = useMemo(() => new SphereGeometry(1, 7, 4), []);
+  // ROUND 22 (C CLUTTER) — TREES v2, read ONCE at mount for the same reason the
+  // tier and the shadow flags are: geometry cannot change under a live
+  // InstancedMesh. The fleet pin (`__flyClutterPin`, 1 fleet-wide) keeps the
+  // R21 blob, so every frozen veg/groundlife count keeps measuring the same
+  // trees; only E's verify-clutter clears it.
+  const trees2 = useMemo(() => {
+    if (cinematic) return true;
+    const p = typeof window === 'undefined' ? 1 : (window.__flyClutterPin ?? 0);
+    return CLUTTER.enabled && CLUTTER.trees2.enabled && (p === 0 || p === 'freeze');
+  }, [cinematic]);
+
+  // R21 and before: a squashed low-poly blob — a 7×4 sphere is 42 triangles.
+  // R22 trees2: ONE MERGED trunk + crown BufferGeometry, 58 triangles, in the
+  // SAME single instanced draw. The R18 objection this looks like it violates
+  // rejected a SECOND GEOMETRY (which is a second draw); merging a trunk into
+  // the one geometry costs 16 triangles per tree and no draw at all. Even a
+  // full 5,000-deep high-tier pool is 290k tris for the whole world's
+  // vegetation — inside the 320k budget (plan §5.9).
+  const geometry = useMemo(
+    () => cinematic ? buildCinematicTreeGeometry(pool) : (trees2 ? buildTreeGeometry() : new SphereGeometry(1, 7, 4)),
+    [cinematic, pool, trees2]
+  );
   const material = useMemo(() => {
+    if (cinematic) return createCinematicTreeMaterial(applyBendAnchor);
     // R24 C (LAMBERT_ENV, recon WB-7): three r185 applies `scene.environment`
     // to Lambert (WebGLPrograms.js:60-63) and Lambert's defaults are
     // `combine = MultiplyOperation`, `reflectivity = 1` — a FULL-STRENGTH
@@ -212,17 +272,19 @@ export function SatVegLayer({ runtime, flight }) {
     // colour, facades take the horizon band, and the twilight HDRI's bright
     // azimuth band lights one facade direction after dark. Uniform-only: a
     // material PARAMETER, so the program and the cache key are unmoved.
-    const m = new MeshLambertMaterial({ vertexColors: false });
+    const m = new MeshLambertMaterial({ vertexColors: trees2 });
     if (LAMBERT_ENV.enabled) m.reflectivity = LAMBERT_ENV.reflectivity;
     applyBendAnchor(m); // existing variant, unmodified — no new cache key
     return m;
-  }, []);
+  }, [cinematic, trees2]);
+  const depthMaterial = useMemo(() => cinematic ? createCinematicTreeMaterial(applyBendAnchor, { depth: true }) : null, [cinematic]);
   useEffect(
     () => () => {
       geometry.dispose();
       material.dispose();
+      depthMaterial?.dispose();
     },
-    [geometry, material]
+    [geometry, material, depthMaterial]
   );
 
   useEffect(() => {
@@ -257,12 +319,18 @@ export function SatVegLayer({ runtime, flight }) {
   // road network at -46 — the ground layers run in streaming order.
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
-    const eyeAgl = Math.max(0, flight.pos.y - flight.groundElev);
+    const liveTier = cinematic ? (useFlyStore.getState().qualityTier ?? tier) : tier;
+    const density = cinematic ? satelliteVisualProfile(liveTier).vegetation : 1;
+    if (cinematic) GROUND_VISUAL_UNIFORMS.treeTime.value = window.__flyClutterPin === 'freeze' ? 0 : t;
+    const eyeAgl = aglOf(runtime, flight); // R24 (C's spec): the damped ground
     engine.update(t, flight.pos.x, flight.pos.z, eyeAgl);
 
     const mesh = meshRef.current;
     const st = placeRef.current;
-    if (mesh && t - st.t >= SAT_VEG.placeCadenceSec) {
+    // R24 (C's spec): a 2 s WALL-CLOCK cadence is a 500 m cadence at 250 m/s.
+    // `paceCadenceSec` scales it by ground speed; it ships OFF, so this is the
+    // identity today (see the header note on the namespace import).
+    if (mesh && t - st.t >= paceSec(SAT_VEG.placeCadenceSec, flight.speed)) {
       // Round 21 (C, S6): the one-time phase nudge. The first pass is still
       // immediate — this only moves where the STEADY cadence lands, so the
       // four pooled layers stop refilling their buffers on the same frame.
@@ -277,10 +345,15 @@ export function SatVegLayer({ runtime, flight }) {
       // walks tens of chunks) and conservative — any difference runs the pass.
       const sg = engine.stats;
       const sig = U
-        ? `${sg.chunks}|${sg.ready}|${sg.empty}|${sg.vegPts}|${sg.clsChunks}|${st.altK.toFixed(3)}`
+        ? `${sg.chunks}|${sg.ready}|${sg.empty}|${sg.vegPts}|${sg.clsChunks}|${st.altK.toFixed(3)}|${density}`
         : '';
       const moved2 = (flight.pos.x - st.atX) ** 2 + (flight.pos.z - st.atZ) ** 2;
-      if (!U || sig !== st.sig || moved2 >= U.staticSkipM ** 2) {
+      // R22 (C): …but never WHILE A BIRTH RAMP IS RUNNING. The skip's premise
+      // is "nothing changed, so there is nothing to do", and a ramp is work
+      // that is owed: the signature stabilises the instant a chunk turns ready,
+      // which is exactly when its trees are still at scale ~0. Without this the
+      // static skip would freeze a newly-streamed forest permanently invisible.
+      if (!U || sig !== st.sig || moved2 >= U.staticSkipM ** 2 || st.born.ramping) {
         st.sig = sig;
         st.atX = flight.pos.x;
         st.atZ = flight.pos.z;
@@ -290,10 +363,14 @@ export function SatVegLayer({ runtime, flight }) {
           flight,
           st.altK,
           pool,
-          perChunkCap,
+          Math.max(1, Math.floor(perChunkCap * density)),
           st.byClass,
           st.classAt,
-          st.prevN ?? 0
+          st.prevN ?? 0,
+          trees2,
+          st.born,
+          t,
+          cinematic
         );
         st.prevN = st.placed;
       }
@@ -368,9 +445,14 @@ export function SatVegLayer({ runtime, flight }) {
               SAT_SHADOWS.enabled && tier === SAT_SHADOWS.minTier && !shadowPin;
             m.castShadow = shadowOn;
             m.receiveShadow = shadowOn;
+            // R22 W2 (Fable arbitration): D's caster-flip marker — DEPTH_PASS
+            // .casters can arm the canopy as a caster via this stamp without
+            // touching the R19 logic above (which stays the default).
+            m.userData.r22Caster = 'trees';
             placeRef.current.t = -Infinity; // place on the very next frame
           }}
           args={[geometry, material, pool]}
+          customDepthMaterial={depthMaterial ?? undefined}
         />
       )}
       {SAT_AMBIENT.enabled && (
@@ -407,13 +489,129 @@ export function SatVegLayer({ runtime, flight }) {
 }
 
 /**
+ * ROUND 22 (C "CLUTTER") — TREES v2: ONE merged trunk + crown geometry.
+ *
+ * Authored in a UNIT TREE frame — base at y = 0, crown top at y = 1, crown
+ * radius 1 in XZ — so the instance transform is (crownR, totalHeight, crownR)
+ * at ground level. That is a different frame from the R21 blob (a centred
+ * sphere lifted half its radius), and placeCanopy branches on `trees2` for
+ * exactly that reason.
+ *
+ *   crown  6 × 5 lat/long sphere        48 tris
+ *   trunk  5-gon prism, no caps         10 tris   (the top is inside the crown
+ *                                                  and the base is in the
+ *                                                  ground — capping either
+ *                                                  would be 6 invisible tris)
+ *   ------------------------------------------
+ *                                       58 tris   (budget 96; pool 5000 = 290k)
+ *
+ * COLOUR_0 IS A MULTIPLIER, NOT A TONE — the SatParcelHomes rule. instanceColor
+ * carries the canopy's absolute green (palette + luma jitter + conifer tint +
+ * distance haze, all resolved in placeCanopy), and these bake the RELATIONSHIP
+ * on top of it: the crown's underside darkens toward the ground and its top
+ * lifts toward the light (a fake self-shadow that costs zero shader work and
+ * zero per-frame work), and the trunk multiplier is channel-tilted warm and
+ * dark so a green tone lands on bark rather than on a green pole.
+ */
+function buildTreeGeometry() {
+  const T = CLUTTER.trees2;
+  const pos = [];
+  const col = [];
+  const idx = [];
+  const push = (x, y, z, r, g, b) => {
+    pos.push(x, y, z);
+    col.push(r, g, b);
+    return pos.length / 3 - 1;
+  };
+
+  // --- crown: a 6 × 5 lat/long sphere, base-relative -------------------------
+  const W = 6;
+  const H = 5;
+  const ry = 0.32; // vertical radius; top = 1 ⇒ centre at 0.68, base at 0.36
+  const cy = 1 - ry;
+  // The self-shadow spread is deliberately NARROW. At 0.58 → 1.16 the five
+  // latitude rows read as colour BANDS on a smooth-shaded sphere rather than as
+  // shading — the low-poly silhouette is honest, a striped one is not.
+  const UNDER = 0.74; // multiplier at the shaded underside…
+  const OVER = 1.1; // …and at the sunlit crown
+  const rows = [];
+  for (let h = 0; h <= H; h++) {
+    const phi = (h / H) * Math.PI; // 0 = top
+    const sy = Math.cos(phi);
+    const sr = Math.sin(phi);
+    const shade = UNDER + (OVER - UNDER) * ((sy + 1) / 2);
+    const row = [];
+    for (let w = 0; w <= W; w++) {
+      const th = (w / W) * Math.PI * 2;
+      row.push(push(Math.cos(th) * sr, cy + sy * ry, Math.sin(th) * sr, shade, shade, shade));
+    }
+    rows.push(row);
+  }
+  for (let h = 0; h < H; h++) {
+    for (let w = 0; w < W; w++) {
+      const a = rows[h][w];
+      const b = rows[h][w + 1];
+      const c = rows[h + 1][w + 1];
+      const d = rows[h + 1][w];
+      // The two pole rows collapse to triangles (a === b at the top, c === d at
+      // the bottom), so each drops the quad half that would be degenerate.
+      // Winding is (a,b,c)/(a,c,d) with theta increasing and y DECREASING,
+      // which is outward-facing — hand-checked at the equator, because a
+      // silently inverted sphere backface-culls into an invisible forest.
+      if (h !== 0) idx.push(a, b, c);
+      if (h !== H - 1) idx.push(a, c, d);
+    }
+  }
+
+  // --- trunk: a 5-gon prism from the ground to inside the crown --------------
+  const TR = T.trunkRadiusFrac;
+  const TH = T.trunkFrac;
+  const BARK = [0.86, 0.62, 0.44]; // warm + dark: green tone → bark, not moss
+  const BARK_LO = [0.5, 0.36, 0.26]; // …darker still at the contact line
+  const N = 5;
+  for (let i = 0; i < N; i++) {
+    const t0 = (i / N) * Math.PI * 2;
+    const t1 = ((i + 1) / N) * Math.PI * 2;
+    const a = push(Math.cos(t0) * TR, 0, Math.sin(t0) * TR, ...BARK_LO);
+    const b = push(Math.cos(t1) * TR, 0, Math.sin(t1) * TR, ...BARK_LO);
+    const c = push(Math.cos(t1) * TR, TH, Math.sin(t1) * TR, ...BARK);
+    const d = push(Math.cos(t0) * TR, TH, Math.sin(t0) * TR, ...BARK);
+    // …and here y INCREASES with the ring order, which flips the sense: the
+    // outward winding is (a,d,c)/(a,c,b), not the sphere's.
+    idx.push(a, d, c, a, c, b);
+  }
+
+  const g = new BufferGeometry();
+  g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3));
+  g.setAttribute('color', new BufferAttribute(new Float32Array(col), 3));
+  g.setIndex(new BufferAttribute(new Uint16Array(idx), 1));
+  g.computeVertexNormals();
+  return g;
+}
+
+/**
  * ONE cadence pass: walk the ready chunks nearest-first, place each chunk's
  * (stably decimated) canopies, park the tail, publish a real bounding sphere.
  * Returns the placed count. Everything the look depends on — palette, jitter,
  * conifer shape, both fades — resolves HERE, so nothing runs per frame.
  */
-function placeCanopy(mesh, engine, flight, altK, pool, perChunkCap, byClass, classAt, prevN) {
+function placeCanopy(
+  mesh,
+  engine,
+  flight,
+  altK,
+  pool,
+  perChunkCap,
+  byClass,
+  classAt,
+  prevN,
+  trees2,
+  born,
+  now,
+  cinematic = false
+) {
   const S = SAT_VEG;
+  const T2 = CLUTTER.trees2;
   const px = flight.pos.x;
   const pz = flight.pos.z;
   // Round 19 (C) — VEG HAZE, and the reason it lives here rather than in a
@@ -439,6 +637,7 @@ function placeCanopy(mesh, engine, flight, altK, pool, perChunkCap, byClass, cla
   let maxR2 = 0; // furthest placed instance from the pool origin (local frame)
   let maxScale = 1;
   let maxD = 0; // …and from the PLAYER, which is what the bend drop keys on
+  let ramping = false; // R22 (C): a birth ramp is still in flight this pass
   // Above altFade.offM there is nothing to place at all, which is also what
   // keeps the ring eviction (cullAglOffM, higher still) invisible.
   if (altK > 0.001 && perChunkCap > 0) {
@@ -449,9 +648,27 @@ function placeCanopy(mesh, engine, flight, altK, pool, perChunkCap, byClass, cla
     const oz = Math.round(pz / 1000) * 1000;
     mesh.position.set(ox, 0, oz);
     const cf = S.conifer;
+    // R22 (C): B SETTLE's birth ramp. A newly-streamed chunk's canopies grow in
+    // over SETTLE_CALM.births.rampSec instead of appearing at full size — a
+    // SCALE ramp, so it costs no shader change and no cache key (plan §5.6).
+    // The `seen` set prunes the map back to the resident ring each pass, so a
+    // long flight cannot leak a timestamp per tile crossed.
+    const ramp = SETTLE_CALM.enabled ? SETTLE_CALM.births.rampSec : 0;
+    const seen = born && ramp > 0 ? new Set() : null;
     for (const chunk of engine.nearest(px, pz)) {
       if (n >= pool) break;
       if (!chunk.veg) continue;
+      let bk = 1;
+      if (seen) {
+        seen.add(chunk.key);
+        let b = born.m.get(chunk.key);
+        if (b === undefined) {
+          b = now;
+          born.m.set(chunk.key, b);
+        }
+        bk = Math.min(1, (now - b) / ramp);
+        if (bk < 1) ramping = true;
+      }
       const rows = chunk.veg.length / 4;
       const cap = Math.min(perChunkCap, rows);
       // STABLE index stride: keep row i iff it opens a new bucket of `cap`,
@@ -471,7 +688,7 @@ function placeCanopy(mesh, engine, flight, altK, pool, perChunkCap, byClass, cla
         const wz = chunk.cz + lz;
         const d = Math.hypot(wx - px, wz - pz);
         if (d >= S.distFade.endM) continue;
-        const k = altK * (1 - smoothstep(S.distFade.startM, S.distFade.endM, d));
+        const k = altK * bk * (1 - smoothstep(S.distFade.startM, S.distFade.endM, d));
         if (k <= 0.001) continue;
         const r = r0 * k;
         const gy = engine.groundAtLocal(chunk, lx, lz);
@@ -486,11 +703,27 @@ function placeCanopy(mesh, engine, flight, altK, pool, perChunkCap, byClass, cla
         if (hazeMax > 0) {
           _col.lerp(_rim, hazeMax * smoothstep(HZ.startM, HZ.endM, d));
         }
-        const sy = conifer ? r * cf.heightFrac : r * S.crownFrac;
-        const sxz = conifer ? r * cf.widthFrac : r;
-        const y = gy + (conifer ? r * cf.liftFrac : r * S.crownLiftFrac);
+        // R21 frame: a CENTRED blob — scale (r, r·crownFrac, r) lifted so its
+        // base tucks under the ground. R22 trees2 frame: the merged geometry is
+        // authored with its BASE at y = 0 and its crown top at y = 1 (see
+        // buildTreeGeometry), so the transform becomes (crownR, totalHeight,
+        // crownR) at ground level and a conifer is the same geometry made
+        // narrower and taller — the "scale/tint-driven, never a second
+        // geometry" rule, unchanged.
+        const sy = trees2
+          ? r * (conifer ? T2.coniferHeightMul : T2.heightMul)
+          : conifer
+            ? r * cf.heightFrac
+            : r * S.crownFrac;
+        const sxz = trees2 ? (conifer ? r * T2.coniferWidthFrac : r) : conifer ? r * cf.widthFrac : r;
+        const y = trees2 ? gy : gy + (conifer ? r * cf.liftFrac : r * S.crownLiftFrac);
         _dummy.position.set(wx - ox, y, wz - oz);
         _dummy.scale.set(sxz, sy, sxz);
+        if (cinematic) {
+          const form = canopyForm(wx * 0.17 + wz * 0.31, conifer);
+          _dummy.scale.set(sxz * form.width, sy * form.height, sxz * form.depth);
+          mesh.geometry.attributes.aCanopyPhase.setX(n, hash(wx * 0.71 + wz * 0.53) * Math.PI * 2);
+        }
         // A hashed yaw breaks up the lat/long seams of a low-poly sphere so a
         // stand of trees does not read as one repeated stamp. Free — the matrix
         // is being composed either way.
@@ -511,7 +744,11 @@ function placeCanopy(mesh, engine, flight, altK, pool, perChunkCap, byClass, cla
         n += 1;
       }
     }
+    // Prune the birth map back to the resident ring: a long flight would
+    // otherwise leak one timestamp per tile ever crossed.
+    if (seen) for (const key of born.m.keys()) if (!seen.has(key)) born.m.delete(key);
   }
+  if (born) born.ramping = ramping;
   // Park the tail at zero scale AND clamp count: `count` is what keeps the GPU
   // off unused instances, the zero scale is the belt to its braces.
   _dummy.position.set(0, 0, 0);
@@ -527,6 +764,7 @@ function placeCanopy(mesh, engine, flight, altK, pool, perChunkCap, byClass, cla
   const touched = Math.max(n, prevN | 0);
   rangeUpload(mesh.instanceMatrix, touched * 16);
   if (mesh.instanceColor) rangeUpload(mesh.instanceColor, touched * 3);
+  if (cinematic) rangeUpload(mesh.geometry.attributes.aCanopyPhase, touched);
   mesh.boundingSphere.center.set(0, 0, 0);
   // R24 B (BEND_LEAD, recon WB-6) — `maxD` was measured at THIS placement pass,
   // but the pool is only refilled on the 2 s cadence, so by the next pass the

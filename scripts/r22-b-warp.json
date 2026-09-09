@@ -1,0 +1,37 @@
+[
+  {
+    "on": false,
+    "gate": {
+      "kind": "far",
+      "epoch": 1,
+      "gate": false,
+      "holdMs": 2752,
+      "capped": false,
+      "ready": true,
+      "terms": null,
+      "holdMax": 3500
+    },
+    "terra": null
+  },
+  {
+    "on": true,
+    "gate": {
+      "kind": "far",
+      "epoch": 1,
+      "gate": true,
+      "holdMs": 2252,
+      "capped": false,
+      "ready": true,
+      "terms": {
+        "terra": true,
+        "bldg": true,
+        "road": true,
+        "parcel": true,
+        "legacy": true,
+        "ready": true
+      },
+      "holdMax": 6500
+    },
+    "terra": null
+  }
+]

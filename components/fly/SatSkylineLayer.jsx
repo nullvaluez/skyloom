@@ -4,11 +4,22 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
 import { SatSkylineEngine } from '@/lib/fly/toy-world/sat-skyline-engine';
-import { SAT_SKYLINE } from '@/lib/fly/fly-constants';
-import { getSatSkyline } from '@/lib/fly/toy-world/world-bend';
+import { SAT_SKYLINE, SETTLE_CALM } from '@/lib/fly/fly-constants';
+import { getSatSkyline, setSatSkyline, getSatBldgFade } from '@/lib/fly/toy-world/world-bend';
+import { chunkFadeOn } from '@/lib/fly/toy-world/chunk-fade';
+import { setSatelliteArchitectureCoverage } from '@/lib/fly/satellite-architecture-material';
+import {
+  applyUniformBirth,
+  arrivalEpoch,
+  birthK,
+  makeBirth,
+  makeUniformBirth,
+  notePopin,
+} from '@/lib/fly/settle';
+import { satelliteVisualsOn, satelliteVisualProfile } from '@/lib/fly/satellite-visuals';
 import { useFlyStore } from '@/stores/fly-store';
 // R24 B (GROUND_VIS, recon A6/T8) — AGL fade bands read the DAMPED ground.
-import { eyeAglVis } from '@/lib/fly/ground-vis';
+import { eyeAglVis, groundElevVis } from '@/lib/fly/ground-vis';
 
 /**
  * Round 18 (A2 "SKYLINE") — mounts the DISTANT BLOCK-MASS streamer inside
@@ -47,15 +58,22 @@ export function SatSkylineLayer({ runtime, flight }) {
   // — react-hooks/purity); the warp subscription reads the current clock here.
   const nowRef = useRef(0);
   const statsAtRef = useRef(0);
+  // R22 (B SETTLE) — the distant mass births on its OWN Bayer term (uSkyFade),
+  // the same mechanism and the same 0-gated identity as the near ring. No new
+  // shader, no new cache key.
+  const birthRef = useRef(makeBirth());
+  const fadeRef = useRef(makeUniformBirth());
 
   // Tier → group cap. Dropping to a smaller cap evicts the surplus on the next
   // refresh; 0 (low) evicts everything immediately. No re-stream on a raise —
   // the desired set just grows.
   useEffect(() => {
-    engine.setMaxChunks(SAT_SKYLINE.maxChunksByTier[qualityTier] ?? 0);
+    engine.setMaxChunks((satelliteVisualsOn() ? satelliteVisualProfile(qualityTier).skylineChunks : SAT_SKYLINE.maxChunksByTier[qualityTier]) ?? 0);
   }, [engine, qualityTier]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability -- shared imperative runtime bus, matching building/road layers
+    runtime.satSkyline = engine;
     const worker = new Worker(
       new URL('../../lib/fly/toy-world/vector-tile.worker.js', import.meta.url),
       { type: 'module' }
@@ -70,6 +88,7 @@ export function SatSkylineLayer({ runtime, flight }) {
     return () => {
       engine.dispose();
       worker.terminate();
+      if (runtime.satSkyline === engine) runtime.satSkyline = null;
       if (process.env.NODE_ENV === 'development') delete window.__satSkyline;
     };
   }, [engine, runtime]);
@@ -91,9 +110,33 @@ export function SatSkylineLayer({ runtime, flight }) {
     const t = clock.elapsedTime;
     nowRef.current = t;
     const eyeAgl = eyeAglVis(runtime, flight); // R24 B (GROUND_VIS)
+    const gVis = groundElevVis(runtime, flight);
     // groundElev rides along as the fallback for far DEM samples that have not
     // streamed yet — sea level would sink a mountain city's skyline.
-    engine.update(t, flight.pos.x, flight.pos.z, eyeAgl, flight.groundElev);
+    engine.setNightMix(runtime.sun?.frac);
+    setSatelliteArchitectureCoverage(engine.material, runtime.satBuildings, runtime.origin?.anchor, getSatBldgFade());
+    engine.update(t, flight.pos.x, flight.pos.z, eyeAgl, gVis);
+    const ready = engine.stats.ready;
+    const k = birthK(
+      birthRef.current,
+      t,
+      ready > 0,
+      arrivalEpoch(),
+      SETTLE_CALM.births.bayerSec
+    );
+    if (k < 1 && !chunkFadeOn()) {
+      const s = getSatSkyline();
+      applyUniformBirth(fadeRef.current, s.fade, k, (v) =>
+        setSatSkyline(s.holeRadiusM, s.holeFeatherM, v)
+      );
+    } else if (!Number.isNaN(fadeRef.current.lastWritten)) {
+      const s = getSatSkyline();
+      applyUniformBirth(fadeRef.current, s.fade, 1, (v) =>
+        setSatSkyline(s.holeRadiusM, s.holeFeatherM, v)
+      );
+      fadeRef.current.lastWritten = Number.NaN;
+    }
+    notePopin('satSkyline', ready > 0, birthRef.current.running || engine.stats.births > 0);
     if (
       process.env.NODE_ENV === 'development' &&
       window.__flyStats &&

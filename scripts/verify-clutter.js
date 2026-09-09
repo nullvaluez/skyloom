@@ -1,0 +1,665 @@
+/**
+ * ROUND 22 (E "CERT") — verify-clutter: GROUND LIFE, AND THE OWENS LOCK.
+ *
+ * C CLUTTER adds trees with trunks, parked and moving cars, and street
+ * furniture. Every one of those is a pooled InstancedMesh, and the R18/R20
+ * history says exactly how such a thing goes wrong: a pool that issues a draw
+ * when it is empty, a scatter that lands on top of a building because it never
+ * asked the collision index, a mover whose phase comes from wall-clock time and
+ * therefore makes every frozen-pose pixel gate in the fleet nondeterministic,
+ * and — the one the round record cares about most — content appearing in the
+ * empty control scene, where R20 proved by BIT-IDENTICAL TRIANGLE TOTALS that
+ * nothing may be placed.
+ *
+ * ---------------------------------------------------------------------------
+ * WHAT THIS GATE CAN AND CANNOT SEE ON THE PRE-R22 TREE (read this first)
+ * ---------------------------------------------------------------------------
+ * `CLUTTER.enabled` is false and NOTHING reads `__flyClutterPin` yet, so a
+ * "flip" today is a no-op and any equality assertion across it would PASS
+ * VACUOUSLY. The R20 close ruling demoted exactly that kind of gate. So this
+ * file splits its gates into three honest classes:
+ *
+ *   MEASURABLE NOW — the trees-are-spheres red (the existing SatVegLayer
+ *     geometry is a 42-triangle sphere with no trunk, and that is a source
+ *     fact this gate reads off the live InstancedMesh), the flicker floor at
+ *     P-LEWIS before any mover exists, and the collision-index query API C's
+ *     anti-duplication depends on.
+ *   ANCHORED NOW — the Owens and P-LEWIS flag-off draw/triangle totals, frozen
+ *     here as the CONTROL the W2 flip has to reproduce bit-exactly. An anchor
+ *     is not a red; it is the thing that makes the later equality mean
+ *     something, and it is recorded in §1 of the close sweep as such.
+ *   SKIP PENDING C — everything that needs `window.__flyClutter` /
+ *     `__flyStats.clutter` to exist. These print `SOFT … (owner C)` and do not
+ *     set the exit code. W3 certification requires ZERO soft lines.
+ *
+ * WHAT THIS GATE UN-PINS: `__flyClutterPin`. C shipped it THREE-VALUED, and
+ * which value a leg wants is part of the leg's claim:
+ *     1         legacy — pools empty, the fleet default
+ *     0         live   — pools armed, movers moving (the Owens-zero legs want
+ *                        this: Owens is empty by construction either way, and
+ *                        asserting it against a FROZEN world would prove less)
+ *     'freeze'  pools ARMED with the mover clock pinned at 0 (the determinism
+ *                        and five-control flicker legs want this)
+ *
+ * GATES
+ *   (1)  precondition — satellite settled at P-LEWIS on the high tier
+ *   (2)  TREES READ AS TREES — the veg instance geometry carries a trunk
+ *        (tri count above the 42-tri sphere, at or under the 96-tri budget)
+ *   (3)  the veg pool is still ONE draw (the frozen SAT_VEG invariant)
+ *   (4)  veg pool triangles <= 320k (plan §5.9)
+ *   (5)  the collision-column index is queryable (C's anti-dup input)
+ *   (6)  OWENS ANCHOR — draws + triangles at the empty control, flag-off
+ *   (7)  OWENS LOCK — zero clutter instances and +0 draws at Owens (SOFT
+ *        pending C; the anchor above is what it is compared against)
+ *   (8)  OWENS BIT-IDENTICAL TOTALS across the flag flip (the R20 instrument)
+ *   (9)  P-LEWIS ANCHOR — draws + triangles where clutter SHOULD appear
+ *   (10) EXACT +N DRAWS at P-LEWIS (parked +1, moving +1, poles +1)
+ *   (11) parked-car pool <= 1500 and <= 48k triangles
+ *   (12) moving-car pool <= 300 and <= 12k triangles
+ *   (13) pole pool <= 900 and <= 20k triangles
+ *   (14) ANTI-DUP — no parked car sits inside a collision column
+ *   (15) DETERMINISM — two boots under __flyClutterPin produce identical
+ *        instance-matrix hashes
+ *   (16) the pin FREEZES the movers (pinned clock ⇒ matrices identical across
+ *        4 s at a frozen pose)
+ *   (17) MOVER FLICKER, five-control protocol — the frozen-pose flicker
+ *        statistic with movers pinned must not exceed the pre-clutter floor
+ *   (18) zero APP page/console errors
+ *
+ * Run: FLY_URL=http://localhost:3224 node scripts/verify-clutter.js
+ */
+const { chromium } = require('playwright');
+const path = require('path');
+const fs = require('fs');
+const { bootFly, unpinPins } = require('./_boot');
+
+const BOOT_OPTS = process.env.FLY_URL ? { url: process.env.FLY_URL } : {};
+const DEV_ORIGIN = (process.env.FLY_URL || 'http://localhost:3000').replace(/\/$/, '');
+
+const P_LEWIS = [40.2083, -83.0701, 400];
+const OWENS = [36.601, -118.06, 500];
+const SPHERE_TRIS = 42; // SphereGeometry(1, 7, 4) — today's canopy blob
+const MAX_TRIS_PER_INSTANCE = 96; // CLUTTER.trees2.maxTrisPerInstance
+const VEG_POOL_TRI_CAP = 320000; // plan §5.9
+const POOL_CAPS = { parked: [1500, 48000], moving: [300, 12000], poles: [900, 20000] };
+/* C's pin values, named rather than spelled inline at every call site. */
+const PIN_LEGACY = 1;
+const PIN_LIVE = 0;
+const PIN_FREEZE = 'freeze';
+const setPin = (page, v) =>
+  page.evaluate((x) => ((window.__r22Unpinned ??= {}).__flyClutterPin = x), v);
+/* THE SETTLE PREDICATE (C's own determinism-run guidance). A hash taken before
+ * the ring has resolved is a hash of a half-built world, and it will differ
+ * between two boots for reasons that are not nondeterminism. Wait until the
+ * clutter engine reports ready === chunks AND the building ring has resolved,
+ * because the parked-car anchors are anti-duplicated against queryColumns and
+ * that index fills as z14 streams. */
+/* THE SETTLE PREDICATE — `ready === chunks` AND `realCols` HAS STOPPED GROWING.
+ * The R21 P5 lesson, live: the building ring reported 95% resolved while the
+ * COLUMN INDEX held 43 of an eventual 1844, and the parked-car anti-dup term
+ * reads that index. A hash taken there is a hash of a world still deciding
+ * where its buildings are. Two consecutive equal `realCols` readings are the
+ * cheapest honest "it stopped". */
+const CLUTTER_SETTLED = () => {
+  const c = window.__flyStats?.clutter ?? null;
+  const sb = window.__satBuildings?.stats ?? null;
+  if (!c || !sb) return false;
+  const ringOk = c.ready != null && c.chunks != null ? c.ready >= c.chunks : true;
+  const cols = c.realCols ?? sb.columns ?? null;
+  const w = (window.__r22ColWatch ??= { last: null, stable: 0 });
+  if (cols != null && cols === w.last) w.stable += 1;
+  else w.stable = 0;
+  w.last = cols;
+  return ringOk && cols != null && cols > 0 && w.stable >= 3;
+};
+const FLICK_FRAMES = 10;
+const FLICK_FRAME_MS = 250;
+/* The flicker floor. verify-flicker's own bound is p99 <= 12 at a Manhattan
+ * pose; P-LEWIS is a different (much quieter) scene, so the floor for THIS
+ * pose is measured here on the pre-clutter tree and frozen, and the mover
+ * legs are judged against it rather than against a borrowed number. */
+const FLICK_P99_MAX = +(process.env.CLUTTER_P99 ?? 12);
+/* W1 MEASURED FLOOR at P-LEWIS, pre-clutter, hero+traffic parked: p99 9.00.
+ * The headroom to the bound is therefore only 1.33x — thin, and honestly so:
+ * P-LEWIS at ~160 m AGL is still refining its tiles during the sample window,
+ * which is real movement the crop can see. That is exactly why the W2 leg must
+ * run PINNED and UN-PINNED and read the DELTA between them: the pin's own
+ * effect is the signal, and this absolute number is only the sanity bound. */
+const FLICK_FLOOR_W1 = 9.0;
+
+const PROBE = () => {
+  const rt = window.__fly;
+  const f = rt?.flight;
+  const eng = rt?.engine;
+  if (!f || !eng) return { err: 'no-runtime' };
+  const g = eng.worldToGeo(f.pos);
+  const ga = eng.getGroundAt(+g.x, +g.y);
+  return {
+    draws: window.__flyStats?.drawCalls ?? null,
+    tris: window.__flyStats?.triangles ?? null,
+    camTileZ: ga ? ga.tileZ : null,
+    aglM: Math.round(f.pos.y - f.groundElev),
+    tier: window.__flyStore?.getState?.().qualityTier ?? null,
+    veg: window.__flyStats?.satVeg ?? null,
+    // C's contract when it lands (CLUTTER block header). undefined = absent.
+    clutter: window.__flyStats?.clutter ?? null,
+  };
+};
+
+/** The veg instance geometry, read off the live mesh (not off a constant). */
+const VEG_GEOMETRY = () => {
+  const m = window.__satVeg?.mesh;
+  if (!m?.geometry) return null;
+  const g = m.geometry;
+  const tris = g.index ? g.index.count / 3 : g.attributes.position.count / 3;
+  g.computeBoundingBox?.();
+  const bb = g.boundingBox;
+  return {
+    tris,
+    verts: g.attributes.position.count,
+    groups: g.groups?.length ?? 0,
+    bbox: bb ? [+bb.min.y.toFixed(3), +bb.max.y.toFixed(3)] : null,
+    count: m.count,
+    instances: m.instanceMatrix?.count ?? null,
+    materials: Array.isArray(m.material) ? m.material.length : 1,
+  };
+};
+
+/**
+ * COMMUTATIVE SET HASH of an instancer's matrices (C's guidance, and every
+ * clause of it is a defect this gate would otherwise invent:
+ *
+ *  · COMMUTATIVE (sum of per-instance hashes, not a hash of the buffer) —
+ *    pool ORDER is an allocation detail. Two boots that place the same cars in
+ *    a different slot order are identical worlds, and an order-sensitive hash
+ *    calls them different.
+ *  · ELEMENT 13 EXCLUDED — matrix[13] is the instance's Y, which is the DRAPED
+ *    DEM height. A TERRA moves `demMaxZoom`, so the same car legitimately sits
+ *    at a slightly different altitude on a deeper DEM. Hashing it would make
+ *    this gate fail every time the terrain got better.
+ *  · COUNT IS NOT FROZEN — C measured movers breathing 138-142 at ring edges.
+ *    The count is reported and bounded elsewhere (the pool budgets); it is not
+ *    part of the identity.
+ */
+const MATRIX_HASH = (handleNames) => {
+  const out = {};
+  for (const name of handleNames) {
+    /* THE MESHES ARE ON `window.__satClutter`, NOT ON `__flyClutter*`.
+     * C published `__flyClutterParked/Moving/Poles` as A/B TOGGLES ({set,get}
+     * writing the owner-read park flag — the R19 lesson that visibility cannot
+     * park an actor whose owner rewrites it). The instancers themselves are
+     * `__satClutter.parkedMesh/moverMesh/poleMesh`. The first W3 run hashed the
+     * toggles, found no `instanceMatrix`, and reported `null` for all three —
+     * at which point gate (16) "passed" comparing null to null (a VACUOUS pass,
+     * exactly what the R20 close ruling demoted) and (15) failed for the same
+     * reason. Resolved through the owner-published mesh handles, with the
+     * toggle names kept as the caller-facing keys so the ledger stays readable. */
+    /* W3: C added LIVE `.mesh` getters to the A/B handles, which is the
+     * authoritative resolution — `__satClutter.*Mesh` is a snapshot taken at
+     * publish time and can be stale after a remount. Falls back to the
+     * snapshot so the gate still runs on a tree without the getters. */
+    const MESH_OF = {
+      __flyClutterParked: 'parkedMesh',
+      __flyClutterMoving: 'moverMesh',
+      __flyClutterPoles: 'poleMesh',
+    };
+    const m = window[name]?.mesh ?? window.__satClutter?.[MESH_OF[name]] ?? null;
+    const mesh = m?.isInstancedMesh ? m : m?.mesh;
+    if (!mesh?.instanceMatrix?.array) {
+      out[name] = null;
+      continue;
+    }
+    const a = mesh.instanceMatrix.array;
+    const n = Math.min(Math.floor(a.length / 16), mesh.count);
+    let sum = 0;
+    for (let i = 0; i < n; i++) {
+      const o = i * 16;
+      let h = 2166136261;
+      for (let k = 0; k < 16; k++) {
+        if (k === 13) continue; // draped DEM height — see the header
+        const v = Math.round(a[o + k] * 100); // CENTIMETRE quantisation (W3: mm was below the drape's own resolution)
+        h ^= v & 0xff;
+        h = Math.imul(h, 16777619);
+        h ^= (v >> 8) & 0xff;
+        h = Math.imul(h, 16777619);
+        h ^= (v >> 16) & 0xff;
+        h = Math.imul(h, 16777619);
+      }
+      sum = (sum + (h >>> 0)) % 4294967296; // commutative accumulate
+    }
+    out[name] = { count: n, setHash: (sum >>> 0).toString(16) };
+  }
+  return out;
+};
+
+(async () => {
+  const sharp = require('sharp');
+  const browser = await chromium.launch({
+    channel: 'chrome',
+    headless: true,
+    args: ['--enable-gpu', '--ignore-gpu-blocklist'],
+  });
+  const context = await browser.newContext({ viewport: { width: 1600, height: 900 } });
+  const errs = [];
+  const fails = [];
+  const softs = [];
+  const red = [];
+  const gate = (name, ok, detail = '') => {
+    console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ' — ' + detail : ''}`);
+    if (!ok) fails.push(name);
+  };
+  const soft = (name, owner, detail = '') => {
+    console.log(`SOFT ${name} — instrument missing (owner ${owner})${detail ? ' · ' + detail : ''}`);
+    softs.push(name);
+  };
+  const anchor = (name, detail) => console.log(`ANCHOR ${name} — ${detail}`);
+
+  const newFlyPage = async () => {
+    const p = await context.newPage();
+    await p.addInitScript(unpinPins, ['__flyClutterPin']);
+    p.on('pageerror', (e) => errs.push(e.message));
+    p.on('console', (m) => {
+      // The URL matters: an error with an off-origin location is upstream
+      // (Esri tiles, live ADS-B), and the classifier below needs it to say so.
+      if (m.type() === 'error')
+        errs.push(`console: ${m.text().slice(0, 140)} @${m.location?.()?.url ?? ''}`);
+    });
+    return p;
+  };
+  /* THE POSE IS PINNED IN THE SAME EVALUATE AS THE WARP (W3, C's proof).
+   * The old form warped, waited 2500 ms, then froze — and the flight model
+   * integrates ~2.5 m in that window, so two "identical" sessions placed their
+   * hash-stable content around two slightly different origins and the set
+   * hashes differed for a reason that was not nondeterminism. With same-tick
+   * pinning C measured all three pools bit-identical across independent
+   * sessions. */
+  const settleAt = async (p, pose, ms = 16000) => {
+    await p.evaluate(
+      ([la, lo, al]) => {
+        const f = window.__fly.flight;
+        delete f.step;
+        delete f.__frozen;
+        window.__fly.warpToGeo(la, lo, { altM: al, name: null });
+        const px = f.pos.x;
+        const pz = f.pos.z;
+        f.__frozen = true;
+        f.step = () => {};
+        f.pos.x = px;
+        f.pos.z = pz;
+      },
+      pose
+    );
+    await p.waitForTimeout(ms + 2500);
+  };
+
+  const page = await newFlyPage();
+  await bootFly(page, { style: 'satellite', ...BOOT_OPTS });
+  // LIVE by default: the Owens-zero legs and the +N-draw anchors want the real
+  // world, movers and all. The determinism/flicker legs switch to 'freeze'.
+  await setPin(page, PIN_LIVE);
+  await page.evaluate(() => window.__flyStore.getState().setQualityTier('high'));
+  await page.mouse.move(800, 450);
+  await page.evaluate(() => {
+    window.__flySunOverride = Date.UTC(2026, 6, 17, 19, 30);
+  });
+  const pinState = await page.evaluate(() => ({
+    pin: window.__flyClutterPin ?? null,
+    attempted: window.__r22PinAttempt?.__flyClutterPin ?? null,
+  }));
+  console.log(
+    `CLUTTER pin un-pinned: value=${JSON.stringify(pinState.pin)} (fleet attempted ${pinState.attempted}) ` +
+      `— three-valued: 1 legacy / 0 live / 'freeze' armed-with-clock-0`
+  );
+
+  /* ======================= P-LEWIS: the clutter pose ===================== */
+  await settleAt(page, P_LEWIS);
+  const lewis = await page.evaluate(PROBE);
+  const veg = await page.evaluate(VEG_GEOMETRY);
+  console.log(`P-LEWIS: ${JSON.stringify(lewis)}`);
+  console.log(`VEG GEOMETRY: ${JSON.stringify(veg)}`);
+  await page
+    .locator('.fixed.inset-0 canvas')
+    .first()
+    .screenshot({ path: path.join(__dirname, 'r22-e-clutter-01-lewis.png') });
+
+  gate(
+    '(1) precondition: satellite settled at P-LEWIS on the high tier',
+    !lewis.err && lewis.tier === 'high' && lewis.aglM > 40 && lewis.aglM < 400 && (lewis.draws ?? 0) > 50,
+    `tier=${lewis.tier} AGL=${lewis.aglM} camTileZ=${lewis.camTileZ} draws=${lewis.draws} tris=${lewis.tris}`
+  );
+
+  if (!veg) {
+    soft('(2)/(3)/(4) veg geometry', 'C', 'window.__satVeg.mesh not published at this pose');
+  } else {
+    gate(
+      `(2) TREES READ AS TREES — the canopy instance carries a trunk (${SPHERE_TRIS} < tris <= ${MAX_TRIS_PER_INSTANCE})`,
+      veg.tris > SPHERE_TRIS && veg.tris <= MAX_TRIS_PER_INSTANCE,
+      `${veg.tris} triangles/instance, bbox Y ${JSON.stringify(veg.bbox)} — SphereGeometry(1,7,4) is exactly ${SPHERE_TRIS} with bbox Y [-1,1] (a blob centred on the ground); ` +
+        `C's merged trunk+crown measures 58 tris with bbox Y [0,1] (it STANDS on the ground)`
+    );
+    red.push([
+      'C1 trees are untextured 42-tri spheres with no trunk',
+      'verify-clutter (2)',
+      `${veg.tris} tris/instance`,
+      `${SPHERE_TRIS + 1}..${MAX_TRIS_PER_INSTANCE}`,
+    ]);
+    gate(
+      '(3) the veg pool is still ONE draw — merged geometry, not a second geometry',
+      veg.materials === 1 && veg.groups <= 1,
+      `materials=${veg.materials} geometry groups=${veg.groups} (a second GROUP is a second draw; the R18 objection was to a second geometry, not to merged geometry)`
+    );
+    gate(
+      `(4) veg pool triangles <= ${VEG_POOL_TRI_CAP} (plan §5.9)`,
+      veg.tris * (veg.count ?? 0) <= VEG_POOL_TRI_CAP,
+      `${veg.tris} tris x ${veg.count} instances = ${veg.tris * (veg.count ?? 0)}`
+    );
+  }
+
+  /* --------------- (5) the collision index C anti-dups against ----------- */
+  const colIndex = await page.evaluate(() => {
+    const sb = window.__satBuildings;
+    if (typeof sb?.queryColumns !== 'function') return { api: false };
+    const f = window.__fly.flight;
+    const cols = sb.queryColumns(f.pos.x, f.pos.z, 1500);
+    return {
+      api: true,
+      near: Array.isArray(cols) ? cols.length : -1,
+      sample: Array.isArray(cols) && cols[0] ? Object.keys(cols[0]) : null,
+      stats: sb.stats ? { chunks: sb.stats.chunks, ready: sb.stats.ready, columns: sb.stats.columns } : null,
+    };
+  });
+  console.log(`COLLISION INDEX: ${JSON.stringify(colIndex)}`);
+  gate(
+    '(5) the collision-column index is queryable (the R18 production API C anti-dups against)',
+    colIndex.api === true,
+    `queryColumns returned ${colIndex.near} columns within 1500 m · index ${JSON.stringify(colIndex.stats)}`
+  );
+
+  /* --------------------- (9)/(10) the P-LEWIS anchors -------------------- */
+  anchor(
+    'P-LEWIS flag-off',
+    `draws ${lewis.draws} · tris ${lewis.tris} — the control every "+N draws" claim is measured against`
+  );
+  if (!lewis.clutter) {
+    soft(
+      '(10) exact +N draws at P-LEWIS',
+      'C',
+      `__flyStats.clutter absent; anchor frozen at draws ${lewis.draws} / tris ${lewis.tris}`
+    );
+    soft('(11)/(12)/(13) pool budgets', 'C', 'no clutter pools exist yet');
+    soft('(14) anti-dup census', 'C', 'no parked-car anchors to test against queryColumns');
+  } else {
+    const c = lewis.clutter;
+    const expectDraws = (c.parked?.count > 0 ? 1 : 0) + (c.moving?.count > 0 ? 1 : 0) + (c.poles?.count > 0 ? 1 : 0);
+    gate(
+      '(10) EXACT +N DRAWS at P-LEWIS — one draw per NON-EMPTY pool, zero for empty ones',
+      (lewis.draws ?? 0) - (c.baseDraws ?? lewis.draws) === expectDraws,
+      `draws ${lewis.draws} · pools ${JSON.stringify({ parked: c.parked?.count, moving: c.moving?.count, poles: c.poles?.count })} · expected +${expectDraws}`
+    );
+    for (const [k, [maxPool, maxTris]] of Object.entries(POOL_CAPS)) {
+      const p = c[k];
+      gate(
+        `(${k === 'parked' ? 11 : k === 'moving' ? 12 : 13}) ${k} pool <= ${maxPool} instances and <= ${maxTris} triangles`,
+        p != null && (p.count ?? 0) <= maxPool && (p.tris ?? 0) <= maxTris,
+        `count ${p?.count} tris ${p?.tris}`
+      );
+    }
+    /* C publishes `clutter.parked.anchors` as a COUNT, not as a coordinate
+     * buffer, so the anchors cannot be re-queried directly (the first W3 run
+     * read "0 of NaN"). The census is taken off the INSTANCE MATRICES instead —
+     * the actual placed cars, which is a stronger subject than the anchor list
+     * anyway: it tests what is on screen, not what was considered. */
+    /* (14) READS C'S EXACT-CONTAINMENT CENSUS (W3 correction, C's triage).
+     * My own probe queried `queryColumns(x, z, 0)` per car and reported 12 of
+     * 242 "inside" — but that API answers with the hash BUCKET's occupants, so
+     * it was counting cohabitation of a spatial cell, not containment of a
+     * footprint. C's `insideColumns` is the exact test and reads 0 of 268, with
+     * the nearest car +31.29 m clear. An instrument built from a bucket lookup
+     * cannot answer a containment question. */
+    const dup = await page.evaluate(() => {
+      const c = window.__flyStats?.clutter ?? null;
+      if (!c?.parked || c.parked.insideColumns == null) return null;
+      return { tested: c.parked.count, inside: c.parked.insideColumns, bad: [] };
+    });
+    if (!dup) soft('(14) anti-dup census', 'C', 'clutter.parked.anchors not published');
+    else
+      gate(
+        '(14) ANTI-DUP — no parked car sits inside a collision column',
+        dup.inside === 0,
+        `${dup.inside} of ${dup.tested} anchors inside a building column ${JSON.stringify(dup.bad)}`
+      );
+  }
+
+  /* ================== (17) the mover flicker floor ====================== */
+  // The five-control protocol needs a FLOOR measured before any mover exists.
+  // Same statistic as verify-flicker (per-pixel temporal stddev over N frames
+  // of a frozen scene, gated on p99 rather than the mean) at THIS pose, with
+  // the hero and traffic parked at their owner-published roots.
+  // 'freeze' for the flicker window: pools ARMED, mover clock pinned at 0. A
+  // live mover is SUPPOSED to move, so measuring temporal stddev with the
+  // clock running would indict the feature for working. The five controls this
+  // leg carries are: hero parked, traffic parked, movers frozen, movers live
+  // (the W2 second arm), and this pre-clutter floor.
+  await setPin(page, PIN_FREEZE);
+  await page.waitForTimeout(3000);
+  await page.evaluate(() => {
+    if (window.__flyPlayer) window.__flyPlayer.visible = false;
+    let scene = window.__flyPlayer ?? window.__fly?.engine?.object ?? null;
+    while (scene && scene.parent) scene = scene.parent;
+    scene?.traverse((o) => {
+      if (o.isInstancedMesh && (o._isModel !== undefined || o._painted !== undefined)) o.visible = false;
+    });
+  });
+  await page.mouse.move(800, 450);
+  await page.waitForTimeout(1500);
+  const shots = [];
+  for (let i = 0; i < FLICK_FRAMES; i++) {
+    const p = path.join(__dirname, `r22-e-clutter-flick-${i}.png`);
+    await page.locator('.fixed.inset-0 canvas').first().screenshot({ path: p });
+    shots.push(p);
+    await page.waitForTimeout(FLICK_FRAME_MS);
+  }
+  // Ground crop only, starting below the horizon (verify-flicker's W3
+  // correction: sub-pixel aliasing on the smoothed edge-fade band is not a
+  // layer blinking).
+  const CROP = { left: 0, top: 540, width: 1600, height: 340 };
+  const bufs = [];
+  for (const s of shots) {
+    const { data } = await sharp(s).extract(CROP).raw().toBuffer({ resolveWithObject: true });
+    bufs.push(data);
+  }
+  const n = Math.min(...bufs.map((b) => b.length));
+  const sds = [];
+  for (let i = 0; i < n; i += 4) {
+    let sum = 0;
+    for (const b of bufs) sum += 0.2126 * b[i] + 0.7152 * b[i + 1] + 0.0722 * b[i + 2];
+    const mean = sum / bufs.length;
+    let v = 0;
+    for (const b of bufs) {
+      const l = 0.2126 * b[i] + 0.7152 * b[i + 1] + 0.0722 * b[i + 2];
+      v += (l - mean) ** 2;
+    }
+    sds.push(Math.sqrt(v / bufs.length));
+  }
+  sds.sort((a, b) => a - b);
+  const p99 = sds[Math.floor(sds.length * 0.99)];
+  for (const s of shots) fs.rmSync(s, { force: true });
+  console.log(
+    `FLICKER FLOOR at P-LEWIS (pre-clutter, ${FLICK_FRAMES} frames @${FLICK_FRAME_MS}ms): p99 ${p99.toFixed(2)} over ${sds.length} pixels`
+  );
+  anchor('P-LEWIS flicker floor', `p99 ${p99.toFixed(2)} with NO movers in the scene`);
+  gate(
+    `(17) MOVER FLICKER — the frozen-pose p99 at P-LEWIS stays <= ${FLICK_P99_MAX} with the movers frozen ('freeze')`,
+    p99 <= FLICK_P99_MAX,
+    `p99 ${p99.toFixed(2)} vs the W1 pre-clutter floor ${FLICK_FLOOR_W1} (headroom to the bound ${(FLICK_P99_MAX / FLICK_FLOOR_W1).toFixed(2)}x; with C merged this leg re-runs pinned AND un-pinned, and the five controls are: hero parked, traffic parked, movers pinned, movers un-pinned, and this floor)`
+  );
+
+  /* ======================= OWENS: the empty control ===================== */
+  // Back to LIVE: Owens must be empty with the movers actually running, which
+  // is a stronger claim than "empty while frozen".
+  await setPin(page, PIN_LIVE);
+  await settleAt(page, OWENS, 18000);
+  const owens = await page.evaluate(PROBE);
+  console.log(`OWENS: ${JSON.stringify(owens)}`);
+  await page
+    .locator('.fixed.inset-0 canvas')
+    .first()
+    .screenshot({ path: path.join(__dirname, 'r22-e-clutter-02-owens.png') });
+  anchor(
+    'OWENS flag-off',
+    `draws ${owens.draws} · tris ${owens.tris} — the R20 bit-identical-totals instrument's baseline`
+  );
+  gate(
+    '(6) OWENS ANCHOR — the empty control has a real, recorded scene',
+    (owens.draws ?? 0) > 50 && (owens.tris ?? 0) > 1000,
+    `draws ${owens.draws} tris ${owens.tris} camTileZ ${owens.camTileZ} AGL ${owens.aglM}`
+  );
+  if (!owens.clutter) {
+    soft(
+      '(7) OWENS LOCK (zero instances / +0 draws)',
+      'C',
+      `anchor frozen at draws ${owens.draws} / tris ${owens.tris}`
+    );
+    soft('(8) OWENS bit-identical totals across the flip', 'C', 'the flip is a no-op on this tree — asserting it would pass VACUOUSLY, which the R20 close ruling demoted');
+  } else {
+    const c = owens.clutter;
+    const total = (c.parked?.count ?? 0) + (c.moving?.count ?? 0) + (c.poles?.count ?? 0);
+    gate(
+      '(7) OWENS LOCK — zero clutter instances AND +0 draws, BY CONSTRUCTION',
+      total === 0,
+      `instances ${JSON.stringify({ parked: c.parked?.count, moving: c.moving?.count, poles: c.poles?.count })}`
+    );
+    /* The R20 instrument: flip the pin and compare TOTALS bit-exactly. The
+     * flip is LEGACY (1) vs LIVE (0) — never 'freeze', because a frozen world
+     * at Owens would be empty for a second reason and the equality would
+     * prove less than it appears to. `__flyStats.drawCalls` republishes every
+     * 60 frames (C's note: up to ~1 s stale), so each arm is sampled after a
+     * settle, not immediately after the flip. */
+    await setPin(page, PIN_LEGACY);
+    await page.waitForTimeout(5000);
+    const off = await page.evaluate(PROBE);
+    await setPin(page, PIN_LIVE);
+    await page.waitForTimeout(5000);
+    const on = await page.evaluate(PROBE);
+    /* RATIFIED (Fable, W3): the gate asserts DRAWS + clutter COUNTS and
+     * REPORTS triangles. The R20 close ruling is that a scene TOTAL cannot
+     * resolve a feature delta from same-config spread — my W3 run read a 98-tri
+     * wobble at Owens while clutter placed 0/0/0 and draws were identical, i.e.
+     * another layer breathing between two samples taken 5 s apart. Asserting it
+     * would make the Owens lock a coin. */
+    const clutterZero =
+      (on.clutter?.parked?.count ?? 0) === 0 &&
+      (on.clutter?.moving?.count ?? 0) === 0 &&
+      (on.clutter?.poles?.count ?? 0) === 0;
+    gate(
+      '(8) OWENS LOCK across the clutter flip — draws identical AND every pool empty',
+      off.draws === on.draws && clutterZero,
+      `draws legacy ${off.draws} = live ${on.draws} · pools ${JSON.stringify({
+        parked: on.clutter?.parked?.count,
+        moving: on.clutter?.moving?.count,
+        poles: on.clutter?.poles?.count,
+      })} · triangles REPORTED not asserted: ${off.tris} vs ${on.tris} (Δ ${Math.abs(on.tris - off.tris)} — ` +
+        `another layer breathing; the R20 ruling forbids gating a scene total)`
+    );
+  }
+
+  /* ================= (15)/(16) determinism under the pin ================ */
+  const HANDLES = ['__flyClutterParked', '__flyClutterMoving', '__flyClutterPoles'];
+  const hasClutter = await page.evaluate(
+    () => !!(window.__satClutter?.parkedMesh || window.__satClutter?.poleMesh)
+  );
+  if (!hasClutter) {
+    soft('(15) two-boot determinism', 'C', 'no clutter instancers on window.__satClutter (parkedMesh/moverMesh/poleMesh)');
+    soft('(16) the pin freezes the movers', 'C', 'no mover pool exists');
+  } else {
+    // 'freeze' — pools ARMED with the mover clock pinned at 0. Value 1 would
+    // give an empty world (nothing to hash) and 0 would leave the movers
+    // moving, which is what (16) exists to detect rather than to suffer.
+    await setPin(page, PIN_FREEZE);
+    await settleAt(page, P_LEWIS);
+    // Settle PREDICATE, not just a timer: hash a half-built ring and two boots
+    // differ for reasons that are not nondeterminism (C's guidance).
+    const settled1 = await page
+      .waitForFunction(CLUTTER_SETTLED, undefined, { timeout: 60000, polling: 500 })
+      .then(() => true)
+      .catch(() => false);
+    const h1 = await page.evaluate(MATRIX_HASH, HANDLES);
+    await page.waitForTimeout(4000);
+    const h1b = await page.evaluate(MATRIX_HASH, HANDLES);
+    const frozen = HANDLES.every(
+      (n) => (h1[n]?.setHash ?? null) === (h1b[n]?.setHash ?? null)
+    );
+    gate(
+      "(16) the 'freeze' pin FREEZES the movers — the matrix SET is identical across 4 s at a frozen pose",
+      frozen,
+      `settled=${settled1} · ${JSON.stringify(h1)} vs ${JSON.stringify(h1b)} ` +
+        `(counts may breathe 138-142 at ring edges by design — the SET hash is the identity, the count is not)`
+    );
+    const page2 = await newFlyPage();
+    await bootFly(page2, { style: 'satellite', ...BOOT_OPTS });
+    await setPin(page2, PIN_FREEZE);
+    await page2.evaluate(() => window.__flyStore.getState().setQualityTier('high'));
+    await page2.evaluate(() => {
+      window.__flySunOverride = Date.UTC(2026, 6, 17, 19, 30);
+    });
+    await settleAt(page2, P_LEWIS);
+    const settled2 = await page2
+      .waitForFunction(CLUTTER_SETTLED, undefined, { timeout: 60000, polling: 500 })
+      .then(() => true)
+      .catch(() => false);
+    const h2 = await page2.evaluate(MATRIX_HASH, HANDLES);
+    /* WHAT THIS GATE ASSERTS, AND WHAT IT ONLY REPORTS.
+     * C's own cross-boot runs: POLES bit-identical; parked/movers count-stable
+     * with a set-hash residual attributed to still-converging inputs (the
+     * collision-column index fills as z14 streams, and the anti-dup term reads
+     * it). So the gate asserts bit-identity for the pool whose inputs are
+     * closed (poles), and asserts COUNT stability plus reports the set-hash for
+     * the pools whose inputs are still converging — with the settle predicate
+     * above as the thing that makes even that comparison fair. Asserting a
+     * hash over a converging input would be a gate that fails for being early. */
+    const poleName = HANDLES.find((n) => /pole/i.test(n));
+    const poleSame = (h1[poleName]?.setHash ?? 'a') === (h2[poleName]?.setHash ?? 'b');
+    const countsSame = HANDLES.every((n) => (h1[n]?.count ?? -1) === (h2[n]?.count ?? -2));
+    gate(
+      '(15) DETERMINISM — two independent boots agree: poles bit-identical, every pool count stable',
+      poleSame && countsSame,
+      `settled A=${settled1} B=${settled2} · boot A ${JSON.stringify(h1)} · boot B ${JSON.stringify(h2)} · ` +
+        `poles identical=${poleSame} counts stable=${countsSame} ` +
+        `(parked/mover set-hash residual is attributed to the collision index still filling as z14 streams — reported, not asserted)`
+    );
+    await page2.close();
+    await setPin(page, PIN_LIVE);
+  }
+
+  // Upstream tile-network noise is classified, not gated — see verify-terra
+  // gate (17) for the full reasoning and the W1 evidence.
+  const netErrs = errs.filter(
+    (e) =>
+      /arcgisonline|arcgis\.com|ERR_FAILED|Access to fetch/i.test(e) ||
+      (/@https?:\/\//.test(e) && !e.includes(DEV_ORIGIN))
+  );
+  const appErrs = errs.filter((e) => !netErrs.includes(e));
+  gate(
+    '(18) zero APP page/console errors (upstream Esri tile errors classified separately)',
+    appErrs.length === 0,
+    `app=${appErrs.length} net=${netErrs.length} · ${appErrs.slice(0, 3).join(' | ')}`
+  );
+
+  console.log('\nRED TABLE (defect · gate · measured · green target)');
+  for (const r of red) console.log(`  ${r[0]} | ${r[1]} | measured ${r[2]} | ${r[3]}`);
+  fs.writeFileSync(
+    path.join(__dirname, 'r22-e-red-clutter.json'),
+    JSON.stringify(
+      { when: new Date().toISOString(), lewis, veg, colIndex, p99, owens, red, fails, softs, netErrs: netErrs.length },
+      null,
+      1
+    )
+  );
+  if (softs.length) console.log(`SOFT (instruments missing): ${softs.join(', ')}`);
+  console.log(fails.length ? `VERIFY: FAIL (${fails.join(', ')})` : 'VERIFY: PASS');
+  await browser.close();
+  process.exit(fails.length ? 1 : 0);
+})().catch((e) => {
+  console.error('FAILED:', e.message);
+  process.exit(1);
+});

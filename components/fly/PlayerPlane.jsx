@@ -1,4 +1,7 @@
 'use client';
+import { cinematicAircraftParameters } from '@/lib/fly/cinematic-models';
+import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
+
 
 import { Suspense, useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -128,6 +131,7 @@ function gradeHullMaterial(src, isCanopy, hasVC = false) {
     clearcoat: isCanopy ? c.canopy.clearcoat : c.clearcoat,
     clearcoatRoughness: c.clearcoatRoughness,
     envMapIntensity: isCanopy ? c.canopy.envMapIntensity : c.envMapIntensity,
+    ...(useFlyStore.getState().mapStyle === 'satellite' && satelliteVisualsOn('models') ? cinematicAircraftParameters(src,isCanopy) : {}),
   });
   m.onBeforeCompile = (shader) => {
     shader.uniforms.uRimColor = _hullRim.uRimColor;
@@ -163,7 +167,7 @@ function PlayerModel({ flight, aircraft }) {
   // Per-mount clone: the material regrade below must never reach the useGLTF
   // cache (ModelTurntable renders the same cached scenes elsewhere — and since
   // round 17 the hangar preview and the traffic fleet share these same files).
-  const cloned = useMemo(() => scene.clone(true), [scene]);
+  const cloned = useMemo(() => scene.clone(true), [scene, mapStyle]);
   const correction = useMemo(
     () =>
       computeModelCorrection(
@@ -252,7 +256,7 @@ function PlayerModel({ flight, aircraft }) {
   useEffect(() => {
     const cfg = PLAYER.hull.byStyle[mapStyle] ?? PLAYER.hull.byStyle.satellite;
     _hullRim.uRimColor.value.set(cfg.rim);
-    _hullRim.uRimStrength.value = cfg.rimStrength;
+    _hullRim.uRimStrength.value = cfg.rimStrength * (mapStyle === 'satellite' && satelliteVisualsOn('models') ? 0.22 : 1);
   }, [mapStyle]);
   useEffect(
     () => () => {

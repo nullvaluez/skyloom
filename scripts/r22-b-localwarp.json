@@ -1,0 +1,66 @@
+[
+  {
+    "on": false,
+    "departZ": 16,
+    "kind": "local",
+    "holdSamples": 0,
+    "holdMs": 0,
+    "deficitAtFlashEnd": 7,
+    "zAtFlashEnd": 11,
+    "zAtEnd": 17,
+    "stageAt250": null,
+    "warpGate": {
+      "kind": "local",
+      "epoch": 1,
+      "gate": false,
+      "holdMs": 903,
+      "localHeld": false,
+      "deficit": null,
+      "terraSeen": true,
+      "reason": "no-deficit-signal"
+    },
+    "arrivalStats": {
+      "gateArmed": false,
+      "kind": "local",
+      "epoch": 1,
+      "holdStartAt": 16700,
+      "revealAt": 17602.89999999106,
+      "reason": "no-deficit-signal",
+      "holdCapMs": null,
+      "holdMs": 903,
+      "terms": null
+    }
+  },
+  {
+    "on": true,
+    "departZ": 16,
+    "kind": "local",
+    "holdSamples": 31,
+    "holdMs": 1322,
+    "deficitAtFlashEnd": 6,
+    "zAtFlashEnd": 12,
+    "zAtEnd": 17,
+    "stageAt250": null,
+    "warpGate": {
+      "kind": "local",
+      "epoch": 1,
+      "gate": true,
+      "holdMs": 2226,
+      "localHeld": true,
+      "deficit": 1,
+      "capped": false,
+      "reason": "content"
+    },
+    "arrivalStats": {
+      "gateArmed": true,
+      "kind": "local",
+      "epoch": 1,
+      "holdStartAt": 15962.199999988079,
+      "revealAt": 18187.89999999106,
+      "reason": "content",
+      "holdCapMs": null,
+      "holdMs": 2226,
+      "terms": null
+    }
+  }
+]

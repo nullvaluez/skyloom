@@ -21,6 +21,10 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+// Already supplied by the installed Next/Babel toolchain; parse, never execute,
+// either vendored snapshot when computing the integration function inventory.
+const { parse } = createRequire(import.meta.url)('@babel/parser');
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const V = path.join(root, 'lib/fly/vendor/three-tile');
@@ -37,6 +41,7 @@ const EXPECT = {
 // AS OF that commit, and separately proves the working copy differs from it
 // only inside marked patch regions.
 const VENDOR_COMMIT = 'b64457b';
+const MAIN_COMMIT = '0ff2a3f3f6721265c285a02bbc87f130b161ff77';
 // Upstream lines a patch is allowed to EDIT rather than leave verbatim (each
 // one is a ledger row that says why). Today: exactly TWO, both signature-only.
 //   `Tile._getDistRatio()` gains an optional parameter so PATCH 2 can ask for
@@ -62,6 +67,39 @@ const gate = (name, ok, detail = '') => {
 };
 const sha = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
 const read = (p) => readFileSync(p, 'utf8');
+const lf = (text) => text.replace(/\r\n/g, '\n');
+const textSha = (text) => createHash('sha256').update(lf(text)).digest('hex');
+const relative = (file) => path.relative(root, file).split(path.sep).join('/');
+
+// Include every declared top-level function and class method (including
+// getters/setters), named by its public export where one exists. Nested work
+// is covered by its enclosing function's exact source, and module constants /
+// inline worker strings are covered by the separate whole-file digest.
+function functionsIn(source) {
+  const nodes = parse(source, { sourceType: 'module' }).program.body;
+  const aliases = new Map(), result = new Map();
+  for (const node of nodes) if (node.type === 'ExportNamedDeclaration') {
+    for (const spec of node.specifiers) aliases.set(spec.local.name, spec.exported.name);
+  }
+  for (let node of nodes) {
+    node = node.declaration || node;
+    if (node.type === 'FunctionDeclaration') {
+      result.set(aliases.get(node.id.name) || node.id.name, source.slice(node.start, node.end));
+    }
+    if (node.type === 'ClassDeclaration') for (const method of node.body.body) {
+      if (method.type !== 'ClassMethod') continue;
+      const kind = method.kind === 'get' || method.kind === 'set' ? `${method.kind} ` : '';
+      const name = `${aliases.get(node.id.name) || node.id.name}.${kind}${method.key.name || method.key.value}`;
+      result.set(name, source.slice(method.start, method.end));
+    }
+  }
+  return result;
+}
+function changedFunctions(before, after) {
+  const a = functionsIn(lf(before)), b = functionsIn(lf(after));
+  return [...new Set([...a.keys(), ...b.keys()])].sort().filter((name) => a.get(name) !== b.get(name))
+    .map((name) => ({ name, change: !a.has(name) ? 'added' : !b.has(name) ? 'removed' : 'modified' }));
+}
 
 console.log('verify-vendor-three-tile — vendored three-tile 0.12.1 integrity\n');
 
@@ -121,14 +159,14 @@ if (haveUpstream) {
     (read(vPlugin).split('\n')[REWRITE_LINE - 1] ?? '').endsWith(REWRITE_TO));
 }
 
-// Leg C: the working copy may differ from the vendoring commit ONLY inside
-// marked patch regions. This is the gate that keeps 8k lines of third-party
-// code reviewable as the round goes on.
+// Leg C: retain the original Round 24 proof against its immutable main tree.
+// The approved parallel lineage has additional lifecycle edits; it is checked
+// separately below, rather than increasing this historical allowance.
 let addedOutsidePatch = [];
 let deletedUpstream = 0;
 try {
   for (const f of ['index.js', 'plugin.js']) {
-    const diff = git(['diff', '-U0', VENDOR_COMMIT, '--', `lib/fly/vendor/three-tile/${f}`]).toString('utf8');
+    const diff = git(['diff', '-U0', VENDOR_COMMIT, MAIN_COMMIT, '--', `lib/fly/vendor/three-tile/${f}`]).toString('utf8');
     if (!diff.trim()) continue;
     const hunks = diff.split(/^@@/m).slice(1);
     for (const h of hunks) {
@@ -144,11 +182,31 @@ try {
 } catch {
   addedOutsidePatch = null;
 }
-gate('7 every edit to the vendored bundle sits in a marked R24 patch hunk',
+gate('7 historical main: every edit sits in a marked R24 patch hunk',
   addedOutsidePatch !== null && addedOutsidePatch.length === 0,
   addedOutsidePatch === null ? 'git diff unavailable' : addedOutsidePatch.join(' | '));
-gate(`8 upstream lines EDITED rather than left verbatim <= the ${DELETED_UPSTREAM_LINES} the ledger declares`,
+gate(`8 historical main: upstream lines EDITED <= the original ${DELETED_UPSTREAM_LINES} allowance`,
   deletedUpstream <= DELETED_UPSTREAM_LINES, `${deletedUpstream} upstream lines replaced`);
+
+// Leg C2: a reviewed integration receipt is deliberately NOT auto-refreshed.
+// Both the entire normalized source and the exact changed-function inventory
+// must match. Unexplained changes fail even when they carry an R24 comment.
+const manifest = JSON.parse(read(path.join(root, 'scripts/vendor-three-tile-integration.json')));
+gate('8a integration receipt names the immutable main baseline', manifest.baselineCommit === MAIN_COMMIT);
+const vendorFiles = ['index.js', 'plugin.js', 'workers/skirt-tail.src.js', 'workers/skirt-tail.built.js'];
+gate('8b integration receipt covers exactly the runtime vendor files',
+  JSON.stringify(Object.keys(manifest.files).sort()) === JSON.stringify([...vendorFiles].sort()));
+for (const file of vendorFiles) {
+  const baseline = git(['show', `${MAIN_COMMIT}:lib/fly/vendor/three-tile/${file}`]).toString('utf8');
+  const current = read(path.join(V, file));
+  const receipt = manifest.files[file];
+  gate(`8c ${file}: immutable main digest`, textSha(baseline) === receipt?.baselineSha256);
+  gate(`8d ${file}: reviewed integration digest`, textSha(current) === receipt?.integratedSha256);
+  const changes = changedFunctions(baseline, current);
+  const recorded = (receipt?.changedFunctions || []).map(({ name, change }) => ({ name, change }));
+  gate(`8e ${file}: exact changed-function inventory`, JSON.stringify(changes) === JSON.stringify(recorded),
+    changes.length ? changes.map(({ name, change }) => `${name} (${change})`).join(', ') : 'unchanged');
+}
 
 // Leg D: the bundle still imports nothing but three (+ the plugin's core).
 // The bundle may import `three` and — since PATCH 5 — its OWN generated worker
@@ -184,15 +242,16 @@ const bareImporters = files
   // (tile-sources.js explains the rewrite) or inside this gate's own constants
   // is not a second copy.
   .filter((f) => /^\s*(?:import|export)[^\n]*from\s*['"]three-tile(\/plugin)?['"]/m.test(read(f)))
-  .map((f) => path.relative(root, f));
+  .map(relative);
 gate('11 no source file imports the bare `three-tile` specifier', bareImporters.length === 0,
   bareImporters.join(', '));
 
 const vendorImporters = files
+  .filter((f) => !relative(f).startsWith('scripts/')) // fixtures are not runtime imports
   .filter((f) => /^\s*(?:import|export)[^\n]*from\s*['"][^'"]*vendor\/three-tile\/(index|plugin)\.js['"]/m.test(read(f)))
-  .map((f) => path.relative(root, f))
+  .map(relative)
   .sort();
-gate('12 exactly the two known files import the vendored copy',
+gate('12 exactly the two known runtime files import the vendored copy',
   vendorImporters.length === 2 &&
     vendorImporters.includes('lib/fly/terrain-engine.js') &&
     vendorImporters.includes('lib/fly/tile-sources.js'),
@@ -237,12 +296,21 @@ const ledgerRows = [...doc.matchAll(/^\|\s*(\d+)\s*\|\s*([A-E])\s*\|/gm)].map((m
 }));
 const markerKeys = markers.map((m) => `${m.owner}${m.n}`).sort();
 const ledgerKeys = ledgerRows.map((r) => `${r.owner}${r.n}`).sort();
+const historicalMarkers = [];
+for (const file of ['index.js', 'plugin.js']) {
+  const source = git(['show', `${MAIN_COMMIT}:lib/fly/vendor/three-tile/${file}`]).toString('utf8');
+  historicalMarkers.push(...[...source.matchAll(markerRe)].map((m) => `${m[1]}${m[2]}`));
+}
 gate('17 every PATCH marker in the vendored code has a VENDOR.md row',
   markerKeys.every((k) => ledgerKeys.includes(k)),
   `markers=[${markerKeys.join(',')}] ledger=[${ledgerKeys.join(',')}]`);
-gate('18 every VENDOR.md patch row has a marker in the vendored code',
-  ledgerKeys.every((k) => markerKeys.includes(k)),
-  `markers=[${markerKeys.join(',')}] ledger=[${ledgerKeys.join(',')}]`);
+const composed = manifest.composedHistoricalMarkers || {};
+gate('18 every historical ledger row remains marked or has an inventoried integration method',
+  ledgerKeys.every((key) => markerKeys.includes(key) ||
+    (historicalMarkers.includes(key) && composed[key]?.length > 0 && composed[key].every((name) =>
+      manifest.files['index.js'].changedFunctions.some((entry) => entry.name === name && entry.change === 'modified')))) &&
+    Object.keys(composed).every((key) => ledgerKeys.includes(key) && !markerKeys.includes(key)),
+  `composed=${Object.entries(composed).map(([key, names]) => `${key}:${names.join('/')}`).join(', ')}`);
 
 // ------------------------------------------- 5. the worker build is not stale
 let builderOut = '';

@@ -1,0 +1,172 @@
+{
+  "schemaVersion": 1,
+  "baselineCommit": "0ff2a3f3f6721265c285a02bbc87f130b161ff77",
+  "compiledAppSourceSha256": "d1e492cdefc5a70bba558080e6cd0b11acea77ff9d9470817ae8c65f4f242b1e",
+  "recordedAt": "2026-09-09",
+  "digestNormalization": "UTF-8 source with physical CRLF normalized to LF; no other source normalization",
+  "inventory": "Top-level declared functions and class methods, named by public export when present; exact normalized source comparison against baselineCommit",
+  "note": "Review receipt, not visual or performance certification. No automatic digest refresh. Future vendor edits require explanation, focused regression evidence, and explicit receipt update.",
+  "files": {
+    "index.js": {
+      "baselineSha256": "931e09ee8d594e709ec19f91be92ecb8fc28cd54054e352ac11d8275df86cb97",
+      "integratedSha256": "422b1decd2e345b0e3cc7003fc8448ba36ed0b80b2eddf2123b753439248544f",
+      "changedFunctions": [
+        {
+          "name": "TerrainLercLoader.doLoad",
+          "change": "modified",
+          "reason": "Pass the optional DEM error table into the existing worker request."
+        },
+        {
+          "name": "Tile.LOD",
+          "change": "modified",
+          "reason": "Compose Motion Hold merge dwell with main saturation and residency-budget precedence."
+        },
+        {
+          "name": "Tile._LODEvaluate",
+          "change": "modified",
+          "reason": "Retain main residency/hysteresis branch; allow the parallel fallback hysteresis control."
+        },
+        {
+          "name": "Tile._getDistRatio",
+          "change": "modified",
+          "reason": "Retain main in-frustum override and optional legacy frustum penalty."
+        },
+        {
+          "name": "Tile._loadSubTiles",
+          "change": "modified",
+          "reason": "Preserve the refine crossfade callback while recovering rejected child loads."
+        },
+        {
+          "name": "Tile._removeSubTiles",
+          "change": "modified",
+          "reason": "Preserve merge crossfade, recheck current frustum after awaits, and restore child index on cancellation/rejection."
+        },
+        {
+          "name": "Tile._retryErrorMaterial",
+          "change": "added",
+          "reason": "Bound resident material retries by backoff, concurrency, residency and source epoch; reinstall material hooks through the load event."
+        },
+        {
+          "name": "Tile._update",
+          "change": "modified",
+          "reason": "Use one saturated-tree walker for both controls and schedule resident imagery recovery."
+        },
+        {
+          "name": "Tile._updateModel",
+          "change": "modified",
+          "reason": "Release loading state on rejected updates and advance the failed epoch to prevent a retry storm."
+        },
+        {
+          "name": "Tile.constructor",
+          "change": "modified",
+          "reason": "Initialize merge dwell state."
+        },
+        {
+          "name": "TileLoader.update",
+          "change": "modified",
+          "reason": "Parallel imagery/DEM under either supported switch; retain serial fallback and shared group sync."
+        },
+        {
+          "name": "TileLoader.updateMaterial",
+          "change": "modified",
+          "reason": "Mark imagery errors, exclude them from reuse, and guard/dispose stale material-only retry results."
+        },
+        {
+          "name": "TileLoader.updateResidentMaterial",
+          "change": "added",
+          "reason": "Material-only retry extension point without reloading geometry."
+        },
+        {
+          "name": "TileMapLoader.updateResidentMaterial",
+          "change": "added",
+          "reason": "Apply normal tile-coordinate/projection preprocessing before material-only retry."
+        },
+        {
+          "name": "We",
+          "change": "modified",
+          "reason": "Preserve main fast-skirt branch and add the parallel fast-skirt fallback/counters."
+        },
+        {
+          "name": "flyBoundaryEdgesFast",
+          "change": "added",
+          "reason": "Parallel lineage boundary-edge algorithm with upstream ordering and non-manifold bailout."
+        },
+        {
+          "name": "flyBoundaryEdgesRef",
+          "change": "added",
+          "reason": "Reference comparator temporarily bypasses both fast-skirt controls and restores both."
+        },
+        {
+          "name": "flyEdgeCapture",
+          "change": "added",
+          "reason": "Bounded edge-input diagnostic capture."
+        },
+        {
+          "name": "flyGetPatch",
+          "change": "added",
+          "reason": "Expose parallel-lineage rollback state."
+        },
+        {
+          "name": "flyRasterError",
+          "change": "added",
+          "reason": "Identify marked imagery material errors for resident retry scheduling."
+        },
+        {
+          "name": "flySkirtStats",
+          "change": "added",
+          "reason": "Expose parallel skirt diagnostics."
+        },
+        {
+          "name": "flyTileHoldStats",
+          "change": "added",
+          "reason": "Expose hold/rejection/retry counters."
+        },
+        {
+          "name": "setDemErrorTable",
+          "change": "added",
+          "reason": "Set optional worker DEM error curve."
+        },
+        {
+          "name": "setFlyPatch",
+          "change": "added",
+          "reason": "Set parallel-lineage rollback controls without importing app code."
+        }
+      ]
+    },
+    "plugin.js": {
+      "baselineSha256": "a8b8b7afbb5c51f787ad048993e23715eb3f8a3382e94783e703aadb8c1e2e21",
+      "integratedSha256": "a8b8b7afbb5c51f787ad048993e23715eb3f8a3382e94783e703aadb8c1e2e21",
+      "changedFunctions": []
+    },
+    "workers/skirt-tail.src.js": {
+      "baselineSha256": "65c8ab554b75b705e68f788ee79850cb6bb1cec82a4f45dfa915a6962feded81",
+      "integratedSha256": "65c8ab554b75b705e68f788ee79850cb6bb1cec82a4f45dfa915a6962feded81",
+      "changedFunctions": []
+    },
+    "workers/skirt-tail.built.js": {
+      "baselineSha256": "b4a840c94e41e44fa2cac8a32cfaffeea543749fcfbfc651d78213c2067d00f6",
+      "integratedSha256": "b4a840c94e41e44fa2cac8a32cfaffeea543749fcfbfc651d78213c2067d00f6",
+      "changedFunctions": []
+    }
+  },
+  "composedHistoricalMarkers": {
+    "A23": [
+      "Tile.LOD"
+    ],
+    "D6": [
+      "Tile._loadSubTiles"
+    ],
+    "D7": [
+      "Tile._removeSubTiles"
+    ]
+  },
+  "nonFunctionChanges": [
+    "Independent FLY_PATCH rollback controls, counters, edge-table scratch storage and named public exports.",
+    "Existing inline LERC worker fe accepts the optional errTable parameter; readable main skirt/normal worker source remains unchanged. The whole index.js digest covers this inherited parallel-lineage string change."
+  ],
+  "focusedBehaviorGates": [
+    "scripts/verify-terrain-merge.mjs",
+    "scripts/verify-raster-recovery.cjs",
+    "scripts/verify-skirt-fast.mjs"
+  ]
+}

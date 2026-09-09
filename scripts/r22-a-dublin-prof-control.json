@@ -1,0 +1,2198 @@
+{
+  "mode": "dublin",
+  "tag": "prof-control",
+  "families": [],
+  "bootMs": 10479,
+  "cfg": {
+    "style": "satellite",
+    "tier": "high",
+    "baseLod": 0.86,
+    "liveLod": 0.86,
+    "curveArmed": false,
+    "maxThreads": 10,
+    "steadyThreads": 10,
+    "maxLevel": 17,
+    "minLevel": 2,
+    "imgMaxLevel": 17,
+    "demMaxLevel": 15,
+    "imgDataType": "image",
+    "demDataType": "lerc",
+    "sizeZ0": 0,
+    "sharpOn": false,
+    "pipeOn": false,
+    "cacheOn": false,
+    "pinned": true
+  },
+  "runs": [
+    {
+      "label": "cold",
+      "reach": {
+        "z10": 1532,
+        "z11": null,
+        "z12": null,
+        "z13": null,
+        "z14": null
+      },
+      "reqs": 306,
+      "settledProfile": {
+        "2": 10,
+        "5": 10,
+        "10": 12,
+        "20": 12,
+        "50": 10
+      },
+      "trace": [
+        {
+          "ms": 511,
+          "z": 9,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 3,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 3,
+            "5": 3,
+            "10": 3,
+            "20": 3,
+            "50": 3
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 175
+        },
+        {
+          "ms": 1018,
+          "z": 9,
+          "maxLeafZ": 10,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 9,
+            "5": 9,
+            "10": 9,
+            "20": 9,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 110
+        },
+        {
+          "ms": 1532,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 150
+        },
+        {
+          "ms": 2040,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 150
+        },
+        {
+          "ms": 2560,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 150
+        },
+        {
+          "ms": 3073,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 154
+        },
+        {
+          "ms": 3582,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 155
+        },
+        {
+          "ms": 4092,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 155
+        },
+        {
+          "ms": 4604,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 155
+        },
+        {
+          "ms": 5111,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 155
+        },
+        {
+          "ms": 5620,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 155
+        },
+        {
+          "ms": 6127,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 156
+        },
+        {
+          "ms": 6643,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 156
+        },
+        {
+          "ms": 7150,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 156
+        },
+        {
+          "ms": 7660,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 156
+        },
+        {
+          "ms": 8166,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 155
+        },
+        {
+          "ms": 8672,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 155
+        },
+        {
+          "ms": 9187,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 154
+        },
+        {
+          "ms": 9706,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 154
+        },
+        {
+          "ms": 10222,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 154
+        },
+        {
+          "ms": 10739,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 154
+        },
+        {
+          "ms": 11245,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 154
+        },
+        {
+          "ms": 11765,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 154
+        },
+        {
+          "ms": 12280,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 145
+        },
+        {
+          "ms": 12794,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 145
+        },
+        {
+          "ms": 13311,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 145
+        },
+        {
+          "ms": 13815,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 145
+        },
+        {
+          "ms": 14330,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 145
+        },
+        {
+          "ms": 14841,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 145
+        },
+        {
+          "ms": 15348,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 145
+        },
+        {
+          "ms": 15859,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 145
+        },
+        {
+          "ms": 16371,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 145
+        },
+        {
+          "ms": 16884,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 145
+        },
+        {
+          "ms": 17386,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 145
+        },
+        {
+          "ms": 17894,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 145
+        },
+        {
+          "ms": 18402,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 144
+        },
+        {
+          "ms": 18907,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 144
+        },
+        {
+          "ms": 19416,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 144
+        },
+        {
+          "ms": 19928,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 144
+        },
+        {
+          "ms": 20435,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 13,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 148
+        },
+        {
+          "ms": 20943,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 13,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 148
+        },
+        {
+          "ms": 21460,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 13,
+            "20": 11,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 148
+        },
+        {
+          "ms": 21975,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 13,
+            "10": 13,
+            "20": 11,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 148
+        },
+        {
+          "ms": 22482,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 13,
+            "10": 13,
+            "20": 11,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 148
+        },
+        {
+          "ms": 22989,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 13,
+            "10": 13,
+            "20": 11,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 148
+        },
+        {
+          "ms": 23494,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 13,
+            "10": 13,
+            "20": 11,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 148
+        },
+        {
+          "ms": 24004,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 13,
+            "10": 13,
+            "20": 11,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 148
+        },
+        {
+          "ms": 24511,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 13,
+            "10": 13,
+            "20": 11,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 149
+        },
+        {
+          "ms": 25015,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 13,
+            "10": 13,
+            "20": 11,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 149
+        },
+        {
+          "ms": 25535,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 13,
+            "10": 13,
+            "20": 11,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 149
+        },
+        {
+          "ms": 26041,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 13,
+            "10": 13,
+            "20": 11,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 149
+        }
+      ],
+      "probeZ": 10,
+      "maxLeafZ": 13,
+      "profile": {
+        "2": 10,
+        "5": 13,
+        "10": 13,
+        "20": 11,
+        "50": 10
+      },
+      "viewZ": {
+        "z": 10,
+        "distKm": 120
+      },
+      "draws": 149,
+      "tris": 69850,
+      "terra": null,
+      "rtTerra": null,
+      "warp": null,
+      "cache": null,
+      "heapMB": 92
+    },
+    {
+      "label": "warm",
+      "reach": {
+        "z10": 1042,
+        "z11": null,
+        "z12": null,
+        "z13": null,
+        "z14": null
+      },
+      "reqs": 306,
+      "settledProfile": {
+        "2": 10,
+        "5": 10,
+        "10": 12,
+        "20": 12,
+        "50": 10
+      },
+      "trace": [
+        {
+          "ms": 523,
+          "z": 4,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 4,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 4,
+            "5": 4,
+            "10": 4,
+            "20": 4,
+            "50": 4
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 173
+        },
+        {
+          "ms": 1042,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": null,
+            "20": null,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 120
+        },
+        {
+          "ms": 1549,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 154
+        },
+        {
+          "ms": 2064,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 153
+        },
+        {
+          "ms": 2579,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 153
+        },
+        {
+          "ms": 3082,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 154
+        },
+        {
+          "ms": 3590,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 154
+        },
+        {
+          "ms": 4106,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 154
+        },
+        {
+          "ms": 4611,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 154
+        },
+        {
+          "ms": 5117,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 154
+        },
+        {
+          "ms": 5620,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 154
+        },
+        {
+          "ms": 6130,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 155
+        },
+        {
+          "ms": 6646,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 155
+        },
+        {
+          "ms": 7153,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 155
+        },
+        {
+          "ms": 7657,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 155
+        },
+        {
+          "ms": 8173,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 154
+        },
+        {
+          "ms": 8690,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 154
+        },
+        {
+          "ms": 9195,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 154
+        },
+        {
+          "ms": 9713,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 154
+        },
+        {
+          "ms": 10220,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 154
+        },
+        {
+          "ms": 10729,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 153
+        },
+        {
+          "ms": 11243,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 153
+        },
+        {
+          "ms": 11757,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 144
+        },
+        {
+          "ms": 12268,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 144
+        },
+        {
+          "ms": 12780,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 144
+        },
+        {
+          "ms": 13299,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 144
+        },
+        {
+          "ms": 13811,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 144
+        },
+        {
+          "ms": 14321,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 144
+        },
+        {
+          "ms": 14835,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 144
+        },
+        {
+          "ms": 15344,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 144
+        },
+        {
+          "ms": 15856,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 144
+        },
+        {
+          "ms": 16360,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 144
+        },
+        {
+          "ms": 16865,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 144
+        },
+        {
+          "ms": 17371,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 144
+        },
+        {
+          "ms": 17877,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 144
+        },
+        {
+          "ms": 18395,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 143
+        },
+        {
+          "ms": 18902,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 143
+        },
+        {
+          "ms": 19421,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 143
+        },
+        {
+          "ms": 19940,
+          "z": 10,
+          "maxLeafZ": 12,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 12,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 143
+        },
+        {
+          "ms": 20451,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 13,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 146
+        },
+        {
+          "ms": 20971,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 13,
+            "20": 12,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 146
+        },
+        {
+          "ms": 21482,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 10,
+            "10": 13,
+            "20": 11,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 146
+        },
+        {
+          "ms": 21998,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 13,
+            "10": 13,
+            "20": 11,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 147
+        },
+        {
+          "ms": 22508,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 13,
+            "10": 13,
+            "20": 11,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 147
+        },
+        {
+          "ms": 23017,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 13,
+            "10": 13,
+            "20": 11,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 147
+        },
+        {
+          "ms": 23521,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 13,
+            "10": 13,
+            "20": 11,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 147
+        },
+        {
+          "ms": 24035,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 13,
+            "10": 13,
+            "20": 11,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 147
+        },
+        {
+          "ms": 24547,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 13,
+            "10": 13,
+            "20": 11,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 148
+        },
+        {
+          "ms": 25061,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 13,
+            "10": 13,
+            "20": 11,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 148
+        },
+        {
+          "ms": 25579,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 13,
+            "10": 13,
+            "20": 11,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 148
+        },
+        {
+          "ms": 26087,
+          "z": 10,
+          "maxLeafZ": 13,
+          "viewZ": {
+            "z": 10,
+            "distKm": 120
+          },
+          "profile": {
+            "2": 10,
+            "5": 13,
+            "10": 13,
+            "20": 11,
+            "50": 10
+          },
+          "camTileZ": null,
+          "targetZ": null,
+          "dl": null,
+          "draws": 148
+        }
+      ],
+      "probeZ": 10,
+      "maxLeafZ": 13,
+      "profile": {
+        "2": 10,
+        "5": 13,
+        "10": 13,
+        "20": 11,
+        "50": 10
+      },
+      "viewZ": {
+        "z": 10,
+        "distKm": 120
+      },
+      "draws": 148,
+      "tris": 65750,
+      "terra": null,
+      "rtTerra": null,
+      "warp": null,
+      "cache": null,
+      "heapMB": 86
+    }
+  ],
+  "cold": {
+    "z10": 1532,
+    "z11": null,
+    "z12": null,
+    "z13": null,
+    "z14": null
+  },
+  "warm": {
+    "z10": 1042,
+    "z11": null,
+    "z12": null,
+    "z13": null,
+    "z14": null
+  },
+  "warmRatio": {
+    "z10": 0.68,
+    "z11": null,
+    "z12": null,
+    "z13": null,
+    "z14": null
+  },
+  "zoomSeen": {
+    "img2": 24,
+    "img3": 86,
+    "img4": 93,
+    "img5": 101,
+    "dem5": 101,
+    "img6": 96,
+    "dem6": 98,
+    "img7": 111,
+    "dem7": 111,
+    "img8": 107,
+    "dem8": 107,
+    "img9": 93,
+    "dem9": 94,
+    "img10": 89,
+    "dem10": 89,
+    "img11": 68,
+    "dem11": 68,
+    "img12": 52,
+    "dem12": 53,
+    "img13": 36,
+    "dem13": 36,
+    "img14": 17,
+    "dem14": 18,
+    "img15": 26,
+    "dem15": 33,
+    "img16": 20
+  },
+  "pageerrors": []
+}

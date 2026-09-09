@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BOOT, MOBILE_UI, PREWARM } from '@/lib/fly/fly-constants';
+import { ARRIVAL_GATE, BOOT, MOBILE_UI, PREWARM } from '@/lib/fly/fly-constants';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
+import { arrivalOn, arrivalTerms, markReveal } from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
 
 /**
@@ -86,6 +87,10 @@ export function BootScreen({ runtime }) {
       satMaxSeen: 0,
       pct: 0, // monotonic floor
       done: false,
+      // R22 (B): what the content terms cost this boot — the ledger number.
+      contentFrom: null,
+      contentHeldMs: 0,
+      contentTerms: null,
     };
     let revealTimer = null;
 
@@ -120,6 +125,47 @@ export function BootScreen({ runtime }) {
             // Browser-cached fast path: ramp on the grace window instead.
             worldP = clamp01((now - t0) / BOOT.satGraceMs);
             worldSteady = now - t0 >= BOOT.satGraceMs && d === 0;
+          }
+          // ROUND 22 (B SETTLE, ARRIVAL_GATE) — CONTENT, not just quiet.
+          //
+          // The satellite world gate has always been a DOWNLOAD-QUEUE
+          // heuristic: an idle queue means nobody is fetching, which is true
+          // both when the world has arrived and when the LOD tree has not yet
+          // asked for it. So the reveal can (and does) land on a coarse ground
+          // with no buildings and no roads, which then assemble in front of
+          // the player — the user's "late pop-in".
+          //
+          // The same terms the warp gate uses now join it: terrain sharpness
+          // (A TERRA's runtime.terraStats — `undefined` degrades to today's
+          // behavior exactly), the two vector rings' resolved fractions inside
+          // their own mount bands, and the parcel trust gate.
+          //
+          // THE BOOT ENVELOPE IS FROZEN (plan §4). So the content terms are
+          // consulted only until ARRIVAL_GATE.bootContentMaxMs from boot start;
+          // past that the legacy drain carries the reveal on its own and
+          // BOOT.maxBootMs remains the only ceiling. gate.contentHeldMs
+          // records what the terms actually cost, which is the number the §5
+          // ledger needs.
+          //
+          // The terms are RESOLVED whenever the legacy gate would have
+          // revealed, flag or no flag, and recorded — that record is the
+          // CONTROL. Without it a flag-off boot reports nothing at all and
+          // there is no honest answer to "what was the old reveal standing
+          // on?". Only the SUPPRESSION below is flag-gated.
+          if (worldSteady) {
+            const aglM = Math.max(0, (rt.geo?.z ?? 0) - (rt.groundElevVis ?? 0));
+            const terms = arrivalTerms(rt, aglM);
+            gate.contentTerms = terms;
+            if (
+              arrivalOn() &&
+              ARRIVAL_GATE.bootTerms &&
+              !terms.ready &&
+              now - t0 < ARRIVAL_GATE.bootContentMaxMs
+            ) {
+              worldSteady = false;
+              if (gate.contentFrom == null) gate.contentFrom = now;
+              gate.contentHeldMs = Math.round(now - gate.contentFrom);
+            }
           }
         }
       }
@@ -168,6 +214,33 @@ export function BootScreen({ runtime }) {
       if (allDone) {
         gate.done = true;
         gate.pct = 100;
+        // R22 (B): the reveal clock every birth envelope and the pop-in
+        // instrument are measured against. Published for E's gates alongside.
+        markReveal('boot');
+        // The same B↔E contract WarpFlash writes, for the BOOT arrival: which
+        // cap was in force, when the hold started, when it revealed and why.
+        // A later warp overwrites it — `kind` says which arrival it describes.
+        rt.arrivalStats = {
+          gateArmed: arrivalOn(),
+          kind: 'boot',
+          epoch: 0,
+          holdStartAt: t0,
+          revealAt: now,
+          holdMs: Math.round(now - t0),
+          holdCapMs: BOOT.maxBootMs,
+          contentCapMs: ARRIVAL_GATE.bootContentMaxMs,
+          contentHeldMs: gate.contentHeldMs,
+          reason: timedOut ? 'cap' : gate.contentHeldMs > 0 ? 'content' : 'legacy',
+          terms: gate.contentTerms,
+        };
+        if (typeof window !== 'undefined') {
+          (window.__flyStats ??= {}).bootGate = {
+            ms: Math.round(now - t0),
+            contentHeldMs: gate.contentHeldMs,
+            terms: gate.contentTerms,
+            timedOut,
+          };
+        }
         publish('ready', 100);
         setView({ phase: 'ready', pct: 100 });
         setStage('reveal');

@@ -1,4 +1,6 @@
 'use client';
+import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
+
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -314,7 +316,8 @@ export function PoiLetters({ runtime, flight, origin }) {
       // Distance up-scale keeps far letters legible (near-constant screen size)
       const fm = FSc ? 1 + (FSc.mul - 1) * smoothstep(FSc.startM, FSc.endM, d) : 1;
       const s = popScale(u) * fm;
-      g.scale.set(s, s, s);
+      const labelScale = useFlyStore.getState().mapStyle === 'satellite' && satelliteVisualsOn('presentation') ? 0.16 : 1;
+      g.scale.set(s * labelScale, s * labelScale, s * labelScale);
 
       // Round 13 (P4): satellite atmosphere fade — recede far letters into the
       // aerial haze (SKY.haze veil) and dissolve them softly toward the horizon

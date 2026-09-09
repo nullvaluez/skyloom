@@ -1,0 +1,4655 @@
+{
+ "when": "2026-08-07T22:27:14.176Z",
+ "bootMs": 7822,
+ "bootRows": [
+  {
+   "t": 0,
+   "stage": null,
+   "boot": null,
+   "z": null,
+   "leaf": null,
+   "sharpReason": null,
+   "dl": null,
+   "agl": null,
+   "draws": null
+  },
+  {
+   "t": 0.14,
+   "stage": null,
+   "boot": null,
+   "z": null,
+   "leaf": null,
+   "sharpReason": null,
+   "dl": null,
+   "agl": null,
+   "draws": null
+  },
+  {
+   "t": 0.2,
+   "stage": null,
+   "boot": null,
+   "z": null,
+   "leaf": null,
+   "sharpReason": null,
+   "dl": null,
+   "agl": null,
+   "draws": null
+  },
+  {
+   "t": 0.31,
+   "stage": null,
+   "boot": null,
+   "z": null,
+   "leaf": null,
+   "sharpReason": null,
+   "dl": null,
+   "agl": null,
+   "draws": null
+  },
+  {
+   "t": 0.41,
+   "stage": null,
+   "boot": 0,
+   "z": null,
+   "leaf": null,
+   "sharpReason": null,
+   "dl": null,
+   "agl": null,
+   "draws": null
+  },
+  {
+   "t": 0.94,
+   "stage": null,
+   "boot": 0,
+   "z": null,
+   "leaf": 1,
+   "dl": 8,
+   "agl": 800,
+   "draws": 0
+  },
+  {
+   "t": 1.07,
+   "stage": null,
+   "boot": 15,
+   "z": null,
+   "leaf": 1,
+   "dl": 8,
+   "agl": 800,
+   "draws": 0
+  },
+  {
+   "t": 1.14,
+   "stage": null,
+   "boot": 15,
+   "z": 2,
+   "leaf": 2,
+   "dl": 8,
+   "agl": 800,
+   "draws": 0
+  },
+  {
+   "t": 1.86,
+   "stage": null,
+   "boot": 40,
+   "z": 2,
+   "leaf": 2,
+   "dl": 4,
+   "agl": 800,
+   "draws": 0
+  },
+  {
+   "t": 1.92,
+   "stage": null,
+   "boot": 99,
+   "z": 2,
+   "leaf": 3,
+   "dl": 4,
+   "agl": 800,
+   "draws": 0
+  },
+  {
+   "t": 2.01,
+   "stage": null,
+   "boot": 99,
+   "z": 3,
+   "leaf": 4,
+   "dl": 8,
+   "agl": 800,
+   "draws": 0
+  },
+  {
+   "t": 2.1,
+   "stage": null,
+   "boot": 99,
+   "z": 3,
+   "leaf": 4,
+   "dl": 6,
+   "agl": 800,
+   "draws": 0
+  },
+  {
+   "t": 2.21,
+   "stage": null,
+   "boot": 99,
+   "z": 3,
+   "leaf": 5,
+   "dl": 7,
+   "agl": 800,
+   "draws": 0
+  },
+  {
+   "t": 2.33,
+   "stage": null,
+   "boot": 99,
+   "z": 6,
+   "leaf": 6,
+   "dl": 4,
+   "agl": 800,
+   "draws": 58
+  },
+  {
+   "t": 2.4,
+   "stage": null,
+   "boot": 99,
+   "z": 4,
+   "leaf": 6,
+   "dl": 8,
+   "agl": 800,
+   "draws": 58
+  },
+  {
+   "t": 2.5,
+   "stage": null,
+   "boot": 99,
+   "z": 4,
+   "leaf": 7,
+   "dl": 8,
+   "agl": 800,
+   "draws": 58
+  },
+  {
+   "t": 2.6,
+   "stage": null,
+   "boot": 99,
+   "z": 4,
+   "leaf": 7,
+   "dl": 8,
+   "agl": 800,
+   "draws": 58
+  },
+  {
+   "t": 2.7,
+   "stage": null,
+   "boot": 99,
+   "z": 5,
+   "leaf": 8,
+   "dl": 4,
+   "agl": 420,
+   "draws": 81
+  },
+  {
+   "t": 2.8,
+   "stage": null,
+   "boot": 99,
+   "z": 6,
+   "leaf": 8,
+   "dl": 8,
+   "agl": 587,
+   "draws": 81
+  },
+  {
+   "t": 2.9,
+   "stage": null,
+   "boot": 99,
+   "z": 7,
+   "leaf": 8,
+   "dl": 7,
+   "agl": 573,
+   "draws": 96
+  },
+  {
+   "t": 3.01,
+   "stage": null,
+   "boot": 99,
+   "z": 8,
+   "leaf": 8,
+   "dl": 5,
+   "agl": 800,
+   "draws": 96
+  },
+  {
+   "t": 3.11,
+   "stage": null,
+   "boot": 99,
+   "z": 9,
+   "leaf": 9,
+   "dl": 9,
+   "agl": 565,
+   "draws": 96
+  },
+  {
+   "t": 3.2,
+   "stage": null,
+   "boot": 99,
+   "z": 9,
+   "leaf": 9,
+   "dl": 5,
+   "agl": 529,
+   "draws": 96
+  },
+  {
+   "t": 3.31,
+   "stage": null,
+   "boot": 99,
+   "z": 10,
+   "leaf": 10,
+   "dl": 8,
+   "agl": 523,
+   "draws": 118
+  },
+  {
+   "t": 3.41,
+   "stage": null,
+   "boot": 99,
+   "z": 10,
+   "leaf": 10,
+   "dl": 6,
+   "agl": 523,
+   "draws": 118
+  },
+  {
+   "t": 3.5,
+   "stage": null,
+   "boot": 99,
+   "z": 10,
+   "leaf": 11,
+   "dl": 5,
+   "agl": 523,
+   "draws": 118
+  },
+  {
+   "t": 3.61,
+   "stage": null,
+   "boot": 99,
+   "z": 10,
+   "leaf": 12,
+   "dl": 9,
+   "agl": 523,
+   "draws": 118
+  },
+  {
+   "t": 3.71,
+   "stage": null,
+   "boot": 99,
+   "z": 11,
+   "leaf": 12,
+   "dl": 8,
+   "agl": 525,
+   "draws": 118
+  },
+  {
+   "t": 3.81,
+   "stage": null,
+   "boot": 99,
+   "z": 12,
+   "leaf": 12,
+   "dl": 8,
+   "agl": 527,
+   "draws": 154
+  },
+  {
+   "t": 3.9,
+   "stage": null,
+   "boot": 99,
+   "z": 12,
+   "leaf": 13,
+   "dl": 4,
+   "agl": 527,
+   "draws": 154
+  },
+  {
+   "t": 4.01,
+   "stage": null,
+   "boot": 99,
+   "z": 13,
+   "leaf": 14,
+   "dl": 8,
+   "agl": 531,
+   "draws": 154
+  },
+  {
+   "t": 4.1,
+   "stage": null,
+   "boot": 99,
+   "z": 14,
+   "leaf": 14,
+   "dl": 8,
+   "agl": 534,
+   "draws": 154
+  },
+  {
+   "t": 4.2,
+   "stage": null,
+   "boot": 99,
+   "z": 14,
+   "leaf": 15,
+   "dl": 6,
+   "agl": 534,
+   "draws": 181
+  },
+  {
+   "t": 4.31,
+   "stage": null,
+   "boot": 99,
+   "z": 14,
+   "leaf": 15,
+   "dl": 6,
+   "agl": 534,
+   "draws": 181
+  },
+  {
+   "t": 4.41,
+   "stage": null,
+   "boot": 99,
+   "z": 14,
+   "leaf": 16,
+   "dl": 8,
+   "agl": 534,
+   "draws": 181
+  },
+  {
+   "t": 4.5,
+   "stage": null,
+   "boot": 99,
+   "z": 15,
+   "leaf": 16,
+   "dl": 8,
+   "agl": 560,
+   "draws": 181
+  },
+  {
+   "t": 4.62,
+   "stage": null,
+   "boot": 99,
+   "z": 15,
+   "leaf": 16,
+   "dl": 9,
+   "agl": 560,
+   "draws": 181
+  },
+  {
+   "t": 4.71,
+   "stage": null,
+   "boot": 99,
+   "z": 16,
+   "leaf": 16,
+   "dl": 9,
+   "agl": 561,
+   "draws": 205
+  },
+  {
+   "t": 4.8,
+   "stage": null,
+   "boot": 99,
+   "z": 16,
+   "leaf": 17,
+   "dl": 4,
+   "agl": 563,
+   "draws": 205
+  },
+  {
+   "t": 4.92,
+   "stage": null,
+   "boot": 99,
+   "z": 16,
+   "leaf": 16,
+   "dl": 9,
+   "agl": 563,
+   "draws": 205
+  },
+  {
+   "t": 5.02,
+   "stage": null,
+   "boot": 99,
+   "z": 16,
+   "leaf": 16,
+   "dl": 4,
+   "agl": 563,
+   "draws": 205
+  },
+  {
+   "t": 5.11,
+   "stage": null,
+   "boot": 99,
+   "z": 16,
+   "leaf": 16,
+   "dl": 8,
+   "agl": 563,
+   "draws": 227
+  },
+  {
+   "t": 5.21,
+   "stage": null,
+   "boot": 99,
+   "z": 16,
+   "leaf": 16,
+   "dl": 4,
+   "agl": 564,
+   "draws": 227
+  },
+  {
+   "t": 5.32,
+   "stage": null,
+   "boot": 99,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 565,
+   "draws": 227
+  },
+  {
+   "t": 5.4,
+   "stage": null,
+   "boot": 99,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 565,
+   "draws": 227
+  },
+  {
+   "t": 5.51,
+   "stage": null,
+   "boot": 99,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 565,
+   "draws": 227
+  },
+  {
+   "t": 5.61,
+   "stage": null,
+   "boot": 99,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 565,
+   "draws": 227
+  },
+  {
+   "t": 5.71,
+   "stage": null,
+   "boot": 99,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 564,
+   "draws": 238
+  },
+  {
+   "t": 5.8,
+   "stage": null,
+   "boot": 99,
+   "z": 16,
+   "leaf": 17,
+   "dl": 4,
+   "agl": 564,
+   "draws": 238
+  },
+  {
+   "t": 5.91,
+   "stage": null,
+   "boot": 99,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 564,
+   "draws": 238
+  },
+  {
+   "t": 6,
+   "stage": null,
+   "boot": 99,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 564,
+   "draws": 238
+  },
+  {
+   "t": 6.11,
+   "stage": null,
+   "boot": 99,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 565,
+   "draws": 248
+  },
+  {
+   "t": 6.2,
+   "stage": null,
+   "boot": 99,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 564,
+   "draws": 248
+  },
+  {
+   "t": 6.3,
+   "stage": null,
+   "boot": 99,
+   "z": 16,
+   "leaf": 17,
+   "dl": 2,
+   "agl": 563,
+   "draws": 248
+  },
+  {
+   "t": 6.41,
+   "stage": null,
+   "boot": 99,
+   "z": 16,
+   "leaf": 16,
+   "dl": 1,
+   "agl": 564,
+   "draws": 241
+  },
+  {
+   "t": 6.5,
+   "stage": null,
+   "boot": 99,
+   "z": null,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 534,
+   "draws": 241
+  },
+  {
+   "t": 6.61,
+   "stage": null,
+   "boot": 99,
+   "z": 12,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 527,
+   "draws": 241
+  },
+  {
+   "t": 6.7,
+   "stage": null,
+   "boot": 99,
+   "z": 12,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 527,
+   "draws": 222
+  },
+  {
+   "t": 6.8,
+   "stage": null,
+   "boot": 99,
+   "z": 12,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 527,
+   "draws": 222
+  },
+  {
+   "t": 6.9,
+   "stage": null,
+   "boot": 99,
+   "z": 12,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 527,
+   "draws": 222
+  },
+  {
+   "t": 7.02,
+   "stage": null,
+   "boot": 99,
+   "z": 12,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 527,
+   "draws": 222
+  },
+  {
+   "t": 7.1,
+   "stage": null,
+   "boot": 99,
+   "z": 12,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 527,
+   "draws": 222
+  },
+  {
+   "t": 7.21,
+   "stage": null,
+   "boot": 99,
+   "z": 12,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 527,
+   "draws": 222
+  },
+  {
+   "t": 7.3,
+   "stage": null,
+   "boot": 99,
+   "z": 12,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 527,
+   "draws": 224
+  },
+  {
+   "t": 7.41,
+   "stage": null,
+   "boot": 99,
+   "z": 12,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 527,
+   "draws": 224
+  },
+  {
+   "t": 7.5,
+   "stage": null,
+   "boot": 99,
+   "z": 12,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 527,
+   "draws": 224
+  },
+  {
+   "t": 7.6,
+   "stage": null,
+   "boot": 100,
+   "z": 12,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 527,
+   "draws": 224
+  },
+  {
+   "t": 7.7,
+   "stage": null,
+   "boot": 100,
+   "z": 12,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 527,
+   "draws": 224
+  },
+  {
+   "t": 7.8,
+   "stage": null,
+   "boot": 100,
+   "z": 12,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 527,
+   "draws": 224
+  },
+  {
+   "t": 7.9,
+   "stage": null,
+   "boot": 100,
+   "z": 12,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 527,
+   "draws": 224
+  },
+  {
+   "t": 8.01,
+   "stage": null,
+   "boot": 100,
+   "z": 12,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 527,
+   "draws": 224
+  },
+  {
+   "t": 8.1,
+   "stage": null,
+   "boot": 100,
+   "z": 12,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 527,
+   "draws": 227
+  },
+  {
+   "t": 8.2,
+   "stage": null,
+   "boot": 100,
+   "z": 12,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 527,
+   "draws": 227
+  },
+  {
+   "t": 8.3,
+   "stage": null,
+   "boot": 100,
+   "z": 12,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 527,
+   "draws": 227
+  },
+  {
+   "t": 8.41,
+   "stage": null,
+   "boot": 100,
+   "z": 12,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 527,
+   "draws": 227
+  },
+  {
+   "t": 8.5,
+   "stage": null,
+   "boot": 100,
+   "z": 12,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 527,
+   "draws": 227
+  },
+  {
+   "t": 8.6,
+   "stage": null,
+   "boot": 100,
+   "z": 12,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 527,
+   "draws": 227
+  },
+  {
+   "t": 8.7,
+   "stage": null,
+   "boot": 100,
+   "z": 12,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 527,
+   "draws": 227
+  },
+  {
+   "t": 8.8,
+   "stage": null,
+   "boot": 100,
+   "z": 12,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 527,
+   "draws": 227
+  },
+  {
+   "t": 8.9,
+   "stage": null,
+   "boot": 100,
+   "z": 12,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 527,
+   "draws": 230
+  },
+  {
+   "t": 9,
+   "stage": null,
+   "boot": 100,
+   "z": 12,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 527,
+   "draws": 230
+  },
+  {
+   "t": 9.1,
+   "stage": null,
+   "boot": 100,
+   "z": 12,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 527,
+   "draws": 227
+  },
+  {
+   "t": 9.2,
+   "stage": null,
+   "boot": 100,
+   "z": 12,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 527,
+   "draws": 227
+  },
+  {
+   "t": 9.3,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 553,
+   "draws": 227
+  },
+  {
+   "t": 9.41,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 553,
+   "draws": 230
+  },
+  {
+   "t": 9.5,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 552,
+   "draws": 230
+  },
+  {
+   "t": 9.6,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 552,
+   "draws": 230
+  },
+  {
+   "t": 9.71,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 553,
+   "draws": 230
+  },
+  {
+   "t": 9.8,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 553,
+   "draws": 230
+  },
+  {
+   "t": 9.9,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 553,
+   "draws": 236
+  },
+  {
+   "t": 10,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 554,
+   "draws": 236
+  },
+  {
+   "t": 10.11,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 4,
+   "agl": 553,
+   "draws": 236
+  },
+  {
+   "t": 10.2,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 551,
+   "draws": 236
+  },
+  {
+   "t": 10.3,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 551,
+   "draws": 236
+  },
+  {
+   "t": 10.4,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 550,
+   "draws": 239
+  },
+  {
+   "t": 10.5,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 551,
+   "draws": 239
+  },
+  {
+   "t": 10.6,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 551,
+   "draws": 239
+  },
+  {
+   "t": 10.7,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 551,
+   "draws": 242
+  },
+  {
+   "t": 10.8,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 550,
+   "draws": 242
+  },
+  {
+   "t": 10.9,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 550,
+   "draws": 242
+  },
+  {
+   "t": 11.01,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 551,
+   "draws": 242
+  },
+  {
+   "t": 11.1,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 3,
+   "agl": 551,
+   "draws": 242
+  },
+  {
+   "t": 11.2,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 550,
+   "draws": 239
+  },
+  {
+   "t": 11.3,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 550,
+   "draws": 239
+  },
+  {
+   "t": 11.41,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 549,
+   "draws": 239
+  },
+  {
+   "t": 11.5,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 551,
+   "draws": 239
+  },
+  {
+   "t": 11.6,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 4,
+   "agl": 552,
+   "draws": 239
+  },
+  {
+   "t": 11.7,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 550,
+   "draws": 227
+  },
+  {
+   "t": 11.8,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 550,
+   "draws": 227
+  },
+  {
+   "t": 11.9,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 550,
+   "draws": 227
+  },
+  {
+   "t": 12,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 550,
+   "draws": 225
+  },
+  {
+   "t": 12.1,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 550,
+   "draws": 225
+  },
+  {
+   "t": 12.2,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 550,
+   "draws": 225
+  },
+  {
+   "t": 12.3,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 550,
+   "draws": 225
+  },
+  {
+   "t": 12.4,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 550,
+   "draws": 225
+  },
+  {
+   "t": 12.5,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 550,
+   "draws": 225
+  },
+  {
+   "t": 12.6,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 549,
+   "draws": 225
+  },
+  {
+   "t": 12.7,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 3,
+   "agl": 549,
+   "draws": 223
+  },
+  {
+   "t": 12.8,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 549,
+   "draws": 223
+  },
+  {
+   "t": 12.9,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 549,
+   "draws": 223
+  },
+  {
+   "t": 13,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 549,
+   "draws": 226
+  },
+  {
+   "t": 13.1,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 549,
+   "draws": 226
+  },
+  {
+   "t": 13.2,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 549,
+   "draws": 226
+  },
+  {
+   "t": 13.31,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 548,
+   "draws": 232
+  },
+  {
+   "t": 13.41,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 548,
+   "draws": 232
+  },
+  {
+   "t": 13.5,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 548,
+   "draws": 232
+  },
+  {
+   "t": 13.6,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 548,
+   "draws": 232
+  },
+  {
+   "t": 13.7,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 548,
+   "draws": 232
+  },
+  {
+   "t": 13.8,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 17,
+   "dl": 4,
+   "agl": 548,
+   "draws": 232
+  },
+  {
+   "t": 13.9,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 548,
+   "draws": 232
+  },
+  {
+   "t": 14,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 548,
+   "draws": 232
+  },
+  {
+   "t": 14.1,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 548,
+   "draws": 234
+  },
+  {
+   "t": 14.21,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 2,
+   "agl": 548,
+   "draws": 234
+  },
+  {
+   "t": 14.3,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 548,
+   "draws": 234
+  },
+  {
+   "t": 14.4,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 548,
+   "draws": 234
+  },
+  {
+   "t": 14.5,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 546,
+   "draws": 234
+  },
+  {
+   "t": 14.6,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 546,
+   "draws": 231
+  },
+  {
+   "t": 14.7,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 545,
+   "draws": 231
+  },
+  {
+   "t": 14.8,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 4,
+   "agl": 546,
+   "draws": 230
+  },
+  {
+   "t": 14.9,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 545,
+   "draws": 230
+  },
+  {
+   "t": 15,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 544,
+   "draws": 230
+  },
+  {
+   "t": 15.1,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 545,
+   "draws": 234
+  },
+  {
+   "t": 15.2,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 545,
+   "draws": 234
+  },
+  {
+   "t": 15.3,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 3,
+   "agl": 545,
+   "draws": 234
+  },
+  {
+   "t": 15.4,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 545,
+   "draws": 236
+  },
+  {
+   "t": 15.5,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 545,
+   "draws": 236
+  },
+  {
+   "t": 15.6,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 546,
+   "draws": 239
+  },
+  {
+   "t": 15.71,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 546,
+   "draws": 239
+  },
+  {
+   "t": 15.8,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 546,
+   "draws": 239
+  },
+  {
+   "t": 15.91,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 546,
+   "draws": 241
+  },
+  {
+   "t": 16,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 545,
+   "draws": 241
+  },
+  {
+   "t": 16.1,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 545,
+   "draws": 241
+  },
+  {
+   "t": 16.2,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 546,
+   "draws": 241
+  },
+  {
+   "t": 16.3,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 546,
+   "draws": 241
+  },
+  {
+   "t": 16.4,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 546,
+   "draws": 244
+  },
+  {
+   "t": 16.5,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 545,
+   "draws": 244
+  },
+  {
+   "t": 16.6,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 551,
+   "draws": 244
+  },
+  {
+   "t": 16.7,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 547,
+   "draws": 244
+  },
+  {
+   "t": 16.82,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 547,
+   "draws": 244
+  },
+  {
+   "t": 16.9,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 531,
+   "draws": 225
+  },
+  {
+   "t": 17,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 531,
+   "draws": 225
+  },
+  {
+   "t": 17.11,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 531,
+   "draws": 225
+  },
+  {
+   "t": 17.2,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 531,
+   "draws": 227
+  },
+  {
+   "t": 17.3,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 531,
+   "draws": 227
+  },
+  {
+   "t": 17.41,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 531,
+   "draws": 227
+  },
+  {
+   "t": 17.5,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 531,
+   "draws": 227
+  },
+  {
+   "t": 17.6,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 531,
+   "draws": 227
+  },
+  {
+   "t": 17.7,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 531,
+   "draws": 226
+  },
+  {
+   "t": 17.8,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 531,
+   "draws": 226
+  },
+  {
+   "t": 17.9,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 530,
+   "draws": 226
+  },
+  {
+   "t": 18,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 530,
+   "draws": 223
+  },
+  {
+   "t": 18.1,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 530,
+   "draws": 223
+  },
+  {
+   "t": 18.2,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 530,
+   "draws": 223
+  },
+  {
+   "t": 18.3,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 530,
+   "draws": 223
+  },
+  {
+   "t": 18.41,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 530,
+   "draws": 223
+  },
+  {
+   "t": 18.5,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 530,
+   "draws": 225
+  },
+  {
+   "t": 18.6,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 530,
+   "draws": 225
+  },
+  {
+   "t": 18.7,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 530,
+   "draws": 225
+  },
+  {
+   "t": 18.8,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 530,
+   "draws": 226
+  },
+  {
+   "t": 18.9,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 530,
+   "draws": 226
+  },
+  {
+   "t": 19.01,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 17,
+   "dl": 4,
+   "agl": 529,
+   "draws": 226
+  },
+  {
+   "t": 19.1,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 529,
+   "draws": 226
+  },
+  {
+   "t": 19.2,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 529,
+   "draws": 226
+  },
+  {
+   "t": 19.3,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 529,
+   "draws": 229
+  },
+  {
+   "t": 19.42,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 529,
+   "draws": 229
+  },
+  {
+   "t": 19.5,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 529,
+   "draws": 226
+  },
+  {
+   "t": 19.6,
+   "stage": null,
+   "boot": 100,
+   "z": 14,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 529,
+   "draws": 226
+  },
+  {
+   "t": 19.7,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 565,
+   "draws": 226
+  },
+  {
+   "t": 19.8,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 566,
+   "draws": 229
+  },
+  {
+   "t": 19.9,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 567,
+   "draws": 229
+  },
+  {
+   "t": 20,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 566,
+   "draws": 228
+  },
+  {
+   "t": 20.1,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 4,
+   "agl": 566,
+   "draws": 228
+  },
+  {
+   "t": 20.2,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 566,
+   "draws": 228
+  },
+  {
+   "t": 20.3,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 566,
+   "draws": 230
+  },
+  {
+   "t": 20.4,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 566,
+   "draws": 230
+  },
+  {
+   "t": 20.5,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 4,
+   "agl": 566,
+   "draws": 230
+  },
+  {
+   "t": 20.61,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 566,
+   "draws": 230
+  },
+  {
+   "t": 20.7,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 566,
+   "draws": 230
+  },
+  {
+   "t": 20.8,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 16,
+   "dl": 4,
+   "agl": 566,
+   "draws": 233
+  },
+  {
+   "t": 20.9,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 566,
+   "draws": 233
+  },
+  {
+   "t": 21,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 566,
+   "draws": 233
+  },
+  {
+   "t": 21.1,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 565,
+   "draws": 234
+  },
+  {
+   "t": 21.2,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 565,
+   "draws": 234
+  },
+  {
+   "t": 21.3,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 564,
+   "draws": 237
+  },
+  {
+   "t": 21.4,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 564,
+   "draws": 237
+  },
+  {
+   "t": 21.5,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 563,
+   "draws": 237
+  },
+  {
+   "t": 21.6,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 563,
+   "draws": 241
+  },
+  {
+   "t": 21.71,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 563,
+   "draws": 241
+  },
+  {
+   "t": 21.8,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 562,
+   "draws": 241
+  },
+  {
+   "t": 21.9,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 0,
+   "agl": 561,
+   "draws": 241
+  },
+  {
+   "t": 22,
+   "stage": null,
+   "boot": 100,
+   "z": 16,
+   "leaf": 17,
+   "dl": 1,
+   "agl": 561,
+   "draws": 241
+  },
+  {
+   "t": 22.1,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 560,
+   "draws": 232
+  },
+  {
+   "t": 22.21,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 560,
+   "draws": 232
+  },
+  {
+   "t": 22.3,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 559,
+   "draws": 232
+  },
+  {
+   "t": 22.4,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 559,
+   "draws": 229
+  },
+  {
+   "t": 22.5,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 558,
+   "draws": 229
+  },
+  {
+   "t": 22.6,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 557,
+   "draws": 229
+  },
+  {
+   "t": 22.7,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 557,
+   "draws": 229
+  },
+  {
+   "t": 22.8,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 556,
+   "draws": 229
+  },
+  {
+   "t": 22.9,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 555,
+   "draws": 229
+  },
+  {
+   "t": 23,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 555,
+   "draws": 229
+  },
+  {
+   "t": 23.11,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 1,
+   "agl": 554,
+   "draws": 229
+  },
+  {
+   "t": 23.2,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 553,
+   "draws": 229
+  },
+  {
+   "t": 23.31,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 0,
+   "agl": 553,
+   "draws": 229
+  },
+  {
+   "t": 23.4,
+   "stage": null,
+   "boot": 100,
+   "z": 15,
+   "leaf": 16,
+   "dl": 4,
+   "agl": 552,
+   "draws": 234
+  }
+ ],
+ "bootReveal": {
+  "t": 7.6,
+  "stage": null,
+  "boot": 100,
+  "z": 12,
+  "leaf": 16,
+  "dl": 0,
+  "agl": 527,
+  "draws": 224
+ },
+ "bootSettled": {
+  "t": 23.4,
+  "stage": null,
+  "boot": 100,
+  "z": 15,
+  "leaf": 16,
+  "dl": 4,
+  "agl": 552,
+  "draws": 234
+ },
+ "before": {
+  "camTileZ": 12,
+  "maxLeafZ": 13,
+  "aglM": 7679,
+  "downloading": 0,
+  "tier": "high",
+  "arrivalStats": null,
+  "terraStats": null
+ },
+ "farRows": [
+  {
+   "t": 0,
+   "stage": null,
+   "boot": 100,
+   "z": 12,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 7679,
+   "draws": 162
+  },
+  {
+   "t": 0.1,
+   "stage": "streak",
+   "boot": 100,
+   "z": 5,
+   "leaf": 6,
+   "dl": 4,
+   "agl": 9144,
+   "draws": 150
+  },
+  {
+   "t": 0.21,
+   "stage": "streak",
+   "boot": 100,
+   "z": 3,
+   "leaf": 7,
+   "dl": 8,
+   "agl": 9144,
+   "draws": 150
+  },
+  {
+   "t": 0.31,
+   "stage": "streak",
+   "boot": 100,
+   "z": 3,
+   "leaf": 9,
+   "dl": 6,
+   "agl": 9144,
+   "draws": 150
+  },
+  {
+   "t": 0.4,
+   "stage": "streak",
+   "boot": 100,
+   "z": 6,
+   "leaf": 9,
+   "dl": 3,
+   "agl": 8931,
+   "draws": 103
+  },
+  {
+   "t": 0.5,
+   "stage": "streak",
+   "boot": 100,
+   "z": 8,
+   "leaf": 9,
+   "dl": 4,
+   "agl": 8909,
+   "draws": 103
+  },
+  {
+   "t": 0.6,
+   "stage": "streak",
+   "boot": 100,
+   "z": 10,
+   "leaf": 10,
+   "dl": 8,
+   "agl": 8867,
+   "draws": 103
+  },
+  {
+   "t": 0.71,
+   "stage": "streak",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 8,
+   "agl": 8867,
+   "draws": 103
+  },
+  {
+   "t": 0.81,
+   "stage": "streak",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 151
+  },
+  {
+   "t": 0.9,
+   "stage": "streak",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 151
+  },
+  {
+   "t": 1.01,
+   "stage": "hold",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 154
+  },
+  {
+   "t": 1.1,
+   "stage": "hold",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 154
+  },
+  {
+   "t": 1.2,
+   "stage": "hold",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 154
+  },
+  {
+   "t": 1.3,
+   "stage": "hold",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 152
+  },
+  {
+   "t": 1.4,
+   "stage": "hold",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 152
+  },
+  {
+   "t": 1.5,
+   "stage": "hold",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 152
+  },
+  {
+   "t": 1.6,
+   "stage": "hold",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 152
+  },
+  {
+   "t": 1.7,
+   "stage": "hold",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 152
+  },
+  {
+   "t": 1.81,
+   "stage": "hold",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 152
+  },
+  {
+   "t": 1.9,
+   "stage": "hold",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 152
+  },
+  {
+   "t": 2.01,
+   "stage": "hold",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 152
+  },
+  {
+   "t": 2.1,
+   "stage": "hold",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 152
+  },
+  {
+   "t": 2.2,
+   "stage": "hold",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 152
+  },
+  {
+   "t": 2.3,
+   "stage": "reveal",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 152
+  },
+  {
+   "t": 2.4,
+   "stage": "reveal",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 152
+  },
+  {
+   "t": 2.5,
+   "stage": "reveal",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 152
+  },
+  {
+   "t": 2.6,
+   "stage": "reveal",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 152
+  },
+  {
+   "t": 2.7,
+   "stage": "reveal",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 152
+  },
+  {
+   "t": 2.8,
+   "stage": "reveal",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 152
+  },
+  {
+   "t": 2.9,
+   "stage": "reveal",
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 152
+  },
+  {
+   "t": 3,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 152
+  },
+  {
+   "t": 3.1,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 152
+  },
+  {
+   "t": 3.2,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 152
+  },
+  {
+   "t": 3.3,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 153
+  },
+  {
+   "t": 3.4,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 153
+  },
+  {
+   "t": 3.5,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 153
+  },
+  {
+   "t": 3.6,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 153
+  },
+  {
+   "t": 3.7,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 153
+  },
+  {
+   "t": 3.8,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 153
+  },
+  {
+   "t": 3.9,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 153
+  },
+  {
+   "t": 4,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 153
+  },
+  {
+   "t": 4.1,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 153
+  },
+  {
+   "t": 4.2,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 153
+  },
+  {
+   "t": 4.3,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 153
+  },
+  {
+   "t": 4.4,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 153
+  },
+  {
+   "t": 4.5,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 153
+  },
+  {
+   "t": 4.6,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 153
+  },
+  {
+   "t": 4.7,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 153
+  },
+  {
+   "t": 4.8,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8867,
+   "draws": 153
+  },
+  {
+   "t": 4.9,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 5,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 5.1,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 5.2,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 5.3,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 5.4,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 5.5,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 5.6,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 5.7,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 5.8,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 5.9,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 6,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 6.1,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 6.2,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 6.3,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 154
+  },
+  {
+   "t": 6.4,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 154
+  },
+  {
+   "t": 6.5,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 154
+  },
+  {
+   "t": 6.6,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 154
+  },
+  {
+   "t": 6.7,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 154
+  },
+  {
+   "t": 6.8,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 154
+  },
+  {
+   "t": 6.9,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 154
+  },
+  {
+   "t": 7,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 154
+  },
+  {
+   "t": 7.1,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 154
+  },
+  {
+   "t": 7.21,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 154
+  },
+  {
+   "t": 7.3,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 154
+  },
+  {
+   "t": 7.4,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 154
+  },
+  {
+   "t": 7.5,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 154
+  },
+  {
+   "t": 7.6,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 154
+  },
+  {
+   "t": 7.7,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 154
+  },
+  {
+   "t": 7.8,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 154
+  },
+  {
+   "t": 7.9,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 154
+  },
+  {
+   "t": 8,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 154
+  },
+  {
+   "t": 8.1,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 8.2,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 8.3,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 8.4,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 8.5,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 8.6,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 8.7,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 8.8,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 8.9,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 9,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 9.1,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 9.2,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 9.3,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8866,
+   "draws": 153
+  },
+  {
+   "t": 9.4,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 9.5,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 9.6,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 9.7,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 9.8,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 9.9,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 10,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 10.1,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 10.2,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 10.3,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 10.4,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 10.5,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 10.6,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 10.7,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 10.8,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 10.9,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 11,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 11.1,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 11.2,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 11.3,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 11.4,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 11.51,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 11.6,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 11.7,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 11.8,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 153
+  },
+  {
+   "t": 11.9,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 144
+  },
+  {
+   "t": 12,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 144
+  },
+  {
+   "t": 12.1,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 144
+  },
+  {
+   "t": 12.2,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 144
+  },
+  {
+   "t": 12.3,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 144
+  },
+  {
+   "t": 12.4,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 144
+  },
+  {
+   "t": 12.5,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 144
+  },
+  {
+   "t": 12.6,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 144
+  },
+  {
+   "t": 12.7,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 144
+  },
+  {
+   "t": 12.8,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 144
+  },
+  {
+   "t": 12.9,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 144
+  },
+  {
+   "t": 13,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 144
+  },
+  {
+   "t": 13.1,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 144
+  },
+  {
+   "t": 13.2,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 144
+  },
+  {
+   "t": 13.3,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 144
+  },
+  {
+   "t": 13.4,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 144
+  },
+  {
+   "t": 13.51,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 144
+  },
+  {
+   "t": 13.6,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 144
+  },
+  {
+   "t": 13.7,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 144
+  },
+  {
+   "t": 13.8,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 144
+  },
+  {
+   "t": 13.9,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8865,
+   "draws": 144
+  },
+  {
+   "t": 14,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 14.11,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 14.2,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 14.3,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 14.4,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 14.5,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 14.6,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 14.7,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 14.8,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 14.9,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 15,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 15.11,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 15.2,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 15.3,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 15.4,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 15.5,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 15.6,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 15.7,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 15.81,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 15.9,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 16.01,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 16.1,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 16.2,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 16.31,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 16.4,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 16.5,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 16.6,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 16.7,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 16.8,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 16.9,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 17,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 17.1,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 17.21,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 17.3,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 17.4,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 17.5,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 17.6,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 17.7,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 17.8,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 144
+  },
+  {
+   "t": 17.91,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 143
+  },
+  {
+   "t": 18.01,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 143
+  },
+  {
+   "t": 18.1,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 143
+  },
+  {
+   "t": 18.2,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 143
+  },
+  {
+   "t": 18.3,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 143
+  },
+  {
+   "t": 18.4,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 143
+  },
+  {
+   "t": 18.5,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8864,
+   "draws": 143
+  },
+  {
+   "t": 18.61,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 143
+  },
+  {
+   "t": 18.7,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 143
+  },
+  {
+   "t": 18.8,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 143
+  },
+  {
+   "t": 18.9,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 143
+  },
+  {
+   "t": 19.01,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 143
+  },
+  {
+   "t": 19.11,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 143
+  },
+  {
+   "t": 19.2,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 143
+  },
+  {
+   "t": 19.3,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 143
+  },
+  {
+   "t": 19.4,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 143
+  },
+  {
+   "t": 19.51,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 143
+  },
+  {
+   "t": 19.6,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 143
+  },
+  {
+   "t": 19.7,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 143
+  },
+  {
+   "t": 19.8,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 143
+  },
+  {
+   "t": 19.9,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 143
+  },
+  {
+   "t": 20,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 143
+  },
+  {
+   "t": 20.1,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 143
+  },
+  {
+   "t": 20.2,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 12,
+   "dl": 4,
+   "agl": 8863,
+   "draws": 143
+  },
+  {
+   "t": 20.3,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 143
+  },
+  {
+   "t": 20.4,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 20.5,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 20.6,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 20.7,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 20.81,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 20.9,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 21,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 21.1,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 21.2,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 21.3,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 21.4,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 21.5,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 21.6,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 21.71,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 21.81,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 21.9,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 22,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 22.1,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 22.2,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 22.3,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 22.4,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 22.5,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 22.6,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 22.7,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 22.82,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  },
+  {
+   "t": 22.9,
+   "stage": null,
+   "boot": 100,
+   "z": 10,
+   "leaf": 13,
+   "dl": 0,
+   "agl": 8863,
+   "draws": 146
+  }
+ ],
+ "revealMs": 2300,
+ "revealZ": 12,
+ "settledZ": 13,
+ "minAfter": 12,
+ "armed": null,
+ "quilt": {
+  "desat": 0,
+  "flatten": 0,
+  "aerial": {
+   "strength": 0,
+   "startM": 800,
+   "endM": 14000,
+   "heightFalloffM": 1200,
+   "rim": [
+    0,
+    0,
+    0
+   ]
+  }
+ },
+ "local": {
+  "kind": "local",
+  "holdMs": 0,
+  "zBefore": 10,
+  "zAfter": 17,
+  "skipped": false
+ },
+ "localOut": {
+  "hex": "a804a7",
+  "distM": 10271
+ },
+ "red": [
+  [
+   "B1 boot reveals over an undescended pyramid",
+   "verify-arrival (11)",
+   "boot reveal cam 12 / leaf 16 -> settles cam 15 / leaf 16",
+   ">= 12"
+  ],
+  [
+   "T8 reveal fires on downloading<3, not on content (RE-BASED W2 -> NOT RED, see the gate)",
+   "verify-arrival (4)",
+   "reveal leaf z12 vs departure leaf z13 (deficit 1) — INSIDE the bound",
+   "deficit <= 1"
+  ],
+  [
+   "T5b far-warp descent stalls at FL300 (RE-BASED W2 -> NOT RED: the stall was the frustum rule)",
+   "verify-arrival (4b)",
+   "settled leaf z13 vs departure leaf z13",
+   "settled >= departure"
+  ],
+  [
+   "T9 a local warp reveals a 7-level deficit with no readiness poll",
+   "verify-arrival (9b)",
+   "deficit 7 levels, hold 0 ms",
+   "<= 2 levels, or a hold <= 1500 ms"
+  ]
+ ],
+ "fails": [
+  "(9b) LOCAL WARP CONTENT — a deficit over 2 levels earns a bounded hold"
+ ],
+ "softs": [
+  "ARRIVAL_GATE state (runtime.arrivalStats)"
+ ]
+}

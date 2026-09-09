@@ -1,0 +1,102 @@
+{
+ "when": "2026-08-07T18:23:30.987Z",
+ "lewis": {
+  "draws": 224,
+  "tris": 240505,
+  "camTileZ": 13,
+  "aglM": 161,
+  "tier": "high",
+  "veg": {
+   "placed": 810,
+   "pool": 5000,
+   "altK": 1,
+   "ready": 9,
+   "vegPts": 3370,
+   "byClass": [
+    0,
+    0,
+    392,
+    11,
+    407,
+    0,
+    0,
+    0
+   ]
+  },
+  "clutter": null
+ },
+ "veg": {
+  "tris": 42,
+  "verts": 40,
+  "groups": 0,
+  "bbox": [
+   -1,
+   1
+  ],
+  "count": 810,
+  "instances": 5000,
+  "materials": 1
+ },
+ "colIndex": {
+  "api": true,
+  "near": 49,
+  "sample": [
+   "x",
+   "z",
+   "topY",
+   "r"
+  ],
+  "stats": {
+   "chunks": 16,
+   "ready": 16,
+   "columns": 1844
+  }
+ },
+ "p99": 9.246100000000004,
+ "owens": {
+  "draws": 195,
+  "tris": 185852,
+  "camTileZ": 15,
+  "aglM": 422,
+  "tier": "high",
+  "veg": {
+   "placed": 1076,
+   "pool": 5000,
+   "altK": 1,
+   "ready": 9,
+   "vegPts": 3511,
+   "byClass": [
+    0,
+    293,
+    37,
+    609,
+    137,
+    0,
+    0,
+    0
+   ]
+  },
+  "clutter": null
+ },
+ "red": [
+  [
+   "C1 trees are untextured 42-tri spheres with no trunk",
+   "verify-clutter (2)",
+   "42 tris/instance",
+   "43..96"
+  ]
+ ],
+ "fails": [
+  "(2) TREES READ AS TREES — the canopy instance carries a trunk (42 < tris <= 96)"
+ ],
+ "softs": [
+  "(10) exact +N draws at P-LEWIS",
+  "(11)/(12)/(13) pool budgets",
+  "(14) anti-dup census",
+  "(7) OWENS LOCK (zero instances / +0 draws)",
+  "(8) OWENS bit-identical totals across the flip",
+  "(15) two-boot determinism",
+  "(16) the pin freezes the movers"
+ ],
+ "netErrs": 0
+}

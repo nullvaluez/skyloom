@@ -1,0 +1,9142 @@
+{
+ "tag": "red3",
+ "pre": {
+  "lat": 40.15142,
+  "lon": -83.09363,
+  "altM": 515,
+  "aglM": 236,
+  "tier": "high",
+  "dpr": 1.5,
+  "terra": {
+   "camTileZ": 17,
+   "targetZ": 18,
+   "lod": 0.86,
+   "sharp": true
+  },
+  "draws": 265,
+  "tris": 849181,
+  "pace": null
+ },
+ "post": {
+  "lat": 40.08724,
+  "lon": -83.12965,
+  "aglM": 233,
+  "draws": 260,
+  "tris": 649532,
+  "pace": null
+ },
+ "bootMs": 6572,
+ "sec": 30.0078,
+ "frames": 5202,
+ "median": 4.2,
+ "p95": 8.5,
+ "p99": 29.1,
+ "worst": 87.5,
+ "stallBound": 28,
+ "stalls": 54,
+ "stallsPerMin": 107.97192729890229,
+ "total": {
+  "bld._drapePending": 516.8000000268221,
+  "bld._finalizePending": 133.7000000178814,
+  "bld.update": 694.5000001043081,
+  "road._drapePending": 95.4999999254942,
+  "road._finalizePending": 8.299999997019768,
+  "road.update": 121.19999991357327,
+  "veg._samplePending": 16.900000020861626,
+  "veg._commitPending": 2.5000000447034836,
+  "veg.update": 35.20000007748604,
+  "sky._drapePending": 45.2000000923872,
+  "sky._finalizePending": 7.299999982118607,
+  "sky.update": 69.700000166893,
+  "clut._samplePending": 44.80000004172325,
+  "clut._commitPending": 2.5000000298023224,
+  "clut.update": 65.10000014305115,
+  "bufferSubData": 304.300000205636,
+  "createImageBitmap.await": 34179.89999984205,
+  "bufferData": 37.20000000298023,
+  "texStorage2D": 1.399999976158142,
+  "texSubImage2D": 74.29999995231628,
+  "generateMipmap": 1.2000000178813934,
+  "bld._oceanFill": 0.09999999403953552
+ },
+ "totalN": {
+  "bld._drapePending": 5202,
+  "bld._finalizePending": 5202,
+  "bld.update": 5202,
+  "road._drapePending": 5202,
+  "road._finalizePending": 5202,
+  "road.update": 5202,
+  "veg._samplePending": 5202,
+  "veg._commitPending": 5202,
+  "veg.update": 5202,
+  "sky._drapePending": 5202,
+  "sky._finalizePending": 5202,
+  "sky.update": 5202,
+  "clut._samplePending": 5202,
+  "clut._commitPending": 5202,
+  "clut.update": 5202,
+  "bufferSubData": 177351,
+  "createImageBitmap.await": 1942,
+  "bufferData": 7250,
+  "texStorage2D": 1726,
+  "texSubImage2D": 1726,
+  "generateMipmap": 1726,
+  "bld._oceanFill": 14
+ },
+ "stallDetail": [
+  {
+   "t": 1224,
+   "dt": 62.5,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [
+    [
+     "bld.update",
+     1.199999988079071
+    ],
+    [
+     "bld._drapePending",
+     1.0999999940395355
+    ]
+   ],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 61.47800000011921,
+     "n": 8
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 56.47400000691414,
+     "n": 4
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 56.287999987602234,
+     "n": 4
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 41,
+     "pct": 40
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 36,
+     "pct": 35
+    },
+    {
+     "name": "(program)",
+     "samples": 9,
+     "pct": 9
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 62.4,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.3"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 62.1,
+     "top": [
+      "RunMicrotasks 54.2",
+      "FunctionCall:loop 4.3",
+      "V8.GC_SCAVENGER_SCAVENGE_PARALLEL_PHASE 1.2"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 2.2,
+     "top": [
+      "CommandBufferService:PutChanged 1.6",
+      "Scheduler::RunTask 0.2",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 0.1"
+     ]
+    }
+   ],
+   "dl": 0,
+   "progs": 91
+  },
+  {
+   "t": 1907.4,
+   "dt": 50,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 48.943999990820885,
+     "n": 8
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 44.08499999344349,
+     "n": 4
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 44.01899999380112,
+     "n": 6
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 37,
+     "pct": 41
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 30,
+     "pct": 33
+    },
+    {
+     "name": "(program)",
+     "samples": 10,
+     "pct": 11
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 49.9,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.3"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 49.6,
+     "top": [
+      "RunMicrotasks 43.3",
+      "FunctionCall:loop 4.0",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.8"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 1.8,
+     "top": [
+      "CommandBufferService:PutChanged 1.3",
+      "Scheduler::RunTask 0.2",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 0.1"
+     ]
+    }
+   ],
+   "dl": 0,
+   "progs": 91
+  },
+  {
+   "t": 3390.8,
+   "dt": 50.1,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 48.73700000345707,
+     "n": 7
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 44.66099999845028,
+     "n": 5
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 44.52600000798702,
+     "n": 3
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 46,
+     "pct": 54
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 22,
+     "pct": 26
+    },
+    {
+     "name": "(program)",
+     "samples": 7,
+     "pct": 8
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 50,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 49.8,
+     "top": [
+      "RunMicrotasks 44.7",
+      "FunctionCall:loop 3.5",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.6"
+     ]
+    },
+    {
+     "thread": "Renderer/DedicatedWorker thread",
+     "ms": 3.1,
+     "top": [
+      "FunctionCall:self.onmessage 1.1",
+      "V8.GC_YOUNG_ARRAY_BUFFER_SWEEP 0.9",
+      "V8.GC_MARK_COMPACTOR 0.2"
+     ]
+    }
+   ],
+   "dl": 8,
+   "progs": 91
+  },
+  {
+   "t": 3490.7,
+   "dt": 29.2,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 28.19800002872944,
+     "n": 9
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 23.207000017166138,
+     "n": 5
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 23.119000002741814,
+     "n": 7
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 16,
+     "pct": 30
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 15,
+     "pct": 28
+    },
+    {
+     "name": "(program)",
+     "samples": 11,
+     "pct": 20
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 29.2,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.1"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 28.7,
+     "top": [
+      "RunMicrotasks 22.5",
+      "FunctionCall:loop 4.5",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.4"
+     ]
+    },
+    {
+     "thread": "Renderer/DedicatedWorker thread",
+     "ms": 7.8,
+     "top": [
+      "FunctionCall:self.onmessage 7.7",
+      "V8.GC_HEAP_ENSURE_SWEEPING_COMPLETED 0.1",
+      "V8.HandleInterrupts 0.0"
+     ]
+    }
+   ],
+   "dl": 8,
+   "progs": 91
+  },
+  {
+   "t": 3519.8,
+   "dt": 29.1,
+   "cause": "js:(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 28.547000020742416,
+     "n": 8
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 22.564999997615814,
+     "n": 4
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 22.394999995827675,
+     "n": 2
+    }
+   ],
+   "js": [
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 18,
+     "pct": 35
+    },
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 13,
+     "pct": 25
+    },
+    {
+     "name": "(program)",
+     "samples": 7,
+     "pct": 13
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 29.1,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.1"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 28.9,
+     "top": [
+      "RunMicrotasks 22.6",
+      "FunctionCall:loop 3.9",
+      "FunctionCall:LabelCanvas.useEffect.draw 1.7"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 2.9,
+     "top": [
+      "CommandBufferService:PutChanged 2.4",
+      "Scheduler::RunTask 0.2",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 0.1"
+     ]
+    }
+   ],
+   "dl": 8,
+   "progs": 91
+  },
+  {
+   "t": 3953.4,
+   "dt": 41.8,
+   "cause": "js:(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 40.53300000727177,
+     "n": 7
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 37.618000000715256,
+     "n": 5
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 37.494000002741814,
+     "n": 3
+    }
+   ],
+   "js": [
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 31,
+     "pct": 40
+    },
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 30,
+     "pct": 38
+    },
+    {
+     "name": "(program)",
+     "samples": 8,
+     "pct": 10
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 41.8,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 41.7,
+     "top": [
+      "RunMicrotasks 37.6",
+      "FunctionCall:loop 2.7",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.2"
+     ]
+    },
+    {
+     "thread": "Browser/ThreadPoolForegroundWorker",
+     "ms": 38.9,
+     "top": [
+      "ThreadPool_RunTask 38.9"
+     ]
+    }
+   ],
+   "dl": 8,
+   "progs": 91
+  },
+  {
+   "t": 4824.9,
+   "dt": 41.7,
+   "cause": "js:(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 40.113999992609024,
+     "n": 8
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 39.14299999177456,
+     "n": 7
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 38.62000000476837,
+     "n": 3
+    }
+   ],
+   "js": [
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 34,
+     "pct": 46
+    },
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 25,
+     "pct": 34
+    },
+    {
+     "name": "(program)",
+     "samples": 9,
+     "pct": 12
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 41.6,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 41.3,
+     "top": [
+      "RunMicrotasks 39.1",
+      "FunctionCall:loop 1.0",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.5"
+     ]
+    },
+    {
+     "thread": "Renderer/DedicatedWorker thread",
+     "ms": 1.9,
+     "top": [
+      "FunctionCall:self.onmessage 1.8",
+      "V8.GC_HEAP_ENSURE_SWEEPING_COMPLETED 0.1",
+      "V8.GC_SCAVENGER_SCAVENGE_FINALIZE 0.0"
+     ]
+    }
+   ],
+   "dl": 0,
+   "progs": 91
+  },
+  {
+   "t": 6095.9,
+   "dt": 41.6,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 40.52400000393391,
+     "n": 9
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 36.75399999320507,
+     "n": 4
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 36.752000004053116,
+     "n": 3
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 28,
+     "pct": 38
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 27,
+     "pct": 37
+    },
+    {
+     "name": "(program)",
+     "samples": 9,
+     "pct": 12
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 41.5,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.1"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 41.3,
+     "top": [
+      "RunMicrotasks 36.8",
+      "FunctionCall:loop 3.3",
+      "SimpleWatcher::OnHandleReady 0.4"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 1.9,
+     "top": [
+      "CommandBufferService:PutChanged 1.5",
+      "Scheduler::RunTask 0.2",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 0.1"
+     ]
+    }
+   ],
+   "dl": 4,
+   "progs": 91
+  },
+  {
+   "t": 6988,
+   "dt": 50.1,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 48.54200001060963,
+     "n": 7
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 45.65500000119209,
+     "n": 6
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 45.362999990582466,
+     "n": 3
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 38,
+     "pct": 42
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 36,
+     "pct": 40
+    },
+    {
+     "name": "(program)",
+     "samples": 8,
+     "pct": 9
+    }
+   ],
+   "threads": [
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 50.2,
+     "top": [
+      "RunMicrotasks 45.1",
+      "FunctionCall:loop 2.7",
+      "MinorGC 0.6"
+     ]
+    },
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 50,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.3"
+     ]
+    },
+    {
+     "thread": "Renderer/ThreadPoolForegroundWorker",
+     "ms": 3.2,
+     "top": [
+      "V8.GC_BACKGROUND_YOUNG_ARRAY_BUFFER_SWEEP 2.9",
+      "V8.GC_SCAVENGER_BACKGROUND_SCAVENGE_PARALLEL 0.1",
+      "Receive mojo message 0.1"
+     ]
+    }
+   ],
+   "dl": 1,
+   "progs": 91
+  },
+  {
+   "t": 8388.3,
+   "dt": 29.1,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 27.592000007629395,
+     "n": 10
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 18.260000005364418,
+     "n": 10
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 18.205999985337257,
+     "n": 4
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 14,
+     "pct": 23
+    },
+    {
+     "name": "(program)",
+     "samples": 13,
+     "pct": 21
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 13,
+     "pct": 21
+    }
+   ],
+   "threads": [
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 29.1,
+     "top": [
+      "RunMicrotasks 17.6",
+      "FunctionCall:loop 8.1",
+      "FunctionCall:LabelCanvas.useEffect.draw 1.1"
+     ]
+    },
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 29.1,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.1"
+     ]
+    },
+    {
+     "thread": "Browser/ThreadPoolForegroundWorker",
+     "ms": 22.6,
+     "top": [
+      "ThreadPool_RunTask 22.6"
+     ]
+    }
+   ],
+   "dl": 0,
+   "progs": 91
+  },
+  {
+   "t": 8505,
+   "dt": 50,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 48.53000000119209,
+     "n": 7
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 42.61500000953674,
+     "n": 3
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 42.48600000143051,
+     "n": 3
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 43,
+     "pct": 50
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 23,
+     "pct": 27
+    },
+    {
+     "name": "(program)",
+     "samples": 8,
+     "pct": 9
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 49.9,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 49.6,
+     "top": [
+      "RunMicrotasks 42.5",
+      "FunctionCall:loop 5.3",
+      "SimpleWatcher::OnHandleReady 0.8"
+     ]
+    },
+    {
+     "thread": "Renderer/ThreadPoolForegroundWorker",
+     "ms": 5.1,
+     "top": [
+      "V8.GC_BACKGROUND_YOUNG_ARRAY_BUFFER_SWEEP 2.6",
+      "ThreadPool_RunTask 2.3",
+      "V8.GC_MC_BACKGROUND_MARKING 0.1"
+     ]
+    }
+   ],
+   "dl": 0,
+   "progs": 91
+  },
+  {
+   "t": 9092.7,
+   "dt": 58.3,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [
+    [
+     "bld.update",
+     0.5
+    ]
+   ],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 57.156999975442886,
+     "n": 7
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 44.84199999272823,
+     "n": 6
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 44.827999994158745,
+     "n": 3
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 41,
+     "pct": 39
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 30,
+     "pct": 28
+    },
+    {
+     "name": "(program)",
+     "samples": 9,
+     "pct": 8
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 58.2,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.3"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 58.1,
+     "top": [
+      "RunMicrotasks 44.1",
+      "FunctionCall:loop 11.7",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.5"
+     ]
+    },
+    {
+     "thread": "Browser/ThreadPoolForegroundWorker",
+     "ms": 45.4,
+     "top": [
+      "ThreadPool_RunTask 44.7",
+      "Receive mojo message 0.6",
+      "SimpleWatcher::OnHandleReady 0.0"
+     ]
+    }
+   ],
+   "dl": 6,
+   "progs": 91
+  },
+  {
+   "t": 10263.9,
+   "dt": 33.4,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 32.57100000977516,
+     "n": 6
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 30.03600001335144,
+     "n": 3
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 30.02800001204014,
+     "n": 2
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 27,
+     "pct": 47
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 17,
+     "pct": 30
+    },
+    {
+     "name": "(program)",
+     "samples": 8,
+     "pct": 14
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 33.3,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.1"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 33.1,
+     "top": [
+      "RunMicrotasks 30.0",
+      "FunctionCall:loop 2.0",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.5"
+     ]
+    },
+    {
+     "thread": "Renderer/DedicatedWorker thread",
+     "ms": 3.6,
+     "top": [
+      "FunctionCall:self.onmessage 3.5",
+      "V8.GC_HEAP_ENSURE_SWEEPING_COMPLETED 0.0",
+      "V8.GC_SCAVENGER_SCAVENGE_FINALIZE 0.0"
+     ]
+    }
+   ],
+   "dl": 4,
+   "progs": 91
+  },
+  {
+   "t": 10301.3,
+   "dt": 37.4,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 36.1169999986887,
+     "n": 7
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 30.83900000154972,
+     "n": 5
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 30.569999992847443,
+     "n": 2
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 30,
+     "pct": 46
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 16,
+     "pct": 25
+    },
+    {
+     "name": "(program)",
+     "samples": 7,
+     "pct": 11
+    }
+   ],
+   "threads": [
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 37.5,
+     "top": [
+      "RunMicrotasks 30.2",
+      "FunctionCall:loop 4.9",
+      "MinorGC 0.6"
+     ]
+    },
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 37.3,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.1"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 3.3,
+     "top": [
+      "CommandBufferService:PutChanged 2.8",
+      "Scheduler::RunTask 0.2",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 0.1"
+     ]
+    }
+   ],
+   "dl": 4,
+   "progs": 91
+  },
+  {
+   "t": 10380.7,
+   "dt": 41.7,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 40.78100000321865,
+     "n": 6
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 36.886000007390976,
+     "n": 3
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 36.84799998998642,
+     "n": 6
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 32,
+     "pct": 46
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 24,
+     "pct": 34
+    },
+    {
+     "name": "(program)",
+     "samples": 6,
+     "pct": 9
+    }
+   ],
+   "threads": [
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 41.7,
+     "top": [
+      "RunMicrotasks 36.8",
+      "FunctionCall:loop 3.5",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.3"
+     ]
+    },
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 41.6,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.1"
+     ]
+    },
+    {
+     "thread": "Renderer/DedicatedWorker thread",
+     "ms": 4.1,
+     "top": [
+      "FunctionCall:self.onmessage 4.0",
+      "V8.HandleInterrupts 0.0"
+     ]
+    }
+   ],
+   "dl": 4,
+   "progs": 91
+  },
+  {
+   "t": 10997.6,
+   "dt": 37.4,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 36.44199998676777,
+     "n": 6
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 31.03499999642372,
+     "n": 2
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 31.017000004649162,
+     "n": 3
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 33,
+     "pct": 47
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 18,
+     "pct": 26
+    },
+    {
+     "name": "(program)",
+     "samples": 8,
+     "pct": 11
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 37.4,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 37.1,
+     "top": [
+      "RunMicrotasks 30.4",
+      "FunctionCall:loop 4.8",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.5"
+     ]
+    },
+    {
+     "thread": "Renderer/DedicatedWorker thread",
+     "ms": 4.8,
+     "top": [
+      "FunctionCall:self.onmessage 4.7",
+      "V8.GC_SCAVENGER_SCAVENGE_FINALIZE 0.0",
+      "MinorGC 0.0"
+     ]
+    }
+   ],
+   "dl": 4,
+   "progs": 91
+  },
+  {
+   "t": 11030.9,
+   "dt": 33.3,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 32.61599999666214,
+     "n": 9
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 28.738999992609024,
+     "n": 3
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 28.711999997496605,
+     "n": 2
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 28,
+     "pct": 43
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 19,
+     "pct": 29
+    },
+    {
+     "name": "(program)",
+     "samples": 10,
+     "pct": 15
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 33.3,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.3"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 33,
+     "top": [
+      "RunMicrotasks 28.7",
+      "FunctionCall:loop 3.0",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.4"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 2.1,
+     "top": [
+      "CommandBufferService:PutChanged 1.4",
+      "Scheduler::RunTask 0.2",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 0.2"
+     ]
+    }
+   ],
+   "dl": 4,
+   "progs": 91
+  },
+  {
+   "t": 11431.2,
+   "dt": 29.2,
+   "cause": "bld.update",
+   "sync": [
+    [
+     "bld.update",
+     7.0999999940395355
+    ],
+    [
+     "bld._finalizePending",
+     7
+    ]
+   ],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 28.913000002503395,
+     "n": 5
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 15.802000001072884,
+     "n": 1
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 15.774000003933907,
+     "n": 1
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 14,
+     "pct": 27
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 10,
+     "pct": 20
+    },
+    {
+     "name": "(program)",
+     "samples": 5,
+     "pct": 10
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 29.2,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.1"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 29.1,
+     "top": [
+      "RunMicrotasks 15.8",
+      "FunctionCall:loop 11.7",
+      "FunctionCall:LabelCanvas.useEffect.draw 1.2"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 2.2,
+     "top": [
+      "CommandBufferService:PutChanged 1.4",
+      "Scheduler::RunTask 0.4",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 0.2"
+     ]
+    }
+   ],
+   "dl": 4,
+   "progs": 91
+  },
+  {
+   "t": 11514.5,
+   "dt": 33.4,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 31.92500001192093,
+     "n": 6
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 26.53200000524521,
+     "n": 7
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 26.19699999690056,
+     "n": 2
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 23,
+     "pct": 40
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 14,
+     "pct": 25
+    },
+    {
+     "name": "(program)",
+     "samples": 7,
+     "pct": 12
+    }
+   ],
+   "threads": [
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 33.4,
+     "top": [
+      "RunMicrotasks 25.3",
+      "FunctionCall:loop 5.1",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.5"
+     ]
+    },
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 33.3,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "Renderer/DedicatedWorker thread",
+     "ms": 4.9,
+     "top": [
+      "FunctionCall:self.onmessage 4.8",
+      "V8.GC_SCAVENGER_SCAVENGE_FINALIZE 0.0",
+      "V8.HandleInterrupts 0.0"
+     ]
+    }
+   ],
+   "dl": 4,
+   "progs": 91
+  },
+  {
+   "t": 11551.9,
+   "dt": 37.4,
+   "cause": "js:(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 35.52799999713898,
+     "n": 8
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 29.331999987363815,
+     "n": 3
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 29.287000000476837,
+     "n": 2
+    }
+   ],
+   "js": [
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 22,
+     "pct": 36
+    },
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 18,
+     "pct": 30
+    },
+    {
+     "name": "(program)",
+     "samples": 10,
+     "pct": 16
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 37.4,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.3"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 36.8,
+     "top": [
+      "RunMicrotasks 29.3",
+      "FunctionCall:loop 5.0",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.6"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 2.9,
+     "top": [
+      "CommandBufferService:PutChanged 2.4",
+      "Scheduler::RunTask 0.2",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 0.1"
+     ]
+    }
+   ],
+   "dl": 4,
+   "progs": 91
+  },
+  {
+   "t": 12985.6,
+   "dt": 62.6,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 61.769999980926514,
+     "n": 8
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 57.766999989748,
+     "n": 4
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 57.59899999201298,
+     "n": 4
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 50,
+     "pct": 48
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 38,
+     "pct": 36
+    },
+    {
+     "name": "(program)",
+     "samples": 8,
+     "pct": 8
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 62.5,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 62.4,
+     "top": [
+      "RunMicrotasks 57.6",
+      "FunctionCall:loop 3.5",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.4"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 1.9,
+     "top": [
+      "CommandBufferService:PutChanged 1.5",
+      "Scheduler::RunTask 0.2",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 0.1"
+     ]
+    }
+   ],
+   "dl": 1,
+   "progs": 91
+  },
+  {
+   "t": 14081.9,
+   "dt": 45.8,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 43.95499999821186,
+     "n": 4
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 43.71899998188019,
+     "n": 7
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 43.51700000464916,
+     "n": 3
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 36,
+     "pct": 49
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 28,
+     "pct": 38
+    },
+    {
+     "name": "(program)",
+     "samples": 5,
+     "pct": 7
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 45.7,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.1"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 45.4,
+     "top": [
+      "RunMicrotasks 43.7",
+      "SimpleWatcher::OnHandleReady 0.7",
+      "FunctionCall:loop 0.5"
+     ]
+    },
+    {
+     "thread": "Renderer/DedicatedWorker thread",
+     "ms": 2,
+     "top": [
+      "FunctionCall:self.onmessage 1.9",
+      "V8.GC_HEAP_ENSURE_SWEEPING_COMPLETED 0.1",
+      "V8.GC_SCAVENGER_SCAVENGE_FINALIZE 0.0"
+     ]
+    }
+   ],
+   "dl": 0,
+   "progs": 91
+  },
+  {
+   "t": 15807.6,
+   "dt": 45.9,
+   "cause": "js:(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 44.88500000536442,
+     "n": 7
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 38.961999997496605,
+     "n": 5
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 38.819000005722046,
+     "n": 3
+    }
+   ],
+   "js": [
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 33,
+     "pct": 39
+    },
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 27,
+     "pct": 32
+    },
+    {
+     "name": "(program)",
+     "samples": 7,
+     "pct": 8
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 45.9,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 45.6,
+     "top": [
+      "RunMicrotasks 39.0",
+      "FunctionCall:loop 5.4",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.5"
+     ]
+    },
+    {
+     "thread": "Renderer/DedicatedWorker thread",
+     "ms": 4.6,
+     "top": [
+      "FunctionCall:self.onmessage 4.4",
+      "V8.GC_SCAVENGER 0.1",
+      "V8.GC_SCAVENGER_SCAVENGE_FINALIZE 0.0"
+     ]
+    }
+   ],
+   "dl": 0,
+   "progs": 91
+  },
+  {
+   "t": 16249.3,
+   "dt": 66.7,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 65.32400000095367,
+     "n": 8
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 62.587000012397766,
+     "n": 7
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 62.43299999833107,
+     "n": 4
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 53,
+     "pct": 48
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 34,
+     "pct": 31
+    },
+    {
+     "name": "(program)",
+     "samples": 10,
+     "pct": 9
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 66.6,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.5"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 66.3,
+     "top": [
+      "RunMicrotasks 59.1",
+      "V8.GC_SCAVENGER_SCAVENGE_PARALLEL 2.9",
+      "FunctionCall:loop 2.4"
+     ]
+    },
+    {
+     "thread": "Renderer/ThreadPoolForegroundWorker",
+     "ms": 6.4,
+     "top": [
+      "V8.GC_BACKGROUND_SAFEPOINT 3.2",
+      "V8.GC_BACKGROUND_YOUNG_ARRAY_BUFFER_SWEEP 2.2",
+      "ThreadPool_RunTask 1.0"
+     ]
+    }
+   ],
+   "dl": 5,
+   "progs": 91
+  },
+  {
+   "t": 17195.4,
+   "dt": 66.7,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [
+    [
+     "road._drapePending",
+     1.1000000089406967
+    ],
+    [
+     "road.update",
+     1.1000000089406967
+    ],
+    [
+     "bld._drapePending",
+     1.0999999940395355
+    ],
+    [
+     "bld.update",
+     1.0999999940395355
+    ]
+   ],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 64.8420000076294,
+     "n": 8
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 57.75900000333786,
+     "n": 4
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 57.73100000619888,
+     "n": 7
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 42,
+     "pct": 39
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 41,
+     "pct": 38
+    },
+    {
+     "name": "(program)",
+     "samples": 11,
+     "pct": 10
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 66.6,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.3"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 66.2,
+     "top": [
+      "RunMicrotasks 57.7",
+      "FunctionCall:loop 6.6",
+      "SimpleWatcher::OnHandleReady 0.8"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 2.7,
+     "top": [
+      "CommandBufferService:PutChanged 2.2",
+      "Scheduler::RunTask 0.2",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 0.1"
+     ]
+    }
+   ],
+   "dl": 8,
+   "progs": 91
+  },
+  {
+   "t": 17395.3,
+   "dt": 58.3,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [
+    [
+     "bld._drapePending",
+     1.0999999940395355
+    ],
+    [
+     "bld.update",
+     1.0999999940395355
+    ]
+   ],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 57.23200000822544,
+     "n": 8
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 48.939999997615814,
+     "n": 8
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 48.58600001037121,
+     "n": 3
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 45,
+     "pct": 45
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 25,
+     "pct": 25
+    },
+    {
+     "name": "(program)",
+     "samples": 10,
+     "pct": 10
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 58.2,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 58,
+     "top": [
+      "RunMicrotasks 48.3",
+      "FunctionCall:loop 7.9",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.4"
+     ]
+    },
+    {
+     "thread": "Renderer/DedicatedWorker thread",
+     "ms": 6.7,
+     "top": [
+      "FunctionCall:self.onmessage 6.4",
+      "V8.GC_HEAP_ENSURE_SWEEPING_COMPLETED 0.1",
+      "V8.GC_SCAVENGER_SCAVENGE_PARALLEL_PHASE 0.1"
+     ]
+    }
+   ],
+   "dl": 8,
+   "progs": 91
+  },
+  {
+   "t": 17424.4,
+   "dt": 29.1,
+   "cause": "js:(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+   "sync": [
+    [
+     "bld._drapePending",
+     1.1000000089406967
+    ],
+    [
+     "bld.update",
+     1.1000000089406967
+    ]
+   ],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 26.32099997997284,
+     "n": 8
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 19.727999985218048,
+     "n": 4
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 17.680999994277954,
+     "n": 1
+    }
+   ],
+   "js": [
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 13,
+     "pct": 23
+    },
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 11,
+     "pct": 19
+    },
+    {
+     "name": "(program)",
+     "samples": 9,
+     "pct": 16
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 29.1,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.1"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 28.8,
+     "top": [
+      "RunMicrotasks 19.7",
+      "FunctionCall:loop 6.0",
+      "FunctionCall:LabelCanvas.useEffect.draw 2.0"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 3.2,
+     "top": [
+      "CommandBufferService:PutChanged 2.2",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 0.5",
+      "Scheduler::RunTask 0.2"
+     ]
+    }
+   ],
+   "dl": 8,
+   "progs": 91
+  },
+  {
+   "t": 18162.4,
+   "dt": 46.2,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 44.77699999511242,
+     "n": 8
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 39.291999980807304,
+     "n": 7
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 38.94100001454353,
+     "n": 3
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 32,
+     "pct": 41
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 23,
+     "pct": 29
+    },
+    {
+     "name": "(program)",
+     "samples": 10,
+     "pct": 13
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 46.1,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.3"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 45.8,
+     "top": [
+      "RunMicrotasks 39.3",
+      "FunctionCall:loop 5.0",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.7"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 3,
+     "top": [
+      "CommandBufferService:PutChanged 2.4",
+      "Scheduler::RunTask 0.2",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 0.1"
+     ]
+    }
+   ],
+   "dl": 5,
+   "progs": 91
+  },
+  {
+   "t": 18341.8,
+   "dt": 62.5,
+   "cause": "js:(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 61.22400000691414,
+     "n": 9
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 56.416999980807304,
+     "n": 7
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 56.29299999773502,
+     "n": 5
+    }
+   ],
+   "js": [
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 45,
+     "pct": 39
+    },
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 44,
+     "pct": 38
+    },
+    {
+     "name": "(program)",
+     "samples": 11,
+     "pct": 10
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 62.4,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 62.1,
+     "top": [
+      "RunMicrotasks 56.4",
+      "FunctionCall:loop 3.8",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.8"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 3.4,
+     "top": [
+      "CommandBufferService:PutChanged 2.8",
+      "Scheduler::RunTask 0.2",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 0.1"
+     ]
+    }
+   ],
+   "dl": 6,
+   "progs": 91
+  },
+  {
+   "t": 19929.4,
+   "dt": 33.4,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 32.163000002503395,
+     "n": 6
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 27.29100000858307,
+     "n": 3
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 27.241999998688698,
+     "n": 2
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 22,
+     "pct": 40
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 18,
+     "pct": 33
+    },
+    {
+     "name": "(program)",
+     "samples": 8,
+     "pct": 15
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 33.3,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.1"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 33,
+     "top": [
+      "RunMicrotasks 27.3",
+      "FunctionCall:loop 4.4",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.4"
+     ]
+    },
+    {
+     "thread": "Renderer/DedicatedWorker thread",
+     "ms": 5.2,
+     "top": [
+      "FunctionCall:self.onmessage 5.0",
+      "MinorGC 0.1",
+      "V8.HandleInterrupts 0.0"
+     ]
+    }
+   ],
+   "dl": 7,
+   "progs": 91
+  },
+  {
+   "t": 19962.7,
+   "dt": 33.3,
+   "cause": "js:(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 32.78999999165535,
+     "n": 8
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 29.359000012278557,
+     "n": 4
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 29.358000010252,
+     "n": 2
+    }
+   ],
+   "js": [
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 25,
+     "pct": 38
+    },
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 22,
+     "pct": 34
+    },
+    {
+     "name": "(program)",
+     "samples": 7,
+     "pct": 11
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 33.3,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 33,
+     "top": [
+      "RunMicrotasks 29.4",
+      "FunctionCall:loop 2.8",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.4"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 2.9,
+     "top": [
+      "CommandBufferService:PutChanged 2.1",
+      "Scheduler::RunTask 0.4",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 0.2"
+     ]
+    }
+   ],
+   "dl": 7,
+   "progs": 91
+  },
+  {
+   "t": 20633.8,
+   "dt": 70.9,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 69.99000000953674,
+     "n": 9
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 62.96600000560284,
+     "n": 4
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 62.82999999821186,
+     "n": 5
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 56,
+     "pct": 45
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 39,
+     "pct": 31
+    },
+    {
+     "name": "(program)",
+     "samples": 10,
+     "pct": 8
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 70.8,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.3"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 70.5,
+     "top": [
+      "RunMicrotasks 59.9",
+      "FunctionCall:loop 6.3",
+      "V8.GC_SCAVENGER_SCAVENGE_PARALLEL_PHASE 2.0"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 3.2,
+     "top": [
+      "CommandBufferService:PutChanged 2.7",
+      "Scheduler::RunTask 0.2",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 0.1"
+     ]
+    }
+   ],
+   "dl": 1,
+   "progs": 91
+  },
+  {
+   "t": 20804.8,
+   "dt": 45.8,
+   "cause": "js:(program)",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 29.262999951839447,
+     "n": 21
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 16.66899998486042,
+     "n": 26
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 14.833999991416931,
+     "n": 3
+    }
+   ],
+   "js": [
+    {
+     "name": "(program)",
+     "samples": 29,
+     "pct": 23
+    },
+    {
+     "name": "(garbage collector)",
+     "samples": 18,
+     "pct": 14
+    },
+    {
+     "name": "run",
+     "samples": 12,
+     "pct": 10
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 45.7,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.3"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 45.4,
+     "top": [
+      "Scheduler::RunTask 30.3",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 11.1",
+      "CommandBufferService:PutChanged 3.2"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 43,
+     "top": [
+      "RunMicrotasks 16.3",
+      "FunctionCall:loop 5.2",
+      "V8.GC_MC_INCREMENTAL 4.9"
+     ]
+    }
+   ],
+   "dl": 1,
+   "progs": 91
+  },
+  {
+   "t": 20900.7,
+   "dt": 29.1,
+   "cause": "js:(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 26.714000016450882,
+     "n": 9
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 21.547999992966652,
+     "n": 6
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 21.453000009059906,
+     "n": 2
+    }
+   ],
+   "js": [
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 17,
+     "pct": 30
+    },
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 15,
+     "pct": 27
+    },
+    {
+     "name": "(program)",
+     "samples": 13,
+     "pct": 23
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 29.1,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.1"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 28.6,
+     "top": [
+      "RunMicrotasks 21.5",
+      "FunctionCall:loop 3.9",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.9"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 14.7,
+     "top": [
+      "Scheduler::RunTask 8.0",
+      "CommandBufferService:PutChanged 3.2",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 2.4"
+     ]
+    }
+   ],
+   "dl": 1,
+   "progs": 91
+  },
+  {
+   "t": 20979.8,
+   "dt": 33.3,
+   "cause": "js:(idle)",
+   "sync": [],
+   "trace": [
+    {
+     "name": "FireAnimationFrame",
+     "ms": 10.583000004291534,
+     "n": 6
+    },
+    {
+     "name": "v8.callFunction",
+     "ms": 10.497999995946884,
+     "n": 9
+    },
+    {
+     "name": "FunctionCall:loop",
+     "ms": 9.57600000500679,
+     "n": 2
+    }
+   ],
+   "js": [
+    {
+     "name": "(idle)",
+     "samples": 36,
+     "pct": 56
+    },
+    {
+     "name": "(program)",
+     "samples": 12,
+     "pct": 19
+    },
+    {
+     "name": "setProgram @25199_three_build_three_module_bf5be9be.js:12193",
+     "samples": 3,
+     "pct": 5
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 33.3,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 32.7,
+     "top": [
+      "Scheduler::RunTask 23.9",
+      "CommandBufferService:PutChanged 3.7",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 3.5"
+     ]
+    },
+    {
+     "thread": "GPU Process/ThreadPoolForegroundWorker",
+     "ms": 18.2,
+     "top": [
+      "ANGLEPlatformImpl::RunWorkerTask 18.1",
+      "ThreadPool_RunTask 0.0"
+     ]
+    }
+   ],
+   "dl": 1,
+   "progs": 91
+  },
+  {
+   "t": 21271.4,
+   "dt": 54,
+   "cause": "js:(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+   "sync": [
+    [
+     "bld._drapePending",
+     1.1000000089406967
+    ],
+    [
+     "bld.update",
+     1.1000000089406967
+    ]
+   ],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 53.11200001835823,
+     "n": 6
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 47.47300000488758,
+     "n": 6
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 47.20899999141693,
+     "n": 3
+    }
+   ],
+   "js": [
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 43,
+     "pct": 44
+    },
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 31,
+     "pct": 32
+    },
+    {
+     "name": "(program)",
+     "samples": 9,
+     "pct": 9
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 53.9,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 53.7,
+     "top": [
+      "RunMicrotasks 46.2",
+      "FunctionCall:loop 5.2",
+      "V8.GC_SCAVENGER_SCAVENGE_PARALLEL 0.5"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 10.8,
+     "top": [
+      "Scheduler::RunTask 6.5",
+      "CommandBufferService:PutChanged 1.7",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 1.4"
+     ]
+    }
+   ],
+   "dl": 5,
+   "progs": 91
+  },
+  {
+   "t": 22634.2,
+   "dt": 62.5,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 62.021000012755394,
+     "n": 8
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 59.08400000631809,
+     "n": 4
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 58.92500001192093,
+     "n": 4
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 53,
+     "pct": 51
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 34,
+     "pct": 33
+    },
+    {
+     "name": "(program)",
+     "samples": 8,
+     "pct": 8
+    }
+   ],
+   "threads": [
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 64.2,
+     "top": [
+      "RunMicrotasks 58.9",
+      "FunctionCall:LabelCanvas.useEffect.draw 1.9",
+      "FunctionCall:loop 1.1"
+     ]
+    },
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 62.4,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.3"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 1.1,
+     "top": [
+      "CommandBufferService:PutChanged 0.5",
+      "Scheduler::RunTask 0.3",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 0.1"
+     ]
+    }
+   ],
+   "dl": 2,
+   "progs": 91
+  },
+  {
+   "t": 23168,
+   "dt": 50,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [
+    [
+     "bld._drapePending",
+     1.0999999940395355
+    ],
+    [
+     "bld.update",
+     1.0999999940395355
+    ],
+    [
+     "sky._drapePending",
+     0.9000000059604645
+    ],
+    [
+     "sky.update",
+     0.9000000059604645
+    ]
+   ],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 48.49700000882149,
+     "n": 12
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 41.909000009298325,
+     "n": 11
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 41.81599999964237,
+     "n": 8
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 39,
+     "pct": 42
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 24,
+     "pct": 26
+    },
+    {
+     "name": "(program)",
+     "samples": 12,
+     "pct": 13
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 49.9,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 49.4,
+     "top": [
+      "RunMicrotasks 41.4",
+      "FunctionCall:loop 5.8",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.7"
+     ]
+    },
+    {
+     "thread": "Renderer/DedicatedWorker thread",
+     "ms": 19.5,
+     "top": [
+      "RunMicrotasks 18.1",
+      "MinorGC 0.5",
+      "V8.GC_SCAVENGER_SCAVENGE_PARALLEL_PHASE 0.2"
+     ]
+    }
+   ],
+   "dl": 0,
+   "progs": 91
+  },
+  {
+   "t": 23293.1,
+   "dt": 29.2,
+   "cause": "js:(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+   "sync": [
+    [
+     "bld._drapePending",
+     1.0999999940395355
+    ],
+    [
+     "bld.update",
+     1.0999999940395355
+    ],
+    [
+     "clut._samplePending",
+     0.8999999910593033
+    ],
+    [
+     "clut.update",
+     0.8999999910593033
+    ]
+   ],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 26.566000029444695,
+     "n": 9
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 16.41899999976158,
+     "n": 13
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 15.805999994277954,
+     "n": 4
+    }
+   ],
+   "js": [
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 14,
+     "pct": 25
+    },
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 11,
+     "pct": 19
+    },
+    {
+     "name": "(program)",
+     "samples": 9,
+     "pct": 16
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 29.2,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.1"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 28.5,
+     "top": [
+      "RunMicrotasks 16.4",
+      "FunctionCall:loop 9.9",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.6"
+     ]
+    },
+    {
+     "thread": "Renderer/DedicatedWorker thread",
+     "ms": 8.3,
+     "top": [
+      "FunctionCall:self.onmessage 8.3"
+     ]
+    }
+   ],
+   "dl": 8,
+   "progs": 91
+  },
+  {
+   "t": 23463.9,
+   "dt": 37.5,
+   "cause": "js:(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+   "sync": [
+    [
+     "bld._drapePending",
+     1.1000000089406967
+    ],
+    [
+     "bld.update",
+     1.1000000089406967
+    ]
+   ],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 36.05699999630451,
+     "n": 6
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 28.221000000834465,
+     "n": 4
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 28.059000000357628,
+     "n": 2
+    }
+   ],
+   "js": [
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 25,
+     "pct": 40
+    },
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 19,
+     "pct": 31
+    },
+    {
+     "name": "(program)",
+     "samples": 6,
+     "pct": 10
+    }
+   ],
+   "threads": [
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 41.2,
+     "top": [
+      "RunMicrotasks 28.2",
+      "FunctionCall:loop 7.3",
+      "SimpleWatcher::OnHandleReady 0.6"
+     ]
+    },
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 37.4,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "Renderer/DedicatedWorker thread",
+     "ms": 7.5,
+     "top": [
+      "FunctionCall:self.onmessage 7.3",
+      "V8.HandleInterrupts 0.1",
+      "V8.GC_HEAP_ENSURE_SWEEPING_COMPLETED 0.1"
+     ]
+    }
+   ],
+   "dl": 8,
+   "progs": 91
+  },
+  {
+   "t": 23497.2,
+   "dt": 33.3,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [
+    [
+     "bld._drapePending",
+     1.1000000089406967
+    ],
+    [
+     "bld.update",
+     1.1000000089406967
+    ]
+   ],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 32.05799999833107,
+     "n": 7
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 27.569000005722046,
+     "n": 6
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 27.340999990701675,
+     "n": 3
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 23,
+     "pct": 40
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 16,
+     "pct": 28
+    },
+    {
+     "name": "(program)",
+     "samples": 7,
+     "pct": 12
+    }
+   ],
+   "threads": [
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 35.8,
+     "top": [
+      "RunMicrotasks 27.6",
+      "FunctionCall:loop 4.1",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.5"
+     ]
+    },
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 33.3,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 3.5,
+     "top": [
+      "CommandBufferService:PutChanged 2.7",
+      "Scheduler::RunTask 0.3",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 0.2"
+     ]
+    }
+   ],
+   "dl": 8,
+   "progs": 91
+  },
+  {
+   "t": 24118,
+   "dt": 33.3,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 31.14800000190735,
+     "n": 6
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 29.660000011324883,
+     "n": 5
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 28.820000007748604,
+     "n": 2
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 23,
+     "pct": 40
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 15,
+     "pct": 26
+    },
+    {
+     "name": "(program)",
+     "samples": 7,
+     "pct": 12
+    }
+   ],
+   "threads": [
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 35.7,
+     "top": [
+      "RunMicrotasks 26.8",
+      "MinorGC 2.8",
+      "FunctionCall:loop 1.9"
+     ]
+    },
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 33.3,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.1"
+     ]
+    },
+    {
+     "thread": "Renderer/ThreadPoolForegroundWorker",
+     "ms": 2.4,
+     "top": [
+      "V8.GC_SCAVENGER_BACKGROUND_SCAVENGE_PARALLEL 2.3",
+      "ThreadPool_RunTask 0.0"
+     ]
+    }
+   ],
+   "dl": 1,
+   "progs": 91
+  },
+  {
+   "t": 24297.2,
+   "dt": 50,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 48.6339999884367,
+     "n": 9
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 44.17499998211861,
+     "n": 10
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 44.03499999642372,
+     "n": 3
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 44,
+     "pct": 43
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 27,
+     "pct": 26
+    },
+    {
+     "name": "(program)",
+     "samples": 11,
+     "pct": 11
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 49.9,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 49.5,
+     "top": [
+      "RunMicrotasks 44.2",
+      "FunctionCall:loop 3.4",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.5"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 10.1,
+     "top": [
+      "Scheduler::RunTask 7.5",
+      "CommandBufferService:PutChanged 1.0",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 0.8"
+     ]
+    }
+   ],
+   "dl": 8,
+   "progs": 91
+  },
+  {
+   "t": 25089.1,
+   "dt": 66.7,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 64.82199999690056,
+     "n": 8
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 60.69800001382828,
+     "n": 8
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 60.62100000679493,
+     "n": 4
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 54,
+     "pct": 49
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 32,
+     "pct": 29
+    },
+    {
+     "name": "(program)",
+     "samples": 10,
+     "pct": 9
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 66.6,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 66.3,
+     "top": [
+      "RunMicrotasks 60.0",
+      "FunctionCall:loop 3.7",
+      "SimpleWatcher::OnHandleReady 0.6"
+     ]
+    },
+    {
+     "thread": "Renderer/DedicatedWorker thread",
+     "ms": 7.4,
+     "top": [
+      "FunctionCall:self.onmessage 7.3",
+      "HandlePostMessage 0.0"
+     ]
+    }
+   ],
+   "dl": 0,
+   "progs": 91
+  },
+  {
+   "t": 25309.9,
+   "dt": 62.5,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [
+    [
+     "bld._drapePending",
+     1.1000000089406967
+    ],
+    [
+     "bld.update",
+     1.1000000089406967
+    ]
+   ],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 61.57300001382828,
+     "n": 8
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 55.17800000309944,
+     "n": 4
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 55.16899999976158,
+     "n": 6
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 48,
+     "pct": 45
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 30,
+     "pct": 28
+    },
+    {
+     "name": "(program)",
+     "samples": 8,
+     "pct": 7
+    }
+   ],
+   "threads": [
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 62.5,
+     "top": [
+      "RunMicrotasks 52.3",
+      "FunctionCall:loop 5.9",
+      "V8.GC_SCAVENGER_SCAVENGE_PARALLEL_PHASE 1.4"
+     ]
+    },
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 62.3,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.1"
+     ]
+    },
+    {
+     "thread": "Renderer/ThreadPoolForegroundWorker",
+     "ms": 3.6,
+     "top": [
+      "V8.GC_BACKGROUND_YOUNG_ARRAY_BUFFER_SWEEP 1.8",
+      "ThreadPool_RunTask 1.1",
+      "V8.GC_SCAVENGER_BACKGROUND_SCAVENGE_PARALLEL 0.7"
+     ]
+    }
+   ],
+   "dl": 4,
+   "progs": 91
+  },
+  {
+   "t": 25951.5,
+   "dt": 29.1,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 28.39599998295307,
+     "n": 5
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 24.483999997377396,
+     "n": 8
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 24.399000003933907,
+     "n": 2
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 23,
+     "pct": 45
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 15,
+     "pct": 29
+    },
+    {
+     "name": "(program)",
+     "samples": 5,
+     "pct": 10
+    }
+   ],
+   "threads": [
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 29.1,
+     "top": [
+      "RunMicrotasks 24.5",
+      "FunctionCall:loop 3.4",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.5"
+     ]
+    },
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 29.1,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.1"
+     ]
+    },
+    {
+     "thread": "Renderer/DedicatedWorker thread",
+     "ms": 6,
+     "top": [
+      "FunctionCall:self.onmessage 5.9",
+      "V8.GC_HEAP_ENSURE_SWEEPING_COMPLETED 0.1",
+      "V8.HandleInterrupts 0.0"
+     ]
+    }
+   ],
+   "dl": 5,
+   "progs": 91
+  },
+  {
+   "t": 26001.6,
+   "dt": 50.1,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 49.37399998307228,
+     "n": 10
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 42.14900000393391,
+     "n": 3
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 42.03900000452995,
+     "n": 5
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 33,
+     "pct": 37
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 27,
+     "pct": 30
+    },
+    {
+     "name": "(program)",
+     "samples": 12,
+     "pct": 13
+    }
+   ],
+   "threads": [
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 52.3,
+     "top": [
+      "RunMicrotasks 41.3",
+      "FunctionCall:loop 5.0",
+      "FunctionCall:LabelCanvas.useEffect.draw 1.9"
+     ]
+    },
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 50,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 2.9,
+     "top": [
+      "CommandBufferService:PutChanged 2.3",
+      "Scheduler::RunTask 0.3",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 0.2"
+     ]
+    }
+   ],
+   "dl": 5,
+   "progs": 91
+  },
+  {
+   "t": 26956,
+   "dt": 87.5,
+   "cause": "js:(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+   "sync": [
+    [
+     "bufferData",
+     0.5000000149011612
+    ],
+    [
+     "texSubImage2D",
+     0.5
+    ]
+   ],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 85.47499997913837,
+     "n": 8
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 73.47100001573563,
+     "n": 10
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 73.26300001144409,
+     "n": 4
+    }
+   ],
+   "js": [
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 59,
+     "pct": 37
+    },
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 57,
+     "pct": 35
+    },
+    {
+     "name": "(program)",
+     "samples": 15,
+     "pct": 9
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 87.4,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.6"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 87.1,
+     "top": [
+      "RunMicrotasks 72.7",
+      "FunctionCall:loop 9.4",
+      "FunctionCall:LabelCanvas.useEffect.draw 2.5"
+     ]
+    },
+    {
+     "thread": "Browser/ThreadPoolForegroundWorker",
+     "ms": 49.5,
+     "top": [
+      "ThreadPool_RunTask 49.5"
+     ]
+    }
+   ],
+   "dl": 1,
+   "progs": 91
+  },
+  {
+   "t": 26993.5,
+   "dt": 37.5,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 35.24600000679493,
+     "n": 9
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 33.034000009298325,
+     "n": 6
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 32.62799999117851,
+     "n": 2
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 25,
+     "pct": 37
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 23,
+     "pct": 34
+    },
+    {
+     "name": "(program)",
+     "samples": 11,
+     "pct": 16
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 37.4,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 37,
+     "top": [
+      "RunMicrotasks 33.0",
+      "FunctionCall:loop 1.8",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.4"
+     ]
+    },
+    {
+     "thread": "Renderer/DedicatedWorker thread",
+     "ms": 6.2,
+     "top": [
+      "FunctionCall:self.onmessage 6.1",
+      "HandlePostMessage 0.0"
+     ]
+    }
+   ],
+   "dl": 1,
+   "progs": 91
+  },
+  {
+   "t": 27022.7,
+   "dt": 29.2,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 27.834000006318092,
+     "n": 8
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 25.243000000715256,
+     "n": 4
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 25.116999998688698,
+     "n": 2
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 23,
+     "pct": 43
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 16,
+     "pct": 30
+    },
+    {
+     "name": "(program)",
+     "samples": 10,
+     "pct": 19
+    }
+   ],
+   "threads": [
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 29.3,
+     "top": [
+      "RunMicrotasks 25.2",
+      "FunctionCall:loop 2.1",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.4"
+     ]
+    },
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 29.2,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.1"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 2.2,
+     "top": [
+      "CommandBufferService:PutChanged 1.6",
+      "Scheduler::RunTask 0.2",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 0.2"
+     ]
+    }
+   ],
+   "dl": 1,
+   "progs": 91
+  },
+  {
+   "t": 27398.1,
+   "dt": 54.1,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 52.8830000013113,
+     "n": 7
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 50.89799998700619,
+     "n": 7
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 50.688999995589256,
+     "n": 4
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 44,
+     "pct": 51
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 28,
+     "pct": 32
+    },
+    {
+     "name": "(program)",
+     "samples": 9,
+     "pct": 10
+    }
+   ],
+   "threads": [
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 55.6,
+     "top": [
+      "RunMicrotasks 50.9",
+      "FunctionCall:loop 1.7",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.4"
+     ]
+    },
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 54,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 0.9,
+     "top": [
+      "CommandBufferService:PutChanged 0.5",
+      "Scheduler::RunTask 0.2",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 0.1"
+     ]
+    }
+   ],
+   "dl": 0,
+   "progs": 91
+  },
+  {
+   "t": 28427.2,
+   "dt": 45.8,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 44.819000005722046,
+     "n": 7
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 42.0789999961853,
+     "n": 6
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 42.07600000500679,
+     "n": 3
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 38,
+     "pct": 48
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 24,
+     "pct": 30
+    },
+    {
+     "name": "(program)",
+     "samples": 8,
+     "pct": 10
+    }
+   ],
+   "threads": [
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 45.7,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 45.4,
+     "top": [
+      "RunMicrotasks 42.1",
+      "FunctionCall:loop 2.3",
+      "FunctionCall:LabelCanvas.useEffect.draw 0.4"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 2,
+     "top": [
+      "CommandBufferService:PutChanged 1.1",
+      "Scheduler::RunTask 0.4",
+      "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush 0.2"
+     ]
+    }
+   ],
+   "dl": 4,
+   "progs": 91
+  },
+  {
+   "t": 28902.3,
+   "dt": 29.1,
+   "cause": "js:measure",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 27.788000017404556,
+     "n": 10
+    },
+    {
+     "name": "SimpleWatcher::OnHandleReady",
+     "ms": 21.18300001323223,
+     "n": 4
+    },
+    {
+     "name": "FunctionCall:performWorkUntilDeadline",
+     "ms": 20.715999990701675,
+     "n": 2
+    }
+   ],
+   "js": [
+    {
+     "name": "measure",
+     "samples": 98,
+     "pct": 55
+    },
+    {
+     "name": "run",
+     "samples": 18,
+     "pct": 10
+    },
+    {
+     "name": "(program)",
+     "samples": 11,
+     "pct": 6
+    }
+   ],
+   "threads": [
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 29.2,
+     "top": [
+      "FunctionCall:performWorkUntilDeadline 19.8",
+      "FunctionCall:loop 5.3",
+      "RunMicrotasks 0.8"
+     ]
+    },
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 29,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.2"
+     ]
+    },
+    {
+     "thread": "GPU Process/CrGpuMain",
+     "ms": 4.9,
+     "top": [
+      "CommandBufferService:PutChanged 4.2",
+      "Scheduler::RunTask 0.3",
+      "DXGISwapChainImageBacking::Present 0.2"
+     ]
+    }
+   ],
+   "dl": 0,
+   "progs": 91
+  },
+  {
+   "t": 29644,
+   "dt": 41.7,
+   "cause": "js:We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+   "sync": [],
+   "trace": [
+    {
+     "name": "v8.callFunction",
+     "ms": 41.10999999940395,
+     "n": 9
+    },
+    {
+     "name": "HandlePostMessage",
+     "ms": 38.26199999451637,
+     "n": 3
+    },
+    {
+     "name": "RunMicrotasks",
+     "ms": 38.20399998128414,
+     "n": 8
+    }
+   ],
+   "js": [
+    {
+     "name": "We @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:775",
+     "samples": 35,
+     "pct": 47
+    },
+    {
+     "name": "(anonymous) @skyloom-3__claude_worktrees_r22-e_lib_fly_vendor_three-tile_3a59c2bd._.js:787",
+     "samples": 25,
+     "pct": 33
+    },
+    {
+     "name": "(program)",
+     "samples": 9,
+     "pct": 12
+    }
+   ],
+   "threads": [
+    {
+     "thread": "Renderer/CrRendererMain",
+     "ms": 43.6,
+     "top": [
+      "RunMicrotasks 36.5",
+      "FunctionCall:loop 2.3",
+      "V8.GC_SCAVENGER_SCAVENGE_PARALLEL 1.2"
+     ]
+    },
+    {
+     "thread": "GPU Process/GpuVSyncThread",
+     "ms": 41.7,
+     "top": [
+      "WinVSyncProvider::GetVSyncIntervalIfAvailable 0.3"
+     ]
+    },
+    {
+     "thread": "Browser/ThreadPoolForegroundWorker",
+     "ms": 21.6,
+     "top": [
+      "ThreadPool_RunTask 21.6"
+     ]
+    }
+   ],
+   "dl": 1,
+   "progs": 91
+  }
+ ],
+ "longtasks": [],
+ "dtHistogram": [
+  -1.3,
+  4.3,
+  8.3,
+  8.3,
+  4.2,
+  8.3,
+  4.1,
+  8.4,
+  4.2,
+  8.3,
+  8.4,
+  8.4,
+  8.3,
+  8.3,
+  8.3,
+  8.4,
+  8.2,
+  8.3,
+  4.2,
+  8.4,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  16.6,
+  8.3,
+  4.3,
+  4.2,
+  4,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  8.3,
+  4.1,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  8.5,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  8.5,
+  4.1,
+  4.2,
+  4.2,
+  4,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.4,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  8.4,
+  8.3,
+  8.4,
+  8.3,
+  8.4,
+  8.3,
+  8.2,
+  4.3,
+  8.3,
+  4.1,
+  8.4,
+  4.2,
+  8.3,
+  62.5,
+  8.3,
+  8.4,
+  8.5,
+  12.4,
+  4.1,
+  25,
+  8.3,
+  8.3,
+  20.8,
+  8.4,
+  4.1,
+  8.4,
+  8.3,
+  4.2,
+  8.3,
+  4.2,
+  16.7,
+  20.8,
+  12.5,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  8.3,
+  4.2,
+  12.5,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  8.3,
+  4.1,
+  4.3,
+  8.3,
+  4.1,
+  4.2,
+  8.3,
+  8.4,
+  8.3,
+  8.3,
+  4.2,
+  4.2,
+  12.4,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  8.4,
+  4.2,
+  8.3,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  8.3,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  8.4,
+  50,
+  8.3,
+  8.3,
+  12.5,
+  4.2,
+  12.5,
+  8.3,
+  8.3,
+  12.5,
+  8.4,
+  12.5,
+  12.4,
+  4.2,
+  8.3,
+  8.4,
+  8.4,
+  4.2,
+  20.8,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  4.1,
+  12.6,
+  12.4,
+  4.3,
+  8.3,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  20.9,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4,
+  4.3,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  8.3,
+  4.2,
+  4.1,
+  8.3,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4,
+  4.2,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  8.3,
+  4.1,
+  20.9,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  8.3,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  8.4,
+  4.2,
+  12.5,
+  8.3,
+  4.2,
+  8.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  12.5,
+  12.5,
+  16.7,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  50.1,
+  20.7,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  29.2,
+  29.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  16.8,
+  8.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  8.3,
+  8.3,
+  8.3,
+  8.3,
+  4.3,
+  4.2,
+  8.2,
+  4.3,
+  4,
+  8.4,
+  8.4,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  4.3,
+  4.1,
+  16.7,
+  4,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  20.8,
+  4.3,
+  8.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  8.5,
+  4.1,
+  4.1,
+  4.3,
+  4,
+  4.2,
+  16.8,
+  41.8,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  12.5,
+  4.2,
+  8.3,
+  4.1,
+  4.3,
+  4.1,
+  8.3,
+  4.2,
+  16.7,
+  8.3,
+  8.4,
+  4.1,
+  4.1,
+  4.2,
+  8.4,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  8.3,
+  8.3,
+  8.4,
+  4.1,
+  8.3,
+  4.3,
+  4.1,
+  12.4,
+  8.4,
+  4.2,
+  8.4,
+  4.1,
+  8.3,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.4,
+  4.1,
+  4.2,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.4,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.3,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  16.6,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  41.7,
+  20.8,
+  4.2,
+  4.2,
+  4.1,
+  8.3,
+  8.3,
+  4.2,
+  4.2,
+  8.4,
+  8.3,
+  12.5,
+  12.5,
+  4.2,
+  8.5,
+  4.1,
+  4.3,
+  8.3,
+  4.2,
+  4.1,
+  8.3,
+  4.1,
+  4.3,
+  16.7,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  8.4,
+  8.3,
+  8.3,
+  8.4,
+  8.3,
+  8.4,
+  4.1,
+  12.6,
+  12.4,
+  8.4,
+  12.5,
+  25,
+  8.3,
+  8.3,
+  8.3,
+  4.1,
+  8.5,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.4,
+  4.1,
+  4.1,
+  4.2,
+  12.5,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  8.3,
+  4.2,
+  8.4,
+  4.1,
+  8.3,
+  8.4,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  8.3,
+  4.3,
+  8.2,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  16.7,
+  4.2,
+  8.3,
+  4.1,
+  8.5,
+  4.1,
+  4.1,
+  8.3,
+  4.3,
+  8.2,
+  4.2,
+  4.2,
+  4.2,
+  8.3,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  8.4,
+  4,
+  4.3,
+  12.5,
+  4.1,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  8.2,
+  4.2,
+  8.4,
+  12.5,
+  4.2,
+  4.1,
+  8.4,
+  8.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.2,
+  4,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.2,
+  4,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  16.7,
+  8.3,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  8.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  20.9,
+  41.6,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4,
+  4.4,
+  4,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.3,
+  4.1,
+  8.3,
+  4.2,
+  8.4,
+  4.2,
+  4.1,
+  8.3,
+  4.1,
+  4.2,
+  8.4,
+  4.1,
+  4.2,
+  8.5,
+  4.2,
+  20.9,
+  4.1,
+  8.4,
+  4.1,
+  8.4,
+  20.8,
+  4.1,
+  8.4,
+  4.1,
+  8.4,
+  8.4,
+  8.2,
+  4.2,
+  8.3,
+  4.2,
+  8.4,
+  4.1,
+  8.3,
+  4.3,
+  8.2,
+  8.3,
+  4.3,
+  8.3,
+  4.2,
+  8.3,
+  8.3,
+  8.3,
+  4.3,
+  8.2,
+  20.9,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  8.4,
+  4.1,
+  4.1,
+  4.4,
+  4.1,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  50.1,
+  20.7,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  12.5,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  16.7,
+  8.3,
+  8.3,
+  12.5,
+  8.4,
+  4.1,
+  8.4,
+  8.2,
+  4.2,
+  8.4,
+  25,
+  4.1,
+  12.6,
+  4.1,
+  8.4,
+  4.1,
+  12.6,
+  8.2,
+  12.6,
+  4.1,
+  8.4,
+  4.1,
+  8.3,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  8.3,
+  4.3,
+  4.1,
+  8.3,
+  4.1,
+  8.4,
+  4.2,
+  8.3,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  20.8,
+  12.5,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  8.3,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  8.3,
+  4.1,
+  8.6,
+  4.2,
+  8.3,
+  4.1,
+  4.3,
+  8.2,
+  4.2,
+  4.3,
+  4.1,
+  8.4,
+  4.1,
+  4.1,
+  8.3,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  8.3,
+  4.1,
+  4.2,
+  8.4,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.4,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.3,
+  8.2,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  8.3,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  8.3,
+  4.2,
+  8.3,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.2,
+  4.1,
+  4.2,
+  8.2,
+  4.3,
+  4.2,
+  16.6,
+  20.8,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  29.1,
+  8.4,
+  8.3,
+  4.1,
+  8.4,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  50,
+  25.2,
+  8.4,
+  16.7,
+  4.2,
+  8.2,
+  16.7,
+  4.1,
+  8.5,
+  8.3,
+  4.1,
+  8.4,
+  12.4,
+  4.2,
+  4.2,
+  8.2,
+  4.3,
+  16.6,
+  8.4,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  8.3,
+  4.3,
+  4.2,
+  4.1,
+  8.3,
+  8.3,
+  8.4,
+  4.1,
+  8.4,
+  8.3,
+  4.1,
+  8.4,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  8.3,
+  4.3,
+  4.1,
+  8.3,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  8.4,
+  8.2,
+  4.2,
+  8.4,
+  8.3,
+  4.2,
+  8.3,
+  4.2,
+  4,
+  8.4,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  8.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  8.3,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  8.3,
+  4.2,
+  4.2,
+  8.4,
+  20.8,
+  58.3,
+  12.5,
+  8.3,
+  8.4,
+  8.3,
+  12.5,
+  8.3,
+  8.4,
+  8.4,
+  8.3,
+  12.5,
+  4.1,
+  8.4,
+  8.3,
+  4.1,
+  25,
+  12.6,
+  4.1,
+  8.4,
+  8.3,
+  16.7,
+  16.6,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  16.7,
+  4.1,
+  4.1,
+  4.3,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.3,
+  4,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  8.4,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4,
+  4.2,
+  4.1,
+  4.3,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  8.3,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.3,
+  4,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  4.1,
+  4.2,
+  4.5,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  4.1,
+  4.3,
+  4.1,
+  8.4,
+  8.3,
+  4.1,
+  4.2,
+  8.4,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  8.3,
+  8.4,
+  8.3,
+  4.2,
+  8.3,
+  4.1,
+  8.5,
+  8.3,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  33.4,
+  37.4,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  8.5,
+  4.2,
+  41.7,
+  24.9,
+  4.2,
+  8.4,
+  4.2,
+  4.1,
+  4.1,
+  8.5,
+  16.6,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  16.7,
+  8.4,
+  4.1,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  4.3,
+  4,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  8.2,
+  4.2,
+  4.2,
+  8.4,
+  12.4,
+  8.6,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  8.3,
+  4.2,
+  8.3,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  8.3,
+  8.5,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  8.3,
+  8.3,
+  8.3,
+  4.2,
+  4.2,
+  8.4,
+  4.1,
+  8.4,
+  12.5,
+  8.3,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.3,
+  37.4,
+  33.3,
+  8.4,
+  4.2,
+  4.1,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  8.4,
+  4.1,
+  12.5,
+  12.5,
+  8.3,
+  12.5,
+  8.4,
+  8.3,
+  12.5,
+  8.3,
+  8.4,
+  8.3,
+  8.4,
+  8.3,
+  4.1,
+  8.4,
+  4.2,
+  8.3,
+  8.3,
+  4.2,
+  8.4,
+  8.3,
+  8.3,
+  4.2,
+  8.3,
+  8.3,
+  8.4,
+  8.3,
+  8.3,
+  4.2,
+  8.4,
+  8.3,
+  8.6,
+  8.3,
+  8.3,
+  8.4,
+  8.3,
+  8.3,
+  4.1,
+  8.4,
+  4.1,
+  4.3,
+  4.1,
+  29.2,
+  8.3,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.3,
+  33.4,
+  37.4,
+  8.4,
+  4.2,
+  4.2,
+  8.4,
+  4.1,
+  8.3,
+  8.4,
+  12.4,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  8.3,
+  4.1,
+  4.2,
+  4.3,
+  4.2,
+  8.2,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  8.5,
+  20.7,
+  4.1,
+  4.3,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  8.4,
+  4.1,
+  4.2,
+  4.1,
+  8.4,
+  8.4,
+  16.6,
+  12.5,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  25,
+  4.2,
+  4.1,
+  4.2,
+  4.3,
+  4.1,
+  8.3,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.4,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4,
+  4.3,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.3,
+  4,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.2,
+  4,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  62.6,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4,
+  4.3,
+  4.1,
+  20.8,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  8.3,
+  4.3,
+  8.2,
+  4.3,
+  4.1,
+  4.2,
+  16.6,
+  4.1,
+  8.4,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  4.3,
+  8.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.3,
+  4.2,
+  8.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  8.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  8.4,
+  16.6,
+  4.1,
+  8.4,
+  4.2,
+  4.2,
+  4.2,
+  8.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.2,
+  4.2,
+  4,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  4.3,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  16.7,
+  8.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.2,
+  4,
+  4.2,
+  4.2,
+  4.2,
+  4.3,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  8.4,
+  25,
+  8.2,
+  4.2,
+  4.1,
+  4.3,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  8.4,
+  45.8,
+  20.8,
+  8.3,
+  8.4,
+  4.1,
+  8.3,
+  4.4,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  4.1,
+  4.2,
+  4.3,
+  8.3,
+  8.3,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  8.3,
+  4.1,
+  8.3,
+  4.2,
+  4.2,
+  4.2,
+  8.5,
+  4.2,
+  8.3,
+  4.2,
+  8.4,
+  4.1,
+  4.1,
+  4.3,
+  8.2,
+  4.2,
+  4.2,
+  4.2,
+  8.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.3,
+  4,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  16.6,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  16.7,
+  8.3,
+  8.4,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  8.4,
+  8.3,
+  4.2,
+  8.3,
+  8.4,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  8.4,
+  8.3,
+  4.1,
+  8.4,
+  8.3,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  8.3,
+  4.2,
+  4.1,
+  8.5,
+  8.3,
+  20.8,
+  4.2,
+  4.1,
+  8.3,
+  4.3,
+  8.2,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.4,
+  4.1,
+  4.2,
+  8.3,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  8.4,
+  12.4,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  16.6,
+  20.9,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  16.7,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.3,
+  4,
+  4.3,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  8.3,
+  4.1,
+  4.2,
+  45.9,
+  20.8,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  8.3,
+  8.3,
+  4.2,
+  4.3,
+  4.1,
+  4.1,
+  8.3,
+  4.2,
+  4.2,
+  8.4,
+  16.6,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  8.3,
+  4.1,
+  4.3,
+  4.1,
+  8.3,
+  8.4,
+  12.4,
+  8.4,
+  8.3,
+  8.4,
+  8.3,
+  8.3,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  8.3,
+  4.1,
+  4.3,
+  8.3,
+  4.1,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  8.5,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  66.7,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  20.8,
+  4.2,
+  8.4,
+  4.1,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  20.8,
+  4.2,
+  4.3,
+  4,
+  8.4,
+  4.1,
+  4.3,
+  8.3,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4,
+  4.3,
+  4,
+  4.3,
+  4.2,
+  4.1,
+  4.2,
+  8.4,
+  4.1,
+  4.1,
+  4.2,
+  8.4,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.4,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  8.4,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  8.4,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  8.3,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  8.3,
+  8.4,
+  4.2,
+  8.4,
+  8.3,
+  66.7,
+  8.2,
+  8.4,
+  8.3,
+  4.2,
+  8.3,
+  8.3,
+  8.3,
+  4.3,
+  8.2,
+  4.2,
+  8.4,
+  20.8,
+  4.3,
+  8.2,
+  8.3,
+  4.2,
+  8.4,
+  8.3,
+  58.3,
+  29.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  8.3,
+  8.4,
+  4.2,
+  4.1,
+  8.3,
+  8.4,
+  20.8,
+  8.3,
+  16.7,
+  8.3,
+  12.6,
+  4.1,
+  4.1,
+  8.4,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  4.1,
+  4.3,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  12.5,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  12.5,
+  8.2,
+  4.2,
+  8.4,
+  4.2,
+  4.1,
+  8.3,
+  8.4,
+  4.2,
+  8.3,
+  4.1,
+  4.2,
+  8.4,
+  4.1,
+  4.2,
+  4.2,
+  4,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  16.6,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  8.4,
+  20.9,
+  46.2,
+  4.2,
+  4.2,
+  4.4,
+  4.1,
+  8.3,
+  8.3,
+  8.4,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  8.4,
+  20.8,
+  62.5,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  12.4,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  12.5,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  8.4,
+  12.6,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  4.1,
+  8.4,
+  8.4,
+  20.8,
+  8.3,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  8.4,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  4.1,
+  4.3,
+  8.3,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4,
+  4.3,
+  8.3,
+  4.1,
+  4.2,
+  8.4,
+  4.1,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  12.6,
+  4.1,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  8.4,
+  8.2,
+  4.2,
+  4.2,
+  8.4,
+  4.1,
+  8.3,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  8.3,
+  12.5,
+  4.2,
+  8.4,
+  4.1,
+  8.3,
+  4.2,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  8.3,
+  4.1,
+  4.2,
+  8.4,
+  4.2,
+  8.3,
+  8.3,
+  4.3,
+  4,
+  8.4,
+  4.2,
+  8.3,
+  8.3,
+  4.3,
+  16.5,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.3,
+  4,
+  4.2,
+  4.1,
+  4.2,
+  4.3,
+  4.1,
+  8.3,
+  4.2,
+  12.5,
+  16.7,
+  8.3,
+  4.2,
+  8.3,
+  4.1,
+  4.2,
+  8.3,
+  20.9,
+  8.4,
+  8.2,
+  4.2,
+  4.1,
+  4.3,
+  4.2,
+  4.1,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.3,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  8.3,
+  12.4,
+  16.8,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  8.4,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  33.4,
+  33.3,
+  8.4,
+  4,
+  4.3,
+  4.2,
+  12.4,
+  4.2,
+  8.3,
+  4.1,
+  4.2,
+  4.2,
+  8.4,
+  4.1,
+  4.3,
+  4.1,
+  8.3,
+  4.1,
+  20.9,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  8.3,
+  4.3,
+  4,
+  4.3,
+  8.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.3,
+  4,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  16.6,
+  8.4,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.4,
+  4.4,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  12.5,
+  4.1,
+  4.2,
+  8.4,
+  8.3,
+  4.1,
+  8.4,
+  8.3,
+  4.3,
+  4,
+  8.4,
+  4.1,
+  8.4,
+  8.4,
+  4.1,
+  4.3,
+  4.1,
+  8.3,
+  16.6,
+  8.3,
+  4.3,
+  8.3,
+  4.1,
+  4.2,
+  8.4,
+  8.3,
+  8.3,
+  8.3,
+  4.3,
+  8.3,
+  4.1,
+  70.9,
+  8.2,
+  4.3,
+  4.1,
+  8.3,
+  8.4,
+  4.2,
+  4.1,
+  8.3,
+  4.2,
+  4.2,
+  8.4,
+  4.1,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  8.3,
+  17,
+  8.3,
+  45.8,
+  16.6,
+  8.4,
+  8.4,
+  8.3,
+  8.3,
+  8.4,
+  8.4,
+  29.1,
+  12.4,
+  4.2,
+  8.3,
+  8.3,
+  8.4,
+  4.2,
+  33.3,
+  4.2,
+  8.4,
+  12.4,
+  8.3,
+  4.2,
+  8.4,
+  8.3,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  4.1,
+  8.5,
+  4.1,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  4.1,
+  8.4,
+  8.4,
+  8.2,
+  8.4,
+  8.4,
+  8.3,
+  8.3,
+  8.3,
+  8.4,
+  4.2,
+  8.3,
+  8.3,
+  25.1,
+  54,
+  8.4,
+  8.4,
+  8.3,
+  4.1,
+  8.3,
+  8.4,
+  4.1,
+  4.3,
+  4.2,
+  8.2,
+  4.2,
+  4.2,
+  8.3,
+  4.1,
+  4.2,
+  8.4,
+  4.2,
+  8.2,
+  8.4,
+  8.3,
+  8.5,
+  4,
+  8.4,
+  8.3,
+  8.3,
+  8.3,
+  8.4,
+  8.4,
+  8.2,
+  8.4,
+  8.4,
+  8.3,
+  4.2,
+  8.2,
+  4.2,
+  8.4,
+  4.1,
+  4.3,
+  8.2,
+  4.2,
+  4.2,
+  8.3,
+  4.3,
+  8.2,
+  4.2,
+  4.2,
+  4.1,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  8.4,
+  4.2,
+  8.2,
+  8.4,
+  8.3,
+  8.4,
+  8.3,
+  4.1,
+  8.4,
+  8.3,
+  8.4,
+  8.5,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  8.3,
+  4.3,
+  16.6,
+  8.3,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  20.8,
+  4.3,
+  4,
+  4.2,
+  4.3,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  8.4,
+  4.1,
+  8.4,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  12.5,
+  4.1,
+  8.5,
+  8.3,
+  8.2,
+  8.4,
+  8.3,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.3,
+  8.2,
+  4.2,
+  4.1,
+  4.3,
+  16.6,
+  4.2,
+  8.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  8.3,
+  16.8,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.1,
+  8.3,
+  4.3,
+  4.1,
+  4.1,
+  4.3,
+  16.6,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  62.5,
+  8.4,
+  4.2,
+  4,
+  4.3,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.3,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.4,
+  4.2,
+  16.7,
+  4.1,
+  4.1,
+  8.4,
+  4.2,
+  4.2,
+  8.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  8.2,
+  4.3,
+  20.8,
+  50,
+  12.5,
+  8.3,
+  8.4,
+  8.4,
+  16.6,
+  12.5,
+  8.2,
+  8.5,
+  4.1,
+  8.4,
+  29.2,
+  8.3,
+  4.2,
+  8.2,
+  8.4,
+  8.3,
+  12.4,
+  8.5,
+  4.1,
+  12.5,
+  4.2,
+  8.3,
+  8.4,
+  4.1,
+  8.4,
+  12.4,
+  4.3,
+  8.3,
+  37.5,
+  33.3,
+  8.3,
+  4.2,
+  4.1,
+  8.4,
+  8.3,
+  8.3,
+  8.4,
+  4.2,
+  8.2,
+  20.9,
+  8.3,
+  8.4,
+  4.1,
+  8.4,
+  4.1,
+  8.4,
+  4.2,
+  8.2,
+  8.4,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.2,
+  8.3,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4,
+  4.3,
+  4.1,
+  4.2,
+  8.3,
+  20.8,
+  20.9,
+  33.3,
+  8.3,
+  4.3,
+  4,
+  8.4,
+  4.1,
+  8.4,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  4.2,
+  8.4,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  8.2,
+  4.2,
+  8.3,
+  8.4,
+  50,
+  20.8,
+  8.4,
+  4.1,
+  4.2,
+  8.3,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  16.7,
+  24.9,
+  4.3,
+  8.3,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  8.4,
+  8.3,
+  20.9,
+  8.3,
+  4.2,
+  8.3,
+  8.3,
+  8.4,
+  8.5,
+  8.4,
+  4.1,
+  8.3,
+  4.2,
+  8.3,
+  4.2,
+  8.4,
+  4.1,
+  4.2,
+  8.2,
+  4.3,
+  8.3,
+  4.1,
+  12.5,
+  4.2,
+  12.5,
+  4.2,
+  4.2,
+  12.5,
+  4.1,
+  8.3,
+  4.3,
+  4.1,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  8.4,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  8.2,
+  4.2,
+  66.7,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  8.3,
+  16.7,
+  4.2,
+  20.8,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  8.4,
+  62.5,
+  4.2,
+  4.2,
+  8.3,
+  4.1,
+  8.4,
+  4.1,
+  8.4,
+  4.2,
+  8.3,
+  4.2,
+  12.5,
+  8.3,
+  8.4,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4,
+  4.2,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.2,
+  4,
+  8.4,
+  4.1,
+  4.3,
+  4.1,
+  12.5,
+  8.4,
+  4.2,
+  4.2,
+  4,
+  4.2,
+  8.4,
+  4.1,
+  4.1,
+  4.2,
+  8.4,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  8.4,
+  4.1,
+  4.3,
+  4.1,
+  8.4,
+  8.3,
+  8.4,
+  8.3,
+  4,
+  4.3,
+  8.4,
+  8.3,
+  16.6,
+  8.3,
+  12.6,
+  4.1,
+  4.2,
+  8.3,
+  8.3,
+  20.9,
+  12.4,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  8.3,
+  16.7,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  20.8,
+  4.2,
+  29.1,
+  50.1,
+  8.3,
+  4.2,
+  8.4,
+  8.3,
+  4.1,
+  8.4,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  8.3,
+  16.7,
+  8.2,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  8.3,
+  4.2,
+  8.3,
+  4.2,
+  8.3,
+  4.2,
+  8.3,
+  4.1,
+  8.5,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.3,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.2,
+  4,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  8.3,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  24.9,
+  4.2,
+  8.4,
+  4.1,
+  4.3,
+  8.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.3,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  20.8,
+  4.2,
+  4.1,
+  4.3,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  87.5,
+  37.5,
+  29.2,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  16.6,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  4.4,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4,
+  4.2,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.3,
+  4.3,
+  4.1,
+  4.2,
+  54.1,
+  4.2,
+  4.1,
+  20.9,
+  4.1,
+  4.2,
+  8.4,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  12.6,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  20.8,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  8.4,
+  4.1,
+  4.2,
+  8.4,
+  4.1,
+  8.3,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.3,
+  4.1,
+  8.3,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  8.3,
+  4.2,
+  8.3,
+  4.2,
+  8.4,
+  8.2,
+  4.2,
+  8.4,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  8.4,
+  8.2,
+  4.2,
+  4.3,
+  8.3,
+  4.1,
+  4.2,
+  8.4,
+  4,
+  4.3,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  8.4,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4,
+  4.3,
+  4.1,
+  16.7,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.3,
+  8.3,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  8.3,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  8.2,
+  4.3,
+  8.3,
+  4.1,
+  8.3,
+  25,
+  45.8,
+  4.2,
+  4.3,
+  4.1,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.1,
+  8.4,
+  4.1,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  4.1,
+  4.1,
+  8.4,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  8.3,
+  12.5,
+  8.4,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.2,
+  4.2,
+  8.2,
+  4.2,
+  8.4,
+  4.1,
+  4.2,
+  8.4,
+  8.3,
+  4.1,
+  8.4,
+  8.3,
+  8.3,
+  4.1,
+  4.3,
+  8.3,
+  4.2,
+  8.3,
+  8.4,
+  8.3,
+  8.3,
+  16.7,
+  29.1,
+  8.3,
+  4.2,
+  8.4,
+  4.2,
+  8.3,
+  4.1,
+  8.4,
+  4.1,
+  8.3,
+  4.2,
+  4.2,
+  8.3,
+  8.4,
+  4.1,
+  8.4,
+  4.1,
+  4.1,
+  4.2,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  8.4,
+  4.1,
+  4.2,
+  8.3,
+  4.2,
+  8.3,
+  20.9,
+  4.2,
+  8.3,
+  4.2,
+  8.2,
+  4.2,
+  4.2,
+  8.4,
+  4.1,
+  8.3,
+  8.4,
+  8.2,
+  4.3,
+  8.3,
+  4.2,
+  8.3,
+  8.3,
+  8.3,
+  4.3,
+  4.1,
+  8.4,
+  4,
+  8.4,
+  8.4,
+  8.3,
+  4.2,
+  8.3,
+  8.3,
+  8.3,
+  8.4,
+  4.2,
+  4.1,
+  8.3,
+  4.2,
+  4.2,
+  4.1,
+  8.4,
+  4.2,
+  8.3,
+  4.2,
+  20.8,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.2,
+  4.2,
+  4.2,
+  8.4,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  16.7,
+  8.3,
+  8.4,
+  4.2,
+  4,
+  8.4,
+  41.7,
+  20.8,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  16.7,
+  12.5,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.3,
+  4,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.3,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4,
+  16.9,
+  4.1,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.1,
+  4.2,
+  4.2,
+  4.2,
+  4.2,
+  4.1,
+  4.2,
+  4.2,
+  8.3,
+  4.1,
+  4.3,
+  4.1,
+  4.1,
+  8.4
+ ],
+ "errs": []
+}

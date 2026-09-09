@@ -1,0 +1,467 @@
+{
+  "pose": "P-MAN Manhattan",
+  "poseArgs": [
+    40.7075,
+    -74.0113,
+    792,
+    2.6,
+    -0.12
+  ],
+  "tier": "high",
+  "dusk": false,
+  "sunMs": 1784347200000,
+  "rows": [
+    {
+      "leg": "swept",
+      "px": 619200,
+      "litFrac": 0.7283107235142119,
+      "warmShare": 0,
+      "coolShare": 0.01916757212231412,
+      "mean": 52.863938331201986,
+      "p5": 24,
+      "p50": 53,
+      "p95": 68,
+      "whiteBlobPx": 1823,
+      "draws": 77,
+      "tris": 58111,
+      "tier": "high",
+      "roadMix": {
+        "night": 1,
+        "day": 0
+      },
+      "roads": 0,
+      "buildings": 0,
+      "nightGate": {
+        "tier": "high",
+        "minTier": "medium",
+        "shippedMinTier": "high",
+        "on": true
+      },
+      "uniforms": {
+        "roads": {
+          "glow": 2.4,
+          "street5": 0.24,
+          "street6": 0.34,
+          "streamBoost": 2.4,
+          "lamp": {
+            "gain": 1.6,
+            "sharp": 260
+          },
+          "traffic": {
+            "boost": 0,
+            "lanes": 0,
+            "dash": {
+              "lenM": 300,
+              "duty": 0.22,
+              "speed": 0.16
+            },
+            "head": [
+              1,
+              0.9137254901960784,
+              0.7529411764705882
+            ],
+            "tail": [
+              1,
+              0.27058823529411763,
+              0.18823529411764706
+            ]
+          }
+        },
+        "windows": {
+          "cells": [
+            8,
+            8
+          ],
+          "phase": 0,
+          "gain": [
+            1,
+            1
+          ],
+          "dark": [
+            0,
+            0
+          ],
+          "tint": 0
+        }
+      },
+      "sunEl": 0,
+      "file": "r23-b-man-swept.png"
+    },
+    {
+      "leg": "swept-noise",
+      "px": 619200,
+      "litFrac": 0.7259657622739019,
+      "warmShare": 0,
+      "coolShare": 0.019478641567189744,
+      "mean": 52.889728268857226,
+      "p5": 24,
+      "p50": 53,
+      "p95": 68,
+      "whiteBlobPx": 1823,
+      "draws": 133,
+      "tris": 56799,
+      "tier": "high",
+      "roadMix": {
+        "night": 1,
+        "day": 0
+      },
+      "roads": 0,
+      "buildings": 0,
+      "nightGate": {
+        "tier": "high",
+        "minTier": "medium",
+        "shippedMinTier": "high",
+        "on": true
+      },
+      "uniforms": {
+        "roads": {
+          "glow": 2.4,
+          "street5": 0.24,
+          "street6": 0.34,
+          "streamBoost": 2.4,
+          "lamp": {
+            "gain": 1.6,
+            "sharp": 260
+          },
+          "traffic": {
+            "boost": 0,
+            "lanes": 0,
+            "dash": {
+              "lenM": 300,
+              "duty": 0.22,
+              "speed": 0.16
+            },
+            "head": [
+              1,
+              0.9137254901960784,
+              0.7529411764705882
+            ],
+            "tail": [
+              1,
+              0.27058823529411763,
+              0.18823529411764706
+            ]
+          }
+        },
+        "windows": {
+          "cells": [
+            8,
+            8
+          ],
+          "phase": 0,
+          "gain": [
+            1,
+            1
+          ],
+          "dark": [
+            0,
+            0
+          ],
+          "tint": 0
+        }
+      },
+      "sunEl": 0,
+      "file": "r23-b-man-swept-noise.png"
+    },
+    {
+      "leg": "roads",
+      "px": 619200,
+      "litFrac": 0.7271753875968993,
+      "warmShare": 0,
+      "coolShare": 0.01977715444391883,
+      "mean": 53.0541888757692,
+      "p5": 24,
+      "p50": 53,
+      "p95": 68,
+      "whiteBlobPx": 1825,
+      "draws": 133,
+      "tris": 56799,
+      "tier": "high",
+      "roadMix": {
+        "night": 1,
+        "day": 0
+      },
+      "roads": 0,
+      "buildings": 0,
+      "nightGate": {
+        "tier": "high",
+        "minTier": "medium",
+        "shippedMinTier": "high",
+        "on": true
+      },
+      "uniforms": {
+        "roads": {
+          "glow": 3.5,
+          "street5": 0.3,
+          "street6": 0.42,
+          "streamBoost": 2.9,
+          "lamp": {
+            "gain": 1.9,
+            "sharp": 210
+          },
+          "traffic": {
+            "boost": 1.35,
+            "lanes": 1,
+            "dash": {
+              "lenM": 300,
+              "duty": 0.22,
+              "speed": 0.16
+            },
+            "head": [
+              1,
+              0.9137254901960784,
+              0.7529411764705882
+            ],
+            "tail": [
+              1,
+              0.27058823529411763,
+              0.18823529411764706
+            ]
+          }
+        },
+        "windows": {
+          "cells": [
+            8,
+            8
+          ],
+          "phase": 0,
+          "gain": [
+            1,
+            1
+          ],
+          "dark": [
+            0,
+            0
+          ],
+          "tint": 0
+        }
+      },
+      "sunEl": 0,
+      "file": "r23-b-man-roads.png"
+    },
+    {
+      "leg": "windows",
+      "px": 619200,
+      "litFrac": 0.7343604651162791,
+      "warmShare": 0,
+      "coolShare": 0.01983655732369215,
+      "mean": 53.23281038190187,
+      "p5": 24,
+      "p50": 54,
+      "p95": 68,
+      "whiteBlobPx": 1822,
+      "draws": 133,
+      "tris": 56799,
+      "tier": "high",
+      "roadMix": {
+        "night": 1,
+        "day": 0
+      },
+      "roads": 0,
+      "buildings": 0,
+      "nightGate": {
+        "tier": "high",
+        "minTier": "medium",
+        "shippedMinTier": "high",
+        "on": true
+      },
+      "uniforms": {
+        "roads": {
+          "glow": 2.4,
+          "street5": 0.24,
+          "street6": 0.34,
+          "streamBoost": 2.4,
+          "lamp": {
+            "gain": 1.6,
+            "sharp": 260
+          },
+          "traffic": {
+            "boost": 0,
+            "lanes": 0,
+            "dash": {
+              "lenM": 300,
+              "duty": 0.22,
+              "speed": 0.16
+            },
+            "head": [
+              1,
+              0.9137254901960784,
+              0.7529411764705882
+            ],
+            "tail": [
+              1,
+              0.27058823529411763,
+              0.18823529411764706
+            ]
+          }
+        },
+        "windows": {
+          "cells": [
+            8,
+            8
+          ],
+          "phase": 1,
+          "gain": [
+            0.45,
+            1.55
+          ],
+          "dark": [
+            0.22,
+            0.08
+          ],
+          "tint": 0.18
+        }
+      },
+      "sunEl": 0,
+      "file": "r23-b-man-windows.png"
+    },
+    {
+      "leg": "r23",
+      "px": 619200,
+      "litFrac": 0.7484173126614987,
+      "warmShare": 0,
+      "coolShare": 0.019479090242112987,
+      "mean": 53.53276011381087,
+      "p5": 24,
+      "p50": 54,
+      "p95": 68,
+      "whiteBlobPx": 1821,
+      "draws": 133,
+      "tris": 56799,
+      "tier": "high",
+      "roadMix": {
+        "night": 1,
+        "day": 0
+      },
+      "roads": 0,
+      "buildings": 0,
+      "nightGate": {
+        "tier": "high",
+        "minTier": "medium",
+        "shippedMinTier": "high",
+        "on": true
+      },
+      "uniforms": {
+        "roads": {
+          "glow": 3.5,
+          "street5": 0.3,
+          "street6": 0.42,
+          "streamBoost": 2.9,
+          "lamp": {
+            "gain": 1.9,
+            "sharp": 210
+          },
+          "traffic": {
+            "boost": 1.35,
+            "lanes": 1,
+            "dash": {
+              "lenM": 300,
+              "duty": 0.22,
+              "speed": 0.16
+            },
+            "head": [
+              1,
+              0.9137254901960784,
+              0.7529411764705882
+            ],
+            "tail": [
+              1,
+              0.27058823529411763,
+              0.18823529411764706
+            ]
+          }
+        },
+        "windows": {
+          "cells": [
+            8,
+            8
+          ],
+          "phase": 1,
+          "gain": [
+            0.45,
+            1.55
+          ],
+          "dark": [
+            0.22,
+            0.08
+          ],
+          "tint": 0.18
+        }
+      },
+      "sunEl": 0,
+      "file": "r23-b-man-r23.png"
+    },
+    {
+      "leg": "r23-notraffic",
+      "px": 619200,
+      "litFrac": 0.7633252583979329,
+      "warmShare": 0,
+      "coolShare": 0.018440667638490133,
+      "mean": 53.870249965878074,
+      "p5": 24,
+      "p50": 54,
+      "p95": 69,
+      "whiteBlobPx": 1818,
+      "draws": 133,
+      "tris": 56799,
+      "tier": "high",
+      "roadMix": {
+        "night": 1,
+        "day": 0
+      },
+      "roads": 0,
+      "buildings": 0,
+      "nightGate": {
+        "tier": "high",
+        "minTier": "medium",
+        "shippedMinTier": "high",
+        "on": true
+      },
+      "uniforms": {
+        "roads": {
+          "glow": 3.5,
+          "street5": 0.3,
+          "street6": 0.42,
+          "streamBoost": 2.9,
+          "lamp": {
+            "gain": 1.9,
+            "sharp": 210
+          },
+          "traffic": {
+            "boost": 0,
+            "dash": {},
+            "head": [
+              1,
+              0.9137254901960784,
+              0.7529411764705882
+            ],
+            "tail": [
+              1,
+              0.27058823529411763,
+              0.18823529411764706
+            ]
+          }
+        },
+        "windows": {
+          "cells": [
+            8,
+            8
+          ],
+          "phase": 1,
+          "gain": [
+            0.45,
+            1.55
+          ],
+          "dark": [
+            0.22,
+            0.08
+          ],
+          "tint": 0.18
+        }
+      },
+      "sunEl": 0,
+      "file": "r23-b-man-r23-notraffic.png"
+    }
+  ],
+  "errs": []
+}

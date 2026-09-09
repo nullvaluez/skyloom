@@ -1,5 +1,7 @@
 # SkyTracker ADSB Application - Comprehensive Analysis & Action Plan
 
+> **Graphics integration:** this tree combines September main's Smooth World renderer with the approved satellite graphics overhaul. See [GRAPHICS_OVERHAUL.md](GRAPHICS_OVERHAUL.md) for scope and verification status. The parallel August Motion Hold [record](FLY_ROUND24_MOTION_HOLD_2026-08-15.md) and [plan](FLY_ROUND24_MOTION_HOLD_PLAN_2026-08-15.md) are archived separately; their certification does not certify this merged tree. Canonical FLY_ROUND24 files below continue to describe September Smooth World.
+
 > **⚠️ THE APP IS NOW FLY-ONLY (Round 9, 2026-07-17):** the flat 2D tracker,
 > AR spotter, and their components/hooks/stores are DELETED —
 > [FLY_ROUND9.md](FLY_ROUND9.md) is the record (tag `round9-pre-delete` =

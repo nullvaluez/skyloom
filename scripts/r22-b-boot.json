@@ -1,0 +1,370 @@
+[
+  {
+    "on": false,
+    "hdriDelayMs": 9000,
+    "cpuRate": 1,
+    "bootMs": 8801,
+    "programsAtReveal": 55,
+    "programsAfter": 68,
+    "newKeys": [
+      "17,18,highp,srgb-linear,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,false,false,0,,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,8388624,srgb,onBeforeCompile() {}",
+      "17,23,GGX_SAMPLES,256,CUBEUV_TEXEL_WIDTH,0.0006510416666666666,CUBEUV_TEXEL_HEIGHT,0.00048828125,CUBEUV_MAX_MIP,9.0,highp,srgb-linear,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,false,false,0,,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,8388624,srgb,onBeforeCompile() {}",
+      "26,27,highp,srgb-linear,301,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,16,8523793,srgb,onBeforeCompile() {}",
+      "physical,STANDARD,,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8389649,8519703,srgb,world-bend-air-anchor-nav",
+      "physical,STANDARD,,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388625,8519703,srgb,world-bend-air-anchor-nav",
+      "physical,STANDARD,,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8389651,8519703,srgb,world-bend-air-anchor-nav",
+      "physical,STANDARD,,PHYSICAL,,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388752,8519699,srgb,player-hull-rim",
+      "lambert,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8389648,8521747,srgb,world-bend-anchor-satskyline-r19",
+      "lambert,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388627,8519699,srgb,world-bend-anchor-r8",
+      "lambert,highp,srgb-linear,306,2048,uv,false,false,false,false,false,false,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8389648,8521747,srgb,world-bend-anchor-satbldg-r19",
+      "phong,highp,srgb-linear,306,2048,false,false,false,false,false,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388688,8388627,srgb,world-bend-water-satglint-r13",
+      "physical,STANDARD,,highp,srgb-linear,306,2048,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388624,8388627,srgb,world-bend-fade-hill-r19",
+      "lambert,highp,srgb-linear,306,2048,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388627,8388627,srgb,(shader)=>{\n                            shader.vertexShader = `attribute float cloudOpacity;\n               varying float vOpacity;\n              ` + shader.vertexShader.replace('#include <fog_vertex>', `#include <fog_vertex>\n                 vOpacity = cloudOpacity;\n                `);\n                            shader.fragmentShader = `varying float vOpacity;\n              ` + shader.fragmentShader.replace(`#include <${opaque_fragment}>`, `#include <${opaque_fragment}>\n                 gl_FragColor = vec4(outgoingLight, diffuseColor.a * vOpacity);\n                `);\n                        }"
+    ],
+    "ground": {
+      "maxRawMps": 98712,
+      "maxVisMps": 98712,
+      "maxRawStepM": 384.98,
+      "maxVisStepM": 384.98
+    },
+    "t90": {
+      "revealAt": 7366.29999999702,
+      "roadsMs": -2708,
+      "bldgMs": -2458
+    },
+    "settleOn": 0,
+    "popin": {
+      "longFrames": 2,
+      "worstMs": 576,
+      "frames": 1781,
+      "layers": {
+        "satBuildings": {
+          "atMs": 2844,
+          "sinceRevealMs": -1,
+          "birthed": false
+        },
+        "satSkyline": {
+          "atMs": 2937,
+          "sinceRevealMs": -1,
+          "birthed": false
+        },
+        "satRoads": {
+          "atMs": 2993,
+          "sinceRevealMs": -1,
+          "birthed": false
+        },
+        "satTint": {
+          "atMs": 3151,
+          "sinceRevealMs": -1,
+          "birthed": false
+        }
+      }
+    },
+    "prewarm": {
+      "warmed": 29,
+      "passes": 9,
+      "ms": 158,
+      "error": null,
+      "queued": 3,
+      "compiledPreReveal": 3,
+      "compiledPostReveal": 0,
+      "pending": 0,
+      "sliceMs": 0
+    },
+    "bootGate": {
+      "ms": 6911,
+      "contentHeldMs": 0,
+      "terms": {
+        "terra": true,
+        "bldg": true,
+        "road": true,
+        "parcel": true,
+        "legacy": true,
+        "bldgFrac": 1,
+        "roadFrac": 0.9375,
+        "ready": true
+      },
+      "timedOut": false
+    },
+    "parcel": 0
+  },
+  {
+    "on": true,
+    "hdriDelayMs": 9000,
+    "cpuRate": 1,
+    "bootMs": 7871,
+    "programsAtReveal": 73,
+    "programsAfter": 92,
+    "newKeys": [
+      "17,18,highp,srgb-linear,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,false,false,0,,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,8388624,srgb,onBeforeCompile() {}",
+      "17,23,GGX_SAMPLES,256,CUBEUV_TEXEL_WIDTH,0.0006510416666666666,CUBEUV_TEXEL_HEIGHT,0.00048828125,CUBEUV_MAX_MIP,9.0,highp,srgb-linear,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,false,false,0,,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,8388624,srgb,onBeforeCompile() {}",
+      "26,27,highp,srgb-linear,301,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,16,8523793,srgb,onBeforeCompile() {}",
+      "physical,STANDARD,,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8389649,8519703,srgb,world-bend-air-anchor-nav",
+      "physical,STANDARD,,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388625,8519703,srgb,world-bend-air-anchor-nav",
+      "physical,STANDARD,,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8389651,8519703,srgb,world-bend-air-anchor-nav",
+      "physical,STANDARD,,PHYSICAL,,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388752,8519699,srgb,player-hull-rim",
+      "lambert,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8389648,8521747,srgb,world-bend-anchor-satskyline-r19",
+      "lambert,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388627,8519699,srgb,world-bend-anchor-r8",
+      "lambert,highp,srgb-linear,306,2048,uv,false,false,false,false,false,false,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8389648,8521747,srgb,world-bend-anchor-satbldg-r19",
+      "phong,highp,srgb-linear,306,2048,false,false,false,false,false,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388688,8388627,srgb,world-bend-water-satglint-r13",
+      "physical,STANDARD,,highp,srgb-linear,306,2048,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388624,8388627,srgb,world-bend-fade-hill-r19",
+      "lambert,highp,srgb-linear,306,2048,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388627,8388627,srgb,(shader)=>{\n                            shader.vertexShader = `attribute float cloudOpacity;\n               varying float vOpacity;\n              ` + shader.vertexShader.replace('#include <fog_vertex>', `#include <fog_vertex>\n                 vOpacity = cloudOpacity;\n                `);\n                            shader.fragmentShader = `varying float vOpacity;\n              ` + shader.fragmentShader.replace(`#include <${opaque_fragment}>`, `#include <${opaque_fragment}>\n                 gl_FragColor = vec4(outgoingLight, diffuseColor.a * vOpacity);\n                `);\n                        }",
+      "physical,STANDARD,,highp,srgb-linear,306,2048,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388624,8519699,srgb,world-bend-fade-hill-r19",
+      "lambert,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8389651,8519699,srgb,world-bend-anchor-r8",
+      "lambert,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8389648,8521747,srgb,world-bend-anchor-satbldg-r19",
+      "lambert,highp,srgb-linear,306,2048,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8389648,8521747,srgb,world-bend-anchor-satbldg-r19",
+      "physical,STANDARD,,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388627,8519703,srgb,world-bend-air-anchor-nav",
+      "lambert,highp,srgb-linear,306,2048,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388627,8388627,srgb,(shader)=>{\n        shader.vertexShader = `attribute float cloudOpacity;\n               varying float vOpacity;\n              ` + shader.vertexShader.replace('#include <fog_vertex>', `#include <fog_vertex>\n                 vOpacity = cloudOpacity;\n                `);\n        shader.fragmentShader = `varying float vOpacity;\n              ` + shader.fragmentShader.replace(`#include <opaque_fragment>`, `#include <opaque_fragment>\n                 gl_FragColor = vec4(outgoingLight, diffuseColor.a * vOpacity);\n                `);\n    }"
+    ],
+    "ground": {
+      "maxRawMps": 87378,
+      "maxVisMps": 327,
+      "maxRawStepM": 384.46,
+      "maxVisStepM": 2.8
+    },
+    "t90": {
+      "revealAt": 6446.600000008941,
+      "roadsMs": -2786,
+      "bldgMs": -3040
+    },
+    "settleOn": 1,
+    "popin": {
+      "longFrames": 2,
+      "worstMs": 155,
+      "frames": 1952,
+      "layers": {
+        "satTint": {
+          "atMs": 1258,
+          "sinceRevealMs": -1,
+          "birthed": true
+        },
+        "satBuildings": {
+          "atMs": 2515,
+          "sinceRevealMs": -1,
+          "birthed": true
+        },
+        "satSkyline": {
+          "atMs": 2547,
+          "sinceRevealMs": -1,
+          "birthed": true
+        },
+        "satRoads": {
+          "atMs": 2561,
+          "sinceRevealMs": -1,
+          "birthed": true
+        }
+      }
+    },
+    "prewarm": {
+      "warmed": 34,
+      "passes": 9,
+      "ms": 286,
+      "error": null,
+      "queued": 17,
+      "compiledPreReveal": 7,
+      "compiledPostReveal": 10,
+      "pending": 0,
+      "sliceMs": 127
+    },
+    "bootGate": {
+      "ms": 6009,
+      "contentHeldMs": 0,
+      "terms": {
+        "terra": true,
+        "bldg": true,
+        "road": true,
+        "parcel": true,
+        "legacy": true,
+        "bldgFrac": 1,
+        "roadFrac": 1,
+        "ready": true
+      },
+      "timedOut": false
+    },
+    "parcel": 0
+  },
+  {
+    "on": false,
+    "hdriDelayMs": 9000,
+    "cpuRate": 1,
+    "bootMs": 7866,
+    "programsAtReveal": 55,
+    "programsAfter": 68,
+    "newKeys": [
+      "17,18,highp,srgb-linear,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,false,false,0,,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,8388624,srgb,onBeforeCompile() {}",
+      "17,23,GGX_SAMPLES,256,CUBEUV_TEXEL_WIDTH,0.0006510416666666666,CUBEUV_TEXEL_HEIGHT,0.00048828125,CUBEUV_MAX_MIP,9.0,highp,srgb-linear,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,false,false,0,,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,8388624,srgb,onBeforeCompile() {}",
+      "26,27,highp,srgb-linear,301,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,16,8523793,srgb,onBeforeCompile() {}",
+      "physical,STANDARD,,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8389649,8519703,srgb,world-bend-air-anchor-nav",
+      "physical,STANDARD,,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388625,8519703,srgb,world-bend-air-anchor-nav",
+      "physical,STANDARD,,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8389651,8519703,srgb,world-bend-air-anchor-nav",
+      "physical,STANDARD,,PHYSICAL,,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388752,8519699,srgb,player-hull-rim",
+      "lambert,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8389648,8521747,srgb,world-bend-anchor-satskyline-r19",
+      "lambert,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388627,8519699,srgb,world-bend-anchor-r8",
+      "lambert,highp,srgb-linear,306,2048,uv,false,false,false,false,false,false,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8389648,8521747,srgb,world-bend-anchor-satbldg-r19",
+      "phong,highp,srgb-linear,306,2048,false,false,false,false,false,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388688,8388627,srgb,world-bend-water-satglint-r13",
+      "physical,STANDARD,,highp,srgb-linear,306,2048,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388624,8388627,srgb,world-bend-fade-hill-r19",
+      "lambert,highp,srgb-linear,306,2048,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388627,8388627,srgb,(shader)=>{\n                            shader.vertexShader = `attribute float cloudOpacity;\n               varying float vOpacity;\n              ` + shader.vertexShader.replace('#include <fog_vertex>', `#include <fog_vertex>\n                 vOpacity = cloudOpacity;\n                `);\n                            shader.fragmentShader = `varying float vOpacity;\n              ` + shader.fragmentShader.replace(`#include <${opaque_fragment}>`, `#include <${opaque_fragment}>\n                 gl_FragColor = vec4(outgoingLight, diffuseColor.a * vOpacity);\n                `);\n                        }"
+    ],
+    "ground": {
+      "maxRawMps": 57382,
+      "maxVisMps": 57382,
+      "maxRawStepM": 384.46,
+      "maxVisStepM": 384.46
+    },
+    "t90": {
+      "revealAt": 6448.399999991059,
+      "roadsMs": -2272,
+      "bldgMs": -2525
+    },
+    "settleOn": 0,
+    "popin": {
+      "longFrames": 2,
+      "worstMs": 158,
+      "frames": 1911,
+      "layers": {
+        "satBuildings": {
+          "atMs": 2503,
+          "sinceRevealMs": -1,
+          "birthed": false
+        },
+        "satRoads": {
+          "atMs": 2532,
+          "sinceRevealMs": -1,
+          "birthed": false
+        },
+        "satSkyline": {
+          "atMs": 2593,
+          "sinceRevealMs": -1,
+          "birthed": false
+        },
+        "satTint": {
+          "atMs": 3108,
+          "sinceRevealMs": -1,
+          "birthed": false
+        }
+      }
+    },
+    "prewarm": {
+      "warmed": 29,
+      "passes": 9,
+      "ms": 174,
+      "error": null,
+      "queued": 3,
+      "compiledPreReveal": 3,
+      "compiledPostReveal": 0,
+      "pending": 0,
+      "sliceMs": 0
+    },
+    "bootGate": {
+      "ms": 6006,
+      "contentHeldMs": 0,
+      "terms": {
+        "terra": true,
+        "bldg": true,
+        "road": true,
+        "parcel": true,
+        "legacy": true,
+        "bldgFrac": 1,
+        "roadFrac": 1,
+        "ready": true
+      },
+      "timedOut": false
+    },
+    "parcel": 0
+  },
+  {
+    "on": true,
+    "hdriDelayMs": 9000,
+    "cpuRate": 1,
+    "bootMs": 7881,
+    "programsAtReveal": 74,
+    "programsAfter": 93,
+    "newKeys": [
+      "17,18,highp,srgb-linear,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,false,false,0,,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,8388624,srgb,onBeforeCompile() {}",
+      "17,23,GGX_SAMPLES,256,CUBEUV_TEXEL_WIDTH,0.0006510416666666666,CUBEUV_TEXEL_HEIGHT,0.00048828125,CUBEUV_MAX_MIP,9.0,highp,srgb-linear,false,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,false,false,0,,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,8388624,srgb,onBeforeCompile() {}",
+      "26,27,highp,srgb-linear,301,,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,16,8523793,srgb,onBeforeCompile() {}",
+      "physical,STANDARD,,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8389649,8519703,srgb,world-bend-air-anchor-nav",
+      "physical,STANDARD,,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388625,8519703,srgb,world-bend-air-anchor-nav",
+      "physical,STANDARD,,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8389651,8519703,srgb,world-bend-air-anchor-nav",
+      "physical,STANDARD,,PHYSICAL,,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388752,8519699,srgb,player-hull-rim",
+      "lambert,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8389648,8521747,srgb,world-bend-anchor-satskyline-r19",
+      "lambert,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388627,8519699,srgb,world-bend-anchor-r8",
+      "lambert,highp,srgb-linear,306,2048,uv,false,false,false,false,false,false,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8389648,8521747,srgb,world-bend-anchor-satbldg-r19",
+      "phong,highp,srgb-linear,306,2048,false,false,false,false,false,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388688,8388627,srgb,world-bend-water-satglint-r13",
+      "physical,STANDARD,,highp,srgb-linear,306,2048,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388624,8388627,srgb,world-bend-fade-hill-r19",
+      "lambert,highp,srgb-linear,306,2048,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388627,8388627,srgb,(shader)=>{\n                            shader.vertexShader = `attribute float cloudOpacity;\n               varying float vOpacity;\n              ` + shader.vertexShader.replace('#include <fog_vertex>', `#include <fog_vertex>\n                 vOpacity = cloudOpacity;\n                `);\n                            shader.fragmentShader = `varying float vOpacity;\n              ` + shader.fragmentShader.replace(`#include <${opaque_fragment}>`, `#include <${opaque_fragment}>\n                 gl_FragColor = vec4(outgoingLight, diffuseColor.a * vOpacity);\n                `);\n                        }",
+      "physical,STANDARD,,highp,srgb-linear,306,2048,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388624,8519699,srgb,world-bend-fade-hill-r19",
+      "lambert,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8389651,8519699,srgb,world-bend-anchor-r8",
+      "lambert,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8389648,8521747,srgb,world-bend-anchor-satbldg-r19",
+      "lambert,highp,srgb-linear,306,2048,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8389648,8521747,srgb,world-bend-anchor-satbldg-r19",
+      "physical,STANDARD,,highp,srgb-linear,306,2048,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388627,8519703,srgb,world-bend-air-anchor-nav",
+      "lambert,highp,srgb-linear,306,2048,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,0,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,2,0,0,0,0,8388627,8388627,srgb,(shader)=>{\n        shader.vertexShader = `attribute float cloudOpacity;\n               varying float vOpacity;\n              ` + shader.vertexShader.replace('#include <fog_vertex>', `#include <fog_vertex>\n                 vOpacity = cloudOpacity;\n                `);\n        shader.fragmentShader = `varying float vOpacity;\n              ` + shader.fragmentShader.replace(`#include <opaque_fragment>`, `#include <opaque_fragment>\n                 gl_FragColor = vec4(outgoingLight, diffuseColor.a * vOpacity);\n                `);\n    }"
+    ],
+    "ground": {
+      "maxRawMps": 103914,
+      "maxVisMps": 472,
+      "maxRawStepM": 384.48,
+      "maxVisStepM": 2.93
+    },
+    "t90": {
+      "revealAt": 6454.29999999702,
+      "roadsMs": null,
+      "bldgMs": -2773
+    },
+    "settleOn": 1,
+    "popin": {
+      "longFrames": 2,
+      "worstMs": 165,
+      "frames": 1911,
+      "layers": {
+        "satTint": {
+          "atMs": 1265,
+          "sinceRevealMs": -1,
+          "birthed": true
+        },
+        "satSkyline": {
+          "atMs": 2523,
+          "sinceRevealMs": -1,
+          "birthed": true
+        },
+        "satRoads": {
+          "atMs": 2534,
+          "sinceRevealMs": -1,
+          "birthed": true
+        },
+        "satBuildings": {
+          "atMs": 2546,
+          "sinceRevealMs": -1,
+          "birthed": true
+        }
+      }
+    },
+    "prewarm": {
+      "warmed": 34,
+      "passes": 9,
+      "ms": 239,
+      "error": null,
+      "queued": 17,
+      "compiledPreReveal": 7,
+      "compiledPostReveal": 10,
+      "pending": 0,
+      "sliceMs": 24
+    },
+    "bootGate": {
+      "ms": 6010,
+      "contentHeldMs": 0,
+      "terms": {
+        "terra": true,
+        "bldg": true,
+        "road": true,
+        "parcel": true,
+        "legacy": true,
+        "bldgFrac": 1,
+        "roadFrac": 0.875,
+        "ready": true
+      },
+      "timedOut": false
+    },
+    "parcel": 0
+  }
+]

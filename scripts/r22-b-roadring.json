@@ -1,0 +1,480 @@
+{
+  "revealAtMs": 4801,
+  "atReveal": {
+    "t": 4801,
+    "stage": "reveal",
+    "rChunks": 16,
+    "rReady": 14,
+    "rEmpty": 0,
+    "bChunks": 16,
+    "bReady": 16,
+    "bEmpty": 0
+  },
+  "fracAtReveal": 0.875,
+  "settledRoadChunks": 16,
+  "settledBldgChunks": 16,
+  "t90FromRevealMs": -1301,
+  "series": [
+    {
+      "t": 107,
+      "stage": "streak",
+      "rChunks": 16,
+      "rReady": 4,
+      "rEmpty": 9,
+      "bChunks": 16,
+      "bReady": 1,
+      "bEmpty": 15
+    },
+    {
+      "t": 601,
+      "stage": "streak",
+      "rChunks": 16,
+      "rReady": 0,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 0,
+      "bEmpty": 0
+    },
+    {
+      "t": 1101,
+      "stage": "hold",
+      "rChunks": 16,
+      "rReady": 0,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 0,
+      "bEmpty": 0
+    },
+    {
+      "t": 1603,
+      "stage": "hold",
+      "rChunks": 16,
+      "rReady": 0,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 0,
+      "bEmpty": 0
+    },
+    {
+      "t": 2106,
+      "stage": "hold",
+      "rChunks": 16,
+      "rReady": 5,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 4,
+      "bEmpty": 0
+    },
+    {
+      "t": 2600,
+      "stage": "hold",
+      "rChunks": 16,
+      "rReady": 13,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 3100,
+      "stage": "hold",
+      "rChunks": 16,
+      "rReady": 13,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 3600,
+      "stage": "hold",
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 4130,
+      "stage": "hold",
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 4600,
+      "stage": "hold",
+      "rChunks": 16,
+      "rReady": 14,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 5100,
+      "stage": "reveal",
+      "rChunks": 16,
+      "rReady": 14,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 5600,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 14,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 6101,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 14,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 6604,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 14,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 7100,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 14,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 7600,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 8101,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 8604,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 14,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 9100,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 14,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 9600,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 14,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 10100,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 14,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 10604,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 14,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 11104,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 14,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 11600,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 12101,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 12604,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 13100,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 13604,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 14100,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 14600,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 15102,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 15600,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 16101,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 15,
+      "bEmpty": 0
+    },
+    {
+      "t": 16600,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 17136,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 17600,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 18101,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 15,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 18601,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 19101,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 19600,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 20101,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 20601,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 21100,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    },
+    {
+      "t": 21601,
+      "stage": null,
+      "rChunks": 16,
+      "rReady": 16,
+      "rEmpty": 0,
+      "bChunks": 16,
+      "bReady": 16,
+      "bEmpty": 0
+    }
+  ],
+  "warpGate": {
+    "kind": "far",
+    "epoch": 2,
+    "gate": true,
+    "holdMs": 4752,
+    "capped": false,
+    "ready": true,
+    "terms": {
+      "terra": true,
+      "bldg": true,
+      "road": true,
+      "parcel": true,
+      "legacy": false,
+      "camTileZ": 15,
+      "targetZ": 17,
+      "bldgFrac": 1,
+      "roadFrac": 0.875,
+      "ready": true
+    },
+    "holdMax": 6500
+  }
+}

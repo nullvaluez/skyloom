@@ -44,6 +44,23 @@ const { chromium } = require('playwright');
 const { bootFly } = require('./_boot');
 const { attachPageErrors } = require('./_pageerrors');
 
+// A missing photographic world cannot certify a visual or loaded-world gate.
+async function requireResidentWorld(page, browser, label) {
+  const state = await page.evaluate(() => {
+    const rt = window.__fly;
+    const hit = rt?.engine?.getGroundInfoAtWorld?.(rt.flight.pos);
+    const material = hit?.object?.material;
+    const materials = Array.isArray(material) ? material : [material];
+    return { imagery: !!hit && materials.length > 0 && materials.every(m => m?.map?.image && !m.userData?.flyError),
+      buildings: (rt?.satBuildings ?? window.__satBuildings)?.stats?.ready ?? 0 };
+  });
+  if (!state.imagery || state.buildings < 1) {
+    await require('./_world-precondition').exitBlocked(JSON.stringify(state),
+      { browser, label: label + ': resident imagery/buildings unavailable; bounds not graded' });
+  }
+}
+
+
 const POWELL = [40.1578, -83.0752, 900, 1.9, -0.3];
 const SETTLE = Number(process.env.STEP_SETTLE_MS || 30000);
 const STEPS = Number(process.env.STEP_COUNT || 6);
@@ -209,6 +226,7 @@ function soft(name, detail) {
   });
   await page.evaluate(([lat, lon, altM]) => window.__fly.warpToGeo(lat, lon, { altM, name: null }), POWELL);
   await page.waitForTimeout(SETTLE);
+  await requireResidentWorld(page, browser, 'verify-step-clean.js');
 
   const pin = await page.evaluate(() => ({
     attempted: window.__r24GovPinAttempt ?? null,
