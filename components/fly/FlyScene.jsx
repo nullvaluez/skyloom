@@ -1,5 +1,6 @@
 'use client';
 import { physicalBendCoefficient } from '@/lib/fly/render-scale';
+import { IMMERSIVE, immersiveOn, immersiveLighting } from '@/lib/fly/immersive';
 
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -1007,7 +1008,7 @@ export function FlyScene({ runtime }) {
   const satShadowsOn =
     mapStyle === 'satellite' &&
     SAT_SHADOWS.enabled &&
-    effectsTier === 'high' &&
+    (effectsTier === 'high' || immersiveOn('lighting')) &&
     satShadowPin;
   // Render-time mirror so the frame loop reads this frame's value with no
   // stale-closure window (the pattern styleRef uses).
@@ -1019,7 +1020,7 @@ export function FlyScene({ runtime }) {
   // any tier but high, this object is byte-for-byte the R18 rig.
   const shadowRig = satShadowsOn
     ? {
-        mapSize: SAT_SHADOWS.mapSize,
+        mapSize: immersiveOn('lighting') ? IMMERSIVE.profiles[effectsTier].shadowSize : SAT_SHADOWS.mapSize,
         radiusM: SAT_SHADOWS.orthoRadiusM,
         farM: SAT_SHADOWS.farM,
         bias: SAT_SHADOWS.bias,
@@ -2456,7 +2457,7 @@ export function FlyScene({ runtime }) {
       // (shader early-out / skipped branch / untouched uniform), so a pinned
       // frame is bit-identical to R18 rather than merely close — which is what
       // lets every frozen satellite pixel gate keep its numbers.
-      const highTier = effectsTier === 'high';
+      const highTier = effectsTier === 'high' || immersiveOn('lighting');
       // R24 D: the fleet PIN is split out of the tier gate because the law runs
       // at medium/low too — the pin must still reach it, the tier gate must
       // not. `aerialGate` below is bit-identical to the R21 expression.
@@ -2506,15 +2507,17 @@ export function FlyScene({ runtime }) {
         const ls = runtime.sun;
         // The SAME basis setHillDir is fed (R16 hour-angle convention), so the
         // Mie forward lobe points where the hillshade thinks the sun is.
-        const lcos = ls ? Math.cos(ls.el) : 0;
+        const lawEl = ls && immersiveOn('lighting') ? Math.asin(Math.min(1, Math.max(-1, ls.sinEl))) : ls?.el;
+        const lcos = ls ? Math.cos(lawEl) : 0;
         const lb = AERIAL_LAW.beta;
         // Tier split: at high the post pass owns the law and the materials read
         // 0; at medium/low the reverse. Never both — that is what makes "one
         // law" true at the pixel rather than only in the source.
-        const lawK = AERIAL_LAW.strength * aerialPin * atmoNightMul;
+        const immersiveHaze = immersiveOn('lighting') ? 0.65 * immersiveLighting(runtime.sun, wx).haze : 1;
+        const lawK = AERIAL_LAW.strength * aerialPin * atmoNightMul * immersiveHaze;
         setAtmoLaw({
           eye: [lm[12], lm[13], lm[14]],
-          sunDir: ls ? [-Math.sin(ls.az) * lcos, Math.sin(ls.el), Math.cos(ls.az) * lcos] : [0, 1, 0],
+          sunDir: ls ? [-Math.sin(ls.az) * lcos, Math.sin(lawEl), Math.cos(ls.az) * lcos] : [0, 1, 0],
           groundY: flight.groundElev,
           beta: [lb.base * lb.tilt[0], lb.base * lb.tilt[1], lb.base * lb.tilt[2]],
           scaleH: AERIAL_LAW.scaleHM,
@@ -2543,6 +2546,7 @@ export function FlyScene({ runtime }) {
         _aerialFeed.strength = lawOn
           ? getAtmoLaw().postStrength
           : AERIAL_PERSPECTIVE.maxMix * aerialGate * atmoNightMul;
+        if (!lawOn && immersiveOn('lighting')) _aerialFeed.strength *= 0.65 * immersiveLighting(runtime.sun, wx).haze;
         _aerialFeed.startM = AERIAL_PERSPECTIVE.startM;
         _aerialFeed.endM = AERIAL_PERSPECTIVE.endM;
         _aerialFeed.heightFalloffM = AERIAL_PERSPECTIVE.heightFalloffM;
@@ -2729,6 +2733,12 @@ export function FlyScene({ runtime }) {
       if (hemiRef.current && hemiBaseRef.current != null) {
         hemiRef.current.intensity = hemiBaseRef.current * ocDim;
       }
+      if (immersiveOn('lighting')) {
+        const light = immersiveLighting(runtime.sun, wx);
+        if (sunRef.current) sunRef.current.intensity = light.sun;
+        if (hemiRef.current) hemiRef.current.intensity = light.fill;
+        runtime.immersiveLighting = light;
+      }
     } else if (ahOn) {
       // Round 12 "Neon Planet" (TOY): the ground fade band BREATHES with
       // altitude — END chases sqrt(eyeAGL/k)·frac (floored at the static band
@@ -2831,6 +2841,14 @@ export function FlyScene({ runtime }) {
     // it follows the style's KEY light (MOODS lightDir) — toy's moon, not
     // the day sun — so shadows agree with the moonlit shading.
     const sun = sunRef.current;
+    if (sun && flyState.mapStyle === 'satellite' && immersiveOn('lighting')) {
+      // Three does not resize an existing shadow target when mapSize changes.
+      // Retire it before this frame's draw so tier telemetry reflects real GPU cost.
+      const shadow=sun.shadow,map=shadow.map;
+      if (map && (map.width!==shadowRig.mapSize || map.height!==shadowRig.mapSize)) {
+        map.dispose();shadow.map=null;shadow.needsUpdate=true;
+      }
+    }
     if (sun && TOY.shadows && flyState.mapStyle === 'toy') {
       const dir = (MOODS[flyState.mapStyle] ?? MOODS.satellite).lightDir;
       let tx = rpx;
@@ -2888,7 +2906,7 @@ export function FlyScene({ runtime }) {
         // frustum stops containing anything and is where depth precision
         // fails, which is a statement about the shadow map, not about light.
         let el;
-        if (ONE_SUN.enabled && Number.isFinite(ss.sinEl)) {
+        if ((ONE_SUN.enabled || immersiveOn('lighting')) && Number.isFinite(ss.sinEl)) {
           const trueEl = Math.asin(Math.min(1, Math.max(-1, ss.sinEl)));
           el = satShadowRef.current ? Math.max(SAT_SHADOWS.minElRad, trueEl) : trueEl;
         } else {
@@ -2936,6 +2954,7 @@ export function FlyScene({ runtime }) {
           _sunAudit.moonY = _moonKeyDir[1];
           _sunAudit.moonZ = _moonKeyDir[2];
         }
+        if (immersiveOn('lighting')) setHillDir(kx, ky, kz);
         let tx = rpx;
         let ty = gy;
         let tz = rpz;
@@ -2972,6 +2991,7 @@ export function FlyScene({ runtime }) {
           parcels: runtime.parcelSettle,
           skylineCoveredTiles: runtime.satSkyline?.material.userData.architecture?.uniforms.uArchitectureTileCount?.value,
           cinematic: satelliteVisualsOn(),
+          immersive: immersiveOn() ? { revision: IMMERSIVE.revision, lighting: runtime.immersiveLighting, clouds: runtime.immersiveClouds, shadowSize: shadowRig.mapSize, shadows: satShadowsOn } : null,
           terrain: runtime.terraStats,
           sun: runtime.sun, weather: runtime.weather?.wx, aglM: flight.pos.y - flight.groundElev });
       }
@@ -3392,7 +3412,7 @@ export function FlyScene({ runtime }) {
         />
       )}
 
-      {(CLOUDS.byStyle[mapStyle]?.enabled ?? true) && (
+      {(CLOUDS.byStyle[mapStyle]?.enabled ?? true) && !(mapStyle === 'satellite' && immersiveOn('clouds')) && (
         <Suspense fallback={null}>
           <CloudField runtime={runtime} flight={flight} origin={origin} />
         </Suspense>

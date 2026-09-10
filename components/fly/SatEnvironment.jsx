@@ -1,6 +1,7 @@
 'use client';
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
 import { resolveSatelliteAtmosphere } from '@/lib/fly/satellite-atmosphere';
+import { IMMERSIVE, immersiveOn } from '@/lib/fly/immersive';
 
 
 import { useEffect, useRef, useState } from 'react';
@@ -411,10 +412,11 @@ export function SatEnvironment({ runtime, bucket }) {
         // cheaper per bake and moves every certified noon pixel; this one costs
         // ~4x the bake area at twilight, which is work FL-10 wants sliced off
         // the frame loop anyway.
-        const W = ENV_UNIFORM.enabled ? ENV_UNIFORM.equirectWidth : SKY_DUSK.blendSize;
+        const immersive = immersiveOn('lighting');
+        const W = immersive ? IMMERSIVE.environmentSize : ENV_UNIFORM.enabled ? ENV_UNIFORM.equirectWidth : SKY_DUSK.blendSize;
         const needsResize =
-          ENV_UNIFORM.enabled && !blending && (texA.image?.width ?? W) !== W;
-        const tex =
+          (ENV_UNIFORM.enabled || immersive) && !blending && (texA.image?.width ?? W) !== W;
+        const lightingTex =
           blending || needsResize
             ? renderBlend(
                 gl,
@@ -427,7 +429,10 @@ export function SatEnvironment({ runtime, bucket }) {
                 blending ? d.s : 0
               )
             : texA;
-        const rt = pm.fromEquirectangular(tex);
+        // Keep immersive endpoint backgrounds on their original HDR; PMREM always
+        // sees the fixed layout. Main's existing non-immersive path is preserved.
+        const tex = immersive && !blending ? texA : lightingTex;
+        const rt = pm.fromEquirectangular(lightingTex);
         // ATOMIC: the new cubemap becomes both the IBL and the visible sky in
         // one go. The old target only dies a frame later (below), so the
         // renderer never sees a null background or two live PMREM outputs in

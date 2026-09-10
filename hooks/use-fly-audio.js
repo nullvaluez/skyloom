@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from 'react';
 import { FlyAudio } from '@/lib/fly/audio-engine';
+import { ImmersiveAudio } from '@/lib/fly/immersive-audio';
+import { immersiveOn } from '@/lib/fly/immersive';
 import { AUDIO } from '@/lib/fly/fly-constants';
 import { resolveAircraft } from '@/lib/fly/player-aircraft';
 import { useFlyStore } from '@/stores/fly-store';
@@ -22,6 +24,7 @@ export function useFlyAudio(runtime) {
 
   useEffect(() => {
     const audio = new FlyAudio();
+    const immersion = new ImmersiveAudio(audio);
     audioRef.current = audio;
     runtime.audio = audio;
     audio.setMuted(!useFlyStore.getState().soundOn);
@@ -40,6 +43,11 @@ export function useFlyAudio(runtime) {
       if (!f) return;
       const cmd = runtime.input?.read();
       audio.update(f.speed, !!cmd?.boost || cmd?.speedPreset === 'boost');
+      const state=useFlyStore.getState();
+      const active=state.mapStyle==='satellite'&&immersiveOn('audio');
+      // Pause gates the shared master too, including synthesized fallback and one-shots.
+      audio.setMuted(!state.soundOn || (active && state.phase==='paused'));
+      immersion.update(runtime,state,active);
     }, 1000 / AUDIO.updateHz);
 
     const unsubs = [
@@ -74,6 +82,8 @@ export function useFlyAudio(runtime) {
       window.removeEventListener('keydown', gesture);
       for (const unsub of unsubs) unsub();
       runtime.audio = null;
+      immersion.dispose();
+      delete runtime.immersiveAudio;
       audio.dispose();
     };
   }, [runtime]);
