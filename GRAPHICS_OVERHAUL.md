@@ -468,3 +468,31 @@ a different compiled tree. Fresh ordinary/legacy/Neon boot checks are **PASS, 3/
 on the final compiled default (`defaults-final/report.json`), with no runtime errors.
 The ordinary default screenshot was inspected and retains distinct neutral/warm
 building finishes. The local branch is ready for the requested main reconciliation.
+
+### GitHub main integration closure
+
+The semantic merge is recorded by c191979; canonical main CLAUDE.md and September
+Round 24 records are retained verbatim. [graphics-main-validation.json](scripts/graphics-main-validation.json)
+is the compact integration receipt, including renderer hashes and measurement scope.
+
+Both 900-second integrated soaks PASS at source d1e492cd: urban 163.6fps, p95 8.4ms,
+p99 16.6ms; mixed 205.3fps, p95 8.4ms, p99 12.5ms. Native1920x1080/high held, with
+zero runtime errors or missing-imagery samples and unchanged draw/triangle budgets.
+Mixed-region transitions produced seven long tasks (p95 517ms); warp frames are
+not claimed to be universally stall-free. Defaults pass in cinematic, legacy and
+Neon; matched Manhattan/Ohio day/night views retain varied materials and lighting.
+
+The geographic sweep then found one delayed nearby building contact repair. The
+initial failing receipt is preserved. GPU tracing showed the same anchor awaiting
+a second DEM check for 19s behind distant repairs. A bounded nearest-building lane
+now shares the existing 8-query, 0.35ms, one-geometry-update budget with the fair sweep.
+A 6000-anchor regression improves the first repair from about100s to0.383s at
+simulated 60fps; a production probe reaches correct contact by its 2s sample.
+
+Final renderer source SHA-256: aec34a2e4d1ff2fd9991173e42031044881dc5c4d530929688ad28b7fa1af795.
+Its production build, graphics/contact regressions, unchanged geography 57/57,
+moving quality ladder 9 steps and resident-raster fixture 4 checks PASS. A targeted
+180-second native flight also PASSes: 131.5fps, p95 12.5ms,
+p99 16.7ms, GPU p95 4.23ms, zero runtime errors and
+missing-imagery samples. The two full soaks precede only this isolated scheduling
+change; they are not represented as runs on the final source hash.

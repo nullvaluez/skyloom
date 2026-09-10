@@ -1,0 +1,277 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-09-10T00:43:49.575Z",
+  "integrationCommit": "c1919798168c123bedfdd0b5ca8178b8aa1e5817",
+  "build": {
+    "status": "PASS",
+    "rendererSourceSha256": "aec34a2e4d1ff2fd9991173e42031044881dc5c4d530929688ad28b7fa1af795",
+    "workerProtocol": 20
+  },
+  "nodeChecks": {
+    "graphics": "PASS",
+    "governor": 14,
+    "terrainLifecycle": 14,
+    "residentRaster": 20,
+    "mainResidency": 40,
+    "atmosphere": 53,
+    "vendorAudit": 34,
+    "contactGeometry": "PASS",
+    "contactScheduling": 8
+  },
+  "soaks": [
+    {
+      "name": "urban",
+      "status": "PASS",
+      "commit": "0ff2a3f3f6721265c285a02bbc87f130b161ff77",
+      "sourceSha256": "d1e492cdefc5a70bba558080e6cd0b11acea77ff9d9470817ae8c65f4f242b1e",
+      "seconds": 900,
+      "hardware": {
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "gpuTimer": true
+      },
+      "timing": {
+        "fps": 163.59299767679764,
+        "p95": 8.400000000023283,
+        "p99": 16.59999999999127,
+        "gpuP95": 3.724128,
+        "gpuSamples": 147410,
+        "disjoint": 0,
+        "cpuLongTasks": 0,
+        "cpuLongTaskP95": null
+      },
+      "budgets": {
+        "drawP95": 234,
+        "triangleP95": 1566140,
+        "native": true,
+        "terrainTextureMBMax": 148.33333333333317
+      },
+      "traffic": {
+        "min": 284,
+        "max": 360
+      },
+      "errors": 0,
+      "missingImagerySamples": 0,
+      "networkFailures": 0,
+      "quality": [
+        {
+          "requested": "high",
+          "actual": "high",
+          "buildings": 16,
+          "roads": 16,
+          "skyline": 10,
+          "night": true
+        },
+        {
+          "requested": "medium",
+          "actual": "medium",
+          "buildings": 10,
+          "roads": 16,
+          "skyline": 6,
+          "night": true
+        },
+        {
+          "requested": "low",
+          "actual": "low",
+          "buildings": 5,
+          "roads": 16,
+          "skyline": 3,
+          "night": true
+        },
+        {
+          "requested": "high",
+          "actual": "high",
+          "buildings": 13,
+          "roads": 16,
+          "skyline": 8,
+          "night": true
+        }
+      ],
+      "heapMiB": {
+        "start": 187.4368190765381,
+        "end": 206.49349975585938,
+        "min": 154.41078186035156,
+        "max": 239.18077945709229
+      },
+      "shaderCounts": [
+        97
+      ]
+    },
+    {
+      "name": "mixed",
+      "status": "PASS",
+      "commit": "c1919798168c123bedfdd0b5ca8178b8aa1e5817",
+      "sourceSha256": "d1e492cdefc5a70bba558080e6cd0b11acea77ff9d9470817ae8c65f4f242b1e",
+      "seconds": 900,
+      "hardware": {
+        "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "gpuTimer": true
+      },
+      "timing": {
+        "fps": 205.2711201707441,
+        "p95": 8.39999999999418,
+        "p99": 12.5,
+        "gpuP95": 3.606304,
+        "gpuSamples": 184967,
+        "disjoint": 0,
+        "cpuLongTasks": 7,
+        "cpuLongTaskP95": 517
+      },
+      "budgets": {
+        "drawP95": 229,
+        "triangleP95": 1677060,
+        "native": true,
+        "terrainTextureMBMax": 190.33333333333437
+      },
+      "traffic": {
+        "min": 14,
+        "max": 345
+      },
+      "errors": 0,
+      "missingImagerySamples": 0,
+      "networkFailures": 0,
+      "quality": [
+        {
+          "requested": "high",
+          "actual": "high",
+          "buildings": 14,
+          "roads": 11,
+          "skyline": 10,
+          "night": true
+        },
+        {
+          "requested": "medium",
+          "actual": "medium",
+          "buildings": 9,
+          "roads": 13,
+          "skyline": 6,
+          "night": true
+        },
+        {
+          "requested": "low",
+          "actual": "medium",
+          "buildings": 8,
+          "roads": 13,
+          "skyline": 6,
+          "night": true
+        },
+        {
+          "requested": "high",
+          "actual": "high",
+          "buildings": 15,
+          "roads": 16,
+          "skyline": 10,
+          "night": true
+        }
+      ],
+      "heapMiB": {
+        "start": 175.52258586883545,
+        "end": 156.4906129837036,
+        "min": 97.76379299163818,
+        "max": 294.99513149261475
+      },
+      "shaderCounts": [
+        97,
+        111,
+        112,
+        113
+      ]
+    }
+  ],
+  "finalRendererChecks": {
+    "geography": {
+      "status": "PASS",
+      "checks": 57,
+      "movingDistanceM": 11301.348180020355,
+      "movingSeconds": 65,
+      "errors": 0
+    },
+    "quality": {
+      "status": "PASS",
+      "steps": 9,
+      "errors": 0
+    },
+    "raster": {
+      "status": "PASS",
+      "checks": 4,
+      "errors": 0
+    },
+    "flight": {
+      "status": "PASS",
+      "seconds": 180,
+      "timing": {
+        "fps": 131.48502761357645,
+        "p95": 12.5,
+        "p99": 16.70000000001164,
+        "gpuP95": 4.225792,
+        "gpuSamples": 23688,
+        "disjoint": 0,
+        "cpuLongTasks": 0,
+        "cpuLongTaskP95": null
+      },
+      "budgets": {
+        "drawP95": 223,
+        "triangleP95": 1681913,
+        "native": true,
+        "terrainTextureMBMax": 138.3333333333329
+      },
+      "errors": 0,
+      "failedImagerySamples": 0
+    }
+  },
+  "baselineVisualChecks": {
+    "rendererSourceSha256": "d1e492cdefc5a70bba558080e6cd0b11acea77ff9d9470817ae8c65f4f242b1e",
+    "defaults": {
+      "status": "PASS",
+      "cases": [
+        {
+          "name": "ordinary",
+          "pass": true
+        },
+        {
+          "name": "legacy",
+          "pass": true
+        },
+        {
+          "name": "neon",
+          "pass": true
+        }
+      ]
+    },
+    "views": [
+      {
+        "site": "manhattan",
+        "time": "noon",
+        "aglFt": 1000,
+        "terrainSharp": true,
+        "buildingsReady": 15
+      },
+      {
+        "site": "manhattan",
+        "time": "night",
+        "aglFt": 1000,
+        "terrainSharp": true,
+        "buildingsReady": 15
+      },
+      {
+        "site": "ohio",
+        "time": "noon",
+        "aglFt": 1000,
+        "terrainSharp": true,
+        "buildingsReady": 16
+      },
+      {
+        "site": "ohio",
+        "time": "night",
+        "aglFt": 1000,
+        "terrainSharp": true,
+        "buildingsReady": 16
+      }
+    ],
+    "manuallyInspected": true
+  },
+  "scope": "The two 900-second soaks and approved appearance/default checks ran on d1e492cd. A subsequent isolated contact-scheduling change kept the existing work caps and rendering contracts. The final aec34a2e renderer passed the production rebuild, unchanged 57-check geography sweep, moving quality ladder, resident-raster fixture and 180-second flight. Historical or earlier failing receipts are not relabeled as final-source passes.",
+  "limitations": [
+    "The mixed soak recorded seven browser long tasks (p95 517ms) around region transitions; frame percentiles do not certify every warp frame as stall-free.",
+    "GPU timing was available on the RTX5080 test machine. Texture totals estimate resident terrain uploads, not all GPU allocations."
+  ]
+}
