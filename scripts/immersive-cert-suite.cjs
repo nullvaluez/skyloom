@@ -8,7 +8,7 @@ const dir=args.output||'.graphics-review/immersive-cert';
 const url=args.url||'http://localhost:3020';
 const flight=['scripts/graphics-flight.cjs',`--url=${url}`,'--stage=immersive','--width=2560','--height=1440','--hour=17','--seconds=900'];
 const jobs={
-  defaults:['scripts/graphics-style-smoke.cjs',`--url=${url}`,'--expect-default=cinematic',`--output=${dir}/defaults`],
+  defaults:['scripts/graphics-style-smoke.cjs',`--url=${url}`,`--output=${dir}/defaults`],
   weather:['scripts/immersive-regression.cjs',`--url=${url}`,'--only=weather',`--output=${dir}/weather`],
   interaction:['scripts/immersive-regression.cjs',`--url=${url}`,'--only=interaction',`--output=${dir}/interaction`],
   quality:['scripts/graphics-quality.cjs',`--url=${url}`,'--stage=immersive','--width=2560','--height=1440',`--output=${dir}/quality`],

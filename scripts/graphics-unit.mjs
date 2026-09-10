@@ -9,7 +9,7 @@ const sourceURLLeaf=file=>`data:text/javascript;base64,${fs.readFileSync(new URL
 const pure = async file => import(sourceURL(file));
 const {inferBuildingStyle,buildingHash,buildingStyleVertex,buildingClassificationHeight,architecturalColor,BUILDING_PROFILES} = await pure('building-profiles.js');
 const {physicalBendCoefficient,metricDirection} = await pure('render-scale.js');
-const {resolveSatelliteVisuals,satelliteVisualProfile,satelliteEffectTier} = await pure('satellite-visuals.js');
+const {satelliteVisualsOn,satelliteVisualProfile,satelliteEffectTier} = await pure('satellite-visuals.js');
 const {resolveSatelliteAtmosphere} = await pure('satellite-atmosphere.js');
 for (const [tags,height,expected] of [['house',8,0],['apartment',18,1],['',20,2],['office',40,3],['glass',120,4],['warehouse',12,5]]) {
   // Family selection must distinguish all six, while variation is revisit-stable.
@@ -44,11 +44,12 @@ for (const tier of ['high','medium','low']) {
   assert.ok(satelliteVisualProfile(tier).buildingChunks>0,'Every tier retains buildings');
   assert.ok(satelliteVisualProfile(tier).skylineChunks>0,'Every tier retains skyline');
 }
-assert.equal(resolveSatelliteVisuals({query:'cinematic'}),true);
-assert.equal(resolveSatelliteVisuals({query:'cinematic',arm:0}),false);
-assert.equal(resolveSatelliteVisuals({query:'legacy',arm:1}),true);
-assert.equal(resolveSatelliteVisuals(),true,'Approved cinematic treatment is the default');
-assert.equal(resolveSatelliteVisuals({query:'legacy'}),false,'Explicit legacy rollback remains available');
+assert.equal(satelliteVisualsOn(),true,'The base renderer is available without a browser');
+globalThis.window={location:{search:'?graphics=legacy'},__flyVisualsArm:0,__flyVisualsFeatures:{architecture:false}};
+assert.equal(satelliteVisualsOn(),true,'Legacy URLs and old preview switches cannot disable the base renderer');
+assert.equal(satelliteVisualsOn('architecture'),true);
+assert.equal(satelliteVisualsOn('unknown'),false);
+delete globalThis.window;
 // Walk the actual sub-native DPR ladder while keeping all high scenery.
 assert.deepEqual([1,.875,.75,.875,1].map(dpr=>satelliteEffectTier('high',dpr)),
   ['high','medium','low','medium','high'],'Effects reduce and recover before scene detail changes');
@@ -62,7 +63,9 @@ for (const lat of [0,40,60]) {
 const day=resolveSatelliteAtmosphere({sinEl:0.7}),night=resolveSatelliteAtmosphere({sinEl:-0.4});
 assert.equal(day.night,0); assert.equal(night.night,1); assert.ok(night.bloomThreshold>0.8);
 assert.equal(resolveSatelliteAtmosphere({el:0.15,sinEl:-0.4}).day,0,'True elevation beats clamped hillshade');
-assert.ok(resolveSatelliteAtmosphere({sinEl:0.7},{overcastT:1}).environment<day.environment);
+const cloudyDay=resolveSatelliteAtmosphere({sinEl:0.7},{overcastT:1});
+assert.ok(cloudyDay.environment>day.environment,'Immersive overcast shifts light into diffuse environment fill');
+assert.ok(cloudyDay.background<day.background,'Overcast still darkens the visible background');
 for(const f of ['sat-building','sat-skyline','sat-road','sat-veg','sat-clutter','toy-world']) {
   assert.match(fs.readFileSync(new URL('../lib/fly/toy-world/'+f+'-engine.js',import.meta.url),'utf8'), /EXPECTED_WORKER_PROTOCOL = 20/);
 }

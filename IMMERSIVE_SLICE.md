@@ -1,9 +1,10 @@
 # Immersive Satellite — playable review slice
 
 The first review milestone of the approved immersion plan is implemented. Open
-`http://localhost:3022/?graphics=immersive` and use Escape for the waterfront,
-Ohio, Sierra, and above-cloud review destinations. The current cinematic treatment
-remains the ordinary default; `?graphics=cinematic` provides the comparison.
+`http://localhost:3022/` and use Escape for the waterfront,
+Ohio, Sierra, and above-cloud review destinations. On 2026-09-10 the user requested
+immersive visuals always load: no query parameter is needed, and old `graphics`
+parameters or preview switches no longer select an earlier renderer.
 
 The continuation's weather corrections and expanded validation are recorded in
 [IMMERSIVE_VALIDATION.md](IMMERSIVE_VALIDATION.md). Results below describe the
@@ -111,7 +112,8 @@ and procedural facade detail remain visible limits on realism.
 
 ## Review checkpoint and remaining work
 
-This is the agreed playable slice, not a default rollout or full-plan completion.
+This implements the agreed playable slice and its subsequently requested default
+rollout; the broader immersion plan still has room for visual refinement.
 Review the look in moving flight before the broader refinement/expansion phase.
 The naturalness of the procedural foliage, cloud density, camera framing, and sound
 mix needs the user's visual/listening judgment. A true volume remains on low quality;
@@ -121,11 +123,11 @@ The expanded weather, interaction, cloud, geography and quality checks are now
 recorded in IMMERSIVE_VALIDATION.md against the integrated main renderer. Both
 15-minute soaks finished at native 1440p within the performance budgets, but each
 retains a BLOCKED verdict for one brief imagery interruption. The earlier flash
-and resize brightness-detector failures are also retained. Before changing
-defaults, incorporate the visual feedback and resolve those certification limits
-on the final accepted treatment. Existing scene and Owens-specific ceilings remain
+and resize brightness-detector failures are also retained. Further refinement
+should incorporate the visual feedback and resolve those certification limits
+on the accepted treatment. Existing scene and Owens-specific ceilings remain
 unchanged. The user authorized publishing this playable slice while validation
-continued; main now contains it, opt-in through `?graphics=immersive`.
+continued, then requested it always load. It is now the standard treatment.
 
 ## Reproduce
 

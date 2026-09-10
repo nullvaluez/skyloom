@@ -7,7 +7,7 @@ const output=args.output||'.graphics-review/style-smoke';
  try{
   fs.mkdirSync(output,{recursive:true});
   browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-gpu']});
-  for(const [name,style,query] of [['ordinary','satellite',''],['legacy','satellite','&graphics=legacy'],['neon','toy','&graphics=cinematic']]){
+  for(const [name,style,query] of [['ordinary','satellite',''],['legacy-url','satellite','&graphics=legacy'],['cinematic-url','satellite','&graphics=cinematic'],['immersive-url','satellite','&graphics=immersive'],['neon','toy','']]){
    const page=await browser.newPage({viewport:{width:1920,height:1080},deviceScaleFactor:1});
    page.on('pageerror',e=>r.errors.push(e.message));
    page.on('console',m=>{if(m.type()==='error'&&/shader|WebGL|ReferenceError|TypeError/.test(m.text()))r.errors.push(m.text().slice(0,1500));});
@@ -21,12 +21,13 @@ const output=args.output||'.graphics-review/style-smoke';
     const rt=window.__fly;let root=rt.engine.object;while(root.parent)root=root.parent;
     const keys=new Set();
     root.traverse(o=>{if(!o.isMesh)return;let p=o;while(p){if(!p.visible)return;p=p.parent;}for(const m of (Array.isArray(o.material)?o.material:[o.material]))if(m)keys.add(m.customProgramCacheKey?.()||m.type);});
-    return {style:window.__flyStore.getState().mapStyle,review:window.__graphicsReview,visibleMaterialKeys:[...keys],shadows:rt.engine.map?.castShadow};
+    return {style:window.__flyStore.getState().mapStyle,review:window.__graphicsReview,visibleMaterialKeys:[...keys],shadows:rt.engine.map?.castShadow,
+      cloudPass:window.__flyComposer?.passes.some(p=>p.name==='ImmersiveClouds')};
    });
    s.name=name;
    const cinematic=s.visibleMaterialKeys.some(k=>k.includes('cinematic-architecture'));
-   s.pass=style==='toy' ? s.style==='toy'&&!s.visibleMaterialKeys.some(k=>k.includes('cinematic-architecture')) :
-     s.review?.terrain?.sharp&&s.review?.buildings?.ready>0&&cinematic===(name==='ordinary'&&args['expect-default']==='cinematic');
+   s.pass=style==='toy' ? s.style==='toy'&&!cinematic&&!s.cloudPass :
+     s.review?.terrain?.sharp&&s.review?.buildings?.ready>0&&cinematic&&s.cloudPass&&s.review?.immersive?.clouds?.active&&s.review?.immersive?.shadows;
    r.cases.push(s);await page.screenshot({path:`${output}/${name}.png`});await page.close();
    fs.writeFileSync(`${output}/report.json`,JSON.stringify(r,null,2));
    console.log(`Style ${name}: ${s.pass?'PASS':'FAIL'}`);

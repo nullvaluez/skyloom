@@ -1,11 +1,29 @@
 # Immersive Satellite — validation record
 
-The playable preview was pushed to GitHub main as `3c52ee3`. Play the integrated
-local build at `http://localhost:3022/?graphics=immersive`, or append
-`?graphics=immersive` to the deployed game URL. Ordinary cinematic remains the
-default; `?graphics=cinematic` selects that appearance explicitly.
+The playable preview was pushed to GitHub main as `3c52ee3`. On 2026-09-10 the
+user requested immersive visuals always load. The renderer now requires no
+`graphics` query parameter; legacy/cinematic URLs and old preview overrides
+cannot disable the immersive treatment or its base Satellite renderer.
 
-The integrated build and completed functional checks pass. Both complete
+The results below retain their original preview-build scope. The default rollout
+changes activation only, with its own build and fresh-boot checks. Older harnesses
+that compare graphics modes or disable preview features must use versioned builds;
+those switches no longer change the treatment on this tree.
+
+## Always-on rollout checks
+
+Production build `617efPac3JC2oRqNRipv5` passes, as do the immersive/graphics unit
+checks and targeted lint. Renderer source SHA-256:
+`72d39599d193e23cf0c6a1b1ac39e3c83f89ef073b743e06a5b5e6ff75ee7eea`.
+
+Fresh production boots pass all five cases: no graphics parameter, legacy URL,
+cinematic URL, explicit immersive URL and Neon. Each Satellite case verifies the
+architecture materials, active volumetric cloud pass and shadows against actual
+rendered scene state. There are zero page/shader errors. The existing Neon map
+style boundary remains intact. Evidence: `.graphics-review/immersive-default/`.
+No lighting, material, cloud or performance-budget values changed in this rollout.
+
+The earlier integrated preview build and its completed functional checks passed. Both complete
 15-minute flights held native 2560×1440 and met the frame-time and scene budgets,
 but each had a brief imagery interruption and retains its **BLOCKED** verdict.
 These results support a playable review, not full visual certification.

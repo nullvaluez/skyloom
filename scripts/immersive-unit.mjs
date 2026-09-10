@@ -2,11 +2,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 const url=`data:text/javascript;base64,${fs.readFileSync(new URL('../lib/fly/immersive.js',import.meta.url)).toString('base64')}`;
 const {IMMERSIVE,immersiveOn,immersiveLighting,cloudPhase,cloudDensity}=await import(url);
-assert.equal(immersiveOn(),false,'SSR never arms preview');
-globalThis.window={location:{search:'?graphics=cinematic'}};
-assert.equal(immersiveOn(),false,'Current default preserved');
-window.location.search='?graphics=immersive';assert.equal(immersiveOn('clouds'),true);
-window.__flyImmersiveFeatures={clouds:false};assert.equal(immersiveOn('clouds'),false);delete window.__flyImmersiveFeatures;
+assert.equal(immersiveOn(),true,'Server and browser use the same standard treatment');
+globalThis.window={location:{search:''},__flyImmersiveArm:false,__flyImmersiveFeatures:{clouds:false}};
+for(const query of ['', '?graphics=legacy', '?graphics=cinematic', '?graphics=immersive']) {
+  window.location.search=query;
+  assert.equal(immersiveOn(),true,'Old URLs and preview switches cannot disable immersive rendering');
+  for(const feature of Object.keys(IMMERSIVE.features))assert.equal(immersiveOn(feature),true);
+}
+assert.equal(immersiveOn('unknown'),false);
+delete window.__flyImmersiveArm;delete window.__flyImmersiveFeatures;
 const noon=immersiveLighting({sinEl:1}),night=immersiveLighting({sinEl:-1}),overcast=immersiveLighting({sinEl:1},{overcastT:1});
 assert.ok(noon.sun>noon.fill*4,'Directional daylight remains distinguishable');
 assert.ok(overcast.sun<noon.sun&&overcast.fill>noon.fill,'Overcast redistributes direct light into fill');
@@ -41,4 +45,4 @@ for(let i=0;i<indices.count;i+=3){
 }
 for(const name of ['position','normal','uv','color'])assert.ok([...geometry.getAttribute(name).array].every(Number.isFinite));
 geometry.dispose();
-console.log('PASS: preview isolation, solar/weather lighting, finite transitions, cloud gaps/bounds/period/rebase, quality continuity');
+console.log('PASS: unconditional immersive mode, solar/weather lighting, finite transitions, cloud gaps/bounds/period/rebase, quality continuity');
