@@ -56,7 +56,9 @@ const pct=(a,p)=>a.length?[...a].sort((x,y)=>x-y)[Math.min(a.length-1,Math.floor
         terrainMeshes,terrainTextures,terrainTextureBytes,failedImagery,failedTiles,
         loads:bench.loads,unloads:bench.unloads,frames:bench.frames.length,
         arrival:performance.now()<bench.arrivalUntil,agl:f.pos.y-f.groundElev,governor:window.__flyGov?.state?.(),
-        speed:f.speed,rebaseEpoch:window.__flyStore.getState().rebaseEpoch,
+        // Main's rebaseCalm no longer wakes the store for origin changes.
+        // The runtime epoch is the counter that actually advances in flight.
+        speed:f.speed,rebaseEpoch:rt.origin.epoch ?? window.__flyStore.getState().rebaseEpoch,
         pins:Object.fromEntries(['__flyGovPin','__flyTerraPin','__flyDepthPin','__flySettlePin','__flyClutterPin','__flyAerialOverride'].map(k=>[k,window[k]??null])),
         recentFrameP95:bench.frames.slice(-600).sort((a,b)=>a-b)[Math.floor(Math.min(600,bench.frames.length)*.95)]};
     };
@@ -114,9 +116,19 @@ const pct=(a,p)=>a.length?[...a].sort((x,y)=>x-y)[Math.min(a.length-1,Math.floor
   report.unpinned=report.samples.every(s=>Object.values(s.pins).every(v=>v===null));
   // Guard a stalled simulation: a frame-time PASS must represent moving flight.
   report.motion={minimumSpeed:Math.min(...report.samples.map(s=>s.speed)),rebases:report.samples.at(-1)?.rebaseEpoch-report.samples[0]?.rebaseEpoch};
+  const measuredSpeeds=report.samples.slice(1).flatMap((s,i)=>{
+    const p=report.samples[i];if(s.arrival||p.arrival)return [];
+    const seconds=(s.at-p.at)/1000;if(seconds<=0)return [];
+    // Absolute Mercator positions survive rebases. Undo the latitude scale;
+    // reported velocity alone could remain nonzero in a stalled simulation.
+    const groundMetres=Math.hypot(s.position.x-p.position.x,s.position.z-p.position.z)/Math.cosh((s.position.z+p.position.z)/(2*6378137));
+    return [groundMetres/seconds];
+  });
+  report.motion.minimumMeasuredGroundSpeed=measuredSpeeds.length?Math.min(...measuredSpeeds):0;
   report.frameTargetMs=stage==='immersive'?16.7:20;
-  report.status=report.errors.length||absent||!report.unpinned?'FAIL':unsuitable||!budgetsMeasured||missingTiles||absentTraffic||report.motion.minimumSpeed<50?'BLOCKED':report.timing.p95<=report.frameTargetMs&&report.timing.p99<=33.3&&budgetsPass?'PASS':'FAIL';
-  report.reason=absent?'A required layer failed to remain ready through quality transitions':unsuitable?'GPU timing unavailable or software renderer':missingTiles?'Terrain imagery missing or insufficient residency':absentTraffic?'No live traffic available during measurement':!budgetsMeasured?'Scene draw/triangle counters unavailable':report.status==='FAIL'?'Errors, draw/triangle budget or frame-time target missed':undefined;
+  const insufficientMotion=!Number.isFinite(report.motion.minimumSpeed)||!Number.isFinite(report.motion.minimumMeasuredGroundSpeed)||report.motion.minimumSpeed<50||report.motion.minimumMeasuredGroundSpeed<50;
+  report.status=report.errors.length||absent||!report.unpinned?'FAIL':unsuitable||!budgetsMeasured||missingTiles||absentTraffic||insufficientMotion?'BLOCKED':report.timing.p95<=report.frameTargetMs&&report.timing.p99<=33.3&&budgetsPass?'PASS':'FAIL';
+  report.reason=absent?'A required layer failed to remain ready through quality transitions':unsuitable?'GPU timing unavailable or software renderer':missingTiles?'Terrain imagery missing or insufficient residency':absentTraffic?'No live traffic available during measurement':!budgetsMeasured?'Scene draw/triangle counters unavailable':insufficientMotion?'Actual ground travel did not meet the existing 50 m/s movement floor':report.status==='FAIL'?'Errors, draw/triangle budget or frame-time target missed':undefined;
  }catch(e){report.status='BLOCKED';report.reason=e.message;}
  finally{await browser?.close();fs.mkdirSync(require('path').dirname(output),{recursive:true});fs.writeFileSync(output,JSON.stringify(report,null,2));console.log(JSON.stringify({status:report.status,reason:report.reason,timing:report.timing,errors:report.errors.slice(0,3)}));process.exitCode=report.status==='BLOCKED'?2:report.status==='FAIL'?1:0;}
 })();

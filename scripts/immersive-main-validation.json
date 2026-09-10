@@ -1,0 +1,660 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-09-10T21:43:04.196Z",
+  "status": "PLAYABLE_REVIEW_WITH_OPEN_FINDINGS",
+  "renderer": {
+    "commit": "3c52ee39eb9fd7cd5ae5586473a006227b9eb38a",
+    "buildId": "Nr6OTYCZ59tpAGs6oJllo",
+    "sourceSha256": "fea3ee9a6385b62757e378c843628308db1def0a3f5bd143afc7ade689ff475e",
+    "hashScope": "scripts/graphics-source.cjs: app, components, lib and stores JS/JSX/MJS/JSON; hooks and harnesses are outside this renderer hash."
+  },
+  "hardware": {
+    "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "gpuTimer": true
+  },
+  "checks": [
+    {
+      "name": "smoke",
+      "status": "PASS",
+      "checks": 12,
+      "errorCount": 0,
+      "evidence": {
+        "path": ".graphics-review/immersive-main/smoke/report.json",
+        "sha256": "00c2e525af914076e62a3c7fa2d56c92264f037e93c725b3820504827625acce"
+      }
+    },
+    {
+      "name": "defaults",
+      "status": "PASS",
+      "checks": 3,
+      "errorCount": 0,
+      "evidence": {
+        "path": ".graphics-review/immersive-main/defaults/report.json",
+        "sha256": "58e5cfacd917e846c53f05cb6913ad8cee1d2e6fa9240f2449bf40fd0154c9ab"
+      }
+    },
+    {
+      "name": "weather",
+      "status": "PASS",
+      "checks": 13,
+      "errorCount": 0,
+      "evidence": {
+        "path": ".graphics-review/immersive-main/weather/report.json",
+        "sha256": "a02bfe9d4dc234b2f19e0f3d1b3607257c16746d78a9dcb4ef5c7c029516a767"
+      }
+    },
+    {
+      "name": "interaction",
+      "status": "PASS",
+      "checks": 11,
+      "errorCount": 0,
+      "evidence": {
+        "path": ".graphics-review/immersive-main/interaction/report.json",
+        "sha256": "722ab60a5bbdf7b69d674660b9dbada031a484f8ac5eb8ca4613ecf1266851f6"
+      }
+    },
+    {
+      "name": "quality",
+      "status": "PASS",
+      "checks": 9,
+      "errorCount": 0,
+      "evidence": {
+        "path": ".graphics-review/immersive-main/quality/report.json",
+        "sha256": "d2342e3f1a54626f950ef8421ed21870c1eb00153479f192bdbbc66449bc828a"
+      }
+    },
+    {
+      "name": "rebase",
+      "status": "PASS",
+      "checks": 4,
+      "errorCount": 0,
+      "evidence": {
+        "path": ".graphics-review/immersive-main/rebase/report.json",
+        "sha256": "5bb809ce3bbe03a58bee03be118780f7ef3d0e2a0b78db80300fad59e21f2f98"
+      }
+    },
+    {
+      "name": "geography",
+      "status": "PASS",
+      "checks": 57,
+      "errorCount": 0,
+      "evidence": {
+        "path": ".graphics-review/immersive-main/geography/report.json",
+        "sha256": "17fd13f4bc4dfd652ac0193b9a828330bdb1fbf8cad0bc7a2c026d1f0c7304d0"
+      }
+    }
+  ],
+  "flights": [
+    {
+      "name": "soak-urban",
+      "status": "BLOCKED",
+      "reason": "Terrain imagery missing or insufficient residency",
+      "seconds": 900,
+      "resolution": [
+        2560,
+        1440
+      ],
+      "timing": {
+        "fps": 135.90234791462677,
+        "p95": 12.5,
+        "p99": 16.70000000006985,
+        "gpuP95": 5.089088,
+        "gpuSamples": 122473,
+        "disjoint": 0,
+        "cpuLongTasks": 1,
+        "cpuLongTaskP95": 51,
+        "steady": {
+          "frames": 122474,
+          "p95": 12.5,
+          "p99": 16.70000000006985,
+          "max": 50.09999999997672
+        },
+        "arrival": {
+          "frames": 0,
+          "p95": null,
+          "p99": null,
+          "max": 0
+        }
+      },
+      "budgets": {
+        "drawP95": 223,
+        "triangleP95": 1349548,
+        "native": true,
+        "terrainTextureMBMax": 144.33333333333306
+      },
+      "motion": {
+        "minimumSpeed": 180,
+        "rebases": 0
+      },
+      "traffic": {
+        "min": 390,
+        "max": 479
+      },
+      "errorCount": 0,
+      "finalGovernor": {
+        "rung": 0,
+        "rungs": 5,
+        "dpr": 1,
+        "tier": "high",
+        "ceilingIdx": 0,
+        "latched": false,
+        "emaFps": 165.31,
+        "refresh": 144,
+        "targetFps": 60,
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "sampled": 126111,
+        "longFrac": 0,
+        "subNativeRungs": 4
+      },
+      "failedImagerySamples": [
+        {
+          "seconds": 40,
+          "count": 1,
+          "tiles": [
+            {
+              "id": 2164,
+              "x": 19304,
+              "y": 24623,
+              "z": 16,
+              "visible": true,
+              "loadedEpoch": 2,
+              "rootEpoch": 2,
+              "loadState": "loaded",
+              "retryAttempts": 0,
+              "retryAt": 72160.79999998212
+            }
+          ],
+          "clearNextSample": true
+        }
+      ],
+      "evidence": {
+        "path": ".graphics-review/immersive-main/soak-urban.json",
+        "sha256": "bcec4187747ca7439108ce0f3fc25889166d5377cd327b9903876899d0ad16a2"
+      }
+    },
+    {
+      "name": "soak-mixed",
+      "status": "BLOCKED",
+      "reason": "Terrain imagery missing or insufficient residency",
+      "seconds": 900,
+      "resolution": [
+        2560,
+        1440
+      ],
+      "timing": {
+        "fps": 181.08659952502856,
+        "p95": 8.400000000023283,
+        "p99": 12.599999999998545,
+        "gpuP95": 4.444928,
+        "gpuSamples": 163124,
+        "disjoint": 0,
+        "cpuLongTasks": 0,
+        "cpuLongTaskP95": null,
+        "steady": {
+          "frames": 133489,
+          "p95": 8.400000000023283,
+          "p99": 12.60000000000582,
+          "max": 45.899999999965075
+        },
+        "arrival": {
+          "frames": 29636,
+          "p95": 8.400000000023283,
+          "p99": 12.5,
+          "max": 45.70000000001164
+        }
+      },
+      "budgets": {
+        "drawP95": 207,
+        "triangleP95": 1355311,
+        "native": true,
+        "terrainTextureMBMax": 151.33333333333326
+      },
+      "motion": {
+        "minimumSpeed": 180,
+        "rebases": 23,
+        "minimumMeasuredGroundSpeed": 179.4787310959701
+      },
+      "traffic": {
+        "min": 26,
+        "max": 617
+      },
+      "errorCount": 0,
+      "finalGovernor": {
+        "rung": 0,
+        "rungs": 5,
+        "dpr": 1,
+        "tier": "high",
+        "ceilingIdx": 0,
+        "latched": false,
+        "emaFps": 104.16,
+        "refresh": 144,
+        "targetFps": 60,
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "sampled": 163540,
+        "longFrac": 0.004,
+        "subNativeRungs": 4
+      },
+      "failedImagerySamples": [
+        {
+          "seconds": 530,
+          "count": 1,
+          "tiles": [
+            {
+              "id": 14510,
+              "x": 16584,
+              "y": 11258,
+              "z": 15,
+              "visible": true,
+              "loadedEpoch": 2,
+              "rootEpoch": 2,
+              "loadState": "loaded",
+              "retryAttempts": 2,
+              "retryAt": 561512.8000000119
+            }
+          ],
+          "clearNextSample": true
+        }
+      ],
+      "evidence": {
+        "path": ".graphics-review/immersive-main/soak-mixed.json",
+        "sha256": "d8fc63bbe1e0d4754cfa691f4f861fd9f95ee44f87a10208456a73fe4e12c664"
+      }
+    },
+    {
+      "name": "flight-overcast",
+      "status": "PASS",
+      "seconds": 120,
+      "resolution": [
+        2560,
+        1440
+      ],
+      "timing": {
+        "fps": 221.6517927743014,
+        "p95": 8.30000000000291,
+        "p99": 8.400000000008731,
+        "gpuP95": 4.124608,
+        "gpuSamples": 26629,
+        "disjoint": 0,
+        "cpuLongTasks": 0,
+        "cpuLongTaskP95": null,
+        "steady": {
+          "frames": 26630,
+          "p95": 8.30000000000291,
+          "p99": 8.400000000008731,
+          "max": 33.30000000000291
+        },
+        "arrival": {
+          "frames": 0,
+          "p95": null,
+          "p99": null,
+          "max": 0
+        }
+      },
+      "budgets": {
+        "drawP95": 186,
+        "triangleP95": 1404007,
+        "native": true,
+        "terrainTextureMBMax": 107.33333333333289
+      },
+      "motion": {
+        "minimumSpeed": 180,
+        "rebases": 3,
+        "minimumMeasuredGroundSpeed": 179.46584241968966
+      },
+      "traffic": {
+        "min": 408,
+        "max": 563
+      },
+      "errorCount": 0,
+      "finalGovernor": {
+        "rung": 0,
+        "rungs": 5,
+        "dpr": 1,
+        "tier": "high",
+        "ceilingIdx": 0,
+        "latched": false,
+        "emaFps": 227.22,
+        "refresh": 144,
+        "targetFps": 60,
+        "dprSteps": 0,
+        "tierSteps": 0,
+        "sampled": 31179,
+        "longFrac": 0,
+        "subNativeRungs": 4
+      },
+      "failedImagerySamples": [],
+      "evidence": {
+        "path": ".graphics-review/immersive-main/flight-overcast.json",
+        "sha256": "972f0174784d16aad6d0f54e69dc186b45d4b27e56b9200cd18cabb1c92cc1d1"
+      }
+    }
+  ],
+  "urbanMotionSupplement": {
+    "commit": "3c52ee39eb9fd7cd5ae5586473a006227b9eb38a",
+    "sourceSha256": "fea3ee9a6385b62757e378c843628308db1def0a3f5bd143afc7ade689ff475e",
+    "workingTree": "modified",
+    "sourceReceipt": "soak-urban.json",
+    "note": "Raw receipt retained. Its store-based rebase counter is obsolete on main; this supplement counts observed anchor changes and reconstructs actual horizontal ground speed from absolute positions.",
+    "originChangesObserved": 21,
+    "minimumMeasuredGroundSpeed": 179.41369850905815,
+    "heapFloorsMiB": [
+      169,
+      167,
+      159,
+      181,
+      166
+    ],
+    "evidence": {
+      "path": ".graphics-review/immersive-main/urban-motion-supplement.json",
+      "sha256": "1caf5764922dae9d8604133f89e363d1273055e8f5280d0f0828e649bc0e4844"
+    }
+  },
+  "pacing": {
+    "status": "FAIL",
+    "firstRun": {
+      "rawStatus": "PASS",
+      "adjudicatedStatus": "INCOMPLETE",
+      "reason": "Original buffer agreement gate reported 0 of 0 frames. Production does not publish the development-only __flyGl handle.",
+      "evidence": {
+        "path": ".graphics-review/immersive-main/pace.log",
+        "sha256": "a0db6ed8887000b0ce62961b82699f34b6266be14be71b43659824ff88ebee87"
+      }
+    },
+    "correctedRun": {
+      "status": "FAIL",
+      "passed": 8,
+      "failed": 1,
+      "viewport": [
+        1280,
+        720
+      ],
+      "commandedSeconds": 90,
+      "frames": 21406,
+      "rollingP95Ms": 6.2,
+      "rollingP99Ms": 12.5,
+      "worstIntervalMs": 38.6,
+      "totalStalls": 1,
+      "longTasks": 0,
+      "programs": 103,
+      "programDelta": 0,
+      "resizeCalls": 16,
+      "resizeCallsOutsideRaf": 4,
+      "bufferMismatchFrames": 0,
+      "note": "FrameStats percentiles use its rolling ring; whole-flight percentiles are in the 900-second flight receipts. Resize calls require attribution against the existing no-op guard.",
+      "evidence": {
+        "path": ".graphics-review/immersive-main/pace-corrected/pace.log",
+        "sha256": "b2cdc0e6df194e8d07ba826aea0901d3369f575de4b3fffbec1ec55354260bfa"
+      }
+    },
+    "attribution": {
+      "rawStatus": "FAIL",
+      "finding": "Method-entry census counts resize requests that the existing guard suppresses. No outside-rAF canvas write was measured.",
+      "commandedSeconds": 60,
+      "observedCanvasWrites": 4,
+      "outsideRafCanvasWrites": 0,
+      "guardedOutsideRafCalls": 4,
+      "bufferComparisonsAtFinalGate": 13844,
+      "bufferMismatches": 0,
+      "trace": {
+        "writes": [
+          {
+            "prop": "width",
+            "value": 1120,
+            "inRaf": true,
+            "at": 60772.40000000596
+          },
+          {
+            "prop": "height",
+            "value": 630,
+            "inRaf": true,
+            "at": 60772.90000000596
+          },
+          {
+            "prop": "width",
+            "value": 1280,
+            "inRaf": true,
+            "at": 73770.59999999404
+          },
+          {
+            "prop": "height",
+            "value": 720,
+            "inRaf": true,
+            "at": 73771.59999999404
+          }
+        ],
+        "calls": [
+          {
+            "method": "setSize",
+            "args": [
+              1280,
+              720,
+              false
+            ],
+            "inRaf": true,
+            "writesBefore": 0,
+            "guardBefore": {},
+            "writesAfter": 2,
+            "guardAfter": {}
+          },
+          {
+            "method": "setPixelRatio",
+            "args": [
+              0.875
+            ],
+            "inRaf": true,
+            "writesBefore": 0,
+            "guardBefore": {},
+            "writesAfter": 2,
+            "guardAfter": {}
+          },
+          {
+            "method": "setSize",
+            "args": [
+              1280,
+              720,
+              true
+            ],
+            "inRaf": true,
+            "writesBefore": 2,
+            "guardBefore": {},
+            "writesAfter": 2,
+            "guardAfter": {
+              "setPixelRatio": 0,
+              "setSize": 1
+            }
+          },
+          {
+            "method": "setPixelRatio",
+            "args": [
+              0.875
+            ],
+            "inRaf": false,
+            "writesBefore": 2,
+            "guardBefore": {
+              "setPixelRatio": 0,
+              "setSize": 1
+            },
+            "writesAfter": 2,
+            "guardAfter": {
+              "setPixelRatio": 1,
+              "setSize": 1
+            }
+          },
+          {
+            "method": "setSize",
+            "args": [
+              1280,
+              720,
+              true
+            ],
+            "inRaf": false,
+            "writesBefore": 2,
+            "guardBefore": {
+              "setPixelRatio": 1,
+              "setSize": 1
+            },
+            "writesAfter": 2,
+            "guardAfter": {
+              "setPixelRatio": 1,
+              "setSize": 2
+            }
+          },
+          {
+            "method": "setSize",
+            "args": [
+              1280,
+              720,
+              false
+            ],
+            "inRaf": true,
+            "writesBefore": 2,
+            "guardBefore": {
+              "setPixelRatio": 1,
+              "setSize": 2
+            },
+            "writesAfter": 4,
+            "guardAfter": {
+              "setPixelRatio": 1,
+              "setSize": 2
+            }
+          },
+          {
+            "method": "setPixelRatio",
+            "args": [
+              1
+            ],
+            "inRaf": true,
+            "writesBefore": 2,
+            "guardBefore": {
+              "setPixelRatio": 1,
+              "setSize": 2
+            },
+            "writesAfter": 4,
+            "guardAfter": {
+              "setPixelRatio": 1,
+              "setSize": 2
+            }
+          },
+          {
+            "method": "setSize",
+            "args": [
+              1280,
+              720,
+              true
+            ],
+            "inRaf": true,
+            "writesBefore": 4,
+            "guardBefore": {
+              "setPixelRatio": 1,
+              "setSize": 2
+            },
+            "writesAfter": 4,
+            "guardAfter": {
+              "setPixelRatio": 1,
+              "setSize": 3
+            }
+          },
+          {
+            "method": "setPixelRatio",
+            "args": [
+              1
+            ],
+            "inRaf": false,
+            "writesBefore": 4,
+            "guardBefore": {
+              "setPixelRatio": 1,
+              "setSize": 3
+            },
+            "writesAfter": 4,
+            "guardAfter": {
+              "setPixelRatio": 2,
+              "setSize": 3
+            }
+          },
+          {
+            "method": "setSize",
+            "args": [
+              1280,
+              720,
+              true
+            ],
+            "inRaf": false,
+            "writesBefore": 4,
+            "guardBefore": {
+              "setPixelRatio": 2,
+              "setSize": 3
+            },
+            "writesAfter": 4,
+            "guardAfter": {
+              "setPixelRatio": 2,
+              "setSize": 4
+            }
+          }
+        ],
+        "steps": [
+          {
+            "at": 60772.09999999404,
+            "direction": -1
+          },
+          {
+            "at": 90772,
+            "direction": 1
+          }
+        ],
+        "frames": 13843,
+        "mismatches": 0
+      },
+      "evidence": {
+        "path": ".graphics-review/immersive-main/pace-attribution/pace.log",
+        "sha256": "2a5d5b21ecb997bdd0ad547ab8862be7db56bce284f6aa4d41dec2bed48151f0"
+      }
+    }
+  },
+  "notes": [
+    "The follow-up changes only harnesses and documentation; the production renderer is unchanged from the published preview.",
+    "Both full soaks keep their original BLOCKED verdict for a transient missing-imagery sample. Their cause is not established by a later successful request.",
+    "Weather started before the strengthened aerial-before-cloud predicate; interaction ran it and passed.",
+    "Earlier isolated-lineage flash and resize brightness-detector failures are retained in IMMERSIVE_VALIDATION.md and do not certify the integrated main renderer."
+  ],
+  "waterReview": {
+    "status": "EXISTING_VISUAL_ISSUE",
+    "finding": "The seam appears in immersive and ordinary cinematic. It disappears with the water material hidden and persists with water depth testing disabled.",
+    "scope": "Water material and engine are byte-unchanged from pre-integration main 7c9cde0; exact mesh/shader cause remains open. Fixed aircraft pose, differing chase framing; not an AGL/HUD or pixel-identity check.",
+    "evidence": [
+      {
+        "path": ".graphics-review/immersive-main/water-diagnostic/report.json",
+        "sha256": "47b9821f420d1f30642fadafec64b063de1150eedd2003094098c9f58523c9e6"
+      },
+      {
+        "path": ".graphics-review/immersive-main/water-diagnostic/ordinary.png",
+        "sha256": "6b0867814845f798bd78d2f0606b80b7f1035b6b30e0c5ca476f0243b2e666a0"
+      },
+      {
+        "path": ".graphics-review/immersive-main/water-diagnostic/without-water.png",
+        "sha256": "c8c16d00fab60428eb1ddcdf81f7722661b9e30c77d8d29013d17feebd12ea0d"
+      },
+      {
+        "path": ".graphics-review/immersive-main/water-diagnostic/water-without-depth-test.png",
+        "sha256": "fb20737c528e28d85e971a548b11d03f9ee07f9181fba1e0b60133f58a79ba95"
+      },
+      {
+        "path": ".graphics-review/immersive-main/water-diagnostic-cinematic/report.json",
+        "sha256": "b289bc1157445d2bd9cd20e1234fbbac44da2fb3d86a86675947ed0ba5cc7d29"
+      },
+      {
+        "path": ".graphics-review/immersive-main/water-diagnostic-cinematic/ordinary.png",
+        "sha256": "8f7dbbf2616439512132cb5be98ae9c3c5106e1d8a3c448f2c750fa0aa4f1f4d"
+      },
+      {
+        "path": ".graphics-review/immersive-main/water-diagnostic-cinematic/without-water.png",
+        "sha256": "90ed8234f318f1b294b0c63d7e8eac5658c89ba2348983616953589b384a1997"
+      },
+      {
+        "path": ".graphics-review/immersive-main/water-diagnostic-cinematic/water-without-depth-test.png",
+        "sha256": "69222ae8830285a6b4ff5a719501c531670dfbe8ce02356dcb074b9b1aa7f3d2"
+      }
+    ]
+  }
+}

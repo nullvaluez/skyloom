@@ -8,6 +8,7 @@ const dir=args.output||'.graphics-review/immersive-cert';
 const url=args.url||'http://localhost:3020';
 const flight=['scripts/graphics-flight.cjs',`--url=${url}`,'--stage=immersive','--width=2560','--height=1440','--hour=17','--seconds=900'];
 const jobs={
+  defaults:['scripts/graphics-style-smoke.cjs',`--url=${url}`,'--expect-default=cinematic',`--output=${dir}/defaults`],
   weather:['scripts/immersive-regression.cjs',`--url=${url}`,'--only=weather',`--output=${dir}/weather`],
   interaction:['scripts/immersive-regression.cjs',`--url=${url}`,'--only=interaction',`--output=${dir}/interaction`],
   quality:['scripts/graphics-quality.cjs',`--url=${url}`,'--stage=immersive','--width=2560','--height=1440',`--output=${dir}/quality`],
@@ -18,10 +19,12 @@ const jobs={
   geography:['scripts/graphics-geography.cjs',`--url=${url}`,'--stage=immersive','--width=2560','--height=1440',`--output=${dir}/geography`],
   flash:['scripts/immersive-flash-regression.cjs'],
   steps:['scripts/immersive-step-regression.cjs'],
+  pace:['-r','./scripts/immersive-legacy-preload.cjs','scripts/verify-frame-pace.js'],
 };
 const environments={
   flash:{FLY_URL:`${url}/?graphics=immersive&graphicsReview=1`,FLY_SHIPPED:'1',POSE:'powell'},
   steps:{FLY_URL:`${url}/?graphics=immersive&graphicsReview=1`,FLY_SHIPPED:'1'},
+  pace:{FLY_URL:`${url}/?graphics=immersive&graphicsReview=1`,FRAME_PACE_STRICT:'1',IMMERSIVE_PACE_STEPS:'1'},
 };
 const selected=(args.checks||'weather,interaction,quality,urban,mixed').split(',');
 if(selected.some(k=>!jobs[k]))throw Error('Unknown check');

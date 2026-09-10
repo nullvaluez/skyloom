@@ -1,7 +1,7 @@
 # Immersive Satellite — playable review slice
 
 The first review milestone of the approved immersion plan is implemented. Open
-`http://localhost:3020/?graphics=immersive` and use Escape for the waterfront,
+`http://localhost:3022/?graphics=immersive` and use Escape for the waterfront,
 Ohio, Sierra, and above-cloud review destinations. The current cinematic treatment
 remains the ordinary default; `?graphics=cinematic` provides the comparison.
 
@@ -117,13 +117,15 @@ The naturalness of the procedural foliage, cloud density, camera framing, and so
 mix needs the user's visual/listening judgment. A true volume remains on low quality;
 performance on lower-end hardware has not been certified.
 
-Before changing defaults: incorporate that feedback; finish the expanded weather,
-altitude and geographic matrix; run the relevant flash/frame/depth/night regression
-harnesses on the final accepted treatment; and complete both 15-minute urban and
-mixed-terrain soaks. Existing 480-draw/2.2M-triangle and Owens-specific ceilings remain
-unchanged. The user subsequently requested publishing this playable slice to main
-while validation continues. It remains opt-in through `?graphics=immersive`; the
-ordinary cinematic default has not changed.
+The expanded weather, interaction, cloud, geography and quality checks are now
+recorded in IMMERSIVE_VALIDATION.md against the integrated main renderer. Both
+15-minute soaks finished at native 1440p within the performance budgets, but each
+retains a BLOCKED verdict for one brief imagery interruption. The earlier flash
+and resize brightness-detector failures are also retained. Before changing
+defaults, incorporate the visual feedback and resolve those certification limits
+on the final accepted treatment. Existing scene and Owens-specific ceilings remain
+unchanged. The user authorized publishing this playable slice while validation
+continued; main now contains it, opt-in through `?graphics=immersive`.
 
 ## Reproduce
 
@@ -132,7 +134,7 @@ PowerShell, from this repository:
 ```powershell
 $env:FLY_BUILD_DIR='.next-immersive'
 node node_modules/next/dist/bin/next build --webpack
-node node_modules/next/dist/bin/next start -p 3020
+node node_modules/next/dist/bin/next start -p 3022
 ```
 
 In another terminal:
@@ -140,8 +142,8 @@ In another terminal:
 ```powershell
 node scripts/immersive-unit.mjs
 node scripts/graphics-unit.mjs
-node scripts/immersive-smoke.cjs
-node scripts/graphics-flight.cjs --url=http://localhost:3020 --stage=immersive --width=2560 --height=1440 --hour=17 --alt=1900 --seconds=120 --output=.graphics-review/immersive-final-flight.json
+node scripts/immersive-smoke.cjs --url=http://localhost:3022
+node scripts/graphics-flight.cjs --url=http://localhost:3022 --stage=immersive --width=2560 --height=1440 --hour=17 --alt=1900 --seconds=120 --output=.graphics-review/immersive-review-flight.json
 ```
 
 Use installed GPU-enabled Chrome with tile-service access. Run GPU captures and

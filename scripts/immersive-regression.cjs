@@ -47,13 +47,17 @@ let browser;
       return { review: window.__graphicsReview, weather: rt.weather.wx, position: { ...rt.flight.pos },
         cloud: pass && { steps: pass.uniforms.steps.value, mix: pass.mix, driftX: pass.driftX, driftZ: pass.driftZ,
           phase: pass.uniforms.phase.value.toArray(), coverage: pass.uniforms.coverage.value, width: pass.target.width, height: pass.target.height },
-        passes: window.__flyComposer.passes.map(p => p.name), phase: window.__flyStore.getState().phase };
+        passes: window.__flyComposer.passes.map(p => p.name),
+        passDetails: window.__flyComposer.passes.map(p => ({name:p.name,effects:(p.effects||[]).map(e=>e.name)})),
+        phase: window.__flyStore.getState().phase };
     });
     const shot = async name => { const data = await snapshot(); const file = `${name}.png`; await page.screenshot({ path: path.join(output, file) }); report.shots.push({ file, ...data }); save(); return data; };
     await page.waitForTimeout(5000);
     const baseline = await shot('baseline');
+    const aerialSlots=baseline.passDetails.flatMap((p,i)=>p.effects.includes('AerialPerspectiveEffect')?[i]:[]);
     check('Full volume, aerial perspective and AO are in the high-quality chain',
-      baseline.cloud?.steps === 96 && baseline.passes.some(p => /N8AO/i.test(p)), baseline.passes);
+      baseline.cloud?.steps === 96 && baseline.passes.some(p => /N8AO/i.test(p)) &&
+      aerialSlots.length===1 && aerialSlots[0]<baseline.passes.indexOf('ImmersiveClouds'), baseline.passDetails);
     if(args.only!=='interaction') {
     // A coverage label is not evidence: assert the actual cloud-pass uniform.
     const conditions = [
