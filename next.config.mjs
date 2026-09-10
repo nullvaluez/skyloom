@@ -1,5 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Isolate review builds from a running local server's generated files.
+  distDir: process.env.FLY_BUILD_DIR || '.next',
+  // Keep the normal Turbopack path free of custom webpack configuration.
+  ...(process.env.FLY_BUILD_DIR ? {
+    webpack(config) {
+      // Node 25's incremental webpack WASM hash path fails on this workstation.
+      config.cache = false;
+      return config;
+    },
+  } : {}),
   reactStrictMode: true,
 
   // Required for the three.js ecosystem (Fly mode). Do NOT enable

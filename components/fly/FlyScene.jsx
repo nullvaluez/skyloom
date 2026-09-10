@@ -1,5 +1,6 @@
 'use client';
 import { physicalBendCoefficient } from '@/lib/fly/render-scale';
+import { IMMERSIVE, immersiveOn, immersiveLighting } from '@/lib/fly/immersive';
 
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -853,7 +854,7 @@ export function FlyScene({ runtime }) {
   const satShadowsOn =
     mapStyle === 'satellite' &&
     SAT_SHADOWS.enabled &&
-    effectsTier === 'high' &&
+    (effectsTier === 'high' || immersiveOn('lighting')) &&
     satShadowPin;
   // Render-time mirror so the frame loop reads this frame's value with no
   // stale-closure window (the pattern styleRef uses).
@@ -865,7 +866,7 @@ export function FlyScene({ runtime }) {
   // any tier but high, this object is byte-for-byte the R18 rig.
   const shadowRig = satShadowsOn
     ? {
-        mapSize: SAT_SHADOWS.mapSize,
+        mapSize: immersiveOn('lighting') ? IMMERSIVE.profiles[effectsTier].shadowSize : SAT_SHADOWS.mapSize,
         radiusM: SAT_SHADOWS.orthoRadiusM,
         farM: SAT_SHADOWS.farM,
         bias: SAT_SHADOWS.bias,
@@ -2090,7 +2091,7 @@ export function FlyScene({ runtime }) {
       // lets every frozen satellite pixel gate keep its numbers.
       // Match the actual post chain during sub-native DPR reductions. The
       // inexpensive content haze takes over before building detail is reduced.
-      const highTier = effectsTier === 'high';
+      const highTier = effectsTier === 'high' || immersiveOn('lighting');
       let aerialGate = highTier ? 1 : 0;
       if (
         process.env.NODE_ENV === 'development' &&
@@ -2107,6 +2108,7 @@ export function FlyScene({ runtime }) {
         camera.updateMatrixWorld();
         const me = camera.matrixWorld.elements;
         _aerialFeed.strength = AERIAL_PERSPECTIVE.maxMix * aerialGate;
+        if (immersiveOn('lighting')) _aerialFeed.strength *= 0.65 * immersiveLighting(runtime.sun,wx).haze;
         _aerialFeed.startM = AERIAL_PERSPECTIVE.startM;
         _aerialFeed.endM = AERIAL_PERSPECTIVE.endM;
         _aerialFeed.heightFalloffM = AERIAL_PERSPECTIVE.heightFalloffM;
@@ -2293,6 +2295,12 @@ export function FlyScene({ runtime }) {
       if (hemiRef.current && hemiBaseRef.current != null) {
         hemiRef.current.intensity = hemiBaseRef.current * ocDim;
       }
+      if (immersiveOn('lighting')) {
+        const light = immersiveLighting(runtime.sun, wx);
+        if (sunRef.current) sunRef.current.intensity = light.sun;
+        if (hemiRef.current) hemiRef.current.intensity = light.fill;
+        runtime.immersiveLighting = light;
+      }
     } else if (ahOn) {
       // Round 12 "Neon Planet" (TOY): the ground fade band BREATHES with
       // altitude — END chases sqrt(eyeAGL/k)·frac (floored at the static band
@@ -2393,6 +2401,14 @@ export function FlyScene({ runtime }) {
     // it follows the style's KEY light (MOODS lightDir) — toy's moon, not
     // the day sun — so shadows agree with the moonlit shading.
     const sun = sunRef.current;
+    if (sun && flyState.mapStyle === 'satellite' && immersiveOn('lighting')) {
+      // Three does not resize an existing shadow target when mapSize changes.
+      // Retire it before this frame's draw so tier telemetry reflects real GPU cost.
+      const shadow=sun.shadow,map=shadow.map;
+      if (map && (map.width!==shadowRig.mapSize || map.height!==shadowRig.mapSize)) {
+        map.dispose();shadow.map=null;shadow.needsUpdate=true;
+      }
+    }
     if (sun && TOY.shadows && flyState.mapStyle === 'toy') {
       const dir = (MOODS[flyState.mapStyle] ?? MOODS.satellite).lightDir;
       sun.position.set(
@@ -2417,8 +2433,11 @@ export function FlyScene({ runtime }) {
       //     appears. The hillshade applies the same floor for the same reason.
       const ss = runtime.sun;
       if (ss) {
-        const el = Math.max(SAT_SHADOWS.minElRad, ss.el);
+        const el = immersiveOn('lighting')
+          ? Math.max(SAT_SHADOWS.minElRad, Math.asin(Math.max(-1,Math.min(1,ss.sinEl))))
+          : Math.max(SAT_SHADOWS.minElRad, ss.el);
         const cosEl = Math.cos(el);
+        if (immersiveOn('lighting')) setHillDir(-Math.sin(ss.az)*cosEl,Math.sin(el),Math.cos(ss.az)*cosEl);
         // The SAME basis setHillDir is fed, so a cast shadow and the hillshade
         // it falls across can never disagree about where the sun is.
         const gy = flight.groundElev;
@@ -2446,6 +2465,7 @@ export function FlyScene({ runtime }) {
           parcels: runtime.parcelSettle,
           skylineCoveredTiles: runtime.satSkyline?.material.userData.architecture?.uniforms.uArchitectureTileCount?.value,
           cinematic: satelliteVisualsOn(),
+          immersive: immersiveOn() ? { revision: IMMERSIVE.revision, lighting: runtime.immersiveLighting, clouds: runtime.immersiveClouds, shadowSize: shadowRig.mapSize, shadows: satShadowsOn } : null,
           terrain: runtime.terraStats,
           sun: runtime.sun, weather: runtime.weather?.wx, aglM: flight.pos.y - flight.groundElev });
       }
@@ -2736,7 +2756,7 @@ export function FlyScene({ runtime }) {
         />
       )}
 
-      {(CLOUDS.byStyle[mapStyle]?.enabled ?? true) && (
+      {(CLOUDS.byStyle[mapStyle]?.enabled ?? true) && !(mapStyle === 'satellite' && immersiveOn('clouds')) && (
         <Suspense fallback={null}>
           <CloudField runtime={runtime} flight={flight} origin={origin} />
         </Suspense>

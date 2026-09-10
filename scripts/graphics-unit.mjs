@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-const pure = async file => import(`data:text/javascript;base64,${fs.readFileSync(new URL('../lib/fly/'+file,import.meta.url)).toString('base64')}`);
+const sourceURL = file => {
+  let text=fs.readFileSync(new URL('../lib/fly/'+file,import.meta.url),'utf8');
+  text=text.replace(/from '\.\/immersive'/g,`from '${sourceURLLeaf('immersive.js')}'`);
+  return `data:text/javascript;base64,${Buffer.from(text).toString('base64')}`;
+};
+const sourceURLLeaf=file=>`data:text/javascript;base64,${fs.readFileSync(new URL('../lib/fly/'+file,import.meta.url)).toString('base64')}`;
+const pure = async file => import(sourceURL(file));
 const {inferBuildingStyle,buildingHash,buildingStyleVertex,buildingClassificationHeight,architecturalColor,BUILDING_PROFILES} = await pure('building-profiles.js');
 const {physicalBendCoefficient,metricDirection} = await pure('render-scale.js');
 const {resolveSatelliteVisuals,satelliteVisualProfile,satelliteEffectTier} = await pure('satellite-visuals.js');
@@ -64,6 +70,7 @@ assert.match(fs.readFileSync(new URL('../lib/fly/toy-world/vector-tile.worker.js
 // Exercise the real near/far handover uniforms through a quality step and a rebase.
 const dataURL = file => `data:text/javascript;base64,${fs.readFileSync(new URL('../lib/fly/'+file,import.meta.url)).toString('base64')}`;
 const materialSource = fs.readFileSync(new URL('../lib/fly/satellite-architecture-material.js',import.meta.url),'utf8')
+  .replace("'./immersive'",JSON.stringify(dataURL('immersive.js')))
   .replace("'three'",JSON.stringify(import.meta.resolve('three')))
   .replace("'./building-profiles'",JSON.stringify(dataURL('building-profiles.js')))
   .replace("'./toy-world/world-bend'",JSON.stringify(dataURL('toy-world/world-bend.js')));

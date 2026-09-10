@@ -1,6 +1,7 @@
 'use client';
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
 import { resolveSatelliteAtmosphere } from '@/lib/fly/satellite-atmosphere';
+import { IMMERSIVE, immersiveOn } from '@/lib/fly/immersive';
 
 
 import { useEffect, useRef, useState } from 'react';
@@ -392,16 +393,26 @@ export function SatEnvironment({ runtime, bucket }) {
         // exact R18 path, which is what keeps a settled day/night sky
         // bit-identical. Only a genuine intermediate step pays for the
         // composite, and only while a crossing is in progress.
-        const tex = blending
+        const stableEnvironment = immersiveOn('lighting');
+        // The day HDR is 2K; the other endpoints and old blend scratch are 1K.
+        // Changing that width makes PMREM dispose/rebuild its convolution
+        // programs AND changes envMapCubeUVHeight in every lit material's key.
+        // A cold day -> night arrival measured ~0.8 s in getProgramInfoLog.
+        // Use the existing linear compositor at a fixed 2K for immersive IBL,
+        // including endpoints. This retains the day's original resolution and
+        // bounds all skies to one shader layout. The visible endpoint background
+        // still uses the original HDR. Ordinary cinematic/Neon paths are unchanged.
+        const lightingTex = blending || stableEnvironment
           ? renderBlend(
               gl,
-              (blenderRef.current ??= makeBlender(SKY_DUSK.blendSize)),
+              (blenderRef.current ??= makeBlender(stableEnvironment ? IMMERSIVE.environmentSize : SKY_DUSK.blendSize)),
               texA,
-              texB,
-              d.s
+              texB ?? texA,
+              blending ? d.s : 0
             )
           : texA;
-        const rt = pm.fromEquirectangular(tex);
+        const tex = blending ? lightingTex : texA;
+        const rt = pm.fromEquirectangular(lightingTex);
         // ATOMIC: the new cubemap becomes both the IBL and the visible sky in
         // one go. The old target only dies a frame later (below), so the
         // renderer never sees a null background or two live PMREM outputs in

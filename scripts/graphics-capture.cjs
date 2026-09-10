@@ -20,7 +20,7 @@ const sites = {
 (async () => {
   fs.mkdirSync(output, { recursive: true });
   const report = { stage, ...require('./graphics-source.cjs')(),
-    recordedAt: new Date().toISOString(), viewport: { width: 1920, height: 1080 },
+    recordedAt: new Date().toISOString(), viewport: { width: Number(args.width||1920), height: Number(args.height||1080) },
     purpose: 'fixed-pose visual evidence; not a frame-time benchmark', errors: [], shots: [] };
   let browser;
   try {
@@ -39,7 +39,7 @@ const sites = {
       if (stage === 'cinematic') window.__flyVisualsArm = 1;
       if (featureOff.length) window.__flyVisualsFeatures = Object.fromEntries(featureOff.map(key=>[key,false]));
     }, { stage, fixedTier: !!args['fixed-tier'], featureOff: (args['feature-off']||'').split(',').filter(Boolean) });
-    await page.goto(`${url}/?graphics=${stage === 'cinematic' ? 'cinematic' : 'legacy'}&graphicsReview=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
+    await page.goto(`${url}/?graphics=${encodeURIComponent(stage)}&graphicsReview=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
     report.hardware = await page.evaluate(() => {
       const gl = document.createElement('canvas').getContext('webgl2');
       const ext = gl?.getExtension('WEBGL_debug_renderer_info');
@@ -69,7 +69,11 @@ const sites = {
             fly.chaseCam?.snap?.();
           }, { site: sites[name], time, aglFt });
           await page.waitForTimeout(Number(args.settle || 20000));
-          await page.waitForFunction(() => (window.__fly?.satBuildings?.stats?.ready ?? 0) > 0 && window.__graphicsReview?.terrain?.sharp, null, {timeout:45000});
+          await page.waitForFunction(() => (window.__fly?.satBuildings?.stats?.ready ?? 0) > 0 && window.__graphicsReview?.terrain?.sharp, null, {timeout:45000}).catch(error => {
+            // Optional diagnostic image, never a relaxed readiness verdict.
+            if (!args['capture-unready']) throw error;
+            (report.readinessFailures ??= []).push({name,time,aglFt,reason:error.message});
+          });
           // Use the resolved DEM for actual AGL, not the approximate bootstrap elevation.
           await page.evaluate(aglFt => { window.__graphicsPose.y = window.__fly.flight.groundElev + aglFt * 0.3048; }, aglFt);
           await page.waitForTimeout(3000);
@@ -87,7 +91,7 @@ const sites = {
     }
     const software = /swiftshader|llvmpipe|software/i.test(report.hardware.renderer || '');
     const empty = report.shots.some(s => !(s.review?.buildings?.ready > 0 || s.stats?.satBuildings?.ready > 0));
-    const unready = report.shots.some(s => !s.review?.terrain?.sharp);
+    const unready = report.shots.some(s => !s.review?.terrain?.sharp) || !!report.readinessFailures?.length;
     report.status = software || empty || unready ? 'BLOCKED' : report.errors.length ? 'FAIL' : 'CAPTURED';
     report.reason = software ? 'Software renderer: no GPU performance certification.' : empty ? 'Required building residency not established.' : unready ? 'Terrain imagery did not reach the active sharpness target.' : undefined;
   } catch (error) {

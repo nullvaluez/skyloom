@@ -1,6 +1,8 @@
 'use client';
 import { satelliteVisualsOn, satelliteEffectTier } from '@/lib/fly/satellite-visuals';
 import { resolveSatelliteAtmosphere } from '@/lib/fly/satellite-atmosphere';
+import { immersiveOn } from '@/lib/fly/immersive';
+import { ImmersiveCloudPass } from '@/lib/fly/immersive-cloud-pass';
 
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -111,8 +113,9 @@ export function buildPassList(style, tier, ctx = {}) {
   const bloom = BLOOM_BY_STYLE[style] ?? BLOOM_BY_STYLE.satellite;
   const toneName = ctx.toneName ?? SKY.toneMapping.byStyle[style] ?? 'ACES';
   const toneMode = TONE_MODES[toneName];
-  const aerialOn = sat && AERIAL_PERSPECTIVE.enabled && tier === 'high';
-  const speedOn = SPEED_FEEL.enabled && tier === 'high' && ctx.speedMount !== false;
+  const aerialOn = sat && AERIAL_PERSPECTIVE.enabled && (tier === 'high' || immersiveOn('lighting'));
+  const cloudOn = sat && immersiveOn('clouds');
+  const speedOn = SPEED_FEEL.enabled && tier === 'high' && ctx.speedMount !== false && !(sat && immersiveOn('camera'));
   const list = [];
 
   // ROUND 22 (D "DEPTH") — N8AO, FIRST in the chain.
@@ -150,6 +153,12 @@ export function buildPassList(style, tier, ctx = {}) {
     });
   }
 
+  if (cloudOn) {
+    // Atmosphere reads terrain depth. Apply it before cloud compositing so it
+    // cannot haze a nearby cloud using the mountain kilometres behind it.
+    if (aerialOn) list.push({id:'aerial',el:()=> <primitive key="aerial" object={ctx.aerial} dispose={null} />,raw:()=>new AerialPerspectiveEffect()});
+    list.push({id:'immersive-clouds',boundary:true,el:()=> ctx.clouds ? <primitive key="immersive-clouds" object={ctx.clouds} dispose={null} /> : null,raw:()=>null});
+  }
   if (bloomScale > 0) {
     list.push({
       id: 'bloom',
@@ -183,7 +192,7 @@ export function buildPassList(style, tier, ctx = {}) {
       raw: () => new SpeedLinesEffect(),
     });
   }
-  if (aerialOn) {
+  if (aerialOn && !cloudOn) {
     list.push({
       id: 'aerial',
       el: () => <primitive key="aerial" object={ctx.aerial} dispose={null} />,
@@ -339,9 +348,13 @@ export const Effects = memo(function Effects({ runtime }) {
   const sceneTier = useFlyStore((s) => s.qualityTier);
   const mapStyle = useFlyStore((s) => s.mapStyle);
   const sat = mapStyle === 'satellite';
+  const flightCamera = useThree((s) => s.camera);
+  const clouds = useMemo(() => sat && immersiveOn('clouds') ? new ImmersiveCloudPass(flightCamera,runtime) : null, [sat,flightCamera,runtime]);
+  useEffect(() => () => clouds?.dispose(), [clouds]);
   const renderDpr = useThree((s) => s.viewport.dpr);
   const qualityTier = sat && satelliteVisualsOn()
     ? satelliteEffectTier(sceneTier, renderDpr) : sceneTier;
+  useEffect(() => { clouds?.setTier(qualityTier); }, [clouds,qualityTier]);
 
   // Tone-map mode: constant per style, with a dev-only live override so the
   // A/B capture (scripts/r13-tonemap-capture.js) can flip AgX/ACES/None
@@ -586,6 +599,7 @@ export const Effects = memo(function Effects({ runtime }) {
         aerial,
         whiteBalance,
         n8ao: aoPass,
+        clouds,
       }).map((p) => p.el()),
     [
       mapStyle,
@@ -597,6 +611,7 @@ export const Effects = memo(function Effects({ runtime }) {
       aerial,
       whiteBalance,
       aoPass,
+      clouds,
     ]
   );
 

@@ -16,14 +16,14 @@ const sites = {
 
 (async () => {
   const report = {...require('./graphics-source.cjs')(),status:'BLOCKED',checks:[],visits:[],errors:[],
-    resolution:[1920,1080],purpose:'Geographic and lifecycle correctness; not a visual or performance certification'};
+    resolution:[Number(args.width||1920),Number(args.height||1080)],stage:args.stage||'cinematic',purpose:'Geographic and lifecycle correctness; not a visual or performance certification'};
   const check = (name,status,detail) => report.checks.push({name,status,detail});
   const save = () => { fs.mkdirSync(output,{recursive:true}); fs.writeFileSync(path.join(output,'report.json'),JSON.stringify(report,null,2)); };
   let browser;
   try {
     report.status='IN_PROGRESS';save();
     browser = await chromium.launch({channel:'chrome',headless:true,args:['--enable-gpu']});
-    const page = await browser.newPage({viewport:{width:1920,height:1080},deviceScaleFactor:1});
+    const page = await browser.newPage({viewport:{width:report.resolution[0],height:report.resolution[1]},deviceScaleFactor:1});
     page.on('pageerror',e => report.errors.push(e.message));
     page.on('console',m => { if(m.type()==='error' && /shader|WebGL|ReferenceError|TypeError/.test(m.text())) report.errors.push(m.text().slice(0,1500)); });
     await page.addInitScript(() => {
@@ -43,7 +43,7 @@ const sites = {
         return fillText.call(this,text,x,y,...rest);
       };
     });
-    await page.goto(`${args.url || 'http://localhost:3010'}/?graphics=cinematic&graphicsReview=1`,{waitUntil:'domcontentloaded',timeout:90000});
+    await page.goto(`${args.url || 'http://localhost:3010'}/?graphics=${encodeURIComponent(report.stage)}&graphicsReview=1`,{waitUntil:'domcontentloaded',timeout:90000});
     await page.waitForFunction(() => window.__flyBoot?.pct===100 && window.__fly?.engine && window.__flyStore,null,{timeout:90000});
     report.hardware = await page.evaluate(() => {
       const gl=document.createElement('canvas').getContext('webgl2'),ext=gl?.getExtension('WEBGL_debug_renderer_info');

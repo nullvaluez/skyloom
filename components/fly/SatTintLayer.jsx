@@ -10,12 +10,14 @@ import {
   MeshBasicMaterial,
   MultiplyBlending,
   Sphere,
+  Vector2,
   Vector3,
 } from 'three';
 import { GLOBE, SAT_TINT, SAT_VEG, SETTLE_CALM, SURFACE_CALM } from '@/lib/fly/fly-constants';
 import { applyBendFade } from '@/lib/fly/toy-world/world-bend';
 import { arrivalEpoch, birthK, makeBirth, notePopin } from '@/lib/fly/settle';
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
+import { immersiveOn } from '@/lib/fly/immersive';
 
 // Worst-case bend drop pad for the CPU bounding sphere (the SatVegLayer
 // recipe): the GPU pushes far geometry DOWN by d²k and the CPU bound cannot
@@ -166,6 +168,24 @@ export function SatTintLayer({ engine, flight }) {
       polygonOffsetUnits: offsetUnits(gl, -2),
     });
     applyBendFade(m); // EXISTING variant, unmodified — no new cache key
+    if (immersiveOn('materials')) {
+      const previous=m.onBeforeCompile,key=m.customProgramCacheKey();
+      const phase={value:new Vector2()};m.userData.groundDetailPhase=phase;
+      m.onBeforeCompile=(shader,renderer)=>{
+        previous(shader,renderer);shader.uniforms.uGroundPhase=phase;
+        shader.vertexShader=shader.vertexShader.replace('#include <common>', '#include <common>\nuniform vec2 uGroundPhase;\nvarying vec2 vGroundDetail;')
+          .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGroundDetail=position.xz/8.+uGroundPhase;');
+        shader.fragmentShader=shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vGroundDetail;')
+          .replace('#include <color_fragment>', `#include <color_fragment>
+vec2 grainPhase=vGroundDetail*6.2831853;
+float grain=.5+.25*sin(grainPhase.x+sin(grainPhase.y))+.25*sin(grainPhase.y*2.+sin(grainPhase.x));
+float resolved=1.-smoothstep(.12,.65,max(fwidth(vGroundDetail.x),fwidth(vGroundDetail.y)));
+// Only existing landcover polygons participate; the birth fade remains an identity.
+float landMask=clamp((1.-dot(diffuseColor.rgb,vec3(.333333)))*8.,0.,1.);
+diffuseColor.rgb*=1.-grain*.065*resolved*landMask;`);
+      };
+      m.customProgramCacheKey=()=>`${key}|immersive-landcover-v1`;
+    }
     return m;
   }, [gl]);
 
@@ -265,6 +285,7 @@ function fillTint(mesh, engine, flight, st) {
   const ox = Math.round(px / 1000) * 1000;
   const oz = Math.round(pz / 1000) * 1000;
   mesh.position.set(ox, 0, oz);
+  mesh.material.userData.groundDetailPhase?.value.set(((ox/8)%128+128)%128,((oz/8)%128+128)%128);
 
   // R22 (B): the birth envelope IS the α. At k 0 every multiplier is exactly
   // 1.0 — the identity of a multiply blend — so a newborn tint is not a faint

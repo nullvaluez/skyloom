@@ -18,6 +18,8 @@ import { crashStakesOn, saveCrashMode, saveQualityTier, saveSoundOn } from '@/li
 // Round 18: CRASH gates whether the stakes row exists at all.
 import { CRASH, HANGAR } from '@/lib/fly/fly-constants';
 import { aircraftName } from '@/lib/fly/player-aircraft';
+import { immersiveOn, readReducedMotion, saveReducedMotion } from '@/lib/fly/immersive';
+import { callRuntimeAction } from '@/lib/fly/runtime-bus';
 
 const TIERS = ['low', 'medium', 'high'];
 const HELP_SEEN_KEY = 'fly-controls-seen';
@@ -71,6 +73,8 @@ export function PauseMenu({ onExit }) {
   // store (see that file for why). This menu is the only surface that shows
   // it, so mirroring it into local state is all the re-render wiring it needs.
   const [stakes, setStakes] = useState(true);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  useEffect(() => setReducedMotion(readReducedMotion()), [phase]);
   useEffect(() => setStakes(crashStakesOn()), [phase]);
 
   // First-entry controls help (map style now resolves in FlyMode, pre-mount)
@@ -162,6 +166,21 @@ export function PauseMenu({ onExit }) {
             <MenuButton onClick={() => store.setPhase('flying')} primary>
               Resume
             </MenuButton>
+            {mapStyle === 'satellite' && immersiveOn() && (
+              <div className="space-y-1 rounded-md border border-zinc-700 p-2">
+                <p className="mb-2 text-xs text-zinc-400">Explore the new atmosphere</p>
+                {[
+                  ['Manhattan waterfront',40.7028,-74.017,150],
+                  ['Ohio countryside',40.20403,-83.0896,550],
+                  ['Sierra mountain flight',36.601,-118.06,3200],
+                  ['Above the clouds',40.7028,-74.017,3400],
+                ].map(([label,lat,lon,altM]) => (
+                  <MenuButton key={label} disabled={!store.runtimeReady} onClick={() => {
+                    store.setPhase('flying');callRuntimeAction('warpToGeo',lat,lon,{altM,name:label});
+                  }}>{label}</MenuButton>
+                ))}
+              </div>
+            )}
             <MenuButton
               onClick={() => {
                 store.setPhase('flying');
@@ -243,6 +262,11 @@ export function PauseMenu({ onExit }) {
             >
               Sound: {soundOn ? 'On' : 'Off'}
             </MenuButton>
+            {mapStyle === 'satellite' && immersiveOn() && (
+              <MenuButton onClick={() => { const next=!reducedMotion; saveReducedMotion(next); setReducedMotion(next); }}>
+                Reduced motion: {reducedMotion ? 'On' : 'Off'}
+              </MenuButton>
+            )}
             {/* Round 18: the stakes switch. Crashes are ON by default (the
                 user's call); "Forgiving" restores the round-17 flight model
                 exactly — the same read gate as CRASH.enabled, so nothing about
@@ -271,10 +295,11 @@ export function PauseMenu({ onExit }) {
   );
 }
 
-function MenuButton({ children, onClick, primary = false, testid }) {
+function MenuButton({ children, onClick, primary = false, testid, disabled = false }) {
   return (
     <button
-      onClick={onClick}
+        onClick={onClick}
+        disabled={disabled}
       data-testid={testid}
       // `phone:min-h-11` is 44px — MOBILE_UI.minTargetPx, the size
       // verify-mobile-layout gates every visible control against. The desktop

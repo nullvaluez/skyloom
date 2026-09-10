@@ -1,4 +1,5 @@
 'use client';
+import { immersiveOn } from '@/lib/fly/immersive';
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -115,7 +116,7 @@ export function SatBuildingLayer({ runtime, flight }) {
     const pinnedOff =
       typeof window !== 'undefined' && window.__flySatShadowOverride === 0;
     engine.setShadows(
-      SAT_SHADOWS.enabled && qualityTier === SAT_SHADOWS.minTier && !pinnedOff
+      SAT_SHADOWS.enabled && (qualityTier === SAT_SHADOWS.minTier || immersiveOn('lighting')) && !pinnedOff
     );
   }, [engine, qualityTier]);
   // Frame-loop timing lives in refs (never mutate the memoized engine in render —

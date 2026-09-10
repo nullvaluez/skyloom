@@ -97,6 +97,7 @@ const DSFS = process.env.STEP_DSF ? [+process.env.STEP_DSF] : [1.5, 1];
 const STEP_N = +(process.env.STEP_N ?? 20);
 const LIVE_MS = +(process.env.STEP_LIVE_MS ?? 180000);
 const PIN_OFF = process.env.STEP_PIN_OFF === '1';
+const SHIPPED = process.env.FLY_SHIPPED === '1';
 
 /* The recorded pose: Powell OH suburbs, satellite, 1689 ft MSL / 766 ft AGL. */
 const POSE = { lat: 40.1748, lon: -83.1079, altM: 515 };
@@ -297,10 +298,16 @@ async function leg(browser, dsf, out) {
   // The sub-native dpr rungs live behind SETTLE_CALM.ladderFix; without this
   // a DSF=1 machine has no dpr rung to step and the leg is vacuous.
   await page.addInitScript(unpinPins, ['__flySettlePin']);
+  if (SHIPPED) {
+    await page.addInitScript(unpinPins, ['__flyTerraPin', '__flyClutterPin', '__flyDepthPin', '__flyAerialOverride', '__flySatShadowOverride']);
+    await page.addInitScript(() => { window.__flySunOverride = Date.UTC(2026, 6, 18, 17); });
+  }
   await page.addInitScript(INSTALL_TRACE);
   if (PIN_OFF) await page.addInitScript(() => { window.__flyStepSafePin = 'off'; });
 
   const { ms } = await bootFly(page, { ...BOOT_OPTS, style: 'satellite' });
+  if (SHIPPED) console.log('  shipped controls', await page.evaluate(() => Object.fromEntries(
+    ['__flyTerraPin', '__flyClutterPin', '__flyDepthPin', '__flyAerialOverride', '__flySatShadowOverride', '__flyGovPin'].map(k => [k, window[k] ?? null]))));
   const patched = await page.evaluate(PATCH_COMPOSER);
   // `window.__fly` is dev-only. Against a PRODUCTION build the gate flies from
   // the boot spawn instead — the pose changes what is on screen, not what the
@@ -314,6 +321,11 @@ async function leg(browser, dsf, out) {
     [POSE.lat, POSE.lon, POSE.altM]
   );
   await page.waitForTimeout(9000);
+  if (SHIPPED) {
+    const pre = await require('./graphics-precondition.cjs')(page);
+    console.log('  shipped precondition', JSON.stringify(pre));
+    if (pre.status === 'BLOCKED') { await ctx.close(); return { blocked: pre.reason }; }
+  }
 
   const env = await page.evaluate(() => ({
     dpr: window.devicePixelRatio,
@@ -458,6 +470,7 @@ async function main() {
   for (const dsf of DSFS) {
     console.log(`\n===== deviceScaleFactor ${dsf} =====`);
     const r = await leg(browser, dsf);
+    if (r.blocked) { await browser.close(); console.log(`VERIFY: BLOCKED — ${r.blocked}`); process.exitCode = 2; return; }
     const F = analyse(r.forced);
     const L = analyse(r.live);
 

@@ -1,4 +1,5 @@
 'use client';
+import { immersiveOn } from '@/lib/fly/immersive';
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -437,7 +438,7 @@ export function SatVegLayer({ runtime, flight }) {
             const shadowPin =
               typeof window !== 'undefined' && window.__flySatShadowOverride === 0;
             const shadowOn =
-              SAT_SHADOWS.enabled && tier === SAT_SHADOWS.minTier && !shadowPin;
+              SAT_SHADOWS.enabled && (tier === SAT_SHADOWS.minTier || immersiveOn('lighting')) && !shadowPin;
             m.castShadow = shadowOn;
             m.receiveShadow = shadowOn;
             // R22 W2 (Fable arbitration): D's caster-flip marker — DEPTH_PASS

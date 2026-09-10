@@ -52,6 +52,9 @@ const POSES = {
 const POSE_KEY = process.env.POSE ?? 'nyc';
 const POSE = POSES[POSE_KEY];
 const PIN_OFF = process.env.FLASH_PIN_OFF === '1';
+// Opt-in continuation coverage: keep every frozen assertion, but measure the
+// current terrain/depth/clutter stack instead of _boot's R21 fleet baseline.
+const SHIPPED = process.env.FLY_SHIPPED === '1';
 
 const results = [];
 const gate = (n, name, pass, detail) => {
@@ -60,13 +63,15 @@ const gate = (n, name, pass, detail) => {
 };
 
 /** installed before the app boots: per-composed-frame framebuffer census */
-const INSTALL = () => {
+const INSTALL = (capture = false) => {
   const comp = window.__flyComposer;
   const gl = window.__flyGl ?? comp?.getRenderer?.();
   if (!comp || !gl) return { ok: false };
   window.__fgFrames = 0;
   window.__fgPale = [];
   window.__fgBlack = [];
+  window.__fgCaptures = [];
+  let wasPale = false;
   let row = null;
   const cr = comp.render.bind(comp);
   comp.render = (dt) => {
@@ -93,6 +98,15 @@ const INSTALL = () => {
     // same thresholds the probes used: >50% of the mid scanline above luma 200
     if (pr > 0.5) window.__fgPale.push({ n: window.__fgFrames, pr: +pr.toFixed(3), L: +(s / W).toFixed(1) });
     else if (dr > 0.9) window.__fgBlack.push({ n: window.__fgFrames, dr: +dr.toFixed(3) });
+    if (capture && pr > 0.5 && !wasPale && window.__fgCaptures.length < 3) {
+      // Capture inside the composed frame: a later CDP screenshot can miss a
+      // one-frame defect. Diagnostic only; encoding perturbs this frame's cost.
+      const rt = window.__fly;
+      window.__fgCaptures.push({ n: window.__fgFrames, pr, L: s / W,
+        png: gl.domElement.toDataURL('image/png'), position: rt && {...rt.flight.pos},
+        sun: rt && {...rt.sun}, weather: rt && {...rt.weather.wx} });
+    }
+    wasPale = pr > 0.5;
     return r;
   };
   return { ok: true };
@@ -100,7 +114,10 @@ const INSTALL = () => {
 
 /** static census of zero-area triangles across every streamed chunk */
 const CENSUS = () => {
-  const g = window.__satBuildings?.object;
+  // The opt-in production review publishes the same live engine on __fly.
+  // Use it for the identical census; no gate or triangle threshold changes.
+  const owner = window.__satBuildings ?? window.__fly?.satBuildings;
+  const g = owner?.object;
   if (!g) return { err: 'no sat-buildings group' };
   let tris = 0;
   let zero = 0;
@@ -128,7 +145,7 @@ const CENSUS = () => {
     tris += t; zero += z; meshes++;
     if (z > 0) worst.push({ uuid: m.uuid.slice(0, 8), tris: t, zero: z });
   }
-  const st = window.__satBuildings?.stats ?? {};
+  const st = owner?.stats ?? {};
   return {
     tris, zero, meshes,
     worst: worst.slice(0, 6),
@@ -175,13 +192,24 @@ async function main() {
     });
   }
   await page.addInitScript(unpinPins, ['__flySettlePin']);
+  if (SHIPPED) {
+    await page.addInitScript(unpinPins, ['__flyTerraPin', '__flyClutterPin', '__flyDepthPin', '__flyAerialOverride', '__flySatShadowOverride']);
+    await page.addInitScript(() => { window.__flySunOverride = Date.UTC(2026, 6, 18, 17); });
+  }
 
   const boot = await bootFly(page, { url: URL, style: 'satellite' });
-  const inst = await page.evaluate(INSTALL);
+  if (SHIPPED) console.log('  shipped controls', await page.evaluate(() => Object.fromEntries(
+    ['__flyTerraPin', '__flyClutterPin', '__flyDepthPin', '__flyAerialOverride', '__flySatShadowOverride', '__flyGovPin'].map(k => [k, window[k] ?? null]))));
+  const inst = await page.evaluate(INSTALL, process.env.FLASH_CAPTURE === '1');
   if (POSE) {
     await page.evaluate(([la, lo, al, nm]) => window.__fly.warpToGeo(la, lo, { altM: al, name: nm }), [POSE.lat, POSE.lon, POSE.altM, POSE.name]);
   }
   await page.waitForTimeout(20000); // let the ring stream and settle
+  if (SHIPPED) {
+    const pre = await require('./graphics-precondition.cjs')(page);
+    console.log('  shipped precondition', JSON.stringify(pre));
+    if (pre.status === 'BLOCKED') { await browser.close(); console.log(`VERIFY: BLOCKED — ${pre.reason}`); process.exitCode = 2; return; }
+  }
   await page.evaluate(() => { window.__fgFrames = 0; window.__fgPale.length = 0; window.__fgBlack.length = 0; window.__fgOn = true; });
 
   const t0 = Date.now();
@@ -197,11 +225,9 @@ async function main() {
   console.log(`  census: ${cen.tris} tris over ${cen.meshes} meshes · zero-area ${cen.zero}`);
   console.log(`  engine: degenScanned ${cen.degenScanned} degenDropped ${cen.degenDropped} degenChunks ${cen.degenChunks}\n`);
 
-  // `window.__satBuildings` is NODE_ENV==='development' only, so against a
-  // production build the census gates cannot run. `__flyComposer` is NOT
-  // dev-gated and `__flyFlashPin` is a plain runtime check, so the pale-frame
-  // gates and BOTH legs still work there — the production run is a real
-  // confirmation, just a narrower one. It is reported, never silently skipped.
+  // The named dev handle is absent in production; graphicsReview=1 publishes
+  // the runtime owner used by CENSUS. Without either handle, report the narrower
+  // pixel-only coverage rather than pretending the triangle census ran.
   const PROD = !!cen.err;
   if (PROD) console.log('  [production build: dev handle __satBuildings absent — census gates (2)-(5) N/A]\n');
 
@@ -255,6 +281,21 @@ async function main() {
   gate(9, 'zero pageerrors / console errors (live-network noise excluded, reported)',
     errs.length === 0,
     (errs.length ? errs.slice(0, 2).join(' | ') : 'none') + ` · network noise ignored: ${netNoise.length}`);
+
+  if (process.env.FLASH_OUTPUT) {
+    const fs = require('node:fs'), path = require('node:path'), dir = process.env.FLASH_OUTPUT;
+    fs.mkdirSync(dir, {recursive:true});
+    const captures = await page.evaluate(() => window.__fgCaptures);
+    for (const [i, c] of captures.entries()) {
+      c.file = `flagged-${i + 1}.png`;
+      fs.writeFileSync(path.join(dir, c.file), Buffer.from(c.png.split(',')[1], 'base64'));
+      delete c.png;
+    }
+    fs.writeFileSync(path.join(dir, 'report.json'), JSON.stringify({
+      ...require('./graphics-source.cjs')(), frames, pale, black, census:cen, results, captures,
+      diagnosticCapture:process.env.FLASH_CAPTURE === '1', errors:errs, networkNoise:netNoise,
+    }, null, 2));
+  }
 
   await browser.close();
 
