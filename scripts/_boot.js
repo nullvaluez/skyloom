@@ -118,6 +118,12 @@ async function bootFly(
     window.__flySettlePin = 1;
     window.__flyClutterPin = 1;
     window.__flyDepthPin = 1;
+    // R25 (Fable, W2 flip): the merged R25 blocks ship ON; the fleet pins them
+    // OFF so every frozen gate keeps measuring the R24 world. An owner gate that
+    // certifies an R25 feature un-pins its OWN block in its own addInitScript
+    // (registered AFTER bootFly's, so it wins) — the accessor-swallow idiom.
+    window.__flyGroundBubbleOverride = { enabled: false };
+    window.__flyLightBubbleOverride = { enabled: false };
     try {
       localStorage.setItem('fly-controls-seen', '1');
       // Round 10: the APP default is now satellite (PauseMenu defaults an
@@ -160,6 +166,8 @@ async function bootFly(
       window.__flySettlePin = 1;
       window.__flyClutterPin = 1;
       window.__flyDepthPin = 1;
+      window.__flyGroundBubbleOverride = { enabled: false }; // R25: reload leg
+      window.__flyLightBubbleOverride = { enabled: false };
       localStorage.setItem('fly-controls-seen', '1');
       localStorage.setItem('fly-map-style-2', s || 'toy'); // round 10: default toy for harnesses
     }, style);
