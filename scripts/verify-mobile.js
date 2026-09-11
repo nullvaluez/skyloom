@@ -14,13 +14,24 @@
  *   · Android BACK closes an overlay instead of leaving the game
  *   · a LANDSCAPE (844x390) second pass over the button-presence gates
  *
+ * ROUND 25 (E CERT, for D MOBILE) routes every ACTION-BUTTON interaction
+ * through `openFan()` from `scripts/_mobile-boot.js`. On a tree where
+ * `MOBILE_FAN_R25` is off there is no `[data-testid="touch-fab"]`, `openFan`
+ * returns false without touching the page, and every gate below reads exactly
+ * as it did in R17 — that is the flag-off identity claim, and it is checked by
+ * running this file on the flag-off tree in both orientations. On a fan tree
+ * the petals live behind the FAB, so a census taken without opening it would
+ * be a census of an empty arc: a gate that passes because nothing mounted is
+ * the failure mode this round is most exposed to. `FAN` below records which
+ * tree we are on so the output says which question was answered.
+ *
  * Run: npm run dev (on :3000) first, then
  *   NODE_PATH=$(npm root -g) node scripts/verify-mobile.js
  * Against a private dev server: FLY_URL=http://localhost:3106 node scripts/verify-mobile.js
  */
 const { chromium } = require('playwright');
 const path = require('path');
-const { bootMobile, MOBILE_CTX, LANDSCAPE_CTX, LAUNCH_ARGS } = require('./_mobile-boot');
+const { bootMobile, openFan, closeFan, hasFan, MOBILE_CTX, LANDSCAPE_CTX, LAUNCH_ARGS } = require('./_mobile-boot');
 
 const BOOT_OPTS = process.env.FLY_URL ? { url: process.env.FLY_URL } : {};
 
@@ -144,8 +155,30 @@ const clusterState = (page) =>
       cinema: q('touch-cinema'),
       joystick: q('touch-joystick'),
       throttle: q('touch-throttle'),
+      // R25 (D MOBILE): the fan's own button, and the action that had no touch
+      // affordance at all before this round (hangar was PauseMenu-only).
+      hangar: q('touch-hangar'),
+      fab: q('touch-fab'),
     };
   });
+
+/**
+ * R25 — tap an ACTION button, opening the fan first when there is one.
+ *
+ * Every petal tap CLOSES the fan (D's close rules), so this is called per
+ * interaction rather than once per pass. With no FAB it is exactly the tap the
+ * R17 gates already made.
+ */
+async function tapAction(page, id, { x = 0, y = 0, dispatch = false } = {}) {
+  await openFan(page);
+  const sel = `[data-testid="${id}"]`;
+  if (dispatch) {
+    await touch(page, sel, 'pointerdown', x, y);
+    await touch(page, sel, 'pointerup', x, y);
+  } else {
+    await page.click(sel);
+  }
+}
 
 (async () => {
   const browser = await chromium.launch({ headless: true, args: LAUNCH_ARGS });
@@ -158,15 +191,24 @@ const clusterState = (page) =>
   console.log('booted in', bootedS, 's');
   await page.waitForTimeout(3000);
 
+  // WHICH TREE IS THIS? Printed, not inferred. Every census below is taken in
+  // the state this answer implies.
+  const FAN = await hasFan(page);
+  console.log(`touch layout: ${FAN ? 'FAN (MOBILE_FAN_R25 armed)' : 'ROW (flag-off / pre-R25)'}`);
+
+  await openFan(page);
   const ui = await page.evaluate(() => ({
     joystick: !!document.querySelector('[data-testid="touch-joystick"]'),
     throttle: !!document.querySelector('[data-testid="touch-throttle"]'),
     pause: !!document.querySelector('[data-testid="touch-pause"]'),
     atlas: !!document.querySelector('[data-testid="touch-atlas"]'),
     look: !!document.querySelector('[data-testid="touch-look"]'),
+    hangar: !!document.querySelector('[data-testid="touch-hangar"]'),
+    fab: !!document.querySelector('[data-testid="touch-fab"]'),
     hasTouchInput: typeof window.__fly?.input?.setTouchSteer === 'function',
   }));
   console.log('mobile UI mounted:', JSON.stringify(ui));
+  await closeFan(page);
   await shot(page, 'v-01-hud');
 
   // --- 1. Steering joystick: hold right, expect the heading to swing right ---
@@ -211,7 +253,7 @@ const clusterState = (page) =>
   await shot(page, 'v-03-throttle');
 
   // --- 3. Free-look toggle: joystick drag should orbit the chase camera ------
-  await page.click('[data-testid="touch-look"]');
+  await tapAction(page, 'touch-look');
   await page.waitForTimeout(150);
   const lookOn = await page.evaluate(() => window.__fly.input.freeLook.active);
   await touch(page, '[data-testid="touch-joystick"]', 'pointerdown', cx, cy);
@@ -222,13 +264,13 @@ const clusterState = (page) =>
   const lookYaw = await page.evaluate(() => window.__fly.chaseRig?._look?.yaw ?? 0);
   await touch(page, '[data-testid="touch-joystick"]', 'pointerup', cx + 60, cy);
   await shot(page, 'v-04-look');
-  await page.click('[data-testid="touch-look"]'); // toggle back off
+  await tapAction(page, 'touch-look'); // toggle back off
   await page.waitForTimeout(150);
   const lookOff = await page.evaluate(() => window.__fly.input.freeLook.active);
   console.log(`look: on=${lookOn} yawMoved=${Math.abs(lookYaw) > 0.001} off=${lookOff}`);
 
   // --- 4. Atlas button opens the Atlas, then closes ---------------------------
-  await page.click('[data-testid="touch-atlas"]');
+  await tapAction(page, 'touch-atlas');
   await page.waitForTimeout(700);
   const atlasOpen = await page.evaluate(() => window.__flyStore.getState().atlasOpen);
   await shot(page, 'v-05-atlas');
@@ -330,7 +372,7 @@ const clusterState = (page) =>
   await page.waitForTimeout(300);
 
   // --- 5. Pause button opens the menu (with touch controls listed) -----------
-  await page.click('[data-testid="touch-pause"]');
+  await tapAction(page, 'touch-pause');
   await page.waitForTimeout(400);
   const paused = await page.evaluate(() => window.__flyStore.getState().phase === 'paused');
   await shot(page, 'v-06-pause');
@@ -342,16 +384,40 @@ const clusterState = (page) =>
   // =========================================================================
 
   // --- 6. The persistent cluster: LOOK ATLAS LOGBOOK PHOTO PAUSE + BOOST ----
+  // R25: on a fan tree these are petals, so the census is taken with the arc
+  // OPEN. The BOOST pad is NOT a petal and is measured either way.
+  await openFan(page);
   const cluster = await clusterState(page);
   gate(
     'cluster: LOOK/ATLAS/LOGBOOK/PHOTO/PAUSE all mounted',
     !!(cluster.look && cluster.atlas && cluster.logbook && cluster.photo && cluster.pause),
     JSON.stringify(cluster)
   );
-  const persistentBig = ['look', 'atlas', 'logbook', 'photo', 'pause'].every(
+  const persistentIds = FAN
+    ? ['look', 'atlas', 'logbook', 'photo', 'hangar', 'pause']
+    : ['look', 'atlas', 'logbook', 'photo', 'pause'];
+  const persistentBig = persistentIds.every(
     (k) => cluster[k] && cluster[k].w >= 44 && cluster[k].h >= 44
   );
-  gate('cluster: every persistent button >= 44px', persistentBig, JSON.stringify(cluster));
+  gate(
+    `cluster: every persistent button >= 44px (${persistentIds.join('/')})`,
+    persistentBig,
+    JSON.stringify(cluster)
+  );
+  // R25 (D MOBILE): HANGAR had no key and no touch button before this round —
+  // PauseMenu was its only door. It is a petal on a fan tree and absent
+  // otherwise, and this gate asserts the tree it is actually on rather than
+  // passing either way.
+  gate(
+    FAN ? 'cluster: HANGAR petal mounted at >= 44px' : 'cluster: no HANGAR button on the flag-off tree',
+    FAN ? !!cluster.hangar && cluster.hangar.w >= 44 && cluster.hangar.h >= 44 : !cluster.hangar,
+    JSON.stringify(cluster.hangar)
+  );
+  gate(
+    FAN ? 'cluster: the FAB itself is mounted at >= 44px' : 'cluster: no FAB on the flag-off tree',
+    FAN ? !!cluster.fab && cluster.fab.w >= 44 && cluster.fab.h >= 44 : !cluster.fab,
+    JSON.stringify(cluster.fab)
+  );
   gate(
     'cluster: BOOST pad mounted at >= 44px',
     !!cluster.boost && cluster.boost.h >= 44 && cluster.boost.w >= 44,
@@ -362,6 +428,7 @@ const clusterState = (page) =>
   // on the first run of this gate) — which is the feature working, not a
   // failure. Read the lock and the DOM in the SAME evaluate so they cannot
   // describe two different moments.
+  await openFan(page);
   const restState = await page.evaluate(() => ({
     lockState: window.__flyStore.getState().lockState,
     inspect: !!document.querySelector('[data-testid="touch-inspect"]'),
@@ -391,6 +458,7 @@ const clusterState = (page) =>
       : !restState.cinema,
     JSON.stringify(restState)
   );
+  await closeFan(page);
 
   // --- 7. BOOST is MOMENTARY: held on pointerdown, released on pointerup ----
   await touch(page, '[data-testid="touch-boost"]', 'pointerdown', 0, 0);
@@ -421,13 +489,32 @@ const clusterState = (page) =>
   // cluster (ATLAS / PAUSE / LOGBOOK / PHOTO) would leave the follow-up
   // pointerup with nothing to dispatch on. LOOK is tapped twice so free-look
   // ends where it started.
-  const leakTargets = [
-    ['touch-joystick', cx, cy],
-    ['touch-throttle-cruise', 0, 0],
-    ['touch-boost', 0, 0],
-    ['touch-look', 0, 0],
-    ['touch-look', 0, 0],
-  ];
+  // R25. Two changes, both forced by the fan and both narrow:
+  //  · the FAB joins the set — it is the one NEW always-mounted control and
+  //    the one a thumb reaches for most. Twice, so the fan ends closed (the
+  //    LOOK idiom).
+  //  · LOOK LEAVES the set on a fan tree, because there it is a PETAL: it is
+  //    not in the DOM with the fan shut, and `dispatchEvent` at a selector
+  //    that does not exist THROWS. Re-opening the fan between taps would not
+  //    fix it either — `openFan` uses a real `page.click`, whose pointerdown
+  //    would be counted by the very listener this gate arms, and the gate
+  //    would go red for the instrument rather than for a leak.
+  //    On the flag-off tree the list is R17's, character for character.
+  const leakTargets = FAN
+    ? [
+        ['touch-joystick', cx, cy],
+        ['touch-throttle-cruise', 0, 0],
+        ['touch-boost', 0, 0],
+        ['touch-fab', 0, 0],
+        ['touch-fab', 0, 0],
+      ]
+    : [
+        ['touch-joystick', cx, cy],
+        ['touch-throttle-cruise', 0, 0],
+        ['touch-boost', 0, 0],
+        ['touch-look', 0, 0],
+        ['touch-look', 0, 0],
+      ];
   for (const [id, x, y] of leakTargets) {
     await touch(page, `[data-testid="${id}"]`, 'pointerdown', x, y);
     await touch(page, `[data-testid="${id}"]`, 'pointerup', x, y);
@@ -464,6 +551,7 @@ const clusterState = (page) =>
     skip('touch-inspect opens the inspect card', 'no lock');
     skip('touch-intercept rides input.press("f")', 'no lock');
   } else {
+    await openFan(page);
     const ctx2 = await clusterState(page);
     gate(
       'contextual: INSPECT + INTERCEPT appear on a lock',
@@ -477,8 +565,10 @@ const clusterState = (page) =>
     );
     await shot(page, 'v-08-contextual');
 
-    // INSPECT → the card opens on the locked contact.
-    await touch(page, '[data-testid="touch-inspect"]', 'pointerdown', 0, 0);
+    // INSPECT → the card opens on the locked contact. (R25: a petal, so the
+    // fan is re-opened first — the ctx2 census above left it open, but an
+    // intervening `covered` transition closes it by D's own rule.)
+    await tapAction(page, 'touch-inspect', { dispatch: true });
     await page.waitForTimeout(600);
     const inspected = await page.evaluate(() => ({
       hex: window.__flyStore.getState().inspectHex,
@@ -499,6 +589,7 @@ const clusterState = (page) =>
     await page.evaluate(() => {
       if (window.__flyStats) window.__flyStats.touchPress = null;
     });
+    await openFan(page);
     const haveIntercept = await page.evaluate(
       () => !!document.querySelector('[data-testid="touch-intercept"]')
     );
@@ -523,7 +614,7 @@ const clusterState = (page) =>
   await page.waitForTimeout(600);
 
   // --- 10. LOGBOOK button opens the logbook --------------------------------
-  await touch(page, '[data-testid="touch-logbook"]', 'pointerdown', 0, 0);
+  await tapAction(page, 'touch-logbook', { dispatch: true });
   await page.waitForTimeout(700);
   const logbook = await page.evaluate(() => ({
     open: window.__flyStore.getState().logbookOpen,
@@ -544,7 +635,7 @@ const clusterState = (page) =>
   await page.waitForTimeout(500);
 
   // --- 11. PHOTO button enters photo mode and TouchControls hides -----------
-  await touch(page, '[data-testid="touch-photo"]', 'pointerdown', 0, 0);
+  await tapAction(page, 'touch-photo', { dispatch: true });
   await page.waitForTimeout(900);
   const photo = await page.evaluate(() => {
     const js = document.querySelector('[data-testid="touch-joystick"]');
@@ -582,6 +673,9 @@ const clusterState = (page) =>
   await bootMobile(landPage, BOOT_OPTS);
   await landPage.waitForTimeout(3000);
 
+  const LAND_FAN = await hasFan(landPage);
+  console.log(`landscape touch layout: ${LAND_FAN ? 'FAN' : 'ROW'}`);
+  await openFan(landPage);
   const landCluster = await clusterState(landPage);
   gate(
     'landscape: the full cluster + stick + throttle + boost are mounted',
@@ -597,43 +691,87 @@ const clusterState = (page) =>
     ),
     JSON.stringify(landCluster)
   );
-  const landBig = ['look', 'atlas', 'logbook', 'photo', 'pause', 'boost'].every(
+  const landIds = LAND_FAN
+    ? ['look', 'atlas', 'logbook', 'photo', 'hangar', 'pause', 'boost', 'fab']
+    : ['look', 'atlas', 'logbook', 'photo', 'pause', 'boost'];
+  const landBig = landIds.every(
     (k) => landCluster[k] && landCluster[k].w >= 44 && landCluster[k].h >= 44
   );
-  gate('landscape: every cluster target still >= 44px', landBig, JSON.stringify(landCluster));
+  gate(
+    `landscape: every cluster target still >= 44px (${landIds.join('/')})`,
+    landBig,
+    JSON.stringify(landCluster)
+  );
 
   // Everything must fit ON the 390 px-tall screen — no control off the bottom
   // or clipped by the top strip.
-  const landFit = await landPage.evaluate(() => {
-    const ids = [
+  const fitCensus = (pg, ids) =>
+    pg.evaluate((list) => {
+      const bad = [];
+      for (const id of list) {
+        const el = document.querySelector(`[data-testid="${id}"]`);
+        if (!el) {
+          bad.push(`${id}:missing`);
+          continue;
+        }
+        const r = el.getBoundingClientRect();
+        if (r.top < 0 || r.bottom > window.innerHeight || r.left < 0 || r.right > window.innerWidth) {
+          bad.push(`${id}:${Math.round(r.top)},${Math.round(r.bottom)}`);
+        }
+      }
+      return { bad, vh: window.innerHeight, vw: window.innerWidth };
+    }, ids);
+
+  // R25: the cluster census above left the arc OPEN. Shut it before the CLOSED
+  // census, or "fan CLOSED" measures a fan that is not.
+  await closeFan(landPage);
+  // R25: TWO censuses on a fan tree, because "fits the viewport" is a
+  // different question closed and open. A 150 px radius arc swung from a FAB
+  // in the bottom-right corner of a 390 px-tall landscape screen is exactly
+  // where a petal goes off the top or off the right, and the closed census
+  // cannot see it — with the fan shut there are no petals to measure at all.
+  const landFit = LAND_FAN
+    ? await fitCensus(landPage, ['touch-joystick', 'touch-throttle', 'touch-boost', 'touch-fab'])
+    : await fitCensus(landPage, [
+        'touch-joystick',
+        'touch-throttle',
+        'touch-boost',
+        'touch-look',
+        'touch-atlas',
+        'touch-logbook',
+        'touch-photo',
+        'touch-pause',
+      ]);
+  gate(
+    LAND_FAN
+      ? 'landscape: no PERSISTENT touch control leaves the 844x390 viewport (fan CLOSED)'
+      : 'landscape: no touch control leaves the 844x390 viewport',
+    landFit.bad.length === 0,
+    JSON.stringify(landFit)
+  );
+  if (LAND_FAN) {
+    await openFan(landPage);
+    const landFitOpen = await fitCensus(landPage, [
       'touch-joystick',
       'touch-throttle',
       'touch-boost',
+      'touch-fab',
       'touch-look',
       'touch-atlas',
       'touch-logbook',
       'touch-photo',
+      'touch-hangar',
       'touch-pause',
-    ];
-    const bad = [];
-    for (const id of ids) {
-      const el = document.querySelector(`[data-testid="${id}"]`);
-      if (!el) {
-        bad.push(`${id}:missing`);
-        continue;
-      }
-      const r = el.getBoundingClientRect();
-      if (r.top < 0 || r.bottom > window.innerHeight || r.left < 0 || r.right > window.innerWidth) {
-        bad.push(`${id}:${Math.round(r.top)},${Math.round(r.bottom)}`);
-      }
-    }
-    return { bad, vh: window.innerHeight, vw: window.innerWidth };
-  });
-  gate(
-    'landscape: no touch control leaves the 844x390 viewport',
-    landFit.bad.length === 0,
-    JSON.stringify(landFit)
-  );
+    ]);
+    gate(
+      'landscape: no PETAL leaves the 844x390 viewport (fan OPEN)',
+      landFitOpen.bad.length === 0,
+      JSON.stringify(landFitOpen)
+    );
+    await closeFan(landPage);
+  } else {
+    skip('landscape: no PETAL leaves the viewport (fan OPEN)', 'no FAB on this tree');
+  }
   await landPage.screenshot({ path: path.join(__dirname, 'mobile-v-13-landscape-cluster.png') });
 
   // Landscape boost is momentary too (different flex layout, same handlers).

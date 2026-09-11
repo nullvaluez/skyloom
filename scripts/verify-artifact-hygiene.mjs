@@ -28,6 +28,24 @@
  * A mechanism can be bypassed by the next harness someone writes. An outcome
  * check cannot.
  *
+ * THE ALLOWANCE (R25, E CERT) — and the rule that keeps gate (1) honest.
+ *
+ * A previous round's file sometimes has to be REPAIRED rather than preserved:
+ * `scripts/r24-c-agl.js` referenced two identifiers (`agl`, `speed`) that its
+ * `page.evaluate` callback never destructured, so the probe threw a
+ * ReferenceError the moment it ran — `verify-import-integrity` is red on the
+ * untouched R25 base because of it. Freezing a broken instrument forever is
+ * not hygiene, it is taxidermy.
+ *
+ * So there is an ALLOWANCE list — and one rule that stops it becoming a
+ * loophole: **an allowance may only ever name an INSTRUMENT (`.js` / `.mjs`),
+ * never EVIDENCE.** The thing this gate exists to protect is the measured
+ * record — `.json` RED files, `.png` calibration pairs, `.md` ledgers — taken
+ * on live third-party tile bytes that nobody can re-measure. Those can never
+ * be allowed, and gate (1b) asserts exactly that, by extension, for every
+ * entry present and every entry anyone adds later. A script can be re-read and
+ * re-judged; a number measured on a planet that has since changed cannot.
+ *
  * RUN (no browser, no GPU, no network — belongs in every smoke):
  *   node scripts/verify-artifact-hygiene.mjs
  *   R24_BASE=<sha> node scripts/verify-artifact-hygiene.mjs
@@ -42,7 +60,37 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // tip the round starts from. R24's own ledgers and artifacts join the frozen set.
 const BASE = process.env.R25_BASE || process.env.R24_BASE || 'f0cd81e';
 // R15..R23 artifact name shapes, as they actually appear in scripts/.
-const PATTERNS = ['scripts/r1*-*', 'scripts/r2[0-4]-*', 'scripts/soak-results*.json'];
+// R25 (E CERT): the last three globs are the hole the R24 version left open,
+// found by falling into it. The MOBILE fleet writes its baselines as
+// `scripts/mobile-*.png`, `scripts/hangar-*.png` and `scripts/logbook-*.png`,
+// which no previous pattern matched — and it does not require `_boot.js`, so
+// the fixture's write redirect never reached it either. Four runs in one
+// afternoon rewrote fourteen tracked PNGs in place while this gate stayed
+// green. Both defences are now closed: `scripts/_mobile-boot.js` requires
+// `_fixture` for the redirect, and these globs make the OUTCOME checkable.
+const PATTERNS = [
+  'scripts/r1*-*',
+  'scripts/r2[0-4]-*',
+  'scripts/soak-results*.json',
+  'scripts/mobile-*.png',
+  'scripts/hangar-*.png',
+  'scripts/logbook-*.png',
+];
+// R25 (E CERT, W1). Each entry is one INSTRUMENT repaired this round, with the
+// reason. Evidence extensions are refused by gate (1b) — see the header.
+const ALLOW = [
+  {
+    path: 'scripts/r24-c-agl.js',
+    why:
+      'R25 W1: the page.evaluate callback at :326 read `agl` and `speed` without ' +
+      'destructuring them out of the argument object it was handed at :367, so the ' +
+      'probe threw a ReferenceError on every run. verify-import-integrity reports ' +
+      'both on the untouched base f0cd81e. The repair is the destructure only; no ' +
+      'measurement, threshold or logic line moves.',
+  },
+];
+const EVIDENCE_EXT = ['.json', '.png', '.jpg', '.jpeg', '.md', '.csv', '.txt', '.bin'];
+const ALLOWED_PATHS = new Set(ALLOW.map((a) => a.path));
 
 let pass = 0;
 let fail = 0;
@@ -68,17 +116,54 @@ gate(
   baseOk,
   baseOk ? '' : `set R24_BASE to this round's base sha`
 );
+// The diff is taken by NAME, not by --stat, so an allowance can be subtracted
+// from it precisely. A --stat line cannot be matched back to a path reliably
+// once a filename contains a space or an arrow.
+let changed = [];
 if (baseOk) {
-  diff = git('diff', '--stat', BASE, '--', ...PATTERNS).trim();
+  changed = git('diff', '--name-only', BASE, '--', ...PATTERNS)
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const offenders = changed.filter((f) => !ALLOWED_PATHS.has(f));
+  diff = offenders.join('\n');
   gate(
-    '(1) NO R15–R24 CALIBRATION ARTIFACT HAS CHANGED THIS ROUND',
-    diff === '',
-    diff === ''
-      ? `${PATTERNS.join(' ')} — all identical to ${BASE}`
-      : `\n${diff
-          .split('\n')
+    '(1) NO R15–R24 CALIBRATION ARTIFACT HAS CHANGED THIS ROUND (allowances excepted)',
+    offenders.length === 0,
+    offenders.length === 0
+      ? `${PATTERNS.join(' ')} — identical to ${BASE} except ${changed.length} named allowance(s)`
+      : `\n${offenders
           .map((l) => '      ' + l)
           .join('\n')}\n      Restore with: git checkout ${BASE} -- <path>`
+  );
+}
+
+// (1b) THE ALLOWANCE IS AN INSTRUMENT, NEVER EVIDENCE. This is the assertion
+// that keeps (1) meaning what its name says: a round may repair a broken
+// probe, and may never rewrite a measured record. It judges the LIST, so it
+// binds every future entry, not just today's.
+const badAllow = ALLOW.filter(
+  (a) => EVIDENCE_EXT.some((e) => a.path.toLowerCase().endsWith(e)) || !a.why || a.why.length < 40
+);
+gate(
+  '(1b) EVERY ALLOWANCE IS A REPAIRED INSTRUMENT WITH A STATED REASON — no evidence file may ever be allowed',
+  badAllow.length === 0,
+  badAllow.length === 0
+    ? ALLOW.length === 0
+      ? 'no allowances on this tree'
+      : ALLOW.map((a) => a.path).join(', ')
+    : `refused: ${badAllow.map((a) => a.path).join(', ')} (evidence extension or missing reason)`
+);
+
+// (1c) AN ALLOWANCE THAT IS NOT IN USE IS DEAD TEXT. Report it rather than
+// fail on it: a stale entry is a documentation bug, not a hygiene breach, but
+// it must not rot in silence into a standing permission.
+if (baseOk) {
+  const unused = ALLOW.map((a) => a.path).filter((p) => !changed.includes(p));
+  gate(
+    '(1c) EVERY ALLOWANCE IS ACTUALLY IN USE (a stale one is a standing permission nobody asked for)',
+    unused.length === 0,
+    unused.length === 0 ? `${ALLOW.length} in use` : `unused: ${unused.join(', ')} — remove the entry`
   );
 }
 
@@ -107,7 +192,11 @@ gate(
 // UNSTAGED only: a deliberate `git checkout <base> -- <path>` restore is
 // staged, and must not read as a violation. What this catches is the thing
 // that actually happens — a gate run silently rewriting a tracked artifact.
-const dirty = git('diff', '--name-only', '--', ...PATTERNS).trim();
+const dirtyAll = git('diff', '--name-only', '--', ...PATTERNS)
+  .split('\n')
+  .map((l) => l.trim())
+  .filter(Boolean);
+const dirty = dirtyAll.filter((f) => !ALLOWED_PATHS.has(f)).join('\n');
 gate(
   '(4) NO PREVIOUS-ROUND ARTIFACT WAS DIRTIED BY A RUN (unstaged changes)',
   dirty === '',

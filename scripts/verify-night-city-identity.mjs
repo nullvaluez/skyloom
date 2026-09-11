@@ -39,6 +39,18 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { register } from 'node:module';
+
+// R25 (E CERT): THIS GATE HAS BEEN UNRUNNABLE SINCE R24 C, and nothing caught
+// it because it is not a row in any smoke. Its own header says "world-bend.js
+// imports NOTHING (the module is deliberately constants-free)" — R24 C gave it
+// `@/lib/fly/fly-constants`, so `import()` here dies with
+// `Cannot find package '@/lib'` before a single gate prints, and the process
+// exits 0 on the unhandled rejection. A gate that cannot load is worse than a
+// red: it is silence. Registering the alias hook (the verify-lod-fade idiom)
+// keeps this on the REAL module rather than downgrading it to source-parsing,
+// and text identity is the whole claim here, so parsing would not do.
+register('./_alias-loader.mjs', import.meta.url);
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..');
@@ -221,7 +233,12 @@ gate(
       !/aRoadSide/.test(cur.roadOff.v) &&
       /if \(this\.r23\)[\s\S]{0,400}aRoadSide/.test(engine) &&
       !/aRoadSide/.test(worker),
-    'no worker payload change ⇒ WORKER_PROTOCOL stays 18'
+    // R25 (E CERT): the label said 18. The protocol has been 20 since R24 at
+    // all seven pin sites, and R25 §0 rules that it STAYS 20 — no owner
+    // changes a worker payload this round. A stale label in a passing gate is
+    // how a protocol bump gets waved through by a green that was describing a
+    // different tree.
+    'no worker payload change ⇒ WORKER_PROTOCOL stays 20'
   );
 }
 

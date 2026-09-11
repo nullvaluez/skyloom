@@ -5,6 +5,29 @@
  * blocked, so the world boots via the maxBootMs ceiling with an empty sky,
  * which is fine for exercising the UI + controls.
  */
+
+// R25 (E CERT) — THE ARTIFACT REDIRECT, AND THE HOLE IT WAS NOT COVERING.
+//
+// `scripts/_fixture.js` installs a redirect at module load under
+// FLY_TILE_FIXTURE: every write landing DIRECTLY in `scripts/` is rewritten to
+// `scripts/r24-out/fixture-<name>`, so a fixture run can never overwrite a
+// tracked calibration artifact. Its own comment says it reaches "every gate
+// that requires `_boot.js`".
+//
+// THE MOBILE FLEET DOES NOT REQUIRE `_boot.js`. It requires THIS file. So
+// verify-mobile / verify-mobile-layout / verify-hangar / verify-logbook /
+// verify-sat-mobile were outside the defence entirely, and every run of them
+// overwrote their tracked `scripts/mobile-*.png` baselines in place.
+// MEASURED, R25 W1: four runs in one afternoon rewrote FOURTEEN tracked PNGs
+// (`git diff --stat` against the round base), and `verify-artifact-hygiene`
+// stayed green throughout because its PATTERNS glob covered `scripts/r1*-*` /
+// `scripts/r2[0-4]-*` and not these names. Both halves are now closed: this
+// line, and the hygiene gate's PATTERNS.
+//
+// Required for the SIDE EFFECT only. It installs nothing when
+// FLY_TILE_FIXTURE is unset, so a run on the user's machine is unaffected.
+require('./_fixture');
+
 async function bootMobile(page, { url = process.env.FLY_URL || 'http://localhost:3000', style = null, waitS = 90 } = {}) {
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.evaluate((s) => {
@@ -25,6 +48,77 @@ async function bootMobile(page, { url = process.env.FLY_URL || 'http://localhost
     await page.waitForTimeout(1000);
   }
   throw new Error('mobile boot timed out');
+}
+
+/**
+ * R25 (E CERT, W1) — the FAN helpers, written against D MOBILE's DOM CONTRACT
+ * before D's code exists.
+ *
+ * THE CONTRACT (FLY_ROUND25_PLAN.md §3 D, agreed with D):
+ *   · the FAB is `[data-testid="touch-fab"]`, carrying `aria-expanded`
+ *   · the petal container is `[data-testid="touch-fan"]`, carrying
+ *     `data-open="1"` when open and `data-open="0"` when closed
+ *   · petals keep every existing `touch-*` testid and add `touch-hangar`
+ *
+ * WHY IT IS A NO-OP WHEN THERE IS NO FAB. Every mobile gate on the flag-off
+ * tree must read EXACTLY as it did before — that is the flag-off identity
+ * claim, and a helper that threw (or waited 30 s) with `MOBILE_FAN_R25` off
+ * would make the identity leg unrunnable rather than green. So `openFan`
+ * returns `false` when no FAB is mounted and the caller proceeds against
+ * today's persistent button row unchanged. It returns `true` only when it
+ * actually opened a fan, so a gate that NEEDS the fan can assert on that
+ * return value instead of guessing.
+ *
+ * It is also IDEMPOTENT: if the fan is already open, it does not tap the FAB
+ * (a second tap closes it — the exact shape of a flaky harness).
+ *
+ * @returns {Promise<boolean>} true if a fan is open when this resolves
+ */
+async function openFan(page, { timeoutMs = 4000 } = {}) {
+  const fab = page.locator('[data-testid="touch-fab"]');
+  if ((await fab.count()) === 0) return false;
+  const fan = page.locator('[data-testid="touch-fan"]');
+  if ((await fan.count()) > 0 && (await fan.first().getAttribute('data-open')) === '1') return true;
+  await fab.first().click({ force: true });
+  try {
+    await page.waitForSelector('[data-testid="touch-fan"][data-open="1"]', { timeout: timeoutMs });
+  } catch {
+    return false;
+  }
+  // The spring settles over ~250 ms; a petal measured mid-flight is measured at
+  // the wrong place, and a 44 px assertion against a scaling element is a coin.
+  await page.waitForTimeout(450);
+  return true;
+}
+
+/**
+ * The mirror of `openFan`. Same no-op rule, same idempotence: a closed fan is
+ * not tapped shut again.
+ * @returns {Promise<boolean>} true if no fan is open when this resolves
+ */
+async function closeFan(page, { timeoutMs = 4000 } = {}) {
+  const fab = page.locator('[data-testid="touch-fab"]');
+  if ((await fab.count()) === 0) return true;
+  const fan = page.locator('[data-testid="touch-fan"]');
+  if ((await fan.count()) === 0) return true;
+  if ((await fan.first().getAttribute('data-open')) !== '1') return true;
+  await fab.first().click({ force: true });
+  try {
+    await page.waitForSelector('[data-testid="touch-fan"][data-open="0"]', { timeout: timeoutMs });
+  } catch {
+    return false;
+  }
+  await page.waitForTimeout(450);
+  return true;
+}
+
+/**
+ * Is a fan present on this tree at all? Gates use it to phrase their own
+ * output honestly ("fan tree" vs "row tree") rather than silently meaning two
+ * different things under one gate name.
+ */
+async function hasFan(page) {
+  return (await page.locator('[data-testid="touch-fab"]').count()) > 0;
 }
 
 const MOBILE_CTX = {
@@ -61,4 +155,4 @@ const LAUNCH_ARGS = [
   '--autoplay-policy=no-user-gesture-required',
 ];
 
-module.exports = { bootMobile, MOBILE_CTX, LANDSCAPE_CTX, LAUNCH_ARGS };
+module.exports = { bootMobile, openFan, closeFan, hasFan, MOBILE_CTX, LANDSCAPE_CTX, LAUNCH_ARGS };

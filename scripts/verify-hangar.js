@@ -38,7 +38,7 @@ const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
 const { bootFly } = require('./_boot');
-const { bootMobile, MOBILE_CTX, LAUNCH_ARGS } = require('./_mobile-boot');
+const { bootMobile, openFan, closeFan, hasFan, MOBILE_CTX, LAUNCH_ARGS } = require('./_mobile-boot');
 
 const ROOT = path.join(__dirname, '..');
 const MAX_GLB_BYTES = 1024 * 1024;
@@ -428,6 +428,9 @@ function seedAircraft(id) {
   await bootMobile(mp, { style: 'toy', ...(process.env.FLY_URL ? { url: process.env.FLY_URL } : {}) });
   await mp.waitForTimeout(2500);
   const stickBefore = await mp.locator('[data-testid="touch-joystick"]').count();
+  // R25: PAUSE is a petal on a fan tree; `openFan` is a no-op without a FAB,
+  // so on the flag-off tree this is the R17 click unchanged.
+  await openFan(mp);
   await mp.locator('[data-testid="touch-pause"]').click();
   await mp.waitForTimeout(600);
   await mp.locator('[data-testid="pause-hangar"]').click();
@@ -468,6 +471,43 @@ function seedAircraft(id) {
       ? `panel ${sheet.w}×${sheet.h} of ${sheet.vw}×${sheet.vh}, ${mCards} cards, ${sheet.small} undersized, overflow ${sheet.overflow}, stick ${stickBefore}→${stickDuring}`
       : 'panel not found'
   );
+  // --- 14b (R25, D MOBILE): the HANGAR PETAL ------------------------------
+  // Before R25 the hangar had no key and no touch button — PauseMenu was its
+  // only door, which is what gate 14 above walks through. The fan adds
+  // `touch-hangar`, and this asserts the same OUTCOME through the new door:
+  // the hangar opens and the thumbstick goes away. On a tree with no FAB the
+  // row is SKIPPED and says so; it never passes by absence.
+  await mp.evaluate(() => window.__flyStore.getState().setHangarOpen(false));
+  await mp.waitForTimeout(600);
+  await mp.evaluate(() => window.__flyStore.getState().setPhase('flying'));
+  await mp.waitForTimeout(600);
+  if (await hasFan(mp)) {
+    const stickPre = await mp.locator('[data-testid="touch-joystick"]').count();
+    await openFan(mp);
+    const petal = await mp.locator('[data-testid="touch-hangar"]').count();
+    let opened = false;
+    let stickPost = -1;
+    if (petal > 0) {
+      await mp.locator('[data-testid="touch-hangar"]').click();
+      try {
+        await mp.waitForSelector('[data-testid="hangar"]', { timeout: 10000 });
+        opened = true;
+      } catch {
+        opened = false;
+      }
+      await mp.waitForTimeout(800);
+      stickPost = await mp.locator('[data-testid="touch-joystick"]').count();
+    }
+    gate(
+      '14b phone: the touch-hangar petal opens the hangar and hides the stick',
+      petal > 0 && opened && stickPre === 1 && stickPost === 0,
+      `petal=${petal} opened=${opened} stick ${stickPre}→${stickPost}`
+    );
+    await mp.screenshot({ path: path.join(__dirname, 'hangar-07-phone-petal.png') });
+  } else {
+    console.log('SKIP 14b touch-hangar petal — no FAB on this tree (MOBILE_FAN_R25 off)');
+  }
+
   gate('15 zero pageerrors (phone)', mErrs.length === 0, mErrs.slice(0, 3).join(' | '));
   await mobileBrowser.close();
 

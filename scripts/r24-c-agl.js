@@ -320,7 +320,13 @@ async function main() {
   // Arm the per-frame trace channel (FlyScene publishes only while this exists)
   // and the scripted straight-and-level command.
   await page.evaluate(
-    ({ hdg }) => {
+    // R25 (E CERT, W1): `agl` and `speed` were REFERENCED in this closure and
+    // never destructured out of the argument object below — a ReferenceError
+    // the moment the probe ran, caught by verify-import-integrity's no-undef
+    // sweep on the R25 base (it reproduces on the untouched f0cd81e). The
+    // repair is the destructure; not one statement of the probe's logic moves.
+    // The values were always passed; only the binding was missing.
+    ({ hdg, agl, speed }) => {
       const rt = window.__fly;
       const rows = [];
       window.__r24rows = rows;

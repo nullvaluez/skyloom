@@ -1,0 +1,273 @@
+#!/usr/bin/env bash
+#
+# R25 (E CERT) — the POST-MERGE SMOKE. One command per W2 merge
+# (E → A → B → C → D → F). It runs the subset that (a) actually runs in this
+# container and (b) finishes in a workable time, and it says out loud what it
+# is NOT covering.
+#
+#   scripts/r25-smoke.sh [port]        # default 3134 (E's port)
+#
+# It expects a dev server ALREADY RUNNING on that port from the worktree under
+# test, and it never starts or stops one — a smoke that boots its own server
+# would race the one the agent is using.
+#
+# ENV
+#   FLY_URL          overrides the whole target (wins over the port argument)
+#   SMOKE_NODE_ONLY  '1' runs ONLY the node gates — no browser, no dev server
+#                    needed. Use it for a fast merge check, and whenever
+#                    someone else's browser owns the machine (six agents share
+#                    four cores; two browser runs at once make every wall-clock
+#                    number meaningless and can starve a certification run).
+#   SMOKE_SKIP_SLOW  '1' drops the long browser gates (fade, lod-fade, and the
+#                    six owner content gates)
+#   SMOKE_OUT        artifact directory (default scripts/r25-out)
+#
+# ROWS THAT DO NOT EXIST YET ARE **SKIPPED, NOT FAILED**, and the run exits 3
+# ("INCOMPLETE") rather than 0 when anything was skipped — because on day 1
+# five of the six owner gates are genuinely absent, and a smoke that reported
+# that as a clean green would be the exact false-green shape R20 shipped.
+#
+# WHAT THIS SMOKE CANNOT SEE — say it in the report, every time:
+#   · any fps / frame-ms / stalls-per-minute number (SwiftShader, ~1-3 fps)
+#   · the perf governor's real ladder behaviour
+#   · tearing (a vsync property; only its MECHANISM is asserted)
+#   · live tileset drift and live traffic (Esri / OpenFreeMap / adsb are
+#     403-blocked at the proxy — the ONLY world here is E's offline fixture)
+#   · the 15-minute satellite soak
+#   · every "does it FEEL better" verdict this round exists to earn
+# Those belong to the user-machine run list in scripts/r25-close-sweep.md §2.
+
+set -uo pipefail
+cd "$(dirname "$0")/.." || exit 1
+
+PORT="${1:-3134}"
+URL="${FLY_URL:-http://localhost:${PORT}}"
+OUT="${SMOKE_OUT:-scripts/r25-out}"
+mkdir -p "$OUT"
+
+export FLY_URL="$URL"
+export FLY_TILE_FIXTURE=1
+export PW_SHIM_QUIET=1
+# Post-reveal waits in bootFly are fixed 30 s on a GPU machine's assumption;
+# under SwiftShader with six agents on four cores they time out AFTER pct 100
+# has already been reached. Scaling them does not weaken the boot contract.
+export FLY_BOOT_SCALE="${SMOKE_BOOT_SCALE:-6}"
+# The finalize-budget scaler, for the CONTENT gates only. Enumerated here on
+# purpose: a pacing gate must never see it (see lib/fly/harness-budget.js).
+CONTENT_K="${SMOKE_FINALIZE_K:-40}"
+
+PASS=0
+FAIL=0
+SKIP=0
+ROWS=()
+
+# run <name> <script-path> <command...>
+#
+# The SCRIPT PATH is an explicit argument. It used to be inferred from the
+# command's first word, which is `node` or `env` — so the presence check tested
+# for a file called "node", every row reported "absent", and the whole smoke
+# exited 0 with "0 passed, 0 failed, 9 skipped". That is the R20 false-green
+# shape exactly: a gate that cannot find itself must be LOUD, never green.
+run() {
+  local name="$1"; shift
+  local script="$1"; shift
+  local log="$OUT/smoke-${name}.log"
+  printf '\n=== %s ===\n' "$name"
+  if [ ! -f "$script" ]; then
+    printf 'SKIP  %s (%s not present on this tree)\n' "$name" "$script"
+    SKIP=$((SKIP+1)); ROWS+=("SKIP  $name  ($script absent)"); return
+  fi
+  local t0; t0=$(date +%s)
+  if "$@" >"$log" 2>&1; then
+    local dt=$(( $(date +%s) - t0 ))
+    printf 'PASS  %s  (%ss)  %s\n' "$name" "$dt" "$log"
+    PASS=$((PASS+1)); ROWS+=("PASS  $name  ${dt}s")
+  else
+    local dt=$(( $(date +%s) - t0 ))
+    printf 'FAIL  %s  (%ss)  %s\n' "$name" "$dt" "$log"
+    tail -25 "$log" | sed 's/^/      /'
+    FAIL=$((FAIL+1)); ROWS+=("FAIL  $name  ${dt}s  -> $log")
+  fi
+}
+
+node_gate() { run "$1" "scripts/$1" node "scripts/$1"; }
+browser_gate() { run "$1" "scripts/$1" node -r ./scripts/_pw-shim.js "scripts/$1"; }
+# CONTENT gates — counts, census and single-frame transitions. Their
+# assertions are on WHAT the world contains and on transition COUNTS, never on
+# how long a drape took, so a wider per-frame budget cannot change an answer.
+content_gate() {
+  run "$1" "scripts/$1" env FLY_FINALIZE_BUDGET_K="$CONTENT_K" \
+    node -r ./scripts/_pw-shim.js "scripts/$1"
+}
+
+NODE_ONLY="${SMOKE_NODE_ONLY:-0}"
+printf 'R25 SMOKE — target %s — fixture ON — %s\n' "$URL" \
+  "$([ "$NODE_ONLY" = 1 ] && echo 'NODE GATES ONLY' || echo 'node + browser')"
+if [ "$NODE_ONLY" != 1 ]; then
+  curl -s -o /dev/null -w 'dev server: HTTP %{http_code}\n' --max-time 60 "$URL/" || {
+    echo "dev server not answering on $URL — start it in the worktree under test first"; exit 2; }
+fi
+
+# ===========================================================================
+# NODE GATES — no browser, no GPU, no network. These run anywhere and are the
+# fastest possible signal that a merge broke a data contract.
+# ===========================================================================
+# FIRST, and deliberately so: the cheapest possible "the app can EVALUATE"
+# signal. Every browser gate in the fleet is downstream of module evaluation,
+# so a red here makes every number after it meaningless. R24 lost four browser
+# rows to an unimported identifier in a module-scope template literal before
+# this gate existed.
+node_gate verify-import-integrity.mjs
+
+node_gate verify-classify.mjs
+node_gate verify-warbirds.mjs
+node_gate verify-daily.mjs
+node_gate verify-depth-offset.mjs        # C (R24): reversed-depth polygonOffset
+node_gate verify-terra-residency.mjs     # A (R24): merge/refetch on a yaw sweep
+node_gate verify-c-flagoff.mjs           # C (R24): every C flag off + GLSL false-branch verbatim
+# D (R24) shipped its node coverage as feature gates rather than one flag-off
+# gate. R25 E re-baselined its vendor-patch SHAPE assertions against the Codex
+# terrain-merge lifecycle fix (be711f2 / 7c9cde0) — see the header of the gate.
+node_gate verify-lod-fade.mjs            # D (R24): the node half; the BROWSER half is E's verify-lod-fade.js
+node_gate verify-worker-normals.mjs      # C (R24): area-weighted DEM normals, 3.34 deg -> 0.26 deg
+# A's skirt-worker identity gate. NOTE (C, 0e2f7cb): its element-by-element
+# identity leg goes RED with TERRAIN_LIGHT.workerNormals ON *by design* — the
+# NORMAL array is meant to change; positions, uv and indices must not. When
+# that flag is on, this needs a flag-on ARM, NOT a re-baseline of A's number.
+# R25: gate 2b is RED on the R25 base and it is a DEFECT, not a stale bound —
+# the shipped splice regex no longer matches the LERC worker tail, so
+# skirtWorker and workerNormals degrade to OFF on the only DEM path the live
+# app uses. Owner A GROUND / vendor arbitration.
+node_gate verify-skirt-worker.mjs
+
+node_gate verify-artifact-hygiene.mjs    # E: no R15-R24 calibration artifact may change
+node_gate r24-b-attr-proof.js            # B (R24): BROKEN=0 — every index/attribute has an array
+node_gate verify-vendor-three-tile.mjs   # A (R24): the vendored copy is verbatim
+node_gate verify-skirt-fast.mjs          # A (R24): O(V) boundary scan is output-identical
+node_gate verify-frame-step.mjs          # A (R24): fixed-timestep sim / interpolated render pose
+node_gate verify-finalize-pace.mjs       # A (R24): wall-clock finalize brake
+
+# --- R25 ADDITIONS to the R24 node set. ------------------------------------
+# WORKER_PROTOCOL stays 20 this round (plan §0), and this is the gate that
+# says so: it asserts `EXPECTED_WORKER_PROTOCOL = 20` at all six engines and
+# `WORKER_PROTOCOL = 20` in the worker. It was not a smoke row in R24.
+node_gate graphics-unit.mjs
+# The Codex terrain-merge lifecycle fix's own gates (VENDOR.md patches 7a/8a).
+# They guard the code that legitimately moved two of R24's vendor-shape
+# assertions, so they belong beside them.
+node_gate verify-terrain-merge.mjs
+node_gate verify-raster-retry.mjs
+# R23 B's flag-off byte-identity gate. E fixed its module loading in R25 W1 —
+# it had been unrunnable since R24 C gave world-bend.js its first import, and
+# it was in no smoke, so nothing noticed for a round.
+node_gate verify-night-city-identity.mjs
+
+# --- R25's own node gates. -------------------------------------------------
+node_gate verify-r25-flagoff.mjs         # E (R25): every R25 block off => no R25 token anywhere
+node_gate verify-registry-inventory.mjs  # E (R25): every cache key is in the world-bend registry
+node_gate verify-ground-bubble-k.mjs     # A (R25): bubbleK() as a pure function (absent until A merges)
+node_gate verify-moon-light.mjs          # C (R25): daytime bit-equality + the synodic night ramp
+
+# --- verify-seam's NODE leg runs offline (HARN-GAP-7): its api.init() is
+#     pinned to the fixture by a global-fetch wrapper. Gates 0-6c are the
+#     fastest deterministic instrument in the fleet.
+#     FLY_URL IS UNSET FOR THIS ROW ON PURPOSE. The smoke exports FLY_URL for
+#     the whole run, and verify-seam.js:452 takes that as "also run the browser
+#     leg" — which then does require('playwright') with no shim preload and
+#     dies with "Cannot find module 'playwright'" AFTER nine green node gates.
+#     The node leg is the fixture column; the browser leg is a browser_gate row.
+run verify-seam.js scripts/verify-seam.js env -u FLY_URL node scripts/verify-seam.js
+
+if [ "$NODE_ONLY" = 1 ]; then
+  printf '\n--------------------------------------------------\n'
+  for r in "${ROWS[@]}"; do printf '%s\n' "$r"; done
+  printf '\n%s passed, %s failed, %s skipped  (NODE GATES ONLY — no browser was run)\n' \
+    "$PASS" "$FAIL" "$SKIP"
+  [ "$PASS" -eq 0 ] && { echo '*** SMOKE FAILED: ZERO gates ran'; exit 2; }
+  [ "$FAIL" -gt 0 ] && exit 1
+  [ "$SKIP" -gt 0 ] && { echo "*** SMOKE INCOMPLETE: $SKIP absent"; exit 3; }
+  exit 0
+fi
+
+# ===========================================================================
+# BROWSER GATES
+# ===========================================================================
+# --- the fixture's own gate. If this is red, every browser number below is
+#     meaningless, so it runs first and its failure is the headline.
+run verify-fixture.js scripts/verify-fixture.js \
+  env FLY_FIXTURE_SETTLE_MS="${SMOKE_FIXTURE_SETTLE:-120000}" \
+      FLY_FINALIZE_BUDGET_K="$CONTENT_K" \
+  node -r ./scripts/_pw-shim.js scripts/verify-fixture.js
+
+# --- hardware-independent browser gates (counts, census, source scans, buffer
+#     identity). Ordered cheapest first.
+# PACING gates — these must NEVER see FLY_FINALIZE_BUDGET_K.
+browser_gate verify-frame-pace.js
+browser_gate verify-step-clean.js
+browser_gate verify-ladder-fix.js        # A (R24): FLY_LADDER_RED=1 = 6/13 fail flag-off; boots TOY
+# verify-seam's BROWSER leg (gates 7-9: engine counters over a settled 60 s).
+run verify-seam-browser scripts/verify-seam.js \
+  node -r ./scripts/_pw-shim.js scripts/verify-seam.js
+content_gate verify-flash-guard.js
+
+if [ "${SMOKE_SKIP_SLOW:-0}" != "1" ]; then
+  content_gate verify-lod-fade.js
+  content_gate verify-fade.js
+  content_gate verify-one-sun.js
+  content_gate verify-linear-haze.js
+  content_gate verify-depth-roundtrip.js
+
+  # --- THE SIX R25 OWNER GATES. --------------------------------------------
+  # Every one is a CONTENT gate: each asserts what the world contains with its
+  # owner's flag armed, never how long anything took. Each is absent until its
+  # owner merges, and an absent row is a SKIP that makes the run INCOMPLETE.
+  content_gate verify-ground-bubble.js   # A GROUND
+  content_gate verify-night-ground.js    # B NIGHT
+  content_gate verify-shadow-bubble.js   # C LIGHT
+  content_gate verify-mobile-fan.js      # D MOBILE
+  content_gate verify-feel-ground.js     # F FEEL
+  # The mobile trio, which D's fan changes the meaning of in BOTH directions:
+  # flag-off they must read exactly as R17 left them, flag-on they must read
+  # the arc. Both orientations are inside each script.
+  content_gate verify-mobile.js
+  content_gate verify-mobile-layout.js
+fi
+
+printf '\n--------------------------------------------------\n'
+for r in "${ROWS[@]}"; do printf '%s\n' "$r"; done
+printf '\n%s passed, %s failed, %s skipped\n' "$PASS" "$FAIL" "$SKIP"
+
+# A smoke that ran nothing is a FAILURE, not a pass. Same for a run in which
+# every row was skipped: the only honest reading of "0 passed" is "this told
+# you nothing".
+VERDICT=0
+if [ "$FAIL" -gt 0 ]; then VERDICT=1; fi
+if [ "$PASS" -eq 0 ]; then
+  printf '\n*** SMOKE FAILED: ZERO gates actually ran (%s skipped). A smoke that skips\n' "$SKIP"
+  printf '*** everything and exits 0 is a false green — check the paths above.\n'
+  VERDICT=2
+fi
+if [ "$SKIP" -gt 0 ] && [ "$VERDICT" -eq 0 ]; then
+  printf '\n*** SMOKE INCOMPLETE: %s gate(s) were skipped as absent. Verify that each is\n' "$SKIP"
+  printf '*** genuinely not on this tree before treating this run as green.\n'
+  VERDICT=3
+fi
+
+cat <<'NOTE'
+
+NOT COVERED BY THIS SMOKE (by construction, not by omission):
+  · every fps / frame-ms / p99 / stalls-per-minute number — this container
+    renders the game at 1-3 fps on a software rasteriser
+  · the perf governor's real ladder, dwell and latch behaviour
+  · tearing itself (only its mechanism is asserted here)
+  · live OpenFreeMap / Esri / adsb bytes, and therefore every LIVE frozen
+    hash and pixel band — the fixture columns are separate numbers and never
+    re-baseline a live one
+  · the 15-minute satellite soak
+  · THE ROUND'S OWN QUESTION. R25 exists because the ground reads flat at
+    50-500 ft and the night ground reads as a black photo with copper roads.
+    Nothing in this file can see either. Every verdict on those is a row in
+    scripts/r25-close-sweep.md §2, measured on the user's RTX 5080 and phone.
+NOTE
+
+exit $VERDICT

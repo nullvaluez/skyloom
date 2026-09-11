@@ -27,5 +27,22 @@ export async function resolve(specifier, context, nextResolve) {
     }
     return { url: pathToFileURL(p).href, shortCircuit: true };
   }
+  // R25 (E CERT): EXTENSIONLESS RELATIVE specifiers. `lib/fly/r25-pins.js`
+  // imports `./fly-constants` and `./fly-pins` the way the bundler resolves
+  // them; node ESM does not. Without this a node gate cannot load the ONE
+  // accessor every R25 feature reads, and `verify-r25-flagoff` would have to
+  // fall back to source-parsing the very thing it exists to EXECUTE.
+  // Tried in order, and only when the bare specifier does not itself resolve,
+  // so nothing that already works changes.
+  if (specifier.startsWith('.') && !/\.[cm]?jsx?$|\.json$/.test(specifier)) {
+    const { statSync } = await import('node:fs');
+    const base = path.resolve(path.dirname(new URL(context.parentURL).pathname), specifier);
+    for (const ext of ['.js', '.mjs', '/index.js']) {
+      try {
+        if (statSync(base + ext).isFile())
+          return { url: pathToFileURL(base + ext).href, shortCircuit: true };
+      } catch { /* try the next extension */ }
+    }
+  }
   return nextResolve(specifier, context);
 }

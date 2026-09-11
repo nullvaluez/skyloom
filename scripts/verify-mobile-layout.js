@@ -55,7 +55,7 @@
  */
 const { chromium } = require('playwright');
 const path = require('path');
-const { bootMobile, MOBILE_CTX, LANDSCAPE_CTX, LAUNCH_ARGS } = require('./_mobile-boot');
+const { bootMobile, openFan, closeFan, hasFan, MOBILE_CTX, LANDSCAPE_CTX, LAUNCH_ARGS } = require('./_mobile-boot');
 
 const BOOT_OPTS = process.env.FLY_URL ? { url: process.env.FLY_URL } : {};
 const MIN_TARGET = 44; // MOBILE_UI.minTargetPx
@@ -71,6 +71,15 @@ const fails = [];
 function gate(name, ok, detail = '') {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
   if (!ok) fails.push(name);
+}
+// R25: a row that could not be evaluated on THIS tree. Reported loudly and
+// counted, so a flag-off run says "not asked" rather than quietly saying
+// "passed" — the R24 lesson that a gate can be green on the frame that
+// contains the defect starts with a gate that never asked the question.
+const skips = [];
+function skip(name, why) {
+  console.log(`SKIP ${name} — ${why}`);
+  skips.push(name);
 }
 
 /** Seeded pre-mount so the logbook and the badge path have real data. */
@@ -350,6 +359,56 @@ async function runOrientation(browser, label, ctxOpts) {
       : `${boxes.length} members pairwise-checked (${[...new Set(boxes.map((b) => b.zone))].join(', ')})`
   );
 
+  // --- 2b (R25, for D MOBILE): THE SAME TWO CENSUSES, FAN OPEN -------------
+  // The 8-zone contract and pairwise disjointness are frozen "closed AND
+  // fan-open" (plan §0). Closed, the arc does not exist: the census above
+  // measures a FAB and nothing else new, and would be green on a fan that
+  // swings its petals straight through the minimap. Petals are
+  // pointer-events-auto descendants of `controls-right`, so `collectBoxes`
+  // picks them up as outermost interactive members the moment they mount —
+  // which is why this is the same function, not a new one. On a tree with no
+  // FAB `openFan` is a no-op and this is reported as SKIPPED, never as a pass.
+  const fanTree = await hasFan(page);
+  if (fanTree && (await openFan(page))) {
+    const openBoxes = await page.evaluate(collectBoxes);
+    const openOutside = openBoxes.filter(
+      (b) => b.x < -1 || b.y < -1 || b.right > overflow.innerW + 1 || b.bottom > overflow.innerH + 1
+    );
+    gate(
+      `${label} FAN OPEN: every zone member is inside the viewport`,
+      openOutside.length === 0,
+      openOutside.length
+        ? openOutside.map((b) => `${b.name} [${b.x},${b.y} ${b.w}x${b.h}]`).join(' | ')
+        : `${openBoxes.length} members measured`
+    );
+    const openClashes = [];
+    for (let i = 0; i < openBoxes.length; i++) {
+      for (let j = i + 1; j < openBoxes.length; j++) {
+        if (openBoxes[i].zone === openBoxes[j].zone) continue;
+        if (overlaps(openBoxes[i], openBoxes[j]))
+          openClashes.push(`${openBoxes[i].name} x ${openBoxes[j].name}`);
+      }
+    }
+    gate(
+      `${label} FAN OPEN: no two zones overlap`,
+      openClashes.length === 0,
+      openClashes.length
+        ? openClashes.join(' | ')
+        : `${openBoxes.length} members pairwise-checked`
+    );
+    // The census MUST have grown, or it measured a fan that never opened and
+    // both greens above are vacuous — the count IS the precondition.
+    gate(
+      `${label} FAN OPEN: the census actually grew (a petal-free census proves nothing)`,
+      openBoxes.length > boxes.length,
+      `${boxes.length} closed -> ${openBoxes.length} open`
+    );
+    await shot('01b-chip-fan-open');
+    await closeFan(page);
+  } else {
+    skip(`${label} FAN OPEN disjointness census`, fanTree ? 'the fan would not open' : 'no FAB on this tree');
+  }
+
   await page.evaluate(() => {
     clearInterval(window.__mlFixture);
     const rt = window.__fly;
@@ -479,6 +538,9 @@ async function runOrientation(browser, label, ctxOpts) {
 
   // --- 5 + 6: landscape-only reachability gates ---------------------------
   if (label === 'landscape') {
+    // R25: PAUSE is a petal on a fan tree; on the flag-off tree openFan is a
+    // no-op and this is the R17 click unchanged.
+    await openFan(page);
     await page.locator('[data-testid="touch-pause"]').click();
     await page.waitForTimeout(700);
     const exitInfo = await page.evaluate(() => {
@@ -539,6 +601,7 @@ async function runOrientation(browser, label, ctxOpts) {
   } finally {
     await browser.close();
   }
+  if (skips.length) console.log(`\nSKIPPED (not asked on this tree): ${skips.join(', ')}`);
   console.log(fails.length ? `\nVERIFY: FAIL (${fails.join(', ')})` : '\nVERIFY: PASS');
   process.exit(fails.length ? 1 : 0);
 })().catch((e) => {
