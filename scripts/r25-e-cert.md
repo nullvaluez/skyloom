@@ -669,8 +669,20 @@ owners' own runs are done).
   whole fleet.
 - **A settled city pose.** `verify-fixture` spent 427 s on manhattan and 428 s
   on powell and neither settled; both draw numbers are unsettled readings.
-- *(the fixed-pose pixel re-baselines of §4, per run — filled in below as they
-  land or fail to)*
+- **The four fixed-pose pixel re-baselines of §4** (`verify-sat-night`,
+  `verify-dusk`, `verify-monuments-sat`, the NEON_COVER hashes). A pixel A/B
+  needs a settled pose and no pose settled today. Queued for a quieter window.
+- **`verify-mobile.js` to completion, in either arm.** Both died mid-run; the
+  control died earlier. It is a §2.7 row on the user's machine.
+- **`verify-hangar.js` and `verify-logbook.js`.** Not run here: each costs a
+  full mobile boot on a saturated box, and each carries exactly one edit — the
+  same `openFan()` no-op whose identity `verify-mobile-layout` proved
+  empirically in both orientations. `verify-hangar`'s NEW gate 14b is
+  `hasFan`-guarded and prints a SKIP line on a no-FAB tree, so it is a no-op
+  here by construction and becomes measurable the moment D merges.
+- **Anything about the fan itself.** `MOBILE_FAN_R25` does not exist yet. Every
+  fan-open assertion E wrote is a hook waiting for D's merge, and every one of
+  them says so in its own output rather than passing quietly.
 
 ---
 
