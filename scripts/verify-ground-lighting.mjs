@@ -56,10 +56,12 @@ check('road uniforms suppress the continuous ribbon while retaining discrete lam
   const base=SATELLITE_VISUALS.lighting,basePeak=base.roadGlow*(1+base.streetPoolGain);
   const peak=gainAt(0),between=gainAt(u.uStreetSpacing.value/2);
   assert(glow<base.roadGlow);
-  // Retain roughly half the previous bright street peak while separating
-  // lamps more strongly from the dark inter-lamp pavement.
-  assert(peak>=basePeak*.4&&peak<=basePeak*.55);
-  assert(peak/between>basePeak/base.roadGlow);
+  // September 11 matched Melton study (.graphics-review/road-study): the
+  // earlier half-brightness target still produced copper rectangles. Keep
+  // the ribbon subordinate to unchanged surface spill and pole emitters.
+  // This is an authored appearance constraint, not a performance rebaseline.
+  assert(peak>0&&peak<basePeak*.15);
+  assert(peak/between>5);
   assert.equal(u.uStreetSpacing.value,SAT_ROADS.night.streetSpacingM);
   assert.equal(u.uStreamBoost.value,policy.GROUND_LIGHTING.road.streamGain);
   assert.equal(u.uTrafBoost.value,policy.GROUND_LIGHTING.road.trafficGain);

@@ -1,5 +1,8 @@
 'use client';
 import { immersiveOn } from '@/lib/fly/immersive';
+import { nearGroundOn } from '@/lib/fly/near-ground';
+import { mercatorScale } from '@/lib/fly/coords';
+import { NEAR_SUPPORT, updateNearContactMatrices } from '@/lib/fly/near-ground-support';
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -67,8 +70,8 @@ function paceSec(baseSec, speedMps) {
   return settle.paceCadenceSec ? settle.paceCadenceSec(baseSec, speedMps) : baseSec;
 }
 
-function canopyPlacementSignature(stats, altK, density) {
-  return `${stats.chunks}|${stats.ready}|${stats.empty}|${stats.vegPts}|${stats.clsChunks}|${altK.toFixed(3)}|${density}|${stats.supportRevision ?? 0}`;
+function canopyPlacementSignature(stats, altK, density, nearOn = false) {
+  return `${stats.chunks}|${stats.ready}|${stats.empty}|${stats.vegPts}|${stats.clsChunks}|${altK.toFixed(3)}|${density}|${stats.supportRevision ?? 0}|${nearOn ? 1 : 0}`;
 }
 
 const _dummy = new Object3D();
@@ -204,6 +207,7 @@ export function SatVegLayer({ runtime, flight }) {
     () => ({
       nearest: (x, z) => engine.nearest(x, z),
       groundAtLocal: (chunk, x, z) => engine.groundAtLocal(chunk, x, z),
+      groundAtNear: (x, z, fallbackY) => engine.groundAtNear(x, z, fallbackY, 'detail'),
       get stats() {
         return engine.stats;
       },
@@ -233,6 +237,9 @@ export function SatVegLayer({ runtime, flight }) {
     atZ: Infinity,
     placed: 0,
     altK: 0,
+    contacts: { indices: new Uint16Array(NEAR_SUPPORT.canopyPoints), x: new Float64Array(NEAR_SUPPORT.canopyPoints),
+      z: new Float64Array(NEAR_SUPPORT.canopyPoints), ground: new Float32Array(NEAR_SUPPORT.canopyPoints),
+      count: 0, cursor: 0, radius2: 0, maxOffset: 0, baseRadius: 0 },
     // R22 (C): per-chunk first-ready timestamps for B SETTLE's birth ramp, plus
     // the "a ramp is in flight" latch the static skip has to respect. Owned
     // HERE rather than on the chunk records because sat-veg-engine.js is not
@@ -326,14 +333,18 @@ export function SatVegLayer({ runtime, flight }) {
   // road network at -46 — the ground layers run in streaming order.
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
-    const liveTier = cinematic ? (useFlyStore.getState().qualityTier ?? tier) : tier;
+    const live = useFlyStore.getState();
+    const liveTier = cinematic ? (live.qualityTier ?? tier) : tier;
     const density = cinematic ? satelliteVisualProfile(liveTier).vegetation : 1;
     if (cinematic) GROUND_VISUAL_UNIFORMS.treeTime.value = window.__flyClutterPin === 'freeze' ? 0 : t;
     const eyeAgl = aglOf(runtime, flight); // R24 (C's spec): the damped ground
-    engine.update(t, flight.pos.x, flight.pos.z, eyeAgl);
+    const mercK = mercatorScale(flight.latDeg ?? 0);
+    const nearOn = cinematic && live.mapStyle === 'satellite' && nearGroundOn('detail');
+    engine.update(t, flight.pos.x, flight.pos.z, eyeAgl, nearOn, live.warpEpoch, liveTier, mercK);
 
     const mesh = meshRef.current;
     const st = placeRef.current;
+    st.contacts.radius2 = engine.nearSupport.active ? (NEAR_SUPPORT.radiusM * mercK) ** 2 : 0;
     // R24 (C's spec): a 2 s WALL-CLOCK cadence is a 500 m cadence at 250 m/s.
     // `paceCadenceSec` scales it by ground speed; it ships OFF, so this is the
     // identity today (see the header note on the namespace import).
@@ -354,7 +365,7 @@ export function SatVegLayer({ runtime, flight }) {
       // A completed DEM repair changes the grid without changing ready/point
       // counts. The commit revision keeps a held forest attached to that grid.
       const sig = U
-        ? canopyPlacementSignature(sg, st.altK, density)
+        ? canopyPlacementSignature(sg, st.altK, density, engine.nearSupport.active)
         : '';
       const moved2 = (flight.pos.x - st.atX) ** 2 + (flight.pos.z - st.atZ) ** 2;
       // R22 (C): …but never WHILE A BIRTH RAMP IS RUNNING. The skip's premise
@@ -379,11 +390,13 @@ export function SatVegLayer({ runtime, flight }) {
           trees2,
           st.born,
           t,
-          cinematic
+          cinematic,
+          st.contacts
         );
         st.prevN = st.placed;
       }
     }
+    if (mesh) updateNearContactMatrices(mesh, st.contacts, engine.nearSupport);
 
     if (
       process.env.NODE_ENV === 'development' &&
@@ -617,7 +630,8 @@ function placeCanopy(
   trees2,
   born,
   now,
-  cinematic = false
+  cinematic = false,
+  contacts = null
 ) {
   const S = SAT_VEG;
   const T2 = CLUTTER.trees2;
@@ -647,6 +661,7 @@ function placeCanopy(
   let maxScale = 1;
   let maxD = 0; // …and from the PLAYER, which is what the bend drop keys on
   let ramping = false; // R22 (C): a birth ramp is still in flight this pass
+  if (contacts) { contacts.count = contacts.cursor = contacts.maxOffset = 0; }
   // Above altFade.offM there is nothing to place at all, which is also what
   // keeps the ring eviction (cullAglOffM, higher still) invisible.
   if (altK > 0.001 && perChunkCap > 0) {
@@ -700,7 +715,13 @@ function placeCanopy(
         const k = altK * bk * (1 - smoothstep(S.distFade.startM, S.distFade.endM, d));
         if (k <= 0.001) continue;
         const r = r0 * k;
-        const gy = engine.groundAtLocal(chunk, lx, lz);
+        const coarseY = engine.groundAtLocal(chunk, lx, lz);
+        let gy = coarseY;
+        if (contacts && contacts.count < contacts.indices.length && d * d < contacts.radius2) {
+          const at = contacts.count++;
+          contacts.indices[at] = n; contacts.x[at] = wx; contacts.z[at] = wz; contacts.ground[at] = coarseY;
+          if (cinematic) gy = engine.groundAtNear(wx, wz, coarseY);
+        }
         const h = hash(lx * 3.117 + lz * 7.731);
         // Luma jitter around a hash-picked swatch — a park of one exact green
         // reads as a decal. Conifers additionally sit darker.
@@ -784,5 +805,6 @@ function placeCanopy(
   // landcover sheet vanishing as one object. Flag-off adds exactly 0.
   const leadD = maxD + (BEND_LEAD.enabled ? BEND_LEAD.poolLeadM : 0);
   mesh.boundingSphere.radius = Math.sqrt(maxR2) + maxScale + leadD * leadD * MAX_BEND_K + 50;
+  if (contacts) contacts.baseRadius = mesh.boundingSphere.radius;
   return n;
 }

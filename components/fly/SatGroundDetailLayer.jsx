@@ -8,12 +8,20 @@ import { mercatorScale } from '@/lib/fly/coords';
 import { NEAR_GROUND, nearGroundOn } from '@/lib/fly/near-ground';
 import { buildGroundDetail, buildGroundScrubGeometry, createGroundScrubMaterial, DETAIL_UNIFORMS } from '@/lib/fly/near-ground-detail';
 import { applyBendAnchor } from '@/lib/fly/toy-world/world-bend';
+import { NEAR_SUPPORT, updateNearContactMatrices } from '@/lib/fly/near-ground-support';
 
 const dummy = new Object3D(), color = new Color();
 const tones = { 2: '#414c32', 3: '#637044', 5: '#817848' };
 export function SatGroundDetailLayer({ runtime, flight }) {
   const meshRef = useRef(null);
-  const stateRef = useRef({ scan: null, at: -Infinity, rows: [], epoch: null, born: new Map(), ms: 0 });
+  const stateRef = useRef({ scan: null, at: -Infinity, rows: [], epoch: null, born: new Map(), ms: 0,
+    contacts: { indices: new Uint16Array(NEAR_SUPPORT.capacity - NEAR_SUPPORT.canopyPoints),
+      x: new Float64Array(NEAR_SUPPORT.capacity - NEAR_SUPPORT.canopyPoints),
+      z: new Float64Array(NEAR_SUPPORT.capacity - NEAR_SUPPORT.canopyPoints),
+      ground: new Float32Array(NEAR_SUPPORT.capacity - NEAR_SUPPORT.canopyPoints),
+      count: 0, cursor: 0, maxOffset: 0, baseRadius: 0, offset: -0.05 } });
+  const support = useMemo(() => ({ active: true,
+    heightAt: (x, z, y) => runtime.satVeg?.groundAtNear?.(x, z, y) ?? y }), [runtime]);
   const geometry = useMemo(() => buildGroundScrubGeometry(), []);
   const material = useMemo(() => createGroundScrubMaterial(applyBendAnchor), []);
   const depth = useMemo(() => createGroundScrubMaterial(applyBendAnchor, true), []);
@@ -31,6 +39,7 @@ export function SatGroundDetailLayer({ runtime, flight }) {
     mesh.receiveShadow = nearGroundOn('shading');
     if (st.epoch !== store.warpEpoch) {
       st.epoch = store.warpEpoch; st.scan = null; st.rows = []; st.kinds = null; st.born.clear(); st.at = -Infinity;
+      st.contacts.count = 0;
       mesh.count = 0; mesh.visible = false;
     }
     if (!visible) { mesh.visible = false; st.scan = null; return; }
@@ -64,9 +73,17 @@ export function SatGroundDetailLayer({ runtime, flight }) {
       const ox = Math.round(flight.pos.x / 1024) * 1024, oz = Math.round(flight.pos.z / 1024) * 1024;
       mesh.position.set(ox, 0, oz);
       let extent = 0;
+      const contacts = st.contacts;
+      contacts.count = contacts.cursor = contacts.maxOffset = 0;
       for (let i = 0; i < st.rows.length; i++) {
         const row = st.rows[i], birth = Math.min(1, (now - st.born.get(row.id)) / 0.7);
-        dummy.position.set(row.x - ox, row.y, row.z - oz);
+        let supportY = row.y + 0.05;
+        if (contacts.count < contacts.indices.length) {
+          const at = contacts.count++;
+          contacts.indices[at] = i; contacts.x[at] = row.x; contacts.z[at] = row.z; contacts.ground[at] = supportY;
+          supportY = support.heightAt(row.x, row.z, supportY);
+        }
+        dummy.position.set(row.x - ox, supportY - 0.05, row.z - oz);
         dummy.rotation.set(0, row.yaw, 0);
         dummy.scale.set(row.widthM * mercK * birth, row.height * birth, row.depthM * mercK * birth);
         dummy.updateMatrix(); mesh.setMatrixAt(i, dummy.matrix);
@@ -78,8 +95,10 @@ export function SatGroundDetailLayer({ runtime, flight }) {
       if (mesh.instanceColor) { mesh.instanceColor.clearUpdateRanges(); mesh.instanceColor.addUpdateRange(0, mesh.count * 3); mesh.instanceColor.needsUpdate = true; }
       // Real instance bound plus conservative bend/height padding.
       mesh.boundingSphere = new Sphere(new Vector3(), extent + 24);
+      contacts.baseRadius = mesh.boundingSphere.radius;
       st.uploadAt = st.at; st.mercK = mercK;
     }
+    updateNearContactMatrices(mesh, st.contacts, support);
     st.wasFading = fading;
     mesh.visible = visible && mesh.count > 0;
     runtime.groundDetail = { count: mesh.count, ...(st.kinds ?? { grass: 0, scrub: 0, hedges: 0 }),

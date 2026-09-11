@@ -26,7 +26,7 @@ const placement = source.slice(source.indexOf('function placeCanopy('));
 const context = vm.createContext({ ...THREE, ...constants,
   getRimColor: out => Object.assign(out, { r: .5, g: .6, b: .7 }) });
 vm.runInContext(`${helpers}\n${placement}\nObject.assign(globalThis,{placeCanopy,canopyPlacementSignature});`, context);
-assert.match(source, /\? canopyPlacementSignature\(sg, st\.altK, density\)/);
+assert.match(source, /\? canopyPlacementSignature\(sg, st\.altK, density, engine\.nearSupport\.active\)/);
 assert.match(source, /sig !== st\.sig \|\| moved2 >= U\.staticSkipM \*\* 2 \|\| st\.born\.ramping/);
 
 let passed = 0;
@@ -80,6 +80,7 @@ check('birth ramps and density/altitude signature changes retain their prior beh
   assert.equal(place(born, 30 + ramp), 1); assert.equal(born.ramping, false); assert.equal(y(), 273);
   assert.notEqual(context.canopyPlacementSignature(engine.stats, .5, 1), sig());
   assert.notEqual(context.canopyPlacementSignature(engine.stats, 1, .5), sig());
+  assert.notEqual(context.canopyPlacementSignature(engine.stats, 1, 1, true), sig());
   engine._parked = true; assert.equal(engine.stats.supportRevision, 1); assert.equal(place(), 0);
   engine._parked = false; assert.equal(place(), 1);
 });
