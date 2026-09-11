@@ -103,7 +103,62 @@ no harness edited, no 3D or shader file touched.
 
 Both orientations, base insets (venue truth above), petals 44 px, FAB 56 px
 portrait / 48 px landscape. `r0` = `MOBILE_FAN_R25.radiusPx`, `r1` = second
-ring = `r0 + petalPx + ringGapPx`.
+ring = `r0 + petalPx + ringGapPx`. Every box below is MEASURED off the armed
+tree (`scripts/r25-out/fan-armed-3.log`, `fan-*-0*.png`); the petal centres are
+measured to within **2 px** of the geometry the component published, which is
+the gate's own assertion.
+
+**PORTRAIT 390×844** — the column, bottom-up from the zone anchor at
+`env(bottom) + 3.25rem` = 52 px:
+
+| | box | height |
+|---|---|---|
+| BOOST pad | `[306,748 – 374,792]` | 44 |
+| gap-3 | | 12 |
+| throttle rail | `[306,602 – 374,736]` | 134 (3 × `min-h-11` + borders) |
+| gap-3 | | 12 |
+| **FAB** | `[318,534 – 374,590]`, centre **(346, 562)** | 56 |
+
+**Column top 534 px ⇒ 310 px = 19.375 rem above the bottom.** The pre-R25
+column (five 48 px buttons where the FAB is, plus a 2.75 rem contextual row on
+a lock) topped out at ~23.5 rem, which is what `dockBottomRem` 24.5 was
+derived against. `MOBILE_FAN_R25.dockBottomRem` 21.75 therefore docks the
+chip's bottom **2.375 rem clear** of the new column — see the note in
+`fly-constants.js` on why the plan's 20.75 was kept rather than tightened.
+
+Petals, ring 0 (`r0` 168), centre = FAB centre + (cos θ, −sin θ)·r:
+
+| petal | θ | centre | box (44 px) |
+|---|---|---|---|
+| `touch-look` | 180° | (178, 562) | `[156,540 – 200,584]` |
+| `touch-atlas` | 162° | (186, 510) | `[164,488 – 208,532]` |
+| `touch-logbook` | 144° | (210, 463) | `[188,441 – 232,485]` |
+| `touch-photo` | 126° | (247, 426) | `[225,404 – 269,448]` |
+| `touch-hangar` | 108° | (294, 402) | `[272,380 – 316,424]` |
+| `touch-pause` | 90° | (346, 394) | `[324,372 – 368,416]` |
+
+Ring 1 (`r1` 220) carries the contextual three at the same first three angles:
+`touch-inspect` 180° → (126, 562), `touch-intercept` 162° → (137, 494),
+`touch-cinema` 144° → (168, 433).
+
+Nearest edges: **156 px of left margin**, **372 px from the top**, and the
+whole fan clears the thumbstick (`[18,664 – 146,792]`) by 80 px vertically.
+
+**LANDSCAPE 844×390** — the FAB joins the `flex-row-reverse items-end`
+throttle row as its third member:
+
+| | box |
+|---|---|
+| throttle rail | `[760,204 – 828,338]` |
+| BOOST pad | `[686,294 – 754,338]` |
+| **FAB** | `[632,290 – 680,338]`, centre **(656, 314)** |
+
+Petals, ring 0 (`r0` 150): look (506, 314) · atlas (513, 268) · logbook
+(535, 226) · photo (568, 193) · hangar (610, 171) · pause (656, 164). Ring 1
+(`r1` 202): inspect (454, 314) · intercept (464, 252) · cinema (493, 195).
+Top-most petal edge **142 px**, left-most **432 px** — clear of the stick
+(`[18,210 – 146,338]`) and of the minimap and contracts chip, both of which
+live in the top corners.
 
 ## §3 Cost
 
@@ -282,3 +337,63 @@ door has ever been reachable without the pause menu.
 * **The live world.** Every tile host is 403-blocked here; the fan was
   certified over an empty sky, and the contextual petals were exercised with
   an injected lock rather than real traffic.
+
+## §9 Lessons — every one of them paid for with a red
+
+1. **A dev server that was running when `globals.css` changed will serve you
+   yesterday's stylesheet.** `hideWhileOpen` read RED — `toasts=VISIBLE` with
+   `data-fan-open="1"` on the root and the selector matching the element
+   (`el.matches(...)` returned `true`). The rule was right; the compiled chunk
+   was 4 minutes older than the source, and Turbopack had rebuilt the app but
+   not the CSS. `ls -la .next/dev/static/chunks/*globals*` against `ls -la
+   app/globals.css` is a one-line check worth doing before believing any CSS
+   red.
+2. **A 700 ms sleep is not a settle; it is a sample of the first frame.** The
+   gate measured a petal at `scale(0.6)` sitting on the FAB and reported "every
+   petal is < 44 px" and "Δ168 px off its arc slot". `getBoundingClientRect`
+   returns the TRANSFORMED box, so a mid-spring read is a lie about the layout
+   in both size and position.
+3. **A quiet window shorter than a frame is not quiet.** Two agreeing reads
+   600 ms apart on a 1 fps renderer can land inside ONE painted frame:
+   "nothing changed" meant "the page has not painted since I last looked", and
+   the gate still read Δ130.8 mid-spring. Three agreeing reads 900 ms apart
+   span 2.7 s — longer than any frame this venue produces, instant on a phone.
+4. **Playwright's `waitForFunction` polls on rAF by default.** It reported
+   `removedWithinCap=false` on a page where the very next line measured
+   `petals=0`. `polling: 250` asks the same question at a rate that does not
+   depend on the GPU.
+5. **`locator.boundingBox()` runs the actionability wait.** It died with
+   `Timeout 30000ms exceeded` against a call log that says, in the same
+   breath, `locator resolved to visible <button data-testid="touch-fab">`. The
+   element was there and unmoving; the FRAMES were not. Read the rect inside
+   `page.evaluate` and dispatch on the selector — `dispatchEvent` only needs
+   the element to be attached. (This is the R24 "actionability never settles
+   on a continuously rendering canvas" lesson, arriving via a plain DOM
+   button.)
+6. **Petals reuse the ROW's testids, so a presence census cannot tell them
+   apart.** On the flag-off tree the gate found five 48 px buttons, called
+   them petals and handed three open-state rows a PASS — a false green inside
+   the RED calibration. Every open assertion now carries
+   `data-open === '1'` alongside whatever it measures.
+7. **A gate about the info chip must contain an info chip.** `hideWhileOpen`
+   and `dockBottomRem` both passed vacuously on the idle HUD, where
+   `[data-zone="info-dock"]` does not exist at all. It is the R17 lesson
+   inverted: not "a probe that contains an actor it does not control", but a
+   probe that passes because the actor is ABSENT.
+8. **Tailwind cannot generate a class you did not write out.** The dock offset
+   had to become a getter returning one of TWO literal strings; a template
+   literal built from `dockBottomRem` would have compiled to no rule at all
+   and docked the chip nowhere. The flag-off literal is then
+   character-identical by construction, which is exactly what the gate
+   asserts.
+9. **`fly-constants.js` cannot import `r25-pins.js`.** The pin accessor imports
+   six constants at module scope, so the cycle throws a TDZ ReferenceError in
+   one of the two load orders. Two hoisted helpers next to the owner's own
+   block spell the same `pinned()` merge; a browser gate asserts the two
+   readings agree.
+10. **Five agents share four cores.** A settle that takes 400 ms on a phone
+    took **29.7 s of wall clock** here, one dev server was OOM-killed
+    mid-run, and three other harnesses were live in the process table. None of
+    that is a number about the feature — which is precisely why every timing
+    number in this ledger is labelled as wall clock, and why the gate waits for
+    STATES rather than for clocks.

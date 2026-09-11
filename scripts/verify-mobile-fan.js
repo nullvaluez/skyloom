@@ -78,10 +78,30 @@ const skip = (name, why) => {
   console.log(`SKIP  ${name}  — ${why}`);
 };
 
-/** A touch-typed pointer event at an element's centre (the R17 idiom). */
+/**
+ * A touch-typed pointer event at an element's centre (the R17 idiom).
+ *
+ * The rect comes from `page.evaluate(getBoundingClientRect)`, NOT from
+ * `locator.boundingBox()`, and that is the fourth thing this venue taught.
+ * `boundingBox()` runs Playwright's actionability wait, which includes a
+ * STABILITY check — the same box across two consecutive animation frames.
+ * With five headless SwiftShader browsers sharing four cores, rAF callbacks
+ * arrive seconds apart, and the call died with `Timeout 30000ms exceeded`
+ * against a call log that says, in the same breath, `locator resolved to
+ * visible <button data-testid="touch-fab">`. The element was there, visible
+ * and unmoving; the frames were not. `dispatchEvent` only requires the
+ * element to be ATTACHED, so reading the rect ourselves removes the whole
+ * actionability class from this gate. (It is also what verify-mobile.js:31
+ * does, for what turns out to be the same reason.)
+ */
 async function touch(page, selector, type) {
-  const box = await page.locator(selector).first().boundingBox();
-  if (!box) throw new Error(`no box for ${selector}`);
+  const box = await page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    if (!el) return null;
+    const b = el.getBoundingClientRect();
+    return { x: b.x, y: b.y, width: b.width, height: b.height };
+  }, selector);
+  if (!box) throw new Error(`no element for ${selector}`);
   await page.dispatchEvent(selector, type, {
     pointerType: 'touch',
     pointerId: 1,
@@ -162,13 +182,23 @@ async function settleFan(page, { timeoutMs = 40000, quietMs = 900, stableReads =
   return 0;
 }
 
-/** Wait for the collapse to actually REMOVE the petals (AnimatePresence exit). */
+/**
+ * Wait for the collapse to actually REMOVE the petals (AnimatePresence exit).
+ *
+ * `polling: 250`, and that is the third instrument bug this venue taught:
+ * Playwright's `waitForFunction` polls on requestAnimationFrame BY DEFAULT, so
+ * on a 1 fps renderer the predicate is evaluated about once a second. It
+ * reported `removedWithinCap=false` on a page where the very next line
+ * measured `petals=0` — the petals were long gone and the poller had simply
+ * not been given a frame to notice. A wall-clock poll asks the same question
+ * at a rate that does not depend on the GPU.
+ */
 async function gone(page, timeoutMs = 25000) {
   return page
     .waitForFunction(
       () => document.querySelectorAll('[data-testid="touch-fan"] [data-testid^="touch-"]').length === 0,
       null,
-      { timeout: timeoutMs }
+      { timeout: timeoutMs, polling: 250 }
     )
     .then(() => true)
     .catch(() => false);
@@ -478,16 +508,50 @@ async function runOrientation(browser, label, ctxOpts) {
   // --- 6. CONTEXTUAL PETALS FOLLOW A LOCK ----------------------------------
   const lockHex = await injectLock(page);
   await page.waitForTimeout(1400);
-  const lockState = await page.evaluate(() => ({
-    hex: window.__flyStore.getState().lockedHex,
-    state: window.__flyStore.getState().lockState,
-  }));
+  const readLock = () =>
+    page.evaluate(() => ({
+      hex: window.__flyStore.getState().lockedHex,
+      state: window.__flyStore.getState().lockState,
+    }));
+  let lockState = await readLock();
+  let lockVia = 'injectLock (a real acquisition)';
+  if (!lockState.hex) {
+    // FALLBACK, and it is a better instrument here than the thing it backs up.
+    // `injectLock` seeds a track and waits for the REAL targeting state machine
+    // to acquire it, which needs a traffic engine with a server clock — this
+    // container has no traffic at all, so verify-mobile skips these rows
+    // outright. FlyScene derives the store's lock straight off
+    // `targeting.lockedHex` every frame (FlyScene.jsx:2098-2109), so freezing
+    // the scanner and setting that field is the same state by the same path,
+    // minus the sky. (verify-mobile-layout.js:246-286 does exactly this to put
+    // an InfoCard on screen, for exactly this reason.)
+    await page.evaluate(() => {
+      const rt = window.__fly;
+      const f = rt.flight;
+      const hex = 'c0ffee';
+      const track = {
+        hex,
+        meta: { flight: 'CTXTEST', r: 'N9CTX', t: 'C172', color: '#22d3ee' },
+        rx: f.pos.x, ry: f.pos.y, ryd: f.pos.y, rz: f.pos.z - 100,
+        yaw: 0, distM: 1200, stale: 0, horizonFade: 1,
+      };
+      rt.targeting.update = () => null;
+      rt.targeting.lockedHex = hex;
+      rt.targeting.target = track;
+      rt.traffic.tracks.set(hex, track);
+      if (!rt.traffic.items.some((x) => x.hex === hex)) rt.traffic.items.push(track);
+      window.__fanLockFixture = setInterval(() => rt.traffic.tracks.set(hex, track), 100);
+    });
+    await page.waitForTimeout(1200);
+    lockState = await readLock();
+    lockVia = 'a frozen-scanner fixture (no traffic in this venue)';
+  }
   if (!opened) {
     skip(`${label} contextual petals follow a lock`, 'no FAB');
   } else if (!lockState.hex) {
     skip(
       `${label} contextual petals follow a lock`,
-      `injectLock returned ${lockHex}, store lock ${JSON.stringify(lockState)} — empty sky`
+      `injectLock returned ${lockHex} and the fixture did not take either: ${JSON.stringify(lockState)}`
     );
   } else {
     await openFan(page);
@@ -496,7 +560,7 @@ async function runOrientation(browser, label, ctxOpts) {
     gate(
       `${label} contextual: INSPECT + INTERCEPT appear as petals on a lock`,
       !!locked.petals['touch-inspect'] && !!locked.petals['touch-intercept'],
-      `lock=${JSON.stringify(lockState)} petals=[${lockedIds.join(',')}]`
+      `lock=${JSON.stringify(lockState)} via ${lockVia} · petals=[${lockedIds.join(',')}]`
     );
     gate(
       `${label} contextual: CINEMA stays away unless the autopilot is engaged`,
@@ -536,6 +600,17 @@ async function runOrientation(browser, label, ctxOpts) {
   await page.evaluate(() => {
     window.__fly?.traffic?.tracks?.delete('fffff9');
     window.__fly?.autopilot?.disengage?.();
+    clearInterval(window.__fanLockFixture);
+    const rt = window.__fly;
+    if (rt?.targeting) {
+      // own property, not the prototype method — delete restores the real one
+      delete rt.targeting.update;
+      rt.targeting.lockedHex = null;
+      rt.targeting.target = null;
+    }
+    const i = rt?.traffic?.items?.findIndex((x) => x.hex === 'c0ffee') ?? -1;
+    if (i >= 0) rt.traffic.items.splice(i, 1);
+    rt?.traffic?.tracks?.delete('c0ffee');
   });
   await page.waitForTimeout(600);
 
