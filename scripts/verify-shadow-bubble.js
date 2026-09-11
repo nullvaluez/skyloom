@@ -125,8 +125,16 @@ const waitForAgl = async (page, targetM, tolM, capMs = 90000) =>
   page
     .waitForFunction(
       ([want, tol]) => {
+        // The bubble's own visual AGL when the substrate is armed; the
+        // aircraft's raw AGL otherwise. The RED leg does not mount
+        // GroundBubbleRig at all, and a poll on a value that can never exist
+        // would spend the whole cap on every pose and then report the timeout
+        // as if it were a fact about the world.
         const a = window.__flyStats?.groundBubble?.aglVisM;
-        return typeof a === 'number' && Math.abs(a - want) <= tol;
+        if (typeof a === 'number') return Math.abs(a - want) <= tol;
+        const f = window.__fly?.flight;
+        if (!f) return false;
+        return Math.abs(f.pos.y - (f.groundElev ?? 0) - want) <= tol;
       },
       [targetM, tolM],
       { timeout: capMs, polling: 500 }

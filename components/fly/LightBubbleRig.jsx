@@ -219,15 +219,17 @@ export function LightBubbleRig({ runtime }) {
       live.shadowRung = r.rung;
       live.shadowTexelM = shadowTexelM(r.radiusM, mapSize);
       if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+        // In place, like GROUND_BUBBLE's publication: a frame loop that
+        // allocates an object per frame to describe a number that changes once
+        // per rung is a small lie about the cost of the instrument.
         const stats = (window.__flyStats = window.__flyStats || {});
-        stats.shadow = {
-          radiusM: r.radiusM,
-          texelM: live.shadowTexelM,
-          rung: r.rung,
-          rawM: r.rawM,
-          mapSize,
-          k,
-        };
+        const sh = stats.shadow ?? (stats.shadow = {});
+        sh.radiusM = r.radiusM;
+        sh.texelM = live.shadowTexelM;
+        sh.rung = r.rung;
+        sh.rawM = r.rawM;
+        sh.mapSize = mapSize;
+        sh.k = k;
       }
     } else {
       publishShadowRadius(runtime, null);
