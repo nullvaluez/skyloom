@@ -46,13 +46,19 @@
  *   (1)  1500 m AT 3500 ft — the R24 cascade is what cruise still gets
  *   (2)  radiusLowM ± one rung AT 80 ft-band AGL, and the texel follows
  *   (3)  HYSTERESIS: a 480 → 560 → 480 m sweep changes the rung at most once
- *   (3b) PROGRAMS ARE FLAT across the whole traverse — the no-second-light
- *        claim, as a number
+ *   (3b) A SECOND k EXCURSION COMPILES NOTHING — the no-second-light claim, as
+ *        a number, with no bound to choose (see the comment at the clause)
  *   (4)  the N8AO radius follows k (high tier only)
  *   (5)  HEMI GROUND: #5a6b53 at noon, the block's night colour at night
+ *   (9)  THE MOON REACHES THE LIGHT — a new/full A/B on the directional's own
+ *        intensity at a pinned −20°, plus the grade riders on the sun object
  *   (6)  the two FlyScene readers see the LIVE radius (bus === camera === stats)
  *   (7)  DRAW CENSUS — the desert control is untouched (fixture column)
  *   (8)  zero app page errors
+ *
+ * (9) is numbered out of order deliberately: it runs where the night pose
+ * already is, and renumbering the clauses a RED calibration has been recorded
+ * against would make two runs incomparable.
  *
  * VENUE. Fixture tiles, SwiftShader at 1–3 fps: every number here is a COUNT,
  * a METRE or a COLOUR, never a frame time. The look these numbers stand for —
@@ -564,7 +570,10 @@ const readState = () =>
 
   // ---- (8) errors ----------------------------------------------------------
   const appErrors = errors.filter((e) => !/favicon|ERR_INTERNET_DISCONNECTED|403/i.test(String(e)));
-  gate('(8) ZERO APP PAGE ERRORS', appErrors.length === 0, appErrors.slice(0, 3).join(' | ') || errorsNote || 'none');
+  // `attachPageErrors` returns the note FUNCTION, not a string — passes 1-3
+  // printed its source code as the gate's detail, which is exactly the kind of
+  // instrument noise that teaches a reader to stop reading details.
+  gate('(8) ZERO APP PAGE ERRORS', appErrors.length === 0, appErrors.slice(0, 3).join(' | ') || errorsNote());
 
   console.log(`\n${pass} passed, ${fail} failed${notCalCount() ? `, ${notCalCount()} NOT CALIBRATED` : ''}`);
   if (notCalCount()) console.log(notCalSummary());
