@@ -99,15 +99,21 @@ const MAX_BEND_K = 1 / (2 * GLOBE.bendRadiusM.satellite);
 // absent — see the header.
 const CLS_ID = { wood: 2, grass: 3, farmland: 5 };
 
-/** Scrub tone per landcover class — read off the ground, not invented. */
+/**
+ * Scrub tone per landcover class, AUTHORED IN sRGB like every other palette in
+ * the tree (SAT_TINT.palette, CLUTTER, PARCEL_HOMES) and decoded by three's
+ * Color — a triple typed straight into a linear working space is a different
+ * colour from the one a person picked, and these are the numbers a §6
+ * checkpoint will re-pick.
+ */
 const CLS_TONE = {
-  2: [0.20, 0.29, 0.17], // wood understorey, darker than the canopy above it
-  3: [0.33, 0.39, 0.20], // mown/rough grass
-  5: [0.47, 0.44, 0.24], // farmland stubble
+  2: '#39492c', // wood understorey — darker than the canopy standing over it
+  3: '#5a6a36', // mown / rough grass
+  5: '#7d7442', // farmland stubble
 };
 
-/** Hedge tone (one, jittered per instance — a hedgerow is one species). */
-const HEDGE_TONE = [0.20, 0.27, 0.16];
+/** Hedge tone (one species per hedgerow; the jitter is per instance). */
+const HEDGE_TONE = '#38472b';
 
 /**
  * 2 crossed cards = 4 triangles, authored in a UNIT SCRUB frame: base at
@@ -270,6 +276,7 @@ export function SatGroundDetailLayer({ runtime, flight }) {
     hedge: 0,
     roadScan: null,
     roadIndex: null,
+    areaM2: 0,
   });
 
   const scrubGeo = useMemo(() => (scrubPool > 0 ? buildScrubGeometry() : null), [scrubPool]);
@@ -317,7 +324,12 @@ export function SatGroundDetailLayer({ runtime, flight }) {
 
     // The resumable road scan (SatParcelHomes' contract, reused verbatim): a
     // newly-streamed road ring must never stall a frame.
-    if (hedge && !st.roadScan && !st.roadIndex) {
+    // Re-offered EVERY frame, exactly as SatParcelHomes does: parcelRoadScan
+    // returns null when the ring's signature is unchanged, so this is a cheap
+    // no-op on a settled ring AND it picks up newly-streamed road chunks. A
+    // one-shot scan would freeze the hedges to whatever had streamed at the
+    // first pass, which on a warp is nothing.
+    if (hedge && !st.roadScan) {
       st.roadScan = parcelRoadScan(
         runtime.satRoads?.chunks,
         mercatorScale(flight.latDeg),
@@ -337,7 +349,16 @@ export function SatGroundDetailLayer({ runtime, flight }) {
     // THE BUBBLE GATE, first and cheapest. Above the bubble there is nothing to
     // place, so every cruise draw census in the fleet is untouched by
     // arithmetic rather than by a number someone could move.
-    const k = live.k;
+    //
+    // DEV-ONLY PARK HANDLE (the SatParcelHomes `__flyParcelHomesOff` idiom, and
+    // R19's lesson behind it): a pixel A/B of the OVERLAY must not contain the
+    // scrub and the hedges, and a probe cannot park them with a bare
+    // `mesh.visible = false` because this owner rewrites both every cadence.
+    // So the OWNER reads the flag, which is what makes the park authoritative.
+    // Compiled out of production by the NODE_ENV guard.
+    const off =
+      process.env.NODE_ENV === 'development' && globalThis.__flyGroundDetailLayerOff === true;
+    const k = off ? 0 : live.k;
     if (k <= 0.001 || !engine) {
       if (scrub) park(scrub, st, 'prevScrub');
       if (hedge) park(hedge, st, 'prevHedge');
@@ -446,6 +467,7 @@ function park(mesh, st, prevKey) {
 function publish(live, st) {
   live.scrubCount = st.scrub;
   live.hedgeCount = st.hedge;
+  live.scrubAreaM2 = st.areaM2 | 0;
   if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && window.__flyStats) {
     window.__flyStats.groundDetail = {
       k: live.k,
@@ -481,21 +503,27 @@ function finish(mesh, n, prev, maxR2, maxScale, maxD) {
 }
 
 /**
- * ONE scrub pass. Walks the ready chunks nearest-first, and inside each walks
- * its landcover TRIANGLES, placing hash-stable samples on the ones whose class
- * is grass / farmland / wood.
+ * ONE scrub pass. Walks the ready chunks nearest-first and, inside each, walks
+ * its landcover TRIANGLES whose class is grass / farmland / wood.
  *
- * HASH-STABLE means the sample position is a pure function of (chunk key,
- * triangle index, sample index) and of NOTHING the camera does — so a tuft
- * never moves, blinks or re-shuffles because the aircraft turned. That is the
- * SAT_VEG rule ("never a distance sort") applied to a source that has no
- * emission order of its own.
+ * THE SAMPLER IS A JITTERED WORLD LATTICE, not N barycentric samples per
+ * triangle, and the difference is not cosmetic. A per-triangle count spreads
+ * its samples over the WHOLE triangle and then range-rejects — so a 600 m
+ * landcover parcel clipped by a 300 m disc delivers only the fraction of its
+ * budget that happens to land in the disc, and a per-triangle CAP (which you
+ * need, or one region-scale parcel spends the pool) makes that fraction
+ * arbitrarily small. A lattice walked over `bbox(triangle) ∩ disc` instead:
  *
- * DENSITY IS DERIVED, not a new constant: a pool of `pool` spread over the
- * `radiusM` disc is `pool / (π r²)` cards per m², so a fully-vegetated disc
- * fills the pool exactly and a half-vegetated one fills half of it. The
- * per-triangle cap stops one enormous parcel from eating the whole pool before
- * the near ones are served.
+ *   · costs work proportional to the IN-DISC area, not the triangle area;
+ *   · needs no cap at all, because a far triangle contributes no cells;
+ *   · is exactly the requested density everywhere, because the spacing IS the
+ *     density: `spacing = 1 / sqrt(pool / (π r²))`;
+ *   · and is HASH-STABLE in the strongest sense — the lattice lives in ABSOLUTE
+ *     world coordinates and each cell's jitter is keyed on its integer cell
+ *     index, so a tuft's position is a pure function of where it is on the
+ *     planet and of NOTHING the camera does. That is the SAT_VEG rule ("never a
+ *     distance sort") applied to a source with no emission order of its own,
+ *     and it is why a tuft never moves, blinks or re-shuffles when you turn.
  */
 function placeScrub(mesh, engine, flight, cfg, k, pool, colIndex, mercK, st) {
   const S = cfg.scrub ?? {};
@@ -510,7 +538,8 @@ function placeScrub(mesh, engine, flight, cfg, k, pool, colIndex, mercK, st) {
   const waterW = (S.waterAvoidM ?? 4) * mercK;
   const hLo = S.cardM?.[0] ?? 0.6;
   const hHi = S.cardM?.[1] ?? 1.4;
-  const density = pool / (Math.PI * radiusM * radiusM); // cards per m²
+  // Lattice spacing in WORLD units: one card per (π r² / pool) m² of landcover.
+  const stepW = Math.sqrt((Math.PI * radiusM * radiusM) / Math.max(1, pool)) * mercK;
   const ox = Math.round(px / 1000) * 1000;
   const oz = Math.round(pz / 1000) * 1000;
   mesh.position.set(ox, 0, oz);
@@ -519,89 +548,101 @@ function placeScrub(mesh, engine, flight, cfg, k, pool, colIndex, mercK, st) {
   let maxR2 = 0;
   let maxScale = 1;
   let maxD = 0;
+  let areaW = 0; // in-disc landcover area considered, for the gate's precondition
 
   for (const chunk of engine.nearest(px, pz)) {
     if (n >= pool) break;
     const tint = chunk.tint;
     if (!tint || !tint.cls) continue;
-    // A chunk whose whole span is outside the disc cannot contribute.
     const half = chunk.span * 0.5;
     if (Math.abs(chunk.cx - px) - half > radiusW || Math.abs(chunk.cz - pz) - half > radiusW)
       continue;
     const water = chunk.water; // ambient-mover anchors, strictly INSIDE water
-    const seed = (chunk.cx * 0.013 + chunk.cz * 0.017) % 1000;
     const tris = tint.idx.length / 3;
     for (let tr = 0; tr < tris && n < pool; tr++) {
       const i0 = tint.idx[tr * 3];
       if (!wanted.has(tint.cls[i0])) continue;
       const i1 = tint.idx[tr * 3 + 1];
       const i2 = tint.idx[tr * 3 + 2];
-      const ax = tint.pos[i0 * 3];
-      const az = tint.pos[i0 * 3 + 2];
-      const bx = tint.pos[i1 * 3];
-      const bz = tint.pos[i1 * 3 + 2];
-      const cx2 = tint.pos[i2 * 3];
-      const cz2 = tint.pos[i2 * 3 + 2];
-      // Triangle area in WORLD units → true m² (the worker maps tile geometry
-      // to mercator, so a real 100 m² parcel is 100·mercK² world units).
-      const areaW = Math.abs((bx - ax) * (cz2 - az) - (cx2 - ax) * (bz - az)) * 0.5;
-      const areaM2 = areaW / (mercK * mercK);
-      // Cap per triangle so one region-scale parcel cannot spend the pool
-      // before the near triangles are served.
-      const want = Math.min(64, Math.round(areaM2 * density));
-      if (want <= 0) continue;
+      // ABSOLUTE world corners — the lattice must not move with the chunk.
+      const ax = chunk.cx + tint.pos[i0 * 3];
+      const az = chunk.cz + tint.pos[i0 * 3 + 2];
+      const bx = chunk.cx + tint.pos[i1 * 3];
+      const bz = chunk.cz + tint.pos[i1 * 3 + 2];
+      const cx2 = chunk.cx + tint.pos[i2 * 3];
+      const cz2 = chunk.cz + tint.pos[i2 * 3 + 2];
+      // bbox(triangle) ∩ bbox(disc) — the only region worth walking.
+      const lo0 = Math.max(Math.min(ax, bx, cx2), px - radiusW);
+      const hi0 = Math.min(Math.max(ax, bx, cx2), px + radiusW);
+      const lo1 = Math.max(Math.min(az, bz, cz2), pz - radiusW);
+      const hi1 = Math.min(Math.max(az, bz, cz2), pz + radiusW);
+      if (hi0 <= lo0 || hi1 <= lo1) continue;
+      const det = (bx - ax) * (cz2 - az) - (cx2 - ax) * (bz - az);
+      if (Math.abs(det) < 1e-9) continue;
+      const inv = 1 / det;
       const tone = CLS_TONE[tint.cls[i0]] ?? CLS_TONE[3];
-      for (let s = 0; s < want && n < pool; s++) {
-        // Barycentric from two hashes, folded so the sample is uniform over the
-        // triangle rather than bunched at one corner.
-        const h1 = hash(seed + tr * 3.71 + s * 0.137);
-        const h2 = hash(seed - tr * 1.93 + s * 0.611);
-        let u = h1;
-        let v = h2;
-        if (u + v > 1) {
-          u = 1 - u;
-          v = 1 - v;
+      const g0 = Math.floor(lo0 / stepW);
+      const g1 = Math.floor(hi0 / stepW);
+      const h0 = Math.floor(lo1 / stepW);
+      const h1 = Math.floor(hi1 / stepW);
+      for (let gx = g0; gx <= g1 && n < pool; gx++) {
+        for (let gz = h0; gz <= h1 && n < pool; gz++) {
+          // Jitter keyed on the integer cell: stable per patch of planet.
+          const j1 = hash(gx * 12.9898 + gz * 78.233);
+          const j2 = hash(gx * 39.3468 - gz * 11.135);
+          const wx = (gx + 0.15 + j1 * 0.7) * stepW;
+          const wz = (gz + 0.15 + j2 * 0.7) * stepW;
+          // Point in triangle, barycentric.
+          const u = ((wx - ax) * (cz2 - az) - (cx2 - ax) * (wz - az)) * inv;
+          if (u < 0 || u > 1) continue;
+          const v = ((bx - ax) * (wz - az) - (wx - ax) * (bz - az)) * inv;
+          if (v < 0 || u + v > 1) continue;
+          const dx = wx - px;
+          const dz = wz - pz;
+          const d2 = dx * dx + dz * dz;
+          if (d2 > rangeSq) continue;
+          areaW += stepW * stepW;
+          if (colIndex && nearColumn(colIndex, wx, wz, urbanW)) continue;
+          // ROADS: the cls 5/6 centreline index SatParcelHomes builds. It is
+          // the only road index reachable from here, so this rejects driveways
+          // and residential streets and NOT arteries — stated, not implied.
+          if (st.roadIndex && nearSegment(st.roadIndex, wx, wz, roadW)) continue;
+          if (water && nearPoint(water, chunk.cx, chunk.cz, wx, wz, waterW)) continue;
+          const h3 = hash(gx * 2.113 - gz * 0.577);
+          // …and the BUBBLE RAMP is a SCALE ramp (the R22 birth idiom): the
+          // pool does not thin out as you climb — every card shrinks together,
+          // so the field fades instead of dissolving into a moving frontier.
+          // `wid` is derived from `hgt`, so the scale stays uniform.
+          const hgt = (hLo + (hHi - hLo) * h3) * mercK * k;
+          const wid = hgt * (0.8 + h3 * 0.5);
+          _dummy.position.set(
+            wx - ox,
+            engine.groundAtLocal(chunk, wx - chunk.cx, wz - chunk.cz),
+            wz - oz
+          );
+          _dummy.scale.set(wid, hgt, wid);
+          _dummy.rotation.set(0, j1 * Math.PI * 2, 0);
+          _dummy.updateMatrix();
+          mesh.setMatrixAt(n, _dummy.matrix);
+          // COLOUR_0 carries the base→tip gradient; instanceColor carries the
+          // absolute tone, jittered so a field is not one flat swatch.
+          _col.set(tone).multiplyScalar(0.82 + j2 * 0.36);
+          mesh.setColorAt(n, _col);
+          const r2 = _dummy.position.lengthSq();
+          if (r2 > maxR2) maxR2 = r2;
+          if (hgt > maxScale) maxScale = hgt;
+          const d = Math.sqrt(d2);
+          if (d > maxD) maxD = d;
+          n += 1;
         }
-        const lx = ax + (bx - ax) * u + (cx2 - ax) * v;
-        const lz = az + (bz - az) * u + (cz2 - az) * v;
-        const wx = chunk.cx + lx;
-        const wz = chunk.cz + lz;
-        const dx = wx - px;
-        const dz = wz - pz;
-        const d2 = dx * dx + dz * dz;
-        if (d2 > rangeSq) continue;
-        if (colIndex && nearColumn(colIndex, wx, wz, urbanW)) continue;
-        // ROADS: the cls 5/6 centreline index SatParcelHomes builds. It is the
-        // only road index reachable from here, so this rejects driveways and
-        // residential streets and NOT arteries — stated rather than implied.
-        if (st.roadIndex && nearSegment(st.roadIndex, wx, wz, roadW)) continue;
-        if (water && nearPoint(water, chunk.cx, chunk.cz, wx, wz, waterW)) continue;
-        const h3 = hash(seed + tr * 0.577 + s * 2.113);
-        // …and the BUBBLE RAMP is a SCALE ramp (the R22 birth idiom): the pool
-        // does not thin out as you climb — every card shrinks together, so the
-        // field fades instead of dissolving into a moving frontier. `wid` is
-        // derived from `hgt`, so the scale stays uniform.
-        const hgt = (hLo + (hHi - hLo) * h3) * mercK * k;
-        const wid = hgt * (0.8 + h3 * 0.5);
-        _dummy.position.set(wx - ox, engine.groundAtLocal(chunk, lx, lz), wz - oz);
-        _dummy.scale.set(wid, hgt, wid);
-        _dummy.rotation.set(0, h1 * Math.PI * 2, 0);
-        _dummy.updateMatrix();
-        mesh.setMatrixAt(n, _dummy.matrix);
-        // COLOUR_0 carries the base→tip gradient; instanceColor carries the
-        // absolute tone, jittered so a field is not one flat swatch.
-        const jit = 0.82 + h2 * 0.36;
-        _col.setRGB(tone[0] * jit, tone[1] * jit, tone[2] * jit);
-        mesh.setColorAt(n, _col);
-        const r2 = _dummy.position.lengthSq();
-        if (r2 > maxR2) maxR2 = r2;
-        if (hgt > maxScale) maxScale = hgt;
-        const d = Math.sqrt(d2);
-        if (d > maxD) maxD = d;
-        n += 1;
       }
     }
   }
+  // The gate's PRECONDITION: how much landcover was in range at all. A zero
+  // count with a zero area is the VENUE having nothing to place on; a zero
+  // count with a non-zero area is a defect. An instrument that cannot tell
+  // those apart reports a coin (the R24 lesson).
+  st.areaM2 = Math.round(areaW / (mercK * mercK));
   const out = finish(mesh, n, st.prevScrub, maxR2, maxScale, maxD);
   st.prevScrub = n;
   return out;
@@ -740,7 +781,7 @@ function placeHedges(mesh, engine, flight, cfg, k, pool, colIndex, mercK, st) {
               _dummy.updateMatrix();
               mesh.setMatrixAt(n, _dummy.matrix);
               const jit = 0.85 + hash(hx * 0.11 - hz * 0.07) * 0.3;
-              _col.setRGB(HEDGE_TONE[0] * jit, HEDGE_TONE[1] * jit, HEDGE_TONE[2] * jit);
+              _col.set(HEDGE_TONE).multiplyScalar(jit);
               mesh.setColorAt(n, _col);
               const r2 = _dummy.position.lengthSq();
               if (r2 > maxR2) maxR2 = r2;
