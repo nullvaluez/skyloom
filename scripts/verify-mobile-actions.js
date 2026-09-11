@@ -94,11 +94,15 @@ async function geometry(page, label) {
         await page.waitForTimeout(160);
         const label=`${style} ${width}x${height}`;
         await closed(page,label);
+        if (width===320 || width===844) await page.screenshot({path:path.join(OUT,`${style}-${width}x${height}-closed.png`)});
         await openActions(page);
         await page.waitForTimeout(180);
         await geometry(page,label);
         gate(`${label}: opening actions keeps flight live`,(await state(page)).phase==='flying');
-        if (width===320 || width===844) await page.screenshot({path:path.join(OUT,`${style}-${width}x${height}.png`)});
+        if (width===320 || width===844) {
+          await page.locator('.touch-actions-scroll').evaluate(el=>{el.scrollTop=0;});
+          await page.screenshot({path:path.join(OUT,`${style}-${width}x${height}.png`)});
+        }
       }
     }
     await closeActions(page);

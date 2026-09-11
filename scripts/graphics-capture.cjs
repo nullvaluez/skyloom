@@ -3,6 +3,8 @@
 const { chromium } = require('playwright');
 const fs = require('node:fs');
 const path = require('node:path');
+const { captureBudgetChecks } = require('./graphics-capture-budget.cjs');
+const { captureStreamersSettled, captureSceneCensus } = require('./graphics-capture-census.cjs');
 
 const args = Object.fromEntries(process.argv.slice(2).map(s => { const [k,v] = s.replace(/^--/, '').split('='); return [k,v ?? true]; }));
 const stage = args.stage || 'cinematic';
@@ -11,6 +13,7 @@ const url = args.url || process.env.FLY_URL || 'http://localhost:3000';
 const sites = {
   manhattan: { lat: 40.7028, lon: -74.017, ground: 0, heading: 0.3, noon: 17, dusk: 24.3, night: 4 },
   powell: { lat: 40.2083, lon: -83.0701, ground: 280, heading: 1.9, noon: 18, dusk: 25, night: 5 },
+  'powell-reference': { lat: 40.1990, lon: -83.0811, ground: 280, heading: 339*Math.PI/180, noon: 18, dusk: 25, night: 5 },
   ohio: { lat: 40.20403, lon: -83.0896, ground: 280, heading: 3.9, noon: 18, dusk: 25, night: 5 },
   melton: { lat: -37.683, lon: 144.582, ground: 135, heading: 1.9, noon: 2, dusk: 7.4, night: 15 },
   paris: { lat: 48.8579, lon: 2.301, ground: 35, heading: 2.6, noon: 12, dusk: 20.8, night: 23 },
@@ -26,6 +29,7 @@ const sites = {
   try {
     browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--enable-gpu'] });
     const page = await browser.newPage({ viewport: report.viewport, deviceScaleFactor: 1 });
+    if(args['audit-textures']) await page.addInitScript(require('./ground-texture-audit.cjs').installGroundTextureAudit);
     page.on('pageerror', e => report.errors.push(e.message));
     page.on('console', m => { if (m.type() === 'error' && /shader|WebGL|ReferenceError|TypeError/.test(m.text())) report.errors.push(m.text().slice(0,2500)); });
     await page.addInitScript(({ stage, fixedTier, featureOff }) => {
@@ -41,10 +45,7 @@ const sites = {
     }, { stage, fixedTier: !!args['fixed-tier'], featureOff: (args['feature-off']||'').split(',').filter(Boolean) });
     await page.goto(`${url}/?graphics=${encodeURIComponent(stage)}&graphicsReview=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
     if (args['build-id']) {
-      const receipt = await page.request.get(`${url}/_next/static/${encodeURIComponent(args['build-id'])}/ground-source.json`);
-      if (!receipt.ok()) throw new Error('Served build receipt unavailable');
-      report.servedBuild = await receipt.json();
-      if (report.servedBuild.buildId !== args['build-id']) throw new Error('Served build identity mismatch');
+      report.servedBuild = await require('./ground-build-receipt.cjs')(page, url, args['build-id']);
     }
     report.hardware = await page.evaluate(() => {
       const gl = document.createElement('canvas').getContext('webgl2');
@@ -75,25 +76,32 @@ const sites = {
             fly.chaseCam?.snap?.();
           }, { site: sites[name], time, aglFt });
           await page.waitForTimeout(Number(args.settle || 20000));
-          await page.waitForFunction(() => (window.__fly?.satBuildings?.stats?.ready ?? 0) > 0 && window.__graphicsReview?.terrain?.sharp, null, {timeout:45000}).catch(error => {
+          await page.waitForFunction(() => (window.__fly?.satBuildings?.stats?.ready ?? 0) > 0 && window.__graphicsReview?.terrain?.sharp, null, {timeout:45000}).catch(async error => {
             // Optional diagnostic image, never a relaxed readiness verdict.
+            (report.readinessFailures ??= []).push({name,time,aglFt,phase:'terrain/buildings',reason:error.message,census:await page.evaluate(captureSceneCensus)});
             if (!args['capture-unready']) throw error;
-            (report.readinessFailures ??= []).push({name,time,aglFt,reason:error.message});
           });
           // Use the resolved DEM for actual AGL, not the approximate bootstrap elevation.
           await page.evaluate(aglFt => { window.__graphicsPose.y = window.__fly.flight.groundElev + aglFt * 0.3048; }, aglFt);
           await page.waitForTimeout(3000);
+          await page.waitForFunction(captureStreamersSettled, null, {timeout:45000,polling:500}).catch(async error=>{
+            (report.readinessFailures??=[]).push({name,time,aglFt,phase:'streamers',reason:error.message,census:await page.evaluate(captureSceneCensus)});
+            if(!args['capture-unready'])throw error;
+          });
+          const sceneCensus=await page.evaluate(captureSceneCensus);
           const telemetry = await page.evaluate(() => ({ stats: window.__flyStats,
             review: window.__graphicsReview,
             boot: window.__flyBoot, tier: window.__flyStore?.getState().qualityTier,
             ground: window.__fly?.groundImmersion,
             groundDetail: window.__fly?.groundDetail,
+            satVeg: window.__fly?.satVeg?.stats,
             nightGround: window.__fly?.groundLighting,
+            textureAudit: window.__groundTextureAudit?.snapshot(),
             shadowRadiusM: window.__fly?.shadowRadiusM,
             activePins: Object.fromEntries(['__flyTerraPin','__flyDepthPin','__flyGovPin','__flyAerialOverride','__flyNightCityArm','__flyVisualsArm','__flyVisualsFeatures','__flyGroundFeatures'].map(k=>[k,window[k] ?? null])) }));
           const file = `${name}-${time}-${aglFt}.png`;
           await page.screenshot({ path: path.join(output, file) });
-          report.shots.push({ name, time, site: sites[name], requestedAglFt: aglFt, file, ...telemetry });
+          report.shots.push({ name, time, site: sites[name], requestedAglFt: aglFt, file, sceneCensus, ...telemetry });
           fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify({ ...report, status: 'IN_PROGRESS' }, null, 2));
           console.log(`Captured ${file}`);
         }
@@ -101,14 +109,14 @@ const sites = {
     }
     const software = /swiftshader|llvmpipe|software/i.test(report.hardware.renderer || '');
     const empty = report.shots.some(s => !(s.review?.buildings?.ready > 0 || s.stats?.satBuildings?.ready > 0));
-    const unready = report.shots.some(s => !s.review?.terrain?.sharp) || !!report.readinessFailures?.length;
-    report.budgetChecks = report.shots.map(s => ({file:s.file,draws:s.review?.drawCalls,triangles:s.review?.triangles,
-      drawLimit:s.name==='owens'?261:375,triangleLimit:2000000,
-      pass:s.review?.drawCalls>1&&s.review.drawCalls<=(s.name==='owens'?261:375)&&s.review?.triangles>0&&s.review.triangles<=2000000}));
+    const unready = report.shots.some(s => !s.review?.terrain?.sharp || !s.sceneCensus?.streamersSettled) || !!report.readinessFailures?.length;
+    report.budgetChecks = captureBudgetChecks(report.shots, !!args['audit-textures']);
     const overBudget = args['gate-budgets'] && report.budgetChecks.some(s=>!s.pass);
-    report.status = software || empty || unready ? 'BLOCKED' : report.errors.length || overBudget ? 'FAIL' : 'CAPTURED';
-    report.reason = software ? 'Software renderer: no GPU performance certification.' : empty ? 'Required building residency not established.' : unready ? 'Terrain imagery did not reach the active sharpness target.' : undefined;
-    if(overBudget) report.reason='A fixed-pose draw or triangle budget was exceeded; see budgetChecks.';
+    const allocationUnknown = args['audit-textures'] && report.budgetChecks.some(s=>!s.allocationObserved);
+    report.status = software || empty || unready || allocationUnknown ? 'BLOCKED' : report.errors.length || overBudget ? 'FAIL' : 'CAPTURED';
+    report.reason = software ? 'Software renderer: no GPU performance certification.' : empty ? 'Required building residency not established.' : unready ? 'Terrain sharpness or streamer settling was not established; see sceneCensus/readinessFailures.' : undefined;
+    if(overBudget) report.reason='A fixed-pose draw, triangle or texture budget was exceeded; see budgetChecks.';
+    if(allocationUnknown) report.reason='Texture allocation tracking is incomplete; see textureAudit.';
   } catch (error) {
     report.status = 'BLOCKED'; report.reason = error.message;
     console.error(error.message);

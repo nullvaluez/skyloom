@@ -36,8 +36,8 @@
  * RED CALIBRATION — measured on the PRE-FIX ordering, same instrument, same
  * machine, same session (r22p1/flash, dev server :3021, headed Chrome, GPU on,
  * satellite, Powell OH pose, deviceScaleFactor 1.5, 12 forced down/up steps).
- * The pre-fix tree is reached WITHOUT a rebuild via `window.__flyStepSafePin =
- * 'off'` (STEP_SAFE's own harness pin: requestDpr() declines and
+ * The pre-fix tree is reached WITHOUT a rebuild via `window.__flyStepSafeOverride =
+ * { enabled: false }` (the current override: the governor declines parking and
  * perf-governor falls back to its R22 `setDpr(d)` line).
  *
  *   metric                                     RED (pre-fix)   GREEN (armed)
@@ -68,11 +68,12 @@
  *                  ladder degenerates to tier steps) — the DSF=1 leg would
  *                  silently test nothing. A user machine has no pins, so
  *                  un-pinning is what makes this gate match production.
- *   Everything else stays fleet-pinned.
+ *   FLY_SHIPPED=1 additionally releases world pins; otherwise the inherited
+ *   fleet pins remain. Both modes are printed in the run evidence.
  *
  * GATES
  *  (1) precondition — satellite, settled, governor + composer handles live
- *  (2) STEP_SAFE armed and consuming: requested === applied, valve 0
+ *  (2) STEP_SAFE consuming: step.n advances per moved step, no valve
  *  (3) EVERY step really moved the drawing buffer (no-flash must not be
  *      no-steps)
  *  (4) zero canvas realloc writes outside a rAF
@@ -85,9 +86,11 @@
  * (12) SAME-FRAME PROOF — the frame that resized is the frame that drew
  * (11) zero pageerrors
  *
- * Run: FLY_URL=http://localhost:3021 node scripts/verify-step-clean.js
+ * Run: FLY_URL=http://localhost:3035 node scripts/immersive-step-regression.cjs
  * Env: STEP_DSF (default runs BOTH 1.5 and 1), STEP_N (steps per leg, 20),
- *      STEP_LIVE_MS (live window, 180000), STEP_PIN_OFF=1 (the RED leg).
+ *      STEP_LIVE_MS (live window, 180000), STEP_PIN_OFF=1 (the RED leg),
+ *      STEP_OUTPUT (directory for full per-leg JSON), STEP_BUILD_ID (optional
+ *      served receipt), FLY_SHIPPED=1 (current immersive world, no fleet pins).
  */
 const { chromium } = require('playwright');
 const { bootFly, unpinPins } = require('./_boot');
@@ -138,6 +141,14 @@ const INSTALL_TRACE = () => {
   window.__inRaf = false;
   window.__drawCount = 0;
   window.__rafSeq = 0;
+  // Identity is assigned before globals exist, then filtered retrospectively.
+  // Texture/HUD canvas writes remain diagnostic evidence, not renderer writes.
+  const canvasIds = new WeakMap();
+  let nextCanvasId = 1;
+  window.__stepCanvasId = (canvas) => {
+    if (!canvasIds.has(canvas)) canvasIds.set(canvas, nextCanvasId++);
+    return canvasIds.get(canvas);
+  };
   const push = (ev, o) => {
     if (window.__traceOn)
       T.push(
@@ -159,7 +170,9 @@ const INSTALL_TRACE = () => {
         // ONLY a changed value reallocates (and clears) the drawing buffer;
         // an unchanged assignment is a no-op in Chromium and must not be
         // counted against the gate.
-        if (before !== v) push('realloc.' + prop, { from: before, to: v, inRaf: !!window.__inRaf });
+        if (before !== v) push('realloc.' + prop, { from: before, to: v, inRaf: !!window.__inRaf,
+          canvasId: window.__stepCanvasId(this), width: this.width, height: this.height,
+          connected: this.isConnected, tag: this.getAttribute?.('data-engine') ?? null });
       },
     });
   }
@@ -216,6 +229,7 @@ const PATCH_COMPOSER = () => {
   const gl = window.__flyGl ?? comp?.getRenderer?.() ?? comp?.renderer ?? null;
   if (!gl || !comp) return { gl: !!gl, composer: !!comp };
   window.__flyGlResolved = gl;
+  window.__stepRendererCanvasId = window.__stepCanvasId(gl.domElement);
   const p = window.__tracePush;
 
   const sp = gl.setPixelRatio.bind(gl);
@@ -276,6 +290,25 @@ const PATCH_COMPOSER = () => {
   return { gl: true, composer: true };
 };
 
+/** Filter after resolving the renderer: early writes retain their real canvas
+ * identity. Missing identity throws instead of manufacturing zero bad writes. */
+const CAPTURE_PHASE = (maxFrames) => {
+  const canvas = window.__flyGlResolved?.domElement;
+  if (!canvas || !window.__stepCanvasId) throw Error('Drawing-canvas identity unavailable');
+  const id = window.__stepCanvasId(canvas), raw = window.__stepTrace.slice(0, 6000);
+  const resize = r => r.ev === 'realloc.width' || r.ev === 'realloc.height';
+  return {
+    trace: raw.filter(r => !resize(r) || r.canvasId === id),
+    otherCanvasWrites: raw.filter(r => resize(r) && r.canvasId !== id),
+    rendererCanvas: { id, width: canvas.width, height: canvas.height },
+    composed: window.__composed.slice(0, maxFrames),
+    step: window.__flyStats?.step ?? null,
+    stepValves: window.__flyStats?.stepValves ?? 0,
+    stepGuard: window.__flyStats?.stepGuard ?? null,
+    gov: window.__flyGov?.state?.() ?? null,
+  };
+};
+
 function median(a) {
   if (!a.length) return 0;
   const s = [...a].sort((x, y) => x - y);
@@ -289,6 +322,11 @@ async function leg(browser, dsf, out) {
   });
   const page = await ctx.newPage();
   const errs = [];
+  const failedResources = [];
+  page.on('response', response => {
+    if (response.status() >= 400) failedResources.push({ at: Date.now(), url: response.url(), status: response.status() });
+  });
+  page.on('requestfailed', request => failedResources.push({ at: Date.now(), url: request.url(), error: request.failure()?.errorText }));
   page.on('pageerror', (e) => errs.push(e.message));
   page.on('console', (m) => {
     if (m.type() === 'error') errs.push(`console: ${m.text().slice(0, 160)}`);
@@ -303,9 +341,11 @@ async function leg(browser, dsf, out) {
     await page.addInitScript(() => { window.__flySunOverride = Date.UTC(2026, 6, 18, 17); });
   }
   await page.addInitScript(INSTALL_TRACE);
-  if (PIN_OFF) await page.addInitScript(() => { window.__flyStepSafePin = 'off'; });
+  if (PIN_OFF) await page.addInitScript(() => { window.__flyStepSafeOverride = { enabled: false }; });
 
   const { ms } = await bootFly(page, { ...BOOT_OPTS, style: 'satellite' });
+  const servedBuild = process.env.STEP_BUILD_ID
+    ? await require('./ground-build-receipt.cjs')(page, process.env.FLY_URL, process.env.STEP_BUILD_ID) : null;
   if (SHIPPED) console.log('  shipped controls', await page.evaluate(() => Object.fromEntries(
     ['__flyTerraPin', '__flyClutterPin', '__flyDepthPin', '__flyAerialOverride', '__flySatShadowOverride', '__flyGovPin'].map(k => [k, window[k] ?? null]))));
   const patched = await page.evaluate(PATCH_COMPOSER);
@@ -334,6 +374,8 @@ async function leg(browser, dsf, out) {
     unpinnedSettle: window.__r22PinAttempt?.__flySettlePin !== undefined,
     style: window.__flyStore?.getState?.().mapStyle ?? 'unknown-prod',
     dbw: window.__flyGlResolved?.getContext?.().drawingBufferWidth ?? null,
+    step: window.__flyStats?.step ?? null,
+    stepValves: window.__flyStats?.stepValves ?? 0,
   }));
 
   await page.evaluate(() => {
@@ -346,7 +388,10 @@ async function leg(browser, dsf, out) {
   const steps = [];
   for (let s = 0; s < STEP_N; s++) {
     const dir = s % 2 === 0 ? -1 : +1;
-    const before = await page.evaluate(() => window.__flyGlResolved.getContext().drawingBufferWidth);
+    const beforeState = await page.evaluate(() => ({
+      dbw: window.__flyGlResolved.getContext().drawingBufferWidth, stepN: window.__flyStats?.step?.n ?? 0,
+    }));
+    const before = beforeState.dbw;
     // Force from INSIDE a rAF: the production path is PerfGovernor's useFrame
     // raising the state change, and React schedules a rAF-raised update
     // differently from one raised in a plain task.
@@ -365,15 +410,13 @@ async function leg(browser, dsf, out) {
     const after = await page.evaluate(() => ({
       dbw: window.__flyGlResolved.getContext().drawingBufferWidth,
       st: window.__flyGov.state(),
+      step: window.__flyStats?.step ?? null,
     }));
-    steps.push({ s, dir, before, after: after.dbw, dpr: after.st.dpr, rung: after.st.rung });
+    steps.push({ s, dir, before, after: after.dbw, dpr: after.st.dpr, rung: after.st.rung,
+      beforeStepN: beforeState.stepN, step: after.step });
   }
 
-  const forced = await page.evaluate(() => ({
-    trace: window.__stepTrace.slice(0, 6000),
-    composed: window.__composed.slice(0, 40000),
-    stepSafe: window.__flyStats?.stepSafe ?? null,
-  }));
+  const forced = await page.evaluate(CAPTURE_PHASE, 40000);
 
   // ---- live window ------------------------------------------------------
   await page.evaluate(() => {
@@ -391,17 +434,13 @@ async function leg(browser, dsf, out) {
     }
     await page.waitForTimeout(1000);
   }
-  const live = await page.evaluate(() => ({
-    trace: window.__stepTrace.slice(0, 6000),
-    composed: window.__composed.slice(0, 60000),
-    gov: window.__flyGov.state(),
-  }));
+  const live = await page.evaluate(CAPTURE_PHASE, 60000);
   await page.evaluate(() => {
     window.__traceOn = false;
   });
 
   await ctx.close();
-  return { dsf, bootMs: ms, patched, warped, env, steps, forced, live, liveSteps, errs, out };
+  return { dsf, bootMs: ms, patched, warped, env, steps, forced, live, liveSteps, errs, out, servedBuild, failedResources };
 }
 
 function analyse(phase) {
@@ -471,8 +510,20 @@ async function main() {
     console.log(`\n===== deviceScaleFactor ${dsf} =====`);
     const r = await leg(browser, dsf);
     if (r.blocked) { await browser.close(); console.log(`VERIFY: BLOCKED — ${r.blocked}`); process.exitCode = 2; return; }
+    if (process.env.STEP_OUTPUT) {
+      const fs = require('node:fs'), path = require('node:path');
+      fs.mkdirSync(process.env.STEP_OUTPUT, { recursive: true });
+      fs.writeFileSync(path.join(process.env.STEP_OUTPUT, `dsf-${dsf}.json`), JSON.stringify(r, null, 2));
+    }
     const F = analyse(r.forced);
     const L = analyse(r.live);
+    for (const [name, phase] of [['FORCED', r.forced], ['LIVE', r.live]]) {
+      const outside = phase.trace.filter(row => row.ev.startsWith('realloc.') && !row.inRaf);
+      console.log(`CANVAS ${name} renderer ${JSON.stringify(phase.rendererCanvas)} · excluded other-canvas writes ${phase.otherCanvasWrites.length}`);
+      if (outside.length) console.log(`DRAWING CANVAS OUTSIDE RAF ${name}`, JSON.stringify(outside));
+      if (phase.otherCanvasWrites.length) console.log(`OTHER CANVAS WRITES ${name}`, JSON.stringify(phase.otherCanvasWrites.slice(0, 20)));
+    }
+    if (r.failedResources.length) console.log('FAILED RESOURCES', JSON.stringify(r.failedResources));
 
     console.log(
       `boot ${r.bootMs} ms · dpr ${r.env.dpr} · ladder rungs ${r.env.gov?.rungs} · ` +
@@ -520,14 +571,18 @@ async function main() {
       `style ${r.env.style} composer ${r.patched.composer} frames ${F.frames} ` +
         `warped ${r.warped}`
     );
-    const ss = r.forced.stepSafe;
+    const ss = r.forced.step;
+    const applied = (ss?.n ?? 0) - (r.env.step?.n ?? 0);
+    const valves = r.forced.stepValves - r.env.stepValves;
+    const movedSteps = r.steps.filter(s => s.before !== s.after);
     if (PIN_OFF) {
-      gate(`(2) STEP_SAFE pinned off ${p}`, !ss || ss.applied === 0, JSON.stringify(ss));
+      gate(`(2) STEP_SAFE pinned off ${p}`, applied === 0, JSON.stringify({ step: ss, applied, valves }));
     } else {
       gate(
         `(2) STEP_SAFE armed + consuming ${p}`,
-        !!ss && ss.applied > 0 && ss.requested === ss.applied && ss.valve === 0 && ss.inFrame === true,
-        JSON.stringify(ss)
+        !!ss && applied > 0 && valves === 0 && ss.viaValve === false &&
+          movedSteps.every(s => s.step?.n > s.beforeStepN && s.step.composer === true && s.step.viaValve === false),
+        JSON.stringify({ step: ss, applied, valves, moved: movedSteps.length, guard: r.forced.stepGuard })
       );
     }
     const moved = r.steps.filter((s) => s.before !== s.after).length;
@@ -573,7 +628,8 @@ async function main() {
   process.exit(fails.length ? 1 : 0);
 }
 
-main().catch((e) => {
+module.exports = { INSTALL_TRACE, CAPTURE_PHASE, analyse };
+if (require.main === module) main().catch((e) => {
   console.error(e);
   console.log('VERIFY FAIL — harness error');
   process.exit(1);

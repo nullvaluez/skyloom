@@ -124,7 +124,8 @@ const pct=(a,p)=>a.length?[...a].sort((x,y)=>x-y)[Math.min(a.length-1,Math.floor
   for(const tier of ['high','medium','low','high']){
     await page.evaluate(t=>window.__flyStore.getState().setQualityTier(t),tier);
     await page.waitForTimeout(12000);
-    report.transitions.push(await page.evaluate(t=>({requested:t,actual:window.__flyStore.getState().qualityTier,buildings:window.__fly.satBuildings?.stats,roads:window.__fly.satRoads?.stats,skyline:window.__fly.satSkyline?.stats,coveredTiles:window.__graphicsReview?.skylineCoveredTiles,nightEnabled:window.__fly.satBuildings?.nightEnabled}),tier));
+    report.transitions.push(await page.evaluate(t=>({requested:t,actual:window.__flyStore.getState().qualityTier,buildings:window.__fly.satBuildings?.stats,roads:window.__fly.satRoads?.stats,skyline:window.__fly.satSkyline?.stats,coveredTiles:window.__graphicsReview?.skylineCoveredTiles,nightEnabled:window.__fly.satBuildings?.nightEnabled,
+      review:window.__graphicsReview,groundLighting:window.__fly.groundLighting,ground:window.__fly.groundImmersion}),tier));
     const captureDir=output.replace(/\.json$/,'-quality');fs.mkdirSync(captureDir,{recursive:true});
     await page.screenshot({path:`${captureDir}/${report.transitions.length}-${tier}.png`});
   }
