@@ -40,12 +40,22 @@ the command that produced it, or an explicit "could not measure here".
 | Pixel determinism | **bit-stable** at a fixed pose | driver-dependent |
 | Frame pacing / tearing | **unobservable** | the only place it exists |
 
-One venue fact that is NEW this round and worth writing down: a settled-pose
-census takes **427 s per pose** here (`verify-fixture`, §1 below) and the two
-city poses did not settle at all inside their budget. Six agents share four
-cores; **two browser runs at once make every wall-clock number here
-meaningless**, which is why `SMOKE_NODE_ONLY=1` exists and why the node smoke
-is the per-merge check.
+Two venue facts that are NEW this round and that every owner needs:
+
+1. **A settled-pose census takes ~427 s here** (`verify-fixture`, §1.2) and
+   three consecutive poses did not settle at all inside their budget. Six
+   agents share four cores; **two browser runs at once make every wall-clock
+   number here meaningless**, which is why `SMOKE_NODE_ONLY=1` exists and why
+   the node smoke is the per-merge check.
+2. **THE DEV SERVER GETS REAPED.** A `next dev` left running is killed after
+   some minutes under load — twice on :3134 in one afternoon, each time
+   mid-harness, and the harness then reports
+   `page.goto: net::ERR_CONNECTION_REFUSED`, which reads exactly like a broken
+   tree and is not one. F FEEL hit it independently on :3135. The fix is a
+   supervisor loop (`scripts/r25-out/devwatch.sh`, gitignored scratch) that
+   curls the port every 20 s and restarts. **Anyone reading a
+   `ERR_CONNECTION_REFUSED` row in this round should check the dev log's tail
+   before believing it.**
 
 ---
 
@@ -336,6 +346,67 @@ COUNT, and the gate would go red for the instrument rather than for a leak.
 It would be green, and it would be green *because nothing mounted* — the R24
 lesson this round is most exposed to.
 
+**One bug in my own edit, caught by re-reading it rather than by a run.** The
+landscape cluster census opens the arc to measure the petals; the in-viewport
+census immediately after is labelled "fan CLOSED" and was measuring a fan that
+was still open. Fixed with one `closeFan()`. **No harness here could have told
+me** — on the flag-off tree the two censuses are the same census, which is
+exactly the blind spot a flag-off identity run has by construction.
+
+### 3.2a The flag-off identity RUN, and its control
+
+The claim to prove: on a tree with no FAB, every edited mobile gate reads
+exactly as it did before. Two arms, same dev server, same venue, same hour:
+
+| Arm | What it is |
+|---|---|
+| TREATMENT | `scripts/verify-mobile.js` as edited, on `r25/e` |
+| CONTROL | `git show 6bf628e:scripts/verify-mobile.js` — the untouched base file — copied to `scripts/r25-out/control-verify-mobile.js` with its `require('./_mobile-boot')` re-pointed and its screenshot names prefixed. Zero `openFan` / `hasFan` / `tapAction` references (grep-verified) |
+
+Running the base file from the same tree against the same server is the
+control that matters: it holds the venue, the dev server, the app and the hour
+fixed and varies ONLY my edits.
+
+**`verify-mobile.js`, both arms, same server, same hour — NEITHER COMPLETED,
+and the CONTROL died EARLIER than the treatment.**
+
+| | Treatment (edited) | Control (base file) |
+|---|---|---|
+| boot | 7 s | 9 s |
+| `touch layout:` line | **ROW (flag-off / pre-R25)** | *(the base file does not print one)* |
+| mount census | joystick/throttle/pause/atlas/look **true**, `hangar:false`, `fab:false` | identical, minus the two new keys |
+| atlas quartet (autofocus / 44 px / + zoom / pinch) | **4 PASS**, identical values (`1.6 → 7.359999999999999`) | **4 PASS**, identical values |
+| back gesture | PASS | PASS |
+| cluster mounted / ≥44 px / BOOST | PASS · PASS · PASS, **identical geometry** (48×48 ×5, boost 68×44, stick 128×128, throttle 68×134) | PASS · PASS · PASS, identical geometry |
+| the two NEW absence rows | **PASS** — "no HANGAR button on the flag-off tree", "no FAB on the flag-off tree" | n/a |
+| contextual absent / CINEMA hidden | PASS · PASS | PASS · PASS |
+| TAP LEAK ×2 | PASS · PASS (`fired 0x`, `inspectHex=null`) | PASS · PASS (identical) |
+| contextual on a lock | **PASS** (`hex fffff9`, state `soft`, 44×44) | **DIED HERE** — `page.evaluate: TypeError: Cannot read properties of undefined (reading 'getState')`, i.e. `window.__flyStore` was gone |
+| the INSPECT tap | **DIED HERE** — `page.dispatchEvent: Timeout 30000ms` waiting for `touch-inspect` | — |
+
+**Reading.** Every row both arms reached agrees, value for value, including the
+pixel geometry of all nine controls. The treatment got FURTHER than the
+control. So the failure is not my edits: the base file, run from this tree
+against this server in the same hour, falls over at the same stage or earlier.
+What fails is the VENUE — under a load average near 15, the app's dev handles
+(`window.__flyStore`, published at `FlyScene.jsx:1435`) go away mid-run and the
+injected soft lock ages out before the tap.
+
+**What I am NOT claiming.** That `verify-mobile.js` is green on the flag-off
+tree. It is not; it is UNCOMPLETABLE here today. The identity claim that IS
+supported is the narrower one the control actually tests: *for every row both
+arms reached, the edited file reads exactly what the base file reads.* The rest
+of the flag-off identity argument is structural — every edit either inserts an
+`openFan()` that returns `false` without touching the page when no FAB exists,
+or is guarded by `FAN` — and it should be re-run on the user's machine, where
+it is one of the §2.7 rows.
+
+**An honest note on a contaminated log.** The first control attempt was started
+twice (a backgrounded subshell that I believed had died, plus a `setsid` retry)
+and both wrote to the same file, interleaving two runs. The log above is read
+only where the two agree; the run was not repeated a third time because the
+venue was already the answer.
+
 ### 3.3 `scripts/r25-smoke.sh`
 
 r24's shape: `run name script cmd` rows, `SMOKE_NODE_ONLY`, `SMOKE_SKIP_SLOW`,
@@ -481,6 +552,28 @@ verdict.
 ---
 
 ## §4 Fixed-pose pixel gates — what was and was not re-baselined here
+
+**THE DECISION, stated before the table so it is not mistaken for laziness.**
+The policy is: each of the five gates un-recertified since the Codex overhaul
+gets a FIXTURE column re-baselined on this tree with RED-first evidence, live
+columns only from user-pasted numbers, and **NOT CALIBRATED — never PASS —**
+where the live column cannot be measured here. On W1 day 1 the FIXTURE column
+for four of the five **could not be taken**, and the reason is measured, not
+assumed:
+
+- a fixed-pose pixel A/B needs a **SETTLED pose**;
+- `verify-fixture` spent **427 s, 428 s and 426 s** on manhattan, powell and
+  owens and **none of the three settled**, then timed out;
+- at that moment A GROUND and B NIGHT were each driving their own chromium
+  (`verify-ground-bubble.js`, `verify-night-ground.js`) out of their own
+  worktrees, and the load average was **14.8 on four cores**.
+
+Adding a third and fourth long browser run would have degraded every agent's
+numbers including my own control, and the number it produced would have been
+taken against an unsettled pose on a saturated box. **That is not a fixture
+column, it is a coin.** So four rows read NOT RUN with the reason, and the
+re-baselines are queued for a quieter window (W2, after the merges, when the
+owners' own runs are done).
 
 *(fills in as runs complete; see §6 for what could not be run)*
 
