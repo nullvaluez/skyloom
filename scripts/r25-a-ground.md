@@ -468,7 +468,38 @@ not tell them apart would have reported a coin either way.
 
 ### 6.4 z19
 
-*(pending — `scripts/r25-a-z19-probe.js` has not been run; see §8.9.)*
+**MEASURED-HERE.** `scripts/r25-a-z19-probe.js`, two boots at the fixture Owens
+pose (36.6 / −118.1) pinned to **95 m AGL** — inside the bubble, the only
+altitude at which the ceiling can bind — satellite, tier high, **`__flyTerraPin`
+UN-PINNED** so the baseline is the SHIPPED z18 and not the fleet-pinned z17
+(measuring a +1 step off the wrong baseline measures nothing).
+
+| | z19 OFF (as it ships) | z19 ARMED |
+|---|---|---|
+| imagery ceiling (`maxLevel`) | **18** | **19** |
+| three-tile's own `targetZ` at this pose | **18** (×6 samples) | **19** (×6 samples) |
+| draws | 78 / 78 / 78 / 78 / 78 / 78 → max **78** | 63 / 63 / 63 / 81 / 81 / 81 → max **81** |
+| tris | max **79,427** | max **82,243** |
+| page errors | 0 | 0 |
+
+**The number the charter asked for: +3 draws, 81 ≤ 261 at this pose.**
+
+And a second thing the run measured, which is the mechanism rather than the
+cost: **`targetZ` moves 18 → 19 with the ceiling.** That is three-tile's own
+distance descent saying it WANTS the deeper level at 95 m AGL — so "the ceiling
+only binds when the aircraft is low enough" is measured here, not asserted. (The
+first three ON samples read 63 draws / 36 k tris because the deeper ring was
+still streaming; the settled value is 81.)
+
+**IT STILL SHIPS OFF, and +3 is not the reason to flip it.** Two things this
+venue cannot say (§8.7): whether Esri serves z19 World_Imagery at all — the
+fixture generates imagery procedurally at any z, so this row says nothing about
+the provider, and R22 probed z18 before wiring it
+(`scripts/r22-a-esri-probe.json`) — and what the deeper ring costs in bandwidth,
+VRAM and frame time. **The fixture's Owens is a procedural desert, not the live
+one the 261 was frozen against**, so +3 here bounds nothing live. The flip
+condition remains: a green ≤ 261 row on the user's machine PLUS the user's z19
+availability check.
 
 ---
 
@@ -715,9 +746,12 @@ user's RTX 5080 + phone, and NONE of it is claimed anywhere above.
    both meshes park at `count 0 / visible false` and Owens is 0 by construction
    — but the number a real OpenFreeMap suburb produces is unknown in EITHER
    direction. §10.1.
-7. **The z19 provider question.** The fixture generates imagery at any z, so a
-   green draw row here says nothing about whether Esri serves z19 World_Imagery.
-   That probe needs a machine that is not 403-blocked.
+7. **The z19 provider question, and what z19 COSTS.** The +3 draws in §6.4 is
+   real and measured, but the fixture generates imagery at any z, so that row
+   says nothing about whether Esri serves z19 World_Imagery — and nothing about
+   bandwidth, VRAM or frame time. **The fixture's Owens is a procedural desert,
+   not the live one the 261 was frozen against.** Both halves need a machine
+   that is not 403-blocked.
 8. **`TERRAIN_LIGHT.workerNormals`.** The LERC decode path is unreachable here
    (the fixture serves terrain-rgb PNGs instead), so the A/B this round wires
    can only be run on a real machine. It ships OFF. **And this is precisely why
