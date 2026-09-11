@@ -17,6 +17,7 @@ import { FrameStatsRig } from '@/lib/fly/frame-stats';
 import { StepSafeRig } from './StepSafeRig';
 import { HudSyncRig } from './HudSyncRig';
 import { GroundBubbleRig } from './GroundBubbleRig';
+import { LightBubbleRig } from './LightBubbleRig';
 import { r25On } from '@/lib/fly/r25-pins';
 import { useFlyStore } from '@/stores/fly-store';
 
@@ -95,6 +96,12 @@ export function FlyCanvas({ runtime }) {
           FlyScene's −50 has stepped the damped ground. Renders nothing;
           unmounted flag-off, so every reader sees exactly 0. */}
       {r25On('GroundBubble') && <GroundBubbleRig runtime={runtime} />}
+      {/* Round 25 (C LIGHT, LIGHT_BUBBLE_R25): the shadow cascade, the AO
+          radius, the moon, the hemisphere ground and the night grade — every
+          one of them a property or uniform write on an object that already
+          exists. Zero draws, zero programs, zero shader text; priority −48,
+          i.e. after the bubble at −49. Unmounted flag-off. */}
+      {r25On('LightBubble') && <LightBubbleRig runtime={runtime} />}
       {/* Round 21 (A): boot shader pre-warm. Adds no object to the scene and
           issues no draw — see components/fly/PrewarmRig.jsx. */}
       {PREWARM.enabled && <PrewarmRig runtime={runtime} />}
