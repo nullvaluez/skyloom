@@ -378,6 +378,40 @@ is stronger than before (the lattice is in absolute world coordinates and each
 cell's jitter is keyed on its integer index, so a tuft's position is a pure
 function of where it is on the planet).
 
+**7.4 `scripts/_boot.js:181` swallows `FLY_BOOT_SCALE` — a latent harness
+defect, and it is the R11 lesson repeating four lines below its own warning.**
+The third RED attempt died with
+
+```
+page.waitForFunction: Timeout 30000ms exceeded.
+    at bootFly (scripts/_boot.js:181)
+```
+
+…with `FLY_BOOT_SCALE=6` set, which should have made that wait 180,000 ms. The
+call is
+
+```js
+await page.waitForFunction(
+  () => !document.querySelector('[data-testid="boot-screen"]'),
+  { timeout: 30000 * bootScale }          // ← SECOND parameter
+);
+```
+
+and `waitForFunction`'s second parameter is **`arg`**, not options — options are
+the THIRD. So the object is passed to the page as an argument, the timeout falls
+back to the 30 s page default, and `FLY_BOOT_SCALE` never reaches this wait.
+The comment eleven lines above it says exactly this about a different call
+("Round 11 fix: options are waitForFunction's THIRD parameter (second is
+`arg`) — the old two-arg call silently fell back to the 30s default").
+
+It is latent because the boot screen normally unmounts inside 30 s. Under this
+afternoon's load (six agents, load average 23) it does not, and **every browser
+gate in the fleet is exposed to it.** `scripts/_boot.js` is E CERT's file and I
+have not touched it; this gate raises the PAGE DEFAULT instead
+(`page.setDefaultTimeout`), which fixes every un-timed wait in that file from
+the caller's side. **E: the one-line fix is to move the options object to the
+third parameter.**
+
 **7.3 The gate reports NOT CALIBRATED, never PASS, when its precondition is
 unmet.** The layer publishes `scrubAreaM2` — the in-disc landcover area the pass
 actually considered. A zero scrub count with zero area is the VENUE having

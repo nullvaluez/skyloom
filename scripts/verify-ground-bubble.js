@@ -147,6 +147,18 @@ function meanAbsDelta(a, b) {
     args: ['--enable-gpu', '--ignore-gpu-blocklist'],
   });
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+  // THE PAGE DEFAULT, and it is load-bearing on this venue — see r25-a-ground.md
+  // §7.4. `scripts/_boot.js:181` calls
+  //   page.waitForFunction(fn, { timeout: 30000 * bootScale })
+  // with the options object in the SECOND parameter, which Playwright reads as
+  // `arg`, not as options — so the boot-screen wait silently falls back to the
+  // 30 s PAGE DEFAULT and FLY_BOOT_SCALE does not reach it. That is precisely
+  // the defect the comment four lines above it warns about ("options are
+  // waitForFunction's THIRD parameter"), present in the very next call. It is
+  // E's file and I have not touched it; raising the page default fixes it from
+  // the caller's side for every wait in the file at once, and is the right
+  // default here anyway at 1-3 fps under a load average over 20.
+  page.setDefaultTimeout(Math.max(30000, 30000 * SCALE));
   const errs = [];
   page.on('pageerror', (e) => errs.push(`pageerror: ${e.message}`));
   page.on('console', (m) => {

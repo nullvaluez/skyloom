@@ -364,6 +364,7 @@ export function SatGroundDetailLayer({ runtime, flight }) {
       if (hedge) park(hedge, st, 'prevHedge');
       st.scrub = 0;
       st.hedge = 0;
+      st.areaM2 = 0; // …and the precondition, or a stale area reads as content
       st.sig = 'out';
       publish(live, st);
       return;
