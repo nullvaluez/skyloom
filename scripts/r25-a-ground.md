@@ -297,7 +297,9 @@ answer, not this container's** — see §8.
 | `prewarm.js` warm-set rule | **A deliberate reading, flagged.** The rule is "new shader TEXT ⇒ new FINAL key + a warm-set entry in the same change". The scrub and hedge materials take an EXISTING variant with no new text — but three's own program key is the material's parameter set, and neither material matches any of prewarm's (a)/(b)/(c) (the scrub adds alphaMap/alphaTest/DoubleSide/uv/vertexColors; the hedge adds vertexColors). Without a warm entry the first descent through the bubble compiles two programs mid-flight, which is exactly the hitch class this round exists to remove. Both entries are guarded by the same predicate the mount is. |
 | `verify-c-flagoff.mjs` | **58/58 GREEN on this branch.** It asserts that the tile key goes through `r24VariantKey` "with the FIXED token order e/f/a/l" — my `'d'` is APPENDED after those four, so the assertion is untouched. MEASURED-HERE. |
 | `verify-atmo-law.mjs` / `verify-depth-offset.mjs` / `verify-vendor-three-tile.mjs` / `verify-artifact-hygiene.mjs` | 53/0 · 7/0 · 34/0 · 5/0 GREEN on this branch. MEASURED-HERE. |
-| `verify-lod-fade.mjs` (60/4) and `verify-skirt-worker.mjs` (8/1) | **RED, and NOT mine.** Every red is an assertion about `lib/fly/vendor/three-tile/**` or the spliced DEM worker tail — files this branch does not touch (`git diff --stat 6bf628e -- lib/fly/vendor` is EMPTY). They were INVISIBLE until §7.6's import fix, because the gate crashed before reaching them. **They need an owner.** |
+| `lib/fly/vendor/three-tile/index.js` — `R24_WORKER_TAIL_RE` | **CHANGED, deliberately, and it is the round's most consequential line for me.** §6.5. `verify-skirt-worker` (E's copy) RED 10/1 → GREEN 11/0, gate 2b 1 of 2 → 2 of 2; `verify-vendor-three-tile` 34/0 → 32/2 → **34/0** once the reviewed receipt recorded the change. |
+| `scripts/vendor-three-tile-integration.json` | One digest and one inventory entry added, with the reason. It is a REVIEW artifact by design, so this is the workflow, not a bypass. |
+| `verify-lod-fade.mjs` (60/4) and this tree's `verify-skirt-worker.mjs` (8/1) | **RED, and NOT mine.** Every red is an assertion about `lib/fly/vendor/three-tile/**` or the spliced DEM worker tail — files this branch does not touch (`git diff --stat 6bf628e -- lib/fly/vendor` is EMPTY). They were INVISIBLE until §7.6's import fix, because the gate crashed before reaching them. **They need an owner.** |
 | `verify-import-integrity.mjs` | RED at the W0 base on `scripts/r24-c-agl.js` (two `no-undef`). **Pre-existing** — verified by stashing this work and re-running. My files add zero. |
 | `hillKey` token order | `'d'` is APPENDED after R24's `e f a l`, and there is a marked insertion point comment for B's `'n'` AFTER it, in both `hillKey` and the GLSL — plan §4's arbitration rule, written into the file so a merge in either order composes. |
 
@@ -415,11 +417,136 @@ by accident — they are what makes the RED run a control rather than a ceremony
 
 ### 6.3 The ARMED run
 
-<!-- R25A-GREEN -->
+Same pose set, `FLY_TILE_FIXTURE=1 FLY_BOOT_SCALE=6 FLY_GD_SETTLE=3`, both
+blocks armed by pin (`{ enabled: true }`, so the shipped sub-switches are the
+ones under test). **15 passed, 1 failed, 3 NOT CALIBRATED, ZERO page errors.**
+
+| Leg | Result |
+|---|---|
+| (1a) `runtime.groundBubble` published | **PASS** `{k:1, aglM:79.83, aglVisM:79.83}` |
+| (1b) k ≥ 0.95 at 80 m | **PASS** k = **1.0000** at aglVis 80 m |
+| (1c) k ≤ 0.02 at 900 m | **PASS** k = **0.0000** at aglVis 900 m |
+| (1d) 480 → 560 → 480 does not ratchet | **PASS** k 0.9053 → … → **0.9053** |
+| (1e) **the 60 m input deadband is real** | **PASS** k 0.9053 → (640) → **0.6484**; a no-deadband bubble returns to 0.9053 |
+| (2a) Owens places ZERO scrub and ZERO hedges | **PASS** both `{count:0, visible:false}` |
+| (2b) …and neither mesh is visible | **PASS** |
+| (2c) Owens draws ≤ 261 | **PASS** max **133** over 8 samples (57 ×7, one 133 sample while the ring was still refining) |
+| (2d) armed ≤ the flag-off control | **NOT CALIBRATED** — the RED run died before writing the control (§7.1/§7.5) |
+| (3a) the suburb places SCRUB | **NOT CALIBRATED** — **0 m²** of grass/farmland/wood landcover inside the 300 m disc at this pose |
+| (3b) the suburb places HEDGES | **NOT CALIBRATED** — the parcel-road index is EMPTY here; no cls 5/6 centreline had streamed |
+| (3c) the drape alpha LIFTS inside the bubble | **PASS** tintAlpha **0.18** (from `SAT_TINT.alpha` 0.1) |
+| (4a) the overlay moves the crop > 2/255 | **PASS** by its bound — **47.953/255** |
+| (4b) …and beats the same-interval control | **FAIL** — control **59.815/255** > signal |
+| (5) the FINAL key carries `'d'` when armed | **PASS** `world-bend-fade-hill-r19-**efd**24` |
+| (6a) `uGroundDetail === 0` at 3500 ft | **PASS** |
+| (6b) both pools parked at 3500 ft | **PASS** both `{count:0, visible:false}` |
+| (6c) drape alpha back at 0.1 at 3500 ft | **PASS** |
+| (0) zero page errors | **PASS** |
+
+Census armed at Powell 80 m: `draws 51 · tris 97,460 · programs 95 ·
+tintChunks 8 / tintVerts 31 / tintPolys 13 · z19Level 17`.
+
+**(4b) IS THE HONEST READING, and it is not a defect of the flag.** The
+same-interval control — two ON frames `gap` apart — measured **59.8/255** of
+mean absolute change while the SIGNAL measured 47.9. The venue's own drift
+(tiles still refining at 1–3 fps) is LARGER than the effect, so **(4a)'s pass
+is not attributable** and the pair reads NOT CALIBRATED as a pair. That is
+exactly what the control is for, and the correct response is neither to lower
+the bound nor to re-run until the coin lands: the overlay's pixel claim belongs
+to the user's machine (§8.1). The fix for a future run is `verify-flicker`'s
+idiom — find a quiescent window FIRST, then assert inside it — not a looser
+bound.
+
+**The two NOT CALIBRATED content legs are the venue, and the gate can prove it
+is the venue.** `scrubAreaM2` is the precondition the layer publishes: 0 m² of
+landcover in range means there is nothing to place on, which is a fact about
+the fixture (its landcover parcels are ~600 × 500 m on a 1.11 km lattice and
+the suburb scene emits them on ~14 % of cells, so whether one overlaps a 300 m
+disc at a FIXED pose is close to a coin — §10.1). A zero count WITH area in
+range would have been a defect; this is not that, and an instrument that could
+not tell them apart would have reported a coin either way.
 
 ### 6.4 z19
 
-<!-- R25A-Z19 -->
+*(pending — `scripts/r25-a-z19-probe.js` has not been run; see §8.9.)*
+
+---
+
+## §6.5 THE VENDOR DEFECT — `R24_WORKER_TAIL_RE`, and why my own charter item 6 would have lied
+
+**Found by E CERT, fixed here, RED → GREEN measured.** This one belongs at the
+top of anybody's reading list because of the SHAPE of the failure, not its size.
+
+**THE DEFECT.** The Codex overhaul re-applied VENDOR.md patch #3
+(`demErrorTable`), which threads an OPTIONAL fourth argument through the LERC
+DEM worker's tail. MEASURED across the two trees:
+
+```
+0ff2a3f   fe (LERC)        le(d.demData,d.z,d.clipBounds)             errTable x0
+f0cd81e   fe (LERC)        le(d.demData,d.z,d.clipBounds,d.errTable)  errTable x2
+          ge (terrain-rgb)  Z(o.demData,o.z,o.clipBounds)             unchanged
+```
+
+`R24_WORKER_TAIL_RE` inside the shipped bundle was **not** widened with it. It
+demanded exactly three arguments, so `r24SpliceWorkerTail(fe)` returned null,
+`r24MakeWorker` returned null, and three-tile built the VERBATIM upstream
+worker. **`TERRA_PACE.skirtWorker` AND `TERRAIN_LIGHT.workerNormals` therefore
+degraded SILENTLY to OFF on the LERC path — the only DEM path the live app
+uses.** The terrain-rgb worker still matched, and terrain-rgb is exactly what
+the offline fixture serves, so nothing in this container and no row in the
+browser fleet could observe it.
+
+**Why it is mine, and why it matters to THIS charter.** Item 6 of my charter is
+the `workerNormals` user A/B. On the user's machine — Esri LERC — that A/B would
+have read **"no difference"**, and it would have read it for this reason and not
+a graphics one. A false negative on a knob whose whole purpose is a human
+judgement is worse than a red gate, because nothing would ever have contradicted
+it.
+
+**THE FIX** (`lib/fly/vendor/three-tile/index.js`, `r24SpliceWorkerTail`):
+1. the fourth argument becomes **optional and captured**, and the pattern stays
+   anchored on the exact `demData, z, clipBounds` prefix and the exact
+   `self.postMessage(<decoded>)` tail — **2 of the 3 `self.onmessage=` sites in
+   the bundle match and the third is the imagery worker**, verified;
+2. the captured field is **forwarded into the spliced decode call**. Dropping it
+   would have spliced a worker that decodes without the per-level error table —
+   subtler and worse than not splicing at all. Proven on both real tails:
+
+```
+decode=le  extra=errTable  ->  le(req.demData, req.z, req.clipBounds, req.errTable)
+decode=Z   extra=(none)    ->  Z(req.demData, req.z, req.clipBounds)
+residual __DECODE__: 0 in both
+```
+
+3. the decode-call replacement is **ASSERTED, not trusted**. An un-checked
+   `String.replace` that silently no-ops is the R24 defect class that cost that
+   round twice; here it would have produced a Blob worker whose call still read
+   `__DECODE__` — a ReferenceError on the user's machine only. A miss now
+   returns null and the verbatim upstream worker is built.
+
+**RED → GREEN, E's gate, run from this worktree:**
+
+| | RED (before) | GREEN (after) |
+|---|---|---|
+| `verify-skirt-worker.mjs` (E's r25/e copy) | **10 passed, 1 failed** | **11 passed, 0 failed** |
+| gate 2b "THE SHIPPED SPLICE MATCHES EVERY DEM WORKER TAIL IT WILL BE HANDED" | **1 of 2** splice-able | **2 of 2** |
+| gate 3 "worker skirt == main-thread skirt, element by element" | PASS | **PASS** (output identity is not disturbed) |
+
+**The reviewed integration receipt was updated deliberately, not refreshed.**
+`verify-vendor-three-tile.mjs` gates 8d/8e read
+`scripts/vendor-three-tile-integration.json`, which its own comment says is
+"deliberately NOT auto-refreshed … unexplained changes fail even when they carry
+an R24 comment". My edit made it 34/0 → **32/2**; the receipt now carries the new
+`index.js` digest and one new inventory entry, `r24SpliceWorkerTail (modified)`,
+with the reason above written into it — and the gate is back to **34 / 0**.
+
+**Also green after the vendor edit:** `verify-skirt-fast` 13/0,
+`verify-worker-normals` 12/12, `verify-c-flagoff` 58/58, `verify-depth-offset`
+7/7, `verify-artifact-hygiene` 5/0, and my own flag-off identity proof 8/8.
+
+**NOTE FOR E:** the copy of `verify-skirt-worker.mjs` in THIS tree still carries
+the old three-argument regex in its own gate 2 and therefore still reads 8/1;
+E's r25/e copy is the one that is correct and it supersedes it at merge.
 
 ---
 
