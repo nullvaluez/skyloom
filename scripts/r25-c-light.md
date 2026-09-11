@@ -303,10 +303,16 @@ venue's own drift. And the claim survives either way, because what the rejected
 design (a second shadow light) would have done is re-key EVERY lit material at
 once: a jump of tens, not a drift of one.
 
-**(c) THE SERVER THAT DIED.** Pass 2 then lost `window.__fly` entirely
-mid-night-leg and threw `Cannot read properties of undefined`. It was not a GPU
-crash and not the rig: the dev server process had exited (the next run got
-`ERR_CONNECTION_REFUSED` on the same port), taking the page's chunks with it.
+**(c) THE SERVER THAT DIED — TWICE, AND IT WAS THE HARNESS, NOT THE APP.**
+Pass 2 lost `window.__fly` entirely mid-night-leg and threw
+`Cannot read properties of undefined`. Not a GPU crash and not the rig: the
+NEXT DEV SERVER had exited (the following run got `ERR_CONNECTION_REFUSED` on
+the same port), taking the page's chunks with it. It happened again with the
+server started as a managed background task — its log ends with a clean
+`[?25h` and exit 0, i.e. a SIGTERM, tied to the agent tool-call lifecycle
+rather than to anything Next did. **The fix is `setsid nohup … &` for both the
+dev server and any browser run longer than a turn**; worth knowing for every
+agent in this round, because the symptom presents as the APP dying mid-gate.
 A gate that dies on a dead server reports nothing about the feature, so the
 gate now checks `window.__fly` at each leg boundary and reads NOT CALIBRATED —
 with `__flyStats.sceneRemounts`, the tripwire FlyScene already ships for this —
