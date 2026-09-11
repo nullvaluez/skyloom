@@ -614,6 +614,15 @@ have not touched it; this gate raises the PAGE DEFAULT instead
 the caller's side. **E: the one-line fix is to move the options object to the
 third parameter.**
 
+**7.8 The dev server jammed its own port, and the failure looked like a
+tree.** After the vendor edit, `next dev -p 3130` failed to bind
+(`EADDRINUSE`) while `curl` to that port got connection-refused — a socket held
+by a process that no longer served. The supervisor loop then restarted into the
+same error every three seconds, and the first visible symptom was a harness
+row, not a server message. The z19 probe was moved to port **3136** (outside the
+six agent ports and none of the forbidden user ports); **that is a deviation
+from the plan's port allocation and it is recorded rather than hidden.**
+
 **7.6 The R25 pin accessor was not loadable by the node gates, and it would
 have bitten all five other owners.** The moment `world-bend.js` imported an R25
 module, `verify-lod-fade.mjs` stopped at import:
