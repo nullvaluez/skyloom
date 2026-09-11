@@ -9,7 +9,7 @@
   "files": {
     "index.js": {
       "baselineSha256": "931e09ee8d594e709ec19f91be92ecb8fc28cd54054e352ac11d8275df86cb97",
-      "integratedSha256": "422b1decd2e345b0e3cc7003fc8448ba36ed0b80b2eddf2123b753439248544f",
+      "integratedSha256": "ec136b457be20588ccf8182bc8bc99c0580976717bf34be409d2741ed5fcc4a8",
       "changedFunctions": [
         {
           "name": "TerrainLercLoader.doLoad",
@@ -120,6 +120,11 @@
           "name": "flyTileHoldStats",
           "change": "added",
           "reason": "Expose hold/rejection/retry counters."
+        },
+        {
+          "name": "r24SpliceWorkerTail",
+          "change": "modified",
+          "reason": "R25 A GROUND, reviewed: widen R24_WORKER_TAIL_RE to accept the OPTIONAL fourth decode argument VENDOR.md patch #3 (demErrorTable) threads through the LERC worker tail, and forward that argument into the spliced decode call. Without it r24SpliceWorkerTail(fe) returned null on the ONLY DEM path the live app uses, so TERRA_PACE.skirtWorker and TERRAIN_LIGHT.workerNormals degraded silently to off there; the terrain-rgb worker (what the offline fixture serves) kept matching, so no gate could see it. Anchored: 2 of the 3 self.onmessage sites match and the third is the imagery worker. The decode-call replacement is ASSERTED \u2014 a miss returns null and the verbatim upstream worker is built, rather than a worker whose call still reads __DECODE__. Proven by scripts/verify-skirt-worker.mjs gate 2b, RED 1 of 2 -> GREEN 2 of 2, with gate 3's element-by-element skirt identity still green."
         },
         {
           "name": "setDemErrorTable",

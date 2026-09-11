@@ -18,6 +18,11 @@ import { applyBendFade, offsetUnits } from '@/lib/fly/toy-world/world-bend';
 import { arrivalEpoch, birthK, makeBirth, notePopin } from '@/lib/fly/settle';
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
 import { immersiveOn } from '@/lib/fly/immersive';
+// R25 A (GROUND_DETAIL_R25) — the low-AGL drape LIFT and, in one line of this
+// layer's own lifecycle, the publish of the SatVegEngine that SatGroundDetail
+// Layer's scrub stands on (the B/SatClutterLayer precedent: the layer that
+// already HAS the data publishes it, rather than a second component contract).
+import { publishGroundSource, tintAlphaFor } from '@/lib/fly/ground-detail';
 
 // Worst-case bend drop pad for the CPU bounding sphere (the SatVegLayer
 // recipe): the GPU pushes far geometry DOWN by d²k and the CPU bound cannot
@@ -201,11 +206,18 @@ diffuseColor.rgb*=1.-grain*.065*resolved*landMask;`);
 
   useEffect(() => {
     meshRef.current = mesh;
+    // R25 A: one line of publish. This layer is the ONLY place in the tree that
+    // holds the streamer carrying BOTH the landcover triangles and a per-chunk
+    // bilinear DEM grid, which is exactly what the scrub layer needs to stand
+    // on the same ground this drape is painted on. Cleared on unmount, so a
+    // style flip leaves the scrub with `groundSource() === null` and it parks.
+    publishGroundSource(engine);
     return () => {
+      publishGroundSource(null);
       geometry.dispose();
       material.dispose();
     };
-  }, [mesh, geometry, material]);
+  }, [mesh, geometry, material, engine]);
 
   // Priority -44: after the canopy placement at -45, so a chunk that just
   // became ready is tinted on the same cadence tick its trees appear on.
@@ -231,7 +243,15 @@ diffuseColor.rgb*=1.-grain*.065*resolved*landMask;`);
     st.t = st.first && U ? t + U.stagger[1] * SAT_VEG.placeCadenceSec : t;
     st.first = false;
     const sg = engine.stats;
-    const sig = U ? `${sg.chunks}|${sg.ready}|${sg.empty}|${sg.tintChunks}|${sg.tintVerts}` : '';
+    // R25 A: …and k joins the signature, or the static skip would hold a
+    // settled parcel at the alpha it was filled with while the aircraft
+    // descends through the bubble. Appended ONLY when the sub-switch is armed,
+    // so the flag-off signature string is character-for-character the R24 one.
+    const gdA = tintAlphaFor(SAT_TINT.alpha);
+    const sig = U
+      ? `${sg.chunks}|${sg.ready}|${sg.empty}|${sg.tintChunks}|${sg.tintVerts}` +
+        (gdA === SAT_TINT.alpha ? '' : `|${gdA.toFixed(3)}`)
+      : '';
     const moved2 = (flight.pos.x - st.atX) ** 2 + (flight.pos.z - st.atZ) ** 2;
     // …and the static skip must not swallow a birth step: the signature is
     // unchanged by construction while a settled ring fades in.
@@ -289,7 +309,12 @@ function fillTint(mesh, engine, flight, st) {
   // R22 (B): the birth envelope IS the α. At k 0 every multiplier is exactly
   // 1.0 — the identity of a multiply blend — so a newborn tint is not a faint
   // tint, it is no tint at all. `st.birthK` is 1 whenever the flag is off.
-  const a = S.alpha * (st.birthK ?? 1);
+  // R25 A (GROUND_DETAIL_R25.tint): the drape LIFTS inside the ground bubble —
+  // `mix(SAT_TINT.alpha, lowAglAlpha, k)`. It costs no shader text and no cache
+  // key because this pass already re-derives every multiplier from the worker's
+  // raw `col` on each cadence (the header's fourth budget decision, cashed in);
+  // flag off, `tintAlphaFor` returns its input unchanged.
+  const a = tintAlphaFor(S.alpha) * (st.birthK ?? 1);
   for (const chunk of engine.nearest(px, pz)) {
     const tint = chunk.tint;
     if (!tint) continue;
