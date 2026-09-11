@@ -468,6 +468,15 @@ matters: **a harness whose server dies produces a row that looks like a
 measurement.** Every number in §6 comes from a run whose server was verified
 alive before and after.
 
+**7.7 The overlay A/B was contaminated by the gate's own feature.**
+`__flyGroundDetail.set(k)` pins the SHARED bubble k — and the landcover drape
+alpha reads the same k — so toggling it between the two arms moved the TINT as
+well as the overlay, and the crop would have been measuring two things at once.
+The fix is R17 §7.1 applied to a feature's own sibling: the drape is parked for
+BOTH arms (SatTintLayer does not rewrite `material.visible`, so
+verify-groundlife's park holds), alongside the two instancers and the hero.
+With all four parked, the only difference between the arms is `uGroundDetail`.
+
 **7.3 The gate reports NOT CALIBRATED, never PASS, when its precondition is
 unmet.** The layer publishes `scrubAreaM2` — the in-disc landcover area the pass
 actually considered. A zero scrub count with zero area is the VENUE having

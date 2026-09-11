@@ -406,9 +406,17 @@ function meanAbsDelta(a, b) {
   // =========================================================================
   // (4) THE OVERLAY MOVES PIXELS — on → on → off, both layers PARKED.
   // =========================================================================
+  // EVERY ACTOR THE A/B DOES NOT CONTROL IS PARKED FOR BOTH ARMS (R17 §7.1),
+  // and that includes one this gate's own feature owns: `__flyGroundDetail.set`
+  // pins the SHARED bubble k, which the landcover drape alpha also reads — so
+  // toggling it moves the tint as well as the overlay, and the crop would be
+  // measuring two things. SatTintLayer does not rewrite `material.visible`, so
+  // verify-groundlife's park holds here; with the drape and both instancers
+  // parked, the only difference between the arms is `uGroundDetail`.
   await page.evaluate(() => {
     globalThis.__flyGroundDetailLayerOff = true; // the owner-read park
-    if (window.__flyPlayer) window.__flyPlayer.visible = false; // R17 §7.1
+    if (window.__satVeg?.tintMesh) window.__satVeg.tintMesh.material.visible = false;
+    if (window.__flyPlayer) window.__flyPlayer.visible = false;
   });
   await page.waitForTimeout(4000 * SCALE);
   const gap = 2500 * SCALE;
@@ -421,6 +429,7 @@ function meanAbsDelta(a, b) {
   await page.evaluate(() => window.__flyGroundDetail?.set?.(null));
   await page.evaluate(() => {
     globalThis.__flyGroundDetailLayerOff = false;
+    if (window.__satVeg?.tintMesh) window.__satVeg.tintMesh.material.visible = true;
     if (window.__flyPlayer) window.__flyPlayer.visible = true;
   });
   const signal = meanAbsDelta(onB, offS);
