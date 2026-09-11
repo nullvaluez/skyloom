@@ -257,8 +257,8 @@ been a second owner in one file for a result the light already produces.
 |---|---|---|
 | `scripts/immersive-unit.mjs` | **GREEN** | it loads `immersive.js` as a data URL; the file stays import-free, and `moon` is only a KEY on the result when a payload was passed, so its `Object.values(...).every(Number.isFinite)` sweep is untouched |
 | `scripts/graphics-unit.mjs` | **GREEN** | `satellite-atmosphere.js` gained no import |
-| `scripts/verify-shadow-calm.mjs` | see §6 run table | `shadow-kernel.js` NOT touched (decision 3) |
-| `scripts/verify-one-sun.js` | see §6 run table | `ONE_SUN`'s key direction is untouched; C changes the key's INTENSITY at night only |
+| `scripts/verify-shadow-calm.mjs` | **32 ok / 1 FAIL — IDENTICAL ON THE BASE TREE**, run both ways | the one failure is its catcher row (`SAT_SHADOWS.catcher.enabled:false`), inherited from R24. `shadow-kernel.js` is NOT touched at all (decision 3), which is why this gate's ShaderChunk legs cannot move |
+| `scripts/verify-one-sun.js` | **NOT RUN HERE — stated, not implied** | it is a 2-tier × 3-elevation browser gate with 180 s land polls per leg, and this container's browser budget went to the two legs of `verify-shadow-bubble` while six owners shared four cores. The ARGUMENT that it is unaffected: every clause in it is about the key's DIRECTION (azimuth agreement, the elevation floor, the moon blend at `moonK === 1`) and C touches only INTENSITY — `ONE_SUN`'s direction code is not in C's diff. That is an argument, not a measurement, and it belongs in W2's fleet |
 | `scripts/verify-import-integrity.mjs` | inherited RED | 2 `no-undef` in `scripts/r24-c-agl.js`, an R24 artifact — **identical on the base tree**, not C's |
 | `verify-c-flagoff.mjs` · `verify-atmo-law.mjs` · `verify-depth-offset.mjs` | **PASS** | the three R24 gates nearest C's edits (the night-ramp line is inside AERIAL_LAW's neighbourhood) |
 | `verify-classify` · `verify-warbirds` · `verify-daily` · `verify-terra-residency` · `verify-worker-normals` · `verify-finalize-pace` · `verify-frame-step` · `verify-vendor-three-tile` | **PASS** | the rest of the node smoke set |
