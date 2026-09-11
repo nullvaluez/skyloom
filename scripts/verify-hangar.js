@@ -38,7 +38,7 @@ const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
 const { bootFly } = require('./_boot');
-const { bootMobile, MOBILE_CTX, LAUNCH_ARGS } = require('./_mobile-boot');
+const { bootMobile, MOBILE_CTX, LAUNCH_ARGS, openActions, closeActions } = require('./_mobile-boot');
 
 const ROOT = path.join(__dirname, '..');
 const MAX_GLB_BYTES = 1024 * 1024;
@@ -428,6 +428,8 @@ function seedAircraft(id) {
   await bootMobile(mp, { style: 'toy', ...(process.env.FLY_URL ? { url: process.env.FLY_URL } : {}) });
   await mp.waitForTimeout(2500);
   const stickBefore = await mp.locator('[data-testid="touch-joystick"]').count();
+  await openActions(mp);
+
   await mp.locator('[data-testid="touch-pause"]').click();
   await mp.waitForTimeout(600);
   await mp.locator('[data-testid="pause-hangar"]').click();

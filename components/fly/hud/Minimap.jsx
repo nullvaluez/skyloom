@@ -6,6 +6,7 @@ import { mercatorScale } from '@/lib/fly/coords';
 import { buildPoiList } from '@/lib/fly/poi-data';
 import { useFlyStore } from '@/stores/fly-store';
 import { Zone } from '../LayoutRoot';
+import { useDeviceLayout } from '@/hooks/use-device-layout';
 
 // Military bases as small hollow triangles on the dial (Atlas round §4.2):
 // the in-world letters stay clean white, so the minimap carries the kind.
@@ -21,6 +22,7 @@ function getMilitaryPois() {
  * runtime only — no React state per tick.
  */
 export function Minimap({ runtime }) {
+  const { isTouch } = useDeviceLayout();
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -159,11 +161,11 @@ export function Minimap({ runtime }) {
       <canvas
         ref={canvasRef}
         style={{ width: MINIMAP.sizePx, height: MINIMAP.sizePx }}
-        className="pointer-events-auto cursor-pointer rounded-full"
-        onClick={() => useFlyStore.getState().setAtlasOpen(true)}
-        title="Open the Atlas (M)"
-        role="button"
-        aria-label="Open the Atlas"
+        className={isTouch ? 'pointer-events-none rounded-full' : 'pointer-events-auto cursor-pointer rounded-full'}
+        onClick={isTouch ? undefined : () => useFlyStore.getState().setAtlasOpen(true)}
+        title={isTouch ? 'Nearby aircraft' : 'Open the Atlas (M)'}
+        role={isTouch ? 'img' : 'button'}
+        aria-label={isTouch ? 'Nearby aircraft minimap' : 'Open the Atlas'}
       />
     </Zone>
   );

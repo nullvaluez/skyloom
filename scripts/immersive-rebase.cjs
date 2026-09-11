@@ -17,6 +17,7 @@ const check=(name,pass,detail)=>{r.checks.push({name,pass,detail});console.log(`
   p.on('console',m=>{if(m.type()==='error'&&/shader|WebGL|TypeError/.test(m.text()))r.errors.push(m.text().slice(0,2000));});
   await p.addInitScript(()=>{localStorage.setItem('fly-map-style-2','satellite');localStorage.setItem('fly-controls-seen','1');localStorage.setItem('fly-quality-tier','high');localStorage.setItem('fly-sound-on','0');window.__flyGovPin='hold';window.__flyWeatherOverride='overcast';window.__flySunOverride=Date.UTC(2026,6,18,17);});
   await p.goto(`${args.url||'http://localhost:3020'}/?graphics=immersive&graphicsReview=1`,{waitUntil:'domcontentloaded',timeout:90000});
+  r.servedBuild=await require('./ground-build-receipt.cjs')(p,args.url||'http://localhost:3020',args['build-id']);
   await p.waitForFunction(()=>window.__flyBoot?.pct===100&&window.__fly?.camera,null,{timeout:90000});
   r.hardware=await p.evaluate(()=>{const gl=document.querySelector('canvas').getContext('webgl2'),e=gl.getExtension('WEBGL_debug_renderer_info');return e&&gl.getParameter(e.UNMASKED_RENDERER_WEBGL);});
   if(!r.hardware||/swiftshader|software/i.test(r.hardware))throw Error('Hardware GPU unavailable');

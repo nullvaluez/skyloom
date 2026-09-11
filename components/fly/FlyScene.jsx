@@ -1,4 +1,10 @@
 'use client';
+
+import { GroundImmersionRig } from './GroundImmersionRig';
+import { SatGroundDetailLayer } from './SatGroundDetailLayer';
+import { applyNearGroundMaterial } from '@/lib/fly/near-ground-material';
+import { applyNightGroundReceiver } from '@/lib/fly/night-ground';
+import { attachGroundShadowLight } from '@/lib/fly/light-bubble';
 import { physicalBendCoefficient } from '@/lib/fly/render-scale';
 import { IMMERSIVE, immersiveOn, immersiveLighting } from '@/lib/fly/immersive';
 
@@ -766,7 +772,7 @@ function SatDepthRig({ runtime, flight, origin, engine, scene }) {
     const receiveOn = depthSubOn('nearReceive');
     const next = receiveOn ? new Set() : null;
     if (receiveOn) {
-      const reach = SAT_SHADOWS.orthoRadiusM + (NR.padM ?? 0);
+      const reach = (runtime.shadowRadiusM ?? SAT_SHADOWS.orthoRadiusM) + (NR.padM ?? 0);
       const cap = NR.maxTiles ?? 48;
       const root = engine?.object;
       _swept.tiles = 0;
@@ -972,6 +978,8 @@ export function FlyScene({ runtime }) {
   const scene = useThree((s) => s.scene); // round 13: live satellite fog color/density
   const sunRef = useRef();
   const hemiRef = useRef();
+  // The ground rig adjusts this existing shadow camera, never the sky's light.
+  useEffect(() => attachGroundShadowLight(runtime, sunRef.current), [runtime]);
   const satAltTRef = useRef(null); // round 13: smoothed satellite altitude term
   const sunTarget = useMemo(() => new Object3D(), []);
   const warpEpochForSun = useFlyStore((s) => s.warpEpoch); // re-aim the day-cycle on warps
@@ -1513,6 +1521,8 @@ export function FlyScene({ runtime }) {
         // null (and therefore an exact R19 program, key and text) whenever
         // LOD_CROSSFADE is off.
         applyHillshade(m, HILLSHADE, attachLodFade(m));
+        applyNearGroundMaterial(m, { surface: 'terrain' });
+        applyNightGroundReceiver(m, 'terrain');
         // Round 11: tier-aware aniso, read imperatively so NEW tiles pick up
         // a live tier change without re-uploading the streamed field (no
         // degrade hitch; the field converges as tiles stream).
@@ -2302,7 +2312,7 @@ export function FlyScene({ runtime }) {
       // the chase rig, whose damped world position is stale by exactly the
       // distance flown while composing.
       chase.snap();
-      chase.update(dt, flight, camera, cmd.freeLook, mercatorScale(flight.latDeg));
+      chase.update(dt, flight, camera, cmd.freeLook, mercatorScale(flight.latDeg), runtime.groundImmersion);
     } else if (flyState.cameraMode === 'cinema' && targeting.target) {
       cinema.update(
         dt,
@@ -2313,7 +2323,7 @@ export function FlyScene({ runtime }) {
         flight.groundElev
       );
     } else {
-      chase.update(dt, flight, camera, cmd.freeLook, mercatorScale(flight.latDeg));
+      chase.update(dt, flight, camera, cmd.freeLook, mercatorScale(flight.latDeg), runtime.groundImmersion);
     }
     camera.position.x -= origin.anchor.x;
     camera.position.z -= origin.anchor.z;
@@ -2858,7 +2868,7 @@ export function FlyScene({ runtime }) {
       // Same rig, same frustum, same tap count — the map just stops
       // re-rasterising into a shifted grid every frame.
       if (SHADOW_CALM.enabled && SHADOW_CALM.texelSnap) {
-        const sp = snapToShadowTexel(sun, tx, ty, tz, shadowRigRef.current.radiusM, shadowRigRef.current.mapSize);
+        const sp = snapToShadowTexel(sun, tx, ty, tz, runtime.shadowRadiusM ?? shadowRigRef.current.radiusM, shadowRigRef.current.mapSize);
         if (sp) {
           tx = sp.x;
           ty = sp.y;
@@ -2963,7 +2973,7 @@ export function FlyScene({ runtime }) {
         // tier, and quantising a light that renders no shadow map would be
         // arithmetic nobody reads.
         if (SHADOW_CALM.enabled && SHADOW_CALM.texelSnap && satShadowRef.current) {
-          const sp = snapToShadowTexel(sun, tx, ty, tz, shadowRigRef.current.radiusM, shadowRigRef.current.mapSize);
+          const sp = snapToShadowTexel(sun, tx, ty, tz, runtime.shadowRadiusM ?? shadowRigRef.current.radiusM, shadowRigRef.current.mapSize);
           if (sp) {
             tx = sp.x;
             ty = sp.y;
@@ -3142,8 +3152,8 @@ export function FlyScene({ runtime }) {
           ...shadowKernelState(),
           casting: satShadowRef.current === true,
           mapSize: shadowRigRef.current.mapSize,
-          radiusM: shadowRigRef.current.radiusM,
-          texelM: +((2 * shadowRigRef.current.radiusM) / shadowRigRef.current.mapSize).toFixed(4),
+          radiusM: runtime.shadowRadiusM ?? shadowRigRef.current.radiusM,
+          texelM: +((2 * (runtime.shadowRadiusM ?? shadowRigRef.current.radiusM)) / shadowRigRef.current.mapSize).toFixed(4),
           normalBias: shadowRigRef.current.normalBias,
           bias: shadowRigRef.current.bias,
           lightPos: sunRef.current
@@ -3250,6 +3260,7 @@ export function FlyScene({ runtime }) {
   return (
     <>
       {/* Pre-HDRI fallback; the SkyDome is the real sky in every style */}
+      <GroundImmersionRig runtime={runtime} flight={flight} />
       <color attach="background" args={[mood.bg]} />
       {/* Aerial haze doubles as the horizon cap that bounds tile loads */}
       <fogExp2 attach="fog" args={mood.fog} />
@@ -3342,6 +3353,7 @@ export function FlyScene({ runtime }) {
             &&-chain / worldRoot reason as the layers above; W0 stub renders
             null and CLUTTER.enabled is false, so this line is a no-op until
             C's merge. */}
+        {mapStyle === 'satellite' && <SatGroundDetailLayer runtime={runtime} flight={flight} />}
         {mapStyle === 'satellite' && CLUTTER.enabled && qualityTier !== 'low' && (
           <SatClutterLayer runtime={runtime} flight={flight} />
         )}

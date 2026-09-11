@@ -765,3 +765,138 @@
   line-height: 1.2; /* = 36/30, i.e. text-3xl's 2.25rem at full size */
 }
 
+
+/* Touch flight actions: one disclosure plus the independent steering stick.
+   All offsets share safe-area variables so phone rotation and inset QA use
+   the same geometry. Desktop selectors and saved layout constants stay intact. */
+[data-fly-root][data-touch='1'] {
+  --touch-safe-top: env(safe-area-inset-top, 0px);
+  --touch-safe-right: env(safe-area-inset-right, 0px);
+  --touch-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --touch-safe-left: env(safe-area-inset-left, 0px);
+  --touch-panel-bottom: calc(var(--touch-safe-bottom) + 12rem);
+  --touch-panel-right: max(var(--touch-safe-right), 1rem);
+  --touch-panel-left-clear: max(var(--touch-safe-left), 1rem);
+  --touch-panel-top-clear: calc(var(--touch-safe-top) + 4.25rem);
+}
+.touch-actions-fab {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 1px solid rgba(125, 211, 252, 0.35);
+  color: #dbeafe;
+  box-shadow: 0 6px 20px rgba(2, 4, 10, 0.5);
+  font: 10px ui-monospace, monospace;
+  touch-action: manipulation;
+}
+.touch-actions-fab[aria-expanded='true'] { border-color: #f9a8d4; color: #fbcfe8; }
+[data-fly-root][data-touch='1'] .touch-actions-panel {
+  position: fixed;
+  z-index: 30;
+  right: var(--touch-panel-right);
+  bottom: var(--touch-panel-bottom);
+  top: auto;
+  left: auto;
+  width: min(344px, calc(100vw - var(--touch-panel-right) - var(--touch-panel-left-clear)));
+  max-height: calc(100dvh - var(--touch-panel-bottom) - var(--touch-panel-top-clear));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  pointer-events: auto;
+  border: 1px solid rgba(125, 211, 252, 0.3);
+  border-radius: 18px;
+  background: rgba(6, 9, 16, 0.96);
+  color: #dbeafe;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+  transform-origin: bottom right;
+  animation: touch-panel-open 160ms ease-out;
+}
+.touch-actions-heading {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+.touch-actions-heading h2 { font-size: 13px; font-weight: 600; }
+.touch-actions-heading > span { font: 10px ui-monospace, monospace; color: #a5b4c8; }
+.touch-actions-scroll {
+  padding: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  scrollbar-width: thin;
+  scrollbar-color: #64748b transparent;
+  scroll-padding: 10px;
+}
+.touch-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  min-width: 44px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.06);
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
+  color: #dbeafe;
+  touch-action: pan-y;
+}
+.touch-action svg { flex: none; }
+.touch-action:disabled { opacity: 0.45; }
+.touch-action:active, .touch-action[aria-pressed='true'] { background: rgba(244, 114, 182, 0.18); border-color: #f9a8d4; color: #fce7f3; }
+.touch-actions-fab:focus-visible, .touch-action:focus-visible,
+.touch-contracts-panel button:focus-visible { outline: 2px solid #7dd3fc; outline-offset: 3px; }
+.touch-actions-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-block: 9px; }
+.touch-speed, .touch-target { min-width: 0; margin: 0; padding: 0; border: 0; }
+.touch-speed legend, .touch-target legend { padding-bottom: 6px; font: 10px ui-monospace, monospace; color: #a5b4c8; }
+.touch-speed > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.touch-boost { position: relative; overflow: hidden; margin-top: 8px; padding-bottom: 11px; }
+.touch-boost progress { position: absolute; width: 100%; height: 3px; bottom: 0; left: 0; appearance: none; border: 0; background: #1e293b; }
+.touch-boost progress::-webkit-progress-bar { background: #1e293b; }
+.touch-boost progress::-webkit-progress-value { background: #7dd3fc; }
+.touch-boost progress::-moz-progress-bar { background: #7dd3fc; }
+[data-fly-root][data-touch='1'] .touch-contracts-scroll { width: 100%; min-height: 0; overscroll-behavior: contain; touch-action: pan-y; padding: 14px 56px 14px 14px; }
+[data-fly-root][data-touch='1'] [data-zone='info-dock'] {
+  bottom: calc(var(--touch-safe-bottom) + 12rem);
+  left: max(var(--touch-safe-left), 0.5rem);
+  right: max(var(--touch-safe-right), 0.5rem);
+  width: auto;
+  transform: none;
+}
+/* Temporarily yield readouts to a panel; keep contracts mounted so progress
+   and completion timers survive opening and closing the disclosure. */
+[data-fly-root][data-touch-panel] [data-zone='info-dock'],
+[data-fly-root][data-touch-panel] [data-zone='toasts'],
+[data-fly-root][data-touch-panel] [data-zone='minimap'],
+[data-fly-root][data-touch-panel='actions'] [data-zone='contracts'] { visibility: hidden; pointer-events: none; }
+[data-fly-root][data-touch='1'] [data-testid='hud-spots-cell'] { pointer-events: none; }
+[data-fly-root][data-touch='1'][data-orient='landscape'] {
+  --touch-panel-bottom: calc(var(--touch-safe-bottom) + 8rem);
+  --touch-panel-left-clear: calc(max(var(--touch-safe-left), 18px) + 140px);
+  --touch-panel-top-clear: calc(var(--touch-safe-top) + 0.5rem);
+}
+/* Landscape has room beside the stick: reserve its entire 128px width and
+   place the panel above the 64px FAB, clear of provider attribution. */
+@media (prefers-reduced-motion: reduce) {
+  [data-fly-root][data-touch='1'] .touch-actions-panel { animation: none; }
+}
+[data-fly-root][data-touch='1'] .touch-actions-panel[data-reduced-motion='1'] { animation: none; }
+@keyframes touch-panel-open {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}

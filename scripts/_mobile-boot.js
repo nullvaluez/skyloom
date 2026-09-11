@@ -61,4 +61,20 @@ const LAUNCH_ARGS = [
   '--autoplay-policy=no-user-gesture-required',
 ];
 
-module.exports = { bootMobile, MOBILE_CTX, LANDSCAPE_CTX, LAUNCH_ARGS };
+/** Labeled touch disclosure; no-op on a legacy/desktop HUD. */
+async function openActions(page) {
+  const fab = page.locator('[data-testid="touch-fab"]');
+  if (!(await fab.count())) return false;
+  if (await page.locator('[data-testid="touch-actions"]').count()) return true;
+  if ((await fab.getAttribute('aria-expanded')) === 'true') await fab.click();
+  await fab.click();
+  await page.locator('[data-testid="touch-actions"]').waitFor({ state: 'visible' });
+  return true;
+}
+async function closeActions(page) {
+  const fab = page.locator('[data-testid="touch-fab"]');
+  if ((await fab.count()) && (await fab.getAttribute('aria-expanded')) === 'true') await fab.click();
+  await page.locator('[data-testid="touch-actions"]').waitFor({ state: 'detached' });
+}
+
+module.exports = { bootMobile, openActions, closeActions, MOBILE_CTX, LANDSCAPE_CTX, LAUNCH_ARGS };

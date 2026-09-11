@@ -23,7 +23,7 @@
 const { chromium } = require('playwright');
 const path = require('path');
 const { bootFly } = require('./_boot');
-const { bootMobile, MOBILE_CTX, LAUNCH_ARGS } = require('./_mobile-boot');
+const { bootMobile, MOBILE_CTX, LAUNCH_ARGS, openActions, closeActions } = require('./_mobile-boot');
 
 const PASSPORT_KEY = 'shadowadsb-passport';
 const PAGE_SIZE = 80; // LOGBOOK.pageSize
@@ -481,6 +481,8 @@ function seedPassport({ key, count }) {
   await mp.waitForTimeout(2500);
 
   const stickBefore = await mp.locator('[data-testid="touch-joystick"]').count();
+  await openActions(mp);
+
   await mp.locator('[data-testid="touch-pause"]').click();
   await mp.waitForTimeout(600);
   await mp.locator('[data-testid="pause-logbook"]').click();

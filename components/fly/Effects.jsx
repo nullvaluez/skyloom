@@ -680,6 +680,10 @@ export const Effects = memo(function Effects({ runtime }) {
   const [aoNonce, setAoNonce] = useState(0);
   const [aoPass, setAoPass] = useState(null);
   const aoRef = useRef(null);
+  useEffect(() => {
+    runtime.aoPass = aoPass;
+    return () => { if (runtime.aoPass === aoPass) runtime.aoPass = null; };
+  }, [runtime, aoPass]);
   // NOTE the absent tier term: creation is gated on style + flag only. The
   // CHAIN membership is tier-gated inside buildPassList, so at medium/low the
   // pass costs nothing but its materials stay alive and its programs stay

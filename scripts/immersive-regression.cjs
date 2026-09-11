@@ -28,6 +28,7 @@ let browser;
       window.__flyGovPin = 'hold';
     });
     await page.goto(`${args.url || 'http://localhost:3020'}/?graphics=immersive&graphicsReview=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
+    report.servedBuild=await require('./ground-build-receipt.cjs')(page,args.url||'http://localhost:3020',args['build-id']);
     await page.waitForFunction(() => window.__flyBoot?.pct === 100 && window.__fly?.engine, null, { timeout: 90000 });
     report.hardware = await page.evaluate(() => {
       const gl = document.querySelector('canvas').getContext('webgl2'), e = gl.getExtension('WEBGL_debug_renderer_info');

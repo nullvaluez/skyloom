@@ -17,8 +17,15 @@ const pct=(a,p)=>a.length?[...a].sort((x,y)=>x-y)[Math.min(a.length-1,Math.floor
   page.on('response',r=>{if(r.status()>=400)rasterFailure(r.url(),{status:r.status()});});
   page.on('console',m=>{if(m.type()==='error'&&/shader|WebGL|ReferenceError|TypeError/.test(m.text()))report.errors.push(m.text().slice(0,1000))});
   report.weather=args.weather||'baseline';
-  await page.addInitScript(({hour,weather})=>{localStorage.setItem('fly-map-style-2','satellite');localStorage.setItem('fly-quality-tier','high');localStorage.setItem('fly-sound-on','0');localStorage.setItem('fly-controls-seen','1');window.__flyWeatherOverride=weather;window.__flySunOverride=Date.UTC(2026,6,18,hour);},{hour:Number(args.hour??4),weather:report.weather});
+  report.crashMode='forgiving'; // Rendering benchmark: an automated route must not respawn through buildings.
+  await page.addInitScript(({hour,weather})=>{localStorage.setItem('fly-map-style-2','satellite');localStorage.setItem('fly-quality-tier','high');localStorage.setItem('fly-sound-on','0');localStorage.setItem('fly-controls-seen','1');localStorage.setItem('fly-crash-mode','forgiving');window.__flyWeatherOverride=weather;window.__flySunOverride=Date.UTC(2026,6,18,hour);},{hour:Number(args.hour??4),weather:report.weather});
   await page.goto((args.url||'http://localhost:3000')+'/?graphics='+encodeURIComponent(stage)+'&graphicsReview=1',{waitUntil:'domcontentloaded',timeout:90000});
+  if(args['build-id']){
+    const receipt=await page.request.get(`${args.url||'http://localhost:3000'}/_next/static/${encodeURIComponent(args['build-id'])}/ground-source.json`);
+    if(!receipt.ok())throw Error('Served build receipt unavailable');
+    report.servedBuild=await receipt.json();
+    if(report.servedBuild.buildId!==args['build-id'])throw Error('Served build identity mismatch');
+  }
   await page.waitForFunction(()=>window.__flyBoot?.pct===100&&window.__fly,null,{timeout:90000});
   await page.evaluate(altM=>window.__fly.warpToGeo(40.7028,-74.017,{altM,name:null}),Number(args.alt??500));
   await page.waitForTimeout(25000);
@@ -27,9 +34,9 @@ const pct=(a,p)=>a.length?[...a].sort((x,y)=>x-y)[Math.min(a.length-1,Math.floor
   if(!report.hardware.gpuTimer || /swiftshader|software|llvmpipe/i.test(report.hardware.renderer||''))throw Error('Hardware GPU timing unavailable');
   await page.waitForFunction(()=>[...window.__fly.traffic.tracks.values()].some(t=>t.fix1 && t.stale!==2),null,{timeout:45000})
     .catch(()=>{throw Error('No live traffic available at benchmark readiness');});
-  await page.evaluate(()=>{
+  await page.evaluate(({aglFt,boost})=>{
     const rt=window.__fly,f=rt.flight,gl=document.querySelector('canvas').getContext('webgl2'),ext=gl.getExtension('EXT_disjoint_timer_query_webgl2');
-    const bench=window.__graphicsFlight={frames:[],steadyFrames:[],arrivalFrames:[],gpu:[],longTasks:[],start:performance.now(),last:0,running:true,disjoint:0,loads:0,unloads:0,baseAltitude:f.pos.y,arrivalUntil:0};
+    const bench=window.__graphicsFlight={frames:[],steadyFrames:[],arrivalFrames:[],gpu:[],longTasks:[],start:performance.now(),last:0,running:true,disjoint:0,loads:0,unloads:0,baseAltitude:f.pos.y,arrivalUntil:0,groundDistanceM:0,movingSeconds:0,teleports:0,lastPose:null};
     rt.engine.map.addEventListener('tile-loaded',()=>bench.loads++);
     rt.engine.map.addEventListener('tile-unload',()=>bench.unloads++);
     if(PerformanceObserver.supportedEntryTypes.includes('longtask')){
@@ -59,6 +66,10 @@ const pct=(a,p)=>a.length?[...a].sort((x,y)=>x-y)[Math.min(a.length-1,Math.floor
         // Main's rebaseCalm no longer wakes the store for origin changes.
         // The runtime epoch is the counter that actually advances in flight.
         speed:f.speed,rebaseEpoch:rt.origin.epoch ?? window.__flyStore.getState().rebaseEpoch,
+        warpEpoch:window.__flyStore.getState().warpEpoch,crashEpoch:window.__flyStore.getState().crashEpoch,
+        groundDistanceM:bench.groundDistanceM,movingSeconds:bench.movingSeconds,teleports:bench.teleports,
+        visualAgl:f.pos.y-(rt.groundElevVis??f.groundElev), ground:rt.groundImmersion,
+        nightGround:rt.groundLighting,groundDetail:rt.groundDetail,shadowRadiusM:rt.shadowRadiusM,
         pins:Object.fromEntries(['__flyGovPin','__flyTerraPin','__flyDepthPin','__flySettlePin','__flyClutterPin','__flyAerialOverride'].map(k=>[k,window[k]??null])),
         recentFrameP95:bench.frames.slice(-600).sort((a,b)=>a-b)[Math.floor(Math.min(600,bench.frames.length)*.95)]};
     };
@@ -66,10 +77,23 @@ const pct=(a,p)=>a.length?[...a].sort((x,y)=>x-y)[Math.min(a.length-1,Math.floor
     function tick(now){
       if(!bench.running){if(active){gl.endQuery(ext.TIME_ELAPSED_EXT);gl.deleteQuery(active)}for(const q of pending)gl.deleteQuery(q);return;}
       if(bench.last){const dt=now-bench.last;bench.frames.push(dt);(now<bench.arrivalUntil?bench.arrivalFrames:bench.steadyFrames).push(dt);}bench.last=now;
+      const store=window.__flyStore.getState(),previous=bench.lastPose;
+      if(previous){
+        if(previous.warpEpoch===store.warpEpoch&&previous.crashEpoch===store.crashEpoch){
+          // f.pos is already absolute Mercator. Accumulate each frame's path,
+          // undoing map scale; neither rebases nor turns shorten this measure.
+          bench.groundDistanceM+=Math.hypot(f.pos.x-previous.x,f.pos.z-previous.z)/Math.cosh((f.pos.z+previous.z)/(2*6378137));
+          bench.movingSeconds+=(now-previous.at)/1000;
+        }else bench.teleports++;
+      }
+      bench.lastPose={x:f.pos.x,z:f.pos.z,at:now,warpEpoch:store.warpEpoch,crashEpoch:store.crashEpoch};
       // Translating turns at actual flight speed, with a gentle altitude cycle.
       // No position freeze, no terrain pin: streaming sees real movement.
       const sec=(now-bench.start)/1000;f.heading=0.25+sec*0.024;f.pitch=0;f.bank=0.12;
-      f.pos.y=Math.max(f.groundElev+100,bench.baseAltitude+120*Math.sin(sec/20));
+      f.pos.y=Number.isFinite(aglFt)
+        ? (rt.groundElevVis??f.groundElev)+aglFt*.3048+Math.min(15,aglFt*.08)*Math.sin(sec/20)
+        : Math.max(f.groundElev+100,bench.baseAltitude+120*Math.sin(sec/20));
+      if(boost)rt.input?.setBoost(true);
       if(ext){
         if(active){gl.endQuery(ext.TIME_ELAPSED_EXT);pending.push(active);active=null;}
         if(gl.getParameter(ext.GPU_DISJOINT_EXT)){bench.disjoint++;for(const q of pending)gl.deleteQuery(q);pending.length=0;}
@@ -79,7 +103,7 @@ const pct=(a,p)=>a.length?[...a].sort((x,y)=>x-y)[Math.min(a.length-1,Math.floor
       bench.raf=requestAnimationFrame(tick);
     }
     bench.raf=requestAnimationFrame(tick);
-  });
+  },{aglFt:args['agl-ft']===undefined?null:Number(args['agl-ft']),boost:!!args.boost});
   const end=Date.now()+duration*1000;
   report.status='IN_PROGRESS';save();
   while(Date.now()<end){
@@ -93,7 +117,7 @@ const pct=(a,p)=>a.length?[...a].sort((x,y)=>x-y)[Math.min(a.length-1,Math.floor
       await page.evaluate(p=>{const b=window.__graphicsFlight;b.arrivalUntil=performance.now()+30000;window.__fly.warpToGeo(p[0],p[1],{altM:p[2],name:null});b.baseAltitude=window.__fly.flight.pos.y;},destination);
     }
   }
-  const values=await page.evaluate(()=>{const b=window.__graphicsFlight;b.running=false;b.observer?.disconnect();return{frames:b.frames,steadyFrames:b.steadyFrames,arrivalFrames:b.arrivalFrames,gpu:b.gpu,disjoint:b.disjoint,longTasks:b.longTasks}});
+  const values=await page.evaluate(()=>{const b=window.__graphicsFlight;b.running=false;window.__fly.input?.setBoost(false);b.observer?.disconnect();return{frames:b.frames,steadyFrames:b.steadyFrames,arrivalFrames:b.arrivalFrames,gpu:b.gpu,disjoint:b.disjoint,longTasks:b.longTasks}});
   report.timing={fps:1000/(values.frames.reduce((a,b)=>a+b,0)/values.frames.length),p95:pct(values.frames,.95),p99:pct(values.frames,.99),gpuP95:pct(values.gpu,.95),gpuSamples:values.gpu.length,disjoint:values.disjoint,cpuLongTasks:values.longTasks.length,cpuLongTaskP95:pct(values.longTasks,.95)};
   report.timing.steady={frames:values.steadyFrames.length,p95:pct(values.steadyFrames,.95),p99:pct(values.steadyFrames,.99),max:values.steadyFrames.reduce((m,v)=>Math.max(m,v),0)};
   report.timing.arrival={frames:values.arrivalFrames.length,p95:pct(values.arrivalFrames,.95),p99:pct(values.arrivalFrames,.99),max:values.arrivalFrames.reduce((m,v)=>Math.max(m,v),0)};
@@ -107,21 +131,23 @@ const pct=(a,p)=>a.length?[...a].sort((x,y)=>x-y)[Math.min(a.length-1,Math.floor
   const absent=report.transitions.some(t=>!(t.buildings?.ready>0&&t.roads?.ready>0&&t.skyline?.ready>0&&t.nightEnabled));
   const unsuitable=/swiftshader|software|llvmpipe/i.test(report.hardware.renderer||'')||!values.gpu.length;
   const drawValues=report.samples.map(s=>s.review?.drawCalls||0),triValues=report.samples.map(s=>s.review?.triangles||0);
-  report.budgets={drawP95:pct(drawValues,.95),triangleP95:pct(triValues,.95),native:report.samples.every(s=>s.review?.dpr===1),terrainTextureMBMax:Math.max(...report.samples.map(s=>s.terrainTextureBytes))/1048576};
-  report.memory={heapStart:report.samples[0]?.heap,heapEnd:report.samples.at(-1)?.heap,heapMin:Math.min(...report.samples.map(s=>s.heap)),heapMax:Math.max(...report.samples.map(s=>s.heap)),programs:report.samples.map(s=>s.review?.programs),geometries:report.samples.map(s=>s.review?.geometries),note:'Texture estimate covers resident terrain RGBA uploads plus mipmaps, not all renderer allocations; CPU metric covers browser long tasks.'};
+  report.budgets={drawP95:pct(drawValues,.95),triangleP95:pct(triValues,.95),native:report.samples.every(s=>s.review?.dpr===1),terrainTextureMBMax:Math.max(...report.samples.map(s=>s.terrainTextureBytes))/1048576,
+    groundLightMapMBMax:Math.max(...report.samples.map(s=>s.nightGround?.bytes??0))/1048576,
+    terrainAndGroundMapMBMax:Math.max(...report.samples.map(s=>s.terrainTextureBytes+(s.nightGround?.bytes??0)))/1048576};
+  report.memory={heapStart:report.samples[0]?.heap,heapEnd:report.samples.at(-1)?.heap,heapMin:Math.min(...report.samples.map(s=>s.heap)),heapMax:Math.max(...report.samples.map(s=>s.heap)),programs:report.samples.map(s=>s.review?.programs),geometries:report.samples.map(s=>s.review?.geometries),note:'Texture estimate covers resident terrain RGBA uploads plus mipmaps and both allocated RGBA8 ground-light maps, not all renderer allocations; CPU metric covers browser long tasks. Renderer draw counters include offscreen ground-light updates.'};
   report.traffic={min:Math.min(...report.samples.map(s=>s.activeTraffic)),max:Math.max(...report.samples.map(s=>s.activeTraffic))};
   const missingTiles=report.samples.some(s=>s.failedImagery>0||s.terrainMeshes<20);
   const absentTraffic=report.traffic.max===0;
-  const budgetsMeasured=drawValues.every(n=>n>1), budgetsPass=report.budgets.native&&report.budgets.drawP95<=480&&report.budgets.triangleP95<=2200000;
+  const budgetsMeasured=drawValues.every(n=>n>1), budgetsPass=report.budgets.native&&report.budgets.drawP95<=375&&report.budgets.triangleP95<=2200000&&report.timing.gpuP95<=12&&report.budgets.terrainAndGroundMapMBMax<=300;
   report.unpinned=report.samples.every(s=>Object.values(s.pins).every(v=>v===null));
   // Guard a stalled simulation: a frame-time PASS must represent moving flight.
-  report.motion={minimumSpeed:Math.min(...report.samples.map(s=>s.speed)),rebases:report.samples.at(-1)?.rebaseEpoch-report.samples[0]?.rebaseEpoch};
+  report.motion={minimumSpeed:Math.min(...report.samples.map(s=>s.speed)),rebases:report.samples.at(-1)?.rebaseEpoch-report.samples[0]?.rebaseEpoch,
+    crashes:report.samples.at(-1)?.crashEpoch-report.samples[0]?.crashEpoch,teleports:report.samples.at(-1)?.teleports,
+    totalGroundDistanceM:report.samples.at(-1)?.groundDistanceM};
   const measuredSpeeds=report.samples.slice(1).flatMap((s,i)=>{
     const p=report.samples[i];if(s.arrival||p.arrival)return [];
-    const seconds=(s.at-p.at)/1000;if(seconds<=0)return [];
-    // Absolute Mercator positions survive rebases. Undo the latitude scale;
-    // reported velocity alone could remain nonzero in a stalled simulation.
-    const groundMetres=Math.hypot(s.position.x-p.position.x,s.position.z-p.position.z)/Math.cosh((s.position.z+p.position.z)/(2*6378137));
+    const seconds=s.movingSeconds-p.movingSeconds;if(seconds<=0)return [];
+    const groundMetres=s.groundDistanceM-p.groundDistanceM;
     return [groundMetres/seconds];
   });
   report.motion.minimumMeasuredGroundSpeed=measuredSpeeds.length?Math.min(...measuredSpeeds):0;

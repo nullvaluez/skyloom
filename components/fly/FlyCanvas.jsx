@@ -4,6 +4,8 @@ import { Suspense, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { PerformanceMonitor } from '@react-three/drei';
 import { FlyScene } from './FlyScene';
+import { NightGroundRig } from './NightGroundRig';
+import { LightBubbleRig } from './LightBubbleRig';
 import { Effects } from './Effects';
 import { PhotoCapture } from './PhotoCapture';
 import { JuiceSystems } from './JuiceSystems';
@@ -73,6 +75,8 @@ export function FlyCanvas({ runtime }) {
   const sceneTree = (
     <Suspense fallback={null}>
       <FlyScene runtime={runtime} />
+      <LightBubbleRig runtime={runtime} />
+      <NightGroundRig runtime={runtime} />
       <Effects runtime={runtime} />
       {/* Round 17: reads the GRADED frame off this canvas at useFrame
           priority 100 — i.e. after the composer above, same task. */}

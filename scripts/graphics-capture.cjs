@@ -40,6 +40,12 @@ const sites = {
       if (featureOff.length) window.__flyVisualsFeatures = Object.fromEntries(featureOff.map(key=>[key,false]));
     }, { stage, fixedTier: !!args['fixed-tier'], featureOff: (args['feature-off']||'').split(',').filter(Boolean) });
     await page.goto(`${url}/?graphics=${encodeURIComponent(stage)}&graphicsReview=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
+    if (args['build-id']) {
+      const receipt = await page.request.get(`${url}/_next/static/${encodeURIComponent(args['build-id'])}/ground-source.json`);
+      if (!receipt.ok()) throw new Error('Served build receipt unavailable');
+      report.servedBuild = await receipt.json();
+      if (report.servedBuild.buildId !== args['build-id']) throw new Error('Served build identity mismatch');
+    }
     report.hardware = await page.evaluate(() => {
       const gl = document.createElement('canvas').getContext('webgl2');
       const ext = gl?.getExtension('WEBGL_debug_renderer_info');
@@ -80,7 +86,11 @@ const sites = {
           const telemetry = await page.evaluate(() => ({ stats: window.__flyStats,
             review: window.__graphicsReview,
             boot: window.__flyBoot, tier: window.__flyStore?.getState().qualityTier,
-            activePins: Object.fromEntries(['__flyTerraPin','__flyDepthPin','__flyGovPin','__flyAerialOverride','__flyNightCityArm','__flyVisualsArm','__flyVisualsFeatures'].map(k=>[k,window[k] ?? null])) }));
+            ground: window.__fly?.groundImmersion,
+            groundDetail: window.__fly?.groundDetail,
+            nightGround: window.__fly?.groundLighting,
+            shadowRadiusM: window.__fly?.shadowRadiusM,
+            activePins: Object.fromEntries(['__flyTerraPin','__flyDepthPin','__flyGovPin','__flyAerialOverride','__flyNightCityArm','__flyVisualsArm','__flyVisualsFeatures','__flyGroundFeatures'].map(k=>[k,window[k] ?? null])) }));
           const file = `${name}-${time}-${aglFt}.png`;
           await page.screenshot({ path: path.join(output, file) });
           report.shots.push({ name, time, site: sites[name], requestedAglFt: aglFt, file, ...telemetry });
@@ -92,8 +102,13 @@ const sites = {
     const software = /swiftshader|llvmpipe|software/i.test(report.hardware.renderer || '');
     const empty = report.shots.some(s => !(s.review?.buildings?.ready > 0 || s.stats?.satBuildings?.ready > 0));
     const unready = report.shots.some(s => !s.review?.terrain?.sharp) || !!report.readinessFailures?.length;
-    report.status = software || empty || unready ? 'BLOCKED' : report.errors.length ? 'FAIL' : 'CAPTURED';
+    report.budgetChecks = report.shots.map(s => ({file:s.file,draws:s.review?.drawCalls,triangles:s.review?.triangles,
+      drawLimit:s.name==='owens'?261:375,triangleLimit:2000000,
+      pass:s.review?.drawCalls>1&&s.review.drawCalls<=(s.name==='owens'?261:375)&&s.review?.triangles>0&&s.review.triangles<=2000000}));
+    const overBudget = args['gate-budgets'] && report.budgetChecks.some(s=>!s.pass);
+    report.status = software || empty || unready ? 'BLOCKED' : report.errors.length || overBudget ? 'FAIL' : 'CAPTURED';
     report.reason = software ? 'Software renderer: no GPU performance certification.' : empty ? 'Required building residency not established.' : unready ? 'Terrain imagery did not reach the active sharpness target.' : undefined;
+    if(overBudget) report.reason='A fixed-pose draw or triangle budget was exceeded; see budgetChecks.';
   } catch (error) {
     report.status = 'BLOCKED'; report.reason = error.message;
     console.error(error.message);

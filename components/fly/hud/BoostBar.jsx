@@ -31,7 +31,7 @@ const RING_PAD = 3; // px of clearance between the pad edge and the ring stroke
  *             not.
  */
 export function BoostBar() {
-  const { isPhone } = useDeviceLayout();
+  const { isPhone, isTouch } = useDeviceLayout();
   const [present, setPresent] = useState(false);
   const fillRef = useRef(null);
   const wrapRef = useRef(null);
@@ -83,7 +83,9 @@ export function BoostBar() {
     return () => clearInterval(id);
   }, []);
 
-  if (!present) return null;
+  // Touch owns an inline charge meter inside the action panel. Never leave a
+  // floating ring at the last position of a now-unmounted Boost button.
+  if (!present || isTouch) return null;
 
   if (isPhone) {
     const w = MOBILE_UI.clusterSize.boostPx + RING_PAD * 2;

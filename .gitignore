@@ -3,6 +3,7 @@
 
 # Reproducible graphics evidence; selected review images can be added explicitly.
 /.graphics-review/
+/scripts/ground-night-out/
 
 # next.js
 .next

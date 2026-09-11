@@ -198,6 +198,8 @@ export function SatVegLayer({ runtime, flight }) {
   // engine itself: nothing outside this file should be able to steer it.
   const bus = useMemo(
     () => ({
+      nearest: (x, z) => engine.nearest(x, z),
+      groundAtLocal: (chunk, x, z) => engine.groundAtLocal(chunk, x, z),
       get stats() {
         return engine.stats;
       },

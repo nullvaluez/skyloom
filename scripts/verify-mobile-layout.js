@@ -55,7 +55,7 @@
  */
 const { chromium } = require('playwright');
 const path = require('path');
-const { bootMobile, MOBILE_CTX, LANDSCAPE_CTX, LAUNCH_ARGS } = require('./_mobile-boot');
+const { bootMobile, MOBILE_CTX, LANDSCAPE_CTX, LAUNCH_ARGS, openActions, closeActions } = require('./_mobile-boot');
 
 const BOOT_OPTS = process.env.FLY_URL ? { url: process.env.FLY_URL } : {};
 const MIN_TARGET = 44; // MOBILE_UI.minTargetPx
@@ -479,6 +479,8 @@ async function runOrientation(browser, label, ctxOpts) {
 
   // --- 5 + 6: landscape-only reachability gates ---------------------------
   if (label === 'landscape') {
+    await openActions(page);
+
     await page.locator('[data-testid="touch-pause"]').click();
     await page.waitForTimeout(700);
     const exitInfo = await page.evaluate(() => {

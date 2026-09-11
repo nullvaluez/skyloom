@@ -1,5 +1,17 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { registerHooks } from 'node:module';
+import { fileURLToPath } from 'node:url';
+// Load the real shader dependency graph; embedding source in data URLs hides
+// new transitive imports and produces enormous, unactionable resolver errors.
+registerHooks({ resolve(specifier, context, next) {
+  if (specifier.startsWith('@/')) specifier = new URL('../' + specifier.slice(2), import.meta.url).href;
+  if (specifier.startsWith('.') || specifier.startsWith('file:')) {
+    const url = new URL(specifier, context.parentURL);
+    if (fs.existsSync(fileURLToPath(url) + '.js')) return next(url.href + '.js', context);
+  }
+  return next(specifier, context);
+} });
 const sourceURL = file => {
   let text=fs.readFileSync(new URL('../lib/fly/'+file,import.meta.url),'utf8');
   text=text.replace(/from '\.\/immersive'/g,`from '${sourceURLLeaf('immersive.js')}'`);
@@ -71,20 +83,7 @@ for(const f of ['sat-building','sat-skyline','sat-road','sat-veg','sat-clutter',
 }
 assert.match(fs.readFileSync(new URL('../lib/fly/toy-world/vector-tile.worker.js',import.meta.url),'utf8'), /WORKER_PROTOCOL = 20/);
 // Exercise the real near/far handover uniforms through a quality step and a rebase.
-const dataURL = file => {
-  // Main's world-bend now imports the shared constants/atmosphere law. Resolve
-  // those real modules before embedding it; a data URL has no alias base.
-  const source = fs.readFileSync(new URL('../lib/fly/'+file,import.meta.url),'utf8')
-    .replace(/from ['"]@\/([^'"]+)['"]/g, (_, module) =>
-      'from ' + JSON.stringify(new URL('../'+module+'.js',import.meta.url).href));
-  return `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`;
-};
-const materialSource = fs.readFileSync(new URL('../lib/fly/satellite-architecture-material.js',import.meta.url),'utf8')
-  .replace("'./immersive'",JSON.stringify(dataURL('immersive.js')))
-  .replace("'three'",JSON.stringify(import.meta.resolve('three')))
-  .replace("'./building-profiles'",JSON.stringify(dataURL('building-profiles.js')))
-  .replace("'./toy-world/world-bend'",JSON.stringify(dataURL('toy-world/world-bend.js')));
-const {createSatelliteArchitectureMaterial,setSatelliteArchitectureCoverage} = await import(`data:text/javascript;base64,${Buffer.from(materialSource).toString('base64')}`);
+const {createSatelliteArchitectureMaterial,setSatelliteArchitectureCoverage} = await import('../lib/fly/satellite-architecture-material.js');
 for(const distant of [false,true]) {
   const material=createSatelliteArchitectureMaterial({distant});
   const shader={uniforms:{},vertexShader:'#include <common>\n#include <begin_vertex>',fragmentShader:'#include <common>\n#include <color_fragment>\n#include <emissivemap_fragment>'};

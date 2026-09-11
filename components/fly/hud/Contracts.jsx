@@ -19,6 +19,7 @@ import { mercatorScale } from '@/lib/fly/coords';
 import { CONTRACTS_LIVING, MOBILE_UI } from '@/lib/fly/fly-constants';
 import { Zone } from '../LayoutRoot';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
+import { setTouchSurface, useTouchSurface } from '@/hooks/use-touch-actions';
 import {
   loadSnapshot,
   reviveEntry,
@@ -160,7 +161,13 @@ export function Contracts({ runtime }) {
   const rerender = () => setTick((t) => t + 1);
   const [streakDays, setStreakDays] = useState(0);
   // Round 17 (layout only — no scoring path reads either of these).
-  const { isPhone, orientation } = useDeviceLayout();
+  const { isPhone, isTouch, orientation } = useDeviceLayout();
+  const touchSurface = useTouchSurface();
+  const touchContracts = isTouch && touchSurface === 'contracts';
+  const touchPanelRef = useRef(null);
+  useEffect(() => {
+    if (touchContracts) touchPanelRef.current?.querySelector('button')?.focus({ preventScroll: true });
+  }, [touchContracts]);
   const landscapePhone = isPhone && orientation === 'landscape';
   const [expanded, setExpanded] = useState(false);
 
@@ -467,21 +474,27 @@ export function Contracts({ runtime }) {
   // is untouched. `expanded` lives here (not the store) because it is pure
   // view state that should reset when the panel unmounts.
   const mapStyle = useFlyStore((s) => s.mapStyle);
-  const collapsed = (isPhone || (mapStyle === 'satellite' && satelliteVisualsOn('presentation'))) && !expanded;
+  const collapsed = (isTouch || (mapStyle === 'satellite' && satelliteVisualsOn('presentation'))) && !(isTouch ? touchContracts : expanded);
+  const Chip = isTouch ? 'div' : 'button';
 
   return (
     <Zone
       name="contracts"
-      className="w-60 select-none max-sm:w-[10.5rem] phone-land:w-auto"
+      className={touchContracts ? 'touch-actions-panel touch-contracts-panel' : 'w-60 select-none max-sm:w-[10.5rem] phone-land:w-auto'}
       data-testid="contracts-panel"
+      data-touch-surface={touchContracts ? 'contracts' : undefined}
+      id={touchContracts ? 'touch-contracts-panel' : undefined}
+      role={touchContracts ? 'region' : undefined}
+      aria-label={touchContracts ? 'Contracts' : undefined}
+      onPointerDown={touchContracts ? (event) => event.stopPropagation() : undefined}
     >
       {collapsed ? (
-        <button
-          type="button"
-          onClick={() => setExpanded(true)}
+        <Chip
+          type={isTouch ? undefined : 'button'}
+          onClick={isTouch ? undefined : () => setExpanded(true)}
           data-testid="contracts-chip"
-          aria-label="Show contracts"
-          className="hud-glass pointer-events-auto flex items-center gap-2 rounded-xl border px-3 font-mono text-[11px]"
+          aria-label={isTouch ? 'Contract progress' : 'Show contracts'}
+          className={`hud-glass ${isTouch ? 'pointer-events-none' : 'pointer-events-auto'} flex items-center gap-2 rounded-xl border px-3 font-mono text-[11px]`}
           style={{
             borderColor: 'rgba(148, 163, 184, 0.16)',
             color: CARD_THEME.ice,
@@ -492,11 +505,12 @@ export function Contracts({ runtime }) {
             ◈ {active.length + daily.length}
           </span>
           <span>{totalScore.toLocaleString()} pts</span>
-        </button>
+        </Chip>
       ) : (
         <div
+          ref={touchPanelRef}
           className={`hud-flat-phone rounded-xl border px-3 py-2.5 backdrop-blur-sm max-sm:px-2 max-sm:py-2 ${
-            landscapePhone
+            isTouch ? 'touch-contracts-scroll pointer-events-auto relative overflow-y-auto pr-12' : landscapePhone
               ? 'pointer-events-auto relative w-[13.5rem] overflow-y-auto pr-9'
               : isPhone
                 ? 'pointer-events-auto relative overflow-y-auto pr-9'
@@ -511,18 +525,18 @@ export function Contracts({ runtime }) {
             // labels push the panel bottom past the info chip's dock band
             // (~404px on 390x844) — cap and scroll; verify-mobile-layout's
             // zone-overlap gate measured the collision.
-            maxHeight: landscapePhone
+            maxHeight: isTouch ? '100%' : landscapePhone
               ? 'calc(100svh - 7rem)'
               : isPhone
                 ? '16rem'
                 : undefined,
           }}
         >
-        {isPhone && (
+        {isTouch && (
           <button
             type="button"
-            onClick={() => setExpanded(false)}
-            aria-label="Collapse contracts"
+            onClick={() => setTouchSurface(null)}
+            aria-label="Close contracts"
             data-testid="contracts-collapse"
             className="pointer-events-auto absolute right-1 top-1 grid place-items-center rounded-md text-[12px]"
             style={{

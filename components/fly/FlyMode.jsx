@@ -20,6 +20,7 @@ import { Logbook } from './hud/Logbook';
 import { HangarPanel } from './hud/HangarPanel';
 import { ArrivalBanner } from './hud/ArrivalBanner';
 import { TouchControls } from './hud/TouchControls';
+import { useTouchSurface } from '@/hooks/use-touch-actions';
 import { PhotoModeBar } from './hud/PhotoModeBar';
 import { CrashFlash } from './CrashFlash';
 import { JuiceHud } from './hud/JuiceHud';
@@ -108,6 +109,7 @@ export function FlyMode({ onClose }) {
   // what a phone is. Stamped onto the root below as data-device/data-orient,
   // which is what the phone:/phone-land:/phone-port: CSS variants key off.
   const device = useDeviceLayout();
+  const touchSurface = useTouchSurface();
   const isTouch = device.isTouch;
   // Round 17: photo mode hides the HUD (see the wrapper in the tree below).
   const photoActive = useFlyStore((s) => s.cameraMode === 'photo');
@@ -265,6 +267,8 @@ export function FlyMode({ onClose }) {
       data-fly-root=""
       data-device={deviceAttr(device)}
       data-orient={device.orientation}
+      data-touch={isTouch ? '1' : undefined}
+      data-touch-panel={isTouch ? touchSurface : undefined}
     >
       <FlyErrorBoundary onExit={onClose}>
         {spawn && <FlyCanvas runtime={runtimeRef.current} />}

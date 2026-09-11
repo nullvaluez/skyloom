@@ -10,6 +10,7 @@ import { M_TO_FT, MPS_TO_KT, RAD2DEG } from '@/lib/fly/coords';
 import { formatSquawk } from '@/lib/format';
 import { Zone } from '../LayoutRoot';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
+import { onTouchInfoDismiss } from '@/hooks/use-touch-actions';
 
 /**
  * Soft-lock info card: auto-shows when the locked target is inside
@@ -22,6 +23,11 @@ import { useDeviceLayout } from '@/hooks/use-device-layout';
 export function InfoCard({ runtime }) {
   const infoCardHex = useFlyStore((s) => s.infoCardHex);
   const suppressed = useRef(new Map()); // hex -> suppress-until epoch ms
+  useEffect(() => onTouchInfoDismiss(() => {
+    const hex = useFlyStore.getState().infoCardHex;
+    if (hex) suppressed.current.set(hex, Date.now() + TARGETING.infoCardSuppressSec * 1000);
+    useFlyStore.getState().setInfoCardHex(null);
+  }), []);
 
   // 5Hz visibility controller
   useEffect(() => {
@@ -62,7 +68,7 @@ export function InfoCard({ runtime }) {
 function InfoCardBody({ hex, runtime, onDismiss }) {
   const track = runtime.traffic?.tracks.get(hex);
   const meta = track?.meta;
-  const { isPhone } = useDeviceLayout();
+  const { isTouch } = useDeviceLayout();
 
   // Live-ish numbers at 2Hz without re-rendering per frame
   const [live, setLive] = useState(null);
@@ -123,20 +129,17 @@ function InfoCardBody({ hex, runtime, onDismiss }) {
   // (MOBILE_UI.infoChip.dockBottomRem is derived from the stick anchor), and
   // opens the full inspect sheet on tap, which is where all this detail
   // already lives on a phone.
-  if (isPhone) {
+  if (isTouch) {
     return (
       <Zone name="info-dock">
         <div
-          className="hud-glass pointer-events-auto flex items-center gap-2 overflow-hidden rounded-xl border border-zinc-700/60 text-zinc-100 shadow-xl"
+          className="hud-glass pointer-events-none flex items-center gap-2 overflow-hidden rounded-xl border border-zinc-700/60 text-zinc-100 shadow-xl"
           style={{ height: `${MOBILE_UI.infoChip.heightRem}rem` }}
           data-testid="infocard-chip"
         >
-          <button
-            type="button"
-            onClick={() => useFlyStore.getState().setInspectHex(hex)}
+          <div
             className="flex h-full min-w-0 flex-1 items-center gap-2 px-3 text-left"
-            aria-label={`Inspect ${title}`}
-            data-testid="infocard-chip-open"
+            aria-label={`Selected aircraft ${title}`}
           >
             <span className="shrink-0 text-[13px] leading-none text-cyan-200/90">✈</span>
             <span className="shrink-0 font-mono text-[13px] font-semibold tracking-wide">
@@ -152,15 +155,7 @@ function InfoCardBody({ hex, runtime, onDismiss }) {
                 {meta.t}
               </span>
             )}
-          </button>
-          <button
-            onClick={onDismiss}
-            aria-label="Dismiss info card"
-            className="grid h-full shrink-0 place-items-center text-zinc-400"
-            style={{ width: MOBILE_UI.minTargetPx }}
-          >
-            <X className="h-4 w-4" />
-          </button>
+          </div>
         </div>
       </Zone>
     );

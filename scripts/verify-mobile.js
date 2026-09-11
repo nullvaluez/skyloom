@@ -20,7 +20,7 @@
  */
 const { chromium } = require('playwright');
 const path = require('path');
-const { bootMobile, MOBILE_CTX, LANDSCAPE_CTX, LAUNCH_ARGS } = require('./_mobile-boot');
+const { bootMobile, MOBILE_CTX, LANDSCAPE_CTX, LAUNCH_ARGS, openActions, closeActions } = require('./_mobile-boot');
 
 const BOOT_OPTS = process.env.FLY_URL ? { url: process.env.FLY_URL } : {};
 
@@ -29,6 +29,7 @@ const shot = (page, name) =>
 
 // Dispatch a touch-typed pointer event on an element at absolute coords.
 async function touch(page, selector, type, x, y, pointerId = 1) {
+  if (type === 'pointerdown' && !selector.includes('touch-joystick')) await openActions(page);
   await page.dispatchEvent(selector, type, {
     pointerType: 'touch',
     pointerId,
@@ -38,6 +39,10 @@ async function touch(page, selector, type, x, y, pointerId = 1) {
     clientX: x,
     clientY: y,
   });
+  // One-shot controls use native click activation so scrolling never fires them.
+  if (type === 'pointerdown' && !/touch-joystick|touch-boost/.test(selector)) {
+    await page.dispatchEvent(selector, 'click', { detail: 1 });
+  }
 }
 
 const gates = [];
@@ -124,8 +129,9 @@ const clearLock = (page) =>
   });
 
 /** Which cluster buttons are in the DOM right now. */
-const clusterState = (page) =>
-  page.evaluate(() => {
+const clusterState = async (page) => {
+  await openActions(page);
+  return page.evaluate(() => {
     const q = (id) => {
       const el = document.querySelector(`[data-testid="${id}"]`);
       if (!el) return null;
@@ -146,6 +152,7 @@ const clusterState = (page) =>
       throttle: q('touch-throttle'),
     };
   });
+};
 
 (async () => {
   const browser = await chromium.launch({ headless: true, args: LAUNCH_ARGS });
@@ -158,6 +165,7 @@ const clusterState = (page) =>
   console.log('booted in', bootedS, 's');
   await page.waitForTimeout(3000);
 
+  await openActions(page);
   const ui = await page.evaluate(() => ({
     joystick: !!document.querySelector('[data-testid="touch-joystick"]'),
     throttle: !!document.querySelector('[data-testid="touch-throttle"]'),
@@ -200,6 +208,7 @@ const clusterState = (page) =>
 
   // --- 2. Throttle rail: tap BOOST / SLOW / CRUISE ---------------------------
   const setThrottle = async (k) => {
+    await openActions(page);
     await page.click(`[data-testid="touch-throttle-${k}"]`);
     await page.waitForTimeout(400);
     return page.evaluate(() => window.__flyStore.getState().speedPreset);
@@ -211,6 +220,7 @@ const clusterState = (page) =>
   await shot(page, 'v-03-throttle');
 
   // --- 3. Free-look toggle: joystick drag should orbit the chase camera ------
+  await openActions(page);
   await page.click('[data-testid="touch-look"]');
   await page.waitForTimeout(150);
   const lookOn = await page.evaluate(() => window.__fly.input.freeLook.active);
@@ -222,12 +232,14 @@ const clusterState = (page) =>
   const lookYaw = await page.evaluate(() => window.__fly.chaseRig?._look?.yaw ?? 0);
   await touch(page, '[data-testid="touch-joystick"]', 'pointerup', cx + 60, cy);
   await shot(page, 'v-04-look');
+  await openActions(page);
   await page.click('[data-testid="touch-look"]'); // toggle back off
   await page.waitForTimeout(150);
   const lookOff = await page.evaluate(() => window.__fly.input.freeLook.active);
   console.log(`look: on=${lookOn} yawMoved=${Math.abs(lookYaw) > 0.001} off=${lookOff}`);
 
   // --- 4. Atlas button opens the Atlas, then closes ---------------------------
+  await openActions(page);
   await page.click('[data-testid="touch-atlas"]');
   await page.waitForTimeout(700);
   const atlasOpen = await page.evaluate(() => window.__flyStore.getState().atlasOpen);
@@ -330,6 +342,7 @@ const clusterState = (page) =>
   await page.waitForTimeout(300);
 
   // --- 5. Pause button opens the menu (with touch controls listed) -----------
+  await openActions(page);
   await page.click('[data-testid="touch-pause"]');
   await page.waitForTimeout(400);
   const paused = await page.evaluate(() => window.__flyStore.getState().phase === 'paused');
@@ -499,6 +512,7 @@ const clusterState = (page) =>
     await page.evaluate(() => {
       if (window.__flyStats) window.__flyStats.touchPress = null;
     });
+    await openActions(page);
     const haveIntercept = await page.evaluate(
       () => !!document.querySelector('[data-testid="touch-intercept"]')
     );
@@ -605,16 +619,8 @@ const clusterState = (page) =>
   // Everything must fit ON the 390 px-tall screen — no control off the bottom
   // or clipped by the top strip.
   const landFit = await landPage.evaluate(() => {
-    const ids = [
-      'touch-joystick',
-      'touch-throttle',
-      'touch-boost',
-      'touch-look',
-      'touch-atlas',
-      'touch-logbook',
-      'touch-photo',
-      'touch-pause',
-    ];
+    // Scrollable actions are checked individually by verify-mobile-actions.
+    const ids = ['touch-joystick', 'touch-fab', 'touch-actions'];
     const bad = [];
     for (const id of ids) {
       const el = document.querySelector(`[data-testid="${id}"]`);
@@ -630,7 +636,7 @@ const clusterState = (page) =>
     return { bad, vh: window.innerHeight, vw: window.innerWidth };
   });
   gate(
-    'landscape: no touch control leaves the 844x390 viewport',
+    'landscape: controls and scroll container stay inside the viewport',
     landFit.bad.length === 0,
     JSON.stringify(landFit)
   );

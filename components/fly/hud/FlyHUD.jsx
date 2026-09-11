@@ -167,7 +167,9 @@ export function FlyHUD({ runtime }) {
             the button re-enables pointers on itself alone. */}
         <button
           type="button"
-          onClick={() => useFlyStore.getState().setLogbookOpen(true)}
+          onClick={isTouch ? undefined : () => useFlyStore.getState().setLogbookOpen(true)}
+          disabled={isTouch}
+          tabIndex={isTouch ? -1 : undefined}
           title="Open the pilot logbook (L)"
           aria-label="Open the pilot logbook"
           data-testid="hud-spots-cell"
