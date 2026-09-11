@@ -23,7 +23,7 @@
 const { chromium } = require('playwright');
 const path = require('path');
 const { bootFly } = require('./_boot');
-const { bootMobile, MOBILE_CTX, LAUNCH_ARGS } = require('./_mobile-boot');
+const { bootMobile, openFan, MOBILE_CTX, LAUNCH_ARGS } = require('./_mobile-boot');
 
 const PASSPORT_KEY = 'shadowadsb-passport';
 const PAGE_SIZE = 80; // LOGBOOK.pageSize
@@ -481,6 +481,9 @@ function seedPassport({ key, count }) {
   await mp.waitForTimeout(2500);
 
   const stickBefore = await mp.locator('[data-testid="touch-joystick"]').count();
+  // R25: PAUSE is a petal on a fan tree; no-op without a FAB, so the flag-off
+  // tree runs the R17 click unchanged.
+  await openFan(mp);
   await mp.locator('[data-testid="touch-pause"]').click();
   await mp.waitForTimeout(600);
   await mp.locator('[data-testid="pause-logbook"]').click();
