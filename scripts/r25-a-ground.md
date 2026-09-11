@@ -693,16 +693,33 @@ user's RTX 5080 + phone, and NONE of it is claimed anywhere above.
    segments, ⅓ hash-dropped, 6 m outboard. On a real OpenFreeMap suburb the cls
    5/6 set is far denser than the fixture's lattice, so the COUNT here is not
    predictive of the count there.
-5. **The z19 provider question.** The fixture generates imagery at any z, so a
+5. **The OVERLAY'S PIXEL EFFECT, as an attributable number.** The armed A/B
+   measured a 47.953/255 signal against a **59.815/255 same-interval control** —
+   the venue's own drift (tiles refining at 1–3 fps) is LARGER than the effect,
+   so (4a)'s pass is not attributable and the pair reads NOT CALIBRATED. No
+   bound was moved and the run was not repeated until it landed. The instrument
+   fix for a future attempt is `verify-flicker`'s: find a quiescent window
+   FIRST, then assert inside it. §6.3.
+6. **Scrub and hedge COUNTS on real data.** Both content legs read NOT
+   CALIBRATED here for two separately-measured venue reasons (0 m² of landcover
+   in the 300 m disc; an empty parcel-road index). The mechanism is proven —
+   both meshes park at `count 0 / visible false` and Owens is 0 by construction
+   — but the number a real OpenFreeMap suburb produces is unknown in EITHER
+   direction. §10.1.
+7. **The z19 provider question.** The fixture generates imagery at any z, so a
    green draw row here says nothing about whether Esri serves z19 World_Imagery.
    That probe needs a machine that is not 403-blocked.
-6. **`TERRAIN_LIGHT.workerNormals`.** The LERC decode path is unreachable here
+8. **`TERRAIN_LIGHT.workerNormals`.** The LERC decode path is unreachable here
    (the fixture serves terrain-rgb PNGs instead), so the A/B this round wires
-   can only be run on a real machine. It ships OFF.
-7. **Texture bytes.** Both new materials share the existing foliage atlas and
+   can only be run on a real machine. It ships OFF. **And this is precisely why
+   §6.5's defect survived a whole round: the only DEM path that could see it is
+   the one no gate in this container can reach.** The splice is now proven
+   STRUCTURALLY on the real LERC tail (the spliced call and its arguments), which
+   is as far as this venue can go; whether smooth normals LOOK better is §9 A9.
+9. **Texture bytes.** Both new materials share the existing foliage atlas and
    add none, so the delta is 0 by construction — but the z19 ceiling's resident
    tile bytes are unbounded here and are part of why it ships OFF.
-8. **Whether the bubble's 500→700 m band is the right band.** It is plan §2's
+10. **Whether the bubble's 500→700 m band is the right band.** It is plan §2's
    number, and the only way to judge it is to fly through it.
 
 ---
