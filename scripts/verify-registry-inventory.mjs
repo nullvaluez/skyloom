@@ -62,17 +62,10 @@ console.log('\nR25 E CERT — verify-registry-inventory (node; no browser, no GP
 // One line each, with the change that introduced it. This list may SHRINK
 // (someone registers a key) and may never GROW.
 const BASELINE_GAP = {
-  '-cinematic-canopy-v1': 'Codex overhaul (lib/fly/cinematic-ground.js:102) — canopy material, derived from the bend key',
-  '-immersive-leaves-v1': 'Codex overhaul (cinematic-ground.js:102) — the immersive leaf variant suffix',
-  '-cinematic-parcel-v1': 'Codex overhaul (cinematic-ground.js:147) — parcel-home material',
-  '-cinematic-model-v1': 'Codex overhaul (lib/fly/cinematic-models.js:90) — monument/model material',
-  '-merged': 'Codex overhaul (cinematic-models.js:90) — the merged-geometry suffix on the above',
-  '|cinematic-architecture-v3-': 'Codex overhaul (lib/fly/satellite-architecture-material.js:127) — the building material base',
-  '|immersive-surface-v1': 'Codex overhaul (satellite-architecture-material.js:127) — the v1 the R25 stub supersedes as v2',
-  'world-bend-road-satnight-cinematic-v1': 'Codex overhaul (world-bend.js:2706) — the cinematic road branch',
-  'world-bend-water-cinematic-v1': 'Codex overhaul (lib/fly/satellite-water.js:4, SATELLITE_WATER_KEY)',
-  '|immersive-landcover-v1': 'Codex overhaul (components/fly/SatTintLayer.jsx:186) — the SatTint drape',
-  'player-hull-rim': 'R17-era (lib/fly/prewarm.js:779 + components/fly/PlayerPlane.jsx:159) — the player hull rim',
+  // R25 W2 (Fable): the eleven keys this list carried at E's merge were
+  // registered in the world-bend header in the same commit (see the header's
+  // "PRE-EXISTING KEYS REGISTERED AT R25 W2" block). The gap is empty; it may
+  // never grow.
 };
 
 // Fragments that are not identities: conditional words and separators that
