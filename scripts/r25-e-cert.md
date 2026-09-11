@@ -752,3 +752,20 @@ owners' own runs are done).
 | **D MOBILE** | the DOM contract exactly as §3.1 spells it — FAB `touch-fab` + `aria-expanded`, container `touch-fan` + `data-open`, petals keep their testids and add `touch-hangar` | every mobile gate edit is written against it already |
 | **F FEEL** | `window.__flyDof` | `verify-feel-ground` |
 | **Fable (W0 row)** | register the 11 `BASELINE_GAP` keys in the `world-bend.js` header; restore the two deleted `R24 D PATCH 6/7` markers in the vendored bundle | §3.5, §2b |
+| **B / C / D / F** | **restart your dev servers** (:3131 / :3132 / :3133 / :3135) — E killed them during its own teardown and the restart was refused by policy | §5.4 |
+
+### 7.1 Follow-ups E deliberately did NOT take
+
+- **`verify-mobile.js`'s INSPECT tap is unguarded** where the INTERCEPT tap
+  beside it is (`if (!haveIntercept) skip(…)`). That asymmetry is the base
+  file's, and it is what the treatment arm died on here. The right guard is
+  lock-aware — re-read the lock, SKIP if it aged out, FAIL if the lock is still
+  there and the button is not — but adding it now would take the edited file
+  further from the base than the fan wiring requires, on the very gate whose
+  flag-off identity is the claim. Left for W2, on a quiet box, with the control
+  re-run beside it.
+- **Attaching the fixture to the mobile fleet** (§2e). It would turn two
+  standing `Failed to fetch` reds green and change what those gates measure.
+  Orchestrator's call.
+- **The `?graphics=` dead param and `__flyVisualsArm`** — plan §3 E.5 rules
+  them documented, not edited. Unchanged; they are in `scripts/r25-recon.md`.
