@@ -45,6 +45,7 @@ import {
   TOY,
 } from '@/lib/fly/fly-constants';
 import { depthSubOn } from '@/lib/fly/depth-pass';
+import { publishAoPass } from '@/lib/fly/light-bubble'; // R25 C
 import { useFlyStore } from '@/stores/fly-store';
 import { WhiteBalanceEffect } from './WhiteBalance';
 import { AerialPerspectiveEffect } from './AerialPerspective';
@@ -700,6 +701,7 @@ export const Effects = memo(function Effects({ runtime }) {
     const size = gl.getDrawingBufferSize(new Vector2());
     const p = createN8AOPass({ gl, scene, camera, cfg: DEPTH_PASS.n8ao, size });
     aoRef.current = p;
+    publishAoPass(runtime, p); // R25 C: the retained pass, so its radius can follow the ground bubble
     setAoPass(p);
     if (DEPTH_PASS.n8ao.selfWarm) {
       warmN8AOPass(gl, p).catch(() => {
@@ -710,7 +712,7 @@ export const Effects = memo(function Effects({ runtime }) {
       live = false;
       void live;
     };
-  }, [aoWanted, gl, scene, camera, aoNonce]);
+  }, [aoWanted, gl, scene, camera, aoNonce, runtime]); // R25 C: `runtime` is FlyMode's stable useRef({}).current
   // Unmount teardown — the effect above only disposes on a WANT transition.
   useEffect(
     () => () => {

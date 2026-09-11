@@ -1,6 +1,7 @@
 'use client';
 import { physicalBendCoefficient } from '@/lib/fly/render-scale';
 import { IMMERSIVE, immersiveOn, immersiveLighting } from '@/lib/fly/immersive';
+import { publishSunLight } from '@/lib/fly/light-bubble'; // R25 C
 
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -766,7 +767,10 @@ function SatDepthRig({ runtime, flight, origin, engine, scene }) {
     const receiveOn = depthSubOn('nearReceive');
     const next = receiveOn ? new Set() : null;
     if (receiveOn) {
-      const reach = SAT_SHADOWS.orthoRadiusM + (NR.padM ?? 0);
+      // R25 C (LIGHT_BUBBLE_R25.shadow): the reach follows the LIVE cascade —
+      // a 350 m frustum with a 1500 m receive sweep enlists tiles that cannot
+      // be inside the shadow map. Absent (flag off) ⇒ the frozen literal.
+      const reach = (runtime.shadowRadiusM ?? SAT_SHADOWS.orthoRadiusM) + (NR.padM ?? 0);
       const cap = NR.maxTiles ?? 48;
       const root = engine?.object;
       _swept.tiles = 0;
@@ -2487,6 +2491,13 @@ export function FlyScene({ runtime }) {
         const nt = Math.min(1, Math.max(0, 1 - (runtime.sun?.frac ?? 1) / nr.dayFrac));
         atmoNightMul = 1 - nt ** nr.gamma;
       }
+      // R25 C (LIGHT_BUBBLE_R25.grade): the HAZE FLOOR. The ramp above drives
+      // aerial perspective to EXACTLY 0 at deep night, so a night city has no
+      // depth cue at all and reads as a flat black photograph — recon L8. The
+      // floor arrives on `runtime.sun` from LightBubbleRig (never editing
+      // AERIAL_LAW or NIGHT_TRUTH_R23, which C does not own); absent ⇒
+      // Math.max(0, mul) on a multiplier that is never negative ⇒ the R24 value.
+      atmoNightMul = Math.max(runtime.sun?.hazeNightFloor ?? 0, atmoNightMul);
 
       // --- R24 D (AERIAL_LAW): the single atmosphere law -------------------
       // ONE analytic f(distance, height, sunDir), evaluated per material at
@@ -2841,6 +2852,7 @@ export function FlyScene({ runtime }) {
     // it follows the style's KEY light (MOODS lightDir) — toy's moon, not
     // the day sun — so shadows agree with the moonlit shading.
     const sun = sunRef.current;
+    publishSunLight(runtime, sun); // R25 C: the ONE directional, on the bus
     if (sun && flyState.mapStyle === 'satellite' && immersiveOn('lighting')) {
       // Three does not resize an existing shadow target when mapSize changes.
       // Retire it before this frame's draw so tier telemetry reflects real GPU cost.
@@ -2963,7 +2975,8 @@ export function FlyScene({ runtime }) {
         // tier, and quantising a light that renders no shadow map would be
         // arithmetic nobody reads.
         if (SHADOW_CALM.enabled && SHADOW_CALM.texelSnap && satShadowRef.current) {
-          const sp = snapToShadowTexel(sun, tx, ty, tz, shadowRigRef.current.radiusM, shadowRigRef.current.mapSize);
+          // R25 C: quantise against the radius the cascade IS this frame.
+          const sp = snapToShadowTexel(sun, tx, ty, tz, runtime.shadowRadiusM ?? shadowRigRef.current.radiusM, shadowRigRef.current.mapSize);
           if (sp) {
             tx = sp.x;
             ty = sp.y;
