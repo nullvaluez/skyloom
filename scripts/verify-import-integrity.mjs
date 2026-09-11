@@ -91,6 +91,20 @@ const IGNORES = [
   // Generated / vendored under scripts/, and the fixture's own node modules.
   'scripts/r24-out/**',
   'scripts/r24-fixture/**',
+  // R25 (E CERT): the round's artifact directory, on the same argument as
+  // r24-out. It is gitignored scratch that gates WRITE — control copies of a
+  // harness, redirected screenshots, saved probe scripts — and none of it is a
+  // module the app can evaluate. Before this entry, a single control copy of
+  // verify-mobile.js dropped there was rule-checked as first-party source.
+  //
+  // NOTE ON WHAT THIS DOES AND DOES NOT DO, because the file COUNT is
+  // misleading: these `ignores` sit beside a `files` key in one flat-config
+  // object, so they EXCLUDE THE FILE FROM THIS CONFIG (no `no-undef`) rather
+  // than from the run. The file still appears in `results` and still counts in
+  // gate (1a)'s total. Proven, R25 W1: a module reading an undefined
+  // identifier is GREEN under scripts/r25-out/ and RED at scripts/ — same
+  // file, same run.
+  'scripts/r25-out/**',
 ];
 
 let pass = 0;
@@ -206,12 +220,13 @@ gate(
     : 'the ignore list currently hides nothing at all'
 );
 gate(
-  '(3) THE IGNORE LIST IS THE FOUR DOCUMENTED PATTERNS, UNCHANGED',
-  IGNORES.length === 4 &&
+  '(3) THE IGNORE LIST IS THE FIVE DOCUMENTED PATTERNS, UNCHANGED',
+  IGNORES.length === 5 &&
     IGNORES[0] === 'lib/fly/vendor/three-tile/plugin.js' &&
     IGNORES[1] === '**/*.built.js' &&
     IGNORES[2] === 'scripts/r24-out/**' &&
-    IGNORES[3] === 'scripts/r24-fixture/**',
+    IGNORES[3] === 'scripts/r24-fixture/**' &&
+    IGNORES[4] === 'scripts/r25-out/**',
   IGNORES.join(' , ')
 );
 
