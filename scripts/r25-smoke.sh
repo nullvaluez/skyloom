@@ -147,6 +147,21 @@ node_gate verify-skirt-fast.mjs          # A (R24): O(V) boundary scan is output
 node_gate verify-frame-step.mjs          # A (R24): fixed-timestep sim / interpolated render pose
 node_gate verify-finalize-pace.mjs       # A (R24): wall-clock finalize brake
 
+# --- R25 ADDITIONS to the R24 node set. ------------------------------------
+# WORKER_PROTOCOL stays 20 this round (plan §0), and this is the gate that
+# says so: it asserts `EXPECTED_WORKER_PROTOCOL = 20` at all six engines and
+# `WORKER_PROTOCOL = 20` in the worker. It was not a smoke row in R24.
+node_gate graphics-unit.mjs
+# The Codex terrain-merge lifecycle fix's own gates (VENDOR.md patches 7a/8a).
+# They guard the code that legitimately moved two of R24's vendor-shape
+# assertions, so they belong beside them.
+node_gate verify-terrain-merge.mjs
+node_gate verify-raster-retry.mjs
+# R23 B's flag-off byte-identity gate. E fixed its module loading in R25 W1 —
+# it had been unrunnable since R24 C gave world-bend.js its first import, and
+# it was in no smoke, so nothing noticed for a round.
+node_gate verify-night-city-identity.mjs
+
 # --- R25's own node gates. -------------------------------------------------
 node_gate verify-r25-flagoff.mjs         # E (R25): every R25 block off => no R25 token anywhere
 node_gate verify-registry-inventory.mjs  # E (R25): every cache key is in the world-bend registry
