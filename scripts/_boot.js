@@ -124,6 +124,7 @@ async function bootFly(
     // (registered AFTER bootFly's, so it wins) — the accessor-swallow idiom.
     window.__flyGroundBubbleOverride = { enabled: false };
     window.__flyLightBubbleOverride = { enabled: false };
+    window.__flyGroundDetailOverride = { enabled: false };
     try {
       localStorage.setItem('fly-controls-seen', '1');
       // Round 10: the APP default is now satellite (PauseMenu defaults an
@@ -168,6 +169,7 @@ async function bootFly(
       window.__flyDepthPin = 1;
       window.__flyGroundBubbleOverride = { enabled: false }; // R25: reload leg
       window.__flyLightBubbleOverride = { enabled: false };
+      window.__flyGroundDetailOverride = { enabled: false };
       localStorage.setItem('fly-controls-seen', '1');
       localStorage.setItem('fly-map-style-2', s || 'toy'); // round 10: default toy for harnesses
     }, style);
