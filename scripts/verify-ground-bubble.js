@@ -271,18 +271,19 @@ function meanAbsDelta(a, b) {
     ARM ? !!r.bubble : r.bubble === null,
     ARM ? JSON.stringify(r.bubble) : 'flag off ⇒ the rig is unmounted and readers see 0'
   );
+  const kOf = (x) => (x.bubble ? `k=${x.bubble.k.toFixed(4)} at aglVis ${Math.round(x.bubble.aglVisM)} m` : 'no runtime.groundBubble — the rig is unmounted (flag off)');
   gate(
     `(1b) k >= ${K_DECK_MIN} at 80 m AGL`,
-    (r.bubble?.k ?? 0) >= K_DECK_MIN,
-    `k=${(r.bubble?.k ?? 0).toFixed(4)} at aglVis ${Math.round(r.bubble?.aglVisM ?? -1)} m`
+    !!r.bubble && r.bubble.k >= K_DECK_MIN,
+    kOf(r)
   );
   const deck = r;
 
   r = await setAgl(900, 6000 * SCALE);
   gate(
     `(1c) k <= ${K_CRUISE_MAX} at 900 m AGL`,
-    (r.bubble?.k ?? 1) <= K_CRUISE_MAX,
-    `k=${(r.bubble?.k ?? 1).toFixed(4)} at aglVis ${Math.round(r.bubble?.aglVisM ?? -1)} m`
+    !!r.bubble && r.bubble.k <= K_CRUISE_MAX,
+    kOf(r)
   );
 
   // THE DEADBAND. The charter's sweep is 480 → 560 → 480; at aglInM 500 BOTH
