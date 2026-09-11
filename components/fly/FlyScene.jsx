@@ -4,7 +4,7 @@ import { GroundImmersionRig } from './GroundImmersionRig';
 import { SatGroundDetailLayer } from './SatGroundDetailLayer';
 import { applyNearGroundMaterial } from '@/lib/fly/near-ground-material';
 import { applyNightGroundReceiver } from '@/lib/fly/night-ground';
-import { applyDaylightSurface } from '@/lib/fly/daylight-depth';
+import { applyDaylightSurface, updateDaylightDepth } from '@/lib/fly/daylight-depth';
 import { nearGroundOn } from '@/lib/fly/near-ground';
 import { createShadowCoverageState, selectShadowReceivers, resolveShadowFocus } from '@/lib/fly/shadow-coverage';
 import { attachGroundShadowLight, publishGroundShadowCoverage, releaseGroundShadowCoverage, publishGroundShadowFocus } from '@/lib/fly/light-bubble';
@@ -2319,6 +2319,8 @@ export function FlyScene({ runtime }) {
     // between the rim and the sky.
     const rpx = flight.pos.x - origin.anchor.x;
     const rpz = flight.pos.z - origin.anchor.z;
+    // Publish once before both the aerial feed and material consumers read it.
+    updateDaylightDepth(runtime, flyState.mapStyle === 'satellite');
     const cinematicScale = flyState.mapStyle === 'satellite' && satelliteVisualsOn('scale');
     const bendR = cinematicScale ? SATELLITE_VISUALS.scale.bendRadiusM : GLOBE.bendRadiusM[flyState.mapStyle] ?? GLOBE.bendRadiusM.satellite;
     let bendK = cinematicScale ? physicalBendCoefficient(bendR, mercatorScale(flight.latDeg)) : 1 / (2 * bendR);

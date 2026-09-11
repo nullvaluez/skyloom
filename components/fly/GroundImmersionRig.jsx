@@ -17,7 +17,6 @@ export function GroundImmersionRig({ runtime, flight }) {
   // never advance the damped signal twice or texture detail jumps on a rebase.
   useFrame(() => {
     updateNearGroundUniforms(runtime, flight, runtime.groundImmersion, useFlyStore.getState().qualityTier);
-    updateDaylightDepth(runtime, useFlyStore.getState().mapStyle === 'satellite');
   }, -49);
   useEffect(() => () => {
     runtime.groundImmersion = null;

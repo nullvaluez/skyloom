@@ -67,6 +67,10 @@ function paceSec(baseSec, speedMps) {
   return settle.paceCadenceSec ? settle.paceCadenceSec(baseSec, speedMps) : baseSec;
 }
 
+function canopyPlacementSignature(stats, altK, density) {
+  return `${stats.chunks}|${stats.ready}|${stats.empty}|${stats.vegPts}|${stats.clsChunks}|${altK.toFixed(3)}|${density}|${stats.supportRevision ?? 0}`;
+}
+
 const _dummy = new Object3D();
 const _col = new Color();
 // Round 19 (C): the live rim tone the canopy hazes toward, read back from the
@@ -347,8 +351,10 @@ export function SatVegLayer({ runtime, flight }) {
       // state and the altitude fade. Cheap by construction (the stats getter
       // walks tens of chunks) and conservative — any difference runs the pass.
       const sg = engine.stats;
+      // A completed DEM repair changes the grid without changing ready/point
+      // counts. The commit revision keeps a held forest attached to that grid.
       const sig = U
-        ? `${sg.chunks}|${sg.ready}|${sg.empty}|${sg.vegPts}|${sg.clsChunks}|${st.altK.toFixed(3)}|${density}`
+        ? canopyPlacementSignature(sg, st.altK, density)
         : '';
       const moved2 = (flight.pos.x - st.atX) ** 2 + (flight.pos.z - st.atZ) ** 2;
       // R22 (C): …but never WHILE A BIRTH RAMP IS RUNNING. The skip's premise
