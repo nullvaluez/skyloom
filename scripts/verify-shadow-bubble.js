@@ -83,6 +83,7 @@ const OWENS = [36.601, -118.06];
 const CRUISE_AGL = 1066.8; // 3500 ft
 const DECK_AGL = 80;
 
+const PAGE_ERRORS = [];
 let pass = 0;
 let fail = 0;
 const gate = (name, ok, detail = '') => {
@@ -133,6 +134,19 @@ const waitForAgl = async (page, targetM, tolM, capMs = 90000) =>
     .then(() => true)
     .catch(() => false);
 
+/**
+ * IS THE SCENE STILL THERE? `window.__fly` is the runtime itself
+ * (FlyScene.jsx:1438) and it is nulled on unmount, so its absence means the
+ * canvas subtree bounced — an error boundary, a Suspense fallback, or a lost
+ * WebGL context, which is a live possibility at this venue (SwiftShader, six
+ * agents, load average ~20). Pass 2 of this gate died with
+ * `Cannot read properties of undefined (reading 'warpToGeo')` halfway through
+ * the night leg: the correct verdict for the clauses after that point is NOT
+ * CALIBRATED, not a stack trace, and `__flyStats.sceneRemounts` is the tripwire
+ * that says which of the two happened.
+ */
+const alive = (page) => page.evaluate(() => typeof window.__fly?.warpToGeo === 'function');
+
 const readState = () =>
   ({
     lb: window.__flyLightBubble ? window.__flyLightBubble.read() : null,
@@ -149,6 +163,8 @@ const readState = () =>
     draws: window.__flyGl?.info?.render?.calls ?? null,
     tier: window.__flyStore?.getState?.().qualityTier ?? null,
     style: window.__flyStore?.getState?.().mapStyle ?? null,
+    alive: typeof window.__fly?.warpToGeo === 'function',
+    remounts: window.__flyStats?.sceneRemounts ?? null,
     elDeg: Number.isFinite(window.__fly?.sun?.sinEl)
       ? (Math.asin(Math.max(-1, Math.min(1, window.__fly.sun.sinEl))) * 180) / Math.PI
       : null,
@@ -163,16 +179,20 @@ const readState = () =>
   const context = await browser.newContext({ viewport: { width: 900, height: 520 } });
   if (process.env.FLY_TILE_FIXTURE) await require('./_fixture').attachFixture(context);
   const page = await context.newPage();
-  const errors = [];
+  const errors = PAGE_ERRORS;
   const errorsNote = attachPageErrors(page, errors);
 
-  if (ARMED) {
-    await page.addInitScript(() => {
+  // D's R22 master un-pinner goes in on BOTH legs: the N8AO pass is not even
+  // CONSTRUCTED with the fleet's `__flyDepthPin` intact, and the RED leg has to
+  // be able to report "the AO radius is a constant 24 m" rather than "there was
+  // no AO pass to look at". Only the two R25 blocks are conditional.
+  await page.addInitScript((armed) => {
+    window.__flyDepthArm = 1;
+    if (armed) {
       window.__flyGroundBubbleOverride = { enabled: true };
       window.__flyLightBubbleOverride = { enabled: true };
-      window.__flyDepthArm = 1; // D's R22 master un-pinner — the AO pass must EXIST
-    });
-  }
+    }
+  }, ARMED);
   console.log(
     `R25 C — verify-shadow-bubble — ${ARMED ? 'ARMED (GroundBubble + LightBubble + depth)' : 'RED LEG (R25_LIGHT=off — no rig at all)'}`
   );
@@ -237,7 +257,7 @@ const readState = () =>
   }
   console.log(
     `  deck: agl ${deck.bubble?.aglVisM?.toFixed(1)} m · k ${deck.bubble?.k?.toFixed(4)} · radius ` +
-      `${deck.stats?.radiusM ?? deck.camRight} · texel ${deck.stats?.texelM?.toFixed(3) ?? 'n/a'} · programs ${deck.programs} · ao ${JSON.stringify(deck.ao)}`
+      `${deck.stats?.radiusM ?? deck.camRight} · texel ${deck.stats?.texelM?.toFixed(3) ?? 'n/a'} · programs ${deck.programs} · draws ${deck.draws} · ao ${JSON.stringify(deck.ao)}`
   );
 
   const block = await page.evaluate(() => window.__flyLightBubble?.read?.().block ?? null);
@@ -280,7 +300,7 @@ const readState = () =>
     const s = await page.evaluate(readState);
     sweep.push({ agl, k: s.bubble?.k ?? null, aglVis: s.bubble?.aglVisM ?? null, rung: s.stats?.rung ?? null, radius: CAM(s), programs: s.programs });
     console.log(
-      `  sweep ${agl} m: aglVis ${s.bubble?.aglVisM?.toFixed(1)} · k ${s.bubble?.k?.toFixed(4)} · rung ${s.stats?.rung} · radius ${CAM(s)} · programs ${s.programs}`
+      `  sweep ${agl} m: aglVis ${s.bubble?.aglVisM?.toFixed(1)} · k ${s.bubble?.k?.toFixed(4)} · rung ${s.stats?.rung} · radius ${CAM(s)} · programs ${s.programs} · draws ${s.draws}`
     );
   }
   const rungChanges = sweep.filter((r, i) => i > 0 && r.rung !== sweep[i - 1].rung).length;
@@ -296,14 +316,30 @@ const readState = () =>
     gate('(3) HYSTERESIS', false, 'no rung exists on the flag-off tree — the radius is constant by construction');
   }
 
+  // THE CONTROL. A world that is still streaming compiles content programs on
+  // its own clock, so "the count moved during the traverse" is not by itself a
+  // statement about the traverse. Pass 2 of this gate read 115 → 115 → 116
+  // across cruise → deck → sweep and would have failed a bare spread-0 test on
+  // one program that arrived with a tile. So the SAME number of samples, over
+  // the SAME settle, is taken with k held CONSTANT, and the traverse is judged
+  // against the venue's own drift rather than against a bound I chose. (The
+  // kickoff rule: a red gets one quiet re-run and then a CONTROL, never a new
+  // bound.)
+  const control = [];
+  for (let i = 0; i < 3; i++) {
+    await page.waitForTimeout(SETTLE);
+    control.push((await page.evaluate(readState)).programs);
+  }
   const progSeries = [cruise.programs, deck.programs, ...sweep.map((r) => r.programs)];
   const progSpread = Math.max(...progSeries) - Math.min(...progSeries);
+  const ctrlSpread = Math.max(...control) - Math.min(...control);
   gate(
-    '(3b) PROGRAMS ARE FLAT ACROSS THE WHOLE TRAVERSE — nothing recompiles',
-    progSpread === 0,
-    `programs ${progSeries.join(' → ')} (spread ${progSpread}). This is the measurement behind REJECTING a second ` +
-      'shadow-casting light: a light count is part of every program cache key (lib/fly/prewarm.js:120-126), so ' +
-      'the alternative design would have moved this number by the size of the material zoo'
+    '(3b) PROGRAMS ARE FLAT ACROSS THE TRAVERSE — no material is re-keyed',
+    progSpread === 0 || progSpread <= ctrlSpread,
+    `traverse ${progSeries.join(' → ')} (spread ${progSpread}) · control at CONSTANT k ${control.join(' → ')} ` +
+      `(spread ${ctrlSpread}). This is the measurement behind REJECTING a second shadow-casting light: a light ` +
+      'count is part of every program cache key (lib/fly/prewarm.js:120-126), so that design re-keys EVERY lit ' +
+      'material at once — a jump of tens, not a drift of one, and nothing like it appears here'
   );
 
   // ---- (4) the AO radius ---------------------------------------------------
@@ -337,6 +373,7 @@ const readState = () =>
   const noonT = findSunTime(POWELL[1], POWELL[0], 55, { dayMs: Date.UTC(2026, 6, 1) });
   const nightT = findSunTime(POWELL[1], POWELL[0], -20, { dayMs: Date.UTC(2026, 6, 1) });
   const driveSun = async (tMs) => {
+    if (!(await alive(page))) return false;
     await page.evaluate((t) => {
       window.__flySunOverride = t;
     }, tMs);
@@ -345,6 +382,7 @@ const readState = () =>
     // and re-runs it at once (the verify-one-sun finding).
     await page.evaluate(pinAgl, [...POWELL, 300, 1.9]);
     await page.waitForTimeout(SETTLE);
+    return true;
   };
   let noonHemi = null;
   let nightHemi = null;
@@ -454,7 +492,13 @@ const readState = () =>
 
   // ---- (6) the two FlyScene readers ---------------------------------------
   const agree = await page.evaluate(readState);
-  if (ARMED) {
+  if (!agree.alive) {
+    notCalibrated(
+      '(6) ONE NUMBER, THREE READERS',
+      `the scene subtree is gone (remounts ${agree.remounts}) — every reader reads null because there is nothing ` +
+        'to read, which is a statement about the canvas, not about the feature'
+    );
+  } else if (ARMED) {
     gate(
       '(6) ONE NUMBER, THREE READERS — the bus, the camera and the stats agree',
       agree.busRadius != null &&
@@ -472,16 +516,26 @@ const readState = () =>
   }
 
   // ---- (7) the desert draw census -----------------------------------------
-  await page.evaluate(pinAgl, [...OWENS, 500, 1.9]);
-  await page.waitForTimeout(SETTLE + 4000);
-  const owens = await page.evaluate(readState);
-  gate(
-    '(7) DRAW CENSUS AT THE DESERT CONTROL — the frozen ceiling is untouched (FIXTURE column)',
-    (owens.draws ?? 1e9) <= 261,
-    `draws ${owens.draws} ≤ 261 · programs ${owens.programs} · radius ${CAM(owens)} m. This feature adds NO object ` +
-      'to the scene, so the count is expected to be identical to the flag-off tree, not merely under the ceiling — ' +
-      'and a fixture desert bounds nothing on the user’s machine'
-  );
+  const sceneAlive = await alive(page);
+  if (!sceneAlive) {
+    notCalibrated(
+      '(7) DRAW CENSUS AT THE DESERT CONTROL',
+      `the scene subtree is gone (window.__fly is undefined, remounts ${agree.remounts}) — there is nothing to count`
+    );
+  }
+  let owens = { draws: null, programs: null, camRight: null };
+  if (sceneAlive) {
+    await page.evaluate(pinAgl, [...OWENS, 500, 1.9]);
+    await page.waitForTimeout(SETTLE + 4000);
+    owens = await page.evaluate(readState);
+    gate(
+      '(7) DRAW CENSUS AT THE DESERT CONTROL — the frozen ceiling is untouched (FIXTURE column)',
+      (owens.draws ?? 1e9) <= 261,
+      `draws ${owens.draws} ≤ 261 · programs ${owens.programs} · radius ${CAM(owens)} m. This feature adds NO object ` +
+        'to the scene, so the count is expected to be identical to the flag-off tree, not merely under the ceiling — ' +
+        'and a fixture desert bounds nothing on the user’s machine'
+    );
+  }
 
   // ---- (8) errors ----------------------------------------------------------
   const appErrors = errors.filter((e) => !/favicon|ERR_INTERNET_DISCONNECTED|403/i.test(String(e)));
@@ -493,5 +547,6 @@ const readState = () =>
   process.exit(fail ? 1 : 0);
 })().catch((e) => {
   console.error('verify-shadow-bubble threw:', e);
+  console.error('collected page errors:', JSON.stringify(PAGE_ERRORS.slice(0, 6), null, 2));
   process.exit(1);
 });

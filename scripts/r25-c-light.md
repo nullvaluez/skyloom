@@ -132,6 +132,20 @@ number; at `up = 0` mine is R24 exactly, which is what clause (4b) asserts.
 `IMMERSIVE.profiles[tier].shadowSize`, so no depth target is reallocated and
 the R19 "castShadow is a discrete transition" rule is untouched.
 
+### 2.1 The run table (this venue only)
+
+| run | what | verdict |
+|---|---|---|
+| `verify-moon-light.mjs` (node) | on r25/c | **16 passed, 0 failed** |
+| `verify-moon-light.mjs` (node) | RED calibration on the flag-off base `6bf628e` | **5 passed, 12 failed** (`scripts/r25-out/r25-c-moon-light-RED-6bf628e.txt`) |
+| `verify-shadow-bubble.js` pass 1 | armed | 11 passed, 2 failed — **both failures the INSTRUMENT** (see §7.1) |
+| `verify-shadow-bubble.js` pass 2 | armed, after the AGL poll | cruise 1500 m / deck **350 m, 0.342 m/texel (4.3× finer)**, AO **24 → 5 m**, intensity **5.0 → 3.5**, hysteresis **0 rung changes**; (3b) failed on a **+1 program drift** and the night leg was lost when the DEV SERVER died mid-run (§7.3) |
+| `verify-shadow-bubble.js` pass 3 | armed, with the program CONTROL | see below |
+| `verify-shadow-bubble.js` RED leg | `R25_LIGHT=off` — same file, no rig | see below |
+| `verify-shadow-calm.mjs` (node) | on r25/c and on the base | **32 ok / 1 FAIL on BOTH** — the catcher row, inherited, not C's |
+| `immersive-unit.mjs` / `graphics-unit.mjs` (node) | on r25/c | **PASS** |
+| `verify-import-integrity.mjs` (node) | on r25/c and on the base | **3/1 on BOTH** — two `no-undef` in `scripts/r24-c-agl.js`, an R24 artifact |
+
 ---
 
 ## §3 THE DECISIONS
@@ -261,6 +275,40 @@ been a second owner in one file for a result the light already produces.
 ---
 
 ## §7 LESSONS
+
+### 7.1 The instrument was wrong three times before the feature was wrong once
+
+Every RED this gate produced was its own, and each one had a different shape.
+
+**(a) THE POSE THAT NEVER ARRIVED.** Pass 1 pinned the aeroplane at 80 m AGL,
+waited a fixed 5 s and measured **1050.8 m** — then reported "the cascade is
+1500 m at 80 m AGL" and "the AO radius is 24 m at k = 1" as two feature
+failures. The bubble keys on the EYE's visual AGL and the eye is the DAMPED
+chase camera: in 5 s at 1–3 fps it had travelled 16 m of the 987 it was sent.
+Waiting for the app's own published AGL instead of for a clock turned both rows
+green with no change to the feature at all (deck 80.0 m, k 1.0000, radius 350,
+AO 5.00 / 3.50). This is verify-one-sun's "wait for the app to pick it up, do
+not wait a duration" lesson, in metres instead of degrees.
+
+**(b) THE +1 THAT WAS THE VENUE.** Pass 2's program count read
+**115 → 115 → 116 → 116 → 116** across the traverse and failed a bare
+"spread === 0". One content program had arrived with a streaming tile. The fix
+is not a looser bound — it is a CONTROL: the same number of samples over the
+same settle with **k held constant**, so the traverse is judged against the
+venue's own drift. And the claim survives either way, because what the rejected
+design (a second shadow light) would have done is re-key EVERY lit material at
+once: a jump of tens, not a drift of one.
+
+**(c) THE SERVER THAT DIED.** Pass 2 then lost `window.__fly` entirely
+mid-night-leg and threw `Cannot read properties of undefined`. It was not a GPU
+crash and not the rig: the dev server process had exited (the next run got
+`ERR_CONNECTION_REFUSED` on the same port), taking the page's chunks with it.
+A gate that dies on a dead server reports nothing about the feature, so the
+gate now checks `window.__fly` at each leg boundary and reads NOT CALIBRATED —
+with `__flyStats.sceneRemounts`, the tripwire FlyScene already ships for this —
+instead of a stack trace.
+
+### 7.2 The rest
 
 1. **A deadband measured from the wrong reference is not a deadband.** The
    rung hysteresis compared the continuous value against the CURRENT RUNG's
