@@ -108,6 +108,21 @@ of the scene" (R24 §7). The frozen ceilings — Owens ≤ 261, satellite ≤ 37
 Powell's ground reads **275.3 m** here, which is what `scripts/r25-user-diag.md`
 derives its `altM: 360` (≈ 85 m AGL) from rather than guessing.
 
+**The run then FAILED, and the failure is the venue, not the fixture.** After
+owens (draws **106**, tris 93 707, 152 meshes, `settled=false` in 426 s at load
+12.5 — *terrain only reached z0 of 14, ground elevation still moving*), the
+next pose hit `page.waitForFunction: Timeout 120000ms exceeded` at
+`verify-fixture.js:109` and the gate exited 1.
+
+Read that number honestly: **three consecutive poses each burned ~427 s and
+none of them settled.** At the same moment, `ps` showed A GROUND's
+`verify-ground-bubble.js` driving its own chromium out of
+`/home/user/skyloom-r25-a`, and the container's load average was **14.8 on four
+cores**. So the fixture's own health gates (1)–(3) are GREEN and the venue is
+sound; what is not available today is a SETTLED POSE. Every fixed-pose pixel
+re-baseline in §4 depends on one, which is why most of that table reads NOT RUN
+rather than a number (§6).
+
 ---
 
 ## §2 The three pre-existing reds — attribution and decision

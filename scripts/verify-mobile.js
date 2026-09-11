@@ -722,6 +722,9 @@ async function tapAction(page, id, { x = 0, y = 0, dispatch = false } = {}) {
       return { bad, vh: window.innerHeight, vw: window.innerWidth };
     }, ids);
 
+  // R25: the cluster census above left the arc OPEN. Shut it before the CLOSED
+  // census, or "fan CLOSED" measures a fan that is not.
+  await closeFan(landPage);
   // R25: TWO censuses on a fan tree, because "fits the viewport" is a
   // different question closed and open. A 150 px radius arc swung from a FAB
   // in the bottom-right corner of a 390 px-tall landscape screen is exactly
