@@ -427,7 +427,8 @@ is a number about that, not about the fan.
 
 | Run | Tree | Result |
 |---|---|---|
-| `fan-RED-flagoff.log` | flag off (gate v1) | **20/30, 10 FAIL, 14 SKIP** — the RED calibration. Three of the passes were FALSE (the row's buttons wearing the petals' testids), which is what put `data-open === '1'` into every open assertion. |
+| `fan-RED-flagoff.log` | flag off (gate v1) | 20/30, 10 FAIL, 14 SKIP. Three of those passes were FALSE — the row's buttons wearing the petals' testids — which is what put `data-open === '1'` into every open assertion. |
+| **`fan-RED-final.log`** | **flag off (shipped gate)** | **20/34 · 14 FAIL · 18 SKIP — the RED calibration of record.** Every armed assertion is red in both orientations (no FAB, no petals, no `data-fan-open`); the 20 passes are the flag-off identity rows themselves — the dock literal, the five row buttons, the never-fetched TouchFan chunk, the untouched stick/throttle/boost, the chip at its pre-R25 `[8,404–382,452]`. **The same gate, same tree, flag on: 53 PASS / 0 FAIL.** |
 | `fan-armed-1/-2/-3` | armed | killed / instrument reds (§9.1-9.5), each one fixed in the gate, none in the feature |
 | `fan-armed-4` | armed | VOID — `ERR_CONNECTION_REFUSED`: the dev server had been killed by another agent's over-broad `pkill -f next-server` |
 | **`fan-armed-5.log`** | **armed** | **53 PASS · 0 FAIL · 0 SKIP**, then the same `pkill` took the server out again five rows from the end |
@@ -465,4 +466,15 @@ container's blocked-fetch signature, with no dynamic-import failure.
 | `verify-mobile-layout.js` | **ARMED** | **14 PASS / 1 FAIL / dies at :482.** The fail is the venue (`portrait zero pageerrors — Failed to fetch`); the death is `locator('[data-testid="touch-pause"]').click()` in the landscape-only leg. **Every frozen contract passes ARMED in both orientations**: the 8 zone names, no overflow, every zone member inside the viewport, pairwise zone disjointness, the 44 px sweep, the toast stack, and the info chip vs the thumbstick — now measured at the NEW dock (`chip [8,448–382,496]` portrait). The census drops from **14 interactive members to 8**, which is the five-buttons-into-one-FAB change, seen from the outside. |
 | `verify-mobile-layout.js` | **flag off** | **16/18 PASS — the base tree's result, row for row.** The only two reds are the venue's `zero pageerrors` pair (`Failed to fetch`), which the UNTOUCHED base tree also fails here; 14 interactive members in both orientations, same pairwise-disjointness set, and the info chip back at `[8,404–382,452]` portrait — the pre-R25 pixels. |
 | `verify-mobile.js` | flag off | NOT RUN TO COMPLETION — E CERT reports it does not complete in EITHER arm on this venue under the current load (three other agents' harnesses live, load ~15-24 on 4 cores). The flag-off tree's rendered control DOM is byte-identical to the base tree's in both orientations (`diff` clean), so the base-tree behaviour is the flag-off behaviour by construction. |
+
+## §11 Flag-off identity — the proof, not the claim
+
+| Claim | How it was proven | Result |
+|---|---|---|
+| TouchControls renders today's rows byte-for-byte | dumped `outerHTML` of `[data-zone="controls-left"]` and `[data-zone="controls-right"]` at BOTH orientations on the base tree (`6bf628e`) and on this tree with the flag off, then `diff` | **IDENTICAL** (`scripts/r25-out/base-controls.txt` vs `flagoff-controls.txt`, diff clean, 15,968 bytes) |
+| the dock string is character-identical | the flag-off branch of `zones['info-dock'].phonePort`, read out of the running app through the dev handle and compared to the pre-R25 literal | **EQUAL**, and `dockBottomRem` reads 24.5 |
+| TouchFan is not imported | `performance.getEntriesByType('resource')` filtered for `/TouchFan/` on the flag-off leg | **no matching resource** — the chunk is never fetched |
+| the fly root is unchanged | `data-fan-open` is `undefined` (React omits the attribute), asserted on every closed census | **absent** |
+| the existing layout gate is unmoved | `verify-mobile-layout.js` flag off vs the base tree | **same 16/18, same boxes** |
+| nothing else in the tree moved | `verify-artifact-hygiene.mjs` gates (1) and (4) | **PASS** |
 
