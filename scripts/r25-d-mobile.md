@@ -307,7 +307,15 @@ door has ever been reachable without the pause menu.
    is not written out in source. The gate asserts the two agree, so a change
    that forgets the class is caught; a PIN that moves it is knowingly
    cosmetic.
-7. **Six petals is the shipped arc; nine is the locked one.** Nothing stops a
+7. **A tap outside closes the fan AND reaches what it hit.** The listener is
+   read-only by charter (it must not fight the R17 tap-leak rule), so a tap on
+   the world with the fan open both dismisses the menu and lets LabelCanvas
+   pick an aircraft, and a tap on the joystick both dismisses and starts
+   steering. The steering case is right; the aircraft-pick case is a judgement
+   call a scrim would change. No scrim ships this round — it would be a new
+   full-screen interactive surface in a HUD whose whole problem was too many
+   surfaces. **User checkpoint.**
+8. **Six petals is the shipped arc; nine is the locked one.** Nothing stops a
    future round adding a tenth `order` entry, and the arc would then space ten
    petals over the same quarter turn (168 px radius ⇒ ~26 px of arc between
    44 px petals — they would overlap). If `order` grows past ~7, the radius or
@@ -397,3 +405,12 @@ door has ever been reachable without the pause menu.
     that is a number about the feature — which is precisely why every timing
     number in this ledger is labelled as wall clock, and why the gate waits for
     STATES rather than for clocks.
+
+## §10 Runs — what was executed, and on which tree
+
+All runs: D's worktree, port 3133, `FLY_TILE_FIXTURE=1 FLY_BOOT_SCALE=6
+node -r ./scripts/_pw-shim.js`. Logs and screenshots under
+`scripts/r25-out/` (gitignored). **Three other agents' browser harnesses were
+live in the process table for most of this window** — every wall-clock number
+is a number about that, not about the fan.
+
