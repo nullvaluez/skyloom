@@ -431,7 +431,9 @@ function toneSpec(toneMode) {
  * Satellite high 4 → 3 EffectPasses, toy high 6 → 5. That matters because
  * Owens has zero draw headroom at 261.
  */
-const PRE_CURVE = new Set(['n8ao', 'bloom', 'speed', 'aerial', 'toy-dof']);
+// Cloud composition adds scene-linear radiance and casts terrain shadows.
+// It must stay before the display curve, just like aerial perspective.
+const PRE_CURVE = new Set(['n8ao', 'immersive-clouds', 'bloom', 'speed', 'aerial', 'toy-dof']);
 
 function reorderForDisplaySpace(list) {
   const tone = list.find((p) => p.id === 'tone');

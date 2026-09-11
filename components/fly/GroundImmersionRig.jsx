@@ -4,6 +4,7 @@ import { useFrame } from '@react-three/fiber';
 import { useFlyStore } from '@/stores/fly-store';
 import { stepNearGroundRuntime } from '@/lib/fly/near-ground';
 import { updateNearGroundUniforms } from '@/lib/fly/near-ground-material';
+import { updateDaylightDepth } from '@/lib/fly/daylight-depth';
 
 export function GroundImmersionRig({ runtime, flight }) {
   // Physics and chase share -50. Read the prior-frame visual pose at -51 so
@@ -16,10 +17,12 @@ export function GroundImmersionRig({ runtime, flight }) {
   // never advance the damped signal twice or texture detail jumps on a rebase.
   useFrame(() => {
     updateNearGroundUniforms(runtime, flight, runtime.groundImmersion, useFlyStore.getState().qualityTier);
+    updateDaylightDepth(runtime, useFlyStore.getState().mapStyle === 'satellite');
   }, -49);
   useEffect(() => () => {
     runtime.groundImmersion = null;
     updateNearGroundUniforms(runtime, flight, null, 'low');
+    updateDaylightDepth(runtime, false);
   }, [runtime, flight]);
   return null;
 }

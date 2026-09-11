@@ -34,7 +34,8 @@ import {
 } from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
 import { satelliteVisualsOn, satelliteVisualProfile } from '@/lib/fly/satellite-visuals';
-import { createCinematicHomeMaterial } from '@/lib/fly/cinematic-ground';
+import { createCinematicHomeMaterial, createCinematicHomeDepthMaterial } from '@/lib/fly/cinematic-ground';
+import { nearGroundOn } from '@/lib/fly/near-ground';
 import { parcelGapDecision, parcelGapSourceReady, parcelGapSupported } from '@/lib/fly/parcel-gap';
 import { parcelRoadDistance, parcelRoadScan, stepParcelRoadScan } from '@/lib/fly/parcel-roads';
 
@@ -126,8 +127,10 @@ function resolvedFrac(s, inFlight) {
  * BUDGET: ONE pooled InstancedMesh — +1 draw for the whole world when anything
  * places, and 0 draws (count = 0, visible = false) when nothing does, which is
  * every Owens/desert/ocean pose and every low-tier boot. 32 triangles per
- * house. Placement runs on the veg cadence (2 s), never per frame; the only
- * per-frame write is one emissive intensity.
+ * house. Ground shading reuses this bounded pool for at most ONE additional
+ * sunlight depth draw (at most 160k submitted triangles at the 5,000-home cap).
+ * The sunlight frustum clips it to the near receiver region; there is no extra
+ * color pass, duplicate instance pool, or per-frame caster-selection scan.
  *
  * ANCHORS come from the worker's dedicated `satParcel` sample (see the pass in
  * vector-tile.worker.js for why the cls-4 canopy scatter could not be the
@@ -220,13 +223,15 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
     applyBendAnchor(m);
     return m;
   }, [cinematic]);
+  const depthMaterial = useMemo(() => cinematic ? createCinematicHomeDepthMaterial(applyBendAnchor) : null, [cinematic]);
   useEffect(
     () => () => {
       geometry.dispose();
       material.emissiveMap?.dispose();
       material.dispose();
+      depthMaterial?.dispose();
     },
-    [geometry, material]
+    [geometry, material, depthMaterial]
   );
 
   // Round 21 (C, P5) — a WARP is a discontinuity, and the warp epoch says so
@@ -254,14 +259,19 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
       if (m) {
         m.count = 0;
         m.visible = false;
+        m.castShadow = false;
       }
       stateRef.current.placed = 0;
       stateRef.current.prevN = 0;
+      stateRef.current.shadowCasters = 0;
+      stateRef.current.shadowTriangles = 0;
+      publishParcelShadowStats(runtime, 0, 0);
     });
-  }, []);
+  }, [runtime]);
 
   // Priority -42: after the canopy (-45), the tint (-44) and the porch lights
   // (-43) — the whole ground stack settles in streaming order on one cadence.
+  // eslint-disable-next-line react-hooks/immutability -- useFrame intentionally updates the shared scene bus and its Three objects, outside React render state
   useFrame(({ clock }) => {
     const mesh = meshRef.current;
     if (!mesh) return;
@@ -296,7 +306,8 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
         localGapPlaced: st.localGapPlaced ?? 0, anchors: st.anchors,
         regionalDens: st.regionalDens, regK: st.regK,
         roadReady: !!st.roadIndex?.done, roadRejected: st.roadRejected ?? 0,
-        groundSamples: st.groundSamples ?? 0 };
+        groundSamples: st.groundSamples ?? 0,
+        shadowCasters: st.shadowCasters ?? 0, shadowTriangles: st.shadowTriangles ?? 0 };
     }
     // R24 B (CHUNK_FADE, recon A6) — ease the provisional grow instead of
     // stepping it. The placement pass writes matrices at the CURRENT growK; in
@@ -357,6 +368,15 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
       rangeUpload(mesh.instanceMatrix, st.placed * 16);
     }
     if (cinematic) correctHomeGround(mesh, runtime, st, t);
+    // Use the real light gate, including its tier and review-pin state. The
+    // visible pool's current matrices/count already include every support
+    // correction and motion/birth envelope, so its depth cannot drift away.
+    const cast = cinematic && nearGroundOn('shading') && useFlyStore.getState().mapStyle === 'satellite'
+      && runtime.sunLight?.castShadow === true && mesh.visible && mesh.count > 0;
+    if (mesh.castShadow !== cast) mesh.castShadow = cast;
+    st.shadowCasters = cast ? mesh.count : 0;
+    st.shadowTriangles = cast ? mesh.count * geometry.index.count / 3 : 0;
+    publishParcelShadowStats(runtime, st.shadowCasters, st.shadowTriangles);
     notePopin(
       'parcelHomes',
       st.placed > 0 && mesh.visible,
@@ -417,16 +437,26 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
         // identity-matrix houses stacked on the pool origin for one cadence.
         m.count = 0;
         m.visible = false;
-        // NO castShadow/receiveShadow: SAT_SHADOWS is a frozen R19 rig whose
-        // pins every satellite pixel gate depends on, and adding a caster is a
-        // change to that rig, not to this layer.
+        // Casting is armed by the frame loop only when the existing sunlight
+        // map and ground shading are active. SatDepthRig owns receiver flags.
+        m.castShadow = false;
         // NO _isModel/_painted: those enrol a mesh in the harness
         // foreground-hide, and this layer is scenery a probe must SEE.
         stateRef.current.t = -Infinity; // place on the very next frame
       }}
       args={[geometry, material, pool]}
+      name="sat-parcel-homes"
+      customDepthMaterial={depthMaterial ?? undefined}
     />
   );
+}
+
+/** Publish the current draw state without allocating a new per-frame record. */
+function publishParcelShadowStats(runtime, casters, triangles) {
+  const stats = runtime.parcelSettle;
+  if (!stats) return;
+  stats.shadowCasters = casters;
+  stats.shadowTriangles = triangles;
 }
 
 // --- the house ---------------------------------------------------------------

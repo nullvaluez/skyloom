@@ -1,6 +1,7 @@
 'use client';
 
 import { applyNightGroundReceiver } from '@/lib/fly/night-ground';
+import { applyDaylightSurface } from '@/lib/fly/daylight-depth';
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -259,6 +260,7 @@ export function SatClutterLayer({ runtime, flight }) {
     });
     applyBendAnchor(m); // existing variant, unmodified — no new cache key
     applyNightGroundReceiver(m, 'clutter', { heightM: 8, coolFill: 0.012 });
+    applyDaylightSurface(m, 'clutter');
     return m;
   }, []);
   useEffect(

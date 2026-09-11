@@ -4,7 +4,10 @@ import { GroundImmersionRig } from './GroundImmersionRig';
 import { SatGroundDetailLayer } from './SatGroundDetailLayer';
 import { applyNearGroundMaterial } from '@/lib/fly/near-ground-material';
 import { applyNightGroundReceiver } from '@/lib/fly/night-ground';
-import { attachGroundShadowLight } from '@/lib/fly/light-bubble';
+import { applyDaylightSurface } from '@/lib/fly/daylight-depth';
+import { nearGroundOn } from '@/lib/fly/near-ground';
+import { createShadowCoverageState, selectShadowReceivers, resolveShadowFocus } from '@/lib/fly/shadow-coverage';
+import { attachGroundShadowLight, publishGroundShadowCoverage, releaseGroundShadowCoverage, publishGroundShadowFocus } from '@/lib/fly/light-bubble';
 import { physicalBendCoefficient } from '@/lib/fly/render-scale';
 import { IMMERSIVE, immersiveOn, immersiveLighting } from '@/lib/fly/immersive';
 
@@ -632,6 +635,7 @@ function countCastersNear(root, px, pz, radiusM) {
 }
 
 function SatDepthRig({ runtime, flight, origin, engine, scene }) {
+  const { camera, gl } = useThree();
   const [armed, setArmed] = useState(false);
   const stateRef = useRef({
     // Seeded LARGE-but-finite, deliberately: `-Infinity + delta` is still
@@ -645,6 +649,7 @@ function SatDepthRig({ runtime, flight, origin, engine, scene }) {
     buildings: 0,
     instanced: 0,
     meshes: 0,
+    coverage: createShadowCoverageState(),
   });
 
   // Charter rule 4's second dev handle (the first is __flyN8AO in Effects.jsx).
@@ -685,6 +690,7 @@ function SatDepthRig({ runtime, flight, origin, engine, scene }) {
     const st = stateRef.current;
     return () => {
       for (const o of st.receivers) _delistReceiver(o);
+      releaseGroundShadowCoverage(runtime, st.coverage.census);
       st.receivers.clear();
       for (const o of st.casters) o.castShadow = false;
       st.casters.clear();
@@ -772,50 +778,22 @@ function SatDepthRig({ runtime, flight, origin, engine, scene }) {
     const receiveOn = depthSubOn('nearReceive');
     const next = receiveOn ? new Set() : null;
     if (receiveOn) {
-      const reach = (runtime.shadowRadiusM ?? SAT_SHADOWS.orthoRadiusM) + (NR.padM ?? 0);
-      const cap = NR.maxTiles ?? 48;
-      const root = engine?.object;
-      _swept.tiles = 0;
-      _swept.leaves = 0;
-      const walkTiles = (t) => {
-        if (!t || !t.visible || next.size >= cap) return;
-        if (t.isTile) {
-          _swept.tiles++;
-          if (t.isLeaf) {
-            _swept.leaves++;
-            const m = t.model;
-            if (m) {
-              const e = t.matrixWorld.elements;
-              _rigV.setFromMatrixPosition(t.matrixWorld);
-              // World half-extent from the matrix' own column lengths — the map
-              // is rotated -90 deg about X, so the ground plane's extents come
-              // out of columns 0 and 1. No decompose, no allocation.
-              const sx = Math.hypot(e[0], e[1], e[2]);
-              const sy = Math.hypot(e[4], e[5], e[6]);
-              const half = Math.max(sx, sy);
-              const dx = _rigV.x - px;
-              const dz = _rigV.z - pz;
-              const lim = reach + half;
-              if (dx * dx + dz * dz <= lim * lim) next.add(m);
-            }
-            return;
-          }
-        }
-        const kids = t.children;
-        for (let i = 0; i < kids.length; i++) walkTiles(kids[i]);
-      };
-      if (root) walkTiles(root);
-      // Sweep telemetry — verify-depth2 (3) asserts the enlistment count, and
-      // when it reads 0 the ONLY useful question is which of the three stages
-      // dropped it: no tree, no leaves, or no leaf inside the radius.
-      st.walked = _swept.tiles;
-      st.leaves = _swept.leaves;
-      st.leavesNear = next.size;
+      // Spend the existing receiver cap on visible foreground, not whichever
+      // quadtree quadrant happens to be traversed first.
+      const coverage = selectShadowReceivers(st.coverage, engine?.object, {
+        camera, focusX: runtime.shadowFocus?.x ?? px, focusZ: runtime.shadowFocus?.z ?? pz,
+        radiusM: runtime.shadowRadiusM ?? SAT_SHADOWS.orthoRadiusM,
+        padM: NR.padM ?? 0, maxTiles: NR.maxTiles ?? 48,
+        bend: getBend(), reversedDepth: !!gl.capabilities.reversedDepthBuffer,
+      });
+      for (const model of coverage.selected) next.add(model);
+      _swept.tiles = st.walked = coverage.census.walked;
+      _swept.leaves = st.leaves = coverage.census.leaves;
+      st.leavesNear = coverage.census.eligible;
+      publishGroundShadowCoverage(runtime, coverage.census);
 
-      // Parcel homes join as RECEIVERS only (never casters — the R20 rig is
-      // hash-stable placement and a 2,000-instance caster set is a different
-      // measurement). Identified by the userData latch SatParcelHomes already
-      // sets on its own mesh, so no edit to B's file.
+      // The parcel component owns its matching instanced depth material and
+      // caster lifecycle. This rig still owns the receiver flag.
       if (NR.parcelHomes) {
         const walkParcel = (o) => {
           if (!o.visible) return;
@@ -844,6 +822,7 @@ function SatDepthRig({ runtime, flight, origin, engine, scene }) {
       st.walked = 0;
       st.leaves = 0;
       st.leavesNear = 0;
+      publishGroundShadowCoverage(runtime, null);
       if (prev.size) {
         for (const o of prev) _delistReceiver(o);
         prev.clear();
@@ -1052,6 +1031,7 @@ export function FlyScene({ runtime }) {
   // a stale closure (the satShadowRef pattern, three lines above).
   const shadowRigRef = useRef(shadowRig);
   shadowRigRef.current = shadowRig;
+  const shadowFocusRef = useRef({ dx: 0, dz: 0, epoch: null, desired: { dx: 0, dz: 0 } });
   useEffect(() => {
     if (process.env.NODE_ENV !== 'development' || typeof window === 'undefined') return;
     // verify-aerial's A/B leg: the ONE harness that un-pins the shadows.
@@ -1523,6 +1503,7 @@ export function FlyScene({ runtime }) {
         applyHillshade(m, HILLSHADE, attachLodFade(m));
         applyNearGroundMaterial(m, { surface: 'terrain' });
         applyNightGroundReceiver(m, 'terrain');
+        applyDaylightSurface(m, 'terrain');
         // Round 11: tier-aware aniso, read imperatively so NEW tiles pick up
         // a live tier change without re-uploading the streamed field (no
         // degrade hitch; the field converges as tiles stream).
@@ -2925,7 +2906,7 @@ export function FlyScene({ runtime }) {
         const cosEl = Math.cos(el);
         // The SAME basis setHillDir is fed, so a cast shadow and the hillshade
         // it falls across can never disagree about where the sun is.
-        const gy = flight.groundElev;
+        const gy = Number.isFinite(runtime.groundElevVis) ? runtime.groundElevVis : flight.groundElev;
         const d = SAT_SHADOWS.distM;
         let kx = -Math.sin(ss.az) * cosEl;
         let ky = Math.sin(el);
@@ -2968,6 +2949,25 @@ export function FlyScene({ runtime }) {
         let tx = rpx;
         let ty = gy;
         let tz = rpz;
+        const focus = shadowFocusRef.current;
+        if (nearGroundOn('shading') && satShadowRef.current) {
+          camera.updateMatrixWorld();
+          resolveShadowFocus(focus.desired, { playerX: rpx, playerZ: rpz, groundY: gy,
+            camera, radiusM: runtime.shadowRadiusM ?? shadowRigRef.current.radiusM });
+        } else {
+          focus.desired.dx = focus.desired.dz = 0;
+        }
+        const focusK = focus.epoch === flyState.warpEpoch ? 1 - Math.exp(-Math.min(dt, 0.1) / 0.35) : 1;
+        focus.dx += (focus.desired.dx - focus.dx) * focusK;
+        focus.dz += (focus.desired.dz - focus.dz) * focusK;
+        const maxFocus = (runtime.shadowRadiusM ?? shadowRigRef.current.radiusM) * 0.6;
+        const focusLength = Math.hypot(focus.dx, focus.dz);
+        if (focusLength > maxFocus) {
+          focus.dx *= maxFocus / focusLength; focus.dz *= maxFocus / focusLength;
+        }
+        focus.epoch = flyState.warpEpoch;
+        tx += focus.dx;
+        tz += focus.dz;
         // R24 C (SHADOW_CALM): texel snap, and ONLY while the shadow camera is
         // actually casting — with ONE_SUN the key-light branch now runs at every
         // tier, and quantising a light that renders no shadow map would be
@@ -2981,6 +2981,7 @@ export function FlyScene({ runtime }) {
           }
         }
         sun.position.set(tx + kx * d, ty + ky * d, tz + kz * d);
+        publishGroundShadowFocus(runtime, tx, ty, tz, focus.dx, focus.dz);
         sunTarget.position.set(tx, ty, tz);
         sunTarget.updateMatrixWorld();
         _sunAudit.az = ss.az;
@@ -2999,6 +3000,9 @@ export function FlyScene({ runtime }) {
           dpr: gl.getPixelRatio(), buildings: runtime.satBuildings?.stats,
           roads: runtime.satRoads?.stats, skyline: runtime.satSkyline?.stats,
           parcels: runtime.parcelSettle,
+          shadowCoverage: runtime.shadowCoverage, shadowFocus: runtime.shadowFocus,
+          shadowRadiusM: runtime.shadowRadiusM,
+          ao: runtime.aoPass ? { radius: runtime.aoPass.configuration.aoRadius, intensity: runtime.aoPass.configuration.intensity, enabled: effectsTier === 'high' } : null,
           skylineCoveredTiles: runtime.satSkyline?.material.userData.architecture?.uniforms.uArchitectureTileCount?.value,
           cinematic: satelliteVisualsOn(),
           immersive: immersiveOn() ? { revision: IMMERSIVE.revision, lighting: runtime.immersiveLighting, clouds: runtime.immersiveClouds, shadowSize: shadowRig.mapSize, shadows: satShadowsOn } : null,

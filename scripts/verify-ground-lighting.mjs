@@ -17,6 +17,9 @@ const policy=await import('../lib/fly/night-lighting-policy.js');
 const ground=await import('../lib/fly/night-ground.js');
 const {createNightSourceCollector}=await import('../lib/fly/night-ground-sources.js');
 const {SAT_ROADS,SUBURB_NIGHT}=await import('../lib/fly/fly-constants.js');
+const {SATELLITE_VISUALS}=await import('../lib/fly/satellite-visuals.js');
+const {satelliteRoadLighting}=await import('../lib/fly/night-city.js');
+const {applyBendRoadSat,setSatRoadMix}=await import('../lib/fly/toy-world/world-bend.js');
 function finishSources(collector){
   let step,steps=0,work=0;
   do{step=collector.step({budgetMs:Infinity,maxWork:128});assert(step.work<=128);work+=step.work;assert(++steps<100000);}while(step.pending);
@@ -38,6 +41,29 @@ check('night weight is dark at noon and continuous at dusk',()=>{
 check('AGL envelope strengthens low flight without extinguishing low-tier city light',()=>{
   assert.equal(policy.groundLightingStrength(0),.25);assert.equal(policy.groundLightingStrength(1),1);
   assert.equal(policy.groundLightingStrength(NaN),.25);
+});
+check('road uniforms suppress the continuous ribbon while retaining discrete lamp peaks',()=>{
+  const material=new MeshBasicMaterial(),cfg=satelliteRoadLighting();
+  applyBendRoadSat(material,SAT_ROADS,SUBURB_NIGHT,cfg);setSatRoadMix(0);
+  const shader={uniforms:{},vertexShader:ShaderLib.basic.vertexShader,fragmentShader:ShaderLib.basic.fragmentShader};
+  material.onBeforeCompile(shader);
+  // Keep this arithmetic tied to the actual emitted shader and runtime knobs;
+  // lampGain alone is not the peak because the shader multiplies it by glow.
+  assert.match(shader.fragmentShader,/gain \+= mStreet \* uRoadNight \* uRoadGlow \* uRoadLamp\.x \* exp\( -sd \* sd \* uRoadLamp\.y \)/);
+  const u=shader.uniforms,glow=u.uRoadGlow.value,lamp=u.uRoadLamp.value;
+  const gainAt=arc=>{const phase=arc/u.uStreetSpacing.value%1,sd=Math.min(phase,1-phase);
+    return glow*u.uRoadNight.value*(1+lamp.x*Math.exp(-sd*sd*lamp.y));};
+  const base=SATELLITE_VISUALS.lighting,basePeak=base.roadGlow*(1+base.streetPoolGain);
+  const peak=gainAt(0),between=gainAt(u.uStreetSpacing.value/2);
+  assert(glow<base.roadGlow);
+  // Retain roughly half the previous bright street peak while separating
+  // lamps more strongly from the dark inter-lamp pavement.
+  assert(peak>=basePeak*.4&&peak<=basePeak*.55);
+  assert(peak/between>basePeak/base.roadGlow);
+  assert.equal(u.uStreetSpacing.value,SAT_ROADS.night.streetSpacingM);
+  assert.equal(u.uStreamBoost.value,policy.GROUND_LIGHTING.road.streamGain);
+  assert.equal(u.uTrafBoost.value,policy.GROUND_LIGHTING.road.trafficGain);
+  material.dispose();
 });
 check('ground height rejects bridge decks and unrelated roofs',()=>{
   assert.equal(policy.sourceHeightWeight(100,100),1);assert.equal(policy.sourceHeightWeight(120,100),0);assert.equal(policy.sourceHeightWeight(80,100),0);
@@ -91,6 +117,7 @@ roads.setAttribute('aRoadCls',new BufferAttribute(new Float32Array([5,5,5,5]),1)
 runtime.satRoads.chunks.set('r',{state:'ready',mesh:new Mesh(roads,new MeshBasicMaterial())});
 check('road sources follow the visible 42m phase and retain deck elevation',()=>{
   const c=collectNightSources(runtime,scene,0,0,512,768);assert.equal(c.counts.lamps,2);
+  assert.deepEqual(c.sources.filter(s=>s.id.startsWith('l')).map(s=>s.z).sort((a,b)=>a-b),[0,SAT_ROADS.night.streetSpacingM]);
   assert(c.sources.filter(s=>s.id.startsWith('l')).every(s=>s.y===130-SAT_ROADS.liftM));
   assert.equal(policy.sourceHeightWeight(130-SAT_ROADS.liftM,c.sources.find(s=>s.id.startsWith('l')).y),1);
   assert.equal(policy.sourceHeightWeight(100,c.sources.find(s=>s.id.startsWith('l')).y),0);

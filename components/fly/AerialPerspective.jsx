@@ -66,6 +66,7 @@ import {
 // A/B would decode the tile setters and leave this uniform on the other path.
 import { linearHazeOn } from '@/lib/fly/toy-world/world-bend';
 import { depthSubOn } from '@/lib/fly/depth-pass';
+import { daylightNearHazeMix } from '@/lib/fly/daylight-depth';
 
 /**
  * Module-scope frame state. One satellite scene exists at a time, so a plain
@@ -143,7 +144,9 @@ export function setAerial(s) {
     // gate and re-applying it means a pinned frame zeroes the near band too and
     // stays bit-identical, without this file needing to know what the gate was.
     const gate = AERIAL_PERSPECTIVE.maxMix > 0 ? s.strength / AERIAL_PERSPECTIVE.maxMix : 0;
-    _state.nearMaxMix = an.nearMaxMix * gate;
+    // Retain distance separation without putting a pale veil over local
+    // shadows. Far haze, weather and cloud density keep their existing laws.
+    _state.nearMaxMix = daylightNearHazeMix(an.nearMaxMix) * gate;
   } else {
     _state.nearStartM = 0;
     _state.nearMaxMix = 0;
