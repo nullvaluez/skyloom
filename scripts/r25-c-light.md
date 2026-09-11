@@ -321,20 +321,26 @@ venue's own drift. And the claim survives either way, because what the rejected
 design (a second shadow light) would have done is re-key EVERY lit material at
 once: a jump of tens, not a drift of one.
 
-**(c) THE SERVER THAT DIED — TWICE, AND IT WAS THE HARNESS, NOT THE APP.**
+**(c) THE SERVER THAT DIED — THREE TIMES, AND IT WAS NEVER THE APP.**
 Pass 2 lost `window.__fly` entirely mid-night-leg and threw
 `Cannot read properties of undefined`. Not a GPU crash and not the rig: the
 NEXT DEV SERVER had exited (the following run got `ERR_CONNECTION_REFUSED` on
-the same port), taking the page's chunks with it. It happened again with the
-server started as a managed background task — its log ends with a clean
-`[?25h` and exit 0, i.e. a SIGTERM, tied to the agent tool-call lifecycle
-rather than to anything Next did. **The fix is `setsid nohup … &` for both the
-dev server and any browser run longer than a turn**; worth knowing for every
-agent in this round, because the symptom presents as the APP dying mid-gate.
-A gate that dies on a dead server reports nothing about the feature, so the
-gate now checks `window.__fly` at each leg boundary and reads NOT CALIBRATED —
-with `__flyStats.sceneRemounts`, the tripwire FlyScene already ships for this —
-instead of a stack trace.
+the same port), taking the page's chunks with it, and its log ends with a clean
+`[?25h` and exit 0 — a SIGTERM. **The orchestrator later supplied the cause:
+E CERT ran an over-broad `pkill -f next-server` during its own teardown and
+took down every owner's dev server on the machine.** I had attributed it to the
+agent tool-call lifecycle; that was a guess from the same evidence, and the
+real cause is worth more than the guess — SIX OWNERS SHARE THIS CONTAINER, and
+a `pkill` pattern that matches another owner's process is a cross-owner failure
+that arrives with no error message in it. Two things follow, both cheap: run
+long things under `setsid nohup` so they at least survive a turn, and NEVER
+read a refused connection, or a vanished `window.__fly`, as a statement about
+the tree. A gate that dies on a dead server must report nothing rather than
+something false, so this one checks `window.__fly` at each leg boundary and
+reads NOT CALIBRATED — with `__flyStats.sceneRemounts`, the tripwire FlyScene
+already ships for this — instead of a stack trace. It did exactly that on the
+final re-run, which was killed mid-`traverse 2` (radius null, programs null, no
+verdict claimed).
 
 **(d) THE DEV HANDLE THAT WAS ALREADY OWNED.** The charter says to ship
 `window.__flyStats.shadow = { radiusM, texelM, rung }`. That key already
