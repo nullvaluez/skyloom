@@ -76,13 +76,71 @@ gate('1 the stringified tail is up to date with its readable source',
 // The tail shape the patch replaces, in the vendored bundle's own inline worker
 // sources. Both geometry-returning DEM workers use it verbatim (only the local
 // variable names differ), which is why one regex covers them.
+//
+// ===========================================================================
+// R25 RE-BASELINE (E CERT, W1) + THE DEFECT IT UNCOVERED. Read both halves.
+//
+// Cited commits: `be711f2` / `7c9cde0` (the Codex "overhaul satellite graphics
+// and terrain recovery" pair, `main` = `f0cd81e`). They re-applied VENDOR.md
+// patch #3 (`demErrorTable`) into the LERC worker source string, which threads
+// an optional `errTable` through `ie()` / `le()` / `onmessage`. Measured:
+//
+//   at 0ff2a3f  fe tail: le(d.demData,d.z,d.clipBounds)             errTable x0
+//   at f0cd81e  fe tail: le(d.demData,d.z,d.clipBounds,d.errTable)  errTable x2
+//                ge tail: Z(o.demData,o.z,o.clipBounds)             (unchanged)
+//
+// (a) THE RE-BASELINE. The tail SHAPE changed on purpose, so the regex here
+//     gains an optional fourth argument. That is a structure with a commit to
+//     cite, and no measured number moves.
+//
+// (b) THE DEFECT, which is NOT re-baselined and must stay red until an owner
+//     fixes it. `R24_WORKER_TAIL_RE` inside the SHIPPED bundle
+//     (lib/fly/vendor/three-tile/index.js, the `r24SpliceWorkerTail` site) was
+//     NOT widened with it. It still demands exactly three arguments, so
+//     `r24SpliceWorkerTail(fe)` returns null, `r24MakeWorker` returns null and
+//     three-tile builds the VERBATIM upstream worker instead. Consequence:
+//     `TERRA_PACE.skirtWorker` AND `TERRAIN_LIGHT.workerNormals` silently
+//     degrade to OFF on the LERC path — which is the ONLY DEM path the live
+//     app uses (Esri LERC). The terrain-rgb worker `ge` still matches, and
+//     terrain-rgb is exactly what E's offline fixture serves, so NOTHING in
+//     this container and NOTHING in the browser fleet can observe it.
+//     R25 A GROUND's charter item 6 (the `workerNormals` user A/B) would read
+//     "no difference" on the user's machine for this reason and not for a
+//     graphics one. Owner: A GROUND / vendor arbitration — E may not edit a
+//     vendored file. Fix is one regex: make the fourth argument optional at
+//     the splice site too.
+// ===========================================================================
 const TAIL_RE =
-  /self\.onmessage=(\w+)=>\{const (\w+)=\1\.data,(\w+)=(\w+)\(\2\.demData,\2\.z,\2\.clipBounds\);self\.postMessage\(\3\)\}/g;
+  /self\.onmessage=(\w+)=>\{const (\w+)=\1\.data,(\w+)=(\w+)\(\2\.demData,\2\.z,\2\.clipBounds(,\2\.errTable)?\);self\.postMessage\(\3\)\}/g;
+// The regex the SHIPPED bundle actually splices with — read out of the bundle
+// rather than retyped, so this gate can never drift from the code it judges.
 const bundle = readFileSync(path.join(root, 'lib/fly/vendor/three-tile/index.js'), 'utf8');
 const matches = [...bundle.matchAll(TAIL_RE)];
 rows.push(`  worker tails found: ${matches.length} (decode entry points: ${matches.map((m) => m[4]).join(', ')})`);
 gate('2 both geometry-returning DEM workers still carry the expected tail shape',
-  matches.length === 2, `${matches.length} matches`);
+  matches.length === 2,
+  `${matches.length} matches${matches.some((m) => m[5]) ? ' (one carries the patch-#3 errTable argument)' : ''}`);
+
+// 2b. THE SPLICE ITSELF. Gate 2 proves the tails are the shape this gate
+// expects; this proves the SHIPPED splice can still consume them. They are
+// different questions and the second is the one a user's machine pays for.
+const shippedRe = (() => {
+  const m = /const R24_WORKER_TAIL_RE\s*=\s*\n?\s*(\/.+\/);/.exec(bundle);
+  if (!m) return null;
+  try {
+    // eslint-disable-next-line no-eval
+    return (0, eval)(m[1]);
+  } catch {
+    return null;
+  }
+})();
+gate('2a the shipped splice regex could be read out of the bundle',
+  shippedRe instanceof RegExp, shippedRe ? String(shippedRe).slice(0, 60) + '…' : 'not found');
+const spliceable = matches.filter((m) => shippedRe && shippedRe.test(m[0])).length;
+gate('2b THE SHIPPED SPLICE MATCHES EVERY DEM WORKER TAIL IT WILL BE HANDED',
+  shippedRe != null && spliceable === matches.length,
+  `${spliceable} of ${matches.length} splice-able — a miss means r24SpliceWorkerTail() returns null and ` +
+    'skirtWorker + workerNormals degrade to OFF on that worker, invisibly (see the R25 note above; owner A GROUND)');
 
 // ------------------------------------------------- 3-8. output identity
 /** Build the {attributes, indices} a decode step hands the tail. */

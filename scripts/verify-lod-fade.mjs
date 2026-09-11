@@ -80,23 +80,61 @@ console.log('[1] vendor patches: present, placed, and INSERT-ONLY');
 const vendored = fs.readFileSync(path.join(ROOT, 'lib/fly/vendor/three-tile/index.js'), 'utf8');
 const ledger = fs.readFileSync(path.join(ROOT, 'lib/fly/vendor/three-tile/VENDOR.md'), 'utf8');
 
+// ===========================================================================
+// R25 RE-BASELINE (E CERT, W1) — READ THIS BEFORE TRUSTING ANY GREEN BELOW.
+//
+// Cited commits: `be711f2` + `7c9cde0` (the Codex "overhaul satellite graphics
+// and terrain recovery" pair, on `main` at `f0cd81e`). They rewrote
+// `Tile._loadSubTiles` and `Tile._removeSubTiles` to wrap both bodies in A's
+// PATCH #7 (`unlockOnReject`) try/catch and to add the merge-completion repair
+// documented as VENDOR.md patch 7a. Four assertions here went red for that,
+// and every one of them was an assertion about TEXT, not about mechanism:
+//
+//   (i)   D's `// R24 D PATCH 6 …` and `// R24 D PATCH 7 …` attribution
+//         COMMENTS were deleted with the surrounding re-indent. The hooks they
+//         labelled — `ir && ir.onRefine(...)` and `ir.onMerge(...)` — are both
+//         still there and still in their required positions. A marker census
+//         therefore measured comment survival, not patch survival, and is
+//         replaced below by the CALL SITES themselves. THE LOST MARKERS ARE A
+//         REAL LOSS and are recorded as a finding in scripts/r25-e-cert.md:
+//         VENDOR.md's switch-idiom leans on those markers for attribution, and
+//         E may not edit a vendored file to restore them.
+//   (ii)  the "D hunks >= 3" count derived from the same comment text.
+//         Insert-only is still asserted, on the hunks that remain D-attributable.
+//         D's hooks now live INSIDE A's try blocks, so a per-owner hunk census
+//         is no longer decidable from the diff at all; the whole-bundle
+//         edited-line budget is `verify-vendor-three-tile.mjs` (green).
+//   (iii) the merge block was anchored on the identifier `_w`, which the
+//         overhaul renamed to `wait`. THE BEHAVIOUR THE ASSERTION NAMES —
+//         `_loadState` held at "loading" across the await — IS STILL PRESENT,
+//         verbatim, and is re-asserted below against the new identifier. This
+//         is a rename, not a removal; the freeze was NOT dropped.
+//
+// A re-baseline is permitted here because each is a STRUCTURE that changed on
+// purpose, with a commit to cite. Nothing about the fade's numbers moved.
+// ===========================================================================
 const markers = [...vendored.matchAll(/\/\/\s*R24\s+D\s+PATCH\s+(\d+)\s*\(([^)]+)\)/g)].map((m) => m[1]);
-ok('the three D patch markers are present (5 is the holder + its export)',
-  [...new Set(markers)].sort().join(',') === '5,6,7', `markers=[${markers.join(',')}]`);
-ok('every D marker names LOD_CROSSFADE as its switch',
+ok('D patch 5 (the hook holder + its export) is still MARKED',
+  [...new Set(markers)].sort().join(',') === '5', `markers=[${markers.join(',')}]`);
+ok('every surviving D marker names LOD_CROSSFADE as its switch',
   [...vendored.matchAll(/\/\/\s*R24\s+D\s+PATCH\s+\d+\s*\(([^)]+)\)/g)].every((m) => m[1] === 'LOD_CROSSFADE'));
+// The REPLACEMENT for the 6/7 marker census: the two call sites themselves.
+// A comment can be re-indented away; a call cannot.
+ok('D patch 6 SURVIVES AS A CALL SITE (the refine hook), marker or no marker',
+  /\bir && ir\.onRefine\(this, o, h\);/.test(vendored));
+ok('D patch 7 SURVIVES AS A CALL SITE (the merge hook), marker or no marker',
+  /\bir\.onMerge\(this, o\)/.test(vendored));
 for (const n of ['5', '6', '7']) {
   ok(`VENDOR.md has a ledger row for D patch ${n}`,
     new RegExp(`^\\|\\s*${n}\\s*\\|\\s*D\\s*\\|`, 'm').test(ledger));
 }
 
-// D's OWN hunks must be INSERT-ONLY. A's gate 8 bounds the WHOLE bundle's
-// edited-upstream-line budget (1 today, spent by A's `_getDistRatio` optional
-// parameter); this narrows it to D: every hunk whose added lines name `R24 D`
-// must delete nothing, i.e. D leaves every upstream statement it guards
-// verbatim. That is the machine-checkable form of VENDOR.md switch-idiom
-// rule 2, scoped to this owner so it cannot be satisfied by someone else's
-// budget.
+// D's OWN hunks must be INSERT-ONLY, on whatever remains attributable to D.
+// A's gate 8 (verify-vendor-three-tile.mjs) bounds the WHOLE bundle's
+// edited-upstream-line budget; this narrows it to the hunks that still name
+// `R24 D`. R25: that is 2, not 3, because the overhaul's re-indent absorbed
+// D's two in-function markers (see the re-baseline note above). What is still
+// load-bearing is the DELETION count: zero.
 const VENDOR_COMMIT = 'b64457b';
 try {
   const diff = execFileSync('git', ['diff', '-U0', VENDOR_COMMIT, '--', 'lib/fly/vendor/three-tile/index.js'],
@@ -108,28 +146,58 @@ try {
     n + h.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---')).length, 0);
   const dAdds = dHunks.reduce((n, h) =>
     n + h.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).length, 0);
-  ok("D's vendor hunks are INSERT-ONLY (zero upstream lines edited or deleted)",
-    dHunks.length >= 3 && dDeletes === 0, `${dHunks.length} D hunks, +${dAdds} / -${dDeletes}`);
+  ok("D's still-attributable vendor hunks are INSERT-ONLY (zero upstream lines edited or deleted)",
+    dHunks.length >= 2 && dDeletes === 0, `${dHunks.length} D hunks, +${dAdds} / -${dDeletes}`);
 } catch (e) {
-  ok("D's vendor hunks are INSERT-ONLY", false, `git diff unavailable: ${e.message}`);
+  ok("D's still-attributable vendor hunks are INSERT-ONLY", false, `git diff unavailable: ${e.message}`);
 }
 
-// Placement: patch 1 must run BEFORE the refine return expression (the parent
-// texture is disposed inside it); patch 2 must run before the merge return and
+// Placement: patch 6 must run BEFORE the refine return expression (the parent
+// texture is disposed inside it); patch 7 must run before the merge return and
 // must hold _loadState across its await.
 const refineHook = vendored.indexOf('ir && ir.onRefine(this, o, h);');
 const refineRet = vendored.indexOf('return h ? this.unloadSubTiles()');
 ok('patch 6 calls the hook BEFORE the refine return (the parent map is still alive)',
   refineHook > 0 && refineRet > refineHook, `hook@${refineHook} return@${refineRet}`);
-const mergeBlock = vendored.slice(vendored.indexOf('const _w = ir.onMerge(this, o);'), vendored.indexOf('return l ? this.unloadModel()'));
+// R25: the anchor is the CALL, not the identifier the overhaul renamed
+// (`const _w =` -> `const wait =`). Anchoring on an assignment identifier is
+// what made this assertion measure a rename.
+const mergeHookAt = vendored.indexOf('ir.onMerge(this, o)');
+const mergeRetAt = vendored.indexOf('return l ? this.unloadModel()');
+const mergeBlock = mergeHookAt >= 0 && mergeRetAt > mergeHookAt
+  ? vendored.slice(mergeHookAt, mergeRetAt)
+  : '';
 ok('patch 7 holds _loadState at "loading" across its await (freezes the subtree)',
-  /_loadState = "loading";[\s\S]*await _w;[\s\S]*_loadState = "loaded";/.test(mergeBlock));
-ok('patch 7 runs before the merge return expression', mergeBlock.length > 0 && mergeBlock.length < 800);
+  /_loadState = "loading";[\s\S]*await (?:_w|wait);[\s\S]*_loadState = "loaded";/.test(mergeBlock),
+  mergeBlock ? `${mergeBlock.length} chars between hook and return` : 'merge block not located');
+ok('patch 7 runs before the merge return expression', mergeBlock.length > 0 && mergeBlock.length < 1400,
+  `${mergeBlock.length} chars`);
+// NEW (R25, and it is not a re-baseline — it is coverage the overhaul created).
+// Patch 7a re-evaluates the LOD verdict AFTER the blend await, so a merge the
+// fade was already running can now be CANCELLED. The overhaul added
+// `onMergeEnd` to lod-crossfade.js in the same change to release those blends.
+// LOD_CROSSFADE ships ON, so this path is live and previously ungated.
+ok('patch 7a releases the blend before it can cancel the merge (onMergeEnd on the success path)',
+  /_loadState = "loaded";\s*\n\s*ir\.onMergeEnd\?\.\(this, o\);/.test(vendored));
+ok('patch 7a releases the blend on the REJECT path too (onMergeEnd in the catch)',
+  /ir\?\.onMergeEnd\?\.\(this, m\);/.test(vendored));
+const crossfadeSrc = fs.readFileSync(path.join(ROOT, 'lib/fly/lod-crossfade.js'), 'utf8');
+ok('the app side implements the hook the library now calls (a `?.` no-op would leak the blend)',
+  /export const lodFadeHook = \{ onRefine, onMerge, onMergeEnd \};/.test(crossfadeSrc) &&
+  /function onMergeEnd\(/.test(crossfadeSrc));
 ok('the hook holder defaults to null (the off-state)', /let ir = null;/.test(vendored));
-ok('the library reads the hook nowhere else',
-  (vendored.match(/\bir\b(?!\s*=\s*null)/g) ?? []).filter((x) => x).length > 0 &&
-  vendored.split('\n').filter((l) => /[^/\s]\s*\bir\b/.test(l) && !l.trim().startsWith('//')).length === 4,
-  `${vendored.split('\n').filter((l) => /[^/\s]\s*\bir\b/.test(l) && !l.trim().startsWith('//')).length} code lines mention it`);
+// R25: the ORIGINAL form of this assertion counted CODE LINES mentioning `ir`
+// and froze the number at 4. That number survived the overhaul by luck — the
+// two new `onMergeEnd` calls each begin their line, so the "preceded by a
+// non-space" regex never saw them. A line census is the wrong instrument for
+// "the library reads the hook nowhere else"; the METHOD SET is the right one,
+// and it goes red the moment the library starts calling something the app's
+// hook object does not implement.
+const hookCalls = [...vendored.matchAll(/\bir\??(?:\.|\?\.)(\w+)/g)].map((m) => m[1]);
+const hookMethods = [...new Set(hookCalls)].sort();
+ok('the library calls EXACTLY the three hook methods the app implements',
+  hookMethods.join(',') === 'onMerge,onMergeEnd,onRefine',
+  `calls=[${hookMethods.join(', ')}] (${hookCalls.length} call sites)`);
 
 // ---------------------------------------------------------------------------
 console.log('\n[2] the map-chunk surgery is version-proof');
