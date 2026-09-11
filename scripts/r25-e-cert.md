@@ -301,6 +301,44 @@ there.
 
 ---
 
+## §2e. A FIFTH defect — and I fell into it myself, with the gate green
+
+`scripts/_fixture.js` installs a write redirect under `FLY_TILE_FIXTURE`: every
+write landing DIRECTLY in `scripts/` is rewritten to
+`scripts/r24-out/fixture-<name>`, so a fixture run can never overwrite a
+tracked calibration artifact. Its own comment states the reach precisely:
+*"every gate that requires `_boot.js`"*.
+
+**The mobile fleet does not require `_boot.js`. It requires `_mobile-boot.js`.**
+So `verify-mobile`, `verify-mobile-layout`, `verify-hangar`, `verify-logbook`
+and `verify-sat-mobile` were outside the defence entirely. Four runs this
+afternoon rewrote **fourteen tracked `scripts/mobile-*.png` baselines in
+place**, and I committed them without noticing — because
+`verify-artifact-hygiene`'s `PATTERNS` glob covers `scripts/r1*-*` and
+`scripts/r2[0-4]-*` and not those names. **The gate was green the whole time.**
+
+Closed in both halves, in the shape the gate's own header argues for:
+
+| | |
+|---|---|
+| MECHANISM | `scripts/_mobile-boot.js` requires `./_fixture` for the side effect. **Proven:** a `writeFileSync` aimed at `scripts/mobile-v-01-hud.png` leaves the tracked file at **1 577 680 bytes** and lands the payload in `scripts/r24-out/fixture-mobile-v-01-hud.png`. It installs nothing when `FLY_TILE_FIXTURE` is unset, so the user's machine is unaffected |
+| OUTCOME | `PATTERNS` gains `scripts/mobile-*.png`, `scripts/hangar-*.png`, `scripts/logbook-*.png`. **RED-calibrated:** appending three bytes to `scripts/mobile-v-04-look.png` turns (1) AND (4) red together; restored, 7/7 |
+| REPAIR | the 14 PNGs restored to their `f0cd81e` content with `git checkout` |
+
+**The lesson.** A defence that names the module it protects — *"every gate that
+requires `_boot.js`"* — has told you exactly where its edge is, and nobody had
+asked which gates were on the other side of it. An outcome check only closes
+the hole its glob can see.
+
+**Follow-up, NOT taken (it is a behaviour change, not hygiene):** the mobile
+fleet also does not `attachFixture`, so it boots against egress-blocked hosts
+and both orientations report `zero pageerrors — Failed to fetch`. Attaching the
+fixture would give those gates a real world — and would change what they
+measure. That is a decision for the orchestrator, not a hygiene fix E makes
+mid-round.
+
+---
+
 ## §3 What E built this round
 
 ### 3.1 `scripts/_mobile-boot.js` — `openFan` / `closeFan` / `hasFan`

@@ -259,7 +259,18 @@ FLY_URL=http://localhost:3019 node scripts/<gate>
 3. **`verify-registry-inventory` ships with an 11-key BASELINE_GAP.** E owns
    `scripts/`, not `world-bend.js`, so the pre-existing unregistered keys are
    named and frozen rather than fixed. Owner: the registry header's owner.
-4. *(more as they happen)*
+4. **The mobile fleet was outside the artifact redirect.** `scripts/_fixture.js`
+   installs its write redirect for every gate that requires `_boot.js`; the five
+   mobile gates require `_mobile-boot.js` instead, so four runs rewrote fourteen
+   tracked `scripts/mobile-*.png` baselines in place while
+   `verify-artifact-hygiene` stayed green. Restored; closed in both halves
+   (`_mobile-boot.js` now requires `_fixture`, and PATTERNS gained the three
+   mobile globs, RED-calibrated). `scripts/r25-e-cert.md` §2e.
+5. **The dev server gets reaped under load** — twice on :3134 mid-harness, and
+   the harness then reports `ERR_CONNECTION_REFUSED`, which reads like a broken
+   tree and is not one. A supervisor loop (`scripts/r25-out/devwatch.sh`,
+   gitignored) restarts it. Check a dev log's tail before believing such a row.
+6. *(more as they happen)*
 
 ---
 
