@@ -270,7 +270,13 @@ FLY_URL=http://localhost:3019 node scripts/<gate>
    the harness then reports `ERR_CONNECTION_REFUSED`, which reads like a broken
    tree and is not one. A supervisor loop (`scripts/r25-out/devwatch.sh`,
    gitignored) restarts it. Check a dev log's tail before believing such a row.
-6. *(more as they happen)*
+6. **E killed four other agents' dev servers during its own teardown** — two
+   over-broad `pkill -f` patterns (`next-server`, and a `devwatch.sh` path that
+   is identical in every worktree). :3131 / :3132 / :3133 / :3135 went to 000;
+   :3130 survived. No files were touched, only running processes; a restart
+   attempt was refused by policy as interference, so B, C, D and F must restart
+   their own. `scripts/r25-e-cert.md` §5.4.
+7. *(more as they happen)*
 
 ---
 
