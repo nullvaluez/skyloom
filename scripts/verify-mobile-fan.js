@@ -101,13 +101,13 @@ async function touch(page, selector, type) {
  * moves. No-ops (and returns false) when there is no FAB, so the flag-off leg
  * can call them without special-casing.
  */
-async function openFan(page, settleMs = 700) {
+async function openFan(page) {
   if ((await page.locator('[data-testid="touch-fab"]').count()) === 0) return false;
   const open = await page.evaluate(
     () => document.querySelector('[data-testid="touch-fan"]')?.dataset.open === '1'
   );
   if (!open) await touch(page, '[data-testid="touch-fab"]', 'pointerdown');
-  await page.waitForTimeout(settleMs);
+  await settleFan(page);
   return true;
 }
 async function closeFan(page) {
@@ -116,8 +116,62 @@ async function closeFan(page) {
     () => document.querySelector('[data-testid="touch-fan"]')?.dataset.open === '1'
   );
   if (open) await touch(page, '[data-testid="touch-fab"]', 'pointerdown');
-  await page.waitForTimeout(500);
+  await gone(page);
   return true;
+}
+
+/** The petals' rects, as one string — the quiescence reader. */
+const petalSig = (page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('[data-testid="touch-fan"] [data-testid^="touch-"]')]
+      .map((el) => {
+        const b = el.getBoundingClientRect();
+        return `${el.dataset.testid}:${Math.round(b.x)},${Math.round(b.y)},${Math.round(b.width)}`;
+      })
+      .join('|')
+  );
+
+/**
+ * WAIT FOR QUIESCENCE, never for a clock — and make the quiet window longer
+ * than a FRAME, which took two goes to get right.
+ *
+ * MEASURED here: the open spring is still at its initial value 1 s after the
+ * tap and fully settled by 2 s. On SwiftShader at 1-3 fps framer-motion's
+ * rAF-driven spring gets one to three updates a SECOND, so a 400 ms animation
+ * takes seconds of wall clock. Version 1 of this gate slept 700 ms and read a
+ * petal at `scale(0.6)` sitting on the FAB — "every petal is < 44 px", "every
+ * petal is Δ168 px off its slot". Version 2 polled for TWO agreeing reads
+ * 600 ms apart and still reported Δ130.8 / Δ154.4: at ~1 fps two reads 600 ms
+ * apart can land inside ONE rendered frame, so "nothing changed" meant "the
+ * page has not painted since I last looked", not "the animation is over".
+ * Three agreeing reads 900 ms apart span 2.7 s — longer than any frame this
+ * venue produces — and the same condition is instant on a 120 Hz phone.
+ * Returns the settle time in ms (0 = never settled), which is reported.
+ */
+async function settleFan(page, { timeoutMs = 40000, quietMs = 900, stableReads = 3 } = {}) {
+  let prev = await petalSig(page);
+  let same = 0;
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeoutMs) {
+    await page.waitForTimeout(quietMs);
+    const cur = await petalSig(page);
+    same = cur === prev && cur !== '' ? same + 1 : 0;
+    prev = cur;
+    if (same >= stableReads) return Date.now() - t0;
+  }
+  return 0;
+}
+
+/** Wait for the collapse to actually REMOVE the petals (AnimatePresence exit). */
+async function gone(page, timeoutMs = 25000) {
+  return page
+    .waitForFunction(
+      () => document.querySelectorAll('[data-testid="touch-fan"] [data-testid^="touch-"]').length === 0,
+      null,
+      { timeout: timeoutMs }
+    )
+    .then(() => true)
+    .catch(() => false);
 }
 
 /** Every box the fan has to coexist with, plus the petals, in one read. */
@@ -256,7 +310,9 @@ async function runOrientation(browser, label, ctxOpts) {
   await shot('01-closed');
 
   // --- 2. OPEN -------------------------------------------------------------
+  const openedAt = Date.now();
   const opened = await openFan(page);
+  const settleMs = Date.now() - openedAt;
   if (!opened) {
     skip(`${label} open gates`, 'no touch-fab in the DOM (flag off / RED calibration)');
   }
@@ -312,9 +368,10 @@ async function runOrientation(browser, label, ctxOpts) {
     gate(
       `${label} open: every petal is within 2 px of its published arc slot`,
       off.length === 0,
-      off.length
+      (off.length
         ? off.join(' | ')
-        : geo.petals.map((p) => `${p.testid}@${p.deg}°r${p.ring}`).join(' ')
+        : geo.petals.map((p) => `${p.testid}@${p.deg}°r${p.ring}`).join(' ')) +
+        `  [the fan settled ${settleMs} ms of WALL CLOCK after the tap on SwiftShader — not an animation duration]`
     );
     gate(
       `${label} open: ring 1 = radiusPx, ring 2 = radiusPx + petalPx + ringGapPx`,
@@ -378,12 +435,12 @@ async function runOrientation(browser, label, ctxOpts) {
   if (opened) {
     await touch(page, '[data-testid="touch-joystick"]', 'pointerdown');
     await touch(page, '[data-testid="touch-joystick"]', 'pointerup');
-    await page.waitForTimeout(600);
+    const removed = await gone(page);
     const afterOutside = await census(page);
     gate(
       `${label} a tap outside closes the fan`,
-      afterOutside.fanOpenAttr === '0' && Object.keys(afterOutside.petals).length === 0,
-      `data-open=${afterOutside.fanOpenAttr} petals=${Object.keys(afterOutside.petals).length}`
+      removed && afterOutside.fanOpenAttr === '0' && Object.keys(afterOutside.petals).length === 0,
+      `data-open=${afterOutside.fanOpenAttr} petals=${Object.keys(afterOutside.petals).length} removedWithinCap=${removed}`
     );
     gate(
       `${label} closing restores the info dock and the toasts`,
@@ -492,7 +549,7 @@ async function runOrientation(browser, label, ctxOpts) {
     await touch(page, '[data-testid="touch-fab"]', 'pointerdown');
     await page.waitForTimeout(SETTLE);
     const springEarly = await census(page);
-    await page.waitForTimeout(900);
+    await settleFan(page);
     const springLate = await census(page);
     await closeFan(page);
 
@@ -500,7 +557,7 @@ async function runOrientation(browser, label, ctxOpts) {
     await touch(page, '[data-testid="touch-fab"]', 'pointerdown');
     await page.waitForTimeout(SETTLE);
     const reducedEarly = await census(page);
-    await page.waitForTimeout(900);
+    await settleFan(page);
     const reducedLate = await census(page);
     const drift = (a, b) =>
       PERSISTENT_TESTIDS.filter((id) => a.petals[id] && b.petals[id]).map((id) =>
@@ -521,6 +578,101 @@ async function runOrientation(browser, label, ctxOpts) {
   } else {
     skip(`${label} reduced motion: petals are at their final positions on the first frame`, 'no FAB');
   }
+
+  // --- 7b. THE DOCK, WITH A REAL CHIP ON SCREEN ----------------------------
+  // `hideWhileOpen` and `dockBottomRem` are both claims ABOUT THE INFO CHIP,
+  // and the resting HUD has no chip in it at all — measuring either one on an
+  // idle screen is the R17 lesson ("a pixel-probe gate must not contain an
+  // actor it doesn't control") turned inside out: a gate that passes because
+  // the actor is absent. So put a real chip up first. Fixture copied from
+  // verify-mobile-layout.js:246-286, including the reasons: NO `fix1` (the
+  // tracer skips items without one, and a track that HAS one is dead-reckoned
+  // into a NaN altitude and throws every frame), and the targeting scanner is
+  // FROZEN for the duration so the card cannot flicker at 5 Hz under us.
+  await page.evaluate(() => {
+    const hex = 'a0beef';
+    const rt = window.__fly;
+    const f = rt.flight;
+    const track = {
+      hex,
+      meta: { flight: 'TEST123', r: 'N123TS', t: 'B738', color: '#4ade80' },
+      rx: f.pos.x, ry: f.pos.y, ryd: f.pos.y, rz: f.pos.z - 100,
+      yaw: 0,
+      distM: 1200,
+      stale: 0,
+      horizonFade: 1,
+    };
+    rt.targeting.update = () => null;
+    rt.targeting.lockedHex = hex;
+    rt.targeting.target = track;
+    rt.traffic.tracks.set(hex, track);
+    const items = rt.traffic.items;
+    if (!items.some((x) => x.hex === hex)) items.push(track);
+    window.__fanFixture = setInterval(() => rt.traffic.tracks.set(hex, track), 100);
+  });
+  await page.waitForSelector('[data-testid="infocard-chip"]', { timeout: 8000 }).catch(() => {});
+  await page.waitForTimeout(400);
+  const chipClosed = await page.evaluate(() => {
+    const q = (s2) => {
+      const el = document.querySelector(s2);
+      if (!el) return null;
+      const b = el.getBoundingClientRect();
+      return { x: Math.round(b.x), y: Math.round(b.y), right: Math.round(b.right), bottom: Math.round(b.bottom) };
+    };
+    return {
+      chip: q('[data-testid="infocard-chip"]'),
+      fab: q('[data-testid="touch-fab"]'),
+      throttle: q('[data-testid="touch-throttle"]'),
+      boost: q('[data-testid="touch-boost"]'),
+      stick: q('[data-testid="touch-joystick"]'),
+      vh: 844,
+    };
+  });
+  if (!chipClosed.chip) {
+    skip(`${label} the info chip clears the shorter column`, 'no chip (empty sky / fixture did not take)');
+  } else {
+    const column = [
+      ['touch-fab', chipClosed.fab],
+      ['touch-throttle', chipClosed.throttle],
+      ['touch-boost', chipClosed.boost],
+      ['touch-joystick', chipClosed.stick],
+    ].filter(([, b]) => b);
+    const chipClash = column.filter(([, b]) => hit(chipClosed.chip, b)).map(([n]) => n);
+    gate(
+      `${label} the info chip clears the ${ARM ? 'FAN' : 'row'} column (dockBottomRem)`,
+      chipClash.length === 0 && column.length >= 3,
+      `chip [${chipClosed.chip.x},${chipClosed.chip.y}–${chipClosed.chip.right},${chipClosed.chip.bottom}] vs ` +
+        column.map(([n, b]) => `${n} top ${b.y}`).join(' · ') +
+        (chipClash.length ? ` · CLASH ${chipClash.join(', ')}` : '')
+    );
+  }
+  if (opened) {
+    await openFan(page);
+    const chipOpen = await census(page);
+    gate(
+      `${label} open: hideWhileOpen hides a chip that is REALLY there`,
+      chipOpen.rootFanOpen === '1' &&
+        !!chipOpen.infoDock &&
+        chipOpen.infoDock.visible === false,
+      `data-fan-open=${chipOpen.rootFanOpen} info-dock=${chipOpen.infoDock ? (chipOpen.infoDock.visible ? 'VISIBLE' : 'hidden') : 'STILL NOT MOUNTED'}`
+    );
+    await shot('04-open-with-chip');
+    await closeFan(page);
+  } else {
+    skip(`${label} open: hideWhileOpen hides a chip that is REALLY there`, 'no FAB');
+  }
+  await page.evaluate(() => {
+    clearInterval(window.__fanFixture);
+    const rt = window.__fly;
+    delete rt.targeting.update;
+    rt.targeting.lockedHex = null;
+    rt.targeting.target = null;
+    const i = rt.traffic.items.findIndex((x) => x.hex === 'a0beef');
+    if (i >= 0) rt.traffic.items.splice(i, 1);
+    rt.traffic.tracks.delete('a0beef');
+    window.__flyStore.getState().setInfoCardHex(null);
+  });
+  await page.waitForTimeout(400);
 
   // --- 8. THE DOCK STRING --------------------------------------------------
   const handle = (await census(page)).handle;
