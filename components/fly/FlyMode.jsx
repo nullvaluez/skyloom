@@ -19,7 +19,7 @@ import { Atlas } from './hud/Atlas';
 import { Logbook } from './hud/Logbook';
 import { HangarPanel } from './hud/HangarPanel';
 import { ArrivalBanner } from './hud/ArrivalBanner';
-import { TouchControls } from './hud/TouchControls';
+import { TouchControls, useFanOpen } from './hud/TouchControls';
 import { PhotoModeBar } from './hud/PhotoModeBar';
 import { CrashFlash } from './CrashFlash';
 import { JuiceHud } from './hud/JuiceHud';
@@ -236,6 +236,12 @@ export function FlyMode({ onClose }) {
 
   // Small non-touch window heads-up: flying wants room. Touch devices get the
   // on-screen controls instead of a "use a desktop" nudge, so skip it there.
+  // ROUND 25 (D MOBILE): is the touch fan open? ONE module signal, read here
+  // and stamped as ONE attribute below — globals.css keys the `hideWhileOpen`
+  // zones off it. With MOBILE_FAN_R25 off the signal is permanently false and
+  // the attribute is never rendered at all, so the root's markup is unchanged.
+  const fanOpen = useFanOpen();
+
   const [mobileNote, setMobileNote] = useState(false);
   useEffect(() => {
     const coarse = window.matchMedia?.('(pointer: coarse)').matches;
@@ -265,6 +271,9 @@ export function FlyMode({ onClose }) {
       data-fly-root=""
       data-device={deviceAttr(device)}
       data-orient={device.orientation}
+      // R25 (D MOBILE): `undefined`, not `"0"` — React omits an undefined
+      // attribute entirely, so the flag-off root is byte-for-byte the R24 one.
+      data-fan-open={fanOpen ? '1' : undefined}
     >
       <FlyErrorBoundary onExit={onClose}>
         {spawn && <FlyCanvas runtime={runtimeRef.current} />}

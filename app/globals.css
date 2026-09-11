@@ -741,6 +741,35 @@
   -webkit-backdrop-filter: none;
 }
 
+/* ROUND 25 (D MOBILE) - the touch fan's `hideWhileOpen` contract.
+
+   The fan opens across the middle of the screen, and in LANDSCAPE the 180 deg
+   petal lands exactly on the info-dock chip (measured: petal [484,292-528,336]
+   against a chip at [252,302-592,350] on 844x390). Two transient, read-only
+   surfaces yield to it for as long as it is open - the info chip and the toast
+   stack - and nothing else does: the minimap, the contracts chip, the
+   thumbstick, the throttle rail and the BOOST pad all stay visible, because
+   they are either flight controls or the reason you opened the menu.
+
+   VISIBILITY, NOT DISPLAY, and that is the same reasoning FlyMode's HudGroup
+   uses for photo mode: `display:none` would unmount nothing but would collapse
+   the toast stack's layout, and SpotToast's queue is timing state that must
+   keep running while a menu is up. `visibility:hidden` also drops both zones
+   out of verify-mobile-layout's census by construction (its `visible()` reads
+   computed visibility), so the fan-open disjointness pass measures what is
+   actually on screen.
+
+   The selector pair mirrors `MOBILE_FAN_R25.hideWhileOpen` - verify-mobile-fan
+   asserts the array still reads exactly ['info-dock','toasts'], because a CSS
+   file cannot read a JS constant and the two would otherwise drift in silence.
+   `data-fan-open` is only ever stamped by FlyMode when the fan is open, so
+   with the flag off not one of these rules can match. */
+[data-fly-root][data-fan-open='1'] [data-zone='info-dock'],
+[data-fly-root][data-fan-open='1'] [data-zone='toasts'] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* Fluid display type for the full-bleed banners (boot wordmark, arrival
    banner, warp label). Each clamp's UPPER bound is today's desktop size and
    the slope is chosen so the clamp is already saturated well below any

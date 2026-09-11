@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import dynamic from 'next/dynamic';
 import {
   BookOpen,
   Camera,
@@ -9,14 +10,33 @@ import {
   Info,
   Map as MapIcon,
   Pause,
+  Plane,
   Video,
   Zap,
 } from 'lucide-react';
 import { Zone } from '@/components/fly/LayoutRoot';
-import { MOBILE_UI } from '@/lib/fly/fly-constants';
+import { HANGAR, MOBILE_UI } from '@/lib/fly/fly-constants';
+import { r25Block, r25On } from '@/lib/fly/r25-pins';
+import { readReducedMotion } from '@/lib/fly/immersive';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { useOverlayBack } from '@/hooks/use-overlay-back';
 import { useFlyStore } from '@/stores/fly-store';
+
+/**
+ * ROUND 25 (D MOBILE) — the fan is LAZY, and that is the one-flag revert.
+ *
+ * `MOBILE_FAN_R25.enabled:false` must leave this component rendering exactly
+ * the rows it rendered before the round, and "exactly" is meant literally: the
+ * module is never fetched, never evaluated, and contributes nothing to the
+ * frame. A static import would evaluate TouchFan (and re-enter framer-motion's
+ * presence machinery) on every touch boot, armed or not, which is a cost the
+ * flag-off tree has not agreed to pay. `dynamic()` here costs one chunk fetch
+ * on the boot that actually renders a FAB.
+ */
+const TouchFan = dynamic(() => import('@/components/fly/hud/TouchFan'), {
+  ssr: false,
+  loading: () => null,
+});
 
 /**
  * On-screen flight controls for touch devices (mobile / tablet). Desktop
@@ -85,13 +105,50 @@ const CLUSTER_ICON = {
   logbook: BookOpen,
   photo: Camera,
   pause: Pause,
+  hangar: Plane, // R25: the hangar picks your AIRCRAFT — a building glyph
+  //               (lucide's Warehouse) names the room, not the choice.
   inspect: Info,
   intercept: Crosshair,
   cinema: Video,
 };
 
-const PERSISTENT = MOBILE_UI.cluster.filter((c) => !c.contextual);
+// `fanOnly` entries (R25's `hangar`) are petals and ONLY petals: the row is
+// the flag-off surface and it has to stay byte-for-byte what it was.
+const PERSISTENT = MOBILE_UI.cluster.filter((c) => !c.contextual && !c.fanOnly);
 const CONTEXTUAL = MOBILE_UI.cluster.filter((c) => c.contextual);
+const BY_ID = new Map(MOBILE_UI.cluster.map((c) => [c.id, c]));
+
+/**
+ * ROUND 25 (D MOBILE) — "is the fan open", published as a module signal.
+ *
+ * FlyMode stamps `data-fan-open="1"` on the fly root from this, and
+ * globals.css hides the zones in `MOBILE_FAN_R25.hideWhileOpen` off that one
+ * attribute. A module signal rather than a store field on purpose: this is
+ * transient HUD chrome state that nothing else in the game may read, react to
+ * or persist, and `stores/fly-store.js` is the save-and-restore surface. It is
+ * also, deliberately, ONE attribute — a component-by-component `hidden` prop
+ * would have put the fan's business inside four other overlays.
+ */
+let fanOpenValue = false;
+const fanOpenSubs = new Set();
+function publishFanOpen(next) {
+  if (next === fanOpenValue) return;
+  fanOpenValue = next;
+  for (const fn of fanOpenSubs) fn();
+}
+function subscribeFanOpen(fn) {
+  fanOpenSubs.add(fn);
+  return () => fanOpenSubs.delete(fn);
+}
+
+/** Reactive read of the fan's open state. Always false with the flag off. */
+export function useFanOpen() {
+  return useSyncExternalStore(
+    subscribeFanOpen,
+    () => fanOpenValue,
+    () => false // server/first paint: never stamp the attribute during SSR
+  );
+}
 
 /** Dev-only telemetry so the harness can prove WHICH action a tap fired. */
 function stampPress(key) {
@@ -307,7 +364,7 @@ function BoostPad({ runtime, held, setHeld }) {
  * inline would have won against the class and handed phones a 22%-alpha button
  * with no backdrop blur behind it — i.e. an unreadable one.
  */
-function ActionButton({ testid, label, active, size = buttonPx, onTap, children }) {
+export function ActionButton({ testid, label, active, size = buttonPx, onTap, children }) {
   return (
     <button
       type="button"
@@ -337,7 +394,7 @@ function ActionButton({ testid, label, active, size = buttonPx, onTap, children 
   );
 }
 
-function Glyph({ id, size }) {
+export function Glyph({ id, size }) {
   const Icon = CLUSTER_ICON[id];
   return Icon ? <Icon style={{ width: size, height: size }} aria-hidden="true" /> : null;
 }
@@ -410,6 +467,54 @@ export function TouchControls({ runtime }) {
   }, [covered, runtime]);
   useEffect(() => () => runtime?.input?.setBoost(false), [runtime]);
 
+  // ---- ROUND 25 (D MOBILE): the fan -------------------------------------
+  // Every hook here is UNCONDITIONAL and sits ABOVE the `covered` early
+  // return, which is the rule `useOverlayBack` is already obeying two screens
+  // up: a hook that stops being called when an overlay opens is a hook order
+  // violation, and this component returns null a dozen times a session.
+  const fanOn = r25On('MobileFan');
+  const fanCfg = r25Block('MobileFan');
+  const [fanOpen, setFanOpen] = useState(false);
+
+  // `covered` ALREADY unmounts this component (`return null` below), so the
+  // petals are gone the instant an overlay opens — but `fanOpen` is state on
+  // the component that survives, so without this the fan would be waiting,
+  // open, behind the Atlas. Reset rather than remember: a menu that reopens
+  // itself when you close a map is a bug you cannot explain to anyone.
+  useEffect(() => {
+    if (covered && fanCfg.closeOnCover !== false) setFanOpen(false);
+  }, [covered, fanCfg.closeOnCover]);
+
+  // ONE attribute on the fly root, off ONE signal (see `useFanOpen`). Gated on
+  // `fanOn` so the flag-off tree can never stamp it, and cleared on unmount so
+  // an exit mid-fan cannot leave the info dock and the toasts hidden forever.
+  const fanVisible = fanOn && fanOpen && !covered;
+  useEffect(() => {
+    publishFanOpen(fanVisible);
+  }, [fanVisible]);
+  useEffect(() => () => publishFanOpen(false), []);
+
+  // DEV HANDLE (the `window.__flyZones` idiom). `window.__flyMobileFan` is how
+  // E CERT's gates and the user's console read the fan without importing a
+  // constant or guessing at a class name: it carries the armed state, the
+  // resolved DOCK strings (so a gate can assert the flag-off literal is
+  // character-identical without a build step) and the clusterSize MIRROR (so
+  // the mirror cannot drift from MOBILE_FAN_R25 unseen). TouchFan appends
+  // `.geometry` — the intended petal positions — when it mounts.
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development' || typeof window === 'undefined') return;
+    const h = (window.__flyMobileFan ??= {});
+    h.enabled = fanOn;
+    h.open = fanVisible;
+    h.orientation = orientation;
+    h.cfg = fanCfg;
+    h.dock = {
+      phonePort: MOBILE_UI.zones['info-dock'].phonePort,
+      dockBottomRem: MOBILE_UI.infoChip.dockBottomRem,
+    };
+    h.clusterSize = MOBILE_UI.clusterSize;
+  }, [fanOn, fanVisible, orientation, fanCfg]);
+
   if (covered) return null;
 
   const toggleLook = () => {
@@ -444,6 +549,13 @@ export function TouchControls({ runtime }) {
     },
     intercept: () => press('f'),
     cinema: () => press('c'),
+    // ROUND 25: the hangar's SECOND door. PauseMenu.jsx:201-211 is the first
+    // and, until this petal, the only one — it takes the same two store
+    // transitions, minus the pause (we are not paused; the fan is).
+    hangar: () => {
+      useFlyStore.getState().setHangarOpen(true);
+      stampPress('hangar');
+    },
   };
 
   const locked = !!lockedHex && lockState !== 'none';
@@ -474,6 +586,53 @@ export function TouchControls({ runtime }) {
     </>
   );
 
+  // ROUND 25 (D MOBILE) — the petal set, built from the SAME `MOBILE_UI.cluster`
+  // metadata, the SAME `TAP` handlers and the SAME `shows`/`actives` rules the
+  // rows use. Nothing about what a button DOES lives in the fan; it owns
+  // placement and nothing else, so a touch Atlas and a fan Atlas cannot drift.
+  // `MOBILE_FAN_R25.order` is the petal order contract (the rows keep
+  // `MOBILE_UI.cluster`'s), and `hangar` drops out if HANGAR is ever disabled —
+  // PauseMenu.jsx:201 already refuses to show a door into a room that is shut.
+  const fanPetals = fanOn
+    ? [
+        ...fanCfg.order
+          .filter((id) => (id === 'hangar' ? HANGAR.enabled : true))
+          .map((id) => BY_ID.get(id))
+          .filter(Boolean)
+          .map((c) => ({
+            id: c.id,
+            testid: c.testid,
+            label: c.label,
+            active: c.id === 'look' ? lookActive : false,
+            onTap: TAP[c.id],
+            contextual: false,
+          })),
+        ...fanCfg.contextual
+          .filter((id) => shows[id])
+          .map((id) => BY_ID.get(id))
+          .filter(Boolean)
+          .map((c) => ({
+            id: c.id,
+            testid: c.testid,
+            label: c.label,
+            active: actives[c.id],
+            onTap: TAP[c.id],
+            contextual: true,
+          })),
+      ]
+    : [];
+
+  const fanEl = fanOn ? (
+    <TouchFan
+      cfg={fanCfg}
+      orientation={orientation}
+      open={fanOpen}
+      setOpen={setFanOpen}
+      petals={fanPetals}
+      reducedMotion={readReducedMotion()}
+    />
+  ) : null;
+
   return (
     <>
       <Zone name="controls-left">
@@ -481,6 +640,17 @@ export function TouchControls({ runtime }) {
       </Zone>
 
       <Zone name="controls-right" className={`flex flex-col items-end ${stackGap}`}>
+        {/* ROUND 25: with the fan armed the FAB stands exactly where the
+            persistent row stood — top of the column in PORTRAIT, and in
+            LANDSCAPE beside the throttle+boost row (that row is `items-end`
+            `flex-row-reverse`, so a third member lands to the LEFT of the
+            boost pad and the fan opens up-left across the empty middle of a
+            844x390 screen). Both contextual rows are gone with it: their
+            actions are petals now, on the second ring. */}
+        {fanOn ? (
+          !land && fanEl
+        ) : (
+          <>
         {/* Integration (Fable): in LANDSCAPE the contextual row rides IN the
             persistent row instead of stacking above it — a stacked row pushed
             the column top to ~y42 on a 390px-tall screen, straight into the
@@ -533,9 +703,14 @@ export function TouchControls({ runtime }) {
             </ActionButton>
           ))}
         </div>
+          </>
+        )}
 
         {land ? (
-          <div className={`flex flex-row-reverse items-end ${rowGap}`}>{throttleGroup}</div>
+          <div className={`flex flex-row-reverse items-end ${rowGap}`}>
+            {throttleGroup}
+            {fanEl}
+          </div>
         ) : (
           throttleGroup
         )}
