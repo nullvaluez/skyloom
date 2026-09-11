@@ -59,6 +59,12 @@ const { makeCanvasShot } = require('./_canvasshot');
 
 const BOOT_OPTS = process.env.FLY_URL ? { url: process.env.FLY_URL } : {};
 const SCALE = Math.max(1, Number(process.env.FLY_BOOT_SCALE || 1));
+// The BOOT scale and the SETTLE scale are different quantities and were one
+// number for two runs too long. Boot has to survive a 1-3 fps cold start under
+// six agents; a pose settle only has to outlast the 2 s placement cadence and
+// the tint's static skip. Splitting them cut this gate from ~19 min to ~9
+// without weakening a single assertion (FLY_GD_SETTLE, default = FLY_BOOT_SCALE).
+const GS = Math.max(1, Number(process.env.FLY_GD_SETTLE || SCALE));
 const OUT = path.join(__dirname, 'r25-out');
 require('fs').mkdirSync(OUT, { recursive: true });
 
@@ -179,6 +185,21 @@ function meanAbsDelta(a, b) {
     console.log(`NOTE ${name} — ${detail}`);
     notes.push(`${name}: ${detail}`);
   };
+  /**
+   * Run one leg GROUP and never let it kill the run. §7.1's lesson is that a
+   * gate which dies mid-run produces a summary row indistinguishable from a
+   * gate that passed nothing — so a group that throws is recorded as an
+   * explicit failure with its error, and the remaining groups still run and
+   * still report. This is not leniency: `died` counts as a FAIL.
+   */
+  const group = async (name, fn) => {
+    try {
+      return await fn();
+    } catch (e) {
+      gate(`${name} [the leg group DIED]`, false, String(e?.message ?? e).slice(0, 200));
+      return null;
+    }
+  };
 
   // Tier high BEFORE the app mounts: SatGroundDetailLayer resolves its pools as
   // a STATIC gate at mount and a later PerformanceMonitor step cannot move them
@@ -248,7 +269,7 @@ function meanAbsDelta(a, b) {
       window.__flySunOverride = t; // BEFORE the warp: warpEpoch re-runs the day cycle
     }, NOON_MS);
     await page.evaluate(pinPose, [...pose, agl]);
-    await page.waitForTimeout(ms * SCALE);
+    await page.waitForTimeout(ms * GS);
     await page.mouse.move(800, 450);
     return read();
   };
@@ -259,271 +280,282 @@ function meanAbsDelta(a, b) {
     return cropStats(path.join(OUT, n));
   };
 
-  // =========================================================================
-  // (1) THE SIGNAL
-  // =========================================================================
-  let r = await fly(POWELL, 80);
-  console.log(
-    `  Powell 80 m: agl=${r.agl} bubble=${JSON.stringify(r.bubble)} gd=${JSON.stringify(r.gd)}`
-  );
-  gate(
-    '(1a) the bubble rig is publishing runtime.groundBubble',
-    ARM ? !!r.bubble : r.bubble === null,
-    ARM ? JSON.stringify(r.bubble) : 'flag off ⇒ the rig is unmounted and readers see 0'
-  );
-  const kOf = (x) => (x.bubble ? `k=${x.bubble.k.toFixed(4)} at aglVis ${Math.round(x.bubble.aglVisM)} m` : 'no runtime.groundBubble — the rig is unmounted (flag off)');
-  gate(
-    `(1b) k >= ${K_DECK_MIN} at 80 m AGL`,
-    !!r.bubble && r.bubble.k >= K_DECK_MIN,
-    kOf(r)
-  );
-  const deck = r;
-
-  r = await setAgl(900, 6000 * SCALE);
-  gate(
-    `(1c) k <= ${K_CRUISE_MAX} at 900 m AGL`,
-    !!r.bubble && r.bubble.k <= K_CRUISE_MAX,
-    kOf(r)
-  );
-
-  // THE DEADBAND. The charter's sweep is 480 → 560 → 480; at aglInM 500 BOTH
-  // endpoints sit on the flat top of the ramp (k = 1 at 480 and at the filtered
-  // 500), so that sweep proves NO RATCHET but cannot make the deadband visible
-  // in k. The second sweep straddles the ramp, where it can: with a 60 m band,
-  // 560 → 640 moves the filtered AGL by exactly 20 m (the excess) and 640 → 560
-  // moves it not at all, so the final k must be BELOW the first one and equal
-  // to the filtered-580 target — while a no-deadband implementation returns
-  // exactly to where it started. Both legs are asserted; the second is the one
-  // that can fail.
-  await setAgl(480, 5000 * SCALE);
-  const a1 = await read();
-  const s1 = a1.bubble?.k ?? NaN;
-  await setAgl(560, 5000 * SCALE);
-  await setAgl(480, 5000 * SCALE);
-  const s2 = (await read()).bubble?.k ?? NaN;
-  gate(
-    '(1d) 480 → 560 → 480 does not ratchet (k returns to its start)',
-    Number.isFinite(s1) && Number.isFinite(s2) && Math.abs(s1 - s2) < 1e-3,
-    Number.isFinite(s1)
-      ? `k ${s1.toFixed(4)} → … → ${s2.toFixed(4)}`
-      : 'no runtime.groundBubble — the rig is unmounted (flag off)'
-  );
-  await setAgl(560, 5000 * SCALE);
-  const t1 = (await read()).bubble?.k ?? NaN;
-  await setAgl(640, 5000 * SCALE);
-  await setAgl(560, 5000 * SCALE);
-  const t2 = (await read()).bubble?.k ?? NaN;
-  gate(
-    '(1e) the 60 m INPUT DEADBAND is real: 560 → 640 → 560 does not come back',
-    Number.isFinite(t1) && Number.isFinite(t2) && t2 < t1 - 0.02,
-    Number.isFinite(t1)
-      ? `k ${t1.toFixed(4)} → (640) → ${t2.toFixed(4)}; a no-deadband bubble returns to ${t1.toFixed(4)}`
-      : 'no runtime.groundBubble — the rig is unmounted (flag off)'
-  );
-
-  // =========================================================================
-  // (6) THE BUBBLE CLOSES — measured at cruise before we leave this pose.
-  // =========================================================================
-  r = await setAgl(1066.8, 8000 * SCALE); // 3500 ft
-  gate(
-    '(6a) uGroundDetail === 0 at 3500 ft',
-    (r.gd?.overlay ?? 0) === 0,
-    `overlay=${r.gd?.overlay ?? 'n/a'} k=${(r.bubble?.k ?? 0).toFixed(4)}`
-  );
-  gate(
-    '(6b) both pools are parked at 3500 ft (count 0, visible false)',
-    (r.scrub?.count ?? 0) === 0 &&
-      (r.hedge?.count ?? 0) === 0 &&
-      (r.scrub ? r.scrub.visible === false : true) &&
-      (r.hedge ? r.hedge.visible === false : true),
-    `scrub=${JSON.stringify(r.scrub)} hedge=${JSON.stringify(r.hedge)}`
-  );
-  gate(
-    '(6c) the landcover drape alpha is back at SAT_TINT.alpha at 3500 ft',
-    !ARM || Math.abs((r.gd?.tintAlpha ?? 0) - 0.1) < 1e-6,
-    `tintAlpha=${r.gd?.tintAlpha ?? 'n/a'}`
-  );
-
-  // =========================================================================
-  // (3) THE SUBURB HAS SOMETHING
-  // =========================================================================
-  r = await setAgl(80, 12000 * SCALE);
-  console.log(
-    `  Powell 80 m armed: tintChunks=${r.vegTint} tintVerts=${r.vegTintVerts} ` +
-      `tintPolys=${r.tint?.polys ?? 'n/a'} scrub=${JSON.stringify(r.scrub)} ` +
-      `hedge=${JSON.stringify(r.hedge)} draws=${r.draws} tris=${r.tris} ` +
-      `tintAlpha=${r.gd?.tintAlpha} roads=${JSON.stringify(
-        await page.evaluate(() => window.__flyStats?.groundDetail ?? null)
-      )}`
-  );
-  // PRECONDITIONS FIRST. A zero count with zero landcover in range is the
-  // VENUE having nothing to place on; a zero count with landcover in range is
-  // a defect. An instrument that cannot tell those apart reports a coin, so
-  // both legs state their precondition and read NOT CALIBRATED — never PASS —
-  // when it is unmet (the R24 §7 rule).
-  const areaM2 = r.gd?.scrubAreaM2 ?? 0;
-  const roadCells = (await page.evaluate(() => window.__flyStats?.groundDetail?.roads ?? 0)) | 0;
-  if (!ARM) {
-    note('(3a/3b) flag-off leg', 'the layer is not mounted — this is the RED calibration');
-    gate('(3a) the suburb places SCRUB (count > 0, mesh visible)', false, 'layer not mounted');
-    gate('(3b) the suburb places HEDGES (count > 0, mesh visible)', false, 'layer not mounted');
-  } else if (areaM2 <= 0) {
-    note(
-      '(3a) NOT CALIBRATED',
-      `the fixture has ${areaM2} m² of grass/farmland/wood landcover inside the ` +
-        `${300} m disc at this pose (${r.vegTint} tint chunks / ${r.vegTintVerts} verts in the ` +
-        `whole ring) — the venue has nothing to place on, which is not a statement about the feature`
+  // ONE outer guard so the SUMMARY always prints and the browser always
+  // closes. A run that dies without a summary is the §7.1 failure mode: in a
+  // table it is indistinguishable from a run that passed nothing.
+  try {
+    // =========================================================================
+    // (1) THE SIGNAL
+    // =========================================================================
+    let r = await fly(POWELL, 80);
+    console.log(
+      `  Powell 80 m: agl=${r.agl} bubble=${JSON.stringify(r.bubble)} gd=${JSON.stringify(r.gd)}`
     );
-  } else {
     gate(
-      '(3a) the suburb places SCRUB (count > 0, mesh visible)',
-      (r.scrub?.count ?? 0) > 0 && r.scrub?.visible === true,
-      `${JSON.stringify(r.scrub)} over ${areaM2} m² of in-disc landcover ` +
-        `(${r.vegTint} tint chunks / ${r.vegTintVerts} verts)`
+      '(1a) the bubble rig is publishing runtime.groundBubble',
+      ARM ? !!r.bubble : r.bubble === null,
+      ARM ? JSON.stringify(r.bubble) : 'flag off ⇒ the rig is unmounted and readers see 0'
     );
-  }
-  if (ARM) {
-    if (roadCells <= 0) {
+    const kOf = (x) => (x.bubble ? `k=${x.bubble.k.toFixed(4)} at aglVis ${Math.round(x.bubble.aglVisM)} m` : 'no runtime.groundBubble — the rig is unmounted (flag off)');
+    gate(
+      `(1b) k >= ${K_DECK_MIN} at 80 m AGL`,
+      !!r.bubble && r.bubble.k >= K_DECK_MIN,
+      kOf(r)
+    );
+    const deck = r;
+
+    r = await setAgl(900, 6000 * GS);
+    gate(
+      `(1c) k <= ${K_CRUISE_MAX} at 900 m AGL`,
+      !!r.bubble && r.bubble.k <= K_CRUISE_MAX,
+      kOf(r)
+    );
+
+    // THE DEADBAND. The charter's sweep is 480 → 560 → 480; at aglInM 500 BOTH
+    // endpoints sit on the flat top of the ramp (k = 1 at 480 and at the filtered
+    // 500), so that sweep proves NO RATCHET but cannot make the deadband visible
+    // in k. The second sweep straddles the ramp, where it can: with a 60 m band,
+    // 560 → 640 moves the filtered AGL by exactly 20 m (the excess) and 640 → 560
+    // moves it not at all, so the final k must be BELOW the first one and equal
+    // to the filtered-580 target — while a no-deadband implementation returns
+    // exactly to where it started. Both legs are asserted; the second is the one
+    // that can fail.
+    await setAgl(480, 5000 * GS);
+    const a1 = await read();
+    const s1 = a1.bubble?.k ?? NaN;
+    await setAgl(560, 5000 * GS);
+    await setAgl(480, 5000 * GS);
+    const s2 = (await read()).bubble?.k ?? NaN;
+    gate(
+      '(1d) 480 → 560 → 480 does not ratchet (k returns to its start)',
+      Number.isFinite(s1) && Number.isFinite(s2) && Math.abs(s1 - s2) < 1e-3,
+      Number.isFinite(s1)
+        ? `k ${s1.toFixed(4)} → … → ${s2.toFixed(4)}`
+        : 'no runtime.groundBubble — the rig is unmounted (flag off)'
+    );
+    await setAgl(560, 5000 * GS);
+    const t1 = (await read()).bubble?.k ?? NaN;
+    await setAgl(640, 5000 * GS);
+    await setAgl(560, 5000 * GS);
+    const t2 = (await read()).bubble?.k ?? NaN;
+    gate(
+      '(1e) the 60 m INPUT DEADBAND is real: 560 → 640 → 560 does not come back',
+      Number.isFinite(t1) && Number.isFinite(t2) && t2 < t1 - 0.02,
+      Number.isFinite(t1)
+        ? `k ${t1.toFixed(4)} → (640) → ${t2.toFixed(4)}; a no-deadband bubble returns to ${t1.toFixed(4)}`
+        : 'no runtime.groundBubble — the rig is unmounted (flag off)'
+    );
+
+    // =========================================================================
+    // (6) THE BUBBLE CLOSES — measured at cruise before we leave this pose.
+    // =========================================================================
+    r = await setAgl(1066.8, 8000 * GS); // 3500 ft
+    gate(
+      '(6a) uGroundDetail === 0 at 3500 ft',
+      (r.gd?.overlay ?? 0) === 0,
+      `overlay=${r.gd?.overlay ?? 'n/a'} k=${(r.bubble?.k ?? 0).toFixed(4)}`
+    );
+    gate(
+      '(6b) both pools are parked at 3500 ft (count 0, visible false)',
+      (r.scrub?.count ?? 0) === 0 &&
+        (r.hedge?.count ?? 0) === 0 &&
+        (r.scrub ? r.scrub.visible === false : true) &&
+        (r.hedge ? r.hedge.visible === false : true),
+      `scrub=${JSON.stringify(r.scrub)} hedge=${JSON.stringify(r.hedge)}`
+    );
+    gate(
+      '(6c) the landcover drape alpha is back at SAT_TINT.alpha at 3500 ft',
+      !ARM || Math.abs((r.gd?.tintAlpha ?? 0) - 0.1) < 1e-6,
+      `tintAlpha=${r.gd?.tintAlpha ?? 'n/a'}`
+    );
+
+    // =========================================================================
+    // (3) THE SUBURB HAS SOMETHING
+    // =========================================================================
+    r = await setAgl(80, 12000 * GS);
+    console.log(
+      `  Powell 80 m armed: tintChunks=${r.vegTint} tintVerts=${r.vegTintVerts} ` +
+        `tintPolys=${r.tint?.polys ?? 'n/a'} scrub=${JSON.stringify(r.scrub)} ` +
+        `hedge=${JSON.stringify(r.hedge)} draws=${r.draws} tris=${r.tris} ` +
+        `tintAlpha=${r.gd?.tintAlpha} roads=${JSON.stringify(
+          await page.evaluate(() => window.__flyStats?.groundDetail ?? null)
+        )}`
+    );
+    // PRECONDITIONS FIRST. A zero count with zero landcover in range is the
+    // VENUE having nothing to place on; a zero count with landcover in range is
+    // a defect. An instrument that cannot tell those apart reports a coin, so
+    // both legs state their precondition and read NOT CALIBRATED — never PASS —
+    // when it is unmet (the R24 §7 rule).
+    const areaM2 = r.gd?.scrubAreaM2 ?? 0;
+    const roadCells = (await page.evaluate(() => window.__flyStats?.groundDetail?.roads ?? 0)) | 0;
+    if (!ARM) {
+      note('(3a/3b) flag-off leg', 'the layer is not mounted — this is the RED calibration');
+      gate('(3a) the suburb places SCRUB (count > 0, mesh visible)', false, 'layer not mounted');
+      gate('(3b) the suburb places HEDGES (count > 0, mesh visible)', false, 'layer not mounted');
+    } else if (areaM2 <= 0) {
       note(
-        '(3b) NOT CALIBRATED',
-        'the parcel-road index is empty at this pose — no cls 5/6 centreline has streamed, ' +
-          'so there is nothing to set a hedge beside'
+        '(3a) NOT CALIBRATED',
+        `the fixture has ${areaM2} m² of grass/farmland/wood landcover inside the ` +
+          `${300} m disc at this pose (${r.vegTint} tint chunks / ${r.vegTintVerts} verts in the ` +
+          `whole ring) — the venue has nothing to place on, which is not a statement about the feature`
       );
     } else {
       gate(
-        '(3b) the suburb places HEDGES (count > 0, mesh visible)',
-        (r.hedge?.count ?? 0) > 0 && r.hedge?.visible === true,
-        `${JSON.stringify(r.hedge)} over ${roadCells} indexed road cells`
+        '(3a) the suburb places SCRUB (count > 0, mesh visible)',
+        (r.scrub?.count ?? 0) > 0 && r.scrub?.visible === true,
+        `${JSON.stringify(r.scrub)} over ${areaM2} m² of in-disc landcover ` +
+          `(${r.vegTint} tint chunks / ${r.vegTintVerts} verts)`
       );
     }
-  }
-  gate(
-    '(3c) the drape alpha is LIFTED inside the bubble',
-    !ARM || (r.gd?.tintAlpha ?? 0) > 0.17,
-    `tintAlpha=${r.gd?.tintAlpha ?? 'n/a'} (SAT_TINT.alpha 0.1, lowAglAlpha 0.18)`
-  );
-  const powellArmed = r;
-
-  // =========================================================================
-  // (4) THE OVERLAY MOVES PIXELS — on → on → off, both layers PARKED.
-  // =========================================================================
-  // EVERY ACTOR THE A/B DOES NOT CONTROL IS PARKED FOR BOTH ARMS (R17 §7.1),
-  // and that includes one this gate's own feature owns: `__flyGroundDetail.set`
-  // pins the SHARED bubble k, which the landcover drape alpha also reads — so
-  // toggling it moves the tint as well as the overlay, and the crop would be
-  // measuring two things. SatTintLayer does not rewrite `material.visible`, so
-  // verify-groundlife's park holds here; with the drape and both instancers
-  // parked, the only difference between the arms is `uGroundDetail`.
-  await page.evaluate(() => {
-    globalThis.__flyGroundDetailLayerOff = true; // the owner-read park
-    if (window.__satVeg?.tintMesh) window.__satVeg.tintMesh.material.visible = false;
-    if (window.__flyPlayer) window.__flyPlayer.visible = false;
-  });
-  await page.waitForTimeout(4000 * SCALE);
-  const gap = 2500 * SCALE;
-  const onA = await shotStats('gd-overlay-on.png');
-  await page.waitForTimeout(gap);
-  const onB = await shotStats('gd-overlay-onb.png');
-  await page.evaluate(() => window.__flyGroundDetail?.set?.(0));
-  await page.waitForTimeout(gap);
-  const offS = await shotStats('gd-overlay-off.png');
-  await page.evaluate(() => window.__flyGroundDetail?.set?.(null));
-  await page.evaluate(() => {
-    globalThis.__flyGroundDetailLayerOff = false;
-    if (window.__satVeg?.tintMesh) window.__satVeg.tintMesh.material.visible = true;
-    if (window.__flyPlayer) window.__flyPlayer.visible = true;
-  });
-  const signal = meanAbsDelta(onB, offS);
-  const control = meanAbsDelta(onA, onB);
-  console.log(
-    `  A/B overlay: signal |dL| ${(signal * 255).toFixed(3)}/255 vs control ` +
-      `${(control * 255).toFixed(3)}/255 · means ${onB.mean.toFixed(2)} / ${offS.mean.toFixed(2)}`
-  );
-  gate(
-    `(4a) the overlay moves a ground crop by > ${(OVERLAY_DELTA_MIN * 255).toFixed(0)}/255` +
-      (ARM ? '' : ' (RED: the flag-off tree must read ~0)'),
-    ARM ? signal > OVERLAY_DELTA_MIN : signal <= OVERLAY_DELTA_MIN,
-    `${(signal * 255).toFixed(3)}/255`
-  );
-  gate(
-    '(4b) …and it beats the same-interval control (causation, not drift)',
-    ARM ? signal > control * 2 : true,
-    `signal ${(signal * 255).toFixed(3)} vs control ${(control * 255).toFixed(3)}` +
-      (ARM ? '' : ' — flag off, informational')
-  );
-
-  // =========================================================================
-  // (5) THE KEY
-  // =========================================================================
-  const key = powellArmed.gd?.hillKey ?? null;
-  gate(
-    ARM
-      ? "(5) the FINAL tile key carries the 'd' token when armed"
-      : "(5) the FINAL tile key carries NO 'd' token with the flag off",
-    ARM ? /-[a-z]*d[a-z]*24$/.test(key ?? '') : !/d/.test((key ?? '').replace(/^world-bend-fade-hill-r19/, '')),
-    `key=${key}`
-  );
-
-  // =========================================================================
-  // (2) THE OWENS CONTENT GATE
-  // =========================================================================
-  r = await fly(OWENS, 95, 40000);
-  const census = [];
-  for (let i = 0; i < 8; i++) {
-    census.push((await read()).draws);
-    await page.waitForTimeout(800 * SCALE);
-  }
-  const owens = await read();
-  const drawMax = Math.max(...census.filter((d) => d > 0));
-  console.log(
-    `  Owens: draws ${census.join('/')} max ${drawMax} tris ${owens.tris} ` +
-      `scrub=${JSON.stringify(owens.scrub)} hedge=${JSON.stringify(owens.hedge)} ` +
-      `tintChunks=${owens.vegTint} programs=${owens.programs}`
-  );
-  gate(
-    '(2a) Owens places ZERO scrub and ZERO hedges (the content gate)',
-    (owens.scrub?.count ?? 0) === 0 && (owens.hedge?.count ?? 0) === 0,
-    `scrub=${JSON.stringify(owens.scrub)} hedge=${JSON.stringify(owens.hedge)}`
-  );
-  gate(
-    '(2b) …and both meshes report visible === false, so the draw is not issued',
-    (owens.scrub ? owens.scrub.visible === false : true) &&
-      (owens.hedge ? owens.hedge.visible === false : true),
-    `scrub=${JSON.stringify(owens.scrub)} hedge=${JSON.stringify(owens.hedge)}`
-  );
-  gate(
-    `(2c) Owens draws <= ${OWENS_DRAW_MAX} (the frozen ceiling)`,
-    drawMax <= OWENS_DRAW_MAX,
-    `max ${drawMax} over ${census.length} samples`
-  );
-
-  // The flag-off control for (2d) is the OTHER run of this same file. It is
-  // written to disk so the armed run can read it — a number measured in a
-  // different process on the same fixture at the same pose is a control; a
-  // number remembered from a different day is not.
-  const ctlFile = path.join(OUT, 'gd-owens-control.json');
-  const fs = require('fs');
-  if (!ARM) {
-    fs.writeFileSync(
-      ctlFile,
-      JSON.stringify({ drawMax, census, programs: owens.programs, at: Date.now() }, null, 2)
-    );
-    note('(2d) flag-off control WRITTEN', `Owens drawMax ${drawMax} → ${ctlFile}`);
-  } else if (fs.existsSync(ctlFile)) {
-    const ctl = JSON.parse(fs.readFileSync(ctlFile, 'utf8'));
+    if (ARM) {
+      if (roadCells <= 0) {
+        note(
+          '(3b) NOT CALIBRATED',
+          'the parcel-road index is empty at this pose — no cls 5/6 centreline has streamed, ' +
+            'so there is nothing to set a hedge beside'
+        );
+      } else {
+        gate(
+          '(3b) the suburb places HEDGES (count > 0, mesh visible)',
+          (r.hedge?.count ?? 0) > 0 && r.hedge?.visible === true,
+          `${JSON.stringify(r.hedge)} over ${roadCells} indexed road cells`
+        );
+      }
+    }
     gate(
-      '(2d) Owens armed draws <= the flag-off control measured on this same fixture',
-      drawMax <= ctl.drawMax,
-      `armed ${drawMax} vs flag-off ${ctl.drawMax}`
+      '(3c) the drape alpha is LIFTED inside the bubble',
+      !ARM || (r.gd?.tintAlpha ?? 0) > 0.17,
+      `tintAlpha=${r.gd?.tintAlpha ?? 'n/a'} (SAT_TINT.alpha 0.1, lowAglAlpha 0.18)`
     );
-    note(
-      '(2e) program delta armed − flag-off',
-      `${owens.programs} − ${ctl.programs} = ${owens.programs - ctl.programs} ` +
-        `(expected +2: the scrub and hedge materials are warmed at boot even where ` +
-        `they place nothing; the 'd' tile program REPLACES the un-'d' one)`
+    const powellArmed = r;
+
+    // =========================================================================
+    // (4) THE OVERLAY MOVES PIXELS — on → on → off, both layers PARKED.
+    // =========================================================================
+    await group('(4) the overlay pixel A/B', async () => {
+      // EVERY ACTOR THE A/B DOES NOT CONTROL IS PARKED FOR BOTH ARMS (R17 §7.1),
+      // and that includes one this gate's own feature owns: `__flyGroundDetail.set`
+      // pins the SHARED bubble k, which the landcover drape alpha also reads — so
+      // toggling it moves the tint as well as the overlay, and the crop would be
+      // measuring two things. SatTintLayer does not rewrite `material.visible`, so
+      // verify-groundlife's park holds here; with the drape and both instancers
+      // parked, the only difference between the arms is `uGroundDetail`.
+      await page.evaluate(() => {
+        globalThis.__flyGroundDetailLayerOff = true; // the owner-read park
+        if (window.__satVeg?.tintMesh) window.__satVeg.tintMesh.material.visible = false;
+        if (window.__flyPlayer) window.__flyPlayer.visible = false;
+      });
+      await page.waitForTimeout(4000 * GS);
+      const gap = 2500 * GS;
+      const onA = await shotStats('gd-overlay-on.png');
+      await page.waitForTimeout(gap);
+      const onB = await shotStats('gd-overlay-onb.png');
+      await page.evaluate(() => window.__flyGroundDetail?.set?.(0));
+      await page.waitForTimeout(gap);
+      const offS = await shotStats('gd-overlay-off.png');
+      await page.evaluate(() => window.__flyGroundDetail?.set?.(null));
+      await page.evaluate(() => {
+        globalThis.__flyGroundDetailLayerOff = false;
+        if (window.__satVeg?.tintMesh) window.__satVeg.tintMesh.material.visible = true;
+        if (window.__flyPlayer) window.__flyPlayer.visible = true;
+      });
+      const signal = meanAbsDelta(onB, offS);
+      const control = meanAbsDelta(onA, onB);
+      console.log(
+        `  A/B overlay: signal |dL| ${(signal * 255).toFixed(3)}/255 vs control ` +
+          `${(control * 255).toFixed(3)}/255 · means ${onB.mean.toFixed(2)} / ${offS.mean.toFixed(2)}`
+      );
+      gate(
+        `(4a) the overlay moves a ground crop by > ${(OVERLAY_DELTA_MIN * 255).toFixed(0)}/255` +
+          (ARM ? '' : ' (RED: the flag-off tree must read ~0)'),
+        ARM ? signal > OVERLAY_DELTA_MIN : signal <= OVERLAY_DELTA_MIN,
+        `${(signal * 255).toFixed(3)}/255`
+      );
+      gate(
+        '(4b) …and it beats the same-interval control (causation, not drift)',
+        ARM ? signal > control * 2 : true,
+        `signal ${(signal * 255).toFixed(3)} vs control ${(control * 255).toFixed(3)}` +
+          (ARM ? '' : ' — flag off, informational')
+      );
+    });
+
+    // =========================================================================
+    // (5) THE KEY
+    // =========================================================================
+    const key = powellArmed.gd?.hillKey ?? null;
+    gate(
+      ARM
+        ? "(5) the FINAL tile key carries the 'd' token when armed"
+        : "(5) the FINAL tile key carries NO 'd' token with the flag off",
+      ARM ? /-[a-z]*d[a-z]*24$/.test(key ?? '') : !/d/.test((key ?? '').replace(/^world-bend-fade-hill-r19/, '')),
+      `key=${key}`
     );
-  } else {
-    note('(2d) NOT CALIBRATED', `no flag-off control at ${ctlFile} — run FLY_GD_ARM=0 first`);
+
+    await group('(2) the Owens content gate', async () => {
+      // =========================================================================
+      // (2) THE OWENS CONTENT GATE
+      // =========================================================================
+      r = await fly(OWENS, 95, 40000);
+      const census = [];
+      for (let i = 0; i < 8; i++) {
+        census.push((await read()).draws);
+        await page.waitForTimeout(800 * GS);
+      }
+      const owens = await read();
+      const drawMax = Math.max(...census.filter((d) => d > 0));
+      console.log(
+        `  Owens: draws ${census.join('/')} max ${drawMax} tris ${owens.tris} ` +
+          `scrub=${JSON.stringify(owens.scrub)} hedge=${JSON.stringify(owens.hedge)} ` +
+          `tintChunks=${owens.vegTint} programs=${owens.programs}`
+      );
+      gate(
+        '(2a) Owens places ZERO scrub and ZERO hedges (the content gate)',
+        (owens.scrub?.count ?? 0) === 0 && (owens.hedge?.count ?? 0) === 0,
+        `scrub=${JSON.stringify(owens.scrub)} hedge=${JSON.stringify(owens.hedge)}`
+      );
+      gate(
+        '(2b) …and both meshes report visible === false, so the draw is not issued',
+        (owens.scrub ? owens.scrub.visible === false : true) &&
+          (owens.hedge ? owens.hedge.visible === false : true),
+        `scrub=${JSON.stringify(owens.scrub)} hedge=${JSON.stringify(owens.hedge)}`
+      );
+      gate(
+        `(2c) Owens draws <= ${OWENS_DRAW_MAX} (the frozen ceiling)`,
+        drawMax <= OWENS_DRAW_MAX,
+        `max ${drawMax} over ${census.length} samples`
+      );
+
+      // The flag-off control for (2d) is the OTHER run of this same file. It is
+      // written to disk so the armed run can read it — a number measured in a
+      // different process on the same fixture at the same pose is a control; a
+      // number remembered from a different day is not.
+      const ctlFile = path.join(OUT, 'gd-owens-control.json');
+      const fs = require('fs');
+      if (!ARM) {
+        fs.writeFileSync(
+          ctlFile,
+          JSON.stringify({ drawMax, census, programs: owens.programs, at: Date.now() }, null, 2)
+        );
+        note('(2d) flag-off control WRITTEN', `Owens drawMax ${drawMax} → ${ctlFile}`);
+      } else if (fs.existsSync(ctlFile)) {
+        const ctl = JSON.parse(fs.readFileSync(ctlFile, 'utf8'));
+        gate(
+          '(2d) Owens armed draws <= the flag-off control measured on this same fixture',
+          drawMax <= ctl.drawMax,
+          `armed ${drawMax} vs flag-off ${ctl.drawMax}`
+        );
+        note(
+          '(2e) program delta armed − flag-off',
+          `${owens.programs} − ${ctl.programs} = ${owens.programs - ctl.programs} ` +
+            `(expected +2: the scrub and hedge materials are warmed at boot even where ` +
+            `they place nothing; the 'd' tile program REPLACES the un-'d' one)`
+        );
+      } else {
+        note('(2d) NOT CALIBRATED', `no flag-off control at ${ctlFile} — run FLY_GD_ARM=0 first`);
+      }
+    });
+  } catch (e) {
+    gate('[the run DIED before the summary]', false, String(e?.message ?? e).slice(0, 300));
   }
 
   gate('(0) zero page errors', errs.length === 0, errs.slice(0, 3).join(' | '));
