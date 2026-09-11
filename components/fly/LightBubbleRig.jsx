@@ -219,9 +219,24 @@ export function LightBubbleRig({ runtime }) {
       live.shadowRung = r.rung;
       live.shadowTexelM = shadowTexelM(r.radiusM, mapSize);
       if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
-        // In place, like GROUND_BUBBLE's publication: a frame loop that
-        // allocates an object per frame to describe a number that changes once
-        // per rung is a small lie about the cost of the instrument.
+        // `__flyStats.shadow` IS ALREADY OWNED — by R24 C's SHADOW_CALM
+        // publisher (FlyScene.jsx:3154), which writes the kernel state, the
+        // bias pair, the light position and target, and `radiusM`/`texelM`
+        // taken from `shadowRigRef.current` — i.e. the JSX BOOT value, on a
+        // `frameCount % 60` cadence, which at this venue's 1–3 fps is a number
+        // up to a minute old. (The RED leg caught it reading **800** — the TOY
+        // rig's radius — during a satellite session, because that ref carries
+        // the toy branch whenever `satShadowsOn` is false, and the fleet pins
+        // it false until a gate releases it.)
+        //
+        // So this is a MERGE, not an assignment: the object is mutated in
+        // place, every R24 field is left alone, and only the four numbers this
+        // feature owns are written — with `jsxRadiusM` kept beside them so a
+        // reader can still see the boot value the R24 publisher meant. The
+        // ORDER is what makes it unambiguous: FlyScene's publisher runs at
+        // useFrame −50 and this rig at −48, so when both write in one frame the
+        // frame ends with the LIVE radius, and the merged object is never half
+        // of one and half of the other.
         const stats = (window.__flyStats = window.__flyStats || {});
         const sh = stats.shadow ?? (stats.shadow = {});
         sh.radiusM = r.radiusM;
@@ -230,6 +245,8 @@ export function LightBubbleRig({ runtime }) {
         sh.rawM = r.rawM;
         sh.mapSize = mapSize;
         sh.k = k;
+        sh.jsxRadiusM = restoreRef.current.cam?.right ?? null;
+        sh.source = 'light-bubble';
       }
     } else {
       publishShadowRadius(runtime, null);

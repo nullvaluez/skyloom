@@ -294,7 +294,14 @@ const readState = () =>
       `radius ${CAM(deck)} m at k ${deck.bubble?.k ?? 'n/a'} (no bubble is published on this tree) · ` +
         `${(((2 * CAM(deck)) / (deck.mapSize || 2048))).toFixed(3)} m/texel at the deck, same as at cruise`
     );
-    gate('(2b) THE TEXEL FOLLOWS', false, '__flyStats.shadow does not exist on the flag-off tree');
+    gate(
+      '(2b) THE TEXEL FOLLOWS',
+      false,
+      `nothing publishes a LIVE texel on this tree: __flyStats.shadow is R24 SHADOW_CALM's ` +
+        `(FlyScene.jsx:3154), which writes radiusM ${deck.stats?.radiusM} / texelM ${deck.stats?.texelM} from the ` +
+        'JSX BOOT value on a frameCount % 60 cadence — at this venue up to a minute stale, and it carries ' +
+        "TOY.shadowRadiusM (800) whenever satShadowsOn is false. There is no rung and no k anywhere on it"
+    );
   }
 
   // ---- (3) the hysteresis sweep — NO warps --------------------------------
@@ -324,30 +331,40 @@ const readState = () =>
     gate('(3) HYSTERESIS', false, 'no rung exists on the flag-off tree — the radius is constant by construction');
   }
 
-  // THE CONTROL. A world that is still streaming compiles content programs on
-  // its own clock, so "the count moved during the traverse" is not by itself a
-  // statement about the traverse. Pass 2 of this gate read 115 → 115 → 116
-  // across cruise → deck → sweep and would have failed a bare spread-0 test on
-  // one program that arrived with a tile. So the SAME number of samples, over
-  // the SAME settle, is taken with k held CONSTANT, and the traverse is judged
-  // against the venue's own drift rather than against a bound I chose. (The
-  // kickoff rule: a red gets one quiet re-run and then a CONTROL, never a new
-  // bound.)
-  const control = [];
-  for (let i = 0; i < 3; i++) {
+  // THE SECOND TRAVERSE IS THE INSTRUMENT — not a looser bound, and not a
+  // control taken later (which is systematically quieter, because the world has
+  // finished streaming by then: measured, traverse spread 1 against control
+  // spread 0 on the RED leg, where NOTHING of C's was even mounted).
+  //
+  // The claim is "a k change re-keys no material". A re-key happens on EVERY
+  // crossing, so it is still there the second time; a CONTENT program arriving
+  // with a streaming tile happens ONCE, because the content is then resident.
+  // So the same k excursion is flown a second time over poses already visited,
+  // and the honest assertion is that the SECOND one compiles nothing at all —
+  // no bound to choose, and it falsifies the rejected design directly.
+  const second = [];
+  for (const agl of [CRUISE_AGL, DECK_AGL, CRUISE_AGL]) {
+    await page.evaluate((a) => {
+      window.__pinAgl = a;
+    }, agl);
+    await waitForAgl(page, agl, agl > 500 ? 60 : 25);
     await page.waitForTimeout(SETTLE);
-    control.push((await page.evaluate(readState)).programs);
+    const st = await page.evaluate(readState);
+    second.push({ agl, programs: st.programs, radius: CAM(st), k: st.bubble?.k ?? null });
+    console.log(`  traverse 2 @ ${agl} m: k ${st.bubble?.k?.toFixed(4)} · radius ${CAM(st)} · programs ${st.programs}`);
   }
   const progSeries = [cruise.programs, deck.programs, ...sweep.map((r) => r.programs)];
   const progSpread = Math.max(...progSeries) - Math.min(...progSeries);
-  const ctrlSpread = Math.max(...control) - Math.min(...control);
+  const secondSeries = second.map((r) => r.programs);
+  const secondSpread = Math.max(...secondSeries) - Math.min(...secondSeries);
   gate(
-    '(3b) PROGRAMS ARE FLAT ACROSS THE TRAVERSE — no material is re-keyed',
-    progSpread === 0 || progSpread <= ctrlSpread,
-    `traverse ${progSeries.join(' → ')} (spread ${progSpread}) · control at CONSTANT k ${control.join(' → ')} ` +
-      `(spread ${ctrlSpread}). This is the measurement behind REJECTING a second shadow-casting light: a light ` +
-      'count is part of every program cache key (lib/fly/prewarm.js:120-126), so that design re-keys EVERY lit ' +
-      'material at once — a jump of tens, not a drift of one, and nothing like it appears here'
+    '(3b) A SECOND k EXCURSION COMPILES NOTHING — no material is re-keyed',
+    secondSpread === 0,
+    `first traverse ${progSeries.join(' → ')} (spread ${progSpread}, content arriving) · SECOND excursion over the ` +
+      `same poses ${secondSeries.join(' → ')} (spread ${secondSpread}) while the radius went ` +
+      `${second.map((r) => r.radius).join(' → ')} m. This is the measurement behind REJECTING a second ` +
+      'shadow-casting light: a light count is part of every program cache key (lib/fly/prewarm.js:120-126), so ' +
+      'that design re-keys EVERY lit material on every crossing — it would compile again here, and nothing does'
   );
 
   // ---- (4) the AO radius ---------------------------------------------------

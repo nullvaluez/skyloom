@@ -140,8 +140,8 @@ the R19 "castShadow is a discrete transition" rule is untouched.
 | `verify-moon-light.mjs` (node) | RED calibration on the flag-off base `6bf628e` | **5 passed, 12 failed** (`scripts/r25-out/r25-c-moon-light-RED-6bf628e.txt`) |
 | `verify-shadow-bubble.js` pass 1 | armed | 11 passed, 2 failed — **both failures the INSTRUMENT** (see §7.1) |
 | `verify-shadow-bubble.js` pass 2 | armed, after the AGL poll | cruise 1500 m / deck **350 m, 0.342 m/texel (4.3× finer)**, AO **24 → 5 m**, intensity **5.0 → 3.5**, hysteresis **0 rung changes**; (3b) failed on a **+1 program drift** and the night leg was lost when the DEV SERVER died mid-run (§7.3) |
-| `verify-shadow-bubble.js` pass 3 | armed, with the program CONTROL | see below |
-| `verify-shadow-bubble.js` RED leg | `R25_LIGHT=off` — same file, no rig | see below |
+| `verify-shadow-bubble.js` RED leg | `R25_LIGHT=off` — the same file, no rig (`…-RED-pass1.txt`) | **5 passed, 8 failed** — and every failure is the defect: the cascade **1500 m at 80 m AGL, 1.465 m/texel, the same as at cruise**; no rung; the AO radius **24.00 at cruise and 24.00 at the deck**; `hemi.groundColor` never written; the night key 0.09 at every phase; nothing on the bus. The five passes are the rig-absent checks, the cruise cascade (1500 on both trees, by design) and the desert ceiling (**draws 56 ≤ 261**) |
+| `verify-shadow-bubble.js` pass 3 | armed, with the SECOND-TRAVERSE instrument | see §2.2 |
 | `verify-shadow-calm.mjs` (node) | on r25/c and on the base | **32 ok / 1 FAIL on BOTH** — the catcher row, inherited, not C's |
 | `immersive-unit.mjs` / `graphics-unit.mjs` (node) | on r25/c | **PASS** |
 | `verify-import-integrity.mjs` (node) | on r25/c and on the base | **3/1 on BOTH** — two `no-undef` in `scripts/r24-c-agl.js`, an R24 artifact |
@@ -318,6 +318,24 @@ gate now checks `window.__fly` at each leg boundary and reads NOT CALIBRATED —
 with `__flyStats.sceneRemounts`, the tripwire FlyScene already ships for this —
 instead of a stack trace.
 
+**(d) THE DEV HANDLE THAT WAS ALREADY OWNED.** The charter says to ship
+`window.__flyStats.shadow = { radiusM, texelM, rung }`. That key already
+belongs to R24 C's SHADOW_CALM publisher (`FlyScene.jsx:3154`), which writes
+the kernel state, the bias pair, the light position/target and its own
+`radiusM`/`texelM` — from `shadowRigRef.current`, i.e. the JSX BOOT value, on a
+`frameCount % 60` cadence. The RED leg is what surfaced it: with the rig
+absent, `__flyStats.shadow.radiusM` read **800 m** — `TOY.shadowRadiusM` — in
+a SATELLITE session whose shadow camera was at 1500, because that ref carries
+the toy branch whenever `satShadowsOn` is false and the fleet pins it false
+until a gate releases it; at 1–3 fps a 60-frame cadence is up to a minute
+stale, so the release had not been seen yet. Two consequences, both recorded:
+the rig now MERGES into that object rather than assigning over it (every R24
+field survives, `jsxRadiusM` keeps the boot value beside the live one, and
+`source: 'light-bubble'` says who wrote), and the ORDER is the thing that makes
+it unambiguous — FlyScene publishes at −50, this rig at −48, so a frame that
+contains both ends with the live radius. **A dev handle is a namespace, and a
+round that adds one should ask who already owns the key.**
+
 ### 7.2 The rest
 
 1. **A deadband measured from the wrong reference is not a deadband.** The
@@ -402,6 +420,10 @@ night ground wants to scale with the moon.
   leg. It arms `__flyGroundBubbleOverride`, `__flyLightBubbleOverride` and
   `__flyDepthArm`, and releases `__flySatShadowOverride` through the app's own
   `window.__flySatShadow.set(true)` handle rather than redefining the fleet pin.
+* **`__flyStats.shadow` IS SHARED** with R24's SHADOW_CALM publisher — see
+  §7.1(d). A gate reading `radiusM`/`texelM` there gets the LIVE cascade when
+  C's flag is on and the (up to 60 frames stale) boot value when it is off;
+  `source: 'light-bubble'` and `jsxRadiusM` distinguish the two.
 * **A PREDICTION, NOT A MEASUREMENT** (it was not run here): when
   `LIGHT_BUBBLE_R25` is eventually flipped ON, `scripts/verify-sun.js`'s
   `midnight sun at floor` row (`night.sun < noon.sun * 0.55 && night.sun > 0.5`,
