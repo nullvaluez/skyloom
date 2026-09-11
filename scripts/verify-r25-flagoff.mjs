@@ -108,15 +108,32 @@ const R24_HILL_TOKENS = ['e', 'f', 'a', 'l'];
 // ---------------------------------------------------------------------------
 console.log('[1] the accessor, EXECUTED');
 const pins = await import('../lib/fly/r25-pins.js');
-const off = BLOCKS.map((b) => [b, pins.r25On(b)]);
+// R25 W2 flip (Fable): blocks flip ON merge by merge once their gates are
+// green, and every flip commit adds the fleet pin
+// `window.__fly<Name>Override = { enabled: false }` to scripts/_boot.js so the
+// frozen gates keep measuring the R24 world. So the identity claim this
+// section proves is SHIP-STATE AWARE: a block that ships OFF reads false with
+// no pin; a block that ships ON reads true with no pin AND false under the
+// fleet pin, its sub-switches unreachable under that pin, and it returns to
+// its shipped state when the pin is removed. The ship state is read off the
+// constants themselves, never hard-coded here.
+const hadWindow0 = typeof globalThis.window !== 'undefined';
+if (!hadWindow0) globalThis.window = {};
+const shipped = Object.fromEntries(BLOCKS.map((b) => [b, pins.r25Block(b).enabled === true]));
+const withFleetPin = (b, fn) => {
+  globalThis.window[`__fly${b}Override`] = { enabled: false };
+  try { return fn(); } finally { delete globalThis.window[`__fly${b}Override`]; }
+};
+const off = BLOCKS.map((b) => [b, pins.r25On(b), shipped[b] ? withFleetPin(b, () => pins.r25On(b)) : false]);
 gate(
-  '(1) r25On() is false for all six R25 blocks with no window pin set',
-  off.every(([, v]) => v === false),
-  off.map(([b, v]) => `${b}=${v}`).join(' ')
+  '(1) r25On() reads the SHIPPED state with no pin, and false under the fleet pin for every block that ships ON',
+  off.every(([b, v, pinned]) => v === shipped[b] && pinned === false),
+  off.map(([b, v, pinned]) => `${b}=${v}${shipped[b] ? `(ships ON, pinned→${pinned})` : ''}`).join(' ')
 );
-// Sub-switches must be false too: `r25On(name, sub)` short-circuits on the
-// block's own `enabled`, so a sub-switch pre-seeded true is harmless — but
-// only while that short-circuit holds, and this asserts it does.
+// Sub-switches must be unreachable while the block is OFF (or pinned off):
+// `r25On(name, sub)` short-circuits on the block's own `enabled`, so a
+// sub-switch pre-seeded true is harmless — but only while that short-circuit
+// holds, and this asserts it does, under the fleet pin for the blocks that ship ON.
 const subs = [
   ['GroundDetail', 'overlay'], ['GroundDetail', 'scrub'], ['GroundDetail', 'hedges'],
   ['GroundDetail', 'tint'], ['GroundDetail', 'z19'],
@@ -126,12 +143,13 @@ const subs = [
   ['Feel', 'groundRush'], ['Feel', 'dof'], ['Feel', 'chase'], ['Feel', 'audio'],
   ['Feel', 'proximity'],
 ];
-const liveSubs = subs.filter(([b, s]) => pins.r25On(b, s));
+const liveSubs = subs.filter(([b, s]) => (shipped[b] ? withFleetPin(b, () => pins.r25On(b, s)) : pins.r25On(b, s)));
 gate(
-  '(1a) every PRE-SEEDED sub-switch is unreachable while its block is off',
+  '(1a) every PRE-SEEDED sub-switch is unreachable while its block is off (or pinned off)',
   liveSubs.length === 0,
-  liveSubs.length ? liveSubs.map(([b, s]) => `${b}.${s}`).join(' ') : `${subs.length} sub-switches checked`
+  liveSubs.length ? liveSubs.map(([b, s]) => `${b}.${s}`).join(' ') : `${subs.length} sub-switches checked; ships ON: ${BLOCKS.filter((b) => shipped[b]).join(', ') || 'none'}`
 );
+if (!hadWindow0) delete globalThis.window;
 
 // (1b) THE ARM. Without this the file would be equally green against an
 // accessor that can never return true — which would silently disarm every
@@ -152,9 +170,9 @@ gate(
   armed.map(([b, v]) => `${b}=${v}`).join(' ')
 );
 gate(
-  '(1c) ...and is false again once the pin is removed (no latching)',
-  BLOCKS.every((b) => pins.r25On(b) === false),
-  'all six back to false'
+  '(1c) ...and returns to its SHIPPED state once the pin is removed (no latching)',
+  BLOCKS.every((b) => pins.r25On(b) === shipped[b]),
+  BLOCKS.map((b) => `${b}=${pins.r25On(b)}`).join(' ')
 );
 
 // ---------------------------------------------------------------------------
