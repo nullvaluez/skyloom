@@ -59,11 +59,18 @@ const read = (p) => readFileSync(path.join(ROOT, p), 'utf8');
  * cutting at one would also cut a `https://…` out of a string literal and
  * could hide a real token.
  */
+// R25 W2 (Fable, merge 3/6 arbitration): the first version dropped only
+// lines that BEGIN with a comment, so a trailing `code // see MOBILE_FAN_R25`
+// was scanned as code and (4b) read D's TouchFan.jsx as a raw constant read —
+// the R20 §7 lesson ("grep-gates read comments too") in its own gate. Trailing
+// line comments now go as well, except a `//` preceded by `:` or a quote
+// (URLs and string literals), which is not a comment.
 const stripComments = (t) =>
   t
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .split('\n')
     .filter((l) => !/^\s*(\/\/|\*)/.test(l))
+    .map((l) => l.replace(/(^|[^:'"`\\])\/\/.*$/, '$1'))
     .join('\n');
 const readCode = (p) => stripComments(read(p));
 
