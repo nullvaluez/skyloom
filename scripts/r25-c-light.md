@@ -241,6 +241,10 @@ been a second owner in one file for a result the light already produces.
 | `scripts/verify-shadow-calm.mjs` | see §6 run table | `shadow-kernel.js` NOT touched (decision 3) |
 | `scripts/verify-one-sun.js` | see §6 run table | `ONE_SUN`'s key direction is untouched; C changes the key's INTENSITY at night only |
 | `scripts/verify-import-integrity.mjs` | inherited RED | 2 `no-undef` in `scripts/r24-c-agl.js`, an R24 artifact — **identical on the base tree**, not C's |
+| `verify-c-flagoff.mjs` · `verify-atmo-law.mjs` · `verify-depth-offset.mjs` | **PASS** | the three R24 gates nearest C's edits (the night-ramp line is inside AERIAL_LAW's neighbourhood) |
+| `verify-classify` · `verify-warbirds` · `verify-daily` · `verify-terra-residency` · `verify-worker-normals` · `verify-finalize-pace` · `verify-frame-step` · `verify-vendor-three-tile` | **PASS** | the rest of the node smoke set |
+| `verify-lod-fade.mjs` | inherited RED | **60/4 on r25/c AND on the base** — run both ways, identical |
+| `verify-skirt-worker.mjs` | inherited RED | **8/1 on r25/c AND on the base** — run both ways, identical |
 
 ---
 
@@ -354,3 +358,59 @@ instead of a stack trace.
 * **Interaction with B NIGHT's irradiance and A GROUND's overlay.** Both land
   after C in the merge order; the moon key and the hemisphere ground colour are
   inputs to what they draw.
+* **A CROSS-TREE PIXEL A/B.** The charter asks for a fixture pixel A/B at one
+  noon and one night pose against the base tree. It is NOT what this venue can
+  produce: the immersive cloud pass integrates WALL-CLOCK elapsed time
+  (`lib/fly/immersive-cloud-pass.js` — `this.elapsed += dt` every unpaused
+  frame), so two boots of the same pose render different cloud phases before
+  anything of C's is considered, and at 1–3 fps the tile field is at a
+  different streaming state as well. What was built instead is
+  `scripts/r25-c-flagoff-census.js`: every quantity C's five mechanisms can
+  move, read off the live objects at a pinned noon and a pinned night, with a
+  scene lookup that does NOT depend on C's own bus (so it can read the control
+  arm). **It was WRITTEN and syntax-checked but NOT RUN in both arms** — the
+  browser budget went to the two legs of `verify-shadow-bubble`, and the
+  flag-off half of that gate (`R25_LIGHT=off`) already reads the same
+  quantities on this tree with the rig unmounted. The missing leg is the BASE
+  tree, and it belongs in W2 or on the user's machine.
+
+---
+
+## §9 HAND-OFF
+
+**To B NIGHT — the seam I call.** `setSkyMoonPhase(illum)` in
+`components/fly/SkyDome.jsx`. The rig imports `./SkyDome` lazily and calls it as
+`setSkyMoonPhase(illum, discBrightness)` — the second argument is
+`LIGHT_BUBBLE_R25.moon.discBrightness` already mapped through `illum`, for an
+implementation that prefers the number to the ratio; a one-argument setter
+ignores it. Until B merges, the export is undefined, the optional call is
+skipped and the disc keeps its constant brightness. B also reads
+`runtime.immersiveLighting.night` for nightK — unchanged by C — and
+`runtime.immersiveLighting.moon = { illum, up, k }` is newly available if the
+night ground wants to scale with the moon.
+
+**To E CERT — what to run, and one prediction to check.**
+* `node scripts/verify-moon-light.mjs` — pure, fast, no server. 16/16.
+* `FLY_TILE_FIXTURE=1 FLY_BOOT_SCALE=6 FLY_URL=… node -r ./scripts/_pw-shim.js
+  scripts/verify-shadow-bubble.js` — armed; add `R25_LIGHT=off` for the RED
+  leg. It arms `__flyGroundBubbleOverride`, `__flyLightBubbleOverride` and
+  `__flyDepthArm`, and releases `__flySatShadowOverride` through the app's own
+  `window.__flySatShadow.set(true)` handle rather than redefining the fleet pin.
+* **A PREDICTION, NOT A MEASUREMENT** (it was not run here): when
+  `LIGHT_BUBBLE_R25` is eventually flipped ON, `scripts/verify-sun.js`'s
+  `midnight sun at floor` row (`night.sun < noon.sun * 0.55 && night.sun > 0.5`,
+  `scripts/verify-sun.js:64`) is a row to look at — and note that its `> 0.5`
+  bound is ALREADY unreachable on the base tree, because the always-on
+  immersive path sets the midnight directional to `immersiveLighting().sun` =
+  **0.09** (`FlyScene.jsx:2736-2741`, and verify-moon-light proves the 0.09).
+  That is an "un-recertified since the overhaul" row (plan §3 E.6), not
+  something C moved: with the flag OFF the number is unchanged, and with it ON
+  a full moon RAISES it to 0.18.
+
+**To the orchestrator — the arbitration list.** `FlyScene.jsx` gets FOUR
+one-line touches (`:773`, `:2500`, `:2855`, `:2979`) — the fourth is the haze
+floor the charter's item 5 asks for, flagged in §3 decision 6. `Effects.jsx`
+gets one new line plus `runtime` added to one existing dependency array.
+`FlyCanvas.jsx` gets one import and one mount line. No constants block but
+`LIGHT_BUBBLE_R25` is touched; `world-bend.js`, `prewarm.js`, `shadow-kernel.js`
+and `night-city.js` are NOT touched at all.
