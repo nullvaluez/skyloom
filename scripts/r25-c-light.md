@@ -120,8 +120,8 @@ number; at `up = 0` mine is R24 exactly, which is what clause (4b) asserts.
 
 | budget | frozen | measured here | how |
 |---|---|---|---|
-| draws | 0 added | **0 added** — the feature adds no object to the scene | `verify-shadow-bubble` (7) |
-| programs | 0 added | **flat across the whole AGL traverse** | `verify-shadow-bubble` (3b) |
+| draws | 0 added | **0 added** — the feature adds no object to the scene; the fixture desert reads **71 ≤ 261** armed and **56 ≤ 261** flag-off (different streaming states, both far under) | `verify-shadow-bubble` (7) |
+| programs | 0 added | **a SECOND k excursion over the same poses compiles nothing: 125 → 125 → 125 while the radius went 1500 → 350 → 1500** | `verify-shadow-bubble` (3b) |
 | shader text | 0 | **0** — no `onBeforeCompile`, no ShaderChunk, no `customProgramCacheKey` | source; `git diff` touches no GLSL file |
 | cache keys | 0 moved | **0** — `world-bend.js` is not in C's diff at all | `git diff --stat` |
 | RT bytes | 0 | **0** — no render target is created | source |
@@ -141,10 +141,28 @@ the R19 "castShadow is a discrete transition" rule is untouched.
 | `verify-shadow-bubble.js` pass 1 | armed | 11 passed, 2 failed — **both failures the INSTRUMENT** (see §7.1) |
 | `verify-shadow-bubble.js` pass 2 | armed, after the AGL poll | cruise 1500 m / deck **350 m, 0.342 m/texel (4.3× finer)**, AO **24 → 5 m**, intensity **5.0 → 3.5**, hysteresis **0 rung changes**; (3b) failed on a **+1 program drift** and the night leg was lost when the DEV SERVER died mid-run (§7.1c) |
 | `verify-shadow-bubble.js` RED leg | `R25_LIGHT=off` — the same file, no rig (`…-RED-pass1.txt`) | **5 passed, 8 failed** — and every failure is the defect: the cascade **1500 m at 80 m AGL, 1.465 m/texel, the same as at cruise**; no rung; the AO radius **24.00 at cruise and 24.00 at the deck**; `hemi.groundColor` never written; the night key 0.09 at every phase; nothing on the bus. The five passes are the rig-absent checks, the cruise cascade (1500 on both trees, by design) and the desert ceiling (**draws 56 ≤ 261**) |
-| `verify-shadow-bubble.js` pass 3 | armed, with the SECOND-TRAVERSE instrument | see §2.2 |
+| `verify-shadow-bubble.js` pass 3 | armed, with the SECOND-TRAVERSE instrument | **15 passed, 0 failed** — §2.2 |
 | `verify-shadow-calm.mjs` (node) | on r25/c and on the base | **32 ok / 1 FAIL on BOTH** — the catcher row, inherited, not C's |
 | `immersive-unit.mjs` / `graphics-unit.mjs` (node) | on r25/c | **PASS** |
 | `verify-import-integrity.mjs` (node) | on r25/c and on the base | **3/1 on BOTH** — two `no-undef` in `scripts/r24-c-agl.js`, an R24 artifact |
+
+### 2.2 What the armed gate measured (pass 3, 15/15)
+
+| clause | number |
+|---|---|
+| (1) cruise | k 0.0000 · shadow camera **1500 m** · **1.465 m/texel** at 2048² |
+| (2) the deck, 80 m AGL | k 1.0000 · **350 m**, rung 8 · **0.342 m/texel — 4.3× finer** |
+| (2b) the texel | published **0.3418** === derived 0.3418 (camera ÷ map size) |
+| (3) hysteresis | 480 → 560 → 480 m: rungs **8 → 8 → 8**, radii **350 → 350 → 350**, visual AGL 480.0 → 560.0 → 480.0 — **0 rung changes** |
+| (3b) re-keying | first traverse **124 → 125** (spread 1, content arriving) · **SECOND excursion over the same poses 125 → 125 → 125, spread 0**, while the radius went 1500 → 350 → 1500 |
+| (4) AO | radius **24.00 → 5.00 m** · intensity **5.00 → 3.50** |
+| (5) hemi ground | **#5a6b53** at el 55.00° · **#1a2030** at el −20.00° |
+| (5b) hemi sky | #cfe5ff → **#3d4c6e** |
+| (9) THE MOON ON THE LIGHT | at el −20.00°, the directional's OWN intensity: **new moon 0.045 → full moon 0.180**, where R24 is **0.09 at both**; up 1, k 1 |
+| (9b) the grade riders | `sun.hazeNightFloor` **0.12** · `sun.grade` **{0.78, −0.10}** |
+| (6) one number, three readers | `runtime.shadowRadiusM` **350** === `camera.right` **350** === `__flyStats.shadow.radiusM` **350** |
+| (7) the desert | **draws 71 ≤ 261** (the flag-off leg read 56 at its own streaming state; the two are not comparable across boots, and neither is near the ceiling) |
+| (8) page errors | zero |
 
 ---
 
