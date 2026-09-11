@@ -414,7 +414,8 @@ night ground wants to scale with the moon.
   a full moon RAISES it to 0.18.
 
 **To the orchestrator — the arbitration list.** `FlyScene.jsx` gets FOUR
-one-line touches (`:773`, `:2500`, `:2855`, `:2979`) — the fourth is the haze
+one-line touches (`:773` the near-receive reach, `:2500` the haze floor,
+`:2855` `publishSunLight`, `:2979` the texel snap) plus one import at `:4` — the fourth is the haze
 floor the charter's item 5 asks for, flagged in §3 decision 6. `Effects.jsx`
 gets one new line plus `runtime` added to one existing dependency array.
 `FlyCanvas.jsx` gets one import and one mount line. No constants block but
