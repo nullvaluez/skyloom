@@ -16,6 +16,8 @@ import { PerfGovernor } from '@/lib/fly/perf-governor';
 import { FrameStatsRig } from '@/lib/fly/frame-stats';
 import { StepSafeRig } from './StepSafeRig';
 import { HudSyncRig } from './HudSyncRig';
+import { GroundBubbleRig } from './GroundBubbleRig';
+import { r25On } from '@/lib/fly/r25-pins';
 import { useFlyStore } from '@/stores/fly-store';
 
 function initialDpr() {
@@ -88,6 +90,11 @@ export function FlyCanvas({ runtime }) {
           matrices, so the HUD stops being a picture of the previous frame
           (recon FL-01). Renders nothing; inert with the flag off. */}
       <HudSyncRig runtime={runtime} />
+      {/* Round 25 (Fable, GROUND_BUBBLE): the ONE "how low are we" signal that
+          A GROUND / C LIGHT / F FEEL key their bands on — priority −49, after
+          FlyScene's −50 has stepped the damped ground. Renders nothing;
+          unmounted flag-off, so every reader sees exactly 0. */}
+      {r25On('GroundBubble') && <GroundBubbleRig runtime={runtime} />}
       {/* Round 21 (A): boot shader pre-warm. Adds no object to the scene and
           issues no draw — see components/fly/PrewarmRig.jsx. */}
       {PREWARM.enabled && <PrewarmRig runtime={runtime} />}

@@ -26,6 +26,7 @@ repomix-output.xml
 .DS_Store
 Thumbs.db
 scripts/r24-out/
+scripts/r25-out/
 .probe-out-*/
 .probe-selftest/
 .probe-calib/

@@ -12,6 +12,25 @@
 > describes deleted code (markers, panels, Leaflet-era plans); do not act
 > on it.
 
+> **⚠️ ROUND 25 "GROUND & NIGHT" IS IN FLIGHT (2026-09-11, W0 scaffolded):**
+> the user's asks are ground-level immersion at 50–500 ft AGL, a night ground
+> that is lit like a real city from a small plane (today: one 0.09 directional
+> and a road layer whose continuous glow was overridden to 0.035 with lamp
+> pools at gain 12 — the "copper striping"), richer lighting overall, and ONE
+> floating button that fans the phone HUD's actions out (throttle + boost stay
+> beside the stick). Plan [FLY_ROUND25_PLAN.md](FLY_ROUND25_PLAN.md), kickoff
+> [FLY_ROUND25_KICKOFF.md](FLY_ROUND25_KICKOFF.md), evidence
+> [`scripts/r25-recon.md`](scripts/r25-recon.md). Six pre-seeded
+> `enabled:false` blocks sit at the END of `lib/fly/fly-constants.js`
+> (`GROUND_BUBBLE`, `GROUND_DETAIL_R25`, `NIGHT_GROUND_R25`,
+> `LIGHT_BUBBLE_R25`, `MOBILE_FAN_R25`, `FEEL_R25`), read through
+> `lib/fly/r25-pins.js`; the shared "how low are we" signal is
+> `runtime.groundBubble` (`components/fly/GroundBubbleRig.jsx`). WORKER_PROTOCOL
+> stays 20. Every R24 flag reads exactly as the notice below says; the Codex
+> overhaul (`f0cd81e`) kept its knobs in `lib/fly/satellite-visuals.js` and
+> `lib/fly/immersive.js` as always-on module constants with no revert flag.
+> Until the R25 record lands, the R24 notice below is still the ship state.
+
 > **⚠️ NEWEST — READ FIRST (2026-09-07): Round 24 "Smooth World" is BUILT and
 > CERTIFIED ON THE FIXTURE — not on a GPU — and
 > [FLY_ROUND24.md](FLY_ROUND24.md) is the record** (plan

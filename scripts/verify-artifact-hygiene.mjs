@@ -31,15 +31,18 @@
  * RUN (no browser, no GPU, no network — belongs in every smoke):
  *   node scripts/verify-artifact-hygiene.mjs
  *   R24_BASE=<sha> node scripts/verify-artifact-hygiene.mjs
+ *   R25_BASE=<sha> node scripts/verify-artifact-hygiene.mjs   (R25: base f0cd81e)
  */
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const BASE = process.env.R24_BASE || '6116fc5';
+// R25 (Fable, W0): the base is the R25 pre-scaffold tree — the Codex overhaul
+// tip the round starts from. R24's own ledgers and artifacts join the frozen set.
+const BASE = process.env.R25_BASE || process.env.R24_BASE || 'f0cd81e';
 // R15..R23 artifact name shapes, as they actually appear in scripts/.
-const PATTERNS = ['scripts/r1*-*', 'scripts/r2[0-3]-*', 'scripts/soak-results*.json'];
+const PATTERNS = ['scripts/r1*-*', 'scripts/r2[0-4]-*', 'scripts/soak-results*.json'];
 
 let pass = 0;
 let fail = 0;
@@ -68,7 +71,7 @@ gate(
 if (baseOk) {
   diff = git('diff', '--stat', BASE, '--', ...PATTERNS).trim();
   gate(
-    '(1) NO R15–R23 CALIBRATION ARTIFACT HAS CHANGED THIS ROUND',
+    '(1) NO R15–R24 CALIBRATION ARTIFACT HAS CHANGED THIS ROUND',
     diff === '',
     diff === ''
       ? `${PATTERNS.join(' ')} — all identical to ${BASE}`
