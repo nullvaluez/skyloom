@@ -11,6 +11,7 @@ import {
 } from 'three';
 import { SAT_VEG, SETTLE_CALM, SUBURB_NIGHT, SURFACE_CALM } from '@/lib/fly/fly-constants';
 import { applyBendAnchor } from '@/lib/fly/toy-world/world-bend';
+import { houseLightPlacementDue, houseLightPlacementSignature } from '@/lib/fly/night-lighting-policy';
 import {
   applyInstanceEnv,
   arrivalEpoch,
@@ -132,7 +133,7 @@ export function SatHouseLights({ engine, runtime, flight }) {
     const H = SUBURB_NIGHT.houseLights;
     const t = clock.elapsedTime;
     const st = stateRef.current;
-    if (t - st.t >= SAT_VEG.placeCadenceSec) {
+    if (houseLightPlacementDue(t, st.t, SAT_VEG.placeCadenceSec)) {
       // Round 21 (C, S6): one-time phase nudge; the first pass stays immediate.
       const U = SURFACE_CALM.enabled ? SURFACE_CALM.uploads : null;
       st.t = st.first && U ? t + U.stagger[2] * SAT_VEG.placeCadenceSec : t;
@@ -158,13 +159,13 @@ export function SatHouseLights({ engine, runtime, flight }) {
       } else {
         // …and the static skip: a settled ring under a parked aircraft
         // re-derives an identical pool and re-uploads it every 2 s. Both
-        // anchor sources are in the signature (the building ring's houseAnchors
-        // and the veg ring's residential scatter), plus the night ramp itself.
+        // anchor sources are in the signature (including their support repairs),
+        // plus the night ramp itself. A stationary healed house must not leave
+        // its visible porch sphere at the old coarse DEM elevation forever.
         const vg = engine.stats;
         const bs = runtime.satBuildings?.stats;
         const sig = U
-          ? `${vg.chunks}|${vg.ready}|${vg.clsChunks}|${vg.vegPts}|` +
-            `${bs?.chunks ?? -1}|${bs?.ready ?? -1}|${bs?.columns ?? -1}|${st.nightK.toFixed(3)}`
+          ? houseLightPlacementSignature(vg, bs, st.nightK)
           : '';
         const moved2 = (flight.pos.x - st.atX) ** 2 + (flight.pos.z - st.atZ) ** 2;
         if (!U || sig !== st.sig || moved2 >= U.staticSkipM ** 2) {

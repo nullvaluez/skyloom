@@ -48,6 +48,25 @@ check('source/emission use identical discrete building decisions',()=>{
     assert(e.gain>=.3&&e.gain<.74);assert(e.color.every(c=>c>0&&c<=1));
   }
 });
+check('stationary porch signature follows completed support repairs without count changes',()=>{
+  const veg={chunks:16,ready:16,clsChunks:16,vegPts:2000,heals:0,sampling:0};
+  const b={chunks:16,ready:16,columns:1500,contactHeals:0,healsInPlace:0,heals:0};
+  const first=policy.houseLightPlacementSignature(veg,b,1);
+  for(const key of ['contactHeals','healsInPlace','heals'])assert.notEqual(policy.houseLightPlacementSignature(veg,{...b,[key]:1},1),first);
+  const queued=policy.houseLightPlacementSignature({...veg,heals:1,sampling:1},b,1);
+  const committed=policy.houseLightPlacementSignature({...veg,heals:1,sampling:0},b,1);
+  assert.notEqual(queued,first);assert.notEqual(committed,queued);
+});
+check('frequent support repairs cannot bypass the existing porch placement cadence',()=>{
+  let last=-Infinity,placements=0;const placedAt=[];
+  for(let frame=0;frame<1000;frame++){
+    const now=frame/100;
+    // Even a new contact heal every frame can cause placement only at the
+    // component's outer cadence gate, never a new per-frame matrix rewrite.
+    if(policy.houseLightPlacementDue(now,last,2)){last=now;placements++;placedAt.push(now);}
+  }
+  assert.equal(placements,5);assert.deepEqual(placedAt,[0,2,4,6,8]);
+});
 const scene=new Scene(),runtime={flight:{latDeg:0},satBuildings:{chunks:new Map()},satRoads:{chunks:new Map()}};
 const parcelGeometry=new BufferGeometry();parcelGeometry.setAttribute('aHomeVariant',new InstancedBufferAttribute(new Float32Array([1,7]),1));
 const parcels=new InstancedMesh(parcelGeometry,new MeshBasicMaterial(),2);parcels.userData.__parcelInit=true;
