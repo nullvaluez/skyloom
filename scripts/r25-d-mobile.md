@@ -153,10 +153,11 @@ throttle row as its third member:
 | BOOST pad | `[686,294 – 754,338]` |
 | **FAB** | `[632,290 – 680,338]`, centre **(656, 314)** |
 
-Petals, ring 0 (`r0` 150): look (506, 314) · atlas (513, 268) · logbook
-(535, 226) · photo (568, 193) · hangar (610, 171) · pause (656, 164). Ring 1
-(`r1` 202): inspect (454, 314) · intercept (464, 252) · cinema (493, 195).
-Top-most petal edge **142 px**, left-most **432 px** — clear of the stick
+Petals, ring 0 (`r0` 150), MEASURED boxes: `touch-look [484,292]` ·
+`atlas [491,246]` · `logbook [513,204]` · `photo [546,171]` ·
+`hangar [588,149]` · `pause [634,142]`, all 44×44. Ring 1 (`r1` 202) carries
+inspect (454, 314) · intercept (464, 252) · cinema (493, 195) by centre.
+Top-most petal edge **142 px**, left-most **484 px** — clear of the stick
 (`[18,210 – 146,338]`) and of the minimap and contracts chip, both of which
 live in the top corners.
 
@@ -477,4 +478,19 @@ container's blocked-fetch signature, with no dynamic-import failure.
 | the fly root is unchanged | `data-fan-open` is `undefined` (React omits the attribute), asserted on every closed census | **absent** |
 | the existing layout gate is unmoved | `verify-mobile-layout.js` flag off vs the base tree | **same 16/18, same boxes** |
 | nothing else in the tree moved | `verify-artifact-hygiene.mjs` gates (1) and (4) | **PASS** |
+
+## §12 Screenshots for the user checkpoint
+
+`scripts/r25-out/` (gitignored — copy them out before the round closes):
+
+| File | What it shows |
+|---|---|
+| `BEFORE-portrait-row.png` · `BEFORE-landscape-row.png` | the flag-off HUD: five 48 px buttons stacked over the throttle rail and the BOOST pad |
+| `DEMO-portrait-closed.png` · `DEMO-landscape-closed.png` | the same HUD armed: ONE hamburger FAB where the row was |
+| `DEMO-portrait-open.png` · `DEMO-landscape-open.png` | the fan open — six petals on the quarter arc |
+| `fan-armed-*-0*.png` | the gate's own evidence (closed / open / open-with-a-lock / open-with-the-chip) |
+
+The plan's §6 checkpoint 3 is "D's fan demo from `r25/d` as soon as W1 closes:
+petal size, arc, spring, chip hiding". The first three are in these images; the
+SPRING is the one they cannot carry (§8).
 

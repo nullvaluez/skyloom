@@ -309,7 +309,11 @@ async function runOrientation(browser, label, ctxOpts) {
   }
   await bootMobile(page, BOOT_OPTS);
   await page.waitForTimeout(3000);
-  const shot = (n) => page.screenshot({ path: path.join(OUT, `fan-${label}-${n}.png`) });
+  // The ARM goes in the FILENAME: the RED run and the armed run take the same
+  // shots in the same order, and without this the flag-off row screenshot
+  // quietly overwrites the fan screenshot it is supposed to be compared with.
+  const shot = (n) =>
+    page.screenshot({ path: path.join(OUT, `fan-${ARM ? 'armed' : 'flagoff'}-${label}-${n}.png`) });
 
   // --- 1. CLOSED -----------------------------------------------------------
   const closed = await census(page);
