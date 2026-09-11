@@ -55,6 +55,11 @@ const pinPose = async ([lat, lon, heading, pitch, agl]) => {
 
 async function arm(browser, z19) {
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+  // See r25-a-ground.md §7.4: scripts/_boot.js:181 passes its options object as
+  // waitForFunction's SECOND parameter, which Playwright reads as `arg`, so the
+  // boot-screen wait falls back to the 30 s PAGE DEFAULT and FLY_BOOT_SCALE
+  // never reaches it. Raising the page default fixes it from the caller's side.
+  page.setDefaultTimeout(Math.max(30000, 30000 * SCALE));
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
   await page.addInitScript(() => {
@@ -82,9 +87,9 @@ async function arm(browser, z19) {
     window.__flySunOverride = t;
   }, NOON_MS);
   await page.evaluate(pinPose, [...OWENS, 95]);
-  await page.waitForTimeout(60000 * SCALE);
+  await page.waitForTimeout(40000 * SCALE);
   const census = [];
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 6; i++) {
     census.push(
       await page.evaluate(() => ({
         draws: window.__flyStats?.drawCalls ?? -1,
@@ -97,7 +102,7 @@ async function arm(browser, z19) {
         leaf: window.__fly?.terraStats ?? null,
       }))
     );
-    await page.waitForTimeout(1500 * SCALE);
+    await page.waitForTimeout(1200 * SCALE);
   }
   await page.close();
   return { census, errs };
