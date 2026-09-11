@@ -377,7 +377,49 @@ z19 probe; every row names the run it came from, and every row is a STRUCTURAL
 number — counts, uniforms, keys, draws, fixed-pose crops. There is no fps, ms
 or look row here and there cannot be.)*
 
-<!-- R25A-MEASURED-ROWS -->
+### 6.1 Flag-off identity (node, `scripts/r25-a-flagoff-identity.mjs`)
+
+**8 / 8.** See §2 for the full output.
+
+### 6.2 The RED calibration (fixture, `FLY_GD_ARM=0`, flag-off tree)
+
+Powell OH 40.1578 / −83.0752, satellite, tier high, noon pinned, AGL pinned
+through the flight model.
+
+| Leg | RED result |
+|---|---|
+| (1a) the rig is unmounted and readers see 0 | **PASS** — `runtime.groundBubble` is `undefined` |
+| (1b) k ≥ 0.95 at 80 m | **FAIL** — no bubble |
+| (1c) k ≤ 0.02 at 900 m | **FAIL** — no bubble |
+| (1d) 480 → 560 → 480 does not ratchet | **FAIL** — no bubble |
+| (1e) the 60 m input deadband is real | **FAIL** — no bubble |
+| (3a) the suburb places SCRUB | **FAIL** — the layer is not mounted |
+| (3b) the suburb places HEDGES | **FAIL** — the layer is not mounted |
+| (6a) `uGroundDetail === 0` at 3500 ft | **PASS** — 0 (the uniform does not exist) |
+| (6b) both pools parked at 3500 ft | **PASS** — no meshes in the scene |
+| (6c) / (3c) drape alpha at `SAT_TINT.alpha` | **PASS** — 0.1, lifted nowhere |
+
+Census on that tree, the RED numbers themselves:
+
+```
+hillKey       world-bend-fade-hill-r19-ef24   (no 'd')
+z19Level      17                              (TERRA pinned legacy by the fleet)
+tintChunks    8     tintVerts 31    tintPolys 13
+draws         49    tris 92,720
+scrubAreaM2   0     scrubCount 0    hedgeCount 0
+```
+
+**Six legs red, and each of the six is a thing the feature makes true.** The
+four PASSes are the "costs nothing when off" half and are green by design, not
+by accident — they are what makes the RED run a control rather than a ceremony.
+
+### 6.3 The ARMED run
+
+<!-- R25A-GREEN -->
+
+### 6.4 z19
+
+<!-- R25A-Z19 -->
 
 ---
 
