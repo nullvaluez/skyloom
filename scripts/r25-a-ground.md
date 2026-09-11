@@ -196,21 +196,30 @@ name.
 
 ## §2 Flag-off identity — PROVEN, byte for byte
 
-`scripts/r25-out/gd-identity.mjs` (scratch, gitignored — reproduced verbatim
-below so the claim is auditable without it) loads **this tree's**
-`applyHillshade` and the **W0 base's** copy (`git show 6bf628e:…`) in one node
-process through `scripts/_node-resolve.mjs`, runs both through the same fake
-shader object, and compares the generated strings:
+`node scripts/r25-a-flagoff-identity.mjs` (committed, re-runnable; it extracts
+the base copy itself with `git show 6bf628e:lib/fly/toy-world/world-bend.js`)
+loads **this tree's** `applyHillshade` and the **W0 base's** in ONE node process
+through `scripts/_node-resolve.mjs`, runs both through the same fake shader
+object, and compares the generated strings. **MEASURED-HERE, 8/8:**
 
 ```
 PASS (1) flag-off FINAL tile key verbatim R24 — world-bend-fade-hill-r19-ef24 (both)
 PASS (2) flag-off fragment string byte-identical — 3047 vs 3047 chars
 PASS (3) flag-off vertex string byte-identical
-PASS (4) flag-off uniform set identical
+PASS (4) flag-off uniform set identical — uHillAO,uHillAmbient,uHillDir,uHillElev,
+         uHillLift,uHillSat,uHillStrength,uMicroAmp,uMicroScale,uMicroStrength,
+         uQuiltAnchor,uQuiltDesat,uQuiltFlat
 PASS (5) flag-off fragment carries no R25 text
-PASS (6) armed key = flag-off key + the single token d — …-ef24 -> …-efd24
-PASS (7) armed fragment is the flag-off fragment PLUS the d block (a pure append)
+PASS (6) armed key = the flag-off key + the single token 'd' — …-ef24 -> …-efd24
+PASS (7) armed fragment = the flag-off fragment PLUS the d block (a pure append)
+PASS (8) armed adds exactly the two overlay uniforms and nothing else
+8 passed, 0 failed
 ```
+
+Note what (1) also records: the FINAL key on the SHIPPED tree is
+`world-bend-fade-hill-r19-ef24` — `e` and `f` only. `AERIAL_LAW` ships OFF (no
+`a`) and `lodFade` is per-material (no `l` in this synthetic capture), so `'d'`
+lands as the third character of the token run when armed.
 
 The other four terms are flag-off-identical by construction and by reading:
 
