@@ -123,22 +123,30 @@ sharing the existing `immersive-foliage.js` 128² leaf atlas (`alphaTest 0.42`,
 Pools {high 2000, medium 800, low 0} ⇒ **8,000 tris at the full high pool,
 exactly the 8 k budget.**
 
-Anchors are hash-stable barycentric samples on the pooled **SatTint landcover
-TRIANGLES**, selected by the worker's own per-vertex `cls` (2 wood / 3 grass /
-5 farmland — **never `park`**, which is administrative and would carpet the
-Mojave; the worker's own warning at `vector-tile.worker.js:3698` and the R19
-measured ruling behind it). Rejections: a building column within `urbanAvoidM`
-(ONE `queryColumns` call for the whole disc, then a 32 m hash grid — per
-candidate it is a bucket walk, not an allocation), a cls 5/6 road centreline
-within `roadAvoidM`, a water anchor within `waterAvoidM`. Ground height is
-`engine.groundAtLocal(chunk, lx, lz)` — **THE SAME bilinear grid** the clutter,
-the tint, the porch lights and the parcel homes stand on, because a mismatched
-grid floats objects (`CLUTTER.gridSegments`, `fly-constants.js:6104`).
+Anchors sit on the pooled **SatTint landcover TRIANGLES**, selected by the
+worker's own per-vertex `cls` (2 wood / 3 grass / 5 farmland — **never `park`**,
+which is administrative and would carpet the Mojave; the worker's own warning at
+`vector-tile.worker.js:3698` and the R19 measured ruling behind it). Rejections:
+a building column within `urbanAvoidM` (ONE `queryColumns` call for the whole
+disc, then a 32 m hash grid — per candidate it is a bucket walk, not an
+allocation), a cls 5/6 road centreline within `roadAvoidM`, a water anchor
+within `waterAvoidM`. Ground height is `engine.groundAtLocal(chunk, lx, lz)` —
+**THE SAME bilinear grid** the clutter, the tint, the porch lights and the
+parcel homes stand on, because a mismatched grid floats objects
+(`CLUTTER.gridSegments`, `fly-constants.js:6104`).
 
-**Density is DERIVED, not a new constant**: `pool / (π · radiusM²)` cards per m²,
-so a fully-vegetated disc fills the pool exactly and a half-vegetated one fills
-half of it. Per-triangle cap 64 so one region-scale parcel cannot spend the pool
-before the near triangles are served.
+**The sampler is a JITTERED WORLD LATTICE**, walked over
+`bbox(triangle) ∩ bbox(disc)` with spacing `1 / sqrt(pool / (π r²))` ≈ 11.9 m at
+the high pool. **Density is DERIVED, not a new constant** — the spacing IS the
+density, so a fully-vegetated disc fills the pool exactly and a half-vegetated
+one fills half of it, with no per-triangle cap needed at all. And it is
+**hash-stable in the strongest sense**: the lattice lives in ABSOLUTE world
+coordinates and each cell's jitter is keyed on its integer index, so a tuft's
+position is a pure function of where it is on the planet and of NOTHING the
+camera does. That is SAT_VEG's rule ("never a distance sort") applied to a
+source with no emission order of its own, and it is why a tuft cannot move,
+blink or re-shuffle when you turn. §7.2 records the sampler this replaced and
+why it measured the wrong thing.
 
 ### 3. `hedges` — a second instancer in the same file, +1 draw where placed
 
@@ -281,7 +289,7 @@ answer, not this container's** — see §8.
 
 ---
 
-## §6 Decisions
+## §5b Decisions
 
 **1. The overlay is a fragment term, not a normal map or a detail map.** Both
 alternatives are texture bytes against a 300 MB ceiling on a vendored tile
@@ -348,6 +356,17 @@ flag-off string does not move.
 
 ---
 
+## §6 Measured rows (fixture, MEASURED-HERE)
+
+*(filled from the `scripts/verify-ground-bubble.js` RED and GREEN runs and the
+z19 probe; every row names the run it came from, and every row is a STRUCTURAL
+number — counts, uniforms, keys, draws, fixed-pose crops. There is no fps, ms
+or look row here and there cannot be.)*
+
+<!-- R25A-MEASURED-ROWS -->
+
+---
+
 ## §7 Instrument notes — what went wrong with the gate, before the gate worked
 
 Two, both worth writing down because both are the venue meeting a harness
@@ -411,6 +430,16 @@ have not touched it; this gate raises the PAGE DEFAULT instead
 (`page.setDefaultTimeout`), which fixes every un-timed wait in that file from
 the caller's side. **E: the one-line fix is to move the options object to the
 third parameter.**
+
+**7.5 The dev server died twice mid-run, and the first symptom was a gate
+result.** Two runs were VOID because `next dev` on this worktree exited under
+the afternoon's load (six agents, load average 23, Turbopack + an 800 MB
+hard-linked `node_modules`) and the harness reported
+`net::ERR_CONNECTION_REFUSED` / a stale log rather than "the server is gone".
+It now runs under a restart supervisor. Recorded because the failure mode
+matters: **a harness whose server dies produces a row that looks like a
+measurement.** Every number in §6 comes from a run whose server was verified
+alive before and after.
 
 **7.3 The gate reports NOT CALIBRATED, never PASS, when its precondition is
 unmet.** The layer publishes `scrubAreaM2` — the in-disc landcover area the pass
