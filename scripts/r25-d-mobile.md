@@ -414,3 +414,55 @@ node -r ./scripts/_pw-shim.js`. Logs and screenshots under
 live in the process table for most of this window** — every wall-clock number
 is a number about that, not about the fan.
 
+### Node gates on this tree (no browser, no contention)
+
+| Gate | Result |
+|---|---|
+| `scripts/verify-artifact-hygiene.mjs` | **5/5 PASS** — including (1) no R15–R24 calibration artifact changed and (4) no previous-round artifact dirtied by a run |
+| `scripts/graphics-unit.mjs` | **PASS** (six families, masks, stable variation, quality continuity, latitude, atmosphere, protocol) |
+| `scripts/immersive-unit.mjs` | **PASS** |
+| `npx eslint` on every file in the diff | clean (FlyMode's 15 `react-hooks/refs` errors are PRE-EXISTING — the same 15 on `HEAD:components/fly/FlyMode.jsx`) |
+
+### `scripts/verify-mobile-fan.js` — D's gate
+
+| Run | Tree | Result |
+|---|---|---|
+| `fan-RED-flagoff.log` | flag off (gate v1) | **20/30, 10 FAIL, 14 SKIP** — the RED calibration. Three of the passes were FALSE (the row's buttons wearing the petals' testids), which is what put `data-open === '1'` into every open assertion. |
+| `fan-armed-1/-2/-3` | armed | killed / instrument reds (§9.1-9.5), each one fixed in the gate, none in the feature |
+| `fan-armed-4` | armed | VOID — `ERR_CONNECTION_REFUSED`: the dev server had been killed by another agent's over-broad `pkill -f next-server` |
+| **`fan-armed-5.log`** | **armed** | **53 PASS · 0 FAIL · 0 SKIP**, then the same `pkill` took the server out again five rows from the end |
+
+The five rows `fan-armed-5` did not reach are the LANDSCAPE tail —
+`hideWhileOpen hides a chip that is REALLY there`, the dev handle, the two
+`armed:` dock/mirror rows and the two pageerror rows. **All five passed in the
+PORTRAIT leg of the same run**, and the two dock rows read the same constants
+in both orientations; they are recorded here as REACHED-IN-ONE-ORIENTATION,
+not as green in both.
+
+What the 53 include, in both orientations unless noted: closed = FAB only
+(56 px portrait / 48 px landscape) with `data-open="0"`, `aria-expanded=false`
+and **zero petals in the DOM**; open = six petals at exactly
+180/162/144/126/108/90° on ring 0, every one 44×44 and within **2 px** of the
+published arc, inside the viewport, disjoint from minimap · contracts chip ·
+stick · throttle · boost; `hideWhileOpen` hiding the toasts (and, portrait,
+a REAL info chip); the BoostBar ring still tracking the pad to within 1.5 px;
+a tap outside closing AND removing the petals; the Atlas unmounting the whole
+control set and restoring it CLOSED; a lock adding INSPECT + INTERCEPT on
+ring 1 with **all six persistent petals within 1 px of their no-lock
+positions** and CINEMA correctly absent on a soft lock; reduced motion landing
+the petals at their final positions with **0.0 px of drift at +60 ms** against
+a spring control that drifted **168.0 px** (portrait) / **150.1 px**
+(landscape); the dock class and `dockBottomRem` agreeing on 21.75 rem; the
+`clusterSize` mirror equalling the block; `hideWhileOpen` still naming exactly
+the two zones `globals.css` hides; and the only pageerror being this
+container's blocked-fetch signature, with no dynamic-import failure.
+
+### The EXISTING mobile harnesses, armed and off
+
+| Harness | Tree | Result |
+|---|---|---|
+| `verify-mobile.js` | **ARMED** | dies at **:214** `page.click('[data-testid="touch-look"]')`, `Timeout 30000ms exceeded`. Before that, :161-168 already reads `pause:false atlas:false look:false` and the stick/throttle/steer legs pass. **Everything from :214 on is unreachable until `openFan` is inserted** — §6 is the list. |
+| `verify-mobile-layout.js` | **ARMED** | **14 PASS / 1 FAIL / dies at :482.** The fail is the venue (`portrait zero pageerrors — Failed to fetch`); the death is `locator('[data-testid="touch-pause"]').click()` in the landscape-only leg. **Every frozen contract passes ARMED in both orientations**: the 8 zone names, no overflow, every zone member inside the viewport, pairwise zone disjointness, the 44 px sweep, the toast stack, and the info chip vs the thumbstick — now measured at the NEW dock (`chip [8,448–382,496]` portrait). The census drops from **14 interactive members to 8**, which is the five-buttons-into-one-FAB change, seen from the outside. |
+| `verify-mobile-layout.js` | **flag off** | **16/18 PASS — the base tree's result, row for row.** The only two reds are the venue's `zero pageerrors` pair (`Failed to fetch`), which the UNTOUCHED base tree also fails here; 14 interactive members in both orientations, same pairwise-disjointness set, and the info chip back at `[8,404–382,452]` portrait — the pre-R25 pixels. |
+| `verify-mobile.js` | flag off | NOT RUN TO COMPLETION — E CERT reports it does not complete in EITHER arm on this venue under the current load (three other agents' harnesses live, load ~15-24 on 4 cores). The flag-off tree's rendered control DOM is byte-identical to the base tree's in both orientations (`diff` clean), so the base-tree behaviour is the flag-off behaviour by construction. |
+
