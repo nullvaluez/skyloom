@@ -1182,7 +1182,9 @@ export function FlyScene({ runtime }) {
         // `_anchor` arithmetic (terrain-engine.js), not matrixWorld. What DOES
         // read matrixWorld the same frame is the tile raycast behind
         // getElevationAt, so the tile map subtree is updated and nothing else.
-        root.updateMatrix();
+        // Refresh the parent world transform before the terrain subtree reads
+        // it for same-frame raycasts and camera-ranked shadow receivers.
+        root.updateWorldMatrix(true, false);
         engine.object?.updateMatrixWorld?.(true);
       } else {
         root.updateMatrixWorld(true);
