@@ -540,10 +540,19 @@ user's RTX 5080 + phone, and NONE of it is claimed anywhere above.
    ops per satellite tile fragment inside the bubble. At the deck the tiles fill
    most of the frame. This is the single most likely place for the feature to
    cost something on a real GPU, and it is exactly what this venue cannot see.
-7. **`chunkAt` is a linear scan** over ready veg chunks per hedge candidate
+7. **The lattice walk is bounded by the disc, but not by the triangle COUNT.**
+   Work is `Σ over landcover triangles of |bbox(tri) ∩ bbox(disc)| / spacing²`
+   point-in-triangle tests. On the fixture that is ~13 triangles and nothing;
+   on a real OpenFreeMap suburb with a hundred small landcover polygons the
+   worst case is bounded above by (disc area / cell area) × N ≈ 2,540 × N tests
+   per 2 s cadence pass. That is the one place this layer could cost CPU on a
+   real world, it is unmeasurable here, and if it binds the fix is a cheap
+   per-triangle bbox-area early-out rather than a cap (a cap is what §7.2
+   removed).
+8. **`chunkAt` is a linear scan** over ready veg chunks per hedge candidate
    (≤ ~20 compares). Fine at the pool sizes here; it would want a grid if the
    hedge pool grew by an order of magnitude.
-8. **The scrub and hedge pools are resolved at MOUNT from the quality tier.** A
+9. **The scrub and hedge pools are resolved at MOUNT from the quality tier.** A
    tier step after mount does not re-pool (deliberately — the R16 §7/§10
    PerformanceMonitor lesson), so a session that steps high → medium keeps the
    high pool until the layer remounts.
