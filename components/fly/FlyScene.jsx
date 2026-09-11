@@ -27,6 +27,7 @@ import {
   setHillElev,
   setHillshade,
   setHillV2,
+  setGroundDetail,
   setMicroDetail,
   setQuiltGrade,
   getQuiltGrade,
@@ -2836,6 +2837,13 @@ export function FlyScene({ runtime }) {
       microStrength = window.__flyMicroOverride;
     }
     setMicroDetail(microStrength);
+    // R25 A (GROUND_DETAIL_R25.overlay): the low-AGL DETAIL overlay's live
+    // drive, beside the micro-detail one it succeeds. Where micro fades OUT
+    // below 1.5 km, this fades IN inside the ground bubble (§2's shared signal,
+    // `runtime.groundBubble.k`; exactly 0 with that rig unmounted). Policy —
+    // tier ladder, style gate, the dev k pin — lives in lib/fly/ground-detail.js
+    // so this stays one line; the uniform write is world-bend's.
+    setGroundDetail(runtime.groundBubble?.k ?? 0, flyState.qualityTier, flyState.mapStyle === 'satellite');
 
     // Toon shadow sun rides with the player (small ortho frustum). Round 8:
     // it follows the style's KEY light (MOODS lightDir) — toy's moon, not
