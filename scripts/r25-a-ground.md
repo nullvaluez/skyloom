@@ -242,6 +242,7 @@ than asserting a frozen number.
 | `components/fly/FlyScene.jsx` | one mount line | TWO lines + two imports: the `&&`-chain mount beside `SatClutterLayer`, and the `setGroundDetail(...)` line beside `setMicroDetail` that the charter names as the permitted second touch. |
 | `lib/fly/tile-sources.js` | "z19 read" | `satMaxZoomFor` now wraps the pre-R25 body (renamed `satMaxZoomBase`, contents untouched). |
 | `lib/fly/prewarm.js` | "SIZES entry if a new attribute" | No new attribute and no SIZES change; **two guarded warm ENTRIES** instead — see §5, this is a deliberate reading of the rule and it is flagged. |
+| `lib/fly/r25-pins.js` | **not in my row (Fable's W0)** | THREE import specifiers `'./x'` → `'@/lib/fly/x'`, zero behaviour, because `_alias-loader.mjs` — which `verify-lod-fade.mjs` and `verify-atmo-law.mjs` register — resolves the `@/` alias and NOT extensionless relative paths, so the first R25 module to reach `world-bend.js` crashed the gate at import. Every owner's chain hits this. §7.6. **Flagged for the orchestrator.** |
 | `lib/fly/terrain-engine.js` | **not in my row** | ONE line + one import: `R24_SWITCHES.workerNormals` reads `TERRAIN_LIGHT` through `pinned`. The charter assigns me this (§3 A6) and no other owner touches this file this round, but it IS out of row. **Flagged for the orchestrator.** |
 | `lib/fly/fly-constants.js` | `GROUND_DETAIL_R25` | Only inside my own block: `z19` gains `levels: 1` and the reason it is a ceiling. |
 | `scripts/verify-ground-bubble.js`, `scripts/r25-a-z19-probe.js`, `scripts/r25-a-ground.md` | NEW | My gate, my measurement probe, this ledger. **`scripts/verify-*` is E's row** — the plan names this gate as "E writes, A ships the handle"; I wrote it because it is the only instrument that can RED-calibrate my own work before merge. **E owns it from the merge on** and should re-key anything that collides. |
@@ -430,6 +431,32 @@ have not touched it; this gate raises the PAGE DEFAULT instead
 (`page.setDefaultTimeout`), which fixes every un-timed wait in that file from
 the caller's side. **E: the one-line fix is to move the options object to the
 third parameter.**
+
+**7.6 The R25 pin accessor was not loadable by the node gates, and it would
+have bitten all five other owners.** The moment `world-bend.js` imported an R25
+module, `verify-lod-fade.mjs` stopped at import:
+
+```
+ERR_MODULE_NOT_FOUND: Cannot find module 'lib/fly/r25-pins'
+  imported from lib/fly/ground-detail.js
+```
+
+That gate registers `scripts/_alias-loader.mjs`, which resolves the `@/` alias
+and **not** extensionless relative specifiers — and `lib/fly/r25-pins.js` (W0)
+imports `'./fly-constants'` / `'./fly-pins'`. Three import specifiers changed to
+`@/…`; zero behaviour, because Next resolves both spellings identically and
+`world-bend.js` has imported `'@/lib/fly/fly-constants'` since R24 for exactly
+this reason. **It is not specific to me** — every R25 owner's chain reaches a
+node gate through `r25-pins` — which is why it was fixed rather than worked
+around, and why it is flagged as out of row in §3. (`scripts/_node-resolve.mjs`
+already handles BOTH forms and would be the alternative fix, in E's row.)
+
+**What the unblocked gate then showed, and it is not mine:**
+`verify-lod-fade` reads **60/4** and `verify-skirt-worker` **8/1**, and every
+red is in `lib/fly/vendor/three-tile/**` or the DEM worker tail — files this
+branch does not touch (`git diff --stat 6bf628e -- lib/fly/vendor` is empty).
+They were hidden behind the crash. **E: five reds exist on the W0 base and need
+an owner.**
 
 **7.5 The dev server died twice mid-run, and the first symptom was a gate
 result.** Two runs were VOID because `next dev` on this worktree exited under
