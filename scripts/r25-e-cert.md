@@ -401,6 +401,47 @@ of the flag-off identity argument is structural — every edit either inserts an
 or is guarded by `FAN` — and it should be re-run on the user's machine, where
 it is one of the §2.7 rows.
 
+#### `verify-mobile-layout.js` — **THE IDENTITY PROOF, and it is exact**
+
+Both arms completed, both orientations, same server, same hour. The control is
+`git show 6bf628e:scripts/verify-mobile-layout.js` with only its
+`require('./_mobile-boot')` and its screenshot prefix re-pointed (grep-verified:
+zero `openFan` / `hasFan` references).
+
+```
+diff <(grep -E '^(PASS|FAIL)' layout-control.log) \
+     <(grep -E '^(PASS|FAIL)' layout-treatment.log)
+→ no output
+```
+
+**Every PASS/FAIL row is byte-identical between the two arms**, values
+included: chip `[8,404–382,452]` vs stick `[18,664–146,792]` in portrait, chip
+`[252,302–592,350]` vs stick `[18,210–146,338]` in landscape, 14 zone members
+measured and pairwise-checked in both orientations, the toast stack 252 px of
+390 and 430 px of 844, and the landscape Exit button at `y 157 h 44 inView
+hittable`. Both arms end on the same verdict line:
+
+> `VERIFY: FAIL (portrait zero pageerrors, landscape zero pageerrors)`
+
+Those two reds are `Failed to fetch` — the 403-blocked tile hosts — and they are
+**the same two reds in the control**, i.e. a venue artifact, not a regression.
+
+The treatment differs from the control by exactly two lines, and they are the
+two new rows doing their job:
+
+```
+SKIP portrait  FAN OPEN disjointness census — no FAB on this tree
+SKIP landscape FAN OPEN disjointness census — no FAB on this tree
+SKIPPED (not asked on this tree): portrait FAN OPEN…, landscape FAN OPEN…
+```
+
+**This run also proves `openFan`'s no-op contract empirically**, not just
+structurally: the landscape `pause: Exit Fly Mode is reachable` row goes
+through `await openFan(page)` before its click and reads identically to the
+control. That is the same mechanism every edit in `verify-hangar.js` and
+`verify-logbook.js` uses, so those two inherit the proof (they were not run
+here — see §6).
+
 **An honest note on a contaminated log.** The first control attempt was started
 twice (a backgrounded subshell that I believed had died, plus a `setsid` retry)
 and both wrote to the same file, interleaving two runs. The log above is read

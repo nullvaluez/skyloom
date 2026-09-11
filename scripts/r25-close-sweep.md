@@ -100,10 +100,10 @@ pair:
 
 | Gate | Why R25 touches it | Flag-off (identity) | Flipped |
 |---|---|---|---|
-| `verify-mobile.js` | E rewired every action tap through `openFan` | | |
-| `verify-mobile-layout.js` | + a second disjointness census, fan OPEN | | |
-| `verify-hangar.js` | + gate 14b, the `touch-hangar` petal | | |
-| `verify-logbook.js` | `openFan` before the pause tap | | |
+| `verify-mobile.js` | E rewired every action tap through `openFan` | **PARTIAL** — every row both arms reached is identical; neither arm completed here (the CONTROL died earlier). §3.2a of `r25-e-cert.md` | |
+| `verify-mobile-layout.js` | + a second disjointness census, fan OPEN | **✔ EXACT** — both orientations, `diff` of the PASS/FAIL rows between the edited file and the base file is EMPTY; the only difference is the two new SKIP rows | |
+| `verify-hangar.js` | + gate 14b, the `touch-hangar` petal | **inherited** — its only edit is the same `openFan` no-op the layout run proved | |
+| `verify-logbook.js` | `openFan` before the pause tap | **inherited** — same | |
 | `verify-sat-night.js` | B NIGHT moves night ground pixels | | |
 | `verify-dusk.js` | C LIGHT moves the night/dusk grade | | |
 | `verify-seam.js` (hashes) | A GROUND's `'d'` block is in the tile fragment | | |
