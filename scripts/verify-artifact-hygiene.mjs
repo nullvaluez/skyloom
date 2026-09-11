@@ -60,7 +60,22 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // tip the round starts from. R24's own ledgers and artifacts join the frozen set.
 const BASE = process.env.R25_BASE || process.env.R24_BASE || 'f0cd81e';
 // R15..R23 artifact name shapes, as they actually appear in scripts/.
-const PATTERNS = ['scripts/r1*-*', 'scripts/r2[0-4]-*', 'scripts/soak-results*.json'];
+// R25 (E CERT): the last three globs are the hole the R24 version left open,
+// found by falling into it. The MOBILE fleet writes its baselines as
+// `scripts/mobile-*.png`, `scripts/hangar-*.png` and `scripts/logbook-*.png`,
+// which no previous pattern matched — and it does not require `_boot.js`, so
+// the fixture's write redirect never reached it either. Four runs in one
+// afternoon rewrote fourteen tracked PNGs in place while this gate stayed
+// green. Both defences are now closed: `scripts/_mobile-boot.js` requires
+// `_fixture` for the redirect, and these globs make the OUTCOME checkable.
+const PATTERNS = [
+  'scripts/r1*-*',
+  'scripts/r2[0-4]-*',
+  'scripts/soak-results*.json',
+  'scripts/mobile-*.png',
+  'scripts/hangar-*.png',
+  'scripts/logbook-*.png',
+];
 // R25 (E CERT, W1). Each entry is one INSTRUMENT repaired this round, with the
 // reason. Evidence extensions are refused by gate (1b) — see the header.
 const ALLOW = [

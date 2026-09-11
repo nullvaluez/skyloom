@@ -5,6 +5,29 @@
  * blocked, so the world boots via the maxBootMs ceiling with an empty sky,
  * which is fine for exercising the UI + controls.
  */
+
+// R25 (E CERT) — THE ARTIFACT REDIRECT, AND THE HOLE IT WAS NOT COVERING.
+//
+// `scripts/_fixture.js` installs a redirect at module load under
+// FLY_TILE_FIXTURE: every write landing DIRECTLY in `scripts/` is rewritten to
+// `scripts/r24-out/fixture-<name>`, so a fixture run can never overwrite a
+// tracked calibration artifact. Its own comment says it reaches "every gate
+// that requires `_boot.js`".
+//
+// THE MOBILE FLEET DOES NOT REQUIRE `_boot.js`. It requires THIS file. So
+// verify-mobile / verify-mobile-layout / verify-hangar / verify-logbook /
+// verify-sat-mobile were outside the defence entirely, and every run of them
+// overwrote their tracked `scripts/mobile-*.png` baselines in place.
+// MEASURED, R25 W1: four runs in one afternoon rewrote FOURTEEN tracked PNGs
+// (`git diff --stat` against the round base), and `verify-artifact-hygiene`
+// stayed green throughout because its PATTERNS glob covered `scripts/r1*-*` /
+// `scripts/r2[0-4]-*` and not these names. Both halves are now closed: this
+// line, and the hygiene gate's PATTERNS.
+//
+// Required for the SIDE EFFECT only. It installs nothing when
+// FLY_TILE_FIXTURE is unset, so a run on the user's machine is unaffected.
+require('./_fixture');
+
 async function bootMobile(page, { url = process.env.FLY_URL || 'http://localhost:3000', style = null, waitS = 90 } = {}) {
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.evaluate((s) => {
