@@ -44,6 +44,7 @@ import { SatAmbientLife } from './SatAmbientLife';
 import { SatHouseLights } from './SatHouseLights';
 import { SatParcelHomes } from './SatParcelHomes';
 import { SatTintLayer } from './SatTintLayer';
+import { stylizedEarthOn } from '@/lib/fly/stylized-earth';
 
 // --- Round 24 — C MOTION's spec, B's call sites -----------------------------
 // settle.js through a NAMESPACE import: `groundElevVis`/`motionSubOn` are C's
@@ -489,7 +490,7 @@ export function SatVegLayer({ runtime, flight }) {
           cross-component contract for data that is already right here. Each is
           its own +1 draw, each parks itself (visible=false / count=0) when its
           scene has nothing to show, and each is one flag from gone. */}
-      {SAT_TINT.enabled && <SatTintLayer engine={engine} flight={flight} />}
+      {!stylizedEarthOn() && SAT_TINT.enabled && <SatTintLayer engine={engine} flight={flight} />}
       {SUBURB_NIGHT.enabled && (
         <SatHouseLights engine={engine} runtime={runtime} flight={flight} />
       )}

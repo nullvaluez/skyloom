@@ -1,6 +1,9 @@
 'use client';
 
 import { GroundImmersionRig } from './GroundImmersionRig';
+import { EarthSurfaceLayer } from './EarthSurfaceLayer';
+import { applyEarthSurface } from '@/lib/fly/earth-surface-material';
+import { stylizedEarthOn } from '@/lib/fly/stylized-earth';
 import { SatGroundDetailLayer } from './SatGroundDetailLayer';
 import { applyNearGroundMaterial } from '@/lib/fly/near-ground-material';
 import { applyNightGroundReceiver } from '@/lib/fly/night-ground';
@@ -9,7 +12,7 @@ import { nearGroundOn } from '@/lib/fly/near-ground';
 import { createShadowCoverageState, selectShadowReceivers, resolveShadowFocus } from '@/lib/fly/shadow-coverage';
 import { attachGroundShadowLight, publishGroundShadowCoverage, releaseGroundShadowCoverage, publishGroundShadowFocus } from '@/lib/fly/light-bubble';
 import { physicalBendCoefficient } from '@/lib/fly/render-scale';
-import { IMMERSIVE, immersiveOn, immersiveLighting } from '@/lib/fly/immersive';
+import { IMMERSIVE, immersiveOn, immersiveLighting, immersiveProfile } from '@/lib/fly/immersive';
 
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -1007,7 +1010,7 @@ export function FlyScene({ runtime }) {
   // any tier but high, this object is byte-for-byte the R18 rig.
   const shadowRig = satShadowsOn
     ? {
-        mapSize: immersiveOn('lighting') ? IMMERSIVE.profiles[effectsTier].shadowSize : SAT_SHADOWS.mapSize,
+        mapSize: immersiveOn('lighting') ? immersiveProfile(effectsTier).shadowSize : SAT_SHADOWS.mapSize,
         radiusM: SAT_SHADOWS.orthoRadiusM,
         farM: SAT_SHADOWS.farM,
         bias: SAT_SHADOWS.bias,
@@ -1506,6 +1509,7 @@ export function FlyScene({ runtime }) {
         applyNearGroundMaterial(m, { surface: 'terrain' });
         applyNightGroundReceiver(m, 'terrain');
         applyDaylightSurface(m, 'terrain');
+        if (stylizedEarthOn()) applyEarthSurface(m);
         // Round 11: tier-aware aniso, read imperatively so NEW tiles pick up
         // a live tier change without re-uploading the streamed field (no
         // degrade hitch; the field converges as tiles stream).
@@ -3339,6 +3343,7 @@ export function FlyScene({ runtime }) {
             worldRoot so chunk meshes ride the -anchor rebase like the toy chunks
             (anchor-bend uBendCenter frame stays in sync). Gated satellite +
             enabled + tier≥medium → byte-noop (no worker/engine/draws) elsewhere. */}
+        {mapStyle === 'satellite' && stylizedEarthOn() && <EarthSurfaceLayer runtime={runtime} />}
         {mapStyle === 'satellite' && SAT_BUILDINGS.enabled && (qualityTier !== 'low' || satelliteVisualsOn()) && (
           <SatBuildingLayer runtime={runtime} flight={flight} />
         )}

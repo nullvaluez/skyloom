@@ -37,8 +37,9 @@ const output = path.resolve(args.output || '.graphics-review/raster-recovery');
       window.__flyWeatherOverride = 'baseline';
       window.__flySunOverride = Date.UTC(2026, 6, 18, 17);
     });
-    await page.goto(`${String(args.url || 'http://localhost:3010').replace(/\/$/, '')}/?graphics=cinematic&graphicsReview=1`,
+    await page.goto(`${String(args.url || 'http://localhost:3010').replace(/\/$/, '')}/?graphics=cinematic&graphicsReview=1${args.earth?'&earth=stylized':''}`,
       { waitUntil: 'domcontentloaded', timeout: 90000 });
+    if(args['build-id'])report.servedBuild=await require('./ground-build-receipt.cjs')(page,args.url||'http://localhost:3010',args['build-id']);
     await page.waitForFunction(() => window.__flyBoot?.pct === 100 && window.__fly?.engine && window.__flyStore,
       null, { timeout: 90000 });
     report.hardware = await page.evaluate(() => {
@@ -67,6 +68,27 @@ const output = path.resolve(args.output || '.graphics-review/raster-recovery');
     await page.waitForFunction(() => window.__graphicsReview?.terrain?.sharp,
       null, { timeout: Number(args.settle || 45000) });
     await page.waitForTimeout(3000);
+
+    let networkFault=!!args['network-fault'], blockedRequests=0;const blockedUrls=[];
+    if(networkFault){
+      report.purpose='Resident real imagery survives delayed HTTP 503 retry responses, then recovers after network restoration';
+      await page.route(/World_Imagery\/MapServer\/tile\//i,async route=>{
+        if(!networkFault)return route.continue();
+        blockedRequests++;
+        if(blockedUrls.length<32)blockedUrls.push(route.request().url());
+        await new Promise(resolve=>setTimeout(resolve,750));
+        await route.fulfill({status:503,contentType:'text/plain',headers:{'access-control-allow-origin':'*'},body:'Controlled imagery outage'});
+      });
+      // This isolated browser owns its cache. A cached successful response
+      // would otherwise bypass the network interception and test no outage.
+      report.clearedImageryEntries=await page.evaluate(async()=>{
+        const cache=await caches.open('fly-raster-v1');let removed=0;
+        for(const request of await cache.keys())if(/World_Imagery\/MapServer\/tile\//i.test(request.url)){
+          if(await cache.delete(request))removed++;
+        }
+        return removed;
+      });
+    }
 
     report.fixture = await page.evaluate(() => {
       const rt = window.__fly, root = rt.engine.map.rootTile, candidates = [];
@@ -119,6 +141,19 @@ const output = path.resolve(args.output || '.graphics-review/raster-recovery');
     });
     if (report.fixture.blocked) throw Error(report.fixture.blocked);
     console.log(`Resident marker fixture: ${JSON.stringify(report.fixture.tile)}`);
+    if(args['network-fault']){
+      // Wait for a failed transport to COMPLETE. A fixed short sleep could
+      // release the outage during nested loader retries and certify nothing.
+      let completedFailure=true;
+      await page.waitForFunction(()=>window.__rasterRecovery.samples.some(s=>s._rasterRetryAttempts>0&&!s._rasterRetryActive),null,{timeout:45000,polling:100})
+        .catch(()=>{completedFailure=false;});
+      const during=await page.evaluate(()=>({current:window.__rasterRecovery.snapshot(),samples:window.__rasterRecovery.samples}));
+      report.outage={blockedRequests,blockedUrls,delayMs:750,durationMs:during.current.elapsedMs,completedFailure,...during};
+      check('real imagery HTTP requests encountered delayed failures',blockedRequests>=1?'PASS':'BLOCKED',{blockedRequests});
+      check('a failed transport completed before network restoration',completedFailure?'PASS':'BLOCKED',during.current);
+      check('outage retains the original attached geometry and imagery',!blockedRequests?'BLOCKED':during.samples.every(s=>s.attached&&s.sameModel&&s.sameGeometry&&!s.replaced)?'PASS':'FAIL',during.current);
+      networkFault=false;
+    }
     let timedOut = false;
     try {
       await page.waitForFunction(() => {

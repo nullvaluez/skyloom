@@ -11,6 +11,8 @@ const stage = args.stage || 'cinematic';
 const output = path.resolve(args.output || `.graphics-review/${stage}`);
 const url = args.url || process.env.FLY_URL || 'http://localhost:3000';
 const sites = {
+  elyria: { lat: 41.1859, lon: -82.0982, ground: 252, heading: 93*Math.PI/180, noon: 18, dusk: 25, night: 5 },
+  erie: { lat: 41.7588, lon: -82.6925, ground: 175, heading: 349*Math.PI/180, noon: 18, dusk: 25, night: 5 },
   manhattan: { lat: 40.7028, lon: -74.017, ground: 0, heading: 0.3, noon: 17, dusk: 24.3, night: 4 },
   powell: { lat: 40.2083, lon: -83.0701, ground: 280, heading: 1.9, noon: 18, dusk: 25, night: 5 },
   'powell-reference': { lat: 40.1990, lon: -83.0811, ground: 280, heading: 339*Math.PI/180, noon: 18, dusk: 25, night: 5 },
@@ -43,7 +45,7 @@ const sites = {
       if (stage === 'cinematic') window.__flyVisualsArm = 1;
       if (featureOff.length) window.__flyVisualsFeatures = Object.fromEntries(featureOff.map(key=>[key,false]));
     }, { stage, fixedTier: !!args['fixed-tier'], featureOff: (args['feature-off']||'').split(',').filter(Boolean) });
-    await page.goto(`${url}/?graphics=${encodeURIComponent(stage)}&graphicsReview=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
+    await page.goto(`${url}/?graphics=${encodeURIComponent(stage)}&graphicsReview=1${args.earth ? '&earth=stylized' : ''}`, { waitUntil: 'domcontentloaded', timeout: 90000 });
     if (args['build-id']) {
       report.servedBuild = await require('./ground-build-receipt.cjs')(page, url, args['build-id']);
     }
@@ -60,11 +62,12 @@ const sites = {
     for (const name of keys) {
       for (const time of (args.times ? args.times.split(',') : args.quick ? ['noon'] : args.matrix ? ['noon','dusk','night'] : ['noon', 'night'])) {
         for (const aglFt of (args.alts ? args.alts.split(',').map(Number) : args.full || args.matrix ? [300, 1000, 3000] : [1000])) {
-          await page.evaluate(({ site, time, aglFt }) => {
+          await page.evaluate(({ site, time, aglFt, msl }) => {
             const fly = window.__fly;
+            window.__flyWeatherOverride = time === 'overcast' ? 'overcast' : 'baseline';
             window.__flySunOverride = Date.UTC(2026, 6, 18) + (site[time] ?? site.noon)*3600000;
             window.__flyStore.getState().setQualityTier('high');
-            fly.warpToGeo(site.lat, site.lon, { altM: site.ground + aglFt * 0.3048, name: null });
+            fly.warpToGeo(site.lat, site.lon, { altM: (msl ? 0 : site.ground) + aglFt * 0.3048, name: null });
             const f = fly.flight;
             f.heading = site.heading; f.pitch = -0.08; f.bank = 0;
             const pin = { x: f.pos.x, y: f.pos.y, z: f.pos.z };
@@ -74,7 +77,7 @@ const sites = {
               Object.assign(f.pos, pin); f.heading = site.heading; f.pitch = -0.08; f.bank = 0; f.speed = 0;
             }, 16);
             fly.chaseCam?.snap?.();
-          }, { site: sites[name], time, aglFt });
+          }, { site: sites[name], time, aglFt, msl: !!args.msl });
           await page.waitForTimeout(Number(args.settle || 20000));
           await page.waitForFunction(() => (window.__fly?.satBuildings?.stats?.ready ?? 0) > 0 && window.__graphicsReview?.terrain?.sharp, null, {timeout:45000}).catch(async error => {
             // Optional diagnostic image, never a relaxed readiness verdict.
@@ -82,15 +85,20 @@ const sites = {
             if (!args['capture-unready']) throw error;
           });
           // Use the resolved DEM for actual AGL, not the approximate bootstrap elevation.
-          await page.evaluate(aglFt => { window.__graphicsPose.y = window.__fly.flight.groundElev + aglFt * 0.3048; }, aglFt);
+          await page.evaluate(({ aglFt, msl }) => { window.__graphicsPose.y = msl ? Math.max(window.__fly.flight.groundElev + 100, aglFt * 0.3048) : window.__fly.flight.groundElev + aglFt * 0.3048; }, { aglFt, msl: !!args.msl });
           await page.waitForTimeout(3000);
           await page.waitForFunction(captureStreamersSettled, null, {timeout:45000,polling:500}).catch(async error=>{
             (report.readinessFailures??=[]).push({name,time,aglFt,phase:'streamers',reason:error.message,census:await page.evaluate(captureSceneCensus)});
             if(!args['capture-unready'])throw error;
           });
           const sceneCensus=await page.evaluate(captureSceneCensus);
+          if (args.earth) await page.waitForFunction(() => (window.__fly?.earthSurface?.ready ?? 0) >= 16 && window.__fly.earthSurface.pending === 0, null, { timeout: 90000 }).catch(error => {
+            (report.readinessFailures ??= []).push({ name, time, aglFt, phase: 'surface-masks', reason: error.message });
+            if (!args['capture-unready']) throw error;
+          });
           const telemetry = await page.evaluate(() => ({ stats: window.__flyStats,
             review: window.__graphicsReview,
+            earthSurface: window.__fly?.earthSurface,
             boot: window.__flyBoot, tier: window.__flyStore?.getState().qualityTier,
             ground: window.__fly?.groundImmersion,
             groundDetail: window.__fly?.groundDetail,
@@ -99,9 +107,9 @@ const sites = {
             textureAudit: window.__groundTextureAudit?.snapshot(),
             shadowRadiusM: window.__fly?.shadowRadiusM,
             activePins: Object.fromEntries(['__flyTerraPin','__flyDepthPin','__flyGovPin','__flyAerialOverride','__flyNightCityArm','__flyVisualsArm','__flyVisualsFeatures','__flyGroundFeatures'].map(k=>[k,window[k] ?? null])) }));
-          const file = `${name}-${time}-${aglFt}.png`;
+          const file = `${name}-${time}-${aglFt}${args.msl ? '-msl' : ''}.png`;
           await page.screenshot({ path: path.join(output, file) });
-          report.shots.push({ name, time, site: sites[name], requestedAglFt: aglFt, file, sceneCensus, ...telemetry });
+          report.shots.push({ name, time, site: sites[name], requestedAglFt: args.msl ? null : aglFt, requestedMslFt: args.msl ? aglFt : null, file, sceneCensus, ...telemetry });
           fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify({ ...report, status: 'IN_PROGRESS' }, null, 2));
           console.log(`Captured ${file}`);
         }

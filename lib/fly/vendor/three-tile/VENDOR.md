@@ -299,3 +299,82 @@ The switch idiom and off-state text above describe the historical main patches.
 The integration composes those hooks with the separately documented Motion Hold
 lifecycle repairs; its safety claim rests on the named integration contracts and
 behavioral gates, not on pretending those repairs are insert-only upstream edits.
+
+## Stylized Earth surface bounds (2026-09-14)
+
+The Hudson GPU fixture at 40.7472, -74.0168 exposed valid tiles entirely below
+sea level (max elevation approximately -1.2 m). `Tile.BBox` constructed an empty
+`[0, maxZ]` vertical interval; Three's `applyMatrix4` left that empty box in local
+coordinates, and frustum parking hid its resident mesh. Layer isolation excluded
+water shading, postprocessing, tint, clouds and building geometry; forcing the
+resident models visible removed the hole.
+
+`TileGeometry.setAttributes` now records the minimum surface height before skirt
+assembly. The readable DEM worker supplies the same scalar before its skirt pass.
+`Tile.BBox` includes that minimum and zero in ordered bounds, with minimum-height
+cache invalidation. Skirt depth is excluded; positive-only terrain keeps its
+previous bounds. Node regression: five failures before, seven checks pass after.
+The real production Hudson fixture passes both empty-bound and water-pixel checks
+with normal culling and terrain/governor controls unpinned.
+
+The LERC tail matcher also accepts the integration's existing optional `errTable`
+argument, and the readable tail forwards it. No worker feature flags are enabled.
+Skirt arrays remain identical across main/worker paths (nine checks). The receipt
+now lists 26 changed methods against the same immutable baseline and explains
+these worker-handler/module changes. The vendor gate passes all 34 checks.
+Windows newline normalization in two harnesses removes CRLF-only false failures;
+source content, worker-count requirements and geometry assertions remain intact.
+
+See `STYLIZED_EARTH.md` for the served build and the separate visual/hardware
+acceptance boundaries. The generated worker was rebuilt with the existing builder.
+
+## Stylized Earth raster coverage (2026-09-14)
+
+Controlled loader failures reproduced three gaps: failed child imagery replaced
+a valid parent, failed parent imagery replaced valid children, and a failed
+material retry replaced the existing valid image with an error placeholder.
+`rasterMark` now keeps valid coverage in each case. LOD replacements back off
+1/2/4/8/16/30 seconds; ordinary tree updates continue during the delay. Failed
+staging is disposed. Material fallback is committed only after its async owner
+guard, preserving source-epoch safety. Successful child batches still replace
+the parent normally. No geometry, material shader or quality threshold changes.
+
+`verify-terrain-coverage.mjs`: three old-code failures, four checks green after
+the repair; existing merge 14/14 and raster retry 20/20 unchanged. The receipt
+updates the same four already-listed functions and the whole-file digest.
+
+## Stylized Earth regional DEM coverage (2026-09-14)
+
+The Namib fixture at -24.732, 15.298 supplies valid measured DEM at z5–13.
+Its z14–16 tiles contain 66,049 finite LERC no-data sentinels each
+(-3.4027999387901487e38). Treating that value as a height created giant curtains,
+invalid normals, unusable ground contact and an effectively infinite AGL.
+
+The inline LERC mesh entry now checks the requested clipped region before
+Martini. Invalid samples return a diagnostic marker instead of geometry. The
+cached and uncached loaders share `geometryFromData`; `TerrainLercLoader.load`
+retries the identical footprint against coarser measured data. A 256-entry,
+five-minute negative coverage cache prevents repeated decoding of missing zooms.
+Fallback stops before clipping below a 2x2 source grid. If all permitted parent
+data is missing, the error propagates to the existing coverage-retention lifecycle,
+instead of constructing a fictitious zero-elevation replacement. HTTP failures
+are not recorded as missing-data regions. Partial missing coverage is keyed by
+clip bounds so a missing quadrant cannot suppress its valid neighbours. Raw raster
+cache keys are unchanged; only fully invalid raw DEM entries are evicted.
+
+The optional skirt/normal worker returns the no-data diagnostic before accessing
+geometry attributes; its flags remain unchanged. Valid geometry/skirt algorithms
+are unchanged. `verify-dem-fallback.mjs` passes ten focused worker, partial
+coverage, geographic clip, fallback, expiry and failure checks; merge 14/14,
+coverage 4/4 and skirt identity 9/9 also pass. The explicit integration receipt
+now covers 29 methods against the same immutable baseline. Browser/measurement
+evidence is recorded separately in `STYLIZED_EARTH.md`.
+
+Final failure-path review also found that transport/decoder failures still became
+flat replacement geometry, and Promise.all could release staging before a late
+material or sibling load finished. Geometry errors now propagate, both parallel
+branches and all refinement siblings settle before cleanup, and rejected DEM
+refinements/merges use the existing bounded raster retry schedule. The dedicated
+`verify-dem-lifecycle.mjs` reproduces four old-code failures and passes 4/4 after
+repair, including disposal and successful retry. The four edited methods were
+already in the explicit integration inventory; healthy geometry is unchanged.

@@ -17,6 +17,7 @@ function installGroundTextureAudit() {
   let renderbufferBytes = 0, peakRenderbufferBytes = 0, peakCombinedBytes = 0;
   let unknowns = 0, peakUnknowns = 0, unknownCalls = 0, estimatedAllocations = 0;
   let trackingErrors=0, untrackedAllocationCalls=0;
+  const unknownEvents=[];
   const wrappedMethods = [], missingMethods = [], unwrappedAvailableMethods=[], errorMessages=[];
   const FACE0=0x8515, CUBE=0x8513, TEX2D=0x0DE1, TEX3D=0x806F, ARRAY=0x8C1A;
   const sized = new Map();
@@ -99,7 +100,7 @@ function installGroundTextureAudit() {
   function put(record,target,level,image){
     if(!record||record.deleted)return;
     const key=`${target}:${level}`;book(record.images.get(key),-1);record.images.set(key,image);book(image,1);
-    if(image.bytes===null)unknownCalls++;peak();
+    if(image.bytes===null){unknownCalls++;if(unknownEvents.length<16)unknownEvents.push({at:Date.now(),id:record.id,target,level,...image,stack:new Error().stack});}peak();
   }
   function sourceSize(source){
     if(!source)return [NaN,NaN];
@@ -139,7 +140,7 @@ function installGroundTextureAudit() {
     createRenderbuffer(gl,args,result){if(!result)return;const r={id:nextId++,context:context(gl).id,image:null,deleted:false};renderbuffers.set(result,r);liveRenderbuffers.set(r.id,r);},
     bindRenderbuffer(gl,[target,object]){
       const ctx=context(gl);let r=object?renderbuffers.get(object):null;
-      if(object&&!r){r={id:nextId++,context:ctx.id,image:{name:'UNOBSERVED_RENDERBUFFER',bytes:null},deleted:false};renderbuffers.set(object,r);liveRenderbuffers.set(r.id,r);book(r.image,1,true);unknownCalls++;peak();}
+      if(object&&!r){r={id:nextId++,context:ctx.id,image:{name:'UNOBSERVED_RENDERBUFFER',bytes:null},deleted:false};renderbuffers.set(object,r);liveRenderbuffers.set(r.id,r);book(r.image,1,true);unknownCalls++;if(unknownEvents.length<16)unknownEvents.push({at:Date.now(),...r.image,stack:new Error().stack});peak();}
       ctx.renderbuffer=r?.context===ctx.id?r:null;
     },
     deleteRenderbuffer(gl,[object]){const r=object&&renderbuffers.get(object);if(r?.context===context(gl).id)releaseRenderbuffer(r);},
@@ -170,7 +171,7 @@ function installGroundTextureAudit() {
     const r=context(gl).renderbuffer;if(!r||r.deleted)return;
     const samples=multi?a[1]:0,internal=a[multi?2:1],width=a[multi?3:2],height=a[multi?4:3];
     const image=describe(internal,null,null,width,height);if(image.bytes!==null)image.bytes*=Math.max(1,samples);
-    image.samples=samples;book(r.image,-1,true);r.image=image;book(image,1,true);if(image.bytes===null)unknownCalls++;peak();
+    image.samples=samples;book(r.image,-1,true);r.image=image;book(image,1,true);if(image.bytes===null){unknownCalls++;if(unknownEvents.length<16)unknownEvents.push({at:Date.now(),...image,stack:new Error().stack});}peak();
   }
   const seen=new Set();
   for(const [name,Constructor] of [['WebGL1',root.WebGLRenderingContext],['WebGL2',root.WebGL2RenderingContext]]){
@@ -202,6 +203,7 @@ function installGroundTextureAudit() {
       contexts:contextCount,textures:liveTextures.size,renderbuffers:liveRenderbuffers.size,created,deleted,
       currentBytes,peakBytes,renderbufferBytes,peakRenderbufferBytes,combinedBytes:currentBytes+renderbufferBytes,peakCombinedBytes,
       unknowns,peakUnknowns,unknownCalls,estimatedAllocations,trackingErrors,untrackedAllocationCalls,errorMessages:[...errorMessages],
+      unknownEvents:[...unknownEvents],
       complete:unknowns===0&&trackingErrors===0&&untrackedAllocationCalls===0&&unwrappedAvailableMethods.length===0,
       peakComplete:peakUnknowns===0&&trackingErrors===0&&untrackedAllocationCalls===0&&unwrappedAvailableMethods.length===0,
       formats:Object.fromEntries([...formats].filter(([,f])=>f.images||f.unknowns).map(([name,f])=>[name,{...f}])),

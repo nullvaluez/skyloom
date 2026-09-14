@@ -14,9 +14,11 @@ function makeShadowTexture() {
   c.height = 64;
   const ctx = c.getContext('2d');
   const g = ctx.createRadialGradient(32, 32, 3, 32, 32, 32);
-  g.addColorStop(0, 'rgba(255,255,255,1)');
-  g.addColorStop(0.6, 'rgba(255,255,255,0.5)');
-  g.addColorStop(1, 'rgba(255,255,255,0)');
+  // Three's alphaMap samples GREEN, not the image's alpha. White RGB with
+  // fading alpha produced a solid, hard-edged disc (most obvious over water).
+  g.addColorStop(0, 'rgb(255,255,255)');
+  g.addColorStop(0.6, 'rgb(128,128,128)');
+  g.addColorStop(1, 'rgb(0,0,0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 64, 64);
   return new CanvasTexture(c);

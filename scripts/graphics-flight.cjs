@@ -67,12 +67,13 @@ async function main(){
   report.weather=args.weather||'baseline';
   report.crashMode='forgiving'; // Rendering benchmark: an automated route must not respawn through buildings.
   await page.addInitScript(({hour,weather})=>{localStorage.setItem('fly-map-style-2','satellite');localStorage.setItem('fly-quality-tier','high');localStorage.setItem('fly-sound-on','0');localStorage.setItem('fly-controls-seen','1');localStorage.setItem('fly-crash-mode','forgiving');window.__flyWeatherOverride=weather;window.__flySunOverride=Date.UTC(2026,6,18,hour);},{hour:Number(args.hour??4),weather:report.weather});
-  await page.goto((args.url||'http://localhost:3000')+'/?graphics='+encodeURIComponent(stage)+'&graphicsReview=1',{waitUntil:'domcontentloaded',timeout:90000});
+  if(args.earth)await page.addInitScript(require('./ground-texture-audit.cjs').installGroundTextureAudit);
+  await page.goto((args.url||'http://localhost:3000')+'/?graphics='+encodeURIComponent(stage)+'&graphicsReview=1'+(args.earth?'&earth=stylized':''),{waitUntil:'domcontentloaded',timeout:90000});
   if(args['build-id']){
     report.servedBuild=await groundBuildReceipt(page,args.url||'http://localhost:3000',args['build-id']);
   }
   await page.waitForFunction(()=>window.__flyBoot?.pct===100&&window.__fly,null,{timeout:90000});
-  await page.evaluate(altM=>window.__fly.warpToGeo(40.7028,-74.017,{altM,name:null}),Number(args.alt??500));
+  await page.evaluate(({altM,lat,lon})=>window.__fly.warpToGeo(lat,lon,{altM,name:null}),{altM:Number(args.alt??500),lat:Number(args.lat??40.7028),lon:Number(args.lon??-74.017)});
   await page.waitForTimeout(25000);
   await page.waitForFunction(()=>window.__fly.satBuildings?.stats.ready>=4,null,{timeout:30000});
   report.hardware=await page.evaluate(()=>{const gl=document.querySelector('canvas').getContext('webgl2');const e=gl.getExtension('WEBGL_debug_renderer_info');return{renderer:e&&gl.getParameter(e.UNMASKED_RENDERER_WEBGL),gpuTimer:!!gl.getExtension('EXT_disjoint_timer_query_webgl2')};});
@@ -118,7 +119,13 @@ async function main(){
           if(im&&!seen.has(tex)){seen.add(tex);terrainTextures++;terrainTextureBytes+=(im.width||0)*(im.height||0)*4*(tex.generateMipmaps?4/3:1);}
         }
       });
-      return{at:Date.now(),review:window.__graphicsReview,terrain:rt.terraStats,
+      let sceneRoot=rt.engine.object;while(sceneRoot.parent)sceneRoot=sceneRoot.parent;
+      const geometryBuffers=new Set();let geometryAttributeBytes=0;
+      sceneRoot.traverse(o=>{if(!o.geometry)return;for(const attr of [...Object.values(o.geometry.attributes),o.geometry.index,o.instanceMatrix,o.instanceColor]){
+        const array=attr?.data?.array??attr?.array;if(array&&!geometryBuffers.has(array.buffer)){geometryBuffers.add(array.buffer);geometryAttributeBytes+=array.buffer.byteLength;}
+      }});
+      return{at:Date.now(),review:window.__graphicsReview,terrain:rt.terraStats,geometryAttributeBytes,
+        terrainResidency:{...rt.engine.residency?.stats,budgetBytes:rt.engine.residency?.budgetBytes},
         heap:performance.memory?.usedJSHeapSize,position:{...f.pos},origin:{...rt.origin.anchor},
         activeTraffic:[...rt.traffic.tracks.values()].filter(t=>t.fix1 && t.stale!==2).length,
         terrainMeshes,terrainTextures,terrainTextureBytes,failedImagery,failedTiles,
@@ -131,7 +138,8 @@ async function main(){
         groundDistanceM:bench.groundDistanceM,movingSeconds:bench.movingSeconds,teleports:bench.teleports,
         visualAgl:f.pos.y-(rt.groundElevVis??f.groundElev), ground:rt.groundImmersion,
         nightGround:rt.groundLighting,groundDetail:rt.groundDetail,shadowRadiusM:rt.shadowRadiusM,
-        nearSupport:rt.satVeg?.stats?.nearSupport,supportMaxima:{...bench.supportMaxima},
+        nearSupport:rt.satVeg?.stats?.nearSupport,supportMaxima:{...bench.supportMaxima},earthSurface:rt.earthSurface?JSON.parse(JSON.stringify(rt.earthSurface)):null,
+        textureAudit:window.__groundTextureAudit?.snapshot(),
         ...(bench.cloud?{cloudState:{...rt.immersiveClouds},cloudLayer:{baseM:rt.immersiveLighting?.cloudBase,thicknessM:rt.immersiveLighting?.cloudThickness},
           cloudCounts:{valid:bench.cloud.validFrames,missing:bench.cloud.missingFrames,entries:bench.cloud.entries,exits:bench.cloud.exits,maxInside:bench.cloud.maxInside}}:{}),
         pins:Object.fromEntries(['__flyGovPin','__flyTerraPin','__flyDepthPin','__flySettlePin','__flyClutterPin','__flyAerialOverride'].map(k=>[k,window[k]??null])),
@@ -182,6 +190,12 @@ async function main(){
     bench.raf=requestAnimationFrame(tick);
   },{aglFt:args['agl-ft']===undefined?null:Number(args['agl-ft']),boost:!!args.boost,cloudTraverse,duration});
   const end=Date.now()+duration*1000;
+  let profiler;
+  if(args.profile){
+    profiler=await page.context().newCDPSession(page);
+    await profiler.send('Profiler.enable'); await profiler.send('Profiler.start');
+    report.profiled=true; report.acceptanceEligible=false; // Diagnostic run only: never representative timing acceptance.
+  }
   report.status='IN_PROGRESS';save();
   while(Date.now()<end){
     await page.waitForTimeout(10000);
@@ -195,6 +209,7 @@ async function main(){
     }
   }
   const values=await page.evaluate(()=>{const b=window.__graphicsFlight;b.running=false;window.__fly.input?.setBoost(false);b.observer?.disconnect();return{frames:b.frames,steadyFrames:b.steadyFrames,arrivalFrames:b.arrivalFrames,gpu:b.gpu,disjoint:b.disjoint,longTasks:b.longTasks,...(b.cloud?{cloud:b.cloud}:{})}});
+  if(profiler){const {profile}=await profiler.send('Profiler.stop');fs.writeFileSync(output.replace(/\.json$/,'.cpuprofile'),JSON.stringify(profile));await profiler.detach();}
   report.timing={fps:1000/(values.frames.reduce((a,b)=>a+b,0)/values.frames.length),p95:pct(values.frames,.95),p99:pct(values.frames,.99),gpuP95:pct(values.gpu,.95),gpuSamples:values.gpu.length,disjoint:values.disjoint,cpuLongTasks:values.longTasks.length,cpuLongTaskP95:pct(values.longTasks,.95)};
   report.timing.steady={frames:values.steadyFrames.length,p95:pct(values.steadyFrames,.95),p99:pct(values.steadyFrames,.99),max:values.steadyFrames.reduce((m,v)=>Math.max(m,v),0)};
   report.timing.arrival={frames:values.arrivalFrames.length,p95:pct(values.arrivalFrames,.95),p99:pct(values.arrivalFrames,.99),max:values.arrivalFrames.reduce((m,v)=>Math.max(m,v),0)};
@@ -216,7 +231,10 @@ async function main(){
   report.traffic={min:Math.min(...report.samples.map(s=>s.activeTraffic)),max:Math.max(...report.samples.map(s=>s.activeTraffic))};
   const missingTiles=report.samples.some(s=>s.failedImagery>0||s.terrainMeshes<20);
   const absentTraffic=report.traffic.max===0;
-  const budgetsMeasured=drawValues.every(n=>n>1), budgetsPass=report.budgets.native&&report.budgets.drawP95<=375&&report.budgets.triangleP95<=2200000&&report.timing.gpuP95<=12&&report.budgets.terrainAndGroundMapMBMax<=300;
+  const validResolution=args.earth?report.samples.every(s=>s.review?.dpr>=.75&&s.review?.dpr<=1):report.budgets.native;
+  const completeTextures=!args.earth||report.samples.every(s=>s.textureAudit?.peakComplete&&s.textureAudit.peakBytes<=300*1048576);
+  const budgetsMeasured=drawValues.every(n=>n>1), budgetsPass=validResolution&&completeTextures&&report.budgets.drawP95<=375&&report.budgets.triangleP95<=2200000&&report.timing.gpuP95<=12&&report.budgets.terrainAndGroundMapMBMax<=300;
+  if(args.earth)report.earthBudget={textureMiBPeak:Math.max(...report.samples.map(s=>(s.textureAudit?.peakBytes??Infinity)/1048576)),renderbufferMiBPeak:Math.max(...report.samples.map(s=>(s.textureAudit?.peakRenderbufferBytes??0)/1048576)),geometryAttributeMiBMax:Math.max(...report.samples.map(s=>s.geometryAttributeBytes/1048576)),geometryNote:'Unique scene attribute backing buffers, including indices and instance data. Estimate excludes driver overhead and unattached cached geometry.',combinedMiBPeak:Math.max(...report.samples.map(s=>(s.textureAudit?.peakCombinedBytes??Infinity)/1048576)),completeTextures,validResolution,referenceHardwareVerified:false,referenceHardware:'Radeon 780M-class integrated graphics; this run establishes only the recorded renderer'};
   report.unpinned=report.samples.every(s=>Object.values(s.pins).every(v=>v===null));
   // Guard a stalled simulation: a frame-time PASS must represent moving flight.
   report.motion={minimumSpeed:Math.min(...report.samples.map(s=>s.speed)),rebases:report.samples.at(-1)?.rebaseEpoch-report.samples[0]?.rebaseEpoch,
@@ -229,7 +247,7 @@ async function main(){
     return [groundMetres/seconds];
   });
   report.motion.minimumMeasuredGroundSpeed=measuredSpeeds.length?Math.min(...measuredSpeeds):0;
-  report.frameTargetMs=stage==='immersive'?16.7:20;
+  report.frameTargetMs=stage==='immersive'||args.earth?16.7:20;
   const insufficientMotion=!Number.isFinite(report.motion.minimumSpeed)||!Number.isFinite(report.motion.minimumMeasuredGroundSpeed)||report.motion.minimumSpeed<50||report.motion.minimumMeasuredGroundSpeed<50;
   report.status=report.errors.length||absent||!report.unpinned?'FAIL':unsuitable||!budgetsMeasured||missingTiles||absentTraffic||insufficientMotion?'BLOCKED':report.timing.p95<=report.frameTargetMs&&report.timing.p99<=33.3&&budgetsPass?'PASS':'FAIL';
   report.reason=absent?'A required layer failed to remain ready through quality transitions':unsuitable?'GPU timing unavailable or software renderer':missingTiles?'Terrain imagery missing or insufficient residency':absentTraffic?'No live traffic available during measurement':!budgetsMeasured?'Scene draw/triangle counters unavailable':insufficientMotion?'Actual ground travel did not meet the existing 50 m/s movement floor':report.status==='FAIL'?'Errors, draw/triangle budget or frame-time target missed':undefined;

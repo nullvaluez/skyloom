@@ -1,5 +1,6 @@
 'use client';
 import { immersiveOn } from '@/lib/fly/immersive';
+import { stylizedEarthOn } from '@/lib/fly/stylized-earth';
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -64,7 +65,7 @@ export function SatBuildingLayer({ runtime, flight }) {
   // mounts at medium+ (FlyScene gate); this flips water on only at high, and off
   // (evicting the water meshes) on a high→medium degrade — no per-frame cost.
   useEffect(() => {
-    engine.setWaterEnabled(SAT_WATER.enabled && (satelliteVisualsOn('water') ? satelliteVisualProfile(qualityTier).water : qualityTier === SAT_WATER.minTier));
+    engine.setWaterEnabled(!stylizedEarthOn() && SAT_WATER.enabled && (satelliteVisualsOn('water') ? satelliteVisualProfile(qualityTier).water : qualityTier === SAT_WATER.minTier));
   }, [engine, qualityTier]);
   // Round 15: facade windows (daylight `map`, medium+) and NIGHT windows
   // (`emissiveMap`, high only) are material swaps on the SAME shared material —

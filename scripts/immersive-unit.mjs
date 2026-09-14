@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-const url=`data:text/javascript;base64,${fs.readFileSync(new URL('../lib/fly/immersive.js',import.meta.url)).toString('base64')}`;
-const {IMMERSIVE,immersiveOn,immersiveLighting,cloudPhase,cloudDensity}=await import(url);
+import { registerHooks } from 'node:module';
+import { fileURLToPath } from 'node:url';
+registerHooks({ resolve(specifier, context, next) {
+  if (specifier.startsWith('.') && context.parentURL) {
+    const target = new URL(specifier, context.parentURL);
+    if (fs.existsSync(fileURLToPath(target)+'.js')) return next(target.href+'.js',context);
+  }
+  return next(specifier,context);
+} });
+const {IMMERSIVE,immersiveOn,immersiveLighting,cloudPhase,cloudDensity}=await import('../lib/fly/immersive.js');
 assert.equal(immersiveOn(),true,'Server and browser use the same standard treatment');
 globalThis.window={location:{search:''},__flyImmersiveArm:false,__flyImmersiveFeatures:{clouds:false}};
 for(const query of ['', '?graphics=legacy', '?graphics=cinematic', '?graphics=immersive']) {

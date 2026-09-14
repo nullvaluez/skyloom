@@ -1,25 +1,35 @@
 {
   "schemaVersion": 1,
   "baselineCommit": "0ff2a3f3f6721265c285a02bbc87f130b161ff77",
-  "compiledAppSourceSha256": "d1e492cdefc5a70bba558080e6cd0b11acea77ff9d9470817ae8c65f4f242b1e",
-  "recordedAt": "2026-09-09",
+  "compiledAppSourceSha256": "a9d5d0fa08c317fdbb59674f7ab2a2fa3b0ea82d1484dc431958b2502bbee788",
+  "recordedAt": "2026-09-14",
   "digestNormalization": "UTF-8 source with physical CRLF normalized to LF; no other source normalization",
   "inventory": "Top-level declared functions and class methods, named by public export when present; exact normalized source comparison against baselineCommit",
   "note": "Review receipt, not visual or performance certification. No automatic digest refresh. Future vendor edits require explanation, focused regression evidence, and explicit receipt update.",
   "files": {
     "index.js": {
       "baselineSha256": "931e09ee8d594e709ec19f91be92ecb8fc28cd54054e352ac11d8275df86cb97",
-      "integratedSha256": "422b1decd2e345b0e3cc7003fc8448ba36ed0b80b2eddf2123b753439248544f",
+      "integratedSha256": "a29bdb115515c753fa74d730d77ecdd50ff0aeb4c831723256deb8de487debef",
       "changedFunctions": [
         {
           "name": "TerrainLercLoader.doLoad",
           "change": "modified",
-          "reason": "Pass the optional DEM error table into the existing worker request."
+          "reason": "Pass the optional DEM error table and construct geometry through the shared no-data-aware decoder result handler."
+        },
+        {
+          "name": "TerrainLercLoader.geometryFromData",
+          "change": "added",
+          "reason": "Shared cached/uncached no-data marker handling before constructing TileGeometry."
+        },
+        {
+          "name": "TerrainLercLoader.load",
+          "change": "added",
+          "reason": "Regional DEM no-data fallback: clip the same requested footprint from valid parent elevations; bounded expiring URL cache; never substitute a zero plane for missing fine DEM."
         },
         {
           "name": "Tile.LOD",
           "change": "modified",
-          "reason": "Compose Motion Hold merge dwell with main saturation and residency-budget precedence."
+          "reason": "Compose Motion Hold merge dwell with main saturation and residency-budget precedence. Also honor bounded raster-replacement backoff."
         },
         {
           "name": "Tile._LODEvaluate",
@@ -34,12 +44,12 @@
         {
           "name": "Tile._loadSubTiles",
           "change": "modified",
-          "reason": "Preserve the refine crossfade callback while recovering rejected child loads."
+          "reason": "Retain valid parent coverage and wait for every sibling owner before disposing failed staging; apply bounded retry backoff to raster and DEM failures."
         },
         {
           "name": "Tile._removeSubTiles",
           "change": "modified",
-          "reason": "Preserve merge crossfade, recheck current frustum after awaits, and restore child index on cancellation/rejection."
+          "reason": "Preserve merge crossfade and current-frustum checks, restore children on cancellation or failure, and apply bounded DEM/raster retry backoff."
         },
         {
           "name": "Tile._retryErrorMaterial",
@@ -62,14 +72,29 @@
           "reason": "Initialize merge dwell state."
         },
         {
+          "name": "Tile.get BBox",
+          "change": "modified",
+          "reason": "Include the pre-skirt minimum surface elevation; keep ordered bounds below sea level and invalidate cache when that minimum changes."
+        },
+        {
+          "name": "TileGeometry.setAttributes",
+          "change": "modified",
+          "reason": "Store the worker surface minimum or compute it before main-thread skirt assembly."
+        },
+        {
           "name": "TileLoader.update",
           "change": "modified",
-          "reason": "Parallel imagery/DEM under either supported switch; retain serial fallback and shared group sync."
+          "reason": "Keep imagery and DEM parallel, but await settlement of both owners before propagating failure or allowing staging disposal."
+        },
+        {
+          "name": "TileLoader.updateGeometry",
+          "change": "modified",
+          "reason": "Propagate DEM missing-data, transport and decoder errors without replacing measured ground with a flat plane."
         },
         {
           "name": "TileLoader.updateMaterial",
           "change": "modified",
-          "reason": "Mark imagery errors, exclude them from reuse, and guard/dispose stale material-only retry results."
+          "reason": "Mark imagery errors, exclude them from reuse, and guard/dispose stale material-only retry results. Retain an existing valid texture during failed replacement, dispose the error placeholder, and mark it for retry only after the async commit guard."
         },
         {
           "name": "TileLoader.updateResidentMaterial",
@@ -140,12 +165,12 @@
     },
     "workers/skirt-tail.src.js": {
       "baselineSha256": "65c8ab554b75b705e68f788ee79850cb6bb1cec82a4f45dfa915a6962feded81",
-      "integratedSha256": "65c8ab554b75b705e68f788ee79850cb6bb1cec82a4f45dfa915a6962feded81",
+      "integratedSha256": "2c7464c8cb52325ce6701e08cabedeeb92024a0296fe85836e287dca531383e5",
       "changedFunctions": []
     },
     "workers/skirt-tail.built.js": {
       "baselineSha256": "b4a840c94e41e44fa2cac8a32cfaffeea543749fcfbfc651d78213c2067d00f6",
-      "integratedSha256": "b4a840c94e41e44fa2cac8a32cfaffeea543749fcfbfc651d78213c2067d00f6",
+      "integratedSha256": "153d907f17afe5b15b70bcbbda03afdf5de28e44a29c8867c1cc18671774e311",
       "changedFunctions": []
     }
   },
@@ -162,11 +187,29 @@
   },
   "nonFunctionChanges": [
     "Independent FLY_PATCH rollback controls, counters, edge-table scratch storage and named public exports.",
-    "Existing inline LERC worker fe accepts the optional errTable parameter; readable main skirt/normal worker source remains unchanged. The whole index.js digest covers this inherited parallel-lineage string change."
+    "Existing inline LERC worker fe accepts the optional errTable parameter; readable main skirt/normal worker source remains unchanged. The whole index.js digest covers this inherited parallel-lineage string change.",
+    "Stylized Earth DEM worker onmessage stores surfaceMinZ before adding skirts; generated source regenerated with the existing builder. Geometry arrays and skirt algorithm are unchanged.",
+    "LERC tail matcher accepts the existing optional errTable argument and the readable tail forwards it; both geometry-worker source shapes must match. No worker feature switches are enabled by this repair.",
+    "Inline LERC mesh entry rejects non-finite and out-of-Earth-range samples after clipping and before Martini. The optional skirt/normal worker returns this diagnostic marker without dereferencing missing attributes. Valid input uses the unchanged geometry algorithm."
   ],
   "focusedBehaviorGates": [
     "scripts/verify-terrain-merge.mjs",
     "scripts/verify-raster-recovery.cjs",
-    "scripts/verify-skirt-fast.mjs"
-  ]
+    "scripts/verify-skirt-fast.mjs",
+    "scripts/verify-terrain-bounds.mjs",
+    "scripts/verify-dem-fallback.mjs"
+  ],
+  "followup": {
+    "recordedAt": "2026-09-14",
+    "reason": "Stylized Earth Hudson hole: below-sea-level DEM created empty [0,maxZ] frustum bounds. Surface minimum excludes skirts; cached and uncached bounds include negative terrain. Node gate calibrated 5 failures before fix, 7/7 after. GPU validation recorded separately in STYLIZED_EARTH.md."
+  },
+  "demCoverage": {
+    "recordedAt": "2026-09-14",
+    "evidence": "Namib -24.732,15.298 actual Esri tiles: z5–13 contain valid elevations; z14–16 contain 66,049 no-data samples each. Eight focused fallback/worker/clip/cache/error checks pass; running scene verification recorded separately. Partial coverage is cached by clipped footprint; wholly empty raw DEM entries are evicted without removing compatible valid raw data. Healthy worker geometry remains byte-identical through three clip cases. Ten focused checks pass."
+  },
+  "demLifecycle": {
+    "date": "2026-09-14",
+    "evidence": "verify-dem-lifecycle.mjs: old 0/4 -> repaired 4/4; transport retention, parallel owner settlement, sibling disposal/recovery and bounded merge retries. Healthy data algorithms and all existing thresholds unchanged."
+  },
+  "compiledBuildId": "no6lqYTQo4mmRaHZj9If5"
 }

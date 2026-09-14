@@ -69,7 +69,7 @@ const srcText = readFileSync(
   'utf8'
 );
 gate('1 the stringified tail is up to date with its readable source',
-  R24_WORKER_SKIRT_TAIL === srcText,
+  R24_WORKER_SKIRT_TAIL === srcText.replace(/\r\n/g, '\n'),
   `${R24_WORKER_SKIRT_TAIL.length} vs ${srcText.length} chars`);
 
 // ------------------------------------------------------------- 2. the splice
@@ -77,7 +77,7 @@ gate('1 the stringified tail is up to date with its readable source',
 // sources. Both geometry-returning DEM workers use it verbatim (only the local
 // variable names differ), which is why one regex covers them.
 const TAIL_RE =
-  /self\.onmessage=(\w+)=>\{const (\w+)=\1\.data,(\w+)=(\w+)\(\2\.demData,\2\.z,\2\.clipBounds\);self\.postMessage\(\3\)\}/g;
+  /self\.onmessage=(\w+)=>\{const (\w+)=\1\.data,(\w+)=(\w+)\(\2\.demData,\2\.z,\2\.clipBounds(?:,\2\.errTable)?\);self\.postMessage\(\3\)\}/g;
 const bundle = readFileSync(path.join(root, 'lib/fly/vendor/three-tile/index.js'), 'utf8');
 const matches = [...bundle.matchAll(TAIL_RE)];
 rows.push(`  worker tails found: ${matches.length} (decode entry points: ${matches.map((m) => m[4]).join(', ')})`);

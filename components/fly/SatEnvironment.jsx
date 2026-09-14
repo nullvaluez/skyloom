@@ -2,6 +2,8 @@
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
 import { resolveSatelliteAtmosphere } from '@/lib/fly/satellite-atmosphere';
 import { IMMERSIVE, immersiveOn } from '@/lib/fly/immersive';
+import { STYLIZED_EARTH, stylizedEarthOn } from '@/lib/fly/stylized-earth';
+import { resizeEarthHdr } from '@/lib/fly/earth-hdr';
 
 
 import { useEffect, useRef, useState } from 'react';
@@ -146,6 +148,7 @@ function loadHdr(url) {
             tex.needsUpdate = true;
           }
         }
+        if (stylizedEarthOn()) resizeEarthHdr(tex, STYLIZED_EARTH.environmentWidth);
         resolve(tex);
       },
       undefined,
@@ -413,7 +416,7 @@ export function SatEnvironment({ runtime, bucket }) {
         // ~4x the bake area at twilight, which is work FL-10 wants sliced off
         // the frame loop anyway.
         const immersive = immersiveOn('lighting');
-        const W = immersive ? IMMERSIVE.environmentSize : ENV_UNIFORM.enabled ? ENV_UNIFORM.equirectWidth : SKY_DUSK.blendSize;
+        const W = stylizedEarthOn() ? STYLIZED_EARTH.environmentWidth : immersive ? IMMERSIVE.environmentSize : ENV_UNIFORM.enabled ? ENV_UNIFORM.equirectWidth : SKY_DUSK.blendSize;
         const needsResize =
           (ENV_UNIFORM.enabled || immersive) && !blending && (texA.image?.width ?? W) !== W;
         const lightingTex =

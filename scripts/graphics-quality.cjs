@@ -13,7 +13,8 @@ const output=args.output||'.graphics-review/quality-final';
   page.on('pageerror',e=>r.errors.push(e.message));
   page.on('console',m=>{if(m.type()==='error'&&/shader|WebGL|TypeError|ReferenceError/.test(m.text()))r.errors.push(m.text().slice(0,1000));});
   await page.addInitScript(()=>{localStorage.setItem('fly-map-style-2','satellite');localStorage.setItem('fly-quality-tier','high');localStorage.setItem('fly-controls-seen','1');localStorage.setItem('fly-sound-on','0');window.__flySunOverride=Date.UTC(2026,6,18,4);window.__flyWeatherOverride='baseline';window.__flyGovPin='hold';});
-  await page.goto(`${args.url||'http://localhost:3010'}/?graphics=${encodeURIComponent(args.stage||'cinematic')}&graphicsReview=1`,{waitUntil:'domcontentloaded',timeout:90000});
+  await page.goto(`${args.url||'http://localhost:3010'}/?graphics=${encodeURIComponent(args.stage||'cinematic')}&graphicsReview=1${args.earth?'&earth=stylized':''}`,{waitUntil:'domcontentloaded',timeout:90000});
+  if(args['build-id'])r.servedBuild=await require('./ground-build-receipt.cjs')(page,args.url||'http://localhost:3010',args['build-id']);
   await page.waitForFunction(()=>window.__flyBoot?.pct===100&&window.__fly,null,{timeout:90000});
   await page.evaluate(()=>window.__fly.warpToGeo(40.7028,-74.017,{altM:305,name:null}));
   await page.waitForTimeout(25000);
@@ -28,7 +29,7 @@ const output=args.output||'.graphics-review/quality-final';
       if(c&&!window.__qualityCloudPass)window.__qualityCloudPass=c;
       return {review:window.__graphicsReview,gov:window.__flyGov.state(),night:window.__fly.satBuildings?.nightEnabled,position:{...window.__fly.flight.pos},
         clouds:c?{samePass:c===window.__qualityCloudPass,steps:c.uniforms.steps.value,width:c.target.width,height:c.target.height}:null,
-        fx:window.__flyStats.fx};
+        fx:window.__flyStats.fx,earthSurface:window.__fly.earthSurface};
     });
     s.label=label;r.steps.push(s);
     await page.screenshot({path:`${output}/${r.steps.length}-${label}.png`});
@@ -42,6 +43,7 @@ const output=args.output||'.graphics-review/quality-final';
   r.effectsBeforeDetail=JSON.stringify(order)===JSON.stringify([['high','high'],['high','medium'],['high','low']]);
   r.recovered=r.steps.at(-1).review?.tier==='high'&&r.steps.at(-1).review?.dpr===1&&r.steps.at(-1).review?.effectsTier==='high';
   r.depthContinuity=args.stage!=='immersive'||r.steps.every(s=>s.clouds?.samePass&&s.clouds.steps>0&&s.review.immersive?.shadows&&s.fx?.bufferMatchesDrawing);
+  if(args.earth)r.depthContinuity=r.depthContinuity&&r.steps.every(s=>s.earthSurface?.ready>=16&&s.review.dpr>=.75);
   r.status=r.errors.length||!present||!r.effectsBeforeDetail||!r.recovered||!r.depthContinuity?'FAIL':'PASS';
   r.note='Governor held only against unsolicited steps; force() used its actual DPR/tier ladder. Flight continued throughout. Screenshots require visual inspection.';
  }catch(e){r.reason=e.stack;}

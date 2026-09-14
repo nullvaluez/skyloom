@@ -12,13 +12,7 @@ registerHooks({ resolve(specifier, context, next) {
   }
   return next(specifier, context);
 } });
-const sourceURL = file => {
-  let text=fs.readFileSync(new URL('../lib/fly/'+file,import.meta.url),'utf8');
-  text=text.replace(/from '\.\/immersive'/g,`from '${sourceURLLeaf('immersive.js')}'`);
-  return `data:text/javascript;base64,${Buffer.from(text).toString('base64')}`;
-};
-const sourceURLLeaf=file=>`data:text/javascript;base64,${fs.readFileSync(new URL('../lib/fly/'+file,import.meta.url)).toString('base64')}`;
-const pure = async file => import(sourceURL(file));
+const pure = async file => import(new URL('../lib/fly/'+file,import.meta.url));
 const {inferBuildingStyle,buildingHash,buildingStyleVertex,buildingClassificationHeight,architecturalColor,BUILDING_PROFILES} = await pure('building-profiles.js');
 const {physicalBendCoefficient,metricDirection} = await pure('render-scale.js');
 const {satelliteVisualsOn,satelliteVisualProfile,satelliteEffectTier} = await pure('satellite-visuals.js');
@@ -79,9 +73,9 @@ const cloudyDay=resolveSatelliteAtmosphere({sinEl:0.7},{overcastT:1});
 assert.ok(cloudyDay.environment>day.environment,'Immersive overcast shifts light into diffuse environment fill');
 assert.ok(cloudyDay.background<day.background,'Overcast still darkens the visible background');
 for(const f of ['sat-building','sat-skyline','sat-road','sat-veg','sat-clutter','toy-world']) {
-  assert.match(fs.readFileSync(new URL('../lib/fly/toy-world/'+f+'-engine.js',import.meta.url),'utf8'), /EXPECTED_WORKER_PROTOCOL = 20/);
+  assert.match(fs.readFileSync(new URL('../lib/fly/toy-world/'+f+'-engine.js',import.meta.url),'utf8'), /EXPECTED_WORKER_PROTOCOL = 21/);
 }
-assert.match(fs.readFileSync(new URL('../lib/fly/toy-world/vector-tile.worker.js',import.meta.url),'utf8'), /WORKER_PROTOCOL = 20/);
+assert.match(fs.readFileSync(new URL('../lib/fly/toy-world/vector-tile.worker.js',import.meta.url),'utf8'), /WORKER_PROTOCOL = 21/);
 // Exercise the real near/far handover uniforms through a quality step and a rebase.
 const {createSatelliteArchitectureMaterial,setSatelliteArchitectureCoverage} = await import('../lib/fly/satellite-architecture-material.js');
 for(const distant of [false,true]) {

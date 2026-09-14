@@ -156,7 +156,7 @@ if (haveUpstream) {
 } else {
   console.log('  leg: SHA (three-tile uninstalled — the git-anchored hashes above are the proof)');
   gate('6 plugin.js line 2 carries the rewritten core import',
-    (read(vPlugin).split('\n')[REWRITE_LINE - 1] ?? '').endsWith(REWRITE_TO));
+    (lf(read(vPlugin)).split('\n')[REWRITE_LINE - 1] ?? '').endsWith(REWRITE_TO));
 }
 
 // Leg C: retain the original Round 24 proof against its immutable main tree.

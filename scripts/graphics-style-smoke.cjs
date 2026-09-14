@@ -7,12 +7,15 @@ const output=args.output||'.graphics-review/style-smoke';
  try{
   fs.mkdirSync(output,{recursive:true});
   browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-gpu']});
-  for(const [name,style,query] of [['ordinary','satellite',''],['legacy-url','satellite','&graphics=legacy'],['cinematic-url','satellite','&graphics=cinematic'],['immersive-url','satellite','&graphics=immersive'],['neon','toy','']]){
+  const cases=[['ordinary','satellite',''],['legacy-url','satellite','&graphics=legacy'],['cinematic-url','satellite','&graphics=cinematic'],['immersive-url','satellite','&graphics=immersive'],['neon','toy','']];
+  if(args.earth)cases.push(['earth-bookmark','satellite','&earth=stylized'],['earth-neon','toy','&earth=stylized'],['earth-legacy-bookmark','satellite','&earth=legacy']);
+  for(const [name,style,query] of cases){
    const page=await browser.newPage({viewport:{width:1920,height:1080},deviceScaleFactor:1});
    page.on('pageerror',e=>r.errors.push(e.message));
    page.on('console',m=>{if(m.type()==='error'&&/shader|WebGL|ReferenceError|TypeError/.test(m.text()))r.errors.push(m.text().slice(0,1500));});
    await page.addInitScript(style=>{localStorage.setItem('fly-map-style-2',style);localStorage.setItem('fly-quality-tier','high');localStorage.setItem('fly-controls-seen','1');localStorage.setItem('fly-sound-on','0');},style);
    await page.goto(`${args.url||'http://localhost:3010'}/?graphicsReview=1${query}`,{waitUntil:'domcontentloaded',timeout:90000});
+   if(args['build-id'])r.servedBuild=await require('./ground-build-receipt.cjs')(page,args.url||'http://localhost:3010',args['build-id']);
    await page.waitForFunction(()=>window.__flyBoot?.pct===100&&window.__fly,null,{timeout:90000});
    await page.evaluate(()=>window.__fly.warpToGeo(40.7028,-74.017,{altM:500,name:null}));
    await page.waitForTimeout(15000);
@@ -22,12 +25,14 @@ const output=args.output||'.graphics-review/style-smoke';
     const keys=new Set();
     root.traverse(o=>{if(!o.isMesh)return;let p=o;while(p){if(!p.visible)return;p=p.parent;}for(const m of (Array.isArray(o.material)?o.material:[o.material]))if(m)keys.add(m.customProgramCacheKey?.()||m.type);});
     return {style:window.__flyStore.getState().mapStyle,review:window.__graphicsReview,visibleMaterialKeys:[...keys],shadows:rt.engine.map?.castShadow,
-      cloudPass:window.__flyComposer?.passes.some(p=>p.name==='ImmersiveClouds')};
+      earthSurface:rt.earthSurface,cloudPass:window.__flyComposer?.passes.some(p=>p.name==='ImmersiveClouds')};
    });
    s.name=name;
    const cinematic=s.visibleMaterialKeys.some(k=>k.includes('cinematic-architecture'));
    s.pass=style==='toy' ? s.style==='toy'&&!cinematic&&!s.cloudPass :
      s.review?.terrain?.sharp&&s.review?.buildings?.ready>0&&cinematic&&s.cloudPass&&s.review?.immersive?.clouds?.active&&s.review?.immersive?.shadows;
+   if(style==='satellite'&&args.earth)s.pass=s.pass&&s.earthSurface?.ready>=16&&s.earthSurface.revision===2;
+   if(style==='toy')s.pass=s.pass&&!s.earthSurface;
    r.cases.push(s);await page.screenshot({path:`${output}/${name}.png`});await page.close();
    fs.writeFileSync(`${output}/report.json`,JSON.stringify(r,null,2));
    console.log(`Style ${name}: ${s.pass?'PASS':'FAIL'}`);
