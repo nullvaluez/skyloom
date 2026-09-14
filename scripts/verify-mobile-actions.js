@@ -12,6 +12,9 @@ const { chromium } = require('playwright');
 const { bootMobile, openActions, closeActions, MOBILE_CTX, LAUNCH_ARGS } = require('./_mobile-boot');
 const OUT = process.env.MOBILE_ACTIONS_OUT || path.join(__dirname, 'ground-night-out', 'mobile-actions');
 const sizes = [[320,568],[360,640],[390,844],[430,932],[568,320],[640,360],[844,390],[932,430],[768,1024],[1024,768]];
+const coreActionIds = ['touch-throttle-slow','touch-throttle-cruise','touch-throttle-boost','touch-boost','touch-look',
+  'touch-atlas','touch-logbook','touch-hangar','touch-contracts','touch-photo','touch-pause'];
+const softActionIds = ['touch-inspect','touch-dismiss-info','touch-intercept'];
 let gates = 0;
 const report={startedAt:new Date().toISOString(),url:process.env.FLY_URL||'http://localhost:3000',expectedBuildId:process.env.FLY_BUILD_ID||null,
   receipt:null,status:'running',gates:[],errors:[],notes:['Chromium touch emulation; not a real Safari/device certification.']};
@@ -47,7 +50,7 @@ async function closed(page, label) {
   });
   gate(`${label}: closed HUD has only joystick and one gameplay button`, result.stick && result.hidden && result.ids.length === 1 && result.ids[0] === 'touch-fab', result);
 }
-async function geometry(page, label) {
+async function geometry(page, label, contextualIds = []) {
   const rects = await page.evaluate(() => {
     const rect=(selector)=>{ const r=document.querySelector(selector)?.getBoundingClientRect(); return r && {x:r.x,y:r.y,right:r.right,bottom:r.bottom,w:r.width,h:r.height}; };
     return { panel:rect('[data-touch-surface]'),stick:rect('[data-testid="touch-joystick"]'),fab:rect('[data-testid="touch-fab"]'),vw:innerWidth,vh:innerHeight };
@@ -56,15 +59,68 @@ async function geometry(page, label) {
   const {panel,stick,fab,vw,vh}=rects;
   gate(`${label}: panel is bounded and clears both controls`, panel && panel.x>=0 && panel.y>=0 && panel.right<=vw+1 && panel.bottom<=vh+1 && !hit(panel,stick) && !hit(panel,fab), rects);
   const buttons = page.locator('[data-testid="touch-actions"] button');
-  for (let i=0; i<await buttons.count(); i++) {
-    const button=buttons.nth(i);
+  // Snapshot identities once. DOM-index iteration used to repeat or skip an
+  // action if a live aircraft lock changed while the panel was being scrolled.
+  const ids = await buttons.evaluateAll(elements=>elements.map(el=>el.dataset.testid));
+  gate(`${label}: action test IDs are unique`,ids.every(id=>/^touch-[a-z-]+$/.test(id)) && new Set(ids).size===ids.length,ids);
+  gate(`${label}: required actions are present`,[...coreActionIds,...contextualIds].every(id=>ids.includes(id)),ids);
+  for (const id of ids) {
+    const button=page.getByTestId('touch-actions').getByTestId(id);
     await button.scrollIntoViewIfNeeded();
     const accessible=await button.evaluate((el)=>{
       const r=el.getBoundingClientRect(), top=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
-      return {ok:r.width>=44 && r.height>=44 && !!top && (top===el || el.contains(top)),id:el.dataset.testid,w:r.width,h:r.height};
+      const name=(el.getAttribute('aria-label') || el.textContent || '').trim();
+      const native=el.tagName==='BUTTON' && el.type==='button' && !el.disabled && !!name;
+      return {ok:native && r.width>=44 && r.height>=44 && !!top && (top===el || el.contains(top)),id:el.dataset.testid,name,native,w:r.width,h:r.height};
     });
     gate(`${label}: ${accessible.id} is reachable at 44px`, accessible.ok, accessible);
   }
+}
+async function targetFixture(page, mode) {
+  await page.evaluate(mode=>{
+    const rt=window.__fly, store=window.__flyStore.getState();
+    if (!window.__touchTargetFixture) {
+      const track={hex:'c0ffee',meta:{flight:'UITEST',r:'N25UI',t:'C172',color:'#22d3ee'},
+        rx:0,ry:0,ryd:0,rz:0,yaw:0,distM:1000,stale:0,horizonFade:1};
+      const fixture={track,mode:'none',methods:[rt.targeting,rt.autopilot].map(object=>({object,descriptor:Object.getOwnPropertyDescriptor(object,'update')}))};
+      // Freeze selection, not the action handlers or their store mirroring.
+      // Keeping the no-selection matrix stable also makes gate counts useful.
+      rt.targeting.update=()=>null; rt.autopilot.update=()=>null;
+      const refresh=()=>{
+        const f=rt.flight;
+        Object.assign(track,{rx:f.pos.x,ry:f.pos.y,ryd:f.pos.y,rz:f.pos.z-100,distM:1000,stale:0});
+        rt.traffic.tracks.set(track.hex,track);
+      };
+      refresh(); fixture.interval=setInterval(refresh,100);
+      window.__touchTargetFixture=fixture;
+    }
+    const fixture=window.__touchTargetFixture;
+    fixture.mode=mode;
+    rt.autopilot.disengage();
+    rt.targeting.lockedHex=mode==='none' ? null : fixture.track.hex;
+    rt.targeting.target=mode==='none' ? null : fixture.track;
+    store.setCameraMode('chase');
+    if (mode==='none') { store.clearLock(); store.setInfoCardHex(null); }
+  },mode);
+  await page.waitForFunction(mode=>{
+    const s=window.__flyStore.getState();
+    return mode==='none' ? s.lockState==='none' && !s.lockedHex : s.lockState==='soft' && s.lockedHex==='c0ffee';
+  },mode);
+}
+async function releaseTargetFixture(page) {
+  await page.evaluate(()=>{
+    const fixture=window.__touchTargetFixture;
+    if (!fixture) return;
+    const rt=window.__fly;
+    clearInterval(fixture.interval);
+    for (const {object,descriptor} of fixture.methods) {
+      if (descriptor) Object.defineProperty(object,'update',descriptor);
+      else delete object.update;
+    }
+    rt.autopilot.disengage(); rt.targeting.lockedHex=null; rt.targeting.target=null;
+    rt.traffic.tracks.delete(fixture.track.hex); window.__flyStore.getState().clearLock();
+    delete window.__touchTargetFixture;
+  });
 }
 (async()=>{
   fs.mkdirSync(OUT,{recursive:true});
@@ -84,7 +140,12 @@ async function geometry(page, label) {
     const errors=report.errors;
     page.on('pageerror',error=>errors.push(error.message));
     await bootMobile(page,{style:'satellite'});
+    // pct=100 begins the fade; it does not mean the title has disappeared.
+    await page.getByTestId('boot-screen').waitFor({state:'detached',timeout:30000});
+    gate('Boot reveal is complete before presentation captures',!(await page.getByTestId('boot-screen').count()));
     await page.getByTestId('touch-fab').waitFor();
+    await targetFixture(page,'none');
+    report.notes.push('Target selection/autopilot updates are fixture-controlled for stable UI coverage; action dispatch and lock-state mirroring remain live.');
     await page.waitForTimeout(300);
     for (const style of ['satellite','toy']) {
       await page.evaluate((s)=>window.__flyStore.getState().setMapStyle(s),style);
@@ -171,6 +232,103 @@ async function geometry(page, label) {
     await page.evaluate(()=>window.dispatchEvent(new Event('blur')));
     gate('Window blur closes panel and releases controls',!(await state(page)).open && !(await state(page)).boost);
     await openActions(page);
+    await pointer(page,'touch-joystick','pointerdown',41,35);
+    await pointer(page,'touch-boost','pointerdown',42);
+    current=await state(page);
+    gate('Visibility cancellation starts with held Boost and steering',current.open && current.boost && current.steer,current);
+    // A deterministic handler test, not a claim about an OS background event.
+    // Headless tabs do not reliably become hidden when another tab is raised.
+    report.visibilitySimulation=await page.evaluate(()=>{
+      const keys=['hidden','visibilityState'];
+      const descriptors=keys.map(key=>Object.getOwnPropertyDescriptor(document,key));
+      const events=[];
+      const observe=event=>events.push({type:event.type,trusted:event.isTrusted,hidden:document.hidden,visibilityState:document.visibilityState});
+      document.addEventListener('visibilitychange',observe,true);
+      try {
+        Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});
+        Object.defineProperty(document,'visibilityState',{configurable:true,get:()=>'hidden'});
+        document.dispatchEvent(new Event('visibilitychange'));
+        return {method:'synthetic visibility properties and event',events,boostAfter:window.__fly.input.touchBoost,steerAfter:window.__fly.input.touch.active};
+      } finally {
+        keys.forEach((key,index)=>{if(descriptors[index])Object.defineProperty(document,key,descriptors[index]);else delete document[key];});
+        document.removeEventListener('visibilitychange',observe,true);
+      }
+    });
+    await page.getByTestId('touch-actions').waitFor({state:'detached'});
+    current=await state(page);
+    gate('Simulated hidden document releases held controls and closes actions',report.visibilitySimulation.events.some(event=>event.hidden && event.visibilityState==='hidden') && !current.open && !current.boost && !current.steer && !current.look,report.visibilitySimulation);
+    report.notes.push('Hidden-document cancellation uses synthetic visibility properties/event; native app backgrounding is not certified.');
+    // This capability transition follows FlyMode's actual isTouch conditional:
+    // the React component unmounts while its input/runtime objects stay alive.
+    // The preceding synthetic pointers have no native captures to cancel first.
+    await openActions(page);
+    await pointer(page,'touch-joystick','pointerdown',51,35);
+    await pointer(page,'touch-boost','pointerdown',52);
+    current=await state(page);
+    gate('TouchControls unmount starts with held Boost and steering',current.open && current.boost && current.steer,current);
+    const priorTouchPoints=await page.evaluate(()=>{
+      const coarseMq=matchMedia('(pointer: coarse)');
+      const fixture={runtime:window.__fly,input:window.__fly.input,coarseMq,events:[],readySince:null,
+        stick:document.querySelector('[data-testid="touch-joystick"]'),panel:document.querySelector('[data-testid="touch-actions"]')};
+      fixture.record=event=>fixture.events.push({type:event?.type || 'initial',trusted:event?.isTrusted ?? null,
+        coarse:coarseMq.matches,touchPoints:navigator.maxTouchPoints,at:performance.now()});
+      fixture.record(); coarseMq.addEventListener('change',fixture.record);
+      window.__touchUnmountFixture=fixture;
+      return navigator.maxTouchPoints;
+    });
+    const deviceCdp=await context.newCDPSession(page);
+    try {
+      await deviceCdp.send('Emulation.setTouchEmulationEnabled',{enabled:false});
+      await page.evaluate(()=>window.dispatchEvent(new Event('resize')));
+      await page.waitForFunction(()=>!document.querySelector('[data-fly-root]').hasAttribute('data-touch'),null,{timeout:5000});
+      await page.getByTestId('touch-joystick').waitFor({state:'detached'});
+      report.touchUnmount=await page.evaluate(()=>{
+        const fixture=window.__touchUnmountFixture, input=fixture.input;
+        return {method:'CDP touch capability change through FlyMode isTouch conditional',coarse:matchMedia('(pointer: coarse)').matches,
+          sameRuntime:fixture.runtime===window.__fly,sameInput:input===window.__fly.input,
+          oldNodesDetached:!fixture.stick.isConnected && !fixture.panel.isConnected,
+          boost:input.touchBoost,steer:input.touch.active,look:input.freeLook.active,phase:window.__flyStore.getState().phase};
+      });
+      const result=report.touchUnmount;
+      gate('Actual TouchControls unmount neutralizes the same live input',!result.coarse && result.sameRuntime && result.sameInput && result.oldNodesDetached && !result.boost && !result.steer && !result.look && result.phase==='flying',result);
+    } finally {
+      await deviceCdp.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:Math.max(1,priorTouchPoints)});
+      await page.evaluate(()=>window.dispatchEvent(new Event('resize')));
+      // Keep this session attached until context.close(). Detaching immediately
+      // after setting touch produced a transient remount followed by desktop
+      // capability state in the first replay; a brief visible FAB was not a
+      // sufficient restoration precondition. Observe media AND the mounted HUD.
+      try {
+        await page.waitForFunction(()=>{
+          const fixture=window.__touchUnmountFixture;
+          const root=document.querySelector('[data-fly-root]');
+          const visible=selector=>{
+            const el=root?.querySelector(selector), rect=el?.getBoundingClientRect();
+            return !!rect && rect.width>0 && rect.height>0 && getComputedStyle(el).visibility!=='hidden';
+          };
+          const ready=fixture.coarseMq.matches && navigator.maxTouchPoints>0 && root?.getAttribute('data-touch')==='1'
+            && visible('[data-testid="touch-joystick"]') && visible('[data-testid="touch-fab"]');
+          if (!ready) { fixture.readySince=null; return false; }
+          fixture.readySince ??= performance.now();
+          return performance.now()-fixture.readySince>=150;
+        },null,{timeout:5000});
+      } finally {
+        report.touchRestore=await page.evaluate(()=>{
+          const fixture=window.__touchUnmountFixture, root=document.querySelector('[data-fly-root]');
+          const result={coarse:fixture.coarseMq.matches,touchPoints:navigator.maxTouchPoints,
+            touchLayout:root?.getAttribute('data-touch'),sameInput:fixture.input===window.__fly.input,
+            mountedStick:!!root?.querySelector('[data-testid="touch-joystick"]'),mountedButton:!!root?.querySelector('[data-testid="touch-fab"]'),
+            stableMs:fixture.readySince===null?0:performance.now()-fixture.readySince,events:fixture.events};
+          fixture.coarseMq.removeEventListener('change',fixture.record);delete window.__touchUnmountFixture;
+          return result;
+        });
+      }
+    }
+    gate('Touch capability and remounted controls remain stable',report.touchRestore.coarse && report.touchRestore.touchPoints>0
+      && report.touchRestore.touchLayout==='1' && report.touchRestore.sameInput && report.touchRestore.mountedStick
+      && report.touchRestore.mountedButton && report.touchRestore.stableMs>=150,report.touchRestore);
+    await closed(page,'after TouchControls remount');
+    await openActions(page);
     await page.keyboard.press('Escape');
     gate('Escape closes disclosure without pausing',!(await state(page)).open && (await state(page)).phase==='flying');
     await openActions(page);
@@ -201,18 +359,30 @@ async function geometry(page, label) {
     await page.getByTestId('photo-exit').waitFor();
     gate('Photo is reachable and hides flight controls',!(await page.getByTestId('touch-joystick').count()));
     await page.getByTestId('photo-exit').click(); await page.getByTestId('touch-fab').waitFor();
-    // A fixed target fixture isolates HUD availability from live ADS-B traffic.
-    // Autopilot computation is parked; action dispatch and lock-state mirroring
-    // still run through FlyScene's real input state machines.
-    await page.evaluate(()=>{
-      const rt=window.__fly, f=rt.flight;
-      const track={hex:'c0ffee',meta:{flight:'UITEST',r:'N25UI',t:'C172',color:'#22d3ee'},
-        rx:f.pos.x,ry:f.pos.y,ryd:f.pos.y,rz:f.pos.z-100,yaw:0,distM:1000,stale:0,horizonFade:1};
-      rt.targeting.update=()=>null; rt.targeting.lockedHex=track.hex; rt.targeting.target=track;
-      rt.autopilot.update=()=>null; rt.autopilot.disengage();
-      rt.traffic.tracks.set(track.hex,track);
-      window.__touchTargetFixture=setInterval(()=>rt.traffic.tracks.set(track.hex,track),100);
-    });
+    // Required contextual geometry cannot depend on a live aircraft happening
+    // to cross the reticle. Check both lock states in the tight phone layouts.
+    for (const style of ['satellite','toy']) {
+      await page.evaluate(style=>window.__flyStore.getState().setMapStyle(style),style);
+      for (const [width,height] of [[320,568],[844,390]]) {
+        await closeActions(page);
+        await page.setViewportSize({width,height});
+        await targetFixture(page,'soft');
+        await page.waitForFunction(()=>window.__flyStore.getState().infoCardHex==='c0ffee');
+        await openActions(page);
+        await page.getByTestId('touch-inspect').waitFor();
+        const label=`${style} ${width}x${height} fixed target`;
+        gate(`${label}: soft lock hides Cinema`,!(await page.getByTestId('touch-cinema').count()));
+        await geometry(page,`${label} soft lock`,softActionIds);
+        await page.getByTestId('touch-intercept').click();
+        await page.getByTestId('touch-cinema').waitFor();
+        await geometry(page,`${label} intercept`,[...softActionIds,'touch-cinema']);
+        await page.getByTestId('touch-intercept').click();
+        await page.getByTestId('touch-cinema').waitFor({state:'detached'});
+      }
+    }
+    await closeActions(page);
+    await page.setViewportSize({width:390,height:844});
+    await targetFixture(page,'soft');
     await openActions(page); await page.getByTestId('touch-inspect').waitFor();
     gate('A soft lock exposes Inspect and Intercept, without Cinema',!!(await page.getByTestId('touch-intercept').count()) && !(await page.getByTestId('touch-cinema').count()));
     await page.waitForFunction(()=>!!window.__flyStore.getState().infoCardHex);
@@ -230,12 +400,7 @@ async function geometry(page, label) {
     gate('Cinema action enters cinematic follow',true);
     await page.getByTestId('touch-cinema').click();
     await page.waitForFunction(()=>window.__flyStore.getState().cameraMode==='chase');
-    await page.evaluate(()=>{
-      const rt=window.__fly; clearInterval(window.__touchTargetFixture);
-      delete rt.targeting.update; delete rt.autopilot.update; rt.autopilot.disengage();
-      rt.targeting.lockedHex=null; rt.targeting.target=null; rt.traffic.tracks.delete('c0ffee');
-      window.__flyStore.getState().clearLock();
-    });
+    await releaseTargetFixture(page);
     await openActions(page);
     const animation=await page.getByTestId('touch-actions').evaluate(el=>getComputedStyle(el).animationName);
     gate('Reduced motion disables panel animation',animation==='none',animation);
