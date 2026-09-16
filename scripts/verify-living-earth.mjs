@@ -138,6 +138,30 @@ check('forest render subdivisions preserve every source stand and absolute posit
   assert.deepEqual(coordinates(),expected);assert.equal(layer.stats.patches,4);
   rt.origin.anchor={x:5000,z:-5000};layer.update(surface,rt,1);assert.deepEqual(coordinates(),expected);layer.dispose();
 });
+check('forest birth and repair never upload singular normal transforms',()=>{
+  const layer=new LivingForest();let matrix;
+  const tile={x:0,z:0,mesh:{setMatrixAt:(_i,m)=>{matrix=m.clone();},
+    instanceMatrix:{addUpdateRange(){}},setColorAt(){},instanceColor:{addUpdateRange(){}}}};
+  const row={x:10,z:20,width:30,height:24,ground:100,seed:.4};
+  for(const fade of [0,Number.EPSILON,.0001,.1,.5,1]){
+    layer._place(tile,0,row,1,fade);
+    assert.ok(matrix.determinant()>0,`Birth fraction ${fade} must remain invertible`);
+    // Match defaultnormal_vertex: divide each normal component by the squared
+    // length of the instance matrix column, then multiply by that matrix.
+    const e=matrix.elements;
+    for(const geometry of [layer.geometry,layer.farGeometry]){
+      const n=geometry.attributes.normal;
+      for(const index of new Set(geometry.index.array)){
+        const v=[n.getX(index),n.getY(index),n.getZ(index)].map((v,c)=>v/(e[c*4]**2+e[c*4+1]**2+e[c*4+2]**2));
+        const transformed=[0,1,2].map(r=>e[r]*v[0]+e[4+r]*v[1]+e[8+r]*v[2]);
+        assert.ok(transformed.every(Number.isFinite));assert.ok(Math.hypot(...transformed)>0);
+      }
+    }
+    if(fade===0)assert.ok(row.ground-.8+matrix.elements[5]<row.ground,'Birth remains underground');
+    if(fade===1)assert.equal(matrix.elements[5],row.height,'Mature forest is unchanged');
+  }
+  layer.dispose();
+});
 check('regional context follows country geography and source tags remain authoritative',()=>{
   assert.equal(architectureRegion(35.68,139.76).style,'east-asia');assert.equal(architectureRegion(-8.65,115.22).style,'tropical-asia');
   assert.equal(architectureRegion(40.14,-83.08).country,'USA');assert.equal(architectureRegion(-37.68,144.58).style,'oceania');
