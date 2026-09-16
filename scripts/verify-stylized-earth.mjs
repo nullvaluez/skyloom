@@ -64,7 +64,8 @@ check('roads and footprints are explicit exclusions',()=>{
 check('wetlands and seasonal water exclude props without erasing roads',()=>{
   const seasonal={...feature('lake',[ring(0,0,10,10)]),properties:{class:'lake',intermittent:1}};
   const mask=buildEarthSurfaceMask({layers:{landcover:layer(feature('wetland',[ring(0,0,128,128)])),water:layer(seasonal),transportation:layer(feature('primary',[[{x:0,y:50},{x:128,y:50}]],2))}},128);
-  assert.equal(mask.revision,2);assert.equal(mask.exclusion[25*128+25],128);
+  // Revision 6 adds Living Earth occupancy/pavement metadata; mask layout stays fixed.
+  assert.equal(mask.revision,6);assert.equal(mask.exclusion[25*128+25],128);
   assert.equal(mask.exclusion[50*128+70],255);assert.equal(mask.exclusion[5*128+5],255);
   assert.equal(mask.classes[25*128+25],config.EARTH_SURFACE.wetland);assert.equal(mask.waterCells,0);
 });
@@ -103,7 +104,7 @@ check('48 resident slots and exactly 6 MiB of GPU mask storage',()=>{
 });
 check('at most two worker requests and no geometry draws',()=>{assert.equal(promises.length,2);assert.equal(engine.stats.draws,0);});
 runtime.flight.pos.x+=1000000;engine.update(runtime,1);
-for(const resolve of promises)resolve({v:21,surface:waterMask});
+for(const resolve of promises)resolve({v:22,surface:waterMask});
 await new Promise(resolve=>setTimeout(resolve,0));
 engine.update(runtime,2);engine.update(runtime,2.02);
 check('late results cannot repaint recycled slots after travel',()=>assert.equal(engine.stats.staleDropped,2));
@@ -115,7 +116,7 @@ check('finer unclassified land retires coarse water without inventing a surface'
 });
 engine.dispose();
 check('disposal releases the pending work and leaves the engine inactive',()=>{assert.equal(engine.disposed,true);assert.equal(engine.queue.length,0);assert.equal(engine.pending.length,0);});
-const oldMasks=new EarthSurfaceEngine({buildTile:async()=>({v:21,surface:{...waterMask,revision:1}})});
+const oldMasks=new EarthSurfaceEngine({buildTile:async()=>({v:22,surface:{...waterMask,revision:2}})});
 oldMasks.update(runtime,0);await new Promise(resolve=>setTimeout(resolve,0));
 check('old derived-mask revisions are rejected even when the worker protocol matches',()=>{
   assert.equal(oldMasks.stats.failed,2);assert.equal(oldMasks.stats.commits,0);assert.equal(oldMasks.pending.length,0);
@@ -127,8 +128,8 @@ check('hydrology keeps imagery dominant and mapped roads remain photographic',()
   e._commit({b,index:0,key:'wet',generation:1,result:{surface:wet}},0);
   const width=b.size*4;assert.equal(b.texture.image.data[(25*width+25)*4+3],90);assert.equal(b.texture.image.data[(50*width+25)*4+3],64);e.dispose();
 });
-check('all worker consumers agree on protocol 21',()=>{
-  for(const name of ['sat-building','sat-clutter','sat-road','sat-skyline','sat-veg','toy-world'])assert.match(fs.readFileSync(path.join(root,`toy-world/${name}-engine.js`),'utf8'),/EXPECTED_WORKER_PROTOCOL = 21/);
-  assert.match(fs.readFileSync(path.join(root,'toy-world/vector-tile.worker.js'),'utf8'),/WORKER_PROTOCOL = 21/);
+check('all worker consumers agree on protocol 22',()=>{
+  for(const name of ['sat-building','sat-clutter','sat-road','sat-skyline','sat-veg','toy-world'])assert.match(fs.readFileSync(path.join(root,`toy-world/${name}-engine.js`),'utf8'),/EXPECTED_WORKER_PROTOCOL = 22/);
+  assert.match(fs.readFileSync(path.join(root,'toy-world/vector-tile.worker.js'),'utf8'),/WORKER_PROTOCOL = 22/);
 });
 console.log(`STYLIZED EARTH: PASS ${checks}/${checks}`);

@@ -1,6 +1,7 @@
 'use client';
 import { cinematicAircraftParameters } from '@/lib/fly/cinematic-models';
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
+import { registerCameraModel } from '@/lib/fly/camera-framing';
 
 
 import { Suspense, useEffect, useMemo, useRef } from 'react';
@@ -178,6 +179,14 @@ function PlayerModel({ flight, aircraft }) {
       ),
     [cloned, entry]
   );
+  // Measure before the clone is mounted. Afterwards matrixWorld already includes
+  // correction and the flight rig, which would apply the model scale twice.
+  const cameraDimensions=useMemo(()=>correctedBox(cloned,correction).getSize(new Vector3()),[cloned,correction]);
+  useEffect(() => {
+    const dimensions=cameraDimensions;
+    // Visual metadata only: collision shape and flight envelope retain ownership.
+    return registerCameraModel(flight,{width:dimensions.x,height:dimensions.y,length:dimensions.z});
+  },[cameraDimensions,flight]);
   // Round 13 Phase 2: regrade EVERY hull material (canopy gets the glassier
   // sub-grade) and arm the player to cast shadows — the toy ortho rig (whose
   // receiver plane already exists) then draws the hero's own shadow for free.

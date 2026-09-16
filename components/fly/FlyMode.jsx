@@ -103,6 +103,17 @@ function HudGroup({ hidden, children }) {
  */
 export function FlyMode({ onClose }) {
   const spawn = useFlyStore((s) => s.spawn);
+  // Opt-in local review only: install the allocation observer BEFORE Canvas
+  // creates a context. Ordinary flight never loads this diagnostic chunk.
+  const [memoryProbeReady,setMemoryProbeReady]=useState(()=>typeof window==='undefined'||!(new URLSearchParams(window.location.search).get('graphicsReview')==='1'&&new URLSearchParams(window.location.search).get('graphicsMemory')==='1'));
+  useEffect(()=>{
+    if(memoryProbeReady)return;
+    let active=true;
+    import('../../scripts/ground-texture-audit.cjs').then(({installGroundTextureAudit})=>{
+      if(!active)return;installGroundTextureAudit();setMemoryProbeReady(true);
+    }).catch(error=>{if(active){window.__graphicsMemoryError=String(error);setMemoryProbeReady(true);}});
+    return()=>{active=false;};
+  },[memoryProbeReady]);
   // Round 17: ONE device description for the whole HUD. `isTouch` is the same
   // boolean useIsTouch() always returned (that hook is now a wrapper over this
   // one); the extra fields are what let the overlays stop disagreeing about
@@ -271,7 +282,7 @@ export function FlyMode({ onClose }) {
       data-touch-panel={isTouch ? touchSurface : undefined}
     >
       <FlyErrorBoundary onExit={onClose}>
-        {spawn && <FlyCanvas runtime={runtimeRef.current} />}
+        {spawn && memoryProbeReady && <FlyCanvas runtime={runtimeRef.current} />}
       </FlyErrorBoundary>
 
       {/* Named layout zones (MOBILE_UI.zones). Empty scaffolding until the

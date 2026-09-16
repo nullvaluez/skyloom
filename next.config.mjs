@@ -1,7 +1,9 @@
+import { fileURLToPath } from 'node:url';
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Isolate review builds from a running local server's generated files.
   distDir: process.env.FLY_BUILD_DIR || '.next',
+  outputFileTracingRoot: fileURLToPath(new URL('.', import.meta.url)),
   // Keep the normal Turbopack path free of custom webpack configuration.
   ...(process.env.FLY_BUILD_DIR ? {
     webpack(config) {

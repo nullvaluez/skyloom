@@ -4,6 +4,8 @@ module.exports = {
   namib: { lat:-24.732,lon:15.298,ground:590,heading:200,noon:11,dusk:16.4,night:22,kind:'desert / sparse data',surface:5 },
   everglades: { lat:25.613,lon:-80.733,ground:2,heading:150,noon:18,dusk:24.2,night:5,kind:'wetland',surface:10 },
   bali: { lat:-8.801,lon:115.231,ground:15,heading:100,noon:4,dusk:10.3,night:16,kind:'tropical coast',surface:8 },
+  'bali-inland': { lat:-8.501,lon:115.265,ground:180,heading:300,noon:4,dusk:10.3,night:16,kind:'tropical woodland / cropland',surface:2 },
   tokyo: { lat:35.6812,lon:139.7671,ground:8,heading:40,noon:3,dusk:10,night:17,kind:'dense city',surface:7 },
   melton: { lat:-37.683,lon:144.582,ground:135,heading:109,noon:2,dusk:7.4,night:15,kind:'sparse building data',surface:7 },
+  deadsea: { lat:31.49,lon:35.48,ground:-430,heading:20,noon:10,dusk:17,night:22,kind:'negative elevation / shoreline',surface:8 },
 };

@@ -4,6 +4,7 @@ const {chromium}=require('playwright'),fs=require('node:fs'),path=require('node:
 const fixtures=require('./earth-world-fixtures.cjs');
 const {captureStreamersSettled,captureSceneCensus}=require('./graphics-capture-census.cjs');
 const {captureBudgetChecks}=require('./graphics-capture-budget.cjs');
+const {cinematicSupportCensus}=require('./cinematic-support-census.cjs');
 const args=Object.fromEntries(process.argv.slice(2).map(a=>{const[k,...v]=a.replace(/^--/,'').split('=');return[k,v.join('=')||true];}));
 const url=args.url||'http://localhost:3033',output=args.output||'.graphics-review/stylized-earth/world/biomes';
 (async()=>{
@@ -32,7 +33,7 @@ const url=args.url||'http://localhost:3033',output=args.output||'.graphics-revie
           // Hold through the real integrator so its AGL/HUD/contact state keeps
           // updating. Replacing step() with a no-op left the displayed AGL stale.
           window.__earthWorldStep ??= f.step.bind(f);
-          f.step=(dt,cmd)=>window.__earthWorldStep(dt,{...cmd,speedOverride:0,turn:0,pitch:0,boost:false});rt.chaseCam?.snap?.();
+          f.step=(dt,cmd)=>{window.__earthWorldStep(dt,{...cmd,speedOverride:0,turn:0,pitch:0,boost:false});f.pos.y=f.groundElev+feet*.3048;};rt.chaseCam?.snap?.();
         },{site,time,feet});
         await page.waitForTimeout(16000);
         await page.waitForFunction(()=>window.__graphicsReview?.terrain?.sharp&&window.__fly?.earthSurface?.ready>=16&&window.__fly.earthSurface.pending===0,null,{timeout:90000});
@@ -49,8 +50,11 @@ const url=args.url||'http://localhost:3033',output=args.output||'.graphics-revie
         const file=`${name}-${time}-${feet}.png`,sceneCensus=await page.evaluate(captureSceneCensus);
         await page.screenshot({path:path.join(output,file)});
         const urban=['tokyo','melton'].includes(name);
-        const correctness=row.terrain>=20&&!row.invalidBounds&&!row.invalidDem&&!row.failedImagery&&row.pins.every(p=>p===null)&&row.earthSurface.revision===2&&row.earthSurface.maskBytes===6*1024*1024&&row.earthSurface.ready<=48&&Number.isFinite(row.ground?.elev)&&Math.abs(row.ground.elev)<20000&&Math.abs(row.agl-feet*.3048)<5&&(!urban||row.review?.buildings?.ready>0);
-        const shot={name,site,time,file,sceneCensus,correctness,...row};report.shots.push(shot);
+        // Revision 5 adds WorldCover fallback; allocation and geometry ceilings remain unchanged.
+        const correctness=row.terrain>=20&&!row.invalidBounds&&!row.invalidDem&&!row.failedImagery&&row.pins.every(p=>p===null)&&row.earthSurface.revision===5&&row.earthSurface.maskBytes===6*1024*1024&&row.earthSurface.ready<=48&&Number.isFinite(row.ground?.elev)&&Math.abs(row.ground.elev)<20000&&Math.abs(row.agl-feet*.3048)<5&&(!urban||row.review?.buildings?.ready>0);
+        const support=await page.evaluate(cinematicSupportCensus);
+        const supportPass=support.maxErrorM<=100;
+        const shot={name,site,time,file,sceneCensus,correctness:correctness&&supportPass,support,supportPass,...row};report.shots.push(shot);
         console.log(`${name} ${time}: ${correctness?'READY':'FAIL'}, draws ${row.review?.drawCalls}, texture peak ${(row.textureAudit.peakBytes/1048576).toFixed(1)} MiB`);
         fs.writeFileSync(path.join(output,'report.json'),JSON.stringify({...report,status:'IN_PROGRESS'},null,2));
       }

@@ -1,10 +1,13 @@
 'use client';
+/* eslint-disable react-hooks/set-state-in-effect -- A warp epoch is an external simulation event; its effect starts the overlay animation and subscribes to readiness. */
 
 import { useEffect, useRef, useState } from 'react';
 import { ARRIVAL_GATE, MOBILE_UI, WARP } from '@/lib/fly/fly-constants';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { arrivalOn, arrivalTerms, markReveal } from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
+import { worldReadiness, retryWorldContent } from '@/lib/fly/world-readiness';
+import { LIVING_EARTH } from '@/lib/fly/living-earth';
 
 /**
  * Warp arrival treatment, keyed on fly-store.warpEpoch.
@@ -24,8 +27,10 @@ export function WarpFlash({ runtime }) {
   // Round 17: layout/particle budget only — no stage or timing logic reads it.
   const { isPhone: phone } = useDeviceLayout();
   const [stage, setStage] = useState(null); // 'flash' | 'streak' | 'hold' | 'reveal'
+  const [help,setHelp]=useState(null);
+  const reducedEntry=useRef(false);
   const runtimeRef = useRef(runtime);
-  runtimeRef.current = runtime;
+  useEffect(()=>{runtimeRef.current=runtime;},[runtime]);
 
   useEffect(() => {
     if (warpEpoch === 0) return undefined;
@@ -33,6 +38,29 @@ export function WarpFlash({ runtime }) {
     let cancelled = false;
     const timers = [];
     const t0 = performance.now();
+    if(useFlyStore.getState().mapStyle==='satellite'){
+      reducedEntry.current=false;setHelp(null);setStage('streak');
+      const rt=runtimeRef.current;rt.worldLoading=true;
+      let readySince=null,helpSince=t0,revealTimer;
+      const poll=setInterval(()=>{
+        if(cancelled)return;
+        const now=performance.now(),content=worldReadiness(rt);
+        rt.worldReadiness=content;
+        if(now-t0>WARP.flashMs)setStage('hold');
+        if(content.ready){readySince??=now;}else readySince=null;
+        if(now-helpSince>=LIVING_EARTH.loadingHelpMs&&!content.ready)setHelp(content.missing);
+        rt.arrivalStats={kind,epoch:warpEpoch,gateArmed:true,holdStartAt:t0,holdCapMs:null,terms:content,revealAt:null};
+        if((readySince!==null&&now-readySince>=600&&now-t0>=WARP.flashMs)||reducedEntry.current){
+          clearInterval(poll);rt.worldLoading=false;rt.worldDegraded=reducedEntry.current;
+          rt.arrivalStats={...rt.arrivalStats,revealAt:now,holdMs:Math.round(now-t0),reason:reducedEntry.current?'explicit-reduced':'content'};
+          window.__flyWorldStatus={degraded:reducedEntry.current,missing:content.missing};
+          (window.__flyStats??={}).warpGate=rt.arrivalStats;
+          markReveal('warp');setStage('reveal');setHelp(null);
+          revealTimer=setTimeout(()=>!cancelled&&setStage(null),WARP.far.revealMs);
+        }
+      },250);
+      return()=>{cancelled=true;clearInterval(poll);clearTimeout(revealTimer);rt.worldLoading=false;};
+    }
     const gate = arrivalOn();
     // R22 (B ↔ E CONTRACT): `runtime.arrivalStats` tells a gate WHICH cap is in
     // force for THIS warp before it judges the hold — without it a correct
@@ -276,7 +304,7 @@ export function WarpFlash({ runtime }) {
   return (
     <div
       key={warpEpoch}
-      className="pointer-events-none absolute inset-0 z-30"
+      className="pointer-events-auto absolute inset-0 z-30"
       data-testid="warp-hold"
       data-stage={stage}
       style={{
@@ -299,7 +327,6 @@ export function WarpFlash({ runtime }) {
       {/* streak tunnel: a handful of radial lines racing outward */}
       {[...Array(phone ? MOBILE_UI.boot.phoneStreaks : 9)].map((_, i) => (
         <div
-          // eslint-disable-next-line react/no-array-index-key
           key={i}
           className="absolute left-1/2 top-1/2 h-2 w-px bg-white/80"
           style={{
@@ -322,6 +349,13 @@ export function WarpFlash({ runtime }) {
         >
           {stage === 'reveal' ? 'arrived' : 'streaming world'}
         </div>
+        {help&&<div className="mx-auto mt-7 max-w-md font-sans text-sm normal-case tracking-normal text-white/80" role="status">
+          <p>Nearby detail is still loading. You can keep waiting or enter with reduced detail.</p>
+          <div className="mt-4 flex justify-center gap-3">
+            <button type="button" className="rounded border border-white/30 px-4 py-2" onClick={()=>{retryWorldContent(runtimeRef.current);setHelp(null);}}>Retry loading</button>
+            <button type="button" className="rounded bg-white px-4 py-2 text-slate-950" onClick={()=>{reducedEntry.current=true;}}>Continue with reduced detail</button>
+          </div>
+        </div>}
       </div>
     </div>
   );

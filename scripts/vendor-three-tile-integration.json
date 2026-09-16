@@ -1,15 +1,15 @@
 {
   "schemaVersion": 1,
   "baselineCommit": "0ff2a3f3f6721265c285a02bbc87f130b161ff77",
-  "compiledAppSourceSha256": "a9d5d0fa08c317fdbb59674f7ab2a2fa3b0ea82d1484dc431958b2502bbee788",
-  "recordedAt": "2026-09-14",
+  "compiledAppSourceSha256": "7ea4879c974b26ae8941a9fe37453210f7980bed0ece381109e24ffd00c13930",
+  "recordedAt": "2026-09-16",
   "digestNormalization": "UTF-8 source with physical CRLF normalized to LF; no other source normalization",
   "inventory": "Top-level declared functions and class methods, named by public export when present; exact normalized source comparison against baselineCommit",
   "note": "Review receipt, not visual or performance certification. No automatic digest refresh. Future vendor edits require explanation, focused regression evidence, and explicit receipt update.",
   "files": {
     "index.js": {
       "baselineSha256": "931e09ee8d594e709ec19f91be92ecb8fc28cd54054e352ac11d8275df86cb97",
-      "integratedSha256": "a29bdb115515c753fa74d730d77ecdd50ff0aeb4c831723256deb8de487debef",
+      "integratedSha256": "10154c313916fd2925a0ee5bccf4a7b5956dcc589245d42d91e31332eba34066",
       "changedFunctions": [
         {
           "name": "TerrainLercLoader.doLoad",
@@ -34,7 +34,12 @@
         {
           "name": "Tile._LODEvaluate",
           "change": "modified",
-          "reason": "Retain main residency/hysteresis branch; allow the parallel fallback hysteresis control."
+          "reason": "Retain main residency/hysteresis branch; allow the parallel fallback hysteresis control. During Satellite arrival, refine only required local ancestors to the bounded ground-support zoom."
+        },
+        {
+          "name": "Tile._arrivalGroundRequired",
+          "change": "added",
+          "reason": "Per-map arrival focus checks a bounded local Mercator circle with longitude wrap and a hard zoom floor; null focus preserves normal flight."
         },
         {
           "name": "Tile._getDistRatio",
@@ -59,7 +64,7 @@
         {
           "name": "Tile._update",
           "change": "modified",
-          "reason": "Use one saturated-tree walker for both controls and schedule resident imagery recovery."
+          "reason": "Use one saturated-tree walker for both controls and schedule resident imagery recovery. Visit the explicitly requested local ground ring while the arrival camera is held."
         },
         {
           "name": "Tile._updateModel",

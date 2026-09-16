@@ -1,0 +1,14 @@
+{
+  "name": "ESA WorldCover 2021 v200",
+  "use": "Fallback land-cover classification and tree placement within existing scenery pools",
+  "license": "CC-BY-4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "source": "https://esa-worldcover.org/en/data-access",
+  "dataset": "https://doi.org/10.5281/zenodo.7254221",
+  "service": "https://wmts.terrascope.be/?request=GetCapabilities&service=WMTS",
+  "layer": "esa-worldcover-map-10m-2021-v2_map",
+  "sourceResolutionM": 10,
+  "sourceYear": 2021,
+  "attribution": "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium",
+  "modifications": "Exact categorical map colors decoded to provider classes, nearest sampling into existing surface masks, conservative mapped-feature exclusions, bounded deterministic tree scatter. No use as a current survey or exact building/road geometry."
+}

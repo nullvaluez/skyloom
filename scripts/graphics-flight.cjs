@@ -79,7 +79,9 @@ async function main(){
   report.hardware=await page.evaluate(()=>{const gl=document.querySelector('canvas').getContext('webgl2');const e=gl.getExtension('WEBGL_debug_renderer_info');return{renderer:e&&gl.getParameter(e.UNMASKED_RENDERER_WEBGL),gpuTimer:!!gl.getExtension('EXT_disjoint_timer_query_webgl2')};});
   if(!report.hardware.gpuTimer || /swiftshader|software|llvmpipe/i.test(report.hardware.renderer||''))throw Error('Hardware GPU timing unavailable');
   await page.waitForFunction(()=>[...window.__fly.traffic.tracks.values()].some(t=>t.fix1 && t.stale!==2),null,{timeout:45000})
-    .catch(()=>{throw Error('No live traffic available at benchmark readiness');});
+    .catch(()=>{report.liveTrafficUnavailableAtReadiness=true;});
+  // Still exercise the requested flight duration during a provider outage.
+  // The existing absentTraffic verdict below remains BLOCKED, never PASS.
   if(cloudTraverse){
     await page.waitForFunction(()=>window.__fly.immersiveClouds?.active&&Number.isFinite(window.__fly.immersiveClouds.inside)
       &&Number.isFinite(window.__fly.immersiveLighting?.cloudBase)&&Number.isFinite(window.__fly.immersiveLighting?.cloudThickness),null,{timeout:30000})

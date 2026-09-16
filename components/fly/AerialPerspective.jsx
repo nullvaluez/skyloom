@@ -50,7 +50,7 @@
  * reads, and the copy happens at the latest possible moment.
  */
 import { Effect, EffectAttribute } from 'postprocessing';
-import { Uniform, Vector2, Vector3, Color, SRGBColorSpace } from 'three';
+import { Uniform, Vector2, Vector3, Vector4, Color, SRGBColorSpace } from 'three';
 import { AERIAL_LAW, DEPTH_FIX, AERIAL_PERSPECTIVE, DEPTH_PASS } from '@/lib/fly/fly-constants';
 // R24 D (AERIAL_LAW): the ONE atmosphere law — the same GLSL string and the
 // same uniform block the per-material term in world-bend injects, so the two
@@ -67,6 +67,7 @@ import {
 import { linearHazeOn } from '@/lib/fly/toy-world/world-bend';
 import { depthSubOn } from '@/lib/fly/depth-pass';
 import { daylightNearHazeMix } from '@/lib/fly/daylight-depth';
+import { LIVING_AIR_GLSL } from '@/lib/fly/living-atmosphere';
 
 /**
  * Module-scope frame state. One satellite scene exists at a time, so a plain
@@ -92,6 +93,7 @@ const _state = {
   // R22 (D DEPTH) — the near band. 0 until DEPTH_PASS.aerialNear is armed.
   nearStartM: 0,
   nearMaxMix: 0,
+  livingAir: [0, 1, .00012, 1200],
 };
 
 /**
@@ -100,6 +102,12 @@ const _state = {
  * unchanged, so a pinned/medium/toy frame is bit-identical to pre-R19.
  */
 export function setAerial(s) {
+  _state.livingAir[0] = s.livingAir ? 1 : 0;
+  if (s.livingAir) {
+    _state.livingAir[1] = s.livingAir.metricScale;
+    _state.livingAir[2] = s.livingAir.extinction;
+    _state.livingAir[3] = s.livingAir.heightM;
+  }
   _state.strength = s.strength;
   _state.startM = s.startM;
   _state.endM = s.endM;
@@ -296,6 +304,8 @@ uniform float uBendK;
 uniform float uGroundY;
 uniform float uReverseDepth;
 uniform vec2 uNear; // R22 D: (nearStartM, nearMaxMix) — both 0 when un-armed
+uniform vec4 uLivingAir; // enabled, Mercator scale, optical density, scale height
+${LIVING_AIR_GLSL}
 
 void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth, out vec4 outputColor) {
   // REVERSED DEPTH. FlyCanvas runs the renderer with reversedDepthBuffer true
@@ -362,6 +372,18 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth,
   // uses. Below the datum clamps to 0 = full density, so valleys fill first
   // and ridges stand out of the haze — the read that sells depth.
   float h = max( 0.0, trueY - uGroundY );
+
+  if (uLivingAir.x > .5) {
+    // Horizontal map coordinates are Mercator-scaled; elevation is already
+    // physical. Recover a metre distance before integrating air density.
+    vec3 metricRay=world-uCamPos;
+    metricRay.xz/=uLivingAir.y;
+    float transmission=livingAirTransmission(length(metricRay),uCamPos.y-uGroundY,h);
+    float authority=clamp(uMaxMix/.55,0.,1.);
+    vec3 transmittance=mix(vec3(1.),pow(vec3(transmission),vec3(.86,1.,1.16)),authority);
+    outputColor=vec4(inputColor.rgb*transmittance+uHazeColor*(1.-transmittance),inputColor.a);
+    return;
+  }
 
   float t = smoothstep( uBand.x, uBand.y, dist );
   float hFall = exp( -h / uHeightFalloff );
@@ -433,6 +455,7 @@ export class AerialPerspectiveEffect extends Effect {
         ['uGroundY', new Uniform(0)],
         ['uReverseDepth', new Uniform(0)],
         ['uNear', new Uniform(new Vector2(0, 0))],
+        ['uLivingAir', new Uniform(new Vector4(0, 1, .00012, 1200))],
       ]),
     });
     this._law = law;
@@ -484,6 +507,7 @@ export class AerialPerspectiveEffect extends Effect {
       return;
     }
     u.get('uMaxMix').value = s.strength;
+    u.get('uLivingAir').value.fromArray(s.livingAir);
     // R24 C (LINEAR_HAZE): Color.setRGB's default colorSpace is the WORKING
     // space, i.e. no conversion — which is exactly the L1 defect. Naming
     // SRGBColorSpace decodes the authored triple into the linear buffer the

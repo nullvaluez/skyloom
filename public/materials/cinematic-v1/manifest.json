@@ -1,0 +1,32 @@
+{
+  "revision": 1,
+  "source": "First-party procedural material artwork",
+  "generator": "scripts/build-cinematic-materials.mjs",
+  "thirdPartyAssets": [],
+  "license": "Project MIT license",
+  "size": 256,
+  "layers": [
+    "asphalt",
+    "concrete",
+    "masonry",
+    "roofing",
+    "soil-grass",
+    "rock",
+    "sand",
+    "snow"
+  ],
+  "format": "RGBA8 texture arrays; color RGB sRGB, color alpha roughness; detail linear normal XY, height, occlusion",
+  "gpuBytesWithMips": 5592406,
+  "assets": [
+    {
+      "file": "color.bin",
+      "bytes": 2097152,
+      "sha256": "d8e3b7b6f178f2bdf6192b05ba6c4dec4832ce180c9eeae58e09b624109d7f57"
+    },
+    {
+      "file": "detail.bin",
+      "bytes": 2097152,
+      "sha256": "6931bc6dcdf7d19e5a3be1ed61e6c2150e1e221907cd611f03ef5ca202c26bae"
+    }
+  ]
+}

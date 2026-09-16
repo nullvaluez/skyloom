@@ -17,13 +17,13 @@ const {inferBuildingStyle,buildingHash,buildingStyleVertex,buildingClassificatio
 const {physicalBendCoefficient,metricDirection} = await pure('render-scale.js');
 const {satelliteVisualsOn,satelliteVisualProfile,satelliteEffectTier} = await pure('satellite-visuals.js');
 const {resolveSatelliteAtmosphere} = await pure('satellite-atmosphere.js');
-for (const [tags,height,expected] of [['house',8,0],['apartment',18,1],['',20,2],['office',40,3],['glass',120,4],['warehouse',12,5]]) {
+for (const [tags,height,expected] of [['house',8,0],['apartment',18,1],['',20,2],['office',40,3],['glass',120,4],['warehouse',12,5],['rowhouse',9,6],['terminal',15,7]]) {
   // Family selection must distinguish all six, while variation is revisit-stable.
   const args={tags,height,id:123,areaM2:400,density:900};
   assert.equal(inferBuildingStyle(args).family,expected);
   assert.deepEqual(inferBuildingStyle(args),inferBuildingStyle(args));
 }
-assert.equal(BUILDING_PROFILES.length,6);
+assert.equal(BUILDING_PROFILES.length,8);
 // A tower's height cannot certify its cladding. Require real variety without
 // freezing artistic percentages, and preserve deterministic revisit/LOD identity.
 const towerFamilies=new Set();
@@ -73,9 +73,9 @@ const cloudyDay=resolveSatelliteAtmosphere({sinEl:0.7},{overcastT:1});
 assert.ok(cloudyDay.environment>day.environment,'Immersive overcast shifts light into diffuse environment fill');
 assert.ok(cloudyDay.background<day.background,'Overcast still darkens the visible background');
 for(const f of ['sat-building','sat-skyline','sat-road','sat-veg','sat-clutter','toy-world']) {
-  assert.match(fs.readFileSync(new URL('../lib/fly/toy-world/'+f+'-engine.js',import.meta.url),'utf8'), /EXPECTED_WORKER_PROTOCOL = 21/);
+  assert.match(fs.readFileSync(new URL('../lib/fly/toy-world/'+f+'-engine.js',import.meta.url),'utf8'), /EXPECTED_WORKER_PROTOCOL = 22/);
 }
-assert.match(fs.readFileSync(new URL('../lib/fly/toy-world/vector-tile.worker.js',import.meta.url),'utf8'), /WORKER_PROTOCOL = 21/);
+assert.match(fs.readFileSync(new URL('../lib/fly/toy-world/vector-tile.worker.js',import.meta.url),'utf8'), /WORKER_PROTOCOL = 22/);
 // Exercise the real near/far handover uniforms through a quality step and a rebase.
 const {createSatelliteArchitectureMaterial,setSatelliteArchitectureCoverage} = await import('../lib/fly/satellite-architecture-material.js');
 for(const distant of [false,true]) {
@@ -85,7 +85,8 @@ for(const distant of [false,true]) {
   assert.match(shader.fragmentShader,/vec3 style = floor\(vBuildingStyle \+ 0\.5\)/,'Night seed precision guard survives');
   assert.match(shader.fragmentShader,/mix\(vec3\(0\.32\), diffuseColor\.rgb, 0\.35\)/,'Glazing reads the existing material variant albedo');
   assert.doesNotMatch(shader.fragmentShader,/vec3\(0\.40,0\.54,0\.61\)/,'Universal cyan glazing is retired');
-  assert.match(material.customProgramCacheKey(),/cinematic-architecture-v3-/);
+  // Texture-array sampling must not reuse the previous program cache entry.
+  assert.match(material.customProgramCacheKey(),/cinematic-architecture-v6-/);
   material.dispose();
 }
 const far = createSatelliteArchitectureMaterial({distant:true});
@@ -104,4 +105,4 @@ buildings.object.visible=false;
 setSatelliteArchitectureCoverage(far,buildings,{x:0,z:0},1);
 assert.equal(u.uArchitectureTileCount.value,0,'An invisible layer cannot leave a skyline hole');
 far.dispose();
-console.log('GRAPHICS UNIT: PASS (six families, masks, stable variation, quality continuity, latitude, atmosphere, protocol)');
+console.log('GRAPHICS UNIT: PASS (eight families, masks, stable variation, quality continuity, latitude, atmosphere, protocol)');

@@ -5,6 +5,9 @@ const fs=require('node:fs'),path=require('node:path');
 const args=Object.fromEntries(process.argv.slice(2).map(a=>{const [k,...v]=a.replace(/^--/,'').split('=');return[k,v.join('=')||true];}));
 const url=args.url||'http://localhost:3028',siteName=args.site||'erie';
 const sites={erie:{lat:41.7588,lon:-82.6925,ground:175,heading:349,noon:18,dusk:25,night:5},elyria:{lat:41.1859,lon:-82.0982,ground:252,heading:93,noon:18,dusk:25,night:5},manhattan:{lat:40.7028,lon:-74.017,ground:0,heading:17,noon:17,dusk:24.3,night:4},owens:{lat:36.601,lon:-118.06,ground:1150,heading:109,noon:20,dusk:27.3,night:8},powell:{lat:40.2083,lon:-83.0701,ground:280,heading:109,noon:18,dusk:25,night:5}};
+sites['owens-boundary']={lat:36.6326,lon:-117.945,ground:2423,heading:172,noon:20,dusk:27.3,night:8};
+sites.jfk={lat:40.6245,lon:-73.7854,ground:4,heading:44,noon:17,dusk:24.3,night:4};
+Object.assign(sites,require('./earth-world-fixtures.cjs'));
 const site=sites[siteName],seconds=Number(args.seconds||60),output=path.resolve(args.output||`.graphics-review/stylized-earth/final/motion-${siteName}`);
 (async()=>{
  const report={...require('./graphics-source.cjs')(),status:'BLOCKED',purpose:'Recorded visual/movement evidence, not frame-time certification',errors:[],legs:[]};let browser,context;
@@ -28,7 +31,7 @@ const site=sites[siteName],seconds=Number(args.seconds||60),output=path.resolve(
    },{site,feet});
    await page.waitForTimeout(15000);
    await page.waitForFunction(()=>window.__fly.earthSurface?.ready>=16,null,{timeout:60000});
-   const start=await page.evaluate(({feet,seconds})=>{
+   const start=await page.evaluate(({feet,seconds,climb})=>{
     const rt=window.__fly,f=rt.flight;
     f.pos.y=feet<10000?f.groundElev+feet*.3048:Math.max(f.groundElev+100,feet*.3048);
     const altitude=f.pos.y,start={x:f.pos.x,z:f.pos.z};delete f.step;const step=f.step.bind(f);let elapsed=0,distance=0,last={...start};
@@ -43,14 +46,15 @@ const site=sites[siteName],seconds=Number(args.seconds||60),output=path.resolve(
         const error=Math.atan2(Math.sin(heading-f.heading),Math.cos(heading-f.heading));turn=Math.max(-1,Math.min(1,error*1.5));
         control.returnMinM=Math.min(control.returnMinM,Math.hypot(start.x-f.pos.x,start.z-f.pos.z));
       }
-      const desired=feet<10000?f.groundElev+feet*.3048:altitude;
+      const climbM=climb?120*Math.sin(Math.PI*Math.max(0,Math.min(1,(t-.12)/.38))):0;
+      const desired=(feet<10000?f.groundElev+feet*.3048:altitude)+climbM;
       step(dt,{...cmd,turn,pitch:Math.max(-.4,Math.min(.4,(desired-f.pos.y)*.002)),boost:phase==='boost',speedOverride:phase==='stop'?0:phase==='boost'?undefined:200,speedPreset:'cruise'});
       distance+=Math.hypot(f.pos.x-last.x,f.pos.z-last.z)/Math.cosh(f.pos.z/6378137);last={x:f.pos.x,z:f.pos.z};
       Object.assign(control,{phase,distance,elapsed});if(f.speed<.1)control.stoppedFrames++;
     };
     return{altitude,agl:f.pos.y-f.groundElev,start};
-   },{feet,seconds});
-   const leg={feet,datum:feet<10000?'AGL':'MSL',start,samples:[]};report.legs.push(leg);
+   },{feet,seconds,climb:!!args.climb});
+   const leg={feet,datum:feet<10000?'AGL':'MSL',climb:!!args.climb,start,samples:[]};report.legs.push(leg);
    for(let i=0;i<seconds;i++){
     await page.waitForTimeout(1000);
     leg.samples.push(await page.evaluate(()=>{

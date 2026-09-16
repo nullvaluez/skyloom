@@ -26,7 +26,7 @@ try {
         const layer=vt.layers[name];if(!layer)continue;
         for(let i=0;i<layer.length;i++){const p=layer.feature(i).properties,key=`${name}:${p.class||''}:${p.subclass||''}`;row.tags[key]=(row.tags[key]||0)+1;}
       }
-      row.tiles.push({z,x,y,bytes:bytes.length,revision:mask.revision,water:mask.waterCells,classified:mask.classifiedCells,valid:mask.classes.every(v=>v>=0&&v<12)&&mask.exclusion.length===mask.classes.length&&mask.waterEdges.length===4*mask.size});
+      row.tiles.push({z,x,y,bytes:bytes.length,revision:mask.revision,water:mask.waterCells,classified:mask.classifiedCells,valid:mask.classes.every(v=>Object.values(EARTH_SURFACE).includes(v))&&mask.exclusion.length===mask.classes.length&&mask.waterEdges.length===4*mask.size});
     }
     row.expectedSurfaceObserved=row.classes[Object.keys(EARTH_SURFACE).find(k=>EARTH_SURFACE[k]===site.surface)]>0;
     report.sites.push(row);console.log(`${name}: ${JSON.stringify(row.classes)}, expected observed ${row.expectedSurfaceObserved}`);

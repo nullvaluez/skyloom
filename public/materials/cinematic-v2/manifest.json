@@ -1,0 +1,265 @@
+{
+  "revision": 2,
+  "source": "Five CC0 Poly Haven surface sets with first-party masonry, roofing and snow",
+  "generator": "scripts/build-cinematic-surface-assets.mjs",
+  "license": "CC0-1.0 source maps; Project MIT license for first-party artwork",
+  "thirdPartyAssets": [
+    {
+      "id": "asphalt_04",
+      "name": "Asphalt 04",
+      "authors": {
+        "Jenelle van Heerden": "Processing",
+        "Sergej Majboroda": "Photography"
+      },
+      "source": "https://polyhaven.com/a/asphalt_04",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "sourceDimensionsMm": [
+        4039.9999618530273,
+        4039.9999618530273
+      ],
+      "authoredRepeatM": 4,
+      "layer": 0,
+      "files": [
+        {
+          "map": "Diffuse",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/asphalt_04/asphalt_04_diff_1k.png",
+          "bytes": 5839817,
+          "sha256": "dad8a9427f228ad5fe3766e6be0cdd87ef19df27713049f689cc33067438e555",
+          "md5": "27286e746a8d2be8024fb429a8f63e42"
+        },
+        {
+          "map": "nor_gl",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/asphalt_04/asphalt_04_nor_gl_1k.png",
+          "bytes": 5787349,
+          "sha256": "46f822e538de9fa5327617cf7e43dfb00b437e2b3cff6a100bf837375a500380",
+          "md5": "dcdf029cda36f9d405ef6669daeed436"
+        },
+        {
+          "map": "Rough",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/asphalt_04/asphalt_04_rough_1k.png",
+          "bytes": 2421036,
+          "sha256": "e273dfb863e31fc1c3c1563551ac2836f162498630959d24add20cda787e35b8",
+          "md5": "e4457bac8bc49800443a4519f15a8dab"
+        },
+        {
+          "map": "Displacement",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/asphalt_04/asphalt_04_disp_1k.png",
+          "bytes": 1769117,
+          "sha256": "15b034f7d657d25e9b6e2447cef959264516cfaa5c60bba611dd21591c85762d",
+          "md5": "b60b90f02b419e5c6910b9aa111b468c"
+        }
+      ]
+    },
+    {
+      "id": "concrete_floor_02",
+      "name": "Concrete Floor 02",
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "source": "https://polyhaven.com/a/concrete_floor_02",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "sourceDimensionsMm": [
+        2000,
+        2000
+      ],
+      "authoredRepeatM": 2,
+      "layer": 1,
+      "files": [
+        {
+          "map": "Diffuse",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/concrete_floor_02/concrete_floor_02_diff_1k.png",
+          "bytes": 2502798,
+          "sha256": "11d05474d61b47db27dcda8de7cdeb616328c6c0670ddd0837dcd57bd3132c52",
+          "md5": "e6b278dadc06f7550fc34eedd80a40ab"
+        },
+        {
+          "map": "nor_gl",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/concrete_floor_02/concrete_floor_02_nor_gl_1k.png",
+          "bytes": 6297394,
+          "sha256": "2899c1338a39369d33edc02effbfa4eb14c82b70c6efa2f13c6a0e088ee0c606",
+          "md5": "fe71a8ff06acc83aadfdd694a42acfd6"
+        },
+        {
+          "map": "Rough",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/concrete_floor_02/concrete_floor_02_rough_1k.png",
+          "bytes": 1866235,
+          "sha256": "cb7ad1a3e8fd0cb0f7b2dfcf4753faad055b0a665d772580dc0a2bee5dc0e797",
+          "md5": "1828b2884b6dc899704410f74b35b2be"
+        },
+        {
+          "map": "Displacement",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/concrete_floor_02/concrete_floor_02_disp_1k.png",
+          "bytes": 1752250,
+          "sha256": "fa420e54ec6c2f28071baf2b4e544ce070202fc4fa37ea173055d0e3c69942ee",
+          "md5": "491b25742fff11f5279da37f1e767917"
+        }
+      ]
+    },
+    {
+      "id": "leafy_grass",
+      "name": "Leafy Grass",
+      "authors": {
+        "Charlotte Baglioni": "All"
+      },
+      "source": "https://polyhaven.com/a/leafy_grass",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "sourceDimensionsMm": [
+        2000,
+        2000
+      ],
+      "authoredRepeatM": 2,
+      "layer": 4,
+      "files": [
+        {
+          "map": "Diffuse",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/leafy_grass/leafy_grass_diff_1k.png",
+          "bytes": 5913007,
+          "sha256": "2a4356e6aef5db70bb803a31fa265321b733b1f77c7c80ac26ae9aa0552f345d",
+          "md5": "7639691afa92caa8034236e6a0687bfe"
+        },
+        {
+          "map": "nor_gl",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/leafy_grass/leafy_grass_nor_gl_1k.png",
+          "bytes": 6111876,
+          "sha256": "7cba8d8a3cbd14663fd974b73ecebcbb42e0cc258d912867e9dd67a5582ca4d9",
+          "md5": "a98f306f4dafb1e956d562b78503e174"
+        },
+        {
+          "map": "Rough",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/leafy_grass/leafy_grass_rough_1k.png",
+          "bytes": 2444449,
+          "sha256": "3b2e89d11950b1ea33731514eff86ed211f4e2e7af3b4be4a2deb6bb8a1cba84",
+          "md5": "5dff12e1e81532a92d074e63473ab127"
+        },
+        {
+          "map": "Displacement",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/leafy_grass/leafy_grass_disp_1k.png",
+          "bytes": 1896460,
+          "sha256": "6e77cbd0c745bf02700dc235ac107083be788c23ac1d8a9d86e56863eecbc537",
+          "md5": "9c38b0ae5af703060e010f96f03a5e3d"
+        }
+      ]
+    },
+    {
+      "id": "aerial_ground_rock",
+      "name": "Aerial Ground Rock",
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "source": "https://polyhaven.com/a/aerial_ground_rock",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "sourceDimensionsMm": [
+        19999.950408935547,
+        20000
+      ],
+      "authoredRepeatM": 16,
+      "layer": 5,
+      "files": [
+        {
+          "map": "Diffuse",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/aerial_ground_rock/aerial_ground_rock_diff_1k.png",
+          "bytes": 6442920,
+          "sha256": "f0231417cb673ddc6263b667a5fced83b9aad91d88b362f6a6e3744d0336bcc0",
+          "md5": "4b1684adf7379010299126dffc0ef364"
+        },
+        {
+          "map": "nor_gl",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/aerial_ground_rock/aerial_ground_rock_nor_gl_1k.png",
+          "bytes": 5999283,
+          "sha256": "b1a3adb3588ab2269ead0b48bc36675772c4a5fb434b2460b4d6a3069ac57b8d",
+          "md5": "4db3943296e3abef63c34ac53d68a5e0"
+        },
+        {
+          "map": "Rough",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/aerial_ground_rock/aerial_ground_rock_rough_1k.png",
+          "bytes": 2244190,
+          "sha256": "ade67ab394a234452115431931cf9ab79c431d2f15a9941a43c730a6a6f60e96",
+          "md5": "b296739d5e2d4b5772bf6cf86c9cedf1"
+        },
+        {
+          "map": "Displacement",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/aerial_ground_rock/aerial_ground_rock_disp_1k.png",
+          "bytes": 1855372,
+          "sha256": "f160fce324b10cdbce34bab523cc9f9088a2bbad1dcdf72be4c7aa1e678a4fa7",
+          "md5": "7cfb797a36d0f7b16143b642731699c3"
+        }
+      ]
+    },
+    {
+      "id": "aerial_sand",
+      "name": "Aerial Sand",
+      "authors": {
+        "Rob Tuytel": "All"
+      },
+      "source": "https://polyhaven.com/a/aerial_sand",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://polyhaven.com/license",
+      "sourceDimensionsMm": [
+        15000,
+        15000
+      ],
+      "authoredRepeatM": 16,
+      "layer": 6,
+      "files": [
+        {
+          "map": "Diffuse",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/aerial_sand/aerial_sand_diff_1k.png",
+          "bytes": 6176901,
+          "sha256": "29b4a1fcf57510660501d47f7eeb8f908bee9e8de8b270115f1c3fc3477d5b25",
+          "md5": "55cd6f4a96adf90d74c9308230d03019"
+        },
+        {
+          "map": "nor_gl",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/aerial_sand/aerial_sand_nor_gl_1k.png",
+          "bytes": 6093377,
+          "sha256": "684a0473fe60590413aba832bf1f1a5ec69dcfeb160ecd25c43e270e77b2a95d",
+          "md5": "11814cfaf17acaff463edd4b8aed9781"
+        },
+        {
+          "map": "Rough",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/aerial_sand/aerial_sand_rough_1k.png",
+          "bytes": 2018770,
+          "sha256": "9356082e3741ed6c08dc58fd142eece25e56195c8fe8f9447daef91e8bfc2cb2",
+          "md5": "804fe445b3df3b0d5967599393315c4e"
+        },
+        {
+          "map": "Displacement",
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/aerial_sand/aerial_sand_disp_1k.png",
+          "bytes": 2040000,
+          "sha256": "7fb9558540100721e0ab7b3cccccf47155b407c226b5d55b040cea8c69ac1b56",
+          "md5": "a7393dc1df6164a28e6e405e970b9b24"
+        }
+      ]
+    }
+  ],
+  "size": 256,
+  "layers": [
+    "asphalt",
+    "concrete",
+    "masonry",
+    "roofing",
+    "soil-grass",
+    "rock",
+    "sand",
+    "snow"
+  ],
+  "format": "RGBA8 texture arrays; color RGB sRGB relative albedo, color alpha linear roughness; detail linear normal XY, height, occlusion",
+  "modifications": "Resampled to 256 square; diffuse normalized to relative linear luminance with restrained chroma; renormalized OpenGL normals; packed roughness and height; physical repeat authored at 2/4/16 metres to preserve origin continuity.",
+  "gpuBytesWithMips": 5592406,
+  "assets": [
+    {
+      "file": "color.bin",
+      "bytes": 2097152,
+      "sha256": "3ddcfcb8703782c55e3cbf974980a6b9f507479cd7fb1c480b587ac0bcc074a7"
+    },
+    {
+      "file": "detail.bin",
+      "bytes": 2097152,
+      "sha256": "889eed2dccee0578df0639697143fe7d33b45c70164913009d13f7d42a2cdb09"
+    }
+  ]
+}

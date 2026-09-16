@@ -1,6 +1,7 @@
 'use client';
+/* eslint-disable react-hooks/immutability -- R3F meshes and the runtime are an imperative simulation bus; frame updates intentionally mutate GPU objects without React renders. */
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import {
   CanvasTexture,
@@ -19,6 +20,7 @@ import { MODEL_SURFACE_ROLES } from '@/lib/fly/assets';
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
 import { applyBendAirAnchor, applyNavLights, horizonFade, setNavTime } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
+import { DetailedTraffic } from '@/lib/fly/detailed-traffic';
 
 const _dummy = new Object3D();
 const _color = new Color();
@@ -77,6 +79,13 @@ function makeBillboardSprite() {
  */
 export function TrafficLayer({ runtime, flight, origin }) {
   const camera = useThree((s) => s.camera);
+  const renderer = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
+  const detailedRef=useRef(null),detailedMount=useRef(null);
+  useEffect(()=>{
+    const detailed=new DetailedTraffic();detailedRef.current=detailed;detailedMount.current?.add(detailed.group);
+    return()=>{detailedRef.current=null;detailed.dispose();runtime.liveFleetReady=false;delete runtime.retryLiveFleet;};
+  },[runtime]);
 
   const meshes = useMemo(
     () =>
@@ -155,7 +164,6 @@ export function TrafficLayer({ runtime, flight, origin }) {
     // mesh array's own (`meshes` is memoized per component instance, so a
     // genuinely new fleet gets a fresh one and still loads).
     if (meshes.__glbSwapped) {
-      // eslint-disable-next-line react-hooks/immutability -- runtime is the scene's mutable bus (FlyScene RUNTIME CONTRACTS (R18)); the deferred write below needs none
       runtime.modelsReady = true;
       return undefined;
     }
@@ -196,16 +204,25 @@ export function TrafficLayer({ runtime, flight, origin }) {
   }, [meshes, billboards]);
 
   useFrame(() => {
+    const detailed=detailedRef.current;
     const traffic = runtime.traffic;
-    if (!traffic) return;
+    if (!traffic||!detailed) return;
 
     // Nav-light strobe/beacon clock — ONE uniform write for the whole fleet
     setNavTime(performance.now() / 1000);
 
     const items = traffic.update(performance.now() / 1000, flight.pos);
+    const mapStyleNow = useFlyStore.getState().mapStyle;
+    if (mapStyleNow === 'satellite' && !detailed.stats.ready && detailed.prepare() && !detailed.compiling) {
+      detailed.compiling=true;
+      renderer.compileAsync(detailed.group,camera,scene).then(()=>{if(!detailed.disposed){detailed.stats.ready=true;runtime.liveFleetReady=true;}}).catch(()=>{detailed.stats.compileFailed=true;});
+    }
     const ax = origin.anchor.x;
     const az = origin.anchor.z;
-    const mapStyleNow = useFlyStore.getState().mapStyle;
+    const liveState=useFlyStore.getState();
+    detailed.update(items,flight,origin,liveState.qualityTier,liveState.inspectHex??runtime.targeting?.lockedHex,mapStyleNow==='satellite',performance.now()/1000);
+    runtime.liveFleet=detailed.stats;
+    runtime.retryLiveFleet=()=>{if(detailed.stats.compileFailed){detailed.stats.compileFailed=false;detailed.compiling=false;}};
     setTrafficSurface(meshes, mapStyleNow === 'satellite' && satelliteVisualsOn('models'));
     _fog.set(FOG_BY_STYLE[mapStyleNow] ?? SKY.fogColor);
     // Round 13 Phase 2: hull PRESENCE floor over dark ground — over-drive the
@@ -244,6 +261,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
         horizonFaded += 1;
         continue;
       }
+      if (it.livingDetailed) continue;
 
       if (it.distM < TRAFFIC.modelLodDistanceM) {
         // R14: out-of-range archetype falls back to the UNKNOWN blob (index 8).
@@ -327,6 +345,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
         <primitive key={i} object={mesh} />
       ))}
       <primitive object={billboards} />
+      <group ref={detailedMount} />
     </group>
   );
 }

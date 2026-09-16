@@ -10,7 +10,7 @@ module.exports = function sourceReceipt(root = process.cwd()) {
     if (!fs.existsSync(p)) return;
     if (fs.statSync(p).isDirectory()) {
       for (const name of fs.readdirSync(p).sort()) add(`${relative}/${name}`);
-    } else if (/\.(?:js|jsx|mjs|cjs|css|json)$/.test(relative)) {
+    } else if (/\.(?:js|jsx|mjs|cjs|css|json|bin)$/.test(relative)) {
       hash.update(relative.replaceAll('\\', '/'));
       hash.update(fs.readFileSync(p));
     }

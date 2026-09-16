@@ -1,0 +1,2 @@
+# Packed GPU textures must remain byte-identical across platform checkouts.
+public/materials/**/*.bin binary

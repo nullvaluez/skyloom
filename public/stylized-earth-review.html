@@ -6,11 +6,12 @@
 *{box-sizing:border-box}body{margin:0;background:#101a19;color:#e8eee8;font:14px system-ui,sans-serif}header{display:flex;align-items:center;gap:14px;padding:12px 18px;flex-wrap:wrap;border-bottom:1px solid #344743}strong{font-size:16px;margin-right:auto}label{display:flex;align-items:center;gap:7px;color:#c3d3cb}select,button,a{font:inherit;color:#e8eee8;background:#223832;border:1px solid #567064;padding:8px 11px;border-radius:6px}a{text-decoration:none}select:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid #b9e997;outline-offset:3px}button{cursor:pointer;background:#416642}#status{padding:7px 18px;color:#c3d3cb;font-size:12px}iframe{border:0;width:100%;height:calc(100dvh - 112px);display:block} @media(max-width:800px){header{gap:8px}strong{width:100%}iframe{height:calc(100dvh - 185px)}}
 </style>
 <header>
-<strong>Stylized Earth <span style="font-weight:400;color:#b5c9bd">/ playable review</span></strong>
+<strong>Cinematic Flight <span style="font-weight:400;color:#b5c9bd">/ worldwide review</span></strong>
 <label>World <select id="world"><option value="satellite">Satellite</option><option value="neon">Neon</option></select></label>
 <label>Place <select id="place"><option value="erie">Lake Erie</option><option value="elyria">Elyria farmland</option><option value="powell">Powell suburbs</option><option value="manhattan">Manhattan</option><option value="owens">Owens Valley</option><option value="aletsch">Aletsch Glacier</option><option value="namib">Namib dunes</option><option value="everglades">Everglades wetlands</option><option value="bali">Bali coast</option><option value="tokyo">Tokyo</option><option value="melton">Melton suburbs</option></select></label>
 <label>Height <select id="height"><option value="300">300 ft AGL</option><option value="1000">1,000 ft AGL</option><option selected value="3000">3,000 ft AGL</option><option value="10000">10,000 ft MSL</option><option value="30000">30,000 ft MSL</option></select></label>
 <label>Light <select id="light"><option value="live">Real time &amp; weather</option><option value="noon">Daylight</option><option value="overcast">Overcast</option><option value="dusk">Dusk</option><option value="night">Night</option></select></label>
+<label>Compare <select id="compare"><option value="">Full treatment</option><option value="materials">Material detail off</option><option value="lighting">Lighting changes off</option><option value="camera">Camera changes off</option><option value="aircraft">Aircraft changes off</option></select></label>
 <button id="visit">Visit</button><a id="full" href="/" target="_blank" rel="noopener">Full-screen game ↗</a>
 </header>
 <div id="status" role="status">Loading Satellite. Flight controls remain inside the game. These location and lighting controls are for this review.</div>
@@ -26,8 +27,24 @@ aletsch:{lat:46.436,lon:8.077,ground:2200,heading:330,noon:12,dusk:19.5,night:23
 namib:{lat:-24.732,lon:15.298,ground:590,heading:200,noon:11,dusk:16.4,night:22},
 everglades:{lat:25.613,lon:-80.733,ground:2,heading:150,noon:18,dusk:24.2,night:5},
 bali:{lat:-8.801,lon:115.231,ground:15,heading:100,noon:4,dusk:10.3,night:16},
+'bali-inland':{lat:-8.501,lon:115.265,ground:180,heading:300,noon:4,dusk:10.3,night:16},
 tokyo:{lat:35.6812,lon:139.7671,ground:8,heading:40,noon:3,dusk:10,night:17},
 melton:{lat:-37.683,lon:144.582,ground:135,heading:109,noon:2,dusk:7.4,night:15}};
+sites.jfk={lat:40.6245,lon:-73.7854,ground:4,heading:44,noon:17,dusk:24.3,night:4};
+$('place').add(new Option('JFK airport','jfk'));
+$('place').add(new Option('Bali inland','bali-inland'));
+// Ordinary flight keeps the existing 50 m terrain clearance. Lower synthetic
+// material inspections belong in the capture harness, not playable controls.
+$('height').add(new Option('170 ft AGL','170'),0);
+// Start inside the approved low-flight milestone. A 3,000 ft opening view
+// hid almost all of the nearby material and scenery work being reviewed.
+$('place').value='jfk';$('height').value='300';$('light').value='noon';
+const reviewParams=new URLSearchParams(location.search);
+for(const id of ['place','height','light']){
+ const value=reviewParams.get(id);
+ if(value&&Array.from($(id).options).some(option=>option.value===value))$(id).value=value;
+}
+$('compare').onchange=()=>{$('game').src='/?graphicsReview=1&cinematicOff='+encodeURIComponent($('compare').value);};
 function visit(){
  const w=$('game').contentWindow,rt=w.__fly,site=sites[$('place').value],feet=Number($('height').value),light=$('light').value;
  if(!rt||w.__flyBoot?.pct!==100){$('status').textContent='The world is still loading. Visit will be available when loading finishes.';return;}

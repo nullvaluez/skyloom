@@ -31,7 +31,9 @@ const output=args.output||'.graphics-review/style-smoke';
    const cinematic=s.visibleMaterialKeys.some(k=>k.includes('cinematic-architecture'));
    s.pass=style==='toy' ? s.style==='toy'&&!cinematic&&!s.cloudPass :
      s.review?.terrain?.sharp&&s.review?.buildings?.ready>0&&cinematic&&s.cloudPass&&s.review?.immersive?.clouds?.active&&s.review?.immersive?.shadows;
-   if(style==='satellite'&&args.earth)s.pass=s.pass&&s.earthSurface?.ready>=16&&s.earthSurface.revision===2;
+   // Surface revision 5 adds WorldCover fallback to the derived masks. The
+   // readiness, style-isolation and rendering checks above remain unchanged.
+   if(style==='satellite'&&args.earth)s.pass=s.pass&&s.earthSurface?.ready>=16&&s.earthSurface.revision===5;
    if(style==='toy')s.pass=s.pass&&!s.earthSurface;
    r.cases.push(s);await page.screenshot({path:`${output}/${name}.png`});await page.close();
    fs.writeFileSync(`${output}/report.json`,JSON.stringify(r,null,2));

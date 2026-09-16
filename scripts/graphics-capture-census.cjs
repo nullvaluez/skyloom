@@ -6,7 +6,13 @@ function captureStreamersSettled() {
     const stats=rt[key]?.stats;
     if(stats&&['queued','building','sampling'].some(field=>Number(stats[field]??0)!==0))return false;
   }
-  return !rt.groundDetail?.scanning;
+  if (!rt.groundDetail?.scanning) return true;
+  // SatGroundDetailLayer clears its generator and hides the mesh when the
+  // live immersion signal retires, then returns before updating telemetry.
+  // A stale scanning flag cannot represent work on that retired layer.
+  let scene=rt.engine?.object;while(scene?.parent)scene=scene.parent;
+  const detail=scene?.getObjectByName('sat-ground-detail');
+  return Number.isFinite(rt.groundImmersion?.k)&&rt.groundImmersion.k<=0.001&&(!detail||!detail.visible);
 }
 function captureSceneCensus() {
   const rt=window.__fly;
@@ -17,7 +23,6 @@ function captureSceneCensus() {
     streamers[key]=stats?{...stats}:null;
     if(stats&&['queued','building','sampling'].some(field=>Number(stats[field]??0)!==0))streamersSettled=false;
   }
-  if(rt.groundDetail?.scanning)streamersSettled=false;
   let scene=rt.engine?.object;while(scene?.parent)scene=scene.parent;
   const meshes=[];
   scene?.traverse(object=>{
@@ -39,7 +44,13 @@ function captureSceneCensus() {
       materialVisible:Array.isArray(object.material)?object.material.map(m=>m.visible):object.material?.visible,
       materialKey:Array.isArray(object.material)?null:object.material?.customProgramCacheKey?.()});
   });
+  if(rt.groundDetail?.scanning){
+    const retired=Number.isFinite(rt.groundImmersion?.k)&&rt.groundImmersion.k<=0.001
+      &&meshes.filter(m=>m.kind==='groundDetail').every(m=>!m.visible);
+    if(!retired)streamersSettled=false;
+  }
   return {available:!!scene,streamers,streamersSettled,meshes,groundDetail:rt.groundDetail?{...rt.groundDetail}:null,
+    groundImmersion:rt.groundImmersion?{...rt.groundImmersion}:null,
     camera:rt.camera?{position:rt.camera.position.toArray(),quaternion:rt.camera.quaternion.toArray(),fov:rt.camera.fov}:null,
     origin:rt.origin?.anchor?.toArray?.()??null};
 }

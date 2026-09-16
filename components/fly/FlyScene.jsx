@@ -13,6 +13,7 @@ import { createShadowCoverageState, selectShadowReceivers, resolveShadowFocus } 
 import { attachGroundShadowLight, publishGroundShadowCoverage, releaseGroundShadowCoverage, publishGroundShadowFocus } from '@/lib/fly/light-bubble';
 import { physicalBendCoefficient } from '@/lib/fly/render-scale';
 import { IMMERSIVE, immersiveOn, immersiveLighting, immersiveProfile } from '@/lib/fly/immersive';
+import { livingAirProfile } from '@/lib/fly/living-atmosphere';
 
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -1934,7 +1935,8 @@ export function FlyScene({ runtime }) {
     // allowance and all of them can see whether the LAST frame overran.
     noteFinalizeFrame(delta);
     const flyState = useFlyStore.getState();
-    const paused = flyState.phase === 'paused';
+    const worldHeld = flyState.mapStyle === 'satellite' && (runtime.worldLoading === true || (typeof window !== 'undefined' && window.__flyBoot && window.__flyBoot.pct < 100));
+    const paused = flyState.phase === 'paused' || worldHeld;
     // Inspect modal / Atlas count as a soft pause for the stick: the world
     // (and your plane) keep flying, but the cursor belongs to the overlay.
     // Round 17: photo mode joins them — the plane keeps flying (the instructor
@@ -2151,7 +2153,13 @@ export function FlyScene({ runtime }) {
     // instead of dilating time, and (b) an INTERPOLATED pose published as NEW
     // fields for render consumers to opt into. No consumer opts in yet — see
     // scripts/r24-a-pace.md §8c for why that half is not this round's.
-    if (frameStep) {
+    if (worldHeld) {
+      // Loading keeps the destination fixed while scene streaming and lighting run.
+      if(frameStep)frameStep.advance(0);
+      prevPose.x=flight.pos.x;prevPose.y=flight.pos.y;prevPose.z=flight.pos.z;
+      prevAtt.heading=flight.heading;prevAtt.pitch=flight.pitch;prevAtt.bank=flight.bank;
+      publishRenderPose(1);
+    } else if (frameStep) {
       const { steps, alpha } = frameStep.advance(delta);
       if (steps === 0) {
         // Not a whole step yet: hold the sim, advance only the render pose.
@@ -2182,7 +2190,7 @@ export function FlyScene({ runtime }) {
     const crash = crashRef.current;
     if (crash.state === 'idle') {
       const hit = crashSys.update(dt, {
-        enabled: CRASH.enabled && crashStakesOn(),
+        enabled: !worldHeld && CRASH.enabled && crashStakesOn(),
         autopilot: autopilot.mode !== 'off', // an assist must not kill you
         flight,
         satellite: flyState.mapStyle === 'satellite',
@@ -2576,6 +2584,8 @@ export function FlyScene({ runtime }) {
         _aerialFeed.bendCz = bnd.cz;
         _aerialFeed.bendK = bnd.k;
         _aerialFeed.groundY = flight.groundElev;
+        _aerialFeed.livingAir = !lawOn && immersiveOn('lighting')
+          ? livingAirProfile(wx, flight.latDeg) : null;
         setAerial(_aerialFeed);
       } else {
         clearAerial();

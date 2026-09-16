@@ -1120,6 +1120,7 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
         const lz = par[i + 1];
         const wx = chunk.cx + lx;
         const wz = chunk.cz + lz;
+        const roadside=chunk.parcelKind?.[i/2]===1;
         const d2 = (wx - px) ** 2 + (wz - pz) ** 2;
         if (d2 > rangeSq) continue;
         const d = Math.sqrt(d2);
@@ -1129,6 +1130,7 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
         // everywhere and an unmapped town still respects its mapped blocks.
         const dens = realDensityAt(wx, wz, mercK);
         let deficit = (1 - dens / target) * regK;
+        if(roadside&&settled&&!st.stale&&parcelGapSourceReady(runtime.satBuildings.chunks,wx,wz,60*mercK,now)&&!occupiedAt(wx,wz))deficit=Math.max(deficit,.5);
         let localGap = false;
         if (cinematicGap && deficit < 0.45) {
           // A regional verdict cannot erase a fully-resolved, residential local
@@ -1162,7 +1164,7 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
         // circle that pops when the player moves.
         const keep =
           1 - (1 - P.thin.farKeep) * smoothstep(P.thin.nearM, P.thin.farM, d);
-        const want = Math.min(P.perAnchor, Math.round(P.perAnchor * deficit * keep));
+        const want = roadside ? (deficit>.02?1:0) : Math.min(P.perAnchor, Math.round(P.perAnchor * deficit * keep));
         if (want <= 0) {
           st.suppressed += 1;
           continue;
@@ -1188,7 +1190,7 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
         const growK = chunkFadeOn() ? st.growK : st.growTarget;
         const fscale = (1 + (P.farScale.mul - 1) * ft) * st.altK * growK;
         // One yaw for the whole cluster: every house on a street shares it.
-        const yaw = hash(lx * 0.731 - lz * 1.117) * Math.PI * 2;
+        const yaw = roadside ? chunk.parcelYaw[i/2] : hash(lx * 0.731 - lz * 1.117) * Math.PI * 2;
         const cs = Math.cos(yaw);
         const sn = Math.sin(yaw);
         // R24 (B) — POOL_FAIR is checked at the ANCHOR boundary above, not
@@ -1201,8 +1203,8 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
           const cz = (k / P.cols) | 0;
           const jx = (hash(lx * 5.13 - lz * 2.71 + k * 17.3) - 0.5) * 2 * P.jitter;
           const jz = (hash(lz * 3.71 - lx * 1.19 + k * 41.7) - 0.5) * 2 * P.jitter;
-          const bx = (cx - (P.cols - 1) / 2 + jx) * P.lotM * mercK;
-          const bz = (cz - (rows - 1) / 2 + jz) * P.rowM * mercK;
+          const bx = roadside ? 0 : (cx - (P.cols - 1) / 2 + jx) * P.lotM * mercK;
+          const bz = roadside ? 0 : (cz - (rows - 1) / 2 + jz) * P.rowM * mercK;
           const offX = bx * cs - bz * sn;
           const offZ = bx * sn + bz * cs;
           const hx = wx + offX;
@@ -1230,7 +1232,7 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
           _dummy.scale.set(fl * fscale, ht * fscale, fs * fscale);
           // Face the street: the cluster yaw plus a quarter turn for the odd
           // house, so a block is aligned without being a stamped row.
-          _dummy.rotation.set(0, yaw + (hf > 0.86 ? Math.PI / 2 : 0), 0);
+          _dummy.rotation.set(0, yaw + (!roadside&&hf > 0.86 ? Math.PI / 2 : 0), 0);
           _dummy.updateMatrix();
           mesh.setMatrixAt(n, _dummy.matrix);
           const jit = 1 + (hash(lx * 11.31 - lz * 5.17 + k * 2.13) - 0.5) * 2 * P.lumaJitter;

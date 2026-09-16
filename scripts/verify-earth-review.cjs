@@ -20,6 +20,8 @@ const url=args.url||'http://localhost:3028',output=path.resolve(args.output||'.g
       report.servedBuild=receipt.bindDocument(receipt.validateReceipt(await response.json(),args['build-id']),await frame.content(),frame.url(),url);
     }
     check('review opens default Satellite without an opt-in URL',await page.locator('#world').inputValue()==='satellite' && await page.evaluate(()=>!document.querySelector('iframe').contentWindow.location.search.includes('earth=')));
+    check('playable heights respect the existing 50 metre flight floor',await page.locator('#height option').evaluateAll(options=>options.every(o=>Number(o.value)*.3048>=50)));
+    check('inland tropical scenery is offered for review',await page.locator('#place option[value="bali-inland"]').count()===1);
     await page.selectOption('#place','powell');await page.selectOption('#height','1000');await page.selectOption('#light','noon');await page.click('#visit');
     await page.waitForTimeout(16000);
     for(const id of ['prop','fighter','cargo']){

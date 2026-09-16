@@ -1,5 +1,9 @@
 # Stylized Earth — graphics and terrain overhaul
 
+The September 15 cinematic materials, lighting, aircraft framing and worldwide
+terrain-support implementation is recorded in [CINEMATIC_FLIGHT.md](CINEMATIC_FLIGHT.md).
+That record identifies its separate local review build, evidence and acceptance limits.
+
 The user reviewed the running sample on September 14 and replied **"SO MUCH
 BETTER! KEEP GOING!"** The accepted treatment is now the standard Satellite
 appearance, including ordinary saved selections and old bookmarks. Neon remains
@@ -437,3 +441,65 @@ never reuse an old receipt after rebuilding. Run GPU checks sequentially.
 
 The commands above document reproducibility and remaining review coverage;
 they do not claim every matrix combination has already been visually accepted.
+
+## September 14 follow-up: Owens woodland boundary
+
+The user's 36.6326, -117.9450 screenshot exposed a material boundary missed by
+the initial geographic fixtures. OpenFreeMap supplies a large `landcover:wood`
+polygon (feature 114852403 at z14/2824/6398) beside unclassified ground. The
+material replaced 78% of the imagery color inside the polygon, then returned
+to photographic grading outside it. Layer isolation reproduced the edge and
+removed it by disabling only the surface shader: terrain remained intact,
+with all 48 surface slots ready and zero failed requests. This finding concerns
+the green-to-bare boundary, not a new diagnosis of every terrain artifact.
+
+Natural surfaces now feather inward using buffered provider geometry in the
+worker. Tile-edge padding prevents the feather from creating a rectangular
+tile outline. Water, farmland, developed footprints and placement exclusions
+retain their original classifications and boundaries. A local imagery-chroma
+term moderates grass/wood lushness so dry soil and exposed rock inside a broad
+woodland polygon do not receive the blanket green treatment. Premultiplied
+mask colors prevent dark fringes next to unclassified pixels.
+
+The surface payload revision is 3, within worker protocol 21; the producer,
+transfer list and revision-gated consumer move together. Raw vector tiles
+remain compatible. The additional resident CPU blend data is bounded at
+1.5 MiB. GPU atlas storage remains 6 MiB, with no new textures, texture samples
+or draw calls. Terrain geometry, flight physics and Neon rendering are unchanged.
+
+Validation on production build `IV1_33rLTWr_ESI-paoyF`, source
+`db5228ad1e3b7c2a14e5f16ab757be4a99a3c4db70c1529fd0f4773b0db7d9ee`:
+
+- Boundary invariants 6/6, existing Stylized Earth checks 21/21, scenery checks
+  2/2, vendor integrity 34/34, targeted lint and production build passed.
+- All 48 captured source tiles retain byte-identical classifications,
+  placement exclusions and water-edge metadata. Local worker rasterization
+  p95 2.55 ms, maximum 4.59 ms on this desktop; no integrated-hardware claim.
+- The exact reported pose renders at 1,918 ft AGL with 48 ready masks, no
+  rendering errors, 170 draws and 519,655 triangles. Complete texture audit
+  peak 270.73 MiB; renderbuffers separately 3.48 MiB. Source-bound receipt and
+  screenshot: `.graphics-review/stylized-earth/seam/verified-after/`.
+- Powell and Erie daylight captures retain vegetation/field structure and
+  coastline continuity. Both existing allocation gates pass; cumulative
+  texture peak 251.53 MiB. Evidence: `seam/ohio/`.
+- A 60-second unpinned flight covered 8.67 km through cruise, boost, banking,
+  stop and return, with zero rendering/mask errors. Return proximity was
+  0.022 Mercator units. The 1,918-ft AGL target was not maintained over the
+  mountains (measured clearance 50–1,231 m); this is movement/visual evidence,
+  not an altitude-hold or frame-time certification. Evidence: `seam/motion/`.
+
+Initial diagnostic captures under `seam/before*` and `seam/after` did not bind
+a served-build receipt; the later `verified-after`, Ohio and moving-flight
+captures do. The earlier release's 15-minute soaks do not certify this patch,
+and Radeon 780M performance and user acceptance of this boundary adjustment
+remain unverified. Local review now uses `.next-earth-boundaries` on port 3033.
+The `owens-boundary` fixture is available in the fixed-pose and motion scripts;
+run `node scripts/verify-earth-boundaries.mjs` for the new boundary invariants.
+
+## September 15: Cinematic Flight ground and scenery checkpoint
+
+The current local review is on port **3052**. [CINEMATIC_FLIGHT.md](CINEMATIC_FLIGHT.md)
+records the exact build, global land-cover fallback, locally packaged CC0
+materials, forest stands, aircraft/camera changes, resource limits and validation.
+Its current derived surface revision is **5**; the records above describe earlier
+builds. The earlier source work and its evidence remain preserved.

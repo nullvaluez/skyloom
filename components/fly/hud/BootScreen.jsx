@@ -5,6 +5,8 @@ import { ARRIVAL_GATE, BOOT, MOBILE_UI, PREWARM } from '@/lib/fly/fly-constants'
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { arrivalOn, arrivalTerms, markReveal } from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
+import { worldReadiness, retryWorldContent } from '@/lib/fly/world-readiness';
+import { LIVING_EARTH } from '@/lib/fly/living-earth';
 
 /**
  * R9-1 boot loading screen — the full-screen INK+ICE overlay that covers the
@@ -26,8 +28,8 @@ import { useFlyStore } from '@/stores/fly-store';
  *
  * window.__flyBoot = { phase, pct } is the harness contract: pct is
  * monotonic, hits 100 exactly when the reveal starts, and stays 100.
- * BOOT.maxBootMs is the absolute ceiling — a dead tile CDN can't trap the
- * boot. The reveal is a WarpFlash-style streak-accelerate + fade.
+ * Satellite now waits for the local Living Earth content contract. At 45s
+ * it offers retry or explicit reduced-detail entry. Neon retains its ceiling.
  */
 
 const CAPTIONS = {
@@ -43,12 +45,19 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
 function publish(phase, pct) {
   if (typeof window !== 'undefined') window.__flyBoot = { phase, pct };
 }
+function makeStars(count){
+  let seed=0x5eed;
+  const random=()=>((seed=(seed*1664525+1013904223)>>>0)/2**32);
+  return Array.from({length:count},(_,id)=>({id,left:random()*100,top:random()*100,size:1+random()*1.6,delay:random()*4,dur:2.4+random()*3,dim:random()<.5}));
+}
 
 export function BootScreen({ runtime }) {
   const [stage, setStage] = useState('loading'); // 'loading' | 'reveal' | null
   const [view, setView] = useState({ phase: 'spawn', pct: 0 });
+  const [help, setHelp] = useState(null);
+  const reducedEntry = useRef(false);
   const runtimeRef = useRef(runtime);
-  runtimeRef.current = runtime;
+  useEffect(()=>{runtimeRef.current=runtime;},[runtime]);
 
   // Round 17: this screen mounts BEFORE the canvas, on the exact frame a
   // phone is also compiling shaders and streaming its first tiles — 70
@@ -64,19 +73,7 @@ export function BootScreen({ runtime }) {
   // Deterministic star field — same sky every boot, zero hydration risk.
   // The PRNG is seeded and consumed in the same order, so the phone field is
   // a prefix of the desktop one rather than a different sky.
-  const stars = useMemo(() => {
-    let s = 0x5eed;
-    const rnd = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32);
-    return Array.from({ length: starCount }, (_, i) => ({
-      id: i,
-      left: rnd() * 100,
-      top: rnd() * 100,
-      size: 1 + rnd() * 1.6,
-      delay: rnd() * 4,
-      dur: 2.4 + rnd() * 3,
-      dim: rnd() < 0.5,
-    }));
-  }, [starCount]);
+  const stars = useMemo(() => makeStars(starCount), [starCount]);
 
   useEffect(() => {
     publish('spawn', 0);
@@ -100,6 +97,12 @@ export function BootScreen({ runtime }) {
       const store = useFlyStore.getState();
       const now = performance.now();
       const frames = rt.framesRendered ?? 0;
+      const living = store.mapStyle === 'satellite';
+      const content = living ? worldReadiness(rt) : null;
+      if(living){
+        rt.worldLoading=true;rt.worldReadiness=content;
+        if(now-t0>=LIVING_EARTH.loadingHelpMs&&!content.ready)setHelp(content.missing);
+      }
 
       // --- gate (a): world streamed in --------------------------------
       let worldP = 0;
@@ -169,6 +172,7 @@ export function BootScreen({ runtime }) {
           }
         }
       }
+      if(living){worldSteady=content.ready;worldP=content.progress;}
       if (worldSteady) {
         if (gate.worldHoldStart == null) gate.worldHoldStart = now;
       } else {
@@ -192,9 +196,9 @@ export function BootScreen({ runtime }) {
         !PREWARM.enabled || rt.prewarm?.done === true || now - t0 >= PREWARM.maxMs;
       const shadersP = framesP === 1 && warmDone ? 1 : Math.min(framesP, 0.99);
 
-      const timedOut = now - t0 >= BOOT.maxBootMs;
+      const timedOut = living ? reducedEntry.current : now - t0 >= BOOT.maxBootMs;
       const allDone =
-        timedOut || (worldDone && modelsP === 1 && shadersP === 1 && !!store.spawn);
+        timedOut || (living ? content.ready && worldDone && frames>=BOOT.minFrames && !!store.spawn : worldDone && modelsP === 1 && shadersP === 1 && !!store.spawn);
 
       // Weighted, monotonic, and pinned ≤99 until the reveal moment so the
       // harness can rely on pct === 100 ⇔ world revealed.
@@ -212,6 +216,8 @@ export function BootScreen({ runtime }) {
       else phase = 'ready';
 
       if (allDone) {
+        rt.worldLoading=false;rt.worldDegraded=!!(living&&reducedEntry.current);
+        if(typeof window!=='undefined')window.__flyWorldStatus={ready:content?.ready??true,degraded:rt.worldDegraded,missing:content?.missing??[]};
         gate.done = true;
         gate.pct = 100;
         // R22 (B): the reveal clock every birth envelope and the pop-in
@@ -227,11 +233,11 @@ export function BootScreen({ runtime }) {
           holdStartAt: t0,
           revealAt: now,
           holdMs: Math.round(now - t0),
-          holdCapMs: BOOT.maxBootMs,
+          holdCapMs: living ? null : BOOT.maxBootMs,
           contentCapMs: ARRIVAL_GATE.bootContentMaxMs,
           contentHeldMs: gate.contentHeldMs,
-          reason: timedOut ? 'cap' : gate.contentHeldMs > 0 ? 'content' : 'legacy',
-          terms: gate.contentTerms,
+          reason: living ? timedOut?'explicit-reduced':'content' : timedOut ? 'cap' : gate.contentHeldMs > 0 ? 'content' : 'legacy',
+          terms: living ? content : gate.contentTerms,
         };
         if (typeof window !== 'undefined') {
           (window.__flyStats ??= {}).bootGate = {
@@ -380,6 +386,13 @@ export function BootScreen({ runtime }) {
           </span>
           <span className="tracking-widest text-[#5a6884]">{view.pct}%</span>
         </div>
+        {help && !revealing && <div className="mt-6 text-sm text-[#d1dbe9]" role="status">
+          <p>Nearby detail is still loading. You can keep waiting or enter with reduced detail.</p>
+          <div className="mt-4 flex justify-center gap-3">
+            <button type="button" className="rounded border border-[#7788a5] px-3 py-2 hover:bg-white/10" onClick={()=>{retryWorldContent(runtimeRef.current);setHelp(null);}}>Retry loading</button>
+            <button className="rounded bg-[#dce7ef] px-3 py-2 text-[#101923]" onClick={()=>{reducedEntry.current=true;}}>Continue with reduced detail</button>
+          </div>
+        </div>}
       </div>
     </div>
   );

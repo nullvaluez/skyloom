@@ -378,3 +378,18 @@ refinements/merges use the existing bounded raster retry schedule. The dedicated
 `verify-dem-lifecycle.mjs` reproduces four old-code failures and passes 4/4 after
 repair, including disposal and successful retry. The four edited methods were
 already in the explicit integration inventory; healthy geometry is unchanged.
+
+### Living Earth arrival ground request — September 16, 2026
+
+An unpinned stationary boot at 40.9781 N, 74.6465 W remained on camera DEM z3
+with one local building tile unable to finish draping. The camera's view never
+requested that ground. A local-request probe raised it to z15 and released the
+unchanged readiness gate. `Tile._arrivalGroundRequired` now accepts a per-map
+local Mercator focus supplied by TerrainEngine only during a low-altitude
+Satellite arrival. `_update` visits those ancestors and `_LODEvaluate` refines
+them to z15; normal distance/frustum behavior resumes when the focus is cleared.
+The request is bounded to the 1 km evidence circle, wraps longitude, and never
+changes the measured elevation or pretends missing data succeeded. The local
+ring, zoom ceiling, longitude seam and cleared-focus cases are covered by
+`verify-living-earth.mjs`. The integration receipt explicitly adds this method
+and explains the two existing method edits. No historical allowance is changed.

@@ -4,6 +4,9 @@
 
 ## Fly Mode assets
 
+- **Living Earth regional context** (data) — Natural Earth contributors, Natural Earth 1:50m Admin 0 Countries · [Public domain](https://www.naturalearthdata.com/about/terms-of-use/) · modifications: Retained country code, subregion and geometry. Used only for inferred architectural context; footprints and heights remain sourced from map data.
+- **Immersive wind texture** (audio) — IgnasD, OpenGameArt · [CC0](https://opengameart.org/content/wind) · modifications: Selected Wind.ogg; loop boundary crossfaded at runtime, filtered by cloud density and airspeed.
+- **Immersive engine texture** (audio) — pauliuw, OpenGameArt · [CC0](https://opengameart.org/content/engine-sounds2) · modifications: Renamed engine_sound.mp3; loop boundary crossfaded at runtime, pitch and filter follow airspeed.
 - **Archivo Black** (font) — Omnibus-Type, Google Fonts · [OFL 1.1](https://fonts.google.com/specimen/Archivo+Black) · modifications: none (3D POI letters in the world + the inspect-card display face)
 - **Chango** (font) — Eduardo Tunni, Google Fonts · [OFL 1.1](https://fonts.google.com/specimen/Chango) · modifications: none (game UI headings — inspect modal)
 - **Patrick Hand** (font) — Patrick Wagesreiter, Google Fonts · [OFL 1.1](https://fonts.google.com/specimen/Patrick+Hand) · modifications: none (Toy World handwritten UI)
