@@ -42,7 +42,7 @@ export function useFlyAudio(runtime) {
       const f = runtime.flight;
       if (!f) return;
       const cmd = runtime.input?.read();
-      audio.update(f.speed, !!cmd?.boost || cmd?.speedPreset === 'boost');
+      audio.update(f.speed, !runtime.operations?.lowSpeed && (!!cmd?.boost || cmd?.speedPreset === 'boost'), runtime.operations);
       const state=useFlyStore.getState();
       const active=state.mapStyle==='satellite'&&immersiveOn('audio');
       // Pause gates the shared master too, including synthesized fallback and one-shots.

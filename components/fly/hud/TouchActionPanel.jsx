@@ -114,11 +114,11 @@ export function TouchActionPanel({ runtime, speedPreset, actions, lookMode, lock
             {SPEEDS.map(([key, label]) => (
               <button key={key} type="button" data-testid={`touch-throttle-${key}`} className="touch-action"
                 aria-pressed={speedPreset === key}
-                onClick={() => runtime.input?.setSpeedPreset(key)}>{label}</button>
+                onClick={() => runtime.input?.setSpeedPreset(key)}>{runtime.operations?.lowSpeed ? ({slow:'Idle',cruise:'Taxi',boost:'Takeoff'})[key] : label}</button>
             ))}
           </div>
         </fieldset>
-        <TouchBoost runtime={runtime} />
+        {!runtime.operations?.lowSpeed && <TouchBoost runtime={runtime} />}
         <div className="touch-actions-grid">
           {ACTIONS.filter(([id]) => id !== 'hangar' || hangar).map(([id, label, Icon]) => (
             <Action key={id} id={id} label={label} Icon={Icon} onClick={actions[id]}

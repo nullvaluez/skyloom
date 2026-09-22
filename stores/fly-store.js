@@ -69,7 +69,8 @@ const initialState = {
   aircraftId: 'fighter',
   // The hangar overlay (input is neutralized while open, same as atlas/logbook).
   // Session state, never persisted — reset() must close it on unmount.
-  hangarOpen: false,
+  hangarOpen: true,
+  hangarDismissible: false,
   // Last atlas-warp arrival { name, kind, at } — drives the arrival banner
   arrival: null,
 
@@ -156,6 +157,7 @@ export const useFlyStore = create(
     setAircraftId: (aircraftId) => set({ aircraftId }),
 
     setHangarOpen: (hangarOpen) => set({ hangarOpen }),
+    setHangarDismissible: (hangarDismissible) => set({ hangarDismissible }),
 
     setArrival: (arrival) => set({ arrival }),
 

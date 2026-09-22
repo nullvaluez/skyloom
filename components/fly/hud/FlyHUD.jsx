@@ -58,7 +58,7 @@ export function FlyHUD({ runtime }) {
       }
       if (presetRef.current) {
         const cmd = runtime.input?.read();
-        presetRef.current.textContent = cmd?.boost ? 'BOOST' : (cmd?.speedPreset ?? 'cruise').toUpperCase();
+        presetRef.current.textContent = runtime.operations?.lowSpeed ? `${Math.round(runtime.operations.throttle*100)}%` : cmd?.boost ? 'BOOST' : (cmd?.speedPreset ?? 'cruise').toUpperCase();
       }
       if (poiRef.current) {
         const poi = runtime.nearestPoi; // written by PoiLetters at 0.5Hz

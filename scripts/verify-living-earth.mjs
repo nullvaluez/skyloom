@@ -215,6 +215,20 @@ check('pavement can reveal supported triangles without drawing missing terrain a
   }
   layer.dispose();
 });
+const {airportById,airportPoint,airportFrame}=await import('../lib/fly/operations-airports.js');
+check('curated airports suppress duplicate mapped pavement and forest in the surface worker',()=>{
+  const airport=airportById('KOSU'),centre=airportPoint(airport,400),span=2000,k=airportFrame(airport).k;
+  const frame={tileSpan:span,mercX0:centre.x-span/2,mercYTop:-centre.z+span/2,cx:centre.x,cz:centre.z};
+  const point=along=>{const p=airportPoint(airport,along);return {x:Math.round((p.x-frame.mercX0)/span*4096),y:Math.round((p.z+frame.mercYTop)/span*4096)};};
+  const vt=decode({aeroway:{features:[{type:2,props:{class:'runway',width:30},rings:[[point(100),point(700)]]}]}});
+  assert.ok(buildAirportSurfaces(vt,span,k).pos.length>0);
+  assert.equal(buildAirportSurfaces(vt,span,k,frame).pos.length,0,'Mapped runway cannot render over the authored runway');
+  const makeMask=()=>({size:64,classes:new Uint8Array(4096).fill(2),exclusion:new Uint8Array(4096)});
+  const without=deriveWorldContent({layers:{}},makeMask(),span,k),withAirport=deriveWorldContent({layers:{}},makeMask(),span,k,frame);
+  const area=forest=>{let total=0;for(let i=2;i<forest.length;i+=3)total+=forest[i]**2;return total;};
+  assert.ok(area(withAirport.forest)<area(without.forest),'Authored corridors clear forest even without provider aeroway data');
+  assert.ok(withAirport.forest.length>0,'Unrelated forest remains');
+});
 check('typed live rendering preserves fixes, hysteresis and true height during a rebase',()=>{
   const renderer=new DetailedTraffic();while(!renderer.prepare()){}
   const item={hex:'abc123',meta:{t:'A320'},archetype:0,opacity:1,distM:700,flags:1,rx:1000,rz:2000,ryd:82,scaleK:1.3,yaw:0,bank:0,fix1:{vE:0,vN:0,vUp:0}};
@@ -230,6 +244,6 @@ const restore=fixture.installFetchStub(()=>fixture.encodeTile({building:building
 try{
   await import('../lib/fly/toy-world/vector-tile.worker.js');
   const result=await globalThis.__livingWorker.buildTile(14,7000,7000,'sat-buildings',{visuals:true});
-  check('actual worker retains every mapped body after the detailed-building budget fills',()=>{assert.equal(result.v,22);assert.equal(result.satBuilding.meta.kept,625);assert.ok(result.satBuilding.meta.provenance.detailedBodies<625);assert.ok(result.satBuilding.meta.provenance.reliefBodies<=160);assert.ok(result.satBuilding.meta.provenance.detailedBodies>result.satBuilding.meta.provenance.reliefBodies,'Roof variety survives the smaller facade-relief budget');assert.ok(result.satBuilding.pos.length<625*400*3);});
+  check('actual worker retains every mapped body after the detailed-building budget fills',()=>{assert.equal(result.v,23);assert.equal(result.satBuilding.meta.kept,625);assert.ok(result.satBuilding.meta.provenance.detailedBodies<625);assert.ok(result.satBuilding.meta.provenance.reliefBodies<=160);assert.ok(result.satBuilding.meta.provenance.detailedBodies>result.satBuilding.meta.provenance.reliefBodies,'Roof variety survives the smaller facade-relief budget');assert.ok(result.satBuilding.pos.length<625*400*3);});
 }finally{restore();}
 console.log(`Living Earth: ${checks} checks passed`);

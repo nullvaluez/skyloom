@@ -1,0 +1,24 @@
+const {chromium}=require('playwright');const assert=require('node:assert/strict');
+(async()=>{const browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-gpu']});const page=await browser.newPage({viewport:{width:1440,height:900}});
+try{
+ await page.addInitScript(()=>localStorage.setItem('fly-controls-seen','1'));
+ await page.goto(process.env.FLY_URL||'http://localhost:3038/?graphicsReview=1');
+ await page.waitForFunction(()=>document.querySelector('[data-testid="hangar-fly"]')?.disabled===false,undefined,{timeout:60000});
+ await page.locator('.ops-start-options label').filter({has:page.locator('input[value="runway"]')}).click();await page.getByTestId('hangar-fly').click();
+ await page.waitForFunction(()=>window.__flyBoot?.pct===100&&!window.__fly.worldLoading&&!window.__fly.worldDegraded&&window.__fly.worldReadiness.ready,undefined,{timeout:90000});await page.getByTestId('warp-hold').waitFor({state:'hidden'});
+ const button=name=>page.getByRole('button',{name,exact:true});
+ await button('Minimize flight controls').focus();await page.keyboard.down(' ');
+ assert.equal(await page.evaluate(()=>window.__fly.input.keys.has(' ')),false,'Disclosure key must not apply wheel brakes');
+ await page.keyboard.up(' ');await page.waitForTimeout(350);
+ assert.equal(await page.getByTestId('operations-hud').getAttribute('data-expanded'),'false');
+ await page.keyboard.press('Space');await page.waitForTimeout(350);
+ assert.equal(await page.getByTestId('operations-hud').getAttribute('data-expanded'),'true');
+ await page.getByText('Destination and guidance',{exact:true}).click();await page.locator('#arrival-airport').focus();await page.keyboard.down('ArrowDown');
+ assert.equal(await page.evaluate(()=>window.__fly.input.keys.has('arrowdown')),false,'Airport selection must not pitch the aircraft');await page.keyboard.up('ArrowDown');
+ await button('Begin takeoff').focus();await page.keyboard.down('s');assert.equal(await page.evaluate(()=>window.__fly.input.keys.has('s')),true,'A focused action button must still permit flight steering');await page.keyboard.up('s');
+ await button('Hold brakes').focus();await page.keyboard.down(' ');
+ assert.equal(await page.evaluate(()=>window.__fly.input.touchBrake),true,'Keyboard can hold the brake control');
+ assert.equal(await page.evaluate(()=>window.__fly.input.keys.has(' ')),false,'Brake button owns its own held state');
+ await page.keyboard.up(' ');assert.equal(await page.evaluate(()=>window.__fly.input.touchBrake),false,'Keyboard brake releases');
+ console.log('VERIFY: PASS — keyboard disclosure, dropdown isolation, steering and brake release.');
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -1,6 +1,8 @@
 'use client';
+import { OperationsHUD } from './hud/OperationsHUD';
+import { airportById } from '@/lib/fly/operations-airports';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FlyErrorBoundary } from './FlyErrorBoundary';
@@ -127,18 +129,18 @@ export function FlyMode({ onClose }) {
 
   // Shared per-frame runtime: engine/flight/input handles written by the
   // scene, read by DOM overlays at low frequency. Never React state.
-  const runtimeRef = useRef({});
+  const runtime = useMemo(() => ({}), []);
 
   // Live ADS-B traffic: poll every 2s around the player, project in the
   // worker, dead-reckon in runtime.traffic (rendered by TrafficLayer).
-  useFlyTraffic(runtimeRef.current, true);
+  useFlyTraffic(runtime, true);
 
   // Real weather at the player's cell (satellite only; toy never fetches).
   // Owns runtime.weather; no data / override 'baseline' = today's exact look.
-  useFlyWeather(runtimeRef.current, true);
+  useFlyWeather(runtime, true);
 
   // Procedural audio bed + one-shots (lock blip, warp sweep, UI clicks)
-  useFlyAudio(runtimeRef.current);
+  useFlyAudio(runtime);
 
   // Spawn where the user is: geolocation (quick timeout — the boot screen
   // covers the wait), else last session's persisted position, else NYC.
@@ -163,7 +165,7 @@ export function FlyMode({ onClose }) {
     resolveInitialAircraft();
     const picked = resolveAircraft(useFlyStore.getState().aircraftId);
     useGLTF.preload(picked.entry.url);
-    getSpawnLatLon().then(([lat, lon]) => {
+    Promise.resolve([airportById('KOSU').a.lat, airportById('KOSU').a.lon]).then(([lat, lon]) => {
       if (cancelled) return;
       const fly = useFlyStore.getState();
       fly.setSpawn({ lat, lon });
@@ -179,7 +181,7 @@ export function FlyMode({ onClose }) {
   // pagehide (the reliable tab-close/refresh signal) plus unmount.
   useEffect(() => {
     const save = () => {
-      const g = runtimeRef.current.geo; // Vector3(lon, lat, altM)
+      const g = runtime.geo; // Vector3(lon, lat, altM)
       if (!g || !Number.isFinite(g.x) || !Number.isFinite(g.y)) return;
       try {
         window.localStorage.setItem(
@@ -197,7 +199,7 @@ export function FlyMode({ onClose }) {
       window.removeEventListener('pagehide', save);
       save();
     };
-  }, []);
+  }, [runtime]);
 
   // Escape priority: inspect → photo → atlas → logbook → hangar → credits →
   // pause/resume. (Round 17: photo sits directly under inspect — the inspect
@@ -216,7 +218,7 @@ export function FlyMode({ onClose }) {
         else if (store.cameraMode === 'photo') store.setCameraMode('chase');
         else if (store.atlasOpen) store.setAtlasOpen(false);
         else if (store.logbookOpen) store.setLogbookOpen(false);
-        else if (store.hangarOpen) store.setHangarOpen(false); // round 17
+        else if (store.hangarOpen) return; // Selection is mandatory at startup.
         else if (store.creditsOpen) store.closeCredits();
         else if (store.phase === 'paused') store.setPhase('flying');
         else store.setPhase('paused');
@@ -282,7 +284,7 @@ export function FlyMode({ onClose }) {
       data-touch-panel={isTouch ? touchSurface : undefined}
     >
       <FlyErrorBoundary onExit={onClose}>
-        {spawn && memoryProbeReady && <FlyCanvas runtime={runtimeRef.current} />}
+        {spawn && memoryProbeReady && <FlyCanvas runtime={runtime} />}
       </FlyErrorBoundary>
 
       {/* Named layout zones (MOBILE_UI.zones). Empty scaffolding until the
@@ -310,26 +312,27 @@ export function FlyMode({ onClose }) {
           shutter/exit must survive the state that hides everything else. */}
       <HudGroup hidden={photoActive}>
         {/* POI names are in-world 3D letters (PoiLetters) in every style */}
-        <LabelCanvas runtime={runtimeRef.current} />
-        <FlyHUD runtime={runtimeRef.current} />
-        <Minimap runtime={runtimeRef.current} />
-        <InfoCard runtime={runtimeRef.current} />
+        <LabelCanvas runtime={runtime} />
+        <FlyHUD runtime={runtime} />
+        <Minimap runtime={runtime} />
+        <InfoCard runtime={runtime} />
       </HudGroup>
-      <InspectModal runtime={runtimeRef.current} />
+      <InspectModal runtime={runtime} />
       <HudGroup hidden={photoActive}>
-        <SpotToast runtime={runtimeRef.current} />
-        <Contracts runtime={runtimeRef.current} />
+        <SpotToast runtime={runtime} />
+        <Contracts runtime={runtime} />
       </HudGroup>
-      <Atlas runtime={runtimeRef.current} />
+      <Atlas runtime={runtime} />
       <Logbook />
-      <HangarPanel />
+      <HangarPanel runtime={runtime} />
+      <OperationsHUD runtime={runtime} />
       <HudGroup hidden={photoActive}>
         <ArrivalBanner />
       </HudGroup>
-      <WarpFlash runtime={runtimeRef.current} />
+      <WarpFlash runtime={runtime} />
       <CrashFlash />
       <HudGroup hidden={photoActive}>
-        {isTouch && <TouchControls runtime={runtimeRef.current} />}
+        {isTouch && <TouchControls runtime={runtime} />}
       </HudGroup>
       <PhotoModeBar />
       {/* Round 18 (A4): combo chip + boost meter + end-of-run summary, all in
@@ -341,7 +344,7 @@ export function FlyMode({ onClose }) {
       {/* Boot overlay (z-40) covers everything — including the first-entry
           controls card — until the world reveals, so the fly-controls-seen
           flow effectively starts AFTER the reveal. */}
-      <BootScreen runtime={runtimeRef.current} />
+      <BootScreen runtime={runtime} />
 
       {mobileNote && (
         <div className="pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-md bg-zinc-900/85 px-3 py-2 text-xs text-zinc-200 shadow-lg">

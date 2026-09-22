@@ -166,6 +166,21 @@ async function bootFly(
     await page.reload({ waitUntil: 'domcontentloaded', timeout: timeoutMs });
   }
 
+  // Legacy airborne regression setup is explicit. These gates test rendering,
+  // formation, etc., NOT the new departure flow. The independent unpinned
+  // verify-operations-browser.cjs never calls this helper and starts via UI.
+  await page.waitForFunction(() => !!window.__fly?.operations, undefined, { timeout: timeoutMs });
+  await page.evaluate(() => {
+    const rt=window.__fly,store=window.__flyStore.getState();
+    rt.operations.phase='airborne';
+    rt.operations.profile=null;
+    rt.operations.warp(rt.flight);
+    store.setHangarOpen(false);
+    // Preserve the old NYC airborne fixture; choosing Ohio as the product's
+    // home airport must not silently change historical screenshot baselines.
+    rt.warpToGeo(40.6892,-74.0445,{altM:800,headingRad:0});
+  });
+
   // The harness contract: pct hits 100 exactly at reveal and stays there.
   // Round 11 fix: options are waitForFunction's THIRD parameter (second is
   // `arg`) — the old two-arg call silently fell back to the 30s default,

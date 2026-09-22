@@ -98,7 +98,7 @@ export function BootScreen({ runtime }) {
       const now = performance.now();
       const frames = rt.framesRendered ?? 0;
       const living = store.mapStyle === 'satellite';
-      const content = living ? worldReadiness(rt) : null;
+      const content = living ? worldReadiness(rt,now-t0) : null;
       if(living){
         rt.worldLoading=true;rt.worldReadiness=content;
         if(now-t0>=LIVING_EARTH.loadingHelpMs&&!content.ready)setHelp(content.missing);
@@ -236,7 +236,7 @@ export function BootScreen({ runtime }) {
           holdCapMs: living ? null : BOOT.maxBootMs,
           contentCapMs: ARRIVAL_GATE.bootContentMaxMs,
           contentHeldMs: gate.contentHeldMs,
-          reason: living ? timedOut?'explicit-reduced':'content' : timedOut ? 'cap' : gate.contentHeldMs > 0 ? 'content' : 'legacy',
+          reason: living ? timedOut?'explicit-reduced':content.deferred.length?'background-detail':'content' : timedOut ? 'cap' : gate.contentHeldMs > 0 ? 'content' : 'legacy',
           terms: living ? content : gate.contentTerms,
         };
         if (typeof window !== 'undefined') {

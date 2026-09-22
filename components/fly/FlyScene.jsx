@@ -1,4 +1,7 @@
 'use client';
+import { connectFlightOperations } from '@/lib/fly/operations-runtime';
+import { FlightOperations } from '@/lib/fly/flight-operations';
+import { AirportOperationsLayer } from './AirportOperationsLayer';
 
 import { GroundImmersionRig } from './GroundImmersionRig';
 import { EarthSurfaceLayer } from './EarthSurfaceLayer';
@@ -1073,6 +1076,7 @@ export function FlyScene({ runtime }) {
     []
   );
   const input = useMemo(() => new InputController(), []);
+  const operations = useMemo(() => new FlightOperations(), []);
   const chase = useMemo(() => new ChaseCamera(), []);
   const cinema = useMemo(() => new CinemaCamera(), []);
   const photo = useMemo(() => new PhotoCamera(), []); // round 17: photo mode
@@ -1260,6 +1264,7 @@ export function FlyScene({ runtime }) {
     // heading and roughly its speed. Rebase + camera snap land the cut
     // clean; the WarpFlash overlay masks the tile stream-in beat.
     runtime.warpTo = (hex) => {
+      if (flight.operations?.grounded || useFlyStore.getState().hangarOpen) return false;
       const track = traffic.tracks.get(hex);
       // Round 8.5 (§B): no hard fix1 gate — the position warp only needs
       // rx/ry/rz; fix1 merely fed the arrival speed (cruise fallback below).
@@ -1297,6 +1302,7 @@ export function FlyScene({ runtime }) {
       const store = useFlyStore.getState();
       store.setInspectHex(null);
       store.bumpWarpEpoch();
+      flight.operations?.warp(flight);
       return true;
     };
 
@@ -1306,6 +1312,7 @@ export function FlyScene({ runtime }) {
     // re-pick). Military/hotspot warps pass offsetM ~4km: spawn OUTSIDE
     // the point, nose toward it (the planes are around a base, not on it).
     runtime.warpToGeo = (lat, lon, opts = {}) => {
+      if (flight.operations?.grounded || useFlyStore.getState().hangarOpen) return false;
       const {
         altM = 800,
         headingRad = 0,
@@ -1364,6 +1371,7 @@ export function FlyScene({ runtime }) {
       // Far warps (cross-region) get the held arrival treatment — the
       // distance is measured on the PRE-warp position captured above.
       store.bumpWarpEpoch(farWarp ? 'far' : 'local');
+      flight.operations?.warp(flight);
       if (name) store.setArrival({ name, kind, at: Date.now() });
       return true;
     };
@@ -1371,6 +1379,7 @@ export function FlyScene({ runtime }) {
     // Force-lock + intercept from the inspect modal (any range — the
     // targeting release cone/range is suspended while the autopilot holds).
     runtime.interceptHex = (hex) => {
+      if (flight.operations?.grounded || flight.operations?.phase === 'hangar') return false;
       const track = traffic.tracks.get(hex);
       if (!track || track.stale === 2) return false;
       targeting.lockedHex = hex;
@@ -1875,6 +1884,11 @@ export function FlyScene({ runtime }) {
   // runtime.geo publisher (see the comment at the sample block below).
   const spawnPlacedRef = useRef(false);
 
+  // Imperative simulation services deliberately mutate the floating origin, not React state.
+  // eslint-disable-next-line react-hooks/immutability
+  useEffect(() => connectFlightOperations({runtime,operations,flight,input,autopilot,chase,engine,rebase,crashSys,crashRef}),
+    [runtime,operations,flight,input,autopilot,chase,engine,rebase,crashSys]);
+
   // Spawn: place the aircraft above the spawn point, pointing north, and
   // drop the floating-origin anchor there.
   useEffect(() => {
@@ -1936,7 +1950,7 @@ export function FlyScene({ runtime }) {
     noteFinalizeFrame(delta);
     const flyState = useFlyStore.getState();
     const worldHeld = flyState.mapStyle === 'satellite' && (runtime.worldLoading === true || (typeof window !== 'undefined' && window.__flyBoot && window.__flyBoot.pct < 100));
-    const paused = flyState.phase === 'paused' || worldHeld;
+    const paused = flyState.phase === 'paused' || worldHeld || flyState.hangarOpen || !!flyState.inspectHex || flyState.atlasOpen || flyState.logbookOpen || document.hidden;
     // Inspect modal / Atlas count as a soft pause for the stick: the world
     // (and your plane) keep flying, but the cursor belongs to the overlay.
     // Round 17: photo mode joins them — the plane keeps flying (the instructor
@@ -1959,6 +1973,9 @@ export function FlyScene({ runtime }) {
     )
       input.neutralize();
     const cmd = input.read();
+    cmd.toggleParkingBrake = !paused && input.consumePress('b');
+    for (let i=0;i<3;i++) if (!paused && input.consumePress(String(i+1))) cmd.powerPreset=i;
+    if (operations.grounded || operations.phase === 'approach' || flyState.hangarOpen) autopilot.disengage();
 
     // Terrain raycasts are ~fractions of a ms but not free — sample the
     // ground under the aircraft every 3rd frame.
@@ -2041,7 +2058,7 @@ export function FlyScene({ runtime }) {
     }
 
     // F engages intercept on a soft lock; F again (or hard stick) releases
-    if (!paused && input.consumePress('f')) {
+    if (!paused && !operations.grounded && operations.phase !== 'approach' && input.consumePress('f')) {
       if (autopilot.mode !== 'off') autopilot.disengage();
       else if (targeting.lockedHex) autopilot.engage('intercept');
     }
@@ -2153,7 +2170,12 @@ export function FlyScene({ runtime }) {
     // instead of dilating time, and (b) an INTERPOLATED pose published as NEW
     // fields for render consumers to opt into. No consumer opts in yet — see
     // scripts/r24-a-pace.md §8c for why that half is not this round's.
-    if (worldHeld) {
+    if (operations.advance(delta, flight, cmd, paused)) {
+      if(frameStep)frameStep.advance(0);
+      prevPose.x=flight.pos.x;prevPose.y=flight.pos.y;prevPose.z=flight.pos.z;
+      prevAtt.heading=flight.heading;prevAtt.pitch=flight.pitch;prevAtt.bank=flight.bank;
+      publishRenderPose(1);
+    } else if (worldHeld) {
       // Loading keeps the destination fixed while scene streaming and lighting run.
       if(frameStep)frameStep.advance(0);
       prevPose.x=flight.pos.x;prevPose.y=flight.pos.y;prevPose.z=flight.pos.z;
@@ -2190,7 +2212,7 @@ export function FlyScene({ runtime }) {
     const crash = crashRef.current;
     if (crash.state === 'idle') {
       const hit = crashSys.update(dt, {
-        enabled: !worldHeld && CRASH.enabled && crashStakesOn(),
+        enabled: !paused && !operations.lowSpeed && operations.phase !== 'crashed' && CRASH.enabled && crashStakesOn(),
         autopilot: autopilot.mode !== 'off', // an assist must not kill you
         flight,
         satellite: flyState.mapStyle === 'satellite',
@@ -3346,6 +3368,7 @@ export function FlyScene({ runtime }) {
 
       <group ref={worldRoot}>
         <primitive object={engine.object} />
+        <AirportOperationsLayer runtime={runtime} />
         {/* Toy World vector chunks drape over the (flat-tan) tile ground */}
         {mapStyle === 'toy' && <ToyWorldLayer runtime={runtime} flight={flight} />}
         {/* Round 13 Phase 3 CENTERPIECE: 3D extruded buildings in satellite,

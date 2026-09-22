@@ -88,6 +88,11 @@ check('Inspect closes before photo, Atlas, Logbook, and Hangar', () => {
 check('Unmount removes only its sentinel', () => {
   const f = fixture(); f.open(); f.unmount(); f.flush(); assert.equal(f.index, 0); assert.equal(f.history.state.app, 'preserved');
 });
+check('Back cannot dismiss mandatory aircraft selection but can cancel return confirmation',()=>{
+  const f=fixture();f.patch({hangarOpen:true,hangarDismissible:false});
+  f.history.back();f.flush();assert.equal(f.store.hangarOpen,true);assert.equal(f.index,1);
+  f.patch({hangarDismissible:true});f.history.back();f.flush();assert.equal(f.store.hangarOpen,false);assert.equal(f.index,0);
+});
 check('A newer router state is not consumed on close', () => {
   const f = fixture(); f.open(); f.history.pushState({ route: 'next' }); f.close(); f.flush(); assert.equal(f.history.state.route, 'next');
 });

@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import {operationsContext,advanceOperationsDisclosure as advance} from '../lib/fly/operations-disclosure.js';
+
+let panel=advance(null,'ground',0);
+assert.equal(panel.expanded,true);
+assert.equal(advance(panel,'ground',60000),panel,'Ground instructions stay open');
+panel=advance(panel,'flight',100);
+assert.equal(advance(panel,'flight',6599).expanded,true,'Allow time to read after liftoff');
+assert.equal(advance(panel,'flight',6600,true).expanded,true,'Do not collapse while changing an input');
+panel=advance(panel,'flight',6700);
+assert.equal(panel.expanded,false,'Cruise folds away');
+panel={...panel,expanded:true,manual:true};
+assert.equal(advance(panel,'flight',60000),panel,'Manual reopening stays open');
+panel={...panel,expanded:false};
+assert.equal(advance(panel,'flight',70000),panel,'Manual minimization stays closed in the same context');
+panel=advance(panel,'arrival',71000);
+assert.equal(panel.expanded,true,'Arrival reopens a minimized panel');
+assert.equal(panel.manual,false);
+assert.equal(advance(panel,'arrival',120000),panel,'Approach instructions remain available');
+assert.equal(advance({...panel,expanded:false},'attention',120001).expanded,true,'Recovery reopens the panel');
+
+const f={agl:100},o={phase:'airborne',grounded:false,lowSpeed:true,vy:-2,approachGuidance:()=>({distance:2000,lateral:40,headingError:.1})};
+assert.equal(operationsContext(o,f),'arrival','Aligned descending final is detected without an assist');
+assert.equal(operationsContext({...o,vy:0},f),'flight','Flying past an airport does not open the panel');
+assert.equal(operationsContext(o,{agl:900}),'flight','Cruising above an airport is not an approach');
+assert.equal(operationsContext({...o,approachGuidance:()=>({distance:2000,lateral:600,headingError:.1})},f),'flight');
+assert.equal(operationsContext({...o,approachGuidance:()=>({distance:2000,lateral:40,headingError:1})},f),'flight');
+assert.equal(operationsContext({...o,phase:'approach',vy:0},{agl:400}),'arrival');
+assert.equal(operationsContext({...o,grounded:true},f),'ground');
+assert.equal(operationsContext({...o,phase:'crashed'},f),'attention');
+assert.equal(operationsContext({...o,routeWarning:'Outside the airport'},f),'attention');
+console.log('VERIFY: PASS — operations disclosure timing, user override, arrival and recovery.');

@@ -14,7 +14,9 @@ export function escapeStep(s) {
   else if (s.cameraMode === 'photo') s.setCameraMode('chase');
   else if (s.atlasOpen) s.setAtlasOpen(false);
   else if (s.logbookOpen) s.setLogbookOpen(false);
-  else if (s.hangarOpen) s.setHangarOpen(false);
+  // Selection is mandatory at startup and after ending a flight. Back may
+  // cancel the return confirmation, but cannot reveal an unstarted world.
+  else if (s.hangarOpen) { if(s.hangarDismissible!==false)s.setHangarOpen(false); }
   else if (s.creditsOpen) s.closeCredits();
   else if (s.phase === 'paused') s.setPhase('flying');
 }

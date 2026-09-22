@@ -27,7 +27,9 @@ const HELP_SEEN_KEY = 'fly-controls-seen';
 const CONTROL_ROWS = [
   ['Mouse', 'steer — cursor offset from center commands the turn/pitch'],
   ['WASD / arrows', 'steer (adds to mouse)'],
-  ['1 / 2 / 3', 'speed preset: slow / cruise / boost'],
+  ['1 / 2 / 3', 'airport: idle / taxi / takeoff · cruise: slow / cruise / boost'],
+  ['+ / −', 'adjust throttle near airports'],
+  ['Space / B', 'hold wheel brakes / toggle parking brake'],
   ['Shift (hold)', 'boost'],
   ['RMB (hold)', 'free-look — full 360° orbit, snaps back on release'],
   ['F', 'intercept the locked aircraft · F again to release'],

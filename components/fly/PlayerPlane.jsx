@@ -1,4 +1,5 @@
 'use client';
+import { LandingGear } from './LandingGear';
 import { cinematicAircraftParameters } from '@/lib/fly/cinematic-models';
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
 import { registerCameraModel } from '@/lib/fly/camera-framing';
@@ -58,6 +59,7 @@ import { useFlyStore } from '@/stores/fly-store';
 export function PlayerPlane({ flight, aircraft }) {
   const ac = aircraft ?? resolveAircraft(DEFAULT_AIRCRAFT_ID);
   const group = useRef();
+  const groundHull = useRef();
 
   // Dev-only rig handle (the __satRoads pattern): verify-sat-night hides the
   // hero during its ground-layer A/B probes — the idle bob straddles the probe
@@ -78,17 +80,21 @@ export function PlayerPlane({ flight, aircraft }) {
     g.position.copy(flight.pos);
     g.rotation.order = 'YXZ';
     g.rotation.set(flight.pitch, -flight.heading, -flight.bank);
+    if(groundHull.current)groundHull.current.position.y=(flight.operations?.profile?.modelOffsetY??0)*(flight.operations?.gear??0);
     // Idle hover wobble: a two-tone bob + faint roll sway (game feel). The
     // camera doesn't share it, so the plane reads alive against the world.
     const t = performance.now() / 1000;
-    g.position.y += Math.sin(t * 1.9) * 0.35 + Math.sin(t * 3.1) * 0.12;
-    g.rotation.z += Math.sin(t * 1.3) * 0.01;
+    const ops=flight.operations;
+    const bob=ops?.grounded?0:ops?.profile?Math.max(0,Math.min(1,(flight.agl-ops.profile.clearance)/30)):1;
+    g.position.y += (Math.sin(t * 1.9) * 0.35 + Math.sin(t * 3.1) * 0.12)*bob;
+    g.rotation.z += Math.sin(t * 1.3) * 0.01*bob;
   }, -30);
 
   return (
     <group ref={group}>
       <Suspense fallback={<PrimitivePlane />}>
-        <PlayerModel flight={flight} aircraft={ac} />
+        <group ref={groundHull}><PlayerModel flight={flight} aircraft={ac} /></group>
+        <LandingGear flight={flight} aircraftId={ac.id} />
       </Suspense>
     </group>
   );

@@ -44,7 +44,7 @@ export function WarpFlash({ runtime }) {
       let readySince=null,helpSince=t0,revealTimer;
       const poll=setInterval(()=>{
         if(cancelled)return;
-        const now=performance.now(),content=worldReadiness(rt);
+        const now=performance.now(),content=worldReadiness(rt,now-t0);
         rt.worldReadiness=content;
         if(now-t0>WARP.flashMs)setStage('hold');
         if(content.ready){readySince??=now;}else readySince=null;
@@ -52,7 +52,7 @@ export function WarpFlash({ runtime }) {
         rt.arrivalStats={kind,epoch:warpEpoch,gateArmed:true,holdStartAt:t0,holdCapMs:null,terms:content,revealAt:null};
         if((readySince!==null&&now-readySince>=600&&now-t0>=WARP.flashMs)||reducedEntry.current){
           clearInterval(poll);rt.worldLoading=false;rt.worldDegraded=reducedEntry.current;
-          rt.arrivalStats={...rt.arrivalStats,revealAt:now,holdMs:Math.round(now-t0),reason:reducedEntry.current?'explicit-reduced':'content'};
+          rt.arrivalStats={...rt.arrivalStats,revealAt:now,holdMs:Math.round(now-t0),reason:reducedEntry.current?'explicit-reduced':content.deferred.length?'background-detail':'content'};
           window.__flyWorldStatus={degraded:reducedEntry.current,missing:content.missing};
           (window.__flyStats??={}).warpGate=rt.arrivalStats;
           markReveal('warp');setStage('reveal');setHelp(null);
