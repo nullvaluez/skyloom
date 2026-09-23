@@ -15,7 +15,8 @@
 > **⚠️ R25 IN PROGRESS (2026-09-23): "Front Door & Clear Sky"** — a title
 > screen + Free Flight vs Takeoff & Landing choice, and a satellite atmosphere /
 > ground coherence pass behind a live **Visuals: Enhanced / Classic** switch.
-> Plan: [FLY_ROUND25_PLAN.md](FLY_ROUND25_PLAN.md). Five roles (A FRONT DOOR /
+> Plan: [FLY_ROUND25_PLAN.md](FLY_ROUND25_PLAN.md); start it in a fresh session with
+> [FLY_ROUND25_KICKOFF.md](FLY_ROUND25_KICKOFF.md). Five roles (A FRONT DOOR /
 > B FLIGHT PLAN / C SKY / D GROUND / E CERT) on `r25/{a..e}`; W0 scaffolding
 > pre-seeded the store fields, stub modules, FlyScene hooks and the
 > `fly-constants.js` owner blocks (all `enabled:false`). The legacy harness

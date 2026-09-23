@@ -1,0 +1,186 @@
+export const meta = {
+  name: 'r25-front-door-and-visuals',
+  description: 'R25: five roles build the Skyloom title screen, flight plan, sky and ground passes in parallel worktrees, peer-review each other, then CERT integrates and certifies',
+  phases: [
+    { title: 'Build', detail: 'five roles in parallel worktrees (E1 first-infra, A, B, C, D)' },
+    { title: 'Review', detail: 'adversarial sibling review per branch' },
+    { title: 'Fix', detail: 'owner fixes blocking review findings' },
+    { title: 'Integrate', detail: 'E merges E->A->B->D->C with a smoke after each; red goes back to its owner' },
+    { title: 'Certify', detail: 'Enhanced columns, Classic identity, budgets, ship state, lean record' },
+  ],
+}
+
+const REPO = '/home/user/skyloom'
+const INT_BRANCH = 'claude/game-intro-menu-world-mf37eg'
+const PLAN = 'FLY_ROUND25_PLAN.md'
+const TRAILER = 'Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01K2eLTYE3VNPJoyFV5jJ72G'
+
+const ROLES = [
+  { k: 'e', name: 'E CERT', port: 3035, fport: 3205, reviewer: 'c',
+    focus: `You are in your E1 phase (infrastructure first, then E-owned harness work). Your E2 phase (integration + certification) is a LATER, separate agent — do not merge other roles here.
+E1 ORDER OF WORK (A-D are waiting on step 3):
+1. Prove a SATELLITE offline-fixture boot on r25-w0: FLY_TILE_FIXTURE=1 FLY_FIXTURE_PORT=3205 FLY_URL=http://localhost:3035 with bootFly(page,{style:'satellite'}). Record __flyWorldStatus / worldReadiness(runtime).missing. Route **/wmts.terrascope.be/** to a new scripts/r24-fixture/worldcover.mjs (legend-exact PNG per scene kind using the lib/fly/world-cover.js class codes) and any other host that blocks readiness (material assets, etc.) in scripts/_fixture.js, until worldReadiness is ready at Owens, Manhattan and Powell. Toy fixture boot must stay green too.
+2. Write the shared helpers: scripts/_title.js (enterHangar(page, mode) — clicks title-free-flight / title-takeoff-landing when [data-testid="title-screen"] exists, otherwise sets __flyStore flightMode directly; waitTitleReady(page)), scripts/_skip-menus.js (enterFlight(page, geo) = bootFly's airborne skip for direct-goto harnesses), scripts/_r25-poses.js (P1 Owens 36.6,-118.1 @1500 m hdg 0; P2 Sierra 36.601,-118.06 @3200 m hdg 270; P3 Manhattan 40.7028,-74.017 @450 m hdg 20; P4 Powell 40.1578,-83.0752 @350 m; P5 Smokies 35.65,-83.5 @1500 m hdg 90; P6 Owens cruise @7000 m; noon/dusk via __flySunOverride; verify each is a fixture scene in scripts/r24-fixture/scenes.mjs and adjust to the nearest real fixture scene if not), scripts/_r25-luma.js (crop sRGB decode, mean linear luminance, clip %, Sobel energy, CIE76 deltaE between two bands — reuse the verify-sat-depth.js / verify-rim.js crop approach).
+3. Commit, then write the E1-ready marker: echo <your commit sha> > /tmp/r25-locks/e1-ready . If the satellite fixture cannot be made ready, still write the marker with the toy-green sha and write the reason to /tmp/r25-locks/e1-satellite-blocked (A-D then treat satellite pixel rows as BLOCKED).
+4. Record W0 baselines into scripts/r25-e-cert.md: Owens/Manhattan draws, triangles, texture peak (graphics-flight.cjs memory probe if it runs), bootFly reveal time toy+satellite, per-pose terrain luminance and horizon deltaE (Classic).
+5. Then the E-owned legacy harness edits from the plan (ops harnesses call enterHangar(page,'ops') after goto; verify-operations-touch Back rule becomes "Back never reveals an unstarted world" (tolerant: if no title-screen exists, keep today's assertion); verify-mobile-actions-node.mjs gains screen/setScreen/settingsOpen + new cases written tolerant of W0 stubs; verify-boot.js:97 and verify-mobile-layout.js:488,506 text updates must accept BOTH old and new strings until A merges), and write verify-r25-flagoff.mjs (node), verify-r25-visuals.cjs and verify-r25-smoke.cjs (fixture) — these become fully meaningful at integration; make them report NOT CALIBRATED (not FAIL) when the feature they need is absent (flag off / stub).
+6. Optional sanctioned fix: teach scripts/verify-import-integrity.mjs to parse JSON import attributes (ecmaVersion latest) so lib/fly/living-regions.js stops counting; do not change its other assertions.`,
+  },
+  { k: 'a', name: 'A FRONT DOOR', port: 3031, fport: 3201, reviewer: 'b',
+    focus: `Build the plan's "A — FRONT DOOR" charter in full: TitleScreen (DOM only, z-45, data-testid title-screen / data-overlay title / data-ready; title-continue, title-free-flight, title-takeoff-landing, title-logbook, title-settings, title-credits, title-spot), lib/fly/title-camera.js installed as runtime.titleCam (orbit around flight.pos at FRONT_DOOR.orbit, terrain-clearance floor, blendFrom(camera), needsSnap on exit, reduced-motion slow period), fill lib/fly/front-door.js (resolveInitialScreen => 'title' when FRONT_DOOR.enabled && !titleBypassPinned(); frameloopFor => 'always' on title+flight, 'demand' in hangar; spotAllowed => inFlight; useTitleHidden), <StagePump> (invalidate at FLIGHT_PLAN.stage.hz* while menuOpen && runtime.staging && !runtime.staging.ready && !document.hidden), BootScreen compact mode under the title (keep __flyBoot contract + boot-screen/boot-caption/data-stage testids byte-for-byte in meaning), Settings sheet (hud/SettingsRows.jsx reused by PauseMenu; settings-visuals-enhanced|classic shown only if visualsAvailable(); live toggle via setVisualsLive + saveVisuals), hud/CreditsPanel.jsx extracted, exit-to-title (pause-exit-title + desktop X; exitToTitle(runtime) per the plan table) replacing window.location.reload (error boundary keeps reload labelled "Restart Skyloom"), explicit runtime.audio.resume() on the first title click + engine bed muted while !inFlight, title gating of contracts/buzz/juice/arrival on inFlight, Esc/Back table (FlyMode Esc chain + hooks/use-overlay-back.js anyOverlayOpen/escapeStep learn screen + settingsOpen; keep verify-mobile-actions-node green), Skyloom branding (app/layout.js metadata except the OG url, public/manifest.json, app/loading.js, BootScreen wordmark, "Welcome to Skyloom", mobile note), remove dead geolocation spawn code but KEEP the fly-last-pos writer. B's functions (readLastSetup, describeSetup, runtime.launchSetup, runtime.staging, FEATURED_DESTINATIONS) are W0 stubs on your branch — code against their signatures and degrade gracefully (Continue hidden when readLastSetup() is null; Free Flight card hidden while FLIGHT_PLAN.enabled is false, and your gates must assert whichever state applies). Gates: scripts/verify-r25-front-door.mjs (node) and scripts/verify-r25-title.cjs (fixture, satellite + toy, phone portrait 390x844 + landscape 844x390). Flip FRONT_DOOR.enabled true on your branch once green.`,
+  },
+  { k: 'b', name: 'B FLIGHT PLAN', port: 3032, fport: 3202, reviewer: 'a',
+    focus: `Build the plan's "B — FLIGHT PLAN" charter in full: runtime.launchFreeFlight(aircraftId, dest) in lib/fly/operations-runtime.js generalising launchGlider + the scripts/_boot.js:172-182 helper (any of the 9 aircraft, airborne, altitude max(dest.altM, ground+FLIGHT_PLAN.freeFlight.minAglM), heading, cruise speed, armWarpTrim, then sync()); keep launchGlider as the KOSU practice alias; runtime.stageDestination(dest|airportId) via runtime.warpToGeo(lat, lon, {altM, headingRad, stage:true}) (W0 already allows stage warps in menus); runtime.staging {key, since, ready} from a 4 Hz worldReadiness poll; runtime.launchSetup(setup). New lib/fly/destinations.js with the 11 curated entries (Grand Canyon, Manhattan, Swiss Alps/Lauterbrunnen, Rio, Tokyo, Yosemite, Sydney, Dubai, Napali Coast, Geirangerfjord, Columbus practice) — verify every coordinate, set clearM = highest terrain within 5 km from your own knowledge/sources and altM >= clearM + 400, headings chosen for the view, title:{radiusM, aglM}. New lib/fly/poi/search.js with the EXACT Atlas ranking (components/fly/hud/Atlas.jsx:65-79) + warpOptsFor moved out; Atlas imports both (behaviour identical). Fill lib/fly/flight-plan.js: FEATURED_DESTINATIONS, searchDestinations, fly-last-setup-v1 read/save/describe with full validation, resolveInitialSpawn (bypass pin => today's KOSU with no altM; else valid last setup location + title params; else the featured spot in daylight now with sun elevation in [minSunElDeg, 50] and a golden-hour bonus, fallback grand-canyon; toy => manhattan). GroundHangar adapts per flightMode: header hangar-back ("< Title", only pre-flight AND only when FRONT_DOOR is enabled) + hangar-mode[data-mode]; ops mode = today's panel exactly (glider in ops mode keeps KOSU practice so verify-operations-fleet stays green); free mode = hangar-dest-search (#free-flight-search), featured grid hangar-dest-{id}, results hangar-dest-result-{n} (<=6), hangar-dest-selected, hangar-stage-status[data-state], and hangar-fly labelled "Fly to {name}"; default destination = the title spot; saveLastSetup on every launch (still write fly-aircraft / fly-departure). FRONT_DOOR is off on your branch (no title) — your fixture gates reach free mode via __flyStore.getState().setFlightMode('free') and must not depend on A's title. Gates: scripts/verify-r25-flight-plan.mjs (node), scripts/verify-r25-freeflight.cjs and scripts/verify-r25-continue.cjs (fixture). Flip FLIGHT_PLAN.enabled true on your branch once green.`,
+  },
+  { k: 'c', name: 'C SKY', port: 3033, fport: 3203, reviewer: 'd',
+    focus: `Build the plan's "C — SKY (one atmosphere)" charter in full: new lib/fly/sky-model.js (single-scattering Rayleigh + Henyey-Greenstein Mie, design at scripts/r24-d-atmos.md:429-452, Mie phase reused from lib/fly/atmo-law.js; CPU per-frame horizonLin at the dipped rim, zenithLin, sunTint, ambientLin, rimSRGB, voidSRGB + a GLSL sky function); fill lib/fly/r25-sky.js: r25SkyAtmo overwrites the rim/void triples IN PLACE (after the weather grey-mix, W0 call site) and r25SkyFrame does the CPU writes (retire the haze stack: depth-haze max 0 + fog density floor, keep the 60-120 km rim fade; IBL alignment scene.environmentRotation.y/backgroundRotation.y = sun.az - hdriSunAz[bucket] with per-HDRI azimuths precomputed by a new scripts/hdr-sun.mjs and stored in R25_SKY; Classic writes nothing — and must restore anything it changed when the profile flips back to Classic live). Enhanced variants: cloud composite in lib/fly/immersive-cloud-pass.js (dip-aware up via an exported getSkyDip() from SkyDome.jsx, model sky + Mie aureole, clouds hazed at slab-entry distance with livingAirTransmission, model ambient/key, 16-22 km alpha fade replacing the hard 22 km cut) as prebuilt Enhanced materials swapped live; AerialPerspective Enhanced define with sun-angle in-scatter (Rayleigh tilt + Mie lobe toward _aerialFeed.sunDir, which you fill in r25SkyFrame) and a pre-curve uExposure; in Enhanced WhiteBalance gets the balance WITHOUT exposureGamma (satellite-atmosphere.js:55-59) since exposure moves pre-curve. Neutral tone mapping only as a dev pin __flyToneOverride. Add a dev pin __flyCloudFreeze that stops cloud drift for pixel gates. Every decision point reads r25On(R25_SKY, sub) from lib/fly/visuals-profile.js; Classic post/cloud text + keys must equal the flag-off tree exactly; warm the Enhanced variants lazily (prewarm.js post/cloud regions around :952/:1045 are yours; never warm the alternate profile under the fleet pin). Satellite only; toy untouched; 0 new draws, 0 new textures. You may NOT edit lib/fly/toy-world/world-bend.js or the terrain chain (that is D). Gates: scripts/verify-r25-sky.mjs (node) and scripts/verify-r25-sky-browser.cjs (fixture: horizon seam deltaE <= R25_CERT.horizon.maxDeltaE and <= improveK x Classic; C-only terrain luminance within R25_CERT.luma.cOnly measured with window.__flyR25Ground = 0; clip +<=1 pt; no 22 km cloud edge; Owens draws unchanged). Flip R25_SKY.enabled true on your branch once green; ship any sub-flag that fails its gate OFF with a reason.`,
+  },
+  { k: 'd', name: 'D GROUND', port: 3034, fport: 3204, reviewer: 'c',
+    focus: `Build the plan's "D — GROUND" charter in full: (1) relief — the DEM decode (see workers/skirt-tail.src.js:130-142 and the vendored lib/fly/vendor/three-tile/index.js; rebuild any .built.js with the repo's own build script) returns, when the request carries r25Relief:true (Enhanced), a mapPx^2 RG8 normal map from central differences over the full decoded grid, pooled as DataTextures (<= poolTiles, LRU) with a per-material holder {uR25Relief, uR25HasRelief} (the attachLodFade holder idiom), same-LOD neighbour edge stitching; flag-off the vendored branch is dead and upstream shape kept — add a VENDOR.md patch-ledger row and update scripts/vendor-three-tile-integration.json so verify-vendor-three-tile.mjs stays 34/34 green. (2) one bounded sun term in the Enhanced applyHillshade text (lib/fly/toy-world/world-bend.js:1423-1657): albedo *= clamp((dot(N,L)+a)/(dot(Ncap,L)+a), lo, hi), N = relief normal (vertex fallback when uR25HasRelief < .5), Ncap = up; relief enters exactly once; normalising replaces groundValue 0.70 (earth-surface-material.js:177) within the D-only luminance band. (3) colour transfer: lib/fly/r25-color-ref.js rolling 512^2 atlas of 64^2 z11 Esri slots fetched through lib/fly/tile-sources.js's imagery URL (so the fixture routes it), recentred on z11 tile crossings; Enhanced text before diffuseColor *= sampledDiffuseColor in BOTH the stock and the LOD-crossfade paths: hi *= clamp(ref / textureLod(map, uv, uR25LodK), .5, 2.); r25GroundFrame writes setQuiltGrade(0,0) (retires SAT_QUILT) in Enhanced. (4) sharpening on the high tier: Catmull-Rom via 5 bilinear taps when magnified + mip-difference unsharp k <= 0.35. (5) mesh sub-flag (launch-applied only, Enhanced only): tighter z13/z14 Martini error via setDemErrorTable at engine creation; it ships ON only if triangles <= 2.0M at fixed poses and Owens draws do not move — otherwise leave R25_GROUND.mesh.enabled false with the measurement. (6) keys: hillKey gains the r25 suffix (e.g. -nsck25 by sub-flag) with a registry entry in world-bend.js:12-412, earth-surface key gains -r25g in Enhanced; prewarm.js:395-412 compiles the current profile, the alternate warms lazily via requeueForEnvironment/pumpRequeue; live toggle = onVisualsChange -> needsUpdate on resident tile materials (add terrainEngine.forEachTileMaterial). Fill lib/fly/r25-ground.js (applyR25Terrain, r25GroundFrame). Every decision point reads r25On(R25_GROUND, sub); Classic text + keys must equal flag-off exactly; toy pixels identical in both profiles. Budget: <= ~5.5 MiB new textures, Enhanced only; if the Enhanced texture peak exceeds 300 MiB set R25_GROUND.budget.enhancedTerrainResidentMiB. NO WORKER_PROTOCOL bump (vector workers untouched), NO light-intensity or post changes (C), NO GPU texture compression (deferred to R26). Gates: scripts/verify-r25-ground.mjs (node: normals within 2 deg on synthetic DEMs, edge continuity, colour ratio bounds + identity, lodK, pool bytes, Classic keys == flag-off, and verify-worker-normals / verify-skirt-worker / verify-vendor-three-tile still green) and scripts/verify-r25-ground-browser.cjs (fixture: Sobel relief gain >= R25_CERT.relief.minGain at Sierra + Smokies, seam step <= Classic, D-only luminance within R25_CERT.luma.dOnly measured with window.__flyR25Sky = 0, toy identical across profiles, Enhanced texture peak <= 300 MiB and Classic == W0 +-0.5 MiB, Owens <= 261, triangles unchanged). Flip R25_GROUND.enabled true on your branch once green; ship failing sub-flags OFF with a reason.`,
+  },
+]
+const byKey = Object.fromEntries(ROLES.map(r => [r.k, r]))
+const dir = k => `/home/user/skyloom-r25-${k}`
+
+const COMMON = r => `You are the R25 role "${r.name}" in the Skyloom repo (Next.js 16 / React 19 / three r185 / react-three-fiber flight game). This is a five-role round orchestrated by a Workflow; the orchestrator already committed the W0 scaffold (tag r25-w0).
+
+YOUR WORKSPACE (use absolute paths; never cd into another role's worktree to edit):
+- worktree: ${dir(r.k)}   branch: r25/${r.k}   (already created from r25-w0; node_modules already hard-linked in)
+- dev server: cd ${dir(r.k)} && setsid nohup node node_modules/next/dist/bin/next dev -p ${r.port} > ${dir(r.k)}/.r25-dev.log 2>&1 &  — record its PID/PGID and kill the whole process group before you finish. Use ONLY port ${r.port} (dev) and ${r.fport} (fixture). Never 3000, 3002, 3019, 3027, 3036 or another role's ports.
+- fixture browser runs: cd ${dir(r.k)} && FLY_TILE_FIXTURE=1 FLY_FIXTURE_PORT=${r.fport} FLY_URL=http://localhost:${r.port} FLY_BOOT_SCALE=3 /tmp/r25-locks/run-browser.sh node -r ./scripts/_pw-shim.js scripts/<gate>  — ALWAYS through /tmp/r25-locks/run-browser.sh (at most two SwiftShader browsers run container-wide; 4 cores). Never edit source in your worktree while one of your own browser gates is running (HMR remounts FlyScene).
+- evidence: .graphics-review/r25/${r.k}/ and scripts/r24-out/ (both gitignored). Your ledger: scripts/r25-${r.k}-*.md (committed; short: RED first, mechanism, fix, cost, gates, open risks, unmeasurable-here).
+
+READ FIRST: ${dir(r.k)}/${PLAN} — the whole plan, especially "Key rulings", "UX flow", your role section, the common rules, and the "W0 addendum" (as-built wiring + gate baselines). The CLAUDE.md top notices describe project history; the house rules that matter here are restated below.
+
+HOUSE RULES (non-negotiable):
+1. Edit only files your role owns (plan role section). NEVER edit W0-only files on your branch: components/fly/FlyScene.jsx, stores/fly-store.js, or lib/fly/fly-constants.js outside YOUR OWN block(s). If you genuinely need a new call site there, put the exact minimal patch in your report's w0Requests and code defensively until it lands.
+2. One-flag revert: everything behind your block; flag-off (and Classic profile) must be byte-identical to r25-w0 — prove it with a gate, not an argument. Flip your own master flag enabled:true on your branch only once your gates are green; ship any failing sub-flag OFF with the reason recorded.
+3. New shader text needs a NEW final cache key (registry in lib/fly/toy-world/world-bend.js) and a PREWARM warm-set entry in the same change; text and key derive from the same predicate.
+4. Never route per-frame data through React or zustand (runtime + refs only). Keep every existing data-testid stable.
+5. Gates are calibrated RED first: run each new gate against r25-w0 behaviour (or your flag off) and record the RED output in the gate header / your ledger before making it green. Verdicts are PASS / FAIL / BLOCKED / NOT CALIBRATED; keep an "unmeasurable here" list. The container 403-blocks Esri/OpenFreeMap/adsb/open-meteo and WebGL is SwiftShader at 1-3 fps: every fps/ms/tearing claim belongs to the user's machine, never to this container. Fixture numbers are fixture numbers.
+6. Before committing: node scripts/verify-import-integrity.mjs must not exceed its baseline (3 pre-existing errors in 2 files, unless E has fixed the parser); targeted eslint on every file you changed must not exceed the per-file baseline in the plan's W0 addendum (npx eslint <files>); run the node gates in the W0 baseline table that touch your area and confirm they match the baseline.
+7. Commit on r25/${r.k} ONLY (git -C ${dir(r.k)} ...). Never push. Never commit to ${INT_BRANCH}, never touch main, never rewrite others' branches. Commit messages start "R25 ${r.name.split(' ')[0]}: " and end with these two trailer lines exactly:
+${TRAILER}
+8. Do not ask the user questions; make the call the plan implies, record it in your ledger, and flag real ambiguity in your report's risks.
+9. The E1 marker protocol: E writes /tmp/r25-locks/e1-ready (contents = the r25/e commit to merge) once the satellite fixture + shared helpers exist. Roles A-D: do node/code work first; before your FIRST fixture browser run, wait for the marker (bounded wait, e.g. timeout 1200 bash -c 'until [ -f /tmp/r25-locks/e1-ready ]; do sleep 20; done', re-check between work items) and then git -C ${dir(r.k)} merge --no-edit $(cat /tmp/r25-locks/e1-ready). If /tmp/r25-locks/e1-satellite-blocked exists, satellite pixel rows are BLOCKED (say so) and you use toy/dev-server checks. If no marker appears after ~2 hours of your own work, proceed without it and mark fixture rows BLOCKED.
+
+YOUR ROLE:
+${r.focus}
+
+FINISH: kill your dev server process group, make sure everything is committed on r25/${r.k} (git status clean except gitignored evidence), then return the structured report.`
+
+const GATE = { type: 'object', properties: {
+  name: { type: 'string' }, verdict: { type: 'string', enum: ['PASS', 'FAIL', 'BLOCKED', 'NOT CALIBRATED', 'SKIPPED'] },
+  redFirst: { type: 'string' }, evidence: { type: 'string' } }, required: ['name', 'verdict'] }
+const BUILD_SCHEMA = { type: 'object', properties: {
+  branch: { type: 'string' }, head: { type: 'string' }, flagFlipped: { type: 'boolean' }, summary: { type: 'string' },
+  gates: { type: 'array', items: GATE },
+  subflags: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, shipped: { type: 'boolean' }, reason: { type: 'string' } }, required: ['name', 'shipped'] } },
+  importIntegrity: { type: 'string' }, lintDelta: { type: 'string' },
+  w0Requests: { type: 'array', items: { type: 'string' } },
+  risks: { type: 'array', items: { type: 'string' } }, unmeasurable: { type: 'array', items: { type: 'string' } },
+}, required: ['branch', 'head', 'flagFlipped', 'summary', 'gates'] }
+const REVIEW_SCHEMA = { type: 'object', properties: {
+  findings: { type: 'array', items: { type: 'object', properties: {
+    severity: { type: 'string', enum: ['blocking', 'major', 'minor', 'nit'] }, file: { type: 'string' }, line: { type: 'number' },
+    claim: { type: 'string' }, repro: { type: 'string' } }, required: ['severity', 'file', 'claim'] } },
+  gatesRerun: { type: 'array', items: GATE }, verdictSummary: { type: 'string' },
+}, required: ['findings', 'verdictSummary'] }
+const MERGE_SCHEMA = { type: 'object', properties: {
+  branch: { type: 'string' }, merged: { type: 'boolean' }, green: { type: 'boolean' },
+  preMergeSha: { type: 'string' }, postMergeSha: { type: 'string' },
+  conflicts: { type: 'array', items: { type: 'string' } }, smoke: { type: 'array', items: GATE },
+  failures: { type: 'array', items: { type: 'object', properties: { owner: { type: 'string' }, gate: { type: 'string' }, detail: { type: 'string' } }, required: ['owner', 'detail'] } },
+  w0RequestsApplied: { type: 'array', items: { type: 'string' } }, notes: { type: 'string' },
+}, required: ['branch', 'merged', 'green', 'smoke'] }
+const CLOSE_SCHEMA = { type: 'object', properties: {
+  head: { type: 'string' },
+  shipState: { type: 'array', items: { type: 'object', properties: { flag: { type: 'string' }, state: { type: 'string' }, evidence: { type: 'string' } }, required: ['flag', 'state'] } },
+  gates: { type: 'array', items: GATE }, recordPath: { type: 'string' },
+  userMachineRunList: { type: 'array', items: { type: 'string' } }, openItems: { type: 'array', items: { type: 'string' } }, notes: { type: 'string' },
+}, required: ['head', 'shipState', 'gates', 'recordPath'] }
+
+// ---------------------------------------------------------------- Build → Review → Fix (pipelined per role, no barrier)
+const built = await pipeline(
+  ROLES,
+  r => agent(COMMON(r), { label: `build:${r.name}`, phase: 'Build', schema: BUILD_SCHEMA }),
+  (b, r) => {
+    if (!b) return null
+    const rv = byKey[r.reviewer]
+    return agent(`You are the R25 role "${rv.name}" acting as an ADVERSARIAL PEER REVIEWER of role "${r.name}"'s branch r25/${r.k} in the Skyloom repo. Read ${REPO}/${PLAN} (the owner's role section, the key rulings, the W0 addendum, the common rules).
+Review target: git -C ${dir(r.k)} diff r25-w0..r25/${r.k}  (plus git log r25-w0..r25/${r.k}). The owner reports: ${JSON.stringify({ summary: b.summary, flagFlipped: b.flagFlipped, gates: b.gates, subflags: b.subflags, w0Requests: b.w0Requests, risks: b.risks }).slice(0, 6000)}
+Your job is to REFUTE that this branch is correct and mergeable. Hunt for: behaviour that breaks flag-off / Classic byte-identity; shader text vs cache-key disagreement or missing prewarm entries; per-frame allocations or per-frame data through React/zustand; broken or renamed data-testids; edits to W0-only files (FlyScene.jsx, fly-store.js, fly-constants.js outside the owner's block) or to files the plan gives another role; harness pins weakened; gates that cannot fail (not calibrated RED first), gates that assert the wrong thing, or claims of PASS without evidence; Esc/Back/audio/state-machine holes (A/B); texture/draw/triangle budget risks (C/D); import-integrity or lint regressions; anything that would make integration merges conflict. Re-run the owner's NODE gates yourself (read-only use of their worktree is fine; do NOT edit, commit, or start a dev server in ${dir(r.k)}). You may run the node gates from a scratch copy if needed. Do not run browser gates.
+Severity: blocking = must fix before merge (correctness, identity, budget, broken gate); major = should fix; minor/nit = optional. Be concrete: file, line, what is wrong, how to reproduce. If you find nothing blocking, say so plainly — do not invent findings.`,
+      { label: `review:${r.name}<-${rv.name}`, phase: 'Review', schema: REVIEW_SCHEMA })
+      .then(review => ({ b, review }))
+  },
+  (br, r) => {
+    if (!br) return null
+    const { b, review } = br
+    const must = (review?.findings || []).filter(f => f.severity === 'blocking' || f.severity === 'major')
+    if (!must.length) return { role: r.k, build: b, review, fix: null }
+    return agent(`${COMMON(r)}
+
+FIX PASS: your branch r25/${r.k} has been built (your earlier report: ${JSON.stringify({ summary: b.summary, gates: b.gates }).slice(0, 3000)}) and an adversarial peer review returned these blocking/major findings:
+${JSON.stringify(must, null, 1).slice(0, 12000)}
+For each finding: verify it (it may be wrong — if so, explain precisely why in your report and leave the code), otherwise fix it on r25/${r.k}, re-run the affected gates (RED-first rule still applies to any new gate), and commit. Your report's summary must list each finding with FIXED / NOT-A-DEFECT(reason) / DEFERRED(reason).`,
+      { label: `fix:${r.name}`, phase: 'Fix', schema: BUILD_SCHEMA })
+      .then(fix => ({ role: r.k, build: b, review, fix }))
+  },
+)
+const results = built.filter(Boolean)
+const missing = ROLES.filter(r => !results.find(x => x.role === r.k)).map(r => r.name)
+if (missing.length) log(`WARNING: no build result for ${missing.join(', ')} — integration will skip them`)
+log(`Build/review/fix done for ${results.map(x => x.role).join(',')}`)
+
+// ---------------------------------------------------------------- Integrate (sequential, E drives)
+const E = byKey.e
+const ORDER = ['e', 'a', 'b', 'd', 'c'].filter(k => results.find(x => x.role === k))
+const reportOf = k => { const x = results.find(y => y.role === k); return x ? (x.fix || x.build) : null }
+const merges = []
+for (const k of ORDER) {
+  const r = byKey[k]
+  let attempt = 0, m = null
+  while (attempt < 3) {
+    attempt++
+    m = await agent(`You are the R25 role "E CERT" in your E2 (INTEGRATION) phase. Read ${REPO}/${PLAN} (merge order, smoke list, W0 addendum, verification matrix).
+Integration worktree: ${REPO} on branch ${INT_BRANCH} (local; never push — the orchestrator pushes). Dev server port 3036, fixture port 3206 (FLY_TILE_FIXTURE=1 FLY_FIXTURE_PORT=3206 FLY_URL=http://localhost:3036 FLY_BOOT_SCALE=3), browser gates ALWAYS through /tmp/r25-locks/run-browser.sh node -r ./scripts/_pw-shim.js scripts/<gate>. Kill your dev server's process group when done.
+Merge order is E -> A -> B -> D -> C. Already merged so far: ${JSON.stringify(merges.filter(x => x.merged && x.green).map(x => x.branch))}.
+THIS STEP: merge r25/${k} (${r.name}), attempt ${attempt} of 3. Owner's latest report: ${JSON.stringify(reportOf(k)).slice(0, 5000)}
+Procedure:
+1. Record preMergeSha = git -C ${REPO} rev-parse HEAD. git -C ${REPO} merge --no-ff --no-edit r25/${k} (commit message "R25 integrate: merge r25/${k} (${r.name})" + the two trailer lines below). Resolve conflicts faithfully to BOTH sides' intent; W0-only files (FlyScene.jsx, fly-store.js, fly-constants.js tail) are the orchestrator's — you may apply a role's w0Requests there if minimal and justified (list them in w0RequestsApplied).
+2. Smoke: node scripts/verify-import-integrity.mjs (<= baseline); targeted eslint on every file changed by this merge (no per-file growth vs the W0 addendum); ALL node gates: every scripts/verify-r25-*.mjs present, graphics-unit.mjs, verify-flight-operations.mjs, verify-mobile-actions-node.mjs, verify-stylized-earth.mjs, verify-c-flagoff.mjs, verify-vendor-three-tile.mjs, verify-living-earth.mjs, verify-cinematic-flight.mjs, verify-operations-disclosure.mjs (verify-lod-fade 60/4 and verify-atmo-law's crash are pre-existing — they must not get WORSE); fixture: bootFly toy + satellite smoke (pinned legacy fleet boot must still reach pct 100 with zero non-network page errors), and from A onward scripts/verify-r25-smoke.cjs (title -> Free Flight -> pause -> Exit to title -> Continue; satellite + toy) plus this role's own fixture gates.
+3. If everything is green: leave the merge in place, green=true. If anything is red and attributable to this merge: capture exact evidence, git -C ${REPO} reset --hard <preMergeSha> (local, unpushed — safe), merged=false, green=false, and list failures with owner '${k}' (or another owner if the evidence says so).
+Trailer lines for any commit:
+${TRAILER}`,
+      { label: `integrate:${r.name}#${attempt}`, phase: 'Integrate', schema: MERGE_SCHEMA })
+    if (!m) break
+    if (m.merged && m.green) break
+    if (attempt >= 3) break
+    const owner = byKey[(m.failures?.[0]?.owner || k).toLowerCase().slice(0, 1)] || r
+    const last = attempt === 2
+    await agent(`${COMMON(owner)}
+
+INTEGRATION FIX: merging r25/${k} into ${INT_BRANCH} failed its smoke (attempt ${attempt}). Evidence:
+${JSON.stringify(m, null, 1).slice(0, 10000)}
+First git -C ${dir(owner.k)} merge --no-edit ${INT_BRANCH} to reproduce against the current integration state (the integration branch is a local ref in the same repo). Root-cause and fix on r25/${owner.k}, re-run the failing gates, commit. ${last ? 'This is the LAST fix attempt: if a sub-feature cannot be made green, set that sub-flag enabled:false in your own constants block (ship it OFF) so the branch merges green, and record why.' : ''}`,
+      { label: `intfix:${owner.name}#${attempt}`, phase: 'Integrate', schema: BUILD_SCHEMA })
+  }
+  merges.push(m ? { ...m, branch: m.branch || `r25/${k}` } : { branch: `r25/${k}`, merged: false, green: false, smoke: [] })
+  log(`integrate r25/${k}: ${m?.merged && m?.green ? 'GREEN' : 'NOT MERGED'}`)
+}
+
+// ---------------------------------------------------------------- Certify + close
+const close = await agent(`You are the R25 role "E CERT" in your final CERTIFY + CLOSE phase. Read ${REPO}/${PLAN}. Integration worktree ${REPO} on ${INT_BRANCH} (never push). Dev 3036 / fixture 3206, browser gates only via /tmp/r25-locks/run-browser.sh. Merges this round: ${JSON.stringify(merges.map(m => ({ branch: m.branch, merged: m.merged, green: m.green, failures: m.failures })))}.
+Role reports (latest): ${JSON.stringify(ROLES.map(r => ({ role: r.name, report: reportOf(r.k) && { summary: reportOf(r.k).summary, subflags: reportOf(r.k).subflags, unmeasurable: reportOf(r.k).unmeasurable, risks: reportOf(r.k).risks } }))).slice(0, 14000)}
+Do, in order:
+1. Enhanced columns for verify-rim / verify-sat-depth / verify-dusk / verify-sat-night / verify-aerial run under an un-pin of __flyVisualsOverride='enhanced' (unpinPins idiom) with thresholds marked "// SANCTIONED RE-BASELINE (R25 Enhanced column)"; Classic thresholds untouched and Classic rows re-run unchanged. Where the fixture cannot exercise a row, say BLOCKED/NOT CALIBRATED honestly.
+2. scripts/verify-r25-visuals.cjs: Classic (all R25 flags on, profile classic) vs flag-off cross-boot within mean |d| <= 0.5/255 and p99 <= 2/255 on masked terrain + sky crops at P1/P3/P5 with clouds frozen; same-session Classic->Enhanced->Classic exactly equal; GL program count flat after the first of 3 toggle cycles; combined luminance within R25_CERT.luma.both and horizon deltaE within bounds; draws Owens <= 261, satellite <= 375, toy <= 480; triangles unchanged unless the D mesh sub-flag shipped (then <= 2.0M); textures <= 300 MiB. scripts/verify-r25-flagoff.mjs green. Product boot to the title (no bypass, default spot) median of 3 <= W0 x 1.05 (fixture) — if red, record it (B's default-spot swap is the remedy).
+3. Ship state: every R25 master flag / sub-flag ON only with its evidence; anything uncertified OFF with the reason (edit only the R25 blocks' enabled values; commit "R25 E: ship state" with trailers). The Visuals default stays 'enhanced' only if at least one Enhanced visual sub-flag ships ON.
+4. Production build receipt: node scripts/ground-night-build.cjs --dist=.next-r25 (or the repo's documented equivalent) must succeed; then a title smoke against FLY_BUILD_DIR=.next-r25 next start on port 3036.
+5. The lean record FLY_FRONT_DOOR_AND_VISUALS.md, structured like FLY_GROUND_OPERATIONS.md: Play the feature / Requirements map / Engineering contracts (state machine table, runtime actions, flags, Visuals profile) / Verification (node, fixture, unmeasurable-here) / User-machine run list (Windows PowerShell; node node_modules/next/dist/bin/next dev -p 3027; the walk; Visuals A/B at 4 spots; the verify-r25-* and verify-operations-* browser gates with $env:FLY_URL; memory audit; phone on LAN) / Ship state table / Follow-ups (R26: GPU texture compression + z13/z14 mesh, buildings/trees/water). Replace the CLAUDE.md "R25 IN PROGRESS" notice with a concise "NEWEST — READ FIRST" R25 notice pointing at the record (keep older notices). Commit with trailers:
+${TRAILER}
+6. Clean up: kill every R25 dev server you started; leave the integration worktree clean. Return the structured report (head = final commit on ${INT_BRANCH}).`,
+  { label: 'certify+close', phase: 'Certify', schema: CLOSE_SCHEMA })
+
+return { results: results.map(x => ({ role: x.role, build: x.build && { head: x.build.head, flagFlipped: x.build.flagFlipped, summary: x.build.summary, gates: x.build.gates, subflags: x.build.subflags }, review: x.review && { verdict: x.review.verdictSummary, findings: (x.review.findings || []).length, blocking: (x.review.findings || []).filter(f => f.severity === 'blocking').length }, fix: x.fix && { head: x.fix.head, summary: x.fix.summary } })), merges, close }
