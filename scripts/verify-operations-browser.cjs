@@ -4,6 +4,7 @@
 const {chromium}=require('playwright');
 const fs=require('node:fs');
 const path=require('node:path');
+const {enterHangar}=require('./_title'); // R25 (E, SANCTIONED): reach the hangar through the title when there is one
 const out=process.env.FLY_OPERATIONS_OUTPUT||'.graphics-review/operations/browser';
 const timeout=Number(process.env.FLY_READY_TIMEOUT_MS)||90000;
 const snapshot=page=>page.evaluate(()=>{
@@ -64,6 +65,7 @@ const snapshot=page=>page.evaluate(()=>{
   }
   try{
     await page.goto(process.env.FLY_URL||'http://localhost:3027');
+    await enterHangar(page,'ops');
     const full=await departure('fresh');
     if(!full){
       if(process.env.FLY_ALLOW_REDUCED==='1'){await controls();report.fallbackControls='PASS';}
@@ -76,6 +78,7 @@ const snapshot=page=>page.evaluate(()=>{
     await page.getByRole('button',{name:'End flight and open hangar',exact:true}).click();
     if(!await departure('second')){report.status='BLOCKED';process.exitCode=2;console.log('VERIFY: BLOCKED — second departure');return;}
     await page.reload();
+    await enterHangar(page,'ops');
     if(!await departure('reload')){report.status='BLOCKED';process.exitCode=2;console.log('VERIFY: BLOCKED — reload departure');return;}
     if(report.errors.some(e=>e!=='Failed to fetch'))throw new Error(report.errors.join('\n'));
     report.status='FULL_DETAIL_PASS';

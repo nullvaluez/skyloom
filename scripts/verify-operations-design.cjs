@@ -1,6 +1,7 @@
 /* Real browser UI inputs; no flight pose or controller state is injected. */
 const {chromium,devices}=require('playwright');
 const fs=require('node:fs');
+const {enterHangar}=require('./_title'); // R25 (E, SANCTIONED): reach the hangar through the title when there is one
 (async()=>{
  const out=process.env.FLY_OPERATIONS_OUTPUT||'.graphics-review/operations/design';fs.mkdirSync(out,{recursive:true});
  const browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-gpu']});
@@ -16,6 +17,7 @@ const fs=require('node:fs');
   page.on('response',r=>{if(r.url().includes('World_Imagery')&&r.status()===200)report.tiles++;});
   await page.addInitScript(()=>localStorage.setItem('fly-controls-seen','1'));
   await page.goto(process.env.FLY_URL||'http://localhost:3038/?graphicsReview=1');
+  await enterHangar(page,'ops');
   await page.getByTestId('hangar').waitFor({timeout:60000});
   await page.waitForFunction(()=>!document.querySelector('[data-testid="hangar-fly"]')?.disabled,undefined,{timeout:60000});
   await page.waitForFunction(()=>document.querySelector('[data-testid="hangar"]')?.dataset.exteriorReady==='true',undefined,{timeout:30000});

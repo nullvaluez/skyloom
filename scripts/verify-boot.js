@@ -94,7 +94,11 @@ const path = require('path');
     const post = await page.evaluate(() => ({
       boot: window.__flyBoot ?? null,
       overlay: !!document.querySelector('[data-testid="boot-screen"]'),
-      helpCard: document.body.innerText.includes('Welcome to Fly Mode'),
+      // R25 (E, SANCTIONED text update): A renames the help card to "Welcome
+      // to Skyloom". Both strings are accepted until A's merge lands.
+      helpCard: ['Welcome to Fly Mode', 'Welcome to Skyloom'].some((t) =>
+        document.body.innerText.includes(t)
+      ),
     }));
     await page.waitForTimeout(11000); // ride past a fly-last-pos save tick
     const persisted = await page.evaluate(() => {

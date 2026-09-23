@@ -12,6 +12,8 @@
  *   GET /mvt/{z}/{x}/{y}.pbf          Mapbox Vector Tile (OMT layer subset)
  *   GET /img/{z}/{y}/{x}              imagery PNG — NOTE the ArcGIS y/x order
  *   GET /dem/{z}/{x}/{y}.png          Mapbox terrain-rgb PNG
+ *   GET /worldcover/{z}/{x}/{y}.png   ESA WorldCover class PNG, legend-exact
+ *                                     (R25 E: worldcover.mjs)
  *   GET /api/aircraft?lat&lon&dist    synthetic ADS-B
  *   GET /api/weather?lat&lon          `{found:false}` = the byte-identical
  *                                     no-weather baseline
@@ -37,6 +39,7 @@ import { mvtTile } from './mvt.mjs';
 import { demTile, demSize } from './dem.mjs';
 import { imageryTile, tileHue, zBorderRGB, tileBandRGB } from './imagery.mjs';
 import { aircraftPayload } from './aircraft.mjs';
+import { worldCoverTile } from './worldcover.mjs';
 import { SCENES, RURAL, tile2lon, tile2lat, lon2tile, lat2tile, isEmptyBodyTile } from './scenes.mjs';
 
 /**
@@ -47,7 +50,8 @@ import { SCENES, RURAL, tile2lon, tile2lat, lon2tile, lat2tile, isEmptyBodyTile 
  * stale server serving a previous round's scenes to someone else's gate is the
  * exact class of silent wrongness the fixture exists to remove.
  */
-export const FIXTURE_REV = 'r24-e.3-imgsource';
+// R25 E: 'r25-e.1-worldcover' — the WorldCover route (a new payload family).
+export const FIXTURE_REV = 'r25-e.1-worldcover';
 
 const stats = { total: 0, byUrl: new Map(), byKind: new Map() };
 
@@ -125,6 +129,7 @@ export function createFixtureServer(opts = {}) {
               carriesIdentity: false,
             },
             mvt: { path: '/mvt/{z}/{x}/{y}.pbf', extent: 4096, buildingsFromZoom: 13 },
+            worldcover: { path: '/worldcover/{z}/{x}/{y}.png', zooms: '6..14', legend: 'ESA WorldCover 2021 v200, exact RGB' },
             tileToLonLat: 'lon = x/2^z*360-180 ; lat = atan(sinh(PI-2*PI*y/2^z))*180/PI',
             scenes: SCENES.map((s) => ({ id: s.id, kind: s.kind, lat: s.lat, lon: s.lon, r: s.r })),
             default: RURAL,
@@ -159,6 +164,15 @@ export function createFixtureServer(opts = {}) {
         const [z, x, y] = m.slice(1).map(Number);
         bump('dem', p);
         return send(res, 200, demTile(z, x, y), 'image/png');
+      }
+
+      if ((m = p.match(/^\/worldcover\/(\d+)\/(\d+)\/(\d+)\.png$/))) {
+        // R25 E: WorldCover (lib/fly/world-cover.js). Same z window as the app
+        // (6..14); anything else is the provider's own 404.
+        const [z, x, y] = m.slice(1).map(Number);
+        bump('worldcover', p);
+        if (z < 6 || z > 14) return send(res, 404, 'out of range', 'text/plain');
+        return send(res, 200, worldCoverTile(z, x, y), 'image/png');
       }
 
       if (p === '/planet' || p === '/planet.json') {

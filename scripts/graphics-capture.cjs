@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { captureBudgetChecks } = require('./graphics-capture-budget.cjs');
 const { captureStreamersSettled, captureSceneCensus } = require('./graphics-capture-census.cjs');
+const { enterFlight, DEFAULT_GEO } = require('./_skip-menus'); // R25 (E, SANCTIONED)
 
 const args = Object.fromEntries(process.argv.slice(2).map(s => { const [k,v] = s.replace(/^--/, '').split('='); return [k,v ?? true]; }));
 const stage = args.stage || 'cinematic';
@@ -66,7 +67,9 @@ const sites = {
     report.hardware.cpu = require('node:os').cpus()[0]?.model;
     report.hardware.memoryBytes = require('node:os').totalmem();
     console.log(JSON.stringify({ stage, hardware: report.hardware }));
-    await page.waitForFunction(() => window.__flyBoot?.pct === 100 && !!window.__fly, null, { timeout: 90000 });
+    // R25 (E, SANCTIONED): skip the mandatory hangar (2c624a3) before waiting for the reveal;
+    // the site loop below warps exactly as before.
+    await enterFlight(page, { ...DEFAULT_GEO, name: null }, { timeoutMs: 90000, waitReveal: true });
     const keys = args.sites ? args.sites.split(',') : args.site ? [args.site] : args.full ? Object.keys(sites) : ['manhattan', 'powell'];
     for (const name of keys) {
       for (const time of (args.times ? args.times.split(',') : args.quick ? ['noon'] : args.matrix ? ['noon','dusk','night'] : ['noon', 'night'])) {
