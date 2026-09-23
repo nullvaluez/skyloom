@@ -120,3 +120,96 @@ the venue's:
 - The title-spot daylight pick as the user sees it (real clock, real sky).
 - Phone layout of the free panel (CSS written for ≤650 px and landscape
   phones; no phone viewport run in this pass).
+
+## 8. Fix pass (peer review, 2026-09-23)
+
+Three findings against `48d99e8`; every one verified before it was touched.
+Venue for the A+B rows: a local trial merge (`r25/a d84bf9e` merged onto
+`r25/b`, FRONT_DOOR on, not committed anywhere) served on :3032, toy fixture.
+
+| # | Finding | Verdict | Mechanism | Fix |
+|---|---|---|---|---|
+| 1 | Esc in the pre-flight hangar does nothing once A merges | **FIXED** | The hangar's `onKeyDown` (unchanged since r25-w0) calls `e.stopPropagation()` on every key; React stops the NATIVE event at the root container, so A's `window` keydown chain (`FlyMode.jsx` on r25/a: hangarOpen && !dismissible → `setScreen('title')`) never sees an Esc pressed with focus inside the hangar — and the hangar focuses its own dialog on mount. A's own t10 leg `blur()`s the hangar before pressing Esc, which is why no gate saw it. Measured RED below. | The hangar handles its own pre-flight Esc: `if (Esc && !confirmReturn && !e.isDefaultPrevented() && toTitle()) e.preventDefault()`. `toTitle()` (the "‹ Title" button's handler) is A's rule verbatim — FRONT_DOOR on and not dismissible — and now returns whether it moved. The search box still owns an Esc that clears a non-empty query (it `preventDefault`s first). The mid-flight confirm is untouched (`!confirmReturn`, and it is dismissible anyway). FRONT_DOOR off ⇒ `toTitle()` is false ⇒ nothing changes (r25-w0 identity, leg (2) on this branch). Gated on FRONT_DOOR only, not FLIGHT_PLAN: Esc → title is the front door's rule, and B's hangar must not swallow it even with B's flag reverted. |
+| 2 | Hangar opened before the runtime services ⇒ staging never happens | **FIXED** | Both staging effects called `runtime.stageDestination?.(…)` ONCE after the debounce; `undefined` (service not installed) was neither retried nor mapped to 'unstaged', so the status sat at `pending` forever and the launch went unstaged. Measured RED below. | Both effects now wait for the service: after the debounce, if `stageDestination` is not a function yet they re-check every 250 ms (`SERVICE_RETRY_MS`), then call it once; the timer chain is cleared by the effect's cleanup. No new dependency on `live`; the Fly button's rule is unchanged. |
+| 3 | `verify-r25-continue` was never run RED-first | **FIXED** (the claim was true) | The ledger recorded RED for the node gate and freeflight only; leg (1) could not fail on a flag-off tree (an always-null reader passes "corrupt hides Continue"). | Leg (1) now carries a CONTROL: the same `readLastSetup()` must return the row one field away from the corrupt one (`aircraftId: 'prop'` instead of `'blimp'`), so a reader that is simply null cannot pass. With a title it still asserts `title-continue` absent. The gate fails fast when the title has no Free Flight card, and skips the post-Continue waits when Continue did not happen. RED recorded below, on both trees. |
+
+### New gate: `scripts/verify-r25-hangar-edges.cjs` (toy fixture)
+Legs: (1) Esc with a query clears it and stays; (2) Esc with focus inside the
+pre-flight hangar → title (FRONT_DOOR on) / nothing (FRONT_DOOR off, the
+r25-w0 identity row); (3) late runtime, free: `stageDestination` removed, pick
+Tokyo, wait 4 s, restore behind a spy → Tokyo staged; (4) late runtime, ops:
+the same for the departure airport (fighter → KCMH); (5) zero page errors.
+
+RED — A+B trial with the PRE-FIX hangar (`hangar-edges-RED-ab-old.log`):
+```
+PASS  (1) query "" · screen hangar · hangar true
+FAIL  (2) focus inside true · screen hangar · title false · hangar true
+FAIL  (3) held true · before: staging manhattan, status pending · after: calls [], staging manhattan, status pending
+FAIL  (4) held true · departure KCMH · calls after restore []
+PASS  (5) clean
+verify-r25-hangar-edges: 2 passed / 3 failed
+```
+GREEN — A+B trial with the fixed hangar (`hangar-edges-GREEN-ab.log`):
+```
+PASS  (1) query "" · screen hangar · hangar true
+PASS  (2) focus inside true · screen title · title true · hangar false
+PASS  (3) held true · before: staging manhattan, status pending · after: calls ["tokyo"], staging tokyo, status staging
+PASS  (4) held true · departure KCMH · calls after restore ["KCMH","KCMH"]
+PASS  (5) clean
+verify-r25-hangar-edges: 5 passed / 0 failed
+```
+(4) recorded two calls, both `KCMH`; where the repeat comes from was not
+isolated. It is harmless: `stageDestination` is idempotent per key (a second
+call while that staging is live returns true without a warp).
+
+r25/b itself, fixed, FRONT_DOOR off (`hangar-edges-b.log`): **5 passed / 0
+failed** — (2) reads the r25-w0 identity (focus inside, screen hangar →
+hangar, hangar open), (3) calls `["tokyo"]` → staging tokyo, status staging,
+(4) `["KCMH","KCMH"]`.
+
+### verify-r25-continue, RED then GREEN
+RED — FLIGHT_PLAN off on r25/b (uncommitted one-line flip, reverted with
+`git checkout`; `continue-RED-b-flagoff.log`):
+```
+FAIL  (1) no title on this tree: readLastSetup() → null · control → null
+FAIL  (2) free hangar absent
+FAIL  (3) continue {"via":"runtime","ok":false}
+FAIL  (4) continue {"via":"runtime","ok":false} · saved null
+PASS  (5) clean
+verify-r25-continue (toy): 1 passed / 4 failed
+```
+RED — FLIGHT_PLAN off on the A+B trial (`continue-RED-ab-flagoff.log`):
+(1) FAIL `title-continue nodes 0 · control → null`; A's title then has no
+Free Flight card, and that run (before the fast-fail existed) ended on the
+900 s click timeout as "harness completed" FAIL. Not re-run: the r25/b RED
+above measures (2)-(4).
+GREEN — A+B trial, the first run of this gate through a real title
+(`continue-GREEN-ab.log`): **5/0** — (1) `title-continue nodes 0 · control →
+free/prop/manhattan`; (3) via **title-continue**, placement Δ 0.000 m, Δalt
+0.000 m, Δhdg 0; (4) via title-continue, runway 10R, Δ 0.000 m.
+GREEN — r25/b (`continue-toy-3.log`): **5/0** — (1) `readLastSetup() → null ·
+control → free/prop/manhattan`; (3) via runtime Δ 0.000 m; (4) 10R Δ 0.000 m.
+
+### Node / lint after the fix
+- `verify-r25-flight-plan.mjs`: 44/0 (unchanged; 8a flag-off hangar markup
+  still byte-identical to r25-w0 — the fix is handler and effect code only).
+- `verify-import-integrity.mjs`: 4/0.
+- eslint on `GroundHangar.jsx`, `verify-r25-hangar-edges.cjs`,
+  `verify-r25-continue.cjs`: 0 errors, 0 warnings.
+
+### Not re-run, and why
+- `verify-r25-freeflight` (toy/satellite): the staging change only adds a
+  wait when the service is missing; when it exists the call happens at the
+  same debounce as before. The normal pick-then-stage path ran green after
+  the fix in both continue GREEN runs (each waits for `staging.key ===
+  'manhattan'` before Fly).
+- Venue note: the r25/b GREEN pair ran concurrently; the second gate's fixture
+  server found 3202 held by the first and fell back to **3203** on its own.
+  That breaks the "3202 only" port rule for one run. Nothing else was
+  listening there, and later runs went back to one at a time.
+
+### Open risks added
+- Esc → title is now written in two places: B's hangar, for focus inside it,
+  and A's window chain, for focus outside it. They share the rule (FRONT_DOOR
+  on, not dismissible) but are two copies of it. If A changes its rule, the
+  hangar's `toTitle()` must follow.

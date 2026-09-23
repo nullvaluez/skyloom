@@ -25,10 +25,19 @@
  * STYLE: toy by default; R25_CONT_STYLE=satellite for the satellite run.
  * Evidence: .graphics-review/r25/b/continue-<style>.json
  *
- * RED FIRST: with FLIGHT_PLAN off (r25-w0 / B's branch before the flip)
- * readLastSetup() is null forever and no launch writes a setup: (1) passes
- * trivially (nothing to hide), (2)-(4) FAIL. Recorded in
- * scripts/r25-b-flight-plan.md.
+ * RED FIRST (scripts/r25-b-flight-plan.md §8), FLIGHT_PLAN off, toy fixture.
+ * Leg (1) carries a CONTROL (the row one field away from CORRUPT must read
+ * back), so an always-null reader cannot pass it.
+ *   r25/b, no title (continue-RED-b-flagoff.log): 1 passed / 4 failed —
+ *     FAIL (1) readLastSetup() → null · control → null
+ *     FAIL (2) free hangar absent
+ *     FAIL (3) continue {"via":"runtime","ok":false}
+ *     FAIL (4) continue {"via":"runtime","ok":false} · saved null
+ *     PASS (5) clean
+ *   A+B trial, title on (continue-RED-ab-flagoff.log): (1) FAIL
+ *     title-continue nodes 0 · control → null; then no Free Flight card on
+ *     the title (that run predates the fast-fail and ended "harness
+ *     completed" FAIL on the click timeout).
  *
  *   FLY_TILE_FIXTURE=1 FLY_FIXTURE_PORT=3202 FLY_URL=http://localhost:3032 FLY_BOOT_SCALE=3 \
  *   /tmp/r25-locks/run-browser.sh node -r ./scripts/_pw-shim.js scripts/verify-r25-continue.cjs
