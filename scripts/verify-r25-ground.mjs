@@ -589,16 +589,37 @@ console.log('\n[5] budget: pool bytes, LRU, release');
   const mk = () => new Uint8Array(8 * 8 * 2).fill(128);
   const holders = [];
   const tiles = [];
+  const H = () => ({ uR25Relief: { value: null }, uR25HasRelief: { value: 0 } });
   for (let i = 0; i < 5; i++) {
-    const h = { uR25Relief: { value: null }, uR25HasRelief: { value: 0 } };
-    const t = { _r24LastVisible: i === 1 ? 0 : 10 + i };
+    const h = H();
+    // t0 and t2 are PARKED (hidden); t1 hidden longest ago.
+    const t = { z: 14, _r24LastVisible: i === 1 ? 0 : 10 + i, model: { visible: i > 2 } };
+    if (i === 1) t.model.visible = false;
     holders.push(h);
     tiles.push(t);
     pool.bind(`t${i}`, mk(), [h], t);
   }
-  gate('(5b) LRU: the 5th tile into a 4-texture pool evicts the least recently VISIBLE (t1), whose holder falls back to vertex normals',
+  gate('(5b) LRU: the 5th tile into a 4-texture pool evicts the least recently VISIBLE hidden tile (t1), whose holder falls back to vertex normals',
     pool.allocated === 4 && pool.stats.evictions === 1 && !pool.has('t1') && holders[1].uR25HasRelief.value === 0 && holders[1].uR25Relief.value === null && holders[4].uR25HasRelief.value === 1,
     `allocated ${pool.allocated}, evictions ${pool.stats.evictions}, resident [${[...pool.entries.keys()].join(',')}]`);
+  // No thrash between VISIBLE tiles: a full pool of visible z14 tiles refuses
+  // another z14 (no cycle), and yields its LOWEST-zoom visible entry only to a
+  // strictly nearer (higher-zoom) tile.
+  const vp = new R.ReliefPool({ maxTiles: 3, mapPx: 8 });
+  const vh = [H(), H(), H(), H(), H()];
+  vp.bind('a', mk(), [vh[0]], { z: 13, model: { visible: true } });
+  vp.bind('b', mk(), [vh[1]], { z: 14, model: { visible: true } });
+  vp.bind('c', mk(), [vh[2]], { z: 14, model: { visible: true } });
+  const same = vp.bind('d', mk(), [vh[3]], { z: 13, model: { visible: true } });
+  const nearer = vp.bind('e', mk(), [vh[4]], { z: 15, model: { visible: true } });
+  gate('(5b2) no thrash: visible tiles are displaced only by a strictly higher zoom, lowest zoom first; otherwise the newcomer keeps vertex normals',
+    same === null && vh[3].uR25HasRelief.value === 0 && !!nearer && !vp.has('a') && vh[0].uR25HasRelief.value === 0 && vp.has('b') && vp.has('c') && vp.stats.refused === 1,
+    `refused ${vp.stats.refused}, resident [${[...vp.entries.keys()].join(',')}]`);
+  // A geometry replaced in place re-binds with its NEW bytes.
+  const fresh = mk().fill(7);
+  vp.bind('b', fresh, [vh[1]], { z: 14, model: { visible: true } });
+  gate('(5b3) a tile whose geometry was replaced re-binds with the new relief bytes', vp.entries.get('b').tex.image.data === fresh);
+  vp.dispose();
   pool.release('t0');
   const freed = pool.free.length === 1 && holders[0].uR25HasRelief.value === 0;
   pool.dispose();
