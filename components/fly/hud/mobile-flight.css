@@ -1,0 +1,544 @@
+/* Phone flight deck: small visual footprint, full-size finger targets. */
+.mobile-flight-deck {
+  --mfd-ink: #090f1c;
+  --mfd-edge: #cfeef82b;
+  --mfd-muted: #b0c0d2;
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  pointer-events: none;
+  font:
+    12px var(--font-geist-sans),
+    sans-serif;
+  color: #eef5ff;
+}
+.mobile-flight-deck button,
+.mobile-flight-deck select,
+.mobile-flight-deck input {
+  font: inherit;
+  touch-action: manipulation;
+}
+.mobile-flight-deck button {
+  min-height: 44px;
+  border: 1px solid var(--mfd-edge);
+  border-radius: 9px;
+  background: #152233;
+  color: #edf5fc;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.mobile-flight-deck button:active {
+  background: #2a4157;
+}
+.mobile-flight-deck :is(button, input, select):focus-visible {
+  outline: 2px solid #9fe8f5;
+  outline-offset: 3px;
+}
+.mfd-strip {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  left: calc(env(safe-area-inset-left, 0px) + 12px);
+  right: calc(env(safe-area-inset-right, 0px) + 66px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 10px 4px 0;
+  background: #090f1cf0;
+  border: 1px solid var(--mfd-edge);
+  border-radius: 12px;
+  pointer-events: auto;
+}
+.mfd-strip .mfd-flight {
+  border: 0;
+  background: transparent;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 4px 10px;
+  line-height: 1.45;
+}
+.mfd-flight > span {
+  font-size: 10px;
+  color: #b0c0d2;
+}
+.mfd-flight strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 550;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.mfd-muted {
+  color: #b0c0d2;
+}
+.mfd-strip output {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-variant-numeric: tabular-nums;
+}
+.mfd-strip output strong {
+  font-size: 20px;
+  line-height: 1.15;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.mfd-strip output span {
+  font-size: 9px;
+  color: #b0c0d2;
+  white-space: nowrap;
+}
+.mfd-guidance {
+  position: absolute;
+  left: calc(env(safe-area-inset-left, 0px) + 12px);
+  right: calc(env(safe-area-inset-right, 0px) + 12px);
+  top: calc(env(safe-area-inset-top, 0px) + 69px);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 10px;
+  border-radius: 9px;
+  background: #090f1cdd;
+  font-size: 11px;
+  line-height: 1.35;
+  pointer-events: none;
+}
+.mfd-guidance > svg {
+  color: #a3d9e7;
+  flex: none;
+}
+.mfd-guidance > span[role] {
+  flex: 1;
+}
+.mfd-target {
+  color: #b0c0d2;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.mfd-guidance[data-rotate="true"] {
+  background: #193c47;
+  color: #d6fbff;
+}
+.mfd-guidance .ops-approach-cue {
+  margin: 0;
+  gap: 10px;
+  width: 100%;
+}
+.mfd-guidance .ops-path-display {
+  width: 60px;
+}
+.mfd-guidance .ops-path-display svg {
+  height: 32px;
+  border: 0;
+  background: none;
+}
+.mfd-guidance .ops-path-display span {
+  display: none;
+}
+.mfd-guidance .ops-approach-cue p {
+  display: none;
+}
+.mfd-guidance .ops-approach-cue strong {
+  font-size: 11px;
+  color: #ecf3fb;
+  font-weight: 450;
+}
+.mfd-power {
+  position: absolute;
+  right: calc(env(safe-area-inset-right, 0px) + 12px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 28px);
+  width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: #090f1cef;
+  border: 1px solid var(--mfd-edge);
+  border-radius: 13px;
+  pointer-events: auto;
+}
+.mfd-power-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #b0c0d2;
+}
+.mfd-power-title strong {
+  font-weight: 500;
+  color: #eef5ff;
+}
+.mfd-power-title button {
+  min-width: 44px;
+  background: transparent;
+  border: 0;
+  padding: 4px 6px;
+}
+.mfd-power input[type="range"] {
+  width: 100%;
+  height: 44px;
+  accent-color: #b1eafa;
+  margin: -5px 0 0;
+  touch-action: none;
+}
+.mobile-flight-deck .mfd-primary {
+  background: #d6f3fa;
+  color: #10232d;
+  border-color: #d6f3fa;
+  font-weight: 600;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  justify-content: center;
+}
+.mfd-brakes {
+  display: grid;
+  grid-template-columns: 54px 1fr;
+  gap: 6px;
+}
+.mfd-brakes > button:first-child {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 6px;
+}
+.mfd-brakes > button:first-child span {
+  font-size: 10px;
+}
+.mfd-brakes > button[aria-pressed="true"] {
+  background: #264557;
+  border-color: #7bcedc;
+}
+.mfd-brakes .ops-brake {
+  padding: 4px;
+  font-size: 11px;
+}
+.mfd-brakes .ops-brake:active {
+  background: #d6f3fa;
+  color: #10232d;
+}
+.mfd-settings {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 69px);
+  left: calc(env(safe-area-inset-left, 0px) + 12px);
+  width: min(
+    310px,
+    calc(
+      100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) -
+        24px
+    )
+  );
+  max-height: calc(
+    100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) -
+      355px
+  );
+  overflow: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  background: #0b1422;
+  border: 1px solid var(--mfd-edge);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 12px 36px #0006;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mfd-settings header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.mfd-settings header button {
+  width: 44px;
+  background: transparent;
+  border: 0;
+}
+.mfd-settings label {
+  color: #b0c0d2;
+  font-size: 11px;
+}
+.mfd-settings select {
+  font-size: 16px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px;
+  background: #162435;
+  color: #eef5ff;
+  border: 1px solid var(--mfd-edge);
+  border-radius: 8px;
+}
+.mfd-settings small {
+  color: #b0c0d2;
+  margin-left: 8px;
+}
+.mfd-result {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  gap: 16px;
+  width: 260px;
+  background: #0b1422;
+  border: 1px solid var(--mfd-edge);
+  border-radius: 14px;
+  padding: 20px;
+  pointer-events: auto;
+}
+[data-fly-root][data-touch="1"]:has(.mobile-flight-deck)
+  :is(
+    [data-testid="flight-stats-strip"],
+    [data-testid="hud-poi"],
+    [data-testid="hud-chase-chip"]
+  ) {
+  display: none;
+}
+[data-fly-root][data-touch="1"] .flight-stick-zone {
+  left: calc(env(safe-area-inset-left, 0px) + 12px) !important;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 32px) !important;
+}
+[data-fly-root][data-touch="1"] .flight-thumbstick {
+  width: 112px;
+  height: 112px;
+  background: #0b1422a8;
+  border-color: #cfeef844 !important;
+  box-shadow: none !important;
+}
+.flight-thumbstick > div:last-child {
+  width: 44px;
+  height: 44px;
+  background: #d1e5ed !important;
+  box-shadow: 0 3px 10px #0004 !important;
+}
+[data-fly-root][data-touch="1"] .flight-menu-zone {
+  top: calc(env(safe-area-inset-top, 0px) + 12px) !important;
+  right: calc(env(safe-area-inset-right, 0px) + 12px) !important;
+  bottom: auto !important;
+  z-index: 26;
+}
+[data-fly-root][data-touch="1"] .touch-actions-fab {
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  background: #0b1422ed;
+  box-shadow: none;
+  border-color: #cfeef82b;
+}
+.touch-actions-fab span {
+  display: none;
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  .mfd-strip {
+    right: auto;
+    width: 310px;
+    gap: 14px;
+  }
+  .mfd-guidance {
+    left: 340px;
+    right: 70px;
+    top: calc(env(safe-area-inset-top, 0px) + 13px);
+    min-height: 44px;
+  }
+  .mfd-power {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+  }
+  .mfd-settings {
+    top: 68px;
+    left: 145px;
+    max-height: calc(100dvh - 92px);
+    width: calc(100vw - 335px);
+  }
+  [data-fly-root][data-touch="1"] .flight-stick-zone {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 20px) !important;
+  }
+}
+@media (max-width: 360px) {
+  .mfd-strip {
+    gap: 8px;
+    padding-right: 8px;
+  }
+  .mfd-flight strong {
+    font-size: 11px;
+  }
+  .mfd-strip output strong {
+    font-size: 18px;
+  }
+  .mfd-power {
+    width: 142px;
+  }
+  .mfd-guidance {
+    font-size: 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mobile-flight-deck * {
+    scroll-behavior: auto;
+    transition: none !important;
+  }
+}
+/* The hangar uses a compact dispatch shelf instead of a floating desktop card. */
+[data-device="phone"] .ops-aircraft-title h2 {
+  font-size: 34px;
+  letter-spacing: -0.035em;
+  margin: 4px 0;
+}
+[data-device="phone"] .ops-heading {
+  inset: calc(env(safe-area-inset-top, 0px) + 16px)
+    calc(env(safe-area-inset-right, 0px) + 18px) auto
+    calc(env(safe-area-inset-left, 0px) + 18px);
+}
+[data-device="phone"] .ops-aircraft-title {
+  top: calc(env(safe-area-inset-top, 0px) + 65px);
+  left: 20px;
+}
+.ops-aircraft-title h2 {
+  letter-spacing: -0.035em;
+}
+[data-device="phone"] .ops-dispatch {
+  left: 12px;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 99px);
+  top: auto;
+  transform: none;
+  width: auto;
+  max-height: 220px;
+  border-radius: 14px;
+  padding: 12px;
+  background: #0c1422f5;
+  box-shadow: none;
+}
+[data-device="phone"] .ops-start-options {
+  margin-top: 10px;
+}
+.ops-start-options label {
+  min-height: 44px;
+}
+[data-device="phone"] .ops-mode-description {
+  font-size: 11px;
+  margin: 7px 0;
+  line-height: 1.35;
+}
+[data-device="phone"] .ops-help {
+  display: none;
+}
+[data-device="phone"] .ops-dispatch select {
+  font-size: 16px;
+  min-height: 44px;
+}
+[data-device="phone"] .ops-dispatch label[for] {
+  font-size: 11px;
+}
+[data-device="phone"] .ops-fleet {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+  left: 12px;
+  right: 12px;
+  border-radius: 13px;
+  padding: 3px;
+  gap: 3px;
+}
+[data-device="phone"] .ops-fleet button {
+  min-width: 76px;
+  min-height: 62px;
+  padding: 5px;
+}
+[data-device="phone"] .ops-fleet button svg {
+  height: 19px;
+  width: 40px;
+  margin-bottom: 3px;
+}
+[data-device="phone"] .ops-fleet small {
+  display: none;
+}
+[data-device="phone"] .ops-fleet span {
+  font-size: 11px;
+}
+[data-device="phone"] .ops-views {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 329px);
+  left: 12px;
+  border-radius: 12px;
+  padding: 0;
+  background: #0c1422db;
+}
+[data-device="phone"] .ops-views button {
+  min-height: 44px;
+  font-size: 11px;
+  padding: 5px 11px;
+}
+[data-device="phone"] .ops-views > svg {
+  display: none;
+}
+[data-device="phone"] .ops-hangar-credit {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 7px);
+  font-size: 8px;
+}
+[data-device="phone"][data-orient="landscape"] .ops-dispatch {
+  left: auto;
+  right: calc(env(safe-area-inset-right, 0px) + 12px);
+  top: 66px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 93px);
+  width: 248px;
+  max-height: none;
+  padding: 10px;
+}
+[data-device="phone"][data-orient="landscape"]
+  .ops-dispatch
+  .ops-start-options {
+  margin-top: 8px;
+}
+[data-device="phone"][data-orient="landscape"] .ops-mode-description {
+  display: none;
+}
+[data-device="phone"][data-orient="landscape"] .ops-dispatch-action {
+  margin-top: 8px;
+}
+[data-device="phone"][data-orient="landscape"] .ops-views {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 99px);
+}
+[data-device="phone"][data-orient="landscape"] .ops-fleet button {
+  min-height: 58px;
+}
+[data-device="phone"][data-orient="landscape"] .ops-aircraft-title {
+  top: 66px;
+}
+
+/* Takeoff and landing keep the horizon clear; navigation remains in Actions. */
+[data-fly-root][data-touch="1"]:has(
+    .mobile-flight-deck:not([data-phase="airborne"])
+  )
+  :is(
+    [data-zone="minimap"],
+    [data-zone="contracts"],
+    [data-testid="juice-hud"],
+    [data-testid="traffic-labels"]
+  ) {
+  visibility: hidden;
+  pointer-events: none;
+}
+[data-fly-root][data-touch="1"] [data-zone="attribution"] > div {
+  left: 8px;
+  right: 8px;
+  bottom: 0;
+  max-width: calc(100% - 16px);
+  font-size: 8.5px;
+  line-height: 11px;
+  gap: 0 8px;
+  padding: 3px 5px;
+  background: #090f1cdd;
+  border-radius: 6px 6px 0 0;
+}
+[data-fly-root][data-touch="1"] .flight-stick-zone {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 62px) !important;
+}
+.mfd-power {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 62px);
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  [data-fly-root][data-touch="1"] .flight-stick-zone {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 30px) !important;
+  }
+  .mfd-power {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 30px);
+  }
+}

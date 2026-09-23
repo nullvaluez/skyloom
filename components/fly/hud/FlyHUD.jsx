@@ -137,7 +137,7 @@ export function FlyHUD({ runtime }) {
           a backdrop-filter over the live GL canvas makes the compositor
           re-read the framebuffer every frame. Desktop keeps blur-sm and
           bg-zinc-950/60 exactly. */}
-      <div className="hud-flat-phone pointer-events-none absolute left-1/2 top-4 z-10 flex -translate-x-1/2 divide-x divide-zinc-700 rounded-lg bg-zinc-950/60 py-1.5 backdrop-blur-sm max-sm:top-[calc(env(safe-area-inset-top)+0.375rem)] phone:top-[calc(env(safe-area-inset-top)+0.375rem)] phone-land:top-[calc(env(safe-area-inset-top)+0.25rem)] phone:bg-zinc-950/85 phone:py-1">
+      <div data-testid="flight-stats-strip" className="hud-flat-phone pointer-events-none absolute left-1/2 top-4 z-10 flex -translate-x-1/2 divide-x divide-zinc-700 rounded-lg bg-zinc-950/60 py-1.5 backdrop-blur-sm max-sm:top-[calc(env(safe-area-inset-top)+0.375rem)] phone:top-[calc(env(safe-area-inset-top)+0.375rem)] phone-land:top-[calc(env(safe-area-inset-top)+0.25rem)] phone:bg-zinc-950/85 phone:py-1">
         <div className={cell}>
           <span className={label}>SPD KT</span>
           <span className={value} ref={spdRef}>—</span>

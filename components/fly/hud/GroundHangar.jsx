@@ -9,6 +9,7 @@ import { OPERATIONS_AIRPORTS,airportEligible,airportById } from '@/lib/fly/opera
 import { operationsProfile } from '@/lib/fly/operations-profiles';
 import { HangarScene } from './HangarScene';
 import './operations.css';
+import './mobile-flight.css';
 export function GroundHangar({runtime}){
   const open=useFlyStore(s=>s.hangarOpen);
   return open?<HangarBody runtime={runtime}/>:null;

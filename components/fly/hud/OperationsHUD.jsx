@@ -1,4 +1,7 @@
 'use client';
+import { useDeviceLayout } from '@/hooks/use-device-layout';
+import { anyOverlayOpen } from '@/hooks/use-overlay-back';
+import { MobileFlightDeck } from './MobileFlightDeck';
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, Navigation, PlaneTakeoff, PlaneLanding } from 'lucide-react';
 import { CARD_THEME } from './inspect/inspect-tokens';
@@ -16,7 +19,7 @@ function BrakeButton({runtime}){
   const release=()=>runtime.input?.setBrake(false);
   useEffect(()=>()=>runtime.input?.setBrake(false),[runtime]);
   return <button className="ops-brake" style={{touchAction:'none'}}
-    onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);runtime.input.setBrake(true);}}
+    onPointerDown={e=>{e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);runtime.input?.setBrake(true);}}
     onPointerUp={release} onPointerCancel={release} onLostPointerCapture={release}
     onKeyDown={e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();runtime.input.setBrake(true);}}}
     onKeyUp={release} onBlur={release}>Hold brakes</button>;
@@ -35,6 +38,8 @@ function ApproachCue({path,flight,operations}){
   </div>;
 }
 export function OperationsHUD({runtime}){
+  const {isTouch}=useDeviceLayout();
+  const covered=useFlyStore(anyOverlayOpen);
   const open=useFlyStore(s=>s.hangarOpen),phase=useFlyStore(s=>s.phase),photo=useFlyStore(s=>s.cameraMode==='photo');
   const [,tick]=useState(0),[disclosure,setDisclosure]=useState(null);
   const body=useRef(),toggle=useRef();
@@ -43,7 +48,8 @@ export function OperationsHUD({runtime}){
   useEffect(()=>{const timer=setInterval(()=>{tick(t=>t+1);const o=runtime.operations;
     if(o?.profile&&runtime.flight){const context=operationsContext(o,runtime.flight),typing=body.current?.contains(document.activeElement)&&document.activeElement?.matches('input,select,textarea');setDisclosure(s=>advanceOperationsDisclosure(s,context,performance.now(),typing));}if(o?.summary&&!o.saved){o.markSaved();try{let raw;try{raw=JSON.parse(localStorage.getItem('fly-flight-history')||'[]');}catch{raw=[];}const rows=Array.isArray(raw)?raw:[];localStorage.setItem('fly-flight-history',JSON.stringify([...rows,o.summary].slice(-100)));}catch{}}},100);return()=>clearInterval(timer);},[runtime]);
   const o=runtime.operations,f=runtime.flight;
-  if(open||phase==='paused'||photo||!o?.profile||o.phase==='hangar'||!f)return null;
+  if(covered||open||phase==='paused'||photo||!o?.profile||o.phase==='hangar'||!f)return null;
+  if(isTouch)return <MobileFlightDeck runtime={runtime} titles={titles} BrakeButton={BrakeButton} ApproachCue={ApproachCue}/>;
   const p=o.profile,approach=o.phase==='approach',path=approach?o.approachGuidance(f):null;
   const departure=['parked','taxiOut','takeoffRoll'].includes(o.phase),takeoff=departure?o.takeoffStatus(f):null;
   const stopped=['completed','crashed'].includes(o.phase),ground=o.grounded;

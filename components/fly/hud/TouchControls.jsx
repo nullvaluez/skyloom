@@ -30,14 +30,15 @@ function Thumbstick({ runtime, lookMode, reducedMotion }) {
     if (!rect) return;
     let x = event.clientX - rect.left - rect.width / 2;
     let y = event.clientY - rect.top - rect.height / 2;
+    const travel = Math.min(KNOB_TRAVEL, rect.width * 0.34);
     const distance = Math.hypot(x, y);
-    if (distance > KNOB_TRAVEL) { x *= KNOB_TRAVEL / distance; y *= KNOB_TRAVEL / distance; }
+    if (distance > travel) { x *= travel / distance; y *= travel / distance; }
     setKnob({ x, y });
     if (lookMode) {
       runtime.input?.addLook((event.clientX - last.current.x) / window.innerWidth,
         (event.clientY - last.current.y) / window.innerHeight);
       last.current = { x: event.clientX, y: event.clientY };
-    } else runtime.input?.setTouchSteer(x / KNOB_TRAVEL, y / KNOB_TRAVEL);
+    } else runtime.input?.setTouchSteer(x / travel, y / travel);
   };
   const release = (event) => {
     event.stopPropagation();
@@ -50,7 +51,7 @@ function Thumbstick({ runtime, lookMode, reducedMotion }) {
   useEffect(() => () => runtime.input?.clearTouchSteer(), [runtime]);
   return (
     <div ref={base} data-testid="touch-joystick" aria-label={lookMode ? 'Camera look joystick' : 'Flight joystick'}
-      className="hud-glass pointer-events-auto relative grid h-32 w-32 place-items-center rounded-full"
+      className="flight-thumbstick hud-glass pointer-events-auto relative grid h-32 w-32 place-items-center rounded-full"
       style={{ touchAction: 'none', border: `1px solid ${lookMode ? 'rgba(249,168,212,0.5)' : 'rgba(125,211,252,0.35)'}`, boxShadow: '0 8px 30px rgba(2,4,10,0.5)' }}
       onPointerDown={(event) => {
         event.preventDefault(); event.stopPropagation();
@@ -183,10 +184,10 @@ export function TouchControls({ runtime }) {
   };
   return (
     <>
-      <Zone name="controls-left" style={{ left: 'max(var(--touch-safe-left), 18px)', bottom: 'calc(var(--touch-safe-bottom) + 3.25rem)' }}>
+      <Zone name="controls-left" className="flight-stick-zone" style={{ left: 'max(var(--touch-safe-left), 18px)', bottom: 'calc(var(--touch-safe-bottom) + 3.25rem)' }}>
         <Thumbstick key={inputEpoch} runtime={runtime} lookMode={lookMode} reducedMotion={reducedMotion} />
       </Zone>
-      <Zone name="controls-right" style={{ right: 'max(var(--touch-safe-right), 16px)', bottom: 'calc(var(--touch-safe-bottom) + 3.25rem)' }}>
+      <Zone name="controls-right" className="flight-menu-zone" style={{ right: 'max(var(--touch-safe-right), 16px)', bottom: 'calc(var(--touch-safe-bottom) + 3.25rem)' }}>
         <button ref={fab} type="button" data-testid="touch-fab" className="hud-glass touch-actions-fab"
           aria-expanded={!!surface} aria-controls={surface === 'contracts' ? 'touch-contracts-panel' : 'touch-actions-panel'}
           aria-label={surface ? 'Close flight actions' : 'Open flight actions'}
