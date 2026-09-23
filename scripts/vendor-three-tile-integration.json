@@ -195,7 +195,7 @@
     },
     "workers/skirt-tail.src.js": {
       "baselineSha256": "65c8ab554b75b705e68f788ee79850cb6bb1cec82a4f45dfa915a6962feded81",
-      "integratedSha256": "f1f080e9dd31dfdb768fae1c1470221829c4de6da698951c2c0aeb6a4dba5432",
+      "integratedSha256": "eb62026352fb106040d3a26c4c2feb2bb5c1f51987dc4860b78e47dc26d702f2",
       "changedFunctions": [
         {
           "name": "r25CaptureMesh",
@@ -216,7 +216,7 @@
     },
     "workers/skirt-tail.built.js": {
       "baselineSha256": "b4a840c94e41e44fa2cac8a32cfaffeea543749fcfbfc651d78213c2067d00f6",
-      "integratedSha256": "fc311784d9b4199bacbf2348d8c9443dd6b54c69554079a06305717567e32cde",
+      "integratedSha256": "c4a24eed76caa3082e3c58bae3a9eb204207b10084f7480d97a92e8a5016a9ea",
       "changedFunctions": []
     }
   },

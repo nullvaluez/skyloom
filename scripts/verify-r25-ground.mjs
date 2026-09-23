@@ -199,8 +199,15 @@ console.log('\n[1] relief math: central differences over the full grid, world fr
   };
   const before = Math.max(edgeStep(mW, mE, 'e'), edgeStep(mW, mS, 's'));
   if (RED !== 'nostitch') {
-    R.stitchPair(mW, mE, N, 'e');
-    R.stitchPair(mW, mS, N, 's');
+    // The pool's own stitch (edges + four-way corners), tiles keyed z/x/y.
+    const sp = new R.ReliefPool({ maxTiles: 3 });
+    const H = () => ({ uR25Relief: { value: null }, uR25HasRelief: { value: 0 } });
+    const key = (x, y) => `${z}/${x}/${y}`;
+    for (const [x, y, m] of [[10, 20, mW], [11, 20, mE], [10, 21, mS]]) {
+      sp.bind(key(x, y), m, [H()], { z, x, y, model: { visible: true } });
+      sp.stitch(key(x, y), (dx, dy) => key(x + dx, y + dy));
+    }
+    sp.dispose();
   }
   const after = Math.max(edgeStep(mW, mE, 'e'), edgeStep(mW, mS, 's'));
   // and the stitched seam is still the analytic normal there
