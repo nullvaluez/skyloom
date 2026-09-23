@@ -683,6 +683,56 @@ console.log('\n[6] frame hook: Classic silent, Enhanced acts, toggle back frees'
     `atlas texture version ${internals._st.atlas?.texture.version}`);
   setArm({ flag: true, profile: 'classic' });
   G.r25GroundFrame({ engine }, ctx('satellite', 'high'));
+
+  // (6e) END TO END through the frame hook: a fake engine carrying three
+  // same-LOD tiles with REAL patched materials and REAL relief bytes.
+  const z = 14;
+  const fn = (X, Zs) => 300 * Math.sin((2 * Math.PI * X) / 1300) * Math.cos((2 * Math.PI * Zs) / 1700);
+  const span = MW / 2 ** z;
+  const mkTile = (x, y, visible = true) => {
+    const m = new THREE.MeshStandardMaterial();
+    m.map = new THREE.Texture();
+    m.map.image = { width: 256, height: 256 };
+    G.applyR25Terrain(m);
+    const geometry = new THREE.BufferGeometry();
+    geometry.userData.r25Relief = R.reliefFromGrid(sampleGrid(fn, 129, 129, z, (x - 100) * span, (y - 200) * span), 129, 129, z, N);
+    return { isTile: true, x, y, z, model: { visible, material: m, geometry } };
+  };
+  const tiles = [mkTile(100, 200), mkTile(101, 200), mkTile(100, 201), mkTile(102, 200, false)];
+  let onLoaded = null, onUnload = null;
+  const eng2 = {
+    ...engine,
+    px: -1,
+    forEachLoadedTile(cb) { tiles.forEach(cb); },
+    forEachTileMaterial(cb) { tiles.forEach((t) => cb(t.model.material)); },
+    onTileEvents(a, b) { onLoaded = a; onUnload = b; return () => {}; },
+  };
+  setArm({ flag: true, profile: 'enhanced' });
+  G.r25GroundFrame({ engine: eng2 }, ctx('satellite', 'high'));
+  const h0 = tiles[0].model.material.userData.__r25Ground;
+  const xf = h0.uR25TileXf.value;
+  const sExp = 2 ** (11 - z);
+  const bound = tiles.every((t) => t.model.material.userData.__r25Ground.uR25HasRelief.value === 1);
+  const eastStep = (() => {
+    let worst = 0;
+    const a = tiles[0].model.geometry.userData.r25Relief, b = tiles[1].model.geometry.userData.r25Relief;
+    // The whole edge INCLUDING its corners (shared by up to four tiles and
+    // set to the mean of every bound owner) must match exactly.
+    for (let k = 0; k < N; k++) worst = Math.max(worst, angle(R.decodeRelief(a, N, N - 1, k), R.decodeRelief(b, N, 0, k)));
+    return worst;
+  })();
+  const xfOk = xf.x === sExp && xf.y === 100 * sExp && xf.z === 200 * sExp && xf.w === R.lodKFor(z, 256);
+  onUnload(tiles[1]);
+  const released = tiles[1].model.material.userData.__r25Ground.uR25HasRelief.value === 0;
+  const late = mkTile(99, 200);
+  tiles.push(late);
+  onLoaded(late);
+  const lateBound = late.model.material.userData.__r25Ground.uR25HasRelief.value === 1;
+  gate('(6e) end to end: goLive binds every loaded tile (relief + z11 transform), stitches same-LOD neighbours, tile-unload releases, tile-loaded binds',
+    bound && xfOk && eastStep < 1e-3 && released && lateBound,
+    `bound ${bound}; TileXf (${xf.x}, ${xf.y}, ${xf.z}, ${xf.w}); stitched east seam ${eastStep.toFixed(4)}deg; unload -> fallback ${released}; late load bound ${lateBound}`);
+  setArm({ flag: true, profile: 'classic' });
+  G.r25GroundFrame({ engine: eng2 }, ctx('satellite', 'high'));
   restoreArm();
 }
 
