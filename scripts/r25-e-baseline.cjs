@@ -34,7 +34,7 @@ const os = require('os');
 const { chromium } = require('playwright');
 const { bootFly, unpinPins } = require('./_boot');
 const { waitTitleReady, installBootProbe } = require('./_title');
-const { pose, warpToPose, sunTimeMs, isolateCanvas } = require('./_r25-poses');
+const { pose, warpToPose, sunTimeMs, isolateCanvas, roadRingInPage } = require('./_r25-poses');
 const L = require('./_r25-luma');
 const { makeCanvasShot } = require('./_canvasshot');
 const { installGroundTextureAudit } = require('./ground-texture-audit.cjs');
@@ -165,8 +165,17 @@ async function productBoot(browser, style) {
     const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     const shot = makeCanvasShot(page).shot;
     await page.addInitScript(installGroundTextureAudit);
-    const b = await bootFly(page, { style: 'satellite', timeoutMs: 900000 });
-    record.boots.satellite = { ms: b.ms, load: load(), worldStatus: await page.evaluate(() => window.__flyWorldStatus ?? null) };
+    // Boot airborne AT the first pose (bootFly geo) — never settle Manhattan
+    // first to measure Owens. The budget is the venue's, not a contract.
+    const P0 = RUNS[0]?.[0];
+    const s0 = P0 ? await sunTimeMs(P0, RUNS[0][1]) : null;
+    if (s0) await page.addInitScript((t) => { window.__flySunOverride = t; }, s0.tMs);
+    const bootBudget = Number(process.env.R25_BASELINE_BOOT_TIMEOUT_S || 1800) * 1000;
+    const b = await bootFly(page, {
+      style: 'satellite', timeoutMs: bootBudget,
+      geo: P0 ? { lat: P0.lat, lon: P0.lon, altM: P0.altM, headingRad: (P0.hdgDeg * Math.PI) / 180 } : undefined,
+    });
+    record.boots.satellite = { ms: b.ms, at: P0?.id ?? 'NYC', load: load(), worldStatus: await page.evaluate(() => window.__flyWorldStatus ?? null) };
     console.log(`satellite boot ${b.ms} ms (load ${load()})`);
     for (const [P, sun] of RUNS) {
       const t0 = Date.now();
@@ -177,6 +186,7 @@ async function productBoot(browser, style) {
         missing: readiness?.missing ?? null, roadsRing: readiness?.roads ?? null, buildingsRing: readiness?.buildings ?? null,
         terra: readiness?.terra ?? null, load: load(),
       };
+      if (readiness?.missing?.includes('roads')) row.roadRing = await page.evaluate(roadRingInPage).catch((e) => String(e).slice(0, 120));
       {
         await page.evaluate(() => {
           for (const o of [window.__flyPlayer, window.__flyTraffic, window.__flyTracers]) if (o) o.visible = false;

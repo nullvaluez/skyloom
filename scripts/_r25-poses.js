@@ -232,6 +232,37 @@ async function loadFlyConstants() {
   }
 }
 
+/**
+ * In-page: the z13 1 km ROAD ring the readiness contract reads, per tile —
+ * the road chunk's state / reason / attempts, its pending drape (grid index,
+ * DEM misses, retries) and the DEM zoom groundAt returns at the tile centre.
+ * The diagnosis for a pose whose readiness sits on ['roads'].
+ */
+function roadRingInPage() {
+  const rt = window.__fly, f = rt.flight, eng = rt.satRoads;
+  const WORLD = 40075016.68557849, zoom = 13, radiusM = 1000;
+  const k = 1 / Math.max(0.1, Math.cos((f.latDeg * Math.PI) / 180));
+  const span = WORLD / 2 ** zoom, radius = radiusM * k, n = 2 ** zoom;
+  const x0 = Math.floor((f.pos.x - radius + WORLD / 2) / span), x1 = Math.floor((f.pos.x + radius + WORLD / 2) / span);
+  const y0 = Math.floor((f.pos.z - radius + WORLD / 2) / span), y1 = Math.floor((f.pos.z + radius + WORLD / 2) / span);
+  const tiles = [];
+  for (let x = x0; x <= x1; x++)
+    for (let y = y0; y <= y1; y++) {
+      const minX = x * span - WORLD / 2, minZ = y * span - WORLD / 2;
+      const d = Math.hypot(Math.max(minX - f.pos.x, 0, f.pos.x - minX - span), Math.max(minZ - f.pos.z, 0, f.pos.z - minZ - span)) / k;
+      if (d > radiusM) continue;
+      const key = `${zoom}/${((x % n) + n) % n}/${y}`;
+      const c = eng?.chunks?.get(key);
+      const p = eng?.pendingFinalize?.find((q) => q.key === key);
+      const lon = ((minX + span / 2) / 6378137) * (180 / Math.PI);
+      const lat = (2 * Math.atan(Math.exp(-(minZ + span / 2) / 6378137)) - Math.PI / 2) * (180 / Math.PI);
+      const g = rt.engine?.getGroundAt?.(lon, lat);
+      tiles.push({ key, d: Math.round(d), state: c?.state ?? null, reason: c?.reason ?? null, attempts: c?.attempts ?? null,
+        pending: p ? { gi: p.gi, nulls: p.nulls, tries: p.tries ?? 0, hasGrid: !!p.grid } : null, demZ: g?.tileZ ?? null });
+    }
+  return { now: eng?._now ?? null, pendingN: eng?.pendingFinalize?.length ?? null, chunks: eng?.chunks?.size ?? null, tiles };
+}
+
 /** Release a `warpToPose({pin:true})` hold. */
 async function unpinPose(page) {
   await page.evaluate(() => {
@@ -291,7 +322,7 @@ async function warpToPose(page, p, { sun = null, waitReady = true, timeoutMs = 2
   return { ms: Date.now() - t0, readiness };
 }
 
-module.exports = { POSES, SUN, pose, sunTimeMs, readinessInPage, warpToPose, unpinPose, isolateCanvas, loadFlyConstants };
+module.exports = { POSES, SUN, pose, sunTimeMs, readinessInPage, roadRingInPage, warpToPose, unpinPose, isolateCanvas, loadFlyConstants };
 
 // `node scripts/_r25-poses.js` — self-check: every pose lands in its named
 // fixture scene (never `rural`), and the readiness mirror still names exactly
