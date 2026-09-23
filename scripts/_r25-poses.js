@@ -52,6 +52,21 @@ const POSES = Object.freeze([
   { id: 'P6', name: 'owensHigh', scene: 'owens', lat: 36.6, lon: -118.1, altM: 7000, hdgDeg: 0 },
 ]);
 
+/**
+ * READINESS-ONLY poses (not certification poses: no gate measures pixels
+ * there, and `r25-e-baseline.cjs`'s ORDER never includes them). R1 exists
+ * because every Free Flight featured spot but Manhattan renders on the
+ * fixture as the generic `rural` scene (scenes.mjs RURAL), and E1 proved
+ * satellite readiness only at Owens / Manhattan / Powell — the product-boot
+ * comparison reads the title spot's world, so E2 proves rural readiness on
+ * r25-w0 first:  scripts/r25-e-sat-probe.cjs satellite grandCanyon
+ * (Grand Canyon is FLIGHT_PLAN.titleSpot.fallbackId; 3200 m MSL clears the
+ * real rim, and the fixture ground there is RURAL's 210 +/- 70 m.)
+ */
+const EXTRA_POSES = Object.freeze([
+  { id: 'R1', name: 'grandCanyon', scene: 'rural', lat: 36.0544, lon: -112.1401, altM: 3200, hdgDeg: 0 },
+]);
+
 /** The sun states, resolved to a timestamp per pose by `sunTimeMs`. */
 const SUN = Object.freeze({
   date: Date.UTC(2026, 6, 1),
@@ -94,7 +109,7 @@ async function sunTimeMs(P, which) {
 }
 
 function pose(idOrName) {
-  const p = POSES.find((q) => q.id === idOrName || q.name === idOrName);
+  const p = [...POSES, ...EXTRA_POSES].find((q) => q.id === idOrName || q.name === idOrName);
   if (!p) throw new Error(`_r25-poses: unknown pose ${idOrName}`);
   return p;
 }
@@ -175,6 +190,119 @@ function readinessInPage() {
   };
 }
 
+/**
+ * Hide every DOM layer over the WORLD canvas (HUD, labels, panels, toasts,
+ * the attribution bar) so a pixel crop reads the rendered world only — the
+ * R17 rule: a pixel gate must not contain an actor it does not control. It is
+ * a stylesheet (`body *` hidden, the world canvas visible), so layers that
+ * mount LATER are hidden too; `isolateCanvas(page, false)` removes it. The
+ * world canvas is `__flyGl.domElement` (dev / graphicsReview), else the first
+ * `.fixed.inset-0 canvas` — never the HUD label canvas. Page-level captures
+ * (`page.screenshot({clip})`, _canvasshot.js) include DOM, hence this.
+ */
+async function isolateCanvas(page, on = true) {
+  return page.evaluate((on) => {
+    const old = document.getElementById('r25-isolate');
+    if (!on) {
+      old?.remove();
+      document.querySelectorAll('canvas[data-r25-world]').forEach((c) => c.removeAttribute('data-r25-world'));
+      return null;
+    }
+    const world = window.__flyGl?.domElement ?? document.querySelector('.fixed.inset-0 canvas');
+    if (!world) return false;
+    world.setAttribute('data-r25-world', '1');
+    if (!old) {
+      const el = document.createElement('style');
+      el.id = 'r25-isolate';
+      el.textContent =
+        'body * { visibility: hidden !important; } canvas[data-r25-world] { visibility: visible !important; }';
+      document.head.appendChild(el);
+    }
+    return true;
+  }, on);
+}
+
+/**
+ * The R25 ship state, read from lib/fly/fly-constants.js itself — a plain ESM
+ * module with NO imports, so it is loaded as a `data:` URL: node then never
+ * has to guess the module type of a `.js` file in a typeless package (the
+ * MODULE_TYPELESS_PACKAGE_JSON reparse warning, which an emitWarning filter
+ * could not catch). Resolves to the module namespace, or {} when it cannot be
+ * read (callers then treat the ship state as unknown). If the file ever gains
+ * an import, the data: load throws and this returns {} with the reason —
+ * never a silently partial namespace.
+ */
+async function loadFlyConstants() {
+  const fs = require('fs');
+  const path = require('path');
+  try {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'fly', 'fly-constants.js'), 'utf8');
+    return await import(`data:text/javascript;base64,${Buffer.from(src).toString('base64')}`);
+  } catch (e) {
+    console.log(`note: fly-constants unreadable from node (${String(e).slice(0, 120)})`);
+    return {};
+  }
+}
+
+/**
+ * In-page: the z13 1 km ROAD ring the readiness contract reads, per tile —
+ * the road chunk's state / reason / attempts, its pending drape (grid index,
+ * DEM misses, retries) and the DEM zoom groundAt returns at the tile centre.
+ * The diagnosis for a pose whose readiness sits on ['roads'].
+ */
+function roadRingInPage() {
+  const rt = window.__fly, f = rt.flight, eng = rt.satRoads;
+  const WORLD = 40075016.68557849, zoom = 13, radiusM = 1000;
+  const k = 1 / Math.max(0.1, Math.cos((f.latDeg * Math.PI) / 180));
+  const span = WORLD / 2 ** zoom, radius = radiusM * k, n = 2 ** zoom;
+  const x0 = Math.floor((f.pos.x - radius + WORLD / 2) / span), x1 = Math.floor((f.pos.x + radius + WORLD / 2) / span);
+  const y0 = Math.floor((f.pos.z - radius + WORLD / 2) / span), y1 = Math.floor((f.pos.z + radius + WORLD / 2) / span);
+  const tiles = [];
+  for (let x = x0; x <= x1; x++)
+    for (let y = y0; y <= y1; y++) {
+      const minX = x * span - WORLD / 2, minZ = y * span - WORLD / 2;
+      const d = Math.hypot(Math.max(minX - f.pos.x, 0, f.pos.x - minX - span), Math.max(minZ - f.pos.z, 0, f.pos.z - minZ - span)) / k;
+      if (d > radiusM) continue;
+      const key = `${zoom}/${((x % n) + n) % n}/${y}`;
+      const c = eng?.chunks?.get(key);
+      const p = eng?.pendingFinalize?.find((q) => q.key === key);
+      const lon = ((minX + span / 2) / 6378137) * (180 / Math.PI);
+      const lat = (2 * Math.atan(Math.exp(-(minZ + span / 2) / 6378137)) - Math.PI / 2) * (180 / Math.PI);
+      const g = rt.engine?.getGroundAt?.(lon, lat);
+      tiles.push({ key, d: Math.round(d), state: c?.state ?? null, reason: c?.reason ?? null, attempts: c?.attempts ?? null,
+        pending: p ? { gi: p.gi, nulls: p.nulls, tries: p.tries ?? 0, hasGrid: !!p.grid } : null, demZ: g?.tileZ ?? null });
+    }
+  return { now: eng?._now ?? null, pendingN: eng?.pendingFinalize?.length ?? null, chunks: eng?.chunks?.size ?? null, tiles };
+}
+
+/**
+ * FREEZE THE SIM for a pixel pair: store phase 'paused'. MEASURED (session 2,
+ * verify-r25-visuals at P1 Owens, W0): with only the 8 ms pin, two Classic
+ * captures 20 frames apart differed by mean 1.8/255, p99 32/255 over 56 % of
+ * pixels — every ground edge lit in the diff, i.e. a whole-ground sub-pixel
+ * SHIFT. Between a pin write and the render the flight model still steps
+ * (speed eases from the pinned 0 toward the preset, the trim servo acts), so
+ * the rendered camera sits a dt-dependent distance off the held pose, and at
+ * 1-3 fps dt is anything. A paused phase is the app's own `held` path
+ * (FlightOperations.advance returns before any integration), the frameloop
+ * stays 'always' (W0 and A's frameloopFor), and nothing in Effects reads the
+ * phase. `holdStill(page, false)` restores the phase it found. The pause menu
+ * is DOM — isolateCanvas hides it from every capture.
+ */
+async function holdStill(page, on = true) {
+  return page.evaluate((on) => {
+    const st = window.__flyStore.getState();
+    if (on) {
+      if (st.phase !== 'paused') window.__r25HeldFrom = st.phase;
+      st.setPhase('paused');
+      return st.phase;
+    }
+    if (window.__r25HeldFrom != null) st.setPhase(window.__r25HeldFrom);
+    window.__r25HeldFrom = null;
+    return window.__flyStore.getState().phase;
+  }, on);
+}
+
 /** Release a `warpToPose({pin:true})` hold. */
 async function unpinPose(page) {
   await page.evaluate(() => {
@@ -208,7 +336,9 @@ async function warpToPose(page, p, { sun = null, waitReady = true, timeoutMs = 2
       f.heading = heading;
       f.pitch = pitchRad;
       f.bank = 0;
-      const q = { x: f.pos.x, y: f.pos.y, z: f.pos.z };
+      // Published as window.__r25PinPose so a gate's RED injection can move
+      // the held pose (a direct pos write is overwritten within 8 ms).
+      const q = (window.__r25PinPose = { x: f.pos.x, y: f.pos.y, z: f.pos.z });
       window.__r25Pin = setInterval(() => {
         f.pos.x = q.x;
         f.pos.y = q.y;
@@ -232,10 +362,11 @@ async function warpToPose(page, p, { sun = null, waitReady = true, timeoutMs = 2
   return { ms: Date.now() - t0, readiness };
 }
 
-module.exports = { POSES, SUN, pose, sunTimeMs, readinessInPage, warpToPose, unpinPose };
+module.exports = { POSES, EXTRA_POSES, SUN, pose, sunTimeMs, readinessInPage, roadRingInPage, warpToPose, unpinPose, isolateCanvas, holdStill, loadFlyConstants };
 
 // `node scripts/_r25-poses.js` — self-check: every pose lands in its named
-// fixture scene (never `rural`), and the readiness mirror still names exactly
+// fixture scene (a certification pose never in `rural`; the readiness-only R1
+// exactly in `rural`), and the readiness mirror still names exactly
 // the app's parts.
 if (require.main === module) {
   (async () => {
@@ -243,7 +374,7 @@ if (require.main === module) {
     const path = require('path');
     const { sceneAt } = await import('./r24-fixture/scenes.mjs');
     let bad = 0;
-    for (const P of POSES) {
+    for (const P of [...POSES, ...EXTRA_POSES]) {
       const s = sceneAt(P.lon, P.lat);
       const ok = s.id === P.scene;
       if (!ok) bad++;
