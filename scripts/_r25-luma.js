@@ -244,18 +244,77 @@ function findHorizon(img, { smooth = 2 } = {}) {
 }
 
 /**
+ * Locate the horizon as the best TWO-CLASS SPLIT of the rows: each row is
+ * reduced to its mean colour (linear light -> Lab), and the row r minimising
+ * the summed within-class squared Lab error of rows [0, r) vs [r, h) is the
+ * horizon (Otsu over rows). Returns { row, sse } in crop coordinates, row =
+ * the first row BELOW the split, searched in [minRow, h - minRow).
+ *
+ * WHY (MEASURED, scripts/r25-e-cert.md §3a): `findHorizon`'s max-median-step
+ * statistic picks the STRONGEST horizontal edge, and the offline fixture's
+ * imagery is stamped with coloured tile borders — at P1 Owens it chose a z16
+ * tile border ~100 px below a soft, hazed horizon and reported the sky/ground
+ * seam as ΔE 10.8 between two patches of GROUND. The split is global: a
+ * border inside the ground class, or a cloud inside the sky class, moves the
+ * class means a little and the split not at all. On real imagery (no stamps)
+ * both methods agree wherever the horizon is the strongest edge.
+ */
+function findHorizonSplit(img, { minRow = 8 } = {}) {
+  const { width: w, height: h, data: d } = img;
+  const L = new Float64Array(h * 3);
+  for (let y = 0; y < h; y++) {
+    let r = 0, g = 0, b = 0;
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 3;
+      r += LUT[d[i]];
+      g += LUT[d[i + 1]];
+      b += LUT[d[i + 2]];
+    }
+    const lab = linearToLab(r / w, g / w, b / w);
+    L[y * 3] = lab[0];
+    L[y * 3 + 1] = lab[1];
+    L[y * 3 + 2] = lab[2];
+  }
+  // prefix sums of each channel and of its square
+  const S = new Float64Array((h + 1) * 3), Q = new Float64Array((h + 1) * 3);
+  for (let y = 0; y < h; y++)
+    for (let c = 0; c < 3; c++) {
+      S[(y + 1) * 3 + c] = S[y * 3 + c] + L[y * 3 + c];
+      Q[(y + 1) * 3 + c] = Q[y * 3 + c] + L[y * 3 + c] ** 2;
+    }
+  const sse = (a, b) => {
+    const n = b - a;
+    let e = 0;
+    for (let c = 0; c < 3; c++) {
+      const s = S[b * 3 + c] - S[a * 3 + c];
+      e += Q[b * 3 + c] - Q[a * 3 + c] - (s * s) / n;
+    }
+    return e;
+  };
+  let best = Infinity, bestRow = -1;
+  for (let r = Math.max(1, minRow); r <= h - Math.max(1, minRow); r++) {
+    const e = sse(0, r) + sse(r, h);
+    if (e < best) (best = e), (bestRow = r);
+  }
+  return { row: bestRow, sse: best };
+}
+
+/**
  * The horizon SEAM: deltaE between the band just ABOVE `row` and the band just
  * BELOW it, each `band` rows tall and `gap` rows away from the row (the gap
- * keeps the anti-aliased edge itself out of both means). With `row` omitted,
- * `findHorizon` locates it. Returns { deltaE, row, above:{lab,srgb8}, below:{lab,srgb8} }.
+ * keeps the anti-aliased edge itself out of both means). With `row` omitted
+ * the row is located by `method`: 'split' (default, `findHorizonSplit`) or
+ * 'edge' (`findHorizon`, the verify-rim statistic).
+ * Returns { deltaE, row, method, above:{lab,srgb8}, below:{lab,srgb8} }.
  */
-function horizonSeam(img, { row = null, gap = 4, band = 10 } = {}) {
-  const r = row ?? findHorizon(img).row;
+function horizonSeam(img, { row = null, gap = 4, band = 10, method = 'split' } = {}) {
+  const r = row ?? (method === 'edge' ? findHorizon(img).row : findHorizonSplit(img, { minRow: gap + band }).row);
   const up = rows(img, r - gap - band, r - gap);
   const dn = rows(img, r + gap, r + gap + band);
-  if (!up.height || !dn.height) return { deltaE: NaN, row: r, above: null, below: null };
+  const m = row != null ? 'given' : method;
+  if (!up.height || !dn.height) return { deltaE: NaN, row: r, method: m, above: null, below: null };
   const A = meanColor(up), B = meanColor(dn);
-  return { deltaE: deltaE76(A.lab, B.lab), row: r, above: { lab: A.lab, srgb8: A.srgb8 }, below: { lab: B.lab, srgb8: B.srgb8 } };
+  return { deltaE: deltaE76(A.lab, B.lab), row: r, method: m, above: { lab: A.lab, srgb8: A.srgb8 }, below: { lab: B.lab, srgb8: B.srgb8 } };
 }
 
 /** Everything a luminance/relief column needs, in one pass per metric. */
@@ -320,6 +379,7 @@ module.exports = {
   meanColor,
   bandDeltaE,
   findHorizon,
+  findHorizonSplit,
   horizonSeam,
   census,
   diffCensus,
@@ -372,6 +432,19 @@ if (require.main === module) {
     const crop = await loadRegion(png, { left: 0, top: 0.625, width: 1, height: 0.375 });
     ok('(11) PNG crop (fractional)', crop.height === 12 && crop.data.every((v) => v === 60), `crop ${crop.width}x${crop.height} top ${crop.region.top}`);
     ok('(12) ratio guard', ratio(1, 0) === null && ratio(NaN, 1) === null && ratio(2, 4) === 0.5, 'null on absent/zero operands');
+    // (13) THE FIXTURE FAILURE MODE: a soft sky->ground ramp (rows 8..12) above
+    // a hard one-row tile border at row 24 inside the ground. The edge
+    // statistic takes the border; the split takes the horizon.
+    const fx = solid(120, 150, 200);
+    for (let y = 8; y < H; y++) {
+      const t = Math.min(1, (y - 8) / 4);
+      const c = [120 + t * (140 - 120), 150 + t * (130 - 150), 200 + t * (90 - 200)].map(Math.round);
+      for (let x = 0; x < W; x++) fx.data.set(y === 24 ? [255, 120, 0] : c, (y * W + x) * 3);
+    }
+    const fe = findHorizon(fx, { smooth: 0 }).row, fs = findHorizonSplit(fx, { minRow: 2 }).row;
+    ok('(13) split finds a soft horizon over a hard ground border', fe >= 24 && fe <= 25 && fs >= 9 && fs <= 12, `edge row ${fe} (the border), split row ${fs} (the ramp 8..12)`);
+    const hs = horizonSeam(hz, { gap: 2, band: 6 });
+    ok('(14) split on the clean step == the step row', hs.row === 20 && hs.method === 'split', `row ${hs.row} method ${hs.method}`);
     process.exit(bad ? 1 : 0);
   })();
 }
