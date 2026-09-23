@@ -433,6 +433,11 @@ async function warpHold(page, lat, lon, altM) {
   // =========================================================================
   // C/D/E — runtime, both styles
   // =========================================================================
+  if (process.argv.includes('--static-only')) {
+    console.log(`STATIC VERIFY: ${fails.length ? 'FAIL' : 'PASS'} (browser checks not run)`);
+    process.exit(fails.length ? 1 : 0);
+  }
+
   const browser = await chromium.launch({
     channel: 'chrome',
     headless: true,

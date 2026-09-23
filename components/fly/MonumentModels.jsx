@@ -1,4 +1,6 @@
 'use client';
+import { useFlyStore } from '@/stores/fly-store';
+import { MonumentDetailCache, landmarkDistanceM, selectMonumentDetails } from '@/lib/fly/monument-detail';
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
 import { attachCinematicModelAttributes, createCinematicModelMaterial, updateCinematicModelNight } from '@/lib/fly/cinematic-models';
 
@@ -29,7 +31,7 @@ import {
   TOY_WORLD,
 } from '@/lib/fly/fly-constants';
 import { applyBendAnchorMonument } from '@/lib/fly/toy-world/world-bend';
-import { loadMonumentGeometries } from '@/lib/fly/monument-loader';
+import { loadMonumentGeometries, loadMonumentDetail } from '@/lib/fly/monument-loader';
 import { setSuppressedMonuments } from '@/lib/fly/monument-models';
 
 const _m = new Matrix4();
@@ -106,6 +108,13 @@ function makeEmptyGeometry() {
 export function MonumentModels({ flight, origin, engine, mapStyle, runtime }) {
   const isToy = mapStyle !== 'satellite';
   const [models, setModels] = useState(null);
+  const detailCache = useRef(null);
+  const desiredDetail = useRef(new Map());
+  useEffect(() => {
+    const cache = new MonumentDetailCache((entry,level) => loadMonumentDetail(entry,level,isToy ? 'toy' : 'sat'));
+    detailCache.current = cache;
+    return () => { cache.dispose(); detailCache.current = null; desiredDetail.current.clear(); };
+  }, [isToy]);
 
   // Async load AFTER mount — deliberately outside the boot contract. GLB
   // failures degrade to the procedural archetype and never reject.
@@ -131,6 +140,7 @@ export function MonumentModels({ flight, origin, engine, mapStyle, runtime }) {
     const out = [];
     for (const p of buildPoiList()) {
       if (p.kind !== 'landmark') continue;
+      if (process.env.NODE_ENV !== 'production' && window.__flyLandmarkBaseline && ['CN Tower','Burj Khalifa'].includes(p.name)) continue;
       const hit = models.get(p.name);
       if (hit) out.push({ poi: p, ...hit });
     }
@@ -251,6 +261,24 @@ export function MonumentModels({ flight, origin, engine, mapStyle, runtime }) {
     }
     cand.sort((a, b) => a.d - b.d);
 
+    const baseline = process.env.NODE_ENV !== 'production' && window.__flyLandmarkBaseline === true;
+    const tier = baseline ? 'low' : useFlyStore.getState().qualityTier;
+    const detailCandidates = cand.map(k => ({name:k.s.poi.name,entry:k.s.entry,
+      distanceM:landmarkDistanceM({...k.s.poi,groundY:k.groundY},flight.pos)}));
+    detailCache.current?.request(detailCandidates,tier);
+    desiredDetail.current = selectMonumentDetails(detailCandidates,desiredDetail.current,tier);
+    for (const k of cand) {
+      const level = desiredDetail.current.get(k.s.poi.name);
+      let activeLevel = level;
+      let geometry = level && detailCache.current?.get(k.s.poi.name,level);
+      // A medium model stays visible while a high-tier replacement downloads.
+      if (!geometry && level === 'high') {
+        geometry = detailCache.current?.get(k.s.poi.name,'medium');
+        if (geometry) activeLevel = 'medium';
+      }
+      k.geometry = geometry || k.s.geometry;
+      k.level = geometry ? activeLevel : 'far';
+    }
     let keep;
     if (!M) {
       keep = cand.slice(0, MONUMENT_MODELS.maxPlaced);
@@ -259,7 +287,7 @@ export function MonumentModels({ flight, origin, engine, mapStyle, runtime }) {
       // triggers one rebuild, while sub-metre re-drapes never do.
       const q = MONUMENT_MODELS.groundReplaceM;
       const sig = keep
-        .map((k) => `${k.s.poi.name}@${Math.round(k.groundY / q)}`)
+        .map((k) => `${k.s.poi.name}@${Math.round(k.groundY / q)}:${k.level}`)
         .sort()
         .join('|');
       if (sig === st.sig) return;
@@ -301,7 +329,7 @@ export function MonumentModels({ flight, origin, engine, mapStyle, runtime }) {
       if (!changed) {
         for (const k of keep) {
           const b = st.baked.get(k.s.poi.name);
-          if (!b || Math.abs(k.groundY - b.groundY) > M.groundDeltaM) {
+          if (!b || b.level !== k.level || Math.abs(k.groundY - b.groundY) > M.groundDeltaM) {
             changed = true;
             break;
           }
@@ -328,8 +356,10 @@ export function MonumentModels({ flight, origin, engine, mapStyle, runtime }) {
       const s = Math.max(8, poi.hM || 0) * LANDMARKS_3D.scaleBoost;
       const x = poi.wx - ax;
       const z = poi.wz - az;
-      const g = k.s.geometry.clone();
-      if (!isToy && satelliteVisualsOn('models')) attachCinematicModelAttributes(g, { ...k.s.entry, poi: poi.name });
+      const g = k.geometry.clone();
+      if (!isToy && satelliteVisualsOn('models')) attachCinematicModelAttributes(g, { ...k.s.entry, ...k.s.entry.detail?.[k.level], poi: poi.name, baseline });
+      g.deleteAttribute('_model_surface');
+      g.deleteAttribute('_model_light');
       _pos.set(x, k.groundY, z);
       _q.set(0, 0, 0, 1); // facing is baked in by monument-loader (yawFixRad)
       _scl.set(s, s, s);
@@ -356,6 +386,7 @@ export function MonumentModels({ flight, origin, engine, mapStyle, runtime }) {
         groundY: k.groundY,
         topY: k.groundY + s,
         heightM: poi.hM,
+        detail: k.level, triangles: g.index.count / 3,
       });
     }
 
@@ -372,7 +403,7 @@ export function MonumentModels({ flight, origin, engine, mapStyle, runtime }) {
     // This is the state (b) above is tested against — per name, absolute.
     st.baked.clear();
     for (let i = 0; i < keep.length; i++) {
-      st.baked.set(keep[i].s.poi.name, { groundY: keep[i].groundY, rank: i });
+      st.baked.set(keep[i].s.poi.name, { groundY: keep[i].groundY, rank: i, level: keep[i].level });
     }
     st.remerges += 1;
 
@@ -398,6 +429,10 @@ export function MonumentModels({ flight, origin, engine, mapStyle, runtime }) {
       mon.placed = placed.length;
       mon.priority = MARQUEE_PRIORITY;
       mon.bumpT = +t.toFixed(4);
+      mon.detailCache = detailCache.current?.items.size ?? 0;
+      mon.detailDownloads = detailCache.current?.active ?? 0;
+      mon.detailed = placed.filter(p => p.detail !== 'far').length;
+      mon.triangles = merged.index.count / 3;
     }
   }, MARQUEE_PRIORITY);
 

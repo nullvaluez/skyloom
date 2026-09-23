@@ -22,6 +22,8 @@ const fs = require('fs');
 
 const ROOT = path.join(__dirname, '..');
 const MAX_GLB_BYTES = 1024 * 1024;
+// Approved nearby-landmark budgets; distant and aircraft assets retain the original cap.
+const detailAssets = require('../lib/fly/monument-detail-assets.json');
 
 (async () => {
   const fails = [];
@@ -41,8 +43,8 @@ const MAX_GLB_BYTES = 1024 * 1024;
     const exists = fs.existsSync(p);
     const size = exists ? fs.statSync(p).size : -1;
     gate(
-      `GLB on disk ≤ 1MB: ${rel}`,
-      exists && size <= MAX_GLB_BYTES,
+      `GLB on disk within declared budget: ${rel}`,
+      exists && size <= (detailAssets.find(a => 'public'+a.file === rel)?.level === 'high' ? 4*MAX_GLB_BYTES : detailAssets.find(a => 'public'+a.file === rel)?.level === 'medium' ? 2*MAX_GLB_BYTES : MAX_GLB_BYTES),
       exists ? `${(size / 1024).toFixed(0)}KB` : 'MISSING'
     );
   }
@@ -66,6 +68,11 @@ const MAX_GLB_BYTES = 1024 * 1024;
   );
 
   // --- B: live fleet ---------------------------------------------------------
+  if (process.argv.includes('--static-only')) {
+    console.log(`STATIC VERIFY: ${fails.length ? 'FAIL' : 'PASS'} (browser checks not run)`);
+    process.exit(fails.length ? 1 : 0);
+  }
+
   const browser = await chromium.launch({
     channel: 'chrome',
     headless: true,

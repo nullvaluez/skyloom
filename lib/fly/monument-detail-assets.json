@@ -1,0 +1,92 @@
+[
+  {
+    "poi": "Eiffel Tower",
+    "level": "high",
+    "file": "/models/monument-eiffel-detail-v1.glb",
+    "triangles": 56012,
+    "bytes": 3283220,
+    "sha256": "c8dbd26591edaf826c2ae8dd3fa75a363fd2e237db050f37cc396172f663fddb",
+    "source": "Scott Marshall / CC-BY 3.0 / https://poly.pizza/m/aIpJchqtRTg"
+  },
+  {
+    "poi": "Eiffel Tower",
+    "level": "medium",
+    "file": "/models/monument-eiffel-medium-v1.glb",
+    "triangles": 9000,
+    "bytes": 337484,
+    "sha256": "bc16282022d31321d61b4ee19d5cce233e70630fde0cf4443062f660d6c3638c",
+    "source": "Skyloom first-party / MIT"
+  },
+  {
+    "poi": "Empire State Building",
+    "level": "high",
+    "file": "/models/monument-empire-state-detail-v1.glb",
+    "triangles": 3552,
+    "bytes": 354792,
+    "sha256": "ecf667cc673e9491a96416015ec9fe756a2d78cfeccdea300032721b11e0d6cd",
+    "source": "Skyloom first-party / MIT"
+  },
+  {
+    "poi": "Willis Tower",
+    "level": "high",
+    "file": "/models/monument-willis-detail-v1.glb",
+    "triangles": 3384,
+    "bytes": 337232,
+    "sha256": "f2d251b2c5e88dff05f522129e23710cdc65e49353ef82692e52b03077ccbfe9",
+    "source": "Skyloom first-party / MIT"
+  },
+  {
+    "poi": "CN Tower",
+    "level": "far",
+    "file": "/models/monument-cn-tower-far-v1.glb",
+    "triangles": 568,
+    "bytes": 46964,
+    "sha256": "e9ef182126218954dc096c9095ed5babbcb91841721b25908549648a44dd4a87",
+    "source": "Skyloom first-party / MIT"
+  },
+  {
+    "poi": "CN Tower",
+    "level": "medium",
+    "file": "/models/monument-cn-tower-medium-v1.glb",
+    "triangles": 2424,
+    "bytes": 189904,
+    "sha256": "e9d2be9652952d323aec650e85cbf2d2d461f77c2f2b027d91b77a93307ecb20",
+    "source": "Skyloom first-party / MIT"
+  },
+  {
+    "poi": "CN Tower",
+    "level": "high",
+    "file": "/models/monument-cn-tower-high-v1.glb",
+    "triangles": 2424,
+    "bytes": 189904,
+    "sha256": "85e955b5b302efb611038cc0dc05f662c0bbfdfc58d8c22a70ff03f750124989",
+    "source": "Skyloom first-party / MIT"
+  },
+  {
+    "poi": "Burj Khalifa",
+    "level": "far",
+    "file": "/models/monument-burj-khalifa-far-v1.glb",
+    "triangles": 1300,
+    "bytes": 114160,
+    "sha256": "607300c1db8edd169135571fd63c786634d7d80a64c4deba4028e556062a70da",
+    "source": "Skyloom first-party / MIT"
+  },
+  {
+    "poi": "Burj Khalifa",
+    "level": "medium",
+    "file": "/models/monument-burj-khalifa-medium-v1.glb",
+    "triangles": 10836,
+    "bytes": 879216,
+    "sha256": "7954b47a9de9025a84f38c88f85fa0d28a5e2a8416da86221c168e38a5c4a0d8",
+    "source": "Skyloom first-party / MIT"
+  },
+  {
+    "poi": "Burj Khalifa",
+    "level": "high",
+    "file": "/models/monument-burj-khalifa-high-v1.glb",
+    "triangles": 27732,
+    "bytes": 2202220,
+    "sha256": "17ab0416bb1fc3480210e58ccfeeef08f259d0f901930d0dddd771f2f66a94e3",
+    "source": "Skyloom first-party / MIT"
+  }
+]
