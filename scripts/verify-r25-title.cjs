@@ -21,8 +21,11 @@
  *           from the camera's absolute position vs flight.pos (not the rig's
  *           own stats); the orbit ADVANCES; eye AGL ≥ minAglM
  *     (t7)  the player group is hidden on the title
- *     (t8)  ZERO passport change over the title dwell (storage-measured),
- *           with the targeting activity that dwell saw reported beside it
+ *     (t8)  ZERO passport change over the title dwell (storage-measured)
+ *           THROUGH real soft-lock acquisitions: the row places the frozen
+ *           flight 3 km from the nearest contact, aims it, and counts the
+ *           Targeting 'acquired' transitions (the exact transition that logs
+ *           a spot in flight) on the title; none seen => NOT CALIBRATED
  *     (t9)  crash disabled: the frozen flight pushed 50 m under its ground
  *           for 3 s raises no crash (state idle, crashEpoch unchanged)
  *     (t10) Takeoff & Landing -> hangar (ops, frameloop 'demand'); Esc with
@@ -334,6 +337,23 @@ async function legDesktop(browser, style) {
     // Passport + targeting baseline for the dwell (t8).
     const pass0 = await passport(page);
     const locks = new Set();
+    // Count every soft-lock ACQUISITION (the exact transition that logs a
+    // passport spot in flight) by wrapping the live Targeting instance's
+    // update for the dwell. MEASURED (run 14): polling lockedHex missed a
+    // real acquisition — the re-aim saw lock 9f15f3 and the next poll read
+    // null (the lock released between two evaluates).
+    await page.evaluate(() => {
+      const T = window.__fly?.targeting;
+      window.__r25Acq = [];
+      if (!T || T.__r25Wrapped) return;
+      const orig = T.update;
+      T.update = function (...a) {
+        const tr = orig.apply(this, a);
+        if (tr === 'acquired') window.__r25Acq.push({ hex: this.lockedHex, screen: window.__flyStore?.getState().screen ?? null });
+        return tr;
+      };
+      T.__r25Wrapped = true;
+    });
     let trafficMax = 0;
 
     // (t5 / s4) reveal
@@ -413,13 +433,44 @@ async function legDesktop(browser, style) {
         item: it ? { x: Math.round(it.rx), y: Math.round(it.ryd ?? it.ry), z: Math.round(it.rz) } : null,
       };
       if (!it) return null;
+      window.__r25Aim = { heading: f.heading, pitch: f.pitch, x: f.pos.x, y: f.pos.y, z: f.pos.z, hex: it.hex };
+      // MEASURED (runs 10-12): the fixture's static fleet puts its nearest
+      // contact 11.6-12.3 km away in 3-D (8.4-9.1 km out, ~8.4 km UP) —
+      // outside TARGETING.acquireRangeM (10 km) — and a lift that parks the
+      // flight at 95 % of the range still never locked: an airliner closes
+      // the 500 m margin in ~2 s of dead reckoning. The frozen flight's pos
+      // is a plain vector (t9 moves it the same way), so the row PLACES it
+      // 3 km short of the contact, level with it, and aims; the pose is
+      // restored afterwards. A scratch probe on this venue locked at once.
+      const dx0 = (f.pos.x - it.rx) / k;
+      const dz0 = (f.pos.z - it.rz) / k;
+      const h0 = Math.hypot(dx0, dz0) || 1;
+      f.pos.x = it.rx + (dx0 / h0) * 3000 * k;
+      f.pos.z = it.rz + (dz0 / h0) * 3000 * k;
+      f.pos.y = it.ryd ?? it.ry;
+      window.__r25AimStats.placedM = Math.round(d(it));
+      return { hex: it.hex, distM: Math.round(d(it)) };
+    });
+    // Re-aim at the chosen contact from the current (placed) pose; the row
+    // repeats it each poll until a soft lock or the bound.
+    const reAim = () => page.evaluate(() => {
+      const rt = window.__fly;
+      const f = rt.flight;
+      const k = 1 / Math.cos((f.latDeg * Math.PI) / 180);
+      const it = (rt.traffic?.items ?? []).find((x) => x.hex === window.__r25Aim?.hex);
+      if (!it) return false;
       const dx = (it.rx - f.pos.x) / k;
       const dz = (it.rz - f.pos.z) / k;
       const dy = (it.ryd ?? it.ry) - f.pos.y;
-      window.__r25Aim = { heading: f.heading, pitch: f.pitch };
       f.heading = Math.atan2(dx, -dz);
       f.pitch = Math.atan2(dy, Math.hypot(dx, dz));
-      return { hex: it.hex, distM: Math.round(d(it)) };
+      // Trace what the acquire test sees (engine distM, cone angle from the
+      // model's own forward(), frames) for the row's detail.
+      const fw = f.forward(f._fwd);
+      const len = Math.hypot(dx, dy, dz) || 1;
+      const ang = (Math.acos(Math.max(-1, Math.min(1, (dx * fw.x + dy * fw.y + dz * fw.z) / len))) * 180) / Math.PI;
+      window.__r25AimStats.trace = { distM: Math.round(it.distM), geoM: Math.round(len), angDeg: +ang.toFixed(2), frames: rt.framesRendered ?? null, locked: rt.targeting?.lockedHex ?? null, tgt: !!rt.targeting, stale: it.stale ?? null };
+      return !!rt.targeting?.lockedHex;
     });
     // The traffic list can be momentarily empty (MEASURED: 0 items at the aim
     // instant, 300 a minute earlier) — retry for up to ~60 s.
@@ -429,15 +480,29 @@ async function legDesktop(browser, style) {
       if (!aim) await page.waitForTimeout(5000);
     }
     if (aim) {
-      await waitFor(page, () => !!window.__fly.targeting?.lockedHex, undefined, 20000);
+      const tA = Date.now();
+      while (Date.now() - tA < 20000 * SCALE && !(await reAim())) await page.waitForTimeout(500);
       const lk = await page.evaluate(() => window.__fly.targeting?.lockedHex ?? null);
       if (lk) locks.add(lk);
       await page.waitForTimeout(2000);
       await page.evaluate(() => {
         const f = window.__fly.flight;
-        Object.assign(f, window.__r25Aim);
+        const a = window.__r25Aim;
+        f.heading = a.heading;
+        f.pitch = a.pitch;
+        f.pos.set(a.x, a.y, a.z);
       });
+      await page.waitForTimeout(3000); // let the rig + ground sample settle back before (t9)
     }
+    const acq = await page.evaluate(() => {
+      const T = window.__fly?.targeting;
+      if (T?.__r25Wrapped) {
+        delete T.update; // back to Targeting.prototype.update
+        delete T.__r25Wrapped;
+      }
+      return window.__r25Acq ?? [];
+    });
+    for (const a of acq) if (a.screen === 'title' && a.hex) locks.add(a.hex);
     const aimStats = await page.evaluate(() => window.__r25AimStats ?? null);
     const pass1 = await passport(page);
     const unchanged = pass1.spots === pass0.spots && pass1.total === pass0.total;
@@ -446,7 +511,7 @@ async function legDesktop(browser, style) {
     if (unchanged && locks.size === 0)
       notCal('(t8) ZERO passport change across the title dwell', `unchanged (spots ${pass0.spots}→${pass1.spots}) but no soft-lock acquisition happened on the title to be suppressed (traffic ${JSON.stringify(aimStats)}); spotAllowed is certified in verify-r25-front-door [2]`);
     else gate('(t8) ZERO passport change across the title dwell, through real soft-lock acquisitions', unchanged,
-      `spots ${pass0.spots}→${pass1.spots}, total ${pass0.total}→${pass1.total} · dwell ${Math.round((Date.now() - t0) / 1000)} s · soft-lock ACQUISITIONS on the title ${locks.size} (aimed at ${aim ? `${aim.hex} ${aim.distM} m` : 'nothing'}; traffic ${JSON.stringify(aimStats)}) · traffic max ${trafficMax}`);
+      `spots ${pass0.spots}→${pass1.spots}, total ${pass0.total}→${pass1.total} · dwell ${Math.round((Date.now() - t0) / 1000)} s · soft-lock ACQUISITIONS on the title ${locks.size} (${acq.filter((a) => a.screen === 'title').length} acquired transitions; aimed at ${aim ? `${aim.hex} ${aim.distM} m` : 'nothing'}; traffic ${JSON.stringify(aimStats)}) · traffic max ${trafficMax}`);
 
     // (t9) crash disabled
     const crash0 = await storeOf(page);

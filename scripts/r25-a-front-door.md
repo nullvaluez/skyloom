@@ -56,16 +56,64 @@ title needs was already wired by W0.
   `force` clicks/taps — still trusted input at the element centre — and a
   bounded `browser.close()` (a hung close held a container-wide slot once).
 * **The toy reveal outran the first click** (title at pct 15 after ~30 s, reveal
-  at ~56 s). The toy leg now holds the traffic GLB responses (BootScreen gate
-  (b)) until the pre-reveal rows are done, then releases them.
+  at ~56 s; a GLB hold cannot help — `BOOT.maxBootMs` 45 s reveals
+  regardless). (t1) now reads an IN-PAGE probe (addInitScript) that clicks
+  `title-settings` the moment it exists with `__flyBoot.pct < 100` and records
+  the pct; the AUDIO row (t2) stays a separate trusted Playwright click.
+* **A trusted click could sit 180 s in actionability** right after the hangar
+  closed (load ~7.5). Navigation steps a row does not certify use one DOM
+  click through `page.evaluate`.
+* **(t8) had no acquisition to suppress.** The fixture's static fleet puts
+  its nearest contact 11.6–12.3 km away in 3-D (8.4–9.1 km out, ~8.4 km up),
+  outside `TARGETING.acquireRangeM` 10 km, so runs 9–11 read NOT CALIBRATED;
+  a lift to 95 % of the range still missed (an airliner closes a 500 m
+  margin in ~2 s of dead reckoning). The row now PLACES the frozen flight
+  3 km short of the contact (a plain vector while frozen, as t9 already
+  moves it), re-aims each poll, and restores the pose. Run 14 then showed
+  the lock taken (`9f15f3` at 3.5 km, 0.00° off the nose) and the NEXT
+  evaluate reading null — polling `lockedHex` misses an acquisition that
+  releases between two evaluates. The row now counts Targeting `'acquired'`
+  transitions by wrapping the live instance's `update` for the dwell (the
+  exact transition that logs a spot in flight) and removes the wrapper
+  afterwards. Scratch probe + log: `.graphics-review/r25/a/aim-probe.*`.
 
 ## 4. Gates (this branch)
 
-(filled below from the runs)
+Tree: `r25/a` with `FRONT_DOOR.enabled: true` and E's harness head `28cafb1`
+merged. Fixture on SwiftShader, `FLY_BOOT_SCALE=3`, one browser slot.
+
+| Gate | Verdict | Evidence |
+|---|---|---|
+| `verify-r25-front-door.mjs` (node) | **PASS 58 / 0** | RED on r25-w0: 21 / 15 (§2). Flag-off arms (1a, 2a, 3b, 4g, 4h over 256 states, 5a, 6n) prove the flag-off tree answers exactly as r25-w0. |
+| `verify-r25-title.cjs` toy + phone + sat (run 10) | **PASS 35 / 0, 1 NOT CALIBRATED (t8, closed by run 15)** | `.graphics-review/r25/a/title-run10.log`. Toy t1–t14 green except (t8); portrait p1–p7 and landscape l1–l7 green (every control ≥ 44 px, the ops card 362×100 portrait / 460×88 landscape, nothing clipped or overlapping, Settings a bottom sheet, Back closes the sheet and returns the pre-flight hangar to the title); satellite s1–s6 green (interactive at boot pct 0, the world revealed after 456 s with the orbit camera away from `flight.pos`, orbit radius error 0.00 %, min AGL 897 m, plane hidden, Esri attribution on top, zero page errors). RED: 0 / 3 with the flag off (§2). |
+| (t8) zero passport change — toy re-run (run 15, `R25_TITLE_MOUNTAIN=0`) | **PASS** | runs 10–14 NOT CALIBRATED (no acquisition happened / was observed; §3). Run 15: **3 `'acquired'` transitions on the title** (contact `9f15f3` placed at 3 km, 0.00° off the nose) and the passport unchanged (spots 0→0, total 0→0). `.graphics-review/r25/a/title-run15.log`. |
+| `verify-import-integrity.mjs` | **PASS 4 / 0** | = baseline |
+| `verify-mobile-actions-node.mjs` | **PASS 16 / 16** | the 5 rows PENDING on r25-w0 (the Esc/Back table) now PASS |
+| `verify-r25-flagoff.mjs` (E) | 8 passed, 2 NOT CALIBRATED | = baseline (the 2 wait for C/D) |
+| graphics-unit · flight-operations (33) · operations-disclosure · cinematic-flight (16) · stylized-earth (22) · living-earth (19) · c-flagoff (58) | **PASS** | = W0 baseline |
+| targeted eslint over every changed product file | FlyCanvas 1e, use-fly-audio 1e, all others 0 | = W0 baseline (both pre-existing `react-hooks/immutability` on `runtime`) |
 
 ## 5. Open risks
 
-(filled below)
+* **Branding is unflagged.** Metadata, manifest, loading text and the
+  wordmark read "Skyloom" whatever `FRONT_DOOR.enabled` says (the user's
+  "Skyloom everywhere"; metadata cannot sit behind a runtime flag). A harness
+  that text-matches the old product name would move; none of the node gates
+  in the baseline table did.
+* **B's surface is stubbed on this branch.** Continue (hidden while
+  `readLastSetup()` is null), the Free Flight card (hidden while
+  `FLIGHT_PLAN.enabled` is false) and the StagePump's `runtime.staging`
+  arm are coded against B's signatures and gated by (t1b) on what ships;
+  their live behaviour is certified only once B lands on the integration tree.
+* **The title's default spot is KOSU** (W0 `resolveInitialSpawn`) until B
+  ships the daylight featured spot; the satellite reveal took 456 s on this
+  venue at KOSU. E's boot-time row owns the product number.
+* **Landscape side-by-side** is measured with one card (Free Flight hidden);
+  two-card layout is CSS-only and re-read at integration with B.
+* **(t8) calibration** rests on a PLACED frozen pose (3 km from a contact);
+  its RED arm (spots logged on the title) was not run in the browser — the
+  suppression's RED is the node gate's (2a)/(2b) table (RED on r25-w0).
+  The row proves real acquisitions happened on the title and logged nothing.
 
 ## 6. Unmeasurable here (the user's machine)
 
