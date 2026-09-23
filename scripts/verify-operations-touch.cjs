@@ -1,6 +1,7 @@
 /* Touch departure/control check against the real world. No airborne fixture. */
 const {chromium,devices}=require('playwright');
 const fs=require('node:fs');
+const {enterHangar,waitTitleReady}=require('./_title'); // R25 (E, SANCTIONED)
 (async()=>{
   const out='.graphics-review/operations/touch';fs.mkdirSync(out,{recursive:true});
   const browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-gpu']});
@@ -12,10 +13,30 @@ const fs=require('node:fs');
   const tap=name=>page.getByRole('button',{name,exact:true}).tap();
   try{
     await page.goto(process.env.FLY_URL||'http://localhost:3027');
-    await page.getByTestId('hangar').waitFor({timeout:60000});
+    // R25 (E, SANCTIONED): the rule is now "BACK NEVER REVEALS AN UNSTARTED
+    // WORLD". With A's title screen, Back on the title root is a no-op and
+    // Back in the pre-flight hangar returns to the title (plan UX table) —
+    // either way a menu must still cover the world and the flight must not
+    // have started. Without a title (r25-w0 / flag off / bypass pin) this is
+    // today's assertion exactly: the mandatory hangar survives Back.
+    const unstarted=async where=>{
+      const s=await page.evaluate(()=>{const st=window.__flyStore?.getState?.();return {screen:st?.screen??null,hangarOpen:st?.hangarOpen??null};});
+      const title=await page.locator('[data-testid="title-screen"]').count()>0&&await page.locator('[data-testid="title-screen"]').first().isVisible();
+      const hangar=await page.getByTestId('hangar').isVisible();
+      if(!(title||hangar)||s.screen==='flight')throw new Error(`Back revealed an unstarted world (${where}): ${JSON.stringify({...s,title,hangar})}`);
+      return title?'title':'hangar';
+    };
+    const t=await waitTitleReady(page,{timeoutMs:60000});
+    if(t.title){
+      await page.evaluate(()=>history.back());await page.waitForTimeout(500);
+      report.checks.push(`Back on the title keeps the ${await unstarted('title root')}`);
+    }
+    await enterHangar(page,'ops',{tap:true,timeoutMs:60000});
     await page.evaluate(()=>history.back());await page.waitForTimeout(500);
-    if(!await page.getByTestId('hangar').isVisible())throw new Error('Back dismissed mandatory aircraft selection');
-    report.checks.push('mandatory selection survives Back');
+    const afterBack=await unstarted('pre-flight hangar');
+    if(!t.title&&afterBack!=='hangar')throw new Error('Back dismissed mandatory aircraft selection');
+    report.checks.push(t.title?`Back in the pre-flight hangar lands on the ${afterBack}`:'mandatory selection survives Back');
+    if(afterBack!=='hangar')await enterHangar(page,'ops',{tap:true,timeoutMs:60000});
     await page.getByTestId('hangar-pick-prop').tap({timeout:60000});
     await page.getByTestId('hangar-fly').tap({timeout:60000});
     try{await page.waitForFunction(()=>window.__flyBoot?.pct===100&&!window.__fly.worldLoading&&window.__fly.worldReadiness.ready,undefined,{timeout:90000});}

@@ -2,6 +2,7 @@
 const {chromium}=require('playwright');
 const fs=require('node:fs');
 const groundBuildReceipt=require('./ground-build-receipt.cjs');
+const {enterFlight}=require('./_skip-menus'); // R25 (E, SANCTIONED)
 const args=Object.fromEntries(process.argv.slice(2).map(s=>{const[k,v]=s.replace(/^--/,'').split('=');return[k,v??true]}));
 const cloudTraverse=!!args['cloud-traverse'];
 const duration=Number(args.seconds||(cloudTraverse?180:90)),output=args.output||'.graphics-review/flight.json';
@@ -72,8 +73,9 @@ async function main(){
   if(args['build-id']){
     report.servedBuild=await groundBuildReceipt(page,args.url||'http://localhost:3000',args['build-id']);
   }
-  await page.waitForFunction(()=>window.__flyBoot?.pct===100&&window.__fly,null,{timeout:90000});
-  await page.evaluate(({altM,lat,lon})=>window.__fly.warpToGeo(lat,lon,{altM,name:null}),{altM:Number(args.alt??500),lat:Number(args.lat??40.7028),lon:Number(args.lon??-74.017)});
+  // R25 (E, SANCTIONED): since 2c624a3 the boot opens on a mandatory hangar (canvas on
+  // 'demand', so pct never reaches 100 behind it) — skip the menus, then wait for the reveal.
+  await enterFlight(page,{altM:Number(args.alt??500),lat:Number(args.lat??40.7028),lon:Number(args.lon??-74.017),headingRad:undefined,name:null},{timeoutMs:90000,waitReveal:true});
   await page.waitForTimeout(25000);
   await page.waitForFunction(()=>window.__fly.satBuildings?.stats.ready>=4,null,{timeout:30000});
   report.hardware=await page.evaluate(()=>{const gl=document.querySelector('canvas').getContext('webgl2');const e=gl.getExtension('WEBGL_debug_renderer_info');return{renderer:e&&gl.getParameter(e.UNMASKED_RENDERER_WEBGL),gpuTimer:!!gl.getExtension('EXT_disjoint_timer_query_webgl2')};});

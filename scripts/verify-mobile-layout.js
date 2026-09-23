@@ -483,9 +483,13 @@ async function runOrientation(browser, label, ctxOpts) {
 
     await page.locator('[data-testid="touch-pause"]').click();
     await page.waitForTimeout(700);
-    const exitInfo = await page.evaluate(() => {
-      const b = [...document.querySelectorAll('button')].find(
-        (e) => e.textContent.trim() === 'Exit Fly Mode'
+    // R25 (E, SANCTIONED text update): A replaces the reload with "Exit to
+    // title". Both labels are accepted until A's merge lands; the gate's
+    // substance (reachable + hittable in landscape) is unchanged.
+    const EXIT_LABELS = ['Exit Fly Mode', 'Exit to title'];
+    const exitInfo = await page.evaluate((labels) => {
+      const b = [...document.querySelectorAll('button')].find((e) =>
+        labels.includes(e.textContent.trim())
       );
       if (!b) return { found: false };
       b.scrollIntoView({ block: 'center' });
@@ -499,11 +503,12 @@ async function runOrientation(browser, label, ctxOpts) {
         inView: r.top >= -1 && r.bottom <= innerHeight + 1,
         hittable: b.contains(at) || at === b,
         vh: innerHeight,
+        label: b.textContent.trim(),
       };
-    });
+    }, EXIT_LABELS);
     await shot('03-pause');
     gate(
-      'landscape pause: Exit Fly Mode is reachable and clickable',
+      'landscape pause: Exit Fly Mode / Exit to title is reachable and clickable',
       exitInfo.found && exitInfo.inView && exitInfo.hittable,
       JSON.stringify(exitInfo)
     );

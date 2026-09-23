@@ -167,7 +167,7 @@ function roadMask(lon, lat, kind) {
 }
 
 /** Metres from the nearest river centre-line, or Infinity. */
-function riverMask(lon, lat, kind) {
+export function riverMask(lon, lat, kind) {
   if (kind === 'desert') return Infinity;
   let best = Infinity;
   for (const k of [Math.floor((lat - RIVER_STEP * 0.5) / RIVER_STEP), Math.ceil((lat - RIVER_STEP * 0.5) / RIVER_STEP)]) {
