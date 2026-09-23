@@ -97,4 +97,32 @@ async function titleVisible(page) {
   return (await l.count()) > 0 && (await l.first().isVisible());
 }
 
-module.exports = { enterHangar, waitTitleReady, titleVisible, TITLE_SELECTOR: TITLE, TITLE_CARDS: CARD };
+/**
+ * The PRODUCT-BOOT PROBE (an init script: `page.addInitScript(installBootProbe)`
+ * BEFORE the goto). Records, in ms since navigation start, the first moment
+ * the title node exists (and the boot pct at that moment), the title's
+ * data-ready, `__flyBoot.pct === 100`, and the first hangar node — on a plain
+ * 50 ms timer, independent of the render loop, so a 1-3 fps venue cannot
+ * reorder them. Read back with `page.evaluate(() => window.__r25Probe)`.
+ * It keeps ticking until the title is ready AND the boot revealed (or 30 min),
+ * so it also serves a tree with no title (the hangar path).
+ */
+function installBootProbe() {
+  const p = (window.__r25Probe = { titleAt: null, titlePct: null, readyAt: null, revealAt: null, hangarAt: null });
+  const tick = () => {
+    const now = performance.now();
+    const title = document.querySelector('[data-testid="title-screen"]');
+    const pct = window.__flyBoot?.pct ?? null;
+    if (title && p.titleAt == null) {
+      p.titleAt = now;
+      p.titlePct = pct;
+    }
+    if (title && p.readyAt == null && ['true', '1'].includes(title.getAttribute('data-ready'))) p.readyAt = now;
+    if (pct === 100 && p.revealAt == null) p.revealAt = now;
+    if (p.hangarAt == null && document.querySelector('[data-testid="hangar"]')) p.hangarAt = now;
+    if (now < 30 * 60 * 1000 && (p.revealAt == null || (p.titleAt != null && p.readyAt == null))) setTimeout(tick, 50);
+  };
+  setTimeout(tick, 0);
+}
+
+module.exports = { enterHangar, waitTitleReady, titleVisible, installBootProbe, TITLE_SELECTOR: TITLE, TITLE_CARDS: CARD };

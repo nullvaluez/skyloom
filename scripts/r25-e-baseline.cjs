@@ -5,10 +5,19 @@
  * integration tree for E2's comparison), in the CLASSIC profile (the fleet
  * pin) with the aeroplane pinned still at each pose:
  *   - bootFly reveal wall time (satellite; toy with R25_BASELINE_TOY=1),
+ *   - PRODUCT boot (R25_BASELINE_PRODUCT=N runs, style R25_BASELINE_PRODUCT_STYLE,
+ *     default satellite): the two R25 pins un-pinned, no airborne skip. With a
+ *     title: ms to the title node and to the title WORLD (data-ready + pct 100).
+ *     Without one (r25-w0): ms to the hangar node, then the first world a player
+ *     can see — prop / KOSU / apron, Fly as soon as hangar-fly enables, ms to
+ *     pct 100. "worldMs" is that first-revealed-world time on either tree (the
+ *     plan's product-boot comparison: E2 median of 3 <= W0 x 1.05),
  *   - per pose P1..P6 at noon (and P1/P3 at dusk): time to world readiness,
  *     draws, triangles, GL programs, texture peak (ground-texture-audit,
  *     logical GL bytes), and from a canvas capture: terrain mean linear
  *     luminance, clip %, Sobel energy, horizon seam deltaE (scripts/_r25-luma.js).
+ * Captures are WORLD ONLY (_r25-poses.js isolateCanvas hides every DOM layer —
+ * HUD, labels, panels — for the capture; the HUD sits inside the terrain crop).
  * Full-frame PNGs are kept beside the JSON so every crop can be re-read
  * offline with a different region — the numbers are a function of the PNG.
  *
@@ -21,8 +30,9 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { chromium } = require('playwright');
-const { bootFly } = require('./_boot');
-const { POSES, pose, warpToPose, sunTimeMs } = require('./_r25-poses');
+const { bootFly, unpinPins } = require('./_boot');
+const { waitTitleReady, installBootProbe } = require('./_title');
+const { POSES, pose, warpToPose, sunTimeMs, isolateCanvas } = require('./_r25-poses');
 const L = require('./_r25-luma');
 const { makeCanvasShot } = require('./_canvasshot');
 const { installGroundTextureAudit } = require('./ground-texture-audit.cjs');
@@ -67,6 +77,44 @@ async function census(page) {
   }, fresh);
 }
 
+/** One PRODUCT boot (see header). Returns the probe + the path taken. */
+async function productBoot(browser, style) {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const row = { style, path: null, load0: load() };
+  try {
+    await page.addInitScript(unpinPins, ['__flyTitleBypass', '__flyVisualsOverride']);
+    await page.addInitScript(installBootProbe);
+    await bootFly(page, { style, timeoutMs: 900000, skipMenus: false });
+    const t = await waitTitleReady(page, { timeoutMs: 300000 * SCALE });
+    if (t.title) {
+      row.path = 'title';
+      await page.waitForFunction(
+        () => ['true', '1'].includes(document.querySelector('[data-testid="title-screen"]')?.getAttribute('data-ready')) && window.__flyBoot?.pct === 100,
+        undefined, { timeout: 900000 * SCALE, polling: 250 });
+    } else {
+      row.path = 'hangar-kosu-apron';
+      await page.getByTestId('hangar').waitFor({ state: 'visible', timeout: 300000 * SCALE });
+      await page.getByTestId('hangar-pick-prop').click({ timeout: 60000 * SCALE });
+      if (await page.locator('#departure-airport').count()) await page.selectOption('#departure-airport', 'KOSU');
+      const apron = page.locator('input[value="apron"]');
+      if (await apron.count()) await apron.first().check().catch(() => {});
+      await page.waitForFunction(() => document.querySelector('[data-testid="hangar-fly"]')?.disabled === false, undefined, { timeout: 300000 * SCALE, polling: 250 });
+      row.flyClickAt = Math.round(await page.evaluate(() => performance.now()));
+      await page.getByTestId('hangar-fly').click();
+      await page.waitForFunction(() => window.__flyBoot?.pct === 100, undefined, { timeout: 900000 * SCALE, polling: 250 });
+    }
+    const p = await page.evaluate(() => window.__r25Probe);
+    for (const k of Object.keys(p || {})) row[k] = p[k] == null ? null : Math.round(p[k]);
+    row.worldMs = row.path === 'title' ? Math.max(row.readyAt ?? 0, row.revealAt ?? 0) : row.revealAt;
+    row.worldStatus = await page.evaluate(() => window.__flyWorldStatus ?? null);
+  } catch (e) {
+    row.error = String(e).slice(0, 300);
+  }
+  row.load1 = load();
+  await page.close();
+  return row;
+}
+
 (async () => {
   const browser = await chromium.launch({ args: ['--enable-webgl', '--ignore-gpu-blocklist'] });
   const record = { tag: TAG, at: new Date().toISOString(), node: process.version, boots: {}, poses: [] };
@@ -78,6 +126,20 @@ async function census(page) {
       console.log(`toy boot ${b.ms} ms (load ${load()})`);
       await tp.close();
     }
+    const nProduct = Number(process.env.R25_BASELINE_PRODUCT || 0);
+    if (nProduct > 0) {
+      const style = process.env.R25_BASELINE_PRODUCT_STYLE || 'satellite';
+      record.boots.product = [];
+      for (let i = 0; i < nProduct; i++) {
+        const r = await productBoot(browser, style);
+        record.boots.product.push(r);
+        console.log(`product boot ${i + 1}/${nProduct}: ${JSON.stringify(r)}`);
+        fs.writeFileSync(path.join(OUT, 'baseline.json'), JSON.stringify(record, null, 2));
+      }
+      const ws = record.boots.product.map((r) => r.worldMs).filter(Number.isFinite).sort((a, b) => a - b);
+      record.boots.productMedianWorldMs = ws.length ? ws[Math.floor(ws.length / 2)] : null;
+    }
+    if (process.env.R25_BASELINE_POSES === '0') return;
     const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     const shot = makeCanvasShot(page).shot;
     await page.addInitScript(installGroundTextureAudit);
@@ -96,7 +158,11 @@ async function census(page) {
         });
         await frames(page, 30);
         Object.assign(row, await census(page));
+        // The capture is page-level (DOM included): read the world only.
+        row.isolated = await isolateCanvas(page, true);
+        await frames(page, 2);
         const png = await shot();
+        await isolateCanvas(page, false);
         const file = path.join(OUT, `${P.id}-${P.name}-${sun}.png`);
         fs.writeFileSync(file, png);
         const terr = L.census(await L.loadRegion(png, TERRAIN));

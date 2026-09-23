@@ -29,7 +29,13 @@ const {enterHangar,waitTitleReady}=require('./_title'); // R25 (E, SANCTIONED)
     const t=await waitTitleReady(page,{timeoutMs:60000});
     if(t.title){
       await page.evaluate(()=>history.back());await page.waitForTimeout(500);
-      report.checks.push(`Back on the title keeps the ${await unstarted('title root')}`);
+      // At the app ROOT the browser's own Back may leave the page (about:blank
+      // in a fresh tab) unless the title pushes a history entry — A's call.
+      // Leaving is not revealing a world; re-enter and carry on.
+      if(!page.url().startsWith(new URL(process.env.FLY_URL||'http://localhost:3027').origin)){
+        report.checks.push('Back on the title root leaves the page (browser default at the app root)');
+        await page.goto(process.env.FLY_URL||'http://localhost:3027');await waitTitleReady(page,{timeoutMs:60000});
+      }else report.checks.push(`Back on the title keeps the ${await unstarted('title root')}`);
     }
     await enterHangar(page,'ops',{tap:true,timeoutMs:60000});
     await page.evaluate(()=>history.back());await page.waitForTimeout(500);

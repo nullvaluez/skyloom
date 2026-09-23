@@ -175,6 +175,63 @@ function readinessInPage() {
   };
 }
 
+/**
+ * Hide every DOM layer over the WORLD canvas (HUD, labels, panels, toasts,
+ * the attribution bar) so a pixel crop reads the rendered world only — the
+ * R17 rule: a pixel gate must not contain an actor it does not control. It is
+ * a stylesheet (`body *` hidden, the world canvas visible), so layers that
+ * mount LATER are hidden too; `isolateCanvas(page, false)` removes it. The
+ * world canvas is `__flyGl.domElement` (dev / graphicsReview), else the first
+ * `.fixed.inset-0 canvas` — never the HUD label canvas. Page-level captures
+ * (`page.screenshot({clip})`, _canvasshot.js) include DOM, hence this.
+ */
+async function isolateCanvas(page, on = true) {
+  return page.evaluate((on) => {
+    const old = document.getElementById('r25-isolate');
+    if (!on) {
+      old?.remove();
+      document.querySelectorAll('canvas[data-r25-world]').forEach((c) => c.removeAttribute('data-r25-world'));
+      return null;
+    }
+    const world = window.__flyGl?.domElement ?? document.querySelector('.fixed.inset-0 canvas');
+    if (!world) return false;
+    world.setAttribute('data-r25-world', '1');
+    if (!old) {
+      const el = document.createElement('style');
+      el.id = 'r25-isolate';
+      el.textContent =
+        'body * { visibility: hidden !important; } canvas[data-r25-world] { visibility: visible !important; }';
+      document.head.appendChild(el);
+    }
+    return true;
+  }, on);
+}
+
+/**
+ * The R25 ship state, read from lib/fly/fly-constants.js itself (a plain ESM
+ * module with no imports). Node reparses it as ESM and warns
+ * MODULE_TYPELESS_PACKAGE_JSON once; that one warning is muted here and every
+ * other warning passes through. Resolves to the module namespace, or {} when
+ * it cannot be read (callers then treat the ship state as unknown).
+ */
+async function loadFlyConstants() {
+  const path = require('path');
+  const { pathToFileURL } = require('url');
+  const emit = process.emitWarning;
+  process.emitWarning = function (w, ...rest) {
+    if (/Module type of .*fly-constants/.test(String(w?.message ?? w))) return;
+    return emit.call(process, w, ...rest);
+  };
+  try {
+    return await import(pathToFileURL(path.join(__dirname, '..', 'lib', 'fly', 'fly-constants.js')).href);
+  } catch (e) {
+    console.log(`note: fly-constants unreadable from node (${String(e).slice(0, 120)})`);
+    return {};
+  } finally {
+    process.emitWarning = emit;
+  }
+}
+
 /** Release a `warpToPose({pin:true})` hold. */
 async function unpinPose(page) {
   await page.evaluate(() => {
@@ -208,7 +265,9 @@ async function warpToPose(page, p, { sun = null, waitReady = true, timeoutMs = 2
       f.heading = heading;
       f.pitch = pitchRad;
       f.bank = 0;
-      const q = { x: f.pos.x, y: f.pos.y, z: f.pos.z };
+      // Published as window.__r25PinPose so a gate's RED injection can move
+      // the held pose (a direct pos write is overwritten within 8 ms).
+      const q = (window.__r25PinPose = { x: f.pos.x, y: f.pos.y, z: f.pos.z });
       window.__r25Pin = setInterval(() => {
         f.pos.x = q.x;
         f.pos.y = q.y;
@@ -232,7 +291,7 @@ async function warpToPose(page, p, { sun = null, waitReady = true, timeoutMs = 2
   return { ms: Date.now() - t0, readiness };
 }
 
-module.exports = { POSES, SUN, pose, sunTimeMs, readinessInPage, warpToPose, unpinPose };
+module.exports = { POSES, SUN, pose, sunTimeMs, readinessInPage, warpToPose, unpinPose, isolateCanvas, loadFlyConstants };
 
 // `node scripts/_r25-poses.js` — self-check: every pose lands in its named
 // fixture scene (never `rural`), and the readiness mirror still names exactly

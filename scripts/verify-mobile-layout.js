@@ -488,9 +488,11 @@ async function runOrientation(browser, label, ctxOpts) {
     // substance (reachable + hittable in landscape) is unchanged.
     const EXIT_LABELS = ['Exit Fly Mode', 'Exit to title'];
     const exitInfo = await page.evaluate((labels) => {
-      const b = [...document.querySelectorAll('button')].find((e) =>
-        labels.includes(e.textContent.trim())
-      );
+      // A's charter testid first, then either label (case-insensitive).
+      const want = labels.map((l) => l.toLowerCase());
+      const b =
+        document.querySelector('[data-testid="pause-exit-title"]') ||
+        [...document.querySelectorAll('button')].find((e) => want.includes(e.textContent.trim().toLowerCase()));
       if (!b) return { found: false };
       b.scrollIntoView({ block: 'center' });
       const r = b.getBoundingClientRect();

@@ -5,7 +5,21 @@
  * blocked, so the world boots via the maxBootMs ceiling with an empty sky,
  * which is fine for exercising the UI + controls.
  */
-async function bootMobile(page, { url = process.env.FLY_URL || 'http://localhost:3000', style = null, waitS = 90 } = {}) {
+// Round 25 (E CERT, SANCTIONED): the airborne skip, shared with _boot.js.
+const { enterFlight } = require('./_skip-menus');
+
+/**
+ * `skipMenus` (default true, R25 E): since 2c624a3 the app boots into a
+ * MANDATORY ground hangar whose canvas runs on 'demand', so `__flyBoot.pct`
+ * never reaches 100 behind it and every mobile harness timed out here
+ * ("mobile boot timed out") — the whole mobile fleet has been stale since.
+ * The skip is bootFly's (scripts/_skip-menus.js enterFlight: phase airborne,
+ * setHangarOpen(false), warp to 40.6892,-74.0445 @800 m — which is also the
+ * pre-2c624a3 headless spawn, FlyMode's NYC-harbor geolocation fallback). A
+ * harness that wants the menus passes `{ skipMenus: false }` and gets today's
+ * hangar (or the R25 title when it un-pins `__flyTitleBypass`) and no wait.
+ */
+async function bootMobile(page, { url = process.env.FLY_URL || 'http://localhost:3000', style = null, waitS = 90, skipMenus = true } = {}) {
   // Round 25 (SANCTIONED harness edit, the _boot.js idiom): skip the title
   // screen and run the CLASSIC visuals profile (= the flag-off tree).
   await page.addInitScript(() => {
@@ -21,6 +35,11 @@ async function bootMobile(page, { url = process.env.FLY_URL || 'http://localhost
     } catch {}
   }, style);
   await page.reload({ waitUntil: 'domcontentloaded' });
+  if (!skipMenus) {
+    await page.waitForFunction(() => !!window.__fly && !!window.__flyStore, undefined, { timeout: waitS * 1000 });
+    return 0;
+  }
+  await enterFlight(page, undefined, { timeoutMs: waitS * 1000 });
   for (let i = 0; i < waitS; i++) {
     const s = await page.evaluate(() => ({
       pct: window.__flyBoot?.pct ?? 0,
