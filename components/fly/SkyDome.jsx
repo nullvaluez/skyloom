@@ -15,6 +15,15 @@ const dipUniform = { value: 0 };
 export function setSkyDip(dipY) {
   dipUniform.value = dipY;
 }
+/**
+ * R25 C SKY: the dome's LIVE dip, read back (the getBend/getEdgeFade idiom) —
+ * the Enhanced cloud composite paints the sky with `y' = ray.y + dip`, the
+ * dome's own `y = vDir.y + uDipY`, so both horizons sit on the bent rim. Pure
+ * read: no uniform, no shader text, no key moves.
+ */
+export function getSkyDip() {
+  return dipUniform.value;
+}
 
 // Round 13 Phase 1: live per-frame dome atmosphere (satellite time-of-day +
 // altitude tint). FlyScene's -50 block writes the interpolated rim/void colors
