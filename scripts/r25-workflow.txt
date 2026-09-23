@@ -11,14 +11,16 @@ export const meta = {
 }
 
 const REPO = '/home/user/skyloom'
-const INT_BRANCH = 'claude/game-intro-menu-world-mf37eg'
+// Pass {intBranch, trailer} via Workflow args from the launching session (FLY_ROUND25_KICKOFF.md).
+const INT_BRANCH = (args && args.intBranch) || 'claude/game-intro-menu-world-mf37eg'
 const PLAN = 'FLY_ROUND25_PLAN.md'
-const TRAILER = 'Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01K2eLTYE3VNPJoyFV5jJ72G'
+const TRAILER = (args && args.trailer) || 'Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>'
 
 const ROLES = [
   { k: 'e', name: 'E CERT', port: 3035, fport: 3205, reviewer: 'c',
     focus: `You are in your E1 phase (infrastructure first, then E-owned harness work). Your E2 phase (integration + certification) is a LATER, separate agent — do not merge other roles here.
-E1 ORDER OF WORK (A-D are waiting on step 3):
+ALREADY LANDED ON THE BASE (commit 5072a38, merged before this workflow started — read scripts/r25-e-cert.md): steps 1-3 below are DONE (satellite fixture reveals — 459.6 s, 0 page errors; toy 51.5 s; WorldCover served by r24-fixture/worldcover.mjs; the shared helpers; verify-r25-flagoff/-smoke/-visuals; the tolerant legacy harness edits; import-integrity now 4/0) and the orchestrator has ALREADY written /tmp/r25-locks/e1-ready = the base commit. So: re-verify with ONE toy fixture bootFly (skip the 8-minute satellite boot unless the toy one is red), then go straight to step 4 (W0 baselines, if scripts/r25-e-cert.md lacks them) and step 5's remaining items, and harden verify-r25-smoke/-visuals for the integration phase.
+E1 ORDER OF WORK (reference; A-D are waiting on step 3):
 1. Prove a SATELLITE offline-fixture boot on r25-w0: FLY_TILE_FIXTURE=1 FLY_FIXTURE_PORT=3205 FLY_URL=http://localhost:3035 with bootFly(page,{style:'satellite'}). Record __flyWorldStatus / worldReadiness(runtime).missing. Route **/wmts.terrascope.be/** to a new scripts/r24-fixture/worldcover.mjs (legend-exact PNG per scene kind using the lib/fly/world-cover.js class codes) and any other host that blocks readiness (material assets, etc.) in scripts/_fixture.js, until worldReadiness is ready at Owens, Manhattan and Powell. Toy fixture boot must stay green too.
 2. Write the shared helpers: scripts/_title.js (enterHangar(page, mode) — clicks title-free-flight / title-takeoff-landing when [data-testid="title-screen"] exists, otherwise sets __flyStore flightMode directly; waitTitleReady(page)), scripts/_skip-menus.js (enterFlight(page, geo) = bootFly's airborne skip for direct-goto harnesses), scripts/_r25-poses.js (P1 Owens 36.6,-118.1 @1500 m hdg 0; P2 Sierra 36.601,-118.06 @3200 m hdg 270; P3 Manhattan 40.7028,-74.017 @450 m hdg 20; P4 Powell 40.1578,-83.0752 @350 m; P5 Smokies 35.65,-83.5 @1500 m hdg 90; P6 Owens cruise @7000 m; noon/dusk via __flySunOverride; verify each is a fixture scene in scripts/r24-fixture/scenes.mjs and adjust to the nearest real fixture scene if not), scripts/_r25-luma.js (crop sRGB decode, mean linear luminance, clip %, Sobel energy, CIE76 deltaE between two bands — reuse the verify-sat-depth.js / verify-rim.js crop approach).
 3. Commit, then write the E1-ready marker: echo <your commit sha> > /tmp/r25-locks/e1-ready . If the satellite fixture cannot be made ready, still write the marker with the toy-green sha and write the reason to /tmp/r25-locks/e1-satellite-blocked (A-D then treat satellite pixel rows as BLOCKED).

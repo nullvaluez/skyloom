@@ -474,3 +474,13 @@ Targeted eslint baseline over every R25-owned file (errors/warnings; only files 
 1e 0w hooks/use-fly-audio.js
 ```
 Every other owned file lints clean. Rule: no owned file's count may grow.
+
+### Session 1 stop point (2026-09-23)
+- The workflow ran briefly, then was stopped by the user's request, to continue in
+  a fresh session via [FLY_ROUND25_KICKOFF.md](FLY_ROUND25_KICKOFF.md).
+- Only E CERT's first phase landed (`5072a38`, scripts only, merged in `8323bb6`).
+  It reads **import-integrity 4/0** (the 3 pre-existing errors are fixed), so that
+  is the new baseline.
+  - `verify-mobile-actions-node.mjs` reads 11/11 with 5 PENDING (the Esc/Back table waits for A).
+  - `verify-r25-flagoff.mjs` reads 8 passed with 2 NOT CALIBRATED (waits for C/D).
+- Roles A–D restart from scratch.
