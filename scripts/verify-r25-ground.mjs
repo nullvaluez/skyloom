@@ -636,12 +636,30 @@ console.log('\n[6] frame hook: Classic silent, Enhanced acts, toggle back frees'
     q.desat === 0 && q.flatten === 0 && sat.sat === 1 && sat.sharp === C.R25_GROUND.sharpen.k && sat.px === N && med === 0 && toy.sat === 0 && toy.sharp === 0 && toy.px === 0,
     `sat ${JSON.stringify(sat)} medium k ${med} toy ${JSON.stringify(toy)}`);
   const liveBytes = sat.bytes;
-  setArm({ flag: true, profile: 'classic' });
   const internals = G.__r25GroundInternals;
+  let atlasGpuFreed = 0;
+  internals._st.atlas?.texture.addEventListener('dispose', () => atlasGpuFreed++);
+  const poolBefore = internals._st.pool;
+  let poolFreed = false;
+  if (poolBefore) {
+    const d0 = poolBefore.dispose.bind(poolBefore);
+    poolBefore.dispose = () => {
+      poolFreed = true;
+      d0();
+    };
+  }
+  setArm({ flag: true, profile: 'classic' });
   G.r25GroundFrame({ engine }, ctx('satellite', 'high'));
-  gate('(6c) toggle back to CLASSIC frees every R25 texture (pool + atlas) and stops relief requests',
-    liveBytes >= 1048576 && !internals._st.live && internals._st.pool === null && internals._st.atlas === null && engine.px === 0 && WB.r25Uniforms.uR25Ref.value === null,
-    `Enhanced held ${(liveBytes / 1048576).toFixed(2)} MiB (atlas; pool textures allocate on bind) -> Classic 0`);
+  gate('(6c) toggle back to CLASSIC frees every R25 GPU texture (pool disposed, atlas GPU copy disposed; its CPU bytes kept for the round trip) and stops relief requests',
+    liveBytes >= 1048576 && !internals._st.live && internals._st.pool === null && poolFreed && atlasGpuFreed === 1 && engine.px === 0 && WB.r25Uniforms.uR25Ref.value === null,
+    `Enhanced held ${(liveBytes / 1048576).toFixed(2)} MiB (atlas; pool textures allocate on bind) -> Classic: pool ${poolFreed ? 'disposed' : 'KEPT'}, atlas GPU dispose x${atlasGpuFreed}`);
+  setArm({ flag: true, profile: 'enhanced' });
+  G.r25GroundFrame({ engine }, ctx('satellite', 'high'));
+  gate('(6d) back to ENHANCED re-uploads the kept atlas (no re-fetch) and re-creates the pool',
+    internals._st.live && !!internals._st.pool && WB.r25Uniforms.uR25Ref.value === internals._st.atlas?.texture && internals._st.atlas.texture.version > 0,
+    `atlas texture version ${internals._st.atlas?.texture.version}`);
+  setArm({ flag: true, profile: 'classic' });
+  G.r25GroundFrame({ engine }, ctx('satellite', 'high'));
   restoreArm();
 }
 
