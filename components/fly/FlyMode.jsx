@@ -251,6 +251,10 @@ export function FlyMode({ onClose }) {
   // R25 A (FRONT DOOR): the title / hangar / flight split for the chrome
   // below. Both are constant (false / true) with the flag off.
   const titleUp = useFlyStore(onTitle);
+  // The Logbook opened FROM the title hides the title layer (and its credit);
+  // the flight bar stands in, exactly as it does under the in-flight Logbook
+  // (which stops 2rem short of the bottom for it). Constant false flag-off.
+  const logbookUp = useFlyStore((s) => onTitle(s) && s.logbookOpen);
   const flyingNow = useFlyStore((s) => !frontDoorOn() || inFlight(s));
   // Exit: to the title over the live world (R25) — else today's reload.
   const exit = exitGoesToTitle() ? () => exitToTitle(runtime) : onClose;
@@ -356,8 +360,10 @@ export function FlyMode({ onClose }) {
       {!titleUp && <JuiceHud />}
       <PauseMenu onExit={exit} />
       {/* R25 A: the title layer carries its own attribution (it sits over this
-          bar); with the flag off `titleUp` is constant false. */}
-      {!titleUp && <AttributionBar />}
+          bar) — except while the Logbook, opened from the title, hides that
+          layer: then this bar is the credit. With the flag off `titleUp` is
+          constant false. */}
+      {(!titleUp || logbookUp) && <AttributionBar />}
 
       {/* Boot overlay (z-40) covers everything — including the first-entry
           controls card — until the world reveals, so the fly-controls-seen

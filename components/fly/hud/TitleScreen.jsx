@@ -138,10 +138,33 @@ function TitleBody({ runtime }) {
   const continueLabel = last ? describeSetup(last) : null;
   const free = freeFlightAvailable();
   const firstAction = useRef(null);
+  const rootRef = useRef(null);
+  const attrRef = useRef(null);
   const attributions = ATTRIBUTIONS_BY_STYLE[mapStyle] ?? ATTRIBUTIONS_BY_STYLE.satellite;
 
   useEffect(() => {
     firstAction.current?.focus({ preventScroll: true });
+  }, []);
+
+  // Esri's terms (AttributionBar): the credit stays visible in every UI state.
+  // The Settings / Credits modal covers the title, so it stops ABOVE the
+  // credit strip: --fly-title-attr-reserve = root bottom − credit top (+4 px),
+  // written straight to the DOM (no React state; resize-driven only).
+  useEffect(() => {
+    const root = rootRef.current;
+    const attr = attrRef.current;
+    if (!root || !attr) return undefined;
+    const apply = () => {
+      const rr = root.getBoundingClientRect();
+      const ar = attr.getBoundingClientRect();
+      const reserve = ar.height > 0 ? Math.max(0, Math.ceil(rr.bottom - ar.top + 4)) : 0;
+      root.style.setProperty('--fly-title-attr-reserve', `${reserve}px`);
+    };
+    apply();
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(apply) : null;
+    ro?.observe(root);
+    ro?.observe(attr);
+    return () => ro?.disconnect();
   }, []);
 
   // The explicit first-click audio unlock (plan): every title action resumes
@@ -160,6 +183,7 @@ function TitleBody({ runtime }) {
 
   return (
     <div
+      ref={rootRef}
       className="fly-title"
       data-testid="title-screen"
       data-overlay="title"
@@ -255,8 +279,9 @@ function TitleBody({ runtime }) {
 
         {/* Esri's terms: the imagery credit stays visible in every UI state —
             the title layer sits over the flight AttributionBar, so it carries
-            its own copy. */}
-        <div className="fly-title-attribution" data-testid="title-attribution">
+            its own copy; the title's modals stop above it (the reserve above),
+            and under the title Logbook FlyMode mounts the flight bar. */}
+        <div ref={attrRef} className="fly-title-attribution" data-testid="title-attribution">
           {attributions.map((a) => (
             <a key={a.label} href={a.href} target="_blank" rel="noopener noreferrer">
               {a.label}

@@ -26,7 +26,18 @@
  *      the rig + mounts the title; exit replaces the reload (the error
  *      boundary keeps it as "Restart Skyloom"); title testids; branding with
  *      the OG url and the passport key unchanged; geolocation gone and the
- *      fly-last-pos writer kept.
+ *      fly-last-pos writer kept; (8j-8l, fix pass) the SPICY tick, the lock
+ *      blip and the credit-under-overlays wiring.
+ *  [9] (fix pass) the audio bed on the REAL FlyAudio over a mock AudioContext
+ *      that sums connected nodes onto an AudioParam (the Web Audio rule the
+ *      'prop' tremolo rides): quietBed silences engine + wind for all nine
+ *      aircraft INCLUDING the LFO depth; wakeBed restores a fresh graph's
+ *      depth exactly; a prop installed while quiet is silenced at once;
+ *      lockBlipWanted = `hex && !prev` flag-off, flight-only flag-on.
+ *      RED (the pre-fix quietBed moved verbatim into front-door): 62 / 6 —
+ *      (9b) prop + warbird-prop engine amplitude 0.121 on the title, (9d),
+ *      (9f) title + hangar blip, (8j/8k/8l)
+ *      (.graphics-review/r25/a/red-front-door-audio.txt).
  *
  * RED FIRST (scripts/r25-a-front-door.md §2): run against the r25-w0 tree
  * (`git worktree add <tmp> r25-w0`, copy this file in, run it) the ON arm of
@@ -522,6 +533,181 @@ try {
   restore();
 }
 
+// --- [9] the audio bed + title one-shots (fix pass) ------------------------------------------
+// The REAL FlyAudio on a mock AudioContext that models the one Web Audio rule
+// the review turned on: a node connected to an AudioParam is SUMMED onto the
+// param's intrinsic value. The 'prop' tremolo LFO (audio-engine _applyProfile)
+// feeds engGain.gain, so the audible engine amplitude on the title is
+// |intrinsic| + Σ|connected depth|, not the intrinsic alone.
+console.log('\n[9] audio bed + title one-shots');
+try {
+  class MockParam {
+    constructor(v) {
+      this._v = v;
+      this.last = v; // the value the param settles to (last scheduled target)
+      this.inputs = [];
+    }
+    get value() {
+      return this._v;
+    }
+    set value(v) {
+      this._v = v;
+      this.last = v;
+    }
+    setTargetAtTime(v) {
+      this.last = v;
+    }
+    setValueAtTime(v) {
+      this._v = v;
+      this.last = v;
+    }
+    linearRampToValueAtTime(v) {
+      this.last = v;
+    }
+    exponentialRampToValueAtTime(v) {
+      this.last = v;
+    }
+    cancelScheduledValues() {
+      this.last = this._v;
+    }
+  }
+  class MockNode {
+    constructor() {
+      this.outs = [];
+    }
+    connect(d) {
+      if (d instanceof MockParam) d.inputs.push(this);
+      this.outs.push(d);
+      return d;
+    }
+    disconnect() {
+      for (const d of this.outs) if (d instanceof MockParam) d.inputs = d.inputs.filter((n) => n !== this);
+      this.outs = [];
+    }
+    start() {}
+    stop() {}
+  }
+  class MockAC {
+    constructor() {
+      this.state = 'running';
+      this.currentTime = 0;
+      this.sampleRate = 8000;
+      this.destination = new MockNode();
+    }
+    createGain() {
+      const n = new MockNode();
+      n.gain = new MockParam(1);
+      return n;
+    }
+    createOscillator() {
+      const n = new MockNode();
+      n.frequency = new MockParam(440);
+      n.detune = new MockParam(0);
+      return n;
+    }
+    createBiquadFilter() {
+      const n = new MockNode();
+      n.frequency = new MockParam(350);
+      n.Q = new MockParam(1);
+      n.gain = new MockParam(0);
+      return n;
+    }
+    createBuffer(_c, len) {
+      const d = new Float32Array(len);
+      return { getChannelData: () => d };
+    }
+    createBufferSource() {
+      return new MockNode();
+    }
+    resume() {
+      return Promise.resolve();
+    }
+    close() {
+      return Promise.resolve();
+    }
+  }
+  window.AudioContext = MockAC;
+  const { FlyAudio } = await imp('lib/fly/audio-engine.js');
+  const PA = await imp('lib/fly/player-aircraft.js');
+  const amp = (p) => Math.abs(p.last) + p.inputs.reduce((s, n) => s + (n.gain ? Math.abs(n.gain.last) : 0), 0);
+  const build = (id) => {
+    const a = new FlyAudio();
+    const ac = PA.resolveAircraft(id);
+    a.setProfile(ac.audio, ac.cfg.speeds);
+    a.resume(); // builds the graph on the mock context (the first-click path)
+    return { a, ac };
+  };
+  const cruise = (a, ac) => a.update(ac.cfg.speeds.cruise, false, null);
+  const ids = PA.PLAYER_AIRCRAFT.map((p) => p.id);
+  const props = ids.filter((id) => PA.resolveAircraft(id).audio.mode === 'prop');
+  const hasQuiet = typeof FD.quietBed === 'function' && typeof FD.wakeBed === 'function';
+  gate('(9-) front-door exports quietBed / wakeBed / lockBlipWanted (the hook calls them)', hasQuiet && typeof FD.lockBlipWanted === 'function');
+
+  // (9a) the thrum exists in flight — the instrument sees the LFO.
+  const f = props.map((id) => {
+    const { a, ac } = build(id);
+    cruise(a, ac);
+    return { id, amp: +amp(a.engGain.gain).toFixed(4), lfo: a.engGain.gain.inputs.length };
+  });
+  gate(`(9a) in flight the 'prop' voices (${props.join(', ')}) carry the tremolo LFO on engGain.gain (instrument sanity)`,
+    props.length >= 2 && f.every((r) => r.lfo === 1 && r.amp > C.AUDIO.engineMaxGain * C.HANGAR.audioDefaults.thrumDepth), JSON.stringify(f));
+
+  if (hasQuiet) {
+    setFD(true);
+    // (9b) every aircraft's engine is SILENT on the title / in the hangar.
+    const q = ids.map((id) => {
+      const { a, ac } = build(id);
+      cruise(a, ac);
+      FD.quietBed(a);
+      return { id, eng: +amp(a.engGain.gain).toFixed(4), wind: +amp(a.windGain.gain).toFixed(4) };
+    });
+    gate(`(9b) quietBed: engine + wind amplitude 0 for all ${ids.length} aircraft (incl. the LFO summed onto engGain.gain)`,
+      q.every((r) => r.eng === 0 && r.wind === 0), q.some((r) => r.eng || r.wind) ? JSON.stringify(q.filter((r) => r.eng || r.wind)) : `all ${ids.length} at 0 (${ids.join(', ')})`);
+    // (9c) back in flight the tremolo depth is exactly a fresh graph's, and the
+    // bed is exactly the never-quieted bed.
+    const w = props.map((id) => {
+      const fresh = build(id);
+      cruise(fresh.a, fresh.ac);
+      const { a, ac } = build(id);
+      cruise(a, ac);
+      FD.quietBed(a);
+      FD.wakeBed(a);
+      cruise(a, ac);
+      return { id, depth: a._lfoGain.gain.last, freshDepth: fresh.a._lfoGain.gain.value, amp: amp(a.engGain.gain), freshAmp: amp(fresh.a.engGain.gain) };
+    });
+    gate('(9c) wakeBed + update restore the flight bed exactly (tremolo depth = a freshly built graph\'s)',
+      w.every((r) => r.depth === r.freshDepth && Math.abs(r.amp - r.freshAmp) < 1e-12), JSON.stringify(w));
+    // (9d) a prop picked WHILE quiet (the hangar pick builds a new LFO at full
+    // depth): quietBed(audio, true) zeroes it at once (value, not a ramp).
+    const { a: j } = build('fighter');
+    FD.quietBed(j);
+    const pr = PA.resolveAircraft(props[0]);
+    j.setProfile(pr.audio, pr.cfg.speeds);
+    const before = j._lfoGain?.gain.value;
+    FD.quietBed(j, true);
+    gate('(9d) a prop voice installed while quiet is silenced immediately (LFO value 0, engine amplitude 0)',
+      before > 0 && j._lfoGain.gain.value === 0 && amp(j.engGain.gain) === 0, `LFO ${before} → ${j._lfoGain?.gain.value}`);
+    restore();
+  }
+
+  // (9e) lock blip: flag off == today's `hex && !prev`; flag on: flight only.
+  if (typeof FD.lockBlipWanted === 'function') {
+    const pairs = [[null, null], ['abc', null], ['abc', 'abd'], [null, 'abc']];
+    setFD(false);
+    const offBad = [];
+    for (const scr of SCREENS) for (const [h, p] of pairs) if (FD.lockBlipWanted(h, p, stateFor(scr)) !== !!(h && !p)) offBad.push(`${scr}:${h}/${p}`);
+    setFD(true);
+    const on = Object.fromEntries(SCREENS.map((scr) => [scr, FD.lockBlipWanted('abc', null, stateFor(scr))]));
+    restore();
+    gate('(9e) lockBlipWanted: flag off equals `hex && !prev` on every screen', offBad.length === 0, offBad.join(',') || '12 cases');
+    gate('(9f) lockBlipWanted: flag on — an acquisition blips in flight only (not on the title, not in the hangar)',
+      on.flight === true && on.title === false && on.hangar === false, JSON.stringify(on));
+  }
+} catch (e) {
+  gate('(9) section ran', false, `threw: ${String(e?.message || e).slice(0, 160)}`);
+  restore();
+}
+
 // --- [8] source posture ------------------------------------------------------------------
 console.log('\n[8] source posture');
 try {
@@ -560,6 +746,17 @@ try {
   gate('(8h) the dead geolocation spawn is gone; the fly-last-pos WRITER stays (verify-boot reads it)',
     !/navigator\.geolocation/.test(mode) && /'fly-last-pos'/.test(mode) && /localStorage\.setItem\(\s*LAST_POS_KEY/.test(mode));
   gate('(8i) no new <canvas> in the title layer (67 harness sites read .fixed.inset-0 canvas)', !/<canvas/.test(title));
+  // Fix pass (adversarial review). Behaviour is certified in the browser
+  // (verify-r25-title leg attr) and in [9]; these pin the wiring.
+  const toast = rd('components/fly/hud/SpotToast.jsx');
+  const spicy = toast.slice(toast.indexOf('SPICY scan'));
+  gate('(8j) the SPICY scan tick returns while !gameplayLive (no ping, no pulse, no once-per-session `seen` spent on the title)',
+    /if \(!gameplayLive\(useFlyStore\.getState\(\)\)\) return;/.test(spicy.slice(0, spicy.indexOf('for (const it of traffic.items)'))));
+  const hook = rd('hooks/use-fly-audio.js');
+  gate('(8k) the audio hook: lockBlipWanted gates the lock blip; quietBed / wakeBed from front-door (no local copy)',
+    /lockBlipWanted\(hex, prev, useFlyStore\.getState\(\)\)/.test(hook) && /wakeBed\(audio\)/.test(hook) && !/function quietBed/.test(hook));
+  gate('(8l) the credit survives the title overlays: the flight bar mounts under the title Logbook; the title modal reserves the credit strip',
+    /\(!titleUp \|\| logbookUp\) && <AttributionBar \/>/.test(mode) && /--fly-title-attr-reserve/.test(title) && /inset:0 0 var\(--fly-title-attr-reserve/.test(rd('components/fly/hud/title.css')));
 } catch (e) {
   gate('(8) section ran', false, `threw: ${String(e?.message || e).slice(0, 160)}`);
   restore();
