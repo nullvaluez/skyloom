@@ -37,8 +37,13 @@ function HangarBody({runtime}){
   const results=useMemo(()=>free?searchDestinations(query,6):[],[free,query]);
   // Debounced staging: pre-stream the pick behind the opaque hangar.
   useEffect(()=>{if(!free||!dest||confirmReturn)return undefined;const t=setTimeout(()=>{const ok=runtime.stageDestination?.(dest);if(ok===false)setStage({state:'unstaged',pct:0});},FLIGHT_PLAN.stage.debounceMs);return()=>clearTimeout(t);},[free,dest,runtime,confirmReturn]);
-  useEffect(()=>{if(!free||!dest)return undefined;const read=()=>{const s=runtime.staging;if(!s||s.key!==dest.id)return setStage(p=>p.state==='unstaged'?p:{state:'pending',pct:0});setStage(s.ready?{state:'ready',pct:100}:{state:'staging',pct:Math.round((s.progress||0)*100)});};read();const t=setInterval(read,250);return()=>clearInterval(t);},[free,dest,runtime]);
+  useEffect(()=>{if(!free||!dest)return undefined;const put=next=>setStage(p=>p.state===next.state&&p.pct===next.pct?p:next);const read=()=>{const s=runtime.staging;if(!s||s.key!==dest.id)return setStage(p=>p.state==='unstaged'||p.state==='pending'?p:{state:'pending',pct:0});put(s.ready?{state:'ready',pct:100}:{state:'staging',pct:Math.round((s.progress||0)*100)});};read();const t=setInterval(read,250);return()=>clearInterval(t);},[free,dest,runtime]);
   const aircraft=resolveAircraft(id),profile=operationsProfile(aircraft.id);
+  // Ops mode stages the departure airport too — a no-op unless the flight is
+  // genuinely far from it (a title spot on another continent; see
+  // OPS_STAGE_MIN_KM), so the Columbus-cluster flows never stage-warp.
+  const opsStageId=aircraft.id==='glider'?'KOSU':airport;
+  useEffect(()=>{if(!plan||free||confirmReturn)return undefined;const t=setTimeout(()=>runtime.stageDestination?.(opsStageId),FLIGHT_PLAN.stage.debounceMs);return()=>clearTimeout(t);},[plan,free,opsStageId,runtime,confirmReturn]);
   const compatible=airportEligible(airportById(airport),aircraft.id);
   const loaded=useCallback(selected=>{if(selected===id)setReady(true);},[id]),failure=useCallback(()=>setFailed(true),[]);
   useEffect(()=>{const t=setInterval(()=>setLive(!!runtime.beginDeparture),250);return()=>clearInterval(t);},[runtime]);

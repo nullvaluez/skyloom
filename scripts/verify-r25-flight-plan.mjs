@@ -646,6 +646,8 @@ await tryGate('7c staging', async () => {
   globalThis.__r25bInvalidations = 0;
   const w = makeWorld({ elev: 12 });
   useFlyStore.getState().setHangarOpen(true);
+  const styleWas = useFlyStore.getState().mapStyle;
+  useFlyStore.setState({ mapStyle: 'satellite' }); // worldReadiness path (+ its 600 ms settle)
   const kosu = FP.resolveDestination('columbus-practice');
   w.flight.pos.copy(w.engine.geoToWorld(kosu.lon, kosu.lat, 800));
   const here = w.runtime.stageDestination('columbus-practice');
@@ -667,8 +669,9 @@ await tryGate('7c staging', async () => {
     liveFleetReady: true,
     prewarm: { done: true },
   });
-  await new Promise((r) => setTimeout(r, 300));
-  const ready = w.runtime.staging.ready === true && Number.isFinite(w.runtime.staging.readyMs);
+  const notYet = w.runtime.staging.ready === false; // 600 ms continuous readiness first
+  await new Promise((r) => setTimeout(r, 1200));
+  const ready = notYet && w.runtime.staging.ready === true && Number.isFinite(w.runtime.staging.readyMs);
   const readyMs = w.runtime.staging.readyMs;
   const polls = w.runtime.staging.polls;
   await new Promise((r) => setTimeout(r, 300));
@@ -690,6 +693,7 @@ await tryGate('7c staging', async () => {
   const n = w.warps.length;
   const opsNear = w.runtime.stageDestination('KCMH') === false && w.warps.length === n;
   w.off();
+  useFlyStore.setState({ mapStyle: styleWas });
   gate('7c stage: already-there → poll only; far → warpToGeo{stage:true}, frozen in hangar; idempotent', noWarp && here && staged && again, `here ${here}/${noWarp}, far ${staged}`);
   gate('7d readiness poll latches ready and stops; FRONT_DOOR off pumps frames (4 Hz), on never does', ready && stopped && pumpedOff >= 2 && pumpedOn === 0, `readyMs ${readyMs}, pumps off=${pumpedOff} on=${pumpedOn}`);
   gate('7e FLIGHT_PLAN off refuses staging; ops airports inside the Columbus cluster never stage-warp', refused && opsNear);
