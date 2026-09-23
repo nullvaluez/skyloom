@@ -71,13 +71,14 @@ async function waitTitleReady(page, { timeoutMs = 120000, world = false } = {}) 
  * { via: 'title'|'store', ms, forced }.
  *
  * The card press is the trusted, actionability-checked click/tap first, for
- * at most ACTIONABLE_MS; then a FORCE click/tap (still trusted input at the
- * card centre — only Playwright's "stable" wait is skipped). R25 E2, MEASURED
- * on the fixture at load ~8: that wait needs two animation frames with one
- * box, and a SwiftShader rAF pair can take seconds, so a plain click on a
- * visible control sat in actionability for 30 s+ (A's ledger measured 180 s).
- * On a real GPU the trusted press succeeds at once and nothing changes; the
- * hangar wait below asserts the EFFECT either way. `forced` says which ran.
+ * at most ACTIONABLE_MS; then ONE page.evaluate DOM click on the card. R25 E2,
+ * MEASURED on the fixture at load ~8-9: the "stable" wait needs two animation
+ * frames with one box and a SwiftShader rAF pair can take seconds (A's ledger
+ * measured a click sitting 180 s), and behind the free hangar's StagePump even
+ * a FORCE click timed out at 180 s — the locator round trips never got a turn
+ * on a saturated main thread. On a real GPU the trusted press succeeds at once
+ * and nothing changes; the hangar wait below asserts the EFFECT either way.
+ * `forced` says the DOM click ran.
  */
 const ACTIONABLE_MS = 30000;
 async function enterHangar(page, mode = 'ops', { timeoutMs = 120000, tap = false } = {}) {
@@ -93,11 +94,18 @@ async function enterHangar(page, mode = 'ops', { timeoutMs = 120000, tap = false
       if (tap) await card.tap({ timeout: Math.min(timeoutMs, ACTIONABLE_MS) });
       else await card.click({ timeout: Math.min(timeoutMs, ACTIONABLE_MS) });
     } catch {
-      // Only if the timed-out press did not land after all (the hangar is up).
+      // Only if the timed-out press did not land after all (the hangar is up):
+      // ONE plain page.evaluate DOM click (A's verify-r25-title domClick idiom)
+      // — a starved main thread can stall even a force click's round trips.
       if (!(await page.getByTestId('hangar').isVisible().catch(() => false))) {
         forced = true;
-        if (tap) await card.tap({ force: true, timeout: timeoutMs });
-        else await card.click({ force: true, timeout: timeoutMs });
+        const ok = await page.evaluate((tid) => {
+          const el = document.querySelector(`[data-testid="${tid}"]`);
+          if (!el || el.disabled) return false;
+          el.click();
+          return true;
+        }, CARD[mode]);
+        if (!ok) throw new Error(`_title.enterHangar: ${CARD[mode]} vanished or is disabled`);
       }
     }
     via = 'title';

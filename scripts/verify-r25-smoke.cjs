@@ -142,29 +142,42 @@ const absent = (flagOn, name, why) => (flagOn ? gate(name, false, `${why} (its f
 const has = async (page, id) => (await page.getByTestId(id).count()) > 0;
 /**
  * Click a control the way a player does, surviving this venue. E2, MEASURED on
- * the integrated tree (toy run 1, load ~8 with two SwiftShader browsers): a
- * plain click() on a visible, ENABLED `hangar-fly` timed out at 30 s inside
- * Playwright's actionability wait — "stable" needs two animation frames with
- * one box, and behind the staging hangar a rAF pair takes seconds — so the
- * smoke died at (4c) on the instrument, not the product. Same idiom as A's
- * verify-r25-title (force) and B's verify-r25-freeflight (fallback): the
- * trusted, actionability-checked click first (a bounded wait), then a FORCE
- * click — still a trusted mouse event at the element centre; only the
- * stability wait is skipped. No leg asserts a click: every leg asserts its
- * EFFECT (screen / phase / store), so a force click that hit the wrong thing
- * still reads FAIL. The fallbacks are counted in report.presses.
+ * the integrated tree (toy, load ~8-9 with two SwiftShader browsers):
+ *   run 1 — a plain click() on a visible, ENABLED `hangar-fly` sat 30 s in
+ *           Playwright's actionability wait ("stable" needs two animation
+ *           frames with one box; behind the staging hangar a rAF pair takes
+ *           seconds) and the smoke died at (4c) on the instrument;
+ *   run 2 — with a force-click fallback, even the FORCE click on `hangar-back`
+ *           timed out at 180 s: the free hangar's StagePump keeps invalidating
+ *           while toy staging cannot finish here (B's ledger), so the page's
+ *           main thread is saturated and the locator machinery's round trips
+ *           never get a turn (A's ledger measured the same in flight).
+ * So: the trusted, actionability-checked click first (bounded), then ONE plain
+ * page.evaluate that DOM-clicks the control — A's verify-r25-title domClick
+ * idiom (B's freeflight falls back to dispatchEvent the same way). The DOM
+ * click goes through the capture phase like a real one (the reload/continue
+ * REDs still intercept it). No leg asserts a click: every leg asserts its
+ * EFFECT (screen / phase / store). Fallbacks are counted in report.presses.
  */
-const presses = { trusted: 0, forced: [] };
+const presses = { trusted: 0, dom: [] };
 async function press(page, id, { timeoutMs = 10000 } = {}) {
   const l = page.getByTestId(id).first();
   await l.waitFor({ state: 'visible', timeout: 60000 * SCALE });
   try {
     await l.click({ timeout: timeoutMs * SCALE });
     presses.trusted++;
+    return;
   } catch {
-    await l.click({ force: true, timeout: 60000 * SCALE });
-    presses.forced.push(id);
+    /* fall through to the DOM click */
   }
+  const ok = await page.evaluate((tid) => {
+    const el = document.querySelector(`[data-testid="${tid}"]`);
+    if (!el || el.disabled) return false;
+    el.click();
+    return true;
+  }, id);
+  presses.dom.push(id);
+  if (!ok) throw new Error(`press ${id}: the control vanished or is disabled`);
 }
 const store = (page) => page.evaluate(() => {
   const s = window.__flyStore.getState();
@@ -599,7 +612,18 @@ const titleReady = () =>
       else {
         const mode = await page.getByTestId('hangar-mode').getAttribute('data-mode', { timeout: 3000 }).catch(() => null);
         await press(page, 'hangar-pick-prop');
-        if (await page.locator('#departure-airport').count()) await page.selectOption('#departure-airport', 'KOSU');
+        if (await page.locator('#departure-airport').count())
+          await page.selectOption('#departure-airport', 'KOSU', { timeout: 30000 * SCALE }).catch(async () => {
+            // The same starved-main-thread fallback as press(): set the value
+            // through the native setter and fire the change React listens for.
+            await page.evaluate(() => {
+              const el = document.querySelector('#departure-airport');
+              if (!el || el.value === 'KOSU') return;
+              Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(el, 'KOSU');
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+            presses.dom.push('#departure-airport');
+          });
         const apron = page.locator('input[value="apron"]');
         if (await apron.count()) await apron.first().check().catch(() => {});
         await waitFor(page, () => document.querySelector('[data-testid="hangar-fly"]')?.disabled === false, undefined, 120000);
