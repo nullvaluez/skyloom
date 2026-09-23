@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useFlyStore } from '@/stores/fly-store';
+import { gameplayLive } from '@/lib/fly/front-door';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { ATLAS_KIND } from './atlas/atlas-tokens';
 import { CARD_THEME } from './inspect/inspect-tokens';
@@ -15,6 +16,9 @@ const BANNER_MS = 3200;
  */
 export function ArrivalBanner() {
   const arrival = useFlyStore((s) => s.arrival);
+  // R25 A (FRONT DOOR): no arrival banner over the title or the hangar
+  // (always shown with the flag off — gameplayLive() is constant true).
+  const live = useFlyStore(gameplayLive);
   const { isPhone: phone } = useDeviceLayout();
 
   useEffect(() => {
@@ -23,7 +27,7 @@ export function ArrivalBanner() {
     return () => clearTimeout(id);
   }, [arrival]);
 
-  if (!arrival) return null;
+  if (!arrival || !live) return null;
   const kind = ATLAS_KIND[arrival.kind];
 
   return (

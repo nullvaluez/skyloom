@@ -1,7 +1,7 @@
 'use client';
 
-import { Suspense, useState } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Suspense, useEffect, useState } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { PerformanceMonitor } from '@react-three/drei';
 import { FlyScene } from './FlyScene';
 import { NightGroundRig } from './NightGroundRig';
@@ -10,7 +10,7 @@ import { Effects } from './Effects';
 import { PhotoCapture } from './PhotoCapture';
 import { JuiceSystems } from './JuiceSystems';
 import { PrewarmRig } from './PrewarmRig';
-import { CANVAS, FRAME_STATS, PERF_GOVERNOR, PREWARM } from '@/lib/fly/fly-constants';
+import { CANVAS, FRAME_STATS, FRONT_DOOR, PERF_GOVERNOR, PREWARM } from '@/lib/fly/fly-constants';
 import { resolveStepSafe } from '@/lib/fly/step-safe';
 import { setDepthReversed } from '@/lib/fly/toy-world/world-bend';
 import { autoTierCeiling } from '@/lib/fly/fly-settings';
@@ -19,7 +19,7 @@ import { FrameStatsRig } from '@/lib/fly/frame-stats';
 import { StepSafeRig } from './StepSafeRig';
 import { HudSyncRig } from './HudSyncRig';
 import { useFlyStore } from '@/stores/fly-store';
-import { frameloopFor } from '@/lib/fly/front-door';
+import { frameloopFor, noteStagePump, stagePumpHz, stagePumpWanted } from '@/lib/fly/front-door';
 
 function initialDpr() {
   if (typeof window === 'undefined') return CANVAS.dprMax;
@@ -27,6 +27,29 @@ function initialDpr() {
 }
 
 const TIERS = ['low', 'medium', 'high'];
+
+/**
+ * R25 A (FRONT DOOR, plan ruling 4): the hangar keeps the world canvas on
+ * 'demand' (it is opaque and has its own preview canvas). This low-rate
+ * invalidate lets the destination B stages behind it — and a title boot that
+ * has not revealed yet — keep streaming: FLIGHT_PLAN.stage.hzDesktop (10 Hz)
+ * or hzPhone (4 Hz), stopping when staging is ready, the boot has revealed or
+ * the tab is hidden (lib/fly/front-door.js stagePumpWanted). A plain interval,
+ * not a useFrame: on 'demand' no frame runs unless something asks for one.
+ * Only mounted with FRONT_DOOR.enabled, so the flag-off tree has no timer.
+ */
+function StagePump({ runtime }) {
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (!stagePumpWanted(useFlyStore.getState(), runtime)) return;
+      noteStagePump(performance.now());
+      invalidate();
+    }, 1000 / stagePumpHz());
+    return () => clearInterval(id);
+  }, [invalidate, runtime]);
+  return null;
+}
 
 /**
  * R9-1 boot gate (c): counts rendered frames AFTER Suspense resolved (it
@@ -65,8 +88,8 @@ function stepQualityTier(dir) {
  * steps DPR down/up as the first rung of the quality ladder.
  */
 export function FlyCanvas({ runtime }) {
-  // R25 W0: A FRONT DOOR's frameloopFor() — W0 = today's rule ('demand'
-  // while the hangar is open, 'always' otherwise).
+  // R25 A (FRONT DOOR): 'always' on the title and in flight, 'demand' while
+  // the opaque hangar is open (fed by <StagePump>). Flag-off = today's rule.
   const frameloop=useFlyStore(frameloopFor);
   const [dpr, setDpr] = useState(initialDpr);
   // R24 A (STEP_SAFE): resolved once at mount — the pin is set before Fly mode
@@ -148,6 +171,7 @@ export function FlyCanvas({ runtime }) {
           mounted at all when FRAME_STATS.enabled is false — no ring, no
           observer, no window.__flyStats.frame (recon HARN-GAP-4). */}
       {FRAME_STATS.enabled && <FrameStatsRig />}
+      {FRONT_DOOR.enabled && <StagePump runtime={runtime} />}
       {PERF_GOVERNOR.enabled ? (
         <>
           {/* Round 21 (A GOVERNOR): the EMA + dwell + cooldown + session-latch

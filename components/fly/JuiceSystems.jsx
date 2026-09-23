@@ -19,6 +19,7 @@ import { MusicDirector } from '@/lib/fly/music-director';
 import { useFlyStore } from '@/stores/fly-store';
 import { useFlyContractsStore } from '@/stores/fly-contracts-store';
 import { usePassportStore } from '@/stores/passport-store';
+import { gameplayLive } from '@/lib/fly/front-door';
 
 /**
  * ROUND 18 "Alive & Dangerous" — A4 SHOWTIME: the arcade layer's engine room.
@@ -68,6 +69,7 @@ export function JuiceSystems({ runtime }) {
     wroteCombo: 0,
     wroteSession: 0,
     wroteRun: 0,
+    wasLive: null, // R25 A: last gameplayLive() — the near-miss re-entry edge
   });
 
   // --- Event intake ------------------------------------------------------
@@ -235,7 +237,16 @@ export function JuiceSystems({ runtime }) {
         if (it.stale === 2) continue;
         if (nearest == null || it.distM < nearest) nearest = it.distM;
       }
-      if (NEARMISS.enabled && detectorRef.current) {
+      // R25 A (FRONT DOOR): no near-miss scoring on the title / in the hangar
+      // (the frozen flight is not flying past anyone). The detector restarts
+      // clean on the way back into flight — its stored distances predate the
+      // menu. gameplayLive() is constant true with the flag off.
+      const live = gameplayLive(useFlyStore.getState());
+      if (live !== S.wasLive) {
+        if (live && S.wasLive === false) detectorRef.current?.reset();
+        S.wasLive = live;
+      }
+      if (NEARMISS.enabled && detectorRef.current && live) {
         const hits = detectorRef.current.step(items, dt, nowSec);
         for (const hit of hits) {
           const res = fireRef.current('nearMiss', NEARMISS.basePts, SHAKE.sources.nearMiss);

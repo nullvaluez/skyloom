@@ -7,6 +7,16 @@ import { immersiveOn } from '@/lib/fly/immersive';
 import { AUDIO } from '@/lib/fly/fly-constants';
 import { resolveAircraft } from '@/lib/fly/player-aircraft';
 import { useFlyStore } from '@/stores/fly-store';
+import { gameplayLive } from '@/lib/fly/front-door';
+
+/** R25 A: ramp the continuous bed (engine + wind) to silence; one-shots untouched. */
+function quietBed(audio) {
+  const ctx = audio.ctx;
+  if (!ctx || ctx.state !== 'running') return;
+  const t = ctx.currentTime;
+  audio.engGain?.gain.setTargetAtTime(0, t, 0.25);
+  audio.windGain?.gain.setTargetAtTime(0, t, 0.25);
+}
 
 /**
  * Owns the FlyAudio instance for a Fly-mode session: resumes on the first
@@ -41,13 +51,20 @@ export function useFlyAudio(runtime) {
     const id = setInterval(() => {
       const f = runtime.flight;
       if (!f) return;
-      const cmd = runtime.input?.read();
-      audio.update(f.speed, !runtime.operations?.lowSpeed && (!!cmd?.boost || cmd?.speedPreset === 'boost'), runtime.operations);
       const state=useFlyStore.getState();
+      // R25 A (FRONT DOOR): the engine/wind bed is silent while not actually
+      // flying (the title's frozen flight and the hangar) — one-shots and UI
+      // sounds still play. gameplayLive() is constant true with the flag off,
+      // so this is today's call sequence exactly.
+      const live=gameplayLive(state);
+      if (live) {
+        const cmd = runtime.input?.read();
+        audio.update(f.speed, !runtime.operations?.lowSpeed && (!!cmd?.boost || cmd?.speedPreset === 'boost'), runtime.operations);
+      } else quietBed(audio);
       const active=state.mapStyle==='satellite'&&immersiveOn('audio');
       // Pause gates the shared master too, including synthesized fallback and one-shots.
       audio.setMuted(!state.soundOn || (active && state.phase==='paused'));
-      immersion.update(runtime,state,active);
+      immersion.update(runtime,state,active&&live);
     }, 1000 / AUDIO.updateHz);
 
     const unsubs = [
