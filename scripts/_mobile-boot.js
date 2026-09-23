@@ -6,6 +6,12 @@
  * which is fine for exercising the UI + controls.
  */
 async function bootMobile(page, { url = process.env.FLY_URL || 'http://localhost:3000', style = null, waitS = 90 } = {}) {
+  // Round 25 (SANCTIONED harness edit, the _boot.js idiom): skip the title
+  // screen and run the CLASSIC visuals profile (= the flag-off tree).
+  await page.addInitScript(() => {
+    window.__flyTitleBypass = true;
+    window.__flyVisualsOverride = 'classic';
+  });
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.evaluate((s) => {
     try {

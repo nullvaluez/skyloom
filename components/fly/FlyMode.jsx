@@ -1,6 +1,5 @@
 'use client';
 import { OperationsHUD } from './hud/OperationsHUD';
-import { airportById } from '@/lib/fly/operations-airports';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
@@ -38,6 +37,9 @@ import { resolveInitialMapStyle } from '@/lib/fly/map-style';
 import { resolveInitialSettings } from '@/lib/fly/fly-settings';
 import { resolveAircraft, resolveInitialAircraft } from '@/lib/fly/player-aircraft';
 import { useFlyStore } from '@/stores/fly-store';
+import { resolveInitialVisuals } from '@/lib/fly/visuals-profile';
+import { resolveInitialScreen } from '@/lib/fly/front-door';
+import { resolveInitialSpawn } from '@/lib/fly/flight-plan';
 
 // Fallback spawn: NYC harbor — dense airspace, good demo
 const DEFAULT_SPAWN = [40.6892, -74.0445];
@@ -163,12 +165,17 @@ export function FlyMode({ onClose }) {
     // and pop in a second later (the fighter is preloaded at import time by
     // PlayerPlane, so only NON-default picks need this).
     resolveInitialAircraft();
+    // R25 W0: the Visuals profile resolves on the same pre-mount beat (C/D
+    // build their materials from it), then the opening screen and the spawn.
+    // W0 stubs = today (mandatory hangar, KOSU, SPAWN_ALT_M).
+    resolveInitialVisuals();
     const picked = resolveAircraft(useFlyStore.getState().aircraftId);
     useGLTF.preload(picked.entry.url);
-    Promise.resolve([airportById('KOSU').a.lat, airportById('KOSU').a.lon]).then(([lat, lon]) => {
+    Promise.resolve(resolveInitialSpawn()).then((spawn) => {
       if (cancelled) return;
       const fly = useFlyStore.getState();
-      fly.setSpawn({ lat, lon });
+      fly.setScreen(resolveInitialScreen());
+      fly.setSpawn(spawn);
       fly.setPhase('flying');
     });
     return () => {

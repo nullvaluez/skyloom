@@ -12,6 +12,15 @@
 > describes deleted code (markers, panels, Leaflet-era plans); do not act
 > on it.
 
+> **⚠️ R25 IN PROGRESS (2026-09-23): "Front Door & Clear Sky"** — a title
+> screen + Free Flight vs Takeoff & Landing choice, and a satellite atmosphere /
+> ground coherence pass behind a live **Visuals: Enhanced / Classic** switch.
+> Plan: [FLY_ROUND25_PLAN.md](FLY_ROUND25_PLAN.md). Five roles (A FRONT DOOR /
+> B FLIGHT PLAN / C SKY / D GROUND / E CERT) on `r25/{a..e}`; W0 scaffolding
+> pre-seeded the store fields, stub modules, FlyScene hooks and the
+> `fly-constants.js` owner blocks (all `enabled:false`). The legacy harness
+> fleet is pinned `__flyTitleBypass=true` + `__flyVisualsOverride='classic'`.
+
 > **⚠️ NEWEST — READ FIRST (2026-09-07): Round 24 "Smooth World" is BUILT and
 > CERTIFIED ON THE FIXTURE — not on a GPU — and
 > [FLY_ROUND24.md](FLY_ROUND24.md) is the record** (plan

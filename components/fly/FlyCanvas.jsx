@@ -19,6 +19,7 @@ import { FrameStatsRig } from '@/lib/fly/frame-stats';
 import { StepSafeRig } from './StepSafeRig';
 import { HudSyncRig } from './HudSyncRig';
 import { useFlyStore } from '@/stores/fly-store';
+import { frameloopFor } from '@/lib/fly/front-door';
 
 function initialDpr() {
   if (typeof window === 'undefined') return CANVAS.dprMax;
@@ -64,7 +65,9 @@ function stepQualityTier(dir) {
  * steps DPR down/up as the first rung of the quality ladder.
  */
 export function FlyCanvas({ runtime }) {
-  const hangarOpen=useFlyStore(s=>s.hangarOpen);
+  // R25 W0: A FRONT DOOR's frameloopFor() — W0 = today's rule ('demand'
+  // while the hangar is open, 'always' otherwise).
+  const frameloop=useFlyStore(frameloopFor);
   const [dpr, setDpr] = useState(initialDpr);
   // R24 A (STEP_SAFE): resolved once at mount — the pin is set before Fly mode
   // mounts and never moves mid-session.
@@ -105,7 +108,7 @@ export function FlyCanvas({ runtime }) {
       shadows
       // The hangar has its own interactive canvas. Retain the world and its
       // resources, but do not render two full scenes continuously behind it.
-      frameloop={hangarOpen?'demand':'always'}
+      frameloop={frameloop}
       camera={{
         fov: CANVAS.fov,
         near: CANVAS.near,

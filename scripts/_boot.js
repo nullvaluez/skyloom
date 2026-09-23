@@ -118,6 +118,14 @@ async function bootFly(
     window.__flySettlePin = 1;
     window.__flyClutterPin = 1;
     window.__flyDepthPin = 1;
+    // Round 25 (SANCTIONED harness edit, the same idiom): the legacy fleet
+    // skips the new title screen (boots into today's mandatory hangar, which
+    // the airborne skip below closes) and runs the CLASSIC visuals profile —
+    // exactly the flag-off tree, so no frozen pixel/draw number can move
+    // under an R25 Enhanced default. Only the R25 gates un-pin these
+    // (unpinPins(['__flyTitleBypass']) / (['__flyVisualsOverride'])).
+    window.__flyTitleBypass = true;
+    window.__flyVisualsOverride = 'classic';
     try {
       localStorage.setItem('fly-controls-seen', '1');
       // Round 10: the APP default is now satellite (PauseMenu defaults an
@@ -160,6 +168,11 @@ async function bootFly(
       window.__flySettlePin = 1;
       window.__flyClutterPin = 1;
       window.__flyDepthPin = 1;
+      // Round 18's boost pin was missing from this reload leg (every other
+      // pin is mirrored here) — added with the R25 pins below.
+      window.__flyBoostInfinite = true;
+      window.__flyTitleBypass = true; // round 25: same idiom, reload leg
+      window.__flyVisualsOverride = 'classic';
       localStorage.setItem('fly-controls-seen', '1');
       localStorage.setItem('fly-map-style-2', s || 'toy'); // round 10: default toy for harnesses
     }, style);

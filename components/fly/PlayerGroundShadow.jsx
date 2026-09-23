@@ -6,6 +6,7 @@ import { CanvasTexture, CircleGeometry, Color, Mesh, MeshBasicMaterial } from 't
 import { PLAYER } from '@/lib/fly/fly-constants';
 import { applyBend } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
+import { useTitleHidden } from '@/lib/fly/front-door';
 
 /** Soft radial falloff for the contact disc — procedural, no asset. */
 function makeShadowTexture() {
@@ -47,6 +48,7 @@ export function PlayerGroundShadow({
   radiusM = PLAYER.groundShadow.blobRadiusM,
 }) {
   const qualityTier = useFlyStore((s) => s.qualityTier);
+  const titleHidden = useTitleHidden(); // R25 W0
   const ref = useRef();
   const mesh = useMemo(() => {
     const gs = PLAYER.groundShadow;
@@ -102,5 +104,10 @@ export function PlayerGroundShadow({
     );
   }, -19); // right after the contrail (-20)
 
-  return <primitive ref={ref} object={mesh} dispose={null} />;
+  // R25 W0: hidden on the title (the disc writes its own visibility per frame).
+  return (
+    <group visible={!titleHidden}>
+      <primitive ref={ref} object={mesh} dispose={null} />
+    </group>
+  );
 }

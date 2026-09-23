@@ -165,7 +165,11 @@ import {
 import { pinned } from '@/lib/fly/fly-pins';
 import { noteFinalizeFrame } from '@/lib/fly/finalize-pace';
 import { createFrameStep, lerpAngle, lerpPose } from '@/lib/fly/frame-step';
-import { useFlyStore } from '@/stores/fly-store';
+import { useFlyStore, menuOpen } from '@/stores/fly-store';
+// R25 W0: title/flight-plan/visuals hooks (owners fill the stub modules).
+import { spotAllowed } from '@/lib/fly/front-door';
+import { r25SkyAtmo, r25SkyFrame } from '@/lib/fly/r25-sky';
+import { applyR25Terrain, r25GroundFrame } from '@/lib/fly/r25-ground';
 // R24 B (GROUND_VIS, recon A6/T8) — the damped VISUAL ground elevation.
 import { eyeAglVis as visualEyeAgl, groundElevVis, stepGroundVis } from '@/lib/fly/ground-vis';
 import { usePassportStore } from '@/stores/passport-store';
@@ -351,6 +355,15 @@ const _ATMO_HI_VOID = _hex2rgb(SKY.altAtmo.highAltVoid);
 const _ATMO_SUN_TINT = _hex2rgb(AERIAL_LAW.sunTint);
 const _atmoRim = [0, 0, 0];
 const _atmoVoid = [0, 0, 0];
+// R25 W0: the C SKY / D GROUND per-frame context. Module scratch, filled IN
+// PLACE (no per-frame allocation) and handed to lib/fly/r25-sky.js and
+// lib/fly/r25-ground.js. Fields: style, tier, dt, scene, camera, gl, flight,
+// sun (DirectionalLight), hemi (HemisphereLight), aerialFeed, eyeAgl,
+// eyeAglVis, altT (satellite altitude ramp 0..1; 0 off-satellite).
+const _r25Ctx = {
+  style: null, tier: null, dt: 0, scene: null, camera: null, gl: null, flight: null,
+  sun: null, hemi: null, aerialFeed: null, eyeAgl: 0, eyeAglVis: 0, altT: 0,
+};
 // Round 19 (B): the aerial-perspective feed, a module scratch object reused
 // every frame (the _atmoRim discipline) — setAerial() copies out of it, so
 // nothing here allocates in the frame loop.
@@ -1264,7 +1277,7 @@ export function FlyScene({ runtime }) {
     // heading and roughly its speed. Rebase + camera snap land the cut
     // clean; the WarpFlash overlay masks the tile stream-in beat.
     runtime.warpTo = (hex) => {
-      if (flight.operations?.grounded || useFlyStore.getState().hangarOpen) return false;
+      if (flight.operations?.grounded || menuOpen(useFlyStore.getState())) return false;
       const track = traffic.tracks.get(hex);
       // Round 8.5 (§B): no hard fix1 gate — the position warp only needs
       // rx/ry/rz; fix1 merely fed the arrival speed (cruise fallback below).
@@ -1312,7 +1325,12 @@ export function FlyScene({ runtime }) {
     // re-pick). Military/hotspot warps pass offsetM ~4km: spawn OUTSIDE
     // the point, nose toward it (the planes are around a base, not on it).
     runtime.warpToGeo = (lat, lon, opts = {}) => {
-      if (flight.operations?.grounded || useFlyStore.getState().hangarOpen) return false;
+      // R25 W0: `stage:true` pre-streams a destination while a menu (title /
+      // hangar) is open — the flight stays frozen in operations phase
+      // 'hangar' (no operations.warp, no arrival banner). Without `stage`
+      // every warp is refused while grounded or while a menu is open, as today.
+      const stage = opts.stage === true;
+      if (!stage && (flight.operations?.grounded || menuOpen(useFlyStore.getState()))) return false;
       const {
         altM = 800,
         headingRad = 0,
@@ -1371,8 +1389,8 @@ export function FlyScene({ runtime }) {
       // Far warps (cross-region) get the held arrival treatment — the
       // distance is measured on the PRE-warp position captured above.
       store.bumpWarpEpoch(farWarp ? 'far' : 'local');
-      flight.operations?.warp(flight);
-      if (name) store.setArrival({ name, kind, at: Date.now() });
+      if (!stage) flight.operations?.warp(flight);
+      if (name && !stage) store.setArrival({ name, kind, at: Date.now() });
       return true;
     };
 
@@ -1520,6 +1538,8 @@ export function FlyScene({ runtime }) {
         applyNightGroundReceiver(m, 'terrain');
         applyDaylightSurface(m, 'terrain');
         if (stylizedEarthOn()) applyEarthSurface(m);
+        // R25 W0: D GROUND's outermost patch (identity unless r25On).
+        applyR25Terrain(m);
         // Round 11: tier-aware aniso, read imperatively so NEW tiles pick up
         // a live tier change without re-uploading the streamed field (no
         // degrade hitch; the field converges as tiles stream).
@@ -1893,7 +1913,9 @@ export function FlyScene({ runtime }) {
   // drop the floating-origin anchor there.
   useEffect(() => {
     if (!spawn) return;
-    flight.pos.copy(engine.geoToWorld(spawn.lon, spawn.lat, SPAWN_ALT_M));
+    // R25 W0: B's resolveInitialSpawn() may carry an MSL altitude (title spot);
+    // absent ⇒ today's SPAWN_ALT_M.
+    flight.pos.copy(engine.geoToWorld(spawn.lon, spawn.lat, spawn.altM ?? SPAWN_ALT_M));
     spawnPlacedRef.current = true; // runtime.geo may publish from here on
     flight.latDeg = spawn.lat;
     flight.heading = 0;
@@ -1950,7 +1972,7 @@ export function FlyScene({ runtime }) {
     noteFinalizeFrame(delta);
     const flyState = useFlyStore.getState();
     const worldHeld = flyState.mapStyle === 'satellite' && (runtime.worldLoading === true || (typeof window !== 'undefined' && window.__flyBoot && window.__flyBoot.pct < 100));
-    const paused = flyState.phase === 'paused' || worldHeld || flyState.hangarOpen || !!flyState.inspectHex || flyState.atlasOpen || flyState.logbookOpen || document.hidden;
+    const paused = flyState.phase === 'paused' || worldHeld || menuOpen(flyState) || !!flyState.inspectHex || flyState.atlasOpen || flyState.logbookOpen || document.hidden;
     // Inspect modal / Atlas count as a soft pause for the stick: the world
     // (and your plane) keep flying, but the cursor belongs to the overlay.
     // Round 17: photo mode joins them — the plane keeps flying (the instructor
@@ -1969,13 +1991,13 @@ export function FlyScene({ runtime }) {
       flyState.inspectHex ||
       flyState.atlasOpen ||
       flyState.logbookOpen ||
-      flyState.hangarOpen // round 17: the hangar is a soft pause like the atlas
+      menuOpen(flyState) // round 17: the hangar is a soft pause like the atlas (R25: + title)
     )
       input.neutralize();
     const cmd = input.read();
     cmd.toggleParkingBrake = !paused && input.consumePress('b');
     for (let i=0;i<3;i++) if (!paused && input.consumePress(String(i+1))) cmd.powerPreset=i;
-    if (operations.grounded || operations.phase === 'approach' || flyState.hangarOpen) autopilot.disengage();
+    if (operations.grounded || operations.phase === 'approach' || menuOpen(flyState)) autopilot.disengage();
 
     // Terrain raycasts are ~fractions of a ms but not free — sample the
     // ground under the aircraft every 3rd frame.
@@ -2046,7 +2068,9 @@ export function FlyScene({ runtime }) {
     if (transition === 'acquired') {
       // First-sight passport spot (store dedups per hex for an hour)
       const t = targeting.target;
-      if (t?.meta) {
+      // R25 W0: A's spotAllowed() suppresses passport spots on the title
+      // (the frozen title camera must not farm the logbook). W0 stub = true.
+      if (t?.meta && spotAllowed(store)) {
         const geo = engine.worldToGeo(_spotPos.set(t.rx, t.ry, t.rz));
         // R17: one shared attribute builder (lib/fly/spot-attrs.js) — it is
         // what finally carries `squawk` (and gs/alt) into the passport, so the
@@ -2321,6 +2345,13 @@ export function FlyScene({ runtime }) {
     // Camera rigs think in absolute coordinates; the camera renders rebased.
     camera.position.x += origin.anchor.x;
     camera.position.z += origin.anchor.z;
+    // R25 W0: A FRONT DOOR's title flyby (lib/fly/title-camera.js) installs
+    // runtime.titleCam. Leaving the title sets needsSnap so the chase rig
+    // hard-cuts onto the plane instead of damping across the orbit radius.
+    if (runtime.titleCam?.needsSnap) {
+      runtime.titleCam.needsSnap = false;
+      chase.snap();
+    }
     if (photoMode) {
       // Round 17: free orbit around the plane, persistent pose, wheel zoom.
       photo.update(dt, flight, camera, input, mercatorScale(flight.latDeg));
@@ -2330,6 +2361,9 @@ export function FlyScene({ runtime }) {
       // distance flown while composing.
       chase.snap();
       chase.update(dt, flight, camera, cmd.freeLook, mercatorScale(flight.latDeg), runtime.groundImmersion);
+    } else if (runtime.titleCam?.active) {
+      // R25 W0: title orbit, same absolute frame as the cinema rig.
+      runtime.titleCam.update(dt, flight, camera, mercatorScale(flight.latDeg), flight.groundElev);
     } else if (flyState.cameraMode === 'cinema' && targeting.target) {
       cinema.update(
         dt,
@@ -2437,6 +2471,21 @@ export function FlyScene({ runtime }) {
         stepWeather(wx, runtime.weather.targets, dt);
         applyWeatherAtmo(_atmoRim, _atmoVoid, wx);
       }
+      // R25 W0: C SKY may overwrite the rim/void triples IN PLACE with the
+      // analytic sky model (after the weather grey-mix, before the four
+      // consumers below) so the rim keeps exactly one source (round-6 rule).
+      // Stub/Classic: no write.
+      _r25Ctx.style = flyState.mapStyle;
+      _r25Ctx.tier = flyState.qualityTier;
+      _r25Ctx.dt = dt;
+      _r25Ctx.scene = scene;
+      _r25Ctx.camera = camera;
+      _r25Ctx.gl = gl;
+      _r25Ctx.flight = flight;
+      _r25Ctx.eyeAgl = eyeAgl;
+      _r25Ctx.eyeAglVis = eyeAglVis;
+      _r25Ctx.altT = altT;
+      r25SkyAtmo(runtime, _atmoRim, _atmoVoid, _r25Ctx);
       // (1) scene fog, (2) tile edge-fade + aerial haze target, (3) SkyDome
       // band — all the same rim color; fog density FALLS with altitude to kill
       // the FL300 "wet mirror" murk band.
@@ -3285,6 +3334,26 @@ export function FlyScene({ runtime }) {
     // outside that one configuration. It is idempotent: three checks
     // matrixWorldNeedsUpdate, so on a frame where nothing moved the camera
     // this is a flag test.
+    // R25 W0: the C SKY / D GROUND per-frame hooks run LAST in the
+    // simulation block so their writes (lights, exposure, IBL rotation,
+    // quilt retirement, relief pool) are the final word this frame. Stubs /
+    // Classic: they return before writing anything.
+    _r25Ctx.style = flyState.mapStyle;
+    _r25Ctx.tier = flyState.qualityTier;
+    _r25Ctx.dt = dt;
+    _r25Ctx.scene = scene;
+    _r25Ctx.camera = camera;
+    _r25Ctx.gl = gl;
+    _r25Ctx.flight = flight;
+    _r25Ctx.sun = sunRef.current;
+    _r25Ctx.hemi = hemiRef.current;
+    _r25Ctx.aerialFeed = _aerialFeed;
+    _r25Ctx.eyeAgl = eyeAgl;
+    _r25Ctx.eyeAglVis = eyeAglVis;
+    if (flyState.mapStyle !== 'satellite') _r25Ctx.altT = 0;
+    r25SkyFrame(runtime, _r25Ctx);
+    r25GroundFrame(runtime, _r25Ctx);
+
     if (hudFramePriority) camera.updateMatrixWorld();
   }, -50);
 

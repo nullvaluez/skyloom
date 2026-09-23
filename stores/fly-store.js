@@ -100,6 +100,22 @@ const initialState = {
   runSummaryOpen: false, // post-crash summary overlay
   crashEpoch: 0, // bumped once per crash — drives CrashFlash + RunSummary
   lastCrash: null, // { at, kind: 'terrain'|'building' }
+
+  // --- ROUND 25 (W0 scaffolding — fields pre-seeded so five branches merge
+  // cleanly; plan FLY_ROUND25_PLAN.md). Discrete transitions only.
+  // screen: 'title' | 'hangar' | 'flight'. W0 keeps today's mandatory-hangar
+  // literal; A FRONT DOOR's resolveInitialScreen() moves the product to
+  // 'title' on the pre-mount beat. `hangarOpen` above is a maintained MIRROR
+  // (screen === 'hangar') so every testid/harness/store caller keeps working.
+  screen: 'hangar',
+  flightMode: 'ops', // 'free' | 'ops' (B FLIGHT PLAN)
+  settingsOpen: false, // title/pause Settings sheet (A)
+  // Visuals profile 'classic' | 'enhanced' (lib/fly/visuals-profile.js is the
+  // only writer). The literal is 'classic' = the flag-off tree; the resolver
+  // decides the real value pre-mount. visualsEpoch bumps on a real change so
+  // engine code can subscribe without React.
+  visuals: 'classic',
+  visualsEpoch: 0,
 };
 
 /**
@@ -156,7 +172,9 @@ export const useFlyStore = create(
     // (same split as quality/sound: a choice is persisted, a state change is not).
     setAircraftId: (aircraftId) => set({ aircraftId }),
 
-    setHangarOpen: (hangarOpen) => set({ hangarOpen }),
+    // R25: hangarOpen mirrors screen. Opening the hangar is screen 'hangar';
+    // closing it (Fly, Continue flight, harness bypass) is screen 'flight'.
+    setHangarOpen: (hangarOpen) => set({ hangarOpen, screen: hangarOpen ? 'hangar' : 'flight' }),
     setHangarDismissible: (hangarDismissible) => set({ hangarDismissible }),
 
     setArrival: (arrival) => set({ arrival }),
@@ -183,6 +201,14 @@ export const useFlyStore = create(
     bumpCrashEpoch: (lastCrash = null) =>
       set((state) => ({ crashEpoch: state.crashEpoch + 1, lastCrash })),
 
+    // --- ROUND 25 action stubs (W0). A owns screen/settings/visuals call
+    // sites; B owns flightMode call sites.
+    setScreen: (screen) => set({ screen, hangarOpen: screen === 'hangar' }),
+    setFlightMode: (flightMode) => set({ flightMode }),
+    setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+    setVisuals: (visuals) =>
+      set((state) => (state.visuals === visuals ? {} : { visuals, visualsEpoch: state.visualsEpoch + 1 })),
+
     addTileStats: (requested = 0, evicted = 0) =>
       set((state) => ({
         tileStats: {
@@ -194,3 +220,13 @@ export const useFlyStore = create(
     reset: () => set({ ...initialState }),
   }))
 );
+
+/**
+ * R25: a menu (title or hangar) is open — the soft-pause predicate every
+ * former `hangarOpen` gate reads. With FRONT_DOOR off `screen` can never be
+ * 'title', so this is exactly `hangarOpen` (flag-off identity).
+ */
+export const menuOpen = (s) => !!s.hangarOpen || s.screen === 'title';
+
+/** R25: the player is actually flying (not on the title or in the hangar). */
+export const inFlight = (s) => s.screen === 'flight';
