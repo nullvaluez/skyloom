@@ -74,7 +74,7 @@ const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
 const { bootFly, unpinPins } = require('./_boot');
-const { pose, warpToPose, isolateCanvas, loadFlyConstants } = require('./_r25-poses');
+const { pose, warpToPose, sunTimeMs, isolateCanvas, loadFlyConstants } = require('./_r25-poses');
 const L = require('./_r25-luma');
 const { makeCanvasShot } = require('./_canvasshot');
 const { installGroundTextureAudit } = require('./ground-texture-audit.cjs');
@@ -221,7 +221,17 @@ function writeReport(extra = {}) {
         /* storage blocked */
       }
     });
-    await bootFly(page, { style: 'satellite', timeoutMs: 900000 });
+    // Boot airborne AT the first pose (bootFly geo, noon pinned) — settling
+    // Manhattan first to then measure Owens cost 16 min at load 8 (§3a).
+    const P0 = pose(POSE_NAMES[0]);
+    const noon0 = (await sunTimeMs(P0, 'noon')).tMs;
+    await page.addInitScript((t) => {
+      window.__flySunOverride = t;
+    }, noon0);
+    await bootFly(page, {
+      style: 'satellite', timeoutMs: 1800000,
+      geo: { lat: P0.lat, lon: P0.lon, altM: P0.altM, headingRad: (P0.hdgDeg * Math.PI) / 180 },
+    });
 
     for (const name of POSE_NAMES) {
       const P = pose(name);
@@ -339,7 +349,15 @@ function writeReport(extra = {}) {
       notCal('(6) CROSS-BOOT: Classic == the flag-off tree', 'the Owens Classic capture was not taken this run');
     else {
       const p2 = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-      await bootFly(p2, { style: 'satellite', url: process.env.FLY_URL_BASELINE, timeoutMs: 900000 });
+      const P1 = pose('owens');
+      const noon1 = (await sunTimeMs(P1, 'noon')).tMs;
+      await p2.addInitScript((t) => {
+        window.__flySunOverride = t;
+      }, noon1);
+      await bootFly(p2, {
+        style: 'satellite', url: process.env.FLY_URL_BASELINE, timeoutMs: 1800000,
+        geo: { lat: P1.lat, lon: P1.lon, altM: P1.altM, headingRad: (P1.hdgDeg * Math.PI) / 180 },
+      });
       const { readiness } = await warpToPose(p2, pose('owens'), { sun: 'noon', timeoutMs: 900000, pollMs: 5000, pin: true });
       if (!readiness?.ready) notCal('(6) CROSS-BOOT: Classic == the flag-off tree', 'baseline world never ready');
       else {
