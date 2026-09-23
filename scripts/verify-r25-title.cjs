@@ -115,6 +115,17 @@ const has = async (page, id) => (await page.getByTestId(id).count()) > 0;
 // and drops only the stability wait.
 const click = (page, id) => page.getByTestId(id).click({ force: true, timeout: 60000 * SCALE });
 const tap = (page, id) => page.getByTestId(id).tap({ force: true, timeout: 60000 * SCALE });
+// A DOM click through ONE page.evaluate — for NAVIGATION steps that are not
+// what a row certifies. MEASURED on this venue (load ~7.5 on 4 cores, five
+// roles' browsers): a trusted click on the title's Takeoff & Landing card sat
+// in "scrolling into view if needed" for 180 s right after the hangar closed.
+const domClick = (page, id) =>
+  page.evaluate((id) => {
+    const el = document.querySelector(`[data-testid="${id}"]`);
+    if (!el || el.disabled) return false;
+    el.click();
+    return true;
+  }, id);
 const pct = (page) => page.evaluate(() => window.__flyBoot?.pct ?? null);
 const storeOf = (page) =>
   page.evaluate(() => {
@@ -251,6 +262,20 @@ async function legDesktop(browser, style) {
       `title in the DOM at boot pct ${probe.titleAt?.pct} (${probe.titleAt?.ms} ms) · Settings clicked at pct ${probe.clickAt.pct} → sheet at pct ${probe.sheetAt?.pct} (+${probe.sheetAt ? probe.sheetAt.ms - probe.clickAt.ms : '?'} ms) · trusted re-open ${sheet}`);
     if (toy && !sheet) throw new Error('the trusted Settings click never opened the sheet (3 tries)');
     if (toy) {
+      // (t1b) the cards follow what ships: Free Flight iff FLIGHT_PLAN.enabled;
+      // Continue iff a last setup exists (a fresh profile has none).
+      const fpOn = /export const FLIGHT_PLAN = \{\s*enabled:\s*true/.test(CONST);
+      const cards = await page.evaluate(() => ({
+        free: !!document.querySelector('[data-testid="title-free-flight"]'),
+        ops: !!document.querySelector('[data-testid="title-takeoff-landing"]'),
+        cont: !!document.querySelector('[data-testid="title-continue"]'),
+        spot: document.querySelector('[data-testid="title-spot"]')?.textContent ?? null,
+      }));
+      gate('(t1b) cards follow the ship state: Free Flight iff FLIGHT_PLAN.enabled, Takeoff & Landing always, no Continue on a fresh profile, spot chip up',
+        cards.free === fpOn && cards.ops && !cards.cont && !!cards.spot,
+        `free ${cards.free} (FLIGHT_PLAN ${fpOn ? 'ON' : 'OFF'}) · ops ${cards.ops} · continue ${cards.cont} · spot "${cards.spot}"`);
+    }
+    if (toy) {
       const running = await waitFor(page, () => window.__fly?.audio?.ctx?.state === 'running', undefined, 8000);
       gate('(t2) AudioContext running after the first title click', running,
         `before ${audioBefore} → after ${await page.evaluate(() => window.__fly?.audio?.ctx?.state ?? 'none')}`);
@@ -376,9 +401,17 @@ async function legDesktop(browser, style) {
       const all = rt.traffic?.items ?? [];
       const d = (it) => Math.hypot((it.rx - f.pos.x) / k, (it.ryd ?? it.ry) - f.pos.y, (it.rz - f.pos.z) / k);
       const live = all.filter((it) => it.stale !== 2 && Number.isFinite(it.rx));
-      live.sort((a, b) => d(a) - d(b));
+      // Nearest by the ENGINE's own distM (what the acquire range tests), the
+      // geometric d() kept beside it as a cross-check of the aim frame.
+      const em = (it) => (Number.isFinite(it.distM) ? it.distM : d(it));
+      live.sort((a, b) => em(a) - em(b));
       const it = live[0];
-      window.__r25AimStats = { items: all.length, live: live.length, stale2: all.filter((x) => x.stale === 2).length, nearestM: it ? Math.round(d(it)) : null };
+      window.__r25AimStats = {
+        items: all.length, live: live.length, stale2: all.filter((x) => x.stale === 2).length,
+        nearestM: it ? Math.round(d(it)) : null, nearestEngineM: it ? Math.round(em(it)) : null,
+        flight: { x: Math.round(f.pos.x), y: Math.round(f.pos.y), z: Math.round(f.pos.z), lat: f.latDeg },
+        item: it ? { x: Math.round(it.rx), y: Math.round(it.ryd ?? it.ry), z: Math.round(it.rz) } : null,
+      };
       if (!it) return null;
       const dx = (it.rx - f.pos.x) / k;
       const dz = (it.rz - f.pos.z) / k;
@@ -457,18 +490,18 @@ async function legDesktop(browser, style) {
       inHangar && hs.screen === 'hangar' && hs.flightMode === 'ops' && backToTitle,
       `hangar ${inHangar} (${hs.screen}/${hs.flightMode}) · back to title ${backToTitle}`);
 
-    // (t11) departure -> pause -> Exit to title over a live world
-    await click(page, 'title-takeoff-landing');
-    await waitFor(page, () => !!document.querySelector('[data-testid="hangar"]'), undefined, 60000);
-    await click(page, 'hangar-pick-prop');
-    if (await page.locator('#departure-airport').count()) await page.selectOption('#departure-airport', 'KOSU', { force: true, timeout: 60000 * SCALE }).catch(() => {});
-    const apron = page.locator('input[value="apron"]');
-    if (await apron.count()) await apron.first().check({ force: true, timeout: 60000 * SCALE }).catch(() => {});
+    // (t11) departure -> pause -> Exit to title over a live world. The
+    // navigation clicks are DOM clicks (see domClick); the defaults already
+    // give the prop a KOSU apron start (fly-departure unset, startMode apron).
+    await waitFor(page, () => !!document.querySelector('[data-testid="title-takeoff-landing"]'), undefined, 60000);
+    await domClick(page, 'title-takeoff-landing');
+    await waitFor(page, () => !!document.querySelector('[data-testid="hangar-pick-prop"]'), undefined, 120000);
+    await domClick(page, 'hangar-pick-prop');
     const flyReady = await waitFor(page, () => document.querySelector('[data-testid="hangar-fly"]')?.disabled === false, undefined, 180000);
     if (!flyReady) {
       notCal('(t11) pause -> Exit to title over a live world', 'hangar-fly never enabled (aircraft preview did not load)');
     } else {
-      await click(page, 'hangar-fly');
+      await domClick(page, 'hangar-fly');
       const flying = await waitFor(page, () => window.__flyStore.getState().screen === 'flight', undefined, 30000);
       // The launch is a far warp: WarpFlash's hold (z-30, pointer-events on)
       // covers the pause menu (z-20) until the destination is ready — exactly
