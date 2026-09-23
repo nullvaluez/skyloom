@@ -32,10 +32,13 @@
 
 const { fixtureEnabled, attachFixture, fixturePin } = require('./_fixture');
 
+const handles = new Set();
+
 async function prepareContext(context) {
   if (context.__flyPreloaded) return;
   context.__flyPreloaded = true;
   const fx = await attachFixture(context);
+  handles.add(fx);
   await context.addInitScript((pin) => {
     window.__flyTileFixture = pin;
   }, fixturePin(fx.url, Number(process.env.FLY_FIXTURE_DEM_MAXZOOM || 15)));
@@ -47,9 +50,29 @@ async function prepareContext(context) {
     }, k);
 }
 
+/**
+ * The fixture server lives in THIS node process, and a harness that never
+ * calls process.exit (the ops harnesses end on `finally { browser.close() }`)
+ * would then never exit — MEASURED on E2's first ops-keyboard run: the harness
+ * printed its error and sat in the slot. So when the browser goes away, close
+ * the server; if something else still holds the loop, exit after a grace
+ * period with the harness's own exit code.
+ */
+function closeFixtureOnDisconnect(browser) {
+  browser.on('disconnected', () => {
+    for (const fx of handles) Promise.resolve(fx.close?.()).catch(() => {});
+    handles.clear();
+    setTimeout(() => {
+      process.stderr.write('[fixture-preload] browser closed; exiting with the harness exit code\n');
+      process.exit(process.exitCode ?? 0);
+    }, 10000).unref();
+  });
+}
+
 function wrapBrowser(browser) {
   if (browser.__flyPreloaded) return browser;
   browser.__flyPreloaded = true;
+  closeFixtureOnDisconnect(browser);
   const newContext = browser.newContext.bind(browser);
   browser.newContext = async (...args) => {
     const context = await newContext(...args);
