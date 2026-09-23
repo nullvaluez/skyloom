@@ -49,9 +49,14 @@
  *          to spare SwiftShader — CSS px are what the targets are measured
  *          in): every visible title control ≥ 44x44 px, cards ≥ 88 px tall,
  *          nothing clipped by the viewport, no overlapping controls,
- *          attribution visible; the Settings sheet is a bottom sheet whose
- *          controls are ≥ 44 px; Back closes the sheet (title stays); Back
- *          in the pre-flight hangar returns to the title.
+ *          attribution visible; the Settings sheet is a bottom sheet docked
+ *          on the credit strip (credit visible + on top) whose controls are
+ *          ≥ 44 px; Back closes the sheet (title stays); Back in the
+ *          pre-flight hangar returns to the title.
+ *   attr   (fix pass) the credit under every title overlay — Logbook /
+ *          Settings / Credits — on desktop + phone portrait + landscape, and
+ *          no lock blip on the title; `attrsat` = the desktop row in
+ *          satellite (the review's Esri repro). See legAttr.
  *
  * RED FIRST (scripts/r25-a-front-door.md §2): the same run with
  * FRONT_DOOR.enabled false (the r25-w0 posture) reads FAIL on every title row
@@ -722,11 +727,19 @@ async function legPhone(browser, orient) {
         .map((b) => ({ id: b.dataset.testid || b.textContent.trim().slice(0, 16), r: b.getBoundingClientRect() }))
         .filter((b) => b.r.width > 0 && (b.r.width < 43.5 || b.r.height < 43.5))
         .map((b) => `${b.id} ${b.r.width.toFixed(0)}x${b.r.height.toFixed(0)}`);
-      return { bottom: Math.round(r.bottom), top: Math.round(r.top), vh: innerHeight, w: Math.round(r.width), vw: innerWidth, small };
+      // Fix pass: the sheet docks ON the credit strip (the title modal reserves
+      // it — Esri's credit stays visible and sharp under the sheet), so its
+      // bottom is the credit's top, not the viewport's bottom.
+      const a = document.querySelector('[data-testid="title-attribution"]')?.getBoundingClientRect();
+      const at = a ? document.elementFromPoint(a.x + a.width / 2, a.y + a.height / 2) : null;
+      const creditOnTop = !!at && !!document.querySelector('[data-testid="title-attribution"]').contains(at);
+      return { bottom: Math.round(r.bottom), top: Math.round(r.top), vh: innerHeight, w: Math.round(r.width), vw: innerWidth, small,
+        creditTop: a ? Math.round(a.top) : null, creditBottom: a ? Math.round(a.bottom) : null, creditOnTop };
     });
     await page.screenshot({ path: path.join(OUT, `phone-${orient}-settings.png`), timeout: 90000 }).catch(() => {});
-    gate(`(${P}4) ${orient}: Settings is a bottom sheet, every control ≥ 44 px`,
-      sheetUp && !!sh && Math.abs(sh.bottom - sh.vh) <= 1 && sh.top >= 0 && sh.w >= sh.vw - 1 && sh.small.length === 0, JSON.stringify(sh));
+    gate(`(${P}4) ${orient}: Settings is a bottom sheet docked on the credit strip (credit visible + on top), every control ≥ 44 px`,
+      sheetUp && !!sh && sh.creditTop != null && sh.bottom <= sh.creditTop + 1 && sh.bottom >= sh.creditTop - 24 && sh.creditBottom <= sh.vh + 1 &&
+        sh.creditOnTop && sh.top >= 0 && sh.w >= sh.vw - 1 && sh.small.length === 0, JSON.stringify(sh));
     await page.goBack().catch(() => {});
     const sheetClosed = await waitFor(page, () => !window.__flyStore.getState().settingsOpen, undefined, 8000);
     const st1 = await storeOf(page);
@@ -747,6 +760,129 @@ async function legPhone(browser, orient) {
   }
 }
 
+/**
+ * LEG attr / attrsat (fix pass after the adversarial review): the credit under
+ * every title overlay + the title's audio one-shots. No reveal wait — the title
+ * is interactive at pct 0, and these rows are DOM + store + audio, not pixels.
+ *   (a1) Logbook opened FROM THE TITLE: the flight AttributionBar
+ *        (`.bottom-2.left-2`, the frozen verify-fly-style selector) is mounted,
+ *        visible and on top — desktop, where the Logbook stops 2rem short of
+ *        the bottom exactly so the credit shows through. Phones: the R16
+ *        Logbook sheet covers that bar in flight too, so the phone row asserts
+ *        parity (mounted) and nothing about paint order.
+ *   (a2) Settings open: the title credit is visible, on top (elementFromPoint)
+ *        and NOT under the modal backdrop (modal bottom ≤ credit top).
+ *   (a3) Credits open: the same.
+ *   (a4) soft-lock transitions on the title play NO lock blip (desktop).
+ * RED (scripts/r25-a-front-door.md §2b): the pre-fix tree reads (a1) no bar,
+ * (a2)/(a3) the credit under the backdrop, (a4) one blip per transition.
+ */
+async function legAttr(browser, { style = null, phone = null } = {}) {
+  const tag = phone || style || 'toy';
+  const A = `a-${tag}`;
+  const opts = phone
+    ? {
+        viewport: phone === 'portrait' ? { width: 390, height: 844 } : { width: 844, height: 390 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true,
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+      }
+    : { viewport: { width: 1280, height: 720 } };
+  const { ctx, page, errors, errNote } = await productPage(browser, opts, style);
+  const credit = (sel) =>
+    page.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return { mounted: false };
+      const r = el.getBoundingClientRect();
+      const at = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      const modal = document.querySelector('.fly-title-modal');
+      const mr = modal?.getBoundingClientRect();
+      const shown = r.width > 0 && r.height > 0;
+      return {
+        mounted: true,
+        visible: typeof el.checkVisibility === 'function' ? el.checkVisibility() && shown : shown,
+        inView: r.top >= -1 && r.bottom <= innerHeight + 1,
+        onTop: !!at && el.contains(at),
+        at: at ? `${at.tagName.toLowerCase()}.${String(at.className || '').slice(0, 40)}` : null,
+        underModal: mr ? Math.round(mr.bottom) > Math.round(r.top) : false,
+        modalBottom: mr ? Math.round(mr.bottom) : null,
+        top: Math.round(r.top),
+        text: el.textContent.slice(0, 60),
+      };
+    }, sel);
+  try {
+    const t = await waitTitleReady(page, { timeoutMs: 240000 * SCALE });
+    if (!t.title) {
+      gate(`(${A}0) the product boots onto the title`, false, `screen ${t.screen}`);
+      return;
+    }
+    await page.waitForTimeout(1500);
+    const expect = style === 'satellite' ? /Esri/ : /./;
+
+    // (a1) Logbook from the title
+    await domClick(page, 'title-logbook');
+    const lb = await waitFor(page, () => !!document.querySelector('[data-testid="logbook"]'), undefined, 30000);
+    await page.waitForTimeout(1200); // the Logbook's spring settles
+    const bar = await credit('[data-zone="attribution"] .bottom-2.left-2');
+    await page.screenshot({ path: path.join(OUT, `attr-${tag}-logbook.png`), timeout: 90000 }).catch(() => {});
+    if (phone)
+      gate(`(${A}1) ${tag}: Logbook from the title mounts the flight credit bar (flight parity: the R16 phone Logbook sheet covers it in flight too)`,
+        lb && bar.mounted, JSON.stringify(bar));
+    else
+      gate(`(${A}1) Logbook opened from the title: the flight credit bar is mounted, visible and on top`,
+        lb && bar.mounted && bar.visible && bar.inView && bar.onTop && expect.test(bar.text), JSON.stringify(bar));
+    await page.evaluate(() => window.__flyStore.getState().setLogbookOpen(false));
+    await waitFor(page, () => !document.querySelector('[data-testid="logbook"]'), undefined, 30000);
+
+    // (a2) Settings, (a3) Credits
+    for (const [n, id, sel, which] of [
+      [2, 'title-settings', '[data-testid="settings-sheet"]', 'Settings'],
+      [3, 'title-credits', '.fly-title-modal', 'Credits'],
+    ]) {
+      await domClick(page, id);
+      const up = await waitFor(page, (sel) => !!document.querySelector(sel), sel, 30000);
+      await page.waitForTimeout(600);
+      const c = await credit('[data-testid="title-attribution"]');
+      await page.screenshot({ path: path.join(OUT, `attr-${tag}-${which.toLowerCase()}.png`), timeout: 90000 }).catch(() => {});
+      gate(`(${A}${n}) ${tag}: ${which} open — the title credit is visible, on top and clear of the modal backdrop`,
+        up && c.mounted && c.visible && c.inView && c.onTop && !c.underModal && expect.test(c.text), JSON.stringify(c));
+      await page.evaluate((which) => {
+        const s = window.__flyStore.getState();
+        if (which === 'Settings') s.setSettingsOpen(false);
+        else s.closeCredits();
+      }, which);
+      await waitFor(page, () => !document.querySelector('.fly-title-modal'), undefined, 30000);
+    }
+
+    // (a4) no lock blip on the title (desktop: one row is enough)
+    if (!phone) {
+      const blips = await page.evaluate(async () => {
+        const a = window.__fly?.audio;
+        if (!a) return null;
+        let lock = 0;
+        const orig = a.lockBlip;
+        a.lockBlip = function (...x) {
+          lock++;
+          return orig.apply(this, x);
+        };
+        const st = window.__flyStore.getState();
+        for (let i = 0; i < 3; i++) {
+          st.setLock(`r25a${i}0`, 'locked');
+          await new Promise((r) => setTimeout(r, 50));
+          st.clearLock();
+          await new Promise((r) => setTimeout(r, 50));
+        }
+        a.lockBlip = orig;
+        return { lockBlips: lock, transitions: 3, screen: window.__flyStore.getState().screen };
+      });
+      gate(`(${A}4) three soft-lock transitions on the title play NO lock blip`, !!blips && blips.screen === 'title' && blips.lockBlips === 0, JSON.stringify(blips));
+    }
+    gate(`(${A}5) ${tag}: ZERO page errors`, errors.length === 0, errNote());
+  } catch (e) {
+    gate(`(${A}!) the ${tag} attribution leg ran to completion`, false, String(e.stack || e).slice(0, 400));
+  } finally {
+    await Promise.race([ctx.close().catch(() => {}), new Promise((r) => setTimeout(r, 30000))]);
+  }
+}
+
 (async () => {
   const browser = await chromium.launch({ args: ['--enable-webgl', '--ignore-gpu-blocklist', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   try {
@@ -755,6 +891,12 @@ async function legPhone(browser, orient) {
       await legPhone(browser, 'portrait');
       await legPhone(browser, 'landscape');
     }
+    if (LEGS.includes('attr')) {
+      await legAttr(browser, {});
+      await legAttr(browser, { phone: 'portrait' });
+      await legAttr(browser, { phone: 'landscape' });
+    }
+    if (LEGS.includes('attrsat')) await legAttr(browser, { style: 'satellite' });
     if (LEGS.includes('sat')) await legDesktop(browser, 'satellite');
   } catch (e) {
     gate('(!) the gate ran to completion', false, String(e.stack || e).slice(0, 400));
