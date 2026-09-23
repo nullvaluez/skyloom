@@ -13,14 +13,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "ShadowADSB - Fly the Living Night Sky",
-  description: "A night-flying game over a glowing toy Earth. Soar through neon cities built from real map data, chase real air traffic live from ADS-B, warp between world landmarks, and log every plane you spot.",
-  keywords: ["flying game", "flight game", "night flight", "ADS-B", "aviation", "toy world", "3D", "exploration"],
+  title: "Skyloom - Fly the living Earth",
+  description: "Fly the living Earth. Real satellite terrain or a neon world built from real map data, live ADS-B air traffic, takeoffs and landings, free flight over famous places, and a logbook of every plane you spot.",
+  keywords: ["Skyloom", "flying game", "flight game", "flight simulator", "satellite", "ADS-B", "aviation", "3D", "exploration"],
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "ShadowADSB",
+    title: "Skyloom",
   },
   formatDetection: {
     telephone: false,
@@ -29,14 +29,14 @@ export const metadata = {
     type: "website",
     locale: "en_US",
     url: "https://shadowadsb.app",
-    title: "ShadowADSB - Fly the Living Night Sky",
-    description: "A night-flying game over a glowing toy Earth. Neon cities from real map data, live ADS-B air traffic, warps to world landmarks.",
-    siteName: "ShadowADSB",
+    title: "Skyloom - Fly the living Earth",
+    description: "Fly the living Earth: real satellite terrain, live ADS-B air traffic, takeoffs and landings, and free flight over famous places.",
+    siteName: "Skyloom",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ShadowADSB - Fly the Living Night Sky",
-    description: "A night-flying game over a glowing toy Earth. Neon cities from real map data, live ADS-B air traffic, warps to world landmarks.",
+    title: "Skyloom - Fly the living Earth",
+    description: "Fly the living Earth: real satellite terrain, live ADS-B air traffic, takeoffs and landings, and free flight over famous places.",
   },
   icons: {
     icon: [
@@ -65,11 +65,11 @@ export default function RootLayout({ children }) {
     <html lang="en" className="dark">
       <head>
         {/* PWA meta tags */}
-        <meta name="application-name" content="ShadowADSB" />
+        <meta name="application-name" content="Skyloom" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="ShadowADSB" />
+        <meta name="apple-mobile-web-app-title" content="Skyloom" />
         <link rel="apple-touch-icon" href="/logo.webp" />
         
         {/* Splash screens for iOS */}

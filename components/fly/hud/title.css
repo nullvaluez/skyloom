@@ -1,0 +1,93 @@
+/* R25 A FRONT DOOR — the title screen. Ink + Ice, the hangar's visual family
+   (operations.css). The layer is transparent in the middle so the live world
+   orbiting behind it IS the backdrop; two scrims keep the type legible. */
+.fly-title{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;pointer-events:auto;isolation:isolate;color:#eef5ff;font-family:var(--font-geist-sans),sans-serif;padding:max(env(safe-area-inset-top),28px) max(env(safe-area-inset-right),40px) max(env(safe-area-inset-bottom),16px) max(env(safe-area-inset-left),40px);-webkit-tap-highlight-color:transparent}
+.fly-title[hidden]{display:none}
+.fly-title-scrim{position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,rgba(4,6,13,.66) 0%,rgba(4,6,13,.2) 20%,transparent 34%,transparent 50%,rgba(4,6,13,.5) 70%,rgba(4,6,13,.86) 100%)}
+/* Only the title's OWN controls inherit the title type; the shared settings
+   rows / credits panel keep their Tailwind sizes and colours. */
+:where(.fly-title-continue,.fly-title-card,.fly-title-secondary button,.fly-title-settings>header button){font:inherit;color:inherit;cursor:pointer}
+.fly-title :is(button,a):focus-visible{outline:2px solid #87e7ff;outline-offset:3px}
+
+.fly-title-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;min-width:0}
+.fly-title-brand{min-width:0}
+.fly-title-wordmark{margin:0;font-family:'Archivo Black',ui-sans-serif,system-ui;font-size:clamp(36px,5vw,64px);font-weight:400;line-height:.95;letter-spacing:-.01em;text-shadow:0 4px 40px rgba(3,7,17,.65)}
+.fly-title-tagline{margin:8px 0 0 3px;font-size:12px;letter-spacing:.34em;text-transform:uppercase;color:#bccbdc;text-shadow:0 2px 16px rgba(3,7,17,.8)}
+.fly-title-spot{display:flex;align-items:center;gap:8px;flex:none;max-width:46vw;padding:8px 14px;border-radius:999px;background:rgba(7,10,20,.55);border:1px solid rgba(207,238,248,.16);backdrop-filter:blur(12px);font-size:12px;color:#d6e4f0;white-space:nowrap}
+.fly-title-spot svg{flex:none;color:#87e7ff}
+.fly-title-spot-name{overflow:hidden;text-overflow:ellipsis}
+.fly-title-spot-sep{flex:none;width:1px;height:12px;background:rgba(207,238,248,.25)}
+.fly-title-spot-time{font-variant-numeric:tabular-nums;color:#eef5ff}
+.fly-title-spot-sun{display:flex}
+.fly-title-spot[data-sun=golden] .fly-title-spot-sun svg{color:#ffc78a}
+.fly-title-spot[data-sun=night] .fly-title-spot-sun svg{color:#c8d3ff}
+
+.fly-title-bottom{display:flex;flex-direction:column;gap:12px;width:min(880px,100%);margin:0 auto}
+.fly-title-continue{display:flex;align-items:center;gap:12px;min-width:0;min-height:52px;padding:10px 20px;border-radius:14px;border:1px solid #c1edfb;background:#d6f6ff;color:#0b1725!important;font-size:15px;font-weight:650;text-align:left;box-shadow:0 8px 30px rgba(104,218,255,.18);transition:background .18s}
+.fly-title-continue:hover{background:#f0fcff}
+.fly-title-continue svg{flex:none}
+.fly-title-continue-detail{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:500;color:#2a4257}
+.fly-title-continue-detail::before{content:'·';margin-right:10px;color:#5c7890}
+
+.fly-title-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fly-title-cards-single{grid-template-columns:minmax(0,460px);justify-content:center}
+.fly-title-card{display:flex;align-items:center;gap:18px;min-width:0;min-height:112px;padding:18px 22px;text-align:left;border-radius:18px;border:1px solid rgba(207,238,248,.22);background:linear-gradient(145deg,rgba(16,23,40,.82),rgba(7,10,20,.74));backdrop-filter:blur(18px);box-shadow:0 18px 50px rgba(0,0,0,.28),inset 0 1px 0 rgba(207,238,248,.08);transition:background .18s,border-color .18s,transform .18s}
+.fly-title-card:hover{border-color:rgba(135,231,255,.6);background:linear-gradient(145deg,rgba(22,34,58,.9),rgba(9,14,28,.82));transform:translateY(-2px)}
+.fly-title-card-icon{flex:none;color:#87e7ff}
+.fly-title-card-text{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fly-title-card-text strong{font-size:22px;font-weight:650;letter-spacing:-.03em;color:#eef5ff}
+.fly-title-card-text span{font-size:13px;line-height:1.45;color:#a9bdd1}
+.fly-title-card-text .fly-title-card-sub{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#7f98b3}
+
+.fly-title-secondary{display:flex;justify-content:center;gap:8px}
+.fly-title-secondary button{display:flex;align-items:center;justify-content:center;gap:8px;min-width:44px;min-height:44px;padding:8px 18px;border-radius:999px;border:1px solid rgba(207,238,248,.16);background:rgba(7,10,20,.5);color:#d0dfeb;font-size:13px;backdrop-filter:blur(10px);transition:background .18s,border-color .18s}
+.fly-title-secondary button:hover{background:rgba(207,238,248,.12);border-color:rgba(207,238,248,.32)}
+.fly-title-secondary svg{flex:none;color:#9ec3dc}
+
+.fly-title-attribution{display:flex;flex-wrap:wrap;justify-content:center;gap:2px 12px;font-size:10px;line-height:1.4;color:#8ea2b8}
+.fly-title-attribution a{color:inherit;text-decoration:none}
+.fly-title-attribution a:hover{color:#eef5ff;text-decoration:underline}
+
+/* Settings / credits: a modal inside the title's own stacking context. */
+.fly-title-modal{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(4,6,13,.55);backdrop-filter:blur(4px)}
+.fly-title-settings{width:min(340px,100%);max-height:calc(100% - 32px);overflow:auto;overscroll-behavior:contain;padding:16px;border-radius:18px;border:1px solid rgba(207,238,248,.22);background:linear-gradient(145deg,rgba(16,23,40,.96),rgba(7,10,20,.95));box-shadow:0 24px 70px rgba(0,0,0,.4)}
+.fly-title-settings>header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.fly-title-settings h2{margin:0;font-size:15px;font-weight:600;letter-spacing:.02em}
+.fly-title-settings>header button{display:grid;place-items:center;width:44px;height:44px;border-radius:12px;border:1px solid rgba(207,238,248,.16);background:rgba(207,238,248,.05)}
+.fly-title-settings-rows{display:flex;flex-direction:column;gap:8px}
+.fly-title-modal-sheet{align-items:flex-end;padding:0}
+.fly-title-modal-sheet .fly-title-settings{width:100%;max-height:82svh;border-radius:20px 20px 0 0;padding-bottom:max(env(safe-area-inset-bottom),16px)}
+
+/* Narrow desktop windows stack the cards. */
+@media (max-width:640px){.fly-title{padding-left:max(env(safe-area-inset-left),16px);padding-right:max(env(safe-area-inset-right),16px)}.fly-title-cards{grid-template-columns:1fr}}
+
+/* Phones (the use-device-layout contract: a phone stays a phone sideways).
+   No backdrop-filter on phones (the R17 .hud-glass lesson: a per-frame
+   framebuffer re-read over a live WebGL scene). Every target >= 44 px; cards
+   >= 88 px tall. */
+[data-device='phone'] .fly-title{padding:max(env(safe-area-inset-top),14px) max(env(safe-area-inset-right),14px) max(env(safe-area-inset-bottom),8px) max(env(safe-area-inset-left),14px)}
+[data-device='phone'] :is(.fly-title-card,.fly-title-spot,.fly-title-secondary button,.fly-title-modal){backdrop-filter:none}
+[data-device='phone'] .fly-title-card{min-height:88px;padding:14px 16px;gap:14px;background:rgba(9,14,28,.9)}
+[data-device='phone'] .fly-title-card:hover{transform:none}
+[data-device='phone'] .fly-title-card-text strong{font-size:18px}
+[data-device='phone'] .fly-title-card-text span{font-size:12px}
+[data-device='phone'] .fly-title-wordmark{font-size:34px}
+[data-device='phone'] .fly-title-tagline{margin-top:6px;font-size:10px;letter-spacing:.26em}
+[data-device='phone'] .fly-title-spot{max-width:50vw;padding:6px 10px;font-size:11px;background:rgba(7,10,20,.78)}
+[data-device='phone'] .fly-title-bottom{gap:8px}
+[data-device='phone'] .fly-title-continue{min-height:48px;padding:8px 16px;font-size:14px}
+[data-device='phone'] .fly-title-secondary button{flex:1;padding:8px 10px;background:rgba(7,10,20,.78)}
+[data-device='phone'][data-orient='portrait'] .fly-title-cards{grid-template-columns:1fr}
+[data-device='phone'][data-orient='portrait'] .fly-title-top{flex-direction:column;gap:10px}
+[data-device='phone'][data-orient='portrait'] .fly-title-spot{max-width:100%}
+[data-device='phone'] .fly-title-tagline{white-space:nowrap}
+[data-device='phone'][data-orient='landscape'] .fly-title{padding-top:max(env(safe-area-inset-top),10px)}
+[data-device='phone'][data-orient='landscape'] .fly-title-wordmark{font-size:26px}
+[data-device='phone'][data-orient='landscape'] .fly-title-tagline{margin-top:4px;font-size:9px}
+[data-device='phone'][data-orient='landscape'] .fly-title-bottom{gap:6px}
+[data-device='phone'][data-orient='landscape'] .fly-title-continue{min-height:44px}
+[data-device='phone'][data-orient='landscape'] .fly-title-card{padding:10px 14px}
+[data-device='phone'][data-orient='landscape'] .fly-title-card-text .fly-title-card-sub{display:none}
+[data-device='phone'][data-orient='landscape'] .fly-title-attribution{font-size:9px}
+
+@media (prefers-reduced-motion:reduce){.fly-title,.fly-title *{transition:none!important;animation:none!important}}

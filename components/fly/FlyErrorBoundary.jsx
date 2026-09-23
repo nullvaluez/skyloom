@@ -3,9 +3,10 @@
 import { Component } from 'react';
 
 /**
- * Catches render/WebGL errors inside Fly mode (context loss, shader
- * compile failures, asset errors) so a broken flight never takes down
- * the tracker underneath.
+ * Catches render/WebGL errors inside the game (context loss, shader compile
+ * failures, asset errors) so a broken flight never takes down the page.
+ * R25 A: exit-to-title lives in the running game now; this boundary keeps the
+ * page reload (onExit) as its recovery, labelled "Restart Skyloom".
  */
 export class FlyErrorBoundary extends Component {
   state = { hasError: false };
@@ -28,7 +29,7 @@ export class FlyErrorBoundary extends Component {
         <div className="flex h-full w-full items-center justify-center bg-zinc-950">
           <div className="text-center">
             <p className="text-lg font-medium text-zinc-100">
-              Fly mode hit a rendering error
+              Skyloom hit a rendering error
             </p>
             <p className="mt-1 text-sm text-zinc-500">
               This is usually a lost WebGL context or a failed asset load.
@@ -44,7 +45,7 @@ export class FlyErrorBoundary extends Component {
                 onClick={this.props.onExit}
                 className="text-zinc-400 hover:underline"
               >
-                Exit Fly Mode
+                Restart Skyloom
               </button>
             </div>
           </div>
