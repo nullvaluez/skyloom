@@ -47,7 +47,13 @@ const os = require('os');
 const path = require('path');
 const { chromium } = require('playwright');
 const { bootFly, unpinPins } = require('./_boot');
-const { pose, warpToPose } = require('./_r25-poses');
+const POSE_LIB = require('./_r25-poses');
+const { pose, warpToPose } = POSE_LIB;
+// E's later helpers (present once E's session-2 commits are on the tree):
+// holdStill = store phase 'paused' (the sim stops stepping, so a pixel pair is
+// not a sub-pixel SHIFT pair); isolateCanvas = hide every DOM overlay.
+const holdStill = POSE_LIB.holdStill || (async () => null);
+const isolateCanvas = POSE_LIB.isolateCanvas || (async () => null);
 const L = require('./_r25-luma');
 const { makeCanvasShot } = require('./_canvasshot');
 const { installGroundTextureAudit } = require('./ground-texture-audit.cjs');
@@ -268,6 +274,7 @@ function stepStat(img, lines, W, H) {
 
     for (const P of POSES) {
       const r = (report.poses[P.name] = { pose: P.id });
+      await holdStill(page, false);
       const { ms, readiness } = await warpToPose(page, P, { sun: 'noon', timeoutMs: 1200000 * Math.min(SCALE, 2), pollMs: 5000, pin: true });
       r.readyMs = ms;
       if (!readiness?.ready) {
@@ -275,8 +282,12 @@ function stepStat(img, lines, W, H) {
         continue;
       }
       await hideActors(page);
+      await isolateCanvas(page, true);
       await frames(page, 20);
       const ed = await waitEnhancedData(page);
+      // Freeze the sim for the pixel pairs (r25GroundFrame keeps running: the
+      // frame block is not skipped while paused, only the flight integration).
+      r.held = await holdStill(page, true);
       r.enhancedData = ed;
       await frames(page, 20);
       // ENHANCED (the product profile the tiles streamed in)
@@ -383,6 +394,8 @@ function stepStat(img, lines, W, H) {
       await tp.addInitScript(() => { window.__flyR25Sky = 0; });
       const tb = await bootFly(tp, { timeoutMs: 900000 });
       await hideActors(tp);
+      await isolateCanvas(tp, true);
+      await holdStill(tp, true);
       await frames(tp, 30);
       const a = await tshot();
       await frames(tp, 10);
