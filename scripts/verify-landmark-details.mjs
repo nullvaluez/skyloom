@@ -36,6 +36,14 @@ await test("twelve POIs, no duplicates, new exclusions bounded", () => {
   assert.equal(new Set(MONUMENT_MANIFEST.map((e) => e.poi)).size, 12);
   for (const e of MONUMENT_MANIFEST)
     assert.ok(e.exclusionM > 0 && e.exclusionM <= 190);
+  for (const e of MONUMENT_MANIFEST)
+    for (const [level, asset] of Object.entries(e.detail ?? {})) {
+      assert.ok(
+        asset.triangles <= C[level].triangles,
+        `${e.poi} ${level} triangle budget`,
+      );
+      assert.ok(asset.bytes <= C[level].bytes, `${e.poi} ${level} byte budget`);
+    }
 });
 for (const r of records)
   await test(r.poi + " " + r.level + " geometry / budget / provenance", () => {

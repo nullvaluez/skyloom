@@ -180,7 +180,7 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
     m.userData.__ramp = ramp; // disposed with the material below
     applyBendAnchor(m);
     return m;
-  }, [isToy]);
+  }, [isToy, cinematic]);
   const haloMaterial = useMemo(() => {
     const m = new MeshBasicMaterial({
       // Round 13 (P4): satellite gets a warm daylight rim-glow (soft white/gold)
@@ -233,7 +233,11 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
       const stats = (window.__flyStats ??= {});
       const mon = (stats.monuments ??= {});
       mon.consumeT = +t.toFixed(4);
-      mon.lagSec = mon.bumpT != null ? +(t - mon.bumpT).toFixed(4) : -1;
+      // Clearing suppression during a style unmount has no replacement actor.
+      // Its epoch must not be timed against the previous style's old model birth.
+      const replacement = mon.bumpEpoch === supEpoch;
+      mon.lagSec = replacement && mon.bumpT != null ? +(t - mon.bumpT).toFixed(4) : 0;
+      mon.releaseConsumes = (mon.releaseConsumes ?? 0) + (replacement ? 0 : 1);
       mon.lateConsumes = (mon.lateConsumes ?? 0) + (mon.lagSec > 1e-6 ? 1 : 0);
       mon.consumes = (mon.consumes ?? 0) + 1;
     }
@@ -272,12 +276,12 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
         _dummy.position.set(poi.wx - origin.anchor.x, groundY, poi.wz - origin.anchor.z);
         // Round 20 (C): THE marquee hook, and the whole of it in this file. A
         // POI whose REAL model is currently placed skips its ARCHETYPE instance
-        // — the tail loop below then parks that slot at scale 0 — but KEEPS its
-        // hero halo: the halo is the monument's ground presence, not part of the
-        // archetype, and a monument must not lose it at the moment it gets
-        // better. With MONUMENT_MODELS.enabled false nothing is ever suppressed,
+        // — the tail loop below then parks that slot at scale 0. The cinematic
+        // model owns its lighting; other styles retain their ground halo below.
+        // With MONUMENT_MODELS.enabled false nothing is ever suppressed,
         // so this branch is the pre-R20 code path unconditionally.
-        if (!isMonumentSuppressed(poi.name)) {
+        const modelPlaced = isMonumentSuppressed(poi.name);
+        if (!modelPlaced) {
           _dummy.scale.set(sx, sy, sz);
           _dummy.rotation.set(0, yaw, 0);
           _dummy.updateMatrix();
@@ -285,7 +289,11 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
           n += 1;
         }
         // hero halo under the monument (shared pool, medium/high only)
-        if (halo && halosOn && h < HALO_POOL) {
+        // Cinematic models already carry architectural illumination. Their old
+        // additive hemisphere covered whole plazas with a hard pale night patch.
+        // Keep it for procedural fallbacks, Neon, and the review baseline only.
+        const baseline = process.env.NODE_ENV !== 'production' && window.__flyLandmarkBaseline;
+        if (halo && halosOn && h < HALO_POOL && (!cinematic || !modelPlaced || baseline)) {
           const r = sy * 0.55;
           if (isToy) {
             // Round 13 P5: flat radial ground pool (lifted a hair off the plane

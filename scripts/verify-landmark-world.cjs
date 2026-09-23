@@ -75,11 +75,13 @@ const percent = (a, p) =>
         await page
           .getByTestId("warp-hold")
           .waitFor({ state: "hidden", timeout: 30000 });
-        if (!baseline || site.name!=="Burj Khalifa") await page.waitForFunction(
-          (name) => window.__flyMonuments?.placed?.some((p) => p.name === name),
-          site.name,
-          { timeout: 30000 },
-        );
+        if (!baseline || site.name !== "Burj Khalifa")
+          await page.waitForFunction(
+            (name) =>
+              window.__flyMonuments?.placed?.some((p) => p.name === name),
+            site.name,
+            { timeout: 30000 },
+          );
         // Warm the local scene, then restart the identical measured approach. No governor or terrain pins.
         await page.waitForTimeout(6000);
         await page.evaluate(
@@ -138,6 +140,7 @@ const percent = (a, p) =>
                 if (detail !== lastDetail) {
                   detailChanges.push({
                     detail,
+                    sampleIndex: frames.length - 1,
                     atMs: t - start,
                     frameMs: last ? t - last : 0,
                   });
@@ -161,6 +164,10 @@ const percent = (a, p) =>
             const marquee = root.getObjectByName("monument-marquee");
             return {
               baseline,
+              pins: {
+                governor: window.__flyGovPin ?? null,
+                terrain: window.__flyTerraPin ?? null,
+              },
               site: site.name,
               frames,
               detailChanges,
@@ -200,6 +207,13 @@ const percent = (a, p) =>
         metrics.p95 = percent(metrics.frames, 0.95);
         metrics.p50 = percent(metrics.frames, 0.5);
         metrics.max = Math.max(...metrics.frames);
+        for (const change of metrics.detailChanges)
+          change.nearbyMaxMs = Math.max(
+            ...metrics.frames.slice(
+              Math.max(0, change.sampleIndex - 1),
+              change.sampleIndex + 4,
+            ),
+          );
         delete metrics.frames;
         report.runs.push(metrics);
         await page.screenshot({

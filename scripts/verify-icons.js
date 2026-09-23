@@ -113,6 +113,7 @@ const probe = () => {
       marquee = {
         indexCount: o.geometry?.index?.count ?? -1,
         key: o.material?.customProgramCacheKey?.() ?? null,
+        cinematic: !!o.material?.userData?.cinematicNight,
         bend: o.material?.userData?.__worldBend ?? null,
         isModel: o._isModel === true,
         painted: o._painted === true,
@@ -466,7 +467,8 @@ async function warpHold(page, lat, lon, altM) {
     gate(`${style} · marquee mesh mounted`, !!p.marquee, JSON.stringify(p.marquee));
     gate(
       `${style} · marquee rides the new anchor bend`,
-      p.marquee?.key === 'world-bend-anchor-monument-r20' && p.marquee?.bend === 'anchor-monument' && p.marquee?.hasAnchor,
+      // Landmark upgrade: the cinematic material now includes authored architectural masks.
+      p.marquee?.key === `world-bend-anchor-monument-r20${p.marquee?.cinematic ? '-cinematic-model-v2-merged' : ''}` && p.marquee?.bend === 'anchor-monument' && p.marquee?.hasAnchor,
       `${p.marquee?.key} / ${p.marquee?.bend} / aAnchor=${p.marquee?.hasAnchor}`
     );
     gate(

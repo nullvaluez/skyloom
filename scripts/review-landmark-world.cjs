@@ -37,7 +37,12 @@ const sites = [
     errors: [],
     blockedAttempts: previous?.blockedAttempts ?? [],
   };
-  if (previous?.reason) report.blockedAttempts.push({reason:previous.reason,errors:previous.errors??[]});
+  if (previous?.reason)
+    report.blockedAttempts.push({
+      reason: previous.reason,
+      errors: previous.errors ?? [],
+    });
+  let captureContext = null;
   const save = () =>
     fs.writeFileSync(out + "/report.json", JSON.stringify(report, null, 2));
   const browser = await chromium.launch({
@@ -45,8 +50,33 @@ const sites = [
     headless: true,
     args: ["--enable-gpu"],
   });
+  const waitForWorld = async (page) => {
+    try {
+      await page
+        .getByTestId("warp-hold")
+        .waitFor({ state: "hidden", timeout: 20000 });
+    } catch (error) {
+      const state = await page.evaluate(() => ({
+        readiness: window.__fly?.worldReadiness,
+        terrain: window.__graphicsReview?.terrain,
+        arrival: window.__fly?.arrivalStats,
+      }));
+      report.blockedScenes ??= [];
+      report.blockedScenes.push({ ...captureContext, ...state });
+      save();
+      const reduced = page.getByRole("button", {
+        name: "Continue with reduced detail",
+        exact: true,
+      });
+      if (!(await reduced.isVisible())) throw error;
+      await reduced.click();
+      await page
+        .getByTestId("warp-hold")
+        .waitFor({ state: "hidden", timeout: 10000 });
+    }
+  };
   try {
-    for (const baseline of [true, false]) {
+    for (const baseline of [false, true]) {
       const page = await browser.newPage({
         viewport: { width: 1280, height: 720 },
       });
@@ -90,6 +120,7 @@ const sites = [
               ).length === 3
             )
               continue;
+            captureContext = { site: site.name, range, style, baseline };
             await page.evaluate(
               ({ site, range }) => {
                 const r = window.__fly,
@@ -127,13 +158,11 @@ const sites = [
               },
               { site, range },
             );
-            await page
-              .getByTestId("warp-hold")
-              .waitFor({ state: "hidden", timeout: 90000 });
+            await waitForWorld(page);
             await page.waitForTimeout(6000);
             for (const time of ["day", "dusk", "night"]) {
               await page.evaluate(
-                ({ site, time }) => {
+                ({ site, time, style }) => {
                   const base = Date.UTC(2026, 6, 18),
                     phi = (site.lat * Math.PI) / 180,
                     decl =
@@ -152,14 +181,13 @@ const sites = [
                     (time === "day" ? 12 : time === "night" ? 24 : dusk) -
                     site.lon / 15;
                   window.__flySunOverride = base + hour * 3600000;
-                  window.__flyStore.getState().bumpWarpEpoch("local");
+                  if (style === "satellite")
+                    window.__flyStore.getState().bumpWarpEpoch("local");
                 },
-                { site, time },
+                { site, time, style },
               );
-              await page
-                .getByTestId("warp-hold")
-                .waitFor({ state: "hidden", timeout: 90000 });
-              await page.waitForTimeout(2100);
+              await waitForWorld(page);
+              await page.waitForTimeout(style === "satellite" ? 2100 : 250);
               const data = await page.evaluate(
                 ({ site, range, baseline, style, time }) => {
                   const r = window.__fly,
@@ -185,9 +213,12 @@ const sites = [
                     style,
                     time,
                     poi: placed.find((p) => p.name === site.name),
-                    sun: r.sun,
+                    sun: style === "satellite" ? r.sun : null,
+                    lighting:
+                      style === "satellite" ? time : "fixed Neon palette",
                     terrain: window.__graphicsReview?.terrain,
                     readiness: r.worldReadiness,
+                    degraded: !!r.worldDegraded,
                     tier: window.__flyStore.getState().qualityTier,
                     monuments: window.__flyStats?.monuments,
                     landmarkDraws:
@@ -242,6 +273,7 @@ const sites = [
       ? "FAIL"
       : report.shots.some(
             (s) =>
+              s.degraded ||
               !s.readiness?.ready ||
               (s.style === "satellite" && !s.terrain?.sharp),
           )

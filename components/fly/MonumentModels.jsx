@@ -32,7 +32,7 @@ import {
 } from '@/lib/fly/fly-constants';
 import { applyBendAnchorMonument } from '@/lib/fly/toy-world/world-bend';
 import { loadMonumentGeometries, loadMonumentDetail } from '@/lib/fly/monument-loader';
-import { setSuppressedMonuments } from '@/lib/fly/monument-models';
+import { setSuppressedMonuments, monumentSuppressionEpoch } from '@/lib/fly/monument-models';
 
 const _m = new Matrix4();
 const _q = new Quaternion();
@@ -429,6 +429,7 @@ export function MonumentModels({ flight, origin, engine, mapStyle, runtime }) {
       mon.placed = placed.length;
       mon.priority = MARQUEE_PRIORITY;
       mon.bumpT = +t.toFixed(4);
+      mon.bumpEpoch = monumentSuppressionEpoch();
       mon.detailCache = detailCache.current?.items.size ?? 0;
       mon.detailDownloads = detailCache.current?.active ?? 0;
       mon.detailed = placed.filter(p => p.detail !== 'far').length;
