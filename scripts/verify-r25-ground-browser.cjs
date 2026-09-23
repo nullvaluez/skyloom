@@ -127,6 +127,19 @@ async function census(page) {
       texComplete: a ? a.peakComplete : null,
       visuals: window.__flyStore.getState().visuals,
       r25Bytes: window.__fly?.r25Ground?.live ? window.__fly.r25Ground.textureBytes : 0,
+      // The R25 textures' OWN uploaded GL bytes, read through the audit (a
+      // texture the renderer never uploaded holds no GL storage and is 0 here).
+      r25GlBytes: (() => {
+        const g = window.__fly?.r25Ground;
+        const gl = window.__flyGl;
+        if (!a || !g?.live || typeof g.textures !== 'function' || !gl?.properties) return 0;
+        let n = 0;
+        for (const t of g.textures()) {
+          const w = gl.properties.get(t)?.__webglTexture;
+          if (w) n += window.__groundTextureAudit.describeTexture(w)?.bytes ?? 0;
+        }
+        return n;
+      })(),
     };
   });
 }
@@ -343,11 +356,12 @@ function stepStat(img, lines, W, H) {
       else {
         const peak = Math.max(cenE.texPeakMiB, cenC.texPeakMiB, cenE2.texPeakMiB);
         gate(`(e1) ${P.name}: Enhanced texture peak <= ${BUDGET.textureMiB} MiB`, peak <= BUDGET.textureMiB && cenE.texComplete !== false, `${peak.toFixed(1)} MiB (logical GL bytes)`);
-        const r25MiB = cenE.r25Bytes / 1048576;
+        const r25MiB = cenE.r25GlBytes / 1048576;
         const drop = cenE.texNowMiB - cenC.texNowMiB;
         gate(`(e2) ${P.name}: toggling to Classic returns every R25 byte (Classic == Enhanced - R25 +-${BUDGET.classicTolMiB} MiB)`,
-          Math.abs(drop - r25MiB) <= BUDGET.classicTolMiB,
-          `Enhanced ${cenE.texNowMiB.toFixed(2)} MiB (R25 ${r25MiB.toFixed(2)}) -> Classic ${cenC.texNowMiB.toFixed(2)} MiB (drop ${drop.toFixed(2)})`);
+          cenE.r25GlBytes > 0 && Math.abs(drop - r25MiB) <= BUDGET.classicTolMiB,
+          `Enhanced ${cenE.texNowMiB.toFixed(2)} MiB (R25 uploaded ${r25MiB.toFixed(2)} of ${(cenE.r25Bytes / 1048576).toFixed(2)} allocated) -> Classic ${cenC.texNowMiB.toFixed(2)} MiB (drop ${drop.toFixed(2)})`);
+        gate(`(e2b) ${P.name}: Enhanced R25 GL bytes <= 5.5 MiB`, cenE.r25GlBytes <= 5.5 * 1048576, `${r25MiB.toFixed(3)} MiB`);
         if (W0_TEX_NOW[P.name] != null) info(`(e3) ${P.name}: Classic ${cenC.texNowMiB.toFixed(1)} MiB vs the E1 W0 column ${W0_TEX_NOW[P.name]} MiB (cross-boot; streaming state differs — information only)`);
       }
       // (f) budgets
