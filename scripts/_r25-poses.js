@@ -208,27 +208,24 @@ async function isolateCanvas(page, on = true) {
 }
 
 /**
- * The R25 ship state, read from lib/fly/fly-constants.js itself (a plain ESM
- * module with no imports). Node reparses it as ESM and warns
- * MODULE_TYPELESS_PACKAGE_JSON once; that one warning is muted here and every
- * other warning passes through. Resolves to the module namespace, or {} when
- * it cannot be read (callers then treat the ship state as unknown).
+ * The R25 ship state, read from lib/fly/fly-constants.js itself — a plain ESM
+ * module with NO imports, so it is loaded as a `data:` URL: node then never
+ * has to guess the module type of a `.js` file in a typeless package (the
+ * MODULE_TYPELESS_PACKAGE_JSON reparse warning, which an emitWarning filter
+ * could not catch). Resolves to the module namespace, or {} when it cannot be
+ * read (callers then treat the ship state as unknown). If the file ever gains
+ * an import, the data: load throws and this returns {} with the reason —
+ * never a silently partial namespace.
  */
 async function loadFlyConstants() {
+  const fs = require('fs');
   const path = require('path');
-  const { pathToFileURL } = require('url');
-  const emit = process.emitWarning;
-  process.emitWarning = function (w, ...rest) {
-    if (/Module type of .*fly-constants/.test(String(w?.message ?? w))) return;
-    return emit.call(process, w, ...rest);
-  };
   try {
-    return await import(pathToFileURL(path.join(__dirname, '..', 'lib', 'fly', 'fly-constants.js')).href);
+    const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'fly', 'fly-constants.js'), 'utf8');
+    return await import(`data:text/javascript;base64,${Buffer.from(src).toString('base64')}`);
   } catch (e) {
     console.log(`note: fly-constants unreadable from node (${String(e).slice(0, 120)})`);
     return {};
-  } finally {
-    process.emitWarning = emit;
   }
 }
 
