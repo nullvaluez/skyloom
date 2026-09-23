@@ -9,22 +9,27 @@
   "files": {
     "index.js": {
       "baselineSha256": "931e09ee8d594e709ec19f91be92ecb8fc28cd54054e352ac11d8275df86cb97",
-      "integratedSha256": "10154c313916fd2925a0ee5bccf4a7b5956dcc589245d42d91e31332eba34066",
+      "integratedSha256": "f64a245cea52f26853e064c872302c54650d7ac450d86df3575e201c9f3e4e2e",
       "changedFunctions": [
         {
           "name": "TerrainLercLoader.doLoad",
           "change": "modified",
-          "reason": "Pass the optional DEM error table and construct geometry through the shared no-data-aware decoder result handler."
+          "reason": "Pass the optional DEM error table and construct geometry through the shared no-data-aware decoder result handler. R25 D GROUND (VENDOR.md R25-32): one inserted spread line in the request literal adds `r25Relief` only while the app requests a relief map (Visuals Enhanced); otherwise it adds no key."
         },
         {
           "name": "TerrainLercLoader.geometryFromData",
           "change": "added",
-          "reason": "Shared cached/uncached no-data marker handling before constructing TileGeometry."
+          "reason": "Shared cached/uncached no-data marker handling before constructing TileGeometry. R25 D GROUND (R25-32): a decoder result carrying `r25Relief` is carried onto geometry.userData via r25CarryRelief (one inserted line); otherwise the original return runs."
         },
         {
           "name": "TerrainLercLoader.load",
           "change": "added",
           "reason": "Regional DEM no-data fallback: clip the same requested footprint from valid parent elevations; bounded expiring URL cache; never substitute a zero plane for missing fine DEM."
+        },
+        {
+          "name": "TerrainRGBLoader.doLoad",
+          "change": "modified",
+          "reason": "R25 D GROUND (VENDOR.md R25-33): one inserted line — terrain-rgb meshes the decoded grid on the main thread, so an Enhanced relief request builds the relief map from that returned grid with the app-installed reliefFromGrid before the verbatim upstream return; off, one short-circuited condition."
         },
         {
           "name": "Tile.LOD",
@@ -152,6 +157,26 @@
           "reason": "Expose hold/rejection/retry counters."
         },
         {
+          "name": "qe",
+          "change": "modified",
+          "reason": "R25 D GROUND (VENDOR.md R25-31): an inserted branch creates the LERC worker from the R25 relief splice (layered on A's PATCH 20 splice) when R24_SWITCHES.r25Relief (the flag) is set; A's branch and the verbatim factory body follow unchanged."
+        },
+        {
+          "name": "r25CarryRelief",
+          "change": "added",
+          "reason": "R25 D GROUND (VENDOR.md R25-32): attach worker/main-thread relief bytes to geometry.userData.r25Relief."
+        },
+        {
+          "name": "r25MakeWorker",
+          "change": "added",
+          "reason": "R25 D GROUND (VENDOR.md R25-31): r24MakeWorker's Blob-URL worker creation over the R25 splice; null falls back to the caller's next branch."
+        },
+        {
+          "name": "r25SpliceWorkerTail",
+          "change": "added",
+          "reason": "R25 D GROUND (VENDOR.md R25-31): takes A's r24SpliceWorkerTail output and substitutes the two inert R25 markers — wraps the worker grid->Martini function (found by shape) for the grid capture, and keeps the skirt in the worker only when A's or C's switch asked for it."
+        },
+        {
           "name": "setDemErrorTable",
           "change": "added",
           "reason": "Set optional worker DEM error curve."
@@ -170,12 +195,28 @@
     },
     "workers/skirt-tail.src.js": {
       "baselineSha256": "65c8ab554b75b705e68f788ee79850cb6bb1cec82a4f45dfa915a6962feded81",
-      "integratedSha256": "2c7464c8cb52325ce6701e08cabedeeb92024a0296fe85836e287dca531383e5",
-      "changedFunctions": []
+      "integratedSha256": "f1f080e9dd31dfdb768fae1c1470221829c4de6da698951c2c0aeb6a4dba5432",
+      "changedFunctions": [
+        {
+          "name": "r25CaptureMesh",
+          "change": "added",
+          "reason": "R25 D GROUND (VENDOR.md R25-31): wraps the worker grid->Martini function so the handler sees the full decoded (clipped) grid."
+        },
+        {
+          "name": "r25PostUnskirted",
+          "change": "added",
+          "reason": "R25 D GROUND (VENDOR.md R25-31): a relief-only splice posts the geometry exactly as upstream builds it (skirt left to the main thread) plus the optional relief map, with transferables."
+        },
+        {
+          "name": "r25ReliefMap",
+          "change": "added",
+          "reason": "R25 D GROUND (VENDOR.md R25-31): mapPx^2 RG8 world-frame normal map by central differences over the full grid; byte-identical to lib/fly/r25-relief.js reliefFromGrid (scripts/verify-r25-ground.mjs 2f)."
+        }
+      ]
     },
     "workers/skirt-tail.built.js": {
       "baselineSha256": "b4a840c94e41e44fa2cac8a32cfaffeea543749fcfbfc651d78213c2067d00f6",
-      "integratedSha256": "153d907f17afe5b15b70bcbbda03afdf5de28e44a29c8867c1cc18671774e311",
+      "integratedSha256": "fc311784d9b4199bacbf2348d8c9443dd6b54c69554079a06305717567e32cde",
       "changedFunctions": []
     }
   },
@@ -195,14 +236,16 @@
     "Existing inline LERC worker fe accepts the optional errTable parameter; readable main skirt/normal worker source remains unchanged. The whole index.js digest covers this inherited parallel-lineage string change.",
     "Stylized Earth DEM worker onmessage stores surfaceMinZ before adding skirts; generated source regenerated with the existing builder. Geometry arrays and skirt algorithm are unchanged.",
     "LERC tail matcher accepts the existing optional errTable argument and the readable tail forwards it; both geometry-worker source shapes must match. No worker feature switches are enabled by this repair.",
-    "Inline LERC mesh entry rejects non-finite and out-of-Earth-range samples after clipping and before Martini. The optional skirt/normal worker returns this diagnostic marker without dereferencing missing attributes. Valid input uses the unchanged geometry algorithm."
+    "Inline LERC mesh entry rejects non-finite and out-of-Earth-range samples after clipping and before Martini. The optional skirt/normal worker returns this diagnostic marker without dereferencing missing attributes. Valid input uses the unchanged geometry algorithm.",
+    "R25 D GROUND (VENDOR.md R25-30..33, all hunks insert-only against r25-w0): R24_SWITCHES gains r25Relief / r25ReliefPx / r25ReliefFn (defaults false / 0 / null); the readable worker tail gains a module-scope grid slot, the `/*__R25_MESH_WRAP__*/` splice marker, the `true /*__R24_WORKER_SKIRT__*/` literal and an optional `r25Relief` transfer; the generated skirt-tail.built.js was rebuilt with scripts/build-tile-worker.mjs. Flag off: no splice, no request field, R24 substituted text."
   ],
   "focusedBehaviorGates": [
     "scripts/verify-terrain-merge.mjs",
     "scripts/verify-raster-recovery.cjs",
     "scripts/verify-skirt-fast.mjs",
     "scripts/verify-terrain-bounds.mjs",
-    "scripts/verify-dem-fallback.mjs"
+    "scripts/verify-dem-fallback.mjs",
+    "scripts/verify-r25-ground.mjs"
   ],
   "followup": {
     "recordedAt": "2026-09-14",
@@ -216,5 +259,15 @@
     "date": "2026-09-14",
     "evidence": "verify-dem-lifecycle.mjs: old 0/4 -> repaired 4/4; transport retention, parallel owner settlement, sibling disposal/recovery and bounded merge retries. Healthy data algorithms and all existing thresholds unchanged."
   },
-  "compiledBuildId": "no6lqYTQo4mmRaHZj9If5"
+  "compiledBuildId": "no6lqYTQo4mmRaHZj9If5",
+  "r25Ground": {
+    "recordedAt": "2026-09-23",
+    "rows": [
+      "R25-30",
+      "R25-31",
+      "R25-32",
+      "R25-33"
+    ],
+    "evidence": "scripts/verify-r25-ground.mjs [2]: the real qe() splice captured through a stub Worker and run in a vm against the real clip + Martini (stubbed LERC decode) — Classic request byte-identical to the verbatim worker; Enhanced map == reliefFromGrid over the full and the clipped grid; loaders carry the map; verify-skirt-worker / verify-worker-normals unchanged."
+  }
 }
