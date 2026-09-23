@@ -196,7 +196,7 @@ own reveal: ready, roads deferred).
 |---|---|---|
 | `verify-r25-flagoff.mjs` (node) | `R25_FLAGOFF_RED=1` injects the realistic mistake (a terrain key suffix + a rim write gated on the BLOCK flag instead of `r25On`): **(2b) CLASSIC terrain FAIL (key), (2e) C-only FAIL, (3b) CLASSIC hooks FAIL (6 writes, colours moved)** — 9/3/0, exit 1. | 8 PASS / 0 FAIL / **2 NOT CALIBRATED** (Enhanced == OFF: the C/D bodies are W0 stubs), exit 2. |
 | `verify-r25-smoke.cjs` (fixture) | `R25_SMOKE_RED=1` breaks the W0 `setHangarOpen`→`screen` mirror in the page → **(7) FAIL** (`hangar left false · screen hangar`), 4/1/14, exit 1 — MEASURED, §4a. | **5 PASS / 0 FAIL / 14 NOT CALIBRATED**, exit 2 (§4a) |
-| `verify-r25-visuals.cjs` (fixture, satellite + toy) | `R25_VISUALS_RED=1` raises the HELD pose 2 m (`__r25PinPose.y`) before the second Classic capture → (1) FAIL. **Session 1's RED wrote `flight.pos.y`, which the 8 ms pin overwrites — it could never have fired; fixed in `fb93a14`.** Its browser RED needs an Enhanced block to reach leg (1) without FORCE — see §4b. | on this tree the ship-state short circuit reads **7 NOT CALIBRATED** in <1 s (no R25 visual block ON), exit 2 |
+| `verify-r25-visuals.cjs` (fixture, satellite + toy) | **MEASURED** (`R25_VISUALS_FORCE=1 R25_VISUALS_RED=1`, P1 Owens, r25-w0): floor **mean 0.053/255, p99 1/255**; the un-nudged Classic→Enhanced→Classic×3 control **0.057 / 1** (would PASS); the 2 m held-pose nudge **mean 9.281/255, p99 100/255 → (1) FAIL**; (2)–(4) NOT CALIBRATED (nothing enhances), programs flat 111→111→111→111, (5a) draws **132/132/132 ≤ 261**, (5c) texture **101.3 MiB**. 2/1/6, exit 1. Session 1's RED wrote `flight.pos.y`, which the 8 ms pin overwrites — it could never have fired (fixed `fb93a14`); and the first forced run read a floor of **mean 1.8, p99 32** because the pin alone creeps (fixed by `holdStill`, `6ab5954` — §4b). | on this tree the ship-state short circuit reads **7 NOT CALIBRATED** in <1 s (no R25 visual block ON), exit 2 |
 | `verify-mobile-actions-node.mjs` (edited) | — (the legacy 9 cases are the baseline) | **11/11 PASS, 5 PENDING** (the R25 Esc/Back cases wait for A's hook; they switch on by themselves when `use-overlay-back.js` learns `screen`/`settingsOpen`) |
 | `verify-import-integrity.mjs` (sanctioned parser fix) | the W0 baseline: 3 passed / 1 failed (3 errors in 2 files) | **4 passed / 0 failed** — `ecmaVersion 'latest'` parses the JSON import attribute in `lib/fly/living-regions.js`, and `scripts/r24-c-agl.js` now destructures the `agl`/`speed` it was always passed (a real ReferenceError on the probe's first frame). No other assertion changed. |
 
@@ -244,8 +244,25 @@ page reload** (an in-page marker survives), Continue keeps mode + aircraft.
   `__flyR25Sky = 0`), re-entering Enhanced under each pin because the pin is
   read when programs / writes are decided; `settle()` waits for the GL
   program count to hold across two 10-frame windows (lazy alternate warms).
-  Its RED is measured then (leg (1) needs an Enhanced column to be reached
-  without FORCE).
+  Its RED is already measured (§4 table): forced on r25-w0 it fails leg (1)
+  on a 2 m nudge and passes the un-nudged control, against a floor of
+  0.053/255 mean.
+- **Why the floor is that small now — `holdStill`.** The first forced run
+  (`visuals-red-w0-run1.log`) read a floor of mean 1.8/255, p99 32/255 over
+  56 % of pixels between two Classic captures 20 frames apart. The amplified
+  diff lit every ground EDGE (tile stamps, borders) and left the sky dark: a
+  whole-ground sub-pixel shift. The `warpToPose` pin re-asserts the pose
+  every 8 ms, but the flight model still steps between a pin write and the
+  render (speed eases up from the pinned 0, the trim servo acts), so the
+  camera renders a dt-dependent distance off the held pose — and at 1–3 fps
+  dt is anything. The paused phase is the app's own held path
+  (`FlightOperations.advance` returns before integrating); with it the floor
+  fell to 0.053 / 1 (2.6 % of pixels; the amplified diff shows the SKY
+  clean and the residue on the ground only — the road's dashed centre marks,
+  which animate, and far-field edge shimmer in the rows just below the
+  horizon: 6.7 % of pixels changed there vs 0.4–1.0 % in the sky bands).
+  **Every R25 pixel pair must use `holdStill`** — C and D included. The
+  R24/R19 pin idiom alone is not a still frame on this venue.
 
 ## §5 Legacy harness edits (E1 step 5, SANCTIONED)
 
