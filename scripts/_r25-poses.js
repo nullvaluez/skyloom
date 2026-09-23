@@ -52,6 +52,21 @@ const POSES = Object.freeze([
   { id: 'P6', name: 'owensHigh', scene: 'owens', lat: 36.6, lon: -118.1, altM: 7000, hdgDeg: 0 },
 ]);
 
+/**
+ * READINESS-ONLY poses (not certification poses: no gate measures pixels
+ * there, and `r25-e-baseline.cjs`'s ORDER never includes them). R1 exists
+ * because every Free Flight featured spot but Manhattan renders on the
+ * fixture as the generic `rural` scene (scenes.mjs RURAL), and E1 proved
+ * satellite readiness only at Owens / Manhattan / Powell — the product-boot
+ * comparison reads the title spot's world, so E2 proves rural readiness on
+ * r25-w0 first:  scripts/r25-e-sat-probe.cjs satellite grandCanyon
+ * (Grand Canyon is FLIGHT_PLAN.titleSpot.fallbackId; 3200 m MSL clears the
+ * real rim, and the fixture ground there is RURAL's 210 +/- 70 m.)
+ */
+const EXTRA_POSES = Object.freeze([
+  { id: 'R1', name: 'grandCanyon', scene: 'rural', lat: 36.0544, lon: -112.1401, altM: 3200, hdgDeg: 0 },
+]);
+
 /** The sun states, resolved to a timestamp per pose by `sunTimeMs`. */
 const SUN = Object.freeze({
   date: Date.UTC(2026, 6, 1),
@@ -94,7 +109,7 @@ async function sunTimeMs(P, which) {
 }
 
 function pose(idOrName) {
-  const p = POSES.find((q) => q.id === idOrName || q.name === idOrName);
+  const p = [...POSES, ...EXTRA_POSES].find((q) => q.id === idOrName || q.name === idOrName);
   if (!p) throw new Error(`_r25-poses: unknown pose ${idOrName}`);
   return p;
 }
@@ -347,10 +362,11 @@ async function warpToPose(page, p, { sun = null, waitReady = true, timeoutMs = 2
   return { ms: Date.now() - t0, readiness };
 }
 
-module.exports = { POSES, SUN, pose, sunTimeMs, readinessInPage, roadRingInPage, warpToPose, unpinPose, isolateCanvas, holdStill, loadFlyConstants };
+module.exports = { POSES, EXTRA_POSES, SUN, pose, sunTimeMs, readinessInPage, roadRingInPage, warpToPose, unpinPose, isolateCanvas, holdStill, loadFlyConstants };
 
 // `node scripts/_r25-poses.js` — self-check: every pose lands in its named
-// fixture scene (never `rural`), and the readiness mirror still names exactly
+// fixture scene (a certification pose never in `rural`; the readiness-only R1
+// exactly in `rural`), and the readiness mirror still names exactly
 // the app's parts.
 if (require.main === module) {
   (async () => {
@@ -358,7 +374,7 @@ if (require.main === module) {
     const path = require('path');
     const { sceneAt } = await import('./r24-fixture/scenes.mjs');
     let bad = 0;
-    for (const P of POSES) {
+    for (const P of [...POSES, ...EXTRA_POSES]) {
       const s = sceneAt(P.lon, P.lat);
       const ok = s.id === P.scene;
       if (!ok) bad++;
