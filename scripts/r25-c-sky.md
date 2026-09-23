@@ -43,14 +43,15 @@ real assets here — only the ground under it is synthetic.
 1. `lib/fly/sky-model.js` — single-scattering Rayleigh + Henyey-Greenstein
    Mie over a spherical exponential atmosphere, Chapman grazing sun path,
    ozone on the sun path, **first-order multiple scattering** (view path lit by
-   the single-scatter sky ambient; without it the tangent horizon is orange at
-   noon — measured r/b 0.98 vs 0.77 with it). Azimuth-separable, so an 8-row
-   table (y' = u², dense at the horizon) × two phase functions per pixel IS
-   the model. Mie phase = atmo-law's lobe (`ATMO_MIE_LOBE_GLSL`, lifted out of
+   the single-scatter sky ambient, an ISOTROPIC third row array; without it
+   the tangent horizon is warm-grey at noon — r/b 0.98 without, 0.73 with).
+   Azimuth-separable, so an 8-row table (y' = u², dense at the horizon) × two
+   phase functions + an isotropic term per pixel IS the model. Mie phase = atmo-law's lobe (`ATMO_MIE_LOBE_GLSL`, lifted out of
    `atmoInscatter` with `ATMO_GLSL_FRAGMENT` byte-identical). Row 0 is the REAL
    planet's tangent ray from the eye altitude, mapped onto the game's dipped
-   rim. `sunE 11.66` is the ONE radiance scale: noon horizon luminance at
-   1500 m MSL = Classic's `#c6d7e8` (ratio 1.0043, gate 1h). CPU cost: a full
+   rim. `sunE 11.17` is the ONE radiance scale: noon horizon luminance at
+   1500 m MSL = Classic's `#c6d7e8` (ratio 1.0042, gate 1h; the model's noon
+   rim encodes to sRGB (.782,.845,.897) against Classic's (.776,.843,.910)). CPU cost: a full
    table integration measured ~0.09 ms (node), re-run only when the eye moves
    10 m vertically or the sun 2e-4 in sin(el); steady state ~0.014 ms.
 2. `r25SkyAtmo` overwrites `_atmoRim/_atmoVoid` IN PLACE with the model
@@ -96,7 +97,7 @@ real assets here — only the ground under it is synthetic.
 
 - **0 new draws** (the aerial variant replaces the aerial text inside the same
   EffectPass group; the cloud pass stays 2 draws), **0 new textures** (the
-  model reaches the GPU as 2 × `vec3[8]` uniform arrays). Program count: +1
+  model reaches the GPU as 3 × `vec3[8]` uniform arrays). Program count: +1
   aerial variant, +2 cloud variants, compiled only once Enhanced is used (or
   lazily warmed when un-pinned).
 - CPU: see (1); the rest is uniform writes.

@@ -133,7 +133,7 @@ console.log('\n[1] model sanity');
   for (const alt of [0, 350, 1500, 3200, 7000, 12000, 30000])
     for (let el = -20; el <= 90; el += 5) {
       const s = model(el, alt);
-      const vals = [...s.horizonAvg, ...s.zenith, ...s.ambient, ...s.sunTint, ...s.key, ...s.rimSRGB, ...s.voidSRGB, ...s.tableR, ...s.tableM];
+      const vals = [...s.horizonAvg, ...s.zenith, ...s.ambient, ...s.sunTint, ...s.key, ...s.rimSRGB, ...s.voidSRGB, ...s.tableR, ...s.tableM, ...s.tableA];
       n++;
       if (!vals.every((v) => Number.isFinite(v) && v >= 0)) bad++;
     }

@@ -564,6 +564,7 @@ export class AerialPerspectiveEffect extends Effect {
           ['uR25Mode', new Uniform(new Vector4(0, 0, 0, 0))],
           ['uR25SkyR', new Uniform(new Float32Array(SKY_ROWS * 3))],
           ['uR25SkyM', new Uniform(new Float32Array(SKY_ROWS * 3))],
+          ['uR25SkyA', new Uniform(new Float32Array(SKY_ROWS * 3))],
           ['uR25SkyP', new Uniform(new Vector4(0.76, 0, 0, 0))],
           ['uR25VeilH', new Uniform(new Vector3())],
           ['uR25VeilZ', new Uniform(new Vector3())],
@@ -656,6 +657,7 @@ export class AerialPerspectiveEffect extends Effect {
     const holders = (this._r25Holders ??= {
       uR25SkyR: u.get('uR25SkyR'),
       uR25SkyM: u.get('uR25SkyM'),
+      uR25SkyA: u.get('uR25SkyA'),
       uR25SkyP: u.get('uR25SkyP'),
       uR25VeilH: u.get('uR25VeilH'),
       uR25VeilZ: u.get('uR25VeilZ'),

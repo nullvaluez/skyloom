@@ -43,7 +43,8 @@
  *
  *   FLY_TILE_FIXTURE=1 FLY_FIXTURE_PORT=3203 FLY_URL=http://localhost:3033 FLY_BOOT_SCALE=3 \
  *   /tmp/r25-locks/run-browser.sh node -r ./scripts/_pw-shim.js scripts/verify-r25-sky-browser.cjs
- *   (R25_SKY_LEGS=owens,high,cloud selects legs; default all three)
+ *   (R25_SKY_LEGS=owens,high,cloud,look selects legs; default all four;
+ *    `look` is INFO only: Owens 1500 m at dusk facing the sun and away)
  *
  * Exit: 1 on any FAIL, else 2 when any leg is NOT CALIBRATED, else 0.
  */
@@ -59,7 +60,7 @@ const { makeCanvasShot } = require('./_canvasshot');
 const OUT = path.join(__dirname, '..', '.graphics-review', 'r25', 'c');
 fs.mkdirSync(OUT, { recursive: true });
 const SCALE = Math.max(1, Number(process.env.FLY_BOOT_SCALE || 1));
-const LEGS = (process.env.R25_SKY_LEGS || 'owens,high,cloud').split(',');
+const LEGS = (process.env.R25_SKY_LEGS || 'owens,high,cloud,look').split(',');
 // E's crops, verbatim (scripts/verify-r25-visuals.cjs) — one ruler.
 const TERRAIN = { left: 0.12, top: 0.62, width: 0.76, height: 0.3 };
 const HORIZON = { left: 0.35, top: 0.05, width: 0.3, height: 0.6 };
@@ -307,6 +308,38 @@ function cloudProfileInPage() {
         if (prof.classic.error || prof.enhanced.error) notCal('(4) no 22 km cloud edge', `instrument: ${prof.classic.error ?? prof.enhanced.error}`);
         else if (!(cRef > 0.02) || !(cEdge > 0.5 * cRef)) notCal('(4) no 22 km cloud edge', `Classic shows no cloud at the cut to fade (${detail})`);
         else gate('(4) no 22 km cloud edge: Enhanced opacity in the last km before the cut <= 15 % of its 12-15 km opacity', eRef > 0.02 && eEdge <= 0.15 * eRef, detail);
+      }
+    }
+    // LOOK (INFO only, evidence for the user's A/B): Owens 1500 m at DUSK
+    // (+4 deg), facing the sun and facing away — the case the azimuth-
+    // dependent in-scatter and the IBL rotation exist for. Heading toward the
+    // sun is az + pi (flight forward = (sin h, ., -cos h); the app sun is
+    // (-sin az, ., cos az)).
+    if (LEGS.includes('look')) {
+      const { sunTimeMs } = require('./_r25-poses');
+      const { computeSun } = await import(pathToFileURL(path.join(__dirname, '..', 'lib/fly/sun-model.js')).href);
+      const base = pose('owens');
+      const { tMs } = await sunTimeMs(base, 'dusk');
+      const az = computeSun(base.lon, base.lat, tMs).az;
+      for (const [tag, hdg] of [['toward', az + Math.PI], ['away', az]]) {
+        const P = { ...base, id: `PL-${tag}`, hdgDeg: ((hdg * 180) / Math.PI + 360) % 360 };
+        const { readiness } = await warpToPose(page, P, { sun: tMs, timeoutMs: 600000, pollMs: 5000, pin: true, pitchRad: -0.05 });
+        if (!readiness?.ready) {
+          info(`look ${tag}`, `world not ready: ${JSON.stringify(readiness?.missing)}`);
+          continue;
+        }
+        await hideActors(page);
+        await setAerialPin(page, undefined);
+        const got = {};
+        for (const v of ['classic', 'enhanced']) {
+          await setVisuals(page, v);
+          await frames(page, 24);
+          got[v] = await cap(`PL-dusk-${tag}-${v}`);
+        }
+        await setVisuals(page, 'classic');
+        const hC = L.horizonSeam(await L.loadRegion(got.classic, HORIZON));
+        const hE = L.horizonSeam(await L.loadRegion(got.enhanced, HORIZON));
+        info(`look dusk ${tag} (hdg ${P.hdgDeg.toFixed(1)})`, `seam Classic ${hC.deltaE.toFixed(2)} @${hC.row} · Enhanced ${hE.deltaE.toFixed(2)} @${hE.row}`);
       }
     }
   } catch (err) {
