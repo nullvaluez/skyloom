@@ -188,12 +188,15 @@ async function productBoot(browser, style) {
       };
       if (readiness?.missing?.includes('roads')) row.roadRing = await page.evaluate(roadRingInPage).catch((e) => String(e).slice(0, 120));
       {
+        // Actors the recorder does not control, incl. the cumulus / cirrus
+        // deck ROOTS (the owner never writes the root; see verify-r25-visuals).
         await page.evaluate(() => {
-          for (const o of [window.__flyPlayer, window.__flyTraffic, window.__flyTracers]) if (o) o.visible = false;
+          for (const o of [window.__flyPlayer, window.__flyTraffic, window.__flyTracers, window.__flyClouds, window.__flyCirrus]) if (o) o.visible = false;
         });
         await frames(page, 30);
         Object.assign(row, await census(page));
         // The capture is page-level (DOM included): read the world only.
+        row.cloudsParked = await page.evaluate(() => (window.__flyClouds ? window.__flyClouds.visible === false : null));
         row.isolated = await isolateCanvas(page, true);
         await frames(page, 2);
         const png = await shot();

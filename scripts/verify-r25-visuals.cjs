@@ -62,8 +62,10 @@
  *
  * RED FIRST (scripts/r25-e-cert.md §4): R25_VISUALS_RED=1 raises the HELD
  * pose (`window.__r25PinPose.y`, _r25-poses.js — a direct pos write would be
- * overwritten by the 8 ms pin) by 2 m before the second Classic capture, a
- * stand-in for a toggle that fails to restore state, and (1) reads FAIL.
+ * overwritten by the 8 ms pin) by 2 m AFTER the honest second Classic
+ * capture, a stand-in for a toggle that fails to restore state; leg (1) reads
+ * the nudged frame and must FAIL, and the un-nudged control is printed beside
+ * it (one expensive run, both halves of the calibration).
  *
  *   FLY_TILE_FIXTURE=1 FLY_FIXTURE_PORT=3205 FLY_URL=http://localhost:3035 FLY_BOOT_SCALE=3 \
  *   /tmp/r25-locks/run-browser.sh node -r ./scripts/_pw-shim.js scripts/verify-r25-visuals.cjs
@@ -109,11 +111,24 @@ const fmt = (d) => `mean ${d.mean.toFixed(3)}/255 p99 ${d.p99}/255 max ${d.max} 
 const inBand = (k, band) => k != null && k >= band[0] && k <= band[1];
 
 async function hideActors(page) {
-  await page.evaluate(() => {
+  return page.evaluate(() => {
     window.__flyCloudFreeze = 1; // C's pin (no-op until C lands)
-    for (const o of [window.__flyPlayer, window.__flyTraffic, window.__flyTracers]) if (o) o.visible = false;
+    // Player, traffic, tracers, and the cumulus + cirrus deck ROOTS (the
+    // CloudField handles). The roots are never written by their owner — the
+    // R19 lesson was that per-PUFF visibility is rewritten every frame — so a
+    // root park holds; the gate reads it back. The cloud SHADOW discs are
+    // rewritten per frame and have no handle: they stay, and drift into the
+    // floor until C's __flyCloudFreeze lands.
+    const hidden = {};
+    for (const [k, o] of Object.entries({ player: window.__flyPlayer, traffic: window.__flyTraffic, tracers: window.__flyTracers, clouds: window.__flyClouds, cirrus: window.__flyCirrus })) {
+      if (o) o.visible = false;
+      hidden[k] = !!o;
+    }
+    return hidden;
   });
 }
+const parkHeld = (page) =>
+  page.evaluate(() => ({ clouds: window.__flyClouds ? window.__flyClouds.visible === false : null, cirrus: window.__flyCirrus ? window.__flyCirrus.visible === false : null }));
 async function setVisuals(page, v) {
   await page.evaluate((v) => window.__flyStore.getState().setVisuals(v), v);
 }
@@ -240,9 +255,9 @@ function writeReport(extra = {}) {
         notCal(`(${P.name}) pose settles`, `world never ready: missing ${JSON.stringify(readiness?.missing)}`);
         continue;
       }
-      await hideActors(page);
+      const hid = await hideActors(page);
       await settle(page, 30);
-      const r = (results[P.name] = {});
+      const r = (results[P.name] = { hidden: hid, parkHeld: await parkHeld(page) });
       // (0) FLOOR
       const c0 = await cap(`${P.name}-classic-0`);
       await frames(page, 20);
@@ -281,15 +296,27 @@ function writeReport(extra = {}) {
         await setVisuals(page, 'classic');
         progs.push(await settle(page));
       }
-      if (RED)
-        await page.evaluate(() => {
-          if (window.__r25PinPose) window.__r25PinPose.y += 2;
-        });
       await frames(page, 10);
       const c1 = await cap(`${P.name}-classic-1`);
       const cen2 = await census(page);
-      const back = L.diffCensus(await L.loadRegion(c0), await L.loadRegion(c1));
       const enh = L.diffCensus(await L.loadRegion(c0), await L.loadRegion(e1));
+      let back = L.diffCensus(await L.loadRegion(c0), await L.loadRegion(c1));
+      if (RED) {
+        // The RED capture is taken AFTER the honest one, so one expensive run
+        // yields both: leg (1) reads the nudged frame (must FAIL) and the
+        // un-nudged control is printed beside it.
+        console.log(`[${P.name}] (1-control) the un-nudged second Classic: ${fmt(back)}`);
+        r.backControl = back;
+        await page.evaluate(() => {
+          if (window.__r25PinPose) window.__r25PinPose.y += 2;
+        });
+        await frames(page, 10);
+        const c1r = await cap(`${P.name}-classic-1-red`);
+        back = L.diffCensus(await L.loadRegion(c0), await L.loadRegion(c1r));
+        await page.evaluate(() => {
+          if (window.__r25PinPose) window.__r25PinPose.y -= 2;
+        });
+      }
       Object.assign(r, { back, enh, programs: progs, census: [cen0, cen1, cen2] });
 
       // (1) Classic -> Enhanced -> Classic
