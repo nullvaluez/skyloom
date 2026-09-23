@@ -188,14 +188,51 @@ own reveal: ready, roads deferred).
 | toy `bootFly` (NYC 800 m) | 46.3 / 49.0 / 50.9 / 59.9 / 63.2 s | 4–7 | five boots this session; session 1: 51.5 s |
 | satellite `bootFly` at NYC | 546 s (run 1) | 4.5 | session 1: 459.6 s at load 4.7; a third attempt did not reveal in 900 s at load ~8 |
 | satellite `bootFly` at P1 Owens | 967 s | 8.1 | the recorder's boot this session |
-| W0 PRODUCT boot, satellite (hangar → prop / KOSU / apron → Fly) | hangar DOM at **1.35 s**; Fly enabled at **61.8 s**; world reveal: see §3c | 6.8 → 3.9 | run 1's probe was read before its timer recorded the reveal (`revealAt null`) — fixed (`a15f984`) |
+| W0 PRODUCT boot, satellite (hangar → prop / KOSU / apron → Fly) | hangar DOM at **1.35 s**; Fly enabled at **61.8 s**; world reveal: **PENDING** (§3c) | 6.8 → 3.9 | run 1's probe was read before its timer recorded the reveal (`revealAt null`) — fixed (`a15f984`) |
+
+### §3c What was NOT captured — PENDING (wrap-up, 2026-09-23)
+
+The E1 instance was stopped mid-run (~16:50 UTC); the killed runs' partial
+output is `.graphics-review/r25/e/baseline-w0.log` and
+`baseline-w0-product/baseline.json`. This wrap-up ran NO browser (both slots
+are reserved for A and B), so every row below stays PENDING for E2:
+
+| baseline | status | why / what E2 does |
+|---|---|---|
+| W0 PRODUCT boot world reveal (satellite, hangar → KOSU apron → Fly) | **PENDING** | run 2 clicked Fly at 107.8 s (load 7.7) and the browser was closed under `waitForFunction` before the reveal; no `worldMs` exists. §8's "≤ W0 × 1.05" comparison therefore has no W0 number yet. **Fix pass (§4c F2):** a lone W0 number would not be enough anyway — E2 runs ONE recorder with `R25_BASELINE_PRODUCT_ARMS="w0=<r25-w0 server>,int=<integration server>" R25_BASELINE_PRODUCT=3`, which interleaves w0,int ×3 under a pinned clock and writes `boots.productVerdict` (NOT CALIBRATED when an arm's own spread exceeds 5 % or its spot moved). The rural readiness proof (`r25-e-sat-probe.cjs satellite grandCanyon` on r25-w0) comes first. |
+| P3 Manhattan noon, P4 Powell noon, P5 Smokies noon | **PENDING (reference only)** | captured UNSETTLED (terrain z13–15 of 16–18; forest at P4/P5) — §3a numbers are references, not baselines. E2 re-captures with a longer settle if a C/D gate needs them; the intro pass holds nothing to them. |
+| P2 Sierra noon terrain crop | **PENDING (clean re-read)** | a cumulus puff sat in the terrain crop (captured before `d926a99` parked the deck); draws/tris/programs/texture are valid. |
+| P4 / P5 dusk, P2 dusk, P6 dusk | **not captured** | not in the killed run's order; C/D-pass concern only. |
+| toy per-pose luminance / ΔE | **not captured** | the plan's per-pose table is Classic satellite; toy is covered by smoke (§4a). |
+| `graphics-flight.cjs` memory probe | **not run** | texture peak is recorded per pose from ground-texture-audit instead (§3a); the GPU-timer path refuses SwiftShader (§7). |
+
+### §3d Node-gate re-verification at `28cafb1` (wrap-up, no browser)
+
+Every node gate in the plan's W0 baseline table plus E's own, run on this
+branch head. All match the W0 baseline; none moved.
+
+| gate | W0 baseline | `r25/e` @ `28cafb1` |
+|---|---|---|
+| verify-import-integrity.mjs | 3 passed / 1 failed | **4 passed / 0 failed** (E's sanctioned parser fix, §4) |
+| verify-r25-flagoff.mjs | (new) | 8 PASS / 0 FAIL / 2 NOT CALIBRATED, exit 2 (C/D stubs) |
+| verify-mobile-actions-node.mjs | 9/9 | 11/11 PASS, 5 PENDING (A's hook) |
+| graphics-unit.mjs | PASS | PASS |
+| verify-flight-operations.mjs | PASS (33) | PASS (33) |
+| verify-stylized-earth.mjs | PASS 22/22 | PASS 22/22 |
+| verify-c-flagoff.mjs | PASS (58) | PASS (58) |
+| verify-vendor-three-tile.mjs | 34 / 0 | 34 / 0 |
+| verify-living-earth.mjs | PASS (19) | PASS (19) |
+| verify-cinematic-flight.mjs | PASS | PASS (16/16) |
+| verify-operations-disclosure.mjs | PASS | PASS |
+| verify-lod-fade.mjs | 60 / 4 (pre-existing) | 60 / 4 — the same four (patch-7 / marker-count stale vs the Motion-Hold vendor edits) |
+| verify-atmo-law.mjs | crashes (pre-existing) | crashes — the same `TypeError: Cannot set properties of undefined (setting '0')` in `setAerial` |
 
 ## §4 Gates written this phase, RED first
 
 | gate | RED (calibration) | on r25-w0 / this branch |
 |---|---|---|
 | `verify-r25-flagoff.mjs` (node) | `R25_FLAGOFF_RED=1` injects the realistic mistake (a terrain key suffix + a rim write gated on the BLOCK flag instead of `r25On`): **(2b) CLASSIC terrain FAIL (key), (2e) C-only FAIL, (3b) CLASSIC hooks FAIL (6 writes, colours moved)** — 9/3/0, exit 1. | 8 PASS / 0 FAIL / **2 NOT CALIBRATED** (Enhanced == OFF: the C/D bodies are W0 stubs), exit 2. |
-| `verify-r25-smoke.cjs` (fixture) | `R25_SMOKE_RED=1` breaks the W0 `setHangarOpen`→`screen` mirror in the page → **(7) FAIL** (`hangar left false · screen hangar`), 4/1/14, exit 1 — MEASURED, §4a. | **5 PASS / 0 FAIL / 14 NOT CALIBRATED**, exit 2 (§4a) |
+| `verify-r25-smoke.cjs` (fixture) | `R25_SMOKE_RED=1` (= `mirror`) breaks the W0 `setHangarOpen`→`screen` mirror in the page → **(7) FAIL** (`hangar left false · screen hangar`), 4/1/14, exit 1 — MEASURED on r25-w0, §4a. **Title-era REDs `title` / `reload` / `continue` (fix pass, §4c F3): WRITTEN, NOT YET RUN** — they need the front door, so E2 calibrates them on the integrated tree BEFORE any green smoke counts. | **5 PASS / 0 FAIL / 14 NOT CALIBRATED**, exit 2 (§4a, pre-fix-pass smoke; the fix pass changed no leg that runs on r25-w0 — see §4c) |
 | `verify-r25-visuals.cjs` (fixture, satellite + toy) | **MEASURED** (`R25_VISUALS_FORCE=1 R25_VISUALS_RED=1`, P1 Owens, r25-w0): floor **mean 0.053/255, p99 1/255**; the un-nudged Classic→Enhanced→Classic×3 control **0.057 / 1** (would PASS); the 2 m held-pose nudge **mean 9.281/255, p99 100/255 → (1) FAIL**; (2)–(4) NOT CALIBRATED (nothing enhances), programs flat 111→111→111→111, (5a) draws **132/132/132 ≤ 261**, (5c) texture **101.3 MiB**. 2/1/6, exit 1. Session 1's RED wrote `flight.pos.y`, which the 8 ms pin overwrites — it could never have fired (fixed `fb93a14`); and the first forced run read a floor of **mean 1.8, p99 32** because the pin alone creeps (fixed by `holdStill`, `6ab5954` — §4b). | on this tree the ship-state short circuit reads **7 NOT CALIBRATED** in <1 s (no R25 visual block ON), exit 2 |
 | `verify-mobile-actions-node.mjs` (edited) | — (the legacy 9 cases are the baseline) | **11/11 PASS, 5 PENDING** (the R25 Esc/Back cases wait for A's hook; they switch on by themselves when `use-overlay-back.js` learns `screen`/`settingsOpen`) |
 | `verify-import-integrity.mjs` (sanctioned parser fix) | the W0 baseline: 3 passed / 1 failed (3 errors in 2 files) | **4 passed / 0 failed** — `ecmaVersion 'latest'` parses the JSON import attribute in `lib/fly/living-regions.js`, and `scripts/r24-c-agl.js` now destructures the `agl`/`speed` it was always passed (a real ReferenceError on the probe's first frame). No other assertion changed. |
@@ -229,6 +266,28 @@ frames with traffic, Settings open/Esc-close, the Visuals row hidden while no
 R25 visual block ships ON (the intro pass), hangar-back to the title over a
 live world, a 60-frame airborne + un-crashed hold, exit-to-title with **no
 page reload** (an in-page marker survives), Continue keeps mode + aircraft.
+(Fix pass, §4c: (2h) now needs a spot OPPORTUNITY and (6) now needs the
+PERSISTED setup — the two claims above were vacuous as first written.)
+
+### §4c Fix pass — adversarial peer review (2026-09-23, no browser)
+
+Three major findings against E's intro-pass gates. All three were verified
+against the code (A's `r25/a` `lib/fly/front-door.js`, FlyScene Phase 5,
+the recorder) before anything was changed. **This pass ran NO dev server, NO
+browser and NO build** (both browser slots were reserved for A and B), so
+every browser consequence below is WRITTEN and node-checked, and its first
+run belongs to E2.
+
+| # | finding | verified? | verdict | what changed |
+|---|---|---|---|---|
+| F1 | smoke (6) CONTINUE cannot fail: (4) never picks an aircraft (it stays `fighter`), A's `exitToTitle` (`r25/a` front-door.js:125-150) never touches `flightMode`/`aircraftId`, no reload — a Continue that only calls `setScreen('flight')` passes; the persisted `fly-last-setup-v1` and the relaunch place are never checked | **yes** — both fields survive `exitToTitle` in memory | **FIXED** | (4) clicks `hangar-pick-bizjet` (non-default) and records the launch geo (`runtime.geo`); (4c) asserts the launched aircraft IS the pick. (6) reads `FLIGHT_PLAN.lastSetupKey` from storage, then **perturbs** the store (aircraft → `fighter`, flightMode → `ops`) before clicking Continue, and asserts airborne + mode `free` + aircraft `bizjet` + ≤ 2.5 km from the launch geo + the persisted key present. A green (6) with the default aircraft reads NOT CALIBRATED. A (5) that FAILED makes (6) FAIL. |
+| F2 | the product-boot gate (median of 3 ≤ W0 × 1.05) has no W0 number, pins no clock (B's daylight title spot follows the wall clock), records no spot, compares a median against one W0 number, applies 5 % on a venue whose boots swing by minutes, and E never proved satellite readiness at a `rural` fixture spot | **yes** — `productBoot` had no `__flySunOverride`, no spot, one arm | **FIXED (code) + DEFERRED (the two browser proofs)** | `r25-e-baseline.cjs`: every product boot pins `__flySunOverride` (default 2026-07-01 19:00 UTC, `R25_BASELINE_PRODUCT_SUN_MS`, `wall` disables), records `spot` + fixture `scene`; `R25_BASELINE_PRODUCT_ARMS="w0=…,int=…"` interleaves the arms ABABAB in one session; the verdict (new `scripts/_r25-product-boot.js`) is **NOT CALIBRATED** when an arm has < 3 valid runs, its own spread > 5 %, or its spot moved — PASS/FAIL only otherwise. Node self-check **6/6**, RED-first (the single-arm recorder, an 11.3 % W0 spread, a moved spot, 2 valid runs all refuse to read PASS/FAIL). Readiness-only pose **R1 `grandCanyon`** (36.0544/-112.1401, scene `rural`, = `titleSpot.fallbackId`) added to `_r25-poses.js` (`EXTRA_POSES`; `node scripts/_r25-poses.js` 8/8 incl. R1 → rural). **DEFERRED to E2 (browser):** the rural readiness proof on r25-w0 and the W0 product-boot numbers themselves. |
+| F3 | none of the intro legs was shown able to fail: the only RED (`setHangarOpen` mirror) was calibrated on r25-w0 through the store path and may not bite on the integrated tree; (2h) "passport unchanged" can pass with no spot opportunity (the only spot path is `targeting.update`'s `acquired` transition) | **yes** — Phase 5 runs every frame on the title, and nothing guaranteed a track enters the frozen nose's cone | **FIXED (code) + DEFERRED (RED calibration runs)** | (2h) wraps the live `__fly.targeting.update` for the window (install at the pre-reveal passport read, unwrap at the post read) and counts acquisitions of a track with `meta` (logSpot's precondition) + traffic max; **no acquisition → NOT CALIBRATED**, never PASS. Wrapper node-checked on a fake runtime (counts 2 acquisitions / 1 with meta over 5 updates, restores the prototype method). New REDs: `R25_SMOKE_RED=title` (setScreen ignores `'title'` → expect (4b)/(5)/(6) FAIL), `reload` (capture-phase hook turns Exit into `location.reload()` → expect (5)/(6) FAIL), `continue` (Continue relaunches the perturbed in-memory store → expect (6) FAIL); `1` = `mirror` unchanged. **DEFERRED to E2:** running all four REDs on the integrated tree and recording them here BEFORE the green smoke is read as certification — including whether `mirror` still turns (7) red there. |
+
+On r25-w0 the fix pass changes no leg that executes there: (2h), (4)–(6)
+are NOT CALIBRATED without a title (same 14), and (1)/(2)/(2e)/(7)/(8) are
+untouched — so §4a's 5/0/14 and its measured `mirror` RED still describe
+this branch.
 
 ### §4b verify-r25-visuals — what runs when
 
@@ -350,6 +409,23 @@ page reload** (an in-page marker survives), Continue keeps mode + aircraft.
   captures) is world-only. A gate that compares against a PRE-isolation PNG
   (none exists in this round) would compare HUD against no HUD.
 
+- **(2h) may never be exercised on the fixture.** A spot needs a track
+  inside the frozen nose's 10° / 10 km acquire cone during the title
+  window; with the fixture's fleet that is not guaranteed, and the leg then
+  reads NOT CALIBRATED by design (fix pass F3). If E2 needs it exercised, it
+  must place a track in the cone deliberately (a harness-side fixture
+  aircraft), not loosen the leg.
+- **(6)'s perturbation writes the store on the title** (aircraft `fighter`,
+  flightMode `ops`) before Continue. If B's Continue restores the aircraft
+  from the separate `fly-aircraft` pick key rather than the last setup, (6)
+  still passes — both are persisted state, which is the contract being
+  tested; only an in-memory Continue fails.
+- **The product-boot clock pin assumes B's daylight rule reads the app's sun
+  clock** (`__flySunOverride`, as FlyScene does). If B reads `Date.now()`
+  directly, the pin does not bind — the verdict's moved-spot rule then
+  catches a spot that changed between runs, and the fix is on B's side (read
+  the same override).
+
 ## §7 Unmeasurable here
 
 - every fps / frame-time / tearing / stall figure (SwiftShader, shared cores);
@@ -372,7 +448,9 @@ slot lock. `export FLY_TILE_FIXTURE=1 FLY_FIXTURE_PORT=3206 FLY_URL=http://local
 | every merge | `node scripts/verify-import-integrity.mjs` | 4/0 |
 | every merge | `node scripts/verify-r25-flagoff.mjs` | 8 PASS, 2 NOT CALIBRATED (exit 2) while C/D are off; [4] constants hygiene must stay PASS |
 | every merge | `node scripts/verify-mobile-actions-node.mjs` | 11/11; the 5 PENDING switch on when A's `use-overlay-back.js` learns `screen`/`settingsOpen` — then they must PASS |
-| every merge | `…/run-browser.sh node -r ./scripts/_pw-shim.js scripts/verify-r25-smoke.cjs` (toy, ~6 min) | r25-w0: 5/0/14. After A (FRONT_DOOR ON): the title legs flip from NOT CALIBRATED to PASS/FAIL. After B (FLIGHT_PLAN ON): (4)–(6). Intro pass target: **0 FAIL, and NOT CALIBRATED only on (3b)'s round trip** — (3b) itself PASSES as "row hidden" while no visual block is ON |
+| A + B merged, BEFORE the first green smoke counts | the smoke with `R25_SMOKE_RED=title`, then `=reload`, then `=continue`, then `=1` (mirror) — one run each | **each must exit 1** with the expected legs red: title → (4b) (5) (6); reload → (5) (6); continue → (6); mirror → record whether (7) still goes red on the title path (if it does not, say the mirror RED no longer calibrates (7)). Record all four in §4c. A RED that stays green means that leg is not certified. |
+| every merge | `…/run-browser.sh node -r ./scripts/_pw-shim.js scripts/verify-r25-smoke.cjs` (toy, ~6 min) | r25-w0: 5/0/14. After A (FRONT_DOOR ON): the title legs flip from NOT CALIBRATED to PASS/FAIL. After B (FLIGHT_PLAN ON): (4)–(6). Intro pass target: **0 FAIL; NOT CALIBRATED allowed only on (3b)'s round trip and on (2h) when no acquisition opportunity occurred** (`report.titleSpotWindow` — record it; an un-exercised (2h) is not a pass) — (3b) itself PASSES as "row hidden" while no visual block is ON |
 | A + B merged | the same with `R25_SMOKE_STYLE=satellite` (~20 min) | the satellite title spot reveals (`productBoot.readyAt` in `smoke/report-satellite.json`) |
-| A + B merged | `R25_BASELINE_TAG=int R25_BASELINE_PRODUCT=3 R25_BASELINE_POSES=0 … scripts/r25-e-baseline.cjs` | product boot → title world; compare `productMedianWorldMs` with §3a's W0 `worldMs` (plan: ≤ W0 × 1.05; a venue number, read with the load average) |
+| A + B merged, before the product-boot row | a second dev server on an `r25-w0` worktree, then `…/run-browser.sh node -r ./scripts/_pw-shim.js scripts/r25-e-sat-probe.cjs satellite grandCanyon` against it | satellite `worldReadiness` reaches ready at the `rural` scene (R1) — the title spot's scene. If it does not, the product-boot row is BLOCKED (not red) and the reason goes in §4c |
+| A + B merged | `R25_BASELINE_TAG=int R25_BASELINE_PRODUCT=3 R25_BASELINE_POSES=0 R25_BASELINE_PRODUCT_ARMS="w0=<r25-w0 server>,int=http://localhost:3036" … scripts/r25-e-baseline.cjs` | six interleaved product boots under the pinned clock; read `boots.productVerdict` (plan: int median ≤ W0 median × 1.05). **NOT CALIBRATED** (an arm's own spread > 5 %, < 3 valid runs, or a moved spot) is the honest outcome on a loaded venue — never hand B a spot swap on it. Record each row's `spot`/`scene` and load |
 | C/D pass only | `scripts/verify-r25-visuals.cjs` (+ `FLY_URL_BASELINE` = a dev server on r25-w0) | intro pass: the ship-state short circuit, 7 NOT CALIBRATED in <1 s |
