@@ -170,12 +170,22 @@ async function press(page, id, { timeoutMs = 10000 } = {}) {
   } catch {
     /* fall through to the DOM click */
   }
-  const ok = await page.evaluate((tid) => {
-    const el = document.querySelector(`[data-testid="${tid}"]`);
-    if (!el || el.disabled) return false;
-    el.click();
-    return true;
-  }, id);
+  let ok;
+  try {
+    ok = await page.evaluate((tid) => {
+      const el = document.querySelector(`[data-testid="${tid}"]`);
+      if (!el || el.disabled) return false;
+      el.click();
+      return true;
+    }, id);
+  } catch (e) {
+    // The click itself navigated (the pre-R25 Exit was location.reload(); the
+    // `reload` RED reinstates it): the evaluate's context died WITH the click.
+    // That is a press that landed — the leg judges what it left behind.
+    if (!/Execution context was destroyed|navigation/i.test(String(e?.message || e))) throw e;
+    ok = true;
+    presses.navigated = (presses.navigated || 0) + 1;
+  }
   presses.dom.push(id);
   if (!ok) throw new Error(`press ${id}: the control vanished or is disabled`);
 }
