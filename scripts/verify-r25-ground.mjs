@@ -469,6 +469,8 @@ const sameT = (a, b) => a.vs === b.vs && a.fs === b.fs && a.uniforms === b.unifo
   const e = arms.enhtrue.fs;
   const guarded =
     /if \( uHillStrength > 0\.0 \) \{\n\s+vec3 r25L/.test(e) &&
+    /float lit = uHillAmbient \+ \( 1\.0 \+ uHillLift - uHillAmbient \) \* clamp\( normalize\( uHillDir \)\.y, 0\.0, 1\.0 \);/.test(e) &&
+    /diffuseColor\.rgb = mix\( diffuseColor\.rgb, shaded, uHillStrength[^\n]*\n  if \( uHillStrength > 0\.0 \) \{/.test(e) &&
     /if \( uHillStrength > 0\.0 \) normal = normalize/.test(e) &&
     /if \( uR25Sat > 0\.5 \) \{/.test(e) &&
     e.includes('if ( uHillStrength > 0.0 ) {') &&
