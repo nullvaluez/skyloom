@@ -39,6 +39,10 @@
  *      profile flips back to Classic live; the table integrates once for a
  *      steady input; exposure / day weight / living-air mirrors equal their
  *      sources; atmo-law's lobe text is the one the model uses.
+ *  [7] GLSL — every Classic and Enhanced program here passes glslangValidator
+ *      as GLSL ES 3.00 (three's GLSL3 prefix, ShaderChunk includes resolved),
+ *      with a CONTROL that must fail. The tool is optional: absent, the section
+ *      prints BLOCKED and does not move the exit code.
  *
  * RED FIRST (scripts/r25-c-sky.md §RED): R25_SKY_RED=ibl uses the literal
  * `sun.az - hdriSunAz` of the plan text, and [5] FAILS (the HDRI sun lands at
@@ -500,6 +504,66 @@ console.log('\n[6] frame hooks');
   Object.assign(u.uAtmoSunTint.value, keep.s);
   Object.assign(u.uAtmoMie.value, keep.m);
   gate('(6p) atmoMieLobe (JS) == the lobe inside atmoInscatterJS', dl < 1e-12, `worst ${dl.toExponential(2)}`);
+}
+
+// --- [7] the Enhanced GLSL compiles (glslangValidator, GLSL ES 3.00) --------
+console.log('\n[7] GLSL ES 3.00 front-end compile (glslangValidator)');
+{
+  let tool = true;
+  try {
+    execFileSync('glslangValidator', ['--version'], { stdio: 'ignore' });
+  } catch {
+    tool = false;
+  }
+  if (!tool) {
+    // An absent OPTIONAL tool is not a verdict on the code: reported, and it
+    // does not move the exit code (the user's Windows machine has no glslang).
+    console.log('BLOCKED  (7) glslangValidator not on PATH — the browser gate compiles these for real');
+  } else {
+    const os = await import('node:os');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'r25-sky-glsl-'));
+    const inc = (t) => t.replace(/^[ \t]*#include +<([\w\d./]+)>/gm, (m, n) => inc(THREE.ShaderChunk[n] ?? `// missing ${n}`));
+    // three's GLSL3 fragment prefix, reduced to what these programs use.
+    const prefix = [
+      '#version 300 es', '#define varying in', 'layout(location = 0) out highp vec4 pc_fragColor;',
+      '#define gl_FragColor pc_fragColor', '#define texture2D texture', '#define textureCube texture',
+      'precision highp float;', 'precision highp int;', 'precision highp sampler2D;', 'precision highp sampler3D;',
+      'uniform mat4 viewMatrix; uniform vec3 cameraPosition; uniform bool isOrthographic;',
+      '#define USE_REVERSED_DEPTH_BUFFER',
+    ].join('\n');
+    const compiles = (name, frag, defines = {}) => {
+      const f = path.join(dir, `${name}.frag`);
+      fs.writeFileSync(f, `${prefix}\n${Object.entries(defines).map(([k, v]) => `#define ${k} ${v}`).join('\n')}\n${inc(frag)}`);
+      try {
+        execFileSync('glslangValidator', [f], { encoding: 'utf8' });
+        return { ok: true, err: '' };
+      } catch (e) {
+        return { ok: false, err: String(e.stdout || '').split('\n').filter((l) => /ERROR/.test(l)).slice(0, 3).join(' | ') };
+      }
+    };
+    const control = compiles('control', 'void main(){ gl_FragColor = vec4(notDeclared); }');
+    gate('(7a) CONTROL: a shader with an undeclared identifier FAILS (the instrument can see a defect)', !control.ok, control.err.slice(0, 90));
+    arm('enhanced');
+    const cp = new CP.ImmersiveCloudPass(cam, { flight: { latDeg: 36.6 }, sun: {}, weather: {} });
+    const r = cp.ensureR25();
+    const pairs = [
+      ['cloud march (Classic)', cp.marchMaterial.fragmentShader],
+      ['cloud composite (Classic)', cp.compositeMaterial.fragmentShader],
+      ['cloud march (Enhanced)', r.march.fragmentShader],
+      ['cloud composite (Enhanced)', r.composite.fragmentShader],
+    ];
+    for (const [nm, e] of [['aerial pass (Classic)', new AP.AerialPerspectiveEffect()], ['aerial pass (Enhanced)', new AP.AerialPerspectiveEffect({ r25: true })]]) {
+      const ps = new EffectPass(cam, e);
+      pairs.push([nm, ps.fullscreenMaterial.fragmentShader, { ...ps.fullscreenMaterial.defines }]);
+    }
+    cp.dispose();
+    restore();
+    for (const [nm, frag, defs] of pairs) {
+      const c = compiles(nm.replace(/\W+/g, '-'), frag, defs);
+      gate(`(7) ${nm} compiles`, c.ok, c.err);
+    }
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 console.log(`\n${pass} passed, ${fail} failed, ${notcal} not calibrated${RED ? `  (R25_SKY_RED=${RED} calibration run)` : ''}`);
