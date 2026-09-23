@@ -29,6 +29,10 @@ const PRIOR = (args && args.priorMerged) || []
 const STOP_AFTER = (args && args.stopAfter) || null
 const REPORTS = (args && args.reports) || null
 const INTRO_MARKER = '/tmp/r25-locks/intro-pushed'
+// args.note: extra instructions appended to every role prompt of this run (resume / wrap-up notes).
+// args.smokeOnce: intermediate merges run node gates only; the fixture smoke runs once after the last merge.
+const EXTRA = (args && args.note) ? `\nORCHESTRATOR NOTE FOR THIS RUN:\n${args.note}\n` : ''
+const SMOKE_ONCE = !!(args && args.smokeOnce)
 
 const ROLES = [
   { k: 'e', name: 'E CERT', port: 3035, fport: 3205, reviewer: 'c',
@@ -88,7 +92,7 @@ ${TRAILER}
 8. Do not ask the user questions; make the call the plan implies, record it in your ledger, and flag real ambiguity in your report's risks.
 9. The E1 marker protocol: E writes /tmp/r25-locks/e1-ready (contents = the r25/e commit to merge) once the satellite fixture + shared helpers exist. Roles A-D: do node/code work first; before your FIRST fixture browser run, wait for the marker (bounded wait, e.g. timeout 1200 bash -c 'until [ -f /tmp/r25-locks/e1-ready ]; do sleep 20; done', re-check between work items) and then git -C ${dir(r.k)} merge --no-edit $(cat /tmp/r25-locks/e1-ready). If /tmp/r25-locks/e1-satellite-blocked exists, satellite pixel rows are BLOCKED (say so) and you use toy/dev-server checks. If no marker appears after ~2 hours of your own work, proceed without it and mark fixture rows BLOCKED.
 
-YOUR ROLE:${PASS_NOTE}
+YOUR ROLE:${PASS_NOTE}${EXTRA}
 ${r.focus}
 
 FINISH: kill your dev server process group, make sure everything is committed on r25/${r.k} (git status clean except gitignored evidence), then return the structured report.`
@@ -171,7 +175,7 @@ for (const k of ORDER) {
     m = await agent(`You are the R25 role "E CERT" in your E2 (INTEGRATION) phase. Read ${REPO}/${PLAN} (merge order, smoke list, W0 addendum, verification matrix).
 Integration worktree: ${REPO} on branch ${INT_BRANCH} (local; never push — the orchestrator pushes). Dev server port 3036, fixture port 3206 (FLY_TILE_FIXTURE=1 FLY_FIXTURE_PORT=3206 FLY_URL=http://localhost:3036 FLY_BOOT_SCALE=3), browser gates ALWAYS through /tmp/r25-locks/run-browser.sh node -r ./scripts/_pw-shim.js scripts/<gate>. Kill your dev server's process group when done.
 Merge order is E -> A -> B -> D -> C.${PASS_NOTE} Already merged so far: ${JSON.stringify(PRIOR.concat(merges.filter(x => x.merged && x.green).map(x => x.branch)))}.
-THIS STEP: merge r25/${k} (${r.name}), attempt ${attempt} of 3. Owner's latest report: ${JSON.stringify(reportOf(k)).slice(0, 5000)}
+THIS STEP: merge r25/${k} (${r.name}), attempt ${attempt} of 3.${SMOKE_ONCE ? (k === ORDER[ORDER.length - 1] ? ` SMOKE POLICY: this is the LAST merge of the run — run the FULL fixture smoke now, plus the own fixture gates of EVERY branch merged in this run (${ORDER.map(x => 'r25/' + x).join(', ')}); if one is red, attribute it to its owner in failures.` : ` SMOKE POLICY: intermediate merge — run import-integrity, targeted eslint and ALL node gates, but SKIP the fixture/browser smoke (it runs once after the last merge of this run: ${'r25/' + ORDER[ORDER.length - 1]}).`) : ''} Owner's latest report: ${JSON.stringify(reportOf(k)).slice(0, 5000)}
 Procedure:
 1. Record preMergeSha = git -C ${REPO} rev-parse HEAD. git -C ${REPO} merge --no-ff --no-edit r25/${k} (commit message "R25 integrate: merge r25/${k} (${r.name})" + the two trailer lines below). Resolve conflicts faithfully to BOTH sides' intent; W0-only files (FlyScene.jsx, fly-store.js, fly-constants.js tail) are the orchestrator's — you may apply a role's w0Requests there if minimal and justified (list them in w0RequestsApplied).
 2. Smoke: node scripts/verify-import-integrity.mjs (must stay 4 passed / 0 failed); targeted eslint on every file changed by this merge (no per-file growth vs the W0 addendum); ALL node gates: every scripts/verify-r25-*.mjs present, graphics-unit.mjs, verify-flight-operations.mjs, verify-mobile-actions-node.mjs, verify-stylized-earth.mjs, verify-c-flagoff.mjs, verify-vendor-three-tile.mjs, verify-living-earth.mjs, verify-cinematic-flight.mjs, verify-operations-disclosure.mjs (verify-lod-fade 60/4 and verify-atmo-law's crash are pre-existing — they must not get WORSE); fixture: bootFly toy + satellite smoke (pinned legacy fleet boot must still reach pct 100 with zero non-network page errors), and from A onward scripts/verify-r25-smoke.cjs (title -> Free Flight -> pause -> Exit to title -> Continue; satellite + toy) plus this role's own fixture gates.
