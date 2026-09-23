@@ -21,9 +21,14 @@ const TRAILER = (args && args.trailer) || 'Co-Authored-By: Claude Opus 5.5 <nore
 // branches already merged on INT_BRANCH by an earlier pass.
 const PASS = (args && args.pass) || 'full'
 const ONLY = (args && Array.isArray(args.roles) && args.roles.length) ? args.roles
-  : PASS === 'intro' ? ['e', 'a', 'b'] : PASS === 'visuals' ? ['c', 'd'] : null
+  : PASS === 'intro' ? ['e', 'a', 'b'] : (PASS === 'visuals' || PASS === 'visuals-early') ? ['c', 'd'] : null
 const BASE = (args && args.base) || 'r25-w0'
 const PRIOR = (args && args.priorMerged) || []
+// args.stopAfter = 'fix' returns right after Build/Review/Fix (no integration, no close);
+// args.reports = { <k>: {build, review, fix} } skips Build/Review/Fix and integrates those branches.
+const STOP_AFTER = (args && args.stopAfter) || null
+const REPORTS = (args && args.reports) || null
+const INTRO_MARKER = '/tmp/r25-locks/intro-pushed'
 
 const ROLES = [
   { k: 'e', name: 'E CERT', port: 3035, fport: 3205, reviewer: 'c',
@@ -53,7 +58,9 @@ E1 ORDER OF WORK (reference; A-D are waiting on step 3):
 const byKey = Object.fromEntries(ROLES.map(r => [r.k, r]))
 const ACTIVE = ONLY ? ROLES.filter(r => ONLY.includes(r.k)) : ROLES
 const PASS_NOTE = PASS === 'intro'
-  ? `\nTHIS IS THE INTRO PASS: the user wants the intro (title screen, Free Flight vs Takeoff & Landing, the adaptive hangar, Continue, exit-to-title, Skyloom branding) FULLY built, certified and pushed to main FIRST. Only roles E, A and B run in this pass; C SKY and D GROUND run in a later pass on top of it (R25_SKY / R25_GROUND stay enabled:false and untouched now, and the Visuals toggle stays hidden while nothing Enhanced exists). Build your charter completely — no stubs left behind for anything this pass owns.\n`
+  ? `\nTHIS IS THE INTRO PASS: the user wants the intro (title screen, Free Flight vs Takeoff & Landing, the adaptive hangar, Continue, exit-to-title, Skyloom branding) FULLY built, certified and pushed to main FIRST. Only roles E, A and B are part of this pass; C SKY and D GROUND are built separately and integrate only after the intro is on main (R25_SKY / R25_GROUND stay enabled:false and untouched here, and the Visuals toggle stays hidden while nothing Enhanced exists). Build your charter completely — no stubs left behind for anything this pass owns.\n`
+  : PASS === 'visuals-early'
+  ? `\nTHIS IS THE EARLY VISUALS BUILD: the intro pass (E, A, B) is being built and integrated RIGHT NOW in another workflow and has absolute priority on this 4-core container's CPU and its two browser slots. Your branch starts at ${BASE}. UNTIL the file ${INTRO_MARKER} exists: do code and NODE-gate work only — do NOT start a dev server, do NOT run any browser/fixture gate, do NOT run a production build. When your code + node work is done, wait for the marker with bounded waits (timeout 590 bash -c 'until [ -f ${INTRO_MARKER} ]; do sleep 30; done', repeated as needed; re-check between work items). Once it exists: git -C <your worktree> merge --no-edit $(cat ${INTRO_MARKER}) (the certified intro tree, title ON — fixture harnesses still boot through the title bypass pin), then start your dev server and do the fixture/browser work your charter requires, RED-first as usual. "Flag-off identity" means identity with the tree you are on (${BASE}, then the intro tree after that merge). Your integration onto the intro tree happens later, in a separate run — do not merge into ${INT_BRANCH}.\n`
   : PASS === 'visuals'
   ? `\nTHIS IS THE VISUALS PASS: the intro pass (E, A, B) is already merged on ${INT_BRANCH} and pushed to main; your branch starts at ${BASE} (the pushed intro tree, title ON). Roles C and D run in this pass. Fixture gates still boot through the harness title bypass pin; "flag-off identity" means identity with ${BASE}.\n`
   : ''
@@ -118,14 +125,14 @@ const CLOSE_SCHEMA = { type: 'object', properties: {
 }, required: ['head', 'shipState', 'gates', 'recordPath'] }
 
 // ---------------------------------------------------------------- Build → Review → Fix (pipelined per role, no barrier)
-const built = await pipeline(
+const built = REPORTS ? Object.entries(REPORTS).map(([role, x]) => ({ role, build: x.build, review: x.review || null, fix: x.fix || null })) : await pipeline(
   ACTIVE,
   r => agent(COMMON(r), { label: `build:${r.name}`, phase: 'Build', schema: BUILD_SCHEMA }),
   (b, r) => {
     if (!b) return null
     const rv = byKey[r.reviewer]
     return agent(`You are the R25 role "${rv.name}" acting as an ADVERSARIAL PEER REVIEWER of role "${r.name}"'s branch r25/${r.k} in the Skyloom repo. Read ${REPO}/${PLAN} (the owner's role section, the key rulings, the W0 addendum, the common rules).
-Review target: git -C ${dir(r.k)} diff ${BASE}..r25/${r.k}  (plus git log ${BASE}..r25/${r.k}).${PASS_NOTE} The owner reports: ${JSON.stringify({ summary: b.summary, flagFlipped: b.flagFlipped, gates: b.gates, subflags: b.subflags, w0Requests: b.w0Requests, risks: b.risks }).slice(0, 6000)}
+Review target: git -C ${dir(r.k)} diff ${BASE}..r25/${r.k}  (plus git log ${BASE}..r25/${r.k}).${PASS === 'visuals-early' ? ` If the branch merged the intro tree (${INTRO_MARKER}), review only the role's own commits: git -C ${dir(r.k)} log --no-merges -p ${BASE}..r25/${r.k} (the intro merge is not this role's work).` : ''}${PASS_NOTE} The owner reports: ${JSON.stringify({ summary: b.summary, flagFlipped: b.flagFlipped, gates: b.gates, subflags: b.subflags, w0Requests: b.w0Requests, risks: b.risks }).slice(0, 6000)}
 Your job is to REFUTE that this branch is correct and mergeable. Hunt for: behaviour that breaks flag-off / Classic byte-identity; shader text vs cache-key disagreement or missing prewarm entries; per-frame allocations or per-frame data through React/zustand; broken or renamed data-testids; edits to W0-only files (FlyScene.jsx, fly-store.js, fly-constants.js outside the owner's block) or to files the plan gives another role; harness pins weakened; gates that cannot fail (not calibrated RED first), gates that assert the wrong thing, or claims of PASS without evidence; Esc/Back/audio/state-machine holes (A/B); texture/draw/triangle budget risks (C/D); import-integrity or lint regressions; anything that would make integration merges conflict. Re-run the owner's NODE gates yourself (read-only use of their worktree is fine; do NOT edit, commit, or start a dev server in ${dir(r.k)}). You may run the node gates from a scratch copy if needed. Do not run browser gates.
 Severity: blocking = must fix before merge (correctness, identity, budget, broken gate); major = should fix; minor/nit = optional. Be concrete: file, line, what is wrong, how to reproduce. If you find nothing blocking, say so plainly — do not invent findings.`,
       { label: `review:${r.name}<-${rv.name}`, phase: 'Review', schema: REVIEW_SCHEMA })
@@ -149,6 +156,7 @@ const results = built.filter(Boolean)
 const missing = ACTIVE.filter(r => !results.find(x => x.role === r.k)).map(r => r.name)
 if (missing.length) log(`WARNING: no build result for ${missing.join(', ')} — integration will skip them`)
 log(`Build/review/fix done for ${results.map(x => x.role).join(',')}`)
+if (STOP_AFTER === 'fix') return { results }
 
 // ---------------------------------------------------------------- Integrate (sequential, E drives)
 const E = byKey.e
