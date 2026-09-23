@@ -11,6 +11,7 @@ import { HangarScene } from './HangarScene';
 import { FLIGHT_PLAN, FRONT_DOOR } from '@/lib/fly/fly-constants';
 import { FEATURED_DESTINATIONS, defaultDestination, flightPlanOn, saveLastSetup, searchDestinations } from '@/lib/fly/flight-plan';
 import './operations.css';
+const SERVICE_RETRY_MS=250;
 export function GroundHangar({runtime}){
   const open=useFlyStore(s=>s.hangarOpen);
   return open?<HangarBody runtime={runtime}/>:null;
@@ -36,14 +37,17 @@ function HangarBody({runtime}){
   const [query,setQuery]=useState(''),[cursor,setCursor]=useState(0),[stage,setStage]=useState({state:'idle',pct:0});
   const results=useMemo(()=>free?searchDestinations(query,6):[],[free,query]);
   // Debounced staging: pre-stream the pick behind the opaque hangar.
-  useEffect(()=>{if(!free||!dest||confirmReturn)return undefined;const t=setTimeout(()=>{const ok=runtime.stageDestination?.(dest);if(ok===false)setStage({state:'unstaged',pct:0});},FLIGHT_PLAN.stage.debounceMs);return()=>clearTimeout(t);},[free,dest,runtime,confirmReturn]);
+  // The hangar can open before FlyScene installs the runtime services (the
+  // title is interactive at once; a phone mounts the world seconds later), so
+  // staging waits for stageDestination instead of calling it once and giving up.
+  useEffect(()=>{if(!free||!dest||confirmReturn)return undefined;let t;const go=()=>{if(typeof runtime.stageDestination!=='function'){t=setTimeout(go,SERVICE_RETRY_MS);return;}if(runtime.stageDestination(dest)===false)setStage({state:'unstaged',pct:0});};t=setTimeout(go,FLIGHT_PLAN.stage.debounceMs);return()=>clearTimeout(t);},[free,dest,runtime,confirmReturn]);
   useEffect(()=>{if(!free||!dest)return undefined;const put=next=>setStage(p=>p.state===next.state&&p.pct===next.pct?p:next);const read=()=>{const s=runtime.staging;if(!s||s.key!==dest.id)return setStage(p=>p.state==='unstaged'||p.state==='pending'?p:{state:'pending',pct:0});put(s.ready?{state:'ready',pct:100}:{state:'staging',pct:Math.round((s.progress||0)*100)});};read();const t=setInterval(read,250);return()=>clearInterval(t);},[free,dest,runtime]);
   const aircraft=resolveAircraft(id),profile=operationsProfile(aircraft.id);
   // Ops mode stages the departure airport too — a no-op unless the flight is
   // genuinely far from it (a title spot on another continent; see
   // OPS_STAGE_MIN_KM), so the Columbus-cluster flows never stage-warp.
   const opsStageId=aircraft.id==='glider'?'KOSU':airport;
-  useEffect(()=>{if(!plan||free||confirmReturn)return undefined;const t=setTimeout(()=>runtime.stageDestination?.(opsStageId),FLIGHT_PLAN.stage.debounceMs);return()=>clearTimeout(t);},[plan,free,opsStageId,runtime,confirmReturn]);
+  useEffect(()=>{if(!plan||free||confirmReturn)return undefined;let t;const go=()=>{if(typeof runtime.stageDestination!=='function'){t=setTimeout(go,SERVICE_RETRY_MS);return;}runtime.stageDestination(opsStageId);};t=setTimeout(go,FLIGHT_PLAN.stage.debounceMs);return()=>clearTimeout(t);},[plan,free,opsStageId,runtime,confirmReturn]);
   const compatible=airportEligible(airportById(airport),aircraft.id);
   const loaded=useCallback(selected=>{if(selected===id)setReady(true);},[id]),failure=useCallback(()=>setFailed(true),[]);
   useEffect(()=>{const t=setInterval(()=>setLive(!!runtime.beginDeparture),250);return()=>clearInterval(t);},[runtime]);
@@ -51,7 +55,11 @@ function HangarBody({runtime}){
   const searchKey=e=>{if(e.key==='ArrowDown'){e.preventDefault();setCursor(c=>Math.min(c+1,results.length-1));}else if(e.key==='ArrowUp'){e.preventDefault();setCursor(c=>Math.max(c-1,0));}else if(e.key==='Enter'&&results.length>0){e.preventDefault();chooseDest(results[Math.min(cursor,results.length-1)]);}else if(e.key==='Escape'&&query){e.preventDefault();setQuery('');}};
   useEffect(()=>{const previous=document.activeElement;root.current?.focus();return()=>previous?.focus?.();},[]);
   useEffect(()=>{const rail=root.current?.querySelector('.ops-fleet'),selected=rail?.querySelector('[aria-pressed="true"]');if(selected)rail.scrollTo({left:selected.offsetLeft-(rail.clientWidth-selected.offsetWidth)/2,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});},[id,confirmReturn]);
-  const keyboard=e=>{e.stopPropagation();if(e.key==='Tab'){const items=[...e.currentTarget.querySelectorAll('button:not(:disabled),select:not(:disabled),input:not(:disabled),a[href],[tabindex="0"]')];const first=items[0],last=items.at(-1);if(e.shiftKey&&(document.activeElement===first||document.activeElement===root.current)){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}};
+  // Every key stops here (today's hangar), and React stops the NATIVE event at
+  // the root, so the window Esc chain never sees an Esc pressed inside the
+  // hangar: the pre-flight Esc → title (FRONT_DOOR) is handled here, unless the
+  // search box already used it to clear its query.
+  const keyboard=e=>{e.stopPropagation();if(e.key==='Escape'&&!confirmReturn&&!e.isDefaultPrevented()&&toTitle())e.preventDefault();if(e.key==='Tab'){const items=[...e.currentTarget.querySelectorAll('button:not(:disabled),select:not(:disabled),input:not(:disabled),a[href],[tabindex="0"]')];const first=items[0],last=items.at(-1);if(e.shiftKey&&(document.activeElement===first||document.activeElement===root.current)){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}};
   const pick=next=>{if(next===id)return;setReady(false);setFailed(false);setId(next);if(!airportEligible(airportById(airport),next)&&next!=='glider')setAirport(next==='prop'||next==='warbird-prop'?'KOSU':'KCMH');};
   const start=()=>{
     const chosen=aircraft.id;if(!ready||!live)return;
@@ -61,7 +69,7 @@ function HangarBody({runtime}){
     if(plan)saveLastSetup(chosen==='glider'?{flightMode:'ops',aircraftId:chosen,start:'practice'}:{flightMode:'ops',aircraftId:chosen,airportId:airport,start:startMode});
     useFlyStore.getState().setHangarOpen(false);
   };
-  const toTitle=()=>{const s=useFlyStore.getState();if(!FRONT_DOOR.enabled||s.hangarDismissible)return;s.setScreen('title');};
+  const toTitle=()=>{const s=useFlyStore.getState();if(!FRONT_DOOR.enabled||s.hangarDismissible)return false;s.setScreen('title');return true;};
   if(confirmReturn)return <div ref={root} tabIndex={-1} onKeyDown={keyboard} onPointerDown={e=>e.stopPropagation()} data-overlay="hangar" className="ops-hangar ops-confirm" role="dialog" aria-modal="true" aria-label="Return to hangar">
     <div><h1>Return to the hangar?</h1><p>This ends your current flight. Choose another aircraft or departure airport in the hangar.</p>
       <button onClick={()=>{runtime.operations.returnToHangar();setConfirmReturn(false);}}>End flight and open hangar</button>

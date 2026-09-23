@@ -50,6 +50,9 @@ fs.mkdirSync(OUT, { recursive: true });
 const TAG = STYLE || 'toy';
 const KEY = 'fly-last-setup-v1';
 const CORRUPT = JSON.stringify({ v: 1, flightMode: 'free', aircraftId: 'blimp', dest: { id: 'manhattan' } });
+// One field away from CORRUPT: the reader must RETURN this one, so a reader that
+// is simply always null (FLIGHT_PLAN off) cannot pass leg (1).
+const CONTROL = JSON.stringify({ v: 1, flightMode: 'free', aircraftId: 'prop', dest: { id: 'manhattan' } });
 
 let pass = 0,
   fail = 0;
@@ -182,11 +185,42 @@ async function doContinue(page, title) {
     const t1 = await boot(page, true);
     const ls1 = await lastSetup(page);
     const continueNodes = t1.title ? await page.getByTestId('title-continue').count() : null;
-    report.legs.corrupt = { title: t1.title, continueNodes, raw: ls1.raw, readLastSetup: ls1.valid };
-    gate('(1) CORRUPT storage hides Continue (and the app boots normally)',
-      ls1.raw === CORRUPT && ls1.valid === null && (t1.title ? continueNodes === 0 : true) && ls1.valid !== undefined,
-      t1.title ? `title-continue nodes ${continueNodes}` : `no title on this tree: readLastSetup() → ${JSON.stringify(ls1.valid)}`);
+    // Control: the same reader, the same page, the row one field away from CORRUPT
+    // (the title decided Continue at mount, so this write cannot change it).
+    const ctl = await page.evaluate(({ k, good, bad }) => {
+      const r = window.__fly;
+      if (typeof r?.readLastSetup !== 'function') return { reader: false, got: null };
+      try {
+        localStorage.setItem(k, good);
+      } catch {
+        return { reader: true, blocked: true, got: null };
+      }
+      const got = r.readLastSetup();
+      try {
+        localStorage.setItem(k, bad);
+      } catch {
+        /* storage blocked */
+      }
+      return { reader: true, got: got ? { mode: got.flightMode, ac: got.aircraftId, dest: got.dest?.id } : null };
+    }, { k: KEY, good: CONTROL, bad: CORRUPT });
+    const ctlOk = ctl.got?.mode === 'free' && ctl.got?.ac === 'prop' && ctl.got?.dest === 'manhattan';
+    report.legs.corrupt = { title: t1.title, continueNodes, raw: ls1.raw, readLastSetup: ls1.valid, control: ctl };
+    gate('(1) CORRUPT storage hides Continue (and the app boots normally); the valid control row one field away reads back',
+      ls1.raw === CORRUPT && ls1.valid === null && (t1.title ? continueNodes === 0 : true) && ls1.valid !== undefined && ctlOk,
+      `${t1.title ? `title-continue nodes ${continueNodes}` : `no title on this tree: readLastSetup() → ${JSON.stringify(ls1.valid)}`} · control → ${JSON.stringify(ctl.got)}`);
 
+    // The Free Flight entry must exist before walking in (with FLIGHT_PLAN off
+    // the title has no Free Flight card — fail fast instead of waiting out the
+    // click timeout; RED run 1 on the A+B tree spent 15 min there).
+    const freeEntry = !t1.title || (await waitFor(page, () => !!document.querySelector('[data-testid="title-free-flight"]'), undefined, 30000 * SCALE));
+    if (!freeEntry) {
+      report.legs.freeEntry = false;
+      for (const n of ['(2) a Free Flight launch writes a valid fly-last-setup-v1', '(3) CONTINUE relaunches the free flight exactly', '(4) CONTINUE relaunches the ops-runway flight exactly'])
+        gate(n, false, 'no Free Flight entry on the title (title-free-flight absent)');
+      gate('(5) ZERO page errors across the three loads', errors.length === 0, errNote());
+      await ctx.close();
+      return;
+    }
     await enterHangar(page, 'free', { timeoutMs: 300000 * SCALE });
     const freeUi = (await page.getByTestId('hangar-dest-manhattan').count()) === 1;
     let A = null;
@@ -207,7 +241,7 @@ async function doContinue(page, title) {
     // ---- load 2 ------------------------------------------------------------------
     const t2 = await boot(page, false);
     const c2 = await doContinue(page, t2.title);
-    await waitFor(page, () => window.__flyStore.getState().screen === 'flight' && window.__fly.operations?.phase === 'airborne', undefined, 60000 * SCALE);
+    if (c2.ok) await waitFor(page, () => window.__flyStore.getState().screen === 'flight' && window.__fly.operations?.phase === 'airborne', undefined, 60000 * SCALE);
     const A2 = c2.ok ? await pose(page) : null;
     // A free launch is compared on its PLACEMENT (runtime.lastLaunch — toy flies
     // on through its warp hold, so the live pose drifts ~60 m/s x read latency);
@@ -241,7 +275,7 @@ async function doContinue(page, title) {
     // ---- load 3 ------------------------------------------------------------------
     const t3 = await boot(page, false);
     const c3 = await doContinue(page, t3.title);
-    await waitFor(page, () => window.__flyStore.getState().screen === 'flight' && window.__fly.operations?.phase === 'parked', undefined, 60000 * SCALE);
+    if (c3.ok) await waitFor(page, () => window.__flyStore.getState().screen === 'flight' && window.__fly.operations?.phase === 'parked', undefined, 60000 * SCALE);
     const B2 = c3.ok ? await pose(page) : null;
     const dB = B && B2 ? { m: distM(B, B2), y: Math.abs(B.y - B2.y), h: Math.abs(B.heading - B2.heading) } : null;
     report.legs.continueOps = { via: c3.via, B, B2, dB };
