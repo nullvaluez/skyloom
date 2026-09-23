@@ -34,7 +34,9 @@
  *  (6) UNSTAGED CONTROL: from the hangar, launch Tokyo WITHOUT staging
  *      (runtime.launchFreeFlight directly) and time its warp-hold; the staged
  *      hold (3) must be shorter. A control that has not revealed by its wait
- *      bound counts as >= the bound (it is still holding).
+ *      bound counts as >= the bound (it is still holding). NOT CALIBRATED when
+ *      staging had not finished at launch (precondition) or when both toy
+ *      holds sit at the toy time cap.
  *  (7) ZERO page errors.
  *
  * STYLE: toy by default; R25_FF_STYLE=satellite for the satellite run.
@@ -348,7 +350,12 @@ const flyEnabled = (page, ms) => waitFor(page, () => { const b = document.queryS
     // ARRIVAL_GATE.holdMaxMs 6500), so when both arms sit at the cap the toy
     // venue cannot separate them — that is NOT CALIBRATED, not a pass.
     const cap = C.ARRIVAL_GATE?.enabled ? C.ARRIVAL_GATE.holdMaxMs : C.WARP?.far?.holdMaxMs ?? 3500;
-    if (!STYLE && Number.isFinite(staged.holdMs) && staged.holdMs >= cap - 300 && ctlHold >= cap - 300)
+    // PRECONDITION: the claim is "a STAGED world holds shorter". If staging did
+    // not finish before launch (the toy ring cannot inside a bounded run at
+    // ~0.4 fps behind the hangar — ledger §3), the claim is not under test.
+    if (ll.staged?.ready !== true)
+      notCal('(6) warp-hold after staging is shorter than an unstaged control', `${holdDetail} — staging had not finished at launch, so nothing staged was compared`);
+    else if (!STYLE && Number.isFinite(staged.holdMs) && staged.holdMs >= cap - 300 && ctlHold >= cap - 300)
       notCal('(6) warp-hold after staging is shorter than an unstaged control', `${holdDetail} — both at the toy time cap ${cap} ms`);
     else
       gate('(6) warp-hold after staging is shorter than an unstaged control',

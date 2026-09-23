@@ -36,6 +36,11 @@ written to work with and without the title.
 - Title spot scoring: sun elevation in `[minSunElDeg, 50]°`, score
   `1 − |el − 30|/50`, +0.5 golden-hour bonus at `el ≤ 18°`; Columbus practice
   is not a candidate; toy → Manhattan.
+- Staging and every Free Flight launch set `runtime.titleSpot` to the
+  destination's `{radiusM, aglM}` (A's title camera reads `runtime.titleSpot ??
+  spawn.title`), so "‹ Title" from the hangar orbits the staged spot with its
+  own orbit, and Exit-to-title after a free flight uses that spot's. Ops
+  launches leave it untouched (the airport has no curated orbit).
 - `describeSetup` returns the detail only ("Skylark · Free Flight over Grand
   Canyon", "Vector · KCMH · Runway") — A's title renders "Continue" before it.
 
@@ -81,9 +86,11 @@ the venue's:
 | Gate | Verdict | Evidence |
 |---|---|---|
 | `verify-r25-flight-plan.mjs` (node) | **PASS 44/0** | RED 4/37 on the r25-w0 stubs (§2) |
-| `verify-r25-freeflight.cjs` toy fixture | **PASS 6 / FAIL 0 / NOT CALIBRATED 1** | `freeflight-toy-3.log`: (1) free hangar, default `columbus-practice`; (2) stage warp, frozen, frames +35, toy ring 18 → 115 chunks, status `staging`; (3) "Fly to Manhattan", placement 0.00 m, alt 950 = max(950, 0+450), heading error 0.0000°, cruise 60 m/s; (4) no crash 10 s (min AGL 773 m); (5) "Brooklyn" → `poi:city:Brooklyn`, placement 0.0 m, 800 m, nose north, no crash; (6) **NOT CALIBRATED** — toy far-warp holds are time-capped (ARRIVAL_GATE 6.5 s) and both arms overran it on a starved poll (staged-not-ready 28.0 s vs unstaged 10.2 s): the toy venue cannot separate them; (7) zero page errors |
+| `verify-r25-freeflight.cjs` toy fixture | **PASS 6 / FAIL 0 / NOT CALIBRATED 1** | Confirmed on the final tree (`freeflight-toy-4.log`, legs (1)–(5), (7) PASS; placement 0.00 m, Brooklyn 0.0 m / 800 m / no crash). Its (6) printed FAIL (staged 7.4 s vs unstaged 5.0 s) **with staging NOT ready at launch** — so nothing staged was compared; the rule now requires that precondition and reads NOT CALIBRATED (re-derived from the recorded numbers; the gate was not re-run after that one-line rule change). Run 3 (`freeflight-toy-3.log`) was the same: 28.0 vs 10.2 s, staging not ready. The toy ring cannot finish staging in a bounded run behind the hangar here (§3); (6) is certified on SATELLITE below. Run 3 detail: (1) free hangar, default `columbus-practice`; (2) stage warp, frozen, frames +35, toy ring 18 → 115 chunks, status `staging`; (3) "Fly to Manhattan", placement 0.00 m, alt 950 = max(950, 0+450), heading error 0.0000°, cruise 60 m/s; (4) no crash 10 s (min AGL 773 m); (5) "Brooklyn" → `poi:city:Brooklyn`, placement 0.0 m, 800 m, nose north, no crash; (6) **NOT CALIBRATED** — toy far-warp holds are time-capped (ARRIVAL_GATE 6.5 s) and both arms overran it on a starved poll (staged-not-ready 28.0 s vs unstaged 10.2 s): the toy venue cannot separate them; (7) zero page errors |
+| `verify-r25-freeflight.cjs` **satellite** fixture (the one satellite confirmation) | **PASS 6 / FAIL 0 / NOT CALIBRATED 0** (+ (5) skipped: not satellite-specific, certified on toy) | `freeflight-sat-1.log`: (2) staging **reached ready behind the hangar in 368 s** (readiness progress 0.67 → 1, the last missing part `terrain`; frames +91, 88 pumps, flight frozen, status `ready`); (3) placement 0.00 m, alt 950, heading error 0; (4) no crash (min AGL 937 m); **(6) staged hold 5,676 ms vs the unstaged Tokyo control still holding after 83,131 ms** (the satellite hold is content-gated and uncapped); (7) zero page errors |
 | `verify-r25-continue.cjs` toy fixture | **PASS 5/0** | `continue-toy-2.log` (3 page loads, one context): (1) corrupt `fly-last-setup-v1` (unknown aircraft) → `readLastSetup()` null, app boots normally (no title on this tree; with a title the gate asserts no `title-continue`); (2) a Free Flight launch writes free · prop · manhattan; (3) Continue after a reload relaunches it: placement Δ 0.000 m, Δalt 0.000 m, Δheading 0; (4) Vector · KCMH · Runway relaunches lined up on 10R, Δ 0.000 m, Δheading 0, phase `parked`; (5) zero page errors. Run 1 read (3) FAIL "Δ 28.5 m" — the instrument compared LIVE poses and the toy flies on through its warp hold (Δalt and Δheading were exactly 0); fixed to compare `runtime.lastLaunch` placements + live ≤ 2 km. |
 | import-integrity | PASS 4/0 | |
+| legacy ops browser harnesses (`verify-operations-*`) | NOT RUN here | ops mode renders today's panel + the mode chip only (node 8b, byte-compared); ops staging is a no-op inside the Columbus cluster (node 7e). E's integration smoke covers the ops flow. |
 | eslint (6 changed app files) | 0 errors / 0 warnings | baseline 0 |
 | W0 node baseline: flight-operations 33, mobile-actions-node 11/11 (+5 pending, A's), operations-disclosure, graphics-unit, r25-flagoff 8/0/2 (constants hygiene PASS) | unchanged | |
 

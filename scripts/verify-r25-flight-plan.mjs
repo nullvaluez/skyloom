@@ -626,6 +626,7 @@ await tryGate('7a launchFreeFlight', () => {
         useFlyStore.getState().warpEpoch === epoch + 1 &&
         useFlyStore.getState().warpKind === 'far' &&
         w.counts.disarm === 1 &&
+        w.runtime.titleSpot === d.title &&
         (w.flight._trimT > 0 || !C.WARP_TRIM?.enabled);
       if (!good) bad.push(`${a.id}@${d.id}`);
       w.off();
@@ -655,7 +656,7 @@ await tryGate('7c staging', async () => {
   const far = w.runtime.stageDestination('manhattan');
   const warp = w.warps.at(-1);
   const staged = far && warp?.stage === true && Math.abs(warp.lat - 40.7) < 1e-9 && w.runtime.staging.key === 'manhattan' && w.runtime.staging.warped === true && w.operations.phase === 'hangar';
-  const again = w.runtime.stageDestination('manhattan') && w.warps.length === 1;
+  const again = w.runtime.stageDestination('manhattan') && w.warps.length === 1 && w.runtime.titleSpot === FP.resolveDestination('manhattan').title;
   // readiness: not ready (no terrain stats) → the FRONT_DOOR-off pump runs at 4 Hz
   await new Promise((r) => setTimeout(r, 620));
   const pumpedOff = globalThis.__r25bInvalidations;
@@ -694,7 +695,7 @@ await tryGate('7c staging', async () => {
   const opsNear = w.runtime.stageDestination('KCMH') === false && w.warps.length === n;
   w.off();
   useFlyStore.setState({ mapStyle: styleWas });
-  gate('7c stage: already-there → poll only; far → warpToGeo{stage:true}, frozen in hangar; idempotent', noWarp && here && staged && again, `here ${here}/${noWarp}, far ${staged}`);
+  gate('7c stage: already-there → poll only; far → warpToGeo{stage:true}, frozen in hangar; idempotent; title orbit params follow the staged spot', noWarp && here && staged && again, `here ${here}/${noWarp}, far ${staged}`);
   gate('7d readiness poll latches ready and stops; FRONT_DOOR off pumps frames (4 Hz), on never does', ready && stopped && pumpedOff >= 2 && pumpedOn === 0, `readyMs ${readyMs}, pumps off=${pumpedOff} on=${pumpedOn}`);
   gate('7e FLIGHT_PLAN off refuses staging; ops airports inside the Columbus cluster never stage-warp', refused && opsNear);
 });
