@@ -140,6 +140,32 @@ const notCal = (name, why) => {
 /** A missing feature: FAIL when its owner's flag ships ON, else NOT CALIBRATED. */
 const absent = (flagOn, name, why) => (flagOn ? gate(name, false, `${why} (its flag ships ON)`) : notCal(name, why));
 const has = async (page, id) => (await page.getByTestId(id).count()) > 0;
+/**
+ * Click a control the way a player does, surviving this venue. E2, MEASURED on
+ * the integrated tree (toy run 1, load ~8 with two SwiftShader browsers): a
+ * plain click() on a visible, ENABLED `hangar-fly` timed out at 30 s inside
+ * Playwright's actionability wait — "stable" needs two animation frames with
+ * one box, and behind the staging hangar a rAF pair takes seconds — so the
+ * smoke died at (4c) on the instrument, not the product. Same idiom as A's
+ * verify-r25-title (force) and B's verify-r25-freeflight (fallback): the
+ * trusted, actionability-checked click first (a bounded wait), then a FORCE
+ * click — still a trusted mouse event at the element centre; only the
+ * stability wait is skipped. No leg asserts a click: every leg asserts its
+ * EFFECT (screen / phase / store), so a force click that hit the wrong thing
+ * still reads FAIL. The fallbacks are counted in report.presses.
+ */
+const presses = { trusted: 0, forced: [] };
+async function press(page, id, { timeoutMs = 10000 } = {}) {
+  const l = page.getByTestId(id).first();
+  await l.waitFor({ state: 'visible', timeout: 60000 * SCALE });
+  try {
+    await l.click({ timeout: timeoutMs * SCALE });
+    presses.trusted++;
+  } catch {
+    await l.click({ force: true, timeout: 60000 * SCALE });
+    presses.forced.push(id);
+  }
+}
 const store = (page) => page.evaluate(() => {
   const s = window.__flyStore.getState();
   return { screen: s.screen, hangarOpen: s.hangarOpen, flightMode: s.flightMode, visuals: s.visuals, phase: s.phase,
@@ -352,7 +378,7 @@ const titleReady = () =>
 
     // ---- (3) SETTINGS ----------------------------------------------------------
     if (t.title && (await has(page, 'title-settings'))) {
-      await page.getByTestId('title-settings').click();
+      await press(page, 'title-settings');
       const sheet = await waitFor(page, () => !!document.querySelector('[data-testid="settings-sheet"]'), undefined, 10000);
       if (!sheet) {
         gate('(3a) SETTINGS sheet opens from the title and Esc closes it', false, 'settings-sheet never appeared');
@@ -364,9 +390,9 @@ const titleReady = () =>
         else if (!rowPresent) absent(visualsShip, '(3b) the Visuals row round-trips live', 'no settings-visuals-* row');
         else {
           const s0 = await store(page);
-          await page.getByTestId('settings-visuals-enhanced').click();
+          await press(page, 'settings-visuals-enhanced');
           const s1 = await store(page);
-          await page.getByTestId('settings-visuals-classic').click();
+          await press(page, 'settings-visuals-classic');
           const s2 = await store(page);
           gate('(3b) SETTINGS: Visuals Enhanced/Classic round-trips live (epoch bumps twice)',
             s1.visuals === 'enhanced' && s2.visuals === 'classic' && s2.visualsEpoch === s0.visualsEpoch + 2,
@@ -405,7 +431,7 @@ const titleReady = () =>
         gate('(4a) FREE FLIGHT card opens hangar[data-mode=free]', true, `flightMode ${(await store(page)).flightMode}`);
         // (4b) back to the title, then in again
         if (await has(page, 'hangar-back')) {
-          await page.getByTestId('hangar-back').click();
+          await press(page, 'hangar-back');
           const back = await waitFor(page, () => window.__flyStore.getState().screen === 'title' && !!document.querySelector('[data-testid="title-screen"]'), undefined, 20000);
           const live = await worldLive(page, 5, 120000);
           gate('(4b) hangar-back returns to the title over a live world', back && live.ok, `frames ${live.f0} -> ${live.f1}`);
@@ -413,7 +439,7 @@ const titleReady = () =>
         } else gate('(4b) hangar-back returns to the title over a live world', false, 'no hangar-back in the free hangar');
         let picked = null;
         if (await has(page, `hangar-pick-${PICK}`)) {
-          await page.getByTestId(`hangar-pick-${PICK}`).click({ timeout: 60000 * SCALE });
+          await press(page, `hangar-pick-${PICK}`);
           picked = PICK;
         }
         await page.screenshot({ path: path.join(OUT, `hangar-free-${TAGS}.png`) }).catch(() => {});
@@ -422,7 +448,7 @@ const titleReady = () =>
           gate('(4c) FREE FLIGHT: hangar-fly enables', false, 'hangar-fly still disabled');
           notCal('(4d) still airborne after 60 frames', 'no launch');
         } else {
-          await page.getByTestId('hangar-fly').click();
+          await press(page, 'hangar-fly');
           const flying = await waitFor(page, () => window.__flyStore.getState().screen === 'flight' && window.__fly.operations?.phase === 'airborne', undefined, 60000);
           const f = await flight(page);
           const s = await store(page);
@@ -472,7 +498,7 @@ const titleReady = () =>
               location.reload();
             }, true);
           });
-        await page.getByTestId('pause-exit-title').click();
+        await press(page, 'pause-exit-title');
         exited = await waitFor(page, () => window.__flyStore.getState().screen === 'title' && !!document.querySelector('[data-testid="title-screen"]'), undefined, 20000);
         const noReload = await page.evaluate(() => window.__r25NoReload === 1).catch(() => false);
         let live = { ok: false, f0: null, f1: null }, f = {}, canvases = 0, scr = null, why = '';
@@ -532,7 +558,7 @@ const titleReady = () =>
             st.setScreen('flight');
           }, true);
         });
-      await page.getByTestId('title-continue').click();
+      await press(page, 'title-continue');
       const ok = await waitFor(page, () => window.__flyStore.getState().screen === 'flight' && window.__fly.operations?.phase === 'airborne', undefined, 90000);
       const after = await store(page);
       const g1 = await geoOf(page);
@@ -554,7 +580,7 @@ const titleReady = () =>
       // back to the title for (7)
       await page.keyboard.press('Escape');
       if ((await waitFor(page, () => window.__flyStore.getState().phase === 'paused', undefined, 10000)) && (await has(page, 'pause-exit-title'))) {
-        await page.getByTestId('pause-exit-title').click();
+        await press(page, 'pause-exit-title');
         await waitFor(page, () => window.__flyStore.getState().screen === 'title', undefined, 20000);
       }
     } else if (exitState === 'fail') gate(name6, false, 'prerequisite (5) EXIT TO TITLE FAILED — Continue is unreachable');
@@ -572,12 +598,12 @@ const titleReady = () =>
       if (err) gate('(7) TAKEOFF & LANDING reaches the ops hangar', false, err);
       else {
         const mode = await page.getByTestId('hangar-mode').getAttribute('data-mode', { timeout: 3000 }).catch(() => null);
-        await page.getByTestId('hangar-pick-prop').click({ timeout: 60000 * SCALE });
+        await press(page, 'hangar-pick-prop');
         if (await page.locator('#departure-airport').count()) await page.selectOption('#departure-airport', 'KOSU');
         const apron = page.locator('input[value="apron"]');
         if (await apron.count()) await apron.first().check().catch(() => {});
         await waitFor(page, () => document.querySelector('[data-testid="hangar-fly"]')?.disabled === false, undefined, 120000);
-        await page.getByTestId('hangar-fly').click();
+        await press(page, 'hangar-fly');
         const left = await waitFor(page, () => !document.querySelector('[data-testid="hangar"]') && window.__flyStore.getState().screen === 'flight', undefined, 30000);
         const parked = await waitFor(page, () => window.__fly.operations?.phase === 'parked', undefined, 120000);
         const f = await flight(page);
@@ -596,7 +622,7 @@ const titleReady = () =>
     gate('(!) the smoke ran to completion', false, String(e.stack || e).slice(0, 400));
   } finally {
     await browser.close();
-    fs.writeFileSync(path.join(OUT, `report-${TAGS}.json`), JSON.stringify({ ...report, pass, fail, notcal, rows }, null, 2));
+    fs.writeFileSync(path.join(OUT, `report-${TAGS}.json`), JSON.stringify({ ...report, presses, pass, fail, notcal, rows }, null, 2));
     console.log(`\nVERIFY r25-smoke (${STYLE || 'toy'}${RED ? `, RED ${RED}` : ''}): ${pass} passed, ${fail} failed, ${notcal} not calibrated`);
     process.exit(fail ? 1 : notcal ? 2 : 0);
   }

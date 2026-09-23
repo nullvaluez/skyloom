@@ -67,17 +67,39 @@ async function waitTitleReady(page, { timeoutMs = 120000, world = false } = {}) 
 
 /**
  * From a fresh page (after `goto`), reach the hangar in `mode` ('ops' =
- * Takeoff & Landing, 'free' = Free Flight). Returns { via: 'title'|'store', ms }.
+ * Takeoff & Landing, 'free' = Free Flight). Returns
+ * { via: 'title'|'store', ms, forced }.
+ *
+ * The card press is the trusted, actionability-checked click/tap first, for
+ * at most ACTIONABLE_MS; then a FORCE click/tap (still trusted input at the
+ * card centre — only Playwright's "stable" wait is skipped). R25 E2, MEASURED
+ * on the fixture at load ~8: that wait needs two animation frames with one
+ * box, and a SwiftShader rAF pair can take seconds, so a plain click on a
+ * visible control sat in actionability for 30 s+ (A's ledger measured 180 s).
+ * On a real GPU the trusted press succeeds at once and nothing changes; the
+ * hangar wait below asserts the EFFECT either way. `forced` says which ran.
  */
+const ACTIONABLE_MS = 30000;
 async function enterHangar(page, mode = 'ops', { timeoutMs = 120000, tap = false } = {}) {
   if (!CARD[mode]) throw new Error(`_title.enterHangar: unknown mode ${mode}`);
   const t0 = Date.now();
   const t = await waitTitleReady(page, { timeoutMs });
   let via;
+  let forced = false;
   if (t.title) {
     const card = page.getByTestId(CARD[mode]);
-    if (tap) await card.tap({ timeout: timeoutMs });
-    else await card.click({ timeout: timeoutMs });
+    await card.waitFor({ state: 'visible', timeout: timeoutMs });
+    try {
+      if (tap) await card.tap({ timeout: Math.min(timeoutMs, ACTIONABLE_MS) });
+      else await card.click({ timeout: Math.min(timeoutMs, ACTIONABLE_MS) });
+    } catch {
+      // Only if the timed-out press did not land after all (the hangar is up).
+      if (!(await page.getByTestId('hangar').isVisible().catch(() => false))) {
+        forced = true;
+        if (tap) await card.tap({ force: true, timeout: timeoutMs });
+        else await card.click({ force: true, timeout: timeoutMs });
+      }
+    }
     via = 'title';
   } else {
     await page.evaluate((m) => {
@@ -88,7 +110,7 @@ async function enterHangar(page, mode = 'ops', { timeoutMs = 120000, tap = false
     via = 'store';
   }
   await page.getByTestId('hangar').waitFor({ state: 'visible', timeout: timeoutMs });
-  return { via, ms: Date.now() - t0 };
+  return { via, ms: Date.now() - t0, forced };
 }
 
 /** True when the title screen is in the DOM right now. */
