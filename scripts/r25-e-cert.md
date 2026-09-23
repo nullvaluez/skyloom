@@ -188,7 +188,44 @@ own reveal: ready, roads deferred).
 | toy `bootFly` (NYC 800 m) | 46.3 / 49.0 / 50.9 / 59.9 / 63.2 s | 4–7 | five boots this session; session 1: 51.5 s |
 | satellite `bootFly` at NYC | 546 s (run 1) | 4.5 | session 1: 459.6 s at load 4.7; a third attempt did not reveal in 900 s at load ~8 |
 | satellite `bootFly` at P1 Owens | 967 s | 8.1 | the recorder's boot this session |
-| W0 PRODUCT boot, satellite (hangar → prop / KOSU / apron → Fly) | hangar DOM at **1.35 s**; Fly enabled at **61.8 s**; world reveal: see §3c | 6.8 → 3.9 | run 1's probe was read before its timer recorded the reveal (`revealAt null`) — fixed (`a15f984`) |
+| W0 PRODUCT boot, satellite (hangar → prop / KOSU / apron → Fly) | hangar DOM at **1.35 s**; Fly enabled at **61.8 s**; world reveal: **PENDING** (§3c) | 6.8 → 3.9 | run 1's probe was read before its timer recorded the reveal (`revealAt null`) — fixed (`a15f984`) |
+
+### §3c What was NOT captured — PENDING (wrap-up, 2026-09-23)
+
+The E1 instance was stopped mid-run (~16:50 UTC); the killed runs' partial
+output is `.graphics-review/r25/e/baseline-w0.log` and
+`baseline-w0-product/baseline.json`. This wrap-up ran NO browser (both slots
+are reserved for A and B), so every row below stays PENDING for E2:
+
+| baseline | status | why / what E2 does |
+|---|---|---|
+| W0 PRODUCT boot world reveal (satellite, hangar → KOSU apron → Fly) | **PENDING** | run 2 clicked Fly at 107.8 s (load 7.7) and the browser was closed under `waitForFunction` before the reveal; no `worldMs` exists. §8's "≤ W0 × 1.05" comparison therefore has no W0 number yet: E2 runs `R25_BASELINE_TAG=w0 R25_BASELINE_PRODUCT=3 R25_BASELINE_POSES=0` against a dev server on the `r25-w0` tag in the SAME session (same load) as the integration run, and compares like with like. |
+| P3 Manhattan noon, P4 Powell noon, P5 Smokies noon | **PENDING (reference only)** | captured UNSETTLED (terrain z13–15 of 16–18; forest at P4/P5) — §3a numbers are references, not baselines. E2 re-captures with a longer settle if a C/D gate needs them; the intro pass holds nothing to them. |
+| P2 Sierra noon terrain crop | **PENDING (clean re-read)** | a cumulus puff sat in the terrain crop (captured before `d926a99` parked the deck); draws/tris/programs/texture are valid. |
+| P4 / P5 dusk, P2 dusk, P6 dusk | **not captured** | not in the killed run's order; C/D-pass concern only. |
+| toy per-pose luminance / ΔE | **not captured** | the plan's per-pose table is Classic satellite; toy is covered by smoke (§4a). |
+| `graphics-flight.cjs` memory probe | **not run** | texture peak is recorded per pose from ground-texture-audit instead (§3a); the GPU-timer path refuses SwiftShader (§7). |
+
+### §3d Node-gate re-verification at `28cafb1` (wrap-up, no browser)
+
+Every node gate in the plan's W0 baseline table plus E's own, run on this
+branch head. All match the W0 baseline; none moved.
+
+| gate | W0 baseline | `r25/e` @ `28cafb1` |
+|---|---|---|
+| verify-import-integrity.mjs | 3 passed / 1 failed | **4 passed / 0 failed** (E's sanctioned parser fix, §4) |
+| verify-r25-flagoff.mjs | (new) | 8 PASS / 0 FAIL / 2 NOT CALIBRATED, exit 2 (C/D stubs) |
+| verify-mobile-actions-node.mjs | 9/9 | 11/11 PASS, 5 PENDING (A's hook) |
+| graphics-unit.mjs | PASS | PASS |
+| verify-flight-operations.mjs | PASS (33) | PASS (33) |
+| verify-stylized-earth.mjs | PASS 22/22 | PASS 22/22 |
+| verify-c-flagoff.mjs | PASS (58) | PASS (58) |
+| verify-vendor-three-tile.mjs | 34 / 0 | 34 / 0 |
+| verify-living-earth.mjs | PASS (19) | PASS (19) |
+| verify-cinematic-flight.mjs | PASS | PASS (16/16) |
+| verify-operations-disclosure.mjs | PASS | PASS |
+| verify-lod-fade.mjs | 60 / 4 (pre-existing) | 60 / 4 — the same four (patch-7 / marker-count stale vs the Motion-Hold vendor edits) |
+| verify-atmo-law.mjs | crashes (pre-existing) | crashes — the same `TypeError: Cannot set properties of undefined (setting '0')` in `setAerial` |
 
 ## §4 Gates written this phase, RED first
 
@@ -374,5 +411,5 @@ slot lock. `export FLY_TILE_FIXTURE=1 FLY_FIXTURE_PORT=3206 FLY_URL=http://local
 | every merge | `node scripts/verify-mobile-actions-node.mjs` | 11/11; the 5 PENDING switch on when A's `use-overlay-back.js` learns `screen`/`settingsOpen` — then they must PASS |
 | every merge | `…/run-browser.sh node -r ./scripts/_pw-shim.js scripts/verify-r25-smoke.cjs` (toy, ~6 min) | r25-w0: 5/0/14. After A (FRONT_DOOR ON): the title legs flip from NOT CALIBRATED to PASS/FAIL. After B (FLIGHT_PLAN ON): (4)–(6). Intro pass target: **0 FAIL, and NOT CALIBRATED only on (3b)'s round trip** — (3b) itself PASSES as "row hidden" while no visual block is ON |
 | A + B merged | the same with `R25_SMOKE_STYLE=satellite` (~20 min) | the satellite title spot reveals (`productBoot.readyAt` in `smoke/report-satellite.json`) |
-| A + B merged | `R25_BASELINE_TAG=int R25_BASELINE_PRODUCT=3 R25_BASELINE_POSES=0 … scripts/r25-e-baseline.cjs` | product boot → title world; compare `productMedianWorldMs` with §3a's W0 `worldMs` (plan: ≤ W0 × 1.05; a venue number, read with the load average) |
+| A + B merged | `R25_BASELINE_TAG=int R25_BASELINE_PRODUCT=3 R25_BASELINE_POSES=0 … scripts/r25-e-baseline.cjs` | product boot → title world; compare `productMedianWorldMs` with a W0 `worldMs` captured in the SAME session on `r25-w0` (§3c: the W0 number is PENDING) (plan: ≤ W0 × 1.05; a venue number, read with the load average) |
 | C/D pass only | `scripts/verify-r25-visuals.cjs` (+ `FLY_URL_BASELINE` = a dev server on r25-w0) | intro pass: the ship-state short circuit, 7 NOT CALIBRATED in <1 s |
