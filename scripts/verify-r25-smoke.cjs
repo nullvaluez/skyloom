@@ -282,7 +282,11 @@ const titleReady = () =>
       const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
       let boot = null, err = null;
       try {
-        boot = await bootFly(page, { style: STYLE, timeoutMs: 600000 });
+        // The reveal bound is the venue's (bootFly does not scale it): a pinned
+        // SATELLITE fixture boot measured 460-967 s in E1 (ledger §3b), and on
+        // E2's first satellite smoke — two SwiftShader browsers, load ~8.5 —
+        // it had not revealed at 600 s. Toy keeps 600 s (it reveals in ~1 min).
+        boot = await bootFly(page, { style: STYLE, timeoutMs: STYLE ? 1800000 : 600000 });
       } catch (e) {
         err = String(e).slice(0, 200);
       }
