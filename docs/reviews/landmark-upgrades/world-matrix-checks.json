@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "checks": {
+    "complete": true,
+    "filesPresent": true,
+    "highQuality": true,
+    "worldReady": true,
+    "sharpSatellite": true,
+    "oneUpdatedDraw": true,
+    "closeDetail": true,
+    "distantFallback": true,
+    "exclusions": true,
+    "noPageErrors": true
+  }
+}

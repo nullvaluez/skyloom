@@ -1,0 +1,84 @@
+{
+  "status": "PASS",
+  "checks": [
+    {
+      "name": "high detail replaces Eiffel fallback",
+      "pass": true
+    },
+    {
+      "name": "low quality returns to distant geometry",
+      "pass": true
+    },
+    {
+      "name": "medium detail fits its own budget",
+      "pass": true
+    },
+    {
+      "name": "style change reloads medium geometry",
+      "pass": true
+    },
+    {
+      "name": "rapid warps retain bounded detail/cache",
+      "pass": true
+    },
+    {
+      "name": "failed high request leaves a visible distant model",
+      "pass": true,
+      "data": {
+        "failures": 1
+      }
+    },
+    {
+      "name": "recovery retains one shared draw",
+      "pass": true,
+      "data": {
+        "key": "world-bend-anchor-monument-r20-cinematic-model-v2-merged",
+        "groups": 0,
+        "materialArray": false,
+        "stats": {
+          "remerges": 2,
+          "deferred": 0,
+          "placed": 1,
+          "priority": -1,
+          "bumpT": 42.8942,
+          "bumpEpoch": 5,
+          "detailCache": 1,
+          "detailDownloads": 0,
+          "detailed": 1,
+          "triangles": 9000,
+          "consumeT": 34.7297,
+          "lagSec": 0,
+          "releaseConsumes": 2,
+          "lateConsumes": 0,
+          "consumes": 5
+        }
+      }
+    },
+    {
+      "name": "fallback suppression stays in the same frame",
+      "pass": true,
+      "data": {
+        "remerges": 2,
+        "deferred": 0,
+        "placed": 1,
+        "priority": -1,
+        "bumpT": 42.8942,
+        "bumpEpoch": 5,
+        "detailCache": 1,
+        "detailDownloads": 0,
+        "detailed": 1,
+        "triangles": 9000,
+        "consumeT": 34.7297,
+        "lagSec": 0,
+        "releaseConsumes": 2,
+        "lateConsumes": 0,
+        "consumes": 5
+      }
+    },
+    {
+      "name": "no page errors",
+      "pass": true
+    }
+  ],
+  "errors": []
+}

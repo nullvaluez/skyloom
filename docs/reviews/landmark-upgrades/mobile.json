@@ -1,0 +1,322 @@
+{
+  "status": "PASS",
+  "checks": [
+    {
+      "name": "hangar launch remains visible and reachable",
+      "pass": true
+    },
+    {
+      "name": "hangar launch remains visible and reachable",
+      "pass": true
+    },
+    {
+      "name": "visible controls inside viewport",
+      "pass": true
+    },
+    {
+      "name": "controls not covered",
+      "pass": true
+    },
+    {
+      "name": "no horizontal overflow",
+      "pass": true
+    },
+    {
+      "name": "takeoff action reaches flight engine",
+      "pass": true
+    },
+    {
+      "name": "power slider reaches flight engine",
+      "pass": true
+    },
+    {
+      "name": "both thumbs reach input controller",
+      "pass": true
+    },
+    {
+      "name": "touch cancellation clears steering and brake",
+      "pass": true
+    },
+    {
+      "name": "two-finger steer + brake then cancellation",
+      "pass": true
+    },
+    {
+      "name": "visible controls inside viewport",
+      "pass": true
+    },
+    {
+      "name": "controls not covered",
+      "pass": true
+    },
+    {
+      "name": "no horizontal overflow",
+      "pass": true
+    },
+    {
+      "name": "setup leaves power controls reachable",
+      "pass": true
+    },
+    {
+      "name": "visible controls inside viewport",
+      "pass": true
+    },
+    {
+      "name": "controls not covered",
+      "pass": true
+    },
+    {
+      "name": "no horizontal overflow",
+      "pass": true
+    },
+    {
+      "name": "setup leaves power controls reachable",
+      "pass": true
+    },
+    {
+      "name": "visible controls inside viewport",
+      "pass": true
+    },
+    {
+      "name": "controls not covered",
+      "pass": true
+    },
+    {
+      "name": "no horizontal overflow",
+      "pass": true
+    },
+    {
+      "name": "setup leaves power controls reachable",
+      "pass": true
+    },
+    {
+      "name": "destination updates",
+      "pass": true
+    },
+    {
+      "name": "go around reaches engine",
+      "pass": true
+    },
+    {
+      "name": "operations hidden under full overlay",
+      "pass": true
+    }
+  ],
+  "errors": [],
+  "fullWorld": true,
+  "rects": [
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "r": [
+        {
+          "name": "mfd-strip",
+          "x": 12,
+          "y": 8,
+          "w": 312,
+          "h": 54,
+          "inside": true,
+          "hit": true
+        },
+        {
+          "name": "mfd-guidance",
+          "x": 12,
+          "y": 69,
+          "w": 366,
+          "h": 28.84375,
+          "inside": true,
+          "hit": true
+        },
+        {
+          "name": "mfd-power",
+          "x": 228,
+          "y": 575,
+          "w": 150,
+          "h": 207,
+          "inside": true,
+          "hit": true
+        },
+        {
+          "name": "flight-thumbstick hud-glass pointer-events-auto relative grid h-32 w-32 place-items-center rounded-full",
+          "x": 12,
+          "y": 670,
+          "w": 112,
+          "h": 112,
+          "inside": true,
+          "hit": true
+        },
+        {
+          "name": "hud-glass touch-actions-fab",
+          "x": 334,
+          "y": 12,
+          "w": 44,
+          "h": 44,
+          "inside": true,
+          "hit": true
+        }
+      ]
+    },
+    {
+      "viewport": {
+        "width": 844,
+        "height": 390
+      },
+      "r": [
+        {
+          "name": "mfd-strip",
+          "x": 12,
+          "y": 8,
+          "w": 310,
+          "h": 54,
+          "inside": true,
+          "hit": true
+        },
+        {
+          "name": "mfd-guidance",
+          "x": 340,
+          "y": 13,
+          "w": 434,
+          "h": 44,
+          "inside": true,
+          "hit": true
+        },
+        {
+          "name": "mfd-power",
+          "x": 682,
+          "y": 153,
+          "w": 150,
+          "h": 207,
+          "inside": true,
+          "hit": true
+        },
+        {
+          "name": "flight-thumbstick hud-glass pointer-events-auto relative grid h-32 w-32 place-items-center rounded-full",
+          "x": 12,
+          "y": 248,
+          "w": 112,
+          "h": 112,
+          "inside": true,
+          "hit": true
+        },
+        {
+          "name": "hud-glass touch-actions-fab",
+          "x": 788,
+          "y": 12,
+          "w": 44,
+          "h": 44,
+          "inside": true,
+          "hit": true
+        }
+      ]
+    },
+    {
+      "viewport": {
+        "width": 320,
+        "height": 568
+      },
+      "r": [
+        {
+          "name": "mfd-strip",
+          "x": 12,
+          "y": 8,
+          "w": 242,
+          "h": 54,
+          "inside": true,
+          "hit": true
+        },
+        {
+          "name": "mfd-guidance",
+          "x": 12,
+          "y": 69,
+          "w": 296,
+          "h": 28,
+          "inside": true,
+          "hit": true
+        },
+        {
+          "name": "mfd-power",
+          "x": 166,
+          "y": 299,
+          "w": 142,
+          "h": 207,
+          "inside": true,
+          "hit": true
+        },
+        {
+          "name": "flight-thumbstick hud-glass pointer-events-auto relative grid h-32 w-32 place-items-center rounded-full",
+          "x": 12,
+          "y": 394,
+          "w": 112,
+          "h": 112,
+          "inside": true,
+          "hit": true
+        },
+        {
+          "name": "hud-glass touch-actions-fab",
+          "x": 264,
+          "y": 12,
+          "w": 44,
+          "h": 44,
+          "inside": true,
+          "hit": true
+        }
+      ]
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "r": [
+        {
+          "name": "mfd-strip",
+          "x": 12,
+          "y": 8,
+          "w": 312,
+          "h": 54,
+          "inside": true,
+          "hit": true
+        },
+        {
+          "name": "mfd-guidance",
+          "x": 12,
+          "y": 69,
+          "w": 366,
+          "h": 28.84375,
+          "inside": true,
+          "hit": true
+        },
+        {
+          "name": "mfd-power",
+          "x": 228,
+          "y": 575,
+          "w": 150,
+          "h": 207,
+          "inside": true,
+          "hit": true
+        },
+        {
+          "name": "flight-thumbstick hud-glass pointer-events-auto relative grid h-32 w-32 place-items-center rounded-full",
+          "x": 12,
+          "y": 670,
+          "w": 112,
+          "h": 112,
+          "inside": true,
+          "hit": true
+        },
+        {
+          "name": "hud-glass touch-actions-fab",
+          "x": 334,
+          "y": 12,
+          "w": 44,
+          "h": 44,
+          "inside": true,
+          "hit": true
+        }
+      ]
+    }
+  ],
+  "controlStatus": "PASS"
+}

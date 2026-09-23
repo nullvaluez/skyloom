@@ -1,0 +1,536 @@
+{
+  "status": "PASS",
+  "runs": [
+    {
+      "baseline": true,
+      "site": "Eiffel Tower",
+      "distance": 1568.5397080589114,
+      "tiers": [
+        "high"
+      ],
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "calls": 245,
+      "triangles": 3235776,
+      "heap": 842563871,
+      "monuments": {
+        "placed": [
+          {
+            "name": "Eiffel Tower",
+            "x": 255422.57162516625,
+            "z": -6250868.901479604,
+            "groundY": 33.845074384934655,
+            "topY": 479.3450743849347,
+            "heightM": 330,
+            "detail": "far",
+            "triangles": 2904
+          }
+        ],
+        "loaded": [
+          "Statue of Liberty",
+          "Empire State Building",
+          "Gateway Arch",
+          "Willis Tower",
+          "Space Needle",
+          "Big Ben",
+          "Eiffel Tower",
+          "Colosseum",
+          "Taj Mahal",
+          "Sydney Opera House"
+        ],
+        "style": "satellite"
+      },
+      "stats": {
+        "remerges": 4,
+        "deferred": 7,
+        "placed": 1,
+        "priority": -1,
+        "bumpT": 24.3421,
+        "detailCache": 0,
+        "detailDownloads": 0,
+        "detailed": 0,
+        "triangles": 2904,
+        "consumeT": 7.0135,
+        "lagSec": 0,
+        "lateConsumes": 0,
+        "consumes": 1
+      },
+      "landmarkMeshes": 1,
+      "landmarkDraws": 1,
+      "readiness": {
+        "ready": true,
+        "detailReady": true,
+        "missing": [],
+        "deferred": [],
+        "blocking": [],
+        "parts": {
+          "terrain": true,
+          "surfaces": true,
+          "materials": true,
+          "buildings": true,
+          "roads": true,
+          "forest": true,
+          "airports": true,
+          "fleet": true,
+          "shaders": true
+        },
+        "buildings": {
+          "ready": true,
+          "total": 6,
+          "done": 6,
+          "unavailable": 0
+        },
+        "roads": {
+          "ready": true,
+          "total": 3,
+          "done": 3,
+          "unavailable": 0
+        },
+        "progress": 1
+      },
+      "terrain": {
+        "camTileZ": 17,
+        "targetZ": 18,
+        "downloading": 7,
+        "sharp": false,
+        "sharpReason": null,
+        "aglM": 214,
+        "lodThreshold": 0.86,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 65280.29999999702,
+        "fades": {
+          "hardSwaps": 85,
+          "faded": 184,
+          "refines": 192,
+          "merges": 77,
+          "active": 4,
+          "peakActive": 37,
+          "retained": 1,
+          "skip": {
+            "disabled": 0,
+            "boot": 65,
+            "warp": 18,
+            "concurrency": 2,
+            "noParentMap": 0,
+            "shape": 0,
+            "unpatched": 0
+          },
+          "noParentMapFirst": []
+        }
+      },
+      "p95": 20.799999999995634,
+      "p50": 12.5,
+      "max": 91.70000000000437
+    },
+    {
+      "baseline": true,
+      "site": "Empire State Building",
+      "distance": 1575.4502535294926,
+      "tiers": [
+        "high"
+      ],
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "calls": 251,
+      "triangles": 2677680,
+      "heap": 612928475,
+      "monuments": {
+        "placed": [
+          {
+            "name": "Empire State Building",
+            "x": -8236050.4499838995,
+            "z": -4975301.253789808,
+            "groundY": 15.330847388255421,
+            "topY": 613.3808473882555,
+            "heightM": 443,
+            "detail": "far",
+            "triangles": 400
+          },
+          {
+            "name": "Statue of Liberty",
+            "x": -8242596.036042545,
+            "z": -4966606.257307652,
+            "groundY": 8.546356898133768,
+            "topY": 134.0963568981338,
+            "heightM": 93,
+            "detail": "far",
+            "triangles": 2458
+          }
+        ],
+        "loaded": [
+          "Statue of Liberty",
+          "Empire State Building",
+          "Gateway Arch",
+          "Willis Tower",
+          "Space Needle",
+          "Big Ben",
+          "Eiffel Tower",
+          "Colosseum",
+          "Taj Mahal",
+          "Sydney Opera House"
+        ],
+        "style": "satellite"
+      },
+      "stats": {
+        "remerges": 7,
+        "deferred": 15,
+        "placed": 2,
+        "priority": -1,
+        "bumpT": 68.517,
+        "detailCache": 0,
+        "detailDownloads": 0,
+        "detailed": 0,
+        "triangles": 2858,
+        "consumeT": 56.9479,
+        "lagSec": 0,
+        "lateConsumes": 0,
+        "consumes": 2
+      },
+      "landmarkMeshes": 1,
+      "landmarkDraws": 1,
+      "readiness": {
+        "ready": true,
+        "detailReady": true,
+        "missing": [],
+        "deferred": [],
+        "blocking": [],
+        "parts": {
+          "terrain": true,
+          "surfaces": true,
+          "materials": true,
+          "buildings": true,
+          "roads": true,
+          "forest": true,
+          "airports": true,
+          "fleet": true,
+          "shaders": true
+        },
+        "buildings": {
+          "ready": true,
+          "total": 4,
+          "done": 4,
+          "unavailable": 0
+        },
+        "roads": {
+          "ready": true,
+          "total": 1,
+          "done": 1,
+          "unavailable": 0
+        },
+        "progress": 1
+      },
+      "terrain": {
+        "camTileZ": 17,
+        "targetZ": 18,
+        "downloading": 4,
+        "sharp": false,
+        "sharpReason": null,
+        "aglM": 353,
+        "lodThreshold": 0.86,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 107919,
+        "fades": {
+          "hardSwaps": 112,
+          "faded": 293,
+          "refines": 279,
+          "merges": 126,
+          "active": 0,
+          "peakActive": 62,
+          "retained": 0,
+          "skip": {
+            "disabled": 0,
+            "boot": 65,
+            "warp": 43,
+            "concurrency": 4,
+            "noParentMap": 0,
+            "shape": 0,
+            "unpatched": 0
+          },
+          "noParentMapFirst": []
+        }
+      },
+      "p95": 20.89999999999418,
+      "p50": 16.59999999999127,
+      "max": 79.19999999999709
+    },
+    {
+      "baseline": false,
+      "site": "Eiffel Tower",
+      "distance": 1565.6001869606473,
+      "tiers": [
+        "high"
+      ],
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "calls": 249,
+      "triangles": 3450779,
+      "heap": 677285248,
+      "monuments": {
+        "placed": [
+          {
+            "name": "Eiffel Tower",
+            "x": 255422.57162516625,
+            "z": -6250868.901479604,
+            "groundY": 33.845074384934655,
+            "topY": 479.3450743849347,
+            "heightM": 330,
+            "detail": "high",
+            "triangles": 56012
+          }
+        ],
+        "loaded": [
+          "Statue of Liberty",
+          "Empire State Building",
+          "Gateway Arch",
+          "Willis Tower",
+          "Space Needle",
+          "CN Tower",
+          "Big Ben",
+          "Eiffel Tower",
+          "Colosseum",
+          "Burj Khalifa",
+          "Taj Mahal",
+          "Sydney Opera House"
+        ],
+        "style": "satellite"
+      },
+      "stats": {
+        "remerges": 2,
+        "deferred": 5,
+        "placed": 1,
+        "priority": -1,
+        "bumpT": 15.0385,
+        "detailCache": 1,
+        "detailDownloads": 0,
+        "detailed": 1,
+        "triangles": 56012,
+        "consumeT": 9.9191,
+        "lagSec": 0,
+        "lateConsumes": 0,
+        "consumes": 1
+      },
+      "landmarkMeshes": 1,
+      "landmarkDraws": 1,
+      "readiness": {
+        "ready": true,
+        "detailReady": true,
+        "missing": [],
+        "deferred": [],
+        "blocking": [],
+        "parts": {
+          "terrain": true,
+          "surfaces": true,
+          "materials": true,
+          "buildings": true,
+          "roads": true,
+          "forest": true,
+          "airports": true,
+          "fleet": true,
+          "shaders": true
+        },
+        "buildings": {
+          "ready": true,
+          "total": 6,
+          "done": 6,
+          "unavailable": 0
+        },
+        "roads": {
+          "ready": true,
+          "total": 3,
+          "done": 3,
+          "unavailable": 0
+        },
+        "progress": 1
+      },
+      "terrain": {
+        "camTileZ": 17,
+        "targetZ": 18,
+        "downloading": 0,
+        "sharp": true,
+        "sharpReason": "target",
+        "aglM": 214,
+        "lodThreshold": 0.86,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 55629.5,
+        "fades": {
+          "hardSwaps": 92,
+          "faded": 196,
+          "refines": 194,
+          "merges": 94,
+          "active": 8,
+          "peakActive": 36,
+          "retained": 2,
+          "skip": {
+            "disabled": 0,
+            "boot": 56,
+            "warp": 25,
+            "concurrency": 11,
+            "noParentMap": 0,
+            "shape": 0,
+            "unpatched": 0
+          },
+          "noParentMapFirst": []
+        }
+      },
+      "p95": 16.80000000000291,
+      "p50": 12.5,
+      "max": 87.40000000000146
+    },
+    {
+      "baseline": false,
+      "site": "Empire State Building",
+      "distance": 1578.0786552494403,
+      "tiers": [
+        "high"
+      ],
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "calls": 253,
+      "triangles": 2674858,
+      "heap": 652070370,
+      "monuments": {
+        "placed": [
+          {
+            "name": "Empire State Building",
+            "x": -8236050.4499838995,
+            "z": -4975301.253789808,
+            "groundY": 15.330847388255421,
+            "topY": 613.3808473882555,
+            "heightM": 443,
+            "detail": "high",
+            "triangles": 3552
+          },
+          {
+            "name": "Statue of Liberty",
+            "x": -8242596.036042545,
+            "z": -4966606.257307652,
+            "groundY": 8.546356898133768,
+            "topY": 134.0963568981338,
+            "heightM": 93,
+            "detail": "far",
+            "triangles": 2458
+          }
+        ],
+        "loaded": [
+          "Statue of Liberty",
+          "Empire State Building",
+          "Gateway Arch",
+          "Willis Tower",
+          "Space Needle",
+          "CN Tower",
+          "Big Ben",
+          "Eiffel Tower",
+          "Colosseum",
+          "Burj Khalifa",
+          "Taj Mahal",
+          "Sydney Opera House"
+        ],
+        "style": "satellite"
+      },
+      "stats": {
+        "remerges": 4,
+        "deferred": 8,
+        "placed": 2,
+        "priority": -1,
+        "bumpT": 59.1222,
+        "detailCache": 2,
+        "detailDownloads": 0,
+        "detailed": 1,
+        "triangles": 6010,
+        "consumeT": 52.5994,
+        "lagSec": 0,
+        "lateConsumes": 0,
+        "consumes": 2
+      },
+      "landmarkMeshes": 1,
+      "landmarkDraws": 1,
+      "readiness": {
+        "ready": true,
+        "detailReady": true,
+        "missing": [],
+        "deferred": [],
+        "blocking": [],
+        "parts": {
+          "terrain": true,
+          "surfaces": true,
+          "materials": true,
+          "buildings": true,
+          "roads": true,
+          "forest": true,
+          "airports": true,
+          "fleet": true,
+          "shaders": true
+        },
+        "buildings": {
+          "ready": true,
+          "total": 4,
+          "done": 4,
+          "unavailable": 0
+        },
+        "roads": {
+          "ready": true,
+          "total": 1,
+          "done": 1,
+          "unavailable": 0
+        },
+        "progress": 1
+      },
+      "terrain": {
+        "camTileZ": 17,
+        "targetZ": 18,
+        "downloading": 0,
+        "sharp": true,
+        "sharpReason": "target",
+        "aglM": 353,
+        "lodThreshold": 0.86,
+        "maxLevel": 18,
+        "burst": false,
+        "at": 97739.40000000596,
+        "fades": {
+          "hardSwaps": 130,
+          "faded": 311,
+          "refines": 280,
+          "merges": 161,
+          "active": 0,
+          "peakActive": 53,
+          "retained": 0,
+          "skip": {
+            "disabled": 0,
+            "boot": 56,
+            "warp": 46,
+            "concurrency": 28,
+            "noParentMap": 0,
+            "shape": 0,
+            "unpatched": 0
+          },
+          "noParentMapFirst": []
+        }
+      },
+      "p95": 20.80000000000291,
+      "p50": 12.5,
+      "max": 62.5
+    }
+  ],
+  "errors": [],
+  "comparisons": [
+    {
+      "site": "Eiffel Tower",
+      "ratio": 0.8076923076926171,
+      "within10Percent": true,
+      "matchedTiers": true,
+      "moving": true,
+      "oneDraw": true,
+      "detailActive": true,
+      "hardware": true
+    },
+    {
+      "site": "Empire State Building",
+      "ratio": 0.9952153110052011,
+      "within10Percent": true,
+      "matchedTiers": true,
+      "moving": true,
+      "oneDraw": true,
+      "detailActive": true,
+      "hardware": true
+    }
+  ]
+}

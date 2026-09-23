@@ -32,7 +32,8 @@ const sites = [
     : null;
   const report = {
     status: "RUNNING",
-    purpose: "fixed world poses; moving flight is measured separately",
+    purpose:
+      "fixed world poses; Neon recaptured at held high quality; moving flight is measured separately without governor or terrain pins",
     shots: previous?.shots ?? [],
     errors: [],
     blockedAttempts: previous?.blockedAttempts ?? [],
@@ -83,6 +84,8 @@ const sites = [
       page.on("pageerror", (e) => report.errors.push(e.message));
       await page.addInitScript((b) => {
         window.__flyLandmarkBaseline = b;
+        window.__flyGovPin = "hold";
+        localStorage.setItem("fly-quality-tier", "high");
         localStorage.setItem("fly-controls-seen", "1");
         localStorage.setItem("fly-sound-on", "0");
         localStorage.setItem("fly-crash-mode", "forgiving");
@@ -220,6 +223,10 @@ const sites = [
                     readiness: r.worldReadiness,
                     degraded: !!r.worldDegraded,
                     tier: window.__flyStore.getState().qualityTier,
+                    pins: {
+                      governor: window.__flyGovPin ?? null,
+                      terrain: window.__flyTerraPin ?? null,
+                    },
                     monuments: window.__flyStats?.monuments,
                     landmarkDraws:
                       m &&
@@ -273,6 +280,7 @@ const sites = [
       ? "FAIL"
       : report.shots.some(
             (s) =>
+              s.tier !== "high" ||
               s.degraded ||
               !s.readiness?.ready ||
               (s.style === "satellite" && !s.terrain?.sharp),

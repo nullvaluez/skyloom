@@ -1,0 +1,1447 @@
+{
+  "status": "CAPTURED",
+  "purpose": "isolated asset review",
+  "shots": [
+    {
+      "ready": true,
+      "poi": "Eiffel Tower",
+      "triangles": 2904,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Eiffel-Tower-sat-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Eiffel Tower",
+      "triangles": 56012,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Eiffel-Tower-sat-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Eiffel Tower",
+      "triangles": 2904,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Eiffel-Tower-sat-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Eiffel Tower",
+      "triangles": 56012,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Eiffel-Tower-sat-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Eiffel Tower",
+      "triangles": 2904,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Eiffel-Tower-sat-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Eiffel Tower",
+      "triangles": 56012,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Eiffel-Tower-sat-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Eiffel Tower",
+      "triangles": 2904,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Eiffel-Tower-toy-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Eiffel Tower",
+      "triangles": 56012,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Eiffel-Tower-toy-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Eiffel Tower",
+      "triangles": 2904,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Eiffel-Tower-toy-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Eiffel Tower",
+      "triangles": 56012,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Eiffel-Tower-toy-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Eiffel Tower",
+      "triangles": 2904,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Eiffel-Tower-toy-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Eiffel Tower",
+      "triangles": 56012,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Eiffel-Tower-toy-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Statue of Liberty",
+      "triangles": 2458,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Statue-of-Liberty-sat-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Statue of Liberty",
+      "triangles": 2458,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Statue-of-Liberty-sat-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Statue of Liberty",
+      "triangles": 2458,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Statue-of-Liberty-sat-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Statue of Liberty",
+      "triangles": 2458,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Statue-of-Liberty-sat-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Statue of Liberty",
+      "triangles": 2458,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Statue-of-Liberty-sat-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Statue of Liberty",
+      "triangles": 2458,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Statue-of-Liberty-sat-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Statue of Liberty",
+      "triangles": 2458,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Statue-of-Liberty-toy-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Statue of Liberty",
+      "triangles": 2458,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Statue-of-Liberty-toy-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Statue of Liberty",
+      "triangles": 2458,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Statue-of-Liberty-toy-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Statue of Liberty",
+      "triangles": 2458,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Statue-of-Liberty-toy-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Statue of Liberty",
+      "triangles": 2458,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Statue-of-Liberty-toy-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Statue of Liberty",
+      "triangles": 2458,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Statue-of-Liberty-toy-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Taj Mahal",
+      "triangles": 5890,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Taj-Mahal-sat-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Taj Mahal",
+      "triangles": 5890,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Taj-Mahal-sat-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Taj Mahal",
+      "triangles": 5890,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Taj-Mahal-sat-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Taj Mahal",
+      "triangles": 5890,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Taj-Mahal-sat-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Taj Mahal",
+      "triangles": 5890,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Taj-Mahal-sat-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Taj Mahal",
+      "triangles": 5890,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Taj-Mahal-sat-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Taj Mahal",
+      "triangles": 5890,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Taj-Mahal-toy-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Taj Mahal",
+      "triangles": 5890,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Taj-Mahal-toy-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Taj Mahal",
+      "triangles": 5890,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Taj-Mahal-toy-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Taj Mahal",
+      "triangles": 5890,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Taj-Mahal-toy-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Taj Mahal",
+      "triangles": 5890,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Taj-Mahal-toy-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Taj Mahal",
+      "triangles": 5890,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Taj-Mahal-toy-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Sydney Opera House",
+      "triangles": 6217,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Sydney-Opera-House-sat-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Sydney Opera House",
+      "triangles": 6217,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Sydney-Opera-House-sat-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Sydney Opera House",
+      "triangles": 6217,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Sydney-Opera-House-sat-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Sydney Opera House",
+      "triangles": 6217,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Sydney-Opera-House-sat-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Sydney Opera House",
+      "triangles": 6217,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Sydney-Opera-House-sat-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Sydney Opera House",
+      "triangles": 6217,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Sydney-Opera-House-sat-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Sydney Opera House",
+      "triangles": 6217,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Sydney-Opera-House-toy-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Sydney Opera House",
+      "triangles": 6217,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Sydney-Opera-House-toy-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Sydney Opera House",
+      "triangles": 6217,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Sydney-Opera-House-toy-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Sydney Opera House",
+      "triangles": 6217,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Sydney-Opera-House-toy-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Sydney Opera House",
+      "triangles": 6217,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Sydney-Opera-House-toy-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Sydney Opera House",
+      "triangles": 6217,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Sydney-Opera-House-toy-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Big Ben",
+      "triangles": 8754,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Big-Ben-sat-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Big Ben",
+      "triangles": 8754,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Big-Ben-sat-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Big Ben",
+      "triangles": 8754,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Big-Ben-sat-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Big Ben",
+      "triangles": 8754,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Big-Ben-sat-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Big Ben",
+      "triangles": 8754,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Big-Ben-sat-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Big Ben",
+      "triangles": 8754,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Big-Ben-sat-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Big Ben",
+      "triangles": 8754,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Big-Ben-toy-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Big Ben",
+      "triangles": 8754,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Big-Ben-toy-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Big Ben",
+      "triangles": 8754,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Big-Ben-toy-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Big Ben",
+      "triangles": 8754,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Big-Ben-toy-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Big Ben",
+      "triangles": 8754,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Big-Ben-toy-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Big Ben",
+      "triangles": 8754,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Big-Ben-toy-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Space Needle",
+      "triangles": 3160,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Space-Needle-sat-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Space Needle",
+      "triangles": 3160,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Space-Needle-sat-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Space Needle",
+      "triangles": 3160,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Space-Needle-sat-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Space Needle",
+      "triangles": 3160,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Space-Needle-sat-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Space Needle",
+      "triangles": 3160,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Space-Needle-sat-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Space Needle",
+      "triangles": 3160,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Space-Needle-sat-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Space Needle",
+      "triangles": 3160,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Space-Needle-toy-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Space Needle",
+      "triangles": 3160,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Space-Needle-toy-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Space Needle",
+      "triangles": 3160,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Space-Needle-toy-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Space Needle",
+      "triangles": 3160,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Space-Needle-toy-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Space Needle",
+      "triangles": 3160,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Space-Needle-toy-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Space Needle",
+      "triangles": 3160,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Space-Needle-toy-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Gateway Arch",
+      "triangles": 4656,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Gateway-Arch-sat-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Gateway Arch",
+      "triangles": 4656,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Gateway-Arch-sat-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Gateway Arch",
+      "triangles": 4656,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Gateway-Arch-sat-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Gateway Arch",
+      "triangles": 4656,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Gateway-Arch-sat-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Gateway Arch",
+      "triangles": 4656,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Gateway-Arch-sat-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Gateway Arch",
+      "triangles": 4656,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Gateway-Arch-sat-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Gateway Arch",
+      "triangles": 4656,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Gateway-Arch-toy-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Gateway Arch",
+      "triangles": 4656,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Gateway-Arch-toy-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Gateway Arch",
+      "triangles": 4656,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Gateway-Arch-toy-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Gateway Arch",
+      "triangles": 4656,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Gateway-Arch-toy-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Gateway Arch",
+      "triangles": 4656,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Gateway-Arch-toy-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Gateway Arch",
+      "triangles": 4656,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Gateway-Arch-toy-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Colosseum",
+      "triangles": 6835,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Colosseum-sat-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Colosseum",
+      "triangles": 6835,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Colosseum-sat-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Colosseum",
+      "triangles": 6835,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Colosseum-sat-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Colosseum",
+      "triangles": 6835,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Colosseum-sat-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Colosseum",
+      "triangles": 6835,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Colosseum-sat-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Colosseum",
+      "triangles": 6835,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Colosseum-sat-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Colosseum",
+      "triangles": 6835,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Colosseum-toy-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Colosseum",
+      "triangles": 6835,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Colosseum-toy-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Colosseum",
+      "triangles": 6835,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Colosseum-toy-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Colosseum",
+      "triangles": 6835,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Colosseum-toy-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Colosseum",
+      "triangles": 6835,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Colosseum-toy-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Colosseum",
+      "triangles": 6835,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Colosseum-toy-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "CN Tower",
+      "triangles": 128,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "CN-Tower-sat-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "CN Tower",
+      "triangles": 2424,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "CN-Tower-sat-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "CN Tower",
+      "triangles": 128,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "CN-Tower-sat-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "CN Tower",
+      "triangles": 2424,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "CN-Tower-sat-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "CN Tower",
+      "triangles": 128,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "CN-Tower-sat-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "CN Tower",
+      "triangles": 2424,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "CN-Tower-sat-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "CN Tower",
+      "triangles": 80,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "CN-Tower-toy-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "CN Tower",
+      "triangles": 2424,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "CN-Tower-toy-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "CN Tower",
+      "triangles": 80,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "CN-Tower-toy-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "CN Tower",
+      "triangles": 2424,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "CN-Tower-toy-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "CN Tower",
+      "triangles": 80,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "CN-Tower-toy-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "CN Tower",
+      "triangles": 2424,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "CN-Tower-toy-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Empire State Building",
+      "triangles": 400,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Empire-State-Building-sat-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Empire State Building",
+      "triangles": 3552,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Empire-State-Building-sat-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Empire State Building",
+      "triangles": 400,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Empire-State-Building-sat-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Empire State Building",
+      "triangles": 3552,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Empire-State-Building-sat-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Empire State Building",
+      "triangles": 400,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Empire-State-Building-sat-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Empire State Building",
+      "triangles": 3552,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Empire-State-Building-sat-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Empire State Building",
+      "triangles": 400,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Empire-State-Building-toy-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Empire State Building",
+      "triangles": 3552,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Empire-State-Building-toy-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Empire State Building",
+      "triangles": 400,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Empire-State-Building-toy-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Empire State Building",
+      "triangles": 3552,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Empire-State-Building-toy-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Empire State Building",
+      "triangles": 400,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Empire-State-Building-toy-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Empire State Building",
+      "triangles": 3552,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Empire-State-Building-toy-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Willis Tower",
+      "triangles": 3072,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Willis-Tower-sat-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Willis Tower",
+      "triangles": 3384,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Willis-Tower-sat-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Willis Tower",
+      "triangles": 3072,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Willis-Tower-sat-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Willis Tower",
+      "triangles": 3384,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Willis-Tower-sat-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Willis Tower",
+      "triangles": 3072,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Willis-Tower-sat-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Willis Tower",
+      "triangles": 3384,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Willis-Tower-sat-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Willis Tower",
+      "triangles": 3072,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Willis-Tower-toy-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Willis Tower",
+      "triangles": 3384,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Willis-Tower-toy-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Willis Tower",
+      "triangles": 3072,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Willis-Tower-toy-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Willis Tower",
+      "triangles": 3384,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Willis-Tower-toy-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Willis Tower",
+      "triangles": 3072,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Willis-Tower-toy-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Willis Tower",
+      "triangles": 3384,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Willis-Tower-toy-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Burj Khalifa",
+      "triangles": 128,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Burj-Khalifa-sat-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Burj Khalifa",
+      "triangles": 27732,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Burj-Khalifa-sat-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Burj Khalifa",
+      "triangles": 128,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Burj-Khalifa-sat-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Burj Khalifa",
+      "triangles": 27732,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Burj-Khalifa-sat-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Burj Khalifa",
+      "triangles": 128,
+      "baseline": true,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Burj-Khalifa-sat-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Burj Khalifa",
+      "triangles": 27732,
+      "baseline": false,
+      "style": "sat",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Burj-Khalifa-sat-night-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Burj Khalifa",
+      "triangles": 80,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Burj-Khalifa-toy-day-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Burj Khalifa",
+      "triangles": 27732,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "day",
+      "file": "Burj-Khalifa-toy-day-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Burj Khalifa",
+      "triangles": 80,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Burj-Khalifa-toy-dusk-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Burj Khalifa",
+      "triangles": 27732,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "dusk",
+      "file": "Burj-Khalifa-toy-dusk-after.png"
+    },
+    {
+      "ready": true,
+      "poi": "Burj Khalifa",
+      "triangles": 80,
+      "baseline": true,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Burj-Khalifa-toy-night-before.png"
+    },
+    {
+      "ready": true,
+      "poi": "Burj Khalifa",
+      "triangles": 27732,
+      "baseline": false,
+      "style": "toy",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "time": "night",
+      "file": "Burj-Khalifa-toy-night-after.png"
+    }
+  ],
+  "errors": []
+}
