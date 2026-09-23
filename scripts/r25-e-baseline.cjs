@@ -12,7 +12,9 @@
  *     can see — prop / KOSU / apron, Fly as soon as hangar-fly enables, ms to
  *     pct 100. "worldMs" is that first-revealed-world time on either tree (the
  *     plan's product-boot comparison: E2 median of 3 <= W0 x 1.05),
- *   - per pose P1..P6 at noon (and P1/P3 at dusk): time to world readiness,
+ *   - per pose P1..P6 at noon (and P1/P3 at dusk), in LOCALITY order: time to
+ *     full world readiness (budget R25_BASELINE_POSE_TIMEOUT_S, default 600 s;
+ *     an unsettled pose is still captured and marked settled:false),
  *     draws, triangles, GL programs, texture peak (ground-texture-audit,
  *     logical GL bytes), and from a canvas capture: terrain mean linear
  *     luminance, clip %, Sobel energy, horizon seam deltaE (scripts/_r25-luma.js).
@@ -32,7 +34,7 @@ const os = require('os');
 const { chromium } = require('playwright');
 const { bootFly, unpinPins } = require('./_boot');
 const { waitTitleReady, installBootProbe } = require('./_title');
-const { POSES, pose, warpToPose, sunTimeMs, isolateCanvas } = require('./_r25-poses');
+const { pose, warpToPose, sunTimeMs, isolateCanvas } = require('./_r25-poses');
 const L = require('./_r25-luma');
 const { makeCanvasShot } = require('./_canvasshot');
 const { installGroundTextureAudit } = require('./ground-texture-audit.cjs');
@@ -42,9 +44,20 @@ const OUT = path.join(__dirname, '..', '.graphics-review', 'r25', 'e', `baseline
 fs.mkdirSync(OUT, { recursive: true });
 const SCALE = Math.max(1, Number(process.env.FLY_BOOT_SCALE || 1));
 const want = process.argv.slice(2);
-const RUNS = [];
-for (const P of POSES) if (!want.length || want.includes(P.id) || want.includes(P.name)) RUNS.push([P, 'noon']);
-for (const id of ['P1', 'P3']) if (!want.length || want.includes(id)) RUNS.push([pose(id), 'dusk']);
+// LOCALITY ORDER (session 2): each warp re-streams the world, and at this
+// venue a full settle is 5-15 min, so poses that share tiles run back to
+// back — Owens noon, Owens high, Owens dusk (only the sun moves), Sierra
+// (20 km away), then Manhattan noon + dusk, Powell, Smokies.
+const ORDER = [['P1', 'noon'], ['P6', 'noon'], ['P1', 'dusk'], ['P2', 'noon'], ['P3', 'noon'], ['P3', 'dusk'], ['P4', 'noon'], ['P5', 'noon']];
+const RUNS = ORDER.filter(([id]) => !want.length || want.includes(id) || want.includes(pose(id).name)).map(([id, sun]) => [pose(id), sun]);
+// A pose that has not reached FULL readiness (every part, the app's
+// `detailReady`) by this budget is captured anyway and marked
+// settled:false with what is missing — MEASURED in session 2: at load 6-8
+// Owens sat 900 s missing only ['roads'] and Sierra 900 s missing
+// ['terrain'], and a recorder that captures nothing on a timeout records
+// nothing at all. An unsettled row is a reference, never a baseline to
+// hold a gate to.
+const POSE_BUDGET_MS = Number(process.env.R25_BASELINE_POSE_TIMEOUT_S || 600) * 1000;
 // Crops, as fractions of the canvas (see _r25-luma.js REGIONS).
 const TERRAIN = { left: 0.12, top: 0.62, width: 0.76, height: 0.3 };
 const HORIZON = { left: 0.35, top: 0.05, width: 0.3, height: 0.6 };
@@ -81,6 +94,7 @@ async function census(page) {
 async function productBoot(browser, style) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const row = { style, path: null, load0: load() };
+  const t0 = Date.now();
   try {
     await page.addInitScript(unpinPins, ['__flyTitleBypass', '__flyVisualsOverride']);
     await page.addInitScript(installBootProbe);
@@ -103,6 +117,14 @@ async function productBoot(browser, style) {
       await page.getByTestId('hangar-fly').click();
       await page.waitForFunction(() => window.__flyBoot?.pct === 100, undefined, { timeout: 900000 * SCALE, polling: 250 });
     }
+    // Node-observed wall time goto -> the world condition (a fallback that
+    // cannot race the probe), then let the probe's 50 ms timer catch up: at
+    // 1-3 fps a long task can hold it past the moment waitForFunction saw
+    // pct 100 (MEASURED: the first W0 product row read revealAt null).
+    row.wallWorldMs = Date.now() - t0;
+    await page
+      .waitForFunction(() => window.__r25Probe?.revealAt != null, undefined, { timeout: 120000 * SCALE, polling: 250 })
+      .catch(() => {});
     const p = await page.evaluate(() => window.__r25Probe);
     for (const k of Object.keys(p || {})) row[k] = p[k] == null ? null : Math.round(p[k]);
     row.worldMs = row.path === 'title' ? Math.max(row.readyAt ?? 0, row.revealAt ?? 0) : row.revealAt;
@@ -149,12 +171,15 @@ async function productBoot(browser, style) {
     for (const [P, sun] of RUNS) {
       const t0 = Date.now();
       const s = await sunTimeMs(P, sun);
-      const { ms, readiness } = await warpToPose(page, P, { sun: s.tMs, timeoutMs: 900000, pollMs: 5000, pin: true });
-      const row = { pose: P.id, name: P.name, sun, sunElDeg: s.elDeg, readyMs: readiness?.ready ? ms : null, missing: readiness?.missing ?? null, load: load() };
-      if (readiness?.ready) {
+      const { ms, readiness } = await warpToPose(page, P, { sun: s.tMs, timeoutMs: POSE_BUDGET_MS, pollMs: 5000, pin: true });
+      const row = {
+        pose: P.id, name: P.name, sun, sunElDeg: s.elDeg, settled: !!readiness?.ready, readyMs: readiness?.ready ? ms : null,
+        missing: readiness?.missing ?? null, roadsRing: readiness?.roads ?? null, buildingsRing: readiness?.buildings ?? null,
+        terra: readiness?.terra ?? null, load: load(),
+      };
+      {
         await page.evaluate(() => {
-          if (window.__flyPlayer) window.__flyPlayer.visible = false;
-          if (window.__flyTraffic) window.__flyTraffic.visible = false;
+          for (const o of [window.__flyPlayer, window.__flyTraffic, window.__flyTracers]) if (o) o.visible = false;
         });
         await frames(page, 30);
         Object.assign(row, await census(page));

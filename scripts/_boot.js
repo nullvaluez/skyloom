@@ -232,7 +232,9 @@ async function bootFly(
   // pin and the fixture exactly as above, but no airborne skip and no reveal
   // wait: the page is left on whatever screen the app opens on (the R25
   // title when a gate un-pins `__flyTitleBypass`, else today's hangar, which
-  // runs the canvas on 'demand' and so never reaches pct 100 on its own).
+  // runs the canvas on 'demand' — MEASURED, a satellite fixture boot had not
+  // revealed behind it after 62 s, while toy with blocked hosts reaches pct
+  // 100 behind it through the Neon ceiling; so never wait on pct there).
   // Returns once the runtime is mounted. The R25 flow gates use this.
   if (!skipMenus) {
     await page.waitForFunction(() => !!window.__fly && !!window.__flyStore, undefined, { timeout: timeoutMs });

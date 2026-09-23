@@ -212,6 +212,9 @@ const titleReady = () =>
       const pp0 = await passport(page);
       // (2d) the title world reveals
       const revealed = await waitFor(page, titleReady, undefined, STYLE ? 900000 : 300000);
+      // The probe's 50 ms timer can lag the moment waitForFunction saw the
+      // reveal (a long task holds it) — let it record before reading it.
+      if (revealed) await waitFor(page, () => window.__r25Probe?.readyAt != null && window.__r25Probe?.revealAt != null, undefined, 60000);
       const pb = await page.evaluate(() => window.__r25Probe);
       report.productBoot = pb;
       gate('(2d) the title WORLD reveals (data-ready + __flyBoot.pct 100)', revealed,
