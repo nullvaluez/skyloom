@@ -197,6 +197,16 @@ async function press(page, id, { timeoutMs = 10000 } = {}) {
   }
   presses.dom.push(id);
 }
+/**
+ * The hangar's mode chip, read in ONE page.evaluate after a bounded wait for it
+ * to exist. MEASURED (RED continue run 2): a locator getAttribute with a 5 s
+ * timeout returned null on a starved main thread while the free hangar WAS up,
+ * and (4a) read FAIL on the instrument.
+ */
+async function hangarMode(page) {
+  await waitFor(page, () => !!document.querySelector('[data-testid="hangar-mode"]')?.getAttribute('data-mode'), undefined, 20000);
+  return page.evaluate(() => document.querySelector('[data-testid="hangar-mode"]')?.getAttribute('data-mode') ?? null).catch(() => null);
+}
 const store = (page) => page.evaluate(() => {
   const s = window.__flyStore.getState();
   return { screen: s.screen, hangarOpen: s.hangarOpen, flightMode: s.flightMode, visuals: s.visuals, phase: s.phase,
@@ -457,7 +467,7 @@ const titleReady = () =>
     let freeFlew = false, freeSetup = null;
     if (t.title && (await has(page, 'title-free-flight'))) {
       await enterHangar(page, 'free', { timeoutMs: 60000 * SCALE });
-      const mode = await page.getByTestId('hangar-mode').getAttribute('data-mode', { timeout: 5000 }).catch(() => null);
+      const mode = await hangarMode(page);
       if (mode !== 'free') {
         absent(flightPlanOn, '(4a) FREE FLIGHT card opens hangar[data-mode=free]', `hangar-mode data-mode=${mode}`);
         for (const leg of ['(4b) hangar-back returns to the title', '(4c) FREE FLIGHT launches airborne', '(4d) still airborne after 60 frames'])
@@ -632,7 +642,7 @@ const titleReady = () =>
       }
       if (err) gate('(7) TAKEOFF & LANDING reaches the ops hangar', false, err);
       else {
-        const mode = await page.getByTestId('hangar-mode').getAttribute('data-mode', { timeout: 3000 }).catch(() => null);
+        const mode = await hangarMode(page);
         await press(page, 'hangar-pick-prop');
         if (await page.locator('#departure-airport').count())
           await page.selectOption('#departure-airport', 'KOSU', { timeout: 30000 * SCALE }).catch(async () => {
