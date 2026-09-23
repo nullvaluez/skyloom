@@ -34,7 +34,7 @@ const os = require('os');
 const { chromium } = require('playwright');
 const { bootFly, unpinPins } = require('./_boot');
 const { waitTitleReady, installBootProbe } = require('./_title');
-const { pose, warpToPose, sunTimeMs, isolateCanvas, roadRingInPage } = require('./_r25-poses');
+const { pose, warpToPose, sunTimeMs, isolateCanvas, holdStill, roadRingInPage } = require('./_r25-poses');
 const L = require('./_r25-luma');
 const { makeCanvasShot } = require('./_canvasshot');
 const { installGroundTextureAudit } = require('./ground-texture-audit.cjs');
@@ -193,6 +193,7 @@ async function productBoot(browser, style) {
         await page.evaluate(() => {
           for (const o of [window.__flyPlayer, window.__flyTraffic, window.__flyTracers, window.__flyClouds, window.__flyCirrus]) if (o) o.visible = false;
         });
+        await holdStill(page, true); // freeze the sim so the pinned pose cannot creep
         await frames(page, 30);
         Object.assign(row, await census(page));
         // The capture is page-level (DOM included): read the world only.
@@ -201,6 +202,7 @@ async function productBoot(browser, style) {
         await frames(page, 2);
         const png = await shot();
         await isolateCanvas(page, false);
+        await holdStill(page, false);
         const file = path.join(OUT, `${P.id}-${P.name}-${sun}.png`);
         fs.writeFileSync(file, png);
         const terr = L.census(await L.loadRegion(png, TERRAIN));

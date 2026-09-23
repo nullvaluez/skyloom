@@ -260,6 +260,34 @@ function roadRingInPage() {
   return { now: eng?._now ?? null, pendingN: eng?.pendingFinalize?.length ?? null, chunks: eng?.chunks?.size ?? null, tiles };
 }
 
+/**
+ * FREEZE THE SIM for a pixel pair: store phase 'paused'. MEASURED (session 2,
+ * verify-r25-visuals at P1 Owens, W0): with only the 8 ms pin, two Classic
+ * captures 20 frames apart differed by mean 1.8/255, p99 32/255 over 56 % of
+ * pixels — every ground edge lit in the diff, i.e. a whole-ground sub-pixel
+ * SHIFT. Between a pin write and the render the flight model still steps
+ * (speed eases from the pinned 0 toward the preset, the trim servo acts), so
+ * the rendered camera sits a dt-dependent distance off the held pose, and at
+ * 1-3 fps dt is anything. A paused phase is the app's own `held` path
+ * (FlightOperations.advance returns before any integration), the frameloop
+ * stays 'always' (W0 and A's frameloopFor), and nothing in Effects reads the
+ * phase. `holdStill(page, false)` restores the phase it found. The pause menu
+ * is DOM — isolateCanvas hides it from every capture.
+ */
+async function holdStill(page, on = true) {
+  return page.evaluate((on) => {
+    const st = window.__flyStore.getState();
+    if (on) {
+      if (st.phase !== 'paused') window.__r25HeldFrom = st.phase;
+      st.setPhase('paused');
+      return st.phase;
+    }
+    if (window.__r25HeldFrom != null) st.setPhase(window.__r25HeldFrom);
+    window.__r25HeldFrom = null;
+    return window.__flyStore.getState().phase;
+  }, on);
+}
+
 /** Release a `warpToPose({pin:true})` hold. */
 async function unpinPose(page) {
   await page.evaluate(() => {
@@ -319,7 +347,7 @@ async function warpToPose(page, p, { sun = null, waitReady = true, timeoutMs = 2
   return { ms: Date.now() - t0, readiness };
 }
 
-module.exports = { POSES, SUN, pose, sunTimeMs, readinessInPage, roadRingInPage, warpToPose, unpinPose, isolateCanvas, loadFlyConstants };
+module.exports = { POSES, SUN, pose, sunTimeMs, readinessInPage, roadRingInPage, warpToPose, unpinPose, isolateCanvas, holdStill, loadFlyConstants };
 
 // `node scripts/_r25-poses.js` — self-check: every pose lands in its named
 // fixture scene (never `rural`), and the readiness mirror still names exactly

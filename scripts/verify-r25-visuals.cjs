@@ -76,7 +76,7 @@ const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
 const { bootFly, unpinPins } = require('./_boot');
-const { pose, warpToPose, sunTimeMs, isolateCanvas, loadFlyConstants } = require('./_r25-poses');
+const { pose, warpToPose, sunTimeMs, isolateCanvas, holdStill, loadFlyConstants } = require('./_r25-poses');
 const L = require('./_r25-luma');
 const { makeCanvasShot } = require('./_canvasshot');
 const { installGroundTextureAudit } = require('./ground-texture-audit.cjs');
@@ -256,6 +256,7 @@ function writeReport(extra = {}) {
         continue;
       }
       const hid = await hideActors(page);
+      await holdStill(page, true); // the pin alone creeps between pin and render (_r25-poses holdStill)
       await settle(page, 30);
       const r = (results[P.name] = { hidden: hid, parkHeld: await parkHeld(page) });
       // (0) FLOOR
@@ -365,6 +366,7 @@ function writeReport(extra = {}) {
       if (!Number.isFinite(peak)) notCal(`(5c) ${P.name}: texture peak <= ${BUDGET.textureMiB} MiB`, 'ground-texture-audit unavailable');
       else gate(`(5c) ${P.name}: texture peak <= ${BUDGET.textureMiB} MiB`, peak <= BUDGET.textureMiB, `${peak} MiB (logical GL storage)`);
       fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results, null, 2));
+      await holdStill(page, false); // the next pose's warp runs unpaused
     }
     await page.close();
 
@@ -389,6 +391,7 @@ function writeReport(extra = {}) {
       if (!readiness?.ready) notCal('(6) CROSS-BOOT: Classic == the flag-off tree', 'baseline world never ready');
       else {
         await hideActors(p2);
+        await holdStill(p2, true);
         await settle(p2, 30);
         await isolateCanvas(p2, true);
         const b = await makeCanvasShot(p2).shot();
@@ -414,6 +417,7 @@ function writeReport(extra = {}) {
       await bootFly(tp, { timeoutMs: 600000 });
       await pinHere(tp);
       await hideActors(tp);
+      await holdStill(tp, true);
       await settle(tp, 30);
       const tshot = makeCanvasShot(tp).shot;
       const tcap = async (tag) => {
