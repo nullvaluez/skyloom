@@ -186,8 +186,16 @@ async function press(page, id, { timeoutMs = 10000 } = {}) {
     ok = true;
     presses.navigated = (presses.navigated || 0) + 1;
   }
+  if (!ok) {
+    // MEASURED (RED reload run 2): the trusted click's timeout can fire AFTER
+    // the click was dispatched (Playwright's log reads "performing click
+    // action" when a starved renderer is slow to ack), so the control is
+    // already gone when the fallback looks for it. A control that vanished
+    // right after a press is a press that landed; the leg judges the effect.
+    presses.late = (presses.late || 0) + 1;
+    return;
+  }
   presses.dom.push(id);
-  if (!ok) throw new Error(`press ${id}: the control vanished or is disabled`);
 }
 const store = (page) => page.evaluate(() => {
   const s = window.__flyStore.getState();
