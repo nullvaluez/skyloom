@@ -1,0 +1,33 @@
+{
+  "revision": 5,
+  "appearanceKey": "painterly-v3-r5",
+  "source": "First-party painted surface artwork",
+  "generator": "scripts/build-painterly-materials.mjs",
+  "license": "MIT",
+  "thirdPartyAssets": [],
+  "size": 256,
+  "layers": [
+    "asphalt",
+    "concrete",
+    "masonry",
+    "roofing",
+    "soil-grass",
+    "rock",
+    "sand",
+    "snow"
+  ],
+  "format": "RGBA8 arrays: sRGB colour/roughness; linear normal XY/height/occlusion",
+  "gpuBytesWithMips": 5592406,
+  "assets": [
+    {
+      "file": "color.bin",
+      "bytes": 2097152,
+      "sha256": "6a79ccafe1e66a11479aad8feb5dc85fe2d2ba10ccfb881ca2dc41bb0972581d"
+    },
+    {
+      "file": "detail.bin",
+      "bytes": 2097152,
+      "sha256": "deb5d75c71bebe7e3ca918176c491a5b81435baf81b233f8024b64b394554d4a"
+    }
+  ]
+}

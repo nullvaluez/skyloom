@@ -1,5 +1,6 @@
 'use client';
 import { LandingGear } from './LandingGear';
+import { applyPainterlyAircraft } from '@/lib/fly/painterly-aircraft';
 import { cinematicAircraftParameters } from '@/lib/fly/cinematic-models';
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
 import { registerCameraModel } from '@/lib/fly/camera-framing';
@@ -130,7 +131,7 @@ const _hullRim = {
  * a file, so the caller passes the geometry's ground truth. player-jet.glb has
  * NO color attribute and no forceVertexColors flag, so the fighter is unmoved.
  */
-function gradeHullMaterial(src, isCanopy, hasVC = false) {
+function gradeHullMaterial(src, isCanopy, hasVC = false, metresPerUnit = 1) {
   const c = PLAYER.hull;
   const m = new MeshPhysicalMaterial({
     color: src?.color?.clone() ?? new Color(isCanopy ? '#9fd8e8' : '#d7dde3'),
@@ -167,6 +168,7 @@ function gradeHullMaterial(src, isCanopy, hasVC = false) {
       );
   };
   m.customProgramCacheKey = () => 'player-hull-rim';
+  applyPainterlyAircraft(m,isCanopy,metresPerUnit);
   return m;
 }
 
@@ -217,7 +219,7 @@ function PlayerModel({ flight, aircraft }) {
       const geoHasColor = !!o.geometry?.hasAttribute?.('color');
       if (geoHasColor) withColorAttr += 1;
       const hasVC = !!entry.forceVertexColors || geoHasColor;
-      const graded = gradeHullMaterial(o.material, isCanopy, hasVC);
+      const graded = gradeHullMaterial(o.material, isCanopy, hasVC, correction.scale);
       if (graded.vertexColors) vertexColored += 1;
       o.material = graded; // replaces the reference on the CLONE only
       made.push(graded);

@@ -259,8 +259,22 @@ const PIN_POSE = ([lat, lon, altM, heading, pitch]) => {
     );
   const setTier = (t) =>
     page.evaluate(
-      ([tier, useGov, dir]) => {
-        if (useGov) return window.__flyGov.force(dir);
+      async ([tier, useGov, dir]) => {
+        if (useGov) {
+          // R22 added DPR rungs before tier changes. One force() now only
+          // resizes high tier (measured high/.875 -> high/1 in all 3 cycles),
+          // so walk the real ladder to the requested tier, restoring the top
+          // rung on the way up. Keep every existing assertion unchanged.
+          const gov = window.__flyGov;
+          const limit = gov.state().rungs;
+          for (let step = 0; step < limit; step++) {
+            const state = gov.state();
+            if (state.tier === tier && (dir < 0 || state.rung === 0)) break;
+            if (!gov.force(dir)) break;
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+          }
+          return;
+        }
         return window.__flyStore.getState().setQualityTier(tier);
       },
       [t, usingGov, t === 'medium' ? -1 : +1]

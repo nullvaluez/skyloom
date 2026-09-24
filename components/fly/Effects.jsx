@@ -3,6 +3,12 @@ import { satelliteVisualsOn, satelliteEffectTier } from '@/lib/fly/satellite-vis
 import { resolveSatelliteAtmosphere } from '@/lib/fly/satellite-atmosphere';
 import { immersiveOn } from '@/lib/fly/immersive';
 import { ImmersiveCloudPass } from '@/lib/fly/immersive-cloud-pass';
+// R25 C SKY: the Enhanced aerial variant + the tint-only grade, both decided
+// by r25On (through aerialR25Wanted), so Classic builds today's chain exactly.
+import { aerialR25Wanted } from '@/lib/fly/r25-sky';
+import { r25On } from '@/lib/fly/visuals-profile';
+import { R25_SKY } from '@/lib/fly/fly-constants';
+import { releaseBloomTargets } from '@/lib/fly/release-bloom-targets';
 
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -169,6 +175,11 @@ export function buildPassList(style, tier, ctx = {}) {
   const aerialOn = sat && AERIAL_PERSPECTIVE.enabled && (tier === 'high' || immersiveOn('lighting'));
   const cloudOn = sat && immersiveOn('clouds');
   const speedOn = SPEED_FEEL.enabled && tier === 'high' && ctx.speedMount !== false && !(sat && immersiveOn('camera'));
+  // R25 C: which aerial TEXT. The live chain passes the instance it chose
+  // (ctx.r25Aerial alongside ctx.aerial); the prewarm passes nothing and gets
+  // the same predicate evaluated now. Classic keeps the R19 constructor call.
+  const r25Aerial = sat && (ctx.r25Aerial ?? aerialR25Wanted());
+  const aerialRaw = r25Aerial ? () => new AerialPerspectiveEffect({ r25: true }) : () => new AerialPerspectiveEffect();
   const list = [];
 
   // ROUND 22 (D "DEPTH") — N8AO, FIRST in the chain.
@@ -209,7 +220,7 @@ export function buildPassList(style, tier, ctx = {}) {
   if (cloudOn) {
     // Atmosphere reads terrain depth. Apply it before cloud compositing so it
     // cannot haze a nearby cloud using the mountain kilometres behind it.
-    if (aerialOn) list.push({id:'aerial',el:()=> <primitive key="aerial" object={ctx.aerial} dispose={null} />,raw:()=>new AerialPerspectiveEffect()});
+    if (aerialOn) list.push({id:'aerial',el:()=> <primitive key="aerial" object={ctx.aerial} dispose={null} />,raw:aerialRaw});
     list.push({id:'immersive-clouds',boundary:true,el:()=> ctx.clouds ? <primitive key="immersive-clouds" object={ctx.clouds} dispose={null} /> : null,raw:()=>null});
   }
   if (bloomScale > 0) {
@@ -249,7 +260,7 @@ export function buildPassList(style, tier, ctx = {}) {
     list.push({
       id: 'aerial',
       el: () => <primitive key="aerial" object={ctx.aerial} dispose={null} />,
-      raw: () => new AerialPerspectiveEffect(),
+      raw: aerialRaw,
     });
   }
   if (sat) {
@@ -506,7 +517,14 @@ export const Effects = memo(function Effects({ runtime }) {
       if (window.__flySetTone) delete window.__flySetTone;
     };
   }, []);
-  const toneName = toneOverride ?? SKY.toneMapping.byStyle[mapStyle] ?? 'ACES';
+  // R25 C: `window.__flyToneOverride` ('Neutral' | 'AgX' | 'ACES' | 'None') —
+  // a DEV PIN, read at mount like the other fleet pins. Neutral tone mapping
+  // never ships without a user A/B (plan C.7); this is how that A/B is taken.
+  const tonePin =
+    process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && window.__flyToneOverride in TONE_MODES
+      ? window.__flyToneOverride
+      : null;
+  const toneName = toneOverride ?? tonePin ?? SKY.toneMapping.byStyle[mapStyle] ?? 'ACES';
   if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
     (window.__flyStats ??= {}).toneMode = toneName;
   }
@@ -521,6 +539,12 @@ export const Effects = memo(function Effects({ runtime }) {
   const bloomRef = useRef(null);
   const bloomFracRef = useRef(null); // last sun frac, so a rebuilt effect catches up
   const setBloom = useCallback((o) => {
+    // R3F defers disposal of reconstructed host objects until idle. A style or
+    // tier switch otherwise overlaps ~26 MiB of outgoing bloom targets with
+    // the incoming chain. Refs detach during commit, before the next draw.
+    // Release only targets now: keep shader references until the incoming
+    // effect has reused them, then let R3F perform its normal full disposal.
+    if (bloomRef.current && bloomRef.current !== o) releaseBloomTargets(bloomRef.current);
     bloomRef.current = o ?? null;
     if (o && bloomFracRef.current != null) applyBloom(o, bloomFracRef.current);
   }, []);
@@ -537,7 +561,19 @@ export const Effects = memo(function Effects({ runtime }) {
   // depth texture, which is a real (if small) cost, so medium/low must not pay
   // it. Its uniforms are fed by FlyScene's -50 block through module setters, so
   // the instance itself is constructed once and never reconfigured.
-  const aerial = useMemo(() => new AerialPerspectiveEffect(), []);
+  const aerialClassic = useMemo(() => new AerialPerspectiveEffect(), []);
+  // R25 C SKY: the Enhanced aerial is a SECOND long-lived instance, built the
+  // first time the profile asks for it (lazily — Classic never allocates it)
+  // and kept, so toggling back and forth swaps two stable objects and the
+  // composer's pass-list diff does the rest. `visuals` is the discrete input
+  // (a Settings toggle), never a per-frame one.
+  const visuals = useFlyStore((s) => s.visuals);
+  const r25Aerial = useMemo(() => sat && visuals === 'enhanced' && aerialR25Wanted(), [sat, visuals]);
+  const aerialR25Ref = useRef(null);
+  const aerial = useMemo(
+    () => (r25Aerial ? (aerialR25Ref.current ??= new AerialPerspectiveEffect({ r25: true })) : aerialClassic),
+    [r25Aerial, aerialClassic]
+  );
 
   // ---- R24 C (POST_ORDER / DEPTH_FIX) -----------------------------------
   // The SMAA instance we own, built through `smaaSpec().raw()` — literally the
@@ -650,7 +686,9 @@ export const Effects = memo(function Effects({ runtime }) {
         ];
       }
       const atmosphere = satelliteVisualsOn('atmosphere') ? resolveSatelliteAtmosphere(runtime.sun, runtime.weather?.wx) : null;
-      if (atmosphere) bal = atmosphere.balance;
+      // R25 C: Enhanced moves the exposure PRE-curve (the aerial pass), so the
+      // grade keeps only the tint. Classic: the R19 balance, unchanged.
+      if (atmosphere) bal = r25On(R25_SKY, 'exposure') ? atmosphere.balanceTint : atmosphere.balance;
       whiteBalance.setBalance(bal[0], bal[1], bal[2]);
       // Round 16: the night bloom rides this SAME 5s cadence — no new timer,
       // no new state, and it reads the frac that was just resolved.
@@ -667,7 +705,9 @@ export const Effects = memo(function Effects({ runtime }) {
     apply();
     const id = setInterval(apply, 5000);
     return () => clearInterval(id);
-  }, [sat, runtime, whiteBalance]);
+    // `visuals` (R25): a profile toggle re-applies at once instead of waiting
+    // out the 5 s cadence with the exposure counted twice.
+  }, [sat, runtime, whiteBalance, visuals]);
 
   // ---- ROUND 22 (D "DEPTH"): N8AO ---------------------------------------
   // Satellite + HIGH tier only. Construction allocates six render targets and
@@ -760,6 +800,7 @@ export const Effects = memo(function Effects({ runtime }) {
     () =>
       buildPassList(mapStyle, qualityTier, {
         toneName,
+        r25Aerial,
         speedMount: speedMountPin,
         setBloom,
         setDof,
@@ -774,6 +815,7 @@ export const Effects = memo(function Effects({ runtime }) {
       mapStyle,
       qualityTier,
       toneName,
+      r25Aerial,
       speedMountPin,
       setBloom,
       setDof,

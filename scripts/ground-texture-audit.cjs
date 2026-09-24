@@ -15,6 +15,7 @@ function installGroundTextureAudit() {
   const formats = new Map();
   let nextId = 1, contextCount = 0, created = 0, deleted = 0, currentBytes = 0, peakBytes = 0;
   let renderbufferBytes = 0, peakRenderbufferBytes = 0, peakCombinedBytes = 0;
+  let peakTextures = null, peakFormats = null;
   let unknowns = 0, peakUnknowns = 0, unknownCalls = 0, estimatedAllocations = 0;
   let trackingErrors=0, untrackedAllocationCalls=0;
   const unknownEvents=[];
@@ -51,7 +52,13 @@ function installGroundTextureAudit() {
   for(const value of [0x8C00,0x8C01,0x8C02,0x8C03])compressed.set(value,{pvrtc:true,bpp:value%2?2:4,name:`PVRTC:0x${value.toString(16)}`});
   const targetOf=(target)=>target>=FACE0&&target<FACE0+6?CUBE:target;
   const hex=(value)=>Number.isFinite(value)?`0x${value.toString(16)}`:'unknown';
-  const peak=()=>{peakBytes=Math.max(peakBytes,currentBytes);peakRenderbufferBytes=Math.max(peakRenderbufferBytes,renderbufferBytes);peakCombinedBytes=Math.max(peakCombinedBytes,currentBytes+renderbufferBytes);peakUnknowns=Math.max(peakUnknowns,unknowns);};
+  const peak=()=>{
+    if(root.__groundTextureAuditPeakDetails && currentBytes>peakBytes){
+      peakTextures=[...liveTextures.values()].map(describeTexture).filter(Boolean).sort((a,b)=>b.bytes-a.bytes).slice(0,20);
+      peakFormats=Object.fromEntries([...formats].map(([k,v])=>[k,{...v}]));
+    }
+    peakBytes=Math.max(peakBytes,currentBytes);peakRenderbufferBytes=Math.max(peakRenderbufferBytes,renderbufferBytes);peakCombinedBytes=Math.max(peakCombinedBytes,currentBytes+renderbufferBytes);peakUnknowns=Math.max(peakUnknowns,unknowns);
+  };
   function book(image,direction,renderbuffer=false){
     if(!image)return;
     const f=formats.get(image.name)||{bytes:0,images:0,unknowns:0,estimated:0,renderbufferBytes:0};
@@ -202,6 +209,7 @@ function installGroundTextureAudit() {
     return {version:2,scope:'Valid WebGL allocation requests in this JavaScript realm, including offscreen contexts. Driver overhead/residency, drawing-buffer swapchain and other worker realms excluded. DEPTH24 conservatively charged 4 bytes.',
       contexts:contextCount,textures:liveTextures.size,renderbuffers:liveRenderbuffers.size,created,deleted,
       currentBytes,peakBytes,renderbufferBytes,peakRenderbufferBytes,combinedBytes:currentBytes+renderbufferBytes,peakCombinedBytes,
+      ...(peakTextures?{peakTextures,peakFormats}:{}),
       unknowns,peakUnknowns,unknownCalls,estimatedAllocations,trackingErrors,untrackedAllocationCalls,errorMessages:[...errorMessages],
       unknownEvents:[...unknownEvents],
       complete:unknowns===0&&trackingErrors===0&&untrackedAllocationCalls===0&&unwrappedAvailableMethods.length===0,

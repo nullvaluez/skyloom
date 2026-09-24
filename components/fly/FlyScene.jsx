@@ -6,6 +6,7 @@ import { AirportOperationsLayer } from './AirportOperationsLayer';
 import { GroundImmersionRig } from './GroundImmersionRig';
 import { EarthSurfaceLayer } from './EarthSurfaceLayer';
 import { applyEarthSurface } from '@/lib/fly/earth-surface-material';
+import { updatePainterlyProfile } from '@/lib/fly/painterly-flight';
 import { stylizedEarthOn } from '@/lib/fly/stylized-earth';
 import { SatGroundDetailLayer } from './SatGroundDetailLayer';
 import { applyNearGroundMaterial } from '@/lib/fly/near-ground-material';
@@ -22,7 +23,8 @@ import { livingAirProfile } from '@/lib/fly/living-atmosphere';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Color, Object3D, ShadowMaterial, Vector3, SRGBColorSpace } from 'three';
-import { Environment } from '@react-three/drei';
+import { NeonEnvironment } from './NeonEnvironment';
+import { compactDepthShadowTarget } from '@/lib/fly/compact-shadow-target';
 import {
   airDrop,
   applyBend,
@@ -169,7 +171,7 @@ import { useFlyStore, menuOpen } from '@/stores/fly-store';
 // R25 W0: title/flight-plan/visuals hooks (owners fill the stub modules).
 import { spotAllowed } from '@/lib/fly/front-door';
 import { r25SkyAtmo, r25SkyFrame } from '@/lib/fly/r25-sky';
-import { applyR25Terrain, r25GroundFrame } from '@/lib/fly/r25-ground';
+import { applyR25Terrain, r25GroundFrame, releaseR25Ground } from '@/lib/fly/r25-ground';
 // R24 B (GROUND_VIS, recon A6/T8) — the damped VISUAL ground elevation.
 import { eyeAglVis as visualEyeAgl, groundElevVis, stepGroundVis } from '@/lib/fly/ground-vis';
 import { usePassportStore } from '@/stores/passport-store';
@@ -1520,6 +1522,7 @@ export function FlyScene({ runtime }) {
   );
 
   // Mini-planet curvature: patch every tile material (now + as tiles
+  useEffect(()=>()=>releaseR25Ground(engine),[engine]);
   // stream); strength rides a live uniform (0 in flat styles) so the patch
   // is style-agnostic and survives imagery hot-swaps. Tiles are GROUND —
   // they get the fade variant so the rim melts into the void (no facets).
@@ -1880,6 +1883,9 @@ export function FlyScene({ runtime }) {
       hemiRef.current.color.set(HC[keyMix.a] ?? HC.day);
       if (keyMix.s > 0) hemiRef.current.color.lerp(_keyLerp.set(HC[keyMix.b] ?? HC.day), keyMix.s);
     }
+    // Keep the current Classic colours for immediate profile restoration.
+    if(sunRef.current)(_r25Ctx.classicSunColor??=new Color()).copy(sunRef.current.color);
+    if(hemiRef.current)(_r25Ctx.classicHemiColor??=new Color()).copy(hemiRef.current.color);
   }, [mapStyle, keyMix]);
 
   // Map style hot-swap: replace the imagery provider in place — the DEM,
@@ -2921,6 +2927,7 @@ export function FlyScene({ runtime }) {
     // it follows the style's KEY light (MOODS lightDir) — toy's moon, not
     // the day sun — so shadows agree with the moonlit shading.
     const sun = sunRef.current;
+    if (sun) compactDepthShadowTarget(sun.shadow, gl.shadowMap.type);
     if (sun && flyState.mapStyle === 'satellite' && immersiveOn('lighting')) {
       // Three does not resize an existing shadow target when mapSize changes.
       // Retire it before this frame's draw so tier telemetry reflects real GPU cost.
@@ -3351,6 +3358,8 @@ export function FlyScene({ runtime }) {
     _r25Ctx.eyeAgl = eyeAgl;
     _r25Ctx.eyeAglVis = eyeAglVis;
     if (flyState.mapStyle !== 'satellite') _r25Ctx.altT = 0;
+    // Review pin isolates the integrated R25 sky/ground from the new materials.
+    updatePainterlyProfile(graphicsReviewOn() && window.__flyPainterlyOverride === 0 ? 'classic' : flyState.visuals, flyState.mapStyle);
     r25SkyFrame(runtime, _r25Ctx);
     r25GroundFrame(runtime, _r25Ctx);
 
@@ -3386,7 +3395,7 @@ export function FlyScene({ runtime }) {
         {mapStyle === 'satellite' ? (
           <SatEnvironment runtime={runtime} bucket={hdriBucket} />
         ) : (
-          <Environment
+          <NeonEnvironment
             key={mapStyle}
             files={SKY.hdri}
             background={mood.hdriBg}
