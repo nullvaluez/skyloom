@@ -36,55 +36,25 @@ import { BOOT } from '@/lib/fly/fly-constants';
 import { resolveInitialMapStyle } from '@/lib/fly/map-style';
 import { resolveInitialSettings } from '@/lib/fly/fly-settings';
 import { resolveAircraft, resolveInitialAircraft } from '@/lib/fly/player-aircraft';
-import { useFlyStore } from '@/stores/fly-store';
+import { useFlyStore, inFlight } from '@/stores/fly-store';
 import { resolveInitialVisuals } from '@/lib/fly/visuals-profile';
-import { resolveInitialScreen } from '@/lib/fly/front-door';
+import {
+  exitGoesToTitle,
+  exitToTitle,
+  frontDoorOn,
+  onTitle,
+  resolveInitialScreen,
+  stagePumpStats,
+} from '@/lib/fly/front-door';
+import { installTitleCamera } from '@/lib/fly/title-camera';
 import { resolveInitialSpawn } from '@/lib/fly/flight-plan';
+import { TitleScreen } from './hud/TitleScreen';
 
-// Fallback spawn: NYC harbor — dense airspace, good demo
-const DEFAULT_SPAWN = [40.6892, -74.0445];
-// Last in-flight position, persisted ~10s + pagehide → next boot spawns here
+// Last in-flight position, persisted ~10s + pagehide. R25 A: nothing reads it
+// at boot any more (the spawn is lib/fly/flight-plan.js resolveInitialSpawn;
+// the R9 geolocation → last-position → NYC resolver was dead code since the
+// hangar landed and is gone), but the WRITER stays: verify-boot.js reads it.
 const LAST_POS_KEY = 'fly-last-pos';
-
-function readLastPos() {
-  try {
-    const raw = window.localStorage.getItem(LAST_POS_KEY);
-    if (!raw) return null;
-    const p = JSON.parse(raw);
-    if (Number.isFinite(p?.lat) && Number.isFinite(p?.lon)) return [p.lat, p.lon];
-  } catch {
-    // corrupt entry — fall through to the default
-  }
-  return null;
-}
-
-/**
- * R9-1 spawn resolution: geolocation with a quick timeout (the boot screen
- * covers the wait) → last session's persisted position → NYC. Resolves
- * [lat, lon]; never rejects. A late/denied permission prompt can't stall
- * the boot past BOOT.geoTimeoutMs.
- */
-function getSpawnLatLon() {
-  return new Promise((resolve) => {
-    const fallback = () => resolve(readLastPos() ?? DEFAULT_SPAWN);
-    if (!navigator.geolocation) {
-      fallback();
-      return;
-    }
-    const timer = setTimeout(fallback, BOOT.geoTimeoutMs);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        clearTimeout(timer);
-        resolve([pos.coords.latitude, pos.coords.longitude]);
-      },
-      () => {
-        clearTimeout(timer);
-        fallback();
-      },
-      { timeout: BOOT.geoTimeoutMs, maximumAge: 10 * 60 * 1000 }
-    );
-  });
-}
 
 /**
  * Round 17: a layout- and stacking-transparent wrapper (display:contents)
@@ -144,8 +114,20 @@ export function FlyMode({ onClose }) {
   // Procedural audio bed + one-shots (lock blip, warp sweep, UI clicks)
   useFlyAudio(runtime);
 
-  // Spawn where the user is: geolocation (quick timeout — the boot screen
-  // covers the wait), else last session's persisted position, else NYC.
+  // R25 A (FRONT DOOR): the title flyby rig — runtime.titleCam, driven by
+  // FlyScene's camera chain and toggled by the store's `screen`. No-op (and
+  // runtime.titleCam never exists) with FRONT_DOOR off.
+  useEffect(() => installTitleCamera(runtime), [runtime]);
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development' || !frontDoorOn()) return undefined;
+    window.__flyStagePump = stagePumpStats; // dev-only gate handle (read-only)
+    return () => {
+      delete window.__flyStagePump;
+    };
+  }, []);
+
+  // Pre-mount beat: style, settings, aircraft, visuals, then the opening
+  // screen and the spawn (R25: title when the front door ships).
   useEffect(() => {
     let cancelled = false;
     // Round 11: resolve the map style BEFORE spawn resolves — FlyCanvas only
@@ -211,6 +193,10 @@ export function FlyMode({ onClose }) {
   // Escape priority: inspect → photo → atlas → logbook → hangar → credits →
   // pause/resume. (Round 17: photo sits directly under inspect — the inspect
   // card can be opened from inside photo mode, so it must unwind first.)
+  // R25 A (FRONT DOOR, flag-gated): the title's Settings sheet closes before
+  // the hangar step; a PRE-FLIGHT hangar (not dismissible) returns to the
+  // title; on the title root Esc is a no-op (never pauses a menu). The
+  // mid-flight return confirmation is unchanged (Esc still does nothing there).
   //
   // Round 16: the L (Logbook) toggle lives in THIS listener, deliberately —
   // the Atlas's private 'm' handler is a standing lesson that a second window
@@ -225,8 +211,14 @@ export function FlyMode({ onClose }) {
         else if (store.cameraMode === 'photo') store.setCameraMode('chase');
         else if (store.atlasOpen) store.setAtlasOpen(false);
         else if (store.logbookOpen) store.setLogbookOpen(false);
-        else if (store.hangarOpen) return; // Selection is mandatory at startup.
+        else if (frontDoorOn() && store.settingsOpen) store.setSettingsOpen(false);
+        else if (store.hangarOpen) {
+          // Selection is mandatory at startup — R25: ‹ back to the title.
+          if (frontDoorOn() && store.hangarDismissible === false) store.setScreen('title');
+          return;
+        }
         else if (store.creditsOpen) store.closeCredits();
+        else if (frontDoorOn() && store.screen === 'title') return; // the title root
         else if (store.phase === 'paused') store.setPhase('flying');
         else store.setPhase('paused');
         return;
@@ -256,18 +248,37 @@ export function FlyMode({ onClose }) {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // R25 A (FRONT DOOR): the title / hangar / flight split for the chrome
+  // below. Both are constant (false / true) with the flag off.
+  const titleUp = useFlyStore(onTitle);
+  // The Logbook opened FROM the title hides the title layer (and its credit);
+  // the flight bar stands in, exactly as it does under the in-flight Logbook
+  // (which stops 2rem short of the bottom for it). Constant false flag-off.
+  const logbookUp = useFlyStore((s) => onTitle(s) && s.logbookOpen);
+  const flyingNow = useFlyStore((s) => !frontDoorOn() || inFlight(s));
+  // Exit: to the title over the live world (R25) — else today's reload.
+  const exit = exitGoesToTitle() ? () => exitToTitle(runtime) : onClose;
+
   // Small non-touch window heads-up: flying wants room. Touch devices get the
   // on-screen controls instead of a "use a desktop" nudge, so skip it there.
+  // R25 A: it waits for the first actual flight (the title has its own
+  // layout); with the flag off `flyingNow` is constant true — mount, as today.
   const [mobileNote, setMobileNote] = useState(false);
+  const noteShown = useRef(false);
   useEffect(() => {
+    if (!flyingNow || noteShown.current) return;
+    noteShown.current = true;
     const coarse = window.matchMedia?.('(pointer: coarse)').matches;
     const hasTouch = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
-    if (!(coarse && hasTouch) && window.innerWidth < 900) {
-      setMobileNote(true);
-      const id = setTimeout(() => setMobileNote(false), 8000);
-      return () => clearTimeout(id);
-    }
-  }, []);
+    if (!(coarse && hasTouch) && window.innerWidth < 900) setMobileNote(true);
+  }, [flyingNow]);
+  // The 8 s hide rides the note itself, so leaving the flight (exit to title)
+  // can never cancel it and strand the note on screen.
+  useEffect(() => {
+    if (!mobileNote) return undefined;
+    const id = setTimeout(() => setMobileNote(false), 8000);
+    return () => clearTimeout(id);
+  }, [mobileNote]);
 
   // Leave no stale lock/telemetry behind for the next session.
   useEffect(() => {
@@ -317,7 +328,9 @@ export function FlyMode({ onClose }) {
           AttributionBar, PauseMenu, WarpFlash, BootScreen and PhotoModeBar
           stay OUTSIDE: the Esri credit is required in EVERY UI state, and the
           shutter/exit must survive the state that hides everything else. */}
-      <HudGroup hidden={photoActive}>
+      {/* R25 A: the flying HUD is also hidden (never unmounted) under the
+          title — the title layer is transparent over the live world. */}
+      <HudGroup hidden={photoActive || titleUp}>
         {/* POI names are in-world 3D letters (PoiLetters) in every style */}
         <LabelCanvas runtime={runtime} />
         <FlyHUD runtime={runtime} />
@@ -325,7 +338,7 @@ export function FlyMode({ onClose }) {
         <InfoCard runtime={runtime} />
       </HudGroup>
       <InspectModal runtime={runtime} />
-      <HudGroup hidden={photoActive}>
+      <HudGroup hidden={photoActive || titleUp}>
         <SpotToast runtime={runtime} />
         <Contracts runtime={runtime} />
       </HudGroup>
@@ -333,41 +346,52 @@ export function FlyMode({ onClose }) {
       <Logbook />
       <HangarPanel runtime={runtime} />
       <OperationsHUD runtime={runtime} />
-      <HudGroup hidden={photoActive}>
+      <HudGroup hidden={photoActive || titleUp}>
         <ArrivalBanner />
       </HudGroup>
       <WarpFlash runtime={runtime} />
       <CrashFlash />
-      <HudGroup hidden={photoActive}>
+      <HudGroup hidden={photoActive || titleUp}>
         {isTouch && <TouchControls runtime={runtime} />}
       </HudGroup>
       <PhotoModeBar />
       {/* Round 18 (A4): combo chip + boost meter + end-of-run summary, all in
           one component so the round costs FlyMode a single line. */}
-      <JuiceHud />
-      <PauseMenu onExit={onClose} />
-      <AttributionBar />
+      {!titleUp && <JuiceHud />}
+      <PauseMenu onExit={exit} />
+      {/* R25 A: the title layer carries its own attribution (it sits over this
+          bar) — except while the Logbook, opened from the title, hides that
+          layer: then this bar is the credit. With the flag off `titleUp` is
+          constant false. */}
+      {(!titleUp || logbookUp) && <AttributionBar />}
 
       {/* Boot overlay (z-40) covers everything — including the first-entry
           controls card — until the world reveals, so the fly-controls-seen
           flow effectively starts AFTER the reveal. */}
       <BootScreen runtime={runtime} />
 
+      {/* R25 A (FRONT DOOR): the title screen, z-45 — over the BootScreen
+          backdrop (which turns into a compact strip under it) and under the
+          hangar (z-60). Renders nothing unless screen === 'title'. */}
+      <TitleScreen runtime={runtime} />
+
       {mobileNote && (
         <div className="pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-md bg-zinc-900/85 px-3 py-2 text-xs text-zinc-200 shadow-lg">
-          Fly Mode is designed for desktop — a mouse and keyboard are recommended.
+          Skyloom is designed for desktop — a mouse and keyboard are recommended.
         </div>
       )}
 
       {/* Desktop keeps the quick-exit X (top-right); touch replaces it with the
-          Pause button in TouchControls, whose menu carries Exit. */}
-      {!isTouch && (
+          Pause button in TouchControls, whose menu carries Exit. R25 A: it
+          exits to the title, and only exists while flying (the title and the
+          hangar are the menus it would exit to). */}
+      {!isTouch && flyingNow && (
         <Zone name="exit">
           <Button
             variant="ghost"
             size="icon"
-            onClick={onClose}
-            aria-label="Exit Fly Mode"
+            onClick={exit}
+            aria-label={exitGoesToTitle() ? 'Exit to title' : 'Exit Fly Mode'}
             className="pointer-events-auto bg-zinc-900/60 text-zinc-100 hover:bg-zinc-800"
           >
             <X className="h-5 w-5" />

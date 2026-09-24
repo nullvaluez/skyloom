@@ -7,6 +7,7 @@ import { immersiveOn } from '@/lib/fly/immersive';
 import { AUDIO } from '@/lib/fly/fly-constants';
 import { resolveAircraft } from '@/lib/fly/player-aircraft';
 import { useFlyStore } from '@/stores/fly-store';
+import { gameplayLive, lockBlipWanted, quietBed, wakeBed } from '@/lib/fly/front-door';
 
 /**
  * Owns the FlyAudio instance for a Fly-mode session: resumes on the first
@@ -31,23 +32,51 @@ export function useFlyAudio(runtime) {
     const applyAircraft = (id) => {
       const ac = resolveAircraft(id);
       audio.setProfile(ac.audio, ac.cfg.speeds);
+      // R25 A: a 'prop' pick in the hangar builds its tremolo at full depth —
+      // silence it before it sounds (constant-true gameplayLive with the flag
+      // off: never taken).
+      if (!gameplayLive(useFlyStore.getState())) quietBed(audio, true);
     };
     applyAircraft(useFlyStore.getState().aircraftId);
 
-    const gesture = () => audio.resume();
+    // R25 A: the first click builds the graph (a 'prop' LFO at full depth);
+    // on the title it is silenced in the same task, before it can sound.
+    let builtCtx = null;
+    const gesture = () => {
+      audio.resume();
+      if (audio.ctx && audio.ctx !== builtCtx) {
+        builtCtx = audio.ctx;
+        if (!gameplayLive(useFlyStore.getState())) quietBed(audio, true);
+      }
+    };
     window.addEventListener('pointerdown', gesture);
     window.addEventListener('keydown', gesture);
 
+    let bedQuiet = false; // R25 A: wakeBed on the quiet -> flight edge only
     const id = setInterval(() => {
       const f = runtime.flight;
       if (!f) return;
-      const cmd = runtime.input?.read();
-      audio.update(f.speed, !runtime.operations?.lowSpeed && (!!cmd?.boost || cmd?.speedPreset === 'boost'), runtime.operations);
       const state=useFlyStore.getState();
+      // R25 A (FRONT DOOR): the engine/wind bed is silent while not actually
+      // flying (the title's frozen flight and the hangar) — one-shots and UI
+      // sounds still play. gameplayLive() is constant true with the flag off,
+      // so this is today's call sequence exactly.
+      const live=gameplayLive(state);
+      if (live) {
+        if (bedQuiet) {
+          wakeBed(audio);
+          bedQuiet = false;
+        }
+        const cmd = runtime.input?.read();
+        audio.update(f.speed, !runtime.operations?.lowSpeed && (!!cmd?.boost || cmd?.speedPreset === 'boost'), runtime.operations);
+      } else {
+        quietBed(audio);
+        bedQuiet = true;
+      }
       const active=state.mapStyle==='satellite'&&immersiveOn('audio');
       // Pause gates the shared master too, including synthesized fallback and one-shots.
       audio.setMuted(!state.soundOn || (active && state.phase==='paused'));
-      immersion.update(runtime,state,active);
+      immersion.update(runtime,state,active&&live);
     }, 1000 / AUDIO.updateHz);
 
     const unsubs = [
@@ -59,7 +88,8 @@ export function useFlyAudio(runtime) {
       useFlyStore.subscribe(
         (s) => s.lockedHex,
         (hex, prev) => {
-          if (hex && !prev) audio.lockBlip();
+          // R25 A: acquisitions on the title / in the hangar are silent.
+          if (lockBlipWanted(hex, prev, useFlyStore.getState())) audio.lockBlip();
         }
       ),
       useFlyStore.subscribe(

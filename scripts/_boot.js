@@ -20,6 +20,7 @@
  *   await bootFly(page, { style: 'satellite' }); // Day
  *   await bootFly(page, { style: 'night' });     // raw seed (legacy-migration tests)
  *   await bootFly(page, { skipMenus: false });   // R25: pins + fixture, no airborne skip
+ *   await bootFly(page, { style: 'satellite', geo: { lat, lon, altM, headingRad } }); // R25: boot airborne elsewhere
  *
  * Returns { ms } — goto → pct 100 wall time.
  */
@@ -74,7 +75,7 @@ function terraPinFor(style) {
 
 async function bootFly(
   page,
-  { style = null, url = BOOT_URL, timeoutMs = 180000, settleMs = 2500, skipMenus = true } = {}
+  { style = null, url = BOOT_URL, timeoutMs = 180000, settleMs = 2500, skipMenus = true, geo = undefined } = {}
 ) {
   // Round 24 (E CERT): the fixture, when asked for. attachFixture installs the
   // Playwright routes for OpenFreeMap / Esri imagery / /api/aircraft /
@@ -232,7 +233,9 @@ async function bootFly(
   // pin and the fixture exactly as above, but no airborne skip and no reveal
   // wait: the page is left on whatever screen the app opens on (the R25
   // title when a gate un-pins `__flyTitleBypass`, else today's hangar, which
-  // runs the canvas on 'demand' and so never reaches pct 100 on its own).
+  // runs the canvas on 'demand' — MEASURED, a satellite fixture boot had not
+  // revealed behind it after 62 s, while toy with blocked hosts reaches pct
+  // 100 behind it through the Neon ceiling; so never wait on pct there).
   // Returns once the runtime is mounted. The R25 flow gates use this.
   if (!skipMenus) {
     await page.waitForFunction(() => !!window.__fly && !!window.__flyStore, undefined, { timeout: timeoutMs });
@@ -244,7 +247,10 @@ async function bootFly(
   // Round 25 (E): the sequence is scripts/_skip-menus.js enterFlight, verbatim
   // (phase 'airborne', profile null, operations.warp, setHangarOpen(false),
   // warpToGeo 40.6892,-74.0445 @800 m hdg 0) — one copy for every harness.
-  await enterFlight(page, undefined, { timeoutMs });
+  // `geo` (R25 E, additive): boot airborne somewhere else — a recorder that
+  // measures Owens should not first settle Manhattan (MEASURED: at load 8 a
+  // satellite NYC boot did not reveal in 900 s). Omitted = the NYC pose.
+  await enterFlight(page, geo, { timeoutMs });
 
   // The harness contract: pct hits 100 exactly at reveal and stays there.
   // Round 11 fix: options are waitForFunction's THIRD parameter (second is

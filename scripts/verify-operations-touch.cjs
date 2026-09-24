@@ -28,11 +28,32 @@ const {enterHangar,waitTitleReady}=require('./_title'); // R25 (E, SANCTIONED)
     };
     const t=await waitTitleReady(page,{timeoutMs:60000});
     if(t.title){
-      await page.evaluate(()=>history.back());await page.waitForTimeout(500);
-      report.checks.push(`Back on the title keeps the ${await unstarted('title root')}`);
+      const origin=new URL(process.env.FLY_URL||'http://localhost:3027').origin;
+      await page.evaluate(()=>history.back());
+      // At the app ROOT the browser's own Back may leave the page (about:blank
+      // in a fresh tab) unless the title pushes a history entry — A's call.
+      // Leaving is not revealing a world; re-enter and carry on. R25 E2
+      // (MEASURED, fixture at load ~8): that navigation can commit well after
+      // a fixed 500 ms, so the URL read raced it and the next evaluate died
+      // with "Execution context was destroyed". Wait for the URL to leave the
+      // origin (bounded), and read a context torn down mid-check as leaving.
+      let left=await page.waitForURL(u=>!u.href.startsWith(origin),{timeout:10000}).then(()=>true,()=>false);
+      let kept=null;
+      if(!left){
+        try{kept=await unstarted('title root');}
+        catch(e){if(!/Execution context was destroyed|navigation/i.test(String(e?.message||e)))throw e;left=true;}
+      }
+      if(left){
+        report.checks.push('Back on the title root leaves the page (browser default at the app root)');
+        await page.goto(process.env.FLY_URL||'http://localhost:3027');await waitTitleReady(page,{timeoutMs:60000});
+      }else report.checks.push(`Back on the title keeps the ${kept}`);
     }
     await enterHangar(page,'ops',{tap:true,timeoutMs:60000});
     await page.evaluate(()=>history.back());await page.waitForTimeout(500);
+    // R25 E2: with a title, Back pops the hangar's history entry; on a loaded
+    // venue the popstate can land after 500 ms — give it a bounded wait so the
+    // read below is not taken mid-transition (no effect without a title).
+    if(t.title)await page.waitForFunction(()=>window.__flyStore?.getState?.().screen==='title',undefined,{timeout:10000,polling:250}).catch(()=>{});
     const afterBack=await unstarted('pre-flight hangar');
     if(!t.title&&afterBack!=='hangar')throw new Error('Back dismissed mandatory aircraft selection');
     report.checks.push(t.title?`Back in the pre-flight hangar lands on the ${afterBack}`:'mandatory selection survives Back');
