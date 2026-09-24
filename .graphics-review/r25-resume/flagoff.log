@@ -1,0 +1,22 @@
+
+[1] harness posture: the legacy fleet runs Classic, title bypassed
+PASS  (1a) _boot.js pins BOTH legs (init script + reload leg)  — __flyTitleBypass x2, __flyVisualsOverride='classic' x2
+PASS  (1b) _mobile-boot.js pins both
+PASS  (1c) the 'classic' pin wins over a saved 'enhanced' with every R25 flag ON  — pinned -> classic; un-pinned -> enhanced (the control)
+
+[2] terrain chain: generated text, uniforms, defines, program key
+PASS  (2a) the chain compiles in every arm  — off:ok classic:ok enhanced:ok dOnly:ok cOnly:ok
+PASS  (2b) CLASSIC terrain == OFF, byte for byte (text, uniforms, defines, key)  — differs in: identical · OFF key world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-da
+PASS  (2c) ENHANCED terrain differs from OFF  — differs in: vs+fs+uniforms+key
+PASS  (2d) new terrain text carries a NEW program key (house rule 3)  — text moved; key new
+PASS  (2e) C-ONLY (__flyR25Ground=0) terrain == OFF  — differs in: identical
+
+[3] sky/ground frame hooks: writes under Classic
+PASS  (3a) OFF: the hooks write nothing  — 0 write(s)
+PASS  (3b) CLASSIC: the hooks write nothing (Classic IS flag-off)  — 0 write(s) ; colours bit-equal
+PASS  (3c) ENHANCED: the hooks act  — 38 write(s), rim/void moved
+
+[4] constants hygiene against the r25-w0 tag
+PASS  (4a) constants outside the R25 blocks == r25-w0 (every role edited only its own block)  — 6 blocks masked, remainder byte-identical
+
+12 passed, 0 failed, 0 not calibrated

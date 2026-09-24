@@ -1,0 +1,574 @@
+{
+  "at": "2026-09-24T14:23:04.962Z",
+  "load0": 0,
+  "stamp": "off",
+  "poses": {
+    "sierra": {
+      "pose": "P2",
+      "readyMs": 5011,
+      "poseMsl": 5000,
+      "held": "flying",
+      "enhancedData": {
+        "live": true,
+        "resident": 96,
+        "binds": 185,
+        "loaded": 64,
+        "pending": 0,
+        "reliefPx": 128,
+        "bytes": 5242816
+      },
+      "lines": {
+        "tiles": 102,
+        "edge": 192,
+        "ctrl": 201
+      },
+      "enhancedData2": {
+        "live": true,
+        "resident": 96,
+        "binds": 142,
+        "loaded": 64,
+        "pending": 0,
+        "reliefPx": 128,
+        "bytes": 5242816
+      },
+      "census": {
+        "enhanced": {
+          "draws": 154,
+          "tris": 363781,
+          "programs": 112,
+          "texNowMiB": 127.90423583984375,
+          "texPeakMiB": 127.90423583984375,
+          "texComplete": true,
+          "visuals": "enhanced",
+          "r25Bytes": 5242816,
+          "r25GlBytes": 5242816
+        },
+        "classic": {
+          "draws": 154,
+          "tris": 363781,
+          "programs": 113,
+          "texNowMiB": 122.904296875,
+          "texPeakMiB": 127.90423583984375,
+          "texComplete": true,
+          "visuals": "classic",
+          "r25Bytes": 0,
+          "r25GlBytes": 0
+        },
+        "enhanced2": {
+          "draws": 154,
+          "tris": 364453,
+          "programs": 113,
+          "texNowMiB": 127.82090377807617,
+          "texPeakMiB": 127.90423583984375,
+          "texComplete": true,
+          "visuals": "enhanced",
+          "r25Bytes": 5242816,
+          "r25GlBytes": 5155436
+        }
+      },
+      "floor": {
+        "mean": 0.029816984953703704,
+        "p99": 1,
+        "max": 117,
+        "changedPct": 6.869574652777778
+      },
+      "terrain": {
+        "E": {
+          "meanLin": 0.26838540468424726,
+          "clipHi": 0,
+          "clipLo": 0,
+          "clip": 0,
+          "sobel": 65.67807047059168,
+          "lab": [
+            58.824834906754035,
+            -1.7921474550897099,
+            9.567412469804793
+          ],
+          "px": 210168
+        },
+        "C": {
+          "meanLin": 0.2702859371434457,
+          "clipHi": 0,
+          "clipLo": 0.03901640592288074,
+          "clip": 0.03901640592288074,
+          "sobel": 64.80662387634456,
+          "lab": [
+            59.00089306395485,
+            -3.260338937655427,
+            7.967905860470648
+          ],
+          "px": 210168
+        }
+      },
+      "gain": 1.013446875367399,
+      "lum": 0.992968437502578,
+      "roundTrip": {
+        "mean": 0.4374370659722222,
+        "p99": 5,
+        "max": 141,
+        "changedPct": 38.344943576388886
+      },
+      "gainOff": 1.0000139550356346,
+      "seam": {
+        "E": {
+          "edge": {
+            "n": 192,
+            "median": 3.867072221624511,
+            "mean": 6.430672235710414
+          },
+          "ctrl": {
+            "n": 201,
+            "median": 3.5032189500682875,
+            "mean": 5.782682682381439
+          }
+        },
+        "C": {
+          "edge": {
+            "n": 192,
+            "median": 4.513763403242777,
+            "mean": 7.440728731324853
+          },
+          "ctrl": {
+            "n": 201,
+            "median": 4.113817929072084,
+            "mean": 6.416473251219948
+          }
+        },
+        "excessE": 0.3638532715562235,
+        "excessC": 0.3999454741706927
+      }
+    },
+    "smokies": {
+      "pose": "P5",
+      "readyMs": 5015,
+      "poseMsl": 2400,
+      "held": "flying",
+      "enhancedData": {
+        "live": true,
+        "resident": 95,
+        "binds": 353,
+        "loaded": 64,
+        "pending": 0,
+        "reliefPx": 128,
+        "bytes": 5242816
+      },
+      "lines": {
+        "tiles": 100,
+        "edge": 84,
+        "ctrl": 79
+      },
+      "enhancedData2": {
+        "live": true,
+        "resident": 96,
+        "binds": 152,
+        "loaded": 64,
+        "pending": 0,
+        "reliefPx": 128,
+        "bytes": 5242816
+      },
+      "census": {
+        "enhanced": {
+          "draws": 193,
+          "tris": 1415935,
+          "programs": 111,
+          "texNowMiB": 128.23756790161133,
+          "texPeakMiB": 145.90416717529297,
+          "texComplete": true,
+          "visuals": "enhanced",
+          "r25Bytes": 5242816,
+          "r25GlBytes": 5242816
+        },
+        "classic": {
+          "draws": 193,
+          "tris": 1416031,
+          "programs": 112,
+          "texNowMiB": 123.23762893676758,
+          "texPeakMiB": 145.90416717529297,
+          "texComplete": true,
+          "visuals": "classic",
+          "r25Bytes": 0,
+          "r25GlBytes": 0
+        },
+        "enhanced2": {
+          "draws": 193,
+          "tris": 1416031,
+          "programs": 112,
+          "texNowMiB": 127.5709114074707,
+          "texPeakMiB": 145.90416717529297,
+          "texComplete": true,
+          "visuals": "enhanced",
+          "r25Bytes": 5242816,
+          "r25GlBytes": 4543776
+        }
+      },
+      "floor": {
+        "mean": 0.09031213831018518,
+        "p99": 1,
+        "max": 118,
+        "changedPct": 2.4881727430555554
+      },
+      "terrain": {
+        "E": {
+          "meanLin": 0.08462676992082468,
+          "clipHi": 0,
+          "clipLo": 0.03663735678124167,
+          "clip": 0.03663735678124167,
+          "sobel": 58.81188271316891,
+          "lab": [
+            34.92813813338499,
+            -13.49625184028222,
+            13.068975961950624
+          ],
+          "px": 210168
+        },
+        "C": {
+          "meanLin": 0.08419858055762519,
+          "clipHi": 0,
+          "clipLo": 0.0033306687982946974,
+          "clip": 0.0033306687982946974,
+          "sobel": 65.57446899181214,
+          "lab": [
+            34.842107561920116,
+            -14.302304237385544,
+            14.921119373362568
+          ],
+          "px": 210168
+        }
+      },
+      "gain": 0.8968716577866971,
+      "lum": 1.00508547009182,
+      "roundTrip": {
+        "mean": 0.2850025318287037,
+        "p99": 5,
+        "max": 116,
+        "changedPct": 13.697808159722221
+      },
+      "gainOff": 0.9999251562034127,
+      "seam": {
+        "E": {
+          "edge": {
+            "n": 84,
+            "median": 1.729506660540146,
+            "mean": 3.2373966668122205
+          },
+          "ctrl": {
+            "n": 79,
+            "median": 2.5018237996588226,
+            "mean": 3.091644526031888
+          }
+        },
+        "C": {
+          "edge": {
+            "n": 84,
+            "median": 3.022262284026965,
+            "mean": 4.598676418668733
+          },
+          "ctrl": {
+            "n": 79,
+            "median": 2.93641207156071,
+            "mean": 3.5954026217655364
+          }
+        },
+        "excessE": -0.7723171391186767,
+        "excessC": 0.08585021246625502
+      }
+    },
+    "owens": {
+      "pose": "P1",
+      "readyMs": 20043,
+      "poseMsl": 1500,
+      "held": "flying",
+      "enhancedData": {
+        "live": true,
+        "resident": 91,
+        "binds": 402,
+        "loaded": 64,
+        "pending": 0,
+        "reliefPx": 128,
+        "bytes": 5242816
+      },
+      "lines": {
+        "tiles": 104,
+        "edge": 101,
+        "ctrl": 115
+      },
+      "enhancedData2": {
+        "live": true,
+        "resident": 96,
+        "binds": 160,
+        "loaded": 64,
+        "pending": 0,
+        "reliefPx": 128,
+        "bytes": 5242816
+      },
+      "census": {
+        "enhanced": {
+          "draws": 159,
+          "tris": 529561,
+          "programs": 111,
+          "texNowMiB": 129.90422821044922,
+          "texPeakMiB": 175.904052734375,
+          "texComplete": true,
+          "visuals": "enhanced",
+          "r25Bytes": 5242816,
+          "r25GlBytes": 5242816
+        },
+        "classic": {
+          "draws": 159,
+          "tris": 529753,
+          "programs": 112,
+          "texNowMiB": 124.90428924560547,
+          "texPeakMiB": 175.904052734375,
+          "texComplete": true,
+          "visuals": "classic",
+          "r25Bytes": 0,
+          "r25GlBytes": 0
+        },
+        "enhanced2": {
+          "draws": 159,
+          "tris": 529753,
+          "programs": 112,
+          "texNowMiB": 129.65423202514648,
+          "texPeakMiB": 175.904052734375,
+          "texComplete": true,
+          "visuals": "enhanced",
+          "r25Bytes": 5242816,
+          "r25GlBytes": 4980676
+        }
+      },
+      "floor": {
+        "mean": 0.010403645833333334,
+        "p99": 1,
+        "max": 19,
+        "changedPct": 2.8702256944444446
+      },
+      "terrain": {
+        "E": {
+          "meanLin": 0.2691014110828399,
+          "clipHi": 0,
+          "clipLo": 0,
+          "clip": 0,
+          "sobel": 61.03115495349087,
+          "lab": [
+            58.891401524257105,
+            -1.405348049205779,
+            11.368430031668275
+          ],
+          "px": 210168
+        },
+        "C": {
+          "meanLin": 0.29117213880907356,
+          "clipHi": 0,
+          "clipLo": 0,
+          "clip": 0,
+          "sobel": 61.440246868224435,
+          "lab": [
+            60.88514276028977,
+            -2.6668669530043876,
+            9.673900802568468
+          ],
+          "px": 210168
+        }
+      },
+      "gain": 0.9933416297038816,
+      "lum": 0.9242004134856262,
+      "roundTrip": {
+        "mean": 0.035300202546296296,
+        "p99": 1,
+        "max": 55,
+        "changedPct": 7.921983506944445
+      },
+      "seam": {
+        "E": {
+          "edge": {
+            "n": 101,
+            "median": 3.990608768686201,
+            "mean": 5.067583861817042
+          },
+          "ctrl": {
+            "n": 115,
+            "median": 3.518847467277439,
+            "mean": 4.988347564559719
+          }
+        },
+        "C": {
+          "edge": {
+            "n": 101,
+            "median": 3.6068073901797817,
+            "mean": 4.958139662489603
+          },
+          "ctrl": {
+            "n": 115,
+            "median": 3.889415293349174,
+            "mean": 5.846095339666679
+          }
+        },
+        "excessE": 0.4717613014087618,
+        "excessC": -0.2826079031693922
+      }
+    }
+  },
+  "toy": null,
+  "boot": {
+    "ms": 12336,
+    "load": 0,
+    "visuals": "enhanced",
+    "attempt": "classic"
+  },
+  "rows": [
+    {
+      "name": "(a) sierra: Sobel relief gain >= 1.15 (RED arm D-off must stay below)",
+      "verdict": "FAIL",
+      "detail": "Enhanced/Classic 1.013 (sobel 65.68 vs 64.81); RED arm 1.000"
+    },
+    {
+      "name": "(b) sierra: seam step (edge minus control, L*) <= Classic + 0.5",
+      "verdict": "PASS",
+      "detail": "Enhanced 0.364 (edge 3.87, ctrl 3.50, n 192) · Classic 0.400"
+    },
+    {
+      "name": "(c) sierra: D-only terrain luminance Enhanced/Classic in [0.95,1.05]",
+      "verdict": "PASS",
+      "detail": "ratio 0.9930 (meanLin 0.2684 vs 0.2703)"
+    },
+    {
+      "name": "(c2) sierra: clip +<= 1 pt",
+      "verdict": "PASS",
+      "detail": "0.039 -> 0.000 %"
+    },
+    {
+      "name": "(e1) sierra: Enhanced texture peak <= 300 MiB",
+      "verdict": "PASS",
+      "detail": "127.9 MiB (logical GL bytes)"
+    },
+    {
+      "name": "(e2) sierra: toggling to Classic returns every R25 byte (Classic == Enhanced - R25 +-0.5 MiB)",
+      "verdict": "PASS",
+      "detail": "Enhanced 127.90 MiB (R25 uploaded 5.00 of 5.00 allocated) -> Classic 122.90 MiB (drop 5.00)"
+    },
+    {
+      "name": "(e2b) sierra: Enhanced R25 GL bytes <= 5.5 MiB",
+      "verdict": "PASS",
+      "detail": "5.000 MiB"
+    },
+    {
+      "name": "(e3) sierra: Classic 122.9 MiB vs the E1 W0 column 126.1 MiB (cross-boot; streaming state differs — information only)",
+      "verdict": "INFO"
+    },
+    {
+      "name": "(f2) sierra: triangles equal across the toggle",
+      "verdict": "FAIL",
+      "detail": "363781 / 363781 / 364453"
+    },
+    {
+      "name": "(f3) sierra: Enhanced -> Classic -> Enhanced round trip restores Enhanced (within floor + 0.5/255)",
+      "verdict": "FAIL",
+      "detail": "mean 0.437/255 p99 5/255 max 141 changed 38.34%"
+    },
+    {
+      "name": "(a) smokies: Sobel relief gain >= 1.15 (RED arm D-off must stay below)",
+      "verdict": "FAIL",
+      "detail": "Enhanced/Classic 0.897 (sobel 58.81 vs 65.57); RED arm 1.000"
+    },
+    {
+      "name": "(b) smokies: seam step (edge minus control, L*) <= Classic + 0.5",
+      "verdict": "PASS",
+      "detail": "Enhanced -0.772 (edge 1.73, ctrl 2.50, n 84) · Classic 0.086"
+    },
+    {
+      "name": "(c) smokies: D-only terrain luminance Enhanced/Classic in [0.95,1.05]",
+      "verdict": "PASS",
+      "detail": "ratio 1.0051 (meanLin 0.0846 vs 0.0842)"
+    },
+    {
+      "name": "(c2) smokies: clip +<= 1 pt",
+      "verdict": "PASS",
+      "detail": "0.003 -> 0.037 %"
+    },
+    {
+      "name": "(e1) smokies: Enhanced texture peak <= 300 MiB",
+      "verdict": "PASS",
+      "detail": "145.9 MiB (logical GL bytes)"
+    },
+    {
+      "name": "(e2) smokies: toggling to Classic returns every R25 byte (Classic == Enhanced - R25 +-0.5 MiB)",
+      "verdict": "PASS",
+      "detail": "Enhanced 128.24 MiB (R25 uploaded 5.00 of 5.00 allocated) -> Classic 123.24 MiB (drop 5.00)"
+    },
+    {
+      "name": "(e2b) smokies: Enhanced R25 GL bytes <= 5.5 MiB",
+      "verdict": "PASS",
+      "detail": "5.000 MiB"
+    },
+    {
+      "name": "(f2) smokies: triangles equal across the toggle",
+      "verdict": "FAIL",
+      "detail": "1415935 / 1416031 / 1416031"
+    },
+    {
+      "name": "(f3) smokies: Enhanced -> Classic -> Enhanced round trip restores Enhanced (within floor + 0.5/255)",
+      "verdict": "FAIL",
+      "detail": "mean 0.285/255 p99 5/255 max 116 changed 13.70%"
+    },
+    {
+      "name": "(b) owens: seam step (edge minus control, L*) <= Classic + 0.5",
+      "verdict": "FAIL",
+      "detail": "Enhanced 0.472 (edge 3.99, ctrl 3.52, n 101) · Classic -0.283"
+    },
+    {
+      "name": "(c) owens: D-only terrain luminance Enhanced/Classic in [0.95,1.05]",
+      "verdict": "FAIL",
+      "detail": "ratio 0.9242 (meanLin 0.2691 vs 0.2912)"
+    },
+    {
+      "name": "(c2) owens: clip +<= 1 pt",
+      "verdict": "PASS",
+      "detail": "0.000 -> 0.000 %"
+    },
+    {
+      "name": "(e1) owens: Enhanced texture peak <= 300 MiB",
+      "verdict": "PASS",
+      "detail": "175.9 MiB (logical GL bytes)"
+    },
+    {
+      "name": "(e2) owens: toggling to Classic returns every R25 byte (Classic == Enhanced - R25 +-0.5 MiB)",
+      "verdict": "PASS",
+      "detail": "Enhanced 129.90 MiB (R25 uploaded 5.00 of 5.00 allocated) -> Classic 124.90 MiB (drop 5.00)"
+    },
+    {
+      "name": "(e2b) owens: Enhanced R25 GL bytes <= 5.5 MiB",
+      "verdict": "PASS",
+      "detail": "5.000 MiB"
+    },
+    {
+      "name": "(e3) owens: Classic 124.9 MiB vs the E1 W0 column 107.3 MiB (cross-boot; streaming state differs — information only)",
+      "verdict": "INFO"
+    },
+    {
+      "name": "(f1) owens: draws <= 261 in both profiles",
+      "verdict": "PASS",
+      "detail": "159 / 159 / 159"
+    },
+    {
+      "name": "(f2) owens: triangles equal across the toggle",
+      "verdict": "FAIL",
+      "detail": "529561 / 529753 / 529753"
+    },
+    {
+      "name": "(f3) owens: Enhanced -> Classic -> Enhanced round trip restores Enhanced (within floor + 0.5/255)",
+      "verdict": "PASS",
+      "detail": "mean 0.035/255 p99 1/255 max 55 changed 7.92%"
+    },
+    {
+      "name": "(d) toy identical across profiles",
+      "verdict": "NOT CALIBRATED",
+      "detail": "--no-toy"
+    }
+  ],
+  "summary": {
+    "pass": 18,
+    "fail": 9,
+    "notcal": 1,
+    "load": 0
+  }
+}

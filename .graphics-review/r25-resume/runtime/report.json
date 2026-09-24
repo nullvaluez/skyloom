@@ -1,0 +1,267 @@
+{
+  "checks": [
+    {
+      "name": "hardware GPU available",
+      "pass": true,
+      "data": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+    },
+    {
+      "name": "shipped governor and terrain settings",
+      "pass": true
+    },
+    {
+      "name": "Classic resident tiles gain relief without replacing geometry",
+      "pass": true,
+      "data": {
+        "same": 173,
+        "filled": 42,
+        "backfill": {
+          "started": 44,
+          "completed": 42,
+          "discarded": 0,
+          "failed": 0,
+          "active": 2,
+          "peak": 2
+        },
+        "bytes": 1834980
+      }
+    },
+    {
+      "name": "relief decodes remain bounded to two",
+      "pass": true,
+      "data": {
+        "started": 44,
+        "completed": 42,
+        "discarded": 0,
+        "failed": 0,
+        "active": 2,
+        "peak": 2
+      }
+    },
+    {
+      "name": "toggle 1: every owned GPU texture released",
+      "pass": true,
+      "data": {
+        "before": {
+          "uploaded": 42,
+          "bytes": 1834980
+        },
+        "released": {
+          "retained": 0,
+          "live": false,
+          "bytes": 0
+        }
+      }
+    },
+    {
+      "name": "toggle 1: cached Enhanced shader uploads its restored textures",
+      "pass": true,
+      "data": {
+        "uploaded": 71
+      }
+    },
+    {
+      "name": "toggle 2: every owned GPU texture released",
+      "pass": true,
+      "data": {
+        "before": {
+          "uploaded": 71,
+          "bytes": 3101990
+        },
+        "released": {
+          "retained": 0,
+          "live": false,
+          "bytes": 0
+        }
+      }
+    },
+    {
+      "name": "toggle 2: cached Enhanced shader uploads its restored textures",
+      "pass": true,
+      "data": {
+        "uploaded": 71
+      }
+    },
+    {
+      "name": "toggle 3: every owned GPU texture released",
+      "pass": true,
+      "data": {
+        "before": {
+          "uploaded": 71,
+          "bytes": 3101990
+        },
+        "released": {
+          "retained": 0,
+          "live": false,
+          "bytes": 0
+        }
+      }
+    },
+    {
+      "name": "toggle 3: cached Enhanced shader uploads its restored textures",
+      "pass": true,
+      "data": {
+        "uploaded": 71
+      }
+    },
+    {
+      "name": "quality medium keeps bounded resources",
+      "pass": true
+    },
+    {
+      "name": "quality low keeps bounded resources",
+      "pass": true
+    },
+    {
+      "name": "quality high keeps bounded resources",
+      "pass": true
+    },
+    {
+      "name": "Neon style releases Enhanced terrain textures",
+      "pass": true
+    },
+    {
+      "name": "return to satellite restores terrain detail",
+      "pass": true
+    },
+    {
+      "name": "actual movement exceeds 1.5 km in every 20-second leg",
+      "pass": true
+    },
+    {
+      "name": "moving-flight p95 stays within 10% of both Classic controls",
+      "pass": true,
+      "data": {
+        "classic": 12.5,
+        "enhanced": 12.60000000000582,
+        "classic2": 12.5
+      }
+    },
+    {
+      "name": "matched quality tiers across moving comparisons",
+      "pass": true
+    },
+    {
+      "name": "texture working set below 300 MiB",
+      "pass": true
+    },
+    {
+      "name": "no runtime or shader errors",
+      "pass": true,
+      "data": {
+        "pageErrors": 0,
+        "shaderErrors": 0
+      }
+    }
+  ],
+  "errors": [],
+  "shaderErrors": [],
+  "flights": [
+    {
+      "profile": "classic",
+      "distance": 2081.107894796218,
+      "p50": 8.30000000000291,
+      "p95": 12.5,
+      "max": 20.799999999995634,
+      "drawsP95": 179,
+      "trisP95": 169905,
+      "tiers": [
+        "high"
+      ],
+      "heapStart": 383528260,
+      "heapEnd": 328624298,
+      "textures": 169,
+      "programs": 132,
+      "r25Bytes": 0,
+      "texMiB": 152.48382568359375,
+      "pins": {
+        "governor": null,
+        "terrain": null
+      }
+    },
+    {
+      "profile": "enhanced",
+      "distance": 2081.1270663979353,
+      "p50": 8.39999999999418,
+      "p95": 12.60000000000582,
+      "max": 16.89999999999418,
+      "drawsP95": 208,
+      "trisP95": 183017,
+      "tiers": [
+        "high"
+      ],
+      "heapStart": 350081016,
+      "heapEnd": 345162715,
+      "textures": 268,
+      "programs": 132,
+      "r25Bytes": 4194240,
+      "texMiB": 157.48376083374023,
+      "pins": {
+        "governor": null,
+        "terrain": null
+      }
+    },
+    {
+      "profile": "classic",
+      "distance": 2081.7602963811887,
+      "p50": 8.30000000000291,
+      "p95": 12.5,
+      "max": 25,
+      "drawsP95": 207,
+      "trisP95": 182319,
+      "tiers": [
+        "high"
+      ],
+      "heapStart": 335531703,
+      "heapEnd": 345620216,
+      "textures": 172,
+      "programs": 132,
+      "r25Bytes": 0,
+      "texMiB": 153.48382186889648,
+      "pins": {
+        "governor": null,
+        "terrain": null
+      }
+    }
+  ],
+  "views": [
+    {
+      "name": "day",
+      "profile": "classic",
+      "file": "sierra-day-classic.png",
+      "time": 1782935640000
+    },
+    {
+      "name": "day",
+      "profile": "enhanced",
+      "file": "sierra-day-enhanced.png",
+      "time": 1782935640000
+    },
+    {
+      "name": "dusk",
+      "profile": "classic",
+      "file": "sierra-dusk-classic.png",
+      "time": 1782960263437
+    },
+    {
+      "name": "dusk",
+      "profile": "enhanced",
+      "file": "sierra-dusk-enhanced.png",
+      "time": 1782960263437
+    },
+    {
+      "name": "night",
+      "profile": "classic",
+      "file": "sierra-night-classic.png",
+      "time": 1782967463437
+    },
+    {
+      "name": "night",
+      "profile": "enhanced",
+      "file": "sierra-night-enhanced.png",
+      "time": 1782967463437
+    }
+  ],
+  "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "status": "PASS"
+}

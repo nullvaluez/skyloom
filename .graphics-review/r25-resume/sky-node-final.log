@@ -1,0 +1,67 @@
+THREE.WARNING: Multiple instances of Three.js being imported.
+
+[1] model sanity
+PASS  (1a) noon zenith is BLUER than the horizon (b/r)  — zenith [0.058, 0.122, 0.285] b/r 4.95 · horizon [0.573, 0.684, 0.781] b/r 1.36
+PASS  (1b) noon zenith is DARKER than the horizon (Y)  — Y zenith 0.120 vs horizon 0.667
+PASS  (1c) the horizon REDDENS monotonically as the sun lowers (r/b)  — el 75/45/20/10/4/1 -> r/b 0.73 < 0.83 < 1.16 < 1.79 < 3.63 < 7.90
+PASS  (1d) the sunlight REDDENS monotonically as the sun lowers (sunTint r/b)  — 1.19 < 1.26 < 1.59 < 2.32 < 5.38 < 29.10
+PASS  (1e) zenith luminance falls MONOTONICALLY with the sun  — 0.120 > 0.088 > 0.062 > 0.051 > 0.039 > 0.027
+PASS  (1f) deep night (el -12) is dark (horizon Y < 0.01, zenith Y < 0.01)  — Y 0.00e+0 / 0.00e+0
+PASS  (1g) every output finite and non-negative over 7 altitudes x 23 elevations  — 161/161 clean
+PASS  (1h) noon calibration: horizon luminance at 1500 m == the certified Classic rim #c6d7e8 (+-2 %)  — ratio 1.0042 (sunE 11.17)
+PASS  (1i) the zenith darkens with altitude (10 km vs 1.5 km)  — 0.039 < 0.120
+PASS  (1j) full overcast veils the horizon to the living-sky grey  — [0.390, 0.425, 0.460]
+
+[2] sRGB / linear parity
+PASS  (2a) the fog/dome decode of rimSRGB (three Color.setRGB sRGB) == the model linear horizon  — max |d| 6.08e-12
+PASS  (2b) at day weight 1 the rim IS the horizon average (linear)
+PASS  (2c) linearToSrgb inverts atmo-law srgbToLinear over all 256 codes  — worst 1.11e-16
+PASS  (2d) twilight: the rim is the LINEAR mix(Classic rim, model horizon, day) the composite shows  — [0.028, 0.040, 0.056]
+
+[3] dip convention
+PASS  (3a) FlyScene still computes the dip with the expression r25-sky mirrors  — 3/3 lines present
+PASS  (3b) skyDipFor == FlyScene expression (incl. the >1e8 boot guard)  — worst 0
+PASS  (3c) sky GLSL uses the dome's convention: y' = ray.y + dip (dome: vDir.y + uDipY)
+PASS  (3d) getSkyDip() reads what setSkyDip wrote
+PASS  (3e) at the rim (ray.y = -dip) the SKY row == the AERIAL in-scatter row, every azimuth  — worst 0.00e+0
+PASS  (3f) the published horizon average == the mean of the sky around the rim (fog/edge/dome == sky)  — |d| 2.22e-16
+
+[4] Classic post / cloud text == flag-off
+PASS  (4a) CLASSIC satellite post chain == OFF (raw effect texts + merged EffectPass programs, 3 tiers)  — identical
+PASS  (4b) CLASSIC cloud march + composite == OFF
+PASS  (4c) CLASSIC WhiteBalance numbers (balance incl. exposure gamma) == OFF
+PASS  (4d) ENHANCED moves the aerial text (a NEW program: ShaderMaterial keys are the text)
+PASS  (4e) ENHANCED leaves every OTHER effect text alone (0 new draws, no pass added)  — passes 3 -> 3
+PASS  (4f) the merged program count is unchanged by Enhanced (0 new draws)
+PASS  (4j) every tier carries the pre-curve exposure the grade dropped (Enhanced aerial in the chain)  — high/medium/low true/true/true
+PASS  (4g) ENHANCED cloud march: model key/ambient + the fade ramp (no hard cut)
+PASS  (4h) ENHANCED composite: model sky, dip-aware up, living-air cloud haze, exposure
+PASS  (4i) Classic cloud march/composite + aerial legacy/law SOURCES == the r25-w0 tag  — march true composite true law true legacy true
+
+[5] IBL alignment (three Euler -> Matrix4 -> Matrix3^T, the renderer path)
+PASS  (5a) looking at the live sun samples the HDRI at ITS sun azimuth (96 bucket x azimuth cases)  — worst az error 5.55e-16 rad, elevation untouched 0.00e+0
+PASS  (5b) hdriSunAzFor picks the day bucket at noon-ish and the table value
+PASS  (5c) R25_SKY.iblAlign.hdriSunAz == scripts/hdr-sun.mjs --r25 on public/hdri  — {"day":-0.972783,"dawn":-0.952488,"dusk":-0.979601,"night":-0.803958}
+
+[6] frame hooks
+PASS  (6a) authority 1: fog -> the floor, the 16-55 km band -> 0  — fog 0.000003 (floor 0.000003), band max 0
+PASS  (6b) authority 0 (pinned / night): the Classic fog + band stand  — fog 0.0000075, band 0.5
+PASS  (6c) half authority: halfway
+PASS  (6d) Enhanced rotates environment AND background by the same theta  — theta -1.37278
+PASS  (6e) Enhanced fills _aerialFeed.sunDir with the true-elevation sun
+PASS  (6f) exposure = 2^(satelliteExposureStops + biasStops)  — x0.8827
+PASS  (6g) a steady input integrates the table ONCE (the cache holds for 100 frames)  — 1 -> 1
+PASS  (6h) flipping LIVE to Classic restores the rotation it found, exactly  — env 0.01,0.02,0.03 bg 0.04,0.05,0.06
+PASS  (6i) Classic leaves the Classic fog / band / rim / void untouched
+PASS  (6j) leaving satellite restores the rotation too (toy is never rotated)
+PASS  (6k) skyDayWeight == immersiveLighting().day (the composite's own mix weight)  — worst 2.22e-16
+PASS  (6l) satelliteExposureStops == resolveSatelliteAtmosphere().exposureStops  — worst 0
+PASS  (6m) balanceTint x exposureGamma == the Classic balance (Enhanced drops ONLY the exposure)  — worst 0.00e+0
+PASS  (6n) the cloud pass's inlined living-air profile is livingAirProfile's arithmetic
+PASS  (6o) atmo-law's lobe: the model imports ATMO_MIE_LOBE_GLSL and it is the law's own lines  — 3/3 lines
+PASS  (6p) atmoMieLobe (JS) == the lobe inside atmoInscatterJS  — worst 0.00e+0
+
+[7] GLSL ES 3.00 front-end compile (glslangValidator)
+BLOCKED  (7) glslangValidator not on PATH — the browser gate compiles these for real
+
+49 passed, 0 failed, 0 not calibrated

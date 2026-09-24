@@ -1,0 +1,2053 @@
+{
+  "checks": [
+    {
+      "name": "hardware GPU available",
+      "pass": true,
+      "data": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+    },
+    {
+      "name": "shipped governor and terrain settings",
+      "pass": true
+    },
+    {
+      "name": "Classic resident tiles gain relief without replacing geometry",
+      "pass": true,
+      "data": {
+        "same": 170,
+        "filled": 71,
+        "backfill": {
+          "started": 71,
+          "completed": 71,
+          "discarded": 0,
+          "failed": 0,
+          "active": 0,
+          "peak": 2
+        },
+        "bytes": 4150566
+      }
+    },
+    {
+      "name": "relief decodes remain bounded to two",
+      "pass": true,
+      "data": {
+        "started": 71,
+        "completed": 71,
+        "discarded": 0,
+        "failed": 0,
+        "active": 0,
+        "peak": 2
+      }
+    }
+  ],
+  "errors": [],
+  "shaderErrors": [
+    "THREE.WebGLProgram: Shader Error 0 - VALIDATE_STATUS false\n\nMaterial Name: \nMaterial Type: MeshStandardMaterial\n\nProgram Info Log: FRAGMENT shader texture image units count exceeds MAX_TEXTURE_IMAGE_UNITS(16)\n\n"
+  ],
+  "flights": [],
+  "views": [],
+  "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "diagnostic": {
+    "rows": [
+      {
+        "z": 3,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "keys": null,
+        "holder": true,
+        "uniforms": [],
+        "hasRelief": 0,
+        "uploaded": false
+      },
+      {
+        "z": 3,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "keys": null,
+        "holder": true,
+        "uniforms": [],
+        "hasRelief": 0,
+        "uploaded": false
+      },
+      {
+        "z": 3,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "keys": null,
+        "holder": true,
+        "uniforms": [],
+        "hasRelief": 0,
+        "uploaded": false
+      },
+      {
+        "z": 3,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "keys": null,
+        "holder": true,
+        "uniforms": [],
+        "hasRelief": 0,
+        "uploaded": false
+      },
+      {
+        "z": 3,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "keys": null,
+        "holder": true,
+        "uniforms": [],
+        "hasRelief": 0,
+        "uploaded": false
+      },
+      {
+        "z": 3,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "keys": null,
+        "holder": true,
+        "uniforms": [],
+        "hasRelief": 0,
+        "uploaded": false
+      },
+      {
+        "z": 3,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "keys": null,
+        "holder": true,
+        "uniforms": [],
+        "hasRelief": 0,
+        "uploaded": false
+      },
+      {
+        "z": 3,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "keys": null,
+        "holder": true,
+        "uniforms": [],
+        "hasRelief": 0,
+        "uploaded": false
+      },
+      {
+        "z": 4,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "keys": null,
+        "holder": true,
+        "uniforms": [],
+        "hasRelief": 0,
+        "uploaded": false
+      },
+      {
+        "z": 4,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "keys": null,
+        "holder": true,
+        "uniforms": [],
+        "hasRelief": 0,
+        "uploaded": false
+      },
+      {
+        "z": 5,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 4,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "keys": null,
+        "holder": true,
+        "uniforms": [],
+        "hasRelief": 0,
+        "uploaded": false
+      },
+      {
+        "z": 4,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "keys": null,
+        "holder": true,
+        "uniforms": [],
+        "hasRelief": 0,
+        "uploaded": false
+      },
+      {
+        "z": 5,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 5,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 6,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 6,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 6,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 6,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 6,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 6,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 6,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 5,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 5,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 6,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 6,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 6,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 7,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 7,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 8,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 8,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 9,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 9,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 10,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 10,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 11,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 11,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 12,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 12,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 13,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 13,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 14,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 7,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 7,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 8,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 8,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 9,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 9,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 10,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 10,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 11,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 11,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 13,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 13,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 13,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 13,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 12,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 14,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 14,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 14,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 14,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 13,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 14,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 15,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 15,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 15,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 15,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 15,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 15,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 16,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 16,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 16,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 16,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 15,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 14,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 14,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 15,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 13,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 12,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 11,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 9,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 8,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 7,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "gv": 6,
+        "program": 124,
+        "keys": [
+          "0,0,0,0,8388624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living",
+          "624,8389651,srgb,world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g"
+        ],
+        "holder": true,
+        "uniforms": [
+          "uR25Sat",
+          "uR25Relief",
+          "uR25HasRelief",
+          "uR25OneSun",
+          "uR25Sharp",
+          "uR25Ref",
+          "uR25RefWin",
+          "uR25RefGain",
+          "uR25TileXf",
+          "uR25GroundValue"
+        ],
+        "hasRelief": 1,
+        "uploaded": false
+      },
+      {
+        "z": 4,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "keys": null,
+        "holder": true,
+        "uniforms": [],
+        "hasRelief": 0,
+        "uploaded": false
+      },
+      {
+        "z": 2,
+        "key": "world-bend-fade-hill-r19-efl24-near-ground-terrain-v1|ground-light-v2-terrain-daylight-terrain-v2-earth-surface-v7-living-nsck25-r25g",
+        "v": 6,
+        "keys": null,
+        "holder": true,
+        "uniforms": [],
+        "hasRelief": 0,
+        "uploaded": false
+      }
+    ],
+    "style": "satellite",
+    "phase": "paused",
+    "screen": "flight",
+    "toggles": 1,
+    "frames": 1698,
+    "render": {
+      "frame": 50959,
+      "calls": 171,
+      "triangles": 136094,
+      "points": 6,
+      "lines": 0
+    },
+    "rendererSame": true
+  },
+  "status": "DIAG"
+}

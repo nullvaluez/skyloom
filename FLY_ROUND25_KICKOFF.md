@@ -1,5 +1,12 @@
 # R25 handoff: finish "Front Door & Clear Sky" in a fresh session
 
+**RESUMED (2026-09-24):** C SKY and D GROUND have been recovered and integrated
+in the isolated `codex/clear-sky-visuals` worktree. The optional Enhanced preview
+passes its real-GPU runtime check; appearance gates remain unfinished. Read
+[CLEAR_SKY_VISUALS.md](CLEAR_SKY_VISUALS.md) for current status. The pause notes,
+workflow prompts and intermediate states below are retained as history, not
+instructions to restart the already recovered work.
+
 **State as of 2026-09-23 (end of session 1):** `main` = `claude/game-intro-menu-world-mf37eg` = `ec7dc6e` plus this doc.
 The game plays exactly as it did at `2c624a3`, because every R25 flag ships `enabled:false`.
 The plan is approved; do not re-plan.
