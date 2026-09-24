@@ -9,20 +9,14 @@ import { useFlyAtlasStore } from '@/stores/fly-atlas-store';
 import { AtlasMap } from './atlas/AtlasMap';
 import { DestinationCard } from './atlas/DestinationCard';
 import { ATLAS_KIND, CARD_THEME } from './atlas/atlas-tokens';
+import { rankAtlasEntries, warpOptsFor } from '@/lib/fly/poi/search';
 
 const FILTER_KINDS = ['city', 'airport', 'military', 'hotspot', 'landmark'];
 const DEFAULT_FILTERS = { city: true, airport: true, military: true, hotspot: true, landmark: false };
 const MAX_RESULTS = 9;
 
-/** Warp spawn parameters per destination kind (FLY_ATLAS_REWORK §4.1). */
-function warpOptsFor(entry) {
-  if (entry.kind === 'military' || entry.kind === 'hotspot') {
-    // The planes are AROUND a base, not on it: arrive ~4km out at ~1200m,
-    // nose toward the point (bearing randomized so revisits vary).
-    return { altM: 1200, offsetM: 4000, offsetBearingRad: Math.random() * Math.PI * 2 };
-  }
-  return { altM: 800 };
-}
+// R25 B: warpOptsFor + the search ranking live in lib/fly/poi/search.js
+// (shared with the hangar's Free Flight search; behaviour identical).
 
 /**
  * The Atlas — fast travel (FLY_ATLAS_REWORK §4.1). Full-screen INK CODEX
@@ -62,21 +56,7 @@ function AtlasBody({ runtime }) {
     [entries, filters]
   );
 
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    const hits = [];
-    for (const e of entries) {
-      const idx = e.search.indexOf(q);
-      if (idx < 0) continue;
-      // rank: name-start match first, then any-name match, then tags/sub
-      const nameIdx = e.name.toLowerCase().indexOf(q);
-      hits.push({ e, rank: nameIdx === 0 ? 0 : nameIdx > 0 ? 1 : 2, idx });
-      if (hits.length > 400) break;
-    }
-    hits.sort((a, b) => a.rank - b.rank || a.idx - b.idx || a.e.name.length - b.e.name.length);
-    return hits.slice(0, MAX_RESULTS).map((h) => h.e);
-  }, [entries, query]);
+  const results = useMemo(() => rankAtlasEntries(entries, query, MAX_RESULTS), [entries, query]);
 
   // Autofocus is a DESKTOP affordance: the Atlas opens, you type, Enter warps.
   // On a phone the same line summons the software keyboard the instant the

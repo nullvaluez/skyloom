@@ -5,10 +5,36 @@
  * integration tree for E2's comparison), in the CLASSIC profile (the fleet
  * pin) with the aeroplane pinned still at each pose:
  *   - bootFly reveal wall time (satellite; toy with R25_BASELINE_TOY=1),
- *   - per pose P1..P6 at noon (and P1/P3 at dusk): time to world readiness,
+ *   - PRODUCT boot (R25_BASELINE_PRODUCT=N runs, style R25_BASELINE_PRODUCT_STYLE,
+ *     default satellite): the two R25 pins un-pinned, no airborne skip. With a
+ *     title: ms to the title node and to the title WORLD (data-ready + pct 100).
+ *     Without one (r25-w0): ms to the hangar node, then the first world a player
+ *     can see — prop / KOSU / apron, Fly as soon as hangar-fly enables, ms to
+ *     pct 100. "worldMs" is that first-revealed-world time on either tree (the
+ *     plan's product-boot comparison: E2 median of 3 <= W0 x 1.05).
+ *     CONTROLLED COMPARISON (peer review, fix pass): the title spot is B's
+ *     "featured spot in good daylight", a function of the CLOCK, so every
+ *     product boot pins `__flySunOverride` to R25_BASELINE_PRODUCT_SUN_MS
+ *     (default PRODUCT_SUN_MS, a fixed instant; 'wall' disables the pin) and
+ *     each row records the spot it revealed (`runtime.geo`) and the fixture
+ *     scene that spot renders as (r24-fixture/scenes.mjs sceneAt — every
+ *     featured spot but Manhattan is the generic 'rural' scene). With
+ *     R25_BASELINE_PRODUCT_ARMS="w0=<url>,int=<url>" the N runs per arm are
+ *     INTERLEAVED (w0,int,w0,int,...) against two servers in ONE session, and
+ *     `boots.productVerdict` reads:
+ *       NOT CALIBRATED  an arm has < 3 valid runs, an arm's own spread
+ *                       (max-min)/median exceeds the 5 % bound, or an arm
+ *                       revealed different spots across its runs;
+ *       PASS / FAIL     int median <= w0 median x 1.05.
+ *     A single-arm run (no ARMS) records rows only — never a verdict.
+ *   - per pose P1..P6 at noon (and P1/P3 at dusk), in LOCALITY order: time to
+ *     full world readiness (budget R25_BASELINE_POSE_TIMEOUT_S, default 600 s;
+ *     an unsettled pose is still captured and marked settled:false),
  *     draws, triangles, GL programs, texture peak (ground-texture-audit,
  *     logical GL bytes), and from a canvas capture: terrain mean linear
  *     luminance, clip %, Sobel energy, horizon seam deltaE (scripts/_r25-luma.js).
+ * Captures are WORLD ONLY (_r25-poses.js isolateCanvas hides every DOM layer —
+ * HUD, labels, panels — for the capture; the HUD sits inside the terrain crop).
  * Full-frame PNGs are kept beside the JSON so every crop can be re-read
  * offline with a different region — the numbers are a function of the PNG.
  *
@@ -21,9 +47,11 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { chromium } = require('playwright');
-const { bootFly } = require('./_boot');
-const { POSES, pose, warpToPose, sunTimeMs } = require('./_r25-poses');
+const { bootFly, unpinPins, BOOT_URL } = require('./_boot');
+const { waitTitleReady, installBootProbe } = require('./_title');
+const { pose, warpToPose, sunTimeMs, isolateCanvas, holdStill, roadRingInPage } = require('./_r25-poses');
 const L = require('./_r25-luma');
+const { productVerdict, median } = require('./_r25-product-boot');
 const { makeCanvasShot } = require('./_canvasshot');
 const { installGroundTextureAudit } = require('./ground-texture-audit.cjs');
 
@@ -32,14 +60,43 @@ const OUT = path.join(__dirname, '..', '.graphics-review', 'r25', 'e', `baseline
 fs.mkdirSync(OUT, { recursive: true });
 const SCALE = Math.max(1, Number(process.env.FLY_BOOT_SCALE || 1));
 const want = process.argv.slice(2);
-const RUNS = [];
-for (const P of POSES) if (!want.length || want.includes(P.id) || want.includes(P.name)) RUNS.push([P, 'noon']);
-for (const id of ['P1', 'P3']) if (!want.length || want.includes(id)) RUNS.push([pose(id), 'dusk']);
+// LOCALITY ORDER (session 2): each warp re-streams the world, and at this
+// venue a full settle is 5-15 min, so poses that share tiles run back to
+// back — Owens noon, Owens high, Owens dusk (only the sun moves), Sierra
+// (20 km away), then Manhattan noon + dusk, Powell, Smokies.
+const ORDER = [['P1', 'noon'], ['P6', 'noon'], ['P1', 'dusk'], ['P2', 'noon'], ['P3', 'noon'], ['P3', 'dusk'], ['P4', 'noon'], ['P5', 'noon']];
+const RUNS = ORDER.filter(([id]) => !want.length || want.includes(id) || want.includes(pose(id).name)).map(([id, sun]) => [pose(id), sun]);
+// A pose that has not reached FULL readiness (every part, the app's
+// `detailReady`) by this budget is captured anyway and marked
+// settled:false with what is missing — MEASURED in session 2: at load 6-8
+// Owens sat 900 s missing only ['roads'] and Sierra 900 s missing
+// ['terrain'], and a recorder that captures nothing on a timeout records
+// nothing at all. An unsettled row is a reference, never a baseline to
+// hold a gate to.
+const POSE_BUDGET_MS = Number(process.env.R25_BASELINE_POSE_TIMEOUT_S || 600) * 1000;
 // Crops, as fractions of the canvas (see _r25-luma.js REGIONS).
 const TERRAIN = { left: 0.12, top: 0.62, width: 0.76, height: 0.3 };
 const HORIZON = { left: 0.35, top: 0.05, width: 0.3, height: 0.6 };
 
 const load = () => +os.loadavg()[0].toFixed(2);
+// The product-boot clock pin: 2026-07-01 19:00 UTC (SUN.date's day; noon in
+// Arizona/California, mid-afternoon in the East — every US featured spot is
+// in daylight, so B's daylight rule picks the same spot on every run).
+const PRODUCT_SUN_MS = Date.UTC(2026, 6, 1, 19, 0, 0);
+function productSunPin() {
+  const v = process.env.R25_BASELINE_PRODUCT_SUN_MS;
+  if (v === 'wall') return null;
+  return v != null && v !== '' ? Number(v) : PRODUCT_SUN_MS;
+}
+function productArms() {
+  const raw = process.env.R25_BASELINE_PRODUCT_ARMS;
+  if (!raw) return [{ tag: TAG, url: BOOT_URL }];
+  return raw.split(',').map((kv) => {
+    const i = kv.indexOf('=');
+    if (i < 1) throw new Error(`R25_BASELINE_PRODUCT_ARMS: expected tag=url, got ${kv}`);
+    return { tag: kv.slice(0, i).trim(), url: kv.slice(i + 1).trim() };
+  });
+}
 async function frames(page, n) {
   const f0 = await page.evaluate(() => window.__fly.framesRendered ?? 0);
   await page.waitForFunction((t) => (window.__fly.framesRendered ?? 0) >= t, f0 + n, { timeout: 180000 * SCALE, polling: 250 });
@@ -67,6 +124,63 @@ async function census(page) {
   }, fresh);
 }
 
+/** One PRODUCT boot (see header). Returns the probe + the path taken. */
+async function productBoot(browser, style, arm, sceneAt) {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const sunMs = productSunPin();
+  const row = { arm: arm.tag, url: arm.url, style, sunPinMs: sunMs, path: null, load0: load() };
+  const t0 = Date.now();
+  try {
+    await page.addInitScript(unpinPins, ['__flyTitleBypass', '__flyVisualsOverride']);
+    await page.addInitScript(installBootProbe);
+    if (sunMs != null) await page.addInitScript((t) => { window.__flySunOverride = t; }, sunMs);
+    await bootFly(page, { style, url: arm.url, timeoutMs: 900000, skipMenus: false });
+    const t = await waitTitleReady(page, { timeoutMs: 300000 * SCALE });
+    if (t.title) {
+      row.path = 'title';
+      await page.waitForFunction(
+        () => ['true', '1'].includes(document.querySelector('[data-testid="title-screen"]')?.getAttribute('data-ready')) && window.__flyBoot?.pct === 100,
+        undefined, { timeout: 900000 * SCALE, polling: 250 });
+    } else {
+      row.path = 'hangar-kosu-apron';
+      await page.getByTestId('hangar').waitFor({ state: 'visible', timeout: 300000 * SCALE });
+      await page.getByTestId('hangar-pick-prop').click({ timeout: 60000 * SCALE });
+      if (await page.locator('#departure-airport').count()) await page.selectOption('#departure-airport', 'KOSU');
+      const apron = page.locator('input[value="apron"]');
+      if (await apron.count()) await apron.first().check().catch(() => {});
+      await page.waitForFunction(() => document.querySelector('[data-testid="hangar-fly"]')?.disabled === false, undefined, { timeout: 300000 * SCALE, polling: 250 });
+      row.flyClickAt = Math.round(await page.evaluate(() => performance.now()));
+      await page.getByTestId('hangar-fly').click();
+      await page.waitForFunction(() => window.__flyBoot?.pct === 100, undefined, { timeout: 900000 * SCALE, polling: 250 });
+    }
+    // Node-observed wall time goto -> the world condition (a fallback that
+    // cannot race the probe), then let the probe's 50 ms timer catch up: at
+    // 1-3 fps a long task can hold it past the moment waitForFunction saw
+    // pct 100 (MEASURED: the first W0 product row read revealAt null).
+    row.wallWorldMs = Date.now() - t0;
+    await page
+      .waitForFunction(() => window.__r25Probe?.revealAt != null, undefined, { timeout: 120000 * SCALE, polling: 250 })
+      .catch(() => {});
+    const p = await page.evaluate(() => window.__r25Probe);
+    for (const k of Object.keys(p || {})) row[k] = p[k] == null ? null : Math.round(p[k]);
+    row.worldMs = row.path === 'title' ? Math.max(row.readyAt ?? 0, row.revealAt ?? 0) : row.revealAt;
+    row.worldStatus = await page.evaluate(() => window.__flyWorldStatus ?? null);
+    // The spot this boot revealed, and the fixture scene it renders as.
+    const g = await page.evaluate(() => (window.__fly?.geo ? { lat: window.__fly.geo.y, lon: window.__fly.geo.x } : null));
+    row.spot = g ? { lat: +g.lat.toFixed(4), lon: +g.lon.toFixed(4) } : null;
+    if (g && sceneAt) {
+      const sc = sceneAt(g.lon, g.lat);
+      row.scene = sc.id;
+      row.sceneKind = sc.kind;
+    }
+  } catch (e) {
+    row.error = String(e).slice(0, 300);
+  }
+  row.load1 = load();
+  await page.close();
+  return row;
+}
+
 (async () => {
   const browser = await chromium.launch({ args: ['--enable-webgl', '--ignore-gpu-blocklist'] });
   const record = { tag: TAG, at: new Date().toISOString(), node: process.version, boots: {}, poses: [] };
@@ -78,25 +192,71 @@ async function census(page) {
       console.log(`toy boot ${b.ms} ms (load ${load()})`);
       await tp.close();
     }
+    const nProduct = Number(process.env.R25_BASELINE_PRODUCT || 0);
+    if (nProduct > 0) {
+      const style = process.env.R25_BASELINE_PRODUCT_STYLE || 'satellite';
+      const arms = productArms();
+      const { sceneAt } = await import('./r24-fixture/scenes.mjs');
+      record.boots.product = [];
+      // INTERLEAVED: run i of every arm before run i+1 of any (ABABAB), so a
+      // load swing on this venue lands on both arms alike.
+      for (let i = 0; i < nProduct; i++) {
+        for (const arm of arms) {
+          const r = await productBoot(browser, style, arm, sceneAt);
+          record.boots.product.push(r);
+          console.log(`product boot ${arm.tag} ${i + 1}/${nProduct}: ${JSON.stringify(r)}`);
+          fs.writeFileSync(path.join(OUT, 'baseline.json'), JSON.stringify(record, null, 2));
+        }
+      }
+      const ws = record.boots.product.map((r) => r.worldMs).filter(Number.isFinite).sort((a, b) => a - b);
+      record.boots.productMedianWorldMs = arms.length === 1 ? median(ws) : null; // single arm only
+      if (arms.length > 1) {
+        record.boots.productVerdict = productVerdict(record.boots.product, arms, { sunPinMs: productSunPin() });
+        console.log(`product-boot verdict: ${JSON.stringify(record.boots.productVerdict)}`);
+      }
+    }
+    if (process.env.R25_BASELINE_POSES === '0') return;
     const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     const shot = makeCanvasShot(page).shot;
     await page.addInitScript(installGroundTextureAudit);
-    const b = await bootFly(page, { style: 'satellite', timeoutMs: 900000 });
-    record.boots.satellite = { ms: b.ms, load: load(), worldStatus: await page.evaluate(() => window.__flyWorldStatus ?? null) };
+    // Boot airborne AT the first pose (bootFly geo) — never settle Manhattan
+    // first to measure Owens. The budget is the venue's, not a contract.
+    const P0 = RUNS[0]?.[0];
+    const s0 = P0 ? await sunTimeMs(P0, RUNS[0][1]) : null;
+    if (s0) await page.addInitScript((t) => { window.__flySunOverride = t; }, s0.tMs);
+    const bootBudget = Number(process.env.R25_BASELINE_BOOT_TIMEOUT_S || 1800) * 1000;
+    const b = await bootFly(page, {
+      style: 'satellite', timeoutMs: bootBudget,
+      geo: P0 ? { lat: P0.lat, lon: P0.lon, altM: P0.altM, headingRad: (P0.hdgDeg * Math.PI) / 180 } : undefined,
+    });
+    record.boots.satellite = { ms: b.ms, at: P0?.id ?? 'NYC', load: load(), worldStatus: await page.evaluate(() => window.__flyWorldStatus ?? null) };
     console.log(`satellite boot ${b.ms} ms (load ${load()})`);
     for (const [P, sun] of RUNS) {
       const t0 = Date.now();
       const s = await sunTimeMs(P, sun);
-      const { ms, readiness } = await warpToPose(page, P, { sun: s.tMs, timeoutMs: 900000, pollMs: 5000, pin: true });
-      const row = { pose: P.id, name: P.name, sun, sunElDeg: s.elDeg, readyMs: readiness?.ready ? ms : null, missing: readiness?.missing ?? null, load: load() };
-      if (readiness?.ready) {
+      const { ms, readiness } = await warpToPose(page, P, { sun: s.tMs, timeoutMs: POSE_BUDGET_MS, pollMs: 5000, pin: true });
+      const row = {
+        pose: P.id, name: P.name, sun, sunElDeg: s.elDeg, settled: !!readiness?.ready, readyMs: readiness?.ready ? ms : null,
+        missing: readiness?.missing ?? null, roadsRing: readiness?.roads ?? null, buildingsRing: readiness?.buildings ?? null,
+        terra: readiness?.terra ?? null, load: load(),
+      };
+      if (readiness?.missing?.includes('roads')) row.roadRing = await page.evaluate(roadRingInPage).catch((e) => String(e).slice(0, 120));
+      {
+        // Actors the recorder does not control, incl. the cumulus / cirrus
+        // deck ROOTS (the owner never writes the root; see verify-r25-visuals).
         await page.evaluate(() => {
-          if (window.__flyPlayer) window.__flyPlayer.visible = false;
-          if (window.__flyTraffic) window.__flyTraffic.visible = false;
+          for (const o of [window.__flyPlayer, window.__flyTraffic, window.__flyTracers, window.__flyClouds, window.__flyCirrus]) if (o) o.visible = false;
         });
+        await holdStill(page, true); // freeze the sim so the pinned pose cannot creep
         await frames(page, 30);
         Object.assign(row, await census(page));
+        // The capture is page-level (DOM included): read the world only.
+        row.cloudsParked = await page.evaluate(() => (window.__flyClouds ? window.__flyClouds.visible === false : null));
+        row.isolated = await isolateCanvas(page, true);
+        await frames(page, 2);
         const png = await shot();
+        await isolateCanvas(page, false);
+        await holdStill(page, false);
         const file = path.join(OUT, `${P.id}-${P.name}-${sun}.png`);
         fs.writeFileSync(file, png);
         const terr = L.census(await L.loadRegion(png, TERRAIN));

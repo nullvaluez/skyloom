@@ -15,6 +15,24 @@ const REPO = '/home/user/skyloom'
 const INT_BRANCH = (args && args.intBranch) || 'claude/game-intro-menu-world-mf37eg'
 const PLAN = 'FLY_ROUND25_PLAN.md'
 const TRAILER = (args && args.trailer) || 'Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>'
+// Optional two-pass mode (session 2): args.pass = 'intro' runs roles e,a,b and a scoped close;
+// args.pass = 'visuals' runs roles c,d on top of the pushed intro. args.roles overrides the set,
+// args.base is the diff/identity base for the roles (default r25-w0), args.priorMerged lists
+// branches already merged on INT_BRANCH by an earlier pass.
+const PASS = (args && args.pass) || 'full'
+const ONLY = (args && Array.isArray(args.roles) && args.roles.length) ? args.roles
+  : PASS === 'intro' ? ['e', 'a', 'b'] : (PASS === 'visuals' || PASS === 'visuals-early') ? ['c', 'd'] : null
+const BASE = (args && args.base) || 'r25-w0'
+const PRIOR = (args && args.priorMerged) || []
+// args.stopAfter = 'fix' returns right after Build/Review/Fix (no integration, no close);
+// args.reports = { <k>: {build, review, fix} } skips Build/Review/Fix and integrates those branches.
+const STOP_AFTER = (args && args.stopAfter) || null
+const REPORTS = (args && args.reports) || null
+const INTRO_MARKER = '/tmp/r25-locks/intro-pushed'
+// args.note: extra instructions appended to every role prompt of this run (resume / wrap-up notes).
+// args.smokeOnce: intermediate merges run node gates only; the fixture smoke runs once after the last merge.
+const EXTRA = (args && args.note) ? `\nORCHESTRATOR NOTE FOR THIS RUN:\n${args.note}\n` : ''
+const SMOKE_ONCE = !!(args && args.smokeOnce)
 
 const ROLES = [
   { k: 'e', name: 'E CERT', port: 3035, fport: 3205, reviewer: 'c',
@@ -42,12 +60,20 @@ E1 ORDER OF WORK (reference; A-D are waiting on step 3):
   },
 ]
 const byKey = Object.fromEntries(ROLES.map(r => [r.k, r]))
+const ACTIVE = ONLY ? ROLES.filter(r => ONLY.includes(r.k)) : ROLES
+const PASS_NOTE = PASS === 'intro'
+  ? `\nTHIS IS THE INTRO PASS: the user wants the intro (title screen, Free Flight vs Takeoff & Landing, the adaptive hangar, Continue, exit-to-title, Skyloom branding) FULLY built, certified and pushed to main FIRST. Only roles E, A and B are part of this pass; C SKY and D GROUND are built separately and integrate only after the intro is on main (R25_SKY / R25_GROUND stay enabled:false and untouched here, and the Visuals toggle stays hidden while nothing Enhanced exists). Build your charter completely — no stubs left behind for anything this pass owns.\n`
+  : PASS === 'visuals-early'
+  ? `\nTHIS IS THE EARLY VISUALS BUILD: the intro pass (E, A, B) is being built and integrated RIGHT NOW in another workflow and has absolute priority on this 4-core container's CPU and its two browser slots. Your branch starts at ${BASE}. UNTIL the file ${INTRO_MARKER} exists: do code and NODE-gate work only — do NOT start a dev server, do NOT run any browser/fixture gate, do NOT run a production build. When your code + node work is done, wait for the marker with bounded waits (timeout 590 bash -c 'until [ -f ${INTRO_MARKER} ]; do sleep 30; done', repeated as needed; re-check between work items). Once it exists: git -C <your worktree> merge --no-edit $(cat ${INTRO_MARKER}) (the certified intro tree, title ON — fixture harnesses still boot through the title bypass pin), then start your dev server and do the fixture/browser work your charter requires, RED-first as usual. "Flag-off identity" means identity with the tree you are on (${BASE}, then the intro tree after that merge). Your integration onto the intro tree happens later, in a separate run — do not merge into ${INT_BRANCH}.\n`
+  : PASS === 'visuals'
+  ? `\nTHIS IS THE VISUALS PASS: the intro pass (E, A, B) is already merged on ${INT_BRANCH} and pushed to main; your branch starts at ${BASE} (the pushed intro tree, title ON). Roles C and D run in this pass. Fixture gates still boot through the harness title bypass pin; "flag-off identity" means identity with ${BASE}.\n`
+  : ''
 const dir = k => `/home/user/skyloom-r25-${k}`
 
 const COMMON = r => `You are the R25 role "${r.name}" in the Skyloom repo (Next.js 16 / React 19 / three r185 / react-three-fiber flight game). This is a five-role round orchestrated by a Workflow; the orchestrator already committed the W0 scaffold (tag r25-w0).
 
 YOUR WORKSPACE (use absolute paths; never cd into another role's worktree to edit):
-- worktree: ${dir(r.k)}   branch: r25/${r.k}   (already created from r25-w0; node_modules already hard-linked in)
+- worktree: ${dir(r.k)}   branch: r25/${r.k}   (already created from ${BASE}; node_modules already hard-linked in)
 - dev server: cd ${dir(r.k)} && setsid nohup node node_modules/next/dist/bin/next dev -p ${r.port} > ${dir(r.k)}/.r25-dev.log 2>&1 &  — record its PID/PGID and kill the whole process group before you finish. Use ONLY port ${r.port} (dev) and ${r.fport} (fixture). Never 3000, 3002, 3019, 3027, 3036 or another role's ports.
 - fixture browser runs: cd ${dir(r.k)} && FLY_TILE_FIXTURE=1 FLY_FIXTURE_PORT=${r.fport} FLY_URL=http://localhost:${r.port} FLY_BOOT_SCALE=3 /tmp/r25-locks/run-browser.sh node -r ./scripts/_pw-shim.js scripts/<gate>  — ALWAYS through /tmp/r25-locks/run-browser.sh (at most two SwiftShader browsers run container-wide; 4 cores). Never edit source in your worktree while one of your own browser gates is running (HMR remounts FlyScene).
 - evidence: .graphics-review/r25/${r.k}/ and scripts/r24-out/ (both gitignored). Your ledger: scripts/r25-${r.k}-*.md (committed; short: RED first, mechanism, fix, cost, gates, open risks, unmeasurable-here).
@@ -56,17 +82,17 @@ READ FIRST: ${dir(r.k)}/${PLAN} — the whole plan, especially "Key rulings", "U
 
 HOUSE RULES (non-negotiable):
 1. Edit only files your role owns (plan role section). NEVER edit W0-only files on your branch: components/fly/FlyScene.jsx, stores/fly-store.js, or lib/fly/fly-constants.js outside YOUR OWN block(s). If you genuinely need a new call site there, put the exact minimal patch in your report's w0Requests and code defensively until it lands.
-2. One-flag revert: everything behind your block; flag-off (and Classic profile) must be byte-identical to r25-w0 — prove it with a gate, not an argument. Flip your own master flag enabled:true on your branch only once your gates are green; ship any failing sub-flag OFF with the reason recorded.
+2. One-flag revert: everything behind your block; flag-off (and Classic profile) must be byte-identical to ${BASE} — prove it with a gate, not an argument. Flip your own master flag enabled:true on your branch only once your gates are green; ship any failing sub-flag OFF with the reason recorded.
 3. New shader text needs a NEW final cache key (registry in lib/fly/toy-world/world-bend.js) and a PREWARM warm-set entry in the same change; text and key derive from the same predicate.
 4. Never route per-frame data through React or zustand (runtime + refs only). Keep every existing data-testid stable.
-5. Gates are calibrated RED first: run each new gate against r25-w0 behaviour (or your flag off) and record the RED output in the gate header / your ledger before making it green. Verdicts are PASS / FAIL / BLOCKED / NOT CALIBRATED; keep an "unmeasurable here" list. The container 403-blocks Esri/OpenFreeMap/adsb/open-meteo and WebGL is SwiftShader at 1-3 fps: every fps/ms/tearing claim belongs to the user's machine, never to this container. Fixture numbers are fixture numbers.
+5. Gates are calibrated RED first: run each new gate against ${BASE} behaviour (or your flag off) and record the RED output in the gate header / your ledger before making it green. Verdicts are PASS / FAIL / BLOCKED / NOT CALIBRATED; keep an "unmeasurable here" list. The container 403-blocks Esri/OpenFreeMap/adsb/open-meteo and WebGL is SwiftShader at 1-3 fps: every fps/ms/tearing claim belongs to the user's machine, never to this container. Fixture numbers are fixture numbers.
 6. Before committing: node scripts/verify-import-integrity.mjs must stay GREEN (4 passed / 0 failed since E1 landed; any no-undef or parse error is yours); targeted eslint on every file you changed must not exceed the per-file baseline in the plan's W0 addendum (npx eslint <files>); run the node gates in the W0 baseline table that touch your area and confirm they match the baseline.
 7. Commit on r25/${r.k} ONLY (git -C ${dir(r.k)} ...). Never push. Never commit to ${INT_BRANCH}, never touch main, never rewrite others' branches. Commit messages start "R25 ${r.name.split(' ')[0]}: " and end with these two trailer lines exactly:
 ${TRAILER}
 8. Do not ask the user questions; make the call the plan implies, record it in your ledger, and flag real ambiguity in your report's risks.
 9. The E1 marker protocol: E writes /tmp/r25-locks/e1-ready (contents = the r25/e commit to merge) once the satellite fixture + shared helpers exist. Roles A-D: do node/code work first; before your FIRST fixture browser run, wait for the marker (bounded wait, e.g. timeout 1200 bash -c 'until [ -f /tmp/r25-locks/e1-ready ]; do sleep 20; done', re-check between work items) and then git -C ${dir(r.k)} merge --no-edit $(cat /tmp/r25-locks/e1-ready). If /tmp/r25-locks/e1-satellite-blocked exists, satellite pixel rows are BLOCKED (say so) and you use toy/dev-server checks. If no marker appears after ~2 hours of your own work, proceed without it and mark fixture rows BLOCKED.
 
-YOUR ROLE:
+YOUR ROLE:${PASS_NOTE}${EXTRA}
 ${r.focus}
 
 FINISH: kill your dev server process group, make sure everything is committed on r25/${r.k} (git status clean except gitignored evidence), then return the structured report.`
@@ -103,14 +129,14 @@ const CLOSE_SCHEMA = { type: 'object', properties: {
 }, required: ['head', 'shipState', 'gates', 'recordPath'] }
 
 // ---------------------------------------------------------------- Build → Review → Fix (pipelined per role, no barrier)
-const built = await pipeline(
-  ROLES,
+const built = REPORTS ? Object.entries(REPORTS).map(([role, x]) => ({ role, build: x.build, review: x.review || null, fix: x.fix || null })) : await pipeline(
+  ACTIVE,
   r => agent(COMMON(r), { label: `build:${r.name}`, phase: 'Build', schema: BUILD_SCHEMA }),
   (b, r) => {
     if (!b) return null
     const rv = byKey[r.reviewer]
     return agent(`You are the R25 role "${rv.name}" acting as an ADVERSARIAL PEER REVIEWER of role "${r.name}"'s branch r25/${r.k} in the Skyloom repo. Read ${REPO}/${PLAN} (the owner's role section, the key rulings, the W0 addendum, the common rules).
-Review target: git -C ${dir(r.k)} diff r25-w0..r25/${r.k}  (plus git log r25-w0..r25/${r.k}). The owner reports: ${JSON.stringify({ summary: b.summary, flagFlipped: b.flagFlipped, gates: b.gates, subflags: b.subflags, w0Requests: b.w0Requests, risks: b.risks }).slice(0, 6000)}
+Review target: git -C ${dir(r.k)} diff ${BASE}..r25/${r.k}  (plus git log ${BASE}..r25/${r.k}).${PASS === 'visuals-early' ? ` If the branch merged the intro tree (${INTRO_MARKER}), review only the role's own commits: git -C ${dir(r.k)} log --no-merges -p ${BASE}..r25/${r.k} (the intro merge is not this role's work).` : ''}${PASS_NOTE} The owner reports: ${JSON.stringify({ summary: b.summary, flagFlipped: b.flagFlipped, gates: b.gates, subflags: b.subflags, w0Requests: b.w0Requests, risks: b.risks }).slice(0, 6000)}
 Your job is to REFUTE that this branch is correct and mergeable. Hunt for: behaviour that breaks flag-off / Classic byte-identity; shader text vs cache-key disagreement or missing prewarm entries; per-frame allocations or per-frame data through React/zustand; broken or renamed data-testids; edits to W0-only files (FlyScene.jsx, fly-store.js, fly-constants.js outside the owner's block) or to files the plan gives another role; harness pins weakened; gates that cannot fail (not calibrated RED first), gates that assert the wrong thing, or claims of PASS without evidence; Esc/Back/audio/state-machine holes (A/B); texture/draw/triangle budget risks (C/D); import-integrity or lint regressions; anything that would make integration merges conflict. Re-run the owner's NODE gates yourself (read-only use of their worktree is fine; do NOT edit, commit, or start a dev server in ${dir(r.k)}). You may run the node gates from a scratch copy if needed. Do not run browser gates.
 Severity: blocking = must fix before merge (correctness, identity, budget, broken gate); major = should fix; minor/nit = optional. Be concrete: file, line, what is wrong, how to reproduce. If you find nothing blocking, say so plainly — do not invent findings.`,
       { label: `review:${r.name}<-${rv.name}`, phase: 'Review', schema: REVIEW_SCHEMA })
@@ -131,9 +157,10 @@ For each finding: verify it (it may be wrong — if so, explain precisely why in
   },
 )
 const results = built.filter(Boolean)
-const missing = ROLES.filter(r => !results.find(x => x.role === r.k)).map(r => r.name)
+const missing = ACTIVE.filter(r => !results.find(x => x.role === r.k)).map(r => r.name)
 if (missing.length) log(`WARNING: no build result for ${missing.join(', ')} — integration will skip them`)
 log(`Build/review/fix done for ${results.map(x => x.role).join(',')}`)
+if (STOP_AFTER === 'fix') return { results }
 
 // ---------------------------------------------------------------- Integrate (sequential, E drives)
 const E = byKey.e
@@ -147,8 +174,8 @@ for (const k of ORDER) {
     attempt++
     m = await agent(`You are the R25 role "E CERT" in your E2 (INTEGRATION) phase. Read ${REPO}/${PLAN} (merge order, smoke list, W0 addendum, verification matrix).
 Integration worktree: ${REPO} on branch ${INT_BRANCH} (local; never push — the orchestrator pushes). Dev server port 3036, fixture port 3206 (FLY_TILE_FIXTURE=1 FLY_FIXTURE_PORT=3206 FLY_URL=http://localhost:3036 FLY_BOOT_SCALE=3), browser gates ALWAYS through /tmp/r25-locks/run-browser.sh node -r ./scripts/_pw-shim.js scripts/<gate>. Kill your dev server's process group when done.
-Merge order is E -> A -> B -> D -> C. Already merged so far: ${JSON.stringify(merges.filter(x => x.merged && x.green).map(x => x.branch))}.
-THIS STEP: merge r25/${k} (${r.name}), attempt ${attempt} of 3. Owner's latest report: ${JSON.stringify(reportOf(k)).slice(0, 5000)}
+Merge order is E -> A -> B -> D -> C.${PASS_NOTE}${EXTRA} Already merged so far: ${JSON.stringify(PRIOR.concat(merges.filter(x => x.merged && x.green).map(x => x.branch)))}.
+THIS STEP: merge r25/${k} (${r.name}), attempt ${attempt} of 3.${SMOKE_ONCE ? (k === ORDER[ORDER.length - 1] ? ` SMOKE POLICY: this is the LAST merge of the run — run the FULL fixture smoke now, plus the own fixture gates of EVERY branch merged in this run (${ORDER.map(x => 'r25/' + x).join(', ')}); if one is red, attribute it to its owner in failures.` : ` SMOKE POLICY: intermediate merge — run import-integrity, targeted eslint and ALL node gates, but SKIP the fixture/browser smoke (it runs once after the last merge of this run: ${'r25/' + ORDER[ORDER.length - 1]}).`) : ''} Owner's latest report: ${JSON.stringify(reportOf(k)).slice(0, 5000)}
 Procedure:
 1. Record preMergeSha = git -C ${REPO} rev-parse HEAD. git -C ${REPO} merge --no-ff --no-edit r25/${k} (commit message "R25 integrate: merge r25/${k} (${r.name})" + the two trailer lines below). Resolve conflicts faithfully to BOTH sides' intent; W0-only files (FlyScene.jsx, fly-store.js, fly-constants.js tail) are the orchestrator's — you may apply a role's w0Requests there if minimal and justified (list them in w0RequestsApplied).
 2. Smoke: node scripts/verify-import-integrity.mjs (must stay 4 passed / 0 failed); targeted eslint on every file changed by this merge (no per-file growth vs the W0 addendum); ALL node gates: every scripts/verify-r25-*.mjs present, graphics-unit.mjs, verify-flight-operations.mjs, verify-mobile-actions-node.mjs, verify-stylized-earth.mjs, verify-c-flagoff.mjs, verify-vendor-three-tile.mjs, verify-living-earth.mjs, verify-cinematic-flight.mjs, verify-operations-disclosure.mjs (verify-lod-fade 60/4 and verify-atmo-law's crash are pre-existing — they must not get WORSE); fixture: bootFly toy + satellite smoke (pinned legacy fleet boot must still reach pct 100 with zero non-network page errors), and from A onward scripts/verify-r25-smoke.cjs (title -> Free Flight -> pause -> Exit to title -> Continue; satellite + toy) plus this role's own fixture gates.
@@ -173,16 +200,24 @@ First git -C ${dir(owner.k)} merge --no-edit ${INT_BRANCH} to reproduce against 
 }
 
 // ---------------------------------------------------------------- Certify + close
-const close = await agent(`You are the R25 role "E CERT" in your final CERTIFY + CLOSE phase. Read ${REPO}/${PLAN}. Integration worktree ${REPO} on ${INT_BRANCH} (never push). Dev 3036 / fixture 3206, browser gates only via /tmp/r25-locks/run-browser.sh. Merges this round: ${JSON.stringify(merges.map(m => ({ branch: m.branch, merged: m.merged, green: m.green, failures: m.failures })))}.
-Role reports (latest): ${JSON.stringify(ROLES.map(r => ({ role: r.name, report: reportOf(r.k) && { summary: reportOf(r.k).summary, subflags: reportOf(r.k).subflags, unmeasurable: reportOf(r.k).unmeasurable, risks: reportOf(r.k).risks } }))).slice(0, 14000)}
-Do, in order:
+const CERT_STEPS = PASS === 'intro' ? `Do, in order (INTRO PASS — only E, A and B were built; C SKY and D GROUND run in a later pass, so R25_SKY / R25_GROUND stay enabled:false and untouched):
+1. Enhanced columns (verify-rim / -sat-depth / -dusk / -sat-night / -aerial): SKIP — nothing Enhanced exists yet; record them PENDING (visuals pass). Re-run the Classic rows only if a merge this pass touched their path, and record the result.
+2. scripts/verify-r25-visuals.cjs: run the rows that apply to the intro — Classic (FRONT_DOOR + FLIGHT_PLAN ON, profile classic) vs flag-off cross-boot within mean |d| <= 0.5/255 and p99 <= 2/255 at P1/P3/P5 with clouds frozen where possible; draws Owens <= 261, satellite <= 375, toy <= 480; triangles unchanged; textures <= 300 MiB. The Enhanced / toggle / luminance rows must read NOT CALIBRATED (never FAIL) while no Enhanced sub-flag exists. scripts/verify-r25-flagoff.mjs green (its C/D rows may stay NOT CALIBRATED). Product boot to the title (no bypass, default spot) median of 3 <= W0 x 1.05 (fixture) — if red, record it, and if B's default-spot swap is a trivial constants/destination change apply it on this branch and re-measure.
+3. Ship state: FRONT_DOOR, VISUALS and FLIGHT_PLAN (and their sub-flags) ON only with their evidence; anything uncertified OFF with the reason (edit only those blocks' enabled values; commit "R25 E: ship state (intro)" with trailers). Confirm the Settings Visuals row is hidden (visualsAvailable() false) while R25_SKY and R25_GROUND are off. Apply the Visuals-default rule (it stays 'enhanced' only if an Enhanced visual sub-flag ships ON) and note that the visuals pass revisits it.
+4. Production build receipt: node scripts/ground-night-build.cjs --dist=.next-r25 (or the repo's documented equivalent) must succeed; then a title smoke against FLY_BUILD_DIR=.next-r25 next start on port 3036 (title renders, Free Flight -> hangar -> Fly reaches flight, Exit to title returns, Continue relaunches).
+5. The lean record FLY_FRONT_DOOR_AND_VISUALS.md, structured like FLY_GROUND_OPERATIONS.md: Play the feature / Requirements map / Engineering contracts (state machine table, runtime actions, flags, Visuals profile) / Verification (node, fixture, unmeasurable-here) / User-machine run list (Windows PowerShell; node node_modules/next/dist/bin/next dev -p 3027; the intro walk; the verify-r25-* and verify-operations-* browser gates with $env:FLY_URL; phone on LAN) / Ship state table / a clearly marked "Visuals (C SKY / D GROUND) — visuals pass, not built yet" section / Follow-ups. Replace the CLAUDE.md "R25 IN PROGRESS" notice with a concise R25 notice: the intro half is BUILT and on main (point at the record), the visuals half (C/D) is IN PROGRESS (point at the plan); keep older notices. Commit with trailers:
+${TRAILER}
+6. Clean up: kill every R25 dev server you started; leave the integration worktree clean. ` : `${PASS === 'visuals' ? `The INTRO pass (E, A, B) already merged, certified and shipped: FLY_FRONT_DOOR_AND_VISUALS.md exists — UPDATE it (fill the visuals sections, the ship-state rows for R25_SKY / R25_GROUND / VISUALS, and the user-machine Visuals A/B + memory audit steps) rather than rewriting the intro sections, and replace the CLAUDE.md R25 notice with the final "NEWEST — READ FIRST" R25 notice. ` : ''}Do, in order:
 1. Enhanced columns for verify-rim / verify-sat-depth / verify-dusk / verify-sat-night / verify-aerial run under an un-pin of __flyVisualsOverride='enhanced' (unpinPins idiom) with thresholds marked "// SANCTIONED RE-BASELINE (R25 Enhanced column)"; Classic thresholds untouched and Classic rows re-run unchanged. Where the fixture cannot exercise a row, say BLOCKED/NOT CALIBRATED honestly.
 2. scripts/verify-r25-visuals.cjs: Classic (all R25 flags on, profile classic) vs flag-off cross-boot within mean |d| <= 0.5/255 and p99 <= 2/255 on masked terrain + sky crops at P1/P3/P5 with clouds frozen; same-session Classic->Enhanced->Classic exactly equal; GL program count flat after the first of 3 toggle cycles; combined luminance within R25_CERT.luma.both and horizon deltaE within bounds; draws Owens <= 261, satellite <= 375, toy <= 480; triangles unchanged unless the D mesh sub-flag shipped (then <= 2.0M); textures <= 300 MiB. scripts/verify-r25-flagoff.mjs green. Product boot to the title (no bypass, default spot) median of 3 <= W0 x 1.05 (fixture) — if red, record it (B's default-spot swap is the remedy).
 3. Ship state: every R25 master flag / sub-flag ON only with its evidence; anything uncertified OFF with the reason (edit only the R25 blocks' enabled values; commit "R25 E: ship state" with trailers). The Visuals default stays 'enhanced' only if at least one Enhanced visual sub-flag ships ON.
 4. Production build receipt: node scripts/ground-night-build.cjs --dist=.next-r25 (or the repo's documented equivalent) must succeed; then a title smoke against FLY_BUILD_DIR=.next-r25 next start on port 3036.
 5. The lean record FLY_FRONT_DOOR_AND_VISUALS.md, structured like FLY_GROUND_OPERATIONS.md: Play the feature / Requirements map / Engineering contracts (state machine table, runtime actions, flags, Visuals profile) / Verification (node, fixture, unmeasurable-here) / User-machine run list (Windows PowerShell; node node_modules/next/dist/bin/next dev -p 3027; the walk; Visuals A/B at 4 spots; the verify-r25-* and verify-operations-* browser gates with $env:FLY_URL; memory audit; phone on LAN) / Ship state table / Follow-ups (R26: GPU texture compression + z13/z14 mesh, buildings/trees/water). Replace the CLAUDE.md "R25 IN PROGRESS" notice with a concise "NEWEST — READ FIRST" R25 notice pointing at the record (keep older notices). Commit with trailers:
 ${TRAILER}
-6. Clean up: kill every R25 dev server you started; leave the integration worktree clean. Return the structured report (head = final commit on ${INT_BRANCH}).`,
+6. Clean up: kill every R25 dev server you started; leave the integration worktree clean. `
+const close = await agent(`You are the R25 role "E CERT" in your final CERTIFY + CLOSE phase. Read ${REPO}/${PLAN}. Integration worktree ${REPO} on ${INT_BRANCH} (never push). Dev 3036 / fixture 3206, browser gates only via /tmp/r25-locks/run-browser.sh. Merges this round: ${JSON.stringify(merges.map(m => ({ branch: m.branch, merged: m.merged, green: m.green, failures: m.failures })))}.${EXTRA}
+Role reports (latest): ${JSON.stringify(ROLES.map(r => ({ role: r.name, report: reportOf(r.k) && { summary: reportOf(r.k).summary, subflags: reportOf(r.k).subflags, unmeasurable: reportOf(r.k).unmeasurable, risks: reportOf(r.k).risks } }))).slice(0, 14000)}
+${CERT_STEPS}Return the structured report (head = final commit on ${INT_BRANCH}).`,
   { label: 'certify+close', phase: 'Certify', schema: CLOSE_SCHEMA })
 
 return { results: results.map(x => ({ role: x.role, build: x.build && { head: x.build.head, flagFlipped: x.build.flagFlipped, summary: x.build.summary, gates: x.build.gates, subflags: x.build.subflags }, review: x.review && { verdict: x.review.verdictSummary, findings: (x.review.findings || []).length, blocking: (x.review.findings || []).filter(f => f.severity === 'blocking').length }, fix: x.fix && { head: x.fix.head, summary: x.fix.summary } })), merges, close }

@@ -67,17 +67,47 @@ async function waitTitleReady(page, { timeoutMs = 120000, world = false } = {}) 
 
 /**
  * From a fresh page (after `goto`), reach the hangar in `mode` ('ops' =
- * Takeoff & Landing, 'free' = Free Flight). Returns { via: 'title'|'store', ms }.
+ * Takeoff & Landing, 'free' = Free Flight). Returns
+ * { via: 'title'|'store', ms, forced }.
+ *
+ * The card press is the trusted, actionability-checked click/tap first, for
+ * at most ACTIONABLE_MS; then ONE page.evaluate DOM click on the card. R25 E2,
+ * MEASURED on the fixture at load ~8-9: the "stable" wait needs two animation
+ * frames with one box and a SwiftShader rAF pair can take seconds (A's ledger
+ * measured a click sitting 180 s), and behind the free hangar's StagePump even
+ * a FORCE click timed out at 180 s — the locator round trips never got a turn
+ * on a saturated main thread. On a real GPU the trusted press succeeds at once
+ * and nothing changes; the hangar wait below asserts the EFFECT either way.
+ * `forced` says the DOM click ran.
  */
+const ACTIONABLE_MS = 30000;
 async function enterHangar(page, mode = 'ops', { timeoutMs = 120000, tap = false } = {}) {
   if (!CARD[mode]) throw new Error(`_title.enterHangar: unknown mode ${mode}`);
   const t0 = Date.now();
   const t = await waitTitleReady(page, { timeoutMs });
   let via;
+  let forced = false;
   if (t.title) {
     const card = page.getByTestId(CARD[mode]);
-    if (tap) await card.tap({ timeout: timeoutMs });
-    else await card.click({ timeout: timeoutMs });
+    await card.waitFor({ state: 'visible', timeout: timeoutMs });
+    try {
+      if (tap) await card.tap({ timeout: Math.min(timeoutMs, ACTIONABLE_MS) });
+      else await card.click({ timeout: Math.min(timeoutMs, ACTIONABLE_MS) });
+    } catch {
+      // Only if the timed-out press did not land after all (the hangar is up):
+      // ONE plain page.evaluate DOM click (A's verify-r25-title domClick idiom)
+      // — a starved main thread can stall even a force click's round trips.
+      if (!(await page.getByTestId('hangar').isVisible().catch(() => false))) {
+        forced = true;
+        const ok = await page.evaluate((tid) => {
+          const el = document.querySelector(`[data-testid="${tid}"]`);
+          if (!el || el.disabled) return false;
+          el.click();
+          return true;
+        }, CARD[mode]);
+        if (!ok) throw new Error(`_title.enterHangar: ${CARD[mode]} vanished or is disabled`);
+      }
+    }
     via = 'title';
   } else {
     await page.evaluate((m) => {
@@ -88,7 +118,7 @@ async function enterHangar(page, mode = 'ops', { timeoutMs = 120000, tap = false
     via = 'store';
   }
   await page.getByTestId('hangar').waitFor({ state: 'visible', timeout: timeoutMs });
-  return { via, ms: Date.now() - t0 };
+  return { via, ms: Date.now() - t0, forced };
 }
 
 /** True when the title screen is in the DOM right now. */
@@ -97,4 +127,32 @@ async function titleVisible(page) {
   return (await l.count()) > 0 && (await l.first().isVisible());
 }
 
-module.exports = { enterHangar, waitTitleReady, titleVisible, TITLE_SELECTOR: TITLE, TITLE_CARDS: CARD };
+/**
+ * The PRODUCT-BOOT PROBE (an init script: `page.addInitScript(installBootProbe)`
+ * BEFORE the goto). Records, in ms since navigation start, the first moment
+ * the title node exists (and the boot pct at that moment), the title's
+ * data-ready, `__flyBoot.pct === 100`, and the first hangar node — on a plain
+ * 50 ms timer, independent of the render loop, so a 1-3 fps venue cannot
+ * reorder them. Read back with `page.evaluate(() => window.__r25Probe)`.
+ * It keeps ticking until the title is ready AND the boot revealed (or 30 min),
+ * so it also serves a tree with no title (the hangar path).
+ */
+function installBootProbe() {
+  const p = (window.__r25Probe = { titleAt: null, titlePct: null, readyAt: null, revealAt: null, hangarAt: null });
+  const tick = () => {
+    const now = performance.now();
+    const title = document.querySelector('[data-testid="title-screen"]');
+    const pct = window.__flyBoot?.pct ?? null;
+    if (title && p.titleAt == null) {
+      p.titleAt = now;
+      p.titlePct = pct;
+    }
+    if (title && p.readyAt == null && ['true', '1'].includes(title.getAttribute('data-ready'))) p.readyAt = now;
+    if (pct === 100 && p.revealAt == null) p.revealAt = now;
+    if (p.hangarAt == null && document.querySelector('[data-testid="hangar"]')) p.hangarAt = now;
+    if (now < 30 * 60 * 1000 && (p.revealAt == null || (p.titleAt != null && p.readyAt == null))) setTimeout(tick, 50);
+  };
+  setTimeout(tick, 0);
+}
+
+module.exports = { enterHangar, waitTitleReady, titleVisible, installBootProbe, TITLE_SELECTOR: TITLE, TITLE_CARDS: CARD };

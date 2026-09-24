@@ -10,6 +10,7 @@ import { getAircraftTypeName } from '@/lib/aircraft-type-names';
 import { BADGES, BADGE_TIERS } from '@/lib/badges';
 import { MOBILE_UI, NEARMISS, SPICY } from '@/lib/fly/fly-constants';
 import { trackSpotAttrs } from '@/lib/fly/spot-attrs';
+import { gameplayLive } from '@/lib/fly/front-door';
 import { Zone } from '../LayoutRoot';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { CARD_THEME } from './inspect/inspect-tokens';
@@ -122,6 +123,11 @@ export function SpotToast({ runtime }) {
     const minTierIdx = tierKeys.indexOf(SPICY.minTier);
 
     const id = setInterval(() => {
+      // R25 A (FRONT DOOR): no SPICY ping from the title's frozen flight or the
+      // hangar — no blip, no minimap pulse, no toast queued behind the hidden
+      // HUD, and no hex spent from the once-per-session `seen` set. Constant
+      // true with the flag off.
+      if (!gameplayLive(useFlyStore.getState())) return;
       const traffic = runtime.traffic;
       const flight = runtime.flight;
       if (!traffic || !flight) return;

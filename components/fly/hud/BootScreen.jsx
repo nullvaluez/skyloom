@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ARRIVAL_GATE, BOOT, MOBILE_UI, PREWARM } from '@/lib/fly/fly-constants';
+import { ARRIVAL_GATE, BOOT, FRONT_DOOR, MOBILE_UI, PREWARM } from '@/lib/fly/fly-constants';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { arrivalOn, arrivalTerms, markReveal } from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
 import { worldReadiness, retryWorldContent } from '@/lib/fly/world-readiness';
 import { LIVING_EARTH } from '@/lib/fly/living-earth';
+import { bootCompactFor } from '@/lib/fly/front-door';
 
 /**
  * R9-1 boot loading screen — the full-screen INK+ICE overlay that covers the
@@ -30,6 +31,17 @@ import { LIVING_EARTH } from '@/lib/fly/living-earth';
  * monotonic, hits 100 exactly when the reveal starts, and stays 100.
  * Satellite now waits for the local Living Earth content contract. At 45s
  * it offers retry or explicit reduced-detail entry. Neon retains its ceiling.
+ *
+ * R25 A (FRONT DOOR) — COMPACT MODE. While the title screen is up
+ * (bootCompactFor: FRONT_DOOR.enabled && bootCompact && screen 'title') the
+ * backdrop stays exactly where it was (z-40, testid boot-screen, data-stage)
+ * so it still hides the unrevealed world, but the centred wordmark + bar
+ * become a small loading STRIP rendered as a sibling ABOVE the title
+ * (titleZ + 1) — the title owns the wordmark and is interactive at once
+ * (plan ruling 1). The strip carries boot-caption and the 45 s help buttons,
+ * so reduced-detail entry stays reachable. The gate logic, the __flyBoot
+ * contract (pct 100 ⇔ reveal — now of the TITLE world) and the reveal fade are
+ * untouched; leaving the title before the reveal restores the full screen.
  */
 
 const CAPTIONS = {
@@ -67,6 +79,7 @@ export function BootScreen({ runtime }) {
   // Read through useDeviceLayout (not a media query) so it agrees with the
   // rest of the HUD about what a phone is, including in landscape.
   const { isPhone } = useDeviceLayout();
+  const compact = useFlyStore(bootCompactFor);
   const starCount = isPhone ? MOBILE_UI.boot.phoneStars : 70;
   const streakCount = isPhone ? MOBILE_UI.boot.phoneStreaks : 9;
 
@@ -273,11 +286,21 @@ export function BootScreen({ runtime }) {
       : CAPTIONS[view.phase];
   const revealing = stage === 'reveal';
 
+  const retry = () => {
+    retryWorldContent(runtimeRef.current);
+    setHelp(null);
+  };
+  const reduced = () => {
+    reducedEntry.current = true;
+  };
+
   return (
+    <>
     <div
-      className="pointer-events-auto absolute inset-0 z-40"
+      className={`${compact ? 'pointer-events-none' : 'pointer-events-auto'} absolute inset-0 z-40`}
       data-testid="boot-screen"
       data-stage={stage}
+      data-compact={compact ? '1' : undefined}
       style={{
         background:
           'radial-gradient(ellipse at 50% 62%, #0a0f22 0%, #04060f 62%, #02030a 100%)',
@@ -338,7 +361,8 @@ export function BootScreen({ runtime }) {
         />
       ))}
 
-      {/* wordmark + progress */}
+      {/* wordmark + progress (full mode) */}
+      {!compact && (
       <div className="absolute left-1/2 top-1/2 w-[min(340px,90vw)] -translate-x-1/2 -translate-y-1/2 text-center">
         <div
           className="fly-display-xl select-none uppercase text-[#eef5ff]"
@@ -348,11 +372,11 @@ export function BootScreen({ runtime }) {
             textShadow: '0 0 24px rgba(120, 170, 255, 0.35)',
           }}
         >
-          Shadow
-          <span className="text-[#8fa0bf]">ADSB</span>
+          Sky
+          <span className="text-[#8fa0bf]">loom</span>
         </div>
-        <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.7em] text-[#5a6884]">
-          fly mode
+        <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.5em] text-[#5a6884]">
+          fly the living earth
         </div>
 
         <div className="mx-auto mt-8 h-0.5 w-[min(16rem,80vw)] overflow-hidden rounded-full bg-[#3d4a75]/40">
@@ -389,11 +413,58 @@ export function BootScreen({ runtime }) {
         {help && !revealing && <div className="mt-6 text-sm text-[#d1dbe9]" role="status">
           <p>Nearby detail is still loading. You can keep waiting or enter with reduced detail.</p>
           <div className="mt-4 flex justify-center gap-3">
-            <button type="button" className="rounded border border-[#7788a5] px-3 py-2 hover:bg-white/10" onClick={()=>{retryWorldContent(runtimeRef.current);setHelp(null);}}>Retry loading</button>
-            <button className="rounded bg-[#dce7ef] px-3 py-2 text-[#101923]" onClick={()=>{reducedEntry.current=true;}}>Continue with reduced detail</button>
+            <button type="button" className="rounded border border-[#7788a5] px-3 py-2 hover:bg-white/10" onClick={retry}>Retry loading</button>
+            <button className="rounded bg-[#dce7ef] px-3 py-2 text-[#101923]" onClick={reduced}>Continue with reduced detail</button>
           </div>
         </div>}
       </div>
+      )}
     </div>
+    {/* R25 A: the compact loading strip, ABOVE the title (titleZ + 1). Only
+        its help buttons take pointer events; everything else falls through
+        to the title's controls. */}
+    {compact && (
+      <div
+        className="pointer-events-none absolute left-1/2 top-[44%] w-[min(300px,82vw)] -translate-x-1/2 -translate-y-1/2 text-center"
+        data-testid="boot-strip"
+        role="status"
+        aria-live="polite"
+        style={{
+          zIndex: FRONT_DOOR.titleZ + 1,
+          opacity: revealing ? 0 : 1,
+          transition: revealing ? `opacity ${BOOT.revealMs}ms ease-in` : 'none',
+        }}
+      >
+        <div className="mx-auto h-0.5 w-full overflow-hidden rounded-full bg-[#3d4a75]/50">
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: `${view.pct}%`,
+              background: '#eef5ff',
+              boxShadow: '0 0 8px rgba(238, 245, 255, 0.7)',
+              transition: `width ${BOOT.pollMs}ms linear`,
+            }}
+          />
+        </div>
+        <div className="mt-2 flex items-baseline justify-center gap-3 font-mono text-[10px] uppercase text-[#8fa0bf]">
+          <span
+            className="tracking-[0.35em]"
+            style={{ animation: 'fly-boot-caption 1.6s ease-in-out infinite' }}
+            data-testid="boot-caption"
+          >
+            {caption}
+          </span>
+          <span className="tracking-widest text-[#5a6884]">{view.pct}%</span>
+        </div>
+        {help && !revealing && (
+          <div className="pointer-events-auto mt-3 flex flex-wrap items-center justify-center gap-2 text-xs text-[#d1dbe9]">
+            <span className="w-full">Nearby detail is still loading.</span>
+            <button type="button" className="min-h-11 rounded border border-[#7788a5] bg-[#070a14]/70 px-3 hover:bg-white/10" onClick={retry}>Retry loading</button>
+            <button type="button" className="min-h-11 rounded bg-[#dce7ef] px-3 text-[#101923]" onClick={reduced}>Reduced detail</button>
+          </div>
+        )}
+      </div>
+    )}
+    </>
   );
 }
