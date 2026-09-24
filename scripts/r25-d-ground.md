@@ -71,6 +71,16 @@ Enhanced only, allocated lazily (pool textures on first bind).
   (D's R24 marker set must be exactly {5, 6, 7}). The integration receipt
   (`scripts/vendor-three-tile-integration.json`) lists the new/modified
   functions with reasons and the new digests; `verify-vendor-three-tile` 34/34.
+- **Why the lazy Classic warm is D's own and not `requeueForEnvironment` /
+  `pumpRequeue`.** The plan names those two as the lazy-alternate vehicle, but
+  both are gated on `ENV_UNIFORM.enabled`, which R24 shipped OFF
+  (`fly-constants.js` ENV_UNIFORM, "SHIPPED OFF (R24 close)"), and their queue
+  lives outside prewarm.js:395-412 (not D's to edit). `warmClassic` in
+  `r25-ground.js` does the same job in the same shape (one retained twin,
+  `compileAsync` under a bound render target, once per session, after 120
+  Enhanced frames), so the first Enhanced → Classic toggle finds the Classic
+  program linked. If ENV_UNIFORM ever ships ON, folding the twin into its
+  queue is a one-call change.
 - **Toy.** Toy tiles compile the same Enhanced program (it is one tile
   material chain) and stay pixel-identical: the one-sun term and the flat
   normal sit behind `uHillStrength > 0` (0 off-satellite), the relief swap is
