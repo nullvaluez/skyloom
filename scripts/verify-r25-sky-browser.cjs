@@ -3,8 +3,11 @@
  *
  * THE CLAIMS (FLY_ROUND25_PLAN.md, role C gates):
  *   (1) ONE HORIZON — the horizon seam deltaE (E's shared instrument,
- *       scripts/_r25-luma.js horizonSeam over E's HORIZON crop) is
+ *       scripts/_r25-luma.js horizonSeam over E's HORIZON crop), read at the
+ *       dome's RIM row (the row where y' = ray.y + dip = 0 — the same row in
+ *       both profiles; E's §3a sanctions an explicit row), is
  *       <= R25_CERT.horizon.maxDeltaE AND <= improveK x the Classic seam.
+ *       The two-class-split seam is recorded beside it as INFO.
  *   (2) C-ONLY LUMINANCE — with `window.__flyR25Ground = 0` (D forced off),
  *       Enhanced / Classic mean linear terrain luminance (E's TERRAIN crop) is
  *       inside R25_CERT.luma.cOnly.
@@ -134,6 +137,34 @@ async function skyStats(page) {
 }
 
 /**
+ * THE RIM ROW (in page): the image row (0..1 of the canvas height) of the
+ * DOME's horizon — the direction whose y is -dip (the dome's `vDir.y + uDipY =
+ * 0`, the same dip the Enhanced sky paints with), straight ahead along the
+ * camera's horizontal heading. `dip` is read from r25-sky's own telemetry
+ * (published in Enhanced, identical in Classic at a held pose: FlyScene
+ * computes it from the pose, never from the profile). This is where the
+ * terrain's rim meets the sky by construction, so it is the row a
+ * "one horizon" seam must be read at; the two-class split (E's default
+ * finder) is recorded beside it, because once the seam is gone the split's
+ * best boundary moves to wherever the image has its largest remaining colour
+ * step (E's §3a note about P6: the haze -> ground boundary).
+ */
+function rimRowInPage(dip) {
+  const cam = window.__fly?.camera;
+  if (!cam || !Number.isFinite(dip)) return null;
+  cam.updateMatrixWorld();
+  const V = cam.position.constructor;
+  const f = new V();
+  cam.getWorldDirection(f);
+  f.y = 0;
+  if (f.lengthSq() < 1e-12) return null;
+  f.normalize().multiplyScalar(Math.sqrt(Math.max(0, 1 - dip * dip)));
+  f.y = -dip;
+  const p = cam.position.clone().addScaledVector(f, 1000).project(cam);
+  return { row01: (1 - p.y) / 2, dip };
+}
+
+/**
  * THE CLOUD INSTRUMENT (in page): read the cloud pass's reduced-resolution
  * target (RGBA half float; a = transmittance after the march), and for each
  * texel in the central column band compute where its ray reaches the dense
@@ -245,7 +276,9 @@ function cloudProfileInPage() {
       await setVisuals(page, 'enhanced');
       r.programsEnhanced = await settle(page, 24);
       const e1 = await cap(`${tag}-enhanced`);
+      await frames(page, 32); // r25Sky telemetry publishes on a 30-frame beat
       r.sky = await skyStats(page);
+      r.rim = await page.evaluate(rimRowInPage, r.sky?.r25?.dip ?? null);
       const dE = drawLeg ? await draws(page) : null;
       // the fleet-pinned column (INFO): aerial pin 0 in both profiles
       await setAerialPin(page, 0);
@@ -259,13 +292,27 @@ function cloudProfileInPage() {
       const c1 = await cap(`${tag}-classic-1`);
       await holdStill(page, false); // the next pose's warp runs unpaused
 
-      const hC = L.horizonSeam(await L.loadRegion(c0, HORIZON));
-      const hE = L.horizonSeam(await L.loadRegion(e1, HORIZON));
-      r.seam = { classic: hC, enhanced: hE };
-      const ok1 = Number.isFinite(hE.deltaE) && hE.deltaE <= CERT.horizon.maxDeltaE && hE.deltaE <= CERT.horizon.improveK * hC.deltaE;
-      gate(`(1) ${tag}: horizon seam dE <= ${CERT.horizon.maxDeltaE} and <= ${CERT.horizon.improveK} x Classic`, ok1,
-        `Classic ${hC.deltaE.toFixed(2)} @row ${hC.row} [${hC.above?.srgb8.map((v) => v.toFixed(0))} | ${hC.below?.srgb8.map((v) => v.toFixed(0))}] · ` +
-          `Enhanced ${hE.deltaE.toFixed(2)} @row ${hE.row} [${hE.above?.srgb8.map((v) => v.toFixed(0))} | ${hE.below?.srgb8.map((v) => v.toFixed(0))}]`);
+      // (1) the seam, read at the dome's RIM row (same row, both profiles)
+      //     and — INFO — at E's two-class split.
+      const cropC = await L.loadRegion(c0, HORIZON);
+      const cropE = await L.loadRegion(e1, HORIZON);
+      const rim = r.rim;
+      const rimRow = rim ? Math.round(rim.row01 * (await L.loadRegion(c0)).height) - cropC.region.top : null;
+      const band = (h) => `[${h.above?.srgb8.map((v) => v.toFixed(0))} | ${h.below?.srgb8.map((v) => v.toFixed(0))}]`;
+      const sC = L.horizonSeam(cropC);
+      const sE = L.horizonSeam(cropE);
+      info(`${tag}: horizon seam at E's two-class split`, `Classic ${sC.deltaE.toFixed(2)} @row ${sC.row} ${band(sC)} · Enhanced ${sE.deltaE.toFixed(2)} @row ${sE.row} ${band(sE)}`);
+      if (rimRow == null || rimRow < 14 || rimRow > cropC.height - 14) {
+        r.seam = { split: { classic: sC, enhanced: sE }, rimRow };
+        notCal(`(1) ${tag}: horizon seam at the rim`, `rim row ${rimRow} not inside the horizon crop (dip ${rim?.dip})`);
+      } else {
+        const hC = L.horizonSeam(cropC, { row: rimRow });
+        const hE = L.horizonSeam(cropE, { row: rimRow });
+        r.seam = { classic: hC, enhanced: hE, split: { classic: sC, enhanced: sE }, rimRow };
+        const ok1 = Number.isFinite(hE.deltaE) && hE.deltaE <= CERT.horizon.maxDeltaE && hE.deltaE <= CERT.horizon.improveK * hC.deltaE;
+        gate(`(1) ${tag}: horizon seam at the rim dE <= ${CERT.horizon.maxDeltaE} and <= ${CERT.horizon.improveK} x Classic`, ok1,
+          `rim row ${rimRow} (dip ${rim.dip.toFixed(5)}): Classic ${hC.deltaE.toFixed(2)} ${band(hC)} · Enhanced ${hE.deltaE.toFixed(2)} ${band(hE)}`);
+      }
       const hCp = L.horizonSeam(await L.loadRegion(cp, HORIZON));
       const hEp = L.horizonSeam(await L.loadRegion(ep, HORIZON));
       info(`${tag}: horizon seam under the FLEET aerial pin (0)`, `Classic ${hCp.deltaE.toFixed(2)} @${hCp.row} · Enhanced ${hEp.deltaE.toFixed(2)} @${hEp.row}`);
