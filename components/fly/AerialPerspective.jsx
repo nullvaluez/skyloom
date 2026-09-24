@@ -68,6 +68,11 @@ import { linearHazeOn } from '@/lib/fly/toy-world/world-bend';
 import { depthSubOn } from '@/lib/fly/depth-pass';
 import { daylightNearHazeMix } from '@/lib/fly/daylight-depth';
 import { LIVING_AIR_GLSL } from '@/lib/fly/living-atmosphere';
+// R25 C SKY: the Enhanced variant's in-scatter is the sky model's horizon row
+// (the same GLSL the cloud composite paints the sky with) and its exposure is
+// the pre-curve one — both read out of r25-sky's per-frame state.
+import { getR25Sky, registerAerialStrengthReader } from '@/lib/fly/r25-sky';
+import { R25_SKY_GLSL_DECL, R25_SKY_GLSL_FUNCS, SKY_ROWS, writeSkyUniforms } from '@/lib/fly/sky-model';
 
 /**
  * Module-scope frame state. One satellite scene exists at a time, so a plain
@@ -166,6 +171,13 @@ export function clearAerial() {
   _state.strength = 0;
   _state.nearMaxMix = 0; // R22 D: the near band is gated on strength too
 }
+
+// R25 C SKY: r25-sky retires the haze stack by THIS pass's authority, and the
+// authoritative value is `_state.strength` (FlyScene's feed object goes stale
+// when the pass is cleared). A reader is registered once at module scope so
+// setAerial/clearAerial stay byte-identical (verify-atmo-law evaluates
+// setAerial's body in isolation).
+registerAerialStrengthReader(() => _state.strength);
 
 /** Dev/harness introspection — verify-aerial reads the live strength. */
 export function getAerialState() {
@@ -407,6 +419,90 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth,
 `;
 
 /**
+ * ROUND 25 (C SKY) — the ENHANCED variant: ONE ATMOSPHERE, at the pixel.
+ *
+ * The legacy living-air path below mixes every distant pixel toward ONE flat
+ * colour (uHazeColor = the rim triple), while the sky it melts into is a
+ * gradient with a sun in it. Enhanced keeps the legacy reconstruction and the
+ * legacy transmittance law VERBATIM and changes exactly two things:
+ *
+ *  (1) SUN-ANGLE IN-SCATTER. The haze target is the sky model's horizon row
+ *      evaluated on THIS pixel's view ray — `r25SkyHorizon(mu)`, a Rayleigh
+ *      (1 + mu^2) tilt plus atmo-law's Mie lobe toward the true-elevation sun
+ *      (lib/fly/sky-model.js). The cloud composite paints the sky with the
+ *      same function, and at the rim (y' = ray.y + dip = 0) the sky IS that
+ *      row, so a fully hazed rim pixel and the sky pixel above it are the same
+ *      colour at every azimuth — not just on average.
+ *  (2) PRE-CURVE EXPOSURE. `uR25Exposure` multiplies every pixel — sky pixels
+ *      and the strength-0 early-out included, so the exposure is a property of
+ *      the frame, not of the haze — in scene-linear light, before the ACES
+ *      curve. The grade (WhiteBalance) then carries the tint only.
+ *
+ * Built ONLY when r25On(R25_SKY, 'aerialSun' | 'exposure') asks for it
+ * (Effects.jsx picks the instance from the same predicate); the Classic text
+ * above is untouched, so Classic = the flag-off program by construction.
+ * uR25Mode.x = 1 selects the model in-scatter (aerialSun), 0 the legacy rim.
+ */
+const enhancedFragmentShader = /* glsl */ `
+uniform vec3 uHazeColor;
+uniform vec2 uBand;
+uniform float uMaxMix;
+uniform float uHeightFalloff;
+uniform float uTanHalfFov;
+uniform vec3 uCamPos;
+uniform vec3 uCamRight;
+uniform vec3 uCamUp;
+uniform vec3 uCamZ;
+uniform vec2 uBendCenter;
+uniform float uBendK;
+uniform float uGroundY;
+uniform float uReverseDepth;
+uniform vec2 uNear;
+uniform vec4 uLivingAir;
+uniform float uR25Exposure;
+uniform vec3 uR25SunDir;
+uniform vec4 uR25Mode;
+${R25_SKY_GLSL_DECL}
+${LIVING_AIR_GLSL}
+${R25_SKY_GLSL_FUNCS}
+
+void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth, out vec4 outputColor) {
+  float d = uReverseDepth > 0.5 ? 1.0 - depth : depth;
+  if ( uMaxMix <= 0.0 || ${SKY_TEST} ) {
+    outputColor = vec4( inputColor.rgb * uR25Exposure, inputColor.a );
+    return;
+  }
+  float viewZ = getViewZ( d );
+  float linZ = -viewZ;
+  vec2 ndc = uv * 2.0 - 1.0;
+  vec3 viewPos = vec3( ndc.x * aspect * uTanHalfFov * linZ, ndc.y * uTanHalfFov * linZ, viewZ );
+  float dist = length( viewPos );
+  vec3 world = uCamPos + uCamRight * viewPos.x + uCamUp * viewPos.y + uCamZ * viewPos.z;
+  float dXZ = distance( world.xz, uBendCenter );
+  float trueY = world.y + dXZ * dXZ * uBendK;
+  float h = max( 0.0, trueY - uGroundY );
+  vec3 viewRay = ( world - uCamPos ) / max( dist, 1.0e-4 );
+  vec3 haze = uR25Mode.x > 0.5 ? r25SkyHorizon( dot( viewRay, uR25SunDir ) ) : uHazeColor;
+
+  if (uLivingAir.x > .5) {
+    vec3 metricRay=world-uCamPos;
+    metricRay.xz/=uLivingAir.y;
+    float transmission=livingAirTransmission(length(metricRay),uCamPos.y-uGroundY,h);
+    float authority=clamp(uMaxMix/.55,0.,1.);
+    vec3 transmittance=mix(vec3(1.),pow(vec3(transmission),vec3(.86,1.,1.16)),authority);
+    outputColor=vec4((inputColor.rgb*transmittance+haze*(1.-transmittance))*uR25Exposure,inputColor.a);
+    return;
+  }
+
+  float t = smoothstep( uBand.x, uBand.y, dist );
+  float hFall = exp( -h / uHeightFalloff );
+  float nearT = smoothstep( uNear.x, uBand.x, dist ) * ( 1.0 - t );
+  float mixAmt = ( uMaxMix * t + uNear.y * nearT ) * hFall;
+  outputColor = vec4( mix( inputColor.rgb, haze, mixAmt ) * uR25Exposure, inputColor.a );
+}
+`;
+
+/**
  * R24 D: which pass ships. Read ONCE at construction, from a module const, so
  * production and the PREWARM twin (which builds through this same constructor)
  * can never compile different programs — the Effects.jsx el()/raw() rule.
@@ -414,9 +510,15 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth,
 const LAW = () => AERIAL_LAW.enabled && !!AERIAL_LAW.styles?.satellite;
 
 export class AerialPerspectiveEffect extends Effect {
-  constructor() {
+  /**
+   * `{ r25: true }` builds the R25 C Enhanced variant (see above). The caller
+   * decides it from r25On() — never this constructor — so the el()/raw() twins
+   * in Effects.jsx build the same text. The LAW variant, when on, wins.
+   */
+  constructor(opts = {}) {
     const law = LAW();
-    super('AerialPerspectiveEffect', law ? lawFragmentShader : fragmentShader, {
+    const r25 = !law && opts?.r25 === true;
+    super('AerialPerspectiveEffect', law ? lawFragmentShader : r25 ? enhancedFragmentShader : fragmentShader, {
       // This is what makes the composer allocate + bind its depth texture.
       attributes: EffectAttribute.DEPTH,
       uniforms: new Map(law ? [
@@ -456,9 +558,21 @@ export class AerialPerspectiveEffect extends Effect {
         ['uReverseDepth', new Uniform(0)],
         ['uNear', new Uniform(new Vector2(0, 0))],
         ['uLivingAir', new Uniform(new Vector4(0, 1, .00012, 1200))],
+        ...(r25 ? [
+          ['uR25Exposure', new Uniform(1)],
+          ['uR25SunDir', new Uniform(new Vector3(0, 1, 0))],
+          ['uR25Mode', new Uniform(new Vector4(0, 0, 0, 0))],
+          ['uR25SkyR', new Uniform(new Float32Array(SKY_ROWS * 3))],
+          ['uR25SkyM', new Uniform(new Float32Array(SKY_ROWS * 3))],
+          ['uR25SkyA', new Uniform(new Float32Array(SKY_ROWS * 3))],
+          ['uR25SkyP', new Uniform(new Vector4(0.76, 0, 0, 0))],
+          ['uR25VeilH', new Uniform(new Vector3())],
+          ['uR25VeilZ', new Uniform(new Vector3())],
+        ] : []),
       ]),
     });
     this._law = law;
+    this._r25 = r25;
     // Resolved from the live renderer on the first update() — see the shader.
     this._reversed = null;
   }
@@ -528,5 +642,26 @@ export class AerialPerspectiveEffect extends Effect {
     u.get('uBendK').value = s.bendK;
     u.get('uGroundY').value = s.groundY;
     u.get('uNear').value.set(s.nearStartM, s.nearMaxMix);
+    if (this._r25) this._updateR25(u);
+  }
+
+  /** R25 C: the Enhanced uniforms, from r25-sky's per-frame state. */
+  _updateR25(u) {
+    const sky = getR25Sky();
+    const live = sky.live;
+    u.get('uR25Exposure').value = live && sky.flags.exposure ? sky.exposure : 1;
+    const useModel = live && sky.flags.aerialSun && sky.modelLive;
+    u.get('uR25Mode').value.x = useModel ? 1 : 0;
+    if (!useModel) return;
+    u.get('uR25SunDir').value.set(sky.sunDir[0], sky.sunDir[1], sky.sunDir[2]);
+    const holders = (this._r25Holders ??= {
+      uR25SkyR: u.get('uR25SkyR'),
+      uR25SkyM: u.get('uR25SkyM'),
+      uR25SkyA: u.get('uR25SkyA'),
+      uR25SkyP: u.get('uR25SkyP'),
+      uR25VeilH: u.get('uR25VeilH'),
+      uR25VeilZ: u.get('uR25VeilZ'),
+    });
+    writeSkyUniforms(sky.model, holders);
   }
 }
