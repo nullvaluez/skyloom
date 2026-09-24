@@ -1,0 +1,23 @@
+{
+  "status": "PASS",
+  "checks": [
+    {
+      "check": "fresh user defaults to Enhanced",
+      "profile": "enhanced"
+    },
+    {
+      "check": "fresh Enhanced production flight",
+      "profile": "enhanced",
+      "reliefTiles": 95,
+      "bytes": 4194240,
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "governorPin": null,
+      "terrainPin": null
+    },
+    {
+      "check": "saved Classic respected",
+      "profile": "classic"
+    }
+  ],
+  "errors": []
+}

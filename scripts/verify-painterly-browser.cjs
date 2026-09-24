@@ -134,7 +134,7 @@ async function main(){
         }
       }
       const enhanced=report.shots.filter(s=>s.profile==='enhanced');
-      check('Classic-first relief reaches resident tiles',enhanced.some(s=>s.reliefTiles>0)?'PASS':'FAIL',enhanced.map(s=>({site:s.name,relief:s.reliefTiles,resident:s.residentTiles,queue:s.r25Ground?.residentRelief})));
+      check('Classic-first relief reaches resident tiles',enhanced.some(s=>s.reliefTiles>0)?'PASS':'FAIL',enhanced.map(s=>({site:s.name,relief:s.reliefTiles,resident:s.residentTiles,queue:s.r25Ground?.backfill})));
       check('painted materials available',enhanced.every(s=>s.earth?.materials?.painterly?.state==='ready')?'PASS':'BLOCKED');
       check('mapped world ready in every matched view',report.shots.every(s=>s.readiness?.ready&&s.review?.terrain?.sharp)?'PASS':'BLOCKED',report.shots.map(s=>({file:s.file,ready:s.readiness?.ready,sharp:s.review?.terrain?.sharp,missing:s.readiness?.missing})));
       report.budgets=captureBudgetChecks(report.shots,mode==='allocation');

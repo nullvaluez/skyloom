@@ -1,0 +1,54 @@
+
+C:\Users\bfecho\.codex\worktrees\clear-sky-visuals\skyloom-3\components\fly\SkyDome.jsx
+  396:5   error  Error: This value cannot be modified
+
+Modifying a value previously passed as an argument to a hook is not allowed. Consider moving the modification before calling the hook.
+
+  394 |     u.uVoid.value.set(voidColor);
+  395 |     u.uRim.value.set(rim ?? voidColor);
+> 396 |     u.uRimOnly.value = rimOnly ? 1 : 0;
+      |     ^^^^^^^^^^ `mesh` cannot be modified
+  397 |     u.uStars.value = stars ? 1 : 0;
+  398 |     u.uMid.value.set(midColor ?? horizon);
+  399 |     u.uMidFrac.value = midFrac;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     react-hooks/immutability
+  418:12  error  Error: Cannot modify local variables after render completes
+
+This argument is a function which may reassign or mutate `mesh` after render, which can cause inconsistent behavior on subsequent renders. Consider using state instead.
+
+  416 |   // Follow the camera (rebased frame) so the dome never parallaxes; in
+  417 |   // satellite the -50 block feeds live time-of-day/altitude atmosphere colors.
+> 418 |   useFrame(({ camera }) => {
+      |            ^^^^^^^^^^^^^^^^^
+> 419 |     mesh.position.copy(camera.position);
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 420 |     const u = mesh.material.uniforms;
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 491 |     }
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 492 |   });
+      | ^^^^ This function may (indirectly) reassign or modify `mesh` after render
+  493 |
+  494 |   return <primitive object={mesh} dispose={null} />;
+  495 | }
+
+  435 |       // it. Deep night still resolves to exactly 1 and daylight to exactly 0,
+  436 |       // so both ends of the R16 contract are untouched.
+> 437 |       u.uNight.value =
+      |       ^^^^^^^^ This modifies `mesh`
+  438 |         sun.active && sun.elValid && skyDuskOn() ? nightWeightEl(sun.elDeg) : night.t;
+  439 |       u.uMoonDir.value.copy(night.dir);
+  440 |     } else if (u.uNight.value !== 1) {  react-hooks/immutability
+  437:7   error  Error: This value cannot be modified
+
+Modifying a value previously passed as an argument to a hook is not allowed. Consider moving the modification before calling the hook.
+
+  435 |       // it. Deep night still resolves to exactly 1 and daylight to exactly 0,
+  436 |       // so both ends of the R16 contract are untouched.
+> 437 |       u.uNight.value =
+      |       ^^^^^^^^ `mesh` cannot be modified
+  438 |         sun.active && sun.elValid && skyDuskOn() ? nightWeightEl(sun.elDeg) : night.t;
+  439 |       u.uMoonDir.value.copy(night.dir);
+  440 |     } else if (u.uNight.value !== 1) {                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 react-hooks/immutability
+
+✖ 3 problems (3 errors, 0 warnings)

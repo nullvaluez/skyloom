@@ -11,7 +11,7 @@ registerHooks({resolve(s,c,next){
 const {paintedSample}=await import('../lib/fly/painterly-material-data.js');
 const {PAINTERLY,painterlyProfile}=await import('../lib/fly/painterly-policy.js');
 const {updatePainterlyProfile,PAINTERLY_UNIFORMS}=await import('../lib/fly/painterly-flight.js');
-const {ResidentReliefQueue}=await import('../lib/fly/resident-relief.js');
+const {ResidentReliefBackfill}=await import('../lib/fly/relief-backfill.js');
 const {buildForestCluster}=await import('../lib/fly/living-forest.js');
 const {applyPainterlyAircraft}=await import('../lib/fly/painterly-aircraft.js');
 const {MeshPhysicalMaterial,ShaderLib,Texture}=await import('three');
@@ -179,24 +179,26 @@ await check('painted forest keeps the evidence envelope and triangle budget at b
 });
 await check('Classic-first resident relief fills without replacing visible geometry, one job at a time',async()=>{
   const a=tile(),b=tile(),original=a.model.geometry;let finish,commits=0;
-  const q=new ResidentReliefQueue(()=>new Promise(r=>finish=r),()=>commits++);
-  q.tick([a,b]);q.tick([a,b]);await flush();assert.equal(q.stats.requested,1);
+  const q=new ResidentReliefBackfill({concurrency:1});
+  const load=()=>new Promise(r=>finish=r),commit=(t,g,data)=>{g.userData.r25Relief=data;commits++;return true;};
+  assert.ok(q.request(a,load,commit));assert.equal(q.request(b,load,commit),false);await flush();assert.equal(q.stats.started,1);
   finish(new Uint8Array(128*128*2));await flush();assert.equal(a.model.geometry,original);assert.equal(a.model.visible,true);assert.equal(commits,1);
-  assert.ok(original.userData.r25Relief);q.dispose();
+  assert.ok(original.userData.r25Relief);q.reset();
 });
 await check('late relief cannot attach after a profile change or a tile replacement',async()=>{
   for(const cancel of [false,true]){
     const t=tile();let finish,commits=0;
-    const q=new ResidentReliefQueue(()=>new Promise(r=>finish=r),()=>commits++);q.tick([t]);await flush();
-    if(cancel)q.dispose();else t.model.geometry={userData:{}};
+    const q=new ResidentReliefBackfill({concurrency:1});q.request(t,()=>new Promise(r=>finish=r),()=>{commits++;return true;});await flush();
+    if(cancel)q.reset();else t.model.geometry={userData:{}};
     finish(new Uint8Array(4));await flush();assert.equal(commits,0);assert.equal(t.model.geometry.userData.r25Relief,undefined);
   }
 });
 await check('DEM failure backs off and recovers without removing the old mesh',async()=>{
   const t=tile(),original=t.model.geometry;let now=0,fail=true;
-  const q=new ResidentReliefQueue(()=>fail?Promise.reject(Error('outage')):new Uint8Array(4),()=>{},()=>now);
-  q.tick([t]);await flush();q.tick([t]);assert.equal(q.stats.requested,1);assert.equal(t.model.geometry,original);
-  now=60001;fail=false;q.tick([t]);await flush();assert.equal(q.stats.completed,1);q.dispose();
+  const q=new ResidentReliefBackfill({concurrency:1,now:()=>now});
+  const load=()=>fail?Promise.reject(Error('outage')):new Uint8Array(4),commit=(t,g,data)=>{g.userData.r25Relief=data;return true;};
+  q.request(t,load,commit);await flush();q.request(t,load,commit);assert.equal(q.stats.started,1);assert.equal(t.model.geometry,original);
+  now=60001;fail=false;q.request(t,load,commit);await flush();assert.equal(q.stats.completed,1);q.reset();
 });
 await check('player treatment retains maps and colours, applies equally to all hull sizes and glass',()=>{
   for(const scale of [.01,1,70])for(const glass of [false,true]){

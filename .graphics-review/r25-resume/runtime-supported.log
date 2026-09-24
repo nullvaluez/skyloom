@@ -1,0 +1,28 @@
+(node:15568) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/bfecho/.codex/worktrees/clear-sky-visuals/skyloom-3/lib/fly/sun-model.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to C:\Users\bfecho\.codex\worktrees\clear-sky-visuals\skyloom-3\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS hardware GPU available "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+PASS shipped governor and terrain settings ""
+PASS Classic resident tiles gain relief without replacing geometry {"same":173,"filled":42,"backfill":{"started":44,"completed":42,"discarded":0,"failed":0,"active":2,"peak":2},"bytes":1834980}
+PASS relief decodes remain bounded to two {"started":44,"completed":42,"discarded":0,"failed":0,"active":2,"peak":2}
+PASS toggle 1: every owned GPU texture released {"before":{"uploaded":42,"bytes":1834980},"released":{"retained":0,"live":false,"bytes":0}}
+PASS toggle 1: cached Enhanced shader uploads its restored textures {"uploaded":71}
+PASS toggle 2: every owned GPU texture released {"before":{"uploaded":71,"bytes":3101990},"released":{"retained":0,"live":false,"bytes":0}}
+PASS toggle 2: cached Enhanced shader uploads its restored textures {"uploaded":71}
+PASS toggle 3: every owned GPU texture released {"before":{"uploaded":71,"bytes":3101990},"released":{"retained":0,"live":false,"bytes":0}}
+PASS toggle 3: cached Enhanced shader uploads its restored textures {"uploaded":71}
+PASS quality medium keeps bounded resources ""
+PASS quality low keeps bounded resources ""
+PASS quality high keeps bounded resources ""
+PASS Neon style releases Enhanced terrain textures ""
+PASS return to satellite restores terrain detail ""
+FLIGHT {"profile":"classic","distance":2081.107894796218,"p50":8.30000000000291,"p95":12.5,"max":20.799999999995634,"drawsP95":179,"trisP95":169905,"tiers":["high"],"heapStart":383528260,"heapEnd":328624298,"textures":169,"programs":132,"r25Bytes":0,"texMiB":152.48382568359375,"pins":{"governor":null,"terrain":null}}
+FLIGHT {"profile":"enhanced","distance":2081.1270663979353,"p50":8.39999999999418,"p95":12.60000000000582,"max":16.89999999999418,"drawsP95":208,"trisP95":183017,"tiers":["high"],"heapStart":350081016,"heapEnd":345162715,"textures":268,"programs":132,"r25Bytes":4194240,"texMiB":157.48376083374023,"pins":{"governor":null,"terrain":null}}
+FLIGHT {"profile":"classic","distance":2081.7602963811887,"p50":8.30000000000291,"p95":12.5,"max":25,"drawsP95":207,"trisP95":182319,"tiers":["high"],"heapStart":335531703,"heapEnd":345620216,"textures":172,"programs":132,"r25Bytes":0,"texMiB":153.48382186889648,"pins":{"governor":null,"terrain":null}}
+PASS actual movement exceeds 1.5 km in every 20-second leg ""
+PASS moving-flight p95 stays within 10% of both Classic controls {"classic":12.5,"enhanced":12.60000000000582,"classic2":12.5}
+PASS matched quality tiers across moving comparisons ""
+PASS texture working set below 300 MiB ""
+PASS no runtime or shader errors {"pageErrors":0,"shaderErrors":0}
+PASS

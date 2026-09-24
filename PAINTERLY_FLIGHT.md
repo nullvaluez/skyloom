@@ -5,7 +5,7 @@ Implemented in the isolated `codex/painterly-flight` worktree, starting at
 
 **Enhanced is an opt-in comparison, not an accepted default.** Visual acceptance
 and the required hardware targets govern the default change. Radeon 780M has
-not been available for measurement. No deployment is part of this work.
+not been available for measurement. The user authorized publication to `main`; no separate deployment command is part of this work.
 
 ## Implementation
 
@@ -86,6 +86,24 @@ not been available for measurement. No deployment is part of this work.
   the existing cool night illumination. Daytime model chroma and Classic cloud
   shaders are unchanged; no additional textures or passes are allocated.
 
+## Integration with current main
+
+Before publishing, fetched main at `30a0450` and merged its Clear Sky work.
+The shared cached-uniform correction was independently present there. Its engine
+teardown subscription, stale warm-up guard and persistent relief-backfill queue
+are retained; the queue is limited to one decode at a time for this pass. Pending
+work keeps its slot through profile changes, and the commit checks actual tile
+residency. The older parallel queue is removed. The painterly material, cloud,
+lighting, memory and terrain corrections are retained. Main's prior default
+change is superseded by this task's explicit visual/hardware acceptance gate:
+Classic is the initial profile, with saved preferences respected.
+
+The merged production build passes (`build-r8.log`). Focused checks pass:
+painterly **18/18**, resident backfill, Classic compatibility **12/12**, and
+saved ground **42/42 executable checks**, with optional offline GLSL compilation
+unavailable. Earlier GPU runs below use the pre-merge production build r7;
+they are not represented as merged-build certification.
+
 ## Latest corrective checks
 
 `rio-clouds-red/report.json` records **42,939 occupied cloud pixels, 100% black,
@@ -109,9 +127,16 @@ The program-count invariant still **fails** (six-program range after cycle one).
 Buffer-only bloom release does not close that failure; it is not claimed as a
 shader-churn fix. See `tier-step-target-release.log`.
 
-The production `matched-r7`, `roundtrip-r7`, `timing-r7` and `allocation-r7`
-runs refresh the evidence after these final corrections. Until they finish,
-the earlier measurements below describe the preceding candidate only.
+The production `matched-r7` capture finished **30 images / 15 pairs**,
+including Rio at night. Eight technical checks pass. The resource check fails
+at Rio in **both** profiles: Classic 2,507,025 and Enhanced 2,507,069 triangles,
+against the unchanged 2,000,000 limit; each uses 223 draws. No runtime/shader
+errors occurred. This new scene exposes a remaining resource failure.
+
+Production `roundtrip-r7` passes Ohio (mean change 0.044/255) but reports
+Nevada **BLOCKED** because its unchanged Enhanced noise floor was 1.791/255;
+that unstable control cannot certify the return comparison. Timing/allocation
+are still running. Earlier measurements below describe the preceding candidate.
 
 ## Verification and evidence
 

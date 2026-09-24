@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import {spawnSync} from 'node:child_process';
 const out='.graphics-review/painterly/checks';fs.mkdirSync(out,{recursive:true});
 const gates=process.argv.slice(2);
-const names=gates.length?gates:['verify-painterly-flight.mjs','verify-cinematic-flight.mjs','verify-living-earth.mjs','verify-stylized-earth.mjs','verify-flight-operations.mjs','verify-terrain-ground-query.mjs','verify-terrain-bounds.mjs','verify-terrain-coverage.mjs','verify-r25-front-door.mjs','verify-r25-flight-plan.mjs','verify-r25-flagoff.mjs','verify-r25-sky.mjs','verify-r25-ground.mjs'];
+const names=gates.length?gates:['verify-painterly-flight.mjs','verify-relief-backfill.mjs','verify-cinematic-flight.mjs','verify-living-earth.mjs','verify-stylized-earth.mjs','verify-flight-operations.mjs','verify-terrain-ground-query.mjs','verify-terrain-bounds.mjs','verify-terrain-coverage.mjs','verify-r25-front-door.mjs','verify-r25-flight-plan.mjs','verify-r25-flagoff.mjs','verify-r25-sky.mjs','verify-r25-ground.mjs'];
 const results=[];
 for(const name of names){
   const r=spawnSync(process.execPath,[`scripts/${name}`],{encoding:'utf8',timeout:180000,maxBuffer:8*1024*1024});

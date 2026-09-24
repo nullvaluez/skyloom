@@ -1,5 +1,18 @@
 # R25 handoff: finish "Front Door & Clear Sky" in a fresh session
 
+> Painterly Flight integration: the record below describes the earlier Clear Sky
+> release. [PAINTERLY_FLIGHT.md](PAINTERLY_FLIGHT.md) is the current visual record.
+> The Painterly Flight plan keeps Classic as the initial profile until visual
+> acceptance and hardware checks pass; existing saved preferences remain honored.
+
+**RESUMED (2026-09-24):** C SKY and D GROUND have been recovered and integrated
+in the isolated `codex/clear-sky-visuals` worktree. Enhanced passes its real-GPU
+runtime check and the user has approved it as the default for publication to main;
+appearance gates remain unfinished. Read
+[CLEAR_SKY_VISUALS.md](CLEAR_SKY_VISUALS.md) for current status. The pause notes,
+workflow prompts and intermediate states below are retained as history, not
+instructions to restart the already recovered work.
+
 **State as of 2026-09-23 (end of session 1):** `main` = `claude/game-intro-menu-world-mf37eg` = `ec7dc6e` plus this doc.
 The game plays exactly as it did at `2c624a3`, because every R25 flag ships `enabled:false`.
 The plan is approved; do not re-plan.

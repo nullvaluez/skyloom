@@ -1,0 +1,30 @@
+{
+  "date": "2026-09-24",
+  "sourceCommit": "724ccf2",
+  "baseCommit": "2fb97b2",
+  "branch": "codex/clear-sky-visuals",
+  "runtimeReport": "runtime/report.json",
+  "runtimeStatus": "20 checks passed; not appearance certification",
+  "configuration": {
+    "defaultProfile": "classic",
+    "sky": true,
+    "relief": true,
+    "oneSun": true,
+    "sharpen": true,
+    "colorRef": false,
+    "retireQuilt": false,
+    "mesh": false
+  },
+  "priorAppearanceReports": {
+    "ground-prior-appearance-report.json": "Earlier full-atlas configuration; 18 PASS, 9 FAIL, 1 NOT CALIBRATED. Not the supported configuration.",
+    "sky-cloud-dusk-report.json": "Cloud cut NOT CALIBRATED; dusk seam samples informational only."
+  },
+  "sampler-limit-diagnostic.json": "Earlier failing configuration. Separate color-reference atlas exceeded the 16-sampler WebGL limit.",
+  "limits": [
+    "20-second moving legs, not a soak",
+    "1280x720 desktop RTX 5080, not mobile performance",
+    "headless Chrome, live tile hosts",
+    "appearance gates still pending; no threshold relaxed",
+    "production build passed; GPU run used isolated development server"
+  ]
+}
