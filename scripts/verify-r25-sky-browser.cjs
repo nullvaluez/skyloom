@@ -63,7 +63,7 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 const { chromium } = require('playwright');
 const { bootFly, unpinPins } = require('./_boot');
-const { pose, warpToPose, holdStill, isolateCanvas } = require('./_r25-poses');
+const { pose, warpToPose, holdStill, isolateCanvas, sunTimeMs } = require('./_r25-poses');
 const L = require('./_r25-luma');
 const { makeCanvasShot } = require('./_canvasshot');
 
@@ -140,18 +140,25 @@ async function skyStats(page) {
  * THE RIM ROW (in page): the image row (0..1 of the canvas height) of the
  * DOME's horizon — the direction whose y is -dip (the dome's `vDir.y + uDipY =
  * 0`, the same dip the Enhanced sky paints with), straight ahead along the
- * camera's horizontal heading. `dip` is read from r25-sky's own telemetry
- * (published in Enhanced, identical in Classic at a held pose: FlyScene
- * computes it from the pose, never from the profile). This is where the
+ * camera's horizontal heading. `dip` is the DOME MATERIAL's own uDipY uniform
+ * (found by walking the scene from a known actor), so it reads the same in
+ * Classic, Enhanced and on a tree with R25_SKY off — FlyScene computes it
+ * from the pose, never from the profile. This is where the
  * terrain's rim meets the sky by construction, so it is the row a
  * "one horizon" seam must be read at; the two-class split (E's default
  * finder) is recorded beside it, because once the seam is gone the split's
  * best boundary moves to wherever the image has its largest remaining colour
  * step (E's §3a note about P6: the haze -> ground boundary).
  */
-function rimRowInPage(dip) {
+function rimRowInPage() {
   const cam = window.__fly?.camera;
-  if (!cam || !Number.isFinite(dip)) return null;
+  let root = window.__flyPlayer ?? window.__flyTraffic ?? null;
+  while (root?.parent) root = root.parent;
+  let dip = null;
+  root?.traverse((m) => {
+    if (dip == null && m.material?.uniforms?.uDipY) dip = m.material.uniforms.uDipY.value;
+  });
+  if (!cam || !Number.isFinite(dip)) return { row01: null, dip };
   cam.updateMatrixWorld();
   const V = cam.position.constructor;
   const f = new V();
@@ -250,7 +257,17 @@ function cloudProfileInPage() {
       window.__flyR25Ground = 0; // C-ONLY: D's block forced off in Enhanced
       window.__flyCloudFreeze = 1;
     });
-    const boot = await bootFly(page, { style: 'satellite', timeoutMs: 1200000 });
+    // Boot airborne AT P1 with its noon pinned (E's verify-r25-visuals idiom):
+    // settling a second world first costs a whole extra settle on this venue.
+    const P0 = pose('owens');
+    const noon0 = (await sunTimeMs(P0, 'noon')).tMs;
+    await page.addInitScript((t) => {
+      window.__flySunOverride = t;
+    }, noon0);
+    const boot = await bootFly(page, {
+      style: 'satellite', timeoutMs: 1800000,
+      geo: { lat: P0.lat, lon: P0.lon, altM: P0.altM, headingRad: (P0.hdgDeg * Math.PI) / 180 },
+    });
     console.log(`[boot] revealed in ${boot.ms} ms`);
     const shipped = await page.evaluate(() => ({ visuals: window.__flyStore.getState().visuals }));
     console.log(`[boot] profile ${shipped.visuals}`);
@@ -278,7 +295,7 @@ function cloudProfileInPage() {
       const e1 = await cap(`${tag}-enhanced`);
       await frames(page, 32); // r25Sky telemetry publishes on a 30-frame beat
       r.sky = await skyStats(page);
-      r.rim = await page.evaluate(rimRowInPage, r.sky?.r25?.dip ?? null);
+      r.rim = await page.evaluate(rimRowInPage);
       const dE = drawLeg ? await draws(page) : null;
       // the fleet-pinned column (INFO): aerial pin 0 in both profiles
       await setAerialPin(page, 0);
@@ -297,7 +314,7 @@ function cloudProfileInPage() {
       const cropC = await L.loadRegion(c0, HORIZON);
       const cropE = await L.loadRegion(e1, HORIZON);
       const rim = r.rim;
-      const rimRow = rim ? Math.round(rim.row01 * (await L.loadRegion(c0)).height) - cropC.region.top : null;
+      const rimRow = Number.isFinite(rim?.row01) ? Math.round(rim.row01 * (await L.loadRegion(c0)).height) - cropC.region.top : null;
       const band = (h) => `[${h.above?.srgb8.map((v) => v.toFixed(0))} | ${h.below?.srgb8.map((v) => v.toFixed(0))}]`;
       const sC = L.horizonSeam(cropC);
       const sE = L.horizonSeam(cropE);
@@ -388,7 +405,6 @@ function cloudProfileInPage() {
     // sun is az + pi (flight forward = (sin h, ., -cos h); the app sun is
     // (-sin az, ., cos az)).
     if (LEGS.includes('look')) {
-      const { sunTimeMs } = require('./_r25-poses');
       const { computeSun } = await import(pathToFileURL(path.join(__dirname, '..', 'lib/fly/sun-model.js')).href);
       const base = pose('owens');
       const { tMs } = await sunTimeMs(base, 'dusk');
