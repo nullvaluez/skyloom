@@ -213,3 +213,72 @@ control → free/prop/manhattan`; (3) via runtime Δ 0.000 m; (4) 10R Δ 0.000 m
   and A's window chain, for focus outside it. They share the rule (FRONT_DOOR
   on, not dismissible) but are two copies of it. If A changes its rule, the
   hangar's `toTitle()` must follow.
+
+## 9. E2 integration fix (2026-09-24, `scripts/r25-e-cert.md` §4d finding 3)
+
+**Venue.** `r25/b` with `claude/skyloom-r25-intro-d0pp2v` merged in
+(`accc3d6`, a fast-forward: the integrated intro tree with the title and the
+flight plan both ON, and E's latest harness). Dev :3032, toy fixture :3202,
+`FLY_BOOT_SCALE=3`, load 7–8 on 4 cores.
+
+**RED.** This is E2's §4d run on the integrated tree: toy **5 / 1 / 1**. It was
+not re-run here because a toy run costs ~10 minutes. Its evidence JSON
+(`.graphics-review/r25/b/freeflight-toy.json` in the integration worktree) reads
+leg (1) `default manhattan`, spawn 40.70 / −74.03. Leg (2) `began true ·
+warped false` failed on its `warped === true` term; every other (2) term held
+(frames +46, toy chunks 48 → 156, status `staging`). `R25_FF_STAGE_DEST=manhattan`
+is now the handle that reproduces it on purpose (not run this pass).
+
+**Mechanism.** Leg (2) always staged `hangar-dest-manhattan`. On B's branch
+the flight started at KOSU, so that stage was a far warp. With the front
+door on, the flight sits at the title spot. The TOY title spot IS Manhattan
+(`FLIGHT_PLAN.titleSpot.toyId`), so `stageDestination` saw a distance under
+`STAGE_HERE_KM` and correctly staged without warping. On satellite the title
+spot was Tokyo, so the same leg warped and passed (6/0/0). **The product is
+not at fault.** The no-warp stage has `minMs = 0`, so `hangar-stage-status`
+reads `ready` on the first poll where the world at that spot passes its own
+readiness test. In the RED that test really was not met: the harness entered
+the hangar right after mount, so the toy ring at Manhattan was still building
+(0 of 48 → 0 of 156 chunks ready). `staging` was the true status, and nothing
+here needs a fix in B's product files.
+
+**Fix (the harness only, `scripts/verify-r25-freeflight.cjs`).**
+- **STAGE PICK**: the harness now takes the first of `manhattan`, `tokyo`, then
+  the featured cards in hangar order that is NOT the hangar default from leg
+  (1) and lies at least `FAR_KM` (50 km, great circle) from the flight.
+  - Toy with the title at Manhattan stages **Tokyo**, which is a fixture city
+    scene.
+  - Satellite with the title at Tokyo still stages **Manhattan**, the same as
+    E2's 6/0/0 row.
+  - With the front door off (KOSU start) it still stages Manhattan, so B's
+    earlier rows are unchanged.
+- Leg (3) now reads the placement, heading, `altM`, "Fly to {name}" and
+  `lastLaunch.destId` from the picked catalog entry (`lib/fly/destinations.js`)
+  instead of Manhattan literals.
+- **CONTROL PICK** (leg 6): the first of `tokyo`, then the featured cards, that
+  is NOT the staged destination and lies at least 50 km from the flight at
+  control time.
+  - Toy (the flight at Brooklyn, Tokyo staged) uses **Grand Canyon**. Keeping
+    Tokyo would re-visit the world that was just staged, which is not an
+    unstaged control.
+  - Satellite (Manhattan staged) still uses **Tokyo**, the boot spot, which
+    E2 measured. A warmer control can only make (6) harder to pass. It cannot
+    produce a false PASS.
+- `R25_FF_STAGE_DEST=<id>` forces the stage pick. That is the RED handle.
+
+**Gates (the merged tree).**
+
+| gate | verdict |
+|---|---|
+| `verify-r25-freeflight.cjs` **toy** | **6 PASS / 0 FAIL / 1 NC** (exit 0). (1) default `manhattan`. **(2) stage pick tokyo, `warped true`**, flight frozen, frames +48, toy chunks 36 → 125, status `staging` (truthful: not ready). (3) "Fly to Tokyo", placement 0.00 m, alt 900 = max(900, 0 + 450), heading error 0.0000°, `staged {warped:true}`, hold 21.8 s. (4) no crash (min AGL 748 m). (5) Brooklyn 0.0 m / 800 m. **(6) NC**: staging had not finished at launch (the toy venue, §3). The control Grand Canyon revealed in 4.7 s. (7) zero page errors. |
+| `verify-r25-freeflight.cjs` satellite | **not re-run**. Both picks resolve to E2's own (stage Manhattan, control Tokyo; checked in node against the catalog), so the §4d 6/0/0 row still stands. A satellite boot takes 15–18 minutes here. |
+| `verify-r25-continue` / `verify-r25-hangar-edges` | **not re-run**. They are separate scripts and share no code with this harness, and no product file changed. |
+| `verify-r25-flight-plan.mjs` | 44 / 0 |
+| `verify-import-integrity.mjs` | 4 / 0 |
+| eslint `scripts/verify-r25-freeflight.cjs` | 0 / 0 (baseline 0 / 0) |
+
+The toy GREEN run executed the flat-earth `distM` for the pick threshold.
+After the run, the harness switched to a great-circle `gcKm`, which only
+affects the km figure in the log (18,723 → 10,852 km for New York–Tokyo). The
+pick results are identical: re-checked in node for the toy, satellite and
+front-door-off cases.
