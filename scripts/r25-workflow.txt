@@ -164,7 +164,10 @@ if (STOP_AFTER === 'fix') return { results }
 
 // ---------------------------------------------------------------- Integrate (sequential, E drives)
 const E = byKey.e
-const ORDER = ['e', 'a', 'b', 'd', 'c'].filter(k => results.find(x => x.role === k))
+// args.skipMerge: branches already merged on INT_BRANCH with nothing new (their step would be a no-op).
+// The intro certification round (reports + smokeOnce) skips 'e' by default: r25/e is already merged.
+const SKIP_MERGE = (args && args.skipMerge) || (PASS === 'intro' && REPORTS && SMOKE_ONCE ? ['e'] : [])
+const ORDER = ['e', 'a', 'b', 'd', 'c'].filter(k => results.find(x => x.role === k) && !SKIP_MERGE.includes(k))
 const reportOf = k => { const x = results.find(y => y.role === k); return x ? (x.fix || x.build) : null }
 const merges = []
 for (const k of ORDER) {
