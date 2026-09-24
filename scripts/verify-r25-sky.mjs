@@ -48,7 +48,8 @@
  * `sun.az - hdriSunAz` of the plan text, and [5] FAILS (the HDRI sun lands at
  * 2·(hdriAz - sunAz) from the key light); R25_SKY_RED=classic gates the
  * Enhanced aerial on the BLOCK flag instead of r25On (the realistic mistake),
- * and [4] CLASSIC FAILS. On r25-w0 the gate cannot import lib/fly/sky-model.js
+ * and [4] CLASSIC FAILS; R25_SKY_RED=noaerial builds the Enhanced chain with
+ * the Classic aerial (the grade still tint-only) and (4j) FAILS. On r25-w0 the gate cannot import lib/fly/sky-model.js
  * at all (recorded in the ledger).
  *
  * Exit 1 on any FAIL, else 2 when anything is NOT CALIBRATED, else 0.
@@ -227,6 +228,7 @@ const cam = new THREE.PerspectiveCamera(55, 16 / 9, 2.5, 600000);
 function chainTexts(tier) {
   const ctx = { speedMount: true };
   if (RED === 'classic') ctx.r25Aerial = C.R25_SKY.enabled; // the realistic mistake: block flag, not r25On
+  if (RED === 'noaerial') ctx.r25Aerial = false; // Enhanced grade without the pass that carries the exposure
   const specs = FX.buildPassList('satellite', tier, ctx);
   const raw = [];
   const effects = [];
@@ -311,6 +313,20 @@ else {
   gate('(4e) ENHANCED leaves every OTHER effect text alone (0 new draws, no pass added)', others,
     `passes ${T.off.high.merged.split('\n~~\n').length} -> ${T.enhanced.high.merged.split('\n~~\n').length}`);
   gate('(4f) the merged program count is unchanged by Enhanced (0 new draws)', ['high', 'medium', 'low'].every((t) => T.off[t].merged.split('\n~~\n').length === T.enhanced[t].merged.split('\n~~\n').length));
+}
+{
+  // (4j) The WhiteBalance drops the exposure gamma whenever r25On(exposure)
+  // (Effects.jsx); the ONLY thing that puts it back, pre-curve, is the
+  // Enhanced aerial's uR25Exposure (the cloud composite exposes just what it
+  // ADDS). So on every tier the Enhanced satellite chain must carry that
+  // aerial, or Enhanced silently loses the exposure (+0.12 stops at noon).
+  const expOn = C.R25_SKY.exposure?.enabled !== false;
+  const carries = ['high', 'medium', 'low'].map((t) => {
+    const a = T.enhanced[t].raw.split('\n~~\n').find((l) => l.startsWith('aerial:'));
+    return !!a && a.includes('uR25Exposure');
+  });
+  if (!expOn) notCal('(4j) every tier carries the pre-curve exposure the grade dropped', 'R25_SKY.exposure is off');
+  else gate('(4j) every tier carries the pre-curve exposure the grade dropped (Enhanced aerial in the chain)', carries.every(Boolean), `high/medium/low ${carries.join('/')}`);
 }
 {
   const e = T.enhanced.cloud.r25;

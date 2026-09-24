@@ -28,8 +28,15 @@
  * immersiveOn('lighting'), true), so the horizon and luminance legs measure
  * the product's atmosphere; the fleet-pinned column is recorded beside it
  * as INFORMATION. `__flyR25Ground = 0` makes every Enhanced column C-ONLY.
- * `__flyCloudFreeze = 1` stops cloud drift. Player + traffic hidden (the R17
- * lesson: a pixel gate must not contain an actor it does not control).
+ * `__flyCloudFreeze = 1` stops cloud drift. Player + traffic + tracers hidden
+ * (the R17 lesson: a pixel gate must not contain an actor it does not
+ * control), every capture isolates the world canvas (E's isolateCanvas — the
+ * HUD is DOM over the terrain crop), and every pixel pair is taken under E's
+ * `holdStill` (store phase 'paused', the app's own held path): E measured the
+ * pin idiom ALONE creeping mean 1.8/255, p99 32/255 between two captures on
+ * this venue (scripts/r25-e-cert.md §4b). Each pose settles on the GL program
+ * count (two 10-frame windows flat) so a lazy Enhanced compile never lands
+ * inside a pair.
  *
  * POSES: P1 Owens 1500 m noon (the Owens lock; horizon + luminance + draws),
  * P6 Owens 7000 m noon (horizon + luminance at cruise), and CLOUD — Owens at
@@ -53,7 +60,7 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 const { chromium } = require('playwright');
 const { bootFly, unpinPins } = require('./_boot');
-const { pose, warpToPose } = require('./_r25-poses');
+const { pose, warpToPose, holdStill, isolateCanvas } = require('./_r25-poses');
 const L = require('./_r25-luma');
 const { makeCanvasShot } = require('./_canvasshot');
 
@@ -99,9 +106,21 @@ async function setAerialPin(page, v) {
 async function hideActors(page) {
   await page.evaluate(() => {
     window.__flyCloudFreeze = 1;
-    if (window.__flyPlayer) window.__flyPlayer.visible = false;
-    if (window.__flyTraffic) window.__flyTraffic.visible = false;
+    for (const o of [window.__flyPlayer, window.__flyTraffic, window.__flyTracers]) if (o) o.visible = false;
   });
+}
+const programs = (page) => page.evaluate(() => window.__flyGl?.info?.programs?.length ?? null);
+/** Frames, then wait until the GL program count holds across two 10-frame windows (E's settle). */
+async function settle(page, n = 20) {
+  await frames(page, n);
+  let last = await programs(page), stable = 0;
+  for (let i = 0; i < 12 && stable < 2; i++) {
+    await frames(page, 10);
+    const now = await programs(page);
+    stable = now === last ? stable + 1 : 0;
+    last = now;
+  }
+  return last;
 }
 async function draws(page) {
   await page.evaluate(() => {
@@ -182,7 +201,9 @@ function cloudProfileInPage() {
   page.on('pageerror', (e) => console.log(`[pageerror] ${e.message}`));
   const shot = makeCanvasShot(page).shot;
   const cap = async (tag) => {
+    await isolateCanvas(page, true);
     const buf = await shot();
+    await isolateCanvas(page, false);
     fs.writeFileSync(path.join(OUT, `${tag}.png`), buf);
     return buf;
   };
@@ -212,8 +233,9 @@ function cloudProfileInPage() {
       }
       await hideActors(page);
       await setAerialPin(page, undefined);
+      await holdStill(page, true);
       await setVisuals(page, 'classic');
-      await frames(page, 30);
+      await settle(page, 30);
       const r = (results[tag] = {});
       const c0 = await cap(`${tag}-classic-0`);
       await frames(page, 12);
@@ -221,20 +243,21 @@ function cloudProfileInPage() {
       r.floor = L.diffCensus(await L.loadRegion(c0), await L.loadRegion(c0b));
       const dC = drawLeg ? await draws(page) : null;
       await setVisuals(page, 'enhanced');
-      await frames(page, 24);
+      r.programsEnhanced = await settle(page, 24);
       const e1 = await cap(`${tag}-enhanced`);
       r.sky = await skyStats(page);
       const dE = drawLeg ? await draws(page) : null;
       // the fleet-pinned column (INFO): aerial pin 0 in both profiles
       await setAerialPin(page, 0);
-      await frames(page, 16);
+      await settle(page, 16);
       const ep = await cap(`${tag}-enhanced-aerialpin0`);
       await setVisuals(page, 'classic');
-      await frames(page, 16);
+      await settle(page, 16);
       const cp = await cap(`${tag}-classic-aerialpin0`);
       await setAerialPin(page, undefined);
-      await frames(page, 20);
+      await settle(page, 20);
       const c1 = await cap(`${tag}-classic-1`);
+      await holdStill(page, false); // the next pose's warp runs unpaused
 
       const hC = L.horizonSeam(await L.loadRegion(c0, HORIZON));
       const hE = L.horizonSeam(await L.loadRegion(e1, HORIZON));
@@ -283,14 +306,16 @@ function cloudProfileInPage() {
       else {
         await hideActors(page);
         await setAerialPin(page, undefined);
+        await holdStill(page, true);
         const prof = {};
         for (const v of ['classic', 'enhanced']) {
           await setVisuals(page, v);
-          await frames(page, 24);
+          await settle(page, 24);
           await cap(`PC-cloud-${v}`);
           prof[v] = await page.evaluate(cloudProfileInPage);
         }
         await setVisuals(page, 'classic');
+        await holdStill(page, false);
         results.cloud = prof;
         const op = (p, a, b) => {
           let n = 0, s = 0;
@@ -330,13 +355,15 @@ function cloudProfileInPage() {
         }
         await hideActors(page);
         await setAerialPin(page, undefined);
+        await holdStill(page, true);
         const got = {};
         for (const v of ['classic', 'enhanced']) {
           await setVisuals(page, v);
-          await frames(page, 24);
+          await settle(page, 24);
           got[v] = await cap(`PL-dusk-${tag}-${v}`);
         }
         await setVisuals(page, 'classic');
+        await holdStill(page, false);
         const hC = L.horizonSeam(await L.loadRegion(got.classic, HORIZON));
         const hE = L.horizonSeam(await L.loadRegion(got.enhanced, HORIZON));
         info(`look dusk ${tag} (hdg ${P.hdgDeg.toFixed(1)})`, `seam Classic ${hC.deltaE.toFixed(2)} @${hC.row} · Enhanced ${hE.deltaE.toFixed(2)} @${hE.row}`);
