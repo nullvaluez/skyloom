@@ -232,7 +232,7 @@ branch head. All match the W0 baseline; none moved.
 | gate | RED (calibration) | on r25-w0 / this branch |
 |---|---|---|
 | `verify-r25-flagoff.mjs` (node) | `R25_FLAGOFF_RED=1` injects the realistic mistake (a terrain key suffix + a rim write gated on the BLOCK flag instead of `r25On`): **(2b) CLASSIC terrain FAIL (key), (2e) C-only FAIL, (3b) CLASSIC hooks FAIL (6 writes, colours moved)** — 9/3/0, exit 1. | 8 PASS / 0 FAIL / **2 NOT CALIBRATED** (Enhanced == OFF: the C/D bodies are W0 stubs), exit 2. |
-| `verify-r25-smoke.cjs` (fixture) | `R25_SMOKE_RED=1` (= `mirror`) breaks the W0 `setHangarOpen`→`screen` mirror in the page → **(7) FAIL** (`hangar left false · screen hangar`), 4/1/14, exit 1 — MEASURED on r25-w0, §4a. **Title-era REDs `title` / `reload` / `continue` (fix pass, §4c F3): WRITTEN, NOT YET RUN** — they need the front door, so E2 calibrates them on the integrated tree BEFORE any green smoke counts. | **5 PASS / 0 FAIL / 14 NOT CALIBRATED**, exit 2 (§4a, pre-fix-pass smoke; the fix pass changed no leg that runs on r25-w0 — see §4c) |
+| `verify-r25-smoke.cjs` (fixture) | `R25_SMOKE_RED=1` (= `mirror`) breaks the W0 `setHangarOpen`→`screen` mirror in the page → **(7) FAIL** (`hangar left false · screen hangar`), 4/1/14, exit 1 — MEASURED on r25-w0, §4a. **Title-era REDs `title` / `reload` / `continue` (fix pass, §4c F3): MEASURED on the integrated tree in E2 (§4d)** — `title` and `reload` exit 1 on their expected legs, and `mirror` still turns (7) red (and now (4c)). | **5 PASS / 0 FAIL / 14 NOT CALIBRATED**, exit 2 (§4a, pre-fix-pass smoke; the fix pass changed no leg that runs on r25-w0 — see §4c) |
 | `verify-r25-visuals.cjs` (fixture, satellite + toy) | **MEASURED** (`R25_VISUALS_FORCE=1 R25_VISUALS_RED=1`, P1 Owens, r25-w0): floor **mean 0.053/255, p99 1/255**; the un-nudged Classic→Enhanced→Classic×3 control **0.057 / 1** (would PASS); the 2 m held-pose nudge **mean 9.281/255, p99 100/255 → (1) FAIL**; (2)–(4) NOT CALIBRATED (nothing enhances), programs flat 111→111→111→111, (5a) draws **132/132/132 ≤ 261**, (5c) texture **101.3 MiB**. 2/1/6, exit 1. Session 1's RED wrote `flight.pos.y`, which the 8 ms pin overwrites — it could never have fired (fixed `fb93a14`); and the first forced run read a floor of **mean 1.8, p99 32** because the pin alone creeps (fixed by `holdStill`, `6ab5954` — §4b). | on this tree the ship-state short circuit reads **7 NOT CALIBRATED** in <1 s (no R25 visual block ON), exit 2 |
 | `verify-mobile-actions-node.mjs` (edited) | — (the legacy 9 cases are the baseline) | **11/11 PASS, 5 PENDING** (the R25 Esc/Back cases wait for A's hook; they switch on by themselves when `use-overlay-back.js` learns `screen`/`settingsOpen`) |
 | `verify-import-integrity.mjs` (sanctioned parser fix) | the W0 baseline: 3 passed / 1 failed (3 errors in 2 files) | **4 passed / 0 failed** — `ecmaVersion 'latest'` parses the JSON import attribute in `lib/fly/living-regions.js`, and `scripts/r24-c-agl.js` now destructures the `agl`/`speed` it was always passed (a real ReferenceError on the probe's first frame). No other assertion changed. |
@@ -288,6 +288,108 @@ On r25-w0 the fix pass changes no leg that executes there: (2h), (4)–(6)
 are NOT CALIBRATED without a title (same 14), and (1)/(2)/(2e)/(7)/(8) are
 untouched — so §4a's 5/0/14 and its measured `mirror` RED still describe
 this branch.
+
+### §4d E2 — the intro-pass integration smoke (2026-09-23, the integrated tree)
+
+**Venue.** Integration worktree on `claude/skyloom-r25-intro-d0pp2v`; r25/e,
+r25/a, r25/b were already merged by the orchestrator and pushed (main
+`93c28f3`), so the step's `git merge --no-ff r25/b` read *Already up to
+date* (pre-merge `83d23d9`). Dev `:3036`, fixture `:3206`/`:3207`,
+`FLY_BOOT_SCALE=3`, TWO SwiftShader browsers at once through the slot lock,
+load average **7.4–9.4** on 4 cores for the whole session. Every time below
+is a venue number.
+
+**Node gates on the tree** — all at their baselines: import-integrity **4/0**,
+verify-r25-front-door **68/0**, verify-r25-flight-plan **44/0**,
+verify-r25-flagoff **8/0/2 NC** (exit 2; the C/D rows), mobile-actions-node
+**16/16**, graphics-unit PASS, flight-operations **33**, stylized-earth
+**22/22**, c-flagoff **58**, vendor-three-tile **34/0**, living-earth **19**,
+cinematic-flight PASS, operations-disclosure PASS; the pre-existing reds did
+not get worse (lod-fade **60/4**, the same four lines; atmo-law the same
+`setAerial` TypeError). Targeted eslint over every file changed since
+`r25-w0` + the W0 files: exactly the W0 addendum's per-file counts
+(Contrail 3e, FlyCanvas 1e, FlyScene 0e/2w, PlayerPlane 2e/2w,
+use-fly-audio 1e; every other file 0).
+
+**The instrument had to be made to survive this venue first** (all E-owned,
+each merged as `r25/e` on top — no product file touched):
+
+| smoke run | what happened | fix |
+|---|---|---|
+| toy 1 | 12/1/1: `(!)` — a plain `click()` on a visible, ENABLED `hangar-fly` sat 30 s in Playwright's actionability wait ("stable" = two rAFs with one box; behind the staging hangar a rAF pair takes seconds) | `cf7c86e`: one `press()` helper (trusted click first, bounded) |
+| toy 2 | 11/1/1: `(!)` — even the FORCE fallback on `hangar-back` timed out at 180 s: the free hangar's StagePump keeps invalidating while toy staging cannot finish here, so the page's main thread is saturated and the locator round trips never get a turn (A's ledger measured the same in flight) | `13a4d29`: fall back to ONE `page.evaluate` DOM click (A's `domClick` idiom; B falls back to `dispatchEvent`); `_title.js enterHangar` the same; (7)'s select falls back to the native setter + `change` |
+| satellite 1 | 17/1/1: (1) LEGACY POSTURE — bootFly's pct-100 wait (unscaled) timed out at 600 s; the PRODUCT title world in the same session revealed at **1075.6 s** | `1602f61`: satellite legacy bound 1800 s (toy keeps 600 s) |
+| RED reload 1 | exit 1 through `(!)` "Execution context was destroyed" — the DOM fallback's own evaluate died with the reload the RED injects | `8f8e315`: a press whose click navigates is a landed press |
+| RED reload 2 / RED continue 1 | `(!)` "the control vanished" — the trusted click's timeout fired AFTER the click was dispatched (a starved renderer acks late), so the fallback found the control gone | `fbde973`: a control that vanished right after a press is a landed press |
+
+Every leg asserts the EFFECT (screen / phase / store), never the click, and
+every fallback is counted (`report.presses`: the green toy runs read 4 trusted
+presses + 5 DOM clicks, and 4 trusted + 4 DOM + 1 late-acked).
+
+**Smoke, green runs** (the certification rows):
+
+| run | result | notes |
+|---|---|---|
+| toy (run 3, and again on the FINAL instrument `dc4c59b`) | **18 PASS / 0 FAIL / 1 NC** (exit 2), twice | legacy toy reveal 65.7 s; the title in the DOM at 1285 ms at boot pct 0, pct 100 at 66.0 s, data-ready 74.8 s; Free Flight (Manhattan, the toy title spot) in the PICKED `bizjet`, AGL 935 m; Exit to title with no reload; Continue restores the PERSISTED setup after the perturbation (0 m from the launch geo, "Continue Meridian · Free Flight over Manhattan"); T&L KOSU apron parks; zero page errors (the re-run: legacy 62.0 s, pct 100 55.5 s, data-ready 73.2 s, Continue 60 m from the launch geo). The one NC is **(2h)**: 0 acquisitions over 52 targeting updates, traffic 300 — no spot opportunity on the fixture's static fleet, so it is NOT a pass. The passport-on-title property is certified by A's `verify-r25-title` **(t8) PASS** instead, which PLACES the frozen flight 3 km from a contact: 1 real acquisition on the title, spots 0→0. |
+| satellite (run 1) | **17 / 1 / 1** | every PRODUCT leg PASS: the title spot was **Tokyo** (the daylight rule at 21:5x UTC), title in the DOM at 1392 ms at pct 0, world revealed 1075.6 s; Free Flight → Tokyo AGL 894 m; exit (no reload); Continue ("Free Flight over Tokyo", 0 m); T&L KOSU apron **parks**; zero page errors. The one FAIL is (1)'s 600 s bound (fixed above); (1) is re-proved standalone below. |
+| satellite (1) standalone (the leg re-run alone with the 1800 s bound, E2 scratch `legacy-sat-boot.cjs`) | **PASS** | pinned satellite bootFly revealed at **845.1 s** (load ~7.5), no title node, `visuals classic`, screen `flight`, `hangarOpen false`, `__flyWorldStatus {ready:true, degraded:false, missing:[]}`, **zero page errors** — so the pinned legacy fleet boot reaches pct 100 in both styles on the integrated tree |
+
+**Title-era REDs on the integrated tree** (plan: each must exit 1 with the
+expected legs red before a green smoke counts):
+
+| RED | expected | measured |
+|---|---|---|
+| `title` (setScreen ignores `'title'`) | (4b) (5) (6) FAIL | **exit 1: (4b) FAIL, (5) FAIL (screen `flight`, player visible), (6) FAIL**, + (7) FAIL (collateral: the title can never be re-entered, `enterHangar(ops)` timed out at 360 s) — 14/4/1 |
+| `reload` (Exit = `location.reload()`) | (5) (6) FAIL | **exit 1: (5) FAIL (`no reload false`), (6) FAIL**, + (8) FAIL (collateral: the smoke's own `waitForFunction` predicates polled the RELOADED page before `__flyStore` existed — two `getState`/`framesRendered` TypeErrors in the predicate eval); (7) PASS — 15/3/1 (run 3; runs 1–2 were instrument, table above) |
+| `continue` (Continue relaunches the perturbed in-memory store) | (6) FAIL | **exit 1: (6) FAIL and nothing else** — after the perturbation Continue relaunched `fighter` / `ops` (launched `bizjet` / `free`), `failed: airborne, mode, aircraft`; 17/1/1 (run 3; run 1 = the late-acked click, run 2 = a 5 s `getAttribute` on the mode chip that read null on a starved main thread → `dc4c59b`) |
+| `1` / `mirror` (setHangarOpen loses its `screen` mirror) | record whether (7) still goes red | **exit 1: (4c) FAIL** (after Fly the screen stays `hangar` — B's free launch goes through `setHangarOpen(false)`) **and (7) FAIL** (the ops hangar never appears, 360 s) — so the mirror RED STILL calibrates (7) on the title path, and now (4c) too — 13/2/4 |
+
+**The owners' own fixture gates on the integrated tree:**
+
+| gate | result | owner verdict |
+|---|---|---|
+| A `verify-r25-title.cjs` toy,phone,attr | **42 / 1 / 0** | **(t11) FAIL — a product defect (A).** Every other t11 condition held (same canvas, no reload, frames advancing, ops back in `hangar`, player hidden, X gone) but `titleCam blends 0`: the title camera SNAPPED instead of easing out of the chase pose. Cause, read from `lib/fly/title-camera.js`: `deactivate()` keeps `_center` from the last title frame, and the first `update()` after `exitToTitle` sees the flight > 3 × radius from that stale centre and treats it as a teleport under the title (snap, blend cancelled). With B merged the toy title spot is Manhattan, not KOSU, so every T&L flight (KOSU) — and any free flight away from the title spot — exits with a hard cut. Node repro (E2 scratch): title shown at A, deactivate, flight ends 800 km away, `blendFrom` + `activate` → **blends 0, snaps 2**; 500 m away → blends 1. Clearing `_hasCenter` in `deactivate()` gives blends 1 in both (a candidate, A's call). On A's branch the title spot was KOSU, so run 16 could not see it. |
+| A `verify-r25-title.cjs` sat,attrsat | **10 / 1 / 0** | **(s2) FAIL — A's gate, exposed by B.** The row asserts ±5 % of `FRONT_DOOR.orbit.radiusM` (2600 m), but the title orbits B's PER-SPOT `title.radiusM` (2400–4000 m in `lib/fly/destinations.js`). This boot's daylight spot was **Sydney (radiusM 2400)** → worst error exactly **7.69 %** = 2400 vs 2600, i.e. the camera sat on the spot's own radius. The toy row passes only because Manhattan's radius is 2600. The gate must compare against the active spot's `titleOrbitParams` radius. (s1) (s3)–(s6) and a-satellite1–5 PASS; reveal 589 s. |
+| B `verify-r25-continue.cjs` toy | **5 / 0** | through the title: free Δ 0.000 m; ops runway 10R Δ 0.000 m; corrupt storage hides Continue. |
+| B `verify-r25-hangar-edges.cjs` | **5 / 0** | Esc clears a query; Esc from inside the hangar → title; late-runtime staging (free Tokyo, ops KCMH). |
+| B `verify-r25-freeflight.cjs` toy | **5 / 1 / 1** | **(2) FAIL — B's gate, exposed by the integration.** It stages `hangar-dest-manhattan`, but with the front door on the TOY title spot IS Manhattan (B's `titleSpot.toyId`; leg (1) itself read `default manhattan`), so the stage does not warp (`warped false`) and the row's `warped === true` term fails. Staging the spot you are already at is correct product behaviour; the gate needs a destination other than the default. (1) (3) (4) (5) (7) PASS; (6) NC (toy staging never finishes here). On B's branch the flight started at KOSU. |
+| B `verify-r25-freeflight.cjs` satellite | **6 / 0 / 0** | title spot Tokyo → the Manhattan stage warps, ready behind the hangar in 405 s; placement 0.00 m; staged hold **6.8 s** vs the unstaged control still holding after **88.6 s**. |
+
+**The ops harnesses through the title** (they open their own context, so a
+new E preload — `scripts/_fixture-preload.js`, a `-r` hook — gives them the
+fixture exactly as bootFly does: routes + DEM pin + finalize scaler, no
+style/weather/title pin; it also closes the in-process fixture server when
+the browser closes, which the first keyboard run showed was needed). The
+product boots satellite (their readiness waits are satellite-only), so they
+meet this venue's satellite boot:
+
+| harness | result | reading |
+|---|---|---|
+| `verify-operations-touch.cjs` | **BLOCKED (exit 2)** | through the title: "Back on the title root leaves the page (browser default at the app root)" and "Back in the pre-flight hangar lands on the title" both hold; the KOSU departure PARKED; full readiness was not reached in the harness's hard 90 s (`missing terrain, forest`, progress 0.89) — the harness's own BLOCKED verdict. Run 1 died on a racy E edit (Back's navigation committed after a fixed 500 ms read) → fixed (`059c093`). |
+| `verify-operations-keyboard.cjs` | **FAIL — venue** | `enterHangar(ops)` through the title passed; the harness's hard 60 s wait for `hangar-fly` enabled (the aircraft preview GLB, `ready`) expired under load (A's gate waits 180 s for the same). |
+| `verify-operations-browser.cjs` | **FAIL — venue** | through the title into the ops hangar; the trusted click on `hangar-pick-prop` logged "performing click action" and timed out at 60 s (a saturated renderer never acked). |
+
+None of the three is a product reading here; they belong to the user
+machine's run list. The T&L flow THROUGH THE TITLE is certified on this
+venue by the smoke's (7) in both styles (KOSU apron departure parks).
+
+**E2 verdict for this merge step: NOT GREEN — three owner findings, the tree
+kept** (the orchestrator's rule for this run: nothing already on main is reset;
+each owner fixes on its branch and E merges on top):
+
+1. **A — product (`lib/fly/title-camera.js`)**: exit-to-title snaps instead of
+   blending whenever the flight ended > 3 × radius from where the title was
+   last shown (stale `_center` across `deactivate`). `verify-r25-title` (t11).
+2. **A — gate (`scripts/verify-r25-title.cjs` (s2)/(t6))**: the orbit radius
+   must be judged against the ACTIVE spot's `title.radiusM`, not the
+   `FRONT_DOOR.orbit` default.
+3. **B — gate (`scripts/verify-r25-freeflight.cjs` (2))**: the staging row must
+   pick a destination other than the one the flight already sits at (the toy
+   title spot is Manhattan).
+
+Everything E owns is green on the tree: node gates at baseline, both styles'
+pinned legacy boot, the smoke's every product leg in both styles, and all four
+title-era REDs calibrated (each exits 1 on its expected legs).
 
 ### §4b verify-r25-visuals — what runs when
 
