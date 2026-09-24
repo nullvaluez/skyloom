@@ -605,6 +605,9 @@ pair ran first (`baseline-warm`), so the timed runs do not include dev compiles.
 - Next.js 16.1.0 (webpack) compiled in 41 s, with 8/8 static pages.
 - Receipt: commit **`480ba99`**, buildId **`SQBH24tF02qNzB6XnJcQJ`**, sourceSha256
   `116fb07f8cfab6f75fcbaed851a991061c3150435634b4d343f0bbcd28fbaf2e`.
+- Recomputed at the close's final head, the source hash is identical: only
+  docs, scripts and the orchestrator's `r25-workflow.txt` changed after
+  `480ba99`. The build is therefore of the exact shipped app source.
 
 Title smoke: `FLY_BUILD_DIR=.next-r25 next start -p 3036` served
 `<title>Skyloom - Fly the living Earth</title>`. `verify-r25-smoke` toy against
