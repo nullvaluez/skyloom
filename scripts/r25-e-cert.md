@@ -391,6 +391,60 @@ Everything E owns is green on the tree: node gates at baseline, both styles'
 pinned legacy boot, the smoke's every product leg in both styles, and all four
 title-era REDs calibrated (each exits 1 on its expected legs).
 
+### §4e E2 round 2 — the three §4d findings, re-run on the FINAL intro tree (2026-09-24)
+
+**Venue.** Integration worktree, `claude/skyloom-r25-intro-d0pp2v`. A container
+restart killed round 2's first attempt; this is the second. The `r25/e` step
+was a no-op. `r25/a` brought only A's fix `c307e9d` (product
+`lib/fly/title-camera.js`, plus A's gates and ledger), merged as `2893391`.
+`r25/b` brought only B's fix `ebff3d5` (the `verify-r25-freeflight.cjs`
+harness and B's ledger). Its `git merge --no-ff` from `2893391` was clean and
+landed as **`a509647`**, the tree every row below ran on. Dev `:3036`,
+fixtures `:3206` and `:3207`, `FLY_BOOT_SCALE=3`, and both browser slots in
+use (C and D run code only). Load average was 6–8.3 on 4 cores. Evidence is in
+`.graphics-review/r25/e/e2-round2/`.
+
+**No row is cited from an owner; each one was re-run on `a509647`.** Both
+browser slots were free, so the rows the orchestrator named were measured on
+the final tree itself. A's own runs agree: toy 16/0/0 and satellite 11/0/0 on
+`95183d3` + A's fix (`r25-a-front-door.md` §8).
+
+**Node gates on `a509647`** are all at baseline: import-integrity **4/0**;
+verify-r25-front-door **70/0** (68 → 70 because A added (6p) and (6q));
+verify-r25-flight-plan **44/0**; verify-r25-flagoff **8/0/2 NC** (exit 2, the
+C/D rows; (4a) hygiene PASS); mobile-actions-node **16/16**; graphics-unit
+PASS; flight-operations **33**; stylized-earth **22/22**; c-flagoff **58**;
+vendor-three-tile **34/0**; living-earth **19**; cinematic-flight **16/16**;
+operations-disclosure PASS. lod-fade is still **60/4** with the same four
+lines, and atmo-law still crashes with the same `setAerial` TypeError.
+Targeted eslint: `verify-r25-freeflight.cjs`, `title-camera.js`,
+`verify-r25-front-door.mjs` and `verify-r25-title.cjs` are all 0e/0w, and the
+W0 files match the addendum exactly (Contrail 3e, FlyCanvas 1e, FlyScene 0e/2w,
+PlayerPlane 2e/2w, use-fly-audio 1e).
+
+| row (§4d RED) | on `a509647` | reading |
+|---|---|---|
+| A `verify-r25-title` **toy** (§4d: (t11) FAIL `blends 0`) | **16 / 0 / 0**, exit 0 | **(t11) `titleCam active true blends 0→1 snaps 2→2`, spot `airport:KOSU`**: the exit from a KOSU departure (~800 km from the Manhattan title spot) now BLENDS. Same canvas, no reload, frames 264→280, ops back in `hangar`, player hidden, X 1→0. (t6) spot manhattan (spawn.title, 2600 m), 0.00 %. (t8) 1 soft-lock acquisition on the title (2 `acquired` transitions, aimed at c725a3 3000 m), passport 0→0 over a 183 s dwell. (t9) crash idle. (t10) Esc in the ops hangar returns to the title. (t13) min AGL 1317 m. (t14) clean. |
+| A `verify-r25-title` **satellite** (§4d: (s2) FAIL 7.69 %, Sydney 2400 vs 2600) | **6 / 0 / 0**, exit 0 | **(s2) spot `yosemite` (spawn.title, 3200 m), worst radius error 0.00 %**, a radius the source ships, min AGL 2643 m. The daylight spot at 01:0x UTC has a NON-default radius, so this reading exercises exactly the case the old gate got wrong: judged against 2600 m it would have read 23.1 %. (s1) title in the DOM at pct 0 (1104 ms). (s4) revealed after 444 s with the orbit camera away from flight.pos. (s5) Esri credit visible and on top. (s6) clean. |
+| B `verify-r25-freeflight` **toy** (§4d: (2) FAIL `warped false`, staged Manhattan = the title spot) | **6 / 0 / 1**, exit 0 | (1) default `manhattan`. **(2) stage pick `tokyo`, 10,852 km from the flight, `warped true`**, flight frozen, frames +47, toy chunks 52→122, status `staging` (ready false because toy staging cannot finish here). **(3) "Fly to Tokyo", `lastLaunch.destId` tokyo, placement 0.00 m, live 28 m, alt 900/900, heading error 0.0000°**, prop, revealed, hold 26,046 ms. (4) no crash in 10 s. (5) Brooklyn 0.0 m, alt 800. (6) NC: the staged Tokyo hold was 26,046 ms with staging not ready at launch, against the unstaged Grand Canyon control at 17,215 ms. That is the venue precondition; satellite (6) stays certified by §4d's 6/0/0. (7) clean. **This is the first browser run of B's COMMITTED text**: B's green run used the flat-earth pick, and the committed harness uses great-circle `gcKm`. That closes B's risk 3. |
+| E `verify-r25-smoke` **toy** (regression check; §4d 18/0/1) | **18 / 0 / 1**, exit 2 | Same as §4d. (1) legacy toy reveal 47.0 s with no title and Classic. (2b) title at 1368 ms, pct 0. pct 100 at 47.8 s, data-ready at 50.9 s. (4c) bizjet at AGL 938 m. (5) Exit to title with no reload, frames 297→307. (6) Continue reads "Continue Meridian · Free Flight over Manhattan": after the perturbation it relaunched free/bizjet, 16 m from the launch geo. (7) KOSU apron parks. (8) zero page errors. The one NC is **(2h)**: 0 acquisitions over 62 targeting updates, traffic 300. The property is certified in this same round by the title gate's (t8) above. Presses: 6 trusted, 1 DOM (`title-continue`), 2 late-acked. |
+
+**Not re-run; the §4d evidence stands.** The satellite smoke (every product leg
+PASS). The satellite pinned legacy `bootFly` (845.1 s, zero page errors),
+since the only product change since then is inside the title camera, which a
+bypass-pinned boot never activates. The four title-era REDs. B's
+`verify-r25-continue` (5/0) and `verify-r25-hangar-edges` (5/0). B's satellite
+freeflight (6/0/0): the new picks resolve to E2's own there, staging Manhattan
+from a Tokyo title with Tokyo as the control. The ops harnesses are
+venue-limited user-machine rows.
+
+**E2 verdict for the last intro merge: GREEN.** All three §4d owner findings
+are closed on the final tree: A product (t11), A gate (s2), B gate (2). Every
+node gate is at baseline, eslint is at the W0 addendum, and no row has a FAIL.
+The NOT CALIBRATED rows are the two the plan allows: smoke (2h), because the
+fixture's static fleet gives no acquisition opportunity, and freeflight toy
+(6), because toy staging cannot finish on SwiftShader.
+
 ### §4b verify-r25-visuals — what runs when
 
 - **Now (intro pass)**: `R25_SKY` / `R25_GROUND` ship `enabled:false`, so
