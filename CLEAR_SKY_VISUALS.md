@@ -1,20 +1,23 @@
-# Clear Sky visuals: implementation preview
+# Clear Sky visuals: implementation and release
 
 2026-09-24. Branch `codex/clear-sky-visuals`, based on `main` at `2fb97b2`.
 Implementation commit `724ccf2`. This is the resumed visual half of
 [Round 25](FLY_ROUND25_PLAN.md), recovered from the saved SKY (`11d1f8d`)
 and GROUND (`4bc873e`) branches through merges `ff617ac` and `64ea151`.
 
-**Status: implemented preview with passing runtime checks; appearance certification
-is unfinished.** The original checkout, its staged files and its development
-server were preserved. This branch has not been merged into main or deployed.
+**Release configuration approved by the user on 2026-09-24:** Enhanced is now
+the default, and publication to main is authorized. Explicit saved Classic
+preferences remain honored. Runtime checks pass; the appearance follow-ups below
+remain open and are not represented as passing. The original checkout, its staged
+files and its development server are preserved during publication.
 
 ## Try it
 
-Run this branch, open **Settings → Visuals → Enhanced**, then fly in Satellite.
-The setting changes live. Classic remains the default until the appearance gates
-are resolved; the plan's eventual default of Enhanced remains the intended release
-state. The current isolated preview is `http://localhost:3020`.
+Enhanced is selected automatically when no visual preference is saved. Open
+**Settings → Visuals** to switch between Enhanced and Classic live, then fly in
+Satellite. The isolated development preview is `http://localhost:3020`.
+The evidence below was captured before the default changed; it explicitly tests
+both profiles and remains applicable to their rendering behavior.
 
 ## What is implemented
 
@@ -26,7 +29,7 @@ state. The current isolated preview is `http://localhost:3020`.
 | Live switching | Resident Classic tiles receive relief without reloading imagery or replacing geometry. Two background DEM decodes maximum; stale results are discarded and failures have a retry delay. |
 | Resource lifetime | Switching back to Classic or Neon releases the Enhanced terrain textures. Returning to Enhanced restores their shader bindings. Engine disposal releases associated warm-up resources. |
 
-`R25_SKY` and `R25_GROUND` are enabled for the optional Enhanced profile. Color
+`R25_SKY` and `R25_GROUND` are enabled for the Enhanced profile. Color
 reference transfer, quilt retirement and mesh refinement remain **disabled**.
 The current ground feature uses at most approximately **4.00 MiB** of additional
 GPU textures under the 5.5 MiB budget.
@@ -50,6 +53,16 @@ GPU textures under the 5.5 MiB budget.
   the worker verifier resolves file URLs correctly. Real Sierra and Smokies
   camera poses use safe MSL altitudes instead of fixture-only heights that could
   place the camera below the actual mountains.
+
+## Release default verification
+
+After the user's default change, the exact release configuration passed a fresh
+production build (10.4 s compile), ESLint and all 12 Classic compatibility checks.
+A real RTX 5080 production-mode flight started in Enhanced with 95 resident relief
+tiles and 4.00 MiB of relief textures. The governor and terrain pins remained null;
+a separate fresh browser context respected a saved Classic preference. Zero
+runtime or shader errors were observed. See
+[the release default report](.graphics-review/r25-resume/release-default.json).
 
 ## Verification
 
@@ -113,10 +126,11 @@ separately from the supported runtime result:
 5. **Deferred features:** solve the color-reference sampler budget, then measure
    color seams before retiring the quilt. Keep mesh refinement off until its
    fixed-pose triangle/draw budgets are measured.
-6. **Release checks:** finish the planned appearance matrix, production-runtime
-   checks, mobile hardware checks and a longer moving-flight soak before making
-   Enhanced the default. The earlier R22–R24 built-but-off lighting, depth and
-   terrain experiments remain outside this implementation pass.
+6. **Release checks:** finish the planned appearance matrix, broader production
+   checks, mobile hardware checks and a longer moving-flight soak. The fresh
+   production launch is verified above. The user approved Enhanced as the default
+   while these follow-ups remain open. The earlier R22–R24 built-but-off lighting,
+   depth and terrain experiments remain outside this implementation pass.
 
 The [evidence manifest](.graphics-review/r25-resume/manifest.json) distinguishes
 the supported configuration from previous diagnostic runs. It includes the

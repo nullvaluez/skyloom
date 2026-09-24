@@ -1,8 +1,9 @@
 # R25 handoff: finish "Front Door & Clear Sky" in a fresh session
 
 **RESUMED (2026-09-24):** C SKY and D GROUND have been recovered and integrated
-in the isolated `codex/clear-sky-visuals` worktree. The optional Enhanced preview
-passes its real-GPU runtime check; appearance gates remain unfinished. Read
+in the isolated `codex/clear-sky-visuals` worktree. Enhanced passes its real-GPU
+runtime check and the user has approved it as the default for publication to main;
+appearance gates remain unfinished. Read
 [CLEAR_SKY_VISUALS.md](CLEAR_SKY_VISUALS.md) for current status. The pause notes,
 workflow prompts and intermediate states below are retained as history, not
 instructions to restart the already recovered work.

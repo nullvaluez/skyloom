@@ -4,8 +4,9 @@ Implementation and verification record, 2026-09-24. Plan:
 [FLY_ROUND25_PLAN.md](FLY_ROUND25_PLAN.md).
 
 **Visuals update (2026-09-24):** the saved SKY and GROUND work is now integrated
-on `codex/clear-sky-visuals`. Enhanced is an optional preview, with 20 passing
-real-GPU runtime checks; appearance certification remains open. See
+on `codex/clear-sky-visuals`. The user approved Enhanced as the default and
+publication to main, with 20 passing real-GPU runtime checks; appearance
+certification remains open. See
 [CLEAR_SKY_VISUALS.md](CLEAR_SKY_VISUALS.md) for the current implementation,
 feature flags, evidence and remaining work. The intro verification and ship-state
 statements below are the historical intro close, not new visual certification.
@@ -16,9 +17,9 @@ statements below are the historical intro close, not new visual certification.
   the title screen, Free Flight vs Takeoff & Landing, the adaptive hangar,
   Continue, Exit to title and the Skyloom branding. Three roles built it:
   A FRONT DOOR, B FLIGHT PLAN and E CERT.
-- **The visuals half is implemented as a branch preview.** C SKY and D GROUND
-  sit behind the Visuals: Enhanced / Classic switch. See the
-  [current visual record](CLEAR_SKY_VISUALS.md); Classic remains the default.
+- **The visuals half is implemented.** C SKY and D GROUND sit behind the
+  Visuals: Enhanced / Classic switch. See the
+  [current visual record](CLEAR_SKY_VISUALS.md); Enhanced is now the default.
 
 Every fps, millisecond and feel judgement is for the user's machine. The
 cloud container blocks the tile hosts and renders WebGL on SwiftShader at 1–3
