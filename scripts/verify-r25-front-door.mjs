@@ -20,7 +20,14 @@
  *      calls, the title camera blend request; a no-op with the flag off.
  *  [6] TitleCamera geometry: orbit radius exact, terrain floor respected on a
  *      rising slope, eye height rule, period (normal + reduced motion), blend
- *      endpoints, snap on teleport, needsSnap on leave, flag-off install no-op.
+ *      endpoints, snap on teleport, needsSnap on leave, flag-off install no-op;
+ *      (6p/6q, integration fix pass) exit to title after a flight that ended
+ *      FAR from the last title centre BLENDS (no stale-centre snap) and does
+ *      not keep the previous spot's terrain floor. RED on the pre-fix rig:
+ *      69 / 1 — (6p) "blends 0 · snaps +1 · start Δ 3444.317"; the one-line
+ *      candidate (`_hasCenter = false` alone) reads 69 / 1 on (6q) "title
+ *      floor 3350 m -> after exit 3350 m · eye 3350 m (want 900)"
+ *      (.graphics-review/r25/a/red-front-door-6pq.txt / -6q-candidate.txt).
  *  [7] <StagePump> policy table + rate (desktop 10 Hz / phone 4 Hz).
  *  [8] source posture: FlyScene's W0 call sites are intact; FlyMode installs
  *      the rig + mounts the title; exit replaces the reload (the error
@@ -498,6 +505,52 @@ if (!TC) {
   un1();
   gate('(6o) flag ON: the rig follows screen (hangar→title activates, title→hangar deactivates + needsSnap); uninstall removes it',
     seq.join(',') === 'false,true,false,true' && rtOn.titleCam === undefined, seq.join(','));
+  // (6p) EXIT TO TITLE after a flight that ended FAR from where the title was
+  // last shown (integration fix pass: E2's t11 read "titleCam active true
+  // blends 0" once the toy title spot became Manhattan and the T&L departure
+  // is KOSU, ~800 km away). The previous title's centre must not survive the
+  // flight: the first frame after exitToTitle is the blend, not a teleport.
+  // RED (pre-fix rig, r25/a 10fb836 + 95183d3): header + scripts/r25-a-front-door.md §8.
+  const tx = new TC.TitleCamera({ sampleGround: () => 300, readStyle: () => 'satellite', readReduced: () => false });
+  const camX = mkCam();
+  tx.activate();
+  tx.update(1 / 60, mkFlight(0, 800, 0, 0), camX, k, 300); // the title at A
+  tx.deactivate(); // Takeoff & Landing -> flight
+  const endF = mkFlight(800000 * k, 900, -120000 * k, 2); // the flight ends ~800 km away
+  camX.position.set(endF.pos.x + 30, 915, endF.pos.z + 60); // the chase pose behind it
+  camX.lookAt(endF.pos.x - 300, 900, endF.pos.z - 900);
+  const pX = camX.position.clone();
+  const snapsX = tx.stats.snaps;
+  tx.blendFrom(camX); // exitToTitle
+  tx.activate();
+  tx.update(0, endF, camX, k, 300);
+  const dX = camX.position.distanceTo(pX);
+  for (let t = 0; t < O.easeSec + 0.2; t += 1 / 30) tx.update(1 / 30, endF, camX, k, 300);
+  const rX = Math.hypot(camX.position.x - endF.pos.x, camX.position.z - endF.pos.z) / k;
+  gate('(6p) exit to title FAR from the last title centre: BLENDS out of the chase pose (no snap), lands on the orbit round the NEW centre',
+    tx.stats.blends === 1 && tx.stats.snaps === snapsX && dX < 1e-6 && Math.abs(rX - O.radiusM) <= 0.05 * O.radiusM,
+    `blends ${tx.stats.blends} · snaps +${tx.stats.snaps - snapsX} · start Δ ${dX.toFixed(3)} · end radius ${rX.toFixed(1)} m`);
+  // (6q) ... and the previous title's terrain floor does not ride along: a
+  // title over 3000 m relief, then the flight ends near sea level where the
+  // DEM has not answered yet — the floor must be the NEW centre ground +
+  // minAglM. Guards the one-line candidate fix (`_hasCenter = false` alone):
+  // it skips the teleport branch, the only place the stale _gMax was dropped.
+  const hi = (x) => (Math.abs(x) < 10000 ? 3000 : null);
+  const tq = new TC.TitleCamera({ sampleGround: (x) => hi(x), readStyle: () => 'satellite', readReduced: () => false });
+  const camQ = mkCam();
+  tq.activate();
+  tq.update(1 / 60, mkFlight(0, 3200, 0, 0), camQ, k, 3000);
+  const floorHi = tq.stats.floorM;
+  tq.deactivate();
+  const seaF = mkFlight(900000 * k, 400, 0, 1);
+  camQ.position.set(seaF.pos.x + 20, 420, seaF.pos.z + 50);
+  tq.blendFrom(camQ);
+  tq.activate();
+  for (let t = 0; t < O.easeSec + 0.5; t += 1 / 30) tq.update(1 / 30, seaF, camQ, k, 0);
+  const eyeQ = Math.max(400, O.aglM, O.minAglM);
+  gate("(6q) ... and the previous title's terrain floor is dropped (DEM unanswered at the new centre => floor = centre ground + minAglM)",
+    floorHi >= 3000 + O.minAglM - 1e-6 && Math.abs(tq.stats.floorM - O.minAglM) < 1e-6 && Math.abs(camQ.position.y - eyeQ) < 1,
+    `title floor ${floorHi.toFixed(0)} m -> after exit ${tq.stats.floorM.toFixed(0)} m · eye ${camQ.position.y.toFixed(0)} m (want ${eyeQ})`);
   restore();
 } catch (e) {
   gate('(6) section ran', false, `threw: ${String(e?.message || e).slice(0, 160)}`);

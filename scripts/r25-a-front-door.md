@@ -163,3 +163,69 @@ z-20) over the attribution zone (z-10) — in flight too. From the title the fli
 bar is now MOUNTED under it (row a-portrait1 / a-landscape1 assert parity, not
 paint order); the phone Logbook covering the credit is pre-existing R16 behaviour
 in `Logbook.jsx` (not A's file) and is recorded, not changed.
+
+## 8. E2 integration fix (2026-09-24)
+
+Venue: `r25/a` with the integration head `95183d3` merged (title + flight plan
+ON; B's per-spot `title` fields live). E2's intro-pass smoke (`r25-e-cert.md`
+§4d) named two A items; a first fix agent was killed by a container restart
+with its edits uncommitted — reviewed here, kept, finished.
+
+**(1) PRODUCT — exit to title SNAPPED instead of blending.**
+
+* **RED (browser, E2 §4d):** `verify-r25-title` toy (t11) FAIL, `titleCam
+  active true blends 0` — every other t11 term held. **RED (node, this pass,
+  committed `title-camera.js` swapped in):** new row **(6p) FAIL 69 / 1** —
+  `blends 0 · snaps +1 · start Δ 3444.317` (the camera jumped 3.4 km on the
+  first title frame instead of starting from the chase pose).
+  `.graphics-review/r25/a/e2fix-front-door-red.txt`.
+* **Mechanism:** `deactivate()` kept `_center` from the last title frame. The
+  first `update()` after `exitToTitle` compared the flight's END position with
+  that stale centre, read the distance flown (> 3 × radius) as a teleport
+  under the title, set `_snapReq` and dropped the blend. On A's own branch the
+  toy title spot was KOSU, so a KOSU departure ended inside 3 × radius and run
+  16 could not see it; with B merged the toy title spot is Manhattan (~800 km
+  from KOSU), so every T&L flight — and any free flight away from the spot —
+  exited with a hard cut.
+* **Fix:** `deactivate()` forgets the title's centre AND its terrain floor
+  (`_hasCenter = false`, `_gMax = null`, `_sampleT = 0` → the first title frame
+  samples the DEM at once). The in-title teleport snap (spawn landing, a staged
+  destination) is unchanged: it only compares frames of ONE title session.
+* **Why not the one-line candidate** (E2's `_hasCenter = false` alone): it
+  skips the teleport branch, which was the only place the stale `_gMax` was
+  dropped, so the previous spot's floor rides along until the new DEM answers
+  (forever, where it never does). New row **(6q)** reads it: the candidate is
+  **69 / 1**, `title floor 3350 m -> after exit 3350 m · eye 3350 m (want 900)`
+  (`e2fix-front-door-6q-candidate.txt`). (6q) PASSES on the committed rig
+  (its teleport branch drops `_gMax`) — it is the candidate's falsifier, not
+  the defect's.
+* **GREEN:** `verify-r25-front-door` **70 / 0** (`e2fix-front-door-green.txt`);
+  browser (t11) below.
+
+**(2) GATE — (s2)/(t6) judged the orbit against the wrong radius.**
+
+* **RED (browser, E2 §4d):** satellite (s2) FAIL, worst radius error exactly
+  **7.69 %** = Sydney's `title.radiusM` 2400 against `FRONT_DOOR.orbit.radiusM`
+  2600 — the CAMERA was right (it flies `titleOrbitParams(spot)`), the gate
+  was wrong. Toy passed only because Manhattan's radius is 2600.
+* **Fix (`scripts/verify-r25-title.cjs`):** each geometry sample reads the spot
+  the rig reads (`runtime.titleSpot ?? spawn.title`, the same expression as
+  `installTitleCamera`'s `readSpot`) and expects its `radiusM`, else the
+  `FRONT_DOOR` default; the row also requires every expected radius to be one
+  the SOURCE ships (`destinations.js` `title: { radiusM }` ×11,
+  `flight-plan.js` `AIRPORT_TITLE`, the default), so the page cannot hand the
+  gate an arbitrary expectation. Falsifier: a rig that ignored the spot would
+  read 53.8 % at the Grand Canyon (4000 vs 2600) and 7.69 % at Sydney.
+  (t11) now asserts a NEW blend across the exit (`after.blends >
+  before.blends`, was `>= 1`) and prints snaps and the spot.
+
+**Gates** (fixture, SwiftShader, `FLY_BOOT_SCALE=3`, dev `:3031`):
+
+| Gate | Verdict | Evidence |
+|---|---|---|
+| `verify-r25-front-door.mjs` (node) | **PASS 70 / 0** | RED 69 / 1 on the committed rig ((6p)); candidate 69 / 1 ((6q)) |
+| `verify-r25-title.cjs` satellite (+attrsat), first fix agent's run on this exact source (edits 00:13–00:14, run 00:19–00:37) | **PASS 11 / 0 / 0** | `fix-title-sat.txt`: **(s2) spot grand-canyon (spawn.title, 4000 m), worst radius err 0.00 %**, min AGL 2555 m; revealed after 599 s; s1 s3–s6 + a-satellite1–5 PASS |
+| `verify-r25-title.cjs` toy (+phone+attr), same run | toy + phone legs all PASS; the attr leg died in the restart (`Target page … closed`) | `fix-title-toy.txt`: (t6) manhattan 2600 m 0.00 %; **(t11) blends 0→1, snaps 2→2, spot airport:KOSU** |
+| `verify-r25-title.cjs` toy, this pass (clean re-run) | **PASS 16 / 0 / 0**, exit 0 | `e2fix-title-toy.txt`: **(t11) `blends 0→1 snaps 2→2`, spot `airport:KOSU`**, same canvas / no reload, frames 252→266, ops `hangar`, player hidden, X 1→0; **(t6) spot manhattan (spawn.title, 2600 m), worst radius err 0.00 %**, min AGL 700 m; (t8) 2 soft-lock acquisitions, passport 0→0; (t13) min AGL 1317 m; (t14) clean |
+| `verify-import-integrity.mjs` | **PASS 4 / 0** | = baseline |
+| eslint (title-camera.js, verify-r25-front-door.mjs, verify-r25-title.cjs) | **0 problems** | = baseline |
