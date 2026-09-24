@@ -4,6 +4,33 @@
 The game plays exactly as it did at `2c624a3`, because every R25 flag ships `enabled:false`.
 The plan is approved; do not re-plan.
 
+## Session 2 state (2026-09-24 ~00:45 UTC) — read this first if the session died
+
+- **The intro is on `main` at `93c28f3`** (E + A + B merged, node gates green, a production build of `28c2d16` succeeded).
+  `FRONT_DOOR` and `FLIGHT_PLAN` are ON; `R25_SKY` / `R25_GROUND` are OFF (the Visuals row is hidden).
+- **Integration branch** `claude/skyloom-r25-intro-d0pp2v` = main + workflow-script commits + E's round-1 E2 smoke
+  (`scripts/r25-e-cert.md` §4d): every product smoke leg is green in toy and satellite, and all four title-era REDs are calibrated.
+  Three owner findings remain:
+  - **A product:** exit-to-title snapped instead of blending (`lib/fly/title-camera.js`, t11).
+  - **A gate:** s2/t6 must use the per-spot radius.
+  - **B gate:** freeflight (2) must stage a non-title destination.
+- **Running when this was written:**
+  - The inline workflow `r25-intro-finish`: the A and B fixes in parallel, then `scripts/r25-workflow.txt` with
+    `pass:'intro', smokeOnce:true, reports:{…}` for the merges, one smoke on the red rows, and the scoped close
+    (record `FLY_FRONT_DOOR_AND_VISUALS.md`, the `CLAUDE.md` notice).
+  - `r25-workflow.txt` `pass:'visuals-early', stopAfter:'fix'` for C and D: code and node gates only until
+    `/tmp/r25-locks/intro-pushed` exists. The orchestrator writes it after the intro close is pushed.
+- **Workflow modes added this session** (`scripts/r25-workflow.txt`):
+  - `pass: intro | visuals-early | visuals`
+  - `roles`, `base`, `priorMerged`, `stopAfter:'fix'`
+  - `reports`, which skips the build and integrates finished branches
+  - `note`, which is appended to every prompt of the run
+  - `smokeOnce`, which runs the fixture smoke only after the last merge
+- **After the intro close:** push the branch and `main`, `echo <head> > /tmp/r25-locks/intro-pushed`. When C and D return,
+  run `pass:'visuals'` with `reports` for c and d and `priorMerged:['r25/e','r25/a','r25/b']`.
+- **Lesson:** on this 4-CPU container a workflow runs at most 2 agents at once. Run one workflow per role (or per pair)
+  when more parallelism is needed, and never assume a queued agent has started.
+
 ## What exists
 
 | Piece | Where | Status |
