@@ -237,6 +237,35 @@ under `lib/fly/vendor/three-tile/workers/` and be re-stringified by
 `scripts/build-tile-worker.mjs` (added with the first worker patch), so the
 minified blob in `index.js` is never hand-edited.
 
+## R25 PATCH LEDGER (Round 25, D GROUND — DEM relief)
+
+R25 patches use their OWN marker grammar, `// R25 <LETTER> PATCH <n> (<SWITCH>)`,
+and their own row ids (`R25-<n>`): the R24 grammar is pinned by two R24 gates
+(`verify-vendor-three-tile` 17/18 map every `R24 <L> PATCH` marker to a numeric
+row, and `verify-lod-fade` pins D's R24 marker set to exactly {5, 6, 7}), so
+reusing it would have moved a frozen R24 assertion. `scripts/verify-r25-ground.mjs`
+is the marker <-> row cross-check for this table. Every R25 hunk is
+INSERT-ONLY against r25-w0 (zero lines edited or deleted — A's and C's R24
+patch sites included; the relief splice is LAYERED on A's `r24SpliceWorkerTail`
+rather than editing it).
+
+| id | Owner | Switch | File · function | Reason | Off-state |
+|---|---|---|---|---|---|
+| R25-30 | D | `R25_GROUND.relief` | `index.js` · `R24_SWITCHES` (module scope) | infrastructure: `r25Relief` (the FLAG, set at engine creation by `lib/fly/terrain-engine.js` `applyR25GroundSwitches`), `r25ReliefPx` (the live Enhanced REQUEST size, written by `lib/fly/r25-ground.js`) and `r25ReliefFn` (the app's main-thread builder for terrain-rgb) | `false` / `0` / `null` — gate 16b still reads every literal default off |
+| R25-31 | D | `R25_GROUND.relief` | `index.js` · new `r25SpliceWorkerTail()` + `r25MakeWorker()` + an inserted branch in `qe()` (the LERC worker factory); `workers/skirt-tail.src.js` · new `r25CaptureMesh()` / `r25ReliefMap()`, the `/*__R25_MESH_WRAP__*/` marker, the `true /*__R24_WORKER_SKIRT__*/` literal and the handler's optional relief + transfer | the follow-up C's PATCH 8 note asked for — the FULL decoded DEM grid. The R25 splice takes A's spliced source and (a) wraps the worker's grid->Martini function (found by shape: `function N(g,..){return new M(g.width).createTile(g.dem)`) so the handler sees the decoded, clipped grid on its way into the mesher, and (b) substitutes `false` into the worker-skirt literal, so a worker spliced for relief ALONE leaves the skirt to the main thread exactly as upstream. A request carrying `r25Relief` gets a mapPx^2 RG8 world-frame normal map by central differences | `r25Relief` false: `qe()` never reaches the branch (verbatim body). A's splice leaves both markers inert (`true`, a comment), so the R24 worker is byte-for-byte the R24 worker. Flag ON with no request field: the posted geometry is byte-identical to the verbatim worker's (`verify-r25-ground` 2c) |
+| R25-32 | D | `R25_GROUND.relief` | `index.js` · `TerrainLercLoader.doLoad()` (one spread line in the request literal) + `.geometryFromData()` + new `r25CarryRelief()`; twin in `lib/fly/raster-cache.js` `FlyCachedLercLoader.doLoad()` | ask for the map only while the app requests it (Visuals Enhanced) and carry the returned bytes onto `geometry.userData.r25Relief` (bound into a pooled texture on `tile-loaded` by `lib/fly/r25-ground.js`) | `r25ReliefPx` 0: the spread adds no key, so the message keys are the R22 ones (2g); `geometryFromData` takes its original return |
+| R25-33 | D | `R25_GROUND.relief` | `index.js` · `TerrainRGBLoader.doLoad()` | terrain-rgb (E's offline fixture) meshes the decoded grid on the MAIN thread (`setData`), so its relief map is built from that same returned grid by the app's `reliefFromGrid` — byte-identical to the worker's algorithm (2f) | `r25ReliefPx` 0 or no installed function: one short-circuited `&&` before the verbatim upstream `return` |
+
+**The flag decides the SPLICE, the profile decides the REQUEST.** DEM workers
+are created lazily and live for the session, so whether the LERC worker carries
+the grid capture is decided from `R25_GROUND.relief` (the flag) before the
+first one exists; the live Visuals profile only decides whether a request asks
+for a map. Classic with the flag on therefore runs the relief-spliced worker
+with no request field — and that path's posted geometry is proven
+byte-identical to the verbatim worker's by `scripts/verify-r25-ground.mjs`,
+which captures the REAL `qe()` output through a stub Worker and runs it in a vm
+against the real clip + Martini with a stubbed LERC decode.
+
 ## How this is verified
 
 `node scripts/verify-vendor-three-tile.mjs` (installed project dependencies,
