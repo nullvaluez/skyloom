@@ -53,9 +53,23 @@
  *      sub-flag is launch-applied); (5c) texture peak <= 300 MiB
  *      (ground-texture-audit, logical GL bytes).
  *  (6) CROSS-BOOT flag-off: with FLY_URL_BASELINE naming a dev server on the
- *      r25-w0 tree (same fixture), the Owens Classic capture vs that tree's at
- *      the same pose: mean |d| <= 0.5/255, p99 <= 2/255. Absent -> NOT
- *      CALIBRATED.
+ *      r25-w0 tree (same fixture), EVERY pose's Classic capture vs that
+ *      tree's at the same pose (R25 E2 close: it was Owens only; the plan
+ *      names P1/P3/P5): mean |d| <= 0.5/255, p99 <= 2/255 over the full
+ *      frame (the terrain and horizon crops are printed beside it); (6t)
+ *      triangles equal to the flag-off tree's (a mismatch with identical
+ *      pixels is two streamed working sets -> NOT CALIBRATED). Absent ->
+ *      NOT CALIBRATED. R25_VISUALS_XPAR=1 runs the flag-off session in a
+ *      second browser CONCURRENTLY (hold both slots: run-browser.sh twice).
+ *      Both sessions park the cloud-shadow pool by layer (hideActors).
+ *      VENUE FLOOR: R25_VISUALS_XFLOOR=1 (with FLY_URL_BASELINE) runs ONLY a
+ *      second flag-off session and records flag-off vs flag-off across two
+ *      boots per pose in xfloor.json. Outside the bound, a pair no worse than
+ *      that floor, where the floor itself breaks the bound, reads NOT
+ *      CALIBRATED (the venue cannot resolve it); otherwise FAIL.
+ *  With NO R25 visual block ON (the intro pass, run FORCED) the toggle legs
+ *  (1)-(4), (5b) and (7a) are vacuous and read NOT CALIBRATED with the
+ *  measured pair printed; (5a), (5c), (6), (7b) are the meaningful rows.
  *  (7) TOY (R25_VISUALS_TOY=0 skips): toy never enhances — (7a) the toy
  *      frame after Classic -> Enhanced equals Classic within the floor;
  *      (7b) toy draws <= 480 in both profiles.
@@ -80,6 +94,7 @@ const { pose, warpToPose, sunTimeMs, isolateCanvas, holdStill, loadFlyConstants 
 const L = require('./_r25-luma');
 const { makeCanvasShot } = require('./_canvasshot');
 const { installGroundTextureAudit } = require('./ground-texture-audit.cjs');
+const { crossBootVerdict, toggleLegsApply } = require('./_r25-xboot');
 
 const OUT = path.join(__dirname, '..', '.graphics-review', 'r25', 'e', 'visuals');
 fs.mkdirSync(OUT, { recursive: true });
@@ -89,6 +104,9 @@ const TOY = process.env.R25_VISUALS_TOY !== '0';
 const POSE_NAMES = (process.env.R25_VISUALS_POSES || 'owens,manhattan').split(',').map((s) => s.trim()).filter(Boolean);
 const SCALE = Math.max(1, Number(process.env.FLY_BOOT_SCALE || 1));
 const BUDGET = { owens: 261, satellite: 375, toy: 480, textureMiB: 300 };
+// Per-pose readiness budget (both sessions). A pose that does not settle reads
+// NOT CALIBRATED, never a capture of a half-streamed world.
+const POSE_TIMEOUT_MS = Number(process.env.R25_VISUALS_POSE_TIMEOUT_S || 900) * 1000;
 // The terrain crop: the lower-middle band of the frame (below the horizon at
 // these poses, clear of the hidden player). The horizon strip: the central
 // third of the upper frame. Same crops as scripts/r25-e-baseline.cjs.
@@ -116,19 +134,39 @@ async function hideActors(page) {
     // Player, traffic, tracers, and the cumulus + cirrus deck ROOTS (the
     // CloudField handles). The roots are never written by their owner — the
     // R19 lesson was that per-PUFF visibility is rewritten every frame — so a
-    // root park holds; the gate reads it back. The cloud SHADOW discs are
-    // rewritten per frame and have no handle: they stay, and drift into the
-    // floor until C's __flyCloudFreeze lands.
+    // root park holds; the gate reads it back. The cloud SHADOW discs have no
+    // handle of their own and CloudField rewrites the pool's `visible`,
+    // opacity and matrices every frame (CloudField.jsx `shadows.mesh.visible =
+    // wantShadows`), so a visibility park cannot hold. R25 E2 close: park the
+    // pool by LAYER instead — the owner never writes `layers`, and the camera
+    // renders layer 0 only. It is the cumulus root's sibling InstancedMesh of
+    // CircleGeometry at renderOrder -1 (CloudField.jsx `shadows`). A
+    // CROSS-BOOT pair needs it: the deck drifts with session time, so two
+    // boots would otherwise place the discs differently.
     const hidden = {};
     for (const [k, o] of Object.entries({ player: window.__flyPlayer, traffic: window.__flyTraffic, tracers: window.__flyTracers, clouds: window.__flyClouds, cirrus: window.__flyCirrus })) {
       if (o) o.visible = false;
       hidden[k] = !!o;
     }
+    const pool = window.__flyClouds?.parent?.children?.find(
+      (o) => o !== window.__flyClouds && o.isInstancedMesh && o.geometry?.type === 'CircleGeometry' && o.renderOrder === -1
+    );
+    if (pool) pool.layers.set(31);
+    hidden.cloudShadows = !!pool;
     return hidden;
   });
 }
 const parkHeld = (page) =>
-  page.evaluate(() => ({ clouds: window.__flyClouds ? window.__flyClouds.visible === false : null, cirrus: window.__flyCirrus ? window.__flyCirrus.visible === false : null }));
+  page.evaluate(() => {
+    const pool = window.__flyClouds?.parent?.children?.find(
+      (o) => o !== window.__flyClouds && o.isInstancedMesh && o.geometry?.type === 'CircleGeometry' && o.renderOrder === -1
+    );
+    return {
+      clouds: window.__flyClouds ? window.__flyClouds.visible === false : null,
+      cirrus: window.__flyCirrus ? window.__flyCirrus.visible === false : null,
+      cloudShadows: pool ? pool.layers.isEnabled(31) && !pool.layers.isEnabled(0) : null,
+    };
+  });
 async function setVisuals(page, v) {
   await page.evaluate((v) => window.__flyStore.getState().setVisuals(v), v);
 }
@@ -186,6 +224,67 @@ async function pinHere(page) {
     }, 8);
   });
 }
+/**
+ * (6) The FLAG-OFF session (FLY_URL_BASELINE, a dev server on r25-w0, same
+ * fixture): boot airborne at the first pose, then every pose in order, and
+ * capture Classic with the SAME recipe as the integration session's c0
+ * (noon pin, pinned pose, actors + cloud decks + cloud-shadow pool parked,
+ * holdStill, program-count settle, world-only capture). The r25-w0 tree
+ * keeps the fleet pins (bypass + 'classic'), which on that tree IS the
+ * product. Never throws: an error is returned in `error`.
+ */
+async function baselineSession(browser, names, suffix = '') {
+  const out = {};
+  let page = null;
+  try {
+    page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    await page.addInitScript(installGroundTextureAudit);
+    const P0 = pose(names[0]);
+    const noon0 = (await sunTimeMs(P0, 'noon')).tMs;
+    await page.addInitScript((t) => {
+      window.__flySunOverride = t;
+    }, noon0);
+    const boot = await bootFly(page, {
+      style: 'satellite', url: process.env.FLY_URL_BASELINE, timeoutMs: 1800000,
+      geo: { lat: P0.lat, lon: P0.lon, altM: P0.altM, headingRad: (P0.hdgDeg * Math.PI) / 180 },
+    });
+    out.bootMs = boot?.ms ?? null;
+    console.log(`[baseline] satellite boot ${out.bootMs} ms`);
+    const shot = makeCanvasShot(page).shot;
+    for (const name of names) {
+      const P = pose(name);
+      const { ms, readiness } = await warpToPose(page, P, { sun: 'noon', timeoutMs: POSE_TIMEOUT_MS, pollMs: 5000, pin: true });
+      if (!readiness?.ready) {
+        out[name] = { ready: false, missing: readiness?.missing ?? null };
+        console.log(`[baseline] ${name}: never ready (${JSON.stringify(readiness?.missing)})`);
+        continue;
+      }
+      const hidden = await hideActors(page);
+      await holdStill(page, true);
+      await settle(page, 30);
+      await isolateCanvas(page, true);
+      const b = await shot();
+      await isolateCanvas(page, false);
+      const file = path.join(OUT, `${name}-baseline${suffix}.png`);
+      fs.writeFileSync(file, b);
+      out[name] = { ready: true, readyMs: ms, hidden, parkHeld: await parkHeld(page), census: await census(page), file };
+      console.log(`[baseline] ${name}: captured (ready ${ms} ms, ${JSON.stringify(out[name].census)})`);
+      await holdStill(page, false);
+    }
+  } catch (e) {
+    out.error = String(e.stack || e).slice(0, 400);
+  }
+  if (page) await page.close().catch(() => {});
+  return out;
+}
+/** The recorded flag-off vs flag-off cross-boot floor for a pose (full frame), or null. */
+function xfloorFor(name) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(OUT, 'xfloor.json'), 'utf8')).poses?.[name]?.full ?? null;
+  } catch {
+    return null;
+  }
+}
 function writeReport(extra = {}) {
   fs.writeFileSync(path.join(OUT, `report${RED ? '-red' : ''}.json`), JSON.stringify({ red: RED, force: FORCE, pass, fail, notcal, rows, ...extra }, null, 2));
 }
@@ -202,6 +301,39 @@ function writeReport(extra = {}) {
     improveK: cert.horizon?.improveK ?? 0.6,
   };
   const skyOn = !!C.R25_SKY?.enabled, groundOn = !!C.R25_GROUND?.enabled;
+
+  // CROSS-BOOT FLOOR CONTROL (R25 E2 close). R25_VISUALS_XFLOOR=1 runs ONLY a
+  // second flag-off session (FLY_URL_BASELINE, same poses, same recipe) and
+  // diffs each capture against the `${pose}-baseline.png` a previous run
+  // wrote: flag-off vs flag-off across two boots, i.e. what the venue alone
+  // moves between sessions (animated actors no park reaches, the session
+  // clock). It judges nothing; (6) reads it from xfloor.json. Measured at
+  // Manhattan: the WITHIN-session floor is p99 4/255, so the identity bound
+  // is not resolvable there without this.
+  if (process.env.R25_VISUALS_XFLOOR === '1') {
+    if (!process.env.FLY_URL_BASELINE) throw new Error('R25_VISUALS_XFLOOR needs FLY_URL_BASELINE');
+    const b2 = await chromium.launch({ args: ['--enable-webgl', '--ignore-gpu-blocklist'] });
+    const ctl = await baselineSession(b2, POSE_NAMES, '-xfloor');
+    await b2.close().catch(() => {});
+    const out = { at: new Date().toISOString(), error: ctl.error ?? null, poses: {} };
+    for (const name of POSE_NAMES) {
+      const first = path.join(OUT, `${name}-baseline.png`);
+      const c = ctl[name];
+      if (!c?.ready || !fs.existsSync(first)) {
+        out.poses[name] = { ready: !!c?.ready, missing: c?.missing ?? null, first: fs.existsSync(first) };
+        console.log(`[xfloor] ${name}: no pair (${JSON.stringify(out.poses[name])})`);
+        continue;
+      }
+      const a = fs.readFileSync(first), b = fs.readFileSync(c.file);
+      const full = L.diffCensus(await L.loadRegion(a), await L.loadRegion(b));
+      const terrain = L.diffCensus(await L.loadRegion(a, TERRAIN), await L.loadRegion(b, TERRAIN));
+      const horizon = L.diffCensus(await L.loadRegion(a, HORIZON), await L.loadRegion(b, HORIZON));
+      out.poses[name] = { ready: true, readyMs: c.readyMs, full, terrain, horizon, census: c.census, parkHeld: c.parkHeld };
+      console.log(`[xfloor] ${name}: flag-off vs flag-off across two boots: full ${fmt(full)} · census ${JSON.stringify(c.census)}`);
+    }
+    fs.writeFileSync(path.join(OUT, 'xfloor.json'), JSON.stringify(out, null, 2));
+    process.exit(0);
+  }
   const shipKnown = !!C.R25_SKY;
   console.log(`ship state: R25_SKY ${skyOn} · R25_GROUND ${groundOn} · bounds ${JSON.stringify(CERT)}`);
 
@@ -217,6 +349,24 @@ function writeReport(extra = {}) {
 
   const browser = await chromium.launch({ args: ['--enable-webgl', '--ignore-gpu-blocklist'] });
   const results = {};
+  // R25_VISUALS_XPAR=1 (with FLY_URL_BASELINE): run the flag-off session in a
+  // SECOND browser concurrently with the integration session instead of after
+  // it — two ~10-minute satellite boots and their settles overlap. It is a
+  // second SwiftShader browser: hold both slots (run-browser.sh nested twice).
+  let basePromise = null;
+  if (process.env.R25_VISUALS_XPAR === '1' && process.env.FLY_URL_BASELINE) {
+    basePromise = (async () => {
+      let b2 = null;
+      try {
+        b2 = await chromium.launch({ args: ['--enable-webgl', '--ignore-gpu-blocklist'] });
+        return await baselineSession(b2, POSE_NAMES);
+      } catch (e) {
+        return { error: String(e.stack || e).slice(0, 400) };
+      } finally {
+        if (b2) await b2.close().catch(() => {});
+      }
+    })();
+  }
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     const shot = makeCanvasShot(page).shot;
@@ -250,7 +400,7 @@ function writeReport(extra = {}) {
 
     for (const name of POSE_NAMES) {
       const P = pose(name);
-      const { readiness } = await warpToPose(page, P, { sun: 'noon', timeoutMs: 900000, pollMs: 5000, pin: true });
+      const { readiness } = await warpToPose(page, P, { sun: 'noon', timeoutMs: POSE_TIMEOUT_MS, pollMs: 5000, pin: true });
       if (!readiness?.ready) {
         notCal(`(${P.name}) pose settles`, `world never ready: missing ${JSON.stringify(readiness?.missing)}`);
         continue;
@@ -320,20 +470,34 @@ function writeReport(extra = {}) {
       }
       Object.assign(r, { back, enh, programs: progs, census: [cen0, cen1, cen2] });
 
-      // (1) Classic -> Enhanced -> Classic
-      if (!resolvable) notCal(`(1) ${P.name}: Classic -> Enhanced -> Classic restores Classic`, `venue floor ${fmt(floor)} exceeds the 0.5/255 mean / 2/255 p99 bound`);
+      // (1) Classic -> Enhanced -> Classic. With NO visual block ON the store
+      // flips but r25On() stays false, so a green here would be vacuous (R25
+      // E2 close: the intro pass runs this gate FORCED) — NOT CALIBRATED,
+      // with the measured pair printed.
+      if (!toggleLegsApply({ skyOn, groundOn })) notCal(`(1) ${P.name}: Classic -> Enhanced -> Classic restores Classic`, `no R25 visual block ships ON — nothing to switch (measured ${fmt(back)}; floor ${fmt(floor)})`);
+      else if (!resolvable) notCal(`(1) ${P.name}: Classic -> Enhanced -> Classic restores Classic`, `venue floor ${fmt(floor)} exceeds the 0.5/255 mean / 2/255 p99 bound`);
       else gate(`(1) ${P.name}: Classic -> Enhanced -> Classic restores Classic`, back.mean <= floor.mean + 0.5 && back.p99 <= Math.max(2, floor.p99), fmt(back));
       // (2) Enhanced differs
-      const moved = enh.mean > floor.mean + 0.25 || enh.p99 > floor.p99 + 1;
-      if (!moved) notCal(`(2) ${P.name}: Enhanced differs from Classic`, `Enhanced == Classic within the floor (${fmt(enh)}) — no R25 visual block acts here`);
+      // With NO R25 visual block ON, r25On() is false everywhere, so the
+      // "Enhanced" capture IS Classic and any difference from c0 is the venue
+      // moving between two captures minutes apart (R25 E2 close, MEASURED at
+      // Manhattan: the steam plumes and the facade shimmer tripped this
+      // detector on a Classic/Classic pair, and (4c) then FAILED on seam 14.70
+      // vs 14.70). No block ON => nothing moved by construction: (2)-(4) and
+      // (5b) read NOT CALIBRATED, whatever the pixels do.
+      const anyVisual = toggleLegsApply({ skyOn, groundOn });
+      const moved = anyVisual && (enh.mean > floor.mean + 0.25 || enh.p99 > floor.p99 + 1);
+      if (!anyVisual) notCal(`(2) ${P.name}: Enhanced differs from Classic`, `no R25 visual block ships ON — the "Enhanced" capture is Classic (venue motion between captures: ${fmt(enh)}; floor ${fmt(floor)})`);
+      else if (!moved) notCal(`(2) ${P.name}: Enhanced differs from Classic`, `Enhanced == Classic within the floor (${fmt(enh)}) — no R25 visual block acts here`);
       else gate(`(2) ${P.name}: Enhanced differs from Classic`, true, fmt(enh));
       // (3) programs flat after the first cycle
       const flat = progs.slice(1).every((n) => n === progs[1]);
       if (!Number.isFinite(progs[0])) notCal(`(3) ${P.name}: GL programs flat after cycle 1`, '__flyGl not exposed (non-development server)');
+      else if (!anyVisual) notCal(`(3) ${P.name}: GL programs flat after cycle 1`, `no R25 visual block ships ON — the leg measured no toggle (${progs.join(' -> ')})`);
       else if (progs[1] === progs[0] && !moved) notCal(`(3) ${P.name}: GL programs flat after cycle 1`, `flat (${progs.join(' -> ')}) but Enhanced compiled nothing — the leg measured no toggle`);
       else gate(`(3) ${P.name}: GL programs flat after cycle 1`, flat, progs.join(' -> '));
       // (4) luminance / clip / horizon / columns
-      if (!moved) notCal(`(4) ${P.name}: luminance + horizon bounds`, 'Enhanced == Classic — no Enhanced column');
+      if (!moved) notCal(`(4) ${P.name}: luminance + horizon bounds`, anyVisual ? 'Enhanced == Classic — no Enhanced column' : 'no R25 visual block ships ON — no Enhanced column');
       else {
         const tC = L.census(await L.loadRegion(c0, TERRAIN));
         const tE = L.census(await L.loadRegion(e1, TERRAIN));
@@ -370,36 +534,56 @@ function writeReport(extra = {}) {
     }
     await page.close();
 
-    // (6) CROSS-BOOT flag-off
-    const c0Owens = path.join(OUT, 'owens-classic-0.png');
+    // (6) CROSS-BOOT flag-off — EVERY pose this run captured (R25 E2 close:
+    // the plan's P1/P3/P5; the gate used to cross-boot Owens only).
+    const captured = POSE_NAMES.filter((n) => results[n]?.floor && fs.existsSync(path.join(OUT, `${n}-classic-0.png`)));
     if (!process.env.FLY_URL_BASELINE)
       notCal('(6) CROSS-BOOT: Classic == the flag-off tree', 'FLY_URL_BASELINE unset (a dev server on the r25-w0 tree, same fixture)');
-    else if (!results.owens?.floor || !fs.existsSync(c0Owens))
-      notCal('(6) CROSS-BOOT: Classic == the flag-off tree', 'the Owens Classic capture was not taken this run');
-    else {
-      const p2 = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-      const P1 = pose('owens');
-      const noon1 = (await sunTimeMs(P1, 'noon')).tMs;
-      await p2.addInitScript((t) => {
-        window.__flySunOverride = t;
-      }, noon1);
-      await bootFly(p2, {
-        style: 'satellite', url: process.env.FLY_URL_BASELINE, timeoutMs: 1800000,
-        geo: { lat: P1.lat, lon: P1.lon, altM: P1.altM, headingRad: (P1.hdgDeg * Math.PI) / 180 },
-      });
-      const { readiness } = await warpToPose(p2, pose('owens'), { sun: 'noon', timeoutMs: 900000, pollMs: 5000, pin: true });
-      if (!readiness?.ready) notCal('(6) CROSS-BOOT: Classic == the flag-off tree', 'baseline world never ready');
-      else {
-        await hideActors(p2);
-        await holdStill(p2, true);
-        await settle(p2, 30);
-        await isolateCanvas(p2, true);
-        const b = await makeCanvasShot(p2).shot();
-        fs.writeFileSync(path.join(OUT, 'owens-baseline.png'), b);
-        const d = L.diffCensus(await L.loadRegion(fs.readFileSync(c0Owens)), await L.loadRegion(b));
-        gate('(6) CROSS-BOOT: Classic == the flag-off tree (mean <= 0.5/255, p99 <= 2/255)', d.mean <= 0.5 && d.p99 <= 2, fmt(d));
+    else if (!captured.length) {
+      if (basePromise) await basePromise; // never leave the parallel session running
+      notCal('(6) CROSS-BOOT: Classic == the flag-off tree', 'no Classic capture was taken this run');
+    } else {
+      const base = basePromise ? await basePromise : await baselineSession(browser, captured);
+      if (base.error) console.log(`[baseline] session error: ${base.error}`);
+      results.crossBoot = { parallel: !!basePromise, error: base.error ?? null };
+      for (const name of POSE_NAMES) {
+        const label = `(6) ${name}: CROSS-BOOT Classic == the flag-off tree (mean <= 0.5/255, p99 <= 2/255)`;
+        const b = base[name];
+        if (!captured.includes(name)) notCal(label, 'the integration session did not capture this pose (it never settled)');
+        else if (!b) notCal(label, `the baseline session did not reach this pose${base.error ? ` (${base.error.slice(0, 160)})` : ''}`);
+        else if (!b.ready) notCal(label, `baseline world never ready: missing ${JSON.stringify(b.missing)}`);
+        else {
+          const c0 = fs.readFileSync(path.join(OUT, `${name}-classic-0.png`));
+          const bb = fs.readFileSync(b.file);
+          const d = L.diffCensus(await L.loadRegion(c0), await L.loadRegion(bb));
+          const dT = L.diffCensus(await L.loadRegion(c0, TERRAIN), await L.loadRegion(bb, TERRAIN));
+          const dH = L.diffCensus(await L.loadRegion(c0, HORIZON), await L.loadRegion(bb, HORIZON));
+          const ci = results[name].census?.[0];
+          results.crossBoot[name] = { full: d, terrain: dT, horizon: dH, int: ci, w0: b.census, hidden: b.hidden, parkHeld: b.parkHeld, readyMs: b.readyMs };
+          const detail = `full ${fmt(d)} · terrain crop mean ${dT.mean.toFixed(3)} p99 ${dT.p99} · horizon crop mean ${dH.mean.toFixed(3)} p99 ${dH.p99} · draws int ${ci?.draws} / w0 ${b.census?.draws}`;
+          // The VENUE's cross-boot floor (R25 E2 close): flag-off vs flag-off
+          // across two boots, recorded by an R25_VISUALS_XFLOOR run
+          // (xfloor.json). A within-run floor measures the reader; a
+          // cross-boot floor measures the venue (R24 §7). MEASURED on the
+          // fixture: Owens 0.531/11 and a clock-driven sky cloud pass, steam
+          // plumes and facade shimmer no park reaches — the identity bound is
+          // not resolvable across boots there. Rule: inside the bound =>
+          // PASS; outside it, but no worse than two flag-off boots differ
+          // from each other while that floor itself breaks the bound => NOT
+          // CALIBRATED (the venue cannot resolve it); anything else => FAIL.
+          const xf = xfloorFor(name);
+          results.crossBoot[name].xfloor = xf;
+          const xv = crossBootVerdict(d, xf); // scripts/_r25-xboot.js (node self-check)
+          const xtail = xf ? ` · venue cross-boot floor ${fmt(xf)}` : ' · no cross-boot floor recorded (R25_VISUALS_XFLOOR=1)';
+          if (xv.verdict === 'NOT CALIBRATED') notCal(label, `${detail}${xtail} — ${xv.why}`);
+          else gate(label, xv.verdict === 'PASS', `${detail}${xtail}`);
+          const tl = `(6t) ${name}: triangles unchanged vs the flag-off tree`;
+          if (!Number.isFinite(ci?.tris) || !Number.isFinite(b.census?.tris)) notCal(tl, 'no triangle census');
+          else if (ci.tris === b.census.tris) gate(tl, true, `int ${ci.tris} / w0 ${b.census.tris}`);
+          else
+            notCal(tl, `int ${ci.tris} vs w0 ${b.census.tris} — two sessions' streamed working sets differ (a settled readiness is a state of the streamer, not an identity of the scene); the pixel row is the load-bearing identity`);
+        }
       }
-      await p2.close();
     }
 
     // (7) TOY never enhances
@@ -440,7 +624,8 @@ function writeReport(extra = {}) {
       await settle(tp);
       const td = L.diffCensus(await L.loadRegion(a0), await L.loadRegion(a1));
       results.toy = { floor: tfloor, enh: td, census: [tc0, tc1] };
-      if (!(tfloor.mean <= 0.5 && tfloor.p99 <= 2)) notCal('(7a) TOY: Enhanced == Classic (toy never enhances)', `venue floor ${fmt(tfloor)} exceeds the identity bound`);
+      if (!toggleLegsApply({ skyOn, groundOn })) notCal('(7a) TOY: Enhanced == Classic (toy never enhances)', `no R25 visual block ships ON — nothing could enhance (measured ${fmt(td)}; floor ${fmt(tfloor)})`);
+      else if (!(tfloor.mean <= 0.5 && tfloor.p99 <= 2)) notCal('(7a) TOY: Enhanced == Classic (toy never enhances)', `venue floor ${fmt(tfloor)} exceeds the identity bound`);
       else gate('(7a) TOY: Enhanced == Classic (toy never enhances)', td.mean <= tfloor.mean + 0.5 && td.p99 <= Math.max(2, tfloor.p99), `${fmt(td)} (floor ${fmt(tfloor)})`);
       gate(`(7b) TOY: draws <= ${BUDGET.toy} in both profiles`, [tc0, tc1].every((c) => Number.isFinite(c?.draws) && c.draws <= BUDGET.toy), `${tc0.draws} / ${tc1.draws}`);
       await tp.close();

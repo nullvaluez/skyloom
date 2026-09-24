@@ -46,6 +46,7 @@ const SCRIPTS = path.join(REPO, 'scripts');
 const OUT = path.join(SCRIPTS, 'r24-out');
 
 let shared = null; // one server per node process
+let starting = null; // R25 E2 close: two pages attaching at once share ONE start
 
 async function ensureServer() {
   if (shared) return shared;
@@ -55,8 +56,11 @@ async function ensureServer() {
     return shared;
   }
   // The fixture is ESM; this file is CJS because 92 harnesses are.
-  const mod = await import('./r24-fixture/server.mjs');
-  shared = await mod.startFixture({ port: Number(process.env.FLY_FIXTURE_PORT || 3199) });
+  // Cache the START, not only its result: two sessions booting concurrently
+  // in one process (verify-r25-visuals R25_VISUALS_XPAR) would otherwise both
+  // see `shared === null` and start two servers.
+  starting ??= import('./r24-fixture/server.mjs').then((mod) => mod.startFixture({ port: Number(process.env.FLY_FIXTURE_PORT || 3199) }));
+  shared = await starting;
   return shared;
 }
 
