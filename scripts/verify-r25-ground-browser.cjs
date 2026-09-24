@@ -47,6 +47,7 @@ const os = require('os');
 const path = require('path');
 const { chromium } = require('playwright');
 const { bootFly, unpinPins } = require('./_boot');
+const { fixtureEnabled } = require('./_fixture');
 const POSE_LIB = require('./_r25-poses');
 const { pose, warpToPose } = POSE_LIB;
 // E's later helpers (present once E's session-2 commits are on the tree):
@@ -69,7 +70,13 @@ const TERRAIN = { left: 0.12, top: 0.62, width: 0.76, height: 0.3 };
 const args = process.argv.slice(2);
 const NO_TOY = args.includes('--no-toy');
 const WANT = args.filter((a) => !a.startsWith('--'));
-const POSES = ['P2', 'P5', 'P1'].filter((id) => !WANT.length || WANT.includes(id)).map((id) => pose(id));
+const POSES = ['P2', 'P5', 'P1'].filter((id) => !WANT.length || WANT.includes(id)).map((id) => {
+  const p = pose(id);
+  // The archived poses target a synthetic DEM. The real Sierra summit is
+  // higher than its 3200 m fixture pose; use a documented safe MSL for live
+  // imagery instead of comparing the undersides of the terrain skirts.
+  return fixtureEnabled() ? p : { ...p, altM: id === 'P2' ? 5000 : id === 'P5' ? 2400 : p.altM };
+});
 const RELIEF = new Set(['sierra', 'smokies']);
 
 let pass = 0, fail = 0, notcal = 0;
@@ -112,9 +119,9 @@ async function waitEnhancedData(page, ms = 240000) {
   while (Date.now() - t0 < ms * SCALE) {
     s = await page.evaluate(() => {
       const g = window.__fly?.r25Ground;
-      return g ? { live: g.live, resident: g.pool?.resident ?? 0, binds: g.pool?.binds ?? 0, loaded: g.atlas?.loaded ?? 0, pending: g.atlas?.pending ?? 99, reliefPx: g.reliefPx, bytes: g.textureBytes } : null;
+      return g ? { live: g.live, resident: g.pool?.resident ?? 0, binds: g.pool?.binds ?? 0, loaded: g.atlas?.loaded ?? 0, hasAtlas: !!g.atlas, pending: g.atlas?.pending ?? 0, reliefPx: g.reliefPx, bytes: g.textureBytes } : null;
     });
-    if (s?.live && s.resident > 0 && s.loaded > 0 && s.pending === 0) break;
+    if (s?.live && s.resident > 0 && (!s.hasAtlas || s.loaded > 0) && s.pending === 0) break;
     await page.waitForTimeout(3000);
   }
   return s;
@@ -248,7 +255,7 @@ function stepStat(img, lines, W, H) {
 }
 
 (async () => {
-  const browser = await chromium.launch({ args: ['--enable-webgl', '--ignore-gpu-blocklist'] });
+  const browser = await chromium.launch({ args: ['--enable-gpu', '--enable-webgl', '--ignore-gpu-blocklist'] });
   const report = { at: new Date().toISOString(), load0: load(), stamp: process.env.FLY_FIXTURE_STAMP || 'on', poses: {}, toy: null };
   if (report.stamp !== 'off') info('FLY_FIXTURE_STAMP is not "off": the imagery carries tile-identity stamps (text + hue) — Sobel/seam columns measure the stamp too');
   try {
@@ -266,7 +273,9 @@ function stepStat(img, lines, W, H) {
       (window.__r22Unpinned ??= {}).__flyVisualsOverride = 'enhanced';
       window.__flyR25Sky = 0; // D-only column: C forced Classic even in Enhanced
     });
-    const b = await bootFly(page, { style: 'satellite', timeoutMs: 1500000 });
+    const first = POSES[0];
+    const b = await bootFly(page, { style: 'satellite', timeoutMs: 180000, geo: { lat: first.lat, lon: first.lon, altM: first.altM, headingRad: first.hdgDeg * Math.PI / 180 } });
+    console.log('[GPU]', await page.evaluate(() => { const gl = window.__flyGl.getContext(); const ex = gl.getExtension('WEBGL_debug_renderer_info'); return ex ? gl.getParameter(ex.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); }));
     const prof = await page.evaluate(() => ({ visuals: window.__flyStore.getState().visuals, attempt: window.__r22PinAttempt?.__flyVisualsOverride ?? null }));
     report.boot = { ms: b.ms, load: load(), ...prof };
     console.log(`satellite boot ${b.ms} ms (load ${load()}), profile ${prof.visuals} (fleet pin swallowed: ${prof.attempt})`);
@@ -274,9 +283,12 @@ function stepStat(img, lines, W, H) {
 
     for (const P of POSES) {
       const r = (report.poses[P.name] = { pose: P.id });
+      await page.evaluate(() => { const m = window.__fly.engine.map; if (m.__r25SavedUpdate) { m.update = m.__r25SavedUpdate; delete m.__r25SavedUpdate; } });
       await holdStill(page, false);
-      const { ms, readiness } = await warpToPose(page, P, { sun: 'noon', timeoutMs: 1200000 * Math.min(SCALE, 2), pollMs: 5000, pin: true });
+      const { ms, readiness } = await warpToPose(page, P, { sun: 'noon', timeoutMs: 120000 * Math.min(SCALE, 2), pollMs: 5000, pin: true });
       r.readyMs = ms;
+      r.poseMsl = P.altM;
+      console.log(`[${P.name}] ready=${readiness?.ready} MSL=${P.altM} AGL=${readiness?.agl} missing=${JSON.stringify(readiness?.missing)}`);
       if (!readiness?.ready) {
         notCal(`(${P.name}) pose settles`, `world never ready in ${ms} ms: missing ${JSON.stringify(readiness?.missing)}`);
         continue;
@@ -288,6 +300,11 @@ function stepStat(img, lines, W, H) {
       // Freeze the sim for the pixel pairs (r25GroundFrame keeps running: the
       // frame block is not skipped while paused, only the flight integration).
       r.held = await holdStill(page, true);
+      // Settle the already-requested tiles before a fixed-geometry shader A/B.
+      // Moving flight is measured separately with the shipped LOD walker.
+      await page.waitForFunction(() => window.__fly.engine.downloading === 0, null, { timeout: 30000 }).catch(() => {});
+      await frames(page, 60);
+      await page.evaluate(() => { const m = window.__fly.engine.map; m.__r25SavedUpdate = m.update; m.update = () => {}; });
       r.enhancedData = ed;
       await frames(page, 20);
       // ENHANCED (the product profile the tiles streamed in)

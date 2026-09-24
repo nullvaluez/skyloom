@@ -191,7 +191,7 @@ function cloudProfileInPage() {
   try {
     gl.readRenderTargetPixels(t, 0, 0, w, h, buf);
   } catch (e) {
-    return { error: `read failed: ${e.message}` };
+    return { error: `read failed: ${e.stack || e.message}` };
   }
   const half = (b) => {
     const s = (b & 0x8000) >> 15, e = (b & 0x7c00) >> 10, f = b & 0x03ff;
@@ -234,9 +234,9 @@ function cloudProfileInPage() {
   const C = await import(pathToFileURL(path.join(__dirname, '..', 'lib/fly/fly-constants.js')).href);
   const CERT = C.R25_CERT;
   const rangeKm = C.R25_SKY.cloudAir.fadeEndM / 1000;
-  const browser = await chromium.launch({ args: ['--enable-webgl', '--ignore-gpu-blocklist'] });
+  const browser = await chromium.launch({ args: ['--enable-gpu', '--enable-webgl', '--ignore-gpu-blocklist'] });
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-  page.on('pageerror', (e) => console.log(`[pageerror] ${e.message}`));
+  page.on('pageerror', (e) => console.log(`[pageerror] ${e.stack || e.message}`));
   const shot = makeCanvasShot(page).shot;
   const cap = async (tag) => {
     await isolateCanvas(page, true);

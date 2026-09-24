@@ -348,6 +348,9 @@ else {
     }
   };
   const slice = (src, a, b) => {
+    // Git blobs use LF; Windows checkouts may use CRLF. Compare shader text,
+    // not the checkout's line-ending conversion.
+    src = src.replace(/\r\n/g, '\n');
     const i = src.indexOf(a);
     const j = src.indexOf(b, i + a.length);
     return i >= 0 && j > i ? src.slice(i, j) : null;

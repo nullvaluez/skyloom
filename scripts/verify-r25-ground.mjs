@@ -394,14 +394,20 @@ const { applyEarthSurface } = await imp('lib/fly/earth-surface-material.js');
 const { stylizedEarthOn } = await imp('lib/fly/stylized-earth.js');
 const SUBS = ['relief', 'oneSun', 'colorRef', 'sharpen'];
 const subSaved = Object.fromEntries(SUBS.map((s) => [s, C.R25_GROUND[s].enabled]));
+const quiltSaved = C.R25_GROUND.retireQuilt.enabled;
 function setArm({ flag, profile, only = null }) {
   C.R25_GROUND.enabled = flag;
-  for (const s of SUBS) C.R25_GROUND[s].enabled = only ? s === only : subSaved[s];
+  // Arithmetic/source tests exercise each built candidate, including the
+  // colour atlas deferred by the shipped shader's 16-sampler limit. The
+  // unpinned runtime gate checks the actual supported default combination.
+  for (const s of SUBS) C.R25_GROUND[s].enabled = only ? s === only : true;
+  C.R25_GROUND.retireQuilt.enabled = true;
   useFlyStore.getState().setVisuals(profile);
 }
 function restoreArm() {
   C.R25_GROUND.enabled = SHIPPED.enabled;
   for (const s of SUBS) C.R25_GROUND[s].enabled = subSaved[s];
+  C.R25_GROUND.retireQuilt.enabled = quiltSaved;
   useFlyStore.getState().setVisuals('classic');
 }
 function compileChain({ lod = true } = {}) {
@@ -665,8 +671,12 @@ console.log('\n[6] frame hook: Classic silent, Enhanced acts, toggle back frees'
   gate('(6b) ENHANCED: quilt retired (0,0) on satellite; sharpen k on HIGH only; relief requested on satellite; toy = identity uniforms',
     q.desat === 0 && q.flatten === 0 && sat.sat === 1 && sat.sharp === C.R25_GROUND.sharpen.k && sat.px === N && med === 0 && toy.sat === 0 && toy.sharp === 0 && toy.px === 0,
     `sat ${JSON.stringify(sat)} medium k ${med} toy ${JSON.stringify(toy)}`);
-  const liveBytes = sat.bytes;
+  // Toy now releases the Enhanced GPU set as well. Return to satellite
+  // before measuring the separate Enhanced -> Classic disposal transition.
   const internals = G.__r25GroundInternals;
+  gate('(6b2) TOY releases Enhanced ground GPU allocations', !internals._st.live && G.r25GroundStats.textureBytes === 0);
+  G.r25GroundFrame({ engine }, ctx('satellite', 'high'));
+  const liveBytes = G.r25GroundStats.textureBytes;
   let atlasGpuFreed = 0;
   internals._st.atlas?.texture.addEventListener('dispose', () => atlasGpuFreed++);
   const poolBefore = internals._st.pool;
@@ -744,6 +754,29 @@ console.log('\n[6] frame hook: Classic silent, Enhanced acts, toggle back frees'
 }
 
 // ===========================================================================
+// Three's material cache skips onBeforeCompile when revisiting an existing
+// program. Compile Enhanced then Classic on the SAME material and retain the
+// renderer's last uniforms object, exactly as that path does.
+{
+  setArm({ flag: true, profile: 'enhanced' });
+  const mat = G.buildR25TerrainTwin();
+  const shader = () => ({ vertexShader: THREE.ShaderLib.standard.vertexShader,
+    fragmentShader: THREE.ShaderLib.standard.fragmentShader,
+    uniforms: THREE.UniformsUtils.clone(THREE.ShaderLib.standard.uniforms) });
+  const enhanced = shader();
+  mat.onBeforeCompile(enhanced, {});
+  const h = mat.userData.__r25Ground;
+  setArm({ flag: true, profile: 'classic' });
+  const classic = shader();
+  mat.onBeforeCompile(classic, {});
+  const restored = new THREE.Texture();
+  h.uR25Relief.value = restored;
+  gate('(6f) cached Enhanced program retains live texture bindings after Classic compile',
+    enhanced.uniforms === classic.uniforms && classic.uniforms.uR25Relief === h.uR25Relief &&
+    classic.uniforms.uR25Relief.value === restored && !classic.fragmentShader.includes('vec3 r25ReliefN'));
+  restored.dispose(); mat.map.dispose(); mat.dispose(); restoreArm();
+}
+
 console.log('\n[7] mesh sub-flag (launch-applied)');
 {
   const merged = TE.r25MeshTable(C.TERRA_SHARP.demErrorTable);

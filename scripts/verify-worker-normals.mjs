@@ -16,8 +16,9 @@
  * Run: node scripts/verify-worker-normals.mjs
  */
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const src = readFileSync(`${ROOT}/lib/fly/vendor/three-tile/workers/skirt-tail.src.js`, 'utf8');
 
 // Evaluate only the function bodies — the message handler references __DECODE__

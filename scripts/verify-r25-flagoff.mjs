@@ -309,7 +309,7 @@ else gate('(3c) ENHANCED: the hooks act', true, `${H.enhanced.writes.length} wri
 console.log('\n[4] constants hygiene against the r25-w0 tag');
 const R25_BLOCKS = ['FRONT_DOOR', 'VISUALS', 'FLIGHT_PLAN', 'R25_SKY', 'R25_GROUND', 'R25_CERT'];
 function stripBlocks(src) {
-  let out = src;
+  let out = src.replace(/\r\n/g, '\n');
   for (const name of R25_BLOCKS) {
     const at = out.indexOf(`export const ${name} = {`);
     if (at < 0) return null;
