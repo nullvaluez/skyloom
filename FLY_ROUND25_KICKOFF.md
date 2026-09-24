@@ -4,6 +4,23 @@
 The game plays exactly as it did at `2c624a3`, because every R25 flag ships `enabled:false`.
 The plan is approved; do not re-plan.
 
+## PAUSED (2026-09-24): the intro is SHIPPED, the visuals pass is paused for the weekly limit
+
+- **`main` = the intro, certified:**
+  - Record: [FLY_FRONT_DOOR_AND_VISUALS.md](FLY_FRONT_DOOR_AND_VISUALS.md), which holds the user-machine run list.
+  - Ship state: `FRONT_DOOR` and `FLIGHT_PLAN` are ON. `R25_SKY` and `R25_GROUND` are OFF. `VISUALS.defaultProfile` is `'classic'` until an Enhanced sub-flag ships.
+- **Visuals backups** (pushed on purpose so the work survives the container):
+  - `origin/r25/c` = `11d1f8d`: C SKY. Code, node gates, and its browser gate started.
+  - `origin/r25/d` = `4bc873e`: D GROUND, with the intro tree `480ba99` merged in.
+  - Both stopped mid-build with nothing uncommitted. Their ledgers are `scripts/r25-c-sky.md` and `scripts/r25-d-ground.md`.
+- **To resume** (fresh container):
+  1. Do the setup from the prompt below. Create the worktrees from `origin/r25/c` and `origin/r25/d` instead of `r25-w0`, and tag `r25-w0` at `1f983be`.
+  2. `echo <main head> > /tmp/r25-locks/intro-pushed`, so C and D may use browsers.
+  3. Run `Workflow({scriptPath:'scripts/r25-workflow.txt', args:{intBranch, trailer, pass:'visuals-early', stopAfter:'fix', note:'RESUMING…'}})`.
+  4. Then run `pass:'visuals'` with `reports:{c,d}` and `priorMerged:['r25/e','r25/a','r25/b']`.
+  5. When an Enhanced sub-flag ships, set `VISUALS.defaultProfile` back to `'enhanced'`.
+- **Open for the visuals pass**, from E's close (`scripts/r25-e-cert.md` §4f): same-tree cross-boots on the fixture already exceed the 0.5/2 identity bound (Owens 0.531/11, Manhattan 2.031/33). The pixel instruments need a venue floor before any Enhanced column can resolve.
+
 ## Session 2 state (2026-09-24 ~00:45 UTC) — read this first if the session died
 
 - **The intro is on `main` at `93c28f3`** (E + A + B merged, node gates green, a production build of `28c2d16` succeeded).
