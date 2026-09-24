@@ -17,7 +17,9 @@
  *     (t4)  Esc closes the sheet, the title stays; Esc on the title root is a
  *           no-op (never pauses a menu)
  *     (t5)  the title world reveals (data-ready) and the boot backdrop leaves
- *     (t6)  ORBIT: radius within ±5 % of FRONT_DOOR.orbit.radiusM, measured
+ *     (t6)  ORBIT: radius within ±5 % of the ACTIVE title spot's radiusM
+ *           (runtime.titleSpot ?? spawn.title — B's destinations.js; default
+ *           FRONT_DOOR.orbit.radiusM), a radius the source ships, measured
  *           from the camera's absolute position vs flight.pos (not the rig's
  *           own stats); the orbit ADVANCES; eye AGL ≥ minAglM
  *     (t7)  the player group is hidden on the title
@@ -34,7 +36,10 @@
  *     (t11) KOSU apron departure -> flight; pause -> "Exit to title" ->
  *           the title over a LIVE world: same canvas element, no reload,
  *           frames advancing, operations back in phase 'hangar', the title
- *           camera blending out of the chase pose, the desktop X gone
+ *           camera blending out of the chase pose (a NEW blend across the
+ *           exit — the toy title spot is Manhattan, ~800 km from KOSU, so a
+ *           stale title centre read the flight as a teleport and SNAPPED:
+ *           E2 integration smoke "blends 0"), the desktop X gone
  *     (t12) the title's attribution is visible and on top
  *     (t13) MOUNTAIN: stage the frozen flight to the Sierra fixture scene
  *           (warpToGeo stage:true, allowed in menus) — eye AGL ≥ minAglM
@@ -91,6 +96,19 @@ const ORBIT = {
   minAglM: Number((FD_BLOCK.match(/minAglM:\s*([\d.]+)/) || [])[1] || 350),
 };
 const TOY = { exag: num(/terrainExaggeration:\s*([\d.]+)/, 1.7), lift: num(/groundLift:\s*([\d.]+)/, 2.5) };
+// The orbit radius the rig SHOULD fly is the active spot's own `title.radiusM`
+// (B's lib/fly/destinations.js, or flight-plan.js AIRPORT_TITLE for an ops
+// setup), falling back to FRONT_DOOR.orbit.radiusM — titleOrbitParams(). The
+// row reads WHICH spot from the page (runtime.titleSpot ?? spawn.title) and
+// checks the radius it expects is one the source ships, so the page cannot
+// hand the gate an arbitrary expectation. (Integration fix pass: E2's s2 read
+// 7.69 % = Sydney's 2400 vs the default 2600 — the camera was right.)
+const SRC = (rel) => fs.readFileSync(path.join(__dirname, '..', rel), 'utf8');
+const SHIPPED_RADII = new Set([
+  ORBIT.radiusM,
+  ...[...SRC('lib/fly/destinations.js').matchAll(/title:\s*\{\s*radiusM:\s*([\d.]+)/g)].map((m) => Number(m[1])),
+  ...[...SRC('lib/fly/flight-plan.js').matchAll(/AIRPORT_TITLE\s*=\s*Object\.freeze\(\{\s*radiusM:\s*([\d.]+)/g)].map((m) => Number(m[1])),
+]);
 
 let pass = 0;
 let fail = 0;
@@ -163,9 +181,15 @@ const geom = (page, toy) =>
         /* engine not ready */
       }
       const st = rt.titleCam?.stats ?? {};
+      // The spot the rig reads (title-camera.js installTitleCamera readSpot).
+      const fs0 = window.__flyStore?.getState();
+      const spot = rt.titleSpot ?? fs0?.spawn?.title ?? null;
+      const spotR = Number.isFinite(spot?.radiusM) && spot.radiusM > 0 ? spot.radiusM : null;
+      const spotId = rt.staging?.dest?.id ?? rt.flightPlanDest?.id ?? fs0?.spawn?.destId ?? null;
       return {
         r, cy, gEye, agl: gEye == null ? null : cy - gEye, active: !!rt.titleCam?.active, blending: !!st.blending,
-        angle: st.angleDeg ?? null, blends: st.blends ?? 0, frames: rt.framesRendered ?? 0,
+        spotR, spotId, spotSrc: rt.titleSpot ? 'runtime.titleSpot' : spot ? 'spawn.title' : 'default',
+        angle: st.angleDeg ?? null, blends: st.blends ?? 0, snaps: st.snaps ?? 0, frames: rt.framesRendered ?? 0,
         player: window.__flyPlayer ? window.__flyPlayer.visible : null, opPhase: rt.operations?.phase ?? null,
         locked: rt.targeting?.lockedHex ?? null, traffic: rt.traffic?.items?.length ?? 0,
       };
@@ -388,14 +412,20 @@ async function legDesktop(browser, style) {
     }
     if (samp.length < 4) notCal(`(${L}${toy ? 6 : 2}) orbit geometry`, `only ${samp.length} settled frames sampled`);
     else {
-      const worstR = Math.max(...samp.map((g) => Math.abs(g.r - ORBIT.radiusM) / ORBIT.radiusM));
+      // Expected radius = the active spot's title.radiusM (per sample: a
+      // staged spot can change it), else FRONT_DOOR.orbit.radiusM.
+      const want = (g) => g.spotR ?? ORBIT.radiusM;
+      const worstR = Math.max(...samp.map((g) => Math.abs(g.r - want(g)) / want(g)));
+      const wants = [...new Set(samp.map(want))];
+      const shipped = wants.every((w) => SHIPPED_RADII.has(w));
+      const spots = [...new Set(samp.map((g) => `${g.spotId ?? '?'} (${g.spotSrc}, ${want(g)} m)`))].join(' / ');
       const agls = samp.map((g) => g.agl).filter((v) => v != null);
       const minAgl = agls.length ? Math.min(...agls) : null;
       const angles = samp.map((g) => g.angle);
       const moved = Math.abs(angles.at(-1) - angles[0]) > 0.01;
-      gate(`(${L}${toy ? 6 : 2}) ORBIT: radius within ±5 % of ${ORBIT.radiusM} m, orbit advancing, eye AGL ≥ ${ORBIT.minAglM} m`,
-        worstR <= 0.05 && moved && (minAgl == null || minAgl >= ORBIT.minAglM * 0.9),
-        `${samp.length} frames · worst radius err ${(worstR * 100).toFixed(2)} % · angle ${angles[0]?.toFixed(2)}→${angles.at(-1)?.toFixed(2)}° · min AGL ${minAgl == null ? 'n/a (DEM unanswered)' : minAgl.toFixed(0) + ' m'}`);
+      gate(`(${L}${toy ? 6 : 2}) ORBIT: radius within ±5 % of the title spot's radiusM (default ${ORBIT.radiusM} m), orbit advancing, eye AGL ≥ ${ORBIT.minAglM} m`,
+        worstR <= 0.05 && shipped && moved && (minAgl == null || minAgl >= ORBIT.minAglM * 0.9),
+        `${samp.length} frames · spot ${spots} · expected radius shipped in source ${shipped} · worst radius err ${(worstR * 100).toFixed(2)} % · angle ${angles[0]?.toFixed(2)}→${angles.at(-1)?.toFixed(2)}° · min AGL ${minAgl == null ? 'n/a (DEM unanswered)' : minAgl.toFixed(0) + ' m'}`);
     }
     // (t7 / s3) plane hidden
     const g1 = await geom(page, toy);
@@ -624,9 +654,9 @@ async function legDesktop(browser, style) {
         const s = await storeOf(page);
         await page.screenshot({ path: path.join(OUT, 'toy-exit-to-title.png'), timeout: 90000 }).catch(() => {});
         gate('(t11) KOSU departure -> pause -> Exit to title: the title over the SAME live world',
-          flying && onTitle && same && after.frames > before.frames && after.opPhase === 'hangar' && after.active && after.blends >= 1 && after.player === false &&
+          flying && onTitle && same && after.frames > before.frames && after.opPhase === 'hangar' && after.active && after.blends > before.blends && after.player === false &&
             s.phase === 'flying' && xInFlight === 1 && xOnTitle === 0,
-          `paused via ${pausedVia} · exit button ${JSON.stringify(hit)} · flight ${flying} · title ${onTitle} · same canvas/no reload ${same} · frames ${before.frames}→${after.frames} · ops ${after.opPhase} · titleCam active ${after.active} blends ${after.blends} · player visible ${after.player} · X ${xInFlight}→${xOnTitle}`);
+          `paused via ${pausedVia} · exit button ${JSON.stringify(hit)} · flight ${flying} · title ${onTitle} · same canvas/no reload ${same} · frames ${before.frames}→${after.frames} · ops ${after.opPhase} · titleCam active ${after.active} blends ${before.blends}→${after.blends} snaps ${before.snaps}→${after.snaps} · spot ${after.spotId ?? '?'} · player visible ${after.player} · X ${xInFlight}→${xOnTitle}`);
       }
     }
 
