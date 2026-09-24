@@ -16,12 +16,13 @@
  *  (1) FREE HANGAR: hangar-mode[data-mode=free], #free-flight-search, the 11
  *      featured cards, a default selection = the spot the flight already sits
  *      at, and the ops panel absent.
- *  (2) STAGING: pick hangar-dest-manhattan → runtime.staging {key manhattan,
- *      warped} while the hangar stays open and the flight stays frozen
- *      (operations phase 'hangar'); the world keeps rendering behind the
- *      opaque hangar (framesRendered advances) and staging reaches ready;
+ *  (2) STAGING: pick a featured destination AWAY from where the flight sits
+ *      (the STAGE PICK below) → runtime.staging {key <id>, warped} while the
+ *      hangar stays open and the flight stays frozen (operations phase
+ *      'hangar'); the world keeps rendering behind the opaque hangar
+ *      (framesRendered advances) and staging reaches ready;
  *      hangar-stage-status walks to data-state=ready.
- *  (3) STAGED LAUNCH: hangar-fly reads "Fly to Manhattan"; click → screen
+ *  (3) STAGED LAUNCH: hangar-fly reads "Fly to <name>"; click → screen
  *      'flight', phase 'airborne', the pose within tolerance of the
  *      placement (lat/lon ≤ 30 m, altitude = max(altM, ground + minAglM) ± 1 m,
  *      heading ± 0.01°, cruise speed); its warp-hold time is recorded.
@@ -31,13 +32,30 @@
  *      #free-flight-search, pick hangar-dest-result-0 (poi:city:Brooklyn),
  *      Fly → airborne 3 km south of Brooklyn, nose north, ≥ 800 m; no crash
  *      in 10 s.
- *  (6) UNSTAGED CONTROL: from the hangar, launch Tokyo WITHOUT staging
- *      (runtime.launchFreeFlight directly) and time its warp-hold; the staged
+ *  (6) UNSTAGED CONTROL: from the hangar, launch the CONTROL PICK below
+ *      WITHOUT staging (runtime.launchFreeFlight directly) and time its
+ *      warp-hold; the staged
  *      hold (3) must be shorter. A control that has not revealed by its wait
  *      bound counts as >= the bound (it is still holding). NOT CALIBRATED when
  *      staging had not finished at launch (precondition) or when both toy
  *      holds sit at the toy time cap.
  *  (7) ZERO page errors.
+ *
+ * STAGE PICK (E2 integration fix, ledger "E2 integration fix"): with the
+ * front door ON the flight already sits at the title spot — the TOY title spot
+ * IS Manhattan (FLIGHT_PLAN.titleSpot.toyId), the satellite one is the daylight
+ * pick — and staging the spot you are at is (correctly) a no-warp stage. So the
+ * staged destination is the first of manhattan, tokyo, then the featured cards
+ * in hangar order that is NOT the hangar's default (leg (1)) and lies
+ * >= FAR_KM from the flight: toy/title-Manhattan stages Tokyo (a fixture city
+ * scene), satellite/title-Tokyo still stages Manhattan (the E2 6/0/0 row).
+ * R25_FF_STAGE_DEST=<id> forces the pick (R25_FF_STAGE_DEST=manhattan on the
+ * toy front-door tree reproduces the §4d RED: (2) warped false).
+ * CONTROL PICK: the first of tokyo, then the featured cards, that is NOT the
+ * staged destination (a revisit of the freshly staged world is not unstaged)
+ * and lies >= FAR_KM from the flight at control time (so it really warps).
+ * It may be the boot/title spot (satellite: Tokyo, as E2 measured) — a warmer
+ * control can only make (6) harder to pass, never a false PASS.
  *
  * STYLE: toy by default; R25_FF_STYLE=satellite for the satellite run.
  * Evidence: .graphics-review/r25/b/freeflight-<style>.json (+ PNGs).
@@ -136,6 +154,25 @@ async function press(locator) {
   }
 }
 const DEG = Math.PI / 180;
+const FAR_KM = 50; // a stage / control this far away is a real far warp (stageDestination warps beyond 0.5 km)
+/** The featured destination catalog (lib/fly/destinations.js has no imports). */
+async function loadDestinations() {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'fly', 'destinations.js'), 'utf8');
+  return (await import(`data:text/javascript;base64,${Buffer.from(src).toString('base64')}`)).DESTINATIONS;
+}
+/** Great-circle km (the picks span continents; distM below is a local flat-earth metre check). */
+const gcKm = (a, b, c, d) => 12742 * Math.asin(Math.sqrt(Math.sin(((c - a) * DEG) / 2) ** 2 + Math.cos(a * DEG) * Math.cos(c * DEG) * Math.sin(((d - b) * DEG) / 2) ** 2));
+/** First id in `prefer` (then the hangar's card order) that is a featured card, not excluded, and >= FAR_KM from (lat, lon). */
+function pickAway(catalog, cards, prefer, exclude, lat, lon) {
+  const ids = [...new Set([...prefer, ...cards])];
+  for (const id of ids) {
+    const d = catalog.find((x) => x.id === id);
+    if (!d || !cards.includes(id) || exclude.includes(id)) continue;
+    if (Number.isFinite(lat) && gcKm(lat, lon, d.lat, d.lon) < FAR_KM) continue;
+    return d;
+  }
+  return null;
+}
 const distM = (a, b, c, d) => Math.hypot((c - a) * 111320, (d - b) * 111320 * Math.cos(((a + c) / 2) * DEG));
 const angDiffDeg = (a, b) => Math.abs((((a - b) % 360) + 540) % 360 - 180);
 
@@ -184,6 +221,7 @@ const flyEnabled = (page, ms) => waitFor(page, () => { const b = document.queryS
 
 (async () => {
   const C = await loadFlyConstants();
+  const CATALOG = await loadDestinations();
   const minAgl = C.FLIGHT_PLAN?.freeFlight?.minAglM ?? 450;
   const report = { style: TAG, ship: { frontDoor: !!C.FRONT_DOOR?.enabled, flightPlan: !!C.FLIGHT_PLAN?.enabled }, legs: {} };
   console.log(`style ${TAG} · FRONT_DOOR ${report.ship.frontDoor} · FLIGHT_PLAN ${report.ship.flightPlan}`);
@@ -233,10 +271,17 @@ const flyEnabled = (page, ms) => waitFor(page, () => { const b = document.queryS
     log(`aircraft preview ready: ${ready}`);
 
     // ---- (2) STAGING ----------------------------------------------------------
+    const cardIds = featured.map((c) => c.replace(/^hangar-dest-/, ''));
+    const forced = process.env.R25_FF_STAGE_DEST ? CATALOG.find((d) => d.id === process.env.R25_FF_STAGE_DEST) : null;
+    const dest = forced || pickAway(CATALOG, cardIds, ['manhattan', 'tokyo'], [sel0], s0.lat, s0.lon);
+    const hereKm = dest && Number.isFinite(s0.lat) ? gcKm(s0.lat, s0.lon, dest.lat, dest.lon) : null;
+    report.legs.stagePick = { default: sel0, dest: dest?.id ?? null, forced: !!forced, fromFlightKm: hereKm };
+    log(`stage pick ${dest?.id} (${forced ? 'forced' : 'away from ' + sel0}, ${hereKm?.toFixed(1)} km from the flight)`);
+    if (!dest) throw new Error(`no featured destination away from ${sel0} (${cardIds.join(',')})`);
     const f0 = (await state(page)).frames;
     const tStage = Date.now();
-    await press(page.getByTestId('hangar-dest-manhattan'));
-    const began = await waitFor(page, () => window.__fly?.staging?.key === 'manhattan', undefined, 30000 * SCALE);
+    await press(page.getByTestId(`hangar-dest-${dest.id}`));
+    const began = await waitFor(page, (k) => window.__fly?.staging?.key === k, dest.id, 30000 * SCALE);
     const samples = [];
     let st = await state(page);
     // Ready is the goal; PROGRESS is the charter ("staging progresses behind
@@ -260,7 +305,7 @@ const flyEnabled = (page, ms) => waitFor(page, () => { const b = document.queryS
       (st.toy && first.toy && (st.toy.ready > first.toy.ready || st.toy.chunks > first.toy.chunks)) ||
       (Number.isFinite(st.staging?.progress) && st.staging.progress > (first.progress ?? 0));
     const statusOk = st.staging?.ready ? ds === 'ready' : ds === 'staging';
-    report.legs.staging = { began, ready: st.staging?.ready, readyMs: st.staging?.readyMs, wallMs: Date.now() - tStage, warped: st.staging?.warped, pumped: st.staging?.pumped, framesBehindHangar: st.frames - f0, status: ds, first, samples: samples.slice(-12) };
+    report.legs.staging = { dest: dest.id, began, ready: st.staging?.ready, readyMs: st.staging?.readyMs, wallMs: Date.now() - tStage, warped: st.staging?.warped, pumped: st.staging?.pumped, framesBehindHangar: st.frames - f0, status: ds, first, samples: samples.slice(-12) };
     gate('(2) STAGING progresses behind the hangar: stage warp, flight frozen, world rendering, destination streaming, status line truthful',
       began && st.staging?.warped === true && frozen && st.frames - f0 >= 5 && grew && statusOk,
       `ready ${st.staging?.ready} (${st.staging?.readyMs ?? '—'} ms) · frames +${st.frames - f0} · pumped ${st.staging?.pumped} · toy ${JSON.stringify(first.toy)}→${JSON.stringify(st.toy)} · progress ${first.progress}→${st.staging?.progress} · status ${ds}`);
@@ -273,23 +318,23 @@ const flyEnabled = (page, ms) => waitFor(page, () => { const b = document.queryS
     const flying = await waitFor(page, () => window.__flyStore.getState().screen === 'flight' && window.__fly.operations?.phase === 'airborne', undefined, 30000 * SCALE);
     const L = await state(page);
     const ll = L.lastLaunch || {};
-    const wantAlt = Math.max(950, (ll.groundM ?? 0) + minAgl);
+    const wantAlt = Math.max(dest.altM, (ll.groundM ?? 0) + minAgl);
     // The PLACEMENT is read from runtime.lastLaunch (the launch itself); the
     // live position only has to be near it (toy flies on through its hold).
     const pose = {
-      dM: Number.isFinite(ll.lat) ? distM(ll.lat, ll.lon, 40.7, -74.03) : null,
-      liveM: L.lat != null ? distM(L.lat, L.lon, 40.7, -74.03) : null,
+      dM: Number.isFinite(ll.lat) ? distM(ll.lat, ll.lon, dest.lat, dest.lon) : null,
+      liveM: L.lat != null ? distM(L.lat, L.lon, dest.lat, dest.lon) : null,
       altErr: Math.abs((ll.altM ?? NaN) - wantAlt),
-      hdgErr: angDiffDeg((L.heading ?? 0) / DEG, 25),
+      hdgErr: angDiffDeg((L.heading ?? 0) / DEG, dest.headingDeg ?? 0),
       speed: L.speed,
       aircraft: L.aircraft,
     };
     const staged = await holdOf(page, e0b, 600000 * SCALE);
     report.legs.stagedLaunch = { label, pose, lastLaunch: ll, hold: staged };
-    gate('(3) STAGED LAUNCH: "Fly to Manhattan" → airborne at the placement (≤30 m, alt ±1 m, hdg ±0.01°, cruise), revealed',
-      label.includes('Fly to Manhattan') && flying && pose.dM <= 1 && pose.liveM <= 2000 && pose.altErr <= 1 && pose.hdgErr <= 0.01 && L.aircraft === 'prop' && ll.staged != null && staged.revealed,
+    gate(`(3) STAGED LAUNCH: "Fly to ${dest.name}" → airborne at the placement (≤30 m, alt ±1 m, hdg ±0.01°, cruise), revealed`,
+      label.includes(`Fly to ${dest.name}`) && ll.destId === dest.id && flying && pose.dM <= 1 && pose.liveM <= 2000 && pose.altErr <= 1 && pose.hdgErr <= 0.01 && L.aircraft === 'prop' && ll.staged != null && staged.revealed,
       `placement ${pose.dM?.toFixed(2)} m · live ${pose.liveM?.toFixed(0)} m · alt ${ll.altM} (want ${wantAlt}) · hdg err ${pose.hdgErr.toFixed(4)}° · speed ${L.speed} · staged ${JSON.stringify(ll.staged)} · hold ${staged.holdMs} ms`);
-    await page.screenshot({ path: path.join(OUT, `freeflight-${TAG}-manhattan.png`), timeout: 8000 }).catch(() => {}); // venue: a live canvas can starve the capture
+    await page.screenshot({ path: path.join(OUT, `freeflight-${TAG}-${dest.id}.png`), timeout: 8000 }).catch(() => {}); // venue: a live canvas can starve the capture
 
     // ---- (4) NO CRASH 10 s ---------------------------------------------------------
     const nc = await noCrash(page, 10);
@@ -331,13 +376,17 @@ const flyEnabled = (page, ms) => waitFor(page, () => { const b = document.queryS
 
     // ---- (6) UNSTAGED CONTROL -----------------------------------------------------------
     await backToHangar(page);
-    const direct = await page.evaluate(() => {
+    const sc = await state(page);
+    const ctlDest = pickAway(CATALOG, cardIds, ['tokyo'], [dest.id], sc.lat, sc.lon);
+    log(`control pick ${ctlDest?.id} (not the staged ${dest.id}; flight at ${sc.lat?.toFixed(3)}, ${sc.lon?.toFixed(3)})`);
+    if (!ctlDest) throw new Error(`no control destination away from the flight and ${dest.id}`);
+    const direct = await page.evaluate((id) => {
       const r = window.__fly;
       const epoch = window.__flyStore.getState().warpEpoch; // read in the same task as the launch
-      const ok = r.launchFreeFlight('prop', 'tokyo');
+      const ok = r.launchFreeFlight('prop', id);
       window.__flyStore.getState().setHangarOpen(false);
-      return { ok, epoch, staged: r.lastLaunch?.staged ?? null };
-    });
+      return { id, ok, epoch, staged: r.lastLaunch?.staged ?? null };
+    }, ctlDest.id);
     const e2 = direct.epoch;
     // The control only has to outlast the staged hold: wait long enough to
     // SEE that (2x the staged hold + 60 s), never more than the venue bound.
@@ -345,7 +394,7 @@ const flyEnabled = (page, ms) => waitFor(page, () => { const b = document.queryS
     const ctl = await holdOf(page, e2 + 1, boundMs);
     const ctlHold = ctl.revealed ? ctl.holdMs : ctl.waitedMs;
     report.legs.control = { direct, ...ctl, effectiveHoldMs: ctlHold };
-    const holdDetail = `staged ${staged.holdMs} ms (staging ready at launch: ${ll.staged?.ready}) vs unstaged ${ctl.revealed ? `${ctl.holdMs} ms` : `still holding after ${ctl.waitedMs} ms`}`;
+    const holdDetail = `staged ${dest.id} ${staged.holdMs} ms (staging ready at launch: ${ll.staged?.ready}) vs unstaged ${ctlDest.id} ${ctl.revealed ? `${ctl.holdMs} ms` : `still holding after ${ctl.waitedMs} ms`}`;
     // Toy far-warp holds are TIME-CAPPED (WarpFlash: holdMinMs 2200 …
     // ARRIVAL_GATE.holdMaxMs 6500), so when both arms sit at the cap the toy
     // venue cannot separate them — that is NOT CALIBRATED, not a pass.
