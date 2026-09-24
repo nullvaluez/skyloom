@@ -1,5 +1,6 @@
 /* Reproduce a wide taxi turn with normal controls. No runtime pose writes. */
 const {chromium}=require('playwright');const fs=require('node:fs');
+const {enterHangar}=require('./_title'); // R25 (E, SANCTIONED): reach the hangar through the title when there is one
 (async()=>{
  const out=process.env.FLY_OPERATIONS_OUTPUT||'.graphics-review/operations/taxi-edge';fs.mkdirSync(out,{recursive:true});
  const browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-gpu']});
@@ -9,6 +10,7 @@ const {chromium}=require('playwright');const fs=require('node:fs');
  const record=async name=>{const s=await state();report.events.push({name,...s});console.log(name+': '+JSON.stringify({phase:s.phase,speed:s.speed,warning:s.warning}));return s;};
  try{
   await page.goto(process.env.FLY_URL||'http://localhost:3027');
+  await enterHangar(page,'ops');
   await page.getByTestId('hangar-pick-prop').click({timeout:60000});await page.selectOption('#departure-airport','KOSU');await page.getByTestId('hangar-fly').click({timeout:60000});
   await page.waitForFunction(()=>window.__flyBoot?.pct===100&&!window.__fly.worldLoading&&!window.__fly.worldDegraded&&window.__fly.worldReadiness.ready,undefined,{timeout:90000});
   await page.getByTestId('warp-hold').waitFor({state:'hidden'});await page.waitForTimeout(1600);

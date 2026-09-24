@@ -15,7 +15,7 @@ const fs = require("fs");
   });
   const page = await context.newPage(),
     report = { status: "RUNNING", checks: [], errors: [] };
-  page.on("pageerror", (e) => report.errors.push(e.message));
+  page.on("pageerror", (e) => report.errors.push(e.stack || e.message));
   await page.addInitScript(() => {
     localStorage.setItem("fly-controls-seen", "1");
     localStorage.setItem("fly-sound-on", "0");
@@ -74,6 +74,35 @@ const fs = require("fs");
   };
   try {
     await page.goto(process.env.FLY_URL || "http://localhost:3017");
+    await page.getByTestId("title-free-flight").tap({ timeout: 60000 });
+    await page.getByTestId("hangar-pick-prop").waitFor({ state: "visible" });
+    for (const viewport of [
+      { width: 390, height: 844 },
+      { width: 844, height: 390 },
+      { width: 320, height: 568 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.waitForTimeout(250);
+      check(
+        "free-flight launch remains reachable",
+        await page.getByTestId("hangar-fly").evaluate((e) => {
+          const b = e.getBoundingClientRect();
+          return (
+            b.top >= 0 &&
+            b.bottom <= innerHeight &&
+            e.contains(
+              document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2),
+            )
+          );
+        }),
+      );
+      await page.screenshot({
+        path: out + "/free-flight-" + viewport.width + ".png",
+      });
+    }
+    await page.getByTestId("hangar-back").tap();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await require("./_landmark-boot.cjs").enterOperationsHangar(page);
     await page.getByTestId("hangar-pick-prop").tap({ timeout: 60000 });
     await page.screenshot({ path: out + "/hangar-portrait.png" });
     for (const viewport of [
@@ -259,7 +288,9 @@ const fs = require("fs");
       "operations hidden under full overlay",
       !(await page.getByTestId("mobile-flight-deck").count()),
     );
+    check("no page errors", report.errors.length === 0);
     report.status = full ? "PASS" : "BLOCKED";
+    if (!full) process.exitCode = 2;
     report.controlStatus = "PASS";
   } catch (e) {
     report.status = "FAIL";

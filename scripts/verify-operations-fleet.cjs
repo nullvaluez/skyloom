@@ -1,6 +1,7 @@
 /* Real UI fleet/lifecycle coverage. No poses, pins, or automatic flights. */
 const {chromium}=require('playwright');
 const fs=require('node:fs');
+const {enterHangar}=require('./_title'); // R25 (E, SANCTIONED): reach the hangar through the title when there is one
 (async()=>{
  const out=process.env.FLY_OPERATIONS_OUTPUT||'.graphics-review/operations/fleet';fs.mkdirSync(out,{recursive:true});
  const browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-gpu']});
@@ -12,6 +13,7 @@ const fs=require('node:fs');
  async function hangar(){await page.keyboard.press('Escape');await page.getByTestId('pause-hangar').click();await page.getByRole('button',{name:'End flight and open hangar',exact:true}).click();}
  try{
   await page.goto(process.env.FLY_URL||'http://localhost:3027/?graphicsReview=1');
+  await enterHangar(page,'ops');
   for(const [id,airport] of [['prop','KOSU'],['fighter','KCMH'],['military','KLCK'],['warbird-jet','KCMH'],['warbird-prop','KOSU'],['bizjet','KLCK'],['airliner','KCMH'],['cargo','KLCK'],['glider',null],['prop','KOSU']]){
    console.log('Checking '+id+' preview');
    await page.getByTestId('hangar-pick-'+id).click({timeout:60000});

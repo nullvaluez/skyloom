@@ -1,7 +1,7 @@
 {
-  "name": "ShadowADSB - Fly the Living Night Sky",
-  "short_name": "ShadowADSB",
-  "description": "A night-flying game over a glowing toy Earth: neon cities built from real map data, live ADS-B air traffic, warps to world landmarks, and a passport of every plane you spot",
+  "name": "Skyloom - Fly the living Earth",
+  "short_name": "Skyloom",
+  "description": "Fly the living Earth: real satellite terrain or a neon toy world built from real map data, live ADS-B air traffic, takeoffs and landings, free flight over famous places, and a logbook of every plane you spot",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#09090b",

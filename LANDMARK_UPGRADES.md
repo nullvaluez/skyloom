@@ -123,3 +123,12 @@ Curated images and machine-readable reports are committed in [docs/reviews/landm
 - Final evidence commit: this report, comparison images, test results and explicit visual capture quality settings.
 
 The isolated development preview is `http://localhost:3017`. No deployment, push or integration into Claude's checkout was performed.
+
+
+## Main integration - 2026-09-24
+
+Before publication, fetching origin revealed 69 newer commits ending at `9bd7b4f` (R25 title screen and flight planning). They were merged into the isolated branch. The sole textual conflict was the GroundHangar import block; both the mobile stylesheet and R25 service-retry constant were retained. Claude's title and Free Flight flow remain intact.
+
+Fresh integrated validation: production build PASS (20.3 s compile), import integrity 4/4, front-door 70/70, flight-plan 44/44, mobile Back/actions 16/16, landmark geometry/cache 16/16, landmark browser lifecycle 9/9, and mobile browser checks 29/29 with zero page errors and ready live terrain. Mobile now covers both Free Flight and operations hangars at 390, 844 and 320 px widths. A new helper enters operations through the actual title UI. The mobile harness now rejects page errors and exits 2 on unavailable world readiness. Two inherited Windows-only test issues were corrected without changing thresholds: slash normalization in the import exclusion census and CRLF normalization in the historical source comparison. The missing local `r25-w0` reference was reconstructed at the documented W0 scaffold `db78bdf`; it is not pushed as a new remote tag.
+
+The first browser pass used the already-running development server during the merge and saw two invalid-token page errors despite passing its interaction assertions. Those results are superseded by the fresh isolated server run with zero page errors. Integrated reports are stored alongside the original evidence as `mobile-integrated.json` and `runtime-integrated.json`. The earlier frame-time and 432-image results describe the pre-R25 landmark tree; they were not relabeled as new integrated performance measurements.

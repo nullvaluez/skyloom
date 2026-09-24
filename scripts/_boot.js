@@ -19,6 +19,8 @@
  *   await bootFly(page);                        // Neon (toy) — SEEDS 'toy' (app default is now satellite, round 10)
  *   await bootFly(page, { style: 'satellite' }); // Day
  *   await bootFly(page, { style: 'night' });     // raw seed (legacy-migration tests)
+ *   await bootFly(page, { skipMenus: false });   // R25: pins + fixture, no airborne skip
+ *   await bootFly(page, { style: 'satellite', geo: { lat, lon, altM, headingRad } }); // R25: boot airborne elsewhere
  *
  * Returns { ms } — goto → pct 100 wall time.
  */
@@ -38,10 +40,42 @@ const BOOT_URL = process.env.FLY_URL || 'http://localhost:3000';
 // UNSET this file behaves byte-identically to R21 — the require is lazy and
 // nothing below runs.
 const { attachFixture, fixtureEnabled, fixturePin } = require('./_fixture');
+// Round 25 (E CERT): the airborne skip below lives in ONE place now, shared
+// with the direct-goto harnesses (graphics-flight / graphics-capture).
+const { enterFlight } = require('./_skip-menus');
+
+/**
+ * Round 25 (E CERT, SANCTIONED harness edit) — THE SATELLITE TERRA UN-PIN.
+ *
+ * MEASURED RED on r25-w0 (scripts/r25-e-cert.md §1, probe
+ * scripts/r25-e-sat-probe.cjs): a pinned satellite bootFly NEVER REVEALS.
+ * Since the Living Earth commit (7b83514) the satellite reveal is the content
+ * contract lib/fly/world-readiness.js, whose `terrain` part is
+ * `runtime.terraStats?.sharp === true && ...`. `terraStats` is published by
+ * TerrainEngine._tick ONLY when terraSharpOn() || terraPipeOn(), and the R22
+ * fleet pin `__flyTerraPin = 1` forces both false — so under the pin
+ * `terraStats` is never written, `terrain` is false forever, and `__flyBoot`
+ * sits at pct 93 ("world") until bootFly's timeout. Probe: 168 s pinned,
+ * `terra=null`, missing [terrain, buildings, roads]; un-pinned the same boot
+ * publishes terraStats and descends (camTileZ 3 -> 14 by 334 s).
+ *
+ * So a SATELLITE boot leaves `__flyTerraPin` unset (both legs), and the
+ * satellite fleet measures the SHIPPED terrain (TERRA_SHARP/PIPE/CACHE and
+ * TILE_HOLD as they ship ON) — which is also what the R24 D scaffold note
+ * said the pin had been hiding. No frozen satellite number can move by this:
+ * on r25-w0 no pinned satellite gate could boot at all. TOY boots keep the
+ * pin exactly as before (the toy reveal reads toyStats, never terraStats).
+ * FLY_TERRA_PIN_SAT=1 restores the pin for a satellite boot (it will not
+ * reveal on this tree; that is the RED, kept reproducible).
+ */
+function terraPinFor(style) {
+  if (style !== 'satellite') return 1;
+  return process.env.FLY_TERRA_PIN_SAT === '1' ? 1 : undefined;
+}
 
 async function bootFly(
   page,
-  { style = null, url = BOOT_URL, timeoutMs = 180000, settleMs = 2500 } = {}
+  { style = null, url = BOOT_URL, timeoutMs = 180000, settleMs = 2500, skipMenus = true, geo = undefined } = {}
 ) {
   // Round 24 (E CERT): the fixture, when asked for. attachFixture installs the
   // Playwright routes for OpenFreeMap / Esri imagery / /api/aircraft /
@@ -60,13 +94,25 @@ async function bootFly(
     // through them at 1-3 fps, so after six minutes `ready` was still 0 with
     // the terrain fully settled. A content gate exports FLY_FINALIZE_BUDGET_K;
     // a PACING gate must not, and none of E's do.
-    const k = Number(process.env.FLY_FINALIZE_BUDGET_K || 0);
+    //
+    // Round 25 (E CERT, same branch): a SATELLITE fixture boot defaults the
+    // scaler to 40 when the run did not choose. Since Living Earth the
+    // satellite reveal WAITS for the 1 km building + road rings to land
+    // (lib/fly/world-readiness.js), so without it a satellite fixture boot
+    // cannot reveal at all — MEASURED on r25-w0: all 16 building chunks
+    // still `draping` after 334 s. That makes it a precondition of the
+    // reveal, not a pacing choice. A pacing gate that boots satellite opts
+    // OUT explicitly with FLY_FINALIZE_BUDGET_K=1 (and then must tolerate a
+    // boot that does not reveal here). Toy boots are unchanged.
+    const kEnv = process.env.FLY_FINALIZE_BUDGET_K;
+    const k = Number(kEnv != null && kEnv !== '' ? kEnv : style === 'satellite' ? 40 : 0);
     if (k > 1)
       await page.addInitScript((v) => {
         window.__flyFinalizeBudgetK = v;
       }, k);
   }
-  await page.addInitScript((s) => {
+  const terraPin = terraPinFor(style);
+  await page.addInitScript(({ s, terraPin }) => {
     // Round 16 (SANCTIONED harness edit): pin the LIVE WEATHER off for the
     // whole browser fleet. Every satellite harness now flies under a real sky
     // fetched from open-meteo/METAR — an overcast Tuesday would grey the rim,
@@ -114,10 +160,19 @@ async function bootFly(
     // Inert while the R22 blocks are enabled:false (W0 state). ONLY the new
     // R22 gates (verify-terra / verify-arrival / verify-settle /
     // verify-clutter / verify-depth2) un-pin, per-gate, deliberately.
-    window.__flyTerraPin = 1;
+    // Round 25 (E): satellite leaves the TERRA pin unset — see terraPinFor.
+    if (terraPin === 1) window.__flyTerraPin = 1;
     window.__flySettlePin = 1;
     window.__flyClutterPin = 1;
     window.__flyDepthPin = 1;
+    // Round 25 (SANCTIONED harness edit, the same idiom): the legacy fleet
+    // skips the new title screen (boots into today's mandatory hangar, which
+    // the airborne skip below closes) and runs the CLASSIC visuals profile —
+    // exactly the flag-off tree, so no frozen pixel/draw number can move
+    // under an R25 Enhanced default. Only the R25 gates un-pin these
+    // (unpinPins(['__flyTitleBypass']) / (['__flyVisualsOverride'])).
+    window.__flyTitleBypass = true;
+    window.__flyVisualsOverride = 'classic';
     try {
       localStorage.setItem('fly-controls-seen', '1');
       // Round 10: the APP default is now satellite (PauseMenu defaults an
@@ -130,7 +185,7 @@ async function bootFly(
     } catch {
       /* storage blocked — the app boots on defaults */
     }
-  }, style);
+  }, { s: style, terraPin });
 
   // Round 24 (E CERT), SANCTIONED and still inside the fixture guard: the two
   // FIXED 30 s post-reveal waits below are a GPU-machine assumption. Under the
@@ -151,35 +206,51 @@ async function bootFly(
   // post-load and reload once so the app re-mounts with the keys in place.
   const seeded = await page.evaluate(() => window.__flyBootSeeded === true);
   if (!seeded) {
-    await page.evaluate((s) => {
+    await page.evaluate(({ s, terraPin }) => {
       window.__flyWeatherOverride = 'baseline'; // round 16: same determinism pin
       window.__flyAerialOverride = 0; // round 19: same idiom, reload leg
       window.__flySatShadowOverride = 0;
       window.__flyGovPin = 'hold'; // round 21: same idiom, reload leg
-      window.__flyTerraPin = 1; // round 22: same idiom, reload leg
+      if (terraPin === 1) window.__flyTerraPin = 1; // round 22 (R25: toy only), reload leg
       window.__flySettlePin = 1;
       window.__flyClutterPin = 1;
       window.__flyDepthPin = 1;
+      // Round 18's boost pin was missing from this reload leg (every other
+      // pin is mirrored here) — added with the R25 pins below.
+      window.__flyBoostInfinite = true;
+      window.__flyTitleBypass = true; // round 25: same idiom, reload leg
+      window.__flyVisualsOverride = 'classic';
       localStorage.setItem('fly-controls-seen', '1');
       localStorage.setItem('fly-map-style-2', s || 'toy'); // round 10: default toy for harnesses
-    }, style);
+    }, { s: style, terraPin });
     await page.reload({ waitUntil: 'domcontentloaded', timeout: timeoutMs });
   }
 
   // Legacy airborne regression setup is explicit. These gates test rendering,
   // formation, etc., NOT the new departure flow. The independent unpinned
   // verify-operations-browser.cjs never calls this helper and starts via UI.
-  await page.waitForFunction(() => !!window.__fly?.operations, undefined, { timeout: timeoutMs });
-  await page.evaluate(() => {
-    const rt=window.__fly,store=window.__flyStore.getState();
-    rt.operations.phase='airborne';
-    rt.operations.profile=null;
-    rt.operations.warp(rt.flight);
-    store.setHangarOpen(false);
-    // Preserve the old NYC airborne fixture; choosing Ohio as the product's
-    // home airport must not silently change historical screenshot baselines.
-    rt.warpToGeo(40.6892,-74.0445,{altM:800,headingRad:0});
-  });
+  // Round 25 (E): `skipMenus: false` is the PRODUCT boot — every determinism
+  // pin and the fixture exactly as above, but no airborne skip and no reveal
+  // wait: the page is left on whatever screen the app opens on (the R25
+  // title when a gate un-pins `__flyTitleBypass`, else today's hangar, which
+  // runs the canvas on 'demand' — MEASURED, a satellite fixture boot had not
+  // revealed behind it after 62 s, while toy with blocked hosts reaches pct
+  // 100 behind it through the Neon ceiling; so never wait on pct there).
+  // Returns once the runtime is mounted. The R25 flow gates use this.
+  if (!skipMenus) {
+    await page.waitForFunction(() => !!window.__fly && !!window.__flyStore, undefined, { timeout: timeoutMs });
+    return { ms: null, t0 };
+  }
+
+  // Preserve the old NYC airborne fixture; choosing Ohio as the product's
+  // home airport must not silently change historical screenshot baselines.
+  // Round 25 (E): the sequence is scripts/_skip-menus.js enterFlight, verbatim
+  // (phase 'airborne', profile null, operations.warp, setHangarOpen(false),
+  // warpToGeo 40.6892,-74.0445 @800 m hdg 0) — one copy for every harness.
+  // `geo` (R25 E, additive): boot airborne somewhere else — a recorder that
+  // measures Owens should not first settle Manhattan (MEASURED: at load 8 a
+  // satellite NYC boot did not reveal in 900 s). Omitted = the NYC pose.
+  await enterFlight(page, geo, { timeoutMs });
 
   // The harness contract: pct hits 100 exactly at reveal and stays there.
   // Round 11 fix: options are waitForFunction's THIRD parameter (second is

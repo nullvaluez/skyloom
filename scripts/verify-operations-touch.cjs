@@ -1,6 +1,7 @@
 /* Touch departure/control check against the real world. No airborne fixture. */
 const {chromium,devices}=require('playwright');
 const fs=require('node:fs');
+const {enterHangar,waitTitleReady}=require('./_title'); // R25 (E, SANCTIONED)
 (async()=>{
   const out='.graphics-review/operations/touch';fs.mkdirSync(out,{recursive:true});
   const browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-gpu']});
@@ -12,10 +13,51 @@ const fs=require('node:fs');
   const tap=name=>page.getByRole('button',{name,exact:true}).tap();
   try{
     await page.goto(process.env.FLY_URL||'http://localhost:3027');
-    await page.getByTestId('hangar').waitFor({timeout:60000});
+    // R25 (E, SANCTIONED): the rule is now "BACK NEVER REVEALS AN UNSTARTED
+    // WORLD". With A's title screen, Back on the title root is a no-op and
+    // Back in the pre-flight hangar returns to the title (plan UX table) —
+    // either way a menu must still cover the world and the flight must not
+    // have started. Without a title (r25-w0 / flag off / bypass pin) this is
+    // today's assertion exactly: the mandatory hangar survives Back.
+    const unstarted=async where=>{
+      const s=await page.evaluate(()=>{const st=window.__flyStore?.getState?.();return {screen:st?.screen??null,hangarOpen:st?.hangarOpen??null};});
+      const title=await page.locator('[data-testid="title-screen"]').count()>0&&await page.locator('[data-testid="title-screen"]').first().isVisible();
+      const hangar=await page.getByTestId('hangar').isVisible();
+      if(!(title||hangar)||s.screen==='flight')throw new Error(`Back revealed an unstarted world (${where}): ${JSON.stringify({...s,title,hangar})}`);
+      return title?'title':'hangar';
+    };
+    const t=await waitTitleReady(page,{timeoutMs:60000});
+    if(t.title){
+      const origin=new URL(process.env.FLY_URL||'http://localhost:3027').origin;
+      await page.evaluate(()=>history.back());
+      // At the app ROOT the browser's own Back may leave the page (about:blank
+      // in a fresh tab) unless the title pushes a history entry — A's call.
+      // Leaving is not revealing a world; re-enter and carry on. R25 E2
+      // (MEASURED, fixture at load ~8): that navigation can commit well after
+      // a fixed 500 ms, so the URL read raced it and the next evaluate died
+      // with "Execution context was destroyed". Wait for the URL to leave the
+      // origin (bounded), and read a context torn down mid-check as leaving.
+      let left=await page.waitForURL(u=>!u.href.startsWith(origin),{timeout:10000}).then(()=>true,()=>false);
+      let kept=null;
+      if(!left){
+        try{kept=await unstarted('title root');}
+        catch(e){if(!/Execution context was destroyed|navigation/i.test(String(e?.message||e)))throw e;left=true;}
+      }
+      if(left){
+        report.checks.push('Back on the title root leaves the page (browser default at the app root)');
+        await page.goto(process.env.FLY_URL||'http://localhost:3027');await waitTitleReady(page,{timeoutMs:60000});
+      }else report.checks.push(`Back on the title keeps the ${kept}`);
+    }
+    await enterHangar(page,'ops',{tap:true,timeoutMs:60000});
     await page.evaluate(()=>history.back());await page.waitForTimeout(500);
-    if(!await page.getByTestId('hangar').isVisible())throw new Error('Back dismissed mandatory aircraft selection');
-    report.checks.push('mandatory selection survives Back');
+    // R25 E2: with a title, Back pops the hangar's history entry; on a loaded
+    // venue the popstate can land after 500 ms — give it a bounded wait so the
+    // read below is not taken mid-transition (no effect without a title).
+    if(t.title)await page.waitForFunction(()=>window.__flyStore?.getState?.().screen==='title',undefined,{timeout:10000,polling:250}).catch(()=>{});
+    const afterBack=await unstarted('pre-flight hangar');
+    if(!t.title&&afterBack!=='hangar')throw new Error('Back dismissed mandatory aircraft selection');
+    report.checks.push(t.title?`Back in the pre-flight hangar lands on the ${afterBack}`:'mandatory selection survives Back');
+    if(afterBack!=='hangar')await enterHangar(page,'ops',{tap:true,timeoutMs:60000});
     await page.getByTestId('hangar-pick-prop').tap({timeout:60000});
     await page.getByTestId('hangar-fly').tap({timeout:60000});
     try{await page.waitForFunction(()=>window.__flyBoot?.pct===100&&!window.__fly.worldLoading&&window.__fly.worldReadiness.ready,undefined,{timeout:90000});}

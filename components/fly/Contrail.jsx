@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
+import { useTitleHidden } from '@/lib/fly/front-door';
 import { useFrame } from '@react-three/fiber';
 import {
   BufferAttribute,
@@ -57,6 +58,7 @@ const DEFAULT_CONTRAIL = {
 
 export function Contrail({ flight, origin, contrail = DEFAULT_CONTRAIL }) {
   const nEmitters = contrail.twin ? 2 : 1;
+  const titleHidden = useTitleHidden(); // R25 W0
 
   const { material, ribbons } = useMemo(() => {
     const mat = new MeshBasicMaterial({
@@ -222,11 +224,13 @@ export function Contrail({ flight, origin, contrail = DEFAULT_CONTRAIL }) {
     }
   }, -20);
 
+  // R25 W0: hidden on the title (the ribbons' own per-frame visibility
+  // writes live on the meshes; the parent group gates them all).
   return (
-    <>
+    <group visible={!titleHidden}>
       {ribbons.map((r, i) => (
         <primitive key={i} object={r.mesh} dispose={null} />
       ))}
-    </>
+    </group>
   );
 }

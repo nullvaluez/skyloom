@@ -1,5 +1,6 @@
 /* Complete assisted training paths through UI controls. Not an unassisted circuit. */
 const {chromium,devices}=require('playwright');const fs=require('node:fs');
+const {enterHangar}=require('./_title'); // R25 (E, SANCTIONED): reach the hangar through the title when there is one
 (async()=>{
  const touch=process.env.FLY_TOUCH==='1',out=process.env.FLY_OPERATIONS_OUTPUT||`.graphics-review/operations/experience-${touch?'touch':'desktop'}`;fs.mkdirSync(out,{recursive:true});
  const browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-gpu']});
@@ -19,6 +20,7 @@ const {chromium,devices}=require('playwright');const fs=require('node:fs');
  }
  try{
   await page.goto(process.env.FLY_URL||'http://localhost:3001/?graphicsReview=1');
+  await enterHangar(page,'ops',{tap:!!touch});
   const ids=touch?['prop']:['fighter','military','warbird-jet','warbird-prop','glider','bizjet','airliner','cargo','prop'];
   let hangarCanvas;
   for(const id of ids){

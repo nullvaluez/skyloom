@@ -30,7 +30,10 @@ const percent = (a, p) =>
         window.__flySunOverride = Date.UTC(2026, 6, 18, 22);
         window.__flyWeatherOverride = "baseline";
       }, baseline);
-      await page.goto("http://localhost:3017/?graphicsReview=1");
+      await page.goto(
+        (process.env.FLY_URL || "http://localhost:3017") + "/?graphicsReview=1",
+      );
+      await require("./_landmark-boot.cjs").enterOperationsHangar(page);
       await page.getByTestId("hangar-pick-prop").click({ timeout: 60000 });
       await page
         .locator(".ops-start-options label")

@@ -320,7 +320,10 @@ async function main() {
   // Arm the per-frame trace channel (FlyScene publishes only while this exists)
   // and the scripted straight-and-level command.
   await page.evaluate(
-    ({ hdg }) => {
+    // R25 E (sanctioned probe fix, import-integrity baseline): `agl` and
+    // `speed` ARE passed below but were never destructured, so the scripted
+    // command threw a ReferenceError inside the page on its first frame.
+    ({ hdg, agl, speed }) => {
       const rt = window.__fly;
       const rows = [];
       window.__r24rows = rows;

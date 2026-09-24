@@ -12,6 +12,29 @@
 > describes deleted code (markers, panels, Leaflet-era plans); do not act
 > on it.
 
+> **⚠️ R25 "Front Door & Clear Sky" (2026-09-24): the INTRO half is BUILT and
+> on `main`, and the VISUALS half is IN PROGRESS.**
+> - **Intro (built):** the app opens on a live-world **title screen**
+>   ("Skyloom") with **Free Flight** (featured spots + city search) and
+>   **Takeoff & Landing** cards, an adaptive hangar that stages the
+>   destination, **Continue**, and **Exit to title** (no reload).
+>   [FLY_FRONT_DOOR_AND_VISUALS.md](FLY_FRONT_DOOR_AND_VISUALS.md) is the
+>   record: state machine, flags, verification, the user-machine run list and
+>   the ship state. `FRONT_DOOR` and `FLIGHT_PLAN` ship ON, certified on the
+>   offline fixture only; every fps / boot-time / feel number belongs to the
+>   user's machine.
+> - **Visuals (in progress):** C SKY / D GROUND, behind the **Visuals:
+>   Enhanced / Classic** switch. [FLY_ROUND25_PLAN.md](FLY_ROUND25_PLAN.md) is
+>   the plan. `R25_SKY` / `R25_GROUND` ship `enabled:false`, so the Settings
+>   Visuals row is hidden, every session is Classic (today's pixels), and
+>   `VISUALS.defaultProfile` is `'classic'` until an Enhanced sub-flag
+>   certifies.
+> - **Harness posture:** the legacy harness fleet is pinned
+>   `__flyTitleBypass=true` + `__flyVisualsOverride='classic'`. R25 gates
+>   un-pin these via `unpinPins`.
+> - **Handoff and ledgers:** [FLY_ROUND25_KICKOFF.md](FLY_ROUND25_KICKOFF.md)
+>   is the session handoff; the per-role ledgers are `scripts/r25-*-*.md`.
+
 > **⚠️ NEWEST — READ FIRST (2026-09-07): Round 24 "Smooth World" is BUILT and
 > CERTIFIED ON THE FIXTURE — not on a GPU — and
 > [FLY_ROUND24.md](FLY_ROUND24.md) is the record** (plan

@@ -120,7 +120,13 @@ function makeLinter(ignores) {
         files: ['**/*.{js,jsx,mjs}'],
         ignores,
         languageOptions: {
-          ecmaVersion: 2023,
+          // R25 E (sanctioned): 'latest', not 2023 — the app ships an ES2025
+          // JSON import attribute (`import data from '…json' with { type:
+          // 'json' }`, lib/fly/living-regions.js:1) that Next compiles and a
+          // 2023 parser rejects as a PARSE error. A parse error is not a
+          // no-undef finding: it hid the whole file from the sweep while
+          // counting against it. No other assertion changes.
+          ecmaVersion: 'latest',
           sourceType: 'module',
           parserOptions: { ecmaFeatures: { jsx: true } },
           // Browser + node + worker: the app spans all three (the vector-tile
@@ -149,7 +155,7 @@ async function sweep(ignores) {
       return true;
     });
     if (errs.length)
-      files.push({ file: path.relative(ROOT, r.filePath), errs, linted: results.length });
+      files.push({ file: path.relative(ROOT, r.filePath).split(path.sep).join('/'), errs, linted: results.length });
   }
   return { files, filtered, linted: results.length };
 }

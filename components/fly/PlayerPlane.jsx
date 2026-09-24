@@ -30,6 +30,7 @@ import {
   resolveAircraft,
 } from '@/lib/fly/player-aircraft';
 import { useFlyStore } from '@/stores/fly-store';
+import { useTitleHidden } from '@/lib/fly/front-door';
 
 /**
  * The player's aircraft: a CC-BY glTF airframe (poly.pizza, see
@@ -60,6 +61,8 @@ export function PlayerPlane({ flight, aircraft }) {
   const ac = aircraft ?? resolveAircraft(DEFAULT_AIRCRAFT_ID);
   const group = useRef();
   const groundHull = useRef();
+  // R25 W0: the title flyby hides the (frozen) player aircraft.
+  const titleHidden = useTitleHidden();
 
   // Dev-only rig handle (the __satRoads pattern): verify-sat-night hides the
   // hero during its ground-layer A/B probes — the idle bob straddles the probe
@@ -91,7 +94,7 @@ export function PlayerPlane({ flight, aircraft }) {
   }, -30);
 
   return (
-    <group ref={group}>
+    <group ref={group} visible={!titleHidden}>
       <Suspense fallback={<PrimitivePlane />}>
         <group ref={groundHull}><PlayerModel flight={flight} aircraft={ac} /></group>
         <LandingGear flight={flight} aircraftId={ac.id} />

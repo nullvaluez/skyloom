@@ -28,6 +28,7 @@ import {
 } from '@/lib/fly/contract-progress';
 import { dailyNowMs, pickDaily, utcDayKey, utcDayNumber } from '@/lib/fly/daily';
 import { buildAtlasList } from '@/lib/fly/poi';
+import { gameplayLive } from '@/lib/fly/front-door';
 import { getStreakDays } from '@/lib/badges';
 import { CARD_THEME } from './inspect/inspect-tokens';
 
@@ -375,6 +376,14 @@ export function Contracts({ runtime }) {
 
       const f = runtime.flight;
       if (!f) return;
+      // R25 A (FRONT DOOR): contracts, overflights and the airport buzz only
+      // advance while actually flying — never from the title's frozen flight
+      // or the hangar. The buzz detector restarts clean afterwards (a menu is
+      // a discontinuity, like a warp). gameplayLive() is true with the flag off.
+      if (!gameplayLive(useFlyStore.getState())) {
+        detectorRef.current?.reset();
+        return;
+      }
       advanceRef.current((tpl) => tpl.kind === 'altitude' && f.pos.y >= tpl.altM);
       const slots = runtime.poiSlots ?? [];
       for (const p of slots) {

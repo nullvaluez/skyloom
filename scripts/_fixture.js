@@ -20,6 +20,9 @@
  *                                   ordered z/y/x)
  *   ** /api/aircraft**              synthetic ADS-B
  *   ** /api/weather**               `{found:false}` — the no-weather baseline
+ *   wmts.terrascope.be/**           ESA WorldCover class tiles (R25 E), from
+ *                                   r24-fixture/worldcover.mjs — legend-exact
+ *                                   PNGs keyed off the same scene table
  *
  * WHAT IS *NOT* ROUTED
  *   the DEM. Esri elevation is LERC, and encoding a Lerc2 body is an untested
@@ -43,6 +46,7 @@ const SCRIPTS = path.join(REPO, 'scripts');
 const OUT = path.join(SCRIPTS, 'r24-out');
 
 let shared = null; // one server per node process
+let starting = null; // R25 E2 close: two pages attaching at once share ONE start
 
 async function ensureServer() {
   if (shared) return shared;
@@ -52,8 +56,11 @@ async function ensureServer() {
     return shared;
   }
   // The fixture is ESM; this file is CJS because 92 harnesses are.
-  const mod = await import('./r24-fixture/server.mjs');
-  shared = await mod.startFixture({ port: Number(process.env.FLY_FIXTURE_PORT || 3199) });
+  // Cache the START, not only its result: two sessions booting concurrently
+  // in one process (verify-r25-visuals R25_VISUALS_XPAR) would otherwise both
+  // see `shared === null` and start two servers.
+  starting ??= import('./r24-fixture/server.mjs').then((mod) => mod.startFixture({ port: Number(process.env.FLY_FIXTURE_PORT || 3199) }));
+  shared = await starting;
   return shared;
 }
 
@@ -112,6 +119,19 @@ async function attachFixture(target) {
   await context.route('**/elevation3d.arcgis.com/**', (route) =>
     route.fulfill({ status: 404, body: 'dem served via __flyTileFixture' })
   );
+
+  // R25 (E CERT): ESA WorldCover. The vector-tile worker fetches
+  // `https://wmts.terrascope.be/?SERVICE=WMTS&REQUEST=GetTile&...&TILEMATRIX=z
+  // &TILECOL=x&TILEROW=y` (lib/fly/world-cover.js) for every surface and
+  // canopy tile. This container 403-blocks the host; unrouted, every tile took
+  // the no-cover fallback and the fixture certified a different world from the
+  // user's. Unparseable URLs answer 404 — never a hang on a blocked host.
+  const { parseWorldCoverURL } = await import('./r24-fixture/worldcover.mjs');
+  await context.route('**/wmts.terrascope.be/**', async (route) => {
+    const t = parseWorldCoverURL(route.request().url());
+    if (!t) return route.fulfill({ status: 404, body: 'not a WorldCover GetTile' });
+    return proxy(route, `/worldcover/${t.z}/${t.x}/${t.y}.png`);
+  });
 
   await context.route('**/api/aircraft?**', async (route) => {
     const u = new URL(route.request().url());
@@ -192,6 +212,14 @@ async function installNodeFetchFixture() {
     if (url.includes('server.arcgisonline.com')) {
       const m = url.match(/tile\/(\d+)\/(\d+)\/(\d+)/);
       if (m) return real(`${base}/img/${m[1]}/${m[2]}/${m[3]}`, init);
+    }
+    if (url.startsWith('https://wmts.terrascope.be/')) {
+      // R25 E: the node leg of the WorldCover route (the worker imports
+      // world-cover.js, and a node-hosted worker would otherwise hit the
+      // blocked host).
+      const { parseWorldCoverURL } = await import('./r24-fixture/worldcover.mjs');
+      const t = parseWorldCoverURL(url);
+      if (t) return real(`${base}/worldcover/${t.z}/${t.x}/${t.y}.png`, init);
     }
     return real(input, init);
   };

@@ -1,8 +1,10 @@
 const {chromium}=require('playwright');const assert=require('node:assert/strict');
+const {enterHangar}=require('./_title'); // R25 (E, SANCTIONED): reach the hangar through the title when there is one
 (async()=>{const browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-gpu']});const page=await browser.newPage({viewport:{width:1440,height:900}});
 try{
  await page.addInitScript(()=>localStorage.setItem('fly-controls-seen','1'));
  await page.goto(process.env.FLY_URL||'http://localhost:3038/?graphicsReview=1');
+ await enterHangar(page,'ops');
  await page.waitForFunction(()=>document.querySelector('[data-testid="hangar-fly"]')?.disabled===false,undefined,{timeout:60000});
  await page.locator('.ops-start-options label').filter({has:page.locator('input[value="runway"]')}).click();await page.getByTestId('hangar-fly').click();
  await page.waitForFunction(()=>window.__flyBoot?.pct===100&&!window.__fly.worldLoading&&!window.__fly.worldDegraded&&window.__fly.worldReadiness.ready,undefined,{timeout:90000});await page.getByTestId('warp-hold').waitFor({state:'hidden'});
