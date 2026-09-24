@@ -102,7 +102,13 @@ The merged production build passes (`build-r8.log`). Focused checks pass:
 painterly **18/18**, resident backfill, Classic compatibility **12/12**, and
 saved ground **42/42 executable checks**, with optional offline GLSL compilation
 unavailable. Earlier GPU runs below use the pre-merge production build r7;
-they are not represented as merged-build certification.
+they are not represented as merged-build certification. The merged production
+round trip (`roundtrip-r8/report.json`) passes Ohio with a 0.041/255 mean
+change and p99 zero. Nevada remains **BLOCKED** because the unchanged Enhanced
+control varies by 0.735/255, p99 four; that exceeds the existing noise limit.
+No runtime errors occurred. The local merged preview is http://localhost:3042;
+the gallery at http://localhost:3041 has 15 pairs / 30 images and all comparison
+controls checked. The code was pushed to main in `de59ab1`.
 
 ## Latest corrective checks
 
@@ -135,8 +141,33 @@ errors occurred. This new scene exposes a remaining resource failure.
 
 Production `roundtrip-r7` passes Ohio (mean change 0.044/255) but reports
 Nevada **BLOCKED** because its unchanged Enhanced noise floor was 1.791/255;
-that unstable control cannot certify the return comparison. Timing/allocation
-are still running. Earlier measurements below describe the preceding candidate.
+that unstable control cannot certify the return comparison.
+
+Production `timing-r7` **passes**: 31,620.9 m in 180 seconds, 22,224 frames,
+p95 **16.6 ms**, p99 **25.0 ms**, full 1920×1080 with terrain/governor unpinned
+and allocation hooks off. Motion p95 is 274 draws / 1,024,156 triangles; runtime
+and shader errors are empty. This is the pre-merge r7 build on RTX 5080, not a
+Radeon 780M measurement. The workspace was merged while that already-built
+server was running; report provenance preserves the sampled workspace stamp
+and separately identifies the actual r7 build.
+
+Final `allocation-r7` **fails** the 300 MiB texture gate: **304.09 MiB**
+peak across warps, profile/style/tier changes and 60 seconds of real streaming.
+The bank/revisit gate fails from the same allocation peak (draws and triangles
+remain within their limits). Renderbuffers peak at **6.48 MiB**, separately;
+maximum sampled live geometry is **185.71 MiB**, excluding detached meshes and
+driver overhead. The other eight technical checks pass, with zero runtime or
+shader errors. The prior revision-5 allocation pass is historical and does not
+supersede this failure.
+
+The merged saved-ground fixture rerun (Owens-only, `r25-ground-roundtrip-fix.log`)
+passes **9 checks, 0 failures**: Enhanced/Classic/Enhanced mean difference
+**0.190/255**, p99 two, under the original floor-relative gate. Both profiles
+use 137 draws and 180,711 triangles; all 5.00 MiB of Enhanced ground allocation
+return on Classic. The omitted Neon leg is explicitly not calibrated; Sierra
+and Smokies readiness remains unverified from the earlier run.
+
+Earlier revision-5 measurements below remain historical evidence.
 
 ## Verification and evidence
 
@@ -213,11 +244,11 @@ node node_modules/next/dist/bin/next build --webpack
 node node_modules/next/dist/bin/next start -p 3040
 
 # Matched views; this includes weather, transfer, switches, banks and revisits
-node scripts/verify-painterly-browser.cjs --mode=capture --url=http://localhost:3040 --sites=nevada,alaska,ohio,powell,manhattan,mountains,owens,arid,desert,coast --output=.graphics-review/painterly/matched-r5
+node scripts/verify-painterly-browser.cjs --mode=capture --url=http://localhost:3040 --sites=nevada,alaska,rio,ohio,powell,manhattan,mountains,owens,arid,desert,coast --output=.graphics-review/painterly/matched-r7
 
 # Time and allocation must remain separate
-node scripts/verify-painterly-browser.cjs --mode=timing --url=http://localhost:3040 --seconds=180 --output=.graphics-review/painterly/timing-r5
-node scripts/verify-painterly-browser.cjs --mode=allocation --url=http://localhost:3040 --sites=ohio,manhattan,owens --output=.graphics-review/painterly/allocation-r5
+node scripts/verify-painterly-browser.cjs --mode=timing --url=http://localhost:3040 --seconds=180 --output=.graphics-review/painterly/timing-r7
+node scripts/verify-painterly-browser.cjs --mode=allocation --url=http://localhost:3040 --sites=ohio,manhattan,owens --output=.graphics-review/painterly/allocation-r7
 
 # Actual fleet dimensions/liveries use the existing development diagnostics
 node scripts/verify-painterly-compatibility.cjs --url=http://localhost:3039
@@ -258,8 +289,8 @@ Earlier allocation failures are retained: `allocation/report.json` reached
 steady retention, but did not close the transient peak by itself. Detailed
 allocation records then exposed outgoing bloom targets overlapping the new
 chain and outgoing imagery. Shrinking prewarm buffers was tested, made no
-measurable difference, and was reverted. The final run below covers immediate
-bloom disposal, the smaller unused shadow attachment and terrain reserve.
+measurable difference, and was reverted. The later runs below cover immediate bloom-target release, the smaller unused
+shadow attachment and terrain reserve.
 
 The first motion harness incorrectly required the arrival `sharp` flag at every
 moving sample. That flag requires an idle loader, which continuous streaming
