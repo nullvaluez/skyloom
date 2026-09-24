@@ -445,6 +445,214 @@ The NOT CALIBRATED rows are the two the plan allows: smoke (2h), because the
 fixture's static fleet gives no acquisition opportunity, and freeflight toy
 (6), because toy staging cannot finish on SwiftShader.
 
+### §4f E2 CLOSE — certify + close on the final intro tree (2026-09-24)
+
+**Venue.** This is the integration worktree on
+`claude/skyloom-r25-intro-d0pp2v`, starting from `d6a9f8d` (§4e, the smoke of
+the last merge, which is not re-run here). The dev server was `:3036` on the
+integration tree. A second dev server ran on `:3035` from a private detached
+worktree of the `r25-w0` tag (`/home/user/skyloom-e-w0`, removed at the end).
+Fixtures were `:3206` and `:3207`, with `FLY_BOOT_SCALE=3`. Both browser slots
+were E's (C and D ran code only). The load average was 1.6–8.8 on 4 cores.
+Evidence is in `.graphics-review/r25/e/close/` and
+`.graphics-review/r25/e/visuals/`.
+
+**Step 1: the Enhanced columns** (`verify-rim` / `-sat-depth` / `-dusk` /
+`-sat-night` / `-aerial`) are **PENDING (visuals pass)**, because nothing
+Enhanced exists. The Classic rows were **not re-run**. No merge in this pass
+touched their render path:
+
+- The only product files the intro changed since `r25-w0` are the title,
+  hangar and menu DOM, `title-camera.js`, `FlyCanvas`'s frameloop selector and
+  `<StagePump>`, `FlyMode`'s pre-mount resolvers, the audio gating, and
+  B's runtime services.
+- Under the fleet's `__flyTitleBypass` pin, the title camera never activates
+  and the screen and spawn resolve to today's hangar and KOSU.
+- The Classic identity on that path is certified by `verify-r25-flagoff`
+  (node, byte-level) and by the cross-boot below.
+
+**Step 2a: `verify-r25-visuals.cjs`, forced**
+(`R25_VISUALS_FORCE=1 R25_VISUALS_XPAR=1 R25_VISUALS_POSES=owens,manhattan,smokies`
+`R25_VISUALS_POSE_TIMEOUT_S=1200 FLY_URL_BASELINE=<r25-w0 :3035>`, run with both
+slots held). The flag-off session ran in a second browser, concurrently.
+
+Four instrument edits were made first, all E-owned:
+
+- **(6) cross-boots every captured pose.** It used to cover Owens only; the
+  plan names P1/P3/P5. Leg (6t) adds triangles vs the flag-off tree.
+- **`R25_VISUALS_XPAR`** runs the flag-off session concurrently.
+- **`hideActors` parks the cloud-shadow pool by LAYER.** CloudField rewrites
+  its `visible` every frame, so a visibility park does not hold.
+- **The toggle legs (1) and (7a) read NOT CALIBRATED while no visual block
+  ships ON.** Without that, a green there is vacuous.
+
+`_fixture.js` now caches the fixture START, so two sessions attaching at once
+share one server.
+
+- **Boots.** Satellite: the flag-off session revealed in 996 s at load 8.
+- **Per pose, noon, pinned, held still:**
+
+| pose | integration (Classic) | flag-off `r25-w0` | cross-boot int vs w0 (full frame) | venue floor: w0 vs w0, two boots |
+|---|---|---|---|---|
+| P1 Owens 1500 m | settled; draws **132**; tris **148,871**; texture peak **109 MiB**; within-run floor 0.048 / 1 | settled in 544 s; draws 132; tris 148,871; texture peak 109.6 MiB | **mean 0.124 / p99 2** (9.3 % of pixels changed); terrain crop 0.200 / 4, horizon crop 0.108 / 2 | **0.531 / 11** (33 % of pixels changed) |
+| P3 Manhattan 450 m | settled in about 1,150 s (inside the 1,200 s budget); draws **175**; tris **541,874**; texture peak **113 MiB**; within-run floor **0.199 / 4** | settled in 941 s; draws 175; tris 541,874; texture peak 115.3 MiB | **mean 0.552 / p99 10**; terrain crop 0.691 / 10, horizon crop 0.384 / 7 | **2.031 / 33** (46 % of pixels changed; tris 542,066 in the second boot) |
+| P5 Smokies 1500 m | **never ready** in 1200 s (terrain, forest) | **never ready** in 1200 s (terrain, forest) | not captured | not captured |
+| toy (7) | draws **148 → 183** (≤ 480); floor 0.043 / 1 | — | — | — |
+
+- **What differs across boots.** The amplified diffs
+  (`visuals/*-diff16.png`) show three kinds of difference:
+  - **A clock-driven sky cloud pass.** The satellite cumulus handle
+    `__flyClouds` is absent at these poses, so the layer park found no pool
+    (`hidden.cloudShadows false`). The sky structure is the fullscreen cloud
+    pass. It has no park until C's `__flyCloudFreeze`.
+  - **Manhattan's steam plumes** (R18 sat-veg movers) and a slow
+    facade-texture shimmer on the building walls. The steam plumes are
+    visible as bright blobs.
+  - **Sub-pixel shimmer** on the edges of the fixture's tile stamps and on
+    the animated road dashes.
+
+  Within ONE session at Manhattan, two Classic captures 32 minutes apart
+  differ by mean 1.047 / p99 22: facades and plumes change, the sky is
+  unchanged.
+- **Venue floor.** Two boots of the SAME flag-off tree differ by more than
+  the identity bound at both poses. **The cross-boot bound (0.5 / 2) is
+  therefore not resolvable on this venue**, and the integration pair is inside
+  that floor at both poses.
+- **The raw run (`visuals/close-run.log`) read 13 PASS / 2 FAIL / 11 NOT
+  CALIBRATED.** Both FAILs were instrument applicability, not the tree:
+  - **(4c) Manhattan** compared a Classic capture with a Classic capture
+    (seam **14.70 vs 14.70**). Over a 10-minute toggle cycle, the plumes and
+    the facade shimmer tripped leg (2)'s motion detector, so (3)–(4b) and (5b)
+    ran on a switch that does not exist. The plan's rule is "Enhanced / toggle
+    / luminance rows must read NOT CALIBRATED (never FAIL) while no Enhanced
+    sub-flag exists".
+  - **(6) Manhattan** read 0.552 / 10 against the literal bound.
+
+  Fixed in the gate:
+  - The toggle-applicability rule and the (6) verdict now live in a pure
+    helper, **`scripts/_r25-xboot.js`**. Its self-check reads **10/10**,
+    RED first: a pair outside the bound with no floor, a pair worse than its
+    floor, and a floor that resolves the bound all read FAIL.
+  - **`R25_VISUALS_XFLOOR=1`** records the venue floor (`xfloor.json`).
+  - Rule (6): **inside the bound → PASS**. Outside it, but no worse than a
+    recorded flag-off vs flag-off floor that itself breaks the bound →
+    **NOT CALIBRATED**. Anything else, **no floor included → FAIL**.
+- **Re-derived under the committed helper from the run's own recorded numbers**
+  (`visuals/rederived.txt`, `report-rederived.json`):
+
+  **8 PASS / 0 FAIL / 14 NOT CALIBRATED.**
+
+  | row | verdict | reading |
+  |---|---|---|
+  | (5a) draws | PASS | Owens **132 ≤ 261**; Manhattan **175 ≤ 375**; toy **148 / 183 ≤ 480** (7b) |
+  | (5c) texture peak | PASS | Owens **109 MiB**; Manhattan **113 MiB** (≤ 300) |
+  | (6) Owens | **PASS** | 0.124 / 2, against a venue floor of 0.531 / 11 |
+  | (6t) triangles vs flag-off | **PASS** | Owens **148,871 = 148,871**; Manhattan **541,874 = 541,874** |
+  | (6) Manhattan | **NOT CALIBRATED** | 0.552 / 10 is inside the venue floor of 2.031 / 33 |
+  | (6) Smokies | NOT CALIBRATED | neither session settled |
+  | (1)–(4), (5b), (7a) | NOT CALIBRATED | no R25 visual block ships ON (the plan's rule) |
+
+  **What the PASS at Owens says and does not say.** The integration pair
+  agrees better than two flag-off boots agree with each other. It cannot see
+  a Classic change smaller than that floor. The byte-level Classic identity
+  is `verify-r25-flagoff` (2b) / (3b).
+- **What was not run end to end:** the committed gate text after the rule
+  change. The re-derivation calls the same helper the gate now calls. The
+  branches are pure; the browser run exercised everything else (XPAR, the
+  multi-pose baseline session, XFLOOR, the pose budget).
+
+**Step 2b: `verify-r25-flagoff.mjs`** read **8 / 0 / 2 NOT CALIBRATED** on
+`480ba99` (the two C/D Enhanced arms). (4a) hygiene PASS: the constants outside
+the six blocks equal `r25-w0`. Its first run after the ship-state edit read
+(4a) FAIL, because the comment had been placed ABOVE the `VISUALS` block. It
+was moved inside, and (4a) PASS.
+
+**Step 2c: product boot to the title, TOY, ABABAB** (`r25-e-baseline.cjs`,
+`R25_BASELINE_PRODUCT=3 R25_BASELINE_PRODUCT_STYLE=toy`, arms
+`w0=:3035,int=:3036`, the pinned clock `2026-07-01 19:00 UTC`). One warm-up
+pair ran first (`baseline-warm`), so the timed runs do not include dev compiles.
+
+| run | w0: hangar → prop / KOSU apron → Fly | int: title (Manhattan) |
+|---|---|---|
+| 1 | pct 100 **47.5 s** behind the hangar; Fly click 80.8 s | title 0.9 s; world **51.0 s** |
+| 2 | 59.8 s; Fly 73.8 s | 1.0 s; **54.0 s** |
+| 3 | 56.4 s; Fly 65.0 s | 1.0 s; **51.8 s** |
+| median | **56.4 s**, spread 21.9 % | **51.8 s**, spread 5.9 % |
+
+- **Verdict: NOT CALIBRATED.** Both arms' own spreads exceed the 5 % bound.
+  The integration median is **0.918 ×** W0.
+- **The instrument favours W0 in toy.** W0's `worldMs` is pct 100 BEHIND the
+  opaque hangar, which the player cannot see until Fly, at 65–81 s.
+  The integration world is visible with the title in the DOM from ~1 s.
+- **Not red → no spot swap.** The satellite comparison is a user-machine row:
+  15–18 minutes per boot here, and NOT CALIBRATED at a > 5 % spread.
+
+**Step 3: ship state.** `480ba99` "R25 E: ship state (intro)":
+
+- `FRONT_DOOR` (+ `bootCompact`, `exitToTitle`) and `FLIGHT_PLAN`
+  (+ `stage`) stay ON on their evidence (§4d, §4e).
+- `R25_SKY` / `R25_GROUND` are untouched (OFF), so `visualsAvailable()` is
+  false. The Settings Visuals row is hidden, per `SettingsRows.jsx` and the
+  smoke (3b), dev and production.
+- **The Visuals-default rule:** `VISUALS.defaultProfile` is `'enhanced'` →
+  **`'classic'`**, because no Enhanced sub-flag ships ON. There is no
+  behaviour change while `visualsAvailable()` is false. The note lives inside
+  the block; **the visuals pass revisits it**.
+
+**Step 4: production build receipt.**
+`node scripts/ground-night-build.cjs --dist=.next-r25` **succeeded**:
+
+- Next.js 16.1.0 (webpack) compiled in 41 s, with 8/8 static pages.
+- Receipt: commit **`480ba99`**, buildId **`SQBH24tF02qNzB6XnJcQJ`**, sourceSha256
+  `116fb07f8cfab6f75fcbaed851a991061c3150435634b4d343f0bbcd28fbaf2e`.
+
+Title smoke: `FLY_BUILD_DIR=.next-r25 next start -p 3036` served
+`<title>Skyloom - Fly the living Earth</title>`. `verify-r25-smoke` toy against
+`http://localhost:3036/?graphicsReview=1` (graphicsReview exposes the harness
+handles in production) read **16 PASS / 0 FAIL / 3 NOT CALIBRATED**:
+
+- (1) the pinned legacy boot reveals in 51.0 s.
+- (2b) the title is in the DOM at **538 ms**, at pct 0.
+- (2d) the world reveals at 57.2 s.
+- (3a) Settings, and (3b) the Visuals row HIDDEN.
+- (4a–d): Free Flight → hangar(free) → bizjet at **AGL 938 m**, still
+  airborne 60 frames later.
+- **(5) Exit to title, no reload.**
+- **(6) Continue relaunches "Meridian · Free Flight over Manhattan"** after
+  the perturbation, 134 m from the launch geo.
+- (7) the KOSU apron departure parks.
+- (8) zero page errors.
+
+The three NOT CALIBRATED rows: (2f) and (2e) need dev-only handles
+(`__flyPlayer`, `__flyGl`) that a production server does not publish; they
+PASS on the dev tree in §4e. (2h) had no acquisition opportunity, as in every
+fixture run; it is certified by title (t8).
+
+**Node gates on `480ba99`:**
+
+- **At baseline:** import-integrity 4/0; front-door 70/0; flight-plan 44/0;
+  flagoff 8/0/2; mobile-actions-node 16/16; `_r25-product-boot` 6/6;
+  graphics-unit PASS; flight-operations 33; stylized-earth 22/22;
+  c-flagoff 58; vendor-three-tile 34/0; living-earth 19; cinematic-flight
+  16/16; operations-disclosure PASS.
+- **Pre-existing reds, unchanged:** lod-fade 60/4 (the same four lines);
+  atmo-law crashes with the same `setAerial` TypeError.
+- **`scripts/_r25-xboot.js`** reads 10/10.
+- **Targeted eslint** equals the W0 addendum: Contrail 3e, FlyCanvas 1e,
+  FlyScene 0e/2w, PlayerPlane 2e/2w, use-fly-audio 1e. The edited E scripts
+  are 0/0.
+
+**Follow-ups this close found** (C/D visuals pass, E instrument):
+
+- Park the sat-veg movers (boats, steam plumes) by layer in `hideActors`.
+  Their owner rewrites `visible`.
+- Freeze the fullscreen cloud pass and the facade shimmer clock for pixel
+  pairs, via C's `__flyCloudFreeze` or a time pin.
+- Leg (7a) must wait for toy readiness before its first capture: draws went
+  148 → 183 between captures, 95.7 % of pixels changed.
+- The Smokies pose did not settle in 1,200 s in either session here, so P5
+  pixel rows need the user's machine or a longer budget.
+
 ### §4b verify-r25-visuals — what runs when
 
 - **Now (intro pass)**: `R25_SKY` / `R25_GROUND` ship `enabled:false`, so
@@ -478,6 +686,18 @@ fixture's static fleet gives no acquisition opportunity, and freeflight toy
   horizon: 6.7 % of pixels changed there vs 0.4–1.0 % in the sky bands).
   **Every R25 pixel pair must use `holdStill`** — C and D included. The
   R24/R19 pin idiom alone is not a still frame on this venue.
+- **Cross-boot (6), after the E2 close (§4f).** A within-run floor is not a
+  cross-boot floor. MEASURED here, two boots of the SAME flag-off tree differ
+  by Owens 0.531 / 11 and Manhattan 2.031 / 33, against the 0.5 / 2 bound:
+  a clock-driven sky cloud pass, steam plumes and facade shimmer. Record the
+  venue floor with `R25_VISUALS_XFLOOR=1` (plus `FLY_URL_BASELINE`) before
+  reading (6). The rule lives in `scripts/_r25-xboot.js`, with a node
+  self-check. `R25_VISUALS_XPAR=1` runs the flag-off session concurrently;
+  hold both slots, e.g.
+  `/tmp/r25-locks/run-browser.sh /tmp/r25-locks/run-browser.sh node ...`.
+  The C/D pass must first freeze the cloud pass and park the sat-veg movers
+  (see the §4f follow-ups), or its Enhanced-vs-Classic columns will read
+  venue motion.
 
 ## §5 Legacy harness edits (E1 step 5, SANCTIONED)
 
