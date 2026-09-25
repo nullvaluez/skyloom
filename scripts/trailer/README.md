@@ -2,7 +2,7 @@
 
 An 86-second, 2.39:1 cinematic trailer for Skyloom starring the house fighter,
 **Vector** (`public/models/player-jet.glb`, the hangar's default aircraft). The
-finished video is `docs/trailer/skyloom-trailer-1080p.mp4`.
+finished video is `docs/trailer/skyloom-trailer-1080p.mp4` (1920×1080, 24 fps, 86 s, H.264 + AAC, -13 LUFS). The poster frame is `docs/trailer/poster.jpg`.
 
 Everything here is deterministic and offline. Each frame is a pure function of
 time, the score is synthesized from the same `timeline.json`, and every asset

@@ -28,7 +28,7 @@ python3 "$ROOT/scripts/trailer/score.py" "$WORK/score.wav"
 
 # 4. encode (loudness-normalised to -14 LUFS, true peak -1 dB)
 "$FFMPEG" -y -framerate 24 -i "$WORK/frames/f%05d.jpg" -i "$WORK/score.wav" \
-  -c:v libx264 -preset slow -crf 20 -tune film -pix_fmt yuv420p -profile:v high -movflags +faststart \
+  -c:v libx264 -preset slow -b:v 4200k -maxrate 9000k -bufsize 12000k -tune film -pix_fmt yuv420p -profile:v high -movflags +faststart \
   -af "highpass=f=28,equalizer=f=70:t=q:w=1:g=-3,loudnorm=I=-14:TP=-1.0:LRA=11" -c:a aac -b:a 256k -ar 48000 \
   -shortest "$OUT/skyloom-trailer-1080p.mp4"
 echo "wrote $OUT/skyloom-trailer-1080p.mp4"
