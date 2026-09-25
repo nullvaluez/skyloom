@@ -41,7 +41,7 @@ like a star"*, especially far traffic you cannot click.
   glint dot; tracer-owned range fade (150–185 km true) for sky-backed traffic.
 - **Calm far traffic.** Prominence follows reach
   (`TRACERS.spot.prominence`, `spotProminence()`): full within 15 km (lock-on
-  range is 10–12 km), the body recedes to a faint hairline by 36 km, the
+  range is 10–12 km), the body recedes to a faint hairline by 34 km, the
   glint, head boost and white core are gone by 30 km, and at night every
   emissive mark also dims to 0.22 by 32 km (additive light over a black sky
   reads at any level). The locked/inspected target is exempt.
