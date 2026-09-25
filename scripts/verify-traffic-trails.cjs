@@ -53,9 +53,10 @@ const LEGACY = process.env.TRAILS_LEGACY === '1';
 const MIN_SIG = 12; // 0..255, max channel
 const RANGES_KM = [4, 9, 16, 26, 40, 60, 80];
 
-// The harness's copy of TRACERS.spot.length (only used to place samples).
+// The harness's copy of TRACERS.spot.length (only used to place samples),
+// fed the engine's TRUE distance (track.distM) like SpotTracers.
 const trailLenM = (dM, speed) =>
-  Math.min(22000, Math.max(4000, 4000 * Math.pow(dM / 8000, 0.7))) * Math.min(1, Math.max(0.45, speed / 220));
+  Math.min(14000, Math.max(4000, 4000 * Math.pow(dM / 8000, 0.55))) * Math.min(1, Math.max(0.45, speed / 220));
 
 (async () => {
   const browser = await chromium.launch({ args: ['--enable-webgl', '--ignore-gpu-blocklist'] });
@@ -130,8 +131,11 @@ const trailLenM = (dM, speed) =>
       for (const side of [-1, 1]) {
         const above = side < 0; // left = above the eye (always sky-backed), right = below
         const d = km * 1000;
-        // ~7° above the eye / ~10° below it, ±17° off the nose.
-        const alt = above ? f.pos.y + Math.max(500, 0.12 * d) : Math.max(700, f.pos.y - Math.max(900, 0.18 * d));
+        // Every target gets its OWN elevation (trails are horizontal lines, so
+        // equal elevations would overlap and each head probe would read a
+        // neighbour's body): above 2°..9° true, below −3°..−8°, ±17° off the nose.
+        const el = above ? (2 + 1.2 * i) * (Math.PI / 180) : -(3 + 0.8 * i) * (Math.PI / 180);
+        const alt = Math.max(700, f.pos.y + Math.tan(el) * d);
         add(`ee${i}${above ? 'a' : 'b'}00`, f.pos.x + side * d * 0.3, alt, f.pos.z - d, side * 230, 0, { km, sky: above, headOn: false, speed: 230 });
       }
     });
@@ -157,7 +161,8 @@ const trailLenM = (dM, speed) =>
   // 60 % of the trail — all through the GPU's own air drop.
   const project = () =>
     page.evaluate(
-      ([ts, lenTable]) => {
+      ([ts, lawSrc]) => {
+        const lenOf = new Function(`return ${lawSrc}`)();
         const fly = window.__fly;
         const cam = fly.camera;
         const f = fly.flight;
@@ -187,7 +192,7 @@ const trailLenM = (dM, speed) =>
           const bx = (-tr.fix1.vE / h) * k;
           const bz = (tr.fix1.vN / h) * k; // world +z = south
           const y = tr.ryd ?? tr.ry;
-          const L = lenTable[t.hex];
+          const L = lenOf(Number.isFinite(tr.distM) ? tr.distM : t.km * 1000, t.speed);
           const along = [];
           for (let i = 1; i <= 16; i++) {
             const s = (0.6 * L * i) / 16;
@@ -201,7 +206,7 @@ const trailLenM = (dM, speed) =>
           };
         });
       },
-      [targets, Object.fromEntries(targets.map((t) => [t.hex, trailLenM(t.km * 1000, t.speed)]))]
+      [targets, trailLenM.toString()]
     );
 
   const setTrails = (v) =>
