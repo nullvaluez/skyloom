@@ -58,8 +58,11 @@ still drawn after the clouds but without the cloud gate.
 `798885a`'s twin engine contrails are unchanged in behaviour: they form above
 `AIRCRAFT_EFFECTS.minAltM` 5,800 m (~FL190), full by 9,200 m, at 55–115 m/s+.
 Below ~6,500 m you get wingtip vapour instead, in fast (> 105 m/s) hard banks
-(> ~20°). They now draw after the cloud composite (they were erased against
-the sky before).
+(> ~20°). They now draw after the cloud composite. Side view at FL310 on the
+fixture (fighter, 180 m/s, orbit ~80°): with the overlays deferred the two
+engine lines stream off behind the jet; the same frame drawn in the main
+pass (`window.__flySkyOverlays.setDeferred(false)`, the pre-branch path)
+shows neither them nor any traffic trail against the sky.
 
 ## 4. Verification (offline fixture — NOT a GPU)
 
@@ -77,7 +80,8 @@ the user's machine.
   fixture's own ~300 tracks, fixes stamped on the engine clock and pinned at
   full opacity, engine and camera frozen, ON/OFF Δ per probe window
   (max-channel for visibility, luma for "subtle"). **24/24 PASS** — §4.1.
-- `verify-tracers.js` gained a satellite rerun of its backfill/cut gates.
+- `verify-tracers.js` gained a satellite rerun of its backfill/cut gates:
+  9/9 PASS (toy and satellite, zero page errors).
 
 ### 4.1 Pixel gate results
 
