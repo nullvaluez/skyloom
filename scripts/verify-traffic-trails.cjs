@@ -334,8 +334,29 @@ const trailLenM = (dM, speed) =>
         { timeout: 240000, polling: 1000 }
       )
       .catch(() => console.log(`  (${leg}) sun pin did not publish in 240 s`));
-    // Damped look weights (0.6/s), bloom and sky settle.
+    // Damped look weights (0.6/s), bloom and sky settle. The look damping
+    // advances by the CLAMPED frame dt (≤ 0.05 s), so at this venue's ~1 fps
+    // it needs minutes, not seconds: wait on the published VALUE until two
+    // readings 3 s apart agree (else the two "ON" frames differ in colour and
+    // the noise floor swallows the signal).
     await page.waitForTimeout(Number(process.env.TRAILS_SETTLE_MS || 20000));
+    {
+      const t0 = Date.now();
+      let prev = null;
+      for (;;) {
+        const cur = await page.evaluate(() => {
+          const s = window.__flyStats?.tracerSpot;
+          return s ? [s.night, s.golden] : null;
+        });
+        if (cur && prev && Math.abs(cur[0] - prev[0]) < 0.004 && Math.abs(cur[1] - prev[1]) < 0.004) break;
+        if (Date.now() - t0 > 300000) {
+          console.log(`  (${leg}) look weights still moving after 300 s: ${JSON.stringify(cur)}`);
+          break;
+        }
+        prev = cur;
+        await page.waitForTimeout(3000);
+      }
+    }
     // Freeze the rendered camera pose and hide every DOM/HUD layer (the label
     // canvas draws right next to the probed heads and animates) — the A/B
     // must differ ONLY by the trail root.
