@@ -155,6 +155,13 @@ const trailLenM = (dM, speed) =>
     tr.update = function frozen() {
       return this.items;
     };
+    // ISOLATE the probe targets: the fixture's own fleet (~300 tracks) would
+    // otherwise keep drawing trails across every sample window, and the A/B
+    // toggles the whole tracer group — a neighbour's line reads as the
+    // target's signal.
+    const keep = tr.items.filter((t) => t.hex.startsWith('ee'));
+    tr.items.length = 0;
+    tr.items.push(...keep);
   });
 
   // Screen positions: head, a body point 1.2 km back, and 16 samples along
