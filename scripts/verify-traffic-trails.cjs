@@ -136,7 +136,9 @@ const trailLenM = (dM, speed) =>
         // neighbour's body): above 2°..9° true, below −3°..−8°, ±17° off the nose.
         const el = above ? (2 + 1.2 * i) * (Math.PI / 180) : -(3 + 0.8 * i) * (Math.PI / 180);
         const alt = Math.max(700, f.pos.y + Math.tan(el) * d);
-        add(`ee${i}${above ? 'a' : 'b'}00`, f.pos.x + side * d * 0.3, alt, f.pos.z - d, side * 230, 0, { km, sky: above, headOn: false, speed: 230 });
+        // Flying INWARD (toward the nose line): the head stays in frame while
+        // the pre-freeze drift runs, and the trail streams out to the edge.
+        add(`ee${i}${above ? 'a' : 'b'}00`, f.pos.x + side * d * 0.3, alt, f.pos.z - d, -side * 230, 0, { km, sky: above, headOn: false, speed: 230 });
       }
     });
     // Head-on: straight ahead, flying at the camera (its trail is edge-on).
