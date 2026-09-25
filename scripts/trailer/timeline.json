@@ -4,7 +4,7 @@
   "bpm": 96,
   "shots": [
     { "id": "globe",     "scene": "globe",  "t0": 0.0,   "t1": 10.0,  "fadeIn": 2.2 },
-    { "id": "dawn",      "scene": "sky",    "t0": 10.0,  "t1": 15.0,  "flashIn": 0.5 },
+    { "id": "dawn",      "scene": "sky",    "t0": 10.0,  "t1": 15.0,  "flashIn": 0.5, "mb": 2 },
     { "id": "reveal",    "scene": "sky",    "t0": 15.0,  "t1": 20.0,  "mb": 4 },
     { "id": "harborA",   "scene": "harbor", "t0": 20.0,  "t1": 25.0,  "mb": 3, "flashIn": 0.35 },
     { "id": "harborB",   "scene": "harbor", "t0": 25.0,  "t1": 30.0,  "mb": 2 },

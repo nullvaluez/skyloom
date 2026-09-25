@@ -5,13 +5,13 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import {
   SKY_GLSL, NOISE_GLSL, skyUniforms, makeSkyDome, buildJet, placeRig, pathPose, Path, Ribbon, trailPoints, JET,
-  clamp, lerp, smooth, easeInOut, easeOut, rng, aim, shake, fbm1, glowSprite,
+  clamp, lerp, smooth, easeInOut, easeOut, rng, aim, shake, fbm1, glowSprite, smoother, FnPath,
 } from './common.js';
 
 const PRESETS = {
   dawn: {
     sky: { zenith: [0.035, 0.07, 0.18], horizon: [0.62, 0.34, 0.2], below: [0.3, 0.2, 0.2], sunGlow: [1.0, 0.52, 0.26], sunDir: [0.55, 0.06, -1], glow: 1.0, disk: 1 },
-    lit: [1.0, 0.6, 0.36], shade: [0.2, 0.17, 0.24], gap: [0.1, 0.09, 0.13], fog: 3.0e-5,
+    lit: [1.05, 0.64, 0.4], shade: [0.3, 0.24, 0.3], gap: [0.1, 0.09, 0.13], fog: 2.3e-5,
     sun: [1.0, 0.7, 0.48], sunI: 2.6, hemi: [[0.35, 0.4, 0.6], [0.45, 0.28, 0.22], 0.7], env: 'dawn',
   },
   day: {
@@ -53,9 +53,10 @@ export async function createSky(renderer) {
     vertexShader: `varying vec3 vW; void main(){ vec4 w = modelMatrix*vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }`,
     fragmentShader: `${SKY_GLSL} ${NOISE_GLSL}
       uniform vec3 uLit; uniform vec3 uShade; uniform vec3 uGap; uniform float uFogDen; uniform vec2 uOff; uniform float uCover; varying vec3 vW;
-      float H(vec2 p){ vec2 q = vec2(fbm3(p*0.45), fbm3(p*0.45+5.2)); return fbm(p + q*1.6); }
+      float H(vec2 p){ vec2 q = vec2(fbm3(p*0.45 + uTime*0.004), fbm3(p*0.45 + 5.2 - uTime*0.003)); return fbm(p + q*1.6); }
       void main(){
-        vec2 p = vW.xz * 0.00042 + uOff;
+        vec2 p = vW.xz * 0.00042 + uOff + uTime * vec2(0.0035, -0.0015);
+        float dist0 = length(vW - cameraPosition);
         float h = H(p); float e = 0.035;
         float hx = H(p + vec2(e,0.0)), hz = H(p + vec2(0.0,e));
         vec3 n = normalize(vec3((h-hx)*15.0, 1.0, (h-hz)*15.0));
@@ -63,6 +64,8 @@ export async function createSky(renderer) {
         float ndl = dot(n, uSunDir);
         float top = smoothstep(0.3, 0.8, h);
         vec3 col = mix(uShade, uLit, clamp(ndl*0.75 + 0.35, 0.0, 1.0)) * (0.7 + 0.45*top);
+        float fine = fbm3(p * 9.0 + uTime * vec2(0.02, 0.01));
+        col *= 1.0 + (fine - 0.5) * 0.55 * (1.0 - smoothstep(900.0, 7000.0, dist0));
         float fs = pow(max(dot(V, uSunDir), 0.0), 10.0);
         col += uSunGlow * fs * 0.35 * (1.0 - top);
         float cov = smoothstep(uCover - 0.04, uCover + 0.22, h);
@@ -75,66 +78,122 @@ export async function createSky(renderer) {
   }));
   scene.add(deck);
 
-  // ---- cumulus towers (instanced sphere-impostor billboards) ------------
-  const MAXP = 700;
+  // ---- cumulus towers: sphere-traced soft volumes ------------------------
+  // Each instance is a sphere. A camera-facing quad just covers its silhouette;
+  // the fragment intersects the view ray with the sphere, measures the chord
+  // (thickness) and erodes it with 3D noise anchored in WORLD space, so the
+  // detail parallaxes correctly, billows over time and never shows a quad edge.
+  // Alpha fades softly where a cloud meets the deck (no hard intersection line).
+  const MAXP = 1400;
   const pg = new THREE.InstancedBufferGeometry(); const quad = new THREE.PlaneGeometry(2, 2);
-  pg.index = quad.index; pg.setAttribute('position', quad.getAttribute('position')); pg.setAttribute('uv', quad.getAttribute('uv'));
-  const iPos = new THREE.InstancedBufferAttribute(new Float32Array(MAXP * 3), 3); const iSize = new THREE.InstancedBufferAttribute(new Float32Array(MAXP), 1); const iSeed = new THREE.InstancedBufferAttribute(new Float32Array(MAXP), 1);
-  pg.setAttribute('iPos', iPos); pg.setAttribute('iSize', iSize); pg.setAttribute('iSeed', iSeed);
-  const puffU = { ...U, uLit: deckU.uLit, uShade: deckU.uShade, uFogDen: deckU.uFogDen, uSunV: { value: new THREE.Vector3() }, uOpacity: { value: 1 } };
+  pg.index = quad.index; pg.setAttribute('position', quad.getAttribute('position'));
+  const iPos = new THREE.InstancedBufferAttribute(new Float32Array(MAXP * 3), 3);
+  const iSize = new THREE.InstancedBufferAttribute(new Float32Array(MAXP), 1);
+  const iSeed = new THREE.InstancedBufferAttribute(new Float32Array(MAXP), 1);
+  const iDens = new THREE.InstancedBufferAttribute(new Float32Array(MAXP), 1);
+  pg.setAttribute('iPos', iPos); pg.setAttribute('iSize', iSize); pg.setAttribute('iSeed', iSeed); pg.setAttribute('iDens', iDens);
+  const puffU = { ...U, uLit: deckU.uLit, uShade: deckU.uShade, uFogDen: deckU.uFogDen, uOpacity: { value: 1 } };
   const puffs = new THREE.Mesh(pg, new THREE.ShaderMaterial({
     uniforms: puffU, transparent: true, depthWrite: false,
-    vertexShader: `attribute vec3 iPos; attribute float iSize; attribute float iSeed; varying vec2 vUv; varying float vSeed; varying vec3 vDirW; varying float vD;
-      void main(){ vUv = uv; vSeed = iSeed; vec4 cv = viewMatrix * vec4(iPos, 1.0); cv.xy += position.xy * iSize; vD = length(cv.xyz); vDirW = normalize(iPos - cameraPosition); gl_Position = projectionMatrix * cv; }`,
-    fragmentShader: `${SKY_GLSL} ${NOISE_GLSL} uniform vec3 uLit; uniform vec3 uShade; uniform float uFogDen; uniform vec3 uSunV; uniform float uOpacity;
-      varying vec2 vUv; varying float vSeed; varying vec3 vDirW; varying float vD;
+    vertexShader: `attribute vec3 iPos; attribute float iSize; attribute float iSeed; attribute float iDens;
+      varying vec3 vWorld; varying vec3 vC; varying float vR; varying float vSeed; varying float vDens;
       void main(){
-        vec2 c = vUv*2.0 - 1.0;
-        float nz = fbm(c*2.3 + vSeed*13.1) - 0.5;
-        float d = -1.0; vec3 nV = vec3(0.0,0.0,1.0);
-        for (int k = 0; k < 8; k++) {
-          float fk = float(k);
-          vec2 ck = vec2(hn(vec2(vSeed, fk)) - 0.5, hn(vec2(fk, vSeed)) * 0.55 - 0.2) * vec2(1.05, 1.0);
-          float rk = 0.22 + 0.3 * hn(vec2(vSeed + fk, 3.7));
-          vec2 dv = (c - ck) / rk; float dk = 1.0 - length(dv);
-          if (dk > d) { d = dk; nV = vec3(dv, sqrt(max(0.0, 1.0 - dot(dv,dv)))); }
+        vC = iPos; vR = iSize; vSeed = iSeed; vDens = iDens;
+        vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
+        vec3 up = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
+        vec3 fwd = -vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]);
+        float d = length(iPos - cameraPosition);
+        if (d > iSize * 1.02) {
+          float k = min(d / sqrt(d*d - iSize*iSize), 3.0) * 1.04;
+          vWorld = iPos + (right * position.x + up * position.y) * iSize * k;
+        } else {
+          vWorld = cameraPosition + fwd + (right * position.x + up * position.y) * 6.0;
         }
-        float a = smoothstep(0.0, 0.5, d + nz*0.45);
-        a *= smoothstep(-0.62, -0.3, c.y + nz*0.15);
-        if (a < 0.01) discard;
-        nV = normalize(nV + vec3(nz*0.8, nz*0.8, 0.0));
-        float ndl = dot(nV, uSunV);
-        float inner = fbm(c*4.0 + vSeed*7.0);
-        vec3 col = mix(uShade, uLit, clamp(ndl*0.55 + 0.4 + (inner-0.5)*0.5, 0.0, 1.0));
-        col *= mix(0.7, 1.05, smoothstep(-0.6, 0.6, c.y));
-        float fs = pow(max(dot(vDirW, uSunDir), 0.0), 6.0);
-        float rim = pow(1.0 - clamp(d / 0.45, 0.0, 1.0), 2.0);
-        col += uSunGlow * fs * rim * 2.4 + uLit * rim * 0.15;
-        float fog = 1.0 - exp(-vD * uFogDen);
-        col = mix(col, skyColor(normalize(vec3(vDirW.x, 0.0, vDirW.z)), false), fog);
+        gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.0);
+      }`,
+    fragmentShader: `${SKY_GLSL}
+      uniform vec3 uLit; uniform vec3 uShade; uniform float uFogDen; uniform float uOpacity;
+      varying vec3 vWorld; varying vec3 vC; varying float vR; varying float vSeed; varying float vDens;
+      float h31(vec3 p){ p = fract(p*0.3183099 + 0.1); p *= 17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
+      float vn3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f*f*(3.0-2.0*f);
+        return mix(mix(mix(h31(i), h31(i+vec3(1,0,0)), f.x), mix(h31(i+vec3(0,1,0)), h31(i+vec3(1,1,0)), f.x), f.y),
+                   mix(mix(h31(i+vec3(0,0,1)), h31(i+vec3(1,0,1)), f.x), mix(h31(i+vec3(0,1,1)), h31(i+vec3(1,1,1)), f.x), f.y), f.z); }
+      float fbm3d(vec3 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { v += a*vn3(p); p = p*2.03 + vec3(3.1,1.7,5.3); a *= 0.5; } return v; }
+      void main(){
+        vec3 ro = cameraPosition; vec3 rd = normalize(vWorld - ro);
+        vec3 oc = ro - vC; float b = dot(oc, rd); float c = dot(oc, oc) - vR*vR; float h = b*b - c;
+        if (h <= 0.0) discard;
+        h = sqrt(h); float tN = max(-b - h, 0.0); float tF = -b + h;
+        if (tF <= 0.0) discard;
+        // short raymarch through the sphere: lumpy, eroded cumulus density
+        const int STEPS = 7;
+        float dt = (tF - tN) / float(STEPS);
+        vec3 seedv = vec3(vSeed*3.1, vSeed*1.7, vSeed*2.3) + vec3(0.035, 0.07, 0.02) * uTime;
+        float T = 1.0; vec3 acc = vec3(0.0);
+        float dc = length(vC - ro);
+        float near = mix(0.3, 1.0, smoothstep(vR*0.4, vR*1.3, dc));
+        for (int i = 0; i < STEPS; i++) {
+          vec3 p = ro + rd * (tN + (float(i) + 0.5) * dt);
+          vec3 q = (p - vC) / vR;
+          float r = length(q);
+          float n = fbm3d(q * 2.1 + seedv);
+          float d = (1.0 - r) * 2.0 - 0.18 + (n - 0.5) * 1.9;
+          d *= smoothstep(1.0, 0.78, r);
+          d *= smoothstep(-0.75, -0.3, q.y + (n - 0.5) * 0.4);
+          d *= smoothstep(0.0, 70.0, p.y);
+          d = max(d, 0.0) * vDens * near;
+          if (d <= 0.0) continue;
+          float sigma = d * dt / vR * 5.5;
+          float lit = clamp(0.5 + 0.62 * dot(q, uSunDir) + (n - 0.5) * 1.1, 0.0, 1.0);
+          float hgt = smoothstep(-0.9, 0.9, q.y);
+          vec3 c = mix(uShade, uLit, clamp(lit * 0.7 + hgt * 0.3, 0.0, 1.0));
+          float ab = 1.0 - exp(-sigma);
+          acc += T * ab * c; T *= 1.0 - ab;
+          if (T < 0.02) break;
+        }
+        float a = 1.0 - T;
+        if (a < 0.004) discard;
+        vec3 col = acc / a;
+        float fs = pow(max(dot(rd, uSunDir), 0.0), 6.0);
+        col += uSunGlow * fs * (1.0 - a) * 1.6;
+        float fog = 1.0 - exp(-length(ro + rd * tN - ro) * uFogDen);
+        col = mix(col, skyColor(normalize(vec3(rd.x, 0.0, rd.z)), false), fog);
         gl_FragColor = vec4(col, a * uOpacity);
       }`,
   }));
   puffs.frustumCulled = false; scene.add(puffs);
   let puffList = [];
+  let wind = new THREE.Vector3();
+  // A cumulus tower = a vertical stack of shrinking spheres + a few side lobes.
+  function tower(r, x, z, y0, R, dens = 1) {
+    const stack = 1 + Math.floor(r() * 3);
+    for (let k = 0; k < stack; k++) {
+      const rk = R * (1 - k * 0.2);
+      puffList.push({ p: new THREE.Vector3(x + (r() - 0.5) * R * 0.5, y0 + R * 0.5 + k * R * 0.62, z + (r() - 0.5) * R * 0.5), s: rk, seed: r() * 10, dens });
+    }
+    const lobes = 2 + Math.floor(r() * 3);
+    for (let k = 0; k < lobes; k++) {
+      const a = r() * Math.PI * 2, rr = R * (0.45 + r() * 0.25);
+      puffList.push({ p: new THREE.Vector3(x + Math.cos(a) * R * 0.75, y0 + rr * 0.55 + r() * R * 0.3, z + Math.sin(a) * R * 0.75), s: rr, seed: r() * 10, dens });
+    }
+  }
   function layoutPuffs(seed, region) {
     const r = rng(seed); puffList = [];
     for (const g of region) {
       for (let i = 0; i < g.n; i++) {
-        const x = lerp(g.x[0], g.x[1], r()), z = lerp(g.z[0], g.z[1], r());
-        const base = g.size[0] + (g.size[1] - g.size[0]) * Math.pow(r(), 2);
-        // a tower is a stack of puffs
-        const stack = 1 + Math.floor(r() * (g.stack || 3));
-        for (let k = 0; k < stack; k++) puffList.push({ p: new THREE.Vector3(x + (r() - 0.5) * base * 0.8, g.y + k * base * 0.55 + r() * base * 0.2, z + (r() - 0.5) * base * 0.8), s: base * (1 - k * 0.18), seed: r() * 10 });
+        let x = lerp(g.x[0], g.x[1], r());
+        if (g.clearX && Math.abs(x) < g.clearX) x = Math.sign(x || 1) * (g.clearX + r() * 200);
+        const z = lerp(g.z[0], g.z[1], r());
+        const R = g.size[0] + (g.size[1] - g.size[0]) * Math.pow(r(), 2);
+        tower(r, x, z, g.y, R, g.dens ?? 1);
       }
     }
-    for (const x of g_extra) puffList.push(x);
   }
-  let g_extra = [];
-  function uploadPuffs(camPos) {
-    const list = puffList.map((p) => ({ ...p, d: p.p.distanceToSquared(camPos) })).sort((a, b) => b.d - a.d).slice(-MAXP);
-    list.forEach((p, i) => { iPos.setXYZ(i, p.p.x, p.p.y, p.p.z); iSize.setX(i, p.s); iSeed.setX(i, p.seed); });
-    pg.instanceCount = list.length; iPos.needsUpdate = true; iSize.needsUpdate = true; iSeed.needsUpdate = true;
+  function uploadPuffs(camPos, t) {
+    const off = wind.clone().multiplyScalar(t);
+    const list = puffList.map((p) => { const q = p.p.clone().add(off); return { ...p, q, d: q.distanceToSquared(camPos) }; }).sort((a, b) => b.d - a.d).slice(-MAXP);
+    list.forEach((p, i) => { iPos.setXYZ(i, p.q.x, p.q.y, p.q.z); iSize.setX(i, p.s); iSeed.setX(i, p.seed); iDens.setX(i, p.dens ?? 1); });
+    pg.instanceCount = list.length; iPos.needsUpdate = true; iSize.needsUpdate = true; iSeed.needsUpdate = true; iDens.needsUpdate = true;
   }
 
   // ---- lights + actors ---------------------------------------------------
@@ -166,18 +225,27 @@ export async function createSky(renderer) {
     jet.model.traverse((o) => { if (o.isMesh) o.material.needsUpdate = true; });
     scene.environment = null;
   }
-  function frameCommon(t) {
+  function frameCommon(t, lt = 0) {
     U.uTime.value = t;
     const sd = U.uSunDir.value; sun.position.copy(camera.position).addScaledVector(sd, 5000); sun.target.position.copy(camera.position);
     deck.position.set(Math.round(camera.position.x / 1000) * 1000, 0, Math.round(camera.position.z / 1000) * 1000);
-    camera.updateMatrixWorld(); puffU.uSunV.value.copy(sd).transformDirection(camera.matrixWorldInverse);
-    uploadPuffs(camera.position);
+    camera.updateMatrixWorld();
+    uploadPuffs(camera.position, lt);
   }
   const hideAll = () => { jet.root.visible = false; liner.visible = false; for (const r of [vapL, vapR, conL, conR, lightTrail, lightTrail2]) r.mesh.visible = false; };
 
   // ---- choreography -------------------------------------------------------
   // dawn glide: camera cruises toward the rising sun
-  const dawnRegion = [{ n: 60, x: [-5000, 5000], z: [-9000, 500], y: 30, size: [180, 520], stack: 3 }];
+  const DAWN_V = 235;
+  const dawnCam = (t) => new THREE.Vector3(Math.sin(t * 0.55) * 22, 300 + Math.sin(t * 0.8) * 10, -DAWN_V * t);
+  function layoutDawn() {
+    const r = rng(11); puffList = [];
+    // near corridor: towers slide past on both sides of the flight line
+    for (let i = 0; i < 18; i++) { const side = i % 2 ? 1 : -1; tower(r, side * (230 + r() * 600), 150 - i * 95 - r() * 60, 0, 90 + r() * 110); }
+    // mid and far fields
+    for (let i = 0; i < 46; i++) { const x = (r() - 0.5) * 9000; tower(r, Math.abs(x) < 650 ? Math.sign(x || 1) * (650 + r() * 400) : x, -800 - r() * 7000, 0, 140 + Math.pow(r(), 2) * 260); }
+    for (let i = 0; i < 34; i++) tower(r, (r() - 0.5) * 26000, -7000 - r() * 16000, 0, 300 + r() * 420);
+  }
   // reveal: the Vector bursts out of a cumulus tower, straight at camera
   const revealPath = new Path([
     [0.0, 40, 128, -760], [1.0, 30, 132, -480], [2.0, 16, 146, -190], [2.5, 10, 152, -12], [3.0, 2, 176, 150], [3.6, -6, 250, 300], [4.4, -12, 400, 470], [5.2, -16, 600, 640],
@@ -187,29 +255,29 @@ export async function createSky(renderer) {
   // formation: jet slides onto the airliner's right wing
   const LINER_V = 235;
   const linerPos = (t) => new THREE.Vector3(0, 1400, -LINER_V * t);
-  const jetRel = (t) => { const e = easeInOut(smooth(0.0, 5.2, t)); return new THREE.Vector3(lerp(140, 64, e), lerp(-55, 4, e) + Math.sin(t * 1.3) * 0.8, lerp(260, 20, e)); };
-  const formPath = new Path(Array.from({ length: 40 }, (_, i) => { const t = -1 + i * 0.25; const p = linerPos(t).add(jetRel(t)); return [t, p.x, p.y, p.z]; }));
+  const jetRel = (t) => { const e = smoother((t + 1.2) / 6.6); return new THREE.Vector3(lerp(112, 64, e), lerp(-34, 4, e) + Math.sin(t * 1.3) * 0.6, lerp(200, 20, e)); };
+  const formPath = new FnPath((t) => linerPos(t).add(jetRel(t)));
   // logo: jet crosses the frame trailing light
   const logoPath = new Path([[0, -2600, 420, -1500], [1.5, -700, 470, -1150], [3.0, 1100, 560, -1050], [4.5, 2900, 700, -1200], [6, 4700, 860, -1500]]);
 
   const shots = {
     dawn(lt, gt) {
-      usePreset('dawn'); hideAll();
-      if (puffList._id !== 'dawn') { layoutPuffs(11, dawnRegion); puffList._id = 'dawn'; }
+      usePreset('dawn'); hideAll(); wind.set(5, 0, 2);
+      if (puffList._id !== 'dawn') { layoutDawn(); puffList._id = 'dawn'; }
       deckU.uCover.value = 0.36; deckU.uOff.value.set(0.3, 0.7);
-      const z = -140 * lt; const y = 260 - 12 * lt;
-      aim(camera, new THREE.Vector3(Math.sin(lt * 0.4) * 30, y, z), new THREE.Vector3(Math.sin(lt * 0.4) * 30 - 60, y - 60, z - 1000), lerp(0.05, -0.03, lt / 5), 38);
-      shake(camera, gt, 0.0015, 1.5);
-      frameCommon(gt);
+      const cam = dawnCam(lt);
+      const ahead = dawnCam(lt + 1.2).add(new THREE.Vector3(-40, -46, 0));
+      aim(camera, cam, ahead, Math.sin(lt * 0.55 + 0.4) * 0.05, 44);
+      shake(camera, gt, 0.0025, 2.2);
+      frameCommon(gt, lt);
     },
     reveal(lt, gt) {
-      usePreset('dawn'); hideAll(); jet.root.visible = true; vapL.mesh.visible = vapR.mesh.visible = true;
+      usePreset('dawn'); hideAll(); wind.set(4, 0, 2); jet.root.visible = true; vapL.mesh.visible = vapR.mesh.visible = true;
       if (puffList._id !== 'reveal') {
-        layoutPuffs(23, [{ n: 55, x: [-5000, 5000], z: [-9000, 2500], y: 20, size: [200, 500], stack: 3 }]);
-        g_extra = [];
+        layoutPuffs(23, [{ n: 50, x: [-5000, 5000], z: [-9000, 2500], y: 0, size: [120, 320], clearX: 260 }]);
         // the tower the jet punches out of + near-field puffs for parallax
-        puffList.push({ p: new THREE.Vector3(40, 110, -700), s: 150, seed: 1.3 }, { p: new THREE.Vector3(-30, 150, -730), s: 130, seed: 2.9 }, { p: new THREE.Vector3(90, 80, -680), s: 120, seed: 4.2 });
-        puffList.push({ p: new THREE.Vector3(-260, 90, -260), s: 120, seed: 5.1 }, { p: new THREE.Vector3(240, 70, 60), s: 140, seed: 6.6 }, { p: new THREE.Vector3(-180, 60, 200), s: 110, seed: 7.7 });
+        puffList.push({ p: new THREE.Vector3(40, 105, -700), s: 120, seed: 1.3 }, { p: new THREE.Vector3(-40, 150, -740), s: 100, seed: 2.9 }, { p: new THREE.Vector3(110, 80, -680), s: 90, seed: 4.2 }, { p: new THREE.Vector3(-110, 70, -660), s: 85, seed: 8.4 }, { p: new THREE.Vector3(20, 200, -760), s: 75, seed: 9.1 });
+        puffList.push({ p: new THREE.Vector3(-300, 80, -300), s: 90, seed: 5.1 }, { p: new THREE.Vector3(280, 70, 40), s: 100, seed: 6.6 }, { p: new THREE.Vector3(-220, 60, 220), s: 80, seed: 7.7 });
         puffList._id = 'reveal';
       }
       deckU.uCover.value = 0.36; deckU.uOff.value.set(0.3, 0.7);
@@ -231,18 +299,18 @@ export async function createSky(renderer) {
         const pts = trailPoints(60, 0.02, lt, revealPose, tip);
         rib.update(pts, camera.position, (i, f) => 0.25 + f * 1.5, (i, f) => (1 - f) * vis(lt - i * 0.02) * 0.5);
       }
-      frameCommon(gt);
+      frameCommon(gt, lt);
       return { g };
     },
     formation(lt, gt) {
-      usePreset('day'); hideAll(); jet.root.visible = true; liner.visible = true; conL.mesh.visible = conR.mesh.visible = true;
-      if (puffList._id !== 'formation') { layoutPuffs(37, [{ n: 70, x: [-9000, 9000], z: [-14000, 4000], y: 40, size: [260, 800], stack: 4 }]); puffList._id = 'formation'; }
+      usePreset('day'); hideAll(); wind.set(8, 0, 3); jet.root.visible = true; liner.visible = true; conL.mesh.visible = conR.mesh.visible = true;
+      if (puffList._id !== 'formation') { layoutPuffs(37, [{ n: 80, x: [-9000, 9000], z: [-14000, 4000], y: 0, size: [150, 460] }]); puffList._id = 'formation'; }
       deckU.uCover.value = 0.42; deckU.uOff.value.set(2.1, 0.4);
       const lp = linerPos(lt);
       const lq = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.sin(lt * 0.5) * 0.01);
       const flip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
       liner.position.copy(lp); liner.quaternion.copy(flip).multiply(lq); liner.updateMatrixWorld(true);
-      const jp = pathPose(formPath, lt, { bankGain: 2.5 }); placeRig(jet, jp);
+      const jp = pathPose(formPath, lt, { bankGain: 0.9, maxBank: 0.6 }); placeRig(jet, jp);
       jet.set(gt, { throttle: 0.18, nav: 1, strobe: 1 });
       // contrails from the two engines (liner local nose -Z after the flip)
       for (const [rib, x] of [[conL, 9.5], [conR, -9.5]]) {
@@ -250,15 +318,15 @@ export async function createSky(renderer) {
         rib.update(pts, camera.position, (i, f) => 0.9 + f * f * 14, (i, f) => smooth(0, 0.06, f) * (1 - f) * 0.9);
       }
       const mid = lp.clone().lerp(jp.p, 0.45 * smooth(1.5, 4.5, lt));
-      const cam = lp.clone().add(new THREE.Vector3(lerp(150, 118, easeInOut(lt / 7.5)), lerp(34, 16, easeInOut(lt / 7.5)), lerp(150, 95, easeInOut(lt / 7.5))));
+      const ce = smoother(lt / 7.5); const cam = lp.clone().add(new THREE.Vector3(lerp(150, 118, ce), lerp(34, 16, ce), lerp(150, 95, ce)));
       aim(camera, cam, mid.add(new THREE.Vector3(0, 0, -20)), -0.03, 40);
       shake(camera, gt, 0.0025, 2.2);
-      frameCommon(gt);
+      frameCommon(gt, lt);
       return { lp, jp };
     },
     logo(lt, gt) {
-      usePreset('night'); hideAll(); jet.root.visible = true; lightTrail.mesh.visible = lightTrail2.mesh.visible = true;
-      if (puffList._id !== 'logo') { layoutPuffs(51, [{ n: 26, x: [-12000, 12000], z: [-16000, -5000], y: 20, size: [300, 700], stack: 3 }]); puffList._id = 'logo'; }
+      usePreset('night'); hideAll(); wind.set(3, 0, 1); jet.root.visible = true; lightTrail.mesh.visible = lightTrail2.mesh.visible = true;
+      if (puffList._id !== 'logo') { layoutPuffs(51, [{ n: 26, x: [-12000, 12000], z: [-16000, -5000], y: 0, size: [180, 420] }]); puffList._id = 'logo'; }
       deckU.uCover.value = 0.3; deckU.uOff.value.set(5.1, 1.4);
       const tt = lt;
       const lpPose = (t) => pathPose(logoPath, t, { bankGain: 1, roll: (x) => easeInOut(smooth(1.6, 2.6, x)) * Math.PI * 2 });
@@ -271,12 +339,12 @@ export async function createSky(renderer) {
         const pts = trailPoints(n, dt, Math.min(tt, 6), lpPose, local);
         rib.update(pts, camera.position, (i, f) => (2.2 + f * 10) * wmul, (i, f) => (1 - f) * (1 - smooth(6, 12, lt)) * 0.9);
       }
-      frameCommon(gt);
+      frameCommon(gt, lt);
     },
   };
 
   const post = {
-    dawn: { bloom: [0.4, 0.5, 1.1], exposure: 1.0, grade: { tint: [1.03, 0.99, 0.95], sat: 1.08, con: 1.1 } },
+    dawn: { bloom: [0.35, 0.5, 1.15], exposure: 1.0, grade: { tint: [1.03, 0.99, 0.95], sat: 1.14, con: 1.17 } },
     reveal: { bloom: [0.45, 0.5, 1.1], exposure: 1.0, grade: { tint: [1.03, 0.99, 0.95], sat: 1.1, con: 1.12, ca: 0.003 } },
     formation: { bloom: [0.3, 0.4, 1.2], exposure: 1.0, grade: { tint: [1.0, 1.0, 1.02], sat: 1.08, con: 1.1 } },
     logo: { bloom: [0.8, 0.6, 0.7], exposure: 1.0, grade: { tint: [1.0, 0.98, 1.02], sat: 1.1, con: 1.1 } },

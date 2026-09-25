@@ -36,6 +36,16 @@ export class Path {
 }
 const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
 
+// C2-smooth ease (continuous acceleration), for anything banking is derived from.
+export const smoother = (t) => { t = clamp(t); return t * t * t * (t * (t * 6 - 15) + 10); };
+// Analytic path with the Path interface (pos/vel/acc) for smooth closed-form motion.
+export class FnPath {
+  constructor(fn) { this.fn = fn; }
+  pos(t, out = new THREE.Vector3()) { return out.copy(this.fn(t)); }
+  vel(t, out = new THREE.Vector3()) { const e = 0.02; return out.copy(this.fn(t + e)).sub(this.fn(t - e)).divideScalar(2 * e); }
+  acc(t, out = new THREE.Vector3()) { const e = 0.22; return out.copy(this.fn(t + e)).add(this.fn(t - e)).addScaledVector(this.fn(t), -2).divideScalar(e * e); }
+}
+
 // Coordinated-turn pose: nose along velocity, bank from lateral accel.
 export function pathPose(path, t, opt = {}) {
   const p = path.pos(t, new THREE.Vector3());
