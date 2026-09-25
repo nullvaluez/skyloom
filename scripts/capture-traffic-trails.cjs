@@ -111,6 +111,7 @@ const ALT = Number(process.env.TRAILS_ALT_M || 9100);
   }
   console.log('pageerrors', errs.length, errs.slice(0, 3).join(' | '));
   await browser.close();
+  process.exit(0); // the fixture server would otherwise hold the event loop open
 })().catch((e) => {
   console.error('FAILED:', e.message);
   process.exit(1);
