@@ -3,9 +3,10 @@
 Implemented in the isolated `codex/painterly-flight` worktree, starting at
 `2fb97b2`. The original checkout and its staged files are unchanged.
 
-**Enhanced is an opt-in comparison, not an accepted default.** Visual acceptance
-and the required hardware targets govern the default change. Radeon 780M has
-not been available for measurement. The user authorized publication to `main`; no separate deployment command is part of this work.
+**Enhanced is the default on all devices as of 2026-09-25**, as requested by
+the user. Explicit saved player choices still take precedence. The validation
+limits below remain recorded: Radeon 780M has not been available for measurement.
+The user authorized publication to `main`; no separate deployment command is part of this work.
 
 ## Implementation
 
@@ -309,7 +310,7 @@ The environment/shadow equivalence test (`neon-environment/report.json`)
 records zero changed pixels. Disabling shadows changes 419 control pixels,
 confirming that the shadow comparison is not a blank or shadow-free scene.
 
-## Acceptance still required
+## Remaining visual and hardware checks
 
 Review low countryside daylight, overcast, dusk and night, including the banked
 return, then check suburbs, Manhattan, mountains, Owens Lake (mapped water),
@@ -320,5 +321,6 @@ traffic and beacon phases remain live. Visual acceptance belongs to the user.
 The 300 MiB limit measures texture allocations. Renderbuffers and live geometry
 attribute payload are reported separately; the latter excludes detached cached
 meshes and driver overhead. Frame timing is measured without allocation hooks.
-Any missed target stays visible in the evidence. Classic remains the default
-until both visual acceptance and the required hardware checks pass.
+Any missed target stays visible in the evidence. The user-requested Enhanced
+default applies across device classes; that policy change makes no new hardware
+performance claim.
