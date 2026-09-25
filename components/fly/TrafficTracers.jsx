@@ -267,7 +267,7 @@ function SpotTracers({ runtime, flight, origin }) {
     const focal = (0.5 * H) / tanHalf;
     const headPx = Math.max(S.width.minHeadPx, S.width.floorHeadPx * hRef);
     const tailPx = Math.max(S.width.minTailPx, S.width.floorTailPx * hRef);
-    const kLat = mercatorScale(flight.latDeg);
+    const kLat = mercatorScale(flight?.latDeg ?? runtime.flight?.latDeg ?? 0);
     const L = stepSpotLook(state, runtime, dt);
     const P = spotPalette(L, state.P);
     const rPx = Math.max(S.glint.minRadiusPx, S.glint.radiusPx * hRef);
@@ -396,7 +396,12 @@ function SpotTracers({ runtime, flight, origin }) {
       const pres = state.cA[c] * (pinned ? S.body.lockPresence : 1);
       const Dt = state.cDt[c];
       const Dw = state.cDw[c];
-      const hazeB = 1 - P.hazeB * smoothstep(S.body.hazeNearM, S.body.hazeFarM, Dt);
+      // Prominence follows reach: full within fullM, receding to a faint
+      // hairline (bodyFar) by farM; the glint is gone by glintFarM.
+      const PR = S.prominence;
+      const promBody = 1 - (1 - PR.bodyFar) * smoothstep(PR.fullM, PR.farM, Dt);
+      const promGlint = 1 - smoothstep(PR.glintFullM, PR.glintFarM, Dt);
+      const hazeB = (1 - P.hazeB * smoothstep(S.body.hazeNearM, S.body.hazeFarM, Dt)) * promBody;
       const nearV = nv.minK + (1 - nv.minK) * smoothstep(nv.startM, nv.endM, Dw);
       const gA = smoothstep(S.body.goldAltM[0], S.body.goldAltM[1], t.ry);
       const ec = P.bodyEmit[b];
@@ -496,7 +501,8 @@ function SpotTracers({ runtime, flight, origin }) {
         smoothstep(S.glint.nearFadeM[0], S.glint.nearFadeM[1], Dw) *
         (1 - P.hazeG * smoothstep(S.glint.hazeNearM, S.glint.hazeFarM, Dt)) *
         (1 - pulse.depth * (0.5 + 0.5 * Math.sin(2 * Math.PI * pulse.hz * state.clock + rec.phase))) *
-        (pinned ? S.glint.lockBoost : 1);
+        (pinned ? S.glint.lockBoost : 1) *
+        (pinned ? 1 : promGlint); // the inspected/locked target keeps its mark at any range
       const gc = P.glintCol[b];
       for (let k = 0; k < 4; k++, v++) {
         const o = v * 3;

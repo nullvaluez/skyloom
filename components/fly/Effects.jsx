@@ -516,7 +516,13 @@ export const Effects = memo(function Effects({ runtime }) {
   const overlay = useMemo(() => (clouds ? new SkyOverlayPass(scene, flightCamera, clouds) : null), [clouds, scene, flightCamera]);
   useLayoutEffect(() => {
     setSkyOverlayDeferred(!!overlay);
-    return () => setSkyOverlayDeferred(false);
+    // Dev-only A/B handle: deferral off draws the overlays in the main pass
+    // again (where the day sky composite erases them) — the pre-fix frame.
+    if (process.env.NODE_ENV === 'development' && overlay) window.__flySkyOverlays = { pass: overlay, setDeferred: setSkyOverlayDeferred };
+    return () => {
+      setSkyOverlayDeferred(false);
+      if (process.env.NODE_ENV === 'development' && window.__flySkyOverlays?.pass === overlay) delete window.__flySkyOverlays;
+    };
   }, [overlay]);
   const renderDpr = useThree((s) => s.viewport.dpr);
   const qualityTier = sat && satelliteVisualsOn()

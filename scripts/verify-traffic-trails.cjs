@@ -27,6 +27,12 @@
  *
  * VISIBLE = sig ≥ max(12, 2 × noise).
  *
+ * The contract (the user's live review: far marks must not read as a
+ * starfield): traffic within REACH (≤ 26 km — lockable/pickable) is clearly
+ * marked (head + body visible, continuous line, head-on glint), while far
+ * traffic (≥ 40 km) stays PRESENT but SUBTLE: a faint continuous hairline,
+ * never a bright head.
+ *
  * Run (container / no hardware GPU; uses the offline fixture):
  *   FLY_TILE_FIXTURE=1 node scripts/verify-traffic-trails.cjs
  * Env: FLY_URL (default :3000), TRAILS_LEGS (default "noon,dusk,night"),
@@ -286,16 +292,23 @@ const trailLenM = (dM, speed) =>
 
   const sunFor = (leg) =>
     page.evaluate((l) => {
-      const want = l === 'night' ? 0 : l === 'dusk' ? 0.1 : 1;
       const g = window.__fly?.geo ?? { x: -74, y: 40.7 };
       const day0 = Date.UTC(2026, 5, 21);
+      const noonUtcH = 12 - g.x / 15; // local solar noon, UTC hours
+      if (l === 'night' || l === 'noon') {
+        // solar midnight / solar noon: the deepest night, the highest sun
+        const h = l === 'night' ? noonUtcH + 12 : noonUtcH;
+        window.__flySunOverride = day0 + (((h % 24) + 24) % 24) * 3600000;
+        return;
+      }
+      // dusk: the EVENING side, frac nearest 0.1
       let best = day0;
       let err = Infinity;
-      for (let m = 0; m < 24 * 60; m += 5) {
-        const t = day0 + m * 60000;
+      for (let m = 0; m < 12 * 60; m += 5) {
+        const t = day0 + (noonUtcH * 60 + m) * 60000;
         const f = window.__flySunModel ? window.__flySunModel(g.x, g.y, t) : 1;
-        if (Math.abs(f - want) < err) {
-          err = Math.abs(f - want);
+        if (Math.abs(f - 0.1) < err) {
+          err = Math.abs(f - 0.1);
           best = t;
         }
       }
@@ -318,6 +331,28 @@ const trailLenM = (dM, speed) =>
       .catch(() => console.log(`  (${leg}) sun pin did not publish in 240 s`));
     // Damped look weights (0.6/s), bloom and sky settle.
     await page.waitForTimeout(Number(process.env.TRAILS_SETTLE_MS || 20000));
+    // Freeze the rendered camera pose and hide every DOM/HUD layer (the label
+    // canvas draws right next to the probed heads and animates) — the A/B
+    // must differ ONLY by the trail root.
+    await page.evaluate(() => {
+      const cam = window.__fly.camera;
+      cam.__freezeP = cam.position.clone();
+      cam.__freezeQ = cam.quaternion.clone();
+      if (!cam.__freezeOrig) {
+        cam.__freezeOrig = cam.updateMatrixWorld.bind(cam);
+        cam.updateMatrixWorld = (force) => {
+          cam.position.copy(cam.__freezeP);
+          cam.quaternion.copy(cam.__freezeQ);
+          cam.__freezeOrig(force);
+        };
+      }
+      const glc = document.querySelector('.fixed.inset-0 canvas');
+      const keep = new Set();
+      for (let e = glc; e; e = e.parentElement) keep.add(e);
+      for (const el of document.body.querySelectorAll('*')) if (!keep.has(el)) el.style.visibility = 'hidden';
+      glc.style.visibility = 'visible';
+    });
+    await frames(3);
     await setTrails(true);
     await frames();
     const pts = await project();
@@ -353,30 +388,37 @@ const trailLenM = (dM, speed) =>
     });
     const sky = rows.filter((r) => r.sky && !r.headOn);
     const low = rows.filter((r) => !r.sky);
+    const reach = (r) => r.km >= 9 && r.km <= 26;
     gate(`${leg}: tracers drawing`, (stats.tracers ?? 0) > 0, `${stats.tracers}`);
     gate(
-      `${leg}: sky-backed heads visible 9–80 km`,
-      sky.filter((r) => r.km >= 9).every((r) => r.headVis),
-      sky.map((r) => `${r.km}:${r.headVis ? 'Y' : 'n'}`).join(' ')
-    );
-    gate(
-      `${leg}: below-eye heads visible 9–40 km`,
-      low.filter((r) => r.km >= 9 && r.km <= 40).every((r) => r.headVis),
-      low.map((r) => `${r.km}:${r.headVis ? 'Y' : 'n'}`).join(' ')
+      `${leg}: in-reach heads visible (9–26 km, above and below the eye)`,
+      rows.filter((r) => !r.headOn && reach(r)).every((r) => r.headVis),
+      rows.filter((r) => !r.headOn && reach(r)).map((r) => `${r.km}${r.sky ? 's' : 'b'}:${r.headVis ? 'Y' : 'n'}`).join(' ')
     );
     const ho = rows.find((r) => r.headOn);
     gate(`${leg}: head-on target visible (edge-on exemption)`, !!ho?.headVis, ho?.head ? `${ho.head.sig}/${ho.head.noise}` : 'off');
     gate(
-      `${leg}: trail bodies visible out to 40 km`,
-      rows.filter((r) => !r.headOn && r.km <= 40).every((r) => r.bodyVis),
-      rows.filter((r) => !r.headOn && r.km <= 40).map((r) => `${r.km}${r.sky ? 's' : 'b'}:${r.bodyVis ? 'Y' : 'n'}`).join(' ')
+      `${leg}: in-reach trail bodies visible (≤ 26 km)`,
+      rows.filter((r) => !r.headOn && r.km <= 26 && r.km >= 9).every((r) => r.bodyVis),
+      rows.filter((r) => !r.headOn && r.km <= 26 && r.km >= 9).map((r) => `${r.km}${r.sky ? 's' : 'b'}:${r.bodyVis ? 'Y' : 'n'}`).join(' ')
     );
     const need = leg === 'noon' ? 12 : 14;
-    const contRows = sky.filter((r) => r.km === 26 || r.km === 60);
+    const near26 = sky.filter((r) => r.km === 26);
     gate(
-      `${leg}: sky trails are continuous lines at 26 and 60 km (≥${need}/16)`,
-      contRows.every((r) => r.contN >= 12 && r.cont >= Math.min(need, r.contN)),
-      contRows.map((r) => `${r.km}:${r.cont}/${r.contN}`).join(' ')
+      `${leg}: in-reach sky trail is a continuous line at 26 km (≥${need}/16)`,
+      near26.every((r) => r.contN >= 12 && r.cont >= Math.min(need, r.contN)),
+      near26.map((r) => `${r.km}:${r.cont}/${r.contN}`).join(' ')
+    );
+    const far = sky.filter((r) => r.km >= 40);
+    gate(
+      `${leg}: far traffic stays PRESENT (a faint line at 40–60 km)`,
+      far.filter((r) => r.km <= 60).every((r) => r.contN >= 8 && r.cont >= Math.ceil(r.contN / 2)),
+      far.map((r) => `${r.km}:${r.cont}/${r.contN}`).join(' ')
+    );
+    gate(
+      `${leg}: far traffic stays SUBTLE (no bright head ≥ 40 km: Δ ≤ 40)`,
+      far.every((r) => !r.head || r.head.sig <= 40),
+      far.map((r) => `${r.km}:${r.head ? r.head.sig : '-'}`).join(' ')
     );
     if (leg === 'noon' && !LEGACY) {
       const bodies = sky.filter((r) => r.km <= 16 && r.body && r.body.sig > 0);

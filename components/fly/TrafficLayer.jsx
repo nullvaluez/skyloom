@@ -26,6 +26,13 @@ import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
 const _dummy = new Object3D();
 const _color = new Color();
 const _fog = new Color(SKY.fogColor);
+// Satellite far-LOD dots recede toward the haze with TRUE range (see the loop).
+const FAR_DOT = { startM: 30000, endM: 110000, floor: 0.35 };
+const smooth01 = (v) => {
+  const t = v < 0 ? 0 : v > 1 ? 1 : v;
+  return t * t * (3 - 2 * t);
+};
+
 // Stale traffic fades toward the style's haze, not always daylight blue
 const FOG_BY_STYLE = { satellite: SKY.fogColor, toy: TOY.fogColor };
 
@@ -302,7 +309,12 @@ export function TrafficLayer({ runtime, flight, origin }) {
       } else {
         if (billboardsUsed >= TRAFFIC.maxBillboards) continue;
         _color.set(it.meta?.color || '#9ca3af'); // far dots stay class-colored
-        const eff = it.opacity * it.horizonFade;
+        // Satellite: far dots recede into the haze with range (drawn after the
+        // cloud composite they no longer vanish against the day sky, and a
+        // sky full of equal dots reads as a starfield — user, live review).
+        // The spot trails' own glint carries traffic within reach.
+        const recede = mapStyleNow === 'satellite' ? 1 - (1 - FAR_DOT.floor) * smooth01((it.distM - FAR_DOT.startM) / (FAR_DOT.endM - FAR_DOT.startM)) : 1;
+        const eff = it.opacity * it.horizonFade * recede;
         if (eff < 1) _color.lerp(_fog, 1 - eff);
         _dummy.position.set(x, y, z);
         _dummy.quaternion.copy(camera.quaternion); // camera-facing

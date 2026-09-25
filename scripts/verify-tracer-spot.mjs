@@ -76,10 +76,21 @@ const worst = Math.max(...[0, 0.3, 0.55, 0.95].map((bg) => S.look.vaporMaxLum * 
 gate('(2a) day head-end pixel < 1.08 bloom over any backdrop ≤ 0.95', worst < 1.08, worst.toFixed(3));
 const tp08 = S.body.tailFloor + (1 - S.body.tailFloor) * 0.8;
 gate('(2b) night body (tt ≤ 0.8) stays under bloom', night.emitPeak * tp08 <= 0.85, (night.emitPeak * tp08).toFixed(3));
-gate('(2c) night comet head blooms (≥ 1.15)', night.emitPeak + night.headBoost >= 1.15, (night.emitPeak + night.headBoost).toFixed(3));
-const gDay = Math.min(...noon.glintCol.map((c) => luma(c) * noon.glintGain));
-const gNight = Math.min(...night.glintCol.map((c) => luma(c) * night.glintGain));
-gate('(2d) glint core luma ≥ 2.2 by day and ≥ 2.8 at night, every band', gDay >= 2.2 && gNight >= 2.8, `${gDay.toFixed(2)} / ${gNight.toFixed(2)}`);
+const nh = night.emitPeak + night.headBoost;
+gate('(2c) night head is a soft glow, not a flare (0.9–1.2)', nh >= 0.9 && nh <= 1.2, nh.toFixed(3));
+const gDay = noon.glintCol.map((c) => luma(c) * noon.glintGain);
+const gNight = night.glintCol.map((c) => luma(c) * night.glintGain);
+gate(
+  '(2d) the glint is a soft dot, not a star: day 0.6–1.0, night 1.0–1.5 luma, no spikes',
+  Math.min(...gDay) >= 0.6 && Math.max(...gDay) <= 1.0 && Math.min(...gNight) >= 1.0 && Math.max(...gNight) <= 1.5 && night.spike === 0 && S.glint.pulse.depth === 0,
+  `${Math.max(...gDay).toFixed(2)} / ${Math.max(...gNight).toFixed(2)}`
+);
+const PR = S.prominence;
+gate(
+  '(2e) prominence follows reach: full ≤ 15 km, glint gone by ≤ 50 km, far body a faint floor',
+  PR.fullM <= 15000 && PR.glintFullM <= PR.glintFarM && PR.glintFarM <= 50000 && PR.fullM < PR.farM && PR.bodyFar > 0 && PR.bodyFar <= 0.4,
+  JSON.stringify(PR)
+);
 
 // ---- (3) R16 -----------------------------------------------------------------
 const dayAdded = noon.bodyEmit.map((ec) => ({
@@ -99,9 +110,9 @@ for (const H of [540, 720, 1080, 2160]) {
   const tail = Math.max(S.width.minTailPx, S.width.floorTailPx * hRef);
   const r = Math.max(S.glint.minRadiusPx, S.glint.radiusPx * hRef);
   const far = r * Math.max(S.glint.farScale, S.glint.farMinPx / r);
-  if (head < 1.5 || tail < 1.2 || far < 2.5) floorOk = false;
+  if (head < 1.25 || tail < 1.0 || far < 2.0) floorOk = false;
 }
-gate('(4a) floors ≥ 1.5 / 1.2 px and far glint ≥ 2.5 px at 540–2160 rows', floorOk);
+gate('(4a) floors ≥ 1.25 / 1.0 px and far glint ≥ 2.0 px at 540–2160 rows', floorOk);
 // Seed the real air bend (satellite-like k at 40.7°N) and compare the
 // compensation against a finite difference of the rendered position.
 const k = 1 / (2 * 1e6 * (1 / Math.cos((40.7 * Math.PI) / 180)) ** 2);
@@ -128,7 +139,7 @@ for (let dd = 0, prev = 0; dd <= 200000; dd += 1000) {
   prev = L;
 }
 const sp70 = Math.min(S.length.maxSpacingWorldM, (S.length.maxM / S.points) / Math.cos((70 * Math.PI) / 180));
-gate('(5) L(8 km) = 4 km, L(80 km) ≥ 18 km, monotone, spacing ≤ 0.6·warpReset at 70°N', Math.abs(L8 - 4000) < 1e-6 && L80 >= 18000 && mono && sp70 <= 0.6 * TRACERS.ribbon.warpResetM, `${L8} / ${L80.toFixed(0)} / ${sp70.toFixed(0)}`);
+gate('(5) L(8 km) = 4 km, 12 ≤ L(80 km) ≤ 14 km, monotone, spacing ≤ 0.6·warpReset at 70°N', Math.abs(L8 - 4000) < 1e-6 && L80 >= 12000 && L80 <= 14000 && mono && sp70 <= 0.6 * TRACERS.ribbon.warpResetM, `${L8} / ${L80.toFixed(0)} / ${sp70.toFixed(0)}`);
 
 // ---- (6) spacing units -------------------------------------------------------
 for (const lat of [40.7, 60]) {
