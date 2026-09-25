@@ -11,7 +11,8 @@
  *   FLY_TILE_FIXTURE=1 node scripts/capture-traffic-trails.cjs [tag]
  * Env: FLY_URL (default :3000), TRAILS_ALT_M (default 9100),
  *      TRAILS_HOURS (comma list of sun-frac overrides, default "noon,night").
- * Screenshots: scripts/trails-<tag>-<leg>.png
+ * Screenshots: scripts/trails-<tag>-<leg>.png (a fixture run redirects them to
+ *   scripts/r24-out/fixture-trails-<tag>-<leg>.png)
  */
 const { chromium } = require('playwright');
 const path = require('path');
@@ -85,7 +86,19 @@ const ALT = Number(process.env.TRAILS_ALT_M || 9100);
       }
       window.__flySunOverride = best;
     }, leg);
-    await page.waitForTimeout(Number(process.env.TRAILS_WAIT_MS || 20000));
+    // runtime.sun recomputes on SKY.dayCycle.refreshSec (60 s): wait on the
+    // published VALUE, not the clock, then let the damped gains settle.
+    await page
+      .waitForFunction(
+        (l) => {
+          const f = window.__fly?.sun?.frac;
+          return l === 'night' ? f < 0.02 : l === 'dusk' ? f > 0.05 && f < 0.25 : f > 0.9;
+        },
+        leg,
+        { timeout: 180000, polling: 1000 }
+      )
+      .catch(() => console.log(leg, 'sun pin did not publish in 180 s'));
+    await page.waitForTimeout(Number(process.env.TRAILS_WAIT_MS || 15000));
     const stats = await page.evaluate(() => ({
       tracers: window.__flyStats?.tracers,
       sunGain: window.__flyStats?.tracerSunGain,
