@@ -1,236 +1,71 @@
 'use client';
+/* eslint-disable react-hooks/immutability -- Three.js buffers, materials and the shared flight runtime are imperative simulation objects, updated by useFrame without React renders. */
 
 import { useEffect, useMemo } from 'react';
-import { useTitleHidden } from '@/lib/fly/front-door';
 import { useFrame } from '@react-three/fiber';
-import {
-  BufferAttribute,
-  BufferGeometry,
-  Color,
-  DoubleSide,
-  Mesh,
-  MeshBasicMaterial,
-  Vector3,
-} from 'three';
-import { CONTRAIL, GLOBE } from '@/lib/fly/fly-constants';
+import { Euler, Quaternion, Vector3 } from 'three';
+import { GLOBE } from '@/lib/fly/fly-constants';
+import { AIRCRAFT_EFFECTS as FX, contrailStrength, playerEngineOffsets, wingVaporStrength } from '@/lib/fly/aircraft-effects';
+import { WakeBatch, WakeHistory } from '@/lib/fly/aircraft-wake';
 import { applyBendAir } from '@/lib/fly/toy-world/world-bend';
+import { useTitleHidden } from '@/lib/fly/front-door';
 import { useFlyStore } from '@/stores/fly-store';
 
-const MAX_POINTS = 160;
-const SPACING_M = 20; // record a point every ~20m of travel (shape ties to space)
-// Backstop only — warps reset explicitly via warpEpoch. Kept well above a
-// boost-speed frame hitch (0.6s at 750 m/s ≈ 450m) so a GC pause can't
-// blank the trail mid-flight.
-const JUMP_RESET_M = 2500;
-const FADE_BAND_M = 800; // opacity ramps in across this band above minAltM
+const attitude = new Euler(0, 0, 0, 'YXZ'), rotation = new Quaternion(), emitter = new Vector3();
 
-const _tan = new Vector3();
-const _view = new Vector3();
-const _side = new Vector3();
-const _camFwd = new Vector3();
-
-/**
- * High-altitude contrail: camera-facing ribbon(s) rebuilt each frame from a
- * ring buffer of ABSOLUTE emitter positions (float64 CPU-side), rendered in
- * the rebased frame. Rebase-immune by construction — this replaced drei
- * Trail, whose zero-filled point buffer forced a warm-up remount on every
- * ~10km rebase (the "intermittent contrail" bug). Warps reset the buffers
- * (a >400m step must never smear); altitude gates fade smoothly.
- *
- * Round 13 Phase 2: the hero emits TWIN per-engine ribbons (offset ±engineSpanM
- * perpendicular to the heading — the fighter's twin exhausts) and both width AND
- * opacity scale with altitude (thin/faint just above minAltM, wide/sharp at
- * cruise — the user's stated satellite joy). Each ribbon rides applyBendAir
- * (shared 'world-bend-air' program) exactly as the round-11 single ribbon did.
- *
- * Round 17 ("Your Wings"): the emitter GEOMETRY is per-aircraft — the `contrail`
- * prop carries {twin, engineSpanM, backM} from the hangar config. The default
- * below is the fighter's, read straight out of the CONTRAIL block, so an
- * un-propped mount is byte-identical to round 16. Everything else (altitude
- * ramps, near/edge/behind collapse, the air bend) is fleet-wide.
- */
-const DEFAULT_CONTRAIL = {
-  enabled: true,
-  twin: CONTRAIL.twin,
-  engineSpanM: CONTRAIL.engineSpanM,
-  backM: CONTRAIL.backM,
-};
-
-export function Contrail({ flight, origin, contrail = DEFAULT_CONTRAIL }) {
-  const nEmitters = contrail.twin ? 2 : 1;
-  const titleHidden = useTitleHidden(); // R25 W0
-
-  const { material, ribbons } = useMemo(() => {
-    const mat = new MeshBasicMaterial({
-      color: new Color(CONTRAIL.color),
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      side: DoubleSide,
-      // Round 8.5 (H3): the trail owns its alpha ladder — toy's ~2.7×
-      // denser fog was washing it toward the haze tone at distance.
-      fog: false,
-    });
-    // Round 11: the player's trail rides the air bend (shares the compiled
-    // 'world-bend-air' program — zero new variants). Subtle by design: points
-    // sit at the player's own eye altitude so the capped drop ≈ 0 near the
-    // head; only the far tail (~3.2km) dips with the globe.
-    applyBendAir(mat, GLOBE.trafficBend);
-
-    const ribbons = [];
-    for (let e = 0; e < nEmitters; e++) {
-      const geo = new BufferGeometry();
-      const pos = new BufferAttribute(new Float32Array(MAX_POINTS * 2 * 3), 3);
-      pos.setUsage(35048); // DynamicDrawUsage
-      geo.setAttribute('position', pos);
-      const idx = [];
-      for (let i = 0; i < MAX_POINTS - 1; i++) {
-        const a = i * 2;
-        idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
-      }
-      geo.setIndex(idx);
-      const mesh = new Mesh(geo, mat);
-      mesh.frustumCulled = false;
-      mesh.visible = false;
-      ribbons.push({ geo, pos, mesh, pts: [] }); // pts: absolute recorded points
-    }
-    return { material: mat, ribbons };
-  }, [nEmitters]);
-
-  // Warps reset each trail explicitly — the distance heuristic alone can't
-  // tell a short-range warp from fast flight.
-  const warpEpoch = useFlyStore((s) => s.warpEpoch);
-  useEffect(() => {
-    for (const r of ribbons) r.pts.length = 0;
-  }, [warpEpoch, ribbons]);
-
-  useEffect(() => {
-    return () => {
-      material.dispose();
-      for (const r of ribbons) r.geo.dispose();
-    };
-  }, [material, ribbons]);
-
-  useFrame(({ camera }) => {
-    const alt = flight.pos.y;
-    const forming = alt > CONTRAIL.minAltM - FADE_BAND_M;
-    const fade = Math.min(
-      1,
-      Math.max(0, (alt - (CONTRAIL.minAltM - FADE_BAND_M)) / FADE_BAND_M)
-    );
-    // Round 13: altitude-scaled presence. altT climbs from 0 at minAltM to 1 by
-    // fullAltM; width & opacity lerp *Lo→*Hi so cruise contrails read sharp and
-    // wide, low ones thin out. The FADE_BAND still owns the on/off ramp.
-    const as = CONTRAIL.altScale;
-    const altT = Math.min(
-      1,
-      Math.max(0, (alt - CONTRAIL.minAltM) / (as.fullAltM - CONTRAIL.minAltM))
-    );
-    const widthScale = as.widthLo + (as.widthHi - as.widthLo) * altT;
-    const opacityScale = as.opacityLo + (as.opacityHi - as.opacityLo) * altT;
-    material.opacity = Math.min(1, CONTRAIL.opacity * fade * opacityScale);
-
-    const ax = origin.anchor.x;
-    const az = origin.anchor.z;
-    // Perpendicular (right) unit vector in world XZ for the twin lateral offset.
-    const rightX = Math.cos(flight.heading);
-    const rightZ = Math.sin(flight.heading);
-    const half = (contrail.engineSpanM ?? CONTRAIL.engineSpanM) / 2;
-    const back = contrail.backM ?? CONTRAIL.backM; // behind the tail, absolute frame
-    const halfWBase = (CONTRAIL.width * 0.1 * widthScale) / 2;
-    camera.getWorldDirection(_camFwd);
-
-    let totalPts = 0;
-    for (let e = 0; e < ribbons.length; e++) {
-      const rib = ribbons[e];
-      const pts = rib.pts;
-      const lateral = ribbons.length > 1 ? (e === 0 ? -half : half) : 0;
-      const ex = flight.pos.x - Math.sin(flight.heading) * back + rightX * lateral;
-      const ey = flight.pos.y;
-      const ez = flight.pos.z + Math.cos(flight.heading) * back + rightZ * lateral;
-
-      const last = pts[pts.length - 1];
-      if (last) {
-        const step = Math.hypot(ex - last.x, ey - last.y, ez - last.z);
-        if (step > JUMP_RESET_M) pts.length = 0; // warp/teleport — hard cut
-      }
-      if (forming) {
-        const tail = pts[pts.length - 1];
-        if (!tail || Math.hypot(ex - tail.x, ey - tail.y, ez - tail.z) >= SPACING_M) {
-          pts.push({ x: ex, y: ey, z: ez });
-          if (pts.length > MAX_POINTS) pts.shift();
-        }
-      } else if (pts.length > 0) {
-        pts.shift(); // below the cold band: dissolve from the tail
-      }
-
-      const n = pts.length;
-      totalPts += n;
-      if (n < 2 || fade <= 0.02) {
-        rib.mesh.visible = false;
-        continue;
-      }
-      rib.mesh.visible = true;
-
-      const pos = rib.pos;
-      for (let i = 0; i < n; i++) {
-        const p = pts[i];
-        const prev = pts[Math.max(0, i - 1)];
-        const next = pts[Math.min(n - 1, i + 1)];
-        _tan.set(next.x - prev.x, next.y - prev.y, next.z - prev.z);
-        _view.set(
-          p.x - ax - camera.position.x,
-          p.y - camera.position.y,
-          p.z - az - camera.position.z
-        );
-        // Points near the camera collapse: the chase cam rides basically
-        // inside this ribbon, and camera-facing quads at ~10m read as a
-        // screen-filling white wedge otherwise.
-        const vlen = _view.length();
-        const nearK = Math.min(
-          1,
-          Math.max(
-            0,
-            (vlen - CONTRAIL.nearFadeStartM) /
-              (CONTRAIL.nearFadeEndM - CONTRAIL.nearFadeStartM)
-          )
-        );
-        _side.crossVectors(_view, _tan);
-        const len = _side.length() || 1;
-        // Edge-on collapse (round 6): viewed straight down its own axis the
-        // stacked camera-facing quads read as a solid white spear — fade the
-        // width out below ~15° of view↔trail angle.
-        const sinT = len / ((vlen * _tan.length()) || 1);
-        const edgeK = Math.min(1, Math.max(0, (sinT - 0.15) / 0.3));
-        // Behind-camera cull (round 6): the chase cam sits INSIDE this trail,
-        // so ~3km of points project with negative w — zero-width them.
-        const behindK = _view.dot(_camFwd) < 0 ? 0 : 1;
-        const t = i / (n - 1); // 0 tail → 1 head
-        const w = (halfWBase * t * t * nearK * edgeK * behindK) / len;
-        const o = i * 6;
-        pos.array[o] = p.x - ax + _side.x * w;
-        pos.array[o + 1] = p.y + _side.y * w;
-        pos.array[o + 2] = p.z - az + _side.z * w;
-        pos.array[o + 3] = p.x - ax - _side.x * w;
-        pos.array[o + 4] = p.y - _side.y * w;
-        pos.array[o + 5] = p.z - az - _side.z * w;
-      }
-      pos.needsUpdate = true;
-      rib.geo.setDrawRange(0, (n - 1) * 6);
-    }
-
+/** Each sample owns its density, age and wind. Descending leaves a dissipating
+ * wake; all engine stations rotate in three axes with the aircraft. */
+export function Contrail({ flight, origin, aircraft, runtime }) {
+  const titleHidden = useTitleHidden();
+  const id = aircraft?.id ?? 'fighter';
+  const state = useMemo(() => {
+    const engines = playerEngineOffsets(id);
+    return { time: 0, engines, histories: engines.map(() => new WakeHistory()),
+      tips: [new WakeHistory(80, FX.vaporLifeSec), new WakeHistory(80, FX.vaporLifeSec)],
+      batch: new WakeBatch(engines.length + 2, FX.points, m => applyBendAir(m, GLOBE.trafficBend)) };
+  }, [id]);
+  const warpEpoch = useFlyStore(s => s.warpEpoch);
+  useEffect(() => { for (const h of [...state.histories, ...state.tips]) h.clear(); }, [state, warpEpoch]);
+  useEffect(() => () => {
+    state.batch.dispose();
     if (process.env.NODE_ENV === 'development' && window.__flyStats) {
-      window.__flyStats.contrailPts = totalPts;
+      delete window.__flyStats.aircraftWake;
+      window.__flyStats.contrailPts = 0;
+    }
+  }, [state]);
+
+  useFrame(({ camera }, delta) => {
+    const store = useFlyStore.getState();
+    const held = store.phase === 'paused' || store.screen !== 'flight' || runtime?.worldLoading ||
+      store.atlasOpen || store.logbookOpen || store.inspectHex || document.hidden;
+    if (!held) state.time += Math.min(delta, .1);
+    const now = state.time, visual = flight.aircraftVisual;
+    rotation.setFromEuler(attitude.set(flight.pitch, -flight.heading, -flight.bank));
+    const density = contrailStrength(flight.pos.y, flight.speed, flight.operations?.grounded);
+    const wind = runtime?.weather?.wx;
+    const windX = (wind?.windX ?? 0) * .35, windZ = (wind?.windZ ?? 0) * .35;
+    const stations = visual?.id === id ? visual.engines : state.engines;
+    for (let e = 0; e < state.histories.length; e++) {
+      emitter.fromArray(stations[e]).applyQuaternion(rotation).add(flight.pos);
+      if (!held) state.histories[e].record(emitter.x, emitter.y, emitter.z, now, density,
+        Math.max(FX.spacingM, flight.speed * FX.sampleSec), windX, windZ);
+    }
+    const vapor = aircraft?.afterburner?.enabled ? wingVaporStrength(flight) : 0;
+    for (let e = 0; e < 2; e++) {
+      const tip = visual?.id === id ? visual.tips[e] : [(e ? 1 : -1) * 8, 0, 0];
+      emitter.fromArray(tip).applyQuaternion(rotation).add(flight.pos);
+      if (!held) state.tips[e].record(emitter.x, emitter.y, emitter.z, now, vapor, Math.max(6, flight.speed * .06), windX, windZ);
+    }
+    state.batch.begin(camera);
+    for (const h of state.histories) state.batch.add(h, now, origin.anchor);
+    for (const h of state.tips) state.batch.add(h, now, origin.anchor,
+      { width: FX.vaporWidthM, spread: FX.vaporSpreadMps, opacity: .65 });
+    state.batch.end(runtime?.sun?.frac ?? 1, store.mapStyle === 'toy');
+    if (process.env.NODE_ENV === 'development' && window.__flyStats) {
+      window.__flyStats.contrailPts = state.histories.reduce((n, h) => n + h.count, 0);
+      window.__flyStats.aircraftWake = { engines: state.histories.length, ribbons: state.batch.used,
+        points: window.__flyStats.contrailPts, density, vapor, gear: flight.operations?.gear ?? 0 };
     }
   }, -20);
-
-  // R25 W0: hidden on the title (the ribbons' own per-frame visibility
-  // writes live on the meshes; the parent group gates them all).
-  return (
-    <group visible={!titleHidden}>
-      {ribbons.map((r, i) => (
-        <primitive key={i} object={r.mesh} dispose={null} />
-      ))}
-    </group>
-  );
+  return <group visible={!titleHidden}><primitive object={state.batch.mesh} dispose={null} /></group>;
 }

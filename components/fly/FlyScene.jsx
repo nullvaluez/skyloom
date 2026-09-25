@@ -3556,7 +3556,7 @@ export function FlyScene({ runtime }) {
       {/* Round 17: props and gliders leave no contrail at all — the component
           is not mounted for them, so they cost zero ribbon draws. */}
       {aircraft.contrail.enabled && (
-        <Contrail flight={flight} origin={origin} contrail={aircraft.contrail} />
+        <Contrail flight={flight} origin={origin} aircraft={aircraft} runtime={runtime} />
       )}
       {/* Round 13 Phase 2: satellite player ground-contact disc (1 draw, low
           AGL only). Toy keeps its real cast shadow via the player's castShadow. */}

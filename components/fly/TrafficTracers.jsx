@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable react-hooks/immutability -- Three.js attributes and trail histories are imperative simulation buffers updated by useFrame, not React state. */
 
 import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -19,6 +20,7 @@ import { GLOBE, TRACERS } from '@/lib/fly/fly-constants';
 import { satelliteVisualsOn, SATELLITE_VISUALS } from '@/lib/fly/satellite-visuals';
 import { applyBendAir } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
+import { TrafficContrails } from './TrafficContrails';
 
 // Altitude → neon (airloom reference): green on the deck, yellow low,
 // orange mid, cyan cruise. Tail fades to black (additive = transparent).
@@ -113,9 +115,9 @@ function stepSunGain(state, mapStyle, runtime, dt) {
  */
 export function TrafficTracers({ runtime, flight, origin }) {
   if (TRACERS.mode === 'streak') {
-    return <StreakTracers runtime={runtime} flight={flight} origin={origin} />;
+    return <><StreakTracers runtime={runtime} flight={flight} origin={origin} /><TrafficContrails runtime={runtime} origin={origin} /></>;
   }
-  return <RibbonTracers runtime={runtime} origin={origin} />;
+  return <><RibbonTracers runtime={runtime} origin={origin} /><TrafficContrails runtime={runtime} origin={origin} /></>;
 }
 
 // ---------------------------------------------------------------------------

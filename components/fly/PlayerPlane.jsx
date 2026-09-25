@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable react-hooks/immutability -- Three.js buffers, materials and the shared flight runtime are imperative simulation objects, updated by useFrame without React renders. */
 import { LandingGear } from './LandingGear';
 import { cinematicAircraftParameters } from '@/lib/fly/cinematic-models';
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
@@ -14,10 +15,7 @@ import {
   BufferAttribute,
   BufferGeometry,
   Color,
-  ConeGeometry,
   Matrix4,
-  Mesh,
-  MeshBasicMaterial,
   MeshPhysicalMaterial,
   PointsMaterial,
   Vector3,
@@ -31,6 +29,8 @@ import {
 } from '@/lib/fly/player-aircraft';
 import { useFlyStore } from '@/stores/fly-store';
 import { useTitleHidden } from '@/lib/fly/front-door';
+import { createEngineExhaust, measureAircraftAnchors, softenAircraftLights } from '@/lib/fly/aircraft-presentation';
+import { smoothBand } from '@/lib/fly/aircraft-effects';
 
 /**
  * The player's aircraft: a CC-BY glTF airframe (poly.pizza, see
@@ -71,9 +71,10 @@ export function PlayerPlane({ flight, aircraft }) {
   // against the 1.2 gate — the plane, not the round, was the signal).
   useEffect(() => {
     if (process.env.NODE_ENV !== 'development') return undefined;
-    window.__flyPlayer = group.current;
+    const rig = group.current;
+    window.__flyPlayer = rig;
     return () => {
-      if (window.__flyPlayer === group.current) delete window.__flyPlayer;
+      if (window.__flyPlayer === rig) delete window.__flyPlayer;
     };
   }, []);
 
@@ -135,6 +136,17 @@ function gradeHullMaterial(src, isCanopy, hasVC = false) {
   const m = new MeshPhysicalMaterial({
     color: src?.color?.clone() ?? new Color(isCanopy ? '#9fd8e8' : '#d7dde3'),
     map: src?.map ?? null,
+    normalMap: src?.normalMap ?? null,
+    roughnessMap: src?.roughnessMap ?? null,
+    metalnessMap: src?.metalnessMap ?? null,
+    aoMap: src?.aoMap ?? null,
+    emissiveMap: src?.emissiveMap ?? null,
+    emissive: src?.emissive?.clone() ?? new Color(0),
+    emissiveIntensity: src?.emissiveIntensity ?? 1,
+    side: src?.side,
+    alphaTest: src?.alphaTest ?? 0,
+    transparent: src?.transparent ?? false,
+    opacity: src?.opacity ?? 1,
     vertexColors: hasVC || (src?.vertexColors ?? false),
     roughness: isCanopy ? c.canopy.roughness : c.roughness,
     metalness: isCanopy ? c.canopy.metalness : c.metalness,
@@ -177,6 +189,9 @@ function PlayerModel({ flight, aircraft }) {
   // Per-mount clone: the material regrade below must never reach the useGLTF
   // cache (ModelTurntable renders the same cached scenes elsewhere — and since
   // round 17 the hangar preview and the traffic fleet share these same files).
+  // A style change owns a fresh clone/material grade; the cached asset stays
+  // untouched. Keeping the style in this memo is deliberate.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const cloned = useMemo(() => scene.clone(true), [scene, mapStyle]);
   const correction = useMemo(
     () =>
@@ -191,6 +206,11 @@ function PlayerModel({ flight, aircraft }) {
   // Measure before the clone is mounted. Afterwards matrixWorld already includes
   // correction and the flight rig, which would apply the model scale twice.
   const cameraDimensions=useMemo(()=>correctedBox(cloned,correction).getSize(new Vector3()),[cloned,correction]);
+  const anchors = useMemo(() => measureAircraftAnchors(cloned, correction, aircraft.id), [cloned, correction, aircraft.id]);
+  useEffect(() => {
+    flight.aircraftVisual = anchors;
+    return () => { if (flight.aircraftVisual === anchors) delete flight.aircraftVisual; };
+  }, [flight, anchors]);
   useEffect(() => {
     const dimensions=cameraDimensions;
     // Visual metadata only: collision shape and flight envelope retain ownership.
@@ -209,18 +229,18 @@ function PlayerModel({ flight, aircraft }) {
       o.castShadow = true;
       o.receiveShadow = false;
       meshes += 1;
-      const matName = o.material.name ?? '';
-      const isCanopy =
-        CANOPY_RE.test(o.name) ||
-        CANOPY_RE.test(matName) ||
-        (entry.canopyMaterial && matName === entry.canopyMaterial);
       const geoHasColor = !!o.geometry?.hasAttribute?.('color');
       if (geoHasColor) withColorAttr += 1;
       const hasVC = !!entry.forceVertexColors || geoHasColor;
-      const graded = gradeHullMaterial(o.material, isCanopy, hasVC);
-      if (graded.vertexColors) vertexColored += 1;
-      o.material = graded; // replaces the reference on the CLONE only
-      made.push(graded);
+      const grade = src => {
+        const matName = src.name ?? '';
+        const isCanopy = CANOPY_RE.test(o.name) || CANOPY_RE.test(matName) ||
+          (entry.canopyMaterial && matName === entry.canopyMaterial);
+        const graded = gradeHullMaterial(src, isCanopy, hasVC);
+        if (graded.vertexColors) vertexColored += 1;
+        made.push(graded); return graded;
+      };
+      o.material = Array.isArray(o.material) ? o.material.map(grade) : grade(o.material);
     });
     if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
       // Evidence for scripts/verify-hangar.js: proof the GLB actually parsed
@@ -287,14 +307,13 @@ function PlayerModel({ flight, aircraft }) {
       <group rotation-y={correction.rotY} scale={correction.scale}>
         <primitive object={cloned} />
       </group>
-      <PlayerLights model={cloned} correction={correction} />
+      <PlayerLights anchors={anchors} flight={flight} />
       {/* Round 17: no burner on props, gliders or heavies — the component is
           simply not mounted, so those airframes carry zero flame nodes. */}
       {aircraft.afterburner?.enabled && (
         <Afterburner
           flight={flight}
-          model={cloned}
-          correction={correction}
+          anchors={anchors}
           cfg={aircraft.afterburner}
         />
       )}
@@ -313,6 +332,7 @@ const _port = new Color(NAV_LIGHTS.port);
 const _stbd = new Color(NAV_LIGHTS.starboard);
 const _tail = new Color(NAV_LIGHTS.tail);
 const _beacon = new Color(NAV_LIGHTS.beacon);
+const _lightView = new Vector3();
 
 function setPointColor(arr, i, c, k) {
   arr[i * 3] = c.r * k;
@@ -339,32 +359,34 @@ function correctedBox(model, correction) {
  * tiny attribute (no React state). Per-style emit clears the bloom threshold so
  * the lights GLOW at night/toy (red/green luma is low without the ×emit lift).
  */
-function PlayerLights({ model, correction }) {
+function PlayerLights({ anchors, flight }) {
   const points = useRef();
   const { geometry, material } = useMemo(() => {
-    const box = correctedBox(model, correction);
-    const c = box.getCenter(new Vector3());
+    const { box, center: c, tips } = anchors;
     const len = box.max.z - box.min.z;
     const pts = [
-      [box.min.x, c.y, c.z], // 0 port, steady red
-      [box.max.x, c.y, c.z], // 1 starboard, steady green
+      tips[0], // 0 port, measured red wingtip
+      tips[1], // 1 starboard, measured green wingtip
       [0, box.max.y, box.max.z - len * 0.06], // 2 tail, double-flash white
       [0, box.min.y, c.z], // 3 belly beacon, blink
-      [box.min.x, c.y, c.z + 0.6], // 4 port wingtip strobe
-      [box.max.x, c.y, c.z + 0.6], // 5 starboard wingtip strobe
+      [tips[0][0], tips[0][1], tips[0][2] + .25],
+      [tips[1][0], tips[1][1], tips[1][2] + .25],
+      [c.x - .6, c.y - .35, box.min.z + len * .16],
+      [c.x + .6, c.y - .35, box.min.z + len * .16],
     ];
     const geo = new BufferGeometry();
     geo.setAttribute('position', new BufferAttribute(new Float32Array(pts.flat()), 3));
     geo.setAttribute('color', new BufferAttribute(new Float32Array(pts.length * 3), 3));
     const mat = new PointsMaterial({
-      size: PLAYER.navLights.sizeM,
+      size: PLAYER.navLights.sizeM * 2,
       vertexColors: true,
       transparent: true,
       blending: AdditiveBlending,
       depthWrite: false,
     });
+    softenAircraftLights(mat);
     return { geometry: geo, material: mat };
-  }, [model, correction]);
+  }, [anchors]);
   useEffect(
     () => () => {
       geometry.dispose();
@@ -373,7 +395,7 @@ function PlayerLights({ model, correction }) {
     [geometry, material]
   );
 
-  useFrame(() => {
+  useFrame(({ camera }) => {
     const attr = points.current?.geometry.attributes.color;
     if (!attr) return;
     const nl = PLAYER.navLights;
@@ -398,6 +420,13 @@ function PlayerLights({ model, correction }) {
     // Belly beacon: slow blink with a dim ember between flashes
     const bph = (t * nl.beaconHz) % 1;
     setPointColor(a, 3, _beacon, beaconE * (bph < 0.4 ? 1 : nl.beaconEmber));
+    // Landing lamps track deployed gear, not merely altitude. Forward-facing
+    // visibility keeps them from shining through the tail in chase view.
+    points.current.worldToLocal(_lightView.copy(camera.position));
+    const facing = -_lightView.z / Math.max(1, _lightView.length());
+    const landing = (flight.operations?.gear ?? 0) * 2.8 * smoothBand(.55, .9, facing);
+    setPointColor(a, 6, _tail, landing);
+    setPointColor(a, 7, _tail, landing);
     attr.needsUpdate = true;
   });
 
@@ -405,91 +434,28 @@ function PlayerLights({ model, correction }) {
 }
 
 /**
- * Throttle-driven afterburner: a 2-tone toon flame (hot core + orange sheath)
- * behind the tail, +2 draws WHEN LIT (hidden → 0 draws at cruise). Throttle is
+ * Engine-aligned afterburners: feathered blue cores, warm shear layers and
+ * shock cells, merged into ONE draw when lit (zero at cruise). Throttle is
  * read from flight.speed (the HUD's own speed source — no per-frame store
  * subscription): OFF at cruise, ramping to a FULL bloom-clearing flame near the
  * boost preset. PLANE-LOCAL (corrected-frame, real meters) — no world-bend.
  *
  * Round 17: `cfg` is the aircraft's burner descriptor. startMps/fullMps make the
  * ramp relative to THAT airframe's envelope (the Dart's 420 boost lights its
- * flame at 200, not the fighter's 250→720), and `scale` sizes the cone to the
+ * flame at 200, not the fighter's 250→720), and `scale` sizes the plume to the
  * airframe. The fighter's cfg is PLAYER.afterburner's own values at scale 1.
  */
-function Afterburner({ flight, model, correction, cfg }) {
-  const group = useRef();
-  const { core, sheath, exhaustZ, centerY } = useMemo(() => {
-    const ab = PLAYER.afterburner;
-    const s = cfg.scale ?? 1;
-    const box = correctedBox(model, correction);
-    const c = box.getCenter(new Vector3());
-    // Cone axis onto +Z, base at the nozzle (local z=0), apex trailing (+Z).
-    const build = (r, len, color, opacity) => {
-      const geo = new ConeGeometry(r, len, 12, 1, true);
-      geo.rotateX(Math.PI / 2); // +Y apex → +Z
-      geo.translate(0, 0, len / 2); // base at local z=0
-      const mat = new MeshBasicMaterial({
-        color: new Color(color),
-        transparent: true,
-        opacity,
-        blending: AdditiveBlending,
-        depthWrite: false,
-        toneMapped: false, // additive flame drives bloom directly
-      });
-      const mesh = new Mesh(geo, mat);
-      mesh.frustumCulled = false;
-      return mesh;
-    };
-    return {
-      core: build(ab.coreRadiusM * s, ab.lengthM * s, ab.coreColor, ab.coreOpacity),
-      sheath: build(
-        ab.sheathRadiusM * s,
-        ab.lengthM * 1.12 * s,
-        ab.sheathColor,
-        ab.sheathOpacity
-      ),
-      exhaustZ: box.max.z - 0.4, // just inside the tail
-      centerY: c.y,
-    };
-  }, [model, correction, cfg]);
-  useEffect(
-    () => () => {
-      for (const m of [core, sheath]) {
-        m.geometry.dispose();
-        m.material.dispose();
-      }
-    },
-    [core, sheath]
-  );
-
-  useFrame(() => {
-    const g = group.current;
-    if (!g) return;
-    const ab = PLAYER.afterburner;
-    // Throttle from actual speed (the HUD's source): 0 at cruise → 1 at boost.
-    const thr = Math.min(
-      1,
-      Math.max(0, (flight.speed - cfg.startMps) / (cfg.fullMps - cfg.startMps))
-    );
-    if (thr <= 0.02) {
-      g.visible = false;
-      return;
-    }
-    g.visible = true;
-    const t = performance.now() / 1000;
-    const flicker = 1 + Math.sin(t * ab.flickerHz) * ab.flickerAmp * thr;
-    const lenFrac = (ab.idleFrac + (1 - ab.idleFrac) * thr) * flicker;
-    g.scale.set(0.7 + 0.3 * thr, 0.7 + 0.3 * thr, lenFrac);
-    core.material.opacity = ab.coreOpacity * thr;
-    sheath.material.opacity = ab.sheathOpacity * thr;
+function Afterburner({ flight, anchors, cfg }) {
+  const exhaust = useMemo(() => createEngineExhaust(anchors.engines, cfg.scale ?? 1), [anchors, cfg]);
+  useEffect(() => () => exhaust.dispose(), [exhaust]);
+  useFrame((_, dt) => {
+    const target = Math.max(0, Math.min(1, (flight.speed - cfg.startMps) / (cfg.fullMps - cfg.startMps)));
+    const u = exhaust.uniforms;
+    u.uExhaustPower.value += (target - u.uExhaustPower.value) * (1 - Math.exp(-Math.min(dt, .1) * 10));
+    u.uExhaustTime.value += Math.min(dt, .1);
+    exhaust.mesh.visible = u.uExhaustPower.value > .015 && !flight.operations?.grounded;
   });
-
-  return (
-    <group ref={group} position={[0, centerY, exhaustZ]} visible={false}>
-      <primitive object={sheath} />
-      <primitive object={core} />
-    </group>
-  );
+  return <primitive object={exhaust.mesh} dispose={null} />;
 }
 
 /** Phase-2 primitive plane — loading fallback only. */
