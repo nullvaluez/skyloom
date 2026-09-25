@@ -1,0 +1,68 @@
+THREE.WARNING: Multiple instances of Three.js being imported.
+
+[1] relief math: central differences over the full grid, world frame
+PASS  (1a) normals within 2 deg of analytic on synthetic DEMs (257^2 grid, z13)  — plane rising EAST 20deg: 0.230deg · plane rising NORTH 30deg: 0.259deg · ridge 600 m, sigma 700 m: 0.316deg · sinusoid field 250 m x 1.6 km: 0.446deg
+PASS  (1b) world-frame orientation: east-rising leans west, north-rising leans south (+Z)  — east (-0.286, 0.958, 0.004) north (0.004, 0.958, 0.286)
+PASS  (1c) corner-aligned layout: map row 0 = south edge (steeper there on a south-steepening bowl)  — nz south -0.098 vs north -0.004
+PASS  (1d) loader grid sizes: 257/129 within 2 deg (65/45 reported — coarser grids under-resolve a 1.6 km sinusoid)  — 257^2 0.45deg · 129^2 0.57deg · 65^2 2.39deg · 45^2 4.44deg
+PASS  (1e) same-LOD edge continuity: stitched seam step == 0 (the unstitched one-sided step is the RED)  — unstitched 1.859deg -> stitched 0.000deg; seam vs analytic 0.606deg
+
+[2] the worker: the REAL vendored splice, run in a vm
+PASS  (2a) flag off: qe() creates the VERBATIM upstream worker (no splice)  — 27248 chars
+PASS  (2b) relief flag: the LERC worker is spliced with the grid capture on the mesher; R25 alone leaves the skirt to the main thread, A's skirtWorker keeps it in the worker  — mesher 'ie', R25-only skirt literal false; with A's switch: capture true, skirt literal true
+PASS  (2c) Classic request through the spliced worker == the verbatim worker, byte for byte (no relief, no worker skirt)  — 289 tris both; r25Relief false; r24Skirted undefined
+PASS  (2d) Enhanced request: the worker map == reliefFromGrid over the FULL decoded grid, transferred, geometry unchanged  — 32768 bytes; transferred true
+PASS  (2e) clipped request (a z14 quadrant of a z13 DEM): the map covers the CLIPPED grid  — grid 129^2
+PASS  (2f) worker r25ReliefMap == main-thread reliefFromGrid, byte for byte (257/129/45/33 grids)
+PASS  (2g) LERC loader (PATCH 32): Classic message has no r25Relief key; Enhanced asks and the geometry carries the map  — keys demData,z,clipBounds,errTable | demData,z,clipBounds,r25Relief,errTable
+PASS  (2h) terrain-rgb loader (PATCH 33): no map in Classic; Enhanced builds reliefFromGrid from the returned grid  — grid 45^2 (the fixture's z13 terrain-rgb size)
+
+[3] shader text / program keys
+PASS  (3a) CLASSIC (flag on) == flag-off, byte for byte — text, uniforms, key — with and without the LOD-crossfade slot  — off key …-daylight-terrain-v2-earth-surface-v7-living | classic …-daylight-terrain-v2-earth-surface-v7-living
+PASS  (3b) ENHANCED key = Classic key + "-nsck25-r25g" (the one token source), text moved  — …-surface-v7-living-nsck25-r25g
+PASS  (3c) each sub-flag alone: key token moves iff its text moves (n/s/c/k; s also -r25g on earth tiles)  — relief: -n25 text moved · oneSun: -s25-r25g text moved · colorRef: -c25 text moved · sharpen: -k25 text moved
+PASS  (3d) every Enhanced patch anchor landed (r25PatchStats.misses == 0)  — misses +0
+PASS  (3e) the lazy Classic warm compiles the Classic program under the Classic key  — …ain-v2-earth-surface-v7-living
+PASS  (3f) toy identity by construction: one-sun + flat normal behind uHillStrength > 0, map terms behind uR25Sat > 0.5
+NOTCAL  (3g) GLSL ES 3.00 compile of every arm  — glslangValidator not installed on this machine (apt: glslang-tools)
+
+[4] colour transfer: ratio algebra, lodK, slot downsampling, the toroidal atlas
+PASS  (4a) ratio: identity when ref == lod(hi); clamped to [lo, hi]; alpha 0 (slot not loaded) = identity  — id 1,1,1 · hi 2 · lo 0.5 · faded 1
+PASS  (4b) lodK: the tile mip whose texel == one z11 reference texel (clamped to the chain)  — z11/256px->2 z16/256px->7 z9/256px->0 z5/256px->0 z20/256px->8 z16/128px->6 z12/256px->3
+PASS  (4c) slot downsampling averages LINEAR light (constant stays constant; a 50% checker -> sRGB 188)  — constant (120,80,40) checker 188
+(node:27168) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/bfecho/.codex/worktrees/clear-sky-visuals/skyloom-3/lib/fly/fly-constants.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to C:\Users\bfecho\.codex\worktrees\clear-sky-visuals\skyloom-3\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS  (4d) toroidal atlas: 64 slots fill; a one-tile recentre invalidates then refetches exactly one column (8 slots)  — loaded 64, centre slot (95,32,255), +1 tile east -> 8 fetches, entering slot x 99
+
+[5] budget: pool bytes, LRU, release
+PASS  (5a) Enhanced texture budget: 96 x 128^2 RG8 (+ mips) + the 512^2 RGBA atlas <= 5.5 MiB  — 43690 B/tile x 96 = 4.000 MiB + atlas 1.000 MiB = 5.000 MiB
+PASS  (5b) LRU: the 5th tile into a 4-texture pool evicts the least recently VISIBLE hidden tile (t1), whose holder falls back to vertex normals  — allocated 4, evictions 1, resident [t0,t2,t3,t4]
+PASS  (5b2) no thrash: visible tiles are displaced only by a strictly higher zoom, lowest zoom first; otherwise the newcomer keeps vertex normals  — refused 1, resident [b,c,e]
+PASS  (5b3) a tile whose geometry was replaced re-binds with the new relief bytes
+PASS  (5c) release returns the texture to the free list; dispose frees every texture
+
+[6] frame hook: Classic silent, Enhanced acts, toggle back frees
+PASS  (6a) CLASSIC: the frame hook leaves SAT_QUILT, the relief request and the uniforms alone
+PASS  (6b) ENHANCED: quilt retired (0,0) on satellite; sharpen k on HIGH only; relief requested on satellite; toy = identity uniforms  — sat {"sat":1,"sharp":0.3,"px":128,"bytes":1048576} medium k 0 toy {"sat":0,"sharp":0,"px":0}
+PASS  (6b2) TOY releases Enhanced ground GPU allocations
+PASS  (6c) toggle back to CLASSIC frees every R25 GPU texture (pool disposed, atlas GPU copy disposed; its CPU bytes kept for the round trip) and stops relief requests  — Enhanced held 1.00 MiB (atlas; pool textures allocate on bind) -> Classic: pool disposed, atlas GPU dispose x1
+PASS  (6d) back to ENHANCED re-uploads the kept atlas (no re-fetch) and re-creates the pool  — atlas texture version 2
+PASS  (6e) end to end: goLive binds every loaded tile (relief + z11 transform), stitches same-LOD neighbours, tile-unload releases, tile-loaded binds  — bound true; TileXf (0.125, 12.5, 25, 5); stitched east seam 0.0000deg; unload -> fallback true; late load bound true
+PASS  (6f) cached Enhanced program retains live texture bindings after Classic compile
+
+[7] mesh sub-flag (launch-applied)
+PASS  (7a) the mesh table merges over TERRA_SHARP's (z13/z14 tightened to 15/6 m)  — {"13":15,"14":6,"15":5,"16":2}
+PASS  (7b) R25_GROUND.mesh ships OFF (unmeasurable on the terrain-rgb fixture — see the ledger)
+
+[7c] the R25 vendor ledger: markers <-> rows, insert-only
+PASS  (7c) every R25 PATCH marker in the bundle has an R25 ledger row in VENDOR.md, and vice versa  — markers [D30,D31,D32,D33] rows [D30,D31,D32,D33]
+PASS  (7d) R25 vendor hunks are INSERT-ONLY vs r25-w0 (index.js + the readable worker tail)  — 0 line(s) edited or deleted
+
+[8] sibling gates
+PASS  (8) verify-worker-normals.mjs exits 0  — geometry on the main thread. Every number above is arithmetic, not a frame.
+PASS  (8) verify-skirt-worker.mjs exits 0  — 9 passed, 0 failed
+PASS  (8) verify-vendor-three-tile.mjs exits 0  — 34 passed, 0 failed
+
+42 passed, 0 failed, 1 not calibrated

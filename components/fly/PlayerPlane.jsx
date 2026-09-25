@@ -1,6 +1,7 @@
 'use client';
 /* eslint-disable react-hooks/immutability -- Three.js buffers, materials and the shared flight runtime are imperative simulation objects, updated by useFrame without React renders. */
 import { LandingGear } from './LandingGear';
+import { applyPainterlyAircraft } from '@/lib/fly/painterly-aircraft';
 import { cinematicAircraftParameters } from '@/lib/fly/cinematic-models';
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
 import { registerCameraModel } from '@/lib/fly/camera-framing';
@@ -131,7 +132,7 @@ const _hullRim = {
  * a file, so the caller passes the geometry's ground truth. player-jet.glb has
  * NO color attribute and no forceVertexColors flag, so the fighter is unmoved.
  */
-function gradeHullMaterial(src, isCanopy, hasVC = false) {
+function gradeHullMaterial(src, isCanopy, hasVC = false, metresPerUnit = 1) {
   const c = PLAYER.hull;
   const m = new MeshPhysicalMaterial({
     color: src?.color?.clone() ?? new Color(isCanopy ? '#9fd8e8' : '#d7dde3'),
@@ -179,6 +180,7 @@ function gradeHullMaterial(src, isCanopy, hasVC = false) {
       );
   };
   m.customProgramCacheKey = () => 'player-hull-rim';
+  applyPainterlyAircraft(m,isCanopy,metresPerUnit);
   return m;
 }
 
@@ -236,7 +238,7 @@ function PlayerModel({ flight, aircraft }) {
         const matName = src.name ?? '';
         const isCanopy = CANOPY_RE.test(o.name) || CANOPY_RE.test(matName) ||
           (entry.canopyMaterial && matName === entry.canopyMaterial);
-        const graded = gradeHullMaterial(src, isCanopy, hasVC);
+        const graded = gradeHullMaterial(src, isCanopy, hasVC, correction.scale);
         if (graded.vertexColors) vertexColored += 1;
         made.push(graded); return graded;
       };

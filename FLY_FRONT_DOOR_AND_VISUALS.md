@@ -1,7 +1,20 @@
 # Front Door & Visuals (Round 25)
 
+> Painterly Flight integration: the record below describes the earlier Clear Sky
+> release. [PAINTERLY_FLIGHT.md](PAINTERLY_FLIGHT.md) is the current visual record.
+> The Painterly Flight plan keeps Classic as the initial profile until visual
+> acceptance and hardware checks pass; existing saved preferences remain honored.
+
 Implementation and verification record, 2026-09-24. Plan:
 [FLY_ROUND25_PLAN.md](FLY_ROUND25_PLAN.md).
+
+**Visuals update (2026-09-24):** the saved SKY and GROUND work is now integrated
+on `codex/clear-sky-visuals`. The user approved Enhanced as the default and
+publication to main, with 20 passing real-GPU runtime checks; appearance
+certification remains open. See
+[CLEAR_SKY_VISUALS.md](CLEAR_SKY_VISUALS.md) for the current implementation,
+feature flags, evidence and remaining work. The intro verification and ship-state
+statements below are the historical intro close, not new visual certification.
 
 **The round has two halves:**
 
@@ -9,9 +22,9 @@ Implementation and verification record, 2026-09-24. Plan:
   the title screen, Free Flight vs Takeoff & Landing, the adaptive hangar,
   Continue, Exit to title and the Skyloom branding. Three roles built it:
   A FRONT DOOR, B FLIGHT PLAN and E CERT.
-- **The visuals half has not been built yet.** It is C SKY and D GROUND,
-  behind the Visuals: Enhanced / Classic switch. See the section
-  [Visuals (C SKY / D GROUND)](#visuals-c-sky--d-ground--visuals-pass-not-built-yet).
+- **The visuals half is implemented.** C SKY and D GROUND sit behind the
+  Visuals: Enhanced / Classic switch. See the
+  [current visual record](CLEAR_SKY_VISUALS.md); Enhanced is now the default.
 
 Every fps, millisecond and feel judgement is for the user's machine. The
 cloud container blocks the tile hosts and renders WebGL on SwiftShader at 1–3
@@ -304,7 +317,7 @@ Remove-Item Env:FLY_URL, Env:R25_BASELINE_TAG, Env:R25_BASELINE_PRODUCT, Env:R25
 5. **Production build**, as a spot check:
    `node node_modules/next/dist/bin/next build`.
 
-## Ship state
+## Ship state at the intro close (historical)
 
 | Flag | State | Evidence / reason |
 | --- | --- | --- |
@@ -320,7 +333,10 @@ Remove-Item Env:FLY_URL, Env:R25_BASELINE_TAG, Env:R25_BASELINE_PRODUCT, Env:R25
 | `R25_CERT` | bounds only | Shared by the C/D/E instruments |
 | Branding ("Skyloom") | **shipped, not flagged** | Metadata cannot sit behind a runtime flag. The passport key and the OG URL are unchanged. |
 
-## Visuals (C SKY / D GROUND) — visuals pass, NOT BUILT YET
+## Visuals (C SKY / D GROUND) — scope recorded at the intro close
+
+The following is the original unbuilt scope. It is superseded for implementation
+status by [the resumed visual record](CLEAR_SKY_VISUALS.md).
 
 **None of this exists on the tree yet.** `R25_SKY` and `R25_GROUND` ship
 `enabled:false`, and their stub bodies (`lib/fly/r25-sky.js`,
