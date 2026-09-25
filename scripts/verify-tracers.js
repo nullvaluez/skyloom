@@ -133,6 +133,52 @@ const shot = (page, name) =>
   await page.evaluate(() => window.__flyStore.getState().setMapStyle('satellite'));
   await page.waitForTimeout(8000);
   await shot(page, '03-sat-fl300');
+
+  // --- 4b. satellite rerun of steps 2–3: satellite draws SpotTracers
+  // (TRACERS.spot), a different component with the same count contracts.
+  // Waits on the counter, not a 400 ms clock (a slow venue renders ~1 fps).
+  const satCount = () =>
+    page
+      .waitForFunction(() => (window.__flyStats?.tracerBackfills ?? 0) >= 1, undefined, { timeout: 60000, polling: 100 })
+      .then(() => page.evaluate(() => window.__flyStats.tracerBackfills))
+      .catch(() => page.evaluate(() => window.__flyStats?.tracerBackfills ?? 0));
+  await page.evaluate(() => {
+    const fly = window.__fly;
+    const f = fly.flight;
+    const liveT = Math.max(0, ...[...fly.traffic.tracks.values()].map((t) => t.fix1?.t ?? 0));
+    const x = f.pos.x + 2000;
+    const y = f.pos.y + 200;
+    const z = f.pos.z;
+    const track = {
+      hex: 'feed02',
+      meta: { flight: 'SYNTH2', t: 'F16', color: '#f87171', iconType: 'military' },
+      archetype: 2, flags: 0, fix0: null,
+      fix1: { x, y, z, vE: 180, vN: 60, vUp: 0, latRad: (f.latDeg * Math.PI) / 180, t: liveT },
+      groundElev: 0, yaw: 0, bank: 0, rx: x, ry: y, rz: z, distM: 2000, opacity: 1, scaleK: 1, stale: 0,
+      blendFix1: null, blendFix0: null, blendStart: 0, altBlendFrom: 0, altBlendStart: null, snapDipUntil: null,
+      lastPollServer: liveT,
+    };
+    fly.traffic.tracks.set('feed02', track);
+    fly.traffic.items.push(track);
+    window.__flyStats.tracerBackfills = 0;
+  });
+  const satFirst = await satCount();
+  gate('satellite: synthetic track backfilled on first sight', satFirst >= 1, `${satFirst}`);
+  await page.evaluate(() => {
+    const t = window.__fly.traffic.tracks.get('feed02');
+    if (t) t.fix1.y += 3000; // altitude correction beyond vertCutM
+    window.__flyStats.tracerBackfills = 0;
+  });
+  const satSnap = await satCount();
+  gate('satellite: altitude snap → cut + re-backfill', satSnap >= 1, `${satSnap}`);
+  const satLive = await page.evaluate(() => window.__flyStats?.tracers ?? 0);
+  gate('satellite: tracers drawing', satLive > 0, `${satLive} slots`);
+  await page.evaluate(() => {
+    const fly = window.__fly;
+    fly.traffic.tracks.delete('feed02');
+    const i = fly.traffic.items.findIndex((x) => x.hex === 'feed02');
+    if (i >= 0) fly.traffic.items.splice(i, 1);
+  });
   await page.evaluate(() => {
     window.__fly.flight.pos.y = 900;
   });
