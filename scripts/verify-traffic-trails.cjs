@@ -86,14 +86,15 @@ const RANGES_KM = [4, 9, 16, 26, 40];
     const out = [];
     ranges.forEach((km, i) => {
       for (const side of [-1, 1]) {
-        const above = side < 0; // left = above the eye (sky), right = below
+        const above = side < 0; // left = above the eye (always sky-backed), right = below
         const d = km * 1000;
-        const alt = above ? f.pos.y + 4000 + i * 900 : Math.max(900, f.pos.y - 1200 - i * 150);
+        // ~7° above the eye / ~10° below it: inside the 58° frame at every range.
+        const alt = above ? f.pos.y + Math.max(500, 0.12 * d) : Math.max(700, f.pos.y - Math.max(900, 0.18 * d));
         const x = f.pos.x + side * d * 0.3;
         const z = f.pos.z - d;
-        // Broadside, slow enough that A/B frames seconds apart see the same
-        // head, fast enough to arm the tracer gate (speedOnMps 18).
-        const vE = side * 40;
+        // Broadside and fast enough to arm the tracer gate (speedOnMps 18);
+        // the engine is frozen below, so nothing moves between the A/B shots.
+        const vE = side * 60;
         const hex = `ee${i}${side < 0 ? 'a' : 'b'}00`;
         const track = {
           hex, meta: { flight: hex.toUpperCase(), t: 'A320', iconType: 'airliner' }, archetype: 0, flags: 0,
@@ -113,6 +114,19 @@ const RANGES_KM = [4, 9, 16, 26, 40];
     // few pixels around a projected synthetic head.
     return out;
   }, RANGES_KM);
+
+  // Let the engine project the fleet and the tracers backfill, then FREEZE
+  // the engine: update() keeps returning the last items, so neither the heads
+  // nor the trails move between the shots of an A/B (at this venue's ~1 fps a
+  // 60 m/s target moved ~100 px between two captures — noise == signal).
+  await page.waitForTimeout(8000);
+  await page.evaluate(() => {
+    const tr = window.__fly.traffic;
+    tr.__update ??= tr.update;
+    tr.update = function frozen() {
+      return this.items;
+    };
+  });
 
   // Screen positions of each head and of a point 1/3 down its trail.
   const project = () =>
@@ -277,26 +291,27 @@ const RANGES_KM = [4, 9, 16, 26, 40];
       const onScreen = !!pt?.head && pt.head.x > 0 && pt.head.x < 1280 && pt.head.y > 0 && pt.head.y < 720;
       rows.push({ ...t, onScreen, head: r?.head, body: r?.body, headVis: onScreen && vis(r?.head), bodyVis: vis(r?.body) });
       console.log(
-        `  ${t.km.toString().padStart(2)} km ${t.sky ? 'sky    ' : 'terrain'} head ${JSON.stringify(r?.head)} body ${JSON.stringify(r?.body)}${onScreen ? '' : ' (off-screen)'}`
+        `  ${t.km.toString().padStart(2)} km ${t.sky ? 'above' : 'below'} head ${JSON.stringify(r?.head)} body ${JSON.stringify(r?.body)}${onScreen ? '' : ' (off-screen)'}`
       );
     }
     summary[leg] = rows;
-    const sky = rows.filter((r) => r.sky && r.onScreen);
-    const ground = rows.filter((r) => !r.sky && r.onScreen);
+    const sky = rows.filter((r) => r.sky);
+    const low = rows.filter((r) => !r.sky);
     gate(`${leg}: tracers drawing`, (stats.tracers ?? 0) > 0, `${stats.tracers}`);
+    gate(`${leg}: every target projects on screen`, rows.every((r) => r.onScreen), rows.filter((r) => !r.onScreen).map((r) => r.hex).join(' '));
     gate(
-      `${leg}: sky-backed heads visible (≥4 of ${sky.length}, incl. 26 km)`,
-      sky.filter((r) => r.headVis).length >= Math.min(4, sky.length) && sky.some((r) => r.km === 26 && r.headVis),
+      `${leg}: sky-backed heads visible (≥4 of 5, incl. 26 and 40 km)`,
+      sky.filter((r) => r.headVis).length >= 4 && sky.filter((r) => r.km >= 26).every((r) => r.headVis),
       sky.map((r) => `${r.km}:${r.headVis ? 'Y' : 'n'}`).join(' ')
     );
     gate(
-      `${leg}: terrain-backed heads visible (≥4 of ${ground.length})`,
-      ground.filter((r) => r.headVis).length >= Math.min(4, ground.length),
-      ground.map((r) => `${r.km}:${r.headVis ? 'Y' : 'n'}`).join(' ')
+      `${leg}: below-eye heads visible (≥4 of 5)`,
+      low.filter((r) => r.headVis).length >= 4,
+      low.map((r) => `${r.km}:${r.headVis ? 'Y' : 'n'}`).join(' ')
     );
     gate(
       `${leg}: trail bodies visible out to 16 km`,
-      rows.filter((r) => r.km <= 16).every((r) => r.bodyVis || !r.onScreen),
+      rows.filter((r) => r.km <= 16).every((r) => r.bodyVis),
       rows.filter((r) => r.km <= 16).map((r) => `${r.km}${r.sky ? 's' : 't'}:${r.bodyVis ? 'Y' : 'n'}`).join(' ')
     );
   }
