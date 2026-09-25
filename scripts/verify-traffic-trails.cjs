@@ -111,7 +111,11 @@ const trailLenM = (dM, speed) =>
   const targets = await page.evaluate((ranges) => {
     const fly = window.__fly;
     const f = fly.flight;
-    const liveT = Math.max(0, ...[...fly.traffic.tracks.values()].map((t) => t.fix1?.t ?? 0));
+    // Stamp the fixes NOW on the engine's own clock: the fixture's newest fix
+    // can be > staleDimSec old, and a target frozen mid-ladder draws at 0.6
+    // opacity on one run and 1.0 on the next (a 1.6× swing, seen).
+    const lastT = Math.max(0, ...[...fly.traffic.tracks.values()].map((t) => t.fix1?.t ?? 0));
+    const liveT = fly.traffic.serverNow?.(performance.now() / 1000) ?? lastT;
     const out = [];
     const add = (hex, x, alt, z, vE, vN, extra) => {
       const d = Math.hypot(x - f.pos.x, z - f.pos.z);
@@ -166,6 +170,12 @@ const trailLenM = (dM, speed) =>
     const keep = tr.items.filter((t) => t.hex.startsWith('ee'));
     tr.items.length = 0;
     tr.items.push(...keep);
+    // …and pin every target fully live: the frozen update no longer runs
+    // the stale ladder, so this is the value every leg measures.
+    for (const t of keep) {
+      t.opacity = 1;
+      t.stale = 0;
+    }
   });
 
   // Screen positions: head, a body point 1.2 km back, and 16 samples along
@@ -274,6 +284,7 @@ const trailLenM = (dM, speed) =>
           const B = data[1].d;
           const C = data[2].d;
           let sig = 0;
+          let lum = 0; // perceived (luma) |Δ| — white over deep blue moves R most
           let noise = 0;
           let peak = 0;
           let best = null;
@@ -284,6 +295,7 @@ const trailLenM = (dM, speed) =>
               const s = Math.max(Math.abs(A[o] - B[o]), Math.abs(A[o + 1] - B[o + 1]), Math.abs(A[o + 2] - B[o + 2]));
               const nz = Math.max(Math.abs(A[o] - C[o]), Math.abs(A[o + 1] - C[o + 1]), Math.abs(A[o + 2] - C[o + 2]));
               peak = Math.max(peak, 0.2126 * A[o] + 0.7152 * A[o + 1] + 0.0722 * A[o + 2]);
+              lum = Math.max(lum, Math.abs(0.2126 * (A[o] - B[o]) + 0.7152 * (A[o + 1] - B[o + 1]) + 0.0722 * (A[o + 2] - B[o + 2])));
               if (s > sig) {
                 sig = s;
                 best = {
@@ -294,7 +306,7 @@ const trailLenM = (dM, speed) =>
               }
               noise = Math.max(noise, nz);
             }
-          return { sig, noise, peak: Math.round(peak), ...best };
+          return { sig, lum: Math.round(lum), noise, peak: Math.round(peak), ...best };
         };
         return ps.map((p) => ({
           hex: p.hex,
@@ -418,7 +430,7 @@ const trailLenM = (dM, speed) =>
       const cont = along.filter((q) => q.sig >= 5).length;
       const row = { ...t, head: r?.head, body: r?.body, headVis: vis(r?.head), bodyVis: vis(r?.body), cont, contN: along.length };
       console.log(
-        `  ${String(t.km).padStart(2)} km ${t.headOn ? 'head-on' : t.sky ? 'above  ' : 'below  '} head ${r?.head ? `${r.head.sig}/${r.head.noise} pk${r.head.peak}` : 'off'}` +
+        `  ${String(t.km).padStart(2)} km ${t.headOn ? 'head-on' : t.sky ? 'above  ' : 'below  '} head ${r?.head ? `${r.head.sig}/${r.head.noise} L${r.head.lum} pk${r.head.peak}` : 'off'}` +
           `  body ${r?.body ? `${r.body.sig}/${r.body.noise}` : '-'}  cont ${cont}/${along.length}`
       );
       return row;
@@ -460,10 +472,13 @@ const trailLenM = (dM, speed) =>
       far.filter((r) => r.km <= 60).every((r) => r.contN >= 8 && r.cont >= Math.ceil(r.contN / 2)),
       far.map((r) => `${r.km}:${r.cont}/${r.contN}`).join(' ')
     );
+    // PERCEIVED brightness: a white hairline over the deep-blue upper sky
+    // moves the dark red channel most (max-channel Δ ≈ 1.6× its luma Δ), so
+    // the "no star" read is judged in luma; max-channel is printed with it.
     gate(
-      `${leg}: far traffic stays SUBTLE (no bright head ≥ 40 km: Δ ≤ 40)`,
-      far.every((r) => !r.head || r.head.sig <= 40),
-      far.map((r) => `${r.km}:${r.head ? r.head.sig : '-'}`).join(' ')
+      `${leg}: far traffic stays SUBTLE (no bright head ≥ 40 km: luma Δ ≤ 30)`,
+      far.every((r) => !r.head || r.head.lum <= 30),
+      far.map((r) => `${r.km}:${r.head ? `${r.head.lum}(max ${r.head.sig})` : '-'}`).join(' ')
     );
     if (leg === 'noon' && !LEGACY) {
       const bodies = sky.filter((r) => r.km <= 16 && r.body && r.body.sig > 0);
