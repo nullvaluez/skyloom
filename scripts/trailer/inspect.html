@@ -1,0 +1,19 @@
+<!doctype html><html><body style="margin:0;background:#000"><canvas id="c"></canvas>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+const W=1600,H=900;const r=new THREE.WebGLRenderer({canvas:document.getElementById('c'),preserveDrawingBuffer:true,antialias:true});r.setSize(W,H,false);
+const s=new THREE.Scene();s.background=new THREE.Color(0x808890);s.add(new THREE.HemisphereLight(0xffffff,0x444444,2.5));
+const g=await new GLTFLoader().loadAsync('/public/models/'+(new URLSearchParams(location.search).get('m')||'player-jet.glb'));
+const m=g.scene;const b=new THREE.Box3().setFromObject(m);const sz=b.getSize(new THREE.Vector3());const c=b.getCenter(new THREE.Vector3());
+const L=Math.max(sz.x,sz.y,sz.z);const k=20/L;m.position.sub(c).multiplyScalar(k);m.scale.setScalar(k);const wrap=new THREE.Group();wrap.add(m);s.add(wrap);
+s.add(new THREE.AxesHelper(12));const grid=new THREE.GridHelper(40,40,0x000000,0x333333);s.add(grid);
+// tail-most vertices
+const pts=[];m.updateMatrixWorld(true);m.traverse(o=>{if(o.isMesh){const p=o.geometry.attributes.position;const v=new THREE.Vector3();for(let i=0;i<p.count;i++){v.fromBufferAttribute(p,i).applyMatrix4(o.matrixWorld);pts.push([v.x,v.y,v.z,o.material.name])}}});
+const bb=new THREE.Box3().setFromObject(m);
+window.info={raw:sz.toArray(),bbox:[bb.min.toArray(),bb.max.toArray()],zmax:pts.filter(p=>p[2]>bb.max.z-1.2).map(p=>p.map(x=>typeof x==='number'?+x.toFixed(2):x)).slice(0,60),zmin:pts.filter(p=>p[2]<bb.min.z+1.2).map(p=>p.map(x=>typeof x==='number'?+x.toFixed(2):x)).slice(0,60)};
+const cam=new THREE.OrthographicCamera(-16,16,9,-9,-100,100);
+window.view=(v)=>{const P={top:[0,30,0.001],side:[30,0,0],back:[0,0,30],front:[0,0,-30],persp:[18,10,22]}[v];cam.position.set(...P);cam.up.set(0,1,0);if(v==='top')cam.up.set(0,0,-1);cam.lookAt(0,0,0);r.render(s,cam);return document.getElementById('c').toDataURL('image/png');};
+window.ready=true;
+</script></body></html>

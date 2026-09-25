@@ -1,0 +1,62 @@
+{
+  "fps": 24,
+  "duration": 86,
+  "bpm": 96,
+  "shots": [
+    { "id": "globe",     "scene": "globe",  "t0": 0.0,   "t1": 10.0,  "fadeIn": 2.2 },
+    { "id": "dawn",      "scene": "sky",    "t0": 10.0,  "t1": 15.0,  "flashIn": 0.5 },
+    { "id": "reveal",    "scene": "sky",    "t0": 15.0,  "t1": 20.0,  "mb": 4 },
+    { "id": "harborA",   "scene": "harbor", "t0": 20.0,  "t1": 25.0,  "mb": 3, "flashIn": 0.35 },
+    { "id": "harborB",   "scene": "harbor", "t0": 25.0,  "t1": 30.0,  "mb": 2 },
+    { "id": "skyline",   "scene": "harbor", "t0": 30.0,  "t1": 32.5,  "mb": 3 },
+    { "id": "formation", "scene": "sky",    "t0": 32.5,  "t1": 40.0,  "flashIn": 0.25 },
+    { "id": "montage1",  "scene": "montage","t0": 40.0,  "t1": 47.5,  "flashIn": 0.4,
+      "images": [
+        { "src": "/scripts/tracer-03-sat-fl300.png", "label": "NEW YORK", "fx": 0.5, "fy": 0.55 },
+        { "src": "/scripts/monuments-sat-01-redeemer-gl.png", "label": "RIO DE JANEIRO", "fx": 0.5, "fy": 0.5 },
+        { "src": "/scripts/r20-c-opera-satellite-after.png", "label": "SYDNEY", "fx": 0.5, "fy": 0.52 },
+        { "src": "/scripts/r20-c-esb-satellite-after.png", "label": "MANHATTAN", "fx": 0.5, "fy": 0.5 },
+        { "src": "/.graphics-review/r25-resume/runtime/sierra-dusk-enhanced.png", "label": "SIERRA NEVADA", "fx": 0.5, "fy": 0.5 },
+        { "src": "/scripts/r22p1-b-pace-powell.png", "label": "OHIO", "fx": 0.5, "fy": 0.52 }
+      ] },
+    { "id": "breath",    "scene": "black",  "t0": 47.5,  "t1": 50.0 },
+    { "id": "eiffelA",   "scene": "paris",  "t0": 50.0,  "t1": 56.25, "fadeIn": 1.2 },
+    { "id": "eiffelB",   "scene": "paris",  "t0": 56.25, "t1": 60.0,  "mb": 4 },
+    { "id": "montage2",  "scene": "montage","t0": 60.0,  "t1": 65.0,  "flashIn": 0.3, "night": true,
+      "images": [
+        { "src": "/scripts/r13-bldg-tokyo.png", "label": "TOKYO", "fx": 0.5, "fy": 0.55 },
+        { "src": "/scripts/r16-satnight-01-manhattan-night.png", "label": "NEW YORK", "fx": 0.5, "fy": 0.55 },
+        { "src": "/scripts/r20-c-eiffel-satellite-techlab.png", "label": "PARIS", "fx": 0.5, "fy": 0.5 },
+        { "src": "/scripts/r13-bldg-sf.png", "label": "SAN FRANCISCO", "fx": 0.5, "fy": 0.55 },
+        { "src": "/scripts/r16-satnight-07-jfk-night.png", "label": "JFK", "fx": 0.5, "fy": 0.55 },
+        { "src": "/scripts/neon-01-manhattan.png", "label": "", "fx": 0.5, "fy": 0.5 },
+        { "src": "/scripts/r13-plane-toy-night.png", "label": "", "fx": 0.62, "fy": 0.5 },
+        { "src": "/scripts/neon-04-high-domes.png", "label": "", "fx": 0.5, "fy": 0.55 }
+      ] },
+    { "id": "climb",     "scene": "paris",  "t0": 65.0,  "t1": 70.0,  "mb": 3, "flashIn": 0.3 },
+    { "id": "cut",       "scene": "black",  "t0": 70.0,  "t1": 71.25 },
+    { "id": "logo",      "scene": "sky",    "t0": 71.25, "t1": 86.0 }
+  ],
+  "texts": [
+    { "t0": 1.4,  "t1": 4.4,  "lines": ["RIGHT NOW"], "size": 64 },
+    { "t0": 4.9,  "t1": 9.5,  "lines": ["THOUSANDS OF REAL FLIGHTS", "ARE CROSSING THE PLANET"], "size": 54 },
+    { "t0": 10.8, "t1": 12.7, "lines": ["THIS TIME"], "size": 64 },
+    { "t0": 12.9, "t1": 14.8, "lines": ["YOU'RE ONE OF THEM"], "size": 64 },
+    { "t0": 21.0, "t1": 24.6, "lines": ["FLY ANYWHERE ON EARTH"], "size": 60 },
+    { "t0": 30.3, "t1": 32.4, "lines": ["REAL CITIES. REAL LANDMARKS."], "size": 52 },
+    { "t0": 33.0, "t1": 36.1, "lines": ["REAL, LIVE AIR TRAFFIC"], "size": 50, "dy": 300 },
+    { "t0": 36.6, "t1": 39.8, "lines": ["SPOT IT. CHASE IT. FLY WITH IT."], "size": 46, "dy": 300 },
+    { "t0": 47.8, "t1": 49.9, "lines": ["AND WHEN THE SUN GOES DOWN"], "size": 50 },
+    { "t0": 63.1, "t1": 64.95, "lines": ["OR GO NEON"], "size": 76 }
+  ],
+  "stamps": [
+    { "t0": 10.4, "t1": 14.9, "text": "OVER THE ATLANTIC  ·  FL120  ·  06:12 LOCAL" },
+    { "t0": 20.3, "t1": 29.9, "text": "TORONTO WATERFRONT  ·  43.6426°N  79.3871°W" },
+    { "t0": 30.15, "t1": 32.45, "text": "MIDTOWN MANHATTAN  ·  40.7484°N  73.9857°W" },
+    { "t0": 50.3, "t1": 59.9, "text": "PARIS  ·  48.8584°N  2.2945°E  ·  23:00" }
+  ],
+  "hits": [15.0, 17.5, 20.0, 25.0, 30.0, 32.5, 40.0, 47.5, 50.0, 56.9, 60.0, 65.0, 70.0, 71.25],
+  "flashes": [
+    { "t": 17.5, "a": 0.35 }, { "t": 20.0, "a": 0.8 }, { "t": 40.0, "a": 0.7 }, { "t": 56.9, "a": 0.35 }, { "t": 60.0, "a": 0.75 }, { "t": 65.0, "a": 0.5 }
+  ]
+}
