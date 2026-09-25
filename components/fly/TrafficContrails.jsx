@@ -6,9 +6,8 @@ import { Euler, Quaternion, Vector3 } from 'three';
 import { LIVE_AIRCRAFT, resolveLiveAircraft } from '@/lib/fly/live-aircraft';
 import { AIRCRAFT_EFFECTS as FX, contrailStrength, liveEngineOffsets } from '@/lib/fly/aircraft-effects';
 import { WakeBatch, WakeHistory } from '@/lib/fly/aircraft-wake';
-import { GLOBE } from '@/lib/fly/fly-constants';
-import { applyBendAir } from '@/lib/fly/toy-world/world-bend';
 import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
+import { patchAirWake } from '@/lib/fly/tracer-spot';
 import { useFlyStore } from '@/stores/fly-store';
 
 const stations = LIVE_AIRCRAFT.map(liveEngineOffsets);
@@ -32,7 +31,7 @@ function sources(t) {
  * Records contain no aircraft metadata and are retired when the track leaves. */
 export function TrafficContrails({ runtime, origin }) {
   const state = useMemo(() => ({ time: 0, recs: new Map(), pool: [],
-    batch: new WakeBatch(FX.maxTraffic.high * 4, 96, m => applyBendAir(m, GLOBE.trafficBend)) }), []);
+    batch: new WakeBatch(FX.maxTraffic.high * 4, 96, patchAirWake) }), []);
   useEffect(() => {
     // Depth-less vapor against the sky: drawn after the cloud composite.
     const unregister = registerSkyOverlay(state.batch.mesh);

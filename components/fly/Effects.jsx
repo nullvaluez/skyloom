@@ -513,7 +513,7 @@ export const Effects = memo(function Effects({ runtime }) {
   // move to its layer in the SAME commit that puts it in the chain (the
   // composer's own pass assembly is a child layout effect, so it has already
   // run) — no frame can draw them twice, or not at all.
-  const overlay = useMemo(() => (clouds ? new SkyOverlayPass(scene, flightCamera) : null), [clouds, scene, flightCamera]);
+  const overlay = useMemo(() => (clouds ? new SkyOverlayPass(scene, flightCamera, clouds) : null), [clouds, scene, flightCamera]);
   useLayoutEffect(() => {
     setSkyOverlayDeferred(!!overlay);
     return () => setSkyOverlayDeferred(false);

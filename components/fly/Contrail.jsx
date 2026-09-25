@@ -4,11 +4,10 @@
 import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Euler, Quaternion, Vector3 } from 'three';
-import { GLOBE } from '@/lib/fly/fly-constants';
 import { AIRCRAFT_EFFECTS as FX, contrailStrength, playerEngineOffsets, wingVaporStrength } from '@/lib/fly/aircraft-effects';
 import { WakeBatch, WakeHistory } from '@/lib/fly/aircraft-wake';
-import { applyBendAir } from '@/lib/fly/toy-world/world-bend';
 import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
+import { patchAirWake } from '@/lib/fly/tracer-spot';
 import { useTitleHidden } from '@/lib/fly/front-door';
 import { useFlyStore } from '@/stores/fly-store';
 
@@ -23,7 +22,7 @@ export function Contrail({ flight, origin, aircraft, runtime }) {
     const engines = playerEngineOffsets(id);
     return { time: 0, engines, histories: engines.map(() => new WakeHistory()),
       tips: [new WakeHistory(80, FX.vaporLifeSec), new WakeHistory(80, FX.vaporLifeSec)],
-      batch: new WakeBatch(engines.length + 2, FX.points, m => applyBendAir(m, GLOBE.trafficBend)) };
+      batch: new WakeBatch(engines.length + 2, FX.points, patchAirWake) };
   }, [id]);
   const warpEpoch = useFlyStore(s => s.warpEpoch);
   useEffect(() => { for (const h of [...state.histories, ...state.tips]) h.clear(); }, [state, warpEpoch]);

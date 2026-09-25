@@ -13,12 +13,12 @@ import {
   Object3D,
   PlaneGeometry,
 } from 'three';
-import { GLOBE, NAV_LIGHTS, SKY, TOY, TRAFFIC, TRAFFIC_HORIZON, WORLD } from '@/lib/fly/fly-constants';
+import { GLOBE, NAV_LIGHTS, SKY, SKY_OVERLAYS, TOY, TRAFFIC, TRAFFIC_HORIZON, WORLD } from '@/lib/fly/fly-constants';
 import { buildArchetypeGeometries } from '@/lib/fly/traffic-geometries';
 import { loadTrafficGeometries } from '@/lib/fly/model-loader';
 import { MODEL_SURFACE_ROLES } from '@/lib/fly/assets';
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
-import { applyBendAirAnchor, applyNavLights, horizonFade, setNavTime } from '@/lib/fly/toy-world/world-bend';
+import { applyBendAirAnchor, applyNavLights, applyOverlayCloudGate, horizonFade, setNavTime } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
 import { DetailedTraffic } from '@/lib/fly/detailed-traffic';
 import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
@@ -140,6 +140,10 @@ export function TrafficLayer({ runtime, flight, origin }) {
     // distance — per-vertex drop stretched ones straddling the AGL blend
     // band into giant vertical bars at the rim ("vertical contrails").
     applyBendAirAnchor(material, GLOBE.trafficBend);
+    // Drawn after the cloud composite: a cloud IN FRONT still dims the dot
+    // (floored — a light glowing through cloud), identity outside that pass.
+    if (SKY_OVERLAYS.cloudGate.enabled && SKY_OVERLAYS.cloudGate.billboards)
+      applyOverlayCloudGate(material, { floor: SKY_OVERLAYS.cloudGate.markFloor });
     const mesh = new InstancedMesh(new PlaneGeometry(1, 1), material, TRAFFIC.maxBillboards);
     mesh.instanceMatrix.setUsage(DynamicDrawUsage);
     mesh.count = 0;
