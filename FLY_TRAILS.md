@@ -74,13 +74,39 @@ the user's machine.
   `verify-c-flagoff.mjs`, `graphics-unit.mjs` pass.
 - Browser gate `verify-traffic-trails.cjs` (`FLY_TILE_FIXTURE=1`): 15
   synthetic targets 4–80 km above and below the eye, ISOLATED from the
-  fixture's own ~300 tracks, engine and camera frozen, max-channel ON/OFF Δ.
-  RESULTS: see §4.1.
+  fixture's own ~300 tracks, fixes stamped on the engine clock and pinned at
+  full opacity, engine and camera frozen, ON/OFF Δ per probe window
+  (max-channel for visibility, luma for "subtle"). **24/24 PASS** — §4.1.
 - `verify-tracers.js` gained a satellite rerun of its backfill/cut gates.
 
 ### 4.1 Pixel gate results
 
-(filled in below)
+Final run (tip of the branch), head Δ as `max-channel / luma`, 3,000 m eye,
+distances are the harness's WORLD km (true ≈ ÷1.32 at 40.7°N):
+
+| leg | in reach, sky-backed (9 / 16 / 26 km) | far (40 / 60 / 80 km) luma | head-on 26 km |
+|---|---|---|---|
+| noon | 112/74 · 160/110 · 167/115 | 26 · 24 · 23 | 182/130 |
+| dusk | 108/90 · 92/75 · 80/61 | 12 · 12 · 11 | 88/69 |
+| night | 197/195 · 196/186 · 187/167 | 15 · 13 · 12 | 183/167 |
+
+Far lines stay PRESENT (16/16 continuity samples at every far range, every
+leg). For comparison, the pre-fix night (isolated targets, before the
+opacity pin — so a lower bound) read far heads at max-channel 120 / 65 / 60
+against 23 / 19 / 19 now.
+
+How the harness got here matters as much as the numbers — four instrument
+defects were found and fixed before a number was trusted:
+1. The A/B toggled the whole tracer group while the fixture's ~300 tracks
+   drew trails through every sample window (far rows all read ~130–150).
+2. Targets shared elevations (trails overlapped); later, a shared 700 m
+   altitude clamp stacked the four far below-eye targets on one line.
+3. Outward-flying targets drifted their near heads off-screen.
+4. Fixes stamped with the fixture's newest fix time froze some runs at the
+   engine's 0.6 stale opacity and others at 1.0 — a 1.6× swing between runs.
+The "subtle" bound is judged in luma because a white hairline over the
+deep-blue upper sky moves the dark red channel most (max-channel ≈ 1.6×
+luma there).
 
 ## 5. Not certified
 
