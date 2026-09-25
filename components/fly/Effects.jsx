@@ -3,6 +3,7 @@ import { satelliteVisualsOn, satelliteEffectTier } from '@/lib/fly/satellite-vis
 import { resolveSatelliteAtmosphere } from '@/lib/fly/satellite-atmosphere';
 import { immersiveOn } from '@/lib/fly/immersive';
 import { ImmersiveCloudPass } from '@/lib/fly/immersive-cloud-pass';
+import { SkyOverlayPass, setSkyOverlayDeferred } from '@/lib/fly/sky-overlay-pass';
 // R25 C SKY: the Enhanced aerial variant + the tint-only grade, both decided
 // by r25On (through aerialR25Wanted), so Classic builds today's chain exactly.
 import { aerialR25Wanted } from '@/lib/fly/r25-sky';
@@ -11,7 +12,7 @@ import { R25_SKY } from '@/lib/fly/fly-constants';
 import { releaseBloomTargets } from '@/lib/fly/release-bloom-targets';
 
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Vector2 } from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import {
@@ -222,6 +223,12 @@ export function buildPassList(style, tier, ctx = {}) {
     // cannot haze a nearby cloud using the mountain kilometres behind it.
     if (aerialOn) list.push({id:'aerial',el:()=> <primitive key="aerial" object={ctx.aerial} dispose={null} />,raw:aerialRaw});
     list.push({id:'immersive-clouds',boundary:true,el:()=> ctx.clouds ? <primitive key="immersive-clouds" object={ctx.clouds} dispose={null} /> : null,raw:()=>null});
+    // Depth-less airborne marks (traffic trails, far traffic glints, plumes,
+    // the player contrail) are drawn HERE, after the cloud composite replaced
+    // every depth-empty pixel with the analytic sky and before bloom, so they
+    // survive against the daytime sky and still glow (lib/fly/sky-overlay-pass.js).
+    // A Pass like the cloud pass: boundary, no raw twin, no program of its own.
+    if (ctx.overlay) list.push({id:'sky-overlays',boundary:true,el:()=> <primitive key="sky-overlays" object={ctx.overlay} dispose={null} />,raw:()=>null});
   }
   if (bloomScale > 0) {
     list.push({
@@ -444,7 +451,7 @@ function toneSpec(toneMode) {
  */
 // Cloud composition adds scene-linear radiance and casts terrain shadows.
 // It must stay before the display curve, just like aerial perspective.
-const PRE_CURVE = new Set(['n8ao', 'immersive-clouds', 'bloom', 'speed', 'aerial', 'toy-dof']);
+const PRE_CURVE = new Set(['n8ao', 'immersive-clouds', 'sky-overlays', 'bloom', 'speed', 'aerial', 'toy-dof']);
 
 function reorderForDisplaySpace(list) {
   const tone = list.find((p) => p.id === 'tone');
@@ -499,8 +506,18 @@ export const Effects = memo(function Effects({ runtime }) {
   const mapStyle = useFlyStore((s) => s.mapStyle);
   const sat = mapStyle === 'satellite';
   const flightCamera = useThree((s) => s.camera);
+  const scene = useThree((s) => s.scene);
   const clouds = useMemo(() => sat && immersiveOn('clouds') ? new ImmersiveCloudPass(flightCamera,runtime) : null, [sat,flightCamera,runtime]);
   useEffect(() => () => clouds?.dispose(), [clouds]);
+  // The overlay pass exists exactly when the cloud pass does, and the overlays
+  // move to its layer in the SAME commit that puts it in the chain (the
+  // composer's own pass assembly is a child layout effect, so it has already
+  // run) — no frame can draw them twice, or not at all.
+  const overlay = useMemo(() => (clouds ? new SkyOverlayPass(scene, flightCamera) : null), [clouds, scene, flightCamera]);
+  useLayoutEffect(() => {
+    setSkyOverlayDeferred(!!overlay);
+    return () => setSkyOverlayDeferred(false);
+  }, [overlay]);
   const renderDpr = useThree((s) => s.viewport.dpr);
   const qualityTier = sat && satelliteVisualsOn()
     ? satelliteEffectTier(sceneTier, renderDpr) : sceneTier;
@@ -717,7 +734,6 @@ export const Effects = memo(function Effects({ runtime }) {
   // `__flyDepthArm` un-pinner; `aoPinNonce` exists so the dev handle can force
   // a re-evaluation the moment a harness writes the arm global.
   const gl = useThree((s) => s.gl);
-  const scene = useThree((s) => s.scene);
   const camera = useThree((s) => s.camera);
   const [aoNonce, setAoNonce] = useState(0);
   const [aoPass, setAoPass] = useState(null);
@@ -810,6 +826,7 @@ export const Effects = memo(function Effects({ runtime }) {
         smaa,
         n8ao: aoPass,
         clouds,
+        overlay,
       }).map((p) => p.el()),
     [
       mapStyle,
@@ -825,6 +842,7 @@ export const Effects = memo(function Effects({ runtime }) {
       smaa,
       aoPass,
       clouds,
+      overlay,
     ]
   );
 

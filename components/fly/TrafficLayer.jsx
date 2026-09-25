@@ -21,6 +21,7 @@ import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
 import { applyBendAirAnchor, applyNavLights, horizonFade, setNavTime } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
 import { DetailedTraffic } from '@/lib/fly/detailed-traffic';
+import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
 
 const _dummy = new Object3D();
 const _color = new Color();
@@ -145,6 +146,10 @@ export function TrafficLayer({ runtime, flight, origin }) {
     mesh.frustumCulled = false;
     return mesh;
   }, []);
+  // The far-LOD glints are THE distance cue past the hull LOD and sit against
+  // the sky by construction (farLiftBoost): draw them after the cloud
+  // composite so the daytime sky replacement cannot erase them.
+  useEffect(() => registerSkyOverlay(billboards), [billboards]);
 
   // GLB asset pass: primitives render instantly; each archetype's merged
   // vertex-colored geometry swaps in when its model resolves (per-model

@@ -8,6 +8,7 @@ import { GLOBE } from '@/lib/fly/fly-constants';
 import { AIRCRAFT_EFFECTS as FX, contrailStrength, playerEngineOffsets, wingVaporStrength } from '@/lib/fly/aircraft-effects';
 import { WakeBatch, WakeHistory } from '@/lib/fly/aircraft-wake';
 import { applyBendAir } from '@/lib/fly/toy-world/world-bend';
+import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
 import { useTitleHidden } from '@/lib/fly/front-door';
 import { useFlyStore } from '@/stores/fly-store';
 
@@ -26,6 +27,8 @@ export function Contrail({ flight, origin, aircraft, runtime }) {
   }, [id]);
   const warpEpoch = useFlyStore(s => s.warpEpoch);
   useEffect(() => { for (const h of [...state.histories, ...state.tips]) h.clear(); }, [state, warpEpoch]);
+  // Depth-less vapor against the sky: drawn after the cloud composite.
+  useEffect(() => registerSkyOverlay(state.batch.mesh), [state]);
   useEffect(() => () => {
     state.batch.dispose();
     if (process.env.NODE_ENV === 'development' && window.__flyStats) {

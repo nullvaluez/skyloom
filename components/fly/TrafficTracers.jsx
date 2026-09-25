@@ -9,6 +9,7 @@ import {
   BufferGeometry,
   Color,
   DoubleSide,
+  Group,
   LineBasicMaterial,
   LineSegments,
   Mesh,
@@ -19,6 +20,7 @@ import { expApproach, mercatorScale } from '@/lib/fly/coords';
 import { GLOBE, TRACERS } from '@/lib/fly/fly-constants';
 import { satelliteVisualsOn, SATELLITE_VISUALS } from '@/lib/fly/satellite-visuals';
 import { applyBendAir } from '@/lib/fly/toy-world/world-bend';
+import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
 import { useFlyStore } from '@/stores/fly-store';
 import { TrafficContrails } from './TrafficContrails';
 
@@ -114,10 +116,33 @@ function stepSunGain(state, mapStyle, runtime, dt) {
  * instantaneous velocity lines. Both share the reliability fixes above.
  */
 export function TrafficTracers({ runtime, flight, origin }) {
-  if (TRACERS.mode === 'streak') {
-    return <><StreakTracers runtime={runtime} flight={flight} origin={origin} /><TrafficContrails runtime={runtime} origin={origin} /></>;
-  }
-  return <><RibbonTracers runtime={runtime} origin={origin} /><TrafficContrails runtime={runtime} origin={origin} /></>;
+  // ONE root for every trail visual (ribbons/streaks + engine plumes). It is
+  // the dev-only park handle: seven pixel gates hide `window.__flyTracers`
+  // with `.visible = false`, and a root covers the plumes too (they had no
+  // handle) and anything this layer grows later. Nothing writes the root's
+  // `.visible` per frame; the sky-overlay pass honours ancestor visibility.
+  const root = useMemo(() => {
+    const g = new Group();
+    g.name = 'traffic-trails';
+    return g;
+  }, []);
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') window.__flyTracers = root;
+    return () => {
+      if (process.env.NODE_ENV === 'development' && window.__flyTracers === root)
+        delete window.__flyTracers;
+    };
+  }, [root]);
+  return (
+    <primitive object={root} dispose={null}>
+      {TRACERS.mode === 'streak' ? (
+        <StreakTracers runtime={runtime} flight={flight} origin={origin} />
+      ) : (
+        <RibbonTracers runtime={runtime} origin={origin} />
+      )}
+      <TrafficContrails runtime={runtime} origin={origin} />
+    </primitive>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -231,15 +256,14 @@ function RibbonTracers({ runtime, origin }) {
   const state = useMemo(() => ({ recs: new Map(), pool: [], gates: new Map(), frame: 0 }), []);
 
   useEffect(() => {
-    // Round 19 (probe determinism, Fable ruling 2): dev-only park handle, the
-    // __flyClouds idiom. This ONE mesh rewrites its whole position attribute
-    // every frame and never moves its matrixWorld, so no visibility sweep and
-    // no matrix-diff census can see it — it was the last live-traffic actor
-    // inside verify-sat-night's (E) ground crop. Dev-only, product no-op.
-    if (process.env.NODE_ENV === 'development') window.__flyTracers = mesh;
+    // Round 19 (probe determinism, Fable ruling 2): this ONE mesh rewrites its
+    // whole position attribute every frame and never moves its matrixWorld, so
+    // no visibility sweep and no matrix-diff census can see it — the dev-only
+    // park handle is the TrafficTracers root that holds it.
+    // Against the daytime sky it must be drawn after the cloud composite.
+    const unregister = registerSkyOverlay(mesh);
     return () => {
-      if (process.env.NODE_ENV === 'development' && window.__flyTracers === mesh)
-        delete window.__flyTracers;
+      unregister();
       mesh.geometry.dispose();
       mesh.material.dispose();
     };
@@ -531,12 +555,10 @@ function StreakTracers({ runtime, flight, origin }) {
   const state = useMemo(() => ({ gates: new Map(), frame: 0 }), []);
 
   useEffect(() => {
-    // Round 19: same dev-only park handle as RibbonTracers (TRACERS.mode picks
-    // exactly one of the two, so the handle names whichever is mounted).
-    if (process.env.NODE_ENV === 'development') window.__flyTracers = mesh;
+    // Parked through the TrafficTracers root, like the ribbon.
+    const unregister = registerSkyOverlay(mesh);
     return () => {
-      if (process.env.NODE_ENV === 'development' && window.__flyTracers === mesh)
-        delete window.__flyTracers;
+      unregister();
       mesh.geometry.dispose();
       mesh.material.dispose();
     };

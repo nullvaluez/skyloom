@@ -8,6 +8,7 @@ import { AIRCRAFT_EFFECTS as FX, contrailStrength, liveEngineOffsets } from '@/l
 import { WakeBatch, WakeHistory } from '@/lib/fly/aircraft-wake';
 import { GLOBE } from '@/lib/fly/fly-constants';
 import { applyBendAir } from '@/lib/fly/toy-world/world-bend';
+import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
 import { useFlyStore } from '@/stores/fly-store';
 
 const stations = LIVE_AIRCRAFT.map(liveEngineOffsets);
@@ -32,7 +33,11 @@ function sources(t) {
 export function TrafficContrails({ runtime, origin }) {
   const state = useMemo(() => ({ time: 0, recs: new Map(), pool: [],
     batch: new WakeBatch(FX.maxTraffic.high * 4, 96, m => applyBendAir(m, GLOBE.trafficBend)) }), []);
-  useEffect(() => () => state.batch.dispose(), [state]);
+  useEffect(() => {
+    // Depth-less vapor against the sky: drawn after the cloud composite.
+    const unregister = registerSkyOverlay(state.batch.mesh);
+    return () => { unregister(); state.batch.dispose(); };
+  }, [state]);
   useFrame(({ camera }, delta) => {
     const store = useFlyStore.getState(), items = runtime.traffic?.items ?? [];
     const dt = document.hidden ? 0 : Math.min(delta, .1);

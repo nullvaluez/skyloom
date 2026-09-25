@@ -26,8 +26,10 @@ const ALT = Number(process.env.TRAILS_ALT_M || 9100);
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
-  // Shipped visuals: lift the fleet's Classic pin so Enhanced resolves.
-  await page.addInitScript(unpinPins, ['__flyVisualsOverride']);
+  // Shipped visuals: lift the fleet's Classic pin so Enhanced resolves, and the
+  // aerial/depth pins so the post chain is the one players get (the aerial
+  // pass hazes depth-less overlays by the terrain behind them).
+  await page.addInitScript(unpinPins, ['__flyVisualsOverride', '__flyAerialOverride', '__flyDepthPin']);
   await bootFly(page, { style: 'satellite', timeoutMs: 600000 });
   const renderer = await page.evaluate(() => {
     const c = document.querySelector('.fixed.inset-0 canvas');
@@ -103,6 +105,8 @@ const ALT = Number(process.env.TRAILS_ALT_M || 9100);
       tracers: window.__flyStats?.tracers,
       sunGain: window.__flyStats?.tracerSunGain,
       wake: window.__flyStats?.trafficWake,
+      overlays: window.__flyStats?.skyOverlays,
+      bloom: window.__flyStats?.bloom,
       items: window.__fly?.traffic?.items?.length,
       sunFrac: window.__fly?.sun?.frac ?? window.__fly?.runtime?.sun?.frac,
     }));
