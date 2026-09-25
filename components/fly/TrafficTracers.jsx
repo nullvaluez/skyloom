@@ -37,6 +37,7 @@ import {
   spotDrawCount,
   spotLengthM,
   spotPalette,
+  spotProminence,
   spotSlotBase,
   spotTracersOn,
   spotUsedVerts,
@@ -186,6 +187,7 @@ const DEG = Math.PI / 180;
 const _buf = new Vector2();
 const _sun = { x: 0, y: 1, z: 0 };
 const _comp = { vS: 1, rho: 1 };
+const _prom = { body: 1, glint: 1, emit: 1 };
 const _spts = new Float64Array((TRACERS.spot.points + 1) * 3);
 const _svlen = new Float64Array(TRACERS.spot.points + 1);
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -353,8 +355,12 @@ function SpotTracers({ runtime, flight, origin }) {
       }
       const cosF = (dx * _camFwd.x + dy * _camFwd.y + dz * _camFwd.z) / Dw;
       let score = Dw * (cosF > cosView ? 1 : S.priority.offViewMul);
-      if (rec.slot) score *= S.priority.keepSlotMul;
-      if (rec.near) score *= S.priority.keepNearMul;
+      // Hysteresis only for a rank held LAST frame: a rec that skipped
+      // scoring (faded out, lost its fix) keeps stale flags otherwise.
+      if (rec.slotFrame === state.frame - 1) {
+        if (rec.slot) score *= S.priority.keepSlotMul;
+        if (rec.near) score *= S.priority.keepNearMul;
+      }
       if (t.hex === pinHex) score = 0;
       state.keys[nc] = Math.min(2147483647, Math.floor(score)) * CAND + nc; // ≤ 2^44: exact
       state.cItem[nc] = i;
@@ -386,6 +392,7 @@ function SpotTracers({ runtime, flight, origin }) {
       const near = r < S.nearSlots;
       rec.slot = true;
       rec.near = near;
+      rec.slotFrame = state.frame;
       if (near) nNear += 1;
       const t = items[state.cItem[c]];
       const m = gatherSpot(rec, near ? 1 : S.farStride, t.rx, t.ryd ?? t.ry, t.rz, _spts);
@@ -397,11 +404,10 @@ function SpotTracers({ runtime, flight, origin }) {
       const Dt = state.cDt[c];
       const Dw = state.cDw[c];
       // Prominence follows reach: full within fullM, receding to a faint
-      // hairline (bodyFar) by farM; the glint is gone by glintFarM.
-      const PR = S.prominence;
-      const promBody = 1 - (1 - PR.bodyFar) * smoothstep(PR.fullM, PR.farM, Dt);
-      const promGlint = 1 - smoothstep(PR.glintFullM, PR.glintFarM, Dt);
-      const hazeB = (1 - P.hazeB * smoothstep(S.body.hazeNearM, S.body.hazeFarM, Dt)) * promBody;
+      // hairline by farM; glint, head boost and white core only within
+      // reach; at night every additive mark falls off steeply past it.
+      const pr = spotProminence(Dt, L.n, pinned, _prom);
+      const hazeB = (1 - P.hazeB * smoothstep(S.body.hazeNearM, S.body.hazeFarM, Dt)) * pr.body;
       const nearV = nv.minK + (1 - nv.minK) * smoothstep(nv.startM, nv.endM, Dw);
       const gA = smoothstep(S.body.goldAltM[0], S.body.goldAltM[1], t.ry);
       const ec = P.bodyEmit[b];
@@ -454,9 +460,11 @@ function SpotTracers({ runtime, flight, origin }) {
         }
         const w = pres * hazeB * eK;
         const a = P.alphaPeak * nearV * tp * w; // vapour opacity
-        const eg = (P.emitPeak * tp + P.headBoost * hk) * w; // emission luma
-        const wm = P.coreWhite * hk;
-        const gg = P.goldGlow * gA * tp * w;
+        const hkR = hk * pr.glint; // the head boost is a within-reach mark
+        const we = w * pr.emit;
+        const eg = (P.emitPeak * tp + P.headBoost * hkR) * we; // emission luma
+        const wm = P.coreWhite * hkR;
+        const gg = P.goldGlow * gA * tp * we;
         const er = (ec.r + (1 - ec.r) * wm) * eg + GOLD_N.r * gg;
         const eG = (ec.g + (1 - ec.g) * wm) * eg + GOLD_N.g * gg;
         const eb = (ec.b + (1 - ec.b) * wm) * eg + GOLD_N.b * gg;
@@ -502,7 +510,8 @@ function SpotTracers({ runtime, flight, origin }) {
         (1 - P.hazeG * smoothstep(S.glint.hazeNearM, S.glint.hazeFarM, Dt)) *
         (1 - pulse.depth * (0.5 + 0.5 * Math.sin(2 * Math.PI * pulse.hz * state.clock + rec.phase))) *
         (pinned ? S.glint.lockBoost : 1) *
-        (pinned ? 1 : promGlint); // the inspected/locked target keeps its mark at any range
+        pr.glint *
+        pr.emit; // the inspected/locked target keeps its mark at any range (both 1)
       const gc = P.glintCol[b];
       for (let k = 0; k < 4; k++, v++) {
         const o = v * 3;
@@ -518,12 +527,16 @@ function SpotTracers({ runtime, flight, origin }) {
     }
     const vUsed = spotUsedVerts(n);
     mesh.geometry.setDrawRange(0, spotDrawCount(n));
-    pos.clearUpdateRanges();
-    pos.addUpdateRange(0, vUsed * 3);
-    pos.needsUpdate = true;
-    col.clearUpdateRanges();
-    col.addUpdateRange(0, vUsed * 4);
-    col.needsUpdate = true;
+    // An empty sky uploads nothing: addUpdateRange(0, 0) would mean "to the
+    // end of the array" to WebGL2's bufferSubData — the whole 19,200 verts.
+    if (vUsed > 0) {
+      pos.clearUpdateRanges();
+      pos.addUpdateRange(0, vUsed * 3);
+      pos.needsUpdate = true;
+      col.clearUpdateRanges();
+      col.addUpdateRange(0, vUsed * 4);
+      col.needsUpdate = true;
+    }
 
     if (++state.frame % R.sweepFrames === 0) sweepSpot(state, runtime.traffic?.tracks);
 

@@ -91,6 +91,24 @@ gate(
   PR.fullM <= 15000 && PR.glintFullM <= PR.glintFarM && PR.glintFarM <= 50000 && PR.fullM < PR.farM && PR.bodyFar > 0 && PR.bodyFar <= 0.4,
   JSON.stringify(PR)
 );
+{
+  // Night: additive light over black reads at any level, so the law must be
+  // steep — the far body a small fraction of the in-reach one, yet never 0.
+  const pr = (d, n, pin = false) => ({ ...T.spotProminence(d, n, pin, {}) });
+  const eN = (d) => {
+    const p = pr(d, 1);
+    return p.body * p.emit;
+  };
+  const r48 = eN(48000) / eN(10000);
+  const r64 = eN(64000) / eN(10000);
+  const day = pr(48000, 0);
+  const pin = pr(90000, 1, true);
+  gate(
+    '(2f) night far emission recedes steeply (48 km ≤ 10 % of in-reach) but stays a line (> 0); day law untouched; the pinned target exempt',
+    r48 <= 0.1 && r64 > 0 && r64 <= r48 && day.emit === 1 && pr(40000, 1).glint === 0 && pin.glint === 1 && pin.emit === 1,
+    `48 km ${(100 * r48).toFixed(1)} % · 64 km ${(100 * r64).toFixed(1)} %`
+  );
+}
 
 // ---- (3) R16 -----------------------------------------------------------------
 const dayAdded = noon.bodyEmit.map((ec) => ({
@@ -101,6 +119,17 @@ const dayAdded = noon.bodyEmit.map((ec) => ({
 const dayChroma = Math.max(...dayAdded.map(chroma));
 gate('(3a) day added light is pale vapour (chroma ≤ 0.30, every band)', dayChroma <= 0.3, dayChroma.toFixed(3));
 gate('(3b) night cruise emission keeps its neon (chroma ≥ 0.8)', chroma(night.bodyEmit[3]) >= 0.8, chroma(night.bodyEmit[3]).toFixed(3));
+{
+  // R18 overcast ADDS white emission: an overcast day line must stay pale.
+  const oc = T.spotPalette({ n: 0, v: 1, g: 0, oc: 1 }, T.makeSpotPalette());
+  const added = oc.bodyEmit.map((ec) => ({
+    r: oc.vapor.r * oc.alphaPeak + ec.r * oc.emitPeak,
+    g: oc.vapor.g * oc.alphaPeak + ec.g * oc.emitPeak,
+    b: oc.vapor.b * oc.alphaPeak + ec.b * oc.emitPeak,
+  }));
+  const c = Math.max(...added.map(chroma));
+  gate('(3c) overcast day added light stays pale (chroma ≤ 0.30, every band)', c <= 0.3, c.toFixed(3));
+}
 
 // ---- (4) floors + air-bend compensation --------------------------------------
 let floorOk = true;

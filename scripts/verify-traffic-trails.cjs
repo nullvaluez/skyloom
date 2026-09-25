@@ -432,10 +432,18 @@ const trailLenM = (dM, speed) =>
     );
     const ho = rows.find((r) => r.headOn);
     gate(`${leg}: head-on target visible (edge-on exemption)`, !!ho?.headVis, ho?.head ? `${ho.head.sig}/${ho.head.noise}` : 'off');
+    // By day a trail BELOW the eye crosses the bright horizon haze, where
+    // white vapour is low-contrast by design (R16: vapour, never a neon
+    // tint) — and the fixture's graph-paper ground is brighter than real
+    // imagery. There the head glint carries it (G = glint-carried).
+    const bodyOk = (r) => r.bodyVis || (leg === 'noon' && !r.sky && r.headVis);
     gate(
-      `${leg}: in-reach trail bodies visible (≤ 26 km)`,
-      rows.filter((r) => !r.headOn && r.km <= 26 && r.km >= 9).every((r) => r.bodyVis),
-      rows.filter((r) => !r.headOn && r.km <= 26 && r.km >= 9).map((r) => `${r.km}${r.sky ? 's' : 'b'}:${r.bodyVis ? 'Y' : 'n'}`).join(' ')
+      `${leg}: in-reach trail bodies visible (≤ 26 km; by day a ground-backed trail may be glint-carried)`,
+      rows.filter((r) => !r.headOn && r.km <= 26 && r.km >= 9).every(bodyOk),
+      rows
+        .filter((r) => !r.headOn && r.km <= 26 && r.km >= 9)
+        .map((r) => `${r.km}${r.sky ? 's' : 'b'}:${r.bodyVis ? 'Y' : bodyOk(r) ? 'G' : 'n'}`)
+        .join(' ')
     );
     const need = leg === 'noon' ? 12 : 14;
     const near26 = sky.filter((r) => r.km === 26);

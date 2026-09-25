@@ -26,7 +26,8 @@ import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
 const _dummy = new Object3D();
 const _color = new Color();
 const _fog = new Color(SKY.fogColor);
-// Satellite far-LOD dots recede toward the haze with TRUE range (see the loop).
+const _dotFog = new Color();
+// Satellite far-LOD dots recede toward the LIVE haze with TRUE range (see the loop).
 const FAR_DOT = { startM: 30000, endM: 110000, floor: 0.35 };
 const smooth01 = (v) => {
   const t = v < 0 ? 0 : v > 1 ? 1 : v;
@@ -153,6 +154,11 @@ export function TrafficLayer({ runtime, flight, origin }) {
       applyOverlayCloudGate(material, { floor: SKY_OVERLAYS.cloudGate.markFloor });
     const mesh = new InstancedMesh(new PlaneGeometry(1, 1), material, TRAFFIC.maxBillboards);
     mesh.instanceMatrix.setUsage(DynamicDrawUsage);
+    // instanceColor exists from birth: SkyOverlayPass compiles each overlay
+    // once, at first sight — before any traffic arrives — and a colour buffer
+    // created later would change the program mid-flight.
+    mesh.setColorAt(0, _color.set(0xffffff));
+    mesh.instanceColor.setUsage(DynamicDrawUsage);
     mesh.count = 0;
     mesh.frustumCulled = false;
     return mesh;
@@ -241,6 +247,10 @@ export function TrafficLayer({ runtime, flight, origin }) {
     runtime.retryLiveFleet=()=>{if(detailed.stats.compileFailed){detailed.stats.compileFailed=false;detailed.compiling=false;}};
     setTrafficSurface(meshes, mapStyleNow === 'satellite' && satelliteVisualsOn('models'));
     _fog.set(FOG_BY_STYLE[mapStyleNow] ?? SKY.fogColor);
+    // Satellite far dots recede into the haze the scene is ACTUALLY using —
+    // FlyScene drives scene.fog from the time-of-day rim, so a night dot
+    // sinks into the dark instead of turning pale blue-white.
+    _dotFog.copy(mapStyleNow === 'satellite' && scene.fog ? scene.fog.color : _fog);
     // Round 13 Phase 2: hull PRESENCE floor over dark ground — over-drive the
     // per-instance tint so lit hulls × dim moonlight never read as black cutouts.
     // Toy is always dark; satellite ramps the lift in only as the sun sets, so
@@ -315,7 +325,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
         // The spot trails' own glint carries traffic within reach.
         const recede = mapStyleNow === 'satellite' ? 1 - (1 - FAR_DOT.floor) * smooth01((it.distM - FAR_DOT.startM) / (FAR_DOT.endM - FAR_DOT.startM)) : 1;
         const eff = it.opacity * it.horizonFade * recede;
-        if (eff < 1) _color.lerp(_fog, 1 - eff);
+        if (eff < 1) _color.lerp(_dotFog, 1 - eff);
         _dummy.position.set(x, y, z);
         _dummy.quaternion.copy(camera.quaternion); // camera-facing
         // Grow with distance so far traffic stays a visible speck
