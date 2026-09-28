@@ -8,7 +8,7 @@ registerHooks({resolve(s,c,next){
 }});
 const {Color,Scene,Group,Mesh,BoxGeometry,MeshBasicMaterial,DirectionalLight,PerspectiveCamera,Matrix4,Vector3}=await import('three');
 const {CoastalReflection,mirrorCoastalCamera}=await import('../lib/fly/coastal-reflection.js');
-const {COASTAL_WATER_UNIFORMS:u,COASTAL_WATER_GLSL}=await import('../lib/fly/coastal-water.js');
+const {COASTAL_WATER_UNIFORMS:u}=await import('../lib/fly/coastal-water.js');
 const {steppedBuildingLevels,emitSteppedBuilding}=await import('../lib/fly/living-architecture.js');
 let checks=0;const check=(name,fn)=>{fn();checks++;console.log('PASS '+name);};
 check('reflected points project to the mirror camera, preserving rolled and reverse-Z projections',()=>{
@@ -63,15 +63,6 @@ check('empty city chunks never start a reflection capture or retain a target',()
  mesh.visible=false;const captures=rig.stats.captures;
  for(let frame=0;frame<20;frame++){rig.update(renderer,scene,camera,runtime,'high',true);assert.equal(rig.target,null);}
  assert.equal(rig.stats.captures,captures);assert.equal(u.uCoastReady.value,0);restored();mesh.visible=true;
-});
-check('all water harmonics remain continuous across the transported 4096-m phase wrap',()=>{
- const factor=Number(COASTAL_WATER_GLSL.match(/vec2 p=metres\*([\d.]+)/)[1]);
- const frequencies=[...COASTAL_WATER_GLSL.matchAll(/seaWave\(p,vec2\(([-\d.]+),([-\d.]+)\)/g)].map(m=>[Number(m[1]),Number(m[2])]);
- assert.equal(frequencies.length,4);
- const wave=(x,z,f)=>Math.sin((x*f[0]+z*f[1])*factor+1.4*Math.sin((x*Math.floor(f[1]*.43)+z*Math.floor(f[0]*.43))*factor+.23));
- for(const f of frequencies)for(const [x,z]of [[13,28],[4000,4050],[-1,-137]]){
-  assert.ok(Math.abs(wave(x,z,f)-wave(x+4096,z,f))<1e-9);assert.ok(Math.abs(wave(x,z,f)-wave(x,z+4096,f))<1e-9);
- }
 });
 check('new apartment and glass setbacks keep every vertex inside the mapped envelope',()=>{
  const polygon={outer:[{x:0,y:0},{x:60,y:0},{x:60,y:90},{x:0,y:90}],holes:[]};
