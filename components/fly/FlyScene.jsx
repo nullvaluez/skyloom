@@ -5,6 +5,7 @@ import { AirportOperationsLayer } from './AirportOperationsLayer';
 
 import { GroundImmersionRig } from './GroundImmersionRig';
 import { EarthSurfaceLayer } from './EarthSurfaceLayer';
+import { CoastalReflectionRig } from './CoastalReflectionRig';
 import { applyEarthSurface } from '@/lib/fly/earth-surface-material';
 import { updatePainterlyProfile } from '@/lib/fly/painterly-flight';
 import { updateWorldArt } from '@/lib/fly/world-art-direction';
@@ -3362,7 +3363,8 @@ export function FlyScene({ runtime }) {
     // Review pin isolates the integrated R25 sky/ground from the new materials.
     updatePainterlyProfile(graphicsReviewOn() && window.__flyPainterlyOverride === 0 ? 'classic' : flyState.visuals, flyState.mapStyle);
     updateWorldArt(flyState.mapStyle === 'satellite' && flyState.visuals === 'enhanced'
-      && !(graphicsReviewOn() && window.__flyWorldArtOverride === 0), runtime, sunRef.current);
+      && !(graphicsReviewOn() && window.__flyWorldArtOverride === 0), runtime, sunRef.current,
+      !(graphicsReviewOn() && window.__flyUrbanArtOverride === 0));
     r25SkyFrame(runtime, _r25Ctx);
     r25GroundFrame(runtime, _r25Ctx);
 
@@ -3423,6 +3425,7 @@ export function FlyScene({ runtime }) {
       />
 
       <hemisphereLight ref={hemiRef} args={mood.hemi} />
+      {mapStyle === 'satellite' && <CoastalReflectionRig runtime={runtime} />}
       {/* Round 8: position follows the style's key light (toy = moon) and
           the shadow map is tier-gated — 2048 is a HIGH-only luxury (P7). */}
       <directionalLight
