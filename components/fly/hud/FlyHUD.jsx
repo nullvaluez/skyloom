@@ -1,5 +1,6 @@
 'use client';
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
+import { cinematicEarthOn } from '@/lib/fly/cinematic-earth';
 
 
 import { useEffect, useRef } from 'react';
@@ -17,7 +18,10 @@ export function FlyHUD({ runtime }) {
   // invisible outside the pause menu, making "why does it look flat?"
   // undiagnosable mid-flight. Store-subscribed, so it is always current.
   const qualityTier = useFlyStore((s) => s.qualityTier);
+  const qualityPreset = useFlyStore((s) => s.qualityPreset);
   const mapStyle = useFlyStore((s) => s.mapStyle);
+  const visuals = useFlyStore((s) => s.visuals);
+  const cinema = cinematicEarthOn({mapStyle, visuals});
   const quiet = mapStyle === 'satellite' && satelliteVisualsOn('presentation');
   const { isTouch } = useDeviceLayout();
   const spdRef = useRef(null);
@@ -123,6 +127,7 @@ export function FlyHUD({ runtime }) {
         // does not land on it (it did — caught in a landscape screenshot, not
         // by a gate, which is why the gate now knows about this element).
         data-testid="hud-poi"
+        data-cinematic={cinema ? '1' : '0'}
         className="pointer-events-none absolute left-1/2 top-20 z-10 -translate-x-1/2 font-mono text-xs font-semibold uppercase tracking-[0.2em] text-amber-200/90 transition-opacity duration-500 [text-shadow:0_1px_4px_rgba(0,0,0,0.9)] max-sm:top-[calc(env(safe-area-inset-top)+4.75rem)] phone:top-[calc(env(safe-area-inset-top)+4.75rem)] phone-land:top-[calc(env(safe-area-inset-top)+3.1rem)] phone:w-[92vw] phone:truncate phone:text-center"
       />
 
@@ -130,6 +135,7 @@ export function FlyHUD({ runtime }) {
       <div
         ref={chaseRef}
         data-testid="hud-chase-chip"
+        data-cinematic={cinema ? '1' : '0'}
         className="pointer-events-none absolute left-1/2 top-27 z-10 -translate-x-1/2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200/90 opacity-0 transition-opacity duration-300 [text-shadow:0_1px_4px_rgba(0,0,0,0.9)] max-sm:top-[calc(env(safe-area-inset-top)+6.5rem)] phone:top-[calc(env(safe-area-inset-top)+6.5rem)] phone-land:top-[calc(env(safe-area-inset-top)+4.4rem)] phone:w-[92vw] phone:truncate phone:text-center"
       />
 
@@ -137,7 +143,7 @@ export function FlyHUD({ runtime }) {
           a backdrop-filter over the live GL canvas makes the compositor
           re-read the framebuffer every frame. Desktop keeps blur-sm and
           bg-zinc-950/60 exactly. */}
-      <div data-testid="flight-stats-strip" className="hud-flat-phone pointer-events-none absolute left-1/2 top-4 z-10 flex -translate-x-1/2 divide-x divide-zinc-700 rounded-lg bg-zinc-950/60 py-1.5 backdrop-blur-sm max-sm:top-[calc(env(safe-area-inset-top)+0.375rem)] phone:top-[calc(env(safe-area-inset-top)+0.375rem)] phone-land:top-[calc(env(safe-area-inset-top)+0.25rem)] phone:bg-zinc-950/85 phone:py-1">
+      <div data-testid="flight-stats-strip" data-cinematic={cinema ? '1' : '0'} className="hud-flat-phone pointer-events-none absolute left-1/2 top-4 z-10 flex -translate-x-1/2 divide-x divide-zinc-700 rounded-lg bg-zinc-950/60 py-1.5 backdrop-blur-sm max-sm:top-[calc(env(safe-area-inset-top)+0.375rem)] phone:top-[calc(env(safe-area-inset-top)+0.375rem)] phone-land:top-[calc(env(safe-area-inset-top)+0.25rem)] phone:bg-zinc-950/85 phone:py-1">
         <div className={cell}>
           <span className={label}>SPD KT</span>
           <span className={value} ref={spdRef}>—</span>
@@ -199,7 +205,7 @@ export function FlyHUD({ runtime }) {
             data-testid="hud-quality-tier"
             className="font-mono text-[10px] uppercase tracking-widest text-zinc-500/80"
           >
-            Q {qualityTier}
+            Q {qualityPreset === 'ultra' && qualityTier === 'high' ? 'ultra' : qualityTier}
           </span>
         </div>
       ) : (
@@ -209,7 +215,7 @@ export function FlyHUD({ runtime }) {
             data-testid="hud-quality-tier"
             className="ml-2 font-mono text-[10px] uppercase tracking-widest text-zinc-500"
           >
-            Q {qualityTier}
+            Q {qualityPreset === 'ultra' && qualityTier === 'high' ? 'ultra' : qualityTier}
           </span>
         </div>
       )}

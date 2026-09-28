@@ -900,3 +900,36 @@
   from { opacity: 0; transform: translateY(6px) scale(0.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+/* Cinematic satellite instruments: keep the sky and aircraft unobstructed.
+   Touch retains the compact, safe-area-aware strip and existing controls. */
+@media (min-width: 900px) and (pointer: fine) {
+  [data-testid='flight-stats-strip'][data-cinematic='1'] {
+    --tw-translate-x: 0px;
+    --tw-translate-y: 0px;
+    left: 24px;
+    top: auto;
+    bottom: 62px;
+    transform: none;
+    translate: none;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(70px, auto));
+    gap: 10px 0;
+    padding: 14px 10px;
+    border-radius: 4px;
+    border-left: 2px solid rgb(177 214 226 / 65%);
+    background: linear-gradient(100deg, rgb(12 22 30 / 82%), rgb(12 22 30 / 44%));
+    backdrop-filter: none;
+  }
+  [data-testid='flight-stats-strip'][data-cinematic='1'] > * {
+    align-items: flex-start;
+    border: 0;
+  }
+  [data-testid='flight-stats-strip'][data-cinematic='1'] > :nth-child(n+5) > :last-child {
+    font-size: 13px;
+    line-height: 18px;
+    color: #b7cbd4;
+  }
+  [data-testid='hud-poi'][data-cinematic='1'] { top: 25px; }
+  [data-testid='hud-chase-chip'][data-cinematic='1'] { top: 49px; }
+}

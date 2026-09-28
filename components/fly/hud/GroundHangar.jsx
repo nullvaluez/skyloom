@@ -5,6 +5,8 @@ import { CARD_THEME } from './inspect/inspect-tokens';
 import { useGLTF } from '@react-three/drei';
 import { useFlyStore } from '@/stores/fly-store';
 import { PLAYER_AIRCRAFT,resolveAircraft,saveAircraft } from '@/lib/fly/player-aircraft';
+import { aircraftPresentation } from '@/lib/fly/cinematic-earth';
+import { isPhoneClass } from '@/lib/fly/device-class';
 import { OPERATIONS_AIRPORTS,airportEligible,airportById } from '@/lib/fly/operations-airports';
 import { operationsProfile } from '@/lib/fly/operations-profiles';
 import { HangarScene } from './HangarScene';
@@ -43,7 +45,12 @@ function HangarBody({runtime}){
   // staging waits for stageDestination instead of calling it once and giving up.
   useEffect(()=>{if(!free||!dest||confirmReturn)return undefined;let t;const go=()=>{if(typeof runtime.stageDestination!=='function'){t=setTimeout(go,SERVICE_RETRY_MS);return;}if(runtime.stageDestination(dest)===false)setStage({state:'unstaged',pct:0});};t=setTimeout(go,FLIGHT_PLAN.stage.debounceMs);return()=>clearTimeout(t);},[free,dest,runtime,confirmReturn]);
   useEffect(()=>{if(!free||!dest)return undefined;const put=next=>setStage(p=>p.state===next.state&&p.pct===next.pct?p:next);const read=()=>{const s=runtime.staging;if(!s||s.key!==dest.id)return setStage(p=>p.state==='unstaged'||p.state==='pending'?p:{state:'pending',pct:0});put(s.ready?{state:'ready',pct:100}:{state:'staging',pct:Math.round((s.progress||0)*100)});};read();const t=setInterval(read,250);return()=>clearInterval(t);},[free,dest,runtime]);
-  const aircraft=resolveAircraft(id),profile=operationsProfile(aircraft.id);
+  const visuals=useFlyStore(s=>s.visuals),mapStyle=useFlyStore(s=>s.mapStyle);
+  const aircraft=useMemo(()=>{
+    const resolved=resolveAircraft(id);
+    return {...resolved,entry:aircraftPresentation(resolved,isPhoneClass(),{visuals,mapStyle})};
+  },[id,visuals,mapStyle]);
+  const profile=operationsProfile(aircraft.id);
   // Ops mode stages the departure airport too — a no-op unless the flight is
   // genuinely far from it (a title spot on another continent; see
   // OPS_STAGE_MIN_KM), so the Columbus-cluster flows never stage-warp.

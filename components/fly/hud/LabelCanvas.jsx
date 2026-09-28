@@ -1,4 +1,5 @@
 'use client';
+import { cinematicEarthOn } from '@/lib/fly/cinematic-earth';
 
 import { useEffect, useRef } from 'react';
 import { Vector3 } from 'three';
@@ -329,7 +330,8 @@ export function LabelCanvas({ runtime }) {
       let labeled = 0;
       const labelState = useFlyStore.getState();
       const quiet = labelState.mapStyle === 'satellite' && satelliteVisualsOn('presentation');
-      const labelLimit = quiet ? SATELLITE_VISUALS.presentation.trafficLabels : TRAFFIC.maxLabels;
+      const cinema = cinematicEarthOn(labelState);
+      const labelLimit = cinema ? 4 : quiet ? SATELLITE_VISUALS.presentation.trafficLabels : TRAFFIC.maxLabels;
 
       for (const it of items) {
         if (it.distM < LABELS.minDistM) continue;
@@ -357,6 +359,9 @@ export function LabelCanvas({ runtime }) {
         hits.push(hit);
 
         const important = quiet && (it.hex === labelState.lockedHex || it.hex === labelState.inspectHex || it.hex === runtime.hoverHex);
+        // Keep the hero readable; all aircraft remain clickable and selected
+        // traffic always earns its full label, even inside the protected area.
+        if (cinema && !important && sx > w*.32 && sx < w*.68 && sy > h*.49 && sy < h*.8) continue;
         if (labeled >= labelLimit && !important) continue; // all tracks stay pickable
         const cell = `${Math.round(sx / LABELS.cellW)}:${Math.round(sy / LABELS.cellH)}`;
         if (grid.has(cell) && !important) continue;

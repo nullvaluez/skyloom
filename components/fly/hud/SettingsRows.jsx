@@ -11,7 +11,7 @@ import { CRASH } from '@/lib/fly/fly-constants';
 import { immersiveOn, readReducedMotion, saveReducedMotion } from '@/lib/fly/immersive';
 import { visualsAvailable, saveVisuals, setVisualsLive } from '@/lib/fly/visuals-profile';
 
-const TIERS = ['low', 'medium', 'high'];
+const TIERS = ['low', 'medium', 'high', 'ultra'];
 const VISUALS_ROW = [
   ['enhanced', 'Enhanced'],
   ['classic', 'Classic'],
@@ -30,6 +30,7 @@ const VISUALS_ROW = [
  */
 export function SettingsRows({ sheet = false }) {
   const qualityTier = useFlyStore((s) => s.qualityTier);
+  const qualityPreset = useFlyStore((s) => s.qualityPreset);
   const soundOn = useFlyStore((s) => s.soundOn);
   const mapStyle = useFlyStore((s) => s.mapStyle);
   const visuals = useFlyStore((s) => s.visuals);
@@ -83,17 +84,17 @@ export function SettingsRows({ sheet = false }) {
       <div className="mb-1.5 text-center text-[10px] uppercase tracking-widest text-zinc-500">
         Quality
       </div>
-      <div className="grid grid-cols-3 gap-1">
+      <div className="grid grid-cols-4 gap-1">
         {TIERS.map((tier) => (
           <button
             key={tier}
             data-testid={tid(`quality-${tier}`)}
             onClick={() => {
-              store.setQualityTier(tier);
+              store.setQualityPreset(tier);
               saveQualityTier(tier); // a CLICKED tier is a choice — persist it
             }}
             className={`rounded py-1 text-xs capitalize phone:min-h-11 ${
-              qualityTier === tier
+              (qualityPreset === 'ultra' ? tier === 'ultra' : qualityTier === tier)
                 ? 'bg-zinc-100 font-medium text-zinc-900'
                 : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
             }`}
@@ -102,6 +103,7 @@ export function SettingsRows({ sheet = false }) {
           </button>
         ))}
       </div>
+      {qualityPreset === 'ultra' && <p className="mt-2 text-xs text-zinc-400">Ultra adds finer clouds for powerful desktops. Effects still adapt to keep flight smooth.</p>}
     </div>
   );
 

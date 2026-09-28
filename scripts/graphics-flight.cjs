@@ -67,7 +67,7 @@ async function main(){
   page.on('console',m=>{if(m.type()==='error'&&/shader|WebGL|ReferenceError|TypeError/.test(m.text()))report.errors.push(m.text().slice(0,1000))});
   report.weather=args.weather||'baseline';
   report.crashMode='forgiving'; // Rendering benchmark: an automated route must not respawn through buildings.
-  await page.addInitScript(({hour,weather})=>{localStorage.setItem('fly-map-style-2','satellite');localStorage.setItem('fly-quality-tier','high');localStorage.setItem('fly-sound-on','0');localStorage.setItem('fly-controls-seen','1');localStorage.setItem('fly-crash-mode','forgiving');window.__flyWeatherOverride=weather;window.__flySunOverride=Date.UTC(2026,6,18,hour);},{hour:Number(args.hour??4),weather:report.weather});
+  await page.addInitScript(({hour,weather,quality})=>{localStorage.setItem('fly-map-style-2','satellite');localStorage.setItem('fly-quality-tier',quality);localStorage.setItem('fly-sound-on','0');localStorage.setItem('fly-controls-seen','1');localStorage.setItem('fly-crash-mode','forgiving');window.__flyWeatherOverride=weather;window.__flySunOverride=Date.UTC(2026,6,18,hour);},{hour:Number(args.hour??4),weather:report.weather,quality:args.quality||'high'});
   if(args.earth)await page.addInitScript(require('./ground-texture-audit.cjs').installGroundTextureAudit);
   await page.goto((args.url||'http://localhost:3000')+'/?graphics='+encodeURIComponent(stage)+'&graphicsReview=1'+(args.earth?'&earth=stylized':''),{waitUntil:'domcontentloaded',timeout:90000});
   if(args['build-id']){

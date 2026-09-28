@@ -13,6 +13,8 @@ const initialState = {
 
   // 'high' | 'medium' | 'low' — drives DPR / bloom / cloud degradation
   qualityTier: 'high',
+  // Requested presentation ceiling; governor changes only qualityTier.
+  qualityPreset: 'high',
 
   // Targeting
   lockedHex: null,
@@ -135,6 +137,10 @@ export const useFlyStore = create(
     setSpeedPreset: (speedPreset) => set({ speedPreset }),
 
     setQualityTier: (qualityTier) => set({ qualityTier }),
+    setQualityPreset: (qualityPreset) => {
+      if (!['low', 'medium', 'high', 'ultra'].includes(qualityPreset)) return;
+      set({ qualityPreset, qualityTier: qualityPreset === 'ultra' ? 'high' : qualityPreset });
+    },
 
     setLock: (lockedHex, lockState) => set({ lockedHex, lockState }),
 

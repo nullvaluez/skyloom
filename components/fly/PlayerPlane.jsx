@@ -5,6 +5,9 @@ import { applyPainterlyAircraft } from '@/lib/fly/painterly-aircraft';
 import { cinematicAircraftParameters } from '@/lib/fly/cinematic-models';
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
 import { registerCameraModel } from '@/lib/fly/camera-framing';
+import { cinematicEarthOn, aircraftPresentation } from '@/lib/fly/cinematic-earth';
+import { isPhoneClass } from '@/lib/fly/device-class';
+import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
 
 
 import { Suspense, useEffect, useMemo, useRef } from 'react';
@@ -185,9 +188,11 @@ function gradeHullMaterial(src, isCanopy, hasVC = false, metresPerUnit = 1) {
 }
 
 function PlayerModel({ flight, aircraft }) {
-  const entry = aircraft.entry;
+  const visuals = useFlyStore((s) => s.visuals);
+  const mapStyle = useFlyStore((s) => s.mapStyle);
+  // Choose a device LOD at mount, never rebuild the plane during a governor step.
+  const entry = useMemo(() => aircraftPresentation(aircraft, isPhoneClass(), {mapStyle, visuals}), [mapStyle, visuals, aircraft]);
   const { scene } = useGLTF(entry.url);
-  const mapStyle = useFlyStore((s) => s.mapStyle); // discrete: rim swaps on style
   // Per-mount clone: the material regrade below must never reach the useGLTF
   // cache (ModelTurntable renders the same cached scenes elsewhere — and since
   // round 17 the hangar preview and the traffic fleet share these same files).
@@ -208,7 +213,11 @@ function PlayerModel({ flight, aircraft }) {
   // Measure before the clone is mounted. Afterwards matrixWorld already includes
   // correction and the flight rig, which would apply the model scale twice.
   const cameraDimensions=useMemo(()=>correctedBox(cloned,correction).getSize(new Vector3()),[cloned,correction]);
-  const anchors = useMemo(() => measureAircraftAnchors(cloned, correction, aircraft.id), [cloned, correction, aircraft.id]);
+  const anchors = useMemo(() => {
+    const measured = measureAircraftAnchors(cloned, correction, aircraft.id);
+    if (entry.engines) measured.engines = entry.engines.map(p => p.map(v => v * correction.scale));
+    return measured;
+  }, [cloned, correction, aircraft.id, entry]);
   useEffect(() => {
     flight.aircraftVisual = anchors;
     return () => { if (flight.aircraftVisual === anchors) delete flight.aircraftVisual; };
@@ -450,9 +459,14 @@ function PlayerLights({ anchors, flight }) {
 function Afterburner({ flight, anchors, cfg }) {
   const exhaust = useMemo(() => createEngineExhaust(anchors.engines, cfg.scale ?? 1), [anchors, cfg]);
   useEffect(() => () => exhaust.dispose(), [exhaust]);
+  useEffect(() => registerSkyOverlay(exhaust.mesh), [exhaust]);
   useFrame((_, dt) => {
-    const target = Math.max(0, Math.min(1, (flight.speed - cfg.startMps) / (cfg.fullMps - cfg.startMps)));
+    const cinema = cinematicEarthOn();
+    const speedPower = Math.max(0, Math.min(1, (flight.speed - cfg.startMps) / (cfg.fullMps - cfg.startMps)));
+    // Thrust should be visible on engagement, before the aircraft has accelerated.
+    const target = cinema && flight.boosting ? Math.max(.65, speedPower) : speedPower;
     const u = exhaust.uniforms;
+    u.uExhaustCinema.value = cinema ? 1 : 0;
     u.uExhaustPower.value += (target - u.uExhaustPower.value) * (1 - Math.exp(-Math.min(dt, .1) * 10));
     u.uExhaustTime.value += Math.min(dt, .1);
     exhaust.mesh.visible = u.uExhaustPower.value > .015 && !flight.operations?.grounded;

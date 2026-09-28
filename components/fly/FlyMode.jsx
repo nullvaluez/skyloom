@@ -36,6 +36,8 @@ import { BOOT } from '@/lib/fly/fly-constants';
 import { resolveInitialMapStyle } from '@/lib/fly/map-style';
 import { resolveInitialSettings } from '@/lib/fly/fly-settings';
 import { resolveAircraft, resolveInitialAircraft } from '@/lib/fly/player-aircraft';
+import { aircraftPresentation } from '@/lib/fly/cinematic-earth';
+import { isPhoneClass } from '@/lib/fly/device-class';
 import { useFlyStore, inFlight } from '@/stores/fly-store';
 import { resolveInitialVisuals } from '@/lib/fly/visuals-profile';
 import {
@@ -152,7 +154,7 @@ export function FlyMode({ onClose }) {
     // W0 stubs = today (mandatory hangar, KOSU, SPAWN_ALT_M).
     resolveInitialVisuals();
     const picked = resolveAircraft(useFlyStore.getState().aircraftId);
-    useGLTF.preload(picked.entry.url);
+    useGLTF.preload(aircraftPresentation(picked, isPhoneClass()).url);
     Promise.resolve(resolveInitialSpawn()).then((spawn) => {
       if (cancelled) return;
       const fly = useFlyStore.getState();
