@@ -7,6 +7,7 @@ import { GroundImmersionRig } from './GroundImmersionRig';
 import { EarthSurfaceLayer } from './EarthSurfaceLayer';
 import { applyEarthSurface } from '@/lib/fly/earth-surface-material';
 import { updatePainterlyProfile } from '@/lib/fly/painterly-flight';
+import { updateWorldArt } from '@/lib/fly/world-art-direction';
 import { stylizedEarthOn } from '@/lib/fly/stylized-earth';
 import { SatGroundDetailLayer } from './SatGroundDetailLayer';
 import { applyNearGroundMaterial } from '@/lib/fly/near-ground-material';
@@ -3360,6 +3361,8 @@ export function FlyScene({ runtime }) {
     if (flyState.mapStyle !== 'satellite') _r25Ctx.altT = 0;
     // Review pin isolates the integrated R25 sky/ground from the new materials.
     updatePainterlyProfile(graphicsReviewOn() && window.__flyPainterlyOverride === 0 ? 'classic' : flyState.visuals, flyState.mapStyle);
+    updateWorldArt(flyState.mapStyle === 'satellite' && flyState.visuals === 'enhanced'
+      && !(graphicsReviewOn() && window.__flyWorldArtOverride === 0), runtime, sunRef.current);
     r25SkyFrame(runtime, _r25Ctx);
     r25GroundFrame(runtime, _r25Ctx);
 
