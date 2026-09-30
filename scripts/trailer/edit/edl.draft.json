@@ -190,11 +190,12 @@
    "t0": 68.0,
    "t1": 70.0,
    "src": "/tmp/claude-0/shots/paris-arrival-preview",
-   "in": 150,
+   "in": 164,
    "trans_in": {
     "type": "flash",
     "dur": 0.2
-   }
+   },
+   "_note": "frames <164 carry the in-world EIFFEL TOWER label (captured before the label-hide fix)"
   },
   {
    "id": "bigben",
@@ -288,12 +289,13 @@
    "id": "climax-water",
    "t0": 89.0,
    "t1": 90.0,
-   "src": "/tmp/claude-0/shots/sydney-skim-preview",
-   "in": 60,
+   "src": "/tmp/claude-0/shots/nyc-hudson-skim-preview",
+   "in": 45,
    "trans_in": {
     "type": "whip",
     "dur": 0.2
-   }
+   },
+   "_note": "draft: sydney-skim plumes clip through the water surface (jet too low); reshoot higher for final"
   },
   {
    "id": "climax-knife",
