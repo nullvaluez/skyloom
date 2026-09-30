@@ -1,0 +1,10 @@
+{
+  "_doc": "Trailer capture locations. core = full-detail box (imagery to z16, vector z9/12/13/14, DEM to z16, WorldCover z6-14). far = imagery+DEM coarse ring (z<=10) radius km around center. S2 = preferred Sentinel-2 months (dry/clear season).",
+  "nyc":    { "lat": 40.720,  "lon": -73.985, "core_km": [40, 40], "far_km": 160, "s2_months": [6,7,8,9],  "notes": "Manhattan, Hudson/East River waterfronts, Statue of Liberty (40.6892,-74.0445), Empire State (40.7484,-73.9857), JFK (40.6413,-73.7781)" },
+  "dubai":  { "lat": 25.155,  "lon": 55.205,  "core_km": [38, 26], "far_km": 150, "s2_months": [1,2,3,11,12], "notes": "Palm Jumeirah (25.112,55.138), Burj Khalifa (25.1972,55.2744), Dubai Marina, coastline" },
+  "sydney": { "lat": -33.857, "lon": 151.215, "core_km": [26, 26], "far_km": 150, "s2_months": [3,4,5,9,10,11], "notes": "Opera House (-33.8568,151.2153), Harbour Bridge, Port Jackson waterfront" },
+  "paris":  { "lat": 48.860,  "lon": 2.320,   "core_km": [26, 26], "far_km": 150, "s2_months": [6,7,8,9],  "notes": "Eiffel Tower (48.8584,2.2945), Seine" },
+  "london": { "lat": 51.505,  "lon": -0.120,  "core_km": [26, 26], "far_km": 150, "s2_months": [5,6,7,8,9], "notes": "Big Ben (51.5007,-0.1246), Thames" },
+  "alps":   { "lat": 46.520,  "lon": 7.980,   "core_km": [40, 40], "far_km": 150, "s2_months": [7,8,9],    "notes": "Jungfrau (46.537,7.962), Eiger (46.577,8.005), Aletsch glacier (46.45,8.05), Lauterbrunnen valley (46.59,7.91) - dramatic terrain" },
+  "rio":    { "lat": -22.940, "lon": -43.190, "core_km": [32, 26], "far_km": 150, "s2_months": [6,7,8],    "notes": "Sugarloaf (-22.9486,-43.1566), Christ the Redeemer (-22.9519,-43.2105), Copacabana, Guanabara Bay" }
+}

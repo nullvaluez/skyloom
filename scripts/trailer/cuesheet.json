@@ -1,0 +1,319 @@
+{
+ "_doc": "Master timeline for the Skyloom trailer. 120 BPM, 4/4: beat = 0.5 s = 15 frames @30fps, bar = 2.0 s = 60 frames. Times in seconds from 0. Every cut, title and hit lands on this grid (beat or half-beat). Music, titles, SFX and the edit all read this file.",
+ "fps": 30,
+ "bpm": 120,
+ "duration": 104.0,
+ "resolution": [
+  1920,
+  1080
+ ],
+ "sections": [
+  {
+   "id": "cold_open",
+   "t0": 0.0,
+   "t1": 8.0,
+   "bars": "1-4",
+   "music": "Near-silence. Sub drone (D), high airy pad, wind, faint radio-static texture, a lonely 4-note piano/celesta motif (D A F E) with long reverb. Tension, awe. A reverse-swell sucks in over 7.0-8.0.",
+   "picture": "Black, then a slow fade up (1.0-2.5) on dawn above an endless cloud sea at high altitude, the Earth's curve, sun cresting. Slow push."
+  },
+  {
+   "id": "hero_reveal",
+   "t0": 8.0,
+   "t1": 16.0,
+   "bars": "5-8",
+   "music": "8.0 MASSIVE BRAAM (brass+synth, D minor) + sub drop + taiko. Then driving low string ostinato (16ths on D) starts at 8.5, taiko on each bar downbeat, rising brass swell into 16.0.",
+   "picture": "8.0 hard cut: chase view of the hero jet over New York Harbor at golden hour, Statue of Liberty below, Manhattan skyline ahead. 12.0 boost ignition, plumes flare, camera whips alongside past Lower Manhattan."
+  },
+  {
+   "id": "world",
+   "t0": 16.0,
+   "t1": 28.0,
+   "bars": "9-14",
+   "music": "Full ostinato + brass melody (heroic theme, 4 bars), timpani rolls, cymbal swells every 2 bars. Hit on 16.0, 20.0, 24.0. Lift at 24.0 (add choir 'ah').",
+   "picture": "Montage, one location per ~2 bars: Swiss Alps valley run (low, fast), Rio (Sugarloaf + Copacabana waterfront), Dubai (Palm Jumeirah from above), Sydney Harbour low water skim at the Opera House, NYC Hudson waterfront skim."
+  },
+  {
+   "id": "live_traffic",
+   "t0": 28.0,
+   "t1": 38.0,
+   "bars": "15-19",
+   "music": "28.0 hit then DROP to tension: pulsing synth bass on 8ths, ticking clock hi-hat, radio-chatter textures, low strings sustain. Build (riser) 34.0-38.0 into a hit at 38.0.",
+   "picture": "Wide: the sky over New York filled with real airliners, their spotter trails and contrails. Inspect holo-card on one airliner. 34-38 a close pass of an airliner with contrails."
+  },
+  {
+   "id": "family",
+   "t0": 38.0,
+   "t1": 50.0,
+   "bars": "20-25",
+   "music": "38.0 soft impact then EMOTIONAL: strings legato swell, choir, piano motif returns in D major (hopeful), warm pads. Big swell peak at 46.0; decrescendo into a breath at 49.5.",
+   "picture": "Sunset above the clouds: the hero jet eases alongside an airliner in formation; cinema wing view; contrails glowing gold."
+  },
+  {
+   "id": "air_force",
+   "t0": 50.0,
+   "t1": 60.0,
+   "bars": "26-30",
+   "music": "50.0 war drums + staccato brass + low strings marcato, aggressive, hits every bar; stinger at 58.0; riser 58.0-60.0.",
+   "picture": "A military formation (tanker + fighters) cutting through the sky; the hero jet slides into the slot; low pass over the Alps."
+  },
+  {
+   "id": "warp",
+   "t0": 60.0,
+   "t1": 68.0,
+   "bars": "31-34",
+   "music": "60.0 whoosh-impact; shimmering Shepard riser + reverse cymbal 62.0-64.0 into a sub BOOM at 64.0 (warp arrival); light ticking pulse.",
+   "picture": "The Atlas world screen: search a city, WARP: light-streak transition, arrival at Paris at dusk with the Eiffel Tower."
+  },
+  {
+   "id": "landmarks",
+   "t0": 68.0,
+   "t1": 78.0,
+   "bars": "35-39",
+   "music": "Heroic theme returns, full orchestra; a big percussive hit on every bar downbeat (68, 70, 72, 74, 76).",
+   "picture": "One landmark per bar, each with a small location label: Eiffel Tower (Paris), Big Ben (London), Opera House (Sydney), Burj Khalifa (Dubai), Empire State (New York, dusk)."
+  },
+  {
+   "id": "night",
+   "t0": 78.0,
+   "t1": 86.0,
+   "bars": "40-43",
+   "music": "78.0 sudden breakdown: only a heartbeat sub pulse + high string harmonics + piano motif. 82.0 drums re-enter building (snare roll crescendo) into 86.0.",
+   "picture": "New York by night: city lights, moonlight on the Hudson, runway lights; the jet's plumes glowing."
+  },
+  {
+   "id": "climax",
+   "t0": 86.0,
+   "t1": 94.0,
+   "bars": "44-47",
+   "music": "Full-power finale: everything, tempo feel doubles (8th-note taiko), cuts on every beat for 90.0-93.0, huge final BRAAM + choir at 93.0, hard stop at 94.0 (silence with a reverb tail).",
+   "picture": "Rapid montage of the best action: boost through clouds, water skim, knife-edge past skyscrapers, formation break, vertical pull into the sunset."
+  },
+  {
+   "id": "title",
+   "t0": 94.0,
+   "t1": 104.0,
+   "bars": "48-52",
+   "music": "94.5 deep sub BOOM + shimmering bell/choir chord for the logo, long tail; soft final piano note at 99.0; fade to silence by 104.",
+   "picture": "SKYLOOM wordmark reveal with a light sweep over black/deep navy starfield; tagline; call to action; small data credits."
+  }
+ ],
+ "titles": [
+  {
+   "t0": 2.0,
+   "t1": 4.6,
+   "text": "RIGHT NOW,",
+   "style": "whisper"
+  },
+  {
+   "t0": 4.8,
+   "t1": 7.6,
+   "text": "THOUSANDS OF REAL AIRCRAFT ARE IN THE SKY.",
+   "style": "whisper"
+  },
+  {
+   "t0": 13.0,
+   "t1": 15.6,
+   "text": "FLY THE LIVING EARTH",
+   "style": "statement"
+  },
+  {
+   "t0": 16.4,
+   "t1": 19.2,
+   "text": "THE REAL PLANET",
+   "style": "statement"
+  },
+  {
+   "t0": 20.4,
+   "t1": 23.2,
+   "text": "EVERY CITY. EVERY COASTLINE.",
+   "style": "statement"
+  },
+  {
+   "t0": 28.6,
+   "t1": 31.4,
+   "text": "EVERY AIRCRAFT IN YOUR SKY",
+   "style": "statement"
+  },
+  {
+   "t0": 31.6,
+   "t1": 34.4,
+   "text": "IS A REAL FLIGHT. LIVE.",
+   "style": "statement"
+  },
+  {
+   "t0": 39.0,
+   "t1": 42.2,
+   "text": "YOUR FAMILY'S FLIGHT HOME?",
+   "style": "emotional"
+  },
+  {
+   "t0": 43.4,
+   "t1": 47.0,
+   "text": "FLY RIGHT ALONGSIDE IT.",
+   "style": "emotional"
+  },
+  {
+   "t0": 50.6,
+   "t1": 54.0,
+   "text": "OR FORM UP WITH THE AIR FORCE.",
+   "style": "statement"
+  },
+  {
+   "t0": 60.4,
+   "t1": 63.6,
+   "text": "WARP ANYWHERE ON EARTH",
+   "style": "statement"
+  },
+  {
+   "t0": 68.2,
+   "t1": 69.8,
+   "text": "PARIS",
+   "style": "location",
+   "sub": "48.8584\u00b0 N  2.2945\u00b0 E"
+  },
+  {
+   "t0": 70.2,
+   "t1": 71.8,
+   "text": "LONDON",
+   "style": "location",
+   "sub": "51.5007\u00b0 N  0.1246\u00b0 W"
+  },
+  {
+   "t0": 72.2,
+   "t1": 73.8,
+   "text": "SYDNEY",
+   "style": "location",
+   "sub": "33.8568\u00b0 S  151.2153\u00b0 E"
+  },
+  {
+   "t0": 74.2,
+   "t1": 75.8,
+   "text": "DUBAI",
+   "style": "location",
+   "sub": "25.1972\u00b0 N  55.2744\u00b0 E"
+  },
+  {
+   "t0": 76.2,
+   "t1": 77.8,
+   "text": "NEW YORK",
+   "style": "location",
+   "sub": "40.7484\u00b0 N  73.9857\u00b0 W"
+  },
+  {
+   "t0": 79.0,
+   "t1": 81.8,
+   "text": "DAY AND NIGHT.",
+   "style": "statement"
+  },
+  {
+   "t0": 82.0,
+   "t1": 84.8,
+   "text": "IN REAL TIME.",
+   "style": "statement"
+  },
+  {
+   "t0": 94.5,
+   "t1": 104.0,
+   "text": "SKYLOOM",
+   "style": "logo"
+  },
+  {
+   "t0": 96.6,
+   "t1": 104.0,
+   "text": "FLY THE LIVING EARTH",
+   "style": "tagline"
+  },
+  {
+   "t0": 99.2,
+   "t1": 104.0,
+   "text": "PLAY NOW IN YOUR BROWSER",
+   "style": "cta"
+  }
+ ],
+ "hits": [
+  {
+   "t": 8.0,
+   "kind": "braam_big"
+  },
+  {
+   "t": 12.0,
+   "kind": "boost_whoosh"
+  },
+  {
+   "t": 16.0,
+   "kind": "hit"
+  },
+  {
+   "t": 20.0,
+   "kind": "hit"
+  },
+  {
+   "t": 24.0,
+   "kind": "hit_lift"
+  },
+  {
+   "t": 28.0,
+   "kind": "hit_drop"
+  },
+  {
+   "t": 38.0,
+   "kind": "soft_impact"
+  },
+  {
+   "t": 50.0,
+   "kind": "hit_war"
+  },
+  {
+   "t": 58.0,
+   "kind": "stinger"
+  },
+  {
+   "t": 60.0,
+   "kind": "whoosh_impact"
+  },
+  {
+   "t": 64.0,
+   "kind": "sub_boom"
+  },
+  {
+   "t": 68.0,
+   "kind": "hit"
+  },
+  {
+   "t": 70.0,
+   "kind": "hit"
+  },
+  {
+   "t": 72.0,
+   "kind": "hit"
+  },
+  {
+   "t": 74.0,
+   "kind": "hit"
+  },
+  {
+   "t": 76.0,
+   "kind": "hit"
+  },
+  {
+   "t": 78.0,
+   "kind": "breakdown"
+  },
+  {
+   "t": 86.0,
+   "kind": "hit_big"
+  },
+  {
+   "t": 93.0,
+   "kind": "braam_final"
+  },
+  {
+   "t": 94.0,
+   "kind": "cut_to_silence"
+  },
+  {
+   "t": 94.5,
+   "kind": "logo_boom"
+  }
+ ]
+}

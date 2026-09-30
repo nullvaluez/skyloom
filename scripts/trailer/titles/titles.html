@@ -1,0 +1,765 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Skyloom trailer titles</title>
+<!--
+  Deterministic title-card renderer for the Skyloom trailer.
+
+  Contract (driven by titles.cjs):
+    window.shapingRequest(titles) -> which strings must be shaped, in which face
+    window.setup(titles, glyphs)  -> groups[]   (glyphs = shape.py output)
+    window.showGroup(i)           builds the DOM for ONE group (a card, or the end card)
+    window.render(t)              sets every element's state as a PURE FUNCTION of t
+                                  (seconds on the master timeline). No CSS transitions,
+                                  no CSS animations, no rAF clocks, no will-change layers
+                                  (their raster scale depends on history). Same t -> same pixels.
+    window.fontsReady()           resolves when the HTML faces are loaded.
+
+  Hero type is drawn as SVG GEOMETRY: glyph outlines placed at HarfBuzz positions
+  (shape.py). Live text in Chrome snaps glyph origins/baselines to the pixel grid,
+  so a slow push or tracking drift steps in 0.3-1 px ticks; outlines under an SVG
+  transform are anti-aliased analytically and move continuously.
+
+  Type system (three faces, no more):
+    Archivo Black  - the game's wordmark face (public/fonts): statements, names, logo
+    Inter          - secondary sans: whispers, emotional lines, CTA, credits
+    JetBrains Mono - coordinates + the brand tagline (the boot screen's mono role)
+-->
+<style>
+@font-face{font-family:'Archivo Black';src:url('../../../public/fonts/ArchivoBlack-Regular.ttf') format('truetype');font-weight:400;font-style:normal}
+@font-face{font-family:'Inter';src:url('fonts/Inter-latin-var.woff2') format('woff2');font-weight:100 900;font-style:normal}
+@font-face{font-family:'JetBrains Mono';src:url('fonts/JetBrainsMono-latin-var.woff2') format('woff2');font-weight:100 800;font-style:normal}
+
+html,body{margin:0;padding:0;width:1920px;height:1080px;overflow:hidden;background:transparent}
+#stage{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden}
+.card{position:absolute;left:0;top:0;width:1920px;height:1080px}
+.abs{position:absolute}
+.wrap{position:absolute;left:960px;z-index:0;transform-origin:50% 50%}
+.txt{display:inline-block;white-space:pre;line-height:1;font-kerning:normal;text-rendering:geometricPrecision;-webkit-font-smoothing:antialiased}
+#probe{position:absolute;left:-9999px;top:0;opacity:0}
+</style>
+</head>
+<body>
+<div id="probe"><span style="font-family:'Archivo Black'">SKYLOOM ’°</span><span style="font-family:Inter;font-weight:400">A’°©</span><span style="font-family:Inter;font-weight:600">A</span><span style="font-family:'JetBrains Mono'">0°</span></div>
+<div id="stage"></div>
+<script>
+'use strict';
+/* ------------------------------------------------------------------ utils */
+const FPS = 30, BEAT = 0.5, FRAME = 1 / FPS;
+const W = 1920, H = 1080;
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const inv = (a, b, x) => (b === a ? (x >= b ? 1 : 0) : clamp((x - a) / (b - a)));
+const E = {
+  lin: (k) => k,
+  inQuad: (k) => k * k,
+  inCubic: (k) => k * k * k,
+  outCubic: (k) => 1 - Math.pow(1 - k, 3),
+  outQuart: (k) => 1 - Math.pow(1 - k, 4),
+  outExpo: (k) => (k >= 1 ? 1 : 1 - Math.pow(2, -10 * k)),
+  inOutSine: (k) => -(Math.cos(Math.PI * k) - 1) / 2,
+  inOutCubic: (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2),
+};
+// next beat on the 120 BPM grid at or after x
+const nextBeat = (x) => Math.ceil(x / BEAT - 1e-6) * BEAT;
+const fmt = (v, d = 3) => +v.toFixed(d);
+const rgba = (r, g, b, a) => `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},${fmt(clamp(a), 4)})`;
+const rgb = (c) => `rgb(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])})`;
+function mkEl(tag, cls, parent, css) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (css) Object.assign(e.style, css);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const SVGNS = 'http://www.w3.org/2000/svg';
+function sEl(tag, attrs, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  if (attrs) for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+let UID = 0;
+const uid = (p) => p + (++UID);
+// deterministic hash -> [0,1)
+function hash01(a, b = 0, c = 0) {
+  let h = (a * 374761393 + b * 668265263 + c * 2147483647) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
+  h = (h ^ (h >>> 16)) >>> 0;
+  return h / 4294967296;
+}
+function rng(seed) {
+  let s = seed >>> 0;
+  return () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296);
+}
+// HTML tracked text: letter-spacing also trails the last glyph; a matching
+// padding-left keeps centred type optically centred.
+function setTrack(elm, em) {
+  elm.style.letterSpacing = fmt(em, 4) + 'em';
+  elm.style.paddingLeft = fmt(em, 4) + 'em';
+}
+
+/* ---------------------------------------------------------------- palette */
+const C = {
+  ice: [238, 243, 255],      // #eef3ff  SKY / statements
+  steel: [159, 179, 217],    // #9fb3d9  LOOM
+  warm: [255, 243, 226],     // emotional warm white
+  cool: [150, 188, 255],     // glow
+  accent: [168, 198, 255],   // location accent line
+};
+const cs = (c, a = 1) => rgba(c[0], c[1], c[2], a);
+const INK = [0, 3, 12];      // shadow ink: a navy-black, never pure black
+
+/* ------------------------------------------------------------ style specs */
+// titles.cjs picks the review moments from these durations.
+const SPEC = {
+  whisper:   { in: 0.6,  out: 0.5 },
+  statement: { in: 0.25, out: 0.3 },
+  emotional: { in: 0.8,  out: 0.8 },
+  location:  { in: 0.5,  out: 0.25 },
+  end:       { in: 0.3,  out: 1.0 },
+};
+// vector faces (shape.py shapes them with HarfBuzz; paths relative to this file)
+const VFONTS = {
+  archivo:  { file: '../../../public/fonts/ArchivoBlack-Regular.ttf' },
+  inter500: { file: 'fonts/Inter-latin-var.woff2', variations: { wght: 500, opsz: 32 } },
+  inter340: { file: 'fonts/Inter-latin-var.woff2', variations: { wght: 340, opsz: 32 } },
+};
+const STYLE_FONT = { whisper: 'inter500', statement: 'archivo', emotional: 'inter340', location: 'archivo', logo: 'archivo' };
+const displayText = (cue) => (cue.style === 'emotional' ? cue.text.replace(/'/g, '’') : cue.text);
+
+/* ============================================================ VECTOR TYPE */
+let GLY = null;
+function installGlyphDefs() {
+  const svg = sEl('svg', { width: 0, height: 0, style: 'position:absolute;left:0;top:0;width:0;height:0;overflow:hidden' });
+  document.body.appendChild(svg);
+  const defs = sEl('defs', null, svg);
+  for (const key in GLY.outlines) for (const gid in GLY.outlines[key]) sEl('path', { id: `g-${key}-${gid}`, d: GLY.outlines[key][gid] }, defs);
+}
+class VText {
+  constructor(key, text, size) {
+    const f = GLY.fonts[key], s = GLY.strings[key + '|' + text];
+    if (!s) throw new Error('unshaped string: ' + key + '|' + text);
+    this.key = key; this.size = size; this.k = size / f.upm; this.cap = f.capHeight * this.k;
+    this.adv = s.adv * this.k; this.gl = s.glyphs; this.n = this.gl.length; this.sets = [];
+    this.track(0);
+  }
+  // CSS letter-spacing semantics: +ls after every glyph; w = ink run (no trailing ls)
+  track(em) { this.ls = em * this.size; this.w = this.adv + (this.n - 1) * this.ls; return this.w; }
+  addSet(parent) {
+    const uses = this.gl.map(([gid]) => sEl('use', { href: `#g-${this.key}-${gid}` }, parent));
+    this.sets.push(uses);
+    return uses;
+  }
+  // origin (x0, y0) = left end of the run, on the baseline
+  place(x0, y0) {
+    const k = fmt(this.k, 7);
+    for (const uses of this.sets) for (let i = 0; i < this.n; i++) {
+      const g = this.gl[i];
+      uses[i].setAttribute('transform', `translate(${fmt(x0 + g[1] * this.k + i * this.ls, 3)} ${fmt(y0 - g[2] * this.k, 3)}) scale(${k} ${-k})`);
+    }
+  }
+}
+// text-shadow semantics as an SVG filter: independent shadows under the source
+function shadowFilter(defs, region = [-0.35, -3, 1.7, 7]) {
+  const id = uid('f');
+  const el = sEl('filter', { id, x: region[0], y: region[1], width: region[2], height: region[3], 'color-interpolation-filters': 'sRGB' }, defs);
+  return {
+    url: `url(#${id})`,
+    // list: [dx, dy, radius(px, CSS text-shadow blur), [r,g,b], alpha]
+    set(list, withSource = true) {
+      let s = '', m = '';
+      list.forEach(([dx, dy, r, c, a], i) => {
+        s += `<feGaussianBlur in="SourceAlpha" stdDeviation="${fmt(r / 2, 2)}" result="b${i}"/>` +
+             `<feOffset in="b${i}" dx="${dx}" dy="${dy}" result="o${i}"/>` +
+             `<feFlood flood-color="${rgb(c)}" flood-opacity="${fmt(clamp(a), 4)}" result="c${i}"/>` +
+             `<feComposite in="c${i}" in2="o${i}" operator="in" result="s${i}"/>`;
+      });
+      for (let i = list.length - 1; i >= 0; i--) m += `<feMergeNode in="s${i}"/>`;
+      if (withSource) m += '<feMergeNode in="SourceGraphic"/>';
+      el.innerHTML = s + `<feMerge>${m}</feMerge>`;
+    },
+  };
+}
+// soft dark halo: many-stop radial ellipse, zero at the rim - never a box
+function haloGradient(defs, alpha, tint = INK) {
+  const id = uid('h');
+  const g = sEl('radialGradient', { id }, defs);
+  for (let i = 0; i <= 12; i++) {
+    const k = i / 12;
+    sEl('stop', { offset: fmt(k, 4), 'stop-color': rgb(tint), 'stop-opacity': fmt(alpha * Math.pow(1 - k, 1.6) * (1 - 0.15 * k), 4) }, g);
+  }
+  return `url(#${id})`;
+}
+/**
+ * A centred vector line of type, in its own full-frame SVG:
+ *   svg (CSS blur) > g.top (opacity) > g.T (translate/scale about the text centre)
+ *     > halo ellipse, fill group (shadows filter), optional sweep (clip + gradient + glow)
+ */
+function vLine(root, { key, text, size, halo = 0.36, haloTint = INK, padX = 0.1, padY = 1.0, sweep = false }) {
+  const svg = sEl('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, class: 'abs', style: 'left:0;top:0;overflow:visible' });
+  root.appendChild(svg);
+  const defs = sEl('defs', null, svg);
+  const vt = new VText(key, text, size);
+  const top = sEl('g', null, svg);
+  const T = sEl('g', null, top);
+  const haloEl = halo > 0 ? sEl('ellipse', { cx: 0, cy: 0, fill: haloGradient(defs, halo, haloTint) }, T) : null;
+  const fillG = sEl('g', null, T);
+  const uses = vt.addSet(fillG);
+  const sh = shadowFilter(defs);
+  fillG.setAttribute('filter', sh.url);
+  let sw = null;
+  if (sweep) {
+    const glow = shadowFilter(defs, [-0.2, -1.5, 1.4, 4]);
+    const sg = sEl('g', { filter: glow.url }, T);
+    const cid = uid('c');
+    const clip = sEl('clipPath', { id: cid }, defs);
+    vt.addSet(clip);
+    const sc = sEl('g', { 'clip-path': `url(#${cid})` }, sg);
+    const lid = uid('l');
+    const lg = sEl('linearGradient', { id: lid, gradientUnits: 'userSpaceOnUse' }, defs);
+    const stops = [0, 0.33, 0.5, 0.67, 1].map((o) => sEl('stop', { offset: o, 'stop-color': '#fff', 'stop-opacity': 0 }, lg));
+    const rect = sEl('rect', { fill: `url(#${lid})` }, sc);
+    sw = { glow, sg, lg, stops, rect };
+  }
+  const L = {
+    svg, top, T, vt, uses, fillG, sh, sw,
+    // tracking (em), centre (cx, cy = optical centre of the caps), scale
+    layout(trackEm, cx, cy, scale = 1) {
+      vt.track(trackEm);
+      vt.place(-vt.w / 2, vt.cap / 2);
+      T.setAttribute('transform', `translate(${fmt(cx, 3)} ${fmt(cy, 3)}) scale(${fmt(scale, 6)})`);
+      if (haloEl) {
+        haloEl.setAttribute('rx', fmt(vt.w / 2 + Math.max(120, vt.w * padX), 2));
+        haloEl.setAttribute('ry', fmt(vt.cap / 2 + vt.cap * padY + 24, 2));
+      }
+      if (sw) {
+        sw.rect.setAttribute('x', fmt(-vt.w / 2 - 60, 2)); sw.rect.setAttribute('width', fmt(vt.w + 120, 2));
+        sw.rect.setAttribute('y', fmt(-vt.cap * 1.5, 2)); sw.rect.setAttribute('height', fmt(vt.cap * 3, 2));
+      }
+    },
+    fill(c, a = 1) { fillG.setAttribute('fill', rgb(c)); fillG.setAttribute('fill-opacity', fmt(a, 4)); },
+    opacity(a) { top.setAttribute('opacity', fmt(clamp(a), 4)); },
+    blur(px) { svg.style.filter = px > 0.05 ? `blur(${fmt(px, 2)}px)` : 'none'; },
+    // light band: c = 0..1 across the run, peak 0..1, band half-width in px
+    sweepAt(c01, peak, bw, glow) {
+      if (!sw) return;
+      if (peak <= 0.001) { sw.sg.setAttribute('opacity', 0); return; }
+      sw.sg.setAttribute('opacity', 1);
+      const c = -vt.w / 2 + c01 * vt.w;
+      const dy = bw * 0.27; // ~15 deg slant, like a 105deg CSS gradient
+      sw.lg.setAttribute('x1', fmt(c - bw, 2)); sw.lg.setAttribute('y1', fmt(-dy, 2));
+      sw.lg.setAttribute('x2', fmt(c + bw, 2)); sw.lg.setAttribute('y2', fmt(dy, 2));
+      [0, 0.55, 1, 0.55, 0].forEach((m, i) => sw.stops[i].setAttribute('stop-opacity', fmt(m * peak, 4)));
+      sw.glow.set(glow);
+    },
+  };
+  return L;
+}
+
+/* ================================================================ WHISPER */
+// small, very wide tracked Inter; blur->sharp; slow tracking drift wider
+function buildWhisper(cue, root) {
+  const L = vLine(root, { key: STYLE_FONT.whisper, text: displayText(cue), size: 34, halo: 0.44, padX: 0.1, padY: 1.1 });
+  L.fill([255, 255, 255], 0.88);
+  L.sh.set([[0, 1, 2, INK, 0.55], [0, 1, 10, INK, 0.40], [0, 0, 26, INK, 0.30], [0, 0, 40, [200, 220, 255], 0.10]]);
+  const { t0, t1 } = cue;
+  const S = SPEC.whisper;
+  return (t) => {
+    const a = E.outCubic(inv(t0, t0 + S.in, t));
+    const b = E.inCubic(inv(t1 - S.out - FRAME, t1 - FRAME, t));
+    const life = inv(t0, t1, t);
+    L.layout(lerp(0.30, 0.36, E.inOutSine(life) * 0.5 + life * 0.5), 960, 540 + lerp(6, 0, a) - 3 * b, 1);
+    L.opacity(a * (1 - b));
+    L.blur(lerp(9, 0, a) + 3 * b);
+  };
+}
+
+/* ============================================================== STATEMENT */
+// Archivo Black, luminous near-white, light sweep that lands on the beat,
+// fast scale/blur resolve in, very slow push, fast fade/blur out.
+function statementSize(text) {
+  // single line, tiered: short lines go big, long lines fit a 1480 px title-safe run
+  const f = GLY.fonts.archivo, s = GLY.strings['archivo|' + text];
+  const w1 = s.adv / f.upm + 0.16 * (s.glyphs.length - 1);
+  return clamp(1480 / w1, 56, 78);
+}
+function buildStatement(cue, root) {
+  const size = cue._size || statementSize(cue.text);
+  const L = vLine(root, { key: 'archivo', text: cue.text, size, halo: 0.36, padX: 0.09, padY: 0.95, sweep: true });
+  L.fill([232, 239, 253], 1);
+  const { t0, t1 } = cue;
+  const S = SPEC.statement;
+  // the sweep's centre crosses the middle of the line ON a beat
+  const tb = nextBeat(t0 + 0.4);
+  const sw0 = tb - 0.5, sw1 = tb + 0.5;
+  return (t) => {
+    const a = E.outCubic(inv(t0, t0 + S.in, t));
+    const b = inv(t1 - S.out - FRAME, t1 - FRAME, t);
+    const bo = E.inQuad(b);
+    const push = lerp(1.0, 1.02, inv(t0, t1, t));
+    const scale = lerp(1.04, 1.0, a) * push * (1 + 0.035 * E.inCubic(b));
+    L.layout(0.16, 960, 518, scale);
+    L.opacity(a * (1 - bo));
+    L.blur(lerp(10, 0, E.outQuart(inv(t0, t0 + S.in * 1.2, t))) + 9 * bo);
+    // landing flash: the glow is hottest the instant the line lands, then settles
+    const land = Math.exp(-Math.max(0, t - t0 - 0.12) / 0.35) * a;
+    L.sh.set([
+      [0, 1, 3, INK, 0.42],
+      [0, 3, 18, INK, 0.34],
+      [0, 0, 18 + 10 * land, C.cool, 0.30 + 0.35 * land],
+      [0, 0, 60 + 40 * land, C.cool, 0.10 + 0.22 * land],
+    ]);
+    const sp = inv(sw0, sw1, t);
+    const pk = sp > 0 && sp < 1 ? Math.sin(Math.PI * sp) : 0;
+    L.sweepAt(lerp(-0.18, 1.18, E.inOutSine(sp)), pk, Math.max(90, size * 1.6),
+      [[0, 0, size * 0.2, [225, 238, 255], 0.95 * pk], [0, 0, size * 0.64, [150, 190, 255], 0.75 * pk]]);
+  };
+}
+
+/* ============================================================== EMOTIONAL */
+// softer: Inter (light-ish), warm white, wide tracking, slow fades, no sweep
+function buildEmotional(cue, root) {
+  const L = vLine(root, { key: STYLE_FONT.emotional, text: displayText(cue), size: 52, halo: 0.42, haloTint: [12, 7, 4], padX: 0.12, padY: 1.1 });
+  L.fill(C.warm, 1);
+  const WI = [12, 6, 0];
+  L.sh.set([[0, 1, 2, WI, 0.55], [0, 2, 14, WI, 0.38], [0, 0, 28, WI, 0.22], [0, 0, 36, [255, 190, 130], 0.18]]);
+  const { t0, t1 } = cue;
+  const S = SPEC.emotional;
+  return (t) => {
+    const a = E.inOutSine(inv(t0, t0 + S.in, t));
+    const ae = E.outCubic(inv(t0, t0 + S.in, t));
+    const b = E.inOutSine(inv(t1 - S.out - FRAME, t1 - FRAME, t));
+    const life = inv(t0, t1, t);
+    L.layout(lerp(0.22, 0.27, life), 960, 528 + lerp(10, 0, ae) - 4 * b, lerp(1.0, 1.015, life));
+    L.opacity(a * (1 - b));
+    L.blur(lerp(8, 0, ae) + 6 * b);
+  };
+}
+
+/* =============================================================== LOCATION */
+// lower-left lower-third: accent line draws, name rises out of the line,
+// coordinates drop out of it and decode, quick fade out.
+function buildLocation(cue, root, idx) {
+  const X = 120, LINE_Y = 902;
+  const nameSize = 44, subSize = 20;
+  const block = mkEl('div', 'abs', root, { left: X + 'px', top: '0px', width: '900px', height: '1080px' });
+  const scrim = mkEl('div', 'abs', block, {});
+  // name: vector type inside a soft-edged mask that ends just above the line
+  const MASK_TOP = LINE_Y - 90, MASK_H = 86, BASE = 70; // baseline 20 px above the line
+  const nameMask = mkEl('div', 'abs', block, {
+    left: '-40px', top: MASK_TOP + 'px', height: MASK_H + 'px', width: '940px',
+    WebkitMaskImage: 'linear-gradient(to bottom, #000 0, #000 calc(100% - 10px), transparent 100%)',
+    maskImage: 'linear-gradient(to bottom, #000 0, #000 calc(100% - 10px), transparent 100%)',
+  });
+  const nsvg = sEl('svg', { width: 940, height: MASK_H, class: 'abs', style: 'left:0;top:0;overflow:visible' });
+  nameMask.appendChild(nsvg);
+  const ndefs = sEl('defs', null, nsvg);
+  const vt = new VText('archivo', cue.text, nameSize);
+  const nT = sEl('g', null, nsvg);
+  const nFill = sEl('g', { fill: rgb([242, 246, 255]) }, nT);
+  vt.addSet(nFill);
+  const nsh = shadowFilter(ndefs, [-0.2, -2, 1.4, 5]);
+  nFill.setAttribute('filter', nsh.url);
+  nsh.set([[0, 1, 3, INK, 0.5], [0, 2, 16, INK, 0.38], [0, 0, 24, C.cool, 0.28]]);
+  // line (+ a dark underlay so it survives a white sky)
+  const lineShade = mkEl('div', 'abs', block, { left: '0px', top: (LINE_Y - 1) + 'px', height: '3px', width: '0px', filter: 'blur(1.5px)' });
+  const line = mkEl('div', 'abs', block, { left: '0px', top: LINE_Y + 'px', height: '1px', width: '0px' });
+  const spark = mkEl('div', 'abs', block, { top: (LINE_Y - 4) + 'px', width: '9px', height: '9px', borderRadius: '50%' });
+  // coordinates (HTML mono; they only translate), soft mask just below the line
+  const subMask = mkEl('div', 'abs', block, {
+    left: '-20px', top: (LINE_Y + 4) + 'px', height: '44px', width: '920px',
+    WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 8px, #000 100%)',
+    maskImage: 'linear-gradient(to bottom, transparent 0, #000 8px, #000 100%)',
+  });
+  const sub = mkEl('span', 'txt abs', subMask, {
+    left: '21px', top: '9px', fontFamily: "'JetBrains Mono'", fontWeight: 500, fontSize: subSize + 'px', color: rgba(200, 212, 236, 0.94),
+    letterSpacing: '0.10em', textShadow: '0 1px 2px rgba(0,3,12,0.6), 0 0 12px rgba(0,3,12,0.45)',
+  });
+  const subText = cue.sub || '';
+  sub.textContent = subText;
+  vt.track(0.22);
+  const inkW = Math.max(vt.w, sub.offsetWidth);
+  Object.assign(scrim.style, {
+    left: '-140px', width: fmt(inkW + 280, 1) + 'px', top: (LINE_Y - 135) + 'px', height: '260px',
+    background: `radial-gradient(closest-side ellipse at 50% 50%, ${Array.from({ length: 11 }, (_, i) => {
+      const k = i / 10; return `rgba(0,3,12,${fmt(0.42 * Math.pow(1 - k, 1.6) * (1 - 0.15 * k), 4)}) ${k * 100}%`; }).join(', ')})`,
+  });
+  const LINE_W = Math.max(inkW + 40, 240);
+  const { t0, t1 } = cue;
+  const S = SPEC.location;
+  return (t) => {
+    const lt = t - t0;
+    const b = E.inQuad(inv(t1 - S.out - FRAME, t1 - FRAME, t));
+    block.style.opacity = fmt(1 - b, 4);
+    block.style.filter = b > 0.01 ? `blur(${fmt(3 * b, 2)}px)` : 'none';
+    block.style.transform = `translateX(${fmt(-10 * b + 6 * inv(t0, t1, t), 3)}px)`;
+    scrim.style.opacity = fmt(E.outCubic(inv(0, 0.3, lt)), 3);
+    // accent line: draws left->right with a light spark on its leading edge
+    const lp = E.outExpo(inv(0, 0.55, lt));
+    const Lw = LINE_W * lp;
+    line.style.width = fmt(Lw, 2) + 'px';
+    line.style.background = `linear-gradient(90deg, ${cs([236, 243, 255], 1)} 0%, ${cs(C.accent, 0.9)} 45%, ${cs(C.accent, 0)} 100%)`;
+    line.style.boxShadow = `0 0 8px ${cs(C.accent, 0.6)}`;
+    line.style.opacity = fmt(inv(0, 0.05, lt), 3);
+    lineShade.style.width = fmt(Lw * 0.8, 2) + 'px';
+    lineShade.style.background = 'linear-gradient(90deg, rgba(0,3,12,0.35), rgba(0,3,12,0))';
+    lineShade.style.opacity = line.style.opacity;
+    const sparkA = inv(0, 0.04, lt) * (1 - E.outCubic(inv(0.3, 0.8, lt)));
+    spark.style.left = fmt(Math.min(Lw, LINE_W * 0.62) - 4.5, 2) + 'px';
+    spark.style.opacity = fmt(sparkA, 3);
+    spark.style.background = 'radial-gradient(circle, rgba(255,255,255,1) 0%, rgba(210,228,255,0.85) 30%, rgba(168,198,255,0) 100%)';
+    spark.style.boxShadow = `0 0 16px 5px ${cs(C.accent, 0.55 * sparkA)}`;
+    // name rises out of the line, tracking settling in
+    const np = E.outExpo(inv(0.06, 0.56, lt));
+    vt.track(lerp(0.30, 0.22, E.outQuart(inv(0.06, 0.9, lt))));
+    vt.place(44, BASE + lerp(70, 0, np));
+    // coordinates drop out of the line, then decode left->right
+    const sp = E.outExpo(inv(0.16, 0.62, lt));
+    sub.style.transform = `translateY(${fmt(lerp(-38, 0, sp), 3)}px)`;
+    const f = Math.round(t * FPS);
+    let out = '';
+    for (let i = 0; i < subText.length; i++) {
+      const ch = subText[i];
+      const settle = 0.22 + 0.028 * i;
+      if (/[0-9]/.test(ch) && lt < settle) out += String(Math.floor(hash01(f, i, idx + 7) * 10));
+      else out += ch;
+    }
+    sub.textContent = out;
+  };
+}
+
+/* =============================================================== END CARD */
+// opaque full frame: brand starfield + planet limb, SKYLOOM ignites on the
+// 94.5 sub boom, tagline 96.6, CTA + credits 99.2, fade to black 103-104.
+function buildEnd(cues, root) {
+  const logo = cues.find((c) => c.style === 'logo');
+  const tag = cues.find((c) => c.style === 'tagline');
+  const cta = cues.find((c) => c.style === 'cta');
+  const T0 = logo.t0, T1 = logo.t1;
+  const bg = mkEl('canvas', 'abs', root, { left: '0px', top: '0px', width: W + 'px', height: H + 'px' });
+  bg.width = W; bg.height = H;
+  const ctx = bg.getContext('2d');
+
+  // --- starfield (deterministic) ------------------------------------------
+  const r = rng(0x5eed);
+  const stars = [];
+  for (let i = 0; i < 520; i++) {
+    const depth = r();
+    stars.push({
+      x: r() * W, y: r() * H,
+      size: 0.45 + Math.pow(r(), 2.2) * 1.5 + depth * 0.3,
+      base: 0.18 + Math.pow(r(), 1.8) * 0.7,
+      freq: 0.25 + r() * 0.9, ph: r() * Math.PI * 2,
+      dim: r() < 0.5, depth,
+    });
+  }
+  // a few hero stars with a soft cross glint, kept off the type
+  const heroes = [];
+  while (heroes.length < 7) {
+    const h = { x: 120 + r() * (W - 240), y: 60 + r() * 700, s: 1.3 + r() * 1.0, ph: r() * 6.28, f: 0.2 + r() * 0.35 };
+    if (h.x > 330 && h.x < 1590 && h.y > 300 && h.y < 830) continue;
+    heroes.push(h);
+  }
+  // film grain / dither tile (static) - kills banding in the navy gradient
+  const grain = document.createElement('canvas'); grain.width = 256; grain.height = 256;
+  { const g = grain.getContext('2d'); const id = g.createImageData(256, 256); const gr = rng(0xbeef);
+    for (let i = 0; i < id.data.length; i += 4) { const v = gr() < 0.5 ? 0 : 255; id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = Math.floor(gr() * 9); }
+    g.putImageData(id, 0, 0); }
+  const grainPat = ctx.createPattern(grain, 'repeat');
+  // the sub boom's shockwave: one soft anamorphic ring racing out of the wordmark
+  const rings = [{ delay: 0.0, a: 0.5, v: 1400 }];
+
+  // --- wordmark (vector) ---------------------------------------------------
+  const WM = 136, WY = 474;
+  const L = vLine(root, { key: 'archivo', text: 'SKYLOOM', size: WM, halo: 0, sweep: true });
+  // anamorphic flare through the wordmark's centre
+  const flare = mkEl('div', 'abs', root, { left: '0px', width: W + 'px', height: '2px', top: (WY - 1) + 'px' });
+  const flareCore = mkEl('div', 'abs', root, { width: '560px', height: '90px', top: (WY - 45) + 'px', borderRadius: '50%' });
+
+  // --- tagline + divider ---------------------------------------------------
+  const divider = mkEl('div', 'abs', root, { top: '566px', height: '1px', left: '960px' });
+  const tg = mkEl('div', 'wrap', root, { top: '606px' });
+  const tgTxt = mkEl('span', 'txt', tg, { fontFamily: "'JetBrains Mono'", fontWeight: 400, fontSize: '22px', color: rgb([138, 155, 190]), textShadow: `0 0 18px ${rgba(120, 160, 255, 0.25)}` });
+  tgTxt.textContent = tag.text;
+
+  // --- CTA pill ------------------------------------------------------------
+  const ct = mkEl('div', 'wrap', root, { top: '748px' });
+  const pill = mkEl('div', null, ct, { position: 'relative', padding: '17px 38px 17px 38px', borderRadius: '999px' });
+  const pillSvg = sEl('svg', { class: 'abs', style: 'left:0;top:0;overflow:visible' });
+  const pillRect = sEl('rect', null, pillSvg);
+  pill.appendChild(pillSvg);
+  const ctTxt = mkEl('span', 'txt', pill, { fontFamily: 'Inter', fontWeight: 600, fontSize: '17px', color: cs(C.ice), position: 'relative', textShadow: `0 0 14px ${rgba(150, 190, 255, 0.35)}` });
+  ctTxt.textContent = cta.text;
+  setTrack(ctTxt, 0.34);
+
+  // --- credits -------------------------------------------------------------
+  const cr = mkEl('div', 'abs', root, { left: '0px', width: W + 'px', top: '988px', textAlign: 'center', fontFamily: 'Inter', fontWeight: 400, fontSize: '13px', lineHeight: '21px', letterSpacing: '0.025em', color: cs(C.ice) });
+  cr.innerHTML = 'Footage captured in-engine. Imagery: contains modified Copernicus Sentinel-2 data (ESA).<br>Map data: Overture Maps Foundation, © OpenStreetMap contributors. Elevation: Mapzen Terrain Tiles. Land cover: ESA WorldCover 2021.';
+
+  const black = mkEl('div', 'abs', root, { left: '0px', top: '0px', width: W + 'px', height: H + 'px', background: '#000' });
+
+  function drawBg(t) {
+    const tau = t - T0;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#02030a'; ctx.fillRect(0, 0, W, H);
+    // the boot screen's radial: ellipse at 50% 62%, #0a0f22 -> #04060f 62% -> #02030a
+    ctx.save();
+    ctx.translate(W * 0.5, H * 0.62); ctx.scale(1, H / W * 1.35);
+    const R = W * 0.78;
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
+    g.addColorStop(0, '#0b1126'); g.addColorStop(0.32, '#070b19'); g.addColorStop(0.62, '#04060f'); g.addColorStop(1, '#02030a');
+    ctx.fillStyle = g; ctx.fillRect(-R, -R * 2, R * 2, R * 4);
+    ctx.restore();
+    // brightness of the whole field: rises out of the boom
+    const up = E.outCubic(inv(0, 1.6, tau));
+    // planet limb: a vast dark sphere whose rim catches a cool dawn light
+    {
+      const cx = W * 0.5, cy = H + 2600, Rp = 2780; // top of the limb at y = H - 180
+      const rise = lerp(40, 0, E.outCubic(inv(0, 6, tau)));
+      ctx.save();
+      ctx.translate(0, rise + lerp(0, -8, inv(0, 9.5, tau)));
+      // atmosphere glow outside the rim
+      const ga = ctx.createRadialGradient(cx, cy, Rp - 6, cx, cy, Rp + 150);
+      ga.addColorStop(0, rgba(120, 165, 255, 0.34 * up));
+      ga.addColorStop(0.06, rgba(95, 140, 240, 0.20 * up));
+      ga.addColorStop(0.3, rgba(60, 95, 200, 0.07 * up));
+      ga.addColorStop(1, 'rgba(40,70,170,0)');
+      ctx.fillStyle = ga; ctx.beginPath(); ctx.arc(cx, cy, Rp + 150, 0, Math.PI * 2); ctx.fill();
+      // planet body
+      const gb = ctx.createRadialGradient(cx, cy - Rp * 0.35, Rp * 0.4, cx, cy, Rp);
+      gb.addColorStop(0, '#010207'); gb.addColorStop(0.97, '#03060f'); gb.addColorStop(1, '#0a1430');
+      ctx.fillStyle = gb; ctx.beginPath(); ctx.arc(cx, cy, Rp, 0, Math.PI * 2); ctx.fill();
+      // thin bright rim line, hottest at the centre of the frame
+      ctx.lineWidth = 1.6;
+      const gl = ctx.createLinearGradient(cx - 1100, 0, cx + 1100, 0);
+      gl.addColorStop(0, 'rgba(160,195,255,0)');
+      gl.addColorStop(0.35, rgba(170, 205, 255, 0.35 * up));
+      gl.addColorStop(0.5, rgba(215, 232, 255, 0.75 * up));
+      gl.addColorStop(0.65, rgba(170, 205, 255, 0.35 * up));
+      gl.addColorStop(1, 'rgba(160,195,255,0)');
+      ctx.strokeStyle = gl; ctx.beginPath(); ctx.arc(cx, cy, Rp - 0.8, Math.PI * 1.25, Math.PI * 1.75); ctx.stroke();
+      ctx.restore();
+    }
+    // stars: twinkle + slow forward drift (radial, depth-weighted)
+    const cx = W / 2, cy = H * 0.46;
+    for (let i = 0; i < stars.length; i++) {
+      const s = stars[i];
+      const k = 1 + (0.006 + 0.02 * s.depth) * (tau + 2);
+      const x = cx + (s.x - cx) * k, y = cy + (s.y - cy) * k;
+      if (y > H - 170 - 6 * s.depth) continue; // behind the planet
+      const tw = 0.55 + 0.45 * Math.sin(s.ph + t * s.freq * Math.PI * 2);
+      const a = s.base * tw * up;
+      if (a < 0.01) continue;
+      ctx.globalAlpha = clamp(a);
+      ctx.fillStyle = s.dim ? '#8fa0bf' : '#eef5ff';
+      ctx.beginPath(); ctx.arc(x, y, s.size * 0.5 + 0.25, 0, Math.PI * 2); ctx.fill();
+    }
+    for (const h of heroes) {
+      const k = 1 + 0.02 * (tau + 2);
+      const x = cx + (h.x - cx) * k, y = cy + (h.y - cy) * k;
+      const tw = 0.6 + 0.4 * Math.sin(h.ph + t * h.f * Math.PI * 2);
+      const a = tw * up;
+      ctx.globalAlpha = clamp(a * 0.9);
+      const hg = ctx.createRadialGradient(x, y, 0, x, y, h.s * 6);
+      hg.addColorStop(0, 'rgba(240,246,255,1)'); hg.addColorStop(0.18, 'rgba(200,220,255,0.5)'); hg.addColorStop(1, 'rgba(160,190,255,0)');
+      ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(x, y, h.s * 6, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = clamp(a * 0.35);
+      ctx.fillStyle = 'rgba(220,235,255,1)';
+      ctx.fillRect(x - h.s * 9, y - 0.5, h.s * 18, 1); ctx.fillRect(x - 0.5, y - h.s * 9, 1, h.s * 18);
+    }
+    ctx.globalAlpha = 1;
+    // shockwave rings on the boom (additive, soft)
+    for (const rg of rings) {
+      const lt = tau - rg.delay;
+      if (lt <= 0 || lt > 1.2) continue;
+      const rad = 90 + rg.v * (1 - Math.exp(-lt * 2.6));
+      const fade = rg.a * Math.exp(-lt / 0.26) * inv(0, 0.03, lt) * (1 - inv(0.8, 1.2, lt));
+      if (fade < 0.004) continue;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.translate(cx, 474); ctx.scale(1, 0.24);
+      ctx.filter = `blur(${fmt(10 + 30 * lt, 1)}px)`;
+      for (const [lw, k, col] of [[60, 0.35, '80,130,255'], [18, 0.6, '150,190,255']]) {
+        ctx.lineWidth = lw * (1 + lt * 2);
+        ctx.strokeStyle = `rgba(${col},${fmt(fade * k, 4)})`;
+        ctx.beginPath(); ctx.arc(0, 0, rad, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    // centre bloom behind the wordmark (the boom)
+    {
+      const bl = Math.exp(-Math.max(0, tau - 0.04) / 0.55) * inv(0, 0.04, tau) + 0.10 * up;
+      const gx = ctx.createRadialGradient(cx, 474, 0, cx, 474, 700);
+      gx.addColorStop(0, rgba(110, 150, 255, 0.28 * bl)); gx.addColorStop(0.35, rgba(80, 120, 230, 0.10 * bl)); gx.addColorStop(1, 'rgba(60,90,200,0)');
+      ctx.save(); ctx.translate(cx, 474); ctx.scale(1, 0.55); ctx.translate(-cx, -474);
+      ctx.fillStyle = gx; ctx.fillRect(cx - 700, 474 - 700, 1400, 1400); ctx.restore();
+    }
+    // vignette
+    {
+      const vg = ctx.createRadialGradient(cx, H * 0.5, H * 0.35, cx, H * 0.5, W * 0.62);
+      vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.55)');
+      ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+    }
+    // grain / dither (static offset so it never crawls)
+    ctx.fillStyle = grainPat; ctx.fillRect(0, 0, W, H);
+  }
+
+  return (t) => {
+    const tau = t - T0;
+    drawBg(t);
+    // ---- wordmark ignition ----
+    const a = E.outCubic(inv(0, 0.12, tau));
+    const settle = E.outQuart(inv(0, 2.6, tau));
+    const push = lerp(1.0, 1.035, inv(0, T1 - T0, tau));
+    L.layout(lerp(0.44, 0.28, settle), 960, WY, push);
+    L.opacity(a);
+    L.blur(lerp(7, 0, E.outCubic(inv(0, 0.7, tau))));
+    // SKY stays ice; LOOM ignites white-hot and cools to steel blue
+    const cool = E.inOutSine(inv(0.15, 1.8, tau));
+    const loomC = [lerp(255, C.steel[0], cool), lerp(255, C.steel[1], cool), lerp(255, C.steel[2], cool)];
+    L.uses.forEach((u, i) => u.setAttribute('fill', rgb(i < 3 ? C.ice : loomC)));
+    const boom = Math.exp(-Math.max(0, tau - 0.03) / 0.5) * inv(0, 0.03, tau);
+    L.sh.set([
+      [0, 0, 3 + 9 * boom, [235, 243, 255], 0.06 + 0.85 * boom],
+      [0, 0, 24 + 26 * boom, [120, 170, 255], 0.34 + 0.55 * boom],
+      [0, 0, 70 + 110 * boom, [100, 150, 255], 0.14 + 0.5 * boom],
+    ]);
+    // light sweeps: the ignition pass, then a soft glint on the 99.0 piano note
+    const pass = (s0, s1, peak) => {
+      const sp = inv(s0, s1, tau);
+      if (sp <= 0 || sp >= 1) return null;
+      return { c: lerp(-0.15, 1.15, E.inOutSine(sp)), pk: peak * Math.sin(Math.PI * sp) };
+    };
+    const P = pass(0.05, 1.35, 1.0) || pass(99.0 - T0 - 0.55, 99.0 - T0 + 0.55, 0.55);
+    if (P) L.sweepAt(P.c, P.pk, 170, [[0, 0, 32, [190, 215, 255], 0.95 * P.pk]]);
+    else L.sweepAt(0, 0);
+    // anamorphic flare, its hot spot riding the first sweep
+    {
+      const wpx = L.vt.w * push;
+      const fl = Math.exp(-Math.max(0, tau - 0.03) / 0.7) * inv(0, 0.03, tau);
+      const sweepX = 960 - wpx / 2 + (P && tau < 1.5 ? P.c * wpx : wpx * 0.5);
+      const fx = lerp(960, sweepX, E.outCubic(inv(0, 0.3, tau)));
+      const fp = (fx / W) * 100;
+      flare.style.opacity = fmt(fl, 4);
+      flare.style.background = `linear-gradient(90deg, rgba(120,170,255,0) 0%, rgba(120,170,255,0.25) ${fmt(fp - 30, 3)}%, rgba(225,238,255,0.95) ${fmt(fp, 3)}%, rgba(120,170,255,0.25) ${fmt(fp + 30, 3)}%, rgba(120,170,255,0) 100%)`;
+      flare.style.boxShadow = `0 0 12px 1px ${rgba(120, 170, 255, 0.6 * fl)}`;
+      flareCore.style.left = fmt(fx - 280, 2) + 'px';
+      flareCore.style.opacity = fmt(fl * 0.9, 4);
+      flareCore.style.background = 'radial-gradient(closest-side ellipse, rgba(200,222,255,0.55) 0%, rgba(140,180,255,0.18) 45%, rgba(120,160,255,0) 100%)';
+    }
+    // ---- divider + tagline (96.6) ----
+    const tt = t - tag.t0;
+    const dW = 420 * E.outExpo(inv(-0.1, 1.2, tt));
+    divider.style.width = fmt(dW, 2) + 'px';
+    divider.style.transform = `translateX(${fmt(-dW / 2, 2)}px)`;
+    divider.style.background = 'linear-gradient(90deg, rgba(159,179,217,0) 0%, rgba(159,179,217,0.55) 50%, rgba(159,179,217,0) 100%)';
+    divider.style.opacity = fmt(inv(-0.1, 0.2, tt), 3);
+    const te = E.outCubic(inv(0, 1.1, tt));
+    setTrack(tgTxt, lerp(0.74, 0.62, E.outCubic(inv(0, 3.0, tt))));
+    tg.style.opacity = fmt(E.inOutSine(inv(0, 1.1, tt)), 4);
+    const tb = lerp(6, 0, te);
+    tg.style.filter = tb > 0.05 ? `blur(${fmt(tb, 2)}px)` : 'none';
+    tg.style.transform = `translate(-50%,-50%) translateY(${fmt(lerp(6, 0, te), 3)}px)`;
+    // ---- CTA (99.2) ----
+    const ct0 = t - cta.t0;
+    const ca = E.outCubic(inv(0, 0.7, ct0));
+    ct.style.opacity = fmt(ca, 4);
+    const cb = lerp(5, 0, ca);
+    ct.style.filter = cb > 0.05 ? `blur(${fmt(cb, 2)}px)` : 'none';
+    ct.style.transform = `translate(-50%,-50%) translateY(${fmt(lerp(10, 0, ca), 3)}px)`;
+    const pw = pill.offsetWidth, ph = pill.offsetHeight;
+    pillSvg.setAttribute('width', pw); pillSvg.setAttribute('height', ph);
+    pillSvg.setAttribute('viewBox', `0 0 ${pw} ${ph}`);
+    pillRect.setAttribute('x', 0.5); pillRect.setAttribute('y', 0.5);
+    pillRect.setAttribute('width', pw - 1); pillRect.setAttribute('height', ph - 1);
+    pillRect.setAttribute('rx', (ph - 1) / 2);
+    pillRect.setAttribute('fill', rgba(159, 179, 217, 0.07 * ca));
+    pillRect.setAttribute('stroke', rgba(214, 226, 250, 0.55));
+    pillRect.setAttribute('stroke-width', '1');
+    // outline draws out of the top centre in both directions and closes at the bottom
+    const perim = 2 * (pw - ph) + Math.PI * (ph - 1);
+    const Lp = perim * E.inOutCubic(inv(0.0, 1.0, ct0));
+    const topC = (pw - 1) / 2 - (ph - 1) / 2; // rect path starts at (x + rx, y), heading right
+    pillRect.setAttribute('stroke-dasharray', `${fmt(Lp, 2)} ${fmt(perim - Lp + 0.01, 2)}`);
+    pillRect.setAttribute('stroke-dashoffset', fmt(-(topC - Lp / 2), 2));
+    // ---- credits (99.2) ----
+    cr.style.opacity = fmt(0.45 * E.inOutSine(inv(0, 1.0, ct0)), 4);
+    // ---- final fade to black ----
+    black.style.opacity = fmt(E.inOutSine(inv(103.0, 104.0 - FRAME, t)), 4);
+  };
+}
+
+/* ================================================================ runtime */
+let GROUPS = [];
+let current = null; // { g, update }
+const stage = document.getElementById('stage');
+const END_STYLES = new Set(['logo', 'tagline', 'cta']);
+function slugify(s) { return s.toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32); }
+
+window.shapingRequest = function (titles) {
+  const strings = [];
+  for (const c of titles) {
+    if (c.style === 'logo') strings.push(['archivo', 'SKYLOOM']);
+    else if (STYLE_FONT[c.style]) strings.push([STYLE_FONT[c.style], displayText(c)]);
+  }
+  return { fonts: VFONTS, strings };
+};
+
+window.setup = function (titles, glyphs) {
+  GLY = glyphs;
+  installGlyphDefs();
+  const cards = titles.map((c, i) => ({ ...c, _i: i }));
+  // consecutive statements that read as ONE sentence (gap < 0.5 s) share a size
+  const st = cards.filter((c) => c.style === 'statement');
+  for (const c of st) c._size = statementSize(c.text);
+  for (let i = 1; i < st.length; i++) {
+    if (st[i].t0 - st[i - 1].t1 < 0.5) {
+      const s = Math.min(st[i]._size, st[i - 1]._size);
+      st[i]._size = s; st[i - 1]._size = s;
+    }
+  }
+  GROUPS = [];
+  for (const c of cards) {
+    if (END_STYLES.has(c.style)) continue;
+    GROUPS.push({ kind: c.style, cues: [c], t0: c.t0, t1: c.t1, alpha: true, text: c.text });
+  }
+  const end = cards.filter((c) => END_STYLES.has(c.style));
+  if (end.length) {
+    GROUPS.push({ kind: 'end', cues: end, t0: Math.min(...end.map((c) => c.t0)), t1: Math.max(...end.map((c) => c.t1)), alpha: false, text: 'SKYLOOM end card' });
+  }
+  GROUPS.forEach((g, i) => { g.index = i; g.slug = String(i + 1).padStart(2, '0') + '_' + (g.kind === 'end' ? 'endcard' : slugify(g.text)); });
+  return GROUPS.map((g) => ({ index: g.index, slug: g.slug, kind: g.kind, t0: g.t0, t1: g.t1, alpha: g.alpha, text: g.text, size: g.cues[0]._size || null, spec: SPEC[g.kind] }));
+};
+
+window.showGroup = function (i) {
+  stage.innerHTML = '';
+  const g = GROUPS[i];
+  const root = mkEl('div', 'card', stage);
+  let update;
+  if (g.kind === 'whisper') update = buildWhisper(g.cues[0], root);
+  else if (g.kind === 'statement') update = buildStatement(g.cues[0], root);
+  else if (g.kind === 'emotional') update = buildEmotional(g.cues[0], root);
+  else if (g.kind === 'location') update = buildLocation(g.cues[0], root, g.cues[0]._i);
+  else if (g.kind === 'end') update = buildEnd(g.cues, root);
+  current = { g, update };
+  return g.slug;
+};
+
+window.render = function (t) {
+  if (!current) return;
+  current.update(t);
+  void stage.offsetHeight; // flush style + layout so the screenshot sees exactly this state
+};
+
+window.fontsReady = async function () {
+  await document.fonts.ready;
+  const need = ["84px 'Archivo Black'", '400 13px Inter', '600 17px Inter', "20px 'JetBrains Mono'"];
+  await Promise.all(need.map((f) => document.fonts.load(f, 'SKYLOOM ’°0©')));
+  return need.map((f) => document.fonts.check(f, 'SKYLOOM'));
+};
+</script>
+</body>
+</html>
