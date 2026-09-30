@@ -150,7 +150,10 @@ export function FlyCanvas({ runtime }) {
   return (
     <Canvas
       dpr={dpr}
-      shadows
+      // R185 normalizes deprecated PCFSoft only inside a shadow render. An
+      // earlier reflection/compile sees it as Basic and binds the wrong
+      // sampler to existing PCF depth maps. Configure the final mode directly.
+      shadows="percentage"
       // The hangar has its own interactive canvas. Retain the world and its
       // resources, but do not render two full scenes continuously behind it.
       frameloop={phoneFlight?'demand':frameloop}

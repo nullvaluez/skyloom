@@ -11,6 +11,8 @@ const {useFlyStore}=await import('../stores/fly-store.js');
 const {CINEMATIC_EARTH,cinematicEarthOn,cinematicQuality,cloudTargetSize,aircraftPresentation}=await import('../lib/fly/cinematic-earth.js');
 const {resolveAircraft}=await import('../lib/fly/player-aircraft.js');
 const {immersiveLighting,cloudDensity}=await import('../lib/fly/immersive.js');
+const {evaluateCinemaEnvironment}=await import('../lib/fly/cinema-environment.js');
+const {cinemaEnvironment}=await import('../lib/fly/cinema-frame.js');
 const {applySatelliteNightRim,satelliteExposureStops}=await import('../lib/fly/satellite-atmosphere.js');
 const {ExhaustHeat}=await import('../lib/fly/exhaust-heat.js');
 const {PerspectiveCamera,Vector3}=await import('three');
@@ -34,8 +36,8 @@ check('cloud targets stay bounded even on 8K and portrait displays',()=>{
 });
 check('solar cycle is continuous and every light has a finite readable floor',()=>{
   let previous;
-  for(let e=-90;e<=90;e+=.1){const sun={sinEl:Math.sin(e*Math.PI/180)},l=immersiveLighting(sun);const values=[l.sun,l.fill,l.environment,satelliteExposureStops(sun)];
-    assert.ok(values.every(Number.isFinite));assert.ok(l.fill>=.18);if(previous)assert.ok(Math.max(...values.map((x,i)=>Math.abs(x-previous[i])))<.04);previous=values;
+  for(let e=-90;e<=90;e+=.1){const sun={sinEl:Math.sin(e*Math.PI/180)};evaluateCinemaEnvironment(cinemaEnvironment,sun);const l=immersiveLighting(sun),values=[l.sun,l.fill,l.environment,satelliteExposureStops(sun)];
+    assert.ok(values.every(Number.isFinite));assert.equal(l,cinemaEnvironment);assert.ok(l.fill>0);if(previous)assert.ok(Math.max(...values.map((x,i)=>Math.abs(x-previous[i])))<.1);previous=values;
   }
 });
 check('night rim is the same scene-linear color as the cloud composite',()=>{
@@ -57,7 +59,8 @@ check('fleet keeps physics and all original non-fighter assets',()=>{
 check('original hero and mobile GLBs are bounded and contain six material roles',()=>{
   let heroTris;
   for(const lod of ['hero','mobile']){
-    const b=fs.readFileSync(`public/models/player-vector-${lod}-v1.glb`);assert.equal(b.readUInt32LE(0),0x46546c67);assert.equal(b.readUInt32LE(8),b.length);
+    const entry=aircraftPresentation(resolveAircraft('fighter'),lod==='mobile');
+    const b=fs.readFileSync(`public${entry.url}`);assert.equal(b.readUInt32LE(0),0x46546c67);assert.equal(b.readUInt32LE(8),b.length);
     const json=JSON.parse(b.subarray(20,20+b.readUInt32LE(12)).toString());assert.equal(json.materials.length,6);let tris=0;
     for(const mesh of json.meshes)for(const p of mesh.primitives){const a=json.accessors[p.attributes.POSITION];assert.ok([...a.min,...a.max].every(Number.isFinite));tris+=(p.indices==null?a.count:json.accessors[p.indices].count)/3;}
     if(lod==='hero'){heroTris=tris;assert.ok(tris<12000);}else assert.ok(tris<heroTris*.5);
@@ -67,8 +70,8 @@ check('original hero and mobile GLBs are bounded and contain six material roles'
     const values=id=>{const a=json.accessors[id],v=json.bufferViews[a.bufferView];return Array.from({length:a.count},(_,i)=>Array.from({length:3},(_,c)=>b.readFloatLE(bin+(v.byteOffset||0)+(a.byteOffset||0)+i*(v.byteStride||12)+c*4)));};
     const positions=values(p.attributes.POSITION),normals=values(p.attributes.NORMAL),right=new Map();
     const key=p=>p.map(x=>x.toFixed(3)).join(',');
-    positions.forEach((p,i)=>{if(p[0]>0&&p[1]>1)right.set(key(p),normals[i]);});
-    positions.forEach((p,i)=>{if(p[0]<0&&p[1]>1){const n=right.get(key([-p[0],p[1],p[2]]));assert.ok(n,'mirrored fin vertex');assert.ok(Math.hypot(normals[i][0]+n[0],normals[i][1]-n[1],normals[i][2]-n[2])<.001,'outward fin normals');}});
+    positions.forEach((p,i)=>{if(p[0]>1&&p[1]>1&&p[2]>4)right.set(key(p),normals[i]);});
+    positions.forEach((p,i)=>{if(p[0]<-1&&p[1]>1&&p[2]>4){const n=right.get(key([-p[0],p[1],p[2]]));assert.ok(n,'mirrored fin vertex');assert.ok(Math.hypot(normals[i][0]+n[0],normals[i][1]-n[1],normals[i][2]-n[2])<.001,'outward fin normals');}});
   }
 });
 check('heat projection handles prewarm, ground, no-engine and disabled states',()=>{

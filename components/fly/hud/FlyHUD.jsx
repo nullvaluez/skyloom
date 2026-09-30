@@ -70,7 +70,7 @@ export function FlyHUD({ runtime }) {
       }
       if (poiRef.current) {
         const poi = runtime.nearestPoi; // written by PoiLetters at 0.5Hz
-        poiRef.current.textContent = poi ? `◆ ${poi}` : '';
+        poiRef.current.textContent = poi ? `${newEarth?'':'◆ '}${poi}` : '';
         poiRef.current.style.opacity = poi ? '1' : '0';
       }
       if (spotsRef.current) {
@@ -101,7 +101,7 @@ export function FlyHUD({ runtime }) {
       }
     }, 100);
     return () => clearInterval(id);
-  }, [runtime, isTouch]);
+  }, [runtime, isTouch, newEarth]);
 
   // max-sm: overrides keep desktop pixel-identical while the phone gets a
   // tighter, notch-safe strip (AGL + Spots fold away below 640px).

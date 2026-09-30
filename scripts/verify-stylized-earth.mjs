@@ -1,20 +1,13 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
+import { registerHooks } from 'node:module';
 
-const root=path.resolve('lib/fly'),modules=new Map();
-function sourceURL(file){
-  const absolute=path.resolve(file);
-  if(modules.has(absolute))return modules.get(absolute);
-  let source=fs.readFileSync(absolute,'utf8');
-  source=source.replace(/from ['"]([^'"]+)['"]/g,(all,spec)=>{
-    if(spec==='three')return `from '${pathToFileURL(path.resolve('node_modules/three/build/three.module.js')).href}'`;
-    if(spec.startsWith('.'))return `from '${sourceURL(path.resolve(path.dirname(absolute),spec.endsWith('.js')?spec:spec+'.js'))}'`;
-    return all;
-  });
-  const url='data:text/javascript;base64,'+Buffer.from(source).toString('base64');modules.set(absolute,url);return url;
-}
+// Resolve the actual graph, including the store/package dependencies. Data
+// URLs cannot resolve a package relative to the importing source module.
+registerHooks({resolve(s,c,next){if(s.startsWith('@/'))s=new URL('../'+s.slice(2),import.meta.url).href;if(s.startsWith('.')||s.startsWith('file:')){const u=new URL(s,c.parentURL);if(fs.existsSync(fileURLToPath(u)+'.js'))return next(u.href+'.js',c);}return next(s,c);}});
+const root=path.resolve('lib/fly'),sourceURL=file=>pathToFileURL(path.resolve(file)).href;
 const config=await import(sourceURL(path.join(root,'stylized-earth.js')));
 const workerProtocol=Number(fs.readFileSync(path.join(root,'toy-world/vector-tile.worker.js'),'utf8').match(/const WORKER_PROTOCOL = (\d+)/)[1]);
 const {paintSurfacePolygon,buildEarthSurfaceMask}=await import(sourceURL(path.join(root,'earth-surface-mask.js')));

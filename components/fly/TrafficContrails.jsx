@@ -54,7 +54,7 @@ export function TrafficContrails({ runtime, origin }) {
       state.recs.delete(hex);
     }
     const wind = runtime.weather?.wx, wx = (wind?.windX ?? 0) * .35, wz = (wind?.windZ ?? 0) * .35;
-    state.batch.begin(camera);
+    state.batch.begin(camera,!!runtime.cinemaEnvironment&&store.mapStyle==='satellite');
     for (const t of chosen) {
       const offsets = sources(t), fix = t.fix1, speed = Math.hypot(fix.vE, fix.vN);
       const density = contrailStrength(t.ry, speed, t.flags & 1);

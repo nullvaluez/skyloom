@@ -7,6 +7,7 @@ import {
   CanvasTexture,
   Color,
   DynamicDrawUsage,
+  InstancedBufferAttribute,
   InstancedMesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
@@ -22,6 +23,7 @@ import { applyBendAirAnchor, applyNavLights, applyOverlayCloudGate, horizonFade,
 import { useFlyStore } from '@/stores/fly-store';
 import { DetailedTraffic } from '@/lib/fly/detailed-traffic';
 import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
+import { cinemaOn } from '@/lib/fly/cinema-policy';
 
 const _dummy = new Object3D();
 const _color = new Color();
@@ -153,6 +155,17 @@ export function TrafficLayer({ runtime, flight, origin }) {
     if (SKY_OVERLAYS.cloudGate.enabled && SKY_OVERLAYS.cloudGate.billboards)
       applyOverlayCloudGate(material, { floor: SKY_OVERLAYS.cloudGate.markFloor });
     const mesh = new InstancedMesh(new PlaneGeometry(1, 1), material, TRAFFIC.maxBillboards);
+    const presence=new InstancedBufferAttribute(new Float32Array(TRAFFIC.maxBillboards).fill(1),1).setUsage(DynamicDrawUsage);
+    mesh.geometry.setAttribute('aTrafficPresence',presence);
+    const before=material.onBeforeCompile,key=material.customProgramCacheKey();
+    material.onBeforeCompile=(shader,renderer)=>{
+      before?.(shader,renderer);
+      shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nattribute float aTrafficPresence; varying float vTrafficPresence;')
+        .replace('#include <begin_vertex>','#include <begin_vertex>\nvTrafficPresence=aTrafficPresence;');
+      shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying float vTrafficPresence;')
+        .replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.a*=vTrafficPresence;');
+    };
+    material.customProgramCacheKey=()=>`${key}|quiet-traffic-v1`;
     mesh.instanceMatrix.setUsage(DynamicDrawUsage);
     // instanceColor exists from birth: SkyOverlayPass compiles each overlay
     // once, at first sight — before any traffic arrives — and a colour buffer
@@ -242,6 +255,8 @@ export function TrafficLayer({ runtime, flight, origin }) {
     const ax = origin.anchor.x;
     const az = origin.anchor.z;
     const liveState=useFlyStore.getState();
+    const quietTraffic=cinemaOn(liveState)&&!liveState.spotting;
+    const focusedHex=liveState.inspectHex??runtime.targeting?.lockedHex??runtime.hoverHex;
     detailed.update(items,flight,origin,liveState.qualityTier,liveState.inspectHex??runtime.targeting?.lockedHex,mapStyleNow==='satellite',performance.now()/1000);
     runtime.liveFleet=detailed.stats;
     runtime.retryLiveFleet=()=>{if(detailed.stats.compileFailed){detailed.stats.compileFailed=false;detailed.compiling=false;}};
@@ -318,7 +333,8 @@ export function TrafficLayer({ runtime, flight, origin }) {
         mesh._used += 1;
       } else {
         if (billboardsUsed >= TRAFFIC.maxBillboards) continue;
-        _color.set(it.meta?.color || '#9ca3af'); // far dots stay class-colored
+        const quiet=quietTraffic&&it.hex!==focusedHex;
+        _color.set(quiet?'#d7e0e6':it.meta?.color || '#9ca3af');
         // Satellite: far dots recede into the haze with range (drawn after the
         // cloud composite they no longer vanish against the day sky, and a
         // sky full of equal dots reads as a starfield — user, live review).
@@ -333,11 +349,12 @@ export function TrafficLayer({ runtime, flight, origin }) {
           TRAFFIC.billboardSizeM *
           WORLD.trafficDisplayScale *
           Math.max(1, it.distM / TRAFFIC.modelLodDistanceM) *
-          it.scaleK;
+          it.scaleK * (quiet ? .62 : 1);
         _dummy.scale.set(s, s, s);
         _dummy.updateMatrix();
         billboards.setMatrixAt(billboardsUsed, _dummy.matrix);
         billboards.setColorAt(billboardsUsed, _color);
+        billboards.geometry.attributes.aTrafficPresence.setX(billboardsUsed,quiet ? .22 : 1);
         billboardsUsed += 1;
       }
     }
@@ -350,6 +367,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
     billboards.count = billboardsUsed;
     billboards.instanceMatrix.needsUpdate = true;
     if (billboards.instanceColor) billboards.instanceColor.needsUpdate = true;
+    billboards.geometry.attributes.aTrafficPresence.needsUpdate = true;
 
     if (process.env.NODE_ENV === 'development' && window.__flyStats) {
       window.__flyStats.horizonFaded = horizonFaded;

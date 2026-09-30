@@ -300,3 +300,150 @@ endurance. Browser emulation only verifies policy, layout and allocation.
 Do not promote Enhanced or delete the superseded treatment until artistic,
 functional and hardware outcomes have each been recorded. The shipping switch
 and reload-based current/new comparison provide rollback during this checkpoint.
+
+## Visual finish pass — September 30, 2026
+
+This pass follows the user's request to finish the eight visual-polish areas
+before adding game features. It builds on the merged HDR presentation.
+
+- The first-party Vector v2 airframe has conformal canopy frames, control-surface
+  joints, service panels, recognition markings and recessed engine throats.
+  Hero/mobile geometry remains six material draws: 8,444 / 3,148 triangles.
+  Versioned asset URLs avoid stale immutable downloads.
+- Cloud banks vary in width, height and wind shear. Separate body and erosion
+  frequencies produce larger forms and broken edges; unresolved erosion fades
+  with the march footprint. Interior extinction and fill separate shaded cores
+  from bright edges without increasing step counts or target dimensions.
+  Cloud-shadow contrast follows the existing air-transmission law, reducing
+  dark cloud silhouettes over the already-hazed distant terrain.
+- Surface-atlas neighbours are validated by geographic identity. Packed
+  appearance interpolation carries readiness per texel across tile boundaries;
+  classification no longer recolors whole rectangles of satellite albedo.
+  The far hydrology band changes from z9 to z11, retaining the 48-slot, 6-MiB
+  mask ceiling. Coastlines are still limited by source classification resolution.
+- Office spandrels, industrial ribs, masonry plinths and roof seams reinforce
+  existing building families. Every procedural frequency retires at its own
+  pixel footprint. Daylight haze and sunset warmth are restrained; night
+  structure recedes behind window and pavement sources.
+- Exhaust histories publish age to the shader. Older plumes widen, curl and
+  develop softer, interrupted edges. Fresh wing vapor stays narrow; Classic
+  retains its original ribbon geometry behavior. Storage remains bounded.
+- Quiet flight suppresses ordinary labels and navigation ribbons, and reduces
+  far traffic glints. Selected/hovered aircraft retain details; every aircraft
+  remains pickable and Spotting restores the full overlay immediately.
+  Fully invisible navigation ribbons skip their GPU draw while their histories
+  continue recording; selecting an aircraft restores its ribbon.
+- Chase-camera damping now stores its orientation before optical shake, so the
+  previous frame's shake cannot accumulate in the next frame's camera pose.
+
+Moving review also exposed repeated city submissions and an accounting defect.
+Building body/roof indices now precede facade trim; the optional metadata remains
+compatible with protocol 23 and missing metadata falls back to the full mesh.
+Auxiliary captures omit sub-metre trim. Spatial index ranges share vertex data
+and reject only out-of-frustum sections, coalescing adjacent visible ranges.
+Whole-building drape, mapped bodies, roof shapes and collision columns remain
+intact. Nearby color views retain trim; unresolved trim retires with hysteresis.
+Spatial ranges retain their own height bounds, padded by the largest measured
+terrain-contact displacement. Reusing the whole tile's maximum height for every
+range admitted invisible low-rise geometry beside skyscrapers. A complete
+legacy redrape refreshes the ranges' height references. Height refinement alone
+did not meet the moving triangle budget. The final bounds also use the live
+curvature uniform and each region's actual building-anchor envelope, with a
+one-metre precision margin; the historical coarse sphere remains as an outer
+guard. Forest tiles now keep conservative bounds through births and terrain
+repairs, testing the color and shadow cameras independently. No tree or building
+is removed from the world. Smaller 8/16-cell partitions were rejected after a
+same-scene diagnostic showed that their draw-call cost exceeded the profile.
+Reflections now use reserved layer 28; layer 29 remains exclusive to airborne
+overlays. Their previous collision admitted traffic markers and contrails into
+architectural captures. The reflection regression includes an excluded overlay.
+
+Repeated production boots exposed another startup race: R3F's boolean `shadows`
+selects deprecated PCFSoft, while three r185 normalizes it only inside the shadow
+render. An earlier auxiliary draw compiled `SHADOWMAP_TYPE_BASIC` but received
+PCF comparison textures (the sampler audit captured both bindings). FlyCanvas
+now selects `percentage` explicitly, matching the already-settled PCF mode.
+Failed production boots and their diagnostic captures remain in the evidence;
+the later four-boot `startup-fixed` run verifies the correction.
+
+The resource census now counts depth textures with their actual component width
+and does not also invent a single-sample depth renderbuffer for the same target.
+The independent GL allocation audit is retained; logical ownership and driver
+VRAM are still different measurements. No profile ceiling was raised.
+
+Regression coverage includes `verify-visual-finish.mjs` (12 checks),
+`verify-quiet-flight.cjs` (synthetic traffic, real rendering and picking),
+`verify-city-water.mjs`, `verify-living-earth.mjs`, `verify-cinema-overhaul.mjs`,
+`verify-stylized-earth.mjs`, `verify-cinematic-earth.mjs`,
+`verify-aircraft-effects.mjs`, `verify-tracer-spot.mjs`, graphics-unit and import
+integrity. `soak-visual-finish.cjs` adds actual control input across day/night
+city flights, mountains, cruise altitude and a city revisit, retaining every
+sample and checking the historical p95 submission ceilings and heap-floor gate.
+The final production build is `tDnQNeDY1QitLKdtiO95u`, with source SHA-256
+`484e6806a88a0c224e647a7cf48a92c7919907114b5627562d776bd6e3ae71d4`.
+The HTTP receipt is matched to the loaded Next document, and the browser reports
+ANGLE / NVIDIA RTX 5080 / Direct3D11. Evidence is under
+`.graphics-review/visual-finish/` (local generated captures, excluded from Git).
+
+- `final-hdr-verified/report.json`: 17/17 on the final build, zero page/shader/
+  invalid-GL errors and no incompatible sampler bindings. All four presets,
+  saved Classic to Enhanced, and real cruise vapor pass. The short cruise
+  records 6,698 frames with p95 6.8 ms / p99 12.0 ms and 764 populated wake
+  vertices, oldest visible age 32.28 seconds. Baseline ANGLE constant-folding
+  warnings and a Classic-path derivative warning remain recorded separately.
+- `final-hdr-certified/report.json`: earlier 17/17, zero page/shader/invalid-GL errors
+  and no incompatible sampler bindings. Low/Medium/High/Ultra, saved Classic
+  to Enhanced, and 40 seconds of ordinary cruise all pass. The player wake has
+  764 populated vertices and an oldest visible sample age of 32.44 seconds.
+  Frame p95 is 10.4 ms in this short run, not an endurance claim. This and
+  `final-city-certified` used build `HKaRkcSW_T-wjqM520ufr` / source
+  `6e54725d078b84c49b3d12562d0a660a10253d6d33dc9aff16e68b9b37c10235`,
+  before the final conservative bounds and invisible-ribbon draw suppression.
+- `startup-fixed/report.json`: four repeated production starts pass after the
+  shadow-mode correction, with the sampler observer enabled. This predates only
+  the subsequent cloud-shadow haze adjustment.
+- `final-lifecycle-verified/report.json`: day/night, all four presets, resize to
+  1280×720, and forced context loss/recovery pass on the final build. Clouds,
+  environment lighting and matching composer buffers recover. Zero rendering
+  errors; one informational ANGLE constant-folding warning. The script reports
+  `REVIEW_REQUIRED` for its artistic checkpoint; the day, night and restored
+  captures were inspected inline after its functional checks completed.
+- `final-city-certified/report.json`: daylight, golden hour, overcast and night
+  rendering pass, as do four quality settings, resize, and forced context loss /
+  recovery. Recovered clouds, environment map and composer buffers are verified.
+  The generic sample script's `REVIEW_REQUIRED` status means artistic review;
+  the day, golden-hour and night images were inspected inline in this session.
+- `final-phone-verified/report.json`: day/night phone policy and layout pass on
+  the final build in desktop emulation: 162/165 draws, 128.14/130.14 MiB logical
+  textures/targets, one cascade, 256 material arrays, matching buffers, HUD in
+  bounds, no desktop material downloads and zero rendering errors. Its captures
+  were inspected; physical-phone thermal/performance behavior is not measured.
+- `final-phone/report.json`: earlier day/night phone policy and layout pass on desktop
+  emulation: 30-fps policy, one cascade, 256 material arrays, matching buffers,
+  HUD in bounds, no desktop material downloads, and zero rendering errors.
+  This run predates the explicit PCF selector and cloud-shadow haze adjustment.
+- `quiet-final/report.json`: 8/8 with injected traffic on live geography: retained
+  tracks, reduced far marker, hidden ordinary overlays, immediate Spotting
+  restoration, hover, inspector selection and selected-ribbon restoration.
+  This is not a live-feed load test.
+- Targeted ESLint passes for the changed graphics modules and harnesses.
+  FlyCanvas retains three baseline `react-hooks/immutability` findings on its
+  existing imperative runtime bus; the same three were reproduced from HEAD.
+  With that one rule excluded for FlyCanvas, no additional lint findings occur.
+- `final-soak-certified/report.json`: interrupted after four settled triangle
+  overages; `night-bounds-check/report.json`: failed before the curvature and
+  forest culling correction. Neither is a completed endurance pass.
+- `final-soak-verified/report.json`: PASS, 90 ten-second samples over 907 seconds
+  of actual flight, across night/day city routes, mountains, 10.5-km cruise and
+  a city revisit. High / DPR 1 / 1920×1080 throughout, 204–694 traffic tracks,
+  20 moving origin rebases, zero rendering errors and no buffer mismatches.
+  Settled p95 submissions: **2,144,883 triangles ≤2,200,000**, **311 draws ≤375**;
+  peak textures/targets **282.26 MiB ≤300 MiB**. Two individual night samples
+  exceeded the triangle ceiling and remain in `budgetOverages`; the existing
+  gate is p95, not a per-frame maximum. The p95 of the ten-second frame-p95
+  windows is **12.6 ms**. Mixed-route heap floors did not climb; this does not
+  equate different locations' heaps or measure physical driver VRAM.
+
+Physical-phone thermal behavior and physical-display tearing cannot be certified
+by desktop Chrome emulation. The historical native-4K endurance gates above are
+not replaced by a 1080p run or a short diagnostic.

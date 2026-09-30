@@ -107,7 +107,7 @@ check('shader wrappers preserve predecessor uniforms and separate cache keys', (
   m.customProgramCacheKey = () => 'air-bend'; softenWakeMaterial(m, { bend: true });
   const s = { uniforms: {}, vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\n#include <color_fragment>\n#include <fog_fragment>' };
   m.onBeforeCompile(s); assert.equal(s.uniforms.previous.value, 1); assert.match(s.fragmentShader, /gl_FragColor.a/);
-  assert.equal(m.customProgramCacheKey(), 'air-bend|optical-wake-v2-hdr'); m.dispose();
+  assert.equal(m.customProgramCacheKey(), 'air-bend|optical-wake-v3-age'); m.dispose();
 });
 check('HDR vapor follows the frame light and restores Classic/Neon without geometry changes', () => {
   const b = new WakeBatch(2, 8), camera = new PerspectiveCamera();

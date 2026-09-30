@@ -18,9 +18,14 @@ async function run() {
   let stage = 'boot';
   const check = (name, value, detail) => { report.checks.push({ name, passed: !!value, detail }); assert.ok(value, name); console.log('PASS ' + name); };
   try {
-    for (const initial of args.classic === '0' ? ['enhanced'] : ['enhanced', 'classic']) {
+    const starts=args.classic==='0'?['enhanced']:['enhanced','classic'];
+    for (const initial of Array.from({length:Number(args.attempts||1)},()=>starts).flat()) {
       stage = initial + '-boot';
       const page = await browser.newPage({ viewport: phone ? { width: 390, height: 844 } : { width: 1920, height: 1080 }, deviceScaleFactor: phone ? 2 : 1, isMobile: phone, hasTouch: phone });
+      if(args.gl==='2'){
+        await page.addInitScript(require('./cinema-sampler-audit.cjs'));
+        await page.addInitScript(()=>{window.__sampleDrawAudit=true;});
+      }
       page.on('pageerror', e => report.errors.push({ stage, message: e.message }));
       page.on('console', m => {
         if (!/shader|WebGLProgram|GL_INVALID|INVALID_OPERATION/.test(m.text())) return;
@@ -41,6 +46,7 @@ async function run() {
         window.__flyWeatherOverride = 'baseline';
       }, { initial, phone });
       await page.goto(url + '/?graphicsReview=1', { waitUntil: 'domcontentloaded', timeout: 90000 });
+      if(args['build-id'])report.servedBuild=await require('./ground-build-receipt.cjs')(page,url,args['build-id']);
       await enterFlight(page, { lat: 40.72, lon: -74.02, altM: 900, headingRad: .3, name: null }, { waitReveal: true });
       await page.waitForFunction(() => !window.__fly.worldLoading, null, { timeout: 90000 });
       const snapshot = () => page.evaluate(() => {
@@ -49,7 +55,12 @@ async function run() {
         const wakes = [];
         root.traverse(o => {
           const u = o.material?.userData?.wakeLight;
-          if (u) wakes.push({ visible: o.visible, vertices: o.geometry.drawRange.count, light: u.uWakeLighting.value.toArray(), key: u.uWakeKey.value.toArray() });
+          if (u) {
+            const attr=o.geometry.attributes.aWake,ages=o.geometry.attributes.aWakeAge;
+            let emitted=0,maxAge=0;
+            for(let i=0;i<attr.count;i++)if(attr.getZ(i)>.001){emitted++;maxAge=Math.max(maxAge,ages?.getX(i)??0);}
+            wakes.push({ visible:o.visible,vertices:o.geometry.drawRange.count,player:attr.count<10000,emitted,maxAge,light:u.uWakeLighting.value.toArray(),key:u.uWakeKey.value.toArray() });
+          }
         });
         const ext = gl.getExtension('WEBGL_debug_renderer_info');
         const effects = window.__flyComposer?.passes.flatMap(p => p.effects?.map(e => e.name) || []);
@@ -59,6 +70,7 @@ async function run() {
           shadows: r.cinemaShadows, ibl: r.cinemaIBL, resources: r.cinemaResources, resolution: [gl.drawingBufferWidth, gl.drawingBufferHeight] };
       });
       let state = await snapshot();
+      if(args.gl==='2')report.badDraws=(report.badDraws??[]).concat(await page.evaluate(()=>window.__sampleBadDraws??[]));
       check(initial + ' preference honored', state.visuals === initial && !!state.environment === (initial === 'enhanced'));
       if (initial === 'classic') {
         stage = 'classic-to-enhanced';
@@ -73,7 +85,7 @@ async function run() {
       if (phone) check('phone effect budget', state.profile?.cascades <= 1 && state.profile?.materialSize <= 256 && state.profile?.reflection === null);
       report.captures.push({ stage, ...state });
       await page.screenshot({ path: path.join(out, initial + '-day.png') });
-      if (initial === 'classic') { await page.close(); continue; }
+      if (initial === 'classic'||args['boot-only']==='1') { await page.close(); continue; }
 
       stage = 'quality-ladder';
       for (const preset of args['skip-ladder'] === '1' ? [] : phone ? ['low', 'medium'] : ['low', 'medium', 'high', 'ultra']) {
@@ -98,7 +110,7 @@ async function run() {
         console.log('cruise ' + ((i + 1) * 10) + 's');
       }
       state = await snapshot();
-      check('physical vapor emitted', state.playerWake?.points > 20 && state.wakes.some(w => w.visible && w.vertices > 0));
+      check('physical vapor emitted', state.wakes.some(w=>w.player&&w.visible&&w.vertices>0&&w.emitted>40&&w.maxAge>2));
       check('vapor shares HDR exposure and direction', state.wakes.filter(w => w.visible).every(w => w.light[0] === 1 && Math.abs(w.light[2] - state.environment.exposure) < .001 && w.key.every((v, i) => Math.abs(v - state.environment.keyDir[i]) < .001)));
       check('cruise WebGL clean', state.error === 0);
       const timing = await page.evaluate(() => { cancelAnimationFrame(window.__hdrFrame); return window.__hdrTimes; });
@@ -126,6 +138,7 @@ async function run() {
       await page.waitForTimeout(500); await page.screenshot({ path: path.join(out, 'vapor-side.png') });
       await page.close(); await delay(250);
     }
+    if(args.gl==='2')check('no invalid sampler bindings',!report.badDraws?.length);
     check('no page, shader or WebGL errors', report.errors.length === 0, report.errors);
     report.status = 'PASS';
   } catch (e) { report.status = 'FAIL'; report.reason = e.stack; console.error(e.message); process.exitCode = 1; }

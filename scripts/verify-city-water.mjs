@@ -7,7 +7,7 @@ registerHooks({resolve(s,c,next){
  return next(s,c);
 }});
 const {Color,Scene,Group,Mesh,BoxGeometry,MeshBasicMaterial,DirectionalLight,PerspectiveCamera,Matrix4,Vector3}=await import('three');
-const {CoastalReflection,mirrorCoastalCamera}=await import('../lib/fly/coastal-reflection.js');
+const {CoastalReflection,mirrorCoastalCamera,COASTAL_REFLECTION_LAYER}=await import('../lib/fly/coastal-reflection.js');
 const {COASTAL_WATER_UNIFORMS:u}=await import('../lib/fly/coastal-water.js');
 const {steppedBuildingLevels,emitSteppedBuilding}=await import('../lib/fly/living-architecture.js');
 let checks=0;const check=(name,fn)=>{fn();checks++;console.log('PASS '+name);};
@@ -29,21 +29,26 @@ check('reflected points project to the mirror camera, preserving rolled and reve
  }
 });
 const scene=new Scene(),group=new Group(),mesh=new Mesh(new BoxGeometry(),new MeshBasicMaterial()),light=new DirectionalLight();
-group.add(mesh);scene.add(group,light);scene.background=new Color('#234567');mesh.layers.enable(3);
+const overlay=mesh.clone();overlay.layers.set(29);
+group.add(mesh);scene.add(group,light,overlay);scene.background=new Color('#234567');mesh.layers.enable(3);
 const camera=new PerspectiveCamera();camera.position.set(0,200,0);camera.lookAt(0,0,-1000);
 const runtime={satBuildings:{object:group},flight:{pos:{y:200},groundElev:4},earthSurface:{nearWaterCells:20}};
 let target={name:'main'},alpha=.7,color=new Color('#abcdef'),fail=false;
 const renderer={autoClear:false,xr:{enabled:true},shadowMap:{autoUpdate:true,needsUpdate:true},info:{autoReset:false,render:{calls:17}},
  getRenderTarget:()=>target,setRenderTarget:v=>{target=v;},getClearAlpha:()=>alpha,getClearColor:v=>v.copy(color),
  setClearColor:(v,a)=>{color.set(v);alpha=a;},clear(){},render(_scene,cam){
-  assert.equal(cam.layers.mask,1<<29);assert.ok(mesh.layers.test(cam.layers));assert.ok(light.layers.test(cam.layers));
+  assert.equal(cam.layers.mask,1<<COASTAL_REFLECTION_LAYER);assert.ok(mesh.layers.test(cam.layers));assert.ok(light.layers.test(cam.layers));
+  assert.equal(overlay.layers.test(cam.layers),false,'Airborne overlays cannot enter an architectural reflection');
+  assert.equal(mesh.geometry.drawRange.count,12);
   assert.equal(scene.background,null);assert.equal(this.shadowMap.autoUpdate,false);assert.equal(this.shadowMap.needsUpdate,false);
   if(fail)throw Error('simulated renderer failure');this.info.render.calls++;
  }};
 const rig=new CoastalReflection(),background=scene.background,mask=mesh.layers.mask;
+mesh.geometry.userData.auxiliaryIndexCount=12;
 const restored=()=>{assert.equal(target.name,'main');assert.equal(alpha,.7);assert.equal(color.getHexString(),'abcdef');assert.equal(scene.background,background);
  assert.equal(mesh.layers.mask,mask);assert.equal(light.layers.mask,1);assert.equal(renderer.autoClear,false);assert.equal(renderer.xr.enabled,true);
- assert.equal(renderer.shadowMap.autoUpdate,true);assert.equal(renderer.shadowMap.needsUpdate,true);};
+ assert.equal(renderer.shadowMap.autoUpdate,true);assert.equal(renderer.shadowMap.needsUpdate,true);
+ assert.equal(mesh.geometry.drawRange.count,Infinity);};
 check('capture restores main render state, including on a render exception',()=>{
  rig.update(renderer,scene,camera,runtime,'high',true);restored();assert.equal(u.uCoastReady.value,1);assert.equal(rig.stats.captures,1);assert.equal(rig.stats.draws,1);
  fail=true;assert.throws(()=>rig.update(renderer,scene,camera,runtime,'high',true),/simulated/);restored();fail=false;

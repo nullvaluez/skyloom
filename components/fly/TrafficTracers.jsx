@@ -291,7 +291,11 @@ function SpotTracers({ runtime, flight, origin }) {
     const bend = getBend();
     const halfDiag = Math.atan(tanHalf * Math.hypot(1, W / H)) / DEG;
     const cosView = Math.cos(Math.min(80, halfDiag + S.priority.viewPadDeg) * DEG);
-    const pinHex = useFlyStore.getState().inspectHex ?? runtime.targeting?.lockedHex ?? null;
+    const trafficState=useFlyStore.getState(),quietTraffic=cinemaOn(trafficState)&&!trafficState.spotting;
+    const pinHex = trafficState.inspectHex ?? runtime.targeting?.lockedHex ?? null;
+    // Recording continues below so Spotting and selection restore immediately.
+    // A wholly transparent navigation mesh does not need a GPU submission.
+    mesh.visible = !quietTraffic || pinHex !== null;
 
     // ---- PASS 1: every eligible item — record + score ----
     let nc = 0;
@@ -316,7 +320,7 @@ function SpotTracers({ runtime, flight, origin }) {
       const dz = hz - az - cz;
       const Dw = Math.hypot(dx, dy, dz) || 1;
       const Dt = Number.isFinite(t.distM) ? t.distM : Dw / kLat;
-      const Lm = spotLengthM(Dt, speed)*(cinemaOn()&&!useFlyStore.getState().spotting&&t.hex!==pinHex? .35:1);
+      const Lm = spotLengthM(Dt, speed);
       // WORLD spacing (true metres × the track's mercator k), so recorded and
       // backfilled trails are the same length.
       const spW = Math.min(S.length.maxSpacingWorldM, (Lm / RING) * kT);
@@ -401,7 +405,7 @@ function SpotTracers({ runtime, flight, origin }) {
       const base = spotSlotBase(r);
       const b = spotBandIndex(t.ry);
       const pinned = t.hex === pinHex;
-      const pres = state.cA[c] * (pinned ? S.body.lockPresence : cinemaOn()&&!useFlyStore.getState().spotting ? .28 : 1);
+      const pres = state.cA[c] * (pinned ? S.body.lockPresence : quietTraffic ? 0 : 1);
       const Dt = state.cDt[c];
       const Dw = state.cDw[c];
       // Prominence follows reach: full within fullM, receding to a faint

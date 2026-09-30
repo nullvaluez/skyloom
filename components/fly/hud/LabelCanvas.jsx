@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable react-hooks/immutability -- The flight runtime is an imperative scene bus; HUD_SYNC registers its draw callback there without React state. */
 import { cinematicEarthOn } from '@/lib/fly/cinematic-earth';
 import { cinemaOn } from '@/lib/fly/cinema-policy';
 
@@ -332,7 +333,7 @@ export function LabelCanvas({ runtime }) {
       const labelState = useFlyStore.getState();
       const quiet = labelState.mapStyle === 'satellite' && satelliteVisualsOn('presentation');
       const cinema = cinematicEarthOn(labelState);
-      const labelLimit = cinemaOn(labelState) ? (labelState.spotting?12:2) : cinema ? 4 : quiet ? SATELLITE_VISUALS.presentation.trafficLabels : TRAFFIC.maxLabels;
+      const labelLimit = cinemaOn(labelState) ? (labelState.spotting?12:0) : cinema ? 4 : quiet ? SATELLITE_VISUALS.presentation.trafficLabels : TRAFFIC.maxLabels;
 
       for (const it of items) {
         if (it.distM < LABELS.minDistM) continue;
@@ -359,7 +360,7 @@ export function LabelCanvas({ runtime }) {
         const hit = { hex: it.hex, sx, sy, name: it.meta?.flight || it.meta?.r || it.hex.toUpperCase(), rect: null };
         hits.push(hit);
 
-        const important = quiet && (it.hex === labelState.lockedHex || it.hex === labelState.inspectHex || it.hex === runtime.hoverHex);
+        const important = quiet && (it.hex === labelState.lockedHex || it.hex === runtime.targeting?.lockedHex || it.hex === labelState.inspectHex || it.hex === runtime.hoverHex);
         // Keep the hero readable; all aircraft remain clickable and selected
         // traffic always earns its full label, even inside the protected area.
         if (cinema && !important && sx > w*.32 && sx < w*.68 && sy > h*.49 && sy < h*.8) continue;

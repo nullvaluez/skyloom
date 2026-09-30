@@ -156,7 +156,7 @@ check('packed terrain atlas retains every classification and appearance byte',()
  engine.classAtlas={image:{data:new Uint8Array(layout.width*layout.height)}};
  engine.appearanceAtlas={image:{data:new Uint8Array(layout.width*layout.height*4)}};
  for(const [i,[ox,oy]]of layout.bands.entries()){
-   const size=i===2?256:128,width=size*4;
+   const size=layout.bands[i][2]/4,width=size*4;
    const data=Uint8Array.from({length:width*width*4},(_,j)=>(j*13+i*29)%256);
    const classes=Uint8Array.from({length:width*width},(_,j)=>(j+i)%17);
    const b={i,size,texture:{image:{data}},classTexture:{image:{data:classes}}};

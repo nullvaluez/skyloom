@@ -58,7 +58,7 @@ export function Contrail({ flight, origin, aircraft, runtime }) {
       emitter.fromArray(tip).applyQuaternion(rotation).add(flight.pos);
       if (!held) state.tips[e].record(emitter.x, emitter.y, emitter.z, now, vapor, Math.max(6, flight.speed * .06), windX, windZ);
     }
-    state.batch.begin(camera);
+    state.batch.begin(camera,!!runtime?.cinemaEnvironment&&store.mapStyle==='satellite');
     for (const h of state.histories) state.batch.add(h, now, origin.anchor);
     for (const h of state.tips) state.batch.add(h, now, origin.anchor,
       { width: FX.vaporWidthM, spread: FX.vaporSpreadMps, opacity: .65 });

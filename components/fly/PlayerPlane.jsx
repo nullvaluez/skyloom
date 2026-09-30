@@ -35,6 +35,8 @@ import { useFlyStore } from '@/stores/fly-store';
 import { useTitleHidden } from '@/lib/fly/front-door';
 import { createEngineExhaust, measureAircraftAnchors, softenAircraftLights } from '@/lib/fly/aircraft-presentation';
 import { smoothBand } from '@/lib/fly/aircraft-effects';
+import { readReducedMotion } from '@/lib/fly/immersive';
+import { cinemaOn } from '@/lib/fly/cinema-policy';
 
 /**
  * The player's aircraft: a CC-BY glTF airframe (poly.pizza, see
@@ -93,7 +95,8 @@ export function PlayerPlane({ flight, aircraft }) {
     // camera doesn't share it, so the plane reads alive against the world.
     const t = performance.now() / 1000;
     const ops=flight.operations;
-    const bob=ops?.grounded?0:ops?.profile?Math.max(0,Math.min(1,(flight.agl-ops.profile.clearance)/30)):1;
+    const clearance=ops?.grounded?0:ops?.profile?Math.max(0,Math.min(1,(flight.agl-ops.profile.clearance)/30)):1;
+    const bob=readReducedMotion()?0:clearance*(cinemaOn()?.28:1);
     g.position.y += (Math.sin(t * 1.9) * 0.35 + Math.sin(t * 3.1) * 0.12)*bob;
     g.rotation.z += Math.sin(t * 1.3) * 0.01*bob;
   }, -30);
