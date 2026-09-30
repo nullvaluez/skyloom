@@ -17,7 +17,7 @@ module.exports = {
     // the 04L glideslope ahead with their lights.
     const keys = [-3, 0, 5].map((t) => ({ t, ...P(2000 - 200 * t, 42) }));
     const fly = TR.flyPath(TR.path(keys));
-    const cam = TR.cam.orbit({ az: (t) => 18 - 1.5 * t, el: 5, dist: 26, lookFwd: 320, lookUp: 14, fov: 56 });
+    const cam = TR.cam.orbit({ az: (t) => 16 - 1.5 * t, el: 7, dist: 24, lookFwd: 110, lookUp: 4, fov: 54 }); // draft: jet sat low-left
     const ARR = [-900, -4600, -8600];
     for (let i = 0; i < 3; i++) {
       const d = ARR[i];

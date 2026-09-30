@@ -52,7 +52,7 @@ module.exports = {
     const headOn = (t) => {
       const a = lead(t); const center = TR.offset(a.pos, H, lat0, 8, -8, -45);
       const eye = TR.offset(a.pos, H, lat0, -34, 7, 170 - 20 * t);
-      return { eye, target: center, fov: 50, roll: 0 };
+      return { eye, target: center, fov: 34, roll: 0 }; // 50 read small in the draft
     };
     const behind = TR.cam.orbit({ az: (t) => -14 + 3 * (t - 3.5), el: 5, dist: 26, lookFwd: 90, lookUp: 6, fov: 56 });
     // break: from just off the Vector's left shoulder, a long lens tracks the

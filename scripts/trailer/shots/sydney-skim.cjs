@@ -8,7 +8,7 @@ module.exports = {
   start: { lat: -33.8545, lon: 151.2450, altM: 50, headingDeg: 272 },
   settle: { maxSec: 600, minSec: 30, streamSec: 150 },
   page: function () {
-    const TR = window.TR; TR.hideLetters = true;
+    const TR = window.TR; TR.hideLetters = true; TR.noHeat = true; // heat-haze slabs over the sun glint (draft review)
     const path = TR.path([
       { t: -3, lat: -33.8547, lon: 151.2470, alt: 48 },
       { t: 0, lat: -33.8551, lon: 151.2395, alt: 42 },

@@ -391,6 +391,17 @@
       });
       TR._lettersHidden = n;
     }
+    if (TR.noHeat) {
+      // Cinema exhaust heat-haze refracts the frame behind the plumes; over a
+      // low-sun water glint its screen-space segments read as hard-edged
+      // light slabs (draft sydney-skim). Zero it for shots that opt in.
+      const c = window.__flyComposer; let n = 0;
+      if (c) for (const p of c.passes || []) for (const q of [p, ...(p.effects || [])]) {
+        const h = q && q.heat;
+        if (h && h.uniforms && h.uniforms.cinemaHeatPower) { if (!h.__trOff) { h.update = function () { this.uniforms.cinemaHeatPower.value = 0; }; h.__trOff = true; } h.uniforms.cinemaHeatPower.value = 0; n++; }
+      }
+      TR._heatOff = n;
+    }
     if (TR.hidePlayer != null) { const p = TR.player(); if (p) p.visible = !TR.hidePlayer; }
   } }, 0.5, TR.r3f);
   // MEASURED on ANGLE-Vulkan/lavapipe headless: drawImage(webglCanvas) reads an

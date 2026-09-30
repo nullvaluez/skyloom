@@ -33,6 +33,8 @@ try {
   if (ov.runInMax != null && (shot.runIn ?? 45) > ov.runInMax) shot.runIn = ov.runInMax;
   if (ov.quality) shot.quality = ov.quality;
   if (ov.settleVP) process.env.TRAILER_SETTLE_VP = ov.settleVP;
+  // final pass: capture only the frames the edit uses ({ "frames": { "<id>": n } })
+  if (ov.frames && ov.frames[shot.id]) shot.frames = Math.min(shot.frames, ov.frames[shot.id]);
 } catch {}
 const FPS = shot.fps || 30;
 const OUT = args.out || path.join(process.env.TRAILER_SHOTS || '/tmp/claude-0/shots', shot.id + (args.preview ? '-preview' : ''));
@@ -288,7 +290,7 @@ const withTO = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTime
         const dbg = JSON.stringify({ d: (window.TR.dbg || []).slice(0, 1).map((x) => x.dt), clk: window.TR.clk });
         const ns = window.__nanscan ? window.__nanscan.map((x) => x.name + ':' + x.invalid).join(' ') : undefined;
         return { dbg, ns, t: +window.TR.t().toFixed(3), fpos: r3(f.pos), hdg: +f.heading.toFixed(3), spd: +f.speed.toFixed(1), cam: r3(c.position), fov: c.fov, anchor: r3(rt.origin.anchor), capMean: +m.toFixed(1), loading: rt.worldLoading, phase: window.__flyStore.getState().phase,
-          pn: +performance.now().toFixed(1), lh: window.TR._lettersHidden,
+          pn: +performance.now().toFixed(1), lh: window.TR._lettersHidden, heat: window.TR._heatOff,
           pup: (window.TR.puppets || []).slice(0, 2).map((a) => { const k = rt.traffic && rt.traffic.tracks.get(a.hex); const p = a.pose(window.TR.t()); return k ? { hex: a.hex, yaw: +(k.yaw || 0).toFixed(3), hd: +p.heading.toFixed(3), dx: +(k.rx - p.pos.x).toFixed(1), dy: +(k.ry - p.pos.y).toFixed(1), dz: +(k.rz - p.pos.z).toFixed(1), lu: k._lastUpdate != null ? +k._lastUpdate.toFixed(3) : null, dist: k.distM != null ? +k.distM.toFixed(0) : null, ld: !!k.livingDetailed } : { hex: a.hex, none: true }; }) };
       });
       log('diag j=' + j, JSON.stringify(d));
