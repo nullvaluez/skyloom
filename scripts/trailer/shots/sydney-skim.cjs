@@ -16,6 +16,8 @@ module.exports = {
     ]);
     const fly = TR.flyPath(path);
     const cam = TR.cam.orbit({ az: (t) => -8 + 3 * t, el: 1.2, dist: 22, lookFwd: 260, lookUp: 6, fov: 52 });
-    window.__shot = { flight: (t) => Object.assign(fly(t), { boosting: true }), camera: cam };
+    // final QA: the long boost plumes over the sun glint drew hard-edged light
+    // slabs (heat-haze off did not help) — skim on dry thrust
+    window.__shot = { flight: (t) => Object.assign(fly(t), { boosting: false }), camera: cam };
   },
 };

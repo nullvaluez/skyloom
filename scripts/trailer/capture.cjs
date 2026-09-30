@@ -176,7 +176,7 @@ const withTO = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTime
         pct: b.pct, ready: !!ws.ready, missing: ws.missing, loading: !!rt.worldLoading, btns: btns.length, clicked,
         sharp: !!ts.sharp, camZ: ts.camTileZ, tZ: ts.targetZ, dl: ts.downloading,
         bq: q(rt.satBuildings && rt.satBuildings.stats), rq: q(rt.satRoads && rt.satRoads.stats), frames: rt.framesRendered,
-        thr: rt.engine && rt.engine.map ? rt.engine.map.maxThreads : null, terr: window.__trTurboErr || undefined,
+        sq: q(rt.satSkyline && rt.satSkyline.stats), thr: rt.engine && rt.engine.map ? rt.engine.map.maxThreads : null, terr: window.__trTurboErr || undefined,
       };
     }, el > helpAfter), 120000, 'settle poll').catch((e) => ({ err: String(e) }));
     clicks += st.clicked || 0;
@@ -184,7 +184,9 @@ const withTO = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTime
     if (line !== lastLine) { log('settle', line); lastLine = line; }
     const revealed = st.pct === 100 && !st.loading;
     if (revealed && revealedAt == null) { revealedAt = el; log('revealed at', el.toFixed(0) + 's', 'help clicks', clicks); }
-    const streamed = st.sharp && st.bq === 0 && st.rq === 0;
+    // the far skyline ring (5-9 km block masses) is its own engine: without it the
+    // final nyc-traffic-sky started with no Lower Manhattan and dissolved it in at f156
+    const streamed = st.sharp && st.bq === 0 && st.rq === 0 && !(st.sq > 0);
     if (revealed && el >= minSettle && (streamed || el - revealedAt > ((shot.settle && shot.settle.streamSec) || 120))) break;
     if (el > maxSettle) {
       log('settle timeout — forcing worldLoading=false');
@@ -197,7 +199,7 @@ const withTO = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTime
   if (SV[0] && SV[0] !== CV[0]) {
     await page.setViewportSize({ width: CV[0], height: CV[1] });
     const f0 = await page.evaluate(() => window.__fly.framesRendered);
-    await page.waitForFunction((f0) => window.__fly.framesRendered >= f0 + 4, f0, { timeout: 120000, polling: 500 });
+    await page.waitForFunction((f0) => window.__fly.framesRendered >= f0 + 4, f0, { timeout: 480000, polling: 500 }); // 120 s timed out at 1080p with four browsers busy
     log('resized to', CV.join('x'));
   }
   // ---- optional pre-rig probe (diagnostics): runs in real time before any override
@@ -247,6 +249,17 @@ const withTO = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTime
     let n = 0;
     for (let k = 0; k < 20 && !n; k++) { n = (await page.evaluate(() => window.TR.stepLoop(16))).n; if (!n) await new Promise((r) => setTimeout(r, 300)); }
     log('loop mode armed, frame landed:', n);
+    // GUARD (final pass: the 1080p atlas-ui take came back with a black world
+    // behind the DOM): grab one GL frame through the priority-101 subscriber
+    // and abort for a retry if the canvas is blank or the context is gone.
+    const g = await page.evaluate(async () => {
+      const TR = window.TR, gl = TR.r3f.getState().gl.getContext();
+      TR.cap.want = true; TR.cap.got = false;
+      for (let k = 0; k < 10 && !TR.cap.got; k++) await TR.stepLoop(34);
+      return { got: TR.cap.got, mean: TR.cap.mean, lost: gl.isContextLost() };
+    });
+    log('loop GL check', JSON.stringify(g));
+    if (g.lost || (g.got && g.mean < 1.5 && !shot.allowDark)) throw new Error('loop mode: GL canvas blank/lost before recording — aborting take for retry');
   }
   paused = true; fakeNowMs = cont.date;
   const runIn = shot.runIn ?? 45;

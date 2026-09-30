@@ -32,7 +32,9 @@ module.exports = {
     TR.ambientFleet({ lat: 40.70, lon: -73.95, n: 14, radiusKm: 28, altMin: 9200, altMax: 11800, seed: 11 });
     TR.ambientFleet({ lat: 40.66, lon: -73.84, n: 6, radiusKm: 10, altMin: 600, altMax: 1800, seed: 12, speed: [85, 110] });
     window.__shot = {
-      flight: (t) => { const p = fly(t); p.boosting = t >= 4.0; return p; },
+      // final QA: at boost speed the path's curvature wiggles drove the bank
+      // through +-60 deg reversals on the side shot — fly it wings-level.
+      flight: (t) => { const p = fly(t); p.boosting = t >= 4.0; if (t >= 3.95) p.bank = 0; return p; },
       camera: (t, fl, k) => (t < 4.0 ? null : side(t, fl, k)),
     };
   },
