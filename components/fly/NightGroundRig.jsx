@@ -61,7 +61,7 @@ export function NightGroundRig({runtime}){
     const st=state.current,store=useFlyStore.getState(),now=performance.now()/1000;
     st.draws=0;
     const active=store.mapStyle==='satellite'&&nearGroundOn('lighting')&&runtime.flight;
-    const night=active?nightWeight(runtime.sun?.frac)*groundLightingStrength(runtime.groundImmersion?.k):0;
+    const night=active?(runtime.cinemaEnvironment?.night??nightWeight(runtime.sun?.frac))*groundLightingStrength(runtime.groundImmersion?.k):0;
     if(!active||night<=0.001){if(target.current||st.active||collector.current.pending){collector.current.reset();resetTarget(target,st);}U.uNGNight.value=0;return;}
     U.uNGNight.value=night;st.night=night;
     const cfg=groundLightProfile(store.qualityTier),flight=runtime.flight;

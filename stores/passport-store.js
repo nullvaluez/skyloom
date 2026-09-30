@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { sessionSafeStorage } from '@/lib/session-safe-storage';
 import { BADGES, checkBadgeUnlock, getStreakDays } from '@/lib/badges';
 import { calculateRarity } from '@/lib/rarity';
 
@@ -263,6 +264,7 @@ export const usePassportStore = create(
     }),
     {
       name: 'shadowadsb-passport',
+      storage: sessionSafeStorage(),
       partialize: (state) => ({
         spottedAircraft: state.spottedAircraft,
         badges: state.badges,

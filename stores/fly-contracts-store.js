@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { sessionSafeStorage } from '@/lib/session-safe-storage';
 
 /**
  * Persisted contract score (round 6, Phase F). Only the LIFETIME tallies
@@ -44,6 +45,7 @@ export const useFlyContractsStore = create(
     }),
     {
       name: 'fly-contracts',
+      storage: sessionSafeStorage(),
       partialize: (state) => ({
         totalScore: state.totalScore,
         completedCount: state.completedCount,

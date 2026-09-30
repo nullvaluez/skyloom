@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { sessionSafeStorage } from '@/lib/session-safe-storage';
 
 const MAX_RECENTS = 8;
 
@@ -37,6 +38,6 @@ export const useFlyAtlasStore = create(
 
       isFavorite: (key) => get().favorites.includes(key),
     }),
-    { name: 'fly-atlas' }
+    { name: 'fly-atlas', storage: sessionSafeStorage() }
   )
 );

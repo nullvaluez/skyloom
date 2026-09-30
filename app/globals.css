@@ -1,4 +1,14 @@
 @import "tailwindcss";
+
+/* Ordinary flight keeps speed, terrain clearance and flight state prominent.
+   Spotting deliberately restores the longer telemetry and traffic presentation. */
+[data-earth='cinematic'][data-spotting='0'] > :is(:nth-child(2),:nth-child(4),:nth-child(6),:nth-child(7),:nth-child(8)){display:none;}
+[data-earth='cinematic'] > :nth-child(3){display:flex;}
+.cinema-spotting{position:absolute;z-index:20;left:24px;bottom:172px;padding:8px 12px;border:1px solid #a9d2e633;border-radius:4px;background:#101c28cf;color:#d1e6ed;font:11px ui-monospace,monospace;letter-spacing:.08em;cursor:pointer;}
+.cinema-spotting[aria-pressed='true']{border-color:#9ee7ed;color:#9ee7ed;}
+.cinema-spotting:focus-visible{outline:2px solid #9ee7ed;outline-offset:3px;}
+@media(min-width:768px){[data-testid='flight-stats-strip'][data-earth='cinematic'][data-spotting='0']{grid-template-columns:repeat(3,minmax(62px,1fr));min-width:240px;}}
+@media(max-width:767px){.cinema-spotting{left:12px;right:auto;top:auto;bottom:calc(env(safe-area-inset-bottom) + 180px);min-height:44px;}[data-earth='cinematic'][data-spotting='1'] > :is(:nth-child(7),:nth-child(8)){display:none;}}
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
@@ -933,3 +943,7 @@
   [data-testid='hud-poi'][data-cinematic='1'] { top: 25px; }
   [data-testid='hud-chase-chip'][data-cinematic='1'] { top: 49px; }
 }
+.cinema-review-dock{position:absolute;top:52px;left:50%;transform:translateX(-50%);display:flex;gap:6px;flex-wrap:wrap;justify-content:center;max-width:calc(100vw - 24px);width:max-content;padding:8px;background:#071520e8;border:1px solid #7db6d54d;border-radius:8px;pointer-events:auto;z-index:40;font:12px ui-monospace,monospace;color:#e0edf4}
+.cinema-review-dock button,.cinema-review-dock select{background:#19303e;color:inherit;border:1px solid #86b9d14d;border-radius:4px;padding:8px;min-height:34px}
+.cinema-review-dock button:focus-visible,.cinema-review-dock select:focus-visible{outline:2px solid #84d7ff;outline-offset:2px}
+@media(max-width:700px){.cinema-review-dock{top:110px;max-width:calc(100vw - 24px)}.cinema-review-dock button,.cinema-review-dock select{min-height:44px}}

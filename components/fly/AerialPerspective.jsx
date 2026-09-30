@@ -50,6 +50,7 @@
  * reads, and the copy happens at the latest possible moment.
  */
 import { Effect, EffectAttribute } from 'postprocessing';
+import { CINEMA_GLSL, CINEMA_UNIFORMS, cinemaEnvironment } from '@/lib/fly/cinema-frame';
 import { Uniform, Vector2, Vector3, Vector4, Color, SRGBColorSpace } from 'three';
 import { AERIAL_LAW, DEPTH_FIX, AERIAL_PERSPECTIVE, DEPTH_PASS } from '@/lib/fly/fly-constants';
 // R24 D (AERIAL_LAW): the ONE atmosphere law — the same GLSL string and the
@@ -444,6 +445,7 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth,
  * uR25Mode.x = 1 selects the model in-scatter (aerialSun), 0 the legacy rim.
  */
 const enhancedFragmentShader = /* glsl */ `
+${CINEMA_GLSL}
 uniform vec3 uHazeColor;
 uniform vec2 uBand;
 uniform float uMaxMix;
@@ -486,6 +488,7 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth,
   // Above the dipped rim, mountains approach the sky at their own elevation.
   // Below it r25Sky clamps to row zero, the shared directional horizon.
   vec3 haze = uR25Mode.x > 0.5 ? r25Sky( viewRay, uR25SunDir ) : uHazeColor;
+  if(uCinema>.5)haze=cinemaSky(normalize(vec3(viewRay.x,viewRay.y+uR25SkyP.y,viewRay.z)));
 
   if (uLivingAir.x > .5) {
     vec3 metricRay=world-uCamPos;
@@ -585,6 +588,7 @@ export class AerialPerspectiveEffect extends Effect {
     });
     this._law = law;
     this._r25 = r25;
+    if(r25)for(const[name,holder]of Object.entries(CINEMA_UNIFORMS))this.uniforms.set(name,holder);
     // Resolved from the live renderer on the first update() — see the shader.
     this._reversed = null;
   }
@@ -634,6 +638,10 @@ export class AerialPerspectiveEffect extends Effect {
     }
     u.get('uMaxMix').value = s.strength;
     u.get('uLivingAir').value.fromArray(s.livingAir);
+    if(this._r25&&CINEMA_UNIFORMS.uCinema.value>.5){
+      u.get('uLivingAir').value.z=cinemaEnvironment.extinction;u.get('uLivingAir').value.w=cinemaEnvironment.heightM;
+      u.get('uMaxMix').value=.55;
+    }
     // R24 C (LINEAR_HAZE): Color.setRGB's default colorSpace is the WORKING
     // space, i.e. no conversion — which is exactly the L1 defect. Naming
     // SRGBColorSpace decodes the authored triple into the linear buffer the

@@ -69,9 +69,9 @@ export function PauseMenu({ onExit }) {
   // First-entry controls help (map style now resolves in FlyMode, pre-mount)
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (window.localStorage.getItem(HELP_SEEN_KEY)) {
-      useFlyStore.getState().markControlsHelpSeen();
-    }
+    try {
+      if (window.localStorage.getItem(HELP_SEEN_KEY)) useFlyStore.getState().markControlsHelpSeen();
+    } catch { /* First-flight help remains available when storage is blocked. */ }
   }, []);
 
   // M from the pause menu goes straight to the Atlas — same key as in
@@ -97,7 +97,7 @@ export function PauseMenu({ onExit }) {
   }, [phase]);
 
   const markHelpSeen = () => {
-    window.localStorage.setItem(HELP_SEEN_KEY, '1');
+    try { window.localStorage.setItem(HELP_SEEN_KEY, '1'); } catch { /* Session acknowledgement still works. */ }
     useFlyStore.getState().markControlsHelpSeen();
   };
 

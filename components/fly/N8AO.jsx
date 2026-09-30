@@ -92,6 +92,8 @@
 import { PerspectiveCamera } from 'three';
 import { N8AOPostPass, DepthType } from 'n8ao';
 import { DEPTH_PASS } from '@/lib/fly/fly-constants';
+import { cinemaOn } from '@/lib/fly/cinema-policy';
+import { cinemaAoDenoise } from '@/lib/fly/cinema-ao';
 
 // The exact source line DepthDownSample.js writes its chosen sample with. The
 // patch is anchored on it so an n8ao upgrade fails LOUDLY (fall back to
@@ -159,6 +161,14 @@ function patchDownsample(pass) {
  * with the real one — n8ao itself is otherwise untouched.
  */
 class FlyN8AOPass extends N8AOPostPass {
+  configureDenoisePass(depthType,ortho){
+    super.configureDenoisePass(depthType,ortho);
+    if(cinemaOn()){
+      const material=this.poissonBlurQuad.material;
+      material.fragmentShader=cinemaAoDenoise(material.fragmentShader);
+      material.needsUpdate=true;
+    }
+  }
   constructor(scene, proxyCamera, sourceCamera, width, height) {
     super(scene, proxyCamera, width, height);
     this._source = sourceCamera;

@@ -1,5 +1,6 @@
 'use client';
 import { cinematicEarthOn } from '@/lib/fly/cinematic-earth';
+import { cinemaOn } from '@/lib/fly/cinema-policy';
 
 import { useEffect, useRef } from 'react';
 import { Vector3 } from 'three';
@@ -331,7 +332,7 @@ export function LabelCanvas({ runtime }) {
       const labelState = useFlyStore.getState();
       const quiet = labelState.mapStyle === 'satellite' && satelliteVisualsOn('presentation');
       const cinema = cinematicEarthOn(labelState);
-      const labelLimit = cinema ? 4 : quiet ? SATELLITE_VISUALS.presentation.trafficLabels : TRAFFIC.maxLabels;
+      const labelLimit = cinemaOn(labelState) ? (labelState.spotting?12:2) : cinema ? 4 : quiet ? SATELLITE_VISUALS.presentation.trafficLabels : TRAFFIC.maxLabels;
 
       for (const it of items) {
         if (it.distM < LABELS.minDistM) continue;

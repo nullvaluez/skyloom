@@ -20,14 +20,14 @@ async function run() {
     const page=await browser.newPage({viewport:{width:Number(args.width||(phone?390:1920)),height:Number(args.height||(phone?844:1080))},deviceScaleFactor:phone?2:1,isMobile:phone,hasTouch:phone});
     let stage='boot';
     page.on('pageerror',e=>report.errors.push({stage,message:e.message,stack:e.stack}));
-    page.on('console',m=>{if(m.type()==='error'&&/shader|WebGLProgram/.test(m.text()))report.errors.push({stage,message:m.text()});});
+    page.on('console',m=>{if(m.type()==='error'&&/shader|WebGLProgram/.test(m.text())){report.errors.push({stage,message:m.text()});console.error(m.text().slice(0,1000));}});
     const site=sites[args.site||'alps'];
     await page.addInitScript(({site,quality})=>{
       localStorage.setItem('fly-map-style-2','satellite');localStorage.setItem('fly-visuals','enhanced');
       localStorage.setItem('fly-quality-tier',quality);localStorage.setItem('fly-sound-on','0');localStorage.setItem('fly-controls-seen','1');localStorage.setItem('fly-crash-mode','forgiving');
       window.__flyWeatherOverride='baseline';window.__flySunOverride=Date.UTC(2026,8,27,site.day);
     },{site,quality:args.quality||(phone?'medium':'ultra')});
-    await page.goto(`${args.url||'http://localhost:3063'}/?graphicsReview=1`,{waitUntil:'domcontentloaded',timeout:90000});
+    await page.goto(`${args.url||'http://localhost:3063'}/?graphicsReview=1${args.look?'&earthLook='+encodeURIComponent(args.look):''}`,{waitUntil:'domcontentloaded',timeout:90000});
     if(args['build-id']){
       report.servedBuild=await groundBuildReceipt(page,args.url,args['build-id']);
       if(report.servedBuild.sourceSha256!==report.sourceSha256)throw Error('Served source differs from the working tree under review');
@@ -44,6 +44,7 @@ async function run() {
       const data=await page.evaluate(()=>({boot:window.__flyBoot,worldLoading:window.__fly.worldLoading,
         sun:window.__fly.sun,quality:window.__flyStore.getState().qualityPreset,tier:window.__flyStore.getState().qualityTier,
         clouds:window.__fly.immersiveClouds,player:window.__flyStats?.player,gear:window.__fly.operations.gear,
+        cinema:{environment:window.__fly.cinemaEnvironment,profile:window.__fly.cinemaProfile,shadows:window.__fly.cinemaShadows,ibl:window.__fly.cinemaIBL,resources:window.__fly.cinemaResources},
         heat:(()=>{const u=window.__flyComposer?.passes.find(p=>p.name==='ImmersiveClouds')?.heat?.uniforms;return u?{power:u.cinemaHeatPower.value,a:u.cinemaHeatA.value.toArray(),b:u.cinemaHeatB.value.toArray()}:null;})(),
         aircraft:window.__fly.flight.aircraftVisual?.id,governor:window.__flyGov?.state(),
         draws:window.__flyStats?.drawCalls,triangles:window.__flyStats?.triangles,
@@ -52,6 +53,7 @@ async function run() {
       report.cases.push({name,...data});console.log(`${name}: ${data.tier}, ground ${data.ground}`);
     };
     stage='day-cruise';await capture(stage);
+    if(args.look==='cinematic'&&!report.cases[0].cinema.environment)throw Error('New cinematic path is inactive; this run cannot certify it.');
     stage='day-boost';await page.keyboard.down('Shift');await page.waitForTimeout(2500);await capture(stage);await page.keyboard.up('Shift');
     if(args.minutes){
       stage='lived-flight';

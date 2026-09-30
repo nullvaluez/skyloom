@@ -1,5 +1,7 @@
 'use client';
 import { satelliteVisualsOn, satelliteEffectTier } from '@/lib/fly/satellite-visuals';
+import { cinemaOn, cinemaProfile, subscribeCinemaEffects, getCinemaEffectLevel } from '@/lib/fly/cinema-policy';
+import {isPhoneClass} from '@/lib/fly/device-class';
 import { resolveSatelliteAtmosphere } from '@/lib/fly/satellite-atmosphere';
 import { immersiveOn } from '@/lib/fly/immersive';
 import { ImmersiveCloudPass } from '@/lib/fly/immersive-cloud-pass';
@@ -12,7 +14,7 @@ import { R25_SKY } from '@/lib/fly/fly-constants';
 import { releaseBloomTargets } from '@/lib/fly/release-bloom-targets';
 
 
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Vector2 } from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import {
@@ -171,7 +173,7 @@ export function buildPassList(style, tier, ctx = {}) {
   const sat = style === 'satellite';
   const bloomScale = BLOOM_SCALE[tier] ?? 0.5;
   const bloom = BLOOM_BY_STYLE[style] ?? BLOOM_BY_STYLE.satellite;
-  const toneName = ctx.toneName ?? SKY.toneMapping.byStyle[style] ?? 'ACES';
+  const toneName = ctx.toneName ?? (cinemaOn()?'AgX':SKY.toneMapping.byStyle[style]) ?? 'ACES';
   const toneMode = TONE_MODES[toneName];
   const aerialOn = sat && AERIAL_PERSPECTIVE.enabled && (tier === 'high' || immersiveOn('lighting'));
   const cloudOn = sat && immersiveOn('clouds');
@@ -525,7 +527,10 @@ export const Effects = memo(function Effects({ runtime }) {
     };
   }, [overlay]);
   const renderDpr = useThree((s) => s.viewport.dpr);
-  const qualityTier = sat && satelliteVisualsOn()
+  useSyncExternalStore(subscribeCinemaEffects,getCinemaEffectLevel,()=>0);
+  useFlyStore(s=>s.qualityPreset);
+  const effective=cinemaOn()?cinemaProfile(sceneTier):null;
+  const qualityTier = effective ? (effective.cascades>=2?'high':effective.cascades===1?'medium':'low') : sat && satelliteVisualsOn()
     ? satelliteEffectTier(sceneTier, renderDpr) : sceneTier;
   useEffect(() => { clouds?.setTier(qualityTier); }, [clouds,qualityTier]);
 
@@ -540,6 +545,14 @@ export const Effects = memo(function Effects({ runtime }) {
       if (window.__flySetTone) delete window.__flySetTone;
     };
   }, []);
+
+  // The new environment owns bloom and exposure chroma on the same frame as
+  // lighting. The legacy five-second grade cadence remains the control path.
+  useFrame(()=>{
+    const e=runtime.cinemaEnvironment;if(!e)return;
+    whiteBalance.setBalance(1,1,1);
+    if(bloomRef.current){bloomRef.current.intensity=e.bloomIntensity;bloomRef.current.luminanceMaterial.threshold=e.bloomThreshold;}
+  },0);
   // R25 C: `window.__flyToneOverride` ('Neutral' | 'AgX' | 'ACES' | 'None') —
   // a DEV PIN, read at mount like the other fleet pins. Neutral tone mapping
   // never ships without a user A/B (plan C.7); this is how that A/B is taken.
@@ -547,7 +560,7 @@ export const Effects = memo(function Effects({ runtime }) {
     process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && window.__flyToneOverride in TONE_MODES
       ? window.__flyToneOverride
       : null;
-  const toneName = toneOverride ?? tonePin ?? SKY.toneMapping.byStyle[mapStyle] ?? 'ACES';
+  const toneName = toneOverride ?? tonePin ?? (cinemaOn()?'AgX':SKY.toneMapping.byStyle[mapStyle]) ?? 'ACES';
   if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
     (window.__flyStats ??= {}).toneMode = toneName;
   }
@@ -753,7 +766,7 @@ export const Effects = memo(function Effects({ runtime }) {
   // pass costs nothing but its materials stay alive and its programs stay
   // refcounted — the prewarm.js "a retained warm pass is what keeps a program
   // refcounted" finding, applied to a pass the warm cannot reach.
-  const aoWanted = sat && depthSubOn('n8ao') && aoNonce >= 0;
+  const aoWanted = sat && depthSubOn('n8ao') && aoNonce >= 0 && !(cinemaOn()&&isPhoneClass());
   useEffect(() => {
     if (!aoWanted) {
       if (aoRef.current) {

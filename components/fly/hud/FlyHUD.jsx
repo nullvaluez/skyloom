@@ -1,6 +1,8 @@
 'use client';
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
 import { cinematicEarthOn } from '@/lib/fly/cinematic-earth';
+import { cinemaOn } from '@/lib/fly/cinema-policy';
+import { CinemaReviewDock } from './CinemaReviewDock';
 
 
 import { useEffect, useRef } from 'react';
@@ -22,6 +24,8 @@ export function FlyHUD({ runtime }) {
   const mapStyle = useFlyStore((s) => s.mapStyle);
   const visuals = useFlyStore((s) => s.visuals);
   const cinema = cinematicEarthOn({mapStyle, visuals});
+  const newEarth=cinemaOn({mapStyle,visuals});
+  const spotting=useFlyStore(s=>s.spotting);
   const quiet = mapStyle === 'satellite' && satelliteVisualsOn('presentation');
   const { isTouch } = useDeviceLayout();
   const spdRef = useRef(null);
@@ -116,6 +120,7 @@ export function FlyHUD({ runtime }) {
 
   return (
     <>
+      <CinemaReviewDock runtime={runtime} />
       {/* steering reference: the cursor's offset from this dot is the command */}
       <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/60" />
 
@@ -143,7 +148,8 @@ export function FlyHUD({ runtime }) {
           a backdrop-filter over the live GL canvas makes the compositor
           re-read the framebuffer every frame. Desktop keeps blur-sm and
           bg-zinc-950/60 exactly. */}
-      <div data-testid="flight-stats-strip" data-cinematic={cinema ? '1' : '0'} className="hud-flat-phone pointer-events-none absolute left-1/2 top-4 z-10 flex -translate-x-1/2 divide-x divide-zinc-700 rounded-lg bg-zinc-950/60 py-1.5 backdrop-blur-sm max-sm:top-[calc(env(safe-area-inset-top)+0.375rem)] phone:top-[calc(env(safe-area-inset-top)+0.375rem)] phone-land:top-[calc(env(safe-area-inset-top)+0.25rem)] phone:bg-zinc-950/85 phone:py-1">
+      {newEarth&&<button type="button" className="cinema-spotting" aria-pressed={spotting} onClick={()=>useFlyStore.getState().setSpotting(!spotting)}>{spotting?'Spotting · On':'Spotting · Off'}</button>}
+      <div data-testid="flight-stats-strip" data-earth={newEarth?'cinematic':undefined} data-spotting={spotting?'1':'0'} data-cinematic={cinema ? '1' : '0'} className="hud-flat-phone pointer-events-none absolute left-1/2 top-4 z-10 flex -translate-x-1/2 divide-x divide-zinc-700 rounded-lg bg-zinc-950/60 py-1.5 backdrop-blur-sm max-sm:top-[calc(env(safe-area-inset-top)+0.375rem)] phone:top-[calc(env(safe-area-inset-top)+0.375rem)] phone-land:top-[calc(env(safe-area-inset-top)+0.25rem)] phone:bg-zinc-950/85 phone:py-1">
         <div className={cell}>
           <span className={label}>SPD KT</span>
           <span className={value} ref={spdRef}>—</span>

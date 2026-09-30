@@ -82,6 +82,7 @@ const initialState = {
 
   // Telemetry (discrete, low-frequency — never per-frame)
   trafficCount: 0,
+  spotting: false,
   lastPollAt: null,
   tileStats: { requested: 0, evicted: 0 },
 
@@ -193,6 +194,7 @@ export const useFlyStore = create(
 
     setTrafficStats: (trafficCount, lastPollAt) =>
       set({ trafficCount, lastPollAt }),
+    setSpotting: (spotting) => set({spotting:!!spotting}),
 
     bumpRebaseEpoch: () =>
       set((state) => ({ rebaseEpoch: state.rebaseEpoch + 1 })),

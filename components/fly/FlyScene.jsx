@@ -9,6 +9,11 @@ import { CoastalReflectionRig } from './CoastalReflectionRig';
 import { applyEarthSurface } from '@/lib/fly/earth-surface-material';
 import { updatePainterlyProfile } from '@/lib/fly/painterly-flight';
 import { updateWorldArt } from '@/lib/fly/world-art-direction';
+import { updateCinemaFrame } from '@/lib/fly/cinema-frame';
+import { CinemaShadowRig } from './CinemaShadowRig';
+import { CinemaResourceRig } from './CinemaResourceRig';
+import { CinemaEnvironmentRig } from './CinemaEnvironmentRig';
+import { cinemaOn, cinemaProfile, setCinemaRenderScale } from '@/lib/fly/cinema-policy';
 import { stylizedEarthOn } from '@/lib/fly/stylized-earth';
 import { SatGroundDetailLayer } from './SatGroundDetailLayer';
 import { applyNearGroundMaterial } from '@/lib/fly/near-ground-material';
@@ -257,6 +262,7 @@ const _snapV = new Vector3();
  * shadow update the matrix is identity and the snap lands in world axes, which
  * is harmless for exactly one frame.
  */
+const _cinemaKey = new Vector3();
 function snapToShadowTexel(sun, tx, ty, tz, radiusM, mapSize) {
   const cam = sun.shadow?.camera;
   if (!cam || !mapSize) return null;
@@ -972,6 +978,8 @@ export function FlyScene({ runtime }) {
   const spawn = useFlyStore((s) => s.spawn);
   const mapStyle = useFlyStore((s) => s.mapStyle);
   const qualityTier = useFlyStore((s) => s.qualityTier);
+  const visualsProfile = useFlyStore((s) => s.visuals);
+  const cinemaActive=cinemaOn({mapStyle,visuals:visualsProfile});
   const renderDpr = useThree((s) => s.viewport.dpr);
   const effectsTier = mapStyle === 'satellite' && satelliteVisualsOn()
     ? satelliteEffectTier(qualityTier, renderDpr) : qualityTier;
@@ -2396,6 +2404,9 @@ export function FlyScene({ runtime }) {
     const rpx = flight.pos.x - origin.anchor.x;
     const rpz = flight.pos.z - origin.anchor.z;
     // Publish once before both the aerial feed and material consumers read it.
+    setCinemaRenderScale(gl.getPixelRatio());
+    updateCinemaFrame(runtime,flyState);
+    runtime.cinemaProfile=cinemaOn(flyState)?cinemaProfile(flyState.qualityTier):null;
     updateDaylightDepth(runtime, flyState.mapStyle === 'satellite');
     const cinematicScale = flyState.mapStyle === 'satellite' && satelliteVisualsOn('scale');
     const bendR = cinematicScale ? SATELLITE_VISUALS.scale.bendRadiusM : GLOBE.bendRadiusM[flyState.mapStyle] ?? GLOBE.bendRadiusM.satellite;
@@ -3367,6 +3378,20 @@ export function FlyScene({ runtime }) {
       !(graphicsReviewOn() && window.__flyUrbanArtOverride === 0));
     r25SkyFrame(runtime, _r25Ctx);
     r25GroundFrame(runtime, _r25Ctx);
+    if(runtime.cinemaEnvironment){
+      const e=runtime.cinemaEnvironment;
+      if(sunRef.current){
+        sunRef.current.intensity=e.sun;sunRef.current.color.fromArray(e.keyColor);
+        sunRef.current.position.copy(sunTarget.position).addScaledVector(_cinemaKey.fromArray(e.keyDir),SAT_SHADOWS.distM);
+      }
+      if(hemiRef.current){hemiRef.current.intensity=e.fill;hemiRef.current.color.fromArray(e.fillColor);hemiRef.current.groundColor.fromArray(e.groundColor);}
+      setHillDir(...e.keyDir);
+      setHillshade(0);
+      if(scene.fog)scene.fog.density=0;
+      setDepthHazeRGB(SKY.haze.startM,SKY.haze.endM,..._atmoRim,0);
+      setSatContentHaze(AERIAL_PERSPECTIVE.content.startM,AERIAL_PERSPECTIVE.content.endM,0,0,0,0);
+      scene.environmentRotation.set(0,0,0);scene.backgroundRotation.set(0,0,0);
+    }
 
     if (hudFramePriority) camera.updateMatrixWorld();
   }, -50);
@@ -3398,7 +3423,7 @@ export function FlyScene({ runtime }) {
             untouched: the same keyed drei element on the certified noon HDRI
             (key 'toy', background false, TOY.envIntensity) it has always had. */}
         {mapStyle === 'satellite' ? (
-          <SatEnvironment runtime={runtime} bucket={hdriBucket} />
+          cinemaActive ? <CinemaEnvironmentRig runtime={runtime} /> : <SatEnvironment runtime={runtime} bucket={hdriBucket} />
         ) : (
           <NeonEnvironment
             key={mapStyle}
@@ -3425,6 +3450,8 @@ export function FlyScene({ runtime }) {
       />
 
       <hemisphereLight ref={hemiRef} args={mood.hemi} />
+      {cinemaActive && <CinemaShadowRig runtime={runtime} sunRef={sunRef} />}
+      {cinemaActive && <CinemaResourceRig runtime={runtime} />}
       {mapStyle === 'satellite' && <CoastalReflectionRig runtime={runtime} />}
       {/* Round 8: position follows the style's key light (toy = moon) and
           the shadow map is tier-gated — 2048 is a HIGH-only luxury (P7). */}

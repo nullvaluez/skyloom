@@ -67,9 +67,9 @@ async function main(){
   page.on('console',m=>{if(m.type()==='error'&&/shader|WebGL|ReferenceError|TypeError/.test(m.text()))report.errors.push(m.text().slice(0,1000))});
   report.weather=args.weather||'baseline';
   report.crashMode='forgiving'; // Rendering benchmark: an automated route must not respawn through buildings.
-  await page.addInitScript(({hour,weather,quality})=>{localStorage.setItem('fly-map-style-2','satellite');localStorage.setItem('fly-quality-tier',quality);localStorage.setItem('fly-sound-on','0');localStorage.setItem('fly-controls-seen','1');localStorage.setItem('fly-crash-mode','forgiving');window.__flyWeatherOverride=weather;window.__flySunOverride=Date.UTC(2026,6,18,hour);},{hour:Number(args.hour??4),weather:report.weather,quality:args.quality||'high'});
+  await page.addInitScript(({hour,weather,quality})=>{localStorage.setItem('fly-map-style-2','satellite');localStorage.setItem('fly-visuals','enhanced');localStorage.setItem('fly-quality-tier',quality);localStorage.setItem('fly-sound-on','0');localStorage.setItem('fly-controls-seen','1');localStorage.setItem('fly-crash-mode','forgiving');window.__flyWeatherOverride=weather;window.__flySunOverride=Date.UTC(2026,6,18,hour);},{hour:Number(args.hour??4),weather:report.weather,quality:args.quality||'high'});
   if(args.earth)await page.addInitScript(require('./ground-texture-audit.cjs').installGroundTextureAudit);
-  await page.goto((args.url||'http://localhost:3000')+'/?graphics='+encodeURIComponent(stage)+'&graphicsReview=1'+(args.earth?'&earth=stylized':''),{waitUntil:'domcontentloaded',timeout:90000});
+  await page.goto((args.url||'http://localhost:3000')+'/?graphics='+encodeURIComponent(stage)+'&graphicsReview=1'+(args.earth?'&earth=stylized':'')+(args.look?'&earthLook='+encodeURIComponent(args.look):''),{waitUntil:'domcontentloaded',timeout:90000});
   if(args['build-id']){
     report.servedBuild=await groundBuildReceipt(page,args.url||'http://localhost:3000',args['build-id']);
   }
@@ -77,6 +77,7 @@ async function main(){
   // 'demand', so pct never reaches 100 behind it) — skip the menus, then wait for the reveal.
   await enterFlight(page,{altM:Number(args.alt??500),lat:Number(args.lat??40.7028),lon:Number(args.lon??-74.017),headingRad:undefined,name:null},{timeoutMs:90000,waitReveal:true});
   await page.waitForTimeout(25000);
+  if(args.look==='cinematic'&&!await page.evaluate(()=>!!window.__fly.cinemaEnvironment))throw Error('Cinematic path inactive');
   await page.waitForFunction(()=>window.__fly.satBuildings?.stats.ready>=4,null,{timeout:30000});
   report.hardware=await page.evaluate(()=>{const gl=document.querySelector('canvas').getContext('webgl2');const e=gl.getExtension('WEBGL_debug_renderer_info');return{renderer:e&&gl.getParameter(e.UNMASKED_RENDERER_WEBGL),gpuTimer:!!gl.getExtension('EXT_disjoint_timer_query_webgl2')};});
   if(!report.hardware.gpuTimer || /swiftshader|software|llvmpipe/i.test(report.hardware.renderer||''))throw Error('Hardware GPU timing unavailable');
@@ -128,7 +129,7 @@ async function main(){
       sceneRoot.traverse(o=>{if(!o.geometry)return;for(const attr of [...Object.values(o.geometry.attributes),o.geometry.index,o.instanceMatrix,o.instanceColor]){
         const array=attr?.data?.array??attr?.array;if(array&&!geometryBuffers.has(array.buffer)){geometryBuffers.add(array.buffer);geometryAttributeBytes+=array.buffer.byteLength;}
       }});
-      return{at:Date.now(),review:window.__graphicsReview,terrain:rt.terraStats,geometryAttributeBytes,
+      return{at:Date.now(),review:window.__graphicsReview,terrain:rt.terraStats,geometryAttributeBytes,cinema:{active:!!rt.cinemaEnvironment,profile:rt.cinemaProfile,resources:rt.cinemaResources},
         terrainResidency:{...rt.engine.residency?.stats,budgetBytes:rt.engine.residency?.budgetBytes},
         heap:performance.memory?.usedJSHeapSize,position:{...f.pos},origin:{...rt.origin.anchor},
         activeTraffic:[...rt.traffic.tracks.values()].filter(t=>t.fix1 && t.stale!==2).length,
@@ -235,9 +236,19 @@ async function main(){
   report.traffic={min:Math.min(...report.samples.map(s=>s.activeTraffic)),max:Math.max(...report.samples.map(s=>s.activeTraffic))};
   const missingTiles=report.samples.some(s=>s.failedImagery>0||s.terrainMeshes<20);
   const absentTraffic=report.traffic.max===0;
-  const validResolution=args.earth?report.samples.every(s=>s.review?.dpr>=.75&&s.review?.dpr<=1):report.budgets.native;
-  const completeTextures=!args.earth||report.samples.every(s=>s.textureAudit?.peakComplete&&s.textureAudit.peakBytes<=300*1048576);
-  const budgetsMeasured=drawValues.every(n=>n>1), budgetsPass=validResolution&&completeTextures&&report.budgets.drawP95<=375&&report.budgets.triangleP95<=2200000&&report.timing.gpuP95<=12&&report.budgets.terrainAndGroundMapMBMax<=300;
+  const validResolution=args.earth&&args.look!=='cinematic'?report.samples.every(s=>s.review?.dpr>=.75&&s.review?.dpr<=1):report.budgets.native;
+  const cinemaUltra=args.look==='cinematic'&&args.quality==='ultra';
+  const completeTextures=!args.earth||report.samples.every(s=>s.textureAudit?.peakComplete&&(cinemaUltra?s.textureAudit.peakCombinedBytes<=768*1048576:s.textureAudit.peakBytes<=300*1048576));
+  // A run that silently drops Ultra effects cannot certify the Ultra contract.
+  const cinemaBudgetPass=!cinemaUltra||report.samples.every(s=>s.cinema.profile?.name==='ultra'&&s.cinema.resources?.combinedBytes<=768*1048576&&s.geometryAttributeBytes<=256*1048576);
+  const budgetsMeasured=drawValues.every(n=>n>1), budgetsPass=validResolution&&completeTextures&&cinemaBudgetPass&&report.budgets.drawP95<=(cinemaUltra?900:375)&&report.budgets.triangleP95<=(cinemaUltra?8000000:2200000)&&report.timing.gpuP95<=12&&report.budgets.terrainAndGroundMapMBMax<=300;
+  if(args.look==='cinematic'){
+    report.cinema={active:report.samples.every(s=>s.cinema.active),requested:args.quality,profiles:[...new Set(report.samples.map(s=>s.cinema.profile?.name))],
+      textureAndRenderbufferCensusMiBMax:Math.max(...report.samples.map(s=>(s.cinema.resources?.combinedBytes??Infinity)/1048576)),geometryMiBMax:Math.max(...report.samples.map(s=>s.geometryAttributeBytes/1048576)),
+      acceptanceEligible:duration>=900&&width===3840&&height===2160&&!args.profile&&!args.earth,
+      note:'A shorter run is diagnostic only. Periodic resource census does not certify peak allocation; use the separate GL allocation audit.'};
+    if(!report.cinema.active)report.errors.push('Cinematic path became inactive during measurement');
+  }
   if(args.earth)report.earthBudget={textureMiBPeak:Math.max(...report.samples.map(s=>(s.textureAudit?.peakBytes??Infinity)/1048576)),renderbufferMiBPeak:Math.max(...report.samples.map(s=>(s.textureAudit?.peakRenderbufferBytes??0)/1048576)),geometryAttributeMiBMax:Math.max(...report.samples.map(s=>s.geometryAttributeBytes/1048576)),geometryNote:'Unique scene attribute backing buffers, including indices and instance data. Estimate excludes driver overhead and unattached cached geometry.',combinedMiBPeak:Math.max(...report.samples.map(s=>(s.textureAudit?.peakCombinedBytes??Infinity)/1048576)),completeTextures,validResolution,referenceHardwareVerified:false,referenceHardware:'Radeon 780M-class integrated graphics; this run establishes only the recorded renderer'};
   report.unpinned=report.samples.every(s=>Object.values(s.pins).every(v=>v===null));
   // Guard a stalled simulation: a frame-time PASS must represent moving flight.
@@ -251,7 +262,7 @@ async function main(){
     return [groundMetres/seconds];
   });
   report.motion.minimumMeasuredGroundSpeed=measuredSpeeds.length?Math.min(...measuredSpeeds):0;
-  report.frameTargetMs=stage==='immersive'||args.earth?16.7:20;
+  report.frameTargetMs=stage==='immersive'||args.earth||args.look==='cinematic'?16.7:20;
   const insufficientMotion=!Number.isFinite(report.motion.minimumSpeed)||!Number.isFinite(report.motion.minimumMeasuredGroundSpeed)||report.motion.minimumSpeed<50||report.motion.minimumMeasuredGroundSpeed<50;
   report.status=report.errors.length||absent||!report.unpinned?'FAIL':unsuitable||!budgetsMeasured||missingTiles||absentTraffic||insufficientMotion?'BLOCKED':report.timing.p95<=report.frameTargetMs&&report.timing.p99<=33.3&&budgetsPass?'PASS':'FAIL';
   report.reason=absent?'A required layer failed to remain ready through quality transitions':unsuitable?'GPU timing unavailable or software renderer':missingTiles?'Terrain imagery missing or insufficient residency':absentTraffic?'No live traffic available during measurement':!budgetsMeasured?'Scene draw/triangle counters unavailable':insufficientMotion?'Actual ground travel did not meet the existing 50 m/s movement floor':report.status==='FAIL'?'Errors, draw/triangle budget or frame-time target missed':undefined;

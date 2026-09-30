@@ -20,6 +20,26 @@ import { StepSafeRig } from './StepSafeRig';
 import { HudSyncRig } from './HudSyncRig';
 import { useFlyStore } from '@/stores/fly-store';
 import { frameloopFor, noteStagePump, stagePumpHz, stagePumpWanted } from '@/lib/fly/front-door';
+import { cinemaOn } from '@/lib/fly/cinema-policy';
+import { isPhoneClass } from '@/lib/fly/device-class';
+import { configureCinemaAssets } from '@/lib/fly/cinema-material-assets';
+import { installContextResourceLifetime } from '@/lib/fly/context-resource-lifetime';
+
+function PhoneFlightPump({enabled}){
+  const invalidate=useThree(s=>s.invalidate);
+  useEffect(()=>{
+    if(!enabled)return;
+    let id,previous=0;
+    const tick=now=>{
+      id=requestAnimationFrame(tick);
+      if(document.hidden)return;
+      if(now-previous>=1000/30-.8){previous=now;invalidate();}
+    };
+    id=requestAnimationFrame(tick);
+    return()=>cancelAnimationFrame(id);
+  },[enabled,invalidate]);
+  return null;
+}
 
 function initialDpr() {
   if (typeof window === 'undefined') return CANVAS.dprMax;
@@ -91,6 +111,8 @@ export function FlyCanvas({ runtime }) {
   // R25 A (FRONT DOOR): 'always' on the title and in flight, 'demand' while
   // the opaque hangar is open (fed by <StagePump>). Flag-off = today's rule.
   const frameloop=useFlyStore(frameloopFor);
+  const visuals=useFlyStore(s=>s.visuals),mapStyle=useFlyStore(s=>s.mapStyle);
+  const phoneFlight=frameloop==='always'&&isPhoneClass()&&cinemaOn({visuals,mapStyle});
   const [dpr, setDpr] = useState(initialDpr);
   // R24 A (STEP_SAFE): resolved once at mount — the pin is set before Fly mode
   // mounts and never moves mid-session.
@@ -131,7 +153,7 @@ export function FlyCanvas({ runtime }) {
       shadows
       // The hangar has its own interactive canvas. Retain the world and its
       // resources, but do not render two full scenes continuously behind it.
-      frameloop={frameloop}
+      frameloop={phoneFlight?'demand':frameloop}
       camera={{
         fov: CANVAS.fov,
         near: CANVAS.near,
@@ -146,6 +168,8 @@ export function FlyCanvas({ runtime }) {
         reversedDepthBuffer: true,
       }}
       onCreated={({ gl }) => {
+        if(cinemaOn())runtime.cinemaContextResources=installContextResourceLifetime(gl.getContext());
+        configureCinemaAssets(gl);
         // R24 C (recon T11): latch the live depth convention for the streaming
         // ENGINES, which build materials with no renderer in scope. Components
         // keep passing `gl` and are unaffected. Production path, not dev-gated:
@@ -165,6 +189,7 @@ export function FlyCanvas({ runtime }) {
         }
       }}
     >
+      <PhoneFlightPump enabled={phoneFlight} />
       {/* Round 24 (E CERT): the frame-pace instrument. Priority -101 puts it
           ahead of the governor (-100) and A's STEP_SAFE rig (-99), so its dt
           is the raw inter-frame delta of the frame that just presented. Not

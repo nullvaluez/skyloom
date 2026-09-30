@@ -1,0 +1,9 @@
+{
+  "author": "Skyloom",
+  "license": "MIT",
+  "size": 64,
+  "channels": 2,
+  "periodMetres": 8192,
+  "bytes": 524288,
+  "sha256": "44823a019270e55f44e0db939f8f062bcaa5fa14f4ee13b6fcb43cc92a81bbf0"
+}

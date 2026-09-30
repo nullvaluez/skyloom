@@ -48,6 +48,7 @@ import {
 } from '@/lib/fly/tracer-spot';
 import { useFlyStore } from '@/stores/fly-store';
 import { TrafficContrails } from './TrafficContrails';
+import { cinemaOn } from '@/lib/fly/cinema-policy';
 
 // Altitude → neon (airloom reference): green on the deck, yellow low,
 // orange mid, cyan cruise. Tail fades to black (additive = transparent).
@@ -315,7 +316,7 @@ function SpotTracers({ runtime, flight, origin }) {
       const dz = hz - az - cz;
       const Dw = Math.hypot(dx, dy, dz) || 1;
       const Dt = Number.isFinite(t.distM) ? t.distM : Dw / kLat;
-      const Lm = spotLengthM(Dt, speed);
+      const Lm = spotLengthM(Dt, speed)*(cinemaOn()&&!useFlyStore.getState().spotting&&t.hex!==pinHex? .35:1);
       // WORLD spacing (true metres × the track's mercator k), so recorded and
       // backfilled trails are the same length.
       const spW = Math.min(S.length.maxSpacingWorldM, (Lm / RING) * kT);
@@ -400,7 +401,7 @@ function SpotTracers({ runtime, flight, origin }) {
       const base = spotSlotBase(r);
       const b = spotBandIndex(t.ry);
       const pinned = t.hex === pinHex;
-      const pres = state.cA[c] * (pinned ? S.body.lockPresence : 1);
+      const pres = state.cA[c] * (pinned ? S.body.lockPresence : cinemaOn()&&!useFlyStore.getState().spotting ? .28 : 1);
       const Dt = state.cDt[c];
       const Dw = state.cDw[c];
       // Prominence follows reach: full within fullM, receding to a faint

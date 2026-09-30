@@ -1,0 +1,610 @@
+{
+  "version": 1,
+  "license": "MIT",
+  "author": "Skyloom",
+  "generator": "scripts/build-cinema-materials.mjs",
+  "layers": [
+    "asphalt",
+    "concrete",
+    "masonry",
+    "roofing",
+    "soil-grass",
+    "rock",
+    "sand",
+    "snow"
+  ],
+  "variants": {
+    "128": {
+      "size": 128,
+      "layers": 8,
+      "files": {
+        "color": {
+          "rgba": {
+            "file": "128-color.rgba",
+            "bytes": 524288,
+            "sha256": "343cf7ee5934751fcea111e7bb0a0785acb47d007b622819a2f4d030850f82ab"
+          },
+          "bc3": {
+            "file": "128-color.bc3",
+            "bytes": 174976,
+            "levels": [
+              {
+                "width": 128,
+                "height": 128,
+                "offset": 0,
+                "length": 131072
+              },
+              {
+                "width": 64,
+                "height": 64,
+                "offset": 131072,
+                "length": 32768
+              },
+              {
+                "width": 32,
+                "height": 32,
+                "offset": 163840,
+                "length": 8192
+              },
+              {
+                "width": 16,
+                "height": 16,
+                "offset": 172032,
+                "length": 2048
+              },
+              {
+                "width": 8,
+                "height": 8,
+                "offset": 174080,
+                "length": 512
+              },
+              {
+                "width": 4,
+                "height": 4,
+                "offset": 174592,
+                "length": 128
+              },
+              {
+                "width": 2,
+                "height": 2,
+                "offset": 174720,
+                "length": 128
+              },
+              {
+                "width": 1,
+                "height": 1,
+                "offset": 174848,
+                "length": 128
+              }
+            ],
+            "sha256": "ae0997128d34671e4a50c64bc1e7824d54319dc2284d4d00ed65c0f4e01d7749"
+          }
+        },
+        "detail": {
+          "rgba": {
+            "file": "128-detail.rgba",
+            "bytes": 524288,
+            "sha256": "6aa71f57f2e637409e6d540f43a9c7295273e3735a19fd75e517fb57ad81e858"
+          },
+          "bc3": {
+            "file": "128-detail.bc3",
+            "bytes": 174976,
+            "levels": [
+              {
+                "width": 128,
+                "height": 128,
+                "offset": 0,
+                "length": 131072
+              },
+              {
+                "width": 64,
+                "height": 64,
+                "offset": 131072,
+                "length": 32768
+              },
+              {
+                "width": 32,
+                "height": 32,
+                "offset": 163840,
+                "length": 8192
+              },
+              {
+                "width": 16,
+                "height": 16,
+                "offset": 172032,
+                "length": 2048
+              },
+              {
+                "width": 8,
+                "height": 8,
+                "offset": 174080,
+                "length": 512
+              },
+              {
+                "width": 4,
+                "height": 4,
+                "offset": 174592,
+                "length": 128
+              },
+              {
+                "width": 2,
+                "height": 2,
+                "offset": 174720,
+                "length": 128
+              },
+              {
+                "width": 1,
+                "height": 1,
+                "offset": 174848,
+                "length": 128
+              }
+            ],
+            "sha256": "f791b043b116b6225d1bf9aa9012b1d7c59343061a90af7652203711c71c40ac"
+          }
+        }
+      }
+    },
+    "256": {
+      "size": 256,
+      "layers": 8,
+      "files": {
+        "color": {
+          "rgba": {
+            "file": "256-color.rgba",
+            "bytes": 2097152,
+            "sha256": "d8e3b7b6f178f2bdf6192b05ba6c4dec4832ce180c9eeae58e09b624109d7f57"
+          },
+          "bc3": {
+            "file": "256-color.bc3",
+            "bytes": 699264,
+            "levels": [
+              {
+                "width": 256,
+                "height": 256,
+                "offset": 0,
+                "length": 524288
+              },
+              {
+                "width": 128,
+                "height": 128,
+                "offset": 524288,
+                "length": 131072
+              },
+              {
+                "width": 64,
+                "height": 64,
+                "offset": 655360,
+                "length": 32768
+              },
+              {
+                "width": 32,
+                "height": 32,
+                "offset": 688128,
+                "length": 8192
+              },
+              {
+                "width": 16,
+                "height": 16,
+                "offset": 696320,
+                "length": 2048
+              },
+              {
+                "width": 8,
+                "height": 8,
+                "offset": 698368,
+                "length": 512
+              },
+              {
+                "width": 4,
+                "height": 4,
+                "offset": 698880,
+                "length": 128
+              },
+              {
+                "width": 2,
+                "height": 2,
+                "offset": 699008,
+                "length": 128
+              },
+              {
+                "width": 1,
+                "height": 1,
+                "offset": 699136,
+                "length": 128
+              }
+            ],
+            "sha256": "5dadd78ae59d3dd5941530cf7e97e7347dc965c8d9da159a6d83c26048e03416"
+          }
+        },
+        "detail": {
+          "rgba": {
+            "file": "256-detail.rgba",
+            "bytes": 2097152,
+            "sha256": "6931bc6dcdf7d19e5a3be1ed61e6c2150e1e221907cd611f03ef5ca202c26bae"
+          },
+          "bc3": {
+            "file": "256-detail.bc3",
+            "bytes": 699264,
+            "levels": [
+              {
+                "width": 256,
+                "height": 256,
+                "offset": 0,
+                "length": 524288
+              },
+              {
+                "width": 128,
+                "height": 128,
+                "offset": 524288,
+                "length": 131072
+              },
+              {
+                "width": 64,
+                "height": 64,
+                "offset": 655360,
+                "length": 32768
+              },
+              {
+                "width": 32,
+                "height": 32,
+                "offset": 688128,
+                "length": 8192
+              },
+              {
+                "width": 16,
+                "height": 16,
+                "offset": 696320,
+                "length": 2048
+              },
+              {
+                "width": 8,
+                "height": 8,
+                "offset": 698368,
+                "length": 512
+              },
+              {
+                "width": 4,
+                "height": 4,
+                "offset": 698880,
+                "length": 128
+              },
+              {
+                "width": 2,
+                "height": 2,
+                "offset": 699008,
+                "length": 128
+              },
+              {
+                "width": 1,
+                "height": 1,
+                "offset": 699136,
+                "length": 128
+              }
+            ],
+            "sha256": "216aeeacd1efb1fcd30f10a240f5080997879ed85d5c7718d508afd271f463b2"
+          }
+        }
+      }
+    },
+    "512": {
+      "size": 512,
+      "layers": 8,
+      "files": {
+        "color": {
+          "rgba": {
+            "file": "512-color.rgba",
+            "bytes": 8388608,
+            "sha256": "996701a3fc0c3dd6db150816cc69864b9c8457c50fe0d2edbfc90fda8e494ec4"
+          },
+          "bc3": {
+            "file": "512-color.bc3",
+            "bytes": 2796416,
+            "levels": [
+              {
+                "width": 512,
+                "height": 512,
+                "offset": 0,
+                "length": 2097152
+              },
+              {
+                "width": 256,
+                "height": 256,
+                "offset": 2097152,
+                "length": 524288
+              },
+              {
+                "width": 128,
+                "height": 128,
+                "offset": 2621440,
+                "length": 131072
+              },
+              {
+                "width": 64,
+                "height": 64,
+                "offset": 2752512,
+                "length": 32768
+              },
+              {
+                "width": 32,
+                "height": 32,
+                "offset": 2785280,
+                "length": 8192
+              },
+              {
+                "width": 16,
+                "height": 16,
+                "offset": 2793472,
+                "length": 2048
+              },
+              {
+                "width": 8,
+                "height": 8,
+                "offset": 2795520,
+                "length": 512
+              },
+              {
+                "width": 4,
+                "height": 4,
+                "offset": 2796032,
+                "length": 128
+              },
+              {
+                "width": 2,
+                "height": 2,
+                "offset": 2796160,
+                "length": 128
+              },
+              {
+                "width": 1,
+                "height": 1,
+                "offset": 2796288,
+                "length": 128
+              }
+            ],
+            "sha256": "64f47431582711b8b52459444e06d5c193cfe3bab62f20773dc3b04a92033e74"
+          }
+        },
+        "detail": {
+          "rgba": {
+            "file": "512-detail.rgba",
+            "bytes": 8388608,
+            "sha256": "05fa97a996388f33d21dccaf77109526107bf34b7aea0181e9549c0c6347003f"
+          },
+          "bc3": {
+            "file": "512-detail.bc3",
+            "bytes": 2796416,
+            "levels": [
+              {
+                "width": 512,
+                "height": 512,
+                "offset": 0,
+                "length": 2097152
+              },
+              {
+                "width": 256,
+                "height": 256,
+                "offset": 2097152,
+                "length": 524288
+              },
+              {
+                "width": 128,
+                "height": 128,
+                "offset": 2621440,
+                "length": 131072
+              },
+              {
+                "width": 64,
+                "height": 64,
+                "offset": 2752512,
+                "length": 32768
+              },
+              {
+                "width": 32,
+                "height": 32,
+                "offset": 2785280,
+                "length": 8192
+              },
+              {
+                "width": 16,
+                "height": 16,
+                "offset": 2793472,
+                "length": 2048
+              },
+              {
+                "width": 8,
+                "height": 8,
+                "offset": 2795520,
+                "length": 512
+              },
+              {
+                "width": 4,
+                "height": 4,
+                "offset": 2796032,
+                "length": 128
+              },
+              {
+                "width": 2,
+                "height": 2,
+                "offset": 2796160,
+                "length": 128
+              },
+              {
+                "width": 1,
+                "height": 1,
+                "offset": 2796288,
+                "length": 128
+              }
+            ],
+            "sha256": "58f1677308880264736c7f186191d8d20fe326bd01e0dcf7dd93066479582bb9"
+          }
+        }
+      }
+    },
+    "1024": {
+      "size": 1024,
+      "layers": 8,
+      "files": {
+        "color": {
+          "rgba": {
+            "file": "1024-color.rgba",
+            "bytes": 33554432,
+            "sha256": "9b14e81c2da8e67abd30618ba56751484ab11bf3503956218749def0855baa4d"
+          },
+          "bc3": {
+            "file": "1024-color.bc3",
+            "bytes": 11185024,
+            "levels": [
+              {
+                "width": 1024,
+                "height": 1024,
+                "offset": 0,
+                "length": 8388608
+              },
+              {
+                "width": 512,
+                "height": 512,
+                "offset": 8388608,
+                "length": 2097152
+              },
+              {
+                "width": 256,
+                "height": 256,
+                "offset": 10485760,
+                "length": 524288
+              },
+              {
+                "width": 128,
+                "height": 128,
+                "offset": 11010048,
+                "length": 131072
+              },
+              {
+                "width": 64,
+                "height": 64,
+                "offset": 11141120,
+                "length": 32768
+              },
+              {
+                "width": 32,
+                "height": 32,
+                "offset": 11173888,
+                "length": 8192
+              },
+              {
+                "width": 16,
+                "height": 16,
+                "offset": 11182080,
+                "length": 2048
+              },
+              {
+                "width": 8,
+                "height": 8,
+                "offset": 11184128,
+                "length": 512
+              },
+              {
+                "width": 4,
+                "height": 4,
+                "offset": 11184640,
+                "length": 128
+              },
+              {
+                "width": 2,
+                "height": 2,
+                "offset": 11184768,
+                "length": 128
+              },
+              {
+                "width": 1,
+                "height": 1,
+                "offset": 11184896,
+                "length": 128
+              }
+            ],
+            "sha256": "451d53cbb17747685491803526689390af928976ca5e084df926b0261eade653"
+          }
+        },
+        "detail": {
+          "rgba": {
+            "file": "1024-detail.rgba",
+            "bytes": 33554432,
+            "sha256": "f9eda4c2c8e47d71f3e79777f2101da29fc42741367f2e382a6af7c346f2a256"
+          },
+          "bc3": {
+            "file": "1024-detail.bc3",
+            "bytes": 11185024,
+            "levels": [
+              {
+                "width": 1024,
+                "height": 1024,
+                "offset": 0,
+                "length": 8388608
+              },
+              {
+                "width": 512,
+                "height": 512,
+                "offset": 8388608,
+                "length": 2097152
+              },
+              {
+                "width": 256,
+                "height": 256,
+                "offset": 10485760,
+                "length": 524288
+              },
+              {
+                "width": 128,
+                "height": 128,
+                "offset": 11010048,
+                "length": 131072
+              },
+              {
+                "width": 64,
+                "height": 64,
+                "offset": 11141120,
+                "length": 32768
+              },
+              {
+                "width": 32,
+                "height": 32,
+                "offset": 11173888,
+                "length": 8192
+              },
+              {
+                "width": 16,
+                "height": 16,
+                "offset": 11182080,
+                "length": 2048
+              },
+              {
+                "width": 8,
+                "height": 8,
+                "offset": 11184128,
+                "length": 512
+              },
+              {
+                "width": 4,
+                "height": 4,
+                "offset": 11184640,
+                "length": 128
+              },
+              {
+                "width": 2,
+                "height": 2,
+                "offset": 11184768,
+                "length": 128
+              },
+              {
+                "width": 1,
+                "height": 1,
+                "offset": 11184896,
+                "length": 128
+              }
+            ],
+            "sha256": "92b6c5e8ffe31bb1dfab9ff83989841dc9effaa92dbb7dda6c738858e93c5df5"
+          }
+        }
+      }
+    }
+  }
+}
