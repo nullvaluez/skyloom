@@ -1,0 +1,887 @@
+{
+ "_doc": "Skyloom trailer SFX, first pass against scripts/trailer/cuesheet.json (120 BPM, bar = 2.0 s). Render: python3 scripts/trailer/audio/sfx.py /tmp/claude-0/audio/sfx_events.json /tmp/claude-0/audio/sfx.wav --duration 104. Anchors: beds start at t; flyby/whoosh/airliner_pass peak at t; impacts/boom/warp/afterburner/ui transients hit at t; reverse_swell ends at t. Picture cut points inside sections are ASSUMED (world 16 Alps / 18 Rio / 20 Dubai / 22 Sydney / 25 Hudson; climax beats 90-93) - move the t values when the edit locks.",
+ "master_gain_db": 0.0,
+ "events": [
+  {
+   "t": 0.6,
+   "kind": "wind_high",
+   "dur": 7.3,
+   "intensity": 0.45,
+   "fade_in": 2.6,
+   "fade_out": 0.9,
+   "gain_db": -4,
+   "label": "cold open: high altitude above the cloud sea"
+  },
+  {
+   "t": 1.5,
+   "kind": "radio",
+   "dur": 5.4,
+   "gain_db": -11,
+   "pan": -0.25,
+   "transmissions": [
+    [
+     0.2,
+     1.1,
+     "hetero"
+    ],
+    [
+     1.8,
+     2.3,
+     "selcal"
+    ],
+    [
+     4.5,
+     0.7,
+     "carrier"
+    ]
+   ],
+   "fade_in": 0.02,
+   "label": "faint radio texture"
+  },
+  {
+   "t": 5.9,
+   "kind": "airliner_pass",
+   "distance": 1400,
+   "height": 0,
+   "speed": 110,
+   "thrust": 0.4,
+   "pan": -0.5,
+   "pan_to": 0.5,
+   "sweeten_db": -99,
+   "air": 1.0,
+   "gain_db": -13,
+   "gate_out": 7.6,
+   "label": "distant real airliner overhead (thousands of real aircraft)"
+  },
+  {
+   "t": 8.0,
+   "kind": "reverse_swell",
+   "dur": 1.1,
+   "gain_db": 0,
+   "label": "suck-in to the 8.0 braam"
+  },
+  {
+   "t": 8.0,
+   "kind": "impact_low",
+   "gain_db": -1,
+   "label": "8.0 hard cut / braam support"
+  },
+  {
+   "t": 8.0,
+   "kind": "jet_bed",
+   "dur": 4.1,
+   "intensity": 0.7,
+   "fade_in": 0.03,
+   "fade_out": 0.25,
+   "gain_db": -3,
+   "label": "chase bed"
+  },
+  {
+   "t": 8.35,
+   "kind": "flyby",
+   "pan": -0.6,
+   "pan_to": 0.9,
+   "crackle": 0.45,
+   "ground": "water",
+   "space": "city",
+   "wet_db": -14,
+   "gate_in": 8.0,
+   "gain_db": 1,
+   "label": "hero jet pass over NY Harbor"
+  },
+  {
+   "t": 12.0,
+   "kind": "afterburner",
+   "dur": 3.0,
+   "pull_away": false,
+   "gain_db": 1,
+   "space": "city",
+   "label": "12.0 boost ignition"
+  },
+  {
+   "t": 12.0,
+   "kind": "jet_bed",
+   "dur": 4.0,
+   "intensity": 0.95,
+   "fade_in": 0.2,
+   "fade_out": 0.15,
+   "gain_db": -3,
+   "label": "boosted chase bed"
+  },
+  {
+   "t": 12.9,
+   "kind": "whoosh",
+   "variant": "long",
+   "pan": 0.8,
+   "pan_to": -0.6,
+   "space": "city",
+   "gain_db": -3,
+   "label": "camera whips alongside, Lower Manhattan"
+  },
+  {
+   "t": 16.0,
+   "kind": "whoosh",
+   "variant": "short",
+   "pan": -0.6,
+   "pan_to": 0.6,
+   "gain_db": -1,
+   "label": "cut: Alps"
+  },
+  {
+   "t": 16.0,
+   "kind": "jet_bed",
+   "dur": 2.05,
+   "intensity": 0.85,
+   "fade_in": 0.02,
+   "fade_out": 0.1,
+   "gain_db": -3,
+   "label": "Alps valley run"
+  },
+  {
+   "t": 17.2,
+   "kind": "whoosh",
+   "variant": "long",
+   "pan": 0.7,
+   "pan_to": -0.5,
+   "space": "valley",
+   "wet_db": -10,
+   "gain_db": -2,
+   "gate_out": 18.0,
+   "label": "rock wall passing, valley echo"
+  },
+  {
+   "t": 18.0,
+   "kind": "whoosh",
+   "variant": "short",
+   "pan": 0.6,
+   "pan_to": -0.6,
+   "gain_db": -3,
+   "label": "cut: Rio"
+  },
+  {
+   "t": 19.1,
+   "kind": "flyby",
+   "pan": 0.8,
+   "pan_to": -0.8,
+   "ground": "water",
+   "pre": 2.0,
+   "post": 2.5,
+   "gain_db": -2,
+   "gate_in": 18.0,
+   "gate_out": 20.0,
+   "label": "past Sugarloaf / Copacabana"
+  },
+  {
+   "t": 20.0,
+   "kind": "wind_high",
+   "dur": 2.05,
+   "intensity": 0.7,
+   "fade_in": 0.05,
+   "fade_out": 0.12,
+   "gain_db": -1,
+   "label": "Dubai, Palm from above"
+  },
+  {
+   "t": 20.0,
+   "kind": "jet_bed",
+   "dur": 2.05,
+   "intensity": 0.5,
+   "fade_in": 0.05,
+   "fade_out": 0.1,
+   "gain_db": -7,
+   "label": "Dubai bed"
+  },
+  {
+   "t": 22.0,
+   "kind": "whoosh",
+   "variant": "short",
+   "pan": -0.6,
+   "pan_to": 0.6,
+   "gain_db": -2,
+   "label": "cut: Sydney skim"
+  },
+  {
+   "t": 22.0,
+   "kind": "water_skim",
+   "dur": 3.05,
+   "intensity": 0.9,
+   "fade_in": 0.08,
+   "fade_out": 0.1,
+   "gain_db": 0,
+   "label": "Sydney Harbour water skim"
+  },
+  {
+   "t": 22.0,
+   "kind": "jet_bed",
+   "dur": 3.05,
+   "intensity": 0.8,
+   "fade_in": 0.05,
+   "fade_out": 0.1,
+   "gain_db": -5,
+   "label": "skim bed"
+  },
+  {
+   "t": 25.0,
+   "kind": "whoosh",
+   "variant": "short",
+   "pan": 0.6,
+   "pan_to": -0.6,
+   "gain_db": -2,
+   "label": "cut: Hudson skim"
+  },
+  {
+   "t": 25.0,
+   "kind": "water_skim",
+   "dur": 3.0,
+   "intensity": 0.85,
+   "fade_in": 0.08,
+   "fade_out": 0.12,
+   "gain_db": -1,
+   "label": "Hudson waterfront skim"
+  },
+  {
+   "t": 26.6,
+   "kind": "flyby",
+   "pan": -0.9,
+   "pan_to": 0.9,
+   "ground": "water",
+   "space": "city",
+   "pre": 2.0,
+   "post": 2.0,
+   "gain_db": -3,
+   "gate_in": 25.0,
+   "gate_out": 28.0,
+   "label": "past the piers"
+  },
+  {
+   "t": 28.0,
+   "kind": "whoosh",
+   "variant": "long",
+   "pan": -0.5,
+   "pan_to": 0.5,
+   "gain_db": -2,
+   "label": "28.0 hit_drop transition"
+  },
+  {
+   "t": 28.0,
+   "kind": "impact_low",
+   "gain_db": -7,
+   "label": "drop sub"
+  },
+  {
+   "t": 28.4,
+   "kind": "radio",
+   "dur": 9.3,
+   "gain_db": 1,
+   "pan": 0.15,
+   "transmissions": [
+    [
+     0.15,
+     1.2,
+     "carrier"
+    ],
+    [
+     3.5,
+     2.1,
+     "selcal"
+    ],
+    [
+     5.9,
+     0.75,
+     "beeps"
+    ],
+    [
+     7.1,
+     1.9,
+     "hetero"
+    ]
+   ],
+   "label": "live-traffic radio chatter (no speech)"
+  },
+  {
+   "t": 30.4,
+   "kind": "airliner_pass",
+   "distance": 650,
+   "height": 0,
+   "speed": 95,
+   "pan": -0.7,
+   "pan_to": 0.2,
+   "sweeten_db": -99,
+   "gain_db": -14,
+   "label": "real airliner, far left"
+  },
+  {
+   "t": 33.2,
+   "kind": "airliner_pass",
+   "distance": 850,
+   "height": 0,
+   "speed": 100,
+   "pan": 0.8,
+   "pan_to": 0.1,
+   "sweeten_db": -99,
+   "gain_db": -16,
+   "label": "real airliner, far right"
+  },
+  {
+   "t": 36.4,
+   "kind": "airliner_pass",
+   "distance": 55,
+   "height": 8,
+   "speed": 62,
+   "pan": -0.9,
+   "pan_to": 0.9,
+   "sweeten_db": -8,
+   "gain_db": 1,
+   "label": "34-38 close airliner pass with contrails"
+  },
+  {
+   "t": 38.0,
+   "kind": "reverse_swell",
+   "dur": 1.0,
+   "gain_db": -5,
+   "label": "into the 38.0 soft impact"
+  },
+  {
+   "t": 38.0,
+   "kind": "impact_low",
+   "gain_db": -9,
+   "decay": 0.9,
+   "label": "38.0 soft impact"
+  },
+  {
+   "t": 38.0,
+   "kind": "jet_bed",
+   "dur": 11.4,
+   "intensity": 0.3,
+   "fade_in": 0.8,
+   "fade_out": 1.6,
+   "gain_db": -12,
+   "label": "sunset above the clouds (soft)"
+  },
+  {
+   "t": 38.0,
+   "kind": "wind_high",
+   "dur": 11.4,
+   "intensity": 0.3,
+   "fade_in": 1.5,
+   "fade_out": 1.8,
+   "gain_db": -11,
+   "label": "air"
+  },
+  {
+   "t": 38.3,
+   "kind": "formation_rumble",
+   "dur": 11.0,
+   "fighters": 0,
+   "tanker": true,
+   "tanker_db": 6,
+   "fade_in": 2.5,
+   "fade_out": 2.2,
+   "gain_db": -10,
+   "label": "airliner alongside: big turbofan drone"
+  },
+  {
+   "t": 50.0,
+   "kind": "reverse_swell",
+   "dur": 0.5,
+   "gain_db": -5,
+   "label": "breath 49.5 -> war drums"
+  },
+  {
+   "t": 50.0,
+   "kind": "impact_low",
+   "gain_db": -3,
+   "label": "50.0 hit_war"
+  },
+  {
+   "t": 50.0,
+   "kind": "formation_rumble",
+   "dur": 8.0,
+   "fighters": 4,
+   "tanker": true,
+   "fade_in": 0.004,
+   "fade_out": 0.4,
+   "gain_db": -1,
+   "gate_out": 58.0,
+   "label": "tanker + fighters formation"
+  },
+  {
+   "t": 52.0,
+   "kind": "flyby",
+   "pan": -0.9,
+   "pan_to": 0.9,
+   "crackle": 0.5,
+   "ground": false,
+   "space": "air",
+   "wet_db": -20,
+   "gain_db": -1,
+   "gate_in": 50.0,
+   "label": "fighter slides past"
+  },
+  {
+   "t": 53.5,
+   "kind": "whoosh",
+   "variant": "short",
+   "pan": 0.6,
+   "pan_to": -0.6,
+   "gain_db": -3,
+   "label": "cut: behind the Vector (53.5)"
+  },
+  {
+   "t": 54.8,
+   "kind": "flyby",
+   "pan": 0.9,
+   "pan_to": -0.9,
+   "crackle": 0.6,
+   "ground": false,
+   "space": "air",
+   "wet_db": -20,
+   "pre": 2.0,
+   "post": 2.5,
+   "gain_db": 0,
+   "gate_in": 53.5,
+   "label": "hero slides into the slot"
+  },
+  {
+   "t": 56.0,
+   "kind": "whoosh",
+   "variant": "short",
+   "pan": -0.6,
+   "pan_to": 0.6,
+   "gain_db": -3,
+   "label": "cut: formation break (56.0)"
+  },
+  {
+   "t": 56.6,
+   "kind": "flyby",
+   "pan": -0.8,
+   "pan_to": 0.8,
+   "crackle": 0.5,
+   "ground": "grass",
+   "distance": 30,
+   "height": 25,
+   "space": "valley",
+   "wet_db": -10,
+   "pre": 2.0,
+   "post": 2.0,
+   "gain_db": 1,
+   "gate_in": 56.0,
+   "gate_out": 58.0,
+   "label": "low pass over the Alps"
+  },
+  {
+   "t": 58.0,
+   "kind": "afterburner",
+   "dur": 1.9,
+   "pull_away": true,
+   "gain_db": 0,
+   "gate_out": 60.0,
+   "label": "58.0 stinger: fleet lights burners"
+  },
+  {
+   "t": 60.0,
+   "kind": "reverse_swell",
+   "dur": 1.6,
+   "gain_db": -3,
+   "label": "riser 58-60"
+  },
+  {
+   "t": 60.0,
+   "kind": "whoosh",
+   "variant": "long",
+   "pan": 0.5,
+   "pan_to": -0.5,
+   "gain_db": 0,
+   "label": "60.0 whoosh_impact into the Atlas"
+  },
+  {
+   "t": 60.4,
+   "kind": "ui_blip",
+   "gain_db": 0,
+   "label": "Atlas opens"
+  },
+  {
+   "t": 60.9,
+   "kind": "ui_type",
+   "text": "PARIS",
+   "gain_db": 0,
+   "label": "typing the city"
+  },
+  {
+   "t": 61.55,
+   "kind": "ui_blip",
+   "notes": [
+    1318.51,
+    1760.0
+   ],
+   "gain_db": -4,
+   "label": "search result"
+  },
+  {
+   "t": 62.0,
+   "kind": "ui_confirm",
+   "gain_db": 0,
+   "label": "WARP confirmed"
+  },
+  {
+   "t": 64.0,
+   "kind": "warp",
+   "pre": 2.0,
+   "gain_db": 1,
+   "label": "warp swell 62-64, arrival Paris at 64.0"
+  },
+  {
+   "t": 64.0,
+   "kind": "jet_bed",
+   "dur": 4.05,
+   "intensity": 0.6,
+   "fade_in": 0.5,
+   "fade_out": 0.1,
+   "gain_db": -6,
+   "label": "arrival at dusk"
+  },
+  {
+   "t": 64.2,
+   "kind": "wind_high",
+   "dur": 3.85,
+   "intensity": 0.5,
+   "fade_in": 0.8,
+   "fade_out": 0.1,
+   "gain_db": -8,
+   "label": "air"
+  },
+  {
+   "t": 68.0,
+   "kind": "jet_bed",
+   "dur": 10.0,
+   "intensity": 0.6,
+   "fade_in": 0.05,
+   "fade_out": 0.02,
+   "gain_db": -8,
+   "gate_out": 78.0,
+   "label": "landmarks bed (stops dead at the 78.0 breakdown)"
+  },
+  {
+   "t": 68.0,
+   "kind": "whoosh",
+   "variant": "short",
+   "pan": -0.6,
+   "pan_to": 0.6,
+   "gain_db": -2,
+   "label": "Eiffel"
+  },
+  {
+   "t": 69.1,
+   "kind": "flyby",
+   "pan": 0.8,
+   "pan_to": -0.8,
+   "ground": "grass",
+   "space": "city",
+   "pre": 1.8,
+   "post": 2.2,
+   "gain_db": -3,
+   "gate_in": 68.0,
+   "gate_out": 70.0,
+   "label": "past the tower"
+  },
+  {
+   "t": 70.0,
+   "kind": "whoosh",
+   "variant": "short",
+   "pan": 0.6,
+   "pan_to": -0.6,
+   "gain_db": -3,
+   "label": "Big Ben"
+  },
+  {
+   "t": 72.0,
+   "kind": "whoosh",
+   "variant": "short",
+   "pan": -0.6,
+   "pan_to": 0.6,
+   "gain_db": -3,
+   "label": "Opera House"
+  },
+  {
+   "t": 72.0,
+   "kind": "water_skim",
+   "dur": 2.0,
+   "intensity": 0.8,
+   "fade_in": 0.05,
+   "fade_out": 0.08,
+   "gain_db": -3,
+   "label": "harbour skim"
+  },
+  {
+   "t": 74.0,
+   "kind": "whoosh",
+   "variant": "long",
+   "pan": -0.7,
+   "pan_to": 0.7,
+   "gain_db": -2,
+   "label": "Burj Khalifa"
+  },
+  {
+   "t": 74.0,
+   "kind": "wind_high",
+   "dur": 2.0,
+   "intensity": 0.9,
+   "fade_in": 0.05,
+   "fade_out": 0.1,
+   "gain_db": -6,
+   "label": "vertical climb past the tower"
+  },
+  {
+   "t": 76.0,
+   "kind": "whoosh",
+   "variant": "short",
+   "pan": 0.6,
+   "pan_to": -0.6,
+   "gain_db": -3,
+   "label": "Empire State"
+  },
+  {
+   "t": 77.0,
+   "kind": "flyby",
+   "pan": -0.8,
+   "pan_to": 0.8,
+   "ground": false,
+   "space": "city",
+   "pre": 1.8,
+   "post": 2.0,
+   "gain_db": -3,
+   "gate_in": 76.0,
+   "gate_out": 78.0,
+   "label": "dusk pass"
+  },
+  {
+   "t": 78.0,
+   "kind": "city_night",
+   "dur": 8.0,
+   "fade_in": 0.25,
+   "fade_out": 0.6,
+   "gain_db": 0,
+   "label": "NYC by night: distant hum, far horn, siren"
+  },
+  {
+   "t": 78.0,
+   "kind": "jet_bed",
+   "dur": 5.2,
+   "intensity": 0.25,
+   "fade_in": 0.6,
+   "fade_out": 1.8,
+   "gain_db": -13,
+   "label": "breakdown: jet barely there"
+  },
+  {
+   "t": 81.5,
+   "kind": "jet_bed",
+   "dur": 4.5,
+   "intensity": 0.85,
+   "fade_in": 4.1,
+   "fade_out": 0.03,
+   "gain_db": -5,
+   "label": "build 82-86"
+  },
+  {
+   "t": 81.5,
+   "kind": "wind_high",
+   "dur": 4.5,
+   "intensity": 0.8,
+   "fade_in": 4.1,
+   "fade_out": 0.03,
+   "gain_db": -7,
+   "label": "build air"
+  },
+  {
+   "t": 86.0,
+   "kind": "reverse_swell",
+   "dur": 1.5,
+   "gain_db": 0,
+   "label": "into the 86.0 hit"
+  },
+  {
+   "t": 86.0,
+   "kind": "impact_low",
+   "gain_db": 0,
+   "label": "86.0 hit_big"
+  },
+  {
+   "t": 86.0,
+   "kind": "afterburner",
+   "dur": 1.8,
+   "pull_away": false,
+   "gain_db": 2,
+   "gate_out": 88.0,
+   "label": "boost through clouds"
+  },
+  {
+   "t": 86.3,
+   "kind": "clouds_rush",
+   "dur": 1.7,
+   "gain_db": -1,
+   "label": "punching through the deck"
+  },
+  {
+   "t": 88.0,
+   "kind": "whoosh",
+   "variant": "short",
+   "pan": 0.6,
+   "pan_to": -0.6,
+   "gain_db": -1,
+   "label": "cut: water skim"
+  },
+  {
+   "t": 88.0,
+   "kind": "water_skim",
+   "dur": 2.0,
+   "intensity": 1.0,
+   "fade_in": 0.03,
+   "fade_out": 0.05,
+   "gain_db": 0,
+   "label": "water skim"
+  },
+  {
+   "t": 89.0,
+   "kind": "flyby",
+   "pan": 0.9,
+   "pan_to": -0.9,
+   "ground": "water",
+   "crackle": 0.5,
+   "pre": 1.5,
+   "post": 1.5,
+   "gain_db": 0,
+   "gate_in": 88.0,
+   "gate_out": 90.0,
+   "label": "skim pass"
+  },
+  {
+   "t": 89.0,
+   "kind": "whoosh",
+   "variant": "short",
+   "pan": 0.7,
+   "pan_to": -0.7,
+   "gain_db": -2,
+   "pitch": 1,
+   "label": "beat cut: harbour skim (89.0)"
+  },
+  {
+   "t": 90.0,
+   "kind": "jet_bed",
+   "dur": 3.0,
+   "intensity": 1.0,
+   "fade_in": 0.02,
+   "fade_out": 0.05,
+   "gain_db": -3,
+   "label": "climax bed"
+  },
+  {
+   "t": 90.0,
+   "kind": "whoosh",
+   "variant": "short",
+   "pan": -0.7,
+   "pan_to": 0.7,
+   "gain_db": -1,
+   "label": "beat cut: knife-edge past skyscrapers"
+  },
+  {
+   "t": 90.5,
+   "kind": "whoosh",
+   "variant": "short",
+   "pan": 0.7,
+   "pan_to": -0.7,
+   "gain_db": -2,
+   "pitch": 1,
+   "label": "beat cut",
+   "enabled": false
+  },
+  {
+   "t": 91.0,
+   "kind": "whoosh",
+   "variant": "short",
+   "pan": -0.7,
+   "pan_to": 0.7,
+   "gain_db": -2,
+   "pitch": 2,
+   "label": "beat cut: formation break"
+  },
+  {
+   "t": 91.3,
+   "kind": "flyby",
+   "pan": -0.9,
+   "pan_to": 0.9,
+   "crackle": 0.7,
+   "ground": false,
+   "space": "air",
+   "pre": 1.3,
+   "post": 1.2,
+   "gain_db": -2,
+   "gate_in": 91.0,
+   "gate_out": 92.0,
+   "label": "fighters break"
+  },
+  {
+   "t": 91.5,
+   "kind": "whoosh",
+   "variant": "short",
+   "pan": 0.7,
+   "pan_to": -0.7,
+   "gain_db": -2,
+   "pitch": 3,
+   "label": "beat cut",
+   "enabled": false
+  },
+  {
+   "t": 92.0,
+   "kind": "whoosh",
+   "variant": "short",
+   "pan": -0.7,
+   "pan_to": 0.7,
+   "gain_db": -1,
+   "pitch": 4,
+   "label": "beat cut: vertical pull"
+  },
+  {
+   "t": 92.0,
+   "kind": "afterburner",
+   "dur": 1.0,
+   "pull_away": true,
+   "gain_db": 0,
+   "label": "vertical pull into the sunset"
+  },
+  {
+   "t": 92.5,
+   "kind": "whoosh",
+   "variant": "short",
+   "pan": 0.7,
+   "pan_to": -0.7,
+   "gain_db": -1,
+   "pitch": 5,
+   "label": "beat cut",
+   "enabled": false
+  },
+  {
+   "t": 93.0,
+   "kind": "sonic_boom",
+   "gain_db": 2,
+   "label": "93.0 braam_final: sonic boom"
+  },
+  {
+   "t": 94.0,
+   "kind": "cut",
+   "tail_db": -24,
+   "tail": 1.4,
+   "label": "94.0 hard stop, tiny tail"
+  },
+  {
+   "t": 95.0,
+   "kind": "whoosh",
+   "variant": "long",
+   "pan": -0.4,
+   "pan_to": 0.4,
+   "gain_db": -16,
+   "enabled": false,
+   "label": "OPTIONAL: logo light-sweep air (disabled: cue sheet wants silence)"
+  }
+ ]
+}

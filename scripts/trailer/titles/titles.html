@@ -495,8 +495,8 @@ function buildEnd(cues, root) {
   setTrack(ctTxt, 0.34);
 
   // --- credits -------------------------------------------------------------
-  const cr = mkEl('div', 'abs', root, { left: '0px', width: W + 'px', top: '988px', textAlign: 'center', fontFamily: 'Inter', fontWeight: 400, fontSize: '13px', lineHeight: '21px', letterSpacing: '0.025em', color: cs(C.ice) });
-  cr.innerHTML = 'Footage captured in-engine. Imagery: contains modified Copernicus Sentinel-2 data (ESA).<br>Map data: Overture Maps Foundation, © OpenStreetMap contributors. Elevation: Mapzen Terrain Tiles. Land cover: ESA WorldCover 2021.';
+  const cr = mkEl('div', 'abs', root, { left: '0px', width: W + 'px', top: '962px', textAlign: 'center', fontFamily: 'Inter', fontWeight: 400, fontSize: '13px', lineHeight: '21px', letterSpacing: '0.025em', color: cs(C.ice) });
+  cr.innerHTML = 'Footage captured in-engine. Imagery: contains modified Copernicus Sentinel-2 data (ESA).<br>Map data: Overture Maps Foundation, © OpenStreetMap contributors. Elevation: Mapzen Terrain Tiles. Land cover: ESA WorldCover 2021.<br>3D models (CC BY): Statue of Liberty – Anna M · Empire State Building – Thomas de Rivaz · Eiffel Tower – Scott Marshall · Sydney Opera House – Nick Reinhardt · Big Ben – Daqian Dong · aircraft – Poly by Google, Miha Lunar (poly.pizza).<br>Air traffic in this trailer is staged for illustration. In the game, traffic is live ADS-B data.';
 
   const black = mkEl('div', 'abs', root, { left: '0px', top: '0px', width: W + 'px', height: H + 'px', background: '#000' });
 

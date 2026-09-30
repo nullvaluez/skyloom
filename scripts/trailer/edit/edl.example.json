@@ -1,0 +1,130 @@
+{
+  "_doc": [
+    "Skyloom trailer EDL -- documented example (it validates: python3 conform.py edl.example.json --check).",
+    "Keys starting with '_' are comments and are ignored everywhere. Everything else is validated STRICTLY:",
+    "unknown keys, wrong types and out-of-range values are errors, and all errors are reported at once.",
+    "All times are timeline seconds (0 .. duration) EXCEPT clip-level keyframes, which are CLIP-RELATIVE",
+    "(0 = the clip's t0). Pixel values (letterbox, shake) are authored at the EDL 'size' and scale with --preview-scale."
+  ],
+  "fps": 30,
+  "duration": 104.0,
+  "size": [1920, 1080],
+
+  "_clips_doc": [
+    "clips: sorted by t0, non-overlapping ([t0, t1) intervals; a gap renders black).",
+    "  id        unique name (used in logs / the missing-frame report)",
+    "  src       directory of NNNNN.jpg frames (+ optional NNNNN.dom.png RGBA UI overlays, alpha-composited over the",
+    "            jpg of the same index), or a single image file. Relative paths resolve against this file's folder.",
+    "            A source smaller than 'size' (the 960x540 drafts) is upscaled with Lanczos4 + a light unsharp mask.",
+    "  in        source frame index shown at t0 (float ok)",
+    "  src_fps   source frame rate (default = fps)",
+    "  speed     1.0, or [[t, speed], ...] keys (clip-relative, linear between keys, held outside). The speed curve is",
+    "            INTEGRATED to a source position, so a ramp never jumps. Speed 0 = freeze, negative = reverse.",
+    "  blend     false: fractional source positions use the nearest frame; true: blend the two neighbours",
+    "  enabled   false drops the clip (its time renders black)",
+    "  fx        zoom [z0, z1] (1.0..8.0; eased in-out over the clip) + zoom_center [x, y] (0..1, the point that stays put)",
+    "            exposure (stops, linear light)  contrast (1 = none; S about mid grey)  sat (1 = none)",
+    "            temp (-1 cool .. 1 warm)  tint (-1 green .. 1 magenta)  lift (-0.25..0.25, raises/lowers blacks)",
+    "            shake (px amplitude, deterministic 1.3-9 Hz; auto-overscan)  blur_radial (0..1 zoom blur)  flip (mirror)",
+    "            Every scalar fx may also be keyframed: [[t, value], ...] (clip-relative).",
+    "  trans_in  {type, dur, strength?, dir?, color?} -- how this clip comes in from the previous one:",
+    "            cut; fade (cross-dissolve over [t0-dur/2, t0+dur/2]); dip_black / dip_white (to the colour at t0 and back);",
+    "            flash (hard cut + additive white bloom peaking ON the cut, 2-frame pre-glow, decaying over dur);",
+    "            whip (directional smear + slide + slight zoom across the cut; dir left|right|up|down);",
+    "            glitch_warp (hyperspace: rush zoom, radial light streaks, chromatic split, glitch slices, white peak).",
+    "            fade / whip / glitch_warp render BOTH clips inside the window: the outgoing clip keeps playing past its",
+    "            t1 and the incoming one starts before its t0 -- the preflight lists the source frames each clip needs."
+  ],
+  "clips": [
+    { "id": "cold-open", "t0": 0.0, "t1": 8.0, "src": "/tmp/claude-0/shots/clouds-dawn", "in": 0,
+      "fx": { "zoom": [1.0, 1.06], "zoom_center": [0.5, 0.45], "exposure": [[0.0, -0.3], [3.0, 0.0]] } },
+    { "id": "hero", "t0": 8.0, "t1": 12.0, "src": "/tmp/claude-0/shots/nyc-hero", "in": 0,
+      "trans_in": { "type": "flash", "dur": 0.3 },
+      "fx": { "shake": [[0.0, 10], [0.4, 0]], "temp": 0.15 } },
+    { "id": "hero-boost", "t0": 12.0, "t1": 16.0, "src": "/tmp/claude-0/shots/nyc-hero", "in": 120,
+      "_note": "a speed ramp: slow-mo into the boost, then punch back to 1.5x, with frame blending",
+      "speed": [[0.0, 1.0], [0.3, 0.35], [1.2, 0.35], [1.6, 1.5]], "blend": true,
+      "trans_in": { "type": "cut" },
+      "fx": { "blur_radial": [[1.2, 0.0], [1.5, 0.6], [2.2, 0.0]], "shake": [[1.3, 0], [1.4, 16], [2.5, 0]] } },
+    { "id": "alps", "t0": 16.0, "t1": 19.0, "src": "/tmp/claude-0/shots/alps-valley", "in": 0,
+      "trans_in": { "type": "flash", "dur": 0.25, "strength": 0.8 } },
+    { "id": "rio", "t0": 19.0, "t1": 21.0, "src": "/tmp/claude-0/shots/rio-sugarloaf", "in": 15,
+      "trans_in": { "type": "whip", "dur": 0.3, "dir": "left" }, "fx": { "sat": 1.05 } },
+    { "id": "sydney", "t0": 21.0, "t1": 24.0, "src": "/tmp/claude-0/shots/sydney-skim", "in": 15,
+      "trans_in": { "type": "fade", "dur": 0.5 }, "fx": { "flip": false, "contrast": 1.05 } },
+    { "id": "night", "t0": 24.0, "t1": 28.0, "src": "/tmp/claude-0/shots/nyc-night", "in": 0,
+      "trans_in": { "type": "dip_black", "dur": 0.4 }, "fx": { "temp": -0.2, "lift": 0.01 } },
+    { "id": "atlas", "t0": 60.0, "t1": 64.0, "src": "/tmp/claude-0/shots/atlas-ui", "in": 6,
+      "_note": "a gap 28-60 renders black; atlas-ui carries NNNNN.dom.png UI overlays",
+      "trans_in": { "type": "dip_white", "dur": 0.3 } },
+    { "id": "paris", "t0": 64.0, "t1": 68.0, "src": "/tmp/claude-0/shots/paris-arrival", "in": 8,
+      "trans_in": { "type": "glitch_warp", "dur": 0.4 } },
+    { "id": "climax", "t0": 92.0, "t1": 94.0, "src": "/tmp/claude-0/shots/clouds-punch", "in": 100,
+      "trans_in": { "type": "flash", "dur": 0.2 } }
+  ],
+
+  "_titles_doc": [
+    "title_manifest: titles/manifest.json from the title renderer: sequences {dir, t0, t1, frames, fps, alpha, pattern}.",
+    "  Frame k = round((t - t0) * fps) of each sequence is composited while 0 <= k < frames.",
+    "  alpha true  -> overlay, alpha-over the graded picture (straight vs premultiplied is auto-detected per sequence",
+    "                 from the PNGs: a colour channel above alpha means straight; the preflight prints the result).",
+    "  alpha false -> opaque plate (the end card): replaces the whole frame, ungraded, no letterbox bars.",
+    "titles_enabled false hides every title; titles_exclude lists sequence slugs to leave out."
+  ],
+  "title_manifest": "/tmp/claude-0/titles/manifest.json",
+  "titles_enabled": true,
+  "titles_exclude": [],
+
+  "_black_fades_doc": [
+    "black: hard-black ranges [[t0, t1], ...] for the PICTURE layer (titles still composite over them).",
+    "fades: global picture fades {t0, t1, from, to (0 = black, 1 = full), curve: linear|smooth}; before t0 the",
+    "  fade does nothing, after t1 it holds 'to'. Several fades multiply."
+  ],
+  "black": [[0.0, 1.0], [28.0, 60.0], [68.0, 92.0], [94.0, 94.5]],
+  "fades": [
+    { "t0": 1.0, "t1": 2.5, "from": 0.0, "to": 1.0 },
+    { "t0": 93.6, "t1": 94.0, "from": 1.0, "to": 0.0, "curve": "smooth" }
+  ],
+
+  "_global_doc": [
+    "letterbox: px per bar at 'size' (0 = off; 60 = 2.0:1), or [[t, px], ...] keys on ABSOLUTE timeline seconds.",
+    "  Bars are drawn last, over titles, except while an opaque plate is up.",
+    "grain 0..1 (animated luma grain, deterministic per frame; ~0.35 is subtle), grain_size 0.5..3 (px softness),",
+    "vignette 0..1 (0.35 = corners -14%), halation 0..1 (red-orange glow around bright highlights),",
+    "chromatic 0..1 (radial R/B split; 0.15 = 0.9 px at the corners).",
+    "grade (the house look, all optional): exposure, contrast, sat (default 0.97), temp, tint, lift -- same meaning as",
+    "  clip fx, applied after them -- plus filmic 0..1.5 (gentle S + highlight shoulder; default 1), split 0..2",
+    "  (teal shadows / warm highlights; default 0.5), shadow_tint / highlight_tint [r, g, b] directions,",
+    "  black (output black floor, default 0) and white (output white, default 1 - 0.025 * filmic)."
+  ],
+  "global": {
+    "letterbox": [[0.0, 60], [94.0, 60]],
+    "grain": 0.35,
+    "grain_size": 1.0,
+    "vignette": 0.35,
+    "halation": 0.25,
+    "chromatic": 0.15,
+    "grade": { "filmic": 1.0, "split": 0.5, "sat": 0.97, "contrast": 1.0 }
+  },
+
+  "_audio_doc": [
+    "audio: rendered by mix.py (cached by content hash next to the output). music (required) + an SFX stem from",
+    "  sfx_events (an sfx.py events JSON, rendered via sfx.py) or sfx_wav (a pre-rendered stem; never overwritten).",
+    "  music_gain_db / sfx_gain_db; duck = music-only dips [[t0, t1, db<0], ...] with an optional 4th element",
+    "  'range' (default: static dip, 80 ms attack before t0, 350 ms release after t1) or 'sidechain' (the dip follows",
+    "  the SFX envelope inside the range), or objects {t0, t1, db, mode, attack, release}; fade_out [t0, t1];",
+    "  target_lufs (-14), ceiling_dbtp (-1), compressor {enabled, threshold_db, ratio, attack_ms, release_ms, knee_db};",
+    "  mix_wav: use a finished mix as-is (skips mix.py)."
+  ],
+  "audio": {
+    "music": "/tmp/claude-0/audio/score.wav",
+    "sfx_events": null,
+    "sfx_wav": "/tmp/claude-0/audio/sfx.wav",
+    "music_gain_db": 0,
+    "sfx_gain_db": -4,
+    "duck": [[8.0, 8.6, -3], [60.0, 60.5, -4, "sidechain"], { "t0": 64.0, "t1": 64.8, "db": -5, "mode": "sidechain", "attack": 0.03, "release": 0.5 }],
+    "fade_out": [102.5, 104.0],
+    "target_lufs": -14.0,
+    "ceiling_dbtp": -1.0
+  }
+}

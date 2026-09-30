@@ -1,0 +1,369 @@
+{
+ "fps": 30,
+ "duration": 104.0,
+ "size": [
+  1920,
+  1080
+ ],
+ "_shots_root": "/tmp/claude-0/shots (draft: <id>-preview dirs at 960x540, upscaled)",
+ "clips": [
+  {
+   "id": "cold-open",
+   "t0": 0.0,
+   "t1": 8.0,
+   "src": "/tmp/claude-0/shots/clouds-dawn-preview",
+   "in": 0,
+   "fx": {
+    "zoom": [
+     1.0,
+     1.05
+    ]
+   }
+  },
+  {
+   "id": "hero",
+   "t0": 8.0,
+   "t1": 11.9667,
+   "src": "/tmp/claude-0/shots/nyc-hero-preview",
+   "in": 0,
+   "trans_in": {
+    "type": "flash",
+    "dur": 0.3
+   }
+  },
+  {
+   "id": "hero-side",
+   "t0": 11.9667,
+   "t1": 16.0,
+   "src": "/tmp/claude-0/shots/nyc-hero-preview",
+   "in": 122,
+   "_note": "in-capture camera switch; source frames 119-121 carry a 3-frame terrain LOD streak at the new view, skipped"
+  },
+  {
+   "id": "alps",
+   "t0": 16.0,
+   "t1": 18.0,
+   "src": "/tmp/claude-0/shots/alps-valley-preview",
+   "in": 0,
+   "trans_in": {
+    "type": "flash",
+    "dur": 0.25
+   }
+  },
+  {
+   "id": "rio",
+   "t0": 18.0,
+   "t1": 20.0,
+   "src": "/tmp/claude-0/shots/rio-sugarloaf-preview",
+   "in": 15,
+   "trans_in": {
+    "type": "whip",
+    "dur": 0.3
+   }
+  },
+  {
+   "id": "dubai-palm",
+   "t0": 20.0,
+   "t1": 22.0,
+   "src": "/tmp/claude-0/shots/dubai-palm-preview",
+   "in": 15,
+   "trans_in": {
+    "type": "cut"
+   }
+  },
+  {
+   "id": "sydney-skim",
+   "t0": 22.0,
+   "t1": 25.0,
+   "src": "/tmp/claude-0/shots/sydney-skim-preview",
+   "in": 15,
+   "trans_in": {
+    "type": "whip",
+    "dur": 0.3
+   }
+  },
+  {
+   "id": "hudson",
+   "t0": 25.0,
+   "t1": 28.0,
+   "src": "/tmp/claude-0/shots/nyc-hudson-skim-preview",
+   "in": 15,
+   "trans_in": {
+    "type": "cut"
+   }
+  },
+  {
+   "id": "traffic",
+   "t0": 28.0,
+   "t1": 34.0,
+   "src": "/tmp/claude-0/shots/nyc-traffic-sky-preview",
+   "in": 0,
+   "trans_in": {
+    "type": "flash",
+    "dur": 0.3
+   },
+   "fx": {
+    "zoom": [
+     1.0,
+     1.04
+    ]
+   }
+  },
+  {
+   "id": "family-approach",
+   "t0": 34.0,
+   "t1": 38.0,
+   "src": "/tmp/claude-0/shots/clouds-family-preview",
+   "in": 0,
+   "trans_in": {
+    "type": "dip_black",
+    "dur": 0.3
+   }
+  },
+  {
+   "id": "family-ui",
+   "t0": 38.0,
+   "t1": 42.0,
+   "src": "/tmp/claude-0/shots/clouds-family-ui-preview",
+   "in": 0,
+   "trans_in": {
+    "type": "cut"
+   }
+  },
+  {
+   "id": "family-abeam",
+   "t0": 42.0,
+   "t1": 46.0,
+   "src": "/tmp/claude-0/shots/clouds-family-preview",
+   "in": 125,
+   "trans_in": {
+    "type": "fade",
+    "dur": 0.4
+   }
+  },
+  {
+   "id": "family-reveal",
+   "t0": 46.0,
+   "t1": 50.0,
+   "src": "/tmp/claude-0/shots/clouds-family-preview",
+   "in": 245,
+   "trans_in": {
+    "type": "fade",
+    "dur": 0.5
+   }
+  },
+  {
+   "id": "airforce",
+   "t0": 50.0,
+   "t1": 60.0,
+   "src": "/tmp/claude-0/shots/alps-airforce-preview",
+   "in": 0,
+   "trans_in": {
+    "type": "flash",
+    "dur": 0.3
+   }
+  },
+  {
+   "id": "atlas",
+   "t0": 60.0,
+   "t1": 64.0,
+   "src": "/tmp/claude-0/shots/atlas-ui-preview",
+   "in": 0,
+   "trans_in": {
+    "type": "whip",
+    "dur": 0.3
+   }
+  },
+  {
+   "id": "paris-arrival",
+   "t0": 64.0,
+   "t1": 68.0,
+   "src": "/tmp/claude-0/shots/paris-arrival-preview",
+   "in": 0,
+   "trans_in": {
+    "type": "glitch_warp",
+    "dur": 0.4
+   }
+  },
+  {
+   "id": "eiffel",
+   "t0": 68.0,
+   "t1": 70.0,
+   "src": "/tmp/claude-0/shots/paris-arrival-preview",
+   "in": 150,
+   "trans_in": {
+    "type": "flash",
+    "dur": 0.2
+   }
+  },
+  {
+   "id": "bigben",
+   "t0": 70.0,
+   "t1": 72.0,
+   "src": "/tmp/claude-0/shots/london-bigben-preview",
+   "in": 15,
+   "trans_in": {
+    "type": "flash",
+    "dur": 0.2
+   }
+  },
+  {
+   "id": "opera",
+   "t0": 72.0,
+   "t1": 74.0,
+   "src": "/tmp/claude-0/shots/sydney-opera-preview",
+   "in": 15,
+   "trans_in": {
+    "type": "flash",
+    "dur": 0.2
+   }
+  },
+  {
+   "id": "burj",
+   "t0": 74.0,
+   "t1": 76.0,
+   "src": "/tmp/claude-0/shots/dubai-burj-preview",
+   "in": 15,
+   "trans_in": {
+    "type": "flash",
+    "dur": 0.2
+   }
+  },
+  {
+   "id": "esb",
+   "t0": 76.0,
+   "t1": 78.0,
+   "src": "/tmp/claude-0/shots/nyc-esb-dusk-preview",
+   "in": 28,
+   "trans_in": {
+    "type": "flash",
+    "dur": 0.2
+   },
+   "_note": "frames 17-26 re-stream buildings (fade-in); start after"
+  },
+  {
+   "id": "night",
+   "t0": 78.0,
+   "t1": 82.0,
+   "src": "/tmp/claude-0/shots/nyc-night-preview",
+   "in": 0,
+   "trans_in": {
+    "type": "dip_black",
+    "dur": 0.4
+   }
+  },
+  {
+   "id": "jfk-night",
+   "t0": 82.0,
+   "t1": 86.0,
+   "src": "/tmp/claude-0/shots/nyc-jfk-night-preview",
+   "in": 0,
+   "trans_in": {
+    "type": "cut"
+   }
+  },
+  {
+   "id": "climax-punch",
+   "t0": 86.0,
+   "t1": 88.0,
+   "src": "/tmp/claude-0/shots/clouds-punch-preview",
+   "in": 30,
+   "trans_in": {
+    "type": "flash",
+    "dur": 0.3
+   }
+  },
+  {
+   "id": "climax-alps",
+   "t0": 88.0,
+   "t1": 89.0,
+   "src": "/tmp/claude-0/shots/alps-valley-preview",
+   "in": 60,
+   "trans_in": {
+    "type": "whip",
+    "dur": 0.2
+   }
+  },
+  {
+   "id": "climax-water",
+   "t0": 89.0,
+   "t1": 90.0,
+   "src": "/tmp/claude-0/shots/sydney-skim-preview",
+   "in": 60,
+   "trans_in": {
+    "type": "whip",
+    "dur": 0.2
+   }
+  },
+  {
+   "id": "climax-knife",
+   "t0": 90.0,
+   "t1": 91.0,
+   "src": "/tmp/claude-0/shots/nyc-knife-preview",
+   "in": 15,
+   "trans_in": {
+    "type": "cut"
+   }
+  },
+  {
+   "id": "climax-break",
+   "t0": 91.0,
+   "t1": 92.0,
+   "src": "/tmp/claude-0/shots/alps-airforce-preview",
+   "in": 225,
+   "trans_in": {
+    "type": "cut"
+   }
+  },
+  {
+   "id": "climax-climb",
+   "t0": 92.0,
+   "t1": 94.0,
+   "src": "/tmp/claude-0/shots/clouds-punch-preview",
+   "in": 90,
+   "trans_in": {
+    "type": "flash",
+    "dur": 0.2
+   }
+  }
+ ],
+ "title_manifest": "/tmp/claude-0/titles/manifest.json",
+ "titles_enabled": true,
+ "black": [
+  [
+   0.0,
+   1.0
+  ],
+  [
+   94.0,
+   94.5
+  ]
+ ],
+ "fades": [
+  {
+   "t0": 1.0,
+   "t1": 2.5,
+   "from": 0.0,
+   "to": 1.0
+  },
+  {
+   "t0": 93.0,
+   "t1": 93.4,
+   "from": 1.0,
+   "to": 1.0
+  }
+ ],
+ "global": {
+  "letterbox": 60,
+  "grain": 0.35,
+  "vignette": 0.35,
+  "halation": 0.25,
+  "chromatic": 0.15
+ },
+ "audio": {
+  "music": "/tmp/claude-0/audio/score.wav",
+  "sfx_wav": "/tmp/claude-0/audio/sfx_draft.wav",
+  "music_gain_db": 0,
+  "sfx_gain_db": -4
+ }
+}

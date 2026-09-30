@@ -25,6 +25,15 @@ const REPO = path.resolve(__dirname, '../..');
 const args = Object.fromEntries(process.argv.slice(3).map((a) => { const m = a.match(/^--([^=]+)(?:=(.*))?$/); return m ? [m[1], m[2] ?? '1'] : [a, '1']; }));
 const shotFile = path.resolve(process.argv[2]);
 const shot = require(shotFile);
+// Draft-time overrides (read at start; lets a running queue pick up changes):
+// { "streamSecMax": n, "runInMax": n, "quality": "high", "settleVP": "480x270" }
+try {
+  const ov = JSON.parse(fs.readFileSync(process.env.TRAILER_OVERRIDES || '/tmp/claude-0/shots/overrides.json', 'utf8'));
+  if (ov.streamSecMax && shot.settle) shot.settle = { ...shot.settle, streamSec: Math.min(shot.settle.streamSec || 120, ov.streamSecMax) };
+  if (ov.runInMax != null && (shot.runIn ?? 45) > ov.runInMax) shot.runIn = ov.runInMax;
+  if (ov.quality) shot.quality = ov.quality;
+  if (ov.settleVP) process.env.TRAILER_SETTLE_VP = ov.settleVP;
+} catch {}
 const FPS = shot.fps || 30;
 const OUT = args.out || path.join(process.env.TRAILER_SHOTS || '/tmp/claude-0/shots', shot.id + (args.preview ? '-preview' : ''));
 const PREVIEW = args.preview ? Number(args.preview) : 0; // grab every Nth frame only
@@ -34,6 +43,7 @@ const SYNTH = process.env.TRAILER_WORLD === 'fixture';
 fs.mkdirSync(OUT, { recursive: true });
 if (!args.from && !args.keep) for (const f of fs.readdirSync(OUT)) if (/\.(jpg|png)$/.test(f) || f === 'DONE') fs.unlinkSync(path.join(OUT, f));
 const LOG = path.join(OUT, 'capture.log');
+if (fs.existsSync(LOG)) fs.renameSync(LOG, LOG + '.prev');
 fs.writeFileSync(LOG, '');
 const t00 = Date.now();
 const log = (...a) => { const s = `[${((Date.now() - t00) / 1000).toFixed(1)}s] ` + a.join(' '); fs.appendFileSync(LOG, s + '\n'); if (!process.env.QUIET) console.log(s); };
@@ -50,7 +60,7 @@ const withTO = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTime
   const page = await ctx.newPage();
   page.on('pageerror', (e) => log('[pageerror]', String(e).slice(0, 400)));
   page.on('console', (m) => { if (m.type() === 'error') log('[console.error]', m.text().slice(0, 300)); });
-  page.on('crash', () => log('[CRASH] page crashed'));
+  page.on('crash', () => { log('[CRASH] page crashed — exiting for retry'); setTimeout(() => process.exit(3), 500); });
 
   const fx = await attachFixture(page);
   const base = fx.url;
@@ -68,9 +78,9 @@ const withTO = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTime
   const fakeNow = () => (paused ? fakeNowMs : Date.now());
 
   // ---- pins (control report §7.5) — deliberately NOT bootFly's legacy pins
-  await page.addInitScript(({ pin, sun, weather, quality, aircraft, extra }) => {
+  await page.addInitScript(({ pin, sun, weather, quality, aircraft, extra, budgetK }) => {
     window.__flyTileFixture = pin;
-    window.__flyFinalizeBudgetK = 40;
+    window.__flyFinalizeBudgetK = budgetK;
     window.__flyTitleBypass = true;
     window.__flyVisualsOverride = 'enhanced';
     window.__flyGovPin = 'hold';
@@ -88,6 +98,7 @@ const withTO = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTime
     } catch {}
     if (extra) { try { (0, eval)(extra); } catch (e) { console.error('extra init failed', e); } }
   }, {
+    budgetK: Number(process.env.TRAILER_BUDGETK || 200),
     pin, sun: shot.sunUtc || 0, weather: shot.weather ?? 'baseline', quality: shot.quality || 'ultra',
     aircraft: shot.aircraft || 'fighter', extra: shot.initScript ? `(${shot.initScript})()` : null,
   });
@@ -114,6 +125,30 @@ const withTO = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTime
   const s0 = shot.start;
   await enterFlight(page, { lat: s0.lat, lon: s0.lon, altM: s0.altM, headingDeg: s0.headingDeg ?? 0, headingRad: (s0.headingDeg ?? 0) * Math.PI / 180, name: null }, { timeoutMs: 300000 });
   log('entered flight');
+  // TURBO (measured diagnosis, 2026-09-30): at ~1 fps the terrain quadtree
+  // refines at most ~2 tiles per rendered frame (TILES.maxThreads 10, one walk
+  // per render), so camTileZ sat at 4-7 against a target of 16 and every
+  // building chunk looped in 'draping' (the drape refuses ground from tiles
+  // below z10/z12). Raise loader concurrency, walk the tree between frames on
+  // a real-time interval (native timer: keeps running during the fake-clock
+  // capture, refining as loads land), and accept coarse drapes after 3 tries.
+  if (process.env.TRAILER_TURBO !== '0') {
+    await page.evaluate(() => {
+      const tick = () => {
+        try {
+          const rt = window.__fly, e = rt && rt.engine;
+          if (!e || !e.map) return;
+          if (e.map.maxThreads < 48) { e.map.maxThreads = 48; e._steadyThreads = 48; }
+          if (rt.satBuildings) rt.satBuildings._warpCoarseUntil = 1e9;
+          const cam = rt.camera;
+          if (!cam || window.__trNoWalk) return;
+          e.map.updateMatrixWorld(true); cam.updateMatrixWorld(); e.map.update(cam);
+        } catch (err) { window.__trTurboErr = String(err); }
+      };
+      window.__trTurbo = setInterval(tick, 150);
+    });
+    log('turbo on (threads 48, inter-frame walks, coarse drape)');
+  }
   // Stream at a small viewport: world streaming is paced per rendered frame and
   // frame cost is fill-bound, so a quarter-size canvas settles ~4x faster.
   const SV = (process.env.TRAILER_SETTLE_VP || '960x540').split('x').map(Number);
@@ -139,6 +174,7 @@ const withTO = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTime
         pct: b.pct, ready: !!ws.ready, missing: ws.missing, loading: !!rt.worldLoading, btns: btns.length, clicked,
         sharp: !!ts.sharp, camZ: ts.camTileZ, tZ: ts.targetZ, dl: ts.downloading,
         bq: q(rt.satBuildings && rt.satBuildings.stats), rq: q(rt.satRoads && rt.satRoads.stats), frames: rt.framesRendered,
+        thr: rt.engine && rt.engine.map ? rt.engine.map.maxThreads : null, terr: window.__trTurboErr || undefined,
       };
     }, el > helpAfter), 120000, 'settle poll').catch((e) => ({ err: String(e) }));
     clicks += st.clicked || 0;
@@ -161,6 +197,12 @@ const withTO = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTime
     const f0 = await page.evaluate(() => window.__fly.framesRendered);
     await page.waitForFunction((f0) => window.__fly.framesRendered >= f0 + 4, f0, { timeout: 120000, polling: 500 });
     log('resized to', CV.join('x'));
+  }
+  // ---- optional pre-rig probe (diagnostics): runs in real time before any override
+  if (shot.beforeRig) {
+    await page.evaluate(shot.beforeRig);
+    await new Promise((r) => setTimeout(r, 4000));
+    log('pre-rig probe', await page.evaluate(() => JSON.stringify(window.__nanscan || null)));
   }
   // ---- install rig
   await page.addScriptTag({ path: path.join(__dirname, 'page-lib.js') });
@@ -221,7 +263,8 @@ const withTO = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTime
     const want = i >= from && i < to && (!PREVIEW || i % PREVIEW === 0);
     // run-in frames before the window and skipped preview frames are still rendered (sim continuity)
     const t1 = Date.now();
-    if (shot.actions) for (const a of shot.actions) if (a.at === i) { log('action at', i, a.name || ''); await a.run(page, log); }
+    // an action scheduled before a (draft-shortened) run-in fires on the first step
+    if (shot.actions) for (const a of shot.actions) if (a.at === i || (j === 0 && a.at < i)) { log('action at', i, a.name || '', a.at !== i ? `(scheduled ${a.at})` : ''); await a.run(page, log); }
     let r;
     if (LOOP) {
       r = await withTO(page.evaluate((ms) => window.TR.stepLoop(ms), ms), 600000, 'step ' + j);
@@ -233,6 +276,7 @@ const withTO = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTime
       r = await withTO(page.evaluate(({ ms, want, q, dt }) => window.TR.step(ms, want, 'image/jpeg', q, dt), { ms, want, q: Number(process.env.TRAILER_JPEGQ || 0.95), dt: shot.dt != null ? shot.dt * (jn - j) : null }), 600000, 'step ' + j);
     }
     fakeNowMs += ms;
+    if (r && (r.lost || r.nan)) throw new Error(`frame ${i}: ${r.lost ? 'WebGL context lost' : 'non-finite camera'} — aborting take for retry`);
     if (j === 0) await page.evaluate(() => { window.__fly.chaseRig.snap && window.__fly.chaseRig.snap(); });
     if (r.n !== 1 && j === 0) throw new Error('first step rendered ' + r.n + ' frames');
     if (j === 0 || j === 1 || j === runIn || process.env.TRAILER_DIAG) {
@@ -241,7 +285,11 @@ const withTO = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTime
         let m = -1;
         try { const dd = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; let s = 0, n = 0; for (let i = 0; i < dd.length; i += 4 * 101) { s += dd[i] + dd[i + 1] + dd[i + 2]; n++; } m = s / n / 3; } catch (e) {}
         const r3 = (v) => [v.x, v.y, v.z].map((x) => +x.toFixed(1));
-        return { t: +window.TR.t().toFixed(3), fpos: r3(f.pos), hdg: +f.heading.toFixed(3), spd: +f.speed.toFixed(1), cam: r3(c.position), fov: c.fov, anchor: r3(rt.origin.anchor), capMean: +m.toFixed(1), loading: rt.worldLoading, phase: window.__flyStore.getState().phase };
+        const dbg = JSON.stringify({ d: (window.TR.dbg || []).slice(0, 1).map((x) => x.dt), clk: window.TR.clk });
+        const ns = window.__nanscan ? window.__nanscan.map((x) => x.name + ':' + x.invalid).join(' ') : undefined;
+        return { dbg, ns, t: +window.TR.t().toFixed(3), fpos: r3(f.pos), hdg: +f.heading.toFixed(3), spd: +f.speed.toFixed(1), cam: r3(c.position), fov: c.fov, anchor: r3(rt.origin.anchor), capMean: +m.toFixed(1), loading: rt.worldLoading, phase: window.__flyStore.getState().phase,
+          pn: +performance.now().toFixed(1), lh: window.TR._lettersHidden,
+          pup: (window.TR.puppets || []).slice(0, 2).map((a) => { const k = rt.traffic && rt.traffic.tracks.get(a.hex); const p = a.pose(window.TR.t()); return k ? { hex: a.hex, yaw: +(k.yaw || 0).toFixed(3), hd: +p.heading.toFixed(3), dx: +(k.rx - p.pos.x).toFixed(1), dy: +(k.ry - p.pos.y).toFixed(1), dz: +(k.rz - p.pos.z).toFixed(1), lu: k._lastUpdate != null ? +k._lastUpdate.toFixed(3) : null, dist: k.distM != null ? +k.distM.toFixed(0) : null, ld: !!k.livingDetailed } : { hex: a.hex, none: true }; }) };
       });
       log('diag j=' + j, JSON.stringify(d));
     }
@@ -251,7 +299,9 @@ const withTO = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTime
     if (want && !LOOP) {
       if (r.miss || !r.data) { log(`MISS frame ${i}`); continue; }
       const b64 = r.data.slice(r.data.indexOf(',') + 1);
-      fs.writeFileSync(path.join(OUT, `${String(i).padStart(5, '0')}.jpg`), Buffer.from(b64, 'base64'));
+      const buf = Buffer.from(b64, 'base64');
+      if (i === from && r.mean != null && r.mean < 1.5 && !shot.allowDark) throw new Error(`frame ${i} looks black (mean ${r.mean.toFixed(2)}) — aborting take for retry`);
+      fs.writeFileSync(path.join(OUT, `${String(i).padStart(5, '0')}.jpg`), buf);
       if (shot.dom) {
         await page.evaluate(() => { document.getElementById('trailer-dom-style').disabled = false; });
         await page.screenshot({ path: path.join(OUT, `${String(i).padStart(5, '0')}.dom.png`), omitBackground: true, timeout: 120000 });

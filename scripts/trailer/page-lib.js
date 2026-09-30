@@ -19,7 +19,12 @@
 
   const TR = {
     t0: null,
-    t() { return TR.t0 == null ? -1e9 : (performance.now() - TR.t0) / 1000; },
+    // Overrides stay inert until the take is armed (t0 set after the clock is
+    // paused). MEASURED: a real-time frame in the install window used to
+    // evaluate the flight path at a sentinel t = -1e9 s, teleporting the jet
+    // ~2e11 m and NaN-poisoning the whole world.
+    armed() { return TR.t0 != null; },
+    t() { return TR.t0 == null ? 0 : (performance.now() - TR.t0) / 1000; },
     V3,
     D2R,
     k(latDeg) { return 1 / Math.cos(latDeg * D2R); },
@@ -132,7 +137,7 @@
   const origStep = flight.step.bind(flight);
   flight.step = function (dt, cmd) {
     const S = window.__shot;
-    if (!S || !S.flight) return origStep(dt, cmd);
+    if (!TR.armed() || !S || !S.flight || (window.__trFlags || {}).noFlight) return origStep(dt, cmd);
     const p = S.flight(TR.t(), flight);
     if (!p) return origStep(dt, cmd);
     flight.pos.copy(p.pos);
@@ -154,10 +159,26 @@
   const origChase = chase.update.bind(chase);
   const eye = new V3(), tgt = new V3(), up = new V3(), m = new M4();
   TR.lastCam = null;
+  const finite = (c) => Number.isFinite(c.position.x + c.position.y + c.position.z + c.quaternion.x + c.quaternion.y + c.quaternion.z + c.quaternion.w + c.fov);
+  TR.dbg = [];
+  const fallbackCam = () => TR.cam.orbit({ az: 0, el: 7, dist: 30, lookFwd: 80, lookUp: 4, fov: 54 });
   chase.update = function (dt, fl, camera, freeLook, k, gi) {
     const S = window.__shot;
-    const pose = S && S.camera ? S.camera(TR.t(), fl, k) : null;
-    if (!pose) { TR.lastCam = null; return origChase(dt, fl, camera, freeLook, k, gi); }
+    let pose = TR.armed() && S && S.camera ? S.camera(TR.t(), fl, k) : null;
+    if (!pose) {
+      TR.lastCam = null;
+      const r = origChase(dt, fl, camera, freeLook, k, gi);
+      if (finite(camera)) return r;
+      // MEASURED: the native chase rig can emit a NaN pose on the first manual
+      // step; one NaN frame poisons damped lighting/AO state for good. Snap and
+      // recompute; if still bad, use a scripted behind-the-jet pose.
+      if (TR.dbg.length < 20) TR.dbg.push({ t: TR.t(), dt, k, gi: JSON.stringify(gi), spd: fl.speed, pos: [fl.pos.x, fl.pos.y, fl.pos.z] });
+      chase.snap && chase.snap();
+      origChase(dt, fl, camera, freeLook, k, gi);
+      if (finite(camera)) return r;
+      pose = fallbackCam()(TR.t(), fl, k);
+      camera.fov = 54; camera.updateProjectionMatrix();
+    }
     eye.copy(pose.eye); tgt.copy(pose.target);
     up.set(0, 1, 0);
     if (pose.roll) {
@@ -198,13 +219,15 @@
     const origTU = traffic.update.bind(traffic);
     traffic.update = function (clientSec, playerPos) {
       const S = window.__shot;
-      if (TR.puppets.length) {
+      if (TR.armed() && TR.puppets.length) {
         if (this._skewSec == null) this._skewSec = 0;
         const now = this.serverNow(clientSec);
         const t = TR.t();
         for (const a of TR.puppets) {
           let k = this.tracks.get(a.hex);
-          if (!k) { k = this._createTrack(a.hex); this.tracks.set(a.hex, k); }
+          // MEASURED (probe-airforce): a new track's yaw starts at 0 (north) and
+          // eases toward the fix heading over ~1 s — seed it on creation.
+          if (!k) { k = this._createTrack(a.hex); this.tracks.set(a.hex, k); k.yaw = a.pose(t).heading; k.bank = 0; }
           k.meta = a.meta; k.archetype = a.arch; k.flags = 0;
           const p1 = a.pose(t), p0 = a.pose(t - 1);
           k.fix1 = fixOf(p1, now); k.fix0 = fixOf(p0, now - 1);
@@ -213,7 +236,7 @@
       }
       const items = origTU(clientSec, playerPos);
       for (const it of items) if (TR.puppetScale[it.hex]) it.scaleK = TR.puppetScale[it.hex];
-      if (S && S.traffic) S.traffic(TR.t(), traffic, playerPos);
+      if (TR.armed() && S && S.traffic) S.traffic(TR.t(), traffic, playerPos);
       return items;
     };
   }
@@ -326,6 +349,15 @@
     return out;
   };
 
+  // MEASURED (lavapipe, no EXT_clip_control -> reversed-depth fallback): the
+  // coastal reflection pass smears the far shore into stretched vertical
+  // "walls" across the water. Off for capture unless a shot opts back in.
+  const cr = rt.coastalReflection;
+  if (cr && cr.update && !window.__trKeepReflection) {
+    cr.update = function () { if (this.release) this.release(); };
+    if (cr.release) cr.release();
+  }
+
   // Scene root + r3f store (production-safe path, see control report §2.1).
   let s = rt.engine.object; while (s.parent) s = s.parent;
   TR.scene = s;
@@ -343,11 +375,21 @@
   TR.cap = { want: false, got: false, out, ctx };
   st.internal.subscribe({ current: () => {
     const S = window.__shot;
-    if (S && S.frame) S.frame(TR.t());
+    if (TR.armed() && S && S.frame) S.frame(TR.t());
     if (TR.hideLetters) {
-      for (const c of TR.scene.children) {
-        if (c.children && c.children[0] && c.children[0].isTroikaText) c.visible = false;
-      }
+      // troika Text meshes anywhere in the scene, and their PoiLetters slot
+      // groups (which the letters useFrame re-shows every frame at priority 0;
+      // this runs after). Scanned every frame: letters mount/unmount as the
+      // aircraft moves.
+      let n = 0;
+      TR.scene.traverse((o) => {
+        // troika-three-text's Text class has no isTroikaText flag (checked in its
+        // dist source), so the old test matched nothing — duck-type it instead.
+        if (!(o.isMesh && typeof o.sync === 'function' && 'text' in o && 'fontSize' in o)) return;
+        o.visible = false; n++;
+        if (o.parent && o.parent !== TR.scene && o.parent.children.length === 1) o.parent.visible = false;
+      });
+      TR._lettersHidden = n;
     }
     if (TR.hidePlayer != null) { const p = TR.player(); if (p) p.visible = !TR.hidePlayer; }
   } }, 0.5, TR.r3f);
@@ -361,6 +403,7 @@
     if (!TR.cap.want) return;
     TR.cap.want = false;
     const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+    if (!w || !h) return;
     if (out.width !== w || out.height !== h) { out.width = w; out.height = h; img = null; }
     if (!pix || pix.length !== w * h * 4) pix = new Uint8Array(w * h * 4);
     if (!img) img = ctx.createImageData(w, h);
@@ -369,6 +412,8 @@
     const row = w * 4, dst = img.data;
     for (let y = 0; y < h; y++) dst.set(pix.subarray((h - 1 - y) * row, (h - y) * row), y * row);
     ctx.putImageData(img, 0, 0);
+    let sum = 0, cnt = 0; for (let i = 0; i < dst.length; i += 4 * 211) { sum += dst[i] + dst[i + 1] + dst[i + 2]; cnt++; }
+    TR.cap.mean = sum / cnt / 3;
     TR.cap.got = true;
   } }, 101, TR.r3f);
 
@@ -431,12 +476,22 @@
     const f0 = rt.framesRendered;
     TR.cap.want = !!grab; TR.cap.got = false;
     await window.__pwClock.controller.runFor(ms);
-    TR.el += dt != null ? dt : ms / 1000;
+    const stepDt = dt != null ? dt : ms / 1000;
+    // Force the r3f clock so delta === stepDt exactly (MEASURED: something can
+    // leave elapsedTime in the wrong units before the first advance, giving a
+    // -91380 s delta and a NaN camera that poisons damped state for good).
+    const ck = TR.r3f.getState().clock;
+    const FL = window.__trFlags || {};
+    if (!FL.noForce) { ck.autoStart = false; ck.running = false; ck.elapsedTime = TR.el; }
+    TR.el += stepDt;
+    if (gl.isContextLost()) return { n: 0, lost: true };
     TR.r3f.getState().advance(TR.el, true);
+    if (gl.isContextLost()) return { n: 0, lost: true };
     const n = rt.framesRendered - f0;
     if (!grab) return { n };
     if (!TR.cap.got) return { n, miss: true };
-    return { n, data: out.toDataURL(fmt, q) };
+    if (!finite(rt.camera)) return { n, nan: true };
+    return { n, mean: TR.cap.mean, data: out.toDataURL(fmt, q) };
   };
 
   window.TR = TR;

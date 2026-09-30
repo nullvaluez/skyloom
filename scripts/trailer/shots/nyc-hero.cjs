@@ -23,7 +23,7 @@ module.exports = {
       { t: 8, lat: 40.7045, lon: -74.0235, alt: 285 },
       { t: 10, lat: 40.7148, lon: -74.0170, alt: 290 },
     ]);
-    const fly = TR.flyPath(path, { bankGain: 1.0 });
+    const fly = TR.flyPath(path, { bankGain: 0.45, bankMax: 28 * TR.D2R });
     const side = TR.cam.orbit({
       az: (t) => -78 + 10 * TR.smooth((t - 4) / 5), // left side, drifting slightly forward
       el: 3, dist: (t) => 24 + 6 * TR.smooth((t - 4) / 5), lookFwd: 6, lookUp: 1,

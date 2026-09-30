@@ -19,16 +19,18 @@ module.exports = {
       photo: { photos: [] },
     },
   },
-  page: function () {
+  page: function (args) {
     const TR = window.TR; TR.hideLetters = true;
+    const native = args && args.nativeCamera;
     const hdg = 262, spd = 235;
     const lat0 = 40.76, lon0 = -72.90;
     const airliner = TR.straight(lat0, lon0, 8000, hdg, spd, 0);
     TR.puppet({ hex: 'a4f2c1', arch: 0, meta: { hex: 'a4f2c1', flight: 'NVA184', r: 'N184NV', t: 'B789', squawk: '2461', category: 'A5', iconType: 'airliner', color: '#4ade80' }, pose: airliner });
-    // Vector: starts 700 m behind / 140 m right / 30 m above, closes to the slot (+95 right, +18 up, -40 back)
+    // Vector: starts 700 m behind / 140 m right / 30 m above, closes to the slot (+62 right, +10 up, -22 back):
+    // ~30 m of clearance off the 787's right wingtip, a close echelon.
     const slot = (t) => {
       const u = TR.smoother((t + 1) / 6);
-      return { right: 140 + (95 - 140) * u, up: 30 + (18 - 30) * u, fwd: -700 + (-40 + 700) * u };
+      return { right: 140 + (62 - 140) * u, up: 30 + (10 - 30) * u, fwd: -700 + (-22 + 700) * u };
     };
     const fl = (t) => {
       const a = airliner(t), s = slot(t);
@@ -38,24 +40,27 @@ module.exports = {
       return { pos, heading: a.heading - 0.012 * (1 - TR.smooth((t - 3) / 3)), pitch: 0, bank: -0.08 * (1 - TR.smooth((t - 4) / 2)), speed: spd + closing, latDeg: lat0 };
     };
     const chase = TR.cam.orbit({ az: 6, el: 5, dist: 30, lookFwd: 260, lookUp: 10, fov: 50 });
+    // v3 (draft review: v1 at 170-230 m read tiny; v2 abeam put the Vector
+    // squarely in front of the 787): 3/4-rear from above the Vector's right
+    // shoulder, looking slightly down so the pair sit over the cloud sea with
+    // ~25 deg of separation — Vector large right of centre, 787 beyond it left.
     const abeam = (t, f) => {
-      // between the two aircraft, 150 m to the right of the Vector, looking left across both, sun behind them
-      const a = airliner(t);
-      const mid = f.pos.clone().lerp(a.pos, 0.35);
-      const eye = TR.offset(mid, a.heading, lat0, 170, 6, 40 - 6 * (t - 4));
-      return { eye, target: mid, fov: 44, roll: 0 };
+      const a = airliner(t), u = (t - 4) / 4;
+      const eye = TR.offset(f.pos, a.heading, lat0, 18 - 2 * u, 12, -38 + 6 * u);
+      const target = TR.offset(f.pos.clone().lerp(a.pos, 0.5), a.heading, lat0, 0, -4, 0);
+      return { eye, target, fov: 48, roll: 0 };
     };
     const reveal = (t, f) => {
       const u = TR.smoother((t - 8) / 4.5);
       const a = airliner(t);
-      const mid = f.pos.clone().lerp(a.pos, 0.4);
-      const eye = TR.offset(mid, a.heading, lat0, 170 + 380 * u, 6 + 190 * u, 30 + 260 * u);
-      return { eye, target: mid, fov: 44 + 6 * u, roll: 0 };
+      const eye = TR.offset(f.pos, a.heading, lat0, 16 + 120 * u, 12 + 50 * u, -36 - 80 * u);
+      const target = TR.offset(f.pos.clone().lerp(a.pos, 0.5), a.heading, lat0, 0, -4 - 6 * u, 0);
+      return { eye, target, fov: 48 - 4 * u, roll: 0 };
     };
     TR.ambientFleet({ lat: 40.8, lon: -73.1, n: 10, radiusKm: 30, altMin: 9000, altMax: 11800, seed: 51 });
     window.__shot = {
       flight: fl,
-      camera: (t, f, k) => (t < 4 ? chase(t, f, k) : t < 8 ? TR.cam.blend(abeam, abeam, 0)(t, f, k) : reveal(t, f)),
+      camera: native ? null : (t, f, k) => (t < 4 ? chase(t, f, k) : t < 8 ? TR.cam.blend(abeam, abeam, 0)(t, f, k) : reveal(t, f)),
     };
   },
 };
