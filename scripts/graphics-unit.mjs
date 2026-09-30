@@ -86,7 +86,7 @@ for(const distant of [false,true]) {
   assert.match(shader.fragmentShader,/mix\(vec3\(0\.32\), diffuseColor\.rgb, 0\.35\)/,'Glazing reads the existing material variant albedo');
   assert.doesNotMatch(shader.fragmentShader,/vec3\(0\.40,0\.54,0\.61\)/,'Universal cyan glazing is retired');
   // Texture-array sampling must not reuse the previous program cache entry.
-  assert.match(material.customProgramCacheKey(),/cinematic-architecture-v6-/);
+  assert.match(material.customProgramCacheKey(),/cinematic-architecture-v9-hdr-/);
   material.dispose();
 }
 const far = createSatelliteArchitectureMaterial({distant:true});

@@ -107,7 +107,27 @@ check('shader wrappers preserve predecessor uniforms and separate cache keys', (
   m.customProgramCacheKey = () => 'air-bend'; softenWakeMaterial(m, { bend: true });
   const s = { uniforms: {}, vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\n#include <color_fragment>\n#include <fog_fragment>' };
   m.onBeforeCompile(s); assert.equal(s.uniforms.previous.value, 1); assert.match(s.fragmentShader, /gl_FragColor.a/);
-  assert.equal(m.customProgramCacheKey(), 'air-bend|optical-wake-v1'); m.dispose();
+  assert.equal(m.customProgramCacheKey(), 'air-bend|optical-wake-v2-hdr'); m.dispose();
+});
+check('HDR vapor follows the frame light and restores Classic/Neon without geometry changes', () => {
+  const b = new WakeBatch(2, 8), camera = new PerspectiveCamera();
+  const h = new WakeHistory(8); camera.position.set(0, 100, 0);
+  for (let i = 0; i < 8; i++) h.record(i * 35 - 120, 100, -500, i, 1, 0);
+  b.begin(camera); b.add(h, 9, { x: 0, z: 0 });
+  const positions = b.pos.array.slice(), count = b.used;
+  const e = { sun: 6, day: 1, exposure: .9, overcast: 0,
+    keyDir: [.6, .8, 0], keyColor: [1, .7, .4], fillColor: [.4, .6, 1] };
+  b.end(1, false, e);
+  const u = b.mesh.material.userData.wakeLight;
+  assert.deepEqual(u.uWakeLighting.value.toArray(), [1, 6, .9, 0]);
+  assert.deepEqual(u.uWakeKey.value.toArray(), e.keyDir);
+  assert.deepEqual(b.pos.array, positions); assert.equal(b.used, count);
+  e.sun = .3; e.exposure = 1.1; e.day = 0;
+  b.end(0, false, e); assert.equal(u.uWakeLighting.value.y, .3);
+  assert.ok(u.uWakeFill.value.z < e.fillColor[2]);
+  b.end(0, true, e); assert.equal(u.uWakeLighting.value.x, 0);
+  b.end(1, false); assert.equal(u.uWakeLighting.value.x, 0);
+  assert.deepEqual(b.pos.array, positions); b.dispose();
 });
 check('visual anchors preserve cached geometry and exhaust stays one bounded mesh', () => {
   const model = new Group(), g = new BoxGeometry(20, 4, 24), m = new MeshBasicMaterial(), mesh = new Mesh(g, m);

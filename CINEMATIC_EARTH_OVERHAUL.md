@@ -1,4 +1,46 @@
-# Cinematic Earth overhaul — visual sample
+# Cinematic Earth overhaul
+
+## September 30, 2026: HDR graphics pass
+
+Enhanced now uses the shared cinematic renderer by default (`CINEMA_SHIPPING`
+is true). Saved Classic preferences and the explicit
+`/?graphicsReview=1&earthLook=current` comparison remain available. The user's
+HDR overhaul request supersedes the preview-only shipping state recorded below.
+
+The pass adds stronger scene-linear sunlight, open cool shade, weather-aware
+exposure, a directional sky aureole and twilight belt, filtered stars and a
+bright solar disc. Clouds gain bounded forward/back scattering and interior
+fill using their existing density samples. Buildings gain filtered glazing
+roughness, bowed glass highlights, neutral dielectric reflections and recessed
+interior lighting; facade emission and pavement spill share the same gain.
+Player and traffic condensation gain stable billows, optical density and the
+same sun/moon color, direction and exposure as the world. A small display grade
+follows AgX and merges into the existing pass. The established quality profiles,
+worker protocol, simulation and geographic providers remain intact.
+
+This is scene-linear HDR through the existing half-float compositor and filmic
+output. It does not add native PQ/HLG monitor output. Classic-to-Enhanced now
+loads the cloud volume lazily even when the cloud pass was created in Classic.
+
+Validation on Windows Chrome / RTX 5080, with live geographic providers:
+
+- Production build, targeted ESLint, and import-integrity sweep: pass.
+- Aircraft/effects: 14 checks; cinematic renderer: 15; tracer checks: 32;
+  graphics material/coverage checks: pass. The tracer source reader now
+  normalizes Windows line endings; shader-cache assertions use the new keys.
+- `verify-hdr-flight.cjs`: 16 desktop checks and 16 phone-emulation checks,
+  including default activation, all applicable quality tiers, shared vapor
+  uniforms and Classic-to-Enhanced. No page, shader compile or WebGL errors.
+  Existing ANGLE warnings in the Classic control are retained in the report.
+- Manhattan day/golden/overcast/night and production Alps day/golden/night
+  captures: completed without shader/page errors. Evidence lives under
+  `.graphics-review/hdr-overhaul/`, with source hashes in each report.
+
+The desktop motion leg is 40 seconds; the phone viewport leg is 20 seconds on
+the desktop GPU. These are integration checks, not physical-phone or 4K
+15-minute performance certification. No performance ceiling has been changed.
+
+## Original September 29 sample record
 
 Built from `5987abfba127ffb4626aa439263ba5b4e7d6f759` on
 `codex/cinematic-earth-overhaul`. This is the implementation/review checkpoint

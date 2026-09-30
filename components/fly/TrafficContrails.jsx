@@ -87,7 +87,7 @@ export function TrafficContrails({ runtime, origin }) {
         state.batch.add(h, now, origin.anchor, { opacity: (t.opacity ?? 1) * (t.horizonFade ?? 1) });
       }
     }
-    state.batch.end(runtime.sun?.frac ?? 1, store.mapStyle === 'toy');
+    state.batch.end(runtime.sun?.frac ?? 1, store.mapStyle === 'toy', runtime.cinemaEnvironment);
     if (process.env.NODE_ENV === 'development' && window.__flyStats)
       window.__flyStats.trafficWake = { aircraft: state.recs.size, ribbons: state.batch.used, capacity: limit, draws: state.batch.used ? 1 : 0 };
   }, -43);

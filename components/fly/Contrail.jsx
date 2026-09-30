@@ -62,7 +62,7 @@ export function Contrail({ flight, origin, aircraft, runtime }) {
     for (const h of state.histories) state.batch.add(h, now, origin.anchor);
     for (const h of state.tips) state.batch.add(h, now, origin.anchor,
       { width: FX.vaporWidthM, spread: FX.vaporSpreadMps, opacity: .65 });
-    state.batch.end(runtime?.sun?.frac ?? 1, store.mapStyle === 'toy');
+    state.batch.end(runtime?.sun?.frac ?? 1, store.mapStyle === 'toy', runtime?.cinemaEnvironment);
     if (process.env.NODE_ENV === 'development' && window.__flyStats) {
       window.__flyStats.contrailPts = state.histories.reduce((n, h) => n + h.count, 0);
       window.__flyStats.aircraftWake = { engines: state.histories.length, ribbons: state.batch.used,

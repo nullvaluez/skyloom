@@ -44,7 +44,8 @@ const chroma = (c) => {
   const mx = Math.max(c.r, c.g, c.b);
   return mx > 0 ? (mx - Math.min(c.r, c.g, c.b)) / mx : 0;
 };
-const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
+// Source gates use LF anchors; a Windows checkout must test the same code.
+const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8').replaceAll('\r\n', '\n');
 
 // ---- (1) layout ------------------------------------------------------------
 const geo = T.buildSpotGeometry();
@@ -253,7 +254,7 @@ const wake = makeWakeMaterial(T.patchAirWake);
 const wakeSh = compile(wake);
 gate(
   '(8d) plume key + chain (gate before optical softening)',
-  wake.customProgramCacheKey() === 'world-bend-air|ovgate-v1|optical-wake-v1' && wakeSh.fragmentShader.includes('ovCloudGate') && wakeSh.vertexShader.includes('vWake = aWake;')
+  wake.customProgramCacheKey() === 'world-bend-air|ovgate-v1|optical-wake-v2-hdr' && wakeSh.fragmentShader.includes('ovCloudGate') && wakeSh.vertexShader.includes('vWake = aWake;')
 );
 gate('(8e) the gate slab mirrors the cloud march literal', read('lib/fly/immersive-cloud-pass.js').includes('float low=base-600.,high=base+thickness;') && (await import('../lib/fly/overlay-gate.js')).OV_SLAB_PAD_M === 600);
 

@@ -12,6 +12,7 @@ import { aerialR25Wanted } from '@/lib/fly/r25-sky';
 import { r25On } from '@/lib/fly/visuals-profile';
 import { R25_SKY } from '@/lib/fly/fly-constants';
 import { releaseBloomTargets } from '@/lib/fly/release-bloom-targets';
+import { HDRGradeEffect } from '@/lib/fly/hdr-grade';
 
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
@@ -272,7 +273,13 @@ export function buildPassList(style, tier, ctx = {}) {
       raw: aerialRaw,
     });
   }
-  if (sat) {
+  if (sat && cinemaOn()) {
+    list.push({
+      id: 'hdr-grade',
+      el: () => <primitive key="hdr-grade" object={ctx.hdrGrade} dispose={null} />,
+      raw: () => new HDRGradeEffect(),
+    });
+  } else if (sat) {
     list.push({
       id: 'sat-hue',
       el: () => <HueSaturation key="sat-hue" saturation={SKY.grade.saturation} />,
@@ -591,6 +598,8 @@ export const Effects = memo(function Effects({ runtime }) {
     () => new WhiteBalanceEffect({ balance: SKY.grade.neutral }),
     []
   );
+  const hdrGrade = useMemo(() => new HDRGradeEffect(), []);
+  useEffect(() => () => hdrGrade.dispose(), [hdrGrade]);
 
   // Round 19 (B): depth-based aerial perspective. Mounted ONLY on satellite +
   // high tier — declaring EffectAttribute.DEPTH makes the composer allocate a
@@ -842,6 +851,7 @@ export const Effects = memo(function Effects({ runtime }) {
         speedLines,
         aerial,
         whiteBalance,
+        hdrGrade,
         smaa,
         n8ao: aoPass,
         clouds,
@@ -858,6 +868,7 @@ export const Effects = memo(function Effects({ runtime }) {
       speedLines,
       aerial,
       whiteBalance,
+      hdrGrade,
       smaa,
       aoPass,
       clouds,
