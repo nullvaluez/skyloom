@@ -6,6 +6,8 @@ import { HangarExterior } from './HangarExterior';
 import { computeModelCorrection } from '@/lib/fly/model-loader';
 import { operationsProfile } from '@/lib/fly/operations-profiles';
 import { LandingGear } from '../LandingGear';
+import { attachVectorControls, fleetAnimator, applyFleetLivery, disposeFleetGeometry } from '@/lib/fly/fleet-animation';
+import { useAdventureStore } from '@/stores/adventure-store';
 class ModelBoundary extends Component {
   state={error:false};
   static getDerivedStateFromError(){return {error:true};}
@@ -14,12 +16,17 @@ class ModelBoundary extends Component {
 }
 function Aircraft({aircraft,onReady}){
   const {scene}=useGLTF(aircraft.entry.url);
-  const clone=useMemo(()=>{const object=scene.clone(true);object.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;const copy=m=>{const c=m.clone();c.vertexColors=!!o.geometry.attributes.color;return c;};o.material=Array.isArray(o.material)?o.material.map(copy):copy(o.material);}});return object;},[scene]);
+  const clone=useMemo(()=>{const object=scene.clone(true);if(aircraft.id==='fighter'&&aircraft.entry.parts)attachVectorControls(object);object.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;const copy=m=>{const c=m.clone();c.vertexColors=!!o.geometry.attributes.color;return c;};o.material=Array.isArray(o.material)?o.material.map(copy):copy(o.material);}});return object;},[scene,aircraft.id,aircraft.entry.parts]);
+  const livery=useAdventureStore(s=>s.progress.liveries[aircraft.id]);
+  useEffect(()=>{applyFleetLivery(clone,aircraft.id,livery==='earned');},[clone,aircraft.id,livery]);
+  const animate=useMemo(()=>fleetAnimator(clone,aircraft.entry.parts),[clone,aircraft.entry.parts]);
+  useFrame((_,dt)=>animate(null,dt,true));
+  useEffect(()=>()=>disposeFleetGeometry(clone),[clone]);
   useEffect(()=>()=>clone.traverse(o=>{if(o.isMesh)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.dispose());}),[clone]);
   const correction=useMemo(()=>computeModelCorrection(clone,aircraft.entry.targetLenM,aircraft.entry.yawFixRad),[clone,aircraft]);
   const p=operationsProfile(aircraft.id);
   useEffect(()=>{onReady(aircraft.id);},[onReady,aircraft.id,clone]);
-  return <group position={[0,p?.clearance??2,0]}>
+  return <group position={[0,p?.clearance??.35,0]}>
     <group position-y={p?.modelOffsetY??0}><group rotation-y={correction.rotY} scale={correction.scale}><primitive object={clone} dispose={null}/></group></group>
     <LandingGear flight={{speed:0}} aircraftId={aircraft.id} preview/>
   </group>;

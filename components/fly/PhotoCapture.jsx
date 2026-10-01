@@ -38,7 +38,7 @@ import { useFlyStore } from '@/stores/fly-store';
  * terms follow the pixels, not the page. It comes from the same
  * ATTRIBUTIONS_BY_STYLE table AttributionBar renders — one source of truth.
  */
-export function PhotoCapture() {
+export function PhotoCapture({runtime}) {
   const gl = useThree((s) => s.gl);
   // { resolve, reject, t0 } — set by the action, drained by the frame below.
   const pendingRef = useRef(null);
@@ -103,6 +103,7 @@ export function PhotoCapture() {
             style: mapStyle,
           };
         }
+        runtime?.adventures?.photo();
         req.resolve({ blob, filename, width: w, height: h, ms });
       }, 'image/png');
     } catch (err) {

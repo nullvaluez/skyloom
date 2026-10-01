@@ -10,6 +10,7 @@ import { crashStakesOn, saveCrashMode, saveQualityTier, saveSoundOn } from '@/li
 import { CRASH } from '@/lib/fly/fly-constants';
 import { immersiveOn, readReducedMotion, saveReducedMotion } from '@/lib/fly/immersive';
 import { visualsAvailable, saveVisuals, setVisualsLive } from '@/lib/fly/visuals-profile';
+import { GuestSaveControls } from './GuestSaveControls';
 
 const TIERS = ['low', 'medium', 'high', 'ultra'];
 const VISUALS_ROW = [
@@ -186,6 +187,7 @@ export function SettingsRows({ sheet = false }) {
       {soundRow}
       {reducedRow}
       {stakesRow}
+      <GuestSaveControls />
     </>
   ) : (
     <>
@@ -195,6 +197,7 @@ export function SettingsRows({ sheet = false }) {
       {soundRow}
       {reducedRow}
       {stakesRow}
+      <GuestSaveControls />
     </>
   );
 }

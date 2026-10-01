@@ -7,10 +7,12 @@ import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
 import { registerCameraModel } from '@/lib/fly/camera-framing';
 import { cinematicEarthOn, aircraftPresentation } from '@/lib/fly/cinematic-earth';
 import { isPhoneClass } from '@/lib/fly/device-class';
+import { attachVectorControls, fleetAnimator, applyFleetLivery, disposeFleetGeometry } from '@/lib/fly/fleet-animation';
+import { useAdventureStore } from '@/stores/adventure-store';
 import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
 
 
-import { Suspense, useEffect, useMemo, useRef } from 'react';
+import { Component, Suspense, useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import {
@@ -28,7 +30,6 @@ import { NAV_LIGHTS, PLAYER } from '@/lib/fly/fly-constants';
 import { computeModelCorrection } from '@/lib/fly/model-loader';
 import {
   DEFAULT_AIRCRAFT_ID,
-  PLAYER_AIRCRAFT,
   resolveAircraft,
 } from '@/lib/fly/player-aircraft';
 import { useFlyStore } from '@/stores/fly-store';
@@ -67,6 +68,7 @@ export function PlayerPlane({ flight, aircraft }) {
   const ac = aircraft ?? resolveAircraft(DEFAULT_AIRCRAFT_ID);
   const group = useRef();
   const groundHull = useRef();
+  const assetRevision=useAdventureStore(s=>s.assetRevision||0);
   // R25 W0: the title flyby hides the (frozen) player aircraft.
   const titleHidden = useTitleHidden();
 
@@ -104,11 +106,17 @@ export function PlayerPlane({ flight, aircraft }) {
   return (
     <group ref={group} visible={!titleHidden}>
       <Suspense fallback={<PrimitivePlane />}>
-        <group ref={groundHull}><PlayerModel flight={flight} aircraft={ac} /></group>
+        <group ref={groundHull}><PlayerAssetBoundary key={`${ac.id}:${assetRevision}`}><PlayerModel flight={flight} aircraft={ac} /></PlayerAssetBoundary></group>
         <LandingGear flight={flight} aircraftId={ac.id} />
       </Suspense>
     </group>
   );
+}
+class PlayerAssetBoundary extends Component {
+  state={failed:false};
+  static getDerivedStateFromError(){return {failed:true};}
+  componentDidCatch(){useAdventureStore.setState({assetWarning:true});}
+  render(){return this.state.failed?<PrimitivePlane/>:this.props.children;}
 }
 
 const CANOPY_RE = /canopy|glass|cockpit/i;
@@ -202,7 +210,7 @@ function PlayerModel({ flight, aircraft }) {
   // A style change owns a fresh clone/material grade; the cached asset stays
   // untouched. Keeping the style in this memo is deliberate.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const cloned = useMemo(() => scene.clone(true), [scene, mapStyle]);
+  const cloned = useMemo(() => {const clone=scene.clone(true);if(entry.parts&&aircraft.id==='fighter')attachVectorControls(clone);return clone;}, [scene, mapStyle]);
   const correction = useMemo(
     () =>
       computeModelCorrection(
@@ -250,7 +258,8 @@ function PlayerModel({ flight, aircraft }) {
         const matName = src.name ?? '';
         const isCanopy = CANOPY_RE.test(o.name) || CANOPY_RE.test(matName) ||
           (entry.canopyMaterial && matName === entry.canopyMaterial);
-        const graded = gradeHullMaterial(src, isCanopy, hasVC, correction.scale);
+        const graded = matName==='cabin' ? src.clone() : gradeHullMaterial(src, isCanopy, hasVC, correction.scale);
+        graded.name=src.name;
         if (graded.vertexColors) vertexColored += 1;
         made.push(graded); return graded;
       };
@@ -304,6 +313,11 @@ function PlayerModel({ flight, aircraft }) {
     // `correction` changes exactly when `cloned`/`entry` do (its own memo has
     // the same deps), so listing it here only feeds the dev-stats footprint.
   }, [cloned, entry, correction]);
+  const livery=useAdventureStore(s=>s.progress.liveries[aircraft.id]);
+  const animate=useMemo(()=>fleetAnimator(cloned,entry.parts),[cloned,entry]);
+  useEffect(()=>{applyFleetLivery(cloned,aircraft.id,livery==='earned');},[cloned,aircraft.id,livery,gradedMats]);
+  useFrame((_,dt)=>animate(flight,dt,false,readReducedMotion()));
+  useEffect(()=>()=>disposeFleetGeometry(cloned),[cloned]);
   // Style-driven fresnel rim (discrete write — never per frame)
   useEffect(() => {
     const cfg = PLAYER.hull.byStyle[mapStyle] ?? PLAYER.hull.byStyle.satellite;
@@ -339,7 +353,6 @@ function PlayerModel({ flight, aircraft }) {
 // every session, and preloading nine GLBs would cost every player who never
 // opens the hangar. A saved pick is preloaded by FlyMode pre-canvas-mount, and
 // the hangar preloads on card select.
-useGLTF.preload(PLAYER_AIRCRAFT[0].url);
 
 // Precomputed nav colors (linear)
 const _port = new Color(NAV_LIGHTS.port);

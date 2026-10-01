@@ -14,6 +14,7 @@ import { callRuntimeAction } from '@/lib/fly/runtime-bus';
 import { MenuButton, SettingsRows } from './hud/SettingsRows';
 import { CreditsPanel } from './hud/CreditsPanel';
 import { exitGoesToTitle, frontDoorOn } from '@/lib/fly/front-door';
+import { useAdventureStore } from '@/stores/adventure-store';
 
 const HELP_SEEN_KEY = 'fly-controls-seen';
 
@@ -61,6 +62,7 @@ export function PauseMenu({ onExit }) {
   const controlsHelpSeen = useFlyStore((s) => s.controlsHelpSeen);
   const mapStyle = useFlyStore((s) => s.mapStyle);
   const aircraftId = useFlyStore((s) => s.aircraftId);
+  const adventureOverlay=useAdventureStore(s=>s.libraryOpen||!!s.summary);
   // R25 A: the first-entry help card waits for an actual flight (the title
   // and the hangar are menus). Constant true with FRONT_DOOR off.
   const flying = useFlyStore((s) => !frontDoorOn() || inFlight(s));
@@ -101,7 +103,7 @@ export function PauseMenu({ onExit }) {
     useFlyStore.getState().markControlsHelpSeen();
   };
 
-  if (phase !== 'paused' && controlsHelpSeen) return null;
+  if (adventureOverlay || (phase !== 'paused' && controlsHelpSeen)) return null;
 
   // --- First-entry help card (shown while flying, before any pause) ------
   // Thirteen control rows do not fit in 390px of landscape-phone height, and
@@ -151,6 +153,7 @@ export function PauseMenu({ onExit }) {
             <MenuButton onClick={() => store.setPhase('flying')} primary>
               Resume
             </MenuButton>
+            <MenuButton onClick={() => useAdventureStore.getState().setLibraryOpen(true)}>Adventures</MenuButton>
             {mapStyle === 'satellite' && immersiveOn() && (
               <div className="space-y-1 rounded-md border border-zinc-700 p-2">
                 <p className="mb-2 text-xs text-zinc-400">Explore the new atmosphere</p>

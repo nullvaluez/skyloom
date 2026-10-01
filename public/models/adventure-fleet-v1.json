@@ -1,0 +1,130 @@
+[
+  {
+    "id": "military",
+    "lod": "hero",
+    "url": "/models/player-talon-hero-v1.glb",
+    "triangles": 5112,
+    "draws": 12,
+    "bytes": 377400
+  },
+  {
+    "id": "military",
+    "lod": "mobile",
+    "url": "/models/player-talon-mobile-v1.glb",
+    "triangles": 2400,
+    "draws": 12,
+    "bytes": 182128
+  },
+  {
+    "id": "warbird-jet",
+    "lod": "hero",
+    "url": "/models/player-dart-hero-v1.glb",
+    "triangles": 3840,
+    "draws": 11,
+    "bytes": 285176
+  },
+  {
+    "id": "warbird-jet",
+    "lod": "mobile",
+    "url": "/models/player-dart-mobile-v1.glb",
+    "triangles": 1852,
+    "draws": 11,
+    "bytes": 142032
+  },
+  {
+    "id": "warbird-prop",
+    "lod": "hero",
+    "url": "/models/player-mustang-hero-v1.glb",
+    "triangles": 3936,
+    "draws": 13,
+    "bytes": 293288
+  },
+  {
+    "id": "warbird-prop",
+    "lod": "mobile",
+    "url": "/models/player-mustang-mobile-v1.glb",
+    "triangles": 2000,
+    "draws": 13,
+    "bytes": 153880
+  },
+  {
+    "id": "prop",
+    "lod": "hero",
+    "url": "/models/player-skylark-hero-v1.glb",
+    "triangles": 3552,
+    "draws": 13,
+    "bytes": 265692
+  },
+  {
+    "id": "prop",
+    "lod": "mobile",
+    "url": "/models/player-skylark-mobile-v1.glb",
+    "triangles": 1672,
+    "draws": 13,
+    "bytes": 130316
+  },
+  {
+    "id": "glider",
+    "lod": "hero",
+    "url": "/models/player-whisper-hero-v1.glb",
+    "triangles": 2568,
+    "draws": 9,
+    "bytes": 192028
+  },
+  {
+    "id": "glider",
+    "lod": "mobile",
+    "url": "/models/player-whisper-mobile-v1.glb",
+    "triangles": 1312,
+    "draws": 9,
+    "bytes": 101624
+  },
+  {
+    "id": "bizjet",
+    "lod": "hero",
+    "url": "/models/player-meridian-hero-v1.glb",
+    "triangles": 4984,
+    "draws": 12,
+    "bytes": 368300
+  },
+  {
+    "id": "bizjet",
+    "lod": "mobile",
+    "url": "/models/player-meridian-mobile-v1.glb",
+    "triangles": 2272,
+    "draws": 12,
+    "bytes": 173032
+  },
+  {
+    "id": "airliner",
+    "lod": "hero",
+    "url": "/models/player-stratoliner-hero-v1.glb",
+    "triangles": 7224,
+    "draws": 12,
+    "bytes": 529636
+  },
+  {
+    "id": "airliner",
+    "lod": "mobile",
+    "url": "/models/player-stratoliner-mobile-v1.glb",
+    "triangles": 3232,
+    "draws": 12,
+    "bytes": 242204
+  },
+  {
+    "id": "cargo",
+    "lod": "hero",
+    "url": "/models/player-leviathan-hero-v1.glb",
+    "triangles": 7920,
+    "draws": 12,
+    "bytes": 579640
+  },
+  {
+    "id": "cargo",
+    "lod": "mobile",
+    "url": "/models/player-leviathan-mobile-v1.glb",
+    "triangles": 3536,
+    "draws": 12,
+    "bytes": 263984
+  }
+]

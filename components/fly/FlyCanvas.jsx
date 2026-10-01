@@ -129,7 +129,7 @@ export function FlyCanvas({ runtime }) {
       <Effects runtime={runtime} />
       {/* Round 17: reads the GRADED frame off this canvas at useFrame
           priority 100 — i.e. after the composer above, same task. */}
-      <PhotoCapture />
+      <PhotoCapture runtime={runtime} />
       {/* Round 18 (A4): the arcade layer's frame driver. Mounted AFTER
           FlyScene so its default-priority useFrame runs behind the -50
           flight step and the -45 traffic update — i.e. every item's

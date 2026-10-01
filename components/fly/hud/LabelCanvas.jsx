@@ -14,6 +14,7 @@ import { airDrop, bendDrop, getBend } from '@/lib/fly/toy-world/world-bend';
 import { pinned } from '@/lib/fly/fly-pins';
 import { useFlyStore } from '@/stores/fly-store';
 import { satelliteVisualsOn, SATELLITE_VISUALS } from '@/lib/fly/satellite-visuals';
+import { createAdventureWaypointPainter } from '@/lib/fly/adventure-guidance.mjs';
 
 const _v = new Vector3();
 const _sample = new Vector3();
@@ -165,6 +166,7 @@ export function LabelCanvas({ runtime }) {
     let raf = 0;
     let losCursor = 0;
     let reticlePrev = null;
+    const drawAdventureWaypoint = createAdventureWaypointPainter();
     // Round 17 — resolved ONCE per mount, never in the draw loop. `isTouch`
     // only changes the two touch-gated behaviours below; `isPhone` halves the
     // 2D compositing cost on the device that needs the GL frame back.
@@ -291,6 +293,7 @@ export function LabelCanvas({ runtime }) {
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
+      drawAdventureWaypoint(ctx, w, h, runtime, useFlyStore.getState(), airDrop);
       if (!traffic || !camera || !flight || !origin) return;
 
       reticlePrev = drawReticle(ctx, w, h, runtime, reticlePrev, isTouch);
@@ -570,6 +573,7 @@ export function LabelCanvas({ runtime }) {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerdown', onDown);
       runtime.hoverHex = null;
+      runtime.adventureWaypoint = null;
     };
   }, [runtime]);
 

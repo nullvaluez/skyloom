@@ -176,6 +176,11 @@ pendingUnless('R25 mid-flight return confirmation is unchanged with the title on
   f.patch({ screen: 'hangar', hangarOpen: true, hangarDismissible: true });
   f.history.back(); f.flush(); assert.equal(f.store.hangarOpen, false); assert.equal(f.store.screen, 'flight');
 });
+check('Adventure dialog closes before resuming a paused flight', () => {
+  const f=fixture(); f.patch({phase:'paused',adventureOpen:true,closeAdventureOverlay:()=>f.patch({adventureOpen:false})});
+  f.history.back();f.flush();assert.equal(f.store.adventureOpen,false);assert.equal(f.store.phase,'paused');
+  f.history.back();f.flush();assert.equal(f.store.phase,'flying');
+});
 check('A newer router state is not consumed on close', () => {
   const f = fixture(); f.open(); f.history.pushState({ route: 'next' }); f.close(); f.flush(); assert.equal(f.history.state.route, 'next');
 });

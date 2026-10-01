@@ -6,6 +6,7 @@ import { useFlyStore } from '@/stores/fly-store';
 import { usePassportStore } from '@/stores/passport-store';
 import { useSheetLayout } from '@/hooks/use-sheet-layout';
 import { LOGBOOK } from '@/lib/fly/fly-constants';
+import { AdventureJournal } from './AdventureExperience';
 import { EXACT_TYPE_CODES } from '@/lib/aircraft-type-tables';
 import { getAircraftTypeName } from '@/lib/aircraft-type-names';
 import { getBadgesByTier, getStreakDays } from '@/lib/badges';
@@ -56,6 +57,7 @@ export function Logbook() {
 }
 
 const TABS = [
+  ['journeys', 'Journeys'],
   ['log', 'Log'],
   ['badges', 'Badges'],
   ['stats', 'Stats'],
@@ -85,7 +87,7 @@ function LogbookBody() {
   const badges = usePassportStore((s) => s.badges);
   const stats = usePassportStore((s) => s.stats);
 
-  const [tab, setTab] = useState('log');
+  const [tab, setTab] = useState('journeys');
   const [scope, setScope] = useState('unique');
   const [sort, setSort] = useState('recent');
   const [kind, setKind] = useState('all');
@@ -276,6 +278,7 @@ function LogbookBody() {
         </div>
 
         {/* ---- LOG ---- */}
+        {tab === 'journeys' && <div className="min-h-0 flex-1 overflow-y-auto"><AdventureJournal /></div>}
         {tab === 'log' && (
           <div className="mt-3 flex min-h-0 flex-1 flex-col" data-testid="logbook-log">
             <div className="flex shrink-0 flex-wrap items-center gap-1.5">

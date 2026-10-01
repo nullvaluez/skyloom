@@ -7,6 +7,10 @@ import { useFlyStore } from '@/stores/fly-store';
 import { PLAYER_AIRCRAFT,resolveAircraft,saveAircraft } from '@/lib/fly/player-aircraft';
 import { aircraftPresentation } from '@/lib/fly/cinematic-earth';
 import { isPhoneClass } from '@/lib/fly/device-class';
+import { FLEET_PRESENTATION } from '@/lib/fly/fleet-aircraft.mjs';
+import { LIVERIES, ADVENTURES, COLLECTION_REWARDS } from '@/lib/fly/adventures.mjs';
+import { useAdventureStore } from '@/stores/adventure-store';
+import { contentAccess } from '@/lib/fly/content-access.mjs';
 import { OPERATIONS_AIRPORTS,airportEligible,airportById } from '@/lib/fly/operations-airports';
 import { operationsProfile } from '@/lib/fly/operations-profiles';
 import { HangarScene } from './HangarScene';
@@ -21,7 +25,7 @@ export function GroundHangar({runtime}){
 }
 function HangarBody({runtime}){
   const root=useRef();
-  const [id,setId]=useState(()=>{try{const saved=localStorage.getItem('fly-aircraft');return PLAYER_AIRCRAFT.some(a=>a.id===saved)?saved:'prop';}catch{return 'prop';}});
+  const [id,setId]=useState(()=>{const fallback=flightPlanOn()&&useFlyStore.getState().flightMode==='free'?'fighter':'prop';try{const saved=localStorage.getItem('fly-aircraft');return PLAYER_AIRCRAFT.some(a=>a.id===saved)?saved:fallback;}catch{return fallback;}});
   const [airport,setAirport]=useState(()=>{try{const saved=localStorage.getItem('fly-departure'),aircraft=localStorage.getItem('fly-aircraft')||'prop';return airportEligible(airportById(saved),aircraft)?saved:aircraft==='prop'||aircraft==='warbird-prop'?'KOSU':'KCMH';}catch{return 'KOSU';}});
   const [ready,setReady]=useState(false),[failed,setFailed]=useState(false),[live,setLive]=useState(false),[retry,setRetry]=useState(0);
   const [exteriorReady,setExteriorReady]=useState(false);
@@ -57,7 +61,7 @@ function HangarBody({runtime}){
   const opsStageId=aircraft.id==='glider'?'KOSU':airport;
   useEffect(()=>{if(!plan||free||confirmReturn)return undefined;let t;const go=()=>{if(typeof runtime.stageDestination!=='function'){t=setTimeout(go,SERVICE_RETRY_MS);return;}runtime.stageDestination(opsStageId);};t=setTimeout(go,FLIGHT_PLAN.stage.debounceMs);return()=>clearTimeout(t);},[plan,free,opsStageId,runtime,confirmReturn]);
   const compatible=airportEligible(airportById(airport),aircraft.id);
-  const loaded=useCallback(selected=>{if(selected===id)setReady(true);},[id]),failure=useCallback(()=>setFailed(true),[]);
+  const loaded=useCallback(selected=>{if(selected===id){setReady(true);const s=useAdventureStore.getState();if(s.assetWarning)useAdventureStore.setState({assetWarning:false,assetRevision:(s.assetRevision||0)+1});}},[id]),failure=useCallback(()=>setFailed(true),[]);
   useEffect(()=>{const t=setInterval(()=>setLive(!!runtime.beginDeparture),250);return()=>clearInterval(t);},[runtime]);
   const chooseDest=d=>{if(!d)return;setDest(d);setQuery('');setCursor(0);setStage({state:'pending',pct:0});};
   const searchKey=e=>{if(e.key==='ArrowDown'){e.preventDefault();setCursor(c=>Math.min(c+1,results.length-1));}else if(e.key==='ArrowUp'){e.preventDefault();setCursor(c=>Math.max(c-1,0));}else if(e.key==='Enter'&&results.length>0){e.preventDefault();chooseDest(results[Math.min(cursor,results.length-1)]);}else if(e.key==='Escape'&&query){e.preventDefault();setQuery('');}};
@@ -92,7 +96,7 @@ function HangarBody({runtime}){
     <div className="ops-hangar-shade"/>
     <header className="ops-heading">{plan&&FRONT_DOOR.enabled&&<button type="button" className="ops-hangar-back" data-testid="hangar-back" onClick={toTitle}><ChevronLeft size={16}/>Title</button>}<div className="ops-wordmark"><Navigation size={22}/><span>Skyloom</span><span className="ops-location-divider"/><h1 id="hangar-title">Hangar</h1>{plan&&<span className="ops-mode-chip" data-testid="hangar-mode" data-mode={free?'free':'ops'}>{free?'Free Flight':'Takeoff & Landing'}</span>}</div>{free&&dest?<div className="ops-location"><MapPin size={14}/><span>{dest.name} <span className="ops-location-name">/ {dest.region}</span></span></div>:<div className="ops-location"><MapPin size={14}/><span>{airport} <span className="ops-location-name">/ {airportById(airport)?.name}</span></span></div>}</header>
     <div className="ops-aircraft-title"><span className="ops-aircraft-class">{categories[id]}</span><h2>{aircraft.entry.name}</h2><p>{aircraft.entry.blurb}</p>{profile&&<dl><div><dt>Rotation</dt><dd>{Math.round(profile.rotate*1.94384)}<span>kt</span></dd></div><div><dt>Approach</dt><dd>{Math.round(profile.approach*1.94384)}<span>kt</span></dd></div><div><dt>Airframe</dt><dd>{aircraft.entry.targetLenM}<span>m</span></dd></div></dl>}</div>
-    <div className="ops-views" aria-label="Inspect aircraft"><Rotate3D size={16}/>{[['quarter','Overview'],['front','Front'],['side','Side'],['rear','Rear']].map(([key,label])=><button key={key} aria-pressed={view===key} onClick={()=>setView(key)}>{label}</button>)}</div>
+    <div className="ops-views" aria-label="Inspect aircraft"><Rotate3D size={16}/>{[['quarter','Overview'],['front','Front'],['side','Side'],['rear','Rear']].map(([key,label])=><button key={key} aria-pressed={view===key} onClick={()=>setView(key)}>{label}</button>)}<FleetCustomization id={id}/></div>
     {!ready&&!failed&&<div className="ops-preview-loading" role="status"><LoaderCircle size={18}/>Preparing your aircraft</div>}
     {free?<FreeDispatch dest={dest} query={query} setQuery={v=>{setQuery(v);setCursor(0);}} results={results} cursor={cursor} onSearchKey={searchKey} choose={chooseDest} stage={stage} ready={ready} live={live} failed={failed} retryPreview={()=>{useGLTF.clear(aircraft.entry.url);setFailed(false);setRetry(v=>v+1);}} start={start}/>:<div className="ops-dispatch">
       <div className="ops-dispatch-scroll">
@@ -109,7 +113,7 @@ function HangarBody({runtime}){
         {failed&&<p role="alert">Aircraft preview could not load. <button onClick={()=>{useGLTF.clear(aircraft.entry.url);setFailed(false);setRetry(v=>v+1);}}>Retry</button></p>}
       </div>
     </div>}
-    <nav className="ops-fleet" aria-label="Choose aircraft">{PLAYER_AIRCRAFT.map(a=><button key={a.id} onClick={()=>pick(a.id)} aria-pressed={id===a.id} data-testid={`hangar-pick-${a.id}`}><AircraftGlyph id={a.id}/><span>{a.name}</span><small>{categories[a.id]}</small></button>)}</nav>
+    <nav className="ops-fleet" aria-label="Choose aircraft">{PLAYER_AIRCRAFT.map(a=><button key={a.id} disabled={!contentAccess(`aircraft:${a.id}`).allowed} onClick={()=>pick(a.id)} aria-pressed={id===a.id} data-testid={`hangar-pick-${a.id}`}><AircraftGlyph id={a.id}/><span>{a.name}</span><small>{categories[a.id]}</small></button>)}</nav>
     <p className="ops-orbit-hint">Drag to orbit <span/> Scroll or pinch to zoom</p>
     <a className="ops-hangar-credit" href="https://www.esri.com/" target="_blank" rel="noreferrer">Airport imagery © Esri, Maxar, Earthstar Geographics</a>
   </section>;
@@ -138,6 +142,13 @@ export function FreeDispatch({dest,query,setQuery,results,cursor,onSearchKey,cho
   </div>;
 }
 function AircraftGlyph({id}){
+  const url=FLEET_PRESENTATION[id]?.thumbnail||(id==='fighter'?'/models/player-vector-v2.svg':null);
+  if(url)return <img src={url} alt="" className="ops-fleet-thumbnail"/>;
   const heavy=['airliner','cargo','bizjet'].includes(id),prop=['prop','warbird-prop','glider'].includes(id);
   return <svg viewBox="0 0 80 42" aria-hidden="true"><path d={heavy?'M39 2Q42 2 43 7L44 17 73 30V34L44 27 44 34 54 39V41L40 38 26 41V39L36 34 36 27 7 34V30L36 17 37 7Q38 2 39 2Z':prop?'M38 3H42L43 18 75 20V25L43 23 43 34 53 38V40L40 37 27 40V38L37 34 37 23 5 25V20L37 18Z':'M40 2 46 17 70 34 70 37 48 30 49 38 58 41 42 38 40 40 38 38 22 41 31 38 32 30 10 37 10 34 34 17Z'}/></svg>;
+}
+function FleetCustomization({id}){
+  const [open,setOpen]=useState(false),progress=useAdventureStore(s=>s.progress),livery=LIVERIES[id],earned=contentAccess(`livery:${id}`,progress).allowed;
+  const route=ADVENTURES.find(a=>a.reward===id),collection=COLLECTION_REWARDS.find(r=>r.aircraftId===id);
+  return <div className="fleet-customize"><button aria-expanded={open} onClick={()=>setOpen(!open)}>Customize</button>{open&&<div className="fleet-liveries" role="group" aria-label="Aircraft liveries"><strong>Make it yours</strong><button aria-pressed={progress.liveries[id]!=='earned'} onClick={()=>useAdventureStore.getState().equip(id,false)}>House colors</button><button disabled={!earned} aria-pressed={progress.liveries[id]==='earned'} onClick={()=>useAdventureStore.getState().equip(id,true)}><span style={{background:livery.accent}}/>{livery.name}</button>{!earned&&<small>{route?`Complete ${route.place} to earn this livery.`:`Collect ${collection.count} destination stamps to earn this livery.`}</small>}<small>All aircraft are free to fly.</small></div>}</div>;
 }

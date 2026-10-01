@@ -14,6 +14,8 @@ import { computeSun } from '@/lib/fly/sun-model';
 import { SettingsRows } from './SettingsRows';
 import { CreditsPanel } from './CreditsPanel';
 import './title.css';
+import { useAdventureStore } from '@/stores/adventure-store';
+import { adventureById } from '@/lib/fly/adventures.mjs';
 
 const DEG = Math.PI / 180;
 
@@ -126,6 +128,7 @@ export function TitleScreen({ runtime }) {
 }
 
 function TitleBody({ runtime }) {
+  const adventure = useAdventureStore(s=>s.progress.active);
   const settingsOpen = useFlyStore((s) => s.settingsOpen);
   const creditsOpen = useFlyStore((s) => s.creditsOpen);
   const logbookOpen = useFlyStore((s) => s.logbookOpen);
@@ -175,6 +178,7 @@ function TitleBody({ runtime }) {
 
   const onContinue = () => {
     unlock();
+    if (adventure) { if (!runtime.adventures?.resume()) useAdventureStore.getState().setLibraryOpen(true); return; }
     if (typeof runtime?.launchSetup === 'function') runtime.launchSetup(last);
     else enterHangarFromTitle(last?.flightMode ?? last?.mode ?? 'ops', runtime);
   };
@@ -216,7 +220,7 @@ function TitleBody({ runtime }) {
       </header>
 
       <div className="fly-title-bottom">
-        {last && (
+        {(last || adventure) && (
           <button
             ref={firstAction}
             type="button"
@@ -226,14 +230,14 @@ function TitleBody({ runtime }) {
           >
             <Play size={18} aria-hidden="true" />
             <span className="fly-title-continue-label">Continue</span>
-            {continueLabel && <span className="fly-title-continue-detail">{continueLabel}</span>}
+            {(adventure || continueLabel) && <span className="fly-title-continue-detail">{adventure ? adventureById(adventure.id)?.name : continueLabel}</span>}
           </button>
         )}
 
+        <button ref={last||adventure?undefined:firstAction} type="button" className="fly-title-adventure" data-testid="title-adventures" onClick={()=>{unlock();useAdventureStore.getState().setLibraryOpen(true);}}><Compass size={28}/><span><strong>Start an Adventure</strong><span>Short flights. Extraordinary places. Discover your next story.</span></span><Play size={22}/></button>
         <div className={`fly-title-cards${free ? '' : ' fly-title-cards-single'}`}>
           {free && (
             <button
-              ref={last ? undefined : firstAction}
               type="button"
               className="fly-title-card"
               data-testid="title-free-flight"
@@ -247,7 +251,6 @@ function TitleBody({ runtime }) {
             </button>
           )}
           <button
-            ref={last || free ? undefined : firstAction}
             type="button"
             className="fly-title-card"
             data-testid="title-takeoff-landing"

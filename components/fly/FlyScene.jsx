@@ -2242,6 +2242,12 @@ export function FlyScene({ runtime }) {
       flight.step(dt, apCmd ?? cmd);
     }
 
+    if(runtime.adventures?.controller.progress.active)runtime.adventures.tick(dt, engine.worldToGeo(flight.pos), {
+      epoch: flyState.warpEpoch, held: paused || photoMode || flyState.screen !== 'flight',
+      bank: flight.bank, speed: flight.speed,
+      crashed: crashRef.current.state !== 'idle' || operations.phase === 'crashed',
+    });
+
     // --- Round 18 (A5 GRAVITY): CRASH -------------------------------------
     // Detection reads flight.floorContact, which the model wrote microseconds
     // ago in the step above and clears every frame — so this call site is the

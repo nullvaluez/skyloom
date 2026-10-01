@@ -51,6 +51,8 @@ import {
 import { installTitleCamera } from '@/lib/fly/title-camera';
 import { resolveInitialSpawn } from '@/lib/fly/flight-plan';
 import { TitleScreen } from './hud/TitleScreen';
+import { AdventureExperience } from './hud/AdventureExperience';
+import { recordVisit } from '@/lib/fly/adventure-analytics';
 
 // Last in-flight position, persisted ~10s + pagehide. R25 A: nothing reads it
 // at boot any more (the spawn is lib/fly/flight-plan.js resolveInitialSpawn;
@@ -78,6 +80,7 @@ function HudGroup({ hidden, children }) {
  * world/fleet/shaders are actually ready (window.__flyBoot contract).
  */
 export function FlyMode({ onClose }) {
+  useEffect(() => { recordVisit(); }, []);
   const spawn = useFlyStore((s) => s.spawn);
   // Opt-in local review only: install the allocation observer BEFORE Canvas
   // creates a context. Ordinary flight never loads this diagnostic chunk.
@@ -209,7 +212,8 @@ export function FlyMode({ onClose }) {
     const onKey = (e) => {
       const store = useFlyStore.getState();
       if (e.key === 'Escape') {
-        if (store.inspectHex) store.setInspectHex(null);
+        if (store.adventureOpen) store.closeAdventureOverlay?.();
+        else if (store.inspectHex) store.setInspectHex(null);
         else if (store.cameraMode === 'photo') store.setCameraMode('chase');
         else if (store.atlasOpen) store.setAtlasOpen(false);
         else if (store.logbookOpen) store.setLogbookOpen(false);
@@ -376,6 +380,7 @@ export function FlyMode({ onClose }) {
           backdrop (which turns into a compact strip under it) and under the
           hangar (z-60). Renders nothing unless screen === 'title'. */}
       <TitleScreen runtime={runtime} />
+      <AdventureExperience runtime={runtime} />
 
       {mobileNote && (
         <div className="pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-md bg-zinc-900/85 px-3 py-2 text-xs text-zinc-200 shadow-lg">

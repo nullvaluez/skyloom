@@ -10,6 +10,11 @@ satellite world you can fly across.
 
 ## Features
 
+- **Adventures and rewards** — six guided sightseeing routes, destination stamps,
+  medals, nine earnable liveries, checkpoint saves and guest backup/recovery.
+  First Flights is always free; Wild Earth is free during preview, with no checkout.
+- **Collectible fleet** — original player airframes, lightweight variants,
+  aircraft-specific landing gear, moving controls and hangar customization.
 - **Live traffic** — real aircraft streamed from community ADS-B networks
   (adsb.lol → adsb.fi → airplanes.live failover), rendered as a 3D fleet with
   contrails, nav lights, and altitude-aware behavior.
@@ -35,8 +40,13 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The app boots directly into
-Fly Mode behind a loading screen.
+Open [http://localhost:3000](http://localhost:3000). The title offers Adventures,
+Free Flight and Takeoff & Landing.
+
+Optional PostHog configuration, save formats, commercial provider dependencies
+and outstanding review gates are documented in
+[Fleet & Adventures](FLY_FLEET_AND_ADVENTURES.md). No configuration is required
+for guest play. Public API availability does not establish commercial-use rights.
 
 ```bash
 npm run build   # production build

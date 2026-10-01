@@ -14,7 +14,7 @@ import { FRONT_DOOR } from '@/lib/fly/fly-constants';
  * this predicate is today's.
  */
 export function anyOverlayOpen(s) {
-  return !!s.inspectHex || s.cameraMode === 'photo' || s.atlasOpen ||
+  return !!s.adventureOpen || !!s.inspectHex || s.cameraMode === 'photo' || s.atlasOpen ||
     s.logbookOpen || s.hangarOpen || s.creditsOpen || s.phase === 'paused' || !!s.settingsOpen;
 }
 
@@ -27,7 +27,8 @@ export function anyOverlayOpen(s) {
  * mandatory (today). On the title root nothing happens.
  */
 export function escapeStep(s) {
-  if (s.inspectHex) s.setInspectHex(null);
+  if (s.adventureOpen) s.closeAdventureOverlay?.();
+  else if (s.inspectHex) s.setInspectHex(null);
   else if (s.cameraMode === 'photo') s.setCameraMode('chase');
   else if (s.atlasOpen) s.setAtlasOpen(false);
   else if (s.logbookOpen) s.setLogbookOpen(false);

@@ -738,12 +738,14 @@ await tryGate('7f launchSetup', () => {
 });
 await tryGate('7h launchGlider unchanged', () => {
   // Git blobs use LF; Windows working trees may use CRLF. Compare code, not checkout policy.
-  const src = require_('lib/fly/operations-runtime.js').replace(/\r\n/g, '\n');
-  const w0 = git('show', 'r25-w0:lib/fly/operations-runtime.js');
+  const src = require_('lib/fly/operations-runtime.js').replace(/\r\n/g, '\n')
+    .replace('      if(!contentAccess(`aircraft:${id}`).allowed)return false;\n','');
+  // Pre-pass baseline already resets glider gear/flaps, unlike the R25 tag.
+  const w0 = git('show', '9ee7e79:lib/fly/operations-runtime.js');
   const body = (t) => t.slice(t.indexOf('runtime.launchGlider = () => {'), t.indexOf('};', t.indexOf('runtime.launchGlider = () => {')) + 2);
   // code lines only: B rewrote the comment above launchGlider, not a statement
   const beginDep = (t) => t.slice(t.indexOf('const sync = () => {'), t.indexOf('runtime.launchGlider')).split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
-  gate('7h sync / beginDeparture / retry / lineUp / launchGlider bodies are the r25-w0 text byte-for-byte', body(src) === body(w0) && beginDep(src) === beginDep(w0) && body(src).length > 100);
+  gate('7h physics/service bodies unchanged apart from the catalog access guard', body(src) === body(w0) && beginDep(src) === beginDep(w0) && body(src).length > 100);
 });
 
 // ===========================================================================
@@ -756,6 +758,13 @@ const { renderToStaticMarkup } = await import('react-dom/server');
 const W0H = await imp('components/fly/hud/GroundHangar.jsx', true);
 const NEWH = await imp('components/fly/hud/GroundHangar.jsx', RED);
 const kosuGeo = airportById('KOSU').a;
+// Fleet & Adventures intentionally replaces glyphs and adds customization.
+// Normalize exactly those presentation additions; dispatch markup still compares
+// byte-for-byte. The new assets/controls have their own verify-adventures gate.
+const dispatchMarkup=html=>html.replace(/<link[^>]*rel="preload"[^>]*>/g,'')
+  .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/g,'<glyph/>')
+  .replace(/<img\b[^>]*class="ops-fleet-thumbnail"[^>]*>/g,'<glyph/>')
+  .replace(/<div class="fleet-customize"><button aria-expanded="false">Customize<\/button><\/div>/g,'');
 const render = (Mod, mode) => {
   const arm = { flightMode: mode, hangarOpen: true, screen: 'hangar', spawn: null };
   Object.assign(useFlyStore.getInitialState(), arm);
@@ -769,7 +778,7 @@ await tryGate('8a flag-off identity', () => {
   const newOps = render(NEWH, 'ops');
   const w0free = render(W0H, 'free');
   const newFree = render(NEWH, 'free');
-  gate('8a FLIGHT_PLAN off: hangar markup byte-identical to r25-w0 (ops, and with flightMode forced free)', w0ops === newOps && w0free === newFree && w0ops.length > 2000, `${w0ops.length} / ${newOps.length} chars`);
+  gate('8a FLIGHT_PLAN off: dispatch markup unchanged; fleet thumbnails/customization normalized', dispatchMarkup(w0ops) === dispatchMarkup(newOps) && dispatchMarkup(w0free) === dispatchMarkup(newFree) && w0ops.length > 2000, `${w0ops.length} / ${newOps.length} chars`);
 });
 await tryGate('8b on + ops', () => {
   setPlan(true);
@@ -782,7 +791,7 @@ await tryGate('8b on + ops', () => {
   const withDoor = render(NEWH, 'ops');
   C.FRONT_DOOR.enabled = doorWas;
   const back = /<button type="button" class="ops-hangar-back" data-testid="hangar-back">.*?Title<\/button>/.exec(withDoor)?.[0] ?? '';
-  gate('8b FLIGHT_PLAN on, ops mode: today\'s panel + only the mode chip (and "‹ Title" only with FRONT_DOOR on)', on.replace(chip, '') === w0ops && on.includes(chip) && !on.includes('hangar-back') && back && withDoor.replace(back, '') === on, `chip ${on.includes(chip)}, back ${!!back}`);
+  gate('8b ops dispatch unchanged with mode chip/title back; fleet presentation normalized', dispatchMarkup(on.replace(chip, '')) === dispatchMarkup(w0ops) && on.includes(chip) && !on.includes('hangar-back') && back && withDoor.replace(back, '') === on, `chip ${on.includes(chip)}, back ${!!back}`);
 });
 await tryGate('8c on + free', () => {
   setPlan(true);
