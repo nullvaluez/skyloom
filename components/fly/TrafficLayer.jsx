@@ -22,6 +22,7 @@ import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
 import { applyBendAirAnchor, applyNavLights, applyOverlayCloudGate, horizonFade, setNavTime } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
 import { DetailedTraffic } from '@/lib/fly/detailed-traffic';
+import { projectModelMatrix } from '@/lib/fly/render-scale';
 import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
 import { cinemaOn } from '@/lib/fly/cinema-policy';
 
@@ -325,9 +326,10 @@ export function TrafficLayer({ runtime, flight, origin }) {
         _dummy.position.set(x, y, z);
         _dummy.rotation.order = 'YXZ';
         _dummy.rotation.set(pitch, -it.yaw, -it.bank);
-        const s = WORLD.trafficDisplayScale * it.scaleK;
+        const s = it.scaleK;
         _dummy.scale.set(s, s, s);
         _dummy.updateMatrix();
+        projectModelMatrix(_dummy.matrix,1/Math.cos(it.fix1.latRad));
         mesh.setMatrixAt(mesh._used, _dummy.matrix);
         mesh.setColorAt(mesh._used, _color);
         mesh._used += 1;

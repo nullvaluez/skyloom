@@ -739,13 +739,14 @@ await tryGate('7f launchSetup', () => {
 await tryGate('7h launchGlider unchanged', () => {
   // Git blobs use LF; Windows working trees may use CRLF. Compare code, not checkout policy.
   const src = require_('lib/fly/operations-runtime.js').replace(/\r\n/g, '\n')
-    .replace('      if(!contentAccess(`aircraft:${id}`).allowed)return false;\n','');
+    .replace('      if(!contentAccess(`aircraft:${id}`).allowed)return false;\n','')
+    .replaceAll('      runtime.adventures?.suspend();\n','');
   // Pre-pass baseline already resets glider gear/flaps, unlike the R25 tag.
   const w0 = git('show', '9ee7e79:lib/fly/operations-runtime.js');
   const body = (t) => t.slice(t.indexOf('runtime.launchGlider = () => {'), t.indexOf('};', t.indexOf('runtime.launchGlider = () => {')) + 2);
   // code lines only: B rewrote the comment above launchGlider, not a statement
   const beginDep = (t) => t.slice(t.indexOf('const sync = () => {'), t.indexOf('runtime.launchGlider')).split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
-  gate('7h physics/service bodies unchanged apart from the catalog access guard', body(src) === body(w0) && beginDep(src) === beginDep(w0) && body(src).length > 100);
+  gate('7h physics/service bodies unchanged apart from catalog access and adventure suspension', body(src) === body(w0) && beginDep(src) === beginDep(w0) && body(src).length > 100);
 });
 
 // ===========================================================================

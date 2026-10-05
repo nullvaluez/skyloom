@@ -1,6 +1,8 @@
 'use client';
 /* eslint-disable react-hooks/immutability -- Three.js buffers, materials and the shared flight runtime are imperative simulation objects, updated by useFrame without React renders. */
 import { LandingGear } from './LandingGear';
+import { mercatorScale } from '@/lib/fly/coords';
+import { projectModelMatrix } from '@/lib/fly/render-scale';
 import { applyPainterlyAircraft } from '@/lib/fly/painterly-aircraft';
 import { cinematicAircraftParameters } from '@/lib/fly/cinematic-models';
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
@@ -101,10 +103,12 @@ export function PlayerPlane({ flight, aircraft }) {
     const bob=readReducedMotion()?0:clearance*(cinemaOn()?.28:1);
     g.position.y += (Math.sin(t * 1.9) * 0.35 + Math.sin(t * 3.1) * 0.12)*bob;
     g.rotation.z += Math.sin(t * 1.3) * 0.01*bob;
+    g.updateMatrix();
+    projectModelMatrix(g.matrix, mercatorScale(flight.latDeg));
   }, -30);
 
   return (
-    <group ref={group} visible={!titleHidden}>
+    <group ref={group} visible={!titleHidden} matrixAutoUpdate={false}>
       <Suspense fallback={<PrimitivePlane />}>
         <group ref={groundHull}><PlayerAssetBoundary key={`${ac.id}:${assetRevision}`}><PlayerModel flight={flight} aircraft={ac} /></PlayerAssetBoundary></group>
         <LandingGear flight={flight} aircraftId={ac.id} />
@@ -405,7 +409,7 @@ function PlayerLights({ anchors, flight }) {
     geo.setAttribute('position', new BufferAttribute(new Float32Array(pts.flat()), 3));
     geo.setAttribute('color', new BufferAttribute(new Float32Array(pts.length * 3), 3));
     const mat = new PointsMaterial({
-      size: PLAYER.navLights.sizeM * 2,
+      size: PLAYER.navLights.sizeM * Math.max(.75,Math.min(1.5,len/24)),
       vertexColors: true,
       transparent: true,
       blending: AdditiveBlending,

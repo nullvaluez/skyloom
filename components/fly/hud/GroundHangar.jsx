@@ -8,7 +8,9 @@ import { PLAYER_AIRCRAFT,resolveAircraft,saveAircraft } from '@/lib/fly/player-a
 import { aircraftPresentation } from '@/lib/fly/cinematic-earth';
 import { isPhoneClass } from '@/lib/fly/device-class';
 import { FLEET_PRESENTATION } from '@/lib/fly/fleet-aircraft.mjs';
-import { LIVERIES, ADVENTURES, COLLECTION_REWARDS } from '@/lib/fly/adventures.mjs';
+import { LIVERIES, ADVENTURES, COLLECTION_REWARDS, adventureById, checkpointStart } from '@/lib/fly/adventures.mjs';
+import { adventureMinutes, aircraftAdvice } from '@/lib/fly/adventure-activities.mjs';
+import { RouteTrace } from './AdventureExperience';
 import { useAdventureStore } from '@/stores/adventure-store';
 import { contentAccess } from '@/lib/fly/content-access.mjs';
 import { OPERATIONS_AIRPORTS,airportEligible,airportById } from '@/lib/fly/operations-airports';
@@ -21,17 +23,20 @@ import './mobile-flight.css';
 const SERVICE_RETRY_MS=250;
 export function GroundHangar({runtime}){
   const open=useFlyStore(s=>s.hangarOpen);
-  return open?<HangarBody runtime={runtime}/>:null;
+  const draft=useAdventureStore(s=>s.preflight);
+  return open?<HangarBody key={draft?.id||'standard'} runtime={runtime}/>:null;
 }
 function HangarBody({runtime}){
   const root=useRef();
-  const [id,setId]=useState(()=>{const fallback=flightPlanOn()&&useFlyStore.getState().flightMode==='free'?'fighter':'prop';try{const saved=localStorage.getItem('fly-aircraft');return PLAYER_AIRCRAFT.some(a=>a.id===saved)?saved:fallback;}catch{return fallback;}});
+  const draft=useAdventureStore(s=>s.preflight),adventure=adventureById(draft?.id),active=useAdventureStore(s=>s.progress.active);
+  const [conditions,setConditions]=useState(draft?.conditions||'curated'),[restart,setRestart]=useState(false),[launchError,setLaunchError]=useState('');
+  const [id,setId]=useState(()=>{if(draft)return draft.aircraftId;const fallback=flightPlanOn()&&useFlyStore.getState().flightMode==='free'?'fighter':'prop';try{const saved=localStorage.getItem('fly-aircraft');return PLAYER_AIRCRAFT.some(a=>a.id===saved)?saved:fallback;}catch{return fallback;}});
   const [airport,setAirport]=useState(()=>{try{const saved=localStorage.getItem('fly-departure'),aircraft=localStorage.getItem('fly-aircraft')||'prop';return airportEligible(airportById(saved),aircraft)?saved:aircraft==='prop'||aircraft==='warbird-prop'?'KOSU':'KCMH';}catch{return 'KOSU';}});
   const [ready,setReady]=useState(false),[failed,setFailed]=useState(false),[live,setLive]=useState(false),[retry,setRetry]=useState(0);
   const [exteriorReady,setExteriorReady]=useState(false);
   const exteriorLoaded=useCallback(()=>setExteriorReady(true),[]);
   const [startMode,setStartMode]=useState('apron'),[view,setView]=useState('quarter');
-  const [confirmReturn,setConfirmReturn]=useState(()=>!!runtime.operations && !['hangar','completed'].includes(runtime.operations.phase));
+  const [confirmReturn,setConfirmReturn]=useState(()=>!draft&&!!runtime.operations && !['hangar','completed'].includes(runtime.operations.phase));
   useEffect(()=>{useFlyStore.getState().setHangarDismissible(confirmReturn);},[confirmReturn]);
   // R25 B FLIGHT PLAN: the panel adapts to the title's choice. Flag-off (and
   // ops mode) renders today's dispatch panel; free mode is the destination
@@ -40,7 +45,9 @@ function HangarBody({runtime}){
   const plan=flightPlanOn(),free=plan&&flightMode==='free';
   // Default = where the flight already is (the title spot), so a first flight needs no staging.
   const fallbackDest=useMemo(()=>free?defaultDestination(runtime,useFlyStore.getState().spawn):null,[free,runtime]);
-  const [picked,setDest]=useState(null),dest=free?picked??fallbackDest:null;
+  const adventureDest=useMemo(()=>adventure?checkpointStart(adventure,active?.id===adventure.id&&active.aircraftId===id&&active.conditions===conditions?active.index:0,id):null,[adventure,active,id,conditions]);
+  const [picked,setDest]=useState(null),dest=adventureDest||(free?picked??fallbackDest:null);
+  useEffect(()=>{if(adventure)runtime.adventures?.previewEnvironment(adventure.id,conditions);},[adventure,conditions,runtime]);
   const [query,setQuery]=useState(''),[cursor,setCursor]=useState(0),[stage,setStage]=useState({state:'idle',pct:0});
   const results=useMemo(()=>free?searchDestinations(query,6):[],[free,query]);
   // Debounced staging: pre-stream the pick behind the opaque hangar.
@@ -72,16 +79,22 @@ function HangarBody({runtime}){
   // hangar: the pre-flight Esc → title (FRONT_DOOR) is handled here, unless the
   // search box already used it to clear its query.
   const keyboard=e=>{e.stopPropagation();if(e.key==='Escape'&&!confirmReturn&&!e.isDefaultPrevented()&&toTitle())e.preventDefault();if(e.key==='Tab'){const items=[...e.currentTarget.querySelectorAll('button:not(:disabled),select:not(:disabled),input:not(:disabled),a[href],[tabindex="0"]')];const first=items[0],last=items.at(-1);if(e.shiftKey&&(document.activeElement===first||document.activeElement===root.current)){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}};
-  const pick=next=>{if(next===id)return;setReady(false);setFailed(false);setId(next);if(!airportEligible(airportById(airport),next)&&next!=='glider')setAirport(next==='prop'||next==='warbird-prop'?'KOSU':'KCMH');};
+  const pick=next=>{if(next===id)return;setReady(false);setFailed(false);setRestart(false);setId(next);if(!airportEligible(airportById(airport),next)&&next!=='glider')setAirport(next==='prop'||next==='warbird-prop'?'KOSU':'KCMH');};
   const start=()=>{
     const chosen=aircraft.id;if(!ready||!live)return;
+    if(adventure){
+      const resuming=active?.id===adventure.id&&active.aircraftId===chosen&&active.conditions===conditions;
+      if(active?.id===adventure.id&&!resuming&&!restart){setRestart(true);return;}
+      const ok=resuming?runtime.adventures?.resume():runtime.adventures?.start(adventure.id,{aircraftId:chosen,conditions});
+      if(!ok)setLaunchError('Flight could not start. Please try again.');return;
+    }
     if(free){if(!dest||!runtime.launchSetup?.({flightMode:'free',aircraftId:chosen,dest}))return;try{localStorage.setItem('fly-departure',airport);}catch{}return;}
     if(chosen==='glider')runtime.launchGlider();else if(!runtime.beginDeparture(chosen,airport,startMode))return;
     saveAircraft(chosen);try{localStorage.setItem('fly-departure',airport);}catch{}
     if(plan)saveLastSetup(chosen==='glider'?{flightMode:'ops',aircraftId:chosen,start:'practice'}:{flightMode:'ops',aircraftId:chosen,airportId:airport,start:startMode});
     useFlyStore.getState().setHangarOpen(false);
   };
-  const toTitle=()=>{const s=useFlyStore.getState();if(!FRONT_DOOR.enabled||s.hangarDismissible)return false;s.setScreen('title');return true;};
+  const toTitle=()=>{const s=useFlyStore.getState();if(!FRONT_DOOR.enabled||s.hangarDismissible)return false;s.setScreen('title');if(adventure){useAdventureStore.setState({selectedRouteId:adventure.id,libraryOpen:true});}return true;};
   if(confirmReturn)return <div ref={root} tabIndex={-1} onKeyDown={keyboard} onPointerDown={e=>e.stopPropagation()} data-overlay="hangar" className="ops-hangar ops-confirm" role="dialog" aria-modal="true" aria-label="Return to hangar">
     <div><h1>Return to the hangar?</h1><p>This ends your current flight. Choose another aircraft or departure airport in the hangar.</p>
       <button onClick={()=>{runtime.operations.returnToHangar();setConfirmReturn(false);}}>End flight and open hangar</button>
@@ -91,14 +104,14 @@ function HangarBody({runtime}){
   const modes=[['apron','Apron',Navigation],['runway','Runway',PlaneTakeoff],['approach','Approach',PlaneLanding]];
   const modeHelp={apron:'The full flight. Taxi out from your parking stand.',runway:'Lined up and ready. You handle the takeoff.',approach:'Find your landing. Begin on a stable final approach.'};
   const theme={'--ops-ice':CARD_THEME.ice,'--ops-muted':CARD_THEME.iceDim,'--ops-edge':CARD_THEME.edgeSoft};
-  return <section ref={root} tabIndex={-1} onKeyDown={keyboard} onPointerDown={e=>e.stopPropagation()} data-overlay="hangar" className="ops-hangar" style={theme} role="dialog" aria-modal="true" aria-labelledby="hangar-title" data-testid="hangar" data-exterior-ready={exteriorReady}>
+  return <section ref={root} tabIndex={-1} onKeyDown={keyboard} onPointerDown={e=>e.stopPropagation()} data-overlay="hangar" className={'ops-hangar'+(adventure?' journey-hangar':'')} style={theme} role="dialog" aria-modal="true" aria-labelledby="hangar-title" data-testid="hangar" data-exterior-ready={exteriorReady}>
     <div className="ops-bay" key={retry}><HangarScene aircraft={aircraft} airport={airportById(airport)||airportById('KOSU')} view={view} onReady={loaded} onError={failure} onExteriorReady={exteriorLoaded}/></div>
     <div className="ops-hangar-shade"/>
-    <header className="ops-heading">{plan&&FRONT_DOOR.enabled&&<button type="button" className="ops-hangar-back" data-testid="hangar-back" onClick={toTitle}><ChevronLeft size={16}/>Title</button>}<div className="ops-wordmark"><Navigation size={22}/><span>Skyloom</span><span className="ops-location-divider"/><h1 id="hangar-title">Hangar</h1>{plan&&<span className="ops-mode-chip" data-testid="hangar-mode" data-mode={free?'free':'ops'}>{free?'Free Flight':'Takeoff & Landing'}</span>}</div>{free&&dest?<div className="ops-location"><MapPin size={14}/><span>{dest.name} <span className="ops-location-name">/ {dest.region}</span></span></div>:<div className="ops-location"><MapPin size={14}/><span>{airport} <span className="ops-location-name">/ {airportById(airport)?.name}</span></span></div>}</header>
+    <header className="ops-heading">{plan&&FRONT_DOOR.enabled&&<button type="button" className="ops-hangar-back" data-testid="hangar-back" onClick={toTitle}><ChevronLeft size={16}/>{adventure?'Adventures':'Title'}</button>}<div className="ops-wordmark"><Navigation size={22}/><span>Skyloom</span><span className="ops-location-divider"/><h1 id="hangar-title">Hangar</h1>{plan&&<span className="ops-mode-chip" data-testid="hangar-mode" data-mode={free?'free':'ops'}>{adventure?'Adventure':free?'Free Flight':'Takeoff & Landing'}</span>}</div>{free&&dest?<div className="ops-location"><MapPin size={14}/><span>{dest.name} <span className="ops-location-name">/ {dest.region}</span></span></div>:<div className="ops-location"><MapPin size={14}/><span>{airport} <span className="ops-location-name">/ {airportById(airport)?.name}</span></span></div>}</header>
     <div className="ops-aircraft-title"><span className="ops-aircraft-class">{categories[id]}</span><h2>{aircraft.entry.name}</h2><p>{aircraft.entry.blurb}</p>{profile&&<dl><div><dt>Rotation</dt><dd>{Math.round(profile.rotate*1.94384)}<span>kt</span></dd></div><div><dt>Approach</dt><dd>{Math.round(profile.approach*1.94384)}<span>kt</span></dd></div><div><dt>Airframe</dt><dd>{aircraft.entry.targetLenM}<span>m</span></dd></div></dl>}</div>
     <div className="ops-views" aria-label="Inspect aircraft"><Rotate3D size={16}/>{[['quarter','Overview'],['front','Front'],['side','Side'],['rear','Rear']].map(([key,label])=><button key={key} aria-pressed={view===key} onClick={()=>setView(key)}>{label}</button>)}<FleetCustomization id={id}/></div>
     {!ready&&!failed&&<div className="ops-preview-loading" role="status"><LoaderCircle size={18}/>Preparing your aircraft</div>}
-    {free?<FreeDispatch dest={dest} query={query} setQuery={v=>{setQuery(v);setCursor(0);}} results={results} cursor={cursor} onSearchKey={searchKey} choose={chooseDest} stage={stage} ready={ready} live={live} failed={failed} retryPreview={()=>{useGLTF.clear(aircraft.entry.url);setFailed(false);setRetry(v=>v+1);}} start={start}/>:<div className="ops-dispatch">
+    {adventure?<div className="ops-dispatch journey-dispatch"><div className="ops-dispatch-scroll"><p className="journey-meta">Adventure · {adventure.place}</p><h2>{adventure.name}</h2><RouteTrace route={adventure}/><p>{aircraftAdvice(id,adventure.aircraftId)}</p><p className="journey-duration">About {adventureMinutes(adventure,id)} minutes <span>+ optional activities</span></p><fieldset className="journey-conditions"><legend>Flight conditions</legend>{[['curated',adventure.conditions.label],['live','Real time and weather']].map(([value,label])=><label key={value}><input type="radio" name="adventure-conditions" value={value} checked={conditions===value} onChange={()=>{setConditions(value);setRestart(false);}}/><span>{label}<small>{value==='curated'?'Curated for this journey':'Conditions at your destination now'}</small></span></label>)}</fieldset><p className="journey-meta">Three optional activities. All aircraft are free to fly.</p></div><div className="ops-dispatch-action">{restart&&<p role="alert">Changing aircraft or conditions restarts this journey. Earned rewards stay yours.</p>}<button data-testid="hangar-fly" className="ops-primary" disabled={!ready||!live} onClick={start}>{!ready?'Loading aircraft…':!live?'Preparing flight…':restart?'Restart with '+aircraft.entry.name:active?.id===adventure.id?'Continue adventure':'Fly '+adventure.place}<ArrowUpRight size={18}/></button>{restart&&<button onClick={()=>{pick(active.aircraftId);setConditions(active.conditions);setRestart(false);}}>Keep current setup</button>}<p className="ops-help">{stage.state==='ready'?'World ready':stage.state==='staging'?'Preparing scenery · '+stage.pct+'%':'Airborne start. Your journey awaits.'}</p>{launchError&&<p role="alert">{launchError}</p>}{failed&&<p role="alert">Aircraft preview could not load. <button onClick={()=>{useGLTF.clear(aircraft.entry.url);setFailed(false);setRetry(v=>v+1);}}>Retry</button></p>}</div></div>:free?<FreeDispatch dest={dest} query={query} setQuery={v=>{setQuery(v);setCursor(0);}} results={results} cursor={cursor} onSearchKey={searchKey} choose={chooseDest} stage={stage} ready={ready} live={live} failed={failed} retryPreview={()=>{useGLTF.clear(aircraft.entry.url);setFailed(false);setRetry(v=>v+1);}} start={start}/>:<div className="ops-dispatch">
       <div className="ops-dispatch-scroll">
         <div className="ops-dispatch-heading"><PlaneTakeoff size={20}/><h3>Make it your flight</h3></div>
         <label htmlFor="departure-airport">Departure airport</label>

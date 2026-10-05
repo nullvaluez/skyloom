@@ -1,6 +1,7 @@
 'use client';
 import { useRef, useState } from 'react';
 import { useAdventureStore } from '@/stores/adventure-store';
+import { useEncounterStore } from '@/stores/encounter-store';
 import { createBackup, parseBackup, restoreBackup, recoveryBackup, RECOVERY_KEY } from '@/lib/fly/save-backup.mjs';
 import { analyticsEnabled, setAnalyticsConsent } from '@/lib/fly/adventure-analytics';
 import { usePassportStore } from '@/stores/passport-store';
@@ -8,9 +9,11 @@ import { useFlyAtlasStore } from '@/stores/fly-atlas-store';
 import { useFlyContractsStore } from '@/stores/fly-contracts-store';
 import { currentContractSnapshot } from '@/lib/fly/contract-progress';
 function currentRecords(){
+  useEncounterStore.getState().hydrate();
   const p=usePassportStore.getState(),a=useFlyAtlasStore.getState(),c=useFlyContractsStore.getState();
   const active=currentContractSnapshot();
-  return {...(active?{'fly-contracts-active-v1':active}:{}),'fly-adventures-v1':{version:1,progress:useAdventureStore.getState().progress},
+  return {...(active?{'fly-contracts-active-v1':active}:{}),'fly-adventures-v1':{version:2,progress:useAdventureStore.getState().progress},
+    'fly-encounters-v1':{version:1,memories:useEncounterStore.getState().memories},
     'shadowadsb-passport':{version:0,state:{spottedAircraft:p.spottedAircraft,badges:p.badges,stats:{...p.stats,uniqueTypes:Array.from(p.stats.uniqueTypes||[])},weeklyRareFinds:p.weeklyRareFinds}},
     'fly-atlas':{version:0,state:{recents:a.recents,favorites:a.favorites,visits:a.visits}},
     'fly-contracts':{version:0,state:{totalScore:c.totalScore,completedCount:c.completedCount}},

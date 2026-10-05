@@ -52,6 +52,7 @@ import { installTitleCamera } from '@/lib/fly/title-camera';
 import { resolveInitialSpawn } from '@/lib/fly/flight-plan';
 import { TitleScreen } from './hud/TitleScreen';
 import { AdventureExperience } from './hud/AdventureExperience';
+import { EncounterExperience } from './hud/EncounterExperience';
 import { recordVisit } from '@/lib/fly/adventure-analytics';
 
 // Last in-flight position, persisted ~10s + pagehide. R25 A: nothing reads it
@@ -340,6 +341,7 @@ export function FlyMode({ onClose }) {
         {/* POI names are in-world 3D letters (PoiLetters) in every style */}
         <LabelCanvas runtime={runtime} />
         <FlyHUD runtime={runtime} />
+        <EncounterExperience runtime={runtime} />
         <Minimap runtime={runtime} />
         <InfoCard runtime={runtime} />
       </HudGroup>

@@ -14,11 +14,11 @@ class ModelBoundary extends Component {
   componentDidCatch(){this.props.onError();}
   render(){return this.state.error?null:this.props.children;}
 }
-function Aircraft({aircraft,onReady}){
+function Aircraft({aircraft,onReady,earnedPreview=false}){
   const {scene}=useGLTF(aircraft.entry.url);
   const clone=useMemo(()=>{const object=scene.clone(true);if(aircraft.id==='fighter'&&aircraft.entry.parts)attachVectorControls(object);object.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;const copy=m=>{const c=m.clone();c.vertexColors=!!o.geometry.attributes.color;return c;};o.material=Array.isArray(o.material)?o.material.map(copy):copy(o.material);}});return object;},[scene,aircraft.id,aircraft.entry.parts]);
   const livery=useAdventureStore(s=>s.progress.liveries[aircraft.id]);
-  useEffect(()=>{applyFleetLivery(clone,aircraft.id,livery==='earned');},[clone,aircraft.id,livery]);
+  useEffect(()=>{applyFleetLivery(clone,aircraft.id,earnedPreview||livery==='earned');},[clone,aircraft.id,livery,earnedPreview]);
   const animate=useMemo(()=>fleetAnimator(clone,aircraft.entry.parts),[clone,aircraft.entry.parts]);
   useFrame((_,dt)=>animate(null,dt,true));
   useEffect(()=>()=>disposeFleetGeometry(clone),[clone]);
@@ -41,7 +41,10 @@ function Bay({aircraft,airport,onReady,onError,onExteriorReady,view}){
   useEffect(()=>{
     const positions={quarter:[.65,.46,-1.35],front:[0,.25,-1.65],side:[1.65,.32,.08],rear:[-.62,.36,1.5]};
     const portrait=size.width<size.height;
-    const distanceScale=portrait?(viewLength>25?1.8:1.55):1;
+    // Near-square desktop panels also need horizontal room for the fleet's
+    // wings and the dispatch column. Avoid the old landscape/portrait cliff.
+    const aspect=size.width/Math.max(1,size.height);
+    const distanceScale=Math.max(portrait?(viewLength>25?1.8:1.55):1,Math.min(2,1.4/aspect));
     const position=positions[view||'quarter'].map(v=>v*viewLength*distanceScale);
     position[1]=Math.min(position[1],height*.7);
     camera.position.set(...position);
@@ -94,4 +97,17 @@ export function HangarScene({aircraft,airport,onReady,onError,onExteriorReady,vi
       <Bay aircraft={aircraft} airport={airport} onReady={onReady} onError={onError} onExteriorReady={onExteriorReady} view={view}/>
     </Canvas>
   </ModelBoundary>;
+}
+
+const previewReady=()=>{};
+/** A stationary reward inspection using the same private model/material clone.
+ * Demand rendering releases the GPU between drags; no extra scenery pipeline. */
+export function RewardAircraftPreview({aircraft,onError=previewReady}) {
+  const length=Math.max(12,aircraft.entry.targetLenM);
+  return <ModelBoundary onError={onError}><Canvas frameloop="demand" dpr={[1,1.25]} camera={{position:[length*.65,length*.42,-length*1.4],fov:42,near:.1,far:600}} aria-label={`${aircraft.entry.name} wearing your earned livery; drag to inspect`}>
+    <hemisphereLight args={['#d6edff','#233744',2]}/>
+    <directionalLight position={[length,length,length]} intensity={3} color="#ffe6bb"/>
+    <Suspense fallback={null}><Environment files="/hdri/kloofendal_48d_partly_cloudy_puresky_2k.hdr" environmentIntensity={.65}/><Aircraft aircraft={aircraft} onReady={previewReady} earnedPreview/></Suspense>
+    <OrbitControls target={[0,length*.07,0]} enablePan={false} enableZoom={false} enableDamping={false}/>
+  </Canvas></ModelBoundary>;
 }

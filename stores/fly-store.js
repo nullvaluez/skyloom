@@ -52,6 +52,8 @@ const initialState = {
   // flying with a neutralized stick — it is NOT phase:'paused'). The cinema
   // auto-revert is scoped to 'cinema' on purpose and cannot eat 'photo'.
   cameraMode: 'chase',
+  chaseFraming: 'world',
+  encountersEnabled: true,
 
   // Overlays
   creditsOpen: false,
@@ -112,6 +114,7 @@ const initialState = {
   // (screen === 'hangar') so every testid/harness/store caller keeps working.
   screen: 'hangar',
   flightMode: 'ops', // 'free' | 'ops' (B FLIGHT PLAN)
+  adventureEnvironmentEpoch: 0,
   settingsOpen: false, // title/pause Settings sheet (A)
   // Visuals profile 'classic' | 'enhanced' (lib/fly/visuals-profile.js is the
   // only writer). The literal is 'classic' = the flag-off tree; the resolver

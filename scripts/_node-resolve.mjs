@@ -15,7 +15,7 @@ import { statSync } from 'node:fs';
 import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const EXTS = ['', '.js', '.mjs', '/index.js'];
+const EXTS = ['', '.js', '.mjs', '.jsx', '/index.js'];
 
 function firstFile(base) {
   for (const ext of EXTS) {

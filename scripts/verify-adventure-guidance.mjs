@@ -69,3 +69,13 @@ test('navigation paints with unavailable traffic and clears during photo, menus,
   }
   for(const status of ['retry','paused','finish']){runtime.adventures.controller.progress.active.status=status;draw(ctx,1280,720,runtime,state,()=>0);assert.equal(runtime.adventureWaypoint,null);}
 });
+
+test('optional course draws only three immediate gates, survives finish, and hides in photo mode',()=>{
+  const route=ADVENTURES[0],points=route.checkpoints.concat(route.checkpoints);
+  const runtime={adventures:{controller:{progress:{active:{id:route.id,index:4,status:'finish'}},offer:()=>({points,headings:[],gateRadiusM:100,name:'Test course'}),reading:{gate:2}}},
+    camera:cameraAt(),engine:{geoToWorld:()=>new Vector3(0,900,-2150)},origin:{anchor:new Vector3()},flight:{pos:new Vector3(0,900,0)},geo:{x:route.start.lon,y:route.start.lat,z:900}};
+  let gates=0;const ctx={save(){},restore(){},beginPath(){},ellipse(){gates++;},stroke(){},fillText(){},translate(){},rotate(){},moveTo(){},lineTo(){}};
+  const draw=createAdventureWaypointPainter(),state={screen:'flight',phase:'flying',cameraMode:'chase'};
+  draw(ctx,1280,720,runtime,state,()=>0);assert.equal(gates,3);assert.equal(runtime.adventureWaypoint,null);
+  draw(ctx,1280,720,runtime,{...state,cameraMode:'photo'},()=>0);assert.equal(gates,3);
+});

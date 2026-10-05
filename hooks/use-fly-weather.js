@@ -10,6 +10,7 @@ import {
 } from '@/lib/fly/weather-model';
 import { settleOn, sinceRevealMs } from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
+import { adventureWeather } from '@/lib/fly/adventure-environment.mjs';
 
 // Round 16 "Living World" — real weather at the player's position.
 //
@@ -78,7 +79,7 @@ function refreshWeatherTargets(runtime) {
   if (!payload && WEATHER.fallback === 'procedural' && runtime.geo) {
     payload = proceduralWeather(runtime.geo.y, runtime.geo.x, Date.now(), WEATHER);
   }
-  computeTargets(payload, WEATHER, w.targets);
+  computeTargets(adventureWeather(runtime.adventureEnvironment,payload), WEATHER, w.targets);
   w.state = w.targets.state;
 
   const s = devStats();

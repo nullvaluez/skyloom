@@ -6,6 +6,8 @@ import { PHOTO } from '@/lib/fly/fly-constants';
 import { ATTRIBUTIONS_BY_STYLE } from '@/lib/fly/tile-sources';
 import { registerRuntimeActions } from '@/lib/fly/runtime-bus';
 import { useFlyStore } from '@/stores/fly-store';
+import { adventurePhotoFrame } from '@/lib/fly/adventure-photo';
+import { encounterPhotoFrame } from '@/lib/fly/encounter-photo';
 
 /**
  * Round 17 — the shutter.
@@ -79,6 +81,8 @@ export function PhotoCapture({runtime}) {
       out.height = h;
       const ctx = out.getContext('2d');
       ctx.drawImage(src, 0, 0);
+      const adventureFrame=adventurePhotoFrame(runtime,useFlyStore.getState().warpEpoch);
+      const encounterFrame=encounterPhotoFrame(runtime,useFlyStore.getState().warpEpoch);
       // From here on the pixels are in a 2D canvas — the WebGL buffer may go.
 
       const mapStyle = useFlyStore.getState().mapStyle;
@@ -103,7 +107,8 @@ export function PhotoCapture({runtime}) {
             style: mapStyle,
           };
         }
-        runtime?.adventures?.photo();
+        runtime?.adventures?.photo(adventureFrame,blob);
+        runtime?.encounters?.photo(encounterFrame,blob);
         req.resolve({ blob, filename, width: w, height: h, ms });
       }, 'image/png');
     } catch (err) {

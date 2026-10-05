@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { CanvasTexture, CircleGeometry, Color, Mesh, MeshBasicMaterial } from 'three';
 import { PLAYER } from '@/lib/fly/fly-constants';
+import { mercatorScale } from '@/lib/fly/coords';
 import { applyBend } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
 import { useTitleHidden } from '@/lib/fly/front-door';
@@ -96,6 +97,8 @@ export function PlayerGroundShadow({
       return;
     }
     m.visible = true;
+    const k=mercatorScale(flight.latDeg);
+    m.scale.set(k,1,k);
     m.material.opacity = op;
     m.position.set(
       flight.pos.x - origin.anchor.x,

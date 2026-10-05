@@ -25,7 +25,7 @@ const W0 = '?r25bw0';
 
 const STUB = {
   'r25b-stub:drei': 'export const useGLTF = Object.assign(() => ({}), { clear() {}, preload() {} });',
-  'r25b-stub:hangar-scene': 'export function HangarScene() { return null; }',
+  'r25b-stub:hangar-scene': 'export function HangarScene() { return null; } export function RewardAircraftPreview() { return null; }',
   'r25b-stub:css': 'export default {};',
   'r25b-stub:fiber':
     'export function invalidate() { globalThis.__r25bInvalidations = (globalThis.__r25bInvalidations || 0) + 1; }\n' +

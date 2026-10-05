@@ -35,6 +35,8 @@ export function SettingsRows({ sheet = false }) {
   const soundOn = useFlyStore((s) => s.soundOn);
   const mapStyle = useFlyStore((s) => s.mapStyle);
   const visuals = useFlyStore((s) => s.visuals);
+  const chaseFraming = useFlyStore(s => s.chaseFraming);
+  const encountersEnabled = useFlyStore(s => s.encountersEnabled);
   // Round 18: the stakes pick lives in a fly-settings module cache, not the
   // store. The rows mount each time the pause card / sheet opens, so a lazy
   // read on mount is current by construction.
@@ -179,6 +181,20 @@ export function SettingsRows({ sheet = false }) {
     </MenuButton>
   );
 
+  const flightViewRows=(
+      <div className="rounded-md border border-zinc-700/60 p-2">
+        <div className="mb-2 text-xs text-zinc-300">Chase view</div>
+        <div className="grid grid-cols-2 gap-1">
+          {['world','close'].map(value=><button key={value} data-testid={`settings-chase-${value}`} aria-pressed={chaseFraming===value} className="min-h-11 rounded bg-zinc-800 text-sm aria-pressed:bg-zinc-100 aria-pressed:text-zinc-900" onClick={()=>{
+            useFlyStore.setState({chaseFraming:value});try{localStorage.setItem('fly-chase-framing',value);}catch{}
+          }}>{value==='world'?'World':'Close'}</button>)}
+        </div>
+        <button className="mt-2 min-h-11 w-full rounded bg-zinc-800 text-sm" aria-pressed={encountersEnabled} onClick={()=>{
+          useFlyStore.setState({encountersEnabled:!encountersEnabled});try{localStorage.setItem('fly-encounters',encountersEnabled?'0':'1');}catch{}
+        }}>Nearby invitations: {encountersEnabled?'On':'Off'}</button>
+      </div>
+  );
+
   return sheet ? (
     <>
       {visualsRow}
@@ -188,6 +204,7 @@ export function SettingsRows({ sheet = false }) {
       {reducedRow}
       {stakesRow}
       <GuestSaveControls />
+      {flightViewRows}
     </>
   ) : (
     <>
@@ -198,6 +215,7 @@ export function SettingsRows({ sheet = false }) {
       {reducedRow}
       {stakesRow}
       <GuestSaveControls />
+      {flightViewRows}
     </>
   );
 }

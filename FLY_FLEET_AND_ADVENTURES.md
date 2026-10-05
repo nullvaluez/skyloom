@@ -1,4 +1,161 @@
-# Fleet & Adventures — implementation and review
+# Adventures Worth Flying — current implementation
+
+Implemented on top of `0592f51` on 2026-10-01. The earlier Fleet & Adventures
+record below is historical; this section describes the updated behavior.
+
+- Six illustrated briefings lead into the existing hangar. All nine aircraft,
+  earned liveries, per-aircraft estimates and Curated / Live conditions are
+  available before launch. Previous aircraft choice is respected; changing an
+  unfinished journey's aircraft or conditions asks before restarting it.
+- Every journey retains four discoveries and has three optional activities.
+  Authored contours, level passes and landmark arcs use directed gates with
+  per-aircraft clearance tolerances and geometry. The controller keeps
+  continuous measurements in memory and publishes only discrete progress.
+- Activities can be skipped or retried individually from an authored approach.
+  Discoveries and completed activities survive that retry. Activity records
+  are saved immediately per route / aircraft / conditions, including when the
+  player later starts a different aircraft. Completion grants Bronze, two
+  activities Silver, and all three Gold. Previous medals never decrease.
+- Compact blue discovery guidance and gold course gates share the synchronized
+  HUD canvas. The next three gates and a direction cue keep the view readable.
+  Discovery captions and separate audio cues respect existing mute/pause
+  controls. Photo mode remains an explicit player action.
+- A photograph must frame the named subject, be within range, have a clear
+  known-terrain sightline and encode successfully. Position, camera projection,
+  run token and warp epoch are captured before encoding. The debrief uses the
+  player's current successful photograph, lists results and improvement hints,
+  and previews an earned livery on the actual aircraft. Next adventure opens
+  its briefing. Purchase-interest research lives in the journal.
+- Version 2 stays inside `fly-adventures-v1`. Version 1 completions, medals,
+  liveries and discovery indices migrate. Unfinished old journeys retain their
+  original recommended aircraft; new activities begin unearned. Backup import,
+  export and recovery accept both envelopes.
+- Curated sun and cloud conditions use production environment state and the
+  existing sky/weather systems. Explicit harness overrides retain precedence.
+  Leaving for ordinary flight, operations or the title restores live conditions;
+  failed launches roll back the environment. Classic/Enhanced and quality remain
+  player choices. Aircraft paint/glass roughness and navigation-light size are
+  refined without new aircraft geometry or altered flight physics.
+
+Destination artwork is captured from the actual game, not external images.
+See `public/adventures/README.md` for provenance and retained credits. The six
+1280px WebPs total approximately 602 KB. Half Dome's photo target uses the
+[climbing area's coordinates](https://www.mountainproject.com/area/105833395/half-dome)
+rather than the airborne discovery position.
+
+## Verification of this update
+
+Node checks passed: adventure/assets/save safety 15, guidance 6, activity and
+migration scenarios 8, runtime integration scenarios, real-camera photo checks
+(composition, rebasing, occlusion, capture-time snapshots), adventure HUD isolation
+(including an unfinished journey during ordinary Free Flight), front door 70, flight-plan
+compatibility 44, operations 33, mobile actions 17, import integrity 4, visual
+finish 12, cinematic flight 16, cinema environment/resources 15, immersive unit,
+cloud/road paths 10 and cloud-shadow range 2. Scoped ESLint has zero errors
+(four existing-style plain-image warnings). Production webpack build passes.
+
+`node scripts/verify-adventure-flight.mjs` flies all 54 route/aircraft combinations
+and 108 activity courses through the unchanged `FlightModel` using steering,
+pitch and cruise commands. It never teleports after an authored approach or
+writes progress. Every first discovery occurs at about 25 simulated seconds;
+recommended main routes take 5–7 minutes, plus optional detours. This proves
+control feasibility, ordering and estimates. It does **not** simulate live DEM
+streaming or certify enjoyment. `scripts/adventure-browser-pilot.js` provides
+reversible control-only driving for live review; it is not production code.
+
+Local review evidence is under `.graphics-review/adventures-worth-flying/`.
+The real-world Canyon route completed through the normal input controller in
+336.48 simulated seconds (338.02 wall seconds), with all four ordered discoveries
+and a minimum observed clearance of 691 m. No poses, timestep, speed or progress
+were overwritten after launch. The optional contour and overlook courses also
+completed through steering/pitch/cruise input, from their normal retry approaches
+(75.75 and 98.28 wall seconds; minimum observed clearance 803 and 1,448 m).
+Individual retries preserved discovery progress. A deliberately failed PNG
+encode left the photograph unearned; the real shutter subsequently credited a
+successfully framed and encoded panorama. The three completed activities survived
+hangar entry, aircraft-change cancellation and Continue.
+
+The remaining live-world journeys and the heavy/fast variants also completed
+through steering, pitch and cruise controls. No pose, progress, speed or timestep
+overrides were used. The five remaining destinations used their Curated profile.
+Each row collected all four discoveries; the clearance is observed live DEM AGL,
+not a guarantee for every possible detour.
+
+| Journey | Aircraft | Flight seconds | Minimum observed AGL |
+|---|---|---:|---:|
+| Grand Canyon | Skylark | 336.48 | 691 m |
+| Manhattan | Skylark | 411.62 | 707 m |
+| Sydney | Skylark | 306.63 | 822 m |
+| Swiss Alps | Whisper | 307.98 | 2,109 m |
+| Yosemite | Skylark | 302.24 | 1,275 m |
+| Nāpali Coast | Skylark | 305.98 | 1,698 m |
+| Grand Canyon | Stratoliner | 103.74 | 691 m |
+| Grand Canyon | Vector | 129.24 | 691 m |
+
+Manhattan's Liberty arc completed its nine directed gates in 53.25 wall seconds,
+with 1,043 m minimum observed AGL. Yosemite's missed corridor did not block its
+remaining discoveries. Canyon also completed with all three activities for Gold;
+later Bronze runs preserved that best medal. All six stamps yielded exactly nine
+liveries. Evidence: `live-journeys.json`, `canyon-gold-flight.json` and the live
+activity captures. These are automated control-driven playthroughs, not human
+enjoyment results. Their frame timings are observational, not paired benchmarks.
+
+All nine aircraft loaded through the hangar selection controls with their own
+duration estimates. Selecting a different aircraft displayed the restart
+confirmation and left the saved aircraft and activities untouched until approval.
+Approving the change to Leviathan restarted the journey; a page reload and the
+title's Continue action retained Leviathan and Live conditions. The nine earned
+liveries and Canyon's Gold medal remained intact.
+All nine hangar models were visually inspected in the fixed studio lighting.
+All 27 aircraft / day-dusk-night chase combinations were captured and inspected:
+models loaded, framing retained their silhouettes, and navigation lights remained
+restrained. The hangar does not have three separate time-of-day lighting modes.
+Temporary lighting pins were cleared after this review.
+Phone layout was checked with a coarse pointer, touch capability and a 390×844
+viewport; the joystick, actions, photo and adventure guidance remained available.
+This is emulated layout testing, not physical-device usability testing.
+The final navigation checks also confirmed that Next opens its destination
+briefing with the adventure environment cleared, and returning from preparation
+to Free Flight opens the ordinary hangar without a redundant end-flight prompt.
+
+The matched performance comparison passes the 10% bound for the measured Canyon
+windows: `0592f51` and the updated build both read **12.5 ms p95 in each of three
+25-second samples**, after a 10-second warm-up, on the same RTX 5080, same active
+browser tab, 1200×800 at DPR 1, Enhanced / High, prop aircraft and Live conditions.
+Each cycle includes a new launch and return to the hangar. The updated build held
+140 programs, 38 render targets and 191,739,579 owned graphics bytes across those
+cycles (baseline: 138 / 38 / 188,943,373). Geometry and texture counts fluctuated
+with streaming rather than continually increasing. Three additional cycles held
+140 programs / 38 targets / 188,288,008 bytes; JavaScript heap fell from 267.7 MB
+to 199.0 MB through ordinary collection. Heap readings are not GC-normalized and
+six short cycles do not certify indefinite leak freedom or all-route performance.
+
+A later production-build recheck read 8.4 ms p95 in three further cycles, with
+134 programs, 38 targets and 187,545,269 owned graphics bytes held steady. An
+extra preview tab had been closed before that run, so this is a stability check,
+not evidence of a feature-driven speedup. The subsequent Free Flight HUD guard
+does not alter the active-adventure benchmark path.
+
+Evidence: `baseline-same-tab.json`, `new-same-tab.json`, and
+`new-memory-cycles.json` and `final-build-cycles.json`. Earlier cross-tab repeats are explicitly VOID: the
+embedded browser throttled the baseline tab to 1 Hz despite visible/focused state.
+Initial unmatched full-route samples are not used to judge the 10% bound. No
+threshold, simulation rate or quality setting was relaxed.
+
+Human enjoyment testing is not yet performed: first-time comprehension,
+unassisted Canyon completion and a memorable activity still require real
+players. No human results are inferred from automated control tests.
+
+For that review, give a new player the title screen and the task “fly an adventure
+in an aircraft you like.” Observe whether they find aircraft selection, identify
+the next discovery, distinguish optional gold gates from the main route, and
+finish Canyon without coaching. Afterwards ask which moment they remember and
+what they would change. Record the aircraft, conditions, input device, completion,
+confusion and quoted feedback. **Participants: 0; human verdict: pending.**
+
+---
+
+# Historical record: Fleet & Adventures foundation
 
 Built against `9ee7e79` on 2026-10-01. This is a local implementation for review, with purchases disabled. Human art acceptance, six complete player playthroughs and the 8-of-10 introductory usability target are not yet certified.
 

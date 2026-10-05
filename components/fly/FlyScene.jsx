@@ -117,6 +117,7 @@ import { DEG2RAD, expApproach, expApproachAngle, mercatorScale, wrapAngle } from
 import { CrashSystem, respawnPose } from '@/lib/fly/crash-system';
 import { crashStakesOn } from '@/lib/fly/fly-settings';
 import { computeSun, moonDirFromSun, nightWeight } from '@/lib/fly/sun-model';
+import { adventureSunTime } from '@/lib/fly/adventure-environment.mjs';
 import { installShadowKernel, shadowKernelState } from '@/lib/fly/shadow-kernel';
 import { trackSpotAttrs } from '@/lib/fly/spot-attrs';
 import {
@@ -994,6 +995,7 @@ export function FlyScene({ runtime }) {
   const satAltTRef = useRef(null); // round 13: smoothed satellite altitude term
   const sunTarget = useMemo(() => new Object3D(), []);
   const warpEpochForSun = useFlyStore((s) => s.warpEpoch); // re-aim the day-cycle on warps
+  const adventureEnvironmentEpoch = useFlyStore((s) => s.adventureEnvironmentEpoch);
   // Round 13 Phase 1: satellite time-of-day HDRI bucket. Discrete React state
   // that changes only on a sun-frac bucket crossing (a PMREM re-bake); toy
   // ignores it and stays on the certified noon HDRI.
@@ -1713,8 +1715,7 @@ export function FlyScene({ runtime }) {
       }
       const lon = runtime.geo?.x ?? spawn?.lon ?? 0;
       const lat = runtime.geo?.y ?? spawn?.lat ?? 0;
-      const t =
-        (typeof window !== 'undefined' && window.__flySunOverride) || Date.now();
+      const t = adventureSunTime(runtime.adventureEnvironment,Date.now(),typeof window !== 'undefined' ? window.__flySunOverride : undefined);
       const sun = computeSun(lon, lat, t);
       const frac =
         SKY.dayCycle.minSunFrac + (1 - SKY.dayCycle.minSunFrac) * sun.frac;
@@ -1785,7 +1786,7 @@ export function FlyScene({ runtime }) {
     apply();
     const id = setInterval(apply, SKY.dayCycle.refreshSec * 1000);
     return () => clearInterval(id);
-  }, [mapStyle, warpEpochForSun, runtime, spawn]);
+  }, [mapStyle, warpEpochForSun, adventureEnvironmentEpoch, runtime, spawn]);
 
   // Round 16: a warp is a CUT, not a journey — damping the weather across it
   // would smear the departure sky over the arrival for ~10s. Snap under the
@@ -1867,7 +1868,7 @@ export function FlyScene({ runtime }) {
     pick();
     const id = setInterval(pick, 5000);
     return () => clearInterval(id);
-  }, [mapStyle, warpEpochForSun, runtime]);
+  }, [mapStyle, warpEpochForSun, adventureEnvironmentEpoch, runtime]);
 
   // Round 13 Phase 2 (P1 handoff): cool the directional KEY + hemi-sky COLOR per
   // HDRI bucket in satellite (moonlit blue at night, warm at dawn/dusk). Discrete
@@ -2243,10 +2244,12 @@ export function FlyScene({ runtime }) {
     }
 
     if(runtime.adventures?.controller.progress.active)runtime.adventures.tick(dt, engine.worldToGeo(flight.pos), {
-      epoch: flyState.warpEpoch, held: paused || photoMode || flyState.screen !== 'flight',
+      epoch: flyState.warpEpoch, held: paused || photoMode || flyState.screen !== 'flight' || flyState.atlasOpen || flyState.logbookOpen || flyState.adventureOpen || flyState.inspectHex || (typeof document !== 'undefined' && document.hidden),
       bank: flight.bank, speed: flight.speed,
       crashed: crashRef.current.state !== 'idle' || operations.phase === 'crashed',
     });
+
+    runtime.encounters?.tick(dt);
 
     // --- Round 18 (A5 GRAVITY): CRASH -------------------------------------
     // Detection reads flight.floorContact, which the model wrote microseconds
@@ -2411,7 +2414,7 @@ export function FlyScene({ runtime }) {
     const rpz = flight.pos.z - origin.anchor.z;
     // Publish once before both the aerial feed and material consumers read it.
     setCinemaRenderScale(gl.getPixelRatio());
-    updateCinemaFrame(runtime,flyState);
+    updateCinemaFrame(runtime,flyState,dt);
     runtime.cinemaProfile=cinemaOn(flyState)?cinemaProfile(flyState.qualityTier):null;
     updateDaylightDepth(runtime, flyState.mapStyle === 'satellite');
     const cinematicScale = flyState.mapStyle === 'satellite' && satelliteVisualsOn('scale');

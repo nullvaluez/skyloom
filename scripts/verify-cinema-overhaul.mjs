@@ -46,6 +46,18 @@ check('cascades preserve material hooks, globals, reversed frusta and dispose',(
  assert.equal(m.onBeforeCompile,hook);assert.equal(m.customProgramCacheKey,key);assert.ok(!m.defines.USE_CSM);
 });
 const {useFlyStore}=await import('../stores/fly-store.js');
+check('disposed and re-adopted material gets exactly one cascade hook',()=>{
+ const camera=new THREE.PerspectiveCamera(58,1.6,2,600000),scene=new THREE.Scene();
+ const rig=new CinemaShadows(camera,scene,resolveCinemaProfile({preset:'high'}));
+ const material=new THREE.MeshStandardMaterial();
+ for(let i=0;i<3;i++){
+   rig.setupMaterial(material);
+   const shader={uniforms:{},fragmentShader:'#include <lights_pars_begin>\n#include <lights_fragment_begin>'};
+   assert.doesNotThrow(()=>material.onBeforeCompile(shader));
+   material.dispose();
+ }
+ rig.dispose();
+});
 check('cached cascade variants retain valid uniform cells across 3→1→3 adoption',()=>{
  const camera=new THREE.PerspectiveCamera(54,16/9,2,600000),scene=new THREE.Scene(),material=new THREE.MeshStandardMaterial();
  const properties={uniforms:{}},renderer={properties:{get:()=>properties}};let original;

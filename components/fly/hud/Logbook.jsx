@@ -7,6 +7,7 @@ import { usePassportStore } from '@/stores/passport-store';
 import { useSheetLayout } from '@/hooks/use-sheet-layout';
 import { LOGBOOK } from '@/lib/fly/fly-constants';
 import { AdventureJournal } from './AdventureExperience';
+import { FlightMemories } from './EncounterExperience';
 import { EXACT_TYPE_CODES } from '@/lib/aircraft-type-tables';
 import { getAircraftTypeName } from '@/lib/aircraft-type-names';
 import { getBadgesByTier, getStreakDays } from '@/lib/badges';
@@ -57,6 +58,7 @@ export function Logbook() {
 }
 
 const TABS = [
+  ['memories', 'Memories'],
   ['journeys', 'Journeys'],
   ['log', 'Log'],
   ['badges', 'Badges'],
@@ -278,6 +280,7 @@ function LogbookBody() {
         </div>
 
         {/* ---- LOG ---- */}
+        {tab === 'memories' && <div className="min-h-0 flex-1 overflow-y-auto"><FlightMemories /></div>}
         {tab === 'journeys' && <div className="min-h-0 flex-1 overflow-y-auto"><AdventureJournal /></div>}
         {tab === 'log' && (
           <div className="mt-3 flex min-h-0 flex-1 flex-col" data-testid="logbook-log">

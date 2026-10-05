@@ -19,7 +19,7 @@ function flyRoute(c,a){let from=a.start;for(const to of a.checkpoints){flyLeg(c,
 function storage(initial={}){const data=new Map(Object.entries(initial));return {getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k),data};}
 test('six routes have stable definitions, distinct rewards and 5–10 minute cruise geometry',()=>{
   assert.equal(ADVENTURES.length,6);assert.equal(Object.keys(LIVERIES).length,9);
-  for(const a of ADVENTURES){assert.equal(a.checkpoints.length,4);assert.equal(a.objectives.length,2);assert.ok(contentAccess(a.id).allowed);
+  for(const a of ADVENTURES){assert.equal(a.checkpoints.length,4);assert.equal(a.activities.length,3);assert.ok(contentAccess(a.id).allowed);
     const speed={prop:60,glider:38,'warbird-prop':115}[a.aircraftId];let p=a.start,length=0;
     for(const to of a.checkpoints){length+=distanceM(p,to);p=to;assert.ok(to.altM>0&&to.radiusM>0);}
     assert.ok(length/speed/60>=5&&length/speed/60<=10,`${a.id}: ${length/speed/60}`);
@@ -27,9 +27,9 @@ test('six routes have stable definitions, distinct rewards and 5–10 minute cru
 });
 test('all six routes complete in order without traffic, with one-time stamp/reward claims',()=>{
   const events=[],c=new AdventureController(undefined,()=>{},(event,data)=>events.push({event,data}));
-  for(const a of ADVENTURES){c.start(a.id);flyRoute(c,a);assert.equal(c.progress.active.status,'finish');assert.equal(c.progress.active.index,4);assert.ok(c.photo(a.checkpoints[3]));assert.equal(c.complete().medal,3);assert.equal(c.complete(),null);}
+  for(const a of ADVENTURES){c.start(a.id);flyRoute(c,a);assert.equal(c.progress.active.status,'finish');assert.equal(c.progress.active.index,4);assert.equal(c.complete().medal,1);assert.equal(c.complete(),null);}
   assert.equal(Object.keys(c.progress.completed).length,6);assert.equal(c.progress.rewards.length,9);assert.equal(events.filter(e=>e.event==='reward_claimed').length,9);
-  c.start(route.id);flyRoute(c,route);assert.deepEqual(c.complete().rewards,[]);assert.equal(c.progress.completed[route.id].medal,3);
+  c.start(route.id);flyRoute(c,route);assert.deepEqual(c.complete().rewards,[]);assert.equal(c.progress.completed[route.id].medal,1);
 });
 test('future checkpoint visits cannot skip the current objective',()=>{const c=new AdventureController();c.start(route.id);c.tick(.1,route.checkpoints[3],{speed:60});assert.equal(c.progress.active.index,0);});
 test('fast segment crossing scores even when both endpoints are outside the radius',()=>{const c=new AdventureController();c.start(route.id);const p=route.checkpoints[0],left={...p,lon:p.lon-.009},right={...p,lon:p.lon+.009};c.tick(.1,left,{speed:1800});c.tick(.5,right,{speed:1800});assert.equal(c.progress.active.index,1);});
@@ -37,7 +37,7 @@ test('a warp, discontinuity or crash requires retry and never advances progress'
   for(const kind of ['epoch','jump','crash']){const c=new AdventureController();c.start(route.id);c.tick(.1,route.start,{epoch:1,speed:60});
     c.tick(.1,route.checkpoints[0],{epoch:kind==='epoch'?2:1,speed:60,crashed:kind==='crash'});assert.equal(c.progress.active.index,0);assert.equal(c.progress.active.status,'retry');c.retry();assert.equal(c.progress.active.status,'flying');}
 });
-test('pause/overlay/background hold cannot accumulate progress or steady time',()=>{const c=new AdventureController();c.start(route.id);for(let i=0;i<80;i++)c.tick(.5,route.checkpoints[0],{held:true,speed:60});assert.equal(c.progress.active.index,0);assert.equal(c.progress.active.elapsed,0);assert.equal(c.progress.active.steady,false);c.pause();flyRoute(c,route);assert.equal(c.progress.active.index,0);});
+test('pause/overlay/background hold cannot accumulate discovery or activity progress',()=>{const c=new AdventureController();c.start(route.id);for(let i=0;i<80;i++)c.tick(.5,route.checkpoints[0],{held:true,speed:60});assert.equal(c.progress.active.index,0);assert.equal(c.progress.active.elapsed,0);assert.ok(Object.values(c.progress.active.activities).every(s=>s==='available'));c.pause();flyRoute(c,route);assert.equal(c.progress.active.index,0);});
 test('reload restores an authored checkpoint and abandon retains existing awards',()=>{const c=new AdventureController();c.start(route.id);flyLeg(c,route.start,route.checkpoints[0]);const resumed=new AdventureController(JSON.parse(JSON.stringify(c.progress)));assert.equal(resumed.progress.active.status,'paused');assert.equal(resumed.progress.active.index,1);assert.equal(checkpointStart(route,1).lat,route.checkpoints[0].lat);resumed.resume();assert.equal(resumed.progress.active.index,1);resumed.abandon();assert.equal(resumed.progress.active,null);});
 test('optional photo requires a discovery location; corrupt and unknown state recovers safely',()=>{const c=new AdventureController();c.start(route.id);assert.equal(c.photo({lat:0,lon:0}),false);assert.deepEqual(validateProgress(null),emptyProgress());assert.equal(validateProgress({active:{id:route.id,index:8}}).active,null);assert.deepEqual(validateProgress({rewards:['cargo'],grants:['wild-earth']}).rewards,[]);assert.equal(validateProgress({active:{id:route.id,index:1,elapsed:Infinity}}).active.elapsed,86400);});
 test('preview has no time expiry; earned access and future ownership deny at the shared resolver',()=>{assert.equal(contentAccess('napali-coast').reason,'preview');assert.equal(contentAccess('livery:cargo').allowed,false);assert.equal(contentAccess('missing').allowed,false);const packs={...PACKS,'wild-earth':{...PACKS['wild-earth'],access:'owned'}};assert.equal(contentAccess('napali-coast',{},[],packs).allowed,false);assert.equal(contentAccess('napali-coast',{},['wild-earth'],packs).allowed,true);});
