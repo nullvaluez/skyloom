@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { BackSide, CubeUVReflectionMapping, HalfFloatType, Mesh, OrthographicCamera, PlaneGeometry, PMREMGenerator, Scene, ShaderMaterial, SphereGeometry, WebGLRenderTarget } from 'three';
 import { CINEMA_GLSL, CINEMA_UNIFORMS, cinemaEnvironment } from '@/lib/fly/cinema-frame';
-import { isPhoneClass } from '@/lib/fly/device-class';
+import { isMobileGraphicsClass } from '@/lib/fly/device-class';
 import {registerCinemaResources} from '@/lib/fly/cinema-resources';
 
 /** A fixed-size, owned environment. Visible sky and IBL evaluate identical radiance. */
@@ -22,7 +22,7 @@ export function CinemaEnvironmentRig({runtime}) {
       vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}',
       fragmentShader:'varying vec2 vUv;uniform sampler2D a,b;uniform float amount;void main(){gl_FragColor=mix(texture2D(a,vUv),texture2D(b,vUv),amount);}'});
     blendScene.add(new Mesh(quadGeometry,blend));
-    const next={sky,pmrem,blendScene,camera,blend,current:null,next:null,display:null,elapsed:0,last:-Infinity,signature:null,fade:1,size:isPhoneClass()?128:256};
+    const next={sky,pmrem,blendScene,camera,blend,current:null,next:null,display:null,elapsed:0,last:-Infinity,signature:null,fade:1,size:isMobileGraphicsClass()?128:256};
     rig.current=next;
     const release=registerCinemaResources('sky-environment',()=>({current:next.current,next:next.next,display:next.display}));
     const lost=()=>{

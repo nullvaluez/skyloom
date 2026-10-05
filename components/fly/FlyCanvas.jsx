@@ -21,19 +21,21 @@ import { HudSyncRig } from './HudSyncRig';
 import { useFlyStore } from '@/stores/fly-store';
 import { frameloopFor, noteStagePump, stagePumpHz, stagePumpWanted } from '@/lib/fly/front-door';
 import { cinemaOn } from '@/lib/fly/cinema-policy';
-import { isPhoneClass } from '@/lib/fly/device-class';
+import { createFrameCadence } from '@/lib/fly/frame-cadence.mjs';
+import { isMobileGraphicsClass } from '@/lib/fly/device-class';
 import { configureCinemaAssets } from '@/lib/fly/cinema-material-assets';
 import { installContextResourceLifetime } from '@/lib/fly/context-resource-lifetime';
 
-function PhoneFlightPump({enabled}){
+function MobileFlightPump({enabled}){
   const invalidate=useThree(s=>s.invalidate);
   useEffect(()=>{
     if(!enabled)return;
-    let id,previous=0;
+    let id;
+    const cadence=createFrameCadence(60);
     const tick=now=>{
       id=requestAnimationFrame(tick);
-      if(document.hidden)return;
-      if(now-previous>=1000/30-.8){previous=now;invalidate();}
+      if(document.hidden){cadence.reset();return;}
+      if(cadence.due(now))invalidate();
     };
     id=requestAnimationFrame(tick);
     return()=>cancelAnimationFrame(id);
@@ -79,6 +81,7 @@ function StagePump({ runtime }) {
  */
 function BootFramePulse({ runtime }) {
   useFrame(() => {
+    // eslint-disable-next-line react-hooks/immutability -- runtime is the imperative simulation handle, not React state.
     runtime.framesRendered = (runtime.framesRendered ?? 0) + 1;
   });
   return null;
@@ -111,8 +114,7 @@ export function FlyCanvas({ runtime }) {
   // R25 A (FRONT DOOR): 'always' on the title and in flight, 'demand' while
   // the opaque hangar is open (fed by <StagePump>). Flag-off = today's rule.
   const frameloop=useFlyStore(frameloopFor);
-  const visuals=useFlyStore(s=>s.visuals),mapStyle=useFlyStore(s=>s.mapStyle);
-  const phoneFlight=frameloop==='always'&&isPhoneClass()&&cinemaOn({visuals,mapStyle});
+  const mobileFlight=frameloop==='always'&&isMobileGraphicsClass();
   const [dpr, setDpr] = useState(initialDpr);
   // R24 A (STEP_SAFE): resolved once at mount — the pin is set before Fly mode
   // mounts and never moves mid-session.
@@ -156,7 +158,7 @@ export function FlyCanvas({ runtime }) {
       shadows="percentage"
       // The hangar has its own interactive canvas. Retain the world and its
       // resources, but do not render two full scenes continuously behind it.
-      frameloop={phoneFlight?'demand':frameloop}
+      frameloop={mobileFlight?'demand':frameloop}
       camera={{
         fov: CANVAS.fov,
         near: CANVAS.near,
@@ -171,6 +173,7 @@ export function FlyCanvas({ runtime }) {
         reversedDepthBuffer: true,
       }}
       onCreated={({ gl }) => {
+        // eslint-disable-next-line react-hooks/immutability -- Renderer-owned diagnostics live on the mutable simulation handle.
         if(cinemaOn())runtime.cinemaContextResources=installContextResourceLifetime(gl.getContext());
         configureCinemaAssets(gl);
         // R24 C (recon T11): latch the live depth convention for the streaming
@@ -192,7 +195,7 @@ export function FlyCanvas({ runtime }) {
         }
       }}
     >
-      <PhoneFlightPump enabled={phoneFlight} />
+      <MobileFlightPump enabled={mobileFlight} />
       {/* Round 24 (E CERT): the frame-pace instrument. Priority -101 puts it
           ahead of the governor (-100) and A's STEP_SAFE rig (-99), so its dt
           is the raw inter-frame delta of the frame that just presented. Not

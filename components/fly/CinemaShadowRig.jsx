@@ -2,16 +2,26 @@
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { CinemaShadows } from '@/lib/fly/cinema-shadows';
-import { cinemaProfile } from '@/lib/fly/cinema-policy';
+import { cinemaOn, cinemaProfile } from '@/lib/fly/cinema-policy';
+import { compactDepthShadowTarget } from '@/lib/fly/compact-shadow-target';
 
 export function CinemaShadowRig({runtime,sunRef}){
-  const rig=useRef(null);
+  const rig=useRef(null),legacyShadow=useRef(false);
   useEffect(()=>{
     const sun=sunRef.current,castShadow=sun?.castShadow;
+    legacyShadow.current=!!castShadow;
     return ()=>{rig.current?.dispose();rig.current=null;delete runtime.cinemaShadows;if(sun)sun.castShadow=castShadow;};
   },[runtime,sunRef]);
   useFrame(({scene,camera,gl})=>{
-    const e=runtime.cinemaEnvironment;if(!e)return;
+    const e=runtime.cinemaEnvironment;
+    // The store can switch styles before React removes this frame subscriber.
+    // Retire its lights immediately: otherwise outgoing terrain compiles the
+    // Classic samplers PLUS cinematic cascades and exceeds WebGL's 16 units.
+    if(!e||!cinemaOn()){
+      rig.current?.dispose();rig.current=null;delete runtime.cinemaShadows;
+      if(sunRef.current)sunRef.current.castShadow=legacyShadow.current;
+      return;
+    }
     const profile=cinemaProfile(),key=`${profile.cascades}:${profile.shadowSize}`;
     if(rig.current?.profileKey!==key){
       rig.current?.dispose();rig.current=null;
@@ -28,15 +38,13 @@ export function CinemaShadowRig({runtime,sunRef}){
       r.fov=camera.fov;r.aspect=camera.aspect;r.reverse=camera.reversedDepth;r.updateFrustums();
     }
     r.lightDirection.fromArray(e.keyDir).negate();
-    for(const light of r.lights){light.intensity=e.sun;light.color.fromArray(e.keyColor);}
+    for(const light of r.lights){light.intensity=e.sun;light.color.fromArray(e.keyColor);compactDepthShadowTarget(light.shadow,gl.shadowMap.type);}
     // Register new streamed materials before their first color draw. A dispose
     // listener drops evicted materials, so the registry never pins the world.
-    scene.traverse(object=>{
-      if(object.material)for(const material of Array.isArray(object.material)?object.material:[object.material])r.setupMaterial(material);
-    });
+    scene.traverse(r.registerObject);
     camera.updateMatrixWorld();r.update();
     runtime.shadowRadiusM=profile.shadowRangeM;
-    runtime.cinemaShadows={cascades:r.cascades,size:profile.shadowSize,rangeM:profile.shadowRangeM,materials:r.owned.size,bytes:r.cascades*profile.shadowSize**2*8};
+    Object.assign(runtime.cinemaShadows??={}, {cascades:r.cascades,size:profile.shadowSize,rangeM:profile.shadowRangeM,materials:r.owned.size,bytes:r.cascades*profile.shadowSize**2*5});
   },-.9);
   return null;
 }

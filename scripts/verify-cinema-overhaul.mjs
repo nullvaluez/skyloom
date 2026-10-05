@@ -26,7 +26,7 @@ check('night preserves darkness and a readable cool key; overcast redistributes 
 check('profile ceilings apply before allocation and effects follow effective scale',()=>{
   const ultra=resolveCinemaProfile({preset:'ultra'});assert.equal(ultra.cascades,3);assert.equal(ultra.cloudSteps,96);
   assert.equal(resolveCinemaProfile({preset:'ultra',scale:.875}).name,'medium');
-  for(const preset of ['low','medium','high','ultra']){const phone=resolveCinemaProfile({preset,phone:true});assert.equal(phone.targetFps,30);assert.equal(phone.reflection,null);assert.ok(phone.cascades<=1);}
+  for(const preset of ['low','medium','high','ultra']){const phone=resolveCinemaProfile({preset,phone:true});assert.equal(phone.targetFps,60);assert.equal(phone.reflection,null);assert.ok(phone.cascades<=1);}
   assert.equal(resolveCinemaProfile({preset:'ultra',phone:true,tier:'low'}).cloudSteps,16);
   assert.equal(resolveCinemaProfile({preset:'high'}).textureBytes,300*1048576);
 });
@@ -72,10 +72,10 @@ check('governor reduces effects before resolution or geographic tier',()=>{
 });
 const {resolveInitialSettings}=await import('../lib/fly/fly-settings.js');
 const {resolveInitialMapStyle}=await import('../lib/fly/map-style.js');
-check('blocked browser storage still resolves phone Medium before allocation',()=>{
+check('blocked browser storage resolves phone High with mobile effect budgets before allocation',()=>{
  window.matchMedia=()=>({matches:true});window.screen={width:390,height:844};window.ontouchstart=null;
  window.localStorage={getItem(){throw Error('blocked');}};
-  resolveInitialSettings();assert.equal(useFlyStore.getState().qualityPreset,'medium');
+  resolveInitialSettings();assert.equal(useFlyStore.getState().qualityPreset,'high');
   useFlyStore.setState({mapStyle:'toy'});resolveInitialMapStyle();assert.equal(useFlyStore.getState().mapStyle,'satellite');
  assert.equal(resolveCinemaProfile({preset:'ultra',phone:true}).materialSize,256);
  window.matchMedia=()=>({matches:false});

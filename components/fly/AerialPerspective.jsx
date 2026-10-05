@@ -487,8 +487,9 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth,
   vec3 viewRay = ( world - uCamPos ) / max( dist, 1.0e-4 );
   // Above the dipped rim, mountains approach the sky at their own elevation.
   // Below it r25Sky clamps to row zero, the shared directional horizon.
-  vec3 haze = uR25Mode.x > 0.5 ? r25Sky( viewRay, uR25SunDir ) : uHazeColor;
+  vec3 haze;
   if(uCinema>.5)haze=cinemaSky(normalize(vec3(viewRay.x,viewRay.y+uR25SkyP.y,viewRay.z)));
+  else haze=uR25Mode.x > 0.5 ? r25Sky(viewRay,uR25SunDir) : uHazeColor;
 
   if (uLivingAir.x > .5) {
     vec3 metricRay=world-uCamPos;

@@ -58,7 +58,7 @@ async function main(){
    if(report.errors.length<12)report.errors.push(entry);
   });
   await page.addInitScript(({site,phone})=>{
-   try{localStorage.setItem('fly-map-style-2','satellite');localStorage.setItem('fly-visuals','enhanced');localStorage.setItem('fly-quality-tier',phone?'medium':'ultra');
+   try{localStorage.setItem('fly-map-style-2','satellite');localStorage.setItem('fly-visuals','enhanced');localStorage.setItem('fly-quality-tier',phone?'high':'ultra');
    localStorage.setItem('fly-sound-on','0');localStorage.setItem('fly-controls-seen','1');localStorage.setItem('fly-crash-mode','forgiving');}catch{/* Defaults must also boot. */}
    window.__flyWeatherOverride='baseline';window.__flySunOverride=Date.UTC(2026,8,27,site.day);
   },{site,phone});
@@ -92,7 +92,7 @@ async function main(){
    const state=await snapshot();report.cases.push({condition,...state});
    assert.equal(!!state.environment,look==='cinematic','The intended visual path must be active');assert.ok(state.hud?.inBounds,'HUD outside viewport');
    if(look==='cinematic')assert.ok(state.clouds?.densityModel==='cellular-v2'&&state.clouds.volumeReady,'The replacement cloud volume must be loaded and active');
-   if(phone)assert.ok(state.profile?.targetFps===30&&state.profile.cascades<=1&&state.profile.materialSize<=256,'Phone allocated desktop profile');
+   if(phone)assert.ok(state.profile?.targetFps===60&&state.profile.cascades<=1&&state.profile.materialSize<=256,'Phone allocated desktop profile');
    if(args.video==='1'&&['day','night'].includes(condition)){
     const encoded=await page.evaluate(async()=>{
      const r=window.__fly;r.flight.step=window.__sampleStep;

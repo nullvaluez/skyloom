@@ -30,9 +30,10 @@
  * Run: node scripts/verify-shadow-calm.mjs
  */
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { ShaderChunk, Matrix4, Vector3, Object3D } from 'three';
 
-const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const read = (p) => readFileSync(`${ROOT}/${p}`, 'utf8');
 
 const fails = [];
@@ -324,8 +325,10 @@ const patch = K.r24PatchShadowChunk;
 {
   const FS = read('components/fly/FlyScene.jsx');
   gate(
-    'the catcher mounts only under satShadowsOn AND a catcher flag',
-    /\{satShadowsOn && \(SAT_SHADOWS\.catcher\.enabled \|\| SHADOW_CALM\.enabled\) && \(/.test(FS)
+    'the depth rig retains the outer shadow gate and the gated/legacy catcher policies',
+    /\{satShadowsOn && \(\s*<SatDepthRig/.test(FS) &&
+      /const legacy = !depthPassOn\(\) && \(SAT_SHADOWS\.catcher\.enabled \|\| SHADOW_CALM\.enabled\)/.test(FS) &&
+      /\{\(armed \|\| legacy\) && <SatShadowCatcher/.test(FS)
   );
   gate(
     'the arm gate is caster-presence AND AGL, on a cadence',

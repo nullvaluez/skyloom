@@ -3445,6 +3445,7 @@ export function FlyScene({ runtime }) {
           the shader terms then forced them to 0 here). They ride the live
           uNight weight — exactly 0 in daylight — so a day frame is unchanged. */}
       <SkyDome
+        composited={cinemaActive && immersiveOn('clouds')}
         horizon={dome.horizon}
         zenith={dome.zenith}
         voidColor={dome.void}

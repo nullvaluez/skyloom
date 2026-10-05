@@ -1,7 +1,7 @@
 'use client';
 import { satelliteVisualsOn, satelliteEffectTier } from '@/lib/fly/satellite-visuals';
 import { cinemaOn, cinemaProfile, subscribeCinemaEffects, getCinemaEffectLevel } from '@/lib/fly/cinema-policy';
-import {isPhoneClass} from '@/lib/fly/device-class';
+import {isMobileGraphicsClass} from '@/lib/fly/device-class';
 import { resolveSatelliteAtmosphere } from '@/lib/fly/satellite-atmosphere';
 import { immersiveOn } from '@/lib/fly/immersive';
 import { ImmersiveCloudPass } from '@/lib/fly/immersive-cloud-pass';
@@ -775,7 +775,7 @@ export const Effects = memo(function Effects({ runtime }) {
   // pass costs nothing but its materials stay alive and its programs stay
   // refcounted — the prewarm.js "a retained warm pass is what keeps a program
   // refcounted" finding, applied to a pass the warm cannot reach.
-  const aoWanted = sat && depthSubOn('n8ao') && aoNonce >= 0 && !(cinemaOn()&&isPhoneClass());
+  const aoWanted = sat && depthSubOn('n8ao') && aoNonce >= 0 && !isMobileGraphicsClass();
   useEffect(() => {
     if (!aoWanted) {
       if (aoRef.current) {

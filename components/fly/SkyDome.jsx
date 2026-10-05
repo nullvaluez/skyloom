@@ -167,6 +167,7 @@ export function SkyDome({
   midColor = null,
   midFrac = 0.3,
   moon = null,
+  composited = false,
 }) {
   const mesh = useMemo(() => {
     const mat = new ShaderMaterial({
@@ -500,5 +501,7 @@ export function SkyDome({
     }
   });
 
-  return <primitive object={mesh} dispose={null} />;
+  // Enhanced's cloud composite owns every depth-empty sky pixel. Keep the
+  // shared horizon/sun state alive, but avoid shading a discarded sky first.
+  return <primitive object={mesh} visible={!composited} dispose={null} />;
 }
