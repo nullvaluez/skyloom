@@ -1,7 +1,7 @@
 'use client';
 import { connectFlightOperations } from '@/lib/fly/operations-runtime';
 import { reviewSurfaceOn } from '@/lib/fly/player-surface';
-import { setTrueScaleK } from '@/lib/fly/true-scale';
+import { setTrueScaleK, toSceneDir } from '@/lib/fly/true-scale';
 import { FlightOperations } from '@/lib/fly/flight-operations';
 import { AirportOperationsLayer } from './AirportOperationsLayer';
 
@@ -3400,7 +3400,9 @@ export function FlyScene({ runtime }) {
       const e=runtime.cinemaEnvironment;
       if(sunRef.current){
         sunRef.current.intensity=e.sun;sunRef.current.color.fromArray(e.keyColor);
-        sunRef.current.position.copy(sunTarget.position).addScaledVector(_cinemaKey.fromArray(e.keyDir),SAT_SHADOWS.distM);
+        // TRUE_SCALE: keyDir is a TRUE direction; the light lives in scene
+        // units, so it is placed along S⁻¹·keyDir (identity at k0 = 1).
+        sunRef.current.position.copy(sunTarget.position).addScaledVector(toSceneDir(_cinemaKey.fromArray(e.keyDir),_cinemaKey),SAT_SHADOWS.distM);
       }
       if(hemiRef.current){hemiRef.current.intensity=e.fill;hemiRef.current.color.fromArray(e.fillColor);hemiRef.current.groundColor.fromArray(e.groundColor);}
       setHillDir(...e.keyDir);

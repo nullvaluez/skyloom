@@ -74,6 +74,7 @@ import { LIVING_AIR_GLSL } from '@/lib/fly/living-atmosphere';
 // the pre-curve one — both read out of r25-sky's per-frame state.
 import { getR25Sky, registerAerialStrengthReader } from '@/lib/fly/r25-sky';
 import { R25_SKY_GLSL_DECL, R25_SKY_GLSL_FUNCS, SKY_ROWS, writeSkyUniforms } from '@/lib/fly/sky-model';
+import { trueRayGLSL, trueScaleShader } from '@/lib/fly/true-scale';
 
 /**
  * Module-scope frame state. One satellite scene exists at a time, so a plain
@@ -518,6 +519,20 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth,
 `;
 
 /**
+ * TRUE_SCALE (lib/fly/true-scale.js): the world position reconstructs through
+ * the camera's own (anisotropic) basis, so it stays exact; but |world - eye| is
+ * then no longer the view-space length, so the scene ray is normalised
+ * directly, and the sky the haze melts into is looked up on the TRUE ray. k0
+ * comes from the basis the pass is already fed (its Y row has length 1/k0).
+ */
+const enhancedFragmentShaderTS = trueScaleShader('aerial-enhanced', enhancedFragmentShader, [
+  ['uniform vec4 uR25Mode;', `uniform vec4 uR25Mode;${trueRayGLSL('vec3(uCamRight.y,uCamUp.y,uCamZ.y)')}`],
+  ['vec3 viewRay = ( world - uCamPos ) / max( dist, 1.0e-4 );', 'vec3 viewRay = normalize( world - uCamPos );'],
+  ['haze=cinemaSky(normalize(vec3(viewRay.x,viewRay.y+uR25SkyP.y,viewRay.z)));', 'haze=cinemaSky(tsTrueRay(normalize(vec3(viewRay.x,viewRay.y+uR25SkyP.y,viewRay.z))));'],
+  ['r25Sky(viewRay,uR25SunDir)', 'r25Sky(tsTrueRay(viewRay),uR25SunDir)', 'optional'],
+]);
+
+/**
  * R24 D: which pass ships. Read ONCE at construction, from a module const, so
  * production and the PREWARM twin (which builds through this same constructor)
  * can never compile different programs — the Effects.jsx el()/raw() rule.
@@ -533,7 +548,7 @@ export class AerialPerspectiveEffect extends Effect {
   constructor(opts = {}) {
     const law = LAW();
     const r25 = !law && opts?.r25 === true;
-    super('AerialPerspectiveEffect', law ? lawFragmentShader : r25 ? enhancedFragmentShader : fragmentShader, {
+    super('AerialPerspectiveEffect', law ? lawFragmentShader : r25 ? enhancedFragmentShaderTS : fragmentShader, {
       // This is what makes the composer allocate + bind its depth texture.
       attributes: EffectAttribute.DEPTH,
       uniforms: new Map(law ? [

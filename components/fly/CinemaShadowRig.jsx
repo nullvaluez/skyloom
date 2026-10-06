@@ -4,6 +4,7 @@ import { useFrame } from '@react-three/fiber';
 import { CinemaShadows } from '@/lib/fly/cinema-shadows';
 import { cinemaOn, cinemaProfile } from '@/lib/fly/cinema-policy';
 import { compactDepthShadowTarget } from '@/lib/fly/compact-shadow-target';
+import { toSceneDir } from '@/lib/fly/true-scale';
 
 export function CinemaShadowRig({runtime,sunRef}){
   const rig=useRef(null),legacyShadow=useRef(false);
@@ -37,7 +38,10 @@ export function CinemaShadowRig({runtime,sunRef}){
       camera._reversedDepth=!!gl.capabilities.reversedDepthBuffer;
       r.fov=camera.fov;r.aspect=camera.aspect;r.reverse=camera.reversedDepth;r.updateFrustums();
     }
-    r.lightDirection.fromArray(e.keyDir).negate();
+    // TRUE_SCALE: the cascades fit and render in scene units, where the TRUE
+    // key direction is S⁻¹·keyDir (identity at k0 = 1). A parallel projection
+    // along it in scene space is exactly the true projection after S.
+    toSceneDir(r.lightDirection.fromArray(e.keyDir),r.lightDirection).negate();
     for(const light of r.lights){light.intensity=e.sun;light.color.fromArray(e.keyColor);compactDepthShadowTarget(light.shadow,gl.shadowMap.type);}
     // Register new streamed materials before their first color draw. A dispose
     // listener drops evicted materials, so the registry never pins the world.
