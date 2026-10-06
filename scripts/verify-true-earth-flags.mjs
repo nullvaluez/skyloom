@@ -70,6 +70,22 @@ check(
   JSON.stringify(applied),
 );
 
+// (3b) condition pins: ?sunUtc= and ?weather=, an existing pin wins
+{
+  const a = { location: { search: '?sunUtc=2026-06-21T00:30:00Z&weather=overcast' }, console: { info() {} } };
+  installUrlFlags(a);
+  const b = { location: { search: '?sunUtc=1750000000000&weather=BAD;x' }, __flyWeatherOverride: 'baseline', console: { info() {} } };
+  installUrlFlags(b);
+  const c = { location: { search: '?sunUtc=not-a-date' }, __flySunOverride: 5, console: { info() {} } };
+  installUrlFlags(c);
+  check(
+    '(3b) ?sunUtc= and ?weather= set the sun and weather pins; junk and existing pins are respected',
+    a.__flySunOverride === Date.parse('2026-06-21T00:30:00Z') && a.__flyWeatherOverride === 'overcast' &&
+      b.__flySunOverride === 1750000000000 && b.__flyWeatherOverride === 'baseline' &&
+      c.__flySunOverride === 5,
+  );
+}
+
 // (4) pinned() sees the installed flag
 globalThis.window = win;
 const base = { enabled: false, k: 1 };

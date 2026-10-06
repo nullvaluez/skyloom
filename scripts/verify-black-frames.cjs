@@ -1,7 +1,8 @@
 /* Read the presented framebuffer synchronously after EVERY composer render.
  * No terrain/governor pins. Readbacks affect timing: this is not an FPS test.
  * --diagnose also scans half-float pass targets for NaN/Infinity.
- * Example: node scripts/verify-black-frames.cjs --url=http://localhost:3044 */
+ * Example: node scripts/verify-black-frames.cjs --url=http://localhost:3044
+ * TRUE EARTH: --flags=HDR_GUARD (or -HDR_GUARD) passes ?flags= through for an A/B. */
 const { chromium } = require('playwright');
 const fs = require('node:fs');
 const args = Object.fromEntries(process.argv.slice(2).map(s => { const [k,...v]=s.replace(/^--/,'').split('='); return [k,v.join('=')]; }));
@@ -17,7 +18,7 @@ async function main() {
       localStorage.setItem('fly-sound-on','0');localStorage.setItem('fly-crash-mode','forgiving');
       window.__flySunOverride=Date.UTC(2026,6,18,17);window.__flyWeatherOverride='baseline';
     });
-    await page.goto((args.url||'http://localhost:3000')+'/?graphicsReview=1',{waitUntil:'domcontentloaded',timeout:120000});
+    await page.goto((args.url||'http://localhost:3000')+'/?graphicsReview=1'+(args.flags?`&flags=${encodeURIComponent(args.flags)}`:''),{waitUntil:'domcontentloaded',timeout:120000});
     await page.waitForFunction(()=>window.__flyComposer,null,{timeout:120000});
 
     report.hardware=await page.evaluate(()=>{const gl=window.__flyComposer.getRenderer().getContext(),e=gl.getExtension('WEBGL_debug_renderer_info');return e&&gl.getParameter(e.UNMASKED_RENDERER_WEBGL);});
