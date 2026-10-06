@@ -9,13 +9,15 @@ follows unchanged under **Plan**.
 ## How to try a flag on a live build
 
 Every look-changing workstream ships `enabled:false` in `lib/fly/fly-constants.js`
-(TRUE EARTH section at the end). Turn it on for one page load with a URL parameter,
+(TRUE EARTH section at the end). URL parameters switch things for one page load,
 which also works on the iPhone where there is no console:
 
-```
-http://<your-dev-server>:3000/?flags=TWILIGHT_FIX,SUN_TRUE_AZ     # on
-http://<your-dev-server>:3000/?flags=-HDR_GUARD                   # force off
-```
+| Parameter | Example | Effect |
+|---|---|---|
+| `flags` | `?flags=TWILIGHT_FIX,SUN_TRUE_AZ` · `?flags=-HDR_GUARD` | turn flags on, or off with a leading `-` |
+| `sunUtc` | `?sunUtc=2026-06-22T00:40:00Z` | pin the sun clock (ISO or epoch ms) |
+| `weather` | `?weather=overcast` · `?weather=baseline` | pin a weather state |
+| `diag` | `?diag=1` | diagnostics panel: live frame stats, 60 s benchmark, device report |
 
 A flag's default flips to `true` in its own one-line commit after its run list passes.
 
@@ -23,8 +25,8 @@ A flag's default flips to `true` in its own one-line commit after its run list p
 
 | Phase | State |
 |---|---|
-| 0 — Foundations, defects, diagnostics | **In progress** |
-| 1 — True proportions | Not started |
+| 0 — Foundations, defects, diagnostics | **Built on `main` (2026-10-06); waiting on your run list** |
+| 1 — True proportions | Next |
 | 2 — Atmosphere, horizon, conditions, shadows | Not started |
 | 3 — Take off and land anywhere | Not started |
 | 4 — Cinematic | Not started |
@@ -32,13 +34,80 @@ A flag's default flips to `true` in its own one-line commit after its run list p
 
 ### Flags
 
-| Flag | Phase | Default | What it changes |
-|---|---|---|---|
-| _(filled in as flags land)_ | | | |
+| Flag | Phase | Default | What it changes | Gate |
+|---|---|---|---|---|
+| `TWILIGHT_FIX` | 0 | off | Sun disc and halo stay on the real sun at sunset; the moon gets its own disc; the key light switches sun→moon at −4° under an intensity dip instead of dragging the "sun" up the sky | `verify-twilight.mjs` 6/6 |
+| `SUN_TRUE_AZ` | 0 | off | True solar azimuth (was the hour angle: noon sun always due south, wrong half of the sky in Sydney/Rio); Astronomical Almanac position; sun refreshed every 2 s instead of 60 s | `verify-sun-azimuth.mjs` 5/5 (0.005° vs Meeus) |
+| `HDR_GUARD` | 0 | off | Clamps the last HDR write before bloom to [0, 65504], so one NaN pixel can't black out the frame | `verify-hdr-guard.mjs` 4/4 (incl. WebGL2 readback) |
+| `LOAD_GUARD` | 0 | off | Provider-empty (ocean) tiles count as ready; vendored three-tile patch R26-1 ends the endless re-update; hard limits 20 s boot / 15 s warp | `verify-load-guard.mjs` 4/4, `verify-vendor-three-tile` 34/34 |
+| `PLAYER_SURFACE` | 0 | off | Players see one look: no Visuals/Map-style rows, no review warps, no neon warp confetti; saved Neon/Classic migrates once. Review (`?graphicsReview=1`) and automation keep everything | `verify-player-surface.mjs` 5/5 |
+| `DEVICE_TIERS` | 0 | off | Start tier follows the GPU (discrete→high, integrated/unknown→medium, software→low); governor sheds clouds and render scale before dropping shadow cascades (which recompile every lit shader) | `verify-device-tiers.mjs` 5/5 |
 
-### Owner run list (open items)
+Shipped without a flag (no look change): OpenStreetMap / OpenMapTiles / OpenFreeMap
+credits and the live ADS-B feed's name in the credit bar, title and photo exports
+(`verify-attribution.mjs` 4/4); no traffic polling from hidden tabs; the `?flags` /
+`?sunUtc` / `?weather` / `?diag` switches; the shadow scene-walk measurement.
 
-_(filled in as items land)_
+### Owner run list (Phase 0)
+
+**Setup, once.** `git pull && npm ci`. For the iPhone, serve on your LAN:
+`npm run dev -- -H 0.0.0.0`, or for representative performance
+`npm run build && FLY_DEVICE_REPORTS=1 npm run start -- -H 0.0.0.0`. Open
+`http://<your-PC-LAN-IP>:3000/...` on the phone.
+
+1. **Baselines (most important).** On the iPhone and on the 5080, open `/?diag=1`,
+   start a Free Flight, press **Benchmark 60 s** (hands off), then **Send report**.
+   Do it once with no flags and once with
+   `/?diag=1&flags=TWILIGHT_FIX,SUN_TRUE_AZ,HDR_GUARD,LOAD_GUARD,PLAYER_SURFACE,DEVICE_TIERS`.
+   Reports land in `.graphics-review/device-reports/` on your PC; grade them with
+   `node scripts/verify-device-report.mjs`. To hand them to me, paste that output,
+   or `git add -f .graphics-review/device-reports && git commit && git push`.
+   The report also answers two open questions: whether the iPhone supports reversed
+   depth (`gpu.reversedDepth`, decides the Safari depth fallback) and what the
+   per-frame shadow scene walk costs (`shadows.scanMs`).
+2. **Sunset (`TWILIGHT_FIX`).** Free Flight over Manhattan, facing west, at
+   `/?flags=TWILIGHT_FIX&sunUtc=2026-06-22T00:45:00Z` and the same with
+   `-TWILIGHT_FIX`. Try `00:30`, `00:45` and `01:00`. Without the fix, a sun disc
+   climbs into the sky as the real sun sets; with it, the sun sets and a moon
+   appears on its own.
+3. **Southern sun (`SUN_TRUE_AZ`).** Sydney at local noon,
+   `/?flags=SUN_TRUE_AZ&sunUtc=2026-06-21T02:00:00Z`, versus `-SUN_TRUE_AZ`. With
+   the fix the sun is in the north and building shadows point south; without it,
+   the reverse.
+4. **Black frames (`HDR_GUARD`).** On the 5080:
+   `node scripts/verify-black-frames.cjs --url=http://localhost:3000` and again
+   with `--flags=HDR_GUARD`.
+5. **Loading (`LOAD_GUARD`).** With `/?flags=LOAD_GUARD&diag=1`, warp to a live
+   airliner over open ocean (click it, then Warp). The streaming hold must end
+   within 15 s, and boot within 20 s.
+6. **One look (`PLAYER_SURFACE`).** With `/?flags=PLAYER_SURFACE`, Settings has no
+   Visuals or Map style rows, Pause has no "Explore the new atmosphere", and warps
+   show no confetti.
+7. **Start tier (`DEVICE_TIERS`).** In a fresh browser profile (no saved quality),
+   `/?flags=DEVICE_TIERS&diag=1`: the panel's tier reads `high` on the 5080. Watch
+   for hitches when the game steps quality down.
+8. **Credits.** On a phone, check the credit bar (now one line longer) does not
+   collide with the joystick or the compass button.
+
+### Found along the way (pre-existing, not caused by this pass)
+
+- This container's clone is shallow; history-dependent gates need
+  `git fetch --shallow-since=2026-08-01 origin main` first (done here).
+- `verify-graphics-governor.mjs` crashes on `main` before this pass: its
+  sandbox predates the cinematic effect rungs. `verify-device-tiers.mjs` now
+  covers the ladder.
+- `verify-cinematic-earth.mjs` fails on a stale aircraft-manifest assertion;
+  `verify-r25-front-door.mjs` reads 68/2 on the untouched tree;
+  `verify-r25-flight-plan.mjs` needs your local `r25-w0` tag.
+
+### Deferred until device data says so
+
+- The Safari depth fallback (dynamic near plane): only if the iPhone report
+  shows no reversed-depth support.
+- Replacing the per-frame shadow scene walk with event-driven registration:
+  only if `shadows.scanMs` is material on the phone.
+- ASTC/KTX2 phone textures and an in-app texture-bytes census.
+- The hero-landmark licensing shortlist starts alongside Phase 1.
 
 ---
 
