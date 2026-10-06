@@ -6,6 +6,7 @@ import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { arrivalOn, arrivalTerms, markReveal } from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
 import { worldReadiness, retryWorldContent } from '@/lib/fly/world-readiness';
+import { holdCapMs } from '@/lib/fly/load-guard';
 import { LIVING_EARTH } from '@/lib/fly/living-earth';
 import { bootCompactFor } from '@/lib/fly/front-door';
 
@@ -209,7 +210,12 @@ export function BootScreen({ runtime }) {
         !PREWARM.enabled || rt.prewarm?.done === true || now - t0 >= PREWARM.maxMs;
       const shadersP = framesP === 1 && warmDone ? 1 : Math.min(framesP, 0.99);
 
-      const timedOut = living ? reducedEntry.current : now - t0 >= BOOT.maxBootMs;
+      // LOAD_GUARD: the Enhanced boot hold gets a hard limit too — only once a
+      // spawn exists and the canvas has drawn, so a cap never reveals nothing.
+      const bootCapMs = living ? holdCapMs('boot') : null;
+      const bootCapped =
+        bootCapMs != null && now - t0 >= bootCapMs && !!store.spawn && frames >= BOOT.minFrames && !content?.ready;
+      const timedOut = living ? reducedEntry.current || bootCapped : now - t0 >= BOOT.maxBootMs;
       const allDone =
         timedOut || (living ? content.ready && worldDone && frames>=BOOT.minFrames && !!store.spawn : worldDone && modelsP === 1 && shadersP === 1 && !!store.spawn);
 
@@ -246,10 +252,10 @@ export function BootScreen({ runtime }) {
           holdStartAt: t0,
           revealAt: now,
           holdMs: Math.round(now - t0),
-          holdCapMs: living ? null : BOOT.maxBootMs,
+          holdCapMs: living ? bootCapMs : BOOT.maxBootMs,
           contentCapMs: ARRIVAL_GATE.bootContentMaxMs,
           contentHeldMs: gate.contentHeldMs,
-          reason: living ? timedOut?'explicit-reduced':content.deferred.length?'background-detail':'content' : timedOut ? 'cap' : gate.contentHeldMs > 0 ? 'content' : 'legacy',
+          reason: living ? timedOut?(reducedEntry.current?'explicit-reduced':'time-cap'):content.deferred.length?'background-detail':'content' : timedOut ? 'cap' : gate.contentHeldMs > 0 ? 'content' : 'legacy',
           terms: living ? content : gate.contentTerms,
         };
         if (typeof window !== 'undefined') {

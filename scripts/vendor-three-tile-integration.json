@@ -9,7 +9,7 @@
   "files": {
     "index.js": {
       "baselineSha256": "931e09ee8d594e709ec19f91be92ecb8fc28cd54054e352ac11d8275df86cb97",
-      "integratedSha256": "f64a245cea52f26853e064c872302c54650d7ac450d86df3575e201c9f3e4e2e",
+      "integratedSha256": "452775ca6fc01d49a6ec0a3b5badfc1c9c89eb74afeb7987f25dc8449606a855",
       "changedFunctions": [
         {
           "name": "TerrainLercLoader.doLoad",
@@ -74,7 +74,7 @@
         {
           "name": "Tile._updateModel",
           "change": "modified",
-          "reason": "Release loading state on rejected updates and advance the failed epoch to prevent a retry storm."
+          "reason": "Release loading state on rejected updates and advance the failed epoch to prevent a retry storm. TRUE EARTH R26-1 (VENDOR.md, LOAD_GUARD.settleNoop): one inserted line settles the epoch when an update changed nothing, ending the endless re-entry that kept the loader from going quiet; off = the R24 body verbatim."
         },
         {
           "name": "Tile.constructor",
@@ -269,5 +269,16 @@
       "R25-33"
     ],
     "evidence": "scripts/verify-r25-ground.mjs [2]: the real qe() splice captured through a stub Worker and run in a vm against the real clip + Martini (stubbed LERC decode) — Classic request byte-identical to the verbatim worker; Enhanced map == reliefFromGrid over the full and the clipped grid; loaders carry the map; verify-skirt-worker / verify-worker-normals unchanged."
-  }
+  },
+  "amendments": [
+    {
+      "date": "2026-10-06",
+      "file": "index.js",
+      "patch": "R26-1",
+      "previousIntegratedSha256": "f64a245cea52f26853e064c872302c54650d7ac450d86df3575e201c9f3e4e2e",
+      "integratedSha256": "452775ca6fc01d49a6ec0a3b5badfc1c9c89eb74afeb7987f25dc8449606a855",
+      "summary": "Tile._updateModel: settle the epoch of an update that changed nothing, behind FLY_PATCH.settleNoop (off = verbatim). Explained in VENDOR.md R26-1.",
+      "evidence": "node scripts/verify-load-guard.mjs (3) drives the real Tile.prototype._updateModel with the switch off and on; node scripts/verify-vendor-three-tile.mjs reports the changed-function inventory unchanged in membership."
+    }
+  ]
 }

@@ -7,6 +7,7 @@ import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { arrivalOn, arrivalTerms, markReveal } from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
 import { worldReadiness, retryWorldContent } from '@/lib/fly/world-readiness';
+import { holdCapMs } from '@/lib/fly/load-guard';
 import { LIVING_EARTH } from '@/lib/fly/living-earth';
 
 /**
@@ -41,6 +42,9 @@ export function WarpFlash({ runtime }) {
     if(useFlyStore.getState().mapStyle==='satellite'){
       reducedEntry.current=false;setHelp(null);setStage('streak');
       const rt=runtimeRef.current;rt.worldLoading=true;
+      // LOAD_GUARD: a hard limit on the hold; past it the world is revealed
+      // and the remaining detail keeps streaming (null = legacy, uncapped).
+      const capMs=holdCapMs('warp');
       let readySince=null,helpSince=t0,revealTimer;
       const poll=setInterval(()=>{
         if(cancelled)return;
@@ -49,11 +53,13 @@ export function WarpFlash({ runtime }) {
         if(now-t0>WARP.flashMs)setStage('hold');
         if(content.ready){readySince??=now;}else readySince=null;
         if(now-helpSince>=LIVING_EARTH.loadingHelpMs&&!content.ready)setHelp(content.missing);
-        rt.arrivalStats={kind,epoch:warpEpoch,gateArmed:true,holdStartAt:t0,holdCapMs:null,terms:content,revealAt:null};
-        if((readySince!==null&&now-readySince>=600&&now-t0>=WARP.flashMs)||reducedEntry.current){
+        rt.arrivalStats={kind,epoch:warpEpoch,gateArmed:true,holdStartAt:t0,holdCapMs:capMs,terms:content,revealAt:null};
+        const settled=readySince!==null&&now-readySince>=600&&now-t0>=WARP.flashMs;
+        const capped=!settled&&capMs!=null&&now-t0>=capMs;
+        if(settled||reducedEntry.current||capped){
           clearInterval(poll);rt.worldLoading=false;rt.worldDegraded=reducedEntry.current;
-          rt.arrivalStats={...rt.arrivalStats,revealAt:now,holdMs:Math.round(now-t0),reason:reducedEntry.current?'explicit-reduced':content.deferred.length?'background-detail':'content'};
-          window.__flyWorldStatus={degraded:reducedEntry.current,missing:content.missing};
+          rt.arrivalStats={...rt.arrivalStats,revealAt:now,holdMs:Math.round(now-t0),reason:reducedEntry.current?'explicit-reduced':capped?'time-cap':content.deferred.length?'background-detail':'content'};
+          window.__flyWorldStatus={degraded:reducedEntry.current,capped,missing:content.missing};
           (window.__flyStats??={}).warpGate=rt.arrivalStats;
           markReveal('warp');setStage('reveal');setHelp(null);
           revealTimer=setTimeout(()=>!cancelled&&setStage(null),WARP.far.revealMs);
