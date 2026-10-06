@@ -25,6 +25,7 @@ import * as settle from '@/lib/fly/settle';
 import { SatClutterEngine } from '@/lib/fly/toy-world/sat-clutter-engine';
 import { applyBendAnchor } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
+import { trueHorizontalK } from '@/lib/fly/true-scale';
 
 const _dummy = new Object3D();
 const _col = new Color();
@@ -885,6 +886,9 @@ function placeStatic(parkedMesh, poleMesh, engine, runtime, flight, st, parkedPo
   const pz = flight.pos.z;
   const eyeAgl = aglOf(runtime, flight); // R24 (C's spec): the damped ground
   const mercK = mercatorScale(flight.latDeg);
+  // TRUE_SCALE: metre-authored props render at true proportion under S —
+  // horizontal × k, and never k in a height (exactly 1 at k0 = 1).
+  const thk = trueHorizontalK(mercK);
   st.parkedAltK = 1 - smoothstep(P.altFade.onM, P.altFade.offM, eyeAgl);
   st.poleAltK = 1 - smoothstep(L.altFade.onM, L.altFade.offM, eyeAgl);
   st.atX = px;
@@ -964,7 +968,7 @@ function placeStatic(parkedMesh, poleMesh, engine, runtime, flight, st, parkedPo
         const h2 = hash(lz * 4.117 - lx * 0.913);
         const lenM = (P.lenM[0] + h2 * (P.lenM[1] - P.lenM[0])) * mercK;
         _dummy.position.set(wx - ox, engine.groundAtLocal(chunk, lx, lz), wz - oz);
-        _dummy.scale.set(lenM * s, lenM * 0.34 * s, lenM * 0.44 * s);
+        _dummy.scale.set(lenM * s, (lenM * 0.34 * s) / thk, lenM * 0.44 * s);
         _dummy.rotation.set(0, Math.atan2(pk[i + 2], pk[i + 3]), 0);
         _dummy.updateMatrix();
         parkedMesh.setMatrixAt(nc, _dummy.matrix);
@@ -1035,7 +1039,7 @@ function placeStatic(parkedMesh, poleMesh, engine, runtime, flight, st, parkedPo
               engine.groundAtLocal(chunk, lx2, lz2),
               chunk.cz + lz2 - oz
             );
-            _dummy.scale.set(L.heightM * sc, L.heightM * sc, L.heightM * sc);
+            _dummy.scale.set(L.heightM * sc * thk, L.heightM * sc, L.heightM * sc * thk);
             // The head leans out along +X of the unit geometry, so yaw it to
             // point AWAY from the carriageway: the lamp hangs over the kerb.
             _dummy.rotation.set(0, Math.atan2(-uz * side, ux * side) + Math.PI, 0);
@@ -1121,6 +1125,9 @@ function selectMovers(engine, runtime, flight, st, pool, now, frozen) {
   st.slots.length = 0;
   st.moverAnchors = 0;
   const mercK = mercatorScale(flight.latDeg);
+  // TRUE_SCALE: metre-authored props render at true proportion under S —
+  // horizontal × k, and never k in a height (exactly 1 at k0 = 1).
+  const thk = trueHorizontalK(mercK);
   const rangeSq = M.rangeM ** 2;
   const moverShare = fairShare(pool); // R24 (B) — POOL_FAIR
   for (const chunk of ready) {
@@ -1177,6 +1184,9 @@ function advanceMovers(mesh, engine, flight, st, moverT) {
   const px = flight.pos.x;
   const pz = flight.pos.z;
   const mercK = mercatorScale(flight.latDeg);
+  // TRUE_SCALE: metre-authored props render at true proportion under S —
+  // horizontal × k, and never k in a height (exactly 1 at k0 = 1).
+  const thk = trueHorizontalK(mercK);
   const ox = Math.round(px / 1000) * 1000;
   const oz = Math.round(pz / 1000) * 1000;
   mesh.position.set(ox, 0, oz);
@@ -1223,7 +1233,7 @@ function advanceMovers(mesh, engine, flight, st, moverT) {
       engine.groundAtLocal(chunk, cx - uz * lane, cz + ux * lane),
       wz - oz
     );
-    _dummy.scale.set(lenM * s, lenM * 0.34 * s, lenM * 0.44 * s);
+    _dummy.scale.set(lenM * s, (lenM * 0.34 * s) / thk, lenM * 0.44 * s);
     _dummy.rotation.set(0, Math.atan2(ux * slot.dir, uz * slot.dir), 0);
     _dummy.updateMatrix();
     mesh.setMatrixAt(n, _dummy.matrix);

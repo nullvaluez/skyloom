@@ -12,6 +12,7 @@ import { bendDrop, getBend } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
 // R24 B (GROUND_VIS, recon A6/T8) — AGL fade bands read the DAMPED ground.
 import { eyeAglVis } from '@/lib/fly/ground-vis';
+import { getTrueScaleK } from '@/lib/fly/true-scale';
 
 const FONT = '/fonts/ArchivoBlack-Regular.ttf'; // OFL, self-hosted
 
@@ -317,7 +318,9 @@ export function PoiLetters({ runtime, flight, origin }) {
       const fm = FSc ? 1 + (FSc.mul - 1) * smoothstep(FSc.startM, FSc.endM, d) : 1;
       const s = popScale(u) * fm;
       const labelScale = useFlyStore.getState().mapStyle === 'satellite' && satelliteVisualsOn('presentation') ? 0.16 : 1;
-      g.scale.set(s * labelScale, s * labelScale, s * labelScale);
+      // TRUE_SCALE: a yaw-only billboard renders k0× taller under S; the
+      // vertical scale gives it back (exactly 1 at k0 = 1).
+      g.scale.set(s * labelScale, (s * labelScale) / getTrueScaleK(), s * labelScale);
 
       // Round 13 (P4): satellite atmosphere fade — recede far letters into the
       // aerial haze (SKY.haze veil) and dissolve them softly toward the horizon

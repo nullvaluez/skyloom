@@ -16,6 +16,7 @@ import {
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { SAT_AMBIENT, SAT_VEG } from '@/lib/fly/fly-constants';
 import { applyBendAnchor } from '@/lib/fly/toy-world/world-bend';
+import { trueHorizontalK } from '@/lib/fly/true-scale';
 
 const TIERS = ['low', 'medium', 'high']; // mirrors FlyCanvas's quality ladder
 const atLeastTier = (tier, min) => TIERS.indexOf(tier) >= TIERS.indexOf(min);
@@ -145,6 +146,7 @@ export function SatAmbientLife({ engine, flight, tier }) {
     const boats = boatRef.current;
     const plumes = plumeRef.current;
     if (!boats && !plumes) return;
+    const hk = trueHorizontalK();
 
     if (t - st.t >= SAT_VEG.placeCadenceSec) {
       st.t = t;
@@ -170,7 +172,9 @@ export function SatAmbientLife({ engine, flight, tier }) {
         const vz = Math.cos(ang) * b.dir;
         _dummy.position.set(x - st.ox, b.y, z - st.oz);
         _dummy.rotation.set(0, Math.atan2(vx, vz), 0);
-        _dummy.scale.setScalar(b.size);
+        // TRUE_SCALE: a metre-authored hull is widened by k so it renders at
+        // true proportion under S (exactly 1 at k0 = 1).
+        _dummy.scale.set(b.size * hk, b.size, b.size * hk);
         _dummy.updateMatrix();
         boats.setMatrixAt(n, _dummy.matrix);
         boats.setColorAt(n, BOAT_COLORS[b.ci]);
@@ -215,7 +219,7 @@ export function SatAmbientLife({ engine, flight, tier }) {
           _dummy.position.set(x, s.y + P.riseM * ph, z);
           // Yaw-only billboard: upright column, always broadside to the camera.
           _dummy.rotation.set(0, Math.atan2(_cam.x - x, _cam.z - z), 0);
-          _dummy.scale.set(r * 2, r * 2, 1);
+          _dummy.scale.set(r * 2 * hk, r * 2, 1);
           _dummy.updateMatrix();
           plumes.setMatrixAt(n, _dummy.matrix);
           // …and the COLOUR carries dispersal: bright at the stack mouth,

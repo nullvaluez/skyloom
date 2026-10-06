@@ -45,6 +45,7 @@ import { SatHouseLights } from './SatHouseLights';
 import { SatParcelHomes } from './SatParcelHomes';
 import { SatTintLayer } from './SatTintLayer';
 import { stylizedEarthOn } from '@/lib/fly/stylized-earth';
+import { trueHorizontalK } from '@/lib/fly/true-scale';
 
 // --- Round 24 — C MOTION's spec, B's call sites -----------------------------
 // settle.js through a NAMESPACE import: `groundElevVis`/`motionSubOn` are C's
@@ -392,7 +393,9 @@ export function SatVegLayer({ runtime, flight }) {
           st.born,
           t,
           cinematic,
-          st.contacts
+          st.contacts,
+          // TRUE_SCALE: metre-authored crowns widen by k under S (exactly 1 at k0 = 1).
+          trueHorizontalK(mercK)
         );
         st.prevN = st.placed;
       }
@@ -632,7 +635,8 @@ function placeCanopy(
   born,
   now,
   cinematic = false,
-  contacts = null
+  contacts = null,
+  vhk = 1
 ) {
   const S = SAT_VEG;
   const T2 = CLUTTER.trees2;
@@ -746,7 +750,7 @@ function placeCanopy(
           : conifer
             ? r * cf.heightFrac
             : r * S.crownFrac;
-        const sxz = trees2 ? (conifer ? r * T2.coniferWidthFrac : r) : conifer ? r * cf.widthFrac : r;
+        const sxz = (trees2 ? (conifer ? r * T2.coniferWidthFrac : r) : conifer ? r * cf.widthFrac : r) * vhk;
         const y = trees2 ? gy : gy + (conifer ? r * cf.liftFrac : r * S.crownLiftFrac);
         _dummy.position.set(wx - ox, y, wz - oz);
         _dummy.scale.set(sxz, sy, sxz);

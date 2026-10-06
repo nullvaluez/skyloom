@@ -33,6 +33,8 @@ import {
 import { applyBendAnchorMonument } from '@/lib/fly/toy-world/world-bend';
 import { loadMonumentGeometries, loadMonumentDetail } from '@/lib/fly/monument-loader';
 import { setSuppressedMonuments, monumentSuppressionEpoch } from '@/lib/fly/monument-models';
+import { trueHorizontalK } from '@/lib/fly/true-scale';
+import { mercatorScale } from '@/lib/fly/coords';
 
 const _m = new Matrix4();
 const _q = new Quaternion();
@@ -279,6 +281,9 @@ export function MonumentModels({ flight, origin, engine, mapStyle, runtime }) {
       k.geometry = geometry || k.s.geometry;
       k.level = geometry ? activeLevel : 'far';
     }
+    // TRUE_SCALE: the bake widens each model by its own k while the view
+    // carries S, so a change of that state is a reason to re-merge.
+    const tsOn = trueHorizontalK() !== 1;
     let keep;
     if (!M) {
       keep = cand.slice(0, MONUMENT_MODELS.maxPlaced);
@@ -289,7 +294,7 @@ export function MonumentModels({ flight, origin, engine, mapStyle, runtime }) {
       const sig = keep
         .map((k) => `${k.s.poi.name}@${Math.round(k.groundY / q)}:${k.level}`)
         .sort()
-        .join('|');
+        .join('|') + (tsOn ? '|ts' : '');
       if (sig === st.sig) return;
       st.sig = sig;
     } else {
@@ -325,7 +330,7 @@ export function MonumentModels({ flight, origin, engine, mapStyle, runtime }) {
         if (sel.length >= MONUMENT_MODELS.maxPlaced) break;
       }
       keep = sel;
-      let changed = keep.length !== st.baked.size;
+      let changed = keep.length !== st.baked.size || !!st.tsOn !== tsOn;
       if (!changed) {
         for (const k of keep) {
           const b = st.baked.get(k.s.poi.name);
@@ -347,6 +352,7 @@ export function MonumentModels({ flight, origin, engine, mapStyle, runtime }) {
       st.lastMergeAt = t;
     }
 
+    st.tsOn = tsOn;
     const ax = origin.anchor.x;
     const az = origin.anchor.z;
     const parts = [];
@@ -362,7 +368,10 @@ export function MonumentModels({ flight, origin, engine, mapStyle, runtime }) {
       g.deleteAttribute('_model_light');
       _pos.set(x, k.groundY, z);
       _q.set(0, 0, 0, 1); // facing is baked in by monument-loader (yawFixRad)
-      _scl.set(s, s, s);
+      // TRUE_SCALE: horizontal × the monument's own k under S (exactly 1 at
+      // k0 = 1); the facing is baked by the loader, so world axes = model axes.
+      const mk = trueHorizontalK(mercatorScale(poi.lat));
+      _scl.set(s * mk, s, s * mk);
       _m.compose(_pos, _q, _scl);
       g.applyMatrix4(_m);
       const n = g.attributes.position.count;

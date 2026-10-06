@@ -21,6 +21,7 @@ import {
   notePopin,
   resetEnv,
 } from '@/lib/fly/settle';
+import { getTrueScaleK } from '@/lib/fly/true-scale';
 
 const _dummy = new Object3D();
 const POOL = SUBURB_NIGHT.houseLights.pool;
@@ -253,7 +254,9 @@ function placeLights(mesh, engine, runtime, flight, st) {
     let ft = Math.min(1, Math.max(0, (Math.hypot(wx - px, wz - pz) - fs.startM) / (fs.endM - fs.startM)));
     ft = ft * ft * (3 - 2 * ft); // smoothstep
     _dummy.position.set(wx - ox, gy + H.liftM, wz - oz);
-    _dummy.scale.setScalar(H.sizeM * (1 + (fs.mul - 1) * ft));
+    // TRUE_SCALE: keep the light's on-screen shape under S (exactly 1 at k0 = 1).
+    const hs = H.sizeM * (1 + (fs.mul - 1) * ft);
+    _dummy.scale.set(hs, hs / getTrueScaleK(), hs);
     _dummy.rotation.set(0, 0, 0);
     _dummy.updateMatrix();
     mesh.setMatrixAt(n, _dummy.matrix);

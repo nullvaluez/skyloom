@@ -49,6 +49,7 @@ import {
 import { useFlyStore } from '@/stores/fly-store';
 import { TrafficContrails } from './TrafficContrails';
 import { cinemaOn } from '@/lib/fly/cinema-policy';
+import { ribbonSideInto } from '@/lib/fly/true-scale';
 
 // Altitude → neon (airloom reference): green on the deck, yellow low,
 // orange mid, cyan cruise. Tail fades to black (additive = transparent).
@@ -473,9 +474,12 @@ function SpotTracers({ runtime, flight, origin }) {
         const er = (ec.r + (1 - ec.r) * wm) * eg + GOLD_N.r * gg;
         const eG = (ec.g + (1 - ec.g) * wm) * eg + GOLD_N.g * gg;
         const eb = (ec.b + (1 - ec.b) * wm) * eg + GOLD_N.b * gg;
-        const ox = _side.x * k;
-        const oy = (_side.y * k) / vS;
-        const oz = _side.z * k;
+        // TRUE_SCALE: face the eye in TRUE space (the side keeps its guards;
+        // no /len — ribbonSideInto's vector is already unit in S-space).
+        const kS = ribbonSideInto(_side, _view, _tan) ? half * nearK * edgeK * behindK : k;
+        const ox = _side.x * kS;
+        const oy = (_side.y * kS) / vS;
+        const oz = _side.z * kS;
         const o = v * 3;
         pa[o] = rx + ox;
         pa[o + 1] = ry + oy;
@@ -871,12 +875,15 @@ function RibbonTracers({ runtime, origin }) {
         const rx = _pts[j3] - ax;
         const ry = _pts[j3 + 1];
         const rz = _pts[j3 + 2] - az;
-        pos.array[vo] = rx + _side.x * halfW;
-        pos.array[vo + 1] = ry + _side.y * halfW;
-        pos.array[vo + 2] = rz + _side.z * halfW;
-        pos.array[vo + 3] = rx - _side.x * halfW;
-        pos.array[vo + 4] = ry - _side.y * halfW;
-        pos.array[vo + 5] = rz - _side.z * halfW;
+        // TRUE_SCALE: face the eye in TRUE space (no /len: that side vector
+        // is already unit in S-space). k0 = 1 keeps the line above exactly.
+        const hw = ribbonSideInto(_side, _view, _tan) ? halfW * len : halfW;
+        pos.array[vo] = rx + _side.x * hw;
+        pos.array[vo + 1] = ry + _side.y * hw;
+        pos.array[vo + 2] = rz + _side.z * hw;
+        pos.array[vo + 3] = rx - _side.x * hw;
+        pos.array[vo + 4] = ry - _side.y * hw;
+        pos.array[vo + 5] = rz - _side.z * hw;
         col.array[vo] = c.r * bright;
         col.array[vo + 1] = c.g * bright;
         col.array[vo + 2] = c.b * bright;

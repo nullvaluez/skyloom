@@ -24,6 +24,7 @@ import { arrivalEpoch, birthK, groundElevVis, makeBirth, notePopin } from '@/lib
 import { useFlyStore } from '@/stores/fly-store';
 // R24 B (GROUND_VIS, recon A6/T8) — AGL fade bands read the DAMPED ground.
 import { eyeAglVis } from '@/lib/fly/ground-vis';
+import { getTrueScaleK } from '@/lib/fly/true-scale';
 
 const TIERS = ['low', 'medium', 'high']; // mirrors FlyCanvas's quality ladder
 const atLeastTier = (tier, min) => TIERS.indexOf(tier) >= TIERS.indexOf(min);
@@ -216,7 +217,8 @@ export function SatRoadLayer({ runtime, flight }) {
           // ABSOLUTE world XZ: this mesh lives inside worldRoot, whose -anchor
           // translation puts it in the same rebased frame as uBendCenter.
           _dummy.position.set(a.wx, (s?.elev ?? 0) + P.liftM, a.wz);
-          _dummy.scale.setScalar(r);
+          // TRUE_SCALE: keep the beacon's on-screen shape under S (exactly 1 at k0 = 1).
+          _dummy.scale.set(r, r / getTrueScaleK(), r);
           _dummy.rotation.set(0, 0, 0);
           _dummy.updateMatrix();
           mesh.setMatrixAt(n, _dummy.matrix);

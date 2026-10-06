@@ -26,7 +26,14 @@
  *       directions, while the unpatched shadow-bias path keeps the scene normal;
  *  (9)  the ShaderChunk patch applies once, all-or-nothing;
  *  (10) faceCameraInto: billboards render square and screen-aligned;
- *  (11) wiring: installed in FlyCanvas onCreated, k0 published at the top of
+ *  (11) trueHorizontalK / ribbonSideInto: ribbons face the eye in TRUE space
+ *       at unit TRUE width; both are exact no-ops at k0 = 1;
+ *  (12) the app's own programs, built by the REAL modules (the four cloud-pass
+ *       programs, the Enhanced aerial pass, the tracer vapor), take every edit
+ *       when on and none when off;
+ *  (13) every audited consumer goes through the helpers (lights, the mirror
+ *       camera, billboards, ribbons, metre-authored instances, shaders);
+ *  (14) wiring: installed in FlyCanvas onCreated, k0 published at the top of
  *       the main frame, before any camera rig runs.
  *
  * Run: node scripts/verify-true-scale.mjs
@@ -47,6 +54,38 @@ function rng(seed) {
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
     return s / 4294967296;
   };
+}
+
+if (legArg && legArg.startsWith('--leg=shaders-')) {
+  // The app's own shader programs, built by the REAL modules: the cloud pass
+  // (all four programs), the Enhanced aerial pass and the tracer vapor.
+  const on = legArg === '--leg=shaders-on';
+  globalThis.window = { location: { search: '', href: 'http://localhost/' }, ...(on ? { __flyTrueScaleOverride: { enabled: true } } : {}) };
+  if (typeof globalThis.OffscreenCanvas === 'undefined') {
+    const inert = new Proxy(function () {}, { get: (t, k) => (k === Symbol.toPrimitive ? () => 0 : inert), apply: () => inert, construct: () => inert });
+    globalThis.OffscreenCanvas = class { constructor(w, h) { this.width = w; this.height = h; } getContext() { return inert; } };
+  }
+  register('./_node-resolve.mjs', import.meta.url);
+  register('./_alias-loader.mjs', import.meta.url);
+  register('./_r25-c-jsx-loader.mjs', import.meta.url);
+  const imp = (rel) => import(new URL(`../${rel}`, import.meta.url).href);
+  const THREE = await imp('node_modules/three/build/three.module.js');
+  const ts = await imp('lib/fly/true-scale.js');
+  const CP = await imp('lib/fly/immersive-cloud-pass.js');
+  const pass = new CP.ImmersiveCloudPass(new THREE.PerspectiveCamera(), {});
+  pass.ensureR25();
+  await imp('components/fly/AerialPerspective.jsx');
+  await imp('lib/fly/toy-world/world-bend.js');
+  const texts = [pass.marchMaterial, pass.compositeMaterial, pass.r25.march, pass.r25.composite].map((m) => m.fragmentShader);
+  console.log(
+    JSON.stringify({
+      shaders: { ...ts.TRUE_SCALE_SHADERS },
+      trueRays: texts.map((t) => t.split('tsTrueRay(').length - 1),
+      sceneDistance: texts.map((t, i) => t.includes('tsSceneDistanceAt(vUv)') && (i % 2 === 0 || t.includes('sampleDistance-distView'))),
+      legacyDistance: texts.map((t) => t.includes('?1000000.:length(viewAt(uv,d));}') && !t.includes('tsSceneDistanceAt')),
+    }),
+  );
+  process.exit(0);
 }
 
 if (legArg) {
@@ -229,8 +268,26 @@ if (legArg) {
     out.allOrNothing = ts.patchEnvChunks(synthetic) === 'miss:envmap_fragment' && JSON.stringify(synthetic) === before;
     out.alreadyIdempotent = ts.patchEnvChunks(fresh) === 'already';
   }
+  // (11) trueHorizontalK and ribbonSideInto under S, then both at k0 = 1
+  {
+    let ribbonErr = 0;
+    for (const k of KS) {
+      ts.setTrueScaleK(k);
+      if (ts.trueHorizontalK() !== k || ts.trueHorizontalK(1.7) !== 1.7) ribbonErr = Infinity;
+      for (let i = 0; i < 200; i++) {
+        const view = new Vector3(rand() - 0.5, rand() - 0.5, rand() - 0.5).multiplyScalar(5000);
+        const tan = new Vector3(rand() - 0.5, rand() - 0.5, rand() - 0.5).multiplyScalar(80);
+        const side = new Vector3();
+        if (!ts.ribbonSideInto(side, view, tan)) ribbonErr = Infinity;
+        const sS = S(side, k);
+        ribbonErr = Math.max(ribbonErr, Math.abs(sS.length() - 1), Math.abs(sS.dot(S(view, k).normalize())), Math.abs(sS.dot(S(tan, k).normalize())));
+      }
+    }
+    out.ribbonErr = ribbonErr;
+  }
   ts.setTrueScaleK(1);
   out.billboardK1 = ts.faceCameraInto(new Matrix4(), cam, new Vector3(), 2) === false;
+  out.helpersK1 = ts.trueHorizontalK(1.7) === 1 && ts.ribbonSideInto(new Vector3(), new Vector3(1, 0, 0), new Vector3(0, 0, 1)) === false;
   console.log(JSON.stringify(out));
   process.exit(0);
 }
@@ -273,13 +330,54 @@ check(
 );
 check('(9) the ShaderChunk patch applies once, all-or-nothing, and spares shadowmap_vertex', on.envPatch === 'patched' && on.chunkPatched && on.allOrNothing && on.alreadyIdempotent, `status ${on.envPatch}`);
 check('(10) faceCameraInto renders square and screen-aligned; writes nothing at k0 = 1', r.billboardErr < 1e-9 && on.billboardK1, `worst ${e(r.billboardErr)}`);
+check(
+  '(11) trueHorizontalK / ribbonSideInto: ribbons face the eye in TRUE space at unit TRUE width; both are exact no-ops at k0 = 1',
+  on.ribbonErr < 1e-9 && on.helpersK1,
+  `worst ${e(on.ribbonErr)}`,
+);
+{
+  const sOff = leg('shaders-off');
+  const sOn = leg('shaders-on');
+  const want = ['cloud-march', 'cloud-composite', 'cloud-march-r25', 'cloud-composite-r25', 'aerial-enhanced', 'tracer-vapor'];
+  const okOn = want.every((n) => sOn.shaders[n] === 'patched') && sOn.trueRays.every((n) => n >= 2) && sOn.sceneDistance.every(Boolean);
+  const okOff = Object.keys(sOff.shaders).length === 0 && sOff.trueRays.every((n) => n === 0) && sOff.legacyDistance.every(Boolean) && !sOff.sceneDistance.some(Boolean);
+  check(
+    '(12) the app\'s own programs (4 cloud, aerial, tracer vapor) take every TRUE_SCALE edit when on, and none when off',
+    okOn && okOff,
+    `on ${JSON.stringify(sOn.shaders)} rays ${sOn.trueRays.join('/')} | off ${Object.keys(sOff.shaders).length} edits`,
+  );
+}
+{
+  const read = (p) => readFileSync(path.join(ROOT, p), 'utf8');
+  const sites = [
+    ['components/fly/FlyScene.jsx', 'toSceneDir(_cinemaKey.fromArray(e.keyDir),_cinemaKey)'],
+    ['components/fly/CinemaShadowRig.jsx', 'toSceneDir(r.lightDirection.fromArray(e.keyDir),r.lightDirection)'],
+    ['lib/fly/coastal-reflection.js', 'installTrueScaleCamera(this.camera);'],
+    ['components/fly/TrafficLayer.jsx', 'faceCameraInto(_dummy.matrix, camera, _dummy.position, s)'],
+    ['components/fly/TrafficTracers.jsx', 'ribbonSideInto(_side, _view, _tan) ? half * nearK * edgeK * behindK : k'],
+    ['components/fly/TrafficTracers.jsx', 'ribbonSideInto(_side, _view, _tan) ? halfW * len : halfW'],
+    ['lib/fly/aircraft-wake.js', 'if (!ribbonSideInto(side, view, tangent)) side.normalize();'],
+    ['components/fly/PoiLetters.jsx', '(s * labelScale) / getTrueScaleK()'],
+    ['components/fly/SatVegLayer.jsx', ': r) * vhk;'],
+    ['components/fly/SatClutterLayer.jsx', '(lenM * 0.34 * s) / thk'],
+    ['components/fly/SatAmbientLife.jsx', 'b.size * hk, b.size, b.size * hk'],
+    ['components/fly/LandmarkMonuments.jsx', 'sx * mhk, sy, sz * mhk'],
+    ['components/fly/MonumentModels.jsx', '_scl.set(s * mk, s, s * mk);'],
+    ['lib/fly/world-art-direction.js', 'tsSceneNormalToView('],
+    ['lib/fly/earth-surface-material.js', 'tsTrueRayFromScene(cameraPosition-vEarthWorld,viewMatrix)'],
+    ['lib/fly/satellite-water.js', 'tsTrueRayFromScene(cameraPosition - vWaterWorld'],
+    ['lib/fly/aircraft-wake.js', 'tsTrueNormalByInverseViewMatrix(normalize(vWakeView),viewMatrix)'],
+  ];
+  const missing = sites.filter(([f, t]) => !read(f).includes(t)).map(([f]) => f);
+  check('(13) every audited consumer goes through the TRUE_SCALE helpers (lights, mirror camera, billboards, ribbons, metre-authored instances, shaders)', missing.length === 0, missing.length ? `missing: ${missing.join(', ')}` : `${sites.length} sites`);
+}
 {
   const canvas = readFileSync(path.join(ROOT, 'components/fly/FlyCanvas.jsx'), 'utf8');
   const scene = readFileSync(path.join(ROOT, 'components/fly/FlyScene.jsx'), 'utf8');
   const set = scene.indexOf('setTrueScaleK(cinemaOn(flyState) ? mercatorScale(flight.latDeg) : 1);');
   const rig = scene.indexOf('chase.update(dt, flight, camera');
   const ok = /onCreated=\{\(\{ gl, camera \}\) => \{[\s\S]{0,1600}installTrueScaleCamera\(camera\);/.test(canvas) && set > 0 && rig > set;
-  check('(11) installed in FlyCanvas onCreated; k0 published before any camera rig runs', ok);
+  check('(14) installed in FlyCanvas onCreated; k0 published before any camera rig runs', ok);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

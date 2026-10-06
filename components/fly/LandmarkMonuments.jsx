@@ -29,6 +29,7 @@ import {
   buildLandmarkGeometries,
   monumentScale,
 } from '@/lib/fly/landmarks-3d';
+import { trueHorizontalK } from '@/lib/fly/true-scale';
 
 const _dummy = new Object3D();
 
@@ -223,6 +224,7 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
     // this whole path is the pre-R20 code.
     const supEpoch = monumentSuppressionEpoch();
     if (!rebased && supEpoch === last.sup && t - last.t < LANDMARKS_3D.refreshSec) return;
+    const mhk = trueHorizontalK();
     // Round 21 (C, S7) — the double-draw instrument. MonumentModels stamps
     // `bumpT` with the frame clock it bumped the epoch on; this stamps the
     // frame clock it CONSUMED it on. Equal ⇒ same frame ⇒ the archetype is
@@ -282,7 +284,9 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
         // so this branch is the pre-R20 code path unconditionally.
         const modelPlaced = isMonumentSuppressed(poi.name);
         if (!modelPlaced) {
-          _dummy.scale.set(sx, sy, sz);
+          // TRUE_SCALE: metre-authored archetypes widen by k under S (exactly
+          // 1 at k0 = 1); a uniform horizontal factor commutes with the yaw.
+          _dummy.scale.set(sx * mhk, sy, sz * mhk);
           _dummy.rotation.set(0, yaw, 0);
           _dummy.updateMatrix();
           mesh.setMatrixAt(n, _dummy.matrix);
@@ -302,7 +306,7 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
             _dummy.position.y = groundY + 3;
             _dummy.scale.set(R, 1, R);
           } else {
-            _dummy.scale.set(r, r * 0.22, r);
+            _dummy.scale.set(r * mhk, r * 0.22, r * mhk);
           }
           _dummy.rotation.set(0, 0, 0);
           _dummy.updateMatrix();

@@ -23,6 +23,7 @@ import { applyBendAirAnchor, applyNavLights, applyOverlayCloudGate, horizonFade,
 import { useFlyStore } from '@/stores/fly-store';
 import { DetailedTraffic } from '@/lib/fly/detailed-traffic';
 import { projectModelMatrix } from '@/lib/fly/render-scale';
+import { faceCameraInto, getTrueScaleK } from '@/lib/fly/true-scale';
 import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
 import { cinemaOn } from '@/lib/fly/cinema-policy';
 
@@ -283,6 +284,10 @@ export function TrafficLayer({ runtime, flight, origin }) {
     for (const mesh of meshes) mesh._used = 0;
     let billboardsUsed = 0;
     let horizonFaded = 0;
+    // TRUE_SCALE: billboards take the camera's own (anisotropic) world basis,
+    // which must be this frame's. Nothing to do at k0 = 1.
+    const trueScaleView = getTrueScaleK() !== 1;
+    if (trueScaleView) camera.updateMatrixWorld();
 
     for (const it of items) {
       const x = it.rx - ax;
@@ -353,7 +358,9 @@ export function TrafficLayer({ runtime, flight, origin }) {
           Math.max(1, it.distM / TRAFFIC.modelLodDistanceM) *
           it.scaleK * (quiet ? .62 : 1);
         _dummy.scale.set(s, s, s);
-        _dummy.updateMatrix();
+        // TRUE_SCALE: the camera QUATERNION shears under S; its world basis
+        // renders the quad square and screen-aligned.
+        if (!(trueScaleView && faceCameraInto(_dummy.matrix, camera, _dummy.position, s))) _dummy.updateMatrix();
         billboards.setMatrixAt(billboardsUsed, _dummy.matrix);
         billboards.setColorAt(billboardsUsed, _color);
         billboards.geometry.attributes.aTrafficPresence.setX(billboardsUsed,quiet ? .22 : 1);

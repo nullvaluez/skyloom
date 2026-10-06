@@ -14,6 +14,7 @@ import { buildPoiList } from '@/lib/fly/poi-data';
 import { SAT_CITY_GLOW } from '@/lib/fly/fly-constants';
 import { applyBendAnchor } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
+import { getTrueScaleK } from '@/lib/fly/true-scale';
 
 const _dummy = new Object3D();
 const _col = new Color();
@@ -141,13 +142,16 @@ export function SatCityGlow({ runtime, flight, origin, engine }) {
       // Anchor-RELATIVE placement: this layer sits OUTSIDE worldRoot (like
       // TownGlow), so it subtracts the floating-origin anchor itself.
       _dummy.position.set(c.wx - origin.anchor.x, groundY, c.wz - origin.anchor.z);
-      _dummy.scale.set(r, r * G.heightFrac, r);
+      // TRUE_SCALE: an aesthetic glow keeps its on-screen shape under S —
+      // the vertical scale gives back k0 (exactly 1 at k0 = 1).
+      const kv = getTrueScaleK();
+      _dummy.scale.set(r, (r * G.heightFrac) / kv, r);
       _dummy.rotation.set(0, 0, 0);
       _dummy.updateMatrix();
       mesh.setMatrixAt(n, _dummy.matrix);
       mesh.setColorAt(n, _col.copy(base).multiplyScalar(fade * nightK));
       const cr = r * G.coreRadiusFrac;
-      _dummy.scale.set(cr, cr * G.coreHeightFrac, cr);
+      _dummy.scale.set(cr, (cr * G.coreHeightFrac) / kv, cr);
       _dummy.updateMatrix();
       core.setMatrixAt(n, _dummy.matrix);
       core.setColorAt(n, _coreCol.copy(coreBase).multiplyScalar(fade * nightK));
