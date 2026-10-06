@@ -9,6 +9,8 @@
  *       pinned(NAME, '<overrideGlobalName(NAME)>'). A flag nothing reads, or
  *       one read under a different global, would make `?flags=NAME` a silent
  *       no-op — the R24 "pre-set and read by NOTHING" lesson.
+ *  (6)   the device report (lib/fly/device-report.js FLAGS) lists every block,
+ *       so a report always says which flags were on.
  *
  * Run: node scripts/verify-true-earth-flags.mjs
  */
@@ -99,6 +101,15 @@ check(
   marker >= 0 && unread.length === 0,
   marker < 0 ? 'marker missing' : `${blocks.length} block(s)${unread.length ? `; unread: ${unread.join(', ')}` : ''}`,
 );
+
+// (6) the device report lists every flag (owners read flags off the report)
+{
+  const report = readFileSync(path.join(ROOT, 'lib/fly/device-report.js'), 'utf8');
+  const m = report.match(/const FLAGS = \{([^}]*)\}/);
+  const listed = m ? m[1].split(',').map((x) => x.trim()).filter(Boolean) : [];
+  const missing = blocks.filter((b) => !listed.includes(b));
+  check('(6) the device report lists every TRUE EARTH flag', m != null && missing.length === 0, missing.length ? `missing: ${missing.join(', ')}` : `${listed.length} listed`);
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
