@@ -1,4 +1,14 @@
 import { fileURLToPath } from 'node:url';
+import { execSync } from 'node:child_process';
+
+// TRUE EARTH: device reports name the exact build they measured.
+function buildSha() {
+  try {
+    return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+  } catch {
+    return '';
+  }
+}
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Isolate review builds from a running local server's generated files.
@@ -13,6 +23,7 @@ const nextConfig = {
     },
   } : {}),
   reactStrictMode: true,
+  env: { NEXT_PUBLIC_BUILD_SHA: process.env.NEXT_PUBLIC_BUILD_SHA || buildSha() },
 
   // Required for the three.js ecosystem (Fly mode). Do NOT enable
   // experimental.cacheComponents — it breaks R3F canvas re-init on

@@ -16,6 +16,9 @@ import { setDepthReversed } from '@/lib/fly/toy-world/world-bend';
 import { autoTierCeiling } from '@/lib/fly/fly-settings';
 import { PerfGovernor } from '@/lib/fly/perf-governor';
 import { FrameStatsRig } from '@/lib/fly/frame-stats';
+import { setDiagRenderer } from '@/lib/fly/diag-handles';
+import { diagRequested } from '@/lib/fly/diag';
+import { DiagFrameTotals } from './DiagFrameTotals';
 import { StepSafeRig } from './StepSafeRig';
 import { HudSyncRig } from './HudSyncRig';
 import { useFlyStore } from '@/stores/fly-store';
@@ -181,6 +184,8 @@ export function FlyCanvas({ runtime }) {
         // keep passing `gl` and are unaffected. Production path, not dev-gated:
         // an engine that guesses the sign wrong drops overlays on slopes.
         setDepthReversed(gl?.capabilities?.reversedDepthBuffer === true);
+        // TRUE EARTH: the diagnostics overlay's renderer handle (every build).
+        setDiagRenderer(gl);
         if (process.env.NODE_ENV === 'development') {
           console.info(
             '[fly] reversedDepthBuffer active:',
@@ -202,6 +207,8 @@ export function FlyCanvas({ runtime }) {
           mounted at all when FRAME_STATS.enabled is false — no ring, no
           observer, no window.__flyStats.frame (recon HARN-GAP-4). */}
       {FRAME_STATS.enabled && <FrameStatsRig />}
+      {/* TRUE EARTH: whole-frame draw/triangle totals, only with ?diag=1. */}
+      {diagRequested() && <DiagFrameTotals />}
       {FRONT_DOOR.enabled && <StagePump runtime={runtime} />}
       {PERF_GOVERNOR.enabled ? (
         <>

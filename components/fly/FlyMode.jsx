@@ -27,6 +27,8 @@ import { CrashFlash } from './CrashFlash';
 import { JuiceHud } from './hud/JuiceHud';
 import { PauseMenu } from './PauseMenu';
 import { BootScreen } from './hud/BootScreen';
+import { DiagnosticsPanel } from './hud/DiagnosticsPanel';
+import { diagRequested } from '@/lib/fly/diag';
 import { useFlyTraffic } from '@/hooks/use-fly-traffic';
 import { useFlyWeather } from '@/hooks/use-fly-weather';
 import { useFlyAudio } from '@/hooks/use-fly-audio';
@@ -377,6 +379,8 @@ export function FlyMode({ onClose }) {
           controls card — until the world reveals, so the fly-controls-seen
           flow effectively starts AFTER the reveal. */}
       <BootScreen runtime={runtime} />
+      {/* TRUE EARTH: device diagnostics, only with ?diag=1. */}
+      {diagRequested() && <DiagnosticsPanel runtime={runtime} />}
 
       {/* R25 A (FRONT DOOR): the title screen, z-45 — over the BootScreen
           backdrop (which turns into a compact strip under it) and under the
