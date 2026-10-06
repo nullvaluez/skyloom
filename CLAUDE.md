@@ -1,5 +1,29 @@
 # SkyTracker ADSB Application - Comprehensive Analysis & Action Plan
 
+> **⚠️ CURRENT STATE — READ FIRST (2026-10-06): the "True Earth" browser pass
+> is IN PROGRESS on `main`. [TRUE_EARTH_PASS.md](TRUE_EARTH_PASS.md) is both its
+> plan and its record** (status, flags, the owner's run list).
+> - **Shipped defaults now** (the R25 banner below is out of date on these):
+>   Enhanced Satellite is the default on every device
+>   (`VISUALS.defaultProfile:'enhanced'`), and `R25_SKY` / `R25_GROUND` ship
+>   `enabled:true`.
+> - **Newer records than R25:** [FLY_FLEET_AND_ADVENTURES.md](FLY_FLEET_AND_ADVENTURES.md)
+>   (Adventures, fleet, saves), [FLY_SCALE_AND_ENCOUNTERS.md](FLY_SCALE_AND_ENCOUNTERS.md)
+>   (World/Close framing, Nearby encounters, the stylized-cinematic art pass),
+>   [FLY_RENDER_OPTIMIZATION.md](FLY_RENDER_OPTIMIZATION.md) and
+>   [CINEMATIC_EARTH_OVERHAUL.md](CINEMATIC_EARTH_OVERHAUL.md).
+> - **Pass rules:**
+>   - Work lands straight on `main`. Every look-changing item sits behind a
+>     TRUE EARTH flag block at the end of `lib/fly/fly-constants.js`, shipped
+>     `enabled:false` until the owner certifies it on their RTX 5080 + iPhone.
+>   - Turn a flag on (or off with a leading `-`) for one page load with
+>     `?flags=NAME`.
+>   - Only Enhanced is meant to be player-facing. Neon and Classic stay in the
+>     code for review and harnesses (PLAYER_SURFACE, Phase 0).
+> - **Environment truth unchanged:** the cloud container has no real GPU and is
+>   blocked from Esri, OpenFreeMap and the ADS-B feeds, so every fps and look
+>   verdict belongs to the owner's machines.
+
 > **⚠️ THE APP IS NOW FLY-ONLY (Round 9, 2026-07-17):** the flat 2D tracker,
 > AR spotter, and their components/hooks/stores are DELETED —
 > [FLY_ROUND9.md](FLY_ROUND9.md) is the record (tag `round9-pre-delete` =
