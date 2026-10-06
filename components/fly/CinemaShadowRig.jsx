@@ -41,10 +41,17 @@ export function CinemaShadowRig({runtime,sunRef}){
     for(const light of r.lights){light.intensity=e.sun;light.color.fromArray(e.keyColor);compactDepthShadowTarget(light.shadow,gl.shadowMap.type);}
     // Register new streamed materials before their first color draw. A dispose
     // listener drops evicted materials, so the registry never pins the world.
-    scene.traverse(r.registerObject);
+    // TRUE EARTH: this walks the WHOLE scene every frame. Before replacing it
+    // with event-driven registration (a missed producer = a recompile hitch),
+    // measure it: objects scanned and an EMA of its cost reach the diagnostics
+    // overlay via runtime.cinemaShadows.
+    const scanStart=performance.now();r.scanObjects=0;
+    r.countingRegister??=object=>{r.scanObjects++;r.registerObject(object);};
+    scene.traverse(r.countingRegister);
+    const scanMs=performance.now()-scanStart;r.scanMs=r.scanMs==null?scanMs:r.scanMs+(scanMs-r.scanMs)*.05;
     camera.updateMatrixWorld();r.update();
     runtime.shadowRadiusM=profile.shadowRangeM;
-    Object.assign(runtime.cinemaShadows??={}, {cascades:r.cascades,size:profile.shadowSize,rangeM:profile.shadowRangeM,materials:r.owned.size,bytes:r.cascades*profile.shadowSize**2*5});
+    Object.assign(runtime.cinemaShadows??={}, {cascades:r.cascades,size:profile.shadowSize,rangeM:profile.shadowRangeM,materials:r.owned.size,bytes:r.cascades*profile.shadowSize**2*5,scanObjects:r.scanObjects,scanMs:r.scanMs});
   },-.9);
   return null;
 }
