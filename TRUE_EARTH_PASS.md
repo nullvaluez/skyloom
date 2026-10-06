@@ -27,7 +27,7 @@ A flag's default flips to `true` in its own one-line commit after its run list p
 |---|---|
 | 0 — Foundations, defects, diagnostics | **Built on `main` (2026-10-06); waiting on your run list** |
 | 1 — True proportions | **`TRUE_SCALE` and `TRUE_AREAS` built on `main` (2026-10-06), off by default; waiting on your run list** |
-| 2 — Atmosphere, horizon, conditions, shadows | **In progress: `CONDITIONS` built on `main` (2026-10-06), off by default; `PHYS_SKY`, `EARTH_HORIZON`, `NIGHT_LIGHTS` and `TERRAIN_SHADOW` not started** |
+| 2 — Atmosphere, horizon, conditions, shadows | **In progress: `CONDITIONS` built on `main` (2026-10-06), off by default; `PHYS_SKY` tables built and verified, not yet wired; `EARTH_HORIZON`, `NIGHT_LIGHTS` and `TERRAIN_SHADOW` not started** |
 | 3 — Take off and land anywhere | Not started |
 | 4 — Cinematic | Not started |
 | 5 — Cities and landmarks | Not started |
@@ -46,6 +46,7 @@ A flag's default flips to `true` in its own one-line commit after its run list p
 | `TRUE_AREAS` | 1b | off | Building footprint filters judge the same house the same way at every latitude (normalised to 40°N, where they were tuned): small homes stop vanishing near the equator, big halls stop going flat in the far north. Ohio and New York stay within 2% | `verify-true-areas.cjs` 7/7 (needs `FLY_TILE_FIXTURE=1`), `verify-seam` PASS |
 | `CONDITIONS` | 2 | off | A time-of-day slider and weather presets (Clear, Scattered, Overcast, Rain, Snow, Fog) in Pause, the title Settings sheet and the photo bar. Live by default; a pick lasts for the session; a time change glides over 1.5 s. Harness pins and curated Adventures still win | `verify-conditions.mjs` 6/6 |
 | `CLOUD_CALM` | fix | off | Steadier clouds and haze when flying low (your report). The haze over terrain and in front of the clouds is measured from a damped ground instead of the raw ground under the aircraft, and the cloud noise moves with the cloud base, so the deck shifts as a whole instead of re-forming | `verify-cloud-calm.mjs` 6/6 |
+| `PHYS_SKY` | 2 | off | **In progress, changes nothing yet.** The physical atmosphere (Hillaire 2020 lookup tables: transmittance, multiple scattering, sky view, aerial perspective) and its CPU mirror are built and verified. The renderer is not wired yet | `verify-phys-sky.mjs` 7/7 (closed forms; GPU tables in WebGL2 within 0.7% of the CPU) |
 
 Shipped without a flag (no look change): OpenStreetMap / OpenMapTiles / OpenFreeMap
 credits and the live ADS-B feed's name in the credit bar, title and photo exports
