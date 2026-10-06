@@ -17,6 +17,8 @@ import { updateCinemaFrame } from '@/lib/fly/cinema-frame';
 import { CinemaShadowRig } from './CinemaShadowRig';
 import { CinemaResourceRig } from './CinemaResourceRig';
 import { CinemaEnvironmentRig } from './CinemaEnvironmentRig';
+import { AtmosphereRig } from './AtmosphereRig';
+import { PHYS_SKY_TEXT_ACTIVE } from '@/lib/fly/cinema-sky';
 import { cinemaOn, cinemaProfile, setCinemaRenderScale } from '@/lib/fly/cinema-policy';
 import { stylizedEarthOn } from '@/lib/fly/stylized-earth';
 import { SatGroundDetailLayer } from './SatGroundDetailLayer';
@@ -3487,7 +3489,13 @@ export function FlyScene({ runtime }) {
             untouched: the same keyed drei element on the certified noon HDRI
             (key 'toy', background false, TOY.envIntensity) it has always had. */}
         {mapStyle === 'satellite' ? (
-          cinemaActive ? <CinemaEnvironmentRig runtime={runtime} /> : <SatEnvironment runtime={runtime} bucket={hdriBucket} />
+          cinemaActive ? (
+            <>
+              {/* TRUE EARTH (PHYS_SKY): the atmosphere tables, before the IBL bake reads them. */}
+              {PHYS_SKY_TEXT_ACTIVE && <AtmosphereRig runtime={runtime} />}
+              <CinemaEnvironmentRig runtime={runtime} />
+            </>
+          ) : <SatEnvironment runtime={runtime} bucket={hdriBucket} />
         ) : (
           <NeonEnvironment
             key={mapStyle}

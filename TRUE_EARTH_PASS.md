@@ -27,7 +27,7 @@ A flag's default flips to `true` in its own one-line commit after its run list p
 |---|---|
 | 0 — Foundations, defects, diagnostics | **Built on `main` (2026-10-06); waiting on your run list** |
 | 1 — True proportions | **`TRUE_SCALE` and `TRUE_AREAS` built on `main` (2026-10-06), off by default; waiting on your run list** |
-| 2 — Atmosphere, horizon, conditions, shadows | **In progress: `CONDITIONS` built on `main` (2026-10-06), off by default; `PHYS_SKY` tables built and verified, not yet wired; `EARTH_HORIZON`, `NIGHT_LIGHTS` and `TERRAIN_SHADOW` not started** |
+| 2 — Atmosphere, horizon, conditions, shadows | **In progress: `CONDITIONS` built on `main` (2026-10-06), off by default; `PHYS_SKY` built (wired, off by default); `EARTH_HORIZON`, `NIGHT_LIGHTS` and `TERRAIN_SHADOW` not started** |
 | 3 — Take off and land anywhere | Not started |
 | 4 — Cinematic | Not started |
 | 5 — Cities and landmarks | Not started |
@@ -46,7 +46,7 @@ A flag's default flips to `true` in its own one-line commit after its run list p
 | `TRUE_AREAS` | 1b | off | Building footprint filters judge the same house the same way at every latitude (normalised to 40°N, where they were tuned): small homes stop vanishing near the equator, big halls stop going flat in the far north. Ohio and New York stay within 2% | `verify-true-areas.cjs` 7/7 (needs `FLY_TILE_FIXTURE=1`), `verify-seam` PASS |
 | `CONDITIONS` | 2 | off | A time-of-day slider and weather presets (Clear, Scattered, Overcast, Rain, Snow, Fog) in Pause, the title Settings sheet and the photo bar. Live by default; a pick lasts for the session; a time change glides over 1.5 s. Harness pins and curated Adventures still win | `verify-conditions.mjs` 6/6 |
 | `CLOUD_CALM` | fix | off | Steadier clouds and haze when flying low (your report). The haze over terrain and in front of the clouds is measured from a damped ground instead of the raw ground under the aircraft, and the cloud noise moves with the cloud base, so the deck shifts as a whole instead of re-forming | `verify-cloud-calm.mjs` 6/6 |
-| `PHYS_SKY` | 2 | off | **In progress, changes nothing yet.** The physical atmosphere (Hillaire 2020 lookup tables: transmittance, multiple scattering, sky view, aerial perspective) and its CPU mirror are built and verified. The renderer is not wired yet | `verify-phys-sky.mjs` 7/7 (closed forms; GPU tables in WebGL2 within 0.7% of the CPU) |
+| `PHYS_SKY` | 2 | off | The Enhanced sky, the haze over terrain and in front of clouds, water reflections and the lighting become one physical atmosphere (Hillaire 2020; Earth's Rayleigh, Mie and ozone). The sun's colour and strength follow the real air it passes through, and the aircraft's underside sees lit ground. The cinematic grade, night sky and weather veil stay on top | `verify-phys-sky.mjs` 12/12 (closed forms; GPU tables and lookups in WebGL2 against the CPU) |
 
 Shipped without a flag (no look change): OpenStreetMap / OpenMapTiles / OpenFreeMap
 credits and the live ADS-B feed's name in the credit bar, title and photo exports
@@ -217,6 +217,87 @@ feed does, so clouds, fog, rain and snow all follow.
    own conditions, and the controls should be disabled.
 6. **iPhone:** the panel fits in the Settings sheet and above the photo pill,
    and the slider is easy to drag.
+
+### Phase 2 — `PHYS_SKY` (physical atmosphere)
+
+With `?flags=PHYS_SKY`, Enhanced draws its sky from a physical model of the air
+(Hillaire 2020: lookup tables for transmittance, multiple scattering, the sky
+and the haze along any line of sight, with Earth's measured Rayleigh, Mie and
+ozone). One switch moves everything that reads the sky:
+
+- **Sky.** Deep blue overhead, paler toward the horizon, and darker the higher
+  you fly. A setting sun turns red and dims because its light really crosses
+  more air; nothing is hand-tinted.
+- **Haze.** Distant terrain and clouds fade into the same air. The haze thickens
+  with distance and thins with altitude. Fog and overcast still add their own
+  weather haze on top.
+- **Light.** The sun's colour and strength follow the air it passes through:
+  warm white at noon, deep orange at about a sixth of the strength at a 2° sun.
+  The lower half of the image-based lighting is now lit ground (8× the old
+  near-black fill), so aircraft bellies are no longer dark.
+- **Kept on top:** a sky-only saturation grade (1.2), the authored night sky as
+  a floor, the overcast and fog veil, AgX and the Enhanced grade. The flag also
+  brings `TWILIGHT_FIX`'s sun and moon geometry.
+- **Not yet (`EARTH_HORIZON`, next):** the world still curves on a 1,000 km
+  sphere, so its edge melts into the horizon colour 36–60 km out.
+
+The check renders every table and both lookups in WebGL2 and compares them with
+the CPU physics (within 0.7% for the tables; 0.3% for the sky lookup; 5.5% for
+the haze lookup away from the sun's glare), and checks the closed forms and the
+lighting.
+
+**Run list (with `?flags=PHYS_SKY`, compared with no flag):**
+1. **Noon over mountains** (the Sierra adventure, or the Alps): blue overhead,
+   pale at the horizon, distant ridges fading blue-grey.
+2. **Golden hour** (CONDITIONS picker, or `?sunUtc=`): the sun and its light go
+   orange-red as it sets, shadows lengthen, and the sky glows around the sun.
+3. **Climb to FL350**: the sky overhead darkens and the haze below thins.
+4. **Night**: moon and stars as before, no glow left at the horizon after
+   dusk, and distant ground fading into the night sky.
+5. **Overcast and fog**: still the grey, flat sky.
+6. **Aircraft underside** in daylight (chase view, pitch up): lit by the ground.
+7. **iPhone**: the `?diag=1` benchmark with and without the flag.
+
+**What the fixture showed** (SwiftShader, the Sierra scene at 3.9 km, High tier,
+each scene booted once with the flag and once without; every look and fps
+verdict is still yours):
+
+| Scene | Without the flag | With `PHYS_SKY` |
+|---|---|---|
+| Noon (sun 77° up) | sun light 5.58 | sun light 6.14, warm white (1.00, 0.94, 0.88). On the same ground tile the ground is as bright as before, distant terrain slightly paler (saturation 0.38 → 0.33), and the sky a deeper blue |
+| Golden hour (sun 3° up) | sun light 3.41; a lavender sky and haze | sun light 2.34, deep orange (1.00, 0.49, 0.17). Blue overhead shading to orange at the horizon, orange-lit clouds, the lavender gone. On the same ground tile the ground is at about 55% of its old brightness, because the low sun now crosses real air |
+| 11 km, noon | flat blue | darker blue overhead, a pale band at the horizon |
+| Night (sun 24° down) | a blue-grey haze veils the ground, even close by | clear air leaves the moonlit ground its colour; distance fades it into the night sky |
+
+No shader failed to compile or link in any run. The only page error was the
+container's blocked network ("Failed to fetch"). The fixture's ground is a
+synthetic test pattern, and it streamed in at different detail levels from
+run to run, so compare the sky, the light and the haze, not the ground's
+colour or pattern.
+
+The first night capture found a gap, now closed. The tables scatter only
+sunlight, so at night the flag's haze added nothing: the ground stood fully
+saturated and cut out against the night sky. Both haze consumers now scatter
+the night sky's floor through the same air (`pskyNightAir`, zero by day). On
+the same ground tile, the far band's saturation went from 1.00 to 0.78 and the
+ground now fades into the sky above it.
+
+**Open questions for your run list:**
+- **Noon haze.** Distant terrain at noon is slightly paler than before. If it
+  reads as washed out, the next step is a turbidity knob in the grade, not a
+  return to the authored haze.
+- **Golden-hour ground.** The darker ground at a low sun is physical, but
+  darker than the old look. If it reads as too dark, the fix is exposure, not
+  a brighter sun.
+- **Night ground.** The old haze veiled the ground blue-grey even close by;
+  clear air leaves moonlit ground its own colour. If it reads as too bright or
+  too colourful, the knob is the moonlight (an authored 0.32), not the haze.
+- **Texture units.** With the flag on, the terrain program uses 16 texture
+  samplers (15 without): the sky table it reads for water reflections adds one.
+  16 is the most WebGL2 guarantees and what Safari offers, so any further
+  texture on the terrain material under this flag will fail to compile on the
+  iPhone. If that happens, water should reflect the environment map instead of
+  reading the sky table.
 
 ### Fix — `CLOUD_CALM` (your low-altitude cloud report)
 

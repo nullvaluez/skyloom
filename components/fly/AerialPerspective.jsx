@@ -75,6 +75,9 @@ import { LIVING_AIR_GLSL } from '@/lib/fly/living-atmosphere';
 import { getR25Sky, registerAerialStrengthReader } from '@/lib/fly/r25-sky';
 import { R25_SKY_GLSL_DECL, R25_SKY_GLSL_FUNCS, SKY_ROWS, writeSkyUniforms } from '@/lib/fly/sky-model';
 import { trueRayGLSL, trueScaleShader } from '@/lib/fly/true-scale';
+import { ATMO_AERIAL_LOOKUP_GLSL } from '@/lib/fly/atmosphere/glsl';
+import { physSkyShader, physWeatherExtinction } from '@/lib/fly/atmosphere/runtime';
+import { PHYS_SKY_TEXT_ACTIVE } from '@/lib/fly/cinema-sky';
 
 /**
  * Module-scope frame state. One satellite scene exists at a time, so a plain
@@ -525,7 +528,33 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth,
  * directly, and the sky the haze melts into is looked up on the TRUE ray. k0
  * comes from the basis the pass is already fed (its Y row has length 1/k0).
  */
-const enhancedFragmentShaderTS = trueScaleShader('aerial-enhanced', enhancedFragmentShader, [
+/**
+ * PHYS_SKY (lib/fly/atmosphere/): in Enhanced the haze becomes the physical
+ * aerial-perspective volume along the true metric ray (at night it carries the
+ * night sky's floor, pskyNightAir), the weather's own extinction (fog,
+ * overcast) rides on top through the living-air law, and the finite world
+ * still melts into the exact sky behind it. Asserted edits on the
+ * base text, before TRUE_SCALE's (whose anchors they leave intact); flag off or
+ * any miss = the text above, unchanged.
+ */
+const enhancedFragmentShaderPhys = physSkyShader('aerial-enhanced', enhancedFragmentShader, [
+  ['uniform vec2 uR25WorldFade;\n', `uniform vec2 uR25WorldFade;\n${ATMO_AERIAL_LOOKUP_GLSL}`],
+  [
+    '    outputColor=vec4((inputColor.rgb*transmittance+haze*(1.-transmittance))*uR25Exposure,inputColor.a);\n',
+    `    if(uCinema>.5){
+      vec3 apS,apT,apDir=normalize(metricRay);
+      pskyAerial(apDir,length(metricRay)*.001,apS,apT);
+      vec3 lit=inputColor.rgb*apT+apS*uPskySunIllum+pskyNightAir(apDir)*(1.-apT);
+      lit=lit*transmission+haze*(1.-transmission);
+      if(uR25Mode.x>.5)lit=mix(lit,haze,smoothstep(uR25WorldFade.x,uR25WorldFade.y,dXZ));
+      outputColor=vec4(lit*uR25Exposure,inputColor.a);
+      return;
+    }
+    outputColor=vec4((inputColor.rgb*transmittance+haze*(1.-transmittance))*uR25Exposure,inputColor.a);\n`,
+  ],
+]);
+
+const enhancedFragmentShaderTS = trueScaleShader('aerial-enhanced', enhancedFragmentShaderPhys, [
   ['uniform vec4 uR25Mode;', `uniform vec4 uR25Mode;${trueRayGLSL('vec3(uCamRight.y,uCamUp.y,uCamZ.y)')}`],
   ['vec3 viewRay = ( world - uCamPos ) / max( dist, 1.0e-4 );', 'vec3 viewRay = normalize( world - uCamPos );'],
   ['haze=cinemaSky(normalize(vec3(viewRay.x,viewRay.y+uR25SkyP.y,viewRay.z)));', 'haze=cinemaSky(tsTrueRay(normalize(vec3(viewRay.x,viewRay.y+uR25SkyP.y,viewRay.z))));'],
@@ -655,7 +684,8 @@ export class AerialPerspectiveEffect extends Effect {
     u.get('uMaxMix').value = s.strength;
     u.get('uLivingAir').value.fromArray(s.livingAir);
     if(this._r25&&CINEMA_UNIFORMS.uCinema.value>.5){
-      u.get('uLivingAir').value.z=cinemaEnvironment.extinction;u.get('uLivingAir').value.w=cinemaEnvironment.heightM;
+      // PHYS_SKY: the physical volume carries clear air; the law adds weather only.
+      u.get('uLivingAir').value.z=PHYS_SKY_TEXT_ACTIVE?physWeatherExtinction(cinemaEnvironment):cinemaEnvironment.extinction;u.get('uLivingAir').value.w=cinemaEnvironment.heightM;
       u.get('uMaxMix').value=.55;
     }
     // R24 C (LINEAR_HAZE): Color.setRGB's default colorSpace is the WORKING
@@ -701,5 +731,7 @@ export class AerialPerspectiveEffect extends Effect {
       uR25VeilZ: u.get('uR25VeilZ'),
     });
     writeSkyUniforms(sky.model, holders);
+    // PHYS_SKY: the physical sky has its own horizon, so its rays carry no dip.
+    if (PHYS_SKY_TEXT_ACTIVE && CINEMA_UNIFORMS.uCinema.value > 0.5) holders.uR25SkyP.value.y = 0;
   }
 }

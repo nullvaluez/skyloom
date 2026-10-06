@@ -3,8 +3,14 @@ import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { BackSide, CubeUVReflectionMapping, HalfFloatType, Mesh, OrthographicCamera, PlaneGeometry, PMREMGenerator, Scene, ShaderMaterial, SphereGeometry, WebGLRenderTarget } from 'three';
 import { CINEMA_GLSL, CINEMA_UNIFORMS, cinemaEnvironment } from '@/lib/fly/cinema-frame';
+import { PHYS_SKY_TEXT_ACTIVE } from '@/lib/fly/cinema-sky';
 import { isMobileGraphicsClass } from '@/lib/fly/device-class';
 import {registerCinemaResources} from '@/lib/fly/cinema-resources';
+
+// PHYS_SKY: the lower hemisphere is lit ground (albedo x sun + sky
+// irradiance) instead of a near-black fill, which lit the aircraft bellies
+// at 5% of the horizon. Flag off: the legacy text, unchanged.
+const LOWER_HEMISPHERE = PHYS_SKY_TEXT_ACTIVE ? 'uPskyGround' : 'uCinemaFill*.045';
 
 /** A fixed-size, owned environment. Visible sky and IBL evaluate identical radiance. */
 export function CinemaEnvironmentRig({runtime}) {
@@ -14,7 +20,7 @@ export function CinemaEnvironmentRig({runtime}) {
     const sky=new Scene(),geometry=new SphereGeometry(10,24,12);
     const material=new ShaderMaterial({side:BackSide,depthWrite:false,toneMapped:false,uniforms:CINEMA_UNIFORMS,
       vertexShader:'varying vec3 direction; void main(){direction=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-      fragmentShader:`varying vec3 direction;${CINEMA_GLSL}\nvoid main(){vec3 ray=normalize(direction);vec3 c=cinemaSky(ray);if(ray.y<0.)c=mix(c,uCinemaFill*.045,1.-smoothstep(-.55,0.,ray.y));gl_FragColor=vec4(c,1.);}`});
+      fragmentShader:`varying vec3 direction;${CINEMA_GLSL}\nvoid main(){vec3 ray=normalize(direction);vec3 c=cinemaSky(ray);if(ray.y<0.)c=mix(c,${LOWER_HEMISPHERE},1.-smoothstep(-.55,0.,ray.y));gl_FragColor=vec4(c,1.);}`});
     sky.add(new Mesh(geometry,material));
     const pmrem=new PMREMGenerator(gl),blendScene=new Scene(),camera=new OrthographicCamera(-1,1,1,-1,0,1);
     const quadGeometry=new PlaneGeometry(2,2),blend=new ShaderMaterial({depthTest:false,depthWrite:false,toneMapped:false,

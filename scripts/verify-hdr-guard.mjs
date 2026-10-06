@@ -61,9 +61,10 @@ check('(1) flag off (default): composite text untouched', HDR_GUARD_ACTIVE.enabl
   const count = src.split(OUT).length - 1;
   const ok =
     count === 1 &&
-    // TRUE_SCALE (Phase 1) wraps the text first; the guard is still the last word.
+    // TRUE_SCALE (Phase 1) and PHYS_SKY (Phase 2) wrap the text first; the
+    // guard is still the last word.
     /this\.compositeMaterial=material\(hdrGuarded\((tsComposite\('cloud-composite',)?composite\)?\)\);/.test(src) &&
-    /composite:material\(hdrGuarded\((tsComposite\('cloud-composite-r25',)?compositeR25\)?\)\)/.test(src);
+    /composite:material\(hdrGuarded\((tsComposite\('cloud-composite-r25',)?(physComposite\()?compositeR25\)?\)?\)\)/.test(src);
   check('(3) both composite materials go through hdrGuarded(); anchor present once', ok, `anchor count ${count}`);
 }
 
