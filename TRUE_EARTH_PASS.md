@@ -216,6 +216,23 @@ feed does, so clouds, fog, rain and snow all follow.
 6. **iPhone:** the panel fits in the Settings sheet and above the photo pill,
    and the slider is easy to drag.
 
+### A defect this pass caused, and its fix
+
+`TRUE_AREAS` (`42c9ed7`) crashed every vector-tile worker in production
+builds, so buildings, roads, the skyline and vegetation failed to load in
+**every** build of `main` from `42c9ed7` until the fix. Flag state made no
+difference: the crash happened when the module loaded. The cause: Next.js
+compiles `typeof window` to `"object"` in client bundles, web workers included,
+so `pinned()`'s bare guard disappeared, and the module-scope read in
+`lib/fly/true-areas.js` threw `window is not defined` in all six workers. Node
+does not apply that transform, so every node gate stayed green. The CONDITIONS
+browser smoke caught it.
+
+`pinned()` now reads `globalThis.window`, which the transform leaves alone and
+which a worker simply lacks. The new `scripts/verify-worker-window.mjs` loads
+both workers in node under the same rewrite and builds fixture tiles in them;
+it is red on the old code and green now. It joins the pre-push checks.
+
 ### Found along the way (pre-existing, not caused by this pass)
 
 - This container's clone is shallow; history-dependent gates need
@@ -321,6 +338,8 @@ concrete defects. These are your decisions:
   - scoped `npx eslint <changed files>`;
   - that phase's node checks;
   - `node scripts/verify-import-integrity.mjs`;
+  - `FLY_TILE_FIXTURE=1 node scripts/verify-worker-window.mjs` (workers load and build
+    under the Next.js `typeof window` rewrite);
   - the isolated build:
     `FLY_BUILD_DIR=.next-trueearth node node_modules/next/dist/bin/next build --webpack`.
 - **One record document, `TRUE_EARTH_PASS.md`.** Per phase it lists what landed, the
