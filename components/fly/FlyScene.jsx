@@ -3,6 +3,7 @@ import { connectFlightOperations } from '@/lib/fly/operations-runtime';
 import { reviewSurfaceOn } from '@/lib/fly/player-surface';
 import { setTrueScaleK, toSceneDir } from '@/lib/fly/true-scale';
 import { conditionsOn, conditionsSunTime, publishConditions, solarHour } from '@/lib/fly/player-conditions';
+import { cloudCalmOn, hazeGroundY, stepHazeGround } from '@/lib/fly/cloud-calm';
 import { FlightOperations } from '@/lib/fly/flight-operations';
 import { AirportOperationsLayer } from './AirportOperationsLayer';
 
@@ -2464,6 +2465,9 @@ export function FlyScene({ runtime }) {
     // Publish once before both the aerial feed and material consumers read it.
     setCinemaRenderScale(gl.getPixelRatio());
     updateCinemaFrame(runtime,flyState,dt);
+    // CLOUD_CALM: one damped haze ground per frame, read by the aerial pass
+    // (below) and the cloud composite; off = the raw ground, untouched.
+    if (cloudCalmOn()) stepHazeGround((runtime.hazeGround ??= {}), flight.groundElev, flyState.warpEpoch, dt);
     runtime.cinemaProfile=cinemaOn(flyState)?cinemaProfile(flyState.qualityTier):null;
     updateDaylightDepth(runtime, flyState.mapStyle === 'satellite');
     const cinematicScale = flyState.mapStyle === 'satellite' && satelliteVisualsOn('scale');
@@ -2731,7 +2735,7 @@ export function FlyScene({ runtime }) {
         _aerialFeed.bendCx = bnd.cx;
         _aerialFeed.bendCz = bnd.cz;
         _aerialFeed.bendK = bnd.k;
-        _aerialFeed.groundY = flight.groundElev;
+        _aerialFeed.groundY = hazeGroundY(runtime, flight.groundElev);
         _aerialFeed.livingAir = !lawOn && immersiveOn('lighting')
           ? livingAirProfile(wx, flight.latDeg) : null;
         setAerial(_aerialFeed);

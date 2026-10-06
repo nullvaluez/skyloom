@@ -45,6 +45,7 @@ A flag's default flips to `true` in its own one-line commit after its run list p
 | `TRUE_SCALE` | 1 | off | True proportions in Enhanced: mountains, buildings and aircraft stop being squashed by cos(latitude) (×1.31 taller at 40°N, ×1.44 in the Alps, ×2 at 60°N). The camera alone carries the correction; physics, collisions, culling, LOD, picking and HUD numbers are untouched | `verify-true-scale.mjs` 14/14; fixture A/B in SwiftShader |
 | `TRUE_AREAS` | 1b | off | Building footprint filters judge the same house the same way at every latitude (normalised to 40°N, where they were tuned): small homes stop vanishing near the equator, big halls stop going flat in the far north. Ohio and New York stay within 2% | `verify-true-areas.cjs` 7/7 (needs `FLY_TILE_FIXTURE=1`), `verify-seam` PASS |
 | `CONDITIONS` | 2 | off | A time-of-day slider and weather presets (Clear, Scattered, Overcast, Rain, Snow, Fog) in Pause, the title Settings sheet and the photo bar. Live by default; a pick lasts for the session; a time change glides over 1.5 s. Harness pins and curated Adventures still win | `verify-conditions.mjs` 6/6 |
+| `CLOUD_CALM` | fix | off | Steadier clouds and haze when flying low (your report). The haze over terrain and in front of the clouds is measured from a damped ground instead of the raw ground under the aircraft, and the cloud noise moves with the cloud base, so the deck shifts as a whole instead of re-forming | `verify-cloud-calm.mjs` 6/6 |
 
 Shipped without a flag (no look change): OpenStreetMap / OpenMapTiles / OpenFreeMap
 credits and the live ADS-B feed's name in the credit bar, title and photo exports
@@ -215,6 +216,42 @@ feed does, so clouds, fog, rain and snow all follow.
    own conditions, and the controls should be disabled.
 6. **iPhone:** the panel fits in the Settings sheet and above the photo pill,
    and the slider is easy to drag.
+
+### Fix — `CLOUD_CALM` (your low-altitude cloud report)
+
+You reported clouds that glitch at lower altitudes, with a texture that keeps
+changing. The cloud shaders are byte-identical to the tree before this pass, so
+this is older behaviour, not a regression. Two mechanisms in the code fit, and
+both are strongest near the ground:
+
+- **The haze stepped.** The haze over the terrain and in front of the clouds
+  measured heights from the raw ground under the aircraft. Low over hills that
+  reference keeps moving, and when a finer elevation tile loads under you it
+  jumps (a fixture boot showed 822 → 1,077 → 1,540 → 1,811 m in four frames).
+  At 300 m above the ground, a 300 m jump changes the haze in front of a cloud
+  12 km away by 3.8% in one frame. With the flag on, the reference is damped
+  (8 s), and the same jump moves the haze by 0.007% that frame.
+- **The clouds re-formed in place.** The cloud base follows a regional ground
+  height that re-samples every 20 km and then eases for minutes, while the cloud
+  noise stayed fixed at absolute altitude. On the real noise volume, a 50–450 m
+  base shift re-forms 458 of 588 cloudy samples. With the flag on, the noise
+  moves with the base, so the deck shifts as a whole (4,000 of 4,000 samples
+  identical after a shift).
+
+The march itself was measured too (a node model of the shader, under climbs,
+level flight, turns, terrain-limited rays and flight inside the deck). It is
+stable to within 1.0–1.4× the true frame-to-frame change, so its sampling was
+left alone.
+
+**Run list (with `?flags=CLOUD_CALM`, compared with no flag):**
+1. Fly low (300–800 m above the ground) under broken cloud over hills, for
+   example the Sierra adventure. The clouds should hold their shape, and the
+   haze should stop pulsing as the ground under you changes.
+2. Fly 30–40 km in a straight line over rising terrain. The cloud deck may move
+   up or down slowly, but the clouds should not re-form.
+3. If anything still glitches, note whether it is a flicker, a shimmer or a
+   slow re-forming, whether you were turning, and the Quality tier shown in
+   `?diag=1`.
 
 ### A defect this pass caused, and its fix
 
