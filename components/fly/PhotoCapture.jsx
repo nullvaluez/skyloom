@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { PHOTO } from '@/lib/fly/fly-constants';
-import { ATTRIBUTIONS_BY_STYLE } from '@/lib/fly/tile-sources';
+import { attributionsFor } from '@/lib/fly/tile-sources';
 import { registerRuntimeActions } from '@/lib/fly/runtime-bus';
 import { useFlyStore } from '@/stores/fly-store';
 import { adventurePhotoFrame } from '@/lib/fly/adventure-photo';
@@ -132,7 +132,7 @@ function photoFilename() {
 /** Bottom-left credit plate: SKYLOOM over the active style's data credits. */
 function drawWatermark(ctx, w, h, mapStyle) {
   const wm = PHOTO.watermark;
-  const list = ATTRIBUTIONS_BY_STYLE[mapStyle] ?? ATTRIBUTIONS_BY_STYLE.satellite;
+  const list = attributionsFor(mapStyle, useFlyStore.getState().trafficSource);
   const credit = list.map((a) => a.label).join('  ·  ');
 
   // Scale with the export so a 4K capture doesn't get a 15px credit line and

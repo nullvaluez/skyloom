@@ -9,12 +9,19 @@ import path from 'node:path';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const { FLY_ASSETS } = await import(new URL('../lib/fly/assets.js', import.meta.url));
 
-// Mirrors TERRAIN_ATTRIBUTIONS in lib/fly/tile-sources.js (not importable
-// here without dragging three-tile into node) — update both on change.
+// Mirrors CREDITS_ATTRIBUTIONS in lib/fly/tile-sources.js (not importable
+// here without dragging three-tile into node) — update both on change;
+// scripts/verify-attribution.mjs fails while they differ.
 const TERRAIN_ATTRIBUTIONS = [
   { label: '© Esri, Maxar, Earthstar Geographics', href: 'https://www.esri.com/en-us/legal/terms/data-attributions' },
+  { label: '© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium', href: 'https://esa-worldcover.org/en/data-access' },
+  { label: '© OpenStreetMap contributors', href: 'https://www.openstreetmap.org/copyright' },
+  { label: '© OpenMapTiles', href: 'https://www.openmaptiles.org/' },
+  { label: 'Tiles © OpenFreeMap', href: 'https://openfreemap.org' },
   { label: 'Terrain © Esri', href: 'https://www.esri.com/en-us/legal/terms/data-attributions' },
   { label: 'Flight data © adsb.lol', href: 'https://adsb.lol' },
+  { label: 'Flight data © adsb.fi', href: 'https://adsb.fi' },
+  { label: 'Flight data © airplanes.live', href: 'https://airplanes.live' },
 ];
 
 const lines = [

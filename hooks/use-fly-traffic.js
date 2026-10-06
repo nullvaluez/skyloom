@@ -85,7 +85,9 @@ export function useFlyTraffic(runtime, enabled) {
       if (err && err !== 'serving_stale') return Math.max(TRAFFIC.pollIntervalMs, 6_000);
       return TRAFFIC.pollIntervalMs;
     },
-    refetchIntervalInBackground: true,
+    // TRUE EARTH: a hidden tab draws nothing, so polling it only spends the
+    // public feeds' rate budget. React Query refetches on return to the tab.
+    refetchIntervalInBackground: false,
     staleTime: 0,
     gcTime: 30_000,
     retry: false,
@@ -104,6 +106,7 @@ export function useFlyTraffic(runtime, enabled) {
     // Identical payloads share `now` — skip before paying the worker trip.
     if (typeof data.now !== 'number' || data.now === lastServerNow.current) return;
     lastServerNow.current = data.now;
+    if (data.source) useFlyStore.getState().setTrafficSource(data.source);
 
     let stale = false;
     workerApi.current

@@ -1,6 +1,6 @@
 'use client';
 
-import { ATTRIBUTIONS_BY_STYLE } from '@/lib/fly/tile-sources';
+import { attributionsFor } from '@/lib/fly/tile-sources';
 import { useFlyStore } from '@/stores/fly-store';
 import { Zone } from '../LayoutRoot';
 
@@ -25,7 +25,8 @@ import { Zone } from '../LayoutRoot';
  */
 export function AttributionBar() {
   const mapStyle = useFlyStore((s) => s.mapStyle);
-  const attributions = ATTRIBUTIONS_BY_STYLE[mapStyle] ?? ATTRIBUTIONS_BY_STYLE.satellite;
+  const trafficSource = useFlyStore((s) => s.trafficSource);
+  const attributions = attributionsFor(mapStyle, trafficSource);
   return (
     <Zone name="attribution">
       <div

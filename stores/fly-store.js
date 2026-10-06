@@ -86,6 +86,7 @@ const initialState = {
   trafficCount: 0,
   spotting: false,
   lastPollAt: null,
+  trafficSource: null,
   tileStats: { requested: 0, evicted: 0 },
 
   // Floating-origin rebase counter — bumped every ~10km for components with
@@ -197,6 +198,9 @@ export const useFlyStore = create(
 
     setTrafficStats: (trafficCount, lastPollAt) =>
       set({ trafficCount, lastPollAt }),
+    // TRUE EARTH: the feed that served the last traffic batch (credit line).
+    setTrafficSource: (trafficSource) =>
+      set((state) => (state.trafficSource === trafficSource ? state : { trafficSource })),
     setSpotting: (spotting) => set({spotting:!!spotting}),
 
     bumpRebaseEpoch: () =>

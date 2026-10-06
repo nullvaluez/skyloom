@@ -1,7 +1,7 @@
 'use client';
 
 import { FLY_ASSETS } from '@/lib/fly/assets';
-import { TERRAIN_ATTRIBUTIONS } from '@/lib/fly/tile-sources';
+import { CREDITS_ATTRIBUTIONS } from '@/lib/fly/tile-sources';
 
 /**
  * Credits & licenses (CC-BY requirement), rendered from the lib/fly/assets.js
@@ -44,7 +44,7 @@ export function CreditsPanel({ onClose }) {
         Map data &amp; imagery
       </h3>
       <ul className="mt-1 space-y-1 text-xs text-zinc-300">
-        {TERRAIN_ATTRIBUTIONS.map((t) => (
+        {CREDITS_ATTRIBUTIONS.map((t) => (
           <li key={t.label}>
             <a href={t.href} target="_blank" rel="noopener noreferrer" className="hover:underline">
               {t.label}

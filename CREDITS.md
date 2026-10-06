@@ -57,8 +57,14 @@
 ## Map data & imagery
 
 - © Esri, Maxar, Earthstar Geographics — https://www.esri.com/en-us/legal/terms/data-attributions
+- © ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium — https://esa-worldcover.org/en/data-access
+- © OpenStreetMap contributors — https://www.openstreetmap.org/copyright
+- © OpenMapTiles — https://www.openmaptiles.org/
+- Tiles © OpenFreeMap — https://openfreemap.org
 - Terrain © Esri — https://www.esri.com/en-us/legal/terms/data-attributions
 - Flight data © adsb.lol — https://adsb.lol
+- Flight data © adsb.fi — https://adsb.fi
+- Flight data © airplanes.live — https://airplanes.live
 
 ## Live flight data
 

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { BookOpen, Compass, Info, MapPin, Moon, Play, PlaneTakeoff, Settings, Sun, Sunrise, X } from 'lucide-react';
 import { useFlyStore } from '@/stores/fly-store';
 import { FRONT_DOOR } from '@/lib/fly/fly-constants';
-import { ATTRIBUTIONS_BY_STYLE } from '@/lib/fly/tile-sources';
+import { attributionsFor } from '@/lib/fly/tile-sources';
 import { OPERATIONS_AIRPORTS } from '@/lib/fly/operations-airports';
 import { CITIES } from '@/lib/fly/poi';
 import { FEATURED_DESTINATIONS, describeSetup, readLastSetup } from '@/lib/fly/flight-plan';
@@ -143,7 +143,8 @@ function TitleBody({ runtime }) {
   const firstAction = useRef(null);
   const rootRef = useRef(null);
   const attrRef = useRef(null);
-  const attributions = ATTRIBUTIONS_BY_STYLE[mapStyle] ?? ATTRIBUTIONS_BY_STYLE.satellite;
+  const trafficSource = useFlyStore((s) => s.trafficSource);
+  const attributions = attributionsFor(mapStyle, trafficSource);
 
   useEffect(() => {
     firstAction.current?.focus({ preventScroll: true });
