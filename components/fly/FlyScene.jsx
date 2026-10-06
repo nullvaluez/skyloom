@@ -116,7 +116,7 @@ import { Autopilot } from '@/lib/fly/autopilot';
 import { DEG2RAD, expApproach, expApproachAngle, mercatorScale, wrapAngle } from '@/lib/fly/coords';
 import { CrashSystem, respawnPose } from '@/lib/fly/crash-system';
 import { crashStakesOn } from '@/lib/fly/fly-settings';
-import { computeSun, moonDirFromSun, nightWeight } from '@/lib/fly/sun-model';
+import { computeSun, moonDirFromSun, nightWeight, SUN_TRUE_AZ_ACTIVE } from '@/lib/fly/sun-model';
 import { adventureSunTime } from '@/lib/fly/adventure-environment.mjs';
 import { installShadowKernel, shadowKernelState } from '@/lib/fly/shadow-kernel';
 import { trackSpotAttrs } from '@/lib/fly/spot-attrs';
@@ -1784,7 +1784,10 @@ export function FlyScene({ runtime }) {
       }
     };
     apply();
-    const id = setInterval(apply, SKY.dayCycle.refreshSec * 1000);
+    // SUN_TRUE_AZ: a 2 s cadence, so long golden-hour shadows no longer step
+    // once a minute. The flag-off cadence is the legacy 60 s.
+    const refreshSec = SUN_TRUE_AZ_ACTIVE.enabled ? SUN_TRUE_AZ_ACTIVE.refreshSec : SKY.dayCycle.refreshSec;
+    const id = setInterval(apply, refreshSec * 1000);
     return () => clearInterval(id);
   }, [mapStyle, warpEpochForSun, adventureEnvironmentEpoch, runtime, spawn]);
 
