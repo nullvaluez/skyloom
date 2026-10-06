@@ -27,7 +27,7 @@ A flag's default flips to `true` in its own one-line commit after its run list p
 |---|---|
 | 0 — Foundations, defects, diagnostics | **Built on `main` (2026-10-06); waiting on your run list** |
 | 1 — True proportions | **`TRUE_SCALE` and `TRUE_AREAS` built on `main` (2026-10-06), off by default; waiting on your run list** |
-| 2 — Atmosphere, horizon, conditions, shadows | Not started |
+| 2 — Atmosphere, horizon, conditions, shadows | **In progress: `CONDITIONS` built on `main` (2026-10-06), off by default; `PHYS_SKY`, `EARTH_HORIZON`, `NIGHT_LIGHTS` and `TERRAIN_SHADOW` not started** |
 | 3 — Take off and land anywhere | Not started |
 | 4 — Cinematic | Not started |
 | 5 — Cities and landmarks | Not started |
@@ -44,6 +44,7 @@ A flag's default flips to `true` in its own one-line commit after its run list p
 | `DEVICE_TIERS` | 0 | off | Start tier follows the GPU (discrete→high, integrated/unknown→medium, software→low); governor sheds clouds and render scale before dropping shadow cascades (which recompile every lit shader) | `verify-device-tiers.mjs` 5/5 |
 | `TRUE_SCALE` | 1 | off | True proportions in Enhanced: mountains, buildings and aircraft stop being squashed by cos(latitude) (×1.31 taller at 40°N, ×1.44 in the Alps, ×2 at 60°N). The camera alone carries the correction; physics, collisions, culling, LOD, picking and HUD numbers are untouched | `verify-true-scale.mjs` 14/14; fixture A/B in SwiftShader |
 | `TRUE_AREAS` | 1b | off | Building footprint filters judge the same house the same way at every latitude (normalised to 40°N, where they were tuned): small homes stop vanishing near the equator, big halls stop going flat in the far north. Ohio and New York stay within 2% | `verify-true-areas.cjs` 7/7 (needs `FLY_TILE_FIXTURE=1`), `verify-seam` PASS |
+| `CONDITIONS` | 2 | off | A time-of-day slider and weather presets (Clear, Scattered, Overcast, Rain, Snow, Fog) in Pause, the title Settings sheet and the photo bar. Live by default; a pick lasts for the session; a time change glides over 1.5 s. Harness pins and curated Adventures still win | `verify-conditions.mjs` 6/6 |
 
 Shipped without a flag (no look change): OpenStreetMap / OpenMapTiles / OpenFreeMap
 credits and the live ADS-B feed's name in the credit bar, title and photo exports
@@ -188,6 +189,32 @@ latitude on and off agree, and flag-off output is byte-identical.
 2. **Far north** — industrial edges of Oslo or Helsinki: large halls stay 3D
    instead of flattening into the ground.
 3. **Home** — Columbus or Manhattan: nothing should change.
+
+### Phase 2 — `CONDITIONS` (time and weather picker)
+
+One resolver, `lib/fly/player-conditions.js`, decides the sun clock and the
+weather, highest first: harness pins (`?sunUtc=`, `?weather=`, so every gate stays
+deterministic), a curated Adventure's own conditions, the player's pick, then
+Live. The time is a **local solar hour** (what the light depends on) applied at
+the aircraft's longitude on today's date, so 07:00 means sunrise light wherever
+you fly, and it stays that hour after a warp. With no pick the sun runs on the
+real clock bit for bit. Weather presets feed the same weather model the live
+feed does, so clouds, fog, rain and snow all follow.
+
+**Run list (with `?flags=CONDITIONS`, best with `TWILIGHT_FIX,SUN_TRUE_AZ`):**
+1. **Pause → Conditions:** drag the time from noon to 20:00. The sun should
+   glide down over about a second and a half, not jump.
+2. **Live:** press Live. The sun glides back to the real time and the label
+   follows the clock.
+3. **Weather:** try each preset. The change should arrive, not cut: fog and
+   light within about 5 s, the cloud deck over about 10 s, rain or snow within
+   about 2 s (Medium tier and up). Live returns to the real weather.
+4. **Photo mode** (P): open the cloud-and-sun button. Golden hour plus Scattered
+   should make a good shot.
+5. **Curated Adventure:** start one. The panel should say the adventure sets its
+   own conditions, and the controls should be disabled.
+6. **iPhone:** the panel fits in the Settings sheet and above the photo pill,
+   and the slider is easy to drag.
 
 ### Found along the way (pre-existing, not caused by this pass)
 

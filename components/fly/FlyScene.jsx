@@ -2,6 +2,7 @@
 import { connectFlightOperations } from '@/lib/fly/operations-runtime';
 import { reviewSurfaceOn } from '@/lib/fly/player-surface';
 import { setTrueScaleK, toSceneDir } from '@/lib/fly/true-scale';
+import { conditionsOn, conditionsSunTime, publishConditions, solarHour } from '@/lib/fly/player-conditions';
 import { FlightOperations } from '@/lib/fly/flight-operations';
 import { AirportOperationsLayer } from './AirportOperationsLayer';
 
@@ -1717,7 +1718,19 @@ export function FlyScene({ runtime }) {
       }
       const lon = runtime.geo?.x ?? spawn?.lon ?? 0;
       const lat = runtime.geo?.y ?? spawn?.lat ?? 0;
-      const t = adventureSunTime(runtime.adventureEnvironment,Date.now(),typeof window !== 'undefined' ? window.__flySunOverride : undefined);
+      const sunPin = typeof window !== 'undefined' ? window.__flySunOverride : undefined;
+      let t;
+      let easing = false;
+      if (conditionsOn()) {
+        // TRUE EARTH (CONDITIONS): pin > curated Adventure > the player's
+        // pick (gliding) > Live. Live with no glide is Date.now() exactly.
+        const c = conditionsSunTime(runtime.adventureEnvironment, Date.now(), sunPin, lon, useFlyStore.getState().conditionsHour);
+        t = c.tMs;
+        easing = c.easing;
+        publishConditions(solarHour(t, lon), runtime.adventureEnvironment?.mode === 'curated');
+      } else {
+        t = adventureSunTime(runtime.adventureEnvironment,Date.now(),sunPin);
+      }
       const sun = computeSun(lon, lat, t);
       const frac =
         SKY.dayCycle.minSunFrac + (1 - SKY.dayCycle.minSunFrac) * sun.frac;
@@ -1784,13 +1797,40 @@ export function FlyScene({ runtime }) {
         (window.__flyStats ??= {}).sunFactor = sun.frac;
         window.__flyHill = { get: getHillshade, set: setHillshade };
       }
+      return easing;
     };
-    apply();
+    const easingNow = apply();
     // SUN_TRUE_AZ: a 2 s cadence, so long golden-hour shadows no longer step
     // once a minute. The flag-off cadence is the legacy 60 s.
     const refreshSec = SUN_TRUE_AZ_ACTIVE.enabled ? SUN_TRUE_AZ_ACTIVE.refreshSec : SKY.dayCycle.refreshSec;
     const id = setInterval(apply, refreshSec * 1000);
-    return () => clearInterval(id);
+    // CONDITIONS: a time pick glides, so while it does the sun is re-solved
+    // at 20 Hz; the slow cadence above takes over again when it lands. A glide
+    // this effect inherits (a warp mid-glide re-runs it) keeps gliding.
+    let glide = null;
+    const glideOn = () => {
+      if (glide) return;
+      glide = setInterval(() => {
+        if (!apply()) {
+          clearInterval(glide);
+          glide = null;
+        }
+      }, 50);
+    };
+    if (easingNow) glideOn();
+    const unsubscribe = conditionsOn()
+      ? useFlyStore.subscribe(
+          (st) => st.conditionsHour,
+          () => {
+            if (apply()) glideOn();
+          }
+        )
+      : null;
+    return () => {
+      clearInterval(id);
+      if (glide) clearInterval(glide);
+      unsubscribe?.();
+    };
   }, [mapStyle, warpEpochForSun, adventureEnvironmentEpoch, runtime, spawn]);
 
   // Round 16: a warp is a CUT, not a journey — damping the weather across it

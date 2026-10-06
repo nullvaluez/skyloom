@@ -11,6 +11,7 @@ import {
 import { settleOn, sinceRevealMs } from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
 import { adventureWeather } from '@/lib/fly/adventure-environment.mjs';
+import { conditionsOn, playerWeatherPayload } from '@/lib/fly/player-conditions';
 
 // Round 16 "Living World" — real weather at the player's position.
 //
@@ -79,7 +80,10 @@ function refreshWeatherTargets(runtime) {
   if (!payload && WEATHER.fallback === 'procedural' && runtime.geo) {
     payload = proceduralWeather(runtime.geo.y, runtime.geo.x, Date.now(), WEATHER);
   }
-  computeTargets(adventureWeather(runtime.adventureEnvironment,payload), WEATHER, w.targets);
+  // TRUE EARTH (CONDITIONS): the player's preset outranks Live but not a
+  // curated Adventure (adventureWeather) or a harness pin (computeTargets).
+  const picked = conditionsOn() ? playerWeatherPayload(useFlyStore.getState().conditionsWeather) : null;
+  computeTargets(adventureWeather(runtime.adventureEnvironment, picked ?? payload), WEATHER, w.targets);
   w.state = w.targets.state;
 
   const s = devStats();

@@ -123,6 +123,12 @@ const initialState = {
   // engine code can subscribe without React.
   visuals: 'classic',
   visualsEpoch: 0,
+
+  // --- TRUE EARTH (CONDITIONS): the player's pick, session only. null = Live.
+  // conditionsHour is a local SOLAR hour (0..24); conditionsWeather is a
+  // lib/fly/player-conditions.js WEATHER_PRESETS id.
+  conditionsHour: null,
+  conditionsWeather: null,
 };
 
 /**
@@ -223,6 +229,11 @@ export const useFlyStore = create(
     setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
     setVisuals: (visuals) =>
       set((state) => (state.visuals === visuals ? {} : { visuals, visualsEpoch: state.visualsEpoch + 1 })),
+
+    // TRUE EARTH (CONDITIONS): null returns to Live.
+    setConditionsHour: (conditionsHour) =>
+      set({ conditionsHour: Number.isFinite(conditionsHour) ? ((conditionsHour % 24) + 24) % 24 : null }),
+    setConditionsWeather: (conditionsWeather) => set({ conditionsWeather: conditionsWeather || null }),
 
     addTileStats: (requested = 0, evicted = 0) =>
       set((state) => ({

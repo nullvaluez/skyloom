@@ -12,6 +12,8 @@ import { CRASH } from '@/lib/fly/fly-constants';
 import { immersiveOn, readReducedMotion, saveReducedMotion } from '@/lib/fly/immersive';
 import { visualsAvailable, saveVisuals, setVisualsLive } from '@/lib/fly/visuals-profile';
 import { GuestSaveControls } from './GuestSaveControls';
+import { ConditionsPanel } from './ConditionsPanel';
+import { conditionsOn } from '@/lib/fly/player-conditions';
 
 const TIERS = ['low', 'medium', 'high', 'ultra'];
 const VISUALS_ROW = [
@@ -137,6 +139,9 @@ export function SettingsRows({ sheet = false }) {
     </div>
   );
 
+  // TRUE EARTH (CONDITIONS): time of day and weather; absent with the flag off.
+  const conditionsRow = conditionsOn() && <ConditionsPanel key="conditions" />;
+
   const soundRow = (
     <MenuButton
       key="sound"
@@ -203,6 +208,7 @@ export function SettingsRows({ sheet = false }) {
       {visualsRow}
       {mapStyleRow}
       {qualityRow}
+      {conditionsRow}
       {soundRow}
       {reducedRow}
       {stakesRow}
@@ -214,6 +220,7 @@ export function SettingsRows({ sheet = false }) {
       {visualsRow}
       {qualityRow}
       {mapStyleRow}
+      {conditionsRow}
       {soundRow}
       {reducedRow}
       {stakesRow}

@@ -1,10 +1,12 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import { Camera, X } from 'lucide-react';
+import { Camera, CloudSun, X } from 'lucide-react';
 import { CARD_THEME } from './inspect/inspect-tokens';
 import { callRuntimeAction } from '@/lib/fly/runtime-bus';
 import { useFlyStore } from '@/stores/fly-store';
+import { conditionsOn } from '@/lib/fly/player-conditions';
+import { ConditionsPanel } from './ConditionsPanel';
 
 /**
  * Round 17 — the photo-mode chrome: a single bottom-center pill, mounted only
@@ -23,6 +25,7 @@ export function PhotoModeBar() {
   const active = useFlyStore((s) => s.cameraMode === 'photo');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
+  const [conditionsOpen, setConditionsOpen] = useState(false);
   const noteTimer = useRef(null);
 
   const flash = useCallback((msg) => {
@@ -87,6 +90,16 @@ export function PhotoModeBar() {
       data-testid="photo-bar"
       className="pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2 select-none max-sm:bottom-[calc(env(safe-area-inset-bottom)+1rem)] phone:bottom-[calc(env(safe-area-inset-bottom)+1rem)]"
     >
+      {/* TRUE EARTH (CONDITIONS): time and weather for the shot, above the
+          pill so the pill itself stays short of the credit bar. */}
+      {conditionsOn() && conditionsOpen && (
+        <div
+          className="hud-flat-phone pointer-events-auto absolute bottom-full left-1/2 mb-2 w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl border p-1 backdrop-blur-sm"
+          style={{ background: `linear-gradient(180deg, ${CARD_THEME.bgTop}, ${CARD_THEME.bgBottom})`, borderColor: CARD_THEME.edge }}
+        >
+          <ConditionsPanel compact />
+        </div>
+      )}
       <div
         className="hud-flat-phone pointer-events-auto flex items-center gap-2 rounded-2xl border px-2 py-2 backdrop-blur-sm"
         style={{
@@ -125,6 +138,21 @@ export function PhotoModeBar() {
         >
           {note || 'drag to orbit'}
         </span>
+
+        {conditionsOn() && (
+          <button
+            type="button"
+            onClick={() => setConditionsOpen((v) => !v)}
+            data-testid="photo-conditions"
+            aria-label="Time and weather"
+            aria-pressed={conditionsOpen}
+            title="Time and weather"
+            className="flex h-11 w-11 items-center justify-center rounded-xl transition-colors"
+            style={{ background: CARD_THEME.panel, color: CARD_THEME.ice }}
+          >
+            <CloudSun className="h-5 w-5" aria-hidden="true" />
+          </button>
+        )}
 
         <button
           type="button"
