@@ -26,7 +26,7 @@ A flag's default flips to `true` in its own one-line commit after its run list p
 | Phase | State |
 |---|---|
 | 0 — Foundations, defects, diagnostics | **Built on `main` (2026-10-06); waiting on your run list** |
-| 1 — True proportions | Next |
+| 1 — True proportions | **`TRUE_SCALE` and `TRUE_AREAS` built on `main` (2026-10-06), off by default; waiting on your run list** |
 | 2 — Atmosphere, horizon, conditions, shadows | Not started |
 | 3 — Take off and land anywhere | Not started |
 | 4 — Cinematic | Not started |
@@ -42,6 +42,8 @@ A flag's default flips to `true` in its own one-line commit after its run list p
 | `LOAD_GUARD` | 0 | off | Provider-empty (ocean) tiles count as ready; vendored three-tile patch R26-1 ends the endless re-update; hard limits 20 s boot / 15 s warp | `verify-load-guard.mjs` 4/4, `verify-vendor-three-tile` 34/34 |
 | `PLAYER_SURFACE` | 0 | off | Players see one look: no Visuals/Map-style rows, no review warps, no neon warp confetti; saved Neon/Classic migrates once. Review (`?graphicsReview=1`) and automation keep everything | `verify-player-surface.mjs` 5/5 |
 | `DEVICE_TIERS` | 0 | off | Start tier follows the GPU (discrete→high, integrated/unknown→medium, software→low); governor sheds clouds and render scale before dropping shadow cascades (which recompile every lit shader) | `verify-device-tiers.mjs` 5/5 |
+| `TRUE_SCALE` | 1 | off | True proportions in Enhanced: mountains, buildings and aircraft stop being squashed by cos(latitude) (×1.31 taller at 40°N, ×1.44 in the Alps, ×2 at 60°N). The camera alone carries the correction; physics, collisions, culling, LOD, picking and HUD numbers are untouched | `verify-true-scale.mjs` 14/14; fixture A/B in SwiftShader |
+| `TRUE_AREAS` | 1b | off | Building footprint filters judge the same house the same way at every latitude (normalised to 40°N, where they were tuned): small homes stop vanishing near the equator, big halls stop going flat in the far north. Ohio and New York stay within 2% | `verify-true-areas.cjs` 7/7 (needs `FLY_TILE_FIXTURE=1`), `verify-seam` PASS |
 
 Shipped without a flag (no look change): OpenStreetMap / OpenMapTiles / OpenFreeMap
 credits and the live ADS-B feed's name in the credit bar, title and photo exports
@@ -89,6 +91,104 @@ credits and the live ADS-B feed's name in the credit bar, title and photo export
 8. **Credits.** On a phone, check the credit bar (now one line longer) does not
    collide with the joystick or the compass button.
 
+### Phase 1 — what `TRUE_SCALE` does, and what to look for
+
+**Mechanism.** The scene's horizontal axes are Web-Mercator units (true metres ×
+k, k = 1/cos latitude) while heights are metres, so everything rendered k times
+too flat. With the flag on, the camera's world matrix becomes T(p)·S⁻¹·R′ with
+S = diag(1, k0, 1) at the player's latitude (`lib/fly/true-scale.js`): the GPU
+sees the world k0 times taller, i.e. a uniformly scaled, true-proportioned copy
+of it. Nothing that thinks in scene units changes — flight model, AGL, crashes,
+runway contact, culling, three-tile LOD, click-to-inspect, HUD labels. Active
+only in Enhanced satellite (k0 = 1 elsewhere, which is three's own camera).
+
+**What had to follow the camera** (each one gated, each one `k0 = 1`-exact):
+- Lights: the sun light and the shadow cascades travel along S⁻¹·(true sun) —
+  a parallel projection in scene units is exactly the true one after S.
+- three's env-map chunks (reflections, irradiance) and the app's own shaders
+  that look at the sky: the cloud march and composite (sky, sun disc, moon,
+  phase functions), the aerial haze, terrain and satellite water, aircraft
+  vapor, tracer glints, and the Enhanced terrain relief normal (lit at its true
+  steepness). Every edit is anchored and all-or-nothing per program; the device
+  report lists each one (`trueScale.shaders`).
+- The coastal reflection camera (same anisotropic view, mirrored).
+- Camera-facing pieces: far-traffic dots, POI letters, contrails, vapor and
+  tracer ribbons (they face the eye in true space).
+- Metre-authored instances widened by k so they keep their shape: trees, cars
+  and street poles, harbour boats, steam plumes, procedural landmarks and the
+  marquee models; city glows, porch lights and airport beacons keep their
+  on-screen shape.
+
+**Known and accepted for now.**
+- The mini-globe reads about k0× more curved (it is now drawn at its true 1,000
+  km radius; before, the squash flattened it). Phase 2's EARTH_HORIZON replaces
+  that radius with the real Earth.
+- Haze looking steeply down is up to k0× thicker (it measures view distance);
+  Phase 2's atmosphere replaces it.
+- Ambient occlusion still works in scene units; rain falls in a k0× taller
+  volume (the drops themselves are fine); Neon/Classic, the toy depth of field
+  and the Classic sprite clouds are not converted (TRUE_SCALE is inactive there).
+- The chase rigs already authored their offsets in true metres, so the camera
+  now sits at its designed angle: a little higher behind the aircraft than you
+  are used to. Tell me if you want it lower.
+
+**What the container verified.** The node gate proves the matrix contract (the
+anisotropic view of the scene equals a rigid camera viewing the true-scaled world,
+culling and picking agree with it, lights and env lookups arrive at true angles,
+billboards stay square, ribbons face the eye) and builds the app's own programs
+with the flag on and off. In SwiftShader on the offline Sierra fixture
+(k0 = 1.245), the flag-on build applied all ten shader edits, compiled with no
+shader errors, and rendered the same frame as flag-off except for proportions: the
+aircraft and the hills stand taller, sky, clouds and haze unchanged. How it looks
+and how fast it runs is yours to judge.
+
+### Owner run list (Phase 1)
+
+Free Flight, Enhanced. For each place, compare `/?flags=TRUE_SCALE` with no flag
+(Atlas search finds them all):
+
+1. **Alps** — Zermatt / the Matterhorn (k0 1.44): the peaks should stand much
+   taller; valleys deeper; no seams or swimming in the terrain while turning.
+2. **Rockies** — Aspen / Maroon Bells (k0 1.29).
+3. **Norway at 60°N** — Bergen or the Hardangerfjord (k0 2.0, the strongest
+   case): fjord walls should be steep, not rolling hills.
+4. **Equator control** — Quito or Mount Kenya (k0 ≈ 1.0): nothing should change.
+5. **Sydney** — buildings and the bridge in proportion; shadows (with
+   `SUN_TRUE_AZ`) fall the right way and are as long as the sun's height says.
+6. **Your aircraft** — chase view: the plane no longer looks squat; contrails and
+   vapor stay ribbons (not slivers) from every angle; far traffic dots stay round.
+7. **Click-to-inspect** a few airliners, and check the HUD labels sit on them.
+8. **One takeoff and landing at KCMH** with the flag on.
+9. **Performance** — the `?diag=1` benchmark with and without the flag on the
+   5080 and the iPhone (expected: no measurable difference).
+
+### Phase 1b — `TRUE_AREAS`
+
+The vector-tile worker gates buildings by footprint area in Mercator square
+units (k² × true m²), so the same 100 m² house is 170 "m²" at 40°N and 100 at
+the equator: small homes fall under the 120 floor near the equator, and big
+buildings trip the 60,000 ceiling (and go flat) at high latitude. With the flag
+on, the satellite building and skyline builders normalise every footprint to the
+latitude those thresholds were tuned at (40°N), so Ohio and New York stay
+within 2% of today and everywhere else matches them. Lengths, positions and coverage
+ratios are untouched; the worker learns the flag per request, so a flag-off
+request is the same message as before.
+
+The gate builds a real suburban tile (Powell OH) and a real downtown tile
+(Manhattan) in the real worker and serves the same bytes at other latitudes. Flag
+off, the builder is blind to latitude (447 buildings kept whether the tile sits
+at the equator, 40°N or 60°N, although those are 170 m² houses at the equator
+and 42 m² sheds at 60°N). Flag on, the count follows true size (475 / 447 / 151),
+and the skyline's area candidates do the same (126 / 120 / 51). At the tile's own
+latitude on and off agree, and flag-off output is byte-identical.
+
+**Run list (with `?flags=TRUE_AREAS`, best together with `TRUE_SCALE`):**
+1. **Near the equator** — a suburb of Singapore, Quito or Lagos: more small
+   homes than without the flag.
+2. **Far north** — industrial edges of Oslo or Helsinki: large halls stay 3D
+   instead of flattening into the ground.
+3. **Home** — Columbus or Manhattan: nothing should change.
+
 ### Found along the way (pre-existing, not caused by this pass)
 
 - This container's clone is shallow; history-dependent gates need
@@ -99,6 +199,12 @@ credits and the live ADS-B feed's name in the credit bar, title and photo export
 - `verify-cinematic-earth.mjs` fails on a stale aircraft-manifest assertion;
   `verify-r25-front-door.mjs` reads 68/2 on the untouched tree;
   `verify-r25-flight-plan.mjs` needs your local `r25-w0` tag.
+- Also red on the untouched tree (checked with this pass's changes stashed):
+  `verify-atmo-law.mjs` crashes in section [8] (`_state.livingAir` undefined);
+  `r24-c-motion-unit.mjs` fails (f2); `verify-painterly-flight.mjs` and
+  `verify-canopy-support.mjs` throw TypeErrors; `verify-world-art.mjs` fails an
+  assertion. `components/fly/PoiLetters.jsx` carries two pre-existing
+  react-hooks lint errors.
 
 ### Deferred until device data says so
 
@@ -107,7 +213,17 @@ credits and the live ADS-B feed's name in the credit bar, title and photo export
 - Replacing the per-frame shadow scene walk with event-driven registration:
   only if `shadows.scanMs` is material on the phone.
 - ASTC/KTX2 phone textures and an in-app texture-bytes census.
-- The hero-landmark licensing shortlist starts alongside Phase 1.
+
+### Hero landmarks — licensing shortlist (Phase 0 item 14, waiting on you)
+
+[TRUE_EARTH_LANDMARKS.md](TRUE_EARTH_LANDMARKS.md): 14 ranked picks (12 CC-BY
+models, two to build in-house: the Sydney Harbour Bridge and the Giza pyramids),
+the ones with no acceptable model, and the IP caveats (the Opera House Trust's
+image policy, the Eiffel Tower's night lighting, Christ the Redeemer, skyscraper
+trademarks). Every model host is blocked from this container, so each licence was
+read from a search index, not the page itself: re-read each page before
+downloading, and check the author and licence inside the downloaded file before it
+is credited. Phase 5 builds only what you approve.
 
 ---
 
