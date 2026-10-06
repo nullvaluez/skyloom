@@ -1,6 +1,7 @@
 'use client';
 import { connectFlightOperations } from '@/lib/fly/operations-runtime';
 import { reviewSurfaceOn } from '@/lib/fly/player-surface';
+import { setTrueScaleK } from '@/lib/fly/true-scale';
 import { FlightOperations } from '@/lib/fly/flight-operations';
 import { AirportOperationsLayer } from './AirportOperationsLayer';
 
@@ -1992,6 +1993,10 @@ export function FlyScene({ runtime }) {
     // allowance and all of them can see whether the LAST frame overran.
     noteFinalizeFrame(delta);
     const flyState = useFlyStore.getState();
+    // TRUE EARTH (TRUE_SCALE): this frame's vertical correction, published
+    // before any rig or engine composes the camera matrix. Enhanced (the
+    // shipped look) only: k0 = 1 everywhere else is three's own camera.
+    setTrueScaleK(cinemaOn(flyState) ? mercatorScale(flight.latDeg) : 1);
     const worldHeld = flyState.mapStyle === 'satellite' && (runtime.worldLoading === true || (typeof window !== 'undefined' && window.__flyBoot && window.__flyBoot.pct < 100));
     const paused = flyState.phase === 'paused' || worldHeld || menuOpen(flyState) || !!flyState.inspectHex || flyState.atlasOpen || flyState.logbookOpen || document.hidden;
     // Inspect modal / Atlas count as a soft pause for the stick: the world

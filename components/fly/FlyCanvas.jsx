@@ -17,6 +17,7 @@ import { autoTierCeiling } from '@/lib/fly/fly-settings';
 import { PerfGovernor } from '@/lib/fly/perf-governor';
 import { FrameStatsRig } from '@/lib/fly/frame-stats';
 import { setDiagRenderer } from '@/lib/fly/diag-handles';
+import { installTrueScaleCamera } from '@/lib/fly/true-scale';
 import { diagRequested } from '@/lib/fly/diag';
 import { DiagFrameTotals } from './DiagFrameTotals';
 import { StepSafeRig } from './StepSafeRig';
@@ -175,7 +176,7 @@ export function FlyCanvas({ runtime }) {
         alpha: false,
         reversedDepthBuffer: true,
       }}
-      onCreated={({ gl }) => {
+      onCreated={({ gl, camera }) => {
         // eslint-disable-next-line react-hooks/immutability -- Renderer-owned diagnostics live on the mutable simulation handle.
         if(cinemaOn())runtime.cinemaContextResources=installContextResourceLifetime(gl.getContext());
         configureCinemaAssets(gl);
@@ -186,6 +187,9 @@ export function FlyCanvas({ runtime }) {
         setDepthReversed(gl?.capabilities?.reversedDepthBuffer === true);
         // TRUE EARTH: the diagnostics overlay's renderer handle (every build).
         setDiagRenderer(gl);
+        // TRUE EARTH (TRUE_SCALE): the anisotropic view. Not installed at all
+        // with the flag off; with it on, k0 = 1 frames are three's own matrix.
+        installTrueScaleCamera(camera);
         if (process.env.NODE_ENV === 'development') {
           console.info(
             '[fly] reversedDepthBuffer active:',
