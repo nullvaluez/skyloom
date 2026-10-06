@@ -1,6 +1,11 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { installUrlFlags } from '@/lib/fly/fly-pins';
+
+// TRUE EARTH: `?flags=` must become pins before any Fly module reads one, and
+// this module evaluates before the lazily imported FlyMode tree.
+if (typeof window !== 'undefined') installUrlFlags(window);
 
 // Round 9 (fly-only pivot): the game IS the app. FlyMode mounts directly —
 // no ui-store gate, no header/sidebar chrome. The dynamic() fallback is a
