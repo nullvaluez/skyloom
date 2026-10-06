@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { reviewSurfaceOn } from '@/lib/fly/player-surface';
 import { useFlyStore } from '@/stores/fly-store';
 import { MAP_STYLE_KEY, MAP_STYLES } from '@/lib/fly/map-style';
 // Round 16: quality + sound persist — but ONLY from the click sites below. The
@@ -54,7 +55,9 @@ export function SettingsRows({ sheet = false }) {
     useFlyStore.getState().setMapStyle(style);
   };
 
-  const visualsRow = visualsAvailable() && (
+  // TRUE EARTH (PLAYER_SURFACE): the look switches are review/automation only.
+  const lookSwitches = reviewSurfaceOn();
+  const visualsRow = visualsAvailable() && lookSwitches && (
     <div key="visuals" className="rounded-md border border-zinc-700/60 p-2" data-testid={sheet ? 'settings-visuals' : undefined}>
       <div className="mb-1.5 text-center text-[10px] uppercase tracking-widest text-zinc-500">
         Visuals
@@ -110,7 +113,7 @@ export function SettingsRows({ sheet = false }) {
     </div>
   );
 
-  const mapStyleRow = (
+  const mapStyleRow = lookSwitches && (
     <div key="map-style" className="rounded-md border border-zinc-700/60 p-2">
       <div className="mb-1.5 text-center text-[10px] uppercase tracking-widest text-zinc-500">
         Map style

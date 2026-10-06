@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { reviewSurfaceOn } from '@/lib/fly/player-surface';
 import { useFlyStore, inFlight } from '@/stores/fly-store';
 import { usePassportStore } from '@/stores/passport-store';
 import { useIsTouch } from '@/hooks/use-is-touch';
@@ -154,7 +155,7 @@ export function PauseMenu({ onExit }) {
               Resume
             </MenuButton>
             <MenuButton onClick={() => useAdventureStore.getState().setLibraryOpen(true)}>Adventures</MenuButton>
-            {mapStyle === 'satellite' && immersiveOn() && (
+            {mapStyle === 'satellite' && immersiveOn() && reviewSurfaceOn() && (
               <div className="space-y-1 rounded-md border border-zinc-700 p-2">
                 <p className="mb-2 text-xs text-zinc-400">Explore the new atmosphere</p>
                 {[

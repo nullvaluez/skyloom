@@ -1,5 +1,6 @@
 'use client';
 import { connectFlightOperations } from '@/lib/fly/operations-runtime';
+import { reviewSurfaceOn } from '@/lib/fly/player-surface';
 import { FlightOperations } from '@/lib/fly/flight-operations';
 import { AirportOperationsLayer } from './AirportOperationsLayer';
 
@@ -3544,8 +3545,9 @@ export function FlyScene({ runtime }) {
       </Suspense>
       {/* Neon altitude tracers (airloom signature) — every style */}
       <TrafficTracers runtime={runtime} flight={flight} origin={origin} />
-      {/* One-shot neon confetti burst masking the warp cut */}
-      <WarpBurst flight={flight} origin={origin} />
+      {/* One-shot neon confetti burst masking the warp cut. TRUE EARTH
+          (PLAYER_SURFACE): Neon's own look; satellite players don't get it. */}
+      {(mapStyle === 'toy' || reviewSurfaceOn()) && <WarpBurst flight={flight} origin={origin} />}
 
       {/* Void-grid floor past the rim (dark styles) — the confined-world seller */}
       {WORLD_EDGE.floor.byStyle[mapStyle] && (
