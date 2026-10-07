@@ -1520,6 +1520,7 @@ export function FlyScene({ runtime }) {
       runtime.warpTo = null;
       runtime.warpToGeo = null;
       runtime.interceptHex = null;
+      runtime.escort = null;
       traffic.dispose();
       engine.dispose();
     };
@@ -2156,8 +2157,14 @@ export function FlyScene({ runtime }) {
 
     // F engages intercept on a soft lock; F again (or hard stick) releases
     if (!paused && !operations.grounded && operations.phase !== 'approach' && input.consumePress('f')) {
-      if (autopilot.mode !== 'off') autopilot.disengage();
-      else if (targeting.lockedHex) autopilot.engage('intercept');
+      if (autopilot.mode !== 'off') {
+        autopilot.disengage();
+        runtime.escort = null;
+      } else if (targeting.lockedHex) {
+        // Plain intercept: the camera stays the player's (C toggles cinema).
+        // The Escort buttons (lib/fly/escort.js) are the cinematic order.
+        autopilot.engage('intercept');
+      }
     }
     // T opens the inspect modal on the locked target — the zero-precision
     // path to warp/intercept (clicking a moving 30px label is fiddly)
@@ -2172,6 +2179,10 @@ export function FlyScene({ runtime }) {
     // C toggles the cinema (wing) camera while the autopilot is flying an
     // intercept/formation — the visible payoff of a CHASE order.
     if (!paused && input.consumePress('c') && autopilot.mode !== 'off') {
+      // An explicit C is the player's camera choice: it retires any pending
+      // escort cinema request (lib/fly/escort.js) so the loop below never
+      // fights the toggle.
+      if (runtime.escort) runtime.escort.wantCinema = false;
       const mode = store.cameraMode === 'cinema' ? 'chase' : 'cinema';
       // Round 19 (E SLIPSTREAM, P11): refuse the engage on an absurd pair. A
       // 21 nm intercept target framed empty sky — the rig stood 62 km off a
@@ -2199,6 +2210,29 @@ export function FlyScene({ runtime }) {
       const mode = store.cameraMode === 'photo' ? 'chase' : 'photo';
       store.setCameraMode(mode);
       (mode === 'photo' ? photo : chase).snap();
+    }
+    // ESCORT (lib/fly/escort.js). An escort ordered from the dossier, the
+    // Nearby panel, an invitation or the lock card asks for the cinematic camera.
+    // Honour it the first frame the pair can be framed (a far target starts in
+    // the chase view and cuts in once CINEMA_FIX allows), GLIDE in from the
+    // chase pose instead of cutting, and forget the escort the moment the
+    // autopilot lets go of it. A press of C above already retired the request.
+    const escort = runtime.escort;
+    if (escort) {
+      if (autopilot.mode === 'off' || targeting.lockedHex !== escort.hex) {
+        runtime.escort = null;
+      } else if (
+        escort.wantCinema &&
+        !paused &&
+        targeting.target &&
+        useFlyStore.getState().cameraMode === 'chase' &&
+        canEngageCinema(flight, targeting.target, mercatorScale(flight.latDeg))
+      ) {
+        escort.wantCinema = false;
+        store.setCameraMode('cinema');
+        cinema.glide();
+        if (store.soundOn) runtime.audio?.whooshSting?.();
+      }
     }
     // Auto-revert when the chase ends (lock lost / disengaged / hard stick)
     if (flyState.cameraMode === 'cinema' && (autopilot.mode === 'off' || !targeting.target)) {

@@ -98,12 +98,14 @@ function thumbnail(root){
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120"><title>${root.name}</title>${faces.sort((a,b)=>b.depth-a.depth).map(f=>`<path fill="${f.color}" d="M${f.points.map(p=>`${((p[0]-minX)*scale+x).toFixed(1)},${((p[1]-minY)*scale+y).toFixed(1)}`).join('L')}Z"/>`).join('')}</svg>`;
 }
 const exporter=new GLTFExporter(),receipt=[];
-for(const def of Object.values(FLEET_PRESENTATION))for(const low of [false,true]){
+// `custom` airframes (the Umbra) have their own builder; keep their files and receipt rows.
+const customRows=JSON.parse(fs.readFileSync('public/models/adventure-fleet-v1.json','utf8')).filter(r=>FLEET_PRESENTATION[r.id]?.custom);
+for(const def of Object.values(FLEET_PRESENTATION).filter(d=>!d.custom))for(const low of [false,true]){
   const {root,triangles,draws}=build(def,low);if(triangles>(low?4800:18000))throw Error(`${def.slug} has no gear budget: ${triangles}`);
   const url=low?def.mobileUrl:def.url,data=await exporter.parseAsync(root,{binary:true});fs.writeFileSync(`public${url}`,Buffer.from(data));
   if(low)fs.writeFileSync(`public${def.thumbnail}`,thumbnail(root));receipt.push({id:def.id,lod:low?'mobile':'hero',url,triangles,draws,bytes:data.byteLength});
 }
-fs.writeFileSync('public/models/adventure-fleet-v1.json',JSON.stringify(receipt,null,2)+'\n');console.log(JSON.stringify(receipt,null,2));
+fs.writeFileSync('public/models/adventure-fleet-v1.json',JSON.stringify([...receipt,...customRows],null,2)+'\n');console.log(JSON.stringify(receipt,null,2));
 const vector=fs.readFileSync('public/models/player-vector-mobile-v2.glb');
 const vectorScene=await new GLTFLoader().parseAsync(vector.buffer.slice(vector.byteOffset,vector.byteOffset+vector.byteLength),'');
 fs.writeFileSync('public/models/player-vector-v2.svg',thumbnail(vectorScene.scene));

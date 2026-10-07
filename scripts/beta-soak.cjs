@@ -60,7 +60,7 @@ const quantile=(rows,q)=>rows.length?[...rows].sort((a,b)=>a-b)[Math.min(rows.le
     await delay(5000);
   }
   const frames=await page.evaluate(()=>{cancelAnimationFrame(window.__betaSoak.raf);return {steady:window.__betaSoak.steady,transition:window.__betaSoak.transition};});
-  const summarize=values=>({count:values.length,p50:quantile(values,.5),p95:quantile(values,.95),p99:quantile(values,.99),over100:values.filter(n=>n>100).length,max:values.length?Math.max(...values):null});
+  const summarize=values=>({count:values.length,p50:quantile(values,.5),p95:quantile(values,.95),p99:quantile(values,.99),over100:values.filter(n=>n>100).length,max:values.length?values.reduce((a,b)=>Math.max(a,b),0):null});
   const report={at:new Date().toISOString(),minutes,wallMs:Date.now()-began,renderer,venue:'1920×1080 DPR1 headless Chromium; live providers; scripted input; High default with governor free',steady:summarize(frames.steady),transitions:summarize(frames.transition),samples,events,errors,responses};
   report.limits={p95Frame:20,p99Frame:33.3,p95Draws:375,p95Triangles:2200000};
   report.resource={p95Draws:quantile(samples.map(s=>s.draws).filter(Number.isFinite),.95),p95Triangles:quantile(samples.map(s=>s.triangles).filter(Number.isFinite),.95)};

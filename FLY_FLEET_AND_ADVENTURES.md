@@ -43,6 +43,20 @@ See `public/adventures/README.md` for provenance and retained credits. The six
 [climbing area's coordinates](https://www.mountainproject.com/area/105833395/half-dome)
 rather than the airborne discovery position.
 
+## Umbra, the stealth flying wing (2026-10-07)
+
+The tenth hangar aircraft (`flying-wing`, "Stealth wing") is an original
+first-party flying wing, 18 m long with a 44 m span: one blended lofted skin with
+a double-W trailing edge, serrated intakes in recessed throats, flat exhaust slots
+over a heat deck, and four swept elevons in hinge-aligned groups (`aileron-*`
+outboard, `elevator-*` inboard; no rudder or propeller). It flies a calm big-wing
+envelope (cruise 215 m/s, boost 560, no afterburner) with twin contrails from its
+slots, uses Takeoff & Landing at KCMH/KLCK and flies every Adventure. It wears
+house colors only, so `LIVERIES` stays at nine. Rebuild it with
+`node scripts/build-flying-wing.mjs`, which writes `player-umbra-{hero,mobile}-v1.glb`,
+the hangar glyph and the two `flying-wing` receipt rows; `build-adventure-fleet.mjs`
+skips this `custom` entry and keeps those rows.
+
 ## Verification of this update
 
 Node checks passed: adventure/assets/save safety 15, guidance 6, activity and

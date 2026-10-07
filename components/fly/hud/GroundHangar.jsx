@@ -101,7 +101,7 @@ function HangarBody({runtime}){
       <button onClick={()=>{runtime.operations.returnToHangar();setConfirmReturn(false);}}>End flight and open hangar</button>
       <button onClick={()=>useFlyStore.getState().setHangarOpen(false)}>Continue flight</button></div>
   </div>;
-  const categories={fighter:'Interceptor',military:'Tactical jet','warbird-jet':'Classic jet','warbird-prop':'Warbird',prop:'Light aircraft',glider:'Glider',bizjet:'Business jet',airliner:'Airliner',cargo:'Heavy transport'};
+  const categories={fighter:'Interceptor',military:'Tactical jet','warbird-jet':'Classic jet','warbird-prop':'Warbird',prop:'Light aircraft',glider:'Glider',bizjet:'Business jet',airliner:'Airliner',cargo:'Heavy transport','flying-wing':'Stealth wing'};
   const modes=[['apron','Apron',Navigation],['runway','Runway',PlaneTakeoff],['approach','Approach',PlaneLanding]].filter(([mode])=>mode!=='apron'||airportById(airport)?.authored!==false);
   const modeHelp={apron:'The full flight. Taxi out from your parking stand.',runway:'Lined up and ready. You handle the takeoff.',approach:'Find your landing. Begin on a stable final approach.'};
   const theme={'--ops-ice':CARD_THEME.ice,'--ops-muted':CARD_THEME.iceDim,'--ops-edge':CARD_THEME.edgeSoft};
@@ -166,5 +166,6 @@ function AircraftGlyph({id}){
 function FleetCustomization({id}){
   const [open,setOpen]=useState(false),progress=useAdventureStore(s=>s.progress),livery=LIVERIES[id],earned=contentAccess(`livery:${id}`,progress).allowed;
   const route=ADVENTURES.find(a=>a.reward===id),collection=COLLECTION_REWARDS.find(r=>r.aircraftId===id);
-  return <div className="fleet-customize"><button aria-expanded={open} onClick={()=>setOpen(!open)}>Customize</button>{open&&<div className="fleet-liveries" role="group" aria-label="Aircraft liveries"><strong>Make it yours</strong><button aria-pressed={progress.liveries[id]!=='earned'} onClick={()=>useAdventureStore.getState().equip(id,false)}>House colors</button><button disabled={!earned} aria-pressed={progress.liveries[id]==='earned'} onClick={()=>useAdventureStore.getState().equip(id,true)}><span style={{background:livery.accent}}/>{livery.name}</button>{!earned&&<small>{route?`Complete ${route.place} to earn this livery.`:`Collect ${collection.count} destination stamps to earn this livery.`}</small>}<small>All aircraft are free to fly.</small></div>}</div>;
+  // An aircraft with no earnable livery (the Umbra) wears its house colors only.
+  return <div className="fleet-customize"><button aria-expanded={open} onClick={()=>setOpen(!open)}>Customize</button>{open&&<div className="fleet-liveries" role="group" aria-label="Aircraft liveries"><strong>Make it yours</strong><button aria-pressed={progress.liveries[id]!=='earned'} onClick={()=>useAdventureStore.getState().equip(id,false)}>House colors</button>{livery?<><button disabled={!earned} aria-pressed={progress.liveries[id]==='earned'} onClick={()=>useAdventureStore.getState().equip(id,true)}><span style={{background:livery.accent}}/>{livery.name}</button>{!earned&&<small>{route?`Complete ${route.place} to earn this livery.`:`Collect ${collection.count} destination stamps to earn this livery.`}</small>}<small>All aircraft are free to fly.</small></>:<small>Signature finish. All aircraft are free to fly.</small>}</div>}</div>;
 }

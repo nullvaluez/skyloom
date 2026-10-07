@@ -8,6 +8,7 @@ import { readReducedMotion } from '@/lib/fly/immersive';
 import { useOverlayBack, anyOverlayOpen } from '@/hooks/use-overlay-back';
 import { dismissTouchInfo, readTouchSurface, setTouchSurface, useTouchSurface } from '@/hooks/use-touch-actions';
 import { useFlyStore } from '@/stores/fly-store';
+import { useEncounterStore } from '@/stores/encounter-store';
 import { TouchActionPanel } from './TouchActionPanel';
 
 const KNOB_TRAVEL = 52;
@@ -175,6 +176,7 @@ export function TouchControls({ runtime }) {
     logbook: () => navigate(() => useFlyStore.getState().setLogbookOpen(true)),
     hangar: () => navigate(() => useFlyStore.getState().setHangarOpen(true)),
     contracts: () => { neutralize(); setTouchSurface('contracts'); },
+    nearby: () => navigate(() => { if (!useEncounterStore.getState().nearbyOpen) runtime.encounters?.nearby(); }),
     photo: () => navigate(() => press('p')),
     pause: () => navigate(() => useFlyStore.getState().setPhase('paused')),
     inspect: () => navigate(() => { useFlyStore.getState().setInspectHex(lockedHex); stampPress('t'); }),

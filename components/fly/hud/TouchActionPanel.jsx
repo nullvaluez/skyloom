@@ -1,13 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BookOpen, Camera, Crosshair, Eye, EyeOff, Info, ListChecks, Map, Pause, Plane, Video, Zap } from 'lucide-react';
+import { BookOpen, Camera, Crosshair, Eye, EyeOff, Info, ListChecks, Map, Pause, Plane, Radar, Video, Zap } from 'lucide-react';
 import { getBoostMirror } from '@/lib/fly/juice';
+import { useNearbyEntry } from './EncounterExperience';
 
 const SPEEDS = [['slow', 'Slow'], ['cruise', 'Cruise'], ['boost', 'Fast']];
 const ACTIONS = [
   ['look', 'Free look', Eye], ['atlas', 'Atlas', Map], ['logbook', 'Logbook', BookOpen],
-  ['hangar', 'Hangar', Plane], ['contracts', 'Contracts', ListChecks], ['photo', 'Photo', Camera],
+  ['hangar', 'Hangar', Plane], ['contracts', 'Contracts', ListChecks], ['nearby', 'Nearby', Radar],
+  ['photo', 'Photo', Camera],
 ];
 
 /** Momentary hold, never a toggle; captured pointer identity survives two thumbs. */
@@ -94,6 +96,8 @@ function Action({ id, label, Icon, active, disabled, onClick }) {
 
 export function TouchActionPanel({ runtime, speedPreset, actions, lookMode, locked, chasing, cinema, hangar, canHideInfo, reducedMotion }) {
   const panel = useRef(null);
+  // Nearby lives here on touch: a closed touch HUD keeps one gameplay button.
+  const nearby = useNearbyEntry();
   useEffect(() => {
     // A disclosure, not a modal: no focus trap and no aria-modal. The joystick
     // and world remain usable; Escape/Back are handled by TouchControls.
@@ -120,9 +124,9 @@ export function TouchActionPanel({ runtime, speedPreset, actions, lookMode, lock
         </fieldset>
         {!runtime.operations?.lowSpeed && <TouchBoost runtime={runtime} />}
         <div className="touch-actions-grid">
-          {ACTIONS.filter(([id]) => id !== 'hangar' || hangar).map(([id, label, Icon]) => (
-            <Action key={id} id={id} label={label} Icon={Icon} onClick={actions[id]}
-              active={id === 'look' ? lookMode : undefined} />
+          {ACTIONS.filter(([id]) => (id !== 'hangar' || hangar) && (id !== 'nearby' || nearby.available)).map(([id, label, Icon]) => (
+            <Action key={id} id={id} label={id === 'nearby' && nearby.count ? `${label} · ${nearby.count}` : label}
+              Icon={Icon} onClick={actions[id]} active={id === 'look' ? lookMode : undefined} />
           ))}
         </div>
         {locked && <fieldset className="touch-target" data-testid="touch-contextual">

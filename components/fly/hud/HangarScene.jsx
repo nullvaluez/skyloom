@@ -32,8 +32,12 @@ function Aircraft({aircraft,onReady,earnedPreview=false}){
   </group>;
 }
 function Bay({aircraft,airport,onReady,onError,onExteriorReady,view}){
-  const length=Math.max(28,aircraft.entry.targetLenM),width=length*1.65,depth=length*1.5,height=Math.max(13,length*.4);
-  const viewLength=Math.max(15,aircraft.entry.targetLenM),cutaway=useRef(),controls=useRef();
+  // A flying wing is far wider than it is long: frame (and house) its span too.
+  // For every other airframe span*.7 stays below its length or the 15/28 m floors,
+  // so their framing is unchanged.
+  const reach=Math.max(aircraft.entry.targetLenM,(aircraft.entry.span||0)*.7);
+  const length=Math.max(28,reach),width=length*1.65,depth=length*1.5,height=Math.max(13,length*.4);
+  const viewLength=Math.max(15,reach),cutaway=useRef(),controls=useRef();
   const {camera,size}=useThree();
   useFrame(()=>{cutaway.current?.traverse(mesh=>{const side=mesh.userData.cutawaySide;if(side===undefined)return;
     mesh.visible=side==='roof'?camera.position.y<height-.5:camera.position.x*side<width*.48;

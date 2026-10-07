@@ -73,10 +73,12 @@ function seedAircraft(id) {
   // Anchored to the entry indent — the file's own doc block quotes a
   // `{ url: '/models/` literal when it explains why this manifest is separate.
   const urls = [...paSrc.matchAll(/^\s{4}url:\s*'(\/models\/[^']+)'/gm)].map((m) => m[1]);
+  // Sanctioned count move: the fleet grew by one original first-party aircraft
+  // (the Umbra flying wing, credited `file:`-only in FLY_ASSETS) — 9 → 10.
   gate(
-    '1a PLAYER_AIRCRAFT is 9 aircraft, one url each, no helicopter',
-    ids.length === 9 &&
-      urls.length === 9 &&
+    '1a PLAYER_AIRCRAFT is 10 aircraft, one url each, no helicopter',
+    ids.length === 10 &&
+      urls.length === 10 &&
       ids[0] === 'fighter' &&
       !urls.some((u) => u.includes('helicopter')),
     `${ids.length} ids [${ids.join(', ')}]`
@@ -113,10 +115,12 @@ function seedAircraft(id) {
   );
   const byIdBlock = hangarBlock.slice(hangarBlock.indexOf('byId: {'));
   const overrideKeys = [...byIdBlock.matchAll(/^\s{4}'?([a-z-]+)'?:\s*\{/gm)].map((m) => m[1]);
+  // Sanctioned count move: the Umbra (original first-party aircraft) adds the
+  // ninth override — 8 → 9. The fighter still has none.
   gate(
     '3 the fighter has NO HANGAR.byId entry (default falls through to R16)',
     hangarBlock.length > 0 &&
-      overrideKeys.length === 8 &&
+      overrideKeys.length === 9 &&
       !overrideKeys.includes('fighter') &&
       overrideKeys.every((k) => ids.includes(k)),
     `byId keys: ${overrideKeys.join(', ')}`

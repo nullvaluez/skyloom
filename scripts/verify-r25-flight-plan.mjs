@@ -524,7 +524,9 @@ await tryGate('5d spawn precedence', () => {
 });
 
 // ===========================================================================
-section('6 placement math, all 9 aircraft');
+// Sanctioned count move: the fleet grew by one original first-party aircraft
+// (the Umbra flying wing) — 9 → 10 aircraft in 6a and 7a.
+section('6 placement math, all 10 aircraft');
 await tryGate('6a placement', () => {
   const minAgl = C.FLIGHT_PLAN.freeFlight.minAglM;
   const bad = [];
@@ -550,7 +552,7 @@ await tryGate('6a placement', () => {
       }
     }
   }
-  gate('6a altitude max(altM, ground+minAglM), heading, cruise inside the envelope — 9 aircraft x 11 destinations x 3 grounds', bad.length === 0 && n === 9 * 11 * 3, bad.slice(0, 5).join(',') || `${n} placements`);
+  gate('6a altitude max(altM, ground+minAglM), heading, cruise inside the envelope — 10 aircraft x 11 destinations x 3 grounds', bad.length === 0 && n === 10 * 11 * 3, bad.slice(0, 5).join(',') || `${n} placements`);
 });
 
 // ===========================================================================
@@ -632,7 +634,7 @@ await tryGate('7a launchFreeFlight', () => {
       w.off();
     }
   }
-  gate('7a launchFreeFlight: 9 aircraft x 11 destinations land airborne at the placement, cruise, far-warp hold, crash disarmed, trim armed', bad.length === 0 && n === 99, bad.slice(0, 6).join(',') || `${n} launches`);
+  gate('7a launchFreeFlight: 10 aircraft x 11 destinations land airborne at the placement, cruise, far-warp hold, crash disarmed, trim armed', bad.length === 0 && n === 110, bad.slice(0, 6).join(',') || `${n} launches`);
 });
 await tryGate('7b launchFreeFlight rejects', () => {
   const w = makeWorld();
@@ -762,10 +764,12 @@ const kosuGeo = airportById('KOSU').a;
 // Fleet & Adventures intentionally replaces glyphs and adds customization.
 // Normalize exactly those presentation additions; dispatch markup still compares
 // byte-for-byte. The new assets/controls have their own verify-adventures gate.
+// The Umbra joined after r25-w0, so W0's category map renders its rail label empty.
 const dispatchMarkup=html=>html.replace(/<link[^>]*rel="preload"[^>]*>/g,'')
   .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/g,'<glyph/>')
   .replace(/<img\b[^>]*class="ops-fleet-thumbnail"[^>]*>/g,'<glyph/>')
-  .replace(/<div class="fleet-customize"><button aria-expanded="false">Customize<\/button><\/div>/g,'');
+  .replace(/<div class="fleet-customize"><button aria-expanded="false">Customize<\/button><\/div>/g,'')
+  .replace('<span>Umbra</span><small>Stealth wing</small>','<span>Umbra</span><small></small>');
 const render = (Mod, mode) => {
   const arm = { flightMode: mode, hangarOpen: true, screen: 'hangar', spawn: null };
   Object.assign(useFlyStore.getInitialState(), arm);

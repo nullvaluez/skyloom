@@ -3,6 +3,7 @@ import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
 import { cinematicEarthOn } from '@/lib/fly/cinematic-earth';
 import { cinemaOn } from '@/lib/fly/cinema-policy';
 import { CinemaReviewDock } from './CinemaReviewDock';
+import { CinemaBars, EscortHud } from './EscortHud';
 
 
 import { useEffect, useRef } from 'react';
@@ -35,7 +36,6 @@ export function FlyHUD({ runtime }) {
   const presetRef = useRef(null);
   const poiRef = useRef(null);
   const spotsRef = useRef(null);
-  const chaseRef = useRef(null);
   const latRef = useRef(null);
   const lonRef = useRef(null);
 
@@ -77,31 +77,9 @@ export function FlyHUD({ runtime }) {
         // persisted Spotter's Passport — read per tick, never reactive
         spotsRef.current.textContent = usePassportStore.getState().stats.totalSpotted;
       }
-      if (chaseRef.current) {
-        // CHASE feedback: the intercept/formation autopilot was previously
-        // invisible — ordering a chase looked like a dead button.
-        const mode = runtime.autopilot?.mode;
-        const t = runtime.targeting?.target;
-        if (mode && mode !== 'off' && t) {
-          const name = t.meta?.flight || t.meta?.r || t.hex?.toUpperCase() || '';
-          const nm = (t.distM / 1852).toFixed(1);
-          const cinema = useFlyStore.getState().cameraMode === 'cinema';
-          // Round 17: a phone has no C key. The chip used to tell touch
-          // players to "press C" for a camera they had no way to reach — it
-          // now names the cluster button that actually does it. Desktop text
-          // is byte-identical.
-          const cine = isTouch ? 'tap ◉' : 'C';
-          chaseRef.current.textContent = cinema
-            ? `◉ CINEMA · ${name} · ${cine} to exit`
-            : `${mode === 'formation' ? '◎ FORMATION' : '◎ INTERCEPT'} · ${name} · ${nm}nm · ${cine} cinema`;
-          chaseRef.current.style.opacity = '1';
-        } else {
-          chaseRef.current.style.opacity = '0';
-        }
-      }
     }, 100);
     return () => clearInterval(id);
-  }, [runtime, isTouch, newEarth]);
+  }, [runtime, newEarth]);
 
   // max-sm: overrides keep desktop pixel-identical while the phone gets a
   // tighter, notch-safe strip (AGL + Spots fold away below 640px).
@@ -136,13 +114,10 @@ export function FlyHUD({ runtime }) {
         className="pointer-events-none absolute left-1/2 top-20 z-10 -translate-x-1/2 font-mono text-xs font-semibold uppercase tracking-[0.2em] text-amber-200/90 transition-opacity duration-500 [text-shadow:0_1px_4px_rgba(0,0,0,0.9)] max-sm:top-[calc(env(safe-area-inset-top)+4.75rem)] phone:top-[calc(env(safe-area-inset-top)+4.75rem)] phone-land:top-[calc(env(safe-area-inset-top)+3.1rem)] phone:w-[92vw] phone:truncate phone:text-center"
       />
 
-      {/* Active chase/intercept chip — visible payoff for the CHASE button */}
-      <div
-        ref={chaseRef}
-        data-testid="hud-chase-chip"
-        data-cinematic={cinema ? '1' : '0'}
-        className="pointer-events-none absolute left-1/2 top-27 z-10 -translate-x-1/2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200/90 opacity-0 transition-opacity duration-300 [text-shadow:0_1px_4px_rgba(0,0,0,0.9)] max-sm:top-[calc(env(safe-area-inset-top)+6.5rem)] phone:top-[calc(env(safe-area-inset-top)+6.5rem)] phone-land:top-[calc(env(safe-area-inset-top)+4.4rem)] phone:w-[92vw] phone:truncate phone:text-center"
-      />
+      {/* The escort HUD (was the one-line chase chip — testid kept) and the
+          cinematic letterbox: the visible payoff of an ESCORT order. */}
+      <CinemaBars />
+      <EscortHud runtime={runtime} cinematic={cinema} />
 
       {/* `hud-flat-phone` + a phone opacity bump replace the blur on phones:
           a backdrop-filter over the live GL canvas makes the compositor
@@ -216,7 +191,7 @@ export function FlyHUD({ runtime }) {
         </div>
       ) : (
         <div className="pointer-events-none absolute bottom-8 left-1/2 z-10 -translate-x-1/2 rounded bg-zinc-950/50 px-3 py-1 text-[11px] text-zinc-400">
-          {quiet ? 'M Atlas · L Logbook · Esc controls' : 'Steer with the mouse · WASD/arrows · 1/2/3 speed · Shift boost · RMB look · click a plane (or T on a lock) to inspect & warp · F intercept · P photo · Esc menu'}
+          {quiet ? 'M Atlas · N Nearby · L Logbook · Esc controls' : 'Steer with the mouse · WASD/arrows · 1/2/3 speed · Shift boost · RMB look · click a plane (or T on a lock) to inspect · F intercept · N nearby · P photo · Esc menu'}
           <span
             data-testid="hud-quality-tier"
             className="ml-2 font-mono text-[10px] uppercase tracking-widest text-zinc-500"

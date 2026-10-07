@@ -7,7 +7,7 @@ const {useFlyStore}=await import('../stores/fly-store.js');
 const {useEncounterStore}=await import('../stores/encounter-store.js');
 const {resolveAircraft}=await import('../lib/fly/player-aircraft.js');
 const data=new Map();Object.defineProperty(globalThis,'localStorage',{configurable:true,value:{getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)}});
-useFlyStore.setState({screen:'flight',phase:'flying',flightMode:'free',aircraftId:'fighter',hangarOpen:false,cameraMode:'chase',encountersEnabled:true});
+useFlyStore.setState({screen:'flight',phase:'flying',flightMode:'free',aircraftId:'fighter',hangarOpen:false,cameraMode:'chase',encountersEnabled:true,runtimeReady:true});
 useEncounterStore.setState({ready:false,memories:[]});
 const track={hex:'abc123',fix1:{vE:80,vN:0,vUp:0},flags:0,opacity:1,stale:0,distM:200,rx:0,ryd:1000,rz:-200,yaw:0,meta:{flight:'REAL123',t:'C172'}};
 let interceptions=0;
@@ -18,8 +18,12 @@ const release=connectEncounters(runtime);
 runtime.encounters.nearby();assert.equal(useEncounterStore.getState().candidates.length,1);
 assert.ok(runtime.encounters.accept('live:abc123'));assert.equal(interceptions,0,'accepting never takes flight controls');
 assert.equal(runtime.encounters.waypoint().altM,1000);
-useFlyStore.setState({lockedHex:'another'});assert.equal(runtime.encounters.assist(),false,'never steal another selected target');
-useFlyStore.setState({lockedHex:track.hex});assert.ok(runtime.encounters.assist());assert.equal(interceptions,1);
+// Escort is an explicit order: it replaces whatever sat in the soft-lock cone
+// (the old "never steal" rule disabled the button whenever ANY plane was ahead).
+useFlyStore.setState({lockedHex:'another'});assert.ok(runtime.encounters.assist(),'explicit escort replaces a soft lock');assert.equal(interceptions,1);
+assert.equal(runtime.escort?.hex,track.hex,'escort requested for the encounter contact');assert.equal(runtime.escort?.wantCinema,true,'escort asks for the cinematic camera');
+useFlyStore.setState({inspectHex:'x'});const heldEscort=runtime.encounters.escortActive();assert.equal(heldEscort.ok,false);assert.ok(heldEscort.message,'a held escort explains itself');useFlyStore.setState({inspectHex:null});
+useFlyStore.setState({lockedHex:track.hex});assert.ok(runtime.encounters.assist());assert.equal(interceptions,2);
 runtime.worldLoading=true;for(let i=0;i<80;i++)runtime.encounters.tick(.5);assert.equal(runtime.encounters.controller.active.hold,0);
 runtime.worldLoading=false;useFlyStore.setState({cameraMode:'photo'});for(let i=0;i<80;i++)runtime.encounters.tick(.5);assert.equal(runtime.encounters.controller.active.hold,0);
 assert.equal(await runtime.encounters.photo(null,new Blob(['x'])),false);
@@ -36,4 +40,4 @@ release();assert.equal(runtime.encounters,undefined);assert.equal(useEncounterSt
 useEncounterStore.setState({ready:false,memories:[]});useEncounterStore.getState().hydrate();assert.equal(useEncounterStore.getState().memories.length,1);
 localStorage.setItem=()=>{throw Error('blocked');};useEncounterStore.getState().remember({...useEncounterStore.getState().memories[0],id:'second'});
 assert.equal(useEncounterStore.getState().memories.length,2);assert.equal(useEncounterStore.getState().sessionOnly,true);
-console.log('PASS encounter runtime: explicit assistance, target ownership, guidance, world loading, photo pause and validation, durable memories, adventure isolation, disposal, reload and storage failure.');
+console.log('PASS encounter runtime: explicit escort (cinematic, replaces a soft lock, explains a refusal), guidance, world loading, photo pause and validation, durable memories, adventure isolation, disposal, reload and storage failure.');

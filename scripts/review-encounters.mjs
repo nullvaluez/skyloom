@@ -32,11 +32,11 @@ try{
   // This leg uses the feed as observed. Never inject a track to make it pass.
   await page.evaluate(()=>{const r=window.__fly;r.autopilot.disengage();window.__flyStore.getState().setAircraftId('fighter');r.flight.speed=r.flight.cfg.speeds.cruise;r.input.neutralize();});
   await page.waitForTimeout(2500);
-  await page.getByRole('button',{name:'Nearby',exact:true}).click();
+  await page.getByTestId('nearby-button').click();
   const live=await page.evaluate(()=>window.__fly.encounters.controller.candidates.find(c=>c.kind==='traffic'));
   if(live){
-    await page.getByRole('button',{name:new RegExp(live.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'))}).click();
-    await page.getByRole('button',{name:'Assist alongside',exact:true}).click();await page.mouse.move(720,450);
+    // One tap: accept the crossing AND start the cinematic escort.
+    await page.getByTestId(`nearby-contact-${live.id}`).getByRole('button',{name:'Fly alongside',exact:true}).click();await page.mouse.move(720,450);
     await page.waitForFunction(()=>!window.__fly.encounters.controller.active,undefined,{timeout:180000}).catch(()=>{});
     const outcome=await page.evaluate(()=>({active:window.__fly.encounters.controller.active?.seconds,result:window.__fly.encounters.controller.result}));
     report.liveEncounter={hex:live.hex,...outcome};check('observed live encounter completed',outcome.result==='Flight memory saved in your logbook.',outcome);
@@ -46,11 +46,11 @@ try{
   await page.evaluate(p=>{const r=window.__fly,s=window.__flyStore.getState();s.setAircraftId('prop');s.setFlightMode('free');window.__flyStore.setState({chaseFraming:'world'});r.warpToGeo(p.lat,p.lon,{altM:p.altM,headingRad:p.headingDeg*Math.PI/180,name:null});},course.approach);
   await page.waitForFunction(()=>!window.__fly.worldLoading,undefined,{timeout:180000});
   await page.waitForTimeout(3000);
-  await page.getByRole('button',{name:'Nearby',exact:true}).click();
+  await page.getByTestId('nearby-button').click();
   const candidates=await page.evaluate(()=>window.__fly.encounters.controller.candidates.map(c=>({id:c.id,source:c.source})));
   check('local course offered using live DEM',candidates.some(c=>c.id===course.id),candidates);
   if(candidates.some(c=>c.id===course.id)){
-    await page.getByRole('button',{name:new RegExp(course.name)}).click();
+    await page.getByTestId(`nearby-contact-${course.id}`).getByRole('button',{name:'Go',exact:true}).click();
     check('course HUD appears',await page.getByTestId('encounter-card').isVisible());
     await page.screenshot({path:`${out}/local-course.png`});
     await page.evaluate(()=>window.__fly.encounters.end());
@@ -62,7 +62,7 @@ try{
   await page.evaluate(()=>window.__flyStore.getState().setLogbookOpen(false));
   await page.setViewportSize({width:390,height:844});
   await page.waitForFunction(()=>window.__flyStore.getState().phase==='flying');
-  await page.getByRole('button',{name:'Nearby',exact:true}).click();await page.screenshot({path:`${out}/phone-nearby.png`});
+  await page.getByTestId('nearby-button').click();await page.screenshot({path:`${out}/phone-nearby.png`});
   check('small screen has no horizontal overflow',await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await page.setViewportSize({width:1440,height:900});
   report.performance=await page.evaluate(()=>new Promise(resolve=>{
