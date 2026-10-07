@@ -10,6 +10,11 @@ satellite world you can fly across.
 
 ## Features
 
+- **Shared open sky (multiplayer, behind a flag)** — other Free Flight pilots
+  appear next to the real traffic: lock, inspect, escort in formation, warp to
+  them, wave and trail smoke. One global world, no accounts, nothing saved; a
+  small keyless relay (`npm run mp`) with a CloudPanel recipe. See
+  [MULTIPLAYER.md](MULTIPLAYER.md).
 - **Adventures and rewards** — six guided sightseeing routes, destination stamps,
   medals, nine earnable liveries, checkpoint saves and guest backup/recovery.
   First Flights is always free; Wild Earth is free during preview, with no checkout.

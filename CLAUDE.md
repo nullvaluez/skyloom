@@ -12,6 +12,14 @@
 >   (World/Close framing, Nearby encounters, the stylized-cinematic art pass),
 >   [FLY_RENDER_OPTIMIZATION.md](FLY_RENDER_OPTIMIZATION.md) and
 >   [CINEMATIC_EARTH_OVERHAUL.md](CINEMATIC_EARTH_OVERHAUL.md).
+> - **Multiplayer — Shared Open Sky (2026-10-07, built, flag OFF):**
+>   [MULTIPLAYER.md](MULTIPLAYER.md) is the record. A keyless in-memory relay
+>   (`server/`, `npm run mp`) and a client session (`lib/fly/mp/`) put other
+>   Free Flight pilots into `TrafficEngine` as `remote:true` tracks ('p:' ids);
+>   every scoring/persistence consumer skips them. Behind `MULTIPLAYER`
+>   (`enabled:false`) AND a relay URL (`NEXT_PUBLIC_MP_URL`); the harness
+>   fleet pins `__flyMultiplayerOverride` off. Deploy target is CloudPanel
+>   (PM2 + nginx, `deploy/`), not Docker.
 > - **Target UI (2026-10-07, shipped on, owner-requested):** [FLY_TARGET_UI.md](FLY_TARGET_UI.md)
 >   — the inspect dossier, ONE Escort action on every button (`lib/fly/escort.js`:
 >   intercept + the cinematic camera, which films a far pair over the shoulder
