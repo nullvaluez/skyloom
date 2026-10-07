@@ -12,6 +12,16 @@ see the evidence ledger below. Headless hardware checks do not close physical
 display, phone, subjective flight/visual quality or ten-player study gates.
 No deployment, service purchase or public launch is part of this change.
 
+**Visual regression repair (2026-10-07):** the owner rejected the Explorer look
+(grey, obscured terrain at Rio) and weather usability. The combined newly enabled
+visual flags have been rolled back to the pre-Explorer defaults, without removing
+the journal, airports, fleet or other gameplay. This is a conservative rollback,
+not proof that one particular atmosphere flag caused the entire screenshot.
+Manual photo time/weather changes were independently confirmed blocked by the
+new freeze guards; those guards now hold automatic evolution, while explicit
+changes still apply. Weather is first in Pause and title Settings, with a desktop
+Weather shortcut. Visual acceptance is still required before re-enabling the bundle.
+
 The work is isolated on `codex/explorer-beta`. It preserves the concurrent Umbra
 aircraft and target-dossier/Escort changes through merge `6f66f01`. The shared
 checkout was reset by another process during implementation; the feature patch
@@ -35,9 +45,10 @@ was recovered from the session record before continuing in this worktree.
 - A local Travel journal combines explored locations, historical Atlas visits,
   adventure discoveries, regional stamps, airport landings, photographs and live
   encounter memories. Existing progression stores still own medals and liveries.
-- Photo composition pauses flight, weather evolution, aircraft propellers/exhaust,
+- Photo composition pauses flight, automatic weather evolution, aircraft propellers/exhaust,
   ambient boats/plumes and traffic ingestion; grids
-  and exposure are adjustable. Successful exports retain the existing baked-in
+  and exposure are adjustable. Manual time and weather changes remain effective
+  while the aircraft is frozen. Successful exports retain the existing baked-in
   provider attribution. Journal thumbnails use the bounded local IndexedDB cache;
   they are not full-resolution backups or proof the OS saved a download.
   Background scenery requests can still finish during composition; this is not a
@@ -76,20 +87,24 @@ Continue can resolve it before the first scene mount.
 
 ## Current world configuration
 
-The following previously staged blocks are enabled together for this candidate:
+The following foundation/control blocks remain enabled:
 
-`TWILIGHT_FIX`, `SUN_TRUE_AZ`, `HDR_GUARD`, `LOAD_GUARD`, `PLAYER_SURFACE`,
-`DEVICE_TIERS`, `TRUE_SCALE`, `TRUE_AREAS`, `CONDITIONS`, `PHYS_SKY`, `EARTH_HORIZON`.
+`HDR_GUARD`, `LOAD_GUARD`, `DEVICE_TIERS`, `CONDITIONS`.
+
+The newly enabled look bundle is now OFF pending visual approval:
+`TWILIGHT_FIX`, `SUN_TRUE_AZ`, `PLAYER_SURFACE`, `TRUE_SCALE`, `TRUE_AREAS`,
+`PHYS_SKY`, `EARTH_HORIZON`. Individual URL flags still permit diagnosis.
 
 `R25_SKY`, `R25_GROUND` and `CLOUD_CALM` were already enabled in the source baseline
-and stay enabled. Enhanced is the player look. Classic/Neon remain available under
-`?graphicsReview=1` and automation for regression comparisons. Existing saved
-Classic/Neon presentation follows the existing PLAYER_SURFACE migration to Enhanced;
-earned progress and aircraft choices are not changed by that migration.
+and stay enabled. Enhanced remains the default. Classic/Enhanced and Day/Neon
+are available to ordinary players, without a review URL or automation exception.
+Saved presentation choices are respected. A choice already overwritten by the
+earlier candidate cannot be inferred; the restored controls let the owner select
+it again. Progress and aircraft choices are preserved.
 
-Enhanced uses Earth-radius curvature with latitude correction and bounded viewing
-distance (High 120 km, Medium 90 km, Low 60 km before the world-unit cap). Existing
-streaming and resource ceilings have not been raised. The Sydney Harbour Bridge
+Enhanced again uses the pre-Explorer horizon and scale. The Earth-radius path is
+retained behind its disabled flag. Existing streaming and resource ceilings have
+not been raised. The Sydney Harbour Bridge
 now has a lightweight first-party arch/hanger silhouette; existing Manhattan hero
 models and the verified Sydney Opera House asset remain in use. `CREDITS.md` is
 generated from the asset manifest and includes the runway data and bridge.
@@ -143,8 +158,8 @@ acceptance timing.
 
 | Earlier assertion | Resolution |
 | --- | --- |
-| New True Earth flags must ship false | On/off behavior is pinned explicitly in the individual tests; candidate ship values are asserted separately. No rendering threshold was loosened. |
-| R25 saved Classic always wins | Preserve the R25 contract with PLAYER_SURFACE explicitly off; its newer migration and production-pin behavior have their own maintained test. |
+| Physical atmosphere must ship enabled | Retired after the owner's visual rejection. Its mathematical/shader checks still run with explicit pins; the shipping check now requires OFF until visual acceptance. No rendering threshold was loosened. |
+| R25 saved Classic always wins | Restored for ordinary players. An unpinned, non-WebDriver test now checks that saved Classic/Neon survive and the look controls remain visible. |
 | `title-free-flight` must exist | Updated to `title-explore`, with a real production UI check of the same entry flow. |
 | Pause must contain the old welcome modal | Welcome moved to the skippable ExplorerGuide; Pause retains the control reference. |
 | Conditions source regex assumes LF | Normalize CRLF at the reader; behavioral requirements are unchanged. |
@@ -169,10 +184,22 @@ VNLK, including sloped terrain and displaced thresholds. These are simulation
 tests; they do not stand in for the ten visual/human airport flights.
 
 The maintained suite contains **30 scripts**, including **17 Explorer cases**.
-The production fixture smoke covers **18 checks** and executes the emitted worker
+The production fixture smoke covers **24 checks** and executes the emitted worker
 bootstrap through its real RPC protocol. The local smoke renderer is
 **RTX 5080 / ANGLE D3D11**, not SwiftShader. Phone screenshots are viewport
 emulation only. The production dependency audit reports zero advisories.
+
+The visual repair passed the production build and all 24 smoke checks, including
+manual fog/clear selection and night/day lighting during frozen composition,
+return to Live, and ordinary-player graphics controls. The initial maintained
+suite passed 29 scripts and failed only the now-retired physical-sky shipping
+assertion; the two shader scripts passed after that contract was corrected.
+Targeted ESLint still reports 26 existing diagnostics in FlyMode/FlyScene; a
+before/after comparison found the same diagnostics and none added by this repair.
+The existing browser was visually inspected at Rio using live scenery, with Clear
+selected and midnight/Live light changes exercised. This is not a same-weather
+image A/B or owner acceptance. The appended `visualRepair` evidence keeps these
+results separate from the earlier candidate's measurements.
 
 ### Live-provider diagnostic and corrections
 

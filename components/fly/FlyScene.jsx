@@ -1719,8 +1719,9 @@ export function FlyScene({ runtime }) {
   const sunBaseRef = useRef(null);
   const hemiBaseRef = useRef(null);
   useEffect(() => {
+    let manualSun = false;
     const apply = () => {
-      if(useFlyStore.getState().cameraMode==='photo')return;
+      if (useFlyStore.getState().cameraMode === 'photo' && !manualSun) return;
       if (useFlyStore.getState().mapStyle !== 'satellite') {
         clearSkyNight(); // toy: hand the dome back to its certified props
         return;
@@ -1806,6 +1807,7 @@ export function FlyScene({ runtime }) {
         (window.__flyStats ??= {}).sunFactor = sun.frac;
         window.__flyHill = { get: getHillshade, set: setHillshade };
       }
+      if (!easing) manualSun = false;
       return easing;
     };
     const easingNow = apply();
@@ -1831,14 +1833,22 @@ export function FlyScene({ runtime }) {
       ? useFlyStore.subscribe(
           (st) => st.conditionsHour,
           () => {
+            manualSun = true;
             if (apply()) glideOn();
           }
         )
       : null;
+    const unsubscribePhoto = useFlyStore.subscribe(
+      (st) => st.cameraMode,
+      (mode, previous) => {
+        if (previous === 'photo' && mode !== 'photo' && apply()) glideOn();
+      },
+    );
     return () => {
       clearInterval(id);
       if (glide) clearInterval(glide);
       unsubscribe?.();
+      unsubscribePhoto();
     };
   }, [mapStyle, warpEpochForSun, adventureEnvironmentEpoch, runtime, spawn]);
 

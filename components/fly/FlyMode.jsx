@@ -5,7 +5,8 @@ import { ExplorerGuide } from './hud/ExplorerGuide';
 import './hud/explorer.css';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { CloudSun, X } from 'lucide-react';
+import { conditionsOn } from '@/lib/fly/player-conditions';
 import { Button } from '@/components/ui/button';
 import { FlyErrorBoundary } from './FlyErrorBoundary';
 import { FlyCanvas } from './FlyCanvas';
@@ -403,8 +404,19 @@ export function FlyMode({ onClose }) {
           Pause button in TouchControls, whose menu carries Exit. R25 A: it
           exits to the title, and only exists while flying (the title and the
           hangar are the menus it would exit to). */}
-      {!isTouch && flyingNow && (
-        <Zone name="exit">
+      {!isTouch && flyingNow && !photoActive && (
+        <Zone name="exit" className="flex items-center gap-2">
+          {conditionsOn() && (
+            <Button
+              variant="ghost"
+              onClick={() => useFlyStore.getState().setPhase('paused')}
+              aria-label="Time and weather"
+              data-testid="flight-conditions"
+              className="pointer-events-auto bg-zinc-900/60 text-zinc-100 hover:bg-zinc-800"
+            >
+              <CloudSun className="h-4 w-4" aria-hidden="true" /> Weather
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"

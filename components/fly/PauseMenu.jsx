@@ -16,6 +16,8 @@ import { MenuButton, SettingsRows } from './hud/SettingsRows';
 import { CreditsPanel } from './hud/CreditsPanel';
 import { exitGoesToTitle } from '@/lib/fly/front-door';
 import { useAdventureStore } from '@/stores/adventure-store';
+import { conditionsOn } from '@/lib/fly/player-conditions';
+import { ConditionsPanel } from './hud/ConditionsPanel';
 
 const CONTROL_ROWS = [
   ['Mouse', 'steer — cursor offset from center commands the turn/pitch'],
@@ -115,6 +117,7 @@ export function PauseMenu({ onExit }) {
             <MenuButton onClick={() => store.setPhase('flying')} primary>
               Resume
             </MenuButton>
+            {conditionsOn() && <ConditionsPanel />}
             <MenuButton onClick={() => useAdventureStore.getState().setLibraryOpen(true)}>Adventures</MenuButton>
             {mapStyle === 'satellite' && immersiveOn() && reviewSurfaceOn() && (
               <div className="space-y-1 rounded-md border border-zinc-700 p-2">
@@ -161,7 +164,7 @@ export function PauseMenu({ onExit }) {
             )}
             {/* R25 A: the rows live in hud/SettingsRows.jsx (shared with the
                 title's Settings sheet); pause keeps its pre-R25 order + markup. */}
-            <SettingsRows />
+            <SettingsRows includeConditions={false} />
             <MenuButton onClick={() => store.openCredits()}>Credits &amp; licenses</MenuButton>
             {exitGoesToTitle() ? (
               // R25 A: leave the flight for the title over the live world

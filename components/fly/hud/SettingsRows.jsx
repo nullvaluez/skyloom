@@ -33,7 +33,7 @@ const VISUALS_ROW = [
  * byte-identical DOM when no R25 visual block ships (the Visuals row renders
  * only when visualsAvailable()).
  */
-export function SettingsRows({ sheet = false }) {
+export function SettingsRows({ sheet = false, includeConditions = true }) {
   const qualityTier = useFlyStore((s) => s.qualityTier);
   const qualityPreset = useFlyStore((s) => s.qualityPreset);
   const soundOn = useFlyStore((s) => s.soundOn);
@@ -206,10 +206,10 @@ export function SettingsRows({ sheet = false }) {
 
   return sheet ? (
     <>
+      {includeConditions && conditionsRow}
       {visualsRow}
       {mapStyleRow}
       {qualityRow}
-      {conditionsRow}
       {soundRow}
       <FlightComfortSettings />
       {reducedRow}
@@ -219,10 +219,10 @@ export function SettingsRows({ sheet = false }) {
     </>
   ) : (
     <>
+      {includeConditions && conditionsRow}
       {visualsRow}
       {qualityRow}
       {mapStyleRow}
-      {conditionsRow}
       {soundRow}
       <FlightComfortSettings />
       {reducedRow}

@@ -484,7 +484,9 @@ void main() {
   }
 }
 
-check('(7) the beta ships the tested physical atmosphere', RT.physSkyOn() === true && PHYS_SKY.enabled === true);
+// Mathematical agreement did not establish an acceptable integrated look.
+// The owner rejected the Explorer visuals; the opt-in paths below remain tested.
+check('(7) physical atmosphere stays opt-in pending visual acceptance', RT.physSkyOn() === false && PHYS_SKY.enabled === false);
 
 {
   const { execFileSync } = await import('node:child_process');

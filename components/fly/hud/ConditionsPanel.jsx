@@ -26,7 +26,7 @@ export function ConditionsPanel({ compact = false }) {
 
   return (
     <div className="rounded-md border border-zinc-700/60 p-2" data-testid="conditions-panel">
-      <div className="mb-1.5 text-center text-[10px] uppercase tracking-widest text-zinc-500">Conditions</div>
+      <div className="mb-1.5 text-center text-[10px] uppercase tracking-widest text-zinc-400">Time &amp; weather</div>
       {curated && (
         <p className="mb-2 text-center text-xs text-zinc-400" data-testid="conditions-curated">
           This adventure sets its own time and weather.

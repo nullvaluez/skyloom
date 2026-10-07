@@ -44,7 +44,7 @@ if (legArg) {
       setItem: (k, v) => store.set(k, String(v)),
       removeItem: (k) => store.delete(k),
     },
-    __flyPlayerSurfaceOverride: { enabled: !!leg.flag },
+    ...(typeof leg.flag === 'boolean' ? { __flyPlayerSurfaceOverride: { enabled: leg.flag } } : {}),
   };
   Object.defineProperty(globalThis, 'navigator', { value: { webdriver: leg.webdriver }, configurable: true });
   register('./_node-resolve.mjs', import.meta.url);
@@ -86,6 +86,9 @@ const run = (leg) =>
       .pop(),
   );
 const legacy = (r) => r.surface === true && r.mapStyle === 'toy' && r.visuals === 'classic' && r.savedStyle === 'toy' && r.savedVisuals === 'classic';
+
+const shipped = run({ webdriver: false, review: false });
+check('shipped ordinary-player settings retain Classic/Neon and show the look controls', legacy(shipped), JSON.stringify(shipped));
 
 const off = run({ flag: false, webdriver: false, review: false });
 check('(1) flag off: nothing moves', legacy(off), JSON.stringify(off));

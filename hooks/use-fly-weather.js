@@ -8,6 +8,7 @@ import {
   computeTargets,
   createWeatherState,
   proceduralWeather,
+  snapWeather,
 } from '@/lib/fly/weather-model';
 import { settleOn, sinceRevealMs } from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
@@ -70,10 +71,10 @@ function inArrivalGrace() {
 }
 
 /** Recompute the targets in place from the last payload + the override. */
-function refreshWeatherTargets(runtime) {
+function refreshWeatherTargets(runtime, manual = false) {
   const w = runtime?.weather;
   if (!w) return;
-  if (inArrivalGrace()) return;
+  if (!manual && inArrivalGrace()) return;
   let payload = w.data && w.data.found ? w.data : null;
   // Designed-but-OFF fallback (WEATHER.fallback ships 'baseline'): invent
   // plausible weather when both upstreams miss. An explicit override still
@@ -86,6 +87,9 @@ function refreshWeatherTargets(runtime) {
   const picked = conditionsOn() ? playerWeatherPayload(useFlyStore.getState().conditionsWeather) : null;
   computeTargets(adventureWeather(runtime.adventureEnvironment, picked ?? payload), WEATHER, w.targets);
   w.state = w.targets.state;
+  // A deliberate selection must work even during frozen photo composition.
+  // Only live evolution is held; the player can still light their photograph.
+  if (manual) snapWeather(w.wx, w.targets);
 
   const s = devStats();
   if (s) {
@@ -173,10 +177,25 @@ export function useFlyWeather(runtime, enabled = true) {
   // place `window.__flyWeatherOverride` is read, so a harness that sets the
   // override mid-session sees it applied within one tick — and the per-frame
   // stepper stays a pure damping loop with zero allocation.
-  const refreshTargets = useCallback(() => {
-    if(useFlyStore.getState().cameraMode==='photo')return;
-    refreshWeatherTargets(runtime);
+  const refreshTargets = useCallback((manual = false) => {
+    if (!manual && useFlyStore.getState().cameraMode === 'photo') return;
+    refreshWeatherTargets(runtime, manual);
   }, [runtime]);
+
+  useEffect(() => {
+    if (!on || !conditionsOn()) return undefined;
+    const stopPick = useFlyStore.subscribe(
+      (s) => s.conditionsWeather,
+      () => refreshTargets(true),
+    );
+    const stopPhoto = useFlyStore.subscribe(
+      (s) => s.cameraMode,
+      (mode, previous) => {
+        if (previous === 'photo' && mode !== 'photo') refreshTargets();
+      },
+    );
+    return () => { stopPick(); stopPhoto(); };
+  }, [on, refreshTargets]);
 
   useEffect(() => {
     if (!on) {

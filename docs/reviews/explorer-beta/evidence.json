@@ -652,5 +652,359 @@
         "programs": 131
       }
     ]
+  },
+  "visualRepair": {
+    "recordedAt": "2026-10-07T18:46:30.955Z",
+    "baseCommit": "f216d0a9b7b437508464d781dae8ff95660f3a31",
+    "productionBuildId": "psG4VUb8ObD3meydhPfon",
+    "applicationDiffSha256": "05ca010810d37fea429ffb9cfaa22443e6ff8eb069216e6bbdb6ad8f1504b4f0",
+    "status": "Visual bundle rolled back after owner rejection. Manual weather/time fixed; subjective acceptance remains open.",
+    "revertedDefaults": [
+      "TWILIGHT_FIX",
+      "SUN_TRUE_AZ",
+      "PLAYER_SURFACE",
+      "TRUE_SCALE",
+      "TRUE_AREAS",
+      "PHYS_SKY",
+      "EARTH_HORIZON"
+    ],
+    "initialSuite": {
+      "at": "2026-10-07T18:33:03.457Z",
+      "venue": "local automated checks; no human/device acceptance implied",
+      "rows": [
+        {
+          "file": "verify-import-integrity.mjs",
+          "ok": true,
+          "ms": 9288
+        },
+        {
+          "file": "verify-true-earth-flags.mjs",
+          "ok": true,
+          "ms": 123
+        },
+        {
+          "file": "verify-r25-front-door.mjs",
+          "ok": true,
+          "ms": 259
+        },
+        {
+          "file": "verify-attribution.mjs",
+          "ok": true,
+          "ms": 196
+        },
+        {
+          "file": "verify-provider-adapters.mjs",
+          "ok": true,
+          "ms": 143
+        },
+        {
+          "file": "verify-explorer.mjs",
+          "ok": true,
+          "ms": 467
+        },
+        {
+          "file": "verify-flight-operations.mjs",
+          "ok": true,
+          "ms": 204
+        },
+        {
+          "file": "verify-operations-disclosure.mjs",
+          "ok": true,
+          "ms": 43
+        },
+        {
+          "file": "verify-adventures.mjs",
+          "ok": true,
+          "ms": 225
+        },
+        {
+          "file": "verify-adventure-runtime.mjs",
+          "ok": true,
+          "ms": 102
+        },
+        {
+          "file": "verify-adventure-photo.mjs",
+          "ok": true,
+          "ms": 106
+        },
+        {
+          "file": "verify-adventure-hud.mjs",
+          "ok": true,
+          "ms": 552
+        },
+        {
+          "file": "verify-adventure-guidance.mjs",
+          "ok": true,
+          "ms": 82
+        },
+        {
+          "file": "verify-adventure-flight.mjs",
+          "ok": true,
+          "ms": 461
+        },
+        {
+          "file": "verify-adventure-activities.mjs",
+          "ok": true,
+          "ms": 122
+        },
+        {
+          "file": "verify-encounters.mjs",
+          "ok": true,
+          "ms": 729
+        },
+        {
+          "file": "verify-encounter-runtime.mjs",
+          "ok": true,
+          "ms": 145
+        },
+        {
+          "file": "verify-mobile-actions-node.mjs",
+          "ok": true,
+          "ms": 53
+        },
+        {
+          "file": "verify-twilight.mjs",
+          "ok": true,
+          "ms": 167
+        },
+        {
+          "file": "verify-sun-azimuth.mjs",
+          "ok": true,
+          "ms": 82
+        },
+        {
+          "file": "verify-load-guard.mjs",
+          "ok": true,
+          "ms": 289
+        },
+        {
+          "file": "verify-device-tiers.mjs",
+          "ok": true,
+          "ms": 433
+        },
+        {
+          "file": "verify-true-scale.mjs",
+          "ok": true,
+          "ms": 1300
+        },
+        {
+          "file": "verify-conditions.mjs",
+          "ok": true,
+          "ms": 342
+        },
+        {
+          "file": "verify-player-surface.mjs",
+          "ok": true,
+          "ms": 642
+        },
+        {
+          "file": "verify-cloud-calm.mjs",
+          "ok": true,
+          "ms": 967
+        },
+        {
+          "file": "verify-raster-retry.mjs",
+          "ok": true,
+          "ms": 85
+        },
+        {
+          "file": "verify-true-areas.cjs",
+          "ok": true,
+          "ms": 354
+        },
+        {
+          "file": "verify-hdr-guard.mjs",
+          "ok": true,
+          "ms": 507
+        },
+        {
+          "file": "verify-phys-sky.mjs",
+          "ok": false,
+          "ms": 2479
+        }
+      ]
+    },
+    "shaderRerun": {
+      "at": "2026-10-07T18:44:19.870Z",
+      "venue": "local automated checks; no human/device acceptance implied",
+      "rows": [
+        {
+          "file": "verify-hdr-guard.mjs",
+          "ok": true,
+          "ms": 493
+        },
+        {
+          "file": "verify-phys-sky.mjs",
+          "ok": true,
+          "ms": 2451
+        }
+      ]
+    },
+    "note": "Initial suite had 29 passing scripts and the obsolete physical-sky-must-ship assertion failed. That shipping contract was explicitly changed after owner rejection; both shader scripts then passed. No numerical threshold changed.",
+    "productionSmoke": {
+      "at": "2026-10-07T18:42:56.630Z",
+      "venue": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11); phone viewport emulated",
+      "flags": "",
+      "rows": [
+        {
+          "name": "production title offers destination discovery",
+          "ok": true
+        },
+        {
+          "name": "comfort settings persist",
+          "ok": true
+        },
+        {
+          "name": "journal has six regional collections",
+          "ok": true
+        },
+        {
+          "name": "regional airport loads into preparation",
+          "ok": true
+        },
+        {
+          "name": "generic airport does not promise apron operations",
+          "ok": true
+        },
+        {
+          "name": "production vector worker asset located",
+          "ok": true,
+          "detail": "1587.39ab55f0404d0bbc.js"
+        },
+        {
+          "name": "bundled worker builds real fixture geometry",
+          "ok": true,
+          "detail": {
+            "empty": false,
+            "vertices": 95355,
+            "keys": [
+              "empty",
+              "tessMs",
+              "v",
+              "land",
+              "building",
+              "trees",
+              "grass"
+            ]
+          }
+        },
+        {
+          "name": "first flight starts with skippable guidance",
+          "ok": true
+        },
+        {
+          "name": "photo mode uses its own weather controls without a competing pause shortcut",
+          "ok": true
+        },
+        {
+          "name": "photo composition freezes flight and local animation time",
+          "ok": true
+        },
+        {
+          "name": "manual weather changes apply inside frozen photo mode",
+          "ok": true
+        },
+        {
+          "name": "photo time changes relight the scene without moving the aircraft",
+          "ok": true
+        },
+        {
+          "name": "failed photo encoding awards no photograph",
+          "ok": true
+        },
+        {
+          "name": "photo export produces a PNG",
+          "ok": true
+        },
+        {
+          "name": "weather is immediately reachable from the flight HUD",
+          "ok": true
+        },
+        {
+          "name": "returning to Live resumes weather after photo composition",
+          "ok": true
+        },
+        {
+          "name": "successful photograph appears in the journal",
+          "ok": true
+        },
+        {
+          "name": "feed loss leaves exploration available",
+          "ok": true
+        },
+        {
+          "name": "context loss exposes a recovery action",
+          "ok": true
+        },
+        {
+          "name": "restored graphics resume through an explicit action",
+          "ok": true
+        },
+        {
+          "name": "phone viewport title has no horizontal overflow",
+          "ok": true
+        },
+        {
+          "name": "ordinary players retain visual choices without review or automation exceptions",
+          "ok": true
+        },
+        {
+          "name": "phone preparation supports the same destination flow",
+          "ok": true
+        },
+        {
+          "name": "production browser has no uncaught errors",
+          "ok": true,
+          "detail": []
+        }
+      ]
+    },
+    "lintComparison": [
+      {
+        "file": "components/fly/FlyMode.jsx",
+        "before": 1,
+        "after": 1,
+        "sameDiagnostics": true
+      },
+      {
+        "file": "components/fly/FlyScene.jsx",
+        "before": 25,
+        "after": 25,
+        "sameDiagnostics": true
+      },
+      {
+        "file": "components/fly/PauseMenu.jsx",
+        "before": 0,
+        "after": 0,
+        "sameDiagnostics": true
+      },
+      {
+        "file": "components/fly/hud/ConditionsPanel.jsx",
+        "before": 0,
+        "after": 0,
+        "sameDiagnostics": true
+      },
+      {
+        "file": "components/fly/hud/SettingsRows.jsx",
+        "before": 0,
+        "after": 0,
+        "sameDiagnostics": true
+      },
+      {
+        "file": "hooks/use-fly-weather.js",
+        "before": 0,
+        "after": 0,
+        "sameDiagnostics": true
+      }
+    ],
+    "visualInspection": {
+      "venue": "Existing Codex in-app browser, ordinary localhost:3094 URL, live scenery providers",
+      "observations": [
+        "Rio terrain and imagery visible after rollback",
+        "Clear weather selected through player controls",
+        "Manual midnight and Live daylight relit frozen photo scene"
+      ],
+      "limits": "A conservative bundle rollback, not an isolated proof of one offending flag. Clear-weather image is not a same-weather before/after measurement."
+    }
   }
 }
