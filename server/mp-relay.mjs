@@ -21,9 +21,12 @@
  *
  * ENV (none are secrets; startRelay(opts) overrides each):
  *   MP_HOST (127.0.0.1)  MP_PORT (8787)  MP_PATH (/mp)
- *   MP_ORIGINS           comma list; exact origins or a '*' in the leftmost host
- *                        label (https://*--site.netlify.app); a ':*' port = any.
- *                        Unset -> http://localhost:* and http://127.0.0.1:* only.
+ *   MP_ORIGINS           comma list; exact origins, a '*' in the leftmost host
+ *                        label (https://*--site.netlify.app), a ':*' port = any,
+ *                        or `same` = the site the relay is served from (the
+ *                        Origin's host equals the request's Host header, i.e.
+ *                        the relay sits behind that site's own reverse proxy).
+ *                        Unset -> same, http://localhost:* and http://127.0.0.1:*.
  *   MP_ALLOW_NO_ORIGIN   '1' admits an upgrade without an Origin header
  *   MP_TRUST_PROXY       loopback (default) | CIDR list | all
  *   MP_CLIENT_IP_HEADER  x-forwarded-for (default) | fly-client-ip | cf-connecting-ip | x-real-ip
@@ -234,12 +237,38 @@ export function clientIp(peer, headers, trust, headerName = 'x-forwarded-for', t
 // ---- Origin ----------------------------------------------------------------
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** An Origin predicate carrying `bad` (1-based positions of entries that do not parse, skipped) and `size`. */
+/**
+ * `same`: the page and the relay share one site (CloudPanel / Caddy / nginx
+ * proxying /mp on the app's own domain). A browser cannot forge Origin or Host,
+ * so a page on another site never matches; like every Origin rule this is
+ * anti-hotlinking, not authentication. Ports are ignored (a proxy's Host
+ * usually drops the default port, Origin keeps a non-default one).
+ */
+function sameSite(origin, host) {
+  if (typeof host !== 'string' || !host.trim()) return false;
+  let u;
+  try {
+    u = new URL(origin);
+  } catch {
+    return false;
+  }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
+  const h = host.trim().toLowerCase();
+  const hostname = h.startsWith('[') ? h.slice(0, h.indexOf(']') + 1) : h.split(':')[0];
+  return u.hostname.toLowerCase() === hostname;
+}
+
+/** An Origin predicate (origin, host) carrying `bad` (1-based positions of entries that do not parse, skipped) and `size`. */
 function originMatcher(list) {
   const res = [];
   const bad = [];
+  let same = false;
   for (const [i, raw] of list.entries()) {
     if (!String(raw).trim()) continue;
+    if (String(raw).trim().toLowerCase() === 'same') {
+      same = true;
+      continue;
+    }
     const m = /^(https?):\/\/([^/:]+)(?::(\d+|\*))?\/?$/i.exec(String(raw).trim());
     const labels = m ? m[2].toLowerCase().split('.') : [];
     // '*' only in the leftmost label
@@ -252,9 +281,10 @@ function originMatcher(list) {
     const port = m[3] === '*' ? '(?::\\d+)?' : m[3] ? `:${m[3]}` : '';
     res.push(new RegExp(`^${m[1].toLowerCase()}://${host}${port}$`));
   }
-  const ok = (origin) => typeof origin === 'string' && res.some((r) => r.test(origin.toLowerCase()));
+  const ok = (origin, host) =>
+    typeof origin === 'string' && (res.some((r) => r.test(origin.toLowerCase())) || (same && sameSite(origin, host)));
   ok.bad = bad;
-  ok.size = res.length;
+  ok.size = res.length + (same ? 1 : 0);
   return ok;
 }
 
@@ -274,9 +304,9 @@ export async function startRelay(opts = {}) {
   const warns = [];
   const originsList =
     cfg.origins == null ? null : Array.isArray(cfg.origins) ? cfg.origins : String(cfg.origins).split(',');
-  const originOk = originMatcher(originsList ?? ['http://localhost:*', 'http://127.0.0.1:*']);
-  if (originsList == null) warns.push('mp warn MP_ORIGINS unset: only localhost origins (any port) may connect');
-  else if (!originOk.size) throw new Error('mp config: MP_ORIGINS has no valid entry (scheme://host[:port])');
+  const originOk = originMatcher(originsList ?? ['same', 'http://localhost:*', 'http://127.0.0.1:*']);
+  if (originsList == null) warns.push('mp note MP_ORIGINS unset: the relay\'s own site and localhost (any port) may connect');
+  else if (!originOk.size) throw new Error('mp config: MP_ORIGINS has no valid entry (scheme://host[:port] or same)');
   else if (originOk.bad.length) warns.push(`mp warn MP_ORIGINS entries #${originOk.bad.join(',#')} ignored: not scheme://host[:port]`);
   const trust = makeTrust(cfg.trustProxy);
   const trustSpec = String(cfg.trustProxy ?? '').trim().toLowerCase();
@@ -404,7 +434,7 @@ export async function startRelay(opts = {}) {
       return abort(socket, 404);
     }
     const origin = req.headers.origin;
-    if (origin === undefined ? !cfg.allowNoOrigin : !originOk(origin)) {
+    if (origin === undefined ? !cfg.allowNoOrigin : !originOk(origin, req.headers.host)) {
       c.reject.origin++;
       return abort(socket, 403);
     }
@@ -587,12 +617,19 @@ export async function startRelay(opts = {}) {
 // Auto-start only when run directly (`node server/mp-relay.mjs`), never on
 // import. Realpaths on both sides: node gives a symlinked main (a
 // /srv/app/current -> releases/N layout) its real path in import.meta.url.
+// PM2 (CloudPanel's process manager) runs a script through its own wrapper, so
+// argv[1] is PM2's ProcessContainerFork; it names the real script in
+// pm_exec_path instead. Without this the relay sat "online" and never listened.
 function isMain() {
-  try {
-    return !!process.argv[1] && fs.realpathSync(path.resolve(process.argv[1])) === fs.realpathSync(fileURLToPath(import.meta.url));
-  } catch {
-    return false;
-  }
+  const self = fs.realpathSync(fileURLToPath(import.meta.url));
+  const is = (p) => {
+    try {
+      return !!p && fs.realpathSync(path.resolve(p)) === self;
+    } catch {
+      return false;
+    }
+  };
+  return is(process.argv[1]) || is(process.env.pm_exec_path);
 }
 if (isMain()) {
   const relay = await startRelay();

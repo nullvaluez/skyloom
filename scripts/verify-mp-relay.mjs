@@ -11,6 +11,7 @@
  *  (1)  welcome + callsign format; (2) same seed -> same callsign, old socket
  *       4000; (3) colliding callsigns made unique; (4) ?v=2 -> err + 4002;
  *  (5)  Origin / path refused BEFORE a socket exists (403 / 404, raw upgrade);
+ *  (37) MP_ORIGINS unset = `same` + localhost: the relay's own site is admitted with no config;
  *  (6)  A and B 2 km apart: B gets enter{cs:A} THEN a batch whose decoded
  *       lat/lon match within 1e-6, nearCount 1;
  *  (7)  C 500 km away gets nothing; (8) C at 140 km -> enter + ~1 record/s;
@@ -43,6 +44,7 @@
  *      no valid entry refuse to start; a bad entry beside good ones is a
  *      warning naming its position; a failed listen leaves no timer running.
  * (31) a SYMLINKED main auto-starts, and SIGTERM stops it cleanly (exit 0).
+ * (38) the PM2 launch shape (wrapper argv[1], pm_exec_path = the relay) auto-starts; a plain import never does.
  * (32) THE LOG: every captured line, from every instance, holds no loopback or
  *      XFF test address, no callsign and no pilot id.
  * WORLD direct (fake clock): (33) 2,000 pilots across the antimeridian and
@@ -82,7 +84,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startRelay, ipKeys, makeTrust, clientIp } from '../server/mp-relay.mjs';
 import { createWorld, callsignFor, CALLSIGN_NOUNS, CALLSIGN_DENY, KM_PER_DEG } from '../server/mp-world.mjs';
 import * as P from '../lib/fly/mp/protocol.mjs';
@@ -895,6 +897,40 @@ check(
   );
 }
 
+// (38) under PM2 (CloudPanel's process manager) argv[1] is PM2's wrapper and the
+// real script is named in pm_exec_path: the relay must still start. A plain
+// import with no pm_exec_path must NOT start one (the gate's own startRelay path).
+{
+  const relayPath = fileURLToPath(new URL('../server/mp-relay.mjs', import.meta.url));
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('MP_') && k !== 'pm_exec_path'));
+  const runWrapped = async (pmPath) => {
+    const wrapper = `import(${JSON.stringify(pathToFileURL(relayPath).href)}).then(() => setTimeout(() => {}, 3000));`;
+    const child = spawn(process.execPath, ['--input-type=module', '-e', wrapper], {
+      env: { ...env, MP_PORT: '0', ...(pmPath ? { pm_exec_path: pmPath } : {}) },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let out = '';
+    child.stdout.on('data', (d) => (out += d));
+    child.stderr.on('data', (d) => (out += d));
+    const exited = new Promise((r) => child.on('exit', (code) => r(code)));
+    const started = !!(await waitFor(() => out.includes('mp relay start'), pmPath ? 5000 : 1500));
+    const port = Number(/port=(\d+)/.exec(out)?.[1]);
+    const h = started ? await healthz(port).catch(() => null) : null;
+    child.kill('SIGINT');
+    const code = await Promise.race([exited, sleep(4000).then(() => 'timeout')]);
+    if (code === 'timeout') child.kill('SIGKILL');
+    for (const line of out.split('\n')) if (line) logs.push(line);
+    return { started, status: h?.status, code, stop: out.includes('mp relay stop') };
+  };
+  const pm = await runWrapped(relayPath);
+  const plain = await runWrapped(null);
+  check(
+    '(38) launched the PM2 way (wrapper argv, pm_exec_path = the relay) it starts and SIGINT stops it; a plain import does not start one',
+    pm.started && pm.status === 200 && pm.code === 0 && pm.stop && !plain.started,
+    `pm2-style: started ${pm.started}, healthz ${pm.status}, exit ${pm.code}, stop ${pm.stop}; plain import started ${plain.started}`
+  );
+}
+
 // (32) the log
 {
   const banned = ['127.0.0.1', '::1', '203.0.113', '198.51.100', '192.0.2.', '2001:db8', 'fe80'];
@@ -1105,6 +1141,32 @@ function miniWorld(cfg = {}) {
     '(36) 40 aircraft flips in 2 s send the current viewer no enter (records keep flowing); a new viewer\'s enter carries the latest',
     spam === 0 && records >= 15 && nEnter?.a === S.a && S.a === 0,
     `${spam} enters to the current viewer, ${records} batches; new viewer enter a=${nEnter?.a} (latest ${S.a})`
+  );
+}
+
+// (37) `same` origin: zero-config behind the site's own proxy (CloudPanel nginx,
+// Caddy). The default (MP_ORIGINS unset) admits the page whose Origin host is
+// the request's Host and still refuses every other site; an explicit list
+// without `same` does not; `same` inside a list does.
+{
+  const up = (p, origin, host) => rawUpgrade(p, '/mp?v=1', { Origin: origin, Host: host });
+  const dflt = await startRelay({ port: 0, log });
+  const own = await up(dflt.port, 'https://skyloom.example.com', 'skyloom.example.com');
+  const ownPort = await up(dflt.port, 'https://skyloom.example.com:8443', 'skyloom.example.com');
+  const other = await up(dflt.port, 'https://evil.example', 'skyloom.example.com');
+  const suffix = await up(dflt.port, 'https://skyloom.example.com.evil.example', 'skyloom.example.com');
+  const noHost = await up(dflt.port, 'https://skyloom.example.com', '');
+  const listed = await startRelay({ port: 0, log, origins: 'https://app.example.org' });
+  const notSame = await up(listed.port, 'https://skyloom.example.com', 'skyloom.example.com');
+  const withSame = await startRelay({ port: 0, log, origins: 'https://app.example.org,same' });
+  const sameOk = await up(withSame.port, 'https://skyloom.example.com', 'skyloom.example.com');
+  for (const r of [own, ownPort, sameOk]) r.socket?.destroy();
+  await Promise.all([dflt.close(), listed.close(), withSame.close()]);
+  check(
+    "(37) MP_ORIGINS unset admits the relay's own site (port-agnostic) and refuses others; a list without `same` refuses it, `same` in a list admits it",
+    own.status === 101 && ownPort.status === 101 && other.status === 403 && suffix.status === 403 && noHost.status === 403 &&
+      notSame.status === 403 && sameOk.status === 101,
+    `own ${own.status} · own:8443 ${ownPort.status} · other ${other.status} · suffix ${suffix.status} · no Host ${noHost.status} · list ${notSame.status} · list+same ${sameOk.status}`
   );
 }
 
