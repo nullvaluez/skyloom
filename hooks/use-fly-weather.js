@@ -8,12 +8,9 @@ import {
   computeTargets,
   createWeatherState,
   proceduralWeather,
-  snapWeather,
 } from '@/lib/fly/weather-model';
 import { settleOn, sinceRevealMs } from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
-import { adventureWeather } from '@/lib/fly/adventure-environment.mjs';
-import { conditionsOn, playerWeatherPayload } from '@/lib/fly/player-conditions';
 
 // Round 16 "Living World" — real weather at the player's position.
 //
@@ -71,10 +68,10 @@ function inArrivalGrace() {
 }
 
 /** Recompute the targets in place from the last payload + the override. */
-function refreshWeatherTargets(runtime, manual = false) {
+function refreshWeatherTargets(runtime) {
   const w = runtime?.weather;
   if (!w) return;
-  if (!manual && inArrivalGrace()) return;
+  if (inArrivalGrace()) return;
   let payload = w.data && w.data.found ? w.data : null;
   // Designed-but-OFF fallback (WEATHER.fallback ships 'baseline'): invent
   // plausible weather when both upstreams miss. An explicit override still
@@ -82,14 +79,11 @@ function refreshWeatherTargets(runtime, manual = false) {
   if (!payload && WEATHER.fallback === 'procedural' && runtime.geo) {
     payload = proceduralWeather(runtime.geo.y, runtime.geo.x, Date.now(), WEATHER);
   }
-  // TRUE EARTH (CONDITIONS): the player's preset outranks Live but not a
-  // curated Adventure (adventureWeather) or a harness pin (computeTargets).
-  const picked = conditionsOn() ? playerWeatherPayload(useFlyStore.getState().conditionsWeather) : null;
-  computeTargets(adventureWeather(runtime.adventureEnvironment, picked ?? payload), WEATHER, w.targets);
+  // Live observations are the only player weather source. Old manual picks
+  // and authored adventure presets cannot override them. Explicit test pins
+  // remain inside computeTargets for deterministic diagnostics.
+  computeTargets(payload, WEATHER, w.targets);
   w.state = w.targets.state;
-  // A deliberate selection must work even during frozen photo composition.
-  // Only live evolution is held; the player can still light their photograph.
-  if (manual) snapWeather(w.wx, w.targets);
 
   const s = devStats();
   if (s) {
@@ -177,24 +171,20 @@ export function useFlyWeather(runtime, enabled = true) {
   // place `window.__flyWeatherOverride` is read, so a harness that sets the
   // override mid-session sees it applied within one tick — and the per-frame
   // stepper stays a pure damping loop with zero allocation.
-  const refreshTargets = useCallback((manual = false) => {
-    if (!manual && useFlyStore.getState().cameraMode === 'photo') return;
-    refreshWeatherTargets(runtime, manual);
+  const refreshTargets = useCallback(() => {
+    if (useFlyStore.getState().cameraMode === 'photo') return;
+    refreshWeatherTargets(runtime);
   }, [runtime]);
 
   useEffect(() => {
-    if (!on || !conditionsOn()) return undefined;
-    const stopPick = useFlyStore.subscribe(
-      (s) => s.conditionsWeather,
-      () => refreshTargets(true),
-    );
+    if (!on) return undefined;
     const stopPhoto = useFlyStore.subscribe(
       (s) => s.cameraMode,
       (mode, previous) => {
         if (previous === 'photo' && mode !== 'photo') refreshTargets();
       },
     );
-    return () => { stopPick(); stopPhoto(); };
+    return stopPhoto;
   }, [on, refreshTargets]);
 
   useEffect(() => {

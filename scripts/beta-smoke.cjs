@@ -20,6 +20,9 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
   browser=await chromium.launch({args:[...(process.env.BETA_SOFTWARE==='1'?['--use-angle=swiftshader']:process.platform==='win32'?['--use-angle=d3d11']:[]),'--enable-unsafe-swiftshader','--ignore-gpu-blocklist']});
   const context=await browser.newContext({viewport:{width:1440,height:900},acceptDownloads:true});
   fixture=await attachFixture(context);
+  // Exercise the real weather adapter with an observation, rather than the
+  // world fixture's intentional {found:false} response. No runtime weather pin.
+  await context.route('**/api/weather?**',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({found:true,source:'beta-fixture',cloudCoverPct:70,visM:20000,windMps:5,windDirDeg:90,precip:'none',tempC:20,observedAt:Date.now(),availability:'live'})}));
   await context.addInitScript(pin=>{window.__flyTileFixture=pin;localStorage.setItem('fly-sound-on','0');localStorage.setItem('fly-quality-tier','low');},fixturePin(fixture.url));
   page=await context.newPage();const errors=[];page.setDefaultTimeout(90000);page.on('pageerror',e=>errors.push(e.message));
   // Review exposes the existing diagnostic handles. No feature, world-style,
@@ -30,6 +33,7 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
   console.log('Renderer',renderer);
   check('production title offers destination discovery',await page.getByTestId('title-explore').isVisible());
   await page.getByTestId('title-settings').click();
+  check('settings keep weather and time live without condition presets',await page.getByTestId('conditions-panel').count()===0);
   await page.getByLabel('Steering sensitivity',{exact:true}).fill('1.25');
   await page.getByLabel('Invert pitch',{exact:true}).check();
   check('comfort settings persist',await page.evaluate(()=>JSON.parse(localStorage.getItem('fly-explorer-preferences-v1')).settings.invertPitch));
@@ -69,23 +73,17 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
   check('first flight starts with skippable guidance',await page.getByRole('button',{name:'Skip tips',exact:true}).isVisible());
   await page.getByRole('button',{name:'Skip tips',exact:true}).click();
   await page.waitForFunction(()=>window.__fly?.worldLoading!==true&&window.__flyBoot?.pct===100);
+  await page.waitForFunction(()=>window.__fly.weather?.wx.source==='beta-fixture');
   await page.keyboard.press('p');await page.getByTestId('photo-composition').waitFor();
-  check('photo mode uses its own weather controls without a competing pause shortcut',await page.getByTestId('flight-conditions').count()===0);
+  check('photo composition has no weather or time override controls',await page.getByTestId('flight-conditions').count()===0&&await page.getByTestId('photo-conditions').count()===0&&await page.getByTestId('conditions-panel').count()===0);
   const frozen=await page.evaluate(()=>({position:window.__fly.flight.pos.toArray(),time:window.__fly.explorerVisualTime}));
   await delay(2000);
   check('photo composition freezes flight and local animation time',await page.evaluate(before=>{const r=window.__fly;return r.flight.pos.toArray().every((v,i)=>v===before.position[i])&&r.explorerVisualTime===before.time;},frozen));
-  await page.getByTestId('photo-conditions').click();
-  await page.getByTestId('conditions-weather-fog').click();
-  await page.waitForFunction(()=>window.__fly.weather.wx.fogT===1);
-  await page.getByTestId('conditions-weather-clear').click();
-  await page.waitForFunction(()=>window.__fly.weather.wx.fogT===0&&window.__fly.weather.wx.source==='player');
-  check('manual weather changes apply inside frozen photo mode',await page.getByTestId('conditions-weather-clear').getAttribute('aria-pressed')==='true');
-  await page.getByTestId('conditions-time').fill('0');
-  await page.waitForFunction(()=>window.__fly.sun.sinEl<-.3);
-  await page.getByTestId('conditions-time').fill('12');
-  await page.waitForFunction(()=>window.__fly.sun.sinEl>.3);
-  check('photo time changes relight the scene without moving the aircraft',await page.evaluate(before=>{const r=window.__fly;return r.flight.pos.toArray().every((v,i)=>v===before.position[i])&&r.explorerVisualTime===before.time;},frozen));
-  await page.getByTestId('photo-conditions').click();
+  const liveWeather=await page.evaluate(()=>JSON.stringify(window.__fly.weather.wx));
+  // Historical session preferences must not become a hidden weather override.
+  await page.evaluate(()=>{window.__flyStore.getState().setConditionsWeather('fog');window.__flyStore.getState().setConditionsHour(0);});
+  await delay(1500);
+  check('legacy condition choices cannot alter the frozen live scene',await page.evaluate(before=>JSON.stringify(window.__fly.weather.wx)===before,liveWeather));
   // The failed encode must not earn a photograph or leave the shutter busy.
   await page.evaluate(()=>{window.__betaToBlob=HTMLCanvasElement.prototype.toBlob;HTMLCanvasElement.prototype.toBlob=function(callback){callback(null);};});
   await page.getByTestId('photo-shutter').click();await page.getByText('capture failed',{exact:true}).first().waitFor();
@@ -95,13 +93,11 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
   await download.saveAs(path.join(OUT,'flight-memory.png'));
   check('photo export produces a PNG',download.suggestedFilename().endsWith('.png'));
   await page.getByTestId('photo-exit').click();
-  await page.getByTestId('flight-conditions').click();
-  check('weather is immediately reachable from the flight HUD',await page.getByTestId('conditions-panel').isVisible());
-  await page.getByTestId('conditions-weather-live').click();
-  await page.getByTestId('conditions-time-live').click();
+  await page.keyboard.press('Escape');
+  check('flight and pause menus have no manual condition controls',await page.getByTestId('flight-conditions').count()===0&&await page.getByTestId('conditions-panel').count()===0);
   await page.getByRole('button',{name:'Resume',exact:true}).click();
-  await page.waitForFunction(()=>window.__fly.weather.wx.source!=='player');
-  check('returning to Live resumes weather after photo composition',await page.evaluate(()=>window.__flyStore.getState().conditionsWeather===null&&window.__flyStore.getState().conditionsHour===null));
+  await delay(1500);
+  check('photo exit automatically resumes feed weather despite legacy preferences',await page.evaluate(()=>{const w=window.__fly.weather;return w.wx.source===w.data.source&&w.wx.source!=='player'&&w.wx.source!=='adventure';}));
   await page.keyboard.press('l');
   await page.locator('.explorer-photos figure').first().waitFor();
   check('successful photograph appears in the journal',await page.locator('.explorer-photos figure').count()===1);
@@ -120,6 +116,7 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
   const p=await phone.newPage();p.setDefaultTimeout(90000);p.on('pageerror',e=>errors.push(e.message));await p.goto(base+'/'+(flags?'?flags='+encodeURIComponent(flags):''),{waitUntil:'domcontentloaded'});await p.getByTestId('title-explore').waitFor({timeout:60000});
   check('phone viewport title has no horizontal overflow',await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await p.getByTestId('title-settings').click();await p.getByLabel('Steering sensitivity',{exact:true}).waitFor();
+  check('phone settings have no manual condition controls',await p.getByTestId('conditions-panel').count()===0);
   check('ordinary players retain visual choices without review or automation exceptions',await p.getByTestId('settings-visuals-classic').isVisible()&&await p.getByTestId('settings-visuals-enhanced').isVisible());
   await p.screenshot({path:path.join(OUT,'settings-phone.png'),timeout:30000});
   await p.getByTestId('settings-close').click();await p.getByTestId('title-explore').click();await p.getByTestId('hangar').waitFor();await p.screenshot({path:path.join(OUT,'prepare-phone.png'),timeout:30000});

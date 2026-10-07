@@ -23,11 +23,26 @@ assert.ok(runtime.adventures.resume());
 assert.equal(launches.at(-1).aircraftId,'cargo');
 assert.equal(controller.progress.active.index,2);
 runtime.adventures.start(route.id,{aircraftId:'prop',conditions:'curated'});
-assert.equal(runtime.adventureEnvironment.mode,'curated');
+assert.equal(runtime.adventureEnvironment.mode,'live','legacy curated requests must use live conditions');
 const old=runtime.launchSetup;runtime.launchSetup=()=>false;
 assert.equal(runtime.adventures.start(ADVENTURES[1].id,{conditions:'live'}),false);
 assert.equal(runtime.adventureEnvironment.routeId,route.id);
-assert.equal(runtime.adventureEnvironment.mode,'curated');runtime.launchSetup=old;
+assert.equal(runtime.adventureEnvironment.mode,'live');runtime.launchSetup=old;
+// Resume old saves in live conditions without restarting discovery progress
+// or rewriting historical records and medals.
+controller.progress.active.conditions='curated';
+controller.progress.active.index=2;
+const historicKey=route.id+'|prop|curated';
+controller.progress.records[historicKey]={activities:{[route.activities[0].id]:'complete'},elapsed:123};
+controller.change();
+const recordsBefore=JSON.stringify(controller.progress.records);
+assert.ok(runtime.adventures.prepare(route.id));
+assert.equal(useAdventureStore.getState().preflight.conditions,'live');
+assert.ok(runtime.adventures.resume());
+assert.equal(controller.progress.active.index,2);
+assert.equal(controller.progress.active.conditions,'live');
+assert.equal(JSON.stringify(controller.progress.records),recordsBefore);
+assert.equal(runtime.adventureEnvironment.mode,'live');
 controller.progress.active.index=3;
 const target=route.activities[2],frame={targetId:target.id,position:offsetPoint(target.target,180,2000),x:0,y:0,visible:true,epoch:controller.epoch,runToken:controller.runToken};
 assert.equal(runtime.adventures.photo(frame,null),false);

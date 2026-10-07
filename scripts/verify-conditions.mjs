@@ -1,9 +1,8 @@
 /**
- * TRUE EARTH Phase 2 — verify-conditions: CONDITIONS, the time-of-day and
- * weather picker (lib/fly/player-conditions.js and its readers: the sun
- * cadence in components/fly/FlyScene.jsx, the weather targets in
- * hooks/use-fly-weather.js, components/fly/hud/ConditionsPanel.jsx in
- * SettingsRows and PhotoModeBar).
+ * CONDITIONS now ships OFF: normal play uses real time and provider weather.
+ * Preserve pure legacy helpers for deterministic diagnostic coverage, while
+ * checking that the production weather reader ignores historical manual and
+ * adventure choices. The browser smoke proves the player controls are absent.
  *
  * THE CONTRACT — the real modules, one process per flag state:
  *  (1) flag off: nothing is offered and nothing changes (no payload, the
@@ -17,7 +16,8 @@
  *  (4) every weather preset lands where it says through the REAL weather
  *      model, and a harness pin and a curated Adventure both outrank it;
  *  (5) the store keeps the pick in [0, 24) and null means Live;
- *  (6) wiring: the readers take the new path only under conditionsOn().
+ *  (6) diagnostic sun/UI readers are gated; live weather ignores old picks;
+ *  (7) shipping config has no pickers or procedural weather fallback.
  *
  * Run: node scripts/verify-conditions.mjs
  */
@@ -175,12 +175,18 @@ check(
   const ok =
     /if \(conditionsOn\(\)\) \{[\s\S]{0,400}conditionsSunTime\(runtime\.adventureEnvironment, Date\.now\(\), sunPin, lon, useFlyStore\.getState\(\)\.conditionsHour\)/.test(scene) &&
     /const unsubscribe = conditionsOn\(\)\n\s*\? useFlyStore\.subscribe\(/.test(scene) &&
-    weather.includes('const picked = conditionsOn() ? playerWeatherPayload(useFlyStore.getState().conditionsWeather) : null;') &&
-    weather.includes('adventureWeather(runtime.adventureEnvironment, picked ?? payload)') &&
+    !weather.includes('conditionsWeather') &&
+    !weather.includes('adventureWeather(') &&
+    weather.includes('computeTargets(payload, WEATHER, w.targets)') &&
     rows.includes('const conditionsRow = conditionsOn() && <ConditionsPanel key="conditions" />;') &&
     bar.includes('{conditionsOn() && conditionsOpen && (') &&
     bar.includes('{conditionsOn() && (');
-  check('(6) wiring: the sun cadence, weather targets, settings rows and photo bar take the new path only under conditionsOn()', ok);
+  check('(6) diagnostic time controls stay gated; production weather ignores manual and adventure picks', ok);
+}
+
+{
+  const { CONDITIONS, WEATHER } = await import('../lib/fly/fly-constants.js');
+  check('(7) ordinary players use live conditions, without pickers or invented weather', !CONDITIONS.enabled && WEATHER.fallback === 'baseline');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

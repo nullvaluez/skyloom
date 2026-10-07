@@ -1006,5 +1006,336 @@
       ],
       "limits": "A conservative bundle rollback, not an isolated proof of one offending flag. Clear-weather image is not a same-weather before/after measurement."
     }
+  },
+  "liveAtmosphere": {
+    "recordedAt": "2026-10-07T19:16:43.559Z",
+    "baseCommit": "847ff9d1bfd0e4b78b74007031b0936846ce71b2",
+    "productionBuildId": "32028fsFR2kJ9Xugk5D4j",
+    "applicationDiffSha256": "e96228cdce185b1b456eb279b52fdd38728899338e0a6041398ceaa7e7ede68d",
+    "status": "Supersedes the visualRepair rollback. Newer atmosphere restored and normal play uses live conditions. Owner visual acceptance remains open.",
+    "restored": [
+      "TWILIGHT_FIX",
+      "SUN_TRUE_AZ",
+      "TRUE_SCALE",
+      "TRUE_AREAS",
+      "PHYS_SKY",
+      "EARTH_HORIZON"
+    ],
+    "disabled": [
+      "CONDITIONS",
+      "PLAYER_SURFACE"
+    ],
+    "weatherFallback": "baseline",
+    "functional": {
+      "at": "2026-10-07T19:08:07.931Z",
+      "venue": "local automated checks; no human/device acceptance implied",
+      "rows": [
+        {
+          "file": "verify-import-integrity.mjs",
+          "ok": true,
+          "ms": 9500
+        },
+        {
+          "file": "verify-true-earth-flags.mjs",
+          "ok": true,
+          "ms": 118
+        },
+        {
+          "file": "verify-r25-front-door.mjs",
+          "ok": true,
+          "ms": 233
+        },
+        {
+          "file": "verify-attribution.mjs",
+          "ok": true,
+          "ms": 180
+        },
+        {
+          "file": "verify-provider-adapters.mjs",
+          "ok": true,
+          "ms": 133
+        },
+        {
+          "file": "verify-explorer.mjs",
+          "ok": true,
+          "ms": 412
+        },
+        {
+          "file": "verify-flight-operations.mjs",
+          "ok": true,
+          "ms": 194
+        },
+        {
+          "file": "verify-operations-disclosure.mjs",
+          "ok": true,
+          "ms": 44
+        },
+        {
+          "file": "verify-adventures.mjs",
+          "ok": true,
+          "ms": 214
+        },
+        {
+          "file": "verify-adventure-runtime.mjs",
+          "ok": true,
+          "ms": 99
+        },
+        {
+          "file": "verify-adventure-photo.mjs",
+          "ok": true,
+          "ms": 109
+        },
+        {
+          "file": "verify-adventure-hud.mjs",
+          "ok": true,
+          "ms": 533
+        },
+        {
+          "file": "verify-adventure-guidance.mjs",
+          "ok": true,
+          "ms": 86
+        },
+        {
+          "file": "verify-adventure-flight.mjs",
+          "ok": true,
+          "ms": 451
+        },
+        {
+          "file": "verify-adventure-activities.mjs",
+          "ok": true,
+          "ms": 109
+        },
+        {
+          "file": "verify-encounters.mjs",
+          "ok": true,
+          "ms": 560
+        },
+        {
+          "file": "verify-encounter-runtime.mjs",
+          "ok": true,
+          "ms": 128
+        },
+        {
+          "file": "verify-mobile-actions-node.mjs",
+          "ok": true,
+          "ms": 50
+        },
+        {
+          "file": "verify-twilight.mjs",
+          "ok": true,
+          "ms": 159
+        },
+        {
+          "file": "verify-sun-azimuth.mjs",
+          "ok": true,
+          "ms": 75
+        },
+        {
+          "file": "verify-load-guard.mjs",
+          "ok": true,
+          "ms": 244
+        },
+        {
+          "file": "verify-device-tiers.mjs",
+          "ok": true,
+          "ms": 340
+        },
+        {
+          "file": "verify-true-scale.mjs",
+          "ok": true,
+          "ms": 1163
+        },
+        {
+          "file": "verify-conditions.mjs",
+          "ok": true,
+          "ms": 234
+        },
+        {
+          "file": "verify-player-surface.mjs",
+          "ok": true,
+          "ms": 511
+        },
+        {
+          "file": "verify-cloud-calm.mjs",
+          "ok": true,
+          "ms": 964
+        },
+        {
+          "file": "verify-raster-retry.mjs",
+          "ok": true,
+          "ms": 75
+        },
+        {
+          "file": "verify-true-areas.cjs",
+          "ok": true,
+          "ms": 322
+        },
+        {
+          "file": "verify-hdr-guard.mjs",
+          "ok": true,
+          "ms": 490
+        },
+        {
+          "file": "verify-phys-sky.mjs",
+          "ok": true,
+          "ms": 2483
+        }
+      ]
+    },
+    "productionSmoke": {
+      "at": "2026-10-07T19:15:09.370Z",
+      "venue": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11); phone viewport emulated",
+      "flags": "",
+      "rows": [
+        {
+          "name": "production title offers destination discovery",
+          "ok": true
+        },
+        {
+          "name": "settings keep weather and time live without condition presets",
+          "ok": true
+        },
+        {
+          "name": "comfort settings persist",
+          "ok": true
+        },
+        {
+          "name": "journal has six regional collections",
+          "ok": true
+        },
+        {
+          "name": "regional airport loads into preparation",
+          "ok": true
+        },
+        {
+          "name": "generic airport does not promise apron operations",
+          "ok": true
+        },
+        {
+          "name": "production vector worker asset located",
+          "ok": true,
+          "detail": "1587.519144a05e2b0a9e.js"
+        },
+        {
+          "name": "bundled worker builds real fixture geometry",
+          "ok": true,
+          "detail": {
+            "empty": false,
+            "vertices": 95355,
+            "keys": [
+              "empty",
+              "tessMs",
+              "v",
+              "land",
+              "building",
+              "trees",
+              "grass"
+            ]
+          }
+        },
+        {
+          "name": "first flight starts with skippable guidance",
+          "ok": true
+        },
+        {
+          "name": "photo composition has no weather or time override controls",
+          "ok": true
+        },
+        {
+          "name": "photo composition freezes flight and local animation time",
+          "ok": true
+        },
+        {
+          "name": "legacy condition choices cannot alter the frozen live scene",
+          "ok": true
+        },
+        {
+          "name": "failed photo encoding awards no photograph",
+          "ok": true
+        },
+        {
+          "name": "photo export produces a PNG",
+          "ok": true
+        },
+        {
+          "name": "flight and pause menus have no manual condition controls",
+          "ok": true
+        },
+        {
+          "name": "photo exit automatically resumes feed weather despite legacy preferences",
+          "ok": true
+        },
+        {
+          "name": "successful photograph appears in the journal",
+          "ok": true
+        },
+        {
+          "name": "feed loss leaves exploration available",
+          "ok": true
+        },
+        {
+          "name": "context loss exposes a recovery action",
+          "ok": true
+        },
+        {
+          "name": "restored graphics resume through an explicit action",
+          "ok": true
+        },
+        {
+          "name": "phone viewport title has no horizontal overflow",
+          "ok": true
+        },
+        {
+          "name": "phone settings have no manual condition controls",
+          "ok": true
+        },
+        {
+          "name": "ordinary players retain visual choices without review or automation exceptions",
+          "ok": true
+        },
+        {
+          "name": "phone preparation supports the same destination flow",
+          "ok": true
+        },
+        {
+          "name": "production browser has no uncaught errors",
+          "ok": true,
+          "detail": []
+        }
+      ]
+    },
+    "testCorrection": "First smoke compared a null weather source to the world fixture missing-feed source (undefined). The revised smoke supplies an actual observation through /api/weather with no runtime weather pin, then checks that old session presets cannot override it. First failed output retained locally as smoke-live-first.json.",
+    "lint": "Touched application files: zero errors, one existing GroundHangar no-img-element warning. Adventure runtime check repeated after removing obsolete condition arguments and passed.",
+    "visualInspection": {
+      "venue": "Ordinary http://localhost:3094/ in the existing Codex browser; production build, live providers, no flag/weather query overrides.",
+      "observations": [
+        "Photo exposure and grid remain available; manual weather/time controls absent.",
+        "Rio terrain, city imagery and layered hills visible under live overcast conditions."
+      ],
+      "weatherAtInspection": {
+        "found": true,
+        "retrievedAt": 1791400349561,
+        "source": "open-meteo",
+        "cell": {
+          "lat": -23,
+          "lon": -43.25
+        },
+        "observedAt": 1791398700000,
+        "cloudCoverPct": 100,
+        "windMps": 5.36,
+        "windDirDeg": 230,
+        "visM": 6340,
+        "visPlus": false,
+        "precip": "rain",
+        "precipMm": 0.1,
+        "tempC": 23.5,
+        "metarRaw": null,
+        "station": null,
+        "availability": "live",
+        "ageMs": 1903555
+      },
+      "screenshot": "skyloom-live-atmosphere.png",
+      "limits": "Original missing-ground screenshot not reproduced after terrain settled; its root cause is not isolated. Live weather explains some haze, not proof of the original defect. No physical-device performance or owner visual acceptance claimed."
+    }
   }
 }

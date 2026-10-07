@@ -484,9 +484,9 @@ void main() {
   }
 }
 
-// Mathematical agreement did not establish an acceptable integrated look.
-// The owner rejected the Explorer visuals; the opt-in paths below remain tested.
-check('(7) physical atmosphere stays opt-in pending visual acceptance', RT.physSkyOn() === false && PHYS_SKY.enabled === false);
+// Shipping intent is separate from the numerical checks and visual acceptance.
+// The owner wants the newer atmosphere retained, rather than a broad rollback.
+check('(7) the newer physical atmosphere is enabled', RT.physSkyOn() === true && PHYS_SKY.enabled === true);
 
 {
   const { execFileSync } = await import('node:child_process');

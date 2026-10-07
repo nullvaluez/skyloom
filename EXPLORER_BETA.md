@@ -12,15 +12,21 @@ see the evidence ledger below. Headless hardware checks do not close physical
 display, phone, subjective flight/visual quality or ten-player study gates.
 No deployment, service purchase or public launch is part of this change.
 
-**Visual regression repair (2026-10-07):** the owner rejected the Explorer look
-(grey, obscured terrain at Rio) and weather usability. The combined newly enabled
-visual flags have been rolled back to the pre-Explorer defaults, without removing
-the journal, airports, fleet or other gameplay. This is a conservative rollback,
-not proof that one particular atmosphere flag caused the entire screenshot.
-Manual photo time/weather changes were independently confirmed blocked by the
-new freeze guards; those guards now hold automatic evolution, while explicit
-changes still apply. Weather is first in Pause and title Settings, with a desktop
-Weather shortcut. Visual acceptance is still required before re-enabling the bundle.
+**Latest owner direction (2026-10-07):** the rollback in `847ff9d` went too far:
+the owner reported the world looked flat and clarified that weather should always
+be live. The newer physical atmosphere, scale, building-area, Earth-radius horizon
+and sun/twilight paths are restored. Manual time/weather controls are disabled;
+new and resumed journeys use the real clock and provider weather, including old
+"curated" saves. Historical records, discoveries and earned rewards are preserved.
+Photo composition holds the current scene and resumes live updates on exit.
+No procedural weather is invented when observations are unavailable.
+
+The original missing-ground screenshot has not been reproduced in the settled
+live-provider Rio scene with the restored atmosphere. Rio's feed during inspection
+reported full cloud cover, light rain and roughly 6 km visibility. Those conditions
+explain some haze but do not prove the cause of the original missing terrain.
+Visual acceptance is still open. The earlier rollback evidence remains historical
+in `evidence.json`; it is superseded by this configuration.
 
 The work is isolated on `codex/explorer-beta`. It preserves the concurrent Umbra
 aircraft and target-dossier/Escort changes through merge `6f66f01`. The shared
@@ -47,8 +53,8 @@ was recovered from the session record before continuing in this worktree.
   encounter memories. Existing progression stores still own medals and liveries.
 - Photo composition pauses flight, automatic weather evolution, aircraft propellers/exhaust,
   ambient boats/plumes and traffic ingestion; grids
-  and exposure are adjustable. Manual time and weather changes remain effective
-  while the aircraft is frozen. Successful exports retain the existing baked-in
+  and exposure are adjustable. Live conditions resume automatically on exit;
+  there are no player time/weather presets. Successful exports retain the existing baked-in
   provider attribution. Journal thumbnails use the bounded local IndexedDB cache;
   they are not full-resolution backups or proof the OS saved a download.
   Background scenery requests can still finish during composition; this is not a
@@ -87,13 +93,14 @@ Continue can resolve it before the first scene mount.
 
 ## Current world configuration
 
-The following foundation/control blocks remain enabled:
+The following foundation blocks remain enabled:
 
-`HDR_GUARD`, `LOAD_GUARD`, `DEVICE_TIERS`, `CONDITIONS`.
+`HDR_GUARD`, `LOAD_GUARD`, `DEVICE_TIERS`.
 
-The newly enabled look bundle is now OFF pending visual approval:
-`TWILIGHT_FIX`, `SUN_TRUE_AZ`, `PLAYER_SURFACE`, `TRUE_SCALE`, `TRUE_AREAS`,
-`PHYS_SKY`, `EARTH_HORIZON`. Individual URL flags still permit diagnosis.
+Restored ON: `TWILIGHT_FIX`, `SUN_TRUE_AZ`, `TRUE_SCALE`, `TRUE_AREAS`,
+`PHYS_SKY`, `EARTH_HORIZON`. `CONDITIONS` is OFF: ordinary play has no manual
+time/weather controls. Explicit diagnostic pins remain available to the harness.
+`PLAYER_SURFACE` stays OFF to preserve saved visual choices.
 
 `R25_SKY`, `R25_GROUND` and `CLOUD_CALM` were already enabled in the source baseline
 and stay enabled. Enhanced remains the default. Classic/Enhanced and Day/Neon
@@ -102,8 +109,8 @@ Saved presentation choices are respected. A choice already overwritten by the
 earlier candidate cannot be inferred; the restored controls let the owner select
 it again. Progress and aircraft choices are preserved.
 
-Enhanced again uses the pre-Explorer horizon and scale. The Earth-radius path is
-retained behind its disabled flag. Existing streaming and resource ceilings have
+Enhanced uses the physical atmosphere, true scale and Earth-radius horizon again.
+Existing streaming and resource ceilings have
 not been raised. The Sydney Harbour Bridge
 now has a lightweight first-party arch/hanger silhouette; existing Manhattan hero
 models and the verified Sydney Opera House asset remain in use. `CREDITS.md` is
@@ -184,22 +191,24 @@ VNLK, including sloped terrain and displaced thresholds. These are simulation
 tests; they do not stand in for the ten visual/human airport flights.
 
 The maintained suite contains **30 scripts**, including **17 Explorer cases**.
-The production fixture smoke covers **24 checks** and executes the emitted worker
+The production fixture smoke covers **25 checks** and executes the emitted worker
 bootstrap through its real RPC protocol. The local smoke renderer is
 **RTX 5080 / ANGLE D3D11**, not SwiftShader. Phone screenshots are viewport
 emulation only. The production dependency audit reports zero advisories.
 
-The visual repair passed the production build and all 24 smoke checks, including
-manual fog/clear selection and night/day lighting during frozen composition,
-return to Live, and ordinary-player graphics controls. The initial maintained
-suite passed 29 scripts and failed only the now-retired physical-sky shipping
-assertion; the two shader scripts passed after that contract was corrected.
-Targeted ESLint still reports 26 existing diagnostics in FlyMode/FlyScene; a
-before/after comparison found the same diagnostics and none added by this repair.
-The existing browser was visually inspected at Rio using live scenery, with Clear
-selected and midnight/Live light changes exercised. This is not a same-weather
-image A/B or owner acceptance. The appended `visualRepair` evidence keeps these
-results separate from the earlier candidate's measurements.
+The restored-atmosphere build passed all 30 maintained scripts and all 25 smoke
+checks. Coverage includes old curated saves resuming without losing discovery
+progress or historical records, hidden condition pickers, old manual choices
+being ignored, photo freeze/resume, and ordinary-player graphics controls.
+The first smoke exposed an assertion assuming the world fixture supplied a
+weather observation; it supplies a miss. The revised smoke supplies an observation
+through the real API adapter and passed. Its initial failed output is retained.
+Touched runtime files have no ESLint errors and one existing image-element warning.
+Rio was visually inspected on the ordinary URL with live providers and no manual
+weather override: terrain and layered hills are visible under overcast skies.
+This does not isolate the original missing-ground defect or constitute owner
+acceptance. `liveAtmosphere` records this build; `visualRepair` retains the earlier,
+superseded rollback and manual-control evidence.
 
 ### Live-provider diagnostic and corrections
 
