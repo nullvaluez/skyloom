@@ -1337,5 +1337,936 @@
       "screenshot": "skyloom-live-atmosphere.png",
       "limits": "Original missing-ground screenshot not reproduced after terrain settled; its root cause is not isolated. Live weather explains some haze, not proof of the original defect. No physical-device performance or owner visual acceptance claimed."
     }
+  },
+  "ultraTerrainRepair": {
+    "recordedAt": "2026-10-07T20:00:56.614Z",
+    "baseCommit": "7b7f9a860a6dd33494398645846e3e486d19c3fa",
+    "productionBuildId": "BVwhyI0S6TDmgWOlyKFiS",
+    "applicationDiffSha256": "003af6240ea65f0640f861ca5efccb7545237b530167d1a6db3161f85a169f07",
+    "diagnosis": "Ultra terrain exceeded MAX_TEXTURE_IMAGE_UNITS(16). Physical sky adds one sampler and Ultra has three directional shadow samplers, putting the old full terrain shader at 17. Failed program links explain missing ground; weather was not the cause.",
+    "change": "Pack the two independently positioned night-light histories into two scissored halves of one RGBA8 render target and bind one sampler. Same pixel resolution, history blending and byte budget. Preserve the physical sky, relief, colour reference, LOD blending and all three Ultra cascades.",
+    "reproducedBefore": {
+      "at": "2026-10-07T19:53:15.795Z",
+      "venue": "Production fixture; governor held to exercise each requested profile",
+      "stages": [
+        {
+          "profile": "ultra",
+          "cascades": 3,
+          "physicalSky": true,
+          "limit": 16,
+          "terrain": [
+            {
+              "linked": false,
+              "log": "FRAGMENT shader texture image units count exceeds MAX_TEXTURE_IMAGE_UNITS(16)\n\u0000",
+              "samplers": [],
+              "count": 0
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "ok": false,
+      "failure": "AssertionError [ERR_ASSERTION]: Every active terrain program must link within the GPU texture limit\n    at C:\\Users\\bfecho\\.codex\\worktrees\\explorer-beta-recovery\\scripts\\verify-ultra-terrain.cjs:48:4\n    at runNextTicks (node:internal/process/task_queues:64:5)\n    at process.processImmediate (node:internal/timers:472:9)"
+    },
+    "verifiedAfter": {
+      "at": "2026-10-07T20:00:04.824Z",
+      "venue": "Production fixture; governor held to exercise each requested profile",
+      "stages": [
+        {
+          "profile": "ultra",
+          "cascades": 3,
+          "physicalSky": true,
+          "limit": 16,
+          "terrain": [
+            {
+              "linked": true,
+              "log": "",
+              "samplers": [
+                {
+                  "name": "uEarthClasses",
+                  "size": 1
+                },
+                {
+                  "name": "uEarthAppearance",
+                  "size": 1
+                },
+                {
+                  "name": "uCinematicColor",
+                  "size": 1
+                },
+                {
+                  "name": "uCinematicDetail",
+                  "size": 1
+                },
+                {
+                  "name": "uPskyView",
+                  "size": 1
+                },
+                {
+                  "name": "uCoastReflection",
+                  "size": 1
+                },
+                {
+                  "name": "uNGMap",
+                  "size": 1
+                },
+                {
+                  "name": "uR25Relief",
+                  "size": 1
+                },
+                {
+                  "name": "uR25Ref",
+                  "size": 1
+                },
+                {
+                  "name": "uLodFadeMap",
+                  "size": 1
+                },
+                {
+                  "name": "map",
+                  "size": 1
+                },
+                {
+                  "name": "envMap",
+                  "size": 1
+                },
+                {
+                  "name": "dfgLUT",
+                  "size": 1
+                },
+                {
+                  "name": "directionalShadowMap[0]",
+                  "size": 3
+                }
+              ],
+              "count": 16
+            }
+          ]
+        },
+        {
+          "profile": "high",
+          "cascades": 2,
+          "physicalSky": true,
+          "limit": 16,
+          "terrain": [
+            {
+              "linked": true,
+              "log": "",
+              "samplers": [
+                {
+                  "name": "uEarthClasses",
+                  "size": 1
+                },
+                {
+                  "name": "uEarthAppearance",
+                  "size": 1
+                },
+                {
+                  "name": "uCinematicColor",
+                  "size": 1
+                },
+                {
+                  "name": "uCinematicDetail",
+                  "size": 1
+                },
+                {
+                  "name": "uPskyView",
+                  "size": 1
+                },
+                {
+                  "name": "uCoastReflection",
+                  "size": 1
+                },
+                {
+                  "name": "uNGMap",
+                  "size": 1
+                },
+                {
+                  "name": "uR25Relief",
+                  "size": 1
+                },
+                {
+                  "name": "uR25Ref",
+                  "size": 1
+                },
+                {
+                  "name": "uLodFadeMap",
+                  "size": 1
+                },
+                {
+                  "name": "map",
+                  "size": 1
+                },
+                {
+                  "name": "envMap",
+                  "size": 1
+                },
+                {
+                  "name": "dfgLUT",
+                  "size": 1
+                },
+                {
+                  "name": "directionalShadowMap[0]",
+                  "size": 2
+                }
+              ],
+              "count": 15
+            },
+            {
+              "linked": true,
+              "log": "",
+              "samplers": [
+                {
+                  "name": "uEarthClasses",
+                  "size": 1
+                },
+                {
+                  "name": "uEarthAppearance",
+                  "size": 1
+                },
+                {
+                  "name": "uCinematicColor",
+                  "size": 1
+                },
+                {
+                  "name": "uCinematicDetail",
+                  "size": 1
+                },
+                {
+                  "name": "uPskyView",
+                  "size": 1
+                },
+                {
+                  "name": "uCoastReflection",
+                  "size": 1
+                },
+                {
+                  "name": "uNGMap",
+                  "size": 1
+                },
+                {
+                  "name": "uR25Relief",
+                  "size": 1
+                },
+                {
+                  "name": "uR25Ref",
+                  "size": 1
+                },
+                {
+                  "name": "uLodFadeMap",
+                  "size": 1
+                },
+                {
+                  "name": "map",
+                  "size": 1
+                },
+                {
+                  "name": "envMap",
+                  "size": 1
+                },
+                {
+                  "name": "dfgLUT",
+                  "size": 1
+                },
+                {
+                  "name": "directionalShadowMap[0]",
+                  "size": 3
+                }
+              ],
+              "count": 16
+            }
+          ]
+        },
+        {
+          "profile": "low",
+          "cascades": 0,
+          "physicalSky": true,
+          "limit": 16,
+          "terrain": [
+            {
+              "linked": true,
+              "log": "",
+              "samplers": [
+                {
+                  "name": "uEarthClasses",
+                  "size": 1
+                },
+                {
+                  "name": "uEarthAppearance",
+                  "size": 1
+                },
+                {
+                  "name": "uCinematicColor",
+                  "size": 1
+                },
+                {
+                  "name": "uCinematicDetail",
+                  "size": 1
+                },
+                {
+                  "name": "uPskyView",
+                  "size": 1
+                },
+                {
+                  "name": "uCoastReflection",
+                  "size": 1
+                },
+                {
+                  "name": "uNGMap",
+                  "size": 1
+                },
+                {
+                  "name": "uR25Relief",
+                  "size": 1
+                },
+                {
+                  "name": "uR25Ref",
+                  "size": 1
+                },
+                {
+                  "name": "uLodFadeMap",
+                  "size": 1
+                },
+                {
+                  "name": "map",
+                  "size": 1
+                },
+                {
+                  "name": "envMap",
+                  "size": 1
+                },
+                {
+                  "name": "dfgLUT",
+                  "size": 1
+                }
+              ],
+              "count": 13
+            },
+            {
+              "linked": true,
+              "log": "",
+              "samplers": [
+                {
+                  "name": "uEarthClasses",
+                  "size": 1
+                },
+                {
+                  "name": "uEarthAppearance",
+                  "size": 1
+                },
+                {
+                  "name": "uCinematicColor",
+                  "size": 1
+                },
+                {
+                  "name": "uCinematicDetail",
+                  "size": 1
+                },
+                {
+                  "name": "uPskyView",
+                  "size": 1
+                },
+                {
+                  "name": "uCoastReflection",
+                  "size": 1
+                },
+                {
+                  "name": "uNGMap",
+                  "size": 1
+                },
+                {
+                  "name": "uR25Relief",
+                  "size": 1
+                },
+                {
+                  "name": "uR25Ref",
+                  "size": 1
+                },
+                {
+                  "name": "uLodFadeMap",
+                  "size": 1
+                },
+                {
+                  "name": "map",
+                  "size": 1
+                },
+                {
+                  "name": "envMap",
+                  "size": 1
+                },
+                {
+                  "name": "dfgLUT",
+                  "size": 1
+                },
+                {
+                  "name": "directionalShadowMap[0]",
+                  "size": 2
+                }
+              ],
+              "count": 15
+            },
+            {
+              "linked": true,
+              "log": "",
+              "samplers": [
+                {
+                  "name": "uEarthClasses",
+                  "size": 1
+                },
+                {
+                  "name": "uEarthAppearance",
+                  "size": 1
+                },
+                {
+                  "name": "uCinematicColor",
+                  "size": 1
+                },
+                {
+                  "name": "uCinematicDetail",
+                  "size": 1
+                },
+                {
+                  "name": "uPskyView",
+                  "size": 1
+                },
+                {
+                  "name": "uCoastReflection",
+                  "size": 1
+                },
+                {
+                  "name": "uNGMap",
+                  "size": 1
+                },
+                {
+                  "name": "uR25Relief",
+                  "size": 1
+                },
+                {
+                  "name": "uR25Ref",
+                  "size": 1
+                },
+                {
+                  "name": "uLodFadeMap",
+                  "size": 1
+                },
+                {
+                  "name": "map",
+                  "size": 1
+                },
+                {
+                  "name": "envMap",
+                  "size": 1
+                },
+                {
+                  "name": "dfgLUT",
+                  "size": 1
+                },
+                {
+                  "name": "directionalShadowMap[0]",
+                  "size": 3
+                }
+              ],
+              "count": 16
+            }
+          ]
+        },
+        {
+          "profile": "ultra",
+          "cascades": 3,
+          "physicalSky": true,
+          "limit": 16,
+          "terrain": [
+            {
+              "linked": true,
+              "log": "",
+              "samplers": [
+                {
+                  "name": "uEarthClasses",
+                  "size": 1
+                },
+                {
+                  "name": "uEarthAppearance",
+                  "size": 1
+                },
+                {
+                  "name": "uCinematicColor",
+                  "size": 1
+                },
+                {
+                  "name": "uCinematicDetail",
+                  "size": 1
+                },
+                {
+                  "name": "uPskyView",
+                  "size": 1
+                },
+                {
+                  "name": "uCoastReflection",
+                  "size": 1
+                },
+                {
+                  "name": "uNGMap",
+                  "size": 1
+                },
+                {
+                  "name": "uR25Relief",
+                  "size": 1
+                },
+                {
+                  "name": "uR25Ref",
+                  "size": 1
+                },
+                {
+                  "name": "uLodFadeMap",
+                  "size": 1
+                },
+                {
+                  "name": "map",
+                  "size": 1
+                },
+                {
+                  "name": "envMap",
+                  "size": 1
+                },
+                {
+                  "name": "dfgLUT",
+                  "size": 1
+                },
+                {
+                  "name": "directionalShadowMap[0]",
+                  "size": 3
+                }
+              ],
+              "count": 16
+            },
+            {
+              "linked": true,
+              "log": "",
+              "samplers": [
+                {
+                  "name": "uEarthClasses",
+                  "size": 1
+                },
+                {
+                  "name": "uEarthAppearance",
+                  "size": 1
+                },
+                {
+                  "name": "uCinematicColor",
+                  "size": 1
+                },
+                {
+                  "name": "uCinematicDetail",
+                  "size": 1
+                },
+                {
+                  "name": "uPskyView",
+                  "size": 1
+                },
+                {
+                  "name": "uCoastReflection",
+                  "size": 1
+                },
+                {
+                  "name": "uNGMap",
+                  "size": 1
+                },
+                {
+                  "name": "uR25Relief",
+                  "size": 1
+                },
+                {
+                  "name": "uR25Ref",
+                  "size": 1
+                },
+                {
+                  "name": "uLodFadeMap",
+                  "size": 1
+                },
+                {
+                  "name": "map",
+                  "size": 1
+                },
+                {
+                  "name": "envMap",
+                  "size": 1
+                },
+                {
+                  "name": "dfgLUT",
+                  "size": 1
+                },
+                {
+                  "name": "directionalShadowMap[0]",
+                  "size": 2
+                }
+              ],
+              "count": 15
+            },
+            {
+              "linked": true,
+              "log": "",
+              "samplers": [
+                {
+                  "name": "uEarthClasses",
+                  "size": 1
+                },
+                {
+                  "name": "uEarthAppearance",
+                  "size": 1
+                },
+                {
+                  "name": "uCinematicColor",
+                  "size": 1
+                },
+                {
+                  "name": "uCinematicDetail",
+                  "size": 1
+                },
+                {
+                  "name": "uPskyView",
+                  "size": 1
+                },
+                {
+                  "name": "uCoastReflection",
+                  "size": 1
+                },
+                {
+                  "name": "uNGMap",
+                  "size": 1
+                },
+                {
+                  "name": "uR25Relief",
+                  "size": 1
+                },
+                {
+                  "name": "uR25Ref",
+                  "size": 1
+                },
+                {
+                  "name": "uLodFadeMap",
+                  "size": 1
+                },
+                {
+                  "name": "map",
+                  "size": 1
+                },
+                {
+                  "name": "envMap",
+                  "size": 1
+                },
+                {
+                  "name": "dfgLUT",
+                  "size": 1
+                }
+              ],
+              "count": 13
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "ok": true
+    },
+    "functional": {
+      "at": "2026-10-07T19:56:05.752Z",
+      "venue": "local automated checks; no human/device acceptance implied",
+      "rows": [
+        {
+          "file": "verify-import-integrity.mjs",
+          "ok": true,
+          "ms": 9836
+        },
+        {
+          "file": "verify-true-earth-flags.mjs",
+          "ok": true,
+          "ms": 117
+        },
+        {
+          "file": "verify-r25-front-door.mjs",
+          "ok": true,
+          "ms": 239
+        },
+        {
+          "file": "verify-attribution.mjs",
+          "ok": true,
+          "ms": 182
+        },
+        {
+          "file": "verify-provider-adapters.mjs",
+          "ok": true,
+          "ms": 135
+        },
+        {
+          "file": "verify-explorer.mjs",
+          "ok": true,
+          "ms": 414
+        },
+        {
+          "file": "verify-flight-operations.mjs",
+          "ok": true,
+          "ms": 194
+        },
+        {
+          "file": "verify-operations-disclosure.mjs",
+          "ok": true,
+          "ms": 44
+        },
+        {
+          "file": "verify-adventures.mjs",
+          "ok": true,
+          "ms": 222
+        },
+        {
+          "file": "verify-adventure-runtime.mjs",
+          "ok": true,
+          "ms": 101
+        },
+        {
+          "file": "verify-adventure-photo.mjs",
+          "ok": true,
+          "ms": 115
+        },
+        {
+          "file": "verify-adventure-hud.mjs",
+          "ok": true,
+          "ms": 558
+        },
+        {
+          "file": "verify-adventure-guidance.mjs",
+          "ok": true,
+          "ms": 85
+        },
+        {
+          "file": "verify-adventure-flight.mjs",
+          "ok": true,
+          "ms": 472
+        },
+        {
+          "file": "verify-adventure-activities.mjs",
+          "ok": true,
+          "ms": 113
+        },
+        {
+          "file": "verify-encounters.mjs",
+          "ok": true,
+          "ms": 590
+        },
+        {
+          "file": "verify-encounter-runtime.mjs",
+          "ok": true,
+          "ms": 134
+        },
+        {
+          "file": "verify-mobile-actions-node.mjs",
+          "ok": true,
+          "ms": 53
+        },
+        {
+          "file": "verify-twilight.mjs",
+          "ok": true,
+          "ms": 158
+        },
+        {
+          "file": "verify-sun-azimuth.mjs",
+          "ok": true,
+          "ms": 80
+        },
+        {
+          "file": "verify-load-guard.mjs",
+          "ok": true,
+          "ms": 260
+        },
+        {
+          "file": "verify-device-tiers.mjs",
+          "ok": true,
+          "ms": 366
+        },
+        {
+          "file": "verify-true-scale.mjs",
+          "ok": true,
+          "ms": 1209
+        },
+        {
+          "file": "verify-conditions.mjs",
+          "ok": true,
+          "ms": 259
+        },
+        {
+          "file": "verify-player-surface.mjs",
+          "ok": true,
+          "ms": 555
+        },
+        {
+          "file": "verify-cloud-calm.mjs",
+          "ok": true,
+          "ms": 933
+        },
+        {
+          "file": "verify-raster-retry.mjs",
+          "ok": true,
+          "ms": 83
+        },
+        {
+          "file": "verify-true-areas.cjs",
+          "ok": true,
+          "ms": 326
+        },
+        {
+          "file": "verify-hdr-guard.mjs",
+          "ok": true,
+          "ms": 508
+        },
+        {
+          "file": "verify-phys-sky.mjs",
+          "ok": true,
+          "ms": 2481
+        },
+        {
+          "file": "verify-ground-lighting.mjs",
+          "ok": true,
+          "ms": 145
+        },
+        {
+          "file": "verify-night-ground-gpu.mjs",
+          "ok": true,
+          "ms": 660
+        }
+      ]
+    },
+    "productionSmoke": {
+      "at": "2026-10-07T19:58:16.573Z",
+      "venue": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11); phone viewport emulated",
+      "flags": "",
+      "rows": [
+        {
+          "name": "production title offers destination discovery",
+          "ok": true
+        },
+        {
+          "name": "settings keep weather and time live without condition presets",
+          "ok": true
+        },
+        {
+          "name": "comfort settings persist",
+          "ok": true
+        },
+        {
+          "name": "journal has six regional collections",
+          "ok": true
+        },
+        {
+          "name": "regional airport loads into preparation",
+          "ok": true
+        },
+        {
+          "name": "generic airport does not promise apron operations",
+          "ok": true
+        },
+        {
+          "name": "production vector worker asset located",
+          "ok": true,
+          "detail": "1587.3cde7c7d70f0fad5.js"
+        },
+        {
+          "name": "bundled worker builds real fixture geometry",
+          "ok": true,
+          "detail": {
+            "empty": false,
+            "vertices": 95355,
+            "keys": [
+              "empty",
+              "tessMs",
+              "v",
+              "land",
+              "building",
+              "trees",
+              "grass"
+            ]
+          }
+        },
+        {
+          "name": "first flight starts with skippable guidance",
+          "ok": true
+        },
+        {
+          "name": "photo composition has no weather or time override controls",
+          "ok": true
+        },
+        {
+          "name": "photo composition freezes flight and local animation time",
+          "ok": true
+        },
+        {
+          "name": "legacy condition choices cannot alter the frozen live scene",
+          "ok": true
+        },
+        {
+          "name": "failed photo encoding awards no photograph",
+          "ok": true
+        },
+        {
+          "name": "photo export produces a PNG",
+          "ok": true
+        },
+        {
+          "name": "flight and pause menus have no manual condition controls",
+          "ok": true
+        },
+        {
+          "name": "photo exit automatically resumes feed weather despite legacy preferences",
+          "ok": true
+        },
+        {
+          "name": "successful photograph appears in the journal",
+          "ok": true
+        },
+        {
+          "name": "feed loss leaves exploration available",
+          "ok": true
+        },
+        {
+          "name": "context loss exposes a recovery action",
+          "ok": true
+        },
+        {
+          "name": "restored graphics resume through an explicit action",
+          "ok": true
+        },
+        {
+          "name": "phone viewport title has no horizontal overflow",
+          "ok": true
+        },
+        {
+          "name": "phone settings have no manual condition controls",
+          "ok": true
+        },
+        {
+          "name": "ordinary players retain visual choices without review or automation exceptions",
+          "ok": true
+        },
+        {
+          "name": "phone preparation supports the same destination flow",
+          "ok": true
+        },
+        {
+          "name": "production browser has no uncaught errors",
+          "ok": true,
+          "detail": []
+        }
+      ]
+    },
+    "nightGpu": "{\"redVisible\":true,\"blueVisible\":true,\"firstPreserved\":true,\"secondPreserved\":true,\"emptyClearsOnlyItsHalf\":true,\"separateOrigins\":true,\"stateRestored\":true,\"bytes\":8192,\"glError\":0}\nPASS packed night-light histories preserve both images, empty updates, origins, renderer state and memory budget",
+    "lint": "Changed renderer and rig: zero errors or warnings.",
+    "visualInspection": {
+      "venue": "Ordinary localhost:3094 in Codex browser, live providers, Ultra selected via Settings; no manual weather or time pins.",
+      "observations": [
+        "Reproduced missing terrain at Ultra before fix in Rio.",
+        "Ground/water visible at Ultra after rebuild in Rio.",
+        "Flew the Columbus featured destination and confirmed imagery and scenery around Powell/Lewis Center with the HUD showing Ultra."
+      ],
+      "screenshot": "ultra-columbus-fixed.png",
+      "limits": "Correctness regression and visual inspection; no new sustained-performance or physical-phone acceptance claimed."
+    },
+    "prevention": "CI now runs smoke:ultra after the normal production smoke. It checks real linked terrain programs and retained samplers at saved-Ultra boot and Ultra/High/Low/Ultra transitions; the held governor prevents silently testing a lower profile."
   }
 }

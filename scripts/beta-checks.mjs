@@ -4,7 +4,7 @@ const groups={
   source:['verify-import-integrity.mjs','verify-true-earth-flags.mjs','verify-r25-front-door.mjs','verify-attribution.mjs','verify-provider-adapters.mjs'],
   gameplay:['verify-explorer.mjs','verify-flight-operations.mjs','verify-operations-disclosure.mjs','verify-adventures.mjs','verify-adventure-runtime.mjs','verify-adventure-photo.mjs','verify-adventure-hud.mjs','verify-adventure-guidance.mjs','verify-adventure-flight.mjs','verify-adventure-activities.mjs','verify-encounters.mjs','verify-encounter-runtime.mjs','verify-mobile-actions-node.mjs'],
   world:['verify-twilight.mjs','verify-sun-azimuth.mjs','verify-load-guard.mjs','verify-device-tiers.mjs','verify-true-scale.mjs','verify-conditions.mjs','verify-player-surface.mjs','verify-cloud-calm.mjs','verify-raster-retry.mjs','verify-true-areas.cjs'],
-  shaders:['verify-hdr-guard.mjs','verify-phys-sky.mjs'],
+  shaders:['verify-hdr-guard.mjs','verify-phys-sky.mjs','verify-ground-lighting.mjs','verify-night-ground-gpu.mjs'],
 };
 const group=process.argv[2]||'all';
 if(group!=='all'&&!groups[group])throw Error('Unknown check group');

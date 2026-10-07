@@ -21,12 +21,20 @@ new and resumed journeys use the real clock and provider weather, including old
 Photo composition holds the current scene and resumes live updates on exit.
 No procedural weather is invented when observations are unavailable.
 
-The original missing-ground screenshot has not been reproduced in the settled
-live-provider Rio scene with the restored atmosphere. Rio's feed during inspection
-reported full cloud cover, light rain and roughly 6 km visibility. Those conditions
-explain some haze but do not prove the cause of the original missing terrain.
-Visual acceptance is still open. The earlier rollback evidence remains historical
-in `evidence.json`; it is superseded by this configuration.
+**Ultra terrain correction (2026-10-07):** the owner isolated the missing ground
+to Ultra. Reproduced on the live preview and on the production fixture: physical
+sky plus three shadow cascades made the terrain fragment shader require 17 texture
+units, exceeding the GPU's limit of 16. The shader failed to link and terrain
+disappeared. Weather was not the cause. Earlier High/Low checks missed this.
+
+The two independently positioned night-light histories now share one RGBA8 atlas
+and one sampler, keeping their resolution, blending, source-height rejection and
+memory budget. Ultra terrain now links with 16 units and retains physical sky,
+DEM relief, colour reference and all three cascades. The production regression
+first failed on the old build, then passed Ultra boot and Ultra → High → Low →
+Ultra on the fixed build. A real GPU test checks that each history survives writes
+and clears to its neighbour. The earlier rollback and atmosphere evidence remain
+historical in `evidence.json`; `ultraTerrainRepair` records this correction.
 
 The work is isolated on `codex/explorer-beta`. It preserves the concurrent Umbra
 aircraft and target-dossier/Escort changes through merge `6f66f01`. The shared
@@ -130,9 +138,10 @@ Use Node 24 (CI) or compatible Node 25, install with `npm ci`, then:
 | `npm run test:gameplay` | Operations, saves/migrations/recovery, adventures, encounters, mobile actions, Explorer |
 | `npm run test:world` | Sun/twilight, loading, device tiers, true scale/areas, conditions, cloud stability, raster retry |
 | `npm run test:shaders` | HDR and physical-sky shader checks, including browser GPU/CPU comparison |
-| `npm run verify:beta` | All 30 maintained scripts above; writes individual logs and structured results |
+| `npm run verify:beta` | All 32 maintained scripts above; writes individual logs and structured results |
 | `npm run build:beta` | Production webpack build in `.next-explorer` |
 | `npm run smoke:beta` | Production fixture UI, actual webpack worker RPC, photo/journal flow and recovery, phone viewport |
+| `npm run smoke:ultra` | Production terrain shader links at Ultra boot and across quality changes, with physical sky and three cascades |
 | `npm run soak:beta` | Twenty-minute live-provider hardware diagnostic; refuses software rendering, retains failed evidence |
 | `npm run analyze:beta` | Derive resource/route verdicts from a soak report without modifying its raw evidence |
 | `npm run start:beta` | Serve the candidate on port 3094 (`PORT` can override it) |
@@ -190,13 +199,14 @@ both runway directions at KSFO, EGLL, RJTT, LFPG, LOWI, NZQN, TNCM, YSSY, KASE a
 VNLK, including sloped terrain and displaced thresholds. These are simulation
 tests; they do not stand in for the ten visual/human airport flights.
 
-The maintained suite contains **30 scripts**, including **17 Explorer cases**.
+The maintained suite contains **32 scripts**, including **17 Explorer cases**,
+26 ground-lighting cases and the packed-history GPU check.
 The production fixture smoke covers **25 checks** and executes the emitted worker
 bootstrap through its real RPC protocol. The local smoke renderer is
 **RTX 5080 / ANGLE D3D11**, not SwiftShader. Phone screenshots are viewport
 emulation only. The production dependency audit reports zero advisories.
 
-The restored-atmosphere build passed all 30 maintained scripts and all 25 smoke
+The earlier restored-atmosphere build passed all 30 then-maintained scripts and all 25 smoke
 checks. Coverage includes old curated saves resuming without losing discovery
 progress or historical records, hidden condition pickers, old manual choices
 being ignored, photo freeze/resume, and ordinary-player graphics controls.
@@ -206,9 +216,9 @@ through the real API adapter and passed. Its initial failed output is retained.
 Touched runtime files have no ESLint errors and one existing image-element warning.
 Rio was visually inspected on the ordinary URL with live providers and no manual
 weather override: terrain and layered hills are visible under overcast skies.
-This does not isolate the original missing-ground defect or constitute owner
-acceptance. `liveAtmosphere` records this build; `visualRepair` retains the earlier,
-superseded rollback and manual-control evidence.
+That inspection did not exercise Ultra and missed the texture-limit defect
+subsequently isolated above. `liveAtmosphere` records that earlier build;
+`visualRepair` retains the superseded rollback and manual-control evidence.
 
 ### Live-provider diagnostic and corrections
 

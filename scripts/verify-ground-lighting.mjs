@@ -203,7 +203,8 @@ check('far road chunks reject before vertex decoding; cached road support follow
 });
 check('receiver shader coexists with ground material position and handles both histories',()=>{
   const s={uniforms:{},vertexShader:ShaderLib.standard.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvec4 ngWorld=vec4(transformed,1.0);'),fragmentShader:ShaderLib.standard.fragmentShader};
-  ground.patchNightGroundShader(s);assert(s.vertexShader.includes('ngLightWorld'));assert(s.fragmentShader.includes('uNGPreviousMap'));
+  ground.patchNightGroundShader(s);assert(s.vertexShader.includes('ngLightWorld'));assert(s.fragmentShader.includes('1.0-uNGCurrentHalf'));
+  assert(!s.fragmentShader.includes('uNGPreviousMap'));assert(s.fragmentShader.includes('uniform sampler2D uNGMap;'));
   assert(s.fragmentShader.includes('abs(vNightGroundWorld.y-sourceY)'));assert(s.fragmentShader.includes('reflectedLight.indirectDiffuse +='));
   const text=s.fragmentShader;ground.patchNightGroundShader(s);assert.equal(s.fragmentShader,text);
 });
@@ -225,10 +226,12 @@ check('style/flag teardown restores owned camera and AO properties',()=>{
 });
 check('RGBA8 histories are bounded and empty update adds no splat draw',()=>{
   const target=ground.createNightGroundTarget(256,3);assert.equal(target.bytes,256*256*8);
+  assert.equal(target.target.width,512);assert.equal(target.target.height,256);assert.equal(target.target.scissorTest,true);
   let current=null,draws=0,alpha=1;const color=new Color(0x123456);
   const gl={autoClear:false,xr:{enabled:true},shadowMap:{autoUpdate:true,needsUpdate:true},getRenderTarget:()=>current,setRenderTarget:t=>{current=t;},getClearAlpha:()=>alpha,
     getClearColor:c=>c.copy(color),setClearColor:(c,a)=>{color.set(c);alpha=a;},clear(){},render(){draws++;},compile(){}};
   target.render(gl,[{x:0,y:100,z:0,r:10,gain:.1,color:[1,.7,.4]}],[0,0],512,0);assert.equal(draws,1);
+  assert.deepEqual(target.target.viewport.toArray(),[256,0,256,256]);assert.deepEqual(target.target.scissor.toArray(),[256,0,256,256]);
   target.render(gl,[],[0,0],512,0);assert.equal(draws,1);assert.equal(current,null);assert.equal(gl.autoClear,false);assert.equal(gl.xr.enabled,true);assert.equal(gl.shadowMap.needsUpdate,true);target.dispose();
 });
 console.log(`ground lighting: ${passes}/${passes} passed; GPU/pixel appearance requires browser certification`);

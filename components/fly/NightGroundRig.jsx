@@ -17,7 +17,7 @@ function publishFrame(runtime,target,st,now){
   const current=t.frames[t.current],previous=t.frames[1-t.current];if(!current)return;
   const origin=runtime.origin?.anchor;
   const ox=origin?.x??0,oz=origin?.z??0;
-  U.uNGMap.value=t.targets[t.current].texture;U.uNGPreviousMap.value=t.targets[previous?1-t.current:t.current].texture;
+  U.uNGMap.value=t.target.texture;U.uNGCurrentHalf.value=t.current;U.uNGHalfTexel.value=.5/t.size;
   U.uNGOrigin.value.set(current.x-ox,current.z-oz);U.uNGPreviousOrigin.value.set((previous?.x??current.x)-ox,(previous?.z??current.z)-oz);
   U.uNGInvSpan.value=1/current.span;U.uNGPreviousInvSpan.value=previous?1/previous.span:0;
   U.uNGHeightBase.value=current.baseY;U.uNGPreviousHeightBase.value=previous?.baseY??current.baseY;
@@ -42,7 +42,7 @@ export function NightGroundRig({runtime}){
       force:()=>{st.signature=null;st.scanAt=-Infinity;},
       readPixels:()=>{
         const t=target.current;if(!t)return null;
-        const pixels=new Uint8Array(t.size*t.size*4);gl.readRenderTargetPixels(t.targets[t.current],0,0,t.size,t.size,pixels);
+        const pixels=new Uint8Array(t.size*t.size*4);gl.readRenderTargetPixels(t.target,t.current*t.size,0,t.size,t.size,pixels);
         let nonzero=0,peak=0;for(let i=0;i<pixels.length;i+=4){const n=Math.max(pixels[i],pixels[i+1],pixels[i+2]);if(n)nonzero++;peak=Math.max(peak,n);}
         return {nonzero,peak,pixels:t.size*t.size};
       },
@@ -50,7 +50,7 @@ export function NightGroundRig({runtime}){
         const t=target.current,f=t?.frames[t.current];if(!f)return null;
         const px=Math.floor(((x-f.x)/f.span+.5)*t.size),pz=Math.floor(((z-f.z)/f.span+.5)*t.size);
         if(px<0||pz<0||px>=t.size||pz>=t.size)return null;
-        const pixel=new Uint8Array(4);gl.readRenderTargetPixels(t.targets[t.current],px,pz,1,1,pixel);
+        const pixel=new Uint8Array(4);gl.readRenderTargetPixels(t.target,t.current*t.size+px,pz,1,1,pixel);
         return {rgba:[...pixel],sourceY:f.baseY+pixel[3]/255*GROUND_LIGHTING.heightRangeM,pixel:[px,pz]};
       },
     };
