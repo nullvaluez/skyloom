@@ -16,8 +16,13 @@ import { MenuButton, SettingsRows } from './hud/SettingsRows';
 import { CreditsPanel } from './hud/CreditsPanel';
 import { exitGoesToTitle, frontDoorOn } from '@/lib/fly/front-door';
 import { useAdventureStore } from '@/stores/adventure-store';
+import { mpAvailable } from '@/lib/fly/mp/mp-flag';
 
 const HELP_SEEN_KEY = 'fly-controls-seen';
+// MULTIPLAYER: the signal rows only when the flag is on AND a relay URL
+// resolves. Module scope is safe — installUrlFlags runs at app/page.js before
+// the lazy FlyMode import — and flag off leaves both arrays byte-identical.
+const MP_HELP = mpAvailable();
 
 const CONTROL_ROWS = [
   ['Mouse', 'steer — cursor offset from center commands the turn/pitch'],
@@ -35,6 +40,7 @@ const CONTROL_ROWS = [
   ['L', 'pilot logbook — every spot, badge and stat you have earned'],
   ['Hard stick input', 'breaks intercept/formation'],
   ['Esc', 'close modal / pause menu'],
+  ...(MP_HELP ? [['4 / 5 / 6 / 7', 'signals to nearby pilots: wave · follow me · nice · smoke']] : []),
 ];
 
 // Touch scheme — mirrors CONTROL_ROWS for the on-screen controls.
@@ -46,6 +52,7 @@ const TOUCH_CONTROL_ROWS = [
   ['🗺 Atlas', 'warp anywhere on Earth'],
   ['📓 Logbook', 'your spots, badges and stats — open it from this menu'],
   ['⏸ Pause', 'this menu — quality, map style, sound, exit'],
+  ...(MP_HELP ? [['👋 Signals', 'wave, follow me, nice, smoke — nearby pilots see them']] : []),
 ];
 
 /**

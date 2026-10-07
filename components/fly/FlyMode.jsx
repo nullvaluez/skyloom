@@ -31,6 +31,9 @@ import { DiagnosticsPanel } from './hud/DiagnosticsPanel';
 import { diagRequested } from '@/lib/fly/diag';
 import { useFlyTraffic } from '@/hooks/use-fly-traffic';
 import { useFlyWeather } from '@/hooks/use-fly-weather';
+import { useFlyMultiplayer } from '@/hooks/use-fly-multiplayer';
+import { mpAvailable } from '@/lib/fly/mp/mp-flag';
+import { MpStatusChip } from './hud/MpStatusChip';
 import { useFlyAudio } from '@/hooks/use-fly-audio';
 import { deviceAttr, useDeviceLayout } from '@/hooks/use-device-layout';
 import { useGLTF } from '@react-three/drei';
@@ -62,6 +65,11 @@ import { recordVisit } from '@/lib/fly/adventure-analytics';
 // the R9 geolocation → last-position → NYC resolver was dead code since the
 // hangar landed and is gone), but the WRITER stays: verify-boot.js reads it.
 const LAST_POS_KEY = 'fly-last-pos';
+
+// MULTIPLAYER (MULTIPLAYER.md): the status chip mounts only when the flag is
+// on AND a relay URL resolves. Module scope is safe — installUrlFlags runs at
+// app/page.js before this lazy module loads. Flag off: nothing mounts.
+const MP_UI = mpAvailable();
 
 /**
  * Round 17: a layout- and stacking-transparent wrapper (display:contents)
@@ -118,6 +126,11 @@ export function FlyMode({ onClose }) {
   // Real weather at the player's cell (satellite only; toy never fetches).
   // Owns runtime.weather; no data / override 'baseline' = today's exact look.
   useFlyWeather(runtime, true);
+
+  // MULTIPLAYER: other Free Flight pilots as live traffic (runtime.mp, the
+  // remote source on runtime.traffic). A no-op unless mpAvailable() — the
+  // session module is never even loaded with the flag off.
+  useFlyMultiplayer(runtime);
 
   // Procedural audio bed + one-shots (lock blip, warp sweep, UI clicks)
   useFlyAudio(runtime);
@@ -346,6 +359,9 @@ export function FlyMode({ onClose }) {
         <EncounterExperience runtime={runtime} />
         <Minimap runtime={runtime} />
         <InfoCard runtime={runtime} />
+        {/* MULTIPLAYER: its own corner, never inside the flight-stats-strip
+            (whose bounds cinema-sample/review-cinematic-earth probe). */}
+        {MP_UI && <MpStatusChip runtime={runtime} />}
       </HudGroup>
       <InspectModal runtime={runtime} />
       <HudGroup hidden={photoActive || titleUp}>

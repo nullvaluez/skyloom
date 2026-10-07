@@ -1,0 +1,148 @@
+/* =====================================================================
+   MULTIPLAYER (MULTIPLAYER.md) — the status chip + disclosure
+   (MpStatusChip.jsx) and the cooling state of the touch signal buttons
+   (TouchActionPanel.jsx). Every selector here is new: nothing in this file
+   matches an element that exists with the flag off.
+
+   WHERE THE CHIP SITS, per device (no MOBILE_UI zone is spent on it):
+   · desktop  top-left, above the contracts zone (left-4 top-24). The
+              cinematic strip lives bottom-left (≥ 900 px; narrower, it is
+              top-centred and the chip's width is capped short of it), the
+              nearest-place line and the escort pill are centred, the exit X
+              and the toasts are top-right — so this corner is empty.
+   · tablet   (touch, desktop zones) under the collapsed contracts chip.
+   · phone    portrait: right column, under the minimap dial (which ends at
+              8rem + its 104 px) and level with the contracts chip on the
+              left. Landscape: the top row between the stats strip and the
+              menu button (44 px at right 12 px).
+   On touch the chip is a passive readout (the Contracts precedent): a
+   closed touch HUD keeps ONE gameplay button (verify-mobile-actions), and
+   the Atlas is in the actions menu. Only the disclosure's Turn off is live.
+   ===================================================================== */
+.mp-chip {
+  position: absolute;
+  z-index: 10;
+  left: 16px;
+  top: 16px;
+  max-width: 16rem;
+  pointer-events: none;
+  color: #dbe7f5;
+  font: 500 11.5px/1.35 var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+/* Below 900 px the stats strip stays top-centred even on Enhanced (the
+   bottom-left move in globals.css needs min-width 900 + a fine pointer); its
+   3-cell form is ~240 px, so a narrow desktop window caps the chip 12 px
+   short of the strip's left edge (50vw - 120 px) and lets the text wrap. */
+@media (max-width: 899px) {
+  .mp-chip {
+    max-width: clamp(9rem, calc(50vw - 148px), 16rem);
+  }
+}
+[data-touch='1'] .mp-chip {
+  left: max(env(safe-area-inset-left), 16px);
+  top: calc(env(safe-area-inset-top) + 9.5rem);
+  max-width: 16rem;
+}
+[data-device='phone'][data-orient='portrait'] .mp-chip {
+  left: auto;
+  right: max(env(safe-area-inset-right), 0.5rem);
+  top: calc(env(safe-area-inset-top) + 15rem);
+  max-width: 11rem;
+}
+[data-device='phone'][data-orient='landscape'] .mp-chip {
+  left: auto;
+  right: calc(env(safe-area-inset-right) + 64px);
+  top: calc(env(safe-area-inset-top) + 12px);
+  max-width: 13.5rem;
+}
+
+.mp-chip-body,
+.mp-disclosure {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 28px;
+  padding: 5px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(186, 222, 255, 0.16);
+  box-shadow: 0 8px 24px rgba(2, 4, 10, 0.35);
+  text-align: left;
+}
+button.mp-chip-body {
+  pointer-events: auto;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+button.mp-chip-body:hover {
+  border-color: rgba(79, 227, 255, 0.5);
+}
+.mp-chip button:focus-visible {
+  outline: 2px solid #4fe3ff;
+  outline-offset: 2px;
+}
+.mp-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--mp-dot, #64748b);
+  box-shadow: 0 0 7px var(--mp-dot, transparent);
+}
+.mp-chip[data-status='connecting'] .mp-dot {
+  animation: mp-dot-pulse 1.2s ease-in-out infinite;
+}
+@keyframes mp-dot-pulse {
+  50% { opacity: 0.3; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mp-chip[data-status='connecting'] .mp-dot { animation: none; }
+}
+.mp-you {
+  color: #a7b8cf;
+}
+.mp-callsign {
+  font-weight: 700;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  letter-spacing: 0.02em;
+  color: var(--mp-dot, #eef5ff);
+}
+
+.mp-disclosure {
+  flex-wrap: wrap;
+  row-gap: 4px;
+  border-color: rgba(79, 227, 255, 0.4);
+}
+.mp-disclosure button {
+  pointer-events: auto;
+  padding: 2px 9px;
+  border: 1px solid rgba(186, 222, 255, 0.3);
+  border-radius: 7px;
+  background: rgba(186, 222, 255, 0.08);
+  font: inherit;
+  font-weight: 600;
+  color: #eef5ff;
+  cursor: pointer;
+}
+.mp-disclosure button:hover {
+  background: rgba(186, 222, 255, 0.16);
+}
+/* MOBILE_UI.minTargetPx: the one live control on a touch HUD is 44 px. */
+[data-touch='1'] .mp-disclosure button {
+  min-height: 44px;
+  min-width: 44px;
+}
+/* Landscape phone: one row (text wraps beside the button), so the banner
+   ends above the minimap dial, which starts 64 px down on this layout. */
+[data-device='phone'][data-orient='landscape'] .mp-disclosure {
+  flex-wrap: nowrap;
+  padding-block: 3px;
+}
+
+/* Touch signals: the emotes dim while the 2 s cooldown runs (the button
+   stays focusable — aria-disabled, not disabled). */
+.touch-action[data-cooling='1'] {
+  opacity: 0.45;
+}

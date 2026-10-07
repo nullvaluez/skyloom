@@ -14,8 +14,14 @@ import { visualsAvailable, saveVisuals, setVisualsLive } from '@/lib/fly/visuals
 import { GuestSaveControls } from './GuestSaveControls';
 import { ConditionsPanel } from './ConditionsPanel';
 import { conditionsOn } from '@/lib/fly/player-conditions';
+import { mpAvailable } from '@/lib/fly/mp/mp-flag';
+import { useMpStore } from '@/stores/mp-store';
 
 const TIERS = ['low', 'medium', 'high', 'ultra'];
+// MULTIPLAYER: the "Fly with others" card exists only when the flag is on AND
+// a relay URL resolves (module scope is safe: installUrlFlags runs at
+// app/page.js before the lazy FlyMode import).
+const MP_ROW = mpAvailable();
 const VISUALS_ROW = [
   ['enhanced', 'Enhanced'],
   ['classic', 'Classic'],
@@ -40,6 +46,7 @@ export function SettingsRows({ sheet = false }) {
   const visuals = useFlyStore((s) => s.visuals);
   const chaseFraming = useFlyStore(s => s.chaseFraming);
   const encountersEnabled = useFlyStore(s => s.encountersEnabled);
+  const flyWithOthers = useMpStore((s) => s.enabled);
   // Round 18: the stakes pick lives in a fly-settings module cache, not the
   // store. The rows mount each time the pause card / sheet opens, so a lazy
   // read on mount is current by construction.
@@ -189,6 +196,24 @@ export function SettingsRows({ sheet = false }) {
     </MenuButton>
   );
 
+  // MULTIPLAYER: its own card, NOT inside GuestSaveControls — that card's "No
+  // photos or flight locations" line is about analytics. Per page load only:
+  // nothing is stored, so an opt-out resets on reload (MULTIPLAYER.md).
+  const multiplayerRow = MP_ROW && (
+    <section key="multiplayer" aria-label="Fly with others" className="rounded-md border border-zinc-700/60 p-2">
+      <MenuButton
+        testid={sheet ? 'settings-multiplayer' : 'pause-multiplayer'}
+        onClick={() => useMpStore.getState().setEnabled(!flyWithOthers)}
+      >
+        Fly with others: {flyWithOthers ? 'On' : 'Off'}
+      </MenuButton>
+      <p className="mt-2 text-xs text-zinc-400">
+        Other pilots see your aircraft, its in-game position and a random callsign. No account, nothing saved,
+        never your real location.
+      </p>
+    </section>
+  );
+
   const flightViewRows=(
       <div className="rounded-md border border-zinc-700/60 p-2">
         <div className="mb-2 text-xs text-zinc-300">Chase view</div>
@@ -212,6 +237,7 @@ export function SettingsRows({ sheet = false }) {
       {soundRow}
       {reducedRow}
       {stakesRow}
+      {multiplayerRow}
       <GuestSaveControls />
       {flightViewRows}
     </>
@@ -224,6 +250,7 @@ export function SettingsRows({ sheet = false }) {
       {soundRow}
       {reducedRow}
       {stakesRow}
+      {multiplayerRow}
       <GuestSaveControls />
       {flightViewRows}
     </>

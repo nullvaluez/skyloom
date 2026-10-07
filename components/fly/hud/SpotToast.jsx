@@ -11,6 +11,7 @@ import { BADGES, BADGE_TIERS } from '@/lib/badges';
 import { MOBILE_UI, NEARMISS, SPICY } from '@/lib/fly/fly-constants';
 import { trackSpotAttrs } from '@/lib/fly/spot-attrs';
 import { gameplayLive } from '@/lib/fly/front-door';
+import { mpAvailable } from '@/lib/fly/mp/mp-flag';
 import { Zone } from '../LayoutRoot';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { CARD_THEME } from './inspect/inspect-tokens';
@@ -28,6 +29,80 @@ const MILITARY_ACCENT = '#f87171';
 // PALETTE.accentGreen — the same "objective cleared" green the Contracts panel
 // stamps a completed row with (var(--contract-done)).
 const CONTRACT_ACCENT = '#4ade80';
+// MULTIPLAYER (MULTIPLAYER.md §8): another pilot's quick signal. ONE pending
+// entry at most — later signals merge into it — and an entry that waited
+// longer than this in the queue is dropped instead of shown late.
+const SIGNAL_STALE_MS = 3000;
+// A visible signal card absorbs a newcomer only while it has this long left
+// on screen, so a merged sender is never shown for a blink.
+const SIGNAL_MERGE_LEFT_MS = 1500;
+const SIGNAL_GLYPH = { wave: '👋', follow: '➜', nice: '👍' };
+const SIGNAL_VERB = {
+  wave: ['waves', 'wave'],
+  follow: ['says follow me', 'say follow me'],
+  nice: ['says nice', 'say nice'],
+};
+const SIGNAL_ACCENT = '#c084fc';
+// Read once (installUrlFlags runs before the lazy FlyMode import): flag off,
+// the listener below is never added.
+const MP_SIGNALS = mpAvailable();
+
+/** Fold one 'fly-mp-signal' detail into a signal toast entry (in place). */
+function mergeSignal(entry, d, now) {
+  if (!entry.senders.size) {
+    entry.first = d.callsign || 'A pilot';
+    entry.accent = d.color || SIGNAL_ACCENT;
+  }
+  entry.senders.set(d.id ?? d.callsign, d.code);
+  entry.at = now;
+  const n = entry.senders.size;
+  const codes = new Set(entry.senders.values());
+  const code = n === 1 || codes.size === 1 ? d.code : null;
+  entry.label = `${code ? SIGNAL_GLYPH[code] : '✦'} ${n === 1 ? 'pilot' : 'pilots'}`;
+  entry.title = n === 1 ? entry.first : `${entry.first} + ${n - 1} other${n > 2 ? 's' : ''}`;
+  if (n === 1) {
+    const nm = (d.distM ?? 0) / 1852;
+    const where = `${nm < 10 ? nm.toFixed(1) : Math.round(nm)} nm${d.clock ? ` ${d.clock} o'clock` : ''}`;
+    entry.type = `${SIGNAL_VERB[code][0]} · ${where}`;
+  } else {
+    entry.type = code ? SIGNAL_VERB[code][1] : 'signal';
+  }
+  return entry;
+}
+
+/**
+ * Route one 'fly-mp-signal' detail: into the live card while it has
+ * SIGNAL_MERGE_LEFT_MS left, else into the ONE pending entry (restarted if it
+ * already went stale), else a new pending entry — returns true for a new one.
+ * `liveRef` is the drain's private mirror of the card on screen, merged into
+ * SYNCHRONOUSLY: the session dispatches a whole relay batch in one task, so a
+ * copy of committed state would hand two same-batch senders the same stale
+ * card and the second write would drop the first.
+ */
+function routeSignal(d, now, liveRef, pendingRef, idRef, setToasts) {
+  const live = liveRef.current;
+  if (live && live.shownAt + live.ms - now >= SIGNAL_MERGE_LEFT_MS) {
+    mergeSignal(live, d, now);
+    const snap = { ...live, senders: new Map(live.senders) };
+    setToasts((prev) => prev.map((t) => (t.id === snap.id ? snap : t)));
+    return false;
+  }
+  const pending = pendingRef.current.find((p) => p.signal);
+  if (pending) {
+    // Stale = the drain would drop it: start over rather than headline it.
+    if (now - pending.at > SIGNAL_STALE_MS) pending.senders.clear();
+    mergeSignal(pending, d, now);
+    return false;
+  }
+  pendingRef.current.push(mergeSignal({ id: idRef.current++, signal: true, ms: TOAST_MS, senders: new Map() }, d, now));
+  return true;
+}
+
+/** The drain admits a signal entry: stamp it and mirror it as the live card. */
+function showSignal(next, now, liveRef) {
+  next.shownAt = now;
+  liveRef.current = { ...next, senders: new Map(next.senders) };
+}
 
 /**
  * ONE toast stack for both spotting reward flavors:
@@ -283,6 +358,35 @@ export function SpotToast({ runtime }) {
     return () => window.removeEventListener('fly-nearmiss', onNearMiss);
   }, []);
 
+  // --- MULTIPLAYER: pilot signals (wave / follow me / nice) ---------------
+  // lib/fly/mp/session.js dispatches 'fly-mp-signal' (already range-gated and
+  // rate-limited per sender). Same deferred queue as the near miss, with one
+  // difference: signals COALESCE. A newcomer merges into the visible signal
+  // card while it has time left, else into the ONE pending signal entry, so
+  // three pilots waving at once is one "HERON 27 + 2 others wave" card, not
+  // three cards burying a badge. Never fires with the flag off.
+  const liveSignalRef = useRef(null); // the signal card on screen (routeSignal)
+  useEffect(() => {
+    if (!MP_SIGNALS) return undefined;
+    const onSignal = (e) => {
+      const d = e.detail || {};
+      if (!SIGNAL_GLYPH[d.code]) return;
+      if (routeSignal(d, performance.now(), liveSignalRef, pendingRef, idRef, setToasts)) {
+        setPendingTick((t) => t + 1);
+      }
+    };
+    window.addEventListener('fly-mp-signal', onSignal);
+    return () => window.removeEventListener('fly-mp-signal', onSignal);
+  }, []);
+  // A spot / SPICY / buzz push can evict the live signal card: once it has
+  // been on screen and is gone, newcomers queue instead of merging into it.
+  useEffect(() => {
+    const live = liveSignalRef.current;
+    if (!live) return;
+    if (toasts.some((t) => t.id === live.id)) live.seen = true;
+    else if (live.seen) liveSignalRef.current = null;
+  }, [toasts]);
+
   // Dev telemetry: the LIVE stack length. The DOM can transiently hold more
   // badge-toast nodes than MAX_STACK while AnimatePresence plays exit springs
   // (an expiring card + its admitted replacement coexist for ~400ms) — the
@@ -299,14 +403,19 @@ export function SpotToast({ runtime }) {
   // to the spot/spicy/buzz push paths.
   useEffect(() => {
     if (toasts.length >= MAX_STACK) return;
-    const next = pendingRef.current.shift();
+    let next = pendingRef.current.shift();
+    // MULTIPLAYER: a pilot signal is news only while fresh — one that waited
+    // out SIGNAL_STALE_MS behind full slots is dropped, not shown late.
+    while (next?.signal && performance.now() - next.at > SIGNAL_STALE_MS) next = pendingRef.current.shift();
     if (!next) return;
+    if (next.signal) showSignal(next, performance.now(), liveSignalRef);
     // Round 18: the near-miss flavor brings its own sting (audio.whooshSting,
     // fired at DETECTION so the sound lands with the fly-by, not with the
     // card). Every other flavor keeps the round-16 blip byte-for-byte.
     if (!next.nearmiss) runtime.audio?.spotBlip?.(3); // blip when it APPEARS, not when it queued
     setToasts((prev) => [next, ...prev].slice(0, MAX_STACK));
     setTimeout(() => {
+      if (liveSignalRef.current?.id === next.id) liveSignalRef.current = null;
       setToasts((prev) => prev.filter((t) => t.id !== next.id));
     }, next.ms ?? BADGE_TOAST_MS); // badges push no `ms` → unchanged dwell
   }, [toasts, pendingTick, runtime]);
@@ -337,7 +446,7 @@ export function SpotToast({ runtime }) {
               }`}
               style={{ fontFamily: CARD_THEME.fontDisplay, color: t.accent }}
             >
-              {t.nearmiss
+              {t.nearmiss || t.signal
                 ? t.label
                 : t.contract
                   ? t.label
@@ -432,17 +541,19 @@ export function SpotToast({ runtime }) {
                 width: land ? MOBILE_UI.toast.landWidth : undefined,
               }}
               data-testid={
-                t.nearmiss
-                  ? 'nearmiss-toast'
-                  : t.contract
-                    ? 'contract-toast'
-                    : t.badge
-                      ? 'badge-toast'
-                      : t.buzz
-                        ? 'buzz-toast'
-                        : t.spicy
-                          ? 'spicy-toast'
-                          : 'spot-toast'
+                t.signal
+                  ? 'signal-toast'
+                  : t.nearmiss
+                    ? 'nearmiss-toast'
+                    : t.contract
+                      ? 'contract-toast'
+                      : t.badge
+                        ? 'badge-toast'
+                        : t.buzz
+                          ? 'buzz-toast'
+                          : t.spicy
+                            ? 'spicy-toast'
+                            : 'spot-toast'
               }
             >
               {phone ? (
