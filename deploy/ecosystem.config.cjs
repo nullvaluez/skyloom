@@ -11,11 +11,36 @@
  *
  * Both listen on localhost only; CloudPanel's nginx is the public HTTPS door.
  * The relay stores nothing: a restart only makes players reconnect.
+ *
+ * Game on Netlify, relay only here: `pm2 start deploy/ecosystem.config.cjs
+ * --only skyloom-relay` (deploy/relay-update.sh does it, with no site build).
  */
+const fs = require('fs');
 const path = require('path');
 
 const root = path.resolve(__dirname, '..');
 const APP_PORT = process.env.SKYLOOM_APP_PORT || '3000';
+
+/**
+ * Optional relay settings, one KEY=VALUE per line (# comments), in
+ * deploy/relay.env — not tracked by git (see deploy/relay.env.example).
+ * Needed when the game is served from ANOTHER site than the relay, e.g. the
+ * game on Netlify and only the relay here: MP_ORIGINS=https://your-site.netlify.app
+ */
+function relayEnv() {
+  const out = {};
+  let text = '';
+  try {
+    text = fs.readFileSync(path.join(__dirname, 'relay.env'), 'utf8');
+  } catch {
+    return out;
+  }
+  for (const line of text.split(/\r?\n/)) {
+    const m = /^\s*([A-Z][A-Z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line);
+    if (m && !line.trim().startsWith('#')) out[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
+  }
+  return out;
+}
 
 module.exports = {
   apps: [
@@ -31,7 +56,7 @@ module.exports = {
       name: 'skyloom-relay',
       cwd: root,
       script: 'server/mp-relay.mjs',
-      env: { NODE_ENV: 'production', MP_HOST: '127.0.0.1', MP_PORT: '8787' },
+      env: { NODE_ENV: 'production', MP_HOST: '127.0.0.1', MP_PORT: '8787', ...relayEnv() },
       // PM2 stops with SIGINT: the relay says bye, closes every player with
       // 1012 (they reconnect on their own) and exits after 1 s.
       kill_timeout: 3000,

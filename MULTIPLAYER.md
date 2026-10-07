@@ -58,7 +58,79 @@ pages. One machine can hold at most 6 connections, the per-IP limit.
 
 ---
 
-## Deploy on CloudPanel (no Docker)
+## Deploy
+
+There are two ways to deploy, neither needing Docker. **A** is the
+recommended one when the game already runs on Netlify.
+
+### A. Game on Netlify, multiplayer relay on CloudPanel (recommended)
+
+Netlify keeps building and serving the game exactly as today. Your CloudPanel
+server runs **only the relay**: one small Node process (~35 MB) and no site
+build, so the server needs almost no memory. The game page connects to the
+relay over a secure WebSocket on a subdomain, e.g. `wss://mp.your-domain.com/mp`.
+
+**On CloudPanel (the relay)**
+
+1. **DNS.** Point a subdomain such as `mp.your-domain.com` at your CloudPanel
+   server with an A record.
+2. **Create the site.** Add a site and choose **Create a Node.js Site** with
+   domain `mp.your-domain.com`, **Node.js 22** and **App Port 8787**. Then
+   issue a Let's Encrypt certificate under the site's **SSL/TLS** tab. A
+   Netlify page is HTTPS, so the relay must be too.
+3. **Add the WebSocket route.** In the site's **Vhost** tab, paste the block
+   from [`deploy/cloudpanel-nginx.conf`](deploy/cloudpanel-nginx.conf) just
+   above the existing `location / {` line, and save.
+4. **Get the code.** SSH in as the **site user**:
+
+   ```bash
+   cd ~/htdocs/mp.your-domain.com
+   # the folder must be empty first (remove CloudPanel's placeholder files)
+   git clone https://github.com/nullvaluez/skyloom.git .
+   git checkout claude/practical-newton-uhxjoc   # until this work is merged
+   npm install -g pm2                            # once per site user
+   cp deploy/relay.env.example deploy/relay.env
+   nano deploy/relay.env    # set MP_ORIGINS to your game's address(es)
+   ```
+
+   `MP_ORIGINS` lists the pages allowed to connect. Use your Netlify address,
+   e.g. `https://your-site.netlify.app`. Add `https://*--your-site.netlify.app`
+   to also allow deploy previews and branch deploys. If the game has its own
+   domain on Netlify, list that address too. `deploy/relay.env` stays on the
+   server only; git ignores it.
+5. **Start it.**
+
+   ```bash
+   bash deploy/relay-update.sh
+   ```
+
+   This pulls, installs the relay's single package (`ws`) into `server/`, starts
+   or reloads `skyloom-relay` under PM2 and saves the list. It ends with
+   `Multiplayer relay: OK`. Run the same command for every update.
+6. **Survive reboots.** Run `which pm2` and note the path. Then run
+   `crontab -e` and add `@reboot /full/path/to/pm2 resurrect`.
+7. **Check it.** `https://mp.your-domain.com/mp/healthz` should answer
+   `{"ok":true,…}`.
+
+**On Netlify (the game)**
+
+1. Go to **Site configuration → Environment variables** and add
+   `NEXT_PUBLIC_MP_URL` = `wss://mp.your-domain.com/mp`.
+2. Redeploy. `NEXT_PUBLIC_…` values are baked in when the site builds, so a
+   rebuild is required after adding or changing the variable.
+3. Netlify must build code that contains multiplayer. Either merge this branch
+   into the branch Netlify publishes, or turn on **branch deploys** and test at
+   `https://claude-practical-newton-uhxjoc--your-site.netlify.app` first.
+4. Open the game with `?flags=MULTIPLAYER` on two devices and fly Free Flight
+   in both.
+
+If the chip says *Offline — retrying*:
+- the relay's address in `NEXT_PUBLIC_MP_URL` is wrong;
+- the certificate is missing; or
+- your game's address is not in `MP_ORIGINS`. `pm2 logs skyloom-relay`
+  counts refused origins as `reject{origin=N}`.
+
+### B. Everything on CloudPanel
 
 CloudPanel already provides nginx, free HTTPS certificates and per-site Node.js.
 Skyloom runs as two small processes kept alive by **PM2**:
@@ -126,8 +198,9 @@ forwards `/mp` on your domain to the relay.
 
 Until you have checked it on your own machines, multiplayer is reached with
 `?flags=MULTIPLAYER`. To make it the default, set `enabled: true` in the
-`MULTIPLAYER` block at the end of `lib/fly/fly-constants.js` and run
-`bash deploy/update.sh`. Players who don't want to be seen can still turn it
+`MULTIPLAYER` block at the end of `lib/fly/fly-constants.js` and redeploy the
+game: let Netlify rebuild for option A, or run `bash deploy/update.sh` for
+option B. Players who don't want to be seen can still turn it
 off in Settings.
 
 ---
@@ -207,7 +280,7 @@ minimap, targeting, Escort, inspect dossier, tracers/contrails (smoke).
 | Engine/render | `lib/fly/traffic-engine.js`, `components/fly/TrafficLayer.jsx`, `TrafficTracers.jsx`, `TrafficContrails.jsx`, `Contrail.jsx`, `hud/LabelCanvas.jsx`, `hud/Minimap.jsx`, `lib/fly/detailed-traffic.js`, `lib/fly/aircraft-effects.js` |
 | Gates on scoring/persistence | `FlyScene.jsx`, `hud/InspectModal.jsx`, `hud/InfoCard.jsx`, `hud/Contracts.jsx`, `hud/SpotToast.jsx`, `lib/fly/juice.js`, `lib/fly/encounters.mjs`, `lib/fly/encounter-runtime.js`, `lib/fly/escort.js` |
 | UI | `hud/MpStatusChip.jsx`, `hud/mp.css`, `hud/SettingsRows.jsx`, `hud/TouchActionPanel.jsx`, `PauseMenu.jsx`, `hud/Atlas.jsx`, `hud/atlas/*` |
-| Deploy | `deploy/ecosystem.config.cjs`, `deploy/cloudpanel-nginx.conf`, `deploy/update.sh` |
+| Deploy | `deploy/ecosystem.config.cjs` (PM2), `deploy/cloudpanel-nginx.conf` (Vhost block), `deploy/relay-update.sh` + `deploy/relay.env.example` (relay only, option A), `deploy/update.sh` (whole site, option B) |
 | Flag | `MULTIPLAYER` block at the end of `lib/fly/fly-constants.js`; listed in `lib/fly/device-report.js`; pinned off in `scripts/_boot.js` and `scripts/_mobile-boot.js` |
 
 ---
@@ -233,6 +306,12 @@ Node gates are all in `scripts/r24-smoke.sh` (`SMOKE_NODE_ONLY=1`):
   Origin (403) and still serves the site.
 - A remote client spoofing a fresh `X-Forwarded-For` per connection still hits
   the per-IP cap.
+- The option A relay-only install from a fresh checkout behaves as intended:
+  - `ws` installs into `server/` and PM2 starts `skyloom-relay` with its
+    settings from `deploy/relay.env`;
+  - the Netlify site, its deploy previews and branch deploys connect;
+  - `evil.netlify.app`, `shadowads.netlify.app.evil.com` and the relay's own
+    domain get 403.
 
 **Only the owner can verify** (this container has no GPU and its tile and
 ADS-B hosts are blocked):
@@ -243,7 +322,7 @@ ADS-B hosts are blocked):
   fleet of up to +10);
 - iOS backgrounding and reconnect;
 - the chip's placement on phones;
-- the real CloudPanel install.
+- the real CloudPanel + Netlify install.
 
 ## Open owner decisions
 

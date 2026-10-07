@@ -58,3 +58,8 @@ scripts/r24-out/
 .probe-c-degen-green/
 .probe-c-look/
 .r22p1-c-*.log
+
+# multiplayer relay: a relay-only install (deploy/relay-update.sh) and its
+# per-server settings
+/server/node_modules/
+/deploy/relay.env
