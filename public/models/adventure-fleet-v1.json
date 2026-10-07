@@ -126,5 +126,21 @@
     "triangles": 3536,
     "draws": 12,
     "bytes": 263984
+  },
+  {
+    "id": "flying-wing",
+    "lod": "hero",
+    "url": "/models/player-umbra-hero-v1.glb",
+    "triangles": 12358,
+    "draws": 10,
+    "bytes": 290344
+  },
+  {
+    "id": "flying-wing",
+    "lod": "mobile",
+    "url": "/models/player-umbra-mobile-v1.glb",
+    "triangles": 3622,
+    "draws": 10,
+    "bytes": 92140
   }
 ]
