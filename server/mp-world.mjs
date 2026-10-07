@@ -333,7 +333,9 @@ export function createWorld(cfgIn = {}, { now } = {}) {
           return;
         }
         p.lastWhereAt = t;
-        p.send(whereSummary(t));
+        // `me` = the cell this summary counted the asker in (null when it did
+        // not count them), so the client can leave itself out exactly.
+        p.send(`${whereSummary(t)},"me":${p.whereCell ?? null}}`);
         return;
     }
   }
@@ -598,12 +600,16 @@ export function createWorld(cfgIn = {}, { now } = {}) {
   }
 
   // ---- where: 2° cells of visible pilots, on demand ----------------------
+  // The cached JSON is left OPEN (no closing brace): each reply appends the
+  // asker's own `me`. p.whereCell is the cell this build counted p in.
   function whereSummary(t) {
     if (whereCache !== null && t - whereAt < cfg.whereRebuildMs) return whereCache;
     const cells = new Map();
     for (const p of players.values()) {
+      p.whereCell = null;
       if (!p.visible) continue;
       const key = Math.floor((p.lat + 90) / 2) * 180 + (Math.floor((p.lon + 180) / 2) % 180);
+      p.whereCell = key;
       let c = cells.get(key);
       if (!c) cells.set(key, (c = { key, lat: 0, lon: 0, alts: [] }));
       c.lat += p.lat;
@@ -620,7 +626,7 @@ export function createWorld(cfgIn = {}, { now } = {}) {
         const med = n % 2 ? c.alts[n >> 1] : (c.alts[n / 2 - 1] + c.alts[n / 2]) / 2;
         return [c.key, r1(c.lat / n), r1(c.lon / n), n, Math.round(med / 100) * 100];
       });
-    whereCache = JSON.stringify({ t: 'where', c: top });
+    whereCache = JSON.stringify({ t: 'where', c: top }).slice(0, -1);
     whereAt = t;
     return whereCache;
   }

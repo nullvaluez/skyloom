@@ -62,10 +62,10 @@ const LAT_C = -33.9; // C flies alone, half a world away (no enters, its own whe
 const LON_C = 151.2;
 const LAT_D = 51.5; // D: a first welcome under a held HUD, alone over London
 const LON_D = -0.12;
-// The relay's AFK and where-cache windows, shortened, and pinned to match on
-// every pilot (session.js mirrors the relay's windows to correct the where-summary).
+// The relay's AFK window, shortened (the where-summary names the asker's own
+// counted cell, so no client-side mirror of the relay's windows is needed).
 const RELAY_AFK_MS = 2000;
-const PIN = { relay: { afkMs: RELAY_AFK_MS, whereCacheMs: 0 } };
+const PIN = {};
 const ALT = 1500;
 const SPEED = 150;
 const HEADING = Math.PI / 2; // both fly east

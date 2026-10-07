@@ -636,13 +636,15 @@ check(
   const cached = await waitFor(() => Q[1].json('where')[0]);
   const strip = (m) => JSON.stringify(m?.c);
   check(
-    '(20) where: 2° cells [cell, lat, lon, n, medianAlt] with correct counts; 1 per 3 s per socket; cached',
+    '(20) where: 2° cells [cell, lat, lon, n, medianAlt] with correct counts; 1 per 3 s per socket; cached; `me` names the asker\'s counted cell',
     JSON.stringify(entry) === JSON.stringify([cell, 10.3, 20.3, 3, 1200]) &&
+      reply.me === cell &&
+      cached?.me === cell &&
       total === visibleNow &&
       reply.c.every((e) => e.length === 5) &&
       limited &&
       strip(cached) === strip(reply),
-    `cluster ${JSON.stringify(entry)}; ${reply?.c.length} cells, n sum ${total} = visible ${visibleNow}; repeat limited ${limited}; second socket served the cache ${strip(cached) === strip(reply)}`
+    `cluster ${JSON.stringify(entry)}; ${reply?.c.length} cells, n sum ${total} = visible ${visibleNow}; repeat limited ${limited}; second socket served the cache ${strip(cached) === strip(reply)}; me ${reply?.me}/${cached?.me}`
   );
 }
 
