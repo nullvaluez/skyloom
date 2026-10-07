@@ -31,6 +31,8 @@ async function bootMobile(page, { url = process.env.FLY_URL || 'http://localhost
   await page.addInitScript(() => {
     window.__flyTitleBypass = true;
     window.__flyVisualsOverride = 'classic';
+    // MULTIPLAYER (SANCTIONED, the _boot.js idiom): the shared sky stays off.
+    window.__flyMultiplayerOverride = { enabled: false };
   });
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.evaluate((s) => {

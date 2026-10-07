@@ -173,6 +173,13 @@ async function bootFly(
     // (unpinPins(['__flyTitleBypass']) / (['__flyVisualsOverride'])).
     window.__flyTitleBypass = true;
     window.__flyVisualsOverride = 'classic';
+    // MULTIPLAYER (SANCTIONED harness edit, the same idiom): pin the shared
+    // sky OFF for the whole browser fleet. Several gates enter Free Flight
+    // (verify-traffic-indicators, verify-aircraft-effects, verify-r25-freeflight),
+    // so the pin, not the flight mode, keeps every frozen gate free of a relay
+    // socket or a remote pilot. verify-mp-browser is the ONE harness that
+    // un-pins it (unpinPins(['__flyMultiplayerOverride'])).
+    window.__flyMultiplayerOverride = { enabled: false };
     try {
       localStorage.setItem('fly-controls-seen', '1');
       // Round 10: the APP default is now satellite (PauseMenu defaults an
@@ -220,6 +227,7 @@ async function bootFly(
       window.__flyBoostInfinite = true;
       window.__flyTitleBypass = true; // round 25: same idiom, reload leg
       window.__flyVisualsOverride = 'classic';
+      window.__flyMultiplayerOverride = { enabled: false }; // multiplayer: same idiom, reload leg
       localStorage.setItem('fly-controls-seen', '1');
       localStorage.setItem('fly-map-style-2', s || 'toy'); // round 10: default toy for harnesses
     }, { s: style, terraPin });
