@@ -18,6 +18,7 @@ const INITIAL = {
   disclosedAt: 0,
   clusters: [],
   signalCooldownUntil: 0,
+  smoke: false, // mirror of runtime.mp.smoke for reactive UI
 };
 
 export const useMpStore = create((set) => ({
@@ -25,5 +26,7 @@ export const useMpStore = create((set) => ({
   ...INITIAL,
   setEnabled: (enabled) => set({ enabled: !!enabled }),
   patch: (p) => set(p),
-  resetSession: () => set(INITIAL),
+  // disclosedAt is once per PAGE LOAD (the uplink-gating disclosure is shown
+  // on the first welcome only), so a session reset never clears it.
+  resetSession: () => set((s) => ({ ...INITIAL, disclosedAt: s.disclosedAt })),
 }));
