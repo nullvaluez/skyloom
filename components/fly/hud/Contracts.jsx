@@ -31,6 +31,7 @@ import { buildAtlasList } from '@/lib/fly/poi';
 import { gameplayLive } from '@/lib/fly/front-door';
 import { getStreakDays } from '@/lib/badges';
 import { CARD_THEME } from './inspect/inspect-tokens';
+import { isRemote } from '@/lib/fly/mp/mp-flag';
 
 const ACTIVE_COUNT = 3;
 const OVERFLY_RANGE_M = 2500;
@@ -317,7 +318,8 @@ export function Contracts({ runtime }) {
       if (s.lockState !== prev) {
         const was = prev;
         prev = s.lockState;
-        if (s.lockState === 'formation' && was !== 'formation') {
+        // MULTIPLAYER: formation with another pilot never pays (two friends could farm it).
+        if (s.lockState === 'formation' && was !== 'formation' && !isRemote(s.lockedHex)) {
           advanceRef.current((tpl) => tpl.kind === 'formation');
         }
       }

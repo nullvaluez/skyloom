@@ -329,17 +329,22 @@ function SpotTracers({ runtime, flight, origin }) {
       if (!rec) {
         if (!gateOn) continue; // nothing recorded, nothing to draw
         rec = newSpotRec(state.pool, t.hex);
+        rec.snap = t.snapEpoch;
         state.recs.set(t.hex, rec);
         if (R.backfill && backfillSpot(rec, fix, hx, hy, hz, spW, kT, Lm)) backfills += 1;
       }
       const buf = rec.buf;
+      // MULTIPLAYER: a remote pilot's warp / crash respawn bumps snapEpoch —
+      // a hard cut even when the jump is under warpResetM (ADS-B: both undefined).
+      const snapCut = rec.snap !== t.snapEpoch;
+      if (snapCut) rec.snap = t.snapEpoch;
       if (rec.cnt > 0) {
         const li = lastSpotIndex(rec);
         const hStep = Math.hypot(hx - buf[li], hz - buf[li + 2]);
         const vStep = Math.abs(hy - buf[li + 1]);
         // Data-gap jump, or an altitude correction (a vertical step that is
         // not flight): hard cut, then re-backfill along the new velocity.
-        if (Math.hypot(hStep, vStep) > R.warpResetM || (vStep > R.vertCutM && vStep > S.vertSlope * hStep)) {
+        if (snapCut || Math.hypot(hStep, vStep) > R.warpResetM || (vStep > R.vertCutM && vStep > S.vertSlope * hStep)) {
           rec.cnt = 0;
           rec.head = 0;
           resets += 1;
@@ -733,11 +738,14 @@ function RibbonTracers({ runtime, origin }) {
       let rec = state.recs.get(t.hex);
       if (!rec) {
         if (!gateOn) continue; // nothing recorded, nothing to draw
-        rec = { buf: state.pool.pop() ?? new Float64Array(P * 3), head: 0, cnt: 0 };
+        rec = { buf: state.pool.pop() ?? new Float64Array(P * 3), head: 0, cnt: 0, snap: t.snapEpoch };
         state.recs.set(t.hex, rec);
         if (TRACERS.ribbon.backfill) backfillRec(rec, t); // instant full trail
       }
       const buf = rec.buf;
+      // MULTIPLAYER: a remote pilot's snapEpoch bump is a hard cut (ADS-B: both undefined).
+      const snapCut = rec.snap !== t.snapEpoch;
+      if (snapCut) rec.snap = t.snapEpoch;
 
       // --- Record (absolute float64 head from the dead-reckoned track) ---
       const hx = t.rx;
@@ -751,7 +759,7 @@ function RibbonTracers({ runtime, origin }) {
         // correction/blend (drawing it produced the "vertical contrail"
         // columns). Either way: hard cut, then re-backfill along the new
         // velocity so the trail comes back whole, not as a stub.
-        if (step > TRACERS.ribbon.warpResetM || vStep > TRACERS.ribbon.vertCutM) {
+        if (snapCut || step > TRACERS.ribbon.warpResetM || vStep > TRACERS.ribbon.vertCutM) {
           rec.cnt = 0;
           rec.head = 0;
           resets += 1;

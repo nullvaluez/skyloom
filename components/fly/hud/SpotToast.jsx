@@ -138,7 +138,8 @@ export function SpotToast({ runtime }) {
       let bestScore = null;
       let bestMil = false;
       for (const it of traffic.items) {
-        if (!it.meta || it.stale === 2 || seen.has(it.hex)) continue;
+        // MULTIPLAYER: another pilot is never a SPICY contact (fighters would always ping).
+        if (!it.meta || it.remote === true || it.stale === 2 || seen.has(it.hex)) continue;
         const distNm = it.distM / 1852;
         if (distNm > SPICY.maxRangeNm) continue;
         let score = rarityByHex.get(it.hex);

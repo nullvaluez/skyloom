@@ -6,8 +6,9 @@ import { cinemaOn } from '@/lib/fly/cinema-policy';
 import { useEffect, useRef } from 'react';
 import { Vector3 } from 'three';
 import { LABELS, LETTERS, MOBILE_UI, TOY_WORLD, TRAFFIC, WARP,
-  HUD_SYNC,
+  HUD_SYNC, MULTIPLAYER,
 } from '@/lib/fly/fly-constants';
+import { F as MP_FLAG } from '@/lib/fly/mp/protocol.mjs';
 import { M_TO_FT } from '@/lib/fly/coords';
 import { isPhoneClass } from '@/lib/fly/device-class';
 import { airDrop, bendDrop, getBend } from '@/lib/fly/toy-world/world-bend';
@@ -305,6 +306,13 @@ export function LabelCanvas({ runtime }) {
       // and clickable even when it doesn't earn one of the 15 labels —
       // "sometimes I can't inspect" was a plane outside the label set.
       const items = traffic.getNearest(TRAFFIC.pickPoolSize, flight.pos);
+      // MULTIPLAYER: remote pilots lead traffic.items — append any the
+      // nearest-N pool missed, so a far pilot stays clickable in dense airspace.
+      for (let i = 0; i < traffic.remoteCount && i < traffic.items.length; i++) {
+        const it = traffic.items[i];
+        if (it.remote !== true) break;
+        if (!items.includes(it)) items.push(it);
+      }
       if (items.length === 0) return;
       camera.getWorldDirection(_camFwd);
 
@@ -340,6 +348,10 @@ export function LabelCanvas({ runtime }) {
       const quiet = labelState.mapStyle === 'satellite' && satelliteVisualsOn('presentation');
       const cinema = cinematicEarthOn(labelState);
       const labelLimit = cinemaOn(labelState) ? (labelState.spotting?12:0) : cinema ? 4 : quiet ? SATELLITE_VISUALS.presentation.trafficLabels : TRAFFIC.maxLabels;
+      // MULTIPLAYER: pilots in range carry their own label budget, outside labelLimit.
+      const pilotCalm = cinemaOn(labelState) || cinema || quiet;
+      const pilotLimit = pilotCalm ? MULTIPLAYER.cinemaLabels : MULTIPLAYER.maxLabels;
+      let pilotsLabeled = 0;
 
       for (const it of items) {
         if (it.distM < LABELS.minDistM) continue;
@@ -370,21 +382,29 @@ export function LabelCanvas({ runtime }) {
         // Keep the hero readable; all aircraft remain clickable and selected
         // traffic always earns its full label, even inside the protected area.
         if (cinema && !important && sx > w*.32 && sx < w*.68 && sy > h*.49 && sy < h*.8) continue;
-        if (labeled >= labelLimit && !important) continue; // all tracks stay pickable
+        // MULTIPLAYER: a pilot within labelMaxM is labelled past labelLimit and
+        // the grid declutter (it still yields the cinema hero box above).
+        const pilot = it.remote === true && it.distM <= MULTIPLAYER.labelMaxM && pilotsLabeled < pilotLimit;
+        if (labeled >= labelLimit && !important && !pilot) continue; // all tracks stay pickable
         const cell = `${Math.round(sx / LABELS.cellW)}:${Math.round(sy / LABELS.cellH)}`;
-        if (grid.has(cell) && !important) continue;
+        if (grid.has(cell) && !important && !pilot) continue;
         grid.add(cell);
-        labeled += 1;
+        if (pilot) pilotsLabeled += 1;
+        else labeled += 1;
 
         // horizon fade multiplies OUTSIDE the 0.25 stale-floor: the floor
         // defeats poll starvation, not the horizon (round 11)
-        const alpha = (it._losDim ? 0.32 : 0.88) * Math.max(0.25, it.opacity) * hFade;
+        const alpha = (it._losDim ? 0.32 : pilot && pilotCalm ? 0.7 : 0.88) * Math.max(0.25, it.opacity) * hFade;
         const name = it.meta?.flight || it.meta?.r || it.hex.toUpperCase();
         const altFt = Math.round((it.ry * M_TO_FT) / 100) * 100;
         const distNm = it.distM / 1852;
-        const text = `${name} · ${altFt >= 18000 ? `FL${Math.round(altFt / 100)}` : `${altFt.toLocaleString()}ft`} · ${
+        let text = `${name} · ${altFt >= 18000 ? `FL${Math.round(altFt / 100)}` : `${altFt.toLocaleString()}ft`} · ${
           distNm < 10 ? distNm.toFixed(1) : Math.round(distNm)
         }nm`;
+        if (it.remote === true) {
+          if (it.mpFlags & MP_FLAG.CRASHED) text += ' · crashed';
+          else if (it.mpFlags & MP_FLAG.HELD) text += ' · paused';
+        }
 
         // caret at the aircraft, label below
         ctx.globalAlpha = alpha;
@@ -395,6 +415,13 @@ export function LabelCanvas({ runtime }) {
         ctx.lineTo(sx + 4, sy + 10);
         ctx.closePath();
         ctx.fill();
+        // MULTIPLAYER signal bubble (a glyph string from the session, or null).
+        const bubble = it.remote === true ? runtime.mp?.bubble?.(it.hex) : null;
+        if (bubble) {
+          ctx.font = '16px system-ui, sans-serif';
+          ctx.fillText(bubble, sx, sy - 10);
+          ctx.font = '500 11px ui-monospace, SFMono-Regular, Menlo, monospace';
+        }
 
         const tw = ctx.measureText(text).width;
         ctx.fillStyle = 'rgba(9, 9, 11, 0.55)';

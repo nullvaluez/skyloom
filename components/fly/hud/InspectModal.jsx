@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { motion, useDragControls } from 'framer-motion';
+import { useGLTF } from '@react-three/drei';
 import { ChevronLeft, ChevronRight, Crosshair, X, Zap } from 'lucide-react';
 import { useFlyStore } from '@/stores/fly-store';
 import { usePassportStore } from '@/stores/passport-store';
@@ -19,6 +20,11 @@ import { formatSquawk } from '@/lib/format';
 import { calculateRarity, getRarityTier } from '@/lib/rarity';
 import { getAircraftTypeName } from '@/lib/aircraft-type-names';
 import { relativeTo, startEscort } from '@/lib/fly/escort';
+import { isRemote } from '@/lib/fly/mp/mp-flag';
+import { F as MP_FLAG } from '@/lib/fly/mp/protocol.mjs';
+import { aircraftName, resolveAircraft } from '@/lib/fly/player-aircraft';
+import { aircraftPresentation } from '@/lib/fly/cinematic-earth';
+import { isPhoneClass } from '@/lib/fly/device-class';
 import { countryFlag } from './inspect/card-bits';
 import { Facts, RelativeRow, RouteStrip, TelemetryTiles } from './inspect/dossier-bits';
 import { ModelTurntable, preloadTurntable } from './inspect/ModelTurntable';
@@ -50,7 +56,18 @@ import './target-ui.css';
  * scene remount. Testids kept: inspect-card/-warp/-chase/-hex/-action-notice/
  * -photo-credit/-photo-state/-spot-log/-reg/-model/-owner/-route/
  * -registry-source/-sheet-handle, plus -turntable/-bearing/-sparkline.
+ *
+ * MULTIPLAYER: another pilot (isRemote) gets the same dossier minus everything
+ * that would score, persist or look up a fake aircraft — no passport spot, no
+ * rarity/NEW chips, and the route/photo/registry hooks receive null so no
+ * /api/aircraft/p:* request is ever made. The hero is the pilot's own airframe
+ * (the hangar's presentation entry).
  */
+
+/** The hangar presentation entry a remote pilot's dossier shows. */
+function pilotEntry(aircraftId) {
+  return aircraftPresentation(resolveAircraft(aircraftId), isPhoneClass());
+}
 export function InspectModal({ runtime }) {
   const inspectHex = useFlyStore((s) => s.inspectHex);
 
@@ -61,7 +78,8 @@ export function InspectModal({ runtime }) {
       const hex = runtime.hoverHex ?? useFlyStore.getState().lockedHex;
       if (!hex) return;
       const t = runtime.traffic?.tracks.get(hex);
-      if (t) preloadTurntable(t.archetype);
+      if (t?.remote === true) useGLTF.preload(pilotEntry(t.meta?.aircraftId).url); // MULTIPLAYER: the pilot's own airframe
+      else if (t) preloadTurntable(t.archetype);
     }, 500);
     return () => clearInterval(id);
   }, [runtime]);
@@ -91,6 +109,7 @@ function ModalBody({ hex, runtime }) {
   const { isPhone, isTouch, orientation } = useDeviceLayout();
   const track = runtime.traffic?.tracks.get(hex);
   const meta = track?.meta;
+  const remote = isRemote(hex);
   const close = useCallback(() => useFlyStore.getState().setInspectHex(null), []);
   const dragControls = useDragControls();
 
@@ -107,13 +126,18 @@ function ModalBody({ hex, runtime }) {
   // disable-with-reason even when telemetry never acquired.
   const [live, setLive] = useState(null);
   const [frozen, setFrozen] = useState(false);
+  const [pilotTag, setPilotTag] = useState(null); // MULTIPLAYER: 'Paused' | 'Signal lost' | null
   const vsSamplesRef = useRef([]);
   const rangeRef = useRef(null);
   useEffect(() => {
     const read = () => {
       const t = runtime.traffic?.tracks.get(hex);
       if (!t) return;
-      setFrozen(t.stale === 2);
+      // A remote pilot's stale 2 is usually "paused": Escort stays pressable
+      // and startEscort says why (lib/fly/escort.js remoteEscortBlocker); the
+      // live tag says it on its own state, matching the label's ' · paused'.
+      setFrozen(t.stale === 2 && t.remote !== true);
+      if (t.remote === true) setPilotTag(t.mpFlags & MP_FLAG.HELD ? 'Paused' : t.stale === 2 ? 'Signal lost' : null);
       if (!t.fix1) return;
       const vsFpm = Math.round(t.fix1.vUp * M_TO_FT * 60);
       const ring = vsSamplesRef.current;
@@ -154,7 +178,7 @@ function ModalBody({ hex, runtime }) {
   });
   useEffect(() => {
     const t = runtime.traffic?.tracks.get(hex);
-    if (!t?.meta) return;
+    if (!t?.meta || t.remote === true) return; // MULTIPLAYER: a pilot is never a spot
     const geo = runtime.engine?.worldToGeo({ x: t.rx, y: t.ry, z: t.rz });
     usePassportStore.getState().logSpot(trackSpotAttrs(t, geo));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -163,7 +187,7 @@ function ModalBody({ hex, runtime }) {
   // R17: the SAME builder logSpot uses, so the printed tier and the passport
   // can never disagree.
   const rarity = useMemo(() => {
-    if (!meta) return null;
+    if (!meta || remote) return null;
     return getRarityTier(calculateRarity(trackSpotAttrs(track)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hex, meta]);
@@ -193,10 +217,12 @@ function ModalBody({ hex, runtime }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hex, meta, live?.gsKt == null]);
 
-  const { route, isLoading: routeLoading } = useRoute(aircraftShim);
-  const { data: photo, isPending: photoPending } = useAircraftPhoto(hex);
-  const { data: info, isPending: infoPending } = useAircraftInfo(hex);
+  // null disables each query (enabled: !!arg): a pilot is never looked up.
+  const { route, isLoading: routeLoading } = useRoute(remote ? null : aircraftShim);
+  const { data: photo, isPending: photoPending } = useAircraftPhoto(remote ? null : hex);
+  const { data: info, isPending: infoPending } = useAircraftInfo(remote ? null : hex);
   const photoSrc = photo?.thumbnail_large?.src || photo?.thumbnail?.src || null;
+  const heroEntry = useMemo(() => (remote ? pilotEntry(meta?.aircraftId) : undefined), [remote, meta?.aircraftId]);
 
   // ---- Actions -------------------------------------------------------------
   const [notice, setNotice] = useState(null); // { key, msg } | null
@@ -301,14 +327,16 @@ function ModalBody({ hex, runtime }) {
   // ---- Identity: registry FIRST, local tables as the honest fallback ------
   const reg = meta.r || info?.registration || null;
   const typeCode = meta.t || info?.typeCode || null;
-  const typeName = getAircraftTypeName(typeCode, meta.category);
+  const typeName = remote ? aircraftName(meta.aircraftId) : getAircraftTypeName(typeCode, meta.category);
   const registryModel = [info?.manufacturer, info?.model].filter(Boolean).join(' ') || null;
   const thinModel = !info?.model || /^[0-9]{1,4}$/.test(info.model);
   const headlineIsRegistry = !!registryModel && !(thinModel && typeName);
   const modelPrimary = (headlineIsRegistry ? registryModel : typeName) || registryModel || 'Unknown type';
   const airlineName = route?.airline?.name || null;
   const owner = info?.owner || null;
-  const operatorLine = airlineName || owner || (reg ? `Registered ${reg}` : 'Unknown operator');
+  const operatorLine = remote
+    ? 'Skyloom pilot · online'
+    : airlineName || owner || (reg ? `Registered ${reg}` : 'Unknown operator');
   const ownerFact = owner && owner !== operatorLine ? owner : null;
   const flag = countryFlag(info?.countryIso);
   const monogram = route?.airline?.iata || route?.airline?.icao || info?.operatorFlagCode || null;
@@ -351,7 +379,11 @@ function ModalBody({ hex, runtime }) {
     show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 260, damping: 26 } },
   };
 
-  const facts = [
+  const facts = remote ? [
+    ['Aircraft', typeName],
+    ['Class', (meta.iconType || 'unknown').replace(/^\w/, (c) => c.toUpperCase())],
+    ['Pilot', 'Skyloom pilot · online · nothing is saved', true],
+  ] : [
     ['Squawk', meta.squawk ? formatSquawk(meta.squawk) : null],
     ['Type code', typeCode],
     ['Registration', reg],
@@ -421,7 +453,7 @@ function ModalBody({ hex, runtime }) {
             {rarity.name}
           </span>
         )}
-        {spot.isNew ? (
+        {remote ? null : spot.isNew ? (
           <motion.span
             className="tgt-stamp"
             initial={{ scale: 1.8, rotate: -16, opacity: 0 }}
@@ -495,15 +527,17 @@ function ModalBody({ hex, runtime }) {
           ) : (
             <>
               <div style={{ position: 'absolute', inset: '0 0 52px 0' }}>
-                <ModelTurntable archetype={track.archetype} meta={meta} heroColor={heroColor} />
+                <ModelTurntable archetype={track.archetype} entry={heroEntry} meta={meta} heroColor={heroColor} />
               </div>
-              <span
-                className="tgt-photo-state"
-                data-testid="inspect-photo-state"
-                data-busy={photoPending ? '1' : '0'}
-              >
-                {photoPending ? 'Photo lookup…' : 'No photo on file'}
-              </span>
+              {!remote && (
+                <span
+                  className="tgt-photo-state"
+                  data-testid="inspect-photo-state"
+                  data-busy={photoPending ? '1' : '0'}
+                >
+                  {photoPending ? 'Photo lookup…' : 'No photo on file'}
+                </span>
+              )}
             </>
           )}
           <div className="tgt-hero-shade" aria-hidden="true" />
@@ -525,13 +559,15 @@ function ModalBody({ hex, runtime }) {
             animate={{ y: '300%' }}
             transition={{ delay: 0.2, duration: 1, ease: [0.4, 0, 0.2, 1] }}
           />
-          <span className="tgt-live" data-frozen={frozen ? '1' : '0'}>
+          <span className="tgt-live" data-frozen={frozen || pilotTag ? '1' : '0'}>
             <i />
             {frozen
               ? 'Signal frozen'
-              : live
-                ? `Live · ${live.distNm < 10 ? live.distNm.toFixed(1) : Math.round(live.distNm)} nm`
-                : 'Acquiring'}
+              : pilotTag
+                ? pilotTag
+                : live
+                  ? `Live · ${live.distNm < 10 ? live.distNm.toFixed(1) : Math.round(live.distNm)} nm`
+                  : 'Acquiring'}
           </span>
           <div className="tgt-callsign">
             <motion.h2
@@ -590,22 +626,26 @@ function ModalBody({ hex, runtime }) {
           <RelativeRow live={live} samples={vsSamplesRef.current} />
         </motion.div>
 
-        <motion.div variants={rise}>
-          <RouteStrip route={route} loading={routeLoading} />
-        </motion.div>
+        {!remote && (
+          <motion.div variants={rise}>
+            <RouteStrip route={route} loading={routeLoading} />
+          </motion.div>
+        )}
 
         <motion.div variants={rise}>
           <Facts
             open={factsOpen}
             onToggle={toggleFacts}
             rows={facts}
-            provenanceBusy={infoPending}
+            provenanceBusy={!remote && infoPending}
             provenance={
-              infoPending
-                ? 'Registry lookup…'
-                : info?.found
-                  ? `Registry · ${info.source}`
-                  : 'Registry · no public record'
+              remote
+                ? 'Another Skyloom pilot · no registry lookup'
+                : infoPending
+                  ? 'Registry lookup…'
+                  : info?.found
+                    ? `Registry · ${info.source}`
+                    : 'Registry · no public record'
             }
           />
         </motion.div>

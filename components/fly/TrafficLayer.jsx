@@ -14,9 +14,9 @@ import {
   Object3D,
   PlaneGeometry,
 } from 'three';
-import { GLOBE, NAV_LIGHTS, SKY, SKY_OVERLAYS, TOY, TRAFFIC, TRAFFIC_HORIZON, WORLD } from '@/lib/fly/fly-constants';
+import { GLOBE, MULTIPLAYER, NAV_LIGHTS, SKY, SKY_OVERLAYS, TOY, TRAFFIC, TRAFFIC_HORIZON, WORLD } from '@/lib/fly/fly-constants';
 import { buildArchetypeGeometries } from '@/lib/fly/traffic-geometries';
-import { loadTrafficGeometries } from '@/lib/fly/model-loader';
+import { loadTrafficGeometries, loadTrafficGeometry } from '@/lib/fly/model-loader';
 import { MODEL_SURFACE_ROLES } from '@/lib/fly/assets';
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
 import { applyBendAirAnchor, applyNavLights, applyOverlayCloudGate, horizonFade, setNavTime } from '@/lib/fly/toy-world/world-bend';
@@ -26,6 +26,10 @@ import { projectModelMatrix } from '@/lib/fly/render-scale';
 import { faceCameraInto, getTrueScaleK } from '@/lib/fly/true-scale';
 import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
 import { cinemaOn } from '@/lib/fly/cinema-policy';
+import { mpAvailable } from '@/lib/fly/mp/mp-flag';
+import { AIRCRAFT_IDS } from '@/lib/fly/mp/protocol.mjs';
+import { aircraftPresentation } from '@/lib/fly/cinematic-earth';
+import { resolveAircraft } from '@/lib/fly/player-aircraft';
 
 const _dummy = new Object3D();
 const _color = new Color();
@@ -40,6 +44,77 @@ const smooth01 = (v) => {
 
 // Stale traffic fades toward the style's haze, not always daylight blue
 const FOG_BY_STYLE = { satellite: SKY.fogColor, toy: TOY.fogColor };
+
+// MULTIPLAYER (MULTIPLAYER.md): the remote fleet exists only when the flag is
+// on AND a relay URL resolves. Off, the layer creates and mounts nothing new.
+const REMOTE_FLEET = mpAvailable();
+
+/**
+ * The traffic hull material: one recipe for every archetype mesh and every
+ * remote-fleet mesh, so they all share ONE shader program (no new key).
+ */
+function hullMaterial(painted) {
+  // Round 8: glossier hull (0.35/0.5) — the moonlit night reads specular
+  const material = new MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.35,
+    metalness: 0.5,
+    flatShading: true,
+    vertexColors: painted,
+  });
+  // Altitude-aware bend, evaluated at the INSTANCE anchor: grounded
+  // traffic hugs the drawn terrain, airborne traffic caps its drop so
+  // it never sinks below eye level — and the whole model translates
+  // rigidly (per-vertex air-drop sheared rim objects vertically).
+  applyBendAirAnchor(material, GLOBE.trafficBend);
+  // Round 8: baked nav-light emissive (aEmissive from the GLB bake;
+  // primitive boot geometries lack it → reads 0 → dark, safe)
+  applyNavLights(material, NAV_LIGHTS);
+  return material;
+}
+
+/**
+ * MULTIPLAYER: build aircraft `a`'s remote-fleet mesh the first time a pilot
+ * flying it comes within fleet.modelRangeM — the player-*-mobile GLB through
+ * the traffic bake, instanced on the shared hull material. Until it resolves
+ * (and for good if it fails) the pilot draws as its look-alike archetype.
+ * fleet.state: 0 idle · 1 loading · 2 ready · 3 failed.
+ */
+function ensureRemoteMesh(fleet, a, mount) {
+  if (fleet.state[a] !== 0 || !mount) return;
+  const id = AIRCRAFT_IDS[a];
+  if (!id) {
+    fleet.state[a] = 3;
+    return;
+  }
+  fleet.state[a] = 1;
+  const gen = fleet.gen;
+  loadTrafficGeometry(aircraftPresentation(resolveAircraft(id), true)).then(
+    (geo) => {
+      if (gen !== fleet.gen) {
+        geo.dispose(); // the layer unmounted (or StrictMode re-ran) meanwhile
+        return;
+      }
+      const mesh = new InstancedMesh(geo, hullMaterial(true), MULTIPLAYER.fleet.maxPerType);
+      mesh.instanceMatrix.setUsage(DynamicDrawUsage);
+      mesh.count = 0;
+      mesh.frustumCulled = false;
+      mesh.name = `remote:${id}`;
+      mesh._isModel = true; // the harness foreground hide, like a swapped-in GLB
+      mesh._painted = true; // white instance tint: the livery is baked
+      mesh._used = 0;
+      fleet.meshes[a] = mesh;
+      fleet.list.push(mesh);
+      fleet.list.__cinematicSurface = undefined; // re-apply the surface to the newcomer
+      fleet.state[a] = 2;
+      mount.add(mesh);
+    },
+    (err) => {
+      if (gen === fleet.gen) fleet.state[a] = 3;
+      console.warn(`[fly-mp] remote fleet ${id} failed, keeping the look-alike:`, err);
+    }
+  );
+}
 
 function setTrafficSurface(meshes, cinematic) {
   if (meshes.__cinematicSurface === cinematic) return;
@@ -111,23 +186,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
         // `unknown` blob deliberately carries no baked color and stays
         // classification-tinted.
         const painted = geometry.userData?.bakedColors === true;
-        // Round 8: glossier hull (0.35/0.5) — the moonlit night reads specular
-        const material = new MeshStandardMaterial({
-          color: 0xffffff,
-          roughness: 0.35,
-          metalness: 0.5,
-          flatShading: true,
-          vertexColors: painted,
-        });
-        // Altitude-aware bend, evaluated at the INSTANCE anchor: grounded
-        // traffic hugs the drawn terrain, airborne traffic caps its drop so
-        // it never sinks below eye level — and the whole model translates
-        // rigidly (per-vertex air-drop sheared rim objects vertically).
-        applyBendAirAnchor(material, GLOBE.trafficBend);
-        // Round 8: baked nav-light emissive (aEmissive from the GLB bake;
-        // primitive boot geometries lack it → reads 0 → dark, safe)
-        applyNavLights(material, NAV_LIGHTS);
-        const mesh = new InstancedMesh(geometry, material, TRAFFIC.maxPerArchetype);
+        const mesh = new InstancedMesh(geometry, hullMaterial(painted), TRAFFIC.maxPerArchetype);
         mesh.instanceMatrix.setUsage(DynamicDrawUsage);
         mesh.count = 0;
         mesh.frustumCulled = false;
@@ -178,6 +237,33 @@ export function TrafficLayer({ runtime, flight, origin }) {
     mesh.frustumCulled = false;
     return mesh;
   }, []);
+  // MULTIPLAYER remote fleet: one InstancedMesh per hangar aircraft, built
+  // lazily (ensureRemoteMesh). null with the flag off — nothing is created.
+  const remoteFleet = useMemo(
+    () =>
+      REMOTE_FLEET
+        ? { meshes: new Array(AIRCRAFT_IDS.length).fill(null), state: new Uint8Array(AIRCRAFT_IDS.length), list: [], gen: 0 }
+        : null,
+    []
+  );
+  const remoteMount = useRef(null);
+  useEffect(() => {
+    if (!remoteFleet) return undefined;
+    return () => {
+      remoteFleet.gen += 1; // in-flight loads resolve into nothing
+      for (const mesh of remoteFleet.list) {
+        mesh.removeFromParent();
+        mesh.geometry.dispose();
+        mesh.material.dispose();
+        mesh.dispose();
+      }
+      remoteFleet.list.length = 0;
+      remoteFleet.list.__cinematicSurface = undefined;
+      remoteFleet.meshes.fill(null);
+      remoteFleet.state.fill(0);
+    };
+  }, [remoteFleet]);
+
   // The far-LOD glints are THE distance cue past the hull LOD and sit against
   // the sky by construction (farLiftBoost): draw them after the cloud
   // composite so the daytime sky replacement cannot erase them.
@@ -263,6 +349,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
     runtime.liveFleet=detailed.stats;
     runtime.retryLiveFleet=()=>{if(detailed.stats.compileFailed){detailed.stats.compileFailed=false;detailed.compiling=false;}};
     setTrafficSurface(meshes, mapStyleNow === 'satellite' && satelliteVisualsOn('models'));
+    if (remoteFleet) setTrafficSurface(remoteFleet.list, mapStyleNow === 'satellite' && satelliteVisualsOn('models'));
     _fog.set(FOG_BY_STYLE[mapStyleNow] ?? SKY.fogColor);
     // Satellite far dots recede into the haze the scene is ACTUALLY using —
     // FlyScene drives scene.fog from the time-of-day rim, so a night dot
@@ -282,6 +369,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
     }
 
     for (const mesh of meshes) mesh._used = 0;
+    if (remoteFleet) for (const mesh of remoteFleet.list) mesh._used = 0;
     let billboardsUsed = 0;
     let horizonFaded = 0;
     // TRUE_SCALE: billboards take the camera's own (anisotropic) world basis,
@@ -293,6 +381,9 @@ export function TrafficLayer({ runtime, flight, origin }) {
       const x = it.rx - ax;
       const y = it.ryd; // drawn-frame render Y (round 8.5 H1; = ry in satellite)
       const z = it.rz - az;
+      // MULTIPLAYER: start a pilot's real airframe loading as it comes in range.
+      if (remoteFleet && it.remote === true && it.distM < MULTIPLAYER.fleet.modelRangeM)
+        ensureRemoteMesh(remoteFleet, it.meta.ac, remoteMount.current);
 
       // Round 11 horizon fade: computed ONCE here (priority -45, after
       // setBendEye at -50 wrote this frame's uEyeY/uBendK), stashed on the
@@ -314,8 +405,11 @@ export function TrafficLayer({ runtime, flight, origin }) {
         // R14: out-of-range archetype falls back to the UNKNOWN blob (index 8).
         // It is no longer the last mesh — warbird-prop/jet/heavy/classic-transport
         // occupy 9–12, so meshes.length-1 would wrongly resolve to classic-transport.
-        const mesh = meshes[it.archetype] ?? meshes[8];
-        if (mesh._used >= TRAFFIC.maxPerArchetype) continue;
+        // MULTIPLAYER: a pilot flies its own airframe once loaded, the
+        // look-alike archetype (it.archetype) until then.
+        const remoteMesh = it.remote === true ? remoteFleet?.meshes[it.meta.ac] : null;
+        const mesh = remoteMesh ?? meshes[it.archetype] ?? meshes[8];
+        if (mesh._used >= (remoteMesh ? MULTIPLAYER.fleet.maxPerType : TRAFFIC.maxPerArchetype)) continue;
         // Anything carrying its own vertex colors — a swapped-in GLB or a
         // round-15 baked-livery primitive — tints WHITE so classification can
         // never repaint a hull. Only the `unknown` blob stays class-colored.
@@ -327,7 +421,8 @@ export function TrafficLayer({ runtime, flight, origin }) {
         if (eff < 1) _color.lerp(_fog, 1 - eff);
         const fix = it.fix1;
         const speed = Math.hypot(fix.vE, fix.vN);
-        const pitch = speed > 20 ? Math.atan2(fix.vUp, speed) : 0;
+        // A remote pilot transmits real attitude; ADS-B pitch is derived.
+        const pitch = it.remote === true ? it.pitch : speed > 20 ? Math.atan2(fix.vUp, speed) : 0;
         _dummy.position.set(x, y, z);
         _dummy.rotation.order = 'YXZ';
         _dummy.rotation.set(pitch, -it.yaw, -it.bank);
@@ -340,7 +435,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
         mesh._used += 1;
       } else {
         if (billboardsUsed >= TRAFFIC.maxBillboards) continue;
-        const quiet=quietTraffic&&it.hex!==focusedHex;
+        const quiet=quietTraffic&&it.hex!==focusedHex&&it.remote!==true; // pilot dots keep their colour in cinema
         _color.set(quiet?'#d7e0e6':it.meta?.color || '#9ca3af');
         // Satellite: far dots recede into the haze with range (drawn after the
         // cloud composite they no longer vanish against the day sky, and a
@@ -373,6 +468,13 @@ export function TrafficLayer({ runtime, flight, origin }) {
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
+    if (remoteFleet) {
+      for (const mesh of remoteFleet.list) {
+        mesh.count = mesh._used;
+        mesh.instanceMatrix.needsUpdate = true;
+        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      }
+    }
     billboards.count = billboardsUsed;
     billboards.instanceMatrix.needsUpdate = true;
     if (billboards.instanceColor) billboards.instanceColor.needsUpdate = true;
@@ -404,6 +506,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
       ))}
       <primitive object={billboards} />
       <group ref={detailedMount} />
+      {REMOTE_FLEET && <group ref={remoteMount} />}
     </group>
   );
 }

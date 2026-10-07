@@ -100,8 +100,14 @@ export function Minimap({ runtime }) {
         ctx.globalAlpha = Math.max(0.25, it.opacity);
         ctx.fillStyle = it.meta?.color || '#9ca3af';
         ctx.beginPath();
-        ctx.arc(x, y, 2, 0, Math.PI * 2);
+        // MULTIPLAYER: a remote pilot is a bigger dot in its own colour, white-ringed.
+        ctx.arc(x, y, it.remote === true ? 3.2 : 2, 0, Math.PI * 2);
         ctx.fill();
+        if (it.remote === true) {
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
         if (it.hex === lockedHex) {
           ctx.strokeStyle = '#fbbf24';
           ctx.lineWidth = 1.25;

@@ -4,7 +4,7 @@ import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Euler, Quaternion, Vector3 } from 'three';
 import { LIVE_AIRCRAFT, resolveLiveAircraft } from '@/lib/fly/live-aircraft';
-import { AIRCRAFT_EFFECTS as FX, contrailStrength, liveEngineOffsets } from '@/lib/fly/aircraft-effects';
+import { AIRCRAFT_EFFECTS as FX, contrailStrength, liveEngineOffsets, playerEngineOffsets } from '@/lib/fly/aircraft-effects';
 import { WakeBatch, WakeHistory } from '@/lib/fly/aircraft-wake';
 import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
 import { patchAirWake } from '@/lib/fly/tracer-spot';
@@ -18,7 +18,20 @@ const fallback = { 0: [[-10, -2, 2], [10, -2, 2]], 1: [[-1.5, 0, 7], [1.5, 0, 7]
   10: [[0, 0, 5.4]] };
 const noSources = [];
 const attitude = new Euler(0, 0, 0, 'YXZ'), rotation = new Quaternion(), emitter = new Vector3();
+// MULTIPLAYER: a remote pilot's wake leaves its own airframe's engines. Memoized
+// per aircraft id — a rec resets whenever its sources reference changes.
+const remoteStations = new Map();
+function remoteSources(id) {
+  let s = remoteStations.get(id);
+  if (!s) {
+    s = playerEngineOffsets(id);
+    if (!s.length) s = noSources;
+    remoteStations.set(id, s);
+  }
+  return s;
+}
 function sources(t) {
+  if (t.remote === true) return remoteSources(t.meta?.aircraftId);
   // Military is a mission class, not an engine type. The shared military GLB
   // must not give a reported turboprop transport a jet's exhaust.
   if (/^(C130|C30J|C160|A400|C27J|C295|P3|E2|PC21|PC9|T6)/.test(t.meta?.t ?? '')) return noSources;
@@ -59,13 +72,15 @@ export function TrafficContrails({ runtime, origin }) {
       const offsets = sources(t), fix = t.fix1, speed = Math.hypot(fix.vE, fix.vN);
       const density = contrailStrength(t.ry, speed, t.flags & 1);
       let rec = state.recs.get(t.hex);
-      if (rec && rec.sources !== offsets) {
+      // A remote pilot's warp / respawn (snapEpoch bump) starts a new wake; ADS-B: both undefined.
+      if (rec && (rec.sources !== offsets || rec.snap !== t.snapEpoch)) {
         for (const h of rec.histories) { h.clear(); state.pool.push(h); }
         state.recs.delete(t.hex); rec = null;
       }
       const fresh = !rec;
-      if (fresh) { rec = { sources: offsets, histories: offsets.map(() => state.pool.pop() ?? new WakeHistory(96)) }; state.recs.set(t.hex, rec); }
-      rotation.setFromEuler(attitude.set(speed > 20 ? Math.atan2(fix.vUp, speed) : 0, -t.yaw, -t.bank));
+      if (fresh) { rec = { sources: offsets, snap: t.snapEpoch, histories: offsets.map(() => state.pool.pop() ?? new WakeHistory(96)) }; state.recs.set(t.hex, rec); }
+      // A remote pilot transmits real attitude; ADS-B pitch is derived.
+      rotation.setFromEuler(attitude.set(t.remote === true ? t.pitch : speed > 20 ? Math.atan2(fix.vUp, speed) : 0, -t.yaw, -t.bank));
       const k = Number.isFinite(fix.latRad) ? 1 / Math.cos(fix.latRad) : 1;
       for (let e = 0; e < offsets.length; e++) {
         const h = rec.histories[e];
@@ -77,7 +92,8 @@ export function TrafficContrails({ runtime, origin }) {
         // velocity-estimated wake (visual only, like the existing tracers),
         // then replace it with recorded positions. Never backfill ground or
         // upper-air gaps, and never pretend this is historical ADS-B data.
-        if (fresh && density > .003) for (let j = 64; j > 0; j--) {
+        // A remote pilot is seen live from its first frame: no seed.
+        if (fresh && density > .003 && t.remote !== true) for (let j = 64; j > 0; j--) {
           const age = j * .32, climb = Math.max(-speed * .12, Math.min(speed * .12, fix.vUp));
           h.record(emitter.x - fix.vE * k * age, emitter.y - climb * age, emitter.z + fix.vN * k * age,
             now - age, density * contrailStrength(t.ry - climb * age, speed), 0, wx, wz);

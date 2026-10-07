@@ -13,6 +13,8 @@ import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { onTouchInfoDismiss } from '@/hooks/use-touch-actions';
 import { releaseEscort, startEscort } from '@/lib/fly/escort';
 import { getAircraftTypeName } from '@/lib/aircraft-type-names';
+import { isRemote } from '@/lib/fly/mp/mp-flag';
+import { aircraftName } from '@/lib/fly/player-aircraft';
 import { AIRCRAFT_SILHOUETTES, getBestSilhouette } from '@/lib/aircraft-silhouettes';
 import './target-ui.css';
 
@@ -125,13 +127,15 @@ function InfoCardBody({ hex, runtime, onDismiss }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hex, meta]);
 
-  const { route } = useRoute(aircraftShim);
-  const { data: photo } = useAircraftPhoto(hex);
+  // MULTIPLAYER: another pilot is never looked up (null disables each query).
+  const remote = isRemote(hex);
+  const { route } = useRoute(remote ? null : aircraftShim);
+  const { data: photo } = useAircraftPhoto(remote ? null : hex);
   const photoSrc = photo?.thumbnail_large?.src || photo?.thumbnail?.src || null;
 
   if (!meta) return null;
   const title = meta.flight?.trim() || meta.r || hex.toUpperCase();
-  const typeName = getAircraftTypeName(meta.t, meta.category);
+  const typeName = remote ? aircraftName(meta.aircraftId) : getAircraftTypeName(meta.t, meta.category);
   const inspect = () => useFlyStore.getState().setInspectHex(hex);
   const escort = () => {
     if (chasing) {
@@ -179,7 +183,7 @@ function InfoCardBody({ hex, runtime, onDismiss }) {
             >
               <Crosshair size={18} aria-hidden="true" />
               <strong>{title}</strong>
-              <small>{[live ? `${live.distNm} nm` : null, meta.t].filter(Boolean).join(' · ')}</small>
+              <small>{[live ? `${live.distNm} nm` : null, remote ? typeName : meta.t].filter(Boolean).join(' · ')}</small>
             </button>
             <button type="button" className="tgt-lock-open" onClick={escort} aria-pressed={chasing}>
               {chasing ? 'Release' : 'Escort'}

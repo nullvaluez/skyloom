@@ -131,6 +131,9 @@ node_gate verify-vendor-three-tile.mjs   # A (R24): the vendored copy is verbati
 node_gate verify-skirt-fast.mjs          # A (R24): O(V) boundary scan is output-identical
 node_gate verify-frame-step.mjs          # A (R24): fixed-timestep sim / interpolated render pose
 node_gate verify-finalize-pace.mjs       # A (R24): wall-clock finalize brake
+node_gate verify-mp-protocol.mjs         # MP: codec + aircraft table + no-persistence scan
+node_gate verify-mp-relay.mjs            # MP: in-process relay on ephemeral 127.0.0.1 ports (~16 s)
+node_gate verify-mp-engine.mjs           # MP: remotes without ADS-B, frozen ADS-B trace, consumer gates
 
 # --- verify-seam's NODE leg runs offline (HARN-GAP-7): its api.init() is
 #     pinned to the fixture by a global-fetch wrapper. Gates 0-6c are the

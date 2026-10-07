@@ -189,6 +189,7 @@ import { applyR25Terrain, r25GroundFrame, releaseR25Ground } from '@/lib/fly/r25
 // R24 B (GROUND_VIS, recon A6/T8) — the damped VISUAL ground elevation.
 import { eyeAglVis as visualEyeAgl, groundElevVis, stepGroundVis } from '@/lib/fly/ground-vis';
 import { usePassportStore } from '@/stores/passport-store';
+import { ESCORT_MESSAGES, remoteEscortBlocker } from '@/lib/fly/escort';
 import { PlayerPlane } from './PlayerPlane';
 import { CloudField } from './CloudField';
 import { VoidFloor } from './VoidFloor';
@@ -2043,6 +2044,7 @@ export function FlyScene({ runtime }) {
     setTrueScaleK(cinemaOn(flyState) ? mercatorScale(flight.latDeg) : 1);
     const worldHeld = flyState.mapStyle === 'satellite' && (runtime.worldLoading === true || (typeof window !== 'undefined' && window.__flyBoot && window.__flyBoot.pct < 100));
     const paused = flyState.phase === 'paused' || worldHeld || menuOpen(flyState) || !!flyState.inspectHex || flyState.atlasOpen || flyState.logbookOpen || document.hidden;
+    runtime.flightHeld = paused; // MULTIPLAYER: the session's HELD bit is this exact predicate
     // Inspect modal / Atlas count as a soft pause for the stick: the world
     // (and your plane) keep flying, but the cursor belongs to the overlay.
     // Round 17: photo mode joins them — the plane keeps flying (the instructor
@@ -2140,7 +2142,8 @@ export function FlyScene({ runtime }) {
       const t = targeting.target;
       // R25 W0: A's spotAllowed() suppresses passport spots on the title
       // (the frozen title camera must not farm the logbook). W0 stub = true.
-      if (t?.meta && spotAllowed(store)) {
+      // MULTIPLAYER: another pilot is never a passport spot (t.remote).
+      if (t?.meta && t.remote !== true && spotAllowed(store)) {
         const geo = engine.worldToGeo(_spotPos.set(t.rx, t.ry, t.rz));
         // R17: one shared attribute builder (lib/fly/spot-attrs.js) — it is
         // what finally carries `squawk` (and gs/alt) into the passport, so the
@@ -2159,7 +2162,11 @@ export function FlyScene({ runtime }) {
       } else if (targeting.lockedHex) {
         // Plain intercept: the camera stays the player's (C toggles cinema).
         // The Escort buttons (lib/fly/escort.js) are the cinematic order.
-        autopilot.engage('intercept');
+        // MULTIPLAYER: a paused or busy pilot says why on the arrival banner
+        // instead (remoteEscortBlocker is null for every ADS-B target).
+        const why = remoteEscortBlocker(runtime, targeting.lockedHex);
+        if (why) store.setArrival({ name: ESCORT_MESSAGES[why], kind: null, at: Date.now() });
+        else autopilot.engage('intercept');
       }
     }
     // T opens the inspect modal on the locked target — the zero-precision
