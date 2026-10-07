@@ -12,6 +12,9 @@ export const ATLAS_KIND = {
   military: { label: 'BASE', color: '#f87171', dot: 2.6 },
   hotspot: { label: 'SPOT', color: '#fbbf24', dot: 2.3 },
   landmark: { label: 'SIGHT', color: '#8fa0bf', dot: 1.5 },
+  // MULTIPLAYER: other pilots' clusters (the relay's where-summary). Not a
+  // filter chip; each entry sizes its own dot by head count (e.dot).
+  pilots: { label: 'PILOTS', color: '#c084fc', dot: 2.6 },
 };
 
 export const ATLAS_MAP = {

@@ -134,6 +134,10 @@ node_gate verify-finalize-pace.mjs       # A (R24): wall-clock finalize brake
 node_gate verify-mp-protocol.mjs         # MP: codec + aircraft table + no-persistence scan
 node_gate verify-mp-relay.mjs            # MP: in-process relay on ephemeral 127.0.0.1 ports (~16 s)
 node_gate verify-mp-engine.mjs           # MP: remotes without ADS-B, frozen ADS-B trace, consumer gates
+node_gate verify-mp-motion.mjs           # MP: clock sync + dead reckoning to the present
+node_gate verify-mp-session.mjs          # MP: real sessions in worker threads through an in-process relay (~37 s)
+node_gate verify-mp-smoke.mjs            # MP: smoke stations; flag-off contrail buffers byte-identical
+node_gate verify-mp-ui.mjs               # MP: settings/touch/help render nothing with the flag off
 
 # --- verify-seam's NODE leg runs offline (HARN-GAP-7): its api.init() is
 #     pinned to the fixture by a global-fetch wrapper. Gates 0-6c are the

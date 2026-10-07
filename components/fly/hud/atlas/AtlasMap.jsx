@@ -145,7 +145,7 @@ export function AtlasMap({ entries, selectedKey, onSelect, runtime, focus }) {
         const [x, y] = toPx(e.lon, e.lat, w, h);
         if (x < -8 || x > w + 8 || y < -8 || y > h + 8) continue;
         const kind = ATLAS_KIND[e.kind] ?? ATLAS_KIND.city;
-        const r = kind.dot;
+        const r = e.dot ?? kind.dot;
         ctx.fillStyle = kind.color;
         ctx.globalAlpha = e.kind === 'airport' || e.kind === 'landmark' ? 0.55 : 0.92;
         if (e.kind === 'military') {

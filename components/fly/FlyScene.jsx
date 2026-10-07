@@ -190,6 +190,7 @@ import { applyR25Terrain, r25GroundFrame, releaseR25Ground } from '@/lib/fly/r25
 import { eyeAglVis as visualEyeAgl, groundElevVis, stepGroundVis } from '@/lib/fly/ground-vis';
 import { usePassportStore } from '@/stores/passport-store';
 import { ESCORT_MESSAGES, remoteEscortBlocker } from '@/lib/fly/escort';
+import { mpAvailable } from '@/lib/fly/mp/mp-flag';
 import { PlayerPlane } from './PlayerPlane';
 import { CloudField } from './CloudField';
 import { VoidFloor } from './VoidFloor';
@@ -212,6 +213,10 @@ import { SatEnvironment } from './SatEnvironment';
 import { PrecipLayer } from './PrecipLayer';
 
 const SPAWN_ALT_M = 800;
+// MULTIPLAYER: own smoke (key 7) rides <Contrail>, so it also mounts for the
+// trail-less types when the feature is available. Read once (installUrlFlags
+// runs before this lazy module loads); flag off -> the mount is unchanged.
+const MP_SMOKE = mpAvailable();
 
 // Round 19 (Fable): scratch for the dusk key-color lerp — one module-scope
 // Color, written and consumed inside a single effect pass, never retained.
@@ -3711,8 +3716,9 @@ export function FlyScene({ runtime }) {
         <PrecipLayer runtime={runtime} flight={flight} />
       )}
       {/* Round 17: props and gliders leave no contrail at all — the component
-          is not mounted for them, so they cost zero ribbon draws. */}
-      {aircraft.contrail.enabled && (
+          is not mounted for them, so they cost zero ribbon draws. MULTIPLAYER:
+          mounted for smoke; it issues no ribbon (no draw) until smoke is on. */}
+      {(aircraft.contrail.enabled || MP_SMOKE) && (
         <Contrail flight={flight} origin={origin} aircraft={aircraft} runtime={runtime} />
       )}
       {/* Round 13 Phase 2: satellite player ground-contact disc (1 draw, low

@@ -6,14 +6,23 @@ import { getRuntimeAction } from '@/lib/fly/runtime-bus';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { useFlyStore } from '@/stores/fly-store';
 import { useFlyAtlasStore } from '@/stores/fly-atlas-store';
+import { useMpStore } from '@/stores/mp-store';
+import { mpAvailable } from '@/lib/fly/mp/mp-flag';
 import { AtlasMap } from './atlas/AtlasMap';
 import { DestinationCard } from './atlas/DestinationCard';
+import { PilotsCard, pilotEntry, pilotsWarpOpts } from './atlas/PilotsCard';
 import { ATLAS_KIND, CARD_THEME } from './atlas/atlas-tokens';
 import { rankAtlasEntries, warpOptsFor } from '@/lib/fly/poi/search';
 
 const FILTER_KINDS = ['city', 'airport', 'military', 'hotspot', 'landmark'];
 const DEFAULT_FILTERS = { city: true, airport: true, military: true, hotspot: true, landmark: false };
 const MAX_RESULTS = 9;
+// MULTIPLAYER: pilot clusters join the map only when the feature is available
+// (read once; installUrlFlags runs before this lazy module loads). Flag off,
+// both selectors below return constants, so the store never re-renders this.
+const MP_ATLAS = mpAvailable();
+const NO_PILOTS = [];
+const WHERE_EVERY_MS = 5000;
 
 // R25 B: warpOptsFor + the search ranking live in lib/fly/poi/search.js
 // (shared with the hangar's Free Flight search; behaviour identical).
@@ -46,15 +55,34 @@ function AtlasBody({ runtime }) {
   const recents = useFlyAtlasStore((s) => s.recents);
   const favorites = useFlyAtlasStore((s) => s.favorites);
 
+  // MULTIPLAYER: the relay's where-summary, as map dots outside the filter
+  // chips and outside search. Asked for on open and every 5 s while open.
+  const mpOnline = useMpStore((s) => MP_ATLAS && s.status === 'online');
+  const clusters = useMpStore((s) => (MP_ATLAS ? s.clusters : NO_PILOTS));
+  const pilots = useMemo(
+    () => (mpOnline && clusters.length ? clusters.filter((c) => c.n > 0).map(pilotEntry) : NO_PILOTS),
+    [mpOnline, clusters]
+  );
+  useEffect(() => {
+    if (!mpOnline) return undefined;
+    const ask = () => runtime?.mp?.where?.();
+    ask();
+    const id = setInterval(ask, WHERE_EVERY_MS);
+    return () => clearInterval(id);
+  }, [mpOnline, runtime]);
+
   const selected = useMemo(
-    () => entries.find((e) => e.key === selectedKey) ?? null,
-    [entries, selectedKey]
+    () =>
+      entries.find((e) => e.key === selectedKey) ??
+      pilots.find((e) => e.key === selectedKey) ??
+      null,
+    [entries, pilots, selectedKey]
   );
 
-  const mapEntries = useMemo(
-    () => entries.filter((e) => filters[e.kind]),
-    [entries, filters]
-  );
+  const mapEntries = useMemo(() => {
+    const shown = entries.filter((e) => filters[e.kind]);
+    return pilots.length ? shown.concat(pilots) : shown;
+  }, [entries, filters, pilots]);
 
   const results = useMemo(() => rankAtlasEntries(entries, query, MAX_RESULTS), [entries, query]);
 
@@ -74,13 +102,22 @@ function AtlasBody({ runtime }) {
     setFocus({ lat: entry.lat, lon: entry.lon, seq: focusSeq.current });
   };
 
+  // Round 8 fix (F5): resolve through the runtime bus AT CALL TIME (the
+  // InspectModal pattern) — the old `if (!runtime.warpToGeo) return` was
+  // a silent dead button across the scene unmount→remount window.
+  const warpFn = () =>
+    getRuntimeAction('warpToGeo') ??
+    (typeof runtime.warpToGeo === 'function' ? runtime.warpToGeo : null);
+  const warpFailed = () =>
+    setWarpNotice({
+      key: Date.now(),
+      msg: useFlyStore.getState().runtimeReady
+        ? 'warp failed — try again'
+        : 'scene rebuilding — try again',
+    });
+
   const warp = (entry) => {
-    // Round 8 fix (F5): resolve through the runtime bus AT CALL TIME (the
-    // InspectModal pattern) — the old `if (!runtime.warpToGeo) return` was
-    // a silent dead button across the scene unmount→remount window.
-    const fn =
-      getRuntimeAction('warpToGeo') ??
-      (typeof runtime.warpToGeo === 'function' ? runtime.warpToGeo : null);
+    const fn = warpFn();
     const ok =
       !!fn &&
       fn(entry.lat, entry.lon, {
@@ -92,13 +129,16 @@ function AtlasBody({ runtime }) {
       setWarpNotice(null);
       useFlyAtlasStore.getState().logVisit(entry.key, entry.name, entry.kind);
     } else {
-      setWarpNotice({
-        key: Date.now(),
-        msg: useFlyStore.getState().runtimeReady
-          ? 'warp failed — try again'
-          : 'scene rebuilding — try again',
-      });
+      warpFailed();
     }
+  };
+
+  // MULTIPLAYER: a pilots cluster is live data, never a place — no logVisit,
+  // no recents (the Atlas store is saved). warpToGeo closes the Atlas.
+  const flyToPilots = (entry) => {
+    const fn = warpFn();
+    if (fn && fn(entry.lat, entry.lon, pilotsWarpOpts(entry))) setWarpNotice(null);
+    else warpFailed();
   };
 
   const randomCity = () => {
@@ -270,7 +310,11 @@ function AtlasBody({ runtime }) {
             />
           </div>
           <div className="w-72 shrink-0 max-sm:w-full max-sm:shrink">
-            <DestinationCard entry={selected} runtime={runtime} onWarp={warp} />
+            {selected?.kind === 'pilots' ? (
+              <PilotsCard entry={selected} runtime={runtime} onFly={flyToPilots} />
+            ) : (
+              <DestinationCard entry={selected} runtime={runtime} onWarp={warp} />
+            )}
           </div>
         </div>
 

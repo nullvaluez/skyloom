@@ -4,10 +4,11 @@ import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Euler, Quaternion, Vector3 } from 'three';
 import { LIVE_AIRCRAFT, resolveLiveAircraft } from '@/lib/fly/live-aircraft';
-import { AIRCRAFT_EFFECTS as FX, contrailStrength, liveEngineOffsets, playerEngineOffsets } from '@/lib/fly/aircraft-effects';
+import { AIRCRAFT_EFFECTS as FX, contrailStrength, liveEngineOffsets, smokeStations, wakeDensity } from '@/lib/fly/aircraft-effects';
 import { WakeBatch, WakeHistory } from '@/lib/fly/aircraft-wake';
 import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
 import { patchAirWake } from '@/lib/fly/tracer-spot';
+import { F as MP_FLAG } from '@/lib/fly/mp/protocol.mjs';
 import { useFlyStore } from '@/stores/fly-store';
 
 const stations = LIVE_AIRCRAFT.map(liveEngineOffsets);
@@ -18,25 +19,21 @@ const fallback = { 0: [[-10, -2, 2], [10, -2, 2]], 1: [[-1.5, 0, 7], [1.5, 0, 7]
   10: [[0, 0, 5.4]] };
 const noSources = [];
 const attitude = new Euler(0, 0, 0, 'YXZ'), rotation = new Quaternion(), emitter = new Vector3();
-// MULTIPLAYER: a remote pilot's wake leaves its own airframe's engines. Memoized
-// per aircraft id — a rec resets whenever its sources reference changes.
-const remoteStations = new Map();
-function remoteSources(id) {
-  let s = remoteStations.get(id);
-  if (!s) {
-    s = playerEngineOffsets(id);
-    if (!s.length) s = noSources;
-    remoteStations.set(id, s);
-  }
-  return s;
-}
 function sources(t) {
-  if (t.remote === true) return remoteSources(t.meta?.aircraftId);
+  // MULTIPLAYER: a remote pilot's wake leaves its own airframe — the engines, or
+  // the tail of an engine-less type, which only ever trails smoke. Memoized per
+  // aircraft id (a jet's is its engine array): a rec resets when this changes.
+  if (t.remote === true) return smokeStations(t.meta?.aircraftId);
   // Military is a mission class, not an engine type. The shared military GLB
   // must not give a reported turboprop transport a jet's exhaust.
   if (/^(C130|C30J|C160|A400|C27J|C295|P3|E2|PC21|PC9|T6)/.test(t.meta?.t ?? '')) return noSources;
   const index = resolveLiveAircraft(t.meta, t.archetype);
   return index == null ? fallback[t.archetype] ?? noSources : stations[index];
+}
+// Condensation; a remote pilot's smoke (protocol F.SMOKE, a state) is density 1.
+function densityOf(t, speed) {
+  return t.remote === true ? wakeDensity(t.meta?.aircraftId, (t.mpFlags & MP_FLAG.SMOKE) !== 0, t.ry, speed, t.flags & 1)
+    : contrailStrength(t.ry, speed, t.flags & 1);
 }
 
 /** Optical engine plumes in addition to the established navigation tracers.
@@ -59,7 +56,7 @@ export function TrafficContrails({ runtime, origin }) {
     // neighbours cannot trade slots and erase one another's histories.
     const eligible = items.filter(t => t.fix1 && t.distM < (state.recs.has(t.hex) ? 26000 : 22000) &&
       (t.opacity ?? 1) * (t.horizonFade ?? 1) > .03 &&
-      (contrailStrength(t.ry, Math.hypot(t.fix1.vE, t.fix1.vN), t.flags & 1) > .003 || state.recs.has(t.hex)) && sources(t).length);
+      (densityOf(t, Math.hypot(t.fix1.vE, t.fix1.vN)) > .003 || state.recs.has(t.hex)) && sources(t).length);
     eligible.sort((a, b) => (a.distM - (state.recs.has(a.hex) ? 1800 : 0)) - (b.distM - (state.recs.has(b.hex) ? 1800 : 0)));
     const chosen = eligible.slice(0, limit), seen = new Set(chosen.map(t => t.hex));
     for (const [hex, rec] of state.recs) if (!seen.has(hex)) {
@@ -70,7 +67,7 @@ export function TrafficContrails({ runtime, origin }) {
     state.batch.begin(camera,!!runtime.cinemaEnvironment&&store.mapStyle==='satellite');
     for (const t of chosen) {
       const offsets = sources(t), fix = t.fix1, speed = Math.hypot(fix.vE, fix.vN);
-      const density = contrailStrength(t.ry, speed, t.flags & 1);
+      const density = densityOf(t, speed);
       let rec = state.recs.get(t.hex);
       // A remote pilot's warp / respawn (snapEpoch bump) starts a new wake; ADS-B: both undefined.
       if (rec && (rec.sources !== offsets || rec.snap !== t.snapEpoch)) {

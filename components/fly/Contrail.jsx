@@ -4,7 +4,7 @@
 import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Euler, Quaternion, Vector3 } from 'three';
-import { AIRCRAFT_EFFECTS as FX, contrailStrength, playerEngineOffsets, wingVaporStrength } from '@/lib/fly/aircraft-effects';
+import { AIRCRAFT_EFFECTS as FX, smokeStations, wakeDensity, wingVaporStrength } from '@/lib/fly/aircraft-effects';
 import { WakeBatch, WakeHistory } from '@/lib/fly/aircraft-wake';
 import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
 import { patchAirWake } from '@/lib/fly/tracer-spot';
@@ -14,12 +14,16 @@ import { useFlyStore } from '@/stores/fly-store';
 const attitude = new Euler(0, 0, 0, 'YXZ'), rotation = new Quaternion(), emitter = new Vector3();
 
 /** Each sample owns its density, age and wind. Descending leaves a dissipating
- * wake; all engine stations rotate in three axes with the aircraft. */
+ * wake; all engine stations rotate in three axes with the aircraft.
+ * MULTIPLAYER: while `runtime.mp.smoke` is on the same stations trail airshow
+ * smoke at density 1. An engine-less type (mounted only when multiplayer is
+ * available) owns one tail station and records nothing unless smoking. */
 export function Contrail({ flight, origin, aircraft, runtime }) {
   const titleHidden = useTitleHidden();
   const id = aircraft?.id ?? 'fighter';
   const state = useMemo(() => {
-    const engines = playerEngineOffsets(id);
+    // A jet's smoke stations ARE its engine array (playerEngineOffsets).
+    const engines = smokeStations(id);
     return { time: 0, engines, histories: engines.map(() => new WakeHistory()),
       tips: [new WakeHistory(80, FX.vaporLifeSec), new WakeHistory(80, FX.vaporLifeSec)],
       batch: new WakeBatch(engines.length + 2, FX.points, patchAirWake) };
@@ -43,10 +47,12 @@ export function Contrail({ flight, origin, aircraft, runtime }) {
     if (!held) state.time += Math.min(delta, .1);
     const now = state.time, visual = flight.aircraftVisual;
     rotation.setFromEuler(attitude.set(flight.pitch, -flight.heading, -flight.bank));
-    const density = contrailStrength(flight.pos.y, flight.speed, flight.operations?.grounded);
+    const density = wakeDensity(id, runtime?.mp?.smoke === true, flight.pos.y, flight.speed, flight.operations?.grounded);
     const wind = runtime?.weather?.wx;
     const windX = (wind?.windX ?? 0) * .35, windZ = (wind?.windZ ?? 0) * .35;
-    const stations = visual?.id === id ? visual.engines : state.engines;
+    // The measured stations (the Talon's two nacelles feed its ONE wake), unless
+    // the airframe publishes fewer than it trails — none: the smoke tail.
+    const stations = visual?.id === id && visual.engines.length >= state.engines.length ? visual.engines : state.engines;
     for (let e = 0; e < state.histories.length; e++) {
       emitter.fromArray(stations[e]).applyQuaternion(rotation).add(flight.pos);
       if (!held) state.histories[e].record(emitter.x, emitter.y, emitter.z, now, density,
