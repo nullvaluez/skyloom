@@ -46,7 +46,7 @@ const REL = ' if(uCinema>.5)return cinemaDensity(vec3(q.x,(p.y-base)/1024.,q.z),
 
 if (legArg) {
   const on = legArg === '--leg=on';
-  globalThis.window = { location: { search: '', href: 'http://localhost/' }, ...(on ? { __flyCloudCalmOverride: { enabled: true } } : {}) };
+  globalThis.window = { location: { search: '', href: 'http://localhost/' }, __flyCloudCalmOverride: { enabled: on } };
   const inert = new Proxy(function () {}, { get: (t, k) => (k === Symbol.toPrimitive ? () => 0 : inert), apply: () => inert, construct: () => inert });
   globalThis.OffscreenCanvas = class { constructor(w, h) { this.width = w; this.height = h; } getContext() { return inert; } };
   register('./_node-resolve.mjs', import.meta.url);
@@ -101,7 +101,7 @@ check(
   JSON.stringify(on),
 );
 
-// (3) the filter, in this process (flag off here, so pass tau explicitly)
+// (3) the filter, independent of the shipped flag (pass tau explicitly)
 const CC = await import(pathToFileURL(path.join(ROOT, 'lib/fly/cloud-calm.js')).href);
 {
   const tau = 8;

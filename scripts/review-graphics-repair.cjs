@@ -6,7 +6,7 @@ const {enterFlight}=require('./_skip-menus');
 const args=Object.fromEntries(process.argv.slice(2).map(v=>v.replace(/^--/,'').split('=')));
 const out=path.resolve(args.output||'.graphics-review/graphics-repair/clouds');
 fs.mkdirSync(out,{recursive:true});
-const report={physicalPhone:false,errors:[],samples:[]};
+const report={physicalPhone:false,cloudCalm:args.cloudCalm||'shipped',errors:[],samples:[]};
 const save=()=>fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(report,null,2));
 const percentile=(a,p)=>[...a].sort((a,b)=>a-b)[Math.floor((a.length-1)*p)];
 (async()=>{
@@ -23,6 +23,9 @@ const percentile=(a,p)=>[...a].sort((a,b)=>a-b)[Math.floor((a.length-1)*p)];
     localStorage.setItem('fly-encounters','0');window.__flyGovPin='hold';
     window.__flyWeatherOverride='baseline';window.__flySunOverride=Date.UTC(2026,8,27,20);
    });
+   // Isolate sampling/reconstruction cost on the same cloud field when the
+   // baseline predates CLOUD_CALM. Ordinary production checks keep it shipped.
+   if(args.cloudCalm==='off')await page.addInitScript(()=>{window.__flyCloudCalmOverride={enabled:false};});
    await page.goto((args.url||'http://localhost:3097')+'/?graphicsReview=1',{waitUntil:'domcontentloaded',timeout:90000});
    // Stop simulation BEFORE entering flight. Freezing after boot lets each
    // build travel a different number of metres while the reveal settles.

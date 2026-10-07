@@ -173,3 +173,113 @@ dense city turn, a mountain approach, day/night, and at least several minutes of
 continuous flight. Record device/browser, render resolution, effective profile,
 and governor steps alongside frame intervals. Existing saved Medium/Classic
 choices are deliberately preserved, so select High/Enhanced to evaluate them.
+
+## Cloud and mobile regression repair — 2026-10-07
+
+The follow-up report was textured/glitching clouds and mobile flight needing
+Classic/Low to remain playable. Review found several independent causes:
+
+- Cloud smoothing gathered 25 cloud/depth pairs at **full scene resolution**.
+  Lowering the ray-march resolution therefore left a substantial fullscreen
+  cost. The replacement filters premultiplied radiance and transmission with
+  two separable five-tap passes at cloud resolution, then reconstructs four
+  depth-compatible neighbours per scene pixel. Both profiles use it; terrain
+  silhouettes stay depth-protected.
+- The body-density volume was sampled without mipmaps or a ray footprint.
+  Sparse mobile marches aliased that detail into moving texture. Both density
+  channels now use explicit footprint-selected mip levels, with the body capped
+  at level two to preserve billows. Jitter stays spatially fixed and occupies
+  the middle half of a step. The low profile trades fewer cloud pixels for 24
+  depth samples instead of 16. There is no temporal history or ghosting buffer.
+- The governor needed 90 usable frames to estimate refresh and discarded frames
+  longer than 0.5 seconds. Severe overload could therefore delay or defeat
+  recovery. A sustained-overload path now acts before that calibration, retaining
+  boot/warp grace, pins, and the session latch. Single long gaps cannot trigger
+  it, and hidden-tab frames are excluded. Resolution/effects still precede
+  scenery-tier reductions.
+- Mobile started at the desktop DPR cap of 1.5. Its shared Canvas/governor cap is
+  now 1.25, **31% fewer shaded pixels** on a high-DPR device. High scenery remains
+  the default. Mobile keeps directional cloud lighting with two light samples,
+  and the atmospheric fallback retains its 512 shadow cascade and 256 materials.
+- Changing a shadow map's resolution rebuilt the whole shadow rig and rebound
+  lit materials. It now resizes the existing targets without changing lights,
+  shader hooks, or compiled uniform identities.
+- The newer upstream `CLOUD_CALM` fix was present but disabled. It now ships on:
+  the haze datum is damped across terrain refinements, and density noise moves
+  with the regional cloud base. Its two test arms explicitly pin their flags.
+  Other True Earth experiment defaults remain unchanged, including PHYS_SKY,
+  TRUE_SCALE, and DEVICE_TIERS. Upstream production worker fixes are preserved.
+
+The pass also skips cloud-shadow density work beyond its visible range and
+uses unbent height for the CPU cloud-inside sample, matching the shader.
+
+GPU correctness was checked in Chrome on the host's NVIDIA RTX 5080. Across
+4,096 samples per density variant, the representative movement-induced density
+variance fell from 0.001290 to 0.000318 (75%), while cloudy samples remained
+599/622. This is a density-sampling measurement, **not a measured percentage of
+onscreen flicker**. The reconstruction test's maximum radiance/transmission and
+foreground-edge errors were below 0.000001, with no GL errors. CLOUD_CALM's
+300 m terrain-step case changes haze by 0.007% in one frame instead of 3.78%;
+moving the base and sample together preserves all 4,000 tested densities.
+
+The integrated tree passes scoped ESLint, import-integrity (859 files), the
+graphics invariants, all eight repair checks, render optimization, cinema
+overhaul/art, cloud-shadow range, cloud-calm, worker startup, device tiers, and
+TRUE_SCALE compatibility. The optional PHYS_SKY checks also pass (12/12),
+including its shader composition with TRUE_SCALE; neither flag is enabled.
+Production builds use `node node_modules/next/dist/bin/next build --webpack`
+with a separate `FLY_BUILD_DIR`.
+
+Matched cloud GPU timings use the old checkout (`7aff577`) and the repaired
+tree integrated onto `5790fd2`. The Grand Canyon camera positions are identical,
+rotation differences are at floating-point epsilon, and base/thickness, weather,
+sun, and drift are held fixed. CLOUD_CALM is explicitly pinned off in **both
+timing arms** to isolate reconstruction/sampling cost; the production transition
+and moving-flight checks use its shipped ON state. Each cell is the median of
+60 non-disjoint GPU timer-query samples, in milliseconds:
+
+| Layout / preset | Before | After | Reduction |
+| --- | ---: | ---: | ---: |
+| Desktop High | 0.485 | 0.408 | 16% |
+| Desktop Medium | 0.326 | 0.171 | 47% |
+| Desktop Low | 0.180 | 0.110 | 39% |
+| Phone High | 0.201 | 0.108 | 46% |
+| Phone Medium | 0.191 | 0.110 | 43% |
+| Phone Low | 0.121 | 0.068 | 44% |
+
+These are **cloud-pass costs on the RTX 5080**, not whole-frame speedups or
+physical-phone measurements. Mobile figures include the 1.5-to-1.25 DPR change;
+desktop resolution is unchanged. Low clouds are intentionally softer, while
+the sampled terrain/building geometry is not removed by these fixes. GPU clock
+and live-world streaming variability still affect absolute timing. Screenshots
+and raw measurements are in `.graphics-review/graphics-repair/matched-before/`
+and `matched-after/`; reproduce with `scripts/review-graphics-repair.cjs`, passing
+`--url`, `--cloudCalm=off`, and separate `--output` directories.
+The old `review-cloud-smoothing.mjs` now fails explicitly if its removed toggle
+is absent or ignored, instead of reporting a false A/B over identical settings.
+
+The final integrated production build (`k0Buee_B405MVy7eFH6sh`) passes **52/52**
+desktop/phone/tablet transition checks, with zero shader/runtime errors: quality
+changes, Classic/Enhanced, Neon return, buffer sizes, shadow depth attachments,
+the mobile shadow-preserving fallback, and day/golden/night. Nine captures are
+under `.graphics-review/graphics-repair/integrated-transitions/`. The live-world
+checks exercise shipped CLOUD_CALM; the timed build's application sources match
+the repair plus its CLOUD_CALM enablement, before this documentation commit.
+
+Ordinary moving flight (live Manhattan, review census disabled, approximately
+10 seconds straight plus 10 seconds turning) also finishes without runtime/GL
+errors. High scenery stays selected throughout:
+
+| Layout | FPS, straight / turn | p95 interval | Longest interval | Effective effects |
+| --- | --- | --- | --- | --- |
+| Phone emulation | 55.4 / 56.1 | 23.4 / 24.5 ms | 102.3 / 69.0 ms | phone-lean, 512 shadow, 256 materials, DPR 1.25 |
+| Desktop | 68.3 / 62.6 | 17.8 / 21.1 ms | 105.4 / 99.5 ms | High, DPR 1 |
+
+Raw results are in `.graphics-review/graphics-repair/integrated-flight/`.
+These whole-frame results remain within the baseline's live-streaming range;
+they do **not** establish an overall FPS gain on this desktop GPU. Occasional
+streaming hitches remain. The demonstrated improvements are lower cloud GPU
+cost, less density aliasing, stable haze/cloud datum, and prompt recovery from
+severe overload. Physical-phone FPS, thermal throttling, and Safari have not
+been measured. The affected-device follow-up above still applies; no claim of
+universal 60 fps or complete removal of every graphics hitch is made.

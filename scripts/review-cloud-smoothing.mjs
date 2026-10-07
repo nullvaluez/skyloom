@@ -20,8 +20,11 @@ try{
  await enterFlight(page,{lat:36.09,lon:-112.1,altM:2700,headingRad:2,name:null},{waitReveal:true});
  await page.evaluate(()=>{const r=window.__fly;r.flight.step=()=>{};r.input.neutralize();window.__flyStore.setState({encountersEnabled:false});});
  await page.waitForFunction(()=>!window.__fly.worldLoading,undefined,{timeout:150000});await page.waitForTimeout(15000);
+ const legacyControl=await page.evaluate(()=>!!window.__flyComposer.passes.find(p=>p.name==='ImmersiveClouds')?.uniforms.cloudSmooth);
+ assert.ok(legacyControl,'The legacy smoothing toggle was replaced. Use review-graphics-repair.cjs against separate before/after builds; this old toggle cannot produce an A/B.');
  for(const smooth of [0,1]){
   await page.evaluate(smooth=>{window.__flyCloudSmooth=smooth;},smooth);await page.waitForTimeout(1500);
+  assert.equal(await page.evaluate(()=>window.__flyComposer.passes.find(p=>p.name==='ImmersiveClouds').uniforms.cloudSmooth.value),smooth,'smoothing pin did not reach the shader (legacy toggle requires a development build)');
   await page.screenshot({path:`${out}/${smooth?'after':'before'}.png`});
   report.samples.push(await page.evaluate(smooth=>{const r=window.__fly,rr=window.__flyComposer.getRenderer();return{smooth,profile:r.cinemaProfile,clouds:r.immersiveClouds,resources:r.cinemaResources,camera:{pos:r.camera.position.toArray(),q:r.camera.quaternion.toArray()},textures:rr.info.memory.textures,programs:rr.info.programs.length};},smooth));
  }
