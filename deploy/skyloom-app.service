@@ -1,0 +1,19 @@
+# systemd unit for the web app without Docker. Build once in /opt/skyloom:
+#   npm ci && NEXT_PUBLIC_MP_URL=/mp npm run build
+# then copy this file to /etc/systemd/system/ and: systemctl enable --now skyloom-app
+[Unit]
+Description=Skyloom web app (next start)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/opt/skyloom
+ExecStart=/usr/bin/node node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3000
+Environment=NODE_ENV=production
+Restart=always
+RestartSec=2
+User=skyloom
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

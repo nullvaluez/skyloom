@@ -1,0 +1,27 @@
+# systemd unit for the relay without Docker. Install the repo at /opt/skyloom
+# (git clone, then `npm ci --omit=dev`), copy this file to
+# /etc/systemd/system/, set MP_ORIGINS, then: systemctl enable --now skyloom-relay
+[Unit]
+Description=Skyloom multiplayer relay (keyless, in-memory)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/opt/skyloom
+ExecStart=/usr/bin/node server/mp-relay.mjs
+Environment=MP_HOST=127.0.0.1
+Environment=MP_PORT=8787
+Environment=MP_ORIGINS=https://skyloom.example.com
+Restart=always
+RestartSec=2
+KillSignal=SIGTERM
+TimeoutStopSec=5
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+MemoryMax=256M
+
+[Install]
+WantedBy=multi-user.target
