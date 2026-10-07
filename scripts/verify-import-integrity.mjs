@@ -81,7 +81,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // It is the same defect class this round already found in the app tree (the
 // AerialPerspective ReferenceError that voided every browser row), in the same
 // week, and the sweep that catches it had been pointed away from half the tree.
-const TARGETS = ['lib', 'components', 'app', 'hooks', 'stores', 'scripts'].filter((d) =>
+const TARGETS = ['lib', 'components', 'app', 'hooks', 'stores', 'scripts', 'server'].filter((d) =>
   fs.existsSync(path.join(ROOT, d))
 );
 
