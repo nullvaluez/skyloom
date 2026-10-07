@@ -23,12 +23,13 @@ export function CinemaShadowRig({runtime,sunRef}){
       if(sunRef.current)sunRef.current.castShadow=legacyShadow.current;
       return;
     }
-    const profile=cinemaProfile(),key=`${profile.cascades}:${profile.shadowSize}`;
+    const profile=cinemaProfile(),key=profile.cascades;
     if(rig.current?.profileKey!==key){
       rig.current?.dispose();rig.current=null;
       if(profile.cascades){rig.current=new CinemaShadows(camera,scene,profile);rig.current.profileKey=key;}
     }
     const r=rig.current;
+    r?.setMapSize(profile.shadowSize);
     if(sunRef.current){sunRef.current.castShadow=false;sunRef.current.intensity=r?0:e.sun;}
     if(!r){runtime.cinemaShadows={cascades:0};return;}
     const range=profile.shadowRangeM*(runtime.cinemaGeography?.worldUnitsPerMetre??1);

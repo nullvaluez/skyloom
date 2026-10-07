@@ -27,7 +27,7 @@ check('profile ceilings apply before allocation and effects follow effective sca
   const ultra=resolveCinemaProfile({preset:'ultra'});assert.equal(ultra.cascades,3);assert.equal(ultra.cloudSteps,96);
   assert.equal(resolveCinemaProfile({preset:'ultra',scale:.875}).name,'medium');
   for(const preset of ['low','medium','high','ultra']){const phone=resolveCinemaProfile({preset,phone:true});assert.equal(phone.targetFps,60);assert.equal(phone.reflection,null);assert.ok(phone.cascades<=1);}
-  assert.equal(resolveCinemaProfile({preset:'ultra',phone:true,tier:'low'}).cloudSteps,16);
+  assert.equal(resolveCinemaProfile({preset:'ultra',phone:true,tier:'low'}).cloudSteps,24);
   assert.equal(resolveCinemaProfile({preset:'high'}).textureBytes,300*1048576);
 });
 const THREE=await import('three');

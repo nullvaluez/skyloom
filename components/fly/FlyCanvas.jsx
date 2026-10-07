@@ -27,6 +27,7 @@ import { frameloopFor, noteStagePump, stagePumpHz, stagePumpWanted } from '@/lib
 import { cinemaOn } from '@/lib/fly/cinema-policy';
 import { createFrameCadence } from '@/lib/fly/frame-cadence.mjs';
 import { isMobileGraphicsClass } from '@/lib/fly/device-class';
+import { initialRenderDpr } from '@/lib/fly/render-resolution';
 import { configureCinemaAssets } from '@/lib/fly/cinema-material-assets';
 import { installContextResourceLifetime } from '@/lib/fly/context-resource-lifetime';
 
@@ -47,10 +48,7 @@ function MobileFlightPump({enabled}){
   return null;
 }
 
-function initialDpr() {
-  if (typeof window === 'undefined') return CANVAS.dprMax;
-  return Math.min(CANVAS.dprMax, window.devicePixelRatio || 1);
-}
+const initialDpr = initialRenderDpr;
 
 const TIERS = ['low', 'medium', 'high'];
 
