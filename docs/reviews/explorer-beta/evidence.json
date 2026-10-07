@@ -1,0 +1,656 @@
+{
+  "recordedAt": "2026-10-07T18:13:23.704Z",
+  "baseCommit": "6f66f01564e4e831e91217c91b5be336fe1efe4d",
+  "productionBuildId": "gNjZAIzygVjfReZGZtfbl",
+  "applicationDiffSha256": "a1c97be7ea50f988ba67f67c4220aeb94b401c3d173a4965a2943d681e7bc154",
+  "status": "Implementation candidate. Performance and physical-device/human acceptance are not certified.",
+  "functional": {
+    "at": "2026-10-07T18:12:00.266Z",
+    "venue": "local automated checks; no human/device acceptance implied",
+    "rows": [
+      {
+        "file": "verify-import-integrity.mjs",
+        "ok": true,
+        "ms": 7134
+      },
+      {
+        "file": "verify-true-earth-flags.mjs",
+        "ok": true,
+        "ms": 109
+      },
+      {
+        "file": "verify-r25-front-door.mjs",
+        "ok": true,
+        "ms": 217
+      },
+      {
+        "file": "verify-attribution.mjs",
+        "ok": true,
+        "ms": 173
+      },
+      {
+        "file": "verify-provider-adapters.mjs",
+        "ok": true,
+        "ms": 123
+      },
+      {
+        "file": "verify-explorer.mjs",
+        "ok": true,
+        "ms": 394
+      },
+      {
+        "file": "verify-flight-operations.mjs",
+        "ok": true,
+        "ms": 179
+      },
+      {
+        "file": "verify-operations-disclosure.mjs",
+        "ok": true,
+        "ms": 40
+      },
+      {
+        "file": "verify-adventures.mjs",
+        "ok": true,
+        "ms": 204
+      },
+      {
+        "file": "verify-adventure-runtime.mjs",
+        "ok": true,
+        "ms": 94
+      },
+      {
+        "file": "verify-adventure-photo.mjs",
+        "ok": true,
+        "ms": 102
+      },
+      {
+        "file": "verify-adventure-hud.mjs",
+        "ok": true,
+        "ms": 514
+      },
+      {
+        "file": "verify-adventure-guidance.mjs",
+        "ok": true,
+        "ms": 78
+      },
+      {
+        "file": "verify-adventure-flight.mjs",
+        "ok": true,
+        "ms": 421
+      },
+      {
+        "file": "verify-adventure-activities.mjs",
+        "ok": true,
+        "ms": 107
+      },
+      {
+        "file": "verify-encounters.mjs",
+        "ok": true,
+        "ms": 606
+      },
+      {
+        "file": "verify-encounter-runtime.mjs",
+        "ok": true,
+        "ms": 133
+      },
+      {
+        "file": "verify-mobile-actions-node.mjs",
+        "ok": true,
+        "ms": 51
+      },
+      {
+        "file": "verify-twilight.mjs",
+        "ok": true,
+        "ms": 149
+      },
+      {
+        "file": "verify-sun-azimuth.mjs",
+        "ok": true,
+        "ms": 73
+      },
+      {
+        "file": "verify-load-guard.mjs",
+        "ok": true,
+        "ms": 249
+      },
+      {
+        "file": "verify-device-tiers.mjs",
+        "ok": true,
+        "ms": 329
+      },
+      {
+        "file": "verify-true-scale.mjs",
+        "ok": true,
+        "ms": 1093
+      },
+      {
+        "file": "verify-conditions.mjs",
+        "ok": true,
+        "ms": 227
+      },
+      {
+        "file": "verify-player-surface.mjs",
+        "ok": true,
+        "ms": 396
+      },
+      {
+        "file": "verify-cloud-calm.mjs",
+        "ok": true,
+        "ms": 859
+      },
+      {
+        "file": "verify-raster-retry.mjs",
+        "ok": true,
+        "ms": 71
+      },
+      {
+        "file": "verify-true-areas.cjs",
+        "ok": true,
+        "ms": 310
+      },
+      {
+        "file": "verify-hdr-guard.mjs",
+        "ok": true,
+        "ms": 444
+      },
+      {
+        "file": "verify-phys-sky.mjs",
+        "ok": true,
+        "ms": 2383
+      }
+    ]
+  },
+  "productionSmoke": {
+    "at": "2026-10-07T18:12:51.255Z",
+    "venue": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11); phone viewport emulated",
+    "flags": "",
+    "rows": [
+      {
+        "name": "production title offers destination discovery",
+        "ok": true
+      },
+      {
+        "name": "comfort settings persist",
+        "ok": true
+      },
+      {
+        "name": "journal has six regional collections",
+        "ok": true
+      },
+      {
+        "name": "regional airport loads into preparation",
+        "ok": true
+      },
+      {
+        "name": "generic airport does not promise apron operations",
+        "ok": true
+      },
+      {
+        "name": "production vector worker asset located",
+        "ok": true,
+        "detail": "1587.9d5e983d73d907ab.js"
+      },
+      {
+        "name": "bundled worker builds real fixture geometry",
+        "ok": true,
+        "detail": {
+          "empty": false,
+          "vertices": 95355,
+          "keys": [
+            "empty",
+            "tessMs",
+            "v",
+            "land",
+            "building",
+            "trees",
+            "grass"
+          ]
+        }
+      },
+      {
+        "name": "first flight starts with skippable guidance",
+        "ok": true
+      },
+      {
+        "name": "photo composition freezes flight and local animation time",
+        "ok": true
+      },
+      {
+        "name": "failed photo encoding awards no photograph",
+        "ok": true
+      },
+      {
+        "name": "photo export produces a PNG",
+        "ok": true
+      },
+      {
+        "name": "successful photograph appears in the journal",
+        "ok": true
+      },
+      {
+        "name": "feed loss leaves exploration available",
+        "ok": true
+      },
+      {
+        "name": "context loss exposes a recovery action",
+        "ok": true
+      },
+      {
+        "name": "restored graphics resume through an explicit action",
+        "ok": true
+      },
+      {
+        "name": "phone viewport title has no horizontal overflow",
+        "ok": true
+      },
+      {
+        "name": "phone preparation supports the same destination flow",
+        "ok": true
+      },
+      {
+        "name": "production browser has no uncaught errors",
+        "ok": true,
+        "detail": []
+      }
+    ]
+  },
+  "governorRegression": {
+    "before": {
+      "atLatch": {
+        "rung": 7,
+        "rungs": 8,
+        "dpr": 0.75,
+        "tier": "low",
+        "effects": 3,
+        "ceilingIdx": 1,
+        "latched": true,
+        "emaFps": 30,
+        "refresh": 60,
+        "targetFps": 60,
+        "dprSteps": 2,
+        "tierSteps": 2,
+        "sampled": 63,
+        "longFrac": 0,
+        "subNativeRungs": 6
+      },
+      "afterFiveMinutes": {
+        "rung": 0,
+        "rungs": 8,
+        "dpr": 1,
+        "tier": "high",
+        "effects": 0,
+        "ceilingIdx": 0,
+        "latched": false,
+        "emaFps": 60,
+        "refresh": 60,
+        "targetFps": 60,
+        "dprSteps": 4,
+        "tierSteps": 4,
+        "sampled": 18063,
+        "longFrac": 0,
+        "subNativeRungs": 6
+      }
+    },
+    "after": {
+      "atLatch": {
+        "rung": 7,
+        "rungs": 8,
+        "dpr": 0.75,
+        "tier": "low",
+        "effects": 3,
+        "ceilingIdx": 1,
+        "latched": true,
+        "emaFps": 30,
+        "refresh": 60,
+        "targetFps": 60,
+        "dprSteps": 2,
+        "tierSteps": 2,
+        "sampled": 63,
+        "longFrac": 0,
+        "subNativeRungs": 6
+      },
+      "afterFiveMinutes": {
+        "rung": 1,
+        "rungs": 8,
+        "dpr": 1,
+        "tier": "high",
+        "effects": 1,
+        "ceilingIdx": 1,
+        "latched": true,
+        "emaFps": 60,
+        "refresh": 60,
+        "targetFps": 60,
+        "dprSteps": 4,
+        "tierSteps": 4,
+        "sampled": 18063,
+        "longFrac": 0,
+        "subNativeRungs": 6
+      }
+    }
+  },
+  "initialEndurance": {
+    "source": ".graphics-review/beta/soak.json",
+    "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "minutes": 20,
+    "steady": {
+      "count": 62385,
+      "p50": 16.69999998807907,
+      "p95": 18,
+      "p99": 24,
+      "over100": 62,
+      "max": 8084.200000047684
+    },
+    "transitions": {
+      "count": 7109,
+      "p50": 16.69999998807907,
+      "p95": 18.900000035762787,
+      "p99": 35.69999998807907,
+      "over100": 19,
+      "max": 5306.5
+    },
+    "errors": [],
+    "resource": {
+      "p95Draws": 378,
+      "p95Triangles": 2069395,
+      "peakDraws": 394,
+      "peakTriangles": 2283692
+    },
+    "legs": [
+      {
+        "leg": "Manhattan daytime",
+        "samples": 33,
+        "tiers": [
+          "high",
+          "medium"
+        ],
+        "holdMs": [
+          20113
+        ],
+        "p95RollingFrame": 48.79999923706055,
+        "p95Draws": 338,
+        "peakTextures": 289,
+        "peakGeometries": 315
+      },
+      {
+        "leg": "Sydney coast dusk",
+        "samples": 36,
+        "tiers": [
+          "medium"
+        ],
+        "holdMs": [
+          20113,
+          12762
+        ],
+        "p95RollingFrame": 18.200000762939453,
+        "p95Draws": 196,
+        "peakTextures": 298,
+        "peakGeometries": 336
+      },
+      {
+        "leg": "Queenstown mountains",
+        "samples": 36,
+        "tiers": [
+          "medium",
+          "high"
+        ],
+        "holdMs": [
+          12762,
+          11501
+        ],
+        "p95RollingFrame": 18,
+        "p95Draws": 189,
+        "peakTextures": 300,
+        "peakGeometries": 318
+      },
+      {
+        "leg": "Manhattan night rain",
+        "samples": 35,
+        "tiers": [
+          "high"
+        ],
+        "holdMs": [
+          11501,
+          11271
+        ],
+        "p95RollingFrame": 22.899999618530273,
+        "p95Draws": 340,
+        "peakTextures": 299,
+        "peakGeometries": 339
+      },
+      {
+        "leg": "Ohio runway departure",
+        "samples": 36,
+        "tiers": [
+          "high",
+          "medium"
+        ],
+        "holdMs": [
+          11271,
+          14267
+        ],
+        "p95RollingFrame": 26.200000762939453,
+        "p95Draws": 378,
+        "peakTextures": 335,
+        "peakGeometries": 389
+      },
+      {
+        "leg": "Ohio final approach",
+        "samples": 36,
+        "tiers": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "holdMs": [
+          14267,
+          4251
+        ],
+        "p95RollingFrame": 21.399999618530273,
+        "p95Draws": 392,
+        "peakTextures": 343,
+        "peakGeometries": 399
+      },
+      {
+        "leg": "Ocean photo and return",
+        "samples": 24,
+        "tiers": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "holdMs": [
+          4251,
+          8752
+        ],
+        "p95RollingFrame": 18.100000381469727,
+        "p95Draws": 142,
+        "peakTextures": 324,
+        "peakGeometries": 389
+      }
+    ],
+    "limits": {
+      "p95Frame": 20,
+      "p99Frame": 33.3,
+      "p95Draws": 375,
+      "p95Triangles": 2200000
+    },
+    "notes": [
+      "Whole-frame resource counts use the production diag publisher. Raw report is unchanged.",
+      "Steady excludes holds, photo, pause and the first 15 seconds after scripted transfers; later streaming hitches remain included.",
+      "Headless hardware measurements do not certify physical display, phone thermals or flight enjoyment.",
+      "Heap readings may be privacy-quantized; use resource trends and device tools for leak certification.",
+      "Scripted airport pilot crashed; stationary crash frames invalidate this run as complete flight-performance certification. Keep the diagnostic results, repair the pilot and rerun."
+    ],
+    "passes": {
+      "completeRoute": true,
+      "noUncaughtErrors": true,
+      "operationsRoute": false,
+      "frameTarget": true,
+      "drawCeiling": false,
+      "triangleCeiling": true
+    }
+  },
+  "focusedAirports": {
+    "source": ".graphics-review/beta-airports-fixed/soak.json",
+    "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "minutes": 6,
+    "steady": {
+      "count": 17789,
+      "p50": 16.69999998807907,
+      "p95": 18,
+      "p99": 39.19999998807907,
+      "over100": 81,
+      "max": 5938
+    },
+    "transitions": {
+      "count": 1304,
+      "p50": 16.799999952316284,
+      "p95": 34.19999998807907,
+      "p99": 252.0999999642372,
+      "over100": 25,
+      "max": 3843.100000023842
+    },
+    "errors": [],
+    "resource": {
+      "p95Draws": 368,
+      "p95Triangles": 1505653,
+      "peakDraws": 375,
+      "peakTriangles": 1521407
+    },
+    "legs": [
+      {
+        "leg": "Ohio runway departure",
+        "samples": 35,
+        "tiers": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "holdMs": [
+          19661,
+          12756
+        ],
+        "p95RollingFrame": 150.6999969482422,
+        "p95Draws": 371,
+        "peakTextures": 329,
+        "peakGeometries": 357
+      },
+      {
+        "leg": "Ohio final approach",
+        "samples": 35,
+        "tiers": [
+          "medium",
+          "low"
+        ],
+        "holdMs": [
+          12756,
+          8505
+        ],
+        "p95RollingFrame": 27.200000762939453,
+        "p95Draws": 257,
+        "peakTextures": 335,
+        "peakGeometries": 368
+      }
+    ],
+    "limits": {
+      "p95Frame": 20,
+      "p99Frame": 33.3,
+      "p95Draws": 375,
+      "p95Triangles": 2200000
+    },
+    "notes": [
+      "Whole-frame resource counts use the production diag publisher. Raw report is unchanged.",
+      "Steady excludes holds, photo, pause and the first 15 seconds after scripted transfers; later streaming hitches remain included.",
+      "Headless hardware measurements do not certify physical display, phone thermals or flight enjoyment.",
+      "Heap readings may be privacy-quantized; use resource trends and device tools for leak certification."
+    ],
+    "passes": {
+      "completeRoute": false,
+      "noUncaughtErrors": true,
+      "operationsRoute": true,
+      "frameTarget": false,
+      "noRecurringStalls": false,
+      "drawCeiling": true,
+      "triangleCeiling": true
+    }
+  },
+  "limitations": [
+    "Initial endurance run used a weak scripted takeoff input and included stationary crash frames; it is not a performance pass.",
+    "Focused six-minute route completed takeoff and landing but still failed p99 frame time and recurring stalls. Its stationary landing tail is excluded by the newer sampler.",
+    "Original raw reports and screenshots remain in the local .graphics-review directories; CI archives fresh functional artifacts.",
+    "No physical phone, Safari, thermal or human enjoyment certification has been performed.",
+    "No public deployment or paid provider commitment was made.",
+    "CPU/WebGL profiling still found multi-second first-use shader waits after coarse runway queries were corrected. Shader readiness remains a release blocker."
+  ],
+  "coarseTerrainComparison": {
+    "vertices": 2601,
+    "candidates": 14097,
+    "beforeMs": 3941.8206,
+    "afterMs": 4.363800000000083,
+    "maxError": 0
+  },
+  "postCoarseTrace": {
+    "at": "2026-10-07T18:09:47.620Z",
+    "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "instrumented": true,
+    "minutes": 1,
+    "steady": {
+      "count": 2012,
+      "p50": 16.69999998807907,
+      "p95": 19.100000023841858,
+      "p99": 71.60000002384186,
+      "over100": 7,
+      "max": 6558.5
+    },
+    "passes": {
+      "noUncaughtErrors": true,
+      "operationsRoute": false,
+      "frameTarget": false,
+      "noRecurringStalls": false,
+      "drawCeiling": false,
+      "triangleCeiling": true
+    },
+    "programLogCalls": {
+      "count": 136,
+      "ms": 21970.499999821186,
+      "max": 4184.700000047684
+    },
+    "slowestCalls": [
+      {
+        "name": "getProgramInfoLog",
+        "ms": 4184.700000047684,
+        "at": 50935.799999952316,
+        "programs": 148
+      },
+      {
+        "name": "getProgramInfoLog",
+        "ms": 4184.399999976158,
+        "at": 4611.5,
+        "programs": 101
+      },
+      {
+        "name": "getProgramInfoLog",
+        "ms": 3678.899999976158,
+        "at": 58547,
+        "programs": 176
+      },
+      {
+        "name": "getProgramInfoLog",
+        "ms": 869.7000000476837,
+        "at": 1392.7999999523163
+      },
+      {
+        "name": "getProgramInfoLog",
+        "ms": 410.69999998807907,
+        "at": 14309.5,
+        "programs": 143
+      },
+      {
+        "name": "getProgramInfoLog",
+        "ms": 365.80000001192093,
+        "at": 11123.399999976158,
+        "programs": 131
+      }
+    ]
+  }
+}

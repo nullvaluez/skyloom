@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { useFlyStore } from '@/stores/fly-store';
 import {
   BoxGeometry,
   CanvasTexture,
@@ -86,6 +87,7 @@ function makeHullGeometry() {
  * mercator coordinates.
  */
 export function SatAmbientLife({ engine, flight, tier }) {
+  const elapsedRef=useRef(0);
   const boatsOn = atLeastTier(tier, SAT_AMBIENT.boats.minTier);
   const plumesOn = atLeastTier(tier, SAT_AMBIENT.plumes.minTier);
   const BOAT_POOL = SAT_AMBIENT.boats.max;
@@ -140,8 +142,9 @@ export function SatAmbientLife({ engine, flight, tier }) {
   );
 
   // Priority -44: after the veg streamer at -45, whose chunk data this reads.
-  useFrame(({ clock, camera }) => {
-    const t = clock.elapsedTime;
+  useFrame(({ camera },delta) => {
+    if(useFlyStore.getState().cameraMode!=='photo')elapsedRef.current+=Math.min(delta,.1);
+    const t = elapsedRef.current;
     const st = stateRef.current;
     const boats = boatRef.current;
     const plumes = plumeRef.current;

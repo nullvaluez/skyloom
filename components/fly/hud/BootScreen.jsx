@@ -235,7 +235,7 @@ export function BootScreen({ runtime }) {
       else phase = 'ready';
 
       if (allDone) {
-        rt.worldLoading=false;rt.worldDegraded=!!(living&&reducedEntry.current);
+        rt.worldLoading=false;rt.worldDegraded=!!(living&&(reducedEntry.current||timedOut));
         if(typeof window!=='undefined')window.__flyWorldStatus={ready:content?.ready??true,degraded:rt.worldDegraded,missing:content?.missing??[]};
         gate.done = true;
         gate.pct = 100;

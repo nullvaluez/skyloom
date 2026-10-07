@@ -7,6 +7,7 @@ import { airportById } from '@/lib/fly/operations-airports';
 import { ADVENTURES, distanceM } from '@/lib/fly/adventures.mjs';
 import { useAdventureStore } from '@/stores/adventure-store';
 import { anyOverlayOpen } from '@/hooks/use-overlay-back';
+import { worldReadiness, retryWorldContent } from '@/lib/fly/world-readiness';
 
 const STEPS=[
   ['Welcome to Skyloom','Steer gently with the mouse, arrow keys, or the touch stick. Return to the centre to level out.'],
@@ -21,7 +22,7 @@ export function ExplorerGuide({runtime}){
   const flying=useFlyStore(s=>inFlight(s)&&!anyOverlayOpen(s));
   const photo=useFlyStore(s=>s.cameraMode==='photo');
   const guidedJourney=useAdventureStore(s=>s.libraryOpen||!!s.summary||s.progress.active?.status==='flying');
-  const [status,setStatus]=useState(null);
+  const [status,setStatus]=useState(null),[degraded,setDegraded]=useState(false);
   const [readyEpoch,setReadyEpoch]=useState(-1),[notice,setNotice]=useState(null);
   const epoch=useFlyStore(s=>s.warpEpoch);
   useEffect(()=>{
@@ -69,6 +70,8 @@ export function ExplorerGuide({runtime}){
         }
       }
       const data=runtime.dataStatus;
+      if(runtime.worldDegraded&&worldReadiness(runtime,Infinity).detailReady)runtime.worldDegraded=false;
+      setDegraded(!!runtime.worldDegraded);
       setStatus(data?.traffic?.state==='unavailable'?'Live traffic is unavailable. You can keep exploring.':data?.traffic?.state==='delayed'?'Traffic positions are delayed.':null);
     },1000);
     return()=>clearInterval(id);
@@ -77,8 +80,8 @@ export function ExplorerGuide({runtime}){
   return <>
     {prefs.tutorial==='new'&&!guidedJourney&&<aside className="explorer-guide" aria-label="First-flight tips" data-testid="explorer-guide">
       <p className="text-xs text-cyan-100/70">First flight · {step+1} of {STEPS.length}</p><strong>{STEPS[step][0]}</strong><p>{STEPS[step][1]}</p>
-      <div><button onClick={()=>setExplorerPreferences({tutorial:'skipped'})}>Skip tips</button><button onClick={()=>step===STEPS.length-1?setExplorerPreferences({tutorial:'done'}):setStep(step+1)}>{step===STEPS.length-1?'Enjoy the flight':'Next'}</button></div>
+      <div><button onClick={()=>{setStep(0);setExplorerPreferences({tutorial:'skipped'});}}>Skip tips</button><button onClick={()=>{if(step===STEPS.length-1){setStep(0);setExplorerPreferences({tutorial:'done'});}else setStep(step+1);}}>{step===STEPS.length-1?'Enjoy the flight':'Next'}</button></div>
     </aside>}
-    {notice&&!guidedJourney&&prefs.tutorial!=='new'?<p className="explorer-data-status" role="status">{notice.text}</p>:status&&<p className="explorer-data-status" role="status">{status}</p>}
+    {prefs.tutorial!=='new'&&!guidedJourney&&(degraded?<p className="explorer-data-status" role="status">Some scenery is still loading. <button className="pointer-events-auto min-h-11 underline" onClick={()=>retryWorldContent(runtime)}>Retry scenery</button></p>:notice?<p className="explorer-data-status" role="status">{notice.text}</p>:status&&<p className="explorer-data-status" role="status">{status}</p>)}
   </>;
 }

@@ -57,9 +57,9 @@ export function WarpFlash({ runtime }) {
         const settled=readySince!==null&&now-readySince>=600&&now-t0>=WARP.flashMs;
         const capped=!settled&&capMs!=null&&now-t0>=capMs;
         if(settled||reducedEntry.current||capped){
-          clearInterval(poll);rt.worldLoading=false;rt.worldDegraded=reducedEntry.current;
+          clearInterval(poll);rt.worldLoading=false;rt.worldDegraded=reducedEntry.current||capped;
           rt.arrivalStats={...rt.arrivalStats,revealAt:now,holdMs:Math.round(now-t0),reason:reducedEntry.current?'explicit-reduced':capped?'time-cap':content.deferred.length?'background-detail':'content'};
-          window.__flyWorldStatus={degraded:reducedEntry.current,capped,missing:content.missing};
+          window.__flyWorldStatus={degraded:rt.worldDegraded,capped,missing:content.missing};
           (window.__flyStats??={}).warpGate=rt.arrivalStats;
           markReveal('warp');setStage('reveal');setHelp(null);
           revealTimer=setTimeout(()=>!cancelled&&setStage(null),WARP.far.revealMs);

@@ -116,7 +116,7 @@ function HangarBody({runtime}){
       <div className="ops-dispatch-scroll">
         <div className="ops-dispatch-heading"><PlaneTakeoff size={20}/><h3>Make it your flight</h3></div>
         <AirportPicker value={airport} aircraftId={id} runtime={runtime} onChange={value=>{setAirport(value);setStartMode(airportById(value)?.authored===false?'runway':'apron');setExteriorReady(false);}} />
-        <label htmlFor="departure-airport">Authored airports</label>
+        <label htmlFor="departure-airport">Departure runway</label>
         <div className="ops-airport-select"><MapPin size={16}/><select id="departure-airport" value={airport} onChange={e=>{setAirport(e.target.value);setExteriorReady(false);}} disabled={!profile}>
           {airportById(airport)?.authored===false&&<option value={airport}>{airportById(airport).name}</option>}
           {OPERATIONS_AIRPORTS.map(a=><option key={a.id} value={a.id} disabled={!airportEligible(a,aircraft.id)}>{a.id} · {a.name}{!airportEligible(a,aircraft.id)?' — unavailable':''}</option>)}

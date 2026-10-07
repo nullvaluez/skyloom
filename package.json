@@ -18,6 +18,8 @@
     "build:beta": "node scripts/beta-next.mjs build",
     "start:beta": "node scripts/beta-next.mjs start",
     "smoke:beta": "node scripts/beta-smoke.cjs",
+    "soak:beta": "node scripts/beta-soak.cjs",
+    "analyze:beta": "node scripts/analyze-beta-soak.mjs",
     "data:runways": "node scripts/build-runway-db.mjs"
   },
   "dependencies": {

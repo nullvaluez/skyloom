@@ -10,6 +10,16 @@ const {parseBackup,createBackup,restoreBackup}=await import('../lib/fly/save-bac
 const {registerAirport,airportFrame,airportPoint,airportLocal,airportEligible,findAirportSurface,nearbyOperationsAirports}=await import('../lib/fly/operations-airports.js');
 const {parseCsv,buildCatalog}=await import('./build-runway-db.mjs');
 const storage=()=>{const data=new Map();return {getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)};};
+test('Enhanced quality latch survives long flights until an explicit preset change',async()=>{
+  const {useFlyStore}=await import('../stores/fly-store.js'),{PERF_GOVERNOR}=await import('../lib/fly/fly-constants.js'),{createGovernor}=await import('../lib/fly/perf-governor.js');
+  const before=useFlyStore.getState();useFlyStore.setState({mapStyle:'satellite',visuals:'enhanced',qualityPreset:'high'});
+  try{
+    const g=createGovernor({dpr0:1,tier0:'high',applyDpr(){},applyTier(){},applyEffects(){},cfg:{...PERF_GOVERNOR,bootGraceSec:0,refreshFrames:1,downHoldSec:.01,upHoldSecDpr:.01,upHoldSecTier:.01,cooldownSecDpr:0,cooldownSecTier:0}});
+    let clock=0;const frames=(dt,n)=>{for(let i=0;i<n;i++){clock+=dt;g.tick(dt,clock,{bootPct:100});}};
+    frames(1/60,5);g.ascendedAt.set(1,clock);frames(1/30,60);assert.ok(g.state().latched);
+    frames(1/60,18000);assert.ok(g.state().latched);assert.ok(g.state().ceilingIdx>0);assert.ok(g.state().rung>=g.state().ceilingIdx);
+  }finally{useFlyStore.setState(before);}
+});
 test('preferences validate and blocked storage retains live controls',()=>{
   const blocked={getItem(){throw Error('blocked');},setItem(){throw Error('blocked');}};
   loadExplorerPreferences(blocked);setExplorerPreferences({sensitivity:1.4,invertPitch:true,music:0},blocked);
@@ -25,6 +35,7 @@ test('journal visits and landing events are idempotent and reject invalid coordi
 test('old and new backups remain compatible and reject unsupported journal versions',()=>{
   const s=storage();s.setItem(EXPLORATION_KEY,JSON.stringify(emptyExploration()));s.setItem(PREFERENCES_KEY,JSON.stringify({version:1,settings:explorerPreferences()}));
   const backup=createBackup(s),target=storage();restoreBackup(target,backup);assert.deepEqual(JSON.parse(target.getItem(EXPLORATION_KEY)),emptyExploration());
+  s.setItem('fly-aircraft','flying-wing');restoreBackup(target,createBackup(s));assert.equal(target.getItem('fly-aircraft'),'flying-wing');
   assert.throws(()=>parseBackup(JSON.stringify({...backup,data:{[EXPLORATION_KEY]:{version:9,places:[],landings:[]}}})));
 });
 
@@ -58,6 +69,8 @@ test('every shipped runway registers and catalog identities are unique',()=>{
     for(const raw of JSON.parse(readFileSync(new URL(`../public/data/runways/v1/regions/${file}`,import.meta.url))).airports){const a=registerAirport(raw);rows.push(a.id);assert.ok(Object.isFrozen(a)&&Object.isFrozen(a.a));assert.ok(a.thresholdA+a.thresholdB<airportFrame(a).length);}
   }
   assert.ok(rows.length>14000);assert.equal(new Set(rows).size,rows.length);
+  assert.equal(nearbyOperationsAirports(0,0,1e9).length,rows.length+3);
+  assert.deepEqual(nearbyOperationsAirports(NaN,0,100),[]);
 });
 
 test('ten varied airports accept actual contact in both directions on their fixed surface',async()=>{
@@ -80,6 +93,20 @@ test('free flight enters a nearby approach without teleporting or cutting power'
   const a=airportById('KOSU'),p=airportPoint(a,-1500),f={pos:new Vector3(p.x,p.y+110,p.z),cfg:{speeds:{cruise:60}},speed:32,heading:airportFrame(a).heading,pitch:-.03,bank:0,latDeg:a.a.lat,groundElev:p.y,turnRate:0};
   const o=new FlightOperations();o.phase='airborne';o.freeAircraftId='prop';const before=f.pos.clone();o.advance(1/60,f,{speedPreset:'slow'});assert.ok(o.freeRoam);assert.ok(f.pos.distanceTo(before)<2);assert.ok(o.throttle>.5);assert.equal(o.phase,'approach');
   f.pos.y=p.y+1000;assert.equal(o.advance(1/60,f,{}),false);assert.equal(o.profile,null);
+});
+
+test('terrain candidate caching preserves runway height and bounded shoulders',async()=>{
+  const {airportTerrainHeight}=await import('../lib/fly/operations-terrain.js'),{airportById}=await import('../lib/fly/operations-airports.js');
+  const index=JSON.parse(readFileSync(new URL('../public/data/runways/v1/index.json',import.meta.url))).runways;
+  const a=airportById(index.find(r=>r.ident==='VNLK').id),along=airportFrame(a).length/2;
+  for(const cross of [0,a.width/2+2,a.width/2+82,a.width/2+170]){
+    const p=airportPoint(a,along,cross),height=p.y-100;
+    const candidates=nearbyOperationsAirports(p.x,p.z,1000);
+    assert.equal(airportTerrainHeight(p.x,p.z,height,candidates),airportTerrainHeight(p.x,p.z,height));
+    assert.equal(airportTerrainHeight(p.x,p.z,height,nearbyOperationsAirports(0,0,1e9)),airportTerrainHeight(p.x,p.z,height));
+    if(cross<a.width/2+4)assert.ok(Math.abs(airportTerrainHeight(p.x,p.z,height,candidates)-p.y)<1e-5);
+    if(cross>a.width/2+160)assert.equal(airportTerrainHeight(p.x,p.z,height,candidates),height);
+  }
 });
 
 test('region stamps combine legacy achievements with casual exploration without granting duplicate rewards',async()=>{

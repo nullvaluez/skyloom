@@ -326,7 +326,7 @@ function PlayerModel({ flight, aircraft }) {
   const livery=useAdventureStore(s=>s.progress.liveries[aircraft.id]);
   const animate=useMemo(()=>fleetAnimator(cloned,entry.parts),[cloned,entry]);
   useEffect(()=>{applyFleetLivery(cloned,aircraft.id,livery==='earned');},[cloned,aircraft.id,livery,gradedMats]);
-  useFrame((_,dt)=>animate(flight,dt,false,readReducedMotion()));
+  useFrame((_,dt)=>animate(flight,dt,useFlyStore.getState().cameraMode==='photo',readReducedMotion()));
   useEffect(()=>()=>disposeFleetGeometry(cloned),[cloned]);
   // Style-driven fresnel rim (discrete write — never per frame)
   useEffect(() => {
@@ -487,6 +487,7 @@ function Afterburner({ flight, anchors, cfg }) {
   useEffect(() => () => exhaust.dispose(), [exhaust]);
   useEffect(() => registerSkyOverlay(exhaust.mesh), [exhaust]);
   useFrame((_, dt) => {
+    if(useFlyStore.getState().cameraMode==='photo')return;
     const cinema = cinematicEarthOn();
     const speedPower = Math.max(0, Math.min(1, (flight.speed - cfg.startMps) / (cfg.fullMps - cfg.startMps)));
     // Thrust should be visible on engagement, before the aircraft has accelerated.
@@ -504,6 +505,7 @@ function Afterburner({ flight, anchors, cfg }) {
 function PrimitivePlane() {
   const prop = useRef();
   useFrame((_, delta) => {
+    if(useFlyStore.getState().cameraMode==='photo')return;
     if (prop.current) prop.current.rotation.z += delta * 45;
   });
 
