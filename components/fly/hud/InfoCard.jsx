@@ -1,16 +1,20 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { Crosshair, X } from 'lucide-react';
 import { useFlyStore } from '@/stores/fly-store';
 import { useRoute } from '@/hooks/use-route';
 import { useAircraftPhoto } from '@/hooks/use-aircraft-photo';
-import { MOBILE_UI, TARGETING } from '@/lib/fly/fly-constants';
+import { TARGETING } from '@/lib/fly/fly-constants';
 import { M_TO_FT, MPS_TO_KT, RAD2DEG } from '@/lib/fly/coords';
 import { formatSquawk } from '@/lib/format';
 import { Zone } from '../LayoutRoot';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { onTouchInfoDismiss } from '@/hooks/use-touch-actions';
+import { releaseEscort, startEscort } from '@/lib/fly/escort';
+import { getAircraftTypeName } from '@/lib/aircraft-type-names';
+import { AIRCRAFT_SILHOUETTES, getBestSilhouette } from '@/lib/aircraft-silhouettes';
+import './target-ui.css';
 
 /**
  * Soft-lock info card: auto-shows when the locked target is inside
@@ -23,11 +27,15 @@ import { onTouchInfoDismiss } from '@/hooks/use-touch-actions';
 export function InfoCard({ runtime }) {
   const infoCardHex = useFlyStore((s) => s.infoCardHex);
   const suppressed = useRef(new Map()); // hex -> suppress-until epoch ms
-  useEffect(() => onTouchInfoDismiss(() => {
-    const hex = useFlyStore.getState().infoCardHex;
-    if (hex) suppressed.current.set(hex, Date.now() + TARGETING.infoCardSuppressSec * 1000);
-    useFlyStore.getState().setInfoCardHex(null);
-  }), []);
+  useEffect(
+    () =>
+      onTouchInfoDismiss(() => {
+        const hex = useFlyStore.getState().infoCardHex;
+        if (hex) suppressed.current.set(hex, Date.now() + TARGETING.infoCardSuppressSec * 1000);
+        useFlyStore.getState().setInfoCardHex(null);
+      }),
+    [],
+  );
 
   // 5Hz visibility controller
   useEffect(() => {
@@ -40,11 +48,7 @@ export function InfoCard({ runtime }) {
 
       if (store.infoCardHex) {
         const current = runtime.traffic?.tracks.get(store.infoCardHex);
-        if (
-          !current ||
-          store.lockedHex !== store.infoCardHex ||
-          current.distM > TARGETING.infoCardReleaseM
-        ) {
+        if (!current || store.lockedHex !== store.infoCardHex || current.distM > TARGETING.infoCardReleaseM) {
           store.setInfoCardHex(null);
         }
       } else if (track && !isSuppressed && track.distM < TARGETING.infoCardRangeM) {
@@ -69,6 +73,9 @@ function InfoCardBody({ hex, runtime, onDismiss }) {
   const track = runtime.traffic?.tracks.get(hex);
   const meta = track?.meta;
   const { isTouch } = useDeviceLayout();
+  const lockState = useFlyStore((s) => s.lockState);
+  const chasing = lockState === 'intercepting' || lockState === 'formation';
+  const [notice, setNotice] = useState(null);
 
   // Live-ish numbers at 2Hz without re-rendering per frame
   const [live, setLive] = useState(null);
@@ -87,6 +94,11 @@ function InfoCardBody({ hex, runtime, onDismiss }) {
     const id = setInterval(read, 500);
     return () => clearInterval(id);
   }, [hex, runtime]);
+  useEffect(() => {
+    if (!notice) return undefined;
+    const id = setTimeout(() => setNotice(null), 3500);
+    return () => clearTimeout(id);
+  }, [notice]);
 
   // Reuse the 2D map's data hooks — geo position for route progress math
   const aircraftShim = useMemo(() => {
@@ -118,127 +130,156 @@ function InfoCardBody({ hex, runtime, onDismiss }) {
   const photoSrc = photo?.thumbnail_large?.src || photo?.thumbnail?.src || null;
 
   if (!meta) return null;
-  const title = meta.flight || meta.r || hex.toUpperCase();
+  const title = meta.flight?.trim() || meta.r || hex.toUpperCase();
+  const typeName = getAircraftTypeName(meta.t, meta.category);
+  const inspect = () => useFlyStore.getState().setInspectHex(hex);
+  const escort = () => {
+    if (chasing) {
+      releaseEscort(runtime);
+      return;
+    }
+    const res = startEscort(runtime, hex, { cinematic: true, source: 'lock' });
+    setNotice(res.ok ? null : res.message);
+  };
+  const silhouette =
+    AIRCRAFT_SILHOUETTES[getBestSilhouette({ t: meta.t }, meta.iconType || 'airliner')] ??
+    AIRCRAFT_SILHOUETTES.unknown;
 
-  // ---- PHONE: a chip, not a card -----------------------------------------
-  // The desktop card is 288px wide and ~200px tall with a photo. On a 390px
-  // phone that is most of the screen, and its `bottom-10 left-4` corner is
-  // exactly where the thumbstick lives — it covered the stick and swallowed
-  // the steering touch (the round-17 complaint, verbatim). The chip carries
-  // the same identity at 48px tall, docks ABOVE the stick by construction
-  // (MOBILE_UI.infoChip.dockBottomRem is derived from the stick anchor), and
-  // opens the full inspect sheet on tap, which is where all this detail
-  // already lives on a phone.
+  // ---- TOUCH: a chip you can act on ---------------------------------------
+  // Round 17 made the phone card a 48 px chip docked above the stick (the old
+  // card covered the stick and swallowed steering). It was pointer-events-none,
+  // so a locked plane could only be inspected through the Actions menu. The
+  // chip is now two real targets: the body opens the dossier, Escort flies.
   if (isTouch) {
     return (
       <Zone name="info-dock">
-        <div
-          className="hud-glass pointer-events-none flex items-center gap-2 overflow-hidden rounded-xl border border-zinc-700/60 text-zinc-100 shadow-xl"
-          style={{ height: `${MOBILE_UI.infoChip.heightRem}rem` }}
-          data-testid="infocard-chip"
-        >
+        <div className="tgt" style={{ '--hero': meta.color || '#4fe3ff' }}>
           <div
-            className="flex h-full min-w-0 flex-1 items-center gap-2 px-3 text-left"
+            className="tgt-lock-chip"
+            data-testid="infocard-chip"
+            role="group"
             aria-label={`Selected aircraft ${title}`}
           >
-            <span className="shrink-0 text-[13px] leading-none text-cyan-200/90">✈</span>
-            <span className="shrink-0 font-mono text-[13px] font-semibold tracking-wide">
-              {title}
-            </span>
-            {live && (
-              <span className="shrink-0 font-mono text-[11px] text-zinc-400">
-                {live.distNm}nm
-              </span>
-            )}
-            {meta.t && (
-              <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-zinc-500">
-                {meta.t}
-              </span>
-            )}
+            <button
+              type="button"
+              onClick={inspect}
+              aria-label={`Details for ${title}`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                flex: 1,
+                minWidth: 0,
+                height: '100%',
+                background: 'none',
+                border: 0,
+                padding: 0,
+                textAlign: 'left',
+              }}
+            >
+              <Crosshair size={18} aria-hidden="true" />
+              <strong>{title}</strong>
+              <small>{[live ? `${live.distNm} nm` : null, meta.t].filter(Boolean).join(' · ')}</small>
+            </button>
+            <button type="button" className="tgt-lock-open" onClick={escort} aria-pressed={chasing}>
+              {chasing ? 'Release' : 'Escort'}
+            </button>
           </div>
+          {notice && (
+            <p className="tgt-result" role="alert" style={{ position: 'static', marginTop: 6 }}>
+              {notice}
+            </p>
+          )}
         </div>
       </Zone>
     );
   }
 
   return (
-    <Zone name="info-dock" className="w-72">
-      <div className="pointer-events-auto overflow-hidden rounded-lg border border-zinc-700/60 bg-zinc-900/80 text-zinc-100 shadow-xl backdrop-blur">
-      {photoSrc && (
-        // Round 15: the photographer credit + link back is a planespotters
-        // REQUIREMENT wherever the photo is shown. This card was rendering a
-        // bare <img> — harmless only because the proxy's User-Agent was being
-        // 403'd, so photoSrc was permanently null. It isn't any more.
-        // (`bottom-1 left-1`, never `bottom-2 left-2` — verify-fly-style finds
-        // the Esri AttributionBar by that class pair.)
-        <div className="relative">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={photoSrc} alt={title} className="h-28 w-full object-cover" />
-          {photo?.photographer && (
-            <a
-              href={photo.link || 'https://www.planespotters.net'}
-              target="_blank"
-              rel="noreferrer"
-              className="absolute bottom-1 left-1 max-w-[92%] truncate rounded bg-zinc-950/75 px-1.5 py-0.5 font-mono text-[9px] text-zinc-300 hover:underline"
-              data-testid="infocard-photo-credit"
-            >
-              📷 {photo.photographer} · planespotters.net
-            </a>
-          )}
-        </div>
-      )}
-      <div className="space-y-1.5 p-3">
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="font-mono text-sm font-semibold tracking-wide">{title}</div>
-            <div className="text-xs text-zinc-400">
-              {route?.airline?.name || (meta.r ? `Reg ${meta.r}` : 'Unknown operator')}
-              {meta.t ? ` · ${meta.t}` : ''}
+    <Zone name="info-dock">
+      <div className="tgt" style={{ '--hero': meta.color || '#4fe3ff' }}>
+        <div className="tgt-lock" data-testid="infocard">
+          <div className="tgt-lock-thumb">
+            {photoSrc ? (
+              // Round 15: the photographer credit + link back is a planespotters
+              // REQUIREMENT wherever the photo is shown (`bottom-1 left-1`, never
+              // `bottom-2 left-2` — verify-fly-style finds the Esri bar by that pair).
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photoSrc} alt={title} />
+                {photo?.photographer && (
+                  <a
+                    href={photo.link || 'https://www.planespotters.net'}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="absolute bottom-1 left-1 max-w-[92%] truncate rounded bg-zinc-950/75 px-1 py-0.5 font-mono text-[8px] text-zinc-300 hover:underline"
+                    data-testid="infocard-photo-credit"
+                    title={`Photo ${photo.photographer} · planespotters.net`}
+                  >
+                    📷 {photo.photographer}
+                  </a>
+                )}
+              </>
+            ) : (
+              <svg viewBox={silhouette.viewBox} width="62" height="62" aria-hidden="true">
+                {silhouette.paths.map((p, i) => (
+                  <path key={i} d={p.d} fill="currentColor" />
+                ))}
+              </svg>
+            )}
+          </div>
+          <div className="tgt-lock-body">
+            <div className="tgt-lock-kicker">
+              <i aria-hidden="true" />
+              {chasing ? 'Escorting' : 'Locked'}
+              <button type="button" onClick={onDismiss} aria-label="Dismiss info card" title="Hide">
+                <X size={13} />
+              </button>
             </div>
-          </div>
-          <button
-            onClick={onDismiss}
-            aria-label="Dismiss info card"
-            className="rounded p-0.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        {(route?.origin || route?.destination) && (
-          <div className="flex items-center gap-2 text-xs">
-            <span className="font-mono font-medium">
-              {route.origin?.iata || route.origin?.icao || '???'}
-            </span>
-            <span className="h-px flex-1 bg-zinc-600" />
-            <span className="text-zinc-400">✈</span>
-            <span className="h-px flex-1 bg-zinc-600" />
-            <span className="font-mono font-medium">
-              {route.destination?.iata || route.destination?.icao || '???'}
-            </span>
-          </div>
-        )}
-
-        {live && (
-          <div className="grid grid-cols-4 gap-1 pt-1 text-center">
-            {[
-              ['ALT', `${live.altFt.toLocaleString()}ft`],
-              ['GS', `${live.gsKt}kt`],
-              ['HDG', `${live.hdg}°`],
-              ['DIST', `${live.distNm}nm`],
-            ].map(([label, value]) => (
-              <div key={label}>
-                <div className="text-[9px] uppercase tracking-wider text-zinc-500">{label}</div>
-                <div className="font-mono text-[11px]">{value}</div>
+            <div className="tgt-lock-name" title={title}>
+              {title}
+            </div>
+            <div className="tgt-lock-sub">
+              {[
+                route?.airline?.name || typeName || meta.t,
+                live ? `${live.distNm} nm` : null,
+                live ? `${live.altFt.toLocaleString()} ft` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </div>
+            {(route?.origin || route?.destination) && (
+              <div className="tgt-lock-sub" style={{ color: 'var(--t-ice)' }}>
+                {route.origin?.iata || route.origin?.icao || '···'} →{' '}
+                {route.destination?.iata || route.destination?.icao || '···'}
+                {meta.squawk ? ` · sqk ${formatSquawk(meta.squawk)}` : ''}
               </div>
-            ))}
+            )}
+            <div className="tgt-lock-actions">
+              <button type="button" onClick={escort} aria-pressed={chasing}>
+                {chasing ? (
+                  <>
+                    Release <kbd className="tgt-kbd">F</kbd>
+                  </>
+                ) : (
+                  'Escort'
+                )}
+              </button>
+              <button type="button" onClick={inspect}>
+                Details <kbd className="tgt-kbd">T</kbd>
+              </button>
+            </div>
+            {notice && (
+              <div
+                className="tgt-lock-sub"
+                role="alert"
+                style={{ color: 'var(--t-rose)', whiteSpace: 'normal' }}
+              >
+                {notice}
+              </div>
+            )}
           </div>
-        )}
-
-        {meta.squawk && (
-          <div className="text-[10px] text-zinc-500">Squawk {formatSquawk(meta.squawk)}</div>
-        )}
-      </div>
+        </div>
       </div>
     </Zone>
   );

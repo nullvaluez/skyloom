@@ -231,6 +231,12 @@ function PlayerModel({ flight, aircraft }) {
   const anchors = useMemo(() => {
     const measured = measureAircraftAnchors(cloned, correction, aircraft.id);
     if (entry.engines) measured.engines = entry.engines.map(p => p.map(v => v * correction.scale));
+    // Airframes whose bbox corners are the wrong place for a light (the Umbra
+    // flying wing has no fin) author their own tail strobe / landing lamps.
+    if (entry.lights) measured.lights = {
+      tail: entry.lights.tail.map(v => v * correction.scale),
+      landing: entry.lights.landing.map(p => p.map(v => v * correction.scale)),
+    };
     return measured;
   }, [cloned, correction, aircraft.id, entry]);
   useEffect(() => {
@@ -393,17 +399,17 @@ function correctedBox(model, correction) {
 function PlayerLights({ anchors, flight }) {
   const points = useRef();
   const { geometry, material } = useMemo(() => {
-    const { box, center: c, tips } = anchors;
+    const { box, center: c, tips, lights } = anchors;
     const len = box.max.z - box.min.z;
     const pts = [
       tips[0], // 0 port, measured red wingtip
       tips[1], // 1 starboard, measured green wingtip
-      [0, box.max.y, box.max.z - len * 0.06], // 2 tail, double-flash white
+      lights?.tail ?? [0, box.max.y, box.max.z - len * 0.06], // 2 tail, double-flash white
       [0, box.min.y, c.z], // 3 belly beacon, blink
       [tips[0][0], tips[0][1], tips[0][2] + .25],
       [tips[1][0], tips[1][1], tips[1][2] + .25],
-      [c.x - .6, c.y - .35, box.min.z + len * .16],
-      [c.x + .6, c.y - .35, box.min.z + len * .16],
+      lights?.landing?.[0] ?? [c.x - .6, c.y - .35, box.min.z + len * .16],
+      lights?.landing?.[1] ?? [c.x + .6, c.y - .35, box.min.z + len * .16],
     ];
     const geo = new BufferGeometry();
     geo.setAttribute('position', new BufferAttribute(new Float32Array(pts.flat()), 3));

@@ -318,6 +318,18 @@
   bottom: auto !important;
   z-index: 26;
 }
+/* Landscape phone: the menu button above owns the top-right corner, and the
+   R17 minimap slot (top 2.6rem) put the button's lower edge across the radar
+   (verify-mobile-layout: "minimap x touch-fab"). Drop the radar below it. */
+[data-fly-root][data-touch="1"][data-device="phone"][data-orient="landscape"] [data-zone="minimap"] {
+  top: calc(env(safe-area-inset-top, 0px) + 64px);
+}
+/* Landscape: the open actions panel grows to 8 px under the top edge, so it
+   covered the same button, its own Close (verify-mobile-actions: "panel is
+   bounded and clears both controls"). Park the panel left of the button. */
+[data-fly-root][data-touch="1"][data-orient="landscape"] {
+  --touch-panel-right: calc(var(--touch-safe-right) + 64px);
+}
 [data-fly-root][data-touch="1"] .touch-actions-fab {
   width: 44px;
   height: 44px;

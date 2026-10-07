@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
-import { motion } from 'framer-motion';
+import { motion, useDragControls } from 'framer-motion';
+import { ChevronLeft, ChevronRight, Crosshair, X, Zap } from 'lucide-react';
 import { useFlyStore } from '@/stores/fly-store';
 import { usePassportStore } from '@/stores/passport-store';
 import { useRoute } from '@/hooks/use-route';
@@ -17,57 +18,38 @@ import { M_TO_FT, MPS_TO_KT, RAD2DEG } from '@/lib/fly/coords';
 import { formatSquawk } from '@/lib/format';
 import { calculateRarity, getRarityTier } from '@/lib/rarity';
 import { getAircraftTypeName } from '@/lib/aircraft-type-names';
-import { CARD_THEME } from './inspect/inspect-tokens';
-import {
-  BearingChip,
-  DataCell,
-  FactRow,
-  MonogramChip,
-  Odometer,
-  RarityChip,
-  RouteProgress,
-  Sparkline,
-  StatBar,
-  countryFlag,
-} from './inspect/card-bits';
+import { relativeTo, startEscort } from '@/lib/fly/escort';
+import { countryFlag } from './inspect/card-bits';
+import { Facts, RelativeRow, RouteStrip, TelemetryTiles } from './inspect/dossier-bits';
 import { ModelTurntable, preloadTurntable } from './inspect/ModelTurntable';
+import './target-ui.css';
 
 /**
- * INK CODEX — the click-to-inspect target panel.
+ * TARGET DOSSIER — the click-to-inspect panel (2026-10 redesign).
  *
- * Round 8.5 (§B) gave it a right-DOCKED column (no full-screen scrim, so
- * clicks outside the panel keep flying) with the planespotters photo as the
- * HERO and the 3D turntable demoted to a secondary section (the turntable
- * still takes the hero when no photo exists).
+ * The INK CODEX card read as a data sheet; this is a game target screen:
+ *   · a hero stage (the real planespotters photo when one exists, else the
+ *     archetype on a lit turntable) framed by lock-on brackets, a LIVE tag
+ *     and the callsign set big over it;
+ *   · four live telemetry tiles, a "where is it from me" row (clock position,
+ *     height difference, closing speed) and the route strip;
+ *   · the registry/transponder facts folded into a Dossier disclosure;
+ *   · two big actions pinned to the bottom (thumb reach on a phone):
+ *       ESCORT — fly alongside with the cinematic camera (lib/fly/escort.js;
+ *                was CHASE, which only engaged the autopilot and closed);
+ *       WARP   — jump in behind it.
+ *   · ‹ › (Q / E) cycles through nearby contacts without closing.
+ * Desktop: a frosted dock on the right. Phone portrait: a bottom sheet you
+ * drag down to dismiss. Phone landscape: a full-height side dock.
  *
- * Round 15 "Ground Truth" EVOLVES that identity — same INK+ICE holo voice
- * (hero color from track.meta.color + rarity are still the only saturated
- * voices, chunky beveled buttons, one-shot holo sweep) with a reworked
- * hierarchy around real data:
- *   · REGISTRY identity (hooks/use-aircraft-info → keyless adsbdb → hexdb):
- *     manufacturer + the real model name, the registered owner, the registry
- *     country. ADS-B alone only ever knew an ICAO type code.
- *   · Richer route: airport names/cities + flags under the codes, ETA clock
- *     and distance-to-run under the progress bar.
- *   · The photo hero actually WORKS again (planespotters started 403ing our
- *     old User-Agent — see app/api/aircraft/[hex]/photo/route.js) and states
- *     its state honestly: looking up… / no photo on file.
- *   · A real phone bottom sheet: full-bleed, drag-handle affordance,
- *     safe-area padding, 50px WARP/CHASE targets, svh-capped height. Short
- *     landscape viewports shrink the desktop dock's vertical inset instead of
- *     clipping (top/bottom use min(4rem, 8svh)).
- *
- * Reliability (the round-8 complaint) is UNCHANGED: WARP/CHASE resolve their
- * actions AT CALL TIME through the runtime bus (scene remounts heal, captured
- * nulls don't orphan), WARP arms on runtimeReady && track (warpTo
- * dead-reckons), CHASE disables with a reason on frozen (stale === 2) tracks,
- * and a failed action flashes the WHOLE panel + auto-retries once ~400ms later.
- *
- * Wiring preserved exactly: opens via store.inspectHex (click a hovered
- * plane, or T on a lock), Esc closes (FlyMode), 1s stale auto-close, 500ms
- * live telemetry (per-frame data never touches React). Testids kept:
- * inspect-card/-warp/-chase/-hex/-action-notice/-photo-credit/-spot-log
- * (plus -turntable/-bearing/-sparkline from the child atoms).
+ * Wiring kept from rounds 8.5/15/17: opens via store.inspectHex (click a
+ * plane, T on a lock, tap the lock chip), Esc closes (FlyMode), 1 s
+ * stale auto-close, 500 ms telemetry (nothing per frame reaches React),
+ * actions resolve AT CALL TIME through the runtime bus, a failed action
+ * flashes the panel and retries ONCE ~400 ms later when the failure can be a
+ * scene remount. Testids kept: inspect-card/-warp/-chase/-hex/-action-notice/
+ * -photo-credit/-photo-state/-spot-log/-reg/-model/-owner/-route/
+ * -registry-source/-sheet-handle, plus -turntable/-bearing/-sparkline.
  */
 export function InspectModal({ runtime }) {
   const inspectHex = useFlyStore((s) => s.inspectHex);
@@ -86,24 +68,31 @@ export function InspectModal({ runtime }) {
 
   if (!inspectHex) return null;
   // keyed: per-plane state (spot capture, odometers, retry arm) never leaks
-  // across targets if inspectHex ever changes while open
+  // across targets when ‹ › cycles to the next contact
   return <ModalBody key={inspectHex} hex={inspectHex} runtime={runtime} />;
 }
 
-// R16: the phone-sheet breakpoint hook moved VERBATIM to
-// hooks/use-sheet-layout.js — the Logbook overlay needs the same one source
-// of truth for "this is a phone". Import swap only; behavior identical.
+// Session memory for the Dossier disclosure (a preference, not a save).
+let factsOpenPref = false;
+
+/** Nearby contacts ordered by range, for ‹ › cycling. */
+function cycleList(runtime) {
+  const items = runtime.traffic?.items ?? [];
+  return items
+    .filter((t) => t.meta && t.stale !== 2)
+    .sort((a, b) => a.distM - b.distM)
+    .slice(0, 40)
+    .map((t) => t.hex);
+}
 
 function ModalBody({ hex, runtime }) {
   const runtimeReady = useFlyStore((s) => s.runtimeReady);
   const isSheet = useSheetLayout();
-  // Round 17: the sheet/dock split needs the orientation too (see the
-  // three-case geometry below). useSheetLayout() is itself a wrapper over
-  // this hook, so both reads come from ONE measurement.
-  const { isPhone, orientation } = useDeviceLayout();
+  const { isPhone, isTouch, orientation } = useDeviceLayout();
   const track = runtime.traffic?.tracks.get(hex);
   const meta = track?.meta;
-  const close = () => useFlyStore.getState().setInspectHex(null);
+  const close = useCallback(() => useFlyStore.getState().setInspectHex(null), []);
+  const dragControls = useDragControls();
 
   // Track vanished (stale-removed) while open — bail out gracefully
   useEffect(() => {
@@ -111,14 +100,15 @@ function ModalBody({ hex, runtime }) {
       if (!runtime.traffic?.tracks.get(hex)) close();
     }, 1000);
     return () => clearInterval(id);
-  }, [hex, runtime]);
+  }, [hex, runtime, close]);
 
-  // Live telemetry at 500ms — the ONLY recurring React state here (plus
-  // the frozen flag). stale is read BEFORE the fix1 gate so CHASE can
+  // Live telemetry at 500 ms — the ONLY recurring React state here (plus the
+  // frozen flag). stale is read BEFORE the fix1 gate so ESCORT can
   // disable-with-reason even when telemetry never acquired.
   const [live, setLive] = useState(null);
   const [frozen, setFrozen] = useState(false);
   const vsSamplesRef = useRef([]);
+  const rangeRef = useRef(null);
   useEffect(() => {
     const read = () => {
       const t = runtime.traffic?.tracks.get(hex);
@@ -129,24 +119,20 @@ function ModalBody({ hex, runtime }) {
       const ring = vsSamplesRef.current;
       ring.push(vsFpm);
       if (ring.length > 12) ring.shift();
-      let bearingDeg = null;
-      let relAltFt = null;
-      const f = runtime.flight;
-      const o = runtime.origin;
-      if (f && o) {
-        const dx = t.rx - (f.pos.x - o.anchor.x);
-        const dz = t.rz - (f.pos.z - o.anchor.z);
-        bearingDeg = ((Math.atan2(dx, -dz) * RAD2DEG) % 360 + 360) % 360;
-        relAltFt = (t.ry - f.pos.y) * M_TO_FT;
-      }
+      const now = performance.now() / 1000;
+      const prev = rangeRef.current;
+      const closingKt = prev && now - prev.t > 0.2 ? ((prev.d - t.distM) / (now - prev.t)) * MPS_TO_KT : null;
+      rangeRef.current = { d: t.distM, t: now };
+      const rel = relativeTo(runtime, t);
+      const heading = runtime.flight ? (((runtime.flight.heading * RAD2DEG) % 360) + 360) % 360 : 0;
       setLive({
         altFt: Math.round(t.ry * M_TO_FT),
         gsKt: Math.round(Math.hypot(t.fix1.vE, t.fix1.vN) * MPS_TO_KT),
         vsFpm,
         hdg: Math.round((((t.yaw * RAD2DEG) % 360) + 360) % 360),
         distNm: t.distM / 1852,
-        bearingDeg,
-        relAltFt,
+        closingKt,
+        rel: rel && { ...rel, offDeg: rel.bearing - heading },
       });
     };
     read();
@@ -155,15 +141,14 @@ function ModalBody({ hex, runtime }) {
   }, [hex, runtime]);
 
   // Passport: capture BEFORE logging (dedup is per hex per hour), then log
-  // this sighting — inspecting a plane now counts as spotting it.
+  // this sighting — inspecting a plane counts as spotting it.
   const [spot] = useState(() => {
     const p = usePassportStore.getState();
     const prev = p.spottedAircraft.filter((s) => s.hex === hex);
     return {
       isNew: !p.hasSpotted(hex),
       count: prev.length,
-      // logSpot prepends ([spot, ...list]) — the array is newest-first, so
-      // "since <date>" must read the LAST element (oldest sighting), not [0]
+      // logSpot prepends — the OLDEST sighting is the last element
       firstAt: prev.length ? prev[prev.length - 1].timestamp : null,
     };
   });
@@ -175,18 +160,15 @@ function ModalBody({ hex, runtime }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hex]);
 
-  // R17: the SAME builder the logSpot above uses, so the tier printed on this
-  // card and the rarity written into the passport can no longer disagree
-  // (before, this memo saw `squawk` and the log did not, and neither saw
-  // gs/alt). `track` is this render's live track — the effect logs off the
-  // same object microseconds apart.
+  // R17: the SAME builder logSpot uses, so the printed tier and the passport
+  // can never disagree.
   const rarity = useMemo(() => {
     if (!meta) return null;
     return getRarityTier(calculateRarity(trackSpotAttrs(track)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hex, meta]);
 
-  // Geo shim for the shared 2D-map data hooks (gs/track feed ETA/progress)
+  // Geo shim for the shared data hooks (gs/track feed ETA/progress)
   const aircraftShim = useMemo(() => {
     if (!meta) return null;
     const t = runtime.traffic?.tracks.get(hex);
@@ -216,8 +198,7 @@ function ModalBody({ hex, runtime }) {
   const { data: info, isPending: infoPending } = useAircraftInfo(hex);
   const photoSrc = photo?.thumbnail_large?.src || photo?.thumbnail?.src || null;
 
-  // ---- Actions: resolve AT CALL TIME (bus first, legacy runtime prop as
-  // fallback), LOUD panel-level failure flash + ONE auto-retry ~400ms.
+  // ---- Actions -------------------------------------------------------------
   const [notice, setNotice] = useState(null); // { key, msg } | null
   const retryTimer = useRef(null);
   useEffect(() => () => clearTimeout(retryTimer.current), []);
@@ -227,527 +208,484 @@ function ModalBody({ hex, runtime }) {
     if (fn) return fn;
     return typeof runtime[name] === 'function' ? runtime[name] : null;
   };
-  const failMsg = (kind) => {
-    if (!useFlyStore.getState().runtimeReady) return 'scene rebuilding';
-    const t = runtime.traffic?.tracks.get(hex);
-    if (!t) return 'target lost — signal gone';
-    if (kind === 'chase' && t.stale === 2) return 'signal frozen — chase unavailable';
-    return kind === 'warp' ? 'warp failed' : 'chase failed';
+  const warpFailMsg = () => {
+    if (!useFlyStore.getState().runtimeReady) return 'Scene rebuilding';
+    if (!runtime.traffic?.tracks.get(hex)) return 'Target lost — signal gone';
+    return 'Warp failed';
   };
   const runAction = (kind, isRetry = false) => {
-    const fn = resolveAction(kind === 'warp' ? 'warpTo' : 'interceptHex');
+    if (kind === 'chase') {
+      const res = startEscort(runtime, hex, { cinematic: true, source: 'inspect' });
+      if (res.ok) {
+        setNotice(null);
+        close();
+        return;
+      }
+      // Only a remount window is worth one silent retry; the rest are facts.
+      const retriable = res.reason === 'scene' || res.reason === 'failed';
+      setNotice({ key: Date.now(), msg: `${res.message}${retriable && !isRetry ? ' Retrying…' : ''}` });
+      if (retriable && !isRetry) {
+        clearTimeout(retryTimer.current);
+        retryTimer.current = setTimeout(() => runAction(kind, true), INSPECT.actionRetryMs);
+      }
+      return;
+    }
+    const fn = resolveAction('warpTo');
     const ok = !!fn && fn(hex) === true;
     if (ok) {
       setNotice(null);
-      if (kind === 'chase') {
-        runtime.audio?.lockBlip?.();
-        close();
-      }
       return; // warp closes the card via warpTo itself
     }
-    setNotice({
-      key: Date.now(),
-      msg: `${failMsg(kind)}${isRetry ? ' — retry failed' : ' — retrying…'}`,
-    });
+    setNotice({ key: Date.now(), msg: `${warpFailMsg()}${isRetry ? ' — retry failed' : ' — retrying…'}` });
     if (!isRetry) {
       clearTimeout(retryTimer.current);
-      retryTimer.current = setTimeout(
-        () => runAction(kind, true),
-        INSPECT.actionRetryMs
-      );
+      retryTimer.current = setTimeout(() => runAction(kind, true), INSPECT.actionRetryMs);
     }
   };
   const onWarp = () => runAction('warp');
-  const onChase = () => runAction('chase');
+  const onEscort = () => runAction('chase');
+
+  const cycle = useCallback(
+    (dir) => {
+      const list = cycleList(runtime);
+      if (list.length < 2) return;
+      const i = list.indexOf(hex);
+      const next = list[(i < 0 ? 0 : i + dir + list.length) % list.length];
+      if (next && next !== hex) useFlyStore.getState().setInspectHex(next);
+    },
+    [runtime, hex],
+  );
+
+  // Keyboard: F escort · G warp · Q/E (or [ ]) cycle. Capture phase + stop,
+  // so the flight input never also sees the key (an F reaching FlyScene the
+  // next frame would release the escort it just started).
+  const actionsRef = useRef({});
+  actionsRef.current = { onEscort, onWarp, cycle, frozen, warpReady: runtimeReady };
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = e.target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      const k = e.key.toLowerCase();
+      const a = actionsRef.current;
+      let handled = true;
+      if (k === 'f') {
+        if (!a.frozen) a.onEscort();
+      } else if (k === 'g') {
+        if (a.warpReady) a.onWarp();
+      } else if (k === 'q' || k === '[') a.cycle(-1);
+      else if (k === 'e' || k === ']') a.cycle(1);
+      else handled = false;
+      if (handled) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
+
+  const [factsOpen, setFactsOpen] = useState(() => factsOpenPref);
+  const toggleFacts = () => {
+    factsOpenPref = !factsOpen;
+    setFactsOpen(!factsOpen);
+  };
 
   if (!meta || !track) return null;
-  const title = meta.flight || meta.r || hex.toUpperCase();
-  const heroColor = meta.color || '#22d3ee';
-  const warpReady = runtimeReady; // track is non-null here by the guard above
+  const title = meta.flight?.trim() || meta.r || hex.toUpperCase();
+  const heroColor = meta.color || '#4fe3ff';
+  const tierColor = rarity && rarity.tier !== 'common' ? rarity.color : '#4fe3ff';
+  const warpReady = runtimeReady;
   const photoLeads = !!photoSrc;
 
   // ---- Identity: registry FIRST, local tables as the honest fallback ------
-  // meta.t is the ADS-B type designator (may be absent); the registry knows
-  // the real model ("R172K", "UH-72A Lakota"), the manufacturer and who owns
-  // the tail. Registration prefers the LIVE ADS-B value — adsbdb mangles some
-  // non-US tails (C-GNWK comes back as "CA-GNWK").
   const reg = meta.r || info?.registration || null;
   const typeCode = meta.t || info?.typeCode || null;
   const typeName = getAircraftTypeName(typeCode, meta.category);
   const registryModel = [info?.manufacturer, info?.model].filter(Boolean).join(' ') || null;
-  // Some registry models are bare series numbers ("Beech 36") — the friendly
-  // table reads better there ("Beechcraft Bonanza 36"). Anything with real
-  // model detail ("R172K", "UH-72A Lakota") beats the generic ICAO name.
   const thinModel = !info?.model || /^[0-9]{1,4}$/.test(info.model);
   const headlineIsRegistry = !!registryModel && !(thinModel && typeName);
-  const modelPrimary = (headlineIsRegistry ? registryModel : typeName) || registryModel || 'UNKNOWN TYPE';
-  const modelSub = [
-    headlineIsRegistry ? typeName : registryModel,
-    typeCode,
-  ]
-    .filter((v) => v && v !== modelPrimary)
-    .join(' · ');
-
+  const modelPrimary = (headlineIsRegistry ? registryModel : typeName) || registryModel || 'Unknown type';
   const airlineName = route?.airline?.name || null;
   const owner = info?.owner || null;
-  const operatorLine =
-    airlineName || owner || (reg ? `Registered ${reg}` : 'Unknown operator');
-  // Only surface OWNER separately when it says something the operator line
-  // didn't (leased airline fleets: operator ≠ registered owner).
+  const operatorLine = airlineName || owner || (reg ? `Registered ${reg}` : 'Unknown operator');
   const ownerFact = owner && owner !== operatorLine ? owner : null;
   const flag = countryFlag(info?.countryIso);
-  const monogram =
-    route?.airline?.iata || route?.airline?.icao || info?.operatorFlagCode || null;
+  const monogram = route?.airline?.iata || route?.airline?.icao || info?.operatorFlagCode || null;
+  const canCycle = (runtime.traffic?.items?.length ?? 0) > 1;
 
   // ---- Geometry: desktop dock · phone sheet · landscape-phone dock --------
-  //
-  // Round 17 added the third case. `isSheet` is now `isPhone || width <= 639`,
-  // so a phone in LANDSCAPE finally counts as a phone — but the bottom sheet
-  // is the wrong answer there: 88svh of a 390px-tall viewport is a 343px slab
-  // covering the whole screen, and the card's content is a tall column that
-  // would have ~40px of scroll height. Sideways, a phone has width to spare
-  // and no height, so it gets a DOCK, sized off vw and inset in svh.
-  // A narrow DESKTOP window keeps the bottom sheet exactly as before: this
-  // branch requires isPhone, not just isSheet.
   const landDock = isPhone && orientation === 'landscape';
-  // The grab handle and the rise-from-below entrance belong to the SHEET
-  // only — a docked panel that sprouts a drag handle reads as broken.
   const sheetMotion = isSheet && !landDock;
   const dockStyle = landDock
     ? {
         right: 'max(env(safe-area-inset-right), 0.5rem)',
-        top: '0.5svh',
-        bottom: '0.5svh',
-        width: 'min(56vw, 420px)',
+        top: 'max(env(safe-area-inset-top), 0.5rem)',
+        bottom: 'max(env(safe-area-inset-bottom), 0.5rem)',
+        width: 'min(58vw, 440px)',
         borderRadius: '1.25rem',
+        '--tgt-hero-h': '128px',
       }
-    : isSheet
+    : sheetMotion
       ? {
           left: 0,
           right: 0,
           top: 'auto',
           bottom: 0,
           maxHeight: `${INSPECT.sheetMaxSvh}svh`,
-          borderRadius: '1.5rem 1.5rem 0 0',
+          borderRadius: '1.6rem 1.6rem 0 0',
+          '--tgt-hero-h': `${INSPECT.heroHMobile}px`,
         }
       : {
           right: '1rem',
-          // Short landscape phones: shrink the inset instead of clipping.
           top: 'min(4rem, 8svh)',
           bottom: 'min(4rem, 8svh)',
           width: `min(${INSPECT.panelW}px, calc(100vw - 1rem))`,
           borderRadius: '1.5rem',
+          '--tgt-hero-h': '232px',
         };
 
-  return (
-    <motion.div
-      // A sheet rises; a dock slides in from the edge it docks to. The
-      // landscape-phone panel is a dock, so it takes the desktop entrance.
-      initial={sheetMotion ? { y: 80, opacity: 0.4 } : { x: INSPECT.panelW + 60, opacity: 0.4 }}
-      animate={sheetMotion ? { y: 0, opacity: 1 } : { x: 0, opacity: 1 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-      style={{
-        ...dockStyle,
-        '--hero': heroColor,
-        backgroundImage: `linear-gradient(180deg, ${CARD_THEME.bgTop}, ${CARD_THEME.bgBottom})`,
-        borderColor: CARD_THEME.edge,
-        boxShadow: `0 24px 80px rgba(2, 4, 10, 0.45), 0 0 44px color-mix(in srgb, var(--hero) 14%, transparent)`,
-      }}
-      className="hud-flat-phone pointer-events-auto absolute z-20 flex flex-col overflow-hidden border backdrop-blur-sm"
-      data-testid="inspect-card"
-    >
-      {/* One-shot holo sweep */}
-      <motion.div
-        initial={{ y: '-130%' }}
-        animate={{ y: '420%' }}
-        transition={{ delay: 0.3, duration: 0.9, ease: 'easeInOut' }}
-        className="pointer-events-none absolute inset-x-0 top-0 z-10 h-1/3"
-        style={{
-          background: `linear-gradient(180deg, transparent, ${CARD_THEME.shine}, transparent)`,
-          mixBlendMode: 'screen',
-        }}
-      />
+  const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.05, delayChildren: 0.12 } } };
+  const rise = {
+    hidden: { opacity: 0, y: 10 },
+    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 260, damping: 26 } },
+  };
 
-      {/* LOUD action-failure flash: the whole panel blinks red once */}
+  const facts = [
+    ['Squawk', meta.squawk ? formatSquawk(meta.squawk) : null],
+    ['Type code', typeCode],
+    ['Registration', reg],
+    ['Category', meta.category],
+    ['Class', (meta.iconType || 'unknown').replace(/^\w/, (c) => c.toUpperCase())],
+    ['Country', info?.countryIso ? `${flag} ${info.country || info.countryIso}` : null],
+    ['Registered owner', ownerFact || owner, true, 'inspect-owner'],
+    [
+      'Spot log',
+      spot.isNew
+        ? 'First sighting — logged'
+        : `Seen ${spot.count}×${spot.firstAt ? ` since ${new Date(spot.firstAt).toLocaleDateString()}` : ''}`,
+      true,
+      'inspect-spot-log',
+    ],
+  ];
+
+  return (
+    <motion.aside
+      className="tgt tgt-dossier hud-flat-phone"
+      data-testid="inspect-card"
+      data-overlay="inspect"
+      aria-label={`Aircraft ${title}`}
+      drag={sheetMotion ? 'y' : false}
+      dragListener={false}
+      dragControls={dragControls}
+      dragConstraints={{ top: 0, bottom: 0 }}
+      dragElastic={{ top: 0, bottom: 0.7 }}
+      onDragEnd={(_, info) => {
+        if (info.offset.y > 110 || info.velocity.y > 650) close();
+      }}
+      initial={sheetMotion ? { y: '60%', opacity: 0 } : { x: 70, opacity: 0, scale: 0.98 }}
+      animate={sheetMotion ? { y: 0, opacity: 1 } : { x: 0, opacity: 1, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+      style={{ ...dockStyle, '--hero': heroColor, '--tier': tierColor }}
+    >
+      {/* LOUD action-failure flash: the whole panel blinks once */}
       {notice && (
         <motion.div
           key={notice.key}
+          className="tgt-flash"
           initial={{ opacity: 1 }}
           animate={{ opacity: 0 }}
           transition={{ duration: 0.7, ease: 'easeOut' }}
-          className="pointer-events-none absolute inset-0 z-20"
-          style={{
-            background: CARD_THEME.dangerFlash,
-            boxShadow: `inset 0 0 0 2px ${CARD_THEME.danger}`,
-            borderRadius: dockStyle.borderRadius,
-          }}
+          style={{ borderRadius: dockStyle.borderRadius }}
         />
       )}
 
-      {/* ---- Sheet grab handle (phone only): the affordance AND a fat,
-           thumb-reachable close target at the top of the sheet ---- */}
       {sheetMotion && (
         <button
+          type="button"
+          className="tgt-grab"
           onClick={close}
-          aria-label="Close inspect panel"
-          className="flex w-full shrink-0 items-center justify-center pb-1 pt-2.5"
+          onPointerDown={(e) => dragControls.start(e)}
+          aria-label="Close aircraft details"
           data-testid="inspect-sheet-handle"
+          style={{ touchAction: 'none' }}
         >
-          <span
-            className="block h-1 w-11 rounded-full"
-            style={{ background: CARD_THEME.edge }}
-          />
+          <span />
         </button>
       )}
 
-      {/* ---- Header band ---- */}
-      <div
-        className="flex shrink-0 items-center justify-between gap-2 px-4 py-2.5"
-        style={{ borderBottom: `1px solid color-mix(in srgb, var(--hero) 30%, transparent)` }}
-      >
-        <div className="flex min-w-0 items-center gap-2.5">
-          {spot.isNew ? (
-            <motion.span
-              initial={{ scale: 1.6, rotate: -14, opacity: 0 }}
-              animate={{ scale: 1, rotate: -3, opacity: 1 }}
-              transition={{ type: 'spring', stiffness: 320, damping: 14, delay: 0.18 }}
-              className="whitespace-nowrap text-[11px] uppercase tracking-[0.2em]"
-              style={{ fontFamily: CARD_THEME.fontDisplay, color: 'var(--hero)' }}
-            >
-              ⟬ new spot! ⟭
-            </motion.span>
-          ) : (
-            <span
-              className="whitespace-nowrap text-[11px] uppercase tracking-[0.2em]"
-              style={{ fontFamily: CARD_THEME.fontDisplay, color: CARD_THEME.iceDim }}
-            >
-              spotted ×{spot.count}
-            </span>
-          )}
-          <RarityChip tier={rarity} />
-        </div>
-        <div
-          className="shrink-0 font-mono text-[10px] uppercase tracking-widest"
-          style={{ color: CARD_THEME.iceDim }}
-          data-testid="inspect-hex"
-        >
-          {hex.toUpperCase()}
-        </div>
-      </div>
-
-      {/* ---- HERO: real photo when planespotters has one, else turntable ---- */}
-      <div
-        className="relative shrink-0 overflow-hidden"
-        style={{ height: isSheet ? INSPECT.heroHMobile : INSPECT.heroH }}
-      >
-        {photoLeads ? (
-          <>
-            <Image src={photoSrc} alt={title} fill unoptimized className="object-cover" />
-            {/* legibility scrim + required planespotters credit/link */}
-            <div className="absolute inset-0" style={{ background: CARD_THEME.heroScrim }} />
-            {photo?.photographer && (
-              <a
-                href={photo.link || 'https://www.planespotters.net'}
-                target="_blank"
-                rel="noreferrer"
-                className="absolute truncate rounded-md px-2 py-1 font-mono text-[9px] hover:underline"
-                // Positioned inline, NOT with `bottom-2 left-2`: verify-fly-style
-                // finds the Esri AttributionBar with the class selector
-                // `.bottom-2.left-2`, and the credit pill would shadow it now
-                // that photos actually come back (they never did while the
-                // planespotters UA was being 403'd).
-                style={{
-                  bottom: '0.5rem',
-                  left: '0.5rem',
-                  background: 'rgba(4, 6, 13, 0.72)',
-                  color: CARD_THEME.iceDim,
-                  maxWidth: 'calc(100% - 1rem)',
-                }}
-                data-testid="inspect-photo-credit"
-              >
-                📷 {photo.photographer} · planespotters.net
-              </a>
-            )}
-          </>
-        ) : (
-          <>
-            <ModelTurntable archetype={track.archetype} meta={meta} heroColor={heroColor} />
-            {/* Honest photo state: a lookup in flight is not "no photo". */}
-            <span
-              className={`pointer-events-none absolute right-2 top-2 rounded-md px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-[0.18em] ${photoPending ? 'animate-pulse' : ''}`}
-              style={{ background: 'rgba(4, 6, 13, 0.55)', color: CARD_THEME.iceFaint }}
-              data-testid="inspect-photo-state"
-            >
-              {photoPending ? 'photo lookup…' : 'no photo on file'}
-            </span>
-          </>
+      {/* ---- Header: rarity, spot stamp, cycle, hex, close ---- */}
+      <div className="tgt-head" onPointerDown={sheetMotion ? (e) => dragControls.start(e) : undefined}>
+        {rarity && (
+          <span className="tgt-rarity" style={{ '--tier': rarity.color }}>
+            {rarity.name}
+          </span>
         )}
+        {spot.isNew ? (
+          <motion.span
+            className="tgt-stamp"
+            initial={{ scale: 1.8, rotate: -16, opacity: 0 }}
+            animate={{ scale: 1, rotate: -4, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 330, damping: 13, delay: 0.25 }}
+          >
+            New spot
+          </motion.span>
+        ) : (
+          <span className="tgt-seen">Seen ×{spot.count}</span>
+        )}
+        <div className="tgt-head-tools">
+          {canCycle && (
+            <>
+              <button
+                type="button"
+                className="tgt-iconbtn"
+                onClick={() => cycle(-1)}
+                aria-label="Previous nearby aircraft"
+                title="Previous (Q)"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <button
+                type="button"
+                className="tgt-iconbtn"
+                onClick={() => cycle(1)}
+                aria-label="Next nearby aircraft"
+                title="Next (E)"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </>
+          )}
+          {!isPhone && (
+            <span className="tgt-hex" data-testid="inspect-hex">
+              {hex.toUpperCase()}
+            </span>
+          )}
+          <button
+            type="button"
+            className="tgt-iconbtn"
+            onClick={close}
+            aria-label="Close aircraft details"
+            title="Close (Esc)"
+          >
+            <X size={18} />
+          </button>
+        </div>
       </div>
 
-      {/* ---- Scroll column: the data stack (uncramped — vertical room) ---- */}
-      <div
-        className="min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden px-4 pb-3 pt-3"
-        style={{ background: CARD_THEME.textPanel }}
-      >
-        {/* Identity — the round-15 headline: what this actually IS */}
-        <div>
-          <div className="flex items-baseline justify-between gap-2">
-            <div
-              className="min-w-0 truncate text-[26px] leading-tight"
-              style={{ fontFamily: CARD_THEME.fontDisplay, color: CARD_THEME.ice }}
-              title={title}
-            >
-              {title}
-            </div>
-            {reg && reg !== title && (
-              <div
-                className="shrink-0 font-mono text-[11px]"
-                style={{ color: CARD_THEME.iceDim }}
-                data-testid="inspect-reg"
-              >
-                {reg}
-              </div>
-            )}
-          </div>
-
-          <div className="mt-1.5 flex items-center gap-2">
-            <MonogramChip code={monogram} />
-            <span
-              className="min-w-0 flex-1 truncate text-[13px]"
-              style={{ color: CARD_THEME.iceDim }}
-              title={operatorLine}
-            >
-              {operatorLine}
-            </span>
-            {flag && (
-              <span
-                className="shrink-0 text-[13px] leading-none"
-                title={info?.country || undefined}
-              >
-                {flag}
-              </span>
-            )}
-          </div>
-
-          <div
-            className="mt-1.5 truncate text-[14px] leading-snug"
-            style={{ color: CARD_THEME.ice }}
-            title={modelPrimary}
-            data-testid="inspect-model"
-          >
-            {modelPrimary}
-          </div>
-          {modelSub && (
-            <div
-              className="truncate font-mono text-[10px] uppercase tracking-wider"
-              style={{ color: CARD_THEME.iceDim }}
-              title={modelSub}
-            >
-              {modelSub}
-            </div>
-          )}
-          {ownerFact && (
-            <div className="mt-1.5">
-              <FactRow label="owner" value={ownerFact} testid="inspect-owner" />
-            </div>
-          )}
-
-          {live && (
-            <div className="mt-2">
-              <BearingChip bearingDeg={live.bearingDeg} relAltFt={live.relAltFt} />
-            </div>
-          )}
-        </div>
-
-        {/* Route progress */}
-        <RouteProgress route={route} loading={routeLoading} />
-
-        {/* Stat meters */}
-        <div className="space-y-1.5">
-          {live ? (
+      {/* ---- Hero stage ---- */}
+      <div className="tgt-hero-band">
+        <div className="tgt-hero">
+          <div className="tgt-hero-floor" aria-hidden="true" />
+          {photoLeads ? (
             <>
-              <StatBar label="ALT" pct={live.altFt / 45000} delay={0.05}>
-                <Odometer value={live.altFt} format={(v) => `${Math.round(v).toLocaleString()} ft`} />
-              </StatBar>
-              <StatBar label="GS" pct={live.gsKt / 600} delay={0.11}>
-                <Odometer value={live.gsKt} format={(v) => `${Math.round(v)} kt`} />
-              </StatBar>
-              <StatBar label="V/S" pct={Math.min(1, Math.abs(live.vsFpm) / 4000)} delay={0.17}>
-                <span style={{ color: 'var(--hero)' }}>{live.vsFpm > 50 ? '▲ ' : live.vsFpm < -50 ? '▼ ' : ''}</span>
-                <Odometer value={Math.abs(live.vsFpm)} format={(v) => `${Math.round(v)} fpm`} />
-              </StatBar>
-              <div className="flex items-center justify-between gap-2 pt-0.5 font-mono text-[11px]" style={{ color: CARD_THEME.iceDim }}>
-                <span className="whitespace-nowrap">
-                  HDG <span style={{ color: CARD_THEME.ice }}>{live.hdg}°</span>
-                </span>
-                <Sparkline samples={vsSamplesRef.current} />
-                <span className="whitespace-nowrap">
-                  DIST{' '}
-                  <span style={{ color: CARD_THEME.ice }}>
-                    <Odometer value={live.distNm} format={(v) => `${v.toFixed(1)} nm`} />
-                  </span>
-                </span>
-              </div>
+              <Image src={photoSrc} alt={title} fill unoptimized sizes="440px" />
+              {photo?.photographer && (
+                <a
+                  className="tgt-credit"
+                  href={photo.link || 'https://www.planespotters.net'}
+                  target="_blank"
+                  rel="noreferrer"
+                  data-testid="inspect-photo-credit"
+                >
+                  📷 {photo.photographer} · planespotters.net
+                </a>
+              )}
             </>
           ) : (
-            <div
-              className="animate-pulse rounded-lg py-3 text-center font-mono text-[10px] uppercase tracking-[0.3em]"
-              style={{ background: CARD_THEME.panel, color: CARD_THEME.iceFaint }}
-            >
-              acquiring telemetry…
-            </div>
+            <>
+              <div style={{ position: 'absolute', inset: '0 0 52px 0' }}>
+                <ModelTurntable archetype={track.archetype} meta={meta} heroColor={heroColor} />
+              </div>
+              <span
+                className="tgt-photo-state"
+                data-testid="inspect-photo-state"
+                data-busy={photoPending ? '1' : '0'}
+              >
+                {photoPending ? 'Photo lookup…' : 'No photo on file'}
+              </span>
+            </>
           )}
-        </div>
-
-        {/* Data grid: squawk / type code / category / class / reg / country,
-            with the registry provenance line underneath (honest about where
-            the identity above came from, or that nothing was on file). */}
-        <div
-          className="rounded-xl px-3 py-2 font-mono text-[11px]"
-          style={{ background: CARD_THEME.panel }}
-        >
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-            <DataCell label="SQUAWK" value={meta.squawk ? formatSquawk(meta.squawk) : null} />
-            <DataCell label="TYPE" value={typeCode} align="right" />
-            <DataCell label="CAT" value={meta.category} />
-            <DataCell label="CLASS" value={(meta.iconType || 'unknown').toUpperCase()} align="right" />
-            <DataCell label="REG" value={reg} />
-            <DataCell
-              label="CTRY"
-              value={info?.countryIso ? `${flag} ${info.countryIso}` : null}
-              title={info?.country || undefined}
-              align="right"
+          <div className="tgt-hero-shade" aria-hidden="true" />
+          {['tl', 'tr', 'bl', 'br'].map((c, i) => (
+            <motion.span
+              key={c}
+              className="tgt-bracket"
+              data-c={c}
+              aria-hidden="true"
+              initial={{ opacity: 0, scale: 1.6 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.15 + i * 0.04, type: 'spring', stiffness: 380, damping: 20 }}
             />
-          </div>
-          <div
-            className={`mt-1.5 border-t pt-1.5 text-[9px] uppercase tracking-[0.2em] ${infoPending ? 'animate-pulse' : ''}`}
-            style={{ borderColor: CARD_THEME.edgeSoft, color: CARD_THEME.iceFaint }}
-            data-testid="inspect-registry-source"
-          >
-            {infoPending
-              ? 'registry lookup…'
-              : info?.found
-                ? `registry · ${info.source}`
-                : 'registry · no public record'}
-          </div>
-        </div>
-
-        {/* Spot log */}
-        <div
-          className="flex items-center justify-between gap-2 rounded-xl px-3 py-2 font-mono text-[10px] uppercase tracking-wider"
-          style={{ background: CARD_THEME.panel, color: CARD_THEME.iceDim }}
-          data-testid="inspect-spot-log"
-        >
-          <span className="shrink-0">spot log</span>
-          <span className="min-w-0 truncate text-right" style={{ color: CARD_THEME.ice }}>
-            {spot.isNew
-              ? 'first sighting'
-              : `×${spot.count}${
-                  spot.firstAt
-                    ? ` · since ${new Date(spot.firstAt).toLocaleDateString()}`
-                    : ''
-                }`}
+          ))}
+          <motion.div
+            className="tgt-scan"
+            aria-hidden="true"
+            initial={{ y: '-110%' }}
+            animate={{ y: '300%' }}
+            transition={{ delay: 0.2, duration: 1, ease: [0.4, 0, 0.2, 1] }}
+          />
+          <span className="tgt-live" data-frozen={frozen ? '1' : '0'}>
+            <i />
+            {frozen
+              ? 'Signal frozen'
+              : live
+                ? `Live · ${live.distNm < 10 ? live.distNm.toFixed(1) : Math.round(live.distNm)} nm`
+                : 'Acquiring'}
           </span>
-        </div>
-
-        {/* Secondary 3D model section (the photo took the hero slot) */}
-        {photoLeads && (
-          <div>
-            <div
-              className="mb-1 font-mono text-[9px] uppercase tracking-[0.25em]"
-              style={{ color: CARD_THEME.iceFaint }}
+          <div className="tgt-callsign">
+            <motion.h2
+              title={title}
+              initial={{ opacity: 0, y: 8, letterSpacing: '0.12em' }}
+              animate={{ opacity: 1, y: 0, letterSpacing: '-0.005em' }}
+              transition={{ delay: 0.1, duration: 0.55, ease: [0.2, 0.8, 0.2, 1] }}
             >
-              3D model — drag to spin
-            </div>
-            <div
-              className="overflow-hidden rounded-2xl"
-              style={{ height: INSPECT.turntableH }}
-            >
-              <ModelTurntable archetype={track.archetype} meta={meta} heroColor={heroColor} />
-            </div>
+              {title}
+            </motion.h2>
+            <p title={modelPrimary}>{modelPrimary}</p>
           </div>
-        )}
+        </div>
       </div>
 
+      {/* ---- Scrolling body ---- */}
+      <motion.div className="tgt-body" data-scroll="" variants={stagger} initial="hidden" animate="show">
+        <motion.div className="tgt-ident" variants={rise}>
+          <span className="tgt-monogram" data-empty={monogram ? '0' : '1'}>
+            {monogram || '✈'}
+          </span>
+          <div className="tgt-ident-text">
+            <div className="tgt-operator" title={operatorLine}>
+              <span>{operatorLine}</span>
+              {flag && <span title={info?.country || undefined}>{flag}</span>}
+            </div>
+            <div className="tgt-model" data-testid="inspect-model" title={modelPrimary}>
+              {[headlineIsRegistry ? typeName : registryModel, typeCode]
+                .filter((v) => v && v !== modelPrimary)
+                .join(' · ') || modelPrimary}
+            </div>
+          </div>
+          {reg && reg !== title && (
+            <span className="tgt-chip" data-testid="inspect-reg">
+              {reg}
+            </span>
+          )}
+          {isPhone && (
+            <span className="tgt-chip" data-testid="inspect-hex">
+              {hex.toUpperCase()}
+            </span>
+          )}
+        </motion.div>
+
+        <motion.div variants={rise}>
+          {live ? (
+            <TelemetryTiles live={live} />
+          ) : (
+            <div className="tgt-empty" data-busy="1">
+              Acquiring telemetry…
+            </div>
+          )}
+        </motion.div>
+
+        <motion.div variants={rise}>
+          <RelativeRow live={live} samples={vsSamplesRef.current} />
+        </motion.div>
+
+        <motion.div variants={rise}>
+          <RouteStrip route={route} loading={routeLoading} />
+        </motion.div>
+
+        <motion.div variants={rise}>
+          <Facts
+            open={factsOpen}
+            onToggle={toggleFacts}
+            rows={facts}
+            provenanceBusy={infoPending}
+            provenance={
+              infoPending
+                ? 'Registry lookup…'
+                : info?.found
+                  ? `Registry · ${info.source}`
+                  : 'Registry · no public record'
+            }
+          />
+        </motion.div>
+
+        {/* The photo took the stage — the 3D model rides along below it. */}
+        {photoLeads && (
+          <motion.div className="tgt-model3d" variants={rise}>
+            <span>3D model · drag to spin</span>
+            <ModelTurntable archetype={track.archetype} meta={meta} heroColor={heroColor} />
+          </motion.div>
+        )}
+      </motion.div>
+
       {/* ---- Actions (pinned) ---- */}
-      <div className="shrink-0 px-4 pb-1 pt-3" style={{ background: CARD_THEME.textPanel }}>
-        <div className="grid grid-cols-2 gap-3">
-          <motion.button
-            whileHover={warpReady ? { scale: 1.04, rotate: -1 } : undefined}
-            whileTap={warpReady ? { scale: 0.94 } : undefined}
+      <div className="tgt-actions">
+        <div className="tgt-actions-row">
+          <button
+            type="button"
+            className="tgt-btn tgt-btn-primary"
+            onClick={onEscort}
+            disabled={frozen}
+            data-testid="inspect-chase"
+            title={
+              frozen
+                ? 'No fresh position — escort needs a live signal'
+                : 'Fly alongside with the cinematic camera (F)'
+            }
+          >
+            <Crosshair size={22} strokeWidth={2.4} aria-hidden="true" />
+            <span className="tgt-btn-label">
+              <strong>{frozen ? 'Signal frozen' : 'Escort'}</strong>
+              <span>{frozen ? 'Needs a live signal' : 'Fly alongside · cinematic'}</span>
+            </span>
+            {!frozen && <span className="tgt-kbd">F</span>}
+          </button>
+          <button
+            type="button"
+            className="tgt-btn tgt-btn-secondary"
             onClick={onWarp}
             disabled={!warpReady}
-            className="rounded-2xl border-b-4 py-2.5 text-[13px] disabled:cursor-not-allowed"
-            style={{
-              fontFamily: CARD_THEME.fontDisplay,
-              background: CARD_THEME.warpBg,
-              borderColor: CARD_THEME.warpEdge,
-              color: CARD_THEME.warpText,
-              opacity: warpReady ? 1 : 0.45,
-              minHeight: isSheet ? INSPECT.sheetActionH : undefined,
-            }}
             data-testid="inspect-warp"
+            title="Jump in right behind it (G)"
           >
-            {warpReady ? '⚡ WARP' : 'SCENE SYNC…'}
-          </motion.button>
-          <motion.button
-            whileHover={!frozen ? { scale: 1.04, rotate: 1 } : undefined}
-            whileTap={!frozen ? { scale: 0.94 } : undefined}
-            onClick={onChase}
-            disabled={frozen}
-            className="rounded-2xl border-b-4 py-2.5 text-[13px] disabled:cursor-not-allowed"
-            style={{
-              fontFamily: CARD_THEME.fontDisplay,
-              background: 'var(--hero)',
-              borderColor: 'color-mix(in srgb, var(--hero) 55%, black)',
-              color: '#0b0e1a',
-              opacity: frozen ? 0.45 : 1,
-              minHeight: isSheet ? INSPECT.sheetActionH : undefined,
-            }}
-            data-testid="inspect-chase"
-          >
-            {frozen ? 'SIGNAL FROZEN' : '◎ CHASE'}
-          </motion.button>
+            <Zap size={20} strokeWidth={2.3} aria-hidden="true" />
+            <span className="tgt-btn-label">
+              <strong>{warpReady ? 'Warp' : 'Syncing…'}</strong>
+              <span>Jump behind it</span>
+            </span>
+            <span className="tgt-kbd">G</span>
+          </button>
         </div>
-        {frozen && !notice && (
-          <div
-            className="pt-1.5 text-center font-mono text-[9px] uppercase tracking-[0.2em]"
-            style={{ color: CARD_THEME.iceFaint }}
-          >
-            no fresh fixes — chase needs a live signal
-          </div>
-        )}
-        {notice && (
+        {notice ? (
           <motion.div
             key={notice.key}
+            className="tgt-notice"
+            data-tone="bad"
+            role="alert"
             initial={{ x: 0 }}
             animate={{ x: [0, -7, 7, -4, 4, 0] }}
             transition={{ duration: 0.35 }}
-            className="pt-2 text-center font-mono text-[10px] uppercase tracking-[0.25em]"
-            style={{ color: CARD_THEME.danger }}
             data-testid="inspect-action-notice"
           >
             {notice.msg}
           </motion.div>
+        ) : frozen ? (
+          <div className="tgt-notice">No fresh fixes — escort needs a live signal.</div>
+        ) : (
+          !isTouch && (
+            <div className="tgt-foot" aria-hidden="true">
+              <span>
+                <span className="tgt-kbd">Q</span>
+                <span className="tgt-kbd">E</span> cycle
+              </span>
+              <span>
+                <span className="tgt-kbd">Esc</span> close
+              </span>
+            </div>
+          )
         )}
       </div>
-
-      <button
-        onClick={close}
-        className="w-full shrink-0 py-2 text-center font-mono text-[11px] tracking-widest transition-colors"
-        style={{
-          color: CARD_THEME.iceDim,
-          background: CARD_THEME.textPanel,
-          // Phone: clear the home indicator / gesture bar.
-          paddingBottom: isSheet
-            ? 'max(0.5rem, env(safe-area-inset-bottom, 0px))'
-            : undefined,
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.color = CARD_THEME.ice)}
-        onMouseLeave={(e) => (e.currentTarget.style.color = CARD_THEME.iceDim)}
-      >
-        esc / close
-      </button>
-    </motion.div>
+    </motion.aside>
   );
 }

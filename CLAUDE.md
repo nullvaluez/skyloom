@@ -12,6 +12,14 @@
 >   (World/Close framing, Nearby encounters, the stylized-cinematic art pass),
 >   [FLY_RENDER_OPTIMIZATION.md](FLY_RENDER_OPTIMIZATION.md) and
 >   [CINEMATIC_EARTH_OVERHAUL.md](CINEMATIC_EARTH_OVERHAUL.md).
+> - **Target UI (2026-10-07, shipped on, owner-requested):** [FLY_TARGET_UI.md](FLY_TARGET_UI.md)
+>   — the inspect dossier, ONE Escort action on every button (`lib/fly/escort.js`:
+>   intercept + the cinematic camera, which films a far pair over the shoulder
+>   and swings round to the wing shot as it closes — `CINEMA_PURSUIT`; the `F`
+>   key stays the plain intercept), the Nearby radar scope, the escort HUD and
+>   the actionable lock chip. Same day: the **Umbra**
+>   (`flying-wing`), an original stealth flying wing, is the 10th hangar
+>   aircraft (`scripts/build-flying-wing.mjs`; FLY_FLEET_AND_ADVENTURES.md).
 > - **Pass rules:**
 >   - Work lands straight on `main`. Every look-changing item sits behind a
 >     TRUE EARTH flag block at the end of `lib/fly/fly-constants.js`, shipped
