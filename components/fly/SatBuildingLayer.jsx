@@ -5,6 +5,7 @@ import { stylizedEarthOn } from '@/lib/fly/stylized-earth';
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
+import { withRunwayGeometry } from '@/lib/fly/runway-worker';
 import { SatBuildingEngine } from '@/lib/fly/toy-world/sat-building-engine';
 import {
   NIGHT_CITY_R23,
@@ -172,7 +173,7 @@ export function SatBuildingLayer({ runtime, flight }) {
       new URL('../../lib/fly/toy-world/vector-tile.worker.js', import.meta.url),
       { type: 'module' }
     );
-    const api = wrap(worker);
+    const api = withRunwayGeometry(wrap(worker));
     api.init().catch((err) => {
       if (process.env.NODE_ENV === 'development')
         console.warn('[sat-buildings] TileJSON init failed:', err?.message ?? err);

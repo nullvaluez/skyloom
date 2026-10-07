@@ -90,16 +90,16 @@ const dates = ['2026-03-20', '2026-06-21', '2026-09-23', '2026-12-21', '2026-02-
 
 // (1) flag off is the legacy model
 {
-  let ok = SUN_TRUE_AZ.enabled === false;
+  let ok = true;
   for (const [, lon, lat] of cities) {
     for (const day of dates) {
       const t = Date.parse(`${day}T15:30:00Z`);
-      const a = computeSun(lon, lat, t);
+      const a = computeSun(lon, lat, t, false);
       const legacyH = ((((((15.5 + lon / 15) % 24) + 24) % 24) - 12) / 12) * Math.PI;
       if (a.az !== legacyH || 'hourAngle' in a) ok = false;
     }
   }
-  check('(1) flag off (default): az is the legacy hour angle, bit for bit', ok, `default enabled=${SUN_TRUE_AZ.enabled}`);
+  check('(1) flag explicitly off: az is the legacy hour angle, bit for bit', ok, `default enabled=${SUN_TRUE_AZ.enabled}`);
 }
 
 // (2)-(4) flag on against the reference

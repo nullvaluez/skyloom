@@ -11,6 +11,7 @@ import { useFlyStore } from "@/stores/fly-store";
 import {
   OPERATIONS_AIRPORTS,
   airportEligible,
+  airportById,
 } from "@/lib/fly/operations-airports";
 import "./mobile-flight.css";
 
@@ -24,6 +25,7 @@ export function MobileFlightDeck({
   const o = runtime.operations,
     f = runtime.flight,
     p = o.profile;
+  const destinations=[...OPERATIONS_AIRPORTS,...(airportById(o.destination)?.authored===false?[airportById(o.destination)]:[])];
   const [settings, setSettings] = useState(false),
     trigger = useRef(null);
   useEffect(() => {
@@ -52,7 +54,7 @@ export function MobileFlightDeck({
     cue =
       o.phase === "takeoffRoll"
         ? status.ready
-          ? "Rotate · pull the stick down"
+          ? "Rotate · push the stick up"
           : "Build speed · hold the centreline"
         : status.aligned
           ? "Runway aligned · ready when you are"
@@ -199,7 +201,7 @@ export function MobileFlightDeck({
         <div className="mfd-result">
           <strong>
             {o.phase === "completed"
-              ? "Parked. Nicely done."
+              ? "Landing complete. Nicely done."
               : "Ready for another try?"}
           </strong>
           {o.phase === "crashed" ? (
@@ -213,9 +215,9 @@ export function MobileFlightDeck({
           ) : (
             <button
               className="mfd-primary"
-              onClick={() => useFlyStore.getState().setHangarOpen(true)}
+              onClick={() => runtime.beginDeparture(p.id,o.airport.id,'runway')}
             >
-              Choose next flight
+              Depart from here
             </button>
           )}
         </div>
@@ -238,7 +240,7 @@ export function MobileFlightDeck({
             value={o.destination}
             onChange={(e) => o.selectDestination(e.target.value)}
           >
-            {OPERATIONS_AIRPORTS.filter((a) => airportEligible(a, p.id)).map(
+            {destinations.filter((a) => airportEligible(a, p.id)).map(
               (a) => (
                 <option key={a.id} value={a.id}>
                   {a.id} · {a.name}

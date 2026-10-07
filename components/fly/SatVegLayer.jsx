@@ -7,6 +7,7 @@ import { NEAR_SUPPORT, updateNearContactMatrices } from '@/lib/fly/near-ground-s
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
+import { withRunwayGeometry } from '@/lib/fly/runway-worker';
 import {
   BufferAttribute,
   BufferGeometry,
@@ -308,7 +309,7 @@ export function SatVegLayer({ runtime, flight }) {
       new URL('../../lib/fly/toy-world/vector-tile.worker.js', import.meta.url),
       { type: 'module' }
     );
-    const api = wrap(worker);
+    const api = withRunwayGeometry(wrap(worker));
     api.init().catch((err) => {
       if (process.env.NODE_ENV === 'development')
         console.warn('[sat-veg] TileJSON init failed:', err?.message ?? err);

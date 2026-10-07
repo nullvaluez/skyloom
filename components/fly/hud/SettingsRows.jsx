@@ -14,6 +14,7 @@ import { visualsAvailable, saveVisuals, setVisualsLive } from '@/lib/fly/visuals
 import { GuestSaveControls } from './GuestSaveControls';
 import { ConditionsPanel } from './ConditionsPanel';
 import { conditionsOn } from '@/lib/fly/player-conditions';
+import { FlightComfortSettings } from './FlightComfortSettings';
 
 const TIERS = ['low', 'medium', 'high', 'ultra'];
 const VISUALS_ROW = [
@@ -210,6 +211,7 @@ export function SettingsRows({ sheet = false }) {
       {qualityRow}
       {conditionsRow}
       {soundRow}
+      <FlightComfortSettings />
       {reducedRow}
       {stakesRow}
       <GuestSaveControls />
@@ -222,6 +224,7 @@ export function SettingsRows({ sheet = false }) {
       {mapStyleRow}
       {conditionsRow}
       {soundRow}
+      <FlightComfortSettings />
       {reducedRow}
       {stakesRow}
       <GuestSaveControls />

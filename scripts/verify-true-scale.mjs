@@ -60,7 +60,7 @@ if (legArg && legArg.startsWith('--leg=shaders-')) {
   // The app's own shader programs, built by the REAL modules: the cloud pass
   // (all four programs), the Enhanced aerial pass and the tracer vapor.
   const on = legArg === '--leg=shaders-on';
-  globalThis.window = { location: { search: '', href: 'http://localhost/' }, ...(on ? { __flyTrueScaleOverride: { enabled: true } } : {}) };
+  globalThis.window = { location: { search: '', href: 'http://localhost/' }, __flyTrueScaleOverride: { enabled: on } };
   if (typeof globalThis.OffscreenCanvas === 'undefined') {
     const inert = new Proxy(function () {}, { get: (t, k) => (k === Symbol.toPrimitive ? () => 0 : inert), apply: () => inert, construct: () => inert });
     globalThis.OffscreenCanvas = class { constructor(w, h) { this.width = w; this.height = h; } getContext() { return inert; } };
@@ -90,7 +90,7 @@ if (legArg && legArg.startsWith('--leg=shaders-')) {
 
 if (legArg) {
   const on = legArg === '--leg=on';
-  if (on) globalThis.window = { location: { search: '' }, __flyTrueScaleOverride: { enabled: true } };
+  globalThis.window = { location: { search: '' }, __flyTrueScaleOverride: { enabled: on } };
   register('./_node-resolve.mjs', import.meta.url);
   const THREE = await import('three');
   const { Frustum, Matrix4, PerspectiveCamera, Quaternion, Vector3, Euler, ShaderChunk } = THREE;

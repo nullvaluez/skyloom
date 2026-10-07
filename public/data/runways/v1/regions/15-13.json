@@ -1,0 +1,1 @@
+{"version":1,"airports":[{"id":"NZFX:15-33","ident":"NZFX","name":"Phoenix Airfield","runway":"15","reciprocal":"33","width":60.96,"a":{"lat":-77.969894,"lon":166.770309,"elevation":10.668000000000001},"b":{"lat":-77.944,"lon":166.728867,"elevation":10.668000000000001},"thresholdA":0,"thresholdB":0,"authored":false,"taxiSide":1,"taxiOffset":0,"standAlong":65,"lighted":false}]}

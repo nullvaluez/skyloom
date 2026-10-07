@@ -8,6 +8,8 @@ import { registerRuntimeActions } from '@/lib/fly/runtime-bus';
 import { useFlyStore } from '@/stores/fly-store';
 import { adventurePhotoFrame } from '@/lib/fly/adventure-photo';
 import { encounterPhotoFrame } from '@/lib/fly/encounter-photo';
+import { saveMemoryPhoto } from '@/lib/fly/encounter-photo';
+import { useExplorationStore } from '@/stores/exploration-store';
 
 /**
  * Round 17 — the shutter.
@@ -52,7 +54,9 @@ export function PhotoCapture({runtime}) {
         // shutter is idempotent within a frame, and the old promise would
         // otherwise dangle forever.
         pendingRef.current?.reject?.(new Error('superseded'));
-        pendingRef.current = { resolve, reject, t0: performance.now() };
+        let settled=false;
+        const timeout=setTimeout(()=>{settled=true;reject(new Error('Photo timed out. Resume the scene and try again.'));},15000);
+        pendingRef.current = { get settled(){return settled;}, resolve:value=>{clearTimeout(timeout);settled=true;resolve(value);}, reject:error=>{clearTimeout(timeout);settled=true;reject(error);}, t0: performance.now() };
       });
     registerRuntimeActions({ capturePhoto });
     return () => {
@@ -68,6 +72,7 @@ export function PhotoCapture({runtime}) {
     const req = pendingRef.current;
     if (!req) return;
     pendingRef.current = null;
+    if(req.settled)return;
 
     try {
       const src = gl.domElement;
@@ -83,6 +88,10 @@ export function PhotoCapture({runtime}) {
       ctx.drawImage(src, 0, 0);
       const adventureFrame=adventurePhotoFrame(runtime,useFlyStore.getState().warpEpoch);
       const encounterFrame=encounterPhotoFrame(runtime,useFlyStore.getState().warpEpoch);
+      const geo=runtime?.geo;
+      const dest=runtime.flightPlanDest;
+      const nearby=dest&&geo&&Math.abs(dest.lat-geo.y)<.2&&Math.abs(dest.lon-geo.x)<.2;
+      const memory=Number.isFinite(geo?.x)&&Number.isFinite(geo?.y)?{id:`photo:${Date.now()}:${Math.random().toString(36).slice(2,8)}`,lat:geo.y,lon:geo.x,at:Date.now(),name:nearby?dest.name:`${geo.y.toFixed(2)}°, ${geo.x.toFixed(2)}°`}:null;
       // From here on the pixels are in a 2D canvas — the WebGL buffer may go.
 
       const mapStyle = useFlyStore.getState().mapStyle;
@@ -90,6 +99,8 @@ export function PhotoCapture({runtime}) {
 
       const filename = photoFilename();
       out.toBlob((blob) => {
+        if(req.settled)return;
+        try {
         const ms = Math.round(performance.now() - req.t0);
         if (!blob) {
           req.reject(new Error('PNG encode failed'));
@@ -109,7 +120,9 @@ export function PhotoCapture({runtime}) {
         }
         runtime?.adventures?.photo(adventureFrame,blob);
         runtime?.encounters?.photo(encounterFrame,blob);
+        if(memory){useExplorationStore.getState().record('photo',memory);saveMemoryPhoto(blob).then(thumbnail=>{if(thumbnail)useExplorationStore.getState().attachThumbnail(memory.id,thumbnail);}).catch(()=>{});}
         req.resolve({ blob, filename, width: w, height: h, ms });
+        } catch(error) { req.reject(error instanceof Error?error:new Error(String(error))); }
       }, 'image/png');
     } catch (err) {
       req.reject(err instanceof Error ? err : new Error(String(err)));

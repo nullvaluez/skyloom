@@ -8,6 +8,7 @@ import { useSheetLayout } from '@/hooks/use-sheet-layout';
 import { LOGBOOK } from '@/lib/fly/fly-constants';
 import { AdventureJournal } from './AdventureExperience';
 import { FlightMemories } from './EncounterExperience';
+import { ExplorerJournal } from './ExplorerJournal';
 import { EXACT_TYPE_CODES } from '@/lib/aircraft-type-tables';
 import { getAircraftTypeName } from '@/lib/aircraft-type-names';
 import { getBadgesByTier, getStreakDays } from '@/lib/badges';
@@ -58,6 +59,7 @@ export function Logbook() {
 }
 
 const TABS = [
+  ['explore', 'Your world'],
   ['memories', 'Memories'],
   ['journeys', 'Journeys'],
   ['log', 'Log'],
@@ -89,7 +91,7 @@ function LogbookBody() {
   const badges = usePassportStore((s) => s.badges);
   const stats = usePassportStore((s) => s.stats);
 
-  const [tab, setTab] = useState('journeys');
+  const [tab, setTab] = useState('explore');
   const [scope, setScope] = useState('unique');
   const [sort, setSort] = useState('recent');
   const [kind, setKind] = useState('all');
@@ -205,7 +207,7 @@ function LogbookBody() {
 
   return (
     <div
-      className="absolute inset-x-0 top-0 z-20 flex items-center justify-center"
+      className="absolute inset-x-0 top-0 z-[48] flex items-center justify-center"
       style={{ background: CARD_THEME.scrim, bottom: isSheet ? 0 : '2rem' }}
       data-testid="logbook"
     >
@@ -217,7 +219,7 @@ function LogbookBody() {
           isSheet ? 'px-3 pb-2 pt-2' : 'rounded-xl p-4'
         }`}
         style={{
-          background: `linear-gradient(180deg, ${CARD_THEME.bgTop}, ${CARD_THEME.bgBottom})`,
+          background: 'linear-gradient(180deg, #102330, #09151f)',
           borderColor: CARD_THEME.edge,
           width: isSheet ? '100%' : `min(94%, ${LOGBOOK.panelW}px)`,
           height: isSheet ? '100svh' : 'min(92%, 720px)',
@@ -233,7 +235,7 @@ function LogbookBody() {
             className="text-lg uppercase tracking-[0.3em] max-sm:text-sm max-sm:tracking-[0.2em]"
             style={{ fontFamily: CARD_THEME.fontDisplay, color: CARD_THEME.ice }}
           >
-            Pilot Logbook
+            Travel journal
           </h2>
           <span
             className="font-mono text-[11px] uppercase tracking-[0.2em]"
@@ -280,6 +282,7 @@ function LogbookBody() {
         </div>
 
         {/* ---- LOG ---- */}
+        {tab === 'explore' && <div className="min-h-0 flex-1 overflow-y-auto"><ExplorerJournal /></div>}
         {tab === 'memories' && <div className="min-h-0 flex-1 overflow-y-auto"><FlightMemories /></div>}
         {tab === 'journeys' && <div className="min-h-0 flex-1 overflow-y-auto"><AdventureJournal /></div>}
         {tab === 'log' && (

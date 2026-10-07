@@ -44,7 +44,7 @@ if (legArg) {
       setItem: (k, v) => store.set(k, String(v)),
       removeItem: (k) => store.delete(k),
     },
-    ...(leg.flag ? { __flyPlayerSurfaceOverride: { enabled: true } } : {}),
+    __flyPlayerSurfaceOverride: { enabled: !!leg.flag },
   };
   Object.defineProperty(globalThis, 'navigator', { value: { webdriver: leg.webdriver }, configurable: true });
   register('./_node-resolve.mjs', import.meta.url);

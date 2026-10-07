@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
+import { withRunwayGeometry } from '@/lib/fly/runway-worker';
 import { SatSkylineEngine } from '@/lib/fly/toy-world/sat-skyline-engine';
 import { SAT_SKYLINE, SETTLE_CALM } from '@/lib/fly/fly-constants';
 import { getSatSkyline, setSatSkyline, getSatBldgFade } from '@/lib/fly/toy-world/world-bend';
@@ -78,7 +79,7 @@ export function SatSkylineLayer({ runtime, flight }) {
       new URL('../../lib/fly/toy-world/vector-tile.worker.js', import.meta.url),
       { type: 'module' }
     );
-    const api = wrap(worker);
+    const api = withRunwayGeometry(wrap(worker));
     api.init().catch((err) => {
       if (process.env.NODE_ENV === 'development')
         console.warn('[sat-skyline] TileJSON init failed:', err?.message ?? err);

@@ -1,0 +1,1 @@
+{"version":1,"airports":[{"id":"EGAR:18-36","ident":"EGAR","name":"Rothera Research Station","runway":"18","reciprocal":"36","width":39.9288,"a":{"lat":-67.563835,"lon":-68.123337,"elevation":3.9624},"b":{"lat":-67.571167,"lon":-68.130836,"elevation":3.9624},"thresholdA":0,"thresholdB":0,"authored":false,"taxiSide":1,"taxiOffset":0,"standAlong":65,"lighted":false}]}

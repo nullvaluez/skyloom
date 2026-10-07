@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { wrap } from 'comlink';
 import { fetchAircraftByLocation } from '@/lib/api';
+import { trafficStatus } from '@/lib/fly/data-status.mjs';
 import { TRAFFIC } from '@/lib/fly/fly-constants';
 import { mercatorWorldXZ } from '@/lib/fly/traffic-engine';
 import { useFlyStore } from '@/stores/fly-store';
@@ -19,6 +20,7 @@ import { useFlyStore } from '@/stores/fly-store';
  */
 export function useFlyTraffic(runtime, enabled) {
   const spawn = useFlyStore((s) => s.spawn);
+  const composing = useFlyStore(s=>s.cameraMode==='photo');
   const workerApi = useRef(null);
   const lastServerNow = useRef(0);
 
@@ -71,7 +73,7 @@ export function useFlyTraffic(runtime, enabled) {
 
   const query = useQuery({
     queryKey: ['fly-traffic', keyPos?.lat, keyPos?.lon],
-    enabled: enabled && !!keyPos,
+    enabled: enabled && !!keyPos && !composing,
     queryFn: () => {
       const geo = runtime.geo;
       return fetchAircraftByLocation(geo?.y ?? keyPos.lat, geo?.x ?? keyPos.lon, TRAFFIC.pollDistNm);
@@ -96,8 +98,9 @@ export function useFlyTraffic(runtime, enabled) {
 
   // Ingest: worker-project then hand the transferable batch to the engine.
   const { data } = query;
+  useEffect(()=>{const update=()=>{(runtime.dataStatus??={}).traffic=trafficStatus(data,query.error);};update();const timer=setInterval(update,1000);return()=>clearInterval(timer);},[runtime,data,query.error]);
   useEffect(() => {
-    if (!enabled || !data || !workerApi.current) return;
+    if (!enabled || composing || !data || !workerApi.current) return;
     // Soft-fail / empty payloads mean "no new data", never "all aircraft left".
     // Stale (serving_stale) still has ac[] — ingest if `now` advanced.
     if (!Array.isArray(data.ac) || (data.error && data.error !== 'serving_stale' && data.ac.length === 0)) {
@@ -105,14 +108,14 @@ export function useFlyTraffic(runtime, enabled) {
     }
     // Identical payloads share `now` — skip before paying the worker trip.
     if (typeof data.now !== 'number' || data.now === lastServerNow.current) return;
-    lastServerNow.current = data.now;
     if (data.source) useFlyStore.getState().setTrafficSource(data.source);
 
     let stale = false;
     workerApi.current
       .processForFly(data.ac, data.now)
       .then((batch) => {
-        if (stale || !runtime.traffic) return;
+        if (stale || useFlyStore.getState().cameraMode==='photo' || !runtime.traffic) return;
+        lastServerNow.current = data.now;
         runtime.traffic.ingest(batch, performance.now() / 1000);
         useFlyStore.getState().setTrafficStats(runtime.traffic.size, Date.now());
       })
@@ -120,7 +123,7 @@ export function useFlyTraffic(runtime, enabled) {
     return () => {
       stale = true;
     };
-  }, [enabled, data, runtime]);
+  }, [enabled, data, runtime, composing]);
 
   return query;
 }

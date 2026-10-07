@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { reviewSurfaceOn } from '@/lib/fly/player-surface';
-import { useFlyStore, inFlight } from '@/stores/fly-store';
+import { useFlyStore } from '@/stores/fly-store';
 import { usePassportStore } from '@/stores/passport-store';
 import { useIsTouch } from '@/hooks/use-is-touch';
 // Round 17: the hangar's ONLY entry point (no keyboard shortcut this round).
@@ -14,10 +14,8 @@ import { callRuntimeAction } from '@/lib/fly/runtime-bus';
 // the title's Settings sheet / Credits button; exit leads to the title.
 import { MenuButton, SettingsRows } from './hud/SettingsRows';
 import { CreditsPanel } from './hud/CreditsPanel';
-import { exitGoesToTitle, frontDoorOn } from '@/lib/fly/front-door';
+import { exitGoesToTitle } from '@/lib/fly/front-door';
 import { useAdventureStore } from '@/stores/adventure-store';
-
-const HELP_SEEN_KEY = 'fly-controls-seen';
 
 const CONTROL_ROWS = [
   ['Mouse', 'steer — cursor offset from center commands the turn/pitch'],
@@ -60,22 +58,10 @@ const TOUCH_CONTROL_ROWS = [
 export function PauseMenu({ onExit }) {
   const phase = useFlyStore((s) => s.phase);
   const creditsOpen = useFlyStore((s) => s.creditsOpen);
-  const controlsHelpSeen = useFlyStore((s) => s.controlsHelpSeen);
   const mapStyle = useFlyStore((s) => s.mapStyle);
   const aircraftId = useFlyStore((s) => s.aircraftId);
   const adventureOverlay=useAdventureStore(s=>s.libraryOpen||!!s.summary);
-  // R25 A: the first-entry help card waits for an actual flight (the title
-  // and the hangar are menus). Constant true with FRONT_DOOR off.
-  const flying = useFlyStore((s) => !frontDoorOn() || inFlight(s));
   const isTouch = useIsTouch();
-
-  // First-entry controls help (map style now resolves in FlyMode, pre-mount)
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      if (window.localStorage.getItem(HELP_SEEN_KEY)) useFlyStore.getState().markControlsHelpSeen();
-    } catch { /* First-flight help remains available when storage is blocked. */ }
-  }, []);
 
   // M from the pause menu goes straight to the Atlas — same key as in
   // flight, so muscle memory doesn't dead-end on the paused screen.
@@ -99,32 +85,7 @@ export function PauseMenu({ onExit }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [phase]);
 
-  const markHelpSeen = () => {
-    try { window.localStorage.setItem(HELP_SEEN_KEY, '1'); } catch { /* Session acknowledgement still works. */ }
-    useFlyStore.getState().markControlsHelpSeen();
-  };
-
-  if (adventureOverlay || (phase !== 'paused' && controlsHelpSeen)) return null;
-
-  // --- First-entry help card (shown while flying, before any pause) ------
-  // Thirteen control rows do not fit in 390px of landscape-phone height, and
-  // this card is the first thing a new player ever sees. Cap it and let it
-  // scroll rather than running "Got it" off the bottom of the screen.
-  if (phase !== 'paused') {
-    if (!flying) return null;
-    return (
-      <div className="pointer-events-auto absolute left-1/2 top-1/2 z-20 flex max-h-[calc(100svh-2rem)] w-[420px] max-w-[calc(100vw-1.5rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-y-auto overscroll-contain rounded-xl border border-zinc-700/60 bg-zinc-900/85 p-5 text-zinc-100 shadow-2xl backdrop-blur">
-        <h2 className="shrink-0 text-base font-semibold">Welcome to Skyloom</h2>
-        <ControlsTable touch={isTouch} />
-        <button
-          onClick={markHelpSeen}
-          className="mt-4 w-full shrink-0 rounded-md bg-zinc-100 py-1.5 text-sm font-medium text-zinc-900 hover:bg-white phone:min-h-11"
-        >
-          Got it — let&apos;s fly
-        </button>
-      </div>
-    );
-  }
+  if (adventureOverlay || phase !== 'paused') return null;
 
   const store = useFlyStore.getState();
   // Read (never subscribe): this branch only renders while paused, so a

@@ -14,7 +14,7 @@
  *  - neither Enhanced hold had a time limit.
  *
  * THE CONTRACT
- *  (1) flag off (default): every helper is off; a no-data chunk still blocks
+ *  (1) flag explicitly off: every helper is off; a no-data chunk still blocks
  *      the ring exactly as before;
  *  (2) flag on: a no-data chunk counts as done; caps are 20 s boot / 15 s warp;
  *  (3) the vendored patch: with settleNoop OFF an unchanged update leaves the
@@ -37,7 +37,7 @@ const legArg = process.argv.find((a) => a.startsWith('--leg='));
 
 if (legArg) {
   // A CHILD LEG: resolve the pin the way the app does (once, at import).
-  if (legArg === '--leg=on') globalThis.window = { __flyLoadGuardOverride: { enabled: true } };
+  globalThis.window = { __flyLoadGuardOverride: { enabled: legArg === '--leg=on' } };
   register('./_node-resolve.mjs', import.meta.url);
   const guard = await import('../lib/fly/load-guard.js');
   const { localRingReadiness } = await import('../lib/fly/world-readiness.js');
@@ -93,7 +93,7 @@ const leg = (name) =>
 const off = leg('off');
 const on = leg('on');
 check(
-  '(1) flag off (default): helpers off, a no-data chunk still blocks the ring',
+  '(1) flag explicitly off: helpers off, a no-data chunk still blocks the ring',
   !off.noData && !off.settle && off.boot === null && off.warp === null && off.allReady && !off.withNoData && !off.withError && off.total > 0,
   JSON.stringify(off),
 );

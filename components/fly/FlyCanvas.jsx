@@ -1,4 +1,5 @@
 'use client';
+import { SessionRecovery } from './SessionRecovery';
 
 import { Suspense, useEffect, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
@@ -202,6 +203,7 @@ export function FlyCanvas({ runtime }) {
         }
       }}
     >
+      <SessionRecovery runtime={runtime}/>
       <MobileFlightPump enabled={mobileFlight} />
       {/* Round 24 (E CERT): the frame-pace instrument. Priority -101 puts it
           ahead of the governor (-100) and A's STEP_SAFE rig (-99), so its dt

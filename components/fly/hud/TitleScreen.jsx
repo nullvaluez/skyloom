@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { BookOpen, Compass, Info, MapPin, Moon, Play, PlaneTakeoff, Settings, Sun, Sunrise, X } from 'lucide-react';
 import { useFlyStore } from '@/stores/fly-store';
+import { OPERATIONS_AIRPORTS } from '@/lib/fly/operations-airports';
 import { FRONT_DOOR } from '@/lib/fly/fly-constants';
 import { attributionsFor } from '@/lib/fly/tile-sources';
-import { OPERATIONS_AIRPORTS } from '@/lib/fly/operations-airports';
 import { CITIES } from '@/lib/fly/poi';
 import { FEATURED_DESTINATIONS, describeSetup, readLastSetup } from '@/lib/fly/flight-plan';
 import { enterHangarFromTitle, freeFlightAvailable } from '@/lib/fly/front-door';
@@ -184,7 +184,7 @@ function TitleBody({ runtime }) {
     else enterHangarFromTitle(last?.flightMode ?? last?.mode ?? 'ops', runtime);
   };
 
-  const airports = OPERATIONS_AIRPORTS.map((a) => a.id).join(' · ');
+  const airports = 'Worldwide runway departures and arrivals';
 
   return (
     <div
@@ -235,19 +235,19 @@ function TitleBody({ runtime }) {
           </button>
         )}
 
-        <button ref={last||adventure?undefined:firstAction} type="button" className="fly-title-adventure" data-testid="title-adventures" onClick={()=>{unlock();useAdventureStore.getState().setLibraryOpen(true);}}><Compass size={28}/><span><strong>Start an Adventure</strong><span>Short flights. Extraordinary places. Discover your next story.</span></span><Play size={22}/></button>
+        <button ref={last||adventure?undefined:firstAction} type="button" className="fly-title-adventure" data-testid="title-explore" onClick={()=>{unlock();enterHangarFromTitle('free',runtime);}}><Compass size={28}/><span><strong>Where will you fly?</strong><span>Discover a city, wander a coastline, or head somewhere new.</span></span><Play size={22}/></button>
         <div className={`fly-title-cards${free ? '' : ' fly-title-cards-single'}`}>
           {free && (
             <button
               type="button"
               className="fly-title-card"
-              data-testid="title-free-flight"
-              onClick={() => enterHangarFromTitle('free', runtime)}
+              data-testid="title-adventures"
+              onClick={() => {unlock();useAdventureStore.getState().setLibraryOpen(true);}}
             >
               <Compass className="fly-title-card-icon" size={26} aria-hidden="true" />
               <span className="fly-title-card-text">
-                <strong>Free Flight</strong>
-                <span>Start airborne over a famous place or any city on Earth.</span>
+                <strong>Guided journeys</strong>
+                <span>Six places to explore. Four discoveries in every journey.</span>
               </span>
             </button>
           )}
@@ -261,7 +261,7 @@ function TitleBody({ runtime }) {
             <span className="fly-title-card-text">
               <strong>Takeoff &amp; Landing</strong>
               <span>{airports}</span>
-              <span className="fly-title-card-sub">Apron · Runway · Approach</span>
+              <span className="fly-title-card-sub">Choose your aircraft and runway</span>
             </span>
           </button>
         </div>
@@ -269,7 +269,7 @@ function TitleBody({ runtime }) {
         <nav className="fly-title-secondary" aria-label="More">
           <button type="button" data-testid="title-logbook" onClick={() => store().setLogbookOpen(true)}>
             <BookOpen size={16} aria-hidden="true" />
-            <span>Logbook</span>
+            <span>Travel journal</span>
           </button>
           <button type="button" data-testid="title-settings" onClick={() => store().setSettingsOpen(true)}>
             <Settings size={16} aria-hidden="true" />

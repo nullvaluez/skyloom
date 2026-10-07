@@ -246,9 +246,9 @@ export function TrafficLayer({ runtime, flight, origin }) {
     if (!traffic||!detailed) return;
 
     // Nav-light strobe/beacon clock — ONE uniform write for the whole fleet
-    setNavTime(performance.now() / 1000);
+    setNavTime(runtime.explorerVisualTime??performance.now()/1000);
 
-    const items = traffic.update(performance.now() / 1000, flight.pos);
+    const items = useFlyStore.getState().cameraMode==='photo'?traffic.items:traffic.update(performance.now() / 1000, flight.pos);
     const mapStyleNow = useFlyStore.getState().mapStyle;
     if (mapStyleNow === 'satellite' && !detailed.stats.ready && detailed.prepare() && !detailed.compiling) {
       detailed.compiling=true;
@@ -259,7 +259,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
     const liveState=useFlyStore.getState();
     const quietTraffic=cinemaOn(liveState)&&!liveState.spotting;
     const focusedHex=liveState.inspectHex??runtime.targeting?.lockedHex??runtime.hoverHex;
-    detailed.update(items,flight,origin,liveState.qualityTier,liveState.inspectHex??runtime.targeting?.lockedHex,mapStyleNow==='satellite',performance.now()/1000);
+    detailed.update(items,flight,origin,liveState.qualityTier,liveState.inspectHex??runtime.targeting?.lockedHex,mapStyleNow==='satellite',runtime.explorerVisualTime??performance.now()/1000);
     runtime.liveFleet=detailed.stats;
     runtime.retryLiveFleet=()=>{if(detailed.stats.compileFailed){detailed.stats.compileFailed=false;detailed.compiling=false;}};
     setTrafficSurface(meshes, mapStyleNow === 'satellite' && satelliteVisualsOn('models'));

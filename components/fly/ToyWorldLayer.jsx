@@ -3,6 +3,7 @@
 import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
+import { withRunwayGeometry } from '@/lib/fly/runway-worker';
 import { ToyWorldEngine } from '@/lib/fly/toy-world/toy-world-engine';
 import { setFoamTime, setPulseTime } from '@/lib/fly/toy-world/world-bend';
 import { BEACONS, FOAM, ROAD_PULSE } from '@/lib/fly/fly-constants';
@@ -31,7 +32,7 @@ export function ToyWorldLayer({ runtime, flight }) {
       new URL('../../lib/fly/toy-world/vector-tile.worker.js', import.meta.url),
       { type: 'module' }
     );
-    const api = wrap(worker);
+    const api = withRunwayGeometry(wrap(worker));
     api.init().catch((err) => {
       if (process.env.NODE_ENV === 'development')
         console.warn('[toy-world] TileJSON init failed:', err?.message ?? err);

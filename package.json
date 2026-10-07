@@ -9,7 +9,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "verify:source": "node scripts/beta-checks.mjs source",
+    "test:gameplay": "node scripts/beta-checks.mjs gameplay",
+    "test:world": "node scripts/beta-checks.mjs world",
+    "test:shaders": "node scripts/beta-checks.mjs shaders",
+    "verify:beta": "node scripts/beta-checks.mjs",
+    "build:beta": "node scripts/beta-next.mjs build",
+    "start:beta": "node scripts/beta-next.mjs start",
+    "smoke:beta": "node scripts/beta-smoke.cjs",
+    "data:runways": "node scripts/build-runway-db.mjs"
   },
   "dependencies": {
     "@mapbox/vector-tile": "3.0.0",
@@ -32,7 +41,7 @@
     "earcut": "3.2.3",
     "framer-motion": "^12.23.26",
     "lucide-react": "^0.562.0",
-    "next": "16.1.0",
+    "next": "16.4.0",
     "pbf": "5.1.2",
     "posthog-js": "^1.435.6",
     "rbush": "^4.0.1",
@@ -46,8 +55,9 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "eslint": "^9",
-    "eslint-config-next": "16.1.0",
+    "eslint-config-next": "16.4.0",
     "geojson-vt": "^5.0.2",
+    "playwright": "1.61.1",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.4.0",
     "vt-pbf": "^3.1.3"

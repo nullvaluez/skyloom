@@ -1,4 +1,5 @@
 'use client';
+import { weatherStatus } from '@/lib/fly/data-status.mjs';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -155,6 +156,7 @@ function publishOffStats() {
  */
 export function useFlyWeather(runtime, enabled = true) {
   const mapStyle = useFlyStore((s) => s.mapStyle);
+  const composing = useFlyStore((s) => s.cameraMode === 'photo');
   const on = !!(WEATHER.enabled && enabled && mapStyle === 'satellite' && runtime);
 
   // --- runtime.weather ownership (idempotent — StrictMode-safe) ------------
@@ -172,6 +174,7 @@ export function useFlyWeather(runtime, enabled = true) {
   // override mid-session sees it applied within one tick — and the per-frame
   // stepper stays a pure damping loop with zero allocation.
   const refreshTargets = useCallback(() => {
+    if(useFlyStore.getState().cameraMode==='photo')return;
     refreshWeatherTargets(runtime);
   }, [runtime]);
 
@@ -211,9 +214,9 @@ export function useFlyWeather(runtime, enabled = true) {
 
   const query = useQuery({
     queryKey: ['fly-weather', cell?.lat, cell?.lon],
-    enabled: on && !!cell,
+    enabled: on && !!cell && !composing,
     queryFn: async () => {
-      const res = await fetch(`/api/weather?lat=${cell.lat}&lon=${cell.lon}`);
+      const res = await fetch(`/api/weather?lat=${cell.lat}&lon=${cell.lon}`,{signal:AbortSignal.timeout(12000)});
       // The route answers 200 for every outcome (misses included), so a
       // non-ok here is a real transport failure — let React Query hold the
       // previous payload rather than flapping the sky back to baseline.
@@ -230,13 +233,14 @@ export function useFlyWeather(runtime, enabled = true) {
 
   // --- ingest: payload → runtime (never React state) -----------------------
   const { data } = query;
+  useEffect(()=>{(runtime.dataStatus??={}).weather=weatherStatus(data,query.error);},[runtime,data,query.error]);
   const lastData = useRef(null);
   useEffect(() => {
-    if (!on || !data || data === lastData.current) return;
+    if (!on || composing || !data || data === lastData.current) return;
     lastData.current = data;
     publishPayload(runtime, data);
     refreshTargets(); // don't wait up to a second for the first real sky
-  }, [on, data, runtime, refreshTargets]);
+  }, [on, composing, data, runtime, refreshTargets]);
 
   return query;
 }

@@ -1,0 +1,1 @@
+{"version":1,"airports":[{"id":"BGQQ:17-35","ident":"BGQQ","name":"Qaanaaq Airport","runway":"17","reciprocal":"35","width":99.6696,"a":{"lat":77.490829,"lon":-69.404373,"elevation":14.630400000000002},"b":{"lat":77.486465,"lon":-69.3731,"elevation":14.630400000000002},"thresholdA":0,"thresholdB":0,"authored":false,"taxiSide":1,"taxiOffset":0,"standAlong":65,"lighted":true}]}

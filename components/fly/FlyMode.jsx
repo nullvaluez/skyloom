@@ -1,5 +1,8 @@
 'use client';
+import { RecoveryNotice } from './hud/RecoveryNotice';
 import { OperationsHUD } from './hud/OperationsHUD';
+import { ExplorerGuide } from './hud/ExplorerGuide';
+import './hud/explorer.css';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
@@ -386,11 +389,13 @@ export function FlyMode({ onClose }) {
           backdrop (which turns into a compact strip under it) and under the
           hangar (z-60). Renders nothing unless screen === 'title'. */}
       <TitleScreen runtime={runtime} />
+      <ExplorerGuide runtime={runtime} />
+      <RecoveryNotice runtime={runtime}/>
       <AdventureExperience runtime={runtime} />
 
       {mobileNote && (
         <div className="pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-md bg-zinc-900/85 px-3 py-2 text-xs text-zinc-200 shadow-lg">
-          Skyloom is designed for desktop — a mouse and keyboard are recommended.
+          Steer with the left stick. Open Actions for the map, camera, and journal.
         </div>
       )}
 

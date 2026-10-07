@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
+import { withRunwayGeometry } from '@/lib/fly/runway-worker';
 import { EarthSurfaceEngine, publishEarthSurface, removeEarthSurface } from '@/lib/fly/earth-surface-engine';
 import { EarthScenery } from '@/lib/fly/earth-scenery';
 import { LivingForest } from '@/lib/fly/living-forest';
@@ -13,7 +14,7 @@ export function EarthSurfaceLayer({ runtime }) {
   const group=useRef(null);
   useEffect(()=>{
     const worker=new Worker(new URL('../../lib/fly/toy-world/vector-tile.worker.js',import.meta.url),{type:'module'});
-    const api=wrap(worker),engine=new EarthSurfaceEngine(api);
+    const api=withRunwayGeometry(wrap(worker)),engine=new EarthSurfaceEngine(api);
     engine.scenery=new EarthScenery();
     engine.forest=new LivingForest();
     engine.airports=new LivingAirports();group.current?.add(engine.airports.group);

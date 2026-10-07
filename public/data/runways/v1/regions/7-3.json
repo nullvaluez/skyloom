@@ -1,0 +1,1 @@
+{"version":1,"airports":[{"id":"BIGR:17-35","ident":"BIGR","name":"Grímsey Airport","runway":"17","reciprocal":"35","width":24.384,"a":{"lat":66.550392,"lon":-18.021309,"elevation":24.6888},"b":{"lat":66.541725,"lon":-18.013323,"elevation":22.86},"thresholdA":0,"thresholdB":0,"authored":false,"taxiSide":1,"taxiOffset":0,"standAlong":65,"lighted":true}]}

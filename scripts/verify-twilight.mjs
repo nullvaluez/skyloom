@@ -24,6 +24,7 @@
  * Run: node scripts/verify-twilight.mjs
  */
 import { register } from 'node:module';
+globalThis.window={__flyTwilightFixOverride:{enabled:false},__flyPhysSkyOverride:{enabled:false}};
 register('./_node-resolve.mjs', import.meta.url);
 const sky = await import('../lib/fly/cinema-sky.js');
 const { createCinemaEnvironment, evaluateCinemaEnvironment } = await import('../lib/fly/cinema-environment.js');
@@ -79,7 +80,7 @@ const smooth = (a, b, v) => {
   }
   check(
     '(1) flag off: legacy shader text and legacy CPU blend, bit for bit',
-    TWILIGHT_FIX.enabled === false && sky.TWILIGHT_ACTIVE === false && textSame && cpuSame,
+    sky.TWILIGHT_ACTIVE === false && textSame && cpuSame,
     `default enabled=${TWILIGHT_FIX.enabled}${worst ? `, first mismatch ${worst}` : ''}`,
   );
 }

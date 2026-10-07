@@ -20,6 +20,7 @@ import { FLIGHT_PLAN, FRONT_DOOR } from '@/lib/fly/fly-constants';
 import { FEATURED_DESTINATIONS, defaultDestination, flightPlanOn, saveLastSetup, searchDestinations } from '@/lib/fly/flight-plan';
 import './operations.css';
 import './mobile-flight.css';
+import { AirportPicker } from './AirportPicker';
 const SERVICE_RETRY_MS=250;
 export function GroundHangar({runtime}){
   const open=useFlyStore(s=>s.hangarOpen);
@@ -29,13 +30,13 @@ export function GroundHangar({runtime}){
 function HangarBody({runtime}){
   const root=useRef();
   const draft=useAdventureStore(s=>s.preflight),adventure=adventureById(draft?.id),active=useAdventureStore(s=>s.progress.active);
-  const [conditions,setConditions]=useState(draft?.conditions||'curated'),[restart,setRestart]=useState(false),[launchError,setLaunchError]=useState('');
+  const [conditions,setConditions]=useState(draft?.conditions||'live'),[restart,setRestart]=useState(false),[launchError,setLaunchError]=useState('');
   const [id,setId]=useState(()=>{if(draft)return draft.aircraftId;const fallback=flightPlanOn()&&useFlyStore.getState().flightMode==='free'?'fighter':'prop';try{const saved=localStorage.getItem('fly-aircraft');return PLAYER_AIRCRAFT.some(a=>a.id===saved)?saved:fallback;}catch{return fallback;}});
   const [airport,setAirport]=useState(()=>{try{const saved=localStorage.getItem('fly-departure'),aircraft=localStorage.getItem('fly-aircraft')||'prop';return airportEligible(airportById(saved),aircraft)?saved:aircraft==='prop'||aircraft==='warbird-prop'?'KOSU':'KCMH';}catch{return 'KOSU';}});
   const [ready,setReady]=useState(false),[failed,setFailed]=useState(false),[live,setLive]=useState(false),[retry,setRetry]=useState(0);
   const [exteriorReady,setExteriorReady]=useState(false);
   const exteriorLoaded=useCallback(()=>setExteriorReady(true),[]);
-  const [startMode,setStartMode]=useState('apron'),[view,setView]=useState('quarter');
+  const [startMode,setStartMode]=useState(()=>airportById(airport)?.authored===false?'runway':'apron'),[view,setView]=useState('quarter');
   const [confirmReturn,setConfirmReturn]=useState(()=>!draft&&!!runtime.operations && !['hangar','completed'].includes(runtime.operations.phase));
   useEffect(()=>{useFlyStore.getState().setHangarDismissible(confirmReturn);},[confirmReturn]);
   // R25 B FLIGHT PLAN: the panel adapts to the title's choice. Flag-off (and
@@ -101,7 +102,7 @@ function HangarBody({runtime}){
       <button onClick={()=>useFlyStore.getState().setHangarOpen(false)}>Continue flight</button></div>
   </div>;
   const categories={fighter:'Interceptor',military:'Tactical jet','warbird-jet':'Classic jet','warbird-prop':'Warbird',prop:'Light aircraft',glider:'Glider',bizjet:'Business jet',airliner:'Airliner',cargo:'Heavy transport'};
-  const modes=[['apron','Apron',Navigation],['runway','Runway',PlaneTakeoff],['approach','Approach',PlaneLanding]];
+  const modes=[['apron','Apron',Navigation],['runway','Runway',PlaneTakeoff],['approach','Approach',PlaneLanding]].filter(([mode])=>mode!=='apron'||airportById(airport)?.authored!==false);
   const modeHelp={apron:'The full flight. Taxi out from your parking stand.',runway:'Lined up and ready. You handle the takeoff.',approach:'Find your landing. Begin on a stable final approach.'};
   const theme={'--ops-ice':CARD_THEME.ice,'--ops-muted':CARD_THEME.iceDim,'--ops-edge':CARD_THEME.edgeSoft};
   return <section ref={root} tabIndex={-1} onKeyDown={keyboard} onPointerDown={e=>e.stopPropagation()} data-overlay="hangar" className={'ops-hangar'+(adventure?' journey-hangar':'')} style={theme} role="dialog" aria-modal="true" aria-labelledby="hangar-title" data-testid="hangar" data-exterior-ready={exteriorReady}>
@@ -114,9 +115,11 @@ function HangarBody({runtime}){
     {adventure?<div className="ops-dispatch journey-dispatch"><div className="ops-dispatch-scroll"><p className="journey-meta">Adventure · {adventure.place}</p><h2>{adventure.name}</h2><RouteTrace route={adventure}/><p>{aircraftAdvice(id,adventure.aircraftId)}</p><p className="journey-duration">About {adventureMinutes(adventure,id)} minutes <span>+ optional activities</span></p><fieldset className="journey-conditions"><legend>Flight conditions</legend>{[['curated',adventure.conditions.label],['live','Real time and weather']].map(([value,label])=><label key={value}><input type="radio" name="adventure-conditions" value={value} checked={conditions===value} onChange={()=>{setConditions(value);setRestart(false);}}/><span>{label}<small>{value==='curated'?'Curated for this journey':'Conditions at your destination now'}</small></span></label>)}</fieldset><p className="journey-meta">Three optional activities. All aircraft are free to fly.</p></div><div className="ops-dispatch-action">{restart&&<p role="alert">Changing aircraft or conditions restarts this journey. Earned rewards stay yours.</p>}<button data-testid="hangar-fly" className="ops-primary" disabled={!ready||!live} onClick={start}>{!ready?'Loading aircraft…':!live?'Preparing flight…':restart?'Restart with '+aircraft.entry.name:active?.id===adventure.id?'Continue adventure':'Fly '+adventure.place}<ArrowUpRight size={18}/></button>{restart&&<button onClick={()=>{pick(active.aircraftId);setConditions(active.conditions);setRestart(false);}}>Keep current setup</button>}<p className="ops-help">{stage.state==='ready'?'World ready':stage.state==='staging'?'Preparing scenery · '+stage.pct+'%':'Airborne start. Your journey awaits.'}</p>{launchError&&<p role="alert">{launchError}</p>}{failed&&<p role="alert">Aircraft preview could not load. <button onClick={()=>{useGLTF.clear(aircraft.entry.url);setFailed(false);setRetry(v=>v+1);}}>Retry</button></p>}</div></div>:free?<FreeDispatch dest={dest} query={query} setQuery={v=>{setQuery(v);setCursor(0);}} results={results} cursor={cursor} onSearchKey={searchKey} choose={chooseDest} stage={stage} ready={ready} live={live} failed={failed} retryPreview={()=>{useGLTF.clear(aircraft.entry.url);setFailed(false);setRetry(v=>v+1);}} start={start}/>:<div className="ops-dispatch">
       <div className="ops-dispatch-scroll">
         <div className="ops-dispatch-heading"><PlaneTakeoff size={20}/><h3>Make it your flight</h3></div>
-        <label htmlFor="departure-airport">Departure airport</label>
+        <AirportPicker value={airport} aircraftId={id} runtime={runtime} onChange={value=>{setAirport(value);setStartMode(airportById(value)?.authored===false?'runway':'apron');setExteriorReady(false);}} />
+        <label htmlFor="departure-airport">Authored airports</label>
         <div className="ops-airport-select"><MapPin size={16}/><select id="departure-airport" value={airport} onChange={e=>{setAirport(e.target.value);setExteriorReady(false);}} disabled={!profile}>
-          {OPERATIONS_AIRPORTS.map(a=><option key={a.id} value={a.id} disabled={!airportEligible(a,aircraft.id)}>{a.id} · {a.name}{!airportEligible(a,aircraft.id)?'  unavailable':''}</option>)}
+          {airportById(airport)?.authored===false&&<option value={airport}>{airportById(airport).name}</option>}
+          {OPERATIONS_AIRPORTS.map(a=><option key={a.id} value={a.id} disabled={!airportEligible(a,aircraft.id)}>{a.id} · {a.name}{!airportEligible(a,aircraft.id)?' — unavailable':''}</option>)}
         </select></div>
         {profile?<><fieldset className="ops-start-options"><legend>Choose your starting point</legend>{modes.map(([key,label,Icon])=><label key={key} className={startMode===key?'selected':''}><input type="radio" name="departure-mode" value={key} checked={startMode===key} onChange={()=>setStartMode(key)}/><Icon size={20}/><strong>{label}</strong>{startMode===key&&<Check className="ops-mode-check" size={12}/>}</label>)}</fieldset><p className="ops-mode-description">{modeHelp[startMode]}</p></>:<p className="ops-mode-description">A quiet start above Ohio State University. Find a thermal and explore.</p>}
       </div>

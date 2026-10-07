@@ -7,7 +7,7 @@ import { ChevronDown, ChevronUp, Navigation, PlaneTakeoff, PlaneLanding } from '
 import { CARD_THEME } from './inspect/inspect-tokens';
 import { operationsContext,advanceOperationsDisclosure } from '@/lib/fly/operations-disclosure';
 import { useFlyStore } from '@/stores/fly-store';
-import { OPERATIONS_AIRPORTS,airportEligible } from '@/lib/fly/operations-airports';
+import { OPERATIONS_AIRPORTS,airportEligible,airportById } from '@/lib/fly/operations-airports';
 const titles={parked:'Ready on the apron',taxiOut:'Taxi to the runway',takeoffRoll:'Takeoff',airborne:'In flight',approach:'Approach',landingRoll:'Touchdown',taxiIn:'Taxi to parking',completed:'Flight complete',crashed:'Try again'};
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 function shieldControlKeys(e){
@@ -51,6 +51,9 @@ export function OperationsHUD({runtime}){
   if(covered||open||phase==='paused'||photo||!o?.profile||o.phase==='hangar'||!f)return null;
   if(isTouch)return <MobileFlightDeck runtime={runtime} titles={titles} BrakeButton={BrakeButton} ApproachCue={ApproachCue}/>;
   const p=o.profile,approach=o.phase==='approach',path=approach?o.approachGuidance(f):null;
+  const destinations=[...OPERATIONS_AIRPORTS,...(airportById(o.destination)?.authored===false?[airportById(o.destination)]:[])];
+  const restartAirport=airportById(o.departure)||o.airport;
+  const restartLabel=restartAirport.authored===false?'Return to runway':'Return to apron';
   const departure=['parked','taxiOut','takeoffRoll'].includes(o.phase),takeoff=departure?o.takeoffStatus(f):null;
   const stopped=['completed','crashed'].includes(o.phase),ground=o.grounded;
   const title=departure&&takeoff.aligned&&o.phase!=='takeoffRoll'?'Ready for takeoff':titles[o.phase];
@@ -67,17 +70,17 @@ export function OperationsHUD({runtime}){
     </>}
     {approach&&<><ApproachCue path={path} flight={f} operations={o}/><div className="ops-action-row"><button className="ops-primary" onClick={()=>o.setApproachPower(f)}>Approach power</button><button onClick={()=>o.goAround(f)}>Go around</button></div></>}
     {o.phase==='airborne'&&<><p className="ops-next-action">Explore, or return for a landing.</p><button onClick={()=>o.guideApproach(f,runtime.weather?.wx)}>Guide approach</button></>}
-    {o.phase==='landingRoll'&&<p className="ops-next-action">Idle power. Hold the brakes, then follow the taxi path.</p>}
+    {o.phase==='landingRoll'&&<p className="ops-next-action">{o.airport.authored===false?'Idle power. Stop and set the parking brake to finish.':'Idle power. Hold the brakes, then follow the taxi path.'}</p>}
     {o.phase==='taxiIn'&&<><p className="ops-next-action">Follow the gold path. Stop at the stand and set the parking brake.</p><button onClick={()=>o.startTaxi()}>Taxi to stand</button></>}
     {o.lastTouchdown&&<p className="ops-touchdown" role="status">{o.lastTouchdown.quality} touchdown <span>{o.lastTouchdown.sink.toFixed(1)} m/s</span></p>}
-    {o.routeWarning&&<div className="ops-notice" role="status">{o.routeWarning}<button onClick={()=>runtime.beginDeparture(p.id,o.departure)}>Return to apron</button></div>}
-    {o.phase==='crashed'&&<div className="ops-recovery"><p role="alert">{o.reason}</p><button className="ops-primary" onClick={()=>runtime.retryApproach()}>Retry approach</button><button onClick={()=>runtime.beginDeparture(p.id,o.departure)}>Return to apron</button></div>}
-    {o.phase==='completed'&&<div className="ops-complete"><p>{o.summary.departure} → {o.summary.destination}</p><p>{Math.floor(o.summary.duration/60)} min {o.summary.duration%60} sec · {o.summary.assisted?'Assisted practice':'Unassisted flight'}</p><button className="ops-primary" onClick={()=>useFlyStore.getState().setHangarOpen(true)}>Choose next flight</button></div>}
+    {o.routeWarning&&<div className="ops-notice" role="status">{o.routeWarning}<button onClick={()=>runtime.beginDeparture(p.id,restartAirport.id)}>{restartLabel}</button></div>}
+    {o.phase==='crashed'&&<div className="ops-recovery"><p role="alert">{o.reason}</p><button className="ops-primary" onClick={()=>runtime.retryApproach()}>Retry approach</button><button onClick={()=>runtime.beginDeparture(p.id,restartAirport.id)}>{restartLabel}</button></div>}
+    {o.phase==='completed'&&<div className="ops-complete"><p>{o.summary.departure||'Free exploration'} → {o.summary.destination}</p><p>{Math.floor(o.summary.duration/60)} min {o.summary.duration%60} sec · {o.summary.assisted?'Assisted practice':'Unassisted flight'}</p><button className="ops-primary" onClick={()=>runtime.beginDeparture(p.id,o.airport.id,'runway')}>Depart from here</button><button onClick={()=>useFlyStore.getState().setHangarOpen(true)}>Choose next flight</button></div>}
     {!stopped&&<>
       {o.lowSpeed&&<div className="ops-power-controls"><div className="ops-power-label"><label htmlFor="flight-throttle">Power <strong>{Math.round(o.throttle*100)}%</strong></label><button onClick={()=>o.setPowerPreset(0)}>Idle</button></div><input id="flight-throttle" aria-label="Throttle" type="range" min="0" max="100" value={Math.round(o.throttle*100)} onChange={e=>o.setThrottle(Number(e.target.value)/100)}/>
         {ground&&<div className="ops-action-row"><button aria-pressed={o.parkingBrake} onClick={()=>o.toggleBrake()}>Parking brake {o.parkingBrake?'on':'off'}</button><BrakeButton runtime={runtime}/></div>}
       </div>}
-      <details className="ops-options"><summary>Destination and guidance</summary><label htmlFor="arrival-airport">Arrival airport</label><select id="arrival-airport" value={o.destination} onChange={e=>o.selectDestination(e.target.value)}>{OPERATIONS_AIRPORTS.filter(a=>airportEligible(a,p.id)).map(a=><option key={a.id} value={a.id}>{a.id} · {a.name}</option>)}</select>
+      <details className="ops-options"><summary>Destination and guidance</summary><label htmlFor="arrival-airport">Arrival airport</label><select id="arrival-airport" value={o.destination} onChange={e=>o.selectDestination(e.target.value)}>{destinations.filter(a=>airportEligible(a,p.id)).map(a=><option key={a.id} value={a.id}>{a.id} · {a.name}</option>)}</select><small>Find nearby airports in the Atlas.</small>
         {approach&&<><label htmlFor="approach-runway">Runway</label><select id="approach-runway" value={o.reverse?'reverse':'forward'} onChange={e=>o.setApproachRunway(e.target.value==='reverse')}><option value="forward">{o.airport.runway}</option><option value="reverse">{o.airport.reciprocal}</option></select></>}
         <button aria-pressed={o.guidance} onClick={()=>o.toggleGuidance()}>Guidance {o.guidance?'on':'off'}</button>
         {!ground&&<button onClick={()=>runtime.retryApproach()}>Practice landing</button>}

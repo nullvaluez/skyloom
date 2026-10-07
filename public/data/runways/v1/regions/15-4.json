@@ -1,0 +1,1 @@
+{"version":1,"airports":[{"id":"UHMA:02-20","ident":"UHMA","name":"Ugolny Yuri Ryktheu Airport","runway":"02","reciprocal":"20","width":59.7408,"a":{"lat":64.719803,"lon":177.731995,"elevation":42.062400000000004},"b":{"lat":64.750099,"lon":177.751007,"elevation":59.1312},"thresholdA":0,"thresholdB":0,"authored":false,"taxiSide":1,"taxiOffset":0,"standAlong":65,"lighted":true}]}

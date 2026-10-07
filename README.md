@@ -1,4 +1,9 @@
-# SkyTracker — Fly Mode
+# Skyloom — Explorer Beta
+
+> **Current release checklist:** [EXPLORER_BETA.md](EXPLORER_BETA.md) records
+> features, flags, verification and open acceptance work. Provider and hosting
+> preparation is in [EXPLORER_PROVIDERS.md](EXPLORER_PROVIDERS.md). Older round
+> records and the background notes below describe historical builds.
 
 A keyless, real-time 3D flight tracker. Boot straight into **Fly Mode** and pilot
 through a stylized mini-globe of live [ADS-B](https://en.wikipedia.org/wiki/Automatic_Dependent_Surveillance%E2%80%93Broadcast)

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { providerURL, observationTime } from '@/lib/fly/provider-config.mjs';
 
 /**
  * Round 16 "Living World" — keyless CURRENT-WEATHER proxy.
@@ -150,10 +151,13 @@ const WMO_SNOW = new Set([71, 73, 75, 77, 85, 86, 56, 57, 66, 67]);
 const SOURCES = [
   {
     name: 'open-meteo',
-    url: (lat, lon) =>
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    url: (lat, lon) => {
+      const url=providerURL((process.env.SKYLOOM_WEATHER_URL || 'https://api.open-meteo.com/v1/forecast')+`?latitude=${lat}&longitude=${lon}` +
       '&current=temperature_2m,cloud_cover,wind_speed_10m,wind_direction_10m,' +
-      'precipitation,snowfall,visibility,weather_code&wind_speed_unit=ms&timezone=UTC',
+      'precipitation,snowfall,visibility,weather_code&wind_speed_unit=ms&timezone=UTC');
+      if(process.env.SKYLOOM_WEATHER_KEY)url.searchParams.set('apikey',process.env.SKYLOOM_WEATHER_KEY);
+      return url.toString();
+    },
     normalize: (data) => {
       const c = data?.current;
       if (!c || typeof c !== 'object' || !Number.isFinite(c.cloud_cover)) return null;
@@ -172,6 +176,7 @@ const SOURCES = [
         precipMm = rainMm;
       }
       return {
+        observedAt: observationTime(c.time),
         cloudCoverPct: c.cloud_cover,
         windMps: num(c.wind_speed_10m),
         windDirDeg: num(c.wind_direction_10m),
@@ -193,7 +198,7 @@ const SOURCES = [
       const minLon = (lon - 1.1).toFixed(2);
       const maxLon = (lon + 1.1).toFixed(2);
       return (
-        'https://aviationweather.gov/api/data/metar?format=json' +
+        (process.env.SKYLOOM_METAR_URL || 'https://aviationweather.gov/api/data/metar')+'?format=json' +
         `&bbox=${minLat},${minLon},${maxLat},${maxLon}`
       );
     },
@@ -228,6 +233,7 @@ const SOURCES = [
       const { visM, visPlus } = parseVisib(best.visib);
       const { precip, precipMm } = parsePresentWeather(best.wxString, best.rawOb);
       return {
+        observedAt: observationTime(best.obsTime ?? best.reportTime),
         cloudCoverPct: cover,
         windMps: Number.isFinite(best.wspd) ? best.wspd * KT_TO_MPS : null,
         // 'VRB' (variable) is a string — no usable direction.
@@ -286,7 +292,8 @@ function memoSet(key, data) {
 
 function respond(data, cached) {
   const maxAge = data.found ? 600 : 120;
-  return NextResponse.json(data, {
+  const ageMs=data.observedAt==null?null:Math.max(0,Date.now()-data.observedAt);
+  return NextResponse.json({...data,availability:!data.found?'unavailable':ageMs==null||ageMs>90*60*1000?'delayed':'live',ageMs}, {
     headers: {
       'Cache-Control': `public, s-maxage=${maxAge}, stale-while-revalidate=1800`,
       'x-weather-source': data.source || 'none',
@@ -343,6 +350,7 @@ export async function GET(request) {
 
       const data = {
         found: true,
+        retrievedAt: Date.now(),
         source: source.name,
         cell: { lat: cLat, lon: cLon },
         ...rec,
@@ -357,7 +365,7 @@ export async function GET(request) {
 
   // A real miss (open ocean, both sources thin) is worth a short negative
   // memo; "everyone was cooling" is not — retry as soon as they are back.
-  const miss = { found: false, cell: { lat: cLat, lon: cLon } };
+  const miss = { found: false, source: null, retrievedAt: Date.now(), observedAt: null, cell: { lat: cLat, lon: cLon } };
   if (attempted > 0) memoSet(key, miss);
   return respond(miss, false);
 }

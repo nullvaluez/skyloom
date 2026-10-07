@@ -45,12 +45,12 @@ if (legArg) {
     screen: { width: 390, height: 844 },
     innerWidth: 390,
     innerHeight: 844,
-    ...(on ? { __flyDeviceTiersOverride: { enabled: true } } : {}),
+    __flyDeviceTiersOverride: { enabled: on },
   });
   register('./_node-resolve.mjs', import.meta.url);
   const { useFlyStore } = await import('../stores/fly-store.js');
   const { resolveCinemaProfile } = await import('../lib/fly/cinema-profile.js');
-  if (on) globalThis.window = { location: { search: '' }, __flyDeviceTiersOverride: { enabled: true } };
+  globalThis.window = { location: { search: '' }, __flyDeviceTiersOverride: { enabled: on } };
   const tiers = await import('../lib/fly/device-tiers.js');
   const gov = await import('../lib/fly/perf-governor.js');
   const { defaultQualityTier } = await import('../lib/fly/fly-settings.js');

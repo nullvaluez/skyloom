@@ -172,6 +172,9 @@ process.env.NODE_ENV = 'development';
 restore();
 {
   // Visuals precedence (visuals-profile.js is A's): pin > saved > default > classic.
+  // Preserve R25's contract explicitly. PLAYER_SURFACE's later migration is
+  // separately covered by verify-player-surface, including production pins.
+  const playerSurface=C.PLAYER_SURFACE.enabled;C.PLAYER_SURFACE.enabled=false;
   const resolve = () => {
     useFlyStore.getState().setVisuals('classic');
     VP.resolveInitialVisuals();
@@ -199,6 +202,7 @@ restore();
   gate('(1h) ... a saved pick beats the default', saved === 'classic', saved);
   gate('(1i) ... the dev pin beats a saved pick', pinned === 'enhanced', pinned);
   gate('(1j) ... the pin is ignored in production (saved wins)', prodPin === 'classic', prodPin);
+  C.PLAYER_SURFACE.enabled=playerSurface;
   gate('(1k) ... corrupt storage falls back to the default', corrupt === C.VISUALS.defaultProfile, corrupt);
   const e0 = useFlyStore.getState().visualsEpoch;
   VP.setVisualsLive('enhanced');
@@ -787,13 +791,13 @@ try {
     /installTitleCamera\(runtime\)/.test(mode) && /<TitleScreen runtime=\{runtime\}/.test(mode) && /FRONT_DOOR\.enabled && <StagePump/.test(canvas));
   gate('(8c) exit goes to the title (pause-exit-title "Exit to title"); the error boundary keeps the reload as "Restart Skyloom"',
     /data-testid|testid="pause-exit-title"/.test(pause) && /Exit to title/.test(pause) && /exitToTitle\(runtime\)/.test(mode) && /Restart Skyloom/.test(eb) && /onExit=\{onClose\}/.test(mode));
-  const ids = ['title-screen', 'title-continue', 'title-free-flight', 'title-takeoff-landing', 'title-logbook', 'title-settings', 'title-credits', 'title-spot', 'settings-sheet'];
+  const ids = ['title-screen', 'title-continue', 'title-explore', 'title-takeoff-landing', 'title-logbook', 'title-settings', 'title-credits', 'title-spot', 'settings-sheet'];
   const missing = ids.filter((id) => !title.includes(`"${id}"`));
   gate('(8d) title testids + data-overlay="title" + data-ready', missing.length === 0 && /data-overlay="title"/.test(title) && /data-ready=/.test(title), missing.join(',') || `${ids.length} ids`);
   gate('(8e) BootScreen keeps boot-screen / boot-caption / data-stage and the __flyBoot publisher',
     /data-testid="boot-screen"/.test(boot) && /data-testid="boot-caption"/.test(boot) && /data-stage=\{stage\}/.test(boot) && /window\.__flyBoot = \{ phase, pct \}/.test(boot));
-  gate('(8f) Skyloom branding: layout metadata, manifest, loading, BootScreen wordmark, "Welcome to Skyloom"',
-    !/ShadowADSB/.test(layout) && /Skyloom/.test(layout) && /"short_name": "Skyloom"/.test(manifest) && /Skyloom/.test(loading) && /Sky\s*<span[^>]*>loom<\/span>/.test(boot) && /Welcome to Skyloom/.test(pause));
+  gate('(8f) Skyloom branding: layout metadata, manifest, loading, BootScreen wordmark; welcome moves to skippable flight tips',
+    !/ShadowADSB/.test(layout) && /Skyloom/.test(layout) && /"short_name": "Skyloom"/.test(manifest) && /Skyloom/.test(loading) && /Sky\s*<span[^>]*>loom<\/span>/.test(boot) && /Welcome to Skyloom/.test(fs.readFileSync(path.join(ROOT,'components/fly/hud/ExplorerGuide.jsx'),'utf8')));
   gate('(8g) ... the OG url and the passport storage key are unchanged',
     /url: "https:\/\/shadowadsb\.app"/.test(layout) && /shadowadsb-passport/.test(rd('stores/passport-store.js')));
   gate('(8h) the dead geolocation spawn is gone; the fly-last-pos WRITER stays (verify-boot reads it)',

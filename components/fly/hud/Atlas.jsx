@@ -7,6 +7,7 @@ import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { useFlyStore } from '@/stores/fly-store';
 import { useFlyAtlasStore } from '@/stores/fly-atlas-store';
 import { AtlasMap } from './atlas/AtlasMap';
+import { NearbyAirports } from './NearbyAirports';
 import { DestinationCard } from './atlas/DestinationCard';
 import { ATLAS_KIND, CARD_THEME } from './atlas/atlas-tokens';
 import { rankAtlasEntries, warpOptsFor } from '@/lib/fly/poi/search';
@@ -271,6 +272,7 @@ function AtlasBody({ runtime }) {
           </div>
           <div className="w-72 shrink-0 max-sm:w-full max-sm:shrink">
             <DestinationCard entry={selected} runtime={runtime} onWarp={warp} />
+            <NearbyAirports runtime={runtime}/>
           </div>
         </div>
 

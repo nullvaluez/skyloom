@@ -32,7 +32,7 @@ const legArg = process.argv.find((a) => a.startsWith('--leg='));
 
 if (legArg) {
   const on = legArg === '--leg=on';
-  globalThis.window = { location: { search: '' }, ...(on ? { __flyConditionsOverride: { enabled: true } } : {}) };
+  globalThis.window = { location: { search: '' }, __flyConditionsOverride: { enabled: on } };
   register('./_node-resolve.mjs', import.meta.url);
   const PC = await import('../lib/fly/player-conditions.js');
   const { computeTargets } = await import('../lib/fly/weather-model.js');
@@ -130,7 +130,7 @@ const leg = (name) =>
       .split('\n')
       .pop(),
   );
-const read = (p) => readFileSync(path.join(ROOT, p), 'utf8');
+const read = (p) => readFileSync(path.join(ROOT, p), 'utf8').replaceAll('\r\n','\n');
 
 const off = leg('off');
 const scene = read('components/fly/FlyScene.jsx');

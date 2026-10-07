@@ -75,7 +75,7 @@ export function useFlyAudio(runtime) {
       }
       const active=state.mapStyle==='satellite'&&immersiveOn('audio');
       // Pause gates the shared master too, including synthesized fallback and one-shots.
-      audio.setMuted(!state.soundOn || (active && state.phase==='paused'));
+      audio.setMuted(!state.soundOn || state.phase==='paused' || document.hidden);
       immersion.update(runtime,state,active&&live);
     }, 1000 / AUDIO.updateHz);
 

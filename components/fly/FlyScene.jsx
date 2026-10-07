@@ -1,4 +1,6 @@
 'use client';
+import { CameraTransition } from '@/lib/fly/camera-transition';
+import { earthHorizonOn, earthBend, earthFade } from '@/lib/fly/earth-horizon';
 import { connectFlightOperations } from '@/lib/fly/operations-runtime';
 import { reviewSurfaceOn } from '@/lib/fly/player-surface';
 import { setTrueScaleK, toSceneDir } from '@/lib/fly/true-scale';
@@ -1111,6 +1113,8 @@ export function FlyScene({ runtime }) {
   const input = useMemo(() => new InputController(), []);
   const operations = useMemo(() => new FlightOperations(), []);
   const chase = useMemo(() => new ChaseCamera(), []);
+  const cameraTransition = useMemo(()=>new CameraTransition(),[]);
+  const reduceCameraMotion = useMemo(()=>typeof matchMedia!=='undefined'&&matchMedia('(prefers-reduced-motion: reduce)').matches,[]);
   const cinema = useMemo(() => new CinemaCamera(), []);
   const photo = useMemo(() => new PhotoCamera(), []); // round 17: photo mode
   const traffic = useMemo(() => new TrafficEngine(), []);
@@ -1715,6 +1719,7 @@ export function FlyScene({ runtime }) {
   const hemiBaseRef = useRef(null);
   useEffect(() => {
     const apply = () => {
+      if(useFlyStore.getState().cameraMode==='photo')return;
       if (useFlyStore.getState().mapStyle !== 'satellite') {
         clearSkyNight(); // toy: hand the dome back to its certified props
         return;
@@ -2041,11 +2046,10 @@ export function FlyScene({ runtime }) {
     // shipped look) only: k0 = 1 everywhere else is three's own camera.
     setTrueScaleK(cinemaOn(flyState) ? mercatorScale(flight.latDeg) : 1);
     const worldHeld = flyState.mapStyle === 'satellite' && (runtime.worldLoading === true || (typeof window !== 'undefined' && window.__flyBoot && window.__flyBoot.pct < 100));
-    const paused = flyState.phase === 'paused' || worldHeld || menuOpen(flyState) || !!flyState.inspectHex || flyState.atlasOpen || flyState.logbookOpen || document.hidden;
+    const paused = flyState.phase === 'paused' || flyState.cameraMode === 'photo' || worldHeld || menuOpen(flyState) || !!flyState.inspectHex || flyState.atlasOpen || flyState.logbookOpen || document.hidden;
     // Inspect modal / Atlas count as a soft pause for the stick: the world
     // (and your plane) keep flying, but the cursor belongs to the overlay.
-    // Round 17: photo mode joins them — the plane keeps flying (the instructor
-    // auto-levels the neutralized stick) while the mouse composes a shot.
+    // Explorer: photo mode holds the simulation while the orbit rig stays live.
     // setPhotoLook also tells neutralize() to spare the orbit drag + P key.
     const photoMode = flyState.cameraMode === 'photo';
     input.setPhotoLook(photoMode);
@@ -2453,6 +2457,7 @@ export function FlyScene({ runtime }) {
     } else {
       chase.update(dt, flight, camera, cmd.freeLook, mercatorScale(flight.latDeg), runtime.groundImmersion);
     }
+    cameraTransition.update(camera,runtime.titleCam?.active?'title':flyState.cameraMode,flyState.warpEpoch,dt,reduceCameraMotion);
     camera.position.x -= origin.anchor.x;
     camera.position.z -= origin.anchor.z;
 
@@ -2476,12 +2481,15 @@ export function FlyScene({ runtime }) {
     const bendR = cinematicScale ? SATELLITE_VISUALS.scale.bendRadiusM : GLOBE.bendRadiusM[flyState.mapStyle] ?? GLOBE.bendRadiusM.satellite;
     let bendK = cinematicScale ? physicalBendCoefficient(bendR, mercatorScale(flight.latDeg)) : 1 / (2 * bendR);
     const flat = GLOBE.altFlatten;
-    if (flat) {
+    const earth=flyState.mapStyle==='satellite'&&flyState.visuals==='enhanced'&&earthHorizonOn();
+    if (earth) bendK=earthBend(mercatorScale(flight.latDeg));
+    if (flat && !earth) {
       const over = Math.max(0, flight.pos.y - flat.startAltM);
       bendK *= Math.max(flat.minKFrac, Math.pow(2, -over / flat.halfAltM));
     }
     setBend(rpx, rpz, bendK);
-    setSatelliteWaterFrame({ enabled: flyState.mapStyle === 'satellite' && satelliteVisualsOn('water'), timeSec: _.clock.elapsedTime, originX: origin.anchor.x, originZ: origin.anchor.z, sunAz: runtime.sun?.az, sunSinEl: runtime.sun?.sinEl, overcast: runtime.weather?.wx?.overcastT, moonDirection: _moonDir });
+    if(!photoMode)runtime.explorerVisualTime=(runtime.explorerVisualTime||0)+dt;
+    setSatelliteWaterFrame({ enabled: flyState.mapStyle === 'satellite' && satelliteVisualsOn('water'), timeSec: runtime.explorerVisualTime||0, originX: origin.anchor.x, originZ: origin.anchor.z, sunAz: runtime.sun?.az, sunSinEl: runtime.sun?.sinEl, overcast: runtime.weather?.wx?.overcastT, moonDirection: _moonDir });
     // The aircraft bend variant caps drops against the player's eye level —
     // grounded targets keep the full drop, high targets never sink below us.
     // Round 8.5 (H1) decision: groundElev stays TRUE-frame here even in toy
@@ -2513,7 +2521,7 @@ export function FlyScene({ runtime }) {
     // write into the LIVE uEdgeFade uniform — every consumer (sky dip below,
     // ultra ring, VoidFloor, TownGlow, clouds) reads it via getEdgeFade().
     // Static styles never enter here; their style effect stays the writer.
-    const skyFade = WORLD_EDGE.fade[flyState.mapStyle] ?? WORLD_EDGE.fade.satellite;
+    const skyFade = earth?earthFade(flyState.qualityTier,mercatorScale(flight.latDeg)):WORLD_EDGE.fade[flyState.mapStyle] ?? WORLD_EDGE.fade.satellite;
     const ah = WORLD_EDGE.altHorizon;
     const ahOn = ah?.enabled && ah.byStyle[flyState.mapStyle];
     if (ahOn && flyState.mapStyle === 'satellite') {
@@ -2551,7 +2559,7 @@ export function FlyScene({ runtime }) {
       // satellite frame is bit-for-bit R15.
       const wx = runtime.weather?.wx;
       if (wx) {
-        stepWeather(wx, runtime.weather.targets, dt);
+        if(!photoMode)stepWeather(wx, runtime.weather.targets, dt);
         applyWeatherAtmo(_atmoRim, _atmoVoid, wx);
       }
       // R25 W0: C SKY may overwrite the rim/void triples IN PLACE with the

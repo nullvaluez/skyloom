@@ -8,7 +8,7 @@
  * The forest source was fixed; nothing guarded the next source.
  *
  * THE CONTRACT
- *  (1) flag off (default): the composite text is untouched;
+ *  (1) flag explicitly off: the composite text is untouched;
  *  (2) the guard transform hits both anchors exactly once, and refuses (null)
  *      when an anchor is missing or duplicated, so it can never half-apply;
  *  (3) both composite materials in immersive-cloud-pass.js go through
@@ -24,6 +24,7 @@
 import { register, createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+globalThis.window={__flyHdrGuardOverride:{enabled:false}};
 register('./_node-resolve.mjs', import.meta.url);
 const { HDR_SAFE_GLSL, guardHdrComposite, hdrGuarded, HDR_GUARD_ACTIVE } = await import('../lib/fly/hdr-guard.js');
 
@@ -40,7 +41,7 @@ const OUT = ' gl_FragColor=vec4(mix(scene,result,cloudMix),1.);';
 const sample = `uniform float x;\nvoid main(){\n vec3 scene=vec3(1.);vec3 result=scene;float cloudMix=.5;\n${OUT}\n}`;
 
 // (1)
-check('(1) flag off (default): composite text untouched', HDR_GUARD_ACTIVE.enabled === false && hdrGuarded(sample) === sample);
+check('(1) flag explicitly off: composite text untouched', HDR_GUARD_ACTIVE.enabled === false && hdrGuarded(sample) === sample);
 
 // (2)
 {

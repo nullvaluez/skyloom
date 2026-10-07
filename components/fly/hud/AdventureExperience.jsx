@@ -118,7 +118,7 @@ function AdventureSummary({runtime,summary}){
 }
 export function AdventureJournal(){
   const progress=useAdventureStore(s=>s.progress);
-  const interest=answer=>{useAdventureStore.getState().save({...progress,interest:answer});trackAdventure('pack_interest',{packId:'wild-earth',answer});};
+
   return <div className="journey-journal"><h3>Your journeys</h3><p>{Object.keys(progress.completed).length} of {ADVENTURES.length} destination stamps · {progress.rewards.length} of 9 liveries</p>{ADVENTURES.map(a=><div className="journey-journal-row" key={a.id}><DestinationImage route={a}/><div><strong>{a.place}</strong><p>{progress.completed[a.id]?medals[progress.completed[a.id].medal]+' medal':progress.active?.id===a.id?progress.active.index+' / '+a.checkpoints.length+' discoveries':'Waiting to be discovered'}</p>{Object.entries(progress.records).filter(([k])=>k.startsWith(a.id+'|')).map(([key,r])=><p key={key}>{aircraftName(key.split('|')[1])} · {key.split('|')[2]} · {Object.values(r.activities).filter(s=>s==='complete').length}/3 activities</p>)}</div></div>)}<h3>Your liveries</h3>{Object.entries(LIVERIES).map(([id,l])=><p key={id}>{progress.rewards.includes(id)?'✓':'○'} {l.name} · {aircraftName(id)}</p>)}<button className="journey-primary" onClick={()=>{useFlyStore.getState().setLogbookOpen(false);useAdventureStore.getState().setLibraryOpen(true);}}>Choose a journey<ArrowRight size={18}/></button>
-  {ADVENTURES.some(a=>a.packId==='wild-earth'&&progress.completed[a.id])&&<section className="journey-survey"><h3>Help shape the next journeys</h3><p>Would you buy three adventures like Wild Earth for $9.99 USD once? Research only; this preview remains free.</p><div className="journey-actions">{['yes','maybe','no'].map(a=><button key={a} aria-pressed={progress.interest===a} onClick={()=>interest(a)}>{a[0].toUpperCase()+a.slice(1)}</button>)}</div></section>}</div>;
+  </div>;
 }

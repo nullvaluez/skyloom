@@ -21,7 +21,7 @@
  *  (6) the GPU: the four table passes compile in WebGL2 and their readbacks
  *      match the CPU mirror (transmittance 0.5%, multiple scattering 3%, sky
  *      view 3%, aerial in-scatter 3% / transmittance 1%) — SwiftShader here;
- *  (7) the flag is off by default;
+ *  (7) the flag is enabled for the Explorer beta candidate;
  *  (8) flag off: the sky texts, the shared uniforms and both patched programs
  *      (the Enhanced aerial pass, the Enhanced cloud composite) are unchanged;
  *  (9) flag on: the physical sky text is in use, its uniforms ride
@@ -52,7 +52,10 @@ if (legArg) {
   // The real modules, built once per flag state (module-level selection).
   const leg = legArg.slice(6);
   const pins = {};
-  if (leg !== 'off') pins.__flyPhysSkyOverride = { enabled: true };
+  pins.__flyPhysSkyOverride = { enabled: leg !== 'off' };
+  pins.__flyTwilightFixOverride = { enabled: false };
+  pins.__flyHdrGuardOverride = { enabled: false };
+  pins.__flyTrueScaleOverride = { enabled: leg === 'on-ts' };
   if (leg === 'on-ts') pins.__flyTrueScaleOverride = { enabled: true };
   globalThis.window = { location: { search: '', href: 'http://localhost/' }, ...pins };
   const inert = new Proxy(function () {}, { get: (t, k) => (k === Symbol.toPrimitive ? () => 0 : inert), apply: () => inert, construct: () => inert });
@@ -481,7 +484,7 @@ void main() {
   }
 }
 
-check('(7) the flag is off by default', RT.physSkyOn() === false && PHYS_SKY.enabled === false);
+check('(7) the beta ships the tested physical atmosphere', RT.physSkyOn() === true && PHYS_SKY.enabled === true);
 
 {
   const { execFileSync } = await import('node:child_process');

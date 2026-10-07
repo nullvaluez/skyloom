@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { providerURL } from '@/lib/fly/provider-config.mjs';
 
 // Per-attempt upstream timeout. Keep short so a hung preferred source
 // fails over inside the client's ~12s abort budget.
@@ -26,16 +27,16 @@ const lastGood = new Map();
 const SOURCES = [
   {
     name: 'adsb.lol',
-    url: (lat, lon, dist) => `https://api.adsb.lol/v2/lat/${lat}/lon/${lon}/dist/${dist}`,
+    url: (lat, lon, dist) => providerURL(process.env.SKYLOOM_ADSB_LOL_URL || 'https://api.adsb.lol/v2/lat/{lat}/lon/{lon}/dist/{dist}',{lat,lon,dist}).toString(),
   },
   {
     name: 'adsb.fi',
     url: (lat, lon, dist) =>
-      `https://opendata.adsb.fi/api/v2/lat/${lat}/lon/${lon}/dist/${dist}`,
+      providerURL(process.env.SKYLOOM_ADSB_FI_URL || 'https://opendata.adsb.fi/api/v2/lat/{lat}/lon/{lon}/dist/{dist}',{lat,lon,dist}).toString(),
   },
   {
     name: 'airplanes.live',
-    url: (lat, lon, dist) => `https://api.airplanes.live/v2/point/${lat}/${lon}/${dist}`,
+    url: (lat, lon, dist) => providerURL(process.env.SKYLOOM_AIRPLANES_URL || 'https://api.airplanes.live/v2/point/{lat}/{lon}/{dist}',{lat,lon,dist}).toString(),
   },
 ];
 
@@ -91,7 +92,7 @@ function findStale(lat, lon, dist) {
 function softUnavailable(lastStatus, stale) {
   if (stale) {
     return NextResponse.json(
-      { ...stale.payload, stale: true, error: 'serving_stale' },
+      { ...stale.payload, stale: true, availability: 'delayed', error: 'serving_stale' },
       {
         status: 200,
         headers: {
@@ -109,6 +110,7 @@ function softUnavailable(lastStatus, stale) {
     {
       error: isRateLimited(lastStatus) ? 'rate_limited' : 'all upstream sources unavailable',
       ac: [],
+      availability: 'unavailable', source: null, retrievedAt: Date.now(),
     },
     {
       status: 200,
@@ -152,8 +154,8 @@ export async function GET(request) {
   for (const source of orderedSources()) {
     if ((cooldownUntil.get(source.name) ?? 0) > now) continue;
     attempted += 1;
-    const upstreamUrl = source.url(qLat, qLon, dist);
     try {
+      const upstreamUrl = source.url(qLat, qLon, dist);
       const response = await fetchWithTimeout(upstreamUrl, {
         next: { revalidate: 3 },
       });
@@ -182,7 +184,7 @@ export async function GET(request) {
         continue;
       }
 
-      const payload = { ...data, ac, aircraft: undefined };
+      const payload = { ...data, ac, aircraft: undefined, source: source.name, retrievedAt: Date.now(), availability: 'live' };
 
       // A WELL-FORMED EMPTY ANSWER IS NOT A HEALTHY ANSWER. A degraded
       // aggregator whose spatial index has fallen over still answers 200 with
