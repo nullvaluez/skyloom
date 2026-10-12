@@ -21,6 +21,7 @@ export function ExplorerGuide({runtime}){
   const prefs=useSyncExternalStore(subscribeExplorerPreferences,explorerPreferences,()=>DEFAULT_PREFERENCES);
   const flying=useFlyStore(s=>inFlight(s)&&!anyOverlayOpen(s));
   const photo=useFlyStore(s=>s.cameraMode==='photo');
+  const observing=useFlyStore(s=>!!s.airportWatch||s.airportBrowserOpen);
   const guidedJourney=useAdventureStore(s=>s.libraryOpen||!!s.summary||s.progress.active?.status==='flying');
   const [status,setStatus]=useState(null),[degraded,setDegraded]=useState(false);
   const [readyEpoch,setReadyEpoch]=useState(-1),[notice,setNotice]=useState(null);
@@ -35,6 +36,7 @@ export function ExplorerGuide({runtime}){
       readyTicks=ready&&lastEpoch===s.warpEpoch?readyTicks+1:0;lastEpoch=s.warpEpoch;
       setReadyEpoch(readyTicks>=2?s.warpEpoch:-1);
       setNotice(n=>n&&n.until<now?null:n);
+      if(s.airportWatch||s.airportBrowserOpen||runtime.escort?.source==='airport'){dwell=0;cell=null;lastEvent=runtime.operations?.sequence||0;return;}
       const live=inFlight(s)&&!anyOverlayOpen(s)&&!journey.libraryOpen&&!journey.summary&&!document.hidden&&ready&&readyTicks>=2;
       const geo=runtime.geo;
       if(!live){dwell=0;return;}
@@ -76,7 +78,7 @@ export function ExplorerGuide({runtime}){
     },1000);
     return()=>clearInterval(id);
   },[runtime]);
-  if(!flying||photo||readyEpoch!==epoch)return null;
+  if(observing||!flying||photo||readyEpoch!==epoch)return null;
   return <>
     {prefs.tutorial==='new'&&!guidedJourney&&<aside className="explorer-guide" aria-label="First-flight tips" data-testid="explorer-guide">
       <p className="text-xs text-cyan-100/70">First flight · {step+1} of {STEPS.length}</p><strong>{STEPS[step][0]}</strong><p>{STEPS[step][1]}</p>

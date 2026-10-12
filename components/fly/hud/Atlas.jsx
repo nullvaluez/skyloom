@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildAtlasList } from '@/lib/fly/poi-data';
+import { AirportEntry } from './AirportExperience';
 import { getRuntimeAction } from '@/lib/fly/runtime-bus';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { useFlyStore } from '@/stores/fly-store';
@@ -164,6 +165,7 @@ function AtlasBody({ runtime }) {
           >
             Atlas
           </h2>
+          <AirportEntry/>
           <div className="relative flex-1">
             <input
               ref={inputRef}

@@ -2,12 +2,19 @@
 
 import { applyBendFade } from '@/lib/fly/toy-world/world-bend';
 import { useEffect, useMemo, useState } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { useFlyStore } from '@/stores/fly-store';
+import { livingAirportsOn } from '@/lib/fly/airport-feature-policy';
+import { AirportLandmark } from './AirportLandmark';
 import { OperationsGuidance } from './OperationsGuidance';
 import { BufferGeometry, Float32BufferAttribute, MeshStandardMaterial, MeshBasicMaterial, DoubleSide } from 'three';
-import { airportFrame, airportPoint, airportTaxiExits, airportPavements, nearbyOperationsAirports } from '@/lib/fly/operations-airports';
+import { OPERATIONS_AIRPORTS, airportFrame, airportPoint, airportTaxiExits, airportPavements, nearbyOperationsAirports, subscribeAirports } from '@/lib/fly/operations-airports';
 import { loadNearbyRunways } from '@/lib/fly/runway-catalog';
 
 const RUNWAY_GLYPHS={
+  '4':['00011','00111','01111','11011','11111','00011','00011'],
+  '6':['01110','11000','11000','11110','11011','11011','01110'],
+  C:['01111','11000','11000','11000','11000','11000','01111'],
   '0':['01110','11011','11011','11011','11011','11011','01110'],
   '1':['00110','01110','00110','00110','00110','00110','01111'],
   '2':['01110','11011','00011','00110','01100','11000','11111'],
@@ -25,14 +32,15 @@ const RUNWAY_GLYPHS={
 
 // One mesh per airport. Pavement and paint use the exact same height profile as
 // contact. Absolute Mercator coordinates live on the group, never in float32.
-function Airport({ airport }) {
+function Airport({ airport, enhanced, scenery, runtime }) {
   const resource=useMemo(()=>{
     const origin=airportPoint(airport,0),f=airportFrame(airport),positions=[],colors=[];
     const rectangle=(s,t,w,l,color,lift=.025)=>{
       // Bend is evaluated at vertices. A kilometre-long quad interpolates a
       // chord below the curved terrain, leaving only the short paint visible.
       // Small cells keep that chord error below the pavement's surface lift.
-      const rows=Math.ceil(l/5),cols=Math.ceil(w/5);
+      const cell=enhanced?12:5;
+      const rows=Math.ceil(l/cell),cols=Math.ceil(w/cell);
       for(let row=0;row<rows;row++)for(let col=0;col<cols;col++){
         const a0=s+l*row/rows,a1=s+l*(row+1)/rows,c0=t-w/2+w*col/cols,c1=t-w/2+w*(col+1)/cols;
         const points=[[a0,c0],[a1,c0],[a1,c1],[a0,c1]].map(([a,c])=>airportPoint(airport,a,c));
@@ -41,6 +49,10 @@ function Airport({ airport }) {
     };
     const dark=[.13,.15,.16],concrete=[.30,.32,.33],white=[.85,.84,.78],yellow=[.8,.58,.08];
     const offset=airport.taxiOffset*airport.taxiSide, width=airport.id==='KOSU'?20:48;
+    if(enhanced)for(const side of [-1,1]){
+      rectangle(-8,side*(airport.width/2+4),8,f.length+16,[.25,.27,.22],.018);
+      rectangle(-15,side*(airport.width/2+11),6,f.length+30,[.29,.32,.20],.012);
+    }
     for(const r of airportPavements(airport))rectangle(r.s0,(r.c0+r.c1)/2,r.c1-r.c0,r.s1-r.s0,r.kind==='runway'?dark:concrete);
     for(let s=45;s<f.length-45;s+=60)rectangle(s,0,1.2,27,white,.055);
     for(const side of [-1,1])rectangle(0,side*(airport.width/2-1),.6,f.length,white,.055);
@@ -75,7 +87,8 @@ function Airport({ airport }) {
     const geometry=new BufferGeometry();geometry.setAttribute('position',new Float32BufferAttribute(positions,3));geometry.setAttribute('color',new Float32BufferAttribute(colors,3));geometry.computeVertexNormals();
     geometry.addGroup(0,paintCount,0);geometry.addGroup(paintCount,positions.length/3-paintCount,1);
     const material=[new MeshStandardMaterial({vertexColors:true,roughness:.95,side:DoubleSide}),new MeshBasicMaterial({vertexColors:true,side:DoubleSide})];material.forEach(applyBendFade);return {origin,geometry,material};
-  },[airport]);
+  },[airport,enhanced]);
+  useFrame(()=>{if(enhanced){const night=1-Math.max(0,Math.min(1,((runtime.sun?.sinEl??1)+.08)/.16));resource.material[1].color.setScalar(.35+night*1.6);}});
   useEffect(()=>()=>{resource.geometry.dispose();resource.material.forEach(m=>m.dispose());},[resource]);
   const h=airportPoint(airport,airport.standAlong,airport.taxiSide*(airport.taxiOffset+180)),frame=airportFrame(airport);
   return <group>
@@ -85,24 +98,28 @@ function Airport({ airport }) {
       <mesh position={[airport.taxiSide*39,12,0]}><boxGeometry args={[1,24,125]}/><meshStandardMaterial color="#777d80"/></mesh>
       {[-1,1].map(side=><mesh key={side} position={[0,12,side*62]}><boxGeometry args={[80,24,1]}/><meshStandardMaterial color="#777d80"/></mesh>)}
     </group>}
+    {scenery&&<AirportLandmark airport={airport} runtime={runtime}/>}
   </group>;
 }
 export function AirportOperationsLayer({runtime}) {
+  const visuals=useFlyStore(s=>s.visuals),style=useFlyStore(s=>s.mapStyle);
+  const enhanced=livingAirportsOn('worldArt')&&visuals==='enhanced'&&style==='satellite';
+  const scenery=livingAirportsOn('scenery')&&visuals==='enhanced'&&style==='satellite';
   const [airports,setAirports]=useState([]);
   useEffect(()=>{
     let active=true,lastCell='',pending=false,retryAfter=0;
     const tick=()=>{
-      const f=runtime.flight,g=runtime.geo;if(!f||!g)return;
+      const f=runtime.flight,g=runtime.geo;if(!active||!f||!g)return;
       const selected=runtime.operations?.airport?.id;
       const rows=nearbyOperationsAirports(f.pos.x,f.pos.z,16000).sort((a,b)=>Number(b.id===selected)-Number(a.id===selected)||Math.hypot(a.a.lat-g.y,a.a.lon-g.x)-Math.hypot(b.a.lat-g.y,b.a.lon-g.x)).slice(0,4);
       setAirports(prev=>prev.map(a=>a.id).join()===rows.map(a=>a.id).join()?prev:rows);
       const cell=`${Math.round(g.y*5)},${Math.round(g.x*5)}`;
       if(!pending&&Date.now()>retryAfter&&cell!==lastCell){pending=true;loadNearbyRunways(g.y,g.x).then(()=>{if(active)lastCell=cell;}).catch(()=>{retryAfter=Date.now()+15000;}).finally(()=>{pending=false;});}
     };
-    tick();const timer=setInterval(tick,2000);return()=>{active=false;clearInterval(timer);};
+    tick();const timer=setInterval(tick,2000),unsub=subscribeAirports(tick);return()=>{active=false;clearInterval(timer);unsub();};
   },[runtime]);
   return <group>
-    {airports.map(a=><Airport key={a.id} airport={a}/>)}
+    {airports.map((a,i)=><Airport key={a.id} airport={a} enhanced={enhanced} scenery={scenery&&airports.findIndex(b=>(b.ident||b.id)===(a.ident||a.id))===i} runtime={runtime}/>)}
     <OperationsGuidance runtime={runtime}/>
   </group>;
 }

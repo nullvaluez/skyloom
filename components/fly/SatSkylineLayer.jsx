@@ -1,9 +1,9 @@
 'use client';
+import { withRunwayGeometry } from '@/lib/fly/runway-worker';
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
-import { withRunwayGeometry } from '@/lib/fly/runway-worker';
 import { SatSkylineEngine } from '@/lib/fly/toy-world/sat-skyline-engine';
 import { SAT_SKYLINE, SETTLE_CALM } from '@/lib/fly/fly-constants';
 import { getSatSkyline, setSatSkyline, getSatBldgFade } from '@/lib/fly/toy-world/world-bend';

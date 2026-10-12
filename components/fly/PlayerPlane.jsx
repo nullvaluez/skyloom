@@ -73,6 +73,7 @@ export function PlayerPlane({ flight, aircraft }) {
   const assetRevision=useAdventureStore(s=>s.assetRevision||0);
   // R25 W0: the title flyby hides the (frozen) player aircraft.
   const titleHidden = useTitleHidden();
+  const observing = useFlyStore(s=>!!s.airportWatch);
 
   // Dev-only rig handle (the __satRoads pattern): verify-sat-night hides the
   // hero during its ground-layer A/B probes — the idle bob straddles the probe
@@ -108,7 +109,7 @@ export function PlayerPlane({ flight, aircraft }) {
   }, -30);
 
   return (
-    <group ref={group} visible={!titleHidden} matrixAutoUpdate={false}>
+    <group ref={group} visible={!titleHidden && !observing} matrixAutoUpdate={false}>
       <Suspense fallback={<PrimitivePlane />}>
         <group ref={groundHull}><PlayerAssetBoundary key={`${ac.id}:${assetRevision}`}><PlayerModel flight={flight} aircraft={ac} /></PlayerAssetBoundary></group>
         <LandingGear flight={flight} aircraftId={ac.id} />

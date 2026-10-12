@@ -1,9 +1,9 @@
 'use client';
+import { withRunwayGeometry } from '@/lib/fly/runway-worker';
 /* eslint-disable react-hooks/immutability -- runtime is the shared imperative simulation bus, not React display state. */
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
-import { withRunwayGeometry } from '@/lib/fly/runway-worker';
 import { EarthSurfaceEngine, publishEarthSurface, removeEarthSurface } from '@/lib/fly/earth-surface-engine';
 import { EarthScenery } from '@/lib/fly/earth-scenery';
 import { LivingForest } from '@/lib/fly/living-forest';

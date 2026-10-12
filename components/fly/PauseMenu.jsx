@@ -60,6 +60,7 @@ const TOUCH_CONTROL_ROWS = [
 export function PauseMenu({ onExit }) {
   const phase = useFlyStore((s) => s.phase);
   const creditsOpen = useFlyStore((s) => s.creditsOpen);
+  const observing = useFlyStore(s=>!!s.airportWatch);
   const mapStyle = useFlyStore((s) => s.mapStyle);
   const aircraftId = useFlyStore((s) => s.aircraftId);
   const adventureOverlay=useAdventureStore(s=>s.libraryOpen||!!s.summary);
@@ -87,7 +88,7 @@ export function PauseMenu({ onExit }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [phase]);
 
-  if (adventureOverlay || phase !== 'paused') return null;
+  if (observing || adventureOverlay || phase !== 'paused') return null;
 
   const store = useFlyStore.getState();
   // Read (never subscribe): this branch only renders while paused, so a

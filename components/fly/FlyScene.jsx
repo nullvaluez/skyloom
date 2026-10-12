@@ -203,6 +203,7 @@ import { MonumentModels } from './MonumentModels';
 import { Contrail } from './Contrail';
 import { PlayerGroundShadow } from './PlayerGroundShadow';
 import { TrafficLayer } from './TrafficLayer';
+import { AirportLounge } from './AirportLounge';
 import { ToyWorldLayer } from './ToyWorldLayer';
 import { SatBuildingLayer } from './SatBuildingLayer';
 import { SatRoadLayer } from './SatRoadLayer';
@@ -984,6 +985,7 @@ const _standIn = /* @__PURE__ */ new Object3D();
  * world Y is true altitude in both frames).
  */
 export function FlyScene({ runtime }) {
+  const airportContentEpoch=useFlyStore(s=>s.airportContentEpoch);
   const spawn = useFlyStore((s) => s.spawn);
   const mapStyle = useFlyStore((s) => s.mapStyle);
   const qualityTier = useFlyStore((s) => s.qualityTier);
@@ -2057,7 +2059,7 @@ export function FlyScene({ runtime }) {
     // shipped look) only: k0 = 1 everywhere else is three's own camera.
     setTrueScaleK(cinemaOn(flyState) ? mercatorScale(flight.latDeg) : 1);
     const worldHeld = flyState.mapStyle === 'satellite' && (runtime.worldLoading === true || (typeof window !== 'undefined' && window.__flyBoot && window.__flyBoot.pct < 100));
-    const paused = flyState.phase === 'paused' || flyState.cameraMode === 'photo' || worldHeld || menuOpen(flyState) || !!flyState.inspectHex || flyState.atlasOpen || flyState.logbookOpen || document.hidden;
+    const paused = flyState.phase === 'paused' || flyState.cameraMode === 'photo' || !!flyState.airportWatch || flyState.airportBrowserOpen || worldHeld || menuOpen(flyState) || !!flyState.inspectHex || flyState.atlasOpen || flyState.logbookOpen || document.hidden;
     // Inspect modal / Atlas count as a soft pause for the stick: the world
     // (and your plane) keep flying, but the cursor belongs to the overlay.
     // Explorer: photo mode holds the simulation while the orbit rig stays live.
@@ -2143,7 +2145,7 @@ export function FlyScene({ runtime }) {
     // --- Phase 5: targeting + autopilot (uses traffic items from the
     // previous frame's update at -45 — 16ms of staleness is immaterial) ---
     const store = useFlyStore.getState();
-    const transition = targeting.update(
+    const transition = runtime.airportWatch?.active ? null : targeting.update(
       performance.now() / 1000,
       flight,
       traffic.items,
@@ -2159,7 +2161,7 @@ export function FlyScene({ runtime }) {
         // R17: one shared attribute builder (lib/fly/spot-attrs.js) — it is
         // what finally carries `squawk` (and gs/alt) into the passport, so the
         // emergency badges and the squawk rarity bonuses are reachable here.
-        usePassportStore.getState().logSpot(trackSpotAttrs(t, geo));
+        if (!runtime.airportWatch?.active && runtime.escort?.source !== 'airport') usePassportStore.getState().logSpot(trackSpotAttrs(t, geo));
       }
     } else if (transition === 'released' && autopilot.mode !== 'off') {
       autopilot.disengage();
@@ -2477,7 +2479,9 @@ export function FlyScene({ runtime }) {
       runtime.titleCam.needsSnap = false;
       chase.snap();
     }
-    if (photoMode) {
+    if (runtime.airportWatch?.active) {
+      runtime.airportWatch.updateCamera(dt, camera);
+    } else if (photoMode) {
       // Round 17: free orbit around the plane, persistent pose, wheel zoom.
       photo.update(dt, flight, camera, input, mercatorScale(flight.latDeg));
     } else if (photo.handoff()) {
@@ -2546,7 +2550,7 @@ export function FlyScene({ runtime }) {
     // reads as "more airborne" by the local lift (≤ 0.7×elev) inside the
     // 150–900m blend band — second-order next to the 420m-at-600m-elev bug
     // the ryd transform fixes.
-    setBendEye(flight.pos.y, groundElevVis(runtime, flight)); // R24 B (GROUND_VIS)
+    setBendEye(runtime.airportWatch?.active ? camera.position.y : flight.pos.y, groundElevVis(runtime, flight)); // R24 B (GROUND_VIS)
 
     // R24 D (LOD_CROSSFADE): advance every in-flight tile blend on the frame
     // clock (early-returns after one add when nothing is fading, which is the
@@ -3606,15 +3610,15 @@ export function FlyScene({ runtime }) {
         <primitive object={engine.object} />
         <AirportOperationsLayer runtime={runtime} />
         {/* Toy World vector chunks drape over the (flat-tan) tile ground */}
-        {mapStyle === 'toy' && <ToyWorldLayer runtime={runtime} flight={flight} />}
+        {mapStyle === 'toy' && <ToyWorldLayer key={`ToyWorldLayer:${airportContentEpoch}`} runtime={runtime} flight={flight} />}
         {/* Round 13 Phase 3 CENTERPIECE: 3D extruded buildings in satellite,
             fed by the same vector worker (lean 'sat-buildings' mode). Inside
             worldRoot so chunk meshes ride the -anchor rebase like the toy chunks
             (anchor-bend uBendCenter frame stays in sync). Gated satellite +
             enabled + tier≥medium → byte-noop (no worker/engine/draws) elsewhere. */}
-        {mapStyle === 'satellite' && stylizedEarthOn() && <EarthSurfaceLayer runtime={runtime} />}
+        {mapStyle === 'satellite' && stylizedEarthOn() && <EarthSurfaceLayer key={`EarthSurfaceLayer:${airportContentEpoch}`} runtime={runtime} />}
         {mapStyle === 'satellite' && SAT_BUILDINGS.enabled && (qualityTier !== 'low' || satelliteVisualsOn()) && (
-          <SatBuildingLayer runtime={runtime} flight={flight} />
+          <SatBuildingLayer key={`SatBuildingLayer:${airportContentEpoch}`} runtime={runtime} flight={flight} />
         )}
         {/* Round 16 (A4): the satellite GROUND-LIGHT NETWORK (roads + runway
             lights + airport beacons). Inside worldRoot for the same reason the
@@ -3623,21 +3627,21 @@ export function FlyScene({ runtime }) {
             Same &&-chain shape as the buildings → off = no mount, no worker, no
             draws, no globals. */}
         {mapStyle === 'satellite' && SAT_ROADS.enabled && (qualityTier !== 'low' || satelliteVisualsOn()) && (
-          <SatRoadLayer runtime={runtime} flight={flight} />
+          <SatRoadLayer key={`SatRoadLayer:${airportContentEpoch}`} runtime={runtime} flight={flight} />
         )}
         {/* Round 18 (A2): the DISTANT BLOCK-MASS skyline ring — the city past
             the detail bubble, and the city that survives the climb. Same
             &&-chain / same worldRoot reason as the two layers above. */}
         {mapStyle === 'satellite' && SAT_SKYLINE.enabled && (qualityTier !== 'low' || satelliteVisualsOn()) && (
-          <SatSkylineLayer runtime={runtime} flight={flight} />
+          <SatSkylineLayer key={`SatSkylineLayer:${airportContentEpoch}`} runtime={runtime} flight={flight} />
         )}
         {/* R22 (C CLUTTER): ground life — parked/moving cars + poles. Same
             &&-chain / worldRoot reason as the layers above; W0 stub renders
             null and CLUTTER.enabled is false, so this line is a no-op until
             C's merge. */}
-        {mapStyle === 'satellite' && <SatGroundDetailLayer runtime={runtime} flight={flight} />}
+        {mapStyle === 'satellite' && <SatGroundDetailLayer key={`SatGroundDetailLayer:${airportContentEpoch}`} runtime={runtime} flight={flight} />}
         {mapStyle === 'satellite' && CLUTTER.enabled && qualityTier !== 'low' && (
-          <SatClutterLayer runtime={runtime} flight={flight} />
+          <SatClutterLayer key={`SatClutterLayer:${airportContentEpoch}`} runtime={runtime} flight={flight} />
         )}
         {/* Round 17: keyed on the pick so a hangar swap is a clean remount —
             the old clone's graded materials dispose, the new GLB mounts. */}
@@ -3646,6 +3650,7 @@ export function FlyScene({ runtime }) {
 
       {/* Traffic writes rebased instance matrices — must stay OUTSIDE worldRoot */}
       <TrafficLayer runtime={runtime} flight={flight} origin={origin} />
+      <AirportLounge runtime={runtime} />
 
       {/* Clean airloom 3D letters at POIs — world objects, ALL styles.
           OWN Suspense: troika suspends on font load, and letting that reach

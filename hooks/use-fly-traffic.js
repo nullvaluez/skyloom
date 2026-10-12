@@ -98,7 +98,7 @@ export function useFlyTraffic(runtime, enabled) {
 
   // Ingest: worker-project then hand the transferable batch to the engine.
   const { data } = query;
-  useEffect(()=>{const update=()=>{(runtime.dataStatus??={}).traffic=trafficStatus(data,query.error);};update();const timer=setInterval(update,1000);return()=>clearInterval(timer);},[runtime,data,query.error]);
+  useEffect(()=>{const update=()=>{runtime.trafficStatus=(runtime.dataStatus??={}).traffic=trafficStatus(query.isPlaceholderData?null:data,query.error);};update();const timer=setInterval(update,1000);return()=>clearInterval(timer);},[data,query.error,query.isPlaceholderData,runtime]);
   useEffect(() => {
     if (!enabled || composing || !data || !workerApi.current) return;
     // Soft-fail / empty payloads mean "no new data", never "all aircraft left".

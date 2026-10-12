@@ -1,4 +1,5 @@
 'use client';
+import { withRunwayGeometry } from '@/lib/fly/runway-worker';
 import { immersiveOn } from '@/lib/fly/immersive';
 import { nearGroundOn } from '@/lib/fly/near-ground';
 import { mercatorScale } from '@/lib/fly/coords';
@@ -7,7 +8,6 @@ import { NEAR_SUPPORT, updateNearContactMatrices } from '@/lib/fly/near-ground-s
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
-import { withRunwayGeometry } from '@/lib/fly/runway-worker';
 import {
   BufferAttribute,
   BufferGeometry,

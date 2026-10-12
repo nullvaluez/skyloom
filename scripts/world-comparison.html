@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Skyloom · World comparison</title>
+  <style>
+    :root{font-family:Inter,Segoe UI,system-ui,sans-serif;color:#ecede8;background:#101310;font-synthesis:none;--muted:#a8b0a6;--line:#30392f;--accent:#c5e5a4}
+    *{box-sizing:border-box}body{margin:0}button,a,input{ -webkit-tap-highlight-color:transparent}button{font:inherit;color:inherit;background:none;border:1px solid var(--line);border-radius:7px;padding:9px 14px;cursor:pointer}button:hover{background:#252d23}button[aria-pressed=true]{background:#d3e9b9;color:#152010;border-color:#d3e9b9}button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #def8be;outline-offset:4px}a{color:#c5dda9;text-underline-offset:4px}button:disabled{opacity:.45;cursor:wait}.shell{max-width:1920px;margin:auto;padding:28px 40px 32px}.masthead{display:flex;justify-content:space-between;align-items:center;gap:24px;padding-bottom:22px;border-bottom:1px solid var(--line)}.brand{font-size:20px;font-weight:650;letter-spacing:-.8px}.brand span{font-size:12px;font-weight:450;letter-spacing:1.4px;text-transform:uppercase;margin-left:17px;color:var(--muted)}.back{font-size:13px;text-decoration:none}.intro{margin:24px 0 20px;display:flex;justify-content:space-between;align-items:end;gap:24px}h1{font-size:clamp(25px,3vw,38px);letter-spacing:-1.4px;font-weight:500;margin:0 0 7px}p{line-height:1.5;margin:0;color:var(--muted);font-size:14px}.modes{display:flex;gap:5px;white-space:nowrap}.toolbar{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:16px}.scenes{display:flex;gap:7px;flex-wrap:wrap}.scene-button{display:flex;gap:12px;align-items:center}.scene-button small{font-size:11px;opacity:.65;font-variant-numeric:tabular-nums}.fullscreen{font-size:13px}.stage-wrap{display:flex;justify-content:center;background:#080b09;border:1px solid var(--line);border-radius:10px;overflow:hidden}.stage-wrap:fullscreen{border:0;border-radius:0;padding:24px;align-items:center}.stage-wrap:fullscreen .stage{width:min(100%,calc((100vh - 48px)*16/9));max-height:none}.stage{--split:50%;position:relative;width:min(100%,calc(68vh*16/9));aspect-ratio:16/9;overflow:hidden;isolation:isolate;touch-action:none;cursor:ew-resize;user-select:none;background:#0b110b}.stage img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none}.stage .before{clip-path:inset(0 calc(100% - var(--split)) 0 0)}.divider{position:absolute;left:var(--split);top:0;bottom:0;width:2px;background:#fff;box-shadow:0 0 8px #0008;pointer-events:none}.handle{position:absolute;left:0;top:50%;width:46px;height:46px;transform:translate(-50%,-50%);border-radius:50%;background:#101610d9;border:1px solid #ffffffb8;display:grid;place-items:center;font-size:19px;box-shadow:0 3px 18px #0005}.tag{position:absolute;top:18px;border:1px solid #ffffff35;border-radius:4px;padding:6px 10px;background:#0e160ede;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;pointer-events:none}.tag.before-tag{left:18px}.tag.after-tag{right:18px}.loading{position:absolute;inset:0;display:grid;place-content:center;background:#0b110b;color:var(--muted);font-size:14px;z-index:5}.loading[hidden]{display:none}.controls{display:flex;align-items:center;justify-content:space-between;gap:24px;margin:14px 0 20px}.slider-group{display:flex;align-items:center;gap:16px;max-width:550px;flex:1;font-size:12px;color:var(--muted)}input[type=range]{accent-color:var(--accent);width:100%;min-width:90px;cursor:ew-resize}output{min-width:32px;font-variant-numeric:tabular-nums}.views{display:flex;gap:7px}.views button{font-size:12px;padding:7px 12px}.caption{display:flex;justify-content:space-between;gap:24px;margin-bottom:22px}.caption h2{font-size:17px;font-weight:500;margin:0 0 5px}.caption p{font-size:13px;max-width:750px}.originals{white-space:nowrap;font-size:12px;display:flex;gap:16px;align-items:start;padding-top:5px}.evidence{border-top:1px solid var(--line);padding-top:17px;font-size:12px;color:var(--muted)}summary{cursor:pointer;color:#d1d8ca;list-style-position:outside;margin-left:15px}.facts{display:grid;grid-template-columns:1fr 1fr;gap:18px 36px;padding:20px 0}.facts strong{display:block;font-weight:500;color:#e0e8d6;margin-bottom:5px}.facts p{font-size:12px;overflow-wrap:anywhere}.disclosure{max-width:1050px;font-size:12px;margin-bottom:18px}footer{border-top:1px solid var(--line);padding-top:17px;font-size:11px;color:#818d7d;line-height:1.6;display:flex;justify-content:space-between;gap:24px}footer a{color:inherit}.error{color:#ffcbb3}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    @media(max-width:780px){.shell{padding:18px}.brand span{display:block;margin:4px 0 0;font-size:10px}.intro{align-items:start;flex-direction:column;gap:17px}.toolbar{gap:12px;align-items:end}.scenes{gap:5px}.scene-button{font-size:12px;padding:8px;gap:6px}.scene-button small{display:none}.fullscreen{font-size:11px;padding:8px}.stage{width:100%}.caption{display:block}.originals{margin-top:12px}.controls{gap:14px;flex-wrap:wrap}.slider-group{min-width:100%}.facts{grid-template-columns:1fr}footer{display:block}.tag{top:10px;font-size:9px}.tag.before-tag{left:10px}.tag.after-tag{right:10px}.handle{width:34px;height:34px}}
+  </style>
+</head>
+<body>
+<main class="shell">
+  <header class="masthead"><div class="brand">Skyloom<span>World comparison</span></div><a class="back" href="http://localhost:3097/?graphicsReview=1&amp;airports=on&amp;airportArt=on&amp;airportScenery=on">Back to the game ↗</a></header>
+  <section class="intro"><div><h1>See exactly what changed.</h1><p>Drag across the world. Before on the left, after on the right.</p></div><div class="modes" aria-label="Comparison scope"><button data-mode="whole" aria-pressed="true">Whole pass</button><button data-mode="materials" aria-pressed="false">Materials only</button></div></section>
+  <div class="toolbar"><nav class="scenes" aria-label="Choose a location"></nav><button class="fullscreen" id="fullscreen">Full screen ↗</button></div>
+  <div class="stage-wrap" id="stage-wrap"><div class="stage" id="stage" aria-busy="true">
+    <img id="after-image" alt="" draggable="false"><img id="before-image" class="before" alt="" draggable="false">
+    <div class="divider"><span class="handle" aria-hidden="true">‹ ›</span></div><span class="tag before-tag">Before</span><span class="tag after-tag">After</span><div class="loading" id="loading" role="status">Loading matched captures…</div>
+  </div></div>
+  <div class="controls"><div class="slider-group"><label for="split">Before</label><input id="split" type="range" min="0" max="100" value="50" aria-label="Before image coverage" aria-describedby="keyboard-help"><output for="split" id="split-value">50%</output></div><span id="keyboard-help" class="sr-only">Use the left and right arrow keys to move the divider. Home shows after only. End shows before only.</span><div class="views" aria-label="Image view"><button data-split="100">Before only</button><button data-split="50" aria-pressed="true">Split</button><button data-split="0">After only</button></div></div>
+  <div class="caption"><div><h2 id="scene-title">Preparing comparison</h2><p id="scene-description"></p></div><div class="originals"><a id="before-file" target="_blank" rel="noopener">Original before PNG ↗</a><a id="after-file" target="_blank" rel="noopener">Original after PNG ↗</a></div></div>
+  <details class="evidence"><summary>Capture conditions &amp; what this comparison includes</summary><div class="facts"><div><strong>Matched conditions</strong><p>2560 × 1440 · DPR 1 · High · Enhanced · Satellite.<br>Fixed weather and solar instant: 12 Oct 2026, 16:00 UTC. Different locations have different local solar times. Animation clock frozen for capture.</p></div><div><strong>Capture hardware</strong><p id="hardware"></p></div><div><strong>Before → after builds</strong><p id="builds"></p></div><div><strong>Camera match</strong><p id="camera"></p></div></div><p class="disclosure" id="scope-note"></p><p class="disclosure">These are unedited PNG captures from the game, with the interface hidden and traffic omitted to remove moving contacts. Whole-pass images use separately loaded builds and live map providers, so small streaming differences can remain. “Materials only” switches the art flag in the same loaded scene. This is a visual comparison, not a performance certification.</p><p class="disclosure"><a href="manifest.json" target="_blank" rel="noopener">Full capture manifest</a> · <a href="CREDITS.md" target="_blank" rel="noopener">Full asset credits</a></p></details>
+  <footer><span>Imagery &amp; terrain © Esri, Maxar, Earthstar Geographics · © OpenStreetMap contributors · OpenMapTiles / OpenFreeMap · ESA WorldCover.</span><span>Local review · no game settings changed</span></footer>
+  <p id="error" class="error" role="alert"></p>
+</main>
+<script>
+  const $=id=>document.getElementById(id), stage=$('stage'), range=$('split');
+  let manifest, sceneIndex=0, mode='whole', generation=0, ready=false;
+  const descriptions={columbus:'Airport pavement, nearby scenery and the surrounding terrain.',manhattan:'Roof and facade treatment against the city’s existing lighting and distant atmosphere.',innsbruck:'Slope textures, terrain blending and the existing mountain silhouette and sky.',sydney:'Coastal ground, water boundaries and airport scenery under the existing night lighting.'};
+  function setSplit(value){const v=Math.max(0,Math.min(100,Number(value)));range.value=v;stage.style.setProperty('--split',v+'%');$('split-value').value=Math.round(v)+'%';range.setAttribute('aria-valuetext',`${Math.round(v)}% before, ${100-Math.round(v)}% after`);document.querySelectorAll('[data-split]').forEach(b=>b.setAttribute('aria-pressed',Number(b.dataset.split)===v));}
+  range.addEventListener('input',()=>setSplit(range.value));
+  document.querySelectorAll('[data-split]').forEach(b=>b.addEventListener('click',()=>setSplit(b.dataset.split)));
+  function pointer(event){const rect=stage.getBoundingClientRect();setSplit((event.clientX-rect.left)/rect.width*100);}
+  stage.addEventListener('pointerdown',event=>{if(!ready||event.button!==0)return;stage.setPointerCapture(event.pointerId);pointer(event);range.focus({preventScroll:true});});
+  stage.addEventListener('pointermove',event=>{if(stage.hasPointerCapture(event.pointerId))pointer(event);});
+  stage.addEventListener('pointerup',event=>{if(stage.hasPointerCapture(event.pointerId))stage.releasePointerCapture(event.pointerId);});
+  $('fullscreen').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('stage-wrap').requestFullscreen();}catch{ $('error').textContent='Full screen is unavailable in this browser. Use the original PNG links for full resolution.'; }});
+  const scope={whole:'Preserved pre-change build → current build with airport discovery, exterior scenery and world-art review switches enabled. The lounge is outside these views.',materials:'Current build with the optional world-art treatment off → on. Airport discovery and exterior scenery remain on in both images. This isolates the terrain and building material treatment.'};
+  async function showScene(){
+    if(!manifest)return;
+    const token=++generation, site=manifest.sites[sceneIndex], beforeVariant=mode==='whole'?'before':'materials-before';
+    ready=false;stage.setAttribute('aria-busy','true');$('loading').hidden=false;$('error').textContent='';
+    document.querySelectorAll('[data-scene]').forEach(b=>b.setAttribute('aria-pressed',Number(b.dataset.scene)===sceneIndex));
+    document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===mode));
+    const before=manifest.captures.find(c=>c.site===site.id&&c.variant===beforeVariant),after=manifest.captures.find(c=>c.site===site.id&&c.variant==='after');
+    try{
+      if(!before||!after)throw new Error('This capture pair is missing.');
+      const images=await Promise.all([before.file,after.file].map(src=>{const image=new Image();image.src=src;return image.decode().then(()=>image);}));
+      if(token!==generation)return;
+      if(images[0].naturalWidth!==images[1].naturalWidth||images[0].naturalHeight!==images[1].naturalHeight)throw new Error('Capture dimensions do not match.');
+      $('before-image').src=before.file;$('after-image').src=after.file;
+      $('before-image').alt=`${site.name}, ${mode==='whole'?'preserved pre-change build':'current build with material treatment off'}`;
+      $('after-image').alt=`${site.name}, current build with world changes enabled`;
+      $('before-file').href=before.file;$('after-file').href=after.file;
+      $('scene-title').textContent=site.name+' · '+site.detail;
+      $('scene-description').textContent=descriptions[site.id];
+      $('scope-note').textContent=scope[mode];
+      $('hardware').textContent=after.environment.gpu+' · Chrome '+manifest.browser;
+      $('builds').textContent=mode==='whole'?manifest.builds.before+' → '+manifest.builds.after:manifest.builds.after+' (same build, art flag off → on)';
+      const check=manifest.cameraChecks.find(c=>c.site===site.id);
+      $('camera').textContent=`${site.lat.toFixed(4)}°, ${site.lon.toFixed(4)}° · altitude ${site.altM.toLocaleString()} m · heading ${(site.headingRad*180/Math.PI).toFixed(1)}°. `+(check?.matching?'Camera position, orientation and lens match.':'Camera matching has not been verified.');
+      $('loading').hidden=true;stage.setAttribute('aria-busy','false');ready=true;
+      history.replaceState(null,'','#'+site.id+(mode==='materials'?'-materials':''));
+    }catch(error){if(token===generation){$('loading').textContent='Could not load this comparison.';$('error').textContent=error.message;}}
+  }
+  document.querySelectorAll('[data-mode]').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.mode;showScene();}));
+  fetch('manifest.json').then(r=>{if(!r.ok)throw new Error('Capture manifest is unavailable.');return r.json();}).then(data=>{
+    if(!data.complete)throw new Error('Captures are still being verified. Reload when capture is complete.');
+    manifest=data;
+    mode=location.hash.endsWith('-materials')?'materials':'whole';
+    const found=manifest.sites.findIndex(s=>location.hash.slice(1).replace(/-materials$/,'')===s.id);if(found>=0)sceneIndex=found;
+    manifest.sites.forEach((site,index)=>{const button=document.createElement('button');button.className='scene-button';button.dataset.scene=index;button.setAttribute('aria-pressed',index===sceneIndex);const number=document.createElement('small');number.textContent=String(index+1).padStart(2,'0');button.append(number,document.createTextNode(site.name));button.addEventListener('click',()=>{sceneIndex=index;showScene();});document.querySelector('.scenes').append(button);});
+    setSplit(50);showScene();
+  }).catch(error=>{$('loading').textContent='Comparison unavailable';$('error').textContent=error.message;});
+</script>
+</body>
+</html>

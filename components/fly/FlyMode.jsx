@@ -3,6 +3,7 @@ import { RecoveryNotice } from './hud/RecoveryNotice';
 import { OperationsHUD } from './hud/OperationsHUD';
 import { ExplorerGuide } from './hud/ExplorerGuide';
 import './hud/explorer.css';
+import { AirportExperience } from './hud/AirportExperience';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CloudSun, X } from 'lucide-react';
@@ -87,6 +88,7 @@ function HudGroup({ hidden, children }) {
  * world/fleet/shaders are actually ready (window.__flyBoot contract).
  */
 export function FlyMode({ onClose }) {
+  const watchingAirport = useFlyStore(s=>!!s.airportWatch);
   useEffect(() => { recordVisit(); }, []);
   const spawn = useFlyStore((s) => s.spawn);
   // Opt-in local review only: install the allocation observer BEFORE Canvas
@@ -219,6 +221,8 @@ export function FlyMode({ onClose }) {
     const onKey = (e) => {
       const store = useFlyStore.getState();
       if (e.key === 'Escape') {
+        if(useFlyStore.getState().airportBrowserOpen){useFlyStore.setState({airportBrowserOpen:false});return;}
+        if(useFlyStore.getState().airportWatch&&!useFlyStore.getState().inspectHex){runtime.airportWatch?.leave();exitToTitle(runtime);return;}
         if (store.adventureOpen) store.closeAdventureOverlay?.();
         else if (store.inspectHex) store.setInspectHex(null);
         else if (store.cameraMode === 'photo') store.setCameraMode('chase');
@@ -343,7 +347,7 @@ export function FlyMode({ onClose }) {
           shutter/exit must survive the state that hides everything else. */}
       {/* R25 A: the flying HUD is also hidden (never unmounted) under the
           title — the title layer is transparent over the live world. */}
-      <HudGroup hidden={photoActive || titleUp}>
+      <HudGroup hidden={photoActive || titleUp || watchingAirport}>
         {/* POI names are in-world 3D letters (PoiLetters) in every style */}
         <LabelCanvas runtime={runtime} />
         <FlyHUD runtime={runtime} />
@@ -352,26 +356,26 @@ export function FlyMode({ onClose }) {
         <InfoCard runtime={runtime} />
       </HudGroup>
       <InspectModal runtime={runtime} />
-      <HudGroup hidden={photoActive || titleUp}>
+      <HudGroup hidden={photoActive || titleUp || watchingAirport}>
         <SpotToast runtime={runtime} />
         <Contracts runtime={runtime} />
       </HudGroup>
       <Atlas runtime={runtime} />
       <Logbook />
       <HangarPanel runtime={runtime} />
-      <OperationsHUD runtime={runtime} />
-      <HudGroup hidden={photoActive || titleUp}>
+      <HudGroup hidden={watchingAirport}><OperationsHUD runtime={runtime} /></HudGroup>
+      <HudGroup hidden={photoActive || titleUp || watchingAirport}>
         <ArrivalBanner />
       </HudGroup>
       <WarpFlash runtime={runtime} />
       <CrashFlash />
-      <HudGroup hidden={photoActive || titleUp}>
+      <HudGroup hidden={photoActive || titleUp || watchingAirport}>
         {isTouch && <TouchControls runtime={runtime} />}
       </HudGroup>
       <PhotoModeBar />
       {/* Round 18 (A4): combo chip + boost meter + end-of-run summary, all in
           one component so the round costs FlyMode a single line. */}
-      {!titleUp && <JuiceHud />}
+      {!titleUp && !watchingAirport && <JuiceHud />}
       <PauseMenu onExit={exit} />
       {/* R25 A: the title layer carries its own attribution (it sits over this
           bar) — except while the Logbook, opened from the title, hides that
@@ -393,6 +397,7 @@ export function FlyMode({ onClose }) {
       <ExplorerGuide runtime={runtime} />
       <RecoveryNotice runtime={runtime}/>
       <AdventureExperience runtime={runtime} />
+      <AirportExperience runtime={runtime} />
 
       {mobileNote && (
         <div className="pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-md bg-zinc-900/85 px-3 py-2 text-xs text-zinc-200 shadow-lg">
@@ -404,7 +409,7 @@ export function FlyMode({ onClose }) {
           Pause button in TouchControls, whose menu carries Exit. R25 A: it
           exits to the title, and only exists while flying (the title and the
           hangar are the menus it would exit to). */}
-      {!isTouch && flyingNow && !photoActive && (
+      {!isTouch && flyingNow && !photoActive && !watchingAirport && (
         <Zone name="exit" className="flex items-center gap-2">
           {conditionsOn() && (
             <Button

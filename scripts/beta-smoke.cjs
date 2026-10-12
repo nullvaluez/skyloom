@@ -58,7 +58,7 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
   const moduleId=workerModule?.split('.')[0];
   // Webpack splits the worker module from its executable bootstrap. Loading
   // the module chunk alone only registers factories and cannot answer RPCs.
-  const workerFile=moduleId&&readdirSync(chunks).find(f=>{if(!f.endsWith('.js'))return false;const code=readFileSync(path.join(chunks,f),'utf8');return code.includes('importScripts(')&&code.includes(`.e(${moduleId})`);});
+  const workerFile=moduleId&&readdirSync(chunks).find(f=>{if(!f.endsWith('.js'))return false;const code=readFileSync(path.join(chunks,f),'utf8');const group=code.match(/Promise\.all\(\[([\d,]+)\]\.map\([\w$]+\.e,[\w$]+\)\)/)?.[1].split(',');return code.includes('importScripts(')&&(code.includes(`.e(${moduleId})`)||group?.includes(moduleId));});
   check('production vector worker asset located',!!workerFile,workerFile);
   const worker=await page.evaluate(async file=>{
     const w=new Worker('/_next/static/chunks/'+file);let n=0;

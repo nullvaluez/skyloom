@@ -86,6 +86,7 @@ export function PhotoCapture({runtime}) {
       out.height = h;
       const ctx = out.getContext('2d');
       ctx.drawImage(src, 0, 0);
+      const observationCapture=!!runtime?.airportWatch?.active||runtime?.escort?.source==='airport';
       const adventureFrame=adventurePhotoFrame(runtime,useFlyStore.getState().warpEpoch);
       const encounterFrame=encounterPhotoFrame(runtime,useFlyStore.getState().warpEpoch);
       const geo=runtime?.geo;
@@ -118,9 +119,9 @@ export function PhotoCapture({runtime}) {
             style: mapStyle,
           };
         }
-        runtime?.adventures?.photo(adventureFrame,blob);
-        runtime?.encounters?.photo(encounterFrame,blob);
-        if(memory){useExplorationStore.getState().record('photo',memory);saveMemoryPhoto(blob).then(thumbnail=>{if(thumbnail)useExplorationStore.getState().attachThumbnail(memory.id,thumbnail);}).catch(()=>{});}
+        if(!observationCapture)runtime?.adventures?.photo(adventureFrame,blob);
+        if(!observationCapture)runtime?.encounters?.photo(encounterFrame,blob);
+        if(memory&&!observationCapture){useExplorationStore.getState().record('photo',memory);saveMemoryPhoto(blob).then(thumbnail=>{if(thumbnail)useExplorationStore.getState().attachThumbnail(memory.id,thumbnail);}).catch(()=>{});}
         req.resolve({ blob, filename, width: w, height: h, ms });
         } catch(error) { req.reject(error instanceof Error?error:new Error(String(error))); }
       }, 'image/png');

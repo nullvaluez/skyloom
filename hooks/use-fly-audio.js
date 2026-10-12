@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { FlyAudio } from '@/lib/fly/audio-engine';
 import { ImmersiveAudio } from '@/lib/fly/immersive-audio';
+import { AirportAudio } from '@/lib/fly/airport-audio';
 import { immersiveOn } from '@/lib/fly/immersive';
 import { AUDIO } from '@/lib/fly/fly-constants';
 import { resolveAircraft } from '@/lib/fly/player-aircraft';
@@ -26,6 +27,7 @@ export function useFlyAudio(runtime) {
   useEffect(() => {
     const audio = new FlyAudio();
     const immersion = new ImmersiveAudio(audio);
+    const airports = new AirportAudio(audio);
     audioRef.current = audio;
     runtime.audio = audio;
     audio.setMuted(!useFlyStore.getState().soundOn);
@@ -77,6 +79,7 @@ export function useFlyAudio(runtime) {
       // Pause gates the shared master too, including synthesized fallback and one-shots.
       audio.setMuted(!state.soundOn || state.phase==='paused' || document.hidden);
       immersion.update(runtime,state,active&&live);
+      airports.update(runtime,state);
     }, 1000 / AUDIO.updateHz);
 
     const unsubs = [
@@ -113,6 +116,7 @@ export function useFlyAudio(runtime) {
       for (const unsub of unsubs) unsub();
       runtime.audio = null;
       immersion.dispose();
+      airports.dispose();
       delete runtime.immersiveAudio;
       audio.dispose();
     };

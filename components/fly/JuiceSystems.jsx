@@ -241,7 +241,7 @@ export function JuiceSystems({ runtime }) {
       // (the frozen flight is not flying past anyone). The detector restarts
       // clean on the way back into flight — its stored distances predate the
       // menu. gameplayLive() is constant true with the flag off.
-      const live = gameplayLive(useFlyStore.getState());
+      const live = gameplayLive(useFlyStore.getState()) && runtime.escort?.source !== 'airport';
       if (live !== S.wasLive) {
         if (live && S.wasLive === false) detectorRef.current?.reset();
         S.wasLive = live;

@@ -1,11 +1,11 @@
 'use client';
+import { withRunwayGeometry } from '@/lib/fly/runway-worker';
 import { immersiveOn } from '@/lib/fly/immersive';
 import { stylizedEarthOn } from '@/lib/fly/stylized-earth';
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
-import { withRunwayGeometry } from '@/lib/fly/runway-worker';
 import { SatBuildingEngine } from '@/lib/fly/toy-world/sat-building-engine';
 import {
   NIGHT_CITY_R23,

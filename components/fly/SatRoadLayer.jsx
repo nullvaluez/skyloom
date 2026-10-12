@@ -1,9 +1,9 @@
 'use client';
+import { withRunwayGeometry } from '@/lib/fly/runway-worker';
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
-import { withRunwayGeometry } from '@/lib/fly/runway-worker';
 import {
   AdditiveBlending,
   DynamicDrawUsage,

@@ -220,6 +220,7 @@ export function Contracts({ runtime }) {
   // Advance helper: bump matching active contracts (and dailies); complete +
   // rotate. `key` dedups per contract (hexes / landmark names / atlas keys).
   const advance = (matchFn, key = null) => {
+    if(runtime.airportWatch?.active||runtime.escort?.source==='airport')return;
     let changed = false;
     stateRef.current = stateRef.current.map((c) => {
       if (c.done || !matchFn(c.tpl)) return c;
@@ -380,7 +381,7 @@ export function Contracts({ runtime }) {
       // advance while actually flying — never from the title's frozen flight
       // or the hangar. The buzz detector restarts clean afterwards (a menu is
       // a discontinuity, like a warp). gameplayLive() is true with the flag off.
-      if (!gameplayLive(useFlyStore.getState())) {
+      if (!gameplayLive(useFlyStore.getState()) || runtime.escort?.source === 'airport') {
         detectorRef.current?.reset();
         return;
       }

@@ -9,6 +9,7 @@ registerHooks({resolve(s,c,next){
 }});
 const {WORLD_ART_UNIFORMS:u,updateWorldArt,patchWorldLighting}=await import('../lib/fly/world-art-direction.js');
 const {ShaderLib,UniformsUtils}=await import('three');
+const {cinemaOn}=await import('../lib/fly/cinema-policy.js');
 let checks=0;
 const check=(name,fn)=>{fn();console.log('PASS '+name);checks++;};
 check('solar transitions are finite and continuous; missing telemetry is daylight',()=>{
@@ -37,7 +38,9 @@ check('terrain chain and near/far buildings bind one live art uniform',()=>{
  material.onBeforeCompile(s,{});
  assert.equal(s.uniforms.uWorldArt,u.uWorldArt);
  assert.equal(s.fragmentShader.split('uniform float uWorldArt;').length-1,1);
- assert.ok(s.fragmentShader.includes('moonFace'));
+ // The cinema path uses the scene's actual directional lighting; the legacy
+ // path adds moonFace fill. Test the effective material contract, not obsolete fill.
+ assert.equal(s.fragmentShader.includes('moonFace'),!cinemaOn());
  material.dispose();
  }
 });

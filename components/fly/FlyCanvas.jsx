@@ -32,7 +32,7 @@ import { initialRenderDpr } from '@/lib/fly/render-resolution';
 import { configureCinemaAssets } from '@/lib/fly/cinema-material-assets';
 import { installContextResourceLifetime } from '@/lib/fly/context-resource-lifetime';
 
-function MobileFlightPump({enabled}){
+function BudgetFramePump({enabled}){
   const invalidate=useThree(s=>s.invalidate);
   useEffect(()=>{
     if(!enabled)return;
@@ -118,6 +118,11 @@ export function FlyCanvas({ runtime }) {
   // the opaque hangar is open (fed by <StagePump>). Flag-off = today's rule.
   const frameloop=useFlyStore(frameloopFor);
   const mobileFlight=frameloop==='always'&&isMobileGraphicsClass();
+  const observing=useFlyStore(s=>!!s.airportWatch);
+  // The seated lounge targets 60 fps. Reuse the tested vsync scheduler so a
+  // high-refresh desktop does not render the same room 144–240 times/second.
+  // Flight/title cadence and all visual quality settings remain unchanged.
+  const budgetedFrames=mobileFlight||(observing&&frameloop==='always');
   const [dpr, setDpr] = useState(initialDpr);
   // R24 A (STEP_SAFE): resolved once at mount — the pin is set before Fly mode
   // mounts and never moves mid-session.
@@ -161,7 +166,7 @@ export function FlyCanvas({ runtime }) {
       shadows="percentage"
       // The hangar has its own interactive canvas. Retain the world and its
       // resources, but do not render two full scenes continuously behind it.
-      frameloop={mobileFlight?'demand':frameloop}
+      frameloop={budgetedFrames?'demand':frameloop}
       camera={{
         fov: CANVAS.fov,
         near: CANVAS.near,
@@ -204,7 +209,7 @@ export function FlyCanvas({ runtime }) {
       }}
     >
       <SessionRecovery runtime={runtime}/>
-      <MobileFlightPump enabled={mobileFlight} />
+      <BudgetFramePump enabled={budgetedFrames} />
       {/* Round 24 (E CERT): the frame-pace instrument. Priority -101 puts it
           ahead of the governor (-100) and A's STEP_SAFE rig (-99), so its dt
           is the raw inter-frame delta of the frame that just presented. Not

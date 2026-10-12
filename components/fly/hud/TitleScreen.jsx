@@ -14,6 +14,7 @@ import { computeSun } from '@/lib/fly/sun-model';
 import { SettingsRows } from './SettingsRows';
 import { CreditsPanel } from './CreditsPanel';
 import './title.css';
+import { AirportEntry } from './AirportExperience';
 import { useAdventureStore } from '@/stores/adventure-store';
 import { adventureById } from '@/lib/fly/adventures.mjs';
 
@@ -237,6 +238,7 @@ function TitleBody({ runtime }) {
 
         <button ref={last||adventure?undefined:firstAction} type="button" className="fly-title-adventure" data-testid="title-explore" onClick={()=>{unlock();enterHangarFromTitle('free',runtime);}}><Compass size={28}/><span><strong>Where will you fly?</strong><span>Discover a city, wander a coastline, or head somewhere new.</span></span><Play size={22}/></button>
         <div className={`fly-title-cards${free ? '' : ' fly-title-cards-single'}`}>
+          <AirportEntry className="fly-title-card"/>
           {free && (
             <button
               type="button"

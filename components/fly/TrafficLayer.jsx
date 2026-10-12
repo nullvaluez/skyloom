@@ -257,7 +257,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
     const ax = origin.anchor.x;
     const az = origin.anchor.z;
     const liveState=useFlyStore.getState();
-    const quietTraffic=cinemaOn(liveState)&&!liveState.spotting;
+    const quietTraffic=cinemaOn(liveState)&&!liveState.spotting&&!runtime.airportWatch?.active;
     const focusedHex=liveState.inspectHex??runtime.targeting?.lockedHex??runtime.hoverHex;
     detailed.update(items,flight,origin,liveState.qualityTier,liveState.inspectHex??runtime.targeting?.lockedHex,mapStyleNow==='satellite',runtime.explorerVisualTime??performance.now()/1000);
     runtime.liveFleet=detailed.stats;

@@ -38,6 +38,7 @@ function HangarBody({runtime}){
   const [exteriorReady,setExteriorReady]=useState(false);
   const exteriorLoaded=useCallback(()=>setExteriorReady(true),[]);
   const [startMode,setStartMode]=useState(()=>airportById(airport)?.authored===false?'runway':'apron'),[view,setView]=useState('quarter');
+  useEffect(()=>{if(airportById(airport)?.authored===false&&startMode==='apron')setStartMode('runway');},[airport,startMode]);
   const [confirmReturn,setConfirmReturn]=useState(()=>!draft&&!!runtime.operations && !['hangar','completed'].includes(runtime.operations.phase));
   useEffect(()=>{useFlyStore.getState().setHangarDismissible(confirmReturn);},[confirmReturn]);
   // R25 B FLIGHT PLAN: the panel adapts to the title's choice. Flag-off (and
@@ -122,7 +123,7 @@ function HangarBody({runtime}){
           {airportById(airport)?.authored===false&&<option value={airport}>{airportById(airport).name}</option>}
           {OPERATIONS_AIRPORTS.map(a=><option key={a.id} value={a.id} disabled={!airportEligible(a,aircraft.id)}>{a.id} · {a.name}{!airportEligible(a,aircraft.id)?' — unavailable':''}</option>)}
         </select></div>
-        {profile?<><fieldset className="ops-start-options"><legend>Choose your starting point</legend>{modes.map(([key,label,Icon])=><label key={key} className={startMode===key?'selected':''}><input type="radio" name="departure-mode" value={key} checked={startMode===key} onChange={()=>setStartMode(key)}/><Icon size={20}/><strong>{label}</strong>{startMode===key&&<Check className="ops-mode-check" size={12}/>}</label>)}</fieldset><p className="ops-mode-description">{modeHelp[startMode]}</p></>:<p className="ops-mode-description">A quiet start above Ohio State University. Find a thermal and explore.</p>}
+        {profile?<><fieldset className="ops-start-options"><legend>Choose your starting point</legend>{modes.filter(([key])=>key!=='apron'||airportById(airport)?.authored!==false).map(([key,label,Icon])=><label key={key} className={startMode===key?'selected':''}><input type="radio" name="departure-mode" value={key} checked={startMode===key} onChange={()=>setStartMode(key)}/><Icon size={20}/><strong>{label}</strong>{startMode===key&&<Check className="ops-mode-check" size={12}/>}</label>)}</fieldset><p className="ops-mode-description">{modeHelp[startMode]}</p></>:<p className="ops-mode-description">A quiet start above Ohio State University. Find a thermal and explore.</p>}
       </div>
       <div className="ops-dispatch-action">
         <button data-testid="hangar-fly" className="ops-primary" disabled={!ready||!live||(!compatible&&!!profile)} onClick={start}><span>{!ready?'Loading aircraft…':!live?'Preparing flight…':!profile?'Start glider practice':({apron:'Start on apron',runway:'Start on runway',approach:'Practice landing'})[startMode]}</span><ArrowUpRight size={20}/></button>

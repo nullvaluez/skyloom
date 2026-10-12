@@ -277,6 +277,7 @@ export function LabelCanvas({ runtime }) {
     window.addEventListener('pointerdown', onDown);
 
     const draw = () => {
+      if(runtime.airportWatch?.active)return;
       // Only the self-driven path re-arms; under HUD_SYNC the GL frame calls us.
       if (!syncToGl) raf = requestAnimationFrame(draw);
       // Round 17 — phone cadence. The overlay redraws at 30 Hz on a phone

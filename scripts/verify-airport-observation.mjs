@@ -1,0 +1,40 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {registerHooks} from 'node:module';
+import {fileURLToPath} from 'node:url';
+registerHooks({resolve(s,c,next){if(s.startsWith('@/'))s=new URL('../'+s.slice(2),import.meta.url).href;if(s.startsWith('.')||s.startsWith('file:')){const u=new URL(s,c.parentURL);if(fs.existsSync(fileURLToPath(u)+'.js'))return next(u.href+'.js',c);}return next(s,c);}});
+const {airportActivity,joinBlocker,observationViews,discoveryNeedsSceneRefresh}=await import('../lib/fly/airport-observation.mjs');
+const registry=await import('../lib/fly/operations-airports.js');
+const {trafficStatus}=await import('../lib/fly/data-status.mjs');
+const {livingAirportsOn}=await import('../lib/fly/airport-feature-policy.js');
+let checks=0;const check=(name,fn)=>{fn();checks++;console.log('PASS '+name);};
+const t={hex:'abc123',rx:1000,ry:1200,rz:0,stale:0,flags:0,fix1:{vE:-100,vN:0,vUp:-3},meta:{flight:' SKY123 '}};
+check('approach classification uses radial movement and descent',()=>assert.equal(airportActivity(t,{x:0,z:0}).category,'approach'));
+check('departure requires outward movement and climb',()=>assert.equal(airportActivity({...t,fix1:{vE:100,vN:0,vUp:3}},{x:0,z:0}).category,'departure'));
+check('stale positions never imply a flight phase',()=>assert.equal(airportActivity({...t,stale:1},{x:0,z:0}).category,'nearby'));
+check('ground is observed separately',()=>assert.equal(airportActivity({...t,flags:1},{x:0,z:0}).category,'ground'));
+check('activity is bounded to local airport radius',()=>assert.equal(airportActivity({...t,rx:50000},{x:0,z:0}),null));
+const safe={track:t,status:'live',cfg:{speeds:{slow:60,boost:300}},ground:300,targetGround:400,altitude:1200};
+check('fresh compatible terrain-clear join allowed',()=>assert.equal(joinBlocker(safe),null));
+check('speed-compatible contact above the chosen aircraft ceiling is rejected',()=>assert.match(joinBlocker({...safe,altitude:6000,cfg:{...safe.cfg,ceiling:5500,ceilingSoftZone:1000}}),/ceiling/));
+for(const [name,patch]of [['missing',{track:null}],['stale',{track:{...t,stale:1}}],['grounded',{track:{...t,flags:1}}],['delayed',{status:'delayed'}],['unavailable',{status:'unavailable'}],['missing terrain',{ground:null}],['target terrain',{targetGround:null}],['clearance',{ground:1000}],['loading',{ready:false}],['incompatible speed',{cfg:{speeds:{slow:5,boost:30}}}],['glider',{aircraftId:'glider'}]])check('join rejected: '+name,()=>assert.equal(typeof joinBlocker({...safe,...patch}),'string'));
+const cmh=registry.airportById('KCMH');
+check('distant discovery retains shared engines; overlapping and unknown bounds refresh',()=>{assert.equal(discoveryNeedsSceneRefresh({x:0,z:0},{x:800000,z:0},1.4),false);assert.equal(discoveryNeedsSceneRefresh({x:0,z:0},{x:30000,z:0},1.4),true);assert.equal(discoveryNeedsSceneRefresh({x:0,z:0},{x:800000,z:0},10),true);assert.equal(discoveryNeedsSceneRefresh(null,{x:0,z:0}),true);});
+check('Ohio identity remains authored and unchanged',()=>{assert.equal(cmh.runway,'10R');assert.ok(registry.airportPavements(cmh).some(p=>p.kind==='taxiway'));});
+check('generic geometry is runway-only',()=>{const a=registry.registerAirport({...cmh,id:'TEST:10-28',ident:'TEST'});assert.equal(a.authored,false);assert.equal(registry.airportPavements(a).length,1);});
+check('registry rejects bad terrain coordinates',()=>assert.throws(()=>registry.registerAirport({...cmh,id:'bad',a:{...cmh.a,lat:NaN}})));
+check('registry retirement preserves authored airports',()=>{registry.retainDiscoveredAirports([]);assert.equal(registry.airportById('TEST:10-28'),undefined);assert.equal(registry.airportById('KCMH'),cmh);});
+check('every airport provides one fixed window seat',()=>{assert.equal(observationViews(cmh,3000).length,1);assert.equal(observationViews(cmh,3000)[0].id,'lounge');assert.equal(observationViews({...cmh,id:'TEST'},3000).length,1);});
+check('provider states distinguish delayed and unavailable',()=>{assert.equal(trafficStatus({now:1000},null,1001000).state,'live');assert.equal(trafficStatus({now:1000},null,1020000).state,'delayed');assert.equal(trafficStatus(null,null).state,'unavailable');});
+globalThis.window={location:{search:'?graphicsReview=1&airports=on&airportArt=off&airportScenery=on'},matchMedia:()=>({matches:false})};
+check('rollout parts are independent',()=>{assert.equal(livingAirportsOn(),true);assert.equal(livingAirportsOn('worldArt'),false);assert.equal(livingAirportsOn('scenery'),true);});
+check('mobile is always excluded',()=>{window.matchMedia=()=>({matches:true});window.ontouchstart=null;assert.equal(livingAirportsOn(),false);delete window.ontouchstart;});
+check('ordinary release remains off',()=>{window.matchMedia=()=>({matches:false});window.location.search='';assert.equal(livingAirportsOn(),false);});
+delete globalThis.window;
+check('every checked-in runway passes runtime validation',()=>{
+  let count=0;for(const file of fs.readdirSync('public/data/runways/v1/regions')){
+    const region=JSON.parse(fs.readFileSync('public/data/runways/v1/regions/'+file,'utf8'));
+    for(const row of region.airports){registry.registerAirport(row);registry.retainDiscoveredAirports([]);count++;}
+  }assert.equal(count,14094);
+});
+console.log(`AIRPORT OBSERVATION: ${checks}/${checks}`);

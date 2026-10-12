@@ -1,4 +1,5 @@
 'use client';
+import { withRunwayGeometry } from '@/lib/fly/runway-worker';
 
 import { applyNightGroundReceiver } from '@/lib/fly/night-ground';
 import { applyDaylightSurface } from '@/lib/fly/daylight-depth';
@@ -6,7 +7,6 @@ import { applyDaylightSurface } from '@/lib/fly/daylight-depth';
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
-import { withRunwayGeometry } from '@/lib/fly/runway-worker';
 import {
   BufferAttribute,
   BufferGeometry,

@@ -4,6 +4,10 @@ import { subscribeWithSelector } from 'zustand/middleware';
 const initialState = {
   // Lifecycle: 'boot' | 'loading-terrain' | 'flying' | 'paused'
   phase: 'boot',
+  airportBrowserOpen: false,
+  airportWatch: null,
+  airportReturn: null,
+  airportContentEpoch: 0,
 
   // Spawn point { lat, lon } resolved by FlyMode on mount
   spawn: null,

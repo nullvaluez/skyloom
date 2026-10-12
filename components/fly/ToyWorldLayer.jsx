@@ -1,9 +1,9 @@
 'use client';
+import { withRunwayGeometry } from '@/lib/fly/runway-worker';
 
 import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
-import { withRunwayGeometry } from '@/lib/fly/runway-worker';
 import { ToyWorldEngine } from '@/lib/fly/toy-world/toy-world-engine';
 import { setFoamTime, setPulseTime } from '@/lib/fly/toy-world/world-bend';
 import { BEACONS, FOAM, ROAD_PULSE } from '@/lib/fly/fly-constants';

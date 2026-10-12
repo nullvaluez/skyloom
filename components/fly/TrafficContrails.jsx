@@ -30,7 +30,7 @@ function sources(t) {
  * ONE bounded draw for the whole fleet; distant/unknown traffic stays cheap.
  * Records contain no aircraft metadata and are retired when the track leaves. */
 export function TrafficContrails({ runtime, origin }) {
-  const state = useMemo(() => ({ time: 0, recs: new Map(), pool: [],
+  const state = useMemo(() => ({ time: 0, recs: new Map(), pool: [], chosen: [], chooseAt: 0, limit: null,
     batch: new WakeBatch(FX.maxTraffic.high * 4, 96, patchAirWake) }), []);
   useEffect(() => {
     // Depth-less vapor against the sky: drawn after the cloud composite.
@@ -44,15 +44,23 @@ export function TrafficContrails({ runtime, origin }) {
     const now = state.time, limit = FX.maxTraffic[store.qualityTier] ?? FX.maxTraffic.medium;
     // Preserve admitted tracks through a small range band so equal-distance
     // neighbours cannot trade slots and erase one another's histories.
-    const eligible = items.filter(t => t.fix1 && t.distM < (state.recs.has(t.hex) ? 26000 : 22000) &&
+    // Admission is a spatial decision, not animation. Reuse its bounded set
+    // between polls while recording/rendering every frame (avoids allocating
+    // filter/sort/Set arrays for the entire regional feed every single frame).
+    if(!runtime.airportWatch?.active||now>=state.chooseAt||limit!==state.limit){
+    state.chooseAt=now+.5;state.limit=limit;
+    const range=runtime.airportWatch?.active?50000:22000;
+    const eligible = items.filter(t => t.fix1 && t.distM < range+(state.recs.has(t.hex)?4000:0) &&
       (t.opacity ?? 1) * (t.horizonFade ?? 1) > .03 &&
       (contrailStrength(t.ry, Math.hypot(t.fix1.vE, t.fix1.vN), t.flags & 1) > .003 || state.recs.has(t.hex)) && sources(t).length);
     eligible.sort((a, b) => (a.distM - (state.recs.has(a.hex) ? 1800 : 0)) - (b.distM - (state.recs.has(b.hex) ? 1800 : 0)));
-    const chosen = eligible.slice(0, limit), seen = new Set(chosen.map(t => t.hex));
+    state.chosen = eligible.slice(0, limit);const seen = new Set(state.chosen.map(t => t.hex));
     for (const [hex, rec] of state.recs) if (!seen.has(hex)) {
       for (const h of rec.histories) { h.clear(); if (state.pool.length < FX.maxTraffic.high * 4) state.pool.push(h); }
       state.recs.delete(hex);
     }
+    }
+    const chosen=state.chosen;
     const wind = runtime.weather?.wx, wx = (wind?.windX ?? 0) * .35, wz = (wind?.windZ ?? 0) * .35;
     state.batch.begin(camera,!!runtime.cinemaEnvironment&&store.mapStyle==='satellite');
     for (const t of chosen) {

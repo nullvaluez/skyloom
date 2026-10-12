@@ -154,7 +154,7 @@ function ModalBody({ hex, runtime }) {
   });
   useEffect(() => {
     const t = runtime.traffic?.tracks.get(hex);
-    if (!t?.meta) return;
+    if (!t?.meta || runtime.airportWatch?.active) return;
     const geo = runtime.engine?.worldToGeo({ x: t.rx, y: t.ry, z: t.rz });
     usePassportStore.getState().logSpot(trackSpotAttrs(t, geo));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -214,6 +214,10 @@ function ModalBody({ hex, runtime }) {
     return 'Warp failed';
   };
   const runAction = (kind, isRetry = false) => {
+    if(runtime.airportWatch?.active){
+      if(kind==='warp'){runtime.airportWatch.selected=hex;runtime.airportWatch.track(true);return;}
+      const result=runtime.airportWatch.join(hex);if(!result.ok)setNotice({key:Date.now(),msg:result.message});return;
+    }
     if (kind === 'chase') {
       const res = startEscort(runtime, hex, { cinematic: true, source: 'inspect' });
       if (res.ok) {
@@ -362,7 +366,7 @@ function ModalBody({ hex, runtime }) {
     [
       'Spot log',
       spot.isNew
-        ? 'First sighting — logged'
+        ? runtime.airportWatch?.active ? 'Watching · not logged' : 'First sighting — logged'
         : `Seen ${spot.count}×${spot.firstAt ? ` since ${new Date(spot.firstAt).toLocaleDateString()}` : ''}`,
       true,
       'inspect-spot-log',
@@ -631,13 +635,13 @@ function ModalBody({ hex, runtime }) {
             title={
               frozen
                 ? 'No fresh position — escort needs a live signal'
-                : 'Fly alongside with the cinematic camera (F)'
+                : runtime.airportWatch?.active ? 'Reposition into a terrain-safe airborne start (F)' : 'Fly alongside with the cinematic camera (F)'
             }
           >
             <Crosshair size={22} strokeWidth={2.4} aria-hidden="true" />
             <span className="tgt-btn-label">
-              <strong>{frozen ? 'Signal frozen' : 'Escort'}</strong>
-              <span>{frozen ? 'Needs a live signal' : 'Fly alongside · cinematic'}</span>
+              <strong>{frozen ? 'Signal frozen' : runtime.airportWatch?.active ? 'Join nearby' : 'Escort'}</strong>
+              <span>{frozen ? 'Needs a live signal' : runtime.airportWatch?.active ? 'Reposition into flight' : 'Fly alongside · cinematic'}</span>
             </span>
             {!frozen && <span className="tgt-kbd">F</span>}
           </button>
@@ -647,12 +651,12 @@ function ModalBody({ hex, runtime }) {
             onClick={onWarp}
             disabled={!warpReady}
             data-testid="inspect-warp"
-            title="Jump in right behind it (G)"
+            title={runtime.airportWatch?.active ? 'Track from this airport viewpoint (G)' : 'Jump in right behind it (G)'}
           >
             <Zap size={20} strokeWidth={2.3} aria-hidden="true" />
             <span className="tgt-btn-label">
-              <strong>{warpReady ? 'Warp' : 'Syncing…'}</strong>
-              <span>Jump behind it</span>
+              <strong>{warpReady ? runtime.airportWatch?.active ? 'Track camera' : 'Warp' : 'Syncing…'}</strong>
+              <span>{runtime.airportWatch?.active ? 'Watch from the airport' : 'Jump behind it'}</span>
             </span>
             <span className="tgt-kbd">G</span>
           </button>
