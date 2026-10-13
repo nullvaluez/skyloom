@@ -411,7 +411,8 @@ const CORRUPT = [
   ['ineligible: cargo at KOSU', JSON.stringify({ v: 1, flightMode: 'ops', aircraftId: 'cargo', airportId: 'KOSU', start: 'apron' })],
   ['ineligible: glider on a runway', JSON.stringify({ v: 1, flightMode: 'ops', aircraftId: 'glider', airportId: 'KOSU', start: 'runway' })],
   ['unknown airport', JSON.stringify({ v: 1, flightMode: 'ops', aircraftId: 'fighter', airportId: 'KJFK', start: 'apron' })],
-  ['unknown start', JSON.stringify({ v: 1, flightMode: 'ops', aircraftId: 'fighter', airportId: 'KCMH', start: 'gate' })],
+  // 'gate' became a real start in GATE TO GATE W0 (4f); any other name is still unknown.
+  ['unknown start', JSON.stringify({ v: 1, flightMode: 'ops', aircraftId: 'fighter', airportId: 'KCMH', start: 'pushback' })],
   ['free without dest', JSON.stringify({ v: 1, flightMode: 'free', aircraftId: 'prop' })],
   ['unknown featured id', JSON.stringify({ v: 1, flightMode: 'free', aircraftId: 'prop', dest: { id: 'atlantis' } })],
   ['searched dest at 89°N', JSON.stringify({ v: 1, flightMode: 'free', aircraftId: 'prop', dest: { id: 'poi:city:X', name: 'X', lat: 89, lon: 0, altM: 800, headingDeg: 0 } })],
@@ -446,6 +447,34 @@ await tryGate('4e featured rehydrate', () => {
   FP.saveLastSetup({ flightMode: 'free', aircraftId: 'prop', dest: 'yosemite' }, st);
   const raw = JSON.parse(st.getItem(KEY));
   gate('4e featured destinations persist by id only (rehydrated from the catalog)', JSON.stringify(raw.dest) === '{"id":"yosemite"}' && FP.readLastSetup(st).dest === FP.FEATURED_DESTINATIONS.find((d) => d.id === 'yosemite'), JSON.stringify(raw.dest));
+});
+// GATE TO GATE W0: the 'gate' start, airport time zones and catalog labels.
+// Catalog runways are registered from public/ for these checks and retired after.
+const REG = await imp('lib/fly/operations-airports.js');
+const catalogRow = (id) => {
+  const dir = path.join(ROOT, 'public/data/runways/v1');
+  const region = JSON.parse(readFileSync(path.join(dir, 'index.json'), 'utf8')).runways.find((r) => r.id === id).region;
+  return REG.registerAirport(JSON.parse(readFileSync(path.join(dir, 'regions', `${region}.json`), 'utf8')).airports.find((a) => a.id === id));
+};
+await tryGate('4f gate start', () => {
+  const st = mem();
+  const setup = { flightMode: 'ops', aircraftId: 'airliner', airportId: 'KCMH', start: 'gate' };
+  const wrote = FP.saveLastSetup(setup, st, 4321);
+  const back = FP.readLastSetup(st);
+  const label = back ? FP.describeSetup(back) : null;
+  gate("4f a 'gate' setup normalizes, round-trips through fly-last-setup and reads 'Gate'", FP.normalizeSetup(setup)?.start === 'gate' && wrote === true && back?.start === 'gate' && back.airportId === 'KCMH' && back.at === 4321 && label === `${aircraftName('airliner')} · KCMH · Gate`, String(label));
+});
+await tryGate('4g airport tz', () => {
+  const egll = catalogRow('EGLL:09L-27R');
+  const tz = [FP.airportDestination('KCMH')?.tz, FP.airportDestination(egll.id)?.tz];
+  REG.retainDiscoveredAirports([]);
+  gate('4g airport destinations take the local standard offset: KCMH -5, an EGLL catalog row 0', tz[0] === -5 && tz[1] === 0, JSON.stringify(tz));
+});
+await tryGate('4h catalog describe', () => {
+  const lowi = catalogRow('LOWI:08-26');
+  const text = FP.describeSetup({ flightMode: 'ops', aircraftId: 'fighter', airportId: lowi.id, start: 'runway' });
+  REG.retainDiscoveredAirports([]);
+  gate("4h a catalog setup's Continue line names the airport, never its raw id", text === `${aircraftName('fighter')} · LOWI · Innsbruck · Runway` && !/[A-Z0-9]+:\d/.test(text), String(text));
 });
 
 // ===========================================================================
