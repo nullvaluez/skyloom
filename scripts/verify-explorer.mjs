@@ -95,6 +95,22 @@ test('free flight enters a nearby approach without teleporting or cutting power'
   f.pos.y=p.y+1000;assert.equal(o.advance(1/60,f,{}),false);assert.equal(o.profile,null);
 });
 
+test('Atlas guidance survives the free-flight drop from 20 km / 1,200 m and captures the approach inside 5.5 km / 500 m',async()=>{
+  const {Vector3}=await import('three'),{FlightOperations}=await import('../lib/fly/flight-operations.js'),{airportById}=await import('../lib/fly/operations-airports.js'),{operationsProfile}=await import('../lib/fly/operations-profiles.js');
+  const a=airportById('KCMH'),frame=airportFrame(a),far=airportPoint(a,-20000);
+  const f={pos:new Vector3(far.x,far.y+1200,far.z),cfg:{speeds:{cruise:240}},speed:150,heading:frame.heading,pitch:0,bank:0,latDeg:a.a.lat,groundElev:far.y,turnRate:0};
+  // runtime.approachAirport, minus the runtime: the destination, a profile, free-roam and the guided mark.
+  const o=new FlightOperations();o.profile=operationsProfile('airliner');o.destination=a.id;o.phase='airborne';o.freeRoam=true;o.freeAircraftId='airliner';o.guided=true;o.vy=0;
+  assert.ok(o.guideApproach(f));
+  for(let i=0;i<600;i++)assert.equal(o.advance(1/60,f,{}),false);
+  assert.ok(o.profile&&o.destination===a.id&&o.approachRequested,'guidance must survive far and high');
+  const near=airportPoint(a,-5000);f.pos.set(near.x,near.y+400,near.z);f.groundElev=near.y;
+  o.advance(1/60,f,{});assert.equal(o.phase,'approach');
+  // Without the guided mark the same start drops back to free flight at once.
+  const free=new FlightOperations();free.profile=operationsProfile('airliner');free.destination=a.id;free.phase='airborne';free.freeRoam=true;
+  f.pos.set(far.x,far.y+1200,far.z);assert.equal(free.advance(1/60,f,{}),false);assert.equal(free.profile,null);
+});
+
 test('terrain candidate caching preserves runway height and bounded shoulders',async()=>{
   const {airportTerrainHeight}=await import('../lib/fly/operations-terrain.js'),{airportById}=await import('../lib/fly/operations-airports.js');
   const index=JSON.parse(readFileSync(new URL('../public/data/runways/v1/index.json',import.meta.url))).runways;
