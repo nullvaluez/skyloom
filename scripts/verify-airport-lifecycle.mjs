@@ -29,7 +29,7 @@ const saved=new Map();globalThis.localStorage={setItem:(k,v)=>saved.set(k,v),get
 globalThis.fetch=async url=>({ok:true,json:async()=>JSON.parse(fs.readFileSync('public'+url,'utf8'))});
 const engine={worldToGeo:p=>new Vector3(p.x/6378137*180/Math.PI,(2*Math.atan(Math.exp(-p.z/6378137))-Math.PI/2)*180/Math.PI,p.y),getGroundAt:()=>({tileZ:18,elev:250})};
 const flight={pos:new Vector3(),cfg:{speeds:{slow:60,boost:300}},heading:0,speed:100,pitch:0,bank:0};
-const runtime={engine,flight,worldLoading:false,traffic:{tracks:new Map(),items:[]},trafficStatus:{state:'live'},autopilot:{mode:'off',disengage(){this.mode='off';}},adventures:{suspend(){}},operations:{phase:'airborne',profile:null,events:[],warp(){}},warpToGeo(lat,lon,{altM,headingRad=0}){const p=projectAirportPoint(lon,lat);flight.pos.set(p.x,altM,p.z);flight.heading=headingRad;return true;},interceptHex(){runtime.autopilot.mode='intercept';return true;}};
+const runtime={engine,flight,worldLoading:false,traffic:{tracks:new Map(),items:[]},trafficStatus:{state:'live'},autopilot:{mode:'off',disengage(){this.mode='off';}},adventures:{suspend(){}},operations:{phase:'airborne',profile:null,events:[],warp(){},snapshot(){return {...this,events:this.events.slice()};},restore(s){Object.assign(this,s);}},warpToGeo(lat,lon,{altM,headingRad=0}){const p=projectAirportPoint(lon,lat);flight.pos.set(p.x,altM,p.z);flight.heading=headingRad;return true;},interceptHex(){runtime.autopilot.mode='intercept';return true;}};
 runtime.targeting={lockedHex:null,target:null,_lockT:0};
 useFlyStore.setState({runtimeReady:true,aircraftId:'fighter',soundOn:false});
 const dispose=connectAirportWatch(runtime);let checks=0;
