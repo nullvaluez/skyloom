@@ -12,6 +12,9 @@
 //   4. the height field rebuilt from a bumpy terrain mesh: an upper envelope of
 //      every terrain vertex, tight (median over-lift), complete, deterministic,
 //      and a refined terrain REPLACES the old surface (no stale accumulation);
+//      the tile zoom it remembers per node (what the engine ground provider
+//      reports, so a field built on a coarse tile is never taken for refined
+//      ground) and the drawn-cell map that bounds where it answers;
 //   5. the airfield lights (finite, bounded, the GLOW_MODE mirror equal to
 //      glow-points.js), the grass field and the pavement appearance field.
 //
@@ -195,7 +198,7 @@ check('layers fit the triangle budget and are deterministic', () => {
 // A rolling, sloping terrain with metre-scale bumps, as a tile mesh would be:
 // a 3 m vertex grid over the field's extent, raw (x, z, elevation) with an
 // identity mapping, plus a skirt row hundreds of metres down.
-function terrainSource(h, spacing = 3) {
+function terrainSource(h, spacing = 3, zoom = 17) {
   // Past the grid on every side, as resident tiles always are.
   const x0 = grid.x0 - 6, z0 = grid.z0 - 6, x1 = grid.x0 + (grid.nx - 1) * grid.step + 6, z1 = grid.z0 + (grid.nz - 1) * grid.step + 6;
   const nx = Math.ceil((x1 - x0) / spacing) + 1, nz = Math.ceil((z1 - z0) / spacing) + 1;
@@ -220,7 +223,7 @@ function terrainSource(h, spacing = 3) {
     pos[o + 2] = h(x0 + i * spacing, z0) - 600;
   }
   for (let i = 0; i + 1 < nx; i++) idx.push(i, nx * nz + i, i + 1);
-  return { pos, idx, nx, nz, source: { position: pos, index: new Uint32Array(idx), skirtBelow: 0, m: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0] } };
+  return { pos, idx, nx, nz, source: { position: pos, index: new Uint32Array(idx), skirtBelow: 0, zoom, m: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0] } };
 }
 // Rolling ground plus 0.2 m bumps at a 26 m wavelength — rougher than a real
 // airfield DEM, which is what the envelope has to cover between 16 m nodes.
@@ -279,6 +282,58 @@ check('height field: deterministic, and a refined terrain replaces the old surfa
   run(field1, [t2.source]);
   const d = overLift(field1, flatter, 4000);
   assert.ok(d[d.length >> 1] < 0.12, `median over-lift after refinement ${d[d.length >> 1].toFixed(3)} m`);
+});
+check('height field: remembers the tile zoom behind every node', () => {
+  const midX = grid.x0 + ((grid.nx - 1) * grid.step) / 2;
+  const left = grid.x0 + (grid.nx - 1) * grid.step * 0.25, right = grid.x0 + (grid.nx - 1) * grid.step * 0.75;
+  const zMid = grid.z0 + ((grid.nz - 1) * grid.step) / 2;
+  // A coarse z12 tile everywhere, 0.5 m low, and a fine z17 tile over the
+  // left half only (as during refinement): each node takes the zoom of the
+  // triangle that set it.
+  const coarse = terrainSource((x, z) => hill(x, z) - 0.5, 9, 12).source;
+  const fineAll = terrainSource(hill, 3, 17);
+  const keep = [];
+  for (let t = 0; t < fineAll.idx.length; t += 3) {
+    const ok = [0, 1, 2].every((q) => fineAll.pos[fineAll.idx[t + q] * 3] < midX - 20);
+    if (ok) keep.push(fineAll.idx[t], fineAll.idx[t + 1], fineAll.idx[t + 2]);
+  }
+  const fine = { ...fineAll.source, index: new Uint32Array(keep) };
+  coarse.skirtBelow = fine.skirtBelow = -Infinity;
+  const f = new H.AirfieldHeightField(grid);
+  run(f, [coarse, fine]);
+  assert.equal(f.zoomAt(left, zMid), 17);
+  assert.equal(f.zoomAt(right, zMid), 12);
+  assert.equal(f.zoomAt(grid.x0 - 50, zMid), 0, 'outside the grid');
+  // Only the fine half: the rest is unknown (no height, zoom 0) ...
+  const g = new H.AirfieldHeightField(grid);
+  run(g, [fine]);
+  assert.equal(g.zoomAt(left, zMid), 17);
+  assert.equal(g.heightAt(right, zMid), null);
+  assert.equal(g.zoomAt(right, zMid), 0);
+  // ... until a later build covers it; a node a build misses keeps its
+  // previous value AND its previous zoom.
+  run(g, [coarse]);
+  assert.equal(g.zoomAt(right, zMid), 12);
+  run(g, [fine]);
+  assert.equal(g.zoomAt(left, zMid), 17);
+  assert.equal(g.zoomAt(right, zMid), 12, 'kept from the previous build');
+});
+check('drawn cells: every layer triangle marks its cell, runways over pavement over grass', () => {
+  const cells = H.drawnCells(grid, [[built.grass, 1], [built.pavement, 2], [built.runway, 3]]);
+  assert.equal(cells.length, (grid.nx - 1) * (grid.nz - 1));
+  for (const [g, code] of [[built.grass, 1], [built.pavement, 2], [built.runway, 3]]) {
+    const p = g.position;
+    for (let t = 0; t < g.index.length; t += 3) {
+      const cx = (p[g.index[t] * 3] + p[g.index[t + 1] * 3] + p[g.index[t + 2] * 3]) / 3;
+      const cz = (p[g.index[t] * 3 + 2] + p[g.index[t + 1] * 3 + 2] + p[g.index[t + 2] * 3 + 2]) / 3;
+      const i = Math.floor((cx - grid.x0) / grid.step), j = Math.floor((cz - grid.z0) / grid.step);
+      assert.ok(cells[j * (grid.nx - 1) + i] >= code);
+    }
+  }
+  const r = model.runways[0];
+  const mx = r.ax + (r.ux * r.length) / 2, mz = r.az + (r.uz * r.length) / 2;
+  assert.equal(cells[Math.floor((mz - grid.z0) / grid.step) * (grid.nx - 1) + Math.floor((mx - grid.x0) / grid.step)], 3, 'the runway middle');
+  assert.ok(cells.some((c) => c === 1) && cells.some((c) => c === 2), 'grass and pavement cells');
 });
 
 // --- lights, grass, pavement field ----------------------------------------------------

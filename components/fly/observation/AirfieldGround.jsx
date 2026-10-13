@@ -19,11 +19,15 @@ import { AirfieldGroundSet } from '@/lib/fly/airfield/airfield-ground';
  * While the set is ready it publishes `runtime.airfieldGround` (heights, the
  * OSM facts and the airport model for the other lounge workstreams) and takes
  * over the observed airport's ground from the older layers
- * (lib/fly/airfield/airfield-suppression.js).
+ * (lib/fly/airfield/airfield-suppression.js). It also registers the engine's
+ * ground provider, so `engine.getGroundAt` answers the drawn surface wherever
+ * this set draws (with the zoom of the terrain it was built from).
  */
 export function AirfieldGround({ runtime }) {
   const parent = useRef(null);
   const set = useRef(null);
+  // The engine our ground provider is registered with, and its unregister.
+  const provider = useRef({ engine: null, off: null });
   const gl = useThree((s) => s.gl);
 
   useEffect(() => {
@@ -58,6 +62,8 @@ export function AirfieldGround({ runtime }) {
     };
     return () => {
       unregister();
+      provider.current.off?.();
+      provider.current = { engine: null, off: null };
       ground.dispose();
       if (set.current === ground) set.current = null;
       if (process.env.NODE_ENV === 'development' && window.__airfieldGround === ground) delete window.__airfieldGround;
@@ -68,6 +74,13 @@ export function AirfieldGround({ runtime }) {
   useFrame((state) => {
     const ground = set.current;
     if (!ground) return;
+    // Engine ground queries inside the airfield answer the drawn surface
+    // (AirfieldGroundSet.groundAt); re-registered if the engine is replaced.
+    const engine = runtime.engine;
+    if (engine?.setGroundProvider && provider.current.engine !== engine) {
+      provider.current.off?.();
+      provider.current = { engine, off: engine.setGroundProvider((x, z) => ground.groundAt(x, z)) };
+    }
     ground.update(state, state.clock.elapsedTime);
     if (typeof window !== 'undefined' && window.__flyStats) window.__flyStats.airfieldGround = ground.stats;
   }, -39);
