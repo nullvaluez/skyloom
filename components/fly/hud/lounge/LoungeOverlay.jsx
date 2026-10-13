@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable react-hooks/immutability -- the flight runtime and the picker are imperative per-frame buses, deliberately outside React state. */
 import { useEffect, useRef } from 'react';
 import { Vector3 } from 'three';
 import { addAfterEffect } from '@react-three/fiber';
