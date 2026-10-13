@@ -49,6 +49,11 @@ lines.push(
   '## Live flight data',
   '',
   '- ADS-B data by [adsb.lol](https://adsb.lol) — community-run, ODbL.',
+  '',
+  '## Airport discovery',
+  '',
+  '- Runway catalog: [OurAirports](https://ourairports.com/data/), public domain. The checked-in snapshot\'s source hashes and retrieval date are recorded in `public/data/runways/v1/manifest.json`.',
+  '- Featured airport terminal/tower silhouettes: first-party Skyloom geometry, simplified and approximately placed for scenery.',
   ''
 );
 
