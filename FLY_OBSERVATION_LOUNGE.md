@@ -341,11 +341,48 @@ Each ran in its own worktree under `C:\Users\bfecho\skyloom-lounge\`, merged
   surfaces in `FLY_ASSETS`; CREDITS.md regenerated (the generator now keeps
   the airport discovery section it used to drop).
 
+### Seats at every airport (2026-10-13)
+
+The four flagships were hand-placed and audited, but every other airport used
+the generic rule (46 % along the longest runway, a fixed distance off it).
+Audited at six hubs it put the set's pier and apron on taxiways (KORD 41 %,
+LFPG 48 % of the footprint), on a crossing runway (KSFO, KPIT) or on grass
+with no apron (KDEN) — and the golden-hour list sends players to exactly those
+hubs.
+
+- `lib/fly/lounge-seat.js` rasterises the airport's OSM data (aprons,
+  runways, taxiway centrelines, buildings, gates; `SEAT` in
+  observation-config) and scores seats along every long runway: never on a
+  runway, taxiways under the set penalised, stands on real apron near real
+  gates rewarded, sightlines to every touchdown zone and approach checked
+  over the buildings; a wide runway takes the mid set only when nothing good
+  fits. ~50 ms per airport.
+- `scripts/build-lounge-seats.mjs` runs it offline for the golden-hour hubs
+  (lib/airports.js) into `lib/fly/lounge-seats.js`: **107 of 111 hubs**, none
+  on a runway, none with the faced runway's approach blocked by more than one
+  point. Re-run it when `SEAT` or the set layout changes.
+- Any other airport chooses at runtime: `enter()` transfers to the generic
+  seat at once, loads the airport's OSM data in the background (the airfield
+  ground's own shared load) and moves to the chosen seat before the reveal
+  (`airportWatch.seatPending`, at most `SEAT.loadTimeoutMs`; the published
+  site epoch remounts the set). Dev server: KPIT 13.2 s (generic seat 63
+  footprint samples on a runway → chosen 0, 113 on apron), KIND 9.7 s.
+- Order in `resolveLoungeSite`: review override → flagship → hub table →
+  runtime choice → generic; `site.source` names it. Gate
+  `verify-lounge-seat.mjs` (6) on a synthetic field the generic rule gets
+  wrong.
+
+Also: `380ac36` a contrail no longer takes a step when the feed jumps during
+a stall frame (it now shifts with any jump inside 3 s; a 1.2 s stall used to
+leave a 36° step for the trail's whole life), with a RED-first check in
+`verify-fleet-airframes` (13).
+
 **Gates on `main` after the pass:** airport observation 45/45, lifecycle 23/23,
-audio 11/11, lounge 12, airport set 17/17, fleet airframes 12/12, airfield
-ground 13/13, runway catalog 9/9, import integrity 4/4, true scale 14/14,
-aircraft effects 14, tracer spot 32/32, warbirds, cloud calm 6/6, HDR guard
-4/4, conditions 7/7, interaction 25/25 (browser), fleet static. Still red and
+audio 11/11, lounge 12, airport set 17/17, fleet airframes 13/13, lounge seat
+6/6, airfield ground 13/13, runway catalog 9/9, import integrity 4/4, true
+scale 14/14, aircraft effects 14, tracer spot 32/32, warbirds, cloud calm
+6/6, HDR guard 4/4, conditions 7/7, interaction 25/25 and browser states 24/24
+(browser), fleet static. Still red and
 not this pass's: `verify-living-earth` "readiness covers missing
 neighbouring tiles" (`world-readiness.js`, last changed before this pass), and
 the earlier `verify-render-optimization` / `verify-r25-sky` (4h, 4i) reds.
@@ -371,9 +408,15 @@ parked fleet 141k, live fleet up to ~380k — each inside its budget.
 
 ### Known issues and follow-ups
 
-- A contrail can still show an occasional corner after a large position
-  correction or a sharp turn (C's correction logic; not reproduced on demand).
-- The sightline review ignores vegetation; a seat change needs a capture.
+- A contrail can still bend at a real sharp turn (the step after a stall
+  frame is fixed, `380ac36`).
+- The sightline review ignores vegetation, and its bounding-cylinder
+  buildings over-report next to large terminals (KLAX, LFPG, EHAM read many
+  "blocked" points that a capture shows clear); the seat chooser itself uses
+  footprints. A seat change needs a capture.
+- A first visit to an airport outside the hub table waits for its OSM data
+  (about 10–15 s on the dev server, where the worker compiles on demand)
+  before the reveal; revisits in a session reuse the choice.
 - Clear-sun shadow penumbrae show a fixed stipple on the apron (the shared
   cinema shadow kernel, not the lounge).
 - Regional stand door sills sit up to 0.33 m off for CRJs and E-Jets (one sill
