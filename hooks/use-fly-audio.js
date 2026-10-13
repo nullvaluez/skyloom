@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable react-hooks/immutability -- the flight runtime is the imperative simulation bus; the audio instances are published on it, never React state. */
 
 import { useEffect, useRef } from 'react';
 import { FlyAudio } from '@/lib/fly/audio-engine';
