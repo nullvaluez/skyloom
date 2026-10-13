@@ -8,11 +8,8 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { useFlyStore } from "@/stores/fly-store";
-import {
-  OPERATIONS_AIRPORTS,
-  airportEligible,
-  airportById,
-} from "@/lib/fly/operations-airports";
+import { airportEligible } from "@/lib/fly/operations-airports";
+import { airportChoices } from "@/lib/fly/ops-labels.mjs";
 import "./mobile-flight.css";
 
 /** Compact flight controls: the runway stays visible and power never lives in a scroller. */
@@ -25,7 +22,8 @@ export function MobileFlightDeck({
   const o = runtime.operations,
     f = runtime.flight,
     p = o.profile;
-  const destinations=[...OPERATIONS_AIRPORTS,...(airportById(o.destination)?.authored===false?[airportById(o.destination)]:[])];
+  // One row per airport; the current destination stands for its ident.
+  const destinations = airportChoices(p.id, { include: o.destination });
   const [settings, setSettings] = useState(false),
     trigger = useRef(null);
   useEffect(() => {

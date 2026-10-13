@@ -13,7 +13,9 @@ import { adventureMinutes, aircraftAdvice } from '@/lib/fly/adventure-activities
 import { RouteTrace } from './AdventureExperience';
 import { useAdventureStore } from '@/stores/adventure-store';
 import { contentAccess } from '@/lib/fly/content-access.mjs';
-import { OPERATIONS_AIRPORTS,airportEligible,airportById } from '@/lib/fly/operations-airports';
+import { airportEligible,airportById } from '@/lib/fly/operations-airports';
+// The departure list: one row per airport, the selected catalog runway shown once.
+import { airportChoices } from '@/lib/fly/ops-labels.mjs';
 import { operationsProfile } from '@/lib/fly/operations-profiles';
 import { HangarScene } from './HangarScene';
 import { FLIGHT_PLAN, FRONT_DOOR } from '@/lib/fly/fly-constants';
@@ -121,7 +123,7 @@ function HangarBody({runtime}){
         <label htmlFor="departure-airport">Departure runway</label>
         <div className="ops-airport-select"><MapPin size={16}/><select id="departure-airport" value={airport} onChange={e=>{setAirport(e.target.value);setExteriorReady(false);}} disabled={!profile}>
           {airportById(airport)?.authored===false&&<option value={airport}>{airportById(airport).name}</option>}
-          {OPERATIONS_AIRPORTS.map(a=><option key={a.id} value={a.id} disabled={!airportEligible(a,aircraft.id)}>{a.id} · {a.name}{!airportEligible(a,aircraft.id)?' — unavailable':''}</option>)}
+          {airportChoices(aircraft.id,{ineligible:true,exclude:airportById(airport)?.authored===false?airport:null}).map(a=><option key={a.id} value={a.id} disabled={!airportEligible(a,aircraft.id)}>{a.id} · {a.name}{!airportEligible(a,aircraft.id)?' — unavailable':''}</option>)}
         </select></div>
         {profile?<><fieldset className="ops-start-options"><legend>Choose your starting point</legend>{modes.filter(([key])=>key!=='apron'||airportById(airport)?.authored!==false).map(([key,label,Icon])=><label key={key} className={startMode===key?'selected':''}><input type="radio" name="departure-mode" value={key} checked={startMode===key} onChange={()=>setStartMode(key)}/><Icon size={20}/><strong>{label}</strong>{startMode===key&&<Check className="ops-mode-check" size={12}/>}</label>)}</fieldset><p className="ops-mode-description">{modeHelp[startMode]}</p></>:<p className="ops-mode-description">A quiet start above Ohio State University. Find a thermal and explore.</p>}
       </div>
@@ -159,7 +161,8 @@ export function FreeDispatch({dest,query,setQuery,results,cursor,onSearchKey,cho
     </div>
   </div>;
 }
-function AircraftGlyph({id}){
+/** The fleet rail's aircraft thumbnail (also the lounge's aircraft rail). */
+export function AircraftGlyph({id}){
   const url=FLEET_PRESENTATION[id]?.thumbnail||(id==='fighter'?'/models/player-vector-v2.svg':null);
   if(url)return <img src={url} alt="" className="ops-fleet-thumbnail"/>;
   const heavy=['airliner','cargo','bizjet'].includes(id),prop=['prop','warbird-prop','glider'].includes(id);
