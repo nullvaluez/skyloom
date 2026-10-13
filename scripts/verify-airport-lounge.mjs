@@ -17,8 +17,10 @@
 //   3. the room stays inside LOUNGE_ROOM.envelope (the airport set leaves
 //      that volume empty) and the glazing sits exactly on the contract
 //      (front plane, cant, x extent, roof strip, side returns);
-//   4. the interior lighting patch applies to three's real shader sources
-//      and keeps the anchors the cinema cascades patch after it;
+//   4. the interior lighting patch applies to three's real shader sources,
+//      keeps the anchors the cinema cascades patch after it, and adds few
+//      fragment uniform vectors (the fixture lists live in a float texture:
+//      WebGL2 only guarantees 224 vectors and three's lighting needs its share);
 //   5. the offline AO bake matches the room geometry (a geometry change
 //      without `node scripts/build-lounge-ao.mjs` fails here);
 //   6. the boards draw the experience runtime's board() rows and the
@@ -49,7 +51,7 @@ const { roomMapBytes } = await import('../lib/fly/lounge/room-textures.js');
 const { BOARD_CANVAS, status } = await import('../lib/fly/lounge/lounge-board.js');
 const { probeBytes } = await import('../lib/fly/lounge/lounge-probe.js');
 const { decodeBake, geometrySignature, applyVertexAO, FLOOR_RECT, AO_URL } = await import('../lib/fly/lounge/room-ao.js');
-const { MAX_LIGHTS, MAX_SHADOWS } = await import('../lib/fly/lounge/room-shading.js');
+const { MAX_LIGHTS, MAX_SHADOWS, FIXTURE_TABLE } = await import('../lib/fly/lounge/room-shading.js');
 
 // A 2D canvas stand-in: every call is a no-op; gradients and text metrics exist.
 const ctx2d = () => new Proxy({}, {
@@ -75,7 +77,8 @@ for (const m of drawables) {
   if (m.geometry.index) geometryBytes += m.geometry.index.array.byteLength;
 }
 const textureBytes = roomMapBytes() + probeBytes(ROOM_LOOK.probeSize)
-  + BOARD_CANVAS.width * BOARD_CANVAS.height * 4 * (4 / 3) + FLOOR_RECT.w * FLOOR_RECT.h * (4 / 3);
+  + BOARD_CANVAS.width * BOARD_CANVAS.height * 4 * (4 / 3) + FLOOR_RECT.w * FLOOR_RECT.h * (4 / 3)
+  + FIXTURE_TABLE.width * FIXTURE_TABLE.height * 16;
 check(`draws ${drawables.length} <= ${B.draws} (room buckets + boards + glass + steam)`, () => assert.ok(drawables.length <= B.draws));
 check(`triangles ${tris} <= ${B.triangles}`, () => assert.ok(tris <= B.triangles));
 check(`geometry ${(geometryBytes / 1e6).toFixed(2)} MB <= 8 MB`, () => assert.ok(geometryBytes <= 8e6));
@@ -132,7 +135,8 @@ check(`fixtures fit the shader: ${room.fixtures.lights} practicals <= ${MAX_LIGH
 });
 
 // --- 4. the interior lighting patch on three's real sources ------------------------
-check('the room patch applies to three\'s shader sources and keeps the cascade anchors', () => {
+let roomSlots = 0;
+check('the room patch applies to three\'s shader sources, keeps the cascade anchors, adds <= 32 uniform vectors', () => {
   for (const m of room.meshes) {
     const material = m.material;
     const lib = material.isMeshBasicMaterial ? ShaderLib.basic : ShaderLib.physical;
@@ -143,6 +147,16 @@ check('the room patch applies to three\'s shader sources and keeps the cascade a
     assert.ok(shader.fragmentShader.includes('THE INTERIOR'), `${m.name}: interior lighting`);
     for (const anchor of ['#include <lights_pars_begin>', '#include <lights_fragment_begin>']) assert.ok(shader.fragmentShader.includes(anchor), `${m.name} keeps ${anchor}`);
     assert.ok(material.customProgramCacheKey().includes('lounge-room'), `${m.name}: program key`);
+    // The room's own fragment uniforms, in vec4 slots (arrays: one per element).
+    const SLOTS = { float: 1, vec2: 1, vec3: 1, vec4: 1, mat3: 3, mat4: 4, sampler2D: 0, samplerCube: 0 };
+    let slots = 0;
+    for (const u of shader.fragmentShader.matchAll(/uniform\s+(?:highp\s+|mediump\s+|lowp\s+)?(\w+)\s+(uLounge\w+)\s*(?:\[\s*(\d+)\s*\])?\s*;/g)) {
+      assert.ok(u[1] in SLOTS, `${m.name}: unexpected uniform type ${u[1]}`);
+      slots += SLOTS[u[1]] * (u[3] ? Number(u[3]) : 1);
+    }
+    // (> 8: the scan found the room's own uniforms, so the bound is not vacuous)
+    assert.ok(slots > 8 && slots <= 32, `${m.name}: the room adds ${slots} fragment uniform vectors`);
+    roomSlots = Math.max(roomSlots, slots);
   }
 });
 
@@ -186,4 +200,4 @@ check('dispose releases every geometry, material and texture the room owns', () 
   assert.equal(released, owned.size, `released ${released} of ${owned.size}`);
 });
 
-console.log(`PASS lounge: ${checks} checks · ${drawables.length} draws · ${tris} triangles · ${(textureBytes / MiB).toFixed(1)} MiB textures · ${room.fixtures.lights} practicals`);
+console.log(`PASS lounge: ${checks} checks · ${drawables.length} draws · ${tris} triangles · ${(textureBytes / MiB).toFixed(1)} MiB textures · ${room.fixtures.lights} practicals · ${roomSlots} room uniform vectors`);
