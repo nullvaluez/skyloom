@@ -1,6 +1,10 @@
 # Observation Lounge — plan and record
 
-> **Status (2026-10-12): W0 scaffolding on `main`; W1 workstreams in flight.**
+> **Status (2026-10-13): W0 and all five W1 workstreams are merged on `main`,
+> with an integration pass on top (see Record).** Still behind
+> `?airports=on`. Every look and fps verdict below comes from headless Chrome
+> on the owner's RTX 5080 box; the owner's own sessions decide the open items
+> in "Owner checkpoints".
 > This file is both the plan every workstream works from and the record of
 > what shipped. It supersedes the seated-room section of
 > [FLY_LIVING_AIRPORTS.md](FLY_LIVING_AIRPORTS.md) for everything inside the
@@ -69,7 +73,7 @@ lounge must not add a time picker.
 
 **Where you sit.** An elevated glass lounge on the terminal side of one runway
 (`lib/fly/lounge-site.js`): flagships use the real terminal side (KCMH 10R,
-KJFK 04L-22R, LOWI 08-26, YSSY 16R-34L), any other airport faces its longest
+KJFK 04L-22R, LOWI 08-26, YSSY 16R-34L at its 16R end), any other airport faces its longest
 runway from the side its sibling runways are on. Floor 9–26 m above the apron
 by runway class, glass 330 m from the runway edge on big airports. A higher
 eye is the single biggest lever for the photo ground (steeper angles) and puts
@@ -177,7 +181,9 @@ floods) through `GlowPoints`, day/dusk/night correct.
 ### E — AIRFIELD STRUCTURES (terminal, bridges, stands, ground support)
 Owns `components/fly/observation/AirportStructures.jsx`, new
 `lib/fly/airport-set/*`, `lib/fly/airport-layout.js` (keeping its record
-shape), exclusions in `lib/fly/operations-scenery.js`, `AIRFIELD.structures`.
+shape), exclusions in `lib/fly/operations-scenery.js`,
+`components/fly/AirportLandmark.jsx` (hidden at the observed airport),
+`AIRFIELD.structures`.
 Delivers the terminal pier under the lounge (curtain walls, roofline, roof
 plant, lit concourse at night), jet bridges docked at stands, stand markings
 and apron furniture, ground support equipment (tugs, belt loaders, baggage
@@ -241,6 +247,15 @@ night `--utc 3`), LOWI (day 10, golden 16), YSSY (day 1, golden 7) and one
 generic airport (EGLL day 12). Every look-changing claim is backed by a
 capture; every fps claim names the machine.
 
+Seats: `node scripts/review-lounge-sightlines.cjs --port <yours> --airports
+<ids>` traces the seated eye to every runway's touchdown zone and 3° approach
+(1.5–12 km) through the streamed building columns and the terrain, and with
+`--grid` / `--candidates` scores other seats, including whether the set's pier
+and apron would land on a real runway or taxiway. `--site
+runwayId,along,cross,floorM` (both review scripts) tries a seat through
+`window.__flyLoungeSiteOverride` (development builds only). It does not see
+trees: confirm a new seat with a capture.
+
 ## Record
 
 ### W0 — scaffolding (2026-10-12)
@@ -250,3 +265,120 @@ at the eye: traffic range, polling and bend centre follow the observer),
 hint clipping on `loungeAperture`, `ObservationWorld` mount with workstream
 stubs, review harness. Gates: airport observation 29/29, lifecycle 12/12,
 import integrity 4/4.
+
+### W1 — five workstreams, merged in this order (2026-10-12 / 13)
+
+Each ran in its own worktree under `C:\Users\bfecho\skyloom-lounge\`, merged
+`--no-ff` onto `main` after its gates and captures were reviewed.
+
+- **B EXPERIENCE (`90becf4`).** The picker works while seated: every contact
+  is projected at its drawn (bent) position, glazing-culled, hover with
+  hysteresis, click selects and follows, drag looks (never selects).
+  Binoculars 1–25× (presets 7/12/20, wheel zoom, double-click raises them on
+  the aircraft under the pointer) with a stabilised lock, twin-lens mask and
+  rangefinder. Spotter card (photo, type, operator, registration, phase),
+  live board (arrivals / departures / ground / overhead from `trackPhase` and
+  runway geometry, ETAs, "not a schedule" footnote), golden-hour-now airport
+  list, the target-UI restyle, and the soundscape (room tone, PA chime, five
+  glass-filtered distant voices from the CC0 engine sample with distance delay
+  and doppler, music ducked). New gate `verify-airport-interaction.cjs` (25,
+  browser).
+- **E STRUCTURES (`eac9026`).** `lib/fly/airport-set/*`: terminal pier with
+  curtain walls and lit concourse, jet bridges docked at the stands, stand
+  markings and decals, ground support (parked and moving), flood masts and
+  pools, the tower at its real coordinates, hangars, windsocks, signs; OSM
+  buildings in the footprint retired (restored on leave). 8–10 draws, ~134k
+  set triangles at YSSY, 2.67 MiB atlas. New gate `verify-airport-set.mjs`
+  (17), review `review-airport-set.cjs`.
+- **A ROOM (`dde871e`).** `lib/fly/lounge/*`: a designed sky lounge (canted
+  curtain wall and roof glazing, seating groups, bar, arrivals screen, side
+  table with coffee, binoculars and notebook, planting), interior lighting
+  through an analytic window aperture, offline AO bake
+  (`public/models/lounge-ao-v1.bin`, `scripts/build-lounge-ao.mjs` — rerun
+  after any room geometry change), 28 practicals, glass as a sky overlay with
+  reflections, eased exposure bias; indoor fixes (no rain or cloud shadow
+  indoors, N8AO sized for the room). 12 draws, 120,198 triangles, 21.9 MiB.
+- **C FLEET & SKY (`812c493`).** First-party procedural airframes for 29
+  families at three LODs (neutral paint, no liveries; windows, doors and the
+  registration drawn at runtime), gear/flaps/spoilers by phase, every contact
+  within 60 km a real model, lights (nav, beacon, strobe, landing, taxi,
+  turn-off) in one GlowPoints draw, touchdown smoke, contrails seen from the
+  ground (2–5 min life, spreading, wind-drifted, sun-lit, pixel-floored, 1
+  draw), parked aircraft docked at the jet bridges by their L1 door
+  (`FLEET_VIEW.parkedScenery`, hidden when a real ground contact claims the
+  stand), and the worker altitude fix (QNH-corrected `alt_baro` low, geoid-
+  corrected `alt_geom` high; identity re-sent). New gate
+  `verify-fleet-airframes.mjs` (12).
+- **D AIRFIELD GROUND (`ab365f8`).** `lib/fly/airfield/*`: the observed
+  airport from OSM (worker detail `'sat-airport'`): pavement that reads at a
+  shallow angle (concrete and asphalt, slabs, staining, rubber), analytic
+  runway markings (FAA/ICAO) and designators, taxiway paint, procedural grass
+  tinted by the imagery, and the lighting system (runway edge/threshold/end,
+  ALSF-2 and MALSR with sequenced flashers, TDZ, centreline, PAPI, taxiway
+  edge/centre, stop bars; ≤12,288 lights). `TerrainEngine.setGroundProvider`
+  makes `getGroundAt` answer the drawn surface while observing. 5–6 draws,
+  ~180–230k triangles. New gate `verify-airfield-ground.mjs` (13).
+
+### Integration pass (2026-10-13)
+
+- `b1a85fe` D's re-sample patch in E's frame loop: the set re-drapes when the
+  airfield surface refines under it (pavement − set ground p99 1.10 → 0.11 m).
+- `75831eb` an unknown 3-letter callsign no longer falls back to a 2-letter
+  IATA match (ATN read "Royal Air Maroc" in the dossier).
+- `5a9465e` idle brackets declutter (airborne first, no overlaps, no parked
+  ground contact past 1.8 km — still pickable); the locked aircraft's
+  navigation trace is hidden while the binoculars are up.
+- `c390c78` **YSSY moved from along 700 to along 100 / cross 580.** From the
+  old seat the terminal's 49 m north block stood in the line to every 16R
+  arrival (the binoculars locked onto a facade). New
+  `scripts/review-lounge-sightlines.cjs`, `airportWatch.runways` (read-only)
+  and `window.__flyLoungeSiteOverride` (development builds). Final sightline
+  audit, blocked points of 36 per airport: KCMH 0, LOWI 0, YSSY 1 (runway 07
+  at 1.5 km), KJFK 2 (13L/13R touchdown zones; the faced 04/22 pair is
+  clear). The set bound in `verify-airport-set.mjs` widened 3.5 → 6 km (a seat
+  at one end of a long runway puts the far windsock 3.6 km out).
+- `2733564` provenance for the room, the airframes, the set and the airfield
+  surfaces in `FLY_ASSETS`; CREDITS.md regenerated (the generator now keeps
+  the airport discovery section it used to drop).
+
+**Gates on `main` after the pass:** airport observation 45/45, lifecycle 23/23,
+audio 11/11, lounge 12, airport set 17/17, fleet airframes 12/12, airfield
+ground 13/13, runway catalog 9/9, import integrity 4/4, true scale 14/14,
+aircraft effects 14, tracer spot 32/32, warbirds, cloud calm 6/6, HDR guard
+4/4, conditions 7/7, interaction 25/25 (browser), fleet static. Still red and
+not this pass's: `verify-living-earth` "readiness covers missing
+neighbouring tiles" (`world-readiness.js`, last changed before this pass), and
+the earlier `verify-render-optimization` / `verify-r25-sky` (4h, 4i) reds.
+
+**Measured (headless Chrome, RTX 5080, 1920×1080, High; vsync-capped, so
+frame times read 16.7 ms p50 everywhere and say nothing about headroom).**
+Golden hour, default view: KCMH 313 calls / 1.78 M rendered triangles, KJFK
+302 / 1.98 M, LOWI 313 / 1.94 M, EGLL 330 / 1.96 M, YSSY 340 / 2.55 M; p95
+16.9 ms, p99 20.7–24.8 ms, zero page errors. YSSY is over the 2.2 M guideline
+because of the city in view from the new seat (satellite buildings 755k);
+the lounge's own layers there are room 120k, set 134k, airfield ground 180k,
+parked fleet 141k, live fleet up to ~380k — each inside its budget.
+
+### Owner checkpoints (open)
+
+- **Parked aircraft at the gates** ship on (`FLEET_VIEW.parkedScenery`) —
+  static scenery, never a contact, hidden when a real aircraft takes the
+  stand. Keep, or leave the gates empty?
+- **Night.** Apron floods, cabin windows and taxiway/runway lights are tuned
+  by eye in headless captures; judge the night apron brightness on a real
+  display (`AIRFIELD.structures.night`, `FLEET_VIEW.flood`).
+- **Frame rate** on the owner's machine at YSSY (the heaviest seat) and KJFK.
+
+### Known issues and follow-ups
+
+- A contrail can still show an occasional corner after a large position
+  correction or a sharp turn (C's correction logic; not reproduced on demand).
+- The sightline review ignores vegetation; a seat change needs a capture.
+- Clear-sun shadow penumbrae show a fixed stipple on the apron (the shared
+  cinema shadow kernel, not the lounge).
+- Regional stand door sills sit up to 0.33 m off for CRJs and E-Jets (one sill
+  height per class).
+- Without traffic reporting `nav_qnh`, low altitudes fall back to raw
+  `alt_geom`; contrail drift uses surface wind × 1.8 (no upper-air wind).
+- Runway markings are foreshortened from a 22 m eye at 0.5–1.5 km
+  (physically right; the binoculars resolve them).

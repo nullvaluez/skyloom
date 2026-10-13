@@ -12,6 +12,11 @@
 >   (World/Close framing, Nearby encounters, the stylized-cinematic art pass),
 >   [FLY_RENDER_OPTIMIZATION.md](FLY_RENDER_OPTIMIZATION.md) and
 >   [CINEMATIC_EARTH_OVERHAUL.md](CINEMATIC_EARTH_OVERHAUL.md).
+> - **Observation lounge (2026-10-13, behind `?airports=on`):**
+>   [FLY_OBSERVATION_LOUNGE.md](FLY_OBSERVATION_LOUNGE.md) is the plan and
+>   record of the seated airport lounge (room, picking/binoculars/board,
+>   procedural airframes and contrails, airfield ground and lighting, terminal
+>   set) and its open owner checkpoints.
 > - **Target UI (2026-10-07, shipped on, owner-requested):** [FLY_TARGET_UI.md](FLY_TARGET_UI.md)
 >   — the inspect dossier, ONE Escort action on every button (`lib/fly/escort.js`:
 >   intercept + the cinematic camera, which films a far pair over the shoulder
