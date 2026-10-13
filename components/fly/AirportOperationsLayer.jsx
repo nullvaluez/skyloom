@@ -1,7 +1,8 @@
 'use client';
 
 import { applyBendFade } from '@/lib/fly/toy-world/world-bend';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { airfieldSuppression, airfieldSuppressesAirport, subscribeAirfieldSuppression } from '@/lib/fly/airfield/airfield-suppression';
 import { useFrame } from '@react-three/fiber';
 import { useFlyStore } from '@/stores/fly-store';
 import { livingAirportsOn } from '@/lib/fly/airport-feature-policy';
@@ -32,7 +33,11 @@ const RUNWAY_GLYPHS={
 
 // One mesh per airport. Pavement and paint use the exact same height profile as
 // contact. Absolute Mercator coordinates live on the group, never in float32.
-function Airport({ airport, enhanced, scenery, runtime }) {
+// `observed`: an observation lounge's AIRFIELD GROUND draws this airport's
+// surfaces and lights now (lib/fly/airfield/airfield-suppression.js), so the
+// runway mesh, its paint/lights and the authored stand-in hangar stand down;
+// the landmark set stays (it is the structures workstream's to retire).
+function Airport({ airport, enhanced, scenery, runtime, observed = false }) {
   const resource=useMemo(()=>{
     const origin=airportPoint(airport,0),f=airportFrame(airport),positions=[],colors=[];
     const rectangle=(s,t,w,l,color,lift=.025)=>{
@@ -92,8 +97,8 @@ function Airport({ airport, enhanced, scenery, runtime }) {
   useEffect(()=>()=>{resource.geometry.dispose();resource.material.forEach(m=>m.dispose());},[resource]);
   const h=airportPoint(airport,airport.standAlong,airport.taxiSide*(airport.taxiOffset+180)),frame=airportFrame(airport);
   return <group>
-    <mesh name="operations-pavement" position={[resource.origin.x,resource.origin.y,resource.origin.z]} geometry={resource.geometry} material={resource.material} dispose={null}/>
-    {airport.authored!==false&&<group name="operations-hangar" position={[h.x,h.y,h.z]} rotation-y={-frame.heading} scale={[frame.k,1,frame.k]}>
+    {!observed&&<mesh name="operations-pavement" position={[resource.origin.x,resource.origin.y,resource.origin.z]} geometry={resource.geometry} material={resource.material} dispose={null}/>}
+    {!observed&&airport.authored!==false&&<group name="operations-hangar" position={[h.x,h.y,h.z]} rotation-y={-frame.heading} scale={[frame.k,1,frame.k]}>
       <mesh position={[0,24,0]}><boxGeometry args={[80,1,125]}/><meshStandardMaterial color="#8a9398"/></mesh>
       <mesh position={[airport.taxiSide*39,12,0]}><boxGeometry args={[1,24,125]}/><meshStandardMaterial color="#777d80"/></mesh>
       {[-1,1].map(side=><mesh key={side} position={[0,12,side*62]}><boxGeometry args={[80,24,1]}/><meshStandardMaterial color="#777d80"/></mesh>)}
@@ -105,6 +110,7 @@ export function AirportOperationsLayer({runtime}) {
   const visuals=useFlyStore(s=>s.visuals),style=useFlyStore(s=>s.mapStyle);
   const enhanced=livingAirportsOn('worldArt')&&visuals==='enhanced'&&style==='satellite';
   const scenery=livingAirportsOn('scenery')&&visuals==='enhanced'&&style==='satellite';
+  const suppression=useSyncExternalStore(subscribeAirfieldSuppression,airfieldSuppression,()=>null);
   const [airports,setAirports]=useState([]);
   useEffect(()=>{
     let active=true,lastCell='',pending=false,retryAfter=0;
@@ -119,7 +125,7 @@ export function AirportOperationsLayer({runtime}) {
     tick();const timer=setInterval(tick,2000),unsub=subscribeAirports(tick);return()=>{active=false;clearInterval(timer);unsub();};
   },[runtime]);
   return <group>
-    {airports.map((a,i)=><Airport key={a.id} airport={a} enhanced={enhanced} scenery={scenery&&airports.findIndex(b=>(b.ident||b.id)===(a.ident||a.id))===i} runtime={runtime}/>)}
+    {airports.map((a,i)=><Airport key={a.id} airport={a} enhanced={enhanced} scenery={scenery&&airports.findIndex(b=>(b.ident||b.id)===(a.ident||a.id))===i} runtime={runtime} observed={airfieldSuppressesAirport(a,suppression)}/>)}
     <OperationsGuidance runtime={runtime}/>
   </group>;
 }
