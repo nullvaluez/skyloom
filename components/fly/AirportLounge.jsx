@@ -33,6 +33,7 @@ const _key = new Vector3();
 const _view = new Vector3();
 const _eye = new Vector3();
 const ease = (from, to, dt, sec) => from + (to - from) * (1 - Math.exp(-Math.max(0, dt) / sec));
+const smooth = (a, b, v) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 /** The overlay pass compiles against a lightless holder: warm the same key. */
 let _overlayWarm = null;
@@ -120,12 +121,23 @@ function Room({ runtime }) {
     group.updateMatrixWorld(true);
     camera.updateMatrixWorld();
 
-    // Binoculars focus at infinity: the room (frames, glass grime, the cup)
-    // falls out of focus entirely. Hysteresis so a zoom ease never flickers.
-    if (camera.fov < ROOM_LOOK.binocularHideFov) s.hidden = true;
-    else if (camera.fov > ROOM_LOOK.binocularShowFov) s.hidden = false;
+    // Binoculars focus at infinity. As the twin-lens mask rises
+    // (optics.amount, 0..1, owned by the watch runtime) the room defocuses
+    // away — frames, furniture, glass and steam dissolve together — and is
+    // hidden outright once the mask is up. Without optics (an older runtime)
+    // the field of view stands in, with hysteresis.
+    let amount = w.optics?.amount;
+    if (!Number.isFinite(amount)) {
+      if (camera.fov < ROOM_LOOK.binocularHideFov) s.fovHidden = true;
+      else if (camera.fov > ROOM_LOOK.binocularShowFov) s.fovHidden = false;
+      amount = s.fovHidden ? 1 : 0;
+    }
+    const fade = smooth(ROOM_LOOK.optics.fadeFrom, ROOM_LOOK.optics.fadeTo, amount);
+    s.hidden = fade >= 0.999;
     const shown = !!w.validated && !s.hidden;
     group.visible = shown;
+    resource.uniforms.uLoungeFade.value = fade;
+    resource.board.mesh.visible = fade < 0.5; // on the back wall: never in a binocular view
 
     const env = runtime.cinemaEnvironment;
     if (env?.keyDir) toSceneDir(_key.fromArray(env.keyDir), _key);
@@ -139,16 +151,20 @@ function Room({ runtime }) {
     // Exposure: an eased bias so the interior reads while the outside stays
     // bright (SessionRecovery applies runtime.loungeExposureStops).
     const X = ROOM_LOOK.exposure;
-    const target = !w.validated ? 0 : X.night + (X.day - X.night) * shade.day - (X.day - X.golden) * shade.golden * shade.day;
+    // (the bias is for reading the room: through the binoculars it eases out)
+    const target = !w.validated ? 0 : (X.night + (X.day - X.night) * shade.day - (X.day - X.golden) * shade.golden * shade.day) * (1 - fade);
     s.exposure = ease(s.exposure, target, dt, X.easeSec);
     runtime.loungeExposureStops = s.exposure;
 
     if (pub) {
       pub.active = !!w.validated;
       pub.inverse.copy(group.matrixWorld).invert();
-      pub.weight = ease(pub.weight, w.validated ? 1 : 0, dt, 0.6);
+      pub.weight = ease(pub.weight, w.validated ? 1 - fade : 0, dt, 0.6);
     }
-    if (!shown) return;
+    if (!shown) {
+      if (runtime.loungeStats) { runtime.loungeStats.hidden = s.hidden; runtime.loungeStats.fade = +fade.toFixed(3); }
+      return;
+    }
 
     // Overlays (TRUE-space key -> room-local and view space).
     const sky = getR25Sky();
@@ -166,14 +182,14 @@ function Room({ runtime }) {
       exposure,
       rain: wx?.precip === 'rain' ? Math.min(1, wx.precipT ?? 0) : 0,
       night: shade.night,
-      lens: 1,
+      lens: 1 - fade,
       time,
       roomRad: u.uLoungeRoomRad.value,
       probe: probe.texture && s.probeKey ? probe : null,
     });
     _view.copy(_key).transformDirection(camera.matrixWorldInverse);
     resource.steam.update({
-      time, exposure, strength: 1, keyOn: shade.keyI > 0.01 ? 1 : 0, lens: 1,
+      time, exposure, strength: 1, keyOn: shade.keyI > 0.01 ? 1 : 0, lens: 1 - fade,
       sunView: _view,
       keyColor: [keyColor[0] * keyI, keyColor[1] * keyI, keyColor[2] * keyI],
       ambient: u.uLoungeBounce.value,
@@ -216,7 +232,7 @@ function Room({ runtime }) {
     }
 
     if (process.env.NODE_ENV === 'development' || runtime.graphicsReview) {
-      runtime.loungeStats = { warm: s.warm, ao: resource.aoApplied, probe: probe.stats, exposureStops: +s.exposure.toFixed(3), practical: +shade.practical.toFixed(3), day: +shade.day.toFixed(3), textureBytes: s.textureBytes ?? 0, hidden: s.hidden };
+      runtime.loungeStats = { warm: s.warm, ao: resource.aoApplied, probe: probe.stats, exposureStops: +s.exposure.toFixed(3), practical: +shade.practical.toFixed(3), day: +shade.day.toFixed(3), textureBytes: s.textureBytes ?? 0, hidden: s.hidden, fade: +fade.toFixed(3) };
     }
   }, -40);
 
