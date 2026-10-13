@@ -1,16 +1,19 @@
 'use client';
 /* eslint-disable react-hooks/immutability -- Three.js buffers, materials and the shared flight runtime are imperative simulation objects, updated by useFrame without React renders. */
 import { useEffect, useMemo } from 'react';
-import { useFrame } from '@react-three/fiber';
-import { Euler, Quaternion, Vector3 } from 'three';
-import { LIVE_AIRCRAFT, resolveLiveAircraft } from '@/lib/fly/live-aircraft';
+import { useFrame, useThree } from '@react-three/fiber';
+import { Euler, Quaternion, Vector2, Vector3 } from 'three';
+import { LIVE_AIRCRAFT, resolveLiveAircraft, resolveLiveType } from '@/lib/fly/live-aircraft';
 import { AIRCRAFT_EFFECTS as FX, contrailStrength, liveEngineOffsets } from '@/lib/fly/aircraft-effects';
 import { WakeBatch, WakeHistory } from '@/lib/fly/aircraft-wake';
+import { SkyTrails, trailPersistence } from '@/lib/fly/fleet-trails';
+import { SKY_VIEW } from '@/lib/fly/observation-config';
 import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
 import { patchAirWake } from '@/lib/fly/tracer-spot';
+import { getR25Sky } from '@/lib/fly/r25-sky';
 import { useFlyStore } from '@/stores/fly-store';
 
-const stations = LIVE_AIRCRAFT.map(liveEngineOffsets);
+const stations = LIVE_AIRCRAFT.map((f) => liveEngineOffsets(f));
 // Unknown types use only established jet archetypes; props, rotorcraft and
 // unknown blobs never acquire fictional jet exhausts.
 const fallback = { 0: [[-10, -2, 2], [10, -2, 2]], 1: [[-1.5, 0, 7], [1.5, 0, 7]],
@@ -18,6 +21,8 @@ const fallback = { 0: [[-10, -2, 2], [10, -2, 2]], 1: [[-1.5, 0, 7], [1.5, 0, 7]
   10: [[0, 0, 5.4]] };
 const noSources = [];
 const attitude = new Euler(0, 0, 0, 'YXZ'), rotation = new Quaternion(), emitter = new Vector3();
+const _buffer = new Vector2();
+const _src = { x: 0, y: 0, z: 0 }, _vel = { x: 0, y: 0, z: 0 }, _wind = { x: 0, z: 0 };
 function sources(t) {
   // Military is a mission class, not an engine type. The shared military GLB
   // must not give a reported turboprop transport a jet's exhaust.
@@ -27,29 +32,51 @@ function sources(t) {
 }
 
 /** Optical engine plumes in addition to the established navigation tracers.
- * ONE bounded draw for the whole fleet; distant/unknown traffic stays cheap.
+ * Flight: ONE bounded draw of short CPU ribbons (aircraft-wake.js).
+ * Observation lounge: persistent GPU trails seen from the ground
+ * (fleet-trails.js), every contrail-forming jet within SKY_VIEW.rangeM.
  * Records contain no aircraft metadata and are retired when the track leaves. */
 export function TrafficContrails({ runtime, origin }) {
+  const renderer = useThree((s) => s.gl);
   const state = useMemo(() => ({ time: 0, recs: new Map(), pool: [], chosen: [], chooseAt: 0, limit: null,
-    batch: new WakeBatch(FX.maxTraffic.high * 4, 96, patchAirWake) }), []);
+    batch: new WakeBatch(FX.maxTraffic.high * 4, 96, patchAirWake), sky: new SkyTrails(), observing: false, skyChosen: [] }), []);
   useEffect(() => {
     // Depth-less vapor against the sky: drawn after the cloud composite.
     const unregister = registerSkyOverlay(state.batch.mesh);
-    return () => { unregister(); state.batch.dispose(); };
+    const unregisterSky = registerSkyOverlay(state.sky.mesh);
+    return () => { unregister(); unregisterSky(); state.batch.dispose(); state.sky.dispose(); };
   }, [state]);
   useFrame(({ camera }, delta) => {
     const store = useFlyStore.getState(), items = runtime.traffic?.items ?? [];
     const dt = document.hidden ? 0 : Math.min(delta, .1);
     state.time += dt;
     const now = state.time, limit = FX.maxTraffic[store.qualityTier] ?? FX.maxTraffic.medium;
+    const observing = !!runtime.airportWatch?.active && store.mapStyle === 'satellite';
+    if (observing !== state.observing) {
+      // Mode switch: each system starts clean.
+      state.observing = observing;
+      for (const [, rec] of state.recs) for (const h of rec.histories) h.clear();
+      state.recs.clear();
+      state.sky.clear();
+      state.chooseAt = 0;
+    }
+    if (observing) {
+      // Wall-clock seconds: the trail ages on the same clock the traffic
+      // engine moves the aircraft on (a hitch must not bend the trail).
+      skyFrame(state, runtime, origin, camera, renderer, items, store, performance.now() / 1000);
+      state.batch.begin(camera, false);
+      state.batch.end(1, false, null);
+      return;
+    }
+    state.sky.mesh.visible = false;
     // Preserve admitted tracks through a small range band so equal-distance
     // neighbours cannot trade slots and erase one another's histories.
     // Admission is a spatial decision, not animation. Reuse its bounded set
     // between polls while recording/rendering every frame (avoids allocating
     // filter/sort/Set arrays for the entire regional feed every single frame).
-    if(!runtime.airportWatch?.active||now>=state.chooseAt||limit!==state.limit){
+    if(now>=state.chooseAt||limit!==state.limit){
     state.chooseAt=now+.5;state.limit=limit;
-    const range=runtime.airportWatch?.active?50000:22000;
+    const range=22000;
     const eligible = items.filter(t => t.fix1 && t.distM < range+(state.recs.has(t.hex)?4000:0) &&
       (t.opacity ?? 1) * (t.horizonFade ?? 1) > .03 &&
       (contrailStrength(t.ry, Math.hypot(t.fix1.vE, t.fix1.vN), t.flags & 1) > .003 || state.recs.has(t.hex)) && sources(t).length);
@@ -99,5 +126,77 @@ export function TrafficContrails({ runtime, origin }) {
     if (process.env.NODE_ENV === 'development' && window.__flyStats)
       window.__flyStats.trafficWake = { aircraft: state.recs.size, ribbons: state.batch.used, capacity: limit, draws: state.batch.used ? 1 : 0 };
   }, -43);
-  return <primitive object={state.batch.mesh} dispose={null} />;
+  return <>
+    <primitive object={state.batch.mesh} dispose={null} />
+    <primitive object={state.sky.mesh} dispose={null} />
+  </>;
+}
+
+/**
+ * Observation lounge: every jet forming a trail within SKY_VIEW.rangeM keeps
+ * a persistent ground-visible contrail (tier capped, nearest first). One
+ * ribbon per aircraft, emitted at the tail; the shader splits it into engine
+ * lobes for the first seconds.
+ */
+function skyFrame(state, runtime, origin, camera, renderer, items, store, now) {
+  const sky = state.sky, cap = SKY_VIEW.maxTrails[store.qualityTier] ?? SKY_VIEW.maxTrails.medium;
+  if (now >= state.chooseAt) {
+    state.chooseAt = now + 0.5;
+    const eligible = [];
+    for (const t of items) {
+      if (!t.fix1 || !(t.distM < SKY_VIEW.rangeM + (sky.byHex.has(t.hex) ? 6000 : 0)) || t.stale === 2) continue;
+      const speed = Math.hypot(t.fix1.vE, t.fix1.vN);
+      if (!(contrailStrength(t.ry, speed, t.flags & 1) > 0) && !sky.byHex.has(t.hex)) continue;
+      if (!sources(t).length) continue;
+      eligible.push(t);
+    }
+    eligible.sort((a, b) => (a.distM - (sky.byHex.has(a.hex) ? 4000 : 0)) - (b.distM - (sky.byHex.has(b.hex) ? 4000 : 0)));
+    state.skyChosen = eligible.slice(0, cap);
+  }
+  const wx = runtime.weather?.wx;
+  // Upper winds blow harder than the surface report: a capped multiple.
+  _wind.x = (wx?.windX ?? 0) * SKY_VIEW.windK; _wind.z = (wx?.windZ ?? 0) * SKY_VIEW.windK;
+  const wind = Math.hypot(_wind.x, _wind.z);
+  if (wind > SKY_VIEW.windMaxMps) { _wind.x *= SKY_VIEW.windMaxMps / wind; _wind.z *= SKY_VIEW.windMaxMps / wind; }
+  // m/s to scene units (Mercator x/z at the observer's latitude).
+  const kSite = runtime.airportWatch?.site?.k ?? 1;
+  _wind.x *= kSite; _wind.z *= kSite;
+  // Persistence bands re-roll every hour of the (real) day.
+  const hourKey = Math.floor(Date.now() / 3600000);
+  for (const t of state.skyChosen) {
+    const fix = t.fix1, speed = Math.hypot(fix.vE, fix.vN);
+    const density = contrailStrength(t.ry, speed, t.flags & 1) * SKY_VIEW.density;
+    const k = Number.isFinite(fix.latRad) ? 1 / Math.cos(fix.latRad) : 1;
+    const spec = resolveLiveType(t);
+    const f = spec ? LIVE_AIRCRAFT[spec.family] : null;
+    const scale = spec?.scale ?? 1;
+    const len = (f?.length ?? 40) * scale;
+    // Velocity in scene units (Mercator x/z, metres y); the trail leaves the tail.
+    _vel.x = fix.vE * k; _vel.y = Math.max(-speed * 0.12, Math.min(speed * 0.12, fix.vUp)); _vel.z = -fix.vN * k;
+    const hx = Math.sin(t.yaw), hz = -Math.cos(t.yaw);
+    _src.x = t.rx - hx * len * 0.5 * k; _src.y = t.ryd; _src.z = t.rz - hz * len * 0.5 * k;
+    // Engine half-span: the outermost nacelle of the family (the early plume
+    // lines), 6 m for an unresolved jet.
+    let engine = 6;
+    if (f) { engine = 0; for (const e of stations[spec.family] ?? []) engine = Math.max(engine, Math.abs(e[0])); engine = Math.max(1.5, engine * scale); }
+    sky.feed(t.hex, _src, _vel, density, now, _wind, { engine, life: trailPersistence(t.ry, hourKey), backfillSec: SKY_VIEW.backfillSec });
+  }
+  sky.rebase(origin.anchor);
+  renderer.getDrawingBufferSize(_buffer);
+  const e = runtime.cinemaEnvironment, exposure = getR25Sky().exposure || 1;
+  const sinEl = runtime.sun?.sinEl ?? 1;
+  const fill = e?.fillColor ?? [0.45, 0.62, 1];
+  const day = e?.day ?? 1, night = e?.night ?? 0;
+  // Sky light on a trail: the ambient fill (the trail is mostly sky-lit
+  // after sunset); exposure folded in because overlays get none.
+  const skyFill = fill.map((c) => c * (0.05 + 0.22 * day) * exposure);
+  sky.end(now, {
+    px: camera.projectionMatrix.elements[5] * (_buffer.y || 1080) * 0.5,
+    sunDir: e?.sunDir ?? [0, 1, 0], sun: [sinEl, 4.6, night * (e?.sun ?? 0.3) * 1.4, exposure],
+    sunColor: [1, 0.97, 0.92], keyDir: e?.keyDir ?? [0, 1, 0], keyColor: e?.keyColor ?? [0.6, 0.7, 1], skyFill, tier: store.qualityTier,
+  });
+  if (process.env.NODE_ENV === 'development' && window.__flyStats) {
+    window.__flyStats.trafficWake = { aircraft: sky.stats.trails, ribbons: sky.stats.trails, capacity: cap, draws: sky.stats.trails ? 1 : 0, mode: 'sky' };
+    window.__flySkyTrails = sky; // review harness handle (scripts/review-fleet-sky.cjs)
+  }
 }
