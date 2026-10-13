@@ -130,9 +130,11 @@ function* placedVertices(built) {
 }
 
 check('the set is bounded (no stray vertex)', () => {
+  // 6 km: a seat at one end of a long runway puts the far windsock that far
+  // out (YSSY's sits 3.6 km away on the 3.96 km 16R/34L).
   for (const { built, site } of sets) {
     for (const [x, y, z] of placedVertices(built)) {
-      assert.ok(Math.abs(x) < 3500 && Math.abs(z) < 3500, `xz bound ${x.toFixed(0)},${z.toFixed(0)}`);
+      assert.ok(Math.abs(x) < 6000 && Math.abs(z) < 6000, `xz bound ${x.toFixed(0)},${z.toFixed(0)}`);
       assert.ok(y > -3 && y < 140, `y bound ${y.toFixed(1)} at ${site.ident}`);
     }
   }

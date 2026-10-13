@@ -3,6 +3,7 @@
 //   node scripts/review-observation-lounge.cjs [--port 3123] [--airport KCMH]
 //        [--utc 16] [--out .graphics-review/observation-lounge/<name>]
 //        [--views default,up,left,right,down,track,binoculars,click] [--settle 20]
+//        [--site runwayId,along,cross,floorM]
 //
 // --utc pins the sun to that UTC hour today (__flySunOverride), so a review
 // can ask for day, golden hour or night wherever the airport is. Every run
@@ -23,6 +24,9 @@ const settle = Number(arg('settle', '20')) * 1000;
 const views = arg('views', 'default,up,left,right,down,track,binoculars,click').split(',');
 const out = path.resolve(arg('out', `.graphics-review/observation-lounge/${airport}-${utc || 'live'}`));
 const url = arg('url', `http://localhost:${port}/?graphicsReview=1&airports=on&airportArt=on&airportScenery=on`);
+// --site "runwayId,along,cross,floorM": seat the lounge there (development builds only).
+const siteArg = arg('site', '');
+const seat = siteArg ? (([runway, along, cross, floorM]) => ({ runway, along: +along, cross: +cross, floorM: +floorM }))(siteArg.split(',')) : null;
 fs.mkdirSync(out, { recursive: true });
 const report = { airport, url, utc, errors: [], shots: [], views: {} };
 
@@ -39,13 +43,14 @@ const report = { airport, url, utc, errors: [], shots: [], views: {} };
   };
   const look = (yaw, pitch) => page.evaluate(([y, p]) => { const w = window.__fly.airportWatch; w.tracking = false; w.yaw = y; w.pitch = p; }, [yaw, pitch]);
   try {
-    await page.addInitScript((utcHour) => {
+    await page.addInitScript(([utcHour, ident, seat]) => {
       window.__flyVisualsOverride = 'enhanced';
+      if (seat) window.__flyLoungeSiteOverride = { [ident]: seat };
       if (utcHour !== '') { const d = new Date(); window.__flySunOverride = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), Number(utcHour)); }
       localStorage.setItem('fly-map-style-2', 'satellite');
       localStorage.setItem('fly-sound-on', '0');
       localStorage.setItem('fly-controls-seen', '1');
-    }, utc);
+    }, [utc, airport, seat]);
     await page.goto(url, { timeout: 240000 });
     await page.waitForFunction(() => window.__fly?.airportWatch, undefined, { timeout: 240000 });
     await page.evaluate((id) => window.__fly.airportWatch.enter(id), airport);
