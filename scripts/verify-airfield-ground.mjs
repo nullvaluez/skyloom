@@ -366,6 +366,19 @@ check('lights: finite, bounded, every system present, GLOW_MODE mirrors glow-poi
     for (const key of ['x', 'z', 'h', 'r', 'g', 'b', 'i', 'size', 'minPx', 'maxPx']) assert.ok(Number.isFinite(l[key]), `light ${key}`);
     assert.ok(l.i > 0 && l.size > 0 && l.minPx > 0);
   }
+  // The capacity is a hard cap: the farthest taxiway lights are shed first,
+  // every runway light stays while the cap allows.
+  const runwayCount = lights.filter((l) => l.group !== 'taxiEdge' && l.group !== 'taxiCenter').length;
+  const cap = runwayCount + 10;
+  const capped = L.buildAirfieldLights(precision, { viewer: { x: 0, z: 0 }, capacity: cap });
+  assert.equal(capped.length, cap);
+  assert.equal(capped.filter((l) => l.group !== 'taxiEdge' && l.group !== 'taxiCenter').length, runwayCount, 'runway systems kept');
+  const dist = (l) => Math.hypot(l.x, l.z);
+  const keptTaxi = capped.filter((l) => l.group === 'taxiEdge' || l.group === 'taxiCenter').map(dist);
+  const keptKeys = new Set(capped.map((l) => `${l.group}:${l.x}:${l.z}`));
+  const shedTaxi = lights.filter((l) => (l.group === 'taxiEdge' || l.group === 'taxiCenter') && !keptKeys.has(`${l.group}:${l.x}:${l.z}`)).map(dist);
+  assert.equal(shedTaxi.length, lights.length - cap);
+  assert.ok(Math.max(...keptTaxi) <= Math.min(...shedTaxi) + 1e-9, 'the nearest taxiway lights are the ones kept');
   const src = fs.readFileSync(new URL('../lib/fly/glow-points.js', import.meta.url), 'utf8');
   const mirror = src.match(/GLOW_MODE\s*=\s*Object\.freeze\((\{[^}]*\})\)/);
   assert.ok(mirror, 'glow-points.js exports GLOW_MODE');
