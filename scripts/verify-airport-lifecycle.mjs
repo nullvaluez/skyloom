@@ -30,6 +30,7 @@ globalThis.fetch=async url=>({ok:true,json:async()=>JSON.parse(fs.readFileSync('
 const engine={worldToGeo:p=>new Vector3(p.x/6378137*180/Math.PI,(2*Math.atan(Math.exp(-p.z/6378137))-Math.PI/2)*180/Math.PI,p.y),getGroundAt:()=>({tileZ:18,elev:250})};
 const flight={pos:new Vector3(),cfg:{speeds:{slow:60,boost:300}},heading:0,speed:100,pitch:0,bank:0};
 const runtime={engine,flight,worldLoading:false,traffic:{tracks:new Map(),items:[]},trafficStatus:{state:'live'},autopilot:{mode:'off',disengage(){this.mode='off';}},adventures:{suspend(){}},operations:{phase:'airborne',profile:null,events:[],warp(){}},warpToGeo(lat,lon,{altM,headingRad=0}){const p=projectAirportPoint(lon,lat);flight.pos.set(p.x,altM,p.z);flight.heading=headingRad;return true;},interceptHex(){runtime.autopilot.mode='intercept';return true;}};
+runtime.targeting={lockedHex:null,target:null,_lockT:0};
 useFlyStore.setState({runtimeReady:true,aircraftId:'fighter',soundOn:false});
 const dispose=connectAirportWatch(runtime);let checks=0;
 const check=async(name,fn)=>{await fn();checks++;console.log('PASS '+name);};
@@ -82,7 +83,8 @@ await check('wheel zoom keeps the pointed-at direction under the pointer',()=>{
 
 const near=placeAt(mk('aaa111'),.08,.05,6000),far=placeAt(mk('bbb222'),.6,.02,9000),behind=placeAt(mk('ccc333'),3.0,.04,4000);
 setTraffic(near,far,behind);
-await check('binoculars with nothing selected auto-acquire the aircraft nearest the centre of view',()=>{watch.clearSelection();watch.resetLook();frames(60);watch.binoculars(true);assert.equal(watch.selected,'aaa111');assert.equal(watch.tracking,true);assert.equal(useFlyStore.getState().lockedHex,'aaa111','soft lock kept for hero detail');frames(150);assert.ok(aimError(near)<camera.fov*DEG*.01,'locked and centred: '+aimError(near));watch.binoculars(false);frames(90);});
+await check('binoculars with nothing selected auto-acquire the aircraft nearest the centre of view',()=>{watch.clearSelection();watch.resetLook();frames(60);watch.binoculars(true);assert.equal(watch.selected,'aaa111');assert.equal(watch.tracking,true);assert.equal(useFlyStore.getState().lockedHex,'aaa111','soft lock kept for hero detail');assert.equal(runtime.targeting.lockedHex,'aaa111','and written where FlyScene and DetailedTraffic read it');assert.equal(runtime.targeting.target,near);frames(150);assert.ok(aimError(near)<camera.fov*DEG*.01,'locked and centred: '+aimError(near));watch.binoculars(false);frames(90);});
+await check('clearing the selection releases the lock',()=>{watch.clearSelection();assert.equal(runtime.targeting.lockedHex,null);assert.equal(useFlyStore.getState().lockedHex,null);});
 await check('a contact behind the lounge walls cannot be followed',()=>{watch.select('ccc333');assert.equal(watch.selected,'ccc333');assert.equal(watch.tracking,false);assert.match(watch.notice,/behind the lounge/);watch.clearSelection();});
 await check('the lock holds a crossing aircraft with zero steady lag at 20x',()=>{
   const t=placeAt(mk('ddd444'),-.3,.08,5000);t.fix1={vE:-70*Math.cos(watch.roomHeading),vN:-70*Math.sin(watch.roomHeading),vUp:-3,latRad:t.fix1.latRad,t:1};setTraffic(t);
