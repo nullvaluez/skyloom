@@ -38,7 +38,7 @@ export function AirportStructures({ runtime }) {
   const airportId = useFlyStore((s) => s.airportWatch?.id ?? null);
   const { gl, camera, scene } = useThree();
   const [set, setSet] = useState(null);
-  const frame = useRef({ group: null, nextGround: 0, groundDone: false, startedAt: 0, nextSweep: 0, size: new Vector2(), cam: new Vector3(), lastLog: 0 });
+  const frame = useRef({ group: null, nextGround: 0, groundDone: false, startedAt: 0, nextSweep: 0, size: new Vector2(), cam: new Vector3(), lastLog: 0, airfieldVersion: 0 });
 
   // Build the set for this airport. Created inside an effect (not useMemo) so
   // StrictMode's mount/unmount/mount disposes the first copy and keeps the
@@ -117,6 +117,19 @@ export function AirportStructures({ runtime }) {
 
     const now = performance.now();
     if (!f.startedAt) f.startedAt = now;
+
+    // The airfield ground (AirfieldGround.jsx) answers engine.getGroundAt with its
+    // drawn surface and bumps its version when that surface moves (the terrain
+    // under it refines to z17-z18 after this field has settled at z16):
+    // sample again so markings, vehicles and parked aircraft stay on it.
+    const airfieldVersion = runtime.airfieldGround?.version ?? 0;
+    if (airfieldVersion !== f.airfieldVersion) {
+      f.airfieldVersion = airfieldVersion;
+      set.ground.done = false;
+      set.ground.passes = 0;
+      f.groundDone = false;
+      f.startedAt = now;
+    }
 
     // Retire OSM buildings in newly streamed chunks (twice a second).
     if (now >= f.nextSweep) {
