@@ -145,7 +145,31 @@ function Room({ runtime }) {
     if (s.fade > 0.998) s.fade = 1;
     const fade = s.fade;
     s.hidden = fade >= 0.999;
-    const shown = !!w.validated && !s.hidden;
+
+    // Prewarm: once the maps are in and the cascade rig (when one runs) has
+    // adopted every lit material (it adopts hidden objects too), compile the
+    // room under a render target so the program keys match the composer's
+    // (linear, no tone mapping). The room stays hidden until its programs
+    // are ready — a first draw never compiles — with a timeout as a backstop.
+    if (s.maps && s.warm === 'pending') {
+      const csm = runtime.cinemaShadows?.cascades > 0;
+      const adopted = !csm || resource.litMaterials().every((m) => m.customProgramCacheKey().includes('cinema-csm'));
+      if (adopted) {
+        s.warm = 'running';
+        s.warmRT ??= new WebGLRenderTarget(1, 1);
+        const prev = gl.getRenderTarget();
+        let job;
+        try {
+          gl.setRenderTarget(s.warmRT);
+          job = Promise.all([gl.compileAsync(group, camera, scene), gl.compileAsync(resource.glass.mesh, camera, overlayWarmScene()), gl.compileAsync(resource.steam.mesh, camera, overlayWarmScene())]);
+        } finally {
+          gl.setRenderTarget(prev);
+        }
+        job.then(() => { if (st.current === s) s.warm = 'done'; }, () => { if (st.current === s) s.warm = 'done'; });
+      }
+    }
+    const ready = s.warm === 'done' || performance.now() - s.started > ROOM_LOOK.prewarmTimeoutMs;
+    const shown = !!w.validated && !s.hidden && ready;
     group.visible = shown;
     resource.uniforms.uLoungeFade.value = fade;
     resource.board.mesh.visible = fade < 0.5; // on the back wall: never in a binocular view
@@ -207,27 +231,6 @@ function Room({ runtime }) {
       ambient: u.uLoungeBounce.value,
     });
     resource.board.update(performance.now(), w, false, runtime.trafficStatus?.state ?? 'live');
-
-    // Prewarm: once the maps are in and the cascade rig (when one runs) has
-    // adopted every lit material, compile the room under a render target so
-    // the program keys match the composer's (linear, no tone mapping).
-    if (s.maps && s.warm === 'pending') {
-      const csm = runtime.cinemaShadows?.cascades > 0;
-      const adopted = !csm || resource.litMaterials().every((m) => m.customProgramCacheKey().includes('cinema-csm'));
-      if (adopted) {
-        s.warm = 'running';
-        s.warmRT ??= new WebGLRenderTarget(1, 1);
-        const prev = gl.getRenderTarget();
-        let job;
-        try {
-          gl.setRenderTarget(s.warmRT);
-          job = Promise.all([gl.compileAsync(group, camera, scene), gl.compileAsync(resource.glass.mesh, camera, overlayWarmScene()), gl.compileAsync(resource.steam.mesh, camera, overlayWarmScene())]);
-        } finally {
-          gl.setRenderTarget(prev);
-        }
-        job.then(() => { if (st.current === s) s.warm = 'done'; }, () => { if (st.current === s) s.warm = 'done'; });
-      }
-    }
 
     // Interior reflection probe: refresh when the light changed enough.
     if (s.warm === 'done') {
