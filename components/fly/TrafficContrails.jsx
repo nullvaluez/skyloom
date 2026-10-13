@@ -171,15 +171,25 @@ function skyFrame(state, runtime, origin, camera, renderer, items, store, now) {
     const f = spec ? LIVE_AIRCRAFT[spec.family] : null;
     const scale = spec?.scale ?? 1;
     const len = (f?.length ?? 40) * scale;
-    // Velocity in scene units (Mercator x/z, metres y); the trail leaves the tail.
-    _vel.x = fix.vE * k; _vel.y = Math.max(-speed * 0.12, Math.min(speed * 0.12, fix.vUp)); _vel.z = -fix.vN * k;
+    // Velocity in scene units (Mercator x/z, metres y) along the DRAWN
+    // heading (the engine flies turns as arcs between fixes); the trail
+    // leaves the tail.
     const hx = Math.sin(t.yaw), hz = -Math.cos(t.yaw);
+    _vel.x = hx * speed * k; _vel.y = Math.max(-speed * 0.12, Math.min(speed * 0.12, fix.vUp)); _vel.z = hz * speed * k;
+    // Turn rate between the last two fixes (rad/s, compass sense).
+    let turn = 0;
+    const f0 = t.fix0;
+    if (f0 && fix.t > f0.t + 0.5 && speed > 20) {
+      const dh = Math.atan2(fix.vE, fix.vN) - Math.atan2(f0.vE, f0.vN);
+      const d = Math.atan2(Math.sin(dh), Math.cos(dh));
+      if (Math.abs(d) > 0.035) turn = Math.max(-0.09, Math.min(0.09, d / (fix.t - f0.t)));
+    }
     _src.x = t.rx - hx * len * 0.5 * k; _src.y = t.ryd; _src.z = t.rz - hz * len * 0.5 * k;
     // Engine half-span: the outermost nacelle of the family (the early plume
     // lines), 6 m for an unresolved jet.
     let engine = 6;
     if (f) { engine = 0; for (const e of stations[spec.family] ?? []) engine = Math.max(engine, Math.abs(e[0])); engine = Math.max(1.5, engine * scale); }
-    sky.feed(t.hex, _src, _vel, density, now, _wind, { engine, life: trailPersistence(t.ry, hourKey), backfillSec: SKY_VIEW.backfillSec });
+    sky.feed(t.hex, _src, _vel, density, now, _wind, { engine, life: trailPersistence(t.ry, hourKey), backfillSec: SKY_VIEW.backfillSec, turn });
   }
   sky.rebase(origin.anchor);
   renderer.getDrawingBufferSize(_buffer);
