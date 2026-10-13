@@ -39,6 +39,10 @@ export function AirfieldGround({ runtime }) {
       get ready() {
         return ground.state === 'ready';
       },
+      /** Bumps whenever the drawn surface moves (re-sample surfaceY then). */
+      get version() {
+        return ground.heights?.version ?? 0;
+      },
       /** The merged OSM facts (scene coordinates), once loaded. */
       get features() {
         return ground.data ?? null;
