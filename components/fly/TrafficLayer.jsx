@@ -13,6 +13,8 @@ import {
   MeshStandardMaterial,
   Object3D,
   PlaneGeometry,
+  Vector2,
+  Vector3,
 } from 'three';
 import { GLOBE, NAV_LIGHTS, SKY, SKY_OVERLAYS, TOY, TRAFFIC, TRAFFIC_HORIZON, WORLD } from '@/lib/fly/fly-constants';
 import { buildArchetypeGeometries } from '@/lib/fly/traffic-geometries';
@@ -26,8 +28,16 @@ import { projectModelMatrix } from '@/lib/fly/render-scale';
 import { faceCameraInto, getTrueScaleK } from '@/lib/fly/true-scale';
 import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
 import { cinemaOn } from '@/lib/fly/cinema-policy';
+import { AircraftLights } from '@/lib/fly/aircraft-lights';
+import { TouchdownSmoke } from '@/lib/fly/fleet-smoke';
+import { FLEET_VIEW } from '@/lib/fly/observation-config';
+import { getR25Sky } from '@/lib/fly/r25-sky';
 
 const _dummy = new Object3D();
+const _bufferSize = new Vector2();
+const _geoProbe = new Vector3();
+const _selected = new Set();
+const _wind = { x: 0, z: 0 };
 const _color = new Color();
 const _fog = new Color(SKY.fogColor);
 const _dotFog = new Color();
@@ -95,6 +105,13 @@ export function TrafficLayer({ runtime, flight, origin }) {
   const renderer = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   const detailedRef=useRef(null),detailedMount=useRef(null);
+  // Aircraft lights and touchdown smoke: sky overlays (drawn after the cloud
+  // composite, depth-tested), one draw each.
+  const lights = useMemo(() => new AircraftLights(), []);
+  const smoke = useMemo(() => new TouchdownSmoke(), []);
+  useEffect(() => lights.glow.overlay(), [lights]);
+  useEffect(() => registerSkyOverlay(smoke.mesh), [smoke]);
+  useEffect(() => () => { lights.dispose(); smoke.dispose(); }, [lights, smoke]);
   useEffect(()=>{
     const detailed=new DetailedTraffic();detailedRef.current=detailed;detailedMount.current?.add(detailed.group);
     return()=>{detailedRef.current=null;detailed.dispose();runtime.liveFleetReady=false;delete runtime.retryLiveFleet;};
@@ -240,7 +257,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
     };
   }, [meshes, billboards]);
 
-  useFrame(() => {
+  useFrame((frameState, delta) => {
     const detailed=detailedRef.current;
     const traffic = runtime.traffic;
     if (!traffic||!detailed) return;
@@ -250,7 +267,9 @@ export function TrafficLayer({ runtime, flight, origin }) {
 
     const items = useFlyStore.getState().cameraMode==='photo'?traffic.items:traffic.update(performance.now() / 1000, flight.pos);
     const mapStyleNow = useFlyStore.getState().mapStyle;
-    if (mapStyleNow === 'satellite' && !detailed.stats.ready && detailed.prepare() && !detailed.compiling) {
+    // Geometry builds one mesh per frame (far silhouettes, family mids, the
+    // common heroes, then any hero a contact asks for).
+    if (mapStyleNow === 'satellite' && detailed.prepare() && !detailed.stats.ready && !detailed.compiling) {
       detailed.compiling=true;
       renderer.compileAsync(detailed.group,camera,scene).then(()=>{if(!detailed.disposed){detailed.stats.ready=true;runtime.liveFleetReady=true;}}).catch(()=>{detailed.stats.compileFailed=true;});
     }
@@ -259,7 +278,33 @@ export function TrafficLayer({ runtime, flight, origin }) {
     const liveState=useFlyStore.getState();
     const quietTraffic=cinemaOn(liveState)&&!liveState.spotting&&!runtime.airportWatch?.active;
     const focusedHex=liveState.inspectHex??runtime.targeting?.lockedHex??runtime.hoverHex;
-    detailed.update(items,flight,origin,liveState.qualityTier,liveState.inspectHex??runtime.targeting?.lockedHex,mapStyleNow==='satellite',runtime.explorerVisualTime??performance.now()/1000);
+    // Observation lounge: every contact within FLEET_VIEW.modelRangeM of the
+    // seat is a real model, LOD follows the projected size (binoculars), and
+    // the observer's selection earns hero detail.
+    const watch = runtime.airportWatch;
+    const observing = !!watch?.active && mapStyleNow === 'satellite';
+    const modelRangeM = observing ? FLEET_VIEW.modelRangeM : TRAFFIC.modelLodDistanceM;
+    _selected.clear();
+    for (const hex of [watch?.active ? watch.selected : null, liveState.inspectHex, runtime.targeting?.lockedHex]) if (hex) _selected.add(hex);
+    const env = runtime.cinemaEnvironment;
+    const night = env ? env.night : Math.min(1, Math.max(0, 1 - (runtime.sun?.frac ?? 1) / 0.35));
+    const frameNow = performance.now() / 1000;
+    renderer.getDrawingBufferSize(_bufferSize);
+    const wx = runtime.weather?.wx;
+    _wind.x = (wx?.windX ?? 0) * 0.5; _wind.z = (wx?.windZ ?? 0) * 0.5;
+    lights.begin(night);
+    detailed.shared.uFleetNight.value.set(night * 2.4, night * 1.6, 0.4 + night * 3, 0);
+    detailed.update(items,flight,origin,liveState.qualityTier,liveState.inspectHex??runtime.targeting?.lockedHex,mapStyleNow==='satellite',runtime.explorerVisualTime??performance.now()/1000,{
+      camera, heightPx: _bufferSize.y || 1080, observing, selectedSet: _selected, modelRangeM,
+      groundAt: runtime.engine ? (x, z) => {
+        _geoProbe.set(x, 0, z);
+        const g = runtime.engine.worldToGeo(_geoProbe), sample = runtime.engine.getGroundAt?.(g.x, g.y);
+        return sample && Number.isFinite(sample.elev) ? sample.elev : null;
+      } : null,
+      airportY: observing ? watch.site?.groundY ?? null : null,
+      dt: Math.min(delta || 0, 0.25), now: frameNow, lights: mapStyleNow === 'satellite' ? lights : null,
+      smoke: mapStyleNow === 'satellite' ? smoke : null, origin, wind: _wind,
+    });
     runtime.liveFleet=detailed.stats;
     runtime.retryLiveFleet=()=>{if(detailed.stats.compileFailed){detailed.stats.compileFailed=false;detailed.compiling=false;}};
     setTrafficSurface(meshes, mapStyleNow === 'satellite' && satelliteVisualsOn('models'));
@@ -310,7 +355,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
       }
       if (it.livingDetailed) continue;
 
-      if (it.distM < TRAFFIC.modelLodDistanceM) {
+      if (it.distM < modelRangeM) {
         // R14: out-of-range archetype falls back to the UNKNOWN blob (index 8).
         // It is no longer the last mesh — warbird-prop/jet/heavy/classic-transport
         // occupy 9–12, so meshes.length-1 would wrongly resolve to classic-transport.
@@ -338,6 +383,8 @@ export function TrafficLayer({ runtime, flight, origin }) {
         mesh.setMatrixAt(mesh._used, _dummy.matrix);
         mesh.setColorAt(mesh._used, _color);
         mesh._used += 1;
+        // GLB / primitive archetypes carry the standard light set at a nominal span.
+        if (mapStyleNow === 'satellite') lights.addPoint(x, y, z, it.yaw, 14, it, { strobe: !(it.flags & 1), eff });
       } else {
         if (billboardsUsed >= TRAFFIC.maxBillboards) continue;
         const quiet=quietTraffic&&it.hex!==focusedHex;
@@ -365,6 +412,8 @@ export function TrafficLayer({ runtime, flight, origin }) {
         billboards.setColorAt(billboardsUsed, _color);
         billboards.geometry.attributes.aTrafficPresence.setX(billboardsUsed,quiet ? .22 : 1);
         billboardsUsed += 1;
+        // Far contacts at night: their beacons and strobes are what you see.
+        if (mapStyleNow === 'satellite' && night > 0.05 && it.distM < FLEET_VIEW.lights.billboardRangeM) lights.addPoint(x, y, z, it.yaw, 0, it, { eff: eff * night });
       }
     }
 
@@ -373,6 +422,16 @@ export function TrafficLayer({ runtime, flight, origin }) {
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
+    const exposure = getR25Sky().exposure || 1;
+    lights.end(camera, _bufferSize.y || 1080, runtime.explorerVisualTime ?? frameNow, mapStyleNow === 'satellite' ? exposure : 0, 0);
+    if (mapStyleNow === 'satellite') {
+      // Smoke lit like the scene: sunlit tops, sky-lit undersides.
+      const key = env?.keyColor ?? [1, 1, 1], fill = env?.fillColor ?? [0.5, 0.6, 0.8], sun = Math.min(4, env?.sun ?? 3);
+      const lit = [0, 1, 2].map((k) => (fill[k] * 0.35 + key[k] * sun * 0.16) * exposure);
+      const shade = [0, 1, 2].map((k) => fill[k] * 0.32 * exposure);
+      smoke.update(origin, frameNow, Math.min(delta || 0, 0.1), lit, shade);
+    } else smoke.update(origin, frameNow, 0, null, null);
+    runtime.fleetLights = lights.stats;
     billboards.count = billboardsUsed;
     billboards.instanceMatrix.needsUpdate = true;
     if (billboards.instanceColor) billboards.instanceColor.needsUpdate = true;
@@ -403,6 +462,8 @@ export function TrafficLayer({ runtime, flight, origin }) {
         <primitive key={i} object={mesh} />
       ))}
       <primitive object={billboards} />
+      <primitive object={lights.mesh} />
+      <primitive object={smoke.mesh} />
       <group ref={detailedMount} />
     </group>
   );
