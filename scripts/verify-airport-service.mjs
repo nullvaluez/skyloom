@@ -369,6 +369,170 @@ await check('a stored seat (flagship) resolves at once without loading OSM data'
   L.clearSessionSites();
 });
 
+// ---- section: contact seam ----------------------------------------------------
+// lib/fly/ops/contact.js: with operations.ground null every answer is the
+// authored registry; an installed ground moves every placement and contact read.
+const { FlightOperations } = await imp('lib/fly/flight-operations.js');
+const { surfaceAt, paved, placementHeight } = await imp('lib/fly/ops/contact.js');
+const { RUNWAY_DRAWN_LIFT } = await imp('lib/fly/airport-service/contracts.js');
+const { Vector3, Object3D, Matrix4 } = await import('three');
+const opsFlight = (cruise = 60) => ({ pos: new Vector3(), cfg: { speeds: { cruise } }, speed: 0, turnRate: 0, pitchRate: 0 });
+/** A stub composite ground: the registry surface, drawn RUNWAY_DRAWN_LIFT higher everywhere. */
+const liftedGround = () => ({
+  surfaceAt(x, z) {
+    const s = registry.findAirportSurface(x, z);
+    return s ? { ...s, height: s.height + RUNWAY_DRAWN_LIFT } : { kind: 'grass', height: 0, airport: null, along: 0, cross: 0, areaIdent: null, source: 'osm' };
+  },
+  placementHeight(x, z) {
+    const s = registry.findAirportSurface(x, z);
+    return s ? s.height + RUNWAY_DRAWN_LIFT : null;
+  },
+});
+
+await check('contact: ground null answers the registry, paved() treats grass as off pavement', () => {
+  const o = new FlightOperations();
+  const a = registry.airportById('KCMH');
+  const p = registry.airportPoint(a, 500);
+  assert.equal(o.ground, null);
+  assert.deepEqual(surfaceAt(o, p.x, p.z), registry.findAirportSurface(p.x, p.z));
+  assert.equal(placementHeight(o, p.x, p.z, 123.25), 123.25);
+  assert.equal(paved(null), false);
+  assert.equal(paved({ kind: 'grass' }), false);
+  assert.equal(paved({ kind: 'taxiway' }), true);
+  assert.ok(Math.abs(RUNWAY_DRAWN_LIFT - 0.09) < 1e-12);
+});
+
+await check('contact: an installed ground moves begin, lineUp and retry onto the drawn surface (+0.09 m, within 1 mm)', () => {
+  for (const place of ['begin', 'lineUp', 'retry']) {
+    const f = opsFlight(240);
+    const o = new FlightOperations();
+    o.ground = liftedGround();
+    assert.ok(o.begin(f, 'airliner', 'KCMH'));
+    if (place === 'lineUp') assert.ok(o.lineUp(f));
+    if (place === 'retry') assert.ok(o.retry(f));
+    const s = registry.findAirportSurface(f.pos.x, f.pos.z);
+    const authored = s ? s.height : null;
+    if (place === 'retry') {
+      // 3 km out on final: the placement height sits over the drawn runway end height
+      const frame = registry.airportFrame(o.airport);
+      const end = registry.airportPoint(o.airport, o.reverse ? frame.length - (o.airport.thresholdB || 0) + 3000 : (o.airport.thresholdA || 0) - 3000);
+      assert.ok(Math.abs(f.groundElev - end.y) < 1e-9, 'off pavement keeps the authored height');
+      continue;
+    }
+    assert.ok(Math.abs(f.pos.y - (authored + RUNWAY_DRAWN_LIFT + o.profile.clearance)) < 1e-3, `${place}: ${f.pos.y} vs ${authored}`);
+  }
+});
+
+await check('contact: a fast roll onto grass from an installed ground is an excursion', () => {
+  const f = opsFlight();
+  const o = new FlightOperations();
+  o.ground = liftedGround();
+  assert.ok(o.begin(f, 'prop', 'KOSU'));
+  const a = o.airport;
+  const p = registry.airportPoint(a, 200, a.taxiOffset - 9.9);
+  f.pos.set(p.x, p.y + o.profile.clearance, p.z);
+  f.heading = registry.airportFrame(a).heading - Math.PI / 2;
+  f.speed = 20;
+  o.phase = 'taxiOut';
+  o.parkingBrake = false;
+  for (let i = 0; i < 12; i++) o.advance(1 / 60, f, { throttle: 1 });
+  assert.equal(o.phase, 'crashed');
+  assert.equal(o.events.at(-1).kind, 'excursion');
+});
+
+// ---- section: snapshot round trip --------------------------------------------
+await check('snapshot: a mutate -> restore round trip restores nested state, removes new keys and keeps event ids unique', () => {
+  const f = opsFlight();
+  const o = new FlightOperations();
+  assert.ok(o.begin(f, 'prop', 'KOSU'));
+  o.startTaxi();
+  for (let i = 0; i < 120; i++) o.advance(1 / 60, f, {});
+  const strip = (x) => JSON.stringify({ ...x, airport: x.airport?.id, profile: x.profile?.id, telemetry: { ...x.telemetry, flareTrace: [...x.telemetry.flareTrace], routeXZ: [...x.telemetry.routeXZ] } });
+  const before = strip(o);
+  const snap = o.snapshot();
+  assert.equal(snap.airport, o.airport, 'the registry airport is shared, not copied');
+  for (let i = 0; i < 300; i++) o.advance(1 / 60, f, {});
+  o.telemetry.routeXZ[0] = 42;
+  o.events.push({ id: 999, type: 'probe' });
+  o.extra = { nested: [1, 2] };
+  o.emit('probe');
+  const seqAfter = o.sequence;
+  o.restore(snap);
+  assert.equal(o.extra, undefined);
+  assert.equal(o.sequence, seqAfter, 'the event sequence never rewinds');
+  o.sequence = snap.sequence;
+  assert.equal(strip(o), before);
+  // the snapshot is reusable: restoring twice gives the same state
+  o.telemetry.flareTrace[0] = 7;
+  o.restore(snap);
+  o.sequence = snap.sequence;
+  assert.equal(strip(o), before);
+});
+
+// ---- section: pose equivalence -------------------------------------------------
+// The shared pose helper against an independent Object3D rig (parent + the
+// groundHull child), 200 random poses, 1e-9. verify-ops-presentation proves the
+// bare rig Object.is-identical to the pre-W0 PlayerPlane code.
+const { composeAircraftMatrix, poseAircraftRig, groundHullOffset } = await imp('lib/fly/aircraft-pose.js');
+const { projectModelMatrix } = await imp('lib/fly/render-scale.js');
+const { mercatorScale } = await imp('lib/fly/coords.js');
+await check('pose: composeAircraftMatrix equals an independent rig (parent x groundHull child) to 1e-9 over 200 poses', () => {
+  let seed = 11;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  for (let i = 0; i < 200; i++) {
+    const f = {
+      pos: new Vector3((rnd() - 0.5) * 2e7, rnd() * 12000, (rnd() - 0.5) * 2e7),
+      heading: (rnd() - 0.5) * 2 * Math.PI,
+      pitch: rnd() - 0.5,
+      bank: (rnd() - 0.5) * 1.6,
+      latDeg: (rnd() - 0.5) * 140,
+      operations: { profile: { modelOffsetY: -1 }, gear: rnd() },
+    };
+    const bob = rnd();
+    const t = rnd() * 500;
+    const parent = new Object3D();
+    parent.matrixAutoUpdate = false;
+    parent.position.copy(f.pos);
+    parent.rotation.order = 'YXZ';
+    parent.rotation.set(f.pitch, -f.heading, -f.bank);
+    parent.position.y += (Math.sin(t * 1.9) * 0.35 + Math.sin(t * 3.1) * 0.12) * bob;
+    parent.rotation.z += Math.sin(t * 1.3) * 0.01 * bob;
+    parent.updateMatrix();
+    projectModelMatrix(parent.matrix, mercatorScale(f.latDeg));
+    const child = new Object3D();
+    child.position.y = groundHullOffset(f);
+    child.updateMatrix();
+    const want = new Matrix4().multiplyMatrices(parent.matrix, child.matrix).elements;
+    const got = composeAircraftMatrix(f, null, { bob, t, latDeg: f.latDeg, groundHull: true, hullY: groundHullOffset(f) }).elements;
+    for (let j = 0; j < 16; j++) assert.ok(Math.abs(want[j] - got[j]) <= 1e-9 * Math.max(1, Math.abs(want[j])), `pose ${i} element ${j}`);
+    const rig = new Object3D();
+    rig.matrixAutoUpdate = false;
+    const bare = poseAircraftRig(rig, f, null, { bob, t, latDeg: f.latDeg }).elements;
+    for (let j = 0; j < 16; j++) assert.ok(Object.is(bare[j], parent.matrix.elements[j]), `bare ${i}/${j}`);
+  }
+});
+
+// ---- section: inert service ----------------------------------------------------
+await check('service: runtime.airports is inert with OPS_AIRFIELD off (registry surface, no areas, no gates)', async () => {
+  const { createAirportService } = await imp('lib/fly/airport-service/index.js');
+  const svc = createAirportService({});
+  const a = registry.airportById('KCMH');
+  const p = registry.airportPoint(a, 700);
+  assert.equal(svc.enabled, false);
+  assert.deepEqual(svc.surfaceAt(p.x, p.z), registry.findAirportSurface(p.x, p.z));
+  assert.equal(svc.snapshot(), svc.snapshot());
+  assert.equal(svc.snapshot().length, 0);
+  const pre = await svc.prefetch('KCMH', 'departure');
+  assert.equal(pre.phase, 'none');
+  assert.equal(svc.prefetchState('KCMH').hasGate, false);
+  assert.equal(svc.gateFor('KCMH', 'airliner'), null);
+  assert.deepEqual(svc.gateOptions('KCMH', 'airliner'), []);
+  assert.equal(svc.planDeparture({ ident: 'KCMH' }), null);
+  assert.equal(svc.towerPoint('KCMH'), null);
+  svc.update({});
+  svc.dispose();
+});
+
 // ---- summary ----------------------------------------------------------------
 const total = pass + failures.length;
 console.log(`\nAIRPORT SERVICE: ${pass}/${total}${failures.length ? ` — FAILED: ${failures.join(' | ')}` : ''}`);

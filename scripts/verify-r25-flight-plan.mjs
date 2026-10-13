@@ -767,6 +767,33 @@ await tryGate('7f launchSetup', () => {
     window.localStorage = store;
   }
 });
+await tryGate('7i gate launch fallback', () => {
+  // GATE TO GATE W0: a 'gate' start without runtime.beginGate (GATE_TO_GATE off,
+  // or no ready gate) lines up on the runway; any launch clears the lounge return.
+  setPlan(true);
+  const store = globalThis.localStorage;
+  const ls = mem();
+  globalThis.localStorage = ls;
+  window.localStorage = ls;
+  try {
+    const w = makeWorld({ elev: 10 });
+    useFlyStore.setState({ airportReturn: { id: 'KCMH', view: 'deck' } });
+    const ok = w.runtime.launchSetup({ flightMode: 'ops', aircraftId: 'airliner', airportId: 'KCMH', start: 'gate' });
+    const lined = ok && w.operations.phase === 'parked' && w.operations.events.some((e) => e.type === 'runway-lineup') && w.operations.takeoffStatus(w.flight).aligned;
+    const cleared = useFlyStore.getState().airportReturn === null;
+    let delegated = null;
+    w.runtime.beginGate = (id, airportId, opts) => {
+      delegated = { id, airportId, opts };
+      return true;
+    };
+    const viaGate = w.runtime.beginDeparture('airliner', 'KCMH', 'gate', { standIndex: 3 });
+    w.off();
+    gate("7i a 'gate' launch lines up on the runway without a gate, delegates to runtime.beginGate when present, and clears the lounge return", lined && cleared && viaGate === true && delegated?.opts?.standIndex === 3, JSON.stringify({ ok, lined, cleared, delegated: !!delegated }));
+  } finally {
+    globalThis.localStorage = store;
+    window.localStorage = store;
+  }
+});
 await tryGate('7h launchGlider unchanged', () => {
   // Git blobs use LF; Windows working trees may use CRLF. Compare code, not checkout policy.
   const src = require_('lib/fly/operations-runtime.js').replace(/\r\n/g, '\n')
