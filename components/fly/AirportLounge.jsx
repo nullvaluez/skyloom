@@ -186,6 +186,7 @@ function Room({ runtime }) {
       time,
       roomRad: u.uLoungeRoomRad.value,
       probe: probe.texture && s.probeKey ? probe : null,
+      probeLod: ROOM_LOOK.probeLod,
     });
     _view.copy(_key).transformDirection(camera.matrixWorldInverse);
     resource.steam.update({
@@ -194,7 +195,7 @@ function Room({ runtime }) {
       keyColor: [keyColor[0] * keyI, keyColor[1] * keyI, keyColor[2] * keyI],
       ambient: u.uLoungeBounce.value,
     });
-    resource.board.update(performance.now(), w);
+    resource.board.update(performance.now(), w, false, runtime.trafficStatus?.state ?? 'live');
 
     // Prewarm: once the maps are in and the cascade rig (when one runs) has
     // adopted every lit material, compile the room under a render target so
