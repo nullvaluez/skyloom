@@ -5,6 +5,7 @@ const {mkdirSync,writeFileSync,readdirSync,readFileSync}=require('node:fs');
 const path=require('node:path');
 const {chromium}=require('playwright');
 const {attachFixture,fixturePin}=require('./_fixture');
+const {departureId,waitForDeparture}=require('./_hangar-pick'); // G2G W0.8: either hangar departure UI
 const OUT=path.resolve('.graphics-review/beta');mkdirSync(OUT,{recursive:true});
 const PORT=Number(process.env.PORT||3094),base=`http://127.0.0.1:${PORT}`;
 const flags=process.env.BETA_FLAGS||'';
@@ -47,8 +48,8 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
   await page.getByTestId('hangar').waitFor();
   await page.getByLabel('Find an airport or runway').fill('LOWI');
   await page.getByRole('button').filter({hasText:'Innsbruck'}).first().click();
-  await page.waitForFunction(()=>document.querySelector('#departure-airport')?.value.startsWith('LOWI:'));
-  check('regional airport loads into preparation',await page.locator('#departure-airport').inputValue().then(v=>v.startsWith('LOWI:')));
+  await waitForDeparture(page,'LOWI:');
+  check('regional airport loads into preparation',await departureId(page).then(v=>!!v&&v.startsWith('LOWI:')));
   check('generic airport does not promise apron operations',await page.getByRole('button',{name:'Apron',exact:true}).count()===0);
   await page.screenshot({path:path.join(OUT,'airport-desktop.png'),timeout:30000});
   // Execute the actual webpack worker asset, using Comlink's wire protocol.

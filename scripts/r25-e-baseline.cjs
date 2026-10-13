@@ -49,6 +49,7 @@ const os = require('os');
 const { chromium } = require('playwright');
 const { bootFly, unpinPins, BOOT_URL } = require('./_boot');
 const { waitTitleReady, installBootProbe } = require('./_title');
+const { hasDeparturePicker, pickDeparture, pickStart } = require('./_hangar-pick'); // G2G W0.8: either hangar departure UI
 const { pose, warpToPose, sunTimeMs, isolateCanvas, holdStill, roadRingInPage } = require('./_r25-poses');
 const L = require('./_r25-luma');
 const { productVerdict, median } = require('./_r25-product-boot');
@@ -145,9 +146,8 @@ async function productBoot(browser, style, arm, sceneAt) {
       row.path = 'hangar-kosu-apron';
       await page.getByTestId('hangar').waitFor({ state: 'visible', timeout: 300000 * SCALE });
       await page.getByTestId('hangar-pick-prop').click({ timeout: 60000 * SCALE });
-      if (await page.locator('#departure-airport').count()) await page.selectOption('#departure-airport', 'KOSU');
-      const apron = page.locator('input[value="apron"]');
-      if (await apron.count()) await apron.first().check().catch(() => {});
+      if (await hasDeparturePicker(page)) await pickDeparture(page, 'KOSU');
+      await pickStart(page, 'apron', { how: 'check', optional: true }).catch(() => {});
       await page.waitForFunction(() => document.querySelector('[data-testid="hangar-fly"]')?.disabled === false, undefined, { timeout: 300000 * SCALE, polling: 250 });
       row.flyClickAt = Math.round(await page.evaluate(() => performance.now()));
       await page.getByTestId('hangar-fly').click();

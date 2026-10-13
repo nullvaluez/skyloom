@@ -1,5 +1,6 @@
 const {chromium}=require('playwright'),fs=require('node:fs'),assert=require('node:assert/strict');
 const {enterHangar}=require('./_title'); // R25 (E, SANCTIONED): reach the hangar through the title when there is one
+const {pickDeparture,pickStart}=require('./_hangar-pick'); // G2G W0.8: either hangar departure UI
 const output='.graphics-review/cloud-paths';fs.mkdirSync(output,{recursive:true});
 (async()=>{
  const browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-gpu']});
@@ -8,7 +9,7 @@ const output='.graphics-review/cloud-paths';fs.mkdirSync(output,{recursive:true}
   const timer=setInterval(()=>{const s=window.__fly?.earthSurface?.airports;if(!s)return;clearInterval(timer);Object.defineProperty(s,'nearPending',{get:()=>99,set:()=>{},configurable:true});window.__forcedPavementPending=true;},25);
  });
  try{
- await page.goto(process.env.FLY_URL||'http://localhost:3001');await enterHangar(page,'ops');await page.getByTestId('hangar-pick-prop').click({timeout:60000});await page.selectOption('#departure-airport','KOSU');await page.locator('input[value="runway"]').click();await page.getByTestId('hangar-fly').click();
+ await page.goto(process.env.FLY_URL||'http://localhost:3001');await enterHangar(page,'ops');await page.getByTestId('hangar-pick-prop').click({timeout:60000});await pickDeparture(page,'KOSU');await pickStart(page,'runway');await page.getByTestId('hangar-fly').click();
  await page.waitForFunction(()=>window.__flyBoot?.pct===100&&!window.__fly.worldLoading,undefined,{timeout:65000});
  report.boot=await page.evaluate(()=>({forced:window.__forcedPavementPending,arrival:window.__fly.arrivalStats,readiness:window.__fly.worldReadiness,degraded:window.__fly.worldDegraded}));
  assert.equal(report.boot.forced,true);assert.equal(report.boot.degraded,false);assert.equal(report.boot.arrival.reason,'background-detail');assert.ok(report.boot.readiness.deferred.includes('airports'));console.log('Boot released with pending pavement: '+report.boot.arrival.holdMs+' ms');

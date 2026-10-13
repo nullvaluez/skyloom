@@ -17,7 +17,7 @@
  *        interactive immediately) — read from an in-page probe installed
  *        before the app mounts (_title.js installBootProbe), so the leg
  *        cannot race the reveal;
- *   (2c) it carries the charter's controls (title-free-flight,
+ *   (2c) it carries the charter's controls (title-explore,
  *        title-takeoff-landing, title-settings, title-logbook, title-credits)
  *        and data-overlay="title";
  *   (2d) the title WORLD reveals (data-ready true AND __flyBoot.pct === 100);
@@ -40,7 +40,7 @@
  *       R25 visual block ON it must be ABSENT (the intro pass: "the Visuals
  *       toggle stays hidden while nothing Enhanced exists"), with one ON it
  *       must round-trip the store live (visuals + visualsEpoch +2).
- *  (4)  FREE FLIGHT: (4a) title-free-flight -> hangar[data-mode=free];
+ *  (4)  FREE FLIGHT: (4a) title-explore -> hangar[data-mode=free];
  *       (4b) hangar-back returns to the title over a live world, and the card
  *       re-enters; (4c) hangar-fly -> screen 'flight', phase 'airborne', above
  *       2/3 of the free-flight AGL floor, in the aircraft PICKED in the free
@@ -103,6 +103,7 @@ const path = require('path');
 const { chromium } = require('playwright');
 const { bootFly, unpinPins } = require('./_boot');
 const { enterHangar, waitTitleReady, titleVisible, installBootProbe } = require('./_title');
+const { hasDeparturePicker, pickDeparture, pickStart } = require('./_hangar-pick'); // G2G W0.8: either hangar departure UI
 const { attachPageErrors } = require('./_pageerrors');
 const { loadFlyConstants } = require('./_r25-poses');
 
@@ -123,7 +124,7 @@ const DEFAULT_AIRCRAFT = 'fighter';
 // that sees phase 'airborne' after a launch, so the aircraft has flown a few
 // frames at most; 2.5 km also absorbs runtime.geo's 3-frame sample cadence.
 const CONTINUE_TOL_M = 2500;
-const TITLE_CONTROLS = ['title-free-flight', 'title-takeoff-landing', 'title-settings', 'title-logbook', 'title-credits'];
+const TITLE_CONTROLS = ['title-explore', 'title-takeoff-landing', 'title-settings', 'title-logbook', 'title-credits'];
 
 let pass = 0, fail = 0, notcal = 0;
 const rows = [];
@@ -465,7 +466,7 @@ const titleReady = () =>
 
     // ---- (4) FREE FLIGHT -----------------------------------------------------
     let freeFlew = false, freeSetup = null;
-    if (t.title && (await has(page, 'title-free-flight'))) {
+    if (t.title && (await has(page, 'title-explore'))) {
       await enterHangar(page, 'free', { timeoutMs: 60000 * SCALE });
       const mode = await hangarMode(page);
       if (mode !== 'free') {
@@ -514,9 +515,9 @@ const titleReady = () =>
         }
       }
     } else {
-      absent(frontDoorOn && t.title, '(4a) FREE FLIGHT card opens hangar[data-mode=free]', 'no title-free-flight');
+      absent(frontDoorOn && t.title, '(4a) FREE FLIGHT card opens hangar[data-mode=free]', 'no title-explore');
       for (const leg of ['(4b) hangar-back returns to the title', '(4c) FREE FLIGHT launches airborne', '(4d) still airborne after 60 frames'])
-        notCal(leg, 'no title-free-flight — FRONT_DOOR / FLIGHT_PLAN off');
+        notCal(leg, 'no title-explore — FRONT_DOOR / FLIGHT_PLAN off');
     }
 
     // ---- (5) EXIT TO TITLE ---------------------------------------------------
@@ -644,20 +645,14 @@ const titleReady = () =>
       else {
         const mode = await hangarMode(page);
         await press(page, 'hangar-pick-prop');
-        if (await page.locator('#departure-airport').count())
-          await page.selectOption('#departure-airport', 'KOSU', { timeout: 30000 * SCALE }).catch(async () => {
-            // The same starved-main-thread fallback as press(): set the value
-            // through the native setter and fire the change React listens for.
-            await page.evaluate(() => {
-              const el = document.querySelector('#departure-airport');
-              if (!el || el.value === 'KOSU') return;
-              Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(el, 'KOSU');
-              el.dispatchEvent(new Event('change', { bubbles: true }));
-            });
-            presses.dom.push('#departure-airport');
-          });
-        const apron = page.locator('input[value="apron"]');
-        if (await apron.count()) await apron.first().check().catch(() => {});
+        // G2G W0.8: either hangar departure UI (scripts/_hangar-pick.js). domFallback
+        // is the same starved-main-thread fallback as press(): on a timed-out
+        // pick, set the value through the DOM once; the effect is asserted below.
+        if (await hasDeparturePicker(page)) {
+          const pick = await pickDeparture(page, 'KOSU', { timeout: 30000 * SCALE, domFallback: true }).catch(() => ({ forced: true }));
+          if (pick.forced) presses.dom.push('#departure-airport');
+        }
+        await pickStart(page, 'apron', { how: 'check', optional: true }).catch(() => {});
         await waitFor(page, () => document.querySelector('[data-testid="hangar-fly"]')?.disabled === false, undefined, 120000);
         await press(page, 'hangar-fly');
         const left = await waitFor(page, () => !document.querySelector('[data-testid="hangar"]') && window.__flyStore.getState().screen === 'flight', undefined, 30000);

@@ -5,6 +5,7 @@ const {chromium}=require('playwright');
 const fs=require('node:fs');
 const path=require('node:path');
 const {enterHangar}=require('./_title'); // R25 (E, SANCTIONED): reach the hangar through the title when there is one
+const {pickDeparture}=require('./_hangar-pick'); // G2G W0.8: either hangar departure UI
 const out=process.env.FLY_OPERATIONS_OUTPUT||'.graphics-review/operations/browser';
 const timeout=Number(process.env.FLY_READY_TIMEOUT_MS)||90000;
 const snapshot=page=>page.evaluate(()=>{
@@ -25,7 +26,7 @@ const snapshot=page=>page.evaluate(()=>{
   await page.addInitScript(()=>localStorage.setItem('fly-controls-seen','1'));
   async function departure(name){
     await page.getByTestId('hangar-pick-prop').click({timeout:60000});
-    await page.selectOption('#departure-airport','KOSU');
+    await pickDeparture(page,'KOSU');
     await page.getByTestId('hangar-fly').click({timeout:60000});
     const started=Date.now();
     await page.getByTestId('hangar').waitFor({state:'hidden'});

@@ -49,6 +49,7 @@ const path = require('path');
 const { chromium } = require('playwright');
 const { bootFly, unpinPins } = require('./_boot');
 const { enterHangar, waitTitleReady } = require('./_title');
+const { pickDeparture, pickStart } = require('./_hangar-pick'); // G2G W0.8: either hangar departure UI
 const { attachPageErrors } = require('./_pageerrors');
 const { loadFlyConstants } = require('./_r25-poses');
 
@@ -221,11 +222,11 @@ async function doContinue(page, title) {
     // The Free Flight entry must exist before walking in (with FLIGHT_PLAN off
     // the title has no Free Flight card — fail fast instead of waiting out the
     // click timeout; RED run 1 on the A+B tree spent 15 min there).
-    const freeEntry = !t1.title || (await waitFor(page, () => !!document.querySelector('[data-testid="title-free-flight"]'), undefined, 30000 * SCALE));
+    const freeEntry = !t1.title || (await waitFor(page, () => !!document.querySelector('[data-testid="title-explore"]'), undefined, 30000 * SCALE));
     if (!freeEntry) {
       report.legs.freeEntry = false;
       for (const n of ['(2) a Free Flight launch writes a valid fly-last-setup-v1', '(3) CONTINUE relaunches the free flight exactly', '(4) CONTINUE relaunches the ops-runway flight exactly'])
-        gate(n, false, 'no Free Flight entry on the title (title-free-flight absent)');
+        gate(n, false, 'no Free Flight entry on the title (title-explore absent)');
       gate('(5) ZERO page errors across the three loads', errors.length === 0, errNote());
       await ctx.close();
       return;
@@ -271,8 +272,8 @@ async function doContinue(page, title) {
       if (await confirm.count()) await press(confirm);
       await page.evaluate(() => window.__flyStore.getState().setFlightMode('ops'));
       await press(page.getByTestId('hangar-pick-fighter'));
-      await page.locator('#departure-airport').selectOption('KCMH');
-      await page.locator('input[name="departure-mode"][value="runway"]').check({ force: true });
+      await pickDeparture(page, 'KCMH');
+      await pickStart(page, 'runway', { how: 'check', force: true });
       await flyEnabled(page, 600000 * SCALE);
       await press(page.getByTestId('hangar-fly'));
       await waitFor(page, () => window.__flyStore.getState().screen === 'flight' && window.__fly.operations?.phase === 'parked', undefined, 60000 * SCALE);
