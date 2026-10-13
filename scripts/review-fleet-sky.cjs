@@ -3,7 +3,7 @@
 // review-observation-lounge.cjs.
 //
 //   node scripts/review-fleet-sky.cjs --port 3143 --airport KJFK --utc 16
-//        [--views gallery,closeup,approach,up,wide,night] [--families a320,b737,...]
+//        [--views gallery,closeup,approach,cruise,up,wide,parked] [--families a320,b737,...]
 //        [--out <dir>] [--settle 20] [--room hide|show] [--fov 3]
 //
 // Views:
@@ -12,7 +12,9 @@
 //             a narrow field of view: the honest way to judge the models
 //   closeup   the nearest live contact in front, framed at --fov degrees
 //   approach  the nearest approach/departure contact, tracked + framed
+//   cruise    the nearest jet laying a contrail, at three zooms
 //   up        the sky above the runway (contrails), room meshes parked
+//   parked    the stands under the lounge (parked airframes, jet bridges)
 //   wide      the default seat view
 // Every run writes PNGs and report.json (fleet stats, lights, wakes,
 // renderer counts, console errors).
@@ -103,6 +105,41 @@ const report = { airport, utc, errors: [], shots: [], views: {} };
         await shot('up-right');
         report.views.up = await stats();
       }
+      if (view === 'parked') {
+        // The stands under the lounge: parked airframes at the jet bridges.
+        await lens(0);
+        for (const [name, yaw, pitch, fov] of [['parked', 0, -0.42, 0], ['parked-left', 0.55, -0.32, 0], ['parked-right', -0.55, -0.32, 0], ['parked-door', 0.12, -0.5, 24]]) {
+          await page.evaluate(([y, p]) => { const w = window.__fly.airportWatch; w.clearSelection(); w.tracking = false; w.yaw = y; w.pitch = p; }, [yaw, pitch]);
+          await lens(fov);
+          await page.waitForTimeout(1500);
+          await shot(name);
+        }
+        // Close on the bridge cab at the nearest parked aircraft's L1 door.
+        const dock = await page.evaluate(() => {
+          const r = window.__fly, w = r.airportWatch, set = r.airportSet, site = set?.site;
+          if (!set) return null;
+          const stands = set.layout.stands.map((s, i) => ({ s, i })).sort((a, b) => Math.abs(a.s.x) - Math.abs(b.s.x));
+          const cls = { regional: { aft: 3.6, half: 1.4, sill: 1.9 }, narrow: { aft: 5.2, half: 2.0, sill: 3.4 }, wide: { aft: 8.6, half: 3.1, sill: 4.9 } };
+          const pick = stands[0];
+          const d = cls[pick.s.cls];
+          const lx = pick.s.x + d.half, lz = pick.s.noseZ - d.aft;
+          const c = Math.cos(site.heading), sn = Math.sin(site.heading);
+          const wx = site.x + site.k * (lx * c + lz * sn), wz = site.z + site.k * (-lx * sn + lz * c), wy = set.apronY() + set.groundAt(lx, lz) + d.sill + 1;
+          const eye = w.seat;
+          const dx = wx - eye.x, dz = wz - eye.z, dy = wy - (eye.y + 1.2);
+          const yaw = Math.atan2(-dx, -dz) - w.roomHeading, pitch = Math.atan2(dy * site.k, Math.hypot(dx, dz));
+          w.clearSelection(); w.tracking = false; w.yaw = Math.atan2(Math.sin(yaw), Math.cos(yaw)); w.pitch = pitch;
+          return { stand: pick.s.id, cls: pick.s.cls, distM: Math.round(Math.hypot(dx, dz) / site.k) };
+        });
+        if (dock) {
+          await lens(Math.max(3, Math.min(30, (2 * Math.atan(14 / dock.distM) * 180) / Math.PI)));
+          await page.waitForTimeout(1500);
+          await shot('parked-dock-' + dock.cls);
+        }
+        await lens(0);
+        report.views.parked = await page.evaluate(() => ({ parked: window.__fly.parkedFleet && { ...window.__fly.parkedFleet }, set: !!window.__fly.airportSet }));
+        report.views.dock = dock;
+      }
       if (view === 'cruise') {
         // The nearest jet laying a trail: the condensation gap and engine
         // lines (tight), then the whole trail spreading behind it (wide).
@@ -110,7 +147,8 @@ const report = { airport, utc, errors: [], shots: [], views: {} };
           const r = window.__fly, w = r.airportWatch, sky = window.__flySkyTrails;
           // Prefer a high jet well above the horizon (less cloud in the way).
           const elev = (x) => { const t = r.traffic.tracks.get(x.hex); return t ? Math.atan2(t.ry - w.floorY, x.distance) : 0; };
-          const rows = w.snapshot().filter((x) => x.stale === 0 && sky?.byHex.has(x.hex)).sort((a, b) => (elev(b) > 0.25) - (elev(a) > 0.25) || a.distance - b.distance);
+          const rows = w.snapshot().filter((x) => x.stale === 0 && sky?.byHex.has(x.hex) && (!w.contactVisible || w.contactVisible(x.hex)) && elev(x) < 0.6)
+            .sort((a, b) => (elev(b) > 0.2) - (elev(a) > 0.2) || a.distance - b.distance);
           const p = rows[0];
           if (!p) return null;
           w.select(p.hex);
@@ -119,7 +157,12 @@ const report = { airport, utc, errors: [], shots: [], views: {} };
         });
         report.views.cruise = pick;
         if (pick) {
-          for (const [name, spanM] of [['tight', 260], ['trail', 9000], ['sky', 40000]]) {
+          // The lounge's own binoculars (workstream B): max power, locked on.
+          await page.evaluate((hex) => { const w = window.__fly.airportWatch; w.select(hex, { follow: true, binoculars: true }); w.setMagnification(99); }, pick.hex);
+          await page.waitForTimeout(3500);
+          await shot('cruise-binoculars-' + (pick.type || 'x'));
+          for (const [name, spanM] of [['trail', 9000], ['sky', 40000]]) {
+            await page.evaluate(() => window.__fly.airportWatch.binoculars(false));
             await lens(Math.max(0.2, Math.min(60, (2 * Math.atan(spanM * 0.5 / (pick.km * 1000)) * 180) / Math.PI)));
             await page.waitForTimeout(2200);
             await shot('cruise-' + name + '-' + (pick.type || 'x'));
@@ -131,7 +174,8 @@ const report = { airport, utc, errors: [], shots: [], views: {} };
         const pick = await page.evaluate((mode) => {
           const r = window.__fly, w = r.airportWatch;
           const rows = w.snapshot().filter((x) => x.inFront && x.stale === 0);
-          const p = mode === 'approach' ? rows.find((x) => x.category === 'approach' || x.category === 'departure') : rows.find((x) => x.category !== 'nearby') || rows[0];
+          // Arrivals first (facing the lounge: landing lights), then departures.
+          const p = mode === 'approach' ? rows.find((x) => x.category === 'approach') || rows.find((x) => x.category === 'departure') : rows.find((x) => x.category !== 'nearby') || rows[0];
           if (!p) return null;
           w.select(p.hex);
           const t = r.traffic.tracks.get(p.hex);
@@ -139,12 +183,13 @@ const report = { airport, utc, errors: [], shots: [], views: {} };
         }, view);
         report.views[view] = pick;
         if (pick) {
-          const fov = Math.max(0.4, Math.min(20, (2 * Math.atan((60 * 0.6) / (pick.km * 1000)) * 180) / Math.PI));
-          await lens(Number(arg('fov', '0')) || fov);
-          await page.waitForTimeout(2500);
+          // Through the lounge's binoculars, power set so the airframe fills
+          // about half the frame (capped at the glasses' maximum).
+          await page.evaluate(([hex, km]) => { const w = window.__fly.airportWatch; w.select(hex, { follow: true, binoculars: true }); w.setMagnification(km * 1000 * 0.0101 * 1.2); }, [pick.hex, pick.km]);
+          await page.waitForTimeout(3500);
           await shot(view + '-' + (pick.type || 'x'));
-          report.views[view].after = await page.evaluate((hex) => { const t = window.__fly.traffic.tracks.get(hex); return t && { lod: t.fleet?.lod, px: t.fleetPx, gear: t.fleet?.gear, flaps: t.fleet?.flaps, phase: t.fleet?.phase }; }, pick.hex);
-          await lens(0);
+          report.views[view].after = await page.evaluate((hex) => { const w = window.__fly.airportWatch, t = window.__fly.traffic.tracks.get(hex); return t && { lod: t.fleet?.lod, px: t.fleetPx, gear: t.fleet?.gear, flaps: t.fleet?.flaps, phase: t.fleet?.phase, mag: w.optics?.mag }; }, pick.hex);
+          await page.evaluate(() => { const w = window.__fly.airportWatch; w.binoculars(false); w.clearSelection(); });
         }
       }
       if (view === 'gallery') {
