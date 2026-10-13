@@ -9,6 +9,7 @@ import {
   Float32BufferAttribute,
   InstancedBufferAttribute,
   InstancedBufferGeometry,
+  Matrix4,
   Mesh,
   ShaderMaterial,
   Vector2,
@@ -106,13 +107,14 @@ const VERT = /* glsl */ `
   uniform float uLean;
   uniform float uSway;
   uniform float uSnow;       // 0 = rain, 1 = snow
+  uniform mat4 uRoomInv;     // observation lounge: scene -> room-local metres
+  uniform float uRoomOn;
   varying vec2 vUv;
   varying float vAlive;
 
   void main() {
     // Fail dark: a missing aSeed attribute reads (0,0,0) → zero-size quad.
     float alive = step(1e-6, aSeed.x + aSeed.y + aSeed.z);
-    vAlive = alive;
     vUv = uv;
 
     float r = uRadius * sqrt(aSeed.x);
@@ -123,6 +125,13 @@ const VERT = /* glsl */ `
     // Snow wanders; rain does not (uSway is 0 for rain).
     c.x += uSway * uSnow * sin(uTime * 1.7 + aSeed.z * 31.4);
     c.z += uSway * uSnow * cos(uTime * 1.3 + aSeed.x * 27.7);
+    // Seated in the observation lounge: no weather inside the room (behind
+    // the canted glass line z + y*tan(14deg) = -1.17, under the roof).
+    if (uRoomOn > 0.5) {
+      vec3 room = (uRoomInv * modelMatrix * vec4(c, 1.0)).xyz;
+      if (abs(room.x) < 11.4 && room.y > -1.0 && room.y < 4.8 && room.z + room.y * 0.2493 > -1.25 && room.z < 14.8) alive = 0.0;
+    }
+    vAlive = alive;
 
     // The streak axis is WORLD up, leaned downwind — banking the aircraft must
     // not roll the rain.
@@ -206,6 +215,8 @@ export function PrecipLayer({ runtime, flight }) {
         uMap: { value: streak },
         uColor: { value: new Color(cfg.rain.color) },
         uOpacity: { value: 0 },
+        uRoomInv: { value: new Matrix4() },
+        uRoomOn: { value: 0 },
       },
     });
     const mesh = new Mesh(geo, mat);
@@ -270,6 +281,10 @@ export function PrecipLayer({ runtime, flight }) {
       u.uColor.value.set(k.color);
     }
     u.uTime.value = state.clock.elapsedTime;
+    // Observation lounge (AirportLounge publishes the room's inverse transform).
+    const lounge = runtime?.loungeRoom;
+    u.uRoomOn.value = lounge?.active ? 1 : 0;
+    if (lounge?.active) u.uRoomInv.value.copy(lounge.inverse);
     u.uOpacity.value = k.opacity * fade;
     const inv = 1 / WEATHER.wind.maxMps;
     u.uWindDir.value.set(wx.windX * inv, wx.windZ * inv);

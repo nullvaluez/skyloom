@@ -5,7 +5,8 @@ import { useFlyStore, inFlight } from '@/stores/fly-store';
 import { photoComposition } from '@/lib/fly/photo-composition';
 export function SessionRecovery({runtime}){
   const canvas=useThree(s=>s.gl.domElement);
-  useFrame(({gl})=>{gl.toneMappingExposure=useFlyStore.getState().cameraMode==='photo'?2**photoComposition().exposure:1;});
+  // Observation lounge: AirportLounge eases runtime.loungeExposureStops (0 when not seated).
+  useFrame(({gl})=>{gl.toneMappingExposure=(useFlyStore.getState().cameraMode==='photo'?2**photoComposition().exposure:1)*2**(runtime.loungeExposureStops||0);});
   useEffect(()=>{
     const pause=()=>{const s=useFlyStore.getState();if(inFlight(s)&&s.phase!=='paused')s.setPhase('paused');runtime.input?.keys?.clear();runtime.input?.clearTouchSteer?.();runtime.input?.setBrake?.(false);};
     const lost=e=>{e.preventDefault();runtime.contextLost=true;pause();};
