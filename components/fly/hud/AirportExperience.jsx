@@ -1,14 +1,13 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Binoculars, Clock3, Moon, PlaneLanding, PlaneTakeoff, Search, Sun, Sunrise, Sunset, X } from 'lucide-react';
+import { Binoculars, Search, Sunset, X } from 'lucide-react';
 import { useFlyStore } from '@/stores/fly-store';
 import { livingAirportsOn } from '@/lib/fly/airport-feature-policy';
 import { FLAGSHIP_AIRPORTS } from '@/lib/fly/airport-observation.mjs';
-import { runwayIndex, searchRunways } from '@/lib/fly/runway-catalog';
+import { searchRunways } from '@/lib/fly/runway-catalog';
 import { airportEligible } from '@/lib/fly/operations-airports';
-import { goldenHourNow, localClockAt, majorAirports, shortAirportName, sunStateAt } from '@/lib/fly/airport-watch-sky.mjs';
-import { AIRPORTS } from '@/lib/airports';
-import { CITIES } from '@/lib/fly/poi/cities';
+import { goldenHourNow } from '@/lib/fly/airport-watch-sky.mjs';
+import { AirportResultRow, FeaturedAirportCard, GoldenHourRow, goldenAirports, sunNow } from './airports/browser-parts';
 import { LoungeHud } from './lounge/LoungeHud';
 import './target-ui.css';
 import './airport-watch.css';
@@ -29,9 +28,10 @@ import './airport-watch.css';
  * lounge-follow, spotter-card (+ -reg, -route, -telemetry, -phase, -notice,
  * -photo-credit and the actions -binoculars, -follow, -details, -join,
  * -photo), binocular-view, binocular-readout, binocular-mag.
+ *
+ * The browser's rows, sun chip and golden-hour pool live in
+ * ./airports/browser-parts.jsx (shared with the hangar's airport chooser).
  */
-
-const sunNow = () => (typeof window !== 'undefined' && Number.isFinite(window.__flySunOverride) ? window.__flySunOverride : Date.now());
 
 /** The entry: a full card on the title screen, a compact pill in the Atlas header. */
 export function AirportEntry({ className = '' }) {
@@ -86,52 +86,6 @@ export function AirportExperience({ runtime }) {
         </p>
       )}
     </>
-  );
-}
-
-// The golden-hour pool: busy hubs (lib/airports.js) that the runway catalog
-// can open, then every other large airport — those serving a known city
-// (lib/fly/poi/cities.js, within 35 km) ahead of remote fields, since a
-// sunset is better with traffic in it. Built once per session.
-let goldenPool = null;
-function servesCity(a, grid) {
-  for (let la = Math.floor(a.lat) - 1; la <= Math.floor(a.lat) + 1; la++) {
-    for (let lo = Math.floor(a.lon) - 1; lo <= Math.floor(a.lon) + 1; lo++) {
-      for (const c of grid.get(`${la}|${lo}`) || []) {
-        const dy = (c[1] - a.lat) * 111.32, dx = (c[2] - a.lon) * 111.32 * Math.cos((a.lat * Math.PI) / 180);
-        if (dx * dx + dy * dy < 35 * 35) return true;
-      }
-    }
-  }
-  return false;
-}
-async function goldenAirports() {
-  if (goldenPool) return goldenPool;
-  const major = majorAirports(await runwayIndex());
-  const byIdent = new Map(major.map((a) => [a.ident, a]));
-  const hubs = Object.values(AIRPORTS)
-    .filter((h) => byIdent.has(h.icao))
-    .map((h) => ({ ...byIdent.get(h.icao), name: h.name, city: h.city, priority: 3 }));
-  const hubIds = new Set(hubs.map((h) => h.ident));
-  const grid = new Map();
-  for (const c of CITIES) {
-    const key = `${Math.floor(c[1])}|${Math.floor(c[2])}`;
-    if (!grid.has(key)) grid.set(key, []);
-    grid.get(key).push(c);
-  }
-  const rest = major.filter((a) => !hubIds.has(a.ident)).map((a) => (servesCity(a, grid) ? { ...a, priority: 1.5 } : a));
-  goldenPool = [...hubs, ...rest];
-  return goldenPool;
-}
-
-function SunChip({ sun }) {
-  if (!sun) return null;
-  const Icon = sun.kind === 'night' ? Moon : sun.kind === 'day' ? Sun : sun.rising ? Sunrise : Sunset;
-  return (
-    <span className="ab-sun" data-sun={sun.kind}>
-      <Icon size={12} aria-hidden="true" />
-      {sun.label}
-    </span>
   );
 }
 
@@ -270,22 +224,9 @@ function AirportBrowser({ runtime }) {
           <>
             <h2 className="ab-section">Featured lounges</h2>
             <div className="ab-featured">
-              {FLAGSHIP_AIRPORTS.map((a) => {
-                const clock = localClockAt(a.lat, a.lon, now);
-                const sun = sunStateAt(a.lat, a.lon, sunNow());
-                return (
-                  <button type="button" key={a.id} disabled={busy} onClick={() => choose(a.id)} data-testid={`airport-featured-${a.id}`} data-sun={sun.kind}>
-                    <small>{a.id}</small>
-                    <strong>{a.name}</strong>
-                    <span>{a.tag}</span>
-                    <span className="ab-meta">
-                      <Clock3 size={12} aria-hidden="true" />
-                      {clock.text}
-                      <SunChip sun={sun} />
-                    </span>
-                  </button>
-                );
-              })}
+              {FLAGSHIP_AIRPORTS.map((a) => (
+                <FeaturedAirportCard key={a.id} airport={a} now={now} busy={busy} onChoose={choose} />
+              ))}
             </div>
 
             <h2 className="ab-section">
@@ -297,17 +238,7 @@ function AirportBrowser({ runtime }) {
               {golden == null && <p className="ab-empty">Reading the sun around the world…</p>}
               {golden?.length === 0 && <p className="ab-empty">No large airport is in golden light this minute. Check back shortly.</p>}
               {golden?.map((g) => (
-                <button type="button" key={g.ident} disabled={busy} onClick={() => choose(g.ident)} data-testid={`golden-hour-${g.ident}`} data-rising={g.rising ? '1' : '0'}>
-                  {g.rising ? <Sunrise size={18} aria-hidden="true" /> : <Sunset size={18} aria-hidden="true" />}
-                  <span className="ab-golden-text">
-                    <strong title={g.name}>{shortAirportName(g.name)}</strong>
-                    <small>
-                      {g.ident} · {g.clock.text} {g.clock.zone === 'solar' ? 'solar' : 'local'}
-                    </small>
-                  </span>
-                  <em>{g.label}</em>
-                  <ArrowRight size={15} aria-hidden="true" />
-                </button>
+                <GoldenHourRow key={g.ident} entry={g} busy={busy} onChoose={choose} />
               ))}
             </div>
           </>
@@ -316,26 +247,7 @@ function AirportBrowser({ runtime }) {
         {query && (
           <div className="ab-results">
             {results.map((a) => (
-              <div key={a.id} className="ab-result" data-testid={`airport-result-${a.id}`}>
-                <button type="button" className="ab-result-main" disabled={busy} onClick={() => choose(a.id)}>
-                  <strong>{a.name}</strong>
-                  <span>
-                    {a.ident} · Runway {a.runway}
-                  </span>
-                </button>
-                <button type="button" className="ab-watch" disabled={busy} onClick={() => choose(a.id)} aria-label={`Watch ${a.name}`}>
-                  <Binoculars size={14} aria-hidden="true" />
-                  Watch
-                </button>
-                <button type="button" className="ab-alt" disabled={busy} onClick={() => choose(a.id, 'runway')}>
-                  <PlaneTakeoff size={14} aria-hidden="true" />
-                  Runway start
-                </button>
-                <button type="button" className="ab-alt" disabled={busy} onClick={() => choose(a.id, 'approach')}>
-                  <PlaneLanding size={14} aria-hidden="true" />
-                  Approach
-                </button>
-              </div>
+              <AirportResultRow key={a.id} airport={a} busy={busy} onChoose={choose} />
             ))}
             {!results.length && <p className="ab-empty">No airport matches “{query}”.</p>}
           </div>
