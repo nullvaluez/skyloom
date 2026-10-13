@@ -99,16 +99,20 @@ const ORBITS = {
       const frames = (n) => new Promise((r) => { let i = 0; const f = () => (++i >= n ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
       // __flyStats.drawCalls refreshes every 60 frames (FlyScene): sample across refreshes.
       const sample = async () => { const xs = []; for (let i = 0; i < 5; i++) { await frames(61); const s = window.__flyStats || {}; xs.push([s.drawCalls, s.triangles]); } xs.sort((a, b) => a[0] - b[0]); return xs[2]; };
+      // Mean frame interval over 180 frames (headless, shared GPU: indicative only).
+      const frameMs = () => new Promise((r) => { let n = 0, t0 = 0; const f = (t) => { if (n === 0) t0 = t; if (++n > 180) r((t - t0) / 180); else requestAnimationFrame(f); }; requestAnimationFrame(f); });
       const r = window.__fly.airportSet?.stats ?? null;
       const set = window.__fly.airportSet?.object;
       if (!set) return { stats: r, error: 'runtime.airportSet.object missing' };
       await frames(10);
       const on = await sample();
+      const msOn = await frameMs();
       set.visible = false;
       await frames(10);
       const off = await sample();
+      const msOff = await frameMs();
       set.visible = true;
-      return { stats: r, framesOn: on, framesOff: off, draws: on[0] - off[0], triangles: on[1] - off[1] };
+      return { stats: r, framesOn: on, framesOff: off, draws: on[0] - off[0], triangles: on[1] - off[1], frameMsOn: +msOn.toFixed(2), frameMsOff: +msOff.toFixed(2) };
     });
     console.log(JSON.stringify(report.cost));
     for (const view of views) {

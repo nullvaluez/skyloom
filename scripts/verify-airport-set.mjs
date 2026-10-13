@@ -275,6 +275,12 @@ check('flagship towers sit at their real coordinates', () => {
   for (const { plan, site } of sets.filter((s) => AIRPORT_LANDMARKS[s.site.ident])) {
     assert.ok(plan.tower?.real, site.ident);
     assert.equal(plan.tower.h, AIRPORT_LANDMARKS[site.ident].towerHeight);
+    // Only stepped off the procedural pier, never moved far from the real spot.
+    assert.ok(plan.tower.nudgeM <= 25, `${site.ident} tower nudged ${plan.tower.nudgeM.toFixed(1)} m`);
+    if (plan.tower.nudgeM > 0) console.log(`  ${site.ident} tower stepped ${plan.tower.nudgeM.toFixed(1)} m off the pier`);
+    const T = plan.terminal;
+    const inside = plan.tower.x > T.x0 - 3 && plan.tower.x < T.x1 + 3 && plan.tower.z > T.z0 - T.eave - 3 && plan.tower.z < T.z1 + 3;
+    assert.ok(!inside, `${site.ident} tower stands inside the pier`);
   }
 });
 
