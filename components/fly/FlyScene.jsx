@@ -2006,6 +2006,15 @@ export function FlyScene({ runtime }) {
   useEffect(() => connectGateToGate({ runtime, operations }), [runtime, operations]);
   // GATE TO GATE: the airport service plans its areas (2 Hz inside; inert while OPS_AIRFIELD is off).
   useFrame((_, delta) => runtime.airports?.update({ dt: Math.min(delta, 0.1), flight, operations }), -40);
+  // GATE TO GATE: hard-cut the chase rig onto the current pose (a review pose,
+  // a same-airport relocation), without depending on the title rig.
+  useEffect(() => {
+    const snap = () => chase.snap();
+    runtime.snapCamera = snap;
+    return () => {
+      if (runtime.snapCamera === snap) delete runtime.snapCamera;
+    };
+  }, [runtime, chase]);
   // GATE TO GATE: the review pose hook (scripts/review-operations-airfield.cjs).
   useEffect(() => {
     if (process.env.NODE_ENV !== 'development') return undefined;

@@ -15,7 +15,7 @@ const report={source:require('./graphics-source.cjs')(),status:'IN_PROGRESS',err
     window.__flySunOverride=Date.UTC(2026,8,24,23);
   });
   await page.goto(`${process.env.FLY_URL||'http://localhost:3039'}/?graphicsReview=1`,{waitUntil:'domcontentloaded',timeout:90000});
-  await page.getByTestId('title-free-flight').click({timeout:90000});
+  await page.getByTestId('title-explore').click({timeout:90000});
   await page.getByTestId('hangar-dest-rio').click();
   await page.getByTestId('hangar-fly').click({timeout:90000});
   await page.waitForFunction(()=>window.__flyStore.getState().screen==='flight'&&window.__flyBoot?.pct===100,null,{timeout:90000});

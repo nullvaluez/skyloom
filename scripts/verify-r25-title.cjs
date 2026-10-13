@@ -298,7 +298,7 @@ async function legDesktop(browser, style) {
       // Continue iff a last setup exists (a fresh profile has none).
       const fpOn = /export const FLIGHT_PLAN = \{\s*enabled:\s*true/.test(CONST);
       const cards = await page.evaluate(() => ({
-        free: !!document.querySelector('[data-testid="title-free-flight"]'),
+        free: !!document.querySelector('[data-testid="title-explore"]'),
         ops: !!document.querySelector('[data-testid="title-takeoff-landing"]'),
         cont: !!document.querySelector('[data-testid="title-continue"]'),
         spot: document.querySelector('[data-testid="title-spot"]')?.textContent ?? null,

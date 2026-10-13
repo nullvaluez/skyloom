@@ -74,7 +74,7 @@ const fs = require("fs");
   };
   try {
     await page.goto(process.env.FLY_URL || "http://localhost:3017");
-    await page.getByTestId("title-free-flight").tap({ timeout: 60000 });
+    await page.getByTestId("title-explore").tap({ timeout: 60000 });
     await page.getByTestId("hangar-pick-prop").waitFor({ state: "visible" });
     for (const viewport of [
       { width: 390, height: 844 },
