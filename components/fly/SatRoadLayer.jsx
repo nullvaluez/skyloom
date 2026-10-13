@@ -26,7 +26,7 @@ import { useFlyStore } from '@/stores/fly-store';
 // R24 B (GROUND_VIS, recon A6/T8) — AGL fade bands read the DAMPED ground.
 import { eyeAglVis } from '@/lib/fly/ground-vis';
 import { getTrueScaleK } from '@/lib/fly/true-scale';
-import { airfieldSuppression, subscribeAirfieldSuppression } from '@/lib/fly/airfield/airfield-suppression';
+import { airfieldSuppressions, subscribeAirfieldSuppression } from '@/lib/fly/airfield/airfield-suppression';
 
 const TIERS = ['low', 'medium', 'high']; // mirrors FlyCanvas's quality ladder
 const atLeastTier = (tier, min) => TIERS.indexOf(tier) >= TIERS.indexOf(min);
@@ -151,11 +151,12 @@ export function SatRoadLayer({ runtime, flight }) {
     };
   }, [engine, runtime]);
 
-  // Observation lounge: the observed airport's runway lights belong to the
-  // AIRFIELD GROUND layer while it is drawn; the baked quads stand down there.
+  // Airfield suppression (the lounge and any flight area): an airport's
+  // runway lights belong to its AIRFIELD GROUND layer while it is drawn; the
+  // baked quads stand down inside every disc.
   useEffect(() => {
-    engine.setRunwayLightExclusion(airfieldSuppression());
-    const off = subscribeAirfieldSuppression((s) => engine.setRunwayLightExclusion(s));
+    engine.setRunwayLightExclusion(airfieldSuppressions());
+    const off = subscribeAirfieldSuppression((list) => engine.setRunwayLightExclusion(list));
     return () => {
       off();
       engine.setRunwayLightExclusion(null);

@@ -2,7 +2,7 @@
 
 import { applyBendFade } from '@/lib/fly/toy-world/world-bend';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { airfieldSuppression, airfieldSuppressesAirport, subscribeAirfieldSuppression } from '@/lib/fly/airfield/airfield-suppression';
+import { airfieldSuppressions, airfieldSuppressesAirport, subscribeAirfieldSuppression } from '@/lib/fly/airfield/airfield-suppression';
 import { useFrame } from '@react-three/fiber';
 import { useFlyStore } from '@/stores/fly-store';
 import { livingAirportsOn } from '@/lib/fly/airport-feature-policy';
@@ -110,7 +110,9 @@ export function AirportOperationsLayer({runtime}) {
   const visuals=useFlyStore(s=>s.visuals),style=useFlyStore(s=>s.mapStyle);
   const enhanced=livingAirportsOn('worldArt')&&visuals==='enhanced'&&style==='satellite';
   const scenery=livingAirportsOn('scenery')&&visuals==='enhanced'&&style==='satellite';
-  const suppression=useSyncExternalStore(subscribeAirfieldSuppression,airfieldSuppression,()=>null);
+  // Every live suppression disc (lounge + flight areas); each runway record
+  // stands down when any disc's replacement draws it.
+  const suppressions=useSyncExternalStore(subscribeAirfieldSuppression,airfieldSuppressions,airfieldSuppressions);
   const [airports,setAirports]=useState([]);
   useEffect(()=>{
     let active=true,lastCell='',pending=false,retryAfter=0;
@@ -125,7 +127,7 @@ export function AirportOperationsLayer({runtime}) {
     tick();const timer=setInterval(tick,2000),unsub=subscribeAirports(tick);return()=>{active=false;clearInterval(timer);unsub();};
   },[runtime]);
   return <group>
-    {airports.map((a,i)=><Airport key={a.id} airport={a} enhanced={enhanced} scenery={scenery&&airports.findIndex(b=>(b.ident||b.id)===(a.ident||a.id))===i} runtime={runtime} observed={airfieldSuppressesAirport(a,suppression)}/>)}
+    {airports.map((a,i)=><Airport key={a.id} airport={a} enhanced={enhanced} scenery={scenery&&airports.findIndex(b=>(b.ident||b.id)===(a.ident||a.id))===i} runtime={runtime} observed={airfieldSuppressesAirport(a,suppressions)}/>)}
     <OperationsGuidance runtime={runtime}/>
   </group>;
 }

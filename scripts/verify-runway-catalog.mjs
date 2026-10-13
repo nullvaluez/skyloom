@@ -16,7 +16,8 @@ await check('simultaneous index readers share one fetch',async()=>{await Promise
 await check('a fifth region evicts the least recently used of four',async()=>{const regions=[...new Set(index.map(a=>a.region))].slice(0,5);for(const id of regions)await catalog.loadRunwayRegion(id);const url=`/data/runways/v1/regions/${regions[0]}.json`,before=calls.get(url);await catalog.loadRunwayRegion(regions[0]);assert.equal(calls.get(url),before+1);});
 const selected=await catalog.ensureAirport('KJFK');
 await check('revisiting a cached airport protects it during nearby discovery',async()=>{
- const others=index.filter(a=>a.id!==selected.id&&a.ident!=='KJFK').slice(0,15);
+ // Fill the registry to its bound (G2G W0 raised it 16 -> 48) so nearby discovery must evict.
+ const others=index.filter(a=>a.id!==selected.id&&a.ident!=='KJFK').slice(0,catalog.RUNWAY_ACTIVE_LIMIT-1);
  for(const a of others)await catalog.ensureAirport(a.id);
  assert.ok(registry.airportById(selected.id));
  await catalog.ensureAirport(selected.id);
@@ -27,13 +28,13 @@ await check('discovered registry stays bounded and retains the active departure'
  const departure=await catalog.ensureAirport('LOWI');catalog.saveRunwayDeparture(departure);
  for(const a of index.slice(80,115))await catalog.ensureAirport(a.id);
  assert.ok(registry.airportById(departure.id));
- assert.ok(registry.OPERATIONS_AIRPORTS.filter(a=>a.authored===false).length<=16);
+ assert.ok(registry.OPERATIONS_AIRPORTS.filter(a=>a.authored===false).length<=catalog.RUNWAY_ACTIVE_LIMIT);
  for(const id of ['KCMH','KOSU','KLCK'])assert.ok(registry.airportById(id));
 });
 await check('Explorer destination stays registered while discovery rotates the cache',async()=>{
  const destination=await catalog.ensureAirport('YSSY');catalog.setRunwayFlightContext({destination:destination.id});
  for(const a of index.slice(140,180))await catalog.ensureAirport(a.id);
- assert.ok(registry.airportById(destination.id));assert.ok(registry.OPERATIONS_AIRPORTS.filter(a=>a.authored===false).length<=16);catalog.setRunwayFlightContext(null);
+ assert.ok(registry.airportById(destination.id));assert.ok(registry.OPERATIONS_AIRPORTS.filter(a=>a.authored===false).length<=catalog.RUNWAY_ACTIVE_LIMIT);catalog.setRunwayFlightContext(null);
 });
 await check('spatial rejection is identical to exact pavement queries at all margins',()=>{
  for(const airport of registry.OPERATIONS_AIRPORTS){
@@ -49,7 +50,7 @@ await check('the observed airport survives unrelated discovery without raising t
  const observed=await catalog.ensureAirport('KJFK');catalog.setRunwayObservation(observed);
  for(const a of index.slice(120,160))await catalog.ensureAirport(a.id);
  assert.ok(registry.airportById(observed.id));assert.ok(registry.airportById('LOWI:08-26'));
- assert.ok(registry.OPERATIONS_AIRPORTS.filter(a=>a.authored===false).length<=16);
+ assert.ok(registry.OPERATIONS_AIRPORTS.filter(a=>a.authored===false).length<=catalog.RUNWAY_ACTIVE_LIMIT);
  catalog.setRunwayObservation(null);
  for(const a of index.slice(170,205))await catalog.ensureAirport(a.id);
  assert.equal(registry.airportById(observed.id),undefined);
@@ -80,6 +81,44 @@ await check('early terrain rejection preserves the original height and shoulder 
   const p=registry.airportPoint(a,-500+(length+1000)*i/149,cross),height=90+i;
   assert.ok(Math.abs(airportTerrainHeight(p.x,p.z,height)-originalHeight(p.x,p.z,height))<1e-10);
  }}
+});
+// G2G W0: eviction used to spin forever once every active row was protected
+// (find() returned undefined and delete(undefined) removed nothing). Whole
+// idents are protected now; the loop stops when nothing is evictable.
+await check('protected idents keep every row while discovery evicts, and eviction terminates when nothing is evictable',async()=>{
+ const discovered=()=>registry.OPERATIONS_AIRPORTS.filter(a=>a.authored===false);
+ const rowsOf=ident=>index.filter(r=>r.ident===ident);
+ const register=async rows=>{for(const r of rows)assert.equal((await catalog.ensureAirport(r.id))?.id,r.id);};
+ const big=['KORD','KDFW','KDEN','KBOS'];
+ for(const ident of big)assert.ok(rowsOf(ident).length>=6,ident);
+ big.forEach((ident,i)=>catalog.protectRunwayIdent(`verify-${i}`,ident));
+ const protectedRows=big.flatMap(rowsOf);
+ await register(protectedRows);
+ const discoveries=index.filter(r=>!big.includes(r.ident)).slice(300,320);
+ await register(discoveries);
+ for(const r of protectedRows)assert.ok(registry.airportById(r.id),r.id);
+ for(const r of discoveries)assert.ok(registry.airportById(r.id),r.id);
+ assert.ok(registry.airportById('LOWI:08-26'));
+ assert.ok(discovered().length<=catalog.RUNWAY_ACTIVE_LIMIT);
+ // Overfull: protected rows alone exceed the bound. Each discovery is still
+ // registered (the row being activated is never evicted), only the newest
+ // unprotected row stays, and nothing protected is lost.
+ const more=['KNRQ','EHAM','KDTW','LTFM'];
+ more.forEach((ident,i)=>catalog.protectRunwayIdent(`verify-more-${i}`,ident));
+ const allProtected=[...protectedRows,...more.flatMap(rowsOf),registry.airportById('LOWI:08-26')];
+ assert.ok(allProtected.length>catalog.RUNWAY_ACTIVE_LIMIT,`${allProtected.length} protected rows`);
+ await register(more.flatMap(rowsOf));
+ const extra=index.filter(r=>![...big,...more].includes(r.ident)).slice(400,405);
+ await register(extra);
+ for(const r of allProtected)assert.ok(registry.airportById(r.id),r.id);
+ assert.equal(discovered().length,allProtected.length+1);
+ assert.ok(registry.airportById(extra.at(-1).id));
+ // Releasing the roles lets the next activation evict back to the bound.
+ [...big.map((_,i)=>`verify-${i}`),...more.map((_,i)=>`verify-more-${i}`)].forEach(role=>catalog.protectRunwayIdent(role,null));
+ assert.deepEqual([...catalog.protectedRunwayIdents()],['LOWI']);
+ await register(index.filter(r=>![...big,...more].includes(r.ident)).slice(410,411));
+ assert.equal(discovered().length,catalog.RUNWAY_ACTIVE_LIMIT);
+ assert.ok(registry.airportById('LOWI:08-26'));
 });
 // Isolated CPU diagnostic; not a browser performance acceptance number.
 const probe=registry.airportPoint(registry.airportById('KCMH'),20000,20000),iterations=200000;

@@ -7,6 +7,7 @@ import { ChevronDown, ChevronUp, Navigation, PlaneTakeoff, PlaneLanding } from '
 import { CARD_THEME } from './inspect/inspect-tokens';
 import { operationsContext,advanceOperationsDisclosure } from '@/lib/fly/operations-disclosure';
 import { useFlyStore } from '@/stores/fly-store';
+import { airportChoices } from '@/lib/fly/ops-labels.mjs';
 import { OPERATIONS_AIRPORTS,airportEligible,airportById } from '@/lib/fly/operations-airports';
 const titles={parked:'Ready on the apron',taxiOut:'Taxi to the runway',takeoffRoll:'Takeoff',airborne:'In flight',approach:'Approach',landingRoll:'Touchdown',taxiIn:'Taxi to parking',completed:'Flight complete',crashed:'Try again'};
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
@@ -51,7 +52,7 @@ export function OperationsHUD({runtime}){
   if(covered||open||phase==='paused'||photo||!o?.profile||o.phase==='hangar'||!f)return null;
   if(isTouch)return <MobileFlightDeck runtime={runtime} titles={titles} BrakeButton={BrakeButton} ApproachCue={ApproachCue}/>;
   const p=o.profile,approach=o.phase==='approach',path=approach?o.approachGuidance(f):null;
-  const destinations=[...OPERATIONS_AIRPORTS,...(airportById(o.destination)?.authored===false?[airportById(o.destination)]:[])];
+  const destinations=airportChoices(p.id,{include:o.destination});
   const restartAirport=airportById(o.departure)||o.airport;
   const restartLabel=restartAirport.authored===false?'Return to runway':'Return to apron';
   const departure=['parked','taxiOut','takeoffRoll'].includes(o.phase),takeoff=departure?o.takeoffStatus(f):null;
