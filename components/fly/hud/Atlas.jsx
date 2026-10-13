@@ -94,11 +94,16 @@ function AtlasBody({ runtime }) {
       setWarpNotice(null);
       useFlyAtlasStore.getState().logVisit(entry.key, entry.name, entry.kind);
     } else {
+      // The scene refuses every warp while the aircraft is on the ground
+      // (FlyScene warpToGeo): say so instead of inviting a retry.
+      const ready = useFlyStore.getState().runtimeReady;
       setWarpNotice({
         key: Date.now(),
-        msg: useFlyStore.getState().runtimeReady
-          ? 'warp failed — try again'
-          : 'scene rebuilding — try again',
+        msg: !ready
+          ? 'scene rebuilding — try again'
+          : runtime.operations?.grounded
+            ? 'Warps are unavailable while you are on the ground'
+            : 'warp failed — try again',
       });
     }
   };
