@@ -276,10 +276,18 @@ check('height field: deterministic, and a refined terrain replaces the old surfa
   const again = new H.AirfieldHeightField(grid);
   run(again, [t1.source]);
   assert.deepEqual(Array.from(again.data), Array.from(field1.data));
+  // A rebuild that reproduces the surface keeps the version (consumers
+  // re-upload, re-place lights and re-sample only when it moves).
+  const v = again.version;
+  run(again, [t1.source]);
+  assert.equal(again.version, v, 'an identical rebuild keeps the version');
+  assert.equal(again.stats.builds, 2);
   // The same field object, rebuilt on a smoother terrain: no memory of the old bumps.
   const t2 = terrainSource(flatter);
   t2.source.skirtBelow = t1.source.skirtBelow;
+  const v1 = field1.version;
   run(field1, [t2.source]);
+  assert.ok(field1.version > v1 && field1.stats.change > 0.1, 'a moved surface bumps the version');
   const d = overLift(field1, flatter, 4000);
   assert.ok(d[d.length >> 1] < 0.12, `median over-lift after refinement ${d[d.length >> 1].toFixed(3)} m`);
 });
