@@ -13,13 +13,15 @@ import { ParkedFleet } from './observation/ParkedFleet';
  * One file per workstream (FLY_OBSERVATION_LOUNGE.md): AirfieldGround and
  * AirportStructures belong to AIRFIELD, ParkedFleet to FLEET. Each reads
  * runtime.airportWatch.site and airportLayout(site); the key remounts the
- * whole set on an airport change so nothing carries over between sites.
+ * whole set on an airport change — or a seat move (`site` counts them: a
+ * seat chosen from the airport's OSM data lands after the transfer) — so
+ * nothing carries over between sites.
  */
 export function ObservationWorld({ runtime }) {
-  const airportId = useFlyStore((s) => s.airportWatch?.id ?? null);
-  if (!airportId) return null;
+  const key = useFlyStore((s) => (s.airportWatch ? `${s.airportWatch.id}#${s.airportWatch.site ?? 0}` : null));
+  if (!key) return null;
   return (
-    <group name="observation-world" key={airportId}>
+    <group name="observation-world" key={key}>
       <AirfieldGround runtime={runtime} />
       <AirportStructures runtime={runtime} />
       <ParkedFleet runtime={runtime} />

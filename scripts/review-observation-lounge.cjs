@@ -64,7 +64,7 @@ const report = { airport, url, utc, errors: [], shots: [], views: {} };
         trafficStatus: r.trafficStatus, items: r.traffic.items.length, nearby: rows.length,
         rows: rows.slice(0, 12).map((x) => ({ hex: x.hex, label: x.label, cat: x.category, km: +(x.distance / 1000).toFixed(1), front: x.inFront })),
         wake: stats.trafficWake, liveFleet: r.liveFleet, frame: stats.frame, quality: window.__flyStore.getState().qualityTier,
-        site: w.site && { runway: w.site.runwayId, along: Math.round(w.site.along), cross: Math.round(w.site.cross), floorM: w.site.floorM, headingDeg: +(w.site.heading * 180 / Math.PI).toFixed(1) },
+        site: w.site && { source: w.site.source, runway: w.site.runwayId, along: Math.round(w.site.along), cross: Math.round(w.site.cross), floorM: w.site.floorM, headingDeg: +(w.site.heading * 180 / Math.PI).toFixed(1) },
         camera: { fov: r.camera.fov, near: r.camera.near },
         render: info && { calls: info.render.calls, triangles: info.render.triangles, geometries: info.memory.geometries, textures: info.memory.textures },
       };

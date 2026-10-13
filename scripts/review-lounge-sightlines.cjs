@@ -3,7 +3,7 @@
 //
 //   node scripts/review-lounge-sightlines.cjs [--port 3123] [--airports KCMH,KJFK,LOWI,YSSY,EGLL]
 //        [--settle 25] [--out .graphics-review/lounge-sightlines]
-//        [--site runwayId,along,cross,floorM] [--candidates ...] [--grid ...]
+//        [--site runwayId,along,cross,floorM] [--candidates ...] [--grid ...] [--shots 1]
 //
 // For every landing direction of the observed airport (airportWatch.runways)
 // it traces straight lines from the eye to the touchdown zone (threshold +
@@ -41,6 +41,8 @@ const candidates = arg('candidates', '').split(';').filter(Boolean).map((s) => s
 // authored one (window.__flyLoungeSiteOverride, development builds only).
 const siteArg = arg('site', '');
 const siteOverride = siteArg ? (([runway, along, cross, floorM]) => ({ runway, along: +along, cross: +cross, floorM: +floorM }))(siteArg.split(',')) : null;
+// --shots 1: also save <airport>.png of the default view at the seat.
+const shots = arg('shots', '0') === '1';
 const grid = arg('grid', '');
 if (grid) {
   const [[x0, x1, dx], [z0, z1, dz], [floorM]] = grid.split(',').map((s) => s.split(':').map(Number));
@@ -153,7 +155,7 @@ async function audit(page, cand) {
       footprint = { samples: n, runway, taxiway, apron };
     }
     return {
-      site: w.site && { runway: w.site.runwayId, along: Math.round(w.site.along), cross: Math.round(w.site.cross), floorM: w.site.floorM },
+      site: w.site && { source: w.site.source, choice: w.seatChoice ?? null, runway: w.site.runwayId, along: Math.round(w.site.along), cross: Math.round(w.site.cross), floorM: w.site.floorM },
       candidate: cand,
       footprint,
       columnsNearEye: (r.satBuildings?.queryColumns?.(eye.x, eye.z, 3000) ?? []).length,
@@ -191,6 +193,11 @@ function print(res) {
         await page.waitForFunction(() => window.__fly?.airportWatch?.validated && window.__flyBoot?.pct === 100 && !window.__fly.worldLoading, undefined, { timeout: 240000 });
         await page.waitForTimeout(settle);
         const res = await audit(page, null);
+        if (shots) {
+          await page.evaluate(() => { const w = window.__fly.airportWatch; w.tracking = false; w.yaw = 0; w.pitch = -0.07; });
+          await page.waitForTimeout(1200);
+          await page.screenshot({ path: path.join(out, `${airport}.png`) });
+        }
         report.airports[airport] = { ...res, errors, candidates: [] };
         console.log(`\n${airport}  site ${JSON.stringify(res.site)}  columns<3km ${res.columnsNearEye}  blocked ${res.blocked}  footprint ${JSON.stringify(res.footprint)}`);
         print(res);
