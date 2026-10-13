@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable react-hooks/immutability -- the flight runtime is the imperative simulation bus; the audio instances are published on it, never React state. */
 
 import { useEffect, useRef } from 'react';
 import { FlyAudio } from '@/lib/fly/audio-engine';
@@ -27,9 +28,13 @@ export function useFlyAudio(runtime) {
   useEffect(() => {
     const audio = new FlyAudio();
     const immersion = new ImmersiveAudio(audio);
+    // The observation lounge soundscape (room tone, PA chime, distant
+    // aircraft through the glass). Published so the lounge runtime can play
+    // its interface cues (select, binoculars) through the same graph.
     const airports = new AirportAudio(audio);
     audioRef.current = audio;
     runtime.audio = audio;
+    runtime.airportAudio = airports;
     audio.setMuted(!useFlyStore.getState().soundOn);
     const applyAircraft = (id) => {
       const ac = resolveAircraft(id);
@@ -117,6 +122,7 @@ export function useFlyAudio(runtime) {
       runtime.audio = null;
       immersion.dispose();
       airports.dispose();
+      if (runtime.airportAudio === airports) delete runtime.airportAudio;
       delete runtime.immersiveAudio;
       audio.dispose();
     };
