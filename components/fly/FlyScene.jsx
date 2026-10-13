@@ -7,6 +7,8 @@ import { setTrueScaleK, toSceneDir } from '@/lib/fly/true-scale';
 import { conditionsOn, conditionsSunTime, publishConditions, solarHour } from '@/lib/fly/player-conditions';
 import { cloudCalmOn, hazeGroundY, stepHazeGround } from '@/lib/fly/cloud-calm';
 import { FlightOperations } from '@/lib/fly/flight-operations';
+import { createSimHold } from '@/lib/fly/sim-hold';
+import { installReviewPoses } from '@/lib/fly/airport-service/review-poses';
 import { AirportOperationsLayer } from './AirportOperationsLayer';
 
 import { GroundImmersionRig } from './GroundImmersionRig';
@@ -1115,6 +1117,8 @@ export function FlyScene({ runtime }) {
   );
   const input = useMemo(() => new InputController(), []);
   const operations = useMemo(() => new FlightOperations(), []);
+  // GATE TO GATE: named reasons that freeze the sim without a menu (lib/fly/sim-hold.js).
+  const simHold = useMemo(() => (runtime.simHold ??= createSimHold()), [runtime]);
   const chase = useMemo(() => new ChaseCamera(), []);
   const cameraTransition = useMemo(()=>new CameraTransition(),[]);
   const reduceCameraMotion = useMemo(()=>typeof matchMedia!=='undefined'&&matchMedia('(prefers-reduced-motion: reduce)').matches,[]);
@@ -1992,6 +1996,11 @@ export function FlyScene({ runtime }) {
   // eslint-disable-next-line react-hooks/immutability
   useEffect(() => connectFlightOperations({runtime,operations,flight,input,autopilot,chase,engine,rebase,crashSys,crashRef}),
     [runtime,operations,flight,input,autopilot,chase,engine,rebase,crashSys]);
+  // GATE TO GATE: the review pose hook (scripts/review-operations-airfield.cjs).
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') return undefined;
+    return installReviewPoses({ runtime, flight, operations });
+  }, [runtime, flight, operations]);
 
   // Spawn: place the aircraft above the spawn point, pointing north, and
   // drop the floating-origin anchor there.
@@ -2060,7 +2069,7 @@ export function FlyScene({ runtime }) {
     // shipped look) only: k0 = 1 everywhere else is three's own camera.
     setTrueScaleK(cinemaOn(flyState) ? mercatorScale(flight.latDeg) : 1);
     const worldHeld = flyState.mapStyle === 'satellite' && (runtime.worldLoading === true || (typeof window !== 'undefined' && window.__flyBoot && window.__flyBoot.pct < 100));
-    const paused = flyState.phase === 'paused' || flyState.cameraMode === 'photo' || !!flyState.airportWatch || flyState.airportBrowserOpen || worldHeld || menuOpen(flyState) || !!flyState.inspectHex || flyState.atlasOpen || flyState.logbookOpen || document.hidden;
+    const paused = flyState.phase === 'paused' || flyState.cameraMode === 'photo' || !!flyState.airportWatch || flyState.airportBrowserOpen || worldHeld || menuOpen(flyState) || !!flyState.inspectHex || flyState.atlasOpen || flyState.logbookOpen || document.hidden || simHold.any();
     // Inspect modal / Atlas count as a soft pause for the stick: the world
     // (and your plane) keep flying, but the cursor belongs to the overlay.
     // Explorer: photo mode holds the simulation while the orbit rig stays live.
