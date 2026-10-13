@@ -32,10 +32,12 @@ import { AircraftLights } from '@/lib/fly/aircraft-lights';
 import { TouchdownSmoke } from '@/lib/fly/fleet-smoke';
 import { FLEET_VIEW } from '@/lib/fly/observation-config';
 import { getR25Sky } from '@/lib/fly/r25-sky';
+import { worldToSite } from '@/lib/fly/lounge-site';
 
 const _dummy = new Object3D();
 const _bufferSize = new Vector2();
 const _geoProbe = new Vector3();
+const _siteProbe = { x: 0, z: 0 };
 const _selected = new Set();
 const _wind = { x: 0, z: 0 };
 const _color = new Color();
@@ -294,16 +296,26 @@ export function TrafficLayer({ runtime, flight, origin }) {
     _wind.x = (wx?.windX ?? 0) * 0.5; _wind.z = (wx?.windZ ?? 0) * 0.5;
     lights.begin(night);
     detailed.shared.uFleetNight.value.set(night * 2.4, night * 1.6, 0.4 + night * 3, 0);
+    // The surface drawn under a point: the lounge's airport set (apron and
+    // pier) inside its footprint while observing, else the refined terrain.
+    const set = observing && runtime.airportSet?.site === watch.site ? runtime.airportSet : null;
+    const groundUnder = (x, z) => {
+      if (set) {
+        const l = worldToSite(set.site, x, z, _siteProbe), L = set.layout;
+        if (l.x > L.apron.x0 && l.x < L.apron.x1 && l.z > L.apron.z0 && l.z < L.terminal.z1) return set.apronY() + set.groundAt(l.x, l.z);
+      }
+      _geoProbe.set(x, 0, z);
+      const g = runtime.engine.worldToGeo(_geoProbe), sample = runtime.engine.getGroundAt?.(g.x, g.y);
+      return sample && Number.isFinite(sample.elev) ? sample.elev : null;
+    };
     detailed.update(items,flight,origin,liveState.qualityTier,liveState.inspectHex??runtime.targeting?.lockedHex,mapStyleNow==='satellite',runtime.explorerVisualTime??performance.now()/1000,{
       camera, heightPx: _bufferSize.y || 1080, observing, selectedSet: _selected, modelRangeM,
-      groundAt: runtime.engine ? (x, z) => {
-        _geoProbe.set(x, 0, z);
-        const g = runtime.engine.worldToGeo(_geoProbe), sample = runtime.engine.getGroundAt?.(g.x, g.y);
-        return sample && Number.isFinite(sample.elev) ? sample.elev : null;
-      } : null,
+      groundAt: runtime.engine ? groundUnder : null,
       airportY: observing ? watch.site?.groundY ?? null : null,
       dt: Math.min(delta || 0, 0.25), now: frameNow, lights: mapStyleNow === 'satellite' ? lights : null,
       smoke: mapStyleNow === 'satellite' ? smoke : null, origin, wind: _wind,
+      // Parked scenery (observation/ParkedFleet.jsx) shares the fleet budget.
+      reserve: observing ? runtime.parkedFleet ?? null : null,
     });
     runtime.liveFleet=detailed.stats;
     runtime.retryLiveFleet=()=>{if(detailed.stats.compileFailed){detailed.stats.compileFailed=false;detailed.compiling=false;}};
@@ -383,8 +395,9 @@ export function TrafficLayer({ runtime, flight, origin }) {
         mesh.setMatrixAt(mesh._used, _dummy.matrix);
         mesh.setColorAt(mesh._used, _color);
         mesh._used += 1;
-        // GLB / primitive archetypes carry the standard light set at a nominal span.
-        if (mapStyleNow === 'satellite') lights.addPoint(x, y, z, it.yaw, 14, it, { strobe: !(it.flags & 1), eff });
+        // GLB / primitive archetypes: their shader carries the navigation
+        // lights (applyNavLights); add the anti-collision beacon and strobes.
+        if (mapStyleNow === 'satellite') lights.addPoint(x, y, z, it.yaw, 0, it, { strobe: !(it.flags & 1), eff });
       } else {
         if (billboardsUsed >= TRAFFIC.maxBillboards) continue;
         const quiet=quietTraffic&&it.hex!==focusedHex;
@@ -412,8 +425,9 @@ export function TrafficLayer({ runtime, flight, origin }) {
         billboards.setColorAt(billboardsUsed, _color);
         billboards.geometry.attributes.aTrafficPresence.setX(billboardsUsed,quiet ? .22 : 1);
         billboardsUsed += 1;
-        // Far contacts at night: their beacons and strobes are what you see.
-        if (mapStyleNow === 'satellite' && night > 0.05 && it.distM < FLEET_VIEW.lights.billboardRangeM) lights.addPoint(x, y, z, it.yaw, 0, it, { eff: eff * night });
+        // Far contacts at night, seen from the lounge: their beacons and
+        // strobes are what you see (flight mode keeps its far dots as they were).
+        if (observing && night > 0.05 && it.distM < FLEET_VIEW.lights.billboardRangeM) lights.addPoint(x, y, z, it.yaw, 0, it, { eff: eff * night });
       }
     }
 
