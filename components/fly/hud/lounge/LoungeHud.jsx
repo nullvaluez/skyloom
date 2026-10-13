@@ -40,6 +40,9 @@ function runwayLabel(airport) {
 export function LoungeHud({ runtime, watch }) {
   const sound = useFlyStore((s) => s.soundOn);
   const inspecting = useFlyStore((s) => !!s.inspectHex);
+  // A full-screen panel over the lounge (Atlas, logbook, airport browser):
+  // the board and the spotter card step aside so the two never interleave.
+  const covered = useFlyStore((s) => s.atlasOpen || s.logbookOpen || s.airportBrowserOpen);
   const picker = useMemo(() => ({ hits: [], hover: null, pointer: { x: 0, y: 0, over: false, dragging: false }, categories: new Map(), surface: null }), []);
   const [board, setBoard] = useState(EMPTY_BOARD);
   const [feed, setFeed] = useState({ state: 'unavailable', count: 0 });
@@ -153,7 +156,7 @@ export function LoungeHud({ runtime, watch }) {
         onLeave={leave}
       />
 
-      {!watch.binocular && !inspecting && (
+      {!watch.binocular && !inspecting && !covered && (
         <LiveBoard
           board={board}
           tab={tab}
@@ -179,7 +182,7 @@ export function LoungeHud({ runtime, watch }) {
       )}
 
       <AnimatePresence>
-        {watch.selected && !watch.binocular && (
+        {watch.selected && !watch.binocular && !covered && (
           <SpotterCard key={watch.selected} runtime={runtime} hex={watch.selected} boardRow={selectedRow} fieldElev={fieldElev} airportIdent={airport?.ident || String(airport?.id || '').split(':')[0]} onPhoto={photo} savingPhoto={savingPhoto} />
         )}
       </AnimatePresence>

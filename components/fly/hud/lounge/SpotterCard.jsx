@@ -27,9 +27,12 @@ const fmtKm = (m) => (m < 9500 ? (m / 1000).toFixed(1) : String(Math.round(m / 1
 export const fmtEta = (s) => {
   if (!Number.isFinite(s)) return null;
   if (s < 45) return 'now';
-  if (s < 600) return `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+  const r = Math.round(s);
+  if (r < 600) return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, '0')}`;
   return `${Math.round(s / 60)} min`;
 };
+/** An arrival row whose aircraft is already on the ground has landed: no ETA. */
+export const landedRow = (row) => row?.category === 'arrival' && (row.phase === 'runway' || row.phase === 'taxi' || row.phase === 'parked');
 
 function readLive(runtime, hex, fieldElev) {
   const t = runtime.traffic?.tracks.get(hex);
@@ -48,7 +51,7 @@ function readLive(runtime, hex, fieldElev) {
   return {
     stale: t.stale ?? 0,
     grounded: !!(t.flags & 1),
-    altFt: (t.ry ?? 0) * M_TO_FT,
+    altFt: Math.max(0, (t.ry ?? 0) * M_TO_FT), // never a negative readout (GNSS heights dip below zero near sea level)
     gsKt: Math.hypot(t.fix1.vE, t.fix1.vN) * MPS_TO_KT,
     vsFpm: (t.fix1.vUp || 0) * M_TO_FT * 60,
     rangeM: Math.hypot(dx, dy, dz),
@@ -135,7 +138,7 @@ export function SpotterCard({ runtime, hex, boardRow, fieldElev, airportIdent, o
   const reg = meta?.r || info?.registration || null;
   const lost = !track || live?.stale === 2;
   const phase = boardRow?.phaseLabel || (live?.phase ? phaseLabel(live.phase) : null);
-  const eta = boardRow?.category === 'arrival' ? fmtEta(boardRow.etaS) : null;
+  const eta = boardRow?.category === 'arrival' && !landedRow(boardRow) ? fmtEta(boardRow.etaS) : null;
   const PhaseIcon = boardRow?.category === 'arrival' ? PlaneLanding : boardRow?.category === 'departure' ? PlaneTakeoff : Plane;
 
   const join = () => {

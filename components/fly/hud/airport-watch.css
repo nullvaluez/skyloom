@@ -21,6 +21,10 @@
   outline: 2px solid var(--t-cyan);
   outline-offset: 2px;
 }
+/* The search field shows focus on its whole box (.ab-search:focus-within). */
+.airport-browser .ab-search input:focus-visible {
+  outline: none;
+}
 .lounge-surface {
   position: absolute;
   inset: 0;

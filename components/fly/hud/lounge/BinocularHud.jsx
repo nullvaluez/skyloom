@@ -31,7 +31,9 @@ function read(runtime) {
       hex: t.hex,
       label: contactLabel(t.meta, t.hex),
       type: typeNameFor(t.meta) || t.meta?.t || 'Type not broadcast',
-      altFt: (t.ry ?? 0) * M_TO_FT,
+      // Feed heights near sea-level fields can dip below zero (GNSS height
+      // over the ellipsoid); an altitude readout never shows a negative.
+      altFt: Math.max(0, (t.ry ?? 0) * M_TO_FT),
       grounded: !!(t.flags & 1),
       gsKt: Math.hypot(t.fix1.vE, t.fix1.vN) * MPS_TO_KT,
       rangeKm: Math.hypot(dx, dy, dz) / 1000,

@@ -1,6 +1,6 @@
 'use client';
 import { Binoculars, ChevronDown, ChevronUp, PlaneLanding, PlaneTakeoff, Radar, TowerControl } from 'lucide-react';
-import { fmtEta } from './SpotterCard';
+import { fmtEta, landedRow } from './SpotterCard';
 
 /*
  * LIVE BOARD — what is happening at this airport right now, from
@@ -20,15 +20,19 @@ export const BOARD_TABS = [
 ];
 
 const km = (m) => (m < 9500 ? (m / 1000).toFixed(1) : String(Math.round(m / 1000)));
-/** Altitude as a board shows it: flight levels up high, hundreds of feet below. */
+/** Altitude as a board shows it: flight levels up high, feet below. */
 const ft = (m) => {
   const f = m * 3.28084;
-  return f >= 18000 ? `FL${Math.round(f / 100)}` : `${(Math.max(0, Math.round(f / 100)) * 100).toLocaleString()} ft`;
+  if (f >= 18000) return `FL${Math.round(f / 100)}`;
+  // Short final and the first climb read in tens of feet, the rest in hundreds.
+  const step = f < 1000 ? 10 : 100;
+  return `${(Math.max(0, Math.round(f / step)) * step).toLocaleString()} ft`;
 };
 
 function Row({ row, tab, selected, onSelect, onBinoculars }) {
   const sub = [row.airline, row.type || row.typeCode].filter(Boolean).join(' · ') || 'Unidentified';
-  const eta = tab === 'arrivals' ? fmtEta(row.etaS) : null;
+  const landed = landedRow(row);
+  const eta = tab === 'arrivals' ? (landed ? 'down' : fmtEta(row.etaS)) : null;
   return (
     <div className="lb-row" data-selected={selected ? '1' : '0'} data-stale={row.stale ? '1' : '0'}>
       <button type="button" className="lb-main" aria-pressed={selected} data-testid={`lounge-board-row-${row.hex}`} onClick={() => onSelect(row.hex)} title={`Select ${row.label}`}>
@@ -39,7 +43,7 @@ function Row({ row, tab, selected, onSelect, onBinoculars }) {
         <span className="lb-phase">{row.phaseLabel}</span>
         <span className="lb-num">
           <b>{km(row.distanceM)}</b> km
-          <small>{row.category === 'ground' ? 'on ground' : ft(row.altM)}</small>
+          <small>{row.category === 'ground' || landed ? 'on ground' : ft(row.altM)}</small>
         </span>
         {tab === 'arrivals' && <span className="lb-eta" data-soon={row.etaS < 120 ? '1' : '0'}>{eta || '—'}</span>}
       </button>

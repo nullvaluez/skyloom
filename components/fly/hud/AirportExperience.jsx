@@ -8,6 +8,7 @@ import { runwayIndex, searchRunways } from '@/lib/fly/runway-catalog';
 import { airportEligible } from '@/lib/fly/operations-airports';
 import { goldenHourNow, localClockAt, majorAirports, shortAirportName, sunStateAt } from '@/lib/fly/airport-watch-sky.mjs';
 import { AIRPORTS } from '@/lib/airports';
+import { CITIES } from '@/lib/fly/poi/cities';
 import { LoungeHud } from './lounge/LoungeHud';
 import './target-ui.css';
 import './airport-watch.css';
@@ -19,10 +20,15 @@ import './airport-watch.css';
  * HUD (./lounge/LoungeHud.jsx). Desktop only — livingAirportsOn() is false
  * on phones by policy.
  *
- * Test ids: watch-airport, airport-observation (kept); airport-browser,
+ * Test ids — kept: watch-airport, airport-observation. Browser: airport-browser,
  * airport-featured-<id>, golden-hour-list, golden-hour-<ident>,
- * airport-result-<id> (new). The lounge's own ids are listed in
- * FLY_OBSERVATION_LOUNGE.md.
+ * airport-result-<id>. Lounge: lounge-surface, lounge-marks, binocular-mask,
+ * lounge-header, lounge-feed-status, lounge-clock, lounge-weather,
+ * lounge-airports, lounge-leave, lounge-board, lounge-board-tab-<list>,
+ * lounge-board-row-<hex>, lounge-face-runway, lounge-binoculars,
+ * lounge-follow, spotter-card (+ -reg, -route, -telemetry, -phase, -notice,
+ * -photo-credit and the actions -binoculars, -follow, -details, -join,
+ * -photo), binocular-view, binocular-readout, binocular-mag.
  */
 
 const sunNow = () => (typeof window !== 'undefined' && Number.isFinite(window.__flySunOverride) ? window.__flySunOverride : Date.now());
@@ -84,8 +90,21 @@ export function AirportExperience({ runtime }) {
 }
 
 // The golden-hour pool: busy hubs (lib/airports.js) that the runway catalog
-// can open, then every other large airport. Built once per session.
+// can open, then every other large airport — those serving a known city
+// (lib/fly/poi/cities.js, within 35 km) ahead of remote fields, since a
+// sunset is better with traffic in it. Built once per session.
 let goldenPool = null;
+function servesCity(a, grid) {
+  for (let la = Math.floor(a.lat) - 1; la <= Math.floor(a.lat) + 1; la++) {
+    for (let lo = Math.floor(a.lon) - 1; lo <= Math.floor(a.lon) + 1; lo++) {
+      for (const c of grid.get(`${la}|${lo}`) || []) {
+        const dy = (c[1] - a.lat) * 111.32, dx = (c[2] - a.lon) * 111.32 * Math.cos((a.lat * Math.PI) / 180);
+        if (dx * dx + dy * dy < 35 * 35) return true;
+      }
+    }
+  }
+  return false;
+}
 async function goldenAirports() {
   if (goldenPool) return goldenPool;
   const major = majorAirports(await runwayIndex());
@@ -94,7 +113,14 @@ async function goldenAirports() {
     .filter((h) => byIdent.has(h.icao))
     .map((h) => ({ ...byIdent.get(h.icao), name: h.name, city: h.city, priority: 3 }));
   const hubIds = new Set(hubs.map((h) => h.ident));
-  goldenPool = [...hubs, ...major.filter((a) => !hubIds.has(a.ident))];
+  const grid = new Map();
+  for (const c of CITIES) {
+    const key = `${Math.floor(c[1])}|${Math.floor(c[2])}`;
+    if (!grid.has(key)) grid.set(key, []);
+    grid.get(key).push(c);
+  }
+  const rest = major.filter((a) => !hubIds.has(a.ident)).map((a) => (servesCity(a, grid) ? { ...a, priority: 1.5 } : a));
+  goldenPool = [...hubs, ...rest];
   return goldenPool;
 }
 

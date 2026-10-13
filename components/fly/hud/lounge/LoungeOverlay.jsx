@@ -60,15 +60,18 @@ function brackets(ctx, x, y, half, arm, rgb, alpha, width) {
   ctx.stroke();
 }
 
-/** A rounded label pill; returns its rectangle. */
-function pill(ctx, x, y, lines, { rgb = C.ice, accent = null, alpha = 1, w: vw, h: vh }) {
+/** A label pill's size for `lines` (callsign, then an optional detail line). */
+function measurePill(ctx, lines, accent) {
   ctx.font = `400 12.5px ${DISPLAY}`;
   const w0 = ctx.measureText(lines[0]).width;
   ctx.font = `600 10.5px ${FONT}`;
   const w1 = lines[1] ? ctx.measureText(lines[1]).width : 0;
-  const w = Math.max(w0, w1) + 18 + (accent ? 6 : 0);
-  const h = lines[1] ? 38 : 24;
-  const px = clamp(x, 8, vw - w - 8), py = clamp(y, 8, vh - h - 8);
+  return [Math.max(w0, w1) + 18 + (accent ? 6 : 0), lines[1] ? 38 : 24];
+}
+
+/** Draw a rounded label pill into rectangle `rect` = [x, y, w, h]. */
+function drawPill(ctx, rect, lines, { rgb = C.ice, accent = null, alpha = 1 }) {
+  const [px, py, w, h] = rect;
   ctx.globalAlpha = alpha;
   ctx.beginPath();
   ctx.roundRect(px, py, w, h, 7);
@@ -93,7 +96,14 @@ function pill(ctx, x, y, lines, { rgb = C.ice, accent = null, alpha = 1, w: vw, 
     ctx.fillText(lines[1], tx, py + 31);
   }
   ctx.globalAlpha = 1;
-  return [px, py, w, h];
+}
+
+/** A pill at (x, y), kept inside the viewport; returns its rectangle. */
+function pill(ctx, x, y, lines, opts) {
+  const [w, h] = measurePill(ctx, lines, !!opts.accent);
+  const rect = [clamp(x, 8, opts.w - w - 8), clamp(y, 8, opts.h - h - 8), w, h];
+  drawPill(ctx, rect, lines, opts);
+  return rect;
 }
 
 const overlaps = (a, b) => a[0] < b[0] + b[2] && b[0] < a[0] + a[2] && a[1] < b[1] + b[3] && b[1] < a[1] + a[3];
@@ -131,11 +141,19 @@ function drawMask(ctx, w, h, a) {
   ctx.fillStyle = v;
   ctx.fillRect(0, 0, w, h);
   ctx.lineWidth = 1.5;
-  for (const cx of [c1, c2]) {
+  for (const [cx, other] of [[c1, c2], [c2, c1]]) {
+    // Only the arc that borders the dark: inside the fused field the other
+    // eyepiece's light covers it, so no ring crosses the picture.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, w, h);
+    ctx.arc(other, cy, R * 0.995, 0, Math.PI * 2, true);
+    ctx.clip('evenodd');
     ctx.beginPath();
     ctx.arc(cx, cy, R * 0.985, 0, Math.PI * 2);
     ctx.strokeStyle = `rgba(150,205,255,${0.07 * up})`;
     ctx.stroke();
+    ctx.restore();
   }
   // Fine post reticle: four posts that FRAME the centre (a locked aircraft
   // sits in the open middle, never under a line) with mil ticks.
@@ -170,6 +188,21 @@ export function LoungeOverlay({ runtime, picker }) {
     const v = new Vector3(), fwd = new Vector3(), aim = {};
     const fx = { hex: null, at: 0 }; // selection snap-in
     let maskKey = '', raf = 0, lastCleared = false;
+    // Screen rectangles of the lounge's own panels (header, board, card,
+    // control bar), re-read at 4 Hz: labels are placed clear of them.
+    let avoid = [], avoidAt = -1e9;
+    const readAvoid = (now) => {
+      if (now - avoidAt < 250) return;
+      avoidAt = now;
+      avoid = [];
+      const root = mark.closest('.lounge');
+      if (!root) return;
+      const base = mark.getBoundingClientRect();
+      for (const el of root.querySelectorAll('.lounge-panel, .lh-actions, .lounge-help')) {
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) avoid.push([r.left - base.left - 6, r.top - base.top - 6, r.width + 12, r.height + 12]);
+      }
+    };
 
     const fit = (canvas, c2d, w, h, dpr) => {
       const W = Math.round(w * dpr), H = Math.round(h * dpr);
@@ -280,12 +313,26 @@ export function LoungeOverlay({ runtime, picker }) {
       }
 
       // Labels: selection first, then hover, then the nearest arrivals and
-      // departures — never overlapping each other.
+      // departures — never overlapping each other or the lounge's panels.
+      // Each tries the right of its marker, then the left.
+      readAvoid(now);
       const taken = [];
-      const label = (hit, lines, opts) => {
-        const rect = pill(ctx, hit.sx + hit.half + 12, hit.sy - 19, lines, { ...opts, w: W, h: H });
-        taken.push(rect);
-        return rect;
+      const label = (hit, lines, opts, required = false) => {
+        const [pw, ph] = measurePill(ctx, lines, !!opts.accent);
+        const top = clamp(hit.sy - ph / 2, 8, H - ph - 8);
+        let first = null;
+        for (const x of [hit.sx + hit.half + 12, hit.sx - hit.half - 12 - pw]) {
+          const rect = [clamp(x, 8, W - pw - 8), top, pw, ph];
+          if (!first) first = rect;
+          if (taken.some((r) => overlaps(r, rect)) || avoid.some((r) => overlaps(r, rect))) continue;
+          drawPill(ctx, rect, lines, opts);
+          taken.push(rect);
+          return rect;
+        }
+        if (!required) return null;
+        drawPill(ctx, first, lines, opts);
+        taken.push(first);
+        return first;
       };
 
       if (selectedHit && amount < 0.98) {
@@ -303,15 +350,14 @@ export function LoungeOverlay({ runtime, picker }) {
         ctx.restore();
         const t = selectedHit.t, cat = picker.categories.get(t.hex);
         const sub = [typeNameFor(t.meta) || t.meta?.t, cat?.phaseLabel, fmtKm(selectedHit.dist)].filter(Boolean).join(' · ');
-        label(selectedHit, [contactLabel(t.meta, t.hex), sub], { accent: C.cyan, alpha: a });
+        label(selectedHit, [contactLabel(t.meta, t.hex), sub], { accent: C.cyan, alpha: a }, true);
       } else if (!w.selected) fx.hex = null;
 
       if (hover && hover.hex !== w.selected && amount < 0.98) {
         brackets(ctx, hover.sx, hover.sy, hover.half + 6, Math.min(8, hover.half * 0.5 + 2), C.ice, 0.95, 1.6);
         const t = hover.t;
         const sub = [typeNameFor(t.meta) || t.meta?.t, fmtKm(hover.dist), 'click to select'].filter(Boolean).join(' · ');
-        const rect = [hover.sx + hover.half + 12, hover.sy - 19, 200, 38];
-        if (!taken.some((r) => overlaps(r, rect))) label(hover, [contactLabel(t.meta, t.hex), sub], {});
+        label(hover, [contactLabel(t.meta, t.hex), sub], {});
       }
 
       if (naked > 0.5) {
@@ -323,10 +369,7 @@ export function LoungeOverlay({ runtime, picker }) {
         let shown = 0;
         for (const { h, cat } of phased) {
           if (shown >= M.maxPhaseLabels) break;
-          const rect = [h.sx + h.half + 12, h.sy - 12, 150, 24];
-          if (taken.some((r) => overlaps(r, rect))) continue;
-          label(h, [`${contactLabel(h.t.meta, h.hex)}  ${cat.category === 'arrival' ? '↘' : '↗'} ${cat.phaseLabel}`], { alpha: 0.82 * naked, accent: cat.category === 'arrival' ? C.lime : C.cyan });
-          shown++;
+          if (label(h, [`${contactLabel(h.t.meta, h.hex)}  ${cat.category === 'arrival' ? '↘' : '↗'} ${cat.phaseLabel}`], { alpha: 0.82 * naked, accent: cat.category === 'arrival' ? C.lime : C.cyan })) shown++;
         }
       }
 
