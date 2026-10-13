@@ -10,6 +10,9 @@
 //                tile hiding, and the single-disc identity with the pre-G2G code.
 //   catalog      runway-catalog eviction with four big protected idents plus
 //                twenty discoveries terminates and keeps every protected row.
+//   session site the session seat cache in lib/fly/lounge-site.js (moved from
+//                airport-watch-runtime.js): stored seats, one OSM choice per
+//                ident and variant, and the outcomes that are not cached.
 //
 // One pass/fail summary at the end; exit 1 on any failure.
 // Run: node scripts/verify-airport-service.mjs
@@ -34,6 +37,7 @@ const { SatRoadEngine } = await imp('lib/fly/toy-world/sat-road-engine.js');
 const { LivingAirports } = await imp('lib/fly/living-airports.js');
 const catalog = await imp('lib/fly/runway-catalog.js');
 const registry = await imp('lib/fly/operations-airports.js');
+const L = await imp('lib/fly/lounge-site.js');
 const { BufferAttribute, BufferGeometry, Mesh, MeshBasicMaterial, ShaderLib } = await import('three');
 
 let pass = 0;
@@ -294,6 +298,75 @@ await check('four big protected idents plus twenty discoveries: eviction termina
   assert.equal(discovered().length, all.length + 1);
   for (const role of ['lounge', 'departure', 'destination', 'nearby', ...more.map((_, i) => `extra-${i}`)]) catalog.protectRunwayIdent(role, null);
   assert.equal(catalog.protectedRunwayIdents().size, 0);
+});
+
+// ---- section: session site --------------------------------------------------
+console.log('\n[session site]');
+
+// Synthetic catalog airports (no stored seat), a chooser that seats 300 m off
+// the runway, and loaders that answer, hang, fail or find nothing.
+const synthetic = (ident) =>
+  registry.airportById(`${ident}:09-27`) ??
+  registry.registerAirport({ id: `${ident}:09-27`, name: `${ident} Field`, width: 45, a: { lat: 10, lon: 20, elevation: 100 }, b: { lat: 10, lon: 20.03, elevation: 100 } });
+const seatFor = (runways) => ({ ident: runways[0].ident, runwayId: runways[0].id, along: 500, cross: 300, floorM: 12 });
+const answer = (calls) => async () => { calls.n++; return { features: true }; };
+
+await check('a fresh OSM choice is made once per ident and variant, reported, and reused synchronously', async () => {
+  L.clearSessionSites();
+  const airport = synthetic('SSA');
+  const calls = { n: 0 }, heard = [];
+  assert.equal(L.sessionSiteSync(airport), null, 'pending before the choice');
+  assert.equal(L.sessionSeat(airport), undefined);
+  const site = await L.resolveSessionSite(airport, { load: answer(calls), choose: seatFor, onChoice: (c) => heard.push(c) });
+  assert.equal(site.source, 'chosen');
+  assert.deepEqual([site.runwayId, site.along, site.cross, site.floorM], ['SSA:09-27', 500, 300, 12]);
+  assert.equal(heard.length, 1);
+  assert.equal(heard[0].ident, 'SSA');
+  assert.equal(heard[0].outcome, 'chosen');
+  assert.ok(Number.isInteger(heard[0].ms));
+  // Reused: same site synchronously, no second load, nothing reported.
+  assert.deepEqual(L.sessionSiteSync(airport), site);
+  assert.deepEqual(L.sessionSeat('SSA'), seatFor([airport]));
+  assert.deepEqual(L.sessionSeat('SSA:09-27'), seatFor([airport]));
+  assert.deepEqual(await L.chooseSessionSeat(airport, { load: answer(calls), choose: seatFor, onChoice: (c) => heard.push(c) }), seatFor([airport]));
+  assert.equal(calls.n, 1);
+  assert.equal(heard.length, 1);
+  // The default variant is the lounge's ('classic' while LOUNGE_PIER is off); another variant chooses afresh.
+  assert.deepEqual(L.sessionSeat(airport, { variant: 'classic' }), seatFor([airport]));
+  assert.equal(L.sessionSeat(airport, { variant: 'pier' }), undefined);
+  assert.equal(L.sessionSiteSync(airport, { variant: 'pier' }), null);
+});
+
+await check('no seat in the data is cached (generic site); timeout, cancel and failure are not', async () => {
+  L.clearSessionSites();
+  const none = synthetic('SSB'), slow = synthetic('SSC'), gone = synthetic('SSD'), bad = synthetic('SSE');
+  const outcomes = [];
+  const onChoice = (c) => outcomes.push(`${c.ident}:${c.outcome}`);
+  const generic = (a) => L.resolveSessionSite(a, { load: async () => ({}), choose: () => null });
+  const g = await generic(none);
+  assert.equal(g.source, 'generic');
+  assert.equal(L.sessionSeat(none), null);
+  assert.deepEqual(L.sessionSiteSync(none), g);
+  const s = await L.resolveSessionSite(slow, { load: () => new Promise(() => {}), choose: seatFor, timeoutMs: 15, onChoice });
+  const c = await L.resolveSessionSite(gone, { load: answer({ n: 0 }), choose: seatFor, cancelled: () => true, onChoice });
+  const e = await L.resolveSessionSite(bad, { load: async () => { throw new Error('offline'); }, choose: seatFor, onChoice });
+  assert.deepEqual([s.source, c.source, e.source], ['generic', 'generic', 'generic']);
+  assert.deepEqual(outcomes, ['SSC:timeout', 'SSD:cancelled', 'SSE:error']);
+  for (const a of [slow, gone, bad]) assert.equal(L.sessionSeat(a), undefined, `${a.ident} not cached`);
+});
+
+await check('a stored seat (flagship) resolves at once without loading OSM data', async () => {
+  L.clearSessionSites();
+  const kcmh = registry.airportById('KCMH');
+  const sync = L.sessionSiteSync(kcmh);
+  assert.equal(sync?.source, 'flagship');
+  let loads = 0;
+  const site = await L.resolveSessionSite(kcmh, { load: async () => { loads++; return {}; }, choose: seatFor });
+  assert.deepEqual(site, L.resolveLoungeSite(kcmh));
+  assert.equal(loads, 0);
+  assert.equal(L.sessionSeat(kcmh), undefined);
+  assert.equal(await L.resolveSessionSite(null), null);
+  L.clearSessionSites();
 });
 
 // ---- summary ----------------------------------------------------------------
