@@ -446,6 +446,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
       smoke.update(origin, frameNow, Math.min(delta || 0, 0.1), lit, shade);
     } else smoke.update(origin, frameNow, 0, null, null);
     runtime.fleetLights = lights.stats;
+    runtime.fleetSmoke = { puffs: smoke.puffs.length, emitting: smoke.emitters.size };
     billboards.count = billboardsUsed;
     billboards.instanceMatrix.needsUpdate = true;
     if (billboards.instanceColor) billboards.instanceColor.needsUpdate = true;

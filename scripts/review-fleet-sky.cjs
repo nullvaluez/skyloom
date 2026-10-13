@@ -105,6 +105,36 @@ const report = { airport, utc, errors: [], shots: [], views: {} };
         await shot('up-right');
         report.views.up = await stats();
       }
+      if (view === 'smoke') {
+        // A harness-only landing in front of the seat: airborne a moment,
+        // then grounded at landing speed (tyre smoke at the mains).
+        const land = await page.evaluate(() => {
+          const r = window.__fly, w = r.airportWatch, T = r.traffic, site = w.site, k = site.k;
+          const c = Math.cos(site.heading), s = Math.sin(site.heading);
+          const toWorld = (lx, lz) => ({ x: site.x + k * (lx * c + lz * s), z: site.z + k * (-lx * s + lz * c) });
+          const ground = (r.airportSet?.apronY?.() ?? w.floorY - site.floorM) + (r.airportSet?.groundAt?.(-140, -260) ?? 0);
+          const hex = 'f1eed0', t = T._createTrack(hex), p = toWorld(-140, -260), now = T.serverNow(performance.now() / 1000) ?? 0;
+          // Rolling along the room's +X (right), 68 m/s.
+          const dir = { x: c, z: -s }, speed = 68;
+          const vE = dir.x * speed, vN = -dir.z * speed;
+          t.fix1 = { t: now, x: p.x, y: ground + 3, z: p.z, vE, vN, vUp: -1, latRad: 2 * Math.atan(Math.exp(-p.z / 6378137)) - Math.PI / 2 };
+          t.flags = 0; t.archetype = 0; t.meta = { hex, t: 'A321', flight: 'TEST1', category: 'A3' };
+          T.tracks.set(hex, t);
+          // Aim at the touchdown point (left of the seat), a tight lens.
+          w.clearSelection(); w.tracking = false; w.yaw = Math.atan2(140 - 30, 260); w.pitch = -0.09;
+          return { hex, ground };
+        });
+        await lens(14);
+        await page.waitForTimeout(900);
+        await page.evaluate(({ hex, ground }) => { const t = window.__fly.traffic.tracks.get(hex); t.flags = 1; t.groundElev = ground; t.fix1.y = ground + 2; t.fix1.vUp = 0; }, land);
+        for (const [name, ms] of [['smoke-0', 450], ['smoke-1', 1200], ['smoke-2', 2500]]) {
+          await page.waitForTimeout(ms);
+          await shot(name);
+        }
+        await lens(0);
+        report.views.smoke = await page.evaluate(() => window.__fly.fleetSmoke ?? null);
+        await page.evaluate(() => window.__fly.traffic.tracks.delete('f1eed0'));
+      }
       if (view === 'parked') {
         // The stands under the lounge: parked airframes at the jet bridges.
         await lens(0);
