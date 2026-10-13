@@ -29,7 +29,31 @@ const { PHASE, trackPhase, phaseConfig } = await import('../lib/fly/flight-phase
 const { buildPaletteData, PALETTE, paletteRow } = await import('../lib/fly/fleet-material.js');
 const { DetailedTraffic } = await import('../lib/fly/detailed-traffic.js');
 const { trailPersistence } = await import('../lib/fly/fleet-trails.js');
-const { SKY_VIEW } = await import('../lib/fly/observation-config.js');
+const { SKY_VIEW, FLEET_VIEW } = await import('../lib/fly/observation-config.js');
+const { planParkedFleet, parkedMatrix } = await import('../lib/fly/fleet-parked.js');
+const { boardingDoor } = await import('../lib/fly/fleet-layout.js');
+const registry = await import('../lib/fly/operations-airports.js');
+const { resolveLoungeSite } = await import('../lib/fly/lounge-site.js');
+const { airportLayout, STAND_CLASS } = await import('../lib/fly/airport-layout.js');
+const { Vector3 } = await import('three');
+
+// Airports for the parked-fleet checks (catalog rules as in verify-airport-set.mjs).
+const catalog = JSON.parse(fs.readFileSync('public/data/runways/v1/index.json', 'utf8')).runways;
+const regions = new Map();
+const region = (r) => { if (!regions.has(r)) regions.set(r, JSON.parse(fs.readFileSync(`public/data/runways/v1/regions/${r}.json`, 'utf8')).airports); return regions.get(r); };
+function loadAirport(id) {
+  let a = registry.airportById(id);
+  if (a) return a;
+  const item = catalog.find((r) => r.id === id) || catalog.filter((r) => r.ident === id).sort((x, y) => (y.length || 0) - (x.length || 0))[0];
+  assert.ok(item, `catalog has ${id}`);
+  for (const it of catalog.filter((r) => Math.abs(r.lat - item.lat) < 0.25 && Math.abs(r.lon - item.lon) * Math.cos(item.lat * Math.PI / 180) < 0.25)) {
+    const row = region(it.region).find((x) => x.id === it.id);
+    if (row) try { registry.registerAirport(row); } catch { /* invalid rows are skipped like the runtime does */ }
+  }
+  a = registry.airportById(item.id);
+  assert.ok(a, `registered ${id}`);
+  return a;
+}
 
 let checks = 0;
 function check(name, fn) {
@@ -298,6 +322,42 @@ check('a busy, diverse sky stays inside 30 draws and 900k triangles, binoculars 
     if (sel) assert.equal(items.find((i) => i.hex === sel).fleet.lod, 'hero', 'the selection is a hero');
   }
   renderer.dispose();
+});
+
+check('parked aircraft dock their L1 door at the jet bridge cab and fit their stands', () => {
+  const sizes = new Set();
+  let parked = 0, worstSill = 0;
+  for (const id of ['KCMH', 'KJFK', 'LOWI', 'YSSY', 'EGLL', 'KMDW', 'KBTV', 'K00V']) {
+    const site = resolveLoungeSite(loadAirport(id));
+    const layout = airportLayout(site);
+    sizes.add(layout.size);
+    const plan = planParkedFleet(site, layout);
+    assert.equal(plan.length, layout.stands.length);
+    assert.equal(JSON.stringify(plan), JSON.stringify(planParkedFleet(site, layout)), 'deterministic');
+    assert.ok(plan.filter((p) => p.empty).length <= Math.ceil(plan.length * FLEET_VIEW.parked.emptyShare * 2.5) + 1, `${id} too many empty stands`);
+    for (const p of plan) {
+      if (p.empty) continue;
+      parked++;
+      const f = T.FLEET_FAMILIES[p.family], L = airframeLayout(f), cls = STAND_CLASS[p.stand.cls], door = boardingDoor(f);
+      // The painted door's outer edge on the port side, in model metres.
+      const zm = -L.len / 2 - p.spec.plugF + door.station + (L.seg(door.station) === -1 ? 0 : p.spec.plugF);
+      const at = new Vector3(-door.half, door.sill + door.height / 2, zm).applyMatrix4(parkedMatrix(p, 0));
+      const sillAt = new Vector3(-door.half, door.sill, zm).applyMatrix4(parkedMatrix(p, 0)).y;
+      assert.ok(Math.abs(at.x - (p.stand.x + cls.door.half)) < 0.05, `${id} ${p.code} across ${at.x - p.stand.x}`);
+      assert.ok(Math.abs(at.z - (p.stand.noseZ - cls.door.aft)) < 0.05, `${id} ${p.code} along`);
+      assert.ok(Math.abs(sillAt - cls.door.sill) < 0.4, `${id} ${p.code} sill ${sillAt.toFixed(2)} vs ${cls.door.sill}`);
+      worstSill = Math.max(worstSill, Math.abs(sillAt - cls.door.sill));
+      // Inside the stand: span within the pitch, nose short of the head-of-stand road, tail clear of the taxilane.
+      const length = (f.length + p.spec.plugF + p.spec.plugA) * p.scale, noseZ = p.z + (L.len / 2 + p.spec.plugF) * p.scale;
+      assert.ok(f.span * p.scale <= cls.pitch - 4, `${id} ${p.code} span`);
+      assert.ok(noseZ <= layout.lanes.road.z0 - 1, `${id} ${p.code} nose in the road`);
+      assert.ok(noseZ - length >= layout.lanes.taxilaneZ + 6, `${id} ${p.code} tail on the taxilane`);
+      assert.ok(Math.abs(p.dock.noseOverStop) < 4, `${id} ${p.code} nose ${p.dock.noseOverStop} m from the stop line`);
+    }
+  }
+  assert.deepEqual([...sizes].sort(), ['big', 'mid', 'small']);
+  assert.ok(parked > 10);
+  console.log(`     ${parked} parked airframes, worst sill offset ${worstSill.toFixed(2)} m`);
 });
 
 for (const m of built.values()) m.hull.dispose();
