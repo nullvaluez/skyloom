@@ -127,5 +127,23 @@ check(
   check('(6) the device report lists every TRUE EARTH flag', m != null && missing.length === 0, missing.length ? `missing: ${missing.join(', ')}` : `${listed.length} listed`);
 }
 
+// (7) nothing but flag blocks after the marker (GATE TO GATE rule): every
+//     export in the section is `export const NAME = {` with an `enabled` key,
+//     so (5) can treat every block it finds there as a flag.
+{
+  const exports = [...section.matchAll(/^export\s+(?:const|let|var|function|class|default)\s*([A-Za-z_$][\w$]*)?[^\n]*/gm)].map((m) => m[0]);
+  const stray = exports.filter((line) => !/^export const [A-Z][A-Z0-9_]* = \{/.test(line));
+  const noEnabled = blocks.filter((b) => {
+    const at = section.indexOf(`export const ${b} = {`);
+    const next = section.indexOf('\nexport ', at + 1);
+    return !/\benabled\s*:/.test(section.slice(at, next < 0 ? undefined : next));
+  });
+  check(
+    '(7) only flag blocks (export const NAME = { enabled, ... }) follow the TRUE EARTH marker',
+    stray.length === 0 && noEnabled.length === 0,
+    stray.length || noEnabled.length ? `stray: ${stray.join(' | ')}; no enabled: ${noEnabled.join(', ')}` : `${blocks.length} blocks`,
+  );
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
