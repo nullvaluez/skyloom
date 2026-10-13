@@ -132,7 +132,18 @@ function Room({ runtime }) {
       else if (camera.fov > ROOM_LOOK.binocularShowFov) s.fovHidden = false;
       amount = s.fovHidden ? 1 : 0;
     }
-    const fade = smooth(ROOM_LOOK.optics.fadeFrom, ROOM_LOOK.optics.fadeTo, amount);
+    // The dissolve is a transition, never a resting state: while the glasses
+    // move it tracks the mask; once the magnification parks (a wheel zoom can
+    // stop anywhere) it settles to whole room or no room, so a parked
+    // half-raised view never shows the dither.
+    const raw = smooth(ROOM_LOOK.optics.fadeFrom, ROOM_LOOK.optics.fadeTo, amount);
+    const moving = Math.abs(amount - (s.lastAmount ?? amount)) > 1e-3;
+    s.lastAmount = amount;
+    s.still = moving ? 0 : (s.still ?? 0) + dt;
+    s.fade = moving || s.fade == null ? raw : ease(s.fade, s.still > 0.25 ? (raw >= 0.5 ? 1 : 0) : raw, dt, 0.1);
+    if (s.fade < 0.002) s.fade = 0;
+    if (s.fade > 0.998) s.fade = 1;
+    const fade = s.fade;
     s.hidden = fade >= 0.999;
     const shown = !!w.validated && !s.hidden;
     group.visible = shown;
