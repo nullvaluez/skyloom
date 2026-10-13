@@ -75,6 +75,7 @@ const path = require('path');
 const { chromium } = require('playwright');
 const { bootFly, unpinPins } = require('./_boot');
 const { enterHangar } = require('./_title');
+const { hasDeparturePicker } = require('./_hangar-pick'); // G2G W0.8: either hangar departure UI
 const { attachPageErrors } = require('./_pageerrors');
 const { loadFlyConstants } = require('./_r25-poses');
 
@@ -255,7 +256,7 @@ const flyEnabled = (page, ms) => waitFor(page, () => { const b = document.queryS
     const mode = await page.getByTestId('hangar-mode').getAttribute('data-mode').catch(() => null);
     const sel0 = await page.getByTestId('hangar-dest-selected').getAttribute('data-dest').catch(() => null);
     const s0 = await state(page);
-    const opsPanel = await page.locator('#departure-airport').count();
+    const opsPanel = (await hasDeparturePicker(page)) ? 1 : 0;
     report.legs.hangar = { mode, featured: featured.length, default: sel0, spawn: [s0.lat, s0.lon] };
     gate('(1) FREE HANGAR: mode chip free, search, 11 featured cards, default = the spot the flight is at, no ops panel',
       mode === 'free' && (await page.locator('#free-flight-search').count()) === 1 && featured.length === 11 && !!sel0 && opsPanel === 0,

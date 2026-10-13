@@ -55,6 +55,7 @@ const path = require('path');
 const { chromium } = require('playwright');
 const { bootFly, unpinPins } = require('./_boot');
 const { enterHangar } = require('./_title');
+const { departureId } = require('./_hangar-pick'); // G2G W0.8: either hangar departure UI
 const { attachPageErrors } = require('./_pageerrors');
 const { loadFlyConstants } = require('./_r25-poses');
 
@@ -206,7 +207,7 @@ const releaseService = (page) =>
     await page.getByTestId('hangar-pick-fighter').waitFor({ state: 'visible', timeout: 60000 * SCALE });
     await press(page.getByTestId('hangar-pick-fighter'));
     await page.waitForTimeout(4000);
-    const airport = await page.locator('#departure-airport').inputValue().catch(() => null);
+    const airport = await departureId(page).catch(() => null);
     await releaseService(page);
     const opsStaged = await waitFor(page, (a) => window.__r25bCalls.includes(a), airport, 30000 * SCALE);
     const calls4 = await page.evaluate(() => [...window.__r25bCalls]);

@@ -1,6 +1,7 @@
 /* Reproduce a wide taxi turn with normal controls. No runtime pose writes. */
 const {chromium}=require('playwright');const fs=require('node:fs');
 const {enterHangar}=require('./_title'); // R25 (E, SANCTIONED): reach the hangar through the title when there is one
+const {pickDeparture}=require('./_hangar-pick'); // G2G W0.8: either hangar departure UI
 (async()=>{
  const out=process.env.FLY_OPERATIONS_OUTPUT||'.graphics-review/operations/taxi-edge';fs.mkdirSync(out,{recursive:true});
  const browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-gpu']});
@@ -11,7 +12,7 @@ const {enterHangar}=require('./_title'); // R25 (E, SANCTIONED): reach the hanga
  try{
   await page.goto(process.env.FLY_URL||'http://localhost:3027');
   await enterHangar(page,'ops');
-  await page.getByTestId('hangar-pick-prop').click({timeout:60000});await page.selectOption('#departure-airport','KOSU');await page.getByTestId('hangar-fly').click({timeout:60000});
+  await page.getByTestId('hangar-pick-prop').click({timeout:60000});await pickDeparture(page,'KOSU');await page.getByTestId('hangar-fly').click({timeout:60000});
   await page.waitForFunction(()=>window.__flyBoot?.pct===100&&!window.__fly.worldLoading&&!window.__fly.worldDegraded&&window.__fly.worldReadiness.ready,undefined,{timeout:90000});
   await page.getByTestId('warp-hold').waitFor({state:'hidden'});await page.waitForTimeout(1600);
   await record('apron');await page.keyboard.press('b');await page.keyboard.press('2');

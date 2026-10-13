@@ -1,6 +1,7 @@
 /* Complete assisted training paths through UI controls. Not an unassisted circuit. */
 const {chromium,devices}=require('playwright');const fs=require('node:fs');
 const {enterHangar}=require('./_title'); // R25 (E, SANCTIONED): reach the hangar through the title when there is one
+const {pickDeparture,pickStart}=require('./_hangar-pick'); // G2G W0.8: either hangar departure UI
 (async()=>{
  const touch=process.env.FLY_TOUCH==='1',out=process.env.FLY_OPERATIONS_OUTPUT||`.graphics-review/operations/experience-${touch?'touch':'desktop'}`;fs.mkdirSync(out,{recursive:true});
  const browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-gpu']});
@@ -36,7 +37,7 @@ const {enterHangar}=require('./_title'); // R25 (E, SANCTIONED): reach the hanga
   report.checks.push('cached aircraft re-selection');
   if(touch){await page.setViewportSize({width:844,height:390});await page.waitForTimeout(400);await page.screenshot({path:out+'/hangar-landscape.png'});await page.setViewportSize({width:390,height:844});}
   if(process.env.FLY_PREVIEW_ONLY==='1'){report.status='PASS';report.limit='Hangar preview and cached selection only; no flight tested in this run.';console.log('VERIFY: PASS — hangar previews and cached aircraft selection.');return;}
-  await page.selectOption('#departure-airport','KOSU');await click(page.locator('input[value="runway"]'));await click(page.getByTestId('hangar-fly'));await ready();
+  await pickDeparture(page,'KOSU');await pickStart(page,'runway',{how:touch?'tap':'click'});await click(page.getByTestId('hangar-fly'));await ready();
   const runway=await record('runway-start');if(runway.phase!=='parked'||runway.speed!==0||!runway.assisted)throw new Error('Runway start was not stationary and assisted');
   await page.screenshot({path:out+'/runway-ready.png'});await click(button('Begin takeoff'));
   await page.waitForFunction(()=>window.__fly.flight.speed>=window.__fly.operations.profile.rotate,undefined,{timeout:45000});

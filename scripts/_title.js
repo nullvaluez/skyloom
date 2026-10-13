@@ -24,7 +24,9 @@
  */
 
 const TITLE = '[data-testid="title-screen"]';
-const CARD = { free: 'title-free-flight', ops: 'title-takeoff-landing' };
+// G2G W0.8: the title's Free Flight entry is `title-explore` ("Where will you
+// fly?", TitleScreen.jsx); the old `title-free-flight` card no longer exists.
+const CARD = { free: 'title-explore', ops: 'title-takeoff-landing' };
 
 /**
  * Wait until the session has decided which screen it opens on, and — when that

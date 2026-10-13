@@ -2,6 +2,7 @@
 const {chromium}=require('playwright');
 const fs=require('node:fs');
 const {enterHangar}=require('./_title'); // R25 (E, SANCTIONED): reach the hangar through the title when there is one
+const {pickDeparture}=require('./_hangar-pick'); // G2G W0.8: either hangar departure UI
 (async()=>{
  const out=process.env.FLY_OPERATIONS_OUTPUT||'.graphics-review/operations/fleet';fs.mkdirSync(out,{recursive:true});
  const browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-gpu']});
@@ -23,7 +24,7 @@ const {enterHangar}=require('./_title'); // R25 (E, SANCTIONED): reach the hanga
     await page.getByRole('button',{name:view,exact:true}).click();await page.waitForTimeout(250);
     await page.screenshot({path:`${out}/${id}-hangar-${view.toLowerCase()}.png`});
    }
-   if(airport)await page.selectOption('#departure-airport',airport);
+   if(airport)await pickDeparture(page,airport);
    await page.getByTestId('hangar-fly').click();const start=Date.now();
    try{await page.waitForFunction(()=>window.__flyBoot?.pct===100&&!window.__fly.worldLoading&&!window.__fly.worldDegraded&&window.__fly.worldReadiness.ready,undefined,{timeout:90000});}
    catch{report.status='BLOCKED';report.cases.push({id,airport,state:await snapshot()});process.exitCode=2;console.log('VERIFY: BLOCKED '+id+' '+airport);return;}
