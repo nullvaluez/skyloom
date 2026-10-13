@@ -9,7 +9,12 @@
  * Run: node scripts/verify-ops-presentation.mjs
  */
 import assert from 'node:assert/strict';
-import { Vector3 } from 'three';
+import { Vector3, Object3D, Matrix4 } from 'three';
+import { projectModelMatrix } from '../lib/fly/render-scale.js';
+import { mercatorScale } from '../lib/fly/coords.js';
+import { poseAircraftRig, composeAircraftMatrix, idleBobAmplitude, groundHullOffset } from '../lib/fly/aircraft-pose.js';
+import { renderView } from '../lib/fly/render-view.js';
+import { createOpsPresentation, PRESENTATION_DEFAULT } from '../lib/fly/ops-presentation.js';
 import { FlightOperations } from '../lib/fly/flight-operations.js';
 import { airportFrame, airportPoint, taxiRoute } from '../lib/fly/operations-airports.js';
 import { createOpsEventCursor } from '../lib/fly/ops-events.js';
@@ -160,6 +165,134 @@ check('data (f) takeoff carries the roll length and speed', () => {
   assert.ok(e && e.rollM > 50 && e.rollM < 1500, `rollM ${e?.rollM}`);
   assert.ok(e.speed >= o.profile.rotate);
   assert.equal(e.runway, o.airport.runway);
+});
+
+// ---- section: pose ---------------------------------------------------------
+// The pre-W0 PlayerPlane.jsx:92-109 math, verbatim, as the reference.
+function oldPlayerMatrix(flight, t, reduced, cinema) {
+  const g = new Object3D();
+  g.matrixAutoUpdate = false;
+  g.position.copy(flight.pos);
+  g.rotation.order = 'YXZ';
+  g.rotation.set(flight.pitch, -flight.heading, -flight.bank);
+  const ops = flight.operations;
+  const clearance = ops?.grounded ? 0 : ops?.profile ? Math.max(0, Math.min(1, (flight.agl - ops.profile.clearance) / 30)) : 1;
+  const bob = reduced ? 0 : clearance * (cinema ? 0.28 : 1);
+  g.position.y += (Math.sin(t * 1.9) * 0.35 + Math.sin(t * 3.1) * 0.12) * bob;
+  g.rotation.z += Math.sin(t * 1.3) * 0.01 * bob;
+  g.updateMatrix();
+  projectModelMatrix(g.matrix, mercatorScale(flight.latDeg));
+  return g.matrix;
+}
+let seed = 7;
+const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+function randomFlight(i) {
+  const ops = [
+    null,
+    { grounded: true, profile: { clearance: 3, modelOffsetY: -1 }, gear: 1 },
+    { grounded: false, profile: { clearance: 7, modelOffsetY: 0 }, gear: rnd() },
+    { grounded: false, profile: null },
+  ][i % 4];
+  return {
+    pos: new Vector3((rnd() - 0.5) * 2e7, rnd() * 12000, (rnd() - 0.5) * 2e7),
+    heading: i % 7 === 0 ? 0 : (rnd() - 0.5) * 2 * Math.PI,
+    pitch: i % 5 === 0 ? 0 : rnd() - 0.5,
+    bank: i % 3 === 0 ? 0 : (rnd() - 0.5) * 1.6,
+    latDeg: (rnd() - 0.5) * 140,
+    agl: rnd() * 80,
+    operations: ops,
+  };
+}
+check('pose (a) poseAircraftRig equals the old PlayerPlane matrix element-for-element (Object.is) over 200 poses', () => {
+  const rig = new Object3D();
+  rig.matrixAutoUpdate = false;
+  for (let i = 0; i < 200; i++) {
+    const f = randomFlight(i);
+    const t = rnd() * 1000;
+    const reduced = i % 11 === 0;
+    const cinema = i % 2 === 0;
+    const want = oldPlayerMatrix(f, t, reduced, cinema).elements;
+    const got = poseAircraftRig(rig, renderView(f), PRESENTATION_DEFAULT, { bob: idleBobAmplitude(f, { reduced, cinema }), t, latDeg: f.latDeg }).elements;
+    for (let j = 0; j < 16; j++) assert.ok(Object.is(want[j], got[j]), `pose ${i} element ${j}: ${want[j]} vs ${got[j]}`);
+  }
+});
+check('pose (b) composeAircraftMatrix: hull = rig x the groundHull child; anchor rebases the translation only', () => {
+  for (let i = 0; i < 50; i++) {
+    const f = randomFlight(i);
+    const hullY = groundHullOffset(f);
+    const rig = new Object3D();
+    rig.matrixAutoUpdate = false;
+    const parent = poseAircraftRig(rig, f, null, { bob: 0, t: 0, latDeg: f.latDeg }).clone();
+    const child = new Object3D();
+    child.position.y = hullY;
+    child.updateMatrix();
+    const want = new Matrix4().multiplyMatrices(parent, child.matrix).elements;
+    const got = composeAircraftMatrix(f, null, { groundHull: true, hullY, latDeg: f.latDeg }).elements;
+    for (let j = 0; j < 16; j++) assert.ok(Math.abs(want[j] - got[j]) <= 1e-9 * Math.max(1, Math.abs(want[j])), `hull ${i}/${j}`);
+    const anchor = { x: 1234.5, z: -987.25 };
+    const rebased = composeAircraftMatrix(f, null, { anchor, latDeg: f.latDeg }).elements;
+    assert.ok(Object.is(rebased[12], parent.elements[12] - anchor.x) && Object.is(rebased[14], parent.elements[14] - anchor.z) && Object.is(rebased[13], parent.elements[13]));
+  }
+});
+check('pose (c) renderView is the flight itself unless the operations core owns rendering', () => {
+  const f = randomFlight(1);
+  assert.equal(renderView(f), f);
+  f.renderOwner = 'ops';
+  f.renderPos = { x: 1, y: 2, z: 3 };
+  f.renderAtt = { heading: 0.1, pitch: 0.2, bank: 0.3 };
+  const v = renderView(f);
+  assert.notEqual(v, f);
+  assert.equal(v.pos, f.renderPos);
+  assert.equal(v.pitch, 0.2);
+  assert.equal(v.operations, f.operations);
+  assert.equal(renderView(f), v);
+});
+
+// ---- section: present -------------------------------------------------------
+check('present (a) with every flag off, every field but lights equals PRESENTATION_DEFAULT', () => {
+  const { f, o } = make();
+  const presentation = createOpsPresentation({ runtime: {}, getOps: () => o });
+  presentation.update(1 / 60, f, o);
+  const p = f.presentation;
+  for (const key of Object.keys(PRESENTATION_DEFAULT)) {
+    if (key === 'lights') continue;
+    assert.deepEqual(p[key], PRESENTATION_DEFAULT[key], key);
+  }
+  assert.deepEqual(Object.keys(p).sort(), Object.keys(PRESENTATION_DEFAULT).sort());
+  presentation.dispose();
+});
+check('present (b) lights follow the phase: parked (nav, beacon), takeoff roll (strobe, landing), taxi-in (taxi, turnoff)', () => {
+  const { f, o } = make();
+  const presentation = createOpsPresentation({ runtime: {}, getOps: () => o });
+  presentation.update(0, f, o);
+  let l = f.presentation.lights;
+  assert.ok(l.nav && l.beacon && !l.strobe && !l.landing && !l.taxi);
+  o.phase = 'takeoffRoll';
+  presentation.update(0, f, o);
+  l = f.presentation.lights;
+  assert.ok(l.strobe && l.landing && !l.taxi);
+  o.phase = 'taxiIn';
+  presentation.update(0, f, o);
+  l = f.presentation.lights;
+  assert.ok(l.taxi && l.turnoff && !l.strobe && !l.landing);
+  presentation.dispose();
+});
+check('present (c) the fan-out hands each event to every subscriber and runtime.playerFx once', () => {
+  const { f, o } = make();
+  const seen = [];
+  const fx = [];
+  const runtime = { playerFx: { event: (e) => fx.push(e.id) } };
+  const presentation = createOpsPresentation({ runtime, getOps: () => o });
+  const off = presentation.subscribe((e) => seen.push(e.id));
+  presentation.update(0, f, o);
+  o.emit('probe');
+  o.emit('probe');
+  presentation.update(0, f, o);
+  presentation.update(0, f, o);
+  assert.deepEqual(seen, fx);
+  assert.equal(seen.length, 2);
+  off();
+  presentation.dispose();
 });
 
 console.log(`\nverify-ops-presentation: ${pass} passed, ${fail} failed`);

@@ -1,8 +1,6 @@
 'use client';
 /* eslint-disable react-hooks/immutability -- Three.js buffers, materials and the shared flight runtime are imperative simulation objects, updated by useFrame without React renders. */
 import { LandingGear } from './LandingGear';
-import { mercatorScale } from '@/lib/fly/coords';
-import { projectModelMatrix } from '@/lib/fly/render-scale';
 import { applyPainterlyAircraft } from '@/lib/fly/painterly-aircraft';
 import { cinematicAircraftParameters } from '@/lib/fly/cinematic-models';
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
@@ -40,6 +38,9 @@ import { createEngineExhaust, measureAircraftAnchors, softenAircraftLights } fro
 import { smoothBand } from '@/lib/fly/aircraft-effects';
 import { readReducedMotion } from '@/lib/fly/immersive';
 import { cinemaOn } from '@/lib/fly/cinema-policy';
+import { groundHullOffset, idleBobAmplitude, poseAircraftRig } from '@/lib/fly/aircraft-pose';
+import { renderView } from '@/lib/fly/render-view';
+import { playerVisible } from '@/lib/fly/player-visibility';
 
 /**
  * The player's aircraft: a CC-BY glTF airframe (poly.pizza, see
@@ -74,6 +75,8 @@ export function PlayerPlane({ flight, aircraft }) {
   // R25 W0: the title flyby hides the (frozen) player aircraft.
   const titleHidden = useTitleHidden();
   const observing = useFlyStore(s=>!!s.airportWatch);
+  // GATE TO GATE: the lounge may show your aircraft parked at its stand (LOUNGE_BRIDGE).
+  const parked = useFlyStore(s=>s.airportWatch?.playerParked ?? null);
 
   // Dev-only rig handle (the __satRoads pattern): verify-sat-night hides the
   // hero during its ground-layer A/B probes — the idle bob straddles the probe
@@ -89,27 +92,28 @@ export function PlayerPlane({ flight, aircraft }) {
     };
   }, []);
 
+  // GATE TO GATE: the visible rig, for consumers that must follow the drawn airframe.
+  useEffect(() => {
+    const rig = group.current;
+    flight.playerRig = rig;
+    return () => {
+      if (flight.playerRig === rig) flight.playerRig = null;
+    };
+  }, [flight]);
+
   useFrame(() => {
     const g = group.current;
     if (!g) return;
-    g.position.copy(flight.pos);
-    g.rotation.order = 'YXZ';
-    g.rotation.set(flight.pitch, -flight.heading, -flight.bank);
-    if(groundHull.current)groundHull.current.position.y=(flight.operations?.profile?.modelOffsetY??0)*(flight.operations?.gear??0);
-    // Idle hover wobble: a two-tone bob + faint roll sway (game feel). The
-    // camera doesn't share it, so the plane reads alive against the world.
+    if(groundHull.current)groundHull.current.position.y=groundHullOffset(flight);
+    // The one pose helper (lib/fly/aircraft-pose.js): the render view, the
+    // presentation offsets, the idle bob and the Mercator projection.
     const t = performance.now() / 1000;
-    const ops=flight.operations;
-    const clearance=ops?.grounded?0:ops?.profile?Math.max(0,Math.min(1,(flight.agl-ops.profile.clearance)/30)):1;
-    const bob=readReducedMotion()?0:clearance*(cinemaOn()?.28:1);
-    g.position.y += (Math.sin(t * 1.9) * 0.35 + Math.sin(t * 3.1) * 0.12)*bob;
-    g.rotation.z += Math.sin(t * 1.3) * 0.01*bob;
-    g.updateMatrix();
-    projectModelMatrix(g.matrix, mercatorScale(flight.latDeg));
+    const bob = idleBobAmplitude(flight, { reduced: readReducedMotion(), cinema: cinemaOn() });
+    poseAircraftRig(g, renderView(flight), flight.presentation, { bob, t, latDeg: flight.latDeg });
   }, -30);
 
   return (
-    <group ref={group} visible={!titleHidden && !observing} matrixAutoUpdate={false}>
+    <group ref={group} visible={playerVisible({ titleHidden, observing, parked })} matrixAutoUpdate={false}>
       <Suspense fallback={<PrimitivePlane />}>
         <group ref={groundHull}><PlayerAssetBoundary key={`${ac.id}:${assetRevision}`}><PlayerModel flight={flight} aircraft={ac} /></PlayerAssetBoundary></group>
         <LandingGear flight={flight} aircraftId={ac.id} />
