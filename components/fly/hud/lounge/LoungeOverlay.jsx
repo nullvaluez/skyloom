@@ -186,6 +186,7 @@ export function LoungeOverlay({ runtime, picker }) {
     if (!mark || !mask) return undefined;
     const ctx = mark.getContext('2d'), mctx = mask.getContext('2d');
     const v = new Vector3(), fwd = new Vector3(), aim = {};
+    const order = [], drawn = []; // idle-bracket declutter scratch (drawn: x, y, r triples)
     const fx = { hex: null, at: 0 }; // selection snap-in
     let maskKey = '', raf = 0, lastCleared = false;
     // Screen rectangles of the lounge's own panels (header, board, card,
@@ -291,8 +292,31 @@ export function LoungeOverlay({ runtime, picker }) {
       const M = VIEW.markers;
       const naked = 1 - smoothstep(0.15, 0.6, amount); // idle brackets fade as the glasses rise
       if (naked > 0.01) {
+        // Declutter: airborne contacts claim their place first (nearest
+        // first), then ground traffic; a bracket that would overlap one
+        // already drawn is skipped, and a parked aircraft past M.groundM draws
+        // none. Skipped contacts stay pickable (hover and click still find them).
+        order.length = 0;
+        drawn.length = 0;
+        if (hover) drawn.push(hover.sx, hover.sy, hover.half + 6);
+        if (selectedHit) drawn.push(selectedHit.sx, selectedHit.sy, selectedHit.half + 8);
         for (const hit of hits) {
           if (hit.hex === w.selected || hit === hover) continue;
+          const grounded = (hit.t.flags & 1) === 1, fix = hit.t.fix1;
+          if (grounded && hit.dist > M.groundM && Math.hypot(fix.vE || 0, fix.vN || 0) < M.parkedMps) continue;
+          hit.rank = (grounded ? 1e7 : 0) + hit.dist;
+          order.push(hit);
+        }
+        order.sort((a, b) => a.rank - b.rank);
+        for (const hit of order) {
+          const r = hit.half + 3;
+          let clash = false;
+          for (let i = 0; i < drawn.length && !clash; i += 3) {
+            const reach = drawn[i + 2] + r + M.gapPx;
+            clash = Math.abs(drawn[i] - hit.sx) < reach && Math.abs(drawn[i + 1] - hit.sy) < reach;
+          }
+          if (clash) continue;
+          drawn.push(hit.sx, hit.sy, r);
           const fade = 1 - smoothstep(M.nearM, M.farM, hit.dist);
           const alpha = (M.minAlpha + (M.maxAlpha - M.minAlpha) * fade) * naked * Math.max(0.3, hit.t.opacity ?? 1);
           const cat = picker.categories.get(hit.hex);

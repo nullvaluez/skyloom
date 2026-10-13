@@ -296,7 +296,9 @@ function SpotTracers({ runtime, flight, origin }) {
     const pinHex = trafficState.inspectHex ?? runtime.targeting?.lockedHex ?? null;
     // Recording continues below so Spotting and selection restore immediately.
     // A wholly transparent navigation mesh does not need a GPU submission.
-    mesh.visible = !quietTraffic || pinHex !== null;
+    // Through the lounge binoculars the eye sees the real aircraft and its
+    // contrail, never the navigation trace.
+    mesh.visible = (!quietTraffic || pinHex !== null) && !runtime.airportWatch?.binocular;
 
     // ---- PASS 1: every eligible item — record + score ----
     let nc = 0;
