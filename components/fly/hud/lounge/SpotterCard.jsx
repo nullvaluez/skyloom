@@ -119,12 +119,15 @@ export function SpotterCard({ runtime, hex, boardRow, fieldElev, airportIdent, o
     return () => clearInterval(id);
   }, [runtime, hex, fieldElev]);
 
+  // A callsign that is just the registration (most private flights) has no
+  // published route: no lookup, so no failed request per selection.
+  const routable = !!meta?.flight?.trim() && meta.flight.trim().replace(/-/g, '') !== String(meta.r || '').replace(/-/g, '');
   const shim = useMemo(
-    () => (meta ? { hex, flight: meta.flight, r: meta.r, t: meta.t, category: meta.category, lat: live?.lat ?? undefined, lon: live?.lon ?? undefined, gs: live?.gsKt, track: live?.trackDeg } : null),
+    () => (meta && routable ? { hex, flight: meta.flight, r: meta.r, t: meta.t, category: meta.category, lat: live?.lat ?? undefined, lon: live?.lon ?? undefined, gs: live?.gsKt, track: live?.trackDeg } : null),
     // The route lookup only needs the identity and a position; re-keying it
     // on every telemetry tick would refetch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [hex, meta, live?.lat == null],
+    [hex, meta, routable, live?.lat == null],
   );
   const { route, isLoading: routeLoading } = useRoute(shim);
   const { data: photo, isPending: photoPending } = useAircraftPhoto(hex);
