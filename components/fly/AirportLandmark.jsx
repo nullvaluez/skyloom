@@ -5,9 +5,23 @@ import { BoxGeometry, BufferGeometry, Float32BufferAttribute, Color, MeshStandar
 import { applyBendFade } from '@/lib/fly/toy-world/world-bend';
 import { airportLandmark } from '@/lib/fly/airport-landmarks';
 import { projectAirportPoint } from '@/lib/fly/operations-airports';
+import { useFlyStore } from '@/stores/fly-store';
 
+const identOf = (a) => a?.ident || String(a?.id ?? a ?? '').split(':')[0];
+
+/**
+ * The simplified flagship exterior seen in flight. While an observation lounge
+ * is open at this airport the full airport set (components/fly/observation/
+ * AirportStructures) replaces it, so the stand-in steps aside.
+ */
 export function AirportLandmark({airport,runtime}) {
-  const nextDetail=useRef(0),near=useRef(true);
+  const observedIdent = useFlyStore((s) => (s.airportWatch?.id ? identOf(s.airportWatch.id) : null));
+  if (observedIdent && observedIdent === identOf(airport)) return null;
+  return <LandmarkExterior airport={airport} runtime={runtime}/>;
+}
+
+function LandmarkExterior({airport,runtime}) {
+  const nextDetail=useRef(0),near=useRef(true),meshRef=useRef(null);
   const resource=useMemo(()=>{
     const spec=airportLandmark(airport);if(!spec)return null;
     const origin=projectAirportPoint(...spec.terminal),k=1/Math.cos(spec.terminal[1]*Math.PI/180),positions=[],normals=[],colors=[],facades=[];
@@ -64,18 +78,22 @@ diffuseColor.rgb*=1.-(1.-terminalWall)*(1.-terminalRoof)*.14;`)
 totalEmissiveRadiance+=vec3(.72,.48,.25)*terminalGlazing*uTerminalNight*.65;`);
     };
     material.customProgramCacheKey=()=>`${key}|airport-terminal-v1`;
-    return {geometry,material,origin,k,coreCount,night};
+    material.userData.terminalNight=night;geometry.userData.coreCount=coreCount;
+    return {geometry,material,origin,k};
   },[airport]);
+  // Per-frame writes go through the mounted mesh (refs are mutable; the memo
+  // value is not, under react-hooks/immutability).
   useFrame(({clock,camera})=>{
-    if(!resource||clock.elapsedTime<nextDetail.current)return;
+    const mesh=meshRef.current;
+    if(!resource||!mesh||clock.elapsedTime<nextDetail.current)return;
     nextDetail.current=clock.elapsedTime+.25;
-    resource.night.value=1-Math.max(0,Math.min(1,((runtime.sun?.sinEl??1)+.08)/.16));
+    mesh.material.userData.terminalNight.value=1-Math.max(0,Math.min(1,((runtime.sun?.sinEl??1)+.08)/.16));
     const anchor=runtime.origin?.anchor;
     const distance=Math.hypot(camera.position.x+(anchor?.x||0)-resource.origin.x,camera.position.z+(anchor?.z||0)-resource.origin.z)/resource.k;
     near.current=distance<(near.current?4000:3500);
-    resource.geometry.setDrawRange(0,near.current?resource.geometry.attributes.position.count:resource.coreCount);
+    mesh.geometry.setDrawRange(0,near.current?mesh.geometry.attributes.position.count:mesh.geometry.userData.coreCount);
   });
   useEffect(()=>()=>{resource?.geometry.dispose();resource?.material.dispose();},[resource]);
   if(!resource)return null;
-  return <mesh name={`airport-landmark:${airport.id}`} position={[resource.origin.x,airport.a.elevation,resource.origin.z]} geometry={resource.geometry} material={resource.material} dispose={null}/>;
+  return <mesh ref={meshRef} name={`airport-landmark:${airport.id}`} position={[resource.origin.x,airport.a.elevation,resource.origin.z]} geometry={resource.geometry} material={resource.material} dispose={null}/>;
 }
