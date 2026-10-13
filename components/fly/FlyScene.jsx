@@ -204,6 +204,7 @@ import { Contrail } from './Contrail';
 import { PlayerGroundShadow } from './PlayerGroundShadow';
 import { TrafficLayer } from './TrafficLayer';
 import { AirportLounge } from './AirportLounge';
+import { ObservationWorld } from './ObservationWorld';
 import { ToyWorldLayer } from './ToyWorldLayer';
 import { SatBuildingLayer } from './SatBuildingLayer';
 import { SatRoadLayer } from './SatRoadLayer';
@@ -3609,6 +3610,9 @@ export function FlyScene({ runtime }) {
       <group ref={worldRoot}>
         <primitive object={engine.object} />
         <AirportOperationsLayer runtime={runtime} />
+        {/* Observation lounge: the observed airport's set piece (absolute
+            scene coordinates; renders only while a lounge is open). */}
+        {mapStyle === 'satellite' && <ObservationWorld runtime={runtime} />}
         {/* Toy World vector chunks drape over the (flat-tan) tile ground */}
         {mapStyle === 'toy' && <ToyWorldLayer key={`ToyWorldLayer:${airportContentEpoch}`} runtime={runtime} flight={flight} />}
         {/* Round 13 Phase 3 CENTERPIECE: 3D extruded buildings in satellite,

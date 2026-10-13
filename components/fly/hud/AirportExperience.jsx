@@ -10,6 +10,7 @@ import { airportEligible } from '@/lib/fly/operations-airports';
 import { getRuntimeAction } from '@/lib/fly/runtime-bus';
 import { exitToTitle } from '@/lib/fly/front-door';
 import { airDrop } from '@/lib/fly/toy-world/world-bend';
+import { loungeAperture } from '@/lib/fly/lounge-site';
 import './airport-watch.css';
 
 export function AirportEntry({className=''}) {
@@ -32,8 +33,8 @@ function AircraftHints({runtime,rows,selected}) {
       for(const el of root.current.children){const t=runtime.traffic?.tracks.get(el.dataset.hex);if(!t){el.hidden=true;continue;}
         point.set(t.rx-origin.anchor.x,(t.ryd??t.ry)-airDrop(Math.hypot(t.rx-flight.pos.x,t.rz-flight.pos.z),t.ryd??t.ry),t.rz-origin.anchor.z);
         const dx=point.x-camera.position.x,dy=point.y-camera.position.y,dz=point.z-camera.position.z;
-        const w=runtime.airportWatch,c=Math.cos(w.roomHeading),s=Math.sin(w.roomHeading);const lx=(dx*c-dz*s)/w.frame.k,lz=(dx*s+dz*c)/w.frame.k;const glassT=-3.2/lz;const glassX=lx*glassT,glassY=1.22+dy*glassT;
-        if(glassT<=0||Math.abs(glassX)>13.7||glassY<.42||glassY>4.02||dx*forward.x+dy*forward.y+dz*forward.z<1||(t.horizonFade??1)<.05){el.hidden=true;continue;}
+        const w=runtime.airportWatch,c=Math.cos(w.roomHeading),s=Math.sin(w.roomHeading);const lx=(dx*c-dz*s)/w.frame.k,lz=(dx*s+dz*c)/w.frame.k,len=Math.hypot(lx,dy,lz)||1;
+        if(!loungeAperture(lx/len,dy/len,lz/len)||dx*forward.x+dy*forward.y+dz*forward.z<1||(t.horizonFade??1)<.05){el.hidden=true;continue;}
         point.project(camera);const inWindow=point.x>-.9&&point.x<.9&&point.y>-.48&&point.y<.78;
         el.hidden=!inWindow;if(inWindow){el.style.left=((point.x+1)*50)+'%';el.style.top=((1-point.y)*50)+'%';}
       }
