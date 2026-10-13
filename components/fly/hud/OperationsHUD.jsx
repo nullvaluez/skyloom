@@ -8,7 +8,7 @@ import { CARD_THEME } from './inspect/inspect-tokens';
 import { operationsContext,advanceOperationsDisclosure } from '@/lib/fly/operations-disclosure';
 import { useFlyStore } from '@/stores/fly-store';
 import { airportChoices } from '@/lib/fly/ops-labels.mjs';
-import { OPERATIONS_AIRPORTS,airportEligible,airportById } from '@/lib/fly/operations-airports';
+import { airportEligible,airportById } from '@/lib/fly/operations-airports';
 const titles={parked:'Ready on the apron',taxiOut:'Taxi to the runway',takeoffRoll:'Takeoff',airborne:'In flight',approach:'Approach',landingRoll:'Touchdown',taxiIn:'Taxi to parking',completed:'Flight complete',crashed:'Try again'};
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 function shieldControlKeys(e){
@@ -47,7 +47,7 @@ export function OperationsHUD({runtime}){
   const expanded=disclosure?.expanded??true;
   useEffect(()=>{if(!expanded){runtime.input?.setBrake(false);if(body.current?.contains(document.activeElement))toggle.current?.focus({preventScroll:true});}},[expanded,runtime]);
   useEffect(()=>{const timer=setInterval(()=>{tick(t=>t+1);const o=runtime.operations;
-    if(o?.profile&&runtime.flight){const context=operationsContext(o,runtime.flight),typing=body.current?.contains(document.activeElement)&&document.activeElement?.matches('input,select,textarea');setDisclosure(s=>advanceOperationsDisclosure(s,context,performance.now(),typing));}if(o?.summary&&!o.saved){o.markSaved();try{let raw;try{raw=JSON.parse(localStorage.getItem('fly-flight-history')||'[]');}catch{raw=[];}const rows=Array.isArray(raw)?raw:[];localStorage.setItem('fly-flight-history',JSON.stringify([...rows,o.summary].slice(-100)));}catch{}}},100);return()=>clearInterval(timer);},[runtime]);
+    if(o?.profile&&runtime.flight){const context=operationsContext(o,runtime.flight),typing=body.current?.contains(document.activeElement)&&document.activeElement?.matches('input,select,textarea');setDisclosure(s=>advanceOperationsDisclosure(s,context,performance.now(),typing));}},100);return()=>clearInterval(timer);},[runtime]);
   const o=runtime.operations,f=runtime.flight;
   if(covered||open||phase==='paused'||photo||!o?.profile||o.phase==='hangar'||!f)return null;
   if(isTouch)return <MobileFlightDeck runtime={runtime} titles={titles} BrakeButton={BrakeButton} ApproachCue={ApproachCue}/>;

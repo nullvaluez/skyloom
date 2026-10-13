@@ -295,5 +295,33 @@ check('present (c) the fan-out hands each event to every subscriber and runtime.
   presentation.dispose();
 });
 
+check('present (d) a completed flight writes one v1 logbook row through the fan-out (the moved HUD writer)', () => {
+  const data = new Map();
+  const before = globalThis.localStorage;
+  globalThis.localStorage = { getItem: (k) => data.get(k) ?? null, setItem: (k, v) => data.set(k, String(v)), removeItem: (k) => data.delete(k) };
+  try {
+    data.set('fly-flight-history', JSON.stringify([{ old: 1 }]));
+    const { f, o } = make();
+    const presentation = createOpsPresentation({ runtime: {}, getOps: () => o });
+    presentation.update(0, f, o);
+    const stand = airportPoint(o.airport, ...taxiRoute(o.airport)[0]);
+    f.pos.set(stand.x, stand.y + o.profile.clearance, stand.z);
+    f.speed = 0;
+    o.phase = 'taxiIn';
+    o.parkingBrake = true;
+    run(o, f, 3, { throttle: 0 });
+    assert.equal(o.phase, 'completed');
+    presentation.update(0, f, o);
+    presentation.update(0, f, o);
+    const rows = JSON.parse(data.get('fly-flight-history'));
+    assert.equal(rows.length, 2);
+    assert.deepEqual(rows[1], JSON.parse(JSON.stringify(o.summary)));
+    assert.equal(o.saved, true);
+    presentation.dispose();
+  } finally {
+    globalThis.localStorage = before;
+  }
+});
+
 console.log(`\nverify-ops-presentation: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
