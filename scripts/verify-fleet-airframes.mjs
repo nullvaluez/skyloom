@@ -28,7 +28,7 @@ const { LIVE_AIRCRAFT, resolveLiveAircraft, resolveLiveType } = await import('..
 const { PHASE, trackPhase, phaseConfig } = await import('../lib/fly/flight-phase.js');
 const { buildPaletteData, PALETTE, paletteRow } = await import('../lib/fly/fleet-material.js');
 const { DetailedTraffic } = await import('../lib/fly/detailed-traffic.js');
-const { trailPersistence } = await import('../lib/fly/fleet-trails.js');
+const { trailPersistence, SkyTrails } = await import('../lib/fly/fleet-trails.js');
 const { SKY_VIEW, FLEET_VIEW } = await import('../lib/fly/observation-config.js');
 const { planParkedFleet, parkedMatrix } = await import('../lib/fly/fleet-parked.js');
 const { boardingDoor } = await import('../lib/fly/fleet-layout.js');
@@ -283,6 +283,43 @@ check('contrail persistence stays within two to five minutes and is stable per f
   }
   assert.ok(seen.size > 5, 'bands differ');
   assert.ok(SKY_VIEW.points * SKY_VIEW.pointSec >= hi, 'the ring holds the longest trail');
+});
+
+// A contrail never takes a step: a source jump of hundreds of metres within a
+// few seconds is the feed's time or position base moving (a re-poll after the
+// seat moves, a stall frame), never the aircraft, so the trail shifts with it.
+// Only a real pause in the feed bridges the gap with a straight run.
+check('a contrail shifts with a feed jump after a stall frame instead of drawing a step; a real pause bridges', () => {
+  const sharpestBend = (trails, hex) => {
+    const s = trails.byHex.get(hex), slot = trails.slots[s], P = trails.P, d = trails.data, pts = [];
+    for (let j = slot.count - 1; j >= 0; j--) {
+      const k = (slot.head - 1 - j + P) % P, o = (s * P + k) * 2 * 14;
+      pts.push([d[o], d[o + 1], d[o + 2]]);
+    }
+    let worst = 0;
+    for (let i = 1; i + 1 < pts.length; i++) {
+      const a = pts[i].map((v, c) => v - pts[i - 1][c]), b = pts[i + 1].map((v, c) => v - pts[i][c]);
+      const la = Math.hypot(...a), lb = Math.hypot(...b);
+      if (la < 1 || lb < 1) continue;
+      worst = Math.max(worst, Math.acos(Math.max(-1, Math.min(1, (a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / (la * lb)))) * 180 / Math.PI);
+    }
+    return worst;
+  };
+  // A jet cruising east at 230 m/s, fed at 60 Hz; after 30 s the feed misses
+  // `gapSec` and comes back 400 m north of where dead reckoning put it.
+  const fly = (gapSec) => {
+    const trails = new SkyTrails({ maxTrails: 4 });
+    const v = { x: 230, y: 0, z: 0 }, wind = { x: 0, z: 0 };
+    let t = 1000, x = 0, north = 0;
+    const step = (dt) => { t += dt; x += 230 * dt; trails.feed('abc123', { x, y: 10500, z: north }, v, 1, t, wind); };
+    for (let i = 0; i < 60 * 30; i++) step(1 / 60);
+    t += gapSec; x += 230 * gapSec; north = -400;
+    for (let i = 0; i < 60 * 20; i++) step(1 / 60);
+    return sharpestBend(trails, 'abc123');
+  };
+  const stall = fly(1.2), pause = fly(8);
+  assert.ok(stall < 3, `a 1.2 s stall frame bends the trail ${stall.toFixed(1)} degrees`);
+  assert.ok(pause > 8, `an 8 s pause should bridge with a visible run (${pause.toFixed(1)} degrees)`);
 });
 
 check('a busy, diverse sky stays inside 30 draws and 900k triangles, binoculars included', () => {
