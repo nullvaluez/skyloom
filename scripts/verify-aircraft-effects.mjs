@@ -139,11 +139,16 @@ check('visual anchors preserve cached geometry and exhaust stays one bounded mes
   assert.ok(e.mesh.geometry.attributes.position.count < 200); e.dispose(); g.dispose(); m.dispose();
 });
 check('live family geometry is finite and detail is bounded', () => {
+  // FLEET & SKY: three levels of detail per family (gear and flaps are parts
+  // of the one geometry); per-LOD budgets, see verify-fleet-airframes.mjs.
+  const budget = { hero: 40000, mid: 9500, far: 1500 };
   for (const f of LIVE_AIRCRAFT) {
-    const { hull, gear } = buildLiveAirframe(f);
-    assert.ok(hull.attributes.position.count / 3 < 15000, f.id);
-    assert.ok(hull.attributes.position.array.every(Number.isFinite), f.id);
-    hull.dispose(); gear.dispose();
+    for (const lod of Object.keys(budget)) {
+      const { hull, triangles } = buildLiveAirframe(f, lod);
+      assert.ok(triangles <= budget[lod], `${f.id} ${lod}`);
+      assert.ok(hull.attributes.position.array.every(Number.isFinite), f.id);
+      hull.dispose();
+    }
   }
 });
 console.log(`VERIFY: PASS (${checks} aircraft-effects checks)`);

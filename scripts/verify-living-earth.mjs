@@ -92,23 +92,27 @@ check('type-code resolver differentiates narrowbody, widebody, regional and prop
   assert.equal(resolveLiveAircraft({t:'ZZZZ'},8),null);assert.equal(resolveLiveAircraft({},3),15);
   assert.equal(liveGearDown({flags:1}),true);assert.equal(liveGearDown({flags:0}),false);
 });
-check('all 19 family models have finite geometry, navigation lights and a cheaper matching distant model',()=>{
-  assert.equal(LIVE_AIRCRAFT.length,19);
+check('all 29 family models have finite geometry at three detail levels, lens zones and a cheaper matching distant model',()=>{
+  // FLEET & SKY (FLY_OBSERVATION_LOUNGE.md): one geometry per family and LOD;
+  // gear, flaps and props are parts of it (aFleetPart), lights are GlowPoints
+  // over the LENS zones (lib/fly/aircraft-lights.js). Budgets per LOD live in
+  // scripts/verify-fleet-airframes.mjs.
+  assert.equal(LIVE_AIRCRAFT.length,29);
   const signatures=new Set();
-  for(const f of LIVE_AIRCRAFT){const m=buildLiveAirframe(f);
-    for(const g of [m.hull,m.gear]){
-      for(const attr of Object.values(g.attributes))for(const n of attr.array)assert.ok(Number.isFinite(n),f.id);
-      assert.equal(g.attributes.uv.count,g.attributes.position.count);assert.equal(g.attributes.aSurfaceRole.count,g.attributes.position.count);
-      assert.ok(g.attributes.position.count/3<12000,f.id);
-    }
-    const far=buildLiveAirframe(f,false);assert.ok(far.hull.attributes.position.count<=m.hull.attributes.position.count);
-    assert.ok(m.hull.attributes.aEmissive.array.some(n=>n>1));
-    assert.ok(Math.abs(m.hull.boundingBox.max.x-m.hull.boundingBox.min.x-f.span)<f.span*.18||f.helicopter,'Span remains type specific');
-    far.hull.dispose();far.gear.dispose();
-    const p=m.hull.attributes.position.array;signatures.add(`${p.length}:${Array.from(p.subarray(0,90)).join(',')}`);
-    assert.ok(m.groundOffset>0);m.hull.dispose();m.gear.dispose();
+  for(const f of LIVE_AIRCRAFT){const m=buildLiveAirframe(f),g=m.hull;
+    for(const attr of Object.values(g.attributes))for(const n of attr.array)assert.ok(Number.isFinite(n),f.id);
+    assert.equal(g.attributes.aFleetUv.count,g.attributes.position.count);assert.equal(g.attributes.aFleetPart.count,g.attributes.position.count);
+    assert.ok(m.triangles<=40000,f.id);
+    const far=buildLiveAirframe(f,'far');assert.ok(far.triangles<=m.triangles);
+    const zones=new Set();const part=g.attributes.aFleetPart.array;for(let i=0;i<part.length;i+=4)zones.add(part[i]);
+    assert.ok(zones.has(10)&&zones.has(11),'Navigation lenses (red/green) are part of the airframe');
+    g.computeBoundingBox();
+    assert.ok(Math.abs(g.boundingBox.max.x-g.boundingBox.min.x-f.span)<f.span*.18||f.helicopter,'Span remains type specific');
+    far.hull.dispose();
+    const p=g.attributes.position.array;signatures.add(`${p.length}:${Array.from(p.subarray(0,90)).join(',')}`);
+    assert.ok(m.groundOffset>0);g.dispose();
   }
-  assert.equal(signatures.size,19);
+  assert.equal(signatures.size,29);
 });
 check('forest occupancy preserves exclusion holes and is deterministic',()=>{
   const mask=()=>({size:128,classes:new Uint8Array(128*128).fill(2),exclusion:new Uint8Array(128*128)});
