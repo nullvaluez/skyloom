@@ -9,6 +9,11 @@ import { cloudCalmOn, hazeGroundY, stepHazeGround } from '@/lib/fly/cloud-calm';
 import { FlightOperations } from '@/lib/fly/flight-operations';
 import { createSimHold } from '@/lib/fly/sim-hold';
 import { installReviewPoses } from '@/lib/fly/airport-service/review-poses';
+import { connectGateToGate } from '@/lib/fly/gate-to-gate-runtime';
+import { cameraOwner, transitionMode } from '@/lib/fly/camera-mode';
+import { cameraDirector, opsFeel } from '@/lib/fly/ops-flags';
+import { renderView } from '@/lib/fly/render-view';
+import { AirportAreas } from './airport/AirportAreas';
 import { AirportOperationsLayer } from './AirportOperationsLayer';
 
 import { GroundImmersionRig } from './GroundImmersionRig';
@@ -1996,6 +2001,11 @@ export function FlyScene({ runtime }) {
   // eslint-disable-next-line react-hooks/immutability
   useEffect(() => connectFlightOperations({runtime,operations,flight,input,autopilot,chase,engine,rebase,crashSys,crashRef}),
     [runtime,operations,flight,input,autopilot,chase,engine,rebase,crashSys]);
+  // GATE TO GATE: the airport service, the camera director and the presentation fan-out.
+  // eslint-disable-next-line react-hooks/immutability
+  useEffect(() => connectGateToGate({ runtime, operations }), [runtime, operations]);
+  // GATE TO GATE: the airport service plans its areas (2 Hz inside; inert while OPS_AIRFIELD is off).
+  useFrame((_, delta) => runtime.airports?.update({ dt: Math.min(delta, 0.1), flight, operations }), -40);
   // GATE TO GATE: the review pose hook (scripts/review-operations-airfield.cjs).
   useEffect(() => {
     if (process.env.NODE_ENV !== 'development') return undefined;
@@ -2092,6 +2102,10 @@ export function FlyScene({ runtime }) {
       input.neutralize();
     const cmd = input.read();
     cmd.toggleParkingBrake = !paused && input.consumePress('b');
+    // GATE TO GATE: gear (G), reverse (R) and the camera cycle (V) exist only behind their flags.
+    cmd.gearToggle = !paused && opsFeel().enabled === true && input.consumePress('g');
+    cmd.reverseToggle = !paused && opsFeel().enabled === true && input.consumePress('r');
+    cmd.cameraCycle = !paused && cameraDirector().enabled === true && input.consumePress('v');
     for (let i=0;i<3;i++) if (!paused && input.consumePress(String(i+1))) cmd.powerPreset=i;
     if (operations.grounded || operations.phase === 'approach' || menuOpen(flyState)) autopilot.disengage();
 
@@ -2354,6 +2368,8 @@ export function FlyScene({ runtime }) {
     } else {
       flight.step(dt, apCmd ?? cmd);
     }
+    // GATE TO GATE: flight.presentation and the one operations event fan-out.
+    runtime.presentation?.update(dt, flight, operations);
 
     if(runtime.adventures?.controller.progress.active)runtime.adventures.tick(dt, engine.worldToGeo(flight.pos), {
       epoch: flyState.warpEpoch, held: paused || photoMode || flyState.screen !== 'flight' || flyState.atlasOpen || flyState.logbookOpen || flyState.adventureOpen || flyState.inspectHex || (typeof document !== 'undefined' && document.hidden),
@@ -2489,21 +2505,26 @@ export function FlyScene({ runtime }) {
       runtime.titleCam.needsSnap = false;
       chase.snap();
     }
-    if (runtime.airportWatch?.active) {
+    // GATE TO GATE: one precedence for who drives the camera (lib/fly/camera-mode.js).
+    const owner = cameraOwner(runtime, flyState, { photoMode, photoExit: () => photo.handoff(), hasTarget: !!targeting.target, ops: operations });
+    if (owner === 'lounge') {
       runtime.airportWatch.updateCamera(dt, camera);
-    } else if (photoMode) {
+    } else if (owner === 'photo') {
       // Round 17: free orbit around the plane, persistent pose, wheel zoom.
       photo.update(dt, flight, camera, input, mercatorScale(flight.latDeg));
-    } else if (photo.handoff()) {
+    } else if (owner === 'photo-exit') {
       // Left photo mode by ANY path (P / Esc / the pill / a warp) — hard-cut
       // the chase rig, whose damped world position is stale by exactly the
       // distance flown while composing.
       chase.snap();
       chase.update(dt, flight, camera, cmd.freeLook, mercatorScale(flight.latDeg), runtime.groundImmersion);
-    } else if (runtime.titleCam?.active) {
+    } else if (owner === 'title') {
       // R25 W0: title orbit, same absolute frame as the cinema rig.
       runtime.titleCam.update(dt, flight, camera, mercatorScale(flight.latDeg), flight.groundElev);
-    } else if (flyState.cameraMode === 'cinema' && targeting.target) {
+    } else if (owner === 'director') {
+      // CAMERA_DIRECTOR (W2 F): shots, beats and cuts.
+      runtime.director.update(dt, renderView(flight), camera, { cmd, k: mercatorScale(flight.latDeg), chase, flyState, ops: operations });
+    } else if (owner === 'cinema') {
       cinema.update(
         dt,
         flight,
@@ -2515,7 +2536,7 @@ export function FlyScene({ runtime }) {
     } else {
       chase.update(dt, flight, camera, cmd.freeLook, mercatorScale(flight.latDeg), runtime.groundImmersion);
     }
-    cameraTransition.update(camera,runtime.titleCam?.active?'title':flyState.cameraMode,flyState.warpEpoch,dt,reduceCameraMotion);
+    cameraTransition.update(camera,transitionMode(runtime, flyState),flyState.warpEpoch,dt,reduceCameraMotion);
     camera.position.x -= origin.anchor.x;
     camera.position.z -= origin.anchor.z;
 
@@ -3622,6 +3643,8 @@ export function FlyScene({ runtime }) {
         {/* Observation lounge: the observed airport's set piece (absolute
             scene coordinates; renders only while a lounge is open). */}
         {mapStyle === 'satellite' && <ObservationWorld runtime={runtime} />}
+        {/* GATE TO GATE: airfield areas in flight (OPS_AIRFIELD; renders nothing while off). */}
+        {mapStyle === 'satellite' && <AirportAreas runtime={runtime} />}
         {/* Toy World vector chunks drape over the (flat-tan) tile ground */}
         {mapStyle === 'toy' && <ToyWorldLayer key={`ToyWorldLayer:${airportContentEpoch}`} runtime={runtime} flight={flight} />}
         {/* Round 13 Phase 3 CENTERPIECE: 3D extruded buildings in satellite,

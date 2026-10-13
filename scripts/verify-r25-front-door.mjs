@@ -786,7 +786,10 @@ try {
   const manifest = rd('public/manifest.json');
   const loading = rd('app/loading.js');
   gate('(8a) FlyScene W0 call sites intact (titleCam needsSnap/active, spotAllowed, menuOpen gates)',
-    /runtime\.titleCam\?\.needsSnap/.test(scene) && /runtime\.titleCam\?\.active/.test(scene) && /spotAllowed\(store\)/.test(scene) && /menuOpen\(/.test(scene));
+    /runtime\.titleCam\?\.needsSnap/.test(scene) &&
+      // GATE TO GATE W0: the camera precedence moved into lib/fly/camera-mode.js; FlyScene calls cameraOwner().
+      (/runtime\.titleCam\?\.active/.test(scene) || (/cameraOwner\(/.test(scene) && /runtime\.titleCam\?\.active/.test(rd('lib/fly/camera-mode.js')))) &&
+      /spotAllowed\(store\)/.test(scene) && /menuOpen\(/.test(scene));
   gate('(8b) FlyMode installs the title camera and mounts the title; FlyCanvas mounts <StagePump> behind the flag',
     /installTitleCamera\(runtime\)/.test(mode) && /<TitleScreen runtime=\{runtime\}/.test(mode) && /FRONT_DOOR\.enabled && <StagePump/.test(canvas));
   gate('(8c) exit goes to the title (pause-exit-title "Exit to title"); the error boundary keeps the reload as "Restart Skyloom"',

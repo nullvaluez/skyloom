@@ -29,6 +29,8 @@ export function WarpFlash({ runtime }) {
   const { isPhone: phone } = useDeviceLayout();
   const [stage, setStage] = useState(null); // 'flash' | 'streak' | 'hold' | 'reveal'
   const [help,setHelp]=useState(null);
+  // GATE TO GATE: the kind of the warp on screen ('airport' draws the calm airport card).
+  const [shownKind,setShownKind]=useState(null);
   const reducedEntry=useRef(false);
   const runtimeRef = useRef(runtime);
   useEffect(()=>{runtimeRef.current=runtime;},[runtime]);
@@ -40,7 +42,7 @@ export function WarpFlash({ runtime }) {
     const timers = [];
     const t0 = performance.now();
     if(useFlyStore.getState().mapStyle==='satellite'){
-      reducedEntry.current=false;setHelp(null);setStage('streak');
+      reducedEntry.current=false;setHelp(null);setShownKind(kind);setStage('streak');
       const rt=runtimeRef.current;rt.worldLoading=true;
       // LOAD_GUARD: a hard limit on the hold; past it the world is revealed
       // and the remaining detail keeps streaming (null = legacy, uncapped).
@@ -239,6 +241,38 @@ export function WarpFlash({ runtime }) {
   }, [warpEpoch]);
 
   if (!stage) return null;
+
+  // GATE TO GATE (CAMERA_DIRECTOR): a same-airport move keeps the readiness
+  // hold above but replaces the streak and 'WARPING' with a calm airport card.
+  // Nothing shows while the world is already ready (the streak stage is
+  // transparent and the card appears only for a real hold).
+  if (shownKind === 'airport' && stage !== 'flash' && stage !== 'localhold') {
+    const airport = runtimeRef.current?.operations?.airport;
+    const code = airport?.ident || String(airport?.id ?? '').split(':')[0];
+    const revealing = stage === 'reveal';
+    return (
+      <div
+        key={warpEpoch}
+        className="pointer-events-auto absolute inset-0 z-30"
+        data-testid="warp-hold"
+        data-stage={stage}
+        data-kind="airport"
+        style={{
+          opacity: stage === 'hold' ? 0.92 : 0,
+          transition: `opacity ${revealing ? WARP.far.revealMs : 220}ms ease-${revealing ? 'in' : 'out'}`,
+          background: '#04060f',
+        }}
+      >
+        <div className="absolute left-1/2 top-1/2 w-[92vw] -translate-x-1/2 -translate-y-1/2 text-center">
+          {code && <div className="mx-auto mb-3 inline-block rounded border border-white/30 px-2 py-0.5 font-mono text-[12px] tracking-[0.2em] text-white/80">{code}</div>}
+          <div className="fly-display-xl max-w-[92vw] break-words text-white" style={{ fontFamily: "'Archivo Black', ui-sans-serif" }}>
+            {airport?.name ?? 'Airport'}
+          </div>
+          <div className="mt-3 font-mono text-[11px] uppercase tracking-[0.4em] text-white/60">Preparing the field</div>
+        </div>
+      </div>
+    );
+  }
 
   if (stage === 'flash') {
     return (

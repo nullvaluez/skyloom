@@ -437,6 +437,9 @@ export function TrafficLayer({ runtime, flight, origin }) {
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
     const exposure = getR25Sky().exposure || 1;
+    // GATE TO GATE: the player's own lights and tyre smoke join the shared
+    // GlowPoints and smoke pools here (PLAYER_GLOW_LIGHTS / OPS_FX, W2 E).
+    runtime.playerFeed?.(lights, smoke, origin, frameNow, mapStyleNow === 'satellite' ? exposure : 0);
     lights.end(camera, _bufferSize.y || 1080, runtime.explorerVisualTime ?? frameNow, mapStyleNow === 'satellite' ? exposure : 0, 0);
     if (mapStyleNow === 'satellite') {
       // Smoke lit like the scene: sunlit tops, sky-lit undersides.

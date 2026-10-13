@@ -103,7 +103,8 @@ export function useFlyAudio(runtime) {
       useFlyStore.subscribe(
         (s) => s.warpEpoch,
         (epoch) => {
-          if (epoch > 0) audio.warpSweep();
+          // GATE TO GATE: a same-airport cut ('airport') is a camera move, not a warp.
+          if (epoch > 0 && useFlyStore.getState().warpKind !== 'airport') audio.warpSweep();
         }
       ),
       useFlyStore.subscribe(
