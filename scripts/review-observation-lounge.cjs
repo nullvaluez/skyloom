@@ -3,12 +3,17 @@
 //   node scripts/review-observation-lounge.cjs [--port 3123] [--airport KCMH]
 //        [--utc 16] [--out .graphics-review/observation-lounge/<name>]
 //        [--views default,up,left,right,down,track,binoculars,click] [--settle 20]
-//        [--site runwayId,along,cross,floorM]
+//        [--site runwayId,along,cross,floorM] [--flags NAME[,NAME]] [--seats all|id,id]
 //
 // --utc pins the sun to that UTC hour today (__flySunOverride), so a review
 // can ask for day, golden hour or night wherever the airport is. Every run
 // writes PNGs plus report.json (traffic, contrails, fleet, frame stats,
 // renderer counts and console errors) into --out.
+//
+// --flags adds ?flags= to the URL for this load. --seats (LOUNGE_WALK) sits in
+// each vantage seat and captures its view and both sides (seat-<id>-*.png),
+// then stands at the window and walks a short loop through the room
+// (walk-*.png, each looking back at the glass).
 const path = require('path');
 const fs = require('fs');
 const { chromium } = require('playwright');
@@ -23,12 +28,14 @@ const utc = arg('utc', '');
 const settle = Number(arg('settle', '20')) * 1000;
 const views = arg('views', 'default,up,left,right,down,track,binoculars,click').split(',');
 const out = path.resolve(arg('out', `.graphics-review/observation-lounge/${airport}-${utc || 'live'}`));
-const url = arg('url', `http://localhost:${port}/?graphicsReview=1&airports=on&airportArt=on&airportScenery=on`);
+const flags = arg('flags', '');
+const seatsArg = arg('seats', '');
+const url = arg('url', `http://localhost:${port}/?graphicsReview=1&airports=on&airportArt=on&airportScenery=on`) + (flags ? `&flags=${flags}` : '');
 // --site "runwayId,along,cross,floorM": seat the lounge there (development builds only).
 const siteArg = arg('site', '');
 const seat = siteArg ? (([runway, along, cross, floorM]) => ({ runway, along: +along, cross: +cross, floorM: +floorM }))(siteArg.split(',')) : null;
 fs.mkdirSync(out, { recursive: true });
-const report = { airport, url, utc, errors: [], shots: [], views: {} };
+const report = { airport, url, utc, flags, errors: [], shots: [], views: {} };
 
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--enable-gpu', '--ignore-gpu-blocklist'] });
@@ -111,6 +118,44 @@ const report = { airport, url, utc, errors: [], shots: [], views: {} };
         if (at) { await page.mouse.click(at.x, at.y); await page.waitForTimeout(900); }
         report.views.click = { at, selected: await page.evaluate(() => window.__fly.airportWatch.selected), inspect: await page.evaluate(() => window.__flyStore.getState().inspectHex) };
         await shot('09-after-click');
+      }
+    }
+    if (seatsArg) {
+      // Each vantage seat: its own view (R faces it), then 1.2 rad to either side.
+      await page.evaluate(() => { const w = window.__fly.airportWatch; w.clearSelection(); if (w.binocular) w.binoculars(false); });
+      const ids = await page.evaluate((want) => {
+        const all = (window.__fly.airportWatch.seats || []).map((x) => x.id);
+        return want === 'all' ? all : want.split(',').filter((id) => all.includes(id));
+      }, seatsArg);
+      report.views.seats = [];
+      if (!ids.length) report.views.seats.push('no vantage seats: is LOUNGE_WALK on (--flags LOUNGE_WALK)?');
+      for (const id of ids) {
+        await page.evaluate((sid) => { const w = window.__fly.airportWatch; w.sit(sid, { instant: true }); w.resetLook(); }, id);
+        await page.waitForTimeout(1500);
+        const lim = await page.evaluate(() => window.__fly.airportWatch.lookLimits());
+        await shot(`seat-${id}-view`);
+        for (const [side, dy] of [['left', 1.2], ['right', -1.2]]) {
+          await look(lim.centre + dy, lim.defaultPitch);
+          await page.waitForTimeout(1200);
+          await shot(`seat-${id}-${side}`);
+        }
+        report.views.seats.push(await page.evaluate(() => { const w = window.__fly.airportWatch; return { id: w.seatId, posture: w.posture, eye: { ...w.eyeLocal }, limits: w.lookLimits() }; }));
+      }
+      if (ids.length) {
+        // A walk: stand at the window, then a loop through the room.
+        await page.evaluate(() => { const w = window.__fly.airportWatch; w.sit('window', { instant: true }); w.setMoveKeys(0, -1, false); w.setMoveKeys(0, 0, false); });
+        await page.waitForFunction(() => window.__fly.airportWatch.posture === 'standing', undefined, { timeout: 5000 });
+        report.views.walk = [];
+        for (const [i, [x, z]] of [[0, 6], [4.2, 9.6], [-6.5, 10.4], [-8, 0.9]].entries()) {
+          await page.evaluate(([tx, tz]) => { const w = window.__fly.airportWatch; w.yaw = Math.atan2(-(tx - w.eyeLocal.x), -(tz - w.eyeLocal.z)); w.setMoveKeys(1, 0, false); }, [x, z]);
+          await page.waitForFunction(([tx, tz]) => { const w = window.__fly.airportWatch; w.yaw = Math.atan2(-(tx - w.eyeLocal.x), -(tz - w.eyeLocal.z)); return Math.hypot(tx - w.eyeLocal.x, tz - w.eyeLocal.z) < 0.5; }, [x, z], { timeout: 30000, polling: 250 }).catch(() => {});
+          await page.evaluate(() => window.__fly.airportWatch.setMoveKeys(0, 0, false));
+          await look(0, -0.05);
+          await page.waitForTimeout(1200);
+          await shot(`walk-${i + 1}`);
+          report.views.walk.push(await page.evaluate(() => { const w = window.__fly.airportWatch; return { eye: { ...w.eyeLocal }, clearance: +w.walk.clearance().toFixed(3) }; }));
+        }
+        await page.evaluate(() => window.__fly.airportWatch.sit('window', { instant: true }));
       }
     }
   } catch (e) {
