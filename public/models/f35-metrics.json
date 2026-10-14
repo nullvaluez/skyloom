@@ -3,9 +3,9 @@
     "id": "f35",
     "lod": "hero",
     "url": "/models/player-f35-hero-v1.glb",
-    "triangles": 15920,
+    "triangles": 15664,
     "draws": 12,
-    "bytes": 414468,
+    "bytes": 411780,
     "bounds": {
       "min": [
         -5.349999904632568,
@@ -23,9 +23,9 @@
     "id": "f35",
     "lod": "mobile",
     "url": "/models/player-f35-mobile-v1.glb",
-    "triangles": 4616,
+    "triangles": 4448,
     "draws": 12,
-    "bytes": 132148,
+    "bytes": 130564,
     "bounds": {
       "min": [
         -5.349999904632568,

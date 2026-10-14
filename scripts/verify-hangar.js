@@ -73,12 +73,11 @@ function seedAircraft(id) {
   // Anchored to the entry indent — the file's own doc block quotes a
   // `{ url: '/models/` literal when it explains why this manifest is separate.
   const urls = [...paSrc.matchAll(/^\s{4}url:\s*'(\/models\/[^']+)'/gm)].map((m) => m[1]);
-  // Sanctioned count move: the fleet grew by one original first-party aircraft
-  // (the Umbra flying wing, credited `file:`-only in FLY_ASSETS) — 9 → 10.
+  // Three original F-35A / C-17 / Concorde models extend the ten-aircraft fleet.
   gate(
-    '1a PLAYER_AIRCRAFT is 10 aircraft, one url each, no helicopter',
-    ids.length === 10 &&
-      urls.length === 10 &&
+    '1a PLAYER_AIRCRAFT is 13 aircraft, one url each, no helicopter',
+    ids.length === 13 &&
+      urls.length === 13 &&
       ids[0] === 'fighter' &&
       !urls.some((u) => u.includes('helicopter')),
     `${ids.length} ids [${ids.join(', ')}]`

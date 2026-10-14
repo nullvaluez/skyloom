@@ -10,6 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { deflateSync } from 'node:zlib';
 import { Box3, BufferGeometry, Color, Float32BufferAttribute, Group, Matrix4, Mesh, MeshStandardMaterial, Vector3 } from 'three';
 import { mergeGeometries, mergeVertices, toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
@@ -73,7 +74,7 @@ function articulated(name,g,a,b,axis,material){
 export function build(low=false){
   const root=new Group();root.name='Skyloom Concorde';root.userData={author:'Skyloom',license:'MIT',revision:1,lod:low?'mobile':'hero',units:'metres',nose:'-Z'};
   const palette={...definition.colors,glass:'#203b48',metal:'#748188',dark:'#101a20',cabin:'#183341'};
-  const mats=Object.fromEntries(Object.entries(palette).map(([name,color])=>[name,new MeshStandardMaterial({name,color,roughness:name==='glass'?.14:name==='metal'?.29:name==='cabin'?.4:.39,metalness:name==='metal'?.68:name==='glass'?.28:.15})]));
+  const mats=Object.fromEntries(Object.entries(palette).map(([name,color])=>[name,new MeshStandardMaterial({name,color,roughness:name==='glass'?.14:name==='metal'?.29:name==='cabin'?.78:.39,metalness:name==='cabin'?0:name==='metal'?.68:name==='glass'?.28:.15})]));
   const buckets=Object.fromEntries(Object.keys(mats).map(k=>[k,[]]));
   const add=(g,role='hull')=>{if(g)buckets[role].push(g);};
   const n=low?14:32,zs=[...new Set([...BODY.map(r=>r[0]),...Array.from({length:low?26:76},(_,i)=>-L/2+L*i/(low?25:75))])].sort((a,b)=>a-b);
@@ -95,8 +96,11 @@ export function build(low=false){
   function bodyPatch(side,theta,z,halfTheta,halfZ,role,lift=.03,rounded=true){
     const o=[],base=side>0?theta:Math.PI-theta,sgn=side>0?1:-1;
     const coords=rounded&&low?[[-.7,-1],[.7,-1],[1,0],[.7,1],[-.7,1],[-1,0]]:rounded?[[0,-1],[.70,-.91],[1,-.60],[1,.60],[.70,.91],[0,1],[-.7,.91],[-1,.6],[-1,-.6],[-.7,-.91]]:[[-1,-1],[1,-1],[1,1],[-1,1]];
-    const c=surface(base,z,lift),rim=coords.map(([a,b])=>surface(base+sgn*a*halfTheta,z+b*halfZ,lift));
-    for(let j=0;j<rim.length;j++)triangle(o,c,rim[j],rim[(j+1)%rim.length],[side,Math.sin(theta),0]);add(soup(o,.9),role);
+    const c=surface(base,z,lift),rings=halfTheta>.4?(low?2:3):1,dir=[side,Math.sin(theta),0];let previous=null;
+    for(let ring=1;ring<=rings;ring++){
+      const rim=coords.map(([a,b])=>surface(base+sgn*a*halfTheta*ring/rings,z+b*halfZ*ring/rings,lift));
+      for(let j=0;j<rim.length;j++){const k=(j+1)%rim.length;if(previous)quad(o,previous[j],rim[j],rim[k],previous[k],dir);else triangle(o,c,rim[j],rim[k],dir);}previous=rim;
+    }add(soup(o,.9),role);
   }
   function bodyRibbon(side,theta0,theta1,z0,z1,role,lift=.025){
     const o=[],steps=low?20:55;for(let i=0;i<steps;i++){const za=lerp(z0,z1,i/steps),zb=lerp(z0,z1,(i+1)/steps),a=side>0?theta0:Math.PI-theta0,b=side>0?theta1:Math.PI-theta1;quad(o,surface(a,za,lift),surface(b,za,lift),surface(b,zb,lift),surface(a,zb,lift),[side,0,0]);}add(soup(o,.7),role);
@@ -141,22 +145,24 @@ export function build(low=false){
     }
     // Fine spanwise panel joints, and two copper tip recognition strokes.
     const o=[],ac=[];
-    for(const x of (low?[7.0]:[3.35,7.0,9.7])){const zz=leading(x)+.8,zt=hinge(x)-.16,steps=low?2:5;
-      for(let i=0;i<steps;i++){const a=lerp(zz,zt,i/steps),b=lerp(zz,zt,(i+1)/steps),P=[wingPoint(side*(x-.012),a),wingPoint(side*(x+.012),a),wingPoint(side*(x+.012),b),wingPoint(side*(x-.012),b)].map(v=>[v[0],v[1]+.012,v[2]]);quad(o,...P,[0,1,0]);}}
+    for(const x of (low?[7.0]:[3.35,7.0,9.7])){const zz=leading(x)+.8,zt=hinge(x)-.16,steps=low?3:12;
+      for(let i=0;i<steps;i++){const a=lerp(zz,zt,i/steps),b=lerp(zz,zt,(i+1)/steps),P=[wingPoint(side*(x-.012),a),wingPoint(side*(x+.012),a),wingPoint(side*(x+.012),b),wingPoint(side*(x-.012),b)].map(v=>[v[0],v[1]+.026,v[2]]);quad(o,...P,[0,1,0]);}}
     for(const x of [11.68,11.86]){const a=leading(x)+.65,b=hinge(x)-.30,P=[wingPoint(side*(x-.045),a),wingPoint(side*(x+.045),a),wingPoint(side*(x+.045),b),wingPoint(side*(x-.045),b)].map(v=>[v[0],v[1]+.017,v[2]]);quad(ac,...P,[0,1,0]);}add(soup(o),'metal');add(soup(ac),'accent');
   }
 
   // Tall swept single fin, an airfoil instead of an extruded flat polygon.
   const FIN=[[.55,12.6,29.6,.46],[2.0,16.0,29.6,.38],[4.5,19.4,29.25,.26],[7.8,24.2,28.9,.11],[8.14,24.78,28.73,.075]];
   const finPoint=(y,u,side)=>{const le=curve(FIN,y,1),te=curve(FIN,y,2),t=curve(FIN,y,3),z=lerp(le,te,u);return [side*t*section(u)*.5,y,z];};
+  const finHinge=y=>lerp(25.79,27.8452,(y-.55)/(8.14-.55));
   function finPanel(moving=false){
     const o=[],ny=low?7:18,nu=low?4:12,start=moving?.78:0,end=moving?1:.772;
-    for(const side of [-1,1])for(let i=0;i<ny;i++)for(let j=0;j<nu;j++){const ya=lerp(.55,8.14,i/ny),yb=lerp(.55,8.14,(i+1)/ny),ua=lerp(start,end,j/nu),ub=lerp(start,end,(j+1)/nu);quad(o,finPoint(ya,ua,side),finPoint(ya,ub,side),finPoint(yb,ub,side),finPoint(yb,ua,side),[side,0,0]);}
-    for(let i=0;i<ny;i++){const ya=lerp(.55,8.14,i/ny),yb=lerp(.55,8.14,(i+1)/ny);for(const [u,dir] of [[start,[0,0,-1]],[end,[0,0,1]]])quad(o,finPoint(ya,u,-1),finPoint(ya,u,1),finPoint(yb,u,1),finPoint(yb,u,-1),dir);}
-    for(const [y,dir] of [[.55,[0,-1,0]],[8.14,[0,1,0]]])for(let j=0;j<nu;j++){const ua=lerp(start,end,j/nu),ub=lerp(start,end,(j+1)/nu);quad(o,finPoint(y,ua,-1),finPoint(y,ub,-1),finPoint(y,ub,1),finPoint(y,ua,1),dir);}return soup(o,.8);
+    const point=(y,u,side)=>{const le=curve(FIN,y,1),te=curve(FIN,y,2),h=(finHinge(y)-le)/(te-le),gap=.035/(te-le),t=(u-start)/(end-start);return finPoint(y,moving?lerp(h+gap,1,t):lerp(0,h-gap,t),side);};
+    for(const side of [-1,1])for(let i=0;i<ny;i++)for(let j=0;j<nu;j++){const ya=lerp(.55,8.14,i/ny),yb=lerp(.55,8.14,(i+1)/ny),ua=lerp(start,end,j/nu),ub=lerp(start,end,(j+1)/nu);quad(o,point(ya,ua,side),point(ya,ub,side),point(yb,ub,side),point(yb,ua,side),[side,0,0]);}
+    for(let i=0;i<ny;i++){const ya=lerp(.55,8.14,i/ny),yb=lerp(.55,8.14,(i+1)/ny);for(const [u,dir] of [[start,[0,0,-1]],[end,[0,0,1]]])quad(o,point(ya,u,-1),point(ya,u,1),point(yb,u,1),point(yb,u,-1),dir);}
+    for(const [y,dir] of [[.55,[0,-1,0]],[8.14,[0,1,0]]])for(let j=0;j<nu;j++){const ua=lerp(start,end,j/nu),ub=lerp(start,end,(j+1)/nu);quad(o,point(y,ua,-1),point(y,ub,-1),point(y,ub,1),point(y,ua,1),dir);}return soup(o,.8);
   }
   add(finPanel(),'trim');
-  root.add(articulated('rudder',finPanel(true),[0,.55,lerp(curve(FIN,.55,1),curve(FIN,.55,2),.776)],[0,8.14,lerp(curve(FIN,8.14,1),curve(FIN,8.14,2),.776)],'y',mats.trim));
+  root.add(articulated('rudder',finPanel(true),[0,.55,finHinge(.55)],[0,8.14,finHinge(8.14)],'y',mats.trim));
   for(const side of [-1,1]){const o=[];
     for(let i=0;i<18;i++){const ya=lerp(1.5,7.8,i/18),yb=lerp(1.5,7.8,(i+1)/18),a=.12,b=.155,pts=[finPoint(ya,a,side),finPoint(ya,b,side),finPoint(yb,b,side),finPoint(yb,a,side)].map(p=>[p[0]+side*.014,p[1],p[2]]);quad(o,...pts,[side,0,0]);}add(soup(o),'accent');
     // Original Skyloom lozenge, no airline branding.
@@ -201,15 +207,31 @@ export function build(low=false){
   return {root,triangles,draws,budget:low?4000:16500};
 }
 
-// The SVG is projected from the delivered mobile geometry: the same oblique
-// camera and understated palette as the existing hangar, with lit faces.
+// A deterministic software depth buffer makes intersecting body/wing facets
+// occlude correctly. Three samples per output pixel give clean small edges;
+// embedding the resulting PNG avoids thousands of SVG paths in the hangar.
+function png(width,height,pixels){
+  const crc=b=>{let c=0xffffffff;for(const v of b){c^=v;for(let i=0;i<8;i++)c=(c>>>1)^((c&1)?0xedb88320:0);}return (c^0xffffffff)>>>0;};
+  const chunk=(name,data)=>{const t=Buffer.from(name),n=Buffer.alloc(4),sum=Buffer.alloc(4);n.writeUInt32BE(data.length);sum.writeUInt32BE(crc(Buffer.concat([t,data])));return Buffer.concat([n,t,data,sum]);};
+  const header=Buffer.alloc(13);header.writeUInt32BE(width);header.writeUInt32BE(height,4);header[8]=8;header[9]=6;
+  const scan=Buffer.alloc(height*(1+width*4));for(let y=0;y<height;y++)pixels.copy(scan,y*(1+width*4)+1,y*width*4,(y+1)*width*4);
+  return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',header),chunk('IDAT',deflateSync(scan)),chunk('IEND',Buffer.alloc(0))]);
+}
+// Same oblique camera and understated palette as the existing hangar.
 export function thumbnail(root){
   const az=Math.PI/6,el=46*Math.PI/180,D=new Vector3(-Math.sin(az)*Math.cos(el),-Math.sin(el),Math.cos(az)*Math.cos(el)),X=new Vector3(Math.cos(az),0,Math.sin(az)),Y=new Vector3().crossVectors(X,D),view=D.clone().negate(),key=new Vector3(.25,1,-.35).normalize(),faces=[];
   root.updateMatrixWorld(true);root.traverse(o=>{if(!o.isMesh)return;const g=o.geometry.index?o.geometry.toNonIndexed():o.geometry,p=g.attributes.position;
     for(let i=0;i<p.count;i+=3){const v=[0,1,2].map(j=>new Vector3().fromBufferAttribute(p,i+j).applyMatrix4(o.matrixWorld)),n=v[1].clone().sub(v[0]).cross(v[2].clone().sub(v[0]));if(n.lengthSq()<1e-12||n.normalize().dot(view)<=0)continue;
-      const color=new Color(o.material.color).multiplyScalar(.55+.64*Math.max(0,n.dot(key)));faces.push({p:v.map(q=>[q.dot(X),q.dot(Y)]),d:v.reduce((s,q)=>s+q.dot(D),0)/3,color:`#${color.getHexString()}`});}});
+      const color=new Color(o.material.color).multiplyScalar(.55+.64*Math.max(0,n.dot(key)));faces.push({p:v.map(q=>[q.dot(X),q.dot(Y),q.dot(D)]),color:color.getHex()});}});
   const pts=faces.flatMap(f=>f.p),xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]),minX=Math.min(...xs),minY=Math.min(...ys),w=Math.max(...xs)-minX,h=Math.max(...ys)-minY,s=Math.min(220/w,98/h),ox=(240-w*s)/2,oy=(120-h*s)/2;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120"><title>Skyloom Concorde</title><g stroke-width=".3" stroke-linejoin="round">${faces.sort((a,b)=>b.d-a.d).map(f=>`<path fill="${f.color}" stroke="${f.color}" d="M${f.p.map(p=>`${((p[0]-minX)*s+ox).toFixed(2)},${((p[1]-minY)*s+oy).toFixed(2)}`).join('L')}Z"/>`).join('')}</g></svg>`;
+  const W=1440,H=720,AA=3,S=6,depth=new Float32Array(W*H).fill(Infinity),rgba=new Uint8Array(W*H*4);
+  for(const f of faces){const v=f.p.map(p=>[((p[0]-minX)*s+ox)*S,((p[1]-minY)*s+oy)*S,p[2]]),[a,b,c]=v,den=(b[1]-c[1])*(a[0]-c[0])+(c[0]-b[0])*(a[1]-c[1]);if(Math.abs(den)<1e-8)continue;
+    const x0=clamp(Math.floor(Math.min(...v.map(p=>p[0]))),0,W-1),x1=clamp(Math.ceil(Math.max(...v.map(p=>p[0]))),0,W-1),y0=clamp(Math.floor(Math.min(...v.map(p=>p[1]))),0,H-1),y1=clamp(Math.ceil(Math.max(...v.map(p=>p[1]))),0,H-1);
+    for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const u=((b[1]-c[1])*(x+.5-c[0])+(c[0]-b[0])*(y+.5-c[1]))/den,vv=((c[1]-a[1])*(x+.5-c[0])+(a[0]-c[0])*(y+.5-c[1]))/den,t=1-u-vv;if(u<0||vv<0||t<0)continue;const z=u*a[2]+vv*b[2]+t*c[2],k=y*W+x;if(z>=depth[k])continue;depth[k]=z;rgba[k*4]=f.color>>>16;rgba[k*4+1]=(f.color>>>8)&255;rgba[k*4+2]=f.color&255;rgba[k*4+3]=255;}
+  }
+  const width=W/AA,height=H/AA,pixels=Buffer.alloc(width*height*4);
+  for(let y=0;y<height;y++)for(let x=0;x<width;x++){const sum=[0,0,0,0];let covered=0;for(let dy=0;dy<AA;dy++)for(let dx=0;dx<AA;dx++){const k=((y*AA+dy)*W+x*AA+dx)*4;if(!rgba[k+3])continue;covered++;for(let j=0;j<3;j++)sum[j]+=rgba[k+j];}const k=(y*width+x)*4;if(covered){for(let j=0;j<3;j++)pixels[k+j]=Math.round(sum[j]/covered);pixels[k+3]=Math.round(covered/(AA*AA)*255);}}
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120"><title>Skyloom Concorde</title><image width="240" height="120" href="data:image/png;base64,${png(width,height,pixels).toString('base64')}"/></svg>`;
 }
 
 async function main(){

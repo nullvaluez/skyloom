@@ -1,0 +1,157 @@
+{
+  "definition": {
+    "id": "c17",
+    "slug": "c17",
+    "length": 53,
+    "span": 51.75,
+    "type": "strategic-airlift",
+    "colors": {
+      "hull": "#9ba7aa",
+      "trim": "#4e626b",
+      "accent": "#bb975d"
+    },
+    "url": "/models/player-c17-hero-v1.glb",
+    "mobileUrl": "/models/player-c17-mobile-v1.glb",
+    "thumbnail": "/models/player-c17-v1.svg",
+    "yawFixRad": 0,
+    "forceVertexColors": false,
+    "canopyMaterial": "glass",
+    "custom": true,
+    "parts": {
+      "ailerons": [
+        "aileron-left",
+        "aileron-right"
+      ],
+      "elevators": [
+        "elevator-left",
+        "elevator-right"
+      ],
+      "rudder": "rudder",
+      "propeller": null
+    },
+    "liverySlots": [
+      "hull",
+      "trim",
+      "accent"
+    ],
+    "engines": [
+      [
+        -8.3,
+        -0.43,
+        -3.25
+      ],
+      [
+        -17.1,
+        -0.72,
+        1.65
+      ],
+      [
+        8.3,
+        -0.43,
+        -3.25
+      ],
+      [
+        17.1,
+        -0.72,
+        1.65
+      ]
+    ],
+    "lights": {
+      "tail": [
+        0,
+        11.08,
+        24.62
+      ],
+      "landing": [
+        [
+          -3.65,
+          -1.94,
+          -6.7
+        ],
+        [
+          3.65,
+          -1.94,
+          -6.7
+        ]
+      ]
+    },
+    "author": "Skyloom",
+    "license": "MIT",
+    "revision": 1
+  },
+  "gear": {
+    "nose": [
+      0,
+      -3.15,
+      -18.6
+    ],
+    "main": [
+      [
+        -3.17,
+        -3.06,
+        3.1
+      ],
+      [
+        3.17,
+        -3.06,
+        3.1
+      ]
+    ],
+    "wheelRadius": 0.68,
+    "wheelY": -4.95
+  },
+  "rows": [
+    {
+      "id": "c17",
+      "lod": "hero",
+      "url": "/models/player-c17-hero-v1.glb",
+      "triangles": 16844,
+      "draws": 11,
+      "bytes": 418600,
+      "degenerate": 0,
+      "bounds": {
+        "min": [
+          -25.875,
+          -3.4600000381469727,
+          -26.5
+        ],
+        "max": [
+          25.875,
+          11.326266288757324,
+          26.5
+        ],
+        "size": [
+          51.75,
+          14.786266326904297,
+          53
+        ]
+      }
+    },
+    {
+      "id": "c17",
+      "lod": "mobile",
+      "url": "/models/player-c17-mobile-v1.glb",
+      "triangles": 4382,
+      "draws": 11,
+      "bytes": 126856,
+      "degenerate": 0,
+      "bounds": {
+        "min": [
+          -25.875,
+          -3.4600000381469727,
+          -26.5
+        ],
+        "max": [
+          25.875,
+          11.326266288757324,
+          26.5
+        ],
+        "size": [
+          51.75,
+          14.786266326904297,
+          53
+        ]
+      }
+    }
+  ]
+}

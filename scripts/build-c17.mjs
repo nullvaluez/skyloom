@@ -8,6 +8,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import {deflateSync} from 'node:zlib';
 import {fileURLToPath} from 'node:url';
 import {Box3,BufferGeometry,Color,CylinderGeometry,Float32BufferAttribute,Group,Matrix4,Mesh,MeshStandardMaterial,Quaternion,SphereGeometry,Vector3} from 'three';
 import {mergeGeometries,mergeVertices,toCreasedNormals} from 'three/addons/utils/BufferGeometryUtils.js';
@@ -93,7 +94,7 @@ export function build(low=false){
   // the moving geometry never overlays a complete fixed trailing edge.
   function foilPoint(row,u,upper=true,vertical=false,side=1){const [span,lead,chord,y,thick]=row;
     const h=5*thick*(.2969*Math.sqrt(u)-.126*u-.3516*u*u+.2843*u*u*u-.1036*u*u*u*u);
-    const t=(upper?1:-1)*h+thick*.075*Math.sin(Math.PI*u);
+    const t=(upper?1:-1)*h+(vertical?0:thick*.075*Math.sin(Math.PI*u));
     return vertical?[t,span,lead+u*chord]:[side*span,y+t,lead+u*chord];
   }
   function hingePoint(row,u,vertical=false,side=1){const a=foilPoint(row,u,true,vertical,side),b=foilPoint(row,u,false,vertical,side);return a.map((x,k)=>(x+b[k])/2);}
@@ -144,8 +145,8 @@ export function build(low=false){
   // blades with real depth, spinner, core cone and separate exhaust annulus.
   for(const side of [-1,1])for(const E of ENGINE){const x=E.x*side,y=E.y,z=E.z;
     revolution([[z,1.52],[z+.23,1.68],[z+.78,1.79],[z+2.2,1.81],[z+4.8,1.62],[z+5.7,1.32]],x,y);
-    revolution([[z-.025,1.51],[z+.035,1.56],[z+.14,1.57],[z+.20,1.47],[z+.13,1.41],[z+.025,1.41],[z-.025,1.51]],x,y,'metal');
-    revolution([[z+.14,1.41],[z+.75,1.35],[z+1.13,1.27]],x,y,'dark');
+    revolution(low?[[z-.025,1.51],[z+.14,1.57],[z+.14,1.41],[z-.025,1.51]]:[[z-.025,1.51],[z+.035,1.56],[z+.14,1.57],[z+.20,1.47],[z+.13,1.41],[z+.025,1.41],[z-.025,1.51]],x,y,'metal');
+    revolution([[z+1.13,1.27],[z+.75,1.35],[z+.14,1.41]],x,y,'dark');
     const fanZ=z+1.12,fan=[],blades=low?10:30;
     for(let j=0;j<blades;j++){const a=j/blades*Math.PI*2,ang=[a,a+.045,a+.24,a+.32],radius=[.27,.27,1.27,1.27];const pts=ang.map((aa,k)=>[x+Math.cos(aa)*radius[k],y+Math.sin(aa)*radius[k],fanZ+(k<2?-.02:.13)]);
       quad(fan,...pts,[0,0,-1]);if(!low)quad(fan,...pts.map(p=>[p[0],p[1],p[2]+.036]).reverse(),[0,0,1]);
@@ -172,9 +173,30 @@ export function build(low=false){
 
   // Surface-conforming cockpit glazing and service details. Every patch is
   // sampled at the fuselage ring/station boundaries to follow its real facets.
-  function surfacePoint(theta,z,lift=.02){const step=Math.PI*2/n,t=(theta%(2*Math.PI)+2*Math.PI)%(2*Math.PI),a=Math.floor(t/step)*step,b=a+step,w=(t-a)/step;const p=bodyPoint(a,z),q=bodyPoint(b,z);return p.map((x,k)=>mix(x,q[k],w)+(k===0?Math.cos(theta)*lift:k===1?Math.sin(theta)*lift:0));}
-  function patch(theta0,theta1,z0,z1,role='glass',lift=.033){const angles=[theta0,...Array.from({length:n+1},(_,i)=>i*2*Math.PI/n).filter(t=>t>theta0&&t<theta1),theta1],zs=[z0,...BODY.map(r=>r[0]).filter(z=>z>z0&&z<z1),z1],soup=[];
-    for(let i=0;i<angles.length-1;i++)for(let j=0;j<zs.length-1;j++){const a=angles[i],b=angles[i+1],c=zs[j],d=zs[j+1];quad(soup,surfacePoint(a,c,lift),surfacePoint(b,c,lift),surfacePoint(b,d,lift),surfacePoint(a,d,lift),[Math.cos((a+b)/2),Math.sin((a+b)/2),0]);}add(soupGeometry(soup),role);
+  function surfacePoint(theta,z,lift=.02){
+    const step=Math.PI*2/n,t=(theta%(2*Math.PI)+2*Math.PI)%(2*Math.PI),a=Math.floor(t/step)*step,b=a+step,u=(t-a)/step;
+    let j=BODY.findIndex((r,i)=>i<BODY.length-1&&z>=r[0]&&z<=BODY[i+1][0]);j=Math.max(0,j);const z0=BODY[j][0],z1=BODY[j+1][0],w=(z-z0)/(z1-z0);
+    const A=bodyPoint(a,z0),B=bodyPoint(b,z0),C=bodyPoint(a,z1),D=bodyPoint(b,z1);
+    return A.map((_,k)=>(u+w<=1?A[k]+u*(B[k]-A[k])+w*(C[k]-A[k]):D[k]+(1-u)*(C[k]-D[k])+(1-w)*(B[k]-D[k]))+(k===0?Math.cos(theta)*lift:k===1?Math.sin(theta)*lift:0));
+  }
+  function patch(theta0,theta1,z0,z1,role='glass',lift=.033){
+    const soup=[],cross=(a,b,p)=>(b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0]);
+    // Clip to each actual hull triangle, then project through that triangle's
+    // plane. Bilinear loft interpolation cuts through a coarse LOD's nose.
+    for(let j=0;j<BODY.length-1;j++){
+      const c=BODY[j][0],d=BODY[j+1][0];if(d<z0||c>z1)continue;
+      for(let i=0;i<n;i++){
+        const a=i/n*Math.PI*2,b=(i+1)/n*Math.PI*2;if(b<theta0||a>theta1)continue;
+        for(const T of [[[a,c],[b,c],[a,d]],[[a,d],[b,c],[b,d]]]){
+          let poly=[[theta0,z0],[theta1,z0],[theta1,z1],[theta0,z1]];
+          for(let e=0;e<3&&poly.length;e++){const P=T[e],Q=T[(e+1)%3],R=T[(e+2)%3],sign=Math.sign(cross(P,Q,R)),out=[];
+            for(let k=0;k<poly.length;k++){const p=poly[k],q=poly[(k+1)%poly.length],u=cross(P,Q,p)*sign,vv=cross(P,Q,q)*sign;if(u>=-1e-10)out.push(p);if((u>=0)!==(vv>=0)){const t=u/(u-vv);out.push(p.map((x,k)=>mix(x,q[k],t)));}}poly=out;
+          }
+          if(poly.length<3)continue;const pts=poly.map(([t,z])=>surfacePoint(t,z,lift));for(let k=1;k<pts.length-1;k++)tri(soup,pts[0],pts[k],pts[k+1],[Math.cos((a+b)/2),Math.sin((a+b)/2),0]);
+        }
+      }
+    }
+    add(soupGeometry(soup),role);
   }
   for(const side of [-1,1]){
     const angles=side>0?[[.56,.83],[.875,1.14],[1.19,1.49]]:[[Math.PI-1.49,Math.PI-1.19],[Math.PI-1.14,Math.PI-.875],[Math.PI-.83,Math.PI-.56]];
@@ -209,28 +231,50 @@ export function build(low=false){
   ball([0,3.58,-5.5],[.23,.14,.33],'trim',true);
   ball(definition.lights.tail,[.09,.09,.13],'glass',true);
 
-  for(const [role,geometries] of Object.entries(buckets))if(geometries.length){const mesh=new Mesh(mergeGeometries(geometries),mats[role]);mesh.name=role;root.add(mesh);}
+  for(const [role,geometries] of Object.entries(buckets))if(geometries.length){
+    // Weld complete position+normal tuples only: shared smooth skin is compact,
+    // but crease normals and material boundaries remain exactly as authored.
+    const mesh=new Mesh(mergeVertices(mergeGeometries(geometries),1e-6),mats[role]);mesh.name=role;root.add(mesh);
+  }
   root.updateMatrixWorld(true);let triangles=0,draws=0,degenerate=0;
   root.traverse(o=>{if(!o.isMesh)return;const g=o.geometry,p=g.attributes.position,ix=g.index;triangles+=(ix?ix.count:p.count)/3;draws++;
     for(let j=0;j<(ix?ix.count:p.count);j+=3){const pts=[0,1,2].map(k=>new Vector3().fromBufferAttribute(p,ix?ix.getX(j+k):j+k));if(pts[1].clone().sub(pts[0]).cross(pts[2].clone().sub(pts[0])).lengthSq()<1e-13)degenerate++;}
   });
   const box=new Box3().setFromObject(root,true),size=box.getSize(new Vector3());
-  return {root,triangles,draws,degenerate,budget:low?3800:16000,bounds:{min:box.min.toArray(),max:box.max.toArray(),size:size.toArray()}};
+  return {root,triangles,draws,degenerate,budget:low?4400:18000,bounds:{min:box.min.toArray(),max:box.max.toArray(),size:size.toArray()}};
 }
 
-// The same oblique, shaded geometry projection as the Umbra hangar glyph.
+// A depth-tested oblique geometry projection. The PNG is generated entirely
+// from the model and embedded in the SVG. A depth buffer is necessary for a
+// high wing, pylons and fuselage: mean-depth SVG face sorting creates spurious
+// sawtooth edges where those surfaces intersect. Supersampling also keeps the
+// smooth fuselage/cowling normals intact at the fleet rail's tiny dimensions.
 export function thumbnail(root){
-  const az=Math.PI/6,el=39*Math.PI/180,D=new Vector3(-Math.sin(az)*Math.cos(el),-Math.sin(el),Math.cos(az)*Math.cos(el)),X=new Vector3(Math.cos(az),0,Math.sin(az)),Y=new Vector3().crossVectors(X,D),faces=[];
-  const view=D.clone().negate(),key=new Vector3(-.25,1,-.65).normalize(),fill=new Vector3(.8,.35,.1).normalize();
-  root.updateMatrixWorld(true);root.traverse(o=>{if(!o.isMesh)return;const g=o.geometry.index?o.geometry.toNonIndexed():o.geometry,p=g.attributes.position;
-    for(let i=0;i<p.count;i+=3){const pts=[0,1,2].map(j=>new Vector3().fromBufferAttribute(p,i+j).applyMatrix4(o.matrixWorld)),normal=pts[1].clone().sub(pts[0]).cross(pts[2].clone().sub(pts[0]));
-      if(normal.lengthSq()<1e-12||normal.normalize().dot(view)<=0)continue;
-      const shade=new Color(o.material.color).multiplyScalar(.51+.61*Math.max(0,normal.dot(key))+.16*Math.max(0,normal.dot(fill)));
-      faces.push({p:pts.map(v=>[v.dot(X),v.dot(Y)]),depth:pts.reduce((s,v)=>s+v.dot(D),0)/3,color:`#${shade.getHexString()}`});
+  const width=960,height=480,az=Math.PI/6,el=34*Math.PI/180,D=new Vector3(-Math.sin(az)*Math.cos(el),-Math.sin(el),Math.cos(az)*Math.cos(el)),X=new Vector3(Math.cos(az),0,Math.sin(az)),Y=new Vector3().crossVectors(X,D),faces=[];
+  const view=D.clone().negate(),key=new Vector3(-.45,1,-.7).normalize(),fill=new Vector3(.8,.25,.2).normalize();
+  root.updateMatrixWorld(true);root.traverse(o=>{if(!o.isMesh)return;const g=o.geometry.index?o.geometry.toNonIndexed():o.geometry,p=g.attributes.position,n=g.attributes.normal;
+    for(let i=0;i<p.count;i+=3){const pts=[0,1,2].map(j=>new Vector3().fromBufferAttribute(p,i+j).applyMatrix4(o.matrixWorld)),face=pts[1].clone().sub(pts[0]).cross(pts[2].clone().sub(pts[0]));
+      if(face.lengthSq()<1e-12||face.normalize().dot(view)<=0)continue;
+      const cols=[0,1,2].map(j=>{const normal=new Vector3().fromBufferAttribute(n,i+j).transformDirection(o.matrixWorld),shade=new Color(o.material.color).multiplyScalar(.46+.75*Math.max(0,normal.dot(key))+.17*Math.max(0,normal.dot(fill)));shade.convertLinearToSRGB();return [shade.r*255,shade.g*255,shade.b*255];});
+      faces.push({p:pts.map(v=>[v.dot(X),v.dot(Y),v.dot(D)]),cols});
     }
   });
-  const pts=faces.flatMap(f=>f.p),xx=pts.map(v=>v[0]),yy=pts.map(v=>v[1]),minX=Math.min(...xx),minY=Math.min(...yy),w=Math.max(...xx)-minX,h=Math.max(...yy)-minY,s=Math.min(222/w,102/h),x=(240-w*s)/2,y=(120-h*s)/2;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120"><title>C-17 Globemaster III</title><g stroke-width=".24" stroke-linejoin="round">${faces.sort((a,b)=>b.depth-a.depth).map(f=>`<path fill="${f.color}" stroke="${f.color}" d="M${f.p.map(p=>`${((p[0]-minX)*s+x).toFixed(2)},${((p[1]-minY)*s+y).toFixed(2)}`).join('L')}Z"/>`).join('')}</g></svg>`;
+  const pts=faces.flatMap(f=>f.p),xx=pts.map(v=>v[0]),yy=pts.map(v=>v[1]),minX=Math.min(...xx),minY=Math.min(...yy),w=Math.max(...xx)-minX,h=Math.max(...yy)-minY,s=Math.min(width*.925/w,height*.85/h),x=(width-w*s)/2,y=(height-h*s)/2;
+  const pixels=Buffer.alloc(width*height*4),depth=new Float64Array(width*height).fill(Infinity);
+  for(const {p,cols} of faces){const P=p.map(([a,b,c])=>[(a-minX)*s+x,(b-minY)*s+y,c]),[A,B,C]=P,den=(B[1]-C[1])*(A[0]-C[0])+(C[0]-B[0])*(A[1]-C[1]);if(Math.abs(den)<1e-12)continue;
+    const x0=Math.max(0,Math.floor(Math.min(...P.map(p=>p[0])))),x1=Math.min(width-1,Math.ceil(Math.max(...P.map(p=>p[0])))),y0=Math.max(0,Math.floor(Math.min(...P.map(p=>p[1])))),y1=Math.min(height-1,Math.ceil(Math.max(...P.map(p=>p[1]))));
+    for(let py=y0;py<=y1;py++)for(let px=x0;px<=x1;px++){
+      const u=((B[1]-C[1])*(px+.5-C[0])+(C[0]-B[0])*(py+.5-C[1]))/den,vv=((C[1]-A[1])*(px+.5-C[0])+(A[0]-C[0])*(py+.5-C[1]))/den,t=1-u-vv;
+      if(Math.min(u,vv,t)<-1e-8)continue;const z=u*A[2]+vv*B[2]+t*C[2],index=py*width+px;if(z>=depth[index])continue;depth[index]=z;
+      for(let k=0;k<3;k++)pixels[index*4+k]=Math.max(0,Math.min(255,Math.round(u*cols[0][k]+vv*cols[1][k]+t*cols[2][k])));pixels[index*4+3]=255;
+    }
+  }
+  const scan=Buffer.alloc((width*4+1)*height);for(let y=0;y<height;y++)pixels.copy(scan,y*(width*4+1)+1,y*width*4,(y+1)*width*4);
+  const crc=data=>{let c=0xffffffff;for(const byte of data){c^=byte;for(let k=0;k<8;k++)c=(c>>>1)^((c&1)?0xedb88320:0);}return (c^0xffffffff)>>>0;};
+  const chunk=(type,data)=>{const header=Buffer.alloc(8),tail=Buffer.alloc(4);header.writeUInt32BE(data.length);header.write(type,4);tail.writeUInt32BE(crc(Buffer.concat([Buffer.from(type),data])));return Buffer.concat([header,data,tail]);};
+  const ihdr=Buffer.alloc(13);ihdr.writeUInt32BE(width);ihdr.writeUInt32BE(height,4);ihdr[8]=8;ihdr[9]=6;
+  const png=Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',ihdr),chunk('IDAT',deflateSync(scan,{level:9})),chunk('IEND',Buffer.alloc(0))]);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 120"><title>C-17 Globemaster III</title><image width="240" height="120" href="data:image/png;base64,${png.toString('base64')}"/></svg>`;
 }
 
 async function main(){

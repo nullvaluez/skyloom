@@ -384,7 +384,7 @@ function setPointColor(arr, i, c, k) {
 
 // Corrected-frame bbox of the raw model (raw bbox pushed through rotY+scale).
 function correctedBox(model, correction) {
-  const box = new Box3().setFromObject(model);
+  const box = new Box3().setFromObject(model, true);
   const m = new Matrix4()
     .makeRotationY(correction.rotY)
     .multiply(

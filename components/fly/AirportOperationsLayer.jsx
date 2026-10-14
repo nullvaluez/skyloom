@@ -11,6 +11,7 @@ import { OperationsGuidance } from './OperationsGuidance';
 import { BufferGeometry, Float32BufferAttribute, MeshStandardMaterial, MeshBasicMaterial, DoubleSide } from 'three';
 import { OPERATIONS_AIRPORTS, airportFrame, airportPoint, airportTaxiExits, airportPavements, nearbyOperationsAirports, subscribeAirports } from '@/lib/fly/operations-airports';
 import { loadNearbyRunways } from '@/lib/fly/runway-catalog';
+import { OPERATIONS_HANGAR, airportHangarOrigin } from '@/lib/fly/operations-hangar';
 
 const RUNWAY_GLYPHS={
   '0':['01110','11011','11011','11011','11011','11011','01110'],
@@ -92,13 +93,13 @@ function Airport({ airport, enhanced, scenery, runtime, observed = false }) {
   },[airport,enhanced]);
   useFrame(()=>{if(enhanced){const night=1-Math.max(0,Math.min(1,((runtime.sun?.sinEl??1)+.08)/.16));resource.material[1].color.setScalar(.35+night*1.6);}});
   useEffect(()=>()=>{resource.geometry.dispose();resource.material.forEach(m=>m.dispose());},[resource]);
-  const h=airportPoint(airport,airport.standAlong,airport.taxiSide*(airport.taxiOffset+180)),frame=airportFrame(airport);
+  const h=airportHangarOrigin(airport),frame=airportFrame(airport),hangar=OPERATIONS_HANGAR;
   return <group>
     {!observed&&<mesh name="operations-pavement" position={[resource.origin.x,resource.origin.y,resource.origin.z]} geometry={resource.geometry} material={resource.material} dispose={null}/>}
     {!observed&&airport.authored!==false&&<group name="operations-hangar" position={[h.x,h.y,h.z]} rotation-y={-frame.heading} scale={[frame.k,1,frame.k]}>
-      <mesh position={[0,24,0]}><boxGeometry args={[80,1,125]}/><meshStandardMaterial color="#8a9398"/></mesh>
-      <mesh position={[airport.taxiSide*39,12,0]}><boxGeometry args={[1,24,125]}/><meshStandardMaterial color="#777d80"/></mesh>
-      {[-1,1].map(side=><mesh key={side} position={[0,12,side*62]}><boxGeometry args={[80,24,1]}/><meshStandardMaterial color="#777d80"/></mesh>)}
+      <mesh position={[0,hangar.wallHeight,0]}><boxGeometry args={[hangar.width,hangar.roofThickness,hangar.depth]}/><meshStandardMaterial color="#8a9398"/></mesh>
+      <mesh position={[airport.taxiSide*(hangar.width/2-1),hangar.wallHeight/2,0]}><boxGeometry args={[1,hangar.wallHeight,hangar.depth]}/><meshStandardMaterial color="#777d80"/></mesh>
+      {[-1,1].map(side=><mesh key={side} position={[0,hangar.wallHeight/2,side*(hangar.depth/2-.5)]}><boxGeometry args={[hangar.width,hangar.wallHeight,1]}/><meshStandardMaterial color="#777d80"/></mesh>)}
     </group>}
     {scenery&&<AirportLandmark airport={airport} runtime={runtime}/>}
   </group>;

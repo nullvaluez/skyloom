@@ -37,14 +37,21 @@ function sample(rows,z){
   const a=rows[i],b=rows[i+1],d=b[0]-a[0],t=(z-a[0])/d,out=[];
   for(let j=1;j<a.length;j++){
     const slope=k=>(rows[k+1][j]-rows[k][j])/(rows[k+1][0]-rows[k][0]);
-    const delta=slope(i),m=k=>{if(k===0)return slope(0);if(k===rows.length-1)return slope(k-1);const p=slope(k-1),q=slope(k);return p*q<=0?0:2*p*q/(p+q);};
+    const m=k=>{if(k===0)return slope(0);if(k===rows.length-1)return slope(k-1);const p=slope(k-1),q=slope(k);return p*q<=0?0:2*p*q/(p+q);};
     out.push((2*t*t*t-3*t*t+1)*a[j]+(t*t*t-2*t*t+t)*m(i)*d+(-2*t*t*t+3*t*t)*b[j]+(t*t*t-t*t)*m(i+1)*d);
   }
   return out;
 }
 function bodyPoint(z,a,lift=0){const [w,up,dn,chine]=sample(BODY,z),s=Math.sin(a),c=Math.cos(a);return [c*(w+chine*Math.exp(-((s/.18)**2)))+lift*c,(s>=0?up:dn)*s+lift*s,z];}
 function bodyTop(x,z,lift=.009){const [w,up]=sample(BODY,z);return [x,up*Math.sqrt(Math.max(0,1-(x/w)**2))+lift,z];}
-function geom(pos,ix,crease=null){let g=new BufferGeometry();g.setAttribute('position',new Float32BufferAttribute(pos,3));g.setIndex(ix);g.computeVertexNormals();if(crease!==null)g=mergeVertices(toCreasedNormals(g,crease),1e-5);return g;}
+function geom(pos,ix,crease=null){
+  // Closed thin foils meet exactly at their leading/trailing edges. Cull the
+  // zero-area closure cells, then compact so no unused zero normal exports.
+  const p=[],index=[],map=new Map();
+  for(let i=0;i<ix.length;i+=3){const ids=ix.slice(i,i+3),q=ids.map(k=>new Vector3().fromArray(pos,k*3));if(q[1].clone().sub(q[0]).cross(q[2].clone().sub(q[0])).lengthSq()<1e-15)continue;
+    for(const id of ids){if(!map.has(id)){map.set(id,p.length/3);p.push(...pos.slice(id*3,id*3+3));}index.push(map.get(id));}}
+  let g=new BufferGeometry();g.setAttribute('position',new Float32BufferAttribute(p,3));g.setIndex(index);g.computeVertexNormals();if(crease!==null)g=mergeVertices(toCreasedNormals(g,crease),1e-5);return g;
+}
 function soup(points,dir){const p=[],ix=[];for(const q of points){const n=V(q[1]).sub(V(q[0])).cross(V(q[2]).sub(V(q[0])));if(n.lengthSq()<1e-13)continue;const tri=dir&&n.dot(V(dir))<0?[q[0],q[2],q[1]]:q;const o=p.length/3;p.push(...tri.flat());ix.push(o,o+1,o+2);}return geom(p,ix,.42);}
 function rings(rows,segments,point,{capStart=false,capEnd=false}={}){
   const p=[],ix=[];for(const r of rows)for(let j=0;j<segments;j++)p.push(...point(r,j/segments*Math.PI*2));

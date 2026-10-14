@@ -1,4 +1,68 @@
-# Adventures Worth Flying — current implementation
+# Fleet expansion: F-35A, C-17 and Concorde (2026-10-13)
+
+The hangar now has thirteen aircraft. Three first-party airframes join the
+existing fleet, with separate desktop and phone GLBs, animated control surfaces,
+geometry-derived thumbnails and the existing hangar inspection views:
+
+- **F-35A Lightning II:** a compact stealth fighter with a blended chine hull,
+  gold canopy, recessed side intakes, twin canted fins and a petal exhaust nozzle.
+- **C-17 Globemaster III:** a large cargo aircraft with a high swept wing,
+  winglets, four detailed turbofans, a T-tail, cargo ramp seams and fourteen wheels.
+- **Concorde:** a supersonic transport with an ogival delta wing, needle nose,
+  four paired engine ducts, cabin windows and a pearl, navy and copper finish.
+
+All three use the existing UI, Free Flight, Adventures, Takeoff & Landing and
+guest save/restore paths. Each has its own flight envelope, camera scale,
+engine/light stations, runway requirements and gear layout. Their house liveries
+are available immediately; the existing earned-livery collection is unchanged.
+Runway and handling values are gameplay tuning, not aircraft operating guidance.
+
+| Aircraft | Hero triangles | Phone triangles | Hero / phone bytes | Mesh draws |
+|---|---:|---:|---:|---:|
+| F-35A | 15,664 | 4,448 | 411,780 / 130,564 | 12 |
+| C-17 | 16,844 | 4,382 | 418,600 / 126,856 | 11 |
+| Concorde | 16,364 | 3,820 | 397,528 / 125,864 | 12 |
+
+These are airframe budgets. With deployed runtime gear the triangle totals are
+16,204 / 4,988, 18,224 / 5,762 and 17,456 / 4,912 respectively, still inside the
+existing 20,000 hero / 6,000 phone limits. No external models or textures are
+bundled; dimension references and authorship are recorded in `CREDITS.md`.
+
+Rebuild with `node scripts/build-player-expansion.mjs`. It runs the three
+authored builders, generates `lib/fly/special-aircraft.mjs`, and updates all six
+rows in `public/models/adventure-fleet-v1.json`. Individual builders can be run
+separately, followed by `--manifest-only` on the aggregate script. The generic
+fleet builder preserves these custom entries. Repeated builds are byte-identical.
+Bounds now measure actual vertices rather than transformed box corners, so swept
+control hinges do not silently shrink correctly sized aircraft.
+
+Verification: `verify-player-expansion.mjs` passes 23 checks covering registry,
+save/restore, actual GLB dimensions, finite nondegenerate geometry, receipt and
+gear budgets, wheel layout, control animation, and takeoff/landing using each
+resolved flight envelope, and chase-camera obstruction. `verify-adventures.mjs` passes 15 checks,
+`verify-flight-operations.mjs` passes 33, and import integrity passes 4. The full
+adventure simulation completes 78 route/aircraft combinations and 156 activity
+courses. Scoped ESLint and the production webpack build pass. These checks do
+not certify frame rate, live terrain clearance or physical iPhone performance.
+
+Browser review caught a pre-existing large-aircraft camera defect: the apron
+chase standoff put the camera behind the authored hangar roof. The C-17 and
+Concorde loaded and submitted meshes but disappeared behind that roof. The chase
+camera now pulls forward when its sightline enters the hangar's shared bounds;
+ordinary flight and unobstructed views retain their existing framing. Replacement
+airfield layers that suppress the old hangar also disable its camera obstruction.
+The independent ray/box regression was red for C-17, Concorde, airliner and cargo
+at both KCMH and KLCK before the fix, and passes afterward in landscape, portrait
+and free-look. F-35A and airborne no-op cases are also checked.
+
+Desktop Chrome review covers all four hangar inspection views and the normal
+select, launch, pause and return-to-hangar flow for all three additions. Phone
+layout emulation at 390 by 844 checks selection, thumbnails and page overflow.
+Screenshots and machine-readable results live in the ignored
+`.graphics-review/player-expansion/` folder. Phone emulation is not an iPhone
+hardware certification.
+
+# Adventures Worth Flying — earlier implementation
 
 Implemented on top of `0592f51` on 2026-10-01. The earlier Fleet & Adventures
 record below is historical; this section describes the updated behavior.

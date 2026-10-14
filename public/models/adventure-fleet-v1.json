@@ -142,5 +142,53 @@
     "triangles": 3622,
     "draws": 10,
     "bytes": 92140
+  },
+  {
+    "id": "f35",
+    "lod": "hero",
+    "url": "/models/player-f35-hero-v1.glb",
+    "triangles": 15664,
+    "draws": 12,
+    "bytes": 411780
+  },
+  {
+    "id": "f35",
+    "lod": "mobile",
+    "url": "/models/player-f35-mobile-v1.glb",
+    "triangles": 4448,
+    "draws": 12,
+    "bytes": 130564
+  },
+  {
+    "id": "c17",
+    "lod": "hero",
+    "url": "/models/player-c17-hero-v1.glb",
+    "triangles": 16844,
+    "draws": 11,
+    "bytes": 418600
+  },
+  {
+    "id": "c17",
+    "lod": "mobile",
+    "url": "/models/player-c17-mobile-v1.glb",
+    "triangles": 4382,
+    "draws": 11,
+    "bytes": 126856
+  },
+  {
+    "id": "concorde",
+    "lod": "hero",
+    "url": "/models/player-concorde-hero-v1.glb",
+    "triangles": 16364,
+    "draws": 12,
+    "bytes": 397528
+  },
+  {
+    "id": "concorde",
+    "lod": "mobile",
+    "url": "/models/player-concorde-mobile-v1.glb",
+    "triangles": 3820,
+    "draws": 12,
+    "bytes": 125864
   }
 ]
