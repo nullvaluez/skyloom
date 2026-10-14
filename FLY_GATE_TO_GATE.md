@@ -8,7 +8,9 @@ wave, and the seams. **Where this file and a design JSON disagree, this file
 wins; where this file and the plan disagree, the plan wins.**
 
 Status: **W0 landed on `main` (2026-10-13). Nothing visible changed.**
-Checkpoint 0 (the owner confirms the flag registry) is open.
+Checkpoint 0 (the owner confirms the flag registry) is open. **W4-0 (the
+lounge contracts) landed on `main` the same day, also invisible**, ahead of W1
+by the owner's order; W4 N (the walk) is next.
 
 ## The seam rule
 
@@ -248,3 +250,27 @@ There is nothing visual to judge. The owner confirms:
 1. The fifteen-flag registry above, including the sub-switches (e.g. `GATE_TO_GATE.maxHoldSec: 45`, `FLIGHT_DECK.guidance: 'minimal'`).
 2. The defaults already set in the plan: auto-taxi, auto-gear and autobrake do not count as "Assisted"; line-ups, practice finals and warps do.
 3. That W1 may start: B → A → C → D, with checkpoint 1 on the RTX 5080 and iPhone for `OPS_AIRFIELD`, `OPS_FEEL` and `FLIGHT_DECK`.
+
+### W4-0 — lounge contracts (2026-10-13)
+
+Executed by the orchestrating session on `g2g/lounge-walk`, then merged
+`--no-ff`. Nothing a player sees changed, and every lounge gate passes
+unchanged with `LOUNGE_WALK`, `LOUNGE_PIER` and `LOUNGE_BRIDGE` off. The
+contract table and the full record are in
+[FLY_OBSERVATION_LOUNGE.md](FLY_OBSERVATION_LOUNGE.md) ("Lounge, further").
+
+| Commit | Step |
+|---|---|
+| `5e3f84e` | task 0: `verify-lounge-promotion.cjs` passed 7/7 as written; it now also checks the Atlas pill (desktop) and its absence (phones): 9/9 |
+| `b10d6ea` | the contracts: vantage seats and walk numbers, room variants and `FLOOR_PLATE`, the aperture from any eye, the observer's eye and posture, the look limits and hooks, enter options, `exit()` / `handoff()`, walk blockers, the pier-ready layout fields, the eye as the audio listener, the shared BVH, the HUD and walk slots |
+| `5b0ccbe` | review fixes: the seam gaps (enter options honoured, `exit()` hands non-title origins to the bridge's `exitLounge`, the Leave label, binoculars halt a walk, the corner-seat zoom anchor, the probe eye), three blockers, and `verify-lounge-walk.mjs` 19 → 28 with a mutation run |
+
+**Gates (flags off):**
+- node: observation 45, lifecycle 24, lounge 13, lounge seat 6, airport set 17, fleet airframes 13, airfield ground 13, true-earth flags 8, ops golden 28/28, airport service 17, import integrity 4, front door 70, all unchanged; audio 11 → 12; NEW lounge walk 28;
+- browser: promotion 9/9, interaction 25/25, browser states 24/24.
+
+**Deviations from the ownership list:**
+- `components/fly/AirportLounge.jsx` (M's file) got the one probe-eye branch, because a walking eye must not drag the glass's box projection with it. The branch is never taken with the flag off.
+- `components/fly/hud/lounge/{BinocularHud,SpotterCard}.jsx` read their range from `watch.eyeWorld()`.
+- N's `SeatsButton`, `SitPrompt` and `SeatMenu` and the walk slot `lounge-walk-runtime.js` were created as null stubs, so LoungeHud is never edited again.
+- `scripts/verify-airport-audio.mjs` gained the walking-eye check, and `scripts/_catalog-airports.mjs` is new.
