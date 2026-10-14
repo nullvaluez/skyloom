@@ -24,6 +24,7 @@ import { bakeRoomTextures } from '@/lib/fly/lounge/room-textures';
 import { loadBake } from '@/lib/fly/lounge/room-ao';
 import { updateRoomShading } from '@/lib/fly/lounge/room-shading';
 import { InteriorProbe } from '@/lib/fly/lounge/lounge-probe';
+import { roomVariant } from '@/lib/fly/lounge/room-plan';
 import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
 import { getR25Sky } from '@/lib/fly/r25-sky';
 import { toSceneDir } from '@/lib/fly/true-scale';
@@ -237,7 +238,15 @@ function Room({ runtime }) {
       const key = `${Math.round(shade.practical * 25)}|${Math.round(shade.day * 20)}`;
       const now = performance.now();
       if ((s.probeDirty || key !== s.probeKey) && now - s.probeAt > ROOM_LOOK.probeMinMs) {
-        _eye.setFromMatrixPosition(camera.matrixWorld);
+        // The glass box-projects the probe from the room's probe eye. Seated at
+        // the window that is the live eye (as always); a walking observer
+        // (LOUNGE_WALK) leaves it at the room's probe eye (room-plan.js roomVariant).
+        if (!w?.walk || (w.posture === 'seated' && w.seatId === 'window')) _eye.setFromMatrixPosition(camera.matrixWorld);
+        else {
+          const pe = roomVariant(w.site?.variant).probeEye;
+          group.updateMatrixWorld();
+          _eye.set(pe[0], pe[1], pe[2]).applyMatrix4(group.matrixWorld);
+        }
         const objects = [...resource.meshes, resource.board.mesh];
         probe.capture(gl, scene, group, objects, _eye);
         s.probeAt = now;

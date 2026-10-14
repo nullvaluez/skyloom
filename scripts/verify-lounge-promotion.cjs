@@ -6,7 +6,8 @@
 //   desktop  the title shows the "Watch an airport" card; it opens the airport
 //            browser; a featured airport enters a validated lounge; the
 //            Atlas header carries the pill; no page errors.
-//   phone    no card on the title (phones and tablets stay excluded).
+//   phone    no card on the title and no Atlas pill (phones and tablets stay
+//            excluded).
 //
 //   FLY_URL=http://localhost:3311/ node scripts/verify-lounge-promotion.cjs [--out <dir>]
 const { chromium, devices } = require('playwright');
@@ -63,6 +64,13 @@ const seed = () => {
     await page.getByTestId('lounge-leave').click();
     await page.waitForFunction(() => !window.__fly?.airportWatch?.active, undefined, { timeout: 30000 });
     check('Leave lounge returns', true);
+    // The Atlas header pill (the same AirportEntry, compact form).
+    await page.evaluate(() => window.__flyStore.setState({ atlasOpen: true }));
+    await page.getByTestId('atlas').waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+    const atlasPill = await page.locator('[data-testid="atlas"] [data-testid="watch-airport"]').count();
+    check('the Atlas header carries the "Watch an airport" pill', atlasPill === 1, { atlasPill });
+    await page.screenshot({ path: path.join(out, 'desktop-atlas.png') });
+    await page.evaluate(() => window.__flyStore.setState({ atlasOpen: false }));
     check('no page errors on desktop', errors.length === 0, errors.slice(0, 3));
     await page.close();
 
@@ -78,6 +86,10 @@ const seed = () => {
     const phoneCards = await p2.getByTestId('watch-airport').count();
     check('phones get no lounge card (excluded by policy)', phoneCards === 0, { phoneCards });
     await p2.screenshot({ path: path.join(out, 'phone-title.png') });
+    await p2.evaluate(() => window.__flyStore.setState({ atlasOpen: true }));
+    const atlasUp = await p2.getByTestId('atlas').waitFor({ state: 'visible', timeout: 15000 }).then(() => true, () => false);
+    const phonePill = await p2.locator('[data-testid="atlas"] [data-testid="watch-airport"]').count();
+    check('phones get no Atlas pill either', atlasUp && phonePill === 0, { atlasUp, phonePill });
     check('no page errors on the phone', errors2.length === 0, errors2.slice(0, 3));
     await phone.close();
   } catch (e) {

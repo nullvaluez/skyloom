@@ -1,10 +1,11 @@
 'use client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Binoculars, Camera, Crosshair, ListOrdered, RotateCcw, Volume2, VolumeX } from 'lucide-react';
 import { useFlyStore } from '@/stores/fly-store';
 import { getRuntimeAction } from '@/lib/fly/runtime-bus';
 import { exitToTitle } from '@/lib/fly/front-door';
+import { leaveLabelFor } from '@/lib/fly/lounge-bridge';
 import { localClockAt, sunStateAt } from '@/lib/fly/airport-watch-sky.mjs';
 import { LoungeOverlay } from './LoungeOverlay';
 import { LoungeSurface } from './LoungeSurface';
@@ -12,6 +13,13 @@ import { LoungeHeader, weatherSummary } from './LoungeHeader';
 import { LiveBoard } from './LiveBoard';
 import { SpotterCard } from './SpotterCard';
 import { BinocularHud } from './BinocularHud';
+// Gate to Gate W4 slots: walking and seats (LOUNGE_WALK) and the flight
+// bridge (LOUNGE_BRIDGE) render here and nowhere else; each is null while
+// its flag is off.
+import { SeatsButton } from './SeatsButton';
+import { SitPrompt } from './SitPrompt';
+import { SeatMenu } from './SeatMenu';
+import { LoungeBridgeBar } from './LoungeBridgeBar';
 
 /*
  * The seated lounge HUD. One 1 Hz poll feeds the header, the board and the
@@ -35,6 +43,17 @@ function readBoardPref() {
 function runwayLabel(airport) {
   if (!airport) return null;
   return airport.runway && airport.reciprocal ? `${airport.runway}/${airport.reciprocal}` : null;
+}
+
+/**
+ * The help line. Seated with no walking it is today's line; with LOUNGE_WALK
+ * it follows the posture.
+ */
+function helpHints(watch) {
+  if (!watch.walk) return ['Drag to look', 'Scroll to zoom', 'Click a plane to select', 'Double-click for binoculars'];
+  if (watch.posture === 'gliding') return ['Drag to look', 'V for seats'];
+  if (watch.posture === 'standing') return ['WASD to walk', 'Shift to run', 'Drag to look', 'Click a chair to sit', 'V for seats'];
+  return ['Drag to look', 'Scroll to zoom', 'Click a plane to select', 'WASD to get up', 'V for seats'];
 }
 
 export function LoungeHud({ runtime, watch }) {
@@ -119,11 +138,18 @@ export function LoungeHud({ runtime, watch }) {
     }
   }, [savingPhoto, flash]);
 
+  // Leave goes back where the lounge was entered from (watch.exit(): the
+  // title today).
   const leave = () => {
-    runtime.airportWatch?.leave();
-    exitToTitle(runtime);
+    const live = runtime.airportWatch;
+    if (live?.exit) live.exit();
+    else exitToTitle(runtime);
   };
   const w = runtime.airportWatch;
+  // The seat you are in (LOUNGE_WALK), for the header and the face button.
+  const seat = watch.walk ? w?.seats?.find((s) => s.id === watch.seat) ?? null : null;
+  const place = !watch.walk ? 'Window lounge' : watch.posture === 'seated' && seat ? seat.label : watch.posture === 'gliding' ? 'Changing seats' : 'Standing';
+  const faceLabel = watch.walk && watch.posture === 'seated' && seat?.faces === 'back' ? 'Face the back window' : 'Face the runway';
   const selectedRow = watch.selected ? picker.categories.get(watch.selected) : null;
   const fieldElev = airport ? (airport.a.elevation + airport.b.elevation) / 2 : 0;
   const status = notice || watch.notice || (!watch.validated ? 'Preparing your window seat…' : '');
@@ -152,9 +178,14 @@ export function LoungeHud({ runtime, watch }) {
         clock={conditions.clock}
         sun={conditions.sun}
         weather={conditions.weather}
+        place={place}
+        leaveLabel={leaveLabelFor(watch.origin)}
         onAirports={() => useFlyStore.setState({ airportBrowserOpen: true })}
         onLeave={leave}
       />
+
+      <SitPrompt runtime={runtime} watch={watch} />
+      <SeatMenu runtime={runtime} watch={watch} />
 
       {!watch.binocular && !inspecting && !covered && (
         <LiveBoard
@@ -195,9 +226,10 @@ export function LoungeHud({ runtime, watch }) {
             <ListOrdered size={16} aria-hidden="true" />
             <span>Board</span>
           </button>
-          <button type="button" className="lounge-btn" data-testid="lounge-face-runway" onClick={() => w?.resetLook()} title="Face the runway (R)">
+          <SeatsButton runtime={runtime} watch={watch} />
+          <button type="button" className="lounge-btn" data-testid="lounge-face-runway" onClick={() => w?.resetLook()} title={`${faceLabel} (R)`}>
             <RotateCcw size={16} aria-hidden="true" />
-            <span>Face the runway</span>
+            <span>{faceLabel}</span>
           </button>
           <button type="button" className="lounge-btn lounge-btn-primary" data-testid="lounge-binoculars" aria-pressed={!!watch.binocular} onClick={() => w?.binoculars()} title="Binoculars (B)">
             <Binoculars size={16} aria-hidden="true" />
@@ -215,11 +247,17 @@ export function LoungeHud({ runtime, watch }) {
           <button type="button" className="lounge-btn lounge-btn-icon" onClick={() => useFlyStore.getState().setSoundOn(!sound)} aria-label={sound ? 'Mute sound' : 'Enable sound'} title={sound ? 'Mute' : 'Sound on'}>
             {sound ? <Volume2 size={17} /> : <VolumeX size={17} />}
           </button>
+          <LoungeBridgeBar runtime={runtime} watch={watch} />
         </footer>
       )}
       {!watch.binocular && (
         <p className="lounge-help" aria-hidden="true">
-          Drag to look <span>·</span> Scroll to zoom <span>·</span> Click a plane to select <span>·</span> Double-click for binoculars
+          {helpHints(watch).map((hint, i) => (
+            <Fragment key={hint}>
+              {i > 0 && <> <span>·</span> </>}
+              {hint}
+            </Fragment>
+          ))}
         </p>
       )}
 
