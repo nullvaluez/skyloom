@@ -330,7 +330,7 @@ function PlayerModel({ flight, aircraft }) {
   }, [cloned, entry, correction]);
   const livery=useAdventureStore(s=>s.progress.liveries[aircraft.id]);
   const animate=useMemo(()=>fleetAnimator(cloned,entry.parts),[cloned,entry]);
-  useEffect(()=>{applyFleetLivery(cloned,aircraft.id,livery==='earned');},[cloned,aircraft.id,livery,gradedMats]);
+  useEffect(()=>{applyFleetLivery(cloned,aircraft.id,livery);},[cloned,aircraft.id,livery,gradedMats]);
   useFrame((_,dt)=>animate(flight,dt,useFlyStore.getState().cameraMode==='photo',readReducedMotion()));
   useEffect(()=>()=>disposeFleetGeometry(cloned),[cloned]);
   // Style-driven fresnel rim (discrete write — never per frame)

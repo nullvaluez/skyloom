@@ -18,7 +18,7 @@ function Aircraft({aircraft,onReady,earnedPreview=false}){
   const {scene}=useGLTF(aircraft.entry.url);
   const clone=useMemo(()=>{const object=scene.clone(true);if(aircraft.id==='fighter'&&aircraft.entry.parts)attachVectorControls(object);object.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;const copy=m=>{const c=m.clone();c.vertexColors=!!o.geometry.attributes.color;return c;};o.material=Array.isArray(o.material)?o.material.map(copy):copy(o.material);}});return object;},[scene,aircraft.id,aircraft.entry.parts]);
   const livery=useAdventureStore(s=>s.progress.liveries[aircraft.id]);
-  useEffect(()=>{applyFleetLivery(clone,aircraft.id,earnedPreview||livery==='earned');},[clone,aircraft.id,livery,earnedPreview]);
+  useEffect(()=>{applyFleetLivery(clone,aircraft.id,earnedPreview?'earned':livery);},[clone,aircraft.id,livery,earnedPreview]);
   const animate=useMemo(()=>fleetAnimator(clone,aircraft.entry.parts),[clone,aircraft.entry.parts]);
   useFrame((_,dt)=>animate(null,dt,true));
   useEffect(()=>()=>disposeFleetGeometry(clone),[clone]);

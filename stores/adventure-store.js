@@ -2,6 +2,7 @@
 import { create } from 'zustand';
 import { emptyProgress, validateProgress } from '@/lib/fly/adventure-controller.mjs';
 import { contentAccess } from '@/lib/fly/content-access.mjs';
+import { validLiveryChoice } from '@/lib/fly/aircraft-liveries.mjs';
 export const ADVENTURE_KEY='fly-adventures-v1';
 export const useAdventureStore=create((set,get)=>({
   progress:emptyProgress(),ready:false,sessionOnly:false,libraryOpen:false,summary:null,preflight:null,selectedRouteId:null,postcard:null,notice:null,
@@ -10,5 +11,10 @@ export const useAdventureStore=create((set,get)=>({
   setPreflight:preflight=>set({preflight}),
   setPostcard(postcard){const old=get().postcard;if(old&&old!==postcard)URL.revokeObjectURL(old);set({postcard});},
   setLibraryOpen:libraryOpen=>set({libraryOpen}),setSummary:summary=>set({summary}),
-  equip(id,earned){const p=get().progress;if(earned&&!contentAccess(`livery:${id}`,p).allowed)return false;get().save({...p,liveries:{...p.liveries,[id]:earned?'earned':'standard'}});return true;},
+  equip(id,selection){
+    const choice=selection===true?'earned':selection===false?'standard':selection;
+    const p=get().progress;
+    if(!validLiveryChoice(id,choice)||(choice==='earned'&&!contentAccess(`livery:${id}`,p).allowed))return false;
+    get().save({...p,liveries:{...p.liveries,[id]:choice}});return true;
+  },
 }));

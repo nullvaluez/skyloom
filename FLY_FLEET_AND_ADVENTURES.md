@@ -1,3 +1,46 @@
+# Preset aircraft finishes (2026-10-13)
+
+Customize now opens a dedicated panel in the hangar with three free preset
+skins for every aircraft: 39 presets across the thirteen-plane fleet. House
+colors remain the default, and the nine existing adventure reward liveries keep
+their unlock conditions. Clicking a finish updates the actual preview at once
+and saves the selection for that aircraft. Done returns to flight setup; Escape
+closes the picker first, and the radio group supports arrow keys, Home and End.
+The phone panel uses a compact grid below the aircraft preview.
+
+The commercial fleet wears original operator designs such as Aurelia Air,
+Pelagic Airways, Meridian Freight and Aster Supersonic, with fuselage lettering,
+painted bellies, ribbons and tail codes. Military designs include Ghost 11,
+Viper 22, Atlas 70 and Raven 01: tactical gray, forest/desert camouflage and
+arctic splinter patterns with callsigns, wing marks and tail numbers. Civil
+light aircraft and gliders have expedition, rescue and sport finishes. No real
+airline logos or third-party livery assets are bundled.
+
+`lib/fly/aircraft-liveries.mjs` is the preset catalog. `livery-paint.js` applies
+the same paint in the hangar and flight, using neutral model coordinates so
+markings move with animated control surfaces. Glass, cabin windows, exposed
+metal and intake interiors retain their finishes. The shader adds no meshes,
+draws or triangles. It installs only when a preset is used; subsequent switches
+change uniforms without creating shader variants. Each visible painted aircraft
+owns a 1024 by 512 lettering atlas and private paint-coordinate geometry; atlases
+are disposed when replaced, reset or unmounted. Cached GLTF assets stay untouched.
+
+Selections remain in the existing version-2 `fly-adventures-v1` envelope under
+`progress.liveries`, with explicit preset-ID validation. Old standard/earned
+saves, adventure progression, backup export/import and storage-failure feedback
+continue to work. An invalid or cross-aircraft preset cannot enter through equip
+or restore, and importing a preset does not grant an adventure reward.
+
+Verification: `node scripts/verify-liveries.mjs` passes 29 checks, including every
+hero/mobile model, save and backup round trips, cache isolation, neutral paint
+coordinates, house restoration and resource disposal. Existing fleet expansion
+checks pass 23, adventure checks 15 and import integrity 4. Chrome browser review
+visits all 39 skins at 1600 by 1000 and phone-emulated 390 by 844, checking visible
+selection, persistence, keyboard interaction, focus return, panel bounds and
+shader errors. Actual flight checks cover F-35A camouflage and an airliner livery.
+The production webpack build passes. Evidence is in `.graphics-review/liveries/`;
+these checks do not establish frame rate or physical iPhone performance.
+
 # Fleet expansion: F-35A, C-17 and Concorde (2026-10-13)
 
 The hangar now has thirteen aircraft. Three first-party airframes join the

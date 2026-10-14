@@ -8,7 +8,7 @@ import { PLAYER_AIRCRAFT,resolveAircraft,saveAircraft } from '@/lib/fly/player-a
 import { aircraftPresentation } from '@/lib/fly/cinematic-earth';
 import { isPhoneClass } from '@/lib/fly/device-class';
 import { FLEET_PRESENTATION } from '@/lib/fly/fleet-aircraft.mjs';
-import { LIVERIES, ADVENTURES, COLLECTION_REWARDS, adventureById, checkpointStart } from '@/lib/fly/adventures.mjs';
+import { adventureById, checkpointStart } from '@/lib/fly/adventures.mjs';
 import { adventureMinutes, aircraftAdvice } from '@/lib/fly/adventure-activities.mjs';
 import { RouteTrace } from './AdventureExperience';
 import { useAdventureStore } from '@/stores/adventure-store';
@@ -18,6 +18,7 @@ import { airportEligible,airportById } from '@/lib/fly/operations-airports';
 import { airportChoices } from '@/lib/fly/ops-labels.mjs';
 import { operationsProfile } from '@/lib/fly/operations-profiles';
 import { HangarScene } from './HangarScene';
+import { AircraftCustomization } from './AircraftCustomization';
 import { FLIGHT_PLAN, FRONT_DOOR } from '@/lib/fly/fly-constants';
 import { FEATURED_DESTINATIONS, defaultDestination, flightPlanOn, saveLastSetup, searchDestinations } from '@/lib/fly/flight-plan';
 import './operations.css';
@@ -30,7 +31,9 @@ export function GroundHangar({runtime}){
   return open?<HangarBody key={draft?.id||'standard'} runtime={runtime}/>:null;
 }
 function HangarBody({runtime}){
-  const root=useRef();
+  const root=useRef(),customizeButton=useRef();
+  const [customizing,setCustomizing]=useState(false);
+  const closeCustomization=()=>{setCustomizing(false);requestAnimationFrame(()=>customizeButton.current?.focus());};
   const draft=useAdventureStore(s=>s.preflight),adventure=adventureById(draft?.id),active=useAdventureStore(s=>s.progress.active);
   const conditions='live';
   const [restart,setRestart]=useState(false),[launchError,setLaunchError]=useState('');
@@ -83,7 +86,7 @@ function HangarBody({runtime}){
   // the root, so the window Esc chain never sees an Esc pressed inside the
   // hangar: the pre-flight Esc → title (FRONT_DOOR) is handled here, unless the
   // search box already used it to clear its query.
-  const keyboard=e=>{e.stopPropagation();if(e.key==='Escape'&&!confirmReturn&&!e.isDefaultPrevented()&&toTitle())e.preventDefault();if(e.key==='Tab'){const items=[...e.currentTarget.querySelectorAll('button:not(:disabled),select:not(:disabled),input:not(:disabled),a[href],[tabindex="0"]')];const first=items[0],last=items.at(-1);if(e.shiftKey&&(document.activeElement===first||document.activeElement===root.current)){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}};
+  const keyboard=e=>{e.stopPropagation();if(e.key==='Escape'&&customizing){e.preventDefault();closeCustomization();return;}if(e.key==='Escape'&&!confirmReturn&&!e.isDefaultPrevented()&&toTitle())e.preventDefault();if(e.key==='Tab'){const items=[...e.currentTarget.querySelectorAll('button:not(:disabled),select:not(:disabled),input:not(:disabled),a[href],[tabindex="0"]')];const first=items[0],last=items.at(-1);if(e.shiftKey&&(document.activeElement===first||document.activeElement===root.current)){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}};
   const pick=next=>{if(next===id)return;setReady(false);setFailed(false);setRestart(false);setId(next);if(!airportEligible(airportById(airport),next)&&next!=='glider')setAirport(next==='prop'||next==='warbird-prop'?'KOSU':'KCMH');};
   const start=()=>{
     const chosen=aircraft.id;if(!ready||!live)return;
@@ -109,12 +112,13 @@ function HangarBody({runtime}){
   const modes=[['apron','Apron',Navigation],['runway','Runway',PlaneTakeoff],['approach','Approach',PlaneLanding]].filter(([mode])=>mode!=='apron'||airportById(airport)?.authored!==false);
   const modeHelp={apron:'The full flight. Taxi out from your parking stand.',runway:'Lined up and ready. You handle the takeoff.',approach:'Find your landing. Begin on a stable final approach.'};
   const theme={'--ops-ice':CARD_THEME.ice,'--ops-muted':CARD_THEME.iceDim,'--ops-edge':CARD_THEME.edgeSoft};
-  return <section ref={root} tabIndex={-1} onKeyDown={keyboard} onPointerDown={e=>e.stopPropagation()} data-overlay="hangar" className={'ops-hangar'+(adventure?' journey-hangar':'')} style={theme} role="dialog" aria-modal="true" aria-labelledby="hangar-title" data-testid="hangar" data-exterior-ready={exteriorReady}>
+  return <section ref={root} tabIndex={-1} onKeyDown={keyboard} onPointerDown={e=>e.stopPropagation()} data-overlay="hangar" className={'ops-hangar'+(adventure?' journey-hangar':'')} style={theme} role="dialog" aria-modal="true" aria-labelledby="hangar-title" data-testid="hangar" data-exterior-ready={exteriorReady} data-customizing={customizing}>
     <div className="ops-bay" key={retry}><HangarScene aircraft={aircraft} airport={airportById(airport)||airportById('KOSU')} view={view} onReady={loaded} onError={failure} onExteriorReady={exteriorLoaded}/></div>
     <div className="ops-hangar-shade"/>
     <header className="ops-heading">{plan&&FRONT_DOOR.enabled&&<button type="button" className="ops-hangar-back" data-testid="hangar-back" onClick={toTitle}><ChevronLeft size={16}/>{adventure?'Adventures':'Title'}</button>}<div className="ops-wordmark"><Navigation size={22}/><span>Skyloom</span><span className="ops-location-divider"/><h1 id="hangar-title">Hangar</h1>{plan&&<span className="ops-mode-chip" data-testid="hangar-mode" data-mode={free?'free':'ops'}>{adventure?'Adventure':free?'Free Flight':'Takeoff & Landing'}</span>}</div>{free&&dest?<div className="ops-location"><MapPin size={14}/><span>{dest.name} <span className="ops-location-name">/ {dest.region}</span></span></div>:<div className="ops-location"><MapPin size={14}/><span>{airport} <span className="ops-location-name">/ {airportById(airport)?.name}</span></span></div>}</header>
     <div className="ops-aircraft-title"><span className="ops-aircraft-class">{categories[id]}</span><h2>{aircraft.entry.name}</h2><p>{aircraft.entry.blurb}</p>{profile&&<dl><div><dt>Rotation</dt><dd>{Math.round(profile.rotate*1.94384)}<span>kt</span></dd></div><div><dt>Approach</dt><dd>{Math.round(profile.approach*1.94384)}<span>kt</span></dd></div><div><dt>Airframe</dt><dd>{aircraft.entry.targetLenM}<span>m</span></dd></div></dl>}</div>
-    <div className="ops-views" aria-label="Inspect aircraft"><Rotate3D size={16}/>{[['quarter','Overview'],['front','Front'],['side','Side'],['rear','Rear']].map(([key,label])=><button key={key} aria-pressed={view===key} onClick={()=>setView(key)}>{label}</button>)}<FleetCustomization id={id}/></div>
+    <div className="ops-views" aria-label="Inspect aircraft"><Rotate3D size={16}/>{[['quarter','Overview'],['front','Front'],['side','Side'],['rear','Rear']].map(([key,label])=><button key={key} aria-pressed={view===key} onClick={()=>setView(key)}>{label}</button>)}<button ref={customizeButton} type="button" data-testid="hangar-customize" aria-expanded={customizing} onClick={()=>setCustomizing(v=>!v)}>Customize</button></div>
+    {customizing&&<AircraftCustomization key={id} id={id} name={aircraft.entry.name} onClose={closeCustomization}/>}
     {!ready&&!failed&&<div className="ops-preview-loading" role="status"><LoaderCircle size={18}/>Preparing your aircraft</div>}
     {adventure?<div className="ops-dispatch journey-dispatch"><div className="ops-dispatch-scroll"><p className="journey-meta">Adventure · {adventure.place}</p><h2>{adventure.name}</h2><RouteTrace route={adventure}/><p>{aircraftAdvice(id,adventure.aircraftId)}</p><p className="journey-duration">About {adventureMinutes(adventure,id)} minutes <span>+ optional activities</span></p><p className="journey-meta" data-testid="journey-live-conditions">Real time and live weather at your destination.</p><p className="journey-meta">Three optional activities. All aircraft are free to fly.</p></div><div className="ops-dispatch-action">{restart&&<p role="alert">Changing aircraft restarts this journey. Earned rewards stay yours.</p>}<button data-testid="hangar-fly" className="ops-primary" disabled={!ready||!live} onClick={start}>{!ready?'Loading aircraft…':!live?'Preparing flight…':restart?'Restart with '+aircraft.entry.name:active?.id===adventure.id?'Continue adventure':'Fly '+adventure.place}<ArrowUpRight size={18}/></button>{restart&&<button onClick={()=>{pick(active.aircraftId);setRestart(false);}}>Keep current setup</button>}<p className="ops-help">{stage.state==='ready'?'World ready':stage.state==='staging'?'Preparing scenery · '+stage.pct+'%':'Airborne start. Your journey awaits.'}</p>{launchError&&<p role="alert">{launchError}</p>}{failed&&<p role="alert">Aircraft preview could not load. <button onClick={()=>{useGLTF.clear(aircraft.entry.url);setFailed(false);setRetry(v=>v+1);}}>Retry</button></p>}</div></div>:free?<FreeDispatch dest={dest} query={query} setQuery={v=>{setQuery(v);setCursor(0);}} results={results} cursor={cursor} onSearchKey={searchKey} choose={chooseDest} stage={stage} ready={ready} live={live} failed={failed} retryPreview={()=>{useGLTF.clear(aircraft.entry.url);setFailed(false);setRetry(v=>v+1);}} start={start}/>:<div className="ops-dispatch">
       <div className="ops-dispatch-scroll">
@@ -167,10 +171,4 @@ export function AircraftGlyph({id}){
   if(url)return <img src={url} alt="" className="ops-fleet-thumbnail"/>;
   const heavy=['airliner','cargo','bizjet'].includes(id),prop=['prop','warbird-prop','glider'].includes(id);
   return <svg viewBox="0 0 80 42" aria-hidden="true"><path d={heavy?'M39 2Q42 2 43 7L44 17 73 30V34L44 27 44 34 54 39V41L40 38 26 41V39L36 34 36 27 7 34V30L36 17 37 7Q38 2 39 2Z':prop?'M38 3H42L43 18 75 20V25L43 23 43 34 53 38V40L40 37 27 40V38L37 34 37 23 5 25V20L37 18Z':'M40 2 46 17 70 34 70 37 48 30 49 38 58 41 42 38 40 40 38 38 22 41 31 38 32 30 10 37 10 34 34 17Z'}/></svg>;
-}
-function FleetCustomization({id}){
-  const [open,setOpen]=useState(false),progress=useAdventureStore(s=>s.progress),livery=LIVERIES[id],earned=contentAccess(`livery:${id}`,progress).allowed;
-  const route=ADVENTURES.find(a=>a.reward===id),collection=COLLECTION_REWARDS.find(r=>r.aircraftId===id);
-  // An aircraft with no earnable livery (the Umbra) wears its house colors only.
-  return <div className="fleet-customize"><button aria-expanded={open} onClick={()=>setOpen(!open)}>Customize</button>{open&&<div className="fleet-liveries" role="group" aria-label="Aircraft liveries"><strong>Make it yours</strong><button aria-pressed={progress.liveries[id]!=='earned'} onClick={()=>useAdventureStore.getState().equip(id,false)}>House colors</button>{livery?<><button disabled={!earned} aria-pressed={progress.liveries[id]==='earned'} onClick={()=>useAdventureStore.getState().equip(id,true)}><span style={{background:livery.accent}}/>{livery.name}</button>{!earned&&<small>{route?`Complete ${route.place} to earn this livery.`:`Collect ${collection.count} destination stamps to earn this livery.`}</small>}<small>All aircraft are free to fly.</small></>:<small>Signature finish. All aircraft are free to fly.</small>}</div>}</div>;
 }
