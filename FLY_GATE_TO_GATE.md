@@ -10,8 +10,8 @@ wins; where this file and the plan disagree, the plan wins.**
 Status: **W0 landed on `main` (2026-10-13). Nothing visible changed.**
 Checkpoint 0 (the owner confirms the flag registry) is open. **W4-0 (the
 lounge contracts) landed on `main` the same day, also invisible**, ahead of W1
-by the owner's order, and **W4 N (the walk) landed behind `LOUNGE_WALK`**, off
-until the owner signs it off at `?flags=LOUNGE_WALK`.
+by the owner's order, and **W4 N (the walk) landed behind `LOUNGE_WALK`**,
+which the owner signed off and is **on since 2026-10-14**.
 
 ## The seam rule
 
@@ -69,9 +69,10 @@ Every shape below exists on `main` now, inert while its flag is off.
 
 ## Flag registry
 
-All fifteen ship `enabled:false`, after `EARTH_HORIZON` at the end of
-`lib/fly/fly-constants.js`. Turn one on for a page load with `?flags=NAME`
-(off with `-NAME`). Nothing but flag blocks may follow the TRUE EARTH marker
+All fifteen shipped `enabled:false`, after `EARTH_HORIZON` at the end of
+`lib/fly/fly-constants.js`; **`LOUNGE_WALK` is on since 2026-10-14** (the
+owner signed the walk off), the other fourteen are still off. Turn one on for
+a page load with `?flags=NAME` (off with `-NAME`). Nothing but flag blocks may follow the TRUE EARTH marker
 (`scripts/verify-true-earth-flags.mjs` (5)–(7)). Each block is listed in
 `device-report.js` FLAGS.
 
@@ -90,7 +91,7 @@ All fifteen ship `enabled:false`, after `EARTH_HORIZON` at the end of
 | `OPS_DEBRIEF` | grade, stamp, auto photo, debrief, history v2, Flights tab, title "your best" | bottom sheet |
 | `REPLAY` | render-only replay (W5) | 1 MB cap |
 | `LOUNGE_PIER` | pier room, pier set both sides, back-aware seats, seated city cap | inert |
-| `LOUNGE_WALK` | walk, postures, vantage seats, Sit prompt, seat menu, glides, footsteps | inert |
+| `LOUNGE_WALK` (**ON**, 2026-10-14) | walk, postures, vantage seats, Sit prompt, seat menu, glides, footsteps | inert |
 | `LOUNGE_BRIDGE` | Fly from here, Watch from the lounge, origin-aware Leave/Esc, Atlas bookmark, `'lounge'` transition, promotion (decision 12) | inert |
 
 Sub-switches: `ops-flags.js` `opsSub(NAME, key)`; e.g. `OPS_FX.smoke`,
@@ -292,4 +293,11 @@ Executed by the orchestrating session on `g2g/lounge-walk-n` (from W4-0), then m
 **Deviations from the design:**
 - **Seat changes across the room fade through black.** The design gives the glide `maxMps 3.2` and `maxSec 3.0`. An 18 m change cannot satisfy both, and holding the 3 s cap meant a peak of 11.5 m/s at eye height. The speed cap wins (the comfort rule): a change that does not fit in 3 s at that speed dips through black (0.6 s, about 1.6 s in all). The seat-menu jump lands in about 1.3 s.
 - **Click-a-chair reaches across the room** (the design names no reach). The nearest chair under the pointer answers, so an ordinary chair hides a vantage chair behind it.
-- The corner seats keep the design's look centre (±0.55). Their framing is an owner checkpoint.
+- The corner seats keep the design's look centre (±0.55); the owner kept it at sign-off.
+
+**`LOUNGE_WALK` on (2026-10-14).** The owner signed the walk off, and the flip is its own commit. Certifying the flipped tree found:
+- a sliver of floor no seat change could start from (fixed: `pathStart()` floods a world-anchored 1 cm lattice; a whole-floor gate check over 101,168 points);
+- the seat-menu jump is now timed on the page's clock;
+- a pre-existing stall: WebGL program links of 4-12 s in the lounge's first minute, with the walk on **or off** (a soak on a production build). It is not the walk's; it is recorded in FLY_OBSERVATION_LOUNGE.md "Known issues", and the walk gate settles past it.
+
+Gates on the flipped tree: node walk 56 and the lounge battery unchanged; browser walk 20/20 (production build), interaction 25/25 and states 24/24 in both arms, promotion 9/9 (dev).
