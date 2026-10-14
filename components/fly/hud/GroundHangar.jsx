@@ -105,7 +105,7 @@ function HangarBody({runtime}){
       <button onClick={()=>{runtime.operations.returnToHangar();setConfirmReturn(false);}}>End flight and open hangar</button>
       <button onClick={()=>useFlyStore.getState().setHangarOpen(false)}>Continue flight</button></div>
   </div>;
-  const categories={fighter:'Interceptor',military:'Tactical jet','warbird-jet':'Classic jet','warbird-prop':'Warbird',prop:'Light aircraft',glider:'Glider',bizjet:'Business jet',airliner:'Airliner',cargo:'Heavy transport','flying-wing':'Stealth wing'};
+  const categories={fighter:'Interceptor',military:'Tactical jet','warbird-jet':'Classic jet','warbird-prop':'Warbird',prop:'Light aircraft',glider:'Glider',bizjet:'Business jet',airliner:'Airliner',cargo:'Heavy transport','flying-wing':'Stealth wing',f35:'Stealth fighter',c17:'Strategic airlift',concorde:'Supersonic airliner'};
   const modes=[['apron','Apron',Navigation],['runway','Runway',PlaneTakeoff],['approach','Approach',PlaneLanding]].filter(([mode])=>mode!=='apron'||airportById(airport)?.authored!==false);
   const modeHelp={apron:'The full flight. Taxi out from your parking stand.',runway:'Lined up and ready. You handle the takeoff.',approach:'Find your landing. Begin on a stable final approach.'};
   const theme={'--ops-ice':CARD_THEME.ice,'--ops-muted':CARD_THEME.iceDim,'--ops-edge':CARD_THEME.edgeSoft};

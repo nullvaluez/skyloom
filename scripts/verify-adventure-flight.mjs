@@ -53,4 +53,4 @@ for(const route of ADVENTURES)for(const id of ADVENTURE_AIRCRAFT_IDS){
 }
 console.log(JSON.stringify(rows,null,2));
 assert.deepEqual(durationFailures,[]);
-console.log('PASS: 54 complete journeys + 108 activity courses using unchanged FlightModel controls. Terrain not simulated.');
+console.log(`PASS: ${rows.length} complete journeys + ${ADVENTURES.reduce((n,a)=>n+a.activities.filter(s=>s.kind!=='photo').length,0)*ADVENTURE_AIRCRAFT_IDS.length} activity courses using unchanged FlightModel controls. Terrain not simulated.`);
