@@ -782,9 +782,12 @@ const step = (dt) => w2.updateCamera(dt, camera);
 const settle = (sec, dt = 1 / 60) => { for (let t = 0; t < sec; t += dt) step(dt); };
 const eyeL = () => ({ x: w2.eyeLocal.x, y: w2.eyeLocal.y, z: w2.eyeLocal.z });
 const room3 = buildTriBvh(room.buckets);
-// An independent leg test: every centimetre of a -> b is free by the exact test
-// (validated against the blockers' own outlines above), not by lineOfSight.
-const legFree = (a, b) => { const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.01)); for (let i = 0; i <= n; i++) if (!W.isFree(grid, a.x + ((b.x - a.x) * i) / n, a.z + ((b.z - a.z) * i) / n)) return false; return true; };
+// An independent leg test: every centimetre of a -> b is on the floor plate and
+// clear of every blocker by the body radius (the clearance is validated against
+// the blockers' own outlines above), not by lineOfSight. 2 mm of tolerance: where
+// two inflated blockers just touch, free floor is a line, free only at points,
+// and the walk steps along it (endpoint tests); furniture is centimetres deep.
+const legFree = (a, b) => { const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.01)); for (let i = 0; i <= n; i++) { const x = a.x + ((b.x - a.x) * i) / n, z = a.z + ((b.z - a.z) * i) / n; if (!W.onFloorPlate(x, z) || W.clearance(blockers, x, z) < WALK.radiusM - 0.002) return false; } return true; };
 // A known standing pose with clear floor ahead (each walking check starts here, not where the last one stopped).
 const standAt = (x, z, yaw, clearM = 0) => {
   if (w2.posture !== 'standing') { w2.setMoveKeys(0, -1, false); w2.setMoveKeys(0, 0, false); settle(1.2); }
@@ -1244,6 +1247,27 @@ await check('click-a-chair through the camera: each vantage chair, projected as 
     }
   } finally { setTrueScaleK(1); }
   assert.ok(tested >= 60, 'cases ' + tested);
+});
+
+await check('every free point on the floor can start a path (a 5 cm lattice everywhere, 1 cm round the two slivers where blockers just touch), and every walk-out leads to a free path', () => {
+  let points = 0, walkOuts = 0;
+  const win = { x: seatsC[0].approach[0], z: seatsC[0].approach[1] };
+  const visit = (x, z) => {
+    if (!W.isFree(grid, x, z)) return;
+    points++;
+    const st = W.pathStart(grid, { x, z });
+    assert.ok(st, `no path start at (${x.toFixed(3)}, ${z.toFixed(3)})`);
+    if (!st.via) return;
+    walkOuts++;
+    const p = W.findPath(grid, { x, z }, win);
+    assert.ok(p, `no path from (${x.toFixed(3)}, ${z.toFixed(3)})`);
+    for (let i = 1; i < p.length; i++) assert.ok(legFree(p[i - 1], p[i]), `walk-out path leg ${i} from (${x.toFixed(3)}, ${z.toFixed(3)})`);
+  };
+  for (let x = P.x0; x <= P.vestibule.x1; x += 0.05) for (let z = P.z0; z <= P.z1; z += 0.05) visit(x, z);
+  // The two slivers the 5 cm scan found before pathStart searched a world lattice:
+  // lines where the sofa's, the mid table's and a chair's inflated footprints touch.
+  for (const [cx, cz] of [[-6.25, 6.95], [-4.55, 6.95]]) for (let x = cx - 0.3; x <= cx + 0.3; x += 0.01) for (let z = cz - 0.3; z <= cz + 0.3; z += 0.01) visit(x, z);
+  assert.ok(points > 100000 && walkOuts > 0, `${points} free points, ${walkOuts} walk-outs`);
 });
 
 await check('every free point in front of a vantage chair can start a path (a strip narrower than a cell walks out to one), and those paths are free', () => {

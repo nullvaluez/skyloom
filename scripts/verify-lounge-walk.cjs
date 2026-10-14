@@ -1,6 +1,7 @@
 // Observation lounge — walking and seats, in the browser (desktop Chrome, real GPU).
 //
-// With ?flags=LOUNGE_WALK and real keys and mouse at KCMH (traffic mocked as
+// With the walk on (LOUNGE_WALK ships on since 2026-10-14; the URL may also
+// say ?flags=LOUNGE_WALK, never -LOUNGE_WALK) and real keys and mouse at KCMH (traffic mocked as
 // in verify-airport-interaction.cjs): the observer starts seated at the
 // window; A stands you up and the Sit prompt offers the chair; Enter sits;
 // S walks (~1.4 m/s) and releasing it stops; Shift runs (~2.4 m/s); the eye
@@ -12,6 +13,12 @@
 // one Esc lowers them; Enter on a focused button is the button's, and the Sit
 // prompt hides behind the menu; a panel opening mid-stride stops the walk; the
 // Esc chain is unchanged (selection, then leave); no page errors.
+//
+// The lounge links shader programs for its first minute and again when new
+// detail comes into view (the binoculars); in a fresh headless Chrome one link can
+// hold a frame for 4-11 s, with or without the walk. The gate settles before its
+// timing checks, waits for states with room for one such stall, times the
+// seat-menu jump net of frames over 1 s, and reports every stall it sees.
 //
 //   FLY_URL='http://localhost:3123/?graphicsReview=1&airports=on&airportArt=on&airportScenery=on&flags=LOUNGE_WALK' \
 //     node scripts/verify-lounge-walk.cjs [--out <dir>]
@@ -47,7 +54,7 @@ const fixtures = () => {
 };
 
 (async () => {
-  if (!/[?&]flags=[^&]*LOUNGE_WALK/.test(URL_)) throw new Error('verify-lounge-walk.cjs needs ?flags=LOUNGE_WALK on FLY_URL');
+  if (/[?&]flags=[^&]*-LOUNGE_WALK/.test(URL_)) throw new Error('verify-lounge-walk.cjs needs the walk on: drop -LOUNGE_WALK from FLY_URL');
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--enable-gpu', '--ignore-gpu-blocklist'] });
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
   page.on('pageerror', (e) => report.errors.push(e.message));
@@ -100,7 +107,34 @@ const fixtures = () => {
       };
       requestAnimationFrame(loop);
     });
-    await wait(1500);
+    // Every frame gap over 400 ms (page clock), so a timing failure says whether the page stalled.
+    await page.evaluate(() => {
+      const g = (window.__gaps = []);
+      let last = performance.now();
+      const tick = () => { const now = performance.now(); if (now - last > 400) g.push([Math.round(last), Math.round(now - last)]); last = now; requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+    });
+    const mark = () => page.evaluate(() => performance.now());
+    const gapsSince = (t) => page.evaluate((t0) => window.__gaps.filter(([at, d]) => at + d > t0).map(([, d]) => d), t);
+    const walkState = () => page.evaluate(() => {
+      const w = window.__fly.airportWatch, st = window.__flyStore.getState();
+      return { posture: w.posture, seat: w.seatId, eye: [+w.eyeLocal.x.toFixed(3), +w.eyeLocal.z.toFixed(3)], yaw: +w.yaw.toFixed(3), prompt: w.sitPrompt?.id ?? null, menu: w.seatMenu, binocular: w.binocular, validated: w.validated, tracking: w.tracking, selected: w.selected, speed: +(w.walk?.speed ?? 0).toFixed(2), veil: w.walk?.veil ?? 0, covered: !!(st.inspectHex || st.airportBrowserOpen || st.atlasOpen || st.logbookOpen || st.phase === 'paused'), focus: document.activeElement?.dataset?.testid ?? document.activeElement?.tagName };
+    });
+    // Settle first. For about a minute after arrival the lounge links shader programs,
+    // with or without the walk (a stall soak with LOUNGE_WALK off shows the same),
+    // and in a fresh headless Chrome (no shader cache) one link can hold a frame for
+    // 4-11 s. The timing checks below measure the walk, so they wait until no frame
+    // has taken over a second for 30 s, at least 80 s after arrival (at most 180 s).
+    // The warm-up stalls are reported, not hidden.
+    const arrived = await mark();
+    for (;;) {
+      const q = await page.evaluate((t0) => { const now = performance.now(), last = window.__gaps.filter(([, d]) => d > 1000).at(-1); return { since: now - t0, quiet: now - Math.max(t0, last ? last[0] + last[1] : t0) }; }, arrived);
+      if ((q.since > 80000 && q.quiet > 30000) || q.since > 180000) break;
+      await wait(1000);
+    }
+    const warmUp = await page.evaluate((t0) => window.__gaps.filter(([at, d]) => at + d > t0 && d > 1000).map(([, d]) => d), arrived);
+    console.log('INFO warm-up stalls (ms, before the timing checks): ' + JSON.stringify(warmUp));
+    report.warmUpStallsMs = warmUp;
 
     let s = await state();
     const flags = await page.evaluate(() => window.__flyUrlFlags ?? null);
@@ -113,15 +147,15 @@ const fixtures = () => {
     await page.keyboard.down('a');
     await wait(120);
     await page.keyboard.up('a');
-    const stood = await until(() => window.__fly.airportWatch.posture === 'standing', undefined, 3000);
+    const stood = await until(() => window.__fly.airportWatch.posture === 'standing', undefined, 20000);
     s = await state();
     check('A stands you up out of the chair (standing, eye at 1.65 m)', stood && Math.abs(s.eye.y - 1.65) < 1e-6, s.eye);
-    const prompted = await page.getByTestId('lounge-sit-prompt').waitFor({ state: 'visible', timeout: 3000 }).then(() => true, () => false);
+    const prompted = await page.getByTestId('lounge-sit-prompt').waitFor({ state: 'visible', timeout: 20000 }).then(() => true, () => false);
     const promptText = prompted ? await page.getByTestId('lounge-sit-prompt').innerText() : '';
     check('the Sit prompt offers the chair you stood up from', prompted && /Window seat/.test(promptText), { promptText });
     await shot('02-standing-prompt');
     await page.keyboard.press('Enter');
-    const satBack = await until(() => { const w = window.__fly.airportWatch; return w.posture === 'seated' && w.seatId === 'window'; }, undefined, 3500);
+    const satBack = await until(() => { const w = window.__fly.airportWatch; return w.posture === 'seated' && w.seatId === 'window'; }, undefined, 20000);
     check('Enter sits at the prompt', satBack, await state());
 
     // Walk: S from the seat stands up and walks back into the room.
@@ -173,13 +207,33 @@ const fixtures = () => {
     await page.keyboard.press('Escape');
     const menuGone = await page.getByTestId('lounge-seat-menu').waitFor({ state: 'hidden', timeout: 3000 }).then(() => true, () => false);
     check('V opens the seat menu; Esc closes it first and keeps the lounge', menuUp && menuGone && (await state()).active);
+    // Timed on the page's own clock, from the press on the seat row to the first
+    // frame seated in the corner (a stall in the harness is not the product's).
+    const from = (await state()).eye;
+    await page.evaluate(() => {
+      const j = (window.__jump = { pressed: null, landed: null, frames: 0, longest: 0 });
+      addEventListener('pointerdown', () => { if (j.pressed == null) j.pressed = performance.now(); }, { capture: true, once: true });
+      let last = performance.now();
+      const tick = () => {
+        const now = performance.now(), w = window.__fly.airportWatch;
+        if (j.pressed != null) { j.frames++; j.longest = Math.max(j.longest, now - last); }
+        last = now;
+        if (j.pressed != null && w.posture === 'seated' && w.seatId === 'corner-left') { j.landed = now; return; }
+        if (j.frames < 2000) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
     await page.getByTestId('lounge-seats').click();
     await page.getByTestId('lounge-seat-corner-left').click();
     const jumpStart = Date.now();
-    const landed = await until(() => { const w = window.__fly.airportWatch; return w.posture === 'seated' && w.seatId === 'corner-left'; }, undefined, 6000);
-    const jumpSec = (Date.now() - jumpStart) / 1000;
+    const landed = await until(() => window.__jump.landed != null, undefined, 30000);
+    const wallSec = (Date.now() - jumpStart) / 1000;
+    const jump = await page.evaluate(() => window.__jump);
+    const jumpGaps = await page.evaluate((t) => window.__gaps.filter(([at, d]) => at + d > t).map(([, d]) => d), jump.pressed ?? 0);
+    const stallSec = jumpGaps.filter((d) => d > 1000).reduce((a, d) => a + d, 0) / 1000;
+    const jumpSec = landed ? (jump.landed - jump.pressed) / 1000 - stallSec : null;
     s = await state();
-    check('a seat-menu jump to the left corner lands within 3.2 s, seated in it', landed && jumpSec <= 3.2 && Math.abs(s.eye.y - 1.18) < 1e-9, { jumpSec, seat: s.seat });
+    check('a seat-menu jump to the left corner lands within 3.2 s, seated in it', landed && jumpSec <= 3.2 && Math.abs(s.eye.y - 1.18) < 1e-9, { jumpSec: jumpSec && +jumpSec.toFixed(3), stallSec, wallSec, longestFrameMs: Math.round(jump.longest), frames: jump.frames, from: { x: +from.x.toFixed(3), z: +from.z.toFixed(3) }, gaps: jumpGaps, seat: s.seat });
     await wait(600);
     await shot('06-corner-left');
 
@@ -188,7 +242,7 @@ const fixtures = () => {
     await page.keyboard.down('d');
     await wait(150);
     await page.keyboard.up('d');
-    await until(() => window.__fly.airportWatch.posture === 'standing', undefined, 3000);
+    await until(() => window.__fly.airportWatch.posture === 'standing', undefined, 20000);
     await page.evaluate(() => { const w = window.__fly.airportWatch; w.eyeLocal.x = -1.2; w.eyeLocal.z = 3.2; });
     await wait(200);
     const roomy = await page.evaluate(() => window.__fly.airportWatch.walk.clearance());
@@ -199,9 +253,10 @@ const fixtures = () => {
       for (let v = -0.9; v <= 0.3; v += 0.05) for (let u = -0.6; u <= 0.6; u += 0.05) if (w.walk.seatAt(u, v) === 'window') return { x: ((u + 1) / 2) * innerWidth, y: ((1 - v) / 2) * innerHeight };
       return null;
     });
+    const tClick = await mark();
     if (px) await page.mouse.click(px.x, px.y);
-    const clicked = px && (await until(() => { const w = window.__fly.airportWatch; return w.posture === 'seated' && w.seatId === 'window'; }, undefined, 5000));
-    check('a click on a vantage chair sits you in it', roomy >= 0.25 && !!clicked, { px, roomy });
+    const clicked = px && (await until(() => { const w = window.__fly.airportWatch; return w.posture === 'seated' && w.seatId === 'window'; }, undefined, 20000));
+    check('a click on a vantage chair sits you in it', roomy >= 0.25 && !!clicked, { px, roomy, gaps: await gapsSince(tClick), ...(clicked ? {} : { state: await walkState() }) });
     await shot('07-clicked-window-seat');
 
     // Binoculars stop a walk; a fresh move key lowers them.
@@ -224,37 +279,41 @@ const fixtures = () => {
     // Strafe through the real keys: A along the view's left, D along its right.
     await page.evaluate(() => { const w = window.__fly.airportWatch; w.eyeLocal.x = 0; w.eyeLocal.z = 5; w.yaw = 0.7; });
     await wait(300);
-    const strafe = {};
+    const strafe = {}, strafeGaps = {}, strafeState = {};
     for (const key of ['a', 'd']) {
-      const p0 = (await state()).eye;
+      const p0 = (await state()).eye, tKey = await mark();
       await page.keyboard.down(key);
-      await wait(500);
+      await until((p) => { const e = window.__fly.airportWatch.eyeLocal; return Math.hypot(e.x - p.x, e.z - p.z) > 0.4; }, p0, 20000);
       await page.keyboard.up(key);
       await wait(500);
       const s1 = await state(), dx = s1.eye.x - p0.x, dz = s1.eye.z - p0.z, n = Math.hypot(dx, dz);
       strafe[key] = n > 0.2 ? +((dx * Math.cos(s1.yaw) - dz * Math.sin(s1.yaw)) / n).toFixed(3) : 0;
+      strafeGaps[key] = await gapsSince(tKey);
+      if (!(n > 0.2)) strafeState[key] = await walkState();
     }
-    check('A walks along the view\'s left and D along its right', strafe.a < -0.99 && strafe.d > 0.99, strafe);
+    check('A walks along the view\'s left and D along its right', strafe.a < -0.99 && strafe.d > 0.99, { ...strafe, gaps: strafeGaps, ...(Object.keys(strafeState).length ? { state: strafeState } : {}) });
 
     // The seat menu behind the binoculars: raising them closes it, so one Esc lowers them.
     await page.keyboard.press('v');
     const menuOpen = await page.getByTestId('lounge-seat-menu').waitFor({ state: 'visible', timeout: 3000 }).then(() => true, () => false);
     await page.keyboard.press('b');
-    await until(() => window.__fly.airportWatch.binocular, undefined, 3000);
+    await until(() => window.__fly.airportWatch.binocular, undefined, 20000);
     await page.keyboard.press('Escape');
     await wait(400);
     s = await state();
     check('with the seat menu open, the binoculars close it and one Esc lowers them', menuOpen && !s.menu && !s.binocular && s.active, { menuOpen, menu: s.menu, binocular: s.binocular });
 
     // Enter on a focused control is that control's, and the Sit prompt hides behind the open menu.
+    const tPrompt = await mark();
     await page.evaluate(() => { const w = window.__fly.airportWatch; w.eyeLocal.x = -0.8; w.eyeLocal.z = 0.5; w.yaw = 0; });
-    const promptUp = await page.getByTestId('lounge-sit-prompt').waitFor({ state: 'visible', timeout: 3000 }).then(() => true, () => false);
+    const promptUp = await page.getByTestId('lounge-sit-prompt').waitFor({ state: 'visible', timeout: 20000 }).then(() => true, () => false);
+    const promptDiag = promptUp ? null : { gaps: await gapsSince(tPrompt), state: await walkState() };
     await page.getByTestId('lounge-seats').focus();
     await page.keyboard.press('Enter');
     await wait(400);
     s = await state();
     const promptHidden = !(await page.getByTestId('lounge-sit-prompt').isVisible());
-    check('Enter on the focused Seats button opens the menu instead of sitting, and the Sit prompt hides behind the menu', promptUp && s.posture === 'standing' && s.menu && promptHidden, { promptUp, posture: s.posture, menu: s.menu, promptHidden });
+    check('Enter on the focused Seats button opens the menu instead of sitting, and the Sit prompt hides behind the menu', promptUp && s.posture === 'standing' && s.menu && promptHidden, { promptUp, posture: s.posture, menu: s.menu, promptHidden, ...(promptDiag ? { diag: promptDiag } : {}) });
     await page.keyboard.press('Escape');
     await page.getByTestId('lounge-surface').focus();
 
