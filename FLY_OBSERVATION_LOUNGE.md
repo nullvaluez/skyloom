@@ -1,10 +1,13 @@
 # Observation Lounge — plan and record
 
 > **Status (2026-10-13): W0 and all five W1 workstreams are merged on `main`,
-> with an integration pass on top (see Record).** Still behind
-> `?airports=on`. Every look and fps verdict below comes from headless Chrome
-> on the owner's RTX 5080 box; the owner's own sessions decide the open items
-> in "Owner checkpoints".
+> with an integration pass on top (see Record).** Promoted the same day: desktop
+> players get "Watch an airport" with no URL parameters (phones excluded).
+> **"Lounge, further" is in progress**: its W4-0 contracts and the walk (N)
+> are on `main`, and **the walk is on for every desktop player since
+> 2026-10-14** (`LOUNGE_WALK`, owner sign-off). See that section below. Every look and fps verdict below comes from
+> headless Chrome on the owner's RTX 5080 box; the owner's own sessions decide
+> the open items in "Owner checkpoints".
 > This file is both the plan every workstream works from and the record of
 > what shipped. It supersedes the seated-room section of
 > [FLY_LIVING_AIRPORTS.md](FLY_LIVING_AIRPORTS.md) for everything inside the
@@ -256,6 +259,70 @@ runwayId,along,cross,floorM` (both review scripts) tries a seat through
 `window.__flyLoungeSiteOverride` (development builds only). It does not see
 trees: confirm a new seat with a capture.
 
+## Lounge, further (pier, walk, bridge) — plan
+
+Gate to Gate W4 ([FLY_GATE_TO_GATE_PLAN.md](FLY_GATE_TO_GATE_PLAN.md)
+decision 9 and the "W4-0" and "W4" sections; the detailed design is
+`.graphics-review/gate-to-gate-plan/design-lounge.json`, local). The owner's
+order (2026-10-13): **the walk first**, on today's classic room, ahead of W1;
+the pier and the bridge after. The session handoff is
+[FLY_LOUNGE_WALK_HANDOFF.md](FLY_LOUNGE_WALK_HANDOFF.md).
+
+The lounge stays one room and one observation view (`observationViews` keeps
+its single 'lounge' entry). Everything new is a room **variant** (`classic`
+today, `pier` behind LOUNGE_PIER, carried on `site.variant`) or an **eye**
+that can move inside the room.
+
+**Flags** (all `enabled:false`, read only through `lib/fly/ops-flags.js`;
+`?flags=NAME` for one page load):
+- `LOUNGE_WALK`: free walk (WASD + Shift, drag-look, collisions), standing and
+  seated postures, the vantage seats (classic: window and two corners; pier:
+  window, back and two corners), the Sit prompt (Enter), click-a-chair, the
+  seat menu (V / "Seats"), glides and footsteps. No pointer lock: the cursor
+  stays the picker.
+- `LOUNGE_PIER`: the pier room (back glass between the FIDS boards, the bar on
+  the right wall), stands and parked aircraft on both sides, back-aware seats,
+  the seated city cap.
+- `LOUNGE_BRIDGE`: "Fly from here", "Watch from the lounge", origin-aware
+  Leave/Esc, the Atlas bookmark, the `'lounge'` camera transition.
+
+### Contracts (W4-0, on `main`)
+
+| Contract | Home | Notes |
+|---|---|---|
+| Numbers | `lib/fly/observation-config.js` | `LOUNGE_PIER_ROOM`, `VANTAGE` (classic / pier seat lists), `WALK`, `PIER_SET`, `SEAT_BACK`, `LOUNGE_BUDGETS.city` / `.parked`. The classic window seat IS today's seat (`LOUNGE_ROOM.eye` / `.look`). A seat: `{id, label, faces, chair {x,z,rot}, eye, approach [x,z], look {centre, yawSpan, pitchMin, pitchMax, defaultPitch}}`, eye = chair + R(rot)·(0, 1.18, −0.08). |
+| Room variant | `lib/fly/lounge/room-plan.js` | `roomVariant(variant)` → `{variant, backGlass, aperture, vantage, bar, art, communalTableX, probeEye}` (classic = every existing export, unchanged; its `probeEye` is the window eye); `FLOOR_PLATE` (sill line to back wall, plus the entrance vestibule). |
+| Aperture from any eye | `lib/fly/lounge-site.js` | `loungeApertureFrom(eye, dx, dy, dz, variant)` → front / roof / side / back / null; `loungeAperture` is the window-eye wrapper (identical on 20,000 directions). `resolveLoungeSite(airport, {variant})` → `site.variant`; the session-site helpers pass it. |
+| Observer eye and posture | `lib/fly/airport-watch-runtime.js` | `watch.eyeLocal` (room-local), `watch.eyeWorld(out)`; `posture`, `seatId`, `seats` ([] without the walk), `sitPrompt`, `seatMenu`, `lookLimits()`; hook points `watch.walk` and `watch.cinematic`; `enter(id, {origin, keepFlight, seat, faceStand, site})` → `watch.entry`, `watch.origin` (`site` is used as is; `keepFlight` leaves a flight within 6 km where it is, `entry.keptFlight`; `faceStand` turns the head to it once the floor is validated); `exit()` (leave + title for the title origin; any other origin goes to the runtime action `exitLounge({origin, entry})` when the bridge registers it), `handoff()`; `setMoveKeys` / `sit` / `stand` / `seatMenuOpen` (inert without the walk); `watch.publish`. The store's `airportWatch` adds `walk, seat, posture, prompt, seatMenu, origin, playerParked`. Every look clamp goes through `lookLimits()`; a full-circle yaw span (standing) wraps and springs the short way. The bob is camera-only. The binoculars coming up by any route halt a walk (`watch.walk.halt`). |
+| Head math | `lib/fly/airport-watch-camera.mjs` | `clampYawAround(yaw, centre, span)` (a clamp; span ≥ π only wraps), `yawAroundCentre(yaw, centre)` (an absolute direction, the short way round the centre, before clamping), `walkBob(phase, speed, reduced)`. |
+| Walk blockers | `lib/fly/lounge/room-build.js` | `buildLoungeRoom({variant}).blockers` and `roomBlockers(variant)`: `{c:[x,z], h:[hx,hz], rot, kind, round?, seatId?}`, pushed by the function that builds each piece (overhangs and canopies included); no geometry, so the AO signature and bake are unchanged. 47 in the classic room; every body-height vertex lies inside one within 5 mm, and the walls seal the floor plate. |
+| Layout, pier-ready | `lib/fly/airport-layout.js` | additive: `pier` (false), `zc`, `aprons`, `sides`, and on each stand `side`, `number`, `canon`. |
+| Listener | `lib/fly/airport-audio.js` | the soundscape listens from `watch.eyeWorld()`. |
+| Walk slot | `lib/fly/lounge-walk-runtime.js` | `attachLoungeWalk(watch, runtime)`, called on each enter while LOUNGE_WALK is on (W4-0: attaches nothing). |
+| Bridge slot | `lib/fly/lounge-bridge.js` | `leaveLabelFor(origin)` ('Leave lounge' / 'Back to your flight' / 'Back to your aircraft'); documented stubs with their final signatures: `entryContext`, `bookmarkFlight`, `restoreFlight`, `preferredDepartureRunway`, `gateOptions`. |
+| Probe | `components/fly/AirportLounge.jsx` | the interior reflection probe is captured at the live eye while seated at the window (as before), else at `roomVariant().probeEye`. |
+| HUD slots | `components/fly/hud/lounge/` | LoungeHud renders `SeatsButton`, `SitPrompt`, `SeatMenu` (N) and `LoungeBridgeBar` (P); LoungeHeader takes `place` and `leaveLabel` (from `leaveLabelFor(watch.origin)`); the help line and the face button follow the posture. Leave and Esc call `watch.exit()`. |
+| BVH | `scripts/_tri-bvh.mjs` | `buildTriBvh(buckets, names)` → `cast` (the AO bake, byte-identical) and `distance` (eye clearance). `build-lounge-ao.mjs --out <file>`. |
+| Gates | `scripts/verify-lounge-walk.mjs`, `scripts/_catalog-airports.mjs` | the W4-0 contract checks, 28 (`--bake` re-bakes and compares); a shared catalog loader. |
+
+**Ownership and merge order** are in [FLY_GATE_TO_GATE.md](FLY_GATE_TO_GATE.md)
+("W4-0" and "W4", merge M → O → N → P; this pass runs N first, on the classic
+room). The hot lounge files (`airport-watch-runtime.js`, `LoungeHud.jsx`,
+`LoungeHeader.jsx`) are edited in W4-0 only.
+
+**Consumed contracts** (P, later): the airport service (`runtime.airports`,
+W0, inert until OPS_AIRFIELD), the gate start (`runtime.beginGate`, W3 J), the
+camera director's `previewPose` (W2 F). Until they land, P's "Fly from here"
+falls back to today's runway start.
+
+**Owner run list:**
+- W4-0: nothing to see. The lounge must look and behave exactly as before.
+- N: `?flags=LOUNGE_WALK` at KCMH: walk and run speed and the bob, collisions
+  with the furniture, the three seats and the seat menu, the Sit prompt;
+  nothing changed with the flag off. Then the two open N checkpoints in the
+  record (the corner seats' framing, seat changes that fade).
+- M/O/P: at their checkpoint (FLY_GATE_TO_GATE_PLAN.md checkpoint 4).
+
 ## Record
 
 ### W0 — scaffolding (2026-10-12)
@@ -396,6 +463,175 @@ because of the city in view from the new seat (satellite buildings 755k);
 the lounge's own layers there are room 120k, set 134k, airfield ground 180k,
 parked fleet 141k, live fleet up to ~380k — each inside its budget.
 
+### Lounge, further — W4-0 contracts (2026-10-13)
+
+Branch `g2g/lounge-walk`, merged `--no-ff`. Nothing a player sees changed:
+every contract above is inert with `LOUNGE_WALK`, `LOUNGE_PIER` and
+`LOUNGE_BRIDGE` off.
+
+- **Task 0, the promotion gate (`5e3f84e`).** `verify-lounge-promotion.cjs`
+  passed 7/7 on `main` (`8b89217`) at a URL with no parameters, but its header
+  promised an Atlas check it never made. It now opens the Atlas after leaving
+  the lounge and requires the "Watch an airport" pill on desktop and none on
+  the iPhone 13 viewport: **9/9**.
+- **The contracts (`b10d6ea`)**, as in the table above.
+- **Review fixes (`5b0ccbe`).** An identity review (flags off, bit for bit)
+  found nothing that changes behaviour. A seam review found the gaps a later
+  stream would have had to reopen the hot files for, now closed:
+  - `enter`'s options do what they say (`site` used as is, `keepFlight`,
+    `faceStand`);
+  - `exit()` hands any origin but the title to the bridge;
+  - the Leave label follows the origin;
+  - every way the binoculars come up halts a walk;
+  - zoom-to-cursor at a corner seat stops at the nearer limit instead of
+    snapping across the back;
+  - the probe stays at the window eye unless the observer has walked away
+    from it.
+
+  A gates review made `verify-lounge-walk.mjs` able to fail (19 → 28):
+  - the aperture is compared with a verbatim copy of the pre-W4-0 function;
+  - new checks: the walls seal the floor plate; the shared BVH equals brute
+    force; the walk hook is tested with a moving eye and a non-zero seat
+    centre; the bob runs along the camera's own right;
+  - the flag is pinned off.
+
+  Seven mutants were run against it. Six were killed; the seventh is
+  equivalent (each frame re-clamps the look target with the same limits).
+  Three blockers were corrected along the way: the olive (1.0 → 0.8 m; its
+  canopy starts 2.03 m up), the banquette's ends and the side walls' inner
+  faces.
+
+**Gates (flags off).**
+- Node:
+  - unchanged: observation 45, lifecycle 24, lounge 13 (AO signature
+    unchanged), lounge seat 6, airport set 17, fleet airframes 13, airfield
+    ground 13, true-earth flags 8, ops golden 28/28, airport service 17,
+    import integrity 4, front door 70;
+  - audio 11 → 12 (the listener is the eye);
+  - NEW lounge walk 28.
+- Browser on the worktree's dev server: promotion 9/9 (no URL parameters),
+  interaction 25/25, browser states 24/24.
+
+### Lounge, further — N, walk and sit (2026-10-13)
+
+Branch `g2g/lounge-walk-n`, merged `--no-ff`. Everything is behind
+`LOUNGE_WALK`, which shipped off and is **on since 2026-10-14** (owner
+sign-off; see "LOUNGE_WALK on" below). `?flags=-LOUNGE_WALK` turns it off for
+one page load, and the lounge is then the W4-0 lounge.
+
+**With the flag on:**
+- **Walking.** W/A/S/D walk at 1.4 m/s and Shift runs at 2.4 m/s, with
+  constant acceleration both ways. Drag looks; standing, the head turns all
+  the way round. A move key stands you up out of the chair. There is no
+  pointer lock: the cursor stays the picker. The keys are taken in the
+  capture phase, so the flight input never sees them. A panel opening (the
+  airport browser, the Atlas, the logbook, the dossier, pause) stops the walk
+  at once.
+- **Collisions.** The room's furniture, planters, bar, boards and walls stop a
+  body of radius 0.25 m, and you slide along edges. The walkable space is
+  built once, on the first validated frame (about 52 ms, behind the loading
+  veil).
+- **Seats.** The three classic vantage seats are the window seat (today's
+  seat) and the two corner chairs. Each has its own look limits, and R faces
+  the seat's view. You sit by:
+  - the **Sit prompt**: stand within 1.4 m of a vantage chair, facing it, and
+    press Enter;
+  - a **click on the chair**: the nearest chair under the pointer answers, so
+    an ordinary chair hides a vantage chair behind it;
+  - the **seat menu**: V or "Seats"; Esc closes it before anything else.
+- **Comfort.**
+  - A seat change never moves faster than `WALK.glide.maxMps` (3.2 m/s)
+    while the view can see it. Stand-up and sit-down take as long as that
+    needs, with the design's times as minimums.
+  - A change too long for 3 s at that speed dips through black for 0.6 s and
+    is about 1.6 s in all. Every seat-to-seat change in the classic room is
+    one. Before the review these flew across the room at up to 11.5 m/s.
+  - Under reduced motion every change is a 0.3 s cut and there is no head
+    bob, read live.
+  - The veil is held fully black around every jump.
+- **Footsteps.** One soft scuff per stride, played on the room bus, so it
+  fades and mutes with the room. No footsteps and no bob while you push
+  against furniture.
+
+**Review.** An adversarial review (runtime; input and HUD; gate strength)
+found five walk defects, now fixed (`bada877`):
+- a seat chosen during a glide restarted it from mid-air;
+- no path could start from a strip of free floor narrower than a grid cell,
+  in front of the right corner chair;
+- the click ray ignored the TRUE_SCALE factor, so in Classic a floor click
+  sat you in a chair;
+- reduced motion was read only on entry;
+- a key held through a landing was ignored.
+
+It also fixed the input issues (Esc behind the binoculars, Enter on a focused
+button, a panel opened mid-stride, the menu covering the prompt). The gate
+gaps the review proved by mutation are closed, and all 11 mutations (theirs
+and a revert of each fix) turn a check red.
+
+**Gates.**
+- Node:
+  - lounge walk 28 → 55 (27 walk checks);
+  - NEW lounge vantage 7: every seat sees the faced runway's touchdown zone
+    and two of its three approach points through glazing at KCMH, KJFK, LOWI,
+    YSSY and EGLL, and picking works from every seat;
+  - audio 12 → 13 (footsteps);
+  - the rest unchanged: observation 45, lifecycle 24, lounge 13, lounge
+    seat 6, airport set 17, fleet airframes 13, airfield ground 13,
+    true-earth flags 8, ops golden 28/28, airport service 17, import
+    integrity 4, front door 70.
+- Browser: NEW lounge walk 20 (`?flags=LOUNGE_WALK`, real keys and mouse);
+  interaction 25/25 and browser states 24/24, flags off and with
+  `?flags=LOUNGE_WALK`; promotion 9/9.
+- Review captures: `review-observation-lounge.cjs --flags LOUNGE_WALK --seats
+  all` at KCMH and KJFK (noon), with each seat's view and sides plus a walk
+  loop. No page errors.
+
+### LOUNGE_WALK on (2026-10-14)
+
+The owner tried the walk at `?flags=LOUNGE_WALK` and signed it off, and
+`LOUNGE_WALK` ships `enabled: true` in its own commit. Certifying the flipped
+tree found one more walk defect and two instrument problems.
+
+- **A sliver no seat change could start from.** Where the sofa's, the mid
+  table's and a chair's inflated footprints just touch, free floor is a line,
+  free only to rounding (two points at 5 cm, x −6.25 and −4.55, z 6.95). The
+  walk can step onto it, and from there no path could start: the 32 straight
+  rays missed a bent sliver, and a search anchored at the start point made
+  different rounding calls from one anchored a centimetre away.
+  `pathStart()` now runs a 1 cm flood fill on a world-anchored lattice, so
+  every start makes the same calls on the same points, into the first free
+  cell; then it straightens the route.
+  - **Gate:** a whole-floor check. Every free point on a 5 cm lattice (101,168
+    points) and every free 1 cm point round both slivers starts a path, and
+    every walk-out leads to a free path. The leg oracle allows 2 mm at a
+    tangency, while furniture is centimetres deep.
+  - **Mutation run:** 12 of 12 killed, including a revert of the flood fill
+    and the start-anchored lattice.
+- **The seat-menu jump is timed on the page's own clock.** It runs from the
+  press on the seat row to the first frame seated, net of any frame over 1 s
+  inside it (reported), not by the harness's wall clock.
+- **A stall the walk does not cause.** The walk gate failed now and then on a
+  single 10-12 s frame. A CPU profile puts it in `getProgramInfoLog`: WebGL
+  shader programs linking. A four-minute soak on a production build had the
+  same stalls with the walk **off** (3 per session, 4.4-10.2 s) as on (2 per
+  session, 10.2-11.6 s), in the first 70 s after arrival. They come again when
+  new detail comes into view (after the binoculars). See "Known issues". The
+  walk gate now settles past them before its timing checks, gives its state
+  waits room for one stall, and reports every stall it sees.
+
+**Gates on the flipped tree** (walk on by default, no URL flag):
+- Node: walk 56, vantage 7, audio 13; the rest unchanged (observation 45,
+  lifecycle 24, lounge 13, lounge seat 6, airport set 17, fleet airframes 13,
+  airfield ground 13, true-earth flags 8, ops golden 28/28, airport service
+  17, import integrity 4, front door 70).
+- Browser:
+  - walk 20/20 on a production build;
+  - interaction 25/25 and browser states 24/24, both with the walk on and
+    with `?flags=-LOUNGE_WALK`;
+  - promotion 9/9 on the dev server. The promotion gate runs with no URL
+    parameters, and a production build exposes `window.__fly` only with
+    `?graphicsReview=1`, so it is a dev-server gate.
+
 ### Owner checkpoints (open)
 
 - **Night.** Apron floods, cabin windows and taxiway/runway lights are tuned
@@ -409,8 +645,30 @@ parked fleet 141k, live fleet up to ~380k — each inside its budget.
   Gate to Gate "full living apron" decision; FLY_GATE_TO_GATE_PLAN.md
   decision 6). `FLEET_VIEW.parkedScenery` stays on: static scenery, never a
   contact, hidden when a real aircraft takes the stand.
+- **The walk (N): signed off, `LOUNGE_WALK` on** (owner, 2026-10-14, after
+  trying it at `?flags=LOUNGE_WALK`). It shipped as built, so two choices
+  stand as they were offered:
+  - the corner seats keep the design's look centre of ±0.55 rad (±0.3 was
+    offered, to keep the corner mullion and the neighbour's lamp out of the
+    middle of the view; `VANTAGE.classic`);
+  - seat changes across the room keep the 0.6 s dip through black rather than
+    a fast glide (`FAR_FADE_SEC`, `WALK.glide.maxMps`).
+
+  `?flags=-LOUNGE_WALK` gives the seated-only lounge for one page load.
 
 ### Known issues and follow-ups
+
+- **A first visit can freeze for seconds while shaders link** (found
+  2026-10-14, not the walk's). In a fresh headless Chrome on the owner's RTX
+  5080 box, the lounge's first ~70 s hold 2-3 frames of 4.4-11.6 s each, with
+  `LOUNGE_WALK` on or off. A frame can stall again when new detail comes into
+  view after the binoculars. The CPU profile puts the time in
+  `getProgramInfoLog`, a synchronous wait for a WebGL program link. Real Chrome
+  keeps a shader cache, so a returning player should not see it; a first-time
+  player may. The material or materials are not identified yet. The likely
+  fixes are a warm-up `compileAsync` of the lounge's programs behind the
+  arrival veil, and `renderer.debug.checkShaderErrors = false` outside
+  development.
 
 - A contrail can still bend at a real sharp turn (the step after a stall
   frame is fixed, `380ac36`).

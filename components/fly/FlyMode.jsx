@@ -222,7 +222,7 @@ export function FlyMode({ onClose }) {
       const store = useFlyStore.getState();
       if (e.key === 'Escape') {
         if(useFlyStore.getState().airportBrowserOpen){useFlyStore.setState({airportBrowserOpen:false});return;}
-        if(useFlyStore.getState().airportWatch&&!useFlyStore.getState().inspectHex){runtime.airportWatch?.leave();exitToTitle(runtime);return;}
+        if(useFlyStore.getState().airportWatch&&!useFlyStore.getState().inspectHex){const w=runtime.airportWatch;if(w?.exit)w.exit();else exitToTitle(runtime);return;} // the lounge leaves to where it was entered from (watch.exit)
         if (store.adventureOpen) store.closeAdventureOverlay?.();
         else if (store.inspectHex) store.setInspectHex(null);
         else if (store.cameraMode === 'photo') store.setCameraMode('chase');

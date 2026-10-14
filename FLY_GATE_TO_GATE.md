@@ -8,7 +8,10 @@ wave, and the seams. **Where this file and a design JSON disagree, this file
 wins; where this file and the plan disagree, the plan wins.**
 
 Status: **W0 landed on `main` (2026-10-13). Nothing visible changed.**
-Checkpoint 0 (the owner confirms the flag registry) is open.
+Checkpoint 0 (the owner confirms the flag registry) is open. **W4-0 (the
+lounge contracts) landed on `main` the same day, also invisible**, ahead of W1
+by the owner's order, and **W4 N (the walk) landed behind `LOUNGE_WALK`**,
+which the owner signed off and is **on since 2026-10-14**.
 
 ## The seam rule
 
@@ -66,9 +69,10 @@ Every shape below exists on `main` now, inert while its flag is off.
 
 ## Flag registry
 
-All fifteen ship `enabled:false`, after `EARTH_HORIZON` at the end of
-`lib/fly/fly-constants.js`. Turn one on for a page load with `?flags=NAME`
-(off with `-NAME`). Nothing but flag blocks may follow the TRUE EARTH marker
+All fifteen shipped `enabled:false`, after `EARTH_HORIZON` at the end of
+`lib/fly/fly-constants.js`; **`LOUNGE_WALK` is on since 2026-10-14** (the
+owner signed the walk off), the other fourteen are still off. Turn one on for
+a page load with `?flags=NAME` (off with `-NAME`). Nothing but flag blocks may follow the TRUE EARTH marker
 (`scripts/verify-true-earth-flags.mjs` (5)–(7)). Each block is listed in
 `device-report.js` FLAGS.
 
@@ -87,7 +91,7 @@ All fifteen ship `enabled:false`, after `EARTH_HORIZON` at the end of
 | `OPS_DEBRIEF` | grade, stamp, auto photo, debrief, history v2, Flights tab, title "your best" | bottom sheet |
 | `REPLAY` | render-only replay (W5) | 1 MB cap |
 | `LOUNGE_PIER` | pier room, pier set both sides, back-aware seats, seated city cap | inert |
-| `LOUNGE_WALK` | walk, postures, vantage seats, Sit prompt, seat menu, glides, footsteps | inert |
+| `LOUNGE_WALK` (**ON**, 2026-10-14) | walk, postures, vantage seats, Sit prompt, seat menu, glides, footsteps | inert |
 | `LOUNGE_BRIDGE` | Fly from here, Watch from the lounge, origin-aware Leave/Esc, Atlas bookmark, `'lounge'` transition, promotion (decision 12) | inert |
 
 Sub-switches: `ops-flags.js` `opsSub(NAME, key)`; e.g. `OPS_FX.smoke`,
@@ -248,3 +252,52 @@ There is nothing visual to judge. The owner confirms:
 1. The fifteen-flag registry above, including the sub-switches (e.g. `GATE_TO_GATE.maxHoldSec: 45`, `FLIGHT_DECK.guidance: 'minimal'`).
 2. The defaults already set in the plan: auto-taxi, auto-gear and autobrake do not count as "Assisted"; line-ups, practice finals and warps do.
 3. That W1 may start: B → A → C → D, with checkpoint 1 on the RTX 5080 and iPhone for `OPS_AIRFIELD`, `OPS_FEEL` and `FLIGHT_DECK`.
+
+### W4-0 — lounge contracts (2026-10-13)
+
+Executed by the orchestrating session on `g2g/lounge-walk`, then merged
+`--no-ff`. Nothing a player sees changed, and every lounge gate passes
+unchanged with `LOUNGE_WALK`, `LOUNGE_PIER` and `LOUNGE_BRIDGE` off. The
+contract table and the full record are in
+[FLY_OBSERVATION_LOUNGE.md](FLY_OBSERVATION_LOUNGE.md) ("Lounge, further").
+
+| Commit | Step |
+|---|---|
+| `5e3f84e` | task 0: `verify-lounge-promotion.cjs` passed 7/7 as written; it now also checks the Atlas pill (desktop) and its absence (phones): 9/9 |
+| `b10d6ea` | the contracts: vantage seats and walk numbers, room variants and `FLOOR_PLATE`, the aperture from any eye, the observer's eye and posture, the look limits and hooks, enter options, `exit()` / `handoff()`, walk blockers, the pier-ready layout fields, the eye as the audio listener, the shared BVH, the HUD and walk slots |
+| `5b0ccbe` | review fixes: the seam gaps (enter options honoured, `exit()` hands non-title origins to the bridge's `exitLounge`, the Leave label, binoculars halt a walk, the corner-seat zoom anchor, the probe eye), three blockers, and `verify-lounge-walk.mjs` 19 → 28 with a mutation run |
+
+**Gates (flags off):**
+- node: observation 45, lifecycle 24, lounge 13, lounge seat 6, airport set 17, fleet airframes 13, airfield ground 13, true-earth flags 8, ops golden 28/28, airport service 17, import integrity 4, front door 70, all unchanged; audio 11 → 12; NEW lounge walk 28;
+- browser: promotion 9/9, interaction 25/25, browser states 24/24.
+
+**Deviations from the ownership list:**
+- `components/fly/AirportLounge.jsx` (M's file) got the one probe-eye branch, because a walking eye must not drag the glass's box projection with it. The branch is never taken with the flag off.
+- `components/fly/hud/lounge/{BinocularHud,SpotterCard}.jsx` read their range from `watch.eyeWorld()`.
+- N's `SeatsButton`, `SitPrompt` and `SeatMenu` and the walk slot `lounge-walk-runtime.js` were created as null stubs, so LoungeHud is never edited again.
+- `scripts/verify-airport-audio.mjs` gained the walking-eye check, and `scripts/_catalog-airports.mjs` is new.
+
+### W4 N — walk and sit, classic room (2026-10-13)
+
+Executed by the orchestrating session on `g2g/lounge-walk-n` (from W4-0), then merged `--no-ff`. Behind `LOUNGE_WALK`, shipped off. With the flag off nothing changes: every lounge gate passes unchanged and `verify-ops-golden` stays 28/28. What the walk does, the comfort rules and the open owner checkpoints are in [FLY_OBSERVATION_LOUNGE.md](FLY_OBSERVATION_LOUNGE.md) ("Lounge, further — N").
+
+| Commit | Step |
+|---|---|
+| `3aa025c` | the walk: `lib/fly/lounge/room-walk.mjs` (walkable space, collisions, A*, glides, Sit prompt, click-a-chair), `lounge-walk-runtime.js`, SitPrompt / SeatMenu / SeatsButton, LoungeSurface keys and click, the walk CSS, the footstep cue; NEW `verify-lounge-vantage.mjs`, `verify-lounge-walk.cjs`; `review-observation-lounge.cjs --flags / --seats` |
+| `bada877` | adversarial review fixes (mid-glide re-targeting, sub-cell path starts, the click ray under TRUE_SCALE, reduced motion read live, a key held through a landing, Esc and Enter and panels) and a gate that kills 11 of 11 mutations |
+
+**Gates:**
+- node: lounge walk 55 (28 W4-0 + 27 walk), NEW lounge vantage 7, audio 13; the rest unchanged (observation 45, lifecycle 24, lounge 13, lounge seat 6, airport set 17, fleet airframes 13, airfield ground 13, true-earth flags 8, ops golden 28/28, airport service 17, import integrity 4, front door 70);
+- browser: NEW lounge walk 20; interaction 25/25 and browser states 24/24 flags off and with `?flags=LOUNGE_WALK`; promotion 9/9.
+
+**Deviations from the design:**
+- **Seat changes across the room fade through black.** The design gives the glide `maxMps 3.2` and `maxSec 3.0`. An 18 m change cannot satisfy both, and holding the 3 s cap meant a peak of 11.5 m/s at eye height. The speed cap wins (the comfort rule): a change that does not fit in 3 s at that speed dips through black (0.6 s, about 1.6 s in all). The seat-menu jump lands in about 1.3 s.
+- **Click-a-chair reaches across the room** (the design names no reach). The nearest chair under the pointer answers, so an ordinary chair hides a vantage chair behind it.
+- The corner seats keep the design's look centre (±0.55); the owner kept it at sign-off.
+
+**`LOUNGE_WALK` on (2026-10-14).** The owner signed the walk off, and the flip is its own commit. Certifying the flipped tree found:
+- a sliver of floor no seat change could start from (fixed: `pathStart()` floods a world-anchored 1 cm lattice; a whole-floor gate check over 101,168 points);
+- the seat-menu jump is now timed on the page's clock;
+- a pre-existing stall: WebGL program links of 4-12 s in the lounge's first minute, with the walk on **or off** (a soak on a production build). It is not the walk's; it is recorded in FLY_OBSERVATION_LOUNGE.md "Known issues", and the walk gate settles past it.
+
+Gates on the flipped tree: node walk 56 and the lounge battery unchanged; browser walk 20/20 (production build), interaction 25/25 and states 24/24 in both arms, promotion 9/9 (dev).

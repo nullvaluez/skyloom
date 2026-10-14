@@ -15,17 +15,20 @@
 > - **Gate to Gate (2026-10-13, IN PROGRESS):** the takeoff & landing
 >   overhaul, then the lounge further. [FLY_GATE_TO_GATE_PLAN.md](FLY_GATE_TO_GATE_PLAN.md)
 >   is the plan; [FLY_GATE_TO_GATE.md](FLY_GATE_TO_GATE.md) is the record, the
->   contract reference, the 15-flag registry (all `enabled:false`, read only
->   through `lib/fly/ops-flags.js`) and the per-wave file ownership. **W0
->   (contracts and seams, nothing visible) is on `main`.** Seam rule: later
+>   contract reference, the 15-flag registry (all `enabled:false` except
+>   `LOUNGE_WALK`, on since 2026-10-14; read only through
+>   `lib/fly/ops-flags.js`) and the per-wave file ownership. **W0 (contracts
+>   and seams, nothing visible), W4-0 (lounge contracts) and W4 N (the lounge
+>   walk) are on `main`.** Seam rule: later
 >   streams never edit `FlyScene.jsx`, `PlayerPlane.jsx`, `TrafficLayer.jsx`,
 >   `operations-runtime.js` or the flag registry outside their own block.
 >   `scripts/verify-ops-golden.mjs` must stay byte-identical with the flags off.
 > - **Observation lounge (2026-10-13, behind `?airports=on`):**
 >   [FLY_OBSERVATION_LOUNGE.md](FLY_OBSERVATION_LOUNGE.md) is the plan and
->   record of the seated airport lounge (room, picking/binoculars/board,
->   procedural airframes and contrails, airfield ground and lighting, terminal
->   set) and its open owner checkpoints.
+>   record of the airport lounge (room, picking/binoculars/board, procedural
+>   airframes and contrails, airfield ground and lighting, terminal set; since
+>   2026-10-14 the walk: WASD, vantage seats, Sit prompt, seat menu, behind
+>   `LOUNGE_WALK`, on) and its open owner checkpoints.
 > - **Target UI (2026-10-07, shipped on, owner-requested):** [FLY_TARGET_UI.md](FLY_TARGET_UI.md)
 >   — the inspect dossier, ONE Escort action on every button (`lib/fly/escort.js`:
 >   intercept + the cinematic camera, which films a far pair over the shoulder
