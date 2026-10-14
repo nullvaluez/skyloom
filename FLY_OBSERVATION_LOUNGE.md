@@ -3,9 +3,9 @@
 > **Status (2026-10-13): W0 and all five W1 workstreams are merged on `main`,
 > with an integration pass on top (see Record).** Promoted the same day: desktop
 > players get "Watch an airport" with no URL parameters (phones excluded).
-> **"Lounge, further" is in progress**: its W4-0 contracts are on `main`
-> (nothing visible), and the walk (N, behind `LOUNGE_WALK`) is next. See that
-> section below. Every look and fps verdict below comes from
+> **"Lounge, further" is in progress**: its W4-0 contracts and the walk (N,
+> behind `LOUNGE_WALK`, off until the owner signs it off) are on `main`. See
+> that section below. Every look and fps verdict below comes from
 > headless Chrome on the owner's RTX 5080 box; the owner's own sessions decide
 > the open items in "Owner checkpoints".
 > This file is both the plan every workstream works from and the record of
@@ -319,7 +319,8 @@ falls back to today's runway start.
 - W4-0: nothing to see. The lounge must look and behave exactly as before.
 - N: `?flags=LOUNGE_WALK` at KCMH: walk and run speed and the bob, collisions
   with the furniture, the three seats and the seat menu, the Sit prompt;
-  nothing changed with the flag off.
+  nothing changed with the flag off. Then the two open N checkpoints in the
+  record (the corner seats' framing, seat changes that fade).
 - M/O/P: at their checkpoint (FLY_GATE_TO_GATE_PLAN.md checkpoint 4).
 
 ## Record
@@ -511,7 +512,93 @@ every contract above is inert with `LOUNGE_WALK`, `LOUNGE_PIER` and
 - Browser on the worktree's dev server: promotion 9/9 (no URL parameters),
   interaction 25/25, browser states 24/24.
 
+### Lounge, further — N, walk and sit (2026-10-13)
+
+Branch `g2g/lounge-walk-n`, merged `--no-ff`. Everything is behind
+`LOUNGE_WALK`, which ships off: `?flags=LOUNGE_WALK` turns it on for one page
+load. With the flag off the lounge is the W4-0 lounge.
+
+**With the flag on:**
+- **Walking.** W/A/S/D walk at 1.4 m/s and Shift runs at 2.4 m/s, with
+  constant acceleration both ways. Drag looks; standing, the head turns all
+  the way round. A move key stands you up out of the chair. There is no
+  pointer lock: the cursor stays the picker. The keys are taken in the
+  capture phase, so the flight input never sees them. A panel opening (the
+  airport browser, the Atlas, the logbook, the dossier, pause) stops the walk
+  at once.
+- **Collisions.** The room's furniture, planters, bar, boards and walls stop a
+  body of radius 0.25 m, and you slide along edges. The walkable space is
+  built once, on the first validated frame (about 52 ms, behind the loading
+  veil).
+- **Seats.** The three classic vantage seats are the window seat (today's
+  seat) and the two corner chairs. Each has its own look limits, and R faces
+  the seat's view. You sit by:
+  - the **Sit prompt**: stand within 1.4 m of a vantage chair, facing it, and
+    press Enter;
+  - a **click on the chair**: the nearest chair under the pointer answers, so
+    an ordinary chair hides a vantage chair behind it;
+  - the **seat menu**: V or "Seats"; Esc closes it before anything else.
+- **Comfort.**
+  - A seat change never moves faster than `WALK.glide.maxMps` (3.2 m/s)
+    while the view can see it. Stand-up and sit-down take as long as that
+    needs, with the design's times as minimums.
+  - A change too long for 3 s at that speed dips through black for 0.6 s and
+    is about 1.6 s in all. Every seat-to-seat change in the classic room is
+    one. Before the review these flew across the room at up to 11.5 m/s.
+  - Under reduced motion every change is a 0.3 s cut and there is no head
+    bob, read live.
+  - The veil is held fully black around every jump.
+- **Footsteps.** One soft scuff per stride, played on the room bus, so it
+  fades and mutes with the room. No footsteps and no bob while you push
+  against furniture.
+
+**Review.** An adversarial review (runtime; input and HUD; gate strength)
+found five walk defects, now fixed (`bada877`):
+- a seat chosen during a glide restarted it from mid-air;
+- no path could start from a strip of free floor narrower than a grid cell,
+  in front of the right corner chair;
+- the click ray ignored the TRUE_SCALE factor, so in Classic a floor click
+  sat you in a chair;
+- reduced motion was read only on entry;
+- a key held through a landing was ignored.
+
+It also fixed the input issues (Esc behind the binoculars, Enter on a focused
+button, a panel opened mid-stride, the menu covering the prompt). The gate
+gaps the review proved by mutation are closed, and all 11 mutations (theirs
+and a revert of each fix) turn a check red.
+
+**Gates.**
+- Node:
+  - lounge walk 28 → 55 (27 walk checks);
+  - NEW lounge vantage 7: every seat sees the faced runway's touchdown zone
+    and two of its three approach points through glazing at KCMH, KJFK, LOWI,
+    YSSY and EGLL, and picking works from every seat;
+  - audio 12 → 13 (footsteps);
+  - the rest unchanged: observation 45, lifecycle 24, lounge 13, lounge
+    seat 6, airport set 17, fleet airframes 13, airfield ground 13,
+    true-earth flags 8, ops golden 28/28, airport service 17, import
+    integrity 4, front door 70.
+- Browser: NEW lounge walk 20 (`?flags=LOUNGE_WALK`, real keys and mouse);
+  interaction 25/25 and browser states 24/24, flags off and with
+  `?flags=LOUNGE_WALK`; promotion 9/9.
+- Review captures: `review-observation-lounge.cjs --flags LOUNGE_WALK --seats
+  all` at KCMH and KJFK (noon), with each seat's view and sides plus a walk
+  loop. No page errors.
+
 ### Owner checkpoints (open)
+
+- **The walk (N), before `LOUNGE_WALK` is flipped on:** walk and run speed,
+  the bob, collisions, the Sit prompt, click-a-chair and the seat menu, at
+  KCMH and a hub.
+- **Corner seats' framing.** The design's look centre for the corners is
+  ±0.55 rad. From the left corner a mullion stands about 9° left of the centre
+  of view with the corner post beyond it; from the right corner the
+  neighbouring side table's lamp fills the lower right. ±0.3 would frame the
+  diagonal through the bay instead (`VANTAGE.classic`, observation-config).
+- **Seat changes that fade.** Every seat-to-seat change in the classic room
+  dips through black (1.6 s) rather than gliding. A short move (a chair within
+  a few metres) still glides. The fade is `FAR_FADE_SEC` in
+  `lib/fly/lounge/room-walk.mjs`; the speed cap is `WALK.glide.maxMps`.
 
 - **Night.** Apron floods, cabin windows and taxiway/runway lights are tuned
   by eye in headless captures; judge the night apron brightness on a real
