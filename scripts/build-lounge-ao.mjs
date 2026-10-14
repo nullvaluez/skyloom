@@ -1,7 +1,7 @@
 /**
  * Observation lounge — offline ambient-occlusion bake (first-party).
  *
- *   node scripts/build-lounge-ao.mjs [--rays 48] [--floor-rays 64]
+ *   node scripts/build-lounge-ao.mjs [--rays 48] [--floor-rays 64] [--out <file>]
  *
  * Builds the room exactly as the game does (lib/fly/lounge/room-build.js),
  * raycasts the real triangles through a BVH and writes
@@ -19,6 +19,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildLoungeRoom } from '../lib/fly/lounge/room-build.js';
 import { BAKE_BUCKETS, FLOOR_RECT, encodeBake, geometrySignature, skipsVertexAO } from '../lib/fly/lounge/room-ao.js';
+import { buildTriBvh } from './_tri-bvh.mjs';
 
 const arg = (name, fallback) => {
   const i = process.argv.indexOf('--' + name);
@@ -30,109 +31,19 @@ const OBJECT_RANGE = 0.42; // metres: crevices and contact
 const FLOOR_RANGE = 0.85; // metres: the soft pool under a seat or table
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const out = path.join(root, 'public/models/lounge-ao-v1.bin');
+// --out writes elsewhere (scripts/verify-lounge-walk.mjs --bake compares a fresh bake with the shipped file).
+const outArg = process.argv.indexOf('--out');
+const out = outArg > 0 && process.argv[outArg + 1] ? path.resolve(process.argv[outArg + 1]) : path.join(root, 'public/models/lounge-ao-v1.bin');
 
 const t0 = performance.now();
 const room = buildLoungeRoom();
 const buckets = room.buckets;
 
 // ---------------------------------------------------------------------------
-// Triangle soup + BVH (median split on the widest centroid axis, leaves <= 4)
+// Triangle soup + BVH (scripts/_tri-bvh.mjs: median split on the widest
+// centroid axis, leaves <= 4 — shared with the lounge walk gates)
 // ---------------------------------------------------------------------------
-let triCount = 0;
-for (const name of BAKE_BUCKETS) if (buckets[name]) triCount += buckets[name].index.count / 3;
-const tri = new Float32Array(triCount * 9); // v0, e1, e2
-const cen = new Float32Array(triCount * 3);
-const box = new Float32Array(triCount * 6);
-{
-  let t = 0;
-  for (const name of BAKE_BUCKETS) {
-    const g = buckets[name];
-    if (!g) continue;
-    const p = g.attributes.position.array, ix = g.index.array;
-    for (let i = 0; i < ix.length; i += 3, t++) {
-      const a = ix[i] * 3, b = ix[i + 1] * 3, c = ix[i + 2] * 3;
-      const o = t * 9;
-      tri[o] = p[a]; tri[o + 1] = p[a + 1]; tri[o + 2] = p[a + 2];
-      tri[o + 3] = p[b] - p[a]; tri[o + 4] = p[b + 1] - p[a + 1]; tri[o + 5] = p[b + 2] - p[a + 2];
-      tri[o + 6] = p[c] - p[a]; tri[o + 7] = p[c + 1] - p[a + 1]; tri[o + 8] = p[c + 2] - p[a + 2];
-      for (let k = 0; k < 3; k++) {
-        const lo = Math.min(p[a + k], p[b + k], p[c + k]), hi = Math.max(p[a + k], p[b + k], p[c + k]);
-        box[t * 6 + k] = lo; box[t * 6 + 3 + k] = hi;
-        cen[t * 3 + k] = (lo + hi) / 2;
-      }
-    }
-  }
-}
-const order = new Uint32Array(triCount).map((_, i) => i);
-const nodeBox = [], nodeA = [], nodeB = []; // leaf: a = start, b = -count ; inner: a = left, b = right
-function buildNode(start, end) {
-  const id = nodeA.length;
-  nodeA.push(0); nodeB.push(0);
-  let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
-  let clo = [Infinity, Infinity, Infinity], chi = [-Infinity, -Infinity, -Infinity];
-  for (let i = start; i < end; i++) {
-    const t = order[i];
-    for (let k = 0; k < 3; k++) {
-      lo[k] = Math.min(lo[k], box[t * 6 + k]); hi[k] = Math.max(hi[k], box[t * 6 + 3 + k]);
-      clo[k] = Math.min(clo[k], cen[t * 3 + k]); chi[k] = Math.max(chi[k], cen[t * 3 + k]);
-    }
-  }
-  nodeBox.push(...lo, ...hi);
-  if (end - start <= 4) { nodeA[id] = start; nodeB[id] = -(end - start); return id; }
-  const axis = chi[0] - clo[0] >= chi[1] - clo[1] && chi[0] - clo[0] >= chi[2] - clo[2] ? 0 : chi[1] - clo[1] >= chi[2] - clo[2] ? 1 : 2;
-  const mid = (start + end) >> 1;
-  // nth_element by centroid along the axis
-  const sub = Array.from(order.subarray(start, end)).sort((a, b) => cen[a * 3 + axis] - cen[b * 3 + axis]);
-  order.set(sub, start);
-  const l = buildNode(start, mid), r = buildNode(mid, end);
-  nodeA[id] = l; nodeB[id] = r;
-  return id;
-}
-buildNode(0, triCount);
-const NB = new Float32Array(nodeBox), NA = new Int32Array(nodeA), NBi = new Int32Array(nodeB);
-const stack = new Int32Array(128);
-
-/** Closest hit distance along a unit ray within tMax (Infinity on a miss). */
-function cast(ox, oy, oz, dx, dy, dz, tMax) {
-  const ix = 1 / dx, iy = 1 / dy, iz = 1 / dz;
-  let best = tMax, sp = 0;
-  stack[sp++] = 0;
-  while (sp) {
-    const n = stack[--sp], b = n * 6;
-    let t1 = (NB[b] - ox) * ix, t2 = (NB[b + 3] - ox) * ix;
-    let tn = Math.min(t1, t2), tf = Math.max(t1, t2);
-    t1 = (NB[b + 1] - oy) * iy; t2 = (NB[b + 4] - oy) * iy;
-    tn = Math.max(tn, Math.min(t1, t2)); tf = Math.min(tf, Math.max(t1, t2));
-    t1 = (NB[b + 2] - oz) * iz; t2 = (NB[b + 5] - oz) * iz;
-    tn = Math.max(tn, Math.min(t1, t2)); tf = Math.min(tf, Math.max(t1, t2));
-    if (tf < Math.max(tn, 0) || tn > best) continue;
-    const cnt = NBi[n];
-    if (cnt <= 0) {
-      const s = NA[n], e = s - cnt;
-      for (let i = s; i < e; i++) {
-        const o = order[i] * 9;
-        const e1x = tri[o + 3], e1y = tri[o + 4], e1z = tri[o + 5], e2x = tri[o + 6], e2y = tri[o + 7], e2z = tri[o + 8];
-        const px = dy * e2z - dz * e2y, py = dz * e2x - dx * e2z, pz = dx * e2y - dy * e2x;
-        const det = e1x * px + e1y * py + e1z * pz;
-        if (det > -1e-12 && det < 1e-12) continue;
-        const inv = 1 / det;
-        const sx = ox - tri[o], sy = oy - tri[o + 1], sz = oz - tri[o + 2];
-        const u = (sx * px + sy * py + sz * pz) * inv;
-        if (u < 0 || u > 1) continue;
-        const qx = sy * e1z - sz * e1y, qy = sz * e1x - sx * e1z, qz = sx * e1y - sy * e1x;
-        const v = (dx * qx + dy * qy + dz * qz) * inv;
-        if (v < 0 || u + v > 1) continue;
-        const t = (e2x * qx + e2y * qy + e2z * qz) * inv;
-        if (t > 1e-5 && t < best) best = t;
-      }
-    } else {
-      stack[sp++] = NA[n];
-      stack[sp++] = cnt;
-    }
-  }
-  return best;
-}
+const { triCount, cast } = buildTriBvh(buckets, BAKE_BUCKETS);
 
 // Cosine-weighted hemisphere directions (Fibonacci), around +Z.
 function hemisphere(n) {

@@ -6,7 +6,8 @@
 // music director is ducked while observing and restored after; a takeoff
 // roll is HEARD only after its sound has travelled to the seat (343 m/s);
 // nearer aircraft are louder and brighter; doppler raises an approaching
-// engine and lowers a receding one; mute, a hidden tab and leaving silence
+// engine and lowers a receding one; the listener is the observer's eye
+// (watch.eyeWorld, which walks with LOUNGE_WALK); mute, a hidden tab and leaving silence
 // everything; leaving tears the graph down and dispose releases every node.
 //
 // Run: node scripts/verify-airport-audio.mjs
@@ -89,6 +90,19 @@ await check('doppler: an approaching engine plays higher than a receding one',()
   assert.ok(a>b*1.3,`approaching ${a} vs receding ${b}`);
 });
 await check('voices pan toward the side the sound comes from',()=>{const left=track('lft',-1500,0,{ground:false,y:600}),right=track('rgt',1500,0,{ground:false,y:600});runtime.traffic.items=[left,right];step(2);assert.ok(voiceFor('lft').pan.pan.value<-0.5&&voiceFor('rgt').pan.pan.value>0.5);});
+await check('the listener is the observer\'s eye: standing 12 m from the seat, a contact is heard at its distance from that eye (343 m/s)',()=>{
+  // LOUNGE_WALK moves the eye; the soundscape listens from watch.eyeWorld().
+  const parked=track('wlk',600,0);runtime.traffic.items=[parked];
+  const standing={x:12,y:seat.y+1.65,z:0};
+  watch.eyeWorld=(out={})=>Object.assign(out,standing);
+  step(3);
+  const row=runtime.airportAudioStats.heard.find(r=>r.hex==='wlk');
+  const fromEye=Math.hypot(600-standing.x,278-standing.y),fromSeat=Math.hypot(600,278-(seat.y+1.18));
+  delete watch.eyeWorld;
+  assert.ok(row,'the contact is voiced');
+  assert.ok(Math.abs(row.d-fromEye)<=1,`distance ${row.d} m: ${fromEye.toFixed(1)} from the eye, not ${fromSeat.toFixed(1)} from the seat`);
+  assert.ok(Math.abs(row.delayS-fromEye/343)<=0.011,`delay ${row.delayS} s vs ${(fromEye/343).toFixed(3)}`);
+});
 await check('the room has a bed and a PA chime',()=>{const before=started;clock+=SOUNDSCAPE.chime.maxSec+1;ctx.currentTime+=1;audio.nextUpdate=0;audio.update(runtime,state);assert.ok(started>before,'chime oscillators scheduled');assert.equal(audio.graph.bus.gain.value,1);});
 await check('mute and a hidden tab silence the room and every voice',()=>{for(const [sound,hidden] of [[false,false],[true,true]]){state.soundOn=sound;document.hidden=hidden;step(0.5);assert.equal(audio.graph.bus.gain.value,0);assert.ok(audio.voices.every(v=>v.gain.gain.value===0));}state.soundOn=true;document.hidden=false;step(0.5);assert.equal(audio.graph.bus.gain.value,1);});
 await check('interface cues play only while sound is up and clean up after themselves',()=>{const before=allocated;base.muted=true;audio.cue('select');assert.equal(allocated,before);base.muted=false;audio.cue('select');audio.cue('raise');assert.ok(allocated>before);});

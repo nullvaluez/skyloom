@@ -31,7 +31,12 @@ export function weatherSummary(data) {
 
 const SKY_ICON = { clear: Sun, partly: CloudSun, cloudy: Cloudy, overcast: Cloud, rain: CloudRain, snow: CloudSnow };
 
-export function LoungeHeader({ code, name, runway, feed, count, clock, sun, weather, onAirports, onLeave }) {
+/**
+ * `place` names where you are in the room ('Window lounge' seated with no
+ * walking; the seat or 'Standing' with LOUNGE_WALK). `leaveLabel` is the exit
+ * button's wording (LOUNGE_BRIDGE makes it origin-aware); test id lounge-leave.
+ */
+export function LoungeHeader({ code, name, runway, feed, count, clock, sun, weather, onAirports, onLeave, place = 'Window lounge', leaveLabel = 'Leave lounge' }) {
   const SkyIcon = weather ? SKY_ICON[weather.kind] || Cloud : Cloud;
   const SunIcon = sun?.kind === 'night' ? Moon : sun?.kind === 'golden' || sun?.kind === 'twilight' ? (sun.rising ? Sunrise : Sunset) : Sun;
   return (
@@ -40,8 +45,8 @@ export function LoungeHeader({ code, name, runway, feed, count, clock, sun, weat
         <span className="lh-code">{code}</span>
         <div className="lh-text">
           <h1 title={name}>{name}</h1>
-          <p>
-            Window lounge{runway ? <> <span aria-hidden="true">·</span> Runway {runway}</> : null}
+          <p data-testid="lounge-place">
+            {place}{runway ? <> <span aria-hidden="true">·</span> Runway {runway}</> : null}
           </p>
         </div>
       </div>
@@ -84,7 +89,7 @@ export function LoungeHeader({ code, name, runway, feed, count, clock, sun, weat
         </button>
         <button type="button" className="lounge-btn airport-exit" onClick={onLeave} data-testid="lounge-leave">
           <X size={15} aria-hidden="true" />
-          Leave lounge
+          {leaveLabel}
         </button>
       </div>
     </header>

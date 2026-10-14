@@ -39,8 +39,9 @@ function readLive(runtime, hex, fieldElev) {
   const w = runtime.airportWatch;
   if (!t?.fix1 || !w) return t ? { stale: t.stale ?? 2 } : null;
   const k = w.frame?.k || 1;
-  const eyeY = w.seat.y + LOUNGE_ROOM.eye[1];
-  const dx = (t.rx - w.seat.x) / k, dz = (t.rz - w.seat.z) / k, dy = (t.ry ?? 0) - eyeY;
+  // Ranged from the observer's eye (it walks with LOUNGE_WALK).
+  const e = w.eyeWorld ? w.eyeWorld() : { x: w.seat.x, y: w.seat.y + LOUNGE_ROOM.eye[1], z: w.seat.z };
+  const dx = (t.rx - e.x) / k, dz = (t.rz - e.z) / k, dy = (t.ry ?? 0) - e.y;
   let lat = null, lon = null;
   if (runtime.engine) {
     const g = runtime.engine.worldToGeo({ x: t.rx, y: t.ry, z: t.rz });
