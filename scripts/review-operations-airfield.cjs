@@ -5,14 +5,14 @@
 //        [--sun day,golden,night] [--date 2026-10-13] [--utc <ISO | epoch ms | UTC hour>]
 //        [--poses lineup,roll40,rotate,final3nm,final1nm,flare,rollout]
 //        [--aircraft auto|airliner|bizjet|...] [--arm off|on|both] [--tier full|registry]
-//        [--cam chase[,side]] [--census 1] [--clean 1] [--reverse 0|1]
+//        [--flags NAME,NAME,...] [--cam chase[,side]] [--census 1] [--clean 1] [--reverse 0|1]
 //        [--weather baseline|live] [--quality high] [--settle 4] [--settleMax 30]
 //        [--out .graphics-review/operations-airfield]
 //
 // One run = one airport x one sun x one arm, on a fresh page:
 //   ?graphicsReview=1&sunUtc=<instant>&weather=baseline   (arm off)
 //   ...&flags=OPS_AIRFIELD,OPS_APRON,GATE_TO_GATE,PLAYER_GLOW_LIGHTS   (arm on;
-//   the W0 flag names — nothing reads them until W1)
+//   the W0 flag names — nothing reads them until W1; --flags replaces the list)
 // then runtime.launchSetup({flightMode:'ops', aircraftId, airportId,
 // start:'runway'}) after runtime.reviewOps.ensureAirport() has loaded a catalog
 // airport's runway rows, a wait for the world, and for each pose
@@ -68,7 +68,7 @@ const settleMin = Number(arg('settle', '4')) * 1000;
 const settleMax = Number(arg('settleMax', '30')) * 1000;
 const outRoot = path.resolve(arg('out', '.graphics-review/operations-airfield'));
 const headed = arg('headed', '0') === '1';
-const ARM_FLAGS = 'OPS_AIRFIELD,OPS_APRON,GATE_TO_GATE,PLAYER_GLOW_LIGHTS';
+const ARM_FLAGS = list(arg('flags', 'OPS_AIRFIELD,OPS_APRON,GATE_TO_GATE,PLAYER_GLOW_LIGHTS')).join(',');
 // Airliner-class first; a short catalog runway falls back down the list (LOWI 08/26 is 1996 m).
 const AUTO_AIRCRAFT = ['airliner', 'bizjet', 'fighter', 'prop'];
 
@@ -211,6 +211,8 @@ async function run(browser, airportArg, sunKind, arm) {
     }, [quality, tier]);
     await page.goto(url, { timeout: 240000, waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => !!window.__fly?.launchSetup && !!window.__fly?.reviewOps, undefined, { timeout: 240000, polling: 250 });
+    // The flags fly-pins.installUrlFlags actually applied from ?flags= (arm on).
+    report.urlFlags = await page.evaluate(() => window.__flyUrlFlags ?? null);
     report.renderer = await page.evaluate(() => {
       const gl = window.__flyGl?.getContext?.();
       const ext = gl?.getExtension?.('WEBGL_debug_renderer_info');
@@ -309,7 +311,7 @@ async function run(browser, airportArg, sunKind, arm) {
         poses: report.poses.filter((p) => !p.skipped).length, skipped: report.poses.filter((p) => p.skipped).map((p) => p.name),
         pageErrors: report.pageErrors.length, consoleErrors: report.consoleErrors.length, failure: report.failure ? String(report.failure).slice(0, 200) : null,
         lineup: lineup ? { draws: lineup.draws, tris: lineup.tris, p50: lineup.frame?.p50 ?? null, p95: lineup.frame?.p95 ?? null, aolVisibleMeshes: lineup.aolVisibleMeshes, tier: lineup.review?.tier ?? null } : null,
-        renderer: report.renderer ?? null, at: report.startedAt,
+        renderer: report.renderer ?? null, urlFlags: report.urlFlags ?? null, at: report.startedAt,
       };
       index.updatedAt = new Date().toISOString();
       fs.writeFileSync(indexFile, JSON.stringify(index, null, 2));
