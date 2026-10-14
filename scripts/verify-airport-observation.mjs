@@ -29,7 +29,7 @@ check('provider states distinguish delayed and unavailable',()=>{assert.equal(tr
 globalThis.window={location:{search:'?graphicsReview=1&airports=on&airportArt=off&airportScenery=on'},matchMedia:()=>({matches:false})};
 check('rollout parts are independent',()=>{assert.equal(livingAirportsOn(),true);assert.equal(livingAirportsOn('worldArt'),false);assert.equal(livingAirportsOn('scenery'),true);});
 check('mobile is always excluded',()=>{window.matchMedia=()=>({matches:true});window.ontouchstart=null;assert.equal(livingAirportsOn(),false);delete window.ontouchstart;});
-check('ordinary release remains off',()=>{window.matchMedia=()=>({matches:false});window.location.search='';assert.equal(livingAirportsOn(),false);});
+check('ordinary desktop release has the lounge; world art and airport scenery stay review-only',()=>{window.matchMedia=()=>({matches:false});window.location.search='';assert.equal(livingAirportsOn(),true);assert.equal(livingAirportsOn('worldArt'),false);assert.equal(livingAirportsOn('scenery'),false);window.location.search='?graphicsReview=1&airports=off';assert.equal(livingAirportsOn(),false);});
 delete globalThis.window;
 check('every checked-in runway passes runtime validation',()=>{
   let count=0;for(const file of fs.readdirSync('public/data/runways/v1/regions')){
