@@ -5,6 +5,7 @@ import { Binoculars, Camera, Crosshair, ListOrdered, RotateCcw, Volume2, VolumeX
 import { useFlyStore } from '@/stores/fly-store';
 import { getRuntimeAction } from '@/lib/fly/runtime-bus';
 import { exitToTitle } from '@/lib/fly/front-door';
+import { leaveLabelFor } from '@/lib/fly/lounge-bridge';
 import { localClockAt, sunStateAt } from '@/lib/fly/airport-watch-sky.mjs';
 import { LoungeOverlay } from './LoungeOverlay';
 import { LoungeSurface } from './LoungeSurface';
@@ -50,6 +51,7 @@ function runwayLabel(airport) {
  */
 function helpHints(watch) {
   if (!watch.walk) return ['Drag to look', 'Scroll to zoom', 'Click a plane to select', 'Double-click for binoculars'];
+  if (watch.posture === 'gliding') return ['Drag to look', 'V for seats'];
   if (watch.posture === 'standing') return ['WASD to walk', 'Shift to run', 'Drag to look', 'Click a chair to sit', 'V for seats'];
   return ['Drag to look', 'Scroll to zoom', 'Click a plane to select', 'WASD to get up', 'V for seats'];
 }
@@ -146,7 +148,7 @@ export function LoungeHud({ runtime, watch }) {
   const w = runtime.airportWatch;
   // The seat you are in (LOUNGE_WALK), for the header and the face button.
   const seat = watch.walk ? w?.seats?.find((s) => s.id === watch.seat) ?? null : null;
-  const place = !watch.walk ? 'Window lounge' : watch.posture === 'seated' && seat ? seat.label : 'Standing';
+  const place = !watch.walk ? 'Window lounge' : watch.posture === 'seated' && seat ? seat.label : watch.posture === 'gliding' ? 'Changing seats' : 'Standing';
   const faceLabel = watch.walk && watch.posture === 'seated' && seat?.faces === 'back' ? 'Face the back window' : 'Face the runway';
   const selectedRow = watch.selected ? picker.categories.get(watch.selected) : null;
   const fieldElev = airport ? (airport.a.elevation + airport.b.elevation) / 2 : 0;
@@ -177,6 +179,7 @@ export function LoungeHud({ runtime, watch }) {
         sun={conditions.sun}
         weather={conditions.weather}
         place={place}
+        leaveLabel={leaveLabelFor(watch.origin)}
         onAirports={() => useFlyStore.setState({ airportBrowserOpen: true })}
         onLeave={leave}
       />
