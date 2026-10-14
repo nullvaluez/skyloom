@@ -12,6 +12,15 @@
 >   (World/Close framing, Nearby encounters, the stylized-cinematic art pass),
 >   [FLY_RENDER_OPTIMIZATION.md](FLY_RENDER_OPTIMIZATION.md) and
 >   [CINEMATIC_EARTH_OVERHAUL.md](CINEMATIC_EARTH_OVERHAUL.md).
+> - **Gate to Gate (2026-10-13, IN PROGRESS):** the takeoff & landing
+>   overhaul, then the lounge further. [FLY_GATE_TO_GATE_PLAN.md](FLY_GATE_TO_GATE_PLAN.md)
+>   is the plan; [FLY_GATE_TO_GATE.md](FLY_GATE_TO_GATE.md) is the record, the
+>   contract reference, the 15-flag registry (all `enabled:false`, read only
+>   through `lib/fly/ops-flags.js`) and the per-wave file ownership. **W0
+>   (contracts and seams, nothing visible) is on `main`.** Seam rule: later
+>   streams never edit `FlyScene.jsx`, `PlayerPlane.jsx`, `TrafficLayer.jsx`,
+>   `operations-runtime.js` or the flag registry outside their own block.
+>   `scripts/verify-ops-golden.mjs` must stay byte-identical with the flags off.
 > - **Observation lounge (2026-10-13, behind `?airports=on`):**
 >   [FLY_OBSERVATION_LOUNGE.md](FLY_OBSERVATION_LOUNGE.md) is the plan and
 >   record of the seated airport lounge (room, picking/binoculars/board,

@@ -398,13 +398,17 @@ parked fleet 141k, live fleet up to ~380k — each inside its budget.
 
 ### Owner checkpoints (open)
 
-- **Parked aircraft at the gates** ship on (`FLEET_VIEW.parkedScenery`) —
-  static scenery, never a contact, hidden when a real aircraft takes the
-  stand. Keep, or leave the gates empty?
 - **Night.** Apron floods, cabin windows and taxiway/runway lights are tuned
   by eye in headless captures; judge the night apron brightness on a real
   display (`AIRFIELD.structures.night`, `FLEET_VIEW.flood`).
 - **Frame rate** on the owner's machine at YSSY (the heaviest seat) and KJFK.
+
+### Owner checkpoints (decided)
+
+- **Parked aircraft at the gates: keep** (owner, 2026-10-13, as part of the
+  Gate to Gate "full living apron" decision; FLY_GATE_TO_GATE_PLAN.md
+  decision 6). `FLEET_VIEW.parkedScenery` stays on: static scenery, never a
+  contact, hidden when a real aircraft takes the stand.
 
 ### Known issues and follow-ups
 
