@@ -26,6 +26,10 @@ Read these first, in order:
   - `lib/fly/player-visibility.js` and `lib/fly/camera-mode.js` exist;
   - `runtime.simHold` has a `'lounge'` reason.
 - **What the owner sees today:** the seated lounge (drag to look, wheel zoom, click a plane, binoculars). **You cannot walk.** That is this job.
+- **Concurrent work in the main checkout (found 2026-10-13):** another session, or the owner, has **uncommitted** changes that add F-35, C-17 and Concorde player aircraft.
+  - Touched files include `fly-constants.js` (HANGAR), `GroundHangar.jsx`, `player-aircraft.js`, `operations-profiles.js`, `assets.js`, `CREDITS.md` and the adventure files, plus new `public/models/player-{f35,concorde}*` and `scripts/build-{c17,concorde,f35}.mjs`.
+  - Never stage, commit, revert or stash them. Always `git add` explicit paths.
+  - Before merging your branch into `main`, check `git status`, and ask the owner if that work is still uncommitted.
 - **The owner is running `next dev` on port 3000 in `C:\Users\bfecho\skyloom-3`.**
   - Do not run harnesses against it.
   - Do not start a second `next dev` in that checkout (it fails on `.next/dev/lock`).
