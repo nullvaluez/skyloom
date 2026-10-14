@@ -237,6 +237,11 @@ Nothing a player sees changed. Every new path is inert with the flags off.
 - bright white hemisphere blobs over the treeline right of the KCMH night final1nm (pre-existing; W1 A should look while the airfield lights land);
 - a one-off "Invalid or unexpected token" on the very first cold dev compile.
 
+### Owner decisions after W0 (2026-10-13)
+
+- **Lounge now:** `LIVING_AIRPORTS.enabled` flipped to `true` (`1846ba4`). "Watch an airport" shows on the title card and the Atlas pill for desktop players with no URL parameters. This is ahead of the W4 promotion in decision 12; phones stay excluded. `scripts/verify-lounge-promotion.cjs` guards it.
+- **Lounge walk first:** W4-0 (lounge contracts) and W4 N (WALK & SIT, classic room) move ahead of W1. The handoff is [FLY_LOUNGE_WALK_HANDOFF.md](FLY_LOUNGE_WALK_HANDOFF.md). W1–W3, the pier (M, O) and the bridge (P) follow; the owner picks the next one at the walk checkpoint.
+
 ### Checkpoint 0 (owner)
 
 There is nothing visual to judge. The owner confirms:
