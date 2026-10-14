@@ -71,3 +71,61 @@ arm off. Each run has 7 runway poses × chase and side cameras, and every
 capture has a `-clean` twin, for 210 captures and 420 PNGs. Every run has a
 `report.json`; `index.json` and `baseline-summary.json` cover the whole set.
 The set has **0 page errors**. The command is in `baseline-summary.json`.
+
+## Integrated tree (9440498)
+
+The same 13 gates plus `verify-loading-scenery.cjs` were run on `main`
+9440498 (the fully integrated W0 tree: helper A, helper B, the orchestrator's
+splits, seams and fixes), with the same server setup and URLs, flags off.
+
+| Gate | Pre-baseline (4f7fac3 + W0.8) | Integrated 9440498 | Changed? |
+|---|---|---|---|
+| `verify-operations-browser.cjs` | PASS | PASS | no |
+| `verify-operations-design.cjs` | FAIL after 8 checks (phone `Minimize flight controls`) | FAIL after 8 checks, same step | no |
+| `verify-operations-keyboard.cjs` | PASS | PASS | no |
+| `verify-operations-experience.cjs` | FAIL after 6 checks (rollout braking, 12.8 m/s) | FAIL after 6 checks, same step (12.2 m/s) | no |
+| `verify-operations-touch.cjs` | FAIL after 2 checks (phone `Parking brake on`) | FAIL after 2 checks, same step | no |
+| `verify-operations-fleet.cjs` | PASS | PASS | no |
+| `verify-operations-taxi-edge.cjs` | PASS | PASS | no |
+| `verify-mobile-flight-deck.cjs` | FAIL, 0 checks (stale `title-free-flight`) | FAIL after 21 checks: the first-flight tips card intercepts the `Close flight setup` tap | yes, it now gets further. The stale id is fixed (9440498), and the remaining red is the pre-existing tips card my scratch run found |
+| `verify-airport-interaction.cjs` | 25/25 | 25/25 | no |
+| `verify-airport-browser-states.cjs` | 24/24 | 24/24 | no |
+| `verify-sat-night.js` | 26/3, re-run 27/2 | 26/3, re-run 27/2 | no. The two SatCityGlow reds are consistent. The third red was a different flake this time: a console 404 from the live `/api/aircraft/<hex>/route` lookup, gone on re-run |
+| `verify-chase-cam.js` | 6/8, re-run PASS | PASS | no (the earlier red was a live-traffic flake) |
+| `verify-feel.js` | 12/13 (punch decayed) | 12/13 (punch decayed, 73.98° against 78°) | no |
+| `verify-loading-scenery.cjs` | PASS | PASS | no |
+
+**Nothing is caused by W0.** No verdict regressed, and the only change is
+the mobile deck getting further.
+
+**Duplicate keys:** 0 React duplicate-key console errors on the integrated
+tree at KJFK:13R-31L and LOWI:08-26 (review runs below; arm off and on). The
+same poses logged 1,100–1,600 per run before `airportChoices`. All five
+integrated review runs logged 0 console errors and 0 page errors.
+
+**Flags-on boot smoke.** `review-operations-airfield.cjs --airport KCMH,LOWI
+--sun day --poses lineup,final1nm --arm on --flags <all 15 W0 names>`, run
+twice (`w0-flags-on`, `w0-flags-on-r2`), plus an arm-off run on the
+integrated tree (`w0-integrated-off`, with KJFK) and a paired LOWI off/on
+run (`w0-lowi-pair`). All are under
+`C:\Users\bfecho\skyloom-3\.graphics-review\operations-airfield\`.
+- 0 page errors and 0 console errors on every run.
+- `window.__flyUrlFlags` lists all 15 names as `true`, plus the `sunUtc`
+  and `weather` pins.
+- Census (draws / tris, median of five 60-frame refreshes):
+
+| Pose | BEFORE | Integrated, off | On #1 | On #2 |
+|---|---|---|---|---|
+| KCMH lineup | 353 / 0.67M | 336 / 0.74M | 341 / 0.65M | 330 / 0.73M |
+| KCMH final1nm | 349 / 1.31M | 335 / 1.18M | 332 / 1.14M | 329 / 1.16M |
+| LOWI lineup | 323 / 1.06M | 336 / 1.12M | 338 / 1.28M | 334 / 1.29M |
+| LOWI final1nm | 360 / 1.34M | 334 / 1.19M | 329 / 1.19M | 339 / 1.21M |
+| KJFK lineup | 334 / 0.78M | 328 / 0.84M | — | — |
+| KJFK final1nm | 340 / 1.10M | 325 / 1.16M | — | — |
+
+  The same configuration repeated moves by about ±15–30 draws and ±15% tris
+  (streaming and live traffic). For example, the paired LOWI run read 363 /
+  1.13M off against 358 / 1.18M on at the lineup, and 376 / 1.337M in both
+  arms on final1nm. Every flags-on delta sits inside that spread, and
+  textures (331–357) and programs (153–156) did not move. Nothing renders
+  differently in W0, as expected.
