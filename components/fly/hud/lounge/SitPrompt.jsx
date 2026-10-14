@@ -1,12 +1,27 @@
 'use client';
+import { Armchair } from 'lucide-react';
 
 /*
- * The "Sit" prompt (LOUNGE_WALK, Gate to Gate W4 stream N): shown while a
- * standing observer is near a vantage seat and facing it; Enter sits.
- * Test id lounge-sit-prompt.
- *
- * W4-0 slot: rendered by LoungeHud; nothing to show until walking lands.
+ * The "Sit" prompt (LOUNGE_WALK): while you stand near a vantage seat and
+ * face it (watch.sitPrompt: within WALK.sit.promptM and the yaw cone), Enter
+ * — or a click on the prompt — sits you there. Test id lounge-sit-prompt.
  */
-export function SitPrompt() {
-  return null;
+export function SitPrompt({ runtime, watch }) {
+  // The seat menu, when open, offers every seat itself (and would cover this).
+  if (!watch.walk || watch.posture !== 'standing' || !watch.prompt || watch.binocular || watch.seatMenu) return null;
+  const seat = runtime.airportWatch?.seats?.find((s) => s.id === watch.prompt);
+  return (
+    <button
+      type="button"
+      className="lounge-sit lounge-panel"
+      data-testid="lounge-sit-prompt"
+      onClick={() => runtime.airportWatch?.sit(watch.prompt)}
+      aria-label={`Sit: ${seat?.label ?? 'seat'} (Enter)`}
+    >
+      <Armchair size={16} aria-hidden="true" />
+      <span>Sit</span>
+      <strong>{seat?.label ?? 'Seat'}</strong>
+      <span className="tgt-kbd">Enter</span>
+    </button>
+  );
 }

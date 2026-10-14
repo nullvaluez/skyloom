@@ -10,7 +10,8 @@ wins; where this file and the plan disagree, the plan wins.**
 Status: **W0 landed on `main` (2026-10-13). Nothing visible changed.**
 Checkpoint 0 (the owner confirms the flag registry) is open. **W4-0 (the
 lounge contracts) landed on `main` the same day, also invisible**, ahead of W1
-by the owner's order; W4 N (the walk) is next.
+by the owner's order, and **W4 N (the walk) landed behind `LOUNGE_WALK`**, off
+until the owner signs it off at `?flags=LOUNGE_WALK`.
 
 ## The seam rule
 
@@ -274,3 +275,21 @@ contract table and the full record are in
 - `components/fly/hud/lounge/{BinocularHud,SpotterCard}.jsx` read their range from `watch.eyeWorld()`.
 - N's `SeatsButton`, `SitPrompt` and `SeatMenu` and the walk slot `lounge-walk-runtime.js` were created as null stubs, so LoungeHud is never edited again.
 - `scripts/verify-airport-audio.mjs` gained the walking-eye check, and `scripts/_catalog-airports.mjs` is new.
+
+### W4 N — walk and sit, classic room (2026-10-13)
+
+Executed by the orchestrating session on `g2g/lounge-walk-n` (from W4-0), then merged `--no-ff`. Behind `LOUNGE_WALK`, shipped off. With the flag off nothing changes: every lounge gate passes unchanged and `verify-ops-golden` stays 28/28. What the walk does, the comfort rules and the open owner checkpoints are in [FLY_OBSERVATION_LOUNGE.md](FLY_OBSERVATION_LOUNGE.md) ("Lounge, further — N").
+
+| Commit | Step |
+|---|---|
+| `3aa025c` | the walk: `lib/fly/lounge/room-walk.mjs` (walkable space, collisions, A*, glides, Sit prompt, click-a-chair), `lounge-walk-runtime.js`, SitPrompt / SeatMenu / SeatsButton, LoungeSurface keys and click, the walk CSS, the footstep cue; NEW `verify-lounge-vantage.mjs`, `verify-lounge-walk.cjs`; `review-observation-lounge.cjs --flags / --seats` |
+| `bada877` | adversarial review fixes (mid-glide re-targeting, sub-cell path starts, the click ray under TRUE_SCALE, reduced motion read live, a key held through a landing, Esc and Enter and panels) and a gate that kills 11 of 11 mutations |
+
+**Gates:**
+- node: lounge walk 55 (28 W4-0 + 27 walk), NEW lounge vantage 7, audio 13; the rest unchanged (observation 45, lifecycle 24, lounge 13, lounge seat 6, airport set 17, fleet airframes 13, airfield ground 13, true-earth flags 8, ops golden 28/28, airport service 17, import integrity 4, front door 70);
+- browser: NEW lounge walk 20; interaction 25/25 and browser states 24/24 flags off and with `?flags=LOUNGE_WALK`; promotion 9/9.
+
+**Deviations from the design:**
+- **Seat changes across the room fade through black.** The design gives the glide `maxMps 3.2` and `maxSec 3.0`. An 18 m change cannot satisfy both, and holding the 3 s cap meant a peak of 11.5 m/s at eye height. The speed cap wins (the comfort rule): a change that does not fit in 3 s at that speed dips through black (0.6 s, about 1.6 s in all). The seat-menu jump lands in about 1.3 s.
+- **Click-a-chair reaches across the room** (the design names no reach). The nearest chair under the pointer answers, so an ordinary chair hides a vantage chair behind it.
+- The corner seats keep the design's look centre (±0.55). Their framing is an owner checkpoint.

@@ -13,6 +13,17 @@
 // the bob and the camera; enter options, exit() and handoff(); the additive
 // layout fields; clampYawAround and walkBob.
 //
+// W4 N WALK & SIT (LOUNGE_WALK pinned on for that section): the walk grid agrees
+// with the blockers; the walk attaches and seats the observer; move keys
+// stand you up; the Sit prompt (reach and yaw cone); walk and run speeds,
+// release stops; footsteps per stride; binoculars stop a walk; a seeded
+// 50,000-step random walk never leaves free space or the envelope and never
+// outruns the run speed; at 5,000 walk positions the eye and the near-plane
+// corners keep 0.12 m from every room triangle; the bob is camera-only and
+// zero under reduced motion; eyeWorld and scenePitch under TRUE_SCALE 1.31;
+// glides are deterministic, free, within 3.0 s (0.3 s veil cut reduced); the
+// seat-menu jump; click-a-chair; nothing walks before the floor is validated.
+//
 // Run: node scripts/verify-lounge-walk.mjs [--bake]
 //   --bake  also re-bakes the room AO (~25 s) and requires the shipped
 //           public/models/lounge-ao-v1.bin byte for byte.
@@ -715,5 +726,604 @@ if (process.argv.includes('--bake')) {
 }
 
 dispose();
+
+// =============================================================================
+// W4 N — walk and sit (LOUNGE_WALK pinned on for this section)
+// =============================================================================
+const W = await import('../lib/fly/lounge/room-walk.mjs');
+const { attachLoungeWalk } = await import('../lib/fly/lounge-walk-runtime.js');
+const { buildTriBvh } = await import('./_tri-bvh.mjs');
+const { scenePitch } = await import('../lib/fly/airport-watch-camera.mjs');
+const grid = W.buildWalkGrid(blockers);
+const seatsC = VANTAGE.classic;
+const seatOf = (id) => seatsC.find((s) => s.id === id);
+
+await check('walk grid: free cells are free all over (every corner on the plate and clear of every blocker by the body radius); the approaches are free and the seat eyes are not', () => {
+  let free = 0;
+  const h = grid.cellM / 2;
+  for (let j = 0; j < grid.nz; j++) for (let i = 0; i < grid.nx; i++) {
+    if (!grid.cells[j * grid.nx + i]) continue;
+    free++;
+    const x = grid.x0 + (i + 0.5) * grid.cellM, z = grid.z0 + (j + 0.5) * grid.cellM;
+    for (const [px, pz] of [[x, z], [x - h, z - h], [x + h, z - h], [x - h, z + h], [x + h, z + h]]) assert.ok(W.isFree(grid, px, pz), `cell ${i},${j} point ${px.toFixed(2)},${pz.toFixed(2)}`);
+  }
+  assert.ok(free > 15000, 'free cells ' + free);
+  for (const s of seatsC) {
+    assert.ok(W.isFree(grid, ...s.approach), `${s.id} approach free`);
+    assert.ok(!W.isFree(grid, s.eye[0], s.eye[2]), `${s.id} eye inside its chair`);
+  }
+  // The exact test against an independent one: the footprint outlines sampled every 4 cm.
+  const outline = [];
+  for (const b of blockers) {
+    if (b.round) { for (let a = 0; a < 360; a += 1) outline.push([b.c[0] + b.h[0] * Math.cos((a * Math.PI) / 180), b.c[1] + b.h[0] * Math.sin((a * Math.PI) / 180)]); continue; }
+    const cs = corners(b);
+    for (let i = 0; i < 4; i++) { const [ax, az] = cs[i], [bx, bz] = cs[(i + 1) % 4], n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 0.04)); for (let k = 0; k < n; k++) outline.push([ax + ((bx - ax) * k) / n, az + ((bz - az) * k) / n]); }
+  }
+  const r = rng(5);
+  for (let i = 0; i < 4000; i++) {
+    const x = P.x0 + r() * (P.vestibule.x1 - P.x0), z = P.z0 + r() * (P.z1 - P.z0);
+    if (!W.onFloorPlate(x, z)) { assert.equal(W.isFree(grid, x, z), false, `off the plate ${x},${z}`); continue; }
+    let d = Infinity;
+    for (const [ox, oz] of outline) d = Math.min(d, Math.hypot(x - ox, z - oz));
+    const inside = blockers.some((b) => inBlocker(b, x, z));
+    if (W.isFree(grid, x, z)) assert.ok(!inside && d >= WALK.radiusM - 0.021, `free at ${x.toFixed(3)},${z.toFixed(3)} but ${inside ? 'inside a blocker' : d.toFixed(3) + ' m from one'}`);
+    else assert.ok(inside || d <= WALK.radiusM + 0.021, `blocked at ${x.toFixed(3)},${z.toFixed(3)} with ${d.toFixed(3)} m clear`);
+  }
+});
+
+// The real runtime with the walk attached: pin LOUNGE_WALK on for this section.
+globalThis.window.__flyLoungeWalkOverride = { enabled: true };
+globalThis.window.localStorage = globalThis.localStorage; // prefersReducedMotion reads the app setting here
+const cues = [];
+runtime.airportAudio = { cue: (name) => cues.push(name) };
+const dispose2 = connectAirportWatch(runtime);
+const w2 = runtime.airportWatch;
+const step = (dt) => w2.updateCamera(dt, camera);
+const settle = (sec, dt = 1 / 60) => { for (let t = 0; t < sec; t += dt) step(dt); };
+const eyeL = () => ({ x: w2.eyeLocal.x, y: w2.eyeLocal.y, z: w2.eyeLocal.z });
+const room3 = buildTriBvh(room.buckets);
+// An independent leg test: every centimetre of a -> b is free by the exact test
+// (validated against the blockers' own outlines above), not by lineOfSight.
+const legFree = (a, b) => { const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.01)); for (let i = 0; i <= n; i++) if (!W.isFree(grid, a.x + ((b.x - a.x) * i) / n, a.z + ((b.z - a.z) * i) / n)) return false; return true; };
+// A known standing pose with clear floor ahead (each walking check starts here, not where the last one stopped).
+const standAt = (x, z, yaw, clearM = 0) => {
+  if (w2.posture !== 'standing') { w2.setMoveKeys(0, -1, false); w2.setMoveKeys(0, 0, false); settle(1.2); }
+  assert.equal(w2.posture, 'standing', 'standing');
+  w2.setMoveKeys(0, 0, false); settle(0.3);
+  w2.eyeLocal.x = x; w2.eyeLocal.z = z; w2.yaw = yaw; settle(0.05);
+  assert.ok(W.isFree(grid, x, z), `(${x}, ${z}) is free`);
+  if (clearM) assert.ok(legFree({ x, z }, { x: x - Math.sin(yaw) * clearM, z: z - Math.cos(yaw) * clearM }), `${clearM} m clear ahead of (${x}, ${z}) at yaw ${yaw}`);
+};
+
+await check('flag on: the walk attaches on enter, the observer starts seated at the window, and the published lounge says so', async () => {
+  assert.equal(loungeWalk().enabled, true);
+  assert.equal(await w2.enter('KCMH'), true);
+  settle(0.2);
+  assert.ok(w2.walk, 'watch.walk');
+  assert.equal(w2.seats, VANTAGE.classic);
+  assert.equal(w2.posture, 'seated');
+  assert.equal(w2.seatId, 'window');
+  assert.deepEqual(Object.values(eyeL()), [...LOUNGE_ROOM.eye]);
+  const pub = useFlyStore.getState().airportWatch;
+  assert.equal(pub.walk, true);
+  assert.equal(pub.seat, 'window');
+});
+
+await check('enter({seat}) starts in that seat with its look; leaving and re-entering starts at the window again', async () => {
+  assert.equal(await w2.enter('KCMH', { seat: 'corner-right' }), true);
+  settle(0.3);
+  assert.equal(w2.seatId, 'corner-right');
+  assert.deepEqual(Object.values(eyeL()), [...seatOf('corner-right').eye]);
+  assert.ok(Math.abs(w2.yaw - seatOf('corner-right').look.centre) < 1e-9, 'faces the seat\'s view ' + w2.yaw);
+  w2.leave();
+  assert.equal(await w2.enter('KCMH'), true);
+  settle(0.3);
+  assert.equal(w2.seatId, 'window');
+});
+
+await check('a move key while seated stands you up out of the chair to its approach, at the standing eye height (1.65 m)', () => {
+  w2.setMoveKeys(0, -1, false); // A: left
+  step(1 / 60);
+  assert.equal(w2.posture, 'gliding');
+  w2.setMoveKeys(0, 0, false);
+  settle(WALK.sit.standSec + 0.1);
+  assert.equal(w2.posture, 'standing');
+  const e = eyeL(), a = seatOf('window').approach;
+  assert.ok(Math.abs(e.y - WALK.eyeStandM) < 1e-12, 'eye height ' + e.y);
+  assert.ok(Math.hypot(e.x - a[0], e.z - a[1]) < 0.15, `near the approach: ${e.x.toFixed(3)}, ${e.z.toFixed(3)}`);
+});
+
+await check('the Sit prompt: offered within reach and facing the chair, not when facing away or out of reach; it names the seat', () => {
+  // Standing at the window approach, looking at the runway: the chair is 62 degrees right, 0.9 m away.
+  settle(0.1);
+  assert.equal(w2.sitPrompt?.id, 'window', JSON.stringify(w2.sitPrompt));
+  assert.equal(useFlyStore.getState().airportWatch.prompt, 'window');
+  const near = W.sitPrompt(seatsC, { x: -0.8, z: 0.5 }, 0);
+  assert.equal(near?.id, 'window');
+  assert.equal(W.sitPrompt(seatsC, { x: -0.8, z: 0.5 }, Math.PI), null, 'facing away');
+  assert.equal(W.sitPrompt(seatsC, { x: -2.2, z: 0.5 }, -Math.PI / 2), null, 'beyond promptM');
+  assert.equal(W.sitPrompt(seatsC, { x: -1.2, z: 0.3 }, -Math.PI / 2)?.id, 'window', 'within reach, facing it');
+});
+
+await check('walking: W walks at 1.4 m/s in the head\'s direction, Shift runs at 2.4 m/s, releasing stops within the ease; speed never exceeds the run speed', () => {
+  standAt(0, 3.2, Math.PI, 5.2); // mid-room, facing the back of the room (+Z)
+  const z0 = w2.eyeLocal.z;
+  w2.setMoveKeys(1, 0, false);
+  settle(1.5);
+  assert.ok(Math.abs(w2.walk.speed - WALK.speedMps) < 0.02, 'walk speed ' + w2.walk.speed);
+  assert.ok(w2.eyeLocal.z > z0 + 1.5, 'moved toward the back: ' + (w2.eyeLocal.z - z0).toFixed(2));
+  w2.setMoveKeys(1, 0, true);
+  settle(1.0);
+  assert.ok(Math.abs(w2.walk.speed - WALK.runMps) < 0.03, 'run speed ' + w2.walk.speed);
+  w2.setMoveKeys(0, 0, false);
+  settle(1.2);
+  assert.ok(w2.walk.speed < 1e-3, 'stopped: ' + w2.walk.speed);
+  const zStop = w2.eyeLocal.z;
+  settle(0.5);
+  assert.equal(w2.eyeLocal.z, zStop, 'stays put');
+});
+
+await check('W, S, A and D move along the head\'s forward, back, left and right at an oblique yaw', () => {
+  const yaw = 0.7, fwd = { x: -Math.sin(yaw), z: -Math.cos(yaw) }, right = { x: Math.cos(yaw), z: -Math.sin(yaw) };
+  for (const [key, f, r, want] of [['W', 1, 0, fwd], ['S', -1, 0, { x: -fwd.x, z: -fwd.z }], ['D', 0, 1, right], ['A', 0, -1, { x: -right.x, z: -right.z }]]) {
+    standAt(0, 5.0, yaw);
+    assert.ok(legFree({ x: 0, z: 5 }, { x: want.x * 1.2, z: 5 + want.z * 1.2 }), `${key}: clear`);
+    const p = eyeL();
+    w2.setMoveKeys(f, r, false); settle(0.5); w2.setMoveKeys(0, 0, false); settle(0.4);
+    const dx = w2.eyeLocal.x - p.x, dz = w2.eyeLocal.z - p.z, n = Math.hypot(dx, dz);
+    assert.ok(n > 0.4 && (dx * want.x + dz * want.z) / n > 0.999, `${key}: moved (${dx.toFixed(3)}, ${dz.toFixed(3)}), want along (${want.x.toFixed(3)}, ${want.z.toFixed(3)})`);
+  }
+});
+
+await check('pushing into furniture: once the eye stops, no footsteps, no bob and no speed while the key is held', () => {
+  standAt(0, 1.2, 0); // facing the window seat's back, 0.4 m from its blocker
+  w2.setMoveKeys(1, 0, false);
+  settle(1.0);
+  const stopped = eyeL();
+  cues.length = 0;
+  let maxBob = 0, maxSpeed = 0;
+  for (let i = 0; i < 150; i++) { step(1 / 60); maxBob = Math.max(maxBob, Math.abs(w2.walk.bob.x), Math.abs(w2.walk.bob.y)); maxSpeed = Math.max(maxSpeed, w2.walk.speed); }
+  w2.setMoveKeys(0, 0, false);
+  assert.ok(Math.hypot(w2.eyeLocal.x - stopped.x, w2.eyeLocal.z - stopped.z) < 1e-9, 'the eye stayed at the chair');
+  assert.ok(stopped.z > 0.5 && stopped.z < 1.2, 'it reached the chair: z ' + stopped.z.toFixed(3));
+  assert.deepEqual([cues.filter((c) => c === 'step').length, maxBob, maxSpeed], [0, 0, 0], 'no treadmill footsteps or bob');
+  settle(0.5);
+});
+
+await check('footsteps: one cue per stride while walking, none at rest', () => {
+  standAt(0, 3.2, 0);
+  assert.ok(legFree({ x: 0, z: 3.2 }, { x: 0, z: 8.0 }), 'clear behind');
+  cues.length = 0;
+  const p0 = eyeL();
+  w2.setMoveKeys(-1, 0, false); // S: backward, toward the back of the room
+  settle(3);
+  w2.setMoveKeys(0, 0, false);
+  settle(1.5);
+  const dist = Math.hypot(w2.eyeLocal.x - p0.x, w2.eyeLocal.z - p0.z);
+  const steps = cues.filter((c) => c === 'step').length;
+  assert.ok(dist > 3, 'walked ' + dist.toFixed(2));
+  assert.ok(Math.abs(steps - dist / WALK.bob.strideM) <= 2, `${steps} steps over ${dist.toFixed(2)} m (stride ${WALK.bob.strideM})`);
+  cues.length = 0; settle(2);
+  assert.equal(cues.length, 0, 'silent at rest');
+});
+
+await check('binoculars stop a walk; a fresh move key lowers them', () => {
+  standAt(0, 3.2, Math.PI, 2);
+  w2.setMoveKeys(1, 0, false); settle(0.6);
+  assert.ok(w2.walk.speed > 1);
+  w2.binoculars(true);
+  const p = eyeL();
+  settle(0.6);
+  assert.ok(w2.walk.speed < 1e-6 && Math.hypot(w2.eyeLocal.x - p.x, w2.eyeLocal.z - p.z) < 1e-9, 'no walking with the glasses up');
+  w2.setMoveKeys(0, 1, false);
+  assert.equal(w2.binocular, false, 'a move key lowered them');
+  w2.setMoveKeys(0, 0, false); settle(1);
+});
+
+await check('a seeded 50,000-step random walk (dt 1/240 to 0.1 s with 100 ms spikes, runs, diagonal pushes into corners, tables and the bar) never leaves free space or the room envelope', () => {
+  const r = rng(424242);
+  const targets = [[-10.5, -0.6], [10.5, -0.6], [-10.5, 13.6], [10.5, 13.6], [0, 11.6], [5.4, 6.6], [-5.4, 7.6], [-10.15, 3.15], [12.3, 11.1], [0.5, -0.92]];
+  let worst = Infinity, steps = 0, maxSpeed = 0, standingSamples = [];
+  for (let leg = 0; steps < 50000; leg++) {
+    // Aim at a target (often an obstacle) or a random heading, then push with random keys.
+    if (r() < 0.6) { const [tx, tz] = targets[Math.floor(r() * targets.length)]; w2.yaw = Math.atan2(-(tx - w2.eyeLocal.x), -(tz - w2.eyeLocal.z)); }
+    else w2.yaw = (r() - 0.5) * 2 * Math.PI;
+    const fwd = r() < 0.8 ? 1 : r() < 0.5 ? -1 : 0, right = r() < 0.4 ? (r() < 0.5 ? -1 : 1) : 0;
+    w2.setMoveKeys(fwd || (right ? 0 : 1), right, r() < 0.35);
+    const n = 20 + Math.floor(r() * 300);
+    for (let i = 0; i < n && steps < 50000; i++, steps++) {
+      const dt = r() < 0.01 ? 0.1 : 1 / 240 + r() * (0.1 - 1 / 240);
+      const before = eyeL();
+      step(dt);
+      const e = eyeL();
+      if (w2.posture !== 'standing') continue;
+      assert.ok(W.isFree(grid, e.x, e.z), `step ${steps}: (${e.x.toFixed(3)}, ${e.z.toFixed(3)}) not free`);
+      assert.ok(inEnvelope([e.x, e.y, e.z]), `step ${steps}: outside the envelope`);
+      worst = Math.min(worst, W.clearance(blockers, e.x, e.z));
+      maxSpeed = Math.max(maxSpeed, Math.hypot(e.x - before.x, e.z - before.z) / Math.min(dt, 0.1));
+      if (steps % 10 === 0) standingSamples.push({ ...e, yaw: w2.yaw, pitch: w2.pitch });
+    }
+  }
+  w2.setMoveKeys(0, 0, false);
+  assert.ok(worst >= WALK.radiusM - 1e-9, 'closest approach to a blocker ' + worst.toFixed(4));
+  assert.ok(maxSpeed <= WALK.runMps + 1e-6, 'fastest step ' + maxSpeed.toFixed(3) + ' m/s');
+  globalThis.__walkSamples = standingSamples;
+});
+
+await check('at 5,000 sampled walk positions the eye and the near-plane corners stay at least 0.12 m from every room triangle', () => {
+  const samples = globalThis.__walkSamples;
+  assert.ok(samples.length >= 5000, 'samples ' + samples.length);
+  const near = 0.08, tanV = Math.tan((58 * Math.PI) / 360), tanH = tanV * (16 / 9);
+  let worst = Infinity, at = null;
+  for (const s of samples.slice(0, 5000)) {
+    const cy = Math.cos(s.yaw), sy = Math.sin(s.yaw), cp = Math.cos(s.pitch), sp = Math.sin(s.pitch);
+    const f = [-sy * cp, sp, -cy * cp], rt = [cy, 0, -sy], up = [sy * sp, cp, cy * sp];
+    const pts = [[s.x, s.y, s.z]];
+    for (const [u, v] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) pts.push([0, 1, 2].map((k) => [s.x, s.y, s.z][k] + near * (f[k] + u * tanH * rt[k] + v * tanV * up[k])));
+    for (const p of pts) {
+      const d = room3.distance(p[0], p[1], p[2], 1);
+      if (d < worst) { worst = d; at = p; }
+    }
+  }
+  assert.ok(worst >= 0.12, `closest ${worst.toFixed(4)} m at ${at?.map((v) => v.toFixed(2))}`);
+});
+
+await check('the bob is camera-only and exactly zero under reduced motion; standing and seated eye heights are 1.65 and 1.18', async () => {
+  // Bob on: walking moves the camera off the eye a little, never the eye.
+  standAt(0, 3.2, Math.PI, 3.5);
+  w2.setMoveKeys(1, 0, false);
+  let maxOff = 0;
+  for (let i = 0; i < 120; i++) { step(1 / 60); const e = w2.eyeWorld(); maxOff = Math.max(maxOff, Math.hypot(camera.position.x - e.x, camera.position.y - e.y, camera.position.z - e.z)); }
+  w2.setMoveKeys(0, 0, false); settle(1);
+  assert.ok(maxOff > 0.003 && maxOff < 0.03, 'bob amplitude ' + maxOff);
+  assert.ok(Math.abs(w2.eyeLocal.y - WALK.eyeStandM) < 1e-12);
+  // Reduced motion: none.
+  saved.set('fly-reduced-motion', '1');
+  assert.equal(await w2.enter('KCMH'), true);
+  settle(0.2);
+  assert.ok(Math.abs(w2.eyeLocal.y - LOUNGE_ROOM.eye[1]) < 1e-12, 'seated 1.18');
+  w2.setMoveKeys(-1, 0, false);
+  settle(0.1);
+  for (let i = 0; i < 120; i++) { step(1 / 60); const e = w2.eyeWorld(); assert.equal(camera.position.distanceTo(new Vector3(e.x, e.y, e.z)), 0, 'frame ' + i); }
+  w2.setMoveKeys(0, 0, false); settle(1);
+  saved.delete('fly-reduced-motion');
+});
+
+await check('TRUE_SCALE k = 1.31: eyeWorld is the site frame (siteToWorld + floor + eye height) and the camera pitch goes through scenePitch', () => {
+  setTrueScaleK(1.31);
+  w2.eyeLocal.x = 3; w2.eyeLocal.z = 9;
+  w2.pitch = 0.4;
+  step(1 / 60);
+  const e = w2.eyeWorld(), want = siteToWorld(w2.site, 3, 9);
+  assert.ok(Math.abs(e.x - want.x) < 1e-9 && Math.abs(e.z - want.z) < 1e-9 && Math.abs(e.y - (w2.floorY + w2.eyeLocal.y)) < 1e-9);
+  assert.ok(Math.abs(camera.rotation.x - scenePitch(w2.pitch, 1.31)) < 1e-9, 'scene pitch ' + camera.rotation.x);
+  setTrueScaleK(1);
+  w2.pitch = -0.07;
+});
+
+await check('seat glides are deterministic, never leave free space on the walk, never move faster than WALK.glide.maxMps where the view can see it (across the room they dip through black), land within 3.0 s (0.3 s veil cut under reduced motion)', () => {
+  // Seats and two standing starts (mid-room, by the bar): near and far moves both.
+  const starts = [...seatsC.map((a) => ({ id: a.id, from: { x: a.eye[0], y: a.eye[1], z: a.eye[2], yaw: a.look.centre, pitch: -0.07, seatId: a.id } })),
+    { id: 'standing mid-room', from: { x: 0, y: WALK.eyeStandM, z: 6, yaw: 2, pitch: 0 } }, { id: 'standing near the right corner', from: { x: 7.4, y: WALK.eyeStandM, z: 1.6, yaw: -1, pitch: 0 } },
+    // Behind the window seat, the seat between: the walk must go round it.
+    { id: 'standing behind the window seat', from: { x: 1.2, y: WALK.eyeStandM, z: 1.2, yaw: 0, pitch: 0 } }, { id: 'standing behind the left corner', from: { x: -7.6, y: WALK.eyeStandM, z: 1.5, yaw: 0, pitch: 0 } }];
+  let near = 0, far = 0, detours = 0;
+  for (const { id: aid, from } of starts) for (const b of seatsC) {
+    if (aid === b.id) continue;
+    const g1 = W.seatGlide(from, b, grid, { seats: seatsC }), g2 = W.seatGlide(from, b, grid, { seats: seatsC });
+    assert.ok(g1 && g1.duration <= WALK.glide.maxSec + 1e-9, `${aid} -> ${b.id} in ${g1?.duration}`);
+    if (g1.far) far++; else near++;
+    if (!g1.far && g1.path.length > 2) detours++;
+    const o1 = {}, o2 = {}, prev = {};
+    const N = 1200;
+    for (let i = 0; i <= N; i++) {
+      const t = (i / N) * g1.duration;
+      g1.sample(t, o1); g2.sample(t, o2);
+      for (const k of ['x', 'y', 'z', 'yaw', 'pitch']) assert.ok(Math.abs(o1[k] - o2[k]) <= 1e-12, `${aid} -> ${b.id} ${k} at ${t}`);
+      if (Math.abs(o1.y - WALK.eyeStandM) < 1e-12) assert.ok(W.isFree(grid, o1.x, o1.z), `${aid} -> ${b.id} walks through (${o1.x.toFixed(2)}, ${o1.z.toFixed(2)})`);
+      if (i > 0) {
+        const v = Math.hypot(o1.x - prev.x, o1.z - prev.z) / (g1.duration / N);
+        if (v > WALK.glide.maxMps + 1e-6) assert.ok(g1.veil(t) === 1 && g1.veil(prev.t) === 1, `${aid} -> ${b.id}: ${v.toFixed(1)} m/s at ${t.toFixed(3)} s with the view open (veil ${g1.veil(t).toFixed(2)})`);
+        if (g1.far && g1.veil(t) === 1) assert.ok(g1.veil(Math.max(0, t - 0.05)) === 1 || g1.veil(t + 0.05) === 1, 'held black around the jump');
+      }
+      Object.assign(prev, o1, { t });
+    }
+    for (const [x, z] of [[b.eye[0], b.eye[2]]]) { g1.sample(g1.duration, o1); assert.ok(Math.hypot(o1.x - x, o1.z - z) < 1e-9 && Math.abs(o1.y - b.eye[1]) < 1e-12, 'ends on the seat eye'); }
+    const cut = W.seatGlide(from, b, grid, { seats: seatsC, reduced: true });
+    assert.ok(cut.cut && cut.duration <= WALK.glide.reducedSec + 1e-12 && cut.veil(cut.duration / 2) === 1, 'reduced: a veil cut');
+    const before = {}, after = {}, m = cut.duration / 2;
+    cut.sample(m - 0.04, before); cut.sample(m + 0.04, after);
+    assert.ok(cut.veil(m - 0.04) === 1 && cut.veil(m + 0.04) === 1 && Math.hypot(after.x - before.x, after.z - before.z) > 0.5, 'reduced: the move happens under full black');
+  }
+  assert.ok(near > 0 && far > 0 && detours > 0, `all kinds exercised: ${near} glides (${detours} round furniture), ${far} fades`);
+});
+
+await check('the seat menu jump: sit(corner-left) from the window glides there and sits within 3.0 s, facing the seat\'s view', async () => {
+  assert.equal(await w2.enter('KCMH'), true);
+  settle(0.2);
+  assert.equal(w2.seatMenuOpen(true), true);
+  assert.equal(useFlyStore.getState().airportWatch.seatMenu, true);
+  assert.equal(w2.sit('corner-left'), true);
+  assert.equal(w2.seatMenu, false, 'choosing closes the menu');
+  let t = 0;
+  while (w2.posture !== 'seated' && t < 4) { step(1 / 60); t += 1 / 60; }
+  assert.ok(t <= WALK.glide.maxSec + 0.05, 'landed after ' + t.toFixed(2) + ' s');
+  assert.equal(w2.seatId, 'corner-left');
+  assert.deepEqual(Object.values(eyeL()), [...seatOf('corner-left').eye]);
+  assert.ok(Math.abs(w2.yaw - seatOf('corner-left').look.centre) < 1e-9);
+  const lim = w2.lookLimits();
+  assert.equal(lim.centre, 0.55);
+  w2.resetLook(); settle(1);
+  assert.ok(Math.abs(w2.yaw - 0.55) < 1e-3, 'R faces the corner\'s view');
+});
+
+await check('click-a-chair: a ray from a standing eye at a vantage chair finds it; at the floor or the window it finds none', () => {
+  const eye = { x: -6, y: WALK.eyeStandM, z: 2.0 };
+  const toward = (p) => { const d = [p[0] - eye.x, p[1] - eye.y, p[2] - eye.z], n = Math.hypot(...d); return { x: d[0] / n, y: d[1] / n, z: d[2] / n }; };
+  assert.equal(W.seatOnRay(blockers, eye, toward([-8.96, 0.5, 0.1])), 'corner-left');
+  assert.equal(W.seatOnRay(blockers, eye, toward([0, 0.5, 0.1])), 'window');
+  assert.equal(W.seatOnRay(blockers, eye, toward([-6, 0, 3.5])), null, 'the floor');
+  assert.equal(W.seatOnRay(blockers, eye, toward([-6, 2, -1.5])), null, 'the window');
+  assert.equal(W.seatOnRay(blockers, eye, toward([-4.48, 0.5, 0.1])), null, 'a chair that is not a vantage seat');
+  // Across the room, from the left corner seat (8.96 m): the window chair's
+  // top shows over the row's ordinary chair at x -4.48, its seat does not.
+  const ce = seatOf('corner-left').eye, from = { x: ce[0], y: ce[1], z: ce[2] };
+  const at = (p) => { const d = [p[0] - ce[0], p[1] - ce[1], p[2] - ce[2]], n = Math.hypot(...d); return { x: d[0] / n, y: d[1] / n, z: d[2] / n }; };
+  assert.equal(W.seatOnRay(blockers, from, at([0, 0.95, 0.08])), 'window', 'across the room, over the row');
+  assert.equal(W.seatOnRay(blockers, from, at([0, 0.5, 0.08])), null, 'the row hides its seat');
+  // The chair in front answers: an ordinary chair hides the vantage chair behind it.
+  const chair = (x, seatId) => ({ c: [x, 0], h: [0.43, 0.46], rot: 0, kind: 'seat', ...(seatId ? { seatId } : {}) });
+  const o = { x: 0, y: 0.8, z: 0 }, ahead = { x: 1, y: 0, z: 0 };
+  assert.equal(W.seatOnRay([chair(4, 'v')], o, ahead), 'v');
+  assert.equal(W.seatOnRay([chair(4, 'v'), chair(2)], o, ahead), null, 'hidden behind an ordinary chair');
+  assert.equal(W.seatOnRay([chair(2, 'v'), chair(4)], o, ahead), 'v', 'in front of one');
+});
+
+await check('nothing walks before the floor is validated', async () => {
+  assert.equal(await w2.enter('KCMH'), true);
+  w2.validated = false;
+  const ground = engine.getGroundAt;
+  engine.getGroundAt = () => null; // keep it unvalidated
+  const e0 = eyeL();
+  w2.setMoveKeys(1, 1, true);
+  settle(1);
+  assert.deepEqual(eyeL(), e0);
+  w2.setMoveKeys(0, 0, false);
+  engine.getGroundAt = ground;
+  await new Promise((r) => setTimeout(r, 600)); // the floor is re-sampled twice a second (wall clock)
+  settle(0.1);
+  assert.ok(w2.validated, 'validated once the ground answers');
+});
+
+await check('the floor is one walkable space: every seat approach is in it, and paths through it (seat to seat and 300 seeded pairs) are free, in sight point to point, deterministic and no shorter than the straight line', () => {
+  // Components of the free cells (A* moves 8 ways without cutting corners: the same connectivity as 4 ways).
+  const { nx, nz, cells } = grid, comp = new Int32Array(nx * nz).fill(-1), sizes = [];
+  for (let k0 = 0; k0 < nx * nz; k0++) {
+    if (!cells[k0] || comp[k0] >= 0) continue;
+    const id = sizes.length, queue = [k0];
+    comp[k0] = id;
+    let n = 0;
+    while (queue.length) {
+      const k = queue.pop(), i = k % nx, j = (k - i) / nx;
+      n++;
+      for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const ni = i + di, nj = j + dj, m = nj * nx + ni;
+        if (ni >= 0 && nj >= 0 && ni < nx && nj < nz && cells[m] && comp[m] < 0) { comp[m] = id; queue.push(m); }
+      }
+    }
+    sizes.push(n);
+  }
+  const total = sizes.reduce((a, b) => a + b, 0), main = sizes.indexOf(Math.max(...sizes));
+  assert.ok(sizes[main] / total > 0.99, `the main space holds ${sizes[main]} of ${total} free cells (${sizes.length} pockets)`);
+  const compAt = (x, z) => comp[Math.floor((z - grid.z0) / grid.cellM) * nx + Math.floor((x - grid.x0) / grid.cellM)];
+  for (const s of seatsC) assert.equal(compAt(...s.approach), main, `${s.id}'s approach is in the main space`);
+  const centre = (k) => ({ x: grid.x0 + ((k % nx) + 0.5) * grid.cellM, z: grid.z0 + (Math.floor(k / nx) + 0.5) * grid.cellM });
+  const freeCells = [];
+  for (let k = 0; k < nx * nz; k++) if (comp[k] === main) freeCells.push(k);
+  const r = rng(77), pairs = [];
+  for (const a of seatsC) for (const b of seatsC) if (a !== b) pairs.push([{ x: a.approach[0], z: a.approach[1] }, { x: b.approach[0], z: b.approach[1] }]);
+  for (let i = 0; i < 300; i++) pairs.push([centre(freeCells[Math.floor(r() * freeCells.length)]), centre(freeCells[Math.floor(r() * freeCells.length)])]);
+  for (const [a, b] of pairs) {
+    const p = W.findPath(grid, a, b), again = W.findPath(grid, a, b);
+    assert.ok(p && p.length >= 2, `a path from (${a.x.toFixed(2)}, ${a.z.toFixed(2)}) to (${b.x.toFixed(2)}, ${b.z.toFixed(2)})`);
+    assert.deepEqual(again, p, 'deterministic');
+    assert.deepEqual([p[0].x, p[0].z, p.at(-1).x, p.at(-1).z], [a.x, a.z, b.x, b.z], 'from a to b');
+    for (let i = 1; i < p.length; i++) assert.ok(legFree(p[i - 1], p[i]), `leg ${i} of ${p.length - 1} crosses blocked floor`);
+    assert.ok(W.pathLength(p) >= Math.hypot(b.x - a.x, b.z - a.z) - 1e-9);
+  }
+});
+
+await check('a push into furniture slides along it: diagonal moves against an edge keep going along the edge and never enter it', () => {
+  // A free point with a blocked cell 12 cm ahead (+Z) and a clear 0.6 m run along +X.
+  let at = null;
+  for (let z = P.z0 + 0.3; z < P.z1 - 0.3 && !at; z += 0.05) for (let x = P.x0 + 0.3; x < P.x1 - 1; x += 0.05) {
+    if (!W.isFree(grid, x, z) || W.isFree(grid, x, z + 0.12)) continue;
+    let ok = true;
+    for (let s = 0; s <= 0.6 && ok; s += 0.025) ok = W.isFree(grid, x + s, z) && !W.isFree(grid, x + s, z + 0.12);
+    if (ok) { at = { x, z }; break; }
+  }
+  assert.ok(at, 'an edge to slide along');
+  let p = { ...at }, refused = 0;
+  const out = {};
+  for (let i = 0; i < 12; i++) {
+    W.moveWithCollision(grid, p, 0.035, 0.035, out);
+    if (out.blocked) refused++;
+    assert.ok(W.isFree(grid, out.x, out.z), `step ${i} stays free`);
+    p = { x: out.x, z: out.z };
+  }
+  assert.ok(p.x - at.x > 0.35, 'slid along the edge ' + (p.x - at.x).toFixed(3));
+  assert.ok(p.z - at.z < 0.12, 'never into it ' + (p.z - at.z).toFixed(3));
+  assert.ok(refused > 0, 'the push into the edge was refused');
+});
+
+await check('the seat menu: V toggles it and the store follows; standing up out of the chair or choosing a seat closes it', async () => {
+  assert.equal(await w2.enter('KCMH'), true);
+  settle(0.2);
+  assert.equal(w2.seatMenuOpen(), true, 'V opens');
+  assert.equal(useFlyStore.getState().airportWatch.seatMenu, true);
+  assert.equal(w2.seatMenuOpen(), false, 'V again closes');
+  assert.equal(useFlyStore.getState().airportWatch.seatMenu, false);
+  w2.seatMenuOpen(true);
+  w2.setMoveKeys(1, 0, false); // stand up
+  assert.equal(w2.seatMenu, false, 'standing up closed it');
+  w2.setMoveKeys(0, 0, false);
+  settle(1);
+  w2.seatMenuOpen(true);
+  assert.equal(w2.sit('corner-left'), true);
+  assert.equal(w2.seatMenu, false, 'a choice closes it');
+  settle(4);
+  assert.equal(w2.seatId, 'corner-left');
+});
+
+await check('leaving mid-walk or mid-glide resets the walk: the next visit starts seated at the window, still and silent, with no prompt, menu or veil', async () => {
+  for (const mode of ['walk', 'glide', 'reduced glide']) {
+    if (mode === 'reduced glide') saved.set('fly-reduced-motion', '1');
+    try {
+      assert.equal(await w2.enter('KCMH'), true);
+      settle(0.2);
+      if (mode === 'walk') {
+        w2.setMoveKeys(1, 0, true);
+        settle(0.5);
+        w2.yaw = Math.PI;
+        settle(0.6);
+        assert.equal(w2.posture, 'standing');
+        assert.ok(w2.walk.speed > 1, 'walking ' + w2.walk.speed);
+      } else {
+        w2.seatMenuOpen(true);
+        assert.equal(w2.sit('corner-right'), true);
+        settle(mode === 'glide' ? 0.8 : 0.1);
+        assert.equal(w2.posture, 'gliding', mode);
+        if (mode === 'reduced glide') assert.ok(w2.walk.veil > 0, 'the veil is down');
+        w2.seatMenuOpen(true);
+      }
+      w2.leave();
+      assert.equal(w2.active, false);
+      assert.equal(await w2.enter('KCMH'), true);
+      settle(0.3);
+      assert.deepEqual([w2.posture, w2.seatId, w2.sitPrompt, w2.seatMenu], ['seated', 'window', null, false], mode);
+      assert.deepEqual(Object.values(eyeL()), [...LOUNGE_ROOM.eye], mode + ': the window eye');
+      assert.deepEqual([w2.walk.speed, w2.walk.veil, w2.walk.bob.x, w2.walk.bob.y], [0, 0, 0, 0], mode);
+      cues.length = 0;
+      settle(1);
+      assert.equal(cues.filter((c) => c === 'step').length, 0, mode + ': no footsteps');
+      assert.ok(camera.position.distanceTo(w2.eyeWorld(new Vector3())) < 1e-9, mode + ': the camera at the eye');
+    } finally {
+      w2.setMoveKeys(0, 0, false);
+      saved.delete('fly-reduced-motion');
+    }
+  }
+});
+
+await check('click-a-chair through the camera: each vantage chair, projected as the renderer projects it (TRUE_SCALE k0 = 1 and k0 = the site scale), is the chair seatAt finds at that point of the screen, in all four quadrants, at its top edge and its seat', async () => {
+  assert.equal(await w2.enter('KCMH'), true);
+  settle(0.2);
+  standAt(0, 3.2, 0);
+  const site = w2.site, k = site.k, cam = new PerspectiveCamera(50, 16 / 9, 0.05, 1000);
+  let tested = 0;
+  try {
+    for (const k0 of [1, k]) {
+      setTrueScaleK(k0);
+      for (const [ex, ez] of [[-1.5, 3.0], [2.2, 2.6]]) {
+        w2.eyeLocal.x = ex; w2.eyeLocal.z = ez;
+        for (const seat of seatsC) for (const hy of [0.92, 0.3]) {
+          const lx = seat.chair.x - ex, lz = seat.chair.z - ez, dl = Math.hypot(lx, lz), ly = hy - WALK.eyeStandM;
+          const yawTo = Math.atan2(-lx, -lz), pitchTo = Math.atan(((k0 / k) * ly) / dl); // rendered: tan pr = (k0 / k) tan pl
+          for (const [du, dv] of [[0.2, 0.1], [-0.2, 0.1], [0.2, -0.1], [-0.2, -0.1]]) {
+            w2.yaw = yawTo + du; w2.pitch = pitchTo + dv; step(1 / 60);
+            // The renderer's view is R'^T S T(-p): R' the head's rendered yaw and pitch, S = diag(1, k0, 1).
+            cam.fov = camera.fov; cam.aspect = camera.aspect; cam.updateProjectionMatrix();
+            cam.position.set(0, 0, 0); cam.rotation.set(w2.pitch, w2.roomHeading + w2.yaw, 0, 'YXZ'); cam.updateMatrixWorld();
+            const P = siteToWorld(site, seat.chair.x, seat.chair.z), e = w2.eyeWorld();
+            const q = new Vector3(P.x - e.x, k0 * (w2.floorY + hy - e.y), P.z - e.z).project(cam);
+            if (Math.abs(q.x) > 0.95 || Math.abs(q.y) > 0.95 || q.z > 1) continue;
+            assert.equal(w2.walk.seatAt(q.x, q.y), seat.id, `k0 ${k0.toFixed(2)} from (${ex}, ${ez}) at ${seat.id} y ${hy} (${q.x.toFixed(2)}, ${q.y.toFixed(2)})`);
+            tested++;
+          }
+        }
+      }
+    }
+  } finally { setTrueScaleK(1); }
+  assert.ok(tested >= 60, 'cases ' + tested);
+});
+
+await check('every free point in front of a vantage chair can start a path (a strip narrower than a cell walks out to one), and those paths are free', () => {
+  let points = 0, strips = 0;
+  for (const seat of seatsC) {
+    for (let x = seat.chair.x - 0.8; x <= seat.chair.x + 0.8; x += 0.01) for (let z = P.z0 + 0.2; z <= seat.chair.z; z += 0.01) {
+      if (!W.isFree(grid, x, z)) continue;
+      points++;
+      const st = W.pathStart(grid, { x, z });
+      assert.ok(st, `no path start at (${x.toFixed(2)}, ${z.toFixed(2)})`);
+      if (!st.via) continue;
+      strips++;
+      const p = W.findPath(grid, { x, z }, { x: seat.approach[0], z: seat.approach[1] });
+      assert.ok(p, `no path from the strip at (${x.toFixed(2)}, ${z.toFixed(2)})`);
+      for (let i = 1; i < p.length; i++) assert.ok(legFree(p[i - 1], p[i]), `strip path leg ${i} from (${x.toFixed(2)}, ${z.toFixed(2)})`);
+    }
+  }
+  assert.ok(points > 1000 && strips > 0, `${points} free points, ${strips} in sub-cell strips`);
+});
+
+await check('a seat chosen during a glide: the same seat carries on, another waits, and the eye and the veil never jump', async () => {
+  assert.equal(await w2.enter('KCMH'), true);
+  settle(0.2);
+  assert.equal(w2.sit('corner-left'), true);
+  settle(0.3);
+  assert.equal(w2.posture, 'gliding');
+  let prev = eyeL(), prevVeil = w2.walk.veil;
+  assert.equal(w2.sit('corner-left'), true, 'already on its way');
+  assert.equal(w2.sit('corner-right'), false, 'another seat waits for the landing');
+  for (let i = 0; i < 240 && w2.posture === 'gliding'; i++) {
+    step(1 / 60);
+    const e = eyeL(), v = w2.walk.veil;
+    assert.ok(Math.abs(e.y - prev.y) < 0.05, `frame ${i}: the eye jumped ${(e.y - prev.y).toFixed(3)} m`);
+    if (Math.hypot(e.x - prev.x, e.z - prev.z) > WALK.glide.maxMps / 60 + 1e-6) assert.ok(v === 1 && prevVeil === 1, `frame ${i}: moved under an open view`);
+    assert.ok(Math.abs(v - prevVeil) < 0.25, `frame ${i}: the veil jumped ${prevVeil.toFixed(2)} -> ${v.toFixed(2)}`);
+    prev = e; prevVeil = v;
+  }
+  assert.deepEqual([w2.posture, w2.seatId], ['seated', 'corner-left']);
+});
+
+await check('landing in a seat with a move key still held stands you back up; the binoculars coming up close the seat menu', async () => {
+  assert.equal(await w2.enter('KCMH'), true);
+  settle(0.2);
+  assert.equal(w2.sit('corner-right'), true);
+  settle(0.3);
+  w2.setMoveKeys(1, 0, false); // held through the landing
+  settle(3);
+  assert.equal(w2.posture, 'standing', 'the held key stood you up');
+  w2.setMoveKeys(0, 0, false);
+  settle(0.5);
+  assert.equal(w2.seatMenuOpen(true), true);
+  w2.binoculars(true);
+  assert.equal(w2.seatMenu, false, 'the glasses closed the menu');
+  assert.equal(useFlyStore.getState().airportWatch.seatMenu, false);
+  w2.binoculars(false);
+  settle(0.5);
+});
+
+await check('reduced motion switched on mid-visit takes effect within half a second: no bob, and the next seat change is the veil cut', async () => {
+  assert.equal(await w2.enter('KCMH'), true);
+  settle(0.2);
+  standAt(0, 3.2, Math.PI, 3);
+  try {
+    saved.set('fly-reduced-motion', '1');
+    settle(0.6);
+    w2.setMoveKeys(1, 0, false);
+    let maxBob = 0;
+    for (let i = 0; i < 60; i++) { step(1 / 60); maxBob = Math.max(maxBob, Math.abs(w2.walk.bob.x), Math.abs(w2.walk.bob.y)); }
+    w2.setMoveKeys(0, 0, false);
+    assert.equal(maxBob, 0, 'no bob');
+    settle(0.5);
+    assert.equal(w2.sit('window'), true);
+    let t = 0;
+    while (w2.posture !== 'seated' && t < 2) { step(1 / 60); t += 1 / 60; }
+    assert.ok(t <= WALK.glide.reducedSec + 0.05, 'a cut, seated after ' + t.toFixed(2) + ' s');
+  } finally { saved.delete('fly-reduced-motion'); settle(0.6); }
+});
+
+dispose2();
+delete globalThis.window.__flyLoungeWalkOverride;
+
 console.log(`\nLOUNGE WALK: ${checks}/${checks + failed}${failed ? ` — ${failed} FAILED` : ''}`);
 process.exit(failed ? 1 : 0);

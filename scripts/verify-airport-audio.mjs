@@ -8,7 +8,8 @@
 // nearer aircraft are louder and brighter; doppler raises an approaching
 // engine and lowers a receding one; the listener is the observer's eye
 // (watch.eyeWorld, which walks with LOUNGE_WALK); mute, a hidden tab and leaving silence
-// everything; leaving tears the graph down and dispose releases every node.
+// everything; a footstep (LOUNGE_WALK) is a short scuff into the room bus;
+// leaving tears the graph down and dispose releases every node.
 //
 // Run: node scripts/verify-airport-audio.mjs
 import assert from 'node:assert/strict';
@@ -17,7 +18,7 @@ import {registerHooks} from 'node:module';
 import {fileURLToPath} from 'node:url';
 registerHooks({resolve(s,c,next){if(s.startsWith('@/'))s=new URL('../'+s.slice(2),import.meta.url).href;if(s.startsWith('.')||s.startsWith('file:')){const u=new URL(s,c.parentURL);if(fs.existsSync(fileURLToPath(u)+'.js'))return next(u.href+'.js',c);}return next(s,c);}});
 const {AirportAudio,retarded}=await import('../lib/fly/airport-audio.js');
-const {SOUNDSCAPE}=await import('../lib/fly/observation-config.js');
+const {SOUNDSCAPE,WALK}=await import('../lib/fly/observation-config.js');
 
 globalThis.document={hidden:false};
 let clock=1000;
@@ -106,6 +107,19 @@ await check('the listener is the observer\'s eye: standing 12 m from the seat, a
 await check('the room has a bed and a PA chime',()=>{const before=started;clock+=SOUNDSCAPE.chime.maxSec+1;ctx.currentTime+=1;audio.nextUpdate=0;audio.update(runtime,state);assert.ok(started>before,'chime oscillators scheduled');assert.equal(audio.graph.bus.gain.value,1);});
 await check('mute and a hidden tab silence the room and every voice',()=>{for(const [sound,hidden] of [[false,false],[true,true]]){state.soundOn=sound;document.hidden=hidden;step(0.5);assert.equal(audio.graph.bus.gain.value,0);assert.ok(audio.voices.every(v=>v.gain.gain.value===0));}state.soundOn=true;document.hidden=false;step(0.5);assert.equal(audio.graph.bus.gain.value,1);});
 await check('interface cues play only while sound is up and clean up after themselves',()=>{const before=allocated;base.muted=true;audio.cue('select');assert.equal(allocated,before);base.muted=false;audio.cue('select');audio.cue('raise');assert.ok(allocated>before);});
+await check('footsteps: a step is a short scuff into the room bus (so it fades and mutes with the room) at WALK.footstepGain within 20 %, stops itself, and is silent while muted',()=>{
+  const made=[],cg=ctx.createGain;
+  ctx.createGain=()=>{const n=cg(),c=n.connect;n.connect=t=>{n.to=t;return c(t);};made.push(n);return n;};
+  try{
+    const a0=allocated;base.muted=true;audio.cue('step');assert.equal(allocated,a0,'muted: nothing built');base.muted=false;
+    const s0=started,p0=stopped;
+    for(let i=0;i<20;i++)audio.cue('step');
+    assert.equal(started-s0,20);assert.equal(stopped-p0,20,'each step stops itself');
+    assert.equal(made.length,20);
+    for(const g of made){assert.equal(g.to,audio.graph.bus,'into the room bus');assert.ok(g.gain.value>=WALK.footstepGain*0.8-1e-12&&g.gain.value<=WALK.footstepGain*1.2+1e-12,'level '+g.gain.value);}
+    assert.ok(new Set(made.map(g=>g.gain.value)).size>1,'no two steps alike');
+  }finally{ctx.createGain=cg;}
+});
 await check('leaving the lounge silences at once, tears the graph down, and restores the music',()=>{
   watch.active=false;step(0.5);assert.equal(audio.graph.bus.gain.value,0);assert.equal(duck.at(-1),1);
   step(3.2);assert.equal(audio.graph,null);assert.equal(audio.voices.length,0);
