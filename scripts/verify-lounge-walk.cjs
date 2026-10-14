@@ -8,7 +8,10 @@
 // furniture; input.keys never holds W/A/S/D or Shift; V opens the seat menu
 // and Esc closes it first; a seat-menu jump lands within 3.2 s; a click on a
 // vantage chair sits there; the binoculars stop a walk and a move key lowers
-// them; the Esc chain is unchanged (selection, then leave); no page errors.
+// them; A and D strafe along the view; the binoculars close the seat menu, so
+// one Esc lowers them; Enter on a focused button is the button's, and the Sit
+// prompt hides behind the menu; a panel opening mid-stride stops the walk; the
+// Esc chain is unchanged (selection, then leave); no page errors.
 //
 //   FLY_URL='http://localhost:3123/?graphicsReview=1&airports=on&airportArt=on&airportScenery=on&flags=LOUNGE_WALK' \
 //     node scripts/verify-lounge-walk.cjs [--out <dir>]
@@ -217,6 +220,60 @@ const fixtures = () => {
     await page.keyboard.up('d');
     check('the binoculars stop a walk; a move key lowers them', d0.binocular && Math.hypot(d1.eye.x - d0.eye.x, d1.eye.z - d0.eye.z) < 1e-6 && !d2.binocular, { up: d0.binocular, drift: Math.hypot(d1.eye.x - d0.eye.x, d1.eye.z - d0.eye.z), after: d2.binocular });
     await wait(600);
+
+    // Strafe through the real keys: A along the view's left, D along its right.
+    await page.evaluate(() => { const w = window.__fly.airportWatch; w.eyeLocal.x = 0; w.eyeLocal.z = 5; w.yaw = 0.7; });
+    await wait(300);
+    const strafe = {};
+    for (const key of ['a', 'd']) {
+      const p0 = (await state()).eye;
+      await page.keyboard.down(key);
+      await wait(500);
+      await page.keyboard.up(key);
+      await wait(500);
+      const s1 = await state(), dx = s1.eye.x - p0.x, dz = s1.eye.z - p0.z, n = Math.hypot(dx, dz);
+      strafe[key] = n > 0.2 ? +((dx * Math.cos(s1.yaw) - dz * Math.sin(s1.yaw)) / n).toFixed(3) : 0;
+    }
+    check('A walks along the view\'s left and D along its right', strafe.a < -0.99 && strafe.d > 0.99, strafe);
+
+    // The seat menu behind the binoculars: raising them closes it, so one Esc lowers them.
+    await page.keyboard.press('v');
+    const menuOpen = await page.getByTestId('lounge-seat-menu').waitFor({ state: 'visible', timeout: 3000 }).then(() => true, () => false);
+    await page.keyboard.press('b');
+    await until(() => window.__fly.airportWatch.binocular, undefined, 3000);
+    await page.keyboard.press('Escape');
+    await wait(400);
+    s = await state();
+    check('with the seat menu open, the binoculars close it and one Esc lowers them', menuOpen && !s.menu && !s.binocular && s.active, { menuOpen, menu: s.menu, binocular: s.binocular });
+
+    // Enter on a focused control is that control's, and the Sit prompt hides behind the open menu.
+    await page.evaluate(() => { const w = window.__fly.airportWatch; w.eyeLocal.x = -0.8; w.eyeLocal.z = 0.5; w.yaw = 0; });
+    const promptUp = await page.getByTestId('lounge-sit-prompt').waitFor({ state: 'visible', timeout: 3000 }).then(() => true, () => false);
+    await page.getByTestId('lounge-seats').focus();
+    await page.keyboard.press('Enter');
+    await wait(400);
+    s = await state();
+    const promptHidden = !(await page.getByTestId('lounge-sit-prompt').isVisible());
+    check('Enter on the focused Seats button opens the menu instead of sitting, and the Sit prompt hides behind the menu', promptUp && s.posture === 'standing' && s.menu && promptHidden, { promptUp, posture: s.posture, menu: s.menu, promptHidden });
+    await page.keyboard.press('Escape');
+    await page.getByTestId('lounge-surface').focus();
+
+    // A panel opening mid-stride stops the walk while the key is still held.
+    await page.evaluate(() => { const w = window.__fly.airportWatch; w.eyeLocal.x = 0; w.eyeLocal.z = 3.2; w.yaw = Math.PI; });
+    await wait(200);
+    await page.keyboard.down('w');
+    await wait(600);
+    const walking = (await state()).speed;
+    await page.evaluate(() => window.__flyStore.setState({ airportBrowserOpen: true }));
+    await wait(400);
+    const q0 = (await state()).eye;
+    await wait(600);
+    const q1 = (await state()).eye;
+    await page.keyboard.up('w');
+    await page.evaluate(() => window.__flyStore.setState({ airportBrowserOpen: false }));
+    await wait(500);
+    const drift = Math.hypot(q1.x - q0.x, q1.z - q0.z);
+    check('a panel opening mid-stride stops the walk while the key is still held', walking > 1 && drift < 0.01, { walking: +walking.toFixed(2), drift });
 
     // The Esc chain: the selection clears first, then the lounge leaves.
     await page.evaluate(() => { const w = window.__fly.airportWatch; w.yaw = 0.12; w.pitch = 0.05; });

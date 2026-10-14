@@ -7,7 +7,8 @@ import { Armchair } from 'lucide-react';
  * — or a click on the prompt — sits you there. Test id lounge-sit-prompt.
  */
 export function SitPrompt({ runtime, watch }) {
-  if (!watch.walk || watch.posture !== 'standing' || !watch.prompt || watch.binocular) return null;
+  // The seat menu, when open, offers every seat itself (and would cover this).
+  if (!watch.walk || watch.posture !== 'standing' || !watch.prompt || watch.binocular || watch.seatMenu) return null;
   const seat = runtime.airportWatch?.seats?.find((s) => s.id === watch.prompt);
   return (
     <button

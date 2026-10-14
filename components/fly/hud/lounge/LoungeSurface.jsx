@@ -22,8 +22,10 @@ import { pickRadius } from '@/lib/fly/airport-watch-camera.mjs';
  *
  * WALKING (LOUNGE_WALK, while watch.walk is attached): W/A/S/D are held move
  * keys and Shift runs (they are always consumed here, so input.keys never
- * holds them, even with a panel open); Enter sits at the Sit prompt; V opens
- * the seat menu, and Esc closes it before anything else. A click that hits
+ * holds them, even with a panel open, and a panel opening releases them);
+ * Enter sits at the Sit prompt (not when it is pressed on another control);
+ * V opens the seat menu, and Esc closes it before anything else (both only
+ * while the menu can be seen: the binoculars hide it). A click that hits
  * no aircraft sits in the vantage chair under the pointer. There is no
  * pointer lock: the cursor stays the picker, and drag still looks.
  */
@@ -33,6 +35,10 @@ const isTyping = (el) => {
   const tag = el?.tagName;
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable;
 };
+/** Enter on a focused control belongs to that control (a seat row, a board row, the Sit prompt itself). */
+const isControl = (el) => !!el?.closest?.('button, a[href], [role="button"], [role="dialog"], summary');
+/** A panel covers the lounge: walking waits. */
+const covered = (s) => !!(s.inspectHex || s.airportBrowserOpen || s.atlasOpen || s.logbookOpen || s.phase === 'paused');
 
 /** Nearest projected aircraft to (x, y) within the zoom-aware pick radius. */
 export function pickAt(picker, x, y, mag) {
@@ -85,7 +91,7 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
       const s = useFlyStore.getState();
       const lower = e.key.toLowerCase();
       const walkKey = !!w.walk && (MOVE_KEYS[lower] || e.key === 'Shift');
-      if (s.inspectHex || s.airportBrowserOpen || s.atlasOpen || s.logbookOpen || s.phase === 'paused') {
+      if (covered(s)) {
         // A panel is up: walking waits, but its keys never reach the flight input.
         if (walkKey) {
           releaseMove();
@@ -113,15 +119,15 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
             w.binoculars();
             break;
           case 'v':
-            if (w.walk) w.seatMenuOpen();
-            else handled = false;
+            if (!w.walk) handled = false;
+            else if (!w.binocular) w.seatMenuOpen(); // hidden behind the glasses: nothing to toggle
             break;
           case 'enter':
-            if (w.walk && w.sitPrompt && w.posture === 'standing') w.sit(w.sitPrompt.id);
+            if (w.walk && w.sitPrompt && w.posture === 'standing' && !w.binocular && !w.seatMenu && !isControl(e.target)) w.sit(w.sitPrompt.id);
             else handled = false;
             break;
           case 'escape':
-            if (w.seatMenu) w.seatMenuOpen(false);
+            if (w.seatMenu && !w.binocular) w.seatMenuOpen(false);
             else if (w.binocular) w.binoculars(false);
             else if (w.selected) w.clearSelection();
             else handled = false; // FlyMode: leave the lounge
@@ -191,7 +197,12 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
     window.addEventListener('keydown', onDown, true);
     window.addEventListener('keyup', onUp, true);
     window.addEventListener('blur', onBlur);
+    // A panel opening mid-stride stops the walk at once (its keys then go to the panel).
+    const unsubscribe = useFlyStore.subscribe((s) => {
+      if (covered(s)) releaseMove();
+    });
     return () => {
+      unsubscribe();
       window.removeEventListener('keydown', onDown, true);
       window.removeEventListener('keyup', onUp, true);
       window.removeEventListener('blur', onBlur);
