@@ -8,6 +8,7 @@
  * and fin rudder use true hinge frames, so animation rotates around the hinge.
  */
 import fs from 'node:fs';
+import {finishAircraft} from './aircraft-surface.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deflateSync } from 'node:zlib';
@@ -18,13 +19,13 @@ import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 export const definition = {
   id:'concorde', slug:'concorde', length:61.66, span:25.56, type:'supersonic', custom:true,
   colors:{hull:'#e5e6de',trim:'#203e50',accent:'#bc8757'},
-  url:'/models/player-concorde-hero-v1.glb', mobileUrl:'/models/player-concorde-mobile-v1.glb', thumbnail:'/models/player-concorde-v1.svg',
+  url:'/models/player-concorde-hero-v3.glb', mobileUrl:'/models/player-concorde-mobile-v3.glb', thumbnail:'/models/player-concorde-v3.svg',
   yawFixRad:0, forceVertexColors:false, canopyMaterial:'glass',
   parts:{ailerons:['aileron-left','aileron-right'],elevators:['elevator-left','elevator-right'],rudder:'rudder',propeller:null},
   liverySlots:['hull','trim','accent'], engines:[-5.75,-3.65,3.65,5.75].map(x=>[x,-1.76,21.15]),
   lights:{tail:[0,7.94,28.58],landing:[[-.57,-.99,-21.7],[.57,-.99,-21.7]]},
   gearMounts:{nose:[0,-1.06,-18.9],main:[[-2.48,-1.12,7.9],[2.48,-1.12,7.9]]},
-  author:'Skyloom',license:'MIT',revision:1,
+  author:'Skyloom',license:'MIT',revision:3,
 };
 const HALF=definition.span/2, L=definition.length, clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),lerp=(a,b,t)=>a+(b-a)*t;
 const V=p=>new Vector3(...p);
@@ -72,7 +73,7 @@ function articulated(name,g,a,b,axis,material){
 }
 
 export function build(low=false){
-  const root=new Group();root.name='Skyloom Concorde';root.userData={author:'Skyloom',license:'MIT',revision:1,lod:low?'mobile':'hero',units:'metres',nose:'-Z'};
+  const root=new Group();root.name='Skyloom Concorde';root.userData={author:'Skyloom',license:'MIT',revision:3,lod:low?'mobile':'hero',units:'metres',nose:'-Z'};
   const palette={...definition.colors,glass:'#203b48',metal:'#748188',dark:'#101a20',cabin:'#183341'};
   const mats=Object.fromEntries(Object.entries(palette).map(([name,color])=>[name,new MeshStandardMaterial({name,color,roughness:name==='glass'?.14:name==='metal'?.29:name==='cabin'?.78:.39,metalness:name==='cabin'?0:name==='metal'?.68:name==='glass'?.28:.15})]));
   const buckets=Object.fromEntries(Object.keys(mats).map(k=>[k,[]]));
@@ -117,9 +118,9 @@ export function build(low=false){
     // Concorde's small pressure windows, at a regular 0.79 m cabin pitch.
     for(let j=0;j<43;j++){const z=-15.82+j*.79;if(!low)bodyPatch(side,.37,z,.105,.153,'trim',.026);bodyPatch(side,.37,z,.078,.122,'cabin',.043);}
     // Door outlines occupy real gaps in the window train.
-    for(const z of [-17.2,18.7]){bodyPatch(side,.15,z,.58,.37,'trim',.028);bodyPatch(side,.15,z,.547,.337,'hull',.046);bodyPatch(side,.52,z,.09,.11,'cabin',.059);}
+    for(const z of [-17.2,18.7]){bodyPatch(side,.15,z,.567,.357,'trim',.028);bodyPatch(side,.15,z,.547,.337,'hull',.046);bodyPatch(side,.52,z,.09,.11,'cabin',.059);}
     // A fine nose separation line and rear pressure bulkhead joint.
-    for(const z of [-25.2,22.8])bodyPatch(side,.23,z,.97,.018,'metal',.018,false);
+    for(const z of [-25.2,22.8])bodyPatch(side,.23,z,.97,.011,'metal',.018,false);
   }
 
   function wingPanel(side,x0,x1,back,front='lead',stepsX=6,stepsU=10){
@@ -203,8 +204,9 @@ export function build(low=false){
 
   for(const [role,list] of Object.entries(buckets))if(list.length){const clean=list.map(g=>{g.deleteAttribute('uv');return g.index?g.toNonIndexed():g;});addMesh(role,mergeVertices(mergeGeometries(clean),1e-5));}
   function addMesh(role,g){root.add(meshRole(g,mats[role],role));}
+  finishAircraft(root,{military:false});
   root.updateMatrixWorld(true);let triangles=0,draws=0;root.traverse(o=>{if(o.isMesh){triangles+=(o.geometry.index?.count??o.geometry.attributes.position.count)/3;draws++;}});
-  return {root,triangles,draws,budget:low?4000:16500};
+  return {root,triangles,draws,budget:low?4800:18000};
 }
 
 // A deterministic software depth buffer makes intersecting body/wing facets

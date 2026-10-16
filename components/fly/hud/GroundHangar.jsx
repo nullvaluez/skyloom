@@ -167,7 +167,7 @@ export function FreeDispatch({dest,query,setQuery,results,cursor,onSearchKey,cho
 }
 /** The fleet rail's aircraft thumbnail (also the lounge's aircraft rail). */
 export function AircraftGlyph({id}){
-  const url=FLEET_PRESENTATION[id]?.thumbnail||(id==='fighter'?'/models/player-vector-v2.svg':null);
+  const url=FLEET_PRESENTATION[id]?.thumbnail||(id==='fighter'?'/models/player-vector-v4.svg':null);
   if(url)return <img src={url} alt="" className="ops-fleet-thumbnail"/>;
   const heavy=['airliner','cargo','bizjet'].includes(id),prop=['prop','warbird-prop','glider'].includes(id);
   return <svg viewBox="0 0 80 42" aria-hidden="true"><path d={heavy?'M39 2Q42 2 43 7L44 17 73 30V34L44 27 44 34 54 39V41L40 38 26 41V39L36 34 36 27 7 34V30L36 17 37 7Q38 2 39 2Z':prop?'M38 3H42L43 18 75 20V25L43 23 43 34 53 38V40L40 37 27 40V38L37 34 37 23 5 25V20L37 18Z':'M40 2 46 17 70 34 70 37 48 30 49 38 58 41 42 38 40 40 38 38 22 41 31 38 32 30 10 37 10 34 34 17Z'}/></svg>;

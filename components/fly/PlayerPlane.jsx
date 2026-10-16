@@ -1,6 +1,7 @@
 'use client';
 /* eslint-disable react-hooks/immutability -- Three.js buffers, materials and the shared flight runtime are imperative simulation objects, updated by useFrame without React renders. */
 import { LandingGear } from './LandingGear';
+import { aircraftSurfaceParameters } from '@/lib/fly/aircraft-surface';
 import { applyPainterlyAircraft } from '@/lib/fly/painterly-aircraft';
 import { cinematicAircraftParameters } from '@/lib/fly/cinematic-models';
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
@@ -178,7 +179,9 @@ function gradeHullMaterial(src, isCanopy, hasVC = false, metresPerUnit = 1) {
     clearcoatRoughness: c.clearcoatRoughness,
     envMapIntensity: isCanopy ? c.canopy.envMapIntensity : c.envMapIntensity,
     ...(useFlyStore.getState().mapStyle === 'satellite' && satelliteVisualsOn('models') ? cinematicAircraftParameters(src,isCanopy) : {}),
+    ...aircraftSurfaceParameters(src,isCanopy),
   });
+  if (src?.userData?.aircraftSurface === 2) m.userData.aircraftSurface = 2;
   m.onBeforeCompile = (shader) => {
     shader.uniforms.uRimColor = _hullRim.uRimColor;
     shader.uniforms.uRimStrength = _hullRim.uRimStrength;
@@ -488,7 +491,7 @@ function PlayerLights({ anchors, flight }) {
  * airframe. The fighter's cfg is PLAYER.afterburner's own values at scale 1.
  */
 function Afterburner({ flight, anchors, cfg }) {
-  const exhaust = useMemo(() => createEngineExhaust(anchors.engines, cfg.scale ?? 1), [anchors, cfg]);
+  const exhaust = useMemo(() => createEngineExhaust(anchors.engines, cfg.scale ?? 1, cfg.radius), [anchors, cfg]);
   useEffect(() => () => exhaust.dispose(), [exhaust]);
   useEffect(() => registerSkyOverlay(exhaust.mesh), [exhaust]);
   useFrame((_, dt) => {

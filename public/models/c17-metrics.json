@@ -10,9 +10,9 @@
       "trim": "#4e626b",
       "accent": "#bb975d"
     },
-    "url": "/models/player-c17-hero-v1.glb",
-    "mobileUrl": "/models/player-c17-mobile-v1.glb",
-    "thumbnail": "/models/player-c17-v1.svg",
+    "url": "/models/player-c17-hero-v3.glb",
+    "mobileUrl": "/models/player-c17-mobile-v3.glb",
+    "thumbnail": "/models/player-c17-v3.svg",
     "yawFixRad": 0,
     "forceVertexColors": false,
     "canopyMaterial": "glass",
@@ -77,7 +77,7 @@
     },
     "author": "Skyloom",
     "license": "MIT",
-    "revision": 1
+    "revision": 3
   },
   "gear": {
     "nose": [
@@ -104,10 +104,10 @@
     {
       "id": "c17",
       "lod": "hero",
-      "url": "/models/player-c17-hero-v1.glb",
-      "triangles": 16844,
-      "draws": 11,
-      "bytes": 418600,
+      "url": "/models/player-c17-hero-v3.glb",
+      "triangles": 17210,
+      "draws": 12,
+      "bytes": 580248,
       "degenerate": 0,
       "bounds": {
         "min": [
@@ -130,10 +130,10 @@
     {
       "id": "c17",
       "lod": "mobile",
-      "url": "/models/player-c17-mobile-v1.glb",
-      "triangles": 4382,
-      "draws": 11,
-      "bytes": 126856,
+      "url": "/models/player-c17-mobile-v3.glb",
+      "triangles": 4414,
+      "draws": 12,
+      "bytes": 170912,
       "degenerate": 0,
       "bounds": {
         "min": [

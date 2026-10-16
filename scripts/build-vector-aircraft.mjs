@@ -1,6 +1,7 @@
 /** First-party Vector airframe. No downloaded geometry, textures, or trademarks.
  * Reproducible hero + mobile LOD; metres, nose -Z. Run with Node. */
 import fs from 'node:fs';
+import {finishAircraft,station} from './aircraft-surface.mjs';
 import { BufferGeometry, Float32BufferAttribute, Group, Mesh, MeshStandardMaterial, SphereGeometry, CylinderGeometry, TorusGeometry, BoxGeometry, TubeGeometry, CatmullRomCurve3, Vector3 } from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
@@ -30,6 +31,7 @@ function build(low) {
   }
   function loft(sections, role, ox = 0, oy = 0) {
     const n = low ? 16 : 32, p = [], ix = [];
+    const source=sections;sections=[...new Set([...source.map(s=>s[0]),...Array.from({length:low?12:28},(_,i)=>source[0][0]+(source.at(-1)[0]-source[0][0])*i/((low?12:28)-1))])].sort((a,b)=>a-b).map(z=>[z,...station(source,z)]);
     for (const [z, rx, ry, cy] of sections) for (let j = 0; j <= n; j++) {
       const a = j/n*Math.PI*2; p.push(ox+Math.cos(a)*rx, oy+cy+Math.sin(a)*ry, z);
     }
@@ -57,10 +59,10 @@ function build(low) {
   }
   for (const side of [-1,1]) {
     const mirror = pts => side===1 ? pts : pts.map(([x,z])=>[-x,z]).reverse();
-    wing(mirror([[1.2,-3.4],[8.9,3.5],[8.6,5.2],[2.4,5.4],[1.3,3.4]]),-.02,.22,'hull');
+    wing(mirror([[1.2,-3.4],[8.9,3.5],[8.6,5.2],[2.4,5.4],[1.3,3.4]]),-.02,.14,'hull');
     wing(mirror([[3.2,.1],[8.5,3.9],[8.25,4.5],[3.2,3.3]]),.105,.016,'trim');
     wing(mirror([[7.3,3.2],[8.6,4.12],[8.48,4.45],[7.14,3.65]]),.12,.018,'accent');
-    wing(mirror([[1.2,4.8],[4.95,7.1],[4.7,8.9],[1.3,7.5]]),.25,.17,'hull');
+    wing(mirror([[1.2,4.8],[4.95,7.1],[4.7,8.9],[1.3,7.5]]),.25,.11,'hull');
     // Authored control-surface joints and maintenance panels. They follow the
     // wing silhouette, instead of stamping a world-space grid onto the hull.
     seam([[side*2.9,.122,4.45],[side*5.4,.122,4.43],[side*8.48,.122,4.60]],.022);
@@ -96,16 +98,16 @@ function build(low) {
       add(new BoxGeometry(.055,.045,.84),'dark',[side*1.65+Math.cos(a)*.67,-.35+Math.sin(a)*.64,7.8],[0,0,a]);
     }
   }
-  const canopy=new SphereGeometry(1,low?20:40,low?12:24);canopy.scale(.68,.73,2.3);add(canopy,'glass',[0,.75,-3.7]);
+  const canopy=new SphereGeometry(1,low?20:40,low?12:24);canopy.scale(.63,.60,2.3);add(canopy,'glass',[0,.75,-3.7]);
   // Frames lie on the actual ellipsoid, including a continuous sill and two
   // transverse arches. A free-floating circular torus cannot fit this canopy.
   for(const z of [-4.85,-2.45]){
     const section=Math.sqrt(1-((z+3.7)/2.3)**2),pts=[];
-    for(let i=0;i<=12;i++){const a=i/12*Math.PI;pts.push([Math.cos(a)*.688*section,.75+Math.sin(a)*.738*section,z]);}
-    seam(pts,.043,'trim');
+    for(let i=0;i<=12;i++){const a=i/12*Math.PI;pts.push([Math.cos(a)*.638*section,.75+Math.sin(a)*.608*section,z]);}
+    seam(pts,.022,'trim');
   }
   for(const side of [-1,1]){
-    const pts=[];for(let i=0;i<=20;i++){const a=i/20*Math.PI;pts.push([side*Math.sin(a)*.688,.77,-3.7+Math.cos(a)*2.30]);}seam(pts,.045,'trim');
+    const pts=[];for(let i=0;i<=20;i++){const a=i/20*Math.PI;pts.push([side*Math.sin(a)*.638,.77,-3.7+Math.cos(a)*2.30]);}seam(pts,.022,'trim');
   }
   // Conformal dorsal panels around the spine and service hatches aft of it.
   for(const side of [-1,1])seam([[-1.1,.54],[1.1,.57],[2.2,.52]].map(([z,x])=>[side*x,top(x,z),z]),.024);
@@ -114,17 +116,19 @@ function build(low) {
   loft([[-8.4,.1,.03,.26],[-6,.22,.035,.61],[-5.9,.22,.035,.62]],'trim');
   seam([-.95,.3,1.55].map(z=>[0,top(0,z),z]),.055,'accent');
   const root=new Group();root.name='Vector — Skyloom original';
-  root.userData={author:'Skyloom',license:'MIT',revision:2,units:'metres',nose:'-Z',lod:low?'mobile':'hero',engineAnchors:[[-1.65,-.35,8.28],[1.65,-.35,8.28]]};
+  root.userData={author:'Skyloom',license:'MIT',revision:4,units:'metres',nose:'-Z',lod:low?'mobile':'hero',engineAnchors:[[-1.65,-.35,8.28],[1.65,-.35,8.28]]};
   let triangles=0;
   for(const [role,list] of Object.entries(buckets))if(list.length){
     const g=mergeGeometries(list);triangles+=g.attributes.position.count/3;
     const mesh=new Mesh(g,materials[role]);mesh.name=role==='glass'?'canopy':role;root.add(mesh);
   }
+  finishAircraft(root,{military:true});
+  triangles=0;root.traverse(o=>{if(o.isMesh)triangles+=(o.geometry.index?.count??o.geometry.attributes.position.count)/3;});
   return {root,triangles};
 }
 const exporter=new GLTFExporter(),receipt=[];
 for(const low of [false,true]){
-  const {root,triangles}=build(low),file=`public/models/player-vector-${low?'mobile':'hero'}-v2.glb`;
+  const {root,triangles}=build(low),file=`public/models/player-vector-${low?'mobile':'hero'}-v4.glb`;
   const data=await exporter.parseAsync(root,{binary:true});fs.writeFileSync(file,Buffer.from(data));receipt.push({file,triangles,bytes:data.byteLength});
 }
 console.log(JSON.stringify(receipt,null,2));

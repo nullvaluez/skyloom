@@ -2,10 +2,10 @@
   {
     "id": "f35",
     "lod": "hero",
-    "url": "/models/player-f35-hero-v1.glb",
-    "triangles": 15664,
-    "draws": 12,
-    "bytes": 411780,
+    "url": "/models/player-f35-hero-v3.glb",
+    "triangles": 16092,
+    "draws": 13,
+    "bytes": 493656,
     "bounds": {
       "min": [
         -5.349999904632568,
@@ -22,10 +22,10 @@
   {
     "id": "f35",
     "lod": "mobile",
-    "url": "/models/player-f35-mobile-v1.glb",
-    "triangles": 4448,
-    "draws": 12,
-    "bytes": 130564,
+    "url": "/models/player-f35-mobile-v3.glb",
+    "triangles": 4528,
+    "draws": 13,
+    "bytes": 155516,
     "bounds": {
       "min": [
         -5.349999904632568,

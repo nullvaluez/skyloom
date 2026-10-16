@@ -8,19 +8,20 @@
  * Six independent surfaces rotate in hinge frames; no fixed skin underneath.
  */
 import fs from 'node:fs';
+import {finishAircraft} from './aircraft-surface.mjs';
 import {pathToFileURL} from 'node:url';
 import {Box3,BufferGeometry,Color,CylinderGeometry,Float32BufferAttribute,Group,Matrix4,Mesh,MeshStandardMaterial,Quaternion,SphereGeometry,TorusGeometry,Vector3} from 'three';
 import {mergeGeometries,mergeVertices,toCreasedNormals} from 'three/addons/utils/BufferGeometryUtils.js';
 import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
 
 export const DEF={id:'f35',slug:'f35',length:15.7,span:10.7,type:'stealth-fighter',custom:true,
-  colors:{hull:'#879094',trim:'#545f65',accent:'#b6ae8e'},
-  url:'/models/player-f35-hero-v1.glb',mobileUrl:'/models/player-f35-mobile-v1.glb',thumbnail:'/models/player-f35-v1.svg',
+  colors:{hull:'#747b7e',trim:'#596164',accent:'#92999c'},
+  url:'/models/player-f35-hero-v3.glb',mobileUrl:'/models/player-f35-mobile-v3.glb',thumbnail:'/models/player-f35-v3.svg',
   yawFixRad:0,forceVertexColors:false,canopyMaterial:'glass',liverySlots:['hull','trim','accent'],
   parts:{ailerons:['aileron-left','aileron-right'],elevators:['elevator-left','elevator-right'],rudder:['rudder-left','rudder-right'],propeller:null},
   // Nozzle lip aft plane; navigation lights on outer leading-edge fillets.
   engines:[[0,-.08,7.83]],lights:{left:[-5.31,.125,2.2],right:[5.31,.125,2.2],tail:[0,.67,6.16],beacon:[0,1.01,.7],landing:[[-.56,-.77,-4.25],[.56,-.77,-4.25]]},
-  author:'Skyloom',license:'MIT',revision:1};
+  author:'Skyloom',license:'MIT',revision:3};
 const mix=(a,b,t)=>a+(b-a)*t;
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const smooth=(a,b,t)=>{t=clamp((t-a)/(b-a),0,1);return t*t*(3-2*t);};
@@ -28,7 +29,7 @@ const V=p=>new Vector3(...p);
 
 // z, half-width, upper radius, lower radius, chine extension. The shoulder
 // broadens at the intake/wing carry-through, then closes around the F135.
-const BODY=[[-7.85,.006,.008,.009,.01],[-7.5,.16,.13,.15,.04],[-6.9,.39,.28,.29,.10],[-6.1,.63,.45,.39,.12],[-5.25,.78,.59,.48,.13],[-4.35,.91,.76,.59,.13],[-3.5,1.04,.89,.76,.15],[-2.4,1.16,.99,.92,.18],[-1,1.32,1.02,1.04,.14],[.65,1.37,1.01,1.08,.12],[2.1,1.25,.91,1.04,.11],[3.5,1.13,.82,.99,.08],[4.9,1.03,.76,.92,.04],[6.1,.92,.72,.89,0],[6.55,.87,.70,.86,0]];
+const BODY=[[-7.85,.006,.008,.009,.01],[-7.5,.16,.13,.15,.04],[-6.9,.39,.28,.29,.10],[-6.1,.63,.45,.39,.12],[-5.25,.78,.59,.48,.13],[-4.35,.91,.76,.59,.13],[-3.5,1.04,.89,.76,.15],[-2.4,1.16,.99,.92,.18],[-1,1.32,1.02,1.04,.14],[.65,1.37,1.01,1.08,.12],[2.1,1.25,.91,1.04,.11],[3.5,1.13,.82,.99,.08],[4.9,1.03,.76,.92,.04],[6.1,.86,.70,.86,0],[6.65,.77,.665,.815,0],[7.17,.72,.64,.80,0]];
 // Shape-preserving cubic interpolation keeps the longitudinal loft smooth
 // without overshooting the nose or the monotone aft engine fairing.
 function sample(rows,z){
@@ -61,7 +62,7 @@ function rings(rows,segments,point,{capStart=false,capEnd=false}={}){
 }
 
 export function build(low=false){
-  const root=new Group();root.name='Skyloom F-35A Lightning II';root.userData={author:'Skyloom',license:'MIT',revision:1,lod:low?'mobile':'hero',units:'metres',nose:'-Z'};
+  const root=new Group();root.name='Skyloom F-35A Lightning II';root.userData={author:'Skyloom',license:'MIT',revision:3,lod:low?'mobile':'hero',units:'metres',nose:'-Z'};
   const materialSpec={hull:[DEF.colors.hull,.46,.16],trim:[DEF.colors.trim,.54,.15],accent:[DEF.colors.accent,.42,.22],glass:['#736443',.12,.55],metal:['#737275',.34,.7],dark:['#10181e',.8,.05]};
   const mats=Object.fromEntries(Object.entries(materialSpec).map(([name,[color,roughness,metalness]])=>[name,new MeshStandardMaterial({name,color,roughness,metalness})]));
   const buckets=Object.fromEntries(Object.keys(mats).map(k=>[k,[]]));
@@ -70,7 +71,7 @@ export function build(low=false){
   const poly=(points,role='trim',dir=[0,1,0])=>{const tris=[];for(let i=1;i<points.length-1;i++)tris.push([points[0],points[i],points[i+1]]);add(soup(tris,dir),role);};
   const lens=(p,r,role='accent')=>{const g=new SphereGeometry(1,low?6:10,low?4:6);g.scale(...r);g.translate(...p);g.deleteAttribute('uv');add(g,role);};
   // The body mesh shares its station vertices and normals across its full skin.
-  const zs=[...new Set([...BODY.map(s=>s[0]),...Array.from({length:low?24:60},(_,i)=>mix(-7.85,6.55,i/((low?24:60)-1)))])].sort((a,b)=>a-b);
+  const zs=[...new Set([...BODY.map(s=>s[0]),...Array.from({length:low?24:60},(_,i)=>mix(-7.85,7.17,i/((low?24:60)-1)))])].sort((a,b)=>a-b);
   add(rings(zs,low?24:48,(z,a)=>bodyPoint(z,a),{capStart:true}));
 
   // Closed cambered airfoil; the split trailing segment is a genuine cutout.
@@ -146,12 +147,12 @@ export function build(low=false){
   }
 
   // One-piece gold canopy, with a thin perimeter sill and a flush fore frame.
-  const CANOPY=[[-5.67,.012,.43,.012],[-5.4,.24,.5,.26],[-4.87,.46,.64,.55],[-4.05,.545,.76,.72],[-3.38,.50,.83,.67],[-2.87,.37,.88,.41],[-2.51,.015,.92,.02]];
+  const CANOPY=[[-5.67,.012,.43,.012],[-5.4,.24,.5,.26],[-4.87,.46,.64,.55],[-4.05,.52,.76,.58],[-3.38,.48,.83,.55],[-2.87,.37,.88,.41],[-2.51,.015,.92,.02]];
   const rows=[...new Set([...CANOPY.map(s=>s[0]),...Array.from({length:low?10:22},(_,i)=>mix(-5.67,-2.51,i/((low?10:22)-1)))])].sort((a,b)=>a-b),arc=low?10:22,p=[],ix=[];
   for(const z of rows){const [w,base,height]=sample(CANOPY,z);for(let j=0;j<=arc;j++){const a=j/arc*Math.PI;p.push(Math.cos(a)*w,base+height*Math.sin(a),z);}}
   for(let i=0;i<rows.length-1;i++)for(let j=0;j<arc;j++){const a=i*(arc+1)+j,b=a+1,c=a+arc+1,d=c+1;ix.push(a,b,c,b,d,c);}
   add(geom(p,ix),'glass');
-  for(const side of [-1,1])for(let i=0;i<rows.length-1;i++){const z0=rows[i],z1=rows[i+1],a=sample(CANOPY,z0),b=sample(CANOPY,z1);rod([side*a[0],a[1]+.01,z0],[side*b[0],b[1]+.01,z1],low?.018:.022,'trim');}
+  for(const side of [-1,1])for(let i=0;i<rows.length-1;i++){const z0=rows[i],z1=rows[i+1],a=sample(CANOPY,z0),b=sample(CANOPY,z1);rod([side*a[0],a[1]+.01,z0],[side*b[0],b[1]+.01,z1],low?.012:.014,'trim');}
   // Dorsal refuelling hatch and sawtooth RAM seams, projected onto the loft.
   function bodyLine(path,width=.012,role='trim'){
     for(let i=0;i<path.length-1;i++){const a=path[i],b=path[i+1],n=low?1:Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/.34));for(let j=0;j<n;j++){const x0=mix(a[0],b[0],j/n),z0=mix(a[1],b[1],j/n),x1=mix(a[0],b[0],(j+1)/n),z1=mix(a[1],b[1],(j+1)/n);rod(bodyTop(x0,z0,.014),bodyTop(x1,z1,.014),width,role);}}
@@ -170,25 +171,28 @@ export function build(low=false){
   // Single F135 exhaust. Individual convergent petals alternate depth at the
   // aft edge, with an inset annular throat and centre flameholder, not a cap.
   const petals=low?16:24,n=petals*2;
-  add(rings([6.10,6.46,7.02],n,(z,a)=>{const r=mix(.87,.94,smooth(6.1,7.02,z));return [Math.cos(a)*r,Math.sin(a)*r-.08,z];}),'metal');
+  // The shroud continues the tapered aft fuselage. The old .94 m flare
+  // exceeded the surrounding skin and exposed 1.75 m of engine hardware.
+  add(rings([7.08,7.19,7.28],n,(z,a)=>{const r=mix(.725,.705,smooth(7.08,7.28,z));return [Math.cos(a)*r,Math.sin(a)*r-.08,z];}),'metal');
   const petalTris=[];for(let i=0;i<petals;i++){
     const a0=(i+.05)/petals*Math.PI*2,a1=(i+.95)/petals*Math.PI*2,am=(a0+a1)/2;
-    const point=(a,r,z)=>[Math.cos(a)*r,Math.sin(a)*r-.08,z],A=point(a0,.94,6.98),B=point(a1,.94,6.98),C=point(a0,.79,7.85),D=point(a1,.79,7.85),M=point(am,.81,7.79);
+    const point=(a,r,z)=>[Math.cos(a)*r,Math.sin(a)*r-.08,z],A=point(a0,.706,7.25),B=point(a1,.706,7.25),C=point(a0,.62,7.85),D=point(a1,.62,7.85),M=point(am,.633,7.81);
     petalTris.push([A,B,M],[A,M,C],[B,D,M]);
-    if(!low)rod(point(am,.949,7.04),point(am,.835,7.61),.013,'trim');
+    if(!low)rod(point(am,.709,7.30),point(am,.647,7.69),.006,'trim');
   }
   add(soup(petalTris),'metal');
   // Duct is intentionally inward-facing; its far black cap occludes the hull.
-  const duct=rings([6.60,7.85],n,(z,a)=>{const r=mix(.59,.76,(z-6.60)/1.25);return [Math.cos(a)*r,Math.sin(a)*r-.08,z];});
+  const duct=rings([6.70,7.85],n,(z,a)=>{const r=mix(.40,.603,(z-6.70)/1.15);return [Math.cos(a)*r,Math.sin(a)*r-.08,z];});
   const di=duct.index.array;for(let i=0;i<di.length;i+=3)[di[i+1],di[i+2]]=[di[i+2],di[i+1]];duct.computeVertexNormals();add(duct,'dark');
-  const disk=new CylinderGeometry(.59,.59,.015,n,1,false);disk.rotateX(Math.PI/2);disk.translate(0,-.08,6.6);disk.deleteAttribute('uv');add(disk,'dark');
-  const ring=new TorusGeometry(.47,.024,low?3:5,n);ring.translate(0,-.08,6.65);ring.deleteAttribute('uv');add(ring,'metal');
-  lens([0,-.08,6.68],[.12,.12,.065],'metal');
-  for(let i=0;i<(low?6:12);i++){const a=i/(low?6:12)*Math.PI*2;rod([Math.cos(a)*.13,Math.sin(a)*.13-.08,6.68],[Math.cos(a+.14)*.45,Math.sin(a+.14)*.45-.08,6.67],.013,'metal');}
+  const disk=new CylinderGeometry(.40,.40,.015,n,1,false);disk.rotateX(Math.PI/2);disk.translate(0,-.08,6.7);disk.deleteAttribute('uv');add(disk,'dark');
+  const ring=new TorusGeometry(.32,.015,low?3:5,n);ring.translate(0,-.08,6.75);ring.deleteAttribute('uv');add(ring,'metal');
+  lens([0,-.08,6.78],[.075,.075,.045],'metal');
+  for(let i=0;i<(low?6:12);i++){const a=i/(low?6:12)*Math.PI*2;rod([Math.cos(a)*.08,Math.sin(a)*.08-.08,6.68],[Math.cos(a+.14)*.31,Math.sin(a+.14)*.31-.08,6.67],.013,'metal');}
   lens([0,1.03,.7],[.065,.025,.10],'accent');
   for(const [role,geos] of Object.entries(buckets))if(geos.length){const mesh=new Mesh(mergeGeometries(geos),mats[role]);mesh.name=role;root.add(mesh);}
+  finishAircraft(root,{military:true,stealth:true});
   root.updateMatrixWorld(true);let triangles=0,draws=0;root.traverse(o=>{if(o.isMesh){triangles+=(o.geometry.index?.count??o.geometry.attributes.position.count)/3;draws++;}});
-  return {root,triangles,draws,budget:low?4700:17000};
+  return {root,triangles,draws,budget:low?4800:18000};
 }
 
 // Geometry-derived, depth-sorted hangar glyph. Identical oblique projection to

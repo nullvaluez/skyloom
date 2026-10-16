@@ -80,7 +80,7 @@ for(const aircraft of PLAYER_AIRCRAFT)for(const phone of [false,true])test(`${ai
       const coords=o.geometry.attributes.aFleetPaint;assert.equal(coords.count,o.geometry.attributes.position.count);for(const v of coords.array)assert.ok(Number.isFinite(v));
       // The patch must compile alongside actual Three material shader anchors.
       const shader={vertexShader:ShaderLib.standard.vertexShader,fragmentShader:ShaderLib.standard.fragmentShader,uniforms:UniformsUtils.clone(ShaderLib.standard.uniforms)};
-      o.material.onBeforeCompile(shader);assert.ok(shader.vertexShader.includes('vFleetPaint=aFleetPaint;'));assert.ok(shader.fragmentShader.includes('diffuseColor.rgb=base;'));
+      o.material.onBeforeCompile(shader);assert.ok(shader.vertexShader.includes('vFleetPaint=aFleetPaint;'));assert.ok(shader.fragmentShader.includes('diffuseColor.rgb=base;'));assert.ok(shader.fragmentShader.includes('diffuseColor.rgb*=vColor.rgb;'),'livery keeps authored occlusion and coating colours');
       assert.equal(shader.uniforms.uFleetPattern,state.uniforms.uFleetPattern);
     });
     keys.push([...originals.keys()].map(o=>o.material.customProgramCacheKey()).join('|'));

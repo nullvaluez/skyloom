@@ -4,8 +4,8 @@
  *
  *   node scripts/build-flying-wing.mjs
  *
- * Writes public/models/player-umbra-{hero,mobile}-v1.glb and the hangar glyph
- * public/models/player-umbra-v1.svg, then replaces only the 'flying-wing' rows
+ * Writes public/models/player-umbra-{hero,mobile}-v3.glb and the hangar glyph
+ * public/models/player-umbra-v3.svg, then replaces only the 'flying-wing' rows
  * of public/models/adventure-fleet-v1.json (every other row is rewritten
  * byte-identical). build-adventure-fleet.mjs skips this `custom` airframe, so
  * rebuilding either script never regenerates the other's files.
@@ -22,6 +22,7 @@
  * normals. The four elevons are separate hinge-aligned groups (see elevon()).
  */
 import fs from 'node:fs';
+import {finishAircraft} from './aircraft-surface.mjs';
 import {Box3,BufferGeometry,Color,Float32BufferAttribute,Group,Matrix4,Mesh,MeshStandardMaterial,Vector3} from 'three';
 import {mergeGeometries,mergeVertices,toCreasedNormals} from 'three/addons/utils/BufferGeometryUtils.js';
 import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
@@ -267,14 +268,22 @@ function details(secs,lod){
     patch(out.glass,paneMap(side,[.8,1.24,.84,1.34]),.018,q,1);
     // Restrained recognition chevrons near each wingtip.
     const cx=side*20.2,cp=pLE(20.2)+.7;
-    ribbon(out.accent,[[cx-side*.42,cp+.36],[cx,cp],[cx+side*.42,cp+.36]],.1,.014,1);
+    ribbon(out.accent,[[cx-side*.42,cp+.36],[cx,cp],[cx+side*.42,cp+.36]],.045,.010,1);
     if(lod.details){
       // Leading-edge panel joint (outboard of the intakes) and a long spine
       // chevron converging on the tail.
-      ribbon(out.trim,[[side*7.6,pLE(7.6)+.86],[side*21.3,pLE(21.3)+.62]],.06,.012,3);
-      ribbon(out.trim,[[side*1.25,6.6],[side*.06,16.9]],.06,.012,3);
+      ribbon(out.trim,[[side*7.6,pLE(7.6)+.86],[side*21.3,pLE(21.3)+.62]],.025,.009,3);
+      ribbon(out.trim,[[side*1.25,6.6],[side*.06,16.9]],.025,.009,3);
       // Exhaust deck border, aft edge of each engine hump.
-      ribbon(out.trim,[[side*(ENGINE.x-ENGINE.w+.05),pEb(ENGINE.x-ENGINE.w+.05)+.12],[side*(ENGINE.x+ENGINE.w-.05),pEb(ENGINE.x+ENGINE.w-.05)+.12]],.05,.012,3);
+      ribbon(out.trim,[[side*(ENGINE.x-ENGINE.w+.05),pEb(ENGINE.x-ENGINE.w+.05)+.12],[side*(ENGINE.x+ENGINE.w-.05),pEb(ENGINE.x+ENGINE.w-.05)+.12]],.022,.009,3);
+    }
+  }
+  // Manufacturing joints follow the blended skin and sweep, not a grid.
+  if(lod.details){
+    for(const side of [-1,1]){
+      for(const x of [8.2,12.3,16.7]){const le=pLE(x),te=pTE(x);ribbon(out.trim,[[side*x,le+.24],[side*x,le+(te-le)*.58],[side*(x+.24),te-.38]],.018,.009,6);}
+      ribbon(out.trim,[[side*.48,5.6],[side*.64,6.4],[side*.58,7.45],[side*.15,7.65]],.022,.009,5);
+      for(const x of [3.65,6.55]){const end=pEx(x);ribbon(out.trim,[[side*x,7.1],[side*x,end-.2]],.018,.009,8);}
     }
   }
   const geos={};for(const [role,o] of Object.entries(out))if(o.i.length)geos[role]=indexedGeometry(o.p,o.n,o.i);
@@ -328,6 +337,7 @@ function build(low){
   for(const [role,g] of Object.entries(decals))add(role,g);
   for(const role of Object.keys(mats))if(parts[role]){const mesh=new Mesh(mergeGeometries(parts[role]),mats[role]);mesh.name=role;root.add(mesh);}
   for(const side of [-1,1])for(const e of ELEVONS)root.add(elevon(e,side,lod,mats.trim));
+  finishAircraft(root,{military:true,stealth:true});
   root.updateMatrixWorld(true);let triangles=0,draws=0;
   root.traverse(o=>{if(o.isMesh){triangles+=(o.geometry.index?o.geometry.index.count:o.geometry.attributes.position.count)/3;draws++;}});
   return {root,triangles,draws,budget:lod.budget};

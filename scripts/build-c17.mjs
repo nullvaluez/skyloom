@@ -7,6 +7,7 @@
  * No external meshes, textures, insignia or font assets.
  */
 import fs from 'node:fs';
+import {finishAircraft} from './aircraft-surface.mjs';
 import path from 'node:path';
 import {deflateSync} from 'node:zlib';
 import {fileURLToPath} from 'node:url';
@@ -17,13 +18,13 @@ import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
 export const definition={
   id:'c17',slug:'c17',length:53,span:51.75,type:'strategic-airlift',
   colors:{hull:'#9ba7aa',trim:'#4e626b',accent:'#bb975d'},
-  url:'/models/player-c17-hero-v1.glb',mobileUrl:'/models/player-c17-mobile-v1.glb',thumbnail:'/models/player-c17-v1.svg',
+  url:'/models/player-c17-hero-v3.glb',mobileUrl:'/models/player-c17-mobile-v3.glb',thumbnail:'/models/player-c17-v3.svg',
   yawFixRad:0,forceVertexColors:false,canopyMaterial:'glass',custom:true,
   parts:{ailerons:['aileron-left','aileron-right'],elevators:['elevator-left','elevator-right'],rudder:'rudder',propeller:null},
   liverySlots:['hull','trim','accent'],
   engines:[[-8.3,-.43,-3.25],[-17.1,-.72,1.65],[8.3,-.43,-3.25],[17.1,-.72,1.65]],
   lights:{tail:[0,11.08,24.62],landing:[[-3.65,-1.94,-6.7],[3.65,-1.94,-6.7]]},
-  author:'Skyloom',license:'MIT',revision:1,
+  author:'Skyloom',license:'MIT',revision:3,
 };
 
 // Cross-sections preserve the short rounded nose, raised flight deck and the
@@ -64,7 +65,7 @@ function interpolate(rows,x){let j=rows.findIndex((r,i)=>i<rows.length-1&&x>=r[0
 export function build(low=false){
   const root=new Group(),n=low?12:36;
   root.name='Skyloom C-17 Globemaster III';
-  root.userData={author:'Skyloom',license:'MIT',revision:1,lod:low?'mobile':'hero',units:'metres',nose:'-Z',airframe:'C-17 Globemaster III'};
+  root.userData={author:'Skyloom',license:'MIT',revision:3,lod:low?'mobile':'hero',units:'metres',nose:'-Z',airframe:'C-17 Globemaster III'};
   const colors={...definition.colors,glass:'#152c3a',metal:'#69747a',dark:'#15232a'};
   const mats=Object.fromEntries(Object.entries(colors).map(([name,color])=>[name,new MeshStandardMaterial({name,color,roughness:name==='glass'?.13:name==='metal'?.31:name==='dark'?.8:.53,metalness:name==='metal'?.70:name==='glass'?.28:.14})]));
   const buckets=Object.fromEntries(Object.keys(mats).map(k=>[k,[]]));
@@ -206,17 +207,17 @@ export function build(low=false){
     // Flight-deck escape panel and the separate forward personnel door.
     const theta=side>0?.10:Math.PI-.10,da=.34;
     const outline=[[theta-da,-19.3],[theta+da,-19.3],[theta+da,-17.7],[theta-da,-17.7],[theta-da,-19.3]].map(([t,z])=>surfacePoint(t,z,.032));
-    polyline(outline,.028);rod(surfacePoint(theta-.10,-18.1,.058),surfacePoint(theta-.10,-17.86,.058),.040,'metal');
+    polyline(outline,.014);rod(surfacePoint(theta-.10,-18.1,.058),surfacePoint(theta-.10,-17.86,.058),.040,'metal');
     const at=side>0?.32:Math.PI-.32;
     patch(at-.075,at+.075,-18.96,-18.48,'glass',.044);
     // Sparse real transport windows rather than an airliner cabin-window row.
     for(const z of [-13.5,10.8])patch(at-.050,at+.050,z-.18,z+.18,'glass',.042);
   }
   // Radome split, cargo-ramp perimeter and aft clamshell seam.
-  const nose=[];for(let j=0;j<=n;j++)nose.push(surfacePoint(j/n*Math.PI*2,-24.8,.025));polyline(nose,.022,'trim');
+  const nose=[];for(let j=0;j<=n;j++)nose.push(surfacePoint(j/n*Math.PI*2,-24.8,.025));polyline(nose,.014,'trim');
   const seamSteps=low?4:12;
-  for(const theta of [Math.PI*1.19,Math.PI*1.81]){const line=[];for(let j=0;j<=seamSteps;j++)line.push(surfacePoint(theta,mix(11.8,22.6,j/seamSteps),.039));polyline(line,.031,'trim');}
-  for(const z of (low?[11.8,22.6]:[11.8,18.4,22.6])){const line=[];for(let j=0;j<=seamSteps;j++)line.push(surfacePoint(mix(Math.PI*1.19,Math.PI*1.81,j/seamSteps),z,.039));polyline(line,.031,'trim');}
+  for(const theta of [Math.PI*1.19,Math.PI*1.81]){const line=[];for(let j=0;j<=seamSteps;j++)line.push(surfacePoint(theta,mix(11.8,22.6,j/seamSteps),.039));polyline(line,.018,'trim');}
+  for(const z of (low?[11.8,22.6]:[11.8,18.4,22.6])){const line=[];for(let j=0;j<=seamSteps;j++)line.push(surfacePoint(mix(Math.PI*1.19,Math.PI*1.81,j/seamSteps),z,.039));polyline(line,.018,'trim');}
   // Recessed vents over the cargo ramp, dorsal aerials, and fin recognition bars.
   for(const side of [-1,1]){
     const theta=side>0?.63:Math.PI-.63;
@@ -236,12 +237,13 @@ export function build(low=false){
     // but crease normals and material boundaries remain exactly as authored.
     const mesh=new Mesh(mergeVertices(mergeGeometries(geometries),1e-6),mats[role]);mesh.name=role;root.add(mesh);
   }
+  finishAircraft(root,{military:true});
   root.updateMatrixWorld(true);let triangles=0,draws=0,degenerate=0;
   root.traverse(o=>{if(!o.isMesh)return;const g=o.geometry,p=g.attributes.position,ix=g.index;triangles+=(ix?ix.count:p.count)/3;draws++;
     for(let j=0;j<(ix?ix.count:p.count);j+=3){const pts=[0,1,2].map(k=>new Vector3().fromBufferAttribute(p,ix?ix.getX(j+k):j+k));if(pts[1].clone().sub(pts[0]).cross(pts[2].clone().sub(pts[0])).lengthSq()<1e-13)degenerate++;}
   });
   const box=new Box3().setFromObject(root,true),size=box.getSize(new Vector3());
-  return {root,triangles,draws,degenerate,budget:low?4400:18000,bounds:{min:box.min.toArray(),max:box.max.toArray(),size:size.toArray()}};
+  return {root,triangles,draws,degenerate,budget:low?4800:18000,bounds:{min:box.min.toArray(),max:box.max.toArray(),size:size.toArray()}};
 }
 
 // A depth-tested oblique geometry projection. The PNG is generated entirely

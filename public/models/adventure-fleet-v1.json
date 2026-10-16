@@ -2,193 +2,193 @@
   {
     "id": "military",
     "lod": "hero",
-    "url": "/models/player-talon-hero-v1.glb",
-    "triangles": 5112,
-    "draws": 12,
-    "bytes": 377400
+    "url": "/models/player-talon-hero-v3.glb",
+    "triangles": 15036,
+    "draws": 13,
+    "bytes": 474624
   },
   {
     "id": "military",
     "lod": "mobile",
-    "url": "/models/player-talon-mobile-v1.glb",
-    "triangles": 2400,
+    "url": "/models/player-talon-mobile-v3.glb",
+    "triangles": 3828,
+    "draws": 13,
+    "bytes": 133960
+  },
+  {
+    "id": "warbird-jet",
+    "lod": "hero",
+    "url": "/models/player-dart-hero-v3.glb",
+    "triangles": 12904,
     "draws": 12,
-    "bytes": 182128
-  },
-  {
-    "id": "warbird-jet",
-    "lod": "hero",
-    "url": "/models/player-dart-hero-v1.glb",
-    "triangles": 3840,
-    "draws": 11,
-    "bytes": 285176
+    "bytes": 410748
   },
   {
     "id": "warbird-jet",
     "lod": "mobile",
-    "url": "/models/player-dart-mobile-v1.glb",
-    "triangles": 1852,
-    "draws": 11,
-    "bytes": 142032
+    "url": "/models/player-dart-mobile-v3.glb",
+    "triangles": 3240,
+    "draws": 12,
+    "bytes": 116124
   },
   {
     "id": "warbird-prop",
     "lod": "hero",
-    "url": "/models/player-mustang-hero-v1.glb",
-    "triangles": 3936,
-    "draws": 13,
-    "bytes": 293288
+    "url": "/models/player-mustang-hero-v3.glb",
+    "triangles": 10756,
+    "draws": 14,
+    "bytes": 350760
   },
   {
     "id": "warbird-prop",
     "lod": "mobile",
-    "url": "/models/player-mustang-mobile-v1.glb",
-    "triangles": 2000,
-    "draws": 13,
-    "bytes": 153880
+    "url": "/models/player-mustang-mobile-v3.glb",
+    "triangles": 3092,
+    "draws": 14,
+    "bytes": 118372
   },
   {
     "id": "prop",
     "lod": "hero",
-    "url": "/models/player-skylark-hero-v1.glb",
+    "url": "/models/player-skylark-hero-v3.glb",
+    "triangles": 8804,
+    "draws": 14,
+    "bytes": 282636
+  },
+  {
+    "id": "prop",
+    "lod": "mobile",
+    "url": "/models/player-skylark-mobile-v3.glb",
+    "triangles": 2566,
+    "draws": 14,
+    "bytes": 93408
+  },
+  {
+    "id": "glider",
+    "lod": "hero",
+    "url": "/models/player-whisper-hero-v3.glb",
+    "triangles": 8432,
+    "draws": 10,
+    "bytes": 277316
+  },
+  {
+    "id": "glider",
+    "lod": "mobile",
+    "url": "/models/player-whisper-mobile-v3.glb",
+    "triangles": 2328,
+    "draws": 10,
+    "bytes": 87196
+  },
+  {
+    "id": "bizjet",
+    "lod": "hero",
+    "url": "/models/player-meridian-hero-v3.glb",
+    "triangles": 12348,
+    "draws": 13,
+    "bytes": 399012
+  },
+  {
+    "id": "bizjet",
+    "lod": "mobile",
+    "url": "/models/player-meridian-mobile-v3.glb",
+    "triangles": 3274,
+    "draws": 13,
+    "bytes": 114896
+  },
+  {
+    "id": "airliner",
+    "lod": "hero",
+    "url": "/models/player-stratoliner-hero-v3.glb",
+    "triangles": 12774,
+    "draws": 13,
+    "bytes": 413908
+  },
+  {
+    "id": "airliner",
+    "lod": "mobile",
+    "url": "/models/player-stratoliner-mobile-v3.glb",
     "triangles": 3552,
     "draws": 13,
-    "bytes": 265692
+    "bytes": 125116
   },
   {
-    "id": "prop",
-    "lod": "mobile",
-    "url": "/models/player-skylark-mobile-v1.glb",
-    "triangles": 1672,
+    "id": "cargo",
+    "lod": "hero",
+    "url": "/models/player-leviathan-hero-v3.glb",
+    "triangles": 17318,
     "draws": 13,
-    "bytes": 130316
-  },
-  {
-    "id": "glider",
-    "lod": "hero",
-    "url": "/models/player-whisper-hero-v1.glb",
-    "triangles": 2568,
-    "draws": 9,
-    "bytes": 192028
-  },
-  {
-    "id": "glider",
-    "lod": "mobile",
-    "url": "/models/player-whisper-mobile-v1.glb",
-    "triangles": 1312,
-    "draws": 9,
-    "bytes": 101624
-  },
-  {
-    "id": "bizjet",
-    "lod": "hero",
-    "url": "/models/player-meridian-hero-v1.glb",
-    "triangles": 4984,
-    "draws": 12,
-    "bytes": 368300
-  },
-  {
-    "id": "bizjet",
-    "lod": "mobile",
-    "url": "/models/player-meridian-mobile-v1.glb",
-    "triangles": 2272,
-    "draws": 12,
-    "bytes": 173032
-  },
-  {
-    "id": "airliner",
-    "lod": "hero",
-    "url": "/models/player-stratoliner-hero-v1.glb",
-    "triangles": 7224,
-    "draws": 12,
-    "bytes": 529636
-  },
-  {
-    "id": "airliner",
-    "lod": "mobile",
-    "url": "/models/player-stratoliner-mobile-v1.glb",
-    "triangles": 3232,
-    "draws": 12,
-    "bytes": 242204
-  },
-  {
-    "id": "cargo",
-    "lod": "hero",
-    "url": "/models/player-leviathan-hero-v1.glb",
-    "triangles": 7920,
-    "draws": 12,
-    "bytes": 579640
+    "bytes": 548080
   },
   {
     "id": "cargo",
     "lod": "mobile",
-    "url": "/models/player-leviathan-mobile-v1.glb",
-    "triangles": 3536,
-    "draws": 12,
-    "bytes": 263984
+    "url": "/models/player-leviathan-mobile-v3.glb",
+    "triangles": 4536,
+    "draws": 13,
+    "bytes": 151892
   },
   {
     "id": "flying-wing",
     "lod": "hero",
-    "url": "/models/player-umbra-hero-v1.glb",
-    "triangles": 12358,
-    "draws": 10,
-    "bytes": 290344
+    "url": "/models/player-umbra-hero-v3.glb",
+    "triangles": 13676,
+    "draws": 11,
+    "bytes": 409508
   },
   {
     "id": "flying-wing",
     "lod": "mobile",
-    "url": "/models/player-umbra-mobile-v1.glb",
-    "triangles": 3622,
-    "draws": 10,
-    "bytes": 92140
+    "url": "/models/player-umbra-mobile-v3.glb",
+    "triangles": 3652,
+    "draws": 11,
+    "bytes": 118268
   },
   {
     "id": "f35",
     "lod": "hero",
-    "url": "/models/player-f35-hero-v1.glb",
-    "triangles": 15664,
-    "draws": 12,
-    "bytes": 411780
+    "url": "/models/player-f35-hero-v3.glb",
+    "triangles": 16092,
+    "draws": 13,
+    "bytes": 493656
   },
   {
     "id": "f35",
     "lod": "mobile",
-    "url": "/models/player-f35-mobile-v1.glb",
-    "triangles": 4448,
-    "draws": 12,
-    "bytes": 130564
+    "url": "/models/player-f35-mobile-v3.glb",
+    "triangles": 4528,
+    "draws": 13,
+    "bytes": 155516
   },
   {
     "id": "c17",
     "lod": "hero",
-    "url": "/models/player-c17-hero-v1.glb",
-    "triangles": 16844,
-    "draws": 11,
-    "bytes": 418600
+    "url": "/models/player-c17-hero-v3.glb",
+    "triangles": 17210,
+    "draws": 12,
+    "bytes": 580248
   },
   {
     "id": "c17",
     "lod": "mobile",
-    "url": "/models/player-c17-mobile-v1.glb",
-    "triangles": 4382,
-    "draws": 11,
-    "bytes": 126856
+    "url": "/models/player-c17-mobile-v3.glb",
+    "triangles": 4414,
+    "draws": 12,
+    "bytes": 170912
   },
   {
     "id": "concorde",
     "lod": "hero",
-    "url": "/models/player-concorde-hero-v1.glb",
-    "triangles": 16364,
-    "draws": 12,
-    "bytes": 397528
+    "url": "/models/player-concorde-hero-v3.glb",
+    "triangles": 16836,
+    "draws": 13,
+    "bytes": 547864
   },
   {
     "id": "concorde",
     "lod": "mobile",
-    "url": "/models/player-concorde-mobile-v1.glb",
-    "triangles": 3820,
-    "draws": 12,
-    "bytes": 125864
+    "url": "/models/player-concorde-mobile-v3.glb",
+    "triangles": 3852,
+    "draws": 13,
+    "bytes": 164208
   }
 ]
