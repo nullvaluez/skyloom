@@ -81,6 +81,18 @@ await check('wheel zoom keeps the pointed-at direction under the pointer',()=>{
   watch.binoculars(false);watch.resetLook();frames(120);
 });
 
+await check('rail raise cancels a pending pointer anchor without rotating or acquiring a contact',()=>{
+  watch.clearSelection();watch.resetLook();frames(120);watch.yaw=0;watch.pitch=0;
+  watch.zoomAt(-20,.8,.2);frames(1);
+  assert.ok(watch.optics.mag<watch.optics.target&&watch.optics.target<1.5,'wheel zoom is still settling below binocular activation');
+  const yaw=watch.yaw,pitch=watch.pitch;
+  watch.binoculars(true,{acquire:false});frames(120);
+  assert.ok(Math.abs(watch.yaw-yaw)<1e-8,'rail preserves yaw instead of reusing the cursor anchor');
+  assert.ok(Math.abs(watch.pitch-pitch)<1e-8,'rail preserves pitch');
+  assert.equal(watch.selected,null);assert.equal(watch.tracking,false);assert.equal(watch.binocular,true);
+  watch.binoculars(false);watch.resetLook();frames(120);
+});
+
 const near=placeAt(mk('aaa111'),.08,.05,6000),far=placeAt(mk('bbb222'),.6,.02,9000),behind=placeAt(mk('ccc333'),3.0,.04,4000);
 setTraffic(near,far,behind);
 await check('binoculars with nothing selected auto-acquire the aircraft nearest the centre of view',()=>{watch.clearSelection();watch.resetLook();frames(60);watch.binoculars(true);assert.equal(watch.selected,'aaa111');assert.equal(watch.tracking,true);assert.equal(useFlyStore.getState().lockedHex,'aaa111','soft lock kept for hero detail');assert.equal(runtime.targeting.lockedHex,'aaa111','and written where FlyScene and DetailedTraffic read it');assert.equal(runtime.targeting.target,near);frames(150);assert.ok(aimError(near)<camera.fov*DEG*.01,'locked and centred: '+aimError(near));watch.binoculars(false);frames(90);});

@@ -1,0 +1,8361 @@
+{
+  "variant": "pier",
+  "source": "mixed cached OpenFreeMap tiles",
+  "fetchedPlanet": "20261011_080001_pt",
+  "cachedSnapshotDate": null,
+  "visualCertification": false,
+  "airports": 115,
+  "selected": 111,
+  "fallback": 4,
+  "rows": [
+    {
+      "ident": "KJFK",
+      "tiles": {
+        "requested": 49,
+        "loaded": 49,
+        "empty": 37,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KJFK",
+        "runwayId": "KJFK:04L-22R",
+        "along": 2116,
+        "cross": -432,
+        "floorM": 24,
+        "score": 338.2,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 30,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 112,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 135,
+              "taxiway": 3,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 16,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 112,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 170,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 13
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 3
+          },
+          "back": {
+            "targets": 18,
+            "samples": 4,
+            "blocked": 8,
+            "total": 72
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KLAX",
+      "tiles": {
+        "requested": 30,
+        "loaded": 30,
+        "empty": 18,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KLAX",
+        "runwayId": "KLAX:7L-25R",
+        "along": 2972,
+        "cross": -424,
+        "floorM": 24,
+        "score": 274.2,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 20,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 10
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 109,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 3
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 151,
+              "taxiway": 3,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 9,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 25,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 13
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 55,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 2
+          },
+          "back": {
+            "targets": 19,
+            "samples": 4,
+            "blocked": 8,
+            "total": 76
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KORD",
+      "tiles": {
+        "requested": 49,
+        "loaded": 49,
+        "empty": 31,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KORD",
+        "runwayId": "KORD:09R-27L",
+        "along": 1391,
+        "cross": 1104,
+        "floorM": 24,
+        "score": 303.9,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 28,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 2
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 100,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 13
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 129,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 32
+            },
+            "gates": 55,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 104,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 8
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 135,
+              "taxiway": 29,
+              "runway": 0,
+              "building": 3
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 1
+          },
+          "back": {
+            "targets": 28,
+            "samples": 4,
+            "blocked": 0,
+            "total": 112
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KATL",
+      "tiles": {
+        "requested": 36,
+        "loaded": 36,
+        "empty": 26,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KATL",
+        "runwayId": "KATL:09L-27R",
+        "along": 1535,
+        "cross": -504,
+        "floorM": 24,
+        "score": 246.3,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 24,
+              "taxiway": 4,
+              "runway": 0,
+              "building": 2
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 92,
+              "taxiway": 12,
+              "runway": 0,
+              "building": 8
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 138,
+              "taxiway": 25,
+              "runway": 0,
+              "building": 7
+            },
+            "gates": 35,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 92,
+              "taxiway": 12,
+              "runway": 0,
+              "building": 8
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 119,
+              "taxiway": 25,
+              "runway": 0,
+              "building": 26
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 18,
+            "samples": 4,
+            "blocked": 0,
+            "total": 72
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KDFW",
+      "tiles": {
+        "requested": 42,
+        "loaded": 42,
+        "empty": 25,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KDFW",
+        "runwayId": "KDFW:17C-35C",
+        "along": 2391,
+        "cross": 824,
+        "floorM": 24,
+        "score": 260.8,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 30,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 105,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 28,
+              "taxiway": 37,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 15,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 103,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 16
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 76,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 67
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 2
+          },
+          "back": {
+            "targets": 29,
+            "samples": 4,
+            "blocked": 10,
+            "total": 116
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KDEN",
+      "tiles": {
+        "requested": 64,
+        "loaded": 64,
+        "empty": 35,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KDEN",
+        "runwayId": "KDEN:17R-35L",
+        "along": 2439,
+        "cross": 424,
+        "floorM": 24,
+        "score": 143.9,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 9
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 53,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 33,
+              "taxiway": 14,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 0,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 8
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 3
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 1
+          },
+          "back": {
+            "targets": 27,
+            "samples": 4,
+            "blocked": 4,
+            "total": 108
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KSFO",
+      "tiles": {
+        "requested": 30,
+        "loaded": 30,
+        "empty": 21,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KSFO",
+        "runwayId": "KSFO:1R-19L",
+        "along": 2217,
+        "cross": -1032,
+        "floorM": 24,
+        "score": 175.5,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 21,
+              "taxiway": 4,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 89,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 87,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 5
+            },
+            "gates": 0,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 92,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 2
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 54,
+              "taxiway": 17,
+              "runway": 0,
+              "building": 5
+            }
+          },
+          "blocked": {
+            "faced": 1,
+            "other": 10
+          },
+          "back": {
+            "targets": 18,
+            "samples": 4,
+            "blocked": 0,
+            "total": 72
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KSEA",
+      "tiles": {
+        "requested": 35,
+        "loaded": 35,
+        "empty": 27,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KSEA",
+        "runwayId": "KSEA:16L-34R",
+        "along": 1335,
+        "cross": -384,
+        "floorM": 24,
+        "score": 148.6,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 8,
+              "taxiway": 2,
+              "runway": 0,
+              "building": 7
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 52,
+              "taxiway": 4,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 9,
+              "taxiway": 46,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 12,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 17,
+              "taxiway": 7,
+              "runway": 0,
+              "building": 4
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 5,
+              "taxiway": 9,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 10,
+            "samples": 4,
+            "blocked": 0,
+            "total": 40
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KMIA",
+      "tiles": {
+        "requested": 30,
+        "loaded": 30,
+        "empty": 19,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KMIA",
+        "runwayId": "KMIA:08R-26L",
+        "along": 1684,
+        "cross": 672,
+        "floorM": 24,
+        "score": 351.1,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 19,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 5
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 108,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 4
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 162,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 3
+            },
+            "gates": 18,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 98,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 8
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 124,
+              "taxiway": 11,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 17,
+            "samples": 4,
+            "blocked": 0,
+            "total": 68
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KEWR",
+      "tiles": {
+        "requested": 25,
+        "loaded": 25,
+        "empty": 17,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KEWR",
+        "runwayId": "KEWR:4L-22R",
+        "along": 2103,
+        "cross": -504,
+        "floorM": 24,
+        "score": 266.2,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 17,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 8
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 81,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 20
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 110,
+              "taxiway": 16,
+              "runway": 0,
+              "building": 15
+            },
+            "gates": 35,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 64,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 10
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 81,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 15
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 14,
+            "samples": 4,
+            "blocked": 0,
+            "total": 56
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KBOS",
+      "tiles": {
+        "requested": 36,
+        "loaded": 36,
+        "empty": 23,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KBOS",
+        "runwayId": "KBOS:04L-22R",
+        "along": 1288,
+        "cross": -1104,
+        "floorM": 24,
+        "score": 201.1,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 15,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 2
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 62,
+              "taxiway": 4,
+              "runway": 0,
+              "building": 8
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 35,
+              "taxiway": 21,
+              "runway": 0,
+              "building": 33
+            },
+            "gates": 11,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 79,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 8
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 67,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 25
+            }
+          },
+          "blocked": {
+            "faced": 1,
+            "other": 1
+          },
+          "back": {
+            "targets": 21,
+            "samples": 4,
+            "blocked": 0,
+            "total": 84
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KPHL",
+      "tiles": {
+        "requested": 42,
+        "loaded": 42,
+        "empty": 29,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KPHL",
+        "runwayId": "KPHL:09R-27L",
+        "along": 1883,
+        "cross": 352,
+        "floorM": 24,
+        "score": 276.3,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 30,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 112,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 44,
+              "taxiway": 8,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 0,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 112,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 33,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 69
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 13,
+            "samples": 4,
+            "blocked": 0,
+            "total": 52
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KLGA",
+      "tiles": {
+        "requested": 30,
+        "loaded": 30,
+        "empty": 25,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KLGA",
+        "runwayId": "KLGA:13-31",
+        "along": 856,
+        "cross": 384,
+        "floorM": 24,
+        "score": 229.3,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 12,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 11
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 77,
+              "taxiway": 5,
+              "runway": 0,
+              "building": 10
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 91,
+              "taxiway": 21,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 28,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 79,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 7
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 73,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 59
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 1
+          },
+          "back": {
+            "targets": 14,
+            "samples": 4,
+            "blocked": 19,
+            "total": 56
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KIAD",
+      "tiles": {
+        "requested": 49,
+        "loaded": 49,
+        "empty": 27,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KIAD",
+        "runwayId": "KIAD:01C-19C",
+        "along": 921,
+        "cross": 784,
+        "floorM": 24,
+        "score": 246.3,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 28,
+              "taxiway": 2,
+              "runway": 0,
+              "building": 5
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 104,
+              "taxiway": 8,
+              "runway": 0,
+              "building": 19
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 149,
+              "taxiway": 20,
+              "runway": 0,
+              "building": 20
+            },
+            "gates": 33,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 104,
+              "taxiway": 8,
+              "runway": 0,
+              "building": 13
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 155,
+              "taxiway": 15,
+              "runway": 0,
+              "building": 18
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 18,
+            "samples": 4,
+            "blocked": 16,
+            "total": 72
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KDCA",
+      "tiles": {
+        "requested": 20,
+        "loaded": 20,
+        "empty": 10,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KDCA",
+        "runwayId": "KDCA:04-22",
+        "along": 380,
+        "cross": -384,
+        "floorM": 24,
+        "score": 265.6,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 21,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 8
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 88,
+              "taxiway": 6,
+              "runway": 0,
+              "building": 6
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 85,
+              "taxiway": 34,
+              "runway": 0,
+              "building": 4
+            },
+            "gates": 9,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 82,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 14
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 85,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 32
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 17,
+            "samples": 4,
+            "blocked": 0,
+            "total": 68
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KPHX",
+      "tiles": {
+        "requested": 24,
+        "loaded": 24,
+        "empty": 9,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KPHX",
+        "runwayId": "KPHX:07L-25R",
+        "along": 2679,
+        "cross": -704,
+        "floorM": 24,
+        "score": 298.3,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 27,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 100,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 33,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 46,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 106,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 67,
+              "taxiway": 66,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 11,
+            "samples": 4,
+            "blocked": 0,
+            "total": 44
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KLAS",
+      "tiles": {
+        "requested": 42,
+        "loaded": 42,
+        "empty": 34,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KLAS",
+        "runwayId": "KLAS:08L-26R",
+        "along": 3043,
+        "cross": -704,
+        "floorM": 24,
+        "score": 267.8,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 29,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 7
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 93,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 35
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 113,
+              "taxiway": 11,
+              "runway": 0,
+              "building": 40
+            },
+            "gates": 23,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 95,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 2
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 35,
+              "taxiway": 91,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 1
+          },
+          "back": {
+            "targets": 18,
+            "samples": 4,
+            "blocked": 4,
+            "total": 72
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KMSP",
+      "tiles": {
+        "requested": 49,
+        "loaded": 49,
+        "empty": 40,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KMSP",
+        "runwayId": "KMSP:04-22",
+        "along": 2302,
+        "cross": 344,
+        "floorM": 24,
+        "score": 281.4,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 24,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 5
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 106,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 56,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 38,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 97,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 12
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 120,
+              "taxiway": 7,
+              "runway": 0,
+              "building": 22
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 21,
+            "samples": 4,
+            "blocked": 0,
+            "total": 84
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KDTW",
+      "tiles": {
+        "requested": 42,
+        "loaded": 42,
+        "empty": 23,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KDTW",
+        "runwayId": "KDTW:09L-27R",
+        "along": 1019,
+        "cross": -424,
+        "floorM": 24,
+        "score": 319.4,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 24,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 112,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 169,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 7,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 57,
+              "taxiway": 2,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 46,
+              "taxiway": 22,
+              "runway": 0,
+              "building": 12
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 24,
+            "samples": 4,
+            "blocked": 0,
+            "total": 96
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KFLL",
+      "tiles": {
+        "requested": 20,
+        "loaded": 20,
+        "empty": 14,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KFLL",
+        "runwayId": "KFLL:10R-28L",
+        "along": 1292,
+        "cross": -864,
+        "floorM": 24,
+        "score": 292.2,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 30,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 2
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 112,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 28
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 78,
+              "taxiway": 5,
+              "runway": 0,
+              "building": 50
+            },
+            "gates": 19,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 111,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 44,
+              "taxiway": 74,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 11,
+            "samples": 4,
+            "blocked": 0,
+            "total": 44
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KMCO",
+      "tiles": {
+        "requested": 36,
+        "loaded": 36,
+        "empty": 16,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KMCO",
+        "runwayId": "KMCO:17R-35L",
+        "along": 967,
+        "cross": 584,
+        "floorM": 24,
+        "score": 309.4,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 28,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 5
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 108,
+              "taxiway": 4,
+              "runway": 0,
+              "building": 25
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 156,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 18
+            },
+            "gates": 20,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 96,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 8
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 89,
+              "taxiway": 3,
+              "runway": 0,
+              "building": 4
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 25,
+            "samples": 4,
+            "blocked": 0,
+            "total": 100
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KIAH",
+      "tiles": {
+        "requested": 49,
+        "loaded": 49,
+        "empty": 28,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KIAH",
+        "runwayId": "KIAH:08R-26L",
+        "along": 2044,
+        "cross": 464,
+        "floorM": 24,
+        "score": 325.6,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 30,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 112,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 124,
+              "taxiway": 46,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 12,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 112,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 49,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 71
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 23,
+            "samples": 4,
+            "blocked": 0,
+            "total": 92
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KCLT",
+      "tiles": {
+        "requested": 36,
+        "loaded": 36,
+        "empty": 25,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KCLT",
+        "runwayId": "KCLT:01R-19L",
+        "along": 959,
+        "cross": -424,
+        "floorM": 24,
+        "score": 347.4,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 29,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 1
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 110,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 2
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 147,
+              "taxiway": 2,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 26,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 105,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 7
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 130,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 12
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 15,
+            "samples": 4,
+            "blocked": 0,
+            "total": 60
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KSAN",
+      "tiles": {
+        "requested": 20,
+        "loaded": 20,
+        "empty": 7,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KSAN",
+        "runwayId": "KSAN:09-27",
+        "along": 1544,
+        "cross": 432,
+        "floorM": 24,
+        "score": 200,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 9,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 82,
+              "taxiway": 14,
+              "runway": 0,
+              "building": 2
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 101,
+              "taxiway": 10,
+              "runway": 0,
+              "building": 47
+            },
+            "gates": 8,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 10,
+            "samples": 4,
+            "blocked": 0,
+            "total": 40
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KTPA",
+      "tiles": {
+        "requested": 25,
+        "loaded": 25,
+        "empty": 18,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KTPA",
+        "runwayId": "KTPA:19L-01R",
+        "along": 1105,
+        "cross": 344,
+        "floorM": 24,
+        "score": 228.7,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 9,
+              "taxiway": 2,
+              "runway": 0,
+              "building": 15
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 104,
+              "taxiway": 4,
+              "runway": 0,
+              "building": 2
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 63,
+              "taxiway": 45,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 17,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 35,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 5
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 21,
+              "taxiway": 11,
+              "runway": 0,
+              "building": 38
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 17,
+            "samples": 4,
+            "blocked": 13,
+            "total": 68
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KPDX",
+      "tiles": {
+        "requested": 35,
+        "loaded": 35,
+        "empty": 19,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KPDX",
+        "runwayId": "KPDX:10L-28R",
+        "along": 560,
+        "cross": 584,
+        "floorM": 24,
+        "score": 306.4,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 6,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 24
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 94,
+              "taxiway": 2,
+              "runway": 0,
+              "building": 16
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 101,
+              "taxiway": 17,
+              "runway": 0,
+              "building": 35
+            },
+            "gates": 23,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 111,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 1
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 64,
+              "taxiway": 53,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 1,
+            "other": 0
+          },
+          "back": {
+            "targets": 15,
+            "samples": 4,
+            "blocked": 0,
+            "total": 60
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KSLC",
+      "tiles": {
+        "requested": 42,
+        "loaded": 42,
+        "empty": 32,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KSLC",
+        "runwayId": "KSLC:16R-34L",
+        "along": 2240,
+        "cross": -784,
+        "floorM": 24,
+        "score": 232,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 24,
+              "taxiway": 3,
+              "runway": 0,
+              "building": 3
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 91,
+              "taxiway": 13,
+              "runway": 0,
+              "building": 8
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 117,
+              "taxiway": 31,
+              "runway": 0,
+              "building": 19
+            },
+            "gates": 24,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 90,
+              "taxiway": 13,
+              "runway": 0,
+              "building": 9
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 116,
+              "taxiway": 26,
+              "runway": 0,
+              "building": 24
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 1
+          },
+          "back": {
+            "targets": 27,
+            "samples": 4,
+            "blocked": 1,
+            "total": 108
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KSTL",
+      "tiles": {
+        "requested": 40,
+        "loaded": 40,
+        "empty": 27,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KSTL",
+        "runwayId": "KSTL:12R-30L",
+        "along": 2003,
+        "cross": 312,
+        "floorM": 24,
+        "score": 280.7,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 10,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 20
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 111,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 6,
+              "taxiway": 96,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 23,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 99,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 8
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 68,
+              "taxiway": 64,
+              "runway": 0,
+              "building": 30
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 15,
+            "samples": 4,
+            "blocked": 4,
+            "total": 60
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KBWI",
+      "tiles": {
+        "requested": 30,
+        "loaded": 30,
+        "empty": 18,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KBWI",
+        "runwayId": "KBWI:15R-33L",
+        "along": 948,
+        "cross": -984,
+        "floorM": 24,
+        "score": 336.4,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 27,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 2
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 105,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 7
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 159,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 11
+            },
+            "gates": 14,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 110,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 141,
+              "taxiway": 16,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 1
+          },
+          "back": {
+            "targets": 15,
+            "samples": 4,
+            "blocked": 0,
+            "total": 60
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KAUS",
+      "tiles": {
+        "requested": 24,
+        "loaded": 24,
+        "empty": 14,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KAUS",
+        "runwayId": "KAUS:18L-36R",
+        "along": 2130,
+        "cross": 504,
+        "floorM": 24,
+        "score": 194,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 11,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 12
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 93,
+              "taxiway": 15,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 109,
+              "taxiway": 8,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 0,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 36,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 15
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 18,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 13
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 1
+          },
+          "back": {
+            "targets": 16,
+            "samples": 4,
+            "blocked": 0,
+            "total": 64
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KRDU",
+      "tiles": {
+        "requested": 25,
+        "loaded": 25,
+        "empty": 17,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KRDU",
+        "runwayId": "KRDU:05R-23L",
+        "along": 1375,
+        "cross": -264,
+        "floorM": 24,
+        "score": 239.5,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 11,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 8
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 112,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 3,
+              "taxiway": 40,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 9,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 7,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 11
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 3,
+              "runway": 0,
+              "building": 52
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 16,
+            "samples": 4,
+            "blocked": 0,
+            "total": 64
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KHNL",
+      "selected": false,
+      "error": "not in runway catalog",
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "PANC",
+      "tiles": {
+        "requested": 64,
+        "loaded": 64,
+        "empty": 44,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "PANC",
+        "runwayId": "PANC:15-33",
+        "along": 2897,
+        "cross": -752,
+        "floorM": 24,
+        "score": 225.9,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 3,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 2
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 68,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 8
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 38,
+              "taxiway": 23,
+              "runway": 0,
+              "building": 2
+            },
+            "gates": 17,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 55,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 6
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 25,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 60
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 17,
+            "samples": 4,
+            "blocked": 0,
+            "total": 68
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KCMH",
+      "tiles": {
+        "requested": 20,
+        "loaded": 20,
+        "empty": 12,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "KCMH",
+        "runwayId": "KCMH",
+        "along": 2169,
+        "cross": -744,
+        "floorM": 24,
+        "score": 149.7,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 18,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 3
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 40,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 68
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 68,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 88
+            },
+            "gates": 25,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 97,
+              "taxiway": 13,
+              "runway": 0,
+              "building": 2
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 36,
+              "taxiway": 54,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 10,
+            "samples": 4,
+            "blocked": 0,
+            "total": 40
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "KRKL",
+      "selected": false,
+      "error": "not in runway catalog",
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "EGLL",
+      "tiles": {
+        "requested": 48,
+        "loaded": 48,
+        "empty": 39,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "EGLL",
+        "runwayId": "EGLL:09L-27R",
+        "along": 1068,
+        "cross": 666,
+        "floorM": 24,
+        "score": 225.2,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 11,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 4
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 65,
+              "taxiway": 4,
+              "runway": 0,
+              "building": 8
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 87,
+              "taxiway": 10,
+              "runway": 0,
+              "building": 12
+            },
+            "gates": 10,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 47,
+              "taxiway": 4,
+              "runway": 0,
+              "building": 12
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 81,
+              "taxiway": 10,
+              "runway": 0,
+              "building": 11
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 13,
+            "samples": 4,
+            "blocked": 0,
+            "total": 52
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "EGKK",
+      "tiles": {
+        "requested": 35,
+        "loaded": 35,
+        "empty": 29,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "EGKK",
+        "runwayId": "EGKK:08R-26L",
+        "along": 1898,
+        "cross": -664,
+        "floorM": 24,
+        "score": 204.9,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 21,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 3
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 64,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 10
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 73,
+              "taxiway": 5,
+              "runway": 0,
+              "building": 5
+            },
+            "gates": 0,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 83,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 1
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 92,
+              "taxiway": 17,
+              "runway": 0,
+              "building": 6
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 10,
+            "samples": 4,
+            "blocked": 0,
+            "total": 40
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "EGSS",
+      "tiles": {
+        "requested": 42,
+        "loaded": 42,
+        "empty": 33,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "EGSS",
+        "runwayId": "EGSS:04-22",
+        "along": 2666,
+        "cross": 824,
+        "floorM": 24,
+        "score": 115.9,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 9,
+              "taxiway": 4,
+              "runway": 0,
+              "building": 1
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 70,
+              "taxiway": 26,
+              "runway": 0,
+              "building": 2
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 100,
+              "taxiway": 37,
+              "runway": 0,
+              "building": 20
+            },
+            "gates": 8,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 3,
+              "taxiway": 3,
+              "runway": 0,
+              "building": 3
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 15
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 10,
+            "samples": 4,
+            "blocked": 0,
+            "total": 40
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "EGLC",
+      "tiles": {
+        "requested": 25,
+        "loaded": 25,
+        "empty": 22,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "EGLC",
+        "runwayId": "EGLC:09-27",
+        "along": 581,
+        "cross": 176,
+        "floorM": 16,
+        "score": 134.7,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 17,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 3
+            },
+            "stands": {
+              "n": 30,
+              "out": 0,
+              "apron": 24,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 63,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 34,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 7,
+            "backStands": {
+              "n": 30,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 63,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 4
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 6,
+            "samples": 4,
+            "blocked": 0,
+            "total": 24
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "LFPG",
+      "tiles": {
+        "requested": 63,
+        "loaded": 63,
+        "empty": 38,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "LFPG",
+        "runwayId": "LFPG:08L-26R",
+        "along": 905,
+        "cross": -544,
+        "floorM": 24,
+        "score": 214.9,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 30,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 82,
+              "taxiway": 30,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 140,
+              "taxiway": 8,
+              "runway": 0,
+              "building": 15
+            },
+            "gates": 26,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 103,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 2
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 25,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 108
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 3
+          },
+          "back": {
+            "targets": 24,
+            "samples": 4,
+            "blocked": 12,
+            "total": 96
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "LFPO",
+      "tiles": {
+        "requested": 63,
+        "loaded": 63,
+        "empty": 49,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "LFPO",
+        "runwayId": "LFPO:02-20",
+        "along": 1488,
+        "cross": -551,
+        "floorM": 24,
+        "score": 194.5,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 3,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 10
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 34,
+              "taxiway": 5,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 108,
+              "taxiway": 9,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 21,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 3,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 1
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 14
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 1
+          },
+          "back": {
+            "targets": 18,
+            "samples": 4,
+            "blocked": 4,
+            "total": 72
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "EDDF",
+      "tiles": {
+        "requested": 64,
+        "loaded": 64,
+        "empty": 43,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "EDDF",
+        "runwayId": "EDDF:07C-25C",
+        "along": 2879,
+        "cross": -631,
+        "floorM": 24,
+        "score": 180,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 16,
+              "taxiway": 2,
+              "runway": 0,
+              "building": 7
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 66,
+              "taxiway": 6,
+              "runway": 0,
+              "building": 26
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 93,
+              "taxiway": 7,
+              "runway": 0,
+              "building": 23
+            },
+            "gates": 43,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 58,
+              "taxiway": 11,
+              "runway": 0,
+              "building": 16
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 81,
+              "taxiway": 21,
+              "runway": 0,
+              "building": 41
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 17,
+            "samples": 4,
+            "blocked": 8,
+            "total": 68
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "EDDM",
+      "tiles": {
+        "requested": 48,
+        "loaded": 48,
+        "empty": 36,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "EDDM",
+        "runwayId": "EDDM:08L-26R",
+        "along": 1479,
+        "cross": 551,
+        "floorM": 24,
+        "score": 126.4,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 48,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 8,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 5,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 14
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 22,
+              "taxiway": 3,
+              "runway": 0,
+              "building": 56
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 17,
+            "samples": 4,
+            "blocked": 0,
+            "total": 68
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "EHAM",
+      "tiles": {
+        "requested": 64,
+        "loaded": 64,
+        "empty": 44,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "EHAM",
+        "runwayId": "EHAM:09-27",
+        "along": 1313,
+        "cross": 544,
+        "floorM": 24,
+        "score": 212,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 18,
+              "taxiway": 2,
+              "runway": 0,
+              "building": 5
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 72,
+              "taxiway": 10,
+              "runway": 0,
+              "building": 17
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 105,
+              "taxiway": 19,
+              "runway": 0,
+              "building": 13
+            },
+            "gates": 21,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 67,
+              "taxiway": 8,
+              "runway": 0,
+              "building": 12
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 77,
+              "taxiway": 22,
+              "runway": 0,
+              "building": 49
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 26,
+            "samples": 4,
+            "blocked": 1,
+            "total": 104
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "LEMD",
+      "tiles": {
+        "requested": 54,
+        "loaded": 54,
+        "empty": 33,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "LEMD",
+        "runwayId": "LEMD:18R-36L",
+        "along": 3823,
+        "cross": -591,
+        "floorM": 24,
+        "score": 321.3,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 27,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 22
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 104,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 5
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 60,
+              "taxiway": 7,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 15,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 104,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 5
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 35,
+              "taxiway": 71,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 20,
+            "samples": 4,
+            "blocked": 0,
+            "total": 80
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "LEBL",
+      "tiles": {
+        "requested": 36,
+        "loaded": 36,
+        "empty": 27,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "LEBL",
+        "runwayId": "LEBL:06R-24L",
+        "along": 819,
+        "cross": -671,
+        "floorM": 24,
+        "score": 287.7,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 1,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 93,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 42,
+              "taxiway": 38,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 22,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 102,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 47,
+              "taxiway": 35,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 17,
+            "samples": 4,
+            "blocked": 0,
+            "total": 68
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "LIRF",
+      "tiles": {
+        "requested": 56,
+        "loaded": 56,
+        "empty": 39,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "LIRF",
+        "runwayId": "LIRF:16R-34L",
+        "along": 2769,
+        "cross": -871,
+        "floorM": 24,
+        "score": 172.4,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 9,
+              "taxiway": 3,
+              "runway": 0,
+              "building": 2
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 43,
+              "taxiway": 17,
+              "runway": 0,
+              "building": 6
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 76,
+              "taxiway": 6,
+              "runway": 0,
+              "building": 16
+            },
+            "gates": 16,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 68,
+              "taxiway": 3,
+              "runway": 0,
+              "building": 7
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 13,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 68
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 20,
+            "samples": 4,
+            "blocked": 0,
+            "total": 80
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "LIMC",
+      "tiles": {
+        "requested": 35,
+        "loaded": 35,
+        "empty": 27,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "LIMC",
+        "runwayId": "LIMC:17L-35R",
+        "along": 671,
+        "cross": 431,
+        "floorM": 24,
+        "score": 227.9,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 25,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 3
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 78,
+              "taxiway": 20,
+              "runway": 0,
+              "building": 6
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 143,
+              "taxiway": 20,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 7,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 95,
+              "taxiway": 5,
+              "runway": 0,
+              "building": 2
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 65,
+              "taxiway": 41,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 11,
+            "samples": 4,
+            "blocked": 0,
+            "total": 44
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "LSZH",
+      "tiles": {
+        "requested": 42,
+        "loaded": 42,
+        "empty": 31,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "LSZH",
+        "runwayId": "LSZH:10-28",
+        "along": 1299,
+        "cross": -391,
+        "floorM": 24,
+        "score": 259.4,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 4,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 20
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 91,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 6
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 48,
+              "taxiway": 63,
+              "runway": 0,
+              "building": 2
+            },
+            "gates": 29,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 110,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 8,
+              "taxiway": 59,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 19,
+            "samples": 4,
+            "blocked": 18,
+            "total": 76
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "LOWW",
+      "tiles": {
+        "requested": 49,
+        "loaded": 49,
+        "empty": 35,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "LOWW",
+        "runwayId": "LOWW:11-29",
+        "along": 2519,
+        "cross": -504,
+        "floorM": 24,
+        "score": 298.6,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 4,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 97,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 102,
+              "taxiway": 9,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 58,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 88,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 2
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 24,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 80
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 14,
+            "samples": 4,
+            "blocked": 3,
+            "total": 56
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "EBBR",
+      "tiles": {
+        "requested": 56,
+        "loaded": 56,
+        "empty": 42,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "EBBR",
+        "runwayId": "EBBR:07L-25R",
+        "along": 2236,
+        "cross": 424,
+        "floorM": 24,
+        "score": 333.5,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 28
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 112,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 68,
+              "taxiway": 61,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 30,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 112,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 111,
+              "taxiway": 59,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 1
+          },
+          "back": {
+            "targets": 21,
+            "samples": 4,
+            "blocked": 4,
+            "total": 84
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "EIDW",
+      "tiles": {
+        "requested": 49,
+        "loaded": 49,
+        "empty": 36,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "EIDW",
+        "runwayId": "EIDW:10R-28L",
+        "along": 1616,
+        "cross": -424,
+        "floorM": 24,
+        "score": 163.8,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 2,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 68,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 6,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 0,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 16,
+              "taxiway": 10,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 57,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 1
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 20,
+            "samples": 4,
+            "blocked": 0,
+            "total": 80
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "EKCH",
+      "tiles": {
+        "requested": 64,
+        "loaded": 64,
+        "empty": 50,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "EKCH",
+        "runwayId": "EKCH:12-30",
+        "along": 835,
+        "cross": -504,
+        "floorM": 24,
+        "score": 230.5,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 25,
+              "taxiway": 5,
+              "runway": 0,
+              "building": 3
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 95,
+              "taxiway": 17,
+              "runway": 0,
+              "building": 14
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 145,
+              "taxiway": 25,
+              "runway": 0,
+              "building": 11
+            },
+            "gates": 30,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 103,
+              "taxiway": 9,
+              "runway": 0,
+              "building": 6
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 123,
+              "taxiway": 15,
+              "runway": 0,
+              "building": 60
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 16,
+            "samples": 4,
+            "blocked": 4,
+            "total": 64
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "ENGM",
+      "tiles": {
+        "requested": 64,
+        "loaded": 64,
+        "empty": 47,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "ENGM",
+        "runwayId": "ENGM:01L-19R",
+        "along": 1732,
+        "cross": 1104,
+        "floorM": 24,
+        "score": 212.4,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 3,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 11
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 59,
+              "taxiway": 4,
+              "runway": 0,
+              "building": 20
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 51,
+              "taxiway": 13,
+              "runway": 0,
+              "building": 7
+            },
+            "gates": 19,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 83,
+              "taxiway": 4,
+              "runway": 0,
+              "building": 2
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 33,
+              "taxiway": 42,
+              "runway": 0,
+              "building": 5
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 14,
+            "samples": 4,
+            "blocked": 0,
+            "total": 56
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "ESSA",
+      "tiles": {
+        "requested": 64,
+        "loaded": 64,
+        "empty": 45,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "ESSA",
+        "runwayId": "ESSA:01L-19R",
+        "along": 995,
+        "cross": 504,
+        "floorM": 24,
+        "score": 241.7,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 26,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 2
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 94,
+              "taxiway": 8,
+              "runway": 0,
+              "building": 4
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 69,
+              "taxiway": 29,
+              "runway": 0,
+              "building": 3
+            },
+            "gates": 23,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 100,
+              "taxiway": 3,
+              "runway": 0,
+              "building": 8
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 67,
+              "taxiway": 6,
+              "runway": 0,
+              "building": 38
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 2
+          },
+          "back": {
+            "targets": 21,
+            "samples": 4,
+            "blocked": 9,
+            "total": 84
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "EFHK",
+      "tiles": {
+        "requested": 64,
+        "loaded": 64,
+        "empty": 42,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "EFHK",
+        "runwayId": "EFHK:04R-22L",
+        "along": 1420,
+        "cross": 551,
+        "floorM": 24,
+        "score": 274.8,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 11,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 19
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 86,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 26
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 129,
+              "taxiway": 41,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 30,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 94,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 14
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 103,
+              "taxiway": 34,
+              "runway": 0,
+              "building": 16
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 1
+          },
+          "back": {
+            "targets": 14,
+            "samples": 4,
+            "blocked": 4,
+            "total": 56
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "LPPT",
+      "tiles": {
+        "requested": 30,
+        "loaded": 30,
+        "empty": 20,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "LPPT",
+        "runwayId": "LPPT:02-20",
+        "along": 658,
+        "cross": 384,
+        "floorM": 24,
+        "score": 146.6,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 21,
+              "taxiway": 4,
+              "runway": 0,
+              "building": 2
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 88,
+              "taxiway": 16,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 51,
+              "taxiway": 44,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 0,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 77,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 42,
+              "taxiway": 29,
+              "runway": 0,
+              "building": 11
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 10,
+            "samples": 4,
+            "blocked": 0,
+            "total": 40
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "LGAV",
+      "tiles": {
+        "requested": 36,
+        "loaded": 36,
+        "empty": 26,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "LGAV",
+        "runwayId": "LGAV:03R-21L",
+        "along": 1880,
+        "cross": -544,
+        "floorM": 24,
+        "score": 200.1,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 8,
+              "taxiway": 2,
+              "runway": 0,
+              "building": 8
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 67,
+              "taxiway": 6,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 47,
+              "taxiway": 41,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 20,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 28,
+              "taxiway": 7,
+              "runway": 0,
+              "building": 3
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 24,
+              "taxiway": 8,
+              "runway": 0,
+              "building": 1
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 14,
+            "samples": 4,
+            "blocked": 0,
+            "total": 56
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "LTFM",
+      "tiles": {
+        "requested": 63,
+        "loaded": 63,
+        "empty": 47,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "LTFM",
+        "runwayId": "LTFM:16L-34R",
+        "along": 550,
+        "cross": -544,
+        "floorM": 24,
+        "score": 169.4,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 13,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 3
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 48,
+              "taxiway": 4,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 65,
+              "taxiway": 10,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 0,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 49,
+              "taxiway": 4,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 65,
+              "taxiway": 15,
+              "runway": 0,
+              "building": 2
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 24,
+            "samples": 4,
+            "blocked": 0,
+            "total": 96
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "UUEE",
+      "tiles": {
+        "requested": 64,
+        "loaded": 64,
+        "empty": 48,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "UUEE",
+        "runwayId": "UUEE:06C-24C",
+        "along": 826,
+        "cross": 831,
+        "floorM": 24,
+        "score": 242.4,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 25,
+              "taxiway": 3,
+              "runway": 0,
+              "building": 2
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 97,
+              "taxiway": 9,
+              "runway": 0,
+              "building": 8
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 152,
+              "taxiway": 17,
+              "runway": 0,
+              "building": 2
+            },
+            "gates": 22,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 91,
+              "taxiway": 13,
+              "runway": 0,
+              "building": 8
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 141,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 29
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 10,
+            "samples": 4,
+            "blocked": 0,
+            "total": 40
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "UUDD",
+      "tiles": {
+        "requested": 56,
+        "loaded": 56,
+        "empty": 37,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "UUDD",
+        "runwayId": "UUDD:13R-31L",
+        "along": 1420,
+        "cross": -711,
+        "floorM": 24,
+        "score": 115.7,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 3,
+              "runway": 0,
+              "building": 4
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 8,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 20
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 10,
+              "taxiway": 17,
+              "runway": 0,
+              "building": 24
+            },
+            "gates": 8,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 5,
+              "taxiway": 2,
+              "runway": 0,
+              "building": 10
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 14,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 28
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 16,
+            "samples": 4,
+            "blocked": 0,
+            "total": 64
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "EPWA",
+      "tiles": {
+        "requested": 49,
+        "loaded": 49,
+        "empty": 34,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "EPWA",
+        "runwayId": "EPWA:15-33",
+        "along": 1042,
+        "cross": -391,
+        "floorM": 24,
+        "score": 277.3,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 29,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 108,
+              "taxiway": 4,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 32,
+              "taxiway": 70,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 37,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 112,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 2
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 64,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 92
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 13,
+            "samples": 4,
+            "blocked": 0,
+            "total": 52
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "LKPR",
+      "tiles": {
+        "requested": 49,
+        "loaded": 49,
+        "empty": 37,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "LKPR",
+        "runwayId": "LKPR:12-30",
+        "along": 1789,
+        "cross": -624,
+        "floorM": 24,
+        "score": 131,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 1
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 12,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 8,
+              "taxiway": 17,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 3,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 14,
+            "samples": 4,
+            "blocked": 0,
+            "total": 56
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "LHBP",
+      "tiles": {
+        "requested": 56,
+        "loaded": 56,
+        "empty": 45,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "LHBP",
+        "runwayId": "LHBP:13L-31R",
+        "along": 945,
+        "cross": 984,
+        "floorM": 24,
+        "score": 202.3,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 16,
+              "taxiway": 3,
+              "runway": 0,
+              "building": 18
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 64,
+              "taxiway": 8,
+              "runway": 0,
+              "building": 17
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 57,
+              "taxiway": 31,
+              "runway": 0,
+              "building": 27
+            },
+            "gates": 31,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 91,
+              "taxiway": 9,
+              "runway": 0,
+              "building": 2
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 52,
+              "taxiway": 66,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 12,
+            "samples": 4,
+            "blocked": 0,
+            "total": 48
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "VHHH",
+      "tiles": {
+        "requested": 30,
+        "loaded": 30,
+        "empty": 20,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "VHHH",
+        "runwayId": "VHHH:07C-25C",
+        "along": 3258,
+        "cross": 791,
+        "floorM": 24,
+        "score": 248.2,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 14,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 15
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 83,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 29
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 86,
+              "taxiway": 17,
+              "runway": 0,
+              "building": 18
+            },
+            "gates": 20,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 99,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 13
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 47,
+              "taxiway": 22,
+              "runway": 0,
+              "building": 18
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 12,
+            "samples": 4,
+            "blocked": 8,
+            "total": 48
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "WSSS",
+      "tiles": {
+        "requested": 30,
+        "loaded": 30,
+        "empty": 15,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "WSSS",
+        "runwayId": "WSSS:02L-20R",
+        "along": 1984,
+        "cross": 911,
+        "floorM": 24,
+        "score": 154.3,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 1,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 27
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 30,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 28
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 23,
+              "taxiway": 20,
+              "runway": 0,
+              "building": 73
+            },
+            "gates": 21,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 70,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 5
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 42,
+              "taxiway": 34,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 2,
+            "other": 1
+          },
+          "back": {
+            "targets": 12,
+            "samples": 4,
+            "blocked": 15,
+            "total": 48
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "RJTT",
+      "tiles": {
+        "requested": 36,
+        "loaded": 36,
+        "empty": 22,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "RJTT",
+        "runwayId": "RJTT:16R-34L",
+        "along": 768,
+        "cross": -432,
+        "floorM": 24,
+        "score": 230.2,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 30,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 112,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 38,
+              "taxiway": 69,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 5,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 84,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 1
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 66
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 3
+          },
+          "back": {
+            "targets": 23,
+            "samples": 4,
+            "blocked": 8,
+            "total": 92
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "RJAA",
+      "tiles": {
+        "requested": 35,
+        "loaded": 35,
+        "empty": 25,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "RJAA",
+        "runwayId": "RJAA:16R-34L",
+        "along": 2184,
+        "cross": -551,
+        "floorM": 24,
+        "score": 293.8,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 7,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 22
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 112,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 1
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 102,
+              "taxiway": 39,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 16,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 98,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 12
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 130,
+              "taxiway": 21,
+              "runway": 0,
+              "building": 16
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 2
+          },
+          "back": {
+            "targets": 17,
+            "samples": 4,
+            "blocked": 21,
+            "total": 68
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "RKSI",
+      "tiles": {
+        "requested": 49,
+        "loaded": 49,
+        "empty": 32,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "RKSI",
+        "runwayId": "RKSI:15R-33L",
+        "along": 1554,
+        "cross": 671,
+        "floorM": 24,
+        "score": 234.1,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 19,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 7
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 78,
+              "taxiway": 2,
+              "runway": 0,
+              "building": 22
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 93,
+              "taxiway": 10,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 16,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 85,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 12
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 32,
+              "taxiway": 47,
+              "runway": 0,
+              "building": 25
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 1
+          },
+          "back": {
+            "targets": 23,
+            "samples": 4,
+            "blocked": 8,
+            "total": 92
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "ZBAA",
+      "tiles": {
+        "requested": 42,
+        "loaded": 42,
+        "empty": 29,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "ZBAA",
+        "runwayId": "ZBAA:18L-36R",
+        "along": 2455,
+        "cross": 511,
+        "floorM": 24,
+        "score": 251.5,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 30,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 104,
+              "taxiway": 8,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 162,
+              "taxiway": 8,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 1,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 56,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 15,
+            "samples": 4,
+            "blocked": 0,
+            "total": 60
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "ZSPD",
+      "tiles": {
+        "requested": 30,
+        "loaded": 30,
+        "empty": 15,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "ZSPD",
+        "runwayId": "ZSPD:17L-35R",
+        "along": 1582,
+        "cross": -511,
+        "floorM": 24,
+        "score": 301.7,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 30,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 100,
+              "taxiway": 12,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 97,
+              "taxiway": 9,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 12,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 112,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 34,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 102
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 24,
+            "samples": 4,
+            "blocked": 0,
+            "total": 96
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "ZGGG",
+      "tiles": {
+        "requested": 42,
+        "loaded": 42,
+        "empty": 29,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "ZGGG",
+        "runwayId": "ZGGG:01R-19L",
+        "along": 1033,
+        "cross": 544,
+        "floorM": 24,
+        "score": 291.1,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 25,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 3
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 100,
+              "taxiway": 9,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 148,
+              "taxiway": 17,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 13,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 88,
+              "taxiway": 7,
+              "runway": 0,
+              "building": 10
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 130,
+              "taxiway": 15,
+              "runway": 0,
+              "building": 13
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 31,
+            "samples": 4,
+            "blocked": 0,
+            "total": 124
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "RCTP",
+      "tiles": {
+        "requested": 25,
+        "loaded": 25,
+        "empty": 17,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "RCTP",
+        "runwayId": "RCTP:05R-23L",
+        "along": 1757,
+        "cross": -431,
+        "floorM": 24,
+        "score": 344.7,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 108,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 145,
+              "taxiway": 7,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 9,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 107,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 87,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 53
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 14,
+            "samples": 4,
+            "blocked": 0,
+            "total": 56
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "VTBS",
+      "tiles": {
+        "requested": 25,
+        "loaded": 25,
+        "empty": 13,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "VTBS",
+        "runwayId": "VTBS:02R-20L",
+        "along": 1447,
+        "cross": 711,
+        "floorM": 24,
+        "score": 223.2,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 20,
+              "taxiway": 2,
+              "runway": 0,
+              "building": 3
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 75,
+              "taxiway": 9,
+              "runway": 0,
+              "building": 12
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 99,
+              "taxiway": 26,
+              "runway": 0,
+              "building": 7
+            },
+            "gates": 11,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 75,
+              "taxiway": 9,
+              "runway": 0,
+              "building": 12
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 98,
+              "taxiway": 46,
+              "runway": 0,
+              "building": 16
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 15,
+            "samples": 4,
+            "blocked": 0,
+            "total": 60
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "WMKK",
+      "tiles": {
+        "requested": 30,
+        "loaded": 30,
+        "empty": 17,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "WMKK",
+        "runwayId": "WMKK:14L-32R",
+        "along": 3491,
+        "cross": 751,
+        "floorM": 24,
+        "score": 209.8,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 28
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 50,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 20
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 51,
+              "taxiway": 22,
+              "runway": 0,
+              "building": 14
+            },
+            "gates": 18,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 51,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 15
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 51,
+              "taxiway": 28,
+              "runway": 0,
+              "building": 16
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 1
+          },
+          "back": {
+            "targets": 23,
+            "samples": 4,
+            "blocked": 4,
+            "total": 92
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "WIII",
+      "tiles": {
+        "requested": 25,
+        "loaded": 25,
+        "empty": 15,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "WIII",
+        "runwayId": "WIII:07L-25R",
+        "along": 2530,
+        "cross": 751,
+        "floorM": 24,
+        "score": 217.6,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 96,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 31,
+              "taxiway": 34,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 9,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 14
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 2
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 17,
+            "samples": 4,
+            "blocked": 0,
+            "total": 68
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "RPLL",
+      "tiles": {
+        "requested": 25,
+        "loaded": 25,
+        "empty": 11,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "RPLL",
+        "runwayId": "RPLL:06-24",
+        "along": 848,
+        "cross": -391,
+        "floorM": 24,
+        "score": 267.1,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 17,
+              "taxiway": 2,
+              "runway": 0,
+              "building": 11
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 106,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 6
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 118,
+              "taxiway": 52,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 15,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 89,
+              "taxiway": 9,
+              "runway": 0,
+              "building": 14
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 75,
+              "taxiway": 21,
+              "runway": 0,
+              "building": 27
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 14,
+            "samples": 4,
+            "blocked": 4,
+            "total": 56
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "VVNB",
+      "tiles": {
+        "requested": 20,
+        "loaded": 20,
+        "empty": 16,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "VVNB",
+        "runwayId": "VVNB:11L-29R",
+        "along": 1804,
+        "cross": 704,
+        "floorM": 24,
+        "score": 228.9,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 20,
+              "taxiway": 2,
+              "runway": 0,
+              "building": 6
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 96,
+              "taxiway": 12,
+              "runway": 0,
+              "building": 5
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 75,
+              "taxiway": 47,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 9,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 95,
+              "taxiway": 2,
+              "runway": 0,
+              "building": 13
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 34,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 117
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 10,
+            "samples": 4,
+            "blocked": 0,
+            "total": 40
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "VVTS",
+      "tiles": {
+        "requested": 20,
+        "loaded": 20,
+        "empty": 13,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "VVTS",
+        "runwayId": "VVTS:07R-25L",
+        "along": 2963,
+        "cross": 304,
+        "floorM": 24,
+        "score": 248.7,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 101,
+              "taxiway": 9,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 35,
+              "taxiway": 68,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 13,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 112,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 51,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 58
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 10,
+            "samples": 4,
+            "blocked": 0,
+            "total": 40
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "VIDP",
+      "tiles": {
+        "requested": 42,
+        "loaded": 42,
+        "empty": 30,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "VIDP",
+        "runwayId": "VIDP:10-28",
+        "along": 3057,
+        "cross": -544,
+        "floorM": 24,
+        "score": 287.2,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 1,
+              "taxiway": 2,
+              "runway": 0,
+              "building": 27
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 102,
+              "taxiway": 4,
+              "runway": 0,
+              "building": 6
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 92,
+              "taxiway": 66,
+              "runway": 0,
+              "building": 12
+            },
+            "gates": 22,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 103,
+              "taxiway": 4,
+              "runway": 0,
+              "building": 5
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 87,
+              "taxiway": 72,
+              "runway": 0,
+              "building": 11
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 1
+          },
+          "back": {
+            "targets": 14,
+            "samples": 4,
+            "blocked": 0,
+            "total": 56
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "VABB",
+      "tiles": {
+        "requested": 25,
+        "loaded": 25,
+        "empty": 18,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "VABB",
+        "runwayId": "VABB:14-32",
+        "along": 2351,
+        "cross": 384,
+        "floorM": 24,
+        "score": 130.2,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 16,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 81,
+              "taxiway": 5,
+              "runway": 0,
+              "building": 10
+            },
+            "gates": 0,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 14,
+            "samples": 4,
+            "blocked": 0,
+            "total": 56
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "VOBL",
+      "tiles": {
+        "requested": 20,
+        "loaded": 20,
+        "empty": 14,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "VOBL",
+        "runwayId": "VOBL:09L-27R",
+        "along": 3380,
+        "cross": 584,
+        "floorM": 24,
+        "score": 186,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 30,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 43,
+              "taxiway": 38,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 125,
+              "taxiway": 45,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 10,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 112,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 49,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 43
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 15,
+            "samples": 4,
+            "blocked": 0,
+            "total": 60
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "YSSY",
+      "tiles": {
+        "requested": 35,
+        "loaded": 35,
+        "empty": 25,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "YSSY",
+        "runwayId": "YSSY:07-25",
+        "along": 500,
+        "cross": 384,
+        "floorM": 24,
+        "score": 177.1,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 1
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 91,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 49,
+              "taxiway": 38,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 0,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 8,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 18,
+            "samples": 4,
+            "blocked": 0,
+            "total": 72
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "YMML",
+      "tiles": {
+        "requested": 30,
+        "loaded": 30,
+        "empty": 16,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "YMML",
+        "runwayId": "YMML:16-34",
+        "along": 1640,
+        "cross": -791,
+        "floorM": 24,
+        "score": 160.6,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 5,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 4
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 30,
+              "taxiway": 4,
+              "runway": 0,
+              "building": 23
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 49,
+              "taxiway": 5,
+              "runway": 0,
+              "building": 11
+            },
+            "gates": 28,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 33,
+              "taxiway": 5,
+              "runway": 0,
+              "building": 10
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 16,
+              "taxiway": 51,
+              "runway": 0,
+              "building": 24
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 13,
+            "samples": 4,
+            "blocked": 0,
+            "total": 52
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "YBBN",
+      "tiles": {
+        "requested": 35,
+        "loaded": 35,
+        "empty": 24,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "YBBN",
+        "runwayId": "YBBN:01R-19L",
+        "along": 2327,
+        "cross": -624,
+        "floorM": 24,
+        "score": 225.6,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 28,
+              "taxiway": 2,
+              "runway": 0,
+              "building": 1
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 95,
+              "taxiway": 14,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 104,
+              "taxiway": 42,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 18,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 77,
+              "taxiway": 6,
+              "runway": 0,
+              "building": 13
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 61,
+              "taxiway": 8,
+              "runway": 0,
+              "building": 33
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 15,
+            "samples": 4,
+            "blocked": 5,
+            "total": 60
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "NZAA",
+      "tiles": {
+        "requested": 30,
+        "loaded": 30,
+        "empty": 23,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "NZAA",
+        "runwayId": "NZAA:05R-23L",
+        "along": 1428,
+        "cross": -1024,
+        "floorM": 24,
+        "score": 173.4,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 35,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 11
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 63,
+              "taxiway": 44,
+              "runway": 0,
+              "building": 24
+            },
+            "gates": 12,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 84,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 1
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 26,
+              "taxiway": 24,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 1,
+            "other": 0
+          },
+          "back": {
+            "targets": 10,
+            "samples": 4,
+            "blocked": 0,
+            "total": 40
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "OMDB",
+      "tiles": {
+        "requested": 30,
+        "loaded": 30,
+        "empty": 12,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "OMDB",
+        "runwayId": "OMDB:12L-30R",
+        "along": 832,
+        "cross": 951,
+        "floorM": 24,
+        "score": 254.2,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 3,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 26
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 61,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 25
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 99,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 21,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 100,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 33,
+              "taxiway": 54,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 10,
+            "samples": 4,
+            "blocked": 0,
+            "total": 40
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "OERK",
+      "tiles": {
+        "requested": 30,
+        "loaded": 30,
+        "empty": 13,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "OERK",
+        "runwayId": "OERK:15L-33R",
+        "along": 907,
+        "cross": 871,
+        "floorM": 24,
+        "score": 180.9,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 4
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 75,
+              "taxiway": 4,
+              "runway": 0,
+              "building": 8
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 84,
+              "taxiway": 33,
+              "runway": 0,
+              "building": 7
+            },
+            "gates": 7,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 4,
+              "runway": 0,
+              "building": 6
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 5,
+              "runway": 0,
+              "building": 20
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 17,
+            "samples": 4,
+            "blocked": 0,
+            "total": 68
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "OEJN",
+      "tiles": {
+        "requested": 36,
+        "loaded": 36,
+        "empty": 9,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "OEJN",
+        "runwayId": "OEJN:16C-34C",
+        "along": 1682,
+        "cross": 791,
+        "floorM": 24,
+        "score": 273.2,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 6
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 112,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 58,
+              "taxiway": 50,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 0,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 112,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 78,
+              "taxiway": 58,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 15,
+            "samples": 4,
+            "blocked": 0,
+            "total": 60
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "OTHH",
+      "tiles": {
+        "requested": 25,
+        "loaded": 25,
+        "empty": 11,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "OTHH",
+        "runwayId": "OTHH:16R-34L",
+        "along": 3313,
+        "cross": 711,
+        "floorM": 24,
+        "score": 202.6,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 54,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 97,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 0,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 78,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 68,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 10,
+            "samples": 4,
+            "blocked": 0,
+            "total": 40
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "OBBI",
+      "tiles": {
+        "requested": 25,
+        "loaded": 25,
+        "empty": 17,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "OBBI",
+        "runwayId": "OBBI:12L-30R",
+        "along": 1372,
+        "cross": 471,
+        "floorM": 24,
+        "score": 232.1,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 9
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 111,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 2
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 32,
+              "taxiway": 36,
+              "runway": 0,
+              "building": 5
+            },
+            "gates": 11,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 10,
+            "samples": 4,
+            "blocked": 0,
+            "total": 40
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "OOMS",
+      "tiles": {
+        "requested": 20,
+        "loaded": 20,
+        "empty": 9,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "OOMS",
+        "runwayId": "OOMS:08L-26R",
+        "along": 2361,
+        "cross": 791,
+        "floorM": 24,
+        "score": 317.3,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 8
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 84,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 170,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 7,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 56,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 2
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 170,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 13,
+            "samples": 4,
+            "blocked": 0,
+            "total": 52
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "OKBK",
+      "selected": false,
+      "error": "not in runway catalog",
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "OIIE",
+      "tiles": {
+        "requested": 30,
+        "loaded": 28,
+        "empty": 20,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "OIIE",
+        "runwayId": "OIIE:11R-29L",
+        "along": 2409,
+        "cross": 344,
+        "floorM": 24,
+        "score": 231.3,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 29,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 105,
+              "taxiway": 7,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 63,
+              "taxiway": 11,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 0,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 109,
+              "taxiway": 3,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 36,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 5
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 10,
+            "samples": 4,
+            "blocked": 0,
+            "total": 40
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "LLBG",
+      "tiles": {
+        "requested": 30,
+        "loaded": 30,
+        "empty": 20,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "LLBG",
+        "runwayId": "LLBG:03-21",
+        "along": 2334,
+        "cross": 311,
+        "floorM": 24,
+        "score": 191.9,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 1,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 89,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 62,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 0,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 15,
+            "samples": 4,
+            "blocked": 0,
+            "total": 60
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "FAOR",
+      "tiles": {
+        "requested": 30,
+        "loaded": 30,
+        "empty": 17,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "FAOR",
+        "runwayId": "FAOR:03L-21R",
+        "along": 2131,
+        "cross": -432,
+        "floorM": 24,
+        "score": 198.2,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 8,
+              "taxiway": 2,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 87,
+              "taxiway": 6,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 33,
+              "taxiway": 38,
+              "runway": 0,
+              "building": 7
+            },
+            "gates": 9,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 29,
+              "taxiway": 5,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 43,
+              "taxiway": 7,
+              "runway": 0,
+              "building": 2
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 10,
+            "samples": 4,
+            "blocked": 0,
+            "total": 40
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "FACT",
+      "tiles": {
+        "requested": 25,
+        "loaded": 25,
+        "empty": 19,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "FACT",
+        "runwayId": "FACT:01-19",
+        "along": 2285,
+        "cross": -232,
+        "floorM": 24,
+        "score": 137.6,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 23,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 2,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 5,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 47,
+              "taxiway": 13,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 89,
+              "taxiway": 42,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 13,
+            "samples": 4,
+            "blocked": 0,
+            "total": 52
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "HECA",
+      "tiles": {
+        "requested": 42,
+        "loaded": 42,
+        "empty": 25,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "HECA",
+        "runwayId": "HECA:05L-23R",
+        "along": 2098,
+        "cross": 431,
+        "floorM": 24,
+        "score": 207.7,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 11,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 83,
+              "taxiway": 4,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 149,
+              "taxiway": 8,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 0,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 22,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 2
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 7,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 15
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 25,
+            "samples": 4,
+            "blocked": 0,
+            "total": 100
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "GMMN",
+      "tiles": {
+        "requested": 25,
+        "loaded": 25,
+        "empty": 17,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "GMMN",
+        "runwayId": "GMMN:17L-35R",
+        "along": 1447,
+        "cross": -584,
+        "floorM": 24,
+        "score": 295.7,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 30,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 112,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 34,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 9
+            },
+            "gates": 9,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 99,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 2
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 14,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 131
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 10,
+            "samples": 4,
+            "blocked": 0,
+            "total": 40
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "HKJK",
+      "tiles": {
+        "requested": 20,
+        "loaded": 20,
+        "empty": 11,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "HKJK",
+        "runwayId": "HKJK:06-24",
+        "along": 1895,
+        "cross": -424,
+        "floorM": 24,
+        "score": 148.7,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 13,
+              "taxiway": 2,
+              "runway": 0,
+              "building": 5
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 76,
+              "taxiway": 9,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 101,
+              "taxiway": 19,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 0,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 16,
+              "taxiway": 3,
+              "runway": 0,
+              "building": 6
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 10,
+            "samples": 4,
+            "blocked": 0,
+            "total": 40
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "DNMM",
+      "tiles": {
+        "requested": 24,
+        "loaded": 24,
+        "empty": 15,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "DNMM",
+        "runwayId": "DNMM:18L-36R",
+        "along": 2231,
+        "cross": 504,
+        "floorM": 24,
+        "score": 200.8,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 19,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 3
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 38,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 12
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 11,
+              "taxiway": 4,
+              "runway": 0,
+              "building": 45
+            },
+            "gates": 10,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 70,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 13
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 62,
+              "taxiway": 6,
+              "runway": 0,
+              "building": 46
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 15,
+            "samples": 4,
+            "blocked": 0,
+            "total": 60
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "HAAB",
+      "tiles": {
+        "requested": 20,
+        "loaded": 20,
+        "empty": 14,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "HAAB",
+        "runwayId": "HAAB:07L-25R",
+        "along": 1944,
+        "cross": -384,
+        "floorM": 24,
+        "score": 239.1,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 30,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 90,
+              "taxiway": 22,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 54,
+              "taxiway": 13,
+              "runway": 0,
+              "building": 4
+            },
+            "gates": 25,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 107,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 112
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 10,
+            "samples": 4,
+            "blocked": 0,
+            "total": 40
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "CYYZ",
+      "tiles": {
+        "requested": 48,
+        "loaded": 48,
+        "empty": 34,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "CYYZ",
+        "runwayId": "CYYZ:15L-33R",
+        "along": 1600,
+        "cross": -632,
+        "floorM": 24,
+        "score": 327.3,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 28,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 2
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 105,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 7
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 163,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 7
+            },
+            "gates": 39,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 92,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 13
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 55,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 81
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 20,
+            "samples": 4,
+            "blocked": 0,
+            "total": 80
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "CYVR",
+      "tiles": {
+        "requested": 42,
+        "loaded": 42,
+        "empty": 31,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "CYVR",
+        "runwayId": "CYVR:08R-26L",
+        "along": 1717,
+        "cross": -912,
+        "floorM": 24,
+        "score": 176.3,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 3,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 19
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 24,
+              "taxiway": 3,
+              "runway": 0,
+              "building": 35
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 34,
+              "taxiway": 26,
+              "runway": 0,
+              "building": 53
+            },
+            "gates": 25,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 72,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 10
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 29,
+              "taxiway": 39,
+              "runway": 0,
+              "building": 18
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 16,
+            "samples": 4,
+            "blocked": 0,
+            "total": 64
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "CYUL",
+      "tiles": {
+        "requested": 36,
+        "loaded": 36,
+        "empty": 26,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "CYUL",
+        "runwayId": "CYUL:06L-24R",
+        "along": 403,
+        "cross": 792,
+        "floorM": 24,
+        "score": 283.1,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 21,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 3
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 87,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 7
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 103,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 24
+            },
+            "gates": 25,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 83,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 16
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 86,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 51
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 13,
+            "samples": 4,
+            "blocked": 0,
+            "total": 52
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "MMMX",
+      "tiles": {
+        "requested": 24,
+        "loaded": 24,
+        "empty": 15,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "MMMX",
+        "runwayId": "MMMX:05L-23R",
+        "along": 1773,
+        "cross": -344,
+        "floorM": 24,
+        "score": 179.2,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 18
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 55,
+              "taxiway": 3,
+              "runway": 0,
+              "building": 26
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 92,
+              "taxiway": 22,
+              "runway": 0,
+              "building": 1
+            },
+            "gates": 14,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 4
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 9
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 10,
+            "samples": 4,
+            "blocked": 0,
+            "total": 40
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "MMUN",
+      "tiles": {
+        "requested": 25,
+        "loaded": 25,
+        "empty": 18,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "MMUN",
+        "runwayId": "MMUN:12L-30R",
+        "along": 537,
+        "cross": 544,
+        "floorM": 24,
+        "score": 169.7,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 3,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 6
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 38,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 8,
+              "taxiway": 44,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 8,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 12,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 11
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 14,
+              "taxiway": 10,
+              "runway": 0,
+              "building": 53
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 13,
+            "samples": 4,
+            "blocked": 0,
+            "total": 52
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "SBGR",
+      "tiles": {
+        "requested": 30,
+        "loaded": 30,
+        "empty": 13,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "SBGR",
+        "runwayId": "SBGR:10L-28R",
+        "along": 1626,
+        "cross": -704,
+        "floorM": 24,
+        "score": 176.2,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 5,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 54,
+              "taxiway": 13,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 73,
+              "taxiway": 29,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 18,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 17,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 21,
+              "taxiway": 10,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 10,
+            "samples": 4,
+            "blocked": 0,
+            "total": 40
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "SCEL",
+      "tiles": {
+        "requested": 24,
+        "loaded": 24,
+        "empty": 17,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "SCEL",
+        "runwayId": "SCEL:17R-35L",
+        "along": 568,
+        "cross": -1104,
+        "floorM": 24,
+        "score": 173,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 22,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 2
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 95,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 3
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 36,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 37
+            },
+            "gates": 0,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 13,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 2
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 12,
+            "samples": 4,
+            "blocked": 0,
+            "total": 48
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "SAEZ",
+      "tiles": {
+        "requested": 30,
+        "loaded": 30,
+        "empty": 21,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "SAEZ",
+        "runwayId": "SAEZ:11-29",
+        "along": 1396,
+        "cross": -671,
+        "floorM": 24,
+        "score": 191.8,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 12,
+              "taxiway": 1,
+              "runway": 0,
+              "building": 0
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 45,
+              "taxiway": 7,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 47,
+              "taxiway": 33,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 8,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 50,
+              "taxiway": 5,
+              "runway": 0,
+              "building": 6
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 40,
+              "taxiway": 13,
+              "runway": 0,
+              "building": 43
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 14,
+            "samples": 4,
+            "blocked": 0,
+            "total": 56
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "SKBO",
+      "tiles": {
+        "requested": 20,
+        "loaded": 20,
+        "empty": 12,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "SKBO",
+        "runwayId": "SKBO:14R-32L",
+        "along": 3058,
+        "cross": -544,
+        "floorM": 24,
+        "score": 261.8,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 5,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 18
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 70,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 6
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 78,
+              "taxiway": 32,
+              "runway": 0,
+              "building": 11
+            },
+            "gates": 19,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 75,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 12
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 43,
+              "taxiway": 66,
+              "runway": 0,
+              "building": 21
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 12,
+            "samples": 4,
+            "blocked": 0,
+            "total": 48
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "SPJC",
+      "selected": false,
+      "error": "not in runway catalog",
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "TNCM",
+      "tiles": {
+        "requested": 16,
+        "loaded": 16,
+        "empty": 12,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "TNCM",
+        "runwayId": "TNCM:10-28",
+        "along": 476,
+        "cross": -384,
+        "floorM": 24,
+        "score": 143.4,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 8
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 54,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 2
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 26,
+              "taxiway": 30,
+              "runway": 0,
+              "building": 7
+            },
+            "gates": 4,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 12
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 10,
+            "samples": 4,
+            "blocked": 0,
+            "total": 40
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "TJSJ",
+      "tiles": {
+        "requested": 20,
+        "loaded": 20,
+        "empty": 14,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "TJSJ",
+        "runwayId": "TJSJ:10-28",
+        "along": 1393,
+        "cross": -344,
+        "floorM": 24,
+        "score": 261.2,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 9,
+              "taxiway": 2,
+              "runway": 0,
+              "building": 8
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 105,
+              "taxiway": 7,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 52,
+              "taxiway": 49,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 21,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 75,
+              "taxiway": 6,
+              "runway": 0,
+              "building": 4
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 81,
+              "taxiway": 8,
+              "runway": 0,
+              "building": 31
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 15,
+            "samples": 4,
+            "blocked": 0,
+            "total": 60
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    },
+    {
+      "ident": "LOWI",
+      "tiles": {
+        "requested": 30,
+        "loaded": 30,
+        "empty": 25,
+        "failed": 0
+      },
+      "selected": true,
+      "seat": {
+        "ident": "LOWI",
+        "runwayId": "LOWI:08-26",
+        "along": 1440,
+        "cross": 344,
+        "floorM": 24,
+        "score": 155.9,
+        "variant": "pier",
+        "detail": {
+          "footprint": {
+            "pier": {
+              "n": 30,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 21
+            },
+            "stands": {
+              "n": 112,
+              "out": 0,
+              "apron": 83,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            },
+            "apron": {
+              "n": 170,
+              "out": 0,
+              "apron": 8,
+              "taxiway": 44,
+              "runway": 0,
+              "building": 0
+            },
+            "gates": 0,
+            "backStands": {
+              "n": 112,
+              "out": 0,
+              "apron": 0,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 8
+            },
+            "backApron": {
+              "n": 170,
+              "out": 0,
+              "apron": 1,
+              "taxiway": 0,
+              "runway": 0,
+              "building": 0
+            }
+          },
+          "blocked": {
+            "faced": 0,
+            "other": 0
+          },
+          "back": {
+            "targets": 10,
+            "samples": 4,
+            "blocked": 0,
+            "total": 40
+          }
+        }
+      },
+      "source": "20261011_080001_pt"
+    }
+  ]
+}

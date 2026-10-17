@@ -1,7 +1,7 @@
 'use client';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Binoculars, Camera, Crosshair, ListOrdered, RotateCcw, Volume2, VolumeX } from 'lucide-react';
+import { Binoculars, Camera, Crosshair, ListOrdered, RotateCcw, Volume2, VolumeX, SlidersHorizontal } from 'lucide-react';
 import { useFlyStore } from '@/stores/fly-store';
 import { getRuntimeAction } from '@/lib/fly/runtime-bus';
 import { exitToTitle } from '@/lib/fly/front-door';
@@ -20,6 +20,7 @@ import { SeatsButton } from './SeatsButton';
 import { SitPrompt } from './SitPrompt';
 import { SeatMenu } from './SeatMenu';
 import { LoungeBridgeBar } from './LoungeBridgeBar';
+import { ObservatoryHud, useObservatory } from './ObservatoryHud';
 
 /*
  * The seated lounge HUD. One 1 Hz poll feeds the header, the board and the
@@ -57,6 +58,8 @@ function helpHints(watch) {
 }
 
 export function LoungeHud({ runtime, watch }) {
+  const observatory = useObservatory(runtime, watch.id);
+  const instrumentOpen = !!observatory?.active;
   const sound = useFlyStore((s) => s.soundOn);
   const inspecting = useFlyStore((s) => !!s.inspectHex);
   // A full-screen panel over the lounge (Atlas, logbook, airport browser):
@@ -67,7 +70,7 @@ export function LoungeHud({ runtime, watch }) {
   const [feed, setFeed] = useState({ state: 'unavailable', count: 0 });
   const [conditions, setConditions] = useState({ clock: null, sun: null, weather: null });
   const [tab, setTab] = useState('arrivals');
-  const [boardOpen, setBoardOpen] = useState(readBoardPref);
+  const [boardOpen, setBoardOpen] = useState(() => runtime.airportWatch?.observatory ? false : readBoardPref());
   const [notice, setNotice] = useState('');
   const [savingPhoto, setSavingPhoto] = useState(false);
   const autoTab = useRef(true);
@@ -161,6 +164,7 @@ export function LoungeHud({ runtime, watch }) {
       data-overlay="airport-observation"
       data-testid="airport-observation"
       data-binocular={watch.binocular ? '1' : '0'}
+      data-instruments={observatory ? '1' : '0'}
       onKeyDown={(e) => {
         // Keyboard isolation: keys typed inside the lounge never steer.
         if (e.key !== 'Escape') e.stopPropagation();
@@ -184,10 +188,11 @@ export function LoungeHud({ runtime, watch }) {
         onLeave={leave}
       />
 
-      <SitPrompt runtime={runtime} watch={watch} />
+      {!observatory?.prompt && !instrumentOpen && <SitPrompt runtime={runtime} watch={watch} />}
+      <ObservatoryHud runtime={runtime} state={observatory} hidden={inspecting || covered || watch.seatMenu} />
       <SeatMenu runtime={runtime} watch={watch} />
 
-      {!watch.binocular && !inspecting && !covered && (
+      {!watch.binocular && !inspecting && !covered && !instrumentOpen && (
         <LiveBoard
           board={board}
           tab={tab}
@@ -213,7 +218,7 @@ export function LoungeHud({ runtime, watch }) {
       )}
 
       <AnimatePresence>
-        {watch.selected && !watch.binocular && !covered && (
+        {watch.selected && !watch.binocular && !covered && !instrumentOpen && (
           <SpotterCard key={watch.selected} runtime={runtime} hex={watch.selected} boardRow={selectedRow} fieldElev={fieldElev} airportIdent={airport?.ident || String(airport?.id || '').split(':')[0]} onPhoto={photo} savingPhoto={savingPhoto} />
         )}
       </AnimatePresence>
@@ -227,6 +232,7 @@ export function LoungeHud({ runtime, watch }) {
             <span>Board</span>
           </button>
           <SeatsButton runtime={runtime} watch={watch} />
+          {observatory && <button type="button" className="lounge-btn" aria-label="Observatory instruments" title="Observatory instruments (I)" data-testid="observatory-open" aria-pressed={instrumentOpen} onClick={() => instrumentOpen ? w?.observatory?.release() : w?.observatory?.activate('airport-table', { remote: true })}><SlidersHorizontal size={16} aria-hidden="true" /><span>Instruments</span></button>}
           <button type="button" className="lounge-btn" data-testid="lounge-face-runway" onClick={() => w?.resetLook()} title={`${faceLabel} (R)`}>
             <RotateCcw size={16} aria-hidden="true" />
             <span>{faceLabel}</span>

@@ -30,13 +30,14 @@ const FLOOR_RAYS = arg('floor-rays', 64);
 const OBJECT_RANGE = 0.42; // metres: crevices and contact
 const FLOOR_RANGE = 0.85; // metres: the soft pool under a seat or table
 
+const variant = process.argv.includes('--pier') ? 'pier' : 'classic';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // --out writes elsewhere (scripts/verify-lounge-walk.mjs --bake compares a fresh bake with the shipped file).
 const outArg = process.argv.indexOf('--out');
-const out = outArg > 0 && process.argv[outArg + 1] ? path.resolve(process.argv[outArg + 1]) : path.join(root, 'public/models/lounge-ao-v1.bin');
+const out = outArg > 0 && process.argv[outArg + 1] ? path.resolve(process.argv[outArg + 1]) : path.join(root, variant === 'pier' ? 'public/models/lounge-ao-pier-v1.bin' : 'public/models/lounge-ao-v1.bin');
 
 const t0 = performance.now();
-const room = buildLoungeRoom();
+const room = buildLoungeRoom({ variant });
 const buckets = room.buckets;
 
 // ---------------------------------------------------------------------------

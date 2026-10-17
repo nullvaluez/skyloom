@@ -123,6 +123,7 @@ export function PrewarmRig({ runtime }) {
         scene,
         style: store.mapStyle,
         tier: store.qualityTier,
+        adoptWarmScene: (object) => runtime.adoptCinematicWarmScene?.(object),
       });
     };
     const wait = () => {

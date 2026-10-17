@@ -15,6 +15,7 @@
 // StrictMode-safe (effects run twice in dev): the resource is created in
 // useMemo, every effect undoes exactly what it did, and dispose() releases GPU
 // resources only (R3F owns the parenting through <primitive>).
+import { ObservatoryInstruments } from './ObservatoryInstruments';
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Matrix4, Scene, Vector3, WebGLRenderTarget } from 'three';
@@ -43,10 +44,10 @@ function overlayWarmScene() {
   return _overlayWarm;
 }
 
-function Room({ runtime }) {
+function Room({ runtime, variant }) {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
-  const resource = useMemo(() => createAirportLounge(), []);
+  const resource = useMemo(() => createAirportLounge({ variant }), [variant]);
   const probe = useMemo(() => new InteriorProbe(ROOM_LOOK.probeSize), []);
   const st = useRef(null);
   if (!st.current) {
@@ -71,14 +72,14 @@ function Room({ runtime }) {
   // The offline AO bake (fetched once per session).
   useEffect(() => {
     let live = true;
-    loadBake().then((bake) => {
+    loadBake(variant).then((bake) => {
       if (!live || !bake) return;
       const ok = resource.attachAO(bake);
       st.current.probeDirty = true;
       if (!ok && process.env.NODE_ENV === 'development') console.warn('[lounge] AO bake does not match the room geometry: run node scripts/build-lounge-ao.mjs');
     });
     return () => { live = false; };
-  }, [resource]);
+  }, [resource, variant]);
 
   // Glass and steam draw after the cloud composite.
   useEffect(() => {
@@ -89,7 +90,7 @@ function Room({ runtime }) {
 
   // Indoor fixes read this (PrecipLayer, the cloud composite, the N8AO rig).
   useEffect(() => {
-    const publish = { active: false, inverse: st.current.inverse, envelope: LOUNGE_ROOM.envelope, aoRadius: ROOM_LOOK.ao.radius, aoIntensity: ROOM_LOOK.ao.intensity, weight: 0 };
+    const publish = { active: false, shown: false, opacity: 0, inverse: st.current.inverse, envelope: LOUNGE_ROOM.envelope, aoRadius: ROOM_LOOK.ao.radius, aoIntensity: ROOM_LOOK.ao.intensity, weight: 0 };
     runtime.loungeRoom = publish;
     return () => {
       if (runtime.loungeRoom === publish) delete runtime.loungeRoom;
@@ -110,9 +111,10 @@ function Room({ runtime }) {
     const w = runtime.airportWatch, seat = w?.seat;
     const group = resource.group;
     const pub = runtime.loungeRoom;
+    if (pub) pub.instrumentMaterial = resource.materials.metal;
     if (!seat || !w.active) {
       group.visible = false;
-      if (pub) pub.active = false;
+      if (pub) { pub.active = false; pub.shown = false; pub.opacity = 0; }
       return;
     }
     const camera = frame.camera;
@@ -171,6 +173,7 @@ function Room({ runtime }) {
     }
     const ready = s.warm === 'done' || performance.now() - s.started > ROOM_LOOK.prewarmTimeoutMs;
     const shown = !!w.validated && !s.hidden && ready;
+    if (pub) { pub.shown = shown; pub.opacity = 1 - fade; }
     group.visible = shown;
     resource.uniforms.uLoungeFade.value = fade;
     resource.board.mesh.visible = fade < 0.5; // on the back wall: never in a binocular view
@@ -182,7 +185,8 @@ function Room({ runtime }) {
       toSceneDir(_key.set(-Math.sin(az) * c, sin, Math.cos(az) * c), _key);
     }
     const time = (performance.now() - s.started) / 1000;
-    const shade = updateRoomShading(resource.uniforms, { group, camera, env, sun: runtime.sun, keyScene: _key, time }, s.shade);
+    s.nightWatch = ease(s.nightWatch ?? 0, w.observatory?.night ? 1 : 0, dt, 0.7);
+    const shade = updateRoomShading(resource.uniforms, { group, camera, env, sun: runtime.sun, keyScene: _key, time, nightWatch: s.nightWatch }, s.shade);
 
     // Exposure: an eased bias so the interior reads while the outside stays
     // bright (SessionRecovery applies runtime.loungeExposureStops).
@@ -218,6 +222,7 @@ function Room({ runtime }) {
       exposure,
       rain: wx?.precip === 'rain' ? Math.min(1, wx.precipT ?? 0) : 0,
       night: shade.night,
+      nightWatch: s.nightWatch,
       lens: 1 - fade,
       time,
       roomRad: u.uLoungeRoomRad.value,
@@ -235,13 +240,13 @@ function Room({ runtime }) {
 
     // Interior reflection probe: refresh when the light changed enough.
     if (s.warm === 'done') {
-      const key = `${Math.round(shade.practical * 25)}|${Math.round(shade.day * 20)}`;
+      const key = `${Math.round(shade.practical * 25)}|${Math.round(shade.day * 20)}|${Math.round(s.nightWatch * 10)}`;
       const now = performance.now();
       if ((s.probeDirty || key !== s.probeKey) && now - s.probeAt > ROOM_LOOK.probeMinMs) {
         // The glass box-projects the probe from the room's probe eye. Seated at
         // the window that is the live eye (as always); a walking observer
         // (LOUNGE_WALK) leaves it at the room's probe eye (room-plan.js roomVariant).
-        if (!w?.walk || (w.posture === 'seated' && w.seatId === 'window')) _eye.setFromMatrixPosition(camera.matrixWorld);
+        if (variant !== 'pier' && (!w?.walk || (w.posture === 'seated' && w.seatId === 'window'))) _eye.setFromMatrixPosition(camera.matrixWorld);
         else {
           const pe = roomVariant(w.site?.variant).probeEye;
           group.updateMatrixWorld();
@@ -264,6 +269,7 @@ function Room({ runtime }) {
 }
 
 export function AirportLounge({ runtime }) {
-  const active = useFlyStore((s) => !!s.airportWatch);
-  return active ? <Room runtime={runtime} /> : null;
+  const snapshot = useFlyStore((s) => s.airportWatch);
+  const variant = runtime.airportWatch?.site?.variant ?? 'classic';
+  return snapshot ? <><Room key={variant} runtime={runtime} variant={variant} /><ObservatoryInstruments runtime={runtime} /></> : null;
 }

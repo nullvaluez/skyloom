@@ -64,7 +64,7 @@ export function AirportStructures({ runtime }) {
     // Ground field under everything that touches the apron (markings,
     // vehicles, bridge wheels), sampled progressively once validated.
     const reach = Math.max(layout.apron.x1, ...plan.hangars.map((h) => h.x + h.w / 2 + 12));
-    built.ground = new SetGround({ x0: layout.apron.x0 - 10, x1: reach + 10, z0: layout.apron.z0 - 8, z1: layout.terminal.z1 + 8 }, 8);
+    built.ground = new SetGround({ x0: layout.apron.x0 - 10, x1: reach + 10, z0: layout.apron.z0 - 8, z1: Math.max(layout.terminal.z1, ...layout.aprons.map((a) => a.z1)) + 8 }, 8);
     built.setGround(built.ground);
     const parked = FLEET_VIEW.parkedScenery !== false;
     plan.stands.forEach((s) => built.setOccupied(s.index, parked));

@@ -33,6 +33,10 @@ const arg = (name, fallback) => {
 const ROOT = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const CACHE = path.resolve(arg('cache', path.join(ROOT, '.graphics-review/lounge-seats/tiles')));
 fs.mkdirSync(CACHE, { recursive: true });
+const variant = process.argv.includes('--pier') ? 'pier' : 'classic';
+const offline = process.argv.includes('--offline');
+const SOURCE_CACHE = arg('source-cache', null);
+const destination = variant === 'pier' ? 'lib/fly/lounge-seats-pier.js' : 'lib/fly/lounge-seats.js';
 
 const registry = await import('../lib/fly/operations-airports.js');
 const { buildAirfieldTile, AIRFIELD_TILE_REVISION } = await import('../lib/fly/airfield/airfield-tile.js');
@@ -54,7 +58,7 @@ const identOf = (a) => a.ident || String(a.id).split(':')[0];
 /** Register the catalog runways around an ident (as the runtime does); its runway records. */
 function registerAround(ident) {
   const item = catalog.filter((r) => r.ident === ident).sort((x, y) => (y.length || 0) - (x.length || 0))[0];
-  if (!item) return [];
+  if (!item) return registry.OPERATIONS_AIRPORTS.filter((r) => identOf(r) === ident);
   for (const it of catalog.filter((r) => Math.abs(r.lat - item.lat) < 0.25 && Math.abs(r.lon - item.lon) * Math.cos((item.lat * Math.PI) / 180) < 0.25)) {
     const row = region(it.region).find((x) => x.id === it.id);
     if (row) try { registry.registerAirport(row); } catch { /* invalid rows are skipped like the runtime does */ }
@@ -62,7 +66,7 @@ function registerAround(ident) {
   return registry.OPERATIONS_AIRPORTS.filter((r) => identOf(r) === ident);
 }
 
-let template = null, planet = '';
+let template = null, planet = offline ? 'cached-unversioned' : '';
 async function tileTemplate() {
   if (template) return template;
   const tj = await (await fetch('https://tiles.openfreemap.org/planet')).json();
@@ -76,7 +80,9 @@ const api = {
     const file = path.join(CACHE, `${z}-${x}-${y}.pbf`);
     let buf;
     if (fs.existsSync(file)) buf = fs.readFileSync(file);
+    else if (SOURCE_CACHE && fs.existsSync(path.join(SOURCE_CACHE, `${z}-${x}-${y}.pbf`))) buf = fs.readFileSync(path.join(SOURCE_CACHE, `${z}-${x}-${y}.pbf`));
     else {
+      if (offline) throw new Error(`uncached tile ${z}/${x}/${y}`);
       const url = (await tileTemplate()).replace('{z}', z).replace('{x}', x).replace('{y}', y);
       const res = await fetch(url);
       if (res.status === 404 || res.status === 204) { fs.writeFileSync(file, Buffer.alloc(0)); return { empty: true }; }
@@ -91,21 +97,24 @@ const api = {
 };
 
 const only = arg('only', '');
-const hubs = Object.values(AIRPORTS).map((a) => a.icao).filter((icao) => icao && !LOUNGE_SITE.flagship[icao]);
-const list = only ? only.split(',') : [...new Set(hubs)];
+const hubs = Object.values(AIRPORTS).map((a) => a.icao).filter((icao) => icao && (variant === 'pier' || !LOUNGE_SITE.flagship[icao]));
+const list = only ? only.split(',') : [...new Set(variant === 'pier' ? [...hubs, ...Object.keys(LOUNGE_SITE.flagship)] : hubs)];
 const seats = {};
-const rows = [];
-await tileTemplate();
+const rows = [], audit = [];
+if (!offline) await tileTemplate();
 for (const ident of list) {
   const runways = registerAround(ident);
-  if (!runways.length) { rows.push(`${ident.padEnd(5)} not in the runway catalog: generic seat`); continue; }
+  if (!runways.length) { rows.push(`${ident.padEnd(5)} not in the runway catalog: classic fallback`); audit.push({ ident, selected: false, error: 'not in runway catalog', source: planet }); console.log(rows.at(-1)); continue; }
   let seat = null, note = '';
   try {
     const features = await loadAirfieldFeatures(runways[0], { api });
-    seat = chooseLoungeSeat(runways, features);
-    if (!seat) note = 'no acceptable seat: generic seat';
+    seat = chooseLoungeSeat(runways, features, { variant });
+    audit.push({ ident, tiles: features.tiles, selected: !!seat, seat, source: planet });
+    if (!seat && features.tiles?.failed) note = 'incomplete tile evidence: classic fallback';
+    else if (!seat) note = variant === 'pier' ? 'no safe two-sided seat: classic fallback' : 'no acceptable seat: generic seat';
   } catch (e) {
-    note = `load failed (${e.message}): generic seat`;
+    note = `load failed (${e.message}): ${variant === 'pier' ? 'classic fallback' : 'generic seat'}`;
+    audit.push({ ident, selected: false, error: e.message, source: planet });
   }
   if (seat) {
     seats[ident] = { runway: seat.runwayId, along: seat.along, cross: seat.cross, floorM: seat.floorM };
@@ -118,19 +127,19 @@ for (const ident of list) {
 
 const body = Object.keys(seats).sort().map((k) => {
   const s = seats[k];
-  return `  ${k}: Object.freeze({ runway: '${s.runway}', along: ${s.along}, cross: ${s.cross}, floorM: ${s.floorM} }),`;
+  return `  ${k}: Object.freeze({ runway: '${s.runway}', along: ${s.along}, cross: ${s.cross}, floorM: ${s.floorM}${variant === 'pier' ? ", variant: 'pier'" : ''} }),`;
 }).join('\n');
 const out = `// GENERATED by scripts/build-lounge-seats.mjs — do not edit by hand; re-run it.
-// Lounge seats for the golden-hour hubs (lib/airports.js) without an authored
-// flagship seat, chosen by lib/fly/lounge-seat.js from OpenStreetMap data
-// (OpenFreeMap planet ${planet || 'unknown'}) and the runway catalog. Same shape as
+// Lounge seats for ${variant === 'pier' ? 'all catalog hubs and flagships' : 'golden-hour hubs without an authored flagship'}, chosen by lib/fly/lounge-seat.js from OpenStreetMap data
+// (OpenFreeMap ${SOURCE_CACHE ? 'mixed cached tiles; cache snapshot date unavailable; fetched planet ' : 'planet '}${planet || 'unknown'}) and the runway catalog. Same shape as
 // LOUNGE_SITE.flagship: the runway faced, metres along it from its first end,
 // metres off its centreline (+ = right of that direction), floor height.
-export const LOUNGE_SEATS = Object.freeze({
+export const ${variant === 'pier' ? 'LOUNGE_SEATS_PIER' : 'LOUNGE_SEATS'} = Object.freeze({
 ${body}
 });
 `;
 if (!only) {
-  fs.writeFileSync(path.join(ROOT, 'lib/fly/lounge-seats.js'), out);
-  console.log(`\nwrote lib/fly/lounge-seats.js: ${Object.keys(seats).length} seats of ${list.length} hubs`);
-} else console.log(`\n(--only: lib/fly/lounge-seats.js not written)\n${out}`);
+  fs.writeFileSync(path.join(ROOT, destination), out);
+  console.log(`\nwrote ${destination}: ${Object.keys(seats).length} seats of ${list.length} hubs`);
+} else console.log(`\n(--only: ${destination} not written)\n${out}`);
+if (variant === 'pier') fs.writeFileSync(path.join(ROOT, 'scripts/lounge-pier-audit.json'), JSON.stringify({ variant, source: SOURCE_CACHE ? 'mixed cached OpenFreeMap tiles' : planet, fetchedPlanet: planet, cachedSnapshotDate: null, visualCertification: false, airports: list.length, selected: audit.filter((a) => a.selected).length, fallback: audit.filter((a) => !a.selected).length, rows: audit }, null, 2) + '\n');

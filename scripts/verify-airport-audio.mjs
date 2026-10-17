@@ -120,6 +120,26 @@ await check('footsteps: a step is a short scuff into the room bus (so it fades a
     assert.ok(new Set(made.map(g=>g.gain.value)).size>1,'no two steps alike');
   }finally{ctx.createGain=cg;}
 });
+await check('directional listening supplements the glass path and releases without altering propagation',()=>{
+  const north=track('listen-north',0,-600,{ground:false,y:500,vN:0}),south=track('listen-south',0,600,{ground:false,y:500,vN:0});
+  runtime.traffic.items=[north,south];watch.observatory={listening:{worldBearing:0}};step(7);
+  const a=voiceFor('listen-north'),b=voiceFor('listen-south');
+  assert.ok(a&&b,'both real contacts share the bounded voice pool');
+  assert.ok(a.microphone.gain.value>.6,'front microphone is audible');
+  assert.equal(b.microphone.gain.value,0,'opposite bearing is rejected');
+  assert.ok(b.gain.gain.value>0,'ordinary through-glass ambience is retained');
+  const delay=runtime.airportAudioStats.heard.find(x=>x.hex==='listen-north').delayS;
+  watch.observatory.listening.worldBearing=180;step(.6);
+  assert.equal(a.microphone.gain.value,0);assert.ok(b.microphone.gain.value>.6);
+  assert.equal(runtime.airportAudioStats.heard.find(x=>x.hex==='listen-north').delayS,delay,'listening never changes propagation delay');
+  watch.observatory.listening=null;step(.6);
+  assert.equal(a.microphone.gain.value,0);assert.equal(b.microphone.gain.value,0);
+  delete watch.observatory;
+});
+await check('pause silences every lounge bus, resuming restores the room',()=>{
+  state.phase='paused';step(.5);assert.equal(audio.graph.bus.gain.value,0);
+  state.phase='flying';step(.5);assert.equal(audio.graph.bus.gain.value,1);
+});
 await check('leaving the lounge silences at once, tears the graph down, and restores the music',()=>{
   watch.active=false;step(0.5);assert.equal(audio.graph.bus.gain.value,0);assert.equal(duck.at(-1),1);
   step(3.2);assert.equal(audio.graph,null);assert.equal(audio.voices.length,0);
@@ -131,5 +151,24 @@ await check('returning rebuilds without a second fetch; dispose releases everyth
   watch.active=true;step(1);assert.ok(audio.graph);assert.equal(fetches,1);assert.equal(duck.at(-1),SOUNDSCAPE.musicDuck);
   const d0=disconnected;audio.dispose();assert.equal(audio.graph,null);assert.ok(disconnected>d0+20);assert.equal(duck.at(-1),1);
   audio.update(runtime,state);assert.equal(audio.graph,null,'a disposed soundscape never rebuilds');
+});
+await check('enabling sound cannot bypass pause or page visibility; subscriptions release on teardown',async()=>{
+  const {connectFlyAudioMute}=await import('../hooks/use-fly-audio.js');
+  const {useFlyStore}=await import('../stores/fly-store.js');
+  const prior={soundOn:useFlyStore.getState().soundOn,phase:useFlyStore.getState().phase};
+  const visibility=new EventTarget();visibility.hidden=false;
+  const master={muted:false,setMuted(value){this.muted=value;}};
+  useFlyStore.setState({soundOn:false,phase:'paused'});
+  const binding=connectFlyAudioMute(master,useFlyStore,visibility);
+  try {
+    useFlyStore.setState({soundOn:true});assert.equal(master.muted,true,'sound-on while paused stays muted synchronously');
+    useFlyStore.setState({phase:'flying'});assert.equal(master.muted,false,'resume restores sound without waiting for the audio tick');
+    visibility.hidden=true;visibility.dispatchEvent(new Event('visibilitychange'));assert.equal(master.muted,true,'hiding mutes immediately');
+    useFlyStore.setState({soundOn:false});useFlyStore.setState({soundOn:true});assert.equal(master.muted,true,'sound-on while hidden stays muted');
+    useFlyStore.setState({phase:'paused'});visibility.hidden=false;visibility.dispatchEvent(new Event('visibilitychange'));assert.equal(master.muted,true,'showing a paused page stays muted');
+    useFlyStore.setState({phase:'flying'});assert.equal(master.muted,false);
+    binding.dispose();useFlyStore.setState({soundOn:false,phase:'paused'});visibility.hidden=true;visibility.dispatchEvent(new Event('visibilitychange'));
+    assert.equal(master.muted,false,'disposed observers no longer write the master');
+  } finally { binding.dispose();useFlyStore.setState(prior); }
 });
 console.log(`AIRPORT AUDIO: ${checks}/${checks}`);

@@ -87,7 +87,9 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
     };
     const onDown = (e) => {
       const w = runtime.airportWatch;
-      if (!w?.active || e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target)) return;
+      // A range owns arrows and movement keys while focused, but Escape still
+      // follows the lounge's overlay/optics hierarchy.
+      if (!w?.active || e.metaKey || e.ctrlKey || e.altKey || (isTyping(e.target) && e.key !== 'Escape')) return;
       const s = useFlyStore.getState();
       const lower = e.key.toLowerCase();
       const walkKey = !!w.walk && (MOVE_KEYS[lower] || e.key === 'Shift');
@@ -115,6 +117,11 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
         handled = key.length === 1 && 'bfrtqe123+=-'.includes(key.toLowerCase());
       } else {
         switch (key.toLowerCase()) {
+          case 'i':
+            if (!w.observatory) handled = false;
+            else if (w.observatory.snapshot().active) w.observatory.release();
+            else if (!w.binocular) w.observatory.activate('airport-table', { remote: true });
+            break;
           case 'b':
             w.binoculars();
             break;
@@ -123,11 +130,13 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
             else if (!w.binocular) w.seatMenuOpen(); // hidden behind the glasses: nothing to toggle
             break;
           case 'enter':
-            if (w.walk && w.sitPrompt && w.posture === 'standing' && !w.binocular && !w.seatMenu && !isControl(e.target)) w.sit(w.sitPrompt.id);
+            if (w.observatory?.snapshot().prompt && !w.binocular && !w.seatMenu && !isControl(e.target)) w.observatory.activate(w.observatory.snapshot().prompt.id);
+            else if (w.walk && w.sitPrompt && w.posture === 'standing' && !w.binocular && !w.seatMenu && !isControl(e.target)) w.sit(w.sitPrompt.id);
             else handled = false;
             break;
           case 'escape':
             if (w.seatMenu && !w.binocular) w.seatMenuOpen(false);
+            else if (w.observatory?.snapshot().active && !w.binocular) w.observatory.release();
             else if (w.binocular) w.binoculars(false);
             else if (w.selected) w.clearSelection();
             else handled = false; // FlyMode: leave the lounge
@@ -221,6 +230,11 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
       if (prev.hex) w.select(prev.hex, { binoculars: true });
       else w.binoculars(true);
       return;
+    }
+    if (w.observatory && !w.binocular) {
+      const rect = ref.current?.getBoundingClientRect();
+      const id = rect && w.observatory.stationAt(((x - rect.left) / rect.width) * 2 - 1, 1 - ((y - rect.top) / rect.height) * 2);
+      if (id) { lastClick.current = null; w.observatory.activate(id); return; }
     }
     const hit = pickAt(picker, x, y, w.optics.mag);
     lastClick.current = { t: now, x, y, hex: hit?.hex ?? null };

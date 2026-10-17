@@ -46,7 +46,7 @@ registerHooks({
 });
 const { ShaderLib } = await import('three');
 const { createAirportLounge } = await import('../lib/fly/airport-lounge.js');
-const { LOUNGE_ROOM, LOUNGE_BUDGETS, ROOM_LOOK } = await import('../lib/fly/observation-config.js');
+const { LOUNGE_ROOM, LOUNGE_PIER_ROOM, LOUNGE_BUDGETS, ROOM_LOOK } = await import('../lib/fly/observation-config.js');
 const { roomMapBytes } = await import('../lib/fly/lounge/room-textures.js');
 const { BOARD_CANVAS, status } = await import('../lib/fly/lounge/lounge-board.js');
 const { probeBytes } = await import('../lib/fly/lounge/lounge-probe.js');
@@ -63,9 +63,10 @@ const doc = { createElement: () => ({ getContext: ctx2d }) };
 let checks = 0;
 const check = (name, fn) => { fn(); checks++; console.log('PASS ' + name); };
 const MiB = 1024 * 1024;
-const B = LOUNGE_BUDGETS.room;
+const variant = process.argv.includes('--pier') ? 'pier' : 'classic';
+const B = variant === 'pier' ? { ...LOUNGE_BUDGETS.room, triangles: 140000 } : LOUNGE_BUDGETS.room;
 
-const room = createAirportLounge({ document: doc });
+const room = createAirportLounge({ document: doc, variant });
 const drawables = room.group.children.filter((o) => o.isMesh);
 const triangles = (g) => (g.index ? g.index.count : g.attributes.position.count) / 3;
 
@@ -113,7 +114,10 @@ check('the glazing sits on the contract (front plane, cant, extent, roof strip, 
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i), k = kind.getX(i);
     seen.add(k);
-    if (k === 0) {
+    if (variant === 'pier' && z > 14) {
+      assert.ok(Math.abs(z - LOUNGE_PIER_ROOM.backGlass.z) < 0.006);
+      assert.ok(Math.abs(Math.abs(x) - LOUNGE_PIER_ROOM.backGlass.halfWidth) < 0.006);
+    } else if (k === 0) {
       // front: z + y * cant = baseZ + baseY * cant (the pane sits <= 5 mm outside the fins)
       assert.ok(Math.abs(z + y * cant - (G.baseZ + G.baseY * cant)) < 0.006, `front plane ${x},${y},${z}`);
       assert.ok(Math.abs(Math.abs(x) - G.halfWidth) < 1e-6 && y >= G.baseY - 1e-6 && y <= G.topY + 1e-6, `front extent ${x},${y}`);
@@ -162,7 +166,7 @@ check('the room patch applies to three\'s shader sources, keeps the cascade anch
 
 // --- 5. the AO bake matches the geometry ----------------------------------------------
 check('the offline AO bake matches the room geometry (else: node scripts/build-lounge-ao.mjs)', () => {
-  const file = fileURLToPath(new URL('../public' + AO_URL, import.meta.url));
+  const file = fileURLToPath(new URL('../public' + (variant === 'pier' ? '/models/lounge-ao-pier-v1.bin' : AO_URL), import.meta.url));
   const bytes = fs.readFileSync(file);
   const bake = decodeBake(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
   assert.ok(bake, 'bake parses');
