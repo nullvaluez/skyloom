@@ -10,7 +10,7 @@ registerHooks({ resolve(s, c, next) {
   return next(s, c);
 } });
 globalThis.window = { location: { search: '' }, matchMedia: () => ({ matches: false }) };
-const { observationContacts, observationRunways, observationToWorld, worldToObservation, buildingBlocksSegment, airfieldSightline, observationBuildingFeatures, renderedOcclusionReady, sampledTerrainSightline, createSuggestionMemory, windowSuggestions } = await import('../lib/fly/lounge/observatory-model.mjs');
+const { observationContacts, observationRunways, observationToWorld, worldToObservation, buildingBlocksSegment, airfieldSightline, sightlineCandidates, observationBuildingFeatures, renderedOcclusionReady, sampledTerrainSightline, createSuggestionMemory, windowSuggestions } = await import('../lib/fly/lounge/observatory-model.mjs');
 const { renderedBuildingBound } = await import('../lib/fly/airfield/rendered-building-bound.js');
 const { observatoryStations, stationState, stationPrompt, stationOnRay, stationLineClear } = await import('../lib/fly/lounge/observatory-stations.mjs');
 const { attachLoungeObservatory } = await import('../lib/fly/lounge-observatory-runtime.js');
@@ -106,6 +106,36 @@ await test('Generated structures replace retired OSM footprints for sightline te
   assert.equal(result.buildings, raw.buildings); assert.equal(result.occluders, raw.occluders);
   assert.equal(result.sightlineBuildings.length, 1); assert.equal(result.sightlineBuildings[0].id, 'set-terminal');
   assert.equal(airfieldSightline({ x: 0, y: 7, z: 0 }, { x: 0, y: 10, z: -1000 }, result), 'blocked');
+});
+await test('Spatial broadphase matches brute force at cell boundaries, corners, holes and long segments', () => {
+  const rect = (x0, x1, z0, z1) => [x0, z0, x1, z0, x1, z1, x0, z1];
+  const occluders = [
+    { id: 'boundary', top: 40, rings: [rect(256, 270, -8, 8)] },
+    { id: 'corner', top: 40, rings: [rect(256, 270, 256, 270)] },
+    { id: 'courtyard', top: 50, rings: [rect(-300, -200, -300, -200), rect(-280, -220, -280, -220)] },
+    { id: 'oversized', top: 40, rings: [rect(-5000, 5000, 8000, 10000)] },
+  ];
+  for (let i = 0; i < 100; i++) occluders.push({ id: i, top: 20 + i % 30, rings: [rect((i % 10) * 400 - 2000, (i % 10) * 400 - 1970, Math.floor(i / 10) * 400 - 2000, Math.floor(i / 10) * 400 - 1970)] });
+  const indexed = observationBuildingFeatures({ ...features, occluders }, site, null), brute = { ...indexed, sightlineIndex: null };
+  assert.equal(indexed.sightlineIndex.spill.length, 1, 'oversized volume is retained outside grid buckets');
+  const rays = [
+    [{ x: 256, y: 10, z: -1000 }, { x: 256, y: 10, z: 1000 }],
+    [{ x: 0, y: 10, z: 0 }, { x: 512, y: 10, z: 512 }],
+    [{ x: 270, y: 10, z: 1000 }, { x: 270, y: 10, z: -1000 }],
+    [{ x: -260, y: 10, z: -260 }, { x: -240, y: 10, z: -240 }],
+    [{ x: 0, y: 10, z: -100000 }, { x: 0, y: 10, z: 100000 }],
+    [{ x: 256, y: 0, z: 0 }, { x: 256, y: 80, z: 0 }],
+  ];
+  let seed = 0x534b594c;
+  const rand = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+  for (let i = 0; i < 500; i++) rays.push([{ x: rand() * 6000 - 3000, y: rand() * 70, z: rand() * 22000 - 11000 }, { x: rand() * 6000 - 3000, y: rand() * 70, z: rand() * 22000 - 11000 }]);
+  for (const [from, to] of rays) {
+    assert.equal(airfieldSightline(from, to, indexed), airfieldSightline(from, to, brute), JSON.stringify({ from, to }));
+    const candidates = new Set(sightlineCandidates(from, to, indexed));
+    for (const b of brute.sightlineBuildings) if (buildingBlocksSegment(from, to, b)) assert.ok(candidates.has(b), `broadphase omitted exact hit ${b.id}`);
+  }
+  const unknown = observationBuildingFeatures({ buildings: [building] }, site, null);
+  assert.equal(unknown.sightlineIndex.spill.length, 1, 'unknown AABB remains a mandatory candidate');
 });
 await test('Site transforms round-trip nonunit Mercator scale and rotation', () => {
   const rotated = { ...site, x: 4000, z: -8000, heading: 1.9, k: 1.42, floorM: 9, groundY: 700 };
@@ -256,6 +286,24 @@ await test('Base-cache entry requests enrichment; pending and failed data never 
   assert.equal(failed.o.snapshot().geometryReady, false);
   assert.equal(failed.o.snapshot().contacts[0].visibility, 'unverified');
   assert.deepEqual(failed.o.snapshot().suggestions, { front: null, back: null }); failed.detach();
+});
+await test('Prepared geometry is retained between refreshes and invalidated by source, site and generated-set changes', () => {
+  let reads = 0;
+  const bound = { id: 'counted', top: 50, get rings() { reads++; return building.pieces[0]; } };
+  let source = { ...features, occluders: [bound] };
+  const f = runtimeFixture({ featuresOf: () => source });
+  let before = reads;
+  for (let i = 0; i < 8; i++) f.o.tick(.3);
+  assert.equal(reads, before, 'fixed geometry must not be rebuilt every contact refresh');
+  source = { ...source, occluders: [bound] }; f.o.tick(.3); assert.ok(reads > before); before = reads;
+  f.watch.site = { ...f.watch.site }; f.o.tick(.3); assert.ok(reads > before); before = reads;
+  let apronY = 0;
+  f.runtime.airportSet = { site: f.watch.site, plan: { footprint: [] }, apronY: () => apronY };
+  f.o.tick(.3); assert.ok(reads > before); before = reads;
+  f.o.tick(.3); assert.equal(reads, before);
+  apronY = 2; f.o.tick(.3); assert.ok(reads > before); before = reads;
+  f.watch.floorY = 8; f.o.tick(.3); assert.ok(reads > before);
+  f.detach();
 });
 await test('Every classic/pier station has a clear, collision-free approach connected to the window seat', () => {
   for (const variant of ['classic', 'pier']) {
