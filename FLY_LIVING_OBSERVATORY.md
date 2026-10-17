@@ -16,7 +16,7 @@ This revision is undergoing rendered validation. Earlier build `817f580` and its
 
 Built from `main` at `9ba95e8` in `codex/living-observatory`, separately from the trailer checkout. Opt in with `?flags=LOUNGE_PIER,LOUNGE_INSTRUMENTS`; `?flags=-LOUNGE_PIER,-LOUNGE_INSTRUMENTS` exercises the unchanged entry experience. The existing phone/tablet feature policy is unchanged.
 
-- `observatory-stations.mjs` defines shared identity, bounds, availability, proximity, unobstructed targeting, prompts and release rules. The physical instrument geometry and HUD consume the same positions. Table, compass and lighting have remote HUD access; the microphone and standing rail retain their proximity requirement.
+- `observatory-stations.mjs` defines shared identity, bounds, availability, proximity, unobstructed targeting, prompts and release rules. The physical instrument geometry and HUD consume the same positions. The map and lighting have global HUD access; window activity, microphone and standing rail have equivalent controls beside their physical stations.
 - `lounge-observatory-runtime.js` attaches to the existing airport watch, owns only instrument state, and releases it on leave. The existing walk is the sole movement controller. Table selection uses `watch.select(..., { follow: false })` and clears an earlier follow without moving the camera. The optional bearing cue expires after 12 seconds.
 - `observatory-model.mjs` derives fresh contacts only from `runtime.traffic.items`. Static scenery never becomes a contact. Missing motion is labelled unavailable. Stale/lost tracks are removed immediately, then can reappear on a fresh fix. Runway centrelines merge the registered catalog and loaded OSM geometry; no runway is labelled active. The existing selection is shared with the board and binoculars.
 - Window eligibility tests room apertures, available OSM buildings, generated terminal/hangar/tower volumes, and rendered terrain height. Terrain queries are cached and bounded: at most 256 new queries per refresh, 4,096 cache entries, 250 m sample spacing, 64 samples per ray, refined tiles only. Beyond 16 km, missing/coarse terrain, incomplete building data and exhausted query budgets remain unverified. This is conservative sampled evidence, not exact visibility against every vegetation leaf or mesh triangle.
@@ -27,7 +27,7 @@ Built from `main` at `9ba95e8` in `codex/living-observatory`, separately from th
 
 The physical instruments add two draws and a 2 MiB atlas, sharing the room's metal shader. All geometry, canvas artwork and procedural sound are first-party or reuse the existing credited soundscape. Assets and the separate pier AO bake are recorded in `lib/fly/assets.js` and regenerated `CREDITS.md`.
 
-## Integration verification
+## Original implementation verification (`817f580`)
 
 Node gates passed: observation 45/45, lifecycle 25/25, audio 16/16, observatory model/runtime 17/17, prewarm 5/5, classic room 12/12, pier room 12/12, pier 8/8, seat 6/6, walk 56/56, vantage 7/7, airport set 17/17, fleet airframes 13/13, flag registry 8/8, operations golden 28/28, import integrity 4/4 and attribution 4/4. Final browser measurements are recorded separately below when complete.
 

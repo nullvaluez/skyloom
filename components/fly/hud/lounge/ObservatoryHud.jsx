@@ -64,14 +64,14 @@ export function ObservatoryHud({ runtime, state, hidden }) {
   const choose = (hex) => o.selectContact(hex);
   const direct = (hex) => { o.showDirection(hex); o.release(); };
   const binocular = runtime.airportWatch.binocular;
-  const windowControls = state.stations.filter((s) => s.available && s.nearby && ['listen', 'support'].includes(s.kind));
+  const windowControls = state.stations.filter((s) => s.available && s.nearby && ['listen', 'support', 'compass'].includes(s.kind));
   const suggestion = active?.kind === 'compass' ? state.suggestions[active.side] : null;
   return <>
     {!active && !windowControls.length && state.prompt && !binocular && !runtime.airportWatch.seatMenu && <button type="button" className="observatory-prompt lounge-panel" data-testid="observatory-prompt" onClick={() => o.activate(state.prompt.id)}>
       <span>{state.prompt.action}</span><kbd>Enter</kbd>
     </button>}
     {!active && !!windowControls.length && !binocular && !runtime.airportWatch.seatMenu && <div className="observatory-nearby lounge-panel" aria-label="Controls at this window">
-      {windowControls.map((s) => <button type="button" key={s.id} data-testid={'instrument-' + s.id} onClick={() => o.activate(s.id, { remote: true })}>{s.kind === 'listen' ? <Headphones size={16} /> : <Binoculars size={16} />}<span>{s.kind === 'listen' ? 'Hear outside' : 'Rest binoculars'}</span>{state.prompt?.id === s.id && <kbd>Enter</kbd>}</button>)}
+      {windowControls.map((s) => <button type="button" key={s.id} data-testid={'instrument-' + s.id} onClick={() => o.activate(s.id, { remote: true })}>{s.kind === 'listen' ? <Headphones size={16} /> : s.kind === 'compass' ? <Compass size={16} /> : <Binoculars size={16} />}<span>{s.kind === 'listen' ? 'Hear outside' : s.kind === 'compass' ? 'Window activity' : 'Rest binoculars'}</span>{state.prompt?.id === s.id && <kbd>Enter</kbd>}</button>)}
     </div>}
     {state.cue && <div className="observatory-direction" role="status" data-testid="observatory-direction">
       <Navigation size={16} aria-hidden="true" /><span><strong>{state.cue.label}</strong> · {state.cue.viewLabel || (state.cue.side ? viewName(state.cue.side) : 'Look toward')} · {bearing(state.cue.bearing)}</span>
