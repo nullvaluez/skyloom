@@ -11,7 +11,7 @@ export function CinemaShadowRig({runtime,sunRef}){
   useEffect(()=>{
     const sun=sunRef.current,castShadow=sun?.castShadow;
     legacyShadow.current=!!castShadow;
-    return ()=>{rig.current?.dispose();rig.current=null;delete runtime.cinemaShadows;if(sun)sun.castShadow=castShadow;};
+    return ()=>{rig.current?.dispose();rig.current=null;delete runtime.cinemaShadows;delete runtime.adoptCinematicWarmScene;if(sun)sun.castShadow=castShadow;};
   },[runtime,sunRef]);
   useFrame(({scene,camera,gl})=>{
     const e=runtime.cinemaEnvironment;
@@ -19,7 +19,7 @@ export function CinemaShadowRig({runtime,sunRef}){
     // Retire its lights immediately: otherwise outgoing terrain compiles the
     // Classic samplers PLUS cinematic cascades and exceeds WebGL's 16 units.
     if(!e||!cinemaOn()){
-      rig.current?.dispose();rig.current=null;delete runtime.cinemaShadows;
+      rig.current?.dispose();rig.current=null;delete runtime.cinemaShadows;delete runtime.adoptCinematicWarmScene;
       if(sunRef.current)sunRef.current.castShadow=legacyShadow.current;
       return;
     }
@@ -31,7 +31,7 @@ export function CinemaShadowRig({runtime,sunRef}){
     const r=rig.current;
     r?.setMapSize(profile.shadowSize);
     if(sunRef.current){sunRef.current.castShadow=false;sunRef.current.intensity=r?0:e.sun;}
-    if(!r){runtime.cinemaShadows={cascades:0};return;}
+    if(!r){runtime.cinemaShadows={cascades:0};delete runtime.adoptCinematicWarmScene;return;}
     const range=profile.shadowRangeM*(runtime.cinemaGeography?.worldUnitsPerMetre??1);
     // Camera.reverseDepth becomes authoritative when the renderer initializes.
     if(r.fov!==camera.fov||r.aspect!==camera.aspect||r.reverse!==gl.capabilities.reversedDepthBuffer||Math.abs(r.maxFar-range)>5){
@@ -53,6 +53,11 @@ export function CinemaShadowRig({runtime,sunRef}){
     const scanStart=performance.now();r.scanObjects=0;
     r.countingRegister??=object=>{r.scanObjects++;r.registerObject(object);};
     scene.traverse(r.countingRegister);
+    // Prewarm's retained twins intentionally live outside the scene graph.
+    // They still need this same material patch: matching lights without the
+    // CSM defines/key compiles another program, leaving the real terrain cold.
+    r.adoptWarmScene??=object=>object.traverse(r.registerObject);
+    runtime.adoptCinematicWarmScene=r.adoptWarmScene;
     const scanMs=performance.now()-scanStart;r.scanMs=r.scanMs==null?scanMs:r.scanMs+(scanMs-r.scanMs)*.05;
     camera.updateMatrixWorld();r.update();
     runtime.shadowRadiusM=profile.shadowRangeM;

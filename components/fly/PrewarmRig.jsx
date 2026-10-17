@@ -3,7 +3,9 @@
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { ENV_UNIFORM, PREWARM, SETTLE_CALM } from '@/lib/fly/fly-constants';
-import { prewarmPending, prewarmSliceStep, prewarmState, pumpRequeue, requeueForEnvironment, runPrewarm } from '@/lib/fly/prewarm';
+import { compileCriticalTerrain, prewarmPending, prewarmSliceStep, prewarmState, pumpRequeue, requeueForEnvironment, runPrewarm } from '@/lib/fly/prewarm';
+import { terrainArrivalCovered } from '@/lib/fly/critical-terrain-prewarm.mjs';
+import { cinemaOn } from '@/lib/fly/cinema-policy';
 import { bumpArrival, noteFrame, popinState, settleOn } from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
 
@@ -13,11 +15,12 @@ import { useFlyStore } from '@/stores/fly-store';
  * Deliberately its own component rather than a line inside FlyScene: the warm
  * needs the renderer, the camera and the LIVE scene (for light/fog/environment
  * parity — see lib/fly/prewarm.js), all of which useThree hands over, and it
- * must not be able to affect a single thing FlyScene renders. It adds no
- * object to the scene graph and issues no draw, so every frozen draw ceiling
+ * adds no object to the scene graph and issues no draw, so every frozen draw ceiling
  * (Owens ≤ 261, satellite ≤ 375, toy ≤ 480) is untouched by construction.
  *
- * Scheduling: idle, but NOT before `scene.environment` exists (capped by
+ * Scheduling: critical terrain dispatches before its first draw, immediately
+ * after the live shadow/environment callbacks. The rest is idle, but NOT
+ * before `scene.environment` exists (capped by
  * PREWARM.envWaitMs). That wait is not caution, it is a MEASURED requirement:
  * three folds the scene environment into a material's program cache key for
  * MeshStandardMaterial (envMapMode CubeUVReflectionMapping +
@@ -26,6 +29,9 @@ import { useFlyStore } from '@/stores/fly-store';
  * material (179 uses) and every traffic model. A warm that lands one field off
  * is not a warm; it is a second program.
  *
+ * The critical publication latch only applies under an arrival curtain; its
+ * existing time cap / explicit reduced entry releases the latch and records
+ * a bypass. Unsupported parallel drivers retain the original rendering path.
  * The compile competes with the GPU but not with the network, so it overlaps
  * the tile stream that dominates boot instead of extending it — and
  * BootScreen's shaders gate only WAITS for it up to PREWARM.maxMs, after which
@@ -107,6 +113,40 @@ export function PrewarmRig({ runtime }) {
     });
   }, -99);
 
+  // The first real tile used to beat the idle warm and block in
+  // getProgramInfoLog for seconds. CSM patches at −0.9 and the environment
+  // publishes at −0.8; dispatch immediately after both, before reflections or
+  // the main draw. Tile material visibility stays latched until ready.
+  useFrame(() => {
+    const store = useFlyStore.getState();
+    const worldProfiles = runtime?.prewarm?.worldProfiles;
+    // A restored renderer has the same JS identity but no old GPU programs.
+    // Recover only the measured profile batch after the rebuilt environment
+    // and live cascade rig publish; the generic boot warm stays one-shot.
+    if (worldProfiles?.status === 'invalidated' && !runtime.contextLost && !gl.getContext().isContextLost()) {
+      if (!cinemaOn(store)) Object.assign(worldProfiles, { required: false, status: 'not-required' });
+      else if (scene.environment && runtime.cinemaShadows != null) runtime.prewarm.retryWorldProfiles?.();
+    }
+    const gate = runtime?.terrainPrewarm;
+    if (!gate) return;
+    if (runtime.prewarm) runtime.prewarm.criticalTerrain = gate.state;
+    if (!['waiting', 'compiling', 'failed'].includes(gate.state.status)) return;
+    const environment = scene.environment;
+    const key = [environment?.id ?? 'none', environment?.mapping ?? '',
+      runtime.cinemaShadows?.cascades ?? 'legacy', store.mapStyle, store.visuals, store.qualityTier,
+      gl.shadowMap.enabled, gl.shadowMap.type].join('/');
+    gate.tick({
+      key,
+      parallel: gl.extensions.has('KHR_parallel_shader_compile'),
+      covered: terrainArrivalCovered(runtime, typeof window !== 'undefined' ? window.__flyBoot : null, store.phase),
+      available: (!!environment || performance.now() - gate.state.createdAt >= PREWARM.envWaitMs)
+        && (!cinemaOn(store) || runtime.cinemaShadows != null),
+      compile: () => compileCriticalTerrain({ gl, camera, scene,
+        adoptWarmScene: (object) => runtime.adoptCinematicWarmScene?.(object),
+        onProfiles: (counts) => { gate.state.cascadeCounts = counts; } }),
+    });
+  }, -0.7);
+
   useEffect(() => {
     if (!PREWARM.enabled || !runtime) return;
     runtime.prewarm = prewarmState();
@@ -123,6 +163,8 @@ export function PrewarmRig({ runtime }) {
         scene,
         style: store.mapStyle,
         tier: store.qualityTier,
+        adoptWarmScene: (object) => runtime.adoptCinematicWarmScene?.(object),
+        beforeWarm: () => runtime.terrainPrewarm?.wait(),
       });
     };
     const wait = () => {

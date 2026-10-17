@@ -11,6 +11,19 @@ import { resolveAircraft } from '@/lib/fly/player-aircraft';
 import { useFlyStore } from '@/stores/fly-store';
 import { gameplayLive, lockBlipWanted, quietBed, wakeBed } from '@/lib/fly/front-door';
 
+/** Keep every master-mute edge under the same sound/pause/visibility policy. */
+export function connectFlyAudioMute(audio, store, visibility) {
+  const sync = () => {
+    const state = store.getState();
+    audio.setMuted(!state.soundOn || state.phase === 'paused' || visibility.hidden);
+  };
+  sync();
+  const offSound = store.subscribe((s) => s.soundOn, sync);
+  const offPhase = store.subscribe((s) => s.phase, sync);
+  visibility.addEventListener('visibilitychange', sync);
+  return { sync, dispose() { offSound(); offPhase(); visibility.removeEventListener('visibilitychange', sync); } };
+}
+
 /**
  * Owns the FlyAudio instance for a Fly-mode session: resumes on the first
  * user gesture, chases the continuous wind/engine bed from runtime.flight,
@@ -35,7 +48,7 @@ export function useFlyAudio(runtime) {
     audioRef.current = audio;
     runtime.audio = audio;
     runtime.airportAudio = airports;
-    audio.setMuted(!useFlyStore.getState().soundOn);
+    const mute = connectFlyAudioMute(audio, useFlyStore, document);
     const applyAircraft = (id) => {
       const ac = resolveAircraft(id);
       audio.setProfile(ac.audio, ac.cfg.speeds);
@@ -82,16 +95,12 @@ export function useFlyAudio(runtime) {
       }
       const active=state.mapStyle==='satellite'&&immersiveOn('audio');
       // Pause gates the shared master too, including synthesized fallback and one-shots.
-      audio.setMuted(!state.soundOn || state.phase==='paused' || document.hidden);
+      mute.sync();
       immersion.update(runtime,state,active&&live);
       airports.update(runtime,state);
     }, 1000 / AUDIO.updateHz);
 
     const unsubs = [
-      useFlyStore.subscribe(
-        (s) => s.soundOn,
-        (soundOn) => audio.setMuted(!soundOn)
-      ),
       useFlyStore.subscribe((s) => s.aircraftId, applyAircraft),
       useFlyStore.subscribe(
         (s) => s.lockedHex,
@@ -117,6 +126,7 @@ export function useFlyAudio(runtime) {
 
     return () => {
       clearInterval(id);
+      mute.dispose();
       window.removeEventListener('pointerdown', gesture);
       window.removeEventListener('keydown', gesture);
       for (const unsub of unsubs) unsub();

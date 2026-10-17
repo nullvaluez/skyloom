@@ -5,6 +5,7 @@ import { useFlyStore } from '@/stores/fly-store';
 import { VIEW, LOUNGE_ROOM } from '@/lib/fly/observation-config';
 import { DEG } from '@/lib/fly/airport-watch-camera.mjs';
 import { contactLabel, typeNameFor } from '@/lib/fly/airport-watch-board.mjs';
+import { useObservatory } from './ObservatoryHud';
 import { M_TO_FT, MPS_TO_KT } from '@/lib/fly/coords';
 
 /*
@@ -49,6 +50,7 @@ function read(runtime) {
 }
 
 export function BinocularHud({ runtime }) {
+  const observatory = useObservatory(runtime, runtime.airportWatch?.airport?.id);
   const target = useFlyStore((s) => s.airportWatch?.mag ?? 1);
   const [s, setS] = useState(() => read(runtime));
   useEffect(() => {
@@ -69,7 +71,7 @@ export function BinocularHud({ runtime }) {
           ELV <b>{s.elevation >= 0 ? '+' : '−'}{Math.abs(s.elevation).toFixed(1)}°</b>
         </span>
       </div>
-      <div className="bino-readout" data-testid="binocular-readout" aria-live="polite">
+      {(!observatory || observatory.readouts) && <div className="bino-readout" data-testid="binocular-readout" aria-live="polite">
         <div className="bino-status">
           <i aria-hidden="true" />
           {status === 'lock' ? 'Locked' : status === 'acquire' ? 'Acquiring' : status === 'lost' ? 'Signal lost' : status === 'free' ? 'Free look' : 'Searching'}
@@ -87,7 +89,12 @@ export function BinocularHud({ runtime }) {
           <p className="bino-hint">Drag to search · click an aircraft to lock on</p>
         )}
       </div>
+      }
       <div className="bino-mag" role="group" aria-label="Magnification">
+        {observatory && <>
+          {observatory.supported && <span className="observatory-supported">Resting on rail</span>}
+          <button type="button" aria-pressed={observatory.readouts} onClick={() => w?.observatory?.setReadouts(!observatory.readouts)}>Readouts</button>
+        </>}
         <span className="bino-mag-now" data-testid="binocular-mag">{s.mag.toFixed(s.mag < 9.95 ? 1 : 0)}×</span>
         {VIEW.optics.steps.map((m, i) => (
           <button key={m} type="button" aria-pressed={Math.abs(target - m) < 0.05} onClick={() => w?.setMagnification(m)} title={`${m}× (${i + 1})`}>

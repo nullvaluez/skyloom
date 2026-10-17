@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildLoungeRoom } from '../lib/fly/lounge/room-build.js';
-import { BAKE_BUCKETS, FLOOR_RECT, encodeBake, geometrySignature, skipsVertexAO } from '../lib/fly/lounge/room-ao.js';
+import { BAKE_BUCKETS, FLOOR_RECT, UPPER_FLOOR_RECT, encodeBake, geometrySignature, skipsVertexAO } from '../lib/fly/lounge/room-ao.js';
 import { buildTriBvh } from './_tri-bvh.mjs';
 
 const arg = (name, fallback) => {
@@ -30,13 +30,14 @@ const FLOOR_RAYS = arg('floor-rays', 64);
 const OBJECT_RANGE = 0.42; // metres: crevices and contact
 const FLOOR_RANGE = 0.85; // metres: the soft pool under a seat or table
 
+const variant = process.argv.includes('--pier') ? 'pier' : 'classic';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // --out writes elsewhere (scripts/verify-lounge-walk.mjs --bake compares a fresh bake with the shipped file).
 const outArg = process.argv.indexOf('--out');
-const out = outArg > 0 && process.argv[outArg + 1] ? path.resolve(process.argv[outArg + 1]) : path.join(root, 'public/models/lounge-ao-v1.bin');
+const out = outArg > 0 && process.argv[outArg + 1] ? path.resolve(process.argv[outArg + 1]) : path.join(root, variant === 'pier' ? 'public/models/lounge-ao-pier-v1.bin' : 'public/models/lounge-ao-v1.bin');
 
 const t0 = performance.now();
-const room = buildLoungeRoom();
+const room = buildLoungeRoom({ variant });
 const buckets = room.buckets;
 
 // ---------------------------------------------------------------------------
@@ -115,10 +116,20 @@ for (let j = 0; j < h; j++) {
     floor[j * w + i] = Math.max(0, Math.min(255, Math.round(ao * 255)));
   }
 }
+let upperFloor = null;
+if (variant === 'pier') {
+  const r = UPPER_FLOOR_RECT;
+  upperFloor = new Uint8Array(r.w * r.h);
+  for (let j = 0; j < r.h; j++) for (let i = 0; i < r.w; i++) {
+    const x = r.x0 + ((i + 0.5) / r.w) * (r.x1 - r.x0), z = r.z0 + ((j + 0.5) / r.h) * (r.z1 - r.z0);
+    const ao = occlusion(x, 4.616, z, 0, 1, 0, floorDirs, FLOOR_RANGE, hash(x, 4.6, z));
+    upperFloor[j * r.w + i] = Math.max(0, Math.min(255, Math.round(ao * 255)));
+  }
+}
 const t2 = performance.now();
 
 const signature = geometrySignature(buckets);
-fs.writeFileSync(out, Buffer.from(encodeBake(signature, vertexAO, floor)));
+fs.writeFileSync(out, Buffer.from(encodeBake(signature, vertexAO, floor, upperFloor)));
 let sum = 0;
 for (const v of floor) sum += v;
 console.log(`lounge AO: ${triCount} triangles, ${baked}/${vertexTotal} vertices baked (${((t1 - t0) / 1000).toFixed(1)} s), floor ${w}x${h} (${((t2 - t1) / 1000).toFixed(1)} s, mean ${(sum / floor.length / 255).toFixed(3)})`);

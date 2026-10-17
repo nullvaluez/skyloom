@@ -46,11 +46,11 @@ registerHooks({
 });
 const { ShaderLib } = await import('three');
 const { createAirportLounge } = await import('../lib/fly/airport-lounge.js');
-const { LOUNGE_ROOM, LOUNGE_BUDGETS, ROOM_LOOK } = await import('../lib/fly/observation-config.js');
+const { LOUNGE_ROOM, LOUNGE_PIER_ROOM, LOUNGE_BUDGETS, ROOM_LOOK } = await import('../lib/fly/observation-config.js');
 const { roomMapBytes } = await import('../lib/fly/lounge/room-textures.js');
 const { BOARD_CANVAS, status } = await import('../lib/fly/lounge/lounge-board.js');
 const { probeBytes } = await import('../lib/fly/lounge/lounge-probe.js');
-const { decodeBake, geometrySignature, applyVertexAO, FLOOR_RECT, AO_URL } = await import('../lib/fly/lounge/room-ao.js');
+const { decodeBake, geometrySignature, applyVertexAO, FLOOR_RECT, UPPER_FLOOR_RECT, AO_URL } = await import('../lib/fly/lounge/room-ao.js');
 const { MAX_LIGHTS, MAX_SHADOWS, FIXTURE_TABLE } = await import('../lib/fly/lounge/room-shading.js');
 
 // A 2D canvas stand-in: every call is a no-op; gradients and text metrics exist.
@@ -63,9 +63,10 @@ const doc = { createElement: () => ({ getContext: ctx2d }) };
 let checks = 0;
 const check = (name, fn) => { fn(); checks++; console.log('PASS ' + name); };
 const MiB = 1024 * 1024;
-const B = LOUNGE_BUDGETS.room;
+const variant = process.argv.includes('--pier') ? 'pier' : 'classic';
+const B = variant === 'pier' ? { ...LOUNGE_BUDGETS.room, triangles: 140000 } : LOUNGE_BUDGETS.room;
 
-const room = createAirportLounge({ document: doc });
+const room = createAirportLounge({ document: doc, variant });
 const drawables = room.group.children.filter((o) => o.isMesh);
 const triangles = (g) => (g.index ? g.index.count : g.attributes.position.count) / 3;
 
@@ -77,7 +78,7 @@ for (const m of drawables) {
   if (m.geometry.index) geometryBytes += m.geometry.index.array.byteLength;
 }
 const textureBytes = roomMapBytes() + probeBytes(ROOM_LOOK.probeSize)
-  + BOARD_CANVAS.width * BOARD_CANVAS.height * 4 * (4 / 3) + FLOOR_RECT.w * FLOOR_RECT.h * (4 / 3)
+  + BOARD_CANVAS.width * BOARD_CANVAS.height * 4 * (4 / 3) + (FLOOR_RECT.w * FLOOR_RECT.h + (variant === 'pier' ? UPPER_FLOOR_RECT.w * UPPER_FLOOR_RECT.h : 0)) * (4 / 3)
   + FIXTURE_TABLE.width * FIXTURE_TABLE.height * 16;
 check(`draws ${drawables.length} <= ${B.draws} (room buckets + boards + glass + steam)`, () => assert.ok(drawables.length <= B.draws));
 check(`triangles ${tris} <= ${B.triangles}`, () => assert.ok(tris <= B.triangles));
@@ -97,8 +98,8 @@ check('every geometry attribute is finite, every bound is real', () => {
 });
 
 // --- 3. envelope and glazing contract -------------------------------------------
-check('the room stays inside LOUNGE_ROOM.envelope', () => {
-  const e = LOUNGE_ROOM.envelope;
+check('the room stays inside its variant envelope', () => {
+  const e = variant === 'pier' ? LOUNGE_PIER_ROOM.envelope : LOUNGE_ROOM.envelope;
   for (const m of drawables) {
     m.geometry.computeBoundingBox();
     const { min, max } = m.geometry.boundingBox;
@@ -113,7 +114,16 @@ check('the glazing sits on the contract (front plane, cant, extent, roof strip, 
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i), k = kind.getX(i);
     seen.add(k);
-    if (k === 0) {
+    if (variant === 'pier' && y >= LOUNGE_PIER_ROOM.upper.glazing.y0 - 0.006) {
+      const u = LOUNGE_PIER_ROOM.upper.glazing;
+      assert.ok(y >= u.y0 - 0.006 && y <= u.y1 + 0.006, 'upper glazing height');
+      if (k === 2) assert.ok(Math.abs(x - u.halfWidth) < 0.006 && z >= u.frontZ - 0.006 && z <= u.backZ + 0.006, 'upper east glass');
+      else if (z > 14) assert.ok(Math.abs(z - u.backZ) < 0.006 && Math.abs(Math.abs(x) - u.halfWidth) < 0.006, 'upper rear glass');
+      else assert.ok(Math.abs(z - u.frontZ) < 0.006 && (Math.abs(x - u.frontX0) < 0.006 || Math.abs(x - u.frontX1) < 0.006), 'upper front glass');
+    } else if (variant === 'pier' && z > 14) {
+      assert.ok(Math.abs(z - LOUNGE_PIER_ROOM.backGlass.z) < 0.006);
+      assert.ok(Math.abs(Math.abs(x) - LOUNGE_PIER_ROOM.backGlass.halfWidth) < 0.006);
+    } else if (k === 0) {
       // front: z + y * cant = baseZ + baseY * cant (the pane sits <= 5 mm outside the fins)
       assert.ok(Math.abs(z + y * cant - (G.baseZ + G.baseY * cant)) < 0.006, `front plane ${x},${y},${z}`);
       assert.ok(Math.abs(Math.abs(x) - G.halfWidth) < 1e-6 && y >= G.baseY - 1e-6 && y <= G.topY + 1e-6, `front extent ${x},${y}`);
@@ -127,7 +137,7 @@ check('the glazing sits on the contract (front plane, cant, extent, roof strip, 
 });
 check(`fixtures fit the shader: ${room.fixtures.lights} practicals <= ${MAX_LIGHTS}, ${room.fixtures.shadows} shadow boxes <= ${MAX_SHADOWS}`, () => {
   assert.ok(room.room.practicals.length <= MAX_LIGHTS && room.room.shadows.length <= MAX_SHADOWS);
-  const e = LOUNGE_ROOM.envelope;
+  const e = variant === 'pier' ? LOUNGE_PIER_ROOM.envelope : LOUNGE_ROOM.envelope;
   for (const l of room.room.practicals) {
     const p = l.type === 'line' ? l.a : l.p;
     assert.ok(p[0] > e.minX && p[0] < e.maxX && p[1] > 0 && p[1] < e.maxY && p[2] > e.minZ && p[2] < e.maxZ, JSON.stringify(l));
@@ -162,13 +172,19 @@ check('the room patch applies to three\'s shader sources, keeps the cascade anch
 
 // --- 5. the AO bake matches the geometry ----------------------------------------------
 check('the offline AO bake matches the room geometry (else: node scripts/build-lounge-ao.mjs)', () => {
-  const file = fileURLToPath(new URL('../public' + AO_URL, import.meta.url));
+  const file = fileURLToPath(new URL('../public' + (variant === 'pier' ? '/models/lounge-ao-pier-v1.bin' : AO_URL), import.meta.url));
   const bytes = fs.readFileSync(file);
   const bake = decodeBake(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
   assert.ok(bake, 'bake parses');
   assert.equal(bake.signature, geometrySignature(room.room.buckets), 'bake signature');
   assert.ok(applyVertexAO(room.room.buckets, bake), 'per-vertex AO applies');
   assert.ok(room.attachAO(bake), 'the resource attaches the bake');
+  if (variant === 'pier') {
+    assert.equal(bake.upperFloor?.w, 512); assert.equal(bake.upperFloor?.h, 160);
+    const atlas = room.uniforms.uLoungeFloorAO.value;
+    assert.equal(atlas.image.width, 512); assert.equal(atlas.image.height, 512);
+    assert.equal(atlas.image.data.length, 512 * 512);
+  }
 });
 
 // --- 6. the boards ---------------------------------------------------------------------

@@ -15,6 +15,7 @@
 // StrictMode-safe (effects run twice in dev): the resource is created in
 // useMemo, every effect undoes exactly what it did, and dispose() releases GPU
 // resources only (R3F owns the parenting through <primitive>).
+import { ObservatoryInstruments } from './ObservatoryInstruments';
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Matrix4, Scene, Vector3, WebGLRenderTarget } from 'three';
@@ -28,7 +29,13 @@ import { roomVariant } from '@/lib/fly/lounge/room-plan';
 import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
 import { getR25Sky } from '@/lib/fly/r25-sky';
 import { toSceneDir } from '@/lib/fly/true-scale';
-import { LOUNGE_ROOM, ROOM_LOOK } from '@/lib/fly/observation-config';
+import { ROOM_LOOK } from '@/lib/fly/observation-config';
+import { cinemaOn } from '@/lib/fly/cinema-policy';
+import { isMobileGraphicsClass } from '@/lib/fly/device-class';
+import { reachableCinemaCascades } from '@/lib/fly/cinema-profile-prewarm';
+import { invalidateRoomProfiles, warmRoomProfiles } from '@/lib/fly/lounge/room-prewarm';
+import { createRoomWarmLifecycle } from '@/lib/fly/lounge/room-lifecycle.mjs';
+import { compileSceneAsync } from '@/lib/fly/compile-scene-safe';
 
 const _key = new Vector3();
 const _view = new Vector3();
@@ -43,42 +50,91 @@ function overlayWarmScene() {
   return _overlayWarm;
 }
 
-function Room({ runtime }) {
+function Room({ runtime, variant }) {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
-  const resource = useMemo(() => createAirportLounge(), []);
+  const resource = useMemo(() => createAirportLounge({ variant }), [variant]);
   const probe = useMemo(() => new InteriorProbe(ROOM_LOOK.probeSize), []);
   const st = useRef(null);
   if (!st.current) {
+    const lifetime = createRoomWarmLifecycle();
     st.current = {
       maps: false, warm: 'pending', warmRT: null, exposure: 0, hidden: false, probeAt: -Infinity,
       probeKey: null, probeDirty: true, shade: {}, inverse: new Matrix4(), started: performance.now(),
+      lifetime, programWarm: lifetime.state,
     };
   }
 
   // GPU-baked surface maps, attached before the cascade rig or the prewarm
   // ever see the materials.
   useLayoutEffect(() => {
-    const baked = bakeRoomTextures(gl);
-    resource.attachMaps(baked.maps);
-    st.current.maps = true;
-    st.current.warm = 'pending';
-    st.current.probeDirty = true;
-    st.current.textureBytes = baked.bytes;
-    return () => baked.dispose();
-  }, [gl, resource]);
+    const state = st.current, life = state.lifetime;
+    life.activate();
+    let baked = null;
+    const rebuild = ({ preserveReveal = false } = {}) => {
+      life.reset('texture-bake', { preserveReveal });
+      const token = life.current();
+      state.maps = false; state.warm = 'pending';
+      state.programWarm.textureStatus = 'baking';
+      // attachMaps replaces/disposes live materials, so it must follow any
+      // pending shader poll which still owns those material programs.
+      return life.afterPending().then(() => {
+        if (!life.valid(token) || state.contextLost) return;
+        let next;
+        try {
+          next = bakeRoomTextures(gl);
+          resource.attachMaps(next.maps);
+          baked?.dispose(); baked = next;
+          state.maps = true; state.textureBytes = next.bytes;
+          state.programWarm.textureStatus = 'ready';
+          state.probeDirty = true; state.probeKey = null;
+        } catch (error) {
+          next?.dispose(); baked?.dispose(); baked = null;
+          // An explicit reduced entry can still show the original untextured
+          // material path. Keep the failed bake truthful and retryable.
+          resource.attachMaps({});
+          state.textureBytes = 0; state.warm = 'failed';
+          state.programWarm.textureStatus = 'failed';
+          life.fail(error, 'texture-bake-error');
+        }
+      });
+    };
+    state.rebuildMaps = rebuild;
+    const lost = () => {
+      state.contextLost = true; state.maps = false; state.warm = 'pending';
+      life.reset('context-lost');
+      invalidateRoomProfiles(gl);
+    };
+    const restored = () => {
+      state.contextLost = false;
+      invalidateRoomProfiles(gl);
+      rebuild();
+    };
+    gl.domElement.addEventListener('webglcontextlost', lost);
+    gl.domElement.addEventListener('webglcontextrestored', restored);
+    rebuild();
+    return () => {
+      gl.domElement.removeEventListener('webglcontextlost', lost);
+      gl.domElement.removeEventListener('webglcontextrestored', restored);
+      state.rebuildMaps = null;
+      life.deactivate(() => {
+        resource.dispose(); probe.dispose();
+        state.warmRT?.dispose(); state.warmRT = null;
+      }).then(() => baked?.dispose());
+    };
+  }, [gl, resource, probe]);
 
   // The offline AO bake (fetched once per session).
   useEffect(() => {
     let live = true;
-    loadBake().then((bake) => {
+    loadBake(variant).then((bake) => {
       if (!live || !bake) return;
       const ok = resource.attachAO(bake);
       st.current.probeDirty = true;
       if (!ok && process.env.NODE_ENV === 'development') console.warn('[lounge] AO bake does not match the room geometry: run node scripts/build-lounge-ao.mjs');
     });
     return () => { live = false; };
-  }, [resource]);
+  }, [resource, variant]);
 
   // Glass and steam draw after the cloud composite.
   useEffect(() => {
@@ -89,30 +145,33 @@ function Room({ runtime }) {
 
   // Indoor fixes read this (PrecipLayer, the cloud composite, the N8AO rig).
   useEffect(() => {
-    const publish = { active: false, inverse: st.current.inverse, envelope: LOUNGE_ROOM.envelope, aoRadius: ROOM_LOOK.ao.radius, aoIntensity: ROOM_LOOK.ao.intensity, weight: 0 };
+    const state = st.current;
+    const publish = { active: false, shown: false, opacity: 0, inverse: state.inverse, envelope: roomVariant(variant).envelope, aoRadius: ROOM_LOOK.ao.radius, aoIntensity: ROOM_LOOK.ao.intensity, weight: 0,
+      programWarm: state.programWarm,
+      bypassWarm: (reason) => state.lifetime.bypass(reason),
+      retryWarm() {
+        if (!['failed', 'bypassed'].includes(state.programWarm.status)) return false;
+        if (state.programWarm.textureStatus === 'failed' || !state.maps) state.rebuildMaps?.({ preserveReveal: true });
+        else { state.lifetime.reset('retry', { preserveReveal: true }); state.warm = 'pending'; }
+        return true;
+      },
+    };
     runtime.loungeRoom = publish;
     return () => {
       if (runtime.loungeRoom === publish) delete runtime.loungeRoom;
       runtime.loungeExposureStops = 0;
     };
-  }, [runtime]);
-
-  // GPU resources only.
-  useEffect(() => () => {
-    resource.dispose();
-    probe.dispose();
-    st.current.warmRT?.dispose();
-    st.current.warmRT = null;
-  }, [resource, probe]);
+  }, [runtime, variant]);
 
   useFrame((frame, dt) => {
     const s = st.current;
     const w = runtime.airportWatch, seat = w?.seat;
     const group = resource.group;
     const pub = runtime.loungeRoom;
+    if (pub) pub.instrumentMaterial = resource.materials.metal;
     if (!seat || !w.active) {
       group.visible = false;
-      if (pub) pub.active = false;
+      if (pub) { pub.active = false; pub.shown = false; pub.opacity = 0; }
       return;
     }
     const camera = frame.camera;
@@ -150,27 +209,45 @@ function Room({ runtime }) {
     // Prewarm: once the maps are in and the cascade rig (when one runs) has
     // adopted every lit material (it adopts hidden objects too), compile the
     // room under a render target so the program keys match the composer's
-    // (linear, no tone mapping). The room stays hidden until its programs
-    // are ready — a first draw never compiles — with a timeout as a backstop.
-    if (s.maps && s.warm === 'pending') {
+    // (linear, no tone mapping). Also retain the reachable cascade/light-count
+    // permutations: governor transitions must not compile the room mid-walk.
+    // The shared arrival cap/explicit reduced entry owns any degraded reveal;
+    // a failed compile is not silently relabelled as a successful warm.
+    if (s.maps && s.warm === 'pending' && !s.contextLost) {
+      const store = useFlyStore.getState();
+      const cinematic = cinemaOn(store);
       const csm = runtime.cinemaShadows?.cascades > 0;
       const adopted = !csm || resource.litMaterials().every((m) => m.customProgramCacheKey().includes('cinema-csm'));
-      if (adopted) {
+      if (adopted && (!cinematic || (scene.environment && runtime.cinemaShadows))) {
         s.warm = 'running';
+        const warm = s.programWarm;
+        const parallel = gl.extensions.has('KHR_parallel_shader_compile');
+        warm.parallel = parallel;
+        warm.profileStatus = cinematic && !parallel ? 'unsupported' : 'compiling';
+        warm.cascadeCounts = cinematic && parallel ? reachableCinemaCascades({ preset: store.qualityPreset, phone: isMobileGraphicsClass() }) : [];
         s.warmRT ??= new WebGLRenderTarget(1, 1);
-        const prev = gl.getRenderTarget();
-        let job;
-        try {
-          gl.setRenderTarget(s.warmRT);
-          job = Promise.all([gl.compileAsync(group, camera, scene), gl.compileAsync(resource.glass.mesh, camera, overlayWarmScene()), gl.compileAsync(resource.steam.mesh, camera, overlayWarmScene())]);
-        } finally {
-          gl.setRenderTarget(prev);
-        }
-        job.then(() => { if (st.current === s) s.warm = 'done'; }, () => { if (st.current === s) s.warm = 'done'; });
+        s.lifetime.run(() => {
+          const prev = gl.getRenderTarget(), jobs = [];
+          try {
+            gl.setRenderTarget(s.warmRT);
+            const profiles = cinematic && parallel ? warmRoomProfiles({ gl, camera, scene, resource, variant, cascadeCounts: warm.cascadeCounts }) : null;
+            if (profiles) jobs.push(profiles.promise);
+            jobs.push(compileSceneAsync(gl, group, camera, scene), compileSceneAsync(gl, resource.glass.mesh, camera, overlayWarmScene()), compileSceneAsync(gl, resource.steam.mesh, camera, overlayWarmScene()));
+          } catch (error) { jobs.push(Promise.reject(error)); }
+          finally { gl.setRenderTarget(prev); }
+          return Promise.allSettled(jobs).then((results) => {
+            const failed = results.find((result) => result.status === 'rejected');
+            if (failed) throw failed.reason;
+          });
+        }, () => {
+          s.warm = 'done';
+          if (warm.profileStatus !== 'unsupported') warm.profileStatus = 'ready';
+        }, () => { s.warm = 'failed'; });
       }
     }
-    const ready = s.warm === 'done' || performance.now() - s.started > ROOM_LOOK.prewarmTimeoutMs;
+    const ready = s.lifetime.canShow();
     const shown = !!w.validated && !s.hidden && ready;
+    if (pub) { pub.shown = shown; pub.opacity = 1 - fade; }
     group.visible = shown;
     resource.uniforms.uLoungeFade.value = fade;
     resource.board.mesh.visible = fade < 0.5; // on the back wall: never in a binocular view
@@ -182,7 +259,8 @@ function Room({ runtime }) {
       toSceneDir(_key.set(-Math.sin(az) * c, sin, Math.cos(az) * c), _key);
     }
     const time = (performance.now() - s.started) / 1000;
-    const shade = updateRoomShading(resource.uniforms, { group, camera, env, sun: runtime.sun, keyScene: _key, time }, s.shade);
+    s.nightWatch = ease(s.nightWatch ?? 0, w.observatory?.night ? 1 : 0, dt, 0.7);
+    const shade = updateRoomShading(resource.uniforms, { group, camera, env, sun: runtime.sun, keyScene: _key, time, nightWatch: s.nightWatch }, s.shade);
 
     // Exposure: an eased bias so the interior reads while the outside stays
     // bright (SessionRecovery applies runtime.loungeExposureStops).
@@ -218,6 +296,7 @@ function Room({ runtime }) {
       exposure,
       rain: wx?.precip === 'rain' ? Math.min(1, wx.precipT ?? 0) : 0,
       night: shade.night,
+      nightWatch: s.nightWatch,
       lens: 1 - fade,
       time,
       roomRad: u.uLoungeRoomRad.value,
@@ -235,20 +314,22 @@ function Room({ runtime }) {
 
     // Interior reflection probe: refresh when the light changed enough.
     if (s.warm === 'done') {
-      const key = `${Math.round(shade.practical * 25)}|${Math.round(shade.day * 20)}`;
+      const plan = roomVariant(variant);
+      const upperProbe = plan.upper && w.eyeLocal.y >= plan.upper.floorY + 0.5;
+      const pe = upperProbe ? plan.upper.probeEye : plan.probeEye;
+      const key = `${Math.round(shade.practical * 25)}|${Math.round(shade.day * 20)}|${Math.round(s.nightWatch * 10)}|${upperProbe ? 1 : 0}`;
       const now = performance.now();
       if ((s.probeDirty || key !== s.probeKey) && now - s.probeAt > ROOM_LOOK.probeMinMs) {
         // The glass box-projects the probe from the room's probe eye. Seated at
         // the window that is the live eye (as always); a walking observer
         // (LOUNGE_WALK) leaves it at the room's probe eye (room-plan.js roomVariant).
-        if (!w?.walk || (w.posture === 'seated' && w.seatId === 'window')) _eye.setFromMatrixPosition(camera.matrixWorld);
+        if (variant !== 'pier' && (!w?.walk || (w.posture === 'seated' && w.seatId === 'window'))) _eye.setFromMatrixPosition(camera.matrixWorld);
         else {
-          const pe = roomVariant(w.site?.variant).probeEye;
           group.updateMatrixWorld();
           _eye.set(pe[0], pe[1], pe[2]).applyMatrix4(group.matrixWorld);
         }
         const objects = [...resource.meshes, resource.board.mesh];
-        probe.capture(gl, scene, group, objects, _eye);
+        probe.capture(gl, scene, group, objects, _eye, pe);
         s.probeAt = now;
         s.probeKey = key;
         s.probeDirty = false;
@@ -264,6 +345,7 @@ function Room({ runtime }) {
 }
 
 export function AirportLounge({ runtime }) {
-  const active = useFlyStore((s) => !!s.airportWatch);
-  return active ? <Room runtime={runtime} /> : null;
+  const snapshot = useFlyStore((s) => s.airportWatch);
+  const variant = runtime.airportWatch?.site?.variant ?? 'classic';
+  return snapshot ? <><Room key={variant} runtime={runtime} variant={variant} /><ObservatoryInstruments runtime={runtime} /></> : null;
 }

@@ -10,18 +10,18 @@ import {
   InstancedBufferAttribute,
   InstancedMesh,
   MeshBasicMaterial,
-  MeshStandardMaterial,
   Object3D,
   PlaneGeometry,
   Vector2,
   Vector3,
 } from 'three';
-import { GLOBE, NAV_LIGHTS, SKY, SKY_OVERLAYS, TOY, TRAFFIC, TRAFFIC_HORIZON, WORLD } from '@/lib/fly/fly-constants';
+import { GLOBE, SKY, SKY_OVERLAYS, TOY, TRAFFIC, TRAFFIC_HORIZON, WORLD } from '@/lib/fly/fly-constants';
 import { buildArchetypeGeometries } from '@/lib/fly/traffic-geometries';
 import { loadTrafficGeometries } from '@/lib/fly/model-loader';
 import { MODEL_SURFACE_ROLES } from '@/lib/fly/assets';
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
-import { applyBendAirAnchor, applyNavLights, applyOverlayCloudGate, horizonFade, setNavTime } from '@/lib/fly/toy-world/world-bend';
+import { applyBendAirAnchor, applyOverlayCloudGate, horizonFade, setNavTime } from '@/lib/fly/toy-world/world-bend';
+import { createTrafficNavMaterial } from '@/lib/fly/world-material-factories';
 import { useFlyStore } from '@/stores/fly-store';
 import { DetailedTraffic } from '@/lib/fly/detailed-traffic';
 import { projectModelMatrix } from '@/lib/fly/render-scale';
@@ -142,21 +142,13 @@ export function TrafficLayer({ runtime, flight, origin }) {
         // classification-tinted.
         const painted = geometry.userData?.bakedColors === true;
         // Round 8: glossier hull (0.35/0.5) — the moonlit night reads specular
-        const material = new MeshStandardMaterial({
-          color: 0xffffff,
-          roughness: 0.35,
-          metalness: 0.5,
-          flatShading: true,
-          vertexColors: painted,
-        });
         // Altitude-aware bend, evaluated at the INSTANCE anchor: grounded
         // traffic hugs the drawn terrain, airborne traffic caps its drop so
         // it never sinks below eye level — and the whole model translates
         // rigidly (per-vertex air-drop sheared rim objects vertically).
-        applyBendAirAnchor(material, GLOBE.trafficBend);
         // Round 8: baked nav-light emissive (aEmissive from the GLB bake;
         // primitive boot geometries lack it → reads 0 → dark, safe)
-        applyNavLights(material, NAV_LIGHTS);
+        const material = createTrafficNavMaterial(painted);
         const mesh = new InstancedMesh(geometry, material, TRAFFIC.maxPerArchetype);
         mesh.instanceMatrix.setUsage(DynamicDrawUsage);
         mesh.count = 0;

@@ -1,5 +1,11 @@
 # Observation Lounge — plan and record
 
+> **Living Observatory implementation (2026-10-17):** the two-sided pier and
+> instruments are implemented behind separate, default-off flags. See the
+> implementation record at the end of this file for current evidence and
+> remaining promotion gates. Earlier performance and owner decisions below
+> describe earlier versions, not approval of this expansion.
+
 > **Status (2026-10-13): W0 and all five W1 workstreams are merged on `main`,
 > with an integration pass on top (see Record).** Promoted the same day: desktop
 > players get "Watch an airport" with no URL parameters (phones excluded).
@@ -665,10 +671,11 @@ tree found one more walk defect and two instrument problems.
   view after the binoculars. The CPU profile puts the time in
   `getProgramInfoLog`, a synchronous wait for a WebGL program link. Real Chrome
   keeps a shader cache, so a returning player should not see it; a first-time
-  player may. The material or materials are not identified yet. The likely
-  fixes are a warm-up `compileAsync` of the lounge's programs behind the
-  arrival veil, and `renderer.debug.checkShaderErrors = false` outside
-  development.
+  player may. **2026-10-17 update:** the terrain program was identified;
+  warm-up twins missed cascade adoption and the live material's transparency
+  key. Those mismatches are corrected in the Living Observatory worktree.
+  Shader-error checks remain enabled. See [the new measurement record](FLY_LIVING_OBSERVATORY.md)
+  for cold-entry evidence and remaining performance gates.
 
 - A contrail can still bend at a real sharp turn (the step after a stall
   frame is fixed, `380ac36`).
@@ -687,3 +694,26 @@ tree found one more walk defect and two instrument problems.
   `alt_geom`; contrail drift uses surface wind × 1.8 (no upper-air wind).
 - Runway markings are foreshortened from a 22 m eye at 0.5–1.5 km
   (physically right; the binoculars resolve them).
+
+## Living Observatory — 2026-10-17 implementation
+
+Built from `main` at `9ba95e8` in the isolated `codex/living-observatory`
+worktree. The trailer checkout is untouched. The implementation extends the
+existing room, walk, watch, selection, airport placement and audio systems.
+Both `LOUNGE_PIER` and `LOUNGE_INSTRUMENTS` remain off by default; the existing
+desktop walk remains on. Review with `?flags=LOUNGE_PIER,LOUNGE_INSTRUMENTS`.
+
+The six connected features are the rear-glazed pier, live airport table,
+directional listening windows, standing binocular support rails, quiet
+window suggestions, and reversible session-local Night Watch lighting.
+Room instruments have equivalent HUD controls under **Instruments / I**.
+Selecting a table contact or asking for a direction never moves the camera
+or the observer. Rails raise free binoculars without acquiring a target;
+**Readouts** explicitly restores telemetry. Movement releases listening or
+support. The photo download action remains available.
+
+The implementation, provenance, exact resource counts, tests, rendered
+review, performance measurements and remaining release gates are recorded
+in [FLY_LIVING_OBSERVATORY.md](FLY_LIVING_OBSERVATORY.md). No backend, runtime
+dependency, new external provider, progression, or persistent discovery
+system is introduced. Owner visual signoff is a separate promotion gate.
