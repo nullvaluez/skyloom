@@ -165,8 +165,8 @@ const check = (arm, name, pass, detail) => {
       check(arm, 'Listening follows an ordinary drag look without moving the player', afterDial.observatory.listening.followsView && afterDial.observatory.listening.bearing !== beforeDial.observatory.listening.bearing && Math.abs(afterDial.yaw - beforeDial.yaw) > .01 && JSON.stringify(afterDial.eye) === JSON.stringify(beforeDial.eye));
       await page.getByRole('button', { name: 'Close window control', exact: true }).focus();
       await page.keyboard.press('w'); await settle(); const afterInput = await state();
-      check(arm, 'Focused window control does not start walking', afterInput.speed === 0 && JSON.stringify(afterInput.eye) === JSON.stringify(afterDial.eye));
-      check(arm, 'Muted instrument retains visual bearing and meter', !afterInput.sound && await page.locator('meter').count() === 1 && Number.isFinite(afterInput.observatory.listening.level));
+      check(arm, 'Focused window control keeps its instrument and does not start walking', afterInput.observatory.active === beforeDial.observatory.active && afterInput.speed === 0 && JSON.stringify(afterInput.eye) === JSON.stringify(afterDial.eye), { active: afterInput.observatory.active, speed: afterInput.speed, eye: afterInput.eye });
+      check(arm, 'Muted instrument retains visual bearing and meter', !afterInput.sound && await page.locator('meter').count() === 1 && Number.isFinite(afterInput.observatory.listening?.level), { sound: afterInput.sound, meters: await page.locator('meter').count(), listening: afterInput.observatory.listening });
       await page.keyboard.press('Escape'); await settle();
       check(arm, 'Escape closes window controls from keyboard focus', !(await state()).observatory.active && (await state()).active);
       await neutralFocus(); await page.keyboard.press('Enter'); await settle(); await neutralFocus();
@@ -197,6 +197,11 @@ const check = (arm, name, pass, detail) => {
         await position('back-listen'); await page.keyboard.press('Enter'); await settle();
         check(arm, 'Rear instrument activates from rear approach', (await state()).observatory.listening?.side === 'back');
         await page.screenshot({ path: path.join(out, `${arm}-rear-instrument.png`) });
+        await position('back-compass');
+        const activityControl = page.getByTestId('instrument-back-compass');
+        await activityControl.waitFor();
+        await activityControl.focus(); await page.keyboard.press('Enter'); await settle();
+        check(arm, 'Rear window activity remains keyboard accessible beside the rail', (await state()).observatory.active === 'back-compass');
         // One explicit ground-floor setup, then real held keyboard movement
         // for the entire stair ascent, landing, upper room and descent.
         await page.evaluate(() => {

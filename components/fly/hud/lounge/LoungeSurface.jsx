@@ -93,6 +93,15 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
       const s = useFlyStore.getState();
       const lower = e.key.toLowerCase();
       const walkKey = !!w.walk && (MOVE_KEYS[lower] || e.key === 'Shift');
+      // Focus inside an instrument belongs to its controls. A movement key
+      // must not silently release the instrument (or let the next Escape
+      // clear the aircraft selection). Arrow defaults can still scroll it.
+      if (e.target?.closest?.('[data-overlay="observatory"]') && (walkKey || arrows[e.key])) {
+        releaseMove();
+        e.stopPropagation();
+        if (walkKey) e.preventDefault();
+        return;
+      }
       if (covered(s)) {
         // A panel is up: walking waits, but its keys never reach the flight input.
         if (walkKey) {
