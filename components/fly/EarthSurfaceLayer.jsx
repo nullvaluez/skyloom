@@ -25,10 +25,11 @@ export function EarthSurfaceLayer({ runtime }) {
     api.init().catch(()=>{engine.stats.failed++;});
     return()=>{ref.current=null;delete runtime.retryEarthSurface;removeEarthSurface(runtime,engine.stats);engine.airports.dispose();engine.forest.dispose();engine.scenery.dispose();engine.dispose();worker.terminate();};
   },[runtime]);
-  useFrame(()=>{
+  useFrame(({gl})=>{
     const engine=ref.current;
     if(!engine)return;
     engine.update(runtime,performance.now()/1000);
+    engine.flushAtlases(gl);
     engine.scenery.update(engine,runtime,performance.now()/1000);
     engine.forest.update(engine,runtime,performance.now()/1000);
     engine.airports.update(engine,runtime);

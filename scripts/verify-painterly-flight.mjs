@@ -128,15 +128,16 @@ await check('paint marks tile exactly, remain restrained, and use finite normals
   }
 });
 await check('packed classification preserves every categorical texel and toroidal slot without resampling',()=>{
-  const atlas=makeEarthClassAtlas(EARTH_CLASS_LAYOUT.width,EARTH_CLASS_LAYOUT.height),ctx={classAtlas:atlas};
+  // The engine packs the appearance atlas beside the identities; the mock carries both.
+  const atlas=makeEarthClassAtlas(EARTH_CLASS_LAYOUT.width,EARTH_CLASS_LAYOUT.height),ctx={classAtlas:atlas,appearanceAtlas:makeEarthAtlas(EARTH_CLASS_LAYOUT.width,EARTH_CLASS_LAYOUT.height)};
   const expected=new Uint8Array(atlas.image.data.length);
   for(let i=0;i<3;i++){
     const [ox,oy,width]=EARTH_CLASS_LAYOUT.bands[i],size=width/4;
-    const band={i,size,classTexture:makeEarthClassAtlas(width)};
+    const band={i,size,classTexture:makeEarthClassAtlas(width),texture:makeEarthAtlas(width)};
     for(let p=0;p<width*width;p++)band.classTexture.image.data[p]=(p*7+Math.floor(p/width)*3+i)%15;
     for(let slot=0;slot<16;slot++)EarthSurfaceEngine.prototype._packClassSlot.call(ctx,band,slot);
     for(let y=0;y<width;y++)for(let x=0;x<width;x++)expected[(oy+y)*EARTH_CLASS_LAYOUT.width+ox+x]=band.classTexture.image.data[y*width+x];
-    band.classTexture.dispose();
+    band.classTexture.dispose();band.texture.dispose();
   }
   assert.deepEqual(atlas.image.data,expected);assert.equal(atlas.image.data.length,1536*1024);atlas.dispose();
 });
@@ -158,13 +159,13 @@ await check('Classic appearance atlas restores byte-for-byte after a painterly r
   const size=256,mask={size,classes:new Uint8Array(size*size).fill(1),exclusion:new Uint8Array(size*size),blend:new Uint8Array(size*size).fill(255)};
   for(let y=0;y<size;y++)mask.classes.fill(14,y*size+128,(y+1)*size);
   const b={i:2,size,texture:makeEarthAtlas(size*4),classTexture:makeEarthClassAtlas(size*4),slots:Array.from({length:16},()=>({mask}))};
-  const ctx={paint:false,classAtlas:makeEarthClassAtlas(1024,1536),_packClassSlot:EarthSurfaceEngine.prototype._packClassSlot};
+  const ctx={paint:false,classAtlas:makeEarthClassAtlas(1024,1536),appearanceAtlas:makeEarthAtlas(1024,1536),_packClassSlot:EarthSurfaceEngine.prototype._packClassSlot};
   const write=()=>EarthSurfaceEngine.prototype._writeSlot.call(ctx,b,5,mask);
   write();const classic=new Uint8Array(b.texture.image.data),classes=new Uint8Array(mask.classes),blend=new Uint8Array(mask.blend);
   ctx.paint=true;write();assert.notDeepEqual(b.texture.image.data,classic);
   ctx.paint=false;write();assert.deepEqual(b.texture.image.data,classic);
   assert.deepEqual(mask.classes,classes);assert.deepEqual(mask.blend,blend);
-  b.texture.dispose();b.classTexture.dispose();ctx.classAtlas.dispose();
+  b.texture.dispose();b.classTexture.dispose();ctx.classAtlas.dispose();ctx.appearanceAtlas.dispose();
 });
 await check('painted forest keeps the evidence envelope and triangle budget at both LODs',()=>{
   for(const detail of [true,false]){

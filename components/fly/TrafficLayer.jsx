@@ -34,6 +34,17 @@ import { FLEET_VIEW } from '@/lib/fly/observation-config';
 import { getR25Sky } from '@/lib/fly/r25-sky';
 import { worldToSite } from '@/lib/fly/lounge-site';
 
+// Upload only the instances that will be drawn. A full-capacity upload of
+// every pool every frame was ~0.5 MB of buffer traffic for a handful of
+// aircraft. A zero-length range would mean "to the end", so an empty pool
+// uploads nothing (nothing past `count` is drawn).
+function uploadPrefix(attribute, used) {
+  if (!attribute || used <= 0) return;
+  attribute.clearUpdateRanges();
+  attribute.addUpdateRange(0, used * attribute.itemSize);
+  attribute.needsUpdate = true;
+}
+
 const _dummy = new Object3D();
 const _bufferSize = new Vector2();
 const _geoProbe = new Vector3();
@@ -433,8 +444,8 @@ export function TrafficLayer({ runtime, flight, origin }) {
 
     for (const mesh of meshes) {
       mesh.count = mesh._used;
-      mesh.instanceMatrix.needsUpdate = true;
-      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      uploadPrefix(mesh.instanceMatrix, mesh._used);
+      if (mesh.instanceColor) uploadPrefix(mesh.instanceColor, mesh._used);
     }
     const exposure = getR25Sky().exposure || 1;
     // GATE TO GATE: the player's own lights and tyre smoke join the shared
@@ -451,9 +462,9 @@ export function TrafficLayer({ runtime, flight, origin }) {
     runtime.fleetLights = lights.stats;
     runtime.fleetSmoke = { puffs: smoke.puffs.length, emitting: smoke.emitters.size };
     billboards.count = billboardsUsed;
-    billboards.instanceMatrix.needsUpdate = true;
-    if (billboards.instanceColor) billboards.instanceColor.needsUpdate = true;
-    billboards.geometry.attributes.aTrafficPresence.needsUpdate = true;
+    uploadPrefix(billboards.instanceMatrix, billboardsUsed);
+    if (billboards.instanceColor) uploadPrefix(billboards.instanceColor, billboardsUsed);
+    uploadPrefix(billboards.geometry.attributes.aTrafficPresence, billboardsUsed);
 
     if (process.env.NODE_ENV === 'development' && window.__flyStats) {
       window.__flyStats.horizonFaded = horizonFaded;

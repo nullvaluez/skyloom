@@ -80,7 +80,10 @@ useFlyStore.setState({mapStyle:'satellite',visuals:'enhanced',qualityTier:'high'
 const {createGovernor}=await import('../lib/fly/perf-governor.js');
 check('governor reduces effects before resolution or geographic tier',()=>{
  const changes=[],gov=createGovernor({dpr0:1,tier0:'high',applyDpr:()=>changes.push('dpr'),applyTier:()=>changes.push('tier'),applyEffects:v=>changes.push(v)});
- gov.force(-1,1);gov.force(-1,20);gov.force(-1,40);assert.deepEqual(changes,[1,2,3]);
+ gov.force(-1,1);gov.force(-1,20);gov.force(-1,40);
+ // DEVICE_TIERS.ladderOrder (shipped): effects that keep Ultra's three cascades
+ // go first, then render scale; cascade-dropping effect rungs wait for both.
+ assert.deepEqual(changes,[1,'dpr','dpr']);
 });
 const {resolveInitialSettings}=await import('../lib/fly/fly-settings.js');
 const {resolveInitialMapStyle}=await import('../lib/fly/map-style.js');

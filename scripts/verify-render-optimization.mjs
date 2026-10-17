@@ -10,6 +10,7 @@ const {isPhoneClass,isMobileGraphicsClass}=await import('../lib/fly/device-class
 const {useFlyStore}=await import('../stores/fly-store.js');
 const {resolveInitialSettings,autoTierCeiling}=await import('../lib/fly/fly-settings.js');
 const {createGovernor}=await import('../lib/fly/perf-governor.js');
+const {ladderOrderOn}=await import('../lib/fly/device-tiers.js');
 const {readReducedMotion,saveReducedMotion}=await import('../lib/fly/immersive.js');
 let count=0;
 async function check(name,run){await run();count++;console.log('PASS '+name);}
@@ -40,6 +41,15 @@ await check('fresh capable phone starts High; explicit Medium/Low and constraine
   stored.clear();browser({memory:2});resolveInitialSettings();assert.equal(useFlyStore.getState().qualityPreset,'medium');
   browser({memory:undefined,cores:6});window.localStorage.getItem=()=>{throw Error('blocked');};resolveInitialSettings();assert.equal(useFlyStore.getState().qualityPreset,'high');
 });
+await check('fresh desktop starts Ultra on the High scene tier; an old saved High lifts once, later picks are final',()=>{
+  browser({phone:false});stored=new Map();resolveInitialSettings();
+  assert.equal(useFlyStore.getState().qualityPreset,'ultra');assert.equal(useFlyStore.getState().qualityTier,'high');assert.equal(autoTierCeiling(),'high');
+  stored=new Map([['fly-quality-tier','high']]);resolveInitialSettings();
+  assert.equal(useFlyStore.getState().qualityPreset,'ultra');assert.equal(stored.get('fly-quality-tier'),'ultra');
+  stored.set('fly-quality-tier','high');resolveInitialSettings();assert.equal(useFlyStore.getState().qualityPreset,'high');
+  stored=new Map([['fly-quality-tier','medium']]);resolveInitialSettings();assert.equal(useFlyStore.getState().qualityPreset,'medium');
+  browser({phone:false});window.localStorage.getItem=()=>{throw Error('blocked');};resolveInitialSettings();assert.equal(useFlyStore.getState().qualityPreset,'ultra');
+});
 await check('tablets use mobile graphics without pretending to have a phone HUD; mouse laptops stay desktop',()=>{
   browser();window.screen={width:1024,height:1366};assert.equal(isPhoneClass(),false);assert.equal(isMobileGraphicsClass(),true);
   browser({phone:false});assert.equal(isMobileGraphicsClass(),false);
@@ -49,7 +59,7 @@ for(const phone of [false,true])for(const tier of ['high','medium','low'])await 
   const governor=createGovernor({dpr0:1.5,tier0:tier,applyDpr(){},applyTier(){},applyEffects(){}});
   let previous;
   for(const rung of governor.ladder){
-    const profile=resolveCinemaProfile({preset:tier,tier:rung.tier,phone,scale:rung.dpr,effectLevel:rung.effects});
+    const profile=resolveCinemaProfile({preset:tier,tier:rung.tier,phone,scale:rung.dpr,effectLevel:rung.effects,scaleDemotes:!ladderOrderOn()});
     if(previous&&rung.tier===previous.rung.tier&&rung.dpr===previous.rung.dpr){
       assert.notEqual(profile,previous.profile,'duplicate effect profile');
       assert.ok(profile.cloudSteps*profile.cloudScale**2<previous.profile.cloudSteps*previous.profile.cloudScale**2);
@@ -57,6 +67,14 @@ for(const phone of [false,true])for(const tier of ['high','medium','low'])await 
     previous={rung,profile};
   }
   if(phone)assert.equal(resolveCinemaProfile({phone,tier}).targetFps,60);
+});
+await check('desktop Ultra: the first rung lightens clouds and keeps all three cascades and full resolution',()=>{
+  browser({phone:false});useFlyStore.setState({mapStyle:'satellite',visuals:'enhanced',qualityPreset:'ultra',qualityTier:'high'});
+  const governor=createGovernor({dpr0:1.5,tier0:'high',applyDpr(){},applyTier(){},applyEffects(){}});
+  const [first,second]=governor.ladder,profile=r=>resolveCinemaProfile({preset:'ultra',tier:r.tier,scale:r.dpr,effectLevel:r.effects,scaleDemotes:!ladderOrderOn()});
+  assert.equal(profile(first).name,'ultra');assert.equal(second.dpr,first.dpr);assert.equal(profile(second).cascades,3);
+  assert.equal(profile(second).shadowSize,2048);assert.equal(profile(second).materialSize,1024);
+  assert.ok(profile(second).cloudSteps*profile(second).cloudScale**2<profile(first).cloudSteps*profile(first).cloudScale**2);
 });
 await check('steady 60 fps mobile does not degrade; sustained overload reduces effects first',()=>{
   browser();useFlyStore.setState({mapStyle:'satellite',visuals:'enhanced',qualityPreset:'high',qualityTier:'high'});

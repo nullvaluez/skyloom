@@ -6,7 +6,9 @@ import { COASTAL_WATER_GLSL } from '../lib/fly/coastal-water.js';
 // Execute the real surface GLSL, not a JS imitation of its arithmetic. The
 // capture deliberately excludes scene lighting so it can test normals at the
 // material-frame wrap and at footprints smaller/larger than a wave.
-const browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-gpu']});
+// Chrome on a GPU machine; the bundled Chromium (SwiftShader) elsewhere.
+const browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-gpu']})
+ .catch(()=>chromium.launch({headless:true,executablePath:process.env.FLY_CHROMIUM||undefined,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']}));
 try{
  const page=await browser.newPage();
  const result=await page.evaluate(glsl=>{
@@ -15,8 +17,10 @@ try{
   const shader=(type,text)=>{const s=gl.createShader(type);gl.shaderSource(s,text);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;};
   const program=gl.createProgram();
   gl.attachShader(program,shader(gl.VERTEX_SHADER,'#version 300 es\nin vec2 position;void main(){gl_Position=vec4(position,0.,1.);}'));
-  gl.attachShader(program,shader(gl.FRAGMENT_SHADER,'#version 300 es\nprecision highp float;\n#define texture2D texture\nout vec4 pixel;uniform vec2 offset;uniform float time,footprint;\n'+glsl+'\nvoid main(){vec3 field=seaSurface(offset+gl_FragCoord.xy*.5,time,footprint);pixel=vec4(field.yz*2.+.5,field.x,1.);}'));
+  gl.attachShader(program,shader(gl.FRAGMENT_SHADER,'#version 300 es\nprecision highp float;\n#define texture2D texture\nout vec4 pixel;uniform vec2 offset;uniform float time,footprint;\n'+glsl+'\nvoid main(){vec3 field=seaSurface(offset+gl_FragCoord.xy*.5,time,footprint);pixel=vec4(field.yz+.5,field.x*.5,1.);}'));
   gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));gl.useProgram(program);
+  // A fresh 8 m/s sea: the slope statistics follow the wind (Cox-Munk).
+  gl.uniform4f(gl.getUniformLocation(program,'uSeaState'),1,0,8,.0046);
   const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
   const a=gl.getAttribLocation(program,'position');gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);gl.disable(gl.DITHER);
   const draw=(x,z,time,footprint)=>{gl.uniform2f(gl.getUniformLocation(program,'offset'),x,z);gl.uniform1f(gl.getUniformLocation(program,'time'),time);gl.uniform1f(gl.getUniformLocation(program,'footprint'),footprint);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);const bytes=new Uint8Array(256*256*4);gl.readPixels(0,0,256,256,gl.RGBA,gl.UNSIGNED_BYTE,bytes);return bytes;};

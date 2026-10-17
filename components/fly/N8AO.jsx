@@ -94,6 +94,7 @@ import { N8AOPostPass, DepthType } from 'n8ao';
 import { DEPTH_PASS } from '@/lib/fly/fly-constants';
 import { cinemaOn } from '@/lib/fly/cinema-policy';
 import { cinemaAoDenoise } from '@/lib/fly/cinema-ao';
+import { withDirectComposite } from '@/lib/fly/n8ao-direct';
 
 // The exact source line DepthDownSample.js writes its chosen sample with. The
 // patch is anchored on it so an n8ao upgrade fails LOUDLY (fall back to
@@ -112,6 +113,7 @@ const _stats = {
   warm: null,
   gpuMs: 0, // n8ao's own EXT_disjoint_timer_query_webgl2 rolling average
   drawsPerFrame: null,
+  directComposite: null, // composited straight into the composer's output (no copy)
   proxyResyncs: 0, // how often the conventional projection had to be restored
   projZ: null, // live proof of which projection the AO is unprojecting with
 };
@@ -223,13 +225,19 @@ class FlyN8AOPass extends N8AOPostPass {
 
   render(renderer, inputBuffer, outputBuffer, deltaTime, stencilTest) {
     this._syncProxy();
-    if (this._drawProbe) {
-      const before = renderer.info.render.calls;
+    // Composite straight into the composer's output when it matches n8ao's
+    // own target (lib/fly/n8ao-direct.js): identical pixels, one fewer
+    // full-resolution copy per frame.
+    const direct = withDirectComposite(this, inputBuffer, outputBuffer, () => {
+      if (this._drawProbe) {
+        const before = renderer.info.render.calls;
+        super.render(renderer, inputBuffer, outputBuffer, deltaTime, stencilTest);
+        _stats.drawsPerFrame = renderer.info.render.calls - before;
+        return;
+      }
       super.render(renderer, inputBuffer, outputBuffer, deltaTime, stencilTest);
-      _stats.drawsPerFrame = renderer.info.render.calls - before;
-      return;
-    }
-    super.render(renderer, inputBuffer, outputBuffer, deltaTime, stencilTest);
+    });
+    _stats.directComposite = direct;
     if (this.debugMode) _stats.gpuMs = +(this.lastTime ?? 0).toFixed(3);
     _stats.projZ = +this.camera.projectionMatrix.elements[10].toFixed(7);
   }

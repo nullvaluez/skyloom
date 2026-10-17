@@ -37,6 +37,13 @@
 >   the actionable lock chip. Same day: the **Umbra**
 >   (`flying-wing`), an original stealth flying wing, is the 10th hangar
 >   aircraft (`scripts/build-flying-wing.mjs`; FLY_FLEET_AND_ADVENTURES.md).
+> - **Ultra, the sea and sooner buildings (2026-10-17, owner-requested, shipped
+>   on):** [FLY_ULTRA_SEA_BUILDINGS.md](FLY_ULTRA_SEA_BUILDINGS.md). Desktop
+>   starts at **Ultra** (High scene tier + Ultra effects; a new `ultra-balanced`
+>   first governor rung; native up to 2× DPR). The Enhanced sea is physically
+>   based behind `SEA_STATE` (on; `?flags=-SEA_STATE` is the old water). The
+>   terrain ground query is bucketed (26× faster building drape, identical
+>   answers), and surface-atlas changes upload slot-sized rectangles.
 > - **Pass rules:**
 >   - Work lands straight on `main`. Every look-changing item sits behind a
 >     TRUE EARTH flag block at the end of `lib/fly/fly-constants.js`, shipped

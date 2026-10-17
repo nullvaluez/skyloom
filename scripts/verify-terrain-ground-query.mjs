@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { Vector3, DoubleSide } from 'three';
+import { Vector3, DoubleSide, MeshBasicMaterial } from 'three';
 import { TileMap, TileSource, TileMesh, TileGeometry } from '../lib/fly/vendor/three-tile/index.js';
 import { TerrainGroundQuery } from '../lib/fly/terrain-ground-query.js';
 
@@ -15,7 +15,10 @@ function model(tile,bias=0){
     const a=y*n+x;indices.push(a,a+1,a+n,a+1,a+n+1,a+n);
   }
   const g=new TileGeometry().setAttributes({attributes:{position:{value:new Float32Array(pos),size:3},texcoord:{value:new Float32Array(uv),size:2},normal:{value:new Float32Array(normal),size:3}},indices:new Uint32Array(indices)},tile.z);
-  const mesh=new TileMesh(g);tile._model=mesh;tile.add(mesh);tile._maxZ=mesh.maxHeight;
+  // A material and its group, as the real tile loader provides. Without them
+  // both paths inspect zero triangles and every comparison is a vacuous
+  // miss-equals-miss.
+  const mesh=new TileMesh(g,[new MeshBasicMaterial()]);mesh.syncGroups();tile._model=mesh;tile.add(mesh);tile._maxZ=mesh.maxHeight;
   for(const material of mesh.material)material.side=DoubleSide;
   return mesh;
 }
@@ -26,12 +29,12 @@ for(let i=0;i<kids.length;i++){
   else {model(kids[i],i*120);leaves.push(kids[i]);}
 }
 map.updateMatrixWorld(true);
-let checked=0;
+let checked=0,hits=0;
 function compare(lon,lat){
   const raw=map.getLocalInfoFromGeo(new Vector3(lon,lat,0)),fast=query.sample(lon,lat);
   assert.notEqual(fast,undefined,'ordinary terrain must use specialized query');
   assert.equal(!!fast,!!raw,`hit mismatch ${lon},${lat}`);
-  if(raw){let tile=raw.object;while(tile&&!tile.isTile)tile=tile.parent;
+  if(raw){hits++;let tile=raw.object;while(tile&&!tile.isTile)tile=tile.parent;
     assert.ok(Math.abs(raw.location.z-fast.elev)<1e-6,`height differs ${raw.location.z} / ${fast.elev}`);
     assert.equal(fast.tileZ,tile.z);
   }checked++;
@@ -53,5 +56,6 @@ for(const t of leaves){for(const [x,y] of [[-.5,0],[.5,0],[0,-.5],[0,.5],[0,0]])
   const geo=map.world2geo(t.model.localToWorld(new Vector3(x,y,0)));compare(geo.x,geo.y);
 }}
 console.log('PASS tile edges and diagonal/shared vertices match raycasting');
-console.log(`TERRAIN GROUND QUERY: PASS ${checked} real-mesh comparisons`);
+assert.ok(hits>checked*.8,`only ${hits}/${checked} comparisons hit terrain: the gate would be vacuous`);
+console.log(`TERRAIN GROUND QUERY: PASS ${checked} real-mesh comparisons (${hits} hits)`);
 map.dispose();
