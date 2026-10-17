@@ -30,7 +30,7 @@ Current source gates include upper geometry 8/8, layered elevation/controller 7/
 
 The YSSY all-floor preflight on `0376b5f` failed the frame-time gate despite passing scene-resource limits. `final-views-yssy-day/report.json` records 23.22 s and 17.00 s frames during the route. A controlled tier-transition diagnosis reproduced new room and terrain shader keys when the governor changed from two shadow cascades to one and then zero; returning to an already compiled profile did not repeat the large room waits. Separately, the first terrain draw still reached its expensive program before the existing idle warm began. Both warmup fixes require fresh GPU measurements before any performance claim or 20-minute soak.
 
-The same YSSY review exposed a placement defect: the synthetic rear apron extended across a road toward the bay without supporting pavement evidence, and the accepted room footprint was not fully inside the supplied airport boundary. Placement scoring and independent rear-set eligibility are being corrected conservatively. The earlier 111-accepted audit below is historical and does not establish safe current coverage.
+The same YSSY review exposed a placement defect: the synthetic rear apron extended across a road toward the bay without supporting pavement evidence, and the accepted room footprint was not fully inside the supplied airport boundary. The corrected scorer moves YSSY to runway 16R/34L, along 477 m, cross 504 m, floor 24 m, with rear scenery disabled. The original audit is preserved in `placement-before-safety-v2.json`; corrected placement source gates pass, while final rendered views remain pending.
 
 ## Runtime and interaction contracts
 
@@ -78,7 +78,7 @@ node scripts/verify-living-observatory.cjs --port 3349 --case all
 
 ## Pier geometry and circulation validation
 
-The pier variant contains a rear curtain wall between the flight boards, the bar on the right wall, a relocated communal table, and four physical vantage chairs. Front and rear apron stands reuse the existing airport-set geometry, docking, routes, fleet resources, and material batches. Classic geometry retains its separate path.
+The pier variant contains a rear curtain wall between the flight boards, the bar on the right wall, a relocated communal table, and four lower physical vantage chairs. The later upper-room revision adds two more chairs. Eligible rear apron stands reuse the existing airport-set geometry, docking, routes, fleet resources, and material batches; the current conservative audit supplies no rear-scenery eligibility. Classic geometry retains its separate path.
 
 The room, its collision proxies, and the separate pier AO bake are generated from the same variant plan. `public/models/lounge-ao-pier-v1.bin` is checked against the pier geometry signature; the classic bake remains separate. No new `THREE.Light` is added. The room contract is at most **14 draws, 140,000 triangles, and 24 MiB of textures including instruments**. The combined presentation gate counts both room and instruments; these resource counts are not frame-time measurements.
 
@@ -108,11 +108,13 @@ node scripts/build-lounge-ao.mjs --pier
 
 ## Placement coverage and provenance
 
-`scripts/lounge-pier-audit.json` records **115 airport identifiers, 111 accepted placements, and 4 classic fallbacks**. All five visual-review airports have scored placements. KHNL, KRKL, OKBK, and SPJC lacked usable runway catalog records in this audit. Acceptance is a data/geometry result, not visual certification.
+Safety revision 2 of `scripts/lounge-pier-audit.json` records **115 unique airport identifiers, 111 accepted placements, and 4 classic fallbacks**. All five visual-review airports retain scored pier placements. KHNL, KRKL, OKBK, and SPJC lacked usable runway catalog records in this audit. All 111 final rounded table positions were independently rechecked against the cached geometry with zero footprint failures. Acceptance is a data/geometry result, not visual certification.
 
-The audit reused cached OpenFreeMap z14 tiles and fetched missing tiles from planet `20261011_080001_pt`. The original cache snapshot dates are unknown; the report explicitly records `source: mixed cached OpenFreeMap tiles`, `cachedSnapshotDate: null`, and `visualCertification: false`. It must not be described as a uniformly fresh OSM snapshot. No new data provider was introduced.
+The original audit reused cached OpenFreeMap z14 tiles and fetched missing tiles from planet `20261011_080001_pt`. Safety revision 2 is an offline rescore of that existing cache. The original cache snapshot dates are unknown; the report explicitly records `source: mixed cached OpenFreeMap tiles`, `cachedSnapshotDate: null`, `offlineRescore: true`, and `visualCertification: false`. It must not be described as a uniformly fresh OSM snapshot. No new data provider was introduced.
 
-The scorer samples both apron footprints, rejects runway overlap and incomplete tile coverage, constrains rear stand taxiway/building overlap, and evaluates rear targets from one seated and three standing/route positions. A missing acceptable placement retains the classic room. A scored row also requires its original runway to resolve in the live registry: missing sibling runway data and a chosen row belonging to another airport cannot enable an unscored generic pier. Regression tests cover these fallback paths.
+The corrected scorer requires the room envelope plus a 2 m margin to be inside the supplied aerodrome boundary on a grid no coarser than 2 m. It rejects runway/taxiway overlap and checks road segments against the room expanded by 8 m for service/track/minor roads or 14 m for other roads. Rear scenery separately requires at least 95% apron coverage in both rear zones, with no sampled out-of-data/runway/building conflicts and no rear-stand taxiway overlap. None of the 111 accepted sites has that evidence, so each retains rear glazing and the upper room with `rearSet:false`; no rear apron, stands, bridges or service staging is invented. A valid rear view may instead be a clear airport horizon, skyline or bay.
+
+Rear sightlines are still evaluated from one seated and three standing/route positions. A missing acceptable room placement retains the classic room. A scored row also requires its original runway to resolve in the live registry: missing sibling runway data and a chosen row belonging to another airport cannot enable an unscored generic pier. The placement gate passes 7/7, including a compact cached-data regression rejecting the previous YSSY location and accepting the corrected one. The classic seat gate passes 6/6 and the pier gate 9/9; explicit eligible fixtures at all three airport-set sizes keep the mirrored scenery checks exercised even though the real audit conservatively enables none.
 
 Regeneration with the existing local source cache used in this session:
 
@@ -120,7 +122,7 @@ Regeneration with the existing local source cache used in this session:
 node scripts/build-lounge-seats.mjs --pier --source-cache C:/Users/bfecho/skyloom-3/.graphics-review/lounge-seats/tiles
 ```
 
-For a cache-only rerun, append `--offline`. Missing cached tiles then fail conservatively. The full command rewrites the pier table and audit; `--only KCMH,KJFK,LOWI,EGLL,YSSY` limits inspection and does not replace the complete seat table, but still writes a scoped audit. Preserve the full audit before using that option.
+For a cache-only rerun, append `--offline`. Missing cached tiles then fail conservatively. The full command rewrites the pier table and audit; `--only KCMH,KJFK,LOWI,EGLL,YSSY` limits inspection and writes neither complete generated file. A hash check confirms a scoped inspection preserves the full audit.
 
 ## Open release gates
 

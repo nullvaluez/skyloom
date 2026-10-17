@@ -173,7 +173,7 @@ check('Night Watch dims decoration coherently while retaining circulation lighti
   assert.ok(room.uniforms.uLoungeBounce.value.length() < bounce);
   assert.equal(JSON.stringify(state.sun), sun);
 });
-const openField = { ...field, buildings: [], taxiwayLines: [], pavements: [{ cls: 'apron', rings: [ring(corners(300, 2700, -250, -1100))] }] };
+const openField = { ...field, aerodromes: [{ rings: [ring(corners(-2500, L+2500, -2500, 2500))] }], buildings: [], taxiwayLines: [], pavements: [{ cls: 'apron', rings: [ring(corners(300, 2700, -250, -1100))] }] };
 let chosen;
 check('pier site scoring checks both apron footprints and four rear seated/standing sightlines', () => {
   chosen = chooseLoungeSeat([runway], openField, { variant: 'pier' });
@@ -218,7 +218,37 @@ function loadAirport(id) {
   return a;
 }
 
-check('both-side stands reuse the same geometry, docking and routes at five review airports', () => {
+check('explicitly eligible rear sets retain mirrored bridges, routes and bounded geometry in all size classes', () => {
+  for (const floorM of [24, 16, 10]) {
+    const site = { airportId: 'REAR-FIXTURE', ident: 'REAR-FIXTURE', variant: 'pier', rearSet: true, floorM, k: 1, heading: 0, x: 0, z: 0, groundY: 0 };
+    const layout = airportLayout(site), plan = planAirportSet(site, layout), half = layout.stands.length / 2;
+    assert.ok(layout.pier && plan.pier && half > 0);
+    for (let i = 0; i < half; i++) {
+      const f = layout.stands[i], b = layout.stands[i + half];
+      assert.ok(Math.abs(f.x + b.x) < 1e-8);
+      assert.ok(Math.abs(f.z + b.z - 2 * layout.zc) < 1e-8);
+      for (let j = 0; j < plan.stands[i].bridges.length; j++) {
+        const fb = plan.stands[i].bridges[j], bb = plan.stands[i + half].bridges[j];
+        assert.ok(Math.abs(fb.docked.cab.x + bb.docked.cab.x) < 1e-8);
+        assert.ok(Math.abs(fb.docked.cab.z + bb.docked.cab.z - 2 * layout.zc) < 1e-8);
+      }
+    }
+    for (let i = 0; i < 2; i++) for (const distance of [0, 11, 127]) {
+      const f = sampleRoute(plan.loops[i], distance), b = sampleRoute(plan.loops[i + 2], distance);
+      assert.ok(Math.abs(f.x + b.x) < 1e-7);
+      assert.ok(Math.abs(f.z + b.z - 2 * layout.zc) < 1e-7);
+    }
+    const built = buildSetGeometry(plan, planAtlas(atlasEntries(plan)));
+    assert.ok(setGeometryStats(built).total < 350000);
+    const geos = [built.staticGeo, built.decals, built.pools, ...built.kits.values(), ...built.bridges.flatMap(b => [b.docked, b.retracted, b.dockedColumn.geo, b.retractedColumn.geo]), ...built.fixtures.map(f => f.geo)];
+    for (const geo of geos) {
+      for (const attribute of Object.values(geo.attributes)) assert.ok(attribute.array.every(Number.isFinite));
+      geo.dispose();
+    }
+  }
+});
+
+check('review airports render only their eligible scenery sides with valid geometry and routes', () => {
   for (const ident of ['KCMH','KJFK','LOWI','EGLL','YSSY']) {
     const airport = loadAirport(ident);
     assert.ok(airport, ident);
@@ -226,20 +256,22 @@ check('both-side stands reuse the same geometry, docking and routes at five revi
     const site = resolveLoungeSite(airport, { variant: 'pier' });
     assert.equal(site.variant, 'pier', ident+' has a scored table placement');
     const layout = airportLayout(site), plan = planAirportSet(site, layout);
-    assert.equal(layout.aprons.length, 2);
+    assert.equal(layout.aprons.length, site.rearSet ? 2 : 1);
+    assert.equal(layout.stands.some((s) => s.side === 'back'), site.rearSet);
+    if (!site.rearSet) assert.ok(!plan.geometrySides?.some((s) => s.rot180), ident+' no unsupported rear geometry');
     assert.ok(layout.terminal.z1 < 15);
     assert.equal(plan.stands.length, layout.stands.length);
     const built = buildSetGeometry(plan, planAtlas(atlasEntries(plan)));
     assert.ok(setGeometryStats(built).total < 350000, ident+' set budget');
     for (const g of [built.staticGeo,built.decals,built.pools,...built.bridges.map((b)=>b.docked)]) for (const a of Object.values(g.attributes)) assert.ok(a.array.every(Number.isFinite), ident+' finite');
-    const half=layout.stands.length/2;
-    for (let i=0;i<half;i++) {
+    const half=site.rearSet ? layout.stands.length/2 : layout.stands.length;
+    for (let i=0;site.rearSet && i<half;i++) {
       const f=layout.stands[i],b=layout.stands[i+half];
       assert.ok(Math.abs(f.x+b.x)<1e-8); assert.ok(Math.abs(f.z+b.z-2*layout.zc)<1e-8);
       const fb=plan.stands[i].bridges,bb=plan.stands[i+half].bridges;
       for(let j=0;j<fb.length;j++) { assert.ok(Math.abs(fb[j].docked.cab.x+bb[j].docked.cab.x)<1e-8); assert.ok(Math.abs(fb[j].docked.cab.z+bb[j].docked.cab.z-2*layout.zc)<1e-8); }
     }
-    for (let i=0;i<2;i++) for(const t of [0,11,127]) {
+    for (let i=0;site.rearSet && i<2;i++) for(const t of [0,11,127]) {
       const f=sampleRoute(plan.loops[i],t),b=sampleRoute(plan.loops[i+2],t);
       assert.ok(Math.abs(f.x+b.x)<1e-7); assert.ok(Math.abs(f.z+b.z-2*layout.zc)<1e-7);
     }
@@ -258,7 +290,7 @@ check('both-side stands reuse the same geometry, docking and routes at five revi
     assert.ok(rendered.lights.n<=rendered.lights.glow.capacity,ident+' light capacity');
     const camera=new PerspectiveCamera(); camera.updateMatrixWorld();
     rendered.update({t:1,night:1,wind:[2,0],camera,heightPx:900,cam:new Vector3(0,25,13)});
-    rendered.setOccupied(half,false); rendered.setOccupied(half,true); rendered.dispose();
+    rendered.setOccupied(site.rearSet ? half : 0,false); rendered.setOccupied(site.rearSet ? half : 0,true); rendered.dispose();
     const parked=new ParkedFleetSet(site,layout); while(!parked.ready) parked.prepare();
     parked.update({airportWatch:{active:true,validated:true,floorY:site.groundY+site.floorM},traffic:{items:[]}},1);
     assert.ok(parked.stats.parked>0); assert.ok(parked.stats.triangles>0); parked.dispose();
