@@ -2,10 +2,14 @@
  *
  * node scripts/review-living-observatory.cjs --port 3347 --airport KCMH --mode cold
  * node scripts/review-living-observatory.cjs --port 3347 --airport YSSY --mode soak --minutes 20
- * node scripts/review-living-observatory.cjs --port 3347 --airports KCMH,KJFK,LOWI,EGLL,YSSY --mode views --lighting day
- * node scripts/review-living-observatory.cjs --port 3347 --airports KCMH,KJFK,LOWI,EGLL,YSSY --mode views --lighting night
+ * node scripts/review-living-observatory.cjs --port 3347 --airport KJFK --mode views --lighting day
+ * node scripts/review-living-observatory.cjs --port 3347 --airport KJFK --mode views --lighting night
+ * Run separate processes for independent UI entries. A labelled runtime-entry
+ * batch may use --entry runtime --airports KCMH,KJFK,LOWI,EGLL,YSSY.
  * Views only: --view-seats windows captures the four front/rear seats;
  * --night-comparison 0 omits additional Night Watch normal/dim pairs.
+ * --seated-only 1 is an explicitly compact visual subset, with no new
+ * continuous walking or stair-coverage claim (reuse must be documented).
  *
  * Use --flags=-LOUNGE_PIER,-LOUNGE_INSTRUMENTS for the baseline, and the same
  * browser/build/UTC/viewport for matched measurements. Do not run another GPU
@@ -27,19 +31,27 @@ const arg = (name, fallback) => {
   return at >= 0 && process.argv[at + 1] != null ? process.argv[at + 1] : fallback;
 };
 const mode = arg('mode', 'cold');
-const minutes = Number(arg('minutes', mode === 'soak' ? '20' : '3'));
-if (!['cold', 'soak', 'views'].includes(mode)) throw new Error('mode must be cold, soak or views');
+const minutes = Number(arg('minutes', mode === 'soak' ? '20' : mode === 'probe' ? '4' : '3'));
+if (!['cold', 'soak', 'views', 'probe'].includes(mode)) throw new Error('mode must be cold, soak, views or probe');
 if (!(minutes >= 0.5 && minutes <= 30)) throw new Error('minutes must be between 0.5 and 30');
+if (mode === 'probe' && (!(minutes >= 3 && minutes <= 5) || arg('cpu', '0') === '1')) throw new Error('The no-capture adaptive probe requires3–5minutes and no CPU profiler');
 const airports = arg('airports', arg('airport', 'KCMH')).split(',');
+const entryMethod = arg('entry', 'ui');
+if (!['ui', 'runtime'].includes(entryMethod)) throw new Error('entry must be ui or runtime');
+if (entryMethod === 'ui' && airports.length > 1) throw new Error('UI entry starts at the title; leaving the lounge returns to flight. Use one airport per fresh process, or explicitly label --entry runtime for a multi-airport diagnostic.');
 const flags = arg('flags', 'LOUNGE_PIER,LOUNGE_INSTRUMENTS');
 const utc = arg('utc', '');
 const lighting = arg('lighting', '');
 if (lighting && !['day', 'night'].includes(lighting)) throw new Error('lighting must be day or night');
 const viewSeats = arg('view-seats', 'all');
 const nightComparison = arg('night-comparison', '1');
+const seatedOnly = arg('seated-only', '0') === '1';
+const postWindowGc = arg('post-gc', '0') === '1';
 if (!['all', 'windows'].includes(viewSeats)) throw new Error('view-seats must be all or windows');
 if (!['0', '1'].includes(nightComparison)) throw new Error('night-comparison must be 0 or 1');
 if (mode !== 'views' && (viewSeats !== 'all' || nightComparison !== '1')) throw new Error('Reduced seat or night-comparison coverage is allowed only in views mode');
+if (seatedOnly && mode !== 'views') throw new Error('The compact seated visual subset is allowed only in views mode');
+if (postWindowGc && mode !== 'views') throw new Error('Post-window GC is diagnostic-only and available in visual review mode');
 const windowSeats = ['window', 'back', 'upper-front', 'upper-back'];
 const localReviewHours = { day: { KCMH: 16, KJFK: 16, LOWI: 12, EGLL: 12, YSSY: 4 }, night: { KCMH: 4, KJFK: 4, LOWI: 22, EGLL: 22, YSSY: 14 } };
 const reviewHour = (airport) => lighting ? localReviewHours[lighting][airport] : utc;
@@ -64,11 +76,15 @@ function servedBuildFromHtml(html) {
   }
   return chunks.join('').match(/"b":"([^"\n]+)"/)?.[1] ?? null;
 }
-const report = { at: new Date().toISOString(), mode, minutes, airports, flags, utc, lighting, url: url.toString(), viewport: [1920, 1080], coldShaderDiskCache: true, entryMethod: arg('entry', 'ui'), errors: [], errorCount: 0, hotReloads: [], consoleErrors: [], responses: {}, visits: [], samples: [], shots: [], events: [] };
-report.requestedCoverage = { seats: mode === 'cold' ? null : mode === 'views' ? viewSeats : 'all', nightWatchComparison: mode !== 'cold' && lighting === 'night' && nightComparison === '1', continuousRoutes: mode !== 'cold' };
+const report = { at: new Date().toISOString(), mode, minutes, airports, flags, utc, lighting, url: url.toString(), viewport: [1920, 1080], coldShaderDiskCache: true, entryMethod, errors: [], errorCount: 0, hotReloads: [], consoleErrors: [], responses: {}, visits: [], samples: [], shots: [], events: [] };
+report.requestedCoverage = { seats: mode === 'cold' ? null : mode === 'views' ? viewSeats : 'all', nightWatchComparison: mode !== 'cold' && lighting === 'night' && nightComparison === '1', continuousRoutes: mode !== 'cold' && !seatedOnly, seatedVisualOnly: seatedOnly, postWindowGc };
+if (mode === 'probe') report.probePurpose = 'Bounded normal-adaptive walk/zoom diagnosis with zero screenshots and no CPU profile; not a20-minute soak.';
 report.source = { revision: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), status: execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim() };
 report.source.checkout = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
 report.source.files = Object.fromEntries(['scripts/review-living-observatory.cjs', 'lib/fly/observation-config.js', 'lib/fly/lounge/room-walk.mjs', 'lib/fly/lounge-walk-runtime.js', 'lib/fly/lounge/room-elevation.mjs', 'lib/fly/lounge/room-build.js', 'lib/fly/lounge/room-shading.js', 'lib/fly/lounge-site.js', 'lib/fly/lounge/observatory-instruments.js', 'lib/fly/lounge/observatory-model.mjs', 'lib/fly/lounge/observatory-stations.mjs', 'lib/fly/lounge-observatory-runtime.js', 'lib/fly/airport-watch-runtime.js', 'components/fly/hud/lounge/ObservatoryHud.jsx', 'components/fly/hud/lounge/observatory.css', 'components/fly/PrewarmRig.jsx', 'lib/fly/prewarm.js'].map((file) => [file, fs.existsSync(file) ? createHash('sha256').update(fs.readFileSync(file)).digest('hex') : null]));
+for (const file of ['lib/fly/compile-scene-safe.js', 'lib/fly/cinema-profile-prewarm.js', 'lib/fly/critical-terrain-prewarm.mjs', 'lib/fly/measured-world-prewarm.js', 'lib/fly/world-material-factories.js', 'lib/fly/lounge/room-prewarm.js', 'lib/fly/lounge/room-lifecycle.mjs', 'lib/fly/lounge/room-textures.js', 'lib/fly/lounge-seats-pier.js', 'lib/fly/airfield/rendered-building-bound.js']) {
+  report.source.files[file] = fs.existsSync(file) ? createHash('sha256').update(fs.readFileSync(file)).digest('hex') : null;
+}
 report.buildDirectory = path.resolve(arg('build-dir', '.next-observatory-final'));
 const buildFile = path.join(report.buildDirectory, 'BUILD_ID');
 report.buildId = fs.existsSync(buildFile) ? fs.readFileSync(buildFile, 'utf8').trim() : null;
@@ -87,15 +103,33 @@ const save = (file = 'progress.json') => fs.writeFileSync(path.join(out, file), 
   const mark = async (phase) => {
     report.events.push({ phase, wall: new Date().toISOString() });
     await page.evaluate((value) => window.__loungeWebGL.mark(value), phase);
+    if (cpu) {
+      const metrics = await cpu.send('Performance.getMetrics');
+      (report.cpuPhases ??= []).push({ phase, timestamp: metrics.metrics.find((m) => m.name === 'Timestamp')?.value ?? null });
+    }
     save();
   };
+  const modelSnapshot = async (name) => {
+    if (arg('model-snapshot', '0') !== '1') return;
+    const input = await page.evaluate(() => {
+      const r = window.__fly, w = r.airportWatch;
+      return { at: performance.now(), site: w.site, floorY: w.floorY, eye: w.eyeLocal, selected: w.selected, runways: w.runways,
+        origin: r.origin?.anchor, bend: r.bend ?? null,
+        tracks: (r.traffic.items ?? []).map((t) => ({ hex: t.hex, rx: t.rx, ry: t.ry, ryd: t.ryd, rz: t.rz, stale: t.stale,
+          horizonFade: t.horizonFade, fix1: t.fix1, meta: t.meta, flags: t.flags, source: t.source, scenery: t.scenery })),
+        set: r.airportSet?.site === w.site ? { plan: r.airportSet.plan, apronY: r.airportSet.apronY() } : null };
+    });
+    fs.writeFileSync(path.join(out, name + '-model-input.json'), JSON.stringify(input, null, 2));
+    (report.modelSnapshots ??= []).push(name + '-model-input.json');
+  };
   const screenshot = async (name) => {
+    if (mode === 'probe') return;
     const file = name + '.png';
     await page.screenshot({ path: path.join(out, file), timeout: 30000 });
     report.shots.push(file);
     (report.shotStates ??= []).push(await page.evaluate((file) => {
       const w = window.__fly.airportWatch;
-      return { file, airport: w.airport?.id, variant: w.site?.variant, floorId: w.walk?.floorId, posture: w.posture, seat: w.seatId, eye: { ...w.eyeLocal }, mag: w.optics?.mag, nightWatch: w.observatory?.night ?? false, sunUtc: window.__flySunOverride ?? null };
+      return { file, airport: w.airport?.id, variant: w.site?.variant, floorId: w.walk?.floorId, posture: w.posture, seat: w.seatId, eye: { ...w.eyeLocal }, yaw: w.yaw, pitch: w.pitch, mag: w.optics?.mag, nightWatch: w.observatory?.night ?? false, sunUtc: window.__flySunOverride ?? null };
     }, file));
   };
   const sample = async () => {
@@ -111,6 +145,8 @@ const save = (file = 'progress.json') => fs.writeFileSync(path.join(out, file), 
         binocular: w?.binocular, mag: w?.optics?.mag, selected: w?.selected, tracked: w?.tracking,
         traffic: { count: r?.traffic?.tracks?.size, state: r?.trafficStatus?.state },
         tier: s?.qualityTier, frame, room: r?.loungeStats,
+        governor: window.__flyGov?.state?.() ?? null,
+        cinemaShadows: r?.cinemaShadows ? { cascades: r.cinemaShadows.cascades, size: r.cinemaShadows.size, rangeM: r.cinemaShadows.rangeM } : null,
         calls: stats?.diag?.calls ?? info?.render?.calls, triangles: stats?.diag?.triangles ?? info?.render?.triangles,
         programs: info?.programs?.length ?? frame?.programs, geometries: info?.memory?.geometries ?? frame?.geometries, textures: info?.memory?.textures ?? frame?.textures,
         heap: performance.memory?.usedJSHeapSize ?? null, hidden: document.hidden,
@@ -214,13 +250,14 @@ const save = (file = 'progress.json') => fs.writeFileSync(path.join(out, file), 
     if (arg('cpu', '0') === '1') {
       cpu = await context.newCDPSession(page);
       await cpu.send('Profiler.enable');
+      await cpu.send('Performance.enable');
       await cpu.send('Profiler.start');
     }
     const documentResponse = await page.goto(url.toString(), { waitUntil: 'domcontentloaded', timeout: 240000 });
     await page.waitForFunction(() => !!window.__fly?.airportWatch, undefined, { timeout: 240000 });
     report.renderer = await page.evaluate(() => {
       const gl = window.__loungeWebGL.context, ext = gl.getExtension('WEBGL_debug_renderer_info');
-      return { renderer: ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER), parallelShaderCompile: !!gl.getExtension('KHR_parallel_shader_compile'), checkShaderErrors: window.__flyGl?.debug.checkShaderErrors ?? null };
+      return { renderer: ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER), parallelShaderCompile: !!gl.getExtension('KHR_parallel_shader_compile'), gpuTimerQueryAvailable: !!gl.getExtension('EXT_disjoint_timer_query_webgl2'), checkShaderErrors: window.__flyGl?.debug.checkShaderErrors ?? null };
     });
     if (/swiftshader|llvmpipe|software/i.test(report.renderer.renderer)) throw new Error('A software renderer cannot certify this hardware route');
     report.browserVersion = browser.version();
@@ -285,10 +322,12 @@ const save = (file = 'progress.json') => fs.writeFileSync(path.join(out, file), 
       await mark(`${airport}:first-view`);
       if (mode === 'cold') {
         await dwell(minutes * 30000);
+        await modelSnapshot(`${airport}-wide`);
         await screenshot(`${airport}-first-view`);
         await mark(`${airport}:first-binocular`);
         await page.evaluate(() => { const w = window.__fly.airportWatch; const row = w.snapshot().find((x) => x.inFront && x.stale === 0 && x.category !== 'ground'); if (row) w.select(row.hex); w.setMagnification(25); });
         await dwell(minutes * 30000);
+        await modelSnapshot(`${airport}-binocular`);
         await screenshot(`${airport}-first-binocular`);
         await page.evaluate(() => window.__fly.airportWatch.binoculars(false));
       } else {
@@ -303,10 +342,10 @@ const save = (file = 'progress.json') => fs.writeFileSync(path.join(out, file), 
         const begin = Date.now();
         let cycle = 0;
         do {
-          await crossRoom(airport, cycle);
+          if (!seatedOnly) await crossRoom(airport, cycle);
           for (const seatSpec of requestedSeats) {
             const seat = seatSpec.id;
-            if (mode === 'soak' && Date.now() - begin >= minutes * 60000) break;
+            if ((mode === 'soak' || mode === 'probe') && Date.now() - begin >= minutes * 60000) break;
             await mark(`${airport}:${cycle}:${seat}:seat`);
             await page.evaluate((id) => { const w = window.__fly.airportWatch; w.setMoveKeys(0, 0, false); w.binoculars(false); w.clearSelection(); w.sit(id); }, seat);
             await page.waitForFunction((id) => { const w = window.__fly.airportWatch; return w.posture === 'seated' && w.seatId === id; }, seat, { timeout: 90000 });
@@ -323,27 +362,37 @@ const save = (file = 'progress.json') => fs.writeFileSync(path.join(out, file), 
               await page.evaluate(() => { const o = window.__fly.airportWatch.observatory; if (o?.night) o.toggleNight(); });
               await dwell(3000);
             }
-            await mark(`${airport}:${cycle}:${seat}:walk`);
-            await page.evaluate(() => window.__fly.airportWatch.stand());
-            await page.waitForFunction(() => window.__fly.airportWatch.posture === 'standing', undefined, { timeout: 30000 });
-            // Walk away from the chair with the real keyboard input, then look
-            // across the room. Collision resolution remains entirely in-game.
-            await page.getByTestId('lounge-surface').focus();
-            await page.keyboard.down('s');
-            try { await dwell(1800); } finally { await page.keyboard.up('s'); }
-            await dwell(500);
-            await page.evaluate(() => { const w = window.__fly.airportWatch; w.yaw += Math.PI; w.pitch = -.08; });
-            await dwell(3000);
-            if (cycle === 0) await screenshot(`${airport}-${seat}-standing-room`);
+            if (!seatedOnly) {
+              await mark(`${airport}:${cycle}:${seat}:walk`);
+              await page.evaluate(() => window.__fly.airportWatch.stand());
+              await page.waitForFunction(() => window.__fly.airportWatch.posture === 'standing', undefined, { timeout: 30000 });
+              // Walk away from the chair with the real keyboard input, then look
+              // across the room. Collision resolution remains entirely in-game.
+              await page.getByTestId('lounge-surface').focus();
+              await page.keyboard.down('s');
+              try { await dwell(1800); } finally { await page.keyboard.up('s'); }
+              await dwell(500);
+              await page.evaluate(() => { const w = window.__fly.airportWatch; w.yaw += Math.PI; w.pitch = -.08; });
+              await dwell(3000);
+              if (cycle === 0) await screenshot(`${airport}-${seat}-standing-room`);
+            }
             await mark(`${airport}:${cycle}:${seat}:binocular`);
-            await page.evaluate(() => { const w = window.__fly.airportWatch; w.yaw -= Math.PI; w.binoculars(true, { acquire: false }); w.setMagnification(25); });
+            await page.evaluate(({ visualReview, seatedOnly }) => {
+              const w = window.__fly.airportWatch;
+              if (!seatedOnly) w.yaw -= Math.PI;
+              // The room-facing shot deliberately looks down. For visual
+              // matrix coverage, return to exterior detail near the horizon
+              // so max zoom is not merely a magnified patch of empty ground.
+              if (visualReview) w.pitch = -.01;
+              w.binoculars(true, { acquire: false }); w.setMagnification(25);
+            }, { visualReview: mode === 'views', seatedOnly });
             await dwell(mode === 'views' ? 5000 : 12000);
             if (cycle === 0) await screenshot(`${airport}-${seat}-binocular`);
             await page.evaluate(() => window.__fly.airportWatch.binoculars(false));
             console.log(`REVIEW ${airport} ${seat} cycle ${cycle} ${((Date.now() - begin) / 60000).toFixed(1)}m`);
           }
           cycle++;
-        } while (mode === 'soak' && Date.now() - begin < minutes * 60000);
+        } while ((mode === 'soak' || mode === 'probe') && Date.now() - begin < minutes * 60000);
         report.visits.at(-1).exerciseMs = Date.now() - begin;
       }
       const frames = await page.evaluate(() => { const p = window.__loungeReviewFrames; cancelAnimationFrame(p.raf); return p; });
@@ -355,7 +404,35 @@ const save = (file = 'progress.json') => fs.writeFileSync(path.join(out, file), 
       visit.standingFrames = frames.standingFrames;
       visit.floorFrames = frames.floorFrames;
       visit.binocularFloorFrames = frames.binocularFloorFrames;
+      let memorySession, memorySnapshot;
+      if (postWindowGc && airport === airports.at(-1)) {
+        // Deliberately after the complete measured frame window, and only
+        // on the last visual visit. Never changes cold/soak frame evidence.
+        await mark(`${airport}:post-window-gc`);
+        memorySession = await context.newCDPSession(page);
+        memorySnapshot = async () => ({
+          heap: await memorySession.send('Runtime.getHeapUsage'),
+          scene: await page.evaluate(() => {
+            const r = window.__fly, w = r.airportWatch;
+            let root = r.engine?.object; while (root?.parent) root = root.parent;
+            const gl = root?.__r3f?.root?.getState?.().gl ?? window.__flyGl;
+            return { at: performance.now(), active: w.active, eye: { ...w.eyeLocal }, posture: w.posture,
+              programs: gl?.info?.programs?.length, geometries: gl?.info?.memory?.geometries, textures: gl?.info?.memory?.textures };
+          }),
+        });
+        report.postWindowMemory = { note: 'Separate visual-run diagnostic after frame collection; not retained-heap proof for the earlier20-minute soak.', beforeGc: await memorySnapshot() };
+        try {
+          await memorySession.send('HeapProfiler.collectGarbage');
+          report.postWindowMemory.afterGc = await memorySnapshot();
+        } catch (error) { report.postWindowMemory.error = String(error); }
+      }
+      await mark(`${airport}:leave`);
       await page.evaluate(() => window.__fly.airportWatch.leave());
+      if (memorySession) {
+        await page.waitForTimeout(1000);
+        report.postWindowMemory.oneSecondAfterLeave = await memorySnapshot();
+        await memorySession.detach();
+      }
     }
     report.resources = Object.fromEntries(['calls', 'triangles', 'programs', 'geometries', 'textures', 'heap'].map((key) => [key, summary(report.samples.map((x) => x[key]).filter(Number.isFinite))]));
     report.residency = { first: report.samples[0], last: report.samples.at(-1) };
@@ -373,11 +450,14 @@ const save = (file = 'progress.json') => fs.writeFileSync(path.join(out, file), 
       drawBudget: report.resources.calls.max != null && report.resources.calls.max <= report.limits.calls,
       triangleBudget: report.resources.triangles.max != null && report.resources.triangles.max <= report.limits.triangles,
       binocularExercised: report.visits.every((v) => v.binocularFrames > 0),
-      walkingExercised: mode === 'cold' ? null : report.visits.every((v) => v.walkDistanceM >= 2),
-      continuousRoundTrip: mode === 'cold' ? null : report.visits.every((v) => v.routes?.some((r) => r.side === 'rear' && r.done && r.travelled >= 8) && v.routes.some((r) => r.side === 'front' && r.done && r.travelled >= 8)),
+      walkingExercised: mode === 'cold' || seatedOnly ? null : report.visits.every((v) => v.walkDistanceM >= 2),
+      continuousRoundTrip: mode === 'cold' || seatedOnly ? null : report.visits.every((v) => v.routes?.some((r) => r.side === 'rear' && r.done && r.travelled >= 8) && v.routes.some((r) => r.side === 'front' && r.done && r.travelled >= 8)),
       allVantageSeatsVisited: mode === 'cold' || (mode === 'views' && viewSeats !== 'all') ? null : report.visits.every((v) => v.seats.every((s) => v.seatVisits.some((seen) => seen.id === s.id && seen.floorId === s.floorId))),
       requestedViewSeatsVisited: mode === 'views' ? report.visits.every((v) => v.requestedSeats.every((s) => v.seatVisits.some((seen) => seen.id === s.id && seen.floorId === s.floorId))) : null,
-      upperAndStairsExercised: mode === 'cold' ? null : report.visits.every((v) => v.variant !== 'pier' || (v.floorFrames.stairs > 0 && v.floorFrames.upper > 0 && v.binocularFloorFrames.upper > 0 && v.routes.some((r) => r.side === 'upper-front' && r.done && r.surfaces.stairs > 0 && r.surfaces.upper > 0 && r.maxY - r.minY > 4) && v.routes.some((r) => r.side === 'upper-back' && r.done && r.floorId === 'upper') && v.routes.some((r) => r.side === 'front' && r.done && r.surfaces.stairs > 0 && r.surfaces.lower > 0 && r.maxY - r.minY > 4))),
+      upperAndStairsExercised: mode === 'cold' || seatedOnly ? null : report.visits.every((v) => v.variant !== 'pier' || (v.floorFrames.stairs > 0 && v.floorFrames.upper > 0 && v.binocularFloorFrames.upper > 0 && v.routes.some((r) => r.side === 'upper-front' && r.done && r.surfaces.stairs > 0 && r.surfaces.upper > 0 && r.maxY - r.minY > 4) && v.routes.some((r) => r.side === 'upper-back' && r.done && r.floorId === 'upper') && v.routes.some((r) => r.side === 'front' && r.done && r.surfaces.stairs > 0 && r.surfaces.lower > 0 && r.maxY - r.minY > 4))),
+      nightWatchPairs: report.requestedCoverage.nightWatchComparison ? report.visits.every(v => v.requestedSeats.filter(s => windowSeats.includes(s.id)).every(s =>
+        report.shotStates?.some(shot => shot.file === `${v.airport}-${s.id}-wide.png` && shot.nightWatch === false)
+        && report.shotStates?.some(shot => shot.file === `${v.airport}-${s.id}-night-watch.png` && shot.nightWatch === true))) : null,
       twentyMinuteSoak: mode === 'soak' ? report.visits.every((v) => v.exerciseMs >= 20 * 60000) : null,
     };
     console.log('REVIEW complete', JSON.stringify({ visits: report.visits, resources: report.resources, checks: report.checks }));
