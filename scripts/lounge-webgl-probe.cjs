@@ -2,7 +2,7 @@
 function installLoungeWebGLProbe() {
   const trace = window.__loungeWebGL = { totals: {}, slow: [], programs: {}, frameGaps: [], marks: [], dropped: 0 };
   const programIds = new WeakMap(), shaderSources = new WeakMap();
-  let serial = 0, last = performance.now(), sourceBytes = 0;
+  let serial = 0, last = performance.now(), sourceBytes = 0, roomSourceBytes = 0;
   const hash = (source) => {
     let value = 2166136261;
     for (let i = 0; i < source.length; i++) value = Math.imul(value ^ source.charCodeAt(i), 16777619);
@@ -24,7 +24,7 @@ function installLoungeWebGLProbe() {
     total.ms += ms;
     total.maxMs = Math.max(total.maxMs, ms);
     if (ms >= 20) {
-      if (trace.slow.length < 2000) trace.slow.push({ method, at: start, ms, ...detail, phase: trace.phase ?? 'boot' });
+      if (trace.slow.length < 2000) trace.slow.push({ method, at: start, ms, ...detail, phase: trace.phase ?? 'boot', ...(ms >= 1000 ? { stack: new Error('Slow WebGL call').stack?.slice(0, 2500) } : {}) });
       else trace.dropped++;
     }
   };
@@ -38,9 +38,16 @@ function installLoungeWebGLProbe() {
       trace.context ??= this;
       // Limit retained source to 16 MiB. Names, hashes and compile parameters
       // survive the cap, so a long soak cannot grow an unbounded shader log.
-      const retained = text.slice(0, Math.min(160000, Math.max(0, (16 * 1024 * 1024 - sourceBytes) / 2)));
-      sourceBytes += retained.length * 2;
-      shaderSources.set(shader, { hash: hash(text), name: text.match(/^#define SHADER_NAME[ \t]+([^\r\n]*)/m)?.[1]?.trim() || null, source: retained, sourceTruncated: retained.length !== text.length });
+      const name = text.match(/^#define SHADER_NAME[ \t]+([^\r\n]*)/m)?.[1]?.trim() || null;
+      // Reserve a second bounded pool for the room. The world warm set can
+      // consume the first pool before a governor transition exposes a room
+      // program miss; dropping those sources would obscure the actual cause.
+      const room = name?.startsWith('lounge-');
+      const used = room ? roomSourceBytes : sourceBytes;
+      const retained = text.slice(0, Math.min(180000, Math.max(0, (16 * 1024 * 1024 - used) / 2)));
+      if (room) roomSourceBytes += retained.length * 2;
+      else sourceBytes += retained.length * 2;
+      shaderSources.set(shader, { hash: hash(text), name, source: retained, sourceTruncated: retained.length !== text.length });
       return source.call(this, shader, text);
     };
     const attach = proto.attachShader;
@@ -69,7 +76,13 @@ function installLoungeWebGLProbe() {
   }
   trace.identify = (object) => programIds.get(object) ?? null;
   trace.annotate = () => {
-    for (const p of window.__flyGl?.info?.programs ?? []) {
+    let renderer = window.__flyGl;
+    if (!renderer) {
+      let scene = window.__fly?.engine?.object;
+      while (scene?.parent) scene = scene.parent;
+      renderer = scene?.__r3f?.root?.getState?.().gl;
+    }
+    for (const p of renderer?.info?.programs ?? []) {
       const row = trace.programs[trace.identify(p.program)];
       if (row) Object.assign(row, { threeId: p.id, name: p.name, type: p.type, cacheKey: p.cacheKey });
     }
@@ -86,7 +99,7 @@ function installLoungeWebGLProbe() {
     trace.annotate();
     const slowIds = new Set(trace.slow.map((s) => s.program));
     const programs = Object.values(trace.programs).map((p) => ({
-      ...p, shaders: p.shaders.map((s) => ({ ...s, source: slowIds.has(p.id) ? s.source : undefined })),
+      ...p, shaders: p.shaders.map((s) => ({ ...s, source: slowIds.has(p.id) || s.name?.startsWith('lounge-') ? s.source : undefined })),
     }));
     return { totals: trace.totals, slow: trace.slow, programs, marks: trace.marks, frameGaps: trace.frameGaps, dropped: trace.dropped };
   };
