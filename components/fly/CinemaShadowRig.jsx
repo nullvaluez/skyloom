@@ -5,6 +5,30 @@ import { CinemaShadows } from '@/lib/fly/cinema-shadows';
 import { cinemaOn, cinemaProfile } from '@/lib/fly/cinema-policy';
 import { compactDepthShadowTarget } from '@/lib/fly/compact-shadow-target';
 import { toSceneDir } from '@/lib/fly/true-scale';
+import { cascadeStagger } from '@/lib/fly/frame-cost';
+
+/**
+ * FRAME COST (CASCADE_STAGGER): the farthest cascade renders every `period`
+ * frames. three refreshes shadow.matrix only when it renders a map, so a held
+ * map stays matched to its own matrix and world-consistent; only its coverage
+ * lags by a frame. A camera jump over `jumpM` (rebase, warp) forces a render.
+ * Off: every cascade autoUpdates, exactly as before.
+ */
+function staggerFarCascade(r,camera){
+  const cfg=cascadeStagger(),on=cfg?.enabled===true&&r.lights.length>=2;
+  const far=r.lights[r.lights.length-1];
+  for(const light of r.lights)if(light!==far||!on)light.shadow.autoUpdate=true;
+  r.staggerFrames=on?r.staggerFrames??0:0;
+  if(!on){r.staggerPos=null;return;}
+  const period=Math.max(1,Math.round(cfg.period||1));
+  const pos=camera.getWorldPosition(r.staggerTmp??=camera.position.clone());
+  const jumped=!r.staggerPos||r.staggerPos.distanceTo(pos)>(cfg.jumpM??Infinity);
+  (r.staggerPos??=pos.clone()).copy(pos);
+  far.shadow.autoUpdate=false;
+  if(jumped||r.staggerFrames%period===0||far.shadow.map===null)far.shadow.needsUpdate=true;
+  r.staggerFrames++;
+  r.staggered=!far.shadow.needsUpdate;
+}
 
 export function CinemaShadowRig({runtime,sunRef}){
   const rig=useRef(null),legacyShadow=useRef(false);
@@ -55,8 +79,9 @@ export function CinemaShadowRig({runtime,sunRef}){
     scene.traverse(r.countingRegister);
     const scanMs=performance.now()-scanStart;r.scanMs=r.scanMs==null?scanMs:r.scanMs+(scanMs-r.scanMs)*.05;
     camera.updateMatrixWorld();r.update();
+    staggerFarCascade(r,camera);
     runtime.shadowRadiusM=profile.shadowRangeM;
-    Object.assign(runtime.cinemaShadows??={}, {cascades:r.cascades,size:profile.shadowSize,rangeM:profile.shadowRangeM,materials:r.owned.size,bytes:r.cascades*profile.shadowSize**2*5,scanObjects:r.scanObjects,scanMs:r.scanMs});
+    Object.assign(runtime.cinemaShadows??={}, {cascades:r.cascades,size:profile.shadowSize,rangeM:profile.shadowRangeM,materials:r.owned.size,bytes:r.cascades*profile.shadowSize**2*5,scanObjects:r.scanObjects,scanMs:r.scanMs,staggered:!!r.staggered});
   },-.9);
   return null;
 }
