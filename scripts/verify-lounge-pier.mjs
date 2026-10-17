@@ -157,7 +157,7 @@ check('rear aperture is open in geometry and shaders; its AO cannot be confused 
     const shader = { ...ShaderLib.physical, uniforms: {} };
     material.onBeforeCompile(shader, {});
     assert.ok(shader.fragmentShader.includes('#define LG_BACK_GLAZED'));
-    assert.ok(material.customProgramCacheKey().endsWith('-pier-upper-v1'));
+    assert.ok(material.customProgramCacheKey().includes('-pier-upper-v1-reed-relief-v1-floor-split-v1'));
   }
 });
 check('Night Watch dims decoration coherently while retaining circulation lighting and exterior state', () => {
