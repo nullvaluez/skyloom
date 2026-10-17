@@ -173,13 +173,15 @@ check('Night Watch dims decoration coherently while retaining circulation lighti
   assert.ok(room.uniforms.uLoungeBounce.value.length() < bounce);
   assert.equal(JSON.stringify(state.sun), sun);
 });
-const openField = { ...field, aerodromes: [{ rings: [ring(corners(-2500, L+2500, -2500, 2500))] }], buildings: [], taxiwayLines: [], pavements: [{ cls: 'apron', rings: [ring(corners(300, 2700, -250, -1100))] }] };
+const openField = { ...field, occluderRevision: 1, occluders: [], aerodromes: [{ rings: [ring(corners(-2500, L+2500, -2500, 2500))] }], buildings: [], taxiwayLines: [], pavements: [{ cls: 'apron', rings: [ring(corners(300, 2700, -250, -1100))] }] };
 let chosen;
 check('pier site scoring checks both apron footprints and four rear seated/standing sightlines', () => {
   chosen = chooseLoungeSeat([runway], openField, { variant: 'pier' });
   assert.ok(chosen, 'a safe open apron admits a pier');
   assert.equal(chosen.variant, 'pier');
   assert.equal(chosen.detail.back.samples, 4);
+  assert.equal(chosen.detail.back.opening.samples.length, 7);
+  assert.ok(chosen.detail.back.opening.samples.every(s => s.clearDeg >= 40));
   assert.equal(chosen.detail.footprint.backStands.runway, 0);
   assert.equal(resolveLoungeSite(runway, { variant: 'pier', seat: chosen }).variant, 'pier');
 });
@@ -187,7 +189,7 @@ check('unknown, runway-covered and obstructed pier candidates retain classic fal
   assert.equal(resolveLoungeSite(runway, { variant: 'pier' }).variant, 'classic');
   const unsafe = { ...openField, pavements: [{ cls: 'runway', rings: [ring(corners(-2500, L+2500, -2500, 2500))] }] };
   assert.equal(chooseLoungeSeat([runway], unsafe, { variant: 'pier' }), null);
-  const blocked = { ...openField, buildings: [{ height: 150, pieces: [[ring(corners(-2500, L+2500, -2500, 2500))]] }] };
+  const blocked = { ...openField, occluders: [{top:150,rings:[ring(corners(-2500,L+2500,-2500,2500))]}], buildings: [{ height: 150, pieces: [[ring(corners(-2500, L+2500, -2500, 2500))]] }] };
   assert.equal(chooseLoungeSeat([runway], blocked, { variant: 'pier' }), null);
 });
 check('missing scored runway and mismatched chosen airport never produce a generic pier', () => {

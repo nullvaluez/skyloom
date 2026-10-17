@@ -13,7 +13,7 @@ registerHooks({
     return next(s, c);
   },
 });
-const { assessPierRoomFootprint, rearSetEligible } = await import('../lib/fly/lounge-seat.js');
+const { assessPierRoomFootprint, assessPierRearOpening, airfieldRaster, rearSetEligible } = await import('../lib/fly/lounge-seat.js');
 const { airportLayout } = await import('../lib/fly/airport-layout.js');
 const { planAirportSet, sampleRoute } = await import('../lib/fly/airport-set/plan.js');
 const { LOUNGE_SEATS_PIER } = await import('../lib/fly/lounge-seats-pier.js');
@@ -80,7 +80,7 @@ check('unknown or ineligible rear set creates no rear stands, bridges, vehicles 
   const classic = { ...site, variant: 'classic' };
   assert.deepEqual(airportLayout(classic), airportLayout({ ...classic, rearSet: true }));
 });
-check('cached YSSY evidence rejects the coastal room and accepts the contained replacement', () => {
+check('cached YSSY evidence rejects coastal and obstructed rooms and accepts the contained open replacement', () => {
   const fixture = JSON.parse(fs.readFileSync(new URL('./fixtures/lounge-placement-yssy.json', import.meta.url)));
   const at = s => {
     const runway = registerAirport(s.runway);
@@ -92,14 +92,26 @@ check('cached YSSY evidence rejects the coastal room and accepts the contained r
   assert.equal(assessPierRoomFootprint(fixture.features, newFrame).safe, true);
   const oldRoads = { ...fixture.features, aerodromes: [{ rings: [ring(oldFrame.x - 500, oldFrame.x + 500, oldFrame.z - 500, oldFrame.z + 500)] }] };
   assert.equal(assessPierRoomFootprint(oldRoads, oldFrame).reason, 'room-road-clearance');
-  assert.equal(fixture.current.runway.id, LOUNGE_SEATS_PIER.YSSY.runway);
-  assert.equal(fixture.current.along, LOUNGE_SEATS_PIER.YSSY.along);
-  assert.equal(fixture.current.cross, LOUNGE_SEATS_PIER.YSSY.cross);
+  const raster = airfieldRaster(fixture.features, fixture.runways.map(registerAirport), 8, { occluders: true });
+  const failed = assessPierRearOpening(raster, newFrame, fixture.current.floorM);
+  assert.equal(failed.safe, false, 'contained room is still unusable behind rendered buildings');
+  assert.ok(failed.samples.every(s => s.clearDeg === 0), 'both floor apertures are obstructed');
+  const clipped = assessPierRearOpening(raster, at(fixture.rejectedApertureCandidate), fixture.rejectedApertureCandidate.floorM);
+  assert.equal(clipped.safe, false, 'candidate that sees open sky only beyond the physical route aperture is rejected');
+  assert.ok(clipped.samples[3].clearDeg < 40);
+  const accepted = fixture.occlusionReplacement;
+  assert.equal(assessPierRoomFootprint(fixture.features, at(accepted), raster).safe, true);
+  const opening = assessPierRearOpening(raster, at(accepted), accepted.floorM);
+  assert.equal(opening.safe, true); assert.ok(opening.samples.every(s => s.clearDeg >= 40));
+  assert.equal(accepted.runway.id, LOUNGE_SEATS_PIER.YSSY.runway);
+  assert.equal(accepted.along, LOUNGE_SEATS_PIER.YSSY.along);
+  assert.equal(accepted.cross, LOUNGE_SEATS_PIER.YSSY.cross);
   assert.equal(LOUNGE_SEATS_PIER.YSSY.rearSet, false);
 });
 check('generated table and complete 115-airport audit agree on safety and rear eligibility', () => {
   const audit = JSON.parse(fs.readFileSync(new URL('./lounge-pier-audit.json', import.meta.url)));
-  assert.equal(audit.safetyRevision, 2);
+  assert.equal(audit.safetyRevision, 3);
+  assert.equal(audit.occlusionRevision, 1);
   assert.equal(audit.airports, 115);
   assert.equal(audit.rows.length, 115);
   assert.equal(new Set(audit.rows.map(r => r.ident)).size, 115);
@@ -111,6 +123,9 @@ check('generated table and complete 115-airport audit agree on safety and rear e
     const table = LOUNGE_SEATS_PIER[r.ident];
     assert.ok(table, r.ident);
     assert.equal(r.seat.detail.roomSafety.safe, true, r.ident);
+    assert.equal(r.seat.detail.back.opening.safe, true, r.ident);
+    assert.equal(r.seat.detail.back.opening.samples.length, 7);
+    assert.ok(r.seat.detail.back.opening.samples.every(s => s.clearDeg >= 40), r.ident);
     assert.equal(table.rearSet, r.seat.rearSet);
     assert.equal(table.rearSet, rearSetEligible(r.seat.detail.footprint));
     assert.equal(table.along, r.seat.along);

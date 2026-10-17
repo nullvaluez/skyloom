@@ -76,7 +76,7 @@ async function tileTemplate() {
   return template;
 }
 const api = {
-  async buildTile(z, x, y, detail) {
+  async buildTile(z, x, y, detail, options = {}) {
     if (detail !== 'sat-airport') throw new Error(`unexpected detail ${detail}`);
     const file = path.join(CACHE, `${z}-${x}-${y}.pbf`);
     let buf;
@@ -92,7 +92,7 @@ const api = {
       fs.writeFileSync(file, buf);
     }
     if (!buf.length) return { empty: true };
-    const airfield = buildAirfieldTile(new VectorTile(new PbfReader(new Uint8Array(buf))), { z, x, y }, null);
+    const airfield = buildAirfieldTile(new VectorTile(new PbfReader(new Uint8Array(buf))), { z, x, y }, null, options);
     return { airfield: { ...airfield, revision: AIRFIELD_TILE_REVISION } };
   },
 };
@@ -108,7 +108,7 @@ for (const ident of list) {
   if (!runways.length) { rows.push(`${ident.padEnd(5)} not in the runway catalog: classic fallback`); audit.push({ ident, selected: false, error: 'not in runway catalog', source: planet }); console.log(rows.at(-1)); continue; }
   let seat = null, note = '';
   try {
-    const features = await loadAirfieldFeatures(runways[0], { api });
+    const features = await loadAirfieldFeatures(runways[0], { api, occluders: variant === 'pier' });
     seat = chooseLoungeSeat(runways, features, { variant });
     audit.push({ ident, tiles: features.tiles, selected: !!seat, seat, source: planet });
     if (!seat && features.tiles?.failed) note = 'incomplete tile evidence: classic fallback';
@@ -143,4 +143,4 @@ if (!only) {
   fs.writeFileSync(path.join(ROOT, destination), out);
   console.log(`\nwrote ${destination}: ${Object.keys(seats).length} seats of ${list.length} hubs`);
 } else console.log(`\n(--only: ${destination} not written)\n${out}`);
-if (variant === 'pier' && !only) fs.writeFileSync(path.join(ROOT, 'scripts/lounge-pier-audit.json'), JSON.stringify({ variant, source: SOURCE_CACHE || offline ? 'mixed cached OpenFreeMap tiles' : planet, fetchedPlanet: offline ? previousAudit?.fetchedPlanet ?? null : planet, cachedSnapshotDate: null, offlineRescore: offline, safetyRevision: 2, visualCertification: false, airports: list.length, selected: audit.filter((a) => a.selected).length, fallback: audit.filter((a) => !a.selected).length, rows: audit }, null, 2) + '\n');
+if (variant === 'pier' && !only) fs.writeFileSync(path.join(ROOT, 'scripts/lounge-pier-audit.json'), JSON.stringify({ variant, source: SOURCE_CACHE || offline ? 'mixed cached OpenFreeMap tiles' : planet, fetchedPlanet: offline ? previousAudit?.fetchedPlanet ?? null : planet, cachedSnapshotDate: null, offlineRescore: offline, safetyRevision: 3, occlusionRevision: 1, visualCertification: false, airports: list.length, selected: audit.filter((a) => a.selected).length, fallback: audit.filter((a) => !a.selected).length, rows: audit }, null, 2) + '\n');
