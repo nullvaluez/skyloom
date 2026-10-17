@@ -10,7 +10,8 @@ registerHooks({ resolve(s, c, next) {
   return next(s, c);
 } });
 globalThis.window = { location: { search: '' }, matchMedia: () => ({ matches: false }) };
-const { observationContacts, observationRunways, observationToWorld, worldToObservation, buildingBlocksSegment, airfieldSightline, observationBuildingFeatures, sampledTerrainSightline, createSuggestionMemory, windowSuggestions } = await import('../lib/fly/lounge/observatory-model.mjs');
+const { observationContacts, observationRunways, observationToWorld, worldToObservation, buildingBlocksSegment, airfieldSightline, observationBuildingFeatures, renderedOcclusionReady, sampledTerrainSightline, createSuggestionMemory, windowSuggestions } = await import('../lib/fly/lounge/observatory-model.mjs');
+const { renderedBuildingBound } = await import('../lib/fly/airfield/rendered-building-bound.js');
 const { observatoryStations, stationState, stationPrompt, stationOnRay, stationLineClear } = await import('../lib/fly/lounge/observatory-stations.mjs');
 const { attachLoungeObservatory } = await import('../lib/fly/lounge-observatory-runtime.js');
 const { loungeApertureFrom } = await import('../lib/fly/lounge-site.js');
@@ -21,7 +22,7 @@ const { VANTAGE } = await import('../lib/fly/observation-config.js');
 let passed = 0, failed = 0;
 async function test(name, run) { try { await run(); passed++; console.log('PASS ' + name); } catch (e) { failed++; console.error('FAIL ' + name + '\n' + e.stack); } }
 const site = { ident: 'TEST', x: 0, z: 0, heading: 0, k: 1, groundY: 0, floorM: 5, variant: 'pier' };
-const features = { buildings: [], tiles: { requested: 1, loaded: 1, empty: 0, failed: 0 } };
+const features = { buildings: [], occluderRevision: 1, occluders: [], tiles: { requested: 1, loaded: 1, empty: 0, failed: 0 } };
 const track = (hex = 'abc123', values = {}) => ({ hex, rx: 0, rz: -1000, ry: 100, stale: 0, flags: 0, fix1: { vE: 0, vN: -60, vUp: -3, latRad: 0 }, meta: { flight: 'TST123' }, ...values });
 const context = (values = {}) => ({ site, eye: { x: 0, y: 1.65, z: 2 }, features, apertureFrom: loungeApertureFrom, terrainSightline: () => 'clear', ...values });
 const building = { height: 50, minHeight: 0, pieces: [[[-10, -100, 10, -100, 10, -50, -10, -50]]] };
@@ -51,10 +52,35 @@ await test('Buildings block low aircraft; rays above roofs and through holes sta
 });
 await test('Missing or failed airfield geometry never claims a visible window', () => {
   assert.equal(airfieldSightline({ x: 0, y: 5, z: 0 }, { x: 0, y: 10, z: -100 }, null), 'unverified');
-  for (const unavailable of [null, { buildings: [], tiles: { failed: 1 } }]) {
+  for (const unavailable of [null, { buildings: [], tiles: { failed: 1 } }, { buildings: [], tiles: features.tiles }, { ...features, tiles: { requested: 2, loaded: 1, empty: 0, failed: 0 } }]) {
     const row = observationContacts([track()], context({ features: unavailable }))[0];
     assert.equal(row.visibility, 'unverified'); assert.equal(row.bestView, null);
   }
+});
+await test('Rendered inference blocks synthetic five-metre bodies without rewriting source heights', () => {
+  const source = { ...building, height: 5 };
+  const bound = { id: 12, ...renderedBuildingBound({ render_height: 5 }, 6000, 1), rings: building.pieces[0] };
+  assert.ok(bound.top > 40); assert.equal(bound.sourceHeight, 5); assert.equal(bound.inferred, true);
+  const raw = { ...features, buildings: [source], occluders: [bound] }, before = JSON.stringify(raw);
+  const geometry = observationBuildingFeatures(raw, site, null);
+  assert.equal(geometry.buildings, raw.buildings); assert.equal(geometry.occluders, raw.occluders);
+  const from = { x: 0, y: 10, z: 0 }, to = { x: 0, y: 20, z: -1000 };
+  assert.equal(buildingBlocksSegment(from, to, source), false, 'the source placeholder alone misses the rendered wall');
+  assert.equal(airfieldSightline(from, to, geometry), 'blocked');
+  assert.equal(airfieldSightline({ ...from, y: 80 }, { ...to, y: 90 }, geometry), 'verified-airfield');
+  const contact = observationContacts([track()], context({ features: geometry }))[0];
+  assert.equal(contact.visibility, 'blocked'); assert.deepEqual(contact.viewpoints, []);
+  assert.deepEqual(windowSuggestions([contact], createSuggestionMemory(), 0), { front: null, back: null });
+  assert.equal(JSON.stringify(raw), before);
+});
+await test('Rendered buildings outside the aerodrome still occlude contacts; absent bounds stay unverified', () => {
+  const bound = { id: 'outside-airport', ...renderedBuildingBound({ render_height: 55, height: 55 }, 2000), rings: building.pieces[0] };
+  const raw = { ...features, buildings: [], occluders: [bound] };
+  const geometry = observationBuildingFeatures(raw, site, null);
+  assert.equal(geometry.sightlineBuildings.length, 1); assert.equal(geometry.sightlineBuildings[0].minX, -10);
+  assert.equal(observationContacts([track()], context({ features: geometry }))[0].visibility, 'blocked');
+  assert.equal(renderedOcclusionReady({ ...features, occluders: [{ ...bound, top: undefined }] }), false);
+  assert.equal(renderedOcclusionReady({ ...features, occluderRevision: 2 }), false);
 });
 await test('Terrain ridge blocks aircraft; missing/coarse/over-range samples never advertise a clear window', () => {
   const eye = { x: 0, y: 20, z: 0 }, target = { x: 1000, y: 100, z: 0 };
@@ -75,8 +101,10 @@ await test('Terrain ridge blocks aircraft; missing/coarse/over-range samples nev
 await test('Generated structures replace retired OSM footprints for sightline tests', () => {
   const osm = { ...building, cx: 0, cz: -75 };
   const plan = { footprint: [{ x0: -20, x1: 20, z0: -120, z1: -40 }], terminal: { x0: -4, x1: 4, z0: -20, z1: -10, roofY: 20 } };
-  const result = observationBuildingFeatures({ buildings: [osm] }, site, plan, 0);
-  assert.equal(result.buildings.length, 1); assert.equal(result.buildings[0].id, 'set-terminal');
+  const raw = { ...features, buildings: [osm], occluders: [{ top: 50, rings: osm.pieces[0] }] };
+  const result = observationBuildingFeatures(raw, site, plan, 0);
+  assert.equal(result.buildings, raw.buildings); assert.equal(result.occluders, raw.occluders);
+  assert.equal(result.sightlineBuildings.length, 1); assert.equal(result.sightlineBuildings[0].id, 'set-terminal');
   assert.equal(airfieldSightline({ x: 0, y: 7, z: 0 }, { x: 0, y: 10, z: -1000 }, result), 'blocked');
 });
 await test('Site transforms round-trip nonunit Mercator scale and rotation', () => {
@@ -208,6 +236,26 @@ await test('Late geometry from a departed airport cannot contaminate its replace
   assert.equal(f.o.snapshot().geometryReady, false);
   pending[1].resolve(features); await Promise.resolve(); await Promise.resolve();
   f.o.tick(.3); assert.equal(f.o.snapshot().geometryReady, true); f.detach();
+});
+await test('Base-cache entry requests enrichment; pending and failed data never suggest a visible window', async () => {
+  const base = { buildings: [], tiles: features.tiles };
+  let resolve, requested;
+  const f = runtimeFixture({ featuresOf: () => base, loadFeatures: (target, options) => {
+    requested = { ident: target.ident, options }; return new Promise((done) => { resolve = done; });
+  } });
+  f.watch.selected = 'abc123';
+  await Promise.resolve();
+  assert.deepEqual(requested, { ident: 'TEST', options: { occluders: true } });
+  assert.equal(f.o.snapshot().geometryReady, false); assert.equal(f.o.snapshot().contacts[0].bestView, null);
+  resolve(features); await new Promise(setImmediate); f.o.tick(.3);
+  assert.equal(f.o.snapshot().geometryReady, true); assert.equal(f.o.snapshot().contacts[0].bestView, 'front');
+  f.o.tick(.3); assert.equal(f.o.snapshot().geometryReady, true, 'subsequent base-cache reads cannot discard enrichment');
+  assert.equal(f.watch.selected, 'abc123'); assert.deepEqual(f.selection, []); f.detach();
+  const failed = runtimeFixture({ featuresOf: () => base, loadFeatures: () => Promise.reject(new Error('offline')) });
+  await new Promise(setImmediate); failed.o.tick(.3);
+  assert.equal(failed.o.snapshot().geometryReady, false);
+  assert.equal(failed.o.snapshot().contacts[0].visibility, 'unverified');
+  assert.deepEqual(failed.o.snapshot().suggestions, { front: null, back: null }); failed.detach();
 });
 await test('Every classic/pier station has a clear, collision-free approach connected to the window seat', () => {
   for (const variant of ['classic', 'pier']) {
