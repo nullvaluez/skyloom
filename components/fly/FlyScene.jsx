@@ -113,6 +113,7 @@ import { PoiLetters } from './PoiLetters';
 import { TrafficTracers } from './TrafficTracers';
 import { WarpBurst } from './WarpBurst';
 import { TerrainEngine } from '@/lib/fly/terrain-engine';
+import { createCriticalTerrainGate, terrainArrivalCovered } from '@/lib/fly/critical-terrain-prewarm.mjs';
 import {
   createImagerySource,
   createTerrainSources,
@@ -166,6 +167,7 @@ import {
   MOON,
   MOTION_R24,
   NIGHT_TRUTH_R23,
+  PREWARM,
   SAT_BUILDINGS,
   SAT_CITY_GLOW,
   SAT_QUILT,
@@ -1564,9 +1566,13 @@ export function FlyScene({ runtime }) {
   // Round 7: + DEM-normal hillshade (strength-gated to satellite via a live
   // uniform — the SAME hook patches toy's solid-tan tiles) and anisotropic
   // imagery sampling (low-pass smearing fix; bandwidth only, zero draws).
-  useEffect(
-    () =>
-      engine.onTileMaterial((m) => {
+  useEffect(() => {
+    const store = useFlyStore.getState();
+    const covered = terrainArrivalCovered(runtime, typeof window !== 'undefined' ? window.__flyBoot : null, store.phase);
+    const gate = PREWARM.enabled && store.mapStyle === 'satellite' && covered ? createCriticalTerrainGate() : null;
+    if (gate) { runtime.terrainPrewarm = gate; runtime.criticalTerrain = gate.state; }
+    const offDispose = gate ? engine.onDispose(() => gate.dispose()) : null;
+    const offMaterials = engine.onTileMaterial((m) => {
         applyBendFade(m);
         // R24 D: the third argument is the per-material LOD crossfade slot —
         // null (and therefore an exact R19 program, key and text) whenever
@@ -1588,9 +1594,15 @@ export function FlyScene({ runtime }) {
           m.map.anisotropy = aniso;
           m.map.needsUpdate = true;
         }
-      }),
-    [engine]
-  );
+        // Hold draw publication, never the renderer-driven map/LOD tree.
+        // All shader patches above still run before the critical compile.
+        gate?.hold(m);
+      });
+    return () => {
+      offMaterials(); offDispose?.(); gate?.dispose();
+      if (runtime.terrainPrewarm === gate) { delete runtime.terrainPrewarm; delete runtime.criticalTerrain; }
+    };
+  }, [engine, runtime]);
 
   // R24 C (ONE_SUN): the stashed style/tier hillshade base + the last TRUE sun
   // elevation the day cycle resolved (90 = "no sun published yet" ⇒ dayK, the

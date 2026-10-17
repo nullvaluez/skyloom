@@ -235,6 +235,10 @@ export function BootScreen({ runtime }) {
       else phase = 'ready';
 
       if (allDone) {
+        if (living && timedOut) {
+          const reason = reducedEntry.current ? 'explicit-reduced' : 'time-cap';
+          rt.terrainPrewarm?.bypass(reason); rt.loungeRoom?.bypassWarm?.(reason);
+        }
         rt.worldLoading=false;rt.worldDegraded=!!(living&&(reducedEntry.current||timedOut));
         if(typeof window!=='undefined')window.__flyWorldStatus={ready:content?.ready??true,degraded:rt.worldDegraded,missing:content?.missing??[]};
         gate.done = true;

@@ -30,6 +30,10 @@ import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
 import { getR25Sky } from '@/lib/fly/r25-sky';
 import { toSceneDir } from '@/lib/fly/true-scale';
 import { ROOM_LOOK } from '@/lib/fly/observation-config';
+import { cinemaOn } from '@/lib/fly/cinema-policy';
+import { isMobileGraphicsClass } from '@/lib/fly/device-class';
+import { reachableCinemaCascades } from '@/lib/fly/cinema-profile-prewarm';
+import { warmRoomProfiles } from '@/lib/fly/lounge/room-prewarm';
 
 const _key = new Vector3();
 const _view = new Vector3();
@@ -54,6 +58,7 @@ function Room({ runtime, variant }) {
     st.current = {
       maps: false, warm: 'pending', warmRT: null, exposure: 0, hidden: false, probeAt: -Infinity,
       probeKey: null, probeDirty: true, shade: {}, inverse: new Matrix4(), started: performance.now(),
+      programWarm: { required: true, status: 'waiting', startedAt: null, readyAt: null, error: null, reason: null, cascadeCounts: [] },
     };
   }
 
@@ -90,7 +95,20 @@ function Room({ runtime, variant }) {
 
   // Indoor fixes read this (PrecipLayer, the cloud composite, the N8AO rig).
   useEffect(() => {
-    const publish = { active: false, shown: false, opacity: 0, inverse: st.current.inverse, envelope: roomVariant(variant).envelope, aoRadius: ROOM_LOOK.ao.radius, aoIntensity: ROOM_LOOK.ao.intensity, weight: 0 };
+    const state = st.current;
+    const publish = { active: false, shown: false, opacity: 0, inverse: state.inverse, envelope: roomVariant(variant).envelope, aoRadius: ROOM_LOOK.ao.radius, aoIntensity: ROOM_LOOK.ao.intensity, weight: 0,
+      programWarm: state.programWarm,
+      bypassWarm(reason) {
+        if (state.programWarm.status === 'ready') return;
+        state.programWarm.status = 'bypassed'; state.programWarm.reason = reason;
+      },
+      retryWarm() {
+        if (state.programWarm.status !== 'failed') return false;
+        state.warm = 'pending';
+        Object.assign(state.programWarm, { status: 'waiting', error: null, reason: null });
+        return true;
+      },
+    };
     runtime.loungeRoom = publish;
     return () => {
       if (runtime.loungeRoom === publish) delete runtime.loungeRoom;
@@ -152,26 +170,52 @@ function Room({ runtime, variant }) {
     // Prewarm: once the maps are in and the cascade rig (when one runs) has
     // adopted every lit material (it adopts hidden objects too), compile the
     // room under a render target so the program keys match the composer's
-    // (linear, no tone mapping). The room stays hidden until its programs
-    // are ready — a first draw never compiles — with a timeout as a backstop.
+    // (linear, no tone mapping). Also retain the reachable cascade/light-count
+    // permutations: governor transitions must not compile the room mid-walk.
+    // The shared arrival cap/explicit reduced entry owns any degraded reveal;
+    // a failed compile is not silently relabelled as a successful warm.
     if (s.maps && s.warm === 'pending') {
+      const store = useFlyStore.getState();
+      const cinematic = cinemaOn(store);
       const csm = runtime.cinemaShadows?.cascades > 0;
       const adopted = !csm || resource.litMaterials().every((m) => m.customProgramCacheKey().includes('cinema-csm'));
-      if (adopted) {
+      if (adopted && (!cinematic || (scene.environment && runtime.cinemaShadows))) {
         s.warm = 'running';
+        const warm = s.programWarm;
+        const parallel = gl.extensions.has('KHR_parallel_shader_compile');
+        if (warm.status !== 'bypassed') warm.status = 'compiling';
+        warm.startedAt = performance.now();
+        warm.parallel = parallel;
+        warm.profileStatus = cinematic && !parallel ? 'unsupported' : 'compiling';
+        warm.cascadeCounts = cinematic && parallel ? reachableCinemaCascades({ preset: store.qualityPreset, phone: isMobileGraphicsClass() }) : [];
         s.warmRT ??= new WebGLRenderTarget(1, 1);
         const prev = gl.getRenderTarget();
         let job;
         try {
           gl.setRenderTarget(s.warmRT);
-          job = Promise.all([gl.compileAsync(group, camera, scene), gl.compileAsync(resource.glass.mesh, camera, overlayWarmScene()), gl.compileAsync(resource.steam.mesh, camera, overlayWarmScene())]);
+          const profiles = cinematic && parallel ? warmRoomProfiles({ gl, camera, scene, resource, variant, cascadeCounts: warm.cascadeCounts }) : null;
+          const jobs = [gl.compileAsync(group, camera, scene), gl.compileAsync(resource.glass.mesh, camera, overlayWarmScene()), gl.compileAsync(resource.steam.mesh, camera, overlayWarmScene())];
+          if (profiles) jobs.push(profiles.promise);
+          job = Promise.all(jobs);
+        } catch (error) {
+          job = Promise.reject(error);
         } finally {
           gl.setRenderTarget(prev);
         }
-        job.then(() => { if (st.current === s) s.warm = 'done'; }, () => { if (st.current === s) s.warm = 'done'; });
+        job.then(() => {
+          if (st.current !== s) return;
+          s.warm = 'done'; warm.readyAt = performance.now();
+          if (warm.profileStatus !== 'unsupported') warm.profileStatus = 'ready';
+          // Preserve the truthful degraded-arrival record if its cap fired.
+          if (warm.status !== 'bypassed') warm.status = 'ready';
+        }, (error) => {
+          if (st.current !== s) return;
+          s.warm = 'failed'; warm.error = String(error?.message ?? error);
+          if (warm.status !== 'bypassed') warm.status = 'failed';
+        });
       }
     }
-    const ready = s.warm === 'done' || performance.now() - s.started > ROOM_LOOK.prewarmTimeoutMs;
+    const ready = s.warm === 'done' || s.programWarm.status === 'bypassed';
     const shown = !!w.validated && !s.hidden && ready;
     if (pub) { pub.shown = shown; pub.opacity = 1 - fade; }
     group.visible = shown;
