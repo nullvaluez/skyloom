@@ -283,3 +283,31 @@ cost, less density aliasing, stable haze/cloud datum, and prompt recovery from
 severe overload. Physical-phone FPS, thermal throttling, and Safari have not
 been measured. The affected-device follow-up above still applies; no claim of
 universal 60 fps or complete removal of every graphics hitch is made.
+
+## Frame-cost flags — 2026-10-17
+
+The per-preset profile (`/mnt/project-files/perf/preset-frame-cost.md`) found
+the immersive cloud march is about 70% of an Ultra frame and that Ultra had no
+program-stable governor rung: its first step down jumped straight to High and
+dropped a shadow cascade. Four flag blocks at the end of `fly-constants.js`,
+read only through `lib/fly/frame-cost.js`:
+
+| Flag | Ships | What it does |
+| --- | --- | --- |
+| `ULTRA_RUNG` | on | Governor effect level 1 on Ultra resolves to `ultra-balanced` (72 cloud steps, 0.4 cloud scale, three cascades kept) instead of High. Ladder: ultra → ultra-balanced → high → low. |
+| `CLOUD_STEPS` | off | The march takes `ceil(interval / minStrideM)` steps, clamped to `[minSteps, steps]`, instead of a fixed count over short ray intervals. |
+| `AERIAL_MERGE` | off | Aerial perspective runs inside the cloud composite (`lib/fly/aerial-merge.js` namespaces the effect's GLSL) instead of as its own full-screen EffectPass. Falls back to the separate pass if the merged program fails. |
+| `CASCADE_STAGGER` | off | The farthest shadow cascade renders every `period` frames; a camera jump over `jumpM` forces a render. |
+
+Container check (SwiftShader, offline fixture, world frozen; ms are not GPU
+numbers): the un-pinned governor walked ultra → ultra-balanced with 3 cascades
+and 72 steps. `AERIAL_MERGE` removes the ~185 ms aerial pass and the merged
+frame matches the separate pass to mean 0.20/255 (0.4% of pixels over 8), below
+the 2.0 same-chain noise floor. `CLOUD_STEPS` is pixel-identical within noise
+and showed no saving in this pose. `CASCADE_STAGGER` skipped the far cascade on
+4 of 8 frames; the fixture has no casters, so its saving is unmeasured.
+
+Owner run list (RTX 5080, then iPhone): compare frame time with
+`?flags=CLOUD_STEPS`, `?flags=AERIAL_MERGE` and `?flags=CASCADE_STAGGER` against
+the default; for the stagger, watch far-shadow edges while banking; flip any
+that pay and look right.

@@ -13,6 +13,7 @@ import { r25On } from '@/lib/fly/visuals-profile';
 import { R25_SKY } from '@/lib/fly/fly-constants';
 import { releaseBloomTargets } from '@/lib/fly/release-bloom-targets';
 import { HDRGradeEffect } from '@/lib/fly/hdr-grade';
+import { aerialMergeOn } from '@/lib/fly/frame-cost';
 
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
@@ -178,6 +179,11 @@ export function buildPassList(style, tier, ctx = {}) {
   const toneMode = TONE_MODES[toneName];
   const aerialOn = sat && AERIAL_PERSPECTIVE.enabled && (tier === 'high' || immersiveOn('lighting'));
   const cloudOn = sat && immersiveOn('clouds');
+  // FRAME COST (AERIAL_MERGE): the cloud composite runs the aerial program
+  // itself (ImmersiveCloudPass.setAerial), so the chain drops its own pass.
+  // `ctx.aerialMerge === false` is the live chain's fallback after a failed
+  // splice; the prewarm, which passes nothing, follows the flag.
+  const aerialMerged = cloudOn && aerialOn && aerialMergeOn() && ctx.aerialMerge !== false;
   const speedOn = SPEED_FEEL.enabled && tier === 'high' && ctx.speedMount !== false && !(sat && immersiveOn('camera'));
   // R25 C: which aerial TEXT. The live chain passes the instance it chose
   // (ctx.r25Aerial alongside ctx.aerial); the prewarm passes nothing and gets
@@ -224,7 +230,7 @@ export function buildPassList(style, tier, ctx = {}) {
   if (cloudOn) {
     // Atmosphere reads terrain depth. Apply it before cloud compositing so it
     // cannot haze a nearby cloud using the mountain kilometres behind it.
-    if (aerialOn) list.push({id:'aerial',el:()=> <primitive key="aerial" object={ctx.aerial} dispose={null} />,raw:aerialRaw});
+    if (aerialOn && !aerialMerged) list.push({id:'aerial',el:()=> <primitive key="aerial" object={ctx.aerial} dispose={null} />,raw:aerialRaw});
     list.push({id:'immersive-clouds',boundary:true,el:()=> ctx.clouds ? <primitive key="immersive-clouds" object={ctx.clouds} dispose={null} /> : null,raw:()=>null});
     // Depth-less airborne marks (traffic trails, far traffic glints, plumes,
     // the player contrail) are drawn HERE, after the cloud composite replaced
@@ -385,7 +391,9 @@ export function buildPassList(style, tier, ctx = {}) {
   // list rather than as a second list, so the el()/raw() twins cannot drift
   // apart (Effects.jsx's whole contract: the pre-warm compiles `raw`, and if
   // it stops matching `el` the warm compiles a program production never uses).
-  return POST_ORDER.enabled ? reorderForDisplaySpace(list) : list;
+  const out = POST_ORDER.enabled ? reorderForDisplaySpace(list) : list;
+  out.aerialMerged = aerialMerged;
+  return out;
 }
 
 /**
@@ -840,9 +848,11 @@ export const Effects = memo(function Effects({ runtime }) {
   // tick, a parent re-render) reuses this exact array — and FlyEffectComposer's
   // pass-list diff then does nothing at all. `runtime` is deliberately NOT a
   // dependency: it is a stable mutable handle, never a render input.
-  const children = useMemo(
+  const [aerialMergeBroken, setAerialMergeBroken] = useState(false);
+  const chain = useMemo(
     () =>
       buildPassList(mapStyle, qualityTier, {
+        aerialMerge: !aerialMergeBroken,
         toneName,
         r25Aerial,
         speedMount: speedMountPin,
@@ -856,8 +866,9 @@ export const Effects = memo(function Effects({ runtime }) {
         n8ao: aoPass,
         clouds,
         overlay,
-      }).map((p) => p.el()),
+      }),
     [
+      aerialMergeBroken,
       mapStyle,
       qualityTier,
       toneName,
@@ -875,6 +886,17 @@ export const Effects = memo(function Effects({ runtime }) {
       overlay,
     ]
   );
+  const children = useMemo(() => chain.map((p) => p.el()), [chain]);
+  // FRAME COST (AERIAL_MERGE): hand the cloud pass the aerial instance in the
+  // same commit that drops the aerial pass from the chain; a failed splice
+  // falls back to the separate pass.
+  const aerialMerged = chain.aerialMerged === true;
+  useLayoutEffect(() => {
+    if (!clouds) return;
+    clouds.onAerialFallback = () => setAerialMergeBroken(true);
+    clouds.setAerial(aerialMerged ? aerial : null);
+    return () => clouds.setAerial(null);
+  }, [clouds, aerial, aerialMerged]);
 
   return (
     <FlyEffectComposer multisampling={0}>{children}</FlyEffectComposer>

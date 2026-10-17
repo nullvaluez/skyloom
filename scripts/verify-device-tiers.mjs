@@ -28,6 +28,9 @@
  *  (6) start preset (ultraStart): a High GPU start on a desktop resolves
  *      Ultra; every other start keeps its tier; automation keeps High unless
  *      the pin sets ultraAutomation; flag off never starts Ultra.
+ *  (7) ULTRA_RUNG: with the ladder flag on, Ultra's first step is an effects
+ *      rung that keeps all three cascades (ultra-balanced), before any
+ *      render-scale rung.
  *
  * Run: node scripts/verify-device-tiers.mjs
  */
@@ -56,6 +59,7 @@ if (legArg) {
   globalThis.window = { location: { search: '' }, __flyDeviceTiersOverride: { enabled: on } };
   const tiers = await import('../lib/fly/device-tiers.js');
   const gov = await import('../lib/fly/perf-governor.js');
+  const { ultraRungOn } = await import('../lib/fly/frame-cost.js');
   const { defaultQualityTier, defaultQualityPreset } = await import('../lib/fly/fly-settings.js');
   const ladder = ({ dpr0, preset = 'high', phone = false }) => {
     if (phone) {
@@ -66,7 +70,7 @@ if (legArg) {
     const g = gov.createGovernor({ dpr0, tier0: 'high', applyDpr() {}, applyTier() {}, applyEffects() {} });
     return g.ladder.map((r) => ({
       ...r,
-      cascades: resolveCinemaProfile({ preset, tier: r.tier, scale: r.dpr, phone, effectLevel: r.effects, scaleDemotes: !tiers.ladderOrderOn() }).cascades,
+      cascades: resolveCinemaProfile({ preset, tier: r.tier, scale: r.dpr, phone, effectLevel: r.effects, scaleDemotes: !tiers.ladderOrderOn(), ultraRung: ultraRungOn() }).cascades,
     }));
   };
   const out = {
@@ -151,6 +155,11 @@ check(
   `DPR1: ${fmt(on.desktop1)} | DPR1.5: ${fmt(on.desktop15)}`,
 );
 check('(3) flag on, Ultra: the 3 -> 2 cascade rung waits for render scale too', sameRungs(on.ultra1, off.ultra1) && cascadeSafe(on.ultra1), fmt(on.ultra1));
+check(
+  '(7) ULTRA_RUNG: Ultra sheds cloud cost on a three-cascade rung before render scale',
+  on.ultra1.length > 2 && on.ultra1[1].effects === 1 && on.ultra1[1].dpr === on.ultra1[0].dpr && on.ultra1[1].cascades === 3 && on.ultra1[0].cascades === 3,
+  fmt(on.ultra1),
+);
 check(
   '(4) flag on, phone: identical rungs, and render scale no longer drops the cascade',
   JSON.stringify(sig(on.phone15)) === JSON.stringify(sig(off.phone15)) && cascadeSafe(on.phone15),
