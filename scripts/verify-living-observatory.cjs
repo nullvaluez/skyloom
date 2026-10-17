@@ -60,16 +60,35 @@ const check = (arm, name, pass, detail) => {
       report.arms.push({ arm, initial }); save();
       check(arm, 'Feature gate matches requested arm', initial.instruments === (arm !== 'off'), initial);
       check(arm, 'Classic/pier room selection matches arm', initial.variant === (arm === 'pier' ? 'pier' : 'classic'), initial.variant);
+      if (arm !== 'off') {
+        fixture = await page.evaluate(() => {
+          const r = window.__fly, w = r.airportWatch, e = w.eyeWorld(), a = w.roomHeading + .12, range = 7000;
+          const g = r.engine.worldToGeo({ x: e.x - Math.sin(a) * range * w.frame.k, y: 0, z: e.z - Math.cos(a) * range * w.frame.k });
+          return [{ hex: 'a1b2c3', flight: 'QAL101', r: 'NB2C3', t: 'A320', category: 'A3', type: 'adsb_icao', lat: g.y, lon: g.x, alt_baro: Math.round((e.y + 180) * 3.28084), alt_geom: Math.round((e.y + 180) * 3.28084), gs: 130, track: ((-w.roomHeading * 180 / Math.PI) + 540) % 360, baro_rate: -500, seen: 0, seen_pos: 0 }];
+        });
+        await page.waitForFunction(() => window.__fly.airportWatch.observatory.snapshot().contacts.some((c) => c.hex === 'a1b2c3'), undefined, { timeout: 45000 });
+      }
       if (requested === 'compact') {
         await page.setViewportSize({ width: 1280, height: 720 });
         await page.keyboard.press('i'); await page.getByTestId('observatory-panel').waitFor();
         const panel = page.getByTestId('observatory-panel');
         const dimensions = await panel.evaluate((el) => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, right: r.right, bottom: r.bottom, height: r.height, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight }; });
         check(arm, '1280×720 airport table remains inside viewport', dimensions.x >= 0 && dimensions.y >= 0 && dimensions.right <= 1280 && dimensions.bottom <= 720, dimensions);
+        await page.locator('.observatory-contact-list button').filter({ hasText: 'QAL101' }).click();
+        const direction = page.getByRole('button', { name: 'Show me the direction', exact: true });
+        await direction.waitFor();
+        const selectedLayout = await panel.evaluate((el) => {
+          const action = el.querySelector('.observatory-action'), list = el.querySelector('.observatory-contact-list');
+          const a = action.getBoundingClientRect(), p = el.getBoundingClientRect(), l = list.getBoundingClientRect();
+          return { actionTop: a.top, actionBottom: a.bottom, panelBottom: p.bottom, listHeight: l.height, scrollTop: el.scrollTop, overflow: el.scrollHeight - el.clientHeight };
+        });
+        check(arm, 'Selected aircraft direction action stays visible without outer scrolling', selectedLayout.actionBottom <= selectedLayout.panelBottom && selectedLayout.actionTop >= 0 && selectedLayout.actionBottom <= 720 && selectedLayout.scrollTop === 0 && selectedLayout.overflow <= 1 && selectedLayout.listHeight >= 64, selectedLayout);
+        await page.screenshot({ path: path.join(out, 'pier-1280x720-selected-map.png') });
+        await direction.click();
+        check(arm, 'Compact map direction action works', await page.getByTestId('observatory-direction').isVisible());
         await page.getByTestId('observatory-lighting').click();
-        await panel.hover(); await page.mouse.wheel(0, 900);
         await page.getByRole('button', { name: 'Restore lounge lighting', exact: true }).click();
-        check(arm, '1280×720 Night Watch restore works with normal scrolling and click', !await page.evaluate(() => window.__fly.airportWatch.observatory.night));
+        check(arm, '1280×720 Night Watch restore works with normal click', !await page.evaluate(() => window.__fly.airportWatch.observatory.night));
         await page.screenshot({ path: path.join(out, 'pier-1280x720-night.png') });
         check(arm, 'No page exceptions', !report.errors.some((e) => e.arm === arm), report.errors.filter((e) => e.arm === arm));
         await page.setViewportSize({ width: 1600, height: 1000 });
@@ -85,12 +104,6 @@ const check = (arm, name, pass, detail) => {
         report.arms.at(-1).scriptErrors = await page.evaluate(() => window.__observatoryScriptErrors ?? []);
         await context.close(); continue;
       }
-      fixture = await page.evaluate(() => {
-        const r = window.__fly, w = r.airportWatch, e = w.eyeWorld(), a = w.roomHeading + .12, range = 7000;
-        const g = r.engine.worldToGeo({ x: e.x - Math.sin(a) * range * w.frame.k, y: 0, z: e.z - Math.cos(a) * range * w.frame.k });
-        return [{ hex: 'a1b2c3', flight: 'QAL101', r: 'NB2C3', t: 'A320', category: 'A3', type: 'adsb_icao', lat: g.y, lon: g.x, alt_baro: Math.round((e.y + 180) * 3.28084), alt_geom: Math.round((e.y + 180) * 3.28084), gs: 130, track: ((-w.roomHeading * 180 / Math.PI) + 540) % 360, baro_rate: -500, seen: 0, seen_pos: 0 }];
-      });
-      await page.waitForFunction(() => window.__fly.airportWatch.observatory.snapshot().contacts.some((c) => c.hex === 'a1b2c3'), undefined, { timeout: 45000 });
       const state = () => page.evaluate(() => { const w = window.__fly.airportWatch; return { active: w.active, posture: w.posture, eye: { ...w.eyeLocal }, yaw: w.yaw, pitch: w.pitch, tracking: w.tracking, binocular: w.binocular, selected: w.selected, observatory: w.observatory.snapshot(), speed: w.walk.speed, sound: window.__flyStore.getState().soundOn }; });
       const settle = () => page.waitForTimeout(350);
       const neutralFocus = () => page.evaluate(() => document.activeElement?.blur?.());

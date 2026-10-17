@@ -5,12 +5,16 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
+const { createHash } = require('node:crypto');
 const { chromium } = require('playwright');
 const arg = (key, fallback) => { const at = process.argv.indexOf('--' + key); return at >= 0 ? process.argv[at + 1] : fallback; };
 const out = path.resolve(arg('out', `.graphics-review/living-observatory/upper-${Date.now()}`));
 const url = `http://localhost:${arg('port', '3351')}/?graphicsReview=1&flags=LOUNGE_PIER,LOUNGE_INSTRUMENTS,LOUNGE_WALK`;
 fs.mkdirSync(out, { recursive: true });
 const report = { at: new Date().toISOString(), url, weather: 'baseline clear', viewport: [1920, 1080], purpose: 'Rendered visual review, no performance certification', errors: [], consoleErrors: [], captures: [], routes: [] };
+report.source = { revision: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), status: execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim() };
+report.source.files = Object.fromEntries(['lib/fly/observation-config.js', 'lib/fly/lounge/room-walk.mjs', 'lib/fly/lounge/room-build.js', 'lib/fly/lounge/room-shading.js', 'lib/fly/lounge/observatory-instruments.js', 'components/fly/hud/lounge/ObservatoryHud.jsx'].map((file) => [file, createHash('sha256').update(fs.readFileSync(file)).digest('hex')]));
 const save = () => fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify(report, null, 2));
 
 (async () => {
@@ -35,6 +39,7 @@ const save = () => fs.writeFileSync(path.join(out, 'report.json'), JSON.stringif
   const walkTo = async (goal, name) => {
     await page.evaluate(() => { const w = window.__fly.airportWatch; w.binoculars(false); w.observatory.release(); w.clearSelection(); });
     const from = await pose();
+    if (!walk.isFree(space.layers?.[goal.floorId] ?? space, goal.x, goal.z)) throw new Error(`Review target ${name} is inside a collision capsule: ${JSON.stringify(goal)}`);
     const points = walk.findPath(space, from, goal);
     if (!points) throw new Error(`No connected walking route ${name}: ${JSON.stringify({ from, goal })}`);
     await page.getByTestId('lounge-surface').focus();
@@ -78,6 +83,7 @@ const save = () => fs.writeFileSync(path.join(out, 'report.json'), JSON.stringif
     await page.evaluate((id) => window.__fly.airportWatch.observatory.activate(id, { remote: true }), id);
     await capture(name + '-hud');
     await page.evaluate(() => window.__fly.airportWatch.observatory.release());
+    await page.getByTestId('observatory-panel').waitFor({ state: 'hidden' });
   };
   try {
     const { roomBlockers } = await import('../lib/fly/lounge/room-build.js');
@@ -104,6 +110,31 @@ const save = () => fs.writeFileSync(path.join(out, 'report.json'), JSON.stringif
     report.initial = await pose(); save();
     if (report.errors.length || report.consoleErrors.some((s) => /shader error|validate_status|gl_invalid|program link/i.test(s))) throw new Error('Page or shader errors on initial upper-room rendering');
     await capture('lower-front-initial');
+    if (arg('mode', '') === 'hud') {
+      await stand();
+      await instrument('airport-table', { x: 4.4, z: 5.2, floorId: 'lower' }, 'airport-table');
+      await page.getByTestId('observatory-open').click();
+      await page.waitForFunction(() => window.__fly.airportWatch.observatory.snapshot().active === 'airport-table');
+      await page.locator('.observatory-contact-list button').first().waitFor({ timeout: 45000 });
+      report.selectedLabel = await page.locator('.observatory-contact-list button').first().innerText();
+      await page.locator('.observatory-contact-list button').first().click();
+      await capture('airport-map-selected-1920');
+      await page.setViewportSize({ width: 1280, height: 720 });
+      const dimensions = () => page.getByTestId('observatory-panel').evaluate((el) => {
+        const box = (node) => { const r = node.getBoundingClientRect(); return { x: r.x, y: r.y, right: r.right, bottom: r.bottom, width: r.width, height: r.height }; };
+        const list = el.querySelector('.observatory-contact-list'), cta = el.querySelector('.observatory-selection .observatory-action');
+        return { panel: box(el), panelScrollTop: el.scrollTop, panelScrollHeight: el.scrollHeight, panelClientHeight: el.clientHeight, list: box(list), listScrollHeight: list.scrollHeight, listClientHeight: list.clientHeight, cta: cta ? box(cta) : null, viewport: { width: innerWidth, height: innerHeight } };
+      });
+      await page.waitForTimeout(500); report.compactBeforeScroll = await dimensions(); save();
+      await capture('airport-map-selected-1280');
+      const action = page.getByRole('button', { name: 'Show me the direction', exact: true });
+      await action.scrollIntoViewIfNeeded();
+      report.compactAfterScroll = await dimensions(); save();
+      await capture('airport-map-selected-1280-scrolled');
+      await action.click(); await capture('airport-map-direction-cue');
+      report.complete = true; report.checks = { noPageErrors: report.errors.length === 0 }; save();
+      return;
+    }
     await stand();
     await walkTo({ x: 0, z: 2.8, floorId: 'lower' }, 'lower-aisle');
     await look(Math.PI, .07); await pair('lower-room');
@@ -137,7 +168,7 @@ const save = () => fs.writeFileSync(path.join(out, 'report.json'), JSON.stringif
     await walkTo({ x: 6.2, z: .45, floorId: 'lower' }, 'window-compass-oblique');
     await page.evaluate(() => { const w = window.__fly.airportWatch, p = [6.8, .96, -.83], e = w.eyeLocal; w.yaw = Math.atan2(-(p[0] - e.x), -(p[2] - e.z)); w.pitch = Math.atan2(p[1] - e.y, Math.hypot(p[0] - e.x, p[2] - e.z)); });
     await capture('window-compass-stem-oblique');
-    await instrument('airport-table', { x: 4.4, z: 5.6, floorId: 'lower' }, 'airport-table');
+    await instrument('airport-table', { x: 4.4, z: 5.2, floorId: 'lower' }, 'airport-table');
     await page.getByTestId('observatory-open').click(); await capture('airport-map-hud');
     await page.setViewportSize({ width: 1280, height: 720 }); await capture('airport-map-hud-1280');
     await page.setViewportSize({ width: 1920, height: 1080 });

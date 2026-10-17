@@ -119,18 +119,22 @@ The left stair has a 1.9 m clear width, 28 equal 164 mm rises and 270 mm treads,
 
 The interior shader now tests the actual two-level shell and intermediate slab for key light and exterior reflections. Interior fixtures cannot light through that slab, except through the stair opening. One existing 256-pixel cube probe is reused and refreshed when the observed level changes; there is no second probe or new `THREE.Light`.
 
-The new AO bake uses the actual 131,196-triangle room geometry, signature `6b7a1f50`. Its version-2 payload retains the 512×352 lower floor map and adds a 512×160 upper floor map, packed into one 512×512 R8 texture. This adds approximately 0.104 MiB including mipmaps. The classic version-1 bake and geometry remain unchanged. The base pier resource has 12 draws, 131,230 triangles including glass/boards/steam, 5.71 MB of geometry and 21.96 MiB of textures; it contains 29 analytical practicals and 40 shadow boxes. The separate combined presentation gate must include the updated instruments before claiming the 14-draw, 140,000-triangle, 24-MiB limit is met.
+The current AO bake uses the actual 131,232-triangle room geometry, signature `5f2162d1`. Its version-2 payload retains the 512×352 lower floor map and adds a 512×160 upper floor map, packed into one 512×512 R8 texture. This adds approximately 0.104 MiB including mipmaps. The classic version-1 bake and geometry remain unchanged. The base pier resource has 12 draws, 131,266 triangles including glass/boards/steam, 5.71 MB of geometry and 21.96 MiB of textures; it contains 30 analytical practicals and 40 shadow boxes. The current combined presentation gate includes both upper support instruments and passes at 14 draws, 138,922 triangles and 23.96 MiB of textures. These are resource counts, not measured frame-time results.
 
-Validation completed before the first production capture of this revision:
+The first production capture confirmed the continuous stair and distinct upper room, but exposed insufficient night illumination across the upper circulation floor and landing. A narrow correction adds a continuous recessed circulation diffuser and a matching analytical source, plus an under-handrail strip with matching stair illumination. These use the existing safe circulation channel independently of decorative dimming; the change adds 36 triangles and one practical source. Exterior lighting, exposure, weather and time are unchanged. The geometry was rebaked after this change. Rendered confirmation of the corrected normal/night-observation pair and stair landing is still pending.
+
+Current source validation:
 
 - `verify-airport-lounge.mjs`: 12/12 classic and 12/12 pier checks, including finite geometry, envelope/glazing contracts, real shader patch anchors, fixture limits, matching AO and disposal.
-- `verify-lounge-upper.mjs`: 6/6 checks using the actual mesh BVH. These include 483 stair-width/headroom samples, both upper seated sightlines, six upper standing sightlines, the open stair ceiling, occupied landing, solid intermediate slab, preserved lower rear view, vertical blocker bounds and separate upper contact shadows.
-- ESLint passed the changed geometry, shading, glass, probe, AO, configuration, component and test files.
+- `verify-lounge-upper.mjs`: 7/7 checks using the actual mesh BVH and fixture bounds. These include 483 stair-width/headroom samples, both upper seated sightlines, six upper standing sightlines, the open stair ceiling, occupied landing, solid intermediate slab, preserved lower rear view, vertical blocker bounds and separate upper contact shadows. The added regression verifies safe-channel source coverage across the upper walking floor.
+- `verify-observatory-presentation.mjs`: combined classic and pier budgets pass, including finite shared-shader instrument attributes and complete disposal.
+- ESLint passed the changed geometry, shading, glass, probe, AO, configuration, component and test files; `git diff --check` passed.
 
 ```powershell
 node scripts/verify-airport-lounge.mjs
 node scripts/verify-airport-lounge.mjs --pier
 node scripts/verify-lounge-upper.mjs
+node scripts/verify-observatory-presentation.mjs
 node scripts/build-lounge-ao.mjs --pier
 ```
 

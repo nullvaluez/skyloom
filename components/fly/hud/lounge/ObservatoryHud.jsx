@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowUpRight, Binoculars, Compass, Headphones, Moon, Navigation, Volume2, VolumeX, X } from 'lucide-react';
 import { useFlyStore } from '@/stores/fly-store';
+import { airportDiagramFrame } from '@/lib/fly/lounge/airport-diagram.mjs';
 import './observatory.css';
 
 export function useObservatory(runtime, id) {
@@ -19,15 +20,13 @@ const viewName = (v) => v === 'back' ? 'Rear window' : v === 'upper' ? 'Upper lo
 const bearing = (v) => String(Math.round(((v || 0) % 360 + 360) % 360)).padStart(3, '0') + '°';
 const distance = (m) => m < 1000 ? Math.round(m / 50) * 50 + ' m' : (m / 1000).toFixed(1) + ' km';
 
-/** Fit the real airport and nearby contacts together; a selected distant
- * contact expands this same geographic frame instead of disappearing. */
+/** Keep the airport legible. A distant selection keeps its real bearing at
+ * the map edge instead of shrinking the runways to fit the traffic feed. */
 export function AirportDiagram({ state, onSelect }) {
   const selected = state.contacts.find((c) => c.selected);
-  const nearby = state.contacts.filter((c) => c.distanceM <= 18000).slice(0, 8);
-  const points = [...state.runways.flatMap((r) => [r.a, r.b]), ...nearby, ...(selected ? [selected] : [])];
-  const extent = Math.max(1200, ...points.flatMap((p) => [Math.abs(p.x), Math.abs(p.z)])) * 1.15;
-  const scale = 112 / extent;
-  const p = (v) => [180 + v.x * scale, 139 + v.z * scale];
+  const { extent, scale, project: p, locate } = airportDiagramFrame(state.runways);
+  const nearby = state.contacts.filter((c) => !locate(c).offMap);
+  const selectedPosition = selected && locate(selected);
   const km = extent > 6000 ? 5 : extent > 2500 ? 2 : 1;
   return <svg className="observatory-diagram" viewBox="0 0 360 278" role="group" aria-label="Airport map. Front window above; rear window below. Select an aircraft to show its direction.">
     <path className="observatory-map-axis" d="M180 34V244 M26 139H334" />
@@ -36,16 +35,18 @@ export function AirportDiagram({ state, onSelect }) {
       const a = p(r.a), b = p(r.b);
       return <g key={r.id}><line className="observatory-runway" x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} strokeWidth={Math.max(2.5, r.widthM * scale)} /><text x={Math.min(300, Math.max(20, a[0] + 5))} y={a[1] - 7}>{r.label}</text></g>;
     })}
-    {selected && <line className="observatory-map-bearing" x1="180" y1="139" x2={p(selected)[0]} y2={p(selected)[1]} />}
+    {selected && <line className="observatory-map-bearing" x1="180" y1="139" x2={selectedPosition.point[0]} y2={selectedPosition.point[1]} />}
     <circle cx="180" cy="139" r="12" className="observatory-map-origin" />
     <path d="M180 132 L185 144 L180 142 L175 144 Z" className="observatory-you" />
     <text x="195" y="143" className="observatory-map-you">You</text>
-    {state.contacts.filter((c) => Math.abs(c.x) < extent && Math.abs(c.z) < extent).map((c) => {
-      const [x, y] = p(c);
+    {state.contacts.filter((c) => c.selected || !locate(c).offMap).map((c) => {
+      const location = locate(c);
+      const [x, y] = location.point;
       return <g key={c.hex} className="observatory-dot" data-selected={c.selected ? '1' : '0'} role="button" tabIndex={0} aria-label={'Select ' + c.label} onClick={() => onSelect(c.hex)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(c.hex); } }}>
         <title>{c.label} · {distance(c.distanceM)} · {c.phaseLabel || 'Live position'}</title>
-        <circle cx={x} cy={y} r="13" className="observatory-dot-hit" /><circle cx={x} cy={y} r={c.selected ? 5 : 3.5} />
-        {(c.selected || nearby.slice(0, 3).includes(c)) && <text x={Math.min(x + 8, 300)} y={y - 7}>{c.label}</text>}
+        <circle cx={x} cy={y} r="13" className="observatory-dot-hit" />
+        {location.offMap ? <path d="M0 -6L5 4L0 2L-5 4Z" transform={'translate(' + x + ' ' + y + ') rotate(' + location.angleDeg + ')'} /> : <circle cx={x} cy={y} r={c.selected ? 5 : 3.5} />}
+        {(c.selected || nearby.slice(0, 3).includes(c)) && <text x={x > 250 ? x - 8 : x + 8} y={y - 9} textAnchor={x > 250 ? 'end' : 'start'}>{c.label}</text>}
       </g>;
     })}
     <path className="observatory-map-scale" d={'M22 252v4h' + km * 1000 * scale + 'v-4'} />
@@ -89,7 +90,7 @@ export function ObservatoryHud({ runtime, state, hidden }) {
         {!state.contacts.length && <p className="observatory-empty">{runtime.trafficStatus?.state === 'live' ? 'No live aircraft nearby right now.' : 'Waiting for current aircraft positions.'}<br />The runway map is still here to explore.</p>}
       </div>
       {selected ? <div className="observatory-selection">
-        <p><strong>{selected.label}</strong>{selected.bestView ? <span>Walk to the {(selected.bestViewLabel || viewName(selected.bestView)).toLowerCase()}.</span> : <span>Its position is live; a clear window view isn’t confirmed.</span>}</p>
+        <p><strong>{selected.label}</strong> · {distance(selected.distanceM)}{selected.bestView ? <span>Walk to the {(selected.bestViewLabel || viewName(selected.bestView)).toLowerCase()}.</span> : <span>Its position is live; a clear window view isn’t confirmed.</span>}</p>
         <button type="button" className="observatory-action" onClick={() => direct(selected.hex)}><Navigation size={16} />Show me the direction</button>
       </div> : <p className="observatory-map-hint">Select a dot or an aircraft above to see where to look.</p>}
       {!state.runways.length && <p className="observatory-note">Runway details are still loading.</p>}

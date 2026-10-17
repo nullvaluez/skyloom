@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { buildLoungeRoom } from '../lib/fly/lounge/room-build.js';
+import { buildLoungeRoom, GLOW } from '../lib/fly/lounge/room-build.js';
 import { roomVariant } from '../lib/fly/lounge/room-plan.js';
 import { geometrySignature, decodeBake, floorAOTexture, UPPER_FLOOR_RECT } from '../lib/fly/lounge/room-ao.js';
 import { buildTriBvh } from './_tri-bvh.mjs';
@@ -52,6 +52,18 @@ check('upper solids publish vertical bounds while classic remains single level',
   assert.deepEqual([...ids].sort(), ['upper-back', 'upper-front']);
   for (const b of room.blockers.filter((b) => b.floorId === 'upper')) { assert.equal(b.y0, u.floorY); assert.ok(b.y1 > b.y0); }
   assert.ok(room.blockers.some((b) => b.kind === 'stair-plinth' && b.floorId === 'lower'));
+});
+check('safe-channel lighting covers the upper walking floor when decoration is dimmed', () => {
+  const fixtures = room.practicals.filter((l) => l.type === 'line' && l.group === GLOW.ENTRANCE && l.a[1] > u.floorY && l.b[1] > u.floorY);
+  assert.ok(fixtures.length, 'a circulation source exists above the upper floor');
+  for (const [x, z] of [[-10,12], [-5.6,11], [0,11], [5.6,11], [10.5,12]]) {
+    const covered = fixtures.some((l) => {
+      const d = l.b.map((v,i) => v-l.a[i]), p = [x,u.floorY,z], q = p.map((v,i) => v-l.a[i]);
+      const t = Math.max(0,Math.min(1,q.reduce((sum,v,i) => sum+v*d[i],0)/d.reduce((sum,v) => sum+v*v,0)));
+      return Math.hypot(...q.map((v,i) => v-t*d[i])) < l.range * 0.8;
+    });
+    assert.ok(covered, `circulation ${x},${z} lies inside the useful light range`);
+  }
 });
 check('both floors have independently baked contact shadows packed into one sampler', () => {
   const bytes = fs.readFileSync(new URL('../public/models/lounge-ao-pier-v1.bin', import.meta.url));
