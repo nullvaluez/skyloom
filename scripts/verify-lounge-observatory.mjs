@@ -15,7 +15,7 @@ const { observatoryStations, stationState, stationPrompt, stationOnRay, stationL
 const { attachLoungeObservatory } = await import('../lib/fly/lounge-observatory-runtime.js');
 const { loungeApertureFrom } = await import('../lib/fly/lounge-site.js');
 const { roomBlockers } = await import('../lib/fly/lounge/room-build.js');
-const { buildWalkGrid, findPath, isFree } = await import('../lib/fly/lounge/room-walk.mjs');
+const { buildWalkSpace, findPath, isFree } = await import('../lib/fly/lounge/room-walk.mjs');
 const { VANTAGE } = await import('../lib/fly/observation-config.js');
 
 let passed = 0, failed = 0;
@@ -178,6 +178,17 @@ await test('Listening compass accounts for lounge heading; night/readouts remain
   detach();
   const next = runtimeFixture(); assert.equal(next.o.night, false); assert.equal(next.o.readouts, false); next.detach();
 });
+await test('Listening follows the view by default; a manual bearing retains control without moving the camera', () => {
+  const { watch, o, detach } = runtimeFixture();
+  const eye = { ...watch.eyeLocal };
+  assert.equal(o.activate('front-listen'), true); assert.equal(o.listening.followsView, true);
+  watch.yaw = -.6; o.tick(.1);
+  assert.ok(Math.abs(o.listening.bearing - .6 * 180 / Math.PI) < 1e-9);
+  assert.equal(watch.yaw, -.6); assert.deepEqual(watch.eyeLocal, eye);
+  o.setBearing(95); watch.yaw = .2; o.tick(.1);
+  assert.equal(o.listening.bearing, 95); assert.equal(o.listening.followsView, false);
+  assert.equal(watch.yaw, .2); assert.deepEqual(watch.eyeLocal, eye); detach();
+});
 await test('Stale/lost positions remove cues and suggestions; stopped lounge releases instruments', () => {
   const { watch, runtime, o, detach } = runtimeFixture();
   assert.equal(o.showDirection('abc123'), true);
@@ -200,14 +211,15 @@ await test('Late geometry from a departed airport cannot contaminate its replace
 });
 await test('Every classic/pier station has a clear, collision-free approach connected to the window seat', () => {
   for (const variant of ['classic', 'pier']) {
-    const blockers = roomBlockers(variant), grid = buildWalkGrid(blockers), start = VANTAGE[variant][0].approach;
+    const blockers = roomBlockers(variant), space = buildWalkSpace(blockers, { variant }), start = VANTAGE[variant][0].approach;
     for (const station of observatoryStations(variant)) {
+      const grid = space.layers?.[station.floorId] ?? space;
       let reachable = false;
       for (let z = station.position[2] - 2.5; z <= station.position[2] + 2.5 && !reachable; z += .25) {
         for (let x = station.bounds.min[0] - 2; x <= station.bounds.max[0] + 2 && !reachable; x += .25) {
           if (!isFree(grid, x, z)) continue;
-          const state = stationState(station, { eye: { x, y: 1.65, z }, blockers });
-          if (state.nearby && findPath(grid, { x: start[0], z: start[1] }, { x, z })) reachable = true;
+          const state = stationState(station, { eye: { x, y: station.floorY + 1.65, z }, blockers });
+          if (state.nearby && findPath(space, { x: start[0], z: start[1], floorId: 'lower' }, { x, z, floorId: station.floorId })) reachable = true;
         }
       }
       assert.equal(reachable, true, `${variant}/${station.id} needs a walkable LOS approach`);

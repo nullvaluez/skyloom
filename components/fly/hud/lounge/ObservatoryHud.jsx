@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Binoculars, Compass, Headphones, Map, Moon, Navigation, X } from 'lucide-react';
+import { ArrowUpRight, Binoculars, Compass, Headphones, Moon, Navigation, Volume2, VolumeX, X } from 'lucide-react';
+import { useFlyStore } from '@/stores/fly-store';
 import './observatory.css';
 
 export function useObservatory(runtime, id) {
@@ -14,79 +15,102 @@ export function useObservatory(runtime, id) {
   return state;
 }
 
-const icons = { table: Map, listen: Headphones, support: Binoculars, compass: Compass, night: Moon };
-const viewName = (v) => v === 'back' ? 'Rear window' : 'Front window';
-const bearing = (v) => `${String(Math.round(v || 0) % 360).padStart(3, '0')}°`;
+const viewName = (v) => v === 'back' ? 'Rear window' : v === 'upper' ? 'Upper lounge' : 'Front window';
+const bearing = (v) => String(Math.round(((v || 0) % 360 + 360) % 360)).padStart(3, '0') + '°';
+const distance = (m) => m < 1000 ? Math.round(m / 50) * 50 + ' m' : (m / 1000).toFixed(1) + ' km';
 
-/** Real runway geometry, scaled uniformly; the table and HUD share room-local metres. */
+/** Fit the real airport and nearby contacts together; a selected distant
+ * contact expands this same geographic frame instead of disappearing. */
 export function AirportDiagram({ state, onSelect }) {
-  const points = state.runways.flatMap((r) => [r.a, r.b]);
-  const extent = Math.max(1000, ...points.flatMap((p) => [Math.abs(p.x), Math.abs(p.z)]));
-  const scale = 145 / extent;
-  const p = (v) => [180 + v.x * scale, 175 + v.z * scale];
-  return (
-    <svg className="observatory-diagram" viewBox="0 0 360 350" role="group" aria-label="Live airport diagram. Top is the front window; bottom is the rear window.">
-      <text x="180" y="21" textAnchor="middle">FRONT WINDOW</text>
-      {state.runways.map((r) => {
-        const a = p(r.a), b = p(r.b);
-        return <g key={r.id}><line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} strokeWidth={Math.max(3, r.widthM * scale)} /><text x={a[0] + 6} y={a[1] - 6}>{r.label}</text></g>;
-      })}
-      <path d="M180 165 L187 182 L180 179 L173 182 Z" className="observatory-you" />
-      <text x="191" y="182">LOUNGE</text>
-      {state.contacts.filter((c) => Math.abs(c.x) < extent && Math.abs(c.z) < extent).map((c) => {
-        const [x, y] = p(c);
-        return <g key={c.hex} className="observatory-dot" data-selected={c.selected ? '1' : '0'} role="button" tabIndex={0} aria-label={`Select ${c.label}`} onClick={() => onSelect(c.hex)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(c.hex); } }}>
-          <title>{c.label} · {c.phaseLabel || 'Live position'}</title><circle cx={x} cy={y} r="12" className="observatory-dot-hit" /><circle cx={x} cy={y} r={c.selected ? 5 : 3} />
-        </g>;
-      })}
-      <text x="180" y="335" textAnchor="middle">{state.stations.some((s) => s.side === 'back') ? 'REAR WINDOW' : 'ROOM BEHIND YOU'}</text>
-    </svg>
-  );
+  const selected = state.contacts.find((c) => c.selected);
+  const nearby = state.contacts.filter((c) => c.distanceM <= 18000).slice(0, 8);
+  const points = [...state.runways.flatMap((r) => [r.a, r.b]), ...nearby, ...(selected ? [selected] : [])];
+  const extent = Math.max(1200, ...points.flatMap((p) => [Math.abs(p.x), Math.abs(p.z)])) * 1.15;
+  const scale = 112 / extent;
+  const p = (v) => [180 + v.x * scale, 139 + v.z * scale];
+  const km = extent > 6000 ? 5 : extent > 2500 ? 2 : 1;
+  return <svg className="observatory-diagram" viewBox="0 0 360 278" role="group" aria-label="Airport map. Front window above; rear window below. Select an aircraft to show its direction.">
+    <path className="observatory-map-axis" d="M180 34V244 M26 139H334" />
+    <text x="180" y="22" textAnchor="middle">Front window</text>
+    {state.runways.map((r) => {
+      const a = p(r.a), b = p(r.b);
+      return <g key={r.id}><line className="observatory-runway" x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} strokeWidth={Math.max(2.5, r.widthM * scale)} /><text x={Math.min(300, Math.max(20, a[0] + 5))} y={a[1] - 7}>{r.label}</text></g>;
+    })}
+    {selected && <line className="observatory-map-bearing" x1="180" y1="139" x2={p(selected)[0]} y2={p(selected)[1]} />}
+    <circle cx="180" cy="139" r="12" className="observatory-map-origin" />
+    <path d="M180 132 L185 144 L180 142 L175 144 Z" className="observatory-you" />
+    <text x="195" y="143" className="observatory-map-you">You</text>
+    {state.contacts.filter((c) => Math.abs(c.x) < extent && Math.abs(c.z) < extent).map((c) => {
+      const [x, y] = p(c);
+      return <g key={c.hex} className="observatory-dot" data-selected={c.selected ? '1' : '0'} role="button" tabIndex={0} aria-label={'Select ' + c.label} onClick={() => onSelect(c.hex)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(c.hex); } }}>
+        <title>{c.label} · {distance(c.distanceM)} · {c.phaseLabel || 'Live position'}</title>
+        <circle cx={x} cy={y} r="13" className="observatory-dot-hit" /><circle cx={x} cy={y} r={c.selected ? 5 : 3.5} />
+        {(c.selected || nearby.slice(0, 3).includes(c)) && <text x={Math.min(x + 8, 300)} y={y - 7}>{c.label}</text>}
+      </g>;
+    })}
+    <path className="observatory-map-scale" d={'M22 252v4h' + km * 1000 * scale + 'v-4'} />
+    <text x="22" y="245">{km} km</text>
+    <text x="180" y="264" textAnchor="middle">{state.stations.some((s) => s.side === 'back') ? 'Rear window' : 'Lounge entrance'}</text>
+  </svg>;
 }
 
 export function ObservatoryHud({ runtime, state, hidden }) {
+  const sound = useFlyStore((s) => s.soundOn);
   const o = runtime.airportWatch?.observatory;
   if (!o || !state || hidden) return null;
   const active = state.stations.find((s) => s.id === state.active);
   const selected = state.contacts.find((c) => c.selected);
   const choose = (hex) => o.selectContact(hex);
+  const direct = (hex) => { o.showDirection(hex); o.release(); };
+  const binocular = runtime.airportWatch.binocular;
+  const windowControls = state.stations.filter((s) => s.available && s.nearby && ['listen', 'support'].includes(s.kind));
+  const suggestion = active?.kind === 'compass' ? state.suggestions[active.side] : null;
   return <>
-    {!active && state.prompt && !runtime.airportWatch.binocular && !runtime.airportWatch.seatMenu && <button type="button" className="observatory-prompt lounge-panel" data-testid="observatory-prompt" onClick={() => o.activate(state.prompt.id)}>
+    {!active && !windowControls.length && state.prompt && !binocular && !runtime.airportWatch.seatMenu && <button type="button" className="observatory-prompt lounge-panel" data-testid="observatory-prompt" onClick={() => o.activate(state.prompt.id)}>
       <span>{state.prompt.action}</span><kbd>Enter</kbd>
     </button>}
+    {!active && !!windowControls.length && !binocular && !runtime.airportWatch.seatMenu && <div className="observatory-nearby lounge-panel" aria-label="Controls at this window">
+      {windowControls.map((s) => <button type="button" key={s.id} data-testid={'instrument-' + s.id} onClick={() => o.activate(s.id, { remote: true })}>{s.kind === 'listen' ? <Headphones size={16} /> : <Binoculars size={16} />}<span>{s.kind === 'listen' ? 'Hear outside' : 'Rest binoculars'}</span>{state.prompt?.id === s.id && <kbd>Enter</kbd>}</button>)}
+    </div>}
     {state.cue && <div className="observatory-direction" role="status" data-testid="observatory-direction">
-      <Navigation size={17} aria-hidden="true" /><span>{state.cue.label} · {state.cue.side ? viewName(state.cue.side) : 'Bearing'} · {bearing(state.cue.bearing)}</span>
+      <Navigation size={16} aria-hidden="true" /><span><strong>{state.cue.label}</strong> · {state.cue.viewLabel || (state.cue.side ? viewName(state.cue.side) : 'Look toward')} · {bearing(state.cue.bearing)}</span>
       <button type="button" aria-label="Dismiss direction" onClick={() => o.showDirection(null)}><X size={15} /></button>
     </div>}
-    {active && active.kind !== 'support' && !runtime.airportWatch.binocular && <aside className="observatory-panel lounge-panel" data-testid="observatory-panel" aria-label="Observatory instruments" data-overlay="observatory">
-      <header><h2>{active.label}</h2><button type="button" className="tgt-iconbtn" aria-label="Close instruments" onClick={() => o.release()}><X size={18} /></button></header>
-      <nav aria-label="Room instruments" className="observatory-tabs">
-        {state.stations.map((s) => { const Icon = icons[s.kind]; return <button key={s.id} type="button" aria-label={s.label} title={s.reason || s.label} aria-pressed={s.id === active.id} disabled={!s.available} onClick={() => o.activate(s.id, { remote: true })} data-testid={`instrument-${s.id}`}><Icon size={16} aria-hidden="true" /><span>{s.side === 'back' ? 'Rear ' : ''}{s.kind === 'table' ? 'Table' : s.kind === 'listen' ? 'Listen' : s.kind === 'support' ? 'Rail' : s.kind === 'night' ? 'Night' : 'Compass'}</span></button>; })}
-      </nav>
-      {active.kind === 'table' && <>
-        <AirportDiagram state={state} onSelect={choose} />
-        <p className="observatory-note">Live positions · movement inferred from tracks</p>
-        {!state.runways.length && <p className="observatory-note">Runway geometry is not available yet.</p>}
-        <div className="observatory-contact-list" aria-label="Aircraft near this airport">
-          {state.contacts.slice(0, 24).map((c) => <button type="button" key={c.hex} aria-pressed={c.selected} onClick={() => choose(c.hex)}><strong>{c.label}</strong><span>{c.phaseLabel || 'Live position'}</span><small>{c.bestView ? viewName(c.bestView) : 'View not verified'}</small></button>)}
-          {!state.contacts.length && <p>No fresh aircraft positions. The airport diagram remains available.</p>}
-        </div>
-        {selected && <div className="observatory-selection"><span><strong>{selected.label}</strong>{selected.bestView ? ` · Best view: ${viewName(selected.bestView).toLowerCase()}` : ' · No clear window view verified'}</span><button type="button" onClick={() => { o.showDirection(selected.hex); o.release(); }}><Navigation size={15} />Show direction</button></div>}
+    {active?.kind === 'table' && !binocular && <aside className="observatory-panel lounge-panel" data-testid="observatory-panel" aria-label="Airport map" data-overlay="observatory">
+      <header><div><h2>Airport map</h2><p>Choose an aircraft. Find its window.</p></div><button type="button" className="observatory-close" aria-label="Close airport map" onClick={() => o.release()}><X size={19} /></button></header>
+      <AirportDiagram state={state} onSelect={choose} />
+      <div className="observatory-list-heading"><h3>Nearby aircraft</h3><span>{state.contacts.length} live</span></div>
+      <div className="observatory-contact-list" aria-label="Aircraft near this airport">
+        {state.contacts.slice(0, 12).map((c) => <button type="button" key={c.hex} aria-pressed={c.selected} onClick={() => choose(c.hex)}>
+          <span className="observatory-contact-name"><strong>{c.label}</strong><small>{c.phaseLabel || 'Live position'}</small></span>
+          <span className="observatory-contact-distance">{distance(c.distanceM)}<small>{c.bestViewLabel || (c.bestView ? viewName(c.bestView) : 'View unconfirmed')}</small></span>
+          <ArrowUpRight size={15} aria-hidden="true" />
+        </button>)}
+        {!state.contacts.length && <p className="observatory-empty">{runtime.trafficStatus?.state === 'live' ? 'No live aircraft nearby right now.' : 'Waiting for current aircraft positions.'}<br />The runway map is still here to explore.</p>}
+      </div>
+      {selected ? <div className="observatory-selection">
+        <p><strong>{selected.label}</strong>{selected.bestView ? <span>Walk to the {(selected.bestViewLabel || viewName(selected.bestView)).toLowerCase()}.</span> : <span>Its position is live; a clear window view isn’t confirmed.</span>}</p>
+        <button type="button" className="observatory-action" onClick={() => direct(selected.hex)}><Navigation size={16} />Show me the direction</button>
+      </div> : <p className="observatory-map-hint">Select a dot or an aircraft above to see where to look.</p>}
+      {!state.runways.length && <p className="observatory-note">Runway details are still loading.</p>}
+    </aside>}
+    {active && !['table', 'support'].includes(active.kind) && !binocular && <aside className="observatory-window-panel lounge-panel" data-testid="observatory-panel" data-overlay="observatory" aria-label={active.kind === 'listen' ? 'Window audio' : active.label}>
+      <button type="button" className="observatory-close" aria-label="Close window control" onClick={() => o.release()}><X size={17} /></button>
+      {active.kind === 'listen' && <>
+        <Headphones size={20} aria-hidden="true" /><h2>Hear outside</h2>
+        <p>{sound ? 'Drag to look around. The microphone listens where you look.' : 'Sound is off. Turn it on to hear aircraft outside this window.'}</p>
+        <div className="observatory-audio-status"><meter min="0" max="1" value={state.listening?.level || 0} aria-label="Estimated aircraft sound level" /><span>{(state.listening?.level || 0) > .015 ? 'Aircraft nearby' : 'Quiet in this direction'}</span><output>{bearing(state.listening?.worldBearing)}</output></div>
+        <button type="button" className="observatory-text-action" onClick={() => useFlyStore.getState().setSoundOn(!sound)}>{sound ? <VolumeX size={15} /> : <Volume2 size={15} />}{sound ? 'Mute' : 'Turn sound on'}</button>
       </>}
-      {active.kind === 'listen' && <div className="observatory-listen">
-        <Headphones size={28} aria-hidden="true" /><p>Turn the exterior microphone. Your view stays where it is.</p>
-        <label htmlFor="observatory-bearing">Listening bearing <output>{bearing(state.listening?.worldBearing)}</output></label>
-        <input id="observatory-bearing" type="range" min="0" max="359" step="1" value={Math.round(state.listening?.bearing || 0)} onChange={(e) => o.setBearing(Number(e.target.value))} />
-        <meter min="0" max="1" value={state.listening?.level || 0} aria-label="Estimated aircraft sound level" />
-        <p className="observatory-note">Estimated level from live tracks. Sound arrives after the aircraft moves. Walking away releases the microphone.</p>
-      </div>}
-      {active.kind === 'compass' && <div className="observatory-compass">
-        <Compass size={32} aria-hidden="true" />
-        {state.suggestions[active.side] ? <><h3>{state.suggestions[active.side].text}</h3><p>{state.suggestions[active.side].label}</p><button type="button" onClick={() => { o.showDirection(state.suggestions[active.side].hex); o.release(); }}>Show direction</button></> : <><h3>A quiet window</h3><p>No fresh activity with a verified clear view right now.</p></>}
-        <p className="observatory-note">Suggestions follow the live sky. You choose when to look.</p>
-      </div>}
-      {active.kind === 'night' && <div className="observatory-night"><Moon size={30} aria-hidden="true" /><h3>Let the airport lights come through</h3><p>Dim decorative lighting and its reflection in the glass. Walking routes stay illuminated.</p><button type="button" aria-pressed={state.night} onClick={() => o.toggleNight()}>{state.night ? 'Restore lounge lighting' : 'Dim for Night Watch'}</button></div>}
-      <p className="observatory-note observatory-access">Listening and the rail become available beside their window. Press I to open or close instruments.</p>
+      {active.kind === 'compass' && <>
+        <Compass size={20} aria-hidden="true" /><h2>{suggestion?.text || 'The view is yours'}</h2>
+        <p>{suggestion ? suggestion.label + ' · ' + viewName(active.side) : 'No live aircraft has a confirmed clear view from this window right now.'}</p>
+        {suggestion && <button type="button" className="observatory-action" onClick={() => direct(suggestion.hex)}><Navigation size={15} />Show direction</button>}
+      </>}
+      {active.kind === 'night' && <>
+        <Moon size={20} aria-hidden="true" /><h2>{state.night ? 'Lights dimmed' : 'Lounge lighting'}</h2><p>The stairs and walking routes stay lit.</p>
+        <button type="button" className="observatory-action" aria-pressed={state.night} onClick={() => o.toggleNight()}>{state.night ? 'Restore lighting' : 'Dim the lounge'}</button>
+      </>}
     </aside>}
   </>;
 }

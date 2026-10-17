@@ -44,6 +44,7 @@ globalThis.fetch=async url=>({ok:true,json:async()=>JSON.parse(fs.readFileSync('
 const { LOUNGE_ROOM, VANTAGE, WALK, LOUNGE_PIER_ROOM, PIER_SET, SEAT_BACK, LOUNGE_BUDGETS } = await import('../lib/fly/observation-config.js');
 const plan = await import('../lib/fly/lounge/room-plan.js');
 const { loungeAperture, loungeApertureFrom, siteToWorld, resolveLoungeSite } = await import('../lib/fly/lounge-site.js');
+const { deckRayHit } = await import('../lib/fly/lounge/room-elevation.mjs');
 const { clampYawAround, yawAroundCentre, walkBob, clamp, wrapPi } = await import('../lib/fly/airport-watch-camera.mjs');
 const { buildLoungeRoom, roomBlockers } = await import('../lib/fly/lounge/room-build.js');
 const { geometrySignature, decodeBake } = await import('../lib/fly/lounge/room-ao.js');
@@ -67,7 +68,7 @@ const check = async (name, fn) => {
 const rng = (seed) => () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const unitDir = (r) => { const z = r() * 2 - 1, a = r() * Math.PI * 2, s = Math.sqrt(1 - z * z); return [s * Math.cos(a), z, s * Math.sin(a)]; };
 const E = LOUNGE_ROOM.envelope, P = plan.FLOOR_PLATE;
-const inEnvelope = ([x, y, z]) => x >= E.minX && x <= E.maxX && y >= E.minY && y <= E.maxY && z >= E.minZ && z <= E.maxZ;
+const inEnvelope = ([x, y, z], envelope = E) => x >= envelope.minX && x <= envelope.maxX && y >= envelope.minY && y <= envelope.maxY && z >= envelope.minZ && z <= envelope.maxZ;
 const onPlate = (x, z, pad = 0) => (x >= P.x0 + pad && x <= P.x1 - pad && z >= P.z0 + pad && z <= P.z1 - pad)
   || (x >= P.vestibule.x0 && x <= P.vestibule.x1 - pad && z >= P.vestibule.z0 + pad && z <= P.vestibule.z1 - pad);
 // A blocker footprint contains (x, z) within `tol` (oriented box or disc; the frame() rotation convention).
@@ -97,16 +98,17 @@ await check('vantage: the classic window seat is today\'s seat (LOUNGE_ROOM eye 
   assert.equal(w.look.centre + w.look.yawSpan, L.yawMax);
   assert.deepEqual([w.look.pitchMin, w.look.pitchMax, w.look.defaultPitch], [L.pitchMin, L.pitchMax, L.defaultPitch]);
   assert.deepEqual(VANTAGE.classic.map((s) => s.id), ['window', 'corner-left', 'corner-right']);
-  assert.deepEqual(VANTAGE.pier.map((s) => s.id), ['window', 'back', 'corner-left', 'corner-right']);
+  assert.deepEqual(VANTAGE.pier.map((s) => s.id), ['window', 'back', 'corner-left', 'corner-right', 'upper-front', 'upper-back']);
 });
 
 await check('vantage: every seat\'s eye is its chair plus R(rot)·(0, 1.18, -0.08), inside the room envelope, its approach on the floor plate', () => {
   for (const [variant, seats] of Object.entries(VANTAGE)) for (const s of seats) {
     const { x, z, rot } = s.chair;
-    const want = [x - 0.08 * Math.sin(rot), 1.18, z - 0.08 * Math.cos(rot)];
+    const floorY = s.floorY ?? 0, envelope = plan.roomVariant(variant).envelope;
+    const want = [x - 0.08 * Math.sin(rot), floorY + 1.18, z - 0.08 * Math.cos(rot)];
     for (let i = 0; i < 3; i++) assert.ok(Math.abs(s.eye[i] - want[i]) < 1e-12, `${variant}/${s.id} eye[${i}] ${s.eye[i]} vs ${want[i]}`);
-    assert.ok(inEnvelope(s.eye), `${variant}/${s.id} eye inside the envelope`);
-    assert.ok(inEnvelope([s.approach[0], WALK.eyeStandM, s.approach[1]]) && onPlate(s.approach[0], s.approach[1], WALK.radiusM), `${variant}/${s.id} approach on the floor plate`);
+    assert.ok(inEnvelope(s.eye, envelope), `${variant}/${s.id} eye inside the envelope`);
+    assert.ok(inEnvelope([s.approach[0], floorY + WALK.eyeStandM, s.approach[1]], envelope) && onPlate(s.approach[0], s.approach[1], WALK.radiusM), `${variant}/${s.id} approach on the floor plate`);
     assert.ok(s.look.yawSpan > 0 && s.look.yawSpan < Math.PI && s.look.pitchMin < s.look.defaultPitch && s.look.defaultPitch < s.look.pitchMax, `${variant}/${s.id} look limits`);
     assert.ok(['runway', 'back'].includes(s.faces) && s.label, `${variant}/${s.id} faces and label`);
   }
@@ -183,7 +185,7 @@ await check('aperture: from the window eye, loungeApertureFrom and loungeApertur
   for (const kind of ['front', 'roof', 'side', 'null']) assert.ok(tally[kind] > 200, `${kind} sampled: ${JSON.stringify(tally)}`);
 });
 
-await check('aperture: the pier adds only the back glass; classic and pier agree everywhere else', () => {
+await check('aperture: lower pier glazing remains consistent; explicit new deck occlusion never advertises a hidden view', () => {
   const r = rng(7), eyes = [LOUNGE_ROOM.eye, [0, 1.65, 6.5], [-6, 1.65, 10], VANTAGE.pier[1].eye];
   let backs = 0;
   for (const eye of eyes) for (let i = 0; i < 5000; i++) {
@@ -194,6 +196,8 @@ await check('aperture: the pier adds only the back glass; classic and pier agree
       assert.equal(c, null, 'the back glass replaces a wall');
       const t = (plan.BACK_Z - eye[2]) / dz, x = eye[0] + dx * t, y = eye[1] + dy * t;
       assert.ok(Math.abs(x) <= LOUNGE_PIER_ROOM.backGlass.halfWidth + 1e-9 && y >= LOUNGE_PIER_ROOM.backGlass.baseY - 1e-9 && y <= LOUNGE_PIER_ROOM.backGlass.topY + 1e-9);
+    } else if (p === null && c !== null) {
+      assert.ok(deckRayHit({ x: eye[0], y: eye[1], z: eye[2] }, { x: dx, y: dy, z: dz }, LOUNGE_PIER_ROOM.upper) < Infinity, `newly blocked view must intersect the actual deck: ${eye}`);
     } else assert.equal(p, c, `eye ${eye}`);
   }
   assert.ok(backs > 300, 'back glass sampled ' + backs);

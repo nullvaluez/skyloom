@@ -77,17 +77,19 @@ const { ShaderLib, Vector3, Group, PerspectiveCamera } = await import('three');
 const { updateRoomShading } = await import('../lib/fly/lounge/room-shading.js');
 const { geometrySignature, decodeBake } = await import('../lib/fly/lounge/room-ao.js');
 const room = createAirportLounge({ variant: 'pier', document: null });
-const grid = W.buildWalkGrid(room.room.blockers), seats = roomVariant('pier').vantage;
-check('all four physical chairs have reachable approaches in one connected circulation space', () => {
+const space = W.buildWalkSpace(room.room.blockers, { variant: 'pier' }), seats = roomVariant('pier').vantage;
+check('all six physical chairs and every accessible floor component connect through the staircase', () => {
   for (const seat of seats) {
     assert.ok(room.room.blockers.some((b) => b.seatId === seat.id), `physical ${seat.id}`);
-    const target = { x: seat.approach[0], z: seat.approach[1] };
+    const target = { x: seat.approach[0], z: seat.approach[1], floorId: seat.floorId ?? 'lower' };
+    const grid = space.layers[target.floorId];
     assert.ok(W.isFree(grid, target.x, target.z), `free approach ${seat.id}`);
-    assert.ok(W.findPath(grid, { x: 0, z: 3 }, target), `reachable ${seat.id}`);
+    assert.ok(W.findPath(space, { x: 0, z: 3, floorId: 'lower' }, target), `reachable ${seat.id}`);
   }
   // The 10 cm navigation grid is conservative (body radius + half diagonal).
   // Verify every component, including cells separated only by that raster
   // margin: each must join the aisle through exact 1 cm collision-safe steps.
+  for (const [floorId, grid] of Object.entries(space.layers)) {
   const visited = new Set(), total = grid.cells.reduce((a, b) => a + b, 0);
   const flood = (start, seen) => {
     const component = [], stack = [start]; seen.add(start);
@@ -102,7 +104,8 @@ check('all four physical chairs have reachable approaches in one connected circu
     return component;
   };
   const centre = (k) => ({ x: grid.x0 + (k % grid.nx + .5) * grid.cellM, z: grid.z0 + (Math.floor(k / grid.nx) + .5) * grid.cellM });
-  const aisle = Math.floor((3-grid.z0)/grid.cellM)*grid.nx+Math.floor((0-grid.x0)/grid.cellM);
+  const anchor = { lower: { x: 0, z: 3 }, stairs: space.links[0], upper: { x: -7.5, z: 11.9 } }[floorId];
+  const aisle = Math.floor((anchor.z-grid.z0)/grid.cellM)*grid.nx+Math.floor((anchor.x-grid.x0)/grid.cellM);
   assert.ok(grid.cells[aisle], 'central aisle has a safe grid cell');
   flood(aisle, visited);
   const coarseCount = visited.size, escapes = [];
@@ -134,7 +137,8 @@ check('all four physical chairs have reachable approaches in one connected circu
     for(const cell of component) visited.add(cell);
   }
   assert.equal(visited.size,total,'every accessible grid component connects to the central aisle');
-  console.log(`  circulation: ${total} cells connected (${coarseCount} coarse + collision-verified escapes ${JSON.stringify(escapes)})`);
+  console.log(`  ${floorId} circulation: ${total} cells connected (${coarseCount} coarse + collision-verified escapes ${JSON.stringify(escapes)})`);
+  }
 });
 check('pier furniture and rear fins have collision footprints at body height', () => {
   for (const [name, geometry] of Object.entries(room.room.buckets)) {
@@ -146,14 +150,14 @@ check('pier furniture and rear fins have collision footprints at body height', (
   }
 });
 check('rear aperture is open in geometry and shaders; its AO cannot be confused with classic', () => {
-  assert.equal(room.glass.mesh.geometry.attributes.position.count, 30);
+  assert.equal(room.glass.mesh.geometry.attributes.position.count, 48);
   const baked = fs.readFileSync(new URL('../public/models/lounge-ao-pier-v1.bin', import.meta.url));
   assert.equal(decodeBake(baked.buffer.slice(baked.byteOffset,baked.byteOffset+baked.byteLength)).signature, geometrySignature(room.room.buckets));
   for (const material of room.litMaterials()) {
     const shader = { ...ShaderLib.physical, uniforms: {} };
     material.onBeforeCompile(shader, {});
     assert.ok(shader.fragmentShader.includes('#define LG_BACK_GLAZED'));
-    assert.ok(material.customProgramCacheKey().endsWith('-pier'));
+    assert.ok(material.customProgramCacheKey().endsWith('-pier-upper-v1'));
   }
 });
 check('Night Watch dims decoration coherently while retaining circulation lighting and exterior state', () => {

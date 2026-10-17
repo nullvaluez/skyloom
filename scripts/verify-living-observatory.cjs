@@ -1,6 +1,7 @@
 /* Living Observatory browser interaction acceptance (real modules + UI).
  * node scripts/verify-living-observatory.cjs --port 3347 --case all
- * --case off|classic|pier isolates one arm. Do not run alongside GPU profiling.
+ * --case off|classic|pier isolates one arm; compact checks a 1280×720 pier HUD.
+ * Do not run alongside GPU profiling.
  * A deterministic live-feed fixture stabilizes selection assertions; world
  * geometry is real. Position setup is explicitly instrumented, while pointer,
  * keyboard, focus, movement and Escape behavior use browser input events.
@@ -11,8 +12,8 @@ const path = require('node:path');
 const { chromium } = require('playwright');
 const arg = (name, fallback) => { const i = process.argv.indexOf('--' + name); return i >= 0 ? process.argv[i + 1] : fallback; };
 const requested = arg('case', 'all');
-const cases = requested === 'all' ? ['off', 'classic', 'pier'] : [requested];
-if (cases.some((v) => !['off', 'classic', 'pier'].includes(v))) throw new Error('--case must be all, off, classic or pier');
+const cases = requested === 'all' ? ['off', 'classic', 'pier'] : requested === 'compact' ? ['pier'] : [requested];
+if (cases.some((v) => !['off', 'classic', 'pier'].includes(v))) throw new Error('--case must be all, off, classic, pier or compact');
 const out = path.resolve(arg('out', `.graphics-review/living-observatory/interactions-${Date.now()}`));
 fs.mkdirSync(out, { recursive: true });
 const report = { at: new Date().toISOString(), cases, checks: [], errors: [], arms: [] };
@@ -59,6 +60,21 @@ const check = (arm, name, pass, detail) => {
       report.arms.push({ arm, initial }); save();
       check(arm, 'Feature gate matches requested arm', initial.instruments === (arm !== 'off'), initial);
       check(arm, 'Classic/pier room selection matches arm', initial.variant === (arm === 'pier' ? 'pier' : 'classic'), initial.variant);
+      if (requested === 'compact') {
+        await page.setViewportSize({ width: 1280, height: 720 });
+        await page.keyboard.press('i'); await page.getByTestId('observatory-panel').waitFor();
+        const panel = page.getByTestId('observatory-panel');
+        const dimensions = await panel.evaluate((el) => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, right: r.right, bottom: r.bottom, height: r.height, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight }; });
+        check(arm, '1280×720 airport table remains inside viewport', dimensions.x >= 0 && dimensions.y >= 0 && dimensions.right <= 1280 && dimensions.bottom <= 720, dimensions);
+        await page.getByTestId('observatory-lighting').click();
+        await panel.hover(); await page.mouse.wheel(0, 900);
+        await page.getByRole('button', { name: 'Restore lounge lighting', exact: true }).click();
+        check(arm, '1280×720 Night Watch restore works with normal scrolling and click', !await page.evaluate(() => window.__fly.airportWatch.observatory.night));
+        await page.screenshot({ path: path.join(out, 'pier-1280x720-night.png') });
+        check(arm, 'No page exceptions', !report.errors.some((e) => e.arm === arm), report.errors.filter((e) => e.arm === arm));
+        await page.setViewportSize({ width: 1600, height: 1000 });
+        await context.close(); continue;
+      }
       if (arm === 'off') {
         check(arm, 'Instruments control absent with flag off', await page.getByTestId('observatory-open').count() === 0);
         await page.keyboard.press('b'); await page.getByTestId('binocular-view').waitFor();
@@ -84,6 +100,7 @@ const check = (arm, name, pass, detail) => {
         await page.evaluate((stationId) => {
           const w = window.__fly.airportWatch, s = w.observatory.snapshot().stations.find((v) => v.id === stationId);
           w.setMoveKeys(0, 0, false); w.walk.halt();
+          w.walk.floorId = 'lower';
           Object.assign(w.eyeLocal, { x: s.position[0], y: 1.65, z: s.side === 'back' ? 12.7 : .1 });
           w.yaw = s.side === 'back' ? Math.PI : 0; w.pitch = -.45; w.publish();
           if (w.walk.clearance() < .22) throw new Error(`Unsafe test setup for ${stationId}`);
@@ -95,7 +112,8 @@ const check = (arm, name, pass, detail) => {
       report.arms.at(-1).table = { runways: tableState.runways, contacts: tableState.contacts, suggestions: tableState.suggestions, geometryReady: tableState.geometryReady, visibilityBasis: tableState.visibilityBasis };
       await page.screenshot({ path: path.join(out, `${arm}-airport-table.png`) });
       check(arm, 'I opens accessible airport table', (await state()).observatory.active === 'airport-table');
-      check(arm, 'Remote rear listening/support require proximity', await page.getByTestId(`instrument-${arm === 'pier' ? 'back' : 'front'}-listen`).isDisabled());
+      check(arm, 'Airport map has no unrelated instrument tabs', await page.locator('.observatory-tabs').count() === 0 && await page.getByRole('heading', { name: 'Airport map', exact: true }).isVisible());
+      check(arm, 'Distant listening/support remain unavailable', tableState.stations.filter((s) => ['listen', 'support'].includes(s.kind) && !s.nearby).every((s) => !s.available));
       const beforeSelection = await state();
       await page.getByRole('button', { name: 'Select QAL101', exact: false }).first().count().then(async (n) => {
         if (n) await page.getByRole('button', { name: 'Select QAL101', exact: false }).first().click();
@@ -103,7 +121,7 @@ const check = (arm, name, pass, detail) => {
       });
       await settle(); const afterSelection = await state();
       check(arm, 'Table selection shares target without camera/position changes', afterSelection.selected === 'a1b2c3' && !afterSelection.tracking && Math.abs(afterSelection.yaw - beforeSelection.yaw) < .01 && Math.abs(afterSelection.pitch - beforeSelection.pitch) < .01 && JSON.stringify(afterSelection.eye) === JSON.stringify(beforeSelection.eye));
-      await page.getByRole('button', { name: 'Show direction', exact: true }).click(); await settle();
+      await page.getByRole('button', { name: 'Show me the direction', exact: true }).click(); await settle();
       check(arm, 'Direction cue closes panel without moving', await page.getByTestId('observatory-direction').isVisible() && !(await state()).observatory.active);
       await page.getByRole('button', { name: 'Dismiss direction' }).click(); await settle();
       check(arm, 'Direction cue dismisses', !(await state()).observatory.cue);
@@ -126,14 +144,18 @@ const check = (arm, name, pass, detail) => {
       // the React panel. Capture both only after their normal refresh interval.
       await page.waitForTimeout(600);
       await page.screenshot({ path: path.join(out, `${arm}-front-listening.png`) });
-      const slider = page.locator('#observatory-bearing');
-      await slider.focus(); const beforeDial = await state(); await page.keyboard.press('ArrowRight'); await settle(); const afterDial = await state();
-      check(arm, 'Focused dial changes bearing without turning camera', afterDial.observatory.listening.bearing !== beforeDial.observatory.listening.bearing && Math.abs(afterDial.yaw - beforeDial.yaw) < .01 && Math.abs(afterDial.pitch - beforeDial.pitch) < .01);
+      const surface = await page.getByTestId('lounge-surface').boundingBox();
+      const beforeDial = await state();
+      await page.mouse.move(surface.x + surface.width * .55, surface.y + surface.height * .4);
+      await page.mouse.down(); await page.mouse.move(surface.x + surface.width * .55 + 100, surface.y + surface.height * .4, { steps: 12 }); await page.mouse.up();
+      await settle(); const afterDial = await state();
+      check(arm, 'Listening follows an ordinary drag look without moving the player', afterDial.observatory.listening.followsView && afterDial.observatory.listening.bearing !== beforeDial.observatory.listening.bearing && Math.abs(afterDial.yaw - beforeDial.yaw) > .01 && JSON.stringify(afterDial.eye) === JSON.stringify(beforeDial.eye));
+      await page.getByRole('button', { name: 'Close window control', exact: true }).focus();
       await page.keyboard.press('w'); await settle(); const afterInput = await state();
-      check(arm, 'Focused range does not start walking', afterInput.speed === 0 && JSON.stringify(afterInput.eye) === JSON.stringify(afterDial.eye));
+      check(arm, 'Focused window control does not start walking', afterInput.speed === 0 && JSON.stringify(afterInput.eye) === JSON.stringify(afterDial.eye));
       check(arm, 'Muted instrument retains visual bearing and meter', !afterInput.sound && await page.locator('meter').count() === 1 && Number.isFinite(afterInput.observatory.listening.level));
       await page.keyboard.press('Escape'); await settle();
-      check(arm, 'Escape closes instruments from range focus', !(await state()).observatory.active && (await state()).active);
+      check(arm, 'Escape closes window controls from keyboard focus', !(await state()).observatory.active && (await state()).active);
       await neutralFocus(); await page.keyboard.press('Enter'); await settle(); await neutralFocus();
       await page.keyboard.down('s'); await page.waitForTimeout(450); await page.keyboard.up('s'); await settle();
       const walked = await state();
@@ -153,7 +175,7 @@ const check = (arm, name, pass, detail) => {
       check(arm, 'Next Escape releases rail before deselecting', !(await state()).observatory.active && (await state()).selected === 'a1b2c3');
 
       await page.keyboard.press('i'); await page.getByTestId('observatory-panel').waitFor();
-      await page.getByTestId('instrument-night').click(); await settle();
+      await page.getByTestId('observatory-lighting').click(); await settle();
       check(arm, 'Night Watch activation toggles session lighting', (await state()).observatory.night);
       await page.getByRole('button', { name: 'Restore lounge lighting' }).click(); await settle();
       check(arm, 'Night Watch restores coherently', !(await state()).observatory.night);
@@ -162,6 +184,44 @@ const check = (arm, name, pass, detail) => {
         await position('back-listen'); await page.keyboard.press('Enter'); await settle();
         check(arm, 'Rear instrument activates from rear approach', (await state()).observatory.listening?.side === 'back');
         await page.screenshot({ path: path.join(out, `${arm}-rear-instrument.png`) });
+        // One explicit ground-floor setup, then real held keyboard movement
+        // for the entire stair ascent, landing, upper room and descent.
+        await page.evaluate(() => {
+          const w = window.__fly.airportWatch;
+          w.observatory.release(); w.setMoveKeys(0, 0, false); w.walk.halt(); w.walk.floorId = 'lower';
+          Object.assign(w.eyeLocal, { x: 0, y: 1.65, z: 2.8 });
+          w.yaw = 0; w.pitch = 0; w.publish();
+        });
+        await neutralFocus();
+        const routeSamples = [];
+        const walkTo = async (goal) => {
+          const start = Date.now(); let held = null;
+          try {
+            while (Date.now() - start < 25000) {
+              const pose = await page.evaluate(() => { const w = window.__fly.airportWatch; return { ...w.eyeLocal, floorId: w.walk.floorId, yaw: w.yaw }; });
+              routeSamples.push(pose);
+              const dx = goal.x - pose.x, dz = goal.z - pose.z;
+              if (Math.hypot(dx, dz) < .16) return pose;
+              const key = Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? 'd' : 'a') : (dz > 0 ? 's' : 'w');
+              if (held !== key) { if (held) await page.keyboard.up(held); await page.keyboard.down(key); held = key; }
+              await page.waitForTimeout(60);
+            }
+            throw new Error('Stair route stalled at ' + JSON.stringify(routeSamples.at(-1)) + ', target ' + JSON.stringify(goal));
+          } finally { if (held) await page.keyboard.up(held); await page.waitForTimeout(180); }
+        };
+        await walkTo({ x: -10, z: 2.8 });
+        await page.screenshot({ path: path.join(out, 'pier-stair-approach.png') });
+        await walkTo({ x: -10, z: 11.9 });
+        const upstairs = await walkTo({ x: -7.5, z: 11.9 });
+        check(arm, 'Continuous keyboard ascent reaches upper lounge', upstairs.floorId === 'upper' && Math.abs(upstairs.y - 6.25) < .03, upstairs);
+        const upper = await state();
+        check(arm, 'Upstairs cannot activate ground-floor instruments', upper.observatory.stations.filter((s) => !s.floorY && ['listen', 'support'].includes(s.kind)).every((s) => !s.available && !s.nearby));
+        await page.screenshot({ path: path.join(out, 'pier-upper-lounge.png') });
+        await walkTo({ x: -10, z: 11.9 });
+        const downstairs = await walkTo({ x: -10, z: 2.8 });
+        check(arm, 'Continuous keyboard descent returns to lower lounge', downstairs.floorId === 'lower' && Math.abs(downstairs.y - 1.65) < .03, downstairs);
+        check(arm, 'Stairs change floor height without rotating the camera', routeSamples.some((p) => p.floorId === 'stairs' && p.y > 2 && p.y < 6) && routeSamples.every((p) => Math.abs(p.yaw) < .001));
+        report.arms.at(-1).stairRoute = routeSamples; save();
       }
       await page.screenshot({ path: path.join(out, `${arm}-instrument.png`) });
       // The browser is output-muted, but the application's WebAudio graph is

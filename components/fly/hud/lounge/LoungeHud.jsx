@@ -1,7 +1,7 @@
 'use client';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Binoculars, Camera, Crosshair, ListOrdered, RotateCcw, Volume2, VolumeX, SlidersHorizontal } from 'lucide-react';
+import { Binoculars, Camera, Crosshair, ListOrdered, Map as MapIcon, Moon, RotateCcw, Sun, Volume2, VolumeX } from 'lucide-react';
 import { useFlyStore } from '@/stores/fly-store';
 import { getRuntimeAction } from '@/lib/fly/runtime-bus';
 import { exitToTitle } from '@/lib/fly/front-door';
@@ -151,7 +151,7 @@ export function LoungeHud({ runtime, watch }) {
   const w = runtime.airportWatch;
   // The seat you are in (LOUNGE_WALK), for the header and the face button.
   const seat = watch.walk ? w?.seats?.find((s) => s.id === watch.seat) ?? null : null;
-  const place = !watch.walk ? 'Window lounge' : watch.posture === 'seated' && seat ? seat.label : watch.posture === 'gliding' ? 'Changing seats' : 'Standing';
+  const place = !watch.walk ? 'Window lounge' : watch.posture === 'seated' && seat ? seat.label : watch.posture === 'gliding' ? 'Changing seats' : w?.walk?.floorId === 'upper' ? 'Upper lounge' : w?.walk?.floorId === 'stairs' ? 'Staircase' : 'Standing';
   const faceLabel = watch.walk && watch.posture === 'seated' && seat?.faces === 'back' ? 'Face the back window' : 'Face the runway';
   const selectedRow = watch.selected ? picker.categories.get(watch.selected) : null;
   const fieldElev = airport ? (airport.a.elevation + airport.b.elevation) / 2 : 0;
@@ -232,7 +232,8 @@ export function LoungeHud({ runtime, watch }) {
             <span>Board</span>
           </button>
           <SeatsButton runtime={runtime} watch={watch} />
-          {observatory && <button type="button" className="lounge-btn" aria-label="Observatory instruments" title="Observatory instruments (I)" data-testid="observatory-open" aria-pressed={instrumentOpen} onClick={() => instrumentOpen ? w?.observatory?.release() : w?.observatory?.activate('airport-table', { remote: true })}><SlidersHorizontal size={16} aria-hidden="true" /><span>Instruments</span></button>}
+          {observatory && <button type="button" className="lounge-btn" aria-label="Airport map" title="Airport map (I)" data-testid="observatory-open" aria-pressed={observatory.active === 'airport-table'} onClick={() => observatory.active === 'airport-table' ? w?.observatory?.release() : w?.observatory?.activate('airport-table', { remote: true })}><MapIcon size={16} aria-hidden="true" /><span>Map</span></button>}
+          {observatory && <button type="button" className="lounge-btn lounge-btn-icon" aria-label={observatory.night ? 'Restore lounge lighting' : 'Dim lounge lighting'} title={observatory.night ? 'Restore lounge lighting' : 'Dim lounge lighting'} aria-pressed={observatory.night} data-testid="observatory-lighting" onClick={() => w?.observatory?.toggleNight()}>{observatory.night ? <Sun size={17} /> : <Moon size={17} />}</button>}
           <button type="button" className="lounge-btn" data-testid="lounge-face-runway" onClick={() => w?.resetLook()} title={`${faceLabel} (R)`}>
             <RotateCcw size={16} aria-hidden="true" />
             <span>{faceLabel}</span>

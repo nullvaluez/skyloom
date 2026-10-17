@@ -34,6 +34,8 @@ if (lighting && !['day', 'night'].includes(lighting)) throw new Error('lighting 
 const localReviewHours = { day: { KCMH: 16, KJFK: 16, LOWI: 12, EGLL: 12, YSSY: 4 }, night: { KCMH: 4, KJFK: 4, LOWI: 22, EGLL: 22, YSSY: 14 } };
 const reviewHour = (airport) => lighting ? localReviewHours[lighting][airport] : utc;
 if (lighting && airports.some((id) => reviewHour(id) == null)) throw new Error('No local solar review hour for one of the requested airports');
+const catalog = require('../public/data/runways/v1/index.json').runways;
+const entryId = (airport) => catalog.filter((row) => row.ident === airport).sort((a, b) => (b.length || 0) - (a.length || 0))[0]?.id ?? airport;
 const out = path.resolve(arg('out', `.graphics-review/living-observatory/${mode}-${airports.join('-')}-${Date.now()}`));
 const url = new URL(arg('url', `http://localhost:${arg('port', '3347')}/`));
 url.searchParams.set('graphicsReview', '1');
@@ -185,8 +187,8 @@ const save = (file = 'progress.json') => fs.writeFileSync(path.join(out, file), 
     report.browserVersion = browser.version();
     console.log('REVIEW renderer', report.renderer.renderer);
     // The title deliberately exposes airport search before its background
-    // world is ready. Use that real entry path: waiting for pct 100 first can
-    // deadlock a fresh title without a spawn, and hides reachable cold stalls.
+    // world is ready. Use that real entry path: waiting for pct 100 first
+    // skips a reachable cold-entry case while the title world is loading.
     // --entry runtime is available only for an explicitly labelled diagnostic.
     report.boot = await page.evaluate(() => ({ ...window.__flyBoot, at: performance.now(), prewarm: window.__fly.prewarm && { ...window.__fly.prewarm } }));
     for (const airport of airports) {
@@ -197,7 +199,7 @@ const save = (file = 'progress.json') => fs.writeFileSync(path.join(out, file), 
       if (report.entryMethod === 'ui') {
         await page.getByTestId('title-screen').getByTestId('watch-airport').click({ timeout: 30000 });
         await page.locator('#airport-search').fill(airport, { timeout: 30000 });
-        await page.getByTestId(`airport-result-${airport}`).locator('.ab-watch').click({ timeout: 30000 });
+        await page.getByTestId(`airport-result-${entryId(airport)}`).locator('.ab-watch').click({ timeout: 30000 });
       } else await page.evaluate((id) => window.__fly.airportWatch.enter(id), airport);
       await page.waitForFunction(() => window.__fly?.airportWatch?.validated && window.__flyBoot?.pct === 100 && !window.__fly.worldLoading, undefined, { timeout: 240000 });
       report.visits.push({ airport, utc: solarHour, readyMs: Date.now() - entered });
@@ -211,10 +213,10 @@ const save = (file = 'progress.json') => fs.writeFileSync(path.join(out, file), 
             if (frame && frame.count !== trace.lastCount) {
               trace.values.push(frame.lastDt);
               trace.lastCount = frame.count;
+              if (w.binocular) trace.binocularFrames++;
+              if (w.posture === 'standing') trace.standingFrames++;
             }
-            if (w.binocular) trace.binocularFrames++;
             if (w.posture === 'standing') {
-              trace.standingFrames++;
               if (trace.eye) trace.distanceM += Math.hypot(w.eyeLocal.x - trace.eye.x, w.eyeLocal.z - trace.eye.z);
               trace.eye = { ...w.eyeLocal };
             } else trace.eye = null;
@@ -269,7 +271,7 @@ const save = (file = 'progress.json') => fs.writeFileSync(path.join(out, file), 
             await dwell(3000);
             if (cycle === 0) await screenshot(`${airport}-${seat}-standing-room`);
             await mark(`${airport}:${cycle}:${seat}:binocular`);
-            await page.evaluate(() => { const w = window.__fly.airportWatch; w.yaw -= Math.PI; w.setMagnification(25); });
+            await page.evaluate(() => { const w = window.__fly.airportWatch; w.yaw -= Math.PI; w.binoculars(true, { acquire: false }); w.setMagnification(25); });
             await dwell(mode === 'views' ? 5000 : 12000);
             if (cycle === 0) await screenshot(`${airport}-${seat}-binocular`);
             await page.evaluate(() => window.__fly.airportWatch.binoculars(false));
@@ -289,7 +291,10 @@ const save = (file = 'progress.json') => fs.writeFileSync(path.join(out, file), 
     }
     report.resources = Object.fromEntries(['calls', 'triangles', 'programs', 'geometries', 'textures', 'heap'].map((key) => [key, summary(report.samples.map((x) => x[key]).filter(Number.isFinite))]));
     report.residency = { first: report.samples[0], last: report.samples.at(-1) };
-    report.limits = { calls: 360, triangles: 2200000, p95Frame: 20, p99Frame: 33.3 };
+    // Current lounge contract, FLY_OBSERVATION_LOUNGE.md:228. Earlier 360
+    // context is retained as an informational comparison, not a moved gate.
+    report.limits = { calls: 375, triangles: 2200000, p95Frame: 20, p99Frame: 33.3, source: 'FLY_OBSERVATION_LOUNGE.md:228' };
+    report.stricter360DrawComparison = report.resources.calls.max <= 360;
     report.checks = {
       noPageErrors: report.errors.length === 0,
       stableBuild: report.hotReloads.length === 0,

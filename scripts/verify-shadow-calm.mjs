@@ -83,10 +83,10 @@ console.log('shipped SHADOW_CALM:', JSON.stringify(shipped), '\n');
 // both-ways execution is the point of this file and does not depend on what
 // ships, which is why the flip touches exactly this one assertion.
 gate(
-  'SHADOW_CALM ships the ruled state (enabled, biasSignFix, kernel world, satCadence 0)',
+  'SHADOW_CALM ships the binocular-reviewed state (enabled, biasSignFix, kernel fixed, satCadence 0)',
   shipped.enabled === true &&
     shipped.biasSignFix === true &&
-    shipped.kernel === 'world' &&
+    shipped.kernel === 'fixed' &&
     shipped.satCadence === 0,
   JSON.stringify(shipped)
 );
@@ -203,6 +203,14 @@ const patch = K.r24PatchShadowChunk;
     `biasSignFix=${shipped.biasSignFix} kernel='${shipped.kernel}'`
   );
   const twice = patch(both.src, { biasSignFix: shipped.biasSignFix, kernel: shipped.kernel });
+  const directional = (chunk) => chunk.slice(chunk.indexOf('float getShadow( sampler2DShadow'), chunk.indexOf('#elif defined( SHADOWMAP_TYPE_VSM )'));
+  const shippedDirectional = directional(both.src);
+  gate('shipped directional filter has no magnifiable spatial rotation noise',
+    shippedDirectional.includes('float phi = 0.0;') && !shippedDirectional.includes('interleavedGradientNoise('));
+  gate('binocular fix retains all five hardware-filtered samples and shadow radius',
+    (shippedDirectional.match(/texture\( shadowMap,/g) || []).length === 5 &&
+    shippedDirectional.includes('float radius = shadowRadius * texelSize.x;') &&
+    (directional(BASE).match(/texture\( shadowMap,/g) || []).length === 5);
   gate(
     'patching an already-patched chunk is a no-op (idempotent)',
     twice.src === both.src && twice.biasSign === false && twice.kernel === null,

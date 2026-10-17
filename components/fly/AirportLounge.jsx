@@ -29,7 +29,7 @@ import { roomVariant } from '@/lib/fly/lounge/room-plan';
 import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
 import { getR25Sky } from '@/lib/fly/r25-sky';
 import { toSceneDir } from '@/lib/fly/true-scale';
-import { LOUNGE_ROOM, ROOM_LOOK } from '@/lib/fly/observation-config';
+import { ROOM_LOOK } from '@/lib/fly/observation-config';
 
 const _key = new Vector3();
 const _view = new Vector3();
@@ -90,13 +90,13 @@ function Room({ runtime, variant }) {
 
   // Indoor fixes read this (PrecipLayer, the cloud composite, the N8AO rig).
   useEffect(() => {
-    const publish = { active: false, shown: false, opacity: 0, inverse: st.current.inverse, envelope: LOUNGE_ROOM.envelope, aoRadius: ROOM_LOOK.ao.radius, aoIntensity: ROOM_LOOK.ao.intensity, weight: 0 };
+    const publish = { active: false, shown: false, opacity: 0, inverse: st.current.inverse, envelope: roomVariant(variant).envelope, aoRadius: ROOM_LOOK.ao.radius, aoIntensity: ROOM_LOOK.ao.intensity, weight: 0 };
     runtime.loungeRoom = publish;
     return () => {
       if (runtime.loungeRoom === publish) delete runtime.loungeRoom;
       runtime.loungeExposureStops = 0;
     };
-  }, [runtime]);
+  }, [runtime, variant]);
 
   // GPU resources only.
   useEffect(() => () => {
@@ -240,7 +240,10 @@ function Room({ runtime, variant }) {
 
     // Interior reflection probe: refresh when the light changed enough.
     if (s.warm === 'done') {
-      const key = `${Math.round(shade.practical * 25)}|${Math.round(shade.day * 20)}|${Math.round(s.nightWatch * 10)}`;
+      const plan = roomVariant(variant);
+      const upperProbe = plan.upper && w.eyeLocal.y >= plan.upper.floorY + 0.5;
+      const pe = upperProbe ? plan.upper.probeEye : plan.probeEye;
+      const key = `${Math.round(shade.practical * 25)}|${Math.round(shade.day * 20)}|${Math.round(s.nightWatch * 10)}|${upperProbe ? 1 : 0}`;
       const now = performance.now();
       if ((s.probeDirty || key !== s.probeKey) && now - s.probeAt > ROOM_LOOK.probeMinMs) {
         // The glass box-projects the probe from the room's probe eye. Seated at
@@ -248,12 +251,11 @@ function Room({ runtime, variant }) {
         // (LOUNGE_WALK) leaves it at the room's probe eye (room-plan.js roomVariant).
         if (variant !== 'pier' && (!w?.walk || (w.posture === 'seated' && w.seatId === 'window'))) _eye.setFromMatrixPosition(camera.matrixWorld);
         else {
-          const pe = roomVariant(w.site?.variant).probeEye;
           group.updateMatrixWorld();
           _eye.set(pe[0], pe[1], pe[2]).applyMatrix4(group.matrixWorld);
         }
         const objects = [...resource.meshes, resource.board.mesh];
-        probe.capture(gl, scene, group, objects, _eye);
+        probe.capture(gl, scene, group, objects, _eye, pe);
         s.probeAt = now;
         s.probeKey = key;
         s.probeDirty = false;

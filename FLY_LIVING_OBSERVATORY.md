@@ -2,6 +2,16 @@
 
 Implementation and validation record for the opt-in lounge expansion. Both `LOUNGE_PIER.enabled` and `LOUNGE_INSTRUMENTS.enabled` remain `false`. This record does not authorize enabling either default.
 
+## Owner feedback and upper lounge revision — October 17, 2026
+
+The owner rejected the first preview's floating instrument heads, striped aircraft shadows and overloaded eight-button instrument panel. The interaction checks below describe functioning controls in that earlier build; they did not establish the requested visual or experiential quality. Those captures and failures remain evidence, not approval.
+
+The rear-facing lower lounge is retained. The current revision adds a distinct enclosed upper observation room at local floor height 4.6 m, reached by a continuous left-wall staircase. The upper room has front and rear glazing, its own seating, guardrails and a raised roof. The same movement controller owns walking, stair elevation and seat transitions; the placement footprint and conservative classic fallback remain unchanged.
+
+The revised HUD opens one airport map with a single aircraft-to-viewpoint action. Window tools appear in proximity instead of as eight global tabs; lighting is a direct toggle. Listening follows the player's look direction and clearly exposes sound-off, so it no longer requires a separate bearing-slider task. Rounded display housings connect through hinges to continuous supports. The existing five-tap shadow filter uses its fixed sample pattern: the previous continuously rotated noise produced visible diagonal bands under magnification. Bias, shadow resolution and cascade count are unchanged.
+
+This revision is undergoing rendered validation. Earlier build `817f580` and its performance/interaction reports do not certify the new upper room. Final revision evidence must include real keyboard ascent and descent, floor-aware picking and controls, upper/lower daylight and night views, close inspection of physical joins, and the corrected apron shadows.
+
 ## Runtime and interaction contracts
 
 Built from `main` at `9ba95e8` in `codex/living-observatory`, separately from the trailer checkout. Opt in with `?flags=LOUNGE_PIER,LOUNGE_INSTRUMENTS`; `?flags=-LOUNGE_PIER,-LOUNGE_INSTRUMENTS` exercises the unchanged entry experience. The existing phone/tablet feature policy is unchanged.
@@ -24,6 +34,14 @@ Node gates passed: observation 45/45, lifecycle 25/25, audio 16/16, observatory 
 The lifecycle regression covers rail activation during an unfinished cursor-anchored zoom: the rail clears that pending anchor without changing ordinary cursor anchoring. Audio coverage includes enabling sound while paused or hidden, immediate store/visibility-edge muting and subscription cleanup; a sound preference cannot bypass the combined master mute predicate.
 
 The combined presentation gate passes for both variants: **14 draws, 120,454 triangles classic / 120,868 triangles pier, 23.86 MiB textures**. It verifies finite shared-shader attributes, resource disposal and unobstructed physical display faces; a regression ray must hit each screen before its housing. The layout detector reported no findings on the new HUD, stylesheet and instrument component. ESLint passed all changed JavaScript files and `git diff --check` passed.
+
+Production interaction acceptance on implementation commit `817f580` passes **62/62** checks: flags off 5, classic with instruments 28, pier with instruments 29. A separate **1280×720 desktop pass is 5/5**, including normal overflow scrolling and clicking the Night Watch restore control. Both reports contain zero page exceptions. The expanded title/front-door suite also passes **70/70** after the shared audio-mute correction.
+
+The browser pass uses real application modules, collision geometry and WebAudio, with a deterministic, explicitly marked traffic fixture for selection assertions. Physical approach setup is instrumented; keyboard, pointer, focus, movement release and Escape use browser input. It covers a muted instrument, range focus, free rail binoculars, opt-in readouts, shared selection, no camera turn on table actions, Night Watch reversal, pause, sound-on while paused, mute teardown and rear activation. Screenshots are taken after the physical atlas/optics settle, not during their intentional transitions.
+
+**Visibility qualification:** headless Chrome kept both tabs visible when another tab was brought forward. The harness records `nativeHidden: false` and explicitly simulates the Page Visibility input to exercise teardown. The application intentionally stays paused after visibility returns, and the test asserts that before explicitly resuming. This branch and the real store/event regression pass, but native OS/browser background-tab behavior remains an owner/manual check; it is not certified by the headless result.
+
+Local browser evidence: `.graphics-review/living-observatory/interactions-final-production/report.json` and `interactions-compact-production/report.json`, with corresponding captures. Earlier failures are retained: physical screen clipping (fixed), a development-only offscreen-click timeout (not reproduced in final production/compact checks), development script errors, and two visibility-harness assumptions corrected to match the application's retained-pause policy. They are not silently counted as passing runs.
 
 Additional commands:
 
@@ -90,3 +108,30 @@ For a cache-only rerun, append `--offline`. Missing cached tiles then fail conse
 - Complete rendered front/rear and walking-route reviews at all five airports in daylight and at night, including standing/seated transitions, interrupted interactions, reduced motion, and maximum zoom. The placement audit and Node geometry gates do not establish visual quality.
 - Complete matched cold-entry/first-binocular measurements, identify and verify program warmup behavior, and record the YSSY comparison plus a 20-minute walk/zoom soak. Historical figures are context only; they do not prove this expansion's performance.
 - Record final live-world integrity, mute/pause/hidden-tab, accessible-control, teardown, and full integration outcomes with the final build. Source assertions alone do not replace these checks.
+
+## Upper lounge revision — geometry validation
+
+The owner subsequently asked for a continuous stair to a distinct upper lounge. This revision supersedes the single-level pier geometry and four-seat circulation figures above. The browser results recorded for `817f580` remain evidence for that earlier build; they do not certify the upper-room revision.
+
+The lower front and rear windows, right-wall bar, entrance and central circulation remain. The upper observation room occupies room-local `x=-11.2..11.2, z=8..14.2`, with its floor at `y=4.6` and roof at `y=7.85`. Its front, rear and east glazing use real bronze channels and seals. Two upholstered observation chairs, stone side tables, lamps, a woven rug, timber flooring and a low credenza give the room a distinct interior. The upper front and rear seats are `upper-front` and `upper-back`; the latter's approach is `[3.1,12.4]` to preserve the walking capsule's clearance from its side table.
+
+The left stair has a 1.9 m clear width, 28 equal 164 mm rises and 270 mm treads, running from `z=3.6` to `11.16`. The existing left banquette, its tables and the front-left planter are removed; two lower lounge chairs are reused upstairs. The stair has a closed plinth, balusters, timber handrails and restrained circulation markers. The ceiling opening, landing, upper floor and guardrails share `LOUNGE_PIER_ROOM.upper` with the navigation model. The room footprint in airport coordinates is unchanged; the variant envelope rises to `maxY=8.05`.
+
+The interior shader now tests the actual two-level shell and intermediate slab for key light and exterior reflections. Interior fixtures cannot light through that slab, except through the stair opening. One existing 256-pixel cube probe is reused and refreshed when the observed level changes; there is no second probe or new `THREE.Light`.
+
+The new AO bake uses the actual 131,196-triangle room geometry, signature `6b7a1f50`. Its version-2 payload retains the 512×352 lower floor map and adds a 512×160 upper floor map, packed into one 512×512 R8 texture. This adds approximately 0.104 MiB including mipmaps. The classic version-1 bake and geometry remain unchanged. The base pier resource has 12 draws, 131,230 triangles including glass/boards/steam, 5.71 MB of geometry and 21.96 MiB of textures; it contains 29 analytical practicals and 40 shadow boxes. The separate combined presentation gate must include the updated instruments before claiming the 14-draw, 140,000-triangle, 24-MiB limit is met.
+
+Validation completed before the first production capture of this revision:
+
+- `verify-airport-lounge.mjs`: 12/12 classic and 12/12 pier checks, including finite geometry, envelope/glazing contracts, real shader patch anchors, fixture limits, matching AO and disposal.
+- `verify-lounge-upper.mjs`: 6/6 checks using the actual mesh BVH. These include 483 stair-width/headroom samples, both upper seated sightlines, six upper standing sightlines, the open stair ceiling, occupied landing, solid intermediate slab, preserved lower rear view, vertical blocker bounds and separate upper contact shadows.
+- ESLint passed the changed geometry, shading, glass, probe, AO, configuration, component and test files.
+
+```powershell
+node scripts/verify-airport-lounge.mjs
+node scripts/verify-airport-lounge.mjs --pier
+node scripts/verify-lounge-upper.mjs
+node scripts/build-lounge-ao.mjs --pier
+```
+
+The shared-controller navigation, complete layered-floor connectivity, rendered room craft, all-five-airport sightlines, daylight/night lighting and matched performance/soak results must be recorded against the upper-room production build. These geometric results are not visual signoff or frame-time evidence. Pier and instruments remain off by default pending owner visual approval.
