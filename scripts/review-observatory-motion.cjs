@@ -18,7 +18,7 @@ const save = () => fs.writeFileSync(path.join(out, 'report.json'), JSON.stringif
     const r = window.__fly, w = r.airportWatch;
     let scene = r.engine.object; while (scene.parent) scene = scene.parent;
     const gl = scene.__r3f.root.getState().gl;
-    return { at: performance.now(), eye: { ...w.eyeLocal }, floorId: w.walk.floorId, posture: w.posture, yaw: w.yaw, pitch: w.pitch, tier: window.__flyStore.getState().qualityTier, csm: r.cinemaShadows, room: r.loungeStats, programs: gl.info.programs.length, frame: window.__flyStats.frame.sample() };
+    return { at: performance.now(), eye: { ...w.eyeLocal }, floorId: w.walk.floorId, posture: w.posture, yaw: w.yaw, pitch: w.pitch, tier: window.__flyStore.getState().qualityTier, csm: r.cinemaShadows, room: r.loungeStats, roomWarm: r.loungeRoom?.programWarm, terrainWarm: r.criticalTerrain, prewarm: r.prewarm, shadowEnabled: gl.shadowMap.enabled, programs: gl.info.programs.length, frame: window.__flyStats.frame.sample() };
   });
   const mark = (value) => page.evaluate((value) => window.__loungeWebGL.mark(value), value);
   const screenshot = async (name) => { const file = name + '.png'; await page.screenshot({ path: path.join(out, file), timeout: 120000 }); report.frames.push({ file, ...(await state()) }); save(); };
