@@ -15,7 +15,7 @@ const { compileCinemaProfiles, reachableCinemaCascades } = await import('../lib/
 const { CinemaShadows } = await import('../lib/fly/cinema-shadows.js');
 const { CINEMA_PROFILES } = await import('../lib/fly/cinema-profile.js');
 const { createRoomMaterials, createRoomUniforms } = await import('../lib/fly/lounge/room-shading.js');
-const { warmRoomProfiles } = await import('../lib/fly/lounge/room-prewarm.js');
+const { invalidateRoomProfiles, warmRoomProfiles } = await import('../lib/fly/lounge/room-prewarm.js');
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
 let count = 0;
 const check = async (name, run) => { await run(); count++; console.log('PASS ' + name); };
@@ -24,10 +24,18 @@ scene.add(new DirectionalLight(), new HemisphereLight()); scene.environment = ne
 const liveRig = new CinemaShadows(camera, scene, CINEMA_PROFILES.high);
 const uniforms = createRoomUniforms(), originalTarget = {}, calls = [], waiting = [];
 let target = originalTarget, disposed = 0;
+const properties = new WeakMap();
 const gl = { shadowMap: { enabled: false, type: 1 }, getRenderTarget: () => target, setRenderTarget: next => { target = next; },
-  compileAsync(warmScene, cam, targetScene) {
+  domElement: new EventTarget(), getContext: () => ({ isContextLost: () => false }), extensions: { has: () => true },
+  properties: { get: material => properties.get(material) },
+  compile(warmScene, cam, targetScene) {
     assert.notEqual(target, originalTarget); assert.equal(this.shadowMap.enabled, true); assert.equal(cam, camera);
-    const wait = deferred(); waiting.push(wait); calls.push({ warmScene, targetScene }); return wait.promise;
+    const wait = deferred(); let ready = false, failed;
+    wait.promise.then(() => { ready = true; }, error => { failed = error; });
+    waiting.push(wait); calls.push({ warmScene, targetScene });
+    const materials = new Set(warmScene.children.map(mesh => mesh.material));
+    for (const material of materials) properties.set(material, { currentProgram: { isReady() { if (failed) throw failed; return ready; } } });
+    return materials;
   } };
 const factory = () => {
   const materials = createRoomMaterials(uniforms, {}, 'pier'), warmScene = new Scene();
@@ -100,7 +108,16 @@ await check('revisiting a room reuses the retained job and only allocates three-
   const textured = warmRoomProfiles({ gl, camera, scene, resource, variant: 'pier', cascadeCounts: [0, 1, 2] });
   assert.notEqual(textured, first); assert.equal(waiting.length, 11);
   waiting.slice(8).forEach(wait => wait.resolve()); await textured.promise;
-  materials.metal.map.dispose(); textured.dispose();
+  // No mounted AirportLounge listener exists in this test. The retained
+  // renderer owner must notice loss/restoration between room visits itself.
+  gl.domElement.dispatchEvent(new Event('webglcontextlost'));
+  gl.domElement.dispatchEvent(new Event('webglcontextrestored'));
+  await Promise.resolve();
+  const restored = warmRoomProfiles({ gl, camera, scene, resource, variant: 'pier', cascadeCounts: [0, 1, 2] });
+  assert.notEqual(restored, textured, 'A restored GL context must not reuse resolved shader evidence');
+  waiting.slice(11).forEach(wait => wait.resolve()); await restored.promise;
+  invalidateRoomProfiles(gl);
+  materials.metal.map.dispose(); restored.dispose(); textured.dispose();
   geometry.dispose(); for (const material of Object.values(materials)) material.dispose(); first.dispose();
 });
 liveRig.dispose(); scene.environment.dispose(); uniforms.uLoungeFix.value.dispose();

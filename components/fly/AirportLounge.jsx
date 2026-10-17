@@ -33,7 +33,9 @@ import { ROOM_LOOK } from '@/lib/fly/observation-config';
 import { cinemaOn } from '@/lib/fly/cinema-policy';
 import { isMobileGraphicsClass } from '@/lib/fly/device-class';
 import { reachableCinemaCascades } from '@/lib/fly/cinema-profile-prewarm';
-import { warmRoomProfiles } from '@/lib/fly/lounge/room-prewarm';
+import { invalidateRoomProfiles, warmRoomProfiles } from '@/lib/fly/lounge/room-prewarm';
+import { createRoomWarmLifecycle } from '@/lib/fly/lounge/room-lifecycle.mjs';
+import { compileSceneAsync } from '@/lib/fly/compile-scene-safe';
 
 const _key = new Vector3();
 const _view = new Vector3();
@@ -55,24 +57,72 @@ function Room({ runtime, variant }) {
   const probe = useMemo(() => new InteriorProbe(ROOM_LOOK.probeSize), []);
   const st = useRef(null);
   if (!st.current) {
+    const lifetime = createRoomWarmLifecycle();
     st.current = {
       maps: false, warm: 'pending', warmRT: null, exposure: 0, hidden: false, probeAt: -Infinity,
       probeKey: null, probeDirty: true, shade: {}, inverse: new Matrix4(), started: performance.now(),
-      programWarm: { required: true, status: 'waiting', startedAt: null, readyAt: null, error: null, reason: null, cascadeCounts: [] },
+      lifetime, programWarm: lifetime.state,
     };
   }
 
   // GPU-baked surface maps, attached before the cascade rig or the prewarm
   // ever see the materials.
   useLayoutEffect(() => {
-    const baked = bakeRoomTextures(gl);
-    resource.attachMaps(baked.maps);
-    st.current.maps = true;
-    st.current.warm = 'pending';
-    st.current.probeDirty = true;
-    st.current.textureBytes = baked.bytes;
-    return () => baked.dispose();
-  }, [gl, resource]);
+    const state = st.current, life = state.lifetime;
+    life.activate();
+    let baked = null;
+    const rebuild = ({ preserveReveal = false } = {}) => {
+      life.reset('texture-bake', { preserveReveal });
+      const token = life.current();
+      state.maps = false; state.warm = 'pending';
+      state.programWarm.textureStatus = 'baking';
+      // attachMaps replaces/disposes live materials, so it must follow any
+      // pending shader poll which still owns those material programs.
+      return life.afterPending().then(() => {
+        if (!life.valid(token) || state.contextLost) return;
+        let next;
+        try {
+          next = bakeRoomTextures(gl);
+          resource.attachMaps(next.maps);
+          baked?.dispose(); baked = next;
+          state.maps = true; state.textureBytes = next.bytes;
+          state.programWarm.textureStatus = 'ready';
+          state.probeDirty = true; state.probeKey = null;
+        } catch (error) {
+          next?.dispose(); baked?.dispose(); baked = null;
+          // An explicit reduced entry can still show the original untextured
+          // material path. Keep the failed bake truthful and retryable.
+          resource.attachMaps({});
+          state.textureBytes = 0; state.warm = 'failed';
+          state.programWarm.textureStatus = 'failed';
+          life.fail(error, 'texture-bake-error');
+        }
+      });
+    };
+    state.rebuildMaps = rebuild;
+    const lost = () => {
+      state.contextLost = true; state.maps = false; state.warm = 'pending';
+      life.reset('context-lost');
+      invalidateRoomProfiles(gl);
+    };
+    const restored = () => {
+      state.contextLost = false;
+      invalidateRoomProfiles(gl);
+      rebuild();
+    };
+    gl.domElement.addEventListener('webglcontextlost', lost);
+    gl.domElement.addEventListener('webglcontextrestored', restored);
+    rebuild();
+    return () => {
+      gl.domElement.removeEventListener('webglcontextlost', lost);
+      gl.domElement.removeEventListener('webglcontextrestored', restored);
+      state.rebuildMaps = null;
+      life.deactivate(() => {
+        resource.dispose(); probe.dispose();
+        state.warmRT?.dispose(); state.warmRT = null;
+      }).then(() => baked?.dispose());
+    };
+  }, [gl, resource, probe]);
 
   // The offline AO bake (fetched once per session).
   useEffect(() => {
@@ -98,14 +148,11 @@ function Room({ runtime, variant }) {
     const state = st.current;
     const publish = { active: false, shown: false, opacity: 0, inverse: state.inverse, envelope: roomVariant(variant).envelope, aoRadius: ROOM_LOOK.ao.radius, aoIntensity: ROOM_LOOK.ao.intensity, weight: 0,
       programWarm: state.programWarm,
-      bypassWarm(reason) {
-        if (state.programWarm.status === 'ready') return;
-        state.programWarm.status = 'bypassed'; state.programWarm.reason = reason;
-      },
+      bypassWarm: (reason) => state.lifetime.bypass(reason),
       retryWarm() {
-        if (state.programWarm.status !== 'failed') return false;
-        state.warm = 'pending';
-        Object.assign(state.programWarm, { status: 'waiting', error: null, reason: null });
+        if (!['failed', 'bypassed'].includes(state.programWarm.status)) return false;
+        if (state.programWarm.textureStatus === 'failed' || !state.maps) state.rebuildMaps?.({ preserveReveal: true });
+        else { state.lifetime.reset('retry', { preserveReveal: true }); state.warm = 'pending'; }
         return true;
       },
     };
@@ -115,14 +162,6 @@ function Room({ runtime, variant }) {
       runtime.loungeExposureStops = 0;
     };
   }, [runtime, variant]);
-
-  // GPU resources only.
-  useEffect(() => () => {
-    resource.dispose();
-    probe.dispose();
-    st.current.warmRT?.dispose();
-    st.current.warmRT = null;
-  }, [resource, probe]);
 
   useFrame((frame, dt) => {
     const s = st.current;
@@ -174,7 +213,7 @@ function Room({ runtime, variant }) {
     // permutations: governor transitions must not compile the room mid-walk.
     // The shared arrival cap/explicit reduced entry owns any degraded reveal;
     // a failed compile is not silently relabelled as a successful warm.
-    if (s.maps && s.warm === 'pending') {
+    if (s.maps && s.warm === 'pending' && !s.contextLost) {
       const store = useFlyStore.getState();
       const cinematic = cinemaOn(store);
       const csm = runtime.cinemaShadows?.cascades > 0;
@@ -183,39 +222,30 @@ function Room({ runtime, variant }) {
         s.warm = 'running';
         const warm = s.programWarm;
         const parallel = gl.extensions.has('KHR_parallel_shader_compile');
-        if (warm.status !== 'bypassed') warm.status = 'compiling';
-        warm.startedAt = performance.now();
         warm.parallel = parallel;
         warm.profileStatus = cinematic && !parallel ? 'unsupported' : 'compiling';
         warm.cascadeCounts = cinematic && parallel ? reachableCinemaCascades({ preset: store.qualityPreset, phone: isMobileGraphicsClass() }) : [];
         s.warmRT ??= new WebGLRenderTarget(1, 1);
-        const prev = gl.getRenderTarget();
-        let job;
-        try {
-          gl.setRenderTarget(s.warmRT);
-          const profiles = cinematic && parallel ? warmRoomProfiles({ gl, camera, scene, resource, variant, cascadeCounts: warm.cascadeCounts }) : null;
-          const jobs = [gl.compileAsync(group, camera, scene), gl.compileAsync(resource.glass.mesh, camera, overlayWarmScene()), gl.compileAsync(resource.steam.mesh, camera, overlayWarmScene())];
-          if (profiles) jobs.push(profiles.promise);
-          job = Promise.all(jobs);
-        } catch (error) {
-          job = Promise.reject(error);
-        } finally {
-          gl.setRenderTarget(prev);
-        }
-        job.then(() => {
-          if (st.current !== s) return;
-          s.warm = 'done'; warm.readyAt = performance.now();
+        s.lifetime.run(() => {
+          const prev = gl.getRenderTarget(), jobs = [];
+          try {
+            gl.setRenderTarget(s.warmRT);
+            const profiles = cinematic && parallel ? warmRoomProfiles({ gl, camera, scene, resource, variant, cascadeCounts: warm.cascadeCounts }) : null;
+            if (profiles) jobs.push(profiles.promise);
+            jobs.push(compileSceneAsync(gl, group, camera, scene), compileSceneAsync(gl, resource.glass.mesh, camera, overlayWarmScene()), compileSceneAsync(gl, resource.steam.mesh, camera, overlayWarmScene()));
+          } catch (error) { jobs.push(Promise.reject(error)); }
+          finally { gl.setRenderTarget(prev); }
+          return Promise.allSettled(jobs).then((results) => {
+            const failed = results.find((result) => result.status === 'rejected');
+            if (failed) throw failed.reason;
+          });
+        }, () => {
+          s.warm = 'done';
           if (warm.profileStatus !== 'unsupported') warm.profileStatus = 'ready';
-          // Preserve the truthful degraded-arrival record if its cap fired.
-          if (warm.status !== 'bypassed') warm.status = 'ready';
-        }, (error) => {
-          if (st.current !== s) return;
-          s.warm = 'failed'; warm.error = String(error?.message ?? error);
-          if (warm.status !== 'bypassed') warm.status = 'failed';
-        });
+        }, () => { s.warm = 'failed'; });
       }
     }
-    const ready = s.warm === 'done' || s.programWarm.status === 'bypassed';
+    const ready = s.lifetime.canShow();
     const shown = !!w.validated && !s.hidden && ready;
     if (pub) { pub.shown = shown; pub.opacity = 1 - fade; }
     group.visible = shown;
