@@ -46,7 +46,7 @@ export function AirportDiagram({ state, onSelect }) {
         <title>{c.label} · {distance(c.distanceM)} · {c.phaseLabel || 'Live position'}</title>
         <circle cx={x} cy={y} r="13" className="observatory-dot-hit" />
         {location.offMap ? <path d="M0 -6L5 4L0 2L-5 4Z" transform={'translate(' + x + ' ' + y + ') rotate(' + location.angleDeg + ')'} /> : <circle cx={x} cy={y} r={c.selected ? 5 : 3.5} />}
-        {(c.selected || nearby.slice(0, 3).includes(c)) && <text x={x > 250 ? x - 8 : x + 8} y={y - 9} textAnchor={x > 250 ? 'end' : 'start'}>{c.label}</text>}
+        {(c.selected || nearby.slice(0, 3).includes(c)) && <text x={x > 250 ? x - 8 : x + 8} y={y < 50 ? y + 17 : y - 9} textAnchor={x > 250 ? 'end' : 'start'}>{c.label}</text>}
       </g>;
     })}
     <path className="observatory-map-scale" d={'M22 252v4h' + km * 1000 * scale + 'v-4'} />
