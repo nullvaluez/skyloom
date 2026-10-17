@@ -104,13 +104,31 @@ const save = () => fs.writeFileSync(path.join(out, 'report.json'), JSON.stringif
     await page.waitForFunction(() => window.__fly.airportWatch.validated && !window.__fly.worldLoading && window.__flyBoot?.pct === 100, undefined, { timeout: 180000 });
     await page.getByTestId('warp-hold').waitFor({ state: 'hidden', timeout: 60000 });
     await page.waitForTimeout(10000);
-    const buildIdFile = path.resolve('.next-observatory-upper/BUILD_ID');
+    const buildIdFile = path.resolve(arg('build-dir', '.next-observatory-upper'), 'BUILD_ID');
     report.buildId = fs.existsSync(buildIdFile) ? fs.readFileSync(buildIdFile, 'utf8').trim() : null;
     report.renderer = await page.evaluate(() => { let scene = window.__fly.engine.object; while (scene.parent) scene = scene.parent; const gl = scene.__r3f.root.getState().gl.getContext(), ext = gl.getExtension('WEBGL_debug_renderer_info'); return ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); });
     report.initial = await pose(); save();
     if (report.errors.length || report.consoleErrors.some((s) => /shader error|validate_status|gl_invalid|program link/i.test(s))) throw new Error('Page or shader errors on initial upper-room rendering');
     await capture('lower-front-initial');
-    if (arg('mode', '') === 'hud') {
+    const reviewMode = arg('mode', 'full');
+    if (reviewMode === 'corrections') {
+      const nightPair = async (name) => {
+        await capture(name + '-normal');
+        await page.getByTestId('observatory-lighting').click(); await capture(name + '-dim');
+        await page.getByTestId('observatory-lighting').click();
+      };
+      await stand();
+      await walkTo({ x: -10, z: 2.8, floorId: 'lower' }, 'corrected-stair-approach');
+      await lighting('night'); await look(Math.PI, .22); await nightPair('stair-night-approach');
+      await walkTo({ x: -10, z: 7.4, floorId: 'stairs' }, 'corrected-stair-midpoint');
+      await look(Math.PI, .16); await nightPair('stair-night-midpoint');
+      await walkTo({ x: -10, z: 11.9, floorId: 'upper' }, 'corrected-upper-landing');
+      await look(-Math.PI / 2, -.04); await nightPair('upper-night-landing');
+      await walkTo({ x: 0, z: 10.7, floorId: 'upper' }, 'corrected-upper-centre');
+      await look(Math.PI / 2, -.08); await nightPair('upper-night');
+      await lighting('day');
+    }
+    if (['hud', 'corrections'].includes(reviewMode)) {
       await stand();
       await instrument('airport-table', { x: 4.4, z: 5.2, floorId: 'lower' }, 'airport-table');
       await page.getByTestId('observatory-open').click();

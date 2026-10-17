@@ -85,6 +85,7 @@ const check = (arm, name, pass, detail) => {
         check(arm, 'Selected aircraft direction action stays visible without outer scrolling', selectedLayout.actionBottom <= selectedLayout.panelBottom && selectedLayout.actionTop >= 0 && selectedLayout.actionBottom <= 720 && selectedLayout.scrollTop === 0 && selectedLayout.overflow <= 1 && selectedLayout.listHeight >= 64, selectedLayout);
         await page.screenshot({ path: path.join(out, 'pier-1280x720-selected-map.png') });
         await direction.click();
+        await page.getByTestId('observatory-direction').waitFor();
         check(arm, 'Compact map direction action works', await page.getByTestId('observatory-direction').isVisible());
         await page.getByTestId('observatory-lighting').click();
         await page.getByRole('button', { name: 'Restore lounge lighting', exact: true }).click();
@@ -164,7 +165,7 @@ const check = (arm, name, pass, detail) => {
       await settle(); const afterDial = await state();
       check(arm, 'Listening follows an ordinary drag look without moving the player', afterDial.observatory.listening.followsView && afterDial.observatory.listening.bearing !== beforeDial.observatory.listening.bearing && Math.abs(afterDial.yaw - beforeDial.yaw) > .01 && JSON.stringify(afterDial.eye) === JSON.stringify(beforeDial.eye));
       await page.getByRole('button', { name: 'Close window control', exact: true }).focus();
-      await page.keyboard.press('w'); await settle(); const afterInput = await state();
+      await page.keyboard.down('w'); await page.waitForTimeout(300); await page.keyboard.up('w'); await settle(); const afterInput = await state();
       check(arm, 'Focused window control keeps its instrument and does not start walking', afterInput.observatory.active === beforeDial.observatory.active && afterInput.speed === 0 && JSON.stringify(afterInput.eye) === JSON.stringify(afterDial.eye), { active: afterInput.observatory.active, speed: afterInput.speed, eye: afterInput.eye });
       check(arm, 'Muted instrument retains visual bearing and meter', !afterInput.sound && await page.locator('meter').count() === 1 && Number.isFinite(afterInput.observatory.listening?.level), { sound: afterInput.sound, meters: await page.locator('meter').count(), listening: afterInput.observatory.listening });
       await page.keyboard.press('Escape'); await settle();
