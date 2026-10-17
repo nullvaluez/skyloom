@@ -46,6 +46,33 @@ check('ceiling opening, occupied landing and lower rear view agree with geometry
   assert.ok(bvh.cast(0, 1.65, 13, 0, 0, 1, 1.25) >= 1.2, 'lower rear glazing stays open');
   assert.ok(bvh.cast(0, 3.6, 10, 0, 1, 0, 2) < 1, 'upper slab remains solid over lower room');
 });
+check('finished floors and every tread stay above their structural faces', () => {
+  const timber = buildTriBvh({ wood: room.buckets.wood });
+  const structure = buildTriBvh({ plaster: room.buckets.plaster });
+  const stone = buildTriBvh({ stone: room.buckets.stone });
+  const fabric = buildTriBvh({ fabric: room.buckets.fabric });
+  const topAt = (mesh, x, z, fromY) => fromY - mesh.cast(x, fromY, z, 0, -1, 0, 10);
+  // Sample both the main upper plate and the occupied landing, not a
+  // computed parameter: these are the actual rendered material buckets.
+  for (const [x,z] of [[5,10],[-10,12]]) {
+    const finish = topAt(timber,x,z,u.floorY+0.3), below = topAt(structure,x,z,u.floorY+0.3);
+    assert.ok(Math.abs(finish-u.floorY)<1e-5, `finished floor height ${x},${z}`);
+    assert.ok(finish-below>=0.035, `timber/structure separation ${x},${z}: ${finish-below}`);
+  }
+  const tread = (st.z1-st.z0)/st.steps, rise=st.rise/st.steps;
+  for(let i=0;i<st.steps;i++) for(const x of [st.x0+0.25,(st.x0+st.x1)/2,st.x1-0.25]) {
+    const z=st.z0+(i+0.5)*tread, expected=(i+1)*rise;
+    const finish=topAt(timber,x,z,expected+0.1), below=topAt(stone,x,z,expected+0.1);
+    assert.ok(Math.abs(finish-expected)<1e-5, `tread ${i} preserves finished rise`);
+    assert.ok(finish-below>=0.025, `tread ${i} has no coplanar stone face: ${finish-below}`);
+  }
+  // The rug is a distinct raised finish: its field and border tops have
+  // separate heights, and neither is coplanar with the walking timber.
+  for(const [x,z,minRise] of [[0,10.95,0.013],[3.88,10.95,0.011]]) {
+    const rug=topAt(fabric,x,z,u.floorY+0.1), finish=topAt(timber,x,z,u.floorY+0.1);
+    assert.ok(rug-finish>=minRise, `rug finish separated from timber ${x},${z}`);
+  }
+});
 check('upper solids publish vertical bounds while classic remains single level', () => {
   assert.equal(roomVariant('classic').upper, null);
   const ids = new Set(room.blockers.filter((b) => b.floorId === 'upper' && b.seatId).map((b) => b.seatId));
