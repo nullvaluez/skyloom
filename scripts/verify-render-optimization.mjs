@@ -41,14 +41,11 @@ await check('fresh capable phone starts High; explicit Medium/Low and constraine
   stored.clear();browser({memory:2});resolveInitialSettings();assert.equal(useFlyStore.getState().qualityPreset,'medium');
   browser({memory:undefined,cores:6});window.localStorage.getItem=()=>{throw Error('blocked');};resolveInitialSettings();assert.equal(useFlyStore.getState().qualityPreset,'high');
 });
-await check('fresh desktop starts Ultra on the High scene tier; an old saved High lifts once, later picks are final',()=>{
-  browser({phone:false});stored=new Map();resolveInitialSettings();
-  assert.equal(useFlyStore.getState().qualityPreset,'ultra');assert.equal(useFlyStore.getState().qualityTier,'high');assert.equal(autoTierCeiling(),'high');
-  stored=new Map([['fly-quality-tier','high']]);resolveInitialSettings();
-  assert.equal(useFlyStore.getState().qualityPreset,'ultra');assert.equal(stored.get('fly-quality-tier'),'ultra');
-  stored.set('fly-quality-tier','high');resolveInitialSettings();assert.equal(useFlyStore.getState().qualityPreset,'high');
-  stored=new Map([['fly-quality-tier','medium']]);resolveInitialSettings();assert.equal(useFlyStore.getState().qualityPreset,'medium');
-  browser({phone:false});window.localStorage.getItem=()=>{throw Error('blocked');};resolveInitialSettings();assert.equal(useFlyStore.getState().qualityPreset,'ultra');
+await check('desktop: a saved pick wins, and Ultra rides the High scene tier with a High auto ceiling',()=>{
+  // The fresh-desktop Ultra start is DEVICE_TIERS.ultraStart (verify-device-tiers gate 6).
+  for(const pick of ['ultra','high','medium']){browser({phone:false});stored=new Map([['fly-quality-tier',pick]]);resolveInitialSettings();
+   assert.equal(useFlyStore.getState().qualityPreset,pick);assert.equal(useFlyStore.getState().qualityTier,pick==='ultra'?'high':pick);}
+  assert.equal(autoTierCeiling(),'high');
 });
 await check('tablets use mobile graphics without pretending to have a phone HUD; mouse laptops stay desktop',()=>{
   browser();window.screen={width:1024,height:1366};assert.equal(isPhoneClass(),false);assert.equal(isMobileGraphicsClass(),true);

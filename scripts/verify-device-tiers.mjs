@@ -24,7 +24,10 @@
  *  (4) flag on, phone: identical rungs (every phone effect rung already keeps
  *      its cascade), and render scale no longer drops it either;
  *  (5) start tier: discrete -> high, integrated/unknown -> medium, software ->
- *      low, phone -> existing policy; flag off -> existing policy.
+ *      low, phone -> existing policy; flag off -> existing policy;
+ *  (6) start preset (ultraStart): a High GPU start on a desktop resolves
+ *      Ultra; every other start keeps its tier; automation keeps High unless
+ *      the pin sets ultraAutomation; flag off never starts Ultra.
  *
  * Run: node scripts/verify-device-tiers.mjs
  */
@@ -53,7 +56,7 @@ if (legArg) {
   globalThis.window = { location: { search: '' }, __flyDeviceTiersOverride: { enabled: on } };
   const tiers = await import('../lib/fly/device-tiers.js');
   const gov = await import('../lib/fly/perf-governor.js');
-  const { defaultQualityTier } = await import('../lib/fly/fly-settings.js');
+  const { defaultQualityTier, defaultQualityPreset } = await import('../lib/fly/fly-settings.js');
   const ladder = ({ dpr0, preset = 'high', phone = false }) => {
     if (phone) {
       globalThis.window = phoneWindow('');
@@ -80,6 +83,16 @@ if (legArg) {
     },
     phone15: ladder({ dpr0: 1.5, phone: true }),
   };
+  // Desktop again (ladder() left a phone window behind), then the Ultra start.
+  globalThis.window = { location: { search: '' }, matchMedia: () => ({ matches: false }), screen: { width: 1440, height: 900 }, innerWidth: 1440, innerHeight: 900 };
+  const nav = (webdriver) => Object.defineProperty(globalThis, 'navigator', { value: { maxTouchPoints: 0, webdriver }, configurable: true });
+  nav(false);
+  const ultraFor = (cls, active = tiers.DEVICE_TIERS_ACTIVE) => tiers.ultraStartOn(active, tiers.gpuStartTier(active, cls));
+  out.ultra = { high: ultraFor('high'), medium: ultraFor('medium'), low: ultraFor('low'), phone: ultraFor('phone'), unknownDesktop: defaultQualityPreset() };
+  nav(true);
+  out.ultra.automation = ultraFor('high');
+  out.ultra.automationOptIn = ultraFor('high', { ...tiers.DEVICE_TIERS_ACTIVE, ultraAutomation: true });
+  nav(false);
   console.log(JSON.stringify(out));
   process.exit(0);
 }
@@ -148,6 +161,13 @@ check(
   JSON.stringify(on.start) === JSON.stringify({ high: 'high', medium: 'medium', low: 'low', phone: null, unknownDesktop: 'medium' }) &&
     off.start.high === null && off.start.unknownDesktop === 'high',
   `on ${JSON.stringify(on.start)} | off ${JSON.stringify(off.start)}`,
+);
+
+check(
+  '(6) start preset: a desktop High GPU start resolves Ultra; automation keeps High; flag off never Ultra',
+  JSON.stringify(on.ultra) === JSON.stringify({ high: true, medium: false, low: false, phone: false, unknownDesktop: 'medium', automation: false, automationOptIn: true }) &&
+    !off.ultra.high && !off.ultra.automationOptIn && off.ultra.unknownDesktop === 'high',
+  `on ${JSON.stringify(on.ultra)} | off ${JSON.stringify(off.ultra)}`,
 );
 
 console.log(`\n${pass} passed, ${fail} failed`);

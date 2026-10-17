@@ -14,16 +14,15 @@ verdict belongs to the owner's RTX 5080 and iPhone.
 
 ## 1. Ultra is the desktop default
 
-- `defaultQualityPreset()` (`lib/fly/fly-settings.js`): a desktop-class device
-  whose GPU-aware start tier is High now starts at **Ultra** (the High scene
-  tier plus the Ultra effects ceiling: 96-step clouds at 0.5 scale, three 2048
-  shadow cascades over 3 km, the 1024 material set, the 1024×512 reflection).
-  With `DEVICE_TIERS` (shipped on) that means discrete GPUs and Apple
-  Pro/Max/Ultra; integrated or unknown desktop GPUs keep their Medium start,
-  phones and tablets keep their own policy, and a saved pick still wins.
-- One-time migration: a saved `high` from before this change (most often the
-  old default) is lifted to Ultra once; the marker `fly-quality-ultra-default-v1`
-  makes every later pick final, including choosing High again.
+- **Start:** `DEVICE_TIERS.ultraStart` (merged to `main` from a parallel
+  session, `220ae2d`, and adopted here): with no saved pick, a desktop whose
+  GPU start reads High (discrete GPUs, Apple Pro/Max/Ultra) starts on the
+  Ultra preset, the High scene tier plus the Ultra effects ceiling (96-step
+  clouds at 0.5 scale, three 2048 shadow cascades over 3 km, the 1024 material
+  set, the 1024×512 reflection). Integrated and unknown desktop GPUs, phones and
+  tablets keep their start; automation (WebDriver) keeps High so no harness
+  preset moves. A saved pick still wins: a player who once chose High in
+  Settings stays on High until they choose Ultra.
 - **The governor no longer spends resolution first on Ultra.** With
   `DEVICE_TIERS.ladderOrder` the Ultra → High rung drops a cascade (3 → 2),
   which recompiles every lit program, so it waited behind render scale: an
