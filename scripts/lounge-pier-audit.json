@@ -1270,7 +1270,7 @@
         "floorM": 16,
         "score": 90.4,
         "variant": "pier",
-        "rearSet": true,
+        "rearSet": false,
         "detail": {
           "footprint": {
             "pier": {
@@ -2546,6 +2546,14 @@
                 }
               ]
             }
+          },
+          "rearSafety": {
+            "revision": 1,
+            "sampleM": 1,
+            "safe": false,
+            "reason": "rear-apron-building",
+            "samples": 0,
+            "featureId": 62568770
           }
         }
       },
@@ -111555,7 +111563,7 @@
         "floorM": 16,
         "score": 159.7,
         "variant": "pier",
-        "rearSet": true,
+        "rearSet": false,
         "detail": {
           "footprint": {
             "pier": {
@@ -112843,6 +112851,14 @@
                 }
               ]
             }
+          },
+          "rearSafety": {
+            "revision": 1,
+            "sampleM": 1,
+            "safe": false,
+            "reason": "rear-apron-building",
+            "samples": 0,
+            "featureId": 51912390
           }
         }
       },
@@ -124659,5 +124675,6 @@
       },
       "source": "cached-unversioned"
     }
-  ]
+  ],
+  "rearSetSafetyRevision": 1
 }

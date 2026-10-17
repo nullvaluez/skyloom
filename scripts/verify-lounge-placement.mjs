@@ -14,6 +14,7 @@ registerHooks({
   },
 });
 const { assessPierRoomFootprint, assessPierRearOpening, airfieldRaster, rearSetEligible } = await import('../lib/fly/lounge-seat.js');
+const { assessPierRearSet } = await import('../lib/fly/lounge-rear-safety.js');
 const { airportLayout } = await import('../lib/fly/airport-layout.js');
 const { planAirportSet, sampleRoute } = await import('../lib/fly/airport-set/plan.js');
 const { LOUNGE_SEATS_PIER } = await import('../lib/fly/lounge-seats-pier.js');
@@ -50,6 +51,34 @@ check('rear scenery needs positive apron evidence and clear stand footprints', (
   }
   assert.equal(rearSetEligible({ backStands: zone, backApron: { ...zone, apron: 0 } }), false);
   assert.equal(rearSetEligible({}), false);
+});
+check('final rear gate covers narrow edge obstacles and preserves unoccupied service-road crossings', () => {
+  const site = { ...frame, airportId: 'REAR-GATE', ident: 'REAR-GATE', variant: 'pier', rearSet: true, floorM: 16, groundY: 0 };
+  const layout = airportLayout(site), apron = layout.aprons[1];
+  const clean = { occluderRevision: 1, occluders: [], aerodromes: [{rings:[ring(-500,500,-500,500)]}], pavements:[{cls:'apron',rings:[ring(-250,250,-50,200)]}], roads:[] };
+  assert.equal(assessPierRearSet({...clean,occluders:undefined},site,layout).safe,false,'missing occluder data cannot certify a rear set');
+  const valid = assessPierRearSet(clean,site,layout);
+  assert.equal(valid.safe,true); assert.ok(valid.samples>50000); assert.equal(valid.sampleM,1);
+  assert.equal(assessPierRearSet({...clean,occluders:[{id:17,top:12,rings:[ring(apron.x1-.1,apron.x1+.1,100.2,100.4)]}]},site,layout).reason,'rear-apron-building');
+  for(const key of ['aerodromes','pavements']) {
+    const source = clean[key].map(p=>({...p,rings:[...p.rings,ring(10.2,10.4,50.2,50.4)]}));
+    assert.equal(assessPierRearSet({...clean,[key]:source},site,layout).safe,false,key+' sub-grid hole caught at source edges');
+  }
+  assert.equal(assessPierRearSet({...clean,pavements:[...clean.pavements,{cls:'taxiway',id:18,rings:[ring(209.9,210.1,100.2,100.4)]}]},site,layout).reason,'rear-apron-flight-pavement');
+  assert.equal(assessPierRearSet({...clean,taxiwayLines:[{id:19,pts:[-400,140,400,140]}]},site,layout).reason,'rear-apron-flight-centreline');
+  const stand=layout.stands.find(s=>s.side==='back');
+  assert.equal(assessPierRearSet({...clean,roads:[{id:20,cls:'service',pts:[stand.x,-500,stand.x,500]}]},site,layout).reason,'rear-structure-road-clearance','long crossing segment is checked even when endpoints lie outside the apron');
+  assert.equal(assessPierRearSet({...clean,roads:[{id:21,cls:'service',pts:[-500,110,500,110]}]},site,layout).safe,true,'a road crossing unoccupied apron is not an invented structure collision');
+});
+check('cached KLAX and CYYZ edge failures disable rear scenery without relocating either room', () => {
+  const saved=JSON.parse(fs.readFileSync(new URL('./fixtures/lounge-rear-safety.json',import.meta.url)));
+  assert.deepEqual(saved.fixtures.map(f=>f.ident),['KLAX','CYYZ']);
+  for(const f of saved.fixtures) {
+    assert.equal(rearSetEligible(f.coarse),true,'old coarse evidence alone looked eligible');
+    const result=assessPierRearSet(f.features,f.site,airportLayout(f.site));
+    assert.equal(result.safe,false); assert.equal(result.reason,'rear-apron-building'); assert.equal(result.featureId,f.expected.featureId);
+    const row=LOUNGE_SEATS_PIER[f.ident]; assert.equal(row.rearSet,false); assert.equal(row.runway,f.originalSite.runwayId); assert.equal(row.along,f.originalSite.along); assert.equal(row.cross,f.originalSite.cross); assert.equal(row.floorM,f.site.floorM);
+  }
 });
 check('unknown or ineligible rear set creates no rear stands, bridges, vehicles or footprint', () => {
   const site = { ...frame, airportId: 'TEST', ident: 'TEST', variant: 'pier', floorM: 24, groundY: 0 };
@@ -112,6 +141,7 @@ check('generated table and complete 115-airport audit agree on safety and rear e
   const audit = JSON.parse(fs.readFileSync(new URL('./lounge-pier-audit.json', import.meta.url)));
   assert.equal(audit.safetyRevision, 3);
   assert.equal(audit.occlusionRevision, 1);
+  assert.equal(audit.rearSetSafetyRevision, 1);
   assert.equal(audit.airports, 115);
   assert.equal(audit.rows.length, 115);
   assert.equal(new Set(audit.rows.map(r => r.ident)).size, 115);
@@ -127,7 +157,8 @@ check('generated table and complete 115-airport audit agree on safety and rear e
     assert.equal(r.seat.detail.back.opening.samples.length, 7);
     assert.ok(r.seat.detail.back.opening.samples.every(s => s.clearDeg >= 40), r.ident);
     assert.equal(table.rearSet, r.seat.rearSet);
-    assert.equal(table.rearSet, rearSetEligible(r.seat.detail.footprint));
+    assert.equal(table.rearSet, rearSetEligible(r.seat.detail.footprint) && r.seat.detail.rearSafety?.safe === true);
+    if(rearSetEligible(r.seat.detail.footprint)) assert.equal(r.seat.detail.rearSafety.revision,1);
     assert.equal(table.along, r.seat.along);
     assert.equal(table.cross, r.seat.cross);
   }
