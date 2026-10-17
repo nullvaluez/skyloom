@@ -1,5 +1,5 @@
 'use client';
-import { MeshStandardMaterial } from 'three';
+import { createCinematicLandmarkMaterial } from '@/lib/fly/world-material-factories';
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
 import { MONUMENT_MANIFEST } from '@/lib/fly/monument-models';
 
@@ -112,8 +112,7 @@ export function LandmarkMonuments({ flight, origin, engine, qualityTier, mapStyl
   }, [isToy]);
   const material = useMemo(() => {
     if (cinematic) {
-      const m = new MeshStandardMaterial({vertexColors:true,color:LANDMARKS_3D.satStyle.color,roughness:0.82,metalness:0.05,envMapIntensity:0.6});
-      applyBendAnchor(m); return m;
+      return createCinematicLandmarkMaterial();
     }
     if (!isToy) {
       // Round 13 (P4) satStyle v2: a two-tone STONE toon ramp (was a flat

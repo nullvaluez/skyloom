@@ -61,7 +61,7 @@ export function WarpFlash({ runtime }) {
         if(settled||reducedEntry.current||capped){
           if(reducedEntry.current||capped){
             const reason=reducedEntry.current?'explicit-reduced':'time-cap';
-            rt.terrainPrewarm?.bypass(reason);rt.loungeRoom?.bypassWarm?.(reason);
+            rt.terrainPrewarm?.bypass(reason);rt.loungeRoom?.bypassWarm?.(reason);rt.prewarm?.bypassWorldProfiles?.(reason);
           }
           clearInterval(poll);rt.worldLoading=false;rt.worldDegraded=reducedEntry.current||capped;
           rt.arrivalStats={...rt.arrivalStats,revealAt:now,holdMs:Math.round(now-t0),reason:reducedEntry.current?'explicit-reduced':capped?'time-cap':content.deferred.length?'background-detail':'content'};

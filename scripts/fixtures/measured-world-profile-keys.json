@@ -1,0 +1,348 @@
+{
+  "evidence": "profile-warm-v1-correct-port/profile-diagnosis.json",
+  "sourceRevision": "9affae63c69392466ce0592c58524843c196fa1c",
+  "entries": [
+    {
+      "program": 200,
+      "phase": "forced-tier-medium",
+      "cacheKey": "physical,STANDARD,,USE_CSM,1,CSM_CASCADES,1,CSM_FADE,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,2,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,8389648,8522771,srgb,world-bend-anchor-satbldg-r19|cinematic-architecture-v11-cinema-art-near|immersive-surface-v1|ground-window-v2|earth-architecture-v2|ground-light-v3-buildings-daylight-building-v2|painterly-v3-r5-architecture-world-art1|cinema-light-v1|cinema-csm-1",
+      "shaderHashes": [
+        "8cb2df5b",
+        "0829e5a7"
+      ]
+    },
+    {
+      "program": 201,
+      "phase": "forced-tier-medium",
+      "cacheKey": "physical,STANDARD,,USE_CSM,1,CSM_CASCADES,1,CSM_FADE,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,2,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,8389648,8522771,srgb,world-bend-anchor-satskyline-r19|cinematic-architecture-v11-cinema-art-far-coverage|immersive-surface-v1|ground-window-v2|earth-architecture-v2-daylight-building-v2|painterly-v3-r5-architecture-world-art1|cinema-light-v1|cinema-csm-1",
+      "shaderHashes": [
+        "bbd42e7d",
+        "2d2ca9c7"
+      ]
+    },
+    {
+      "program": 202,
+      "phase": "forced-tier-medium",
+      "cacheKey": "physical,STANDARD,,USE_CSM,1,CSM_CASCADES,1,CSM_FADE,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,2,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,8388624,8520723,srgb,world-bend-daylight-terrain-v2|airfield-runway-v2|cinema-csm-1",
+      "shaderHashes": [
+        "1a1b3e57",
+        "6d35e70b"
+      ]
+    },
+    {
+      "program": 203,
+      "phase": "forced-tier-medium",
+      "cacheKey": "physical,STANDARD,,USE_CSM,1,CSM_CASCADES,1,CSM_FADE,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,2,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,8388624,8520723,srgb,world-bend-daylight-terrain-v2|airfield-pavement-v2|cinema-csm-1",
+      "shaderHashes": [
+        "3826d31f",
+        "06a48008"
+      ]
+    },
+    {
+      "program": 204,
+      "phase": "forced-tier-medium",
+      "cacheKey": "physical,STANDARD,,PHYSICAL,,USE_CSM,1,CSM_CASCADES,1,CSM_FADE,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,2,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,8388755,8520723,srgb,world-bend-air-anchor|fleet-airframe-v2|cinema-csm-1",
+      "shaderHashes": [
+        "90cea33b",
+        "981e393a"
+      ]
+    },
+    {
+      "program": 205,
+      "phase": "forced-tier-medium",
+      "cacheKey": "physical,STANDARD,,USE_CSM,1,CSM_CASCADES,1,CSM_FADE,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,2,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,8651792,8520723,srgb,airport-set-solid-v1-daylight-building-v2|cinema-csm-1",
+      "shaderHashes": [
+        "65b22ca4",
+        "915e7532"
+      ]
+    },
+    {
+      "program": 206,
+      "phase": "forced-tier-medium",
+      "cacheKey": "physical,STANDARD,,USE_CSM,1,CSM_CASCADES,1,CSM_FADE,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,2,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,8389648,8520723,srgb,airport-set-solid-v1-daylight-building-v2|cinema-csm-1",
+      "shaderHashes": [
+        "92814e63",
+        "915e7532"
+      ]
+    },
+    {
+      "program": 207,
+      "phase": "forced-tier-medium",
+      "cacheKey": "physical,STANDARD,,USE_CSM,1,CSM_CASCADES,1,CSM_FADE,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,2,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,8389651,8520723,srgb,world-bend-anchor-r8-daylight-canopy-v2-forest-coverage-v4|painterly-v3-r5-forest-world-art1|cinema-light-v1|cinema-csm-1",
+      "shaderHashes": [
+        "0c9daf09",
+        "0ac0ebda"
+      ]
+    },
+    {
+      "program": 208,
+      "phase": "forced-tier-medium",
+      "cacheKey": "physical,STANDARD,,USE_CSM,1,CSM_CASCADES,1,CSM_FADE,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,2,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,8389651,8520723,srgb,world-bend-anchor-r8-daylight-clutter-v2|cinema-csm-1",
+      "shaderHashes": [
+        "4e0192ac",
+        "49fd7fe6"
+      ]
+    },
+    {
+      "program": 209,
+      "phase": "forced-tier-medium",
+      "cacheKey": "physical,STANDARD,,USE_CSM,1,CSM_CASCADES,1,CSM_FADE,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,2,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,8389648,8522771,srgb,world-bend-anchor-monument-r20-cinematic-model-v2-merged|cinema-csm-1",
+      "shaderHashes": [
+        "282abfe6",
+        "8df3ad2a"
+      ]
+    },
+    {
+      "program": 210,
+      "phase": "forced-tier-medium",
+      "cacheKey": "physical,STANDARD,,USE_CSM,1,CSM_CASCADES,1,CSM_FADE,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,2,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,8389649,8520723,srgb,world-bend-anchor-r8|cinema-csm-1",
+      "shaderHashes": [
+        "93b5bf95",
+        "a68f0b67"
+      ]
+    },
+    {
+      "program": 211,
+      "phase": "forced-tier-medium",
+      "cacheKey": "physical,STANDARD,,USE_CSM,1,CSM_CASCADES,1,CSM_FADE,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,2,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,8389649,8520727,srgb,world-bend-air-anchor-nav|cinema-csm-1",
+      "shaderHashes": [
+        "67464926",
+        "17e3bdf1"
+      ]
+    },
+    {
+      "program": 212,
+      "phase": "forced-tier-medium",
+      "cacheKey": "physical,STANDARD,,USE_CSM,1,CSM_CASCADES,1,CSM_FADE,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,2,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,8388625,8520727,srgb,world-bend-air-anchor-nav|cinema-csm-1",
+      "shaderHashes": [
+        "31db5c9d",
+        "f4459690"
+      ]
+    },
+    {
+      "program": 213,
+      "phase": "forced-tier-medium",
+      "cacheKey": "physical,STANDARD,,USE_CSM,1,CSM_CASCADES,1,CSM_FADE,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,2,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,8389651,8520727,srgb,world-bend-air-anchor-nav|cinema-csm-1",
+      "shaderHashes": [
+        "7d3c27b2",
+        "17e3bdf1"
+      ]
+    },
+    {
+      "program": 215,
+      "phase": "forced-tier-medium",
+      "cacheKey": "physical,STANDARD,,USE_CSM,1,CSM_CASCADES,1,CSM_FADE,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,2,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,8389651,8520723,srgb,world-bend-anchor-r8-cinematic-parcel-v1|ground-light-v3-homes-near-ground-building-v1-daylight-building-v2|cinema-csm-1",
+      "shaderHashes": [
+        "ad660101",
+        "17d8b44e"
+      ]
+    },
+    {
+      "program": 216,
+      "phase": "forced-tier-medium",
+      "cacheKey": "physical,STANDARD,,USE_CSM,1,CSM_CASCADES,1,CSM_FADE,,highp,srgb-linear,306,1024,false,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,2,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,8390163,8522771,srgb,world-bend-anchor-r8-cinematic-canopy-v1-immersive-leaves-v1|ground-light-v3-canopy-daylight-canopy-v2|cinema-csm-1",
+      "shaderHashes": [
+        "ae3b4bed",
+        "c7a70049"
+      ]
+    },
+    {
+      "program": 219,
+      "phase": "forced-tier-medium",
+      "cacheKey": "physical,STANDARD,,USE_CSM,1,CSM_CASCADES,1,CSM_FADE,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,2,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,8388624,8389651,srgb,world-bend-daylight-terrain-v2|airfield-grass-v2|cinema-csm-1",
+      "shaderHashes": [
+        "ca227b5b",
+        "83cf6a4c"
+      ]
+    },
+    {
+      "program": 220,
+      "phase": "forced-tier-medium",
+      "cacheKey": "physical,STANDARD,,USE_CSM,1,CSM_CASCADES,1,CSM_FADE,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,2,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,8388624,8389651,srgb,world-bend-daylight-terrain-v2|airfield-paint-v2|cinema-csm-1",
+      "shaderHashes": [
+        "719da7b1",
+        "cafbed15"
+      ]
+    },
+    {
+      "program": 221,
+      "phase": "forced-tier-medium",
+      "cacheKey": "physical,STANDARD,,USE_CSM,1,CSM_CASCADES,1,CSM_FADE,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,2,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,8389648,8389651,srgb,airport-set-decal-v4|cinema-csm-1",
+      "shaderHashes": [
+        "d8e268a7",
+        "edb8bb81"
+      ]
+    },
+    {
+      "program": 225,
+      "phase": "forced-tier-low",
+      "cacheKey": "physical,STANDARD,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,8389648,8521747,srgb,world-bend-anchor-satskyline-r19|cinematic-architecture-v11-cinema-art-far-coverage|immersive-surface-v1|ground-window-v2|earth-architecture-v2-daylight-building-v2|painterly-v3-r5-architecture-world-art1|cinema-light-v1",
+      "shaderHashes": [
+        "22f674d1",
+        "ccd23e6e"
+      ]
+    },
+    {
+      "program": 226,
+      "phase": "forced-tier-low",
+      "cacheKey": "physical,STANDARD,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,8388624,8519699,srgb,world-bend-daylight-terrain-v2|airfield-runway-v2",
+      "shaderHashes": [
+        "b94903bf",
+        "810c9028"
+      ]
+    },
+    {
+      "program": 227,
+      "phase": "forced-tier-low",
+      "cacheKey": "physical,STANDARD,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,8388624,8519699,srgb,world-bend-daylight-terrain-v2|airfield-pavement-v2",
+      "shaderHashes": [
+        "ca525f23",
+        "4b1c2b85"
+      ]
+    },
+    {
+      "program": 228,
+      "phase": "forced-tier-low",
+      "cacheKey": "physical,STANDARD,,PHYSICAL,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,8388755,8519699,srgb,world-bend-air-anchor|fleet-airframe-v2",
+      "shaderHashes": [
+        "276fa2b5",
+        "2041e5f1"
+      ]
+    },
+    {
+      "program": 229,
+      "phase": "forced-tier-low",
+      "cacheKey": "physical,STANDARD,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,8651792,8519699,srgb,airport-set-solid-v1-daylight-building-v2",
+      "shaderHashes": [
+        "4be0ee46",
+        "b28acbcb"
+      ]
+    },
+    {
+      "program": 230,
+      "phase": "forced-tier-low",
+      "cacheKey": "physical,STANDARD,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,8389648,8519699,srgb,airport-set-solid-v1-daylight-building-v2",
+      "shaderHashes": [
+        "aaf54ea9",
+        "b28acbcb"
+      ]
+    },
+    {
+      "program": 231,
+      "phase": "forced-tier-low",
+      "cacheKey": "physical,STANDARD,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,8389651,8519699,srgb,world-bend-anchor-r8-daylight-canopy-v2-forest-coverage-v4|painterly-v3-r5-forest-world-art1|cinema-light-v1",
+      "shaderHashes": [
+        "c9ca1885",
+        "1fae6d3b"
+      ]
+    },
+    {
+      "program": 232,
+      "phase": "forced-tier-low",
+      "cacheKey": "physical,STANDARD,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,8389651,8519699,srgb,world-bend-anchor-r8-daylight-clutter-v2",
+      "shaderHashes": [
+        "bbd30a88",
+        "1753967f"
+      ]
+    },
+    {
+      "program": 233,
+      "phase": "forced-tier-low",
+      "cacheKey": "physical,STANDARD,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,8389648,8521747,srgb,world-bend-anchor-monument-r20-cinematic-model-v2-merged",
+      "shaderHashes": [
+        "29ffdb74",
+        "2c282359"
+      ]
+    },
+    {
+      "program": 234,
+      "phase": "forced-tier-low",
+      "cacheKey": "physical,STANDARD,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,8389649,8519699,srgb,world-bend-anchor-r8",
+      "shaderHashes": [
+        "af9c93f9",
+        "5b64dda4"
+      ]
+    },
+    {
+      "program": 235,
+      "phase": "forced-tier-low",
+      "cacheKey": "physical,STANDARD,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,8389649,8519703,srgb,world-bend-air-anchor-nav",
+      "shaderHashes": [
+        "92ad541a",
+        "37bfc3a4"
+      ]
+    },
+    {
+      "program": 236,
+      "phase": "forced-tier-low",
+      "cacheKey": "physical,STANDARD,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,8388625,8519703,srgb,world-bend-air-anchor-nav",
+      "shaderHashes": [
+        "49345e1b",
+        "efe34269"
+      ]
+    },
+    {
+      "program": 237,
+      "phase": "forced-tier-low",
+      "cacheKey": "physical,STANDARD,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,8389651,8519703,srgb,world-bend-air-anchor-nav",
+      "shaderHashes": [
+        "1af2b0ee",
+        "37bfc3a4"
+      ]
+    },
+    {
+      "program": 238,
+      "phase": "forced-tier-low",
+      "cacheKey": "physical,STANDARD,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,8389651,8519699,srgb,world-bend-anchor-r8-cinematic-parcel-v1|ground-light-v3-homes-near-ground-building-v1-daylight-building-v2",
+      "shaderHashes": [
+        "f639028b",
+        "23c52add"
+      ]
+    },
+    {
+      "program": 239,
+      "phase": "forced-tier-low",
+      "cacheKey": "physical,STANDARD,,highp,srgb-linear,306,1024,false,uv,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,8390163,8521747,srgb,world-bend-anchor-r8-cinematic-canopy-v1-immersive-leaves-v1|ground-light-v3-canopy-daylight-canopy-v2",
+      "shaderHashes": [
+        "cda20537",
+        "7532ee68"
+      ]
+    },
+    {
+      "program": 240,
+      "phase": "forced-tier-low",
+      "cacheKey": "physical,STANDARD,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,8389648,8521747,srgb,world-bend-anchor-satbldg-r19|cinematic-architecture-v11-cinema-art-near|immersive-surface-v1|ground-window-v2|earth-architecture-v2|ground-light-v3-buildings-daylight-building-v2|painterly-v3-r5-architecture-world-art1|cinema-light-v1",
+      "shaderHashes": [
+        "aa4dd3e1",
+        "e69b7794"
+      ]
+    },
+    {
+      "program": 243,
+      "phase": "forced-tier-low",
+      "cacheKey": "physical,STANDARD,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,8388624,8388627,srgb,world-bend-daylight-terrain-v2|airfield-grass-v2",
+      "shaderHashes": [
+        "1066d163",
+        "08850d45"
+      ]
+    },
+    {
+      "program": 244,
+      "phase": "forced-tier-low",
+      "cacheKey": "physical,STANDARD,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,8388624,8388627,srgb,world-bend-daylight-terrain-v2|airfield-paint-v2",
+      "shaderHashes": [
+        "da222b35",
+        "1c98f782"
+      ]
+    },
+    {
+      "program": 245,
+      "phase": "forced-tier-low",
+      "cacheKey": "physical,STANDARD,,highp,srgb-linear,306,1024,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,,true,false,0,,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,8389648,8388627,srgb,airport-set-decal-v4",
+      "shaderHashes": [
+        "740f497f",
+        "62275150"
+      ]
+    }
+  ]
+}

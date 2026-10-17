@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { registerHooks } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { Group, Mesh, MeshStandardMaterial } from 'three';
+import { BufferGeometry, Group, Mesh, MeshStandardMaterial, Scene, Texture } from 'three';
 import { createCriticalTerrainGate, criticalTerrainReady, terrainArrivalCovered } from '../lib/fly/critical-terrain-prewarm.mjs';
 import { createTerrainProgramRetention } from '../lib/fly/terrain-program-retention.mjs';
 
@@ -15,6 +15,7 @@ registerHooks({ resolve(specifier, context, next) {
   return next(specifier, context);
 } });
 const { worldReadiness, retryWorldContent } = await import('../lib/fly/world-readiness.js');
+const { compileSceneAsync } = await import('../lib/fly/compile-scene-safe.js');
 const deferred = () => {
   let resolve, reject;
   const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
@@ -192,11 +193,66 @@ await check('production ordering retains exact critical programs, and degraded r
   assert.match(component, /beforeWarm: \(\) => runtime\.terrainPrewarm\?\.wait\(\)/);
   assert.match(warm, /compileCinemaProfiles\(\{ gl, camera, scene, createWarmScene,/);
   assert.match(warm, /currentProgram\?\.cacheKey/);
-  assert.match(warm, /return cache\.retain\(key, job\)/);
+  assert.match(warm, /return await cache\.retain\(key, job\)/);
   for (const file of ['components/fly/hud/BootScreen.jsx', 'components/fly/hud/WarpFlash.jsx']) {
     const source = read(file), bypass = source.indexOf('terrainPrewarm?.bypass(');
     assert.ok(bypass >= 0 && source.indexOf('rt.worldLoading=false', bypass) > bypass, file);
     assert.match(source, /loungeRoom\?\.bypassWarm\?\.\(reason\)/);
   }
+});
+// Exercise the actual production dispatch function without importing its
+// unrelated React postprocessing inventory into Node. Only renderer services
+// are injected; this is the source function, not a reimplementation.
+const warmSource = fs.readFileSync(new URL('../lib/fly/prewarm.js', import.meta.url), 'utf8');
+const dispatchStart = warmSource.indexOf('export async function compileCriticalTerrain(');
+const dispatchEnd = warmSource.indexOf('\n/**', dispatchStart);
+const underStart = warmSource.indexOf('function compileUnder('), underEnd = warmSource.indexOf('\nfunction dummyRT', underStart);
+function terrainDispatcher() {
+  const dependencies = { criticalTerrainByRenderer: new WeakMap(), createTerrainProgramRetention, Scene, compileSceneAsync,
+    cinemaOn: () => false, dummyRT: () => ({}),
+    addTerrainWarmMeshes(owner) {
+      const material = new MeshStandardMaterial({ map: new Texture() });
+      owner.add(new Mesh(new BufferGeometry(), material));
+    },
+  };
+  return Function(...Object.keys(dependencies), warmSource.slice(underStart, underEnd) + '\n' +
+    warmSource.slice(dispatchStart, dispatchEnd).replace('export ', '') + '\nreturn compileCriticalTerrain;')(...Object.values(dependencies));
+}
+function faultRenderer({ keyFault = false, restoreFault = false } = {}) {
+  const properties = new WeakMap(); let reads = 0, target = null;
+  const gl = { ready: false, calls: 0, disposed: 0, domElement: new EventTarget(),
+    extensions: { has: () => true }, getContext: () => ({ isContextLost: () => false }),
+    getRenderTarget: () => target, setRenderTarget(next) { target = next; if (restoreFault && next === null) throw Error('restore fault'); },
+    properties: { get(material) { if (keyFault && ++reads > 1) throw Error('identity fault'); return properties.get(material); } },
+    compile(owner) {
+      this.calls++; const materials = new Set();
+      owner.traverse(object => { if (!object.material) return;
+        object.material.addEventListener('dispose', () => { this.disposed++; });
+        properties.set(object.material, { currentProgram: { cacheKey: 'exact-critical-key', isReady: () => this.ready } });
+        materials.add(object.material);
+      }); return materials;
+    },
+    compileAsync() { throw Error('Unsafe native polling must not run'); },
+  };
+  return gl;
+}
+await check('non-cinematic terrain dispatch stays synchronous and uses cancellable captured-program polling', async () => {
+  const compile = terrainDispatcher(), gl = faultRenderer();
+  const work = compile({ gl, camera: {}, scene: new Scene() });
+  assert.equal(gl.calls, 1); assert.equal(gl.disposed, 0);
+  const rejected = assert.rejects(work, /context lost/i);
+  gl.domElement.dispatchEvent(new Event('webglcontextlost')); await rejected;
+  assert.equal(gl.disposed, 1);
+});
+for (const [label, options, onProfiles, expected] of [
+  ['identity inspection', { keyFault: true }, null, /identity fault/],
+  ['renderer restoration', { restoreFault: true }, null, /restore fault/],
+  ['profile notification', {}, () => { throw Error('notification fault'); }, /notification fault/],
+]) await check(`${label} failure cannot dispose a pending critical program`, async () => {
+  const compile = terrainDispatcher(), gl = faultRenderer(options);
+  const work = compile({ gl, camera: {}, scene: new Scene(), onProfiles });
+  const rejected = assert.rejects(work, expected);
+  await new Promise(resolve => setTimeout(resolve, 15)); assert.equal(gl.disposed, 0);
+  gl.ready = true; await rejected; assert.equal(gl.disposed, 1);
 });
 console.log(`CRITICAL TERRAIN PREWARM: ${count}/${count}`);

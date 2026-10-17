@@ -169,7 +169,8 @@ function readinessInPage() {
     airports: earth?.airports != null && earth.airports.nearPending === 0,
     fleet: rt.modelsReady === true && rt.liveFleetReady === true,
     shaders: rt.prewarm?.done === true && (!rt.criticalTerrain?.required || rt.criticalTerrain.status === 'ready')
-      && (!rt.loungeRoom?.programWarm?.required || rt.loungeRoom.programWarm.status === 'ready'),
+      && (!rt.loungeRoom?.programWarm?.required || rt.loungeRoom.programWarm.status === 'ready')
+      && (!rt.prewarm?.worldProfiles?.required || rt.prewarm.worldProfiles.status === 'ready'),
   };
   const missing = Object.keys(parts).filter((k) => !parts[k]);
   return {

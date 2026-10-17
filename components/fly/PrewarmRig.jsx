@@ -118,11 +118,19 @@ export function PrewarmRig({ runtime }) {
   // publishes at −0.8; dispatch immediately after both, before reflections or
   // the main draw. Tile material visibility stays latched until ready.
   useFrame(() => {
+    const store = useFlyStore.getState();
+    const worldProfiles = runtime?.prewarm?.worldProfiles;
+    // A restored renderer has the same JS identity but no old GPU programs.
+    // Recover only the measured profile batch after the rebuilt environment
+    // and live cascade rig publish; the generic boot warm stays one-shot.
+    if (worldProfiles?.status === 'invalidated' && !runtime.contextLost && !gl.getContext().isContextLost()) {
+      if (!cinemaOn(store)) Object.assign(worldProfiles, { required: false, status: 'not-required' });
+      else if (scene.environment && runtime.cinemaShadows != null) runtime.prewarm.retryWorldProfiles?.();
+    }
     const gate = runtime?.terrainPrewarm;
     if (!gate) return;
     if (runtime.prewarm) runtime.prewarm.criticalTerrain = gate.state;
     if (!['waiting', 'compiling', 'failed'].includes(gate.state.status)) return;
-    const store = useFlyStore.getState();
     const environment = scene.environment;
     const key = [environment?.id ?? 'none', environment?.mapping ?? '',
       runtime.cinemaShadows?.cascades ?? 'legacy', store.mapStyle, store.visuals, store.qualityTier,
