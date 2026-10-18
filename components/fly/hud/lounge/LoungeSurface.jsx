@@ -267,11 +267,17 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
       w.select(hit.hex);
       return;
     }
-    // No aircraft there: a vantage chair under the pointer sits you in it (LOUNGE_WALK).
+    // No aircraft there: a vantage chair under the pointer sits you in it
+    // (LOUNGE_WALK); else the pier's décor on offer under it opens its card.
     if (w.walk && !w.binocular) {
       const rect = ref.current?.getBoundingClientRect();
       if (!rect) return;
       const seat = w.walk.seatAt(((x - rect.left) / rect.width) * 2 - 1, 1 - ((y - rect.top) / rect.height) * 2);
+      const decor = !seat && w.walk.decorAt?.(((x - rect.left) / rect.width) * 2 - 1, 1 - ((y - rect.top) / rect.height) * 2);
+      if (decor && w.walk.openInspect(decor)) {
+        lastClick.current = null; // a double-click must not raise the binoculars
+        return;
+      }
       if (seat) {
         lastClick.current = null; // a double-click must not raise the binoculars
         w.sit(seat);

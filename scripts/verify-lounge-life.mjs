@@ -13,9 +13,10 @@
 //      standing still and facing it, and only then: never before its dressing
 //      is built, from another floor, beyond its reach, while walking, facing
 //      away or with something solid in between;
-//   2. the walk offers the piece in front of you, opens its card without moving
-//      the camera, and a stride, a seat, the binoculars or leaving close it;
-//      nothing is offered or opened in the classic room;
+//   2. the walk offers the piece in front of you (and a click on it), opens its
+//      card without moving the camera, and a stride, a seat, the seat menu,
+//      the binoculars or leaving close it; nothing is offered or opened in the
+//      classic room;
 //   3. the keys: Escape closes an open card first; Enter closes it unless a
 //      control in the card has focus; Enter opens the piece on offer only when
 //      no chair or instrument claims the key;
@@ -142,6 +143,10 @@ check('the walk offers the model display in front of you, opens its card without
   watch.yaw = yawTo(watch.eyeLocal, display.focus); tick();
   assert.equal(walk.inspectOffer?.id, 'model-display', JSON.stringify(walk.inspectOffer));
   assert.equal(walk.inspectOffer.label, display.label); assert.equal(walk.inspectOffer.text, display.text);
+  // Click-the-décor: the centre of the view, aimed at the focus, is on the piece; the sky corner is not.
+  watch.pitch = Math.atan2(display.focus[1] - watch.eyeLocal.y, Math.hypot(display.focus[0] - watch.eyeLocal.x, display.focus[2] - watch.eyeLocal.z));
+  assert.equal(walk.decorAt(0, 0), 'model-display', 'a click on the models');
+  assert.equal(walk.decorAt(-0.95, 0.95), null, 'a click on the sky');
   const before = { eye: { ...watch.eyeLocal }, yaw: watch.yaw, pitch: watch.pitch };
   assert.equal(walk.openInspect('library'), false, 'only the piece on offer opens');
   assert.equal(walk.openInspect(), true);
@@ -189,7 +194,7 @@ check('walking past does not offer it; standing still does; the binoculars, the 
 
 check('the classic room never offers or opens anything (its walk is unchanged)', () => {
   const { watch, walk, tick, detach } = walker('classic', { x: 0, y: 1.65, z: 3.2 });
-  for (let a = 0; a < Math.PI * 2; a += 0.3) { watch.yaw = a; tick(0.05); assert.equal(walk.inspectOffer, null); }
+  for (let a = 0; a < Math.PI * 2; a += 0.3) { watch.yaw = a; tick(0.05); assert.equal(walk.inspectOffer, null); assert.equal(walk.decorAt(0, 0), null); }
   assert.equal(walk.openInspect(), false); assert.equal(walk.inspecting, null);
   detach();
 });
