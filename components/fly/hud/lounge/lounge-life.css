@@ -29,11 +29,13 @@
 .lounge-decor-close:hover { background: #2a3943; color: #fff; }
 .lounge-decor-close:focus-visible { outline: 2px solid #b6e5e7; outline-offset: 2px; }
 
-/* The seat menu grouped by floor (only when the seats span two floors). */
+/* The seat menu grouped by floor (only when the seats span two floors): eight
+   seats, so the rows sit a little tighter, and a short window scrolls. */
 .lounge-seat-menu[data-grouped] { max-height: calc(100dvh - 220px); overflow: auto; }
-.lounge-seat-menu[data-grouped] .lsm-row { min-height: 46px; }
-.lsm-group + .lsm-group { margin-top: 10px; }
+.lounge-seat-menu[data-grouped] ul { gap: 2px; }
+.lounge-seat-menu[data-grouped] .lsm-row { min-height: 44px; padding: 5px 12px; }
+.lsm-group + .lsm-group { margin-top: 8px; }
 .lsm-group h3 {
-  margin: 0 4px 6px; font: 700 10px/1 var(--t-mono); letter-spacing: 0.12em; text-transform: uppercase;
+  margin: 0 4px 4px; font: 700 10px/1 var(--t-mono); letter-spacing: 0.12em; text-transform: uppercase;
   color: rgba(238, 245, 255, 0.55);
 }
