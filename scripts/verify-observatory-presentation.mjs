@@ -22,6 +22,11 @@ const { ROOM_LOOK } = await import('../lib/fly/observation-config.js');
 const { FLOOR_RECT, UPPER_FLOOR_RECT } = await import('../lib/fly/lounge/room-ao.js');
 const { FIXTURE_TABLE } = await import('../lib/fly/lounge/room-shading.js');
 
+const { LOUNGE_BUDGETS } = await import('../lib/fly/observation-config.js');
+// Room + instruments triangle ceilings. The pier rises to the shared room
+// contract (LOUNGE_BUDGETS.room, 160k) for the second-level pass
+// (FLY_LOUNGE_SECOND_LEVEL.md, W0); the classic room keeps its 140k.
+const TRIANGLE_CEILING = { classic: 140000, pier: LOUNGE_BUDGETS.room.triangles };
 for (const variant of ['classic', 'pier']) {
   const room = createAirportLounge({ variant, document: null });
   const instruments = createObservatoryInstruments(variant, null);
@@ -30,7 +35,7 @@ for (const variant of ['classic', 'pier']) {
   let triangles = instruments.stats.triangles;
   for (const g of geometries) triangles += (g.index?.count ?? g.attributes.position.count) / 3;
   assert.equal(geometries.length + instruments.stats.draws, 14);
-  assert.ok(triangles <= 140000, `${variant}: ${triangles} triangles`);
+  assert.ok(triangles <= TRIANGLE_CEILING[variant], `${variant}: ${triangles} triangles > ${TRIANGLE_CEILING[variant]}`);
   assert.equal(instruments.stats.textureBytes, 2 * 1024 * 1024);
   const floorBytes = (FLOOR_RECT.w * FLOOR_RECT.h + (variant === 'pier' ? UPPER_FLOOR_RECT.w * UPPER_FLOOR_RECT.h : 0)) * 4 / 3;
   const bytes = roomMapBytes() + probeBytes(ROOM_LOOK.probeSize) + BOARD_CANVAS.width * BOARD_CANVAS.height * 4 * 4 / 3 + floorBytes + FIXTURE_TABLE.width * FIXTURE_TABLE.height * 16 + instruments.stats.textureBytes;

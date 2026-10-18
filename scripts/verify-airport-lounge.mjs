@@ -64,7 +64,12 @@ let checks = 0;
 const check = (name, fn) => { fn(); checks++; console.log('PASS ' + name); };
 const MiB = 1024 * 1024;
 const variant = process.argv.includes('--pier') ? 'pier' : 'classic';
-const B = variant === 'pier' ? { ...LOUNGE_BUDGETS.room, triangles: 140000 } : LOUNGE_BUDGETS.room;
+// The pier room is held to the shared room contract (LOUNGE_BUDGETS.room:
+// 14 draws, 160k triangles, 24 MiB). Its earlier 140k override was lifted by
+// the second-level pass (FLY_LOUNGE_SECOND_LEVEL.md, W0) to give the upper
+// room's dressing its share of the documented 160k; the classic room was
+// always checked against the same contract.
+const B = LOUNGE_BUDGETS.room;
 
 const room = createAirportLounge({ document: doc, variant });
 const drawables = room.group.children.filter((o) => o.isMesh);
