@@ -265,6 +265,9 @@ async function setup({ variant = 'pier', width = 1280, height = 720, flags = [] 
       m.onBeforeCompile = (shader, r) => {
         prev.call(m, shader, r);
         const a = 'return normalize( abs( det ) * surfNorm - grad );';
+        // The pier program carries its own guard since the LIGHT lane
+        // (room-shading.js GLSL_FUNCS_PIER): nothing left to patch there.
+        if (!shader.fragmentShader.includes(a) && shader.fragmentShader.includes('lgBn * inversesqrt( lgBl )')) return;
         if (!shader.fragmentShader.includes(a)) throw new Error('SAFE_BUMP: lgBump anchor missing');
         shader.fragmentShader = shader.fragmentShader.replace(a, 'vec3 lgv = abs( det ) * surfNorm - grad; return dot( lgv, lgv ) > 1e-30 ? normalize( lgv ) : surfNorm;');
       };
