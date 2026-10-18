@@ -336,7 +336,7 @@ const save = (file = 'progress.json') => fs.writeFileSync(path.join(out, file), 
         if (!seats.length) throw new Error('Walking review requires LOUNGE_WALK and at least one vantage seat');
         const visit = report.visits.at(-1);
         visit.seats = seats; visit.seatVisits = [];
-        if (visit.variant === 'pier' && (seats.length !== 6 || ['window', 'back', 'corner-left', 'corner-right', 'upper-front', 'upper-back'].some((id) => !seats.some((s) => s.id === id)))) throw new Error('The pier review requires all six lower and upper vantage seats');
+        if (visit.variant === 'pier' && (seats.length < 6 || ['window', 'back', 'corner-left', 'corner-right', 'upper-front', 'upper-back'].some((id) => !seats.some((s) => s.id === id)))) throw new Error('The pier review requires all six lower and upper vantage seats');
         const requestedSeats = mode === 'views' && viewSeats === 'windows' ? seats.filter((s) => windowSeats.includes(s.id)) : seats;
         visit.requestedSeats = requestedSeats.map((s) => ({ ...s }));
         const begin = Date.now();

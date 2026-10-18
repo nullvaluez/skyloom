@@ -118,6 +118,13 @@ is enforced by `verify-observatory-presentation.mjs` (pier) and
 `verify-airport-lounge.mjs --pier`. A lane that frees fixtures or triangles by
 consolidation records it here.
 
+- FURNISH consolidation: the two existing upper chairs (`upper-front`,
+  `upper-back`) now cast two sun-shadow boxes each instead of three (the seat
+  and arm boxes merged into one with the same footprint, `shadowChairPair` in
+  `room-build.js`), freeing 2 rows. FURNISH then used 9 of the 10 free rows
+  (pier 47 / 48 shadow boxes), both free practicals (32 / 32) and +17,044
+  room triangles (pier room buckets 131,232 → 148,276).
+
 ## W0 contracts (landed)
 
 1. **Pier triangle ceiling 160,000** — `scripts/verify-airport-lounge.mjs`

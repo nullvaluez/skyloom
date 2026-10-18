@@ -98,7 +98,7 @@ await check('vantage: the classic window seat is today\'s seat (LOUNGE_ROOM eye 
   assert.equal(w.look.centre + w.look.yawSpan, L.yawMax);
   assert.deepEqual([w.look.pitchMin, w.look.pitchMax, w.look.defaultPitch], [L.pitchMin, L.pitchMax, L.defaultPitch]);
   assert.deepEqual(VANTAGE.classic.map((s) => s.id), ['window', 'corner-left', 'corner-right']);
-  assert.deepEqual(VANTAGE.pier.map((s) => s.id), ['window', 'back', 'corner-left', 'corner-right', 'upper-front', 'upper-back']);
+  assert.deepEqual(VANTAGE.pier.map((s) => s.id), ['window', 'back', 'corner-left', 'corner-right', 'upper-front', 'upper-back', 'upper-nook', 'upper-east']);
 });
 
 await check('vantage: every seat\'s eye is its chair plus R(rot)·(0, 1.18, -0.08), inside the room envelope, its approach on the floor plate', () => {

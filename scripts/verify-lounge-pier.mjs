@@ -78,7 +78,12 @@ const { updateRoomShading } = await import('../lib/fly/lounge/room-shading.js');
 const { geometrySignature, decodeBake } = await import('../lib/fly/lounge/room-ao.js');
 const room = createAirportLounge({ variant: 'pier', document: null });
 const space = W.buildWalkSpace(room.room.blockers, { variant: 'pier' }), seats = roomVariant('pier').vantage;
-check('all six physical chairs and every accessible floor component connect through the staircase', () => {
+check('all eight physical chairs and every accessible floor component connect through the staircase', () => {
+  // Four downstairs, four upstairs (the second-level pass added the reading
+  // nook and the rear corner seat); each approach is free floor and reachable
+  // from the lower aisle, the upper ones up the stair.
+  assert.equal(seats.length, 8);
+  assert.deepEqual(seats.filter((s) => s.floorId === 'upper').map((s) => s.id), ['upper-front', 'upper-back', 'upper-nook', 'upper-east']);
   for (const seat of seats) {
     assert.ok(room.room.blockers.some((b) => b.seatId === seat.id), `physical ${seat.id}`);
     const target = { x: seat.approach[0], z: seat.approach[1], floorId: seat.floorId ?? 'lower' };
