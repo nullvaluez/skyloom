@@ -93,7 +93,9 @@ await check('rail raise cancels a pending pointer anchor without rotating or acq
   watch.binoculars(false);watch.resetLook();frames(120);
 });
 
-const near=placeAt(mk('aaa111'),.08,.05,6000),far=placeAt(mk('bbb222'),.6,.02,9000),behind=placeAt(mk('ccc333'),3.0,.04,4000);
+// 'behind' sits 2.5 rad round from the runway: solid wall in both rooms. Dead astern (3.0) is solid in the
+// classic room but seen through the pier's back curtain wall, which is the default since LOUNGE_PIER went on.
+const near=placeAt(mk('aaa111'),.08,.05,6000),far=placeAt(mk('bbb222'),.6,.02,9000),behind=placeAt(mk('ccc333'),2.5,.04,4000);
 setTraffic(near,far,behind);
 await check('binoculars with nothing selected auto-acquire the aircraft nearest the centre of view',()=>{watch.clearSelection();watch.resetLook();frames(60);watch.binoculars(true);assert.equal(watch.selected,'aaa111');assert.equal(watch.tracking,true);assert.equal(useFlyStore.getState().lockedHex,'aaa111','soft lock kept for hero detail');assert.equal(runtime.targeting.lockedHex,'aaa111','and written where FlyScene and DetailedTraffic read it');assert.equal(runtime.targeting.target,near);frames(150);assert.ok(aimError(near)<camera.fov*DEG*.01,'locked and centred: '+aimError(near));watch.binoculars(false);frames(90);});
 await check('clearing the selection releases the lock',()=>{watch.clearSelection();assert.equal(runtime.targeting.lockedHex,null);assert.equal(useFlyStore.getState().lockedHex,null);});

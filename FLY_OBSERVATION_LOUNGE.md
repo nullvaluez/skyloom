@@ -1,5 +1,9 @@
 # Observation Lounge — plan and record
 
+> **Promoted (2026-10-18):** `LOUNGE_PIER` and `LOUNGE_INSTRUMENTS` ship on
+> after the owner tested the two-level room
+> ([FLY_LOUNGE_SECOND_LEVEL.md](FLY_LOUNGE_SECOND_LEVEL.md), "Promotion").
+>
 > **Living Observatory implementation (2026-10-17):** the two-sided pier and
 > instruments are implemented behind separate, default-off flags. See the
 > implementation record at the end of this file for current evidence and
@@ -700,8 +704,9 @@ tree found one more walk defect and two instrument problems.
 Built from `main` at `9ba95e8` in the isolated `codex/living-observatory`
 worktree. The trailer checkout is untouched. The implementation extends the
 existing room, walk, watch, selection, airport placement and audio systems.
-Both `LOUNGE_PIER` and `LOUNGE_INSTRUMENTS` remain off by default; the existing
-desktop walk remains on. Review with `?flags=LOUNGE_PIER,LOUNGE_INSTRUMENTS`.
+Both `LOUNGE_PIER` and `LOUNGE_INSTRUMENTS` were off by default at this point;
+they ship on since 2026-10-18 (owner sign-off after the second-level pass;
+`?flags=-LOUNGE_PIER,-LOUNGE_INSTRUMENTS` is the classic room for one page load).
 
 The six connected features are the rear-glazed pier, live airport table,
 directional listening windows, standing binocular support rails, quiet

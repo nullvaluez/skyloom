@@ -1,6 +1,6 @@
 # Living Observatory
 
-Implementation and validation record for the opt-in lounge expansion. Both `LOUNGE_PIER.enabled` and `LOUNGE_INSTRUMENTS.enabled` remain `false`. This record does not authorize enabling either default.
+Implementation and validation record for the lounge expansion. **Promoted 2026-10-18:** the owner tested the pier room and instruments after the second-level pass and both `LOUNGE_PIER.enabled` and `LOUNGE_INSTRUMENTS.enabled` now ship `true` (see "Promotion" in [FLY_LOUNGE_SECOND_LEVEL.md](FLY_LOUNGE_SECOND_LEVEL.md)). The release limits recorded below (frame-time gates at JFK/LOWI, the EGLL draw ceiling, the retained-heap question) were not re-measured by that promotion.
 
 **Newer (2026-10-18):** the second-level pass on the pier room's upper floor (furnishing, stair finish, lighting, footsteps, décor, upstairs listening window) is recorded in [FLY_LOUNGE_SECOND_LEVEL.md](FLY_LOUNGE_SECOND_LEVEL.md).
 

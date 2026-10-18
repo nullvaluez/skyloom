@@ -243,5 +243,68 @@ test('Reduced motion: no lift and no bob anywhere on the stair (the cadence of t
   p.detach();
 });
 
+// The pier is the default room since LOUNGE_PIER went on (2026-10-18), so it
+// gets the classic room's robustness walk (verify-lounge-walk), across both
+// floors: legs aim at targets on either floor (by way of the stair foot and the
+// top landing when the target is on the other floor) or at a random heading,
+// with random keys, runs and frame spikes. While standing, every step must be
+// free on its own layer, on the ramp's height, inside the envelope, never
+// faster than a run, and change floors only through the stair.
+test('A seeded 50,000-step random walk over both floors and the stair never leaves free space, the ramp or the envelope', () => {
+  let seed = 515151;
+  const r = () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const env = plan.envelope, eps = 1e-9;
+  const targets = [
+    ['lower', -10.4, -0.6], ['lower', 10.4, -0.6], ['lower', 0, 12.4], ['lower', 7.6, 7], ['lower', 4.4, 6.6], ['lower', 11.8, 11.1], ['lower', -7.5, 1.5],
+    ['upper', 0, 10.6], ['upper', 10.4, 9.0], ['upper', 9.6, 13.6], ['upper', -6.5, 9.6], ['upper', 6.7, 12.4], ['upper', -7.6, 13.6], ['upper', -1, 13.8],
+  ];
+  const foot = [-10, 2.7], head = [-9.9, 12.0];
+  const watch = { active: true, validated: true, site: { variant: 'pier' }, frame: { k: 1 }, posture: 'standing', eyeLocal: { x: 0, y: 1.65, z: 2.8 }, yaw: 0, pitch: 0, binocular: false, publish() {} };
+  const detach = attachLoungeWalk(watch, {}), walk = watch.walk;
+  const visits = { lower: 0, stairs: 0, upper: 0 };
+  let now = 0, steps = 0, climbs = 0, descents = 0, maxSpeed = 0;
+  for (let leg = 0; steps < 50000; leg++) {
+    const wander = r() < 0.3, target = targets[Math.floor(r() * targets.length)];
+    const randomYaw = (r() - 0.5) * 2 * Math.PI, strafe = r() < 0.25 ? (r() < 0.5 ? -1 : 1) : 0, run = r() < 0.35;
+    const n = 40 + Math.floor(r() * 500);
+    for (let i = 0; i < n && steps < 50000; i++, steps++) {
+      if (wander) watch.yaw = randomYaw;
+      else {
+        // The waypoint for this frame: the target on its own floor, else the way to the stair.
+        const e = watch.eyeLocal, here = walk.floorId;
+        let [tx, tz] = [target[1], target[2]];
+        if (here !== target[0]) {
+          const goingUp = target[0] === 'upper';
+          if (here === 'stairs') [tx, tz] = goingUp ? [head[0], head[1] + 0.5] : [foot[0], foot[1] - 0.5];
+          else if (goingUp) [tx, tz] = Math.hypot(e.x - foot[0], e.z - foot[1]) < 0.35 ? [foot[0], head[1]] : foot;
+          else [tx, tz] = Math.hypot(e.x - head[0], e.z - head[1]) < 0.35 ? [head[0], foot[1]] : head;
+        }
+        watch.yaw = Math.atan2(-(tx - e.x), -(tz - e.z)) + (r() - 0.5) * 0.3;
+      }
+      walk.setMoveKeys(strafe ? 0 : 1, strafe, run);
+      const dt = r() < 0.01 ? 0.1 : 1 / 240 + r() * (0.1 - 1 / 240);
+      const bx = watch.eyeLocal.x, bz = watch.eyeLocal.z, from = walk.floorId;
+      walk.update(dt, now += dt);
+      const e = watch.eyeLocal, to = walk.floorId;
+      visits[to]++;
+      if (from !== to) {
+        assert.ok(from === 'stairs' || to === 'stairs', `step ${steps}: ${from} -> ${to} without the stair`);
+        if (from === 'stairs' && to === 'upper') climbs++;
+        if (from === 'stairs' && to === 'lower') descents++;
+      }
+      assert.ok(W.isFree(space.layers[to], e.x, e.z), `step ${steps}: (${e.x.toFixed(3)}, ${e.z.toFixed(3)}) not free on ${to}`);
+      assert.ok(Math.abs(e.y - (1.65 + W.floorHeight(space, e.x, e.z, to))) < eps, `step ${steps}: eye ${e.y.toFixed(4)} off the ${to} floor`);
+      assert.ok(e.x >= env.minX && e.x <= env.maxX && e.y >= env.minY && e.y <= env.maxY && e.z >= env.minZ && e.z <= env.maxZ, `step ${steps}: outside the envelope`);
+      maxSpeed = Math.max(maxSpeed, Math.hypot(e.x - bx, e.z - bz) / dt);
+    }
+    walk.setMoveKeys(0, 0, false);
+  }
+  detach();
+  assert.ok(maxSpeed <= 2.4 + 1e-6, 'fastest step ' + maxSpeed.toFixed(3) + ' m/s');
+  for (const [floor, count] of Object.entries(visits)) assert.ok(count > 2000, `${floor} visited ${count} steps`);
+  assert.ok(climbs >= 3 && descents >= 3, `climbs ${climbs}, descents ${descents}`);
+  console.log(`  ${steps} steps · lower ${visits.lower} / stairs ${visits.stairs} / upper ${visits.upper} · ${climbs} climbs, ${descents} descents · fastest ${maxSpeed.toFixed(3)} m/s`);
+});
+
 console.log(`\nLounge elevation: ${passed} passed, ${failed} failed.`);
 if (failed) process.exitCode = 1;

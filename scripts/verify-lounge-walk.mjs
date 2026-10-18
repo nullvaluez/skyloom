@@ -37,7 +37,12 @@ import { fileURLToPath } from 'node:url';
 import { Vector3, PerspectiveCamera } from 'three';
 registerHooks({resolve(s,c,next){if(s.startsWith('@/'))s=new URL('../'+s.slice(2),import.meta.url).href;if(s.startsWith('.')||s.startsWith('file:')){const u=new URL(s,c.parentURL);if(fs.existsSync(fileURLToPath(u)+'.js'))return next(u.href+'.js',c);}return next(s,c);}});
 
-globalThis.window={location:{search:'?graphicsReview=1&airports=on'},matchMedia:()=>({matches:false})};
+// This gate is the classic room's walk contract (its grid, blockers, BVH and
+// VANTAGE.classic), so the classic room is pinned: LOUNGE_PIER ships on since
+// 2026-10-18. The pier's two floors are verify-lounge-pier, -elevation (incl. a
+// seeded random walk over both floors) and -life; the pier vantage list and
+// apertures are still checked here by name.
+globalThis.window={location:{search:'?graphicsReview=1&airports=on'},matchMedia:()=>({matches:false}),__flyLoungePierOverride:{enabled:false}};
 const saved=new Map();globalThis.localStorage={setItem:(k,v)=>saved.set(k,v),getItem:k=>saved.get(k)};
 globalThis.fetch=async url=>({ok:true,json:async()=>JSON.parse(fs.readFileSync('public'+url,'utf8'))});
 

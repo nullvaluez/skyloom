@@ -364,8 +364,10 @@ check('a busy, diverse sky stays inside 30 draws and 900k triangles, binoculars 
 check('parked aircraft dock their L1 door at the jet bridge cab and fit their stands', () => {
   const sizes = new Set();
   let parked = 0, worstSill = 0;
-  for (const id of ['KCMH', 'KJFK', 'LOWI', 'YSSY', 'EGLL', 'KMDW', 'KBTV', 'K00V']) {
-    const site = resolveLoungeSite(loadAirport(id));
+  // Both room variants: the pier room is the default since LOUNGE_PIER went on
+  // (2026-10-18); the classic sites keep the 'mid' size class (LOWI) in the set.
+  for (const variant of ['pier', 'classic']) for (const id of ['KCMH', 'KJFK', 'LOWI', 'YSSY', 'EGLL', 'KMDW', 'KBTV', 'K00V']) {
+    const site = resolveLoungeSite(loadAirport(id), { variant });
     const layout = airportLayout(site);
     sizes.add(layout.size);
     const plan = planParkedFleet(site, layout);

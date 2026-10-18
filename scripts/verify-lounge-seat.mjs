@@ -108,8 +108,13 @@ check('seat order: flagship, hub table, chosen, generic', () => {
   // A seat for another airport is ignored.
   assert.equal(resolveLoungeSite(runway, { seat: { ...seat, ident: 'ZZXX' } }).source, 'generic');
   // A flagship ignores a passed seat (stub lookup: the authored runway is the flagship's own).
+  // That is the classic room's order; the pier room (the default since LOUNGE_PIER went on,
+  // 2026-10-18) takes its scored pier-table row first and ignores a passed seat just the same.
   const kcmh = registry.airportById('KCMH');
-  if (kcmh) assert.equal(resolveLoungeSite(kcmh, { seat: { ...seat, ident: 'KCMH' } }).source, 'flagship');
+  if (kcmh) {
+    assert.equal(resolveLoungeSite(kcmh, { seat: { ...seat, ident: 'KCMH' }, variant: 'classic' }).source, 'flagship');
+    assert.equal(resolveLoungeSite(kcmh, { seat: { ...seat, ident: 'KCMH' }, variant: 'pier' }).source, 'table');
+  }
   assert.equal(storedSeat(runway), null);
 });
 

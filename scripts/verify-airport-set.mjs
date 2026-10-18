@@ -53,10 +53,15 @@ function loadAirport(id) {
 }
 
 const AIRPORTS = ['KCMH', 'KJFK', 'LOWI', 'YSSY', 'EGLL', 'KMDW', 'KBTV', 'K00V'];
+// Every airport under both room variants: the pier room is the default since
+// LOUNGE_PIER went on (2026-10-18), and the classic room is still the fallback
+// where no pier placement scores (and ?flags=-LOUNGE_PIER). The pier's scored
+// placements move LOWI to a big terminal, so the classic sites keep the 'mid'
+// size class in the review set.
 const sets = [];
-for (const id of AIRPORTS) {
+for (const variant of ['pier', 'classic']) for (const id of AIRPORTS) {
   const airport = loadAirport(id);
-  const site = resolveLoungeSite(airport);
+  const site = resolveLoungeSite(airport, { variant });
   const layout = airportLayout(site);
   const runway = registry.airportById(site.runwayId);
   const isPavement = (x, z) => !!registry.findAirportSurface(x, z, 25);

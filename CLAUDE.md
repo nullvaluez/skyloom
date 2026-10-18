@@ -16,7 +16,8 @@
 >   overhaul, then the lounge further. [FLY_GATE_TO_GATE_PLAN.md](FLY_GATE_TO_GATE_PLAN.md)
 >   is the plan; [FLY_GATE_TO_GATE.md](FLY_GATE_TO_GATE.md) is the record, the
 >   contract reference, the 15-flag registry (all `enabled:false` except
->   `LOUNGE_WALK`, on since 2026-10-14; read only through
+>   `LOUNGE_WALK`, on since 2026-10-14, and `LOUNGE_PIER` /
+>   `LOUNGE_INSTRUMENTS`, on since 2026-10-18; read only through
 >   `lib/fly/ops-flags.js`) and the per-wave file ownership. **W0 (contracts
 >   and seams, nothing visible), W4-0 (lounge contracts) and W4 N (the lounge
 >   walk) are on `main`.** Seam rule: later
@@ -44,10 +45,12 @@
 >   based behind `SEA_STATE` (on; `?flags=-SEA_STATE` is the old water). The
 >   terrain ground query is bucketed (26× faster building drape, identical
 >   answers), and surface-atlas changes upload slot-sized rectangles.
-> - **Lounge second level (2026-10-18, five-agent pass, flags still off):**
+> - **Lounge second level (2026-10-18, five-agent pass, SHIPPED ON):**
 >   [FLY_LOUNGE_SECOND_LEVEL.md](FLY_LOUNGE_SECOND_LEVEL.md) — audit, plan
 >   and record for the pier room's upper floor behind `LOUNGE_PIER` /
->   `LOUNGE_INSTRUMENTS` (both `enabled:false`): a furnished upper room
+>   `LOUNGE_INSTRUMENTS` (both **on** since 2026-10-18 after the owner tested
+>   them; `?flags=-LOUNGE_PIER,-LOUNGE_INSTRUMENTS` is the classic room for
+>   one page load; "Promotion" in that file): a furnished upper room
 >   (reading nook, library, coffee station, desk models, two new seats), a
 >   finished stair and lit lower roof, NaN-free pier shading, surface-aware
 >   footsteps, inspectable décor and an upstairs listening window; 14 draws,

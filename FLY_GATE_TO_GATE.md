@@ -90,7 +90,7 @@ a page load with `?flags=NAME` (off with `-NAME`). Nothing but flag blocks may f
 | `OPS_HANGAR` | title hero, airport chooser, briefing + diagram, real-sun hangar, exterior stand fix, staging behind the hangar, confirm-before-discard | sheet chooser |
 | `OPS_DEBRIEF` | grade, stamp, auto photo, debrief, history v2, Flights tab, title "your best" | bottom sheet |
 | `REPLAY` | render-only replay (W5) | 1 MB cap |
-| `LOUNGE_PIER` | pier room, pier set both sides, back-aware seats, seated city cap | inert |
+| `LOUNGE_PIER` (**ON**, 2026-10-18) | pier room, pier set both sides, back-aware seats, seated city cap | inert |
 | `LOUNGE_WALK` (**ON**, 2026-10-14) | walk, postures, vantage seats, Sit prompt, seat menu, glides, footsteps | inert |
 | `LOUNGE_BRIDGE` | Fly from here, Watch from the lounge, origin-aware Leave/Esc, Atlas bookmark, `'lounge'` transition, promotion (decision 12) | inert |
 

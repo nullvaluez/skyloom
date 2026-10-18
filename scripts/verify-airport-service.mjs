@@ -38,6 +38,7 @@ const { LivingAirports } = await imp('lib/fly/living-airports.js');
 const catalog = await imp('lib/fly/runway-catalog.js');
 const registry = await imp('lib/fly/operations-airports.js');
 const L = await imp('lib/fly/lounge-site.js');
+const { loungeVariant } = await imp('lib/fly/ops-flags.js');
 const { BufferAttribute, BufferGeometry, Mesh, MeshBasicMaterial, ShaderLib } = await import('three');
 
 let pass = 0;
@@ -331,10 +332,12 @@ await check('a fresh OSM choice is made once per ident and variant, reported, an
   assert.deepEqual(await L.chooseSessionSeat(airport, { load: answer(calls), choose: seatFor, onChoice: (c) => heard.push(c) }), seatFor([airport]));
   assert.equal(calls.n, 1);
   assert.equal(heard.length, 1);
-  // The default variant is the lounge's ('classic' while LOUNGE_PIER is off); another variant chooses afresh.
-  assert.deepEqual(L.sessionSeat(airport, { variant: 'classic' }), seatFor([airport]));
-  assert.equal(L.sessionSeat(airport, { variant: 'pier' }), undefined);
-  assert.equal(L.sessionSiteSync(airport, { variant: 'pier' }), null);
+  // The default variant is the lounge's (loungeVariant(): 'pier' since LOUNGE_PIER went on, 2026-10-18);
+  // the other variant chooses afresh.
+  const [dflt, other] = loungeVariant() === 'pier' ? ['pier', 'classic'] : ['classic', 'pier'];
+  assert.deepEqual(L.sessionSeat(airport, { variant: dflt }), seatFor([airport]));
+  assert.equal(L.sessionSeat(airport, { variant: other }), undefined);
+  assert.equal(L.sessionSiteSync(airport, { variant: other }), null);
 });
 
 await check('no seat in the data is cached (generic site); timeout, cancel and failure are not', async () => {
@@ -355,16 +358,18 @@ await check('no seat in the data is cached (generic site); timeout, cancel and f
   for (const a of [slow, gone, bad]) assert.equal(L.sessionSeat(a), undefined, `${a.ident} not cached`);
 });
 
-await check('a stored seat (flagship) resolves at once without loading OSM data', async () => {
-  L.clearSessionSites();
+await check('a stored seat (the classic flagship, the pier table row) resolves at once without loading OSM data', async () => {
   const kcmh = registry.airportById('KCMH');
-  const sync = L.sessionSiteSync(kcmh);
-  assert.equal(sync?.source, 'flagship');
-  let loads = 0;
-  const site = await L.resolveSessionSite(kcmh, { load: async () => { loads++; return {}; }, choose: seatFor });
-  assert.deepEqual(site, L.resolveLoungeSite(kcmh));
-  assert.equal(loads, 0);
-  assert.equal(L.sessionSeat(kcmh), undefined);
+  for (const [variant, source] of [['classic', 'flagship'], ['pier', 'table']]) {
+    L.clearSessionSites();
+    const sync = L.sessionSiteSync(kcmh, { variant });
+    assert.equal(sync?.source, source, variant);
+    let loads = 0;
+    const site = await L.resolveSessionSite(kcmh, { variant, load: async () => { loads++; return {}; }, choose: seatFor });
+    assert.deepEqual(site, L.resolveLoungeSite(kcmh, { variant }), variant);
+    assert.equal(loads, 0, variant);
+    assert.equal(L.sessionSeat(kcmh, { variant }), undefined, variant);
+  }
   assert.equal(await L.resolveSessionSite(null), null);
   L.clearSessionSites();
 });

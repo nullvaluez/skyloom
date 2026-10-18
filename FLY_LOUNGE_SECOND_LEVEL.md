@@ -1,11 +1,12 @@
 # Lounge second level — audit, plan and record
 
 The second-level pass on the observation lounge's two-floor **pier** room
-(`LOUNGE_PIER`) and its instruments (`LOUNGE_INSTRUMENTS`). Both flags stay
-`enabled:false`; owner visual sign-off is a separate gate. Review with
-`?flags=LOUNGE_PIER,LOUNGE_INSTRUMENTS`. Everything in this pass is scoped to
-the pier variant (or the instruments flag): the classic room and flags-off
-behaviour stay unchanged.
+(`LOUNGE_PIER`) and its instruments (`LOUNGE_INSTRUMENTS`). **Both flags ship
+ON since 2026-10-18**: the owner tested the pass and signed it off (see
+[Promotion](#promotion) at the end). `?flags=-LOUNGE_PIER,-LOUNGE_INSTRUMENTS`
+gives the classic room for one page load. Everything in this pass is scoped to
+the pier variant (or the instruments flag): the classic room is unchanged, and
+it is still the room wherever no pier placement scores.
 
 Five agents: a scout (audit, render harness, W0 contracts, this plan), three
 implementation lanes (FURNISH, LIGHT, LIFE) and an integrator. Background:
@@ -35,9 +36,9 @@ belongs to the owner's RTX 5080.
   **Integrator: certified** the combined tree and landed four small
   cross-lane fixes. The [Record](#record) at the end is the account: what
   landed, budgets, gates, harness evidence, review findings, what was
-  deferred and the owner checkpoints. `LOUNGE_PIER` and `LOUNGE_INSTRUMENTS`
-  still ship `enabled:false`; nothing here has been seen on the owner's
-  RTX 5080 yet.
+  deferred and the owner checkpoints. At the close `LOUNGE_PIER` and
+  `LOUNGE_INSTRUMENTS` still shipped `enabled:false`; the owner then tested
+  the build and both were promoted the same day ([Promotion](#promotion)).
 
 ## Audit
 
@@ -889,7 +890,7 @@ salvage).
 - Seam files (`FlyScene.jsx`, `PlayerPlane.jsx`, `TrafficLayer.jsx`,
   `operations-runtime.js`, `ops-flags.js`): no diff since `204d5eb`;
   `verify-ops-golden` 28 / 28.
-- `LOUNGE_PIER` and `LOUNGE_INSTRUMENTS`: still `{ enabled: false }`.
+- `LOUNGE_PIER` and `LOUNGE_INSTRUMENTS`: still `{ enabled: false }` at the close (promoted afterwards, see [Promotion](#promotion)).
 - ESLint on all 37 changed JS / JSX / MJS / CJS files: clean except nine
   errors that are identical on `204d5eb` (eight `react-hooks` errors in
   `AirportLounge.jsx`, one `set-state-in-effect` in `LoungeHud.jsx`; counted
@@ -1036,3 +1037,70 @@ stair → upper room at day, golden hour and night:
 Every fps, frame-time, glare, aliasing and comfort verdict above is the
 owner's to make on the RTX 5080; the harness can only say the pixels are
 finite and the shapes are where the plan put them.
+
+## Promotion
+
+**2026-10-18, owner decision:** the owner tested the second-level build
+(`0bffcea`) with `?flags=LOUNGE_PIER,LOUNGE_INSTRUMENTS` and asked for it to
+be the default ("i tested and its good"). Both flags now ship
+`{ enabled: true }` in `lib/fly/fly-constants.js`; `?flags=-LOUNGE_PIER`
+(classic single-level room) and `?flags=-LOUNGE_INSTRUMENTS` turn either off
+for one page load. Nothing else about either feature changed in this commit.
+The classic room is still built wherever no pier placement scores (10 of the
+115 audited airports) and remains byte-identical.
+
+What the flip changes for players: every desktop lounge visit at an airport
+with a scored pier placement opens the two-level pier room with its
+instruments; flight areas use the pier set as well, since the variant is
+global (`loungeVariant()`, `lib/fly/ops-flags.js`). Phones are unaffected (no
+lounge).
+
+**Gates.** Every node gate (`scripts/verify-*.mjs`, 137) was run before and
+after the flip on this container. Before: 109 pass, 28 fail. The 28 failures
+are pre-existing and not lounge gates (GPU, browser and R25 harnesses that
+cannot run here). After the flip and the gate updates below: the same 109 pass
+and the same 28 fail; no gate newly fails and none newly passes. Seven gates
+had encoded "the default variant is classic" and failed on the flip; each was
+examined, and none was a defect of the pier room:
+
+- `verify-lounge-walk.mjs` checks the classic room's walk against the classic
+  grid, BVH and `VANTAGE.classic`; with the pier as default its runtime opened
+  the pier, whose open floor (the banquette gone) the classic grid calls
+  blocked. It now pins the classic room (`__flyLoungePierOverride`), as it
+  already pins `LOUNGE_WALK`. 56 / 56.
+- `verify-lounge-elevation.mjs` gains the pier's equivalent of that classic
+  robustness walk, which had no pier counterpart: a seeded 50,000-step random
+  walk through the real controller over both floors and the stair (24,008
+  lower / 2,632 stair / 23,360 upper steps, 7 climbs, 5 descents), asserting
+  free space on the current layer, the ramp height, the envelope, the run
+  speed and floor changes only through the stair. 12 / 12.
+- `verify-lounge-vantage.mjs`: the picking check walks `VANTAGE.classic` and
+  asserts the classic walls (a contact dead astern is hidden); the pier's back
+  glass rightly shows it. The check pins the classic room. 7 / 7.
+- `verify-airport-lifecycle.mjs`: "a contact behind the lounge walls cannot be
+  followed" placed its contact dead astern, which the pier's back glass shows.
+  It now sits 2.5 rad round, solid wall in both rooms; the gate runs on the
+  default (pier) room and passes 25 / 25 under the classic pin too.
+- `verify-lounge-seat.mjs`: "a flagship ignores a passed seat" is the classic
+  order; it now names the classic variant and also asserts the pier's
+  (KCMH's scored pier-table row, which ignores a passed seat as well). 6 / 6.
+- `verify-airport-service.mjs`: the session-seat checks follow
+  `loungeVariant()` instead of assuming classic, and the stored-seat check runs
+  for both rooms (classic flagship, pier table row). 17 / 17.
+- `verify-airport-set.mjs` and `verify-fleet-airframes.mjs`: the review set now
+  runs every airport under both room variants (16 sets). The pier's scored
+  placement moves LOWI from a mid to a big terminal, so the classic sites keep
+  the mid size class in the set; every other set invariant (overlap, finite,
+  bounded, envelope, determinism, budgets, bridges, movers, footprint, towers,
+  retirement) and the parked-fleet docking check hold at all 16. 17 / 17 and
+  13 / 13 (114 parked airframes, worst sill 0.33 m).
+
+`node --no-warnings scripts/lounge-pass-gates.mjs` passes on the promoted
+tree, including the classic invariant.
+
+**Not re-measured by the promotion.** The browser harness fleet was not run
+(no GPU or tile network in this container). The release limits in
+[FLY_LIVING_OBSERVATORY.md](FLY_LIVING_OBSERVATORY.md) — frame-time gates at
+KJFK and LOWI, the EGLL draw ceiling, the retained-heap question — were
+recorded against the pre-pass build and were not re-measured; the owner's
+own testing is the acceptance here.

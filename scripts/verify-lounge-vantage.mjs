@@ -94,8 +94,12 @@ for (const id of AIRPORTS) {
   });
 }
 
-// Picking from every seat, through the real runtime.
+// Picking from every seat, through the real runtime. These are the classic
+// room's seats and walls, so the classic room is pinned: LOUNGE_PIER ships on
+// since 2026-10-18 and its back curtain wall would (rightly) show the '-back'
+// contacts. The pier's apertures are verify-lounge-walk's and -pier's.
 globalThis.window.__flyLoungeWalkOverride = { enabled: true };
+globalThis.window.__flyLoungePierOverride = { enabled: false };
 const engine = { worldToGeo: (p) => new Vector3(p.x / 6378137 * 180 / Math.PI, (2 * Math.atan(Math.exp(-p.z / 6378137)) - Math.PI / 2) * 180 / Math.PI, p.y), getGroundAt: () => ({ tileZ: 18, elev: 250 }) };
 const flight = { pos: new Vector3(), cfg: { speeds: { slow: 60, boost: 300 } }, heading: 0, speed: 100, pitch: 0, bank: 0 };
 const runtime = {
@@ -144,5 +148,6 @@ await check('picking from every seat: front, side and roof contacts are visible;
 
 dispose();
 delete globalThis.window.__flyLoungeWalkOverride;
+delete globalThis.window.__flyLoungePierOverride;
 console.log(`\nLOUNGE VANTAGE: ${checks}/${checks + failed}${failed ? ` — ${failed} FAILED` : ''}`);
 process.exit(failed ? 1 : 0);
