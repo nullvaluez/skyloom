@@ -1,0 +1,39 @@
+/* The pier room's décor prompt and card, and the seat menu's floor groups
+   (LOUNGE_PIER; the second-level pass, LIFE). Calm, solid panels in the
+   observatory's palette; nothing animates. */
+.lounge-decor-prompt {
+  position: absolute; bottom: 112px; left: 50%; transform: translateX(-50%); z-index: 6;
+  display: flex; gap: 12px; align-items: center; padding: 11px 16px; border: 0; border-radius: 8px;
+  background: #152632; color: #eef5ff; font: 500 13px var(--t-sans); pointer-events: auto; cursor: pointer;
+}
+.lounge-decor-prompt svg { color: #b6dcdc; flex: none; }
+.lounge-decor-prompt kbd { margin-left: 6px; color: #c6dfdf; font: 600 12px var(--t-sans); }
+.lounge-decor-prompt:hover { background: #1d3341; }
+.lounge-decor-prompt:focus-visible { outline: 2px solid #b6e5e7; outline-offset: 3px; }
+.lounge-decor-card {
+  position: absolute; bottom: 112px; left: 50%; transform: translateX(-50%); z-index: 6;
+  width: min(360px, calc(100% - 48px)); padding: 20px 22px 16px; border-radius: 12px;
+  background: #101a23; color: #edf2f4; box-shadow: 0 16px 44px rgba(1, 8, 13, 0.4);
+  font-family: var(--t-sans); pointer-events: auto;
+}
+.lounge-decor-card:focus { outline: none; }
+.lounge-decor-card:focus-visible { outline: 2px solid #b6e5e7; outline-offset: 3px; }
+.lounge-decor-icon { display: block; color: #c9dfdf; margin-bottom: 10px; }
+.lounge-decor-card h2 { margin: 0 24px 8px 0; font: 600 18px/1.3 var(--t-sans); letter-spacing: -0.02em; }
+.lounge-decor-card p { margin: 0 0 12px; color: #bdcfd6; font: 400 13px/1.6 var(--t-sans); }
+.lounge-decor-card small { color: #8fa6ae; font: 500 11px var(--t-sans); }
+.lounge-decor-close {
+  position: absolute; top: 10px; right: 10px; display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; color: #c9d7dd; cursor: pointer;
+}
+.lounge-decor-close:hover { background: #2a3943; color: #fff; }
+.lounge-decor-close:focus-visible { outline: 2px solid #b6e5e7; outline-offset: 2px; }
+
+/* The seat menu grouped by floor (only when the seats span two floors). */
+.lounge-seat-menu[data-grouped] { max-height: calc(100dvh - 220px); overflow: auto; }
+.lounge-seat-menu[data-grouped] .lsm-row { min-height: 46px; }
+.lsm-group + .lsm-group { margin-top: 10px; }
+.lsm-group h3 {
+  margin: 0 4px 6px; font: 700 10px/1 var(--t-mono); letter-spacing: 0.12em; text-transform: uppercase;
+  color: rgba(238, 245, 255, 0.55);
+}

@@ -52,6 +52,7 @@ export const STANDARD_GATES = [
   ['verify-attribution.mjs'],
   ['verify-import-integrity.mjs'],
   ['verify-lounge-light.mjs'], // LIGHT lane: pier-only shading, glow channels, probe, steam
+  ['verify-lounge-life.mjs'], // LIFE lane: inspectable décor, seat menu by floor, place label
 ];
 
 /**

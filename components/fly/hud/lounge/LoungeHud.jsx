@@ -21,6 +21,10 @@ import { SitPrompt } from './SitPrompt';
 import { SeatMenu } from './SeatMenu';
 import { LoungeBridgeBar } from './LoungeBridgeBar';
 import { ObservatoryHud, useObservatory } from './ObservatoryHud';
+// The pier room's décor prompt and card, and its floor-aware place label
+// (LOUNGE_PIER; the second-level pass).
+import { DecorCard, DecorPrompt, useWalkFeel } from './DecorCard';
+import { decorTurn, pierPlace } from '@/lib/fly/lounge/lounge-life.mjs';
 
 /*
  * The seated lounge HUD. One 1 Hz poll feeds the header, the board and the
@@ -60,6 +64,7 @@ function helpHints(watch) {
 export function LoungeHud({ runtime, watch }) {
   const observatory = useObservatory(runtime, watch.id);
   const instrumentOpen = !!observatory?.active;
+  const feel = useWalkFeel(runtime, watch.id);
   const sound = useFlyStore((s) => s.soundOn);
   const inspecting = useFlyStore((s) => !!s.inspectHex);
   // A full-screen panel over the lounge (Atlas, logbook, airport browser):
@@ -151,7 +156,13 @@ export function LoungeHud({ runtime, watch }) {
   const w = runtime.airportWatch;
   // The seat you are in (LOUNGE_WALK), for the header and the face button.
   const seat = watch.walk ? w?.seats?.find((s) => s.id === watch.seat) ?? null : null;
-  const place = !watch.walk ? 'Window lounge' : watch.posture === 'seated' && seat ? seat.label : watch.posture === 'gliding' ? 'Changing seats' : w?.walk?.floorId === 'upper' ? 'Upper lounge' : w?.walk?.floorId === 'stairs' ? 'Staircase' : 'Standing';
+  const pier = w?.site?.variant === 'pier';
+  // Standing in the pier room, the header names the floor (or the stair) as
+  // you climb; the classic room reads as it always has.
+  const place = !watch.walk ? 'Window lounge' : watch.posture === 'seated' && seat ? seat.label : watch.posture === 'gliding' ? 'Changing seats' : pier ? pierPlace(feel.floorId ?? w?.walk?.floorId) : w?.walk?.floorId === 'upper' ? 'Upper lounge' : w?.walk?.floorId === 'stairs' ? 'Staircase' : 'Standing';
+  const decorOpen = pier && watch.walk && watch.posture === 'standing' && feel.open && !watch.binocular && !watch.seatMenu && !inspecting && !covered && !instrumentOpen ? feel.open : null;
+  // One prompt at a time: a chair or an instrument within reach keeps the floor (Enter asks the same).
+  const decorOffer = pier && !feel.open && !inspecting && !covered && decorTurn(w, observatory) ? feel.offer : null;
   const faceLabel = watch.walk && watch.posture === 'seated' && seat?.faces === 'back' ? 'Face the back window' : 'Face the runway';
   const selectedRow = watch.selected ? picker.categories.get(watch.selected) : null;
   const fieldElev = airport ? (airport.a.elevation + airport.b.elevation) / 2 : 0;
@@ -188,8 +199,10 @@ export function LoungeHud({ runtime, watch }) {
         onLeave={leave}
       />
 
-      {!observatory?.prompt && !instrumentOpen && <SitPrompt runtime={runtime} watch={watch} />}
-      <ObservatoryHud runtime={runtime} state={observatory} hidden={inspecting || covered || watch.seatMenu} />
+      {!observatory?.prompt && !instrumentOpen && !decorOpen && <SitPrompt runtime={runtime} watch={watch} />}
+      <DecorPrompt runtime={runtime} offer={decorOffer} />
+      {decorOpen && <DecorCard key={decorOpen.id} runtime={runtime} item={decorOpen} />}
+      <ObservatoryHud runtime={runtime} state={observatory} hidden={inspecting || covered || watch.seatMenu || !!decorOpen} />
       <SeatMenu runtime={runtime} watch={watch} />
 
       {!watch.binocular && !inspecting && !covered && !instrumentOpen && (

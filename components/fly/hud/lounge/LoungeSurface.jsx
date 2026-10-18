@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useFlyStore } from '@/stores/fly-store';
 import { VIEW } from '@/lib/fly/observation-config';
 import { pickRadius } from '@/lib/fly/airport-watch-camera.mjs';
+import { decorTurn, inspectKeyAction } from '@/lib/fly/lounge/lounge-life.mjs';
 
 /*
  * The full-screen look surface under the lounge HUD. It owns the pointer:
@@ -28,6 +29,11 @@ import { pickRadius } from '@/lib/fly/airport-watch-camera.mjs';
  * while the menu can be seen: the binoculars hide it). A click that hits
  * no aircraft sits in the vantage chair under the pointer. There is no
  * pointer lock: the cursor stays the picker, and drag still looks.
+ *
+ * THE PIER ROOM (LOUNGE_PIER): Enter opens the card of the décor on offer
+ * when no chair or instrument claims it, Enter or Esc closes an open card
+ * first (lib/fly/lounge/lounge-life.mjs inspectKeyAction), and the arrows
+ * move between the rows of the seat menu while it is grouped by floor.
  */
 const MOVE_KEYS = { w: 'forward', s: 'back', a: 'left', d: 'right' };
 
@@ -102,6 +108,9 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
         if (walkKey) e.preventDefault();
         return;
       }
+      // The grouped seat menu (pier) moves its own focus with the arrows: let
+      // them reach it (the lounge section keeps them from the flight input).
+      if (arrows[e.key] && e.target?.closest?.('.lounge-seat-menu[data-grouped]')) return;
       if (covered(s)) {
         // A panel is up: walking waits, but its keys never reach the flight input.
         if (walkKey) {
@@ -138,13 +147,20 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
             if (!w.walk) handled = false;
             else if (!w.binocular) w.seatMenuOpen(); // hidden behind the glasses: nothing to toggle
             break;
-          case 'enter':
-            if (w.observatory?.snapshot().prompt && !w.binocular && !w.seatMenu && !isControl(e.target)) w.observatory.activate(w.observatory.snapshot().prompt.id);
+          case 'enter': {
+            const decor = inspectKeyAction('Enter', { open: !!w.walk?.inspecting, offer: w.walk?.inspectOffer, onControl: isControl(e.target), blocked: !decorTurn(w, w.observatory?.snapshot() ?? null) });
+            if (w.walk?.inspecting) {
+              if (decor === 'close') w.walk.closeInspect();
+              else handled = false; // a control in the card answers Enter itself
+            } else if (w.observatory?.snapshot().prompt && !w.binocular && !w.seatMenu && !isControl(e.target)) w.observatory.activate(w.observatory.snapshot().prompt.id);
             else if (w.walk && w.sitPrompt && w.posture === 'standing' && !w.binocular && !w.seatMenu && !isControl(e.target)) w.sit(w.sitPrompt.id);
+            else if (decor === 'open') w.walk.openInspect(w.walk.inspectOffer.id);
             else handled = false;
             break;
+          }
           case 'escape':
-            if (w.seatMenu && !w.binocular) w.seatMenuOpen(false);
+            if (inspectKeyAction('Escape', { open: !!w.walk?.inspecting }) === 'close') w.walk.closeInspect();
+            else if (w.seatMenu && !w.binocular) w.seatMenuOpen(false);
             else if (w.observatory?.snapshot().active && !w.binocular) w.observatory.release();
             else if (w.binocular) w.binoculars(false);
             else if (w.selected) w.clearSelection();
