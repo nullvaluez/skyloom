@@ -44,6 +44,16 @@
 >   based behind `SEA_STATE` (on; `?flags=-SEA_STATE` is the old water). The
 >   terrain ground query is bucketed (26× faster building drape, identical
 >   answers), and surface-atlas changes upload slot-sized rectangles.
+> - **Lounge second level (2026-10-18, five-agent pass, flags still off):**
+>   [FLY_LOUNGE_SECOND_LEVEL.md](FLY_LOUNGE_SECOND_LEVEL.md) — audit, plan
+>   and record for the pier room's upper floor behind `LOUNGE_PIER` /
+>   `LOUNGE_INSTRUMENTS` (both `enabled:false`): a furnished upper room
+>   (reading nook, library, coffee station, desk models, two new seats), a
+>   finished stair and lit lower roof, NaN-free pier shading, surface-aware
+>   footsteps, inspectable décor and an upstairs listening window; 14 draws,
+>   157,474 / 160,000 triangles; the classic room byte-identical. The room-only
+>   render harness is `scripts/render-lounge-room.cjs`, the gate suite
+>   `scripts/lounge-pass-gates.mjs`.
 > - **Pass rules:**
 >   - Work lands straight on `main`. Every look-changing item sits behind a
 >     TRUE EARTH flag block at the end of `lib/fly/fly-constants.js`, shipped

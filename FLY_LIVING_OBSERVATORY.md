@@ -2,6 +2,8 @@
 
 Implementation and validation record for the opt-in lounge expansion. Both `LOUNGE_PIER.enabled` and `LOUNGE_INSTRUMENTS.enabled` remain `false`. This record does not authorize enabling either default.
 
+**Newer (2026-10-18):** the second-level pass on the pier room's upper floor (furnishing, stair finish, lighting, footsteps, décor, upstairs listening window) is recorded in [FLY_LOUNGE_SECOND_LEVEL.md](FLY_LOUNGE_SECOND_LEVEL.md).
+
 ## Main integration — October 17, 2026
 
 The integration combines feature head `4364ecd` with main `6b2c73f`, preserving main's desktop Ultra policy, sea rendering and building changes. Feature-registry conflicts retain both `SEA_STATE` and `LOUNGE_INSTRUMENTS`; both lounge expansion defaults remain off. The elevation test's old source-only building fixture was updated to the complete rendered-occluder contract, with an additional assertion that incomplete building data cannot verify a view. No visibility requirement was relaxed.

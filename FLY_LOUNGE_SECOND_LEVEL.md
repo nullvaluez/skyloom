@@ -31,7 +31,13 @@ belongs to the owner's RTX 5080.
   room 4 renders differ by 0, 0, 11 and 3 pixels of 921,600, which is the
   harness's own run-to-run variation on that classic pose (two runs of the
   same tree differ by 6 and 2 pixels there).
-- FURNISH, LIGHT, LIFE: briefs below. Record section at the end.
+- **LIGHT, FURNISH, LIFE: landed** on `main` (nine, one and five commits).
+  **Integrator: certified** the combined tree and landed four small
+  cross-lane fixes. The [Record](#record) at the end is the account: what
+  landed, budgets, gates, harness evidence, review findings, what was
+  deferred and the owner checkpoints. `LOUNGE_PIER` and `LOUNGE_INSTRUMENTS`
+  still ship `enabled:false`; nothing here has been seen on the owner's
+  RTX 5080 yet.
 
 ## Audit
 
@@ -648,5 +654,385 @@ new station (`/home/user/skyloom/.graphics-review/lounge-second-level/life-after
 
 ## Record
 
-*(The integrator fills this section: what each lane landed, with commits,
-gate results, harness captures and anything left open.)*
+Written by the integrator on 2026-10-18 after certifying the combined tree.
+Every look statement below comes from the room-only harness on SwiftShader
+(see "Harness evidence" for what that does and does not reproduce). No fps,
+frame-time or feel claim is made: those belong to the owner's RTX 5080.
+
+### What landed
+
+All on `main`, in this order (the scout's W0 commit first):
+
+| Commit | Lane | Subject |
+|---|---|---|
+| `1fdad4c` | scout | room harness, gate suite, W0 contracts |
+| `c32d24b` | LIGHT | no non-finite pixels from the room shader |
+| `1125f36` | LIGHT | shade each interior-probe face from its own camera |
+| `1f2ae8b` | LIGHT | light the lower roof and the stairwell skin as outdoors |
+| `8abcc65` | LIGHT | a mood per floor: airy upper day, warm pools after dark |
+| `6703402` | LIGHT | oak boards, a planked ceiling, chart prints and book spines |
+| `e02cc53` | LIGHT | steam over every cup the room builds |
+| `e55af8a` | LIGHT | no specular glints from the practicals or the reeds |
+| `ff0c083` | LIGHT | the lane's gate (`verify-lounge-light.mjs`) |
+| `acfff64` | LIGHT | comments match the code |
+| `8e42f02` | FURNISH | furnish the second level, unbury the bar, finish the stair |
+| `8b59a5e` | LIFE | footsteps that know the floor, a stair you can feel, a quieter upper room |
+| `6336f4e` | LIFE | décor worth a closer look, the seat menu by floor, a header that names the floor |
+| `95bbcea` | LIFE | a listening window upstairs |
+| `79561c5` | LIFE | the grouped seat menu fits its eight seats at 720 px |
+| `3798492` | LIFE | a click on the décor on offer opens its card |
+| `8389eb1` | integrator | the bar's onyx shows its veining; upstairs lamps on READING |
+| `dad1477` | integrator | the roof troughs read as planting, not a row of sprigs |
+| `5c8487e` | integrator | two décor cards say what is actually there |
+| `16a92a8` | integrator | upstairs table lamps keep LIGHT's night pool on READING |
+
+This record's own commit (documents only) sits on top. Every lane pushed
+its own work; the three lane worktrees were left clean (nothing unpushed to
+salvage).
+
+### LIGHT — light, materials, glass, atmosphere
+
+- **No non-finite pixels (weakness 5), pier program only.** Three causes:
+  `lgBump` normalised a zero vector (guarded); sliver triangles in the metal
+  bucket extrapolated their AO varying far outside [0, 1], and the contact
+  curve turned that into about −9.4e5 radiance, stored as NaN in the
+  half-float target (the scout's "metal bucket residual"; the combined AO is
+  now clamped); `pow()` of a negative base on the reeds and the frosted door
+  (now squares), plus a face-normal fallback where a smoothed normal
+  interpolates through zero. Harness: 42 / 42 pier renders at 0 non-finite
+  pixels without `SAFE_BUMP` (before: 27,416 on the window seat at night,
+  15,240 on stair-side). The classic room keeps all of these sources by
+  design (owner follow-up below).
+- **Probe (weakness 6), pier only.** `InteriorProbe.capture` writes each
+  face camera's view-to-room mapping and the probe eye into the room
+  uniforms and restores them; `AirportLounge.jsx` passes the uniforms for
+  the pier only. The harness now captures the pier probe once per floor,
+  time of day and Night Watch state, as the app does.
+- **Exterior (weakness 2).** `SURF.EXTERIOR`, and anything above the deck
+  beyond the upper glazing outside the stairwell, is shaded as outdoors: the
+  world key shadowed by the solid stairwell box and the upper room as a
+  ~70 % glass box, sky and IBL scaled by how much sky those volumes leave,
+  no glass, practicals or bounce. The black band under the upper runway
+  seat's view is gone.
+- **Mood (weaknesses 4, 13).** `GLOW.READING` = 8 and `GLOW.DISPLAY` = 9
+  get channels of their own (`uLoungeGlow[ 10 ]` in the pier program, `[ 8 ]`
+  in classic); upstairs bounce is 1.2× by day and 0.6× after dark; the
+  cross-room circulation line drops 12 → 3.5 and the upper table lamps rise
+  0.18 → 0.7 (on TABLE; see the integrator's follow-up); pier Night Watch
+  keeps 80 % of the circulation channel; pier glass reflectance rises from
+  3 % to 8 % after dark with a softer knee, so the room shows in the panes.
+- **Surface detail (weakness 11), pier only.** 0.18 m oak boards in random
+  lengths with staggered joints (each board its own patch of the oak map),
+  0.12 m ceiling planks with 6 mm gaps, the four chart prints (two muted
+  sectionals, two approach plates, from `CHART_PANELS`), book spines (cover
+  colour plus a filtered cloth grain). Every line is drawn at its pixel
+  coverage and faded to its mean before it aliases.
+- **Steam** over every cup in `room.steamSources` (14 triangles a cup; each
+  pier cup on its own phase; the classic plume and shader text unchanged).
+- **Sparkle (weakness 7).** Root cause: line-light specular was evaluated
+  at a representative point where the bumped normal faces away, without its
+  own cosine, so `BRDF_GGX`'s visibility term blew up (measured 56×
+  over-bright glints). The specular now carries its own N·L, the lobe widens
+  with the fixture's size over distance, and faded reed relief moves into
+  roughness. Isolated single-pixel glints: stair-foot night 199 → 12, bar
+  night 9 → 3 (the remainder attributed to the harness's runway lights and
+  two real downlight discs).
+- New gate `verify-lounge-light.mjs` (8 checks).
+
+### FURNISH — geometry and dressing (`8e42f02`)
+
+- **Bar unburied (weakness 3).** `LOUNGE_PIER_ROOM.bar.counterX` 8.55 →
+  8.45: the back bar's wall plane lands on the right wall's inner face and
+  the onyx (x 11.17–11.19) stands in front of the plaster instead of 70 mm
+  inside it; blockers, shadow boxes, floor AO and practicals ride the same
+  transform.
+- **Stair (weaknesses 7, 8).** One continuous travertine stringer along the
+  rake (50 mm proud, top 60 mm above the nosings, over a 40 mm shadow gap
+  with a dark kick; the east balusters fix to its face) replaces the 28
+  exposed block faces; a bronze trim (40 mm tall, 24 mm proud) covers the
+  y = 4.6 seam on the stair wall; the under-handrail light is a 22 mm opal
+  diffuser 13 mm below a bronze channel (same light, same channel).
+- **Upper room (weaknesses 1, 9, 12).** A reading nook with a new vantage
+  seat `upper-nook` ("Upper reading nook"; wool chair, teal cushion, the
+  contracted nook rug, side table with `CUP_NOOK` and a paperback, a satin
+  bronze floor lamp with one `GLOW.READING` spot practical, a fiddle-leaf
+  fig); a walnut library on the west wall behind the top landing (about 90
+  books as 12-triangle boxes on `SURF.SPINES`, flat stacks and a lean,
+  bookends, a framed photograph, a `GLOW.DISPLAY` picture light practical);
+  the credenza as a coffee station (espresso machine, both contracted cups,
+  a tray with sugar bowl, spoons and stacked cups; the ready light is an
+  amber lens, not an emitter); a slim oak console of three first-party desk
+  models against the east glazing (high-wing single, twin-jet, four-engine
+  with a hump; scenery, never contacts); a rear-facing seat `upper-east`
+  ("Upper rear corner") with a side table; a snake plant in the back-east
+  corner.
+- **Stair wall and lower roof.** Four framed chart prints exactly on
+  `CHART_PANELS` (print face x = −11.16, frame back 20 mm off the wall); the
+  lower roof finished for the upstairs view (`SURF.EXTERIOR` ballast 30 mm
+  over the deck, paver borders and two paths, a bronze coping and parapets,
+  three planter troughs, an exterior skin on the stairwell's east return),
+  all under the upper seats' line to the runway.
+- **Fixtures.** Both free practicals used (32 / 32). Shadow boxes 47 / 48:
+  the two existing upper chairs were consolidated from three boxes to two
+  each (`shadowChairPair`), freeing two rows, and nine were added.
+- `geometry-kit.js` gains `block()` (12 triangles) and `frameRing()` (32
+  triangles); helper options default to the classic output. Pier AO
+  re-baked. `verify-lounge-upper.mjs` 8 → 15 checks; `verify-lounge-pier.mjs`
+  checks all eight chairs, the upper seat order and reachability.
+- Deviations (FURNISH's, with reasons): the fig stands in the nook corner
+  (−7.95, 9.1), not at the plan's (−6.9, 13.55), where its canopy blocker
+  crossed the scout's own `KEEP_CLEAR` sightline corridor (contract
+  conflict, reported, contract not edited); a snake plant replaces the olive
+  (an olive canopy crossed both glazings and overhung the coffee machine);
+  no ceiling beams (the circulation diffuser runs across the ceiling at
+  z 11); no further rugs (an undeclared rug would make `surfaceAt()` lie);
+  no lamp at `upper-east` (the fixture table is full).
+
+### LIFE — capabilities, feel, motion, sound, HUD
+
+- **Footsteps that know the floor (weakness 10).** `cue('step', { surface })`
+  from `surfaceAt()` and `roomDressing('pier')`: stone is the old scuff node
+  for node; oak a warm low-passed scuff over a damped 190–240 Hz body tone; a
+  rug a muffled 380 Hz low-pass, quieter; a tread oak's knock a little higher
+  plus a ~360 Hz hollow riser resonance. Every node is released when its
+  sources end. The classic `cue('step')` is unchanged.
+- **The stair (weakness 10).** One footfall per 0.54 m of horizontal travel
+  on the flight (measured 0.538 m), and the bob's vertical becomes a
+  camera-only stepped lift (12 mm peak, eased, zero mean, faded in and out
+  over the first and last tread pair). Speed along the incline and FOV
+  unchanged; exactly zero under reduced motion.
+- **Two floors that sound different.** The room bus crossfades with eye
+  height (smoothstep 2.2 → 5.6 m): upstairs the murmur −6.02 dB, ventilation
+  and hum ×0.7, the glass path's cutoff ×1.22 and level ×1.15. The PA chime is
+  unchanged; the classic graph is never written. The header names the place
+  standing in the pier (Lower lounge / Staircase / Upper observation room);
+  no chime, no toast.
+- **Décor worth a closer look (weakness 9).** The model display, the stair
+  charts, the library and the coffee station (`INSPECTABLES`) are offered
+  only once built, from their own floor, within reach, nearly still
+  (< 0.3 m/s), facing within 25° and in clear sight; Enter, a click on the
+  prompt or on the piece opens a calm card (`DecorCard.jsx`); Enter or Esc
+  closes it and focus returns. No camera move, rewards or persistence; works
+  with the instruments off. New gate `verify-lounge-life.mjs` (13 checks).
+- **An upstairs listening window** (`LOUNGE_INSTRUMENTS`) at exactly the
+  reserved position (4.48, 5.72, 8.3), the lower windows' instrument on the
+  upper floor with a joined satin pedestal, +1,010 instrument triangles, its
+  face in the atlas's free band (x 0–256, y 160–256); the live face is the
+  station in use.
+- **The seat menu by floor** (pier): "Lower lounge" / "Upper room", focus in
+  on open, arrows / Home / End between rows, focus back on close, all eight
+  seats fit at 720 px; cross-floor glides keep the comfort fade. The classic
+  menu's server-rendered markup is identical to before.
+- Gates: `verify-airport-audio` 16 → 18, `verify-lounge-elevation` 7 → 11,
+  `verify-lounge-observatory` 23 → 24, `verify-observatory-presentation`
+  extended.
+
+### Integrator — certification and cross-lane fixes
+
+- **The pier onyx read the wrong axes** (reported by FURNISH; LIGHT's file).
+  The emissive shader drew veining and vignette from the room's (x, y),
+  written for the classic back wall; in the pier the whole panel sits at
+  x = 11.18, so the veins ran flat and the vignette held at ×0.65. The pier
+  emissive program now reads the panel's own (z about the bar's centre, y)
+  (`8389eb1`, key `lounge-emissive-v2-pier-v2`); the classic program text is
+  unchanged and `verify-lounge-light` now asserts both. Harness `bar` night
+  shows the veining (`final/pier-bar-night.png`).
+- **Upstairs lamps on two curves.** LIGHT documented READING as "reading and
+  table lamps upstairs", but the seats' table lamps stayed on TABLE and every
+  opal shade glowed on TABLE, so the nook lamp's shade and its light ran on
+  different curves. `tableLamp` takes an optional group (classic calls
+  unchanged), the upper lamps pass `GLOW.READING`, and a pier opal shade
+  above the upper floor glows on READING (`8389eb1`). At LIGHT's power 0.7
+  that made the pools 1.5× brighter after dark and the table tops clipped to
+  white in the harness (upper-west night), so `16a92a8` sets 0.47 on
+  READING, LIGHT's certified night pool (0.7 × 1.0 = 0.47 × 1.5), with the
+  lamps barely on by day as READING intends.
+- **The roof troughs read as sticks.** From the upper runway seat each
+  trough's 22 upright olive-sprig cards read as a row of separate twisted
+  sprigs. They are now 20 tufts of three splayed cards each (`frame()` yaw
+  and an outward lean), warmer and lower (about 0.25 m above the soil): a
+  continuous low hedge from the seats (`dad1477`, +456 triangles; pier AO
+  re-baked; `verify-lounge-upper`'s runway-sightline check holds).
+- **Two card texts were wrong** (`5c8487e`): the stair carries two
+  sectionals and two approach plates, not "an approach plate"; the coffee
+  tray holds sugar and stacked cups, not saucers. Text only, in the W0
+  contract module; ids, positions, bounds and reach unchanged.
+
+### Final budgets (tree `16a92a8`)
+
+| Resource | Before the pass | Final | Ceiling |
+|---|---|---|---|
+| Draws, pier room + instruments | 14 | 14 | 14 |
+| Triangles, pier room + instruments | 138,922 | **157,474** (room 148,808 + instruments 8,666) | plan 158,500; sanctioned 160,000 |
+| — of which | | FURNISH +17,044 · LIGHT +42 (steam) · LIFE +1,010 · integrator +456 | |
+| Textures | 23.96 MiB | 23.96 MiB (no new allocation) | 24 MiB |
+| Practicals | 30 | 32 | 32 (table fixed) |
+| Shadow boxes | 40 | 47 | 48 (table fixed) |
+| Room uniform vectors | 20 | 22 | LIGHT 24; gate 32 |
+| Lights added | 0 | 0 | 0 |
+| Classic room (room-only gate) | 12 draws · 120,198 · 21.9 MiB · 28 practicals · 20 vectors | identical | |
+| Classic room + instruments | 123,890 · 23.86 MiB | identical | 140,000 |
+
+### Gates and checks on the final tree
+
+- `node --no-warnings scripts/lounge-pass-gates.mjs`: **PASS all 29** — the
+  26 standard gates (the 25 the pass depends on plus
+  `verify-lounge-second-level.mjs`), `verify-lounge-light.mjs`,
+  `verify-lounge-life.mjs` and the classic invariant line
+  (12 draws · 120198 triangles · 21.9 MiB · 28 practicals). Run on the
+  merged lane tip `3798492` before any integrator change, after the
+  integrator fixes, and again on the final tree before the record push.
+- `git diff 204d5eb -- public/models/lounge-ao-v1.bin`: empty (classic AO
+  bake untouched). The pier bake matches the final geometry
+  (`verify-airport-lounge --pier`, `verify-lounge-upper`, signature
+  `de400714`).
+- Seam files (`FlyScene.jsx`, `PlayerPlane.jsx`, `TrafficLayer.jsx`,
+  `operations-runtime.js`, `ops-flags.js`): no diff since `204d5eb`;
+  `verify-ops-golden` 28 / 28.
+- `LOUNGE_PIER` and `LOUNGE_INSTRUMENTS`: still `{ enabled: false }`.
+- ESLint on all 37 changed JS / JSX / MJS / CJS files: clean except nine
+  errors that are identical on `204d5eb` (eight `react-hooks` errors in
+  `AirportLounge.jsx`, one `set-state-in-effect` in `LoungeHud.jsx`; counted
+  on both trees). `git diff --check`: clean.
+- Production build (`FLY_BUILD_DIR=.next-pass … next build --webpack`):
+  succeeds on `3798492` and on the final code tree `16a92a8` (build ID
+  `sCGAtOdG0TI4zrVMft9h0`); `.next-pass` removed afterwards.
+
+### Harness evidence
+
+Under `/home/user/skyloom/.graphics-review/lounge-second-level/` (local,
+gitignored), all 1280×720 from `scripts/render-lounge-room.cjs` on
+SwiftShader:
+
+- `final/` — the final tree: 14 pier poses × day / golden / night, the
+  app's shader, no `SAFE_BUMP` (42 / 42 at 0 non-finite pixels, zero page,
+  shader or console errors), sheets `sheet-pier*.png`, `stats-pier.json`,
+  run log `final-run-pier.log`.
+- `final/compare/` — labelled BEFORE | AFTER sheets against the scout's
+  `before/` (exactly the app's shader then, so its magenta marks the
+  non-finite pixels): `before-after-{day,golden,night}.png` and
+  `-lower` / `-upper` halves of each.
+- `final/classic/` — classic window seat, wide view and bar, day and night.
+  Against `before-classic/`: window seat 0 px and wide view 9 px of 921,600
+  differ (run-to-run noise on that pose is 2–11 px); classic non-finite
+  counts are unchanged (28,709 window seat, 3,166 wide view).
+- Lane evidence: `light/` (incl. `before-after-light.png`, Night Watch set),
+  `furnish/` (incl. `closeups/` of the nook, library, coffee station, models,
+  east seat and seam), `life/` (the listening window close up and static
+  mocks of the décor prompt, card and grouped seat menu), and `int-work/`
+  (the integrator's A/B crops).
+
+What the harness does not reproduce: the world (a procedural sky and one
+ground plane 18 m down), CSM shadows (one directional plus one hemisphere
+light carrying the app's values), N8AO, aerial perspective, immersive clouds,
+the grade and vignette, TRUE_SCALE anisotropy, the app's bloom (UnrealBloom
+stands in), the HUD, the walk controller, audio and live traffic (boards read
+"QUIET SKIES", instrument screens "WAITING FOR FRESH POSITIONS"). Times are
+meaningless. The real app could not be run here (no GPU, and the container is
+blocked from Esri, OpenFreeMap and ADS-B, so no airport loads): the HUD,
+focus handling and sounds are verified by node gates, server-rendered markup
+and LIFE's static mocks only.
+
+### Adversarial review
+
+Reviewed the combined diff from `204d5eb` for cross-lane interactions,
+coplanar faces, aliasing, sightlines, blockers, disposal, shader forks,
+reduced motion, keyboard paths and classic leakage.
+
+Fixed: the pier onyx axes; the upstairs lamp channel split (and the
+over-bright first attempt at it); the roof troughs' look; the two card
+texts (all above).
+
+Checked and found sound: chart frames sit 20 mm off the wall and clear of
+the dado trim; the seam trim's back face is opposite-facing against the wall;
+the roof's coping, paver and ballast faces never share a visible plane; steam
+sources match the built cups (contract gate); `FOOTSTEP_SURFACES` rugs match
+the built rugs (BVH casts); every new piece of upper furniture has a walk
+blocker (`verify-lounge-upper` "everything at body height has a walk
+footprint"); the new seats' approaches connect (`verify-lounge-pier`); the
+décor card closes on a stride, a seat, the binoculars, the seat menu, an
+instrument or leaving; Enter on the focused card cannot reopen it (the card
+counts as a control); `surfaceStep` disconnects every node; no per-frame
+define changes (the glass `uF0` and steam phases are uniforms / attributes);
+the stair lift and bob are exactly zero under reduced motion; no debug
+leftovers in the diff.
+
+Not fixed, recorded:
+
+- **Dotted rug edges.** Every rug (classic and pier, the new nook rug
+  included) shows a row of evenly spaced dark dots along its rounded rim at
+  a grazing view (`int-work/crop-rug-border.png`): the 6 mm quarter-round rim
+  is a sub-pixel band at a slight slope, so it rasterises in periodic dots.
+  Pre-existing (`before/`), shared with the classic rug helper, and likely
+  much weaker at the owner's 2× DPR; a pier-only rug rim was not worth
+  re-baking every pier rug blind.
+- The décor HUD polls the walk state at 8 Hz in both rooms (cheap; no visible
+  effect in classic, whose markup is unchanged).
+- Remaining harness glints on pre-existing geometry: the credenza's rounded
+  corner and the east mullions at night (`furnish/closeups/pier-coffee-night.png`).
+- The exterior predicate is positional (y > 4.62, z < 8, outside the
+  stairwell): any future pier geometry placed there shades as outdoors.
+
+### Deferred
+
+- A pool of light at the coffee station: the fixture table is full. LIGHT's
+  suggestion, for the owner: retire the lower downlight at (8.9, 4.55, 9)
+  (the bar pendant 0.3 m away covers that spot) and give its slot to a small
+  DISPLAY spot over the station.
+- Book spines have no bands or titles (book extents are not in the
+  contract); no dust motes in the sun (restraint, and the steam overlay has
+  no reduced-motion input); no ceiling beams; no lamp at `upper-east`; no
+  more rugs.
+- **Classic owner follow-ups** (kept byte-identical by rule): the classic
+  room still has the shader NaN sources (28,709 non-finite px from the
+  window seat at night in the harness), the camera-dependent probe and the
+  line-light specular singularity that LIGHT fixed for the pier.
+- The fig's placement and the snake plant in place of the olive are the
+  owner's call; the middle and back of the 22 m upper room are still fairly
+  open because the triangle plan is nearly spent (1,026 triangles left).
+
+### Owner checkpoints (RTX 5080 + the real app)
+
+Load `?flags=LOUNGE_PIER,LOUNGE_INSTRUMENTS` at KCMH and walk lower lounge →
+stair → upper room at day, golden hour and night:
+
+1. **Bar:** the onyx glows behind the bottles with soft veining, brighter
+   toward its centre (compare the classic bar).
+2. **Stair:** one continuous stringer facing the lounge; the four chart
+   prints stepping up with the rake (readable, not shimmering, as you climb);
+   no dotted line at the y = 4.6 seam or under the handrail; no sparkle field
+   at the stair foot at night. Feel the 0.54 m cadence and the 12 mm stepped
+   lift (`LOUNGE_FEEL.stair`) and confirm reduced motion removes the lift.
+3. **Upper room, day:** airy and evenly lit; oak boards visible but calm at
+   grazing angles (no moiré); planked ceiling; the library facing you at the
+   head of the stair; the nook, models, coffee station and rear seat reading
+   as a furnished room with clear walkways.
+4. **Upper runway seat:** the lower roof is a lit, composed surface (ballast,
+   pavers, coping, the three planted troughs) instead of a black band;
+   whether the sunlit membrane is too bright at a high sun.
+5. **Night:** warm pools at the nook lamp and the two seat lamps, the
+   picture light on the library, legible circulation; the upper room is
+   darker overall than before (LIGHT's harness measurement: top-landing
+   lower-half mean luma 57 → 29, part of the old brightness was glare) — tunables in
+   `room-build.js upperRoom` (circulation line 3.5, table lamps 0.47 on
+   READING) and the `CHANNEL` curves in `room-shading.js`. Try Night Watch.
+   The room should show in the night glass, upstairs and down.
+6. **Décor:** stand still facing the models, the charts, the library or the
+   coffee station: the prompt appears only then; Enter or a click opens the
+   card, Enter or Esc closes it and focus returns; it works with
+   `?flags=LOUNGE_PIER` alone.
+7. **Seats:** V opens the menu grouped Lower lounge / Upper room with focus
+   on your seat; arrows move between rows; cross-floor glides keep the
+   comfort fade; sit in `upper-nook` and `upper-east`.
+8. **Sound:** footsteps on travertine, oak, the rugs and the treads; the
+   upstairs room tone (quieter murmur, softer HVAC, the outside a little more
+   present) against downstairs (`LOUNGE_FEEL.steps`, `LOUNGE_FEEL.ambience`).
+   Nothing in the audio has been heard yet.
+9. **Instruments:** the upstairs listening window stands on its pedestal at
+   the front glass and offers its control only on the upper floor.
+10. **Flags off** (and `?flags=-LOUNGE_PIER,-LOUNGE_INSTRUMENTS`): the classic
+    room looks, walks and sounds as before.
+
+Every fps, frame-time, glare, aliasing and comfort verdict above is the
+owner's to make on the RTX 5080; the harness can only say the pixels are
+finite and the shapes are where the plan put them.
