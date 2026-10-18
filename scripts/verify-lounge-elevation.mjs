@@ -1,4 +1,9 @@
 // The real pier geometry + existing walk controller, without a browser/GPU.
+// Since the second-level pass (LIFE) also the stair you can feel: a footfall
+// per tread pair on the flight and per 0.72 m stride on the floors, each
+// naming its surface; the classic room's plain cue; the camera-only stepped
+// lift (<= 15 mm, low at each footfall, eased, faded at both ends of the
+// flight) and nothing at all under reduced motion.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { registerHooks } from 'node:module';
@@ -125,6 +130,117 @@ test('Upper glazing admits real window rays, while steep views through the lower
   const features = { buildings: [], occluderRevision: 1, occluders: [], tiles: { requested: 1, loaded: 1, failed: 0 } };
   const rows = observationContacts(tracks, { ...context, features });
   assert.equal(rows[0].viewpointLevel, 'upper'); assert.equal(rows[0].bestView, 'front'); assert.equal(rows[0].bestViewLabel, 'Upper front window');
+});
+
+// --- The stair you can feel (second-level pass, LIFE; LOUNGE_FEEL.stair) ---------------------------------
+// A pier walk with a recording audio double: every footstep cue with its
+// options and where it fell, and the camera-only bob each frame.
+const { LOUNGE_FEEL, WALK } = await import('../lib/fly/observation-config.js');
+const { stairWeight, stairLift, footstepSurface } = await import('../lib/fly/lounge/lounge-life.mjs');
+const { roomDressing } = await import('../lib/fly/lounge/room-build.js');
+const S = plan.upper.stair, F = LOUNGE_FEEL.stair;
+function pierWalk({ reduced = false, variant = 'pier', start = { x: 0, y: 1.65, z: 2.8 } } = {}) {
+  window.matchMedia = () => ({ matches: reduced });
+  const cues = [], frames = [];
+  const watch = { active: true, validated: true, site: { variant }, frame: { k: 1 }, posture: 'standing', eyeLocal: { ...start }, yaw: 0, pitch: 0, binocular: false, publish() {} };
+  const detach = attachLoungeWalk(watch, { airportAudio: { cue: (...args) => cues.push({ args, x: watch.eyeLocal.x, z: watch.eyeLocal.z, floorId: watch.walk.floorId, bob: watch.walk.bob.y }) } });
+  const walk = watch.walk;
+  let now = 0, leg = 0;
+  const go = (axis, target, yaw) => {
+    leg++;
+    watch.yaw = yaw; walk.setMoveKeys(1, 0, false);
+    const sign = Math.sign(target - watch.eyeLocal[axis]);
+    for (let i = 0; i < 1500 && sign * (target - watch.eyeLocal[axis]) > .025; i++) {
+      walk.update(1 / 60, now += 1 / 60);
+      const e = watch.eyeLocal;
+      frames.push({ leg, x: e.x, y: e.y, z: e.z, floorId: walk.floorId, bob: walk.bob.y, sway: walk.bob.x, speed: walk.speed });
+    }
+    walk.setMoveKeys(0, 0, false); walk.halt();
+  };
+  return { watch, walk, cues, frames, go, detach: () => { detach(); window.matchMedia = () => ({ matches: false }); } };
+}
+const fullStair = (z) => z > S.z0 + F.strideM && z < S.z1 - F.strideM;
+
+test('Pier footsteps: one per tread pair (0.54 m horizontal) on the flight and one per 0.72 m stride on the floors, each naming the surface it lands on', () => {
+  const p = pierWalk();
+  p.go('x', -10, Math.PI / 2); p.go('z', 11.9, Math.PI); p.go('x', -7.5, -Math.PI / 2); p.go('x', 0, -Math.PI / 2);
+  const steps = p.cues.filter((c) => c.args[0] === 'step');
+  assert.ok(steps.every((c) => c.args.length === 2 && typeof c.args[1].surface === 'string'), 'every pier footstep names its surface');
+  const tread = steps.filter((c) => c.args[1].surface === 'tread');
+  const inner = tread.filter((c) => fullStair(c.z));
+  const gaps = inner.slice(1).map((c, i) => c.z - inner[i].z);
+  assert.ok(gaps.length >= 9 && gaps.every((g) => Math.abs(g - F.strideM) < 0.03), `tread-pair cadence: ${gaps.map((g) => g.toFixed(3)).join(' ')}`);
+  assert.ok(tread.length >= 13 && tread.length <= 15, `${tread.length} footfalls over the ${(S.z1 - S.z0).toFixed(2)} m flight`);
+  assert.ok(steps.filter((c) => c.floorId === 'lower').every((c) => c.args[1].surface === 'stone'), 'the lower floor is travertine');
+  const lower = steps.filter((c) => c.floorId === 'lower' && Math.abs(c.z - 2.8) < 1e-9); // the straight first leg
+  const flatGaps = lower.slice(1).map((c, i) => Math.abs(c.x - lower[i].x));
+  assert.ok(lower.length >= 10 && flatGaps.every((g) => Math.abs(g - WALK.bob.strideM) < 0.03), `the lower floor: a footfall every ${WALK.bob.strideM} m (${flatGaps.map((g) => g.toFixed(3)).join(' ')})`);
+  const upper = steps.filter((c) => c.floorId === 'upper');
+  assert.ok(upper.some((c) => c.args[1].surface === 'oak') && upper.some((c) => c.args[1].surface === 'rug'), 'upstairs: oak boards, then the rug');
+  for (const c of upper) assert.equal(c.args[1].surface, c.x > -3.95 ? 'rug' : 'oak', `upstairs at x ${c.x.toFixed(2)}`);
+  // The run-ins of the stair layer are flat floor: stone below the flight, oak above it.
+  assert.ok(steps.filter((c) => c.floorId === 'stairs' && c.z < S.z0).every((c) => c.args[1].surface === 'stone'));
+  assert.ok(steps.filter((c) => c.floorId === 'stairs' && c.z > S.z1).every((c) => c.args[1].surface === 'oak'));
+  p.detach();
+  const built = roomDressing('pier');
+  assert.equal(footstepSurface('lower', -5.4, 6.5, built), 'rug', 'the lounge group\'s rug');
+  assert.equal(footstepSurface('lower', 4.4, 6.6, built), 'rug', 'the communal table\'s rug');
+  assert.equal(footstepSurface('upper', -6.5, 9.4, built), 'rug', 'the nook rug, built');
+  assert.equal(footstepSurface('upper', -6.5, 9.4, []), 'oak', 'a contracted rug that is not built is bare oak');
+  assert.equal(footstepSurface('stairs', -10, 7, built), 'tread');
+});
+
+test('The classic room\'s footsteps are the plain cue, exactly as before (no surface, the 0.72 m stride)', () => {
+  const p = pierWalk({ variant: 'classic', start: { x: 0, y: 1.65, z: 3.2 } });
+  p.go('z', 7.2, Math.PI);
+  const steps = p.cues.filter((c) => c.args[0] === 'step');
+  assert.ok(steps.length >= 4 && steps.every((c) => c.args.length === 1), 'cue(\'step\') with no options');
+  const gaps = steps.slice(1).map((c, i) => c.z - steps[i].z);
+  assert.ok(gaps.every((g) => Math.abs(g - WALK.bob.strideM) < 0.03), gaps.join(' '));
+  assert.equal(p.walk.inspectOffer, null); assert.equal(p.walk.inspecting, null);
+  p.detach();
+});
+
+test('The stair\'s stepped lift: camera-only, at most 15 mm, low at each footfall, faded in and out over the end tread pairs, eased (no pop); the eye stays on the ramp and the pace along the incline is unchanged', () => {
+  assert.ok(F.liftM <= 0.015, 'LOUNGE_FEEL.stair.liftM <= 15 mm');
+  let peak = 0;
+  for (let u = 0; u < 1; u += 0.001) peak = Math.max(peak, Math.abs(stairLift(u)));
+  assert.ok(Math.abs(peak - F.liftM) < 1e-4, 'the profile peaks at liftM: ' + peak);
+  assert.ok(Math.abs(stairLift(0) - stairLift(1)) < 1e-12 && Math.abs(stairLift(0.9999) - stairLift(0)) < 1e-4, 'continuous across footfalls');
+  assert.ok(stairLift(0) < -0.9 * F.liftM, 'low at the footfall');
+  assert.equal(stairWeight('stairs', S.z0), 0); assert.equal(stairWeight('stairs', S.z1), 0);
+  assert.equal(stairWeight('stairs', S.z0 + F.strideM), 1); assert.equal(stairWeight('stairs', (S.z0 + S.z1) / 2), 1);
+  assert.equal(stairWeight('upper', 7), 0); assert.equal(stairWeight('lower', 7), 0);
+  const p = pierWalk({ start: { x: -10, y: 1.65, z: 2.8 } });
+  p.go('z', 11.9, Math.PI); p.go('z', 2.8, 0);
+  const onFlight = p.frames.filter((f) => f.floorId === 'stairs');
+  assert.ok(onFlight.length > 300, 'frames on the stair: ' + onFlight.length);
+  let maxBob = 0, maxStep = 0;
+  for (let i = 0; i < p.frames.length; i++) {
+    const f = p.frames[i];
+    assert.ok(Math.abs(f.y - 1.65 - W.floorHeight(space, f.x, f.z, f.floorId)) < 1e-12, `the eye rides the ramp exactly (z ${f.z.toFixed(3)})`);
+    assert.ok(f.speed <= WALK.speedMps + 1e-8, 'pace along the incline ' + f.speed);
+    if (f.floorId === 'stairs') maxBob = Math.max(maxBob, Math.abs(f.bob));
+    // Within a leg (each leg ends in a hard halt(), the binoculars' stop, not a key release).
+    if (i && p.frames[i - 1].leg === f.leg) maxStep = Math.max(maxStep, Math.abs(f.bob - p.frames[i - 1].bob));
+  }
+  assert.ok(maxBob <= 0.015 + 1e-12 && maxBob > 0.008, `lift peak ${(maxBob * 1000).toFixed(2)} mm`);
+  assert.ok(maxStep < 0.006, `eased: the camera moves at most ${(maxStep * 1000).toFixed(2)} mm in a 60 Hz frame`);
+  const footfalls = p.cues.filter((c) => c.args[0] === 'step' && c.floorId === 'stairs' && fullStair(c.z));
+  assert.ok(footfalls.length >= 20 && footfalls.every((c) => c.bob < -0.6 * F.liftM), `low at each footfall: ${footfalls.map((c) => (c.bob * 1000).toFixed(1)).join(' ')}`);
+  p.detach();
+});
+
+test('Reduced motion: no lift and no bob anywhere on the stair (the cadence of the footsteps is unchanged)', () => {
+  const p = pierWalk({ reduced: true, start: { x: -10, y: 1.65, z: 2.8 } });
+  p.go('z', 11.9, Math.PI);
+  assert.ok(p.frames.length > 300);
+  for (const f of p.frames) assert.ok(f.bob === 0 && f.sway === 0, `z ${f.z.toFixed(3)}: bob ${f.bob}, sway ${f.sway}`);
+  assert.deepEqual(p.walk.bob, { x: 0, y: 0 });
+  const inner = p.cues.filter((c) => c.args[0] === 'step' && c.args[1]?.surface === 'tread' && fullStair(c.z));
+  const gaps = inner.slice(1).map((c, i) => c.z - inner[i].z);
+  assert.ok(gaps.length >= 9 && gaps.every((g) => Math.abs(g - F.strideM) < 0.03), gaps.join(' '));
+  p.detach();
 });
 
 console.log(`\nLounge elevation: ${passed} passed, ${failed} failed.`);

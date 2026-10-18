@@ -9,7 +9,12 @@
 // engine and lowers a receding one; the listener is the observer's eye
 // (watch.eyeWorld, which walks with LOUNGE_WALK); mute, a hidden tab and leaving silence
 // everything; a footstep (LOUNGE_WALK) is a short scuff into the room bus;
-// leaving tears the graph down and dispose releases every node.
+// the pier room's footsteps (LOUNGE_FEEL.steps) give oak, rug and tread their
+// own short graphs into the room bus, each released once its sources end, while
+// stone (and the classic cue) stays the scuff node for node; the pier's room
+// tone follows the eye upstairs (murmur -6 dB, softer ventilation, the glass a
+// little more open) and lands exactly on each floor, and the classic room
+// never touches it; leaving tears the graph down and dispose releases every node.
 //
 // Run: node scripts/verify-airport-audio.mjs
 import assert from 'node:assert/strict';
@@ -18,7 +23,7 @@ import {registerHooks} from 'node:module';
 import {fileURLToPath} from 'node:url';
 registerHooks({resolve(s,c,next){if(s.startsWith('@/'))s=new URL('../'+s.slice(2),import.meta.url).href;if(s.startsWith('.')||s.startsWith('file:')){const u=new URL(s,c.parentURL);if(fs.existsSync(fileURLToPath(u)+'.js'))return next(u.href+'.js',c);}return next(s,c);}});
 const {AirportAudio,retarded}=await import('../lib/fly/airport-audio.js');
-const {SOUNDSCAPE,WALK}=await import('../lib/fly/observation-config.js');
+const {SOUNDSCAPE,WALK,LOUNGE_FEEL}=await import('../lib/fly/observation-config.js');
 
 globalThis.document={hidden:false};
 let clock=1000;
@@ -119,6 +124,94 @@ await check('footsteps: a step is a short scuff into the room bus (so it fades a
     for(const g of made){assert.equal(g.to,audio.graph.bus,'into the room bus');assert.ok(g.gain.value>=WALK.footstepGain*0.8-1e-12&&g.gain.value<=WALK.footstepGain*1.2+1e-12,'level '+g.gain.value);}
     assert.ok(new Set(made.map(g=>g.gain.value)).size>1,'no two steps alike');
   }finally{ctx.createGain=cg;}
+});
+// --- the pier room (second-level pass, LIFE): surface footsteps and the upstairs room tone ---
+// Record every node a call builds: what it connects to, every gain level it is
+// given (a knock ramps up then away, so its peak is the largest value written),
+// and how often it is released.
+const capture=(fn)=>{
+  const made=[],orig={};
+  for(const k of ['createGain','createBiquadFilter','createBufferSource','createOscillator']){
+    orig[k]=ctx[k];
+    ctx[k]=(...a)=>{
+      const n=orig[k](...a);n.kind=k;n.to=[];n.released=0;
+      const c=n.connect,d=n.disconnect;n.connect=(t)=>{n.to.push(t);return c.call(n,t);};n.disconnect=()=>{n.released++;return d.call(n);};
+      if(n.gain){const g=n.gain;g.written=-Infinity;for(const m of ['setValueAtTime','exponentialRampToValueAtTime','setTargetAtTime']){const f=g[m];g[m]=(x,...r)=>{g.written=Math.max(g.written,x);return f.call(g,x,...r);};}Object.defineProperty(g,'peak',{get(){return Math.max(g.written,g.value);}});}
+      made.push(n);return n;
+    };
+  }
+  try{fn();}finally{Object.assign(ctx,orig);}
+  return made;
+};
+await check('surface footsteps (pier): oak, rug and tread each build their own short graph into the room bus, at levels around WALK.footstepGain, stop themselves and release every node once their sources end',()=>{
+  for(const surface of ['oak','rug','tread']){
+    const S=LOUNGE_FEEL.steps[surface];
+    for(let rep=0;rep<12;rep++){
+      const made=capture(()=>audio.cue('step',{surface}));
+      const sources=made.filter(n=>n.kind==='createBufferSource'||n.kind==='createOscillator');
+      const sinks=made.filter(n=>n.to.includes(audio.graph.bus));
+      assert.ok(sources.length>=1&&sources.every(s=>s.started),`${surface}: every source starts`);
+      assert.ok(sinks.length>=1&&sinks.every(n=>n.kind==='createGain'),`${surface}: into the room bus, through gains`);
+      for(const n of sinks)assert.ok(n.gain.peak<=WALK.footstepGain*1.2+1e-12&&n.gain.peak>=WALK.footstepGain*0.3-1e-12,`${surface}: level ${n.gain.peak}`);
+      const oscs=made.filter(n=>n.kind==='createOscillator'),filters=made.filter(n=>n.kind==='createBiquadFilter');
+      if(surface==='rug'){
+        assert.equal(oscs.length,0,'a rug has no body tone');
+        assert.ok(filters.length===1&&filters[0].type==='lowpass'&&filters[0].frequency.value<=500,'muffled: one low lowpass');
+        assert.ok(sinks[0].gain.peak<=WALK.footstepGain*S.level*1.2+1e-12&&S.level<1,'and quieter');
+      }else{
+        assert.equal(oscs.length,1,surface+': one body tone');
+        const hz=oscs[0].frequency.value;
+        assert.ok(hz>=S.knockHz[0]-1e-9&&hz<=S.knockHz[1]+1e-9,`${surface}: body tone ${hz} Hz in its band`);
+        if(surface==='oak')assert.ok(hz>=180&&hz<=260,'oak knocks in the 180-260 Hz band');
+        const hollow=filters.filter(f=>f.type==='bandpass');
+        assert.equal(hollow.length,surface==='tread'?1:0,surface+': the riser resonance only on a tread');
+        if(surface==='tread')assert.ok(Math.abs(hollow[0].frequency.value/S.hollowHz-1)<=0.05+1e-9,'the hollow riser near '+S.hollowHz+' Hz');
+      }
+      const ends=sources.map(s=>s.onended);
+      assert.ok(ends.every(f=>typeof f==='function'),'each source cleans up when it ends');
+      for(let i=0;i<ends.length-1;i++)ends[i]();
+      if(ends.length>1)assert.ok(made.every(n=>n.released===0),'nothing is released while a source still plays');
+      ends.at(-1)();
+      assert.ok(made.every(n=>n.released===1),`${surface}: every node released once (${made.filter(n=>!n.released).map(n=>n.kind)})`);
+    }
+  }
+  const stoneDefault=capture(()=>audio.cue('step')),stone=capture(()=>audio.cue('step',{surface:'stone'}));
+  for(const made of [stoneDefault,stone]){
+    assert.deepEqual(made.map(n=>n.kind),['createBufferSource','createBiquadFilter','createGain'],'stone is the travertine scuff, node for node');
+    assert.deepEqual([made[1].type,made[1].frequency.value,made[1].Q.value],['bandpass',900,0.8]);
+    assert.deepEqual(made[2].to,[audio.graph.bus]);
+  }
+  const a0=allocated;base.muted=true;for(const surface of ['oak','rug','tread'])audio.cue('step',{surface});base.muted=false;
+  assert.equal(allocated,a0,'muted: no surface builds anything');
+});
+await check('the upstairs room tone (pier): with the eye in the upper room the murmur is 6 dB down, the ventilation softer and the glass path a little more open; it moves smoothly over the stair and lands exactly on each floor; the classic room never touches it',()=>{
+  const A=LOUNGE_FEEL.ambience,R=SOUNDSCAPE.room,G=SOUNDSCAPE.glass,g=audio.graph;
+  const read=()=>({murmurK:g.murmurGain.gain.value/(R.murmurGain*g.swell),hvac:g.hvacGain.gain.value,hum:g.humGain.gain.value,cutoff:g.glass.frequency.value,glass:g.glassGain.gain.value});
+  const base0={murmurK:1,hvac:R.hvacGain,hum:R.humGain,cutoff:G.cutoffHz,glass:G.level};
+  // Classic: the eye up high changes nothing, and nothing is even written.
+  let writes=0;const spy=g.hvacGain.gain.setTargetAtTime;g.hvacGain.gain.setTargetAtTime=function(...a){writes++;return spy.apply(this,a);};
+  watch.eyeLocal={x:0,y:6.25,z:10};step(2);
+  assert.equal(writes,0,'classic: the room tone is never shaped');
+  assert.deepEqual(read(),base0);
+  g.hvacGain.gain.setTargetAtTime=spy;
+  watch.site.variant='pier';
+  const at=(y)=>{watch.eyeLocal={x:-10,y,z:7};step(1.2);return read();};
+  const down=at(1.65);
+  for(const k of Object.keys(base0))assert.ok(Math.abs(down[k]-base0[k])<1e-12,`downstairs ${k} ${down[k]} vs ${base0[k]}`);
+  const up=at(6.25);
+  assert.ok(Math.abs(20*Math.log10(up.murmurK)+6.02)<0.01,`murmur ${(20*Math.log10(up.murmurK)).toFixed(2)} dB`);
+  assert.ok(Math.abs(up.hvac-R.hvacGain*A.hvacK)<1e-12&&Math.abs(up.hum-R.humGain*A.hvacK)<1e-12&&A.hvacK<1,'softer ventilation');
+  assert.ok(Math.abs(up.cutoff-G.cutoffHz*A.glassCutoffK)<1e-9&&Math.abs(up.glass-G.level*A.glassLevelK)<1e-12&&A.glassCutoffK>1&&A.glassLevelK>1,'the outside a little more present');
+  const seatedUp=at(5.78),seatedDown=at(1.18);
+  assert.ok(Math.abs(seatedUp.murmurK-up.murmurK)<1e-12&&Math.abs(seatedDown.murmurK-1)<1e-12,'seated eyes read as their floor');
+  let last=0;
+  for(let y=1.65;y<=6.25;y+=0.23){const s=at(y),k=(s.murmurK-1)/(A.murmurK-1);assert.ok(k>=last-1e-9&&k-last<0.2,`smooth over the stair at y ${y.toFixed(2)}: ${k.toFixed(3)} after ${last.toFixed(3)}`);last=k;}
+  const back=at(1.65);
+  for(const k of Object.keys(base0))assert.ok(Math.abs(back[k]-base0[k])<1e-12,`back downstairs ${k}`);
+  const shaped=at(6.25);assert.ok(shaped.murmurK<0.6);
+  watch.site.variant=undefined;step(1.2);
+  assert.deepEqual(read(),base0,'a classic room after the pier gets its built values back');
+  delete watch.eyeLocal;
 });
 await check('directional listening supplements the glass path and releases without altering propagation',()=>{
   const north=track('listen-north',0,-600,{ground:false,y:500,vN:0}),south=track('listen-south',0,600,{ground:false,y:500,vN:0});
