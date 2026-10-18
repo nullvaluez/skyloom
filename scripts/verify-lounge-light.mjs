@@ -65,6 +65,7 @@ check('the classic program carries none of the pier-only code and keeps eight gl
   }
   const em = source(classic.materials.emissive);
   assert.ok(em.includes('uLoungeGlow[ 8 ]') && em.includes('pow( ( vLoungePos.y - 1.5 ) / 1.1, 2.0 )'), 'classic emissive text');
+  assert.ok(em.includes('vec2 q = vLoungePos.xy * vec2( 1.6, 2.3 );') && !em.includes('lgOnyx'), 'classic onyx reads the back wall (x, y)');
   assert.equal(classic.materials.emissive.customProgramCacheKey(), 'lounge-emissive-v2');
   assert.equal(classic.uniforms.uLoungeGlow.value.length, GLOW_CHANNELS.classic);
 });
@@ -80,7 +81,9 @@ check('the pier program carries the NaN guards, the exterior, the surface detail
   }
   const em = source(pier.materials.emissive);
   assert.ok(em.includes(`uLoungeGlow[ ${GLOW_CHANNELS.pier} ]`) && !em.includes('pow( ( vLoungePos.y'), 'pier emissive text');
-  assert.equal(pier.materials.emissive.customProgramCacheKey(), 'lounge-emissive-v2-pier-v1');
+  // The pier's onyx stands on the right wall: its veining and vignette read the panel's (z, y) (integrator fix).
+  assert.ok(em.includes('vec2 lgOnyx = vec2( 7.1 - vLoungePos.z, vLoungePos.y );') && !em.includes('vec2 q = vLoungePos.xy'), 'pier onyx reads its own panel coordinates');
+  assert.equal(pier.materials.emissive.customProgramCacheKey(), 'lounge-emissive-v2-pier-v2');
   assert.equal(pier.uniforms.uLoungeGlow.value.length, GLOW_CHANNELS.pier);
 });
 
