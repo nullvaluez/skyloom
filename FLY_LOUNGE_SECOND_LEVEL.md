@@ -124,6 +124,12 @@ consolidation records it here.
   `room-build.js`), freeing 2 rows. FURNISH then used 9 of the 10 free rows
   (pier 47 / 48 shadow boxes), both free practicals (32 / 32) and +17,044
   room triangles (pier room buckets 131,232 → 148,276).
+- LIFE: +1,010 instrument triangles for the upstairs listening window (one
+  more instrument of the lower windows' build; pier instruments 7,656 →
+  8,666, room + instruments 157,018 / plan 158,500). Its face is painted into
+  the existing 1024 × 512 atlas's free band (x 0–256, y 160–256). No draws,
+  textures, lights, practicals or shadow boxes; nothing else in the lane adds
+  geometry.
 
 ## W0 contracts (landed)
 

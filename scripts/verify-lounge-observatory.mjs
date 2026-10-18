@@ -305,6 +305,41 @@ await test('Prepared geometry is retained between refreshes and invalidated by s
   f.watch.floorY = 8; f.o.tick(.3); assert.ok(reads > before);
   f.detach();
 });
+await test('The upstairs listening window (pier): at its reserved place on the upper floor, offered from the upper floor only, and live on its own', async () => {
+  const { RESERVED_STATIONS } = await import('../lib/fly/lounge/upper-dressing.mjs');
+  const reserved = RESERVED_STATIONS.find((r) => r.id === 'upper-front-listen');
+  const upper = observatoryStations('pier').find((s) => s.id === 'upper-front-listen');
+  assert.ok(upper, 'the pier has it'); assert.equal(observatoryStations('classic').some((s) => s.id === 'upper-front-listen'), false, 'the classic room does not');
+  assert.deepEqual([upper.kind, upper.side, upper.floorId, upper.floorY, upper.prompt], ['listen', 'front', 'upper', reserved.floorY, 'Listen through this window']);
+  for (let i = 0; i < 3; i++) assert.equal(upper.position[i], reserved.position[i], 'reserved position ' + i);
+  // Appended last: every existing station keeps its order (and its display tile).
+  assert.equal(observatoryStations('pier').at(-1).id, 'upper-front-listen');
+  const blockers = roomBlockers('pier');
+  const eye = { x: 4.48, y: 6.25, z: 9.0 };
+  const near = stationState(upper, { eye, yaw: 0, blockers });
+  assert.equal(near.nearby, true); assert.equal(near.available, true); assert.equal(near.facing, true);
+  assert.equal(stationPrompt([near]).id, 'upper-front-listen');
+  // The same plan position one floor down (under the deck) is not near it, and the lower listening window is not offered upstairs.
+  assert.equal(stationState(upper, { eye: { x: 4.48, y: 1.65, z: 9.0 }, yaw: 0, blockers }).nearby, false, 'not from the lower floor');
+  const lower = observatoryStations('pier').find((s) => s.id === 'front-listen');
+  assert.equal(stationState(lower, { eye, yaw: 0, blockers }).nearby, false, 'the lower window is not near the upper floor');
+  const d = { x: 0, y: upper.position[1] - eye.y, z: upper.position[2] - eye.z }, len = Math.hypot(d.x, d.y, d.z);
+  assert.equal(stationOnRay(observatoryStations('pier'), eye, { x: d.x / len, y: d.y / len, z: d.z / len }, blockers), 'upper-front-listen', 'a click on it picks it');
+  // In use: its listening state names it, so the lower window's face stays quiet.
+  const f = runtimeFixture();
+  f.watch.eyeLocal = { x: 2.2, y: 1.65, z: -.2 };
+  assert.equal(f.o.activate('upper-front-listen', { remote: true }), false, 'not from downstairs');
+  f.watch.eyeLocal = { ...eye };
+  assert.equal(f.o.activate('upper-front-listen'), true);
+  assert.deepEqual([f.o.listening.stationId, f.o.listening.side], ['upper-front-listen', 'front']);
+  f.watch.eyeLocal.z = 11.5; f.o.tick(.001); assert.equal(f.o.listening, null, 'walking away releases it');
+  f.watch.eyeLocal = { x: -2.2, y: 1.65, z: -.2 };
+  let closed = 0;
+  f.watch.walk = { halt() {}, closeInspect() { closed++; return true; } };
+  assert.equal(f.o.activate('front-listen'), true); assert.equal(f.o.listening.stationId, 'front-listen');
+  assert.equal(closed, 1, 'an instrument opening closes the pier\'s décor card');
+  f.detach();
+});
 await test('Every classic/pier station has a clear, collision-free approach connected to the window seat', () => {
   for (const variant of ['classic', 'pier']) {
     const blockers = roomBlockers(variant), space = buildWalkSpace(blockers, { variant }), start = VANTAGE[variant][0].approach;
