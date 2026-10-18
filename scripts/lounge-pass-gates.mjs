@@ -51,6 +51,7 @@ export const STANDARD_GATES = [
   ['verify-ops-golden.mjs'],
   ['verify-attribution.mjs'],
   ['verify-import-integrity.mjs'],
+  ['verify-lounge-light.mjs'], // LIGHT lane: pier-only shading, glow channels, probe, steam
 ];
 
 /**
