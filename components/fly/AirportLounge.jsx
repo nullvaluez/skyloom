@@ -329,7 +329,8 @@ function Room({ runtime, variant }) {
           _eye.set(pe[0], pe[1], pe[2]).applyMatrix4(group.matrixWorld);
         }
         const objects = [...resource.meshes, resource.board.mesh];
-        probe.capture(gl, scene, group, objects, _eye, pe);
+        // The pier shades each probe face from its own camera (lounge-probe.js).
+        probe.capture(gl, scene, group, objects, _eye, pe, variant === 'pier' ? resource.uniforms : null);
         s.probeAt = now;
         s.probeKey = key;
         s.probeDirty = false;

@@ -404,13 +404,16 @@ async function render(poseName, tod) {
   const plan = roomVariant(H.variant);
   const upperProbe = !!plan.upper && pose.eye[1] >= plan.upper.floorY + 0.5;
   const pe = upperProbe ? plan.upper.probeEye : plan.probeEye;
-  // Captured afresh for every pose: the probe renders the room with the live
-  // camera's shading uniforms (as the app does), so a capture shared across
-  // poses would make a pose's reflections depend on the order poses ran in.
-  const probeKey = `${tod}|${upperProbe ? 1 : 0}|${poseName}`;
+  // The pier shades each probe face from its own camera (lounge-probe.js), so
+  // one capture serves every pose on a floor, as in the app. The classic room
+  // still renders its probe with the live camera's shading uniforms, so it is
+  // captured afresh for every pose: a capture shared across poses would make a
+  // pose's reflections depend on the order poses ran in.
+  const pier = H.variant === 'pier';
+  const probeKey = `${tod}|${upperProbe ? 1 : 0}|${H.nightWatch}|${pier ? '' : poseName}`;
   if (H.probeOn && probeKey !== H.probeKey) {
-    const eye = H.variant !== 'pier' && pose.seatId === 'window' ? H.camera.position.clone() : new Vector3(...pe).applyMatrix4(group.matrixWorld);
-    H.probe.capture(H.renderer, H.scene, group, [...resource.meshes, resource.board.mesh], eye, pe);
+    const eye = !pier && pose.seatId === 'window' ? H.camera.position.clone() : new Vector3(...pe).applyMatrix4(group.matrixWorld);
+    H.probe.capture(H.renderer, H.scene, group, [...resource.meshes, resource.board.mesh], eye, pe, pier ? resource.uniforms : null);
     H.probeKey = probeKey;
   }
   resource.glass.update({
