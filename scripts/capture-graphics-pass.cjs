@@ -155,7 +155,16 @@ async function pinLens(page) {
   });
 }
 
-/** Freeze the R3F clock at 240 s for the screenshot (same animation phase in both arms). */
+/**
+ * Freeze the R3F clock at 240 s for the screenshot (same animation phase in
+ * both arms), and pin the cloud field. The cloud pass integrates its wind
+ * drift per rendered frame (min(dt, 0.1 s) each), so after a settle of a few
+ * hundred software frames the two arms' clouds sit kilometres apart. The
+ * pass is a <primitive> child of the effect composer's group, reachable
+ * through the R3F instance tree in any build: zero its drift (and the
+ * Living World cirrus drift, where it exists) so a pose shows the same
+ * clouds in every build. Returns what it pinned.
+ */
 function freezeClock(page) {
   return page.evaluate(() => {
     let scene = window.__fly.engine.object;
@@ -169,7 +178,25 @@ function freezeClock(page) {
     c.getElapsedTime = () => 240;
     state.gl.domElement.setAttribute('data-capture-canvas', '');
     return true;
-  });
+  }).then(async (clock) => ({ clock, clouds: await pinClouds(page) }));
+}
+function pinClouds(page) {
+  return page.evaluate(() => {
+    let scene = window.__fly?.engine?.object;
+    if (!scene) return false;
+    while (scene.parent) scene = scene.parent;
+    let clouds = null;
+    scene.traverse((o) => {
+      for (const child of (!clouds && o.__r3f?.children) || []) {
+        const p = child.object;
+        if (p && typeof p.driftX === 'number' && typeof p.driftZ === 'number') { clouds = p; break; }
+      }
+    });
+    if (!clouds) return false;
+    clouds.driftX = 0; clouds.driftZ = 0;
+    clouds.r25?.uniforms?.uLivCirrusPhase?.value?.set(0, 0);
+    return true;
+  }).catch(() => false);
 }
 function thawClock(page) {
   return page.evaluate(() => {
@@ -316,8 +343,11 @@ async function enterPhoto(page, photo) {
         await page.waitForSelector('[data-testid="title-screen"]', { timeout: 180000 });
         await page.waitForFunction(() => window.__flyBoot?.pct === 100, undefined, { timeout: 300000, polling: 1000 });
         await page.waitForTimeout(12000);
+        const pinned = { clouds: await pinClouds(page) };
+        console.log(`  title cloud pin: ${pinned.clouds}`);
+        await page.waitForTimeout(3000);
         await shoot(page, 'menu-title.png', { ui: true });
-        report.captures.push({ scene: 'menu-title', file: 'menu-title.png', ui: true });
+        report.captures.push({ scene: 'menu-title', file: 'menu-title.png', ui: true, pinned });
         await page.click('[data-testid="title-explore"]', { timeout: 20000 });
         await page.waitForSelector('[data-testid="hangar"]', { timeout: 60000 });
         await page.waitForTimeout(15000);
@@ -346,11 +376,11 @@ async function enterPhoto(page, photo) {
         await placeScene(page, scene);
         const ready = await waitSettled(page, scene);
         if (scene.camera === 'photo') await enterPhoto(page, scene.photo);
-        await freezeClock(page);
+        const pinned = await freezeClock(page);
         await page.waitForTimeout(4000);
         const t = await telemetry(page);
         await shoot(page, `${scene.id}.png`);
-        report.captures.push({ scene: scene.id, file: `${scene.id}.png`, ready, telemetry: t });
+        report.captures.push({ scene: scene.id, file: `${scene.id}.png`, ready, pinned, telemetry: t });
         if (scene.id === 'cruise-contrails' || scene.id === 'alps-noon') {
           await shoot(page, `${scene.id}-hud.png`, { ui: true });
           report.captures.push({ scene: `${scene.id}-hud`, file: `${scene.id}-hud.png`, ui: true });
