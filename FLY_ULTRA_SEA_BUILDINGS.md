@@ -99,10 +99,13 @@ water became a flat mirror with a pin-point sun, everywhere the same teal.
   Holzschuch's (2010) anisotropic Gaussian microfacet lobe with Smith masking,
   and the sky reflection their mean Fresnel. Result: a physically sized,
   wind-stretched glitter path at every distance and altitude.
-- **Real water colour:** the water body takes the satellite imagery's own
-  regional colour where it reads as water (shallows, reefs, sediment, glacial
-  lakes), and a deep-sea albedo where it does not (clouds, glint or gaps in the
-  imagery).
+- **Water colour (changed 2026-10-20):** the water body first took the
+  satellite imagery's own colour where it read as water. Esri World Imagery is
+  a mosaic of captures, so every capture and LOD edge showed on the water as
+  rectangles and stair-steps (the owner's report over the Hudson and New York
+  Harbor). It now uses one physical deep-water albedo with the vector shore
+  band; reef and sandbar shallows read deep blue until a seam-free colour
+  source (the consistent z11 mosaic) is wired in. `scripts/verify-sea-seams.mjs`.
 - **Light through backlit crests** at low sun; **0.5 m glitter facets** that
   converge to the smooth lobe as the footprint grows; **whitecaps** at the
   measured coverage for the wind (Monahan & O'Muircheartaigh 1980: ~0.1 % at
