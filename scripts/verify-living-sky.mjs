@@ -6,7 +6,8 @@
  *      targets or far-deck filter) with texts byte-identical to a tree where
  *      the Living World modules do nothing — the previous frame by construction.
  *  (2) Flags ON: the Enhanced march and composite carry every addition
- *      (one marker per block) and the Classic pair is untouched.
+ *      (one marker per block, plus the far deck's slope and upsampling and the
+ *      shaft darkening's physical bound) and the Classic trio is untouched.
  *  (3) WebGL2 (SwiftShader is fine): every patched program, plus the two shaft
  *      programs and the far filter, compiles and links under three's
  *      ShaderMaterial prefix.
@@ -118,7 +119,7 @@ const marks = {
   FAR_CLOUDS: on.march.includes('livFarDeck(ray,livTR,metricRay,rayCone,livSceneT,livFarL,livFarA);') && on.march.includes('float cx=dFdx(col),cy=dFdy(col)')
     && !!on.filter?.includes('mix(.008,.04,smoothstep(15000.,30000.,fb))') && on.composite.includes('*mix(.008,.04,smoothstep(15000.,30000.,min('),
   CIRRUS: on.march.includes('livCirrus(ray,livTR,metricRay,rayCone,livSceneT,livFarL,livFarA);'),
-  LIGHT_SHAFTS: on.composite.includes('livShaftLight(vUv,') && !!on.shafts,
+  LIGHT_SHAFTS: on.composite.includes('livShaftLight(vUv,') && !!on.shafts && (!on.composite.includes('void pskyAerial(') || on.composite.includes('l=max(l,-S*uPskySunIllum);')),
   LENS_FLARE: on.composite.includes('livLens(vUv)'),
   NIGHT_SKY: on.composite.includes('light+=livMilkyWay(ray)*uCinemaOptics.y;') && on.composite.includes('livTwinkle(cell,ray.y)'),
 };
