@@ -15,6 +15,7 @@ const { FLY_ASSETS } = await import(new URL('../lib/fly/assets.js', import.meta.
 const TERRAIN_ATTRIBUTIONS = [
   { label: '© Esri, Maxar, Earthstar Geographics', href: 'https://www.esri.com/en-us/legal/terms/data-attributions' },
   { label: '© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium', href: 'https://esa-worldcover.org/en/data-access' },
+  { label: 'Night lights: NASA Black Marble via GIBS', href: 'https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api' },
   { label: '© OpenStreetMap contributors', href: 'https://www.openstreetmap.org/copyright' },
   { label: '© OpenMapTiles', href: 'https://www.openmaptiles.org/' },
   { label: 'Tiles © OpenFreeMap', href: 'https://openfreemap.org' },

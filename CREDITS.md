@@ -69,6 +69,7 @@
 
 - © Esri, Maxar, Earthstar Geographics — https://www.esri.com/en-us/legal/terms/data-attributions
 - © ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium — https://esa-worldcover.org/en/data-access
+- Night lights: NASA Black Marble via GIBS — https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api
 - © OpenStreetMap contributors — https://www.openstreetmap.org/copyright
 - © OpenMapTiles — https://www.openmaptiles.org/
 - Tiles © OpenFreeMap — https://openfreemap.org
