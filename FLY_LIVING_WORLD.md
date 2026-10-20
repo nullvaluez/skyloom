@@ -94,8 +94,23 @@ Seattle, and the title, hangar and pause screens.
 | Workstream | State |
 |---|---|
 | W0 — survey, flags, reader, capture harness, this plan | **Done** |
-| SKY | In progress |
-| AIRFRAME | In progress |
-| GROUND | In progress |
-| UI | In progress |
+| SKY | **Landed** (`a4f2a61`, `25eaeab`, `04a5036`, `03183ea`); real-GPU smoke pending |
+| AIRFRAME | Restarted 2026-10-20 (see Handoff) |
+| GROUND | Restarted 2026-10-20 (see Handoff) |
+| UI | Restarted 2026-10-20, split into UI-MENUS (`MENU_GLASS`, `TITLE_MOTION`) and UI-FLIGHT (`FLIGHT_INSTRUMENTS`, `HANGAR_STAGE`) |
 | Integration, after captures, gallery | Not started |
+
+## Handoff (2026-10-20)
+
+The cloud session that started this pass (`session_01PgZ4TGUqBRVNc2ubRY3X3V`)
+hit its usage limit after pushing W0 and the SKY workstream. The AIRFRAME,
+GROUND and UI work had not been pushed, so it never reached the remote and is
+restarted from `4f7aff0` by a local session on the owner's Windows workstation
+(RTX 5080). Two things change with that:
+
+- **The GPU is real.** Browser smokes and captures run on hardware, so a look
+  check here is a real frame. fps is still only the owner's to judge in use:
+  agents run headless with other work on the machine.
+- **The eight unconsumed blocks now ship `enabled:false`.** W0 seeded them ON
+  with nothing reading them. Each workstream turns its block on in the commit
+  that lands its consumer, so the flag never claims a look that is not there.
