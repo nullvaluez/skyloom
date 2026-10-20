@@ -4,6 +4,8 @@ import { cinematicEarthOn } from '@/lib/fly/cinematic-earth';
 import { cinemaOn } from '@/lib/fly/cinema-policy';
 import { CinemaReviewDock } from './CinemaReviewDock';
 import { CinemaBars, EscortHud } from './EscortHud';
+import { FlightInstruments } from './FlightInstruments';
+import { livingWorldOn } from '@/lib/fly/living-world';
 
 
 import { useEffect, useRef } from 'react';
@@ -11,6 +13,12 @@ import { MPS_TO_KT, M_TO_FT, RAD2DEG } from '@/lib/fly/coords';
 import { usePassportStore } from '@/stores/passport-store';
 import { useFlyStore } from '@/stores/fly-store';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
+
+// LIVING WORLD (FLIGHT_INSTRUMENTS): a page-load decision, like every flag of
+// the pass. Off renders exactly the previous HUD (no instruments element, no
+// strip attribute); on adds the instruments and lets the Enhanced strip yield
+// to them (flight-instruments.css).
+const INSTRUMENTS = livingWorldOn('FLIGHT_INSTRUMENTS');
 
 /**
  * Flight readouts. DOM text updated at 10Hz from the shared runtime via
@@ -101,6 +109,9 @@ export function FlyHUD({ runtime }) {
       <CinemaReviewDock runtime={runtime} />
       {/* steering reference: the cursor's offset from this dot is the command */}
       <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/60" />
+      {/* LIVING WORLD: tapes, heading scale and the flight-path marker, drawn
+          per GL frame (FlightInstruments.jsx). */}
+      {INSTRUMENTS && <FlightInstruments runtime={runtime} />}
 
       {/* "Where am I" — nearest airport/city + bearing, video-game style.
           On phones it sits below the notch-safe stats strip. */}
@@ -124,7 +135,7 @@ export function FlyHUD({ runtime }) {
           re-read the framebuffer every frame. Desktop keeps blur-sm and
           bg-zinc-950/60 exactly. */}
       {newEarth&&<button type="button" className="cinema-spotting" aria-pressed={spotting} onClick={()=>useFlyStore.getState().setSpotting(!spotting)}>{spotting?'Spotting · On':'Spotting · Off'}</button>}
-      <div data-testid="flight-stats-strip" data-earth={newEarth?'cinematic':undefined} data-spotting={spotting?'1':'0'} data-cinematic={cinema ? '1' : '0'} className="hud-flat-phone pointer-events-none absolute left-1/2 top-4 z-10 flex -translate-x-1/2 divide-x divide-zinc-700 rounded-lg bg-zinc-950/60 py-1.5 backdrop-blur-sm max-sm:top-[calc(env(safe-area-inset-top)+0.375rem)] phone:top-[calc(env(safe-area-inset-top)+0.375rem)] phone-land:top-[calc(env(safe-area-inset-top)+0.25rem)] phone:bg-zinc-950/85 phone:py-1">
+      <div data-testid="flight-stats-strip" data-earth={newEarth?'cinematic':undefined} data-spotting={spotting?'1':'0'} data-cinematic={cinema ? '1' : '0'} data-instruments={INSTRUMENTS ? '1' : undefined} className="hud-flat-phone pointer-events-none absolute left-1/2 top-4 z-10 flex -translate-x-1/2 divide-x divide-zinc-700 rounded-lg bg-zinc-950/60 py-1.5 backdrop-blur-sm max-sm:top-[calc(env(safe-area-inset-top)+0.375rem)] phone:top-[calc(env(safe-area-inset-top)+0.375rem)] phone-land:top-[calc(env(safe-area-inset-top)+0.25rem)] phone:bg-zinc-950/85 phone:py-1">
         <div className={cell}>
           <span className={label}>SPD KT</span>
           <span className={value} ref={spdRef}>—</span>

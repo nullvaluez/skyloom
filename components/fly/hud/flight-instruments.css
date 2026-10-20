@@ -1,0 +1,173 @@
+/* =====================================================================
+   LIVING WORLD — FLIGHT_INSTRUMENTS (components/fly/hud/FlightInstruments.jsx)
+   Thin luminous symbology in the target UI's ice and cyan, legible over
+   bright cloud and dark ground alike: every line is drawn twice (a dark halo
+   under a light ink stroke) and every number carries its halo as a stroke
+   painted under the fill. No backdrop-filter, no full-screen filter: the only
+   filter is a small glow on the flight-path marker.
+   Nothing here matches unless the flag is on (the .fi root and the
+   data-instruments attribute exist only then).
+   ===================================================================== */
+.fi {
+  --fi-ink: #eef8ff;
+  --fi-accent: #9ff3ff;
+  --fi-cyan: #4fe3ff;
+  --fi-amber: #ffc561;
+  --fi-halo: rgba(2, 8, 18, 0.6);
+  --fi-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --fi-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  overflow: visible;
+  transition: opacity 0.3s;
+}
+.fi[data-hidden='1'] {
+  opacity: 0;
+}
+.fi line,
+.fi path,
+.fi circle {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.fi .fi-halo {
+  stroke: var(--fi-halo);
+  stroke-width: 3.4;
+}
+.fi .fi-ink {
+  stroke: var(--fi-ink);
+  stroke-width: 1.25;
+}
+.fi .fi-spine {
+  stroke-opacity: 0.5;
+}
+.fi-text {
+  font-family: var(--fi-mono);
+  fill: var(--fi-ink);
+  stroke: var(--fi-halo);
+  stroke-width: 2.3px;
+  stroke-linejoin: round;
+  paint-order: stroke fill;
+  font-variant-numeric: tabular-nums;
+}
+.fi-tick-label {
+  font-weight: 500;
+  fill-opacity: 0.88;
+}
+.fi-tick-label[data-card='1'] {
+  font-family: var(--fi-sans);
+  font-weight: 700;
+  fill: var(--fi-accent);
+  fill-opacity: 1;
+}
+.fi-caption {
+  font-family: var(--fi-sans);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  fill: rgba(220, 236, 250, 0.78);
+  stroke-width: 1.6px;
+}
+.fi .fi-box {
+  fill: rgba(4, 10, 22, 0.86);
+  stroke: rgba(150, 232, 255, 0.55);
+  stroke-width: 1.1;
+}
+.fi-readout {
+  font-weight: 600;
+  stroke-width: 0;
+}
+.fi-tape-band {
+  fill: rgba(5, 12, 24, 0.16);
+}
+.fi .fi-trend {
+  stroke: var(--fi-cyan);
+  stroke-width: 2.4;
+  transition: opacity 0.2s;
+}
+.fi-annunciator {
+  font-family: var(--fi-sans);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  fill: rgba(225, 240, 252, 0.88);
+}
+.fi-annunciator[data-boost='1'] {
+  fill: var(--fi-amber);
+}
+.fi-vs {
+  font-weight: 600;
+  fill: var(--fi-accent);
+}
+.fi-agl {
+  font-weight: 500;
+  fill: rgba(225, 240, 252, 0.82);
+}
+.fi-agl[data-warn='1'] {
+  fill: var(--fi-amber);
+}
+
+/* Flight-path marker */
+.fi-fpm .fi-ink {
+  stroke: var(--fi-accent);
+  stroke-width: 1.7;
+}
+.fi-fpm .fi-halo {
+  stroke-width: 4.2;
+}
+.fi-fpm {
+  filter: drop-shadow(0 0 3px rgba(79, 227, 255, 0.45));
+}
+.fi-fpm[data-state='off'] {
+  visibility: hidden;
+}
+.fi-fpm[data-state='caged'] {
+  opacity: 0.55;
+}
+.fi-fpm[data-state='caged'] .fi-ink {
+  stroke-dasharray: 3 3;
+}
+
+/* Pitch ladder */
+.fi-rung[data-on='0'] {
+  display: none;
+}
+.fi-rung .fi-ink {
+  stroke-width: 1.1;
+  stroke-opacity: 0.85;
+}
+.fi-rung.fi-neg .fi-ink,
+.fi-rung.fi-neg .fi-halo {
+  stroke-dasharray: 7 5;
+}
+.fi-rung.fi-horizon .fi-ink {
+  stroke-opacity: 0.62;
+}
+.fi-rung-label {
+  font-weight: 500;
+  fill-opacity: 0.8;
+}
+
+/* With the instruments up, the Enhanced (cinematic) telemetry table would only
+   repeat them: it stays in the DOM, updating, for assistive technology and the
+   harnesses that read it, but takes no space and paints nothing. Spotting
+   mode, which is the extended-telemetry view, keeps it. */
+[data-testid='flight-stats-strip'][data-instruments='1'][data-earth='cinematic'][data-spotting='0'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-width: 0;
+  padding: 0;
+  margin: -1px;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* A landscape phone's escort pill sits where the heading labels are; it wins
+   while it is up (it carries the controls that matter then). */
+[data-fly-root][data-orient='landscape']:has(.tgt-escort[data-active='1']) .fi[data-kind='landscape'] .fi-heading {
+  opacity: 0;
+}
