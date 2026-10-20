@@ -94,11 +94,84 @@ Seattle, and the title, hangar and pause screens.
 | Workstream | State |
 |---|---|
 | W0 — survey, flags, reader, capture harness, this plan | **Done** |
-| SKY | **Landed** (`a4f2a61`, `25eaeab`, `04a5036`, `03183ea`); real-GPU smoke pending |
-| AIRFRAME | Restarted 2026-10-20 (see Handoff) |
-| GROUND | Restarted 2026-10-20 (see Handoff) |
-| UI | Restarted 2026-10-20, split into UI-MENUS (`MENU_GLASS`, `TITLE_MOTION`) and UI-FLIGHT (`FLIGHT_INSTRUMENTS`, `HANGAR_STAGE`) |
-| Integration, after captures, gallery | Not started |
+| SKY | **Landed**, then repaired after the owner flew it (merge `b7a9e61`, flags `0ef62b2`, night-sky fix `3b36fd4`) |
+| AIRFRAME | **Landed** (merge `f733916`; hangar wiring `3714518`) |
+| GROUND | **Landed** (merges `218e54f`, `9cc7d41`; wiring `9e160ed`; low-altitude tuning `22acdb1`) |
+| UI-MENUS | **Landed** (merge `31aaee9`) |
+| UI-FLIGHT | **Landed** (merge `d320cae`) |
+| Integration, after captures, gallery | In progress |
+
+### Flag state at the close
+
+| Flag | State | Note |
+|---|---|---|
+| `LIVING_CLOUDS` | **on** | Repaired: ambient from the sky's irradiance at the deck, ground-lit bases, eccentric octaves |
+| `FAR_CLOUDS` | **on** | Repaired: per-column opacity, a lit and a shadow side, cover averaged past the footprint, wider depth tolerance |
+| `CIRRUS` | off | Value-noise filaments on a fixed grid read as a lattice; needs a new density field |
+| `LIGHT_SHAFTS` | off | Screen space darkens the air in front of every sunlit valley; needs shadowed air marched along the view |
+| `LENS_FLARE` | off | A camera artefact over every sun; off with the shafts, and whether it belongs at all is the owner's call |
+| `FILM_GRADE`, `NIGHT_SKY`, `SKY_TRAILS`, `RAIN_OVERLAY` | on | |
+| `VAPOR_FX`, `AIRFRAME_DETAIL` | on | |
+| `NIGHT_LIGHTS`, `GROUND_MIST` | on | After a fix round (below) |
+| `MENU_GLASS`, `TITLE_MOTION`, `FLIGHT_INSTRUMENTS`, `HANGAR_STAGE` | on | |
+
+## Results (2026-10-20)
+
+**The owner flew the SKY work and it glitched.** On a production build of the
+branch at Ultra, the owner reported near clouds with blue, purple and green
+cores and fringes, a band of patchy far clouds flickering in motion, a dark line
+across the clouds at the horizon, and sun rays that looked wrong. None of the
+SKY work had run on a real GPU or in motion before. `LIVING_CLOUDS`,
+`FAR_CLOUDS`, `LIGHT_SHAFTS` and `LENS_FLARE` went off the same hour (`79dc8ad`).
+Measured causes (SKY polish): the cloud ambient was tinted by the zenith at the
+eye and kept its daylight level as the sun fell, and the art's cool interiors
+counted the blue twice; one far-deck sample per pixel covered 6–11 km of shell
+per row near the horizon and aliased; the shafts' cancel term subtracted 3–4×
+the air's own in-scatter. The horizon line was **pre-existing** (present on
+`ebfb6ab` with every Living World flag off): the reconstruction dropped all four
+taps on the last terrain row, where depth jumps from ~200 km to the sky's 1e6.
+
+**The motion bar.** From then on no look flag shipped on without an integrator
+check in motion on the RTX 5080: the camera held still (frame-to-frame change
+over the ground and sky bands must match the arm with the flag off) and a burst
+of flying frames compared magnified. Two features that had passed their
+author's stills failed it on first merge and went back:
+- `GROUND_MIST` popped: with the camera still, one frame changed 10.5% of the
+  ground (≤0.13% with it off). The first height grid after an arrival came from
+  coarse terrain with holes read as basins, and the 30 s rebuild swapped in
+  within a frame. Fixed with hole filling and a double-buffered 5 s crossfade.
+- `NIGHT_LIGHTS` crawled: pixel-sized sparkle decided per pixel from filtered
+  radiance switched on and off in flight. Replaced by a world-fixed,
+  GPU-filtered street-lamp pattern the radiance is redistributed onto.
+
+AIRFRAME measured its own effects in motion and found five bugs no still
+showed (tip ribbons facing the wrong eye after a floating-origin rebase,
+shader patches dropped on every tier step, trails cut short at high refresh,
+lights floating metres off the skin, vapour in a 1 g cruise).
+
+**The capture harness** reused synthetic aircraft hexes across poses, so the
+engine blended each "aircraft" across thousands of km and drew kinked and
+vertical contrails; it also stepped the feed clock 5 s per 3 s poll. Fixed in
+`bb06396`; the kinks were never the trails.
+
+**A regression the gate sweep caught:** `NIGHT_SKY`'s moon edit anchored on a
+line only the twilight and physical sky texts carry, so `?flags=-PHYS_SKY`
+threw at load and `verify-phys-sky` crashed (12/0 on `ebfb6ab`). Fixed in
+`3b36fd4`.
+
+### Owner checkpoints
+
+- The wordmark's thread through "loom" can read as a strikethrough.
+- The hangar key light blows light liveries to white on the nose.
+- After sunset `LIVING_CLOUDS` makes clouds darker than before (physical);
+  `LIVING_CLOUDS.skyLevel` is the knob.
+- The far deck at cruise is sparser and softer than the first version;
+  `FAR_CLOUDS.meanCover` and `formDensity` restore presence.
+- Vapour strength in hard turns (`VAPOR_FX`), and a possible hitch the first
+  time an aircraft mounts while its patched programs compile.
+- City lights at low altitude still read as a bright band beyond ~5 km.
+- The reflector floor renders the hangar twice on Medium and up: frame cost.
+- Every fps and feel verdict, and the iPhone, remain the owner's.
 
 ## Handoff (2026-10-20)
 
