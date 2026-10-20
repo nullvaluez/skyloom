@@ -5,6 +5,8 @@ import {isMobileGraphicsClass} from '@/lib/fly/device-class';
 import { resolveSatelliteAtmosphere } from '@/lib/fly/satellite-atmosphere';
 import { immersiveOn } from '@/lib/fly/immersive';
 import { ImmersiveCloudPass } from '@/lib/fly/immersive-cloud-pass';
+// LIVING WORLD (FILM_GRADE): display-space grain, merged into the grade pass.
+import { FilmGradeEffect, filmGradeOn } from '@/lib/fly/film-grade';
 import { SkyOverlayPass, setSkyOverlayDeferred } from '@/lib/fly/sky-overlay-pass';
 // R25 C SKY: the Enhanced aerial variant + the tint-only grade, both decided
 // by r25On (through aerialR25Wanted), so Classic builds today's chain exactly.
@@ -60,6 +62,7 @@ import { WhiteBalanceEffect } from './WhiteBalance';
 import { AerialPerspectiveEffect } from './AerialPerspective';
 import { SpeedLinesEffect, speedFeelStrength } from './SpeedLines';
 import { FlyEffectComposer } from './FlyEffectComposer';
+import { attachLivingGround } from '@/lib/fly/living-ground';
 import {
   createN8AOPass,
   disposeN8AOPass,
@@ -376,6 +379,15 @@ export function buildPassList(style, tier, ctx = {}) {
     el: () => <Vignette key="vignette" eskil={false} offset={0.25} darkness={0.55} />,
     raw: () => new VignetteEffect({ eskil: false, offset: 0.25, darkness: 0.55 }),
   });
+  // LIVING WORLD (FILM_GRADE): after the grade and vignette, display-referred;
+  // a non-convolution effect, so it merges into the same EffectPass (no pass).
+  if (sat && cinemaOn() && filmGradeOn(tier)) {
+    list.push({
+      id: 'film-grade',
+      el: () => <primitive key="film-grade" object={ctx.filmGrade} dispose={null} />,
+      raw: () => new FilmGradeEffect(),
+    });
+  }
   list.push(smaaSpec(ctx));
   if (toneMode != null) list.push(toneSpec(toneMode));
 
@@ -518,6 +530,9 @@ export const Effects = memo(function Effects({ runtime }) {
   const scene = useThree((s) => s.scene);
   const clouds = useMemo(() => sat && immersiveOn('clouds') ? new ImmersiveCloudPass(flightCamera,runtime) : null, [sat,flightCamera,runtime]);
   useEffect(() => () => clouds?.dispose(), [clouds]);
+  // LIVING WORLD GROUND: hands the aerial pass the runtime its city lights
+  // and valley mist read. A no-op with NIGHT_LIGHTS and GROUND_MIST off.
+  useEffect(() => attachLivingGround(runtime), [runtime]);
   // The overlay pass exists exactly when the cloud pass does, and the overlays
   // move to its layer in the SAME commit that puts it in the chain (the
   // composer's own pass assembly is a child layout effect, so it has already
@@ -600,6 +615,8 @@ export const Effects = memo(function Effects({ runtime }) {
   );
   const hdrGrade = useMemo(() => new HDRGradeEffect(), []);
   useEffect(() => () => hdrGrade.dispose(), [hdrGrade]);
+  const filmGrade = useMemo(() => new FilmGradeEffect(), []);
+  useEffect(() => () => filmGrade.dispose(), [filmGrade]);
 
   // Round 19 (B): depth-based aerial perspective. Mounted ONLY on satellite +
   // high tier — declaring EffectAttribute.DEPTH makes the composer allocate a
@@ -852,6 +869,7 @@ export const Effects = memo(function Effects({ runtime }) {
         aerial,
         whiteBalance,
         hdrGrade,
+        filmGrade,
         smaa,
         n8ao: aoPass,
         clouds,
@@ -869,6 +887,7 @@ export const Effects = memo(function Effects({ runtime }) {
       aerial,
       whiteBalance,
       hdrGrade,
+      filmGrade,
       smaa,
       aoPass,
       clouds,

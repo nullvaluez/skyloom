@@ -1,0 +1,58 @@
+{
+  "page": {
+    "lede": "Skyloom before and after the Living World graphics pass: the same poses, sun, weather, traffic and lens on both sides, rendered on the RTX 5080. Drag across a frame to compare, or switch it to Before or After.",
+    "facts": [["Renderer", "RTX 5080 (D3D11)"], ["Poses", "14"], ["Flags on", "14 of 17"], ["Before", "ebfb6ab"], ["After", "claude/living-world-rtx"]],
+    "flags": [
+      { "name": "Sky", "items": [
+        ["LIVING_CLOUDS", "Cloud light from the sky at the deck, ground-lit bases, multiple scattering"],
+        ["FAR_CLOUDS", "The cloud deck continues past 22 km to the horizon, soft and shaded"],
+        ["SKY_TRAILS", "Contrails that persist and spread behind cruising jets and your own"],
+        ["NIGHT_SKY", "The Milky Way where it really is, fading under city skyglow; twinkling stars; a moon with maria"],
+        ["FILM_GRADE", "Fine film grain after the grade"],
+        ["RAIN_OVERLAY", "Rain and snow streaks stay visible against the sky"],
+        ["CIRRUS, LIGHT_SHAFTS, LENS_FLARE", "Off: they did not hold up on the RTX 5080"]
+      ] },
+      { "name": "Aircraft", "items": [
+        ["AIRFRAME_DETAIL", "Panel lines and rivets, glass canopies with a pilot, prop discs, running lights that read by day"],
+        ["VAPOR_FX", "Transonic vapour cone, over-wing vapour under load, wingtip vortices"]
+      ] },
+      { "name": "Ground", "items": [
+        ["NIGHT_LIGHTS", "NASA Black Marble city light on a street-lamp pattern beyond the generated city"],
+        ["GROUND_MIST", "Mist that pools in valleys at dawn and dusk and in humid air"]
+      ] },
+      { "name": "Menus and HUD", "items": [
+        ["MENU_GLASS", "One glass design for Pause, Settings and Credits"],
+        ["TITLE_MOTION", "Wordmark, card art, an entrance sequence and a lit Continue"],
+        ["FLIGHT_INSTRUMENTS", "Speed and altitude tapes, a heading scale and a flight-path marker"],
+        ["HANGAR_STAGE", "Studio light, a reflective floor, door haze, eased camera moves and a turntable"]
+      ] }
+    ],
+    "revert": "Every change is one flag at the end of <code>lib/fly/fly-constants.js</code>. Add <code>?flags=-NAME</code> to the address to see the previous look for one page load, or <code>?flags=NAME</code> to try one that ships off.",
+    "runlist": [
+      "Fly a hard turn low over the sea in a fighter: the tip vortices and wing vapour should look strong but believable.",
+      "Cruise at FL350 at night over the US East Coast: city light as street grids with dark country between.",
+      "At 1,500 ft at night over a city, judge the far city: from low down it is brighter than the ground beneath you, and at dusk it reads pale.",
+      "Fly at golden hour toward the sun: backlit clouds should be warm grey, not blue.",
+      "Open the hangar on Medium or above and watch the frame rate: the reflective floor draws the hangar twice.",
+      "Check the title wordmark: the thread through \"loom\" can read as a strikethrough."
+    ],
+    "method": "Captured with scripts/capture-graphics-pass.cjs against production builds of ebfb6ab and the final tree, sun, weather, governor, lens and animation clock pinned, synthetic traffic. Every look flag that ships on was also checked in motion on the same GPU: a still camera must change no more than with the flag off, and a burst of flying frames must not crawl or pop. These are look evidence, not frame-rate measurements."
+  },
+  "order": ["menu-title", "menu-hangar", "aircraft-closeup", "cruise-contrails-hud", "cruise-contrails", "alps-golden", "alps-noon", "alps-noon-hud", "yosemite-morning", "coast-afternoon", "manhattan-dusk", "manhattan-night", "overcast-rain", "menu-pause"],
+  "poses": {
+    "menu-title": { "group": "Menus", "changes": [["TITLE_MOTION", "Wordmark with a contrail thread, line art on each card, a lit primary action"], ["MENU_GLASS", "Glass cards that belong with the live world behind them"]] },
+    "menu-hangar": { "group": "Menus", "changes": [["HANGAR_STAGE", "Studio key and rim light, a reflective floor and light from the door"], ["AIRFRAME_DETAIL", "The display aircraft gets a glass canopy with a pilot"]] },
+    "aircraft-closeup": { "group": "Aircraft", "changes": [["AIRFRAME_DETAIL", "Clear canopy with a pilot instead of an opaque dome; running lights visible by day"]] },
+    "cruise-contrails-hud": { "group": "HUD", "changes": [["FLIGHT_INSTRUMENTS", "Speed and altitude tapes, heading scale and flight-path marker replace the text table"], ["SKY_TRAILS", "Persistent, spreading contrails behind the traffic"]] },
+    "cruise-contrails": { "group": "Sky", "changes": [["SKY_TRAILS", "Contrails that persist and widen with age"], ["FAR_CLOUDS", "Scattered cumulus continue toward the horizon, soft and fading into haze"]] },
+    "alps-golden": { "group": "Sky", "changes": [["LIVING_CLOUDS", "Backlit clouds glow warm with neutral cores"]] },
+    "alps-noon": { "group": "Sky", "changes": [["LIVING_CLOUDS", "Whiter tops, shaded bases: the clouds read as volumes"]] },
+    "alps-noon-hud": { "group": "HUD", "changes": [["FLIGHT_INSTRUMENTS", "The flight instruments over bright cloud and mountains"]] },
+    "yosemite-morning": { "group": "Ground", "changes": [["LIVING_CLOUDS", "Cloud light"], ["GROUND_MIST", "Mostly burned off by this hour; see the motion notes for dawn"]] },
+    "coast-afternoon": { "group": "Sky", "changes": [["LIVING_CLOUDS", "Cloud light; the sea and coast are unchanged"]] },
+    "manhattan-dusk": { "group": "Ground", "changes": [["NIGHT_LIGHTS", "The far city's lamps come on over still-lit ground; this reads pale and is an open question"], ["NIGHT_SKY", "Twilight sky"]] },
+    "manhattan-night": { "group": "Ground", "changes": [["NIGHT_LIGHTS", "Lit streets beyond Manhattan to the horizon"], ["NIGHT_SKY", "The Milky Way is dimmed by the city's skyglow"]] },
+    "overcast-rain": { "group": "Sky", "changes": [["RAIN_OVERLAY", "Rain streaks visible against the sky as well as the ground"]] },
+    "menu-pause": { "group": "Menus", "changes": [["MENU_GLASS", "A three-pane glass pause screen: navigation, settings, controls"]] }
+  }
+}

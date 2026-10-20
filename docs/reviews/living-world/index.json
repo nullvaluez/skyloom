@@ -1,0 +1,314 @@
+{
+  "purpose": "Unedited game frames, before and after the Living World pass, same poses and pins. Rendered on ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11): look evidence, not performance.",
+  "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "before": {
+    "url": "http://localhost:3098",
+    "capturedAt": "2026-10-20T14:23:34.605Z",
+    "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  "after": {
+    "url": "http://localhost:3150",
+    "capturedAt": "2026-10-20T18:56:53.743Z",
+    "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+  },
+  "viewport": {
+    "width": 1600,
+    "height": 900
+  },
+  "items": [
+    {
+      "id": "menu-title",
+      "title": "Title screen",
+      "detail": "The front door over the live world",
+      "before": "menu-title-before.webp",
+      "after": "menu-title-after.webp",
+      "compare": "menu-title-compare.webp",
+      "ui": true,
+      "ready": {
+        "before": null,
+        "after": null
+      }
+    },
+    {
+      "id": "menu-hangar",
+      "title": "Hangar",
+      "detail": "Choosing an aircraft and a destination",
+      "before": "menu-hangar-before.webp",
+      "after": "menu-hangar-after.webp",
+      "compare": "menu-hangar-compare.webp",
+      "ui": true,
+      "ready": {
+        "before": null,
+        "after": null
+      }
+    },
+    {
+      "id": "alps-noon",
+      "title": "Alps at midday",
+      "detail": "Innsbruck, 2.9 km, scattered cumulus",
+      "before": "alps-noon-before.webp",
+      "after": "alps-noon-after.webp",
+      "compare": "alps-noon-compare.webp",
+      "ui": false,
+      "ready": {
+        "before": {
+          "worldLoading": true,
+          "streamers": true,
+          "terrainSharpSmall": true,
+          "terrainSharp": true,
+          "ms": 21397
+        },
+        "after": {
+          "worldLoading": true,
+          "streamers": true,
+          "terrainSharpSmall": true,
+          "terrainSharp": true,
+          "ms": 18192
+        }
+      }
+    },
+    {
+      "id": "alps-noon-hud",
+      "title": "Alps at midday (HUD)",
+      "detail": "Innsbruck, 2.9 km, scattered cumulus",
+      "before": "alps-noon-hud-before.webp",
+      "after": "alps-noon-hud-after.webp",
+      "compare": "alps-noon-hud-compare.webp",
+      "ui": true,
+      "ready": {
+        "before": null,
+        "after": null
+      }
+    },
+    {
+      "id": "alps-golden",
+      "title": "Alpine golden hour",
+      "detail": "Innsbruck, 2.6 km, facing the low sun",
+      "before": "alps-golden-before.webp",
+      "after": "alps-golden-after.webp",
+      "compare": "alps-golden-compare.webp",
+      "ui": false,
+      "ready": {
+        "before": {
+          "worldLoading": true,
+          "streamers": true,
+          "terrainSharpSmall": true,
+          "terrainSharp": true,
+          "ms": 21184
+        },
+        "after": {
+          "worldLoading": true,
+          "streamers": true,
+          "terrainSharpSmall": true,
+          "terrainSharp": true,
+          "ms": 21143
+        }
+      }
+    },
+    {
+      "id": "yosemite-morning",
+      "title": "Valley morning",
+      "detail": "Yosemite, 2.7 km, early light",
+      "before": "yosemite-morning-before.webp",
+      "after": "yosemite-morning-after.webp",
+      "compare": "yosemite-morning-compare.webp",
+      "ui": false,
+      "ready": {
+        "before": {
+          "worldLoading": true,
+          "streamers": true,
+          "terrainSharpSmall": true,
+          "terrainSharp": true,
+          "ms": 26107
+        },
+        "after": {
+          "worldLoading": true,
+          "streamers": true,
+          "terrainSharpSmall": true,
+          "terrainSharp": true,
+          "ms": 37145
+        }
+      }
+    },
+    {
+      "id": "cruise-contrails",
+      "title": "Cruise with traffic",
+      "detail": "FL350 over Indiana, live-style airliner traffic",
+      "before": "cruise-contrails-before.webp",
+      "after": "cruise-contrails-after.webp",
+      "compare": "cruise-contrails-compare.webp",
+      "ui": false,
+      "ready": {
+        "before": {
+          "worldLoading": true,
+          "streamers": true,
+          "terrainSharpSmall": true,
+          "terrainSharp": true,
+          "ms": 22083
+        },
+        "after": {
+          "worldLoading": true,
+          "streamers": true,
+          "terrainSharpSmall": true,
+          "terrainSharp": true,
+          "ms": 21100
+        }
+      }
+    },
+    {
+      "id": "cruise-contrails-hud",
+      "title": "Cruise with traffic (HUD)",
+      "detail": "FL350 over Indiana, live-style airliner traffic",
+      "before": "cruise-contrails-hud-before.webp",
+      "after": "cruise-contrails-hud-after.webp",
+      "compare": "cruise-contrails-hud-compare.webp",
+      "ui": true,
+      "ready": {
+        "before": null,
+        "after": null
+      }
+    },
+    {
+      "id": "aircraft-closeup",
+      "title": "Your aircraft",
+      "detail": "Photo orbit, 1.8 km over the Hudson Valley",
+      "before": "aircraft-closeup-before.webp",
+      "after": "aircraft-closeup-after.webp",
+      "compare": "aircraft-closeup-compare.webp",
+      "ui": false,
+      "ready": {
+        "before": {
+          "worldLoading": true,
+          "streamers": true,
+          "terrainSharpSmall": true,
+          "terrainSharp": true,
+          "ms": 23083
+        },
+        "after": {
+          "worldLoading": true,
+          "streamers": true,
+          "terrainSharpSmall": true,
+          "terrainSharp": true,
+          "ms": 22089
+        }
+      }
+    },
+    {
+      "id": "coast-afternoon",
+      "title": "Coast and sea",
+      "detail": "Honolulu, 450 m, afternoon",
+      "before": "coast-afternoon-before.webp",
+      "after": "coast-afternoon-after.webp",
+      "compare": "coast-afternoon-compare.webp",
+      "ui": false,
+      "ready": {
+        "before": {
+          "worldLoading": true,
+          "streamers": true,
+          "terrainSharpSmall": true,
+          "terrainSharp": true,
+          "ms": 34136
+        },
+        "after": {
+          "worldLoading": true,
+          "streamers": true,
+          "terrainSharpSmall": true,
+          "terrainSharp": true,
+          "ms": 34093
+        }
+      }
+    },
+    {
+      "id": "overcast-rain",
+      "title": "Rain under overcast",
+      "detail": "Seattle, 900 m, overcast and rain",
+      "before": "overcast-rain-before.webp",
+      "after": "overcast-rain-after.webp",
+      "compare": "overcast-rain-compare.webp",
+      "ui": false,
+      "ready": {
+        "before": {
+          "worldLoading": true,
+          "streamers": true,
+          "terrainSharpSmall": true,
+          "terrainSharp": true,
+          "ms": 23096
+        },
+        "after": {
+          "worldLoading": true,
+          "streamers": true,
+          "terrainSharpSmall": true,
+          "terrainSharp": true,
+          "ms": 31088
+        }
+      }
+    },
+    {
+      "id": "menu-pause",
+      "title": "Pause menu",
+      "detail": "Settings and navigation in flight",
+      "before": "menu-pause-before.webp",
+      "after": "menu-pause-after.webp",
+      "compare": "menu-pause-compare.webp",
+      "ui": true,
+      "ready": {
+        "before": null,
+        "after": null
+      }
+    },
+    {
+      "id": "manhattan-dusk",
+      "title": "City at dusk",
+      "detail": "Manhattan from the Hudson, 650 m",
+      "before": "manhattan-dusk-before.webp",
+      "after": "manhattan-dusk-after.webp",
+      "compare": "manhattan-dusk-compare.webp",
+      "ui": false,
+      "ready": {
+        "before": {
+          "worldLoading": true,
+          "streamers": true,
+          "terrainSharpSmall": true,
+          "terrainSharp": true,
+          "ms": 19231
+        },
+        "after": {
+          "worldLoading": true,
+          "streamers": true,
+          "terrainSharpSmall": true,
+          "terrainSharp": true,
+          "ms": 18112
+        }
+      }
+    },
+    {
+      "id": "manhattan-night",
+      "title": "City at night",
+      "detail": "Manhattan from the Hudson, 650 m",
+      "before": "manhattan-night-before.webp",
+      "after": "manhattan-night-after.webp",
+      "compare": "manhattan-night-compare.webp",
+      "ui": false,
+      "ready": {
+        "before": {
+          "worldLoading": true,
+          "streamers": true,
+          "terrainSharpSmall": true,
+          "terrainSharp": true,
+          "ms": 16093
+        },
+        "after": {
+          "worldLoading": true,
+          "streamers": true,
+          "terrainSharpSmall": true,
+          "terrainSharp": true,
+          "ms": 18197
+        }
+      }
+    }
+  ],
+  "errors": {
+    "before": [],
+    "after": []
+  }
+}

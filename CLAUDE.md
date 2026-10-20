@@ -7,6 +7,13 @@
 >   Enhanced Satellite is the default on every device
 >   (`VISUALS.defaultProfile:'enhanced'`), and `R25_SKY` / `R25_GROUND` ship
 >   `enabled:true`.
+> - **Living World graphics pass (2026-10-20, merged to `main` from `claude/living-world-rtx`):**
+>   [FLY_LIVING_WORLD.md](FLY_LIVING_WORLD.md) is the plan and record — 17 flags
+>   (sky, clouds, trails, aircraft, ground, menus, HUD, hangar), read only through
+>   `lib/fly/living-world.js`. The owner flew the first SKY build and it glitched in
+>   motion; since then **no look flag ships on without a motion check on the RTX
+>   5080** (still camera matches the flag-off arm; flying bursts compared).
+>   `CIRRUS`, `LIGHT_SHAFTS` and `LENS_FLARE` ship off.
 > - **Newer records than R25:** [FLY_FLEET_AND_ADVENTURES.md](FLY_FLEET_AND_ADVENTURES.md)
 >   (Adventures, fleet, saves), [FLY_SCALE_AND_ENCOUNTERS.md](FLY_SCALE_AND_ENCOUNTERS.md)
 >   (World/Close framing, Nearby encounters, the stylized-cinematic art pass),

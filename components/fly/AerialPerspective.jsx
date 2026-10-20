@@ -78,6 +78,9 @@ import { trueRayGLSL, trueScaleShader } from '@/lib/fly/true-scale';
 import { ATMO_AERIAL_LOOKUP_GLSL } from '@/lib/fly/atmosphere/glsl';
 import { physSkyShader, physWeatherExtinction } from '@/lib/fly/atmosphere/runtime';
 import { PHYS_SKY_TEXT_ACTIVE } from '@/lib/fly/cinema-sky';
+// LIVING WORLD (GROUND): night lights and valley mist on the ground pixel,
+// before the air in front of it (lib/fly/living-ground.js).
+import { LIVING_GROUND_ACTIVE, LIVING_GROUND_UNIFORMS, livingGroundAerial, updateLivingGround } from '@/lib/fly/living-ground';
 
 /**
  * Module-scope frame state. One satellite scene exists at a time, so a plain
@@ -562,6 +565,15 @@ const enhancedFragmentShaderTS = trueScaleShader('aerial-enhanced', enhancedFrag
 ]);
 
 /**
+ * LIVING WORLD (GROUND: NIGHT_LIGHTS, GROUND_MIST): city lights and valley mist
+ * act on the ground radiance before the air above is applied, so both are
+ * hazed, curved and faded by the terrain's own law. Asserted edits on the
+ * built text, after PHYS_SKY's and TRUE_SCALE's; both blocks off = the text
+ * above, unchanged.
+ */
+const enhancedFragmentShaderLiving = livingGroundAerial(enhancedFragmentShaderTS);
+
+/**
  * R24 D: which pass ships. Read ONCE at construction, from a module const, so
  * production and the PREWARM twin (which builds through this same constructor)
  * can never compile different programs — the Effects.jsx el()/raw() rule.
@@ -577,7 +589,7 @@ export class AerialPerspectiveEffect extends Effect {
   constructor(opts = {}) {
     const law = LAW();
     const r25 = !law && opts?.r25 === true;
-    super('AerialPerspectiveEffect', law ? lawFragmentShader : r25 ? enhancedFragmentShaderTS : fragmentShader, {
+    super('AerialPerspectiveEffect', law ? lawFragmentShader : r25 ? enhancedFragmentShaderLiving : fragmentShader, {
       // This is what makes the composer allocate + bind its depth texture.
       attributes: EffectAttribute.DEPTH,
       uniforms: new Map(law ? [
@@ -634,6 +646,7 @@ export class AerialPerspectiveEffect extends Effect {
     this._law = law;
     this._r25 = r25;
     if(r25)for(const[name,holder]of Object.entries(CINEMA_UNIFORMS))this.uniforms.set(name,holder);
+    if(r25&&LIVING_GROUND_ACTIVE)for(const[name,holder]of Object.entries(LIVING_GROUND_UNIFORMS))this.uniforms.set(name,holder);
     // Resolved from the live renderer on the first update() — see the shader.
     this._reversed = null;
   }
@@ -642,7 +655,7 @@ export class AerialPerspectiveEffect extends Effect {
    * postprocessing calls this immediately before the pass draws — the latest
    * point in the frame, and therefore the least stale. Pure uniform writes.
    */
-  update(renderer) {
+  update(renderer, inputBuffer) {
     const u = this.uniforms;
     const s = _state;
     // Depth-buffer orientation is a device contract, not a preference (the R16
@@ -709,6 +722,7 @@ export class AerialPerspectiveEffect extends Effect {
     u.get('uGroundY').value = s.groundY;
     u.get('uNear').value.set(s.nearStartM, s.nearMaxMix);
     if (this._r25) this._updateR25(u);
+    if (this._r25 && LIVING_GROUND_ACTIVE) updateLivingGround(s, inputBuffer?.height);
   }
 
   /** R25 C: the Enhanced uniforms, from r25-sky's per-frame state. */
