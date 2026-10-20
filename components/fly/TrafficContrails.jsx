@@ -12,6 +12,9 @@ import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
 import { patchAirWake } from '@/lib/fly/tracer-spot';
 import { getR25Sky } from '@/lib/fly/r25-sky';
 import { useFlyStore } from '@/stores/fly-store';
+// LIVING WORLD (SKY_TRAILS): the lounge's persistent trails, in flight too.
+import { SKY_TRAILS_ON, SKY_TRAILS_CFG, applyFlightTrailFades, livingContrailStrength, skyTrailLight, skyTrailWind } from '@/lib/fly/sky-trails';
+import { mercatorScale } from '@/lib/fly/coords';
 
 const stations = LIVE_AIRCRAFT.map((f) => liveEngineOffsets(f));
 // Unknown types use only established jet archetypes; props, rotorcraft and
@@ -39,12 +42,22 @@ function sources(t) {
 export function TrafficContrails({ runtime, origin }) {
   const renderer = useThree((s) => s.gl);
   const state = useMemo(() => ({ time: 0, recs: new Map(), pool: [], chosen: [], chooseAt: 0, limit: null,
-    batch: new WakeBatch(FX.maxTraffic.high * 4, 96, patchAirWake), sky: new SkyTrails(), observing: false, skyChosen: [] }), []);
+    batch: new WakeBatch(FX.maxTraffic.high * 4, 96, patchAirWake), sky: new SkyTrails(), observing: false, skyChosen: [],
+    // SKY_TRAILS: a second, flight-mode batch (near and age fades), so the
+    // lounge's own program and state stay exactly as they were.
+    flightSky: SKY_TRAILS_ON ? new SkyTrails({ maxTrails: Math.max(...Object.values(SKY_TRAILS_CFG.maxTrails)), points: SKY_VIEW.points, flight: true }) : null,
+    flightChosen: [], flightChooseAt: 0 }), []);
+  // SKY_TRAILS: a warp starts the flight batch clean, so its local origin
+  // (the first trail fed) restarts beside the aircraft instead of keeping
+  // float32 positions thousands of kilometres from it.
+  const warpEpoch = useFlyStore((s) => s.warpEpoch);
+  useEffect(() => { state.flightSky?.clear(); state.flightChooseAt = 0; }, [state, warpEpoch]);
   useEffect(() => {
     // Depth-less vapor against the sky: drawn after the cloud composite.
     const unregister = registerSkyOverlay(state.batch.mesh);
     const unregisterSky = registerSkyOverlay(state.sky.mesh);
-    return () => { unregister(); unregisterSky(); state.batch.dispose(); state.sky.dispose(); };
+    const unregisterFlight = state.flightSky ? registerSkyOverlay(state.flightSky.mesh) : null;
+    return () => { unregister(); unregisterSky(); unregisterFlight?.(); state.batch.dispose(); state.sky.dispose(); state.flightSky?.dispose(); };
   }, [state]);
   useFrame(({ camera }, delta) => {
     const store = useFlyStore.getState(), items = runtime.traffic?.items ?? [];
@@ -58,17 +71,21 @@ export function TrafficContrails({ runtime, origin }) {
       for (const [, rec] of state.recs) for (const h of rec.histories) h.clear();
       state.recs.clear();
       state.sky.clear();
-      state.chooseAt = 0;
+      state.flightSky?.clear();
+      state.chooseAt = 0; state.flightChooseAt = 0;
     }
     if (observing) {
       // Wall-clock seconds: the trail ages on the same clock the traffic
       // engine moves the aircraft on (a hitch must not bend the trail).
       skyFrame(state, runtime, origin, camera, renderer, items, store, performance.now() / 1000);
+      if (state.flightSky) state.flightSky.mesh.visible = false;
       state.batch.begin(camera, false);
       state.batch.end(1, false, null);
       return;
     }
     state.sky.mesh.visible = false;
+    const wxNow = runtime.weather?.wx;
+    if (state.flightSky) flightSkyFrame(state, runtime, origin, camera, renderer, items, store, performance.now() / 1000, wxNow);
     // Preserve admitted tracks through a small range band so equal-distance
     // neighbours cannot trade slots and erase one another's histories.
     // Admission is a spatial decision, not animation. Reuse its bounded set
@@ -79,7 +96,7 @@ export function TrafficContrails({ runtime, origin }) {
     const range=22000;
     const eligible = items.filter(t => t.fix1 && t.distM < range+(state.recs.has(t.hex)?4000:0) &&
       (t.opacity ?? 1) * (t.horizonFade ?? 1) > .03 &&
-      (contrailStrength(t.ry, Math.hypot(t.fix1.vE, t.fix1.vN), t.flags & 1) > .003 || state.recs.has(t.hex)) && sources(t).length);
+      (livingContrailStrength(t.ry, Math.hypot(t.fix1.vE, t.fix1.vN), t.flags & 1, wxNow) > .003 || state.recs.has(t.hex)) && sources(t).length);
     eligible.sort((a, b) => (a.distM - (state.recs.has(a.hex) ? 1800 : 0)) - (b.distM - (state.recs.has(b.hex) ? 1800 : 0)));
     state.chosen = eligible.slice(0, limit);const seen = new Set(state.chosen.map(t => t.hex));
     for (const [hex, rec] of state.recs) if (!seen.has(hex)) {
@@ -92,14 +109,15 @@ export function TrafficContrails({ runtime, origin }) {
     state.batch.begin(camera,!!runtime.cinemaEnvironment&&store.mapStyle==='satellite');
     for (const t of chosen) {
       const offsets = sources(t), fix = t.fix1, speed = Math.hypot(fix.vE, fix.vN);
-      const density = contrailStrength(t.ry, speed, t.flags & 1);
+      const density = livingContrailStrength(t.ry, speed, t.flags & 1, wxNow);
       let rec = state.recs.get(t.hex);
       if (rec && rec.sources !== offsets) {
         for (const h of rec.histories) { h.clear(); state.pool.push(h); }
         state.recs.delete(t.hex); rec = null;
       }
       const fresh = !rec;
-      if (fresh) { rec = { sources: offsets, histories: offsets.map(() => state.pool.pop() ?? new WakeHistory(96)) }; state.recs.set(t.hex, rec); }
+      // SKY_TRAILS: the near ribbon hands over to the persistent trail sooner.
+      if (fresh) { rec = { sources: offsets, histories: offsets.map(() => state.pool.pop() ?? new WakeHistory(96, SKY_TRAILS_ON ? SKY_TRAILS_CFG.nearLifeSec : undefined)) }; state.recs.set(t.hex, rec); }
       rotation.setFromEuler(attitude.set(speed > 20 ? Math.atan2(fix.vUp, speed) : 0, -t.yaw, -t.bank));
       const k = Number.isFinite(fix.latRad) ? 1 / Math.cos(fix.latRad) : 1;
       for (let e = 0; e < offsets.length; e++) {
@@ -115,7 +133,7 @@ export function TrafficContrails({ runtime, origin }) {
         if (fresh && density > .003) for (let j = 64; j > 0; j--) {
           const age = j * .32, climb = Math.max(-speed * .12, Math.min(speed * .12, fix.vUp));
           h.record(emitter.x - fix.vE * k * age, emitter.y - climb * age, emitter.z + fix.vN * k * age,
-            now - age, density * contrailStrength(t.ry - climb * age, speed), 0, wx, wz);
+            now - age, density * livingContrailStrength(t.ry - climb * age, speed, false, wxNow), 0, wx, wz);
         }
         if (dt > 0) h.record(emitter.x, emitter.y, emitter.z, now, t.stale === 2 ? 0 : density,
           Math.max(FX.spacingM, speed * .38), wx, wz);
@@ -129,7 +147,74 @@ export function TrafficContrails({ runtime, origin }) {
   return <>
     <primitive object={state.batch.mesh} dispose={null} />
     <primitive object={state.sky.mesh} dispose={null} />
+    {state.flightSky && <primitive object={state.flightSky.mesh} dispose={null} />}
   </>;
+}
+
+/** 0..1 per ICAO hex, stable. */
+function hexShade(hex) {
+  let h = 2166136261;
+  for (let i = 0; i < hex.length; i++) h = Math.imul(h ^ hex.charCodeAt(i), 16777619);
+  return ((h >>> 0) % 1000) / 999;
+}
+
+/**
+ * LIVING WORLD (SKY_TRAILS): flight mode's persistent trails — skyFrame's
+ * per-aircraft feed with the flight's range and tier caps, the physical
+ * formation band, the player's latitude for scene units, and the flight
+ * batch's near and age fades. Wall-clock seconds like the lounge (the
+ * traffic engine moves the aircraft on that clock).
+ */
+function flightSkyFrame(state, runtime, origin, camera, renderer, items, store, now, wxNow) {
+  const sky = state.flightSky, tier = store.qualityTier;
+  const cap = runtime.cinemaEnvironment && store.mapStyle === 'satellite' ? SKY_TRAILS_CFG.maxTrails[tier] ?? 0 : 0;
+  if (!cap) { if (sky.stats.trails) sky.clear(); sky.mesh.visible = false; return; }
+  const range = SKY_TRAILS_CFG.rangeM;
+  if (now >= state.flightChooseAt) {
+    state.flightChooseAt = now + 0.5;
+    const eligible = [];
+    for (const t of items) {
+      if (!t.fix1 || !(t.distM < range + (sky.byHex.has(t.hex) ? 6000 : 0)) || t.stale === 2) continue;
+      const speed = Math.hypot(t.fix1.vE, t.fix1.vN);
+      if (!(livingContrailStrength(t.ry, speed, t.flags & 1, wxNow) > 0) && !sky.byHex.has(t.hex)) continue;
+      if (!sources(t).length) continue;
+      eligible.push(t);
+    }
+    eligible.sort((a, b) => (a.distM - (sky.byHex.has(a.hex) ? 4000 : 0)) - (b.distM - (sky.byHex.has(b.hex) ? 4000 : 0)));
+    state.flightChosen = eligible.slice(0, cap);
+  }
+  const kSite = runtime.cinemaGeography?.worldUnitsPerMetre ?? mercatorScale(runtime.flight?.latDeg || 0);
+  skyTrailWind(wxNow, kSite, _wind);
+  const hourKey = Math.floor(Date.now() / 3600000);
+  for (const t of state.flightChosen) {
+    const fix = t.fix1, speed = Math.hypot(fix.vE, fix.vN);
+    // Each trail its own optical depth (engine count, fuel flow, the air it
+    // forms in), deterministic per aircraft so a re-admitted trail matches.
+    const density = livingContrailStrength(t.ry, speed, t.flags & 1, wxNow) * SKY_VIEW.density * SKY_TRAILS_CFG.density * (0.62 + 0.38 * hexShade(t.hex));
+    const k = Number.isFinite(fix.latRad) ? 1 / Math.cos(fix.latRad) : 1;
+    const spec = resolveLiveType(t);
+    const f = spec ? LIVE_AIRCRAFT[spec.family] : null;
+    const scale = spec?.scale ?? 1;
+    const len = (f?.length ?? 40) * scale;
+    const hx = Math.sin(t.yaw), hz = -Math.cos(t.yaw);
+    _vel.x = hx * speed * k; _vel.y = Math.max(-speed * 0.12, Math.min(speed * 0.12, fix.vUp)); _vel.z = hz * speed * k;
+    let turn = 0;
+    const f0 = t.fix0;
+    if (f0 && fix.t > f0.t + 0.5 && speed > 20) {
+      const dh = Math.atan2(fix.vE, fix.vN) - Math.atan2(f0.vE, f0.vN);
+      const d = Math.atan2(Math.sin(dh), Math.cos(dh));
+      if (Math.abs(d) > 0.035) turn = Math.max(-0.09, Math.min(0.09, d / (fix.t - f0.t)));
+    }
+    _src.x = t.rx - hx * len * 0.5 * k; _src.y = t.ryd; _src.z = t.rz - hz * len * 0.5 * k;
+    let engine = 6;
+    if (f) { engine = 0; for (const e of stations[spec.family] ?? []) engine = Math.max(engine, Math.abs(e[0])); engine = Math.max(1.5, engine * scale); }
+    sky.feed(t.hex, _src, _vel, density, now, _wind, { engine, life: trailPersistence(t.ry, hourKey), backfillSec: SKY_TRAILS_CFG.backfillSec, turn });
+  }
+  sky.rebase(origin.anchor);
+  applyFlightTrailFades(sky);
+  sky.end(now, skyTrailLight(runtime, camera, renderer, tier));
+  if (process.env.NODE_ENV === 'development' && window.__flyStats)
+    window.__flyStats.flightTrails = { trails: sky.stats.trails, chosen: state.flightChosen.length, cap, visible: sky.mesh.visible };
 }
 
 /**
