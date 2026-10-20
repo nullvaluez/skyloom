@@ -13,7 +13,11 @@
  *  (3) The CPU halves: the atlas window and slots, the decode (background to
  *      black, the curve, sRGB-encoded), the mist's time-of-day / wind / fog
  *      law, and the ground field built from a synthetic valley (floor below
- *      the ridges, the deeper pool in the valley, coarse DEM refused).
+ *      the ridges, the deeper pool in the valley, coarse DEM refused); the
+ *      street-light pattern (deterministic, three nested densities, no
+ *      clipping); the field's crossfade (a new grid fades in over the old,
+ *      never overwrites a grid still on screen) and its holes (unknown
+ *      terrain carries no mist and invents no basin).
  *  (4) WebGL2: the merged EffectPass program, on and off, compiles and links
  *      under three's prefix (the host's GPU; SwiftShader where there is none),
  *      and a copy with one undeclared call must fail, so the row can go red.
@@ -128,6 +132,57 @@ async function buildLeg(on) {
       floorEdge: at(2, mid, 0), terrainEdge: at(2, mid, 1), depthEdge: at(2, mid, 2),
       top: field.live?.top ?? null,
     };
+    // The crossfade: a second grid over different terrain fades in over the
+    // first, and no third build may land while both are on screen.
+    {
+      const g = new GMm.GroundField(block);
+      const eA = makeEngine(13), eB = { getGroundAt: (lon, lat) => ({ elev: eA.getGroundAt(lon, lat).elev + 150, tileZ: 13 }) };
+      let t = 0;
+      for (let i = 0; i < 400 && !g.live; i++) g.step(eA, w, 200, (t += 0.016), 50);
+      const firstBuf = g.live.buf, born1 = g.live.born;
+      // Age it out and rebuild on the raised terrain.
+      t += block.map.maxAgeSec + 1;
+      for (let i = 0; i < 400 && g.live.born === born1; i++) g.step(eB, w, 200, (t += 0.016), 50);
+      const swapped = g.live.born !== born1 && g.live.buf !== firstBuf && !!g.prev;
+      const b0 = g.blend(t);
+      const half = g.blend(g.live.born + block.map.blendSec / 2);
+      // While blending, a further build must not finish.
+      const born2 = g.live.born;
+      for (let i = 0; i < 50; i++) g.step(eA, w, 200, g.live.born + 0.1, 50);
+      const heldWhileBlending = g.live.born === born2;
+      const done = g.blend(g.live.born + block.map.blendSec + 0.01);
+      out.blendCheck = { swapped, b0: +b0.toFixed(3), half: +half.toFixed(3), heldWhileBlending, done, prevRetired: g.prev === null };
+      g.dispose();
+    }
+    // Holes: a band of unanswered terrain across a valley carries no mist and
+    // drags no floor below the answered terrain around it.
+    {
+      const g = new GMm.GroundField(block);
+      const eng = makeEngine(13);
+      const holey = { getGroundAt: (lon, lat) => (Math.abs(lat - 47.2) < 0.05 ? null : eng.getGroundAt(lon, lat)) };
+      for (let i = 0; i < 400 && !g.live; i++) g.step(holey, w, -800, i, 50);
+      const n = g.n, d = g.data;
+      let holes = 0, holeCovered = 0, minFloor = Infinity, minAnswered = Infinity;
+      for (let i = 0; i < n * n; i++) {
+        const a = THREE.DataUtils.fromHalfFloat(d[i * 4 + 3]);
+        const fl = THREE.DataUtils.fromHalfFloat(d[i * 4]) + g.live.base;
+        if (a < 0.5) { holes++; minFloor = Math.min(minFloor, fl); } else { minAnswered = Math.min(minAnswered, fl); if (a < 0.99) holeCovered++; }
+      }
+      out.holeCheck = { live: !!g.live, holes, holeCovered, minHoleFloor: Math.round(minFloor), minAnsweredFloor: Math.round(minAnswered) };
+      g.dispose();
+    }
+    // The street-light pattern, small: deterministic, three nested densities.
+    {
+      const P = await imp('lib/fly/night-lights-pattern.js');
+      const cfg = { size: 128, texelM: 16, cells: 4, seed: 7 };
+      const seeds = P.lightPatternSeeds({ cells: 4, period: 128 * 16, seed: 7 });
+      const run = () => { const o = new Uint8Array(128 * 128 * 4), sums = [0, 0, 0]; P.lightPatternRows(cfg, seeds, o, sums, 0, 128); return { o, sums }; };
+      const a = run(), b = run();
+      let same = a.o.length === b.o.length, nz = [0, 0, 0], sat = 0;
+      for (let i = 0; i < a.o.length; i++) if (a.o[i] !== b.o[i]) { same = false; break; }
+      for (let i = 0; i < 128 * 128; i++) for (let c = 0; c < 3; c++) { if (a.o[i * 4 + c] > 0) nz[c]++; if (a.o[i * 4 + c] === 255) sat++; }
+      out.pattern = { same, sums: a.sums.map((v) => +v.toFixed(1)), nz, sat };
+    }
     field.dispose();
     coarse.dispose();
   }
@@ -145,7 +200,7 @@ const check = (name, ok, detail = '') => { (ok ? pass++ : fail++); console.log(`
 const run = (l) => JSON.parse(execFileSync(process.execPath, [fileURLToPath(import.meta.url), `--leg=${l}`], { cwd: ROOT, maxBuffer: 64 << 20, stdio: ['ignore', 'pipe', 'ignore'] }).toString());
 const off = run('off');
 const on = run('on');
-const GROUND_ID = /\b(lgHash|lgNoise|nlLights|nlSparkle|nlImagery|gmApply|gmSegment|gfField|livingGround|lgGround|lgEmit|lgAir|uNL\w+|uGM\w+|uGF\w+)\b/;
+const GROUND_ID = /\b(lgHash|lgNoise|nlLights|nlFresh|nlLum|gmApply|gmSegment|gfField|gfGrid|livingGround|lgGround|lgEmit|uNL\w+|uGM\w+|uGF\w+)\b/;
 
 // (1) off
 check('(1a) flags off: the Enhanced aerial text carries no GROUND code', !GROUND_ID.test(off.enhanced) && off.shaders['aerial-enhanced'] === 'off');
@@ -156,11 +211,11 @@ check('(1d) flags off: the satellite credits and the Credits list do not name NA
 // (2) on
 const marks = {
   field: on.enhanced.includes('vec4 gfField(vec2 xz){'),
-  lights: on.enhanced.includes('emit=nlLights(world,metricRay,dXZ,dist,trueY,screen,city);'),
+  lights: on.enhanced.includes('emit=nlLights(world,metricRay,dXZ,trueY,city);'),
   mist: on.enhanced.includes('gmApply(world,metricRay,city*uNLMist,ground,emit);'),
-  driver: on.enhanced.includes('    livingGround(world,metricRay,dXZ,dist,trueY,uv,lgGround,lgEmit,lgAir);\n'),
-  phys: on.enhanced.includes('vec3 lit=lgGround*apT+') && on.enhanced.includes('lit+=lgEmit*apT*transmission+lgAir*(1.-apT*transmission);'),
-  fallback: on.enhanced.includes('outputColor=vec4((lgGround*transmittance+haze*(1.-transmittance)+lgEmit*transmittance+lgAir*(1.-transmittance))*uR25Exposure,inputColor.a);'),
+  driver: on.enhanced.includes('    livingGround(world,metricRay,dXZ,trueY,lgGround,lgEmit);\n'),
+  phys: on.enhanced.includes('vec3 lit=lgGround*apT+') && on.enhanced.includes('lit+=lgEmit*apT*transmission;'),
+  fallback: on.enhanced.includes('outputColor=vec4((lgGround*transmittance+haze*(1.-transmittance)+lgEmit*transmittance)*uR25Exposure,inputColor.a);'),
 };
 check('(2a) flags on: every block is in the Enhanced aerial program', Object.values(marks).every(Boolean) && on.shaders['aerial-enhanced'] === 'patched', JSON.stringify(marks));
 check('(2b) flags on: the Classic and LAW aerial texts are byte-identical to flags off', on.classic === off.classic && on.law === off.law && on.law.length > 0);
@@ -170,10 +225,10 @@ check('(2b) flags on: the Classic and LAW aerial texts are byte-identical to fla
   const MAIN = 'void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth, out vec4 outputColor) {';
   const declAt = t.indexOf('\nfloat lgHash(');
   t = declAt >= 0 ? t.slice(0, declAt) + t.slice(t.indexOf(MAIN)) : t;
-  t = t.replace('    vec3 lgGround=inputColor.rgb,lgEmit,lgAir;\n    livingGround(world,metricRay,dXZ,dist,trueY,uv,lgGround,lgEmit,lgAir);\n', '');
+  t = t.replace('    vec3 lgGround=inputColor.rgb,lgEmit;\n    livingGround(world,metricRay,dXZ,trueY,lgGround,lgEmit);\n', '');
   t = t.replace('vec3 lit=lgGround*apT+', 'vec3 lit=inputColor.rgb*apT+');
-  t = t.replace('      lit+=lgEmit*apT*transmission+lgAir*(1.-apT*transmission);\n', '');
-  t = t.replace('outputColor=vec4((lgGround*transmittance+haze*(1.-transmittance)+lgEmit*transmittance+lgAir*(1.-transmittance))*uR25Exposure,inputColor.a);', 'outputColor=vec4((inputColor.rgb*transmittance+haze*(1.-transmittance))*uR25Exposure,inputColor.a);');
+  t = t.replace('      lit+=lgEmit*apT*transmission;\n', '');
+  t = t.replace('outputColor=vec4((lgGround*transmittance+haze*(1.-transmittance)+lgEmit*transmittance)*uR25Exposure,inputColor.a);', 'outputColor=vec4((inputColor.rgb*transmittance+haze*(1.-transmittance))*uR25Exposure,inputColor.a);');
   check('(2c) flags on minus the GROUND edits === flags off (the only difference is the blocks)', t === off.enhanced, t === off.enhanced ? '' : `lengths ${t.length} vs ${off.enhanced.length}`);
 }
 {
@@ -200,6 +255,15 @@ check('(2f) flags on: NASA is credited on screen (satellite) and in the Credits 
   check('(3f) field: the valley floor lies below the ridges and the valley pool is deeper than the ridge-top veil',
     f.live && f.floorCentre < f.terrainEdge - 300 && f.floorCentre <= f.terrainCentre + 1 && f.depthCentre >= f.depthEdge && f.top > f.floorCentre, JSON.stringify(f));
   check('(3g) field: a grid answered only by coarse DEM tiles never goes live', !f.coarseLive);
+  const bc = on.blendCheck;
+  check('(3h) field: a rebuild fades in over the old grid (other buffer), holds further builds until the fade ends, then retires the old grid',
+    bc.swapped && bc.b0 < 0.05 && Math.abs(bc.half - 0.5) < 0.02 && bc.heldWhileBlending && bc.done === 1 && bc.prevRetired, JSON.stringify(bc));
+  const hc = on.holeCheck;
+  check('(3i) field: unanswered terrain carries no mist and drags no floor below the answered terrain (no invented basin)',
+    hc.live && hc.holes > 0 && hc.minHoleFloor >= hc.minAnsweredFloor - 1, JSON.stringify(hc));
+  const pt = on.pattern;
+  check('(3j) the street-light pattern: deterministic, the core set contains more light than the suburb set and the suburb more than the countryside, nothing clipped',
+    pt.same && pt.sums[0] > pt.sums[1] && pt.sums[1] > pt.sums[2] && pt.sums[2] > 0 && pt.nz[0] >= pt.nz[1] && pt.sat === 0, JSON.stringify(pt));
 }
 
 // (4) WebGL2 compile + link of the merged pass, on and off.
