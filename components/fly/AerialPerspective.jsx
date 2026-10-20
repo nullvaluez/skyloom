@@ -81,13 +81,14 @@ import { PHYS_SKY_TEXT_ACTIVE } from '@/lib/fly/cinema-sky';
 // LIVING WORLD (GROUND): city lights from altitude and valley mist, both inside
 // this pass's Enhanced program (FLY_LIVING_WORLD.md).
 import {
+  NL,
   NIGHT_LIGHTS_GLSL,
   NIGHT_LIGHTS_ON,
   NIGHT_LIGHTS_UNIFORMS,
   nightLightsStats,
   stepNightLights,
 } from '@/lib/fly/night-lights-atlas';
-import { GROUND_MIST_GLSL, GROUND_MIST_ON, GROUND_MIST_STATS, GROUND_MIST_UNIFORMS, stepGroundMist } from '@/lib/fly/ground-mist';
+import { GM, GROUND_MIST_GLSL, GROUND_MIST_ON, GROUND_MIST_STATS, GROUND_MIST_UNIFORMS, reseedGroundMist, stepGroundMist } from '@/lib/fly/ground-mist';
 import { COASTAL_WATER_UNIFORMS } from '@/lib/fly/coastal-water';
 import { getComposer } from '@/lib/fly/step-safe';
 import { isMobileGraphicsClass } from '@/lib/fly/device-class';
@@ -616,7 +617,7 @@ vec3 lwGround(vec3 c,vec3 world,vec3 metricRay,float trueY,float dXZ,vec3 haze){
   float distM=length(metricRay);
   vec3 dir=metricRay/max(distM,1.0e-3);
   vec3 glow=vec3(0.);
-  ${nl ? 'glow=nlEmission(world,distM,dir,trueY,dXZ);\n  c+=glow;' : ''}
+  ${nl ? 'glow=nlEmission(c,world,distM,dir,trueY,dXZ);\n  c+=glow;' : ''}
   ${gm ? 'c=gmMist(c,world,distM,dir,trueY,haze,glow);' : ''}
   return c;
 }
@@ -708,7 +709,15 @@ function stepLivingGround(renderer, deltaTime) {
   if (LW_GM) stepGroundMist(c);
   if (typeof window !== 'undefined' && window.__flyStats && now - _lwStatsAt > 0.5) {
     _lwStatsAt = now;
-    window.__flyStats.livingGround = { nightLights: LW_NL ? nightLightsStats() : null, mist: LW_GM ? GROUND_MIST_STATS : null, origin: c.origin ? { ...c.origin } : null };
+    window.__flyStats.livingGround = { nightLights: LW_NL ? nightLightsStats() : null, mist: LW_GM ? GROUND_MIST_STATS : null, origin: c.origin ? { ...c.origin } : null, groundY: c.groundY };
+    // Review/dev handle (window.__flyStats exists only there): the live
+    // tunables (edits land next frame), the uniforms and a mist-floor re-seed
+    // (a harness that pins the haze ground after a warp), for A/Bs.
+    window.__flyLivingGround ??= {
+      nl: LW_NL ? NL : null, gm: LW_GM ? GM : null,
+      nlUniforms: LW_NL ? NIGHT_LIGHTS_UNIFORMS : null, gmUniforms: LW_GM ? GROUND_MIST_UNIFORMS : null,
+      reseedMist: LW_GM ? reseedGroundMist : null,
+    };
   }
 }
 

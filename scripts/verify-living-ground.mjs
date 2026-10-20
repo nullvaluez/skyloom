@@ -13,7 +13,8 @@
  *  (4) uploads: whole array before the GPU has a copy, then one slot
  *      rectangle per commit at the right layer and offset; arrival fades
  *  (5) the colour key: moonlit sea, snow and desert in Black Marble's
- *      palette are black; warm and white lights pass, monotonic in brightness
+ *      palette are black; warm and white lights pass, monotonic in brightness;
+ *      the light grain keeps the mean, fades to exactly 1 and is periodic
  *  (6) the night weight and the range ramp: endpoints, monotonic, the ramp
  *      leaves the generated lights alone low and takes the whole view high
  *  (7) the mist profile: dawn > dusk > night > noon = 0, weather adds; the
@@ -310,6 +311,28 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
     `dark ${[...dark]} lights ${[...lights]}`);
 }
 
+// (5b) the light grain (nlGrain's mirror)
+{
+  const g = { ...NL.grain, strength: 1, mottle: 1 };
+  let seed = 12345;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+  let sum = 0, peak = 0, lo = Infinity;
+  const N = 200000;
+  for (let i = 0; i < N; i++) {
+    const v = NLm.nightLightsGrain(rnd() * 65536, rnd() * 65536, 0, 1.3, g);
+    sum += v;
+    peak = Math.max(peak, v);
+    lo = Math.min(lo, v);
+  }
+  const mean = sum / N;
+  const far = NLm.nightLightsGrain(1234.5, 6789.1, g.mottleCell * 2, 1, g);
+  const off = NLm.nightLightsGrain(1234.5, 6789.1, 0, 1, { ...g, strength: 0, mottle: 0 });
+  const wrap = near(NLm.nightLightsGrain(1234.5, 6789.1, 0, 1, g), NLm.nightLightsGrain(1234.5 + 65536, 6789.1 - 65536, 0, 1, g), 1e-6);
+  check('(5b) light texture: points of light and neighbourhood mottling that keep the mean (within 5%), exactly 1 past their footprint and when off, periodic over 65,536 scene units',
+    Math.abs(mean - 1) < 0.05 && peak > 4 && lo < 0.05 && far === 1 && off === 1 && wrap,
+    `mean ${mean.toFixed(3)} peak ${peak.toFixed(1)} min ${lo.toFixed(3)} wrap ${wrap}`);
+}
+
 // (6) night weight and range ramp
 {
   const w = (el) => NLm.nightLightsWeight(el, NL);
@@ -456,7 +479,7 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
     `len ${off.len} = base ${off.baseLen}`);
   check('(9b) flags on: the ground terms enter the PHYS block and the plain living-air line; PHYS_SKY and TRUE_SCALE still patched; verify-phys-sky substrings intact',
     on.flags.NIGHT_LIGHTS && on.flags.GROUND_MIST && !on.equalsBase && on.hasGround && on.hasNl && on.hasGm && on.physUsesSurf && on.plainUsesSurf && on.keepsPhysSubstrings && on.noInputLeft &&
-      on.phys === 'patched' && on.ts === 'patched' && on.uniforms.filter((k) => k.startsWith('uNL')).length === 10 && on.uniforms.filter((k) => k.startsWith('uGM')).length === 5 && on.classicHasNone,
+      on.phys === 'patched' && on.ts === 'patched' && on.uniforms.filter((k) => k.startsWith('uNL')).length === 13 && on.uniforms.filter((k) => k.startsWith('uGM')).length === 5 && on.classicHasNone,
     `len ${on.baseLen} -> ${on.len}`);
   check('(9c) each flag alone carries only its own terms and uniforms',
     nl.hasNl && !nl.hasGm && nl.uniforms.some((k) => k.startsWith('uNL')) && !nl.uniforms.some((k) => k.startsWith('uGM')) &&
