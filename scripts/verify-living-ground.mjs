@@ -86,7 +86,7 @@ if (legArg) {
     ts: TS.TRUE_SCALE_SHADERS['aerial-enhanced'],
     equalsBase: text === base,
     baseClean: !/lwGround|lwSurf|uNL|uGM|nlEmission|gmMist/.test(base),
-    hasGround: text.includes('vec3 lwSurf=lwGround(inputColor.rgb,world,metricRay,trueY,dXZ,haze);'),
+    hasGround: text.includes('vec3 lwSurf=lwGround(uv,inputColor.rgb,world,metricRay,trueY,dXZ,haze);'),
     hasNl: text.includes('nlEmission('),
     hasGm: text.includes('gmMist('),
     physUsesSurf: text.includes('vec3 lit=lwSurf*apT+apS*uPskySunIllum+pskyNightAir(apDir)*(1.-apT);'),
@@ -479,7 +479,7 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
     `len ${off.len} = base ${off.baseLen}`);
   check('(9b) flags on: the ground terms enter the PHYS block and the plain living-air line; PHYS_SKY and TRUE_SCALE still patched; verify-phys-sky substrings intact',
     on.flags.NIGHT_LIGHTS && on.flags.GROUND_MIST && !on.equalsBase && on.hasGround && on.hasNl && on.hasGm && on.physUsesSurf && on.plainUsesSurf && on.keepsPhysSubstrings && on.noInputLeft &&
-      on.phys === 'patched' && on.ts === 'patched' && on.uniforms.filter((k) => k.startsWith('uNL')).length === 13 && on.uniforms.filter((k) => k.startsWith('uGM')).length === 5 && on.classicHasNone,
+      on.phys === 'patched' && on.ts === 'patched' && on.uniforms.filter((k) => k.startsWith('uNL')).length === 15 && on.uniforms.filter((k) => k.startsWith('uGM')).length === 6 && on.classicHasNone,
     `len ${on.baseLen} -> ${on.len}`);
   check('(9c) each flag alone carries only its own terms and uniforms',
     nl.hasNl && !nl.hasGm && nl.uniforms.some((k) => k.startsWith('uNL')) && !nl.uniforms.some((k) => k.startsWith('uGM')) &&

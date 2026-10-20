@@ -612,18 +612,18 @@ const LW_PLAIN = 'outputColor=vec4((inputColor.rgb*transmittance+haze*(1.-transm
 export function livingGroundShader(src, { nl = LW_NL, gm = LW_GM, phys = PHYS_SKY_SHADERS['aerial-enhanced'] === 'patched' } = {}) {
   if (!nl && !gm) return src;
   const decl = `${nl ? NIGHT_LIGHTS_GLSL : ''}${gm ? GROUND_MIST_GLSL : ''}
-vec3 lwGround(vec3 c,vec3 world,vec3 metricRay,float trueY,float dXZ,vec3 haze){
+vec3 lwGround(vec2 uv,vec3 c,vec3 world,vec3 metricRay,float trueY,float dXZ,vec3 haze){
   if(uCinema<.5)return c;
   float distM=length(metricRay);
   vec3 dir=metricRay/max(distM,1.0e-3);
   vec3 glow=vec3(0.);
-  ${nl ? 'glow=nlEmission(c,world,distM,dir,trueY,dXZ);\n  c+=glow;' : ''}
+  ${nl ? 'glow=nlEmission(uv,c,world,distM,dir,trueY,dXZ);\n  c+=glow;' : ''}
   ${gm ? 'c=gmMist(c,world,distM,dir,trueY,haze,glow);' : ''}
   return c;
 }
 `;
   let out = lwSwap(src, LW_MAIN, `${decl}${LW_MAIN}`);
-  out = lwSwap(out, LW_AFTER, `${LW_AFTER}    vec3 lwSurf=lwGround(inputColor.rgb,world,metricRay,trueY,dXZ,haze);\n`);
+  out = lwSwap(out, LW_AFTER, `${LW_AFTER}    vec3 lwSurf=lwGround(uv,inputColor.rgb,world,metricRay,trueY,dXZ,haze);\n`);
   // PHYS_SKY's cinema block is the frame every Enhanced pixel takes; without
   // the physical sky the plain living-air line below carries the same terms.
   if (phys) out = lwSwap(out, LW_PHYS, LW_PHYS.replace('vec3 lit=inputColor.rgb*apT', 'vec3 lit=lwSurf*apT'));

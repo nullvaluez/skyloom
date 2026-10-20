@@ -15,7 +15,8 @@
  *   node scripts/capture-graphics-pass.cjs --url=http://localhost:3097 --label=after
  *   options: --scenes=id,id  --width=1600 --height=900  --quality=high|ultra
  *            --flags=NAME,-NAME (appended to the page URL)  --settle=ms
- *            --append (merge into an existing set)  --scenes=menus|pause|<pose ids>
+ *            --append (merge into an existing set)
+ *            --scenes=menus (title, hangar, pause) | title (title, hangar) | pause | <pose ids>
  *
  * Environment truth: in the cloud container WebGL is SwiftShader (software),
  * so frames take seconds each. These are LOOK captures, never fps evidence.
@@ -338,7 +339,7 @@ async function enterPhoto(page, photo) {
       const e = gl?.getExtension('WEBGL_debug_renderer_info');
       return e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : null;
     });
-    if (!wanted || wanted.includes('menus')) {
+    if (!wanted || wanted.includes('menus') || wanted.includes('title')) {
       try {
         await page.waitForSelector('[data-testid="title-screen"]', { timeout: 180000 });
         await page.waitForFunction(() => window.__flyBoot?.pct === 100, undefined, { timeout: 300000, polling: 1000 });
@@ -348,7 +349,10 @@ async function enterPhoto(page, photo) {
         await page.waitForTimeout(3000);
         await shoot(page, 'menu-title.png', { ui: true });
         report.captures.push({ scene: 'menu-title', file: 'menu-title.png', ui: true, pinned });
-        await page.click('[data-testid="title-explore"]', { timeout: 20000 });
+        // A loaded software renderer can keep Playwright's actionability
+        // checks from settling on an animated title: fall back to a DOM click.
+        await page.click('[data-testid="title-explore"]', { timeout: 30000 })
+          .catch(() => page.$eval('[data-testid="title-explore"]', (el) => el.click()));
         await page.waitForSelector('[data-testid="hangar"]', { timeout: 60000 });
         await page.waitForTimeout(15000);
         await shoot(page, 'menu-hangar.png', { ui: true });
