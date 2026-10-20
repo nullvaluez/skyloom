@@ -1,10 +1,10 @@
 /**
  * LIVING WORLD — verify-living-airframe: the AIRFRAME workstream's gate
- * (AIRFRAME_DETAIL).
+ * (VAPOR_FX, AIRFRAME_DETAIL).
  *
  *  (1) Flags OFF: every entry point returns null and touches nothing — on a
  *      real clone of every hangar GLB the materials keep their hooks, program
- *      keys, blending and colours, no mesh is hidden or added; the wingtip
+ *      keys, blending and colours, no mesh is hidden or added; the old wingtip
  *      ribbons keep their strength; PlayerPlane's block is the only edit to
  *      that file.
  *  (2) Flags ON: the survey finds what each hangar aircraft really has (a
@@ -15,10 +15,16 @@
  *      exactly, a patch another owner drops (the cinema shadow rig's
  *      restore-what-I-found, on every tier step) is re-seated by update(), and
  *      running lights hanging off the skin (bbox-corner anchors) are seated.
+ *  (3) The condensation's physics: the cone lives only in its Mach band and in
+ *      humid air, the sheets grow with load, light aircraft and dry or high air
+ *      make no tips, a fair-weather 1 g cruise makes nothing on any hangar
+ *      aircraft, the ground and taxi speeds make nothing; the effect builds,
+ *      runs and disposes cleanly, its ribbons face a rebased eye (the floating
+ *      origin), and it takes the wingtip ribbons over.
  *  (4) WebGL2 (the real GPU where there is one; SwiftShader is fine): every
- *      patched program (panels after the livery paint, glass, running lights),
- *      the cockpit and the prop disc compile and link through three's own
- *      WebGLRenderer.
+ *      patched program (panels after the livery paint, glass, running lights)
+ *      and the four Living programs (prop disc, cone, sheet, tips) compile and
+ *      link through three's own WebGLRenderer.
  *
  * Run: node scripts/verify-living-airframe.mjs
  * Legs run in child processes because each flag is a page-load (module-load)
@@ -71,7 +77,7 @@ function serialUniforms(u) {
 }
 
 async function runLeg(on) {
-  globalThis.window = { location: { search: '', href: 'http://localhost/' }, __flyAirframeDetailOverride: { enabled: on } };
+  globalThis.window = { location: { search: '', href: 'http://localhost/' }, __flyVaporFxOverride: { enabled: on }, __flyAirframeDetailOverride: { enabled: on } };
   globalThis.self = globalThis.window;
   register('./_node-resolve.mjs', import.meta.url);
   register('./_alias-loader.mjs', import.meta.url);
@@ -79,6 +85,7 @@ async function runLeg(on) {
   const THREE = await imp('node_modules/three/build/three.module.js');
   const { GLTFLoader } = await imp('node_modules/three/examples/jsm/loaders/GLTFLoader.js');
   const AD = await imp('lib/fly/airframe-detail.js');
+  const VX = await imp('lib/fly/vapor-fx.js');
   const LA = await imp('lib/fly/living-airframe.js');
   const AE = await imp('lib/fly/aircraft-effects.js');
   const { PLAYER_AIRCRAFT } = await imp('lib/fly/player-aircraft.js');
@@ -122,7 +129,7 @@ async function runLeg(on) {
     return shader;
   };
 
-  const out = { on, flags: { detail: AD.AIRFRAME_DETAIL_ON }, fleet: {}, programs: [] };
+  const out = { on, flags: { detail: AD.AIRFRAME_DETAIL_ON, vapor: VX.VAPOR_FX_ON }, fleet: {}, programs: [] };
   const ribbonsFlight = { bank: 0.9, speed: 150, turnRate: 0.3, pitchRate: 0.05, pitch: 0.05, operations: null, pos: { y: 1500 } };
   out.ribbonsBefore = AE.wingVaporStrength(ribbonsFlight);
 
@@ -157,6 +164,10 @@ async function runLeg(on) {
       row.hiddenBlades = 0;
       for (const d of h.discs) d.node.traverse((o) => { if (o.isMesh && !o.visible) row.hiddenBlades++; });
       row.cockpit = !!root.getObjectByName('living-cockpit');
+      // A 1 g cruise in a fair-weather sky condenses nothing on any airframe.
+      const loading = VX.surveyLoading(id, h.survey, h.stats.metresPerUnit);
+      const cruise = VX.vaporTargets({ speed: 200, altM: 1500, load: 1, env: { cloudCoverage: 0.45, overcast: 0, fog: 0, cloudBase: 1700, cloudThickness: 1500 }, loading });
+      row.cruise = [cruise.cone, cruise.sheet, cruise.tips].map((x) => +x.toFixed(3));
       h.update(1 / 60);
       h.dispose();
       row.restored = sameAs(before, snapshot(root));
@@ -281,8 +292,63 @@ async function runLeg(on) {
       out.seat[id] = row;
     }
 
-    const flight = { latDeg: 0, speed: 260, pos: { y: 900 }, groundElev: 0, pitch: 0.05, bank: 0, turnRate: 0, pitchRate: 0, operations: null };
-    const cam = new THREE.PerspectiveCamera();
+    // The condensation, built on the real fighter and run through a pull.
+    const f = await cloneOf('fighter');
+    const rig = new THREE.Group(); rig.matrixAutoUpdate = false;
+    const outer = new THREE.Group(); const corr = new THREE.Group();
+    rig.add(outer); outer.add(corr); corr.add(f.root);
+    const survey = (await imp('lib/fly/airframe-survey.js')).surveyAirframe(f.root, { canopyMaterial: f.entry.canopyMaterial });
+    const mpu = 20 / survey.length;
+    corr.scale.setScalar(mpu);
+    const regs = [];
+    const vx = VX.createVaporFx({ root: f.root, outer, survey, mpu, anchors: null, rig, register: (m) => { regs.push(m); return () => regs.splice(regs.indexOf(m), 1); }, aircraftId: 'fighter' });
+    const cam = new THREE.PerspectiveCamera(); cam.position.set(0, 4, 30);
+    const flight = { latDeg: 0, speed: 260, pos: { y: 900 }, groundElev: 0, pitch: 0.05, bank: 1.2, turnRate: 0, pitchRate: 0.2, operations: null };
+    for (let i = 0; i < 90; i++) { rig.position.z -= flight.speed / 60; vx.update(flight, cam, 1 / 60, { allowed: true, held: false }); }
+    out.vapor = { built: !!vx, registered: regs.length, names: regs.map((m) => m.material.name).sort(), stats: { ...vx.stats }, groups: [!!f.root.parent.getObjectByName('living-vapor'), !!outer.getObjectByName('living-vapor-tips')] };
+    vx.update(flight, cam, 1 / 60, { allowed: false });
+    out.vapor.lowDraws = vx.stats.draws;
+    for (const m of regs) out.programs.push({ name: m.material.name, kind: 'shader', params: { side: m.material.side, transparent: true }, vertex: m.material.vertexShader, fragment: m.material.fragmentShader, uniforms: serialUniforms(m.material.uniforms) });
+    vx.dispose();
+    out.vapor.disposed = regs.length === 0 && !f.root.parent.getObjectByName('living-vapor') && !outer.getObjectByName('living-vapor-tips');
+
+    // The floating origin: the rig sits at ABSOLUTE coordinates inside a world
+    // root shifted by the anchor, the camera holds REBASED ones. With the eye on
+    // the port trail 30 m behind, the ribbon points beside it must fade out
+    // (the near fade) — an eye taken as camera − rig is 8 km off and never does.
+    {
+      const fo = await cloneOf('fighter');
+      const worldRoot = new THREE.Group(); worldRoot.position.set(-8000, 0, 0);
+      const frig = new THREE.Group(); frig.position.set(8000, 900, 0);
+      const fouter = new THREE.Group(), fcorr = new THREE.Group();
+      worldRoot.add(frig); frig.add(fouter); fouter.add(fcorr); fcorr.add(fo.root);
+      fcorr.scale.setScalar(mpu);
+      const fx = VX.createVaporFx({ root: fo.root, outer: fouter, survey, mpu, anchors: null, rig: frig, register: () => () => {}, aircraftId: 'fighter' });
+      const fcam = new THREE.PerspectiveCamera();
+      const tipX = fx.debug.tipLocal[0].x;
+      for (let i = 0; i < 60; i++) {
+        frig.position.z -= flight.speed / 60;
+        worldRoot.updateMatrixWorld(true);
+        fcam.position.set(tipX, 900, frig.position.z + 30);
+        fx.update(flight, fcam, 1 / 60, { allowed: true, held: false });
+      }
+      const rb = fx.debug.ribbons, eye = new THREE.Vector3(tipX, 0, 30);
+      let near = 0, nearLit = 0, far = 0;
+      for (let i = 0; i < rb.trails[0].length; i++) {
+        const sp = rb.trails[0][rb.trails[0].length - 1 - i];
+        const a = rb.alpha.getX(i * 2);
+        const d = Math.hypot(sp.p.x - eye.x, sp.p.z - eye.z);
+        if (d < 3.5) { near++; if (a > 1e-3) nearLit++; } else if (d > 25 && a > 0.05) far++;
+      }
+      out.vapor.floatingOrigin = { near, nearLit, far };
+      fx.dispose();
+    }
+
+    // The owner hook: while the condensation owns the tips, the ribbons stand down.
+    const release = AE.setWingVaporOwner(() => true);
+    out.ribbonsOwned = AE.wingVaporStrength(ribbonsFlight);
+    release();
+    out.ribbonsReleased = AE.wingVaporStrength(ribbonsFlight);
 
     // The whole mount, as PlayerPlane calls it.
     const m = await cloneOf('warbird-prop');
@@ -291,9 +357,9 @@ async function runLeg(on) {
     mrig.add(mouter); mouter.add(mcorr); mcorr.add(m.root);
     mouter.add(new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial()));
     const mb = snapshot(m.root);
-    const mounted = LA.mountLivingAirframe({ flight: { ...flight, playerRig: mrig }, aircraft: { id: 'warbird-prop' }, entry: m.entry, root: m.root, correction: { scale: 1 }, anchors: null });
+    const mounted = LA.mountLivingAirframe({ flight: { ...flight, playerRig: mrig }, aircraft: { id: 'warbird-prop' }, entry: m.entry, root: m.root, correction: { scale: 10 / survey.length }, anchors: null });
     mounted.update({ camera: cam }, 1 / 60);
-    out.mount = { detail: !!mounted.detail, discs: mounted.detail?.discs.length ?? 0 };
+    out.mount = { detail: !!mounted.detail, vapor: !!mounted.vapor, discs: mounted.detail?.discs.length ?? 0 };
     mounted.dispose();
     out.mount.restored = sameAs(mb, snapshot(m.root)) && mouter.children.length === 2;
   } else {
@@ -303,11 +369,32 @@ async function runLeg(on) {
     rig.add(outer); outer.add(corr); corr.add(root);
     const before = snapshot(root);
     out.mountNull = LA.mountLivingAirframe({ flight: { playerRig: rig }, aircraft: { id: 'fighter' }, entry, root, correction: { scale: 1 }, anchors: null }) === null;
+    out.vaporNull = VX.createVaporFx({ root, outer, survey: { length: 1 }, mpu: 1, anchors: null, rig, register: () => () => {}, aircraftId: 'fighter' }) === null;
     out.lightsCount = null;
     out.mountUntouched = sameAs(before, snapshot(root)) && outer.children.length === 1;
   }
   out.ribbonsAfter = AE.wingVaporStrength(ribbonsFlight);
 
+  // Physics (pure; the same functions both legs, compared in the parent).
+  const L = (id, span, area) => VX.airframeLoading(id, span, area);
+  const humid = { cloudCoverage: 0.8, overcast: 0.3, fog: 0, cloudBase: 1500, cloudThickness: 1500 };
+  const dry = { cloudCoverage: 0, overcast: 0, fog: 0, cloudBase: 3000, cloudThickness: 500 };
+  const fighter = L('fighter', 13, 50), prop = L('prop', 11, 16), airliner = L('airliner', 60, 360);
+  const a1000 = VX.isaAir(1000).a;
+  const T = (o) => VX.vaporTargets({ altM: 1000, groundM: 0, env: humid, loading: fighter, load: 1, ...o });
+  out.physics = {
+    machBand: [0.7, 0.95, 1.25].map((M) => +T({ speed: M * a1000 }).cone.toFixed(3)),
+    coneDry: +VX.vaporTargets({ speed: 0.95 * VX.isaAir(11500).a, altM: 11500, env: dry, loading: fighter }).cone.toFixed(3),
+    sheetLoad: [1, 2, 6].map((n) => +T({ speed: 230, load: n }).sheet.toFixed(3)),
+    tipsFighter: +T({ speed: 150, load: 7 }).tips.toFixed(3),
+    tipsProp: +T({ speed: 60, load: 3, loading: prop }).tips.toFixed(3),
+    tipsDry: +VX.vaporTargets({ speed: 200, altM: 1000, env: dry, loading: fighter, load: 1.5 }).tips.toFixed(3),
+    airlinerCruise: (() => { const t = VX.vaporTargets({ speed: 0.8 * VX.isaAir(11000).a, altM: 11000, env: humid, loading: airliner, load: 1 }); return [t.cone, t.sheet, t.tips].map((x) => +x.toFixed(3)); })(),
+    grounded: (() => { const t = T({ speed: 0.95 * a1000, load: 6, grounded: true }); return t.cone + t.sheet + t.tips; })(),
+    taxi: (() => { const t = T({ speed: 20, load: 6 }); return t.cone + t.sheet + t.tips; })(),
+    levelLoad: +VX.loadFactor({ speed: 200, pitch: 0, turnRate: 0, pitchRate: 0 }).toFixed(4),
+    turn60: +VX.loadFactor({ speed: 200, pitch: 0, turnRate: (9.80665 * Math.tan(Math.PI / 3)) / 200, pitchRate: 0 }).toFixed(4),
+  };
   return out;
 }
 
@@ -325,9 +412,9 @@ const on = run('on');
 const ids = Object.keys(EXPECT);
 
 // (1) off
-check('(1a) flags off: the block reads off', !off.flags.detail);
+check('(1a) flags off: both blocks read off', !off.flags.detail && !off.flags.vapor);
 check('(1b) flags off: applyAirframeDetail is null and every hangar clone is untouched', ids.every((id) => !off.fleet[id].applied && off.fleet[id].untouched), ids.filter((id) => off.fleet[id].applied || !off.fleet[id].untouched).join(', '));
-check('(1c) flags off: the mount is null; nothing added or patched', off.mountNull && off.mountUntouched);
+check('(1c) flags off: the mount and the condensation are null; nothing added or patched', off.mountNull && off.vaporNull && off.mountUntouched);
 check('(1d) flags off: the wingtip ribbons keep their strength', off.ribbonsBefore > 0 && off.ribbonsAfter === off.ribbonsBefore && on.ribbonsBefore === off.ribbonsBefore, `${off.ribbonsBefore}`);
 {
   const src = fs.readFileSync(path.join(ROOT, 'components/fly/PlayerPlane.jsx'), 'utf8');
@@ -350,7 +437,7 @@ check('(1d) flags off: the wingtip ribbons keep their strength', off.ribbonsBefo
 }
 
 // (2) on
-check('(2a) flags on: the block reads on', on.flags.detail);
+check('(2a) flags on: both blocks read on', on.flags.detail && on.flags.vapor);
 {
   const bad = [];
   for (const id of ids) {
@@ -373,7 +460,24 @@ check('(2f) a patch another owner drops is re-seated once by update()', on.heal.
 check('(2g) dispose under a later owner: ours turns pass-through, theirs stays', on.heal.passThrough && on.heal.oursReplaced);
 check('(2h) running lights: patched, moved to the sky overlays, restored', on.lights.count === 1 && on.lights.registered === 1 && on.lights.key && on.lights.text && on.lights.restored, JSON.stringify(on.lights));
 check('(2h2) floating lights seat on the skin (the fighter tail strobe, the airliner belly beacon), the wingtips stay, dispose restores', Object.values(on.seat).every((r) => r.seated >= 1 && r.target > 0.5 && r.tipsKept && r.restored), JSON.stringify(on.seat));
-check('(2i) the whole mount: finish + discs, then a clean dispose', on.mount.detail && on.mount.discs === 1 && on.mount.restored, JSON.stringify(on.mount));
+check('(2i) the whole mount: finish + discs + condensation, then a clean dispose', on.mount.detail && on.mount.vapor && on.mount.discs === 1 && on.mount.restored, JSON.stringify(on.mount));
+
+// (3) physics + the effect
+const p = on.physics;
+check('(3a) physics is the same function in both legs', JSON.stringify(p) === JSON.stringify(off.physics));
+check('(3b) the cone lives in its Mach band only (M0.7 / 0.95 / 1.25)', p.machBand[0] === 0 && p.machBand[1] > 0.5 && p.machBand[2] === 0, JSON.stringify(p.machBand));
+check('(3c) no cone in dry air at altitude', p.coneDry < 0.02, `${p.coneDry}`);
+check('(3d) the over-wing sheets grow with load (1 g / 2 g / 6 g)', p.sheetLoad[0] < 0.05 && p.sheetLoad[0] < p.sheetLoad[1] && p.sheetLoad[1] < p.sheetLoad[2] && p.sheetLoad[2] > 0.5, JSON.stringify(p.sheetLoad));
+check('(3e) tips: a pulling fighter in humid air yes; a light single, or a gentle turn in dry air, no', p.tipsFighter > 0.3 && p.tipsProp < 0.02 && p.tipsDry < 0.02, `${p.tipsFighter} / ${p.tipsProp} / ${p.tipsDry}`);
+check('(3f) an airliner cruising at FL360 makes nothing', p.airlinerCruise.every((x) => x < 0.02), JSON.stringify(p.airlinerCruise));
+check('(3g) on the ground and at taxi speed nothing', p.grounded === 0 && p.taxi === 0);
+check('(3g2) a fair-weather 1 g cruise condenses nothing on any of the hangar aircraft', ids.every((id) => on.fleet[id].cruise.every((x) => x < 0.05)), ids.filter((id) => !on.fleet[id].cruise.every((x) => x < 0.05)).map((id) => `${id} ${on.fleet[id].cruise}`).join(', ') || 'all 13');
+check('(3h) load factor: level 1 g, a coordinated 60° turn 2 g', Math.abs(p.levelLoad - 1) < 1e-3 && Math.abs(p.turn60 - 2) < 1e-3, `${p.levelLoad} / ${p.turn60}`);
+const v = on.vapor;
+check('(3i) the condensation builds (cone, sheet, tips), registers as sky overlays and runs', v.built && v.registered === 3 && JSON.stringify(v.names) === '["lw-vapor-cone","lw-vapor-sheet","lw-vapor-tips"]' && v.groups.every(Boolean) && v.stats.sheet > 0.3 && v.stats.tips > 0.1 && v.stats.draws >= 2, JSON.stringify(v.stats));
+check('(3j) not allowed (Low) draws nothing; dispose unregisters and removes', v.lowDraws === 0 && v.disposed);
+check('(3j2) floating origin: the ribbons fade beside a rebased eye (8 km anchor) and show away from it', v.floatingOrigin.near > 0 && v.floatingOrigin.nearLit === 0 && v.floatingOrigin.far > 0, JSON.stringify(v.floatingOrigin));
+check('(3k) while the condensation owns the tips the old ribbons stand down, and come back', on.ribbonsOwned === 0 && on.ribbonsReleased === on.ribbonsBefore);
 
 // (4) compile + link through three's own renderer
 const { chromium } = await import('playwright');
@@ -434,7 +538,7 @@ try {
     return out;
   }, on.programs);
   for (const [name, err, gpu] of results) check(`(4) ${name} compiles and links`, !err, err ?? gpu);
-  check('(4z) every program was compiled', results.length === on.programs.length && on.programs.length === 5, `${results.length} of ${on.programs.length}`);
+  check('(4z) every program was compiled', results.length === on.programs.length && on.programs.length === 8, `${results.length} of ${on.programs.length}`);
 } finally {
   await browser.close();
 }
