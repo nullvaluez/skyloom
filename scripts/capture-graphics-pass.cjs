@@ -241,6 +241,12 @@ async function waitTerrain(page, scene, t0, timeout) {
 
 async function waitSettled(page, scene) {
   const t0 = Date.now();
+  // --quick=ms: iteration mode for sky and cloud work (no terrain wait).
+  if (args.quick) {
+    await page.waitForFunction(() => !window.__fly.worldLoading, undefined, { timeout: 240000, polling: 1000 }).catch(() => {});
+    await page.waitForTimeout(Number(args.quick) || 20000);
+    return { quick: true, ms: Date.now() - t0 };
+  }
   const ready = { worldLoading: false, streamers: false };
   if (settleViewport) await page.setViewportSize(settleViewport);
   try {
