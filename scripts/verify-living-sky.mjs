@@ -3,14 +3,23 @@
  * (LIVING_CLOUDS, FAR_CLOUDS, CIRRUS, LIGHT_SHAFTS, LENS_FLARE, NIGHT_SKY).
  *
  *  (1) Flags OFF: the real cloud pass builds its four programs (and no shaft
- *      targets) with texts byte-identical to a tree where the Living World
- *      modules do nothing — the previous frame by construction.
+ *      targets or far-deck filter) with texts byte-identical to a tree where
+ *      the Living World modules do nothing — the previous frame by construction.
  *  (2) Flags ON: the Enhanced march and composite carry every addition
- *      (one marker per block) and the Classic pair is untouched.
+ *      (one marker per block, plus the far deck's slope and upsampling and the
+ *      shaft darkening's physical bound) and the Classic trio is untouched.
  *  (3) WebGL2 (SwiftShader is fine): every patched program, plus the two shaft
- *      programs, compiles and links under three's ShaderMaterial prefix.
+ *      programs and the far filter, compiles and links under three's
+ *      ShaderMaterial prefix.
  *  (4) The galactic frame: the north galactic pole sits where an almanac puts
  *      it (Polaris check and two fixed instants), and stays unit length.
+ *  (5) The cloud ambient follows the sky at the deck: as authored under a high
+ *      sun, dimmer and no bluer than the old zenith tint at a 5-degree sun;
+ *      the bases' (ground-facing) ambient neutral by day and dimmed alike.
+ *  (6) Pre-existing fix, either way: the Enhanced reconstruction compares tap
+ *      depths only within the cloud reach (no 1-px horizon line); Classic as was.
+ *  (7) The far deck turns into its mean band where a pixel's footprint along
+ *      the shell spans many clouds, and that band's cover follows the deck's.
  *
  * Run: node scripts/verify-living-sky.mjs
  * Legs run in child processes because each flag is a page-load (module-load)
@@ -44,6 +53,8 @@ async function buildTexts(on) {
   const out = {
     classicMarch: pass.marchMaterial.fragmentShader,
     classicComposite: pass.compositeMaterial.fragmentShader,
+    classicFilter: pass.filterMaterial.fragmentShader,
+    filter: pass.r25.filter ? pass.r25.filter.fragmentShader : null,
     march: pass.r25.march.fragmentShader,
     composite: pass.r25.composite.fragmentShader,
     vertex: pass.r25.march.vertexShader,
@@ -62,6 +73,26 @@ async function buildTexts(on) {
     // (Sagittarius at ~23h local in July), the pole high in the north-west.
     NS.updateNightSky(u, { timeMs: Date.UTC(2026, 6, 18, 3), latDeg: 40, lonDeg: -83, elapsed: 10 });
     out.galactic = { pole: u.uLivGalPole.value.toArray(), centre: u.uLivGalCenter.value.toArray(), polaris };
+    // The cloud ambient under a high and a low sun (Alps deck, clear air).
+    const { createCinemaEnvironment, evaluateCinemaEnvironment } = await imp('lib/fly/cinema-environment.js');
+    const { applyCinemaArt } = await imp('lib/fly/cinema-art.js');
+    const { applyPhysicalSky, PHYS_TWILIGHT } = await imp('lib/fly/atmosphere/runtime.js');
+    const LC = await imp('lib/fly/living-clouds.js');
+    out.ambient = {};
+    for (const el of [62.8, 4.8]) {
+      const e = createCinemaEnvironment();
+      evaluateCinemaEnvironment(e, { sinEl: Math.sin((el * Math.PI) / 180), az: 0 }, { overcastT: 0, fogT: 0, presenceFrac: 1 }, PHYS_TWILIGHT);
+      applyCinemaArt(e);
+      applyPhysicalSky(e, { camera: { position: { y: 2600 } } }, PHYS_TWILIGHT);
+      const z = e.zenith, zl = 0.2126 * z[0] + 0.7152 * z[1] + 0.0722 * z[2];
+      LC.updateLivingClouds(pass.r25.uniforms, { name: 'high' }, { env: e, sky: z, sinEl: e.sunDir[1], cloudBase: 2400, cloudThickness: 2300, dt: 0 });
+      out.ambient[el] = { tint: pass.r25.uniforms.uLivSkyTint.value.toArray(), ground: pass.r25.uniforms.uLivGroundTint.value.toArray(), zenithTint: z.map((c) => 1 + (c / zl - 1) * 0.35) };
+    }
+    // The far deck's mean band (past a pixel's resolvable footprint) at two coverages.
+    out.farRes = [0.44, 0.88].map((coverage) => {
+      LC.updateLivingClouds(pass.r25.uniforms, { name: 'high' }, { cloudBase: 2400, cloudThickness: 2300, dt: 0, coverage });
+      return pass.r25.uniforms.uLivFarRes.value.toArray();
+    });
   }
   return out;
 }
@@ -81,24 +112,37 @@ const on = run('on');
 // (1) off: no Living World edits, no shafts, no extra uniforms.
 check('(1a) flags off: the Enhanced march carries no Living World code', !/\bliv[A-Z]/.test(off.march));
 check('(1b) flags off: the Enhanced composite carries no Living World code', !/\bliv[A-Z]/.test(off.composite));
-check('(1c) flags off: no shaft targets, no Living uniforms', off.shafts === null && !off.uniforms.some((k) => /^uLiv[A-Z]/.test(k)));
+check('(1c) flags off: no shaft targets, no far filter, no Living uniforms', off.shafts === null && off.filter === null && !off.uniforms.some((k) => /^uLiv[A-Z]/.test(k)));
 // (2) on: each block's marker, and the Classic pair untouched.
 const marks = {
   LIVING_CLOUDS: on.march.includes('float cloudShade=livKeyDepth(p,footprint);') && on.march.includes('livScatter(mu,cloudShade,powder)'),
-  FAR_CLOUDS: on.march.includes('livFarDeck(ray,livTR,metricRay,rayCone,livSceneT,livFarL,livFarA);'),
+  FAR_CLOUDS: on.march.includes('livFarDeck(ray,livTR,metricRay,rayCone,livSceneT,livFarL,livFarA);') && on.march.includes('float cx=dFdx(col),cy=dFdy(col)')
+    && !!on.filter?.includes('mix(.008,.04,smoothstep(15000.,30000.,fb))') && on.composite.includes('*mix(.008,.04,smoothstep(15000.,30000.,min('),
   CIRRUS: on.march.includes('livCirrus(ray,livTR,metricRay,rayCone,livSceneT,livFarL,livFarA);'),
-  LIGHT_SHAFTS: on.composite.includes('livShaftLight(vUv,') && !!on.shafts,
+  LIGHT_SHAFTS: on.composite.includes('livShaftLight(vUv,') && !!on.shafts && (!on.composite.includes('void pskyAerial(') || on.composite.includes('l=max(l,-S*uPskySunIllum);')),
   LENS_FLARE: on.composite.includes('livLens(vUv)'),
   NIGHT_SKY: on.composite.includes('light+=livMilkyWay(ray)*uCinemaOptics.y;') && on.composite.includes('livTwinkle(cell,ray.y)'),
 };
 check('(2a) flags on: every block is in its program', Object.values(marks).every(Boolean), JSON.stringify(marks));
-check('(2b) flags on: the Classic march and composite are byte-identical to flags off', on.classicMarch === off.classicMarch && on.classicComposite === off.classicComposite);
+check('(2b) flags on: the Classic march, composite and filter are byte-identical to flags off', on.classicMarch === off.classicMarch && on.classicComposite === off.classicComposite && on.classicFilter === off.classicFilter);
 check('(2c) flags on: the TRUE_SCALE and HDR_GUARD edits survive', on.march.includes('tsTrueRay') === off.march.includes('tsTrueRay') && on.composite.includes('hdrSafe(') === off.composite.includes('hdrSafe('));
+// (6) the horizon line (pre-existing, so flags on and off alike)
+const reach = (t) => t.includes('float cloudReach=rangeM*max(metricScale,1.)*1.1;') && t.includes('max(cloudReach-min(sampleDistance,');
+check('(6) the Enhanced reconstruction compares depths within the cloud reach, flags on and off; Classic untouched', reach(on.composite) && reach(off.composite) && !reach(off.classicComposite));
 
 // (4) the galactic frame
 const g = on.galactic;
 const len = (v) => Math.hypot(...v);
 check('(4a) Polaris from 40N stands ~40 deg up, due north', Math.abs(g.polaris.up - 40) < 1.2 && g.polaris.north > 0.7 && Math.abs(g.polaris.east) < 0.03, JSON.stringify(g.polaris));
+// (5) the cloud ambient against the sky at the deck
+const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+const hi = on.ambient['62.8'], lo = on.ambient['4.8'];
+check('(5a) high sun: the ambient as authored (level ~1, chroma near the old tint)', Math.abs(lum(hi.tint) - 1) < 0.05 && Math.abs(hi.tint[2] / hi.tint[0] - hi.zenithTint[2] / hi.zenithTint[0]) < 0.25, JSON.stringify(hi));
+check('(5b) 5-deg sun: the ambient dims with the sky and is no bluer than the zenith tint', lum(lo.tint) > 0.45 && lum(lo.tint) < 0.85 && lo.tint[2] / lo.tint[0] < lo.zenithTint[2] / lo.zenithTint[0], JSON.stringify(lo));
+check('(5c) the bases face the ground: neutral under a high sun, dimmed by the same level at a low one', Math.abs(hi.ground[2] / hi.ground[0] - 1) < 0.05 && Math.abs(lum(lo.ground) - lum(lo.tint)) < 0.01, JSON.stringify({ hi: hi.ground, lo: lo.ground }));
+// (7) the far deck past its resolvable footprint
+const [r44, r88] = on.farRes;
+check('(7) far deck: a mean band from 0.9 to 3.5 km of footprint, its cover following the deck coverage', r44[0] === 900 && r44[1] === 3500 && Math.abs(r44[2] - 0.05) < 1e-6 && Math.abs(r88[2] - 0.1) < 1e-6 && on.march.includes('uLivFarRes'), JSON.stringify(on.farRes));
 check('(4b) July 23h local, Ohio: the galactic centre low in the south, the pole high', g.centre[1] > 0 && g.centre[1] < 0.45 && g.centre[2] > 0.6 && g.pole[1] > 0.45 && Math.abs(len(g.pole) - 1) < 1e-9 && Math.abs(len(g.centre) - 1) < 1e-9, `centre ${g.centre.map((x) => x.toFixed(2))} pole ${g.pole.map((x) => x.toFixed(2))}`);
 
 // (3) compile + link in WebGL2
@@ -108,7 +152,7 @@ const fs = await import('node:fs');
 const browser = await chromium.launch({ executablePath: fs.existsSync(exe) ? exe : undefined, headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 try {
   const page = await browser.newPage();
-  const programs = [['march', on.vertex, on.march], ['composite', on.vertex, on.composite], ['shaft-source', on.vertex, on.shafts.source], ['shaft-blur', on.vertex, on.shafts.blur], ['march (off)', off.vertex, off.march], ['composite (off)', off.vertex, off.composite]];
+  const programs = [['march', on.vertex, on.march], ['composite', on.vertex, on.composite], ['shaft-source', on.vertex, on.shafts.source], ['shaft-blur', on.vertex, on.shafts.blur], ['far filter', on.vertex, on.filter], ['march (off)', off.vertex, off.march], ['composite (off)', off.vertex, off.composite]];
   const results = await page.evaluate((programs) => {
     const gl = document.createElement('canvas').getContext('webgl2');
     // three's ShaderMaterial prefix (r185, GLSL3), the parts these programs use.
