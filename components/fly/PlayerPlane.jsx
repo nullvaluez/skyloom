@@ -348,6 +348,31 @@ function PlayerModel({ flight, aircraft }) {
     },
     [gradedMats]
   );
+  // LIVING WORLD AIRFRAME — begin
+  // FLY_LIVING_WORLD.md (VAPOR_FX, AIRFRAME_DETAIL): the airframe finish
+  // (panel lines, glass and a pilot, propeller discs, running lights that read
+  // by day) and condensation round it, all in lib/fly/living-airframe.js. It
+  // is imported here rather than at the top so every edit to this file stays
+  // inside this block; it patches the graded materials after they exist (the
+  // livery paint's own idiom). With both flags off the mount returns null and
+  // nothing is patched, added or drawn.
+  const livingAirframe = useRef(null);
+  useEffect(() => {
+    let live = true;
+    let mounted = null;
+    import('@/lib/fly/living-airframe').then(({ mountLivingAirframe }) => {
+      if (!live) return;
+      mounted = mountLivingAirframe({ flight, aircraft, entry, root: cloned, correction, anchors });
+      livingAirframe.current = mounted;
+    });
+    return () => {
+      live = false;
+      if (livingAirframe.current === mounted) livingAirframe.current = null;
+      mounted?.dispose();
+    };
+  }, [flight, aircraft, entry, cloned, correction, anchors, gradedMats]);
+  useFrame((state, dt) => livingAirframe.current?.update(state, dt));
+  // LIVING WORLD AIRFRAME — end
   return (
     <group>
       <group rotation-y={correction.rotY} scale={correction.scale}>
