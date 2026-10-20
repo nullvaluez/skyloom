@@ -104,8 +104,14 @@ water became a flat mirror with a pin-point sun, everywhere the same teal.
   a mosaic of captures, so every capture and LOD edge showed on the water as
   rectangles and stair-steps (the owner's report over the Hudson and New York
   Harbor). It now uses one physical deep-water albedo with the vector shore
-  band; reef and sandbar shallows read deep blue until a seam-free colour
-  source (the consistent z11 mosaic) is wired in. `scripts/verify-sea-seams.mjs`.
+  band, plus a **regional colour from the z11 mosaic** (one colour-balanced
+  capture, no edges): a water-only layer in mip 1 of the R25 reference atlas
+  (~600 m texels of open-water pixels only, clouds and glint rejected),
+  sampled in world space across tiles, applied only where it is clearly
+  greener or redder than the deep albedo (shallows, reefs, sediment), with
+  reach and warp fades so streaming never shows. The atlas now follows the
+  camera at every altitude on desktop (1.25 MiB); phones, tablets and Low keep
+  the uniform albedo. `scripts/verify-sea-seams.mjs`, `verify-cruise-color.mjs`.
 - **Light through backlit crests** at low sun; **0.5 m glitter facets** that
   converge to the smooth lobe as the footprint grows; **whitecaps** at the
   measured coverage for the wind (Monahan & O'Muircheartaigh 1980: ~0.1 % at
