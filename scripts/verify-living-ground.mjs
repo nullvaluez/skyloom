@@ -329,14 +329,19 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
   const tod = (el, east) => GMm.mistTimeOfDay(el, east, GM);
   const dawn = tod(1, 1), dusk = tod(1, -1), night = tod(-25, 1), noon = tod(50, 1), late = tod(10, 1);
   const humid = GMm.mistHumidity(1, 0, GM);
-  // Floor: down to a valley in ~floorSec[0], up out of it slowly; re-seeded by a warp.
+  // Floor: seeded by a warp from a half-loaded DEM and following it fast while
+  // it converges; then down to a valley in ~floorSec[0], up out of it slowly.
   const st = { y: NaN, epoch: -1 };
-  GMm.stepMistFloor(st, 1000, 0.016, 0, GM);
-  for (let i = 0; i < 600; i++) GMm.stepMistFloor(st, 600, 0.05, 0, GM); // 30 s over a valley
+  let t = 0;
+  GMm.stepMistFloor(st, 0, 0.016, 0, GM, t); // the warp lands before the DEM: 0 m
+  for (let i = 0; i < 100; i++) GMm.stepMistFloor(st, 1000, 0.05, 0, GM, (t += 0.05)); // 5 s: the DEM says 1000 m
+  const settled = st.y;
+  t = GM.settleSec + 10;
+  for (let i = 0; i < 600; i++) GMm.stepMistFloor(st, 600, 0.05, 0, GM, (t += 0.05)); // 30 s over a valley
   const down = st.y;
-  for (let i = 0; i < 600; i++) GMm.stepMistFloor(st, 1400, 0.05, 0, GM); // 30 s over a ridge
+  for (let i = 0; i < 600; i++) GMm.stepMistFloor(st, 1400, 0.05, 0, GM, (t += 0.05)); // 30 s over a ridge
   const up = st.y;
-  GMm.stepMistFloor(st, 50, 0.05, 1, GM); // warp
+  GMm.stepMistFloor(st, 50, 0.05, 1, GM, t); // the next warp
   const seeded = st.y === 50;
   // Closed form vs numerical integration of exp(-max(y,-cap)/H) along the segment.
   const numeric = (L, a, b, H, cap) => { let s = 0; const n = 20000; for (let i = 0; i < n; i++) { const y = a + (b - a) * ((i + 0.5) / n); s += Math.exp(-Math.max(y, -cap) / H); } return (s / n) * L; };
@@ -359,8 +364,8 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
   check('(7a) mist amount: dawn > dusk > night > noon = 0; humid air adds; the morning window closes after the sun climbs',
     dawn === 1 && dusk < dawn && dusk > night && night > 0 && noon === 0 && late < dawn && late > 0 && humid === GM.humid.fog,
     `dawn ${dawn.toFixed(2)} dusk ${dusk.toFixed(2)} night ${night.toFixed(2)} 10deg ${late.toFixed(2)} noon ${noon}`);
-  check('(7b) floor: follows a valley down in ~10 s, rises out of it slowly, re-seeds on a warp',
-    down < 600 + 25 && up < 1000 && up > down && seeded, `30 s down -> ${down.toFixed(1)} m, 30 s up -> ${up.toFixed(1)} m`);
+  check('(7b) floor: re-seeds on a warp and follows the arriving DEM fast, then follows a valley down in ~10 s and rises out of it slowly',
+    settled > 850 && down < 600 + 25 && up < 1000 && up > down && seeded, `after the warp 5 s -> ${settled.toFixed(0)} m; 30 s down -> ${down.toFixed(1)} m, 30 s up -> ${up.toFixed(1)} m`);
   check('(7c) closed-form optical depth = numerical integration (within 0.5%)', errs.every((e) => e < 0.005), errs.map((e) => (e * 100).toFixed(3) + '%').join(' '));
   check('(7d) cover field in [0,1], periodic over 65,536 scene units, unmoved by a rebase', inRange && periodic && rebase);
 }
