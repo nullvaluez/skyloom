@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable react-hooks/immutability, react-hooks/purity -- Three.js buffers and materials are imperative render objects updated by useFrame (the Contrail.jsx convention); the streak seeds are drawn once per mount inside useMemo, where any random value is as good as another. */
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -15,6 +16,8 @@ import {
   Vector2,
 } from 'three';
 import { WEATHER } from '@/lib/fly/fly-constants';
+import { registerSkyOverlay } from '@/lib/fly/sky-overlay-pass';
+import { livingWorldOn } from '@/lib/fly/living-world';
 import { useFlyStore } from '@/stores/fly-store';
 
 /**
@@ -249,6 +252,12 @@ export function PrecipLayer({ runtime, flight }) {
       }
     };
   }, [built]);
+
+  // LIVING WORLD (RAIN_OVERLAY): the streaks write no depth, so the Enhanced
+  // cloud composite, which replaces every depth-empty pixel with the sky,
+  // erased each streak seen against open sky (FLY_LIVING_WORLD.md). As a sky
+  // overlay they draw after it, still depth-tested against terrain and hulls.
+  useEffect(() => (built && livingWorldOn('RAIN_OVERLAY') ? registerSkyOverlay(built.mesh) : undefined), [built]);
 
   useFrame((state) => {
     if (!built) return;

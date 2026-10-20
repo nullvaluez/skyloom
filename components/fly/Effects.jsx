@@ -5,6 +5,8 @@ import {isMobileGraphicsClass} from '@/lib/fly/device-class';
 import { resolveSatelliteAtmosphere } from '@/lib/fly/satellite-atmosphere';
 import { immersiveOn } from '@/lib/fly/immersive';
 import { ImmersiveCloudPass } from '@/lib/fly/immersive-cloud-pass';
+// LIVING WORLD (FILM_GRADE): display-space grain, merged into the grade pass.
+import { FilmGradeEffect, filmGradeOn } from '@/lib/fly/film-grade';
 import { SkyOverlayPass, setSkyOverlayDeferred } from '@/lib/fly/sky-overlay-pass';
 // R25 C SKY: the Enhanced aerial variant + the tint-only grade, both decided
 // by r25On (through aerialR25Wanted), so Classic builds today's chain exactly.
@@ -376,6 +378,15 @@ export function buildPassList(style, tier, ctx = {}) {
     el: () => <Vignette key="vignette" eskil={false} offset={0.25} darkness={0.55} />,
     raw: () => new VignetteEffect({ eskil: false, offset: 0.25, darkness: 0.55 }),
   });
+  // LIVING WORLD (FILM_GRADE): after the grade and vignette, display-referred;
+  // a non-convolution effect, so it merges into the same EffectPass (no pass).
+  if (sat && cinemaOn() && filmGradeOn(tier)) {
+    list.push({
+      id: 'film-grade',
+      el: () => <primitive key="film-grade" object={ctx.filmGrade} dispose={null} />,
+      raw: () => new FilmGradeEffect(),
+    });
+  }
   list.push(smaaSpec(ctx));
   if (toneMode != null) list.push(toneSpec(toneMode));
 
@@ -600,6 +611,8 @@ export const Effects = memo(function Effects({ runtime }) {
   );
   const hdrGrade = useMemo(() => new HDRGradeEffect(), []);
   useEffect(() => () => hdrGrade.dispose(), [hdrGrade]);
+  const filmGrade = useMemo(() => new FilmGradeEffect(), []);
+  useEffect(() => () => filmGrade.dispose(), [filmGrade]);
 
   // Round 19 (B): depth-based aerial perspective. Mounted ONLY on satellite +
   // high tier — declaring EffectAttribute.DEPTH makes the composer allocate a
@@ -852,6 +865,7 @@ export const Effects = memo(function Effects({ runtime }) {
         aerial,
         whiteBalance,
         hdrGrade,
+        filmGrade,
         smaa,
         n8ao: aoPass,
         clouds,
@@ -869,6 +883,7 @@ export const Effects = memo(function Effects({ runtime }) {
       aerial,
       whiteBalance,
       hdrGrade,
+      filmGrade,
       smaa,
       aoPass,
       clouds,
