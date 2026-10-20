@@ -18,6 +18,7 @@ const TERRAIN_ATTRIBUTIONS = [
   { label: '© OpenStreetMap contributors', href: 'https://www.openstreetmap.org/copyright' },
   { label: '© OpenMapTiles', href: 'https://www.openmaptiles.org/' },
   { label: 'Tiles © OpenFreeMap', href: 'https://openfreemap.org' },
+  { label: 'Night lights: NASA Black Marble (VIIRS) via GIBS', href: 'https://earthdata.nasa.gov/gibs' },
   { label: 'Terrain © Esri', href: 'https://www.esri.com/en-us/legal/terms/data-attributions' },
   { label: 'Flight data © adsb.lol', href: 'https://adsb.lol' },
   { label: 'Flight data © adsb.fi', href: 'https://adsb.fi' },
