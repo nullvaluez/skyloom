@@ -159,6 +159,19 @@ line only the twilight and physical sky texts carry, so `?flags=-PHYS_SKY`
 threw at load and `verify-phys-sky` crashed (12/0 on `ebfb6ab`). Fixed in
 `3b36fd4`.
 
+**Two lines of the same pass.** The cloud session was not gone: after its limit
+reset it went on pushing to `claude/vigilant-newton-moag9y` (its own GROUND, SKY
+tweaks, a gallery page, a Milky Way skyglow fade), none of it run on a GPU. The
+owner chose this line, which lives on `claude/living-world-rtx`; the cloud
+branch is left as it is. Ported from it after a check here: the skyglow fade
+(`0bafd5f`, now eased so a recompute never steps the band) and the gallery page
+(`fe72d8b`).
+
+**Gallery.** `docs/reviews/living-world/` holds the 14 before/after WebP pairs
+(production builds of `ebfb6ab` and the final tree, RTX 5080), `index.json` and
+`notes.json`; `node scripts/build-living-world-gallery.cjs --out=<page>` builds
+the page (it expects the images under `img/` beside it).
+
 ### Owner checkpoints
 
 - The wordmark's thread through "loom" can read as a strikethrough.
@@ -169,7 +182,7 @@ threw at load and `verify-phys-sky` crashed (12/0 on `ebfb6ab`). Fixed in
   `FAR_CLOUDS.meanCover` and `formDensity` restore presence.
 - Vapour strength in hard turns (`VAPOR_FX`), and a possible hitch the first
   time an aircraft mounts while its patched programs compile.
-- City lights at low altitude still read as a bright band beyond ~5 km.
+- City lights from low altitude: the far city is brighter than the ground beneath you, and at dusk it reads pale (gallery: Manhattan at dusk).
 - The reflector floor renders the hangar twice on Medium and up: frame cost.
 - Every fps and feel verdict, and the iPhone, remain the owner's.
 
