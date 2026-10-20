@@ -285,7 +285,10 @@ async function enterPhoto(page, photo) {
   const proxy = process.env.HTTPS_PROXY ? { server: process.env.HTTPS_PROXY, bypass: 'localhost,127.0.0.1' } : undefined;
   const browser = await chromium.launch({
     executablePath: fs.existsSync(CHROME) ? CHROME : undefined, headless: true, proxy,
-    args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'],
+    // The cloud container has no GPU; on the owner's Windows workstation the
+    // real one is D3D11 through ANGLE. FLY_SOFTWARE=1 forces SwiftShader.
+    args: [...(process.env.FLY_SOFTWARE === '1' || process.platform !== 'win32' ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : ['--use-angle=d3d11']),
+      '--ignore-gpu-blocklist', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'],
   });
   report.browser = browser.version();
   const wanted = args.scenes ? String(args.scenes).split(',') : null;
