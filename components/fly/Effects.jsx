@@ -62,6 +62,7 @@ import { WhiteBalanceEffect } from './WhiteBalance';
 import { AerialPerspectiveEffect } from './AerialPerspective';
 import { SpeedLinesEffect, speedFeelStrength } from './SpeedLines';
 import { FlyEffectComposer } from './FlyEffectComposer';
+import { attachLivingGround } from '@/lib/fly/living-ground';
 import {
   createN8AOPass,
   disposeN8AOPass,
@@ -529,6 +530,9 @@ export const Effects = memo(function Effects({ runtime }) {
   const scene = useThree((s) => s.scene);
   const clouds = useMemo(() => sat && immersiveOn('clouds') ? new ImmersiveCloudPass(flightCamera,runtime) : null, [sat,flightCamera,runtime]);
   useEffect(() => () => clouds?.dispose(), [clouds]);
+  // LIVING WORLD GROUND: hands the aerial pass the runtime its city lights
+  // and valley mist read. A no-op with NIGHT_LIGHTS and GROUND_MIST off.
+  useEffect(() => attachLivingGround(runtime), [runtime]);
   // The overlay pass exists exactly when the cloud pass does, and the overlays
   // move to its layer in the SAME commit that puts it in the chain (the
   // composer's own pass assembly is a child layout effect, so it has already
