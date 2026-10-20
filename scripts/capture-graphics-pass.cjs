@@ -15,6 +15,7 @@
  *   node scripts/capture-graphics-pass.cjs --url=http://localhost:3097 --label=after
  *   options: --scenes=id,id  --width=1600 --height=900  --quality=high|ultra
  *            --flags=NAME,-NAME (appended to the page URL)  --settle=ms
+ *            --append (merge into an existing set)  --scenes=menus|pause|<pose ids>
  *
  * Environment truth: in the cloud container WebGL is SwiftShader (software),
  * so frames take seconds each. These are LOOK captures, never fps evidence.
@@ -98,7 +99,14 @@ const report = {
     traffic: 'synthetic, fixed epoch', date: '2026-07-18 (local solar hours per pose)' },
   scenes: SCENES, captures: [], errors: [], console: [],
 };
-const save = () => fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify(report, null, 2));
+// --append: recapture some poses into an existing set (e.g. one that timed
+// out); captures of the same pose are replaced, everything else is kept.
+const prior = args.append && fs.existsSync(path.join(out, 'manifest.json')) ? JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8')) : null;
+const save = () => {
+  const merged = prior ? { ...report, captures: [...prior.captures.filter((c) => !report.captures.some((n) => n.scene === c.scene)), ...report.captures],
+    errors: [...prior.errors.filter((e) => !report.captures.some((n) => n.scene === e.scene)), ...report.errors], appended: [...(prior.appended ?? []), report.capturedAt] } : report;
+  fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify(merged, null, 2));
+};
 
 async function newPage(browser) {
   const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
@@ -178,7 +186,7 @@ function thawClock(page) {
 const CANVAS_ONLY = 'body * { visibility:hidden!important; } canvas[data-capture-canvas] { visibility:visible!important; }';
 
 async function shoot(page, file, { ui = false } = {}) {
-  await page.screenshot({ path: path.join(out, file), timeout: 120000, ...(ui ? {} : { style: CANVAS_ONLY }) });
+  await page.screenshot({ path: path.join(out, file), timeout: 300000, ...(ui ? {} : { style: CANVAS_ONLY }) });
   console.log(`CAPTURE ${label} ${file}`);
 }
 
@@ -355,8 +363,9 @@ async function enterPhoto(page, photo) {
       }
       save();
     }
-    // ---- The pause menu over the last pose. ----
-    if (!wanted || wanted.includes('menus')) {
+    // ---- The pause menu over the last pose (--scenes=overcast-rain,pause
+    // recaptures it alone over the full run's last pose). ----
+    if (!wanted || wanted.includes('menus') || wanted.includes('pause')) {
       try {
         currentScene = { id: 'menu-pause' };
         await page.keyboard.press('Escape');

@@ -3,14 +3,14 @@
  *
  * Reads the two manifests written by scripts/capture-graphics-pass.cjs and,
  * for every capture present in both arms, writes:
- *   <id>-before.jpg, <id>-after.jpg   (full size, JPEG q84)
- *   <id>-compare.jpg                  (side by side, labelled)
+ *   <id>-before.webp, <id>-after.webp   (full size, WebP q82)
+ *   <id>-compare.webp                   (side by side, labelled)
  * plus index.json for the gallery. Pixels are the captures' own: resized and
  * re-encoded only, never retouched.
  *
  *   node scripts/compose-graphics-pass.cjs \
  *     --before=.graphics-review/living-world/before --after=.graphics-review/living-world/after \
- *     --out=docs/living-world
+ *     --out=docs/reviews/living-world
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -19,7 +19,7 @@ const sharp = require('sharp');
 const args = Object.fromEntries(process.argv.slice(2).map((s) => { const [k, ...v] = s.replace(/^--/, '').split('='); return [k, v.join('=') || true]; }));
 const beforeDir = path.resolve(args.before || '.graphics-review/living-world/before');
 const afterDir = path.resolve(args.after || '.graphics-review/living-world/after');
-const out = path.resolve(args.out || 'docs/living-world');
+const out = path.resolve(args.out || 'docs/reviews/living-world');
 const readManifest = (d) => JSON.parse(fs.readFileSync(path.join(d, 'manifest.json'), 'utf8'));
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -49,15 +49,15 @@ function label(width, height, text, sub, align) {
     const [title, detail] = menuTitles[id] ?? [meta.title ? `${meta.title}${id.endsWith('-hud') ? ' (HUD)' : ''}` : id, meta.detail ?? ''];
     const bi = sharp(path.join(beforeDir, b.file)), ai = sharp(path.join(afterDir, cap.file));
     const { width, height } = await ai.metadata();
-    await bi.clone().jpeg({ quality: 84, mozjpeg: true }).toFile(path.join(out, `${id}-before.jpg`));
-    await ai.clone().jpeg({ quality: 84, mozjpeg: true }).toFile(path.join(out, `${id}-after.jpg`));
+    await bi.clone().webp({ quality: 82 }).toFile(path.join(out, `${id}-before.webp`));
+    await ai.clone().webp({ quality: 82 }).toFile(path.join(out, `${id}-after.webp`));
     const w = Math.round(width / 2), h = Math.round(height / 2), gap = 6;
     const half = async (src, text, align) => sharp(await src.clone().resize(w, h).toBuffer()).composite([{ input: label(w, 92, text, `${title}${detail ? ` · ${detail}` : ''}`, align), top: 0, left: 0 }]).toBuffer();
     const left = await half(bi, 'Before', 'left'), right = await half(ai, 'After', 'right');
     await sharp({ create: { width: w * 2 + gap, height: h, channels: 3, background: '#05080f' } })
       .composite([{ input: left, left: 0, top: 0 }, { input: right, left: w + gap, top: 0 }])
-      .jpeg({ quality: 86, mozjpeg: true }).toFile(path.join(out, `${id}-compare.jpg`));
-    index.items.push({ id, title, detail, before: `${id}-before.jpg`, after: `${id}-after.jpg`, compare: `${id}-compare.jpg`, ui: !!cap.ui, ready: { before: b.ready ?? null, after: cap.ready ?? null } });
+      .webp({ quality: 84 }).toFile(path.join(out, `${id}-compare.webp`));
+    index.items.push({ id, title, detail, before: `${id}-before.webp`, after: `${id}-after.webp`, compare: `${id}-compare.webp`, ui: !!cap.ui, ready: { before: b.ready ?? null, after: cap.ready ?? null } });
     console.log(`COMPOSED ${id}`);
   }
   index.errors = { before: before.errors, after: after.errors };
