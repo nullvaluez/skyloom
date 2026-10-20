@@ -253,8 +253,9 @@ const fn = (src, name) => {
   return src.slice(i, Math.min(...ends));
 };
 check('(5a) the classic Bay is byte-identical to the starting commit (line endings normalised)', fn(hsNow, 'Bay') !== null && fn(hsNow, 'Bay') === fn(hsBase, 'Bay'), `${fn(hsNow, 'Bay')?.length ?? 0} chars`);
-// Comments aside, the one difference integration may add is the AIRFRAME call.
-const strip = (s) => s.replace(/\/\/[^\n]*/g, '').replace(/applyAirframeDetail\([^;]*\);/g, '').replace(/\s+/g, '');
+// Comments aside, the one difference integration may add is the AIRFRAME call
+// (it landed as one effect after the livery paint: the line holding the call).
+const strip = (s) => s.replace(/\/\/[^\n]*/g, '').replace(/^[^\n]*applyAirframeDetail[^\n]*$/gm, '').replace(/\s+/g, '');
 check('(5b) the shared Aircraft differs from the starting commit by comments (and the AIRFRAME call) only', strip(fn(hsNow, 'Aircraft')) === strip(fn(hsBase, 'Aircraft')));
 check('(5c) HangarScene renders Bay unless HANGAR_STAGE is on (one page-load decision)', /const STAGE = livingWorldOn\('HANGAR_STAGE'\);/.test(hsNow) && /\{STAGE\s*\?<StageBay [^>]*\/>\s*:<Bay aircraft=\{aircraft\} airport=\{airport\} onReady=\{onReady\} onError=\{onError\} onExteriorReady=\{onExteriorReady\} view=\{view\}\/>\}/.test(hsNow.replace(/\n\s*/g, '')));
 registerHooks();
@@ -266,7 +267,8 @@ check("(5d) the stage frames each view exactly where the Bay cuts to", JSON.stri
 const body = fn(hsNow, 'StageBay') ?? '';
 check('(6a) the reflector floor is off the cheap path only (phones and Low keep a plain floor)', /const cheap=isPhoneClass\(\)\|\|tier==='low';/.test(body) && /\{cheap\?<meshStandardMaterial[^>]*\/>\s*:<MeshReflectorMaterial /.test(body) && (body.match(/MeshReflectorMaterial/g) || []).length === 1);
 check('(6b) reduced motion: the camera cuts, the turntable stops, the dust holds still', /if\(readReducedMotion\(\)\|\|previous===next\)\{/.test(body) && /if\(m\.homing\|\|reduced\)/.test(body) && /if\(!reduced\)advanceHaze\(haze,dt\);/.test(body));
-check('(6c) the AIRFRAME_DETAIL integration point is marked (or wired) inside Aircraft', /applyAirframeDetail\(object, aircraft\.id[^;]*\);[\s\S]*return object;/.test(fn(hsNow, 'Aircraft')));
+check('(6c) the AIRFRAME_DETAIL integration point is marked (or wired) inside Aircraft', /applyAirframeDetail\(object, aircraft\.id[^;]*\);[\s\S]*return object;/.test(fn(hsNow, 'Aircraft'))
+  || /applyFleetLivery\([\s\S]*useEffect\(\(\)=>\{const finish=applyAirframeDetail\(clone,aircraft\.id,\{mode:'hangar'/.test(fn(hsNow, 'Aircraft')));
 const constants = lf(readFileSync(path.join(ROOT, 'lib/fly/fly-constants.js'), 'utf8'));
 check('(6d) both blocks ship on (their consumers are in this tree)', /export const FLIGHT_INSTRUMENTS = \{\n  enabled: true,/.test(constants) && /export const HANGAR_STAGE = \{\n  enabled: true,/.test(constants));
 
