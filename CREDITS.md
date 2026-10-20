@@ -72,6 +72,7 @@
 - © OpenStreetMap contributors — https://www.openstreetmap.org/copyright
 - © OpenMapTiles — https://www.openmaptiles.org/
 - Tiles © OpenFreeMap — https://openfreemap.org
+- Night lights: NASA Black Marble (VIIRS) via GIBS — https://earthdata.nasa.gov/gibs
 - Terrain © Esri — https://www.esri.com/en-us/legal/terms/data-attributions
 - Flight data © adsb.lol — https://adsb.lol
 - Flight data © adsb.fi — https://adsb.fi
