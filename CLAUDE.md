@@ -7,7 +7,7 @@
 >   Enhanced Satellite is the default on every device
 >   (`VISUALS.defaultProfile:'enhanced'`), and `R25_SKY` / `R25_GROUND` ship
 >   `enabled:true`.
-> - **Living World graphics pass (2026-10-20, branch `claude/vigilant-newton-moag9y`):**
+> - **Living World graphics pass (2026-10-20, merged to `main` from `claude/living-world-rtx`):**
 >   [FLY_LIVING_WORLD.md](FLY_LIVING_WORLD.md) is the plan and record — 17 flags
 >   (sky, clouds, trails, aircraft, ground, menus, HUD, hangar), read only through
 >   `lib/fly/living-world.js`. The owner flew the first SKY build and it glitched in
