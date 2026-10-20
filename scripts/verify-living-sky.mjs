@@ -12,7 +12,8 @@
  *      programs and the far filter, compiles and links under three's
  *      ShaderMaterial prefix.
  *  (4) The galactic frame: the north galactic pole sits where an almanac puts
- *      it (Polaris check and two fixed instants), and stays unit length.
+ *      it (Polaris check and two fixed instants), and stays unit length; the
+ *      city skyglow that dims the Milky Way is ~1 over Manhattan, 0 at sea.
  *  (5) The cloud ambient follows the sky at the deck: as authored under a high
  *      sun, dimmer and no bluer than the old zenith tint at a 5-degree sun;
  *      the bases' (ground-facing) ambient neutral by day and dimmed alike.
@@ -93,6 +94,7 @@ async function buildTexts(on) {
       LC.updateLivingClouds(pass.r25.uniforms, { name: 'high' }, { cloudBase: 2400, cloudThickness: 2300, dt: 0, coverage });
       return pass.r25.uniforms.uLivFarRes.value.toArray();
     });
+    out.skyglow = { manhattan: NS.skyglowAt(40.70, -74.035), innsbruck: NS.skyglowAt(47.215, 11.33), yosemite: NS.skyglowAt(37.705, -119.70), atlantic: NS.skyglowAt(38, -45) };
   }
   return out;
 }
@@ -144,6 +146,9 @@ check('(5c) the bases face the ground: neutral under a high sun, dimmed by the s
 const [r44, r88] = on.farRes;
 check('(7) far deck: a mean band from 0.9 to 3.5 km of footprint, its cover following the deck coverage', r44[0] === 900 && r44[1] === 3500 && Math.abs(r44[2] - 0.05) < 1e-6 && Math.abs(r88[2] - 0.1) < 1e-6 && on.march.includes('uLivFarRes'), JSON.stringify(on.farRes));
 check('(4b) July 23h local, Ohio: the galactic centre low in the south, the pole high', g.centre[1] > 0 && g.centre[1] < 0.45 && g.centre[2] > 0.6 && g.pole[1] > 0.45 && Math.abs(len(g.pole) - 1) < 1e-9 && Math.abs(len(g.centre) - 1) < 1e-9, `centre ${g.centre.map((x) => x.toFixed(2))} pole ${g.pole.map((x) => x.toFixed(2))}`);
+
+const sg = on.skyglow;
+check('(4c) skyglow: Manhattan near 1, the open Atlantic 0, Yosemite low, Innsbruck between', sg.manhattan > 0.85 && sg.atlantic === 0 && sg.yosemite < 0.25 && sg.innsbruck > sg.yosemite && sg.innsbruck < sg.manhattan, JSON.stringify(Object.fromEntries(Object.entries(sg).map(([k, v]) => [k, +v.toFixed(3)]))));
 
 // (3) compile + link in WebGL2
 const { chromium } = await import('playwright');
