@@ -11,6 +11,8 @@
  *      programs, compiles and links under three's ShaderMaterial prefix.
  *  (4) The galactic frame: the north galactic pole sits where an almanac puts
  *      it (Polaris check and two fixed instants), and stays unit length.
+ *  (6) Pre-existing fix, either way: the Enhanced reconstruction compares tap
+ *      depths only within the cloud reach (no 1-px horizon line); Classic as was.
  *
  * Run: node scripts/verify-living-sky.mjs
  * Legs run in child processes because each flag is a page-load (module-load)
@@ -94,6 +96,9 @@ const marks = {
 check('(2a) flags on: every block is in its program', Object.values(marks).every(Boolean), JSON.stringify(marks));
 check('(2b) flags on: the Classic march and composite are byte-identical to flags off', on.classicMarch === off.classicMarch && on.classicComposite === off.classicComposite);
 check('(2c) flags on: the TRUE_SCALE and HDR_GUARD edits survive', on.march.includes('tsTrueRay') === off.march.includes('tsTrueRay') && on.composite.includes('hdrSafe(') === off.composite.includes('hdrSafe('));
+// (6) the horizon line (pre-existing, so flags on and off alike)
+const reach = (t) => t.includes('float cloudReach=rangeM*max(metricScale,1.)*1.1;') && t.includes('max(cloudReach-min(sampleDistance,');
+check('(6) the Enhanced reconstruction compares depths within the cloud reach, flags on and off; Classic untouched', reach(on.composite) && reach(off.composite) && !reach(off.classicComposite));
 
 // (4) the galactic frame
 const g = on.galactic;
