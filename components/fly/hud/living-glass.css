@@ -1,0 +1,1146 @@
+/* =====================================================================
+   LIVING GLASS — Skyloom's menu language (Living World, MENU_GLASS).
+
+   The menus are canopy glass: smoked, nearly black-blue, so the live world
+   keeps showing through, with one bright glint where light catches the top
+   edge. Values the player has selected are lit in cockpit "selected" cyan
+   (the colour a glass cockpit uses for pilot-set targets); anything that
+   ends a flight or raises the stakes reads amber. Everything else is ice.
+
+   Type: Archivo Black (the brand face of the wordmark and the in-world
+   letters) for one heading per panel, Geist for every label, Geist Mono only
+   for instrument readouts (numbers, keys).
+
+   EVERY rule here sits under an `lg-` class that only flag-on markup
+   carries, so importing this file changes nothing while MENU_GLASS is off.
+   Phones get solid glass (no backdrop-filter over the live WebGL canvas —
+   the R17 .hud-glass lesson) and 44 px targets.
+   ===================================================================== */
+
+.lg {
+  --lg-glass: rgba(8, 14, 27, 0.8);
+  --lg-glass-solid: rgba(8, 13, 25, 0.95);
+  --lg-well: rgba(190, 225, 255, 0.05);
+  --lg-well-hi: rgba(190, 225, 255, 0.09);
+  --lg-sunk: rgba(0, 4, 12, 0.32);
+  --lg-edge: rgba(190, 225, 255, 0.13);
+  --lg-edge-hi: rgba(190, 225, 255, 0.26);
+  --lg-ice: #eef5ff;
+  --lg-haze: #a9bacd;
+  --lg-faint: #74879e;
+  --lg-sel: #7fe7ff;
+  --lg-sel-soft: rgba(127, 231, 255, 0.14);
+  --lg-sel-edge: rgba(127, 231, 255, 0.42);
+  --lg-sel-glow: rgba(127, 231, 255, 0.4);
+  --lg-lit: #e2f9ff;
+  --lg-lit-ink: #07202c;
+  --lg-caution: #ffbf5e;
+  --lg-caution-soft: rgba(255, 191, 94, 0.13);
+  --lg-display: 'Archivo Black', ui-sans-serif, system-ui, sans-serif;
+  --lg-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --lg-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --lg-r-panel: 22px;
+  --lg-r-ctl: 11px;
+  --lg-r-key: 6px;
+  --lg-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --lg-ease-in: cubic-bezier(0.55, 0, 0.8, 0.2);
+  --lg-in: 260ms;
+  --lg-out: 150ms;
+  --lg-blur: 22px;
+  font-family: var(--lg-sans);
+  color: var(--lg-ice);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+:where(.lg) button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+:where(.lg) button:disabled {
+  cursor: default;
+}
+.lg :is(button, a, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--lg-sel);
+  outline-offset: 2px;
+}
+.lg-vh {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---- the surface ---------------------------------------------------- */
+.lg-panel {
+  position: relative;
+  border-radius: var(--lg-r-panel);
+  border: 1px solid var(--lg-edge);
+  background:
+    linear-gradient(180deg, rgba(205, 232, 255, 0.075), rgba(205, 232, 255, 0) 140px),
+    var(--lg-glass);
+  box-shadow:
+    0 40px 90px -30px rgba(0, 0, 0, 0.7),
+    0 2px 6px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(226, 244, 255, 0.12);
+  backdrop-filter: blur(var(--lg-blur)) saturate(1.3) brightness(0.8);
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(1.3) brightness(0.8);
+}
+/* The glint: light catching the top edge of the glass. */
+.lg-panel::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 28px;
+  right: 28px;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(228, 246, 255, 0.6) 30%, rgba(228, 246, 255, 0.6) 70%, transparent);
+}
+[data-device='phone'] .lg-panel {
+  background: linear-gradient(180deg, rgba(205, 232, 255, 0.06), rgba(205, 232, 255, 0) 140px), var(--lg-glass-solid);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.lg-title {
+  margin: 0;
+  font: 400 28px/1 var(--lg-display);
+  letter-spacing: -0.005em;
+  color: var(--lg-ice);
+}
+.lg-sub {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--lg-haze);
+}
+.lg-label {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 560;
+  letter-spacing: 0.01em;
+  color: var(--lg-haze);
+}
+.lg-rule {
+  height: 1px;
+  margin: 8px 4px;
+  background: var(--lg-edge);
+  border: 0;
+}
+
+/* ---- keys: an instrument keycap, never read by assistive tech -------- */
+.lg-kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--lg-r-key);
+  font: 600 11px/1 var(--lg-mono);
+  color: var(--lg-haze);
+  background: linear-gradient(180deg, rgba(190, 225, 255, 0.12), rgba(190, 225, 255, 0.05));
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(190, 225, 255, 0.16);
+  white-space: nowrap;
+}
+[data-touch='1'] .lg-kbd-hint {
+  display: none;
+}
+
+/* ---- buttons ---------------------------------------------------------- */
+.lg-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: var(--lg-r-ctl);
+  border: 1px solid var(--lg-edge);
+  background: var(--lg-well);
+  font-size: 14px;
+  font-weight: 520;
+  transition: background 0.16s, border-color 0.16s, transform 0.16s var(--lg-ease);
+}
+.lg-btn:hover {
+  background: var(--lg-well-hi);
+  border-color: var(--lg-edge-hi);
+}
+.lg-btn:active {
+  transform: translateY(1px);
+}
+/* The lit face: the one action a panel exists for (Resume). */
+.lg-btn-lit {
+  border-color: rgba(190, 245, 255, 0.9);
+  background: linear-gradient(180deg, #f2fcff, #c8f1ff);
+  color: var(--lg-lit-ink);
+  font-weight: 650;
+  box-shadow: 0 0 0 1px rgba(127, 231, 255, 0.25), 0 10px 34px -10px var(--lg-sel-glow), inset 0 -1px 0 rgba(4, 60, 80, 0.18);
+}
+.lg-btn-lit:hover {
+  background: linear-gradient(180deg, #ffffff, #d8f6ff);
+  border-color: #ffffff;
+}
+.lg-btn-lit .lg-kbd {
+  color: #2a5367;
+  background: rgba(7, 32, 44, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(7, 32, 44, 0.16);
+}
+.lg-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 12px;
+  border: 1px solid var(--lg-edge);
+  background: var(--lg-well);
+  color: var(--lg-haze);
+  transition: background 0.16s, color 0.16s, border-color 0.16s;
+}
+.lg-icon-btn:hover {
+  background: var(--lg-well-hi);
+  color: var(--lg-ice);
+  border-color: var(--lg-edge-hi);
+}
+
+/* ---- nav list (the pause card's destinations) ------------------------ */
+.lg-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lg-nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 48px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: var(--lg-r-ctl);
+  background: transparent;
+  text-align: left;
+  transition: background 0.16s;
+}
+.lg-nav-item > svg {
+  flex: none;
+  color: var(--lg-faint);
+  transition: color 0.16s;
+}
+.lg-nav-item:hover:not(:disabled) {
+  background: var(--lg-well-hi);
+}
+.lg-nav-item:hover:not(:disabled) > svg {
+  color: var(--lg-sel);
+}
+/* The selection tick: a short lit bar at the left edge on hover. */
+.lg-nav-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--lg-sel);
+  box-shadow: 0 0 10px var(--lg-sel);
+  opacity: 0;
+  transform: scaleY(0.4);
+  transition: opacity 0.16s, transform 0.2s var(--lg-ease);
+}
+.lg-nav-item:hover:not(:disabled)::before {
+  opacity: 1;
+  transform: none;
+}
+.lg-nav-item:disabled {
+  opacity: 0.45;
+}
+.lg-nav-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+.lg-nav-label {
+  font-size: 15px;
+  font-weight: 560;
+  letter-spacing: -0.01em;
+  color: var(--lg-ice);
+}
+.lg-nav-note {
+  font-size: 12.5px;
+  color: var(--lg-faint);
+}
+.lg-nav-meta {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 12.5px/1 var(--lg-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--lg-haze);
+}
+.lg-nav-item[data-tone='caution'] .lg-nav-label,
+.lg-nav-item[data-tone='caution'] > svg {
+  color: var(--lg-caution);
+}
+.lg-nav-item[data-tone='caution']::before {
+  background: var(--lg-caution);
+  box-shadow: 0 0 10px var(--lg-caution);
+}
+.lg-nav-item[data-tone='caution']:hover {
+  background: var(--lg-caution-soft);
+}
+.lg-nav-group {
+  margin: 6px 0;
+  padding: 10px 6px 6px;
+  border-radius: 14px;
+  background: var(--lg-sunk);
+  box-shadow: inset 0 0 0 1px var(--lg-edge);
+}
+.lg-nav-group > .lg-label {
+  padding: 0 8px 6px;
+}
+.lg-nav-group .lg-nav-item {
+  min-height: 40px;
+}
+.lg-nav-group .lg-nav-label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* ---- settings rows ----------------------------------------------------- */
+.lg-settings {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+}
+.lg-settings > * + * {
+  border-top: 1px solid var(--lg-edge);
+}
+.lg-field {
+  display: grid;
+  gap: 8px;
+  padding: 12px 2px;
+}
+@container (min-width: 360px) {
+  .lg-field {
+    grid-template-columns: 108px minmax(0, 1fr);
+    align-items: center;
+    column-gap: 14px;
+  }
+  .lg-field > .lg-note {
+    grid-column: 2;
+  }
+}
+.lg-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--lg-faint);
+}
+
+/* Segmented switch: a sunk track; the selected segment is lit like a
+   backlit cockpit key — selected cyan, with its annunciator bar. */
+.lg-seg {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--lg-r-ctl);
+  background: var(--lg-sunk);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45), inset 0 0 0 1px var(--lg-edge);
+}
+.lg-seg > button {
+  position: relative;
+  min-height: 34px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 520;
+  color: var(--lg-haze);
+  text-transform: capitalize;
+  transition: color 0.16s, background 0.16s, box-shadow 0.2s;
+}
+.lg-seg > button:hover {
+  color: var(--lg-ice);
+  background: var(--lg-well);
+}
+.lg-seg > button[data-on] {
+  color: var(--lg-sel);
+  background: linear-gradient(180deg, rgba(127, 231, 255, 0.17), rgba(127, 231, 255, 0.05));
+  box-shadow: inset 0 0 0 1px var(--lg-sel-edge), 0 0 22px -8px var(--lg-sel-glow);
+}
+.lg-seg > button[data-on]::after {
+  content: '';
+  position: absolute;
+  left: 32%;
+  right: 32%;
+  bottom: 4px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--lg-sel);
+  box-shadow: 0 0 8px var(--lg-sel);
+}
+
+/* Toggle row: label on the left, the value and a switch on the right. */
+.lg-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 4px 0 2px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  border-radius: 0;
+}
+.lg-toggle-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 520;
+  color: var(--lg-ice);
+}
+.lg-toggle-value {
+  font-size: 13px;
+  color: var(--lg-haze);
+  transition: color 0.16s;
+}
+.lg-switch {
+  position: relative;
+  flex: none;
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--lg-sunk);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5), inset 0 0 0 1px var(--lg-edge-hi);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.lg-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #dfe9f5, #9fb1c6);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  transition: transform 0.22s var(--lg-ease), background 0.2s;
+}
+.lg-toggle[aria-pressed='true'] .lg-switch {
+  background: rgba(127, 231, 255, 0.28);
+  box-shadow: inset 0 0 0 1px var(--lg-sel-edge), 0 0 16px -4px var(--lg-sel-glow);
+}
+.lg-toggle[aria-pressed='true'] .lg-switch::after {
+  transform: translateX(16px);
+  background: linear-gradient(180deg, #ffffff, #bff3ff);
+}
+.lg-toggle[aria-pressed='true'] .lg-toggle-value {
+  color: var(--lg-sel);
+}
+.lg-toggle[data-tone='caution'][aria-pressed='true'] .lg-switch {
+  background: rgba(255, 191, 94, 0.26);
+  box-shadow: inset 0 0 0 1px rgba(255, 191, 94, 0.5), 0 0 16px -4px rgba(255, 191, 94, 0.45);
+}
+.lg-toggle[data-tone='caution'][aria-pressed='true'] .lg-switch::after {
+  background: linear-gradient(180deg, #fff6e6, #ffd48f);
+}
+.lg-toggle[data-tone='caution'][aria-pressed='true'] .lg-toggle-value {
+  color: var(--lg-caution);
+}
+.lg-toggle:hover .lg-toggle-label {
+  color: #ffffff;
+}
+.lg-toggle:focus-visible {
+  outline-offset: -2px;
+  border-radius: 8px;
+}
+
+/* Rows other components render (flight comfort, guest saves, conditions):
+   adopted into the language from here, without touching their files. */
+.lg-settings section[aria-label='Flight comfort'] {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 12px 2px 8px;
+  border: 0;
+  border-radius: 0;
+}
+.lg-settings section[aria-label='Flight comfort'] > * + * {
+  margin-top: 0;
+}
+.lg-settings section[aria-label='Flight comfort'] > h3 {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+  font-weight: 560;
+  letter-spacing: 0.01em;
+  color: var(--lg-haze);
+}
+.lg-settings section[aria-label='Flight comfort'] > label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(96px, 42%) 48px;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--lg-ice);
+}
+.lg-settings section[aria-label='Flight comfort'] > label:has(> input[type='checkbox']) {
+  display: flex;
+  gap: 12px;
+}
+.lg-settings section[aria-label='Flight comfort'] output {
+  justify-self: end;
+  font: 500 12.5px/1 var(--lg-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--lg-haze);
+}
+.lg-settings section[aria-label='Flight comfort'] > button {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 13px;
+  color: var(--lg-haze);
+  text-decoration: underline;
+  text-decoration-color: rgba(169, 186, 205, 0.4);
+  text-underline-offset: 4px;
+}
+.lg-settings section[aria-label='Flight comfort'] > button:hover {
+  color: var(--lg-ice);
+  text-decoration-color: currentColor;
+}
+.lg-settings input[type='range'] {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  margin: 0;
+  accent-color: var(--lg-sel);
+  cursor: pointer;
+}
+.lg-settings input[type='checkbox'] {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  display: inline-grid;
+  place-content: center;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  flex: none;
+  border-radius: 6px;
+  background: var(--lg-sunk);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5), inset 0 0 0 1px var(--lg-edge-hi);
+  cursor: pointer;
+  transition: background 0.16s, box-shadow 0.16s;
+}
+.lg-settings input[type='checkbox']::after {
+  content: '';
+  width: 10px;
+  height: 5px;
+  margin-top: -3px;
+  border-left: 2px solid var(--lg-lit-ink);
+  border-bottom: 2px solid var(--lg-lit-ink);
+  transform: rotate(-45deg) scale(0.4);
+  opacity: 0;
+  transition: transform 0.18s var(--lg-ease), opacity 0.12s;
+}
+.lg-settings input[type='checkbox']:checked {
+  background: var(--lg-sel);
+  box-shadow: 0 0 14px -3px var(--lg-sel-glow), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+.lg-settings input[type='checkbox']:checked::after {
+  opacity: 1;
+  transform: rotate(-45deg) scale(1);
+}
+.lg-settings .journey-save {
+  margin: 0;
+  padding: 14px 2px;
+  border-top: 1px solid var(--lg-edge);
+  font-size: 14px;
+  color: var(--lg-ice);
+}
+.lg-settings .journey-save > strong {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 560;
+  letter-spacing: 0.01em;
+  color: var(--lg-haze);
+}
+.lg-settings .journey-save p {
+  margin: 6px 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--lg-faint);
+}
+.lg-settings .journey-save button {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--lg-r-ctl);
+  border: 1px solid var(--lg-edge);
+  background: var(--lg-well);
+  font-size: 13px;
+  font-weight: 520;
+  color: var(--lg-ice);
+  transition: background 0.16s, border-color 0.16s;
+}
+.lg-settings .journey-save button:hover {
+  background: var(--lg-well-hi);
+  border-color: var(--lg-edge-hi);
+}
+.lg-settings .journey-save .journey-actions {
+  margin-top: 10px;
+}
+.lg-settings .journey-save .journey-consent {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--lg-haze);
+}
+.lg-settings [data-testid='conditions-panel'] {
+  padding: 12px 2px;
+  border: 0;
+  border-radius: 0;
+}
+.lg-settings [data-testid='conditions-panel'] > div:first-child {
+  margin-bottom: 8px;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-size: 12.5px;
+  font-weight: 560;
+  color: var(--lg-haze);
+}
+.lg-settings [data-testid='conditions-panel'] button {
+  border-radius: 8px;
+  background: var(--lg-well);
+  color: var(--lg-haze);
+  box-shadow: inset 0 0 0 1px var(--lg-edge);
+}
+.lg-settings [data-testid='conditions-panel'] button[aria-pressed='true'] {
+  color: var(--lg-sel);
+  background: var(--lg-sel-soft);
+  box-shadow: inset 0 0 0 1px var(--lg-sel-edge);
+}
+
+/* ---- the controls reference: keycaps, not a table -------------------- */
+.lg-keys {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+.lg-keys > div {
+  display: grid;
+  grid-template-columns: minmax(104px, auto) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 12px;
+  padding: 6px 0;
+}
+.lg-keys dt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 560;
+  color: var(--lg-ice);
+}
+.lg-keys dt .lg-key-or {
+  font-size: 11px;
+  color: var(--lg-faint);
+}
+.lg-keys dt .lg-key-hold {
+  font-size: 11px;
+  font-weight: 450;
+  color: var(--lg-faint);
+}
+.lg-keys dd {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--lg-haze);
+}
+
+/* ---- PAUSE ---------------------------------------------------------- */
+.lg-pause-scrim {
+  position: absolute;
+  inset: 0 0 2rem 0;
+  z-index: 20;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: max(env(safe-area-inset-top), 24px) max(env(safe-area-inset-right), 20px) 20px max(env(safe-area-inset-left), 20px);
+  background: radial-gradient(120% 95% at 50% 42%, rgba(3, 6, 12, 0.2), rgba(3, 6, 12, 0.66));
+}
+.lg-pause {
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr) minmax(0, 330px);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    'head head head'
+    'nav settings keys';
+  width: min(1140px, 100%);
+  max-height: 100%;
+  margin: auto 0;
+}
+.lg-pause-head {
+  grid-area: head;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px 26px 20px;
+  border-bottom: 1px solid var(--lg-edge);
+}
+.lg-pause-head .lg-btn-lit {
+  min-height: 48px;
+  padding: 0 14px 0 22px;
+  font-size: 15px;
+}
+.lg-pane {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px 18px 20px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(190, 225, 255, 0.22) transparent;
+}
+.lg-pane + .lg-pane {
+  border-left: 1px solid var(--lg-edge);
+}
+.lg-pane-nav {
+  grid-area: nav;
+  padding: 12px 10px 16px;
+}
+.lg-pane-settings {
+  grid-area: settings;
+  padding-left: 22px;
+  padding-right: 22px;
+}
+.lg-pane-keys {
+  grid-area: keys;
+  background: rgba(0, 4, 12, 0.14);
+  border-bottom-right-radius: var(--lg-r-panel);
+}
+.lg-pane > .lg-label {
+  margin-bottom: 4px;
+}
+@media (max-width: 1180px) {
+  .lg-pause {
+    width: min(860px, 100%);
+    grid-template-columns: 290px minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    grid-template-areas:
+      'head head'
+      'nav settings'
+      'keys keys';
+    overflow-y: auto;
+    max-height: none;
+  }
+  .lg-pane {
+    overflow: visible;
+  }
+  .lg-pane-keys {
+    border-left: 0;
+    border-top: 1px solid var(--lg-edge);
+    border-bottom-left-radius: var(--lg-r-panel);
+  }
+  .lg-pane-keys .lg-keys {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 28px;
+  }
+}
+@media (max-width: 760px) {
+  .lg-pause {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'head' 'nav' 'settings' 'keys';
+  }
+  .lg-pane + .lg-pane {
+    border-left: 0;
+    border-top: 1px solid var(--lg-edge);
+  }
+  .lg-pane-keys .lg-keys {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* Phones: one column that the backdrop scrolls (Exit stays reachable in
+   landscape — verify-mobile-layout 5), every target >= 44 px. */
+[data-device='phone'] .lg-pause-scrim {
+  padding: max(env(safe-area-inset-top), 8px) max(env(safe-area-inset-right), 8px) 12px max(env(safe-area-inset-left), 8px);
+}
+[data-device='phone'] .lg-pause {
+  width: min(560px, 100%);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: none;
+  grid-template-areas: 'head' 'nav' 'settings' 'keys';
+  overflow: visible;
+  max-height: none;
+}
+[data-device='phone'][data-orient='landscape'] .lg-pause {
+  width: min(760px, 100%);
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-areas: 'head head' 'nav settings' 'keys keys';
+}
+[data-device='phone'] .lg-pane {
+  overflow: visible;
+}
+[data-device='phone'] .lg-pane + .lg-pane {
+  border-left: 0;
+  border-top: 1px solid var(--lg-edge);
+}
+[data-device='phone'][data-orient='landscape'] .lg-pane-settings {
+  border-top: 0;
+  border-left: 1px solid var(--lg-edge);
+}
+[data-device='phone'] .lg-pause-head {
+  padding: 16px 16px 14px;
+}
+[data-device='phone'] .lg-pause-head .lg-title {
+  font-size: 24px;
+}
+[data-device='phone'] .lg-pause-head .lg-sub {
+  display: none;
+}
+[data-device='phone'] :is(.lg-nav-item, .lg-seg > button, .lg-btn) {
+  min-height: 44px;
+}
+[data-device='phone'] .lg-pane-settings {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+/* ---- CREDITS -------------------------------------------------------- */
+.lg-credits {
+  --lg-glass: rgba(8, 14, 27, 0.88);
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  width: min(560px, calc(100vw - 2rem));
+  max-height: min(78vh, 100%);
+  margin: auto 0;
+}
+.lg-credits-head {
+  padding: 24px 26px 16px;
+  border-bottom: 1px solid var(--lg-edge);
+}
+.lg-credits-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px 26px 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(190, 225, 255, 0.22) transparent;
+}
+.lg-credits-body > section {
+  padding: 16px 0 6px;
+}
+.lg-credits-body > section + section {
+  border-top: 1px solid var(--lg-edge);
+}
+.lg-credit-list {
+  display: grid;
+  gap: 12px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.lg-credit-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
+  row-gap: 2px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--lg-haze);
+}
+.lg-credit-name {
+  font-size: 13.5px;
+  font-weight: 580;
+  color: var(--lg-ice);
+  text-decoration: none;
+}
+a.lg-credit-name:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.lg-credit-by,
+.lg-credit-mod {
+  grid-column: 1 / -1;
+}
+.lg-credit-mod {
+  color: var(--lg-faint);
+}
+.lg-chip {
+  align-self: start;
+  padding: 3px 7px;
+  border-radius: 6px;
+  font: 600 10.5px/1.2 var(--lg-mono);
+  color: var(--lg-haze);
+  background: var(--lg-well);
+  box-shadow: inset 0 0 0 1px var(--lg-edge);
+  white-space: nowrap;
+}
+.lg-credit-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.lg-credit-links a {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: var(--lg-ice);
+  text-decoration: none;
+  background: var(--lg-well);
+  box-shadow: inset 0 0 0 1px var(--lg-edge);
+  transition: background 0.16s;
+}
+.lg-credit-links a:hover {
+  background: var(--lg-well-hi);
+}
+.lg-credits-body p {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--lg-haze);
+}
+.lg-credits-body p a {
+  color: var(--lg-ice);
+  text-decoration: underline;
+  text-decoration-color: rgba(238, 245, 255, 0.35);
+  text-underline-offset: 3px;
+}
+.lg-credits-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 14px 26px 20px;
+  border-top: 1px solid var(--lg-edge);
+}
+.lg-credits-foot .lg-btn {
+  min-width: 120px;
+}
+[data-device='phone'] .lg-credits-head {
+  padding: 18px 18px 12px;
+}
+[data-device='phone'] .lg-credits-head .lg-title {
+  font-size: 22px;
+}
+[data-device='phone'] .lg-credits-body {
+  padding: 4px 18px 8px;
+}
+[data-device='phone'] .lg-credits-foot {
+  padding: 12px 18px 16px;
+}
+[data-device='phone'] .lg-credits-foot .lg-btn {
+  width: 100%;
+}
+[data-device='phone'] .lg-credit-links a {
+  padding: 13px 12px;
+}
+[data-device='phone'] .lg-credits {
+  max-height: 100%;
+}
+[data-device='phone'][data-orient='landscape'] .lg-credits-head {
+  padding: 12px 18px 10px;
+}
+[data-device='phone'][data-orient='landscape'] .lg-credits-head .lg-title {
+  font-size: 19px;
+}
+[data-device='phone'][data-orient='landscape'] .lg-credits-head .lg-sub {
+  display: none;
+}
+[data-device='phone'][data-orient='landscape'] .lg-credits-foot {
+  padding: 8px 18px 10px;
+}
+
+/* ---- the title's settings drawer -------------------------------------- */
+.fly-title-modal.lg-drawer-host {
+  justify-content: flex-end;
+  align-items: stretch;
+  padding: 16px;
+  background: linear-gradient(90deg, rgba(4, 6, 13, 0.12) 30%, rgba(4, 6, 13, 0.62));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.lg-drawer {
+  display: flex;
+  flex-direction: column;
+  width: min(440px, 100%);
+  max-height: 100%;
+}
+.lg-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 18px 16px 24px;
+  border-bottom: 1px solid var(--lg-edge);
+}
+.lg-drawer-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 24px 20px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(190, 225, 255, 0.22) transparent;
+}
+.fly-title-modal.lg-credits-host {
+  background: radial-gradient(120% 95% at 50% 45%, rgba(4, 6, 13, 0.3), rgba(4, 6, 13, 0.7));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+/* Phones: the bottom sheet the R25 harness measures (docked on the credit
+   strip, full width), solid glass. */
+.fly-title-modal-sheet.lg-drawer-host {
+  align-items: flex-end;
+  justify-content: stretch;
+  padding: 0;
+  background: rgba(4, 6, 13, 0.55);
+}
+.fly-title-modal-sheet .lg-drawer {
+  width: 100%;
+  max-height: min(82svh, 100%);
+  border-radius: 22px 22px 0 0;
+  border-bottom: 0;
+}
+.fly-title-modal-sheet .lg-drawer-head {
+  padding: 14px 12px 12px 18px;
+}
+.fly-title-modal-sheet .lg-drawer-head .lg-title {
+  font-size: 22px;
+}
+.fly-title-modal-sheet .lg-drawer-body {
+  padding: 2px 18px max(env(safe-area-inset-bottom), 16px);
+}
+
+/* ---- motion: purposeful, short, and off under reduced motion ---------- */
+@keyframes lg-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+}
+@keyframes lg-sink {
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+}
+@keyframes lg-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+}
+@keyframes lg-slide-out {
+  to {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+}
+/* The phone sheet rises by revealing, not by moving: its box never leaves
+   the credit strip it docks on (verify-r25-title p4 measures it mid-boot,
+   when frames are scarce and an animation can sit at its first keyframe). */
+@keyframes lg-sheet-in {
+  from {
+    clip-path: inset(100% 0 0 0 round 22px 22px 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0 round 22px 22px 0 0);
+  }
+}
+@keyframes lg-sheet-out {
+  from {
+    clip-path: inset(0 0 0 0 round 22px 22px 0 0);
+  }
+  to {
+    clip-path: inset(100% 0 0 0 round 22px 22px 0 0);
+  }
+}
+@keyframes lg-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes lg-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+.lg-enter {
+  animation: lg-rise var(--lg-in) var(--lg-ease) both;
+}
+.lg-pause-scrim {
+  animation: lg-fade-in 200ms ease-out both;
+}
+.lg-pause-scrim[data-state='closing'],
+.fly-title-modal.lg-modal[data-state='closing'] {
+  pointer-events: none;
+  animation: lg-fade-out var(--lg-out, 150ms) var(--lg-ease-in) both;
+}
+.lg-pause-scrim[data-state='closing'] .lg-enter {
+  animation: lg-sink var(--lg-out) var(--lg-ease-in) both;
+}
+.fly-title-modal.lg-modal {
+  animation: lg-fade-in 200ms ease-out both;
+}
+.lg-drawer-host .lg-drawer {
+  animation: lg-slide-in 300ms var(--lg-ease) both;
+}
+.lg-drawer-host[data-state='closing'] .lg-drawer {
+  animation: lg-slide-out var(--lg-out) var(--lg-ease-in) both;
+}
+.fly-title-modal-sheet.lg-drawer-host .lg-drawer {
+  animation-name: lg-sheet-in;
+}
+.fly-title-modal-sheet.lg-drawer-host[data-state='closing'] .lg-drawer {
+  animation-name: lg-sheet-out;
+}
+.lg-credits-host .lg-credits {
+  animation: lg-rise var(--lg-in) var(--lg-ease) both;
+}
+.lg-credits-host[data-state='closing'] .lg-credits {
+  animation: lg-sink var(--lg-out) var(--lg-ease-in) both;
+}
+.lg[data-still] *,
+.lg[data-still],
+[data-still] .lg,
+[data-still] .lg * {
+  animation: none !important;
+  transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lg,
+  .lg *,
+  .lg-pause-scrim,
+  .fly-title-modal.lg-modal {
+    animation: none !important;
+    transition: none !important;
+  }
+}

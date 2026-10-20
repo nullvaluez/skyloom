@@ -17,6 +17,9 @@ import './title.css';
 import { AirportEntry } from './AirportExperience';
 import { useAdventureStore } from '@/stores/adventure-store';
 import { adventureById } from '@/lib/fly/adventures.mjs';
+// Living World (MENU_GLASS): the title's Settings and Credits in glass. Flag
+// off renders the markup below unchanged.
+import { GLASS_ON, GLASS_EXIT_MS, closingProps, glassRootProps, stillMotion, usePresence } from './LivingGlass';
 
 const DEG = Math.PI / 180;
 
@@ -296,12 +299,76 @@ function TitleBody({ runtime }) {
         </div>
       </div>
 
-      {settingsOpen && <SettingsSheet phone={isPhone} />}
-      {creditsOpen && !settingsOpen && (
+      {!GLASS_ON && settingsOpen && <SettingsSheet phone={isPhone} />}
+      {!GLASS_ON && creditsOpen && !settingsOpen && (
         <div className="fly-title-modal" onClick={(e) => e.target === e.currentTarget && store().closeCredits()}>
           <CreditsPanel onClose={() => store().closeCredits()} />
         </div>
       )}
+      {GLASS_ON && <GlassSettingsSheet open={settingsOpen} phone={isPhone} />}
+      {GLASS_ON && <GlassTitleCredits open={creditsOpen && !settingsOpen} />}
+    </div>
+  );
+}
+
+/**
+ * Living World (MENU_GLASS): Settings as a glass drawer from the right edge
+ * (the title stays in view on the left), a bottom sheet on phones, with an
+ * exit as purposeful as the entrance. Same testids, names and focus order.
+ */
+function GlassSettingsSheet({ open, phone }) {
+  const still = stillMotion();
+  const p = usePresence(open, still ? 0 : GLASS_EXIT_MS);
+  const closeRef = useRef(null);
+  useEffect(() => {
+    if (open) closeRef.current?.focus({ preventScroll: true });
+  }, [open]);
+  if (!p.mounted) return null;
+  const close = () => useFlyStore.getState().setSettingsOpen(false);
+  return (
+    <div
+      className={`fly-title-modal lg lg-modal lg-drawer-host${phone ? ' fly-title-modal-sheet' : ''}`}
+      {...glassRootProps(still)}
+      {...closingProps(p.closing)}
+      onClick={(e) => e.target === e.currentTarget && close()}
+    >
+      <section
+        className="lg-panel lg-drawer"
+        data-testid="settings-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="fly-title-settings-h"
+      >
+        <header className="lg-drawer-head">
+          <h2 id="fly-title-settings-h" className="lg-title">
+            Settings
+          </h2>
+          <button ref={closeRef} type="button" className="lg-icon-btn" data-testid="settings-close" aria-label="Close settings" onClick={close}>
+            <X size={18} aria-hidden="true" />
+          </button>
+        </header>
+        <div className="lg-drawer-body lg-settings">
+          <SettingsRows sheet />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/** Living World (MENU_GLASS): the title's Credits, entering and leaving. */
+function GlassTitleCredits({ open }) {
+  const still = stillMotion();
+  const p = usePresence(open, still ? 0 : GLASS_EXIT_MS);
+  if (!p.mounted) return null;
+  const close = () => useFlyStore.getState().closeCredits();
+  return (
+    <div
+      className="fly-title-modal lg lg-modal lg-credits-host"
+      {...glassRootProps(still)}
+      {...closingProps(p.closing)}
+      onClick={(e) => e.target === e.currentTarget && close()}
+    >
+      <CreditsPanel onClose={close} />
     </div>
   );
 }
