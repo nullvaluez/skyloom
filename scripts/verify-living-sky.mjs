@@ -10,7 +10,8 @@
  *  (3) WebGL2 (SwiftShader is fine): every patched program, plus the two shaft
  *      programs, compiles and links under three's ShaderMaterial prefix.
  *  (4) The galactic frame: the north galactic pole sits where an almanac puts
- *      it (Polaris check and two fixed instants), and stays unit length.
+ *      it (Polaris check and two fixed instants), and stays unit length; the
+ *      city skyglow that dims the Milky Way is ~1 over Manhattan, 0 at sea.
  *
  * Run: node scripts/verify-living-sky.mjs
  * Legs run in child processes because each flag is a page-load (module-load)
@@ -62,6 +63,7 @@ async function buildTexts(on) {
     // (Sagittarius at ~23h local in July), the pole high in the north-west.
     NS.updateNightSky(u, { timeMs: Date.UTC(2026, 6, 18, 3), latDeg: 40, lonDeg: -83, elapsed: 10 });
     out.galactic = { pole: u.uLivGalPole.value.toArray(), centre: u.uLivGalCenter.value.toArray(), polaris };
+    out.skyglow = { manhattan: NS.skyglowAt(40.70, -74.035), innsbruck: NS.skyglowAt(47.215, 11.33), yosemite: NS.skyglowAt(37.705, -119.70), atlantic: NS.skyglowAt(38, -45) };
   }
   return out;
 }
@@ -100,6 +102,9 @@ const g = on.galactic;
 const len = (v) => Math.hypot(...v);
 check('(4a) Polaris from 40N stands ~40 deg up, due north', Math.abs(g.polaris.up - 40) < 1.2 && g.polaris.north > 0.7 && Math.abs(g.polaris.east) < 0.03, JSON.stringify(g.polaris));
 check('(4b) July 23h local, Ohio: the galactic centre low in the south, the pole high', g.centre[1] > 0 && g.centre[1] < 0.45 && g.centre[2] > 0.6 && g.pole[1] > 0.45 && Math.abs(len(g.pole) - 1) < 1e-9 && Math.abs(len(g.centre) - 1) < 1e-9, `centre ${g.centre.map((x) => x.toFixed(2))} pole ${g.pole.map((x) => x.toFixed(2))}`);
+
+const sg = on.skyglow;
+check('(4c) skyglow: Manhattan near 1, the open Atlantic 0, Yosemite low, Innsbruck between', sg.manhattan > 0.85 && sg.atlantic === 0 && sg.yosemite < 0.25 && sg.innsbruck > sg.yosemite && sg.innsbruck < sg.manhattan, JSON.stringify(Object.fromEntries(Object.entries(sg).map(([k, v]) => [k, +v.toFixed(3)]))));
 
 // (3) compile + link in WebGL2
 const { chromium } = await import('playwright');
