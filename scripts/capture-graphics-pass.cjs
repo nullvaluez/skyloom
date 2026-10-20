@@ -196,7 +196,7 @@ async function telemetry(page) {
     return { quality: s.qualityTier, visuals: s.visuals, style: s.mapStyle, cinemaProfile: rt.cinemaProfile ?? null,
       sun: rt.sun ? { sinEl: rt.sun.sinEl, frac: rt.sun.frac } : null, aglM: rt.flight.pos.y - rt.flight.groundElev,
       terrainSharp: rt.terraStats?.sharp ?? null, terra: rt.terraStats ? { ...rt.terraStats } : null,
-      traffic: rt.traffic?.items?.length ?? 0, flags: window.__flyUrlFlags ?? null, build: window.__flyBuild ?? null };
+      traffic: rt.traffic?.items?.length ?? 0, flightTrails: window.__flyStats?.flightTrails ?? null, flags: window.__flyUrlFlags ?? null, build: window.__flyBuild ?? null };
   });
 }
 
