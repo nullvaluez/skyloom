@@ -1,0 +1,147 @@
+<title>Living World Before &amp; After</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one long flight log — each pose a full-width frame with a draggable
+   before/after divider, its changes beside it; the game's own Ink + Ice look,
+   committed to one dark world because the frames themselves are the subject. */
+:root {
+  --ink: #060a12;
+  --panel: #0c1321;
+  --line: rgba(196, 226, 246, .14);
+  --ice: #eef5ff;
+  --mist: #9fb1c6;
+  --cyan: #87e7ff;
+  --gold: #e9c58d;
+  --display: 'Archivo Black', 'Arial Black', Impact, sans-serif;
+  --body: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  color-scheme: dark;
+}
+html { background: var(--ink); }
+body { background: var(--ink); color: var(--ice); font-family: var(--body); font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+.page { max-width: 1240px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 40px 72px; display: grid; gap: 56px; }
+header.top { display: grid; gap: 14px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--cyan); }
+h1 { font-family: var(--display); font-weight: 400; font-size: clamp(40px, 7vw, 84px); line-height: .92; letter-spacing: -.01em; margin: 0; text-wrap: balance; }
+.lede { max-width: 68ch; color: var(--mist); margin: 0; font-size: 16px; }
+.lede strong { color: var(--ice); font-weight: 600; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 18px; font-family: var(--mono); font-size: 12px; color: var(--mist); }
+.facts span b { color: var(--ice); font-weight: 500; }
+nav.filters { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; flex-wrap: wrap; gap: 8px; padding-block: 10px; background: linear-gradient(var(--ink) 70%, transparent); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--ink); }
+.chip { appearance: none; border: 1px solid var(--line); background: transparent; color: var(--mist); font: 500 13px var(--body); padding: 7px 14px; border-radius: 999px; cursor: pointer; }
+.chip[aria-pressed="true"] { color: var(--ink); background: var(--cyan); border-color: var(--cyan); }
+.chip:focus-visible, .mode button:focus-visible, .frame:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+.poses { display: grid; gap: 72px; }
+.pose { display: grid; gap: 16px; }
+.pose-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 18px; }
+.pose-head h2 { margin: 0; font-size: clamp(22px, 2.6vw, 30px); font-weight: 600; letter-spacing: -.02em; text-wrap: balance; }
+.pose-head p { margin: 0; color: var(--mist); font-family: var(--mono); font-size: 12.5px; }
+.frame { position: relative; width: 100%; max-width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 10px; background: var(--panel); touch-action: pan-y; cursor: ew-resize; user-select: none; -webkit-user-select: none; }
+.frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; max-width: none; pointer-events: none; }
+.frame .after { clip-path: inset(0 0 0 var(--split, 50%)); }
+.frame .divider { position: absolute; top: 0; bottom: 0; left: var(--split, 50%); width: 2px; margin-left: -1px; background: var(--ice); box-shadow: 0 0 0 1px rgba(6, 10, 18, .35); pointer-events: none; }
+.frame .knob { position: absolute; top: 50%; left: 50%; width: 38px; height: 38px; margin: -19px 0 0 -19px; border-radius: 50%; background: var(--ice); color: var(--ink); display: grid; place-items: center; font: 600 13px var(--mono); box-shadow: 0 4px 18px rgba(0, 0, 0, .45); }
+.frame .tag { position: absolute; top: 12px; padding: 4px 10px; border-radius: 999px; font: 500 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; background: rgba(6, 10, 18, .62); color: var(--ice); pointer-events: none; }
+.frame .tag.b { left: 12px; }
+.frame .tag.a { right: 12px; color: var(--gold); }
+.frame[data-mode="before"] .after, .frame[data-mode="before"] .divider, .frame[data-mode="before"] .tag.a { display: none; }
+.frame[data-mode="after"] .after { clip-path: none; }
+.frame[data-mode="after"] .divider, .frame[data-mode="after"] .tag.b { display: none; }
+.pose-foot { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px 32px; align-items: start; }
+.changes { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; min-width: 0; }
+.changes li { display: grid; grid-template-columns: 9.5em minmax(0, 1fr); gap: 12px; align-items: baseline; }
+.changes code { font: 500 11.5px var(--mono); color: var(--cyan); letter-spacing: .02em; overflow-wrap: anywhere; }
+.changes span { color: var(--ice); opacity: .92; }
+.mode { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; gap: 2px; }
+.mode button { appearance: none; border: 0; background: transparent; color: var(--mist); font: 500 12.5px var(--body); padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+.mode button[aria-pressed="true"] { background: rgba(196, 226, 246, .14); color: var(--ice); }
+section.notes { display: grid; gap: 28px; border-top: 1px solid var(--line); padding-top: 40px; }
+section.notes h2 { font-family: var(--display); font-weight: 400; font-size: clamp(26px, 3.4vw, 40px); margin: 0; letter-spacing: -.005em; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 28px 40px; }
+.group h3 { margin: 0 0 10px; font-size: 13px; font-family: var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--gold); font-weight: 500; }
+.group ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.group li { display: grid; gap: 2px; min-width: 0; }
+.group li code { font: 500 12px var(--mono); color: var(--cyan); }
+.group li span { color: var(--mist); }
+.runlist { margin: 0; padding-left: 1.2em; display: grid; gap: 8px; max-width: 72ch; color: var(--mist); }
+.runlist b { color: var(--ice); font-weight: 600; }
+.fine { color: var(--mist); font-size: 13px; max-width: 80ch; margin: 0; }
+.fine code { font-family: var(--mono); font-size: 12px; color: var(--ice); }
+@media (max-width: 720px) {
+  .pose-foot { grid-template-columns: minmax(0, 1fr); }
+  .changes li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
+</style>
+
+<div class="page">
+  <header class="top">
+    <div class="eyebrow">Skyloom · graphics pass · 2026-10-20</div>
+    <h1>Living World</h1>
+    <p class="lede" id="lede"></p>
+    <div class="facts" id="facts"></div>
+  </header>
+  <nav class="filters" aria-label="Filter poses" id="filters"></nav>
+  <main class="poses" id="poses"></main>
+  <section class="notes" aria-labelledby="flags-h">
+    <h2 id="flags-h">What changed</h2>
+    <div class="cols" id="flags"></div>
+    <p class="fine" id="revert"></p>
+  </section>
+  <section class="notes" aria-labelledby="run-h">
+    <h2 id="run-h">On your machines</h2>
+    <ol class="runlist" id="runlist"></ol>
+    <p class="fine" id="method"></p>
+  </section>
+</div>
+
+<script id="gallery-data" type="application/json">__DATA__</script>
+<script>
+(() => {
+  const D = JSON.parse(document.getElementById('gallery-data').textContent);
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, attrs = {}, ...kids) => { const n = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) { if (k === 'text') n.textContent = v; else if (k === 'html') n.innerHTML = v; else n.setAttribute(k, v); } for (const k of kids) if (k) n.append(k); return n; };
+  $('lede').innerHTML = D.lede;
+  for (const [k, v] of D.facts) $('facts').append(el('span', {}, document.createTextNode(k + ' '), el('b', { text: v })));
+  const groups = ['All', ...new Set(D.items.map((i) => i.group))];
+  let current = 'All';
+  const chips = groups.map((g) => { const b = el('button', { class: 'chip', type: 'button', 'aria-pressed': String(g === current), id: 'chip-' + g.toLowerCase() }, document.createTextNode(g)); b.addEventListener('click', () => { current = g; for (const c of chips) c.setAttribute('aria-pressed', String(c === b)); for (const p of poses) p.hidden = !(g === 'All' || p.dataset.group === g); }); $('filters').append(b); return b; });
+  const poses = D.items.map((it) => {
+    const frame = el('div', { class: 'frame', tabindex: '0', role: 'slider', 'aria-label': it.title + ' — drag to compare before and after', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': '50', 'data-mode': 'split', id: 'frame-' + it.id },
+      el('img', { src: it.before, alt: it.title + ', before', loading: 'lazy', decoding: 'async' }),
+      el('img', { class: 'after', src: it.after, alt: it.title + ', after', loading: 'lazy', decoding: 'async' }),
+      el('div', { class: 'divider' }, el('div', { class: 'knob', 'aria-hidden': 'true', text: '⇆' })),
+      el('div', { class: 'tag b', text: 'Before' }), el('div', { class: 'tag a', text: 'After' }));
+    const setSplit = (pct) => { pct = Math.max(0, Math.min(100, pct)); frame.style.setProperty('--split', pct + '%'); frame.setAttribute('aria-valuenow', String(Math.round(pct))); };
+    const fromEvent = (e) => { const r = frame.getBoundingClientRect(); setSplit(((e.clientX - r.left) / r.width) * 100); };
+    let drag = false;
+    frame.addEventListener('pointerdown', (e) => { if (frame.dataset.mode !== 'split') return; drag = true; frame.setPointerCapture(e.pointerId); fromEvent(e); });
+    frame.addEventListener('pointermove', (e) => { if (drag) fromEvent(e); });
+    frame.addEventListener('pointerup', () => { drag = false; });
+    frame.addEventListener('pointercancel', () => { drag = false; });
+    frame.addEventListener('keydown', (e) => { const v = Number(frame.getAttribute('aria-valuenow')); if (e.key === 'ArrowLeft') { setSplit(v - 5); e.preventDefault(); } if (e.key === 'ArrowRight') { setSplit(v + 5); e.preventDefault(); } });
+    const mode = el('div', { class: 'mode', role: 'group', 'aria-label': 'View' });
+    for (const m of ['before', 'split', 'after']) { const b = el('button', { type: 'button', 'aria-pressed': String(m === 'split'), id: 'mode-' + it.id + '-' + m, text: m === 'split' ? 'Compare' : m[0].toUpperCase() + m.slice(1) }); b.addEventListener('click', () => { frame.dataset.mode = m; for (const x of mode.children) x.setAttribute('aria-pressed', String(x === b)); }); mode.append(b); }
+    const changes = el('ul', { class: 'changes' });
+    for (const [flag, what] of it.changes) changes.append(el('li', {}, el('code', { text: flag }), el('span', { text: what })));
+    const node = el('article', { class: 'pose', 'data-group': it.group, id: it.id },
+      el('div', { class: 'pose-head' }, el('h2', { text: it.title }), el('p', { text: it.detail })),
+      frame,
+      el('div', { class: 'pose-foot' }, changes, mode));
+    $('poses').append(node);
+    return node;
+  });
+  for (const g of D.flags) {
+    const ul = el('ul');
+    for (const [flag, what] of g.items) ul.append(el('li', {}, el('code', { text: flag }), el('span', { text: what })));
+    $('flags').append(el('div', { class: 'group' }, el('h3', { text: g.name }), ul));
+  }
+  $('revert').innerHTML = D.revert;
+  for (const r of D.runlist) $('runlist').append(el('li', { html: r }));
+  $('method').innerHTML = D.method;
+})();
+</script>
