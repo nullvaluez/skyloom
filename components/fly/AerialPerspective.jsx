@@ -76,8 +76,23 @@ import { getR25Sky, registerAerialStrengthReader } from '@/lib/fly/r25-sky';
 import { R25_SKY_GLSL_DECL, R25_SKY_GLSL_FUNCS, SKY_ROWS, writeSkyUniforms } from '@/lib/fly/sky-model';
 import { trueRayGLSL, trueScaleShader } from '@/lib/fly/true-scale';
 import { ATMO_AERIAL_LOOKUP_GLSL } from '@/lib/fly/atmosphere/glsl';
-import { physSkyShader, physWeatherExtinction } from '@/lib/fly/atmosphere/runtime';
+import { PHYS_SKY_SHADERS, physSkyShader, physWeatherExtinction } from '@/lib/fly/atmosphere/runtime';
 import { PHYS_SKY_TEXT_ACTIVE } from '@/lib/fly/cinema-sky';
+// LIVING WORLD (GROUND): city lights from altitude and valley mist, both inside
+// this pass's Enhanced program (FLY_LIVING_WORLD.md).
+import {
+  NL,
+  NIGHT_LIGHTS_GLSL,
+  NIGHT_LIGHTS_ON,
+  NIGHT_LIGHTS_UNIFORMS,
+  nightLightsStats,
+  stepNightLights,
+} from '@/lib/fly/night-lights-atlas';
+import { GM, GROUND_MIST_GLSL, GROUND_MIST_ON, GROUND_MIST_STATS, GROUND_MIST_UNIFORMS, reseedGroundMist, stepGroundMist } from '@/lib/fly/ground-mist';
+import { COASTAL_WATER_UNIFORMS } from '@/lib/fly/coastal-water';
+import { getComposer } from '@/lib/fly/step-safe';
+import { isMobileGraphicsClass } from '@/lib/fly/device-class';
+import { useFlyStore } from '@/stores/fly-store';
 
 /**
  * Module-scope frame state. One satellite scene exists at a time, so a plain
@@ -562,6 +577,151 @@ const enhancedFragmentShaderTS = trueScaleShader('aerial-enhanced', enhancedFrag
 ]);
 
 /**
+ * LIVING WORLD — GROUND (NIGHT_LIGHTS, GROUND_MIST; FLY_LIVING_WORLD.md).
+ *
+ * Both act on the SURFACE radiance, before the atmosphere: city light leaving
+ * the ground (lib/fly/night-lights-atlas.js), then the mist lying on it
+ * (lib/fly/ground-mist.js), and the physical aerial perspective, the weather
+ * fog and the world-edge fade apply to the result unchanged, so distant
+ * lights and mist fade into the same air as the terrain. `lwGround` runs in
+ * the Enhanced living-air block (every Enhanced frame takes it), on the TRUE
+ * metric ray that block already builds, and returns its input untouched
+ * outside the cinema look.
+ *
+ * Anchored edits on the final Enhanced text (after PHYS_SKY and TRUE_SCALE,
+ * whose anchors they leave alone), applied only when a flag is on; each
+ * anchor must match exactly once or the module throws (swapExact idiom).
+ * Flags off: the text above, byte for byte.
+ */
+const LW_NL = NIGHT_LIGHTS_ON;
+const LW_GM = GROUND_MIST_ON;
+const LW_ON = LW_NL || LW_GM;
+function lwSwap(src, from, to) {
+  const at = src.indexOf(from);
+  if (at < 0 || src.indexOf(from, at + from.length) >= 0) {
+    throw new Error(`AerialPerspective (Living World): anchor ${at < 0 ? 'missing' : 'ambiguous'}: ${from.slice(0, 72)}`);
+  }
+  return src.slice(0, at) + to + src.slice(at + from.length);
+}
+const LW_MAIN = 'void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth, out vec4 outputColor) {';
+const LW_AFTER = '    float transmission=livingAirTransmission(length(metricRay),uCamPos.y-uGroundY,h);\n';
+const LW_PHYS = '      vec3 lit=inputColor.rgb*apT+apS*uPskySunIllum+pskyNightAir(apDir)*(1.-apT);\n';
+const LW_PLAIN = 'outputColor=vec4((inputColor.rgb*transmittance+haze*(1.-transmittance))*uR25Exposure,inputColor.a);';
+
+/** The Enhanced text with the ground terms (`nl`/`gm` pick the features). */
+export function livingGroundShader(src, { nl = LW_NL, gm = LW_GM, phys = PHYS_SKY_SHADERS['aerial-enhanced'] === 'patched' } = {}) {
+  if (!nl && !gm) return src;
+  const decl = `${nl ? NIGHT_LIGHTS_GLSL : ''}${gm ? GROUND_MIST_GLSL : ''}
+vec3 lwGround(vec3 c,vec3 world,vec3 metricRay,float trueY,float dXZ,vec3 haze){
+  if(uCinema<.5)return c;
+  float distM=length(metricRay);
+  vec3 dir=metricRay/max(distM,1.0e-3);
+  vec3 glow=vec3(0.);
+  ${nl ? 'glow=nlEmission(c,world,distM,dir,trueY,dXZ);\n  c+=glow;' : ''}
+  ${gm ? 'c=gmMist(c,world,distM,dir,trueY,haze,glow);' : ''}
+  return c;
+}
+`;
+  let out = lwSwap(src, LW_MAIN, `${decl}${LW_MAIN}`);
+  out = lwSwap(out, LW_AFTER, `${LW_AFTER}    vec3 lwSurf=lwGround(inputColor.rgb,world,metricRay,trueY,dXZ,haze);\n`);
+  // PHYS_SKY's cinema block is the frame every Enhanced pixel takes; without
+  // the physical sky the plain living-air line below carries the same terms.
+  if (phys) out = lwSwap(out, LW_PHYS, LW_PHYS.replace('vec3 lit=inputColor.rgb*apT', 'vec3 lit=lwSurf*apT'));
+  return lwSwap(out, LW_PLAIN, LW_PLAIN.replace('(inputColor.rgb*transmittance', '(lwSurf*transmittance'));
+}
+/** The pre-pass Enhanced text (the flags-off program; verify-living-ground compares). */
+export const ENHANCED_AERIAL_TEXT_BASE = enhancedFragmentShaderTS;
+const enhancedFragmentShaderLW = LW_ON ? livingGroundShader(enhancedFragmentShaderTS) : enhancedFragmentShaderTS;
+
+/**
+ * The floating-origin anchor, read off the live scene: FlyScene positions
+ * worldRoot at -anchor and mounts the terrain's TileMap directly inside it
+ * (terrain-engine.js setAnchor contract). The composer the pass renders in is
+ * registered at module scope (step-safe.js) and its RenderPass holds that
+ * scene, so the anchor needs no FlyScene hook. Searched once (re-tried at
+ * most once a second while missing), then one property read per frame.
+ * null = unknown: the night lights stay dark; the mist pattern loses only its
+ * rebase stability.
+ */
+const _lwOrigin = { x: 0, z: 0 };
+let _lwMap = null;
+let _lwRetryAt = 0;
+function findTileMap(root, depth = 0) {
+  if (!root || depth > 3) return null;
+  for (const c of root.children ?? []) {
+    // three-tile's TileMap (named 'map'); its parent is worldRoot.
+    if (c?.isLOD && c.name === 'map' && typeof c.world2geo === 'function') return c;
+  }
+  for (const c of root.children ?? []) {
+    const hit = findTileMap(c, depth + 1);
+    if (hit) return hit;
+  }
+  return null;
+}
+function resolveLwOrigin(now) {
+  if (!_lwMap?.parent?.parent) {
+    _lwMap = null;
+    if (now < _lwRetryAt) return null;
+    _lwRetryAt = now + 1;
+    const scene = getComposer()?.passes?.find((p) => p?.scene?.isScene)?.scene ?? null;
+    _lwMap = findTileMap(scene);
+    if (!_lwMap) return null;
+  }
+  _lwOrigin.x = -_lwMap.parent.position.x;
+  _lwOrigin.z = -_lwMap.parent.position.z;
+  return _lwOrigin;
+}
+const _lwWind = [0, 0];
+const _lwCtx = {
+  frame: -1, now: 0, dt: 0, renderer: null, cinema: false, tier: 'high', phone: false, fixture: false,
+  origin: null, camX: 0, camY: 0, camZ: 0, groundY: 0, kMerc: 1, sunSinEl: 1, sunDir: null,
+  fog: 0, overcast: 0, wind: _lwWind, windMps: 0, warpEpoch: 0,
+};
+let _lwStatsAt = 0;
+/** Per-frame ground terms, from the pass's own update() (no FlyScene hook). */
+function stepLivingGround(renderer, deltaTime) {
+  const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+  const s = _state, c = _lwCtx, e = cinemaEnvironment, store = useFlyStore.getState();
+  const sea = COASTAL_WATER_UNIFORMS.uSeaState?.value;
+  c.frame = renderer?.info?.render?.frame ?? c.frame + 1;
+  c.now = now;
+  c.dt = Number.isFinite(deltaTime) ? Math.max(0, Math.min(0.1, deltaTime)) : 1 / 60;
+  c.renderer = renderer;
+  c.cinema = CINEMA_UNIFORMS.uCinema.value > 0.5;
+  c.tier = store.qualityTier;
+  c.phone = isMobileGraphicsClass();
+  c.fixture = typeof window !== 'undefined' && !!window.__flyTileFixture;
+  c.origin = resolveLwOrigin(now);
+  c.camX = s.camPos[0];
+  c.camY = s.camPos[1];
+  c.camZ = s.camPos[2];
+  c.groundY = s.groundY;
+  c.kMerc = s.livingAir[0] > 0.5 && s.livingAir[1] > 0 ? s.livingAir[1] : 1;
+  c.sunSinEl = e.sunDir[1];
+  c.sunDir = e.sunDir;
+  c.fog = e.fog;
+  c.overcast = e.overcast;
+  _lwWind[0] = sea?.x ?? 0;
+  _lwWind[1] = sea?.y ?? 0;
+  c.windMps = sea?.z ?? 0;
+  c.warpEpoch = store.warpEpoch;
+  if (LW_NL) stepNightLights(c);
+  if (LW_GM) stepGroundMist(c);
+  if (typeof window !== 'undefined' && window.__flyStats && now - _lwStatsAt > 0.5) {
+    _lwStatsAt = now;
+    window.__flyStats.livingGround = { nightLights: LW_NL ? nightLightsStats() : null, mist: LW_GM ? GROUND_MIST_STATS : null, origin: c.origin ? { ...c.origin } : null, groundY: c.groundY };
+    // Review/dev handle (window.__flyStats exists only there): the live
+    // tunables (edits land next frame), the uniforms and a mist-floor re-seed
+    // (a harness that pins the haze ground after a warp), for A/Bs.
+    window.__flyLivingGround ??= {
+      nl: LW_NL ? NL : null, gm: LW_GM ? GM : null,
+      nlUniforms: LW_NL ? NIGHT_LIGHTS_UNIFORMS : null, gmUniforms: LW_GM ? GROUND_MIST_UNIFORMS : null,
+      reseedMist: LW_GM ? reseedGroundMist : null,
+    };
+  }
+}
+
+/**
  * R24 D: which pass ships. Read ONCE at construction, from a module const, so
  * production and the PREWARM twin (which builds through this same constructor)
  * can never compile different programs — the Effects.jsx el()/raw() rule.
@@ -577,7 +737,7 @@ export class AerialPerspectiveEffect extends Effect {
   constructor(opts = {}) {
     const law = LAW();
     const r25 = !law && opts?.r25 === true;
-    super('AerialPerspectiveEffect', law ? lawFragmentShader : r25 ? enhancedFragmentShaderTS : fragmentShader, {
+    super('AerialPerspectiveEffect', law ? lawFragmentShader : r25 ? enhancedFragmentShaderLW : fragmentShader, {
       // This is what makes the composer allocate + bind its depth texture.
       attributes: EffectAttribute.DEPTH,
       uniforms: new Map(law ? [
@@ -634,6 +794,10 @@ export class AerialPerspectiveEffect extends Effect {
     this._law = law;
     this._r25 = r25;
     if(r25)for(const[name,holder]of Object.entries(CINEMA_UNIFORMS))this.uniforms.set(name,holder);
+    // LIVING WORLD (GROUND): shared holders, so the prewarm twin binds the same
+    // objects. Flags off: no uniform is added.
+    if (r25 && LW_NL) for (const [name, holder] of Object.entries(NIGHT_LIGHTS_UNIFORMS)) this.uniforms.set(name, holder);
+    if (r25 && LW_GM) for (const [name, holder] of Object.entries(GROUND_MIST_UNIFORMS)) this.uniforms.set(name, holder);
     // Resolved from the live renderer on the first update() — see the shader.
     this._reversed = null;
   }
@@ -642,7 +806,7 @@ export class AerialPerspectiveEffect extends Effect {
    * postprocessing calls this immediately before the pass draws — the latest
    * point in the frame, and therefore the least stale. Pure uniform writes.
    */
-  update(renderer) {
+  update(renderer, inputBuffer, deltaTime) {
     const u = this.uniforms;
     const s = _state;
     // Depth-buffer orientation is a device contract, not a preference (the R16
@@ -709,6 +873,9 @@ export class AerialPerspectiveEffect extends Effect {
     u.get('uGroundY').value = s.groundY;
     u.get('uNear').value.set(s.nearStartM, s.nearMaxMix);
     if (this._r25) this._updateR25(u);
+    // LIVING WORLD (GROUND): the atlas, its uploads and both features' uniforms,
+    // driven from here, the last moment before the pass samples them.
+    if (this._r25 && LW_ON) stepLivingGround(renderer, deltaTime);
   }
 
   /** R25 C: the Enhanced uniforms, from r25-sky's per-frame state. */
