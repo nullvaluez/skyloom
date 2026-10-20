@@ -18,6 +18,10 @@ import { exitGoesToTitle } from '@/lib/fly/front-door';
 import { useAdventureStore } from '@/stores/adventure-store';
 import { conditionsOn } from '@/lib/fly/player-conditions';
 import { ConditionsPanel } from './hud/ConditionsPanel';
+// Living World (MENU_GLASS): the glass pause card. Flag off renders the
+// pre-pass card below, unchanged.
+import { BookOpen, Compass, Globe2, Info, LogOut, MapPin, Plane, Play } from 'lucide-react';
+import { GLASS_ON, GLASS_EXIT_MS, GlassKeys, GlassNavItem, closingProps, glassRootProps, stillMotion, usePresence } from './hud/LivingGlass';
 
 const CONTROL_ROWS = [
   ['Mouse', 'steer — cursor offset from center commands the turn/pitch'],
@@ -65,6 +69,9 @@ export function PauseMenu({ onExit }) {
   const aircraftId = useFlyStore((s) => s.aircraftId);
   const adventureOverlay=useAdventureStore(s=>s.libraryOpen||!!s.summary);
   const isTouch = useIsTouch();
+  const open = !observing && !adventureOverlay && phase === 'paused';
+  const still = GLASS_ON && open ? stillMotion() : false;
+  const presence = usePresence(GLASS_ON && open, still ? 0 : GLASS_EXIT_MS);
 
   // M from the pause menu goes straight to the Atlas — same key as in
   // flight, so muscle memory doesn't dead-end on the paused screen.
@@ -88,6 +95,20 @@ export function PauseMenu({ onExit }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [phase]);
 
+  if (GLASS_ON) {
+    if (!presence.mounted) return null;
+    return (
+      <GlassPause
+        onExit={onExit}
+        closing={presence.closing}
+        still={still}
+        creditsOpen={creditsOpen}
+        mapStyle={mapStyle}
+        aircraftId={aircraftId}
+        isTouch={isTouch}
+      />
+    );
+  }
   if (observing || adventureOverlay || phase !== 'paused') return null;
 
   const store = useFlyStore.getState();
@@ -178,6 +199,123 @@ export function PauseMenu({ onExit }) {
           <div className="mt-3 border-t border-zinc-800 pt-3">
             <ControlsTable compact touch={isTouch} />
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const REVIEW_WARPS = [
+  ['Manhattan waterfront', 40.7028, -74.017, 150],
+  ['Ohio countryside', 40.20403, -83.0896, 550],
+  ['Sierra mountain flight', 36.601, -118.06, 3200],
+  ['Above the clouds', 40.7028, -74.017, 3400],
+];
+
+/**
+ * Living World (MENU_GLASS): the pause card as one glass instrument panel —
+ * a header with the lit Resume, the destinations on the left, the settings
+ * in the middle and the controls reference on the right (stacked on narrow
+ * windows and phones). Every testid, label and accessible name of the
+ * pre-pass card is kept; only the arrangement and the finish change.
+ */
+function GlassPause({ onExit, closing, still, creditsOpen, mapStyle, aircraftId, isTouch }) {
+  const store = useFlyStore.getState();
+  // Read, never subscribe (as the classic card): mounted only while paused.
+  const totalSpots = usePassportStore.getState().stats.totalSpotted ?? 0;
+  const spots = `${totalSpots.toLocaleString()} ${totalSpots === 1 ? 'spot' : 'spots'}`;
+  const fly = (then) => () => {
+    store.setPhase('flying');
+    then?.();
+  };
+  return (
+    <div className="lg lg-pause-scrim" {...glassRootProps(still)} {...closingProps(closing)}>
+      {creditsOpen ? (
+        <CreditsPanel onClose={() => store.closeCredits()} />
+      ) : (
+        <div className="lg-panel lg-pause lg-enter" role="dialog" aria-modal="true" aria-labelledby="lg-pause-title">
+          <header className="lg-pause-head">
+            <div>
+              <h2 className="lg-title" id="lg-pause-title">
+                Paused
+              </h2>
+              <p className="lg-sub">Live traffic keeps moving while you&apos;re paused.</p>
+            </div>
+            <button type="button" className="lg-btn lg-btn-lit" onClick={fly()}>
+              <Play size={16} fill="currentColor" aria-hidden="true" />
+              Resume
+              <span className="lg-kbd lg-kbd-hint" aria-hidden="true">
+                Esc
+              </span>
+            </button>
+          </header>
+
+          <nav className="lg-pane lg-pane-nav" aria-label="Pause menu">
+            <div className="lg-nav">
+              <GlassNavItem icon={Compass} label="Adventures" onClick={() => useAdventureStore.getState().setLibraryOpen(true)} />
+              {mapStyle === 'satellite' && immersiveOn() && reviewSurfaceOn() && (
+                <div className="lg-nav-group">
+                  <p className="lg-label">Explore the new atmosphere</p>
+                  {REVIEW_WARPS.map(([label, lat, lon, altM]) => (
+                    <GlassNavItem
+                      key={label}
+                      icon={MapPin}
+                      label={label}
+                      disabled={!store.runtimeReady}
+                      onClick={fly(() => callRuntimeAction('warpToGeo', lat, lon, { altM, name: label }))}
+                    />
+                  ))}
+                </div>
+              )}
+              <GlassNavItem
+                icon={Globe2}
+                label="Atlas"
+                note="warp the world"
+                name="Atlas — warp the world"
+                kbd="M"
+                onClick={fly(() => store.setAtlasOpen(true))}
+              />
+              <GlassNavItem
+                icon={BookOpen}
+                testid="pause-logbook"
+                label="Pilot Logbook"
+                meta={spots}
+                name={`Pilot Logbook — ${spots}`}
+                kbd="L"
+                onClick={fly(() => store.setLogbookOpen(true))}
+              />
+              {HANGAR.enabled && (
+                <GlassNavItem
+                  icon={Plane}
+                  testid="pause-hangar"
+                  label="Hangar"
+                  meta={aircraftName(aircraftId)}
+                  name={`Hangar — ${aircraftName(aircraftId)}`}
+                  onClick={fly(() => store.setHangarOpen(true))}
+                />
+              )}
+              <hr className="lg-rule" />
+              <GlassNavItem icon={Info} label="Credits & licenses" onClick={() => store.openCredits()} />
+              {exitGoesToTitle() ? (
+                <GlassNavItem icon={LogOut} testid="pause-exit-title" tone="caution" label="Exit to title" onClick={onExit} />
+              ) : (
+                <GlassNavItem icon={LogOut} tone="caution" label="Exit Fly Mode" onClick={onExit} />
+              )}
+            </div>
+          </nav>
+
+          <section className="lg-pane lg-pane-settings" aria-label="Settings">
+            <p className="lg-label">Settings</p>
+            <div className="lg-settings">
+              {conditionsOn() && <ConditionsPanel />}
+              <SettingsRows includeConditions={false} />
+            </div>
+          </section>
+
+          <section className="lg-pane lg-pane-keys" aria-label={isTouch ? 'Touch controls' : 'Controls'}>
+            <p className="lg-label">{isTouch ? 'Touch controls' : 'Controls'}</p>
+            <GlassKeys rows={isTouch ? TOUCH_CONTROL_ROWS : CONTROL_ROWS} keycaps={!isTouch} />
+          </section>
         </div>
       )}
     </div>

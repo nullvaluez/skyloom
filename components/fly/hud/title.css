@@ -94,3 +94,146 @@
 [data-device='phone'][data-orient='landscape'] .fly-title-attribution{font-size:9px}
 
 @media (prefers-reduced-motion:reduce){.fly-title,.fly-title *{transition:none!important;animation:none!important}}
+
+/* ===========================================================================
+   Living World — TITLE_MOTION. Every rule below is scoped to `.lwt`, the class
+   the title root carries only with the flag on, so everything above is the
+   title exactly as it was. The language is LIVING GLASS (living-glass.css):
+   smoked glass over the live world, ice type, selected-cyan for what is lit,
+   amber for where you are going. One orchestrated entrance (data-motion=
+   'enter'), then the settled title ('done'); 'still' under reduced motion.
+   =========================================================================== */
+.lwt{--lwt-ice:#eef5ff;--lwt-haze:#a9bacd;--lwt-faint:#74879e;--lwt-sel:#7fe7ff;--lwt-glass:rgba(8,14,27,.74);--lwt-edge:rgba(190,225,255,.14);--lwt-ease:cubic-bezier(.16,1,.3,1);--lwt-art-h:92px}
+.lwt .fly-title-scrim{background:radial-gradient(60% 50% at 0% 0%,rgba(4,7,15,.6),transparent 72%),linear-gradient(180deg,rgba(4,6,13,.42) 0%,rgba(4,6,13,.1) 22%,transparent 34%,transparent 44%,rgba(4,6,13,.42) 62%,rgba(4,6,13,.9) 100%)}
+
+/* The wordmark: Sky in ice, loom in haze (the boot screen's split), and the thread. */
+.lwt .fly-title-wordmark{position:relative;isolation:isolate;font-size:clamp(48px,5.4vw,86px);letter-spacing:-.01em;text-shadow:0 4px 34px rgba(3,7,17,.55)}
+.lwt :is(.lwt-wm-sky,.lwt-wm-loom){display:inline-block}
+.lwt .lwt-wm-loom{color:#b4c4d8}
+.lwt .lwt-wm-oo{position:relative;display:inline-block}
+.lwt .lwt-thread{position:absolute;left:-1.3em;top:-.3em;width:4.7em;height:1.2em;overflow:visible;pointer-events:none}
+.lwt .lwt-thread-under{z-index:-1}
+.lwt .lwt-thread-over{z-index:1}
+.lwt .fly-title-tagline{margin:12px 0 0 .2em;font-size:16px;font-weight:450;letter-spacing:.01em;text-transform:none;color:#c9d6e5}
+
+.lwt .fly-title-spot{gap:10px;padding:8px 14px 8px 12px;background:rgba(8,14,27,.6);border-color:rgba(190,225,255,.16);backdrop-filter:blur(14px) saturate(1.3);box-shadow:0 12px 30px -16px rgba(0,0,0,.7);font-size:12.5px}
+.lwt .fly-title-spot-time{font-family:var(--font-geist-mono),ui-monospace,monospace;font-size:12px;letter-spacing:.02em}
+
+.lwt .fly-title-bottom{width:min(940px,100%);gap:12px}
+
+/* Continue: the lit key. A backlit face, a lamp, and one sweep of light. */
+.lwt .fly-title-continue{position:relative;isolation:isolate;overflow:hidden;gap:14px;min-height:58px;padding:10px 22px 10px 11px;border-radius:16px;border:1px solid rgba(220,250,255,.95);background:linear-gradient(180deg,#f4fdff 0%,#d6f6ff 55%,#bdeeff 100%);box-shadow:0 0 0 1px rgba(127,231,255,.28),0 16px 46px -14px rgba(127,231,255,.62),0 0 70px -24px rgba(127,231,255,.8),inset 0 1px 0 #fff,inset 0 -2px 0 rgba(4,60,80,.14);transition:box-shadow .22s,transform .22s var(--lwt-ease)}
+.lwt .fly-title-continue:hover{background:linear-gradient(180deg,#fff 0%,#e0f9ff 55%,#c8f2ff 100%);box-shadow:0 0 0 1px rgba(127,231,255,.4),0 18px 52px -12px rgba(127,231,255,.75),0 0 80px -20px rgba(127,231,255,.9),inset 0 1px 0 #fff,inset 0 -2px 0 rgba(4,60,80,.14);transform:translateY(-1px)}
+.lwt .fly-title-continue:active{transform:translateY(1px)}
+.lwt .lwt-lamp{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:50%;background:radial-gradient(circle at 50% 40%,#123747,#06161f);color:#9ff0ff;box-shadow:0 0 0 3px rgba(7,32,44,.1),inset 0 0 12px rgba(127,231,255,.45)}
+.lwt .lwt-lamp svg{margin-left:2px;filter:drop-shadow(0 0 4px rgba(127,231,255,.9))}
+.lwt .fly-title-continue-label{font-size:16px;font-weight:700;letter-spacing:-.01em}
+.lwt .fly-title-continue-detail{font-size:14px;color:#24485c}
+.lwt .fly-title-continue-detail::before{content:'';display:inline-block;width:1px;height:15px;margin:0 14px 0 2px;vertical-align:-3px;background:rgba(7,32,44,.24)}
+.lwt .lwt-sheen{position:absolute;inset:0;z-index:-1;overflow:hidden;border-radius:inherit;pointer-events:none}
+.lwt .lwt-sheen::before{content:'';position:absolute;top:-20%;bottom:-20%;left:0;width:22%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.95),transparent);transform:translateX(-160%) skewX(-18deg)}
+.lwt .fly-title-continue:hover .lwt-sheen::before{animation:lwt-sheen .95s cubic-bezier(.4,0,.2,1)}
+
+/* Where will you fly?: the hero, dark glass with a great circle over the limb. */
+.lwt-explore{position:relative;isolation:isolate;display:flex;align-items:center;gap:20px;width:100%;min-height:112px;padding:20px 22px 20px 28px;overflow:hidden;text-align:left;font:inherit;color:inherit;cursor:pointer;border-radius:20px;border:1px solid var(--lwt-edge);background:linear-gradient(180deg,rgba(205,232,255,.07),rgba(205,232,255,0) 70%),var(--lwt-glass);backdrop-filter:blur(18px) saturate(1.3) brightness(.85);box-shadow:0 24px 60px -26px rgba(0,0,0,.7),inset 0 1px 0 rgba(226,244,255,.1);transition:border-color .2s,box-shadow .2s,transform .22s var(--lwt-ease)}
+.lwt-explore::before{content:'';position:absolute;top:-1px;left:32px;right:32px;height:1px;background:linear-gradient(90deg,transparent,rgba(228,246,255,.55) 30%,rgba(228,246,255,.55) 70%,transparent)}
+.lwt-explore[data-primary]{border-color:rgba(127,231,255,.42);box-shadow:0 0 0 1px rgba(127,231,255,.16),0 22px 64px -22px rgba(127,231,255,.38),inset 0 1px 0 rgba(226,244,255,.12)}
+.lwt-explore-art{position:absolute;z-index:-1;inset:0 0 0 auto;width:min(60%,560px);background:url(./title-art/explore.svg) right 40px center/auto 120% no-repeat;-webkit-mask-image:linear-gradient(90deg,transparent,#000 34%);mask-image:linear-gradient(90deg,transparent,#000 34%);transition:transform .6s var(--lwt-ease)}
+.lwt-explore-text{display:flex;flex-direction:column;gap:7px;flex:1;min-width:0}
+.lwt-explore-text strong{font:400 28px/1.05 'Archivo Black',ui-sans-serif,system-ui;letter-spacing:-.005em;color:var(--lwt-ice)}
+.lwt-explore-text>span{max-width:46ch;font-size:14.5px;line-height:1.45;color:var(--lwt-haze)}
+.lwt-go{display:grid;place-items:center;flex:none;width:50px;height:50px;border-radius:50%;border:1px solid rgba(127,231,255,.5);background:rgba(8,20,32,.6);color:var(--lwt-sel);box-shadow:0 0 24px -6px rgba(127,231,255,.55);transition:background .2s,color .2s,box-shadow .2s}
+.lwt-go svg{margin-left:2px}
+.lwt-explore:hover{border-color:rgba(127,231,255,.5);transform:translateY(-2px)}
+.lwt-explore:hover .lwt-explore-art{transform:translateX(-10px)}
+.lwt-explore:hover .lwt-go{background:var(--lwt-sel);color:#07202c;box-shadow:0 0 30px -4px rgba(127,231,255,.8)}
+.lwt-explore:focus-visible{outline:2px solid var(--lwt-sel);outline-offset:3px}
+
+/* The cards: an instrument display on top (the art), the words below. */
+.lwt .fly-title-cards{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)}
+.lwt .fly-title-cards-single{grid-auto-columns:minmax(0,460px);justify-content:center}
+.lwt .lwt-card{position:relative;isolation:isolate;flex-direction:column;align-items:stretch;gap:0;min-height:0;padding:0;overflow:hidden;border-radius:18px;border-color:var(--lwt-edge);background:linear-gradient(180deg,rgba(205,232,255,.05),rgba(205,232,255,0) 60%),var(--lwt-glass);backdrop-filter:blur(18px) saturate(1.3) brightness(.85);box-shadow:0 22px 54px -26px rgba(0,0,0,.7),inset 0 1px 0 rgba(226,244,255,.09);transition:border-color .2s,transform .22s var(--lwt-ease),box-shadow .2s}
+.lwt .lwt-card::before{content:'';display:block;flex:none;height:var(--lwt-art-h);border-bottom:1px solid var(--lwt-edge);background:linear-gradient(rgba(190,225,255,.05) 1px,transparent 1px) 0 0/100% 15px,linear-gradient(90deg,rgba(190,225,255,.05) 1px,transparent 1px) 0 0/15px 100%,radial-gradient(130% 150% at 50% 0%,rgba(127,231,255,.1),rgba(3,8,18,.55))}
+.lwt .lwt-card::after{content:'';position:absolute;z-index:1;top:0;left:0;right:0;height:var(--lwt-art-h);pointer-events:none;background-position:center 45%;background-size:cover;background-repeat:no-repeat;transition:transform .6s var(--lwt-ease)}
+.lwt .lwt-card-watch::after{background-image:url(./title-art/watch.svg)}
+.lwt .lwt-card-journeys::after{background-image:url(./title-art/journeys.svg)}
+.lwt .lwt-card-runway::after{background-image:url(./title-art/runway.svg)}
+.lwt .lwt-card .fly-title-card-icon{display:none}
+.lwt .lwt-card .fly-title-card-text{gap:5px;padding:15px 20px 18px}
+.lwt .lwt-card .fly-title-card-text strong{font-size:19px;font-weight:650;letter-spacing:-.02em}
+.lwt .lwt-card .fly-title-card-text span{font-size:13px;line-height:1.5}
+.lwt .lwt-card .fly-title-card-text .fly-title-card-sub{margin-top:2px;font-size:12px;letter-spacing:0;text-transform:none;color:var(--lwt-sel)}
+.lwt .lwt-card:hover{border-color:rgba(127,231,255,.5);background:linear-gradient(180deg,rgba(205,232,255,.08),rgba(205,232,255,0) 60%),var(--lwt-glass);transform:translateY(-3px)}
+.lwt .lwt-card:hover::after{transform:scale(1.05)}
+
+.lwt .fly-title-secondary{gap:4px}
+.lwt .fly-title-secondary button{gap:9px;padding:8px 16px;border-color:transparent;background:transparent;backdrop-filter:none;color:#c6d3e1;font-size:13.5px}
+.lwt .fly-title-secondary button:hover{background:rgba(190,225,255,.09);border-color:rgba(190,225,255,.16);color:var(--lwt-ice)}
+.lwt .fly-title-secondary svg{color:#8fa9c2}
+
+/* Short desktop windows: a slimmer art band. */
+@media (max-height:780px){.lwt{--lwt-art-h:68px}.lwt .fly-title-continue{min-height:52px}.lwt-explore{min-height:96px}}
+@media (max-width:640px){.lwt .fly-title-cards{grid-auto-flow:row;grid-auto-columns:auto;grid-template-columns:1fr}}
+
+/* Phones: solid glass (no blur over the live canvas), the art beside the words. */
+[data-device='phone'] .lwt :is(.lwt-explore,.lwt-card,.fly-title-spot){backdrop-filter:none}
+[data-device='phone'] .lwt{--lwt-rise:5px}
+[data-device='phone'] .lwt .fly-title-wordmark{font-size:40px}
+[data-device='phone'] .lwt .fly-title-tagline{margin-top:8px;font-size:14px;letter-spacing:.01em}
+[data-device='phone'] .lwt .fly-title-continue{min-height:50px;padding:6px 16px 6px 8px;gap:12px}
+[data-device='phone'] .lwt .lwt-lamp{width:32px;height:32px}
+[data-device='phone'] .lwt .fly-title-continue-label{font-size:15px}
+[data-device='phone'] .lwt .fly-title-continue-detail{font-size:13px}
+[data-device='phone'] .lwt .fly-title-continue-detail::before{margin:0 10px 0 0}
+[data-device='phone'] .lwt-explore{min-height:96px;padding:14px 12px 14px 18px;gap:12px;background:linear-gradient(180deg,rgba(205,232,255,.06),rgba(205,232,255,0) 70%),rgba(8,13,25,.92)}
+[data-device='phone'] .lwt-explore-text strong{font-size:21px}
+[data-device='phone'] .lwt-explore-text>span{font-size:13px}
+[data-device='phone'] .lwt-explore-art{width:78%;opacity:.55;background-position:right -36px bottom -6px;background-size:auto 104%;-webkit-mask-image:linear-gradient(90deg,transparent,#000 55%);mask-image:linear-gradient(90deg,transparent,#000 55%)}
+[data-device='phone'] .lwt-go{width:44px;height:44px}
+[data-device='phone'] .lwt .lwt-card{flex-direction:row;align-items:center;min-height:88px;background:linear-gradient(180deg,rgba(205,232,255,.05),rgba(205,232,255,0) 60%),rgba(8,13,25,.92)}
+[data-device='phone'] .lwt .lwt-card::before{display:none}
+[data-device='phone'] .lwt .lwt-card::after{z-index:-1;inset:0 0 0 auto;width:52%;height:auto;background-size:cover;background-position:right center;opacity:.42;-webkit-mask-image:linear-gradient(90deg,transparent,#000 70%);mask-image:linear-gradient(90deg,transparent,#000 70%)}
+[data-device='phone'] .lwt .lwt-card .fly-title-card-text{padding:14px 16px}
+[data-device='phone'] .lwt .lwt-card .fly-title-card-text strong{font-size:17px}
+[data-device='phone'] .lwt .lwt-card .fly-title-card-text span{font-size:12.5px}
+[data-device='phone'] .lwt .lwt-card:hover{transform:none}
+[data-device='phone'] .lwt .fly-title-secondary button{flex:1;background:rgba(8,13,25,.78);border-color:rgba(190,225,255,.12)}
+[data-device='phone'][data-orient='portrait'] .lwt .fly-title-cards{grid-auto-flow:row;grid-auto-columns:auto;grid-template-columns:1fr}
+[data-device='phone'][data-orient='landscape'] .lwt .fly-title-wordmark{font-size:28px}
+[data-device='phone'][data-orient='landscape'] .lwt .fly-title-tagline{display:none}
+[data-device='phone'][data-orient='landscape'] .lwt .fly-title-continue{min-height:44px;padding-top:4px;padding-bottom:4px}
+[data-device='phone'][data-orient='landscape'] .lwt .lwt-lamp{width:28px;height:28px}
+[data-device='phone'][data-orient='landscape'] .lwt-explore{min-height:60px;padding:6px 10px 6px 18px}
+[data-device='phone'][data-orient='landscape'] .lwt-explore-text{gap:2px}
+[data-device='phone'][data-orient='landscape'] .lwt-explore-text strong{font-size:18px}
+[data-device='phone'][data-orient='landscape'] .lwt-explore-text>span{font-size:12px;max-width:none}
+[data-device='phone'][data-orient='landscape'] .lwt .lwt-card{padding:0}
+[data-device='phone'][data-orient='landscape'] .lwt .lwt-card .fly-title-card-text{padding:10px 14px}
+
+/* The entrance: one orchestrated sequence, then nothing moves on its own.
+   Boxes move at most 8 px (5 px on phones) and the spot chip only fades, so
+   a layout harness that measures mid-boot, when frames are scarce and an
+   animation can sit near its first keyframe, still sees disjoint, on-screen
+   controls (verify-r25-title p1/p2). */
+@keyframes lwt-letters{from{opacity:0;transform:translateY(.16em);filter:blur(10px)}}
+@keyframes lwt-rise{from{opacity:0;transform:translateY(var(--lwt-rise,8px))}}
+@keyframes lwt-fade{from{opacity:0}}
+@keyframes lwt-draw{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
+@keyframes lwt-head{from{opacity:0;transform:translate(300px,6px) rotate(-45deg) scale(.6)}to{opacity:1;transform:translate(322px,-6px) rotate(-45deg) scale(1.25)}}
+@keyframes lwt-lamp-on{0%{filter:brightness(.6) saturate(.4)}55%{filter:brightness(1.12) saturate(1.1)}100%{filter:none}}
+@keyframes lwt-sheen{from{transform:translateX(-160%) skewX(-18deg)}to{transform:translateX(560%) skewX(-18deg)}}
+.lwt[data-motion='enter'] .lwt-wm-sky{animation:lwt-letters .9s var(--lwt-ease) both}
+.lwt[data-motion='enter'] .lwt-wm-loom{animation:lwt-letters .9s var(--lwt-ease) .09s both}
+.lwt[data-motion='enter'] .lwt-t{stroke-dasharray:100;animation:lwt-draw 1.2s cubic-bezier(.5,0,.2,1) .5s both}
+.lwt[data-motion='enter'] .lwt-head{animation:lwt-head .55s var(--lwt-ease) 1.5s both}
+.lwt[data-motion='enter'] .fly-title-tagline{animation:lwt-rise .64s var(--lwt-ease) .18s both}
+.lwt[data-motion='enter'] .fly-title-spot{animation:lwt-fade .7s ease-out .26s both}
+.lwt[data-motion='enter'] .fly-title-continue{animation:lwt-rise .6s var(--lwt-ease) .3s both,lwt-lamp-on .9s ease-out .62s both}
+.lwt[data-motion='enter'] .lwt-sheen::before{animation:lwt-sheen 1.05s cubic-bezier(.4,0,.2,1) 1.1s both}
+.lwt[data-motion='enter'] .lwt-explore{animation:lwt-rise .6s var(--lwt-ease) .37s both}
+.lwt[data-motion='enter'] .fly-title-cards>:nth-child(1){animation:lwt-rise .6s var(--lwt-ease) .44s both}
+.lwt[data-motion='enter'] .fly-title-cards>:nth-child(2){animation:lwt-rise .6s var(--lwt-ease) .5s both}
+.lwt[data-motion='enter'] .fly-title-cards>:nth-child(3){animation:lwt-rise .6s var(--lwt-ease) .56s both}
+.lwt[data-motion='enter'] .fly-title-secondary{animation:lwt-fade .6s ease-out .62s both}
+.lwt[data-motion='still'] *,.lwt[data-motion='still'] *::before,.lwt[data-motion='still'] *::after{animation:none!important;transition:none!important}
+@media (prefers-reduced-motion:reduce){.lwt *,.lwt *::before,.lwt *::after{animation:none!important;transition:none!important}}

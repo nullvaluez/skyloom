@@ -15,6 +15,9 @@ import { GuestSaveControls } from './GuestSaveControls';
 import { ConditionsPanel } from './ConditionsPanel';
 import { conditionsOn } from '@/lib/fly/player-conditions';
 import { FlightComfortSettings } from './FlightComfortSettings';
+// Living World (MENU_GLASS): the glass rows. Flag off renders the markup below
+// each `GLASS_ON ?` unchanged.
+import { GLASS_ON, GlassField, GlassToggle } from './LivingGlass';
 
 const TIERS = ['low', 'medium', 'high', 'ultra'];
 const VISUALS_ROW = [
@@ -60,7 +63,67 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
 
   // TRUE EARTH (PLAYER_SURFACE): the look switches are review/automation only.
   const lookSwitches = reviewSurfaceOn();
-  const visualsRow = visualsAvailable() && lookSwitches && (
+  const pickVisuals = (key) => {
+    setVisualsLive(key); // live: C/D materials re-key on the epoch bump
+    saveVisuals(key); // a CLICKED profile is a choice — persist it
+  };
+  const pickQuality = (tier) => {
+    store.setQualityPreset(tier);
+    saveQualityTier(tier); // a CLICKED tier is a choice — persist it
+  };
+  const qualityOn = (tier) => (qualityPreset === 'ultra' ? tier === 'ultra' : qualityTier === tier);
+  const flipSound = () => {
+    // Keep the existing toggle as the single source of truth for the
+    // flip, then persist whatever it landed on.
+    store.toggleSound();
+    saveSoundOn(useFlyStore.getState().soundOn);
+  };
+  const flipReduced = () => {
+    const next = !reducedMotion;
+    saveReducedMotion(next);
+    setReducedMotion(next);
+  };
+  const flipStakes = () => {
+    const next = !stakes;
+    saveCrashMode(next); // a CLICKED mode is a choice — persist it
+    setStakes(next);
+  };
+  const pickChase = (value) => {
+    useFlyStore.setState({ chaseFraming: value });
+    try {
+      localStorage.setItem('fly-chase-framing', value);
+    } catch {
+      // storage blocked — the live choice still applies for this session
+    }
+  };
+  const flipEncounters = () => {
+    useFlyStore.setState({ encountersEnabled: !encountersEnabled });
+    try {
+      localStorage.setItem('fly-encounters', encountersEnabled ? '0' : '1');
+    } catch {
+      // storage blocked — the live choice still applies for this session
+    }
+  };
+  const seg = (on) => (on ? '' : undefined);
+
+  const visualsRow = visualsAvailable() && lookSwitches && (GLASS_ON ? (
+    <GlassField key="visuals" label="Visuals" testid={sheet ? 'settings-visuals' : undefined}>
+      <div className="lg-seg" role="group" aria-label="Visuals">
+        {VISUALS_ROW.map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            data-testid={`settings-visuals-${key}`}
+            aria-pressed={visuals === key}
+            data-on={seg(visuals === key)}
+            onClick={() => pickVisuals(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </GlassField>
+  ) : (
     <div key="visuals" className="rounded-md border border-zinc-700/60 p-2" data-testid={sheet ? 'settings-visuals' : undefined}>
       <div className="mb-1.5 text-center text-[10px] uppercase tracking-widest text-zinc-500">
         Visuals
@@ -71,10 +134,7 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
             key={key}
             data-testid={`settings-visuals-${key}`}
             aria-pressed={visuals === key}
-            onClick={() => {
-              setVisualsLive(key); // live: C/D materials re-key on the epoch bump
-              saveVisuals(key); // a CLICKED profile is a choice — persist it
-            }}
+            onClick={() => pickVisuals(key)}
             className={`rounded py-1 text-xs phone:min-h-11 ${
               visuals === key
                 ? 'bg-zinc-100 font-medium text-zinc-900'
@@ -86,9 +146,27 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
         ))}
       </div>
     </div>
-  );
+  ));
 
-  const qualityRow = (
+  const ULTRA_NOTE = 'Ultra adds finer clouds for powerful desktops. Effects still adapt to keep flight smooth.';
+  const qualityRow = GLASS_ON ? (
+    <GlassField key="quality" label="Quality" note={qualityPreset === 'ultra' ? ULTRA_NOTE : null}>
+      <div className="lg-seg" role="group" aria-label="Quality">
+        {TIERS.map((tier) => (
+          <button
+            key={tier}
+            type="button"
+            data-testid={tid(`quality-${tier}`)}
+            aria-pressed={qualityOn(tier)}
+            data-on={seg(qualityOn(tier))}
+            onClick={() => pickQuality(tier)}
+          >
+            {tier}
+          </button>
+        ))}
+      </div>
+    </GlassField>
+  ) : (
     <div key="quality" className="rounded-md border border-zinc-700/60 p-2">
       <div className="mb-1.5 text-center text-[10px] uppercase tracking-widest text-zinc-500">
         Quality
@@ -98,12 +176,9 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
           <button
             key={tier}
             data-testid={tid(`quality-${tier}`)}
-            onClick={() => {
-              store.setQualityPreset(tier);
-              saveQualityTier(tier); // a CLICKED tier is a choice — persist it
-            }}
+            onClick={() => pickQuality(tier)}
             className={`rounded py-1 text-xs capitalize phone:min-h-11 ${
-              (qualityPreset === 'ultra' ? tier === 'ultra' : qualityTier === tier)
+              qualityOn(tier)
                 ? 'bg-zinc-100 font-medium text-zinc-900'
                 : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
             }`}
@@ -112,11 +187,28 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
           </button>
         ))}
       </div>
-      {qualityPreset === 'ultra' && <p className="mt-2 text-xs text-zinc-400">Ultra adds finer clouds for powerful desktops. Effects still adapt to keep flight smooth.</p>}
+      {qualityPreset === 'ultra' && <p className="mt-2 text-xs text-zinc-400">{ULTRA_NOTE}</p>}
     </div>
   );
 
-  const mapStyleRow = lookSwitches && (
+  const mapStyleRow = lookSwitches && (GLASS_ON ? (
+    <GlassField key="map-style" label="Map style">
+      <div className="lg-seg" role="group" aria-label="Map style">
+        {MAP_STYLES.map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            data-testid={tid(`style-${key}`)}
+            aria-pressed={mapStyle === key}
+            data-on={seg(mapStyle === key)}
+            onClick={() => pickMapStyle(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </GlassField>
+  ) : (
     <div key="map-style" className="rounded-md border border-zinc-700/60 p-2">
       <div className="mb-1.5 text-center text-[10px] uppercase tracking-widest text-zinc-500">
         Map style
@@ -138,69 +230,91 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
         ))}
       </div>
     </div>
-  );
+  ));
 
   // TRUE EARTH (CONDITIONS): time of day and weather; absent with the flag off.
   const conditionsRow = conditionsOn() && <ConditionsPanel key="conditions" />;
 
-  const soundRow = (
-    <MenuButton
-      key="sound"
-      testid={tid('sound')}
-      onClick={() => {
-        // Keep the existing toggle as the single source of truth for the
-        // flip, then persist whatever it landed on.
-        store.toggleSound();
-        saveSoundOn(useFlyStore.getState().soundOn);
-      }}
-    >
+  const onOff = (v) => (v ? 'On' : 'Off');
+  const soundRow = GLASS_ON ? (
+    <GlassToggle key="sound" testid={tid('sound')} label="Sound" value={onOff(soundOn)} on={soundOn} name={`Sound: ${onOff(soundOn)}`} onClick={flipSound} />
+  ) : (
+    <MenuButton key="sound" testid={tid('sound')} onClick={flipSound}>
       Sound: {soundOn ? 'On' : 'Off'}
     </MenuButton>
   );
 
-  const reducedRow = (sheet || (mapStyle === 'satellite' && immersiveOn())) && (
-    <MenuButton
+  const reducedRow = (sheet || (mapStyle === 'satellite' && immersiveOn())) && (GLASS_ON ? (
+    <GlassToggle
       key="reduced-motion"
       testid={tid('reduced-motion')}
-      onClick={() => {
-        const next = !reducedMotion;
-        saveReducedMotion(next);
-        setReducedMotion(next);
-      }}
-    >
+      label="Reduced motion"
+      value={onOff(reducedMotion)}
+      on={reducedMotion}
+      name={`Reduced motion: ${onOff(reducedMotion)}`}
+      onClick={flipReduced}
+    />
+  ) : (
+    <MenuButton key="reduced-motion" testid={tid('reduced-motion')} onClick={flipReduced}>
       Reduced motion: {reducedMotion ? 'On' : 'Off'}
     </MenuButton>
-  );
+  ));
 
   // Round 18: the stakes switch. Crashes are ON by default (the user's call);
   // "Forgiving" restores the round-17 flight model exactly — the same read
   // gate as CRASH.enabled, so nothing about a forgiving session differs from
   // R17 by a single frame.
-  const stakesRow = CRASH.enabled && (
-    <MenuButton
+  const stakesValue = stakes ? 'Crashes ON' : 'Forgiving';
+  const stakesRow = CRASH.enabled && (GLASS_ON ? (
+    <GlassToggle
       key="stakes"
       testid={sheet ? 'settings-stakes' : 'pause-stakes'}
-      onClick={() => {
-        const next = !stakes;
-        saveCrashMode(next); // a CLICKED mode is a choice — persist it
-        setStakes(next);
-      }}
-    >
+      label="Flight stakes"
+      value={stakesValue}
+      on={stakes}
+      tone="caution"
+      name={`Flight stakes: ${stakesValue}`}
+      onClick={flipStakes}
+    />
+  ) : (
+    <MenuButton key="stakes" testid={sheet ? 'settings-stakes' : 'pause-stakes'} onClick={flipStakes}>
       Flight stakes: {stakes ? 'Crashes ON' : 'Forgiving'}
     </MenuButton>
-  );
+  ));
 
-  const flightViewRows=(
+  const flightViewRows = GLASS_ON ? (
+    <>
+      <GlassField label="Chase view">
+        <div className="lg-seg" role="group" aria-label="Chase view">
+          {['world', 'close'].map((value) => (
+            <button
+              key={value}
+              type="button"
+              data-testid={`settings-chase-${value}`}
+              aria-pressed={chaseFraming === value}
+              data-on={seg(chaseFraming === value)}
+              onClick={() => pickChase(value)}
+            >
+              {value === 'world' ? 'World' : 'Close'}
+            </button>
+          ))}
+        </div>
+      </GlassField>
+      <GlassToggle
+        label="Nearby invitations"
+        value={onOff(encountersEnabled)}
+        on={encountersEnabled}
+        name={`Nearby invitations: ${onOff(encountersEnabled)}`}
+        onClick={flipEncounters}
+      />
+    </>
+  ) : (
       <div className="rounded-md border border-zinc-700/60 p-2">
         <div className="mb-2 text-xs text-zinc-300">Chase view</div>
         <div className="grid grid-cols-2 gap-1">
-          {['world','close'].map(value=><button key={value} data-testid={`settings-chase-${value}`} aria-pressed={chaseFraming===value} className="min-h-11 rounded bg-zinc-800 text-sm aria-pressed:bg-zinc-100 aria-pressed:text-zinc-900" onClick={()=>{
-            useFlyStore.setState({chaseFraming:value});try{localStorage.setItem('fly-chase-framing',value);}catch{}
-          }}>{value==='world'?'World':'Close'}</button>)}
+          {['world','close'].map(value=><button key={value} data-testid={`settings-chase-${value}`} aria-pressed={chaseFraming===value} className="min-h-11 rounded bg-zinc-800 text-sm aria-pressed:bg-zinc-100 aria-pressed:text-zinc-900" onClick={()=>pickChase(value)}>{value==='world'?'World':'Close'}</button>)}
         </div>
-        <button className="mt-2 min-h-11 w-full rounded bg-zinc-800 text-sm" aria-pressed={encountersEnabled} onClick={()=>{
-          useFlyStore.setState({encountersEnabled:!encountersEnabled});try{localStorage.setItem('fly-encounters',encountersEnabled?'0':'1');}catch{}
-        }}>Nearby invitations: {encountersEnabled?'On':'Off'}</button>
+        <button className="mt-2 min-h-11 w-full rounded bg-zinc-800 text-sm" aria-pressed={encountersEnabled} onClick={flipEncounters}>Nearby invitations: {encountersEnabled?'On':'Off'}</button>
       </div>
   );
 
