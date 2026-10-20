@@ -39,7 +39,10 @@ function label(width, height, text, sub, align) {
   fs.mkdirSync(out, { recursive: true });
   const scenes = Object.fromEntries([...(before.scenes || []), ...(after.scenes || [])].map((s) => [s.id, s]));
   const menuTitles = { 'menu-title': ['Title screen', 'The front door over the live world'], 'menu-hangar': ['Hangar', 'Choosing an aircraft and a destination'], 'menu-pause': ['Pause menu', 'Settings and navigation in flight'] };
-  const index = { purpose: 'Unedited game frames, before and after the Living World pass, same poses and pins. Software (SwiftShader) captures: look evidence, not performance.', before: { url: before.url, capturedAt: before.capturedAt }, after: { url: after.url, capturedAt: after.capturedAt }, viewport: after.viewport, items: [] };
+  // Name the renderer the captures came from: SwiftShader in the cloud
+  // container, the owner's GPU on the workstation. Look evidence either way.
+  const renderer = after.gpu || 'unknown renderer';
+  const index = { purpose: `Unedited game frames, before and after the Living World pass, same poses and pins. Rendered on ${renderer}: look evidence, not performance.`, renderer, before: { url: before.url, capturedAt: before.capturedAt, gpu: before.gpu ?? null }, after: { url: after.url, capturedAt: after.capturedAt, gpu: after.gpu ?? null }, viewport: after.viewport, items: [] };
   for (const cap of after.captures) {
     const b = before.captures.find((c) => c.scene === cap.scene);
     if (!b) continue;
