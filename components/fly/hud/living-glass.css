@@ -691,7 +691,19 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: max(env(safe-area-inset-top), 24px) max(env(safe-area-inset-right), 20px) 20px max(env(safe-area-inset-left), 20px);
-  background: radial-gradient(120% 95% at 50% 42%, rgba(3, 6, 12, 0.2), rgba(3, 6, 12, 0.66));
+  --lg-scrim: radial-gradient(120% 95% at 50% 42%, rgba(3, 6, 12, 0.2), rgba(3, 6, 12, 0.66));
+}
+/* The dim is a layer of its own, never the container: an ancestor with an
+   opacity animation becomes a backdrop root and the glass inside it stops
+   blurring the world (measured: the title's own text showed through the
+   Credits panel). Fixed, so it stays put while a phone scrolls the card. */
+.lg-pause-scrim::before {
+  content: '';
+  position: fixed;
+  inset: 0 0 2rem 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--lg-scrim);
 }
 .lg-pause {
   pointer-events: auto;
@@ -747,6 +759,16 @@
 .lg-pane > .lg-label {
   margin-bottom: 4px;
 }
+/* Scrolling regions fade out at the bottom edge, a hint that more is below;
+   their bottom padding is deeper than the fade, so nothing is ever dimmed
+   once scrolled to the end. */
+.lg-pause .lg-pane,
+.lg-drawer-body,
+.lg-credits-body {
+  padding-bottom: 32px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent);
+}
 @media (max-width: 1180px) {
   .lg-pause {
     width: min(860px, 100%);
@@ -761,6 +783,11 @@
   }
   .lg-pane {
     overflow: visible;
+  }
+  .lg-pause .lg-pane {
+    padding-bottom: 20px;
+    -webkit-mask-image: none;
+    mask-image: none;
   }
   .lg-pane-keys {
     border-left: 0;
@@ -806,6 +833,11 @@
 [data-device='phone'] .lg-pane {
   overflow: visible;
 }
+[data-device='phone'] .lg-pause .lg-pane {
+  padding-bottom: 18px;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
 [data-device='phone'] .lg-pane + .lg-pane {
   border-left: 0;
   border-top: 1px solid var(--lg-edge);
@@ -849,7 +881,7 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 6px 26px 8px;
+  padding: 6px 26px 32px;
   scrollbar-width: thin;
   scrollbar-color: rgba(190, 225, 255, 0.22) transparent;
 }
@@ -952,7 +984,7 @@ a.lg-credit-name:hover {
   font-size: 22px;
 }
 [data-device='phone'] .lg-credits-body {
-  padding: 4px 18px 8px;
+  padding: 4px 18px 30px;
 }
 [data-device='phone'] .lg-credits-foot {
   padding: 12px 18px 16px;
@@ -984,7 +1016,8 @@ a.lg-credit-name:hover {
   justify-content: flex-end;
   align-items: stretch;
   padding: 16px;
-  background: linear-gradient(90deg, rgba(4, 6, 13, 0.12) 30%, rgba(4, 6, 13, 0.62));
+  --lg-scrim: linear-gradient(90deg, rgba(4, 6, 13, 0.12) 30%, rgba(4, 6, 13, 0.62));
+  background: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
@@ -1006,12 +1039,13 @@ a.lg-credit-name:hover {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 4px 24px 20px;
+  padding: 4px 24px 32px;
   scrollbar-width: thin;
   scrollbar-color: rgba(190, 225, 255, 0.22) transparent;
 }
 .fly-title-modal.lg-credits-host {
-  background: radial-gradient(120% 95% at 50% 45%, rgba(4, 6, 13, 0.3), rgba(4, 6, 13, 0.7));
+  --lg-scrim: radial-gradient(120% 95% at 50% 45%, rgba(4, 6, 13, 0.3), rgba(4, 6, 13, 0.7));
+  background: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
@@ -1021,7 +1055,15 @@ a.lg-credit-name:hover {
   align-items: flex-end;
   justify-content: stretch;
   padding: 0;
-  background: rgba(4, 6, 13, 0.55);
+  --lg-scrim: rgba(4, 6, 13, 0.55);
+}
+.fly-title-modal.lg-modal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--lg-scrim);
 }
 .fly-title-modal-sheet .lg-drawer {
   width: 100%;
@@ -1036,7 +1078,7 @@ a.lg-credit-name:hover {
   font-size: 22px;
 }
 .fly-title-modal-sheet .lg-drawer-body {
-  padding: 2px 18px max(env(safe-area-inset-bottom), 16px);
+  padding: 2px 18px max(env(safe-area-inset-bottom), 30px);
 }
 
 /* ---- motion: purposeful, short, and off under reduced motion ---------- */
@@ -1096,19 +1138,20 @@ a.lg-credit-name:hover {
 .lg-enter {
   animation: lg-rise var(--lg-in) var(--lg-ease) both;
 }
-.lg-pause-scrim {
+.lg-pause-scrim::before,
+.fly-title-modal.lg-modal::before {
   animation: lg-fade-in 200ms ease-out both;
 }
 .lg-pause-scrim[data-state='closing'],
 .fly-title-modal.lg-modal[data-state='closing'] {
   pointer-events: none;
+}
+.lg-pause-scrim[data-state='closing']::before,
+.fly-title-modal.lg-modal[data-state='closing']::before {
   animation: lg-fade-out var(--lg-out, 150ms) var(--lg-ease-in) both;
 }
 .lg-pause-scrim[data-state='closing'] .lg-enter {
   animation: lg-sink var(--lg-out) var(--lg-ease-in) both;
-}
-.fly-title-modal.lg-modal {
-  animation: lg-fade-in 200ms ease-out both;
 }
 .lg-drawer-host .lg-drawer {
   animation: lg-slide-in 300ms var(--lg-ease) both;
@@ -1128,8 +1171,11 @@ a.lg-credit-name:hover {
 .lg-credits-host[data-state='closing'] .lg-credits {
   animation: lg-sink var(--lg-out) var(--lg-ease-in) both;
 }
-.lg[data-still] *,
 .lg[data-still],
+.lg[data-still]::before,
+.lg[data-still] *,
+.lg[data-still] *::before,
+.lg[data-still] *::after,
 [data-still] .lg,
 [data-still] .lg * {
   animation: none !important;
@@ -1137,9 +1183,10 @@ a.lg-credit-name:hover {
 }
 @media (prefers-reduced-motion: reduce) {
   .lg,
+  .lg::before,
   .lg *,
-  .lg-pause-scrim,
-  .fly-title-modal.lg-modal {
+  .lg *::before,
+  .lg *::after {
     animation: none !important;
     transition: none !important;
   }
