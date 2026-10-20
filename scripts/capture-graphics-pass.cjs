@@ -64,14 +64,33 @@ const SCENES = [
  * from receipt); `now` advances so every poll is accepted.
  */
 let currentScene = null;
-let pollNow = 1767225600;
+const FEED_EPOCH = 1767225600;
+const feedT0 = Date.now();
+let pollNow = FEED_EPOCH;
+let epochScene = null;
+let epochNow = pollNow;
 function syntheticTraffic(qLat, qLon) {
   const sc = currentScene;
   const ac = [];
-  const add = (i, dxKm, dzKm, altFt, trackDeg, type, gs = 460) => {
+  // The feed's clock runs in real time, as a live feed's does: the engine
+  // estimates clock skew from it, so a clock that steps 5 s per poll whatever
+  // the poll interval desynchronises every track's age.
+  pollNow = FEED_EPOCH + (Date.now() - feedT0) / 1000;
+  // Each jet flies on along its track from the scene's first poll. Sending the
+  // same position with a later clock made the client dead-reckon ahead and
+  // then snap back every poll, which drew kinked trails.
+  if (sc !== epochScene) { epochScene = sc; epochNow = pollNow; }
+  const flownSec = pollNow - epochNow;
+  const add = (i, dxKm0, dzKm0, altFt, trackDeg, type, gs = 460) => {
+    const flownKm = (gs * 1.852 * flownSec) / 3600;
+    const dxKm = dxKm0 + flownKm * Math.sin((trackDeg * Math.PI) / 180);
+    const dzKm = dzKm0 + flownKm * Math.cos((trackDeg * Math.PI) / 180);
     const lat = (sc ? sc.lat : qLat) + dzKm / 111.32;
     const lon = (sc ? sc.lon : qLon) + dxKm / (111.32 * Math.cos(((sc ? sc.lat : qLat) * Math.PI) / 180));
-    ac.push({ hex: `fa${(0x1000 + i).toString(16)}`, flight: `SKY${100 + i}`, r: `N${400 + i}LW`, t: type, lat, lon,
+    // A hex per scene: the same hex reappearing at the next pose (thousands of
+    // km away) is one aircraft to the engine, which blends it across the gap
+    // and lays a trail along that path (vertical where the bend drops it).
+    ac.push({ hex: (0xfa0000 + Math.max(0, SCENES.indexOf(sc)) * 0x100 + i).toString(16), flight: `SKY${100 + i}`, r: `N${400 + i}LW`, t: type, lat, lon,
       alt_baro: altFt, alt_geom: altFt + 150, gs, track: trackDeg, baro_rate: 0, squawk: '2200', category: 'A3', seen: 0.5, seen_pos: 0.5 });
   };
   if (sc?.traffic === 'cruise') {
@@ -87,7 +106,6 @@ function syntheticTraffic(qLat, qLon) {
       [-6, -25, 12000, 140, 'E75L'], [18, 4, 6500, 200, 'C172', 110], [-20, -8, 38000, 20, 'A359']];
     plan.forEach(([dx, dz, alt, trk, t, gs], i) => add(i, dx, dz, alt, trk, t, gs));
   }
-  pollNow += 5;
   return { ac, now: pollNow * 1000, total: ac.length, source: 'Living World capture fixture' };
 }
 
@@ -95,7 +113,7 @@ const report = {
   purpose: 'Unedited game frames for a visual before/after review. Not a performance benchmark.',
   label, url, viewport, quality, capturedAt: new Date().toISOString(),
   pins: { governor: 'hold', visuals: 'enhanced', map: 'satellite', cameraFovDeg: 60, animationClockSec: 240,
-    traffic: 'synthetic, fixed epoch', date: '2026-07-18 (local solar hours per pose)' },
+    traffic: 'synthetic, flying on from the first poll of each scene', date: '2026-07-18 (local solar hours per pose)' },
   scenes: SCENES, captures: [], errors: [], console: [],
 };
 const save = () => fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify(report, null, 2));
