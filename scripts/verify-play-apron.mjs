@@ -134,6 +134,7 @@ check('(2c2) flag on: each layer carries its additions (none silently skipped)',
   const frag = (l) => on.out[l].raw.fragmentShader;
   assert.ok(frag('pavement').includes('afApronWear( pave, afP, afFoot, concreteW )'));
   assert.ok(frag('pavement').includes('totalEmissiveRadiance += diffuseColor.rgb * uAfApronN.rgb'), 'night floodlight');
+  assert.ok(frag('grass').includes('totalEmissiveRadiance += diffuseColor.rgb * uAfApronN.rgb'), 'floodlight spill on the grass');
   assert.ok(frag('pavement').includes('roughnessFactor - afSheen'));
   assert.ok(frag('grass').includes('afGrassApron( grass, afP, afFoot )') && frag('grass').includes('mowK = uAfApronG.x'));
   assert.ok(frag('runway').includes('rubber = max( rubber, roll * uAfApronG.w )') && frag('runway').includes('uAfApronC.z'));
@@ -289,16 +290,16 @@ check('(5a) stand blobs: nose stop, gear and engines in the stand frame, mapped 
   const [bx, bz] = toLocal(40, 40 + 0.12 * STAND_CLASS.narrow.length);
   assert.ok(Math.hypot(back.x - bx, back.z - bz) < 1e-6, 'a back stand faces -z');
 });
-check('(5b) set taxi lines: the taxilane and both lead-in turns per stand, rear side turned about zc', () => {
+check('(5b) set taxi lines: the taxilane and the router lead-in turn per stand, rear side turned about zc', () => {
   const lanes = { taxilaneZ: -120, noseZ: -40, road: { z0: -30, z1: -20 } };
   const stand = { x: 40, z: -60, noseZ: -40, cls: 'narrow', canon: { x: 40, z: -60, noseZ: -40 } };
   const layout = { lanes, apron: { x0: -200, x1: 200, z0: -170, z1: -10 }, zc: 30, sides: [{ side: 'front', stands: [stand], lanes, xform: { rot180: false, zc: 30 } }, { side: 'back', stands: [{ ...stand, x: -40, noseZ: 100 }], lanes, xform: { rot180: true, zc: 30 } }] };
   const lines = A.setTaxiLines(site, layout, standLeadIn);
-  assert.equal(lines.length, 2 * (1 + 3));
+  assert.equal(lines.length, 2 * (1 + 2));
   const [tx, tz] = toLocal(-196, -120);
   assert.ok(Math.hypot(lines[0].pts[0] - tx, lines[0].pts[1] - tz) < 1e-6, 'front taxilane start');
   const [rx, rz] = toLocal(196, 2 * 30 + 120);
-  assert.ok(Math.hypot(lines[4].pts[0] - rx, lines[4].pts[1] - rz) < 1e-6, 'rear taxilane start, turned 180 degrees');
+  assert.ok(Math.hypot(lines[3].pts[0] - rx, lines[3].pts[1] - rz) < 1e-6, 'rear taxilane start, turned 180 degrees');
   for (const l of lines) for (const v of l.pts) assert.ok(Number.isFinite(v));
 });
 

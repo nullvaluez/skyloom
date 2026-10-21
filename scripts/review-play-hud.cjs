@@ -37,7 +37,7 @@ const SITES = {
   'alps-night': { lat: 46.58, lon: 7.94, altM: 3500, headingDeg: 130, utc: 22 },
   jfk: { lat: 40.60, lon: -73.86, altM: 1100, headingDeg: 300, utc: 16 },
 };
-const site = SITES[args.site || 'manhattan'];
+const site = { ...SITES[args.site || 'manhattan'], ...(args.altM ? { altM: Number(args.altM) } : {}) };
 const states = String(args.states || 'cruise,steer,idle,nearby,escort,inspect').split(',');
 fs.mkdirSync(out, { recursive: true });
 const report = { label, base, size: `${W}x${H}`, phone, flags: args.flags || '', site: args.site || 'manhattan', errors: [], shots: [] };
@@ -85,7 +85,7 @@ const PROBES = {
     console.log('shot', name, Object.keys(r).join(','));
   };
   try {
-    await page.addInitScript(({ utc, tutorial, hudMode }) => {
+    await page.addInitScript(({ utc, tutorial, hudMode, legendFlights, score }) => {
       window.__flyVisualsOverride = 'enhanced';
       window.__flyWeatherOverride = 'baseline';
       const d = new Date();
@@ -96,7 +96,9 @@ const PROBES = {
       localStorage.setItem('fly-crash-mode', 'forgiving');
       if (tutorial !== 'new') localStorage.setItem('fly-explorer-preferences-v1', JSON.stringify({ version: 1, settings: { sensitivity: 1, invertPitch: false, master: 1, effects: 1, music: 0.65, tutorial } }));
       if (hudMode) localStorage.setItem('fly-hud-mode', hudMode);
-    }, { utc: site.utc, tutorial: args.tutorial || 'done', hudMode: args.hudMode || '' });
+      if (legendFlights !== '') localStorage.setItem('fly-hud-legend-v1', JSON.stringify({ flights: Number(legendFlights) }));
+      if (score !== '') localStorage.setItem('fly-contracts', JSON.stringify({ state: { totalScore: Number(score), completedCount: 3 }, version: 0 }));
+    }, { utc: site.utc, tutorial: args.tutorial || 'done', hudMode: args.hudMode || '', legendFlights: args.legendFlights ?? '', score: args.score ?? '' });
     const q = args.flags ? `&flags=${args.flags}` : '';
     await page.goto(`${base}/?graphicsReview=1${q}`, { waitUntil: 'domcontentloaded', timeout: 240000 });
     // The player's own path into Free Flight (the hangar's launch): flightMode
@@ -159,6 +161,17 @@ const PROBES = {
           await page.keyboard.press('Escape');
           await page.waitForTimeout(800);
         }
+      } else if (s === 'low') {
+        await page.evaluate(() => {
+          const f = window.__fly.flight;
+          const g = window.__fly.geo;
+          window.__fly.warpToGeo(g.y, g.x, { altM: (f.groundElev ?? 0) + 150, headingRad: f.heading });
+        });
+        await page.waitForTimeout(5000);
+        await page.keyboard.down('s');
+        await page.waitForTimeout(600);
+        await shot('low');
+        await page.keyboard.up('s');
       } else if (s === 'lock') {
         await page.waitForTimeout(1000);
         await shot('lock');

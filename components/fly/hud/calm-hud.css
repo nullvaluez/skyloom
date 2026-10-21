@@ -284,7 +284,8 @@
 .calm-keys[data-legend='full'] {
   animation: calm-rise 0.7s var(--calm-ease) both;
 }
-.calm-keys[data-legend='full'] .calm-tier {
+.calm-keys[data-legend='full'] .calm-tier,
+.calm-keys[data-legend='none'] .calm-tier {
   display: none;
 }
 .calm-tier {
@@ -346,7 +347,7 @@
    (an escort's film) gets the frame to itself, as the instruments did. */
 .calm-root[data-cinema='1'] .calm-cue,
 .calm-root[data-cinema='1'] .calm-dock,
-.calm-root[data-mode='clean'] .calm-dock {
+.calm-root[data-mode='clean'] .calm-dock > :not(.calm-notice) {
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.3s ease, visibility 0s linear 0.3s;
@@ -537,9 +538,16 @@
   outline: 2px solid #7fe7ff;
   outline-offset: 2px;
 }
-/* Under the escort pill while it is up (it takes the place line's slot). */
-[data-fly-root]:has(.tgt-escort[data-active='1']) .calm-notice {
-  top: 118px;
+/* On a pointer device the notice is the dock's top row: it moves with the
+   dock, so it never meets the toasts, the escort pill or the bottom band. */
+.calm-notice[data-docked] {
+  position: static;
+  transform: none;
+  animation-name: calm-rise;
+}
+.calm-root[data-calm='1'] .calm-notice[data-docked] {
+  opacity: 0.85;
+  transition: opacity 1.4s ease;
 }
 /* Phones: the notice takes the place line's slot while it speaks (the band
    between the strip and the toasts is the only free one), two lines at most. */
