@@ -112,6 +112,10 @@ async function runLeg(arm) {
   const on = arm === 'on';
   globalThis.window = { location: { search: '', href: 'http://localhost/' } };
   globalThis.window.__flyCalmHudOverride = { enabled: on };
+  // The escort card (ENCOUNTER_FEEL, the ENCOUNTERS stream) asks react-query
+  // for the route, which needs a QueryClient node does not have; this gate is
+  // about the HUD, so the escort stays its pre-pass self here.
+  globalThis.window.__flyEncounterFeelOverride = { enabled: false };
   globalThis.OffscreenCanvas ??= class {
     constructor(w, h) {
       this.width = w;
@@ -402,8 +406,12 @@ for (const s of Object.keys(STATES)) {
     }
   };
   for (const d of ['lib', 'components', 'hooks']) walk(path.join(ROOT, d));
-  const others = hits.filter((p) => p !== 'components/fly/hud/CinemaTitle.jsx');
-  check('(9) H belongs to the HUD in flight (the title uses it only on its own root)', others.length === 0 && on.block.key === 'h', others.join(', '));
+  // The title's H hides its UI on its own root; the lounge's H (LOUNGE_DIRECTOR's
+  // Watch for me) acts only while the airport watch is up, which CalmHud's H skips.
+  const others = hits.filter((p) => p !== 'components/fly/hud/CinemaTitle.jsx' && p !== 'components/fly/hud/lounge/LoungeSurface.jsx' && p !== 'components/fly/hud/CalmHud.jsx');
+  const calmSrc = read('components/fly/hud/CalmHud.jsx');
+  const lounge = read('components/fly/hud/lounge/LoungeSurface.jsx');
+  check('(9) H belongs to the HUD in flight (the title and the lounge use it only on their own surfaces)', others.length === 0 && on.block.key === 'h' && /s\.airportWatch \|\| s\.airportBrowserOpen\) return;/.test(calmSrc) && /if \(!w\?\.active/.test(lounge), others.join(', '));
 }
 
 // (10) css scoping
@@ -484,7 +492,7 @@ if (urlArg) {
       return { x: r.x, y: r.y, r: r.right, b: r.bottom };
     };
     const mine = [...document.querySelectorAll('.calm-dock > *, .calm-notice')].map((el) => ({ id: el.className.split(' ')[0], box: vis(el) })).filter((m) => m.box);
-    const sel = { attribution: '[data-zone="attribution"] > div', minimap: '[data-zone="minimap"] canvas', contracts: '[data-zone="contracts"] > *', toasts: '[data-zone="toasts"] > *', info: '[data-testid="infocard"], [data-testid="infocard-chip"]', exit: '[data-zone="exit"] > *', nearby: '.tgt-scope-btn', nearbyPanel: '[data-testid="nearby-panel"]', escort: '.tgt-escort[data-active="1"]', encounter: '[data-testid="encounter-card"]', poi: '[data-testid="hud-poi"]', juice: '[data-testid="juice-hud"]', ops: '[data-testid="operations-hud"]' };
+    const sel = { attribution: '[data-zone="attribution"] > div', minimap: '[data-zone="minimap"] canvas', contracts: '[data-zone="contracts"] > *', toasts: '[data-zone="toasts"] > *', info: '[data-testid="infocard"], [data-testid="infocard-chip"]', exit: '[data-zone="exit"] > *', nearby: '.tgt-scope-btn', nearbyPanel: '[data-testid="nearby-panel"]', escort: '.tgt-escort[data-active="1"]', encounter: '[data-testid="encounter-card"]', escortCard: '.tgt-ec', moment: '.tgt-moment', result: '.tgt-result', poi: '[data-testid="hud-poi"]', juice: '[data-testid="juice-hud"]', ops: '[data-testid="operations-hud"]' };
     const others = [];
     for (const [id, s] of Object.entries(sel)) for (const el of document.querySelectorAll(s)) { const box = vis(el); if (box) others.push({ id, box }); }
     const hit = (a, b) => a.x < b.r - 1 && b.x < a.r - 1 && a.y < b.b - 1 && b.y < a.b - 1;

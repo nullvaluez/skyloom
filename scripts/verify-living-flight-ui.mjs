@@ -108,6 +108,9 @@ async function runLeg(on) {
   // as, so CALM_HUD (whose default mode hides the instruments) is pinned off;
   // scripts/verify-play-hud.mjs certifies them as CALM_HUD's Instruments mode.
   globalThis.window.__flyCalmHudOverride = { enabled: false };
+  // ENCOUNTER_FEEL's escort card needs a react-query client node does not
+  // have; the instruments are what this gate certifies.
+  globalThis.window.__flyEncounterFeelOverride = { enabled: false };
   globalThis.window.__flyHangarStageOverride = { enabled: on };
   process.env.NODE_ENV = 'production';
   registerHooks();

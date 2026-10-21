@@ -41,7 +41,7 @@ import './calm-hud.css';
 const CUE = { deadzone: FLIGHT.mouseDeadzone, expo: FLIGHT.mouseExpo, ...(CALM_CFG.cue ?? {}) };
 const DIM = CALM_CFG.calm ?? {};
 // The obstacles of the bottom band the dock steps over (visible ones only).
-const BAND = ['[data-testid="infocard"]', '[data-testid="infocard-chip"]', '.tgt-scope-btn', '[data-testid="encounter-card"]', '.tgt-mission', '[data-zone="minimap"] canvas', '[data-testid="juice-hud"]', '[data-testid="operations-hud"]'];
+const BAND = ['[data-testid="infocard"]', '[data-testid="infocard-chip"]', '.tgt-scope-btn', '[data-testid="encounter-card"]', '.tgt-mission', '.tgt-ec', '.tgt-moment', '.tgt-result', '[data-zone="minimap"] canvas', '[data-testid="juice-hud"]', '[data-testid="operations-hud"]'];
 // The dimmed opacities as custom properties: the root carries its own; the
 // <style> hands the shared ones to the chrome calm-hud.css dims with :has.
 const ROOT_VARS = `[data-fly-root]{--calm-dim-cluster:${DIM.cluster ?? 0.5};--calm-dim-chrome:${DIM.chrome ?? 0.38};--calm-dim-minimap:${DIM.minimap ?? 0.55};--calm-night:${DIM.nightScale ?? 0.8}}`;
