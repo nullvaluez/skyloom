@@ -61,6 +61,15 @@ import { CinemaTitle } from './hud/CinemaTitle';
 import { AdventureExperience } from './hud/AdventureExperience';
 import { EncounterExperience } from './hud/EncounterExperience';
 import { recordVisit } from '@/lib/fly/adventure-analytics';
+// PLAY PASS imports: one block per workstream (FLY_PLAY_PASS.md).
+// PLAY PASS HUD imports begin
+// PLAY PASS HUD imports end
+
+// PLAY PASS ENCOUNTERS imports begin
+// PLAY PASS ENCOUNTERS imports end
+
+// PLAY PASS DIRECTOR imports begin
+// PLAY PASS DIRECTOR imports end
 
 // Last in-flight position, persisted ~10s + pagehide. R25 A: nothing reads it
 // at boot any more (the spawn is lib/fly/flight-plan.js resolveInitialSpawn;
@@ -398,6 +407,17 @@ export function FlyMode({ onClose }) {
       <RecoveryNotice runtime={runtime}/>
       <AdventureExperience runtime={runtime} />
       <AirportExperience runtime={runtime} />
+
+      {/* PLAY PASS (FLY_PLAY_PASS.md): one block per workstream; a stream edits
+          only its own block. */}
+      {/* PLAY PASS HUD begin */}
+      {/* PLAY PASS HUD end */}
+
+      {/* PLAY PASS ENCOUNTERS begin */}
+      {/* PLAY PASS ENCOUNTERS end */}
+
+      {/* PLAY PASS DIRECTOR begin */}
+      {/* PLAY PASS DIRECTOR end */}
 
       {mobileNote && (
         <div className="pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-md bg-zinc-900/85 px-3 py-2 text-xs text-zinc-200 shadow-lg">

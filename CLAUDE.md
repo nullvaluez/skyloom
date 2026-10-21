@@ -7,6 +7,13 @@
 >   Enhanced Satellite is the default on every device
 >   (`VISUALS.defaultProfile:'enhanced'`), and `R25_SKY` / `R25_GROUND` ship
 >   `enabled:true`.
+> - **Play Pass (2026-10-21, IN PROGRESS on local `main`, owner-requested):**
+>   [FLY_PLAY_PASS.md](FLY_PLAY_PASS.md) is the review, plan and record — Free
+>   Flight and Watch an Airport made worth playing: a calm HUD (`CALM_HUD`),
+>   fly-alongside feel (`ENCOUNTER_FEEL`), city facades (`CITY_FACADES`), a lounge
+>   director (`LOUNGE_DIRECTOR`), apron detail (`APRON_DETAIL`); read only through
+>   `lib/fly/play-pass.js`, ON by default, `?flags=-NAME` for the previous look.
+>   Takeoff & Landing and Guided Journeys are backlogged for this pass.
 > - **Living World graphics pass (2026-10-20, merged to `main` from `claude/living-world-rtx`):**
 >   [FLY_LIVING_WORLD.md](FLY_LIVING_WORLD.md) is the plan and record — 17 flags
 >   (sky, clouds, trails, aircraft, ground, menus, HUD, hangar), read only through

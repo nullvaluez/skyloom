@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "skyloom-dev-3123",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "dev", "--port", "3123"],
+      "port": 3123
     }
   ]
 }

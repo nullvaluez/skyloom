@@ -222,6 +222,18 @@ import { SatClutterLayer } from './SatClutterLayer';
 import { SatCityGlow } from './SatCityGlow';
 import { SatEnvironment } from './SatEnvironment';
 import { PrecipLayer } from './PrecipLayer';
+// PLAY PASS imports: one block per workstream (FLY_PLAY_PASS.md).
+// PLAY PASS ENCOUNTERS imports begin
+// PLAY PASS ENCOUNTERS imports end
+
+// PLAY PASS CITY imports begin
+// PLAY PASS CITY imports end
+
+// PLAY PASS DIRECTOR imports begin
+// PLAY PASS DIRECTOR imports end
+
+// PLAY PASS APRON imports begin
+// PLAY PASS APRON imports end
 
 const SPAWN_ALT_M = 800;
 
@@ -3718,6 +3730,20 @@ export function FlyScene({ runtime }) {
       </Suspense>
       {/* Neon altitude tracers (airloom signature) — every style */}
       <TrafficTracers runtime={runtime} flight={flight} origin={origin} />
+
+      {/* PLAY PASS (FLY_PLAY_PASS.md): one block per workstream; a stream edits
+          only its own block. */}
+      {/* PLAY PASS ENCOUNTERS begin */}
+      {/* PLAY PASS ENCOUNTERS end */}
+
+      {/* PLAY PASS CITY begin */}
+      {/* PLAY PASS CITY end */}
+
+      {/* PLAY PASS DIRECTOR begin */}
+      {/* PLAY PASS DIRECTOR end */}
+
+      {/* PLAY PASS APRON begin */}
+      {/* PLAY PASS APRON end */}
       {/* One-shot neon confetti burst masking the warp cut. TRUE EARTH
           (PLAYER_SURFACE): Neon's own look; satellite players don't get it. */}
       {(mapStyle === 'toy' || reviewSurfaceOn()) && <WarpBurst flight={flight} origin={origin} />}
