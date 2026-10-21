@@ -91,11 +91,13 @@ export function EncounterFeelRig({ runtime }) {
 
   // The shutter: after the composer has drawn this frame (PHOTO.capturePriority
   // is the photo mode's own read; one later so both may share a frame).
-  useFrame(() => {
+  useFrame(({ camera }) => {
     if (!shutter.current) return;
     shutter.current = false;
     const memory = runtime.encounters?.payoff?.live?.memory;
     if (!memory) return;
+    // Dev-only: what the shutter saw (scripts/review-play-encounters.cjs).
+    if (process.env.NODE_ENV === 'development') window.__flyEncounterShutter = { at: performance.now(), beatSec: runtime.encounters.payoff.state.t, camera: camera.position.toArray(), mode: useFlyStore.getState().cameraMode, photo: escortShotState.photo };
     try {
       const src = gl.domElement;
       if (!src.width || !src.height) return;
