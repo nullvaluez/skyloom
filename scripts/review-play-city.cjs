@@ -42,7 +42,8 @@ const FT = 0.3048;
 const SCENES = [
   { id: 'nyc-1000-noon', detail: 'Manhattan from the Hudson, 1,000 ft, noon', lat: 40.742, lon: -74.022, altM: 1000 * FT, headingDeg: 105, hour: 12.5 },
   { id: 'nyc-3000-noon', detail: 'Lower Manhattan to Midtown, 3,000 ft, noon', lat: 40.688, lon: -74.035, altM: 3000 * FT, headingDeg: 30, hour: 12.5 },
-  { id: 'nyc-8000-noon', detail: 'Manhattan, 8,000 ft, noon, few clouds', lat: 40.655, lon: -74.05, altM: 8000 * FT, headingDeg: 28, hour: 12.5, weather: 'few' },
+  { id: 'nyc-8000-noon', detail: 'Manhattan, 8,000 ft, noon, clear', lat: 40.655, lon: -74.05, altM: 8000 * FT, headingDeg: 28, hour: 12.5, weather: 'clear' },
+  { id: 'nyc-6000-noon', detail: 'Manhattan, 6,000 ft, noon, clear', lat: 40.66, lon: -74.05, altM: 6000 * FT, headingDeg: 28, hour: 12.5, weather: 'clear' },
   { id: 'nyc-3000-golden', detail: 'Lower Manhattan to Midtown, 3,000 ft, golden hour', lat: 40.688, lon: -74.035, altM: 3000 * FT, headingDeg: 30, hour: 18.85 },
   { id: 'nyc-towers-noon', detail: 'Among the Midtown towers, 750 ft, noon', lat: 40.738, lon: -73.992, altM: 230, headingDeg: 20, hour: 13 },
   { id: 'nyc-towers-golden', detail: 'Among the Midtown towers, 750 ft, golden hour', lat: 40.738, lon: -73.992, altM: 230, headingDeg: 20, hour: 18.85 },
@@ -151,7 +152,7 @@ async function telemetry(page) {
     const u = b && gl ? gl.properties.get(b.material)?.uniforms : null;
     const pick = (n) => (u?.[n] ? (u[n].value?.toArray ? u[n].value.toArray() : u[n].value) : null);
     return { quality: s.qualityTier, visuals: s.visuals, style: s.mapStyle, sun: rt.sun ? { sinEl: rt.sun.sinEl, frac: rt.sun.frac } : null,
-      aglM: rt.flight.pos.y - rt.flight.groundElev, cityFacades: window.__flyStats?.cityFacades ?? null,
+      aglM: rt.flight.pos.y - rt.flight.groundElev, weather: rt.weather?.wx ? { cover: rt.weather.wx.cloudCoverPct ?? null, overcastT: rt.weather.wx.overcastT ?? null, visM: rt.weather.wx.visM ?? null } : null, cinemaFog: rt.cinemaEnvironment?.fog ?? null, cloudBase: rt.cinemaEnvironment?.cloudBase ?? null, cityFacades: window.__flyStats?.cityFacades ?? null,
       satBuildings: b ? { ...b.stats, key: b.material.customProgramCacheKey() } : null,
       uniforms: u ? Object.fromEntries(['uWorldArt', 'uUrbanArt', 'uCohesiveWorld', 'uCinema', 'uCinemaArt', 'uCinematicMaterials', 'uArchitectureNight', 'uArchitectureDetail', 'uPainterly', 'uCityFacades'].map((n) => [n, pick(n)])) : null };
   });
