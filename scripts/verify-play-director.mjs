@@ -94,7 +94,7 @@ await check('1 every tunable is present, finite and sane', () => {
     optics: ['fill', 'minMag', 'maxMag', 'lockOmega', 'rateFilterSec', 'bodyM', 'nakedMag'],
     watch: ['slewOmega', 'slewRampSec', 'rolloutHoldS', 'landedDoneS', 'taxiMs', 'climbHoldS', 'airborneDoneS', 'climbWatchS', 'climbDoneRangeM', 'lostS', 'maxWatchS'],
     director: ['leadS', 'closeEtaS', 'closeRangeM', 'restS', 'fillerS', 'fillerRangeM', 'fillerCooldownS', 'captionS'],
-    moments: ['touchdownMinMs', 'liftoffMinMs', 'showS', 'rangeM', 'pastThresholdM', 'runwayM', 'centrelineM', 'levelMs'],
+    moments: ['touchdownMinMs', 'liftoffMinMs', 'showS', 'rangeM', 'pastThresholdM', 'runwayM', 'centrelineM', 'levelMs', 'recentS'],
   };
   for (const [group, keys] of Object.entries(want)) for (const k of keys) assert.ok(Number.isFinite(LOUNGE_DIRECTOR[group]?.[k]) && LOUNGE_DIRECTOR[group][k] >= 0, `${group}.${k}`);
   assert.ok(cfg.sky.bracketM < cfg.sky.dotM && cfg.sky.movementM <= cfg.sky.dotM, 'bracket ranges inside the dot range');
@@ -376,6 +376,20 @@ await check('3 an arrival still turning in is expected on the runway in use (its
   assert.equal(n.hex, 'def456');
   assert.equal(n.runway, null, 'no runway claimed for it');
   assert.equal(n.touchdown?.label, '04R', 'but its locator points at the touchdown zone in use');
+  h.detach();
+});
+await check('3 the next landing earns its touchdown moment even as the cue moves on to the following one', () => {
+  const h = harness();
+  h.setEta(20);
+  h.run(1);
+  assert.equal(h.watch.director.next.hex, 'abc123');
+  h.run(30, (s) => {
+    const eta = 20 - s;
+    if (eta > 0) h.setEta(eta);
+    else { h.t.flags = 1; h.setEta(0, { phase: 'runway' }); } // landed: the board takes it off the cue
+  });
+  assert.notEqual(h.watch.director.next?.hex, 'abc123', 'the cue moved on');
+  assert.ok(h.cues.includes('select'), 'its touchdown still chimed (the moment; the harness select() makes no sound)');
   h.detach();
 });
 await check('3 an unseen arrival: the director looks where it will land and follows it on sight', () => {
