@@ -163,6 +163,32 @@ frames it as the view from a window seat, with a dataview over it.
   - The tape is one transform per frame on a promoted layer.
   - The polls run at 1 Hz (dataview) and 4 Hz (shade and tour).
 
+## Round 2 (2026-10-21): ideas from the cockpit-HUD reference
+
+Ideas taken from the owner's fourth reference and made our own, not copied:
+
+- **The boot hero.** The page's first showing puts "FLY THE / LIVING
+  EARTH." on the closed shade, thin over heavy, with the kicker under it
+  ("Preparing your window · Grand Canyon"). Later hops and Exit to title show
+  the plain place lockup (`hero={!hop && firstShowing && shownKey === 0}`).
+- **The route map.** A "World tour" map under the place card: the Atlas
+  coastlines on an equirectangular crop (`ROUTE_MAP`, 75°N to 55°S), every
+  stop a dot you can click, the current stop cyan and the next amber, and on a
+  hop a great-circle arc from where you were with a small plane that flies it
+  once (SVG `animateMotion`, 2.6 s, `fill="freeze"`, nothing that loops).
+  Paths break at the antimeridian instead of drawing a seam across the map.
+  Hidden on phones, under 1100 px wide and under 760 px tall.
+- **The aircraft on the pass.** The boarding pass carries the hangar's own
+  render of the aircraft it names (`FLEET_PRESENTATION[id].thumbnail`, the
+  fighter's vector render), above the stub. Smaller on phone portrait, hidden
+  on phone landscape.
+- **Three claims.** "Real places. / Real weather. / Real traffic." in mono at
+  the upper left. Hidden on phones and under 800 px tall.
+
+Pure helpers in `lib/fly/title-tour.js`: `projectRoute`, `greatCircle`,
+`routePath`, `coastPath`. `verify-title-cinema` gate (4g) checks the crop,
+the endpoints and the antimeridian breaks (22/0).
+
 ## Verification (cloud container: SwiftShader, offline world fixture)
 
 | Check | Result |

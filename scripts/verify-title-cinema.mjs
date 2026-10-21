@@ -144,6 +144,24 @@ async function child(arm) {
       bars: [JSON.stringify(tour.passBarcode('x')), JSON.stringify(tour.passBarcode('x')), JSON.stringify(tour.passBarcode('y'))],
       barsFit: tour.passBarcode('free:manhattan', 64).every((b) => b.x >= 0 && b.x + b.w <= 64 && b.w >= 1 && b.w <= 3),
       posters: tour.TOUR_POSTERS,
+      route: (() => {
+        const M = tour.ROUTE_MAP;
+        const ny = { lat: 40.71, lon: -74.01 }, syd = { lat: -33.86, lon: 151.21 }, zrh = { lat: 46.5, lon: 8.0 };
+        const inside = (p) => p.x >= 0 && p.x <= M.w && p.y >= 0 && p.y <= M.h;
+        const gcA = tour.greatCircle(ny, zrh, 48), gcB = tour.greatCircle(syd, { lat: 37.77, lon: -122.42 }, 48);
+        const end = (g, q) => Math.abs(g[0].lat - q[0].lat) < 1e-9 && Math.abs(g[0].lon - q[0].lon) < 1e-9 && Math.abs(g.at(-1).lat - q[1].lat) < 1e-9 && Math.abs(g.at(-1).lon - q[1].lon) < 1e-9;
+        const atl = tour.routePath(gcA, M), pac = tour.routePath(gcB, M);
+        const coast = tour.coastPath([[-74, 40.7, -70, 42, -66, 44.5], [170, 10, 179, 10, -179, 10, -170, 10]], M);
+        return {
+          corners: [tour.projectRoute(M.latTop, -180, M), tour.projectRoute(M.latBottom, 179.999, M)].map((p) => [Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10]),
+          inside: [ny, syd, zrh].every((q) => inside(tour.projectRoute(q.lat, q.lon, M))),
+          ends: end(gcA, [ny, zrh]) && end(gcB, [syd, { lat: 37.77, lon: -122.42 }]),
+          n: gcA.length,
+          atlMoves: (atl.match(/M/g) || []).length,
+          pacMoves: (pac.match(/M/g) || []).length,
+          coastMoves: (coast.match(/M/g) || []).length,
+        };
+      })(),
       advance: {
         base: tour.tourMayAdvance({ auto: true, covered: false, hidden: false, bootReady: true, busy: false, dwellMs: 1000, shownMs: 1000, idleMs: 5000, idleNeedMs: 5000 }),
         manual: tour.tourMayAdvance({ auto: false, covered: false, hidden: false, bootReady: true, busy: false, dwellMs: 1000, shownMs: 1000, idleMs: 5000, idleNeedMs: 5000 }),
@@ -280,6 +298,12 @@ if (armArg) {
     '(4f) the dataview formats: coordinates in degrees and minutes, a light phrase per sun band',
     P.latlon === '40°42′N 74°01′W' && JSON.stringify(P.light) === JSON.stringify(['Night', 'Blue hour', 'Twilight', 'Golden hour', 'Soft daylight', 'High sun']),
     `${P.latlon} · ${P.light.join(', ')}`,
+  );
+  check(
+    '(4g) the route map: the crop spans the plate exactly, places project inside it, great circles keep their endpoints, and a path that crosses the antimeridian (an arc or a coastline) breaks instead of drawing a seam across the map',
+    JSON.stringify(P.route.corners) === JSON.stringify([[0, 0], [380, 137]]) && P.route.inside && P.route.ends && P.route.n === 49 &&
+      P.route.atlMoves === 1 && P.route.pacMoves === 2 && P.route.coastMoves === 3,
+    JSON.stringify(P.route),
   );
 
   // (5)

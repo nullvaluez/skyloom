@@ -7,6 +7,7 @@
    backdrop-filter over the live canvas — the R17 .hud-glass lesson). */
 
 .tcn{
+  --tcn-amber:#ffc98a;
   --tcn-ice:#f2f7ff;
   --tcn-haze:#b6c4d6;
   --tcn-faint:#8395ab;
@@ -93,6 +94,10 @@
 .tcn .tcn-spot{gap:10px;padding:8px 14px 8px 12px;border-radius:999px;background:rgba(6,11,22,.5);border:1px solid rgba(214,232,255,.18);backdrop-filter:blur(14px) saturate(1.3);box-shadow:0 12px 30px -16px rgba(0,0,0,.7);font-size:12.5px;color:var(--tcn-ice)}
 .tcn .tcn-spot .fly-title-spot-time{font-family:var(--tcn-mono);font-size:12px;letter-spacing:.04em}
 
+/* --- the claims: three true lines in the empty upper left ---------------------- */
+.tcn-claims{position:absolute;left:calc(var(--tcn-pad-x) + env(safe-area-inset-left));top:max(180px,26%);display:flex;flex-direction:column;gap:7px;margin:0;padding-top:16px;font:500 10.5px/1 var(--tcn-mono);letter-spacing:.32em;text-transform:uppercase;color:#d2dcea;text-shadow:0 1px 3px rgba(3,7,17,.6),0 1px 12px rgba(3,7,17,.9);pointer-events:none}
+.tcn-claims::before{content:'';position:absolute;left:0;top:0;width:28px;height:1px;background:rgba(226,240,255,.7)}
+
 /* --- the place ---------------------------------------------------------------- */
 .tcn-place{grid-area:place;align-self:end;justify-self:end;min-width:0;max-width:min(860px,58vw);padding:0 0 26px;text-align:right;transition:opacity .55s ease,filter .55s ease,transform .7s var(--tcn-ease)}
 .tcn-place-in{animation:tcn-place-in 1s var(--tcn-ease) both}
@@ -121,7 +126,7 @@
   -webkit-mask:radial-gradient(circle var(--notch) at calc(100% - var(--stub)) 0,#0000 97%,#000) top/100% 51% no-repeat,radial-gradient(circle var(--notch) at calc(100% - var(--stub)) 100%,#0000 97%,#000) bottom/100% 51% no-repeat;
   mask:radial-gradient(circle var(--notch) at calc(100% - var(--stub)) 0,#0000 97%,#000) top/100% 51% no-repeat,radial-gradient(circle var(--notch) at calc(100% - var(--stub)) 100%,#0000 97%,#000) bottom/100% 51% no-repeat}
 .tcn-pass-main{display:flex;flex:1;flex-direction:column;gap:9px;min-width:0;padding:12px 18px 13px 16px;color:#0a1622}
-.tcn-pass-top{display:flex;justify-content:space-between;gap:12px;font:600 9px/1 var(--tcn-mono);letter-spacing:.22em;text-transform:uppercase;color:#5e778c}
+.tcn-pass-top{display:flex;gap:12px;padding-right:118px;font:600 9px/1 var(--tcn-mono);letter-spacing:.22em;text-transform:uppercase;color:#5e778c}
 .tcn-pass-head{display:flex;align-items:center;gap:12px;min-width:0}
 .tcn-pass-lamp{display:grid;place-items:center;flex:none;width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 50% 38%,#163c4e,#061620);color:#a6f2ff;box-shadow:inset 0 0 12px rgba(127,231,255,.45),0 0 0 3px rgba(7,32,44,.08);transition:box-shadow .3s ease}
 .tcn-pass-lamp svg{margin-left:2px;filter:drop-shadow(0 0 4px rgba(127,231,255,.9))}
@@ -141,6 +146,9 @@
 .tcn-pass-seat small:last-child{align-self:end;padding-bottom:2px;color:#2a6b85}
 .tcn-barcode{display:block;width:100%;height:22px;fill:#0b1a27;opacity:.9}
 .tcn-pass-sheen{position:absolute;inset:0;overflow:hidden;border-radius:14px;pointer-events:none}
+/* The aircraft (the hangar's own render) rests on the ticket, breaking its top edge. */
+.tcn-pass-art{position:absolute;top:-30px;right:calc(var(--stub) + 6px);width:124px;height:62px;pointer-events:none;background:center/contain no-repeat;filter:drop-shadow(0 8px 10px rgba(3,10,20,.35));transition:transform .45s var(--tcn-ease)}
+.tcn-pass[data-active] .tcn-pass-art{transform:translate(4px,-3px) rotate(-2deg)}
 .tcn-pass-sheen::before{content:'';position:absolute;top:-30%;bottom:-30%;left:0;width:18%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.9),transparent);transform:translateX(-200%) skewX(-18deg)}
 .tcn-pass[data-active]{transform:translateY(-2px);filter:drop-shadow(0 24px 40px rgba(0,0,0,.5)) drop-shadow(0 0 36px rgba(127,231,255,.32))}
 .tcn-pass[data-active] .tcn-pass-lamp{box-shadow:inset 0 0 14px rgba(127,231,255,.7),0 0 0 3px rgba(127,231,255,.25),0 0 18px rgba(127,231,255,.55)}
@@ -174,6 +182,24 @@
 .tcn-tour-next{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tcn-tour-next b{margin-left:6px;font-weight:600;color:var(--tcn-ice)}
 .tcn-tour-rail{display:flex;align-items:center;gap:10px}
+
+/* The route map: the world as a flight plan (Atlas coastlines, the stops, the
+   great circle to the next one). 1:1 px, so its path is the plane's path. */
+.tcn-route{display:block;align-self:flex-end;overflow:visible;-webkit-mask-image:linear-gradient(90deg,transparent,#000 9%,#000 91%,transparent);mask-image:linear-gradient(90deg,transparent,#000 9%,#000 91%,transparent)}
+.tcn-route-grat{fill:none;stroke:rgba(190,225,255,.07);stroke-width:1}
+.tcn-route-coast{fill:none;stroke:rgba(214,235,255,.6);stroke-width:.8;filter:drop-shadow(0 0 2px rgba(3,7,16,.6));stroke-linejoin:round;stroke-linecap:round}
+.tcn-route-arc{fill:none;stroke:var(--tcn-sel);stroke-width:1.3;stroke-dasharray:3 4;opacity:.75;filter:drop-shadow(0 0 3px rgba(127,231,255,.7))}
+.tcn-route[data-flying] .tcn-route-arc{stroke-dasharray:none;opacity:1;stroke-width:1.6;animation:tcn-arc 2.6s cubic-bezier(.45,0,.2,1) both}
+.tcn-route-stop{cursor:pointer}
+.tcn-route-hit{fill:transparent}
+.tcn-route-dot{fill:rgba(232,242,255,.8);transition:fill .2s ease}
+.tcn-route-stop:hover .tcn-route-dot{fill:#fff}
+.tcn-route-stop[data-state='here'] .tcn-route-dot{fill:var(--tcn-sel);stroke:rgba(127,231,255,.35);stroke-width:5}
+.tcn-route-stop[data-state='next'] .tcn-route-dot{fill:var(--tcn-amber,#ffc98a);stroke:rgba(255,201,138,.3);stroke-width:4}
+.tcn-route-pos{fill:none;stroke:var(--tcn-sel);stroke-width:1.4}
+.tcn-route-label{fill:#e6eef8;font:600 8px/1 var(--tcn-mono);letter-spacing:.12em;text-transform:uppercase;paint-order:stroke;stroke:rgba(3,7,16,.85);stroke-width:3px}
+.tcn-route-label-next{fill:var(--tcn-amber,#ffc98a)}
+.tcn-route-plane path{fill:#fff;filter:drop-shadow(0 0 4px rgba(127,231,255,.9))}
 .tcn-tour-btn{display:grid;place-items:center;flex:none;width:40px;height:40px;padding:0;border-radius:50%;border:1px solid var(--tcn-line-2);background:rgba(6,11,22,.42);color:var(--tcn-ice);backdrop-filter:blur(10px);transition:background .2s ease,border-color .2s ease,color .2s ease}
 .tcn-tour-btn:hover{border-color:rgba(127,231,255,.6);background:rgba(127,231,255,.12);color:#fff}
 .tcn-dots{flex:1;display:flex;align-items:center;gap:5px;min-width:60px}
@@ -210,6 +236,12 @@
 .tcn-shade-lockup{position:absolute;left:50%;bottom:calc(56% + 30px);width:min(92vw,1000px);transform:translateX(-50%);text-align:center}
 .tcn-shade-kicker{margin:0;font:500 11px/1 var(--tcn-mono);letter-spacing:.32em;text-transform:uppercase;color:var(--tcn-sel)}
 .tcn-shade-name{margin:14px 0 0;font-weight:300;font-size:clamp(44px,6.4vw,104px);line-height:.95;letter-spacing:-.045em;color:#fff;text-wrap:balance}
+/* The boot hero: thin over heavy, the line the game stands on. */
+.tcn-shade-hero{bottom:calc(56% + 34px)}
+.tcn-hero{display:flex;flex-direction:column;align-items:center;margin:0;line-height:.86;text-transform:uppercase;color:#fff;text-shadow:0 4px 60px rgba(2,6,14,.55)}
+.tcn-hero-thin{font-weight:200;font-size:clamp(44px,min(6.6vw,11vh),118px);letter-spacing:-.03em}
+.tcn-hero-heavy{font:400 clamp(46px,min(7vw,11.6vh),126px)/.9 'Archivo Black',ui-sans-serif,system-ui;letter-spacing:-.015em}
+.tcn-shade-hero .tcn-shade-kicker{margin-top:22px}
 .tcn-shade-region{margin:16px 0 0;font:500 12px/1 var(--tcn-mono);letter-spacing:.28em;text-transform:uppercase;color:var(--tcn-haze)}
 .tcn-shade-progress{position:absolute;left:50%;top:44%;width:min(300px,82vw);transform:translate(-50%,-50%);text-align:center}
 .tcn-shade-progress::before{content:'';display:block;height:2px;border-radius:2px;background:rgba(61,74,117,.5)}
@@ -239,9 +271,14 @@
 @keyframes tcn-place-in{from{opacity:0;transform:translateY(14px);filter:blur(12px)}}
 @keyframes tcn-draw{from{transform:scaleX(0)}}
 @keyframes tcn-dwell{to{transform:scaleX(1)}}
+@keyframes tcn-arc{from{stroke-dasharray:0 900}to{stroke-dasharray:900 0}}
+@keyframes tcn-hero-in{from{opacity:0;transform:translateY(.12em);filter:blur(10px)}}
 @keyframes tcn-sheen{from{transform:translateX(-200%) skewX(-18deg)}to{transform:translateX(700%) skewX(-18deg)}}
 @keyframes tcn-hint{0%{opacity:0}12%{opacity:1}75%{opacity:1}100%{opacity:0}}
 .tcn[data-motion='enter'] .tcn-frame{animation:tcn-frame-in 1.6s ease-out both}
+.tcn[data-motion='enter'] .tcn-hero-thin{animation:tcn-hero-in 1s var(--tcn-ease) .15s both}
+.tcn[data-motion='enter'] .tcn-hero-heavy{animation:tcn-hero-in 1.1s var(--tcn-ease) .3s both}
+.tcn[data-motion='enter'] .tcn-claims{animation:tcn-fade 1s ease-out .8s both}
 .tcn[data-motion='enter'] .tcn-tagline{animation:tcn-rise .7s var(--tcn-ease) .25s both}
 .tcn[data-motion='enter'] .tcn-tape{animation:tcn-fade 1s ease-out .55s both}
 .tcn[data-motion='enter'] .tcn-status{animation:tcn-fade .9s ease-out .65s both}
@@ -255,6 +292,8 @@
 .tcn[data-motion='enter'] .tcn-foot{animation:tcn-fade .9s ease-out 1.05s both}
 
 /* --- shorter and narrower desktop windows ---------------------------------------- */
+@media (max-height:800px){.tcn-claims{display:none}}
+@media (max-height:760px),(max-width:1100px){.tcn-route{display:none}}
 @media (max-height:820px){
   .tcn-blurb{display:none}
   .tcn-data{margin-top:18px}
@@ -291,7 +330,11 @@
    Solid surfaces, every target >= 44 px, the credit always visible. */
 [data-device='phone'] .tcn{--tcn-bezel:0px;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr) auto auto auto;grid-template-areas:"top" "place" "." "deck" "tour" "foot";row-gap:10px;column-gap:0;
   padding:max(env(safe-area-inset-top),14px) max(env(safe-area-inset-right),16px) max(env(safe-area-inset-bottom),8px) max(env(safe-area-inset-left),16px)}
-[data-device='phone'] .tcn-frame,[data-device='phone'] .tcn-reticle,[data-device='phone'] .tcn-tape,[data-device='phone'] .tcn-keys,[data-device='phone'] .tcn-blurb{display:none}
+[data-device='phone'] .tcn-frame,[data-device='phone'] .tcn-reticle,[data-device='phone'] .tcn-tape,[data-device='phone'] .tcn-keys,[data-device='phone'] .tcn-blurb,[data-device='phone'] .tcn-claims,[data-device='phone'] .tcn-route{display:none}
+[data-device='phone'] .tcn-pass-art{top:-22px;width:90px;height:45px}
+[data-device='phone'] .tcn-pass-top{padding-right:84px}
+[data-device='phone'] .tcn-hero-thin{font-size:clamp(34px,10.5vw,52px)}
+[data-device='phone'] .tcn-hero-heavy{font-size:clamp(36px,11vw,56px)}
 [data-device='phone'] .tcn-scrim{background:var(--tcn-grain),linear-gradient(180deg,rgba(3,6,13,.66) 0%,rgba(3,6,13,.2) 22%,rgba(3,6,13,0) 40%,rgba(3,6,13,.4) 58%,rgba(3,6,13,.9) 100%)}
 [data-device='phone'] .tcn-top{grid-template-columns:minmax(0,1fr) auto;gap:10px}
 [data-device='phone'] .tcn-brand.lwt .fly-title-wordmark{font-size:30px}
@@ -362,6 +405,7 @@
 [data-device='phone'][data-orient='landscape'] .tcn-pass-main{padding:7px 10px}
 [data-device='phone'][data-orient='landscape'] .tcn-pass-lamp{width:30px;height:30px}
 [data-device='phone'][data-orient='landscape'] .tcn-pass-seat{display:none}
+[data-device='phone'][data-orient='landscape'] .tcn-pass-art{display:none}
 [data-device='phone'][data-orient='landscape'] .tcn-pass-stub{justify-content:center;padding:8px 10px}
 [data-device='phone'][data-orient='landscape'] .tcn-row{min-height:44px}
 [data-device='phone'][data-orient='landscape'] .tcn-row-text strong{font-size:16px}

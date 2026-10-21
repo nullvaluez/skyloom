@@ -33,8 +33,15 @@ import { adventureById } from '@/lib/fly/adventures.mjs';
 import { livingAirportsOn } from '@/lib/fly/airport-feature-policy';
 import { computeSun } from '@/lib/fly/sun-model';
 import { livingWorldBlock, livingWorldOn } from '@/lib/fly/living-world';
+import { loadCoastlines } from '@/lib/fly/atlas/coastlines';
+import { FLEET_PRESENTATION } from '@/lib/fly/fleet-aircraft.mjs';
 import {
+  ROUTE_MAP,
   TOUR_POSTERS,
+  coastPath,
+  greatCircle,
+  projectRoute,
+  routePath,
   formatLatLon,
   lightPhrase,
   orbitHeadingDeg,
@@ -96,6 +103,7 @@ const pad2 = (n) => String(n).padStart(2, '0');
 // Page-lifetime memory: the entrance plays once per page load (exit to title
 // returns to a settled title), and the tour keeps its auto setting.
 let entrancePlayed = false;
+let titleShown = false; // the page's first title showing carries the boot hero
 
 /**
  * Automation (navigator.webdriver: the harness fleet) keeps the tour manual,
@@ -339,6 +347,7 @@ export function continueFields(last, adventure) {
         ['To', a?.place ?? '—'],
       ],
       seed: `adv:${adventure.id}`,
+      aircraftId: adventure.aircraftId,
     };
   }
   if (!last) return null;
@@ -353,10 +362,11 @@ export function continueFields(last, adventure) {
         ['To', last.dest.name],
       ],
       seed: `free:${last.dest.id}`,
+      aircraftId: last.aircraftId,
     };
   }
   if (last.start === 'practice') {
-    return { label: 'Continue', sub: 'Glider practice over Columbus', fields: [['Mode', 'Practice'], ['Aircraft', who], ['From', 'KOSU']], seed: 'ops:practice' };
+    return { label: 'Continue', sub: 'Glider practice over Columbus', fields: [['Mode', 'Practice'], ['Aircraft', who], ['From', 'KOSU']], seed: 'ops:practice', aircraftId: last.aircraftId };
   }
   const l = airportLabel(airportById(last.airportId));
   const start = { apron: 'From the apron', runway: 'On the runway', approach: 'On approach', gate: 'From the gate' }[last.start] ?? 'Takeoff & landing';
@@ -369,6 +379,7 @@ export function continueFields(last, adventure) {
       [last.start === 'approach' ? 'To' : 'From', l?.code ?? last.airportId],
     ],
     seed: `ops:${last.airportId}:${last.start}`,
+    aircraftId: last.aircraftId,
   };
 }
 
@@ -383,6 +394,7 @@ function savedAircraft() {
 
 /** The boarding pass: the title's one lit action. */
 function BoardingPass({ pass, testid, onClick, onFocusIn, innerRef, active }) {
+  const art = aircraftArt(pass.aircraftId);
   return (
     <button
       ref={innerRef}
@@ -398,8 +410,7 @@ function BoardingPass({ pass, testid, onClick, onFocusIn, innerRef, active }) {
     >
       <span className="tcn-pass-main">
         <span className="tcn-pass-top">
-          <span>Boarding pass</span>
-          <span>{passFlightNo(pass.seed)}</span>
+          <span>Boarding pass · {passFlightNo(pass.seed)}</span>
         </span>
         <span className="tcn-pass-head">
           <span className="tcn-pass-lamp" aria-hidden="true">
@@ -425,24 +436,44 @@ function BoardingPass({ pass, testid, onClick, onFocusIn, innerRef, active }) {
         </span>
         <Barcode seed={pass.seed} />
       </span>
+      {art && <span className="tcn-pass-art" style={{ backgroundImage: `url(${art})` }} aria-hidden="true" />}
       <span className="tcn-pass-sheen" aria-hidden="true" />
     </button>
   );
 }
 
+/** The hangar's own render of an aircraft (the fleet rail's thumbnail), or null. */
+function aircraftArt(id) {
+  return FLEET_PRESENTATION[id]?.thumbnail || (id === 'fighter' ? '/models/player-vector-v4.svg' : null);
+}
+
 /** The window shade: frosted, with the place it is opening onto. Pointer-transparent. */
-function Shade({ state, subject, kicker, pct, showProgress }) {
+function Shade({ state, subject, kicker, pct, showProgress, hero }) {
   const poster = subject?.destId ? TOUR_POSTERS[subject.destId] : null;
   return (
     <div className="tcn-shade" data-state={state} aria-hidden={state === 'up' ? 'true' : undefined}>
       <div className="tcn-shade-panel">
         {poster && <div key={poster} className="tcn-shade-poster" style={{ backgroundImage: `url(${poster})` }} />}
         <div className="tcn-shade-tint" />
-        <div className="tcn-shade-lockup" role={state === 'up' ? undefined : 'status'}>
-          <p className="tcn-shade-kicker">{kicker}</p>
-          <p className="tcn-shade-name">{subject?.name ?? 'Skyloom'}</p>
-          {subject?.region && <p className="tcn-shade-region">{subject.region}</p>}
-        </div>
+        {hero ? (
+          // The boot: the line the game stands on, before the window opens.
+          <div className="tcn-shade-lockup tcn-shade-hero" role={state === 'up' ? undefined : 'status'}>
+            <p className="tcn-hero">
+              <span className="tcn-hero-thin">Fly the</span>
+              <span className="tcn-hero-heavy">Living Earth.</span>
+            </p>
+            <p className="tcn-shade-kicker">
+              {kicker}
+              {subject?.name ? ` · ${subject.name}` : ''}
+            </p>
+          </div>
+        ) : (
+          <div className="tcn-shade-lockup" role={state === 'up' ? undefined : 'status'}>
+            <p className="tcn-shade-kicker">{kicker}</p>
+            <p className="tcn-shade-name">{subject?.name ?? 'Skyloom'}</p>
+            {subject?.region && <p className="tcn-shade-region">{subject.region}</p>}
+          </div>
+        )}
         {showProgress && (
           <div className="tcn-shade-progress" aria-hidden="true">
             <span style={{ width: `${Math.max(4, Math.min(100, pct))}%` }} />
@@ -454,6 +485,97 @@ function Shade({ state, subject, kicker, pct, showProgress }) {
         </span>
       </div>
     </div>
+  );
+}
+
+// The coastline path, built once per page from the Atlas's own data.
+let coastCache = null;
+function useCoastPath() {
+  const [d, setD] = useState(coastCache);
+  useEffect(() => {
+    if (coastCache != null) return undefined;
+    let live = true;
+    loadCoastlines().then((lines) => {
+      coastCache = coastPath(lines);
+      if (live) setD(coastCache);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+  return d;
+}
+
+const GRATICULE = (() => {
+  const { w, h, latTop, latBottom } = ROUTE_MAP;
+  let d = '';
+  for (let lon = -150; lon < 180; lon += 30) d += `M${(((lon + 180) / 360) * w).toFixed(1)} 0V${h}`;
+  for (let lat = 60; lat > latBottom; lat -= 30) d += `M0 ${(((latTop - lat) / (latTop - latBottom)) * h).toFixed(1)}H${w}`;
+  return d;
+})();
+
+const PLANE = 'M6 0L-3 -3.6L-1.4 0L-3 3.6Z';
+
+/**
+ * The flight plan: the world (the Atlas coastlines), every stop, and the great
+ * circle to the next one. During a hop the arc lights and a plane flies it
+ * once (finite; still under reduced motion). A stop is a click away.
+ */
+function RouteMap({ stops, current, from, to, flying, still, onPick }) {
+  const coast = useCoastPath();
+  const fLat = from?.lat;
+  const fLon = from?.lon;
+  const tLat = to?.lat;
+  const tLon = to?.lon;
+  const arc = useMemo(
+    () => (Number.isFinite(fLat) && Number.isFinite(tLat) && (fLat !== tLat || fLon !== tLon) ? routePath(greatCircle({ lat: fLat, lon: fLon }, { lat: tLat, lon: tLon }, 64)) : ''),
+    [fLat, fLon, tLat, tLon]
+  );
+  const { w, h } = ROUTE_MAP;
+  const label = (d, cls) => {
+    if (!d) return null;
+    const p = projectRoute(d.lat, d.lon);
+    const right = p.x > w - 96;
+    return (
+      <text className={cls} x={right ? p.x - 7 : p.x + 7} y={Math.min(h - 4, Math.max(9, p.y + 3))} textAnchor={right ? 'end' : 'start'}>
+        {d.name}
+      </text>
+    );
+  };
+  const fromStop = current >= 0 ? stops[current] : null;
+  const pos = !fromStop && from ? projectRoute(from.lat, from.lon) : null;
+  const close = fromStop && to && Math.hypot(projectRoute(fromStop.lat, fromStop.lon).x - projectRoute(to.lat, to.lon).x, projectRoute(fromStop.lat, fromStop.lon).y - projectRoute(to.lat, to.lon).y) < 60;
+  return (
+    <svg className="tcn-route" width={w} height={h} viewBox={`0 0 ${w} ${h}`} role="group" aria-label="Tour map" data-flying={flying ? '' : undefined}>
+      <path className="tcn-route-grat" d={GRATICULE} />
+      {coast && <path className="tcn-route-coast" d={coast} />}
+      {arc && <path key={`${fLat},${fLon}>${tLat},${tLon}`} className="tcn-route-arc" d={arc} />}
+      {stops.map((d, i) => {
+        const p = projectRoute(d.lat, d.lon);
+        return (
+          <g
+            key={d.id}
+            className="tcn-route-stop"
+            data-state={i === current ? 'here' : d === to ? 'next' : undefined}
+            transform={`translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`}
+            onClick={(e) => onPick(i, e)}
+          >
+            <title>{d.name}</title>
+            <circle className="tcn-route-hit" r="8" />
+            <circle className="tcn-route-dot" r="2.3" />
+          </g>
+        );
+      })}
+      {pos && <circle className="tcn-route-pos" cx={pos.x} cy={pos.y} r="3" />}
+      {label(fromStop, 'tcn-route-label')}
+      {!close && label(to, 'tcn-route-label tcn-route-label-next')}
+      {flying && arc && !still && (
+        <g key={`plane-${tLat},${tLon}`} className="tcn-route-plane">
+          <path d={PLANE} />
+          <animateMotion dur="2.6s" fill="freeze" rotate="auto" path={arc} calcMode="spline" keyTimes="0;1" keySplines="0.45 0 0.2 1" />
+        </g>
+      )}
+    </svg>
   );
 }
 
@@ -488,6 +610,11 @@ function CinemaBody({ runtime }) {
   const rootRef = useRef(null);
   const attrRef = useRef(null);
   const passRef = useRef(null);
+  const [firstShowing] = useState(() => {
+    const first = !titleShown;
+    titleShown = true;
+    return first;
+  });
   const [motion] = useState(() => {
     if (stillMotion()) return 'still';
     if (entrancePlayed) return 'done';
@@ -513,12 +640,14 @@ function CinemaBody({ runtime }) {
   // --- the menu: the pass, then the modes ----------------------------------
   const contPass = continueFields(last, adventure);
   const placeName = view?.place?.name ?? '—';
+  const hereAircraft = savedAircraft();
   const herePass = {
+    aircraftId: hereAircraft,
     label: 'Fly here',
     sub: view?.place?.region ? `Free flight · ${view.place.region}` : 'Free flight from this window',
     fields: [
       ['Mode', 'Free flight'],
-      ['Aircraft', aircraftName(savedAircraft())],
+      ['Aircraft', aircraftName(hereAircraft)],
       ['To', placeName],
     ],
     seed: `here:${view?.place?.key ?? 'earth'}`,
@@ -566,6 +695,7 @@ function CinemaBody({ runtime }) {
   const auto = !reduced && tourAutoAllowed() && (isPhone ? TOUR_CFG.autoPhone === true : TOUR_CFG.autoDesktop !== false);
   const here = view ? tourIndexAt(stops, view.lat, view.lon) : -1;
   const [hop, setHop] = useState(null); // the stop the shade is opening onto
+  const [hopFrom, setHopFrom] = useState(null); // where that hop left from (the route map's arc)
   // Mounted over a ready world with nothing streaming: open from the first frame.
   const [shade, setShade] = useState(() => (bootReady && !shadeWanted({ bootReady, staging: runtime?.staging, now: -Infinity, capMs: CAP_MS }) ? 'up' : 'down'));
   const [stagePct, setStagePct] = useState(0);
@@ -574,7 +704,7 @@ function CinemaBody({ runtime }) {
   const covered = settingsOpen || creditsOpen || logbookOpen || browserOpen || libraryOpen;
   const live = useRef({});
   useEffect(() => {
-    live.current = { auto, covered, here, stops, bootReady };
+    live.current = { auto, covered, here, stops, bootReady, pos: view ? { lat: view.lat, lon: view.lon } : null };
   });
   const hopRef = useRef(null);
   const shadeRef = useRef(shade);
@@ -589,6 +719,8 @@ function CinemaBody({ runtime }) {
     (dest) => {
       if (!dest || hopRef.current || typeof runtime?.stageDestination !== 'function') return false;
       hopRef.current = { dest, closedAt: performance.now(), staged: false };
+      const L = live.current;
+      setHopFrom(L.here >= 0 ? L.stops[L.here] : L.pos);
       setHop(dest);
       setStagePct(0);
       shadeRef.current = 'down';
@@ -597,6 +729,11 @@ function CinemaBody({ runtime }) {
     },
     [runtime]
   );
+  const pickStop = (i, e) => {
+    markInput(e);
+    const L = live.current;
+    if (i !== L.here && hopTo(L.stops[i])) tick();
+  };
   const step = (dir, e) => {
     markInput(e);
     const L = live.current;
@@ -770,7 +907,7 @@ function CinemaBody({ runtime }) {
       onPointerMove={markInput}
       onKeyDown={onKeyDown}
     >
-      <Shade state={shade} subject={shadeSubject} kicker={kicker} pct={stagePct} showProgress={!!hop && bootReady} />
+      <Shade state={shade} subject={shadeSubject} kicker={kicker} pct={stagePct} showProgress={!!hop && bootReady} hero={!hop && firstShowing && shownKey === 0} />
       <div className="tcn-scrim" aria-hidden="true" />
       <div className="tcn-frame" aria-hidden="true">
         <i />
@@ -816,6 +953,12 @@ function CinemaBody({ runtime }) {
           )}
         </div>
       </header>
+
+      <p className="tcn-claims tcn-ui">
+        <span>Real places.</span>
+        <span>Real weather.</span>
+        <span>Real traffic.</span>
+      </p>
 
       <section className="tcn-place tcn-ui" aria-label="Now showing">
         {place && (
@@ -925,6 +1068,15 @@ function CinemaBody({ runtime }) {
             )}
           </span>
         </div>
+        <RouteMap
+          stops={stops}
+          current={hop ? stops.indexOf(hopFrom) : here}
+          from={hop ? hopFrom : here >= 0 ? stops[here] : view ? { lat: view.lat, lon: view.lon } : null}
+          to={hop ?? nextStop}
+          flying={!!hop}
+          still={reduced}
+          onPick={pickStop}
+        />
         <div className="tcn-tour-rail">
           <button type="button" className="tcn-tour-btn" data-testid="title-tour-prev" aria-label="Previous place" onClick={(e) => step(-1, e)}>
             <ChevronLeft size={18} aria-hidden="true" />
