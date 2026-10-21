@@ -65,7 +65,8 @@ function autoLine(d) {
   return 'Waiting for the next movement';
 }
 
-export function DirectorCue({ runtime, state, binocular }) {
+/** `card`: the spotter card is open below it (short windows fold the cue to its essentials). */
+export function DirectorCue({ runtime, state, binocular, card = false }) {
   const w = runtime.airportWatch;
   const d = state;
   if (!d) return null;
@@ -109,7 +110,7 @@ export function DirectorCue({ runtime, state, binocular }) {
   if (binocular) return null;
   const watching = d.session && !d.session.auto ? d.session : null;
   return (
-    <section className="lounge-panel dir-cue" data-auto="0" data-tone={tone(next?.kind)} data-testid="director-cue" data-director-control="" aria-label="Next movement">
+    <section className="lounge-panel dir-cue" data-auto="0" data-card={card ? '1' : '0'} data-tone={tone(next?.kind)} data-testid="director-cue" data-director-control="" aria-label="Next movement">
       <div className="dir-cue-head">
         <span className="dir-kicker">
           <i aria-hidden="true" />
