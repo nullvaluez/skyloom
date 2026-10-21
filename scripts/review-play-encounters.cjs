@@ -12,7 +12,7 @@
  *   node scripts/review-play-encounters.cjs --label=before --flags=-ENCOUNTER_FEEL
  *   options: --url=http://localhost:3132  --scene=heli|cessna|jet|live
  *            --seconds=45 --every=3  --width=1440 --height=900  --hour=15.5
- *            --discovery (also opens a Nearby discovery and captures it)
+ *            --discovery[=id] (no escort: Nearby → Go on a discovery, fly at it, frame it, shoot)
  *            --noSpot (dev pin: no traffic trails, to see the hulls alone)
  *            --trails (no escort: Spotting on, the pose held, a few frames of every trail)
  *
@@ -120,7 +120,8 @@ async function telemetry(page, hex) {
       sepM: t ? Math.round(Math.hypot((f.pos.x - t.rx) / (1 / Math.cos(t.fix1?.latRad ?? 0.7)), f.pos.y - (t.ryd ?? t.ry), (f.pos.z - t.rz) / (1 / Math.cos(t.fix1?.latRad ?? 0.7)))) : null,
       player, target, playerSpeed: Math.round(f.speed), fov: +cam.fov.toFixed(1), escort: rt.escort ? { ...rt.escort } : null,
       encounter: enc ? { id: enc.id, seconds: enc.seconds ?? 0, hold: +(enc.hold ?? 0).toFixed(1) } : null,
-      result: rt.encounters?.controller?.result ?? null, feel: rt.encounterFeel?.stats ?? null };
+      result: rt.encounters?.controller?.result ?? null,
+      card: (() => { const c = document.querySelector('[data-testid="hud-chase-chip"]'); const w = c?.parentElement; return c ? { active: c.dataset.active, letterbox: w?.dataset.letterbox ?? null, bottom: w ? getComputedStyle(w).bottom : null, rect: c.getBoundingClientRect().toJSON(), wrap: w?.getBoundingClientRect().toJSON(), wrapTop: w ? getComputedStyle(w).top : null, wrapH: w ? getComputedStyle(w).height : null, tr: getComputedStyle(c).transform } : null; })() };
   }, hex);
 }
 
@@ -189,6 +190,46 @@ async function telemetry(page, hex) {
       }
       return;
     }
+    if (args.discovery) {
+      // A Nearby discovery end to end: Go, fly at it, frame it in photo mode, shoot.
+      const id = typeof args.discovery === 'string' ? args.discovery : 'manhattan-skyline:photo';
+      const snap = async (name) => {
+        await page.screenshot({ path: path.join(out, `${name}.png`) });
+        const st = await page.evaluate(() => { const c = window.__fly.encounters?.controller; return { active: c?.active ? { id: c.active.id, kind: c.active.kind, gate: c.active.gate } : null, result: c?.result ?? null, mode: window.__flyStore.getState().cameraMode, moment: window.__flyEncounterMoment ?? null }; });
+        report.frames.push({ file: `${name}.png`, ...st });
+        console.log(`FRAME ${name} ${JSON.stringify(st)}`);
+      };
+      await page.evaluate(() => { window.__reviewHold = { ...window.__reviewHold }; });
+      await page.evaluate(() => window.__fly.encounters?.nearby());
+      await page.waitForTimeout(1500);
+      await snap('discovery-nearby');
+      await page.getByTestId(`nearby-contact-${id}`).getByRole('button', { name: 'Go', exact: true }).click();
+      await page.mouse.move(viewport.width / 2, viewport.height / 2);
+      await page.waitForTimeout(1500);
+      await snap('discovery-accepted');
+      // Hold the aircraft level and pointed at the subject.
+      await page.evaluate(() => {
+        const r = window.__fly, f = r.flight, w = r.encounters.waypoint(), g = r.geo;
+        const dx = (w.lon - g.x) * Math.cos((g.y * Math.PI) / 180), dz = w.lat - g.y;
+        window.__reviewHold = { y: f.pos.y, h: Math.atan2(dx, dz) };
+        f.step = (dt, cmd) => { window.__reviewStep(dt, { ...cmd, turn: 0, pitch: 0 }); f.pos.y = window.__reviewHold.y; f.heading = window.__reviewHold.h; f.pitch = 0; f.bank = 0; };
+        f.speed = f.cfg.speeds.slow;
+      });
+      await page.waitForTimeout(Number(args.approachMs || 12000));
+      await snap('discovery-toward');
+      await page.keyboard.press('KeyP');
+      await page.waitForTimeout(2500);
+      await snap('discovery-photo-mode');
+      await page.getByTestId('photo-shutter').click().catch(() => {});
+      // The shutter encodes a full-size PNG: wait for it (the button reads "…" while busy).
+      await page.waitForFunction(() => !/…/.test(document.querySelector('[data-testid="photo-shutter"]')?.textContent ?? ''), undefined, { timeout: 20000, polling: 250 }).catch(() => {});
+      await page.waitForTimeout(1500);
+      await snap('discovery-shot');
+      await page.keyboard.press('KeyP');
+      await page.waitForTimeout(2500);
+      await snap('discovery-after');
+      return;
+    }
     let hex = scene?.hex ?? null;
     if (live) {
       hex = await page.evaluate(() => window.__fly.encounters?.controller?.candidates?.find((c) => c.kind === 'traffic')?.hex ?? null);
@@ -215,7 +256,7 @@ async function telemetry(page, hex) {
       const file = `t${String(n * every).padStart(3, '0')}.png`;
       await page.screenshot({ path: path.join(out, file) });
       report.frames.push({ file, t: Math.round((Date.now() - t0) / 100) / 10, ...tele });
-      console.log(`FRAME ${file} ${tele.cameraMode}/${tele.lockState} sep=${tele.sepM} tgt=${JSON.stringify(tele.target?.ndc)} px=${tele.target?.px} lod=${tele.target?.lod} player=${JSON.stringify(tele.player)} enc=${tele.encounter?.seconds ?? '-'} ${tele.result ?? ''}`);
+      console.log(`FRAME ${file} card=${JSON.stringify(tele.card && { lb: tele.card.letterbox, b: tele.card.bottom })} ${tele.cameraMode}/${tele.lockState} sep=${tele.sepM} tgt=${JSON.stringify(tele.target?.ndc)} px=${tele.target?.px} lod=${tele.target?.lod} player=${JSON.stringify(tele.player)} enc=${tele.encounter?.seconds ?? '-'} ${tele.result ?? ''}`);
       save();
       n++;
       const wait = t0 + n * every * 1000 - Date.now();
@@ -230,13 +271,6 @@ async function telemetry(page, hex) {
       report.frames.push({ file, t: Math.round((Date.now() - t0) / 100) / 10, ...tele });
       console.log(`FRAME ${file} ${tele.cameraMode}/${tele.lockState} enc=${tele.encounter?.seconds ?? '-'} ${tele.result ?? ''}`);
       await page.waitForTimeout(1500);
-    }
-    if (args.discovery) {
-      await page.evaluate(() => { window.__fly.autopilot?.disengage?.(); window.__fly.escort = null; });
-      await page.waitForTimeout(2000);
-      await page.evaluate(() => window.__fly.encounters?.nearby());
-      await page.waitForTimeout(1500);
-      await page.screenshot({ path: path.join(out, 'discoveries.png') });
     }
   } catch (e) {
     report.errors.push({ fatal: e.message.split('\n')[0] });

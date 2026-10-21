@@ -29,7 +29,7 @@ export function EscortHud({ runtime, cinematic }) {
   // PLAY PASS (ENCOUNTER_FEEL): ONE escort card — identity, the memory, the
   // actions — in the lock card's slot. Flag off: the pill, exactly as it was.
   return ENCOUNTER_FEEL_ACTIVE.enabled === true ? (
-    <EscortCard runtime={runtime} cinematic={cinematic} />
+    <EscortCard runtime={runtime} />
   ) : (
     <EscortPill runtime={runtime} cinematic={cinematic} />
   );
