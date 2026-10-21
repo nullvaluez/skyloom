@@ -7,8 +7,10 @@ import { HUD_SYNC } from '@/lib/fly/fly-constants';
 import { pinned } from '@/lib/fly/fly-pins';
 import { VIEW } from '@/lib/fly/observation-config';
 import { drawnPoint, glazingFor } from '@/lib/fly/airport-watch-runtime';
-import { DEG, clamp, pickRadius, wingspanFor, smoothstep } from '@/lib/fly/airport-watch-camera.mjs';
+import { DEG, clamp, pickRadius, wingspanFor, smoothstep, prefersReducedMotion } from '@/lib/fly/airport-watch-camera.mjs';
 import { contactLabel, typeNameFor } from '@/lib/fly/airport-watch-board.mjs';
+import { playPassOn, playPassBlock } from '@/lib/fly/play-pass';
+import { skyMarker, countdown } from '@/lib/fly/airport-watch-director.mjs';
 
 /*
  * The lounge's in-view layer, drawn once per GL frame (HUD_SYNC: from
@@ -25,7 +27,16 @@ import { contactLabel, typeNameFor } from '@/lib/fly/airport-watch-board.mjs';
  *    edge arrow when the selection is out of frame, the binocular lock box,
  *    and — on its own canvas, redrawn only when it changes — the twin-lens
  *    binocular mask with vignette and reticle.
+ *
+ * Play Pass DIRECTOR (LOUNGE_DIRECTOR; null below while the flag is off, and
+ * every use is guarded by it): a CLEAN SKY — idle brackets only on contacts
+ * that help (lib/fly/airport-watch-director.mjs skyMarker), a faint dot for
+ * mid-range ones, nothing for far ones (all stay pickable) — and the NEXT
+ * MOVEMENT's locator from watch.director.next: a ring and its countdown on the
+ * aircraft in view, an edge arrow toward it, or toward its touchdown zone
+ * while the aircraft itself is out of sight.
  */
+const DIRECTOR = playPassOn('LOUNGE_DIRECTOR') ? playPassBlock('LOUNGE_DIRECTOR') : null;
 
 const C = {
   ice: '238,245,255',
@@ -107,10 +118,72 @@ function pill(ctx, x, y, lines, opts) {
 }
 
 const overlaps = (a, b) => a[0] < b[0] + b[2] && b[0] < a[0] + a[2] && a[1] < b[1] + b[3] && b[1] < a[1] + a[3];
+
+/** DIRECTOR: the next movement's ring (a soft halo under a fine line). */
+function ring(ctx, x, y, r, rgb, alpha) {
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.strokeStyle = `rgba(${C.ink},${0.5 * alpha})`;
+  ctx.lineWidth = 3.4;
+  ctx.stroke();
+  ctx.save();
+  ctx.shadowColor = `rgba(${rgb},0.7)`;
+  ctx.shadowBlur = 9;
+  ctx.strokeStyle = `rgba(${rgb},${alpha})`;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** DIRECTOR: a toned arrow at the screen edge toward NDC direction (ux, uy), slid clear of the panels; returns its tip. */
+function edgeArrow(ctx, W, H, ux, uy, inset, rgb, avoid) {
+  const len = Math.hypot(ux, uy) || 1;
+  ux /= len; uy /= len;
+  const hx = W / 2 - inset, hy = H / 2 - inset - 40;
+  const sx = hx / Math.max(1e-6, Math.abs(ux)), sy = hy / Math.max(1e-6, Math.abs(uy));
+  const s = Math.min(sx, sy);
+  let ex = W / 2 + ux * s, ey = H / 2 - uy * s;
+  for (const r of avoid) {
+    if (ex < r[0] - 14 || ex > r[0] + r[2] + 14 || ey < r[1] - 14 || ey > r[1] + r[3] + 14) continue;
+    if (sx <= sy) ey = r[1] + r[3] + 18; // on a side edge: slide below the panel
+    else ex = ux > 0 ? r[0] - 18 : r[0] + r[2] + 18; // on the top or bottom: beside it
+  }
+  ctx.save();
+  ctx.translate(ex, ey);
+  ctx.rotate(Math.atan2(-uy, ux));
+  ctx.beginPath();
+  ctx.moveTo(13, 0);
+  ctx.lineTo(-6, -9);
+  ctx.lineTo(-2, 0);
+  ctx.lineTo(-6, 9);
+  ctx.closePath();
+  ctx.fillStyle = `rgba(${rgb},0.95)`;
+  ctx.shadowColor = `rgba(${rgb},0.8)`;
+  ctx.shadowBlur = 10;
+  ctx.fill();
+  ctx.restore();
+  return { ex, ey, ux, uy };
+}
+
+/** DIRECTOR: a pill at (x, y) moved clear of the panels (below one it would cover, else above). */
+function pillClear(ctx, x, y, lines, opts, avoid) {
+  const [w, h] = measurePill(ctx, lines, !!opts.accent);
+  const rect = [clamp(x, 8, opts.w - w - 8), clamp(y, 8, opts.h - h - 8), w, h];
+  for (let i = 0; i < 3; i++) {
+    const r = avoid.find((o) => overlaps(o, rect));
+    if (!r) break;
+    const below = r[1] + r[3] + 6;
+    rect[1] = below + h < opts.h - 8 ? below : Math.max(8, r[1] - h - 6);
+  }
+  drawPill(ctx, rect, lines, opts);
+  return rect;
+}
 const fmtKm = (m) => (m < 9500 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m / 1000)} km`);
 
 /** The twin-lens mask, vignette and reticle for raise amount `a` (0..1). */
-function drawMask(ctx, w, h, a) {
+// `posts` (0..1, DIRECTOR): the reticle's strength — it fades while steady
+// binoculars frame a locked aircraft, which the lock box then frames instead.
+function drawMask(ctx, w, h, a, posts = 1) {
   ctx.clearRect(0, 0, w, h);
   if (a <= 0.001) return;
   const up = 1 - Math.pow(1 - a, 3); // ease-out raise
@@ -157,7 +230,7 @@ function drawMask(ctx, w, h, a) {
   }
   // Fine post reticle: four posts that FRAME the centre (a locked aircraft
   // sits in the open middle, never under a line) with mil ticks.
-  const x = w / 2, ra = up * 0.6, gap = 46, reach = 150;
+  const x = w / 2, ra = up * 0.6 * posts, gap = 46, reach = 150;
   ctx.lineWidth = 1;
   ctx.beginPath();
   for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
@@ -187,6 +260,9 @@ export function LoungeOverlay({ runtime, picker }) {
     const ctx = mark.getContext('2d'), mctx = mask.getContext('2d');
     const v = new Vector3(), fwd = new Vector3(), aim = {};
     const order = [], drawn = []; // idle-bracket declutter scratch (drawn: x, y, r triples)
+    const dots = []; // DIRECTOR: mid-range contacts drawn as faint dots
+    const reduced = prefersReducedMotion();
+    let posts = 1, postsAt = 0; // DIRECTOR: the reticle's eased strength
     const fx = { hex: null, at: 0 }; // selection snap-in
     let maskKey = '', raf = 0, lastCleared = false;
     // Screen rectangles of the lounge's own panels (header, board, card,
@@ -199,7 +275,7 @@ export function LoungeOverlay({ runtime, picker }) {
       const root = mark.closest('.lounge');
       if (!root) return;
       const base = mark.getBoundingClientRect();
-      for (const el of root.querySelectorAll('.lounge-panel, .lh-actions, .lounge-help')) {
+      for (const el of root.querySelectorAll('.lounge-panel, .lh-actions, .lounge-help, .dir-lower')) {
         const r = el.getBoundingClientRect();
         if (r.width > 0 && r.height > 0) avoid.push([r.left - base.left - 6, r.top - base.top - 6, r.width + 12, r.height + 12]);
       }
@@ -247,6 +323,9 @@ export function LoungeOverlay({ runtime, picker }) {
       const hits = picker.hits;
       hits.length = 0;
       let selectedHit = null, selectedTrack = null;
+      // DIRECTOR: the next movement (watch.director.next), its hit and its glazing-visible track.
+      const next = DIRECTOR ? w.director?.next ?? null : null;
+      let nextHit = null, nextTrack = null;
       for (const t of traffic?.items || []) {
         if (!t.fix1 || (t.horizonFade ?? 1) < 0.05) continue;
         drawnPoint(t, flight.pos, aim);
@@ -254,6 +333,7 @@ export function LoungeOverlay({ runtime, picker }) {
         const dx = rx - camera.position.x, dy = aim.y - camera.position.y, dz = rz - camera.position.z;
         if (!glazingFor(w, dx, dy, dz)) continue;
         if (t.hex === w.selected) selectedTrack = t;
+        if (next && t.hex === next.hex) nextTrack = t;
         if (dx * fwd.x + dy * fwd.y + dz * fwd.z < 1) continue; // behind the eye
         v.set(rx, aim.y, rz).project(camera);
         if (v.z > 1) continue;
@@ -264,6 +344,7 @@ export function LoungeOverlay({ runtime, picker }) {
         const hit = { hex: t.hex, sx, sy, half, dist, t, onScreen: sx >= 0 && sx <= W && sy >= 0 && sy <= H };
         hits.push(hit);
         if (t.hex === w.selected) selectedHit = hit;
+        if (next && t.hex === next.hex) nextHit = hit;
       }
 
       // --- hover under the pointer (hysteresis) -----------------------------
@@ -298,12 +379,23 @@ export function LoungeOverlay({ runtime, picker }) {
         // none. Skipped contacts stay pickable (hover and click still find them).
         order.length = 0;
         drawn.length = 0;
+        dots.length = 0;
         if (hover) drawn.push(hover.sx, hover.sy, hover.half + 6);
         if (selectedHit) drawn.push(selectedHit.sx, selectedHit.sy, selectedHit.half + 8);
         for (const hit of hits) {
           if (hit.hex === w.selected || hit === hover) continue;
           const grounded = (hit.t.flags & 1) === 1, fix = hit.t.fix1;
           if (grounded && hit.dist > M.groundM && Math.hypot(fix.vE || 0, fix.vN || 0) < M.parkedMps) continue;
+          if (DIRECTOR) {
+            // The clean sky: the next movement draws its locator; the rest earn a bracket, a dot or nothing.
+            if (hit === nextHit) continue;
+            const mark = skyMarker({ grounded, speedMs: Math.hypot(fix.vE || 0, fix.vN || 0), dist: hit.dist, category: picker.categories.get(hit.hex)?.category }, DIRECTOR);
+            if (!mark) continue;
+            if (mark === 'dot') {
+              dots.push(hit);
+              continue;
+            }
+          }
           hit.rank = (grounded ? 1e7 : 0) + hit.dist;
           order.push(hit);
         }
@@ -333,6 +425,16 @@ export function LoungeOverlay({ runtime, picker }) {
             ctx.lineWidth = 1.3;
             ctx.stroke();
           }
+        }
+        // DIRECTOR: mid-range contacts as faint dots, clear of every bracket.
+        for (const hit of dots) {
+          let clash = false;
+          for (let i = 0; i < drawn.length && !clash; i += 3) clash = Math.abs(drawn[i] - hit.sx) < drawn[i + 2] + 4 && Math.abs(drawn[i + 1] - hit.sy) < drawn[i + 2] + 4;
+          if (clash) continue;
+          ctx.beginPath();
+          ctx.arc(hit.sx, hit.sy, 1.6, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(${C.ice},${DIRECTOR.sky.dotAlpha * naked * Math.max(0.3, hit.t.opacity ?? 1)})`;
+          ctx.fill();
         }
       }
 
@@ -384,15 +486,59 @@ export function LoungeOverlay({ runtime, picker }) {
         label(hover, [contactLabel(t.meta, t.hex), sub], {});
       }
 
+      // DIRECTOR: the next movement's locator (labelled before the phase labels).
+      if (next && next.hex !== w.selected && naked > 0.5) {
+        const rgb = next.kind === 'landing' ? C.lime : C.amber;
+        const count = next.kind === 'landing' ? countdown(next.etaS) : 'now';
+        const rw = next.runway ? ' ' + next.runway : '';
+        const when = next.kind === 'landing' ? `Lands${rw} · ${count}` : next.kind === 'takeoff' ? `Taking off${rw} · now` : `Climbing out${next.runway ? ' of ' + next.runway : ''}`;
+        const a = naked;
+        const L = DIRECTOR.locator;
+        if (nextHit?.onScreen && nextHit !== hover) {
+          const pulse = reduced ? 0 : Math.sin((now / 1000) * ((Math.PI * 2) / 1.8)) * 1.6;
+          ring(ctx, nextHit.sx, nextHit.sy, Math.max(L.ringPx, nextHit.half + 9) + pulse, rgb, 0.92 * a);
+          label(nextHit, [next.label, when], { accent: rgb, alpha: a }, true);
+        } else if (nextTrack && !nextHit?.onScreen) {
+          drawnPoint(nextTrack, flight.pos, aim);
+          v.set(aim.x - ax, aim.y, aim.z - az).sub(camera.position);
+          const behind = v.dot(fwd) < 0;
+          v.add(camera.position).project(camera);
+          const e = edgeArrow(ctx, W, H, behind ? -v.x : v.x, behind ? -v.y : v.y, L.edgeInsetPx, rgb, avoid);
+          pillClear(ctx, e.ex - e.ux * 40 - 44, e.ey + e.uy * 40 - 19, [next.label, when], { w: W, h: H, accent: rgb, alpha: 0.92 * a }, avoid);
+        } else if (!nextTrack && next.touchdown?.seen) {
+          // Out of sight for now: point at where it will touch down.
+          const z = next.touchdown;
+          v.set(z.wx - ax, z.y, z.wz - az).sub(camera.position);
+          const behind = v.dot(fwd) < 0;
+          v.add(camera.position).project(camera);
+          const sx = (v.x * 0.5 + 0.5) * W, sy = (-v.y * 0.5 + 0.5) * H;
+          if (!behind && v.z < 1 && sx >= 0 && sx <= W && sy >= 0 && sy <= H) {
+            ctx.beginPath();
+            ctx.moveTo(sx, sy - 7); ctx.lineTo(sx + 9, sy); ctx.lineTo(sx, sy + 7); ctx.lineTo(sx - 9, sy); ctx.closePath();
+            ctx.strokeStyle = `rgba(${C.ink},${0.5 * a})`;
+            ctx.lineWidth = 3.2;
+            ctx.stroke();
+            ctx.strokeStyle = `rgba(${rgb},${0.9 * a})`;
+            ctx.lineWidth = 1.4;
+            ctx.stroke();
+            // On its runway it lands here; still turning in, it is expected on the runway in use.
+            label({ sx, sy, half: 9 }, [next.label, `${next.runway ? 'Lands' : 'Expected'} here${count === 'now' ? ' now' : ' in ' + count}`], { accent: rgb, alpha: a }, true);
+          } else {
+            const e = edgeArrow(ctx, W, H, behind ? -v.x : v.x, behind ? -v.y : v.y, L.edgeInsetPx, rgb, avoid);
+            pillClear(ctx, e.ex - e.ux * 40 - 44, e.ey + e.uy * 40 - 19, [next.label, `Touchdown${rw} · ${count}`], { w: W, h: H, accent: rgb, alpha: 0.86 * a }, avoid);
+          }
+        }
+      }
+
       if (naked > 0.5) {
         const phased = hits
-          .filter((h) => h.hex !== w.selected && h !== hover && h.onScreen)
+          .filter((h) => h.hex !== w.selected && h !== hover && h.onScreen && (!DIRECTOR || h !== nextHit))
           .map((h) => ({ h, cat: picker.categories.get(h.hex) }))
           .filter(({ h, cat }) => (cat?.category === 'arrival' && h.dist < M.labelArrivalM) || (cat?.category === 'departure' && h.dist < M.labelDepartureM))
           .sort((a, b) => a.h.dist - b.h.dist);
         let shown = 0;
         for (const { h, cat } of phased) {
-          if (shown >= M.maxPhaseLabels) break;
+          if (shown >= (DIRECTOR ? DIRECTOR.sky.phaseLabels : M.maxPhaseLabels)) break;
           if (label(h, [`${contactLabel(h.t.meta, h.hex)}  ${cat.category === 'arrival' ? '↘' : '↗'} ${cat.phaseLabel}`], { alpha: 0.82 * naked, accent: cat.category === 'arrival' ? C.lime : C.cyan })) shown++;
         }
       }
@@ -437,11 +583,18 @@ export function LoungeOverlay({ runtime, picker }) {
         brackets(ctx, selectedHit.sx, selectedHit.sy, half, Math.min(14, half * 0.35), locked ? C.cyan : C.amber, 0.85 * a, 1.2);
       }
 
+      // DIRECTOR: the reticle fades while steady binoculars frame a held lock.
+      if (DIRECTOR) {
+        const framed = w.optics.auto && w.tracking && !!selectedHit && w.lockError() < fovRad / 8;
+        posts += ((framed ? 0 : 1) - posts) * (1 - Math.exp(-Math.min(0.1, (now - postsAt) / 1000) * 5));
+        postsAt = now;
+      }
+
       // --- the binocular mask (only redrawn when it changes) ------------------
-      const key = `${Math.round(amount * 400)}|${W}x${H}`;
+      const key = `${Math.round(amount * 400)}|${W}x${H}` + (DIRECTOR ? `|${Math.round(posts * 24)}` : '');
       if (key !== maskKey) {
         maskKey = key;
-        drawMask(mctx, W, H, amount);
+        drawMask(mctx, W, H, amount, DIRECTOR ? Math.round(posts * 24) / 24 : 1);
       }
     };
 

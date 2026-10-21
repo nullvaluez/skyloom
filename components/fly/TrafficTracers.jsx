@@ -50,6 +50,9 @@ import { useFlyStore } from '@/stores/fly-store';
 import { TrafficContrails } from './TrafficContrails';
 import { cinemaOn } from '@/lib/fly/cinema-policy';
 import { ribbonSideInto } from '@/lib/fly/true-scale';
+// PLAY PASS ENCOUNTERS imports begin
+import { FEEL_ON as FEEL_TRAILS, escortedHex, honestTrail } from '@/lib/fly/encounter-feel';
+// PLAY PASS ENCOUNTERS imports end
 
 // Altitude → neon (airloom reference): green on the deck, yellow low,
 // orange mid, cyan cruise. Tail fades to black (additive = transparent).
@@ -69,6 +72,10 @@ const BANDS = [
 function displayAlphaFor(t) {
   return t.scaleK < 1 ? t.opacity : Math.max(TRACERS.alphaFloor, t.opacity);
 }
+
+// PLAY PASS ENCOUNTERS: honest-trail scratch (no per-frame allocation).
+const _hon = { vapour: 1, headM: 0, tailM: 0, alphaK: 1, bodyK: 1 };
+const _honBase = { headM: 0, tailM: 0 };
 
 /** Speed hysteresis: arm above speedOnMps, disarm below speedOffMps. */
 function speedGate(gates, hex, speed) {
@@ -387,6 +394,12 @@ function SpotTracers({ runtime, flight, origin }) {
     const ca = col.array;
     let nNear = 0;
     const tailW = S.width.tailNightM + (S.width.tailDayM - S.width.tailNightM) * L.v;
+    // PLAY PASS ENCOUNTERS begin — honest trails (ENCOUNTER_FEEL; lib/fly/encounter-feel.js)
+    const escortHex = FEEL_TRAILS ? escortedHex(runtime) : null;
+    const wxTrail = runtime.weather?.wx ?? null;
+    _honBase.headM = S.width.headM;
+    _honBase.tailM = tailW;
+    // PLAY PASS ENCOUNTERS end
     const nv = S.body.nearVapor;
     const pulse = S.glint.pulse;
     for (let r = 0; r < nc; r++) {
@@ -417,6 +430,20 @@ function SpotTracers({ runtime, flight, origin }) {
       const pr = spotProminence(Dt, L.n, pinned, _prom);
       const hazeB = (1 - P.hazeB * smoothstep(S.body.hazeNearM, S.body.hazeFarM, Dt)) * pr.body;
       const nearV = nv.minK + (1 - nv.minK) * smoothstep(nv.startM, nv.endM, Dw);
+      // PLAY PASS ENCOUNTERS begin — below contrail-forming air the trail is a
+      // light line that gives way to the hull; the escorted aircraft drops it.
+      let tW = tailW;
+      let hW = S.width.headM;
+      let aK = 1;
+      let bK = 1;
+      if (FEEL_TRAILS) {
+        const h = honestTrail(_hon, t.ry, wxTrail, Dt, t.hex === escortHex, _honBase);
+        tW = h.tailM;
+        hW = h.headM;
+        aK = h.alphaK;
+        bK = h.bodyK;
+      }
+      // PLAY PASS ENCOUNTERS end
       const gA = smoothstep(S.body.goldAltM[0], S.body.goldAltM[1], t.ry);
       const ec = P.bodyEmit[b];
 
@@ -454,7 +481,7 @@ function SpotTracers({ runtime, flight, origin }) {
         const edgeK = clamp01((sinT - 0.06) / 0.2);
         const behindK = _view.dot(_camFwd) < 0 ? 0 : 1;
         const tt = j / (m - 1); // 0 tail → 1 head
-        const wHalf = 0.5 * (tailW + (S.width.headM - tailW) * tt);
+        const wHalf = 0.5 * (tW + (hW - tW) * tt);
         const fHalf = (fT + (fH - fT) * tt) * _svlen[j];
         const half = wHalf > fHalf ? wHalf : fHalf;
         const eK = wHalf >= fHalf ? 1 : Math.max(S.width.energyMin, Math.sqrt(wHalf / fHalf));
@@ -466,8 +493,8 @@ function SpotTracers({ runtime, flight, origin }) {
           hk = Math.min(1, (tt - (1 - S.body.headFrac)) / S.body.headFrac);
           hk = hk * hk * (3 - 2 * hk);
         }
-        const w = pres * hazeB * eK;
-        const a = P.alphaPeak * nearV * tp * w; // vapour opacity
+        const w = pres * hazeB * eK * bK;
+        const a = P.alphaPeak * nearV * tp * w * aK; // vapour opacity
         const hkR = hk * pr.glint; // the head boost is a within-reach mark
         const we = w * pr.emit;
         const eg = (P.emitPeak * tp + P.headBoost * hkR) * we; // emission luma

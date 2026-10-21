@@ -9,6 +9,10 @@ import { releaseEscort, toggleEscortCamera } from '@/lib/fly/escort';
 import { MPS_TO_KT } from '@/lib/fly/coords';
 import { ENCOUNTER_LIMITS } from '@/lib/fly/encounters.mjs';
 import './target-ui.css';
+// PLAY PASS ENCOUNTERS imports begin
+import { ENCOUNTER_FEEL_ACTIVE } from '@/lib/fly/play-pass';
+import { EscortCard } from './EscortCard';
+// PLAY PASS ENCOUNTERS imports end
 
 /**
  * The escort HUD: what the intercept → formation autopilot is doing, to whom,
@@ -22,6 +26,16 @@ import './target-ui.css';
  * and closing-rate line is written through a ref at 4 Hz, never per frame.
  */
 export function EscortHud({ runtime, cinematic }) {
+  // PLAY PASS (ENCOUNTER_FEEL): ONE escort card — identity, the memory, the
+  // actions — in the lock card's slot. Flag off: the pill, exactly as it was.
+  return ENCOUNTER_FEEL_ACTIVE.enabled === true ? (
+    <EscortCard runtime={runtime} cinematic={cinematic} />
+  ) : (
+    <EscortPill runtime={runtime} cinematic={cinematic} />
+  );
+}
+
+function EscortPill({ runtime, cinematic }) {
   const lockState = useFlyStore((s) => s.lockState);
   const cameraMode = useFlyStore((s) => s.cameraMode);
   const lockedHex = useFlyStore((s) => s.lockedHex);

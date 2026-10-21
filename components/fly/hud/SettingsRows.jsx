@@ -18,6 +18,9 @@ import { FlightComfortSettings } from './FlightComfortSettings';
 // Living World (MENU_GLASS): the glass rows. Flag off renders the markup below
 // each `GLASS_ON ?` unchanged.
 import { GLASS_ON, GlassField, GlassToggle } from './LivingGlass';
+// PLAY PASS (CALM_HUD): the HUD mode row, glass only (the frozen zinc menu of
+// MENU_GLASS off stays the pre-pass menu; H still cycles the modes there).
+import { CALM, HUD_MODES, hudModeLabel, hudModeNote, saveHudMode } from './calm-hud';
 
 const TIERS = ['low', 'medium', 'high', 'ultra'];
 const VISUALS_ROW = [
@@ -44,6 +47,7 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
   const visuals = useFlyStore((s) => s.visuals);
   const chaseFraming = useFlyStore(s => s.chaseFraming);
   const encountersEnabled = useFlyStore(s => s.encountersEnabled);
+  const hudMode = useFlyStore((s) => s.hudMode);
   // Round 18: the stakes pick lives in a fly-settings module cache, not the
   // store. The rows mount each time the pause card / sheet opens, so a lazy
   // read on mount is current by construction.
@@ -105,6 +109,7 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
     }
   };
   const seg = (on) => (on ? '' : undefined);
+  const pickHud = (mode) => store.setHudMode(saveHudMode(mode)); // a CLICKED mode is a choice — persist it
 
   const visualsRow = visualsAvailable() && lookSwitches && (GLASS_ON ? (
     <GlassField key="visuals" label="Visuals" testid={sheet ? 'settings-visuals' : undefined}>
@@ -318,6 +323,25 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
       </div>
   );
 
+  const hudRow = CALM && GLASS_ON && (
+    <GlassField key="hud" label="HUD" note={hudModeNote(hudMode)} testid={sheet ? 'settings-hud' : 'pause-hud'}>
+      <div className="lg-seg" role="group" aria-label="HUD">
+        {HUD_MODES.map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            data-testid={`settings-hud-${mode}`}
+            aria-pressed={hudMode === mode}
+            data-on={seg(hudMode === mode)}
+            onClick={() => pickHud(mode)}
+          >
+            {hudModeLabel(mode)}
+          </button>
+        ))}
+      </div>
+    </GlassField>
+  );
+
   return sheet ? (
     <>
       {includeConditions && conditionsRow}
@@ -329,6 +353,7 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
       {reducedRow}
       {stakesRow}
       <GuestSaveControls />
+      {hudRow}
       {flightViewRows}
     </>
   ) : (
@@ -342,6 +367,7 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
       {reducedRow}
       {stakesRow}
       <GuestSaveControls />
+      {hudRow}
       {flightViewRows}
     </>
   );
