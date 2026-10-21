@@ -74,13 +74,159 @@ previous experience for one page load.
   for anything near operations, and a browser check in the stream's own dev
   server with zero page errors, flag on and off.
 
-## Status
+## Status (2026-10-21, the pass is built)
 
-| Stream | State |
-|---|---|
-| W0 — review, flags, reader, mount blocks, this record | **Done** |
-| HUD | In progress |
-| ENCOUNTERS | In progress |
-| CITY | In progress |
-| DIRECTOR | In progress |
-| APRON | In progress |
+Every stream landed on local `main` (not pushed); all five flags ship **on**.
+The owner tests on the dev server (`skyloom-dev-3123` in `.claude/launch.json`).
+Review captures from every stream are in `.graphics-review/play-pass/<stream>/`
+(gitignored, local).
+
+| Stream | State | Merges on `main` |
+|---|---|---|
+| W0: review, flags, reader, mount blocks, this record | **Done** | `553c4cb`, plus `a08407c` (EarthSurfaceLayer null-flight guard; the dev hot reload threw ~50k errors) |
+| HUD (`CALM_HUD`) | **Landed** | `d9d68ff`, `58a8ea2` |
+| ENCOUNTERS (`ENCOUNTER_FEEL`) | **Landed**. The agent ran out of session before writing its report; its commits and gate are complete | `5f22d09`, `e7c6ac1`, `b75058a` |
+| CITY (`CITY_FACADES`) | **Landed** | `63b03d8` |
+| DIRECTOR (`LOUNGE_DIRECTOR`) | **Landed** | `56994c3`, `cc608de`, `6b2baf6`, `47903b5` |
+| APRON (`APRON_DETAIL`) | **Landed**. Same as ENCOUNTERS: session ended before the report; commits and gate complete | `0f6cd3b`, `baf5c73`, `a8d3e98`, `b04613f` |
+
+### What the player gets
+
+- **HUD.** Free Flight opens on the **Explorer** HUD:
+  - The middle of the screen is the aircraft and the world.
+  - Speed, altitude (AGL in amber below 1,000 ft), heading and throttle sit in one quiet row at the bottom centre.
+  - The place name is the headline at the top.
+  - A steering cue (a ring and a needle toward the cursor) shows only while the mouse is off-centre and moving.
+  - **H** cycles Explorer → **Instruments** (the `FLIGHT_INSTRUMENTS` HUD, unchanged) → **Clean**. The mode can also be set in Settings → HUD and is saved under `fly-hud-mode`.
+  - After 6 s without input the chrome dims; any input or event brings it back.
+  - The Spotting toggle moves into the bottom row.
+  - The points chip waits for the first score.
+  - The key legend shows for the first 3 flights, then becomes one line (`fly-hud-legend-v1`).
+  - Notices share one lane in the bottom row.
+  - The scenery notice speaks only when missing scenery is actually on screen, after 30 s, and retries once by itself first.
+  - Phones keep their compact strip.
+  - Files: `components/fly/hud/CalmHud.jsx`, `calm-hud.js`, `calm-hud.css`.
+- **ENCOUNTERS.** Fly alongside:
+  - The camera is a photo ship close in: the target large and lit, the player in the same frame, swinging round from the pursuit on an arc (`lib/fly/escort-shot.js`).
+  - Formation holds the slot by speed along the target's track, so helicopters are held alongside rather than looped (`escort-formation.js`, through the autopilot's marked block).
+  - One escort card (`EscortCard.jsx`) shows photo, type, route, the 30 s memory bar, and Photo / Cinema / Release.
+  - Drifting out of the slot drains the timer instead of zeroing it.
+  - Payoff: the camera eases to the best angle, the shutter keeps that frame, and a "Flight memory saved" lower third appears (`EncounterMoment.jsx`).
+  - Every memory earns that lower third: escort, discovery or crossing; a crossing's photo joins its memory.
+  - Discoveries get a guidance marker in the experience's colour, with an off-screen chevron and its distance.
+  - Photo mode gets a viewfinder chip that says what the encounter shutter will see.
+  - Honest trails: below contrail-forming air a traffic trail is a thin light line that gives way to the hull, and the escorted aircraft drops its trail at escort range.
+- **CITY.** Daytime satellite buildings get:
+  - Regional cladding: nine palettes, chosen from the worker's Natural Earth context and eased over 2.5 s.
+  - Dark tinted curtain-wall glass that reflects the scene's own sky (high tier only).
+  - Cladding that is consistent across a tower's separately mapped parts.
+  - Real roofs (membrane, gravel, tar, planted, tile) with parapets a shade darker.
+  - Night, Classic, Neon and the toy world are unchanged.
+  - No new draws or textures.
+  - Code: `lib/fly/city-facades.js`, `satellite-architecture-material.js`.
+- **DIRECTOR.** Watch an Airport:
+  - A **Next movement** cue (callsign, type, runway, countdown, and the movement after it).
+  - A locator: a ring on the aircraft, an edge arrow with its ETA when off screen, or the touchdown spot when the aircraft is hidden.
+  - **N** watches it: the head eases into the swing and follows through touchdown and rollout (or the roll and climb-out), then lets go.
+  - **H, Watch for me:** an auto director. It takes each movement it can actually show, raises the binoculars on short final and through touchdown, and shows broadcast lower thirds (airline and flight, type, the route when it agrees). It rests on the runway between movements and fills quiet spells with taxiing aircraft. Any input hands control back.
+  - "Touchdown" and "Airborne" moments.
+  - Steady binoculars that auto-zoom to fit the aircraft (measured ±3 px at 25x, 7–8 km).
+  - A clean sky: brackets only near and on movers, faint dots in the middle distance, nothing far.
+  - Code: `lib/fly/airport-watch-director*.{mjs,js}`, `components/fly/hud/lounge/DirectorHud.jsx`.
+- **APRON.** The lounge's airfield ground:
+  - Concrete in paving lanes with slabs, joints and cracks; oxidised asphalt with patches.
+  - A detail field (`lib/fly/airfield/airfield-apron.js`, never on touch devices) for:
+    - main-gear rubber either side of every taxi path;
+    - oil stains under parked aircraft;
+    - edge dirt and shoulders;
+    - runways worn down the centre.
+  - Yellow taxiway paint with black borders.
+  - Grass:
+    - mown runway strips with swaths that catch the light, rough grass beyond, and scoured runway ends;
+    - the grass frays into the photographed world instead of stopping on a ruled line.
+  - At night, floodlit apron pools that spill onto the grass.
+  - Rain soaks the airfield over about a minute and dries over about ten: glossy pavement, standing water, darker paint.
+  - No draws added.
+
+### Verification on the merged `main` (orchestrator, 2026-10-21)
+
+- **Node gates, all green:**
+
+  | Gate | Result |
+  |---|---|
+  | `verify-play-hud` | 51 |
+  | `verify-play-encounters` | on and off arms |
+  | `verify-play-city` | pass |
+  | `verify-play-director` | 24 |
+  | `verify-play-apron` | 19 |
+  | `verify-ops-golden` | 28/28 (byte-identical) |
+  | `verify-true-earth-flags` | 8 |
+  | `verify-import-integrity` | 4 |
+  | `verify-escort` | pass |
+  | `verify-encounter-runtime` | pass |
+  | `verify-living-flight-ui` | 34 |
+  | `verify-living-menus` | 12 |
+  | `graphics-unit` | pass |
+
+- **ESLint:** 51 changed files, 28 errors before and 28 after, all pre-existing in `FlyScene.jsx`.
+- **Browser on :3123:**
+  - the HUD's three modes;
+  - an escort through to "Flight memory saved";
+  - the JFK lounge by day (Watch for me through short final) and at dusk (floodlit apron);
+  - Manhattan by day (pinned noon) and at night.
+
+  Zero page and shader errors on the final tree.
+- **Streams' own browser gates** (per their reports):
+  - HUD overlap audit at 1440, 1920 and 1280: 64/64;
+  - lounge gate suite: 30/30;
+  - CITY: a motion burst with no more sparkle than flag off;
+  - every flag-off arm: zero errors.
+- **Flag-off identity** is pinned in node for every stream: the DOM and Settings rows (HUD), shader text and program keys by sha256 (CITY, APRON), and the runtime with no director attached (DIRECTOR).
+
+### Owner checkpoints (open)
+
+- **Look in motion on the RTX 5080** (nothing here had a real-GPU motion check):
+  - CITY: Midtown at 750–1,500 ft, curtain-wall frames and roof edges, flag on vs `?flags=-CITY_FACADES`;
+  - APRON: slab and paint detail through the binoculars;
+  - the escort shot.
+- **HUD:**
+  - Is Explorer the right default, and H the right key?
+  - Calm timing (`CALM_HUD.calm`).
+  - Should calm also dim the Nearby button (an ENCOUNTERS file)?
+  - Should Clean hide more?
+  - Should AGL show only below 1,000 ft?
+  - The points chip now hides until the first score; on desktop that also hides the contracts list.
+- **CITY tuning:**
+  - glass strength (`CITY_FACADES.reflect`, `skyBias`, `glassF0`);
+  - glass share (`claddingCuts`);
+  - roof mix;
+  - Tokyo's east-asia palette may want more warmth.
+- **DIRECTOR:**
+  - Should Watch an Airport open in Watch for me? A button on the airport browser's cards would sit in `browser-parts.jsx`.
+  - Director timing (`LOUNGE_DIRECTOR.director`), clean-sky ranges (`.sky`), binocular fill (`.optics`).
+  - Moments reuse the soft "select" chime; there is no touchdown sound in the game.
+  - Whether N and H belong in the lounge help line.
+- **APRON:** wetness strength (`APRON_DETAIL.wet`; the dev pin `window.__flyApronWet = 0..1` previews it).
+
+### Known issues and follow-ups
+
+- **Not this pass, found during it:**
+  - **Grey veil at altitude.** From about 8,000 ft, Manhattan disappears into a uniform grey haze even in pinned clear weather; 6,000 ft is fine. This is the sky/atmosphere pass (aerial perspective), reported by CITY with captures (`city/on11/nyc-8000-noon.png` vs `nyc-6000-noon.png`).
+  - **Assert flood.** `PoiLetters` → `TerrainEngine.getElevationAt` → three-tile `getLocalInfoFromGeo` fails `console.assert` about 6 times a second in flight and in the lounge. The guard forwards every failure, so a dev console buffers tens of thousands.
+  - **YSSY seat.** YSSY's window seat never validates in a headless harness, flag on or off ("Loading terrain and live activity…"); check it on the owner's machine.
+- **Pre-existing reds** (each fails the same with this pass's flags off or before it):
+
+  | Gate | Failure |
+  |---|---|
+  | `verify-encounters.mjs` | C-17 GLB length 53.45 m against its declared length |
+  | `verify-living-earth.mjs` | localRingReadiness no-data |
+  | `verify-finalize-pace.mjs` | check 9 (an LF regex on a CRLF file) |
+  | `verify-sat-buildings.js` | F1 (kept ≤ 500 per chunk vs ~5,438) |
+  | `verify-lounge-promotion.cjs` | 8/9 (expects `fly-title-card`; the cinema title renamed it `tcn-row`) |
+  | `verify-mobile-layout.js` | an intermittent React "Cannot commit the same tree" page error, also with `?flags=-CALM_HUD` |
+
+- **Seams to tidy:**
+  - Flight's Nearby key handler (`EncounterExperience.jsx`) still hears N in the lounge. DIRECTOR closes that scope from its side with the flag on; ENCOUNTERS could ignore N while `airportWatch` is active.
+  - ENCOUNTERS' result line ("A new place, a fresh sky.") is a second notice surface beside the HUD lane.
+- **Dev only:** a merge landing while the game is open can throw React's "Should not already be working" on hot reload; a full reload clears it.
+- **Out of scope** (backlog): Takeoff & Landing, Guided Journeys.
