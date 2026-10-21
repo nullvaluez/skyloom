@@ -30,6 +30,9 @@ export function EarthSurfaceLayer({ runtime }) {
     if(!engine)return;
     engine.update(runtime,performance.now()/1000);
     engine.flushAtlases(gl);
+    // FlyScene's cleanup nulls runtime.flight while this layer can still tick
+    // (a remount, a dev hot reload); scenery, forest and airports read it unguarded.
+    if(!runtime.flight?.pos)return;
     engine.scenery.update(engine,runtime,performance.now()/1000);
     engine.forest.update(engine,runtime,performance.now()/1000);
     engine.airports.update(engine,runtime);
