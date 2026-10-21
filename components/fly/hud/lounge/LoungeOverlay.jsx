@@ -521,7 +521,8 @@ export function LoungeOverlay({ runtime, picker }) {
             ctx.strokeStyle = `rgba(${rgb},${0.9 * a})`;
             ctx.lineWidth = 1.4;
             ctx.stroke();
-            label({ sx, sy, half: 9 }, [next.label, `Lands here${count === 'now' ? ' now' : ' in ' + count}`], { accent: rgb, alpha: a }, true);
+            // On its runway it lands here; still turning in, it is expected on the runway in use.
+            label({ sx, sy, half: 9 }, [next.label, `${next.runway ? 'Lands' : 'Expected'} here${count === 'now' ? ' now' : ' in ' + count}`], { accent: rgb, alpha: a }, true);
           } else {
             const e = edgeArrow(ctx, W, H, behind ? -v.x : v.x, behind ? -v.y : v.y, L.edgeInsetPx, rgb, avoid);
             pillClear(ctx, e.ex - e.ux * 40 - 44, e.ey + e.uy * 40 - 19, [next.label, `Touchdown${rw} · ${count}`], { w: W, h: H, accent: rgb, alpha: 0.86 * a }, avoid);
