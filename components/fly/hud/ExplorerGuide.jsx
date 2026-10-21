@@ -8,6 +8,9 @@ import { ADVENTURES, distanceM } from '@/lib/fly/adventures.mjs';
 import { useAdventureStore } from '@/stores/adventure-store';
 import { anyOverlayOpen } from '@/hooks/use-overlay-back';
 import { worldReadiness, retryWorldContent } from '@/lib/fly/world-readiness';
+// PLAY PASS (CALM_HUD): one notice lane (calm-hud.js createNoticeLane) in place
+// of the three overlapping lines; flag off renders exactly the lines below.
+import { CALM, CALM_CFG, createNoticeLane, publishNotice, sceneryTrouble, wakeHud } from './calm-hud';
 
 const STEPS=[
   ['Welcome to Skyloom','Steer gently with the mouse, arrow keys, or the touch stick. Return to the centre to level out.'],
@@ -26,9 +29,12 @@ export function ExplorerGuide({runtime}){
   const [status,setStatus]=useState(null),[degraded,setDegraded]=useState(false);
   const [readyEpoch,setReadyEpoch]=useState(-1),[notice,setNotice]=useState(null);
   const epoch=useFlyStore(s=>s.warpEpoch);
+  const [lane,setLane]=useState(null);
   useEffect(()=>{
     useExplorationStore.getState().hydrate();
     let lastEvent=runtime.operations?.sequence||0,cell=null,dwell=0,lastAt=performance.now(),lastEpoch=-1,readyTicks=0;
+    // CALM: the lane's clock, its warp epoch and the discovery it is saying.
+    const notices=CALM?createNoticeLane():null;let laneEpoch=-1,discovery=null;
     const id=setInterval(()=>{
       const now=performance.now(),delta=Math.min(1.5,(now-lastAt)/1000);lastAt=now;
       const s=useFlyStore.getState(),journey=useAdventureStore.getState();
@@ -47,6 +53,7 @@ export function ExplorerGuide({runtime}){
             const added=useExplorationStore.getState().record('place',{id:`discovery:${region.id}:${index}`,name:point.name,lat:point.lat,lon:point.lon,at:Date.now()});
             if(added&&journey.progress.active?.status!=='flying'){
               setNotice({text:`Discovered ${point.name} · saved in your journal`,until:now+5000});
+              if(CALM)discovery={text:`Discovered ${point.name} · saved in your journal`,until:now/1000+(CALM_CFG.notices?.discoverySec??5)};
               if(s.soundOn)runtime.audio?.adventureCue?.('adventure_checkpoint');
             }
           }
@@ -75,15 +82,28 @@ export function ExplorerGuide({runtime}){
       if(runtime.worldDegraded&&worldReadiness(runtime,Infinity).detailReady)runtime.worldDegraded=false;
       setDegraded(!!runtime.worldDegraded);
       setStatus(data?.traffic?.state==='unavailable'?'Live traffic is unavailable. You can keep exploring.':data?.traffic?.state==='delayed'?'Traffic positions are delayed.':null);
+      if(notices){
+        // Streaming scenery never speaks: only trouble on screen (coarse ground,
+        // missing surface layers), held unbroken long enough to matter.
+        if(laneEpoch!==s.warpEpoch){laneEpoch=s.warpEpoch;notices.reset();}
+        const r=notices.step(now/1000,{trouble:sceneryTrouble(runtime),traffic:data?.traffic?.state??null,discovery});
+        if(r.retry)retryWorldContent(runtime);
+        setLane(prev=>{const n=r.notice;if(prev?.kind===n?.kind&&prev?.text===n?.text)return prev;if(n)wakeHud();return n;});
+      }
     },1000);
     return()=>clearInterval(id);
   },[runtime]);
+  // CALM: the lane's notice is drawn by the HUD dock (CalmHud), under exactly
+  // the conditions this guide would have drawn it.
+  const laneShown=CALM&&!observing&&flying&&!photo&&readyEpoch===epoch&&prefs.tutorial!=='new'&&!guidedJourney?lane:null;
+  useEffect(()=>{if(CALM)publishNotice(laneShown);},[laneShown]);
+  useEffect(()=>()=>{if(CALM)publishNotice(null);},[]);
   if(observing||!flying||photo||readyEpoch!==epoch)return null;
   return <>
-    {prefs.tutorial==='new'&&!guidedJourney&&<aside className="explorer-guide" aria-label="First-flight tips" data-testid="explorer-guide">
+    {prefs.tutorial==='new'&&!guidedJourney&&<aside className="explorer-guide" aria-label="First-flight tips" data-testid="explorer-guide" data-calm={CALM?'1':undefined}>
       <p className="text-xs text-cyan-100/70">First flight · {step+1} of {STEPS.length}</p><strong>{STEPS[step][0]}</strong><p>{STEPS[step][1]}</p>
       <div><button onClick={()=>{setStep(0);setExplorerPreferences({tutorial:'skipped'});}}>Skip tips</button><button onClick={()=>{if(step===STEPS.length-1){setStep(0);setExplorerPreferences({tutorial:'done'});}else setStep(step+1);}}>{step===STEPS.length-1?'Enjoy the flight':'Next'}</button></div>
     </aside>}
-    {prefs.tutorial!=='new'&&!guidedJourney&&(degraded?<p className="explorer-data-status" role="status">Some scenery is still loading. <button className="pointer-events-auto min-h-11 underline" onClick={()=>retryWorldContent(runtime)}>Retry scenery</button></p>:notice?<p className="explorer-data-status" role="status">{notice.text}</p>:status&&<p className="explorer-data-status" role="status">{status}</p>)}
+    {prefs.tutorial!=='new'&&!guidedJourney&&!CALM&&(degraded?<p className="explorer-data-status" role="status">Some scenery is still loading. <button className="pointer-events-auto min-h-11 underline" onClick={()=>retryWorldContent(runtime)}>Retry scenery</button></p>:notice?<p className="explorer-data-status" role="status">{notice.text}</p>:status&&<p className="explorer-data-status" role="status">{status}</p>)}
   </>;
 }

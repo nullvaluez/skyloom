@@ -23,7 +23,7 @@
 @media (min-width: 900px) {
   /* A lower third: above the letterbox bar while the cinema flies (not on
      touch, where the zone already sits clear of the controls). */
-  [data-fly-root]:not([data-touch]) .tgt-ec-wrap[data-cinematic='1'] {
+  [data-fly-root]:not([data-touch]) .tgt-ec-wrap[data-letterbox='1'] {
     bottom: calc(clamp(18px, 7.5vh, 76px) + 14px);
   }
 }
@@ -267,6 +267,47 @@
   -webkit-backdrop-filter: none;
   background-image: linear-gradient(165deg, rgba(12, 19, 36, 0.96), rgba(4, 7, 15, 0.97));
 }
+/* Portrait phone: the cinema's subject is mid-frame, so the card and the
+   lower third ride at the top (where the escort pill sat) in one row, the
+   memory as a bar along the card's foot and its seconds in the kicker; the
+   place line gives up its slot while they are up. */
+[data-device='phone'][data-orient='portrait'] .tgt-ec-wrap {
+  top: calc(env(safe-area-inset-top) + 4.5rem);
+  bottom: auto;
+}
+[data-device='phone'] .tgt-ec {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+[data-device='phone'] .tgt-ec-thumb {
+  display: none;
+}
+[data-device='phone'] .tgt-ec-memory {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0;
+  border: 0;
+}
+[data-device='phone'] .tgt-ec-memory > span:first-child {
+  display: none;
+}
+[data-device='phone'] .tgt-ec-bar {
+  height: 3px;
+  border-radius: 0;
+}
+.tgt-ec-secs {
+  display: none;
+}
+[data-device='phone'] .tgt-ec-secs {
+  display: inline;
+  font-style: normal;
+  letter-spacing: 0.06em;
+  color: var(--t-lime);
+}
+[data-device='phone'][data-orient='portrait']:has(.tgt-ec[data-active='1'], .tgt-moment) [data-testid='hud-poi'] {
+  visibility: hidden;
+}
 
 /* ---- the flight-memory lower third ---- */
 .tgt-moment {
@@ -336,10 +377,11 @@
 }
 .tgt-moment-name {
   margin-top: 8px;
-  font: 400 21px/1 var(--t-display);
-  white-space: nowrap;
+  font: 400 19px/1.15 var(--t-display);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 .tgt-moment-sub {
   margin-top: 7px;
@@ -362,4 +404,49 @@
   .tgt-moment-photo:not(:has(img))::after {
     animation: none;
   }
+}
+
+/* ---- the viewfinder (photo mode, an active photo discovery or crossing) ---- */
+.tgt-viewfinder {
+  position: absolute;
+  top: 88px;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: fit-content;
+  max-width: calc(100vw - 24px);
+  z-index: 21;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  pointer-events: none;
+  font: 600 13px/1.2 var(--t-sans);
+  color: var(--t-ice);
+  background: rgba(5, 9, 19, 0.8);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vf) 55%, transparent), 0 10px 30px rgba(0, 0, 0, 0.4);
+  --vf: var(--t-amber);
+}
+.tgt-viewfinder > svg {
+  flex-shrink: 0;
+  color: var(--vf);
+}
+.tgt-viewfinder[data-ok='1'] {
+  --vf: var(--t-lime);
+}
+.tgt-viewfinder > i {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 9px solid var(--vf);
+  transition: transform 0.25s;
+}
+.tgt-viewfinder[data-dir='right'] > i { transform: rotate(90deg); }
+.tgt-viewfinder[data-dir='down'] > i { transform: rotate(180deg); }
+.tgt-viewfinder[data-dir='left'] > i { transform: rotate(-90deg); }
+[data-device='phone'] .tgt-viewfinder {
+  top: calc(env(safe-area-inset-top) + 4.5rem);
+  font-size: 12px;
 }

@@ -133,6 +133,11 @@ const initialState = {
   // lib/fly/player-conditions.js WEATHER_PRESETS id.
   conditionsHour: null,
   conditionsWeather: null,
+
+  // --- PLAY PASS (CALM_HUD): 'explorer' | 'instruments' | 'clean'. The
+  // literal is the default; components/fly/hud/calm-hud.js restores the saved
+  // pick when the HUD mounts. Unread with the flag off.
+  hudMode: 'explorer',
 };
 
 /**
@@ -238,6 +243,9 @@ export const useFlyStore = create(
     setConditionsHour: (conditionsHour) =>
       set({ conditionsHour: Number.isFinite(conditionsHour) ? ((conditionsHour % 24) + 24) % 24 : null }),
     setConditionsWeather: (conditionsWeather) => set({ conditionsWeather: conditionsWeather || null }),
+
+    // PLAY PASS (CALM_HUD): a state change only; calm-hud.js saveHudMode() persists a pick.
+    setHudMode: (hudMode) => set((state) => (state.hudMode === hudMode ? state : { hudMode })),
 
     addTileStats: (requested = 0, evicted = 0) =>
       set((state) => ({

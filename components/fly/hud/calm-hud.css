@@ -1,0 +1,624 @@
+/* =====================================================================
+   PLAY PASS — CALM_HUD (components/fly/hud/CalmHud.jsx, FlyHUD.jsx,
+   ExplorerGuide.jsx; FLY_PLAY_PASS.md F1–F3, F7).
+   The cinema title's dataview language carried into flight: mono labels,
+   tabular figures, hairlines, ice ink with a dark halo, selected-cyan, no
+   boxes over the world (a soft radial scrim where text must read over
+   cloud). Every rule is scoped to something only the flag renders (.calm-*,
+   data-calm, data-testid="hud-calm"), so with CALM_HUD off nothing matches.
+   Pointer devices only, unless a rule says otherwise: phones keep their
+   proven compact strip and touch controls.
+   ===================================================================== */
+.calm-root {
+  --calm-ice: #f2f7ff;
+  --calm-haze: #b6c4d6;
+  --calm-faint: #a3b3c6;
+  --calm-line: rgba(214, 232, 255, 0.2);
+  --calm-sel: #7fe7ff;
+  --calm-amber: #ffc98a;
+  --calm-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --calm-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --calm-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --calm-halo: 0 1px 2px rgba(2, 6, 14, 0.55), 0 1px 12px rgba(2, 6, 14, 0.6);
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+.calm-root[data-night='1'] {
+  --calm-ice: #dfe8f3;
+  --calm-haze: #a7b5c7;
+}
+
+/* --- the steering cue ----------------------------------------------------- */
+.calm-cue {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.calm-cue[data-on='1'] {
+  opacity: 1;
+  transition-duration: 0.14s;
+}
+.calm-cue-ring {
+  position: absolute;
+  left: -7px;
+  top: -7px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.25px solid rgba(244, 250, 255, 0.82);
+  box-shadow: 0 0 0 1px rgba(3, 8, 16, 0.22), 0 0 12px rgba(3, 8, 16, 0.32);
+}
+.calm-cue-ring::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 2px;
+  margin: -1px;
+  border-radius: 50%;
+  background: #fff;
+}
+.calm-cue-needle {
+  position: absolute;
+  left: 0;
+  top: -1px;
+  width: var(--calm-cue-len, 10px);
+  height: 2.5px;
+  margin-top: -0.25px;
+  border-radius: 2px;
+  transform-origin: 0 50%;
+  transform: rotate(var(--calm-cue-ang, 0deg)) translateX(10px);
+  background: linear-gradient(90deg, rgba(244, 250, 255, 0.95), rgba(160, 238, 255, 0.85) 75%, rgba(127, 231, 255, 0.2));
+  box-shadow: 0 0 0 1px rgba(3, 8, 16, 0.2), 0 0 8px rgba(3, 8, 16, 0.4);
+  opacity: calc(0.55 + var(--calm-cue-mag, 0) * 0.45);
+}
+/* The tip: a small chevron at the needle's end. */
+.calm-cue-needle::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  border-top: 2px solid rgba(190, 243, 255, 0.95);
+  border-right: 2px solid rgba(190, 243, 255, 0.95);
+  transform: rotate(45deg);
+  filter: drop-shadow(0 0 3px rgba(3, 8, 16, 0.5));
+}
+
+/* --- the dock ------------------------------------------------------------- */
+.calm-dock {
+  position: absolute;
+  left: 50%;
+  bottom: var(--calm-bottom, 56px);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  max-width: calc(100vw - 32px);
+  transition: bottom 0.45s var(--calm-ease), opacity 0.3s ease, visibility 0s;
+}
+.calm-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.calm-cluster {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  padding: 2px 4px;
+  transition: opacity 0.25s ease;
+}
+/* The scrim: a soft pool of dark under the figures, not a box. */
+.calm-cluster::before {
+  content: '';
+  position: absolute;
+  inset: -22px -46px -16px;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(3, 7, 14, 0.62), rgba(3, 7, 14, 0.4) 50%, rgba(3, 7, 14, 0));
+}
+.calm-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 17px;
+  border-left: 1px solid var(--calm-line);
+}
+.calm-cell:first-child {
+  border-left: 0;
+}
+.calm-label {
+  font: 500 clamp(9px, 0.55vw, 10.5px)/1 var(--calm-mono);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--calm-faint);
+  text-shadow: var(--calm-halo);
+}
+.calm-value {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+  text-shadow: var(--calm-halo);
+}
+.calm-value b {
+  font: 600 clamp(18px, 1.15vw, 22px)/1 var(--calm-sans);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  color: var(--calm-ice);
+}
+.calm-cell[data-k='spd'] b {
+  min-width: 3ch;
+  text-align: right;
+}
+.calm-cell[data-k='alt'] b {
+  min-width: 5.2ch;
+  text-align: right;
+}
+.calm-value small {
+  font: 500 9.5px/1 var(--calm-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--calm-haze);
+}
+.calm-cell[data-k='hdg'] small {
+  min-width: 2ch;
+  color: var(--calm-sel);
+}
+.calm-vs {
+  width: 1ch;
+  font: 600 8px/1 var(--calm-sans);
+  font-style: normal;
+  color: var(--calm-sel);
+}
+.calm-cell[data-low='1'] .calm-label,
+.calm-cell[data-low='1'] b {
+  color: var(--calm-amber);
+}
+.calm-thr {
+  min-width: 6.2ch;
+  font-family: var(--calm-mono) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.16em !important;
+  padding-top: 3px;
+}
+.calm-thr[data-state='boost'] {
+  color: var(--calm-amber);
+  text-shadow: 0 0 14px rgba(255, 201, 138, 0.55), var(--calm-halo);
+}
+
+/* The Spotting toggle lives in the dock: it can never land on a card. */
+.calm-spotting {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 13px 0 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(214, 232, 255, 0.22);
+  background: rgba(6, 11, 22, 0.5);
+  box-shadow: 0 10px 26px -14px rgba(0, 0, 0, 0.7);
+  font: 500 11.5px/1 var(--calm-sans);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  color: var(--calm-haze);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: color 0.2s, border-color 0.2s, background 0.2s, opacity 0.25s ease;
+}
+.calm-spotting:hover {
+  color: var(--calm-ice);
+  border-color: rgba(214, 232, 255, 0.4);
+}
+.calm-spotting i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(214, 232, 255, 0.35);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.calm-spotting[aria-pressed='true'] {
+  color: var(--calm-sel);
+  border-color: rgba(127, 231, 255, 0.55);
+}
+.calm-spotting[aria-pressed='true'] i {
+  background: var(--calm-sel);
+  box-shadow: 0 0 8px rgba(127, 231, 255, 0.85);
+}
+.calm-spotting:focus-visible {
+  outline: 2px solid var(--calm-sel);
+  outline-offset: 3px;
+}
+
+/* The keyboard row: the full legend for the first flights, then the hint. */
+.calm-keys {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px 16px;
+  max-width: min(820px, calc(100vw - 48px));
+  font: 500 11px/1 var(--calm-sans);
+  color: var(--calm-haze);
+  text-shadow: var(--calm-halo);
+  transition: opacity 0.3s ease;
+}
+.calm-keys[data-legend='hint'],
+.calm-keys[data-legend='none'] {
+  gap: 6px 12px;
+  font-size: 10.5px;
+  opacity: 0.72;
+}
+.calm-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.calm-key kbd,
+.calm-caption kbd {
+  min-width: 18px;
+  padding: 3px 5px;
+  border-radius: 4px;
+  border: 1px solid rgba(214, 232, 255, 0.28);
+  background: rgba(6, 11, 22, 0.5);
+  font: 600 9.5px/1 var(--calm-mono);
+  letter-spacing: 0.06em;
+  text-align: center;
+  color: var(--calm-ice);
+  text-shadow: none;
+}
+.calm-keys[data-legend='full'] {
+  animation: calm-rise 0.7s var(--calm-ease) both;
+}
+.calm-keys[data-legend='full'] .calm-tier,
+.calm-keys[data-legend='none'] .calm-tier {
+  display: none;
+}
+.calm-tier {
+  font: 500 9px/1 var(--calm-mono);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--calm-faint);
+  opacity: 0.8;
+}
+.calm-spot-row {
+  display: flex;
+  gap: 16px;
+  font: 500 10.5px/1 var(--calm-mono);
+  letter-spacing: 0.08em;
+  color: var(--calm-haze);
+  text-shadow: var(--calm-halo);
+}
+.calm-spot-row b {
+  font-weight: 600;
+  color: var(--calm-ice);
+}
+
+/* The mode caption after H or a Settings pick. */
+.calm-caption {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 22px 12px;
+  border-radius: 14px;
+  background: radial-gradient(closest-side, rgba(3, 7, 14, 0.62), rgba(3, 7, 14, 0));
+  color: var(--calm-ice);
+  text-shadow: var(--calm-halo);
+  animation: calm-caption var(--calm-caption-ms, 1.8s) var(--calm-ease) both;
+}
+.calm-caption span {
+  font: 500 10px/1 var(--calm-mono);
+  letter-spacing: 0.32em;
+  color: var(--calm-faint);
+}
+.calm-caption b {
+  font: 300 30px/1 var(--calm-sans);
+  letter-spacing: -0.02em;
+}
+.calm-caption small {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 500 10.5px/1 var(--calm-sans);
+  color: var(--calm-haze);
+}
+
+/* Modes: Instruments keeps the dock for the toggle and the keys (the tapes
+   carry the figures); Clean keeps only the essentials. The cinematic camera
+   (an escort's film) gets the frame to itself, as the instruments did. */
+.calm-root[data-cinema='1'] .calm-cue,
+.calm-root[data-cinema='1'] .calm-dock,
+.calm-root[data-mode='clean'] .calm-dock > :not(.calm-notice) {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+}
+
+/* Calm: after a few quiet seconds the chrome steps back. Dimming is slow,
+   waking is quick (a transition takes the destination state's timing). */
+.calm-root[data-calm='1'] .calm-cluster {
+  opacity: var(--calm-dim-cluster, 0.5);
+  transition: opacity 1.4s ease;
+}
+.calm-root[data-calm='1'] .calm-spotting {
+  opacity: var(--calm-dim-chrome, 0.38);
+  transition: opacity 1.4s ease;
+}
+.calm-root[data-calm='1'] .calm-keys,
+.calm-root[data-calm='1'] .calm-spot-row {
+  opacity: 0;
+  transition: opacity 1.2s ease;
+}
+.calm-root[data-calm='1'][data-night='1'] .calm-cluster {
+  opacity: calc(var(--calm-dim-cluster, 0.5) * var(--calm-night, 0.8));
+}
+
+/* --- the rest of the HUD, carried along (pointer devices) ------------------- */
+/* The telemetry table stays in the DOM, updating, for assistive technology and
+   the harnesses that read it (the flight-instruments.css idiom); the dock is
+   its face. */
+[data-fly-root]:not([data-touch='1']) [data-testid='flight-stats-strip'][data-calm] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-width: 0;
+  padding: 0;
+  margin: -1px;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* The place is the hero line. */
+[data-fly-root]:not([data-touch='1']) [data-testid='hud-poi'][data-calm] {
+  top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #f2f7ff;
+  text-shadow: 0 1px 3px rgba(3, 7, 17, 0.6), 0 1px 16px rgba(3, 7, 17, 0.85);
+}
+[data-fly-root]:not([data-touch='1']) [data-testid='hud-poi'][data-calm] .calm-place-name {
+  font: 600 clamp(17px, 1.05vw, 21px)/1.1 var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.24em;
+  padding-left: 0.24em;
+  white-space: nowrap;
+}
+[data-fly-root]:not([data-touch='1']) [data-testid='hud-poi'][data-calm] .calm-place-sep {
+  display: none;
+}
+[data-fly-root]:not([data-touch='1']) [data-testid='hud-poi'][data-calm] .calm-place-dist {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 500 10px/1 var(--font-geist-mono), ui-monospace, monospace;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #b6c4d6;
+}
+[data-fly-root]:not([data-touch='1']) [data-testid='hud-poi'][data-calm] .calm-place-dist::before,
+[data-fly-root]:not([data-touch='1']) [data-testid='hud-poi'][data-calm] .calm-place-dist::after {
+  content: '';
+  width: 22px;
+  height: 1px;
+  background: rgba(226, 240, 255, 0.42);
+}
+[data-fly-root]:has(.calm-root[data-night='1']) [data-testid='hud-poi'][data-calm] {
+  color: #dbe5f0;
+}
+[data-testid='hud-poi'][data-calm='clean'] {
+  transition-duration: 1.4s;
+}
+/* Phones: the place keeps its one line and its slot, in the calm ink. */
+[data-fly-root][data-touch='1'] [data-testid='hud-poi'][data-calm] {
+  color: #e8f0f8;
+}
+
+/* The points chip appears once something has scored, and pulses on a gain.
+   A phone's Actions → Contracts panel still opens (it lives in the zone). */
+[data-fly-root]:not([data-touch-panel='contracts']):has(.calm-root[data-scored='0']) [data-zone='contracts'] {
+  display: none;
+}
+[data-fly-root]:has(.calm-root[data-gain='1']) [data-testid='contracts-chip'] {
+  animation: calm-gain 1.5s var(--calm-ease, ease) both;
+}
+
+/* Calm carries the corners along: the dial, the chip and the exit dim. */
+[data-fly-root]:not([data-touch='1']):has(.calm-root) :is([data-zone='minimap'], [data-zone='contracts'], [data-zone='exit']) {
+  transition: opacity 0.25s ease;
+}
+[data-fly-root]:not([data-touch='1']):has(.calm-root[data-calm='1']) [data-zone='minimap'] {
+  opacity: var(--calm-dim-minimap, 0.55);
+  transition: opacity 1.4s ease;
+}
+[data-fly-root]:not([data-touch='1']):has(.calm-root[data-calm='1']) :is([data-zone='contracts'], [data-zone='exit']):not(:hover):not(:focus-within) {
+  opacity: var(--calm-dim-chrome, 0.38);
+  transition: opacity 1.4s ease;
+}
+
+/* Clean: the dial, the chip and an idle Nearby scope step aside (N still
+   opens Nearby; a waiting invitation still shows). */
+[data-fly-root]:not([data-touch='1']):has(.calm-root[data-mode='clean']) :is([data-zone='minimap'], [data-zone='contracts']) {
+  visibility: hidden;
+}
+[data-fly-root]:not([data-touch='1']):has(.calm-root[data-mode='clean']) .tgt-scope-btn:not([data-offer='1']):not([aria-expanded='true']) {
+  visibility: hidden;
+}
+/* Phones in Clean: the strip steps aside too (the touch controls stay). */
+[data-fly-root][data-touch='1'] [data-testid='flight-stats-strip'][data-calm='clean'] {
+  visibility: hidden;
+}
+
+/* The first-flight tips sit above the dock; on an upright phone, in the open
+   sky between the toasts and the lock chip (not over the dial and the toasts). */
+[data-fly-root]:not([data-touch='1']) .explorer-guide[data-calm] {
+  bottom: 168px;
+}
+[data-fly-root][data-device='phone'][data-orient='portrait'] .explorer-guide[data-calm] {
+  top: 40%;
+  bottom: auto;
+}
+
+/* --- the notice lane (ExplorerGuide) -------------------------------------- */
+.calm-notice {
+  position: absolute;
+  left: 50%;
+  top: 72px;
+  z-index: 34;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 8px 14px 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(214, 232, 255, 0.16);
+  background: rgba(6, 11, 22, 0.62);
+  box-shadow: 0 12px 30px -16px rgba(0, 0, 0, 0.7);
+  font: 500 12px/1.35 var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  color: #dbe6f1;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: calm-notice 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.calm-notice::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #8fa1b6;
+}
+.calm-notice[data-kind='discovery']::before {
+  background: #7fe7ff;
+  box-shadow: 0 0 10px rgba(127, 231, 255, 0.85);
+}
+.calm-notice[data-kind='traffic']::before,
+.calm-notice[data-kind='scenery']::before {
+  background: #ffc98a;
+}
+.calm-notice button {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(214, 232, 255, 0.25);
+  font: 500 11px/1.2 var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  color: #f2f7ff;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.calm-notice button:hover {
+  border-color: rgba(214, 232, 255, 0.5);
+}
+.calm-notice button:focus-visible {
+  outline: 2px solid #7fe7ff;
+  outline-offset: 2px;
+}
+/* On a pointer device the notice is the dock's top row: it moves with the
+   dock, so it never meets the toasts, the escort pill or the bottom band. */
+.calm-notice[data-docked] {
+  position: static;
+  transform: none;
+  animation-name: calm-rise;
+}
+.calm-root[data-calm='1'] .calm-notice[data-docked] {
+  opacity: 0.85;
+  transition: opacity 1.4s ease;
+}
+/* Phones: the notice takes the place line's slot while it speaks (the band
+   between the strip and the toasts is the only free one), two lines at most. */
+[data-fly-root][data-device='phone'] .calm-notice {
+  top: calc(env(safe-area-inset-top) + 4.6rem);
+  max-width: calc(100vw - 24px);
+  padding: 6px 12px 6px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  line-height: 1.3;
+}
+[data-fly-root][data-device='phone'][data-orient='landscape'] .calm-notice {
+  top: calc(env(safe-area-inset-top) + 2.95rem);
+  max-width: min(560px, calc(100vw - 300px));
+}
+[data-fly-root][data-device='phone']:has(.calm-notice) [data-testid='hud-poi'] {
+  visibility: hidden;
+}
+/* A phone's escort pill owns that band: the lane waits. */
+[data-fly-root][data-device='phone']:has(.tgt-escort[data-active='1']) .calm-notice {
+  display: none;
+}
+
+@keyframes calm-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes calm-notice {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+}
+@keyframes calm-caption {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 8px) scale(0.98);
+  }
+  14%,
+  72% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -4px) scale(1);
+  }
+}
+@keyframes calm-gain {
+  0% {
+    box-shadow: 0 0 0 0 rgba(127, 231, 255, 0);
+    transform: scale(1);
+  }
+  25% {
+    box-shadow: 0 0 0 3px rgba(127, 231, 255, 0.45), 0 0 24px rgba(127, 231, 255, 0.55);
+    transform: scale(1.06);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(127, 231, 255, 0);
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .calm-keys[data-legend='full'],
+  .calm-notice,
+  .calm-caption {
+    animation: none;
+  }
+  .calm-dock {
+    transition: none;
+  }
+}
