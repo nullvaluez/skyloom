@@ -37,6 +37,17 @@
 >   airframes and contrails, airfield ground and lighting, terminal set; since
 >   2026-10-14 the walk: WASD, vantage seats, Sit prompt, seat menu, behind
 >   `LOUNGE_WALK`, on) and its open owner checkpoints.
+> - **Cinema title (2026-10-21, owner-requested, shipped on):**
+>   [FLY_TITLE_CINEMA.md](FLY_TITLE_CINEMA.md) — the front door rebuilt as a
+>   window seat: a live dataview over the orbit (heading tape off
+>   `runtime.titleCam`, coordinates, light, altitude, live traffic), the place
+>   set large, a WORLD TOUR across the featured spots behind a window shade
+>   that hides each stop's streaming (`runtime.stageDestination`), a
+>   boarding-pass primary (Continue / Fly here), numbered modes with arrow
+>   keys, H to watch. Flag `TITLE_CINEMA` (Living World registry);
+>   `?flags=-TITLE_CINEMA` is the previous title. Every title testid is kept;
+>   automation (`navigator.webdriver`) keeps the tour manual. Gate:
+>   `scripts/verify-title-cinema.mjs`.
 > - **Target UI (2026-10-07, shipped on, owner-requested):** [FLY_TARGET_UI.md](FLY_TARGET_UI.md)
 >   — the inspect dossier, ONE Escort action on every button (`lib/fly/escort.js`:
 >   intercept + the cinematic camera, which films a far pair over the shoulder

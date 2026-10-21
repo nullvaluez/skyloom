@@ -14,13 +14,18 @@ import { isPhoneClass } from '@/lib/fly/device-class';
 import { RewardAircraftPreview } from './HangarScene';
 import { adventureRecovery } from '@/lib/fly/adventure-guidance.mjs';
 import './adventures.css';
+// TITLE_CINEMA: the library opens as a full-bleed sheet in the cinema title's language.
+import { livingWorldOn } from '@/lib/fly/living-world';
+import './cinema-menus.css';
+
+const CINEMA_ON = livingWorldOn('TITLE_CINEMA');
 
 const medals=['','Bronze','Silver','Gold'];
-function Dialog({title,onClose,children}){
+function Dialog({title,onClose,children,className='',style}){
   const ref=useRef();
   useEffect(()=>{const previous=document.activeElement,dialog=ref.current;const siblings=[...(dialog?.parentElement?.children||[])].filter(e=>e!==dialog&&!e.contains(dialog));const flags=siblings.map(e=>e.inert);siblings.forEach(e=>{e.inert=true;});dialog?.focus();return()=>{siblings.forEach((e,i)=>{e.inert=flags[i];});previous?.focus?.();};},[]);
   const keys=e=>{e.stopPropagation();if(e.key==='Escape'){e.preventDefault();onClose();}if(e.key==='Tab'){const all=[...ref.current.querySelectorAll('button:not(:disabled),input,select,[tabindex="0"],a[href]')].filter(el=>el.getClientRects().length&&!el.closest('[inert]'));const first=all[0],last=all.at(-1);if(e.shiftKey&&(document.activeElement===first||document.activeElement===ref.current)){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}};
-  return <section className="journey-dialog" ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} onKeyDown={keys}><header><div><Compass size={20}/><span>Skyloom journeys</span></div><button onClick={onClose} aria-label={'Close '+title}><X size={22}/></button></header>{children}</section>;
+  return <section className={'journey-dialog'+(className?' '+className:'')} style={style} ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} onKeyDown={keys}><header><div><Compass size={20}/><span>Skyloom journeys</span></div><button onClick={onClose} aria-label={'Close '+title}><X size={22}/></button></header>{children}</section>;
 }
 function usePauseForMenu(){
   useEffect(()=>{const old=useFlyStore.getState().phase;useFlyStore.getState().setPhase('paused');return()=>{const s=useFlyStore.getState();if(s.phase==='paused')s.setPhase(s.screen==='flight'?'flying':old);};},[]);
@@ -48,7 +53,7 @@ function AdventureLibrary({runtime}){
   useEffect(()=>{const read=()=>setReady(!!runtime.adventures);read();const timer=setInterval(read,400);return()=>clearInterval(timer);},[runtime]);
   const close=()=>useAdventureStore.getState().setLibraryOpen(false);
   const launch=()=>{if(progress.active&&!resuming&&!replace){setReplace(true);return;}runtime.audio?.resume?.();if(!runtime.adventures?.prepare(route.id))setError('Flight is not ready yet. Please try again in a moment.');};
-  return <Dialog title="Adventures" onClose={close}><div className="journey-library">
+  return <Dialog title="Adventures" onClose={close} className={CINEMA_ON?'tcn-sheet':''} style={CINEMA_ON?{'--tcn-photo':`url(${route.artwork})`}:undefined}><div className="journey-library">
     <div className="journey-index"><h1>Find your<br/>next horizon.</h1><p>Six places to get lost in.<br/>Nine ways to fly there.</p>
       {['first-flights','wild-earth'].map(pack=><section key={pack}><h2>{pack==='first-flights'?'First Flights':'Wild Earth'} <small>{pack==='first-flights'?'Always free':'Free during preview'}</small></h2>
         {ADVENTURES.filter(a=>a.packId===pack).map(a=><button className="journey-route" key={a.id} aria-pressed={id===a.id} onClick={()=>{setReplace(false);setError('');setId(a.id);useAdventureStore.setState({selectedRouteId:a.id});}} data-testid={'adventure-'+a.id}><DestinationImage route={a}/><span><strong>{a.place}</strong><small>{a.name}</small></span><span>{progress.completed[a.id]?medals[progress.completed[a.id].medal]:adventureMinutes(a,a.aircraftId)+' min'}</span></button>)}

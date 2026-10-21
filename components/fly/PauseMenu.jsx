@@ -22,6 +22,10 @@ import { ConditionsPanel } from './hud/ConditionsPanel';
 // pre-pass card below, unchanged.
 import { BookOpen, Compass, Globe2, Info, LogOut, MapPin, Plane, Play } from 'lucide-react';
 import { GLASS_ON, GLASS_EXIT_MS, GlassKeys, GlassNavItem, closingProps, glassRootProps, stillMotion, usePresence } from './hud/LivingGlass';
+import { livingWorldOn } from '@/lib/fly/living-world';
+
+// TITLE_CINEMA: the glass pause card speaks the cinema title's type (cinema-menus.css, .tcn-pause).
+const CINEMA_ON = livingWorldOn('TITLE_CINEMA');
 
 const CONTROL_ROWS = [
   ['Mouse', 'steer — cursor offset from center commands the turn/pitch'],
@@ -229,7 +233,7 @@ function GlassPause({ onExit, closing, still, creditsOpen, mapStyle, aircraftId,
     then?.();
   };
   return (
-    <div className="lg lg-pause-scrim" {...glassRootProps(still)} {...closingProps(closing)}>
+    <div className={CINEMA_ON ? 'lg lg-pause-scrim tcn-pause' : 'lg lg-pause-scrim'} {...glassRootProps(still)} {...closingProps(closing)}>
       {creditsOpen ? (
         <CreditsPanel onClose={() => store.closeCredits()} />
       ) : (
