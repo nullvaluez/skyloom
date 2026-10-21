@@ -10,7 +10,7 @@ import { anyOverlayOpen } from '@/hooks/use-overlay-back';
 import { worldReadiness, retryWorldContent } from '@/lib/fly/world-readiness';
 // PLAY PASS (CALM_HUD): one notice lane (calm-hud.js createNoticeLane) in place
 // of the three overlapping lines; flag off renders exactly the lines below.
-import { CALM, CALM_CFG, createNoticeLane, wakeHud } from './calm-hud';
+import { CALM, CALM_CFG, createNoticeLane, publishNotice, sceneryTrouble, wakeHud } from './calm-hud';
 
 const STEPS=[
   ['Welcome to Skyloom','Steer gently with the mouse, arrow keys, or the touch stick. Return to the centre to level out.'],
@@ -83,24 +83,27 @@ export function ExplorerGuide({runtime}){
       setDegraded(!!runtime.worldDegraded);
       setStatus(data?.traffic?.state==='unavailable'?'Live traffic is unavailable. You can keep exploring.':data?.traffic?.state==='delayed'?'Traffic positions are delayed.':null);
       if(notices){
-        // Streaming scenery alone never speaks: only a degraded arrival still
-        // missing a part the flight needs, held long enough to matter.
+        // Streaming scenery never speaks: only trouble on screen (coarse ground,
+        // missing surface layers), held unbroken long enough to matter.
         if(laneEpoch!==s.warpEpoch){laneEpoch=s.warpEpoch;notices.reset();}
-        const blocking=!!runtime.worldDegraded&&!worldReadiness(runtime,Infinity).ready;
-        const r=notices.step(now/1000,{blocking,traffic:data?.traffic?.state??null,discovery});
+        const r=notices.step(now/1000,{trouble:sceneryTrouble(runtime),traffic:data?.traffic?.state??null,discovery});
         if(r.retry)retryWorldContent(runtime);
         setLane(prev=>{const n=r.notice;if(prev?.kind===n?.kind&&prev?.text===n?.text)return prev;if(n)wakeHud();return n;});
       }
     },1000);
     return()=>clearInterval(id);
   },[runtime]);
+  // CALM: the lane's notice is drawn by the HUD dock (CalmHud), under exactly
+  // the conditions this guide would have drawn it.
+  const laneShown=CALM&&!observing&&flying&&!photo&&readyEpoch===epoch&&prefs.tutorial!=='new'&&!guidedJourney?lane:null;
+  useEffect(()=>{if(CALM)publishNotice(laneShown);},[laneShown]);
+  useEffect(()=>()=>{if(CALM)publishNotice(null);},[]);
   if(observing||!flying||photo||readyEpoch!==epoch)return null;
   return <>
     {prefs.tutorial==='new'&&!guidedJourney&&<aside className="explorer-guide" aria-label="First-flight tips" data-testid="explorer-guide" data-calm={CALM?'1':undefined}>
       <p className="text-xs text-cyan-100/70">First flight · {step+1} of {STEPS.length}</p><strong>{STEPS[step][0]}</strong><p>{STEPS[step][1]}</p>
       <div><button onClick={()=>{setStep(0);setExplorerPreferences({tutorial:'skipped'});}}>Skip tips</button><button onClick={()=>{if(step===STEPS.length-1){setStep(0);setExplorerPreferences({tutorial:'done'});}else setStep(step+1);}}>{step===STEPS.length-1?'Enjoy the flight':'Next'}</button></div>
     </aside>}
-    {prefs.tutorial!=='new'&&!guidedJourney&&CALM&&lane&&<p className="calm-notice" data-testid="hud-notice" data-kind={lane.kind} role="status">{lane.text}{lane.kind==='scenery'&&<button type="button" onClick={()=>retryWorldContent(runtime)}>Retry</button>}</p>}
     {prefs.tutorial!=='new'&&!guidedJourney&&!CALM&&(degraded?<p className="explorer-data-status" role="status">Some scenery is still loading. <button className="pointer-events-auto min-h-11 underline" onClick={()=>retryWorldContent(runtime)}>Retry scenery</button></p>:notice?<p className="explorer-data-status" role="status">{notice.text}</p>:status&&<p className="explorer-data-status" role="status">{status}</p>)}
   </>;
 }

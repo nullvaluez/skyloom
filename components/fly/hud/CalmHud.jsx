@@ -8,9 +8,10 @@ import { anyOverlayOpen } from '@/hooks/use-overlay-back';
 import { explorerPreferences, subscribeExplorerPreferences, DEFAULT_PREFERENCES } from '@/lib/fly/explorer-preferences.mjs';
 import { FLIGHT } from '@/lib/fly/fly-constants';
 import { MPS_TO_KT, M_TO_FT, RAD2DEG } from '@/lib/fly/coords';
+import { retryWorldContent } from '@/lib/fly/world-readiness';
 import {
-  CALM_CFG, cardinal, fmtThousands, hudModeLabel, lastWake, legendMode, nextHudMode, placeDock,
-  readHudMode, readLegendFlights, saveHudMode, saveLegendFlights, steerCue,
+  CALM_CFG, cardinal, currentNotice, fmtThousands, hudModeLabel, lastWake, legendMode, nextHudMode, placeDock,
+  readHudMode, readLegendFlights, saveHudMode, saveLegendFlights, steerCue, subscribeNotice,
 } from './calm-hud';
 import './calm-hud.css';
 
@@ -63,6 +64,7 @@ export function CalmHud({ runtime, mode, isTouch, newEarth, spotting }) {
   const qualityPreset = useFlyStore((s) => s.qualityPreset);
   const totalScore = useFlyContractsStore((s) => s.totalScore);
   const prefs = useSyncExternalStore(subscribeExplorerPreferences, explorerPreferences, () => DEFAULT_PREFERENCES);
+  const notice = useSyncExternalStore(subscribeNotice, currentNotice, () => null);
   const rootRef = useRef(null);
   const dockRef = useRef(null);
   const cueRef = useRef(null);
@@ -317,10 +319,21 @@ export function CalmHud({ runtime, mode, isTouch, newEarth, spotting }) {
   const scored = totalScore > 0 ? '1' : '0';
   const tier = `Q ${qualityPreset === 'ultra' && qualityTier === 'high' ? 'ultra' : qualityTier}`;
   const legend = legendMode({ flights, shownSec: shown ? Infinity : 0, tutorial: prefs.tutorial });
+  const noticeEl = notice && (
+    <p className="calm-notice" data-testid="hud-notice" data-kind={notice.kind} data-docked={isTouch ? undefined : '1'} role="status" key={notice.text}>
+      {notice.text}
+      {notice.kind === 'scenery' && (
+        <button type="button" onClick={() => retryWorldContent(runtime)}>
+          Retry
+        </button>
+      )}
+    </p>
+  );
   return (
     <>
       <style>{ROOT_VARS}</style>
       <div ref={rootRef} className="calm-root" data-testid="hud-calm" data-mode={mode} data-scored={scored} data-gain={gain ? '1' : '0'} data-touch={isTouch ? '1' : undefined} data-cinema={cinema ? '1' : undefined}>
+        {isTouch && noticeEl}
         {!isTouch && (
           <>
             <div ref={cueRef} className="calm-cue" data-testid="hud-steer-cue" data-on="0" aria-hidden="true">
@@ -328,6 +341,7 @@ export function CalmHud({ runtime, mode, isTouch, newEarth, spotting }) {
               <i className="calm-cue-needle" />
             </div>
             <div ref={dockRef} className="calm-dock" data-testid="hud-dock">
+              {noticeEl}
               <div className="calm-keys" data-legend={legend}>
                 {legend === 'full'
                   ? LEGEND.map(([k, v]) => (

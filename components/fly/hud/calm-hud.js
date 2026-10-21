@@ -146,11 +146,24 @@ export const NOTICE_TEXT = Object.freeze({
 });
 
 /**
+ * Scenery trouble a player can actually see: the ground still coarse (the
+ * terrain loader has not settled at a sharp zoom) or, on the Enhanced earth,
+ * its surface or material layers not up. The boot gate's readiness parts are
+ * not this: a capped arrival leaves `shaders` "missing" for the whole flight
+ * (the prewarm was bypassed) and the camera tile depth breathes by a level
+ * while flying, and neither is anything on screen (F3: the notice that sat
+ * up for minutes over a finished Manhattan).
+ */
+export function sceneryTrouble(rt) {
+  const earth = rt?.earthSurface;
+  return rt?.terraStats?.sharp === false || (!!earth && (earth.near?.ready === false || (!!earth.materials && earth.materials.state !== 'ready')));
+}
+
+/**
  * The notice lane: one notice at a time, discovery first, then scenery, then
  * traffic. `step(nowSec, input)` with
- *   input.blocking  the arrival was degraded AND a part the flight needs
- *                   (terrain, surfaces, materials, fleet, shaders) is still
- *                   missing; streaming scenery alone never speaks,
+ *   input.trouble   sceneryTrouble() this tick; it has to hold, unbroken,
+ *                   for `sceneryAfterSec` before the lane says anything,
  *   input.traffic   null | 'delayed' | 'unavailable',
  *   input.discovery null | { text, until } (until in seconds),
  * returns { notice: null | { kind, text }, retry } where `retry` asks the
@@ -172,10 +185,10 @@ export function createNoticeLane(cfg = CALM_CFG.notices ?? {}) {
     st.trafficQuiet = -Infinity;
   };
   reset();
-  const step = (now, { blocking = false, traffic = null, discovery = null } = {}) => {
+  const step = (now, { trouble = false, traffic = null, discovery = null } = {}) => {
     let retry = false;
     // Scenery
-    if (!blocking) {
+    if (!trouble) {
       st.degradedSince = null;
       st.sceneryAt = null;
       st.retried = false;
@@ -224,3 +237,21 @@ export function wakeHud(now = typeof performance !== 'undefined' ? performance.n
   wokeAt = now;
 }
 export const lastWake = () => wokeAt;
+
+// The lane's current notice, published by ExplorerGuide (which owns the
+// lane) and drawn by CalmHud: in the dock on a pointer device, so it moves
+// with the dock and never meets the toasts, the escort pill or the bottom
+// band; in the place line's slot on a phone.
+let notice = null;
+const noticeSubs = new Set();
+export function publishNotice(n) {
+  const next = n ? { kind: n.kind, text: n.text } : null;
+  if (next?.kind === notice?.kind && next?.text === notice?.text) return;
+  notice = next;
+  noticeSubs.forEach((fn) => fn());
+}
+export const currentNotice = () => notice;
+export function subscribeNotice(fn) {
+  noticeSubs.add(fn);
+  return () => noticeSubs.delete(fn);
+}
