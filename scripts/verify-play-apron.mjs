@@ -142,6 +142,7 @@ check('(2c2) flag on: each layer carries its additions (none silently skipped)',
   assert.ok(!off.out.pavement.raw.fragmentShader.includes('totalEmissiveRadiance += diffuseColor'), 'flag off: no floodlight');
   for (const l of ['pavement', 'runway', 'paint']) assert.ok(frag(l).includes('afWetten(') && frag(l).includes('uAfWet'), `${l}: rain`);
   assert.ok(frag('grass').includes('uAfWet.x'), 'grass: rain');
+  assert.ok(frag('grass').includes('afRunwayZones( afP )') && frag('grass').includes('afBlast'), 'grass: runway strips and scoured ends');
   for (const l of ['pavement', 'runway', 'paint']) assert.ok(/uAfWet\.x > 0\.001/.test(frag(l)), `${l}: dry costs a branch, not the work`);
 });
 check('(2d) a missing or repeated anchor throws', () => {
@@ -174,7 +175,8 @@ check('(3a) APRON_DETAIL ships on, with sane tunables', () => {
   for (const v of Object.values(B.wear)) assert.ok(v >= 0 && v <= 2);
   assert.equal(B.shoulderM.length, 3);
   assert.ok(B.shoulderM.every((v, i) => v >= 0 && v <= 12 && (i === 0 || v <= B.shoulderM[i - 1])));
-  for (const v of Object.values(B.grass)) assert.ok(v >= 0 && v <= 2);
+  for (const [k, v] of Object.entries(B.grass)) if (k !== 'stripM') assert.ok(v >= 0 && v <= 2, `grass.${k}`);
+  assert.ok(B.grass.stripM >= 40 && B.grass.stripM <= 150, 'the mown strip is the graded strip, tens of metres');
   assert.ok(B.night.flood >= 0 && B.night.flood <= 1.5);
   assert.equal(B.night.floodColor.length, 3);
   assert.ok(B.night.floodColor.every((v) => v >= 0 && v <= 1.5));
