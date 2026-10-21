@@ -14,6 +14,14 @@ import { RAD2DEG } from '@/lib/fly/coords';
 import { getAircraftTypeName } from '@/lib/aircraft-type-names';
 import './encounters.css';
 import './target-ui.css';
+// PLAY PASS ENCOUNTERS imports begin
+import { ENCOUNTER_FEEL_ACTIVE } from '@/lib/fly/play-pass';
+// PLAY PASS ENCOUNTERS imports end
+
+// PLAY PASS (ENCOUNTER_FEEL): while the escort flies a live crossing, the
+// escort card (EscortCard.jsx) carries its timer, Photo and Release — the
+// mission card stands down instead of saying the same thing on the right.
+const FEEL = ENCOUNTER_FEEL_ACTIVE.enabled === true;
 
 /**
  * NEARBY — live aircraft you can fly alongside and Skyloom discoveries within
@@ -138,7 +146,7 @@ const fmtHeight = (ft) =>
       : `${Math.abs(ft) >= 1000 ? `${(Math.abs(ft) / 1000).toFixed(1)}k` : Math.round(Math.abs(ft))} ft ${ft > 0 ? 'above' : 'below'}`;
 
 function Nearby({ runtime, encounter, lockState, lockedHex }) {
-  const { active, offer, result, candidates, nearbyOpen, guidance } = encounter;
+  const { active, offer, result, candidates, nearbyOpen, guidance, moment } = encounter;
   const { isPhone, isTouch } = useDeviceLayout();
   const [hot, setHot] = useState(null);
   const [error, setError] = useState(null);
@@ -337,7 +345,7 @@ function Nearby({ runtime, encounter, lockState, lockedHex }) {
           />
         )}
 
-        {active && (
+        {active && !(FEEL && active.kind === 'traffic' && escorting && lockedHex === active.hex) && (
           <Mission
             key={active.id}
             active={active}
@@ -350,7 +358,7 @@ function Nearby({ runtime, encounter, lockState, lockedHex }) {
           />
         )}
 
-        {result && !active && !offer && !nearbyOpen && (
+        {result && !active && !offer && !nearbyOpen && !(FEEL && moment) && (
           <motion.p
             key="result"
             className="tgt-result"
