@@ -284,7 +284,8 @@
 .calm-keys[data-legend='full'] {
   animation: calm-rise 0.7s var(--calm-ease) both;
 }
-.calm-keys[data-legend='full'] .calm-tier {
+.calm-keys[data-legend='full'] .calm-tier,
+.calm-keys[data-legend='none'] .calm-tier {
   display: none;
 }
 .calm-tier {

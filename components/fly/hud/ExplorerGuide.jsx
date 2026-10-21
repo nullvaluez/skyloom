@@ -10,7 +10,7 @@ import { anyOverlayOpen } from '@/hooks/use-overlay-back';
 import { worldReadiness, retryWorldContent } from '@/lib/fly/world-readiness';
 // PLAY PASS (CALM_HUD): one notice lane (calm-hud.js createNoticeLane) in place
 // of the three overlapping lines; flag off renders exactly the lines below.
-import { CALM, CALM_CFG, createNoticeLane, wakeHud } from './calm-hud';
+import { CALM, CALM_CFG, createNoticeLane, sceneryTrouble, wakeHud } from './calm-hud';
 
 const STEPS=[
   ['Welcome to Skyloom','Steer gently with the mouse, arrow keys, or the touch stick. Return to the centre to level out.'],
@@ -83,11 +83,10 @@ export function ExplorerGuide({runtime}){
       setDegraded(!!runtime.worldDegraded);
       setStatus(data?.traffic?.state==='unavailable'?'Live traffic is unavailable. You can keep exploring.':data?.traffic?.state==='delayed'?'Traffic positions are delayed.':null);
       if(notices){
-        // Streaming scenery alone never speaks: only a degraded arrival still
-        // missing a part the flight needs, held long enough to matter.
+        // Streaming scenery never speaks: only trouble on screen (coarse ground,
+        // missing surface layers), held unbroken long enough to matter.
         if(laneEpoch!==s.warpEpoch){laneEpoch=s.warpEpoch;notices.reset();}
-        const blocking=!!runtime.worldDegraded&&!worldReadiness(runtime,Infinity).ready;
-        const r=notices.step(now/1000,{blocking,traffic:data?.traffic?.state??null,discovery});
+        const r=notices.step(now/1000,{trouble:sceneryTrouble(runtime),traffic:data?.traffic?.state??null,discovery});
         if(r.retry)retryWorldContent(runtime);
         setLane(prev=>{const n=r.notice;if(prev?.kind===n?.kind&&prev?.text===n?.text)return prev;if(n)wakeHud();return n;});
       }

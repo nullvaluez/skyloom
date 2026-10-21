@@ -24,7 +24,7 @@
  *  (6) The legend's schedule: full for the first flights, then the hint; the
  *      first-flight tips suppress it.
  *  (7) The notice lane: streaming scenery alone never speaks; a held,
- *      blocking degradation retries once, speaks once at its delay, goes away
+ *      scenery trouble a player can see retries once, speaks once at its delay, goes away
  *      on its own and stays quiet; flickering traffic never speaks; a
  *      discovery wins; a warp resets.
  *  (8) placeDock: the base when clear, the lowest clear lift otherwise, per
@@ -217,17 +217,27 @@ async function runLeg(arm) {
       return tl;
     };
     out.lane = {
-      streaming: run(900, { blocking: false, traffic: null }),
-      blocking: run(N.sceneryAfterSec + N.showSec + N.repeatSec + 60, { blocking: true }),
-      recovered: run(N.sceneryAfterSec + 4, (t) => ({ blocking: t < N.sceneryAfterSec + 2 })),
+      streaming: run(900, { trouble: false, traffic: null }),
+      held: run(N.sceneryAfterSec + N.showSec + N.repeatSec + 60, { trouble: true }),
+      recovered: run(N.sceneryAfterSec + 4, (t) => ({ trouble: t < N.sceneryAfterSec + 2 })),
       traffic: run(N.trafficAfterSec + N.showSec + 30, { traffic: 'delayed' }),
       flicker: run(600, (t) => ({ traffic: Math.floor(t / 5) % 2 ? 'delayed' : 'live' })),
       unavailable: run(N.trafficAfterSec + 2, { traffic: 'unavailable' }),
-      discovery: run(N.sceneryAfterSec + 4, (t) => ({ blocking: true, discovery: { text: 'Discovered X', until: N.sceneryAfterSec + 2 } })),
+      discovery: run(N.sceneryAfterSec + 4, (t) => ({ trouble: true, discovery: { text: 'Discovered X', until: N.sceneryAfterSec + 2 } })),
       warp: run(N.sceneryAfterSec + 10, (t, lane) => {
         if (t === N.sceneryAfterSec - 5) lane.reset();
-        return { blocking: true };
+        return { trouble: true };
       }),
+    };
+    out.trouble = {
+      fine: hud.sceneryTrouble({ terraStats: { sharp: true }, earthSurface: { near: { ready: true }, materials: { state: 'ready' } } }),
+      coarse: hud.sceneryTrouble({ terraStats: { sharp: false } }),
+      surfaces: hud.sceneryTrouble({ terraStats: { sharp: true }, earthSurface: { near: { ready: false }, materials: { state: 'ready' } } }),
+      materials: hud.sceneryTrouble({ terraStats: { sharp: true }, earthSurface: { near: { ready: true }, materials: { state: 'error' } } }),
+      // A capped arrival: the prewarm bypassed (readiness "shaders" missing for
+      // good) and the camera tile a level shy of target: nothing on screen.
+      capped: hud.sceneryTrouble({ worldDegraded: true, criticalTerrain: { status: 'bypassed' }, terraStats: { sharp: true, camTileZ: 14, targetZ: 17 }, earthSurface: { near: { ready: true }, materials: { state: 'ready' } } }),
+      neon: hud.sceneryTrouble({ terraStats: { sharp: true } }),
     };
     out.place = {
       clear: hud.placeDock([{ left: 500, right: 940, y0: 0, y1: 44 }], [{ left: 1060, right: 1240, top: 815, bottom: 861 }], { base: 62, vh: 900 }),
@@ -277,7 +287,7 @@ for (const r of ['pause', 'sheet']) {
   const allowed = (l) => nowSrc.includes(l) || nowSrc.includes(l.replace('data-testid="explorer-guide">', 'data-testid="explorer-guide" data-calm={CALM?\'1\':undefined}>')) || nowSrc.includes(l.replace("{prefs.tutorial!=='new'&&!guidedJourney&&(degraded?", "{prefs.tutorial!=='new'&&!guidedJourney&&!CALM&&(degraded?"));
   const gone = baseLines.filter((l) => !allowed(l));
   const added = nowSrc.split('\n').filter((l) => l.trim() && !baseSrc.includes(l));
-  const unguarded = added.filter((l) => !/CALM|notices|laneEpoch|discovery|setLane|blocking|retryWorldContent|^\s*\/\/|^\s*\}\s*$|^\s*if\(r\.retry\)|^\s*const r=notices/.test(l));
+  const unguarded = added.filter((l) => !/CALM|notices|laneEpoch|discovery|setLane|sceneryTrouble|retryWorldContent|^\s*\/\/|^\s*\}\s*$|^\s*if\(r\.retry\)|^\s*const r=notices/.test(l));
   check('(1c) ExplorerGuide keeps every pre-pass line and adds only CALM-guarded work', gone.length === 0 && unguarded.length === 0, [...gone.map((l) => `gone: ${l.trim().slice(0, 60)}`), ...unguarded.map((l) => `unguarded: ${l.trim().slice(0, 60)}`)].join(' | '));
 }
 
@@ -365,18 +375,20 @@ for (const s of Object.keys(STATES)) {
   const N = on.block.notices;
   const said = (tl, kind) => tl.filter((x) => x.kind === kind).map((x) => x.t);
   const S = on.lane;
+  const T = on.trouble;
+  check('(7-) trouble is what a player sees (coarse ground, missing surface layers); a capped arrival with a bypassed prewarm is not', !T.fine && T.coarse && T.surfaces && T.materials && !T.capped && !T.neon, JSON.stringify(T));
   check('(7a) streaming scenery alone never speaks (15 minutes)', S.streaming.every((x) => !x.kind && !x.retry));
-  const sc = said(S.blocking, 'scenery');
-  const retries = S.blocking.filter((x) => x.retry).map((x) => x.t);
+  const sc = said(S.held, 'scenery');
+  const retries = S.held.filter((x) => x.retry).map((x) => x.t);
   const first = sc.filter((t) => t < N.sceneryAfterSec + N.showSec);
   const again = sc.filter((t) => t >= N.sceneryAfterSec + N.showSec);
-  check('(7b) a held, blocking degradation retries once, then speaks at its delay for showSec', JSON.stringify(retries) === JSON.stringify([N.retryAfterSec]) && first.length === N.showSec && first[0] === N.sceneryAfterSec, `retry at ${retries} · said ${first[0]}…${first.at(-1)}`);
+  check('(7b) held scenery trouble retries once, then speaks at its delay for showSec', JSON.stringify(retries) === JSON.stringify([N.retryAfterSec]) && first.length === N.showSec && first[0] === N.sceneryAfterSec, `retry at ${retries} · said ${first[0]}…${first.at(-1)}`);
   check('(7c) it goes away on its own and stays quiet for repeatSec', again.length === 0 || again[0] >= N.sceneryAfterSec + N.showSec + N.repeatSec, `next at ${again[0] ?? 'never'}`);
   check('(7d) recovery ends the notice at once', S.recovered.at(-1).kind === null && S.recovered.some((x) => x.kind === 'scenery'));
   const tr = said(S.traffic, 'traffic');
   check('(7e) traffic speaks after trafficAfterSec, for showSec', tr[0] === N.trafficAfterSec && tr.length === N.showSec, `${tr[0]} × ${tr.length}`);
   check('(7f) traffic flickering delayed/live never speaks', S.flicker.every((x) => !x.kind));
-  check('(7g) the copy is calm and specific', /offline for now/.test(S.unavailable.at(-1).text ?? '') && /fill in as you fly/.test(S.blocking[N.sceneryAfterSec].text));
+  check('(7g) the copy is calm and specific', /offline for now/.test(S.unavailable.at(-1).text ?? '') && /fill in as you fly/.test(S.held[N.sceneryAfterSec].text));
   check('(7h) a discovery wins over scenery while it lasts', S.discovery[N.sceneryAfterSec].kind === 'discovery' && S.discovery[N.sceneryAfterSec + 3].kind === 'scenery');
   check('(7i) a warp starts the clock again', said(S.warp, 'scenery').length === 0);
 }
