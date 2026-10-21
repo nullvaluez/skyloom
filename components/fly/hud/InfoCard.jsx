@@ -15,6 +15,10 @@ import { releaseEscort, startEscort } from '@/lib/fly/escort';
 import { getAircraftTypeName } from '@/lib/aircraft-type-names';
 import { AIRCRAFT_SILHOUETTES, getBestSilhouette } from '@/lib/aircraft-silhouettes';
 import './target-ui.css';
+// PLAY PASS ENCOUNTERS imports begin
+import { ENCOUNTER_FEEL_ACTIVE } from '@/lib/fly/play-pass';
+import { useEncounterStore } from '@/stores/encounter-store';
+// PLAY PASS ENCOUNTERS imports end
 
 /**
  * Soft-lock info card: auto-shows when the locked target is inside
@@ -26,6 +30,10 @@ import './target-ui.css';
  */
 export function InfoCard({ runtime }) {
   const infoCardHex = useFlyStore((s) => s.infoCardHex);
+  // PLAY PASS (ENCOUNTER_FEEL): the escort card carries this aircraft while an
+  // escort flies, and the flight-memory lower third holds the slot after it.
+  const standDown = useFlyStore((s) => ENCOUNTER_FEEL_ACTIVE.enabled === true && (s.lockState === 'intercepting' || s.lockState === 'formation'));
+  const moment = useEncounterStore((s) => ENCOUNTER_FEEL_ACTIVE.enabled === true && !!s.moment);
   const suppressed = useRef(new Map()); // hex -> suppress-until epoch ms
   useEffect(
     () =>
@@ -65,7 +73,7 @@ export function InfoCard({ runtime }) {
     useFlyStore.getState().setInfoCardHex(null);
   };
 
-  if (!infoCardHex) return null;
+  if (!infoCardHex || standDown || moment) return null;
   return <InfoCardBody hex={infoCardHex} runtime={runtime} onDismiss={dismiss} />;
 }
 
