@@ -1,0 +1,383 @@
+/* =====================================================================
+   DIRECTOR (Play Pass, LOUNGE_DIRECTOR) — the next-movement cue under the
+   place, the auto director's state, and the broadcast lower third. The
+   target-ui language of the lounge (ink glass, Archivo Black names, mono
+   numbers); the movement's tone carries the colour: lime lands, amber
+   departs. Desktop only, like the lounge.
+   ===================================================================== */
+
+.dir-cue {
+  --dir-tone: var(--t-lime);
+  position: absolute;
+  top: 94px;
+  left: 24px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: clamp(300px, 21vw, 352px);
+  padding: 11px 12px 12px;
+  border-radius: 16px;
+  font-family: var(--t-sans);
+  color: var(--t-ice);
+  transition: opacity 0.25s, transform 0.25s;
+}
+.dir-cue[data-tone='depart'] {
+  --dir-tone: var(--t-amber);
+}
+.dir-cue[data-tone='ground'] {
+  --dir-tone: var(--t-cyan);
+}
+.dir-cue::before {
+  content: '';
+  position: absolute;
+  inset: 0 16px auto 16px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--dir-tone), transparent);
+  opacity: 0.85;
+}
+.dir-cue-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 18px;
+}
+.dir-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font: 700 9.5px/1 var(--t-sans);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--t-dim);
+}
+.dir-kicker i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dir-tone);
+  box-shadow: 0 0 10px var(--dir-tone);
+}
+.dir-kicker svg {
+  color: var(--dir-tone);
+}
+.dir-count {
+  margin-left: auto;
+  font: 600 20px/1 var(--t-mono);
+  letter-spacing: -0.02em;
+  color: var(--t-ice);
+  font-variant-numeric: tabular-nums;
+}
+.dir-count[data-soon='1'] {
+  color: var(--dir-tone);
+  text-shadow: 0 0 16px color-mix(in srgb, var(--dir-tone) 55%, transparent);
+}
+.dir-next {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  row-gap: 6px;
+  align-items: center;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 11px;
+  text-align: left;
+  color: inherit;
+  background: var(--t-panel);
+  box-shadow: inset 0 0 0 1px var(--t-edge);
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.dir-next:hover {
+  background: var(--t-panel-hi);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dir-tone) 55%, transparent);
+}
+.dir-next > svg {
+  grid-row: 1;
+  color: var(--dir-tone);
+}
+.dir-id {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.dir-id strong {
+  overflow: hidden;
+  font: 400 16px/1.05 var(--t-display);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.dir-id small {
+  overflow: hidden;
+  font: 600 11px/1.2 var(--t-sans);
+  color: var(--t-dim);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.dir-when {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  font: 700 11.5px/1.2 var(--t-sans);
+  color: var(--dir-tone);
+}
+.dir-when em {
+  font: 600 10.5px/1.2 var(--t-sans);
+  font-style: normal;
+  color: var(--t-faint);
+}
+.dir-quiet {
+  margin: 0;
+  font: 500 12px/1.45 var(--t-sans);
+  color: var(--t-dim);
+}
+.dir-watching {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 9px;
+  border-radius: 9px;
+  font: 600 11px/1.25 var(--t-sans);
+  color: var(--t-dim);
+  background: rgba(79, 227, 255, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(79, 227, 255, 0.28);
+}
+.dir-watching svg {
+  flex: none;
+  color: var(--t-cyan);
+}
+.dir-watching b {
+  font-weight: 700;
+  color: var(--t-ice);
+}
+.dir-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  gap: 6px;
+}
+.dir-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  font: 700 12px/1 var(--t-sans);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: var(--t-ice);
+  background: rgba(8, 13, 26, 0.6);
+  box-shadow: inset 0 0 0 1px var(--t-edge-strong);
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.dir-btn:hover:not(:disabled) {
+  background: rgba(20, 31, 54, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(79, 227, 255, 0.45);
+}
+.dir-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.dir-btn-auto {
+  color: #021018;
+  background: linear-gradient(135deg, #b9f6ff 0%, var(--t-cyan) 45%, var(--t-cyan-deep) 100%);
+  box-shadow: 0 10px 26px -14px rgba(79, 227, 255, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+.dir-btn-auto:hover:not(:disabled) {
+  background: linear-gradient(135deg, #c8f8ff 0%, #6ae8ff 45%, var(--t-cyan-deep) 100%);
+  box-shadow: 0 10px 26px -12px rgba(79, 227, 255, 0.95), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+.dir-btn kbd,
+.dir-stop kbd {
+  padding: 2px 5px;
+  border-radius: 5px;
+  font: 700 9.5px/1 var(--t-mono);
+  background: rgba(186, 222, 255, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(186, 222, 255, 0.22);
+}
+.dir-btn-auto kbd {
+  background: rgba(2, 16, 24, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(2, 16, 24, 0.22);
+}
+.dir-then {
+  margin: 0;
+  padding: 0 2px;
+  font: 600 10.5px/1.3 var(--t-sans);
+  color: var(--t-faint);
+}
+.dir-then b {
+  font-weight: 700;
+  color: var(--t-dim);
+}
+
+/* The auto director has the view. */
+.dir-cue[data-auto='1'] {
+  gap: 9px;
+  width: clamp(280px, 19vw, 320px);
+}
+.dir-cue[data-auto='1'] .dir-kicker {
+  color: var(--t-ice);
+}
+.dir-stop {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  height: 26px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 8px;
+  font: 700 11px/1 var(--t-sans);
+  color: var(--t-ice);
+  background: rgba(8, 13, 26, 0.6);
+  box-shadow: inset 0 0 0 1px var(--t-edge-strong);
+  cursor: pointer;
+}
+.dir-stop:hover {
+  box-shadow: inset 0 0 0 1px rgba(79, 227, 255, 0.5);
+}
+.dir-auto-now {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dir-auto-now > svg {
+  flex: none;
+  color: var(--dir-tone);
+}
+.dir-auto-now .dir-id small {
+  color: var(--dir-tone);
+}
+.dir-foot {
+  margin: 0;
+  font: 600 10px/1.2 var(--t-mono);
+  letter-spacing: 0.04em;
+  color: var(--t-faint);
+}
+/* Through the glasses the auto director keeps only its title line. */
+.dir-cue[data-compact='1'] {
+  top: calc(3vh + 14px);
+  left: calc(3vw + 8px);
+  width: auto;
+  padding: 8px 10px 8px 12px;
+  background-image: none;
+  background: rgba(1, 3, 7, 0.55);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: inset 0 0 0 1px var(--t-edge);
+}
+.dir-cue[data-compact='1']::before {
+  display: none;
+}
+.dir-cue[data-compact='1'] .dir-stop {
+  margin-left: 14px;
+}
+
+/* ---------------------------------------------------------------------
+   LOWER THIRD — bottom left, above the control bar; beside the spotter
+   card when it is open; inside the dark of the binocular mask when up.
+   --------------------------------------------------------------------- */
+.dir-lower-slot {
+  position: absolute;
+  left: 24px;
+  bottom: 104px;
+  z-index: 3;
+  pointer-events: none;
+}
+.dir-lower-slot[data-beside='1'] {
+  left: calc(24px + clamp(372px, 25vw, 452px) + 16px);
+}
+.lounge[data-binocular='1'] .dir-lower-slot {
+  left: calc(3vw + 18px);
+  bottom: calc(3vh + 34px);
+}
+.dir-lower {
+  --dir-tone: var(--t-lime);
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  max-width: min(460px, calc(100vw - 48px));
+  padding: 12px 18px 13px 12px;
+  border-radius: 6px 14px 14px 6px;
+  background: linear-gradient(100deg, rgba(3, 7, 15, 0.9) 0%, rgba(6, 12, 24, 0.82) 70%, rgba(6, 12, 24, 0.6) 100%);
+  box-shadow: 0 18px 50px rgba(1, 3, 9, 0.5), inset 0 0 0 1px rgba(186, 222, 255, 0.12);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.dir-lower[data-tone='depart'] {
+  --dir-tone: var(--t-amber);
+}
+.dir-lower[data-tone='ground'] {
+  --dir-tone: var(--t-cyan);
+}
+.dir-lower-bar {
+  flex: none;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--dir-tone);
+  box-shadow: 0 0 14px var(--dir-tone);
+}
+.dir-lower-text {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.dir-lower-text small {
+  font: 700 10px/1 var(--t-sans);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--dir-tone);
+}
+.dir-lower-text strong {
+  overflow: hidden;
+  font: 400 21px/1.1 var(--t-display);
+  letter-spacing: 0.005em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--t-ice);
+}
+.dir-lower-text span {
+  overflow: hidden;
+  font: 600 12.5px/1.3 var(--t-sans);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--t-dim);
+}
+.dir-lower[data-variant='moment'] strong {
+  font-size: 19px;
+}
+
+@media (max-width: 1280px) {
+  .dir-cue {
+    width: 300px;
+  }
+  .dir-lower-slot[data-beside='1'] {
+    left: calc(24px + 372px + 16px);
+  }
+}
+@media (max-height: 820px) {
+  .dir-then {
+    display: none;
+  }
+  .dir-lower-slot {
+    bottom: 92px;
+  }
+}
+
+/* The auto director's binocular view is clean: its own title line and the
+   lower third stand in for the readouts and the power buttons. */
+.lounge[data-auto='1'] .bino-top,
+.lounge[data-auto='1'] .bino-readout,
+.lounge[data-auto='1'] .bino-mag {
+  display: none;
+}

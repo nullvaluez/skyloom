@@ -25,6 +25,12 @@ import { ObservatoryHud, useObservatory } from './ObservatoryHud';
 // (LOUNGE_PIER; the second-level pass).
 import { DecorCard, DecorPrompt, useWalkFeel } from './DecorCard';
 import { decorTurn, pierPlace } from '@/lib/fly/lounge/lounge-life.mjs';
+// Play Pass DIRECTOR (LOUNGE_DIRECTOR): the next-movement cue, the auto
+// director and its lower thirds. Nothing of it renders while the flag is off.
+import { playPassOn } from '@/lib/fly/play-pass';
+import { DirectorCue, DirectorLower, useDirector } from './DirectorHud';
+
+const DIRECTOR_ON = playPassOn('LOUNGE_DIRECTOR');
 
 /*
  * The seated lounge HUD. One 1 Hz poll feeds the header, the board and the
@@ -65,6 +71,10 @@ export function LoungeHud({ runtime, watch }) {
   const observatory = useObservatory(runtime, watch.id);
   const instrumentOpen = !!observatory?.active;
   const feel = useWalkFeel(runtime, watch.id);
+  const director = useDirector(runtime, watch.id, DIRECTOR_ON);
+  // The auto director has the view: the board, the card and the bar step aside,
+  // and a press or a wheel anywhere but its own controls takes the view back.
+  const auto = DIRECTOR_ON && !!watch.auto;
   const sound = useFlyStore((s) => s.soundOn);
   const inspecting = useFlyStore((s) => !!s.inspectHex);
   // A full-screen panel over the lounge (Atlas, logbook, airport browser):
@@ -176,10 +186,13 @@ export function LoungeHud({ runtime, watch }) {
       data-testid="airport-observation"
       data-binocular={watch.binocular ? '1' : '0'}
       data-instruments={observatory ? '1' : '0'}
+      data-auto={auto ? '1' : undefined}
       onKeyDown={(e) => {
         // Keyboard isolation: keys typed inside the lounge never steer.
         if (e.key !== 'Escape') e.stopPropagation();
       }}
+      onPointerDownCapture={auto ? (e) => { if (!e.target.closest?.('[data-director-control]')) w?.director?.handBack(); } : undefined}
+      onWheelCapture={auto ? () => w?.director?.handBack() : undefined}
     >
       <LoungeSurface runtime={runtime} picker={picker} onNotice={flash} />
       <LoungeOverlay runtime={runtime} picker={picker} />
@@ -205,7 +218,10 @@ export function LoungeHud({ runtime, watch }) {
       <ObservatoryHud runtime={runtime} state={observatory} hidden={inspecting || covered || watch.seatMenu || !!decorOpen} />
       <SeatMenu runtime={runtime} watch={watch} />
 
-      {!watch.binocular && !inspecting && !covered && !instrumentOpen && (
+      {DIRECTOR_ON && !inspecting && !covered && !instrumentOpen && !watch.seatMenu && !decorOpen && <DirectorCue runtime={runtime} state={director} binocular={!!watch.binocular} />}
+      {DIRECTOR_ON && !covered && <DirectorLower runtime={runtime} state={director} ident={airport?.ident || String(airport?.id || '').split(':')[0]} beside={!!watch.selected && !watch.binocular && !auto && !instrumentOpen} />}
+
+      {!watch.binocular && !inspecting && !covered && !instrumentOpen && !auto && (
         <LiveBoard
           board={board}
           tab={tab}
@@ -231,14 +247,14 @@ export function LoungeHud({ runtime, watch }) {
       )}
 
       <AnimatePresence>
-        {watch.selected && !watch.binocular && !covered && !instrumentOpen && (
+        {watch.selected && !watch.binocular && !covered && !instrumentOpen && !auto && (
           <SpotterCard key={watch.selected} runtime={runtime} hex={watch.selected} boardRow={selectedRow} fieldElev={fieldElev} airportIdent={airport?.ident || String(airport?.id || '').split(':')[0]} onPhoto={photo} savingPhoto={savingPhoto} />
         )}
       </AnimatePresence>
 
       <AnimatePresence>{watch.binocular && <BinocularHud key="bino" runtime={runtime} />}</AnimatePresence>
 
-      {!watch.binocular && (
+      {!watch.binocular && !auto && (
         <footer className="lounge-bar lounge-panel" aria-label="Lounge controls">
           <button type="button" className="lounge-btn" aria-pressed={boardOpen} onClick={() => setBoardOpen((v) => !v)} title="Live board">
             <ListOrdered size={16} aria-hidden="true" />
@@ -270,7 +286,7 @@ export function LoungeHud({ runtime, watch }) {
           <LoungeBridgeBar runtime={runtime} watch={watch} />
         </footer>
       )}
-      {!watch.binocular && (
+      {!watch.binocular && !auto && (
         <p className="lounge-help" aria-hidden="true">
           {helpHints(watch).map((hint, i) => (
             <Fragment key={hint}>

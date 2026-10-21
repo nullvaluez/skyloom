@@ -34,8 +34,16 @@ import { decorTurn, inspectKeyAction } from '@/lib/fly/lounge/lounge-life.mjs';
  * when no chair or instrument claims it, Enter or Esc closes an open card
  * first (lib/fly/lounge/lounge-life.mjs inspectKeyAction), and the arrows
  * move between the rows of the seat menu while it is grouped by floor.
+ *
+ * THE DIRECTOR (Play Pass, LOUNGE_DIRECTOR; watch.director): N watches the
+ * next movement, H toggles "Watch for me". While the auto director has the
+ * view any other key takes it back (and still does its own job), except Esc,
+ * which only takes it back. Without the flag there is no watch.director and
+ * neither key is handled.
  */
 const MOVE_KEYS = { w: 'forward', s: 'back', a: 'left', d: 'right' };
+// Keys that never take the view back from the auto director on their own.
+const MODIFIERS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock']);
 
 const isTyping = (el) => {
   const tag = el?.tagName;
@@ -98,6 +106,13 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
       if (!w?.active || e.metaKey || e.ctrlKey || e.altKey || (isTyping(e.target) && e.key !== 'Escape')) return;
       const s = useFlyStore.getState();
       const lower = e.key.toLowerCase();
+      if (w.director?.auto && lower !== 'h' && !MODIFIERS.has(e.key)) {
+        w.director.handBack();
+        if (e.key === 'Escape') {
+          consume(e);
+          return;
+        }
+      }
       const walkKey = !!w.walk && (MOVE_KEYS[lower] || e.key === 'Shift');
       // Focus inside an instrument belongs to its controls. A movement key
       // must not silently release the instrument (or let the next Escape
@@ -142,6 +157,14 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
             break;
           case 'b':
             w.binoculars();
+            break;
+          case 'n':
+            if (!w.director) handled = false;
+            else if (!w.director.watchNext()) onNotice?.('Nothing is lined up to land or take off yet.');
+            break;
+          case 'h':
+            if (!w.director) handled = false;
+            else w.director.toggleAuto();
             break;
           case 'v':
             if (!w.walk) handled = false;

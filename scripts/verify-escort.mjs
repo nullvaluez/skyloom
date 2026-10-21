@@ -10,6 +10,10 @@
 //    a portrait phone backs off to the framing range).
 import assert from 'node:assert/strict';
 import { register } from 'node:module';
+// PLAY PASS (ENCOUNTER_FEEL): ESCORT_FEEL_OFF=1 runs every check against the
+// flag-off rig — the escort as it was before the pass, the way
+// ?flags=-ENCOUNTER_FEEL loads it in the browser (scripts/verify-play-encounters.mjs runs both arms).
+if (process.env.ESCORT_FEEL_OFF === '1') globalThis.window = { __flyEncounterFeelOverride: { enabled: false } };
 import { PerspectiveCamera, Vector3 } from 'three';
 register('./_node-resolve.mjs', import.meta.url);
 const { startEscort, releaseEscort, relativeTo, toggleEscortCamera, ESCORT_MESSAGES } = await import('../lib/fly/escort.js');
@@ -17,6 +21,7 @@ const { CinemaCamera, CINEMA_PURSUIT } = await import('../lib/fly/cinema-camera.
 const { useFlyStore } = await import('../stores/fly-store.js');
 const { registerRuntimeActions, clearRuntimeActions } = await import('../lib/fly/runtime-bus.js');
 const { CAMERA } = await import('../lib/fly/fly-constants.js');
+const { ESCORT_SHOT_ON, SHOT } = await import('../lib/fly/escort-shot.js');
 
 let n = 0;
 const test = (label, fn) => {
@@ -141,7 +146,18 @@ test('far pairs film over the shoulder: the camera is near the player, not kilom
   assert.ok(f.p.y < f.t.y, `player ndc y ${f.p.y.toFixed(2)} below target ${f.t.y.toFixed(2)}`);
 });
 
-test('inside wingM the rig is the classic abeam wing shot (pursuit weight 0)', () => {
+test(ESCORT_SHOT_ON ? 'inside photoM the rig is the photo ship: near the target, beyond it from the player' : 'inside wingM the rig is the classic abeam wing shot (pursuit weight 0)', () => {
+  if (ESCORT_SHOT_ON) {
+    // ENCOUNTER_FEEL: subjectK target lengths from the target (30 m when the
+    // track carries no airframe), on the far side from the player.
+    const f = frame(300, 16 / 9, { frames: 240 });
+    const c = f.camera.position;
+    const toT = Math.hypot((c.x - f.target.rx) / k, c.y - f.target.ryd, (c.z - f.target.rz) / k);
+    const toP = Math.hypot((c.x - f.flight.pos.x) / k, c.y - f.flight.pos.y, (c.z - f.flight.pos.z) / k);
+    assert.ok(toT <= Math.max(SHOT.minM, 30 * SHOT.subjectK) * 1.6 + 5, `camera ${toT.toFixed(1)} m from the target`);
+    assert.ok(toT < toP, `nearer the target (${toT.toFixed(1)} m) than the player (${toP.toFixed(1)} m)`);
+    return;
+  }
   const sep = 500;
   const f = frame(sep, 16 / 9, { frames: 1 }); // snapped pose, no damping
   const mid = new Vector3((f.flight.pos.x + f.target.rx) / 2, (f.flight.pos.y + f.target.ryd) / 2, (f.flight.pos.z + f.target.rz) / 2);
