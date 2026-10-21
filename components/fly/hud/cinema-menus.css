@@ -1,0 +1,92 @@
+/* TITLE_CINEMA — the menus the cinema title opens, in its language.
+   Scoped to .tcn-sheet, the class the journeys library dialog carries only
+   with the flag on (AdventureExperience.jsx), so the flag-off library is
+   untouched. The chosen journey's in-game capture fills the sheet (a
+   background on the scroll container stays put while the list scrolls), the
+   place is set large like the title's, the routes are numbered rows with the
+   title's lit bar, and the brief is one smoked-glass card. */
+
+.journey-dialog.tcn-sheet{
+  --tcn-ice:#f2f7ff;--tcn-haze:#b6c4d6;--tcn-faint:#8fa0b5;--tcn-line:rgba(214,232,255,.14);--tcn-line-2:rgba(214,232,255,.3);
+  --tcn-sel:#7fe7ff;--tcn-mono:var(--font-geist-mono),ui-monospace,SFMono-Regular,Menlo,monospace;--tcn-ease:cubic-bezier(.16,1,.3,1);
+  --tcn-pad:clamp(22px,3.6vw,64px);
+  inset:0 0 44px 0;border:0;border-radius:0 0 clamp(16px,1.6vw,26px) clamp(16px,1.6vw,26px);
+  background:
+    linear-gradient(90deg,rgba(3,6,12,.94) 0%,rgba(3,6,12,.78) 30%,rgba(3,6,12,.2) 56%,rgba(3,6,12,.42) 78%,rgba(3,6,12,.82) 100%),
+    linear-gradient(180deg,rgba(3,6,12,.66) 0%,rgba(3,6,12,0) 20%,rgba(3,6,12,0) 55%,rgba(3,6,12,.82) 100%),
+    var(--tcn-photo,none) 50% 0/cover no-repeat,
+    #03060c;
+  color:var(--tcn-ice);
+  animation:tcn-sheet-in .5s var(--tcn-ease) both}
+.journey-dialog.tcn-sheet>header{padding:20px var(--tcn-pad);border:0;background:linear-gradient(180deg,rgba(3,6,12,.7),rgba(3,6,12,0))}
+.journey-dialog.tcn-sheet>header>div{font:500 11px/1 var(--tcn-mono);letter-spacing:.24em;text-transform:uppercase;color:var(--tcn-haze)}
+.journey-dialog.tcn-sheet>header>div svg{color:var(--tcn-sel)}
+.journey-dialog.tcn-sheet>header>button{display:grid;place-items:center;width:44px;height:44px;padding:0;border-radius:50%;border:1px solid var(--tcn-line-2);background:rgba(6,11,22,.5);backdrop-filter:blur(10px)}
+.journey-dialog.tcn-sheet>header>button:hover{border-color:rgba(127,231,255,.6);background:rgba(127,231,255,.12)}
+
+.tcn-sheet .journey-library{max-width:none;margin:0;padding:4px var(--tcn-pad) 40px;grid-template-columns:minmax(300px,440px) minmax(0,580px);justify-content:space-between;align-items:end;gap:48px;min-height:calc(100% - 84px)}
+
+/* the index: an editorial heading and numbered routes */
+.tcn-sheet .journey-index{counter-reset:tcn-route}
+.tcn-sheet .journey-index>h1{margin-bottom:16px;font-size:clamp(40px,4.4vw,70px);font-weight:300;line-height:.94;letter-spacing:-.05em;text-shadow:0 2px 30px rgba(2,6,14,.5)}
+.tcn-sheet .journey-index>p{margin:0;font-size:15px;color:var(--tcn-haze)}
+.tcn-sheet .journey-index>section{margin-top:26px}
+.tcn-sheet .journey-index h2{margin-bottom:8px;font:500 10.5px/1 var(--tcn-mono);letter-spacing:.24em;text-transform:uppercase;color:var(--tcn-haze)}
+.tcn-sheet .journey-index h2 small{font:inherit;letter-spacing:.16em;color:var(--tcn-sel)}
+.tcn-sheet .journey-route{position:relative;gap:14px;padding:9px 12px 9px 14px!important;border-top:1px solid var(--tcn-line)!important;border-bottom:0!important;background:transparent;counter-increment:tcn-route;transition:background .25s ease}
+.tcn-sheet section>.journey-route:last-child{border-bottom:1px solid var(--tcn-line)!important}
+.tcn-sheet .journey-route::before{content:'';position:absolute;left:0;top:-1px;bottom:-1px;width:2px;background:var(--tcn-sel);box-shadow:0 0 14px rgba(127,231,255,.8);transform:scaleY(0);transition:transform .35s var(--tcn-ease)}
+.tcn-sheet .journey-route:hover{background:rgba(220,236,255,.05)}
+.tcn-sheet .journey-route[aria-pressed=true]{background:linear-gradient(90deg,rgba(127,231,255,.14),rgba(127,231,255,.03) 60%,rgba(127,231,255,0))}
+.tcn-sheet .journey-route[aria-pressed=true]::before{transform:scaleY(1)}
+.tcn-sheet .journey-route>.journey-destination-image{width:76px;height:46px;border-radius:7px;object-position:50% 0;box-shadow:0 0 0 1px rgba(214,232,255,.14)}
+.tcn-sheet .journey-route[aria-pressed=true]>.journey-destination-image{box-shadow:0 0 0 1px rgba(127,231,255,.7),0 0 18px -4px rgba(127,231,255,.7)}
+.tcn-sheet .journey-route strong{font-size:17px;font-weight:450;letter-spacing:-.015em}
+.tcn-sheet .journey-route small{font-size:11.5px;color:var(--tcn-faint)}
+.tcn-sheet .journey-route>span:last-child{font:500 10.5px/1 var(--tcn-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--tcn-faint)}
+.tcn-sheet .journey-route[aria-pressed=true] strong{color:#fff}
+
+/* the brief: the place set large over its own capture, then one glass card */
+.tcn-sheet .journey-brief{background:transparent;border-radius:0;overflow:visible;align-self:end}
+.tcn-sheet .journey-landscape{height:auto;min-height:0;display:block;padding:0 4px 26px 0;text-align:right}
+.tcn-sheet .journey-landscape>.journey-destination-image,.tcn-sheet .journey-landscape>.journey-destination-fallback{display:none}
+.tcn-sheet .journey-landscape::after{display:none}
+.tcn-sheet .journey-landscape span{display:block;font-size:clamp(52px,6.4vw,118px);font-weight:300;line-height:.9;letter-spacing:-.05em;text-shadow:0 2px 50px rgba(2,6,14,.55),0 1px 2px rgba(2,6,14,.35)}
+.tcn-sheet .journey-landscape p{margin:16px 0 0;font:500 12px/1.4 var(--tcn-mono);letter-spacing:.22em;text-transform:uppercase;color:#e3ecf6;text-shadow:0 1px 12px rgba(2,6,14,.9)}
+.tcn-sheet .journey-brief-body{padding:24px 26px 26px;border-radius:18px;border:1px solid var(--tcn-line);background:linear-gradient(180deg,rgba(205,232,255,.06),rgba(205,232,255,0) 40%),rgba(5,10,20,.66);backdrop-filter:blur(20px) saturate(1.2);box-shadow:0 30px 70px -30px rgba(0,0,0,.85),inset 0 1px 0 rgba(226,244,255,.08)}
+.tcn-sheet .journey-brief h2{font-size:28px;font-weight:450;letter-spacing:-.03em}
+.tcn-sheet .journey-brief .journey-meta{font:500 10.5px/1.4 var(--tcn-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--tcn-haze)}
+.tcn-sheet .journey-brief .journey-meta svg{color:var(--tcn-sel)}
+.tcn-sheet .journey-brief p{color:var(--tcn-haze)}
+.tcn-sheet .journey-brief li span{font-family:var(--tcn-mono)}
+.tcn-sheet button.journey-primary{min-height:54px;border:1px solid rgba(220,250,255,.95);border-radius:14px;background:linear-gradient(180deg,#f7fbff 0%,#e1f3fc 100%);color:#06111b;font-size:15px;font-weight:700;letter-spacing:-.01em;box-shadow:0 0 0 1px rgba(127,231,255,.25),0 16px 40px -16px rgba(127,231,255,.6),inset 0 1px 0 #fff;transition:transform .25s var(--tcn-ease),box-shadow .25s ease}
+.tcn-sheet button.journey-primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 0 0 1px rgba(127,231,255,.4),0 20px 46px -14px rgba(127,231,255,.75),inset 0 1px 0 #fff}
+.tcn-sheet .journey-mobile-launch{background:rgba(3,6,12,.92);border-top-color:var(--tcn-line)}
+
+/* the pause card (Living Glass) in the title's voice: a thin display title,
+   mono section labels, the destinations a size up. Layout and controls are
+   Living Glass's own. */
+.tcn-pause{--tcn-mono:var(--font-geist-mono),ui-monospace,SFMono-Regular,Menlo,monospace}
+.tcn-pause .lg-pause-head .lg-title{font:300 clamp(34px,3.2vw,48px)/.95 var(--font-geist-sans),ui-sans-serif,system-ui,sans-serif;letter-spacing:-.045em}
+.tcn-pause .lg-pause-head .lg-sub{margin-top:10px;font:500 10.5px/1.4 var(--tcn-mono);letter-spacing:.2em;text-transform:uppercase}
+.tcn-pause :is(.lg-pane>.lg-label,.lg-nav-group>.lg-label){font:500 10.5px/1.3 var(--tcn-mono);letter-spacing:.22em;text-transform:uppercase}
+.tcn-pause .lg-nav-label{font-size:16.5px;font-weight:450;letter-spacing:-.015em}
+.tcn-pause .lg-nav-group .lg-nav-label{font-size:14px}
+.tcn-pause .lg-nav-note{font:500 10px/1.3 var(--tcn-mono);letter-spacing:.14em;text-transform:uppercase}
+
+@keyframes tcn-sheet-in{from{opacity:0}}
+
+@media (max-width:900px){
+  .tcn-sheet .journey-library{grid-template-columns:minmax(230px,.85fr) minmax(300px,1fr);gap:28px}
+}
+@media (max-width:760px){
+  .journey-dialog.tcn-sheet{inset:0 0 42px 0;border-radius:0 0 14px 14px;background:linear-gradient(180deg,rgba(3,6,12,.5) 0%,rgba(3,6,12,.2) 26%,rgba(3,6,12,.86) 58%,rgba(3,6,12,.96) 100%),var(--tcn-photo,none) 50% 0/auto 62vh no-repeat,#03060c}
+  .journey-dialog.tcn-sheet>header{padding:12px 16px}
+  .tcn-sheet .journey-library{grid-template-columns:1fr;padding:0 16px 24px;gap:22px;min-height:0}
+  .tcn-sheet .journey-landscape{padding:12px 0 18px;text-align:left}
+  .tcn-sheet .journey-landscape span{font-size:clamp(40px,12vw,56px)}
+  .tcn-sheet .journey-brief-body{padding:20px;backdrop-filter:none;background:rgba(5,10,20,.88)}
+}
+@media (prefers-reduced-motion:reduce){
+  .journey-dialog.tcn-sheet,.tcn-sheet .journey-route,.tcn-sheet .journey-route::before,.tcn-sheet button.journey-primary{animation:none;transition:none}
+}

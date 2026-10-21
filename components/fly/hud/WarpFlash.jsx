@@ -9,6 +9,12 @@ import { useFlyStore } from '@/stores/fly-store';
 import { worldReadiness, retryWorldContent } from '@/lib/fly/world-readiness';
 import { holdCapMs } from '@/lib/fly/load-guard';
 import { LIVING_EARTH } from '@/lib/fly/living-earth';
+import { livingWorldOn } from '@/lib/fly/living-world';
+
+// TITLE_CINEMA: on the cinema title the window shade owns every stage warp's
+// transition (the tour, a hangar pick), so the overlay keeps its readiness
+// hold and bookkeeping but draws nothing while the title is up.
+const CINEMA_ON = livingWorldOn('TITLE_CINEMA');
 
 /**
  * Warp arrival treatment, keyed on fly-store.warpEpoch.
@@ -25,6 +31,7 @@ import { LIVING_EARTH } from '@/lib/fly/living-earth';
  */
 export function WarpFlash({ runtime }) {
   const warpEpoch = useFlyStore((s) => s.warpEpoch);
+  const titleUp = useFlyStore((s) => CINEMA_ON && s.screen === 'title');
   // Round 17: layout/particle budget only — no stage or timing logic reads it.
   const { isPhone: phone } = useDeviceLayout();
   const [stage, setStage] = useState(null); // 'flash' | 'streak' | 'hold' | 'reveal'
@@ -244,7 +251,7 @@ export function WarpFlash({ runtime }) {
     };
   }, [warpEpoch]);
 
-  if (!stage) return null;
+  if (!stage || titleUp) return null;
 
   // GATE TO GATE (CAMERA_DIRECTOR): a same-airport move keeps the readiness
   // hold above but replaces the streak and 'WARPING' with a calm airport card.

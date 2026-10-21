@@ -23,6 +23,9 @@ import { GLASS_ON, GLASS_EXIT_MS, closingProps, glassRootProps, stillMotion, use
 import { livingWorldBlock, livingWorldOn } from '@/lib/fly/living-world';
 
 const TITLE_ON = livingWorldOn('TITLE_MOTION');
+// TITLE_CINEMA replaces this title wholesale (./CinemaTitle.jsx, mounted
+// beside it by FlyMode); this one renders nothing then.
+const CINEMA_ON = livingWorldOn('TITLE_CINEMA');
 const TITLE_BLOCK = livingWorldBlock('TITLE_MOTION') ?? {};
 // The entrance hands over to the settled title after this long (so the
 // Logbook's hide/show never replays it).
@@ -136,7 +139,7 @@ function useWorldReady() {
  */
 export function TitleScreen({ runtime }) {
   const screen = useFlyStore((s) => s.screen);
-  if (!FRONT_DOOR.enabled || screen !== 'title') return null;
+  if (!FRONT_DOOR.enabled || screen !== 'title' || CINEMA_ON) return null;
   return <TitleBody runtime={runtime} />;
 }
 
@@ -372,7 +375,7 @@ const THREAD = 'M-120 63C-40 61 60 58 180 52C250 48.5 292 24 322-6';
 const HEAD = 'M8 0L5-1L1-1.2L-2-7.6L-4-7.6L-2.6-1.2L-6.4-1L-8-3.6L-9.3-3.6L-8.4 0L-9.3 3.6L-8 3.6L-6.4 1L-2.6 1.2L-4 7.6L-2 7.6L1 1.2L5 1Z';
 const THREAD_BOX = '-130 -30 470 120';
 
-function Wordmark() {
+export function Wordmark() {
   return (
     <h1 className="fly-title-wordmark lwt-wordmark">
       <span className="lwt-wm-sky">Sky</span>
@@ -425,7 +428,7 @@ function Wordmark() {
  * (the title stays in view on the left), a bottom sheet on phones, with an
  * exit as purposeful as the entrance. Same testids, names and focus order.
  */
-function GlassSettingsSheet({ open, phone }) {
+export function GlassSettingsSheet({ open, phone }) {
   const still = stillMotion();
   const p = usePresence(open, still ? 0 : GLASS_EXIT_MS);
   const closeRef = useRef(null);
@@ -465,7 +468,7 @@ function GlassSettingsSheet({ open, phone }) {
 }
 
 /** Living World (MENU_GLASS): the title's Credits, entering and leaving. */
-function GlassTitleCredits({ open }) {
+export function GlassTitleCredits({ open }) {
   const still = stillMotion();
   const p = usePresence(open, still ? 0 : GLASS_EXIT_MS);
   if (!p.mounted) return null;
@@ -482,7 +485,7 @@ function GlassTitleCredits({ open }) {
   );
 }
 
-function SettingsSheet({ phone }) {
+export function SettingsSheet({ phone }) {
   const close = () => useFlyStore.getState().setSettingsOpen(false);
   const closeRef = useRef(null);
   useEffect(() => {
