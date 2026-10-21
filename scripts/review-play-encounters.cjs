@@ -14,6 +14,7 @@
  *            --seconds=45 --every=3  --width=1440 --height=900  --hour=15.5
  *            --discovery[=id] (no escort: Nearby → Go on a discovery, fly at it, frame it, shoot)
  *            --noSpot (dev pin: no traffic trails, to see the hulls alone)
+ *            --logbook (after the payoff, open Logbook → Memories)
  *            --trails (no escort: Spotting on, the pose held, a few frames of every trail)
  *
  * The synthetic sky (--scene other than live) flies on from its first poll, so
@@ -190,6 +191,24 @@ async function telemetry(page, hex) {
       }
       return;
     }
+    if (args.course) {
+      // The course's moment without flying it: accept it, then complete it as its last gate would.
+      const r = await page.evaluate(() => {
+        const rt = window.__fly, c = rt.encounters;
+        c.nearby();
+        const id = c.controller.candidates.find((x) => x.kind === 'course')?.id;
+        if (!id || !c.accept(id)) return { id, ok: false };
+        const g = rt.geo;
+        c.controller.complete({ position: { lat: g.y, lon: g.x, altM: rt.flight.pos.y }, track: null });
+        return { id, ok: true };
+      });
+      console.log(`COURSE ${JSON.stringify(r)}`);
+      for (const [i, ms] of [[0, 400], [1, 2500], [2, 5000]]) {
+        await page.waitForTimeout(ms);
+        await page.screenshot({ path: path.join(out, `course-${i}.png`) });
+      }
+      return;
+    }
     if (args.discovery) {
       // A Nearby discovery end to end: Go, fly at it, frame it in photo mode, shoot.
       const id = typeof args.discovery === 'string' ? args.discovery : 'manhattan-skyline:photo';
@@ -271,6 +290,26 @@ async function telemetry(page, hex) {
       report.frames.push({ file, t: Math.round((Date.now() - t0) / 100) / 10, ...tele });
       console.log(`FRAME ${file} ${tele.cameraMode}/${tele.lockState} enc=${tele.encounter?.seconds ?? '-'} ${tele.result ?? ''}`);
       await page.waitForTimeout(1500);
+    }
+    // The lower third's thumbnail, as the player saw it, and when the shutter fired.
+    report.shutter = await page.evaluate(() => window.__flyEncounterShutter ?? null);
+    const thumb = await page.evaluate(async () => {
+      const img = document.querySelector('[data-testid="encounter-moment"] img');
+      if (!img) return null;
+      const b = await (await fetch(img.src)).blob();
+      return await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(b); });
+    }).catch(() => null);
+    if (thumb) fs.writeFileSync(path.join(out, 'moment-thumb.jpg'), Buffer.from(thumb.split(',')[1], 'base64'));
+    console.log(`SHUTTER ${JSON.stringify(report.shutter)} thumb=${!!thumb}`);
+    if (args.logbook) {
+      // The memory as the Logbook keeps it (Memories tab), shutter frame included.
+      await page.waitForTimeout(3000);
+      await page.evaluate(() => window.__flyStore.getState().setLogbookOpen(true));
+      await page.getByRole('button', { name: 'Memories', exact: true }).click({ timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(2500);
+      await page.screenshot({ path: path.join(out, 'logbook-memories.png') });
+      report.memories = await page.evaluate(() => JSON.parse(localStorage.getItem('fly-encounters-v1') || 'null'));
+      console.log(`MEMORIES ${JSON.stringify(report.memories?.memories?.slice(0, 2))}`);
     }
   } catch (e) {
     report.errors.push({ fatal: e.message.split('\n')[0] });

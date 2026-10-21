@@ -263,6 +263,7 @@ if (!OFF) {
     assert.match(feel.viewfinderStatus({ ...ok, visible: false }, disc, 5500).text, /^Turn the camera toward the Midtown skyline/);
     assert.match(feel.viewfinderStatus({ ...ok, knownTerrain: false }, disc, 5500).text, /still loading/);
     assert.match(feel.viewfinderStatus(null, { kind: 'traffic', name: 'N412SK' }, 1500).text, /fresh position from N412SK/);
+    assert.match(feel.viewfinderStatus(ok, { kind: 'traffic', name: 'N412SK' }, 1500).text, /joins the flight memory/, 'a crossing is earned alongside, not by the shutter');
   });
 
   test('the fit guard backs a camera off until a wide or stacked pair fits, and leaves a fitting one alone', () => {
