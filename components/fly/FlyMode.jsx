@@ -416,7 +416,7 @@ export function FlyMode({ onClose }) {
       {/* PLAY PASS HUD end */}
 
       {/* PLAY PASS ENCOUNTERS begin */}
-      {ENCOUNTER_FEEL_ACTIVE.enabled === true && !watchingAirport && <EncounterMoment />}
+      {ENCOUNTER_FEEL_ACTIVE.enabled === true && !watchingAirport && <EncounterMoment runtime={runtime} />}
       {/* PLAY PASS ENCOUNTERS end */}
 
       {/* PLAY PASS DIRECTOR begin */}

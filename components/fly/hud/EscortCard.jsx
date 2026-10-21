@@ -36,7 +36,7 @@ import './play-encounters.css';
  * text (verify-inspect-actions, verify-chase-cam). The live line is written
  * through a ref at 4 Hz, never per frame.
  */
-export function EscortCard({ runtime, cinematic }) {
+export function EscortCard({ runtime }) {
   const lockState = useFlyStore((s) => s.lockState);
   const cameraMode = useFlyStore((s) => s.cameraMode);
   const lockedHex = useFlyStore((s) => s.lockedHex);
@@ -119,14 +119,13 @@ export function EscortCard({ runtime, cinematic }) {
   const waiting = memory && encounter.stale;
 
   return (
-    <div className={`${zoneClass('info-dock')} tgt-ec-wrap`} data-cinematic={cinematic ? '1' : '0'}>
+    <div className={`${zoneClass('info-dock')} tgt-ec-wrap`} data-letterbox={cinema ? '1' : '0'}>
       <div
         className="tgt tgt-ec"
         data-testid="hud-chase-chip"
         data-overlay="escort"
         data-active={active ? '1' : '0'}
         data-mode={mode}
-        data-cinematic={cinematic ? '1' : '0'}
         data-memory={memory ? '1' : '0'}
         aria-hidden={!active}
         role="status"
@@ -164,6 +163,11 @@ export function EscortCard({ runtime, cinematic }) {
             <i aria-hidden="true" />
             <span>{phase}</span>
             {cinema && <b>CINEMA</b>}
+            {memory && (
+              <em className="tgt-ec-secs">
+                {seconds}/{ENCOUNTER_LIMITS.holdSec} s
+              </em>
+            )}
           </div>
           <div className="tgt-ec-name" title={title}>
             {title}

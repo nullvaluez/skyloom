@@ -243,6 +243,51 @@ if (!OFF) {
     assert.deepEqual(quick, ['shutter', 'release']);
   });
 
+  test("a discovery's own photo skips the shutter; the viewfinder says what the shutter will see", () => {
+    const p = feel.createPayoff();
+    p.start({ id: 'm3', kind: 'photo', photoRef: 'memory-1' }, { cinematic: false, shutter: false });
+    const steps = [];
+    for (let t = 0; t < 2; t += 1 / 30) {
+      const s = p.tick(1 / 30);
+      if (s) steps.push(s);
+    }
+    assert.deepEqual(steps, ['release'], "no shutter over the player's own photo");
+    const disc = { kind: 'photo', name: 'Frame the Midtown skyline' };
+    const ok = { x: 0.1, y: -0.2, distanceM: 900, visible: true, knownTerrain: true };
+    assert.equal(feel.viewfinderStatus(null, { kind: 'course', name: 'x' }, 1000), null, 'courses have no photo to take');
+    assert.equal(feel.viewfinderStatus(ok, disc, 5500).ok, true);
+    assert.match(feel.viewfinderStatus(ok, disc, 5500).text, /^The Midtown skyline is in frame/);
+    assert.equal(feel.viewfinderStatus({ ...ok, x: 0.9 }, disc, 5500).dir, 'right');
+    assert.equal(feel.viewfinderStatus({ ...ok, y: -0.8 }, disc, 5500).dir, 'down');
+    assert.match(feel.viewfinderStatus({ ...ok, distanceM: 7000 }, disc, 5500).text, /^Fly closer · 3\.8 nm \(within 3\.0 nm\)/);
+    assert.match(feel.viewfinderStatus({ ...ok, visible: false }, disc, 5500).text, /^Turn the camera toward the Midtown skyline/);
+    assert.match(feel.viewfinderStatus({ ...ok, knownTerrain: false }, disc, 5500).text, /still loading/);
+    assert.match(feel.viewfinderStatus(null, { kind: 'traffic', name: 'N412SK' }, 1500).text, /fresh position from N412SK/);
+  });
+
+  test('the fit guard backs a camera off until a wide or stacked pair fits, and leaves a fitting one alone', () => {
+    const p = new Vector3(0, 300, 0);
+    for (const [tx, ty, tz] of [[600, 300, 0], [0, 900, 0], [300, 600, -200]]) {
+      const cam = new Vector3(200, 320, 120);
+      const moved = shot.fitGuard(cam, p, tx, ty, tz, 1, 20 * DEG, 14 * DEG);
+      assert.equal(moved, true);
+      const camera = new PerspectiveCamera(28, 0.46, 1, 1e6);
+      camera.position.copy(cam);
+      camera.lookAt((p.x + tx) / 2, (p.y + ty) / 2, (p.z + tz) / 2);
+      camera.updateMatrixWorld(true);
+      // The pair's spread fits 2 × 20° across and 2 × 14° up and down (the
+      // look's lean then places it; see the photo-ship framing checks).
+      const ang = [p, new Vector3(tx, ty, tz)].map((q) => {
+        const v = q.clone().applyMatrix4(camera.matrixWorldInverse);
+        return [Math.atan2(v.x, -v.z), Math.atan2(v.y, -v.z)];
+      });
+      assert.ok(Math.abs(ang[0][0] - ang[1][0]) <= 40 * DEG + 1e-3 && Math.abs(ang[0][1] - ang[1][1]) <= 28 * DEG + 1e-3, `${tx},${ty},${tz}: ${JSON.stringify(ang)}`);
+    }
+    const far = new Vector3(0, 300, 5000);
+    assert.equal(shot.fitGuard(far, p, 100, 300, 0, 1, 20 * DEG, 14 * DEG), false, 'already fits: untouched');
+    assert.deepEqual(far.toArray(), [0, 300, 5000]);
+  });
+
   test('adopted escorts, and a timer that drains instead of zeroing', () => {
     const memories = [];
     const c = new EncounterController(() => {}, (m) => memories.push(m));
