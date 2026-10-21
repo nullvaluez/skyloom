@@ -369,6 +369,16 @@
   .dir-then {
     display: none;
   }
+  /* With the spotter card open below, the cue keeps the next movement and its
+     countdown; the buttons wait (N and H still work). */
+  .dir-cue[data-card='1'] .dir-actions,
+  .dir-cue[data-card='1'] .dir-next .dir-id small {
+    display: none;
+  }
+  .dir-cue[data-card='1'] .dir-next {
+    padding: 7px 10px;
+    row-gap: 3px;
+  }
   .dir-lower-slot {
     bottom: 92px;
   }

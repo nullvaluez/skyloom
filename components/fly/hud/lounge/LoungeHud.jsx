@@ -218,7 +218,7 @@ export function LoungeHud({ runtime, watch }) {
       <ObservatoryHud runtime={runtime} state={observatory} hidden={inspecting || covered || watch.seatMenu || !!decorOpen} />
       <SeatMenu runtime={runtime} watch={watch} />
 
-      {DIRECTOR_ON && !inspecting && !covered && !instrumentOpen && !watch.seatMenu && !decorOpen && <DirectorCue runtime={runtime} state={director} binocular={!!watch.binocular} />}
+      {DIRECTOR_ON && !inspecting && !covered && !instrumentOpen && !watch.seatMenu && !decorOpen && <DirectorCue runtime={runtime} state={director} binocular={!!watch.binocular} card={!!watch.selected && !watch.binocular && !auto} />}
       {DIRECTOR_ON && !covered && <DirectorLower runtime={runtime} state={director} ident={airport?.ident || String(airport?.id || '').split(':')[0]} beside={!!watch.selected && !watch.binocular && !auto && !instrumentOpen} />}
 
       {!watch.binocular && !inspecting && !covered && !instrumentOpen && !auto && (
