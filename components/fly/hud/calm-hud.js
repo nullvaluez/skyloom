@@ -237,3 +237,21 @@ export function wakeHud(now = typeof performance !== 'undefined' ? performance.n
   wokeAt = now;
 }
 export const lastWake = () => wokeAt;
+
+// The lane's current notice, published by ExplorerGuide (which owns the
+// lane) and drawn by CalmHud: in the dock on a pointer device, so it moves
+// with the dock and never meets the toasts, the escort pill or the bottom
+// band; in the place line's slot on a phone.
+let notice = null;
+const noticeSubs = new Set();
+export function publishNotice(n) {
+  const next = n ? { kind: n.kind, text: n.text } : null;
+  if (next?.kind === notice?.kind && next?.text === notice?.text) return;
+  notice = next;
+  noticeSubs.forEach((fn) => fn());
+}
+export const currentNotice = () => notice;
+export function subscribeNotice(fn) {
+  noticeSubs.add(fn);
+  return () => noticeSubs.delete(fn);
+}

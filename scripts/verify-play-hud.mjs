@@ -514,8 +514,10 @@ if (urlArg) {
     return { mine: mine.map((m) => m.id), others: [...new Set(others.map((o) => o.id))], clashes };
   });
 
+  // --only=1440,1920,1280,off runs a subset (debugging a single leg).
+  const only = process.argv.find((a) => a.startsWith('--only='))?.slice(7);
   // (12) behaviour at 1440×900
-  {
+  if (!only || only.split(',').includes('1440')) {
     const { page, errors } = await session({ width: 1440, height: 900 });
     try {
       const st = await page.evaluate(() => ({ mode: window.__flyStore.getState().hudMode, fi: !!document.querySelector('[data-testid="hud-instruments"]'), strip: (() => { const r = document.querySelector('[data-testid="flight-stats-strip"]').getBoundingClientRect(); return r.width * r.height; })(), spd: document.querySelector('.calm-cell[data-k="spd"] b')?.textContent }));
@@ -543,14 +545,15 @@ if (urlArg) {
       const modes = [];
       for (let i = 0; i < 3; i++) {
         await page.keyboard.press('h');
-        await page.waitForTimeout(700);
-        modes.push(await page.evaluate(() => ({ mode: window.__flyStore.getState().hudMode, saved: localStorage.getItem('fly-hud-mode'), fi: document.querySelector('[data-testid="hud-instruments"]')?.dataset.kind ?? null, dock: getComputedStyle(document.querySelector('[data-testid="hud-dock"]')).visibility, minimap: getComputedStyle(document.querySelector('[data-zone="minimap"]')).visibility, caption: !!document.querySelector('[data-testid="hud-mode-caption"]') })));
+        const caption = await page.waitForSelector('[data-testid="hud-mode-caption"]', { timeout: 1500 }).then(() => true, () => false);
+        await page.waitForTimeout(400);
+        modes.push(await page.evaluate((caption) => ({ mode: window.__flyStore.getState().hudMode, saved: localStorage.getItem('fly-hud-mode'), fi: document.querySelector('[data-testid="hud-instruments"]')?.dataset.kind ?? null, dock: getComputedStyle(document.querySelector('.calm-dock > .calm-row')).visibility, minimap: getComputedStyle(document.querySelector('[data-zone="minimap"]')).visibility, caption }), caption));
       }
       const [a, b, c] = modes;
       check('(12d) H: Instruments (the FLIGHT_INSTRUMENTS HUD), Clean (dock and dial away), Explorer; each persisted and captioned',
         a.mode === 'instruments' && a.fi === 'desktop' && b.mode === 'clean' && !b.fi && b.dock === 'hidden' && b.minimap === 'hidden' && c.mode === 'explorer' && !c.fi && c.dock === 'visible' && modes.every((m) => m.saved === m.mode && m.caption), JSON.stringify(modes));
       const au = await audit(page);
-      check('(13a) 1440×900 cruise: the dock overlaps nothing', au.clashes.length === 0 && au.mine.length >= 2, `${au.clashes.join('; ')} · mine ${au.mine} · others ${au.others}`);
+      check('(13a) 1440×900 cruise: the dock overlaps nothing', au.clashes.length === 0 && au.mine.includes('calm-row'), `${au.clashes.join('; ')} · mine ${au.mine} · others ${au.others}`);
       await page.keyboard.press('n');
       await page.waitForTimeout(1500);
       const au2 = await audit(page);
@@ -570,14 +573,14 @@ if (urlArg) {
       await page.close();
     }
   }
-  for (const size of [{ width: 1920, height: 1080 }, { width: 1280, height: 720 }]) {
+  for (const size of [{ width: 1920, height: 1080 }, { width: 1280, height: 720 }].filter((z) => !only || only.split(',').includes(String(z.width)))) {
     const { page, errors } = await session(size);
     try {
       const au = await audit(page);
       await page.keyboard.press('n');
       await page.waitForTimeout(1500);
       const au2 = await audit(page);
-      check(`(13d) ${size.width}×${size.height}: the dock overlaps nothing (cruise, Nearby open)`, au.clashes.length === 0 && au2.clashes.length === 0 && au.mine.length >= 2, [...au.clashes, ...au2.clashes].join('; '));
+      check(`(13d) ${size.width}×${size.height}: the dock overlaps nothing (cruise, Nearby open)`, au.clashes.length === 0 && au2.clashes.length === 0 && au.mine.includes('calm-row'), `${[...au.clashes, ...au2.clashes].join('; ')} · mine ${au.mine}`);
       check(`(15b) ${size.width}×${size.height}: zero page and shader errors`, errors.length === 0, errors.slice(0, 2).join(' | '));
     } catch (e) {
       check(`(13d) ${size.width}×${size.height} run`, false, e.message.split('\n')[0]);
@@ -586,7 +589,7 @@ if (urlArg) {
     }
   }
   // (14) flag off
-  {
+  if (!only || only.split(',').includes('off')) {
     const { page, errors } = await session({ width: 1440, height: 900 }, '&flags=-CALM_HUD');
     try {
       const st = await page.evaluate(() => ({
