@@ -88,13 +88,13 @@ await check('1 the block is on and read through play-pass', () => {
 });
 await check('1 every tunable is present, finite and sane', () => {
   const want = {
-    next: ['horizonS', 'switchS', 'hiddenTouchdownS', 'otherRunwayS', 'climbS', 'climbPerKmS', 'climbRangeM', 'refreshMs'],
+    next: ['horizonS', 'switchS', 'hiddenTouchdownS', 'otherRunwayS', 'climbS', 'climbPerKmS', 'climbRangeM', 'refreshMs', 'inUseS'],
     sky: ['bracketM', 'movementM', 'dotM', 'dotAlpha', 'groundMovingM', 'groundMovingMs', 'phaseLabels'],
     locator: ['ringPx', 'edgeInsetPx', 'touchdownAlongM'],
     optics: ['fill', 'minMag', 'maxMag', 'lockOmega', 'rateFilterSec', 'bodyM', 'nakedMag'],
     watch: ['slewOmega', 'slewRampSec', 'rolloutHoldS', 'landedDoneS', 'taxiMs', 'climbHoldS', 'airborneDoneS', 'climbWatchS', 'climbDoneRangeM', 'lostS', 'maxWatchS'],
     director: ['leadS', 'closeEtaS', 'closeRangeM', 'restS', 'fillerS', 'fillerRangeM', 'fillerCooldownS', 'captionS'],
-    moments: ['touchdownMinMs', 'liftoffMinMs', 'showS', 'rangeM', 'pastThresholdM', 'runwayM', 'centrelineM', 'levelMs'],
+    moments: ['touchdownMinMs', 'liftoffMinMs', 'showS', 'rangeM', 'pastThresholdM', 'runwayM', 'centrelineM', 'levelMs', 'recentS'],
   };
   for (const [group, keys] of Object.entries(want)) for (const k of keys) assert.ok(Number.isFinite(LOUNGE_DIRECTOR[group]?.[k]) && LOUNGE_DIRECTOR[group][k] >= 0, `${group}.${k}`);
   assert.ok(cfg.sky.bracketM < cfg.sky.dotM && cfg.sky.movementM <= cfg.sky.dotM, 'bracket ranges inside the dot range');
@@ -138,6 +138,8 @@ await check('2 nextMovement: hysteresis holds the shown one inside switchS; excl
   assert.equal(D.nextMovement(b, null, cfg, () => null, 'l2').hex, 'l1', 'excluded');
   const seen = (hex) => ({ touchdownSeen: hex !== 'l2', facedRunway: true });
   assert.equal(D.nextMovement(board([row('l1', 'arrival', { etaS: 90 }), row('l2', 'arrival', { etaS: 60 })]), null, cfg, seen).hex, 'l1', 'a landing you cannot see waits hiddenTouchdownS');
+  const only = (m, f) => f.touchdownSeen !== false;
+  assert.equal(D.nextMovement(board([row('l1', 'arrival', { etaS: 300 }), row('l2', 'arrival', { etaS: 10 })]), null, cfg, seen, null, only).hex, 'l1', 'accept() leaves out what cannot be shown');
 });
 await check('2 rangeMagnification: frames the span at `fill`, monotonic in range, clamped to the optics', () => {
   let last = 0;
@@ -240,6 +242,7 @@ await check('2 wording: countdown, flight title, caption kicker, moment title', 
   assert.equal(D.captionKicker('landing', 'short-final', '04R'), 'Short final · Runway 04R');
   assert.equal(D.captionKicker('landing', 'rollout', null), 'Landed');
   assert.equal(D.captionKicker('takeoff', 'takeoff-roll', '22R'), 'Takeoff roll · Runway 22R');
+  assert.equal(D.captionKicker('filler', 'filler', null), 'Taxiing');
   assert.equal(D.momentTitle('touchdown', '04R'), 'Touchdown · Runway 04R');
   assert.equal(D.momentTitle('liftoff', null), 'Airborne');
 });
@@ -359,6 +362,35 @@ await check('3 a landing the feed never flags on the ground touches down over it
   assert.ok(h.cues.includes('select'), 'the touchdown moment chimed');
   assert.equal(h.watch.director.session, null, 'the watch let go after the rollout');
   assert.equal(h.watch.tracking, false);
+  h.detach();
+});
+await check('3 an arrival still turning in is expected on the runway in use (its locator points there)', () => {
+  const h = harness();
+  h.setEta(150); // the aligned one: 04R
+  h.run(1);
+  h.watch.director.reset();
+  const b = h.watch.board();
+  const rows = [row('def456', 'arrival', { label: 'SWA1', etaS: 60, runway: null }), ...b.arrivals];
+  h.watch.board = () => board(rows);
+  h.run(1);
+  const n = h.watch.director.next;
+  assert.equal(n.hex, 'def456');
+  assert.equal(n.runway, null, 'no runway claimed for it');
+  assert.equal(n.touchdown?.label, '04R', 'but its locator points at the touchdown zone in use');
+  h.detach();
+});
+await check('3 the next landing earns its touchdown moment even as the cue moves on to the following one', () => {
+  const h = harness();
+  h.setEta(20);
+  h.run(1);
+  assert.equal(h.watch.director.next.hex, 'abc123');
+  h.run(30, (s) => {
+    const eta = 20 - s;
+    if (eta > 0) h.setEta(eta);
+    else { h.t.flags = 1; h.setEta(0, { phase: 'runway' }); } // landed: the board takes it off the cue
+  });
+  assert.notEqual(h.watch.director.next?.hex, 'abc123', 'the cue moved on');
+  assert.ok(h.cues.includes('select'), 'its touchdown still chimed (the moment; the harness select() makes no sound)');
   h.detach();
 });
 await check('3 an unseen arrival: the director looks where it will land and follows it on sight', () => {

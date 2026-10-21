@@ -38,6 +38,8 @@ import { useFlyStore } from '@/stores/fly-store';
 import { SatVegLayer } from './SatVegLayer';
 // R24 B (GROUND_VIS, recon A6/T8) — AGL fade bands read the DAMPED ground.
 import { eyeAglVis } from '@/lib/fly/ground-vis';
+// PLAY PASS CITY (CITY_FACADES): the region palette the facade pass reads.
+import { CITY_FACADES_ON, updateCityFacades, cityFacadesState, setCityFacadesSky } from '@/lib/fly/city-facades';
 
 const TIERS = ['low', 'medium', 'high']; // mirrors FlyCanvas's quality ladder
 const atLeastTier = (tier, min) => TIERS.indexOf(tier) >= TIERS.indexOf(min);
@@ -108,6 +110,7 @@ export function SatBuildingLayer({ runtime, flight }) {
       satelliteVisualsOn() ? { ringM: SAT_COVERAGE.high.ringM, maxChunks: satelliteVisualProfile(qualityTier).buildingChunks } : SAT_COVERAGE.enabled && qualityTier === 'high' ? SAT_COVERAGE.high : null
     );
     setSatelliteArchitectureDetail(engine.material, satelliteVisualProfile(qualityTier).normalMaps);
+    if (CITY_FACADES_ON) setCityFacadesSky(satelliteVisualProfile(qualityTier).normalMaps); // PLAY PASS CITY
   }, [engine, qualityTier]);
   // Round 19 — the two SAT_SHADOWS mesh flags for THIS layer's meshes (the
   // plan's per-layer rule; B DEEPFIELD owns the light rig and FlyScene's
@@ -205,6 +208,8 @@ export function SatBuildingLayer({ runtime, flight }) {
     // republished on a 60s cadence — this just reads it; one uniform write).
     engine.setNightMix(runtime.sun?.frac);
     engine.update(clock.elapsedTime, flight.pos.x, flight.pos.z, eyeAgl);
+    // PLAY PASS CITY: one region vote a second, a few uniform writes while easing.
+    if (CITY_FACADES_ON) updateCityFacades(engine, clock.elapsedTime, runtime.origin?.anchor);
     // …and the birth, AFTER the engine's own uniform write.
     const ready = engine.stats.ready;
     const k = birthK(
@@ -232,6 +237,7 @@ export function SatBuildingLayer({ runtime, flight }) {
     ) {
       statsAtRef.current = clock.elapsedTime;
       window.__flyStats.satBuildings = engine.stats;
+      if (CITY_FACADES_ON) window.__flyStats.cityFacades = cityFacadesState();
     }
   }, -47);
 

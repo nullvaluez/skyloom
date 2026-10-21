@@ -80,7 +80,10 @@ assert.match(fs.readFileSync(new URL('../lib/fly/toy-world/vector-tile.worker.js
 const {createSatelliteArchitectureMaterial,setSatelliteArchitectureCoverage} = await import('../lib/fly/satellite-architecture-material.js');
 for(const distant of [false,true]) {
   const material=createSatelliteArchitectureMaterial({distant});
-  const shader={uniforms:{},vertexShader:'#include <common>\n#include <begin_vertex>',fragmentShader:'#include <common>\n#include <color_fragment>\n#include <emissivemap_fragment>'};
+  // Three's real standard program, not a stub: PLAY PASS CITY's anchored edits
+  // (lib/fly/city-facades.js) throw on a missing anchor, as they should.
+  const {ShaderLib}=await import('three');
+  const shader={uniforms:{},vertexShader:ShaderLib.standard.vertexShader,fragmentShader:ShaderLib.standard.fragmentShader};
   material.onBeforeCompile(shader);
   assert.match(shader.fragmentShader,/vec3 style = floor\(vBuildingStyle \+ 0\.5\)/,'Night seed precision guard survives');
   assert.match(shader.fragmentShader,/mix\(vec3\(0\.32\), diffuseColor\.rgb, 0\.35\)/,'Glazing reads the existing material variant albedo');

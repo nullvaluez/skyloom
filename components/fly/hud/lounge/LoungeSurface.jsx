@@ -2,6 +2,7 @@
 /* eslint-disable react-hooks/immutability -- the picker is the overlay's imperative per-frame bus. */
 import { useEffect, useRef } from 'react';
 import { useFlyStore } from '@/stores/fly-store';
+import { useEncounterStore } from '@/stores/encounter-store';
 import { VIEW } from '@/lib/fly/observation-config';
 import { pickRadius } from '@/lib/fly/airport-watch-camera.mjs';
 import { decorTurn, inspectKeyAction } from '@/lib/fly/lounge/lounge-life.mjs';
@@ -160,7 +161,13 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
             break;
           case 'n':
             if (!w.director) handled = false;
-            else if (!w.director.watchNext()) onNotice?.('Nothing is lined up to land or take off yet.');
+            else {
+              // Flight's N (the Nearby scope, components/fly/hud/EncounterExperience.jsx)
+              // hears this key first and toggles its hidden scope, which would then
+              // swallow the next Esc: in the lounge N is ours, so it stays closed.
+              if (useEncounterStore.getState().nearbyOpen) useEncounterStore.getState().setNearbyOpen(false);
+              if (!w.director.watchNext()) onNotice?.('Nothing is lined up to land or take off yet.');
+            }
             break;
           case 'h':
             if (!w.director) handled = false;

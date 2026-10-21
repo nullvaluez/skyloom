@@ -123,6 +123,26 @@ const report = { airport, url, utc, flags, errors: [], shadersErrors: [], shots:
       await shot('05-bino-late');
       await page.evaluate(() => { const w = window.__fly.airportWatch; if (w.binocular) w.binoculars(false); });
     }
+    if (steps.includes('keys')) {
+      // The real key path (LoungeSurface): N watches, H toggles, any other key or Esc hands back, the walk too.
+      const st = () => page.evaluate(() => { const w = window.__fly.airportWatch; return { active: w.active, auto: !!w.director?.auto, session: w.director?.session?.hex ?? null, selected: w.selected, tracking: w.tracking, posture: w.posture }; });
+      const keys = {};
+      await page.mouse.click(720, 600); // focus the look surface (a click on nothing)
+      await page.keyboard.press('n'); await page.waitForTimeout(1500); keys.n = await st();
+      await page.keyboard.press('h'); await page.waitForTimeout(2500); keys.h = await st();
+      await shot('07-keys-auto');
+      await page.keyboard.down('ArrowLeft'); await page.waitForTimeout(300); await page.keyboard.up('ArrowLeft'); keys.arrowHandsBack = await st();
+      await page.keyboard.press('h'); await page.waitForTimeout(800); keys.h2 = await st();
+      await page.keyboard.press('Escape'); await page.waitForTimeout(500); keys.escHandsBack = await st();
+      await page.mouse.click(720, 600);
+      await page.keyboard.press('h'); await page.waitForTimeout(800);
+      await page.mouse.move(700, 500); await page.mouse.down(); await page.mouse.move(760, 520, { steps: 4 }); await page.mouse.up(); keys.dragHandsBack = await st();
+      await page.keyboard.press('h'); await page.waitForTimeout(800);
+      await page.keyboard.down('w'); await page.waitForTimeout(900); await page.keyboard.up('w'); await page.waitForTimeout(400); keys.walkHandsBack = await st();
+      await shot('08-keys-standing');
+      report.steps.keys = keys;
+      console.log(JSON.stringify(keys));
+    }
     if (steps.includes('director')) {
       const started = await page.evaluate(() => { const w = window.__fly.airportWatch; w.clearSelection(); return w.director ? (w.director.setAuto(true), true) : false; });
       report.steps.director = { started, timeline: [] };
