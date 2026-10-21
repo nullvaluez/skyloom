@@ -242,6 +242,7 @@ await check('2 wording: countdown, flight title, caption kicker, moment title', 
   assert.equal(D.captionKicker('landing', 'short-final', '04R'), 'Short final · Runway 04R');
   assert.equal(D.captionKicker('landing', 'rollout', null), 'Landed');
   assert.equal(D.captionKicker('takeoff', 'takeoff-roll', '22R'), 'Takeoff roll · Runway 22R');
+  assert.equal(D.captionKicker('filler', 'filler', null), 'Taxiing');
   assert.equal(D.momentTitle('touchdown', '04R'), 'Touchdown · Runway 04R');
   assert.equal(D.momentTitle('liftoff', null), 'Airborne');
 });
