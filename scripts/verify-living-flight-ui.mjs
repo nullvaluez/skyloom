@@ -104,6 +104,13 @@ const STATES = {
 async function runLeg(on) {
   globalThis.window = { location: { search: '', href: 'http://localhost/' } };
   globalThis.window.__flyFlightInstrumentsOverride = { enabled: on };
+  // PLAY PASS: this gate certifies FLIGHT_INSTRUMENTS as the HUD it was built
+  // as, so CALM_HUD (whose default mode hides the instruments) is pinned off;
+  // scripts/verify-play-hud.mjs certifies them as CALM_HUD's Instruments mode.
+  globalThis.window.__flyCalmHudOverride = { enabled: false };
+  // ENCOUNTER_FEEL's escort card needs a react-query client node does not
+  // have; the instruments are what this gate certifies.
+  globalThis.window.__flyEncounterFeelOverride = { enabled: false };
   globalThis.window.__flyHangarStageOverride = { enabled: on };
   process.env.NODE_ENV = 'production';
   registerHooks();
@@ -340,7 +347,7 @@ if (urlArg) {
       } catch { /* private mode */ }
     });
     await page.route('**/api/weather**', (r) => r.fulfill({ json: { found: false } }));
-    const flags = onArm ? '' : '&flags=-FLIGHT_INSTRUMENTS,-HANGAR_STAGE';
+    const flags = onArm ? '&flags=-CALM_HUD' : '&flags=-FLIGHT_INSTRUMENTS,-HANGAR_STAGE,-CALM_HUD'; // CALM_HUD: see runLeg
     await page.goto(`${urlArg}/?graphicsReview=1${flags}`, { waitUntil: 'domcontentloaded', timeout: 300000 });
     return { ctx, page, errors };
   }

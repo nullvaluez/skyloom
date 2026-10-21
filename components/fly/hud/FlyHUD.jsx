@@ -6,6 +6,8 @@ import { CinemaReviewDock } from './CinemaReviewDock';
 import { CinemaBars, EscortHud } from './EscortHud';
 import { FlightInstruments } from './FlightInstruments';
 import { livingWorldOn } from '@/lib/fly/living-world';
+import { CALM, CALM_CFG } from './calm-hud';
+import { CalmHud } from './CalmHud';
 
 
 import { useEffect, useRef } from 'react';
@@ -19,6 +21,9 @@ import { useDeviceLayout } from '@/hooks/use-device-layout';
 // strip attribute); on adds the instruments and lets the Enhanced strip yield
 // to them (flight-instruments.css).
 const INSTRUMENTS = livingWorldOn('FLIGHT_INSTRUMENTS');
+// PLAY PASS (CALM_HUD): with the flag on the instruments are one of three HUD
+// modes (CalmHud.jsx). Off, every branch below is the line it always was.
+const CLEAN_PLACE_MS = (CALM_CFG.cleanPlaceSec ?? 6) * 1000;
 
 /**
  * Flight readouts. DOM text updated at 10Hz from the shared runtime via
@@ -37,6 +42,15 @@ export function FlyHUD({ runtime }) {
   const spotting=useFlyStore(s=>s.spotting);
   const quiet = mapStyle === 'satellite' && satelliteVisualsOn('presentation');
   const { isTouch } = useDeviceLayout();
+  const hudMode = useFlyStore((s) => s.hudMode);
+  const mode = CALM ? hudMode : null;
+  const instrumentsUp = INSTRUMENTS && (!CALM || mode === 'instruments');
+  const modeRef = useRef(mode);
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
+  const placeNameRef = useRef(null);
+  const placeDistRef = useRef(null);
   const spdRef = useRef(null);
   const altRef = useRef(null);
   const aglRef = useRef(null);
@@ -48,6 +62,9 @@ export function FlyHUD({ runtime }) {
   const lonRef = useRef(null);
 
   useEffect(() => {
+    // CALM: the place line's name and distance live in their own spans (the
+    // element's text stays "NAME · 1.6nm W"); a new name eases in.
+    const place = { name: null, dist: null, at: -Infinity };
     const id = setInterval(() => {
       const f = runtime.flight;
       if (!f) return;
@@ -76,7 +93,26 @@ export function FlyHUD({ runtime }) {
         const cmd = runtime.input?.read();
         presetRef.current.textContent = runtime.operations?.lowSpeed ? `${Math.round(runtime.operations.throttle*100)}%` : cmd?.boost ? 'BOOST' : (cmd?.speedPreset ?? 'cruise').toUpperCase();
       }
-      if (poiRef.current) {
+      if (CALM && poiRef.current && placeNameRef.current && placeDistRef.current) {
+        const poi = runtime.nearestPoi; // written by PoiLetters at 0.5Hz
+        const cut = poi ? poi.indexOf(' · ') : -1;
+        const name = poi ? (cut < 0 ? poi : poi.slice(0, cut)) : '';
+        const dist = cut < 0 ? '' : poi.slice(cut + 3);
+        const now = performance.now();
+        if (name !== place.name) {
+          place.name = name;
+          place.at = now;
+          placeNameRef.current.textContent = name;
+          if (name && poiRef.current.style.opacity === '1' && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
+            placeNameRef.current.animate?.([{ opacity: 0, letterSpacing: '0.42em', filter: 'blur(3px)' }, { opacity: 1 }], { duration: 900, easing: 'cubic-bezier(.16,1,.3,1)' });
+        }
+        if (dist !== place.dist) {
+          place.dist = dist;
+          placeDistRef.current.textContent = dist;
+        }
+        const show = !!poi && (modeRef.current !== 'clean' || now - place.at < CLEAN_PLACE_MS);
+        poiRef.current.style.opacity = show ? '1' : '0';
+      } else if (poiRef.current) {
         const poi = runtime.nearestPoi; // written by PoiLetters at 0.5Hz
         poiRef.current.textContent = poi ? `${newEarth?'':'◆ '}${poi}` : '';
         poiRef.current.style.opacity = poi ? '1' : '0';
@@ -107,11 +143,15 @@ export function FlyHUD({ runtime }) {
   return (
     <>
       <CinemaReviewDock runtime={runtime} />
-      {/* steering reference: the cursor's offset from this dot is the command */}
-      <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/60" />
+      {/* steering reference: the cursor's offset from this dot is the command
+          (CALM: only in the Instruments mode; the other modes get the fading
+          steering cue instead, CalmHud.jsx) */}
+      {(!CALM || mode === 'instruments') && <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/60" />}
       {/* LIVING WORLD: tapes, heading scale and the flight-path marker, drawn
           per GL frame (FlightInstruments.jsx). */}
-      {INSTRUMENTS && <FlightInstruments runtime={runtime} />}
+      {instrumentsUp && <FlightInstruments runtime={runtime} />}
+      {/* PLAY PASS (CALM_HUD): the dock, the steering cue, calm and the modes. */}
+      {CALM && <CalmHud runtime={runtime} mode={mode} isTouch={isTouch} newEarth={newEarth} spotting={spotting} />}
 
       {/* "Where am I" — nearest airport/city + bearing, video-game style.
           On phones it sits below the notch-safe stats strip. */}
@@ -122,8 +162,17 @@ export function FlyHUD({ runtime }) {
         // by a gate, which is why the gate now knows about this element).
         data-testid="hud-poi"
         data-cinematic={cinema ? '1' : '0'}
+        data-calm={CALM ? mode : undefined}
         className="pointer-events-none absolute left-1/2 top-20 z-10 -translate-x-1/2 font-mono text-xs font-semibold uppercase tracking-[0.2em] text-amber-200/90 transition-opacity duration-500 [text-shadow:0_1px_4px_rgba(0,0,0,0.9)] max-sm:top-[calc(env(safe-area-inset-top)+4.75rem)] phone:top-[calc(env(safe-area-inset-top)+4.75rem)] phone-land:top-[calc(env(safe-area-inset-top)+3.1rem)] phone:w-[92vw] phone:truncate phone:text-center"
-      />
+      >
+        {CALM && (
+          <>
+            <span className="calm-place-name" ref={placeNameRef} />
+            <span className="calm-place-sep"> · </span>
+            <span className="calm-place-dist" ref={placeDistRef} />
+          </>
+        )}
+      </div>
 
       {/* The escort HUD (was the one-line chase chip — testid kept) and the
           cinematic letterbox: the visible payoff of an ESCORT order. */}
@@ -134,8 +183,8 @@ export function FlyHUD({ runtime }) {
           a backdrop-filter over the live GL canvas makes the compositor
           re-read the framebuffer every frame. Desktop keeps blur-sm and
           bg-zinc-950/60 exactly. */}
-      {newEarth&&<button type="button" className="cinema-spotting" aria-pressed={spotting} onClick={()=>useFlyStore.getState().setSpotting(!spotting)}>{spotting?'Spotting · On':'Spotting · Off'}</button>}
-      <div data-testid="flight-stats-strip" data-earth={newEarth?'cinematic':undefined} data-spotting={spotting?'1':'0'} data-cinematic={cinema ? '1' : '0'} data-instruments={INSTRUMENTS ? '1' : undefined} className="hud-flat-phone pointer-events-none absolute left-1/2 top-4 z-10 flex -translate-x-1/2 divide-x divide-zinc-700 rounded-lg bg-zinc-950/60 py-1.5 backdrop-blur-sm max-sm:top-[calc(env(safe-area-inset-top)+0.375rem)] phone:top-[calc(env(safe-area-inset-top)+0.375rem)] phone-land:top-[calc(env(safe-area-inset-top)+0.25rem)] phone:bg-zinc-950/85 phone:py-1">
+      {newEarth&&(!CALM||isTouch)&&<button type="button" className="cinema-spotting" aria-pressed={spotting} onClick={()=>useFlyStore.getState().setSpotting(!spotting)}>{spotting?'Spotting · On':'Spotting · Off'}</button>}
+      <div data-testid="flight-stats-strip" data-earth={newEarth?'cinematic':undefined} data-spotting={spotting?'1':'0'} data-cinematic={cinema ? '1' : '0'} data-instruments={instrumentsUp ? '1' : undefined} data-calm={CALM ? mode : undefined} className="hud-flat-phone pointer-events-none absolute left-1/2 top-4 z-10 flex -translate-x-1/2 divide-x divide-zinc-700 rounded-lg bg-zinc-950/60 py-1.5 backdrop-blur-sm max-sm:top-[calc(env(safe-area-inset-top)+0.375rem)] phone:top-[calc(env(safe-area-inset-top)+0.375rem)] phone-land:top-[calc(env(safe-area-inset-top)+0.25rem)] phone:bg-zinc-950/85 phone:py-1">
         <div className={cell}>
           <span className={label}>SPD KT</span>
           <span className={value} ref={spdRef}>—</span>
@@ -191,7 +240,7 @@ export function FlyHUD({ runtime }) {
       {/* Desktop: the full control legend. Touch: the on-screen controls are
           self-explanatory, so drop the mouse/keyboard sentence and keep only
           the tiny live quality-tier chip (out of the way, above attribution). */}
-      {isTouch ? (
+      {CALM && !isTouch ? null : isTouch ? (
         <div className="pointer-events-none absolute bottom-[calc(env(safe-area-inset-bottom)+0.5rem)] left-1/2 z-10 -translate-x-1/2">
           <span
             data-testid="hud-quality-tier"
