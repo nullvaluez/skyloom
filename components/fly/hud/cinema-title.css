@@ -1,4 +1,4 @@
-/* TITLE_CINEMA — the window-seat title (components/fly/hud/CinemaTitle.jsx).
+/* The cinema title — the window-seat title (components/fly/hud/CinemaTitle.jsx).
    Every rule is scoped to .tcn, the root the cinema title alone renders, so
    the flag-off title (title.css) is untouched. The language: the live world
    is the window; a dark bezel with rounded inner corners frames it; mono

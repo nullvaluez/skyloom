@@ -32,7 +32,6 @@ import { aircraftName, isAircraftId } from '@/lib/fly/player-aircraft';
 import { adventureById } from '@/lib/fly/adventures.mjs';
 import { livingAirportsOn } from '@/lib/fly/airport-feature-policy';
 import { computeSun } from '@/lib/fly/sun-model';
-import { livingWorldBlock, livingWorldOn } from '@/lib/fly/living-world';
 import { loadCoastlines } from '@/lib/fly/atlas/coastlines';
 import { FLEET_PRESENTATION } from '@/lib/fly/fleet-aircraft.mjs';
 import {
@@ -52,6 +51,7 @@ import {
   tourMayAdvance,
   tourStep,
   tourStops,
+  TITLE_TOUR,
 } from '@/lib/fly/title-tour';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { CreditsPanel } from './CreditsPanel';
@@ -61,7 +61,7 @@ import './title.css';
 import './cinema-title.css';
 
 /*
- * TITLE_CINEMA — the window-seat title (owner-requested, 2026-10-21).
+ * The cinema title — the window-seat title (owner-requested, 2026-10-21).
  *
  * The live world orbiting behind the title IS the view; this layer frames it
  * as a window with a dataview over it:
@@ -84,8 +84,7 @@ import './cinema-title.css';
  * state (Esri's terms), and the Settings / Credits sheets stop above it.
  */
 
-export const CINEMA_ON = livingWorldOn('TITLE_CINEMA');
-const CFG = livingWorldBlock('TITLE_CINEMA') ?? {};
+const CFG = TITLE_TOUR;
 const TOUR_CFG = CFG.tour ?? {};
 const SHADE_CFG = CFG.shade ?? {};
 const num = (v, d) => (Number.isFinite(v) ? v : d);
@@ -580,13 +579,12 @@ function RouteMap({ stops, current, from, to, flying, still, onPick }) {
 }
 
 /**
- * Mounted by FlyMode beside TitleScreen (which steps aside with the flag on).
- * Renders nothing unless the flag ships, the front door is on and the screen
- * is the title.
+ * The title (FlyMode mounts it; the classic TitleScreen is no longer mounted).
+ * Renders nothing unless the front door is on and the screen is the title.
  */
 export function CinemaTitle({ runtime }) {
   const screen = useFlyStore((s) => s.screen);
-  if (!CINEMA_ON || !FRONT_DOOR.enabled || screen !== 'title') return null;
+  if (!FRONT_DOOR.enabled || screen !== 'title') return null;
   return <CinemaBody runtime={runtime} />;
 }
 

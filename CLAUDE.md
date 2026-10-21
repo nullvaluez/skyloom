@@ -37,15 +37,16 @@
 >   airframes and contrails, airfield ground and lighting, terminal set; since
 >   2026-10-14 the walk: WASD, vantage seats, Sit prompt, seat menu, behind
 >   `LOUNGE_WALK`, on) and its open owner checkpoints.
-> - **Cinema title (2026-10-21, owner-requested, shipped on):**
+> - **Cinema title (2026-10-21, owner-requested, the only title, no flag):**
 >   [FLY_TITLE_CINEMA.md](FLY_TITLE_CINEMA.md) — the front door rebuilt as a
 >   window seat: a live dataview over the orbit (heading tape off
 >   `runtime.titleCam`, coordinates, light, altitude, live traffic), the place
 >   set large, a WORLD TOUR across the featured spots behind a window shade
 >   that hides each stop's streaming (`runtime.stageDestination`), a
 >   boarding-pass primary (Continue / Fly here), numbered modes with arrow
->   keys, H to watch. Flag `TITLE_CINEMA` (Living World registry);
->   `?flags=-TITLE_CINEMA` is the previous title. Every title testid is kept;
+>   keys, H to watch. No flag: FlyMode mounts only `CinemaTitle`, tunables
+>   are `TITLE_TOUR` in `lib/fly/title-tour.js`, and the classic `TitleScreen`
+>   is no longer mounted (its sheets and wordmark are reused). Every title testid is kept;
 >   automation (`navigator.webdriver`) keeps the tour manual. Gate:
 >   `scripts/verify-title-cinema.mjs`.
 > - **Target UI (2026-10-07, shipped on, owner-requested):** [FLY_TARGET_UI.md](FLY_TARGET_UI.md)

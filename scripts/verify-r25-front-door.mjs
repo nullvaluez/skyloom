@@ -779,7 +779,8 @@ try {
   const mode = rd('components/fly/FlyMode.jsx');
   const pause = rd('components/fly/PauseMenu.jsx');
   const canvas = rd('components/fly/FlyCanvas.jsx');
-  const title = rd('components/fly/hud/TitleScreen.jsx');
+  // The cinema title is the title (2026-10-21); it reuses TitleScreen's sheets.
+  const title = rd('components/fly/hud/TitleScreen.jsx') + rd('components/fly/hud/CinemaTitle.jsx');
   const boot = rd('components/fly/hud/BootScreen.jsx');
   const eb = rd('components/fly/FlyErrorBoundary.jsx');
   const layout = rd('app/layout.js');
@@ -791,7 +792,7 @@ try {
       (/runtime\.titleCam\?\.active/.test(scene) || (/cameraOwner\(/.test(scene) && /runtime\.titleCam\?\.active/.test(rd('lib/fly/camera-mode.js')))) &&
       /spotAllowed\(store\)/.test(scene) && /menuOpen\(/.test(scene));
   gate('(8b) FlyMode installs the title camera and mounts the title; FlyCanvas mounts <StagePump> behind the flag',
-    /installTitleCamera\(runtime\)/.test(mode) && /<TitleScreen runtime=\{runtime\}/.test(mode) && /FRONT_DOOR\.enabled && <StagePump/.test(canvas));
+    /installTitleCamera\(runtime\)/.test(mode) && /<(TitleScreen|CinemaTitle) runtime=\{runtime\}/.test(mode) && /FRONT_DOOR\.enabled && <StagePump/.test(canvas));
   gate('(8c) exit goes to the title (pause-exit-title "Exit to title"); the error boundary keeps the reload as "Restart Skyloom"',
     /data-testid|testid="pause-exit-title"/.test(pause) && /Exit to title/.test(pause) && /exitToTitle\(runtime\)/.test(mode) && /Restart Skyloom/.test(eb) && /onExit=\{onClose\}/.test(mode));
   const ids = ['title-screen', 'title-continue', 'title-explore', 'title-takeoff-landing', 'title-logbook', 'title-settings', 'title-credits', 'title-spot', 'settings-sheet'];

@@ -1,19 +1,16 @@
 /**
- * TITLE_CINEMA — verify-title-cinema: the window-seat title, in node.
+ * verify-title-cinema: the window-seat title, in node.
  *
- * Server-renders the real CinemaTitle and TitleScreen in two arms, each in its
- * own node process, with the block forced in memory by the loader (the
- * constants file on disk is never touched — the R24 harness-hygiene rule):
- *   on   TITLE_CINEMA enabled (MENU_GLASS / TITLE_MOTION as they ship);
- *   off  TITLE_CINEMA disabled.
+ * Server-renders the real CinemaTitle in a child node process (JSX through
+ * the loader, stylesheets stubbed) and runs the pure checks there. The cinema
+ * title is the only title: no flag gates it (2026-10-21, owner's call).
  *
- *  (1) the block ships ON with its tunables, is read only through
- *      lib/fly/living-world.js, and FlyMode mounts the cinema title beside
- *      TitleScreen;
- *  (2) on: CinemaTitle renders the title root carrying every harness address
- *      of the old title (and its own), and TitleScreen steps aside;
- *  (3) off: CinemaTitle renders nothing and TitleScreen renders the Living
- *      World title (class "fly-title lwt") — the flag-off title is today's;
+ *  (1) its tunables live in lib/fly/title-tour.js (TITLE_TOUR), and no flag
+ *      named TITLE_CINEMA (or its pin) survives anywhere in the app;
+ *  (2) CinemaTitle renders the title root carrying every harness address of
+ *      the old title (and its own), and nothing off the title screen;
+ *  (3) FlyMode mounts CinemaTitle and no longer mounts the classic TitleScreen
+ *      (whose Settings / Credits sheets and wordmark the cinema title reuses);
  *  (4) the tour helpers: the stop list, the stop under a position, stepping,
  *      when the tour may move on by itself, when the shade is down, and the
  *      tape heading against the title camera's own behindAngle;
@@ -25,13 +22,13 @@
  *      silences them) and the title asks for them optional-chained.
  *  (8) automation (navigator.webdriver) keeps the tour manual unless a harness
  *      opts in; phones and reduced motion never move it by themselves.
- *  (9) the far-warp overlay draws nothing on the cinema title (the shade owns
- *      the transition) but keeps its readiness hold and bookkeeping.
+ *  (9) the far-warp overlay draws nothing on the title (the shade owns the
+ *      transition) but keeps its readiness hold and bookkeeping.
  *
  * Run: node scripts/verify-title-cinema.mjs
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -40,7 +37,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TS_URL = pathToFileURL(createRequire(import.meta.url).resolve('typescript')).href;
 const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
 
-// The loader every arm runs under: JSX, a stylesheet stub and the forced flag.
+// The loader the child runs under: JSX and a stylesheet stub.
 const LOADER = `
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -57,12 +54,6 @@ export async function load(url, context, nextLoad) {
   if (!url.startsWith('file:')) return nextLoad(url, context);
   const file = fileURLToPath(url.split('?')[0]);
   const rel = path.relative(cfg.root, file).split(path.sep).join('/');
-  if (rel === 'lib/fly/fly-constants.js') {
-    const src = readFileSync(file, 'utf8');
-    const re = /(export const TITLE_CINEMA = \\{\\s*enabled:\\s*)(true|false)/;
-    if (!re.test(src)) throw new Error('verify-title-cinema: no TITLE_CINEMA block');
-    return { format: 'module', source: src.replace(re, '$1' + (cfg.arm === 'on')), shortCircuit: true };
-  }
   if (!file.endsWith('.jsx')) return nextLoad(url, context);
   const out = ts.transpileModule(readFileSync(file, 'utf8'), {
     fileName: file,
@@ -91,7 +82,6 @@ async function child(arm) {
   const React = (await import('react')).default;
   const { renderToStaticMarkup } = await import('react-dom/server');
   const { useFlyStore } = await import('../stores/fly-store.js');
-  const { TitleScreen } = await import('../components/fly/hud/TitleScreen.jsx');
   const { CinemaTitle, continueFields } = await import('../components/fly/hud/CinemaTitle.jsx');
   const h = React.createElement;
   const init = { ...useFlyStore.getInitialState() };
@@ -105,7 +95,6 @@ async function child(arm) {
       cinema: at(title, h(CinemaTitle, { runtime: {} })),
       'cinema-settings': at({ ...title, settingsOpen: true }, h(CinemaTitle, { runtime: {} })),
       'cinema-flight': at({ ...title, screen: 'flight' }, h(CinemaTitle, { runtime: {} })),
-      classic: at(title, h(TitleScreen, { runtime: {} })),
     },
   };
   if (arm === 'on') {
@@ -114,7 +103,6 @@ async function child(arm) {
     const { DESTINATIONS, destinationById } = await import('../lib/fly/destinations.js');
     const { validateSetup } = await import('../lib/fly/flight-plan.js');
     const { LIVING_AIRPORTS } = await import('../lib/fly/airport-feature-policy.js');
-    const { livingWorldBlock } = await import('../lib/fly/living-world.js');
     const noon = Date.UTC(2026, 5, 21, 12, 0, 0); // Greenwich noon: Europe lit, the Pacific dark
     const toy = tour.tourStops({ style: 'toy' });
     const sat = tour.tourStops({ style: 'satellite', now: noon });
@@ -190,7 +178,7 @@ async function child(arm) {
         setupsValid: Object.values(setups).every(Boolean),
       },
       livingAirports: LIVING_AIRPORTS.enabled === true,
-      block: livingWorldBlock('TITLE_CINEMA'),
+      block: tour.TITLE_TOUR,
     };
   }
   process.stdout.write(JSON.stringify(out));
@@ -214,24 +202,27 @@ if (armArg) {
     return JSON.parse(r.stdout);
   };
   const on = run('on');
-  const off = run('off');
   const P = on.pure;
 
   // (1)
-  const consts = read('lib/fly/fly-constants.js');
-  const block = (consts.match(/export const TITLE_CINEMA = \{[\s\S]*?\n\};/) || [''])[0];
+  const block = read('lib/fly/title-tour.js');
   const cinemaSrc = read('components/fly/hud/CinemaTitle.jsx');
-  const titleSrc = read('components/fly/hud/TitleScreen.jsx');
   const modeSrc = read('components/fly/FlyMode.jsx');
-  const lw = read('lib/fly/living-world.js');
-  const direct = [cinemaSrc, titleSrc].some((s) => /import\s*\{[^}]*\bTITLE_CINEMA\b[^}]*\}\s*from\s*['"][^'"]*fly-constants/.test(s));
+  const appFiles = (dir) =>
+    readdirSync(path.join(ROOT, dir), { recursive: true })
+      .map(String)
+      .filter((f) => /\.(m?js|jsx|css)$/.test(f) && !f.includes('vendor') && !f.includes('.built.'))
+      .map((f) => path.join(dir, f));
+  const flagged = ['components', 'lib', 'app', 'stores', 'hooks']
+    .filter((d) => existsSync(path.join(ROOT, d)))
+    .flatMap(appFiles)
+    .filter((f) => /\bTITLE_CINEMA\b|__flyTitleCinemaOverride/.test(read(f)));
   check(
-    '(1) TITLE_CINEMA ships ON with its tunables, is read only through living-world.js, and FlyMode mounts the cinema title beside TitleScreen',
-    /enabled: true/.test(block) && /dwellSec:/.test(block) && /capSec:/.test(block) && !direct &&
-      /livingWorldOn\('TITLE_CINEMA'\)/.test(cinemaSrc) && /livingWorldOn\('TITLE_CINEMA'\)/.test(titleSrc) &&
-      /pinned\(TITLE_CINEMA, '__flyTitleCinemaOverride'\)/.test(lw) &&
-      /<TitleScreen runtime=\{runtime\} \/>[\s\S]{0,200}<CinemaTitle runtime=\{runtime\} \/>/.test(modeSrc) &&
-      P.block?.enabled === true && P.block?.tour?.dwellSec > 0,
+    '(1) the title\'s tunables live in title-tour.js (TITLE_TOUR), and no TITLE_CINEMA flag or pin survives in the app',
+    /export const TITLE_TOUR = Object\.freeze\(/.test(block) && /dwellSec:/.test(block) && /capSec:/.test(block) &&
+      /const CFG = TITLE_TOUR;/.test(cinemaSrc) && flagged.length === 0 &&
+      P.block?.tour?.dwellSec > 0 && P.block?.shade?.capSec > 0 && P.block?.enabled === undefined,
+    flagged.join(', '),
   );
 
   // (2)
@@ -246,22 +237,22 @@ if (armArg) {
   const got = testids(c);
   const missing = want.filter((t) => !got.has(t));
   check(
-    `(2) on: the cinema root renders every harness address (${want.length}) at the title z, and TitleScreen steps aside`,
+    `(2) the cinema root renders every harness address (${want.length}) at the title z, and nothing off the title screen`,
     missing.length === 0 && /class="tcn"/.test(c) && /data-overlay="title"/.test(c) && /data-ready="false"/.test(c) && /z-index:45/.test(c) &&
-      on.scenes.classic === '' && on.scenes['cinema-flight'] === '',
-    missing.length ? `missing ${missing.join(', ')}` : `classic ${on.scenes.classic.length} chars`,
+      on.scenes['cinema-flight'] === '',
+    missing.length ? `missing ${missing.join(', ')}` : `${c.length} chars`,
   );
   const ids = [...c.matchAll(/data-testid="([^"]*)"/g)].map((m) => m[1]);
   const dupes = ids.filter((v, i) => ids.indexOf(v) !== i);
   check('(2b) no harness address appears twice (one Fly here: on the pass when there is no Continue)', dupes.length === 0, dupes.join(', '));
-  check('(2c) on: the Settings sheet opens inside the cinema title (settings-sheet, settings-close)',
+  check('(2c) the Settings sheet opens inside the cinema title (settings-sheet, settings-close)',
     testids(on.scenes['cinema-settings']).has('settings-sheet') && testids(on.scenes['cinema-settings']).has('settings-close'));
 
   // (3)
   check(
-    '(3) off: CinemaTitle renders nothing and TitleScreen renders the Living World title',
-    off.scenes.cinema === '' && off.scenes['cinema-settings'] === '' && /class="fly-title lwt"/.test(off.scenes.classic) &&
-      !/class="tcn/.test(off.scenes.classic) && testids(off.scenes.classic).has('title-explore'),
+    '(3) FlyMode mounts CinemaTitle and no longer imports or mounts the classic TitleScreen',
+    /<CinemaTitle runtime=\{runtime\} \/>/.test(modeSrc) && !/<TitleScreen\b/.test(modeSrc) && !/import \{ TitleScreen \}/.test(modeSrc) &&
+      /if \(!FRONT_DOOR\.enabled \|\| screen !== 'title'\) return null;\s*return <CinemaBody/.test(cinemaSrc),
   );
 
   // (4)
@@ -349,10 +340,9 @@ if (armArg) {
     unscoped.slice(0, 5).join(' | '),
   );
   check(
-    '(6d) the menus only take the cinema classes with the flag on (the journeys sheet, the pause card)',
-    /className=\{CINEMA_ON\?'tcn-sheet':''\}/.test(read('components/fly/hud/AdventureExperience.jsx')) &&
-      /className=\{CINEMA_ON \? 'lg lg-pause-scrim tcn-pause' : 'lg lg-pause-scrim'\}/.test(read('components/fly/PauseMenu.jsx')) &&
-      /livingWorldOn\('TITLE_CINEMA'\)/.test(read('components/fly/PauseMenu.jsx')),
+    '(6d) the menus wear the cinema classes (the journeys sheet, the glass pause card)',
+    /className='tcn-sheet' style=\{\{'--tcn-photo':/.test(read('components/fly/hud/AdventureExperience.jsx')) &&
+      /className="lg lg-pause-scrim tcn-pause"/.test(read('components/fly/PauseMenu.jsx')),
   );
   check(
     '(6b) reduced motion stands it still: the OS pick, the app pick (data-motion="still") and the shade opens without travel',
@@ -389,9 +379,8 @@ if (armArg) {
   // (9)
   const warp = read('components/fly/hud/WarpFlash.jsx');
   check(
-    '(9) the warp overlay draws nothing while the cinema title is up (the shade owns stage warps) and keeps its hold logic; flag off and in flight it is unchanged',
-    /const CINEMA_ON = livingWorldOn\('TITLE_CINEMA'\);/.test(warp) &&
-      /const titleUp = useFlyStore\(\(s\) => CINEMA_ON && s\.screen === 'title'\);/.test(warp) &&
+    '(9) the warp overlay draws nothing while the title is up (the shade owns stage warps) and keeps its hold logic; in flight it is unchanged',
+    /const titleUp = useFlyStore\(\(s\) => s\.screen === 'title'\);/.test(warp) &&
       /if \(!stage \|\| titleUp\) return null;/.test(warp) &&
       (warp.match(/titleUp/g) || []).length === 2,
   );

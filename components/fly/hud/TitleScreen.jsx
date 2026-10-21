@@ -23,9 +23,6 @@ import { GLASS_ON, GLASS_EXIT_MS, closingProps, glassRootProps, stillMotion, use
 import { livingWorldBlock, livingWorldOn } from '@/lib/fly/living-world';
 
 const TITLE_ON = livingWorldOn('TITLE_MOTION');
-// TITLE_CINEMA replaces this title wholesale (./CinemaTitle.jsx, mounted
-// beside it by FlyMode); this one renders nothing then.
-const CINEMA_ON = livingWorldOn('TITLE_CINEMA');
 const TITLE_BLOCK = livingWorldBlock('TITLE_MOTION') ?? {};
 // The entrance hands over to the settled title after this long (so the
 // Logbook's hide/show never replays it).
@@ -139,7 +136,7 @@ function useWorldReady() {
  */
 export function TitleScreen({ runtime }) {
   const screen = useFlyStore((s) => s.screen);
-  if (!FRONT_DOOR.enabled || screen !== 'title' || CINEMA_ON) return null;
+  if (!FRONT_DOOR.enabled || screen !== 'title') return null;
   return <TitleBody runtime={runtime} />;
 }
 

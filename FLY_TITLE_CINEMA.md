@@ -5,11 +5,16 @@ The ONLY part I like is that it panoramas the view of different areas."* Three
 reference images (an aircraft-window dataview, an editorial landing page, a
 boarding-pass hero) were given as inspiration, not as targets to copy.
 
-**Flag:** `TITLE_CINEMA` (Living World registry, end of
-`lib/fly/fly-constants.js`, read only through `lib/fly/living-world.js`),
-**shipped ON** because the owner asked for it. Use `?flags=-TITLE_CINEMA` to
-see the previous Living World title (`TITLE_MOTION`) for one page load. With
-the flag off, the old title renders exactly as before (gate below).
+**No flag (since 2026-10-21, owner's call).** The cinema title is the only
+title. It first shipped behind a `TITLE_CINEMA` Living World flag; at the
+owner's request the flag was removed the same day: FlyMode mounts only
+`CinemaTitle`, the tunables moved to `TITLE_TOUR` in `lib/fly/title-tour.js`,
+and the journeys sheet and pause card always wear the cinema classes.
+`?flags=-TITLE_CINEMA` no longer does anything. The classic `TitleScreen`
+component is no longer mounted; its file stays because the cinema title
+reuses its Settings / Credits sheets and wordmark, and
+`scripts/verify-living-menus.mjs` still renders it. The sections below
+describe the round-1 build, when the flag existed.
 
 ## What the player sees
 

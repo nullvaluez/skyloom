@@ -14,11 +14,8 @@ import { isPhoneClass } from '@/lib/fly/device-class';
 import { RewardAircraftPreview } from './HangarScene';
 import { adventureRecovery } from '@/lib/fly/adventure-guidance.mjs';
 import './adventures.css';
-// TITLE_CINEMA: the library opens as a full-bleed sheet in the cinema title's language.
-import { livingWorldOn } from '@/lib/fly/living-world';
+// The library opens as a full-bleed sheet in the cinema title's language.
 import './cinema-menus.css';
-
-const CINEMA_ON = livingWorldOn('TITLE_CINEMA');
 
 const medals=['','Bronze','Silver','Gold'];
 function Dialog({title,onClose,children,className='',style}){
@@ -53,7 +50,7 @@ function AdventureLibrary({runtime}){
   useEffect(()=>{const read=()=>setReady(!!runtime.adventures);read();const timer=setInterval(read,400);return()=>clearInterval(timer);},[runtime]);
   const close=()=>useAdventureStore.getState().setLibraryOpen(false);
   const launch=()=>{if(progress.active&&!resuming&&!replace){setReplace(true);return;}runtime.audio?.resume?.();if(!runtime.adventures?.prepare(route.id))setError('Flight is not ready yet. Please try again in a moment.');};
-  return <Dialog title="Adventures" onClose={close} className={CINEMA_ON?'tcn-sheet':''} style={CINEMA_ON?{'--tcn-photo':`url(${route.artwork})`}:undefined}><div className="journey-library">
+  return <Dialog title="Adventures" onClose={close} className='tcn-sheet' style={{'--tcn-photo':`url(${route.artwork})`}}><div className="journey-library">
     <div className="journey-index"><h1>Find your<br/>next horizon.</h1><p>Six places to get lost in.<br/>Nine ways to fly there.</p>
       {['first-flights','wild-earth'].map(pack=><section key={pack}><h2>{pack==='first-flights'?'First Flights':'Wild Earth'} <small>{pack==='first-flights'?'Always free':'Free during preview'}</small></h2>
         {ADVENTURES.filter(a=>a.packId===pack).map(a=><button className="journey-route" key={a.id} aria-pressed={id===a.id} onClick={()=>{setReplace(false);setError('');setId(a.id);useAdventureStore.setState({selectedRouteId:a.id});}} data-testid={'adventure-'+a.id}><DestinationImage route={a}/><span><strong>{a.place}</strong><small>{a.name}</small></span><span>{progress.completed[a.id]?medals[progress.completed[a.id].medal]:adventureMinutes(a,a.aircraftId)+' min'}</span></button>)}

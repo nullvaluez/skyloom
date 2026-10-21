@@ -76,10 +76,6 @@ export async function load(url, context, nextLoad) {
       if (!re.test(src)) throw new Error('verify-living-menus: no ' + name + ' block');
       src = src.replace(re, '$1' + (cfg.arm === 'on'));
     }
-    // TITLE_CINEMA replaces the title this gate certifies, so it is pinned OFF
-    // in both arms (an absent pin inherits the shipped state);
-    // scripts/verify-title-cinema.mjs owns the cinema title.
-    src = src.replace(/(export const TITLE_CINEMA = \\{\\s*enabled:\\s*)(true|false)/, '$1false');
     return { format: 'module', source: src, shortCircuit: true };
   }
   if (!file.endsWith('.jsx')) return nextLoad(url, context);

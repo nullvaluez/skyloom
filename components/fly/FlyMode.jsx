@@ -57,7 +57,6 @@ import {
 } from '@/lib/fly/front-door';
 import { installTitleCamera } from '@/lib/fly/title-camera';
 import { resolveInitialSpawn } from '@/lib/fly/flight-plan';
-import { TitleScreen } from './hud/TitleScreen';
 import { CinemaTitle } from './hud/CinemaTitle';
 import { AdventureExperience } from './hud/AdventureExperience';
 import { EncounterExperience } from './hud/EncounterExperience';
@@ -394,8 +393,6 @@ export function FlyMode({ onClose }) {
       {/* R25 A (FRONT DOOR): the title screen, z-45 — over the BootScreen
           backdrop (which turns into a compact strip under it) and under the
           hangar (z-60). Renders nothing unless screen === 'title'. */}
-      <TitleScreen runtime={runtime} />
-      {/* TITLE_CINEMA: the window-seat title; TitleScreen steps aside when it ships. */}
       <CinemaTitle runtime={runtime} />
       <ExplorerGuide runtime={runtime} />
       <RecoveryNotice runtime={runtime}/>

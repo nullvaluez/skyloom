@@ -59,7 +59,7 @@ default** (owner-requested), read only through `lib/fly/living-world.js`.
 | `TITLE_MOTION` | Title sequence: wordmark, staggered entrance, card art, a lit Continue | UI | `components/fly/hud/TitleScreen.jsx`, `title.css` |
 | `FLIGHT_INSTRUMENTS` | Speed and altitude tapes, a heading scale, a flight-path marker | UI | `components/fly/hud/FlyHUD.jsx`, new component |
 | `HANGAR_STAGE` | Studio light, reflective floor, door haze, eased camera moves, idle turntable | UI | `components/fly/hud/HangarScene.jsx`, `GroundHangar.jsx` |
-| `TITLE_CINEMA` | The window-seat title: live dataview, world tour behind a window shade, boarding-pass primary, numbered modes; the journeys sheet and the pause card in its type ([FLY_TITLE_CINEMA.md](FLY_TITLE_CINEMA.md), 2026-10-21) | UI | `components/fly/hud/CinemaTitle.jsx`, `cinema-title.css`, `cinema-menus.css`, `lib/fly/title-tour.js` |
+| ~~`TITLE_CINEMA`~~ (flag removed 2026-10-21; the cinema title is the only title) | The window-seat title: live dataview, world tour behind a window shade, boarding-pass primary, numbered modes; the journeys sheet and the pause card in its type ([FLY_TITLE_CINEMA.md](FLY_TITLE_CINEMA.md), 2026-10-21) | UI | `components/fly/hud/CinemaTitle.jsx`, `cinema-title.css`, `cinema-menus.css`, `lib/fly/title-tour.js` |
 
 ### Rules every workstream follows
 
@@ -115,7 +115,7 @@ Seattle, and the title, hangar and pause screens.
 | `VAPOR_FX`, `AIRFRAME_DETAIL` | on | |
 | `NIGHT_LIGHTS`, `GROUND_MIST` | on | After a fix round (below) |
 | `MENU_GLASS`, `TITLE_MOTION`, `FLIGHT_INSTRUMENTS`, `HANGAR_STAGE` | on | |
-| `TITLE_CINEMA` | **on** | Owner-requested (2026-10-21); replaces the `TITLE_MOTION` title while on. DOM only, no shader or program key. `?flags=-TITLE_CINEMA` is the previous title |
+| `TITLE_CINEMA` | **removed** | Owner-requested (2026-10-21): shipped on, then the flag was removed the same day at the owner's request. The cinema title is the only title, and the `TITLE_MOTION` title is no longer mounted. DOM only, no shader or program key |
 
 ## Results (2026-10-20)
 

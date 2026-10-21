@@ -1,7 +1,6 @@
-/* TITLE_CINEMA — the menus the cinema title opens, in its language.
-   Scoped to .tcn-sheet, the class the journeys library dialog carries only
-   with the flag on (AdventureExperience.jsx), so the flag-off library is
-   untouched. The chosen journey's in-game capture fills the sheet (a
+/* The menus the cinema title opens, in its language.
+   Scoped to .tcn-sheet, the class the journeys library dialog carries
+   (AdventureExperience.jsx), and .tcn-pause on the glass pause card. The chosen journey's in-game capture fills the sheet (a
    background on the scroll container stays put while the list scrolls), the
    place is set large like the title's, the routes are numbered rows with the
    title's lit bar, and the brief is one smoked-glass card. */
