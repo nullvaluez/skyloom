@@ -140,6 +140,9 @@ check('(2c2) flag on: each layer carries its additions (none silently skipped)',
   assert.ok(frag('runway').includes('rubber = max( rubber, roll * uAfApronG.w )') && frag('runway').includes('uAfApronC.z'));
   assert.ok(frag('paint').includes('afBorder') && (frag('paint').match(/uAfApron\.x > 0\.5/g) || []).length >= 4);
   assert.ok(!off.out.pavement.raw.fragmentShader.includes('totalEmissiveRadiance += diffuseColor'), 'flag off: no floodlight');
+  for (const l of ['pavement', 'runway', 'paint']) assert.ok(frag(l).includes('afWetten(') && frag(l).includes('uAfWet'), `${l}: rain`);
+  assert.ok(frag('grass').includes('uAfWet.x'), 'grass: rain');
+  for (const l of ['pavement', 'runway', 'paint']) assert.ok(/uAfWet\.x > 0\.001/.test(frag(l)), `${l}: dry costs a branch, not the work`);
 });
 check('(2d) a missing or repeated anchor throws', () => {
   assert.throws(() => A.swap('abc', 'x', 'y', 'test'), /missing/);
@@ -175,6 +178,9 @@ check('(3a) APRON_DETAIL ships on, with sane tunables', () => {
   assert.ok(B.night.flood >= 0 && B.night.flood <= 1.5);
   assert.equal(B.night.floodColor.length, 3);
   assert.ok(B.night.floodColor.every((v) => v >= 0 && v <= 1.5));
+  assert.ok(B.wet.soaked > 0.3 && B.wet.soaked < 1 && B.wet.roughness > 0 && B.wet.roughness < 0.6);
+  assert.ok(B.wet.puddles >= 0 && B.wet.puddles <= 0.8 && B.wet.rainFloor >= 0 && B.wet.rainFloor <= 1);
+  assert.ok(B.wet.soakSec > 0 && B.wet.drySec >= B.wet.soakSec, 'dries slower than it soaks');
 });
 check('(3b) the flag is read only through lib/fly/play-pass.js', () => {
   const offenders = [];
