@@ -66,6 +66,8 @@ import { recordVisit } from '@/lib/fly/adventure-analytics';
 // PLAY PASS HUD imports end
 
 // PLAY PASS ENCOUNTERS imports begin
+import { EncounterMoment } from './hud/EncounterMoment';
+import { ENCOUNTER_FEEL_ACTIVE } from '@/lib/fly/play-pass';
 // PLAY PASS ENCOUNTERS imports end
 
 // PLAY PASS DIRECTOR imports begin
@@ -414,6 +416,7 @@ export function FlyMode({ onClose }) {
       {/* PLAY PASS HUD end */}
 
       {/* PLAY PASS ENCOUNTERS begin */}
+      {ENCOUNTER_FEEL_ACTIVE.enabled === true && !watchingAirport && <EncounterMoment />}
       {/* PLAY PASS ENCOUNTERS end */}
 
       {/* PLAY PASS DIRECTOR begin */}

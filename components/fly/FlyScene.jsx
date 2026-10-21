@@ -224,6 +224,8 @@ import { SatEnvironment } from './SatEnvironment';
 import { PrecipLayer } from './PrecipLayer';
 // PLAY PASS imports: one block per workstream (FLY_PLAY_PASS.md).
 // PLAY PASS ENCOUNTERS imports begin
+import { EncounterFeelRig } from './EncounterFeelRig';
+import { ENCOUNTER_FEEL_ACTIVE } from '@/lib/fly/play-pass';
 // PLAY PASS ENCOUNTERS imports end
 
 // PLAY PASS CITY imports begin
@@ -3734,6 +3736,7 @@ export function FlyScene({ runtime }) {
       {/* PLAY PASS (FLY_PLAY_PASS.md): one block per workstream; a stream edits
           only its own block. */}
       {/* PLAY PASS ENCOUNTERS begin */}
+      {ENCOUNTER_FEEL_ACTIVE.enabled === true && <EncounterFeelRig runtime={runtime} />}
       {/* PLAY PASS ENCOUNTERS end */}
 
       {/* PLAY PASS CITY begin */}
