@@ -76,7 +76,8 @@ previous experience for one page load.
 
 ## Status (2026-10-21, the pass is built)
 
-Every stream landed on local `main` (not pushed); all five flags ship **on**.
+Every stream landed on `main` (pushed to `origin/main` on 2026-10-22 at the
+owner's request); all five flags ship **on**.
 The owner tests on the dev server (`skyloom-dev-3123` in `.claude/launch.json`).
 Review captures from every stream are in `.graphics-review/play-pass/<stream>/`
 (gitignored, local).

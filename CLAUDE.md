@@ -7,7 +7,7 @@
 >   Enhanced Satellite is the default on every device
 >   (`VISUALS.defaultProfile:'enhanced'`), and `R25_SKY` / `R25_GROUND` ship
 >   `enabled:true`.
-> - **Play Pass (2026-10-21, BUILT on local `main`, not pushed, owner-requested):**
+> - **Play Pass (2026-10-21, BUILT, pushed to `origin/main` 2026-10-22, owner-requested):**
 >   [FLY_PLAY_PASS.md](FLY_PLAY_PASS.md) is the review, plan and record — Free
 >   Flight and Watch an Airport made worth playing: a calm HUD (`CALM_HUD`),
 >   fly-alongside feel (`ENCOUNTER_FEEL`), city facades (`CITY_FACADES`), a lounge
