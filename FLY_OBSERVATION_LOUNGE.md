@@ -722,3 +722,104 @@ review, performance measurements and remaining release gates are recorded
 in [FLY_LIVING_OBSERVATORY.md](FLY_LIVING_OBSERVATORY.md). No backend, runtime
 dependency, new external provider, progression, or persistent discovery
 system is introduced. Owner visual signoff is a separate promotion gate.
+
+## Worldwide lounge destinations — 2026-10-29
+
+Owner request: expand the airports available to the lounge with another Sol
+agent, keep this pass confined to observation, and land it on `main`.
+
+The airport browser now exposes **180 destinations across seven regions**,
+alongside the original four featured lounges and the existing golden-hour
+picks. Region filters and incremental listing make these destinations
+browseable without knowing an airport code. Search accepts airport names,
+cities, countries, IATA/ICAO codes and documented aliases, ignores accents,
+and returns one lounge per airport instead of repeating its parallel runways.
+Other airports in the existing worldwide runway snapshot remain searchable,
+including the authored Ohio State and Rickenbacker airports.
+
+| Region | Lounge destinations |
+| --- | ---: |
+| North America and Caribbean | 54 |
+| South America | 11 |
+| Europe | 45 |
+| Africa | 15 |
+| Middle East | 12 |
+| Asia | 31 |
+| Oceania | 12 |
+
+`lib/fly/lounge-airports.mjs` is a pure observation directory. Importing it
+does not register flight airports. Geometry still comes from the checked-in
+public-domain OurAirports snapshot dated 2026-10-07; supplemental IATA,
+country and municipality metadata was checked against
+[OurAirports data](https://ourairports.com/data/) on 2026-10-29, with the exact
+source URL and SHA256 in the module. Directory-only mappings preserve
+Honolulu (`KHNL` searches `PHNL`), Kuwait (`OKBK` searches `OKKK`), and Lima
+(ICAO `SPJC` searches the snapshot's airport ident `SPIM`).
+
+The lounge now loads **all runways belonging to its destination** before
+resolving a saved seat or choosing a runtime seat. The existing nearby
+loader selects only eight rows, so it cannot guarantee that a saved lounge's
+chosen runway is present at a large hub. A temporary role protects the full
+destination through preparation and nearby discovery; the existing observation
+pin takes over when the seat is placed. Each request owns its role and releases
+it on completion, error or cancellation, preserving the currently seated
+airport during cancelled transfers. The existing four-region cache and
+48-row registry limit remain intact.
+
+The production transfer run also reproduced the reason an unlisted airport
+could remain stuck at **“Finding the best seat at the terminal…”**. Successful
+entry closes the picker, whose subscription advanced the same request token
+used by asynchronous seat refinement. The completion was then discarded with
+`seatPending` still true. Seat refinement now has a separate committed-seat
+generation: picker dismissal, reopening/closing the picker and failed or
+cancelled newer transfers preserve the current seat's work; a successful new
+placement, leave or disposal retires it. Rejected warps restore the previous
+pending state, and retired completions cannot overwrite active diagnostics.
+The original behavior was reproduced as a red node regression before the fix.
+
+The browser uses lounge-only watch rows. The hangar's airport chooser, flight
+eligibility, authored operations geometry, landing behavior, runway data,
+room meshes, seat tables and feature flags are unchanged. Airports without
+stored seats use the existing OSM scorer and classic fallback. The desktop
+policy remains in force. Catalog errors preserve local directory search and
+offer retry; airport-entry errors return the message into view.
+
+Work split: the Sol collaborator owned the directory, source checks and its
+verification script, then independently reviewed integration. The primary
+agent owned discovery/loading, UI, integration checks and this record. Review
+caught and closed the omission of authored KOSU/KLCK from the first search
+implementation.
+
+Verification on the integrated source:
+
+| Check | Result |
+| --- | --- |
+| `verify-lounge-directory.mjs` | 10/10; all 180 identities and metadata |
+| `verify-lounge-catalog.mjs` | 5/5; all 180 destinations through real catalog/registry modules; 216 stored variant placements and 144 runtime/fallback placements; registry bounded at 48/48 |
+| `verify-lounge-entry.mjs` | 9/9; controlled deferred loads through the real runtime, store, registry and no-data fallback |
+| `verify-airport-lifecycle.mjs` | 25/25 |
+| `verify-airport-observation.mjs` | 45/45 |
+| `verify-lounge-placement.mjs` | 9/9 |
+| `verify-lounge-pier.mjs` | 9/9 |
+| Targeted ESLint and `git diff --check` | Pass |
+| Isolated production webpack build | Pass |
+| `verify-lounge-browser.cjs` | 28/28; ordinary production desktop UI, Heathrow and Queenstown preparation/reveal, return flow and phone exclusion; no page errors |
+
+The new `verify-lounge-browser.cjs` checks the production player flow with no
+review parameters, including discovery, search, keyboard focus, compact
+desktop sizing, lounge entry/transfer and phone exclusion. Its first transfer
+probe incorrectly waited on `window.__fly`, which production deliberately
+hides. A header and absent warp overlay also proved insufficient: both can
+appear while the eye is still held above an unprepared lounge. The final
+probe waits for the preparation status to disappear (seat choice and floor
+validation complete) as well as the reveal gate, which exposed the cancellation
+defect above.
+Final browser evidence is recorded in
+`.graphics-review/lounge-airports/report.json` with desktop captures alongside.
+The final Queenstown capture shows the completed window lounge at runway
+height, rather than the provisional airborne hold from the defective run.
+
+This is a destination/discovery expansion, not a visual or performance
+certification of 180 live airfields. Stored placements retain their previous
+evidence; other destinations are scored at runtime. Live traffic still depends
+on regional ADS-B coverage. No new departure or landing locations were authored.

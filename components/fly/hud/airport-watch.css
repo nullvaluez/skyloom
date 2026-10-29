@@ -1416,6 +1416,108 @@
   overflow: auto;
   scrollbar-width: thin;
 }
+/* Lounge directory: airport-level choices, independent of the hangar's
+   runway and approach rows. Keep this styling scoped to the watch browser. */
+.airport-browser .ab-regions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+.airport-browser .ab-regions button,
+.airport-browser .ab-more {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--t-edge-strong);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--t-dim);
+  font: 600 12px/1.35 var(--t-sans);
+  cursor: pointer;
+}
+.airport-browser .ab-regions button[aria-pressed='true'] {
+  border-color: var(--t-cyan);
+  background: rgba(79, 227, 255, 0.1);
+  color: var(--t-ice);
+}
+.airport-browser .ab-regions button:hover,
+.airport-browser .ab-more:hover {
+  border-color: var(--t-cyan);
+  color: var(--t-ice);
+}
+.airport-browser .ab-lounge-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 16px;
+}
+.airport-browser .ab-lounge-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  min-height: 76px;
+  padding: 12px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--t-edge);
+  border-radius: 0;
+  text-align: left;
+  color: var(--t-ice);
+  background: transparent;
+  cursor: pointer;
+}
+.airport-browser .ab-lounge-row:hover:not(:disabled) {
+  background: rgba(186, 222, 255, 0.05);
+}
+.airport-browser .ab-lounge-code {
+  flex: 0 0 42px;
+  font: 600 14px/1.3 var(--t-mono);
+  color: var(--t-cyan);
+}
+.airport-browser .ab-lounge-place {
+  display: grid;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+.airport-browser .ab-lounge-place strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 14px/1.3 var(--t-sans);
+}
+.airport-browser .ab-lounge-place > span {
+  color: var(--t-dim);
+  font: 500 12px/1.45 var(--t-sans);
+  overflow-wrap: anywhere;
+}
+.airport-browser .ab-lounge-row > svg {
+  flex: none;
+  color: var(--t-cyan);
+}
+.airport-browser .ab-more {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+}
+.airport-browser .ab-catalog-error {
+  color: var(--t-dim);
+  font: 500 13px/1.5 var(--t-sans);
+}
+.airport-browser .ab-catalog-error button {
+  min-height: 40px;
+  padding: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--t-cyan);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (max-width: 720px) {
+  .airport-browser .ab-lounge-list { grid-template-columns: minmax(0, 1fr); }
+  .airport-browser .ab-section { flex-wrap: wrap; line-height: 1.5; }
+}
 .ab-result {
   display: flex;
   align-items: center;

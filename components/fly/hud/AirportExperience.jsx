@@ -4,10 +4,11 @@ import { Binoculars, Search, Sunset, X } from 'lucide-react';
 import { useFlyStore } from '@/stores/fly-store';
 import { livingAirportsOn } from '@/lib/fly/airport-feature-policy';
 import { FLAGSHIP_AIRPORTS } from '@/lib/fly/airport-observation.mjs';
-import { searchRunways } from '@/lib/fly/runway-catalog';
-import { airportEligible } from '@/lib/fly/operations-airports';
+import { LOUNGE_AIRPORTS, LOUNGE_REGIONS, searchLoungeAirports } from '@/lib/fly/lounge-airports.mjs';
+import { searchLoungeCatalog } from '@/lib/fly/lounge-catalog';
 import { goldenHourNow } from '@/lib/fly/airport-watch-sky.mjs';
-import { AirportResultRow, FeaturedAirportCard, GoldenHourRow, goldenAirports, sunNow } from './airports/browser-parts';
+import { FeaturedAirportCard, GoldenHourRow, goldenAirports, sunNow } from './airports/browser-parts';
+import { LoungeAirportRow } from './airports/LoungeAirportRow';
 import { LoungeHud } from './lounge/LoungeHud';
 import './target-ui.css';
 import './airport-watch.css';
@@ -91,7 +92,10 @@ export function AirportExperience({ runtime }) {
 
 function AirportBrowser({ runtime }) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
+  const [region, setRegion] = useState('all');
+  const [visible, setVisible] = useState(12);
+  const [search, setSearch] = useState({ query: '', rows: [], error: '' });
+  const [retry, setRetry] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [golden, setGolden] = useState(null);
@@ -99,6 +103,14 @@ function AirportBrowser({ runtime }) {
   const ref = useRef(null);
   // Request generation: a newer choice (or closing) retires an older one.
   const generation = useRef(0);
+  const term = query.trim();
+  const searching = !!term && search.query !== term;
+  // Curated destinations work immediately, including while the worldwide
+  // catalog is loading or unavailable. The network only adds other airports.
+  const results = term
+    ? search.query === term ? search.rows : searchLoungeAirports(LOUNGE_AIRPORTS, term)
+    : searchLoungeAirports(LOUNGE_AIRPORTS, '', { region });
+  const searchError = term && search.query === term ? search.error : '';
   const close = () => {
     generation.current++;
     runtime.airportWatch?.cancelPending();
@@ -114,21 +126,22 @@ function AirportBrowser({ runtime }) {
     };
   }, []);
   useEffect(() => {
+    if (!term) return;
     let cancelled = false;
     const timer = setTimeout(() => {
-      searchRunways(query, runtime.geo ? { lat: runtime.geo.y, lon: runtime.geo.x } : null)
+      searchLoungeCatalog(term)
         .then((rows) => {
-          if (!cancelled) setResults(rows);
+          if (!cancelled) setSearch({ query: term, rows, error: '' });
         })
         .catch((e) => {
-          if (!cancelled) setError(e.message);
+          if (!cancelled) setSearch({ query: term, rows: searchLoungeAirports(LOUNGE_AIRPORTS, term), error: e.message });
         });
     }, 180);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [query, runtime]);
+  }, [term, retry]);
   // Live clocks and the golden-hour list refresh every 30 s while open.
   useEffect(() => {
     let cancelled = false;
@@ -150,24 +163,18 @@ function AirportBrowser({ runtime }) {
     };
   }, []);
 
-  async function choose(id, start = null) {
+  async function choose(id) {
     const token = ++generation.current;
     setBusy(true);
     setError('');
     try {
       if (!runtime.airportWatch) throw Error('The world is still loading. Try again in a moment.');
-      if (start) {
-        const { ensureAirport } = await import('@/lib/fly/runway-catalog');
-        const a = await ensureAirport(id);
-        if (token !== generation.current) return;
-        const aircraftId = useFlyStore.getState().aircraftId;
-        if (!airportEligible(a, aircraftId) || !runtime.launchSetup({ flightMode: 'ops', aircraftId, airportId: a.id, start }))
-          throw Error('This aircraft cannot use this runway. Choose another aircraft in the hangar.');
-        runtime.airportWatch.leave();
-        close();
-      } else await runtime.airportWatch.enter(id);
+      await runtime.airportWatch.enter(id);
     } catch (e) {
-      if (token === generation.current) setError(e.message);
+      if (token === generation.current) {
+        setError(e.message);
+        ref.current?.scrollTo({ top: 0 });
+      }
     } finally {
       if (token === generation.current) setBusy(false);
     }
@@ -216,11 +223,13 @@ function AirportBrowser({ runtime }) {
 
         <label className="ab-search" htmlFor="airport-search">
           <Search size={17} aria-hidden="true" />
-          <span className="ab-sr">Airport name or code</span>
-          <input id="airport-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search an airport — Columbus, JFK, Heathrow, LOWI…" autoComplete="off" spellCheck={false} />
+          <span className="ab-sr">Airport, city, country, ICAO or IATA code</span>
+          <input id="airport-search" type="search" value={query} onChange={(e) => { setQuery(e.target.value); setVisible(12); setError(''); }} placeholder="Airport, city or code — Tokyo, LHR, Dubai…" autoComplete="off" spellCheck={false} aria-controls="lounge-airport-results" />
         </label>
 
-        {!query && (
+        {(error || busy) && <p className="ab-status" role="status">{error || 'Preparing the airport…'}</p>}
+
+        {!term && (
           <>
             <h2 className="ab-section">Featured lounges</h2>
             <div className="ab-featured">
@@ -229,6 +238,38 @@ function AirportBrowser({ runtime }) {
               ))}
             </div>
 
+          </>
+        )}
+
+        <h2 className="ab-section" id="lounge-directory-title">
+          {term ? 'Search results' : 'Explore the world'}
+          <small aria-live="polite">{results.length} {results.length === 1 ? 'airport' : 'airports'}{searching ? ' · Searching worldwide…' : ''}</small>
+        </h2>
+        {!term && (
+          <div className="ab-regions" role="group" aria-label="Browse lounge airports by region">
+            {[{ id: 'all', label: 'All regions' }, ...LOUNGE_REGIONS].map((r) => (
+              <button type="button" key={r.id} aria-pressed={region === r.id} onClick={() => { setRegion(r.id); setVisible(12); }}>
+                {r.label}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="ab-lounge-list" id="lounge-airport-results" aria-labelledby="lounge-directory-title" aria-busy={searching}>
+          {results.slice(0, visible).map((a) => (
+            <LoungeAirportRow key={a.ident} airport={a} busy={busy} onChoose={choose} />
+          ))}
+          {!results.length && !searching && !searchError && <p className="ab-empty">No airport matches “{term}”. Try its airport name or ICAO code.</p>}
+          {!results.length && searching && <p className="ab-empty">Searching worldwide airports…</p>}
+        </div>
+        {visible < results.length && (
+          <button type="button" className="ab-more" onClick={() => setVisible((n) => n + 24)} aria-controls="lounge-airport-results">
+            Show more airports · {results.length - visible} more
+          </button>
+        )}
+        {searchError && <p className="ab-catalog-error" role="status">The worldwide catalog could not load. You can still search the destination directory. <button type="button" onClick={() => { setSearch({ query: '', rows: [], error: '' }); setRetry((n) => n + 1); }}>Retry search</button></p>}
+
+        {!term && (
+          <>
             <h2 className="ab-section">
               <Sunset size={15} aria-hidden="true" />
               Golden hour now
@@ -244,19 +285,7 @@ function AirportBrowser({ runtime }) {
           </>
         )}
 
-        {query && (
-          <div className="ab-results">
-            {results.map((a) => (
-              <AirportResultRow key={a.id} airport={a} busy={busy} onChoose={choose} />
-            ))}
-            {!results.length && <p className="ab-empty">No airport matches “{query}”.</p>}
-          </div>
-        )}
-
-        <p className="ab-note">Every airport has a window lounge and live regional traffic. Runway and approach starts are also available; detailed taxi routes are limited to the authored Ohio airports.</p>
-        <p className="ab-status" role="status">
-          {error || (busy ? 'Preparing the airport…' : '')}
-        </p>
+        <p className="ab-note">Browse {LOUNGE_AIRPORTS.length} destinations or search the worldwide airport catalog. Take a lounge seat at any airport with runway data; live traffic depends on local coverage.</p>
       </section>
     </div>
   );
