@@ -4,9 +4,9 @@ import { useEffect, useRef } from 'react';
 import { useFlyStore } from '@/stores/fly-store';
 import { useEncounterStore } from '@/stores/encounter-store';
 import { VIEW, MOBILE_TOUCH } from '@/lib/fly/observation-config';
-import { pickRadius, touchPickRadius } from '@/lib/fly/airport-watch-camera.mjs';
+import { pickRadius, touchPickRadius, nearestHit } from '@/lib/fly/airport-watch-camera.mjs';
 import { decorTurn, inspectKeyAction } from '@/lib/fly/lounge/lounge-life.mjs';
-import { createTouchGestures } from '@/lib/fly/lounge/touch-gestures.mjs';
+import { createTouchGestures, createHoldTimer, doubleTapAction } from '@/lib/fly/lounge/touch-gestures.mjs';
 import { haptic } from '@/lib/fly/lounge/haptics';
 import { isMobileGraphicsClass } from '@/lib/fly/device-class';
 
@@ -52,12 +52,17 @@ import { isMobileGraphicsClass } from '@/lib/fly/device-class';
  * it), two pinch about their midpoint (zoom follows the finger gap; past
  * VIEW.optics.binocularAt the binoculars come up, the wheel's semantics) and
  * pan by it; a tap is the click (aircraft, chair, décor, station), with a
- * fingertip's pick radius; a double-tap raises the binoculars on the tapped
- * aircraft or where you look, and lowers them on empty glass; a still
- * long-press on an aircraft opens its details (the T key). The walk stick
- * (LoungeTouchControls) hands its taps here ('lounge-touch-tap'), so a tap in
- * the thumb zone still selects and sits. On a touch device the surface also
- * owns the iOS gestures a lounge must not have: WebKit's page pinch
+ * fingertip's pick radius (with the binoculars up it stops growing with the
+ * power); a double-tap raises the binoculars on the tapped aircraft or where
+ * you look, and with them up lowers them anywhere but on another aircraft
+ * (doubleTapAction); a still long-press on an aircraft opens its details
+ * (the T key). The walk stick (LoungeTouchControls) hands its taps here
+ * ('lounge-touch-tap'), so a tap in the thumb zone still selects and sits,
+ * and relays the zone's fingers that belong to the glass
+ * ('lounge-touch-relay': a pinch that starts with a finger in the zone); a
+ * finger landing here asks it for a thumb it holds still in the zone
+ * ('lounge-touch-claim'), the first finger of that pinch. On a touch device
+ * the surface also owns the iOS gestures a lounge must not have: WebKit's page pinch
  * (gesturestart / gesturechange), the scroll and overscroll of a dragged
  * finger (non-passive touchmove) and the long-press callout (lounge-touch.css).
  * The mouse, the pen and the keys above are untouched.
@@ -80,17 +85,10 @@ const covered = (s) => !!(s.inspectHex || s.airportBrowserOpen || s.atlasOpen ||
  * (`radius`: the mouse's pickRadius; a finger passes touchPickRadius).
  */
 export function pickAt(picker, x, y, mag, radius = pickRadius) {
-  let best = null, bestD = Infinity;
-  const base = radius(mag);
-  for (const hit of picker.hits) {
-    const d = Math.hypot(hit.sx - x, hit.sy - y);
-    if (d <= base + hit.half && d < bestD) {
-      bestD = d;
-      best = hit;
-    }
-  }
-  return best;
+  return nearestHit(picker.hits, x, y, radius(mag));
 }
+/** A control's own element (a touch on its icon is a touch on it). */
+const CONTROL = 'button, a[href], input, select, textarea, [role="button"], [role="slider"], [role="switch"], [role="tab"]';
 
 export function LoungeSurface({ runtime, picker, onNotice }) {
   const ref = useRef(null);
@@ -100,8 +98,7 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
   // pinch's starting midpoint, and the last single tap (its aircraft, or
   // whether it already did something: sat, opened a card, used a station).
   const gestures = useRef(null);
-  const holdTimer = useRef(0);
-  const holdDue = useRef(null);
+  const hold = useRef(null);
   const pinchMid = useRef(null);
   const lastTap = useRef(null);
 
@@ -312,11 +309,24 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
     if (!rect?.width || !rect.height) return null;
     return { u: ((x - rect.left) / rect.width) * 2 - 1, v: 1 - ((y - rect.top) / rect.height) * 2, h: rect.height };
   };
-  /** A single tap: the click (a station, an aircraft, a chair, the décor), with a fingertip's radius. */
+  /** A finger's pick: a fingertip's radius (held to MOBILE_TOUCH.pick.binocularMaxPx with the glasses up). */
+  const touchPick = (w, x, y) => pickAt(picker, x, y, w.optics.mag, (m) => touchPickRadius(m, w.binocular));
+  /**
+   * A single tap: the click (a station, an aircraft, a chair, the décor),
+   * with a fingertip's radius. For a double-tap it remembers what it found
+   * (the aircraft, and whether that is the one already selected and locked:
+   * `held`) and what was in the lounge when it landed (onDocDown: a second
+   * tap is the double's only on something this one opened). A tap on the
+   * aircraft the view already holds changes nothing (no re-primed follow, no
+   * second lock tap on the motor).
+   */
   const touchTap = (x, y) => {
     const w = runtime.airportWatch;
     if (!w) return;
-    lastTap.current = { hex: null, used: false };
+    const root = ref.current?.closest('.lounge');
+    const dom = root ? new Set(root.querySelectorAll('*')) : null;
+    dom?.add(root);
+    lastTap.current = { hex: null, held: false, used: false, dom };
     if (w.observatory && !w.binocular) {
       const p = ndc(x, y);
       const id = p && w.observatory.stationAt(p.u, p.v);
@@ -326,10 +336,11 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
         return;
       }
     }
-    const hit = pickAt(picker, x, y, w.optics.mag, touchPickRadius);
+    const hit = touchPick(w, x, y);
     if (hit) {
       lastTap.current.hex = hit.hex;
-      w.select(hit.hex);
+      lastTap.current.held = hit.hex === w.selected && !!w.tracking;
+      if (!lastTap.current.held) w.select(hit.hex);
       return;
     }
     if (w.walk && !w.binocular) {
@@ -345,22 +356,26 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
     }
   };
   /**
-   * The second tap of a double-tap: the binoculars on the aircraft the first
-   * tap picked; on empty glass they come up where you look, or, already up,
-   * come down. A first tap that sat or opened something is not doubled.
+   * The second tap of a double-tap (doubleTapAction): the binoculars on the
+   * aircraft the first tap picked, or up where you look on empty glass; with
+   * the glasses up it lowers them, on empty glass or on the aircraft they
+   * already hold, and only another aircraft swings them onto that one. A
+   * first tap that sat or opened something is not doubled.
    */
   const touchDoubleTap = () => {
     const w = runtime.airportWatch, prev = lastTap.current;
     lastTap.current = null;
-    if (!w || prev?.used) return;
-    if (prev?.hex) w.select(prev.hex, { binoculars: true });
-    else w.binoculars(!w.binocular);
+    if (!w) return;
+    const act = doubleTapAction(prev, w.binocular);
+    if (act === 'lower') w.binoculars(false);
+    else if (act === 'lock') w.select(prev.hex, { binoculars: true });
+    else if (act === 'raise') w.binoculars(true);
   };
   /** A still long-press on an aircraft: select it and open its details (the T key). */
   const touchLongPress = (x, y) => {
     const w = runtime.airportWatch;
     if (!w) return;
-    const hit = pickAt(picker, x, y, w.optics.mag, touchPickRadius);
+    const hit = touchPick(w, x, y);
     if (!hit) return;
     w.select(hit.hex);
     useFlyStore.getState().setInspectHex(hit.hex);
@@ -399,37 +414,32 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
       }
     }
   };
-  /**
-   * Re-arm the long-press timer from the recognizer's deadline (input time).
-   * A main thread that stalled past the deadline still waits half a
-   * long-press from now, so a quick tap whose lift is queued behind the
-   * stall is read as the tap it was, not as a hold.
-   */
-  const armHold = () => {
-    const due = gestures.current?.deadline() ?? null;
-    if (due === holdDue.current) return; // a still finger's jitter never pushes the deadline
-    clearTimeout(holdTimer.current);
-    holdDue.current = due;
-    if (due == null) return;
-    holdTimer.current = setTimeout(() => {
-      holdDue.current = null;
-      if (gestures.current) runIntents(gestures.current.poll(performance.now()));
-    }, Math.max(due - performance.now(), MOBILE_TOUCH.gesture.longPressMs / 2) + 4);
+  /** The recognizer and its long-press clock (createHoldTimer: judged at the next frame). */
+  const recognizer = () => {
+    if (!gestures.current) {
+      gestures.current = createTouchGestures();
+      hold.current = createHoldTimer(gestures.current);
+    }
+    return gestures.current;
   };
   // The input's own clock: a busy main thread hands events over late and in
   // bursts, and a tap or a flick must be judged by when the finger moved.
   const stamp = (ev) => (ev.timeStamp > 0 ? ev.timeStamp : performance.now());
+  /** One sample into the recognizer: a finger on the glass, or one the stick zone relays. */
+  const feed = (kind, id, x, y, t) => {
+    const g = recognizer();
+    if (kind === 'down') runIntents(g.down(id, x, y, t));
+    else if (kind === 'move') runIntents(g.move(id, x, y, t));
+    else if (kind === 'up') runIntents(g.up(id, x, y, t));
+    else runIntents(g.cancel(id));
+    hold.current.arm(runIntents);
+  };
   const touch = (kind, e) => {
-    gestures.current ||= createTouchGestures();
-    const g = gestures.current, now = stamp(e);
-    if (kind === 'down') runIntents(g.down(e.pointerId, e.clientX, e.clientY, now));
-    else if (kind === 'move') {
+    if (kind === 'move') {
       // Coalesced samples keep a fast flick's true release velocity.
       const list = e.nativeEvent.getCoalescedEvents?.() || [];
-      for (const ev of list.length ? list : [e]) runIntents(g.move(e.pointerId, ev.clientX, ev.clientY, stamp(ev)));
-    } else if (kind === 'up') runIntents(g.up(e.pointerId, e.clientX, e.clientY, now));
-    else runIntents(g.cancel(e.pointerId));
-    armHold();
+      for (const ev of list.length ? list : [e]) feed('move', e.pointerId, ev.clientX, ev.clientY, stamp(ev));
+    } else feed(kind, e.pointerId, e.clientX, e.clientY, stamp(e));
   };
 
   // Touch devices only: the page itself must not pinch-zoom (WebKit's
@@ -439,7 +449,7 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
     const el = ref.current;
     if (!el) return undefined;
     const onTap = (e) => {
-      const g = (gestures.current ||= createTouchGestures());
+      const g = recognizer();
       const { x, y } = e.detail || {};
       if (!Number.isFinite(x) || !Number.isFinite(y)) return;
       // Through the recognizer, so a tap there can still be a double-tap's
@@ -452,20 +462,41 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
       runIntents(g.down('stick-tap', x, y, t));
       runIntents(g.up('stick-tap', x, y, t));
     };
+    // The stick zone's fingers that belong to the glass (a pinch that started
+    // with a finger in the zone), and its question for a touch landing there:
+    // does it pair with the one still finger here into a pinch?
+    const onRelay = (e) => {
+      const d = e.detail;
+      if (!d) return;
+      if (d.kind === 'ask') d.pairable = !!gestures.current?.pairable(d.t);
+      else feed(d.kind, d.id, d.x, d.y, d.t);
+    };
     el.addEventListener('lounge-touch-tap', onTap);
-    if (!isMobileGraphicsClass()) return () => el.removeEventListener('lounge-touch-tap', onTap);
+    el.addEventListener('lounge-touch-relay', onRelay);
+    if (!isMobileGraphicsClass()) {
+      return () => {
+        el.removeEventListener('lounge-touch-tap', onTap);
+        el.removeEventListener('lounge-touch-relay', onRelay);
+      };
+    }
     const block = (e) => e.preventDefault();
     const blockMove = (e) => {
       if (e.cancelable) e.preventDefault();
     };
     // A double-tap's second tap that lands on what the first one opened (the
-    // spotter card rising over the aircraft just tapped) is the double's, not
-    // a tap on that panel: it is taken here, before React sees it, with its
-    // lift and the click it would make.
+    // spotter card rising over the aircraft just tapped, the décor card it
+    // opened) is the double's, not a tap on that panel: it is taken here,
+    // before React sees it, with its lift and the click it would make. Only
+    // then: the first tap must have picked an aircraft or done something, and
+    // what this touch lands on (its control, if it is on one) must not have
+    // been in the lounge when the first tap landed. A control already on
+    // screen keeps its touch (a quick corrective re-tap after a near miss).
     const swallowed = new Map(); // pointerId -> { x, y }
     let swallowClick = null; // { x, y, until }
     const onDocDown = (e) => {
       if (e.pointerType !== 'touch' || el.contains(e.target) || !e.target?.closest?.('.lounge')) return;
+      const first = lastTap.current;
+      if (!first?.dom || !(first.hex || first.used) || first.dom.has(e.target.closest(CONTROL) || e.target)) return;
       const intents = gestures.current?.secondTap(e.clientX, e.clientY, stamp(e)) ?? [];
       if (!intents.length) return;
       e.preventDefault();
@@ -495,6 +526,7 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
     el.addEventListener('touchmove', blockMove, { passive: false });
     return () => {
       el.removeEventListener('lounge-touch-tap', onTap);
+      el.removeEventListener('lounge-touch-relay', onRelay);
       document.removeEventListener('pointerdown', onDocDown, true);
       document.removeEventListener('pointerup', onDocUp, true);
       document.removeEventListener('pointercancel', onDocUp, true);
@@ -502,8 +534,7 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
       document.removeEventListener('gesturestart', block);
       document.removeEventListener('gesturechange', block);
       el.removeEventListener('touchmove', blockMove);
-      clearTimeout(holdTimer.current);
-      holdDue.current = null;
+      hold.current?.stop();
       gestures.current?.reset();
     };
     // runIntents reads refs and the runtime; it is rebuilt each render on purpose.
@@ -561,6 +592,11 @@ export function LoungeSurface({ runtime, picker, onNotice }) {
         if (e.pointerType === 'touch') {
           e.currentTarget.setPointerCapture(e.pointerId);
           e.stopPropagation();
+          // The first finger of a pinch may be a thumb the walk stick holds
+          // still in its zone: the stick hands it over (relayed) first.
+          if (!gestures.current?.count) {
+            e.currentTarget.closest('.lounge')?.querySelector('.lounge-touch')?.dispatchEvent(new CustomEvent('lounge-touch-claim', { detail: { t: stamp(e) } }));
+          }
           touch('down', e);
           return;
         }

@@ -727,7 +727,7 @@ export function LoungeOverlay({ runtime, picker, binoLayout = 'desktop', insets 
       // Binocular lock box: hugs the aircraft once the glasses are up (on a
       // phone its smallest size follows the lens radius).
       if (selectedHit && amount > 0.3) {
-        const locked = w.tracking && w.lockError() < fovRad / 8;
+        const locked = w.tracking && w.lockError() < (w.lockTolerance?.() ?? fovRad / 8); // the runtime's lock tolerance (contract 5)
         const a = smoothstep(0.3, 0.9, amount);
         const half = Math.max(figure ? Math.max(12, figure.R * MOBILE_GLASS.bino.lockMinFrac) : 16, selectedHit.half * 1.18);
         brackets(ctx, selectedHit.sx, selectedHit.sy, half, Math.min(14, half * 0.35), locked ? C.cyan : C.amber, 0.85 * a, 1.2);
@@ -735,7 +735,7 @@ export function LoungeOverlay({ runtime, picker, binoLayout = 'desktop', insets 
 
       // DIRECTOR: the reticle fades while steady binoculars frame a held lock.
       if (DIRECTOR) {
-        const framed = w.optics.auto && w.tracking && !!selectedHit && w.lockError() < fovRad / 8;
+        const framed = w.optics.auto && w.tracking && !!selectedHit && w.lockError() < (w.lockTolerance?.() ?? fovRad / 8);
         posts += ((framed ? 0 : 1) - posts) * (1 - Math.exp(-Math.min(0.1, (now - postsAt) / 1000) * 5));
         postsAt = now;
       }

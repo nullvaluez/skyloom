@@ -5,7 +5,12 @@
 //     streams: tap / drag / long-press / double-tap / pinch, a finger lifted
 //     mid-pinch (no look jump, no phantom tap), two quick taps far apart are
 //     two taps, a tap never after a drag or a pinch, a third finger ignored,
-//     cancel, and the pinch scale (gap ratio, floored gaps).
+//     cancel, and the pinch scale (gap ratio, floored gaps); a pinch whose
+//     first finger landed in the walk stick's zone (pinchPair / pairable).
+//  1b. The binocular double-tap against GLASS's REAL lens
+//     (lib/fly/lounge/glass-layout.mjs binocularFigure): with the glasses up
+//     the touch radius stops growing, empty glass can be found, and a
+//     double-tap lowers them anywhere but on another aircraft (doubleTapAction).
 //  2. The portrait field (airport-watch-camera.mjs nakedFovDeg / fovForMag):
 //     the DESKTOP IDENTITY TABLE (aspects 16/9, 16/10, 4/3, a landscape phone
 //     and none, at 1x, 7x, 12x, 20x, 25x: bit-identical to 58 / mag), the
@@ -17,7 +22,9 @@
 //     (exponential, travel = v x glideSec; none under reduced motion), the
 //     pinch follows the gap ratio about its midpoint, crosses the binocular
 //     line both ways with the wheel's cues, keeps a lock unless the midpoint
-//     pans, and the touch pick radius covers a fingertip.
+//     pans, and the touch pick radius covers a fingertip; auto-acquire keeps
+//     to the screen and the lock tolerance reads the narrower field on a
+//     touch device (today's on desktop, bit for bit).
 //  4. The walk stick: stickVector (deadzone, curve, run threshold with
 //     hysteresis, direction) and setMoveAnalog walking the real walk runtime
 //     (half throw is a slower walk, the run is the run, release stops, a
@@ -64,7 +71,8 @@ const hadVibrate = 'vibrate' in nav;
 Object.defineProperty(nav, 'vibrate', { configurable: true, writable: true, value: (p) => { buzz.push(p); return true; } });
 
 const { MOBILE_TOUCH, VIEW, WALK } = await import('../lib/fly/observation-config.js');
-const { createTouchGestures } = await import('../lib/fly/lounge/touch-gestures.mjs');
+const { createTouchGestures, createHoldTimer, pinchPair, doubleTapAction } = await import('../lib/fly/lounge/touch-gestures.mjs');
+const { binocularFigure } = await import('../lib/fly/lounge/glass-layout.mjs');
 const { stickVector } = await import('../lib/fly/lounge/touch-stick.mjs');
 const { backAxis, deviceLook, screenRoll, createMotionFilter } = await import('../lib/fly/lounge/touch-motion.mjs');
 const { createHaptics, haptic, HAPTIC_KINDS } = await import('../lib/fly/lounge/haptics.js');
@@ -118,6 +126,49 @@ await check('recognizer: a drag grabs at the touch-down point, follows the finge
   assert.deepEqual(g.up(1, 60, 0, 1032 + G.staleMs + 50), [{ type: 'look-end', vx: 0, vy: 0 }]);
 });
 
+await check('long-press clock (createHoldTimer): the press is judged at the NEXT FRAME, after the moves that frame delivers, so a slow frame never turns a drag into a long-press; a still finger still long-presses; a lift queued behind a stall is still a tap', () => {
+  // A fake browser: timers on a manual clock, frames run by hand (each frame
+  // first delivers the pointermoves that waited for it, then its callbacks).
+  let now = 0;
+  const timers = [], frames = [];
+  const env = {
+    setTimer: (fn, ms) => timers.push({ fn, at: now + ms }),
+    clearTimer: (id) => { if (timers[id - 1]) timers[id - 1].dead = true; },
+    nextFrame: (fn) => frames.push(fn),
+    now: () => now,
+  };
+  const runTimers = () => { for (const t of timers) if (!t.dead && !t.done && t.at <= now) { t.done = true; t.fn(); } };
+  const frame = (input = () => {}) => { input(); for (const f of frames.splice(0)) f(); };
+  // A drag whose frame comes 900 ms late (a GPU-bound hitch): the timer is due first.
+  const g = createTouchGestures(), out = [];
+  const sink = (list) => out.push(...list);
+  const hold = createHoldTimer(g, env);
+  sink(g.down(1, 100, 300, 0)); hold.arm(sink);
+  now = 900; runTimers();
+  assert.equal(frames.length, 1, 'the due timer waits for the frame');
+  frame(() => { for (let i = 1; i <= 4; i++) { sink(g.move(1, 100 + 12 * i, 300, 30 * i)); hold.arm(sink); } });
+  assert.ok(out.some((i) => i.type === 'look-start'), 'a drag');
+  assert.ok(!out.some((i) => i.type === 'long-press'), 'never a long-press');
+  // The control: polled inside the timer (the clock before this fix) it was a long-press.
+  const before = createTouchGestures();
+  before.down(1, 100, 300, 0);
+  assert.deepEqual(types(before.poll(900)), ['long-press'], 'the pre-fix poll at the timer');
+  // A still finger long-presses at the frame after its deadline.
+  now = 2000; out.length = 0;
+  const g2 = createTouchGestures(), h2 = createHoldTimer(g2, env);
+  sink(g2.down(1, 50, 50, 2000)); h2.arm(sink);
+  now = 2000 + G.longPressMs + 10; runTimers(); frame();
+  assert.deepEqual(types(out), ['long-press'], 'a still finger');
+  // A quick tap whose lift is queued behind a stall: the timer waits half a
+  // long-press from arming, and the lift lands first.
+  now = 5000; out.length = 0;
+  const g3 = createTouchGestures(), h3 = createHoldTimer(g3, env);
+  sink(g3.down(1, 50, 50, 4300)); h3.arm(sink); // its down arrived 700 ms late
+  frame(() => { sink(g3.up(1, 50, 50, 4360)); h3.arm(sink); });
+  now = 5000 + G.longPressMs; runTimers(); frame();
+  assert.deepEqual(types(out), ['tap'], 'the tap it was');
+});
+
 await check('recognizer: a long-press needs stillness (poll at longPressMs), then the rest of the touch does nothing; moving first cancels it', () => {
   const g = createTouchGestures();
   g.down(1, 50, 60, 0);
@@ -164,6 +215,36 @@ await check('recognizer: double-tap = two taps within doubleMs and doublePx (cou
   g3.down(1, 10, 10, 60); g3.move(1, 60, 10, 80); g3.up(1, 60, 10, 100);
   g3.down(1, 10, 10, 120);
   assert.equal(g3.up(1, 10, 10, 150)[0].count, 1);
+});
+
+await check('recognizer: a pinch may start with a finger on another element (the stick zone relays it): two fingers landing within pinchPairMs, the first still, pair (pinchPair / pairable); a resting, moving or walking first finger does not', () => {
+  const P = G.pinchPairMs;
+  assert.equal(pinchPair({ still: true, t0: 100 }, 100 + P - 1), true);
+  assert.equal(pinchPair({ still: true, t0: 100 }, 100 + P + 1), false, 'a thumb resting longer is the stick');
+  assert.equal(pinchPair({ still: false, t0: 100 }, 120), false, 'a thumb already walking keeps the stick');
+  assert.equal(pinchPair(null, 120), false);
+  assert.equal(pinchPair({ still: true, t0: 100 }, undefined), false, 'no time, no pair');
+  const g = createTouchGestures();
+  assert.equal(g.pairable(0), false, 'nothing on the glass');
+  g.down(1, 100, 300, 0);
+  assert.equal(g.pairable(80), true, 'one still finger, just landed');
+  assert.equal(g.pairable(P + 10), false, 'one resting longer');
+  g.move(1, 100 + G.slopPx + 2, 300, 40);
+  assert.equal(g.pairable(60), false, 'a looking finger keeps its gesture');
+  g.up(1, 100 + G.slopPx + 2, 300, 80);
+  // The relayed protocol (LoungeTouchControls -> LoungeSurface): the zone's
+  // still thumb arrives first with its own touch-down time, then the glass
+  // finger: one pinch about their midpoint, never a tap, a look or a glide.
+  const r = createTouchGestures();
+  assert.deepEqual(r.down('zone', 60, 500, 1000), []);
+  assert.deepEqual(r.move('zone', 63, 502, 1030), [], 'still, inside the slop');
+  const start = r.down(7, 203, 502, 1080);
+  assert.deepEqual(types(start), ['pinch-start']);
+  const step = r.move(7, 343, 502, 1120);
+  assert.deepEqual(types(step), ['pinch']);
+  near(step[0].scale, 280 / 140, 1e-9, 'the gap ratio across the two elements');
+  assert.deepEqual(types(r.up('zone', 63, 502, 1200)), ['pinch-end']);
+  assert.deepEqual(r.up(7, 343, 502, 1210), [], 'no tap, no glide');
 });
 
 await check('recognizer: pinch scale is the finger-gap ratio (gaps floored at minGapPx), the midpoint pans, and a quick two-finger touch is never a tap', () => {
@@ -265,12 +346,108 @@ await check('portrait field: a portrait phone keeps the horizontal floor (390x66
   assert.equal(cam.slewMag(2 * DEG, 25), cam.slewMag(2 * DEG, 25, 58), 'default: today');
 });
 
+await check('desktop: the mouse\'s pick is today\'s — nearestHit (LoungeSurface pickAt) is the pre-fix loop over the hits, hit for hit', () => {
+  // The pre-fix LoungeSurface pickAt body, verbatim but for its inputs.
+  const before = (hits, x, y, mag) => {
+    let best = null, bestD = Infinity;
+    const base = cam.pickRadius(mag);
+    for (const hit of hits) {
+      const d = Math.hypot(hit.sx - x, hit.sy - y);
+      if (d <= base + hit.half && d < bestD) {
+        bestD = d;
+        best = hit;
+      }
+    }
+    return best;
+  };
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  let found = 0;
+  for (let i = 0; i < 4000; i++) {
+    const hits = Array.from({ length: 1 + Math.floor(rnd() * 6) }, (_, k) => ({ hex: 'h' + k, sx: rnd() * 1920, sy: rnd() * 1080, half: 6 + rnd() * 60 }));
+    const x = rnd() * 1920, y = rnd() * 1080, mag = 1 + rnd() * 24;
+    const a = before(hits, x, y, mag), b = cam.nearestHit(hits, x, y, cam.pickRadius(mag));
+    assert.equal(b, a);
+    if (a) found++;
+  }
+  assert.ok(found > 200, 'the sweep hits aircraft too: ' + found);
+});
+
 await check('touch pick radius: a fingertip (>= minPx, >= 24 CSS px) at every magnification, the mouse radius scaled, capped', () => {
   for (const mag of [1, 1.5, 7, 12, 20, 25]) {
     const r = cam.touchPickRadius(mag);
     assert.ok(r >= 24 && r >= MOBILE_TOUCH.pick.minPx, `mag ${mag}: ${r}`);
     assert.ok(r >= cam.pickRadius(mag), 'never smaller than the mouse radius');
     assert.ok(r <= MOBILE_TOUCH.pick.maxPx);
+  }
+});
+
+await check('binoculars up: the touch radius stops growing with the power, so GLASS\'s portrait lens has glass to find, and a double-tap anywhere in it lowers them except on another aircraft (doubleTapAction); the naked eye is unchanged', () => {
+  const T = MOBILE_TOUCH.pick;
+  for (const mag of [1.5, 3, 7, 12, 20, 23, 25]) {
+    const r = cam.touchPickRadius(mag, true);
+    assert.ok(r >= T.minPx && r <= T.binocularMaxPx, `mag ${mag}: ${r}`);
+    assert.ok(r <= cam.touchPickRadius(mag), 'never wider than the naked-eye finger');
+  }
+  for (const mag of [1, 1.2, 1.4]) assert.equal(cam.touchPickRadius(mag, false), cam.touchPickRadius(mag), 'naked eye: today');
+  for (let mag = 1; mag <= 25; mag += 0.25) assert.equal(cam.touchPickRadius(mag, false), Math.min(T.maxPx, Math.max(T.minPx, cam.pickRadius(mag) * T.scale)), 'the default is the pre-fix radius');
+  // The action table.
+  assert.equal(doubleTapAction({ hex: null, held: false, used: false }, true), 'lower', 'empty glass, glasses up');
+  assert.equal(doubleTapAction({ hex: 'a', held: true, used: false }, true), 'lower', 'the aircraft they hold');
+  assert.equal(doubleTapAction({ hex: 'b', held: false, used: false }, true), 'lock', 'another aircraft');
+  assert.equal(doubleTapAction({ hex: 'a', held: true, used: false }, false), 'lock', 'glasses down: binoculars on the followed one');
+  assert.equal(doubleTapAction({ hex: null, held: false, used: false }, false), 'raise');
+  assert.equal(doubleTapAction({ hex: null, held: false, used: true }, false), 'none', 'the first tap sat');
+  assert.equal(doubleTapAction(null, true), 'lower');
+  // GLASS's real figure: the locked A320 (35 m span) 5.9 km out at 23x on the
+  // optical axis, a neighbour off to one side; sweep every point of the lens.
+  const A3 = cam.wingspanFor('A3');
+  const scenes = [
+    { name: 'portrait 390x664, safe areas', mode: 'portrait', w: 390, h: 664, insets: { top: 47, bottom: 34, left: 0, right: 0 }, touchField: true },
+    { name: 'portrait 390x664, a tab', mode: 'portrait', w: 390, h: 664, insets: undefined, touchField: true },
+    { name: 'portrait 390x844', mode: 'portrait', w: 390, h: 844, insets: { top: 47, bottom: 34, left: 0, right: 0 }, touchField: true },
+    { name: 'landscape 750x342', mode: 'landscape', w: 750, h: 342, insets: { top: 0, bottom: 21, left: 47, right: 47 }, touchField: true },
+  ];
+  const mag = 23;
+  for (const sc of scenes) {
+    const fig = binocularFigure(sc.mode, sc.w, sc.h, sc.insets);
+    const fov = sc.touchField ? cam.fovForMag(mag, sc.w / sc.h) : 58 / mag;
+    const focal = sc.h / 2 / Math.tan((fov * DEG) / 2);
+    const locked = { hex: 'a1b2c3', sx: sc.w / 2, sy: sc.h / 2, half: (A3 * 0.5 * focal) / 5900 };
+    const other = { hex: 'd4e5f6', sx: sc.w / 2 + fig.R * 0.55, sy: sc.h / 2 - fig.R * 0.2, half: 12 };
+    const hits = [locked, other];
+    const inLens = (x, y) => fig.lenses.some((l) => Math.hypot(x - l.cx, y - l.cy) <= fig.R);
+    let n = 0, lower = 0, lockOther = 0, emptyNew = 0, emptyOld = 0, stuckOld = 0;
+    for (let y = 0; y <= sc.h; y += 4) {
+      for (let x = 0; x <= sc.w; x += 4) {
+        if (!inLens(x, y)) continue;
+        n++;
+        const hit = cam.nearestHit(hits, x, y, cam.touchPickRadius(mag, true));
+        const act = doubleTapAction({ hex: hit?.hex ?? null, held: hit?.hex === locked.hex, used: false }, true);
+        if (act === 'lower') lower++;
+        else {
+          assert.equal(act, 'lock');
+          assert.equal(hit.hex, other.hex, 'only another aircraft keeps the glasses up');
+          assert.ok(Math.hypot(x - other.sx, y - other.sy) <= T.binocularMaxPx + other.half + 1e-9);
+          lockOther++;
+        }
+        if (!hit) emptyNew++;
+        // Before: the naked-eye radius (150 px at 23x) and the old double-tap
+        // (a picked aircraft is re-selected, so the glasses stay up).
+        const old = cam.nearestHit(hits, x, y, cam.touchPickRadius(mag));
+        if (!old) emptyOld++;
+        else stuckOld++;
+      }
+    }
+    const detail = `${sc.name}: R ${fig.R.toFixed(1)}, lowers ${(lower / n).toFixed(3)}, locks the neighbour ${(lockOther / n).toFixed(3)}, empty glass ${(emptyNew / n).toFixed(3)} (was ${(emptyOld / n).toFixed(3)}; the old double-tap stuck on ${(stuckOld / n).toFixed(3)})`;
+    assert.ok(lockOther > 0, 'the neighbour can be locked: ' + detail);
+    assert.ok(lower / n >= 0.8, 'a double-tap lowers almost everywhere: ' + detail);
+    assert.ok(emptyNew / n >= 0.4, 'the glass itself can be found: ' + detail);
+    // At the aircraft held, too (the gesture-table row).
+    const atLock = cam.nearestHit(hits, locked.sx, locked.sy, cam.touchPickRadius(mag, true));
+    assert.equal(doubleTapAction({ hex: atLock.hex, held: true, used: false }, true), 'lower');
+    if (sc.mode === 'portrait') assert.ok(stuckOld / n > 0.5, 'the pre-fix composition (control): ' + detail);
+    console.log('     ' + detail);
   }
 });
 
@@ -438,6 +615,104 @@ await check('touch: the phone\'s motor answers the cue points (raise, lower) on 
   watch.binoculars(false); frames(30);
   watch.director = director;
   assert.deepEqual(buzz, [P.raise, P.lower], 'no buzz under the auto director');
+});
+
+/** A still track `yawOff` (room-relative radians, from the head) and `upM` above the eye, `range` m out. */
+const trackAt = (hex, yawOff, upM = 0, range = 5000) => {
+  const t = { hex, rx: 0, ry: 0, ryd: 0, rz: 0, yaw: 0, stale: 0, flags: 0, horizonFade: 1, distM: range, fix1: { vE: 0, vN: 0, vUp: 0, latRad: 40 * DEG, t: 1 }, meta: { flight: hex.toUpperCase(), category: 'A3' } };
+  const e = watch.eyeWorld(), k = watch.frame.k, a = watch.roomHeading + watch.yaw + yawOff;
+  t.rx = e.x - Math.sin(a) * range * k; t.rz = e.z - Math.cos(a) * range * k; t.ry = t.ryd = e.y + upM;
+  return t;
+};
+const placeTraffic = (...list) => { runtime.traffic.tracks = new Map(list.map((t) => [t.hex, t])); runtime.traffic.items = list; };
+
+await check('ndc round trip: directionNdc inverts ndcDirection (any head, any NDC), and a direction behind the eye has no NDC', () => {
+  for (const [yaw, pitch] of [[0, 0], [0.7, -0.2], [-2.4, 0.5], [3.1, 1.2]]) {
+    for (const [u, v] of [[0, 0], [0.5, -0.3], [-0.95, 0.9], [1.4, -1.6]]) {
+      const tanV = Math.tan(38 * DEG), tanH = tanV * 0.587;
+      const d = cam.ndcDirection(yaw, pitch, u, v, tanH, tanV, {});
+      const p = cam.directionNdc(d.yaw, d.pitch, yaw, pitch, tanH, tanV, {});
+      near(p.u, u, 1e-9, 'u'); near(p.v, v, 1e-9, 'v');
+    }
+    assert.equal(cam.directionNdc(yaw + Math.PI, -pitch, yaw, pitch, 0.5, 0.5, {}), null, 'behind');
+  }
+});
+
+await check('touch: binocular auto-acquire keeps to what is on screen (a portrait phone\'s vertical half-field is the wider one, so the cone alone reached past the sides); a desktop keeps today\'s cone', async () => {
+  useDevice(true);
+  camera.aspect = 390 / 664;
+  assert.equal(await watch.enter('KCMH'), true);
+  frames(2); watch.binoculars(false); watch.clearSelection(); watch.resetLook(); frames(120);
+  const half = watch.fieldDeg().h / 2; // 25 deg
+  near(half, 25, 1e-9);
+  const off = (half + 5) * DEG; // inside the 32 / 38.4 deg cone, past the screen's side
+  placeTraffic(trackAt('aaa111', off));
+  assert.equal(watch.acquire(), null, 'off screen: not acquired');
+  placeTraffic(trackAt('aaa111', -off));
+  assert.equal(watch.acquire(), null, 'nor on the other side');
+  placeTraffic(trackAt('aaa111', (half - 5) * DEG));
+  assert.equal(watch.acquire(), 'aaa111', 'on screen: acquired');
+  // Raising the glasses (the dock button, a double-tap on empty glass) never swings to the unseen one.
+  placeTraffic(trackAt('aaa111', off));
+  const y0 = watch.yaw;
+  watch.binoculars(true); frames(180);
+  assert.equal(watch.selected, null, 'nothing locked');
+  near(watch.yaw, y0, 1e-6, 'the glasses stayed where you looked');
+  watch.binoculars(false); frames(150);
+  // Desktop (the control): today's cone acquires it, at any aspect.
+  useDevice(false);
+  assert.equal(await watch.enter('KCMH'), true);
+  frames(2); watch.resetLook(); frames(120);
+  for (const aspect of [16 / 9, 390 / 664]) {
+    camera.aspect = aspect; frames(2);
+    placeTraffic(trackAt('aaa111', off));
+    assert.equal(watch.acquire(), 'aaa111', 'desktop at aspect ' + aspect.toFixed(3) + ': today\'s 32 deg cone');
+  }
+  placeTraffic();
+  camera.aspect = 16 / 9;
+});
+
+await check('touch: the lock tolerance is an eighth of the narrower field on a touch device (the horizontal one in portrait), the vertical one on desktop and a landscape phone (today\'s, bit for bit); the lock taps the motor only inside it', async () => {
+  // Desktop: exactly today's (camera.fov * DEG) / 8, at any aspect and power.
+  useDevice(false);
+  assert.equal(await watch.enter('KCMH'), true);
+  for (const aspect of [16 / 9, 390 / 664]) {
+    camera.aspect = aspect;
+    for (const mag of [1, 7, 12, 20]) {
+      watch.setMagnification(mag); frames(150);
+      assert.equal(watch.lockTolerance(), (camera.fov * DEG) / 8, `desktop ${aspect.toFixed(3)} ${mag}x`);
+    }
+  }
+  watch.binoculars(false); frames(150);
+  camera.aspect = 16 / 9;
+  // A portrait phone: the horizontal field's eighth; a landscape phone: today's.
+  useDevice(true);
+  camera.aspect = 390 / 664;
+  assert.equal(await watch.enter('KCMH'), true);
+  watch.setMagnification(12); frames(150);
+  const f = watch.fieldDeg();
+  assert.ok(f.h < f.v);
+  near(watch.lockTolerance(), (f.h * DEG) / 8, 1e-12, 'portrait: the horizontal eighth');
+  camera.aspect = 750 / 342; frames(5);
+  assert.equal(watch.lockTolerance(), (camera.fov * DEG) / 8, 'landscape phone: today\'s');
+  camera.aspect = 390 / 664; frames(5);
+  watch.binoculars(false); watch.clearSelection(); watch.resetLook(); frames(150);
+  // The lock's motor tap: recorded at the frame it fires.
+  placeTraffic(trackAt('bbb222', 12 * DEG, 150));
+  await sleep(MOBILE_TOUCH.haptics.minGapMs + 10);
+  watch.select('bbb222', { binoculars: true });
+  await sleep(MOBILE_TOUCH.haptics.minGapMs + 10); // the raise / select taps are behind us
+  buzz.length = 0;
+  let at = null;
+  for (let i = 0; i < 900 && !at; i++) {
+    frames(1);
+    if (buzz.some((p) => Array.isArray(p) && p.length === 3)) at = { err: watch.lockError(), tol: watch.lockTolerance(), vEighth: (watch.fieldDeg().v * DEG) / 8 };
+  }
+  assert.ok(at, 'the lock tapped the motor');
+  assert.ok(at.err < at.tol, `inside the tolerance: ${at.err} < ${at.tol}`);
+  assert.ok(at.tol < at.vEighth, 'the tolerance is the narrower (horizontal) eighth');
+  watch.binoculars(false); watch.clearSelection(); frames(150);
+  placeTraffic();
 });
 
 // --- 4. the walk stick ------------------------------------------------------------

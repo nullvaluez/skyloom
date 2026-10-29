@@ -97,13 +97,13 @@ the smallest change, keep it in its own commit, and name it in your report.
 | Gesture | Where | Does |
 |---|---|---|
 | One-finger drag | the view | Look: the world under the finger follows it (gain from the live field of view), a short glide on release (none under reduced motion) |
-| Pinch | the view | Continuous zoom 1x to 25x about the fingers' midpoint. Spreading past `VIEW.optics.binocularAt` raises the binoculars; pinching back below lowers them (the wheel's semantics) |
+| Pinch | the view | Continuous zoom 1x to 25x about the fingers' midpoint. Spreading past `VIEW.optics.binocularAt` raises the binoculars; pinching back below lowers them (the wheel's semantics). A pinch may start with a finger in the walk stick's thumb zone: two fingers landing within `MOBILE_TOUCH.gesture.pinchPairMs`, the first still, are a pinch, whichever lands first and wherever (the zone relays its fingers to the glass) |
 | Two-finger drag | the view | Look by the midpoint while pinching |
-| Tap | an aircraft | Select it (a touch pick radius of at least 24 CSS px plus the aircraft's projected size) |
+| Tap | an aircraft | Select it (a touch pick radius of at least 24 CSS px plus the aircraft's projected size; with the binoculars up the radius stops growing with the power, at most `MOBILE_TOUCH.pick.binocularMaxPx`, since the projected size already grows). A tap on the aircraft already selected and followed changes nothing |
 | Tap | a chair / decor (standing) | Sit there / open its card (today's click) |
-| Double-tap | an aircraft / empty view | Binoculars on that aircraft / raise them where you look; with the binoculars up, a double-tap on empty glass lowers them |
+| Double-tap | an aircraft / empty view | Binoculars on that aircraft / raise them where you look. With the binoculars up, a double-tap lowers them, on empty glass or on the aircraft they hold; only a double-tap on another aircraft keeps them up and swings them onto it. The second tap counts when it lands on what the first one opened (the spotter card rising over the aircraft); on a control that was already on screen it is that control's tap |
 | Long-press (about 0.5 s, still) | an aircraft | Its details (the `T` key) |
-| Walk stick | lower-left thumb zone | Standing: analog walk, run past about 85 % travel, stop on release. Seated: pushing it stands you up and walks (the WASD rule) |
+| Walk stick | lower-left thumb zone | Standing: analog walk once the thumb has moved past the tap slop, run past about 85 % travel, stop on release; a second finger while the thumb walks looks (in the zone or on the glass). Seated: pushing it stands you up and walks (the WASD rule) |
 | Motion look | binoculars, opt-in | Device orientation steers the view 1:1, low-pass filtered, recentred when enabled; drag still adds an offset |
 
 iOS Safari gotchas the TOUCH stream owns: `touch-action: none` on the look
@@ -149,6 +149,13 @@ no page scroll or overscroll bounce while dragging.
    `setMagnification(m)` / `stepMagnification(dir)` / `binoculars(force)`;
    TOUCH keeps their semantics. If TOUCH makes the binocular field of view
    aspect-aware, `optics.mag` keeps meaning "times the naked eye".
+   **The lock tolerance** (added in the cross-review round):
+   `runtime.airportWatch.lockTolerance()` is the aim error (radians) inside
+   which the binoculars hold a lock: an eighth of the vertical field on a
+   desktop (today's `camera.fov / 8`, bit for bit) and of the narrower field
+   on a touch device (a portrait phone's vertical field is the wider one).
+   The runtime's lock haptic and sway read it, and so do GLASS's LOCKED
+   readout and lock box (`BinocularHud`, `LoungeOverlay`), so the three agree.
 
 ## The harness
 
