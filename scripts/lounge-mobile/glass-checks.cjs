@@ -893,6 +893,10 @@ async function atlasEntryGates(h, g) {
   });
   const flying = await h.until(() => window.__flyStore.getState().screen === 'flight' && !window.__flyStore.getState().airportWatch, undefined, 60000);
   h.check(`${h.phase} Back chains: in flight on the phone (the harness's airborne skip)`, flying);
+  // The skip is a far warp: its arrival curtain (warp-hold) takes every tap
+  // until the new area has streamed, a moment on a phone and minutes under
+  // SwiftShader. A tap before it lifts lands on the curtain, not the Atlas.
+  await page.getByTestId('warp-hold').waitFor({ state: 'hidden', timeout: 600000 }).catch(() => {});
   await h.wait(2500);
   const openAtlas = async () => {
     await page.evaluate(() => window.__flyStore.getState().setAtlasOpen(true));
