@@ -267,8 +267,10 @@ below.
 
 Each stream reviewed the other on the integrated tree; the authoring stream
 then tried to refute every finding. All 18 were confirmed (two partly). The
-fix round closed the confirmed ones (FIX_SUMMARY). The ones that mattered
-most:
+fix round closed the 16 owned by the streams, each with a gate that would have
+caught it; the lead's two are the harness (fixed: a resting orientation
+sensor and `h.reset()`) and the binoculars' masked fill (an owner-phone
+experiment, below). The ones that mattered most:
 - **Blocker:** entering the lounge from the Atlas's "Watch an airport" on a
   touch device dropped the player on the title. The flight HUD's Back chain
   (`hooks/use-overlay-back.js`) popped the airport browser's history sentinel
@@ -281,7 +283,21 @@ most:
   had no sensor, so only the integrated run could show it.
 - "Double-tap empty glass lowers the binoculars" could not happen in the
   portrait lens: the touch pick radius covered nearly the whole lens.
-- Coach marks and captions covered the seated Walk ring in the thumb zone.
+  The gesture is now: with the glasses up, a double-tap lowers them anywhere
+  but on ANOTHER aircraft (that one it swings onto), and the touch pick radius
+  stops growing with the power (48 px plus the projected half-span), so 63 %
+  of the 23x portrait lens is empty glass, against 0 % before.
+- Coach marks, the status line and the director's captions covered the seated
+  Walk ring and the standing stick; they now keep out of the thumb zone, and
+  sideways the sheets sit clear of it so the left thumb walks while the right
+  one reads.
+- Also fixed: a pinch may start in the stick's zone; a quick corrective re-tap
+  on a control is never swallowed as a double-tap's second; on a portrait
+  phone LOCKED, the lock haptic and auto-acquire use the narrower (horizontal)
+  field (`watch.lockTolerance()`, bit-identical on desktop); the focus wheel's
+  glide stops with the glasses; phones never blur the live canvas; the game's
+  own reduced-motion setting drives the phone HUD; one name per action in the
+  dock and the spotter sheet.
 
 ### The phone render posture (lead)
 
