@@ -81,6 +81,24 @@ const stick = (h) => h.page.evaluate(() => {
   return el ? { mode: el.getAttribute('data-mode'), state: el.getAttribute('data-state'), x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, zone: !!document.querySelector('[data-testid="lounge-stick-zone"]') } : null;
 });
 
+/** The lounge's frame count (the runtime's updateCamera, wrapped once per page). */
+const countFrames = (h) => h.page.evaluate(() => {
+  const w = window.__fly.airportWatch;
+  if (!w.__touchFrames) {
+    const update = w.updateCamera;
+    w.__touchFrames = { n: 0 };
+    w.updateCamera = function counted(...args) {
+      w.__touchFrames.n++;
+      return update.apply(this, args);
+    };
+  }
+  return w.__touchFrames.n;
+});
+/** Wait for `n` more lounge frames (a slow box renders a frame every second or two). */
+async function frames(h, n, ms = 60000) {
+  const f0 = await countFrames(h);
+  return h.until(([f, k]) => window.__fly.airportWatch.__touchFrames.n >= f + k, [f0, n], ms);
+}
 /**
  * Wait until the head and the optics have landed: the optics exactly on their
  * target (easeMag lands on it), the head unchanged across three LOUNGE
@@ -89,18 +107,10 @@ const stick = (h) => h.page.evaluate(() => {
  * sample must follow a new frame, counted from the runtime's own
  * updateCamera (wrapped once per page; FlyScene calls it through the property).
  */
-async function settled(h, ms = 30000) {
+async function settled(h, ms = 60000) {
+  await countFrames(h);
   await h.page.evaluate(() => {
-    const w = window.__fly.airportWatch;
-    if (!w.__touchFrames) {
-      const update = w.updateCamera;
-      w.__touchFrames = { n: 0 };
-      w.updateCamera = function counted(...args) {
-        w.__touchFrames.n++;
-        return update.apply(this, args);
-      };
-    }
-    window.__touchSettle = { yaw: NaN, pitch: NaN, frame: w.__touchFrames.n, n: 0 };
+    window.__touchSettle = { yaw: NaN, pitch: NaN, frame: window.__fly.airportWatch.__touchFrames.n, n: 0 };
   });
   return h.until(() => {
     const w = window.__fly.airportWatch, s = window.__touchSettle, frame = w.__touchFrames.n;
@@ -195,16 +205,20 @@ async function holdTraffic(h) {
   await h.page.route(AIRCRAFT, handler);
   return () => h.page.unroute(AIRCRAFT, handler);
 }
-/** Wait for QAL101 on screen and holding still (the held traffic has landed in the feed). */
+/**
+ * Wait for QAL101 on screen and holding still across two lounge frames (the
+ * held traffic has landed in the feed and the head has stopped).
+ */
 async function aircraftReady(h) {
-  const deadline = Date.now() + 90000;
+  const deadline = Date.now() + 150000;
   let last = null;
   while (Date.now() < deadline) {
     await h.until(() => window.__fly.loungePicker?.hits.some((q) => q.hex === 'a1b2c3' && q.onScreen), undefined, 15000);
     const a = await hitOf(h, 'a1b2c3');
     if (a && last && Math.hypot(a.x - last.x, a.y - last.y) < 3) return a;
     last = a;
-    await h.wait(1500);
+    await h.wait(400);
+    await frames(h, 2, 20000);
   }
   return null;
 }
@@ -399,6 +413,8 @@ module.exports = {
         }
         const s = await h.state();
         h.check('portrait: a double-tap on QAL101 raises the binoculars on it (selected and followed)', s.binocular && s.selected === 'a1b2c3' && s.tracking, { at: p, binocular: s.binocular, selected: s.selected, tracking: s.tracking, mag: +s.mag.toFixed(2) });
+        // (The checks below test their own gestures: if that raise failed, set it up directly.)
+        if (!s.binocular || s.selected !== 'a1b2c3') await h.page.evaluate(() => window.__fly.airportWatch.select('a1b2c3', { binoculars: true }));
         // The capture once the glasses hold the lock (the runtime's lock tolerance).
         const locked = await lockHeld(h);
         h.info('portrait: the binoculars settle on QAL101 (inside the lock tolerance)', { locked });
@@ -408,12 +424,13 @@ module.exports = {
         // integrated failure) still covered the locked aircraft, but clear of
         // the binocular reach of every aircraft.
         const empty = await emptyGlass(h, { preferNear: 'a1b2c3' });
-        if (empty) {
+        const up = (await h.state()).binocular;
+        if (empty && up) {
           await touch.doubleTap(empty.at[0], empty.at[1]);
           await h.until(() => !window.__fly.airportWatch.binocular, undefined, 20000);
         }
         const e = await h.state();
-        h.check('portrait: a double-tap on empty glass with the binoculars up lowers them (the selection stays) — inside GLASS\'s lens, within the old finger reach of the locked aircraft', !!empty?.withinOldReach && !e.binocular && e.selected === 'a1b2c3', { ...empty, binocular: e.binocular, selected: e.selected });
+        h.check('portrait: a double-tap on empty glass with the binoculars up lowers them (the selection stays) — inside GLASS\'s lens, within the old finger reach of the locked aircraft', !!empty?.withinOldReach && up && !e.binocular && e.selected === 'a1b2c3', { ...empty, upBefore: up, binocular: e.binocular, selected: e.selected });
         await sample('double-tap');
 
         // Up again on it (set up directly: with the glasses down a phone's
@@ -436,7 +453,8 @@ module.exports = {
         await h.page.evaluate(() => window.__fly.airportWatch.motionLook?.disable?.());
 
         // A double-tap on the locked aircraft itself lowers them too (the gesture table).
-        await h.page.evaluate(() => { const w = window.__fly.airportWatch; if (!w.binocular) w.select('a1b2c3', { binoculars: true }); });
+        // (Motion look took the head from the lock: lock on again first.)
+        await h.page.evaluate(() => { const w = window.__fly.airportWatch; if (!w.binocular || !w.tracking) w.select('a1b2c3', { binoculars: true }); });
         const held = await lockHeld(h);
         const b = await hitOf(h, 'a1b2c3');
         const pre = await h.state();
